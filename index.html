@@ -23,6 +23,7 @@
         <button class="nav-item" data-view="followups">随访管理</button>
         <button class="nav-item" data-view="analytics">统计分析</button>
         <button class="nav-item" data-view="governance">协同监管</button>
+        <button class="nav-item" data-view="emergency">公共卫生应急</button>
         <button class="nav-item" data-view="planning">国家规划对齐</button>
       </nav>
     </aside>
@@ -152,6 +153,32 @@
               <span>共享、监管、隐私、应急</span>
             </div>
             <div class="rule-list" id="planning-security"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="emergency" class="view">
+        <div class="metrics-grid" id="emergency-cards"></div>
+        <div class="content-grid">
+          <section class="panel wide">
+            <div class="panel-header">
+              <h2>多点触发预警</h2>
+              <span id="emergency-count"></span>
+            </div>
+            <div id="emergency-signals" class="list"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-header">
+              <h2>响应流程</h2>
+            </div>
+            <div class="timeline" id="emergency-flow"></div>
+          </section>
+          <section class="panel wide">
+            <div class="panel-header">
+              <h2>资源调配</h2>
+              <span>医疗机构、基层服务、药品取药联动</span>
+            </div>
+            <div id="emergency-resources" class="table-wrap"></div>
           </section>
         </div>
       </section>

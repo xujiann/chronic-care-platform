@@ -231,6 +231,7 @@ function renderCitizen(residentId) {
   renderDiseases(diseases, risk);
   renderFollowups(followups);
   renderPickups(resident.id);
+  renderSeniorServices(resident.id);
 }
 
 function renderVault(resident, diseases, followups, records) {
@@ -360,6 +361,20 @@ function renderPickups(residentId) {
       <span class="status ${item.status === "待取药" ? "warn" : ""}">${item.status} · ${item.coverage}</span>
     </article>`)
     .join("") || `<p class="muted">暂无固定取药计划。</p>`;
+}
+
+function renderSeniorServices(residentId) {
+  const target = document.querySelector("#senior-service-cards");
+  if (!target) return;
+  const services = (state.seniorServices || []).filter((item) => item.residentId === residentId);
+  target.innerHTML = services
+    .map((item) => `<article class="mini-card">
+      <h3>${item.service}</h3>
+      <p class="muted">${item.channel} · ${item.contact}</p>
+      <p>${item.nextAction}</p>
+      <span class="status ${item.status === "待开通" ? "warn" : ""}">${item.status}</span>
+    </article>`)
+    .join("") || `<p class="muted">暂无适老服务配置。</p>`;
 }
 
 function assessRisk(resident) {

@@ -78,6 +78,7 @@ const titles = {
   followups: ["随访管理", "跟踪计划、逾期提醒、干预建议和随访结果。"],
   analytics: ["统计分析", "按病种、机构、风险等级观察管理成效。"],
   governance: ["协同监管", "监测四端贯通、机构绩效、数据质量和风险预警。"],
+  emergency: ["公共卫生应急", "建设多点触发预警、资源调配、快速报送和协同处置能力，支撑早发现、早报告、早处置。"],
   planning: ["国家规划对齐", "对照《“十四五”国家信息化规划》，补齐普惠数字医疗、数据共享、智慧监管、公共卫生应急和适老化服务。"]
 };
 
@@ -116,7 +117,7 @@ function normalizePersonIndexes() {
     resident.identityIndex = resident.personIndex;
   });
   const residentMap = new Map(residents.map((resident) => [resident.id, resident]));
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices"].forEach((key) => {
     (Array.isArray(state[key]) ? state[key] : []).forEach((item) => {
       item.personIndex = item.personIndex || personIndexForResident(residentMap, item.residentId);
     });
@@ -295,6 +296,7 @@ function render() {
   renderFollowups();
   renderAnalytics();
   renderGovernance();
+  renderEmergency();
   renderPlanning();
 }
 
@@ -495,7 +497,7 @@ function renderPlanning() {
   const items = state.policyAlignment || policyAlignmentDefaults;
   const started = items.filter((item) => ["已启动", "原型完成", "已纳入", "数据底座完成"].includes(item.status)).length;
   const pending = items.length - started;
-  const sharedCollections = ["residents", "personalRecords", "diseases", "followups", "careOrders", "insuranceClaims", "medicationPickups"];
+  const sharedCollections = ["residents", "personalRecords", "diseases", "followups", "careOrders", "insuranceClaims", "medicationPickups", "seniorServices"];
   const indexedCollections = sharedCollections.filter((key) => (state[key] || []).some((item) => item.personIndex));
   document.querySelector("#planning-cards").innerHTML = [
     ["规划映射", items.length, "国家信息化规划能力项"],
@@ -524,6 +526,55 @@ function renderPlanning() {
     ["应急预留", "公共卫生应急可从风险预警扩展，接入传染病、资源负荷、药品物资和多点触发预警。"],
     ["适老化预留", "居民端后续增加大字模式、家属代办、固定取药提醒、线下服务二维码和无障碍标签。"]
   ].map(([title, text]) => `<div><strong>${title}</strong><span>${text}</span></div>`).join("");
+}
+
+function renderEmergency() {
+  const signals = state.emergencySignals || [];
+  const high = signals.filter((item) => item.level === "高").length;
+  const pending = signals.filter((item) => item.status !== "已处置").length;
+  const resources = state.medicalResources || [];
+  const beds = resources.reduce((sum, item) => sum + Number(item.beds || 0), 0);
+  document.querySelector("#emergency-cards").innerHTML = [
+    ["预警信号", signals.length, "多点触发监测"],
+    ["高等级", high, "需联动处置"],
+    ["待处置", pending, "需跟踪闭环"],
+    ["可调配床位", beds, "区域医疗资源"],
+    ["基层机构", resources.filter((item) => String(item.type || "").includes("基层")).length, "社区服务承接"],
+    ["固定取药", (state.medicationPickups || []).length, "慢病药品保障"]
+  ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><em>${hint}</em></article>`).join("");
+
+  document.querySelector("#emergency-count").textContent = `${signals.length} 条`;
+  document.querySelector("#emergency-signals").innerHTML = signals
+    .map((item) => `<div class="list-item">
+      <div>
+        <strong>${item.title}</strong><br>
+        <small>${item.source} · ${item.region} · ${item.date}</small><br>
+        <small>${item.action}</small>
+      </div>
+      <span class="badge ${item.level === "高" ? "danger" : item.level === "中" ? "warn" : "info"}">${item.level} · ${item.status}</span>
+    </div>`)
+    .join("") || `<div class="subtle">暂无公共卫生应急预警。</div>`;
+
+  document.querySelector("#emergency-flow").innerHTML = [
+    "多点触发",
+    "自动汇聚",
+    "集中研判",
+    "快速报送",
+    "资源调配",
+    "处置反馈"
+  ].map((step) => `<div>${step}</div>`).join("");
+
+  document.querySelector("#emergency-resources").innerHTML = `<table>
+    <thead><tr><th>机构</th><th>区域</th><th>床位</th><th>医生</th><th>慢病门诊</th><th>应急角色</th></tr></thead>
+    <tbody>${resources.map((item) => `<tr>
+      <td>${item.institution}</td>
+      <td>${item.region}</td>
+      <td>${item.beds}</td>
+      <td>${item.doctors}</td>
+      <td>${item.chronicClinics}</td>
+      <td>${Number(item.beds || 0) >= 500 ? "区域救治支撑" : "基层监测随访"}</td>
+    </tr>`).join("")}</tbody>
+  </table>`;
 }
 
 function renderPortalGrid() {
