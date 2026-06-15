@@ -403,6 +403,22 @@ function renderChronicModule() {
     ["卫健委管理职责", "负责慢病纳管、质量控制、机构绩效、资源配置和跨端运行监测。"],
     ["跨端闭环", "个人端固定取药、医疗机构协同、医保审核结果统一回流到慢病医防整合模块。"]
   ].map(([title, text]) => `<div><strong>${title}</strong><span>${text}</span></div>`).join("");
+
+  document.querySelector("#pickup-workflow-table").innerHTML = `<table>
+    <thead><tr><th>居民</th><th>药品</th><th>申请</th><th>机构确认</th><th>医保审核</th><th>药房状态</th><th>下次取药</th></tr></thead>
+    <tbody>${pickups.map((item) => {
+      const resident = findResident(item.residentId);
+      return `<tr>
+        <td>${resident?.name || "未知居民"}</td>
+        <td>${item.medication}</td>
+        <td>${item.applyMode || "本人申请"} · ${item.requestStatus || "待申请"}</td>
+        <td>${item.institutionReview || "待确认"}</td>
+        <td>${item.insuranceReview || "待审核"}</td>
+        <td>${item.pharmacyStatus || item.status}</td>
+        <td>${item.nextPickup}</td>
+      </tr>`;
+    }).join("")}</tbody>
+  </table>`;
 }
 
 function renderResidents() {

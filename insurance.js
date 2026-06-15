@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderMetrics(state);
   renderClaims(state);
   renderSupervisions(state);
+  renderPickupAudits(state);
   renderInsuranceAudit(state);
 });
 
@@ -58,6 +59,23 @@ function renderSupervisions(state) {
       <span class="badge ${badge}">${item.level}</span>
     </section>`;
   }).join("") || `<p class="muted">暂无机构监管事项。</p>`;
+}
+
+function renderPickupAudits(state) {
+  const pickups = state.medicationPickups || [];
+  document.querySelector("#pickup-audit-count").textContent = `${pickups.length} 项`;
+  document.querySelector("#pickup-audit-list").innerHTML = pickups.map((item) => {
+    const resident = residentOf(state, item.residentId);
+    const badge = item.insuranceReview === "已通过" ? "info" : "warn";
+    return `<section class="item">
+      <div>
+        <h3>${resident?.name || "未知居民"} · ${item.medication}</h3>
+        <p>${item.coverage} · ${item.dosage} · ${item.nextPickup}</p>
+        <p>机构确认：${item.institutionReview || "待确认"} · 药房状态：${item.pharmacyStatus || item.status}</p>
+      </div>
+      <span class="badge ${badge}">${item.insuranceReview || "待审核"}</span>
+    </section>`;
+  }).join("") || `<p class="muted">暂无固定取药审核事项。</p>`;
 }
 
 function renderInsuranceAudit(state) {

@@ -294,7 +294,14 @@
       "nextPickup": "2026-07-05",
       "status": "待取药",
       "coverage": "门诊慢特病",
-      "personIndex": "210204196802113219#13800010001"
+      "personIndex": "210204196802113219#13800010001",
+      "applyMode": "本人申请",
+      "requestStatus": "已申请",
+      "institutionReview": "已确认",
+      "insuranceReview": "已通过",
+      "pharmacyStatus": "待取药",
+      "deliveryMode": "社区药房自取",
+      "lastUpdated": "2026-06-15"
     },
     {
       "id": "mp2",
@@ -306,7 +313,14 @@
       "nextPickup": "2026-07-05",
       "status": "待取药",
       "coverage": "门诊慢特病",
-      "personIndex": "210204196802113219#13800010001"
+      "personIndex": "210204196802113219#13800010001",
+      "applyMode": "本人申请",
+      "requestStatus": "已申请",
+      "institutionReview": "已确认",
+      "insuranceReview": "已通过",
+      "pharmacyStatus": "待取药",
+      "deliveryMode": "社区药房自取",
+      "lastUpdated": "2026-06-15"
     },
     {
       "id": "mp3",
@@ -318,7 +332,14 @@
       "nextPickup": "2026-07-10",
       "status": "已预约",
       "coverage": "门诊统筹",
-      "personIndex": "210203197505203427#13800010002"
+      "personIndex": "210203197505203427#13800010002",
+      "applyMode": "本人申请",
+      "requestStatus": "已申请",
+      "institutionReview": "已确认",
+      "insuranceReview": "待审核",
+      "pharmacyStatus": "已预约",
+      "deliveryMode": "社区药房自取",
+      "lastUpdated": "2026-06-15"
     },
     {
       "id": "mp4",
@@ -330,7 +351,14 @@
       "nextPickup": "2026-07-15",
       "status": "待确认",
       "coverage": "基层慢病服务包",
-      "personIndex": "210213196410013521#13800010004"
+      "personIndex": "210213196410013521#13800010004",
+      "applyMode": "家属代办",
+      "requestStatus": "已申请",
+      "institutionReview": "待确认",
+      "insuranceReview": "待审核",
+      "pharmacyStatus": "待确认",
+      "deliveryMode": "家属代取",
+      "lastUpdated": "2026-06-15"
     }
   ],
   "institutionSupervisions": [

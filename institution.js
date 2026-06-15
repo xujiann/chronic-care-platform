@@ -100,6 +100,7 @@ function renderPickups(state) {
         <h3>${resident?.name || "未知居民"} · ${item.medication}</h3>
         <p>${item.pharmacy} · 每月 ${item.pickupDay} 日 · 下次 ${item.nextPickup}</p>
         <p>${item.dosage} · ${item.coverage}</p>
+        <p>机构确认：${item.institutionReview || "待确认"} · 医保审核：${item.insuranceReview || "待审核"} · ${item.deliveryMode || "社区药房自取"}</p>
       </div>
       <span class="badge ${badge}">${item.status}</span>
     </section>`;

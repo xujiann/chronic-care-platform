@@ -359,6 +359,8 @@ function renderPickups(residentId) {
       <p class="muted">${item.dosage} · 每月 ${item.pickupDay} 日</p>
       <p>${item.pharmacy}</p>
       <p>下次取药：${item.nextPickup}</p>
+      <p>闭环：${item.requestStatus || "待申请"} · ${item.institutionReview || "待机构确认"} · ${item.insuranceReview || "待医保审核"} · ${item.pharmacyStatus || item.status}</p>
+      <p class="muted">${item.applyMode || "本人申请"} · ${item.deliveryMode || "社区药房自取"}</p>
       <span class="status ${item.status === "待取药" ? "warn" : ""}">${item.status} · ${item.coverage}</span>
     </article>`)
     .join("") || `<p class="muted">暂无固定取药计划。</p>`;
