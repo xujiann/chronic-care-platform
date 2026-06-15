@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>医保端 · 支付审核</title>
+    <link rel="stylesheet" href="./portal.css" />
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>医保端</span>
+          <h1>慢病支付与控费审核</h1>
+          <p>围绕门诊慢特病、基层慢病服务包、长期处方和结算风险进行协同审核。</p>
+        </div>
+        <nav>
+          <a href="./index.html">管理端</a>
+          <a href="./institution.html">医疗机构端</a>
+          <a href="./citizen.html">居民端</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" id="insurance-metrics"></section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>结算审核队列</h2>
+            <span id="claim-count"></span>
+          </div>
+          <div id="claim-list" class="list"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>控费规则</h2>
+          </div>
+          <div class="rules">
+            <div><strong>门诊慢特病</strong><span>核验病种、用药、长期处方和授权病历摘要。</span></div>
+            <div><strong>基层服务包</strong><span>匹配家庭医生随访、健康档案和慢病管理状态。</span></div>
+            <div><strong>异常提醒</strong><span>高频就诊、重复用药、费用异常进入人工复核。</span></div>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <script src="./shared.js"></script>
+    <script src="./insurance.js"></script>
+  </body>
+</html>

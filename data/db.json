@@ -170,6 +170,82 @@
       "advice": "保持运动"
     }
   ],
+  "careOrders": [
+    {
+      "id": "co1",
+      "residentId": "r1",
+      "institution": "大连市中心医院",
+      "department": "心内科",
+      "type": "专科复诊",
+      "status": "待接诊",
+      "priority": "高",
+      "date": "2026-06-16",
+      "summary": "高血压控制不佳，建议专科复诊并调整用药。"
+    },
+    {
+      "id": "co2",
+      "residentId": "r2",
+      "institution": "大连医科大学附属医院",
+      "department": "内分泌科",
+      "type": "糖尿病复查",
+      "status": "已接诊",
+      "priority": "中",
+      "date": "2026-06-18",
+      "summary": "空腹血糖偏高，建议复查糖化血红蛋白。"
+    },
+    {
+      "id": "co3",
+      "residentId": "r4",
+      "institution": "青泥洼桥社区卫生服务中心",
+      "department": "家庭医生工作室",
+      "type": "基层随访",
+      "status": "管理中",
+      "priority": "中",
+      "date": "2026-06-20",
+      "summary": "稳定管理，继续季度随访。"
+    }
+  ],
+  "insuranceClaims": [
+    {
+      "id": "ic1",
+      "residentId": "r1",
+      "institution": "大连市中心医院",
+      "claimType": "门诊慢特病",
+      "diseaseType": "高血压",
+      "totalAmount": 386.5,
+      "insurancePay": 251.2,
+      "selfPay": 135.3,
+      "status": "待审核",
+      "risk": "需核验长期处方",
+      "date": "2026-05-21"
+    },
+    {
+      "id": "ic2",
+      "residentId": "r2",
+      "institution": "大连医科大学附属医院",
+      "claimType": "门诊统筹",
+      "diseaseType": "糖尿病",
+      "totalAmount": 612.8,
+      "insurancePay": 398.3,
+      "selfPay": 214.5,
+      "status": "已通过",
+      "risk": "无异常",
+      "date": "2026-05-18"
+    },
+    {
+      "id": "ic3",
+      "residentId": "r4",
+      "institution": "青泥洼桥社区卫生服务中心",
+      "claimType": "基层慢病随访",
+      "diseaseType": "高血压",
+      "totalAmount": 96,
+      "insurancePay": 76.8,
+      "selfPay": 19.2,
+      "status": "智能初审",
+      "risk": "基层服务包匹配",
+      "date": "2026-03-30"
+    }
+  ],
   "personalRecords": [
     {
       "id": "f9f54626-0cf0-4c63-b384-5e996631a5fb",

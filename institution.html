@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>医疗机构端 · 慢病协同</title>
+    <link rel="stylesheet" href="./portal.css" />
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>医疗机构端</span>
+          <h1>诊疗协同工作台</h1>
+          <p>接收基层转诊、查看授权健康档案、补充电子病历，并与医保结算审核贯通。</p>
+        </div>
+        <nav>
+          <a href="./index.html">管理端</a>
+          <a href="./citizen.html">居民端</a>
+          <a href="./insurance.html">医保端</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" id="institution-metrics"></section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>协同任务</h2>
+            <span id="order-count"></span>
+          </div>
+          <div id="care-orders" class="list"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>授权健康档案</h2>
+          </div>
+          <div id="authorized-records" class="list compact"></div>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>医保贯通提示</h2>
+        </div>
+        <div id="claim-links" class="claim-grid"></div>
+      </section>
+    </main>
+
+    <script src="./shared.js"></script>
+    <script src="./institution.js"></script>
+  </body>
+</html>
