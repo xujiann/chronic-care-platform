@@ -1,0 +1,450 @@
+{
+  "accounts": [
+    {
+      "id": "a1",
+      "name": "王建国账户",
+      "phone": "13800010001",
+      "role": "本人",
+      "members": [
+        {
+          "residentId": "r1",
+          "relation": "本人"
+        },
+        {
+          "residentId": "r4",
+          "relation": "母亲"
+        }
+      ]
+    },
+    {
+      "id": "a2",
+      "name": "李秀兰账户",
+      "phone": "13800010002",
+      "role": "本人",
+      "members": [
+        {
+          "residentId": "r2",
+          "relation": "本人"
+        }
+      ]
+    }
+  ],
+  "residents": [
+    {
+      "id": "r1",
+      "name": "王建国",
+      "idCard": "210204196802113219",
+      "gender": "男",
+      "birthDate": "1968-02-11",
+      "phone": "13800010001",
+      "organization": "青泥洼桥社区卫生服务中心",
+      "familyDoctor": "刘医生",
+      "address": "中山区人民路 18 号",
+      "metrics": {
+        "systolic": 166,
+        "diastolic": 96,
+        "glucose": 6.8,
+        "bmi": 29.4
+      }
+    },
+    {
+      "id": "r2",
+      "name": "李秀兰",
+      "idCard": "210203197505203427",
+      "gender": "女",
+      "birthDate": "1975-05-20",
+      "phone": "13800010002",
+      "organization": "星海湾社区卫生服务中心",
+      "familyDoctor": "赵医生",
+      "address": "沙河口区西南路 60 号",
+      "metrics": {
+        "systolic": 138,
+        "diastolic": 84,
+        "glucose": 7.8,
+        "bmi": 25.1
+      }
+    },
+    {
+      "id": "r3",
+      "name": "陈海涛",
+      "idCard": "210211198811093014",
+      "gender": "男",
+      "birthDate": "1988-11-09",
+      "phone": "13800010003",
+      "organization": "甘井子区人民医院",
+      "familyDoctor": "孙医生",
+      "address": "甘井子区山东路 88 号",
+      "metrics": {
+        "systolic": 126,
+        "diastolic": 78,
+        "glucose": 5.5,
+        "bmi": 24.2
+      }
+    },
+    {
+      "id": "r4",
+      "name": "赵敏",
+      "idCard": "210213196410013521",
+      "gender": "女",
+      "birthDate": "1964-10-01",
+      "phone": "13800010004",
+      "organization": "青泥洼桥社区卫生服务中心",
+      "familyDoctor": "刘医生",
+      "address": "中山区解放街 7 号",
+      "metrics": {
+        "systolic": 148,
+        "diastolic": 88,
+        "glucose": 6.3,
+        "bmi": 28.6
+      }
+    }
+  ],
+  "diseases": [
+    {
+      "id": "d1",
+      "residentId": "r1",
+      "type": "高血压",
+      "diagnosedAt": "2024-10-12",
+      "source": "社区筛查",
+      "status": "管理中",
+      "note": "需加强用药依从性"
+    },
+    {
+      "id": "d2",
+      "residentId": "r2",
+      "type": "糖尿病",
+      "diagnosedAt": "2024-11-03",
+      "source": "医院门诊",
+      "status": "需转诊",
+      "note": "血糖控制不佳"
+    },
+    {
+      "id": "d3",
+      "residentId": "r4",
+      "type": "高血压",
+      "diagnosedAt": "2025-01-18",
+      "source": "家庭医生随访",
+      "status": "稳定管理",
+      "note": "按季度复查"
+    }
+  ],
+  "followups": [
+    {
+      "id": "f1",
+      "residentId": "r1",
+      "diseaseType": "高血压",
+      "plannedAt": "2026-06-13",
+      "assignee": "刘医生",
+      "status": "已逾期",
+      "result": "未记录",
+      "advice": "补充电话随访"
+    },
+    {
+      "id": "f2",
+      "residentId": "r2",
+      "diseaseType": "糖尿病",
+      "plannedAt": "2026-06-15",
+      "assignee": "赵医生",
+      "status": "待随访",
+      "result": "未记录",
+      "advice": "复测空腹血糖"
+    },
+    {
+      "id": "f3",
+      "residentId": "r4",
+      "diseaseType": "高血压",
+      "plannedAt": "2026-06-20",
+      "assignee": "刘医生",
+      "status": "待随访",
+      "result": "未记录",
+      "advice": "记录家庭血压"
+    },
+    {
+      "id": "f4",
+      "residentId": "r3",
+      "diseaseType": "健康管理",
+      "plannedAt": "2026-06-10",
+      "assignee": "孙医生",
+      "status": "已完成",
+      "result": "控制良好",
+      "advice": "保持运动"
+    }
+  ],
+  "personalRecords": [
+    {
+      "id": "f9f54626-0cf0-4c63-b384-5e996631a5fb",
+      "residentId": "r1",
+      "category": "emr",
+      "date": "2026-05-21",
+      "name": "原发性高血压 2 级",
+      "result": "复诊血压偏高，建议调整生活方式并规律服药。",
+      "source": "大连市中心医院 · 心内科",
+      "meta": {
+        "visitType": "门诊",
+        "exams": [
+          "心电图：窦性心律",
+          "肾功能：未见明显异常"
+        ],
+        "medications": [
+          "苯磺酸氨氯地平片",
+          "厄贝沙坦片"
+        ]
+      },
+      "createdBy": "system",
+      "createdAt": "2026-06-15T05:55:39.990Z"
+    },
+    {
+      "id": "97404359-7171-4069-b3b0-ce5f823acc68",
+      "residentId": "r1",
+      "category": "emr",
+      "date": "2026-04-12",
+      "name": "高血压随访",
+      "result": "家庭血压记录不规律，已进行用药依从性宣教。",
+      "source": "青泥洼桥社区卫生服务中心 · 全科门诊",
+      "meta": {
+        "visitType": "随访",
+        "exams": [
+          "血压：158/92 mmHg"
+        ],
+        "medications": [
+          "继续原方案"
+        ]
+      },
+      "createdBy": "system",
+      "createdAt": "2026-06-15T05:55:39.990Z"
+    },
+    {
+      "id": "274d4826-4618-46c3-9499-9e315457dbbc",
+      "residentId": "r2",
+      "category": "emr",
+      "date": "2026-05-18",
+      "name": "2 型糖尿病",
+      "result": "空腹血糖控制不佳，建议复查糖化血红蛋白。",
+      "source": "大连医科大学附属医院 · 内分泌科",
+      "meta": {
+        "visitType": "门诊",
+        "exams": [
+          "空腹血糖：7.8 mmol/L",
+          "糖化血红蛋白：待复查"
+        ],
+        "medications": [
+          "二甲双胍片"
+        ]
+      },
+      "createdBy": "system",
+      "createdAt": "2026-06-15T05:55:39.990Z"
+    },
+    {
+      "id": "3fad59ff-1adc-4d9a-ae3d-a21862b6a273",
+      "residentId": "r4",
+      "category": "emr",
+      "date": "2026-03-30",
+      "name": "高血压稳定管理",
+      "result": "血压较前稳定，继续季度随访。",
+      "source": "青泥洼桥社区卫生服务中心 · 家庭医生工作室",
+      "meta": {
+        "visitType": "签约服务",
+        "exams": [
+          "血压：148/88 mmHg"
+        ],
+        "medications": [
+          "继续原用药"
+        ]
+      },
+      "createdBy": "system",
+      "createdAt": "2026-06-15T05:55:39.990Z"
+    },
+    {
+      "id": "80dff619-fe74-46cd-91be-b41eae312ccc",
+      "residentId": "r1",
+      "category": "labs",
+      "date": "2026-05-21",
+      "name": "肾功能",
+      "result": "未见明显异常",
+      "source": "大连市中心医院",
+      "meta": {},
+      "createdBy": "system",
+      "createdAt": "2026-06-15T05:55:39.990Z"
+    },
+    {
+      "id": "ac1369e5-4834-412b-a2b2-a2809679b4b9",
+      "residentId": "r1",
+      "category": "labs",
+      "date": "2026-05-21",
+      "name": "心电图",
+      "result": "窦性心律",
+      "source": "大连市中心医院",
+      "meta": {},
+      "createdBy": "system",
+      "createdAt": "2026-06-15T05:55:39.990Z"
+    },
+    {
+      "id": "dd3fad41-33ce-4812-8482-22a6cef348af",
+      "residentId": "r2",
+      "category": "labs",
+      "date": "2026-05-18",
+      "name": "空腹血糖",
+      "result": "7.8 mmol/L，偏高",
+      "source": "大连医科大学附属医院",
+      "meta": {},
+      "createdBy": "system",
+      "createdAt": "2026-06-15T05:55:39.990Z"
+    },
+    {
+      "id": "039562f5-a5f0-4e41-9cd3-c6867d777a4e",
+      "residentId": "r4",
+      "category": "labs",
+      "date": "2026-03-30",
+      "name": "血压复测",
+      "result": "148/88 mmHg",
+      "source": "青泥洼桥社区卫生服务中心",
+      "meta": {},
+      "createdBy": "system",
+      "createdAt": "2026-06-15T05:55:39.990Z"
+    },
+    {
+      "id": "51fa52bb-5fed-43d3-821b-b1c3ca6afcd5",
+      "residentId": "r1",
+      "category": "medications",
+      "date": "2026-05-21",
+      "name": "苯磺酸氨氯地平片",
+      "result": "每日 1 次",
+      "source": "心内科门诊",
+      "meta": {},
+      "createdBy": "system",
+      "createdAt": "2026-06-15T05:55:39.990Z"
+    },
+    {
+      "id": "02200cb1-3c33-4c71-b3db-efdc60eca38e",
+      "residentId": "r1",
+      "category": "medications",
+      "date": "2026-05-21",
+      "name": "厄贝沙坦片",
+      "result": "每日 1 次",
+      "source": "心内科门诊",
+      "meta": {},
+      "createdBy": "system",
+      "createdAt": "2026-06-15T05:55:39.990Z"
+    },
+    {
+      "id": "3621411f-b5fd-4444-b906-61130b479593",
+      "residentId": "r2",
+      "category": "medications",
+      "date": "2026-05-18",
+      "name": "二甲双胍片",
+      "result": "每日 2 次",
+      "source": "内分泌科门诊",
+      "meta": {},
+      "createdBy": "system",
+      "createdAt": "2026-06-15T05:55:39.990Z"
+    },
+    {
+      "id": "2b6ce28a-98c3-47cc-9a43-eeba66b5f121",
+      "residentId": "r1",
+      "category": "allergies",
+      "date": "2025-10-02",
+      "name": "青霉素",
+      "result": "既往皮疹",
+      "source": "居民自述",
+      "meta": {},
+      "createdBy": "system",
+      "createdAt": "2026-06-15T05:55:39.990Z"
+    },
+    {
+      "id": "cd86af40-e45c-4d6f-ba8d-86a41f07af7d",
+      "residentId": "r2",
+      "category": "allergies",
+      "date": "2025-08-14",
+      "name": "无明确药物过敏史",
+      "result": "已确认",
+      "source": "门诊问诊",
+      "meta": {},
+      "createdBy": "system",
+      "createdAt": "2026-06-15T05:55:39.990Z"
+    },
+    {
+      "id": "bc1c39d1-9e84-439a-a07b-b39d14536a0f",
+      "residentId": "r1",
+      "category": "vaccines",
+      "date": "2025-11-01",
+      "name": "流感疫苗",
+      "result": "已接种",
+      "source": "社区卫生服务中心",
+      "meta": {},
+      "createdBy": "system",
+      "createdAt": "2026-06-15T05:55:39.990Z"
+    },
+    {
+      "id": "b4fe6020-d549-451d-9c93-22db83cc20b6",
+      "residentId": "r4",
+      "category": "vaccines",
+      "date": "2025-11-05",
+      "name": "流感疫苗",
+      "result": "已接种",
+      "source": "社区卫生服务中心",
+      "meta": {},
+      "createdBy": "system",
+      "createdAt": "2026-06-15T05:55:39.990Z"
+    },
+    {
+      "id": "020fd902-091a-470a-b857-60072d844054",
+      "residentId": "r1",
+      "category": "admissions",
+      "date": "2024-06-18",
+      "name": "日间观察",
+      "result": "血压波动观察，未住院",
+      "source": "大连市中心医院",
+      "meta": {},
+      "createdBy": "system",
+      "createdAt": "2026-06-15T05:55:39.990Z"
+    },
+    {
+      "id": "1d27b7bd-e8a5-4cce-a99c-e359d5fe0206",
+      "residentId": "r3",
+      "category": "admissions",
+      "date": "2025-12-09",
+      "name": "体检中心",
+      "result": "年度体检，无住院记录",
+      "source": "甘井子区人民医院",
+      "meta": {},
+      "createdBy": "system",
+      "createdAt": "2026-06-15T05:55:39.990Z"
+    },
+    {
+      "id": "192cd2f6-c297-4bd0-855c-f520043f75da",
+      "residentId": "r1",
+      "category": "authorizations",
+      "date": "2026-01-01",
+      "name": "家庭医生团队",
+      "result": "允许查看健康档案和随访记录",
+      "source": "居民授权",
+      "meta": {},
+      "createdBy": "system",
+      "createdAt": "2026-06-15T05:55:39.990Z"
+    },
+    {
+      "id": "6845bfaa-53b1-4b95-9893-9a2e5a081d69",
+      "residentId": "r1",
+      "category": "authorizations",
+      "date": "2026-01-01",
+      "name": "区域医疗机构",
+      "result": "允许查看电子病历摘要",
+      "source": "居民授权",
+      "meta": {},
+      "createdBy": "system",
+      "createdAt": "2026-06-15T05:55:39.990Z"
+    },
+    {
+      "id": "b2149847-9a97-4918-98f0-0ec95761832b",
+      "residentId": "r2",
+      "category": "authorizations",
+      "date": "2026-01-01",
+      "name": "家庭医生团队",
+      "result": "允许查看慢病管理信息",
+      "source": "居民授权",
+      "meta": {},
+      "createdBy": "system",
+      "createdAt": "2026-06-15T05:55:39.990Z"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "chronic-care-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "慢病医防融合管理平台本地 MVP",
+  "scripts": {
+    "dev": "node server.js",
+    "check": "node --check app.js && node --check server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

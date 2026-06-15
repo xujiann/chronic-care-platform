@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>慢病医防融合管理平台</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">慢</div>
+        <div>
+          <strong>慢病医防融合</strong>
+          <span>本地演示版</span>
+        </div>
+      </div>
+      <nav class="nav" aria-label="主导航">
+        <button class="nav-item active" data-view="dashboard">工作台</button>
+        <button class="nav-item" data-view="residents">居民档案</button>
+        <button class="nav-item" data-view="diseases">慢病登记</button>
+        <button class="nav-item" data-view="followups">随访管理</button>
+        <button class="nav-item" data-view="analytics">统计分析</button>
+      </nav>
+    </aside>
+
+    <main class="app">
+      <header class="topbar">
+        <div>
+          <h1 id="view-title">工作台</h1>
+          <p id="view-subtitle">筛查、登记、评估、随访、评价的一体化闭环。</p>
+        </div>
+        <div class="topbar-actions">
+          <span class="source-badge" id="data-source">连接中</span>
+          <a class="ghost-button link-button" href="./citizen.html">居民端</a>
+          <a class="ghost-button link-button" href="./mobile-preview.html">手机预览</a>
+          <button class="ghost-button" id="export-data">导出 CSV</button>
+          <button class="ghost-button" id="seed-data">重置演示数据</button>
+          <button class="primary-button" id="quick-add">新增居民</button>
+        </div>
+      </header>
+
+      <section id="dashboard" class="view active">
+        <div class="metrics-grid" id="metric-cards"></div>
+        <div class="content-grid">
+          <section class="panel wide">
+            <div class="panel-header">
+              <h2>今日待办</h2>
+              <span id="todo-count"></span>
+            </div>
+            <div id="todo-list" class="list"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-header">
+              <h2>风险分布</h2>
+            </div>
+            <div id="risk-bars" class="bars"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="residents" class="view">
+        <section class="panel">
+          <div class="panel-header">
+            <h2>居民档案</h2>
+            <div class="filters">
+              <input id="resident-search" type="search" placeholder="搜索姓名、身份证、电话" />
+              <select id="resident-org-filter">
+                <option value="">全部机构</option>
+              </select>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>姓名</th>
+                  <th>性别</th>
+                  <th>年龄</th>
+                  <th>管理机构</th>
+                  <th>家庭医生</th>
+                  <th>风险</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="resident-table"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section id="diseases" class="view">
+        <div class="split">
+          <section class="panel">
+            <div class="panel-header">
+              <h2>慢病登记</h2>
+              <button class="primary-button small" id="add-disease">登记慢病</button>
+            </div>
+            <div id="disease-list" class="list"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-header">
+              <h2>风险评估规则</h2>
+            </div>
+            <div class="rule-list">
+              <div><strong>高危</strong><span>收缩压 ≥160 或空腹血糖 ≥7.0 或 BMI ≥30</span></div>
+              <div><strong>中危</strong><span>收缩压 ≥140 或空腹血糖 ≥6.1 或 BMI ≥28</span></div>
+              <div><strong>低危</strong><span>未触发中高危条件，建议保持健康管理</span></div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section id="followups" class="view">
+        <section class="panel">
+          <div class="panel-header">
+            <h2>随访计划</h2>
+            <button class="primary-button small" id="add-followup">新增随访</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>居民</th>
+                  <th>病种</th>
+                  <th>计划日期</th>
+                  <th>责任人</th>
+                  <th>状态</th>
+                  <th>最近结果</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody id="followup-table"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section id="analytics" class="view">
+        <div class="content-grid">
+          <section class="panel">
+            <div class="panel-header">
+              <h2>病种统计</h2>
+            </div>
+            <div id="disease-bars" class="bars"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-header">
+              <h2>机构统计</h2>
+            </div>
+            <div id="org-bars" class="bars"></div>
+          </section>
+          <section class="panel wide">
+            <div class="panel-header">
+              <h2>闭环进展</h2>
+            </div>
+            <div class="timeline">
+              <div>筛查建档</div>
+              <div>风险评估</div>
+              <div>慢病登记</div>
+              <div>干预随访</div>
+              <div>效果评价</div>
+            </div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="resident-dialog">
+      <form method="dialog" class="dialog-form" id="resident-form">
+        <header>
+          <h2>居民档案</h2>
+          <button type="button" class="icon-button" data-close>×</button>
+        </header>
+        <input type="hidden" name="id" />
+        <div class="form-grid">
+          <label>姓名<input name="name" required /></label>
+          <label>身份证号<input name="idCard" required /></label>
+          <label>性别<select name="gender"><option>男</option><option>女</option></select></label>
+          <label>出生日期<input name="birthDate" type="date" required /></label>
+          <label>联系电话<input name="phone" required /></label>
+          <label>管理机构<select name="organization" required></select></label>
+          <label>家庭医生<input name="familyDoctor" required /></label>
+          <label>地址<input name="address" required /></label>
+          <label>收缩压<input name="systolic" type="number" min="70" max="260" required /></label>
+          <label>舒张压<input name="diastolic" type="number" min="40" max="160" required /></label>
+          <label>空腹血糖<input name="glucose" type="number" step="0.1" min="2" max="30" required /></label>
+          <label>BMI<input name="bmi" type="number" step="0.1" min="10" max="60" required /></label>
+        </div>
+        <footer>
+          <button type="button" class="ghost-button" data-close>取消</button>
+          <button class="primary-button" value="save">保存</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="disease-dialog">
+      <form method="dialog" class="dialog-form" id="disease-form">
+        <header>
+          <h2>慢病登记</h2>
+          <button type="button" class="icon-button" data-close>×</button>
+        </header>
+        <div class="form-grid">
+          <label>居民<select name="residentId" required></select></label>
+          <label>病种<select name="type" required><option>高血压</option><option>糖尿病</option><option>冠心病</option><option>脑卒中</option></select></label>
+          <label>诊断日期<input name="diagnosedAt" type="date" required /></label>
+          <label>来源机构<input name="source" required /></label>
+          <label>管理状态<select name="status"><option>管理中</option><option>稳定管理</option><option>需转诊</option></select></label>
+          <label class="full">备注<input name="note" /></label>
+        </div>
+        <footer>
+          <button type="button" class="ghost-button" data-close>取消</button>
+          <button class="primary-button" value="save">保存</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="followup-dialog">
+      <form method="dialog" class="dialog-form" id="followup-form">
+        <header>
+          <h2>随访记录</h2>
+          <button type="button" class="icon-button" data-close>×</button>
+        </header>
+        <input type="hidden" name="id" />
+        <div class="form-grid">
+          <label>居民<select name="residentId" required></select></label>
+          <label>病种<select name="diseaseType" required><option>高血压</option><option>糖尿病</option><option>冠心病</option><option>脑卒中</option></select></label>
+          <label>计划日期<input name="plannedAt" type="date" required /></label>
+          <label>责任人<input name="assignee" required /></label>
+          <label>状态<select name="status"><option>待随访</option><option>已完成</option><option>已逾期</option></select></label>
+          <label>最近结果<select name="result"><option>未记录</option><option>控制良好</option><option>需调整方案</option><option>建议转诊</option></select></label>
+          <label class="full">干预建议<input name="advice" /></label>
+        </div>
+        <footer>
+          <button type="button" class="ghost-button" data-close>取消</button>
+          <button class="primary-button" value="save">保存</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="resident-detail-dialog">
+      <section class="detail-panel">
+        <header>
+          <div>
+            <h2 id="detail-name">居民详情</h2>
+            <p id="detail-meta"></p>
+          </div>
+          <button type="button" class="icon-button" data-close>×</button>
+        </header>
+        <div id="detail-content"></div>
+      </section>
+    </dialog>
+
+    <script src="./app.js"></script>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>

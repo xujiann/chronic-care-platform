@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>手机预览 · 居民端</title>
+    <link rel="stylesheet" href="./mobile-preview.css" />
+  </head>
+  <body>
+    <main class="preview-shell">
+      <section class="preview-copy">
+        <span>居民端手机预览</span>
+        <h1>健康档案与电子病历</h1>
+        <p>右侧为 390px 宽手机视口，可用于检查居民端在手机上的首页、健康档案、电子病历时间线、慢病管理和随访提醒。</p>
+        <div class="preview-actions">
+          <a href="./citizen.html">打开居民端</a>
+          <a href="./index.html">返回管理端</a>
+        </div>
+        <div class="hint">
+          <strong>真机访问</strong>
+          <p>电脑和手机在同一 Wi-Fi 下时，可用电脑局域网 IP 加端口访问。</p>
+          <code>http://电脑IP:5173/citizen.html</code>
+        </div>
+      </section>
+
+      <section class="phone-frame" aria-label="居民端手机预览">
+        <div class="phone-speaker"></div>
+        <iframe src="./citizen.html" title="居民端"></iframe>
+      </section>
+    </main>
+  </body>
+</html>

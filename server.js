@@ -1,0 +1,361 @@
+const http = require("http");
+const fs = require("fs");
+const path = require("path");
+const { randomUUID } = require("crypto");
+
+const PORT = Number(process.env.PORT || 5173);
+const ROOT = __dirname;
+const DATA_DIR = path.join(ROOT, "data");
+const DB_FILE = path.join(DATA_DIR, "db.json");
+
+const mimeTypes = {
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".png": "image/png",
+  ".svg": "image/svg+xml"
+};
+
+function todayOffset(days) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function seedState() {
+  return {
+    accounts: [
+      {
+        id: "a1",
+        name: "王建国账户",
+        phone: "13800010001",
+        role: "本人",
+        members: [
+          { residentId: "r1", relation: "本人" },
+          { residentId: "r4", relation: "母亲" }
+        ]
+      },
+      {
+        id: "a2",
+        name: "李秀兰账户",
+        phone: "13800010002",
+        role: "本人",
+        members: [
+          { residentId: "r2", relation: "本人" }
+        ]
+      }
+    ],
+    residents: [
+      {
+        id: "r1",
+        name: "王建国",
+        idCard: "210204196802113219",
+        gender: "男",
+        birthDate: "1968-02-11",
+        phone: "13800010001",
+        organization: "青泥洼桥社区卫生服务中心",
+        familyDoctor: "刘医生",
+        address: "中山区人民路 18 号",
+        metrics: { systolic: 166, diastolic: 96, glucose: 6.8, bmi: 29.4 }
+      },
+      {
+        id: "r2",
+        name: "李秀兰",
+        idCard: "210203197505203427",
+        gender: "女",
+        birthDate: "1975-05-20",
+        phone: "13800010002",
+        organization: "星海湾社区卫生服务中心",
+        familyDoctor: "赵医生",
+        address: "沙河口区西南路 60 号",
+        metrics: { systolic: 138, diastolic: 84, glucose: 7.8, bmi: 25.1 }
+      },
+      {
+        id: "r3",
+        name: "陈海涛",
+        idCard: "210211198811093014",
+        gender: "男",
+        birthDate: "1988-11-09",
+        phone: "13800010003",
+        organization: "甘井子区人民医院",
+        familyDoctor: "孙医生",
+        address: "甘井子区山东路 88 号",
+        metrics: { systolic: 126, diastolic: 78, glucose: 5.5, bmi: 24.2 }
+      },
+      {
+        id: "r4",
+        name: "赵敏",
+        idCard: "210213196410013521",
+        gender: "女",
+        birthDate: "1964-10-01",
+        phone: "13800010004",
+        organization: "青泥洼桥社区卫生服务中心",
+        familyDoctor: "刘医生",
+        address: "中山区解放街 7 号",
+        metrics: { systolic: 148, diastolic: 88, glucose: 6.3, bmi: 28.6 }
+      }
+    ],
+    diseases: [
+      { id: "d1", residentId: "r1", type: "高血压", diagnosedAt: "2024-10-12", source: "社区筛查", status: "管理中", note: "需加强用药依从性" },
+      { id: "d2", residentId: "r2", type: "糖尿病", diagnosedAt: "2024-11-03", source: "医院门诊", status: "需转诊", note: "血糖控制不佳" },
+      { id: "d3", residentId: "r4", type: "高血压", diagnosedAt: "2025-01-18", source: "家庭医生随访", status: "稳定管理", note: "按季度复查" }
+    ],
+    followups: [
+      { id: "f1", residentId: "r1", diseaseType: "高血压", plannedAt: todayOffset(-2), assignee: "刘医生", status: "已逾期", result: "未记录", advice: "补充电话随访" },
+      { id: "f2", residentId: "r2", diseaseType: "糖尿病", plannedAt: todayOffset(0), assignee: "赵医生", status: "待随访", result: "未记录", advice: "复测空腹血糖" },
+      { id: "f3", residentId: "r4", diseaseType: "高血压", plannedAt: todayOffset(5), assignee: "刘医生", status: "待随访", result: "未记录", advice: "记录家庭血压" },
+      { id: "f4", residentId: "r3", diseaseType: "健康管理", plannedAt: todayOffset(-5), assignee: "孙医生", status: "已完成", result: "控制良好", advice: "保持运动" }
+    ],
+    personalRecords: seedPersonalRecords()
+  };
+}
+
+function seedPersonalRecords() {
+  return [
+    record("r1", "emr", "2026-05-21", "原发性高血压 2 级", "复诊血压偏高，建议调整生活方式并规律服药。", "大连市中心医院 · 心内科", {
+      visitType: "门诊",
+      exams: ["心电图：窦性心律", "肾功能：未见明显异常"],
+      medications: ["苯磺酸氨氯地平片", "厄贝沙坦片"]
+    }),
+    record("r1", "emr", "2026-04-12", "高血压随访", "家庭血压记录不规律，已进行用药依从性宣教。", "青泥洼桥社区卫生服务中心 · 全科门诊", {
+      visitType: "随访",
+      exams: ["血压：158/92 mmHg"],
+      medications: ["继续原方案"]
+    }),
+    record("r2", "emr", "2026-05-18", "2 型糖尿病", "空腹血糖控制不佳，建议复查糖化血红蛋白。", "大连医科大学附属医院 · 内分泌科", {
+      visitType: "门诊",
+      exams: ["空腹血糖：7.8 mmol/L", "糖化血红蛋白：待复查"],
+      medications: ["二甲双胍片"]
+    }),
+    record("r4", "emr", "2026-03-30", "高血压稳定管理", "血压较前稳定，继续季度随访。", "青泥洼桥社区卫生服务中心 · 家庭医生工作室", {
+      visitType: "签约服务",
+      exams: ["血压：148/88 mmHg"],
+      medications: ["继续原用药"]
+    }),
+    record("r1", "labs", "2026-05-21", "肾功能", "未见明显异常", "大连市中心医院"),
+    record("r1", "labs", "2026-05-21", "心电图", "窦性心律", "大连市中心医院"),
+    record("r2", "labs", "2026-05-18", "空腹血糖", "7.8 mmol/L，偏高", "大连医科大学附属医院"),
+    record("r4", "labs", "2026-03-30", "血压复测", "148/88 mmHg", "青泥洼桥社区卫生服务中心"),
+    record("r1", "medications", "2026-05-21", "苯磺酸氨氯地平片", "每日 1 次", "心内科门诊"),
+    record("r1", "medications", "2026-05-21", "厄贝沙坦片", "每日 1 次", "心内科门诊"),
+    record("r2", "medications", "2026-05-18", "二甲双胍片", "每日 2 次", "内分泌科门诊"),
+    record("r1", "allergies", "2025-10-02", "青霉素", "既往皮疹", "居民自述"),
+    record("r2", "allergies", "2025-08-14", "无明确药物过敏史", "已确认", "门诊问诊"),
+    record("r1", "vaccines", "2025-11-01", "流感疫苗", "已接种", "社区卫生服务中心"),
+    record("r4", "vaccines", "2025-11-05", "流感疫苗", "已接种", "社区卫生服务中心"),
+    record("r1", "admissions", "2024-06-18", "日间观察", "血压波动观察，未住院", "大连市中心医院"),
+    record("r3", "admissions", "2025-12-09", "体检中心", "年度体检，无住院记录", "甘井子区人民医院"),
+    record("r1", "authorizations", "2026-01-01", "家庭医生团队", "允许查看健康档案和随访记录", "居民授权"),
+    record("r1", "authorizations", "2026-01-01", "区域医疗机构", "允许查看电子病历摘要", "居民授权"),
+    record("r2", "authorizations", "2026-01-01", "家庭医生团队", "允许查看慢病管理信息", "居民授权")
+  ];
+}
+
+function record(residentId, category, date, name, result, source, meta = {}) {
+  return {
+    id: randomUUID(),
+    residentId,
+    category,
+    date,
+    name,
+    result,
+    source,
+    meta,
+    createdBy: "system",
+    createdAt: new Date().toISOString()
+  };
+}
+
+function ensureDatabase() {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  if (!fs.existsSync(DB_FILE)) {
+    fs.writeFileSync(DB_FILE, JSON.stringify(seedState(), null, 2), "utf8");
+  }
+}
+
+function readDatabase() {
+  ensureDatabase();
+  const data = normalizeState(JSON.parse(fs.readFileSync(DB_FILE, "utf8")));
+  writeDatabase(data);
+  return data;
+}
+
+function writeDatabase(data) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf8");
+}
+
+function sendJson(res, status, payload) {
+  res.writeHead(status, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store"
+  });
+  res.end(JSON.stringify(payload));
+}
+
+function collectJson(req) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    req.on("data", (chunk) => {
+      body += chunk;
+      if (body.length > 2_000_000) {
+        req.destroy();
+        reject(new Error("请求体过大"));
+      }
+    });
+    req.on("end", () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch (error) {
+        reject(error);
+      }
+    });
+  });
+}
+
+function normalizeState(data) {
+  return {
+    accounts: Array.isArray(data.accounts) ? data.accounts : seedState().accounts,
+    residents: Array.isArray(data.residents) ? data.residents : [],
+    diseases: Array.isArray(data.diseases) ? data.diseases : [],
+    followups: Array.isArray(data.followups) ? data.followups : [],
+    personalRecords: Array.isArray(data.personalRecords) ? data.personalRecords : seedPersonalRecords()
+  };
+}
+
+function normalizePersonalRecord(data) {
+  const category = String(data.category || "").trim();
+  const residentId = String(data.residentId || "").trim();
+  if (!residentId || !category) {
+    throw new Error("residentId 和 category 不能为空");
+  }
+  return {
+    id: data.id || randomUUID(),
+    residentId,
+    category,
+    date: String(data.date || todayOffset(0)),
+    name: String(data.name || "未命名健康资料"),
+    result: String(data.result || ""),
+    source: String(data.source || "居民上传"),
+    meta: data.meta && typeof data.meta === "object" ? data.meta : {},
+    createdBy: data.createdBy || "resident",
+    createdAt: data.createdAt || new Date().toISOString()
+  };
+}
+
+function serveStatic(req, res) {
+  const rawPath = decodeURIComponent(new URL(req.url, `http://${req.headers.host}`).pathname);
+  const requested = rawPath === "/" ? "/index.html" : rawPath;
+  const filePath = path.normalize(path.join(ROOT, requested));
+
+  if (!filePath.startsWith(ROOT)) {
+    res.writeHead(403);
+    res.end("Forbidden");
+    return;
+  }
+
+  fs.readFile(filePath, (error, content) => {
+    if (error) {
+      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end("Not found");
+      return;
+    }
+    const ext = path.extname(filePath);
+    res.writeHead(200, { "Content-Type": mimeTypes[ext] || "application/octet-stream" });
+    res.end(content);
+  });
+}
+
+async function handleApi(req, res) {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+
+  if (req.method === "GET" && req.url === "/api/health") {
+    sendJson(res, 200, { ok: true, storage: DB_FILE });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/state") {
+    sendJson(res, 200, readDatabase());
+    return;
+  }
+
+  if (req.method === "PUT" && url.pathname === "/api/state") {
+    const data = normalizeState(await collectJson(req));
+    writeDatabase(data);
+    sendJson(res, 200, data);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/personal-records") {
+    const data = readDatabase();
+    const residentId = url.searchParams.get("residentId");
+    const category = url.searchParams.get("category");
+    const records = data.personalRecords.filter((item) => (!residentId || item.residentId === residentId) && (!category || item.category === category));
+    sendJson(res, 200, records);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/personal-records") {
+    const data = readDatabase();
+    const recordData = normalizePersonalRecord(await collectJson(req));
+    data.personalRecords.push(recordData);
+    writeDatabase(data);
+    sendJson(res, 201, recordData);
+    return;
+  }
+
+  if (req.method === "PATCH" && url.pathname.startsWith("/api/personal-records/")) {
+    const id = decodeURIComponent(url.pathname.replace("/api/personal-records/", ""));
+    const patch = await collectJson(req);
+    const data = readDatabase();
+    const index = data.personalRecords.findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "personal record not found" });
+      return;
+    }
+    data.personalRecords[index] = {
+      ...data.personalRecords[index],
+      ...patch,
+      meta: {
+        ...(data.personalRecords[index].meta || {}),
+        ...(patch.meta || {})
+      },
+      updatedAt: new Date().toISOString()
+    };
+    writeDatabase(data);
+    sendJson(res, 200, data.personalRecords[index]);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/reset") {
+    const data = seedState();
+    writeDatabase(data);
+    sendJson(res, 200, data);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/id") {
+    sendJson(res, 200, { id: randomUUID() });
+    return;
+  }
+
+  sendJson(res, 404, { error: "API not found" });
+}
+
+const server = http.createServer(async (req, res) => {
+  try {
+    if (req.url.startsWith("/api/")) {
+      await handleApi(req, res);
+      return;
+    }
+    serveStatic(req, res);
+  } catch (error) {
+    sendJson(res, 500, { error: error.message });
+  }
+});
+
+server.listen(PORT, () => {
+  ensureDatabase();
+  console.log(`慢病医防融合管理平台已启动：http://localhost:${PORT}`);
+});

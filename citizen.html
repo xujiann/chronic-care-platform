@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>居民端 · 健康档案与电子病历</title>
+    <link rel="stylesheet" href="./citizen.css" />
+  </head>
+  <body>
+    <main class="citizen-shell">
+      <header class="citizen-header">
+        <div>
+          <span class="eyebrow">居民端</span>
+          <h1>个人健康信息库</h1>
+          <p>保留个人健康档案、电子病历、检查检验、用药处方、过敏史、免疫接种和随访信息。</p>
+        </div>
+        <div class="header-actions">
+          <select id="account-select" aria-label="选择个人账户"></select>
+          <a class="ghost-link" href="./mobile-preview.html">手机预览</a>
+          <a class="ghost-link" href="./index.html">管理端</a>
+        </div>
+      </header>
+
+      <section class="account-panel">
+        <div>
+          <span>当前账户</span>
+          <strong id="account-name">个人账户</strong>
+          <small id="account-meta">加载中</small>
+        </div>
+        <div class="member-list" id="member-list"></div>
+      </section>
+
+      <section class="profile-band">
+        <div>
+          <h2 id="profile-name">居民姓名</h2>
+          <p id="profile-meta">加载中</p>
+        </div>
+        <div id="profile-risk" class="risk-pill">风险等级</div>
+      </section>
+
+      <section class="summary-grid" id="summary-grid"></section>
+
+      <section class="panel vault-panel">
+        <div class="panel-title">
+          <h2>健康信息归集</h2>
+          <div class="panel-actions">
+            <span id="vault-updated">持续更新</span>
+            <button class="small-button" id="upload-record">上传资料</button>
+            <button class="small-button primary" id="grant-auth">新增授权</button>
+          </div>
+        </div>
+        <div class="completeness">
+          <div>
+            <strong id="completeness-score">0%</strong>
+            <span>档案完整度</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="completeness-bar"></div>
+          </div>
+        </div>
+        <div class="vault-tabs" id="vault-tabs"></div>
+        <div class="vault-content" id="vault-content"></div>
+      </section>
+
+      <section class="two-column">
+        <article class="panel">
+          <div class="panel-title">
+            <h2>电子病历时间线</h2>
+            <span id="emr-count"></span>
+          </div>
+          <div class="timeline" id="emr-timeline"></div>
+        </article>
+
+        <aside class="stack">
+          <article class="panel">
+            <div class="panel-title">
+              <h2>慢病管理</h2>
+            </div>
+            <div id="disease-cards" class="cards"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-title">
+              <h2>随访提醒</h2>
+            </div>
+            <div id="followup-cards" class="cards"></div>
+          </article>
+        </aside>
+      </section>
+    </main>
+
+    <dialog id="upload-dialog">
+      <form method="dialog" class="dialog-form" id="upload-form">
+        <header>
+          <h2>上传健康资料</h2>
+          <button type="button" class="close-button" data-close>×</button>
+        </header>
+        <div class="form-grid">
+          <label>资料类型
+            <select name="category" required>
+              <option value="labs">检查检验</option>
+              <option value="emr">电子病历</option>
+              <option value="medications">用药处方</option>
+              <option value="allergies">过敏史</option>
+              <option value="vaccines">免疫接种</option>
+              <option value="admissions">手术住院</option>
+            </select>
+          </label>
+          <label>日期<input name="date" type="date" required /></label>
+          <label>标题<input name="name" placeholder="例如：年度体检报告" required /></label>
+          <label>来源<input name="source" placeholder="例如：个人上传/外院" required /></label>
+          <label class="full">内容摘要<input name="result" placeholder="填写主要结论、指标或说明" required /></label>
+        </div>
+        <footer>
+          <button type="button" class="ghost-link" data-close>取消</button>
+          <button class="small-button primary" value="save">保存</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="auth-dialog">
+      <form method="dialog" class="dialog-form" id="auth-form">
+        <header>
+          <h2>新增授权</h2>
+          <button type="button" class="close-button" data-close>×</button>
+        </header>
+        <div class="form-grid">
+          <label>授权对象<input name="name" placeholder="例如：家庭医生团队" required /></label>
+          <label>有效期至<input name="date" type="date" required /></label>
+          <label class="full">授权范围<input name="result" placeholder="例如：允许查看健康档案和电子病历摘要" required /></label>
+          <label class="full">授权来源<input name="source" value="居民主动授权" required /></label>
+        </div>
+        <footer>
+          <button type="button" class="ghost-link" data-close>取消</button>
+          <button class="small-button primary" value="save">保存</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="./citizen.js"></script>
+  </body>
+</html>
