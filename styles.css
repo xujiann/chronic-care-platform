@@ -348,6 +348,21 @@ th {
   background: #fde9e7;
 }
 
+.badge.danger {
+  color: var(--red);
+  background: #fde9e7;
+}
+
+.badge.warn {
+  color: var(--amber);
+  background: #fff3d8;
+}
+
+.badge.info {
+  color: #184a91;
+  background: #eaf2ff;
+}
+
 .action-link {
   border: 0;
   background: transparent;
@@ -416,6 +431,31 @@ th {
   color: #184a91;
   font-weight: 700;
   text-align: center;
+}
+
+.governance-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.governance-grid article {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fbfd;
+}
+
+.governance-grid span,
+.governance-grid small {
+  display: block;
+  color: var(--muted);
+}
+
+.governance-grid strong {
+  display: block;
+  margin: 8px 0;
+  font-size: 24px;
 }
 
 dialog {
@@ -605,6 +645,7 @@ dialog::backdrop {
 
   .nav,
   .metrics-grid,
+  .governance-grid,
   .content-grid,
   .split,
   .timeline,

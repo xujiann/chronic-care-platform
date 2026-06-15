@@ -71,11 +71,12 @@ const seedState = {
 let state = structuredClone(seedState);
 
 const titles = {
-  dashboard: ["工作台", "筛查、登记、评估、随访、评价的一体化闭环。"],
+  dashboard: ["监管总览", "卫生健康委端：统筹居民、医疗机构、医保和基层随访协同。"],
   residents: ["居民档案", "管理居民基础信息、家庭医生和关键健康指标。"],
   diseases: ["慢病登记", "登记重点病种并基于指标生成风险分层。"],
   followups: ["随访管理", "跟踪计划、逾期提醒、干预建议和随访结果。"],
-  analytics: ["统计分析", "按病种、机构、风险等级观察管理成效。"]
+  analytics: ["统计分析", "按病种、机构、风险等级观察管理成效。"],
+  governance: ["协同监管", "监测四端贯通、机构绩效、数据质量和风险预警。"]
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -236,6 +237,7 @@ function render() {
   renderDiseases();
   renderFollowups();
   renderAnalytics();
+  renderGovernance();
 }
 
 function refreshFollowupStatus() {
@@ -358,13 +360,83 @@ function renderAnalytics() {
   renderBars("#org-bars", countBy(state.residents.map((item) => item.organization)), organizations);
 }
 
+function renderGovernance() {
+  renderPortalGrid();
+  renderWarnings();
+  renderPerformanceTable();
+  renderQualityBars();
+}
+
+function renderPortalGrid() {
+  const portals = [
+    ["居民端", state.accounts?.length || 0, "个人账户"],
+    ["医疗机构端", state.careOrders?.length || 0, "协同任务"],
+    ["医保端", state.insuranceClaims?.length || 0, "结算审核"],
+    ["卫健委端", state.residents.length, "监管对象"]
+  ];
+  document.querySelector("#portal-health").textContent = "运行中";
+  document.querySelector("#portal-grid").innerHTML = portals
+    .map(([name, value, hint]) => `<article><span>${name}</span><strong>${value}</strong><small>${hint}</small></article>`)
+    .join("");
+}
+
+function renderWarnings() {
+  const warnings = [];
+  state.residents.forEach((resident) => {
+    const risk = assessRisk(resident);
+    if (risk.level === "高危") warnings.push([resident.name, "高危慢病指标", risk.reason, "danger"]);
+  });
+  state.followups.filter((item) => item.status === "已逾期").forEach((item) => {
+    warnings.push([findResident(item.residentId)?.name || "未知居民", "随访逾期", `${item.diseaseType} · ${item.plannedAt}`, "warn"]);
+  });
+  (state.insuranceClaims || []).filter((item) => item.status !== "已通过").forEach((item) => {
+    warnings.push([findResident(item.residentId)?.name || "未知居民", "医保审核待处理", `${item.claimType} · ${item.risk}`, "info"]);
+  });
+  document.querySelector("#warning-count").textContent = `${warnings.length} 项`;
+  document.querySelector("#warning-list").innerHTML = warnings
+    .map(([name, title, detail, level]) => `<div class="list-item"><div><strong>${name} · ${title}</strong><br><small>${detail}</small></div><span class="badge ${level}">${level === "danger" ? "高" : level === "warn" ? "中" : "提示"}</span></div>`)
+    .join("") || `<div class="subtle">暂无风险预警。</div>`;
+}
+
+function renderPerformanceTable() {
+  const rows = organizations.map((org) => {
+    const residents = state.residents.filter((item) => item.organization === org);
+    const residentIds = new Set(residents.map((item) => item.id));
+    const diseases = state.diseases.filter((item) => residentIds.has(item.residentId));
+    const followups = state.followups.filter((item) => residentIds.has(item.residentId));
+    const completed = followups.filter((item) => item.status === "已完成").length;
+    const orders = (state.careOrders || []).filter((item) => residentIds.has(item.residentId)).length;
+    const rate = followups.length ? Math.round((completed / followups.length) * 100) : 0;
+    return { org, residents: residents.length, diseases: diseases.length, followups: followups.length, rate, orders };
+  });
+  document.querySelector("#performance-table").innerHTML = `<table>
+    <thead><tr><th>机构</th><th>建档</th><th>慢病登记</th><th>随访计划</th><th>完成率</th><th>协同任务</th></tr></thead>
+    <tbody>${rows.map((row) => `<tr><td>${row.org}</td><td>${row.residents}</td><td>${row.diseases}</td><td>${row.followups}</td><td>${row.rate}%</td><td>${row.orders}</td></tr>`).join("")}</tbody>
+  </table>`;
+}
+
+function renderQualityBars() {
+  const total = Math.max(1, state.residents.length);
+  const hasPhone = state.residents.filter((item) => item.phone).length;
+  const hasDoctor = state.residents.filter((item) => item.familyDoctor).length;
+  const hasMetrics = state.residents.filter((item) => item.metrics?.systolic && item.metrics?.glucose && item.metrics?.bmi).length;
+  const withPersonalRecords = new Set((state.personalRecords || []).map((item) => item.residentId)).size;
+  renderBars("#quality-bars", {
+    "联系方式完整": Math.round((hasPhone / total) * 100),
+    "家庭医生绑定": Math.round((hasDoctor / total) * 100),
+    "指标完整": Math.round((hasMetrics / total) * 100),
+    "健康信息归集": Math.round((withPersonalRecords / total) * 100)
+  }, ["联系方式完整", "家庭医生绑定", "指标完整", "健康信息归集"]);
+}
+
 function renderBars(selector, counts, order) {
-  const max = Math.max(1, ...Object.values(counts));
+  const max = selector === "#quality-bars" ? 100 : Math.max(1, ...Object.values(counts));
   document.querySelector(selector).innerHTML = order
     .filter((label) => counts[label] !== undefined || selector !== "#org-bars")
     .map((label) => {
       const value = counts[label] || 0;
-      return `<div class="bar-row"><span>${label}</span><div class="bar-track"><div class="bar-fill" style="width:${(value / max) * 100}%"></div></div><strong>${value}</strong></div>`;
+      const suffix = selector === "#quality-bars" ? "%" : "";
+      return `<div class="bar-row"><span>${label}</span><div class="bar-track"><div class="bar-fill" style="width:${(value / max) * 100}%"></div></div><strong>${value}${suffix}</strong></div>`;
     })
     .join("");
 }

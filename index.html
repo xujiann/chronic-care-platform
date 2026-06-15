@@ -16,19 +16,20 @@
         </div>
       </div>
       <nav class="nav" aria-label="主导航">
-        <button class="nav-item active" data-view="dashboard">工作台</button>
+        <button class="nav-item active" data-view="dashboard">监管总览</button>
         <button class="nav-item" data-view="residents">居民档案</button>
         <button class="nav-item" data-view="diseases">慢病登记</button>
         <button class="nav-item" data-view="followups">随访管理</button>
         <button class="nav-item" data-view="analytics">统计分析</button>
+        <button class="nav-item" data-view="governance">协同监管</button>
       </nav>
     </aside>
 
     <main class="app">
       <header class="topbar">
         <div>
-          <h1 id="view-title">工作台</h1>
-          <p id="view-subtitle">筛查、登记、评估、随访、评价的一体化闭环。</p>
+          <h1 id="view-title">监管总览</h1>
+          <p id="view-subtitle">卫生健康委端：统筹居民、医疗机构、医保和基层随访协同。</p>
         </div>
         <div class="topbar-actions">
           <span class="source-badge" id="data-source">连接中</span>
@@ -57,6 +58,38 @@
               <h2>风险分布</h2>
             </div>
             <div id="risk-bars" class="bars"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="governance" class="view">
+        <div class="content-grid">
+          <section class="panel">
+            <div class="panel-header">
+              <h2>四端贯通运行监测</h2>
+              <span id="portal-health"></span>
+            </div>
+            <div id="portal-grid" class="governance-grid"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-header">
+              <h2>风险预警</h2>
+              <span id="warning-count"></span>
+            </div>
+            <div id="warning-list" class="list"></div>
+          </section>
+          <section class="panel wide">
+            <div class="panel-header">
+              <h2>机构绩效</h2>
+              <span>建档、慢病、随访、协同</span>
+            </div>
+            <div id="performance-table" class="table-wrap"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-header">
+              <h2>数据质量</h2>
+            </div>
+            <div id="quality-bars" class="bars"></div>
           </section>
         </div>
       </section>
