@@ -112,8 +112,22 @@ function seedState() {
     medicationPickups: seedMedicationPickups(),
     institutionSupervisions: seedInstitutionSupervisions(),
     insuranceClaims: seedInsuranceClaims(),
+    policyAlignment: seedPolicyAlignment(),
     personalRecords: seedPersonalRecords()
   };
+}
+
+function seedPolicyAlignment() {
+  return [
+    { domain: "普惠数字医疗", requirement: "建设互通共享的全民健康信息平台，推动医疗卫生机构数据共享互认和业务协同。", capability: "个人健康信息库聚合电子病历、检查检验、用药、授权和慢病管理数据。", status: "已启动" },
+    { domain: "医疗全流程在线办理", requirement: "加快异地转诊、就医、住院、医保等医疗全流程在线办理。", capability: "医疗机构端承接转诊协同，医保端承接结算审核，个人端承接固定取药和授权共享。", status: "原型完成" },
+    { domain: "互联网医疗监管", requirement: "完善互联网医疗服务监管体系，推进互联网+监管和智慧监管。", capability: "卫健委端建设四端运行监测、机构绩效、风险预警和数据质量看板。", status: "已纳入" },
+    { domain: "电子健康码与医保凭证", requirement: "普及居民电子健康码，加快医保电子凭证推广应用。", capability: "以身份证号+手机号形成 personIndex，后续可对接电子健康码、医保电子凭证和居民一卡通。", status: "数据底座完成" },
+    { domain: "公共卫生应急", requirement: "建立智慧化预警多点触发机制，支持公共卫生机构和医疗机构数据共享。", capability: "风险预警汇聚慢病高危、随访逾期、医保异常和资源负荷，预留公共卫生应急监测入口。", status: "待扩展" },
+    { domain: "基层智慧治理", requirement: "以数据驱动、信息共享提升基层治理和疫情防控能力。", capability: "基层机构、家庭医生、居民端、医保端共用同一居民主索引和慢病闭环台账。", status: "已启动" },
+    { domain: "数据安全与合规", requirement: "完善数据脱敏、加密保护、合规评估和安全保障体系。", capability: "增加授权共享、撤销授权、数据质量审计，后续补充分级权限、脱敏展示和日志留痕。", status: "待扩展" },
+    { domain: "适老化与无障碍", requirement: "优化信息无障碍环境，解决老年人等群体数字鸿沟。", capability: "个人端按手机视口设计，后续补充大字模式、家属代办、语音提示和线下帮办。", status: "待扩展" }
+  ];
 }
 
 function seedMedicalResources() {
@@ -329,7 +343,7 @@ function collectJson(req) {
 }
 
 function normalizeState(data) {
-  return {
+  const state = {
     accounts: Array.isArray(data.accounts) ? data.accounts : seedState().accounts,
     residents: Array.isArray(data.residents) ? data.residents : [],
     diseases: Array.isArray(data.diseases) ? data.diseases : [],
@@ -339,8 +353,10 @@ function normalizeState(data) {
     medicationPickups: Array.isArray(data.medicationPickups) ? data.medicationPickups : seedMedicationPickups(),
     institutionSupervisions: Array.isArray(data.institutionSupervisions) ? data.institutionSupervisions : seedInstitutionSupervisions(),
     insuranceClaims: Array.isArray(data.insuranceClaims) ? data.insuranceClaims : seedInsuranceClaims(),
+    policyAlignment: Array.isArray(data.policyAlignment) ? data.policyAlignment : seedPolicyAlignment(),
     personalRecords: Array.isArray(data.personalRecords) ? data.personalRecords : seedPersonalRecords()
   };
+  return normalizePersonIndexes(state);
 }
 
 function normalizePersonalRecord(data) {
@@ -361,6 +377,35 @@ function normalizePersonalRecord(data) {
     createdBy: data.createdBy || "resident",
     createdAt: data.createdAt || new Date().toISOString()
   };
+}
+
+function normalizePersonIndexes(state) {
+  const residents = Array.isArray(state.residents) ? state.residents : [];
+  residents.forEach((resident) => {
+    resident.personIndex = personIndexFromParts(resident.idCard, resident.phone);
+    resident.identityIndex = resident.personIndex;
+  });
+  const residentMap = new Map(residents.map((resident) => [resident.id, resident]));
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims"].forEach((key) => {
+    (Array.isArray(state[key]) ? state[key] : []).forEach((item) => {
+      item.personIndex = item.personIndex || personIndexForResident(residentMap, item.residentId);
+    });
+  });
+  (Array.isArray(state.accounts) ? state.accounts : []).forEach((account) => {
+    (Array.isArray(account.members) ? account.members : []).forEach((member) => {
+      member.personIndex = member.personIndex || personIndexForResident(residentMap, member.residentId);
+    });
+  });
+  return state;
+}
+
+function personIndexFromParts(idCard, phone) {
+  return `${String(idCard || "").trim()}#${String(phone || "").trim()}`;
+}
+
+function personIndexForResident(residentMap, residentId) {
+  const resident = residentMap.get(residentId);
+  return resident ? personIndexFromParts(resident.idCard, resident.phone) : "";
 }
 
 function serveStatic(req, res) {
@@ -418,6 +463,8 @@ async function handleApi(req, res) {
   if (req.method === "POST" && url.pathname === "/api/personal-records") {
     const data = readDatabase();
     const recordData = normalizePersonalRecord(await collectJson(req));
+    const residentMap = new Map(data.residents.map((resident) => [resident.id, resident]));
+    recordData.personIndex = recordData.personIndex || personIndexForResident(residentMap, recordData.residentId);
     data.personalRecords.push(recordData);
     writeDatabase(data);
     sendJson(res, 201, recordData);

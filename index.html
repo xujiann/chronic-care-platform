@@ -17,11 +17,13 @@
       </div>
       <nav class="nav" aria-label="主导航">
         <button class="nav-item active" data-view="dashboard">监管总览</button>
+        <button class="nav-item" data-view="chronic">慢病医防整合</button>
         <button class="nav-item" data-view="residents">居民档案</button>
         <button class="nav-item" data-view="diseases">慢病登记</button>
         <button class="nav-item" data-view="followups">随访管理</button>
         <button class="nav-item" data-view="analytics">统计分析</button>
         <button class="nav-item" data-view="governance">协同监管</button>
+        <button class="nav-item" data-view="planning">国家规划对齐</button>
       </nav>
     </aside>
 
@@ -59,6 +61,32 @@
               <h2>风险分布</h2>
             </div>
             <div id="risk-bars" class="bars"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="chronic" class="view">
+        <div class="metrics-grid" id="chronic-module-cards"></div>
+        <div class="content-grid">
+          <section class="panel wide">
+            <div class="panel-header">
+              <h2>慢病医防整合流程</h2>
+              <span>筛查、登记、干预、协同、支付、取药闭环</span>
+            </div>
+            <div class="timeline" id="chronic-flow"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-header">
+              <h2>管理规则</h2>
+            </div>
+            <div class="rule-list" id="chronic-rules"></div>
+          </section>
+          <section class="panel wide">
+            <div class="panel-header">
+              <h2>慢病纳管台账</h2>
+              <span>以身份证号 + 手机号统一索引</span>
+            </div>
+            <div class="table-wrap" id="chronic-ledger"></div>
           </section>
         </div>
       </section>
@@ -102,6 +130,32 @@
         </div>
       </section>
 
+      <section id="planning" class="view">
+        <div class="metrics-grid" id="planning-cards"></div>
+        <div class="content-grid">
+          <section class="panel wide">
+            <div class="panel-header">
+              <h2>规划要求与系统落点</h2>
+              <span>依据《“十四五”国家信息化规划》补齐健康城市能力</span>
+            </div>
+            <div class="table-wrap" id="planning-table"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-header">
+              <h2>建设原则</h2>
+            </div>
+            <div class="rule-list" id="planning-rules"></div>
+          </section>
+          <section class="panel wide">
+            <div class="panel-header">
+              <h2>数据与安全清单</h2>
+              <span>共享、监管、隐私、应急</span>
+            </div>
+            <div class="rule-list" id="planning-security"></div>
+          </section>
+        </div>
+      </section>
+
       <section id="residents" class="view">
         <section class="panel">
           <div class="panel-header">
@@ -117,7 +171,7 @@
             <table>
               <thead>
                 <tr>
-                  <th>姓名</th>
+                  <th>姓名 / 统一索引</th>
                   <th>性别</th>
                   <th>年龄</th>
                   <th>管理机构</th>

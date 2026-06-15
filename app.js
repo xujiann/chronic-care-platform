@@ -72,15 +72,29 @@ let state = structuredClone(seedState);
 
 const titles = {
   dashboard: ["监管总览", "卫生健康委端：统筹居民、医疗机构、医保和基层随访协同。"],
+  chronic: ["慢病医防整合", "作为卫健委端独立管理模块，统一管理筛查建档、慢病登记、随访干预、转诊协同、医保审核和固定取药。"],
   residents: ["居民档案", "管理居民基础信息、家庭医生和关键健康指标。"],
   diseases: ["慢病登记", "登记重点病种并基于指标生成风险分层。"],
   followups: ["随访管理", "跟踪计划、逾期提醒、干预建议和随访结果。"],
   analytics: ["统计分析", "按病种、机构、风险等级观察管理成效。"],
-  governance: ["协同监管", "监测四端贯通、机构绩效、数据质量和风险预警。"]
+  governance: ["协同监管", "监测四端贯通、机构绩效、数据质量和风险预警。"],
+  planning: ["国家规划对齐", "对照《“十四五”国家信息化规划》，补齐普惠数字医疗、数据共享、智慧监管、公共卫生应急和适老化服务。"]
 };
+
+const policyAlignmentDefaults = [
+  { domain: "普惠数字医疗", requirement: "建设权威统一、互通共享的全民健康信息平台，推动医疗卫生机构数据共享互认和业务协同。", capability: "以个人健康信息库聚合电子病历、检查检验、用药、授权和慢病管理数据。", status: "已启动" },
+  { domain: "医疗全流程在线办理", requirement: "加快异地转诊、就医、住院、医保等医疗全流程在线办理。", capability: "医疗机构端承接转诊协同，医保端承接结算审核，个人端承接固定取药和授权共享。", status: "原型完成" },
+  { domain: "互联网医疗监管", requirement: "完善互联网医疗服务监管体系，推进互联网+监管和智慧监管。", capability: "卫健委端建设四端运行监测、机构绩效、风险预警和数据质量看板。", status: "已纳入" },
+  { domain: "电子健康码与医保凭证", requirement: "普及居民电子健康码，加快医保电子凭证推广应用。", capability: "以身份证号+手机号形成 personIndex，后续可对接电子健康码、医保电子凭证和居民一卡通。", status: "数据底座完成" },
+  { domain: "公共卫生应急", requirement: "建立智慧化预警多点触发机制，支持公共卫生机构和医疗机构数据共享，做到早发现、早报告、早处置。", capability: "在风险预警中汇聚慢病高危、随访逾期、医保异常和资源负荷，预留公共卫生应急监测入口。", status: "待扩展" },
+  { domain: "基层智慧治理", requirement: "以数据驱动、信息共享提升基层治理和疫情防控能力。", capability: "基层机构、家庭医生、居民端、医保端共用同一居民主索引和慢病闭环台账。", status: "已启动" },
+  { domain: "数据安全与合规", requirement: "完善数据脱敏、加密保护、合规评估和安全保障体系。", capability: "增加授权共享、撤销授权、数据质量审计，后续补充分级权限、脱敏展示和日志留痕。", status: "待扩展" },
+  { domain: "适老化与无障碍", requirement: "优化信息无障碍环境，解决老年人等群体数字鸿沟。", capability: "个人端按手机视口设计，后续补充大字模式、家属代办、语音提示和线下帮办。", status: "待扩展" }
+];
 
 document.addEventListener("DOMContentLoaded", async () => {
   state = await loadState();
+  normalizePersonIndexes();
   bindNavigation();
   bindDialogs();
   bindForms();
@@ -93,6 +107,34 @@ function todayOffset(days) {
   const date = new Date();
   date.setDate(date.getDate() + days);
   return date.toISOString().slice(0, 10);
+}
+
+function normalizePersonIndexes() {
+  const residents = Array.isArray(state.residents) ? state.residents : [];
+  residents.forEach((resident) => {
+    resident.personIndex = personIndexFromParts(resident.idCard, resident.phone);
+    resident.identityIndex = resident.personIndex;
+  });
+  const residentMap = new Map(residents.map((resident) => [resident.id, resident]));
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims"].forEach((key) => {
+    (Array.isArray(state[key]) ? state[key] : []).forEach((item) => {
+      item.personIndex = item.personIndex || personIndexForResident(residentMap, item.residentId);
+    });
+  });
+  (Array.isArray(state.accounts) ? state.accounts : []).forEach((account) => {
+    (Array.isArray(account.members) ? account.members : []).forEach((member) => {
+      member.personIndex = member.personIndex || personIndexForResident(residentMap, member.residentId);
+    });
+  });
+}
+
+function personIndexFromParts(idCard, phone) {
+  return `${String(idCard || "").trim()}#${String(phone || "").trim()}`;
+}
+
+function personIndexForResident(residentMap, residentId) {
+  const resident = residentMap.get(residentId);
+  return resident ? personIndexFromParts(resident.idCard, resident.phone) : "";
 }
 
 async function loadState() {
@@ -123,6 +165,7 @@ async function loadState() {
 }
 
 async function saveState() {
+  normalizePersonIndexes();
   if (apiEnabled) {
     try {
       const response = await fetch(`${API_BASE}/state`, {
@@ -180,6 +223,8 @@ function bindForms() {
       gender: data.gender,
       birthDate: data.birthDate,
       phone: data.phone,
+      personIndex: personIndexFromParts(data.idCard, data.phone),
+      identityIndex: personIndexFromParts(data.idCard, data.phone),
       organization: data.organization,
       familyDoctor: data.familyDoctor,
       address: data.address,
@@ -201,6 +246,7 @@ function bindForms() {
   document.querySelector("#disease-form").addEventListener("submit", (event) => {
     event.preventDefault();
     const disease = { id: crypto.randomUUID(), ...Object.fromEntries(new FormData(event.currentTarget)) };
+    disease.personIndex = personIndexForResident(new Map(state.residents.map((resident) => [resident.id, resident])), disease.residentId);
     state.diseases.push(disease);
     saveState();
     event.currentTarget.reset();
@@ -213,6 +259,7 @@ function bindForms() {
     event.preventDefault();
     const followup = Object.fromEntries(new FormData(event.currentTarget));
     followup.id = followup.id || crypto.randomUUID();
+    followup.personIndex = personIndexForResident(new Map(state.residents.map((resident) => [resident.id, resident])), followup.residentId);
     upsert(state.followups, followup);
     saveState();
     event.currentTarget.closest("dialog").close();
@@ -242,11 +289,13 @@ function render() {
   refreshFollowupStatus();
   renderDataSource();
   renderDashboard();
+  renderChronicModule();
   renderResidents();
   renderDiseases();
   renderFollowups();
   renderAnalytics();
   renderGovernance();
+  renderPlanning();
 }
 
 function refreshFollowupStatus() {
@@ -287,11 +336,76 @@ function renderDashboard() {
   renderBars("#risk-bars", countBy(state.residents.map((item) => assessRisk(item).level)), ["低危", "中危", "高危"]);
 }
 
+function renderChronicModule() {
+  const container = document.querySelector("#chronic-module-cards");
+  if (!container) return;
+  const stats = getStats();
+  const chronicIds = new Set(state.diseases.map((item) => item.residentId));
+  const chronicResidents = state.residents.filter((item) => chronicIds.has(item.id));
+  const careOrders = state.careOrders || [];
+  const pickups = state.medicationPickups || [];
+  const claims = state.insuranceClaims || [];
+  const linkedIndexes = new Set([
+    ...state.diseases.map((item) => item.personIndex),
+    ...state.followups.map((item) => item.personIndex),
+    ...careOrders.map((item) => item.personIndex),
+    ...pickups.map((item) => item.personIndex),
+    ...claims.map((item) => item.personIndex)
+  ].filter(Boolean));
+
+  container.innerHTML = [
+    ["纳管居民", stats.chronicResidents, "已进入慢病医防整合管理"],
+    ["待随访", stats.pending, "基层家庭医生待处理"],
+    ["转诊协同", careOrders.length, "医疗机构协同任务"],
+    ["固定取药", pickups.length, "居民端每月取药计划"],
+    ["医保审核", claims.filter((item) => item.status !== "已通过").length, "待医保联审"],
+    ["主索引贯通", linkedIndexes.size, "身份证号 + 手机号"]
+  ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><em>${hint}</em></article>`).join("");
+
+  document.querySelector("#chronic-flow").innerHTML = [
+    "筛查建档",
+    "慢病登记",
+    "风险分层",
+    "随访干预",
+    "转诊协同",
+    "医保审核",
+    "固定取药"
+  ].map((step) => `<div>${step}</div>`).join("");
+
+  document.querySelector("#chronic-ledger").innerHTML = `<table>
+    <thead><tr><th>居民</th><th>统一索引</th><th>病种</th><th>风险</th><th>随访</th><th>协同</th><th>取药</th><th>医保</th></tr></thead>
+    <tbody>${chronicResidents.map((resident) => {
+      const diseases = state.diseases.filter((item) => item.residentId === resident.id).map((item) => item.type).join("、");
+      const followups = state.followups.filter((item) => item.residentId === resident.id && item.status !== "已完成").length;
+      const orders = careOrders.filter((item) => item.residentId === resident.id).length;
+      const residentPickups = pickups.filter((item) => item.residentId === resident.id).length;
+      const residentClaims = claims.filter((item) => item.residentId === resident.id && item.status !== "已通过").length;
+      const risk = assessRisk(resident);
+      return `<tr>
+        <td>${resident.name}</td>
+        <td><span class="subtle">${resident.personIndex}</span></td>
+        <td>${diseases}</td>
+        <td><span class="badge risk-${risk.level}">${risk.level}</span></td>
+        <td>${followups}</td>
+        <td>${orders}</td>
+        <td>${residentPickups}</td>
+        <td>${residentClaims}</td>
+      </tr>`;
+    }).join("")}</tbody>
+  </table>`;
+
+  document.querySelector("#chronic-rules").innerHTML = [
+    ["统一主索引", "居民个人数据统一使用“身份证号 + 手机号”形成 personIndex，跨端数据仍保留 residentId 便于内部关联。"],
+    ["卫健委管理职责", "负责慢病纳管、质量控制、机构绩效、资源配置和跨端运行监测。"],
+    ["跨端闭环", "个人端固定取药、医疗机构协同、医保审核结果统一回流到慢病医防整合模块。"]
+  ].map(([title, text]) => `<div><strong>${title}</strong><span>${text}</span></div>`).join("");
+}
+
 function renderResidents() {
   const keyword = document.querySelector("#resident-search")?.value?.trim() || "";
   const org = document.querySelector("#resident-org-filter")?.value || "";
   const rows = state.residents.filter((item) => {
-    const matchesKeyword = [item.name, item.idCard, item.phone].some((value) => value.includes(keyword));
+    const matchesKeyword = [item.name, item.idCard, item.phone, item.personIndex].some((value) => String(value || "").includes(keyword));
     const matchesOrg = !org || item.organization === org;
     return matchesKeyword && matchesOrg;
   });
@@ -299,7 +413,7 @@ function renderResidents() {
     .map((item) => {
       const risk = assessRisk(item);
       return `<tr>
-        <td><strong>${item.name}</strong><br><span class="subtle">${item.phone}</span></td>
+        <td><strong>${item.name}</strong><br><span class="subtle">${item.personIndex}</span></td>
         <td>${item.gender}</td>
         <td>${ageOf(item.birthDate)}</td>
         <td>${item.organization}</td>
@@ -375,6 +489,41 @@ function renderGovernance() {
   renderMedicalResources();
   renderPerformanceTable();
   renderQualityBars();
+}
+
+function renderPlanning() {
+  const items = state.policyAlignment || policyAlignmentDefaults;
+  const started = items.filter((item) => ["已启动", "原型完成", "已纳入", "数据底座完成"].includes(item.status)).length;
+  const pending = items.length - started;
+  const sharedCollections = ["residents", "personalRecords", "diseases", "followups", "careOrders", "insuranceClaims", "medicationPickups"];
+  const indexedCollections = sharedCollections.filter((key) => (state[key] || []).some((item) => item.personIndex));
+  document.querySelector("#planning-cards").innerHTML = [
+    ["规划映射", items.length, "国家信息化规划能力项"],
+    ["已落地/已启动", started, "可在当前 MVP 中演示"],
+    ["待扩展", pending, "安全、应急、适老化深化"],
+    ["共享数据集", indexedCollections.length, "已接入 personIndex"],
+    ["授权记录", (state.personalRecords || []).filter((item) => item.category === "authorizations").length, "居民授权共享"],
+    ["监管预警", document.querySelectorAll("#warning-list .list-item").length || 0, "风险识别入口"]
+  ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><em>${hint}</em></article>`).join("");
+
+  document.querySelector("#planning-table").innerHTML = `<table>
+    <thead><tr><th>规划方向</th><th>规划要求</th><th>系统落点</th><th>状态</th></tr></thead>
+    <tbody>${items.map((item) => `<tr><td>${item.domain}</td><td>${item.requirement}</td><td>${item.capability}</td><td><span class="badge ${item.status.includes("待") ? "warn" : "info"}">${item.status}</span></td></tr>`).join("")}</tbody>
+  </table>`;
+
+  document.querySelector("#planning-rules").innerHTML = [
+    ["一体化", "卫健委、医疗机构、医保、个人端共享同一居民主索引，减少重复采集。"],
+    ["普惠化", "个人端优先围绕健康档案、电子病历、慢病取药和授权共享，服务普通居民与老年慢病人群。"],
+    ["监管化", "把医疗资源、机构绩效、医保审核、慢病质量和数据质量纳入卫健委端统一监管。"],
+    ["开放化", "项目按 MIT 协议开源，适合继续拆分为前端静态演示和后端 API 服务。"]
+  ].map(([title, text]) => `<div><strong>${title}</strong><span>${text}</span></div>`).join("");
+
+  document.querySelector("#planning-security").innerHTML = [
+    ["数据最小够用", "演示环境只使用样例身份证号和手机号；真实部署需采用脱敏、加密、分级授权和审计日志。"],
+    ["授权优先", "个人健康信息库通过授权记录控制医疗机构、家庭医生和区域平台的数据查看范围。"],
+    ["应急预留", "公共卫生应急可从风险预警扩展，接入传染病、资源负荷、药品物资和多点触发预警。"],
+    ["适老化预留", "居民端后续增加大字模式、家属代办、固定取药提醒、线下服务二维码和无障碍标签。"]
+  ].map(([title, text]) => `<div><strong>${title}</strong><span>${text}</span></div>`).join("");
 }
 
 function renderPortalGrid() {
@@ -495,6 +644,10 @@ function openResidentDetail(id) {
         <strong>${resident.idCard}</strong>
       </article>
       <article>
+        <span>统一索引</span>
+        <strong>${resident.personIndex}</strong>
+      </article>
+      <article>
         <span>风险等级</span>
         <strong><span class="badge risk-${risk.level}">${risk.level}</span></strong>
       </article>
@@ -605,13 +758,14 @@ function ageOf(birthDate) {
 
 function exportCsv() {
   const rows = [
-    ["姓名", "身份证号", "性别", "年龄", "联系电话", "管理机构", "家庭医生", "风险等级", "收缩压", "舒张压", "空腹血糖", "BMI", "慢病登记", "待随访数", "逾期随访数"],
+    ["姓名", "统一索引", "身份证号", "性别", "年龄", "联系电话", "管理机构", "家庭医生", "风险等级", "收缩压", "舒张压", "空腹血糖", "BMI", "慢病登记", "待随访数", "逾期随访数"],
     ...state.residents.map((resident) => {
       const risk = assessRisk(resident);
       const diseases = state.diseases.filter((item) => item.residentId === resident.id).map((item) => item.type).join("、") || "无";
       const followups = state.followups.filter((item) => item.residentId === resident.id);
       return [
         resident.name,
+        resident.personIndex,
         resident.idCard,
         resident.gender,
         ageOf(resident.birthDate),
