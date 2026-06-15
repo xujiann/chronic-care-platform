@@ -79,6 +79,7 @@ const titles = {
   analytics: ["统计分析", "按病种、机构、风险等级观察管理成效。"],
   governance: ["协同监管", "监测四端贯通、机构绩效、数据质量和风险预警。"],
   emergency: ["公共卫生应急", "建设多点触发预警、资源调配、快速报送和协同处置能力，支撑早发现、早报告、早处置。"],
+  security: ["数据安全审计", "围绕个人健康信息授权、访问留痕、脱敏展示、分级权限和合规审计构建安全底座。"],
   planning: ["国家规划对齐", "对照《“十四五”国家信息化规划》，补齐普惠数字医疗、数据共享、智慧监管、公共卫生应急和适老化服务。"]
 };
 
@@ -297,6 +298,7 @@ function render() {
   renderAnalytics();
   renderGovernance();
   renderEmergency();
+  renderSecurity();
   renderPlanning();
 }
 
@@ -575,6 +577,61 @@ function renderEmergency() {
       <td>${Number(item.beds || 0) >= 500 ? "区域救治支撑" : "基层监测随访"}</td>
     </tr>`).join("")}</tbody>
   </table>`;
+}
+
+function renderSecurity() {
+  const logs = state.dataAccessLogs || [];
+  const authorizations = (state.personalRecords || []).filter((item) => item.category === "authorizations");
+  const activeAuth = authorizations.filter((item) => item.meta?.status !== "revoked").length;
+  const sensitiveCollections = ["residents", "personalRecords", "insuranceClaims", "medicationPickups", "seniorServices"];
+  const indexed = sensitiveCollections.filter((key) => (state[key] || []).some((item) => item.personIndex || item.identityIndex)).length;
+  const denied = logs.filter((item) => item.result === "拒绝").length;
+
+  document.querySelector("#security-cards").innerHTML = [
+    ["访问日志", logs.length, "跨端访问留痕"],
+    ["有效授权", activeAuth, "居民授权共享"],
+    ["拒绝访问", denied, "越权或授权不足"],
+    ["敏感数据集", sensitiveCollections.length, "需分级保护"],
+    ["已索引数据集", indexed, "personIndex 贯通"],
+    ["脱敏策略", 4, "身份证、手机号、病历、医保"]
+  ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><em>${hint}</em></article>`).join("");
+
+  document.querySelector("#audit-count").textContent = `${logs.length} 条`;
+  document.querySelector("#audit-table").innerHTML = `<table>
+    <thead><tr><th>时间</th><th>访问方</th><th>居民</th><th>数据范围</th><th>用途</th><th>结果</th></tr></thead>
+    <tbody>${logs.map((log) => {
+      const resident = findResident(log.residentId);
+      return `<tr>
+        <td>${log.at}</td>
+        <td>${log.actor}</td>
+        <td>${resident?.name || log.personIndex || "未知"}</td>
+        <td>${log.scope}</td>
+        <td>${log.purpose}</td>
+        <td><span class="badge ${log.result === "拒绝" ? "danger" : "info"}">${log.result}</span></td>
+      </tr>`;
+    }).join("")}</tbody>
+  </table>`;
+
+  document.querySelector("#authorization-list").innerHTML = authorizations
+    .map((item) => {
+      const resident = findResident(item.residentId);
+      const revoked = item.meta?.status === "revoked";
+      return `<div class="list-item">
+        <div>
+          <strong>${resident?.name || "未知居民"} · ${item.name}</strong><br>
+          <small>${item.result} · ${item.date}</small>
+        </div>
+        <span class="badge ${revoked ? "warn" : "info"}">${revoked ? "已撤销" : "有效"}</span>
+      </div>`;
+    })
+    .join("") || `<div class="subtle">暂无居民授权记录。</div>`;
+
+  document.querySelector("#security-rules").innerHTML = [
+    ["身份证与手机号脱敏", "列表默认只展示后四位，完整 personIndex 仅在授权详情、审计导出或管理员权限下查看。"],
+    ["最小必要授权", "医疗机构、医保端和基层团队按诊疗、审核、随访、取药等用途申请不同数据范围。"],
+    ["全量访问留痕", "所有查看电子病历、检查检验、医保结算和授权记录的动作写入 dataAccessLogs。"],
+    ["异常访问预警", "拒绝访问、非工作时间批量查看、跨机构查看等行为进入协同监管和安全审计看板。"]
+  ].map(([title, text]) => `<div><strong>${title}</strong><span>${text}</span></div>`).join("");
 }
 
 function renderPortalGrid() {

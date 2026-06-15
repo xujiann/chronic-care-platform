@@ -115,6 +115,7 @@ function seedState() {
     policyAlignment: seedPolicyAlignment(),
     emergencySignals: seedEmergencySignals(),
     seniorServices: seedSeniorServices(),
+    dataAccessLogs: seedDataAccessLogs(),
     personalRecords: seedPersonalRecords()
   };
 }
@@ -132,6 +133,15 @@ function seedSeniorServices() {
     { id: "ss1", residentId: "r4", service: "家属代办取药", channel: "个人端", status: "已开通", contact: "王建国", nextAction: "每月 15 日提醒家属确认取药" },
     { id: "ss2", residentId: "r1", service: "大字模式提醒", channel: "手机端", status: "待开通", contact: "本人", nextAction: "下次登录提示开启适老显示" },
     { id: "ss3", residentId: "r2", service: "线下帮办预约", channel: "社区服务站", status: "已预约", contact: "本人", nextAction: "社区工作人员协助绑定医保电子凭证" }
+  ];
+}
+
+function seedDataAccessLogs() {
+  return [
+    { id: "al1", residentId: "r1", at: "2026-06-15 09:12", actor: "青泥洼桥社区卫生服务中心", role: "家庭医生", scope: "健康档案、随访记录", purpose: "慢病随访", result: "允许" },
+    { id: "al2", residentId: "r1", at: "2026-06-15 10:35", actor: "大连市中心医院", role: "医疗机构", scope: "电子病历摘要、用药处方", purpose: "专科复诊", result: "允许" },
+    { id: "al3", residentId: "r2", at: "2026-06-15 11:20", actor: "医保端审核员", role: "医保监管", scope: "医保结算、诊断摘要", purpose: "慢病结算审核", result: "允许" },
+    { id: "al4", residentId: "r4", at: "2026-06-15 14:08", actor: "未授权机构", role: "外部机构", scope: "完整电子病历", purpose: "未知", result: "拒绝" }
   ];
 }
 
@@ -374,6 +384,7 @@ function normalizeState(data) {
     policyAlignment: Array.isArray(data.policyAlignment) ? data.policyAlignment : seedPolicyAlignment(),
     emergencySignals: Array.isArray(data.emergencySignals) ? data.emergencySignals : seedEmergencySignals(),
     seniorServices: Array.isArray(data.seniorServices) ? data.seniorServices : seedSeniorServices(),
+    dataAccessLogs: Array.isArray(data.dataAccessLogs) ? data.dataAccessLogs : seedDataAccessLogs(),
     personalRecords: Array.isArray(data.personalRecords) ? data.personalRecords : seedPersonalRecords()
   };
   return normalizePersonIndexes(state);
@@ -406,7 +417,7 @@ function normalizePersonIndexes(state) {
     resident.identityIndex = resident.personIndex;
   });
   const residentMap = new Map(residents.map((resident) => [resident.id, resident]));
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs"].forEach((key) => {
     (Array.isArray(state[key]) ? state[key] : []).forEach((item) => {
       item.personIndex = item.personIndex || personIndexForResident(residentMap, item.residentId);
     });
