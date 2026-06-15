@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderMetrics(state);
   renderClaims(state);
   renderSupervisions(state);
+  renderInsuranceAudit(state);
 });
 
 function residentOf(state, id) {
@@ -57,4 +58,20 @@ function renderSupervisions(state) {
       <span class="badge ${badge}">${item.level}</span>
     </section>`;
   }).join("") || `<p class="muted">暂无机构监管事项。</p>`;
+}
+
+function renderInsuranceAudit(state) {
+  const logs = (state.dataAccessLogs || []).filter((item) => item.role === "医保监管");
+  document.querySelector("#insurance-audit-count").textContent = `${logs.length} 条`;
+  document.querySelector("#insurance-audit").innerHTML = logs.map((log) => {
+    const resident = residentOf(state, log.residentId);
+    return `<section class="item">
+      <div>
+        <h3>${resident?.name || "未知居民"} · ${log.scope}</h3>
+        <p>${log.actor} · ${log.at}</p>
+        <p>${log.purpose} · ${log.personIndex || "未生成统一索引"}</p>
+      </div>
+      <span class="badge info">${log.result}</span>
+    </section>`;
+  }).join("") || `<p class="muted">暂无医保审核访问留痕。</p>`;
 }

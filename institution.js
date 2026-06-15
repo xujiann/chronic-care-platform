@@ -6,6 +6,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderCareOrders(state);
   renderAuthorizedRecords(state);
   renderClaimLinks(state);
+  renderInstitutionAudit(state);
   renderPickups(state);
 });
 
@@ -68,6 +69,24 @@ function renderClaimLinks(state) {
       <span>${claim.institution}<br>${money(claim.totalAmount)} · ${claim.status}</span>
     </article>`;
   }).join("");
+}
+
+function renderInstitutionAudit(state) {
+  const logs = state.dataAccessLogs || [];
+  const institutionLogs = logs.filter((item) => ["医疗机构", "家庭医生"].includes(item.role));
+  document.querySelector("#audit-link-count").textContent = `${institutionLogs.length} 条`;
+  document.querySelector("#institution-audit").innerHTML = institutionLogs.map((log) => {
+    const resident = residentOf(state, log.residentId);
+    const badge = log.result === "拒绝" ? "danger" : "info";
+    return `<section class="item">
+      <div>
+        <h3>${resident?.name || "未知居民"} · ${log.scope}</h3>
+        <p>${log.actor} · ${log.role} · ${log.at}</p>
+        <p>${log.purpose} · ${log.personIndex || "未生成统一索引"}</p>
+      </div>
+      <span class="badge ${badge}">${log.result}</span>
+    </section>`;
+  }).join("") || `<p class="muted">暂无机构端访问审计记录。</p>`;
 }
 
 function renderPickups(state) {
