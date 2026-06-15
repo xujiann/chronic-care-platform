@@ -10,6 +10,12 @@ async function loadPlatformState(fallback) {
       // Static fallback below.
     }
   }
+  try {
+    const response = await fetch("./data/db.json");
+    if (response.ok) return await response.json();
+  } catch (error) {
+    // Browser storage fallback below.
+  }
   const saved = localStorage.getItem(STORAGE_KEY);
   return saved ? JSON.parse(saved) : fallback;
 }

@@ -4,6 +4,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const state = await loadPlatformState(fallbackState);
   renderMetrics(state);
   renderClaims(state);
+  renderSupervisions(state);
 });
 
 function residentOf(state, id) {
@@ -39,4 +40,21 @@ function renderClaims(state) {
       <span class="badge ${risk}">${claim.status}</span>
     </section>`;
   }).join("");
+}
+
+function renderSupervisions(state) {
+  const items = state.institutionSupervisions || [];
+  document.querySelector("#supervision-count").textContent = `${items.length} 项`;
+  document.querySelector("#supervision-list").innerHTML = items.map((item) => {
+    const badge = item.level === "关注" ? "warn" : item.level === "提示" ? "info" : "";
+    const resource = (state.medicalResources || []).find((row) => row.institution === item.institution);
+    return `<section class="item">
+      <div>
+        <h3>${item.institution} · ${item.issue}</h3>
+        <p>${resource ? `${resource.type} · ${resource.region} · 医生 ${resource.doctors} · 床位 ${resource.beds}` : "机构资源待补充"}</p>
+        <p>${item.action} · ${item.status}</p>
+      </div>
+      <span class="badge ${badge}">${item.level}</span>
+    </section>`;
+  }).join("") || `<p class="muted">暂无机构监管事项。</p>`;
 }

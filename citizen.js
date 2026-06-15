@@ -156,6 +156,12 @@ async function loadState() {
       // Fall back to browser data below.
     }
   }
+  try {
+    const response = await fetch("./data/db.json");
+    if (response.ok) return await response.json();
+  } catch (error) {
+    // Fall back to browser data below.
+  }
   const saved = localStorage.getItem(STORAGE_KEY);
   return saved ? JSON.parse(saved) : fallbackState;
 }
@@ -224,6 +230,7 @@ function renderCitizen(residentId) {
   renderEmr(records);
   renderDiseases(diseases, risk);
   renderFollowups(followups);
+  renderPickups(resident.id);
 }
 
 function renderVault(resident, diseases, followups, records) {
@@ -340,6 +347,19 @@ function renderFollowups(followups) {
       <span class="status ${item.status === "已逾期" ? "danger" : item.status === "待随访" ? "warn" : ""}">${item.status}</span>
     </article>`)
     .join("") || `<p class="muted">暂无随访提醒。</p>`;
+}
+
+function renderPickups(residentId) {
+  const pickups = (state.medicationPickups || []).filter((item) => item.residentId === residentId).sort(sortByDateDesc);
+  document.querySelector("#pickup-cards").innerHTML = pickups
+    .map((item) => `<article class="mini-card">
+      <h3>${item.medication}</h3>
+      <p class="muted">${item.dosage} · 每月 ${item.pickupDay} 日</p>
+      <p>${item.pharmacy}</p>
+      <p>下次取药：${item.nextPickup}</p>
+      <span class="status ${item.status === "待取药" ? "warn" : ""}">${item.status} · ${item.coverage}</span>
+    </article>`)
+    .join("") || `<p class="muted">暂无固定取药计划。</p>`;
 }
 
 function assessRisk(resident) {

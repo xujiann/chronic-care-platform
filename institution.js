@@ -6,6 +6,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderCareOrders(state);
   renderAuthorizedRecords(state);
   renderClaimLinks(state);
+  renderPickups(state);
 });
 
 function residentOf(state, id) {
@@ -67,4 +68,21 @@ function renderClaimLinks(state) {
       <span>${claim.institution}<br>${money(claim.totalAmount)} · ${claim.status}</span>
     </article>`;
   }).join("");
+}
+
+function renderPickups(state) {
+  const pickups = state.medicationPickups || [];
+  document.querySelector("#pickup-count").textContent = `${pickups.length} 项`;
+  document.querySelector("#pickup-list").innerHTML = pickups.map((item) => {
+    const resident = residentOf(state, item.residentId);
+    const badge = item.status === "待取药" ? "warn" : item.status === "已预约" ? "info" : "";
+    return `<section class="item">
+      <div>
+        <h3>${resident?.name || "未知居民"} · ${item.medication}</h3>
+        <p>${item.pharmacy} · 每月 ${item.pickupDay} 日 · 下次 ${item.nextPickup}</p>
+        <p>${item.dosage} · ${item.coverage}</p>
+      </div>
+      <span class="badge ${badge}">${item.status}</span>
+    </section>`;
+  }).join("") || `<p class="muted">暂无固定取药计划。</p>`;
 }

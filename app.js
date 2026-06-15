@@ -108,6 +108,15 @@ async function loadState() {
       apiEnabled = false;
     }
   }
+  try {
+    const response = await fetch("./data/db.json");
+    if (response.ok) {
+      showToast("已加载开源演示数据");
+      return await response.json();
+    }
+  } catch (error) {
+    // Browser data fallback below.
+  }
   const saved = localStorage.getItem(STORAGE_KEY);
   showToast("未连接本地服务，已切换为浏览器本地模式");
   return saved ? JSON.parse(saved) : structuredClone(seedState);
@@ -363,6 +372,7 @@ function renderAnalytics() {
 function renderGovernance() {
   renderPortalGrid();
   renderWarnings();
+  renderMedicalResources();
   renderPerformanceTable();
   renderQualityBars();
 }
@@ -396,6 +406,18 @@ function renderWarnings() {
   document.querySelector("#warning-list").innerHTML = warnings
     .map(([name, title, detail, level]) => `<div class="list-item"><div><strong>${name} · ${title}</strong><br><small>${detail}</small></div><span class="badge ${level}">${level === "danger" ? "高" : level === "warn" ? "中" : "提示"}</span></div>`)
     .join("") || `<div class="subtle">暂无风险预警。</div>`;
+}
+
+function renderMedicalResources() {
+  const resources = state.medicalResources || [];
+  const beds = resources.reduce((sum, item) => sum + Number(item.beds || 0), 0);
+  const doctors = resources.reduce((sum, item) => sum + Number(item.doctors || 0), 0);
+  const clinics = resources.reduce((sum, item) => sum + Number(item.chronicClinics || 0), 0);
+  document.querySelector("#resource-summary").textContent = `${resources.length} 家机构 · ${beds} 张床位 · ${doctors} 名医生 · ${clinics} 个慢病门诊`;
+  document.querySelector("#resource-table").innerHTML = `<table>
+    <thead><tr><th>机构</th><th>类型</th><th>区域</th><th>床位</th><th>医生</th><th>护士</th><th>慢病门诊</th><th>设备</th></tr></thead>
+    <tbody>${resources.map((row) => `<tr><td>${row.institution}</td><td>${row.type}</td><td>${row.region}</td><td>${row.beds}</td><td>${row.doctors}</td><td>${row.nurses}</td><td>${row.chronicClinics}</td><td>${row.devices}</td></tr>`).join("")}</tbody>
+  </table>`;
 }
 
 function renderPerformanceTable() {
