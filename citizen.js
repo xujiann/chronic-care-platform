@@ -232,6 +232,7 @@ function renderCitizen(residentId) {
   renderFollowups(followups);
   renderPickups(resident.id);
   renderSeniorServices(resident.id);
+  renderAccessLogs(resident.id);
 }
 
 function renderVault(resident, diseases, followups, records) {
@@ -375,6 +376,20 @@ function renderSeniorServices(residentId) {
       <span class="status ${item.status === "待开通" ? "warn" : ""}">${item.status}</span>
     </article>`)
     .join("") || `<p class="muted">暂无适老服务配置。</p>`;
+}
+
+function renderAccessLogs(residentId) {
+  const target = document.querySelector("#access-log-cards");
+  if (!target) return;
+  const logs = (state.dataAccessLogs || []).filter((item) => item.residentId === residentId).slice(0, 4);
+  target.innerHTML = logs
+    .map((item) => `<article class="mini-card">
+      <h3>${item.actor}</h3>
+      <p class="muted">${item.at} · ${item.purpose}</p>
+      <p>${item.scope}</p>
+      <span class="status ${item.result === "拒绝" ? "danger" : ""}">${item.result}</span>
+    </article>`)
+    .join("") || `<p class="muted">暂无访问记录。</p>`;
 }
 
 function assessRisk(resident) {
