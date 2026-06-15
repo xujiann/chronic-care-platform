@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>健康城市四端协同系统</title>
+    <link rel="stylesheet" href="./portal.css" />
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>开源健康城市系统</span>
+          <h1>四端协同总览</h1>
+          <p>以居民健康账户为核心，贯通卫生健康委、医疗机构、医保和个人端，支撑慢病管理、资源监管、结算审核和固定取药。</p>
+        </div>
+        <nav>
+          <a href="./index.html">卫健委端</a>
+          <a href="./institution.html">医疗机构端</a>
+          <a href="./insurance.html">医保端</a>
+          <a href="./citizen.html">个人端</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid">
+        <article class="metric-card">
+          <span>系统定位</span>
+          <strong>健康城市</strong>
+          <small>四端协同开源 MVP</small>
+        </article>
+        <article class="metric-card">
+          <span>核心数据</span>
+          <strong>统一档案</strong>
+          <small>居民、病历、医保、资源</small>
+        </article>
+        <article class="metric-card">
+          <span>部署方式</span>
+          <strong>静态+API</strong>
+          <small>GitHub Pages / Node.js</small>
+        </article>
+        <article class="metric-card">
+          <span>开源协议</span>
+          <strong>MIT</strong>
+          <small>可学习、演示、二开</small>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>四端功能</h2>
+          </div>
+          <div class="capability-grid">
+            <a class="capability-card" href="./index.html">
+              <strong>卫生健康委端</strong>
+              <span>监管总览、医疗资源监管、机构绩效、风险预警、数据质量、四端运行监测。</span>
+            </a>
+            <a class="capability-card" href="./institution.html">
+              <strong>医疗机构端</strong>
+              <span>协同任务、授权健康档案、医保贯通提示、固定取药协同。</span>
+            </a>
+            <a class="capability-card" href="./insurance.html">
+              <strong>医保端</strong>
+              <span>慢病结算审核、基金支付、控费规则、医疗机构监管。</span>
+            </a>
+            <a class="capability-card" href="./citizen.html">
+              <strong>个人端</strong>
+              <span>个人健康信息库、电子病历、检查检验、授权共享、每月固定取药。</span>
+            </a>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>数据贯通</h2>
+          </div>
+          <div class="rules">
+            <div><strong>居民主索引</strong><span>以居民档案关联个人账户、家属、慢病、随访。</span></div>
+            <div><strong>个人健康信息库</strong><span>统一保存电子病历、检查检验、用药、过敏、接种、住院、授权。</span></div>
+            <div><strong>协同业务</strong><span>医疗协同、医保结算、固定取药和资源监管共用同一数据底座。</span></div>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>核心数据模型</h2>
+          <span>当前 MVP 使用 data/db.json，后续可升级为 SQLite/PostgreSQL</span>
+        </div>
+        <div class="model-grid">
+          <div><strong>accounts</strong><span>个人账户与家庭成员关系</span></div>
+          <div><strong>residents</strong><span>居民基础档案与健康指标</span></div>
+          <div><strong>diseases</strong><span>慢病登记与管理状态</span></div>
+          <div><strong>followups</strong><span>随访计划与随访结果</span></div>
+          <div><strong>personalRecords</strong><span>个人健康信息库</span></div>
+          <div><strong>medicalResources</strong><span>医疗资源监管数据</span></div>
+          <div><strong>careOrders</strong><span>医疗机构协同任务</span></div>
+          <div><strong>medicationPickups</strong><span>每月固定取药计划</span></div>
+          <div><strong>insuranceClaims</strong><span>医保结算审核</span></div>
+          <div><strong>institutionSupervisions</strong><span>医保端医疗机构监管事项</span></div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

@@ -57,6 +57,12 @@ http://localhost:5173
 
 ## 居民端预览
 
+系统总览：
+
+```text
+https://xujiann.github.io/chronic-care-platform/health-city.html
+```
+
 服务模式：
 
 ```text
