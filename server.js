@@ -111,6 +111,7 @@ function seedState() {
       { id: "f4", residentId: "r3", diseaseType: "健康管理", plannedAt: todayOffset(-5), assignee: "孙医生", status: "已完成", result: "控制良好", advice: "保持运动" }
     ],
     medicalResources: seedMedicalResources(),
+    healthStatistics: seedHealthStatistics(),
     careOrders: seedCareOrders(),
     medicationPickups: seedMedicationPickups(),
     institutionSupervisions: seedInstitutionSupervisions(),
@@ -425,6 +426,36 @@ function seedMedicalResources() {
   ];
 }
 
+function seedHealthStatistics() {
+  return {
+    period: "2026-05",
+    basis: "依据卫生健康统计工作管理要求，围绕统计调查制度、数据质量控制、机构报送责任和直报系统校验，形成医疗卫生资源与诊疗服务量统计。",
+    sources: [
+      { id: "his", name: "医疗机构接口", system: "HIS/EMR/住院管理/人力资源接口", scope: "床位、医生、护士、门急诊、住院、出院、床日", updateCycle: "日采集、月汇总", status: "已接入" },
+      { id: "direct", name: "卫生健康统计直报系统", system: "卫生健康统计网络直报", scope: "机构资源年报/月报、医疗服务量、住院服务量", updateCycle: "月报、季报、年报", status: "对账中" }
+    ],
+    resourceReports: [
+      { institutionId: "mr1", institution: "大连市中心医院", region: "市级", type: "三级医院", interfaceData: { beds: 1200, doctors: 860, nurses: 1240 }, directReport: { beds: 1198, doctors: 858, nurses: 1242 }, status: "待复核", issue: "床位和人员口径存在小幅差异" },
+      { institutionId: "mr2", institution: "大连医科大学附属医院", region: "市级", type: "三级医院", interfaceData: { beds: 1500, doctors: 980, nurses: 1380 }, directReport: { beds: 1500, doctors: 980, nurses: 1378 }, status: "待复核", issue: "护士数需与直报系统核对" },
+      { institutionId: "mr3", institution: "青泥洼桥社区卫生服务中心", region: "中山区", type: "基层医疗机构", interfaceData: { beds: 60, doctors: 42, nurses: 58 }, directReport: { beds: 60, doctors: 42, nurses: 58 }, status: "已一致", issue: "无" },
+      { institutionId: "mr4", institution: "星海湾社区卫生服务中心", region: "沙河口区", type: "基层医疗机构", interfaceData: { beds: 45, doctors: 36, nurses: 44 }, directReport: { beds: 45, doctors: 35, nurses: 44 }, status: "待复核", issue: "医生数差异 1 人" },
+      { institutionId: "mr5", institution: "甘井子区人民医院", region: "甘井子区", type: "区级医院", interfaceData: { beds: 520, doctors: 310, nurses: 430 }, directReport: { beds: 520, doctors: 310, nurses: 430 }, status: "已一致", issue: "无" }
+    ],
+    serviceReports: [
+      { institutionId: "mr1", institution: "大连市中心医院", interfaceData: { outpatientVisits: 128600, emergencyVisits: 18600, inpatientAdmissions: 9200, discharges: 9050, bedDays: 286000 }, directReport: { outpatientVisits: 128420, emergencyVisits: 18620, inpatientAdmissions: 9190, discharges: 9042, bedDays: 285600 }, status: "待复核" },
+      { institutionId: "mr2", institution: "大连医科大学附属医院", interfaceData: { outpatientVisits: 146200, emergencyVisits: 16400, inpatientAdmissions: 10120, discharges: 10080, bedDays: 318500 }, directReport: { outpatientVisits: 146200, emergencyVisits: 16380, inpatientAdmissions: 10110, discharges: 10075, bedDays: 318420 }, status: "已一致" },
+      { institutionId: "mr3", institution: "青泥洼桥社区卫生服务中心", interfaceData: { outpatientVisits: 18600, emergencyVisits: 420, inpatientAdmissions: 120, discharges: 118, bedDays: 1860 }, directReport: { outpatientVisits: 18580, emergencyVisits: 420, inpatientAdmissions: 120, discharges: 118, bedDays: 1860 }, status: "已一致" },
+      { institutionId: "mr4", institution: "星海湾社区卫生服务中心", interfaceData: { outpatientVisits: 14200, emergencyVisits: 360, inpatientAdmissions: 86, discharges: 84, bedDays: 1260 }, directReport: { outpatientVisits: 14120, emergencyVisits: 360, inpatientAdmissions: 84, discharges: 84, bedDays: 1260 }, status: "待复核" },
+      { institutionId: "mr5", institution: "甘井子区人民医院", interfaceData: { outpatientVisits: 64200, emergencyVisits: 7200, inpatientAdmissions: 4260, discharges: 4200, bedDays: 128800 }, directReport: { outpatientVisits: 64240, emergencyVisits: 7180, inpatientAdmissions: 4260, discharges: 4196, bedDays: 128600 }, status: "待复核" }
+    ],
+    qualityRules: [
+      { rule: "资源口径一致", detail: "床位、执业医生、注册护士以机构接口与统计直报系统双源比对，差异超过 1% 标记复核。", status: "已配置" },
+      { rule: "诊疗量完整", detail: "门急诊、入院、出院、实际占用总床日按月汇总，缺报或异常波动进入质量清单。", status: "已配置" },
+      { rule: "报送责任留痕", detail: "按机构、周期、来源记录采集状态和复核状态，支持卫健委端追踪。", status: "已配置" }
+    ]
+  };
+}
+
 function seedCareOrders() {
   return [
     {
@@ -634,6 +665,7 @@ function normalizeState(data) {
     diseases: Array.isArray(data.diseases) ? data.diseases : [],
     followups: Array.isArray(data.followups) ? data.followups : [],
     medicalResources: Array.isArray(data.medicalResources) ? data.medicalResources : seedMedicalResources(),
+    healthStatistics: data.healthStatistics && typeof data.healthStatistics === "object" ? data.healthStatistics : seedHealthStatistics(),
     careOrders: Array.isArray(data.careOrders) ? data.careOrders : seedCareOrders(),
     medicationPickups: Array.isArray(data.medicationPickups) ? data.medicationPickups : seedMedicationPickups(),
     institutionSupervisions: Array.isArray(data.institutionSupervisions) ? data.institutionSupervisions : seedInstitutionSupervisions(),

@@ -506,12 +506,14 @@ function renderFollowups() {
 function renderAnalytics() {
   renderBars("#disease-bars", countBy(state.diseases.map((item) => item.type)), ["高血压", "糖尿病", "冠心病", "脑卒中"]);
   renderBars("#org-bars", countBy(state.residents.map((item) => item.organization)), organizations);
+  renderStatisticsAnalytics();
 }
 
 function renderGovernance() {
   renderPortalGrid();
   renderWarnings();
   renderMedicalResources();
+  renderHealthStatistics();
   renderPerformanceTable();
   renderQualityBars();
 }
@@ -761,6 +763,137 @@ function renderMedicalResources() {
     <thead><tr><th>机构</th><th>类型</th><th>区域</th><th>床位</th><th>医生</th><th>护士</th><th>慢病门诊</th><th>设备</th></tr></thead>
     <tbody>${resources.map((row) => `<tr><td>${row.institution}</td><td>${row.type}</td><td>${row.region}</td><td>${row.beds}</td><td>${row.doctors}</td><td>${row.nurses}</td><td>${row.chronicClinics}</td><td>${row.devices}</td></tr>`).join("")}</tbody>
   </table>`;
+}
+
+function renderHealthStatistics() {
+  const statistics = getHealthStatistics();
+  const resourceTotals = sumNested(statistics.resourceReports, "interfaceData", ["beds", "doctors", "nurses"]);
+  const directResourceTotals = sumNested(statistics.resourceReports, "directReport", ["beds", "doctors", "nurses"]);
+  const serviceTotals = sumNested(statistics.serviceReports, "interfaceData", ["outpatientVisits", "emergencyVisits", "inpatientAdmissions", "discharges", "bedDays"]);
+  const directServiceTotals = sumNested(statistics.serviceReports, "directReport", ["outpatientVisits", "emergencyVisits", "inpatientAdmissions", "discharges", "bedDays"]);
+  const resourceIssues = statistics.resourceReports.filter((item) => item.status !== "已一致").length;
+  const serviceIssues = statistics.serviceReports.filter((item) => item.status !== "已一致").length;
+
+  document.querySelector("#health-stat-summary").textContent = `${formatPeriod(statistics.period)} · 医疗机构接口 + 卫生健康统计直报系统`;
+  document.querySelector("#health-stat-metrics").innerHTML = [
+    ["实有床位", resourceTotals.beds, `直报 ${directResourceTotals.beds}`],
+    ["执业医生", resourceTotals.doctors, `直报 ${directResourceTotals.doctors}`],
+    ["注册护士", resourceTotals.nurses, `直报 ${directResourceTotals.nurses}`],
+    ["门急诊量", serviceTotals.outpatientVisits + serviceTotals.emergencyVisits, `直报 ${directServiceTotals.outpatientVisits + directServiceTotals.emergencyVisits}`],
+    ["入院量", serviceTotals.inpatientAdmissions, `直报 ${directServiceTotals.inpatientAdmissions}`],
+    ["出院量", serviceTotals.discharges, `直报 ${directServiceTotals.discharges}`],
+    ["实际占用总床日", serviceTotals.bedDays, `直报 ${directServiceTotals.bedDays}`],
+    ["待复核机构", resourceIssues + serviceIssues, "资源/服务量差异"]
+  ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${formatNumber(value)}</strong><em>${hint}</em></article>`).join("");
+
+  document.querySelector("#health-stat-sources").innerHTML = (statistics.sources || []).map((source) => `<article>
+    <span>${source.name}</span>
+    <strong>${source.status}</strong>
+    <small>${source.system}<br>${source.scope}<br>${source.updateCycle}</small>
+  </article>`).join("");
+
+  document.querySelector("#health-stat-resource-check").innerHTML = `<table>
+    <thead><tr><th>机构</th><th>区域</th><th>类型</th><th>接口床位/医生/护士</th><th>直报床位/医生/护士</th><th>差异</th><th>状态</th><th>说明</th></tr></thead>
+    <tbody>${statistics.resourceReports.map((row) => {
+      const diff = resourceDiff(row);
+      return `<tr>
+        <td>${row.institution}</td>
+        <td>${row.region}</td>
+        <td>${row.type}</td>
+        <td>${row.interfaceData.beds}/${row.interfaceData.doctors}/${row.interfaceData.nurses}</td>
+        <td>${row.directReport.beds}/${row.directReport.doctors}/${row.directReport.nurses}</td>
+        <td>${diff.beds}/${diff.doctors}/${diff.nurses}</td>
+        <td><span class="badge ${row.status === "已一致" ? "info" : "warn"}">${row.status}</span></td>
+        <td>${row.issue}</td>
+      </tr>`;
+    }).join("")}</tbody>
+  </table>`;
+
+  document.querySelector("#health-stat-service-table").innerHTML = `<table>
+    <thead><tr><th>机构</th><th>接口门急诊</th><th>接口入院</th><th>接口出院</th><th>接口床日</th><th>直报门急诊</th><th>直报入院/出院/床日</th><th>状态</th></tr></thead>
+    <tbody>${statistics.serviceReports.map((row) => {
+      const interfaceVisits = row.interfaceData.outpatientVisits + row.interfaceData.emergencyVisits;
+      const directVisits = row.directReport.outpatientVisits + row.directReport.emergencyVisits;
+      return `<tr>
+        <td>${row.institution}</td>
+        <td>${formatNumber(interfaceVisits)}</td>
+        <td>${formatNumber(row.interfaceData.inpatientAdmissions)}</td>
+        <td>${formatNumber(row.interfaceData.discharges)}</td>
+        <td>${formatNumber(row.interfaceData.bedDays)}</td>
+        <td>${formatNumber(directVisits)}</td>
+        <td>${formatNumber(row.directReport.inpatientAdmissions)} / ${formatNumber(row.directReport.discharges)} / ${formatNumber(row.directReport.bedDays)}</td>
+        <td><span class="badge ${row.status === "已一致" ? "info" : "warn"}">${row.status}</span></td>
+      </tr>`;
+    }).join("")}</tbody>
+  </table>`;
+}
+
+function renderStatisticsAnalytics() {
+  const statistics = getHealthStatistics();
+  const resourceTotals = sumNested(statistics.resourceReports, "interfaceData", ["beds", "doctors", "nurses"]);
+  const serviceTotals = sumNested(statistics.serviceReports, "interfaceData", ["outpatientVisits", "emergencyVisits", "inpatientAdmissions", "discharges", "bedDays"]);
+  const resourceIssues = statistics.resourceReports.filter((item) => item.status !== "已一致").length;
+  const serviceIssues = statistics.serviceReports.filter((item) => item.status !== "已一致").length;
+  document.querySelector("#analytics-stat-summary").textContent = `${formatPeriod(statistics.period)} · 资源、诊疗量、住院量统一统计`;
+  document.querySelector("#analytics-stat-cards").innerHTML = [
+    ["床位", resourceTotals.beds, "医疗卫生资源"],
+    ["医生", resourceTotals.doctors, "医疗卫生人员"],
+    ["护士", resourceTotals.nurses, "护理人员"],
+    ["门急诊量", serviceTotals.outpatientVisits + serviceTotals.emergencyVisits, "诊疗服务量"],
+    ["住院量", serviceTotals.inpatientAdmissions, "入院人次"],
+    ["出院量", serviceTotals.discharges, "出院人次"],
+    ["床日", serviceTotals.bedDays, "实际占用总床日"],
+    ["复核项", resourceIssues + serviceIssues, "双源对账差异"]
+  ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${formatNumber(value)}</strong><em>${hint}</em></article>`).join("");
+  document.querySelector("#analytics-stat-quality").innerHTML = (statistics.qualityRules || []).map((rule) => `<article>
+    <strong>${rule.rule}</strong>
+    <span>${rule.detail}</span>
+    <span class="badge info">${rule.status}</span>
+  </article>`).join("");
+}
+
+function getHealthStatistics() {
+  return state.healthStatistics || {
+    period: "2026-05",
+    basis: "卫生健康统计监测",
+    sources: [],
+    resourceReports: (state.medicalResources || []).map((item) => ({
+      institutionId: item.id,
+      institution: item.institution,
+      region: item.region,
+      type: item.type,
+      interfaceData: { beds: item.beds || 0, doctors: item.doctors || 0, nurses: item.nurses || 0 },
+      directReport: { beds: item.beds || 0, doctors: item.doctors || 0, nurses: item.nurses || 0 },
+      status: "已一致",
+      issue: "无"
+    })),
+    serviceReports: [],
+    qualityRules: []
+  };
+}
+
+function sumNested(rows, key, fields) {
+  return fields.reduce((totals, field) => {
+    totals[field] = (rows || []).reduce((sum, row) => sum + Number(row[key]?.[field] || 0), 0);
+    return totals;
+  }, {});
+}
+
+function resourceDiff(row) {
+  return {
+    beds: Number(row.interfaceData?.beds || 0) - Number(row.directReport?.beds || 0),
+    doctors: Number(row.interfaceData?.doctors || 0) - Number(row.directReport?.doctors || 0),
+    nurses: Number(row.interfaceData?.nurses || 0) - Number(row.directReport?.nurses || 0)
+  };
+}
+
+function formatPeriod(period) {
+  const [year, month] = String(period || "").split("-");
+  return year && month ? `${year} 年 ${Number(month)} 月` : period || "当前周期";
+}
+
+function formatNumber(value) {
+  return Number(value || 0).toLocaleString("zh-CN");
 }
 
 function renderPerformanceTable() {

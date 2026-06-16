@@ -251,6 +251,11 @@ h1 {
   margin-bottom: 16px;
 }
 
+.metrics-grid.compact-grid {
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  margin-bottom: 14px;
+}
+
 .metric-card,
 .panel {
   background: var(--panel);
@@ -490,7 +495,20 @@ th {
   gap: 10px;
 }
 
+.rules-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
 .governance-grid article {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fbfd;
+}
+
+.rules-grid article {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 12px;
@@ -503,10 +521,21 @@ th {
   color: var(--muted);
 }
 
+.rules-grid span {
+  display: block;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
 .governance-grid strong {
   display: block;
   margin: 8px 0;
   font-size: 24px;
+}
+
+.rules-grid strong {
+  display: block;
+  margin-bottom: 8px;
 }
 
 dialog {
@@ -698,6 +727,7 @@ dialog::backdrop {
   .nav,
   .metrics-grid,
   .governance-grid,
+  .rules-grid,
   .content-grid,
   .split,
   .timeline,
