@@ -7,6 +7,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderAuthorizedRecords(state);
   renderClaimLinks(state);
   renderIntegratedProfiles(state);
+  renderStandardArchiveProfiles(state);
   renderInstitutionAudit(state);
   renderPickups(state);
 });
@@ -92,6 +93,48 @@ function renderIntegratedProfiles(state) {
       <span class="badge info">${resident?.personIndex || "待索引"}</span>
     </section>`;
   }).join("") || `<p class="muted">暂无可贯通的授权档案。</p>`;
+}
+
+function renderStandardArchiveProfiles(state) {
+  const authorizedResidentIds = getAuthorizedResidentIds(state);
+  document.querySelector("#standard-profile-count").textContent = `${authorizedResidentIds.length} 人`;
+  document.querySelector("#standard-profiles").innerHTML = authorizedResidentIds.map((residentId) => {
+    const coverage = getStandardCoverage(state, residentId);
+    const resident = coverage.resident;
+    const ready = coverage.datasets.filter((item) => item.status === "已归集").slice(0, 5);
+    const missing = coverage.datasets.filter((item) => item.status === "待补齐").slice(0, 4);
+    return `<section class="item standard-item">
+      <div>
+        <h3>${resident?.name || "未知居民"} · ${coverage.lifeStage || "生命阶段待识别"} · ${coverage.risk || "风险待评估"}</h3>
+        <p>健康问题：${coverage.problems.join("、")} · 适用数据集归集度 ${coverage.score}% (${coverage.applicableCompleted}/${coverage.applicableTotal})</p>
+        <div class="model-grid standard-dimensions">
+          ${coverage.activities.map((activity) => `<div><strong>${activity.title}</strong><span>${activity.detail}</span></div>`).join("")}
+        </div>
+        <div class="standard-tags">
+          ${ready.map((item) => `<span class="badge">${item.code} ${item.name}</span>`).join("")}
+          ${missing.map((item) => `<span class="badge warn">待补齐 ${item.code}</span>`).join("")}
+        </div>
+        <p>医生查看重点：基础身份和主索引、慢病管理、门诊病历、检查检验、用药处方、固定取药与授权审计。</p>
+      </div>
+      <div class="score-badge">
+        <strong>${coverage.score}%</strong>
+        <span>标准档案</span>
+      </div>
+    </section>`;
+  }).join("") || `<p class="muted">暂无可按标准查看的授权健康档案。</p>`;
+}
+
+function getAuthorizedResidentIds(state) {
+  return [...new Set(state.personalRecords
+    .filter((item) => item.category === "authorizations" && item.meta?.status !== "revoked")
+    .map((item) => item.residentId))];
+}
+
+function getStandardCoverage(state, residentId) {
+  if (window.HealthArchiveStandard) {
+    return window.HealthArchiveStandard.getResidentCoverage(state, residentId);
+  }
+  return { datasets: [], activities: [], problems: [], score: 0, applicableCompleted: 0, applicableTotal: 0 };
 }
 
 function renderInstitutionAudit(state) {

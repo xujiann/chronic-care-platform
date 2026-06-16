@@ -933,5 +933,283 @@
       "usage": "线下帮办、家属代取药",
       "personIndex": "210213196410013521#13800010004"
     }
-  ]
+  ],
+  "healthArchiveStandard": {
+    "version": "健康档案基本架构与数据标准（试行）",
+    "dimensions": [
+      {
+        "key": "lifeStage",
+        "title": "生命阶段",
+        "detail": "按婴儿、儿童、青少年、成年、中年、老年等阶段组织全生命周期档案。"
+      },
+      {
+        "key": "healthProblem",
+        "title": "健康和疾病问题",
+        "detail": "围绕慢病、风险因素、过敏史、健康指标和重大疾病问题持续更新。"
+      },
+      {
+        "key": "serviceActivity",
+        "title": "卫生服务活动",
+        "detail": "归集预防、医疗、保健、康复、健康教育和随访干预记录。"
+      }
+    ],
+    "contentGroups": [
+      {
+        "key": "basic",
+        "title": "个人基本信息",
+        "detail": "人口学、社会经济、亲属、社会保障、基本健康、建档信息。"
+      },
+      {
+        "key": "child",
+        "title": "儿童保健",
+        "detail": "出生医学证明、新生儿筛查、儿童体检、体弱儿童管理。"
+      },
+      {
+        "key": "women",
+        "title": "妇女保健",
+        "detail": "婚前保健、妇女病普查、计划生育、孕产期保健、产前筛查、出生缺陷监测。"
+      },
+      {
+        "key": "diseaseControl",
+        "title": "疾病预防",
+        "detail": "预防接种、传染病、结核病、艾滋病、职业病、伤害、中毒、行为危险因素、死亡证明。"
+      },
+      {
+        "key": "diseaseManagement",
+        "title": "疾病管理",
+        "detail": "高血压、糖尿病、肿瘤、严重精神障碍、老年人健康管理。"
+      },
+      {
+        "key": "medical",
+        "title": "医疗服务",
+        "detail": "门诊、住院、住院病案首页、成人健康体检。"
+      }
+    ],
+    "datasets": [
+      {
+        "code": "HRA00.01",
+        "group": "basic",
+        "name": "个人信息基本数据集",
+        "activity": "建档",
+        "appliesTo": "all"
+      },
+      {
+        "code": "HRB01.01",
+        "group": "child",
+        "name": "出生医学证明",
+        "activity": "儿童保健",
+        "appliesTo": "child"
+      },
+      {
+        "code": "HRB01.02",
+        "group": "child",
+        "name": "新生儿疾病筛查",
+        "activity": "儿童保健",
+        "appliesTo": "child"
+      },
+      {
+        "code": "HRB01.03",
+        "group": "child",
+        "name": "儿童健康体检",
+        "activity": "儿童保健",
+        "appliesTo": "child"
+      },
+      {
+        "code": "HRB01.04",
+        "group": "child",
+        "name": "体弱儿童管理",
+        "activity": "儿童保健",
+        "appliesTo": "child"
+      },
+      {
+        "code": "HRB02.01",
+        "group": "women",
+        "name": "婚前保健服务",
+        "activity": "妇女保健",
+        "appliesTo": "women"
+      },
+      {
+        "code": "HRB02.02",
+        "group": "women",
+        "name": "妇女病普查",
+        "activity": "妇女保健",
+        "appliesTo": "women"
+      },
+      {
+        "code": "HRB02.03",
+        "group": "women",
+        "name": "计划生育技术服务",
+        "activity": "妇女保健",
+        "appliesTo": "women"
+      },
+      {
+        "code": "HRB02.04",
+        "group": "women",
+        "name": "孕产期保健服务与高危管理",
+        "activity": "妇女保健",
+        "appliesTo": "women"
+      },
+      {
+        "code": "HRB02.05",
+        "group": "women",
+        "name": "产前筛查与诊断",
+        "activity": "妇女保健",
+        "appliesTo": "women"
+      },
+      {
+        "code": "HRB02.06",
+        "group": "women",
+        "name": "出生缺陷监测",
+        "activity": "妇女保健",
+        "appliesTo": "women"
+      },
+      {
+        "code": "HRB03.01",
+        "group": "diseaseControl",
+        "name": "预防接种",
+        "activity": "疾病预防",
+        "appliesTo": "all"
+      },
+      {
+        "code": "HRB03.02",
+        "group": "diseaseControl",
+        "name": "传染病报告",
+        "activity": "疾病预防",
+        "appliesTo": "event"
+      },
+      {
+        "code": "HRB03.03",
+        "group": "diseaseControl",
+        "name": "结核病防治",
+        "activity": "疾病预防",
+        "appliesTo": "event"
+      },
+      {
+        "code": "HRB03.04",
+        "group": "diseaseControl",
+        "name": "艾滋病防治",
+        "activity": "疾病预防",
+        "appliesTo": "event"
+      },
+      {
+        "code": "HRB03.05",
+        "group": "diseaseControl",
+        "name": "血吸虫病病人管理",
+        "activity": "疾病预防",
+        "appliesTo": "event"
+      },
+      {
+        "code": "HRB03.06",
+        "group": "diseaseControl",
+        "name": "慢性丝虫病病人管理",
+        "activity": "疾病预防",
+        "appliesTo": "event"
+      },
+      {
+        "code": "HRB03.07",
+        "group": "diseaseControl",
+        "name": "职业病报告",
+        "activity": "疾病预防",
+        "appliesTo": "event"
+      },
+      {
+        "code": "HRB03.08",
+        "group": "diseaseControl",
+        "name": "职业性健康监护",
+        "activity": "疾病预防",
+        "appliesTo": "event"
+      },
+      {
+        "code": "HRB03.09",
+        "group": "diseaseControl",
+        "name": "伤害监测报告",
+        "activity": "疾病预防",
+        "appliesTo": "event"
+      },
+      {
+        "code": "HRB03.10",
+        "group": "diseaseControl",
+        "name": "中毒报告",
+        "activity": "疾病预防",
+        "appliesTo": "event"
+      },
+      {
+        "code": "HRB03.11",
+        "group": "diseaseControl",
+        "name": "行为危险因素监测",
+        "activity": "疾病预防",
+        "appliesTo": "all"
+      },
+      {
+        "code": "HRB03.12",
+        "group": "diseaseControl",
+        "name": "死亡医学证明",
+        "activity": "疾病预防",
+        "appliesTo": "event"
+      },
+      {
+        "code": "HRB04.01",
+        "group": "diseaseManagement",
+        "name": "高血压病例管理",
+        "activity": "疾病管理",
+        "appliesTo": "disease"
+      },
+      {
+        "code": "HRB04.02",
+        "group": "diseaseManagement",
+        "name": "糖尿病病例管理",
+        "activity": "疾病管理",
+        "appliesTo": "disease"
+      },
+      {
+        "code": "HRB04.03",
+        "group": "diseaseManagement",
+        "name": "肿瘤病例管理",
+        "activity": "疾病管理",
+        "appliesTo": "disease"
+      },
+      {
+        "code": "HRB04.04",
+        "group": "diseaseManagement",
+        "name": "精神分裂症病例管理",
+        "activity": "疾病管理",
+        "appliesTo": "disease"
+      },
+      {
+        "code": "HRB04.05",
+        "group": "diseaseManagement",
+        "name": "老年人健康管理",
+        "activity": "疾病管理",
+        "appliesTo": "elderly"
+      },
+      {
+        "code": "HRC00.01",
+        "group": "medical",
+        "name": "门诊诊疗",
+        "activity": "医疗服务",
+        "appliesTo": "all"
+      },
+      {
+        "code": "HRC00.02",
+        "group": "medical",
+        "name": "住院诊疗",
+        "activity": "医疗服务",
+        "appliesTo": "event"
+      },
+      {
+        "code": "HRC00.03",
+        "group": "medical",
+        "name": "住院病案首页",
+        "activity": "医疗服务",
+        "appliesTo": "event"
+      },
+      {
+        "code": "HRC00.04",
+        "group": "medical",
+        "name": "成人健康体检",
+        "activity": "医疗服务",
+        "appliesTo": "adult"
+      }
+    ]
+  }
 }

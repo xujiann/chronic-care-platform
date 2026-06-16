@@ -117,7 +117,63 @@ function seedState() {
     seniorServices: seedSeniorServices(),
     dataAccessLogs: seedDataAccessLogs(),
     digitalCredentials: seedDigitalCredentials(),
+    healthArchiveStandard: seedHealthArchiveStandard(),
     personalRecords: seedPersonalRecords()
+  };
+}
+
+function seedHealthArchiveStandard() {
+  const contentGroups = [
+    { key: "basic", title: "个人基本信息", detail: "人口学、社会经济、亲属、社会保障、基本健康、建档信息。" },
+    { key: "child", title: "儿童保健", detail: "出生医学证明、新生儿筛查、儿童体检、体弱儿童管理。" },
+    { key: "women", title: "妇女保健", detail: "婚前保健、妇女病普查、计划生育、孕产期保健、产前筛查、出生缺陷监测。" },
+    { key: "diseaseControl", title: "疾病预防", detail: "预防接种、传染病、结核病、艾滋病、职业病、伤害、中毒、行为危险因素、死亡证明。" },
+    { key: "diseaseManagement", title: "疾病管理", detail: "高血压、糖尿病、肿瘤、严重精神障碍、老年人健康管理。" },
+    { key: "medical", title: "医疗服务", detail: "门诊、住院、住院病案首页、成人健康体检。" }
+  ];
+  const datasets = [
+    ["HRA00.01", "basic", "个人信息基本数据集", "建档", "all"],
+    ["HRB01.01", "child", "出生医学证明", "儿童保健", "child"],
+    ["HRB01.02", "child", "新生儿疾病筛查", "儿童保健", "child"],
+    ["HRB01.03", "child", "儿童健康体检", "儿童保健", "child"],
+    ["HRB01.04", "child", "体弱儿童管理", "儿童保健", "child"],
+    ["HRB02.01", "women", "婚前保健服务", "妇女保健", "women"],
+    ["HRB02.02", "women", "妇女病普查", "妇女保健", "women"],
+    ["HRB02.03", "women", "计划生育技术服务", "妇女保健", "women"],
+    ["HRB02.04", "women", "孕产期保健服务与高危管理", "妇女保健", "women"],
+    ["HRB02.05", "women", "产前筛查与诊断", "妇女保健", "women"],
+    ["HRB02.06", "women", "出生缺陷监测", "妇女保健", "women"],
+    ["HRB03.01", "diseaseControl", "预防接种", "疾病预防", "all"],
+    ["HRB03.02", "diseaseControl", "传染病报告", "疾病预防", "event"],
+    ["HRB03.03", "diseaseControl", "结核病防治", "疾病预防", "event"],
+    ["HRB03.04", "diseaseControl", "艾滋病防治", "疾病预防", "event"],
+    ["HRB03.05", "diseaseControl", "血吸虫病病人管理", "疾病预防", "event"],
+    ["HRB03.06", "diseaseControl", "慢性丝虫病病人管理", "疾病预防", "event"],
+    ["HRB03.07", "diseaseControl", "职业病报告", "疾病预防", "event"],
+    ["HRB03.08", "diseaseControl", "职业性健康监护", "疾病预防", "event"],
+    ["HRB03.09", "diseaseControl", "伤害监测报告", "疾病预防", "event"],
+    ["HRB03.10", "diseaseControl", "中毒报告", "疾病预防", "event"],
+    ["HRB03.11", "diseaseControl", "行为危险因素监测", "疾病预防", "all"],
+    ["HRB03.12", "diseaseControl", "死亡医学证明", "疾病预防", "event"],
+    ["HRB04.01", "diseaseManagement", "高血压病例管理", "疾病管理", "disease"],
+    ["HRB04.02", "diseaseManagement", "糖尿病病例管理", "疾病管理", "disease"],
+    ["HRB04.03", "diseaseManagement", "肿瘤病例管理", "疾病管理", "disease"],
+    ["HRB04.04", "diseaseManagement", "精神分裂症病例管理", "疾病管理", "disease"],
+    ["HRB04.05", "diseaseManagement", "老年人健康管理", "疾病管理", "elderly"],
+    ["HRC00.01", "medical", "门诊诊疗", "医疗服务", "all"],
+    ["HRC00.02", "medical", "住院诊疗", "医疗服务", "event"],
+    ["HRC00.03", "medical", "住院病案首页", "医疗服务", "event"],
+    ["HRC00.04", "medical", "成人健康体检", "医疗服务", "adult"]
+  ].map(([code, group, name, activity, appliesTo]) => ({ code, group, name, activity, appliesTo }));
+  return {
+    version: "健康档案基本架构与数据标准（试行）",
+    dimensions: [
+      { key: "lifeStage", title: "生命阶段", detail: "按生命阶段组织居民全生命周期档案。" },
+      { key: "healthProblem", title: "健康和疾病问题", detail: "围绕风险因素、慢病、重大疾病和健康问题持续更新。" },
+      { key: "serviceActivity", title: "卫生服务活动", detail: "归集预防、医疗、保健、康复、健康教育和随访干预。" }
+    ],
+    contentGroups,
+    datasets
   };
 }
 
@@ -396,6 +452,7 @@ function normalizeState(data) {
     seniorServices: Array.isArray(data.seniorServices) ? data.seniorServices : seedSeniorServices(),
     dataAccessLogs: Array.isArray(data.dataAccessLogs) ? data.dataAccessLogs : seedDataAccessLogs(),
     digitalCredentials: Array.isArray(data.digitalCredentials) ? data.digitalCredentials : seedDigitalCredentials(),
+    healthArchiveStandard: data.healthArchiveStandard && typeof data.healthArchiveStandard === "object" ? data.healthArchiveStandard : seedHealthArchiveStandard(),
     personalRecords: Array.isArray(data.personalRecords) ? data.personalRecords : seedPersonalRecords()
   };
   return normalizePersonIndexes(state);

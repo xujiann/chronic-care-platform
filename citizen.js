@@ -114,6 +114,7 @@ const personalHealthData = {
 
 const vaultSections = [
   { key: "timeline", label: "健康时间线" },
+  { key: "standard", label: "标准健康档案" },
   { key: "archive", label: "健康档案" },
   { key: "emr", label: "电子病历" },
   { key: "labs", label: "检查检验" },
@@ -239,7 +240,7 @@ function renderCitizen(residentId) {
 
 function renderVault(resident, diseases, followups, records) {
   const grouped = collectVaultData(resident, diseases, followups, records);
-  const completeCount = vaultSections.filter((section) => grouped[section.key]?.length).length;
+  const completeCount = vaultSections.filter((section) => section.key === "standard" || grouped[section.key]?.length).length;
   const score = Math.round((completeCount / vaultSections.length) * 100);
   document.querySelector("#completeness-score").textContent = `${score}%`;
   document.querySelector("#completeness-bar").style.width = `${score}%`;
@@ -259,6 +260,11 @@ function renderVault(resident, diseases, followups, records) {
       renderVault(resident, diseases, followups, records);
     });
   });
+
+  if (activeVaultSection === "standard") {
+    document.querySelector("#vault-content").innerHTML = renderStandardArchive(resident.id);
+    return;
+  }
 
   const activeItems = grouped[activeVaultSection] || [];
   document.querySelector("#vault-content").innerHTML = activeItems
@@ -293,6 +299,7 @@ function collectVaultData(resident, diseases, followups, records) {
   ];
   return {
     timeline: buildHealthTimeline(archive, records, labs, medications, allergies, vaccines, admissions),
+    standard: buildStandardArchiveItems(resident.id),
     archive,
     emr: records.map((item) => ({ ...item, categoryLabel: "电子病历", related: relatedArchiveSummary(diseases, followups) })),
     labs,
@@ -302,6 +309,81 @@ function collectVaultData(resident, diseases, followups, records) {
     admissions,
     authorizations
   };
+}
+
+function buildStandardArchiveItems(residentId) {
+  const coverage = getStandardCoverage(residentId);
+  return coverage.datasets.filter((item) => item.status === "已归集");
+}
+
+function renderStandardArchive(residentId) {
+  const coverage = getStandardCoverage(residentId);
+  const standard = coverage.standard;
+  const groups = standard.contentGroups.map((group) => {
+    const datasets = coverage.datasets.filter((item) => item.group === group.key);
+    const done = datasets.filter((item) => item.status === "已归集").length;
+    const applicable = datasets.filter((item) => item.applicable).length;
+    return { ...group, done, applicable, datasets };
+  });
+  return `<div class="standard-archive">
+    <section class="standard-hero">
+      <div>
+        <span>${standard.version}</span>
+        <h3>${coverage.lifeStage} · ${coverage.risk}</h3>
+        <p>以居民个人为中心，将健康档案、电子病历、慢病随访、检查检验、用药处方和固定取药统一索引到 ${coverage.resident.personIndex || "personIndex 待生成"}。</p>
+      </div>
+      <div class="standard-score">
+        <strong>${coverage.score}%</strong>
+        <span>适用数据集归集度</span>
+        <small>${coverage.applicableCompleted}/${coverage.applicableTotal} 项适用数据集已归集</small>
+      </div>
+    </section>
+    <section class="dimension-grid">
+      ${standard.dimensions.map((item) => `<article>
+        <strong>${item.title}</strong>
+        <span>${item.key === "lifeStage" ? coverage.lifeStage : item.key === "healthProblem" ? coverage.problems.join("、") : coverage.activities.map((activity) => activity.title).join("、")}</span>
+        <p>${item.detail}</p>
+      </article>`).join("")}
+    </section>
+    <section class="activity-grid">
+      ${coverage.activities.map((item) => `<article>
+        <strong>${item.title}</strong>
+        <span>${item.detail}</span>
+      </article>`).join("")}
+    </section>
+    <section class="standard-groups">
+      ${groups.map((group) => `<article>
+        <div class="standard-group-head">
+          <div>
+            <strong>${group.title}</strong>
+            <p>${group.detail}</p>
+          </div>
+          <span>${group.done}/${group.applicable || group.datasets.length}</span>
+        </div>
+        <div class="dataset-list">
+          ${group.datasets.map((dataset) => renderDataset(dataset)).join("")}
+        </div>
+      </article>`).join("")}
+    </section>
+  </div>`;
+}
+
+function renderDataset(dataset) {
+  const statusClass = dataset.status === "已归集" ? "ready" : dataset.status === "待补齐" ? "missing" : "idle";
+  const evidence = dataset.evidence.length ? dataset.evidence.slice(0, 2).join("；") : dataset.status === "当前不适用" ? "按当前年龄、性别或疾病情况暂不适用。" : "后续由医疗机构、公共卫生服务或个人上传补齐。";
+  return `<div class="dataset-row ${statusClass}">
+    <span>${dataset.code}</span>
+    <strong>${dataset.name}</strong>
+    <em>${dataset.status}</em>
+    <small>${evidence}</small>
+  </div>`;
+}
+
+function getStandardCoverage(residentId) {
+  if (window.HealthArchiveStandard) {
+    return window.HealthArchiveStandard.getResidentCoverage(state, residentId);
+  }
+  return { standard: { dimensions: [], contentGroups: [], datasets: [] }, datasets: [], score: 0, applicableCompleted: 0, applicableTotal: 0, activities: [], problems: [] };
 }
 
 function buildHealthTimeline(archive, records, labs, medications, allergies, vaccines, admissions) {

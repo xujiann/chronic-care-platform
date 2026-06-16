@@ -159,6 +159,44 @@ h1 { margin-top: 4px; font-size: 28px; }
   line-height: 1.55;
 }
 
+.standard-item {
+  grid-template-columns: 1fr 112px;
+  align-items: stretch;
+}
+
+.standard-dimensions {
+  grid-template-columns: repeat(4, 1fr);
+  margin: 10px 0;
+}
+
+.standard-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.score-badge {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  border-radius: 8px;
+  background: #eaf2ff;
+  color: #184a91;
+  padding: 10px;
+  text-align: center;
+}
+
+.score-badge strong {
+  font-size: 28px;
+}
+
+.score-badge span {
+  color: #184a91;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .badge {
   display: inline-flex;
   border-radius: 999px;
