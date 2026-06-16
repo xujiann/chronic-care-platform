@@ -121,8 +121,78 @@ function seedState() {
     authUsers: seedAuthUsers(),
     countyConsortium: seedCountyConsortium(),
     referralSystem: seedReferralSystem(),
+    platformRoadmap: seedPlatformRoadmap(),
     personalRecords: seedPersonalRecords()
   };
+}
+
+function seedPlatformRoadmap() {
+  return [
+    {
+      priority: "P0",
+      title: "统一运营工作台",
+      reason: "系统功能多、端口多，需要总控台承接整体梳理、跨端待办和后续开发顺序。",
+      scope: ["系统总览", "跨端待办", "路线图"],
+      status: "已完成",
+      nextAction: "继续从工作台选择下一项 P0。"
+    },
+    {
+      priority: "P0",
+      title: "真实认证、角色权限和审计闭环",
+      reason: "健康档案和电子病历属于敏感数据，当前登录仍是前端演示，需要后端会话、接口权限和审计。",
+      scope: ["登录", "权限", "审计", "API"],
+      status: "待开发",
+      nextAction: "新增后端认证接口、会话校验和角色权限中间件。"
+    },
+    {
+      priority: "P0",
+      title: "SQLite 数据库迁移",
+      reason: "JSON 适合演示，不适合长期开发。需要结构化表、索引、迁移脚本和数据备份。",
+      scope: ["数据层", "持久化", "迁移"],
+      status: "待开发",
+      nextAction: "建立 SQLite schema，迁移 data/db.json。"
+    },
+    {
+      priority: "P1",
+      title: "居民 360 详情与趋势图",
+      reason: "医生和居民都需要按时间查看指标、病历、用药、检查、随访、取药和转诊。",
+      scope: ["个人端", "医疗机构端", "健康档案"],
+      status: "待开发",
+      nextAction: "新增居民全景详情页和血压、血糖、BMI 趋势。"
+    },
+    {
+      priority: "P1",
+      title: "业务动作闭环",
+      reason: "当前多数状态为展示型，下一步要能接诊、审核、下转、完成取药、完成随访。",
+      scope: ["分级诊疗", "医保", "取药", "随访"],
+      status: "待开发",
+      nextAction: "为转诊、医保审核、固定取药增加状态操作。"
+    },
+    {
+      priority: "P1",
+      title: "检查检验互认与资源共享中心深化",
+      reason: "县域医共体和分级诊疗都依赖医技共享、结果互认、危急值和质控。",
+      scope: ["医共体", "医疗机构", "医保监管"],
+      status: "待开发",
+      nextAction: "新增影像、心电、检验互认台账和质控规则。"
+    },
+    {
+      priority: "P2",
+      title: "统计报表和绩效考核",
+      reason: "卫健委和医共体办公室需要面向管理的月报、绩效、机构排名和导出能力。",
+      scope: ["卫健委端", "县域医共体", "导出"],
+      status: "待开发",
+      nextAction: "补充月报生成、机构绩效评分和 CSV/JSON 导出。"
+    },
+    {
+      priority: "P2",
+      title: "移动端和适老化深化",
+      reason: "居民端最终要在手机上使用，需要大字模式、家属代办、消息提醒和无障碍优化。",
+      scope: ["个人端", "手机预览", "适老化"],
+      status: "待开发",
+      nextAction: "新增大字模式、提醒中心、家属代办入口。"
+    }
+  ];
 }
 
 function seedReferralSystem() {
@@ -565,6 +635,7 @@ function normalizeState(data) {
     authUsers: Array.isArray(data.authUsers) ? data.authUsers : seedAuthUsers(),
     countyConsortium: data.countyConsortium && typeof data.countyConsortium === "object" ? data.countyConsortium : seedCountyConsortium(),
     referralSystem: data.referralSystem && typeof data.referralSystem === "object" ? data.referralSystem : seedReferralSystem(),
+    platformRoadmap: Array.isArray(data.platformRoadmap) ? data.platformRoadmap : seedPlatformRoadmap(),
     personalRecords: Array.isArray(data.personalRecords) ? data.personalRecords : seedPersonalRecords()
   };
   return normalizePersonIndexes(state);

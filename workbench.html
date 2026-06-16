@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>统一运营工作台 · 健康城市系统</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+    <script>window.HealthCityAuth.requireRole(["commission", "county"])</script>
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>统一运营工作台</span>
+          <h1>健康城市系统总控台</h1>
+          <p>把卫生健康委端、医疗机构端、医保端、个人端和县域医共体平台的功能、数据、待办、风险和继续开发优先级统一梳理。</p>
+        </div>
+        <nav>
+          <a href="./health-city.html">系统总览</a>
+          <a href="./index.html">卫健委端</a>
+          <a href="./county.html">医共体平台</a>
+          <a href="./institution.html">医疗机构端</a>
+          <a href="./insurance.html">医保端</a>
+          <a href="./citizen.html">个人端</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" id="workbench-metrics"></section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>系统整体结构</h2>
+          <span>门户、业务端、统一数据底座、监管闭环</span>
+        </div>
+        <div id="platform-map" class="platform-map"></div>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>继续开发优先级</h2>
+            <span>按价值、风险和依赖顺序推进</span>
+          </div>
+          <div id="priority-list" class="priority-list"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>跨端待办</h2>
+            <span id="task-count"></span>
+          </div>
+          <div id="unified-tasks" class="list"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel">
+          <div class="panel-title">
+            <h2>数据底座成熟度</h2>
+          </div>
+          <div id="data-maturity" class="list compact"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>下一轮开发队列</h2>
+          </div>
+          <div id="next-queue" class="rules"></div>
+        </article>
+      </section>
+    </main>
+
+    <script src="./shared.js"></script>
+    <script src="./workbench.js"></script>
+  </body>
+</html>

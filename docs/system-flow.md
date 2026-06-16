@@ -5,43 +5,53 @@
 ```mermaid
 flowchart TB
   Login["统一登录与角色授权"] --> Portal["健康城市系统总览"]
+  Login --> Workbench["统一运营工作台<br/>系统结构、跨端待办、开发优先级"]
   Login --> Citizen["个人端"]
   Login --> Institution["医疗机构端"]
   Login --> Insurance["医保端"]
   Login --> Commission["卫生健康委端"]
   Login --> County["县域医共体平台"]
 
-  Citizen --> PersonIndex["统一个人主索引 personIndex\n身份证号 + 手机号"]
+  Workbench --> Portal
+  Workbench --> Commission
+  Workbench --> County
+  Workbench --> Institution
+  Workbench --> Insurance
+  Workbench --> Citizen
+
+  Citizen --> PersonIndex["统一个人主索引 personIndex<br/>身份证号 + 手机号"]
   Institution --> PersonIndex
   Insurance --> PersonIndex
   Commission --> PersonIndex
   County --> PersonIndex
 
-  PersonIndex --> Archive["个人健康信息库\n健康档案、电子病历、检查检验、用药、接种、过敏、住院、授权"]
-  Archive --> Standard["健康档案标准模型\n三维架构 + 32类基础数据集"]
+  PersonIndex --> Archive["个人健康信息库<br/>健康档案、电子病历、检查检验、用药、接种、过敏、住院、授权"]
+  Archive --> Standard["健康档案标准模型<br/>三维架构 + 32 类基础数据集"]
   Archive --> Audit["访问审计与授权留痕"]
 
+  Commission --> Chronic["慢病医防整合管理模块"]
   Commission --> Resource["医疗资源监管"]
   Commission --> Emergency["公共卫生应急"]
   Commission --> Quality["数据质量与规划对齐"]
 
   Institution --> CareOrder["转诊、复诊、随访协同任务"]
   Institution --> EMR["电子病历补充与标准档案视图"]
-  Institution --> ReferralCenter["分级诊疗转诊中心\n上转、下转、号源床位预留"]
+  Institution --> ReferralCenter["分级诊疗转诊中心<br/>上转、下转、号源床位预留"]
 
   Insurance --> Claim["慢病结算审核"]
   Insurance --> Supervision["医疗机构监管"]
-  Insurance --> PaymentGuide["分级诊疗支付引导\n连续起付线、差异化报销、长期处方"]
+  Insurance --> PaymentGuide["分级诊疗支付引导<br/>连续起付线、差异化报销、长期处方"]
 
-  County --> SharedCenters["区域医技共享中心\n影像、心电、检验、病理、会诊、急救、消毒供应"]
-  County --> CountyPublicHealth["公共卫生协同\n慢病、老年、妇幼、疫苗、应急"]
-  County --> CountyOps["基层综合管理\n人财物、药耗、行政、绩效、医废"]
-  County --> ReferralBuild["分级诊疗体系建设\n紧密型医联体、基层首诊、双向转诊"]
+  County --> SharedCenters["区域医技共享中心<br/>影像、心电、检验、病理、会诊、急救、消毒供应"]
+  County --> CountyPublicHealth["公共卫生协同<br/>慢病、老年、妇幼、疫苗、应急"]
+  County --> CountyOps["基层综合管理<br/>人财物、药耗、行政、绩效、医废"]
+  County --> ReferralBuild["分级诊疗体系建设<br/>紧密型医联体、基层首诊、双向转诊"]
 
   Citizen --> Pickup["每月固定取药申请"]
   Pickup --> Institution
   Pickup --> Insurance
   Pickup --> Commission
+  Pickup --> County
 ```
 
 ## 2. 慢病医防整合与固定取药闭环
@@ -81,7 +91,7 @@ flowchart TB
   Archive --> Problem["健康和疾病问题"]
   Archive --> Activity["卫生服务活动"]
 
-  LifeStage --> StandardDatasets["32类基础数据集映射"]
+  LifeStage --> StandardDatasets["32 类基础数据集映射"]
   Problem --> StandardDatasets
   Activity --> StandardDatasets
 
@@ -103,17 +113,18 @@ sequenceDiagram
   U->>L: 选择角色账号并登录
   L->>A: 校验账号、生成会话
   A-->>L: 返回角色、姓名、首页
-  L->>P: 跳转到角色端系统
+  L->>P: 跳转到角色端系统或统一运营工作台
   P->>A: requireRole 校验当前角色
   A-->>P: 允许访问或重定向
-  P->>Log: 后续查看健康档案、病历、医保数据时留痕
+  P->>Log: 查看健康档案、病历、医保数据时留痕
 ```
 
-## 5. 登录系统后续生产化方向
+## 5. 后续生产化方向
 
 - 前端演示账号替换为后端认证接口。
-- 密码改为加盐哈希存储，不在前端保存任何明文凭据。
+- 密码改为加盐哈希存储，不在前端保存明文凭据。
 - 增加短信验证码、电子健康码、医保电子凭证、政务统一身份认证。
 - 后端签发短期访问令牌和刷新令牌。
 - 按角色、机构、居民授权范围做细粒度接口权限。
 - 所有健康档案、电子病历、医保数据访问写入 `dataAccessLogs`。
+- 将 `data/db.json` 迁移到 SQLite，再逐步升级 PostgreSQL。
