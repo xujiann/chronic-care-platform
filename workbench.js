@@ -95,7 +95,7 @@ function renderDataMaturity(state) {
     ["分级诊疗模型", Boolean(state.referralSystem), "基层首诊、转诊、医保支付和家庭医生服务已入模。"],
     ["县域医共体模型", Boolean(state.countyConsortium), "36 项功能清单和运营监管已入模。"],
     ["登录权限", Boolean(state.authUsers?.length && state.securityEvents?.length), "已具备后端会话、角色校验和安全事件日志第一版。"],
-    ["持久化数据库", false, "当前为 JSON 文件，下一步升级 SQLite。"]
+    ["持久化数据库", Boolean(state.storageMeta?.engine), `${state.storageMeta?.mode || "已配置 SQLite 主存储与 JSON 快照兼容策略。"}${state.storageMeta?.sqliteFile ? ` · ${state.storageMeta.sqliteFile}` : ""}`]
   ];
   document.querySelector("#data-maturity").innerHTML = rows.map(([name, ok, detail]) => `<section class="item">
     <div>
@@ -214,8 +214,8 @@ function defaultRoadmap() {
       title: "SQLite 数据库迁移",
       reason: "JSON 适合演示，不适合长期开发。需要结构化表、索引、迁移脚本和数据备份。",
       scope: ["数据层", "持久化", "迁移"],
-      status: "待开发",
-      nextAction: "建立 SQLite schema，迁移 data/db.json。"
+      status: "进行中",
+      nextAction: "已完成 SQLite 主存储与 JSON 快照第一版；下一步拆分居民、病历、统计等结构化表和索引。"
     },
     {
       priority: "P1",

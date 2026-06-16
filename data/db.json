@@ -2,32 +2,32 @@
   "accounts": [
     {
       "id": "a1",
-      "name": "王建国账户",
-      "phone": "13800010001",
+      "name": "演示居民A账户",
+      "phone": "DEMO-MOBILE-R1",
       "role": "本人",
       "members": [
         {
           "residentId": "r1",
           "relation": "本人",
-          "personIndex": "210204196802113219#13800010001"
+          "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
         },
         {
           "residentId": "r4",
           "relation": "母亲",
-          "personIndex": "210213196410013521#13800010004"
+          "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
         }
       ]
     },
     {
       "id": "a2",
-      "name": "李秀兰账户",
-      "phone": "13800010002",
+      "name": "演示居民B账户",
+      "phone": "DEMO-MOBILE-R2",
       "role": "本人",
       "members": [
         {
           "residentId": "r2",
           "relation": "本人",
-          "personIndex": "210203197505203427#13800010002"
+          "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
         }
       ]
     }
@@ -35,79 +35,79 @@
   "residents": [
     {
       "id": "r1",
-      "name": "王建国",
-      "idCard": "210204196802113219",
+      "name": "演示居民A",
+      "idCard": "DEMO-ID-R1",
       "gender": "男",
       "birthDate": "1968-02-11",
-      "phone": "13800010001",
+      "phone": "DEMO-MOBILE-R1",
       "organization": "青泥洼桥社区卫生服务中心",
       "familyDoctor": "刘医生",
-      "address": "中山区人民路 18 号",
+      "address": "演示地址A",
       "metrics": {
         "systolic": 166,
         "diastolic": 96,
         "glucose": 6.8,
         "bmi": 29.4
       },
-      "personIndex": "210204196802113219#13800010001",
-      "identityIndex": "210204196802113219#13800010001"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
+      "identityIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "r2",
-      "name": "李秀兰",
-      "idCard": "210203197505203427",
+      "name": "演示居民B",
+      "idCard": "DEMO-ID-R2",
       "gender": "女",
       "birthDate": "1975-05-20",
-      "phone": "13800010002",
+      "phone": "DEMO-MOBILE-R2",
       "organization": "星海湾社区卫生服务中心",
       "familyDoctor": "赵医生",
-      "address": "沙河口区西南路 60 号",
+      "address": "演示地址B",
       "metrics": {
         "systolic": 138,
         "diastolic": 84,
         "glucose": 7.8,
         "bmi": 25.1
       },
-      "personIndex": "210203197505203427#13800010002",
-      "identityIndex": "210203197505203427#13800010002"
+      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2",
+      "identityIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
       "id": "r3",
-      "name": "陈海涛",
-      "idCard": "210211198811093014",
+      "name": "演示居民C",
+      "idCard": "DEMO-ID-R3",
       "gender": "男",
       "birthDate": "1988-11-09",
-      "phone": "13800010003",
+      "phone": "DEMO-MOBILE-R3",
       "organization": "甘井子区人民医院",
       "familyDoctor": "孙医生",
-      "address": "甘井子区山东路 88 号",
+      "address": "演示地址C",
       "metrics": {
         "systolic": 126,
         "diastolic": 78,
         "glucose": 5.5,
         "bmi": 24.2
       },
-      "personIndex": "210211198811093014#13800010003",
-      "identityIndex": "210211198811093014#13800010003"
+      "personIndex": "DEMO-ID-R3#DEMO-MOBILE-R3",
+      "identityIndex": "DEMO-ID-R3#DEMO-MOBILE-R3"
     },
     {
       "id": "r4",
-      "name": "赵敏",
-      "idCard": "210213196410013521",
+      "name": "演示居民D",
+      "idCard": "DEMO-ID-R4",
       "gender": "女",
       "birthDate": "1964-10-01",
-      "phone": "13800010004",
+      "phone": "DEMO-MOBILE-R4",
       "organization": "青泥洼桥社区卫生服务中心",
       "familyDoctor": "刘医生",
-      "address": "中山区解放街 7 号",
+      "address": "演示地址D",
       "metrics": {
         "systolic": 148,
         "diastolic": 88,
         "glucose": 6.3,
         "bmi": 28.6
       },
-      "personIndex": "210213196410013521#13800010004",
-      "identityIndex": "210213196410013521#13800010004"
+      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4",
+      "identityIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     }
   ],
   "diseases": [
@@ -119,7 +119,7 @@
       "source": "社区筛查",
       "status": "管理中",
       "note": "需加强用药依从性",
-      "personIndex": "210204196802113219#13800010001"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "d2",
@@ -129,7 +129,7 @@
       "source": "医院门诊",
       "status": "需转诊",
       "note": "血糖控制不佳",
-      "personIndex": "210203197505203427#13800010002"
+      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
       "id": "d3",
@@ -139,7 +139,7 @@
       "source": "家庭医生随访",
       "status": "稳定管理",
       "note": "按季度复查",
-      "personIndex": "210213196410013521#13800010004"
+      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     }
   ],
   "followups": [
@@ -152,7 +152,7 @@
       "status": "已逾期",
       "result": "未记录",
       "advice": "补充电话随访",
-      "personIndex": "210204196802113219#13800010001"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "f2",
@@ -163,7 +163,7 @@
       "status": "待随访",
       "result": "未记录",
       "advice": "复测空腹血糖",
-      "personIndex": "210203197505203427#13800010002"
+      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
       "id": "f3",
@@ -174,7 +174,7 @@
       "status": "待随访",
       "result": "未记录",
       "advice": "记录家庭血压",
-      "personIndex": "210213196410013521#13800010004"
+      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     },
     {
       "id": "f4",
@@ -185,7 +185,7 @@
       "status": "已完成",
       "result": "控制良好",
       "advice": "保持运动",
-      "personIndex": "210211198811093014#13800010003"
+      "personIndex": "DEMO-ID-R3#DEMO-MOBILE-R3"
     }
   ],
   "medicalResources": [
@@ -752,7 +752,7 @@
       "priority": "高",
       "date": "2026-06-16",
       "summary": "高血压控制不佳，建议专科复诊并调整用药。",
-      "personIndex": "210204196802113219#13800010001"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "co2",
@@ -764,7 +764,7 @@
       "priority": "中",
       "date": "2026-06-18",
       "summary": "空腹血糖偏高，建议复查糖化血红蛋白。",
-      "personIndex": "210203197505203427#13800010002"
+      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
       "id": "co3",
@@ -776,7 +776,7 @@
       "priority": "中",
       "date": "2026-06-20",
       "summary": "稳定管理，继续季度随访。",
-      "personIndex": "210213196410013521#13800010004"
+      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     }
   ],
   "medicationPickups": [
@@ -790,7 +790,7 @@
       "nextPickup": "2026-07-05",
       "status": "待取药",
       "coverage": "门诊慢特病",
-      "personIndex": "210204196802113219#13800010001",
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
       "applyMode": "本人申请",
       "requestStatus": "已申请",
       "institutionReview": "已确认",
@@ -809,7 +809,7 @@
       "nextPickup": "2026-07-05",
       "status": "待取药",
       "coverage": "门诊慢特病",
-      "personIndex": "210204196802113219#13800010001",
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
       "applyMode": "本人申请",
       "requestStatus": "已申请",
       "institutionReview": "已确认",
@@ -828,7 +828,7 @@
       "nextPickup": "2026-07-10",
       "status": "已预约",
       "coverage": "门诊统筹",
-      "personIndex": "210203197505203427#13800010002",
+      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2",
       "applyMode": "本人申请",
       "requestStatus": "已申请",
       "institutionReview": "已确认",
@@ -847,7 +847,7 @@
       "nextPickup": "2026-07-15",
       "status": "待确认",
       "coverage": "基层慢病服务包",
-      "personIndex": "210213196410013521#13800010004",
+      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4",
       "applyMode": "家属代办",
       "requestStatus": "已申请",
       "institutionReview": "待确认",
@@ -896,7 +896,7 @@
       "status": "待审核",
       "risk": "需核验长期处方",
       "date": "2026-05-21",
-      "personIndex": "210204196802113219#13800010001"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "ic2",
@@ -910,7 +910,7 @@
       "status": "已通过",
       "risk": "无异常",
       "date": "2026-05-18",
-      "personIndex": "210203197505203427#13800010002"
+      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
       "id": "ic3",
@@ -924,7 +924,7 @@
       "status": "智能初审",
       "risk": "基层服务包匹配",
       "date": "2026-03-30",
-      "personIndex": "210213196410013521#13800010004"
+      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     }
   ],
   "policyAlignment": [
@@ -1016,9 +1016,9 @@
       "service": "家属代办取药",
       "channel": "个人端",
       "status": "已开通",
-      "contact": "王建国",
+      "contact": "演示居民A",
       "nextAction": "每月 15 日提醒家属确认取药",
-      "personIndex": "210213196410013521#13800010004"
+      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     },
     {
       "id": "ss2",
@@ -1028,7 +1028,7 @@
       "status": "待开通",
       "contact": "本人",
       "nextAction": "下次登录提示开启适老显示",
-      "personIndex": "210204196802113219#13800010001"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "ss3",
@@ -1038,7 +1038,7 @@
       "status": "已预约",
       "contact": "本人",
       "nextAction": "社区工作人员协助绑定医保电子凭证",
-      "personIndex": "210203197505203427#13800010002"
+      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     }
   ],
   "dataAccessLogs": [
@@ -1051,7 +1051,7 @@
       "scope": "健康档案、随访记录",
       "purpose": "慢病随访",
       "result": "允许",
-      "personIndex": "210204196802113219#13800010001"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "al2",
@@ -1062,7 +1062,7 @@
       "scope": "电子病历摘要、用药处方",
       "purpose": "专科复诊",
       "result": "允许",
-      "personIndex": "210204196802113219#13800010001"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "al3",
@@ -1073,7 +1073,7 @@
       "scope": "医保结算、诊断摘要",
       "purpose": "慢病结算审核",
       "result": "允许",
-      "personIndex": "210203197505203427#13800010002"
+      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
       "id": "al4",
@@ -1084,7 +1084,7 @@
       "scope": "完整电子病历",
       "purpose": "未知",
       "result": "拒绝",
-      "personIndex": "210213196410013521#13800010004"
+      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     }
   ],
   "securityEvents": [
@@ -1129,29 +1129,29 @@
       "status": "已绑定",
       "lastVerified": "2026-06-15",
       "usage": "就医身份识别、健康档案调阅",
-      "personIndex": "210204196802113219#13800010001"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "dc2",
       "residentId": "r1",
       "type": "医保电子凭证",
       "provider": "医保信息平台",
-      "credentialNo": "MI-13800010001",
+      "credentialNo": "MI-DEMO-MOBILE-R1",
       "status": "已激活",
       "lastVerified": "2026-06-15",
       "usage": "门诊慢特病结算、固定取药审核",
-      "personIndex": "210204196802113219#13800010001"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "dc3",
       "residentId": "r2",
       "type": "医保电子凭证",
       "provider": "医保信息平台",
-      "credentialNo": "MI-13800010002",
+      "credentialNo": "MI-DEMO-MOBILE-R2",
       "status": "待核验",
       "lastVerified": "2026-06-12",
       "usage": "门诊统筹结算",
-      "personIndex": "210203197505203427#13800010002"
+      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
       "id": "dc4",
@@ -1162,7 +1162,7 @@
       "status": "家属代办",
       "lastVerified": "2026-06-10",
       "usage": "线下帮办、家属代取药",
-      "personIndex": "210213196410013521#13800010004"
+      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     }
   ],
   "healthArchiveStandard": {
@@ -1474,7 +1474,7 @@
     {
       "id": "u4",
       "username": "citizen",
-      "name": "王建国",
+      "name": "演示居民A",
       "role": "citizen",
       "roleName": "个人端",
       "home": "citizen.html",
@@ -2298,7 +2298,7 @@
         "date": "2026-06-16",
         "reservedResource": "????? 2 ???? 1 ?",
         "insurancePolicy": "????????????????",
-        "personIndex": "210204196802113219#13800010001"
+        "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
       },
       {
         "id": "rf2",
@@ -2313,7 +2313,7 @@
         "date": "2026-06-18",
         "reservedResource": "??????? 3 ?",
         "insurancePolicy": "????????????????",
-        "personIndex": "210203197505203427#13800010002"
+        "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
       },
       {
         "id": "rf3",
@@ -2328,7 +2328,7 @@
         "date": "2026-06-20",
         "reservedResource": "?????? 1 ?????? 8 ?",
         "insurancePolicy": "??????????????????",
-        "personIndex": "210213196410013521#13800010004"
+        "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
       }
     ],
     "reservedResources": [
@@ -2392,7 +2392,7 @@
         ],
         "fulfillment": "???",
         "nextAction": "???????????????",
-        "personIndex": "210204196802113219#13800010001"
+        "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
       },
       {
         "residentId": "r2",
@@ -2406,7 +2406,7 @@
         ],
         "fulfillment": "???",
         "nextAction": "???????????????",
-        "personIndex": "210203197505203427#13800010002"
+        "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
       },
       {
         "residentId": "r4",
@@ -2420,7 +2420,7 @@
         ],
         "fulfillment": "???",
         "nextAction": "??????? 8 ???",
-        "personIndex": "210213196410013521#13800010004"
+        "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
       }
     ],
     "education": [
@@ -2479,8 +2479,8 @@
         "持久化",
         "迁移"
       ],
-      "status": "待开发",
-      "nextAction": "建立 SQLite schema，迁移 data/db.json。"
+      "status": "进行中",
+      "nextAction": "已完成 SQLite 主存储与 JSON 快照第一版；下一步拆分居民、病历、统计等结构化表和索引。"
     },
     {
       "priority": "P1",
@@ -2566,7 +2566,7 @@
       },
       "createdBy": "system",
       "createdAt": "2026-06-15T05:55:39.990Z",
-      "personIndex": "210204196802113219#13800010001"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "97404359-7171-4069-b3b0-ce5f823acc68",
@@ -2587,7 +2587,7 @@
       },
       "createdBy": "system",
       "createdAt": "2026-06-15T05:55:39.990Z",
-      "personIndex": "210204196802113219#13800010001"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "274d4826-4618-46c3-9499-9e315457dbbc",
@@ -2609,7 +2609,7 @@
       },
       "createdBy": "system",
       "createdAt": "2026-06-15T05:55:39.990Z",
-      "personIndex": "210203197505203427#13800010002"
+      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
       "id": "3fad59ff-1adc-4d9a-ae3d-a21862b6a273",
@@ -2630,7 +2630,7 @@
       },
       "createdBy": "system",
       "createdAt": "2026-06-15T05:55:39.990Z",
-      "personIndex": "210213196410013521#13800010004"
+      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     },
     {
       "id": "80dff619-fe74-46cd-91be-b41eae312ccc",
@@ -2643,7 +2643,7 @@
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-15T05:55:39.990Z",
-      "personIndex": "210204196802113219#13800010001"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "ac1369e5-4834-412b-a2b2-a2809679b4b9",
@@ -2656,7 +2656,7 @@
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-15T05:55:39.990Z",
-      "personIndex": "210204196802113219#13800010001"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "dd3fad41-33ce-4812-8482-22a6cef348af",
@@ -2669,7 +2669,7 @@
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-15T05:55:39.990Z",
-      "personIndex": "210203197505203427#13800010002"
+      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
       "id": "039562f5-a5f0-4e41-9cd3-c6867d777a4e",
@@ -2682,7 +2682,7 @@
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-15T05:55:39.990Z",
-      "personIndex": "210213196410013521#13800010004"
+      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     },
     {
       "id": "51fa52bb-5fed-43d3-821b-b1c3ca6afcd5",
@@ -2695,7 +2695,7 @@
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-15T05:55:39.990Z",
-      "personIndex": "210204196802113219#13800010001"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "02200cb1-3c33-4c71-b3db-efdc60eca38e",
@@ -2708,7 +2708,7 @@
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-15T05:55:39.990Z",
-      "personIndex": "210204196802113219#13800010001"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "3621411f-b5fd-4444-b906-61130b479593",
@@ -2721,7 +2721,7 @@
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-15T05:55:39.990Z",
-      "personIndex": "210203197505203427#13800010002"
+      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
       "id": "2b6ce28a-98c3-47cc-9a43-eeba66b5f121",
@@ -2734,7 +2734,7 @@
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-15T05:55:39.990Z",
-      "personIndex": "210204196802113219#13800010001"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "cd86af40-e45c-4d6f-ba8d-86a41f07af7d",
@@ -2747,7 +2747,7 @@
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-15T05:55:39.990Z",
-      "personIndex": "210203197505203427#13800010002"
+      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
       "id": "bc1c39d1-9e84-439a-a07b-b39d14536a0f",
@@ -2760,7 +2760,7 @@
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-15T05:55:39.990Z",
-      "personIndex": "210204196802113219#13800010001"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "b4fe6020-d549-451d-9c93-22db83cc20b6",
@@ -2773,7 +2773,7 @@
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-15T05:55:39.990Z",
-      "personIndex": "210213196410013521#13800010004"
+      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     },
     {
       "id": "020fd902-091a-470a-b857-60072d844054",
@@ -2786,7 +2786,7 @@
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-15T05:55:39.990Z",
-      "personIndex": "210204196802113219#13800010001"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "1d27b7bd-e8a5-4cce-a99c-e359d5fe0206",
@@ -2799,7 +2799,7 @@
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-15T05:55:39.990Z",
-      "personIndex": "210211198811093014#13800010003"
+      "personIndex": "DEMO-ID-R3#DEMO-MOBILE-R3"
     },
     {
       "id": "192cd2f6-c297-4bd0-855c-f520043f75da",
@@ -2812,7 +2812,7 @@
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-15T05:55:39.990Z",
-      "personIndex": "210204196802113219#13800010001"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "6845bfaa-53b1-4b95-9893-9a2e5a081d69",
@@ -2825,7 +2825,7 @@
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-15T05:55:39.990Z",
-      "personIndex": "210204196802113219#13800010001"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "b2149847-9a97-4918-98f0-0ec95761832b",
@@ -2838,7 +2838,15 @@
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-15T05:55:39.990Z",
-      "personIndex": "210203197505203427#13800010002"
+      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     }
-  ]
+  ],
+  "storageMeta": {
+    "engine": "json-snapshot",
+    "mode": "GitHub Pages 静态预览 JSON 快照",
+    "sqliteFile": "data/health-city.sqlite",
+    "jsonFile": "data/db.json",
+    "sqliteAvailable": true,
+    "sqliteError": ""
+  }
 }

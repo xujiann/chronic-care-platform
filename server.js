@@ -7,9 +7,13 @@ const PORT = Number(process.env.PORT || 5173);
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, "data");
 const DB_FILE = path.join(DATA_DIR, "db.json");
+const SQLITE_FILE = path.join(DATA_DIR, "health-city.sqlite");
+const STORAGE_ENGINE = String(process.env.STORAGE_ENGINE || "auto").toLowerCase();
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const DEMO_PASSWORD = "123456";
 const sessions = new Map();
+let sqliteModule = null;
+let sqliteError = null;
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -31,8 +35,8 @@ function seedState() {
     accounts: [
       {
         id: "a1",
-        name: "王建国账户",
-        phone: "13800010001",
+        name: "演示居民A账户",
+        phone: "DEMO-MOBILE-R1",
         role: "本人",
         members: [
           { residentId: "r1", relation: "本人" },
@@ -41,8 +45,8 @@ function seedState() {
       },
       {
         id: "a2",
-        name: "李秀兰账户",
-        phone: "13800010002",
+        name: "演示居民B账户",
+        phone: "DEMO-MOBILE-R2",
         role: "本人",
         members: [
           { residentId: "r2", relation: "本人" }
@@ -52,50 +56,50 @@ function seedState() {
     residents: [
       {
         id: "r1",
-        name: "王建国",
-        idCard: "210204196802113219",
+        name: "演示居民A",
+        idCard: "DEMO-ID-R1",
         gender: "男",
         birthDate: "1968-02-11",
-        phone: "13800010001",
+        phone: "DEMO-MOBILE-R1",
         organization: "青泥洼桥社区卫生服务中心",
         familyDoctor: "刘医生",
-        address: "中山区人民路 18 号",
+        address: "演示地址A",
         metrics: { systolic: 166, diastolic: 96, glucose: 6.8, bmi: 29.4 }
       },
       {
         id: "r2",
-        name: "李秀兰",
-        idCard: "210203197505203427",
+        name: "演示居民B",
+        idCard: "DEMO-ID-R2",
         gender: "女",
         birthDate: "1975-05-20",
-        phone: "13800010002",
+        phone: "DEMO-MOBILE-R2",
         organization: "星海湾社区卫生服务中心",
         familyDoctor: "赵医生",
-        address: "沙河口区西南路 60 号",
+        address: "演示地址B",
         metrics: { systolic: 138, diastolic: 84, glucose: 7.8, bmi: 25.1 }
       },
       {
         id: "r3",
-        name: "陈海涛",
-        idCard: "210211198811093014",
+        name: "演示居民C",
+        idCard: "DEMO-ID-R3",
         gender: "男",
         birthDate: "1988-11-09",
-        phone: "13800010003",
+        phone: "DEMO-MOBILE-R3",
         organization: "甘井子区人民医院",
         familyDoctor: "孙医生",
-        address: "甘井子区山东路 88 号",
+        address: "演示地址C",
         metrics: { systolic: 126, diastolic: 78, glucose: 5.5, bmi: 24.2 }
       },
       {
         id: "r4",
-        name: "赵敏",
-        idCard: "210213196410013521",
+        name: "演示居民D",
+        idCard: "DEMO-ID-R4",
         gender: "女",
         birthDate: "1964-10-01",
-        phone: "13800010004",
+        phone: "DEMO-MOBILE-R4",
         organization: "青泥洼桥社区卫生服务中心",
         familyDoctor: "刘医生",
-        address: "中山区解放街 7 号",
+        address: "演示地址D",
         metrics: { systolic: 148, diastolic: 88, glucose: 6.3, bmi: 28.6 }
       }
     ],
@@ -155,8 +159,8 @@ function seedPlatformRoadmap() {
       title: "SQLite 数据库迁移",
       reason: "JSON 适合演示，不适合长期开发。需要结构化表、索引、迁移脚本和数据备份。",
       scope: ["数据层", "持久化", "迁移"],
-      status: "待开发",
-      nextAction: "建立 SQLite schema，迁移 data/db.json。"
+      status: "进行中",
+      nextAction: "已完成 SQLite 主存储与 JSON 快照第一版；下一步拆分居民、病历、统计等结构化表和索引。"
     },
     {
       priority: "P1",
@@ -255,7 +259,7 @@ function seedAuthUsers() {
     { id: "u1", username: "whjw", name: "卫健委管理员", role: "commission", roleName: "卫生健康委端", home: "index.html", status: "启用" },
     { id: "u2", username: "doctor", name: "刘医生", role: "institution", roleName: "医疗机构端", home: "institution.html", status: "启用" },
     { id: "u3", username: "insurance", name: "医保审核员", role: "insurance", roleName: "医保端", home: "insurance.html", status: "启用" },
-    { id: "u4", username: "citizen", name: "王建国", role: "citizen", roleName: "个人端", home: "citizen.html", residentId: "r1", accountId: "a1", status: "启用" },
+    { id: "u4", username: "citizen", name: "演示居民A", role: "citizen", roleName: "个人端", home: "citizen.html", residentId: "r1", accountId: "a1", status: "启用" },
     { id: "u5", username: "county", name: "医共体办公室", role: "county", roleName: "县域医共体平台", home: "county.html", status: "启用" }
   ];
 }
@@ -372,7 +376,7 @@ function seedEmergencySignals() {
 
 function seedSeniorServices() {
   return [
-    { id: "ss1", residentId: "r4", service: "家属代办取药", channel: "个人端", status: "已开通", contact: "王建国", nextAction: "每月 15 日提醒家属确认取药" },
+    { id: "ss1", residentId: "r4", service: "家属代办取药", channel: "个人端", status: "已开通", contact: "演示居民A", nextAction: "每月 15 日提醒家属确认取药" },
     { id: "ss2", residentId: "r1", service: "大字模式提醒", channel: "手机端", status: "待开通", contact: "本人", nextAction: "下次登录提示开启适老显示" },
     { id: "ss3", residentId: "r2", service: "线下帮办预约", channel: "社区服务站", status: "已预约", contact: "本人", nextAction: "社区工作人员协助绑定医保电子凭证" }
   ];
@@ -398,8 +402,8 @@ function seedSecurityEvents() {
 function seedDigitalCredentials() {
   return [
     { id: "dc1", residentId: "r1", type: "电子健康码", provider: "区域全民健康信息平台", credentialNo: "HC-210204-3219", status: "已绑定", lastVerified: "2026-06-15", usage: "就医身份识别、健康档案调阅" },
-    { id: "dc2", residentId: "r1", type: "医保电子凭证", provider: "医保信息平台", credentialNo: "MI-13800010001", status: "已激活", lastVerified: "2026-06-15", usage: "门诊慢特病结算、固定取药审核" },
-    { id: "dc3", residentId: "r2", type: "医保电子凭证", provider: "医保信息平台", credentialNo: "MI-13800010002", status: "待核验", lastVerified: "2026-06-12", usage: "门诊统筹结算" },
+    { id: "dc2", residentId: "r1", type: "医保电子凭证", provider: "医保信息平台", credentialNo: "MI-DEMO-MOBILE-R1", status: "已激活", lastVerified: "2026-06-15", usage: "门诊慢特病结算、固定取药审核" },
+    { id: "dc3", residentId: "r2", type: "医保电子凭证", provider: "医保信息平台", credentialNo: "MI-DEMO-MOBILE-R2", status: "待核验", lastVerified: "2026-06-12", usage: "门诊统筹结算" },
     { id: "dc4", residentId: "r4", type: "居民一卡通", provider: "城市服务平台", credentialNo: "CC-210213-3521", status: "家属代办", lastVerified: "2026-06-10", usage: "线下帮办、家属代取药" }
   ];
 }
@@ -674,18 +678,139 @@ function ensureDatabase() {
   if (!fs.existsSync(DB_FILE)) {
     fs.writeFileSync(DB_FILE, JSON.stringify(seedState(), null, 2), "utf8");
   }
+  if (shouldUseSqlite()) {
+    ensureSqliteDatabase();
+  }
 }
 
 function readDatabase() {
   ensureDatabase();
-  const data = normalizeState(JSON.parse(fs.readFileSync(DB_FILE, "utf8")));
+  const raw = shouldUseSqlite() ? readSqliteState() : JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
+  const data = normalizeState(raw);
+  data.storageMeta = storageMeta();
   writeDatabase(data);
   return data;
 }
 
 function writeDatabase(data) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf8");
+  const normalized = normalizeState(data);
+  normalized.storageMeta = data.storageMeta || storageMeta();
+  if (shouldUseSqlite()) {
+    writeSqliteState(normalized);
+  }
+  const snapshot = {
+    ...normalized,
+    storageMeta: {
+      ...normalized.storageMeta,
+      engine: shouldUseSqlite() ? "json-snapshot" : "json",
+      mode: shouldUseSqlite() ? "GitHub Pages 静态预览 JSON 快照" : "JSON 文件存储"
+    }
+  };
+  fs.writeFileSync(DB_FILE, JSON.stringify(snapshot, null, 2), "utf8");
+}
+
+function loadSqliteModule() {
+  if (sqliteModule || sqliteError) return sqliteModule;
+  try {
+    sqliteModule = require("node:sqlite");
+  } catch (error) {
+    sqliteError = error;
+  }
+  return sqliteModule;
+}
+
+function shouldUseSqlite() {
+  if (STORAGE_ENGINE === "json") return false;
+  return Boolean(loadSqliteModule()?.DatabaseSync);
+}
+
+function openSqliteDatabase() {
+  const sqlite = loadSqliteModule();
+  if (!sqlite?.DatabaseSync) {
+    throw new Error("SQLite runtime unavailable");
+  }
+  return new sqlite.DatabaseSync(SQLITE_FILE);
+}
+
+function ensureSqliteDatabase() {
+  const db = openSqliteDatabase();
+  let needsSeed = false;
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS state_collections (
+        key TEXT PRIMARY KEY,
+        payload TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS storage_events (
+        id TEXT PRIMARY KEY,
+        at TEXT NOT NULL,
+        event TEXT NOT NULL,
+        detail TEXT NOT NULL
+      );
+    `);
+    const row = db.prepare("SELECT COUNT(*) AS count FROM state_collections").get();
+    needsSeed = !row.count;
+  } finally {
+    db.close();
+  }
+  if (needsSeed) {
+    const seed = JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
+    writeSqliteState(seed, "migrate-json-snapshot");
+  }
+}
+
+function readSqliteState() {
+  const db = openSqliteDatabase();
+  try {
+    const rows = db.prepare("SELECT key, payload FROM state_collections").all();
+    if (!rows.length) return JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
+    return rows.reduce((state, row) => {
+      state[row.key] = JSON.parse(row.payload);
+      return state;
+    }, {});
+  } finally {
+    db.close();
+  }
+}
+
+function writeSqliteState(data, event = "write-state") {
+  const db = openSqliteDatabase();
+  const now = new Date().toISOString();
+  try {
+    db.exec("BEGIN");
+    const deleteStatement = db.prepare("DELETE FROM state_collections");
+    deleteStatement.run();
+    const insertStatement = db.prepare("INSERT INTO state_collections (key, payload, updated_at) VALUES (?, ?, ?)");
+    Object.entries(data).forEach(([key, value]) => {
+      if (key === "storageMeta") return;
+      insertStatement.run(key, JSON.stringify(value), now);
+    });
+    db.prepare("INSERT INTO storage_events (id, at, event, detail) VALUES (?, ?, ?, ?)").run(randomUUID(), now, event, "platform state persisted");
+    db.exec("COMMIT");
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  } finally {
+    db.close();
+  }
+}
+
+function storageMeta() {
+  const sqlite = shouldUseSqlite();
+  return {
+    engine: sqlite ? "sqlite" : "json",
+    mode: sqlite ? "SQLite 主存储 + JSON 快照" : "JSON 文件存储",
+    sqliteFile: sqlite ? relativeProjectPath(SQLITE_FILE) : "",
+    jsonFile: relativeProjectPath(DB_FILE),
+    sqliteAvailable: sqlite,
+    sqliteError: sqliteError ? sqliteError.message : ""
+  };
+}
+
+function relativeProjectPath(filePath) {
+  return path.relative(ROOT, filePath).replace(/\\/g, "/");
 }
 
 function sendJson(res, status, payload) {
@@ -926,7 +1051,7 @@ async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
   if (req.method === "GET" && req.url === "/api/health") {
-    sendJson(res, 200, { ok: true, storage: DB_FILE });
+    sendJson(res, 200, { ok: true, storage: storageMeta() });
     return;
   }
 
