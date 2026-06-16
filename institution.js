@@ -6,6 +6,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderCareOrders(state);
   renderAuthorizedRecords(state);
   renderClaimLinks(state);
+  renderReferralCenter(state);
+  renderReservedResources(state);
   renderIntegratedProfiles(state);
   renderStandardArchiveProfiles(state);
   renderInstitutionAudit(state);
@@ -71,6 +73,32 @@ function renderClaimLinks(state) {
       <span>${claim.institution}<br>${money(claim.totalAmount)} · ${claim.status}</span>
     </article>`;
   }).join("");
+}
+
+function renderReferralCenter(state) {
+  const referrals = state.referralSystem?.referrals || [];
+  document.querySelector("#referral-center-count").textContent = `${referrals.length} 条`;
+  document.querySelector("#referral-center").innerHTML = referrals.map((item) => {
+    const resident = residentOf(state, item.residentId);
+    const badge = item.priority === "高" ? "danger" : item.status.includes("待") ? "warn" : "info";
+    return `<section class="item">
+      <div>
+        <h3>${resident?.name || "未知居民"} · ${item.type} · ${item.diseaseType}</h3>
+        <p>${item.from} → ${item.to} · ${item.date}</p>
+        <p>${item.reason}</p>
+        <p>资源安排：${item.reservedResource} · 医保衔接：${item.insurancePolicy}</p>
+      </div>
+      <span class="badge ${badge}">${item.status}</span>
+    </section>`;
+  }).join("") || `<p class="muted">暂无转诊中心任务。</p>`;
+}
+
+function renderReservedResources(state) {
+  const resources = state.referralSystem?.reservedResources || [];
+  document.querySelector("#reserved-resources").innerHTML = resources.map((item) => `<article class="claim-card">
+    <strong>${item.institution} · ${item.department}</strong>
+    <span>号源 ${item.outpatientSlots} · 床位 ${item.beds}<br>${item.forPrimaryReferral} · ${item.status}</span>
+  </article>`).join("") || `<p class="muted">暂无预留号源床位配置。</p>`;
 }
 
 function renderIntegratedProfiles(state) {

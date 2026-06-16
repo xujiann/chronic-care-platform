@@ -78,6 +78,7 @@ const titles = {
   followups: ["随访管理", "跟踪计划、逾期提醒、干预建议和随访结果。"],
   analytics: ["统计分析", "按病种、机构、风险等级观察管理成效。"],
   governance: ["协同监管", "监测四端贯通、机构绩效、数据质量和风险预警。"],
+  referral: ["分级诊疗", "落实基层首诊、双向转诊、急慢分治、上下联动和医保支付引导。"],
   emergency: ["公共卫生应急", "建设多点触发预警、资源调配、快速报送和协同处置能力，支撑早发现、早报告、早处置。"],
   security: ["数据安全审计", "围绕个人健康信息授权、访问留痕、脱敏展示、分级权限和合规审计构建安全底座。"],
   planning: ["国家规划对齐", "对照《“十四五”国家信息化规划》，补齐普惠数字医疗、数据共享、智慧监管、公共卫生应急和适老化服务。"]
@@ -297,6 +298,7 @@ function render() {
   renderFollowups();
   renderAnalytics();
   renderGovernance();
+  renderReferralSystem();
   renderEmergency();
   renderSecurity();
   renderPlanning();
@@ -509,6 +511,71 @@ function renderGovernance() {
   renderMedicalResources();
   renderPerformanceTable();
   renderQualityBars();
+}
+
+function renderReferralSystem() {
+  const referral = state.referralSystem || {};
+  const referrals = referral.referrals || [];
+  const up = referrals.filter((item) => item.type === "上转").length;
+  const down = referrals.filter((item) => item.type === "下转").length;
+  const pending = referrals.filter((item) => !["已接诊", "基层承接", "已完成"].includes(item.status)).length;
+  const slots = (referral.reservedResources || []).reduce((sum, item) => sum + Number(item.outpatientSlots || 0), 0);
+  const beds = (referral.reservedResources || []).reduce((sum, item) => sum + Number(item.beds || 0), 0);
+  document.querySelector("#referral-cards").innerHTML = [
+    ["转诊单", referrals.length, "上转、下转、跨域转诊"],
+    ["上转", up, "基层到二三级医院"],
+    ["下转", down, "恢复期和稳定期回基层"],
+    ["待接诊", pending, "需转诊中心跟踪"],
+    ["预留号源", slots, "牵头医院优先接诊"],
+    ["预留床位", beds, "住院一体化管理"]
+  ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><em>${hint}</em></article>`).join("");
+
+  document.querySelector("#referral-rules").innerHTML = (referral.rules || [])
+    .map((item) => `<div><strong>${item.name}</strong><span>${item.scenario}：${item.action}<br>${item.owner}</span></div>`)
+    .join("") || `<div class="subtle">暂无分级诊疗规则。</div>`;
+
+  document.querySelector("#referral-roles").innerHTML = (referral.institutionRoles || [])
+    .map((item) => `<div><strong>${item.level}</strong><span>${item.role}<br>门诊重点：${item.outpatientFocus}<br>转诊职责：${item.gatekeeping}</span></div>`)
+    .join("") || `<div class="subtle">暂无机构功能定位。</div>`;
+
+  document.querySelector("#referral-count").textContent = `${referrals.length} 条`;
+  document.querySelector("#referral-table").innerHTML = `<table>
+    <thead><tr><th>居民</th><th>类型</th><th>病种</th><th>转出</th><th>转入</th><th>原因</th><th>资源</th><th>状态</th></tr></thead>
+    <tbody>${referrals.map((item) => {
+      const resident = findResident(item.residentId);
+      const badge = item.priority === "高" ? "danger" : item.status.includes("待") ? "warn" : "info";
+      return `<tr>
+        <td>${resident?.name || "未知居民"}</td>
+        <td>${item.type}</td>
+        <td>${item.diseaseType}</td>
+        <td>${item.from}</td>
+        <td>${item.to}</td>
+        <td>${item.reason}</td>
+        <td>${item.reservedResource}</td>
+        <td><span class="badge ${badge}">${item.status}</span></td>
+      </tr>`;
+    }).join("")}</tbody>
+  </table>`;
+
+  document.querySelector("#reserved-resource-table").innerHTML = `<table>
+    <thead><tr><th>机构</th><th>科室</th><th>预留号源</th><th>床位</th><th>用途</th><th>状态</th></tr></thead>
+    <tbody>${(referral.reservedResources || []).map((item) => `<tr>
+      <td>${item.institution}</td>
+      <td>${item.department}</td>
+      <td>${item.outpatientSlots}</td>
+      <td>${item.beds}</td>
+      <td>${item.forPrimaryReferral}</td>
+      <td><span class="badge info">${item.status}</span></td>
+    </tr>`).join("")}</tbody>
+  </table>`;
+
+  document.querySelector("#referral-insurance-rules").innerHTML = (referral.insuranceGuidance || [])
+    .map((item) => `<div><strong>${item.item}</strong><span>${item.policy}<br>${item.status}</span></div>`)
+    .join("") || `<div class="subtle">暂无医保支付引导规则。</div>`;
+
+  document.querySelector("#referral-education").innerHTML = (referral.education || [])
+    .map((item) => `<div><strong>${item.title}</strong><span>${item.audience} · ${item.channel}<br>${item.message}</span></div>`)
+    .join("") || `<div class="subtle">暂无分级诊疗宣传内容。</div>`;
 }
 
 function renderPlanning() {

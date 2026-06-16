@@ -27,13 +27,16 @@ flowchart TB
 
   Institution --> CareOrder["转诊、复诊、随访协同任务"]
   Institution --> EMR["电子病历补充与标准档案视图"]
+  Institution --> ReferralCenter["分级诊疗转诊中心\n上转、下转、号源床位预留"]
 
   Insurance --> Claim["慢病结算审核"]
   Insurance --> Supervision["医疗机构监管"]
+  Insurance --> PaymentGuide["分级诊疗支付引导\n连续起付线、差异化报销、长期处方"]
 
   County --> SharedCenters["区域医技共享中心\n影像、心电、检验、病理、会诊、急救、消毒供应"]
   County --> CountyPublicHealth["公共卫生协同\n慢病、老年、妇幼、疫苗、应急"]
   County --> CountyOps["基层综合管理\n人财物、药耗、行政、绩效、医废"]
+  County --> ReferralBuild["分级诊疗体系建设\n紧密型医联体、基层首诊、双向转诊"]
 
   Citizen --> Pickup["每月固定取药申请"]
   Pickup --> Institution

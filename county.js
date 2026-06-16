@@ -9,6 +9,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderCountyCapabilities(county, "all");
   renderCountyTasks(county);
   renderCountyWorkflows(county);
+  renderCountyReferral(state);
   renderCountyIndicators(county);
   renderCountyGovernance(county);
 });
@@ -82,6 +83,35 @@ function renderCountyWorkflows(county) {
     <strong>${flow.name}</strong>
     <div class="flow-steps">
       ${flow.steps.map((step, index) => `<span>${index + 1}. ${step}</span>`).join("")}
+    </div>
+  </article>`).join("");
+}
+
+function renderCountyReferral(state) {
+  const referral = state.referralSystem || {};
+  const referrals = referral.referrals || [];
+  const blocks = [
+    {
+      name: "紧密型医联体协同",
+      steps: referral.goals || ["以紧密型医联体为抓手完善分级诊疗协同机制"]
+    },
+    {
+      name: "转诊中心运行",
+      steps: referrals.map((item) => `${item.type}：${item.from} → ${item.to} · ${item.status}`)
+    },
+    {
+      name: "预留资源",
+      steps: (referral.reservedResources || []).map((item) => `${item.institution}${item.department}：号源 ${item.outpatientSlots}，床位 ${item.beds}`)
+    },
+    {
+      name: "医保与长期处方",
+      steps: (referral.insuranceGuidance || []).map((item) => `${item.item}：${item.status}`)
+    }
+  ];
+  document.querySelector("#county-referral").innerHTML = blocks.map((flow) => `<article>
+    <strong>${flow.name}</strong>
+    <div class="flow-steps">
+      ${(flow.steps.length ? flow.steps : ["待配置"]).map((step, index) => `<span>${index + 1}. ${step}</span>`).join("")}
     </div>
   </article>`).join("");
 }

@@ -232,6 +232,7 @@ function renderCitizen(residentId) {
   renderEmr(records, resident, diseases, followups);
   renderDiseases(diseases, risk);
   renderFollowups(followups);
+  renderReferrals(resident.id);
   renderPickups(resident.id);
   renderSeniorServices(resident.id);
   renderDigitalCredentials(resident.id);
@@ -462,6 +463,36 @@ function renderFollowups(followups) {
       <span class="status ${item.status === "已逾期" ? "danger" : item.status === "待随访" ? "warn" : ""}">${item.status}</span>
     </article>`)
     .join("") || `<p class="muted">暂无随访提醒。</p>`;
+}
+
+function renderReferrals(residentId) {
+  const target = document.querySelector("#referral-cards");
+  if (!target) return;
+  const referrals = (state.referralSystem?.referrals || []).filter((item) => item.residentId === residentId);
+  const services = (state.referralSystem?.familyDoctorServices || []).filter((item) => item.residentId === residentId);
+  const education = state.referralSystem?.education || [];
+  target.innerHTML = [
+    ...referrals.map((item) => `<article class="mini-card">
+      <h3>${item.type} · ${item.diseaseType}</h3>
+      <p class="muted">${item.from} → ${item.to}</p>
+      <p>${item.reason}</p>
+      <p>${item.reservedResource}</p>
+      <span class="status ${item.priority === "高" ? "danger" : item.status.includes("待") ? "warn" : ""}">${item.status}</span>
+    </article>`),
+    ...services.map((item) => `<article class="mini-card">
+      <h3>${item.servicePackage}</h3>
+      <p class="muted">${item.provider} · ${item.fulfillment}</p>
+      <p>${item.items.join("、")}</p>
+      <p>${item.nextAction}</p>
+      <span class="status">家庭医生签约</span>
+    </article>`),
+    ...education.slice(0, referrals.length ? 1 : 2).map((item) => `<article class="mini-card">
+      <h3>${item.title}</h3>
+      <p class="muted">${item.audience} · ${item.channel}</p>
+      <p>${item.message}</p>
+      <span class="status">就医指引</span>
+    </article>`)
+  ].join("") || `<p class="muted">暂无转诊服务。常见病、慢性病稳定期建议优先基层首诊。</p>`;
 }
 
 function renderPickups(residentId) {

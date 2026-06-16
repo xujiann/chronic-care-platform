@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderMetrics(state);
   renderClaims(state);
   renderSupervisions(state);
+  renderReferralPayments(state);
   renderPickupAudits(state);
   renderCredentialChecks(state);
   renderInsuranceAudit(state);
@@ -60,6 +61,24 @@ function renderSupervisions(state) {
       <span class="badge ${badge}">${item.level}</span>
     </section>`;
   }).join("") || `<p class="muted">暂无机构监管事项。</p>`;
+}
+
+function renderReferralPayments(state) {
+  const rules = state.referralSystem?.insuranceGuidance || [];
+  const referrals = state.referralSystem?.referrals || [];
+  document.querySelector("#referral-payment-count").textContent = `${rules.length} 项`;
+  document.querySelector("#referral-payment-list").innerHTML = rules.map((item) => {
+    const related = referrals.filter((referral) => referral.insurancePolicy?.includes(item.item.slice(0, 4))).length;
+    const badge = item.status.includes("待") ? "warn" : "info";
+    return `<section class="item">
+      <div>
+        <h3>${item.item}</h3>
+        <p>${item.policy}</p>
+        <p>关联转诊 ${related} 条 · 用于结算审核、差异化支付和基金监管。</p>
+      </div>
+      <span class="badge ${badge}">${item.status}</span>
+    </section>`;
+  }).join("") || `<p class="muted">暂无分级诊疗支付政策配置。</p>`;
 }
 
 function renderPickupAudits(state) {
