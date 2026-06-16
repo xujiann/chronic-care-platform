@@ -22,6 +22,57 @@ body {
   font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
 }
 
+.auth-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.auth-bar strong,
+.auth-bar span {
+  display: block;
+}
+
+.auth-bar span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.auth-bar nav {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.auth-bar a,
+.auth-bar button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: #fff;
+  color: var(--ink);
+  text-decoration: none;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.auth-bar button {
+  color: var(--red);
+}
+
 .portal-shell {
   width: min(1220px, calc(100vw - 32px));
   margin: 0 auto;
@@ -75,6 +126,135 @@ h1 { margin-top: 4px; font-size: 28px; }
   background: #fff;
   text-decoration: none;
   font-weight: 700;
+}
+
+.login-shell {
+  display: grid;
+  min-height: 100vh;
+  align-items: center;
+}
+
+.login-layout {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 16px;
+  align-items: stretch;
+}
+
+.login-intro,
+.login-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.login-intro {
+  padding: 28px;
+  background: #102033;
+  color: #fff;
+}
+
+.login-intro span {
+  color: #8fe0c9;
+  font-weight: 800;
+}
+
+.login-intro h1 {
+  margin: 10px 0;
+  font-size: 30px;
+}
+
+.login-intro p {
+  color: #c8d7e4;
+  line-height: 1.7;
+}
+
+.login-flow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 28px;
+}
+
+.login-flow div,
+.demo-accounts button {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.login-flow strong,
+.login-flow span {
+  display: block;
+}
+
+.login-flow strong {
+  font-size: 24px;
+  color: #8fe0c9;
+}
+
+.login-form {
+  display: grid;
+  gap: 14px;
+}
+
+.login-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.login-form select,
+.login-form input {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+}
+
+.primary-action {
+  min-height: 42px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--blue);
+  color: #fff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.login-error {
+  min-height: 20px;
+  color: var(--red);
+}
+
+.demo-accounts {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.demo-accounts button {
+  border-color: var(--line);
+  background: #f8fbfd;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.demo-accounts strong,
+.demo-accounts span {
+  display: block;
+}
+
+.demo-accounts span {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .metric-grid {
@@ -253,6 +433,30 @@ h1 { margin-top: 4px; font-size: 28px; }
   gap: 10px;
 }
 
+.auth-flow-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.auth-flow-grid div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fbfd;
+}
+
+.auth-flow-grid strong,
+.auth-flow-grid span {
+  display: block;
+}
+
+.auth-flow-grid span {
+  margin-top: 6px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
 .capability-card,
 .model-grid div {
   border: 1px solid var(--line);
@@ -281,6 +485,17 @@ h1 { margin-top: 4px; font-size: 28px; }
   .portal-header {
     flex-direction: column;
   }
+  .auth-bar,
+  .login-layout {
+    grid-template-columns: 1fr;
+  }
+  .auth-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .auth-bar nav {
+    justify-content: flex-start;
+  }
   .portal-header nav {
     justify-content: flex-start;
   }
@@ -289,6 +504,9 @@ h1 { margin-top: 4px; font-size: 28px; }
   .claim-grid,
   .capability-grid,
   .model-grid,
+  .auth-flow-grid,
+  .login-flow,
+  .demo-accounts,
   .item {
     grid-template-columns: 1fr;
   }

@@ -118,8 +118,18 @@ function seedState() {
     dataAccessLogs: seedDataAccessLogs(),
     digitalCredentials: seedDigitalCredentials(),
     healthArchiveStandard: seedHealthArchiveStandard(),
+    authUsers: seedAuthUsers(),
     personalRecords: seedPersonalRecords()
   };
+}
+
+function seedAuthUsers() {
+  return [
+    { id: "u1", username: "whjw", name: "卫健委管理员", role: "commission", roleName: "卫生健康委端", home: "index.html", status: "启用" },
+    { id: "u2", username: "doctor", name: "刘医生", role: "institution", roleName: "医疗机构端", home: "institution.html", status: "启用" },
+    { id: "u3", username: "insurance", name: "医保审核员", role: "insurance", roleName: "医保端", home: "insurance.html", status: "启用" },
+    { id: "u4", username: "citizen", name: "王建国", role: "citizen", roleName: "个人端", home: "citizen.html", residentId: "r1", accountId: "a1", status: "启用" }
+  ];
 }
 
 function seedHealthArchiveStandard() {
@@ -453,6 +463,7 @@ function normalizeState(data) {
     dataAccessLogs: Array.isArray(data.dataAccessLogs) ? data.dataAccessLogs : seedDataAccessLogs(),
     digitalCredentials: Array.isArray(data.digitalCredentials) ? data.digitalCredentials : seedDigitalCredentials(),
     healthArchiveStandard: data.healthArchiveStandard && typeof data.healthArchiveStandard === "object" ? data.healthArchiveStandard : seedHealthArchiveStandard(),
+    authUsers: Array.isArray(data.authUsers) ? data.authUsers : seedAuthUsers(),
     personalRecords: Array.isArray(data.personalRecords) ? data.personalRecords : seedPersonalRecords()
   };
   return normalizePersonIndexes(state);

@@ -26,6 +26,57 @@ body {
   font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
 }
 
+.auth-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.auth-bar strong,
+.auth-bar span {
+  display: block;
+}
+
+.auth-bar span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.auth-bar nav {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.auth-bar a,
+.auth-bar button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: #fff;
+  color: var(--ink);
+  text-decoration: none;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.auth-bar button {
+  color: var(--red);
+}
+
 button,
 input,
 select {
@@ -637,6 +688,7 @@ dialog::backdrop {
 
   .topbar,
   .panel-header,
+  .auth-bar,
   .topbar-actions,
   .filters {
     align-items: stretch;
