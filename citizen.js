@@ -113,6 +113,7 @@ const personalHealthData = {
 };
 
 const vaultSections = [
+  { key: "timeline", label: "健康时间线" },
   { key: "archive", label: "健康档案" },
   { key: "emr", label: "电子病历" },
   { key: "labs", label: "检查检验" },
@@ -123,7 +124,7 @@ const vaultSections = [
   { key: "authorizations", label: "授权共享" }
 ];
 
-let activeVaultSection = "archive";
+let activeVaultSection = "timeline";
 
 let state = fallbackState;
 let citizenExtra = loadCitizenExtra();
@@ -227,7 +228,7 @@ function renderCitizen(residentId) {
 
   renderSummary(resident, diseases, followups, records);
   renderVault(resident, diseases, followups, records);
-  renderEmr(records);
+  renderEmr(records, resident, diseases, followups);
   renderDiseases(diseases, risk);
   renderFollowups(followups);
   renderPickups(resident.id);
@@ -264,6 +265,7 @@ function renderVault(resident, diseases, followups, records) {
       <div>
         <strong>${item.name}</strong>
         <p>${item.result}</p>
+        ${item.categoryLabel ? `<p class="muted">${item.categoryLabel}${item.related ? ` · ${item.related}` : ""}</p>` : ""}
         ${activeVaultSection === "authorizations" ? renderAuthorizationState(item) : ""}
       </div>
       <span>${item.date}<br>${item.source}</span>
@@ -276,21 +278,47 @@ function renderVault(resident, diseases, followups, records) {
 }
 
 function collectVaultData(resident, diseases, followups, records) {
+  const labs = getPersonalRecords(resident.id, "labs");
+  const medications = getPersonalRecords(resident.id, "medications");
+  const allergies = getPersonalRecords(resident.id, "allergies");
+  const vaccines = getPersonalRecords(resident.id, "vaccines");
+  const admissions = getPersonalRecords(resident.id, "admissions");
+  const authorizations = getPersonalRecords(resident.id, "authorizations");
+  const archive = [
+    { date: todayOffset(0), name: "基础档案", result: `${resident.gender}，${ageOf(resident.birthDate)} 岁，${resident.address}`, source: resident.organization, categoryLabel: "健康档案" },
+    { date: todayOffset(0), name: "健康指标", result: `血压 ${resident.metrics.systolic}/${resident.metrics.diastolic}，血糖 ${resident.metrics.glucose}，BMI ${resident.metrics.bmi}`, source: "居民健康档案", categoryLabel: "健康档案" },
+    ...diseases.map((item) => ({ date: item.diagnosedAt, name: item.type, result: item.status, source: item.source, categoryLabel: "慢病登记" })),
+    ...followups.map((item) => ({ date: item.plannedAt, name: `${item.diseaseType}随访`, result: `${item.status} · ${item.advice || item.result}`, source: item.assignee, categoryLabel: "随访管理" }))
+  ];
   return {
-    archive: [
-      { date: todayOffset(0), name: "基础档案", result: `${resident.gender}，${ageOf(resident.birthDate)} 岁，${resident.address}`, source: resident.organization },
-      { date: todayOffset(0), name: "健康指标", result: `血压 ${resident.metrics.systolic}/${resident.metrics.diastolic}，血糖 ${resident.metrics.glucose}，BMI ${resident.metrics.bmi}`, source: "居民健康档案" },
-      ...diseases.map((item) => ({ date: item.diagnosedAt, name: item.type, result: item.status, source: item.source })),
-      ...followups.map((item) => ({ date: item.plannedAt, name: `${item.diseaseType}随访`, result: item.status, source: item.assignee }))
-    ],
-    emr: records,
-    labs: getPersonalRecords(resident.id, "labs"),
-    medications: getPersonalRecords(resident.id, "medications"),
-    allergies: getPersonalRecords(resident.id, "allergies"),
-    vaccines: getPersonalRecords(resident.id, "vaccines"),
-    admissions: getPersonalRecords(resident.id, "admissions"),
-    authorizations: getPersonalRecords(resident.id, "authorizations")
+    timeline: buildHealthTimeline(archive, records, labs, medications, allergies, vaccines, admissions),
+    archive,
+    emr: records.map((item) => ({ ...item, categoryLabel: "电子病历", related: relatedArchiveSummary(diseases, followups) })),
+    labs,
+    medications,
+    allergies,
+    vaccines,
+    admissions,
+    authorizations
   };
+}
+
+function buildHealthTimeline(archive, records, labs, medications, allergies, vaccines, admissions) {
+  return [
+    ...archive,
+    ...records.map((item) => ({ ...item, categoryLabel: "电子病历" })),
+    ...labs.map((item) => ({ ...item, categoryLabel: "检查检验" })),
+    ...medications.map((item) => ({ ...item, categoryLabel: "用药处方" })),
+    ...allergies.map((item) => ({ ...item, categoryLabel: "过敏史" })),
+    ...vaccines.map((item) => ({ ...item, categoryLabel: "免疫接种" })),
+    ...admissions.map((item) => ({ ...item, categoryLabel: "手术住院" }))
+  ].sort(sortByDateDesc);
+}
+
+function relatedArchiveSummary(diseases, followups) {
+  const diseaseText = diseases.map((item) => item.type).join("、") || "暂无慢病登记";
+  const pending = followups.filter((item) => item.status !== "已完成").length;
+  return `${diseaseText} · ${pending} 项待随访`;
 }
 
 function renderSummary(resident, diseases, followups, records) {
@@ -310,8 +338,9 @@ function renderSummary(resident, diseases, followups, records) {
     .join("");
 }
 
-function renderEmr(records) {
+function renderEmr(records, resident, diseases, followups) {
   document.querySelector("#emr-count").textContent = `${records.length} 条`;
+  const archiveLink = `${resident.organization} · ${diseases.map((item) => item.type).join("、") || "暂无慢病登记"} · ${followups.filter((item) => item.status !== "已完成").length} 项待随访`;
   document.querySelector("#emr-timeline").innerHTML = records
     .map((record) => `<section class="visit">
       <div class="visit-date">${record.date}<br><span class="tag">${record.meta?.visitType || "病历"}</span></div>
@@ -319,6 +348,7 @@ function renderEmr(records) {
         <h3>${record.source}</h3>
         <p class="muted">${record.name}</p>
         <p>${record.result}</p>
+        <p class="muted">关联健康档案：${archiveLink}</p>
         <div class="visit-tags">
           ${(record.meta?.exams || []).map((item) => `<span class="tag">${item}</span>`).join("")}
           ${(record.meta?.medications || []).map((item) => `<span class="tag">${item}</span>`).join("")}

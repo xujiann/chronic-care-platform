@@ -6,6 +6,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderCareOrders(state);
   renderAuthorizedRecords(state);
   renderClaimLinks(state);
+  renderIntegratedProfiles(state);
   renderInstitutionAudit(state);
   renderPickups(state);
 });
@@ -69,6 +70,28 @@ function renderClaimLinks(state) {
       <span>${claim.institution}<br>${money(claim.totalAmount)} · ${claim.status}</span>
     </article>`;
   }).join("");
+}
+
+function renderIntegratedProfiles(state) {
+  const authorizedResidentIds = [...new Set(state.personalRecords
+    .filter((item) => item.category === "authorizations" && item.meta?.status !== "revoked")
+    .map((item) => item.residentId))];
+  document.querySelector("#integrated-profile-count").textContent = `${authorizedResidentIds.length} 人`;
+  document.querySelector("#integrated-profiles").innerHTML = authorizedResidentIds.map((residentId) => {
+    const resident = residentOf(state, residentId);
+    const diseases = state.diseases.filter((item) => item.residentId === residentId).map((item) => item.type).join("、") || "暂无慢病";
+    const emrs = state.personalRecords.filter((item) => item.residentId === residentId && item.category === "emr").sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+    const labs = state.personalRecords.filter((item) => item.residentId === residentId && item.category === "labs").length;
+    const latest = emrs[0];
+    return `<section class="item">
+      <div>
+        <h3>${resident?.name || "未知居民"} · ${diseases}</h3>
+        <p>${resident ? `血压 ${resident.metrics.systolic}/${resident.metrics.diastolic} · 血糖 ${resident.metrics.glucose} · BMI ${resident.metrics.bmi}` : "健康指标待补充"}</p>
+        <p>最新病历：${latest ? `${latest.date} · ${latest.name} · ${latest.source}` : "暂无电子病历"} · 检查检验 ${labs} 条</p>
+      </div>
+      <span class="badge info">${resident?.personIndex || "待索引"}</span>
+    </section>`;
+  }).join("") || `<p class="muted">暂无可贯通的授权档案。</p>`;
 }
 
 function renderInstitutionAudit(state) {
