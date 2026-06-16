@@ -507,6 +507,8 @@ function renderAnalytics() {
   renderBars("#disease-bars", countBy(state.diseases.map((item) => item.type)), ["高血压", "糖尿病", "冠心病", "脑卒中"]);
   renderBars("#org-bars", countBy(state.residents.map((item) => item.organization)), organizations);
   renderStatisticsAnalytics();
+  renderDalianHealthStatistics2025();
+  renderHealthStatisticsIngestion();
   renderHealthBulletin2024();
 }
 
@@ -895,6 +897,88 @@ function renderHealthBulletin2024() {
       <td>${row.change}</td>
     </tr>`).join("")}</tbody>
   </table>`;
+}
+
+function renderDalianHealthStatistics2025() {
+  const dalian = getDalianHealthStatistics2025();
+  document.querySelector("#dalian-stat-summary").textContent = `${dalian.year} · ${dalian.source} · ${dalian.status}`;
+  document.querySelector("#dalian-stat-cards").innerHTML = (dalian.keyIndicators || []).map((item) => `<article class="metric-card">
+    <span>${item.label}</span>
+    <strong>${formatNumber(item.value)}${item.unit}</strong>
+    <em>${item.hint}</em>
+  </article>`).join("");
+
+  document.querySelector("#dalian-stat-domains").innerHTML = (dalian.domains || []).map((item) => `<article>
+    <span>${item.name}</span>
+    <strong>${item.value}</strong>
+    <p>${item.detail}</p>
+    <small>${item.status}</small>
+  </article>`).join("");
+
+  document.querySelector("#dalian-national-compare").innerHTML = `<table>
+    <thead><tr><th>指标</th><th>大连 2025</th><th>全国 2024</th><th>差异</th><th>解读</th></tr></thead>
+    <tbody>${(dalian.nationalComparisons || []).map((row) => `<tr>
+      <td>${row.indicator}</td>
+      <td>${row.dalian}</td>
+      <td>${row.national}</td>
+      <td>${row.delta}</td>
+      <td>${row.interpretation}</td>
+    </tr>`).join("")}</tbody>
+  </table>`;
+
+  document.querySelector("#dalian-stat-pipeline").innerHTML = (dalian.dataPipeline || []).map((step) => `<article>
+    <strong>${step.name}</strong>
+    <span>${step.detail}</span>
+    <span class="badge info">${step.status}</span>
+  </article>`).join("");
+}
+
+function renderHealthStatisticsIngestion() {
+  const ingestion = getHealthStatisticsIngestion();
+  document.querySelector("#stat-ingestion-workflow").innerHTML = (ingestion.workflow || []).map((step, index) => {
+    const width = Math.min(100, Math.max(8, Number(step.progress || 0)));
+    return `<section class="bulletin-bar">
+      <header>
+        <strong>${index + 1}. ${step.name}</strong>
+        <span>${step.owner} · ${step.status}</span>
+      </header>
+      <div class="compare-row current"><span>${step.input}</span><div class="compare-track"><i style="width:${width}%"></i></div><em>${step.output}</em></div>
+    </section>`;
+  }).join("");
+
+  document.querySelector("#stat-ingestion-jobs").innerHTML = `<table>
+    <thead><tr><th>任务</th><th>来源</th><th>周期</th><th>状态</th><th>质控</th><th>入库目标</th><th>下一步</th></tr></thead>
+    <tbody>${(ingestion.jobs || []).map((job) => `<tr>
+      <td>${job.name}</td>
+      <td>${job.source}</td>
+      <td>${job.period}</td>
+      <td><span class="badge info">${job.status}</span></td>
+      <td>${job.quality}</td>
+      <td>${job.target}</td>
+      <td>${job.nextAction}</td>
+    </tr>`).join("")}</tbody>
+  </table>`;
+}
+
+function getDalianHealthStatistics2025() {
+  return state.dalianHealthStatistics2025 || {
+    title: "2025 年大连市卫生健康统计提要",
+    source: "2025 年国家卫生统计信息网络直报系统年报数据",
+    year: 2025,
+    status: "本地提要数据，待正式年报汇编确认",
+    keyIndicators: [],
+    domains: [],
+    nationalComparisons: [],
+    dataPipeline: []
+  };
+}
+
+function getHealthStatisticsIngestion() {
+  return state.healthStatisticsIngestion || {
+    title: "卫生健康统计数据接入流程",
+    workflow: [],
+    jobs: []
+  };
 }
 
 function getHealthBulletin2024() {

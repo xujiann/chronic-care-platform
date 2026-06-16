@@ -117,6 +117,8 @@ function seedState() {
     medicalResources: seedMedicalResources(),
     healthStatistics: seedHealthStatistics(),
     healthBulletin2024: seedHealthBulletin2024(),
+    dalianHealthStatistics2025: seedDalianHealthStatistics2025(),
+    healthStatisticsIngestion: seedHealthStatisticsIngestion(),
     careOrders: seedCareOrders(),
     medicationPickups: seedMedicationPickups(),
     institutionSupervisions: seedInstitutionSupervisions(),
@@ -518,6 +520,118 @@ function seedHealthBulletin2024() {
   };
 }
 
+function seedDalianHealthStatistics2025() {
+  return {
+    title: "2025 年大连市卫生健康统计提要",
+    source: "2025 年国家卫生统计信息网络直报系统年报数据",
+    sourceFile: "2025年大连市卫生健康统计提要.pdf",
+    year: 2025,
+    population: { value: 755.7, unit: "万人", source: "大连市统计局常住人口" },
+    status: "本地提要数据，待正式年报汇编确认",
+    note: "统计口径按照国家卫生健康统计调查制度，不包含驻军及武警医疗机构。",
+    keyIndicators: [
+      { label: "医疗卫生机构", value: 5195, unit: "个", hint: "同比增长 6.45%" },
+      { label: "医院", value: 255, unit: "个", hint: "三级医院 37 个，三甲 9 个" },
+      { label: "基层医疗卫生机构", value: 4885, unit: "个", hint: "社区卫生服务中心站 184 个，乡镇卫生院 90 个" },
+      { label: "实有床位", value: 53522, unit: "张", hint: "每千人口 7.08 张" },
+      { label: "卫生人员", value: 90223, unit: "人", hint: "卫生技术人员 75393 人" },
+      { label: "执业助理医师", value: 31127, unit: "人", hint: "每千人口 4.12 人" },
+      { label: "注册护士", value: 34894, unit: "人", hint: "每千人口 4.62 人" },
+      { label: "总诊疗量", value: 5329.32, unit: "万人次", hint: "同比增长 6.17%" },
+      { label: "入院人次", value: 133.61, unit: "万人次", hint: "同比下降 6.32%" },
+      { label: "出院人次", value: 134.02, unit: "万人次", hint: "同比下降 5.61%" },
+      { label: "床位使用率", value: 60.28, unit: "%", hint: "较上年下降 6.14 个百分点" },
+      { label: "人均预期寿命", value: 82.63, unit: "岁", hint: "居民健康水平指标" }
+    ],
+    domains: [
+      { name: "卫生资源", value: "5195 个机构 / 53522 张床位", detail: "医院 255 个，基层医疗卫生机构 4885 个；医院床位 49734 张，占 92.92%。", status: "资源扩容" },
+      { name: "卫生人员", value: "90223 人", detail: "执业助理医师 31127 人、注册护士 34894 人、全科医生 3950 人。", status: "人员增长" },
+      { name: "医疗服务", value: "5329.32 万人次", detail: "医院诊疗 2809.40 万人次，基层诊疗 2468.30 万人次，基层占 46.32%。", status: "诊疗增长" },
+      { name: "住院服务", value: "入院 133.61 万 / 出院 134.02 万", detail: "住院量同比下降，医院出院者平均住院日 8.6 日。", status: "住院收缩" },
+      { name: "基层卫生", value: "乡镇卫生院 90 个 / 村卫生室 758 个", detail: "社区卫生服务中心站 184 个，社区诊疗 1508.02 万人次。", status: "基层承接" },
+      { name: "中医药服务", value: "718.30 万人次", detail: "中医类机构 831 个，床位 6930 张，中医药人员 6363 人。", status: "中医增长" },
+      { name: "医药费用", value: "门诊 286.94 元 / 住院 11393.21 元", detail: "全市次均门诊费用下降 0.99%，次均住院费用下降 5.43%。", status: "费用下降" },
+      { name: "改善医疗服务", value: "检查互认 100%", detail: "二级以上公立医院 63.04% 开展预约诊疗，52.19% 开展远程医疗服务。", status: "服务优化" }
+    ],
+    nationalComparisons: [
+      { indicator: "每千人口医疗机构床位", dalian: "7.08 张", national: "7.32 张", delta: "-0.24 张", interpretation: "床位配置略低于全国 2024 水平，需结合人口结构和区域流入就医复核。" },
+      { indicator: "每千人口执业助理医师", dalian: "4.12 人", national: "3.61 人", delta: "+0.51 人", interpretation: "医师配置高于全国平均，支撑分级诊疗和专科高峰建设。" },
+      { indicator: "每千人口注册护士", dalian: "4.62 人", national: "4.16 人", delta: "+0.46 人", interpretation: "护理人员配置高于全国平均，但需继续关注医护比和基层分布。" },
+      { indicator: "总诊疗量增速", dalian: "+6.17%", national: "+6.2%", delta: "-0.03 个百分点", interpretation: "诊疗服务恢复和增长节奏与全国基本一致。" },
+      { indicator: "入院人次增速", dalian: "-6.32%", national: "+3.3%", delta: "-9.62 个百分点", interpretation: "大连住院量与全国趋势相反，需要结合床位使用率、病种结构和医保支付方式分析。" },
+      { indicator: "基层诊疗占比", dalian: "46.32%", national: "约 52.12%", delta: "-5.80 个百分点", interpretation: "基层承接仍有提升空间，应继续强化家庭医生、慢病长期处方和基层首诊。" },
+      { indicator: "医院病床使用率", dalian: "64.15%", national: "78.8%", delta: "-14.65 个百分点", interpretation: "医院床位利用率低于全国公报水平，应与专科结构、民营医院床位扩张和住院下降联动分析。" },
+      { indicator: "医院出院者平均住院日", dalian: "8.6 日", national: "8.6 日", delta: "持平", interpretation: "平均住院日与全国一致，说明效率指标具备可比基础。" },
+      { indicator: "医院次均门诊费用", dalian: "372.15 元", national: "361.0 元", delta: "+11.15 元", interpretation: "门诊费用略高于全国医院均值，需结合三级医院占比和检查检验结构复核。" },
+      { indicator: "医院次均住院费用", dalian: "11501.79 元", national: "9870.0 元", delta: "+1631.79 元", interpretation: "住院费用高于全国医院均值，应纳入医保监管和病组费用分析。" },
+      { indicator: "中医类诊疗占比", dalian: "13.69%", national: "约 16.57%", delta: "-2.88 个百分点", interpretation: "中医服务增长较快，但占比仍低于全国粗略测算水平，口径需复核。" }
+    ],
+    dataPipeline: [
+      { name: "类似报表导入", detail: "支持 PDF、Excel、Word 年报或提要上传后，经 OCR/表格抽取、字段映射、人工复核进入统计主题库。", status: "已设计" },
+      { name: "统计直报系统获取", detail: "对接国家卫生统计信息网络直报系统或其导出文件，按年报、季报、月报周期刷新资源、人员、诊疗和住院指标。", status: "待接口" },
+      { name: "医疗机构接口补充", detail: "从 HIS、EMR、住院管理、人力资源和床位管理接口采集日/月数据，与直报数据做双源对账。", status: "已纳入" },
+      { name: "质量控制", detail: "统一口径、机构编码、时间周期和审核状态；对同比异常、接口直报差异、缺报迟报自动生成复核清单。", status: "已纳入" }
+    ]
+  };
+}
+
+function seedHealthStatisticsIngestion() {
+  return {
+    title: "卫生健康统计数据接入流程",
+    principle: "同一指标必须保留来源、周期、口径、映射规则、质控状态和发布版本，支持报表导入与统计直报系统双路径。",
+    workflow: [
+      { name: "采集", input: "PDF/Excel/Word 报表、直报系统接口、医疗机构接口", output: "原始文件与接口批次", owner: "规划发展与信息化处", status: "已启动", progress: 100 },
+      { name: "解析", input: "表格抽取、OCR、接口 JSON/CSV", output: "标准化临时表", owner: "数据治理岗", status: "已启动", progress: 85 },
+      { name: "映射", input: "机构编码、指标编码、统计周期、计量单位", output: "healthStatistics 主题指标", owner: "统计业务岗", status: "进行中", progress: 75 },
+      { name: "质控", input: "同比、环比、缺报、迟报、接口直报差异", output: "复核清单和审核意见", owner: "卫健委统计审核岗", status: "进行中", progress: 70 },
+      { name: "入库", input: "已审核指标包", output: "SQLite 主库与 JSON 预览快照", owner: "平台运维岗", status: "已启动", progress: 90 },
+      { name: "发布", input: "管理端图表、国家对比、机构反馈", output: "统计分析看板和审计日志", owner: "卫生健康管理端", status: "已启动", progress: 80 }
+    ],
+    jobs: [
+      {
+        id: "stat-job-dalian-2025",
+        name: "2025 年大连市卫生健康统计提要",
+        source: "PDF 报表导入",
+        period: "2025 年报",
+        status: "已结构化",
+        quality: "口径已标注，待正式年报汇编确认",
+        target: "dalianHealthStatistics2025",
+        nextAction: "补充区县、机构明细和正式年报版本号。"
+      },
+      {
+        id: "stat-job-national-2024",
+        name: "2024 年我国卫生健康事业发展统计公报",
+        source: "国家公报 PDF",
+        period: "2024 年报",
+        status: "已入库",
+        quality: "作为全国参照基准",
+        target: "healthBulletin2024",
+        nextAction: "后续接入 2025 国家公报后自动切换参照年度。"
+      },
+      {
+        id: "stat-job-direct-system",
+        name: "国家卫生统计信息网络直报系统",
+        source: "直报系统接口或导出文件",
+        period: "月报、季报、年报",
+        status: "待接口",
+        quality: "需对接机构编码、报表期和审核状态",
+        target: "healthStatistics.resourceReports / serviceReports",
+        nextAction: "定义 API 或导出文件模板，建立自动导入任务。"
+      },
+      {
+        id: "stat-job-institution-interface",
+        name: "医疗机构 HIS/EMR/住院/人力资源接口",
+        source: "医疗机构接口",
+        period: "日采集、月汇总",
+        status: "已纳入设计",
+        quality: "与直报数据做双源对账，差异超过阈值进入复核",
+        target: "healthStatistics 对账表",
+        nextAction: "补充机构级接口适配器和数据质量规则。"
+      }
+    ]
+  };
+}
+
 function seedCareOrders() {
   return [
     {
@@ -850,6 +964,8 @@ function normalizeState(data) {
     medicalResources: Array.isArray(data.medicalResources) ? data.medicalResources : seedMedicalResources(),
     healthStatistics: data.healthStatistics && typeof data.healthStatistics === "object" ? data.healthStatistics : seedHealthStatistics(),
     healthBulletin2024: data.healthBulletin2024 && typeof data.healthBulletin2024 === "object" ? data.healthBulletin2024 : seedHealthBulletin2024(),
+    dalianHealthStatistics2025: data.dalianHealthStatistics2025 && typeof data.dalianHealthStatistics2025 === "object" ? data.dalianHealthStatistics2025 : seedDalianHealthStatistics2025(),
+    healthStatisticsIngestion: data.healthStatisticsIngestion && typeof data.healthStatisticsIngestion === "object" ? data.healthStatisticsIngestion : seedHealthStatisticsIngestion(),
     careOrders: Array.isArray(data.careOrders) ? data.careOrders : seedCareOrders(),
     medicationPickups: Array.isArray(data.medicationPickups) ? data.medicationPickups : seedMedicationPickups(),
     institutionSupervisions: Array.isArray(data.institutionSupervisions) ? data.institutionSupervisions : seedInstitutionSupervisions(),

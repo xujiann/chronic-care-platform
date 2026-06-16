@@ -146,6 +146,8 @@ data/db.json
 - `medicalResources`：卫生健康委端医疗资源数据。
 - `healthStatistics`：卫生健康统计数据，包含医疗机构接口、卫生健康统计直报系统、资源对账、诊疗量、住院量和质量规则。
 - `healthBulletin2024`：2024 年卫生健康事业发展统计公报可视化数据，包含关键指标、领域概览、趋势对比和明细指标。
+- `dalianHealthStatistics2025`：2025 年大连市卫生健康统计提要结构化摘要，包含大连关键指标、与国家公报对比、报表导入和统计直报系统接入路径。
+- `healthStatisticsIngestion`：卫生健康统计数据接入流程，覆盖报表采集、解析、指标映射、质控、入库、发布和审计留痕。
 - `storageMeta`：本地 SQLite 主存储和 GitHub Pages JSON 快照的存储状态说明。
 - `careOrders`：医疗机构端协同任务。
 - `medicationPickups`：个人端每月固定取药计划。
