@@ -7,6 +7,9 @@ const PORT = Number(process.env.PORT || 5173);
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, "data");
 const DB_FILE = path.join(DATA_DIR, "db.json");
+const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+const DEMO_PASSWORD = "123456";
+const sessions = new Map();
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -116,6 +119,7 @@ function seedState() {
     emergencySignals: seedEmergencySignals(),
     seniorServices: seedSeniorServices(),
     dataAccessLogs: seedDataAccessLogs(),
+    securityEvents: seedSecurityEvents(),
     digitalCredentials: seedDigitalCredentials(),
     healthArchiveStandard: seedHealthArchiveStandard(),
     authUsers: seedAuthUsers(),
@@ -141,8 +145,8 @@ function seedPlatformRoadmap() {
       title: "真实认证、角色权限和审计闭环",
       reason: "健康档案和电子病历属于敏感数据，当前登录仍是前端演示，需要后端会话、接口权限和审计。",
       scope: ["登录", "权限", "审计", "API"],
-      status: "待开发",
-      nextAction: "新增后端认证接口、会话校验和角色权限中间件。"
+      status: "进行中",
+      nextAction: "已完成后端会话、接口权限和安全事件第一版；下一步接入真实身份源、密码哈希和机构级权限。"
     },
     {
       priority: "P0",
@@ -378,6 +382,14 @@ function seedDataAccessLogs() {
     { id: "al2", residentId: "r1", at: "2026-06-15 10:35", actor: "大连市中心医院", role: "医疗机构", scope: "电子病历摘要、用药处方", purpose: "专科复诊", result: "允许" },
     { id: "al3", residentId: "r2", at: "2026-06-15 11:20", actor: "医保端审核员", role: "医保监管", scope: "医保结算、诊断摘要", purpose: "慢病结算审核", result: "允许" },
     { id: "al4", residentId: "r4", at: "2026-06-15 14:08", actor: "未授权机构", role: "外部机构", scope: "完整电子病历", purpose: "未知", result: "拒绝" }
+  ];
+}
+
+function seedSecurityEvents() {
+  return [
+    { id: "se1", at: "2026-06-15 08:55", actor: "卫健委管理员", role: "commission", action: "登录", target: "卫生健康委端", result: "允许", detail: "演示账号进入监管总览" },
+    { id: "se2", at: "2026-06-15 10:20", actor: "医保审核员", role: "insurance", action: "访问接口", target: "/api/state", result: "允许", detail: "读取结算审核与机构监管数据" },
+    { id: "se3", at: "2026-06-15 14:08", actor: "未授权机构", role: "unknown", action: "访问个人健康信息", target: "完整电子病历", result: "拒绝", detail: "未取得居民授权或角色权限" }
   ];
 }
 
@@ -630,6 +642,7 @@ function normalizeState(data) {
     emergencySignals: Array.isArray(data.emergencySignals) ? data.emergencySignals : seedEmergencySignals(),
     seniorServices: Array.isArray(data.seniorServices) ? data.seniorServices : seedSeniorServices(),
     dataAccessLogs: Array.isArray(data.dataAccessLogs) ? data.dataAccessLogs : seedDataAccessLogs(),
+    securityEvents: Array.isArray(data.securityEvents) ? data.securityEvents : seedSecurityEvents(),
     digitalCredentials: Array.isArray(data.digitalCredentials) ? data.digitalCredentials : seedDigitalCredentials(),
     healthArchiveStandard: data.healthArchiveStandard && typeof data.healthArchiveStandard === "object" ? data.healthArchiveStandard : seedHealthArchiveStandard(),
     authUsers: Array.isArray(data.authUsers) ? data.authUsers : seedAuthUsers(),
@@ -719,11 +732,144 @@ function serveStatic(req, res) {
   });
 }
 
+function sanitizeUser(user) {
+  if (!user) return null;
+  const { password, passwordHash, ...safeUser } = user;
+  return safeUser;
+}
+
+function findAuthUser(username) {
+  const data = readDatabase();
+  return data.authUsers.find((user) => user.username === username && user.status !== "停用");
+}
+
+function createSession(user) {
+  const token = randomUUID();
+  const now = Date.now();
+  const safeUser = sanitizeUser(user);
+  const session = {
+    token,
+    user: safeUser,
+    issuedAt: new Date(now).toISOString(),
+    expiresAt: new Date(now + SESSION_TTL_MS).toISOString()
+  };
+  sessions.set(token, session);
+  return session;
+}
+
+function currentSession(req) {
+  const auth = String(req.headers.authorization || "");
+  const bearer = auth.match(/^Bearer\s+(.+)$/i);
+  const token = bearer?.[1] || req.headers["x-auth-token"];
+  if (!token) return null;
+  const session = sessions.get(token);
+  if (!session) return null;
+  if (new Date(session.expiresAt).getTime() < Date.now()) {
+    sessions.delete(token);
+    return null;
+  }
+  return session;
+}
+
+function requireApiRole(req, res, roles, target) {
+  const allowed = Array.isArray(roles) ? roles : [roles];
+  const session = currentSession(req);
+  if (!session) {
+    appendSecurityEvent({ actor: "anonymous", role: "anonymous", action: "访问接口", target, result: "拒绝", detail: "未登录或会话已过期" });
+    sendJson(res, 401, { error: "Unauthorized", message: "请先登录后再访问该接口" });
+    return null;
+  }
+  if (!allowed.includes(session.user.role) && session.user.role !== "commission") {
+    appendSecurityEvent({ actor: session.user.name, role: session.user.role, action: "访问接口", target, result: "拒绝", detail: `需要角色：${allowed.join("、")}` });
+    sendJson(res, 403, { error: "Forbidden", message: "当前角色无权访问该接口" });
+    return null;
+  }
+  return session.user;
+}
+
+function canAccessResident(user, residentId, data) {
+  if (!residentId) return user.role !== "citizen";
+  if (user.role !== "citizen") return true;
+  if (user.residentId === residentId) return true;
+  const account = data.accounts.find((item) => item.id === user.accountId);
+  return Boolean(account?.members?.some((member) => member.residentId === residentId));
+}
+
+function appendSecurityEvent(event) {
+  const data = readDatabase();
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: event.actor || "unknown",
+      role: event.role || "unknown",
+      action: event.action || "访问接口",
+      target: event.target || "",
+      result: event.result || "允许",
+      detail: event.detail || ""
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+  writeDatabase(data);
+}
+
+function appendDataAccessLog(data, user, residentId, scope, purpose, result = "允许") {
+  const residentMap = new Map(data.residents.map((resident) => [resident.id, resident]));
+  data.dataAccessLogs = [
+    {
+      id: randomUUID(),
+      residentId,
+      personIndex: personIndexForResident(residentMap, residentId),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user?.name || "anonymous",
+      role: user?.roleName || user?.role || "anonymous",
+      scope,
+      purpose,
+      result
+    },
+    ...(Array.isArray(data.dataAccessLogs) ? data.dataAccessLogs : [])
+  ].slice(0, 120);
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
   if (req.method === "GET" && req.url === "/api/health") {
     sendJson(res, 200, { ok: true, storage: DB_FILE });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/auth/login") {
+    const credentials = await collectJson(req);
+    const user = findAuthUser(String(credentials.username || "").trim());
+    if (!user || credentials.password !== DEMO_PASSWORD) {
+      appendSecurityEvent({ actor: credentials.username || "unknown", role: "unknown", action: "登录", target: "统一认证", result: "拒绝", detail: "账号或密码错误" });
+      sendJson(res, 401, { ok: false, message: "账号或密码不正确" });
+      return;
+    }
+    const session = createSession(user);
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "登录", target: user.home, result: "允许", detail: "后端会话已签发" });
+    sendJson(res, 200, { ok: true, token: session.token, expiresAt: session.expiresAt, user: session.user });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/auth/me") {
+    const session = currentSession(req);
+    if (!session) {
+      sendJson(res, 401, { ok: false, message: "未登录或会话已过期" });
+      return;
+    }
+    sendJson(res, 200, { ok: true, user: session.user, expiresAt: session.expiresAt });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/auth/logout") {
+    const session = currentSession(req);
+    if (session) {
+      sessions.delete(session.token);
+      appendSecurityEvent({ actor: session.user.name, role: session.user.role, action: "退出登录", target: "统一认证", result: "允许", detail: "后端会话已注销" });
+    }
+    sendJson(res, 200, { ok: true });
     return;
   }
 
@@ -733,39 +879,82 @@ async function handleApi(req, res) {
   }
 
   if (req.method === "PUT" && url.pathname === "/api/state") {
+    const user = requireApiRole(req, res, ["commission"], "/api/state");
+    if (!user) return;
     const data = normalizeState(await collectJson(req));
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "更新数据",
+        target: "/api/state",
+        result: "允许",
+        detail: "全量保存平台数据"
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
     writeDatabase(data);
     sendJson(res, 200, data);
     return;
   }
 
   if (req.method === "GET" && url.pathname === "/api/personal-records") {
+    const user = requireApiRole(req, res, ["citizen", "institution", "insurance", "county", "commission"], "/api/personal-records");
+    if (!user) return;
     const data = readDatabase();
     const residentId = url.searchParams.get("residentId");
     const category = url.searchParams.get("category");
+    if (!canAccessResident(user, residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "访问个人健康信息", target: residentId || "all", result: "拒绝", detail: "超出居民授权范围" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权访问该居民健康信息" });
+      return;
+    }
     const records = data.personalRecords.filter((item) => (!residentId || item.residentId === residentId) && (!category || item.category === category));
+    if (residentId) {
+      appendDataAccessLog(data, user, residentId, "个人健康信息库", `查询 ${category || "全部"} 记录`);
+      writeDatabase(data);
+    }
     sendJson(res, 200, records);
     return;
   }
 
   if (req.method === "POST" && url.pathname === "/api/personal-records") {
+    const user = requireApiRole(req, res, ["citizen", "institution", "commission"], "/api/personal-records");
+    if (!user) return;
     const data = readDatabase();
     const recordData = normalizePersonalRecord(await collectJson(req));
+    if (!canAccessResident(user, recordData.residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "新增个人健康信息", target: recordData.residentId, result: "拒绝", detail: "超出居民授权范围" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权新增该居民健康信息" });
+      return;
+    }
     const residentMap = new Map(data.residents.map((resident) => [resident.id, resident]));
     recordData.personIndex = recordData.personIndex || personIndexForResident(residentMap, recordData.residentId);
+    recordData.createdBy = user.username || user.role;
+    recordData.createdByName = user.name;
     data.personalRecords.push(recordData);
+    appendDataAccessLog(data, user, recordData.residentId, "个人健康信息库", `新增 ${recordData.category} 记录`);
     writeDatabase(data);
     sendJson(res, 201, recordData);
     return;
   }
 
   if (req.method === "PATCH" && url.pathname.startsWith("/api/personal-records/")) {
+    const user = requireApiRole(req, res, ["citizen", "institution", "commission"], "/api/personal-records/:id");
+    if (!user) return;
     const id = decodeURIComponent(url.pathname.replace("/api/personal-records/", ""));
     const patch = await collectJson(req);
     const data = readDatabase();
     const index = data.personalRecords.findIndex((item) => item.id === id);
     if (index < 0) {
       sendJson(res, 404, { error: "personal record not found" });
+      return;
+    }
+    if (!canAccessResident(user, data.personalRecords[index].residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "更新个人健康信息", target: data.personalRecords[index].residentId, result: "拒绝", detail: "超出居民授权范围" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权更新该居民健康信息" });
       return;
     }
     data.personalRecords[index] = {
@@ -775,21 +964,41 @@ async function handleApi(req, res) {
         ...(data.personalRecords[index].meta || {}),
         ...(patch.meta || {})
       },
+      updatedBy: user.username || user.role,
+      updatedByName: user.name,
       updatedAt: new Date().toISOString()
     };
+    appendDataAccessLog(data, user, data.personalRecords[index].residentId, "个人健康信息库", `更新 ${data.personalRecords[index].category} 记录`);
     writeDatabase(data);
     sendJson(res, 200, data.personalRecords[index]);
     return;
   }
 
   if (req.method === "POST" && url.pathname === "/api/reset") {
+    const user = requireApiRole(req, res, ["commission"], "/api/reset");
+    if (!user) return;
     const data = seedState();
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "重置数据",
+        target: "/api/reset",
+        result: "允许",
+        detail: "恢复演示数据"
+      },
+      ...data.securityEvents
+    ];
     writeDatabase(data);
     sendJson(res, 200, data);
     return;
   }
 
   if (req.method === "POST" && url.pathname === "/api/id") {
+    const user = requireApiRole(req, res, ["citizen", "institution", "insurance", "county", "commission"], "/api/id");
+    if (!user) return;
     sendJson(res, 200, { id: randomUUID() });
     return;
   }

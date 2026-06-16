@@ -591,6 +591,38 @@
       "personIndex": "210213196410013521#13800010004"
     }
   ],
+  "securityEvents": [
+    {
+      "id": "se1",
+      "at": "2026-06-15 08:55",
+      "actor": "卫健委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "卫生健康委端",
+      "result": "允许",
+      "detail": "演示账号进入监管总览"
+    },
+    {
+      "id": "se2",
+      "at": "2026-06-15 10:20",
+      "actor": "医保审核员",
+      "role": "insurance",
+      "action": "访问接口",
+      "target": "/api/state",
+      "result": "允许",
+      "detail": "读取结算审核与机构监管数据"
+    },
+    {
+      "id": "se3",
+      "at": "2026-06-15 14:08",
+      "actor": "未授权机构",
+      "role": "unknown",
+      "action": "访问个人健康信息",
+      "target": "完整电子病历",
+      "result": "拒绝",
+      "detail": "未取得居民授权或角色权限"
+    }
+  ],
   "digitalCredentials": [
     {
       "id": "dc1",
@@ -1939,8 +1971,8 @@
         "审计",
         "API"
       ],
-      "status": "待开发",
-      "nextAction": "新增后端认证接口、会话校验和角色权限中间件。"
+      "status": "进行中",
+      "nextAction": "已完成后端会话、接口权限和安全事件第一版；下一步接入真实身份源、密码哈希和机构级权限。"
     },
     {
       "priority": "P0",

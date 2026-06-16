@@ -1,5 +1,6 @@
 (function () {
   const SESSION_KEY = "health-city-auth-session";
+  const API_BASE = location.protocol === "file:" ? "" : "/api";
   const demoUsers = [
     { id: "u1", username: "whjw", password: "123456", name: "卫健委管理员", role: "commission", roleName: "卫生健康委端", home: "index.html" },
     { id: "u2", username: "doctor", password: "123456", name: "刘医生", role: "institution", roleName: "医疗机构端", home: "institution.html" },
@@ -16,11 +17,36 @@
     county: "county.html"
   };
 
-  function login(username, password) {
+  async function login(username, password) {
+    if (API_BASE) {
+      try {
+        const response = await fetch(`${API_BASE}/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (response.ok && payload.ok) {
+          const session = {
+            ...payload.user,
+            token: payload.token,
+            expiresAt: payload.expiresAt,
+            loginAt: new Date().toISOString(),
+            authMode: "server"
+          };
+          localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+          return { ok: true, user: session };
+        }
+        return { ok: false, message: payload.message || "账号或密码不正确" };
+      } catch (error) {
+        // Static preview and offline demos fall back to local demo users.
+      }
+    }
     const user = demoUsers.find((item) => item.username === username && item.password === password);
     if (!user) return { ok: false, message: "账号或密码不正确" };
     const session = sanitizeUser(user);
     session.loginAt = new Date().toISOString();
+    session.authMode = "local";
     localStorage.setItem(SESSION_KEY, JSON.stringify(session));
     return { ok: true, user: session };
   }
@@ -39,7 +65,26 @@
     }
   }
 
+  function authHeaders(extra = {}) {
+    const user = getUser();
+    return user?.token ? { ...extra, Authorization: `Bearer ${user.token}` } : extra;
+  }
+
+  function authFetch(url, options = {}) {
+    return fetch(url, {
+      ...options,
+      headers: authHeaders(options.headers || {})
+    });
+  }
+
   function logout() {
+    const user = getUser();
+    if (API_BASE && user?.token) {
+      fetch(`${API_BASE}/auth/logout`, {
+        method: "POST",
+        headers: authHeaders()
+      }).catch(() => {});
+    }
     localStorage.removeItem(SESSION_KEY);
     window.location.href = "./login.html";
   }
@@ -49,6 +94,11 @@
     const user = getUser();
     if (!user) {
       window.location.replace(`./login.html?redirect=${encodeURIComponent(currentPage())}`);
+      return false;
+    }
+    if (user.expiresAt && new Date(user.expiresAt).getTime() < Date.now()) {
+      localStorage.removeItem(SESSION_KEY);
+      window.location.replace(`./login.html?redirect=${encodeURIComponent(currentPage())}&expired=1`);
       return false;
     }
     if (!allowed.includes(user.role) && user.role !== "commission") {
@@ -81,10 +131,11 @@
       bar.innerHTML = `
         <div>
           <strong>${user.name}</strong>
-          <span>${user.roleName} · ${new Date(user.loginAt || Date.now()).toLocaleString("zh-CN")}</span>
+          <span>${user.roleName} · ${user.authMode === "server" ? "后端会话" : "本地演示"} · ${new Date(user.loginAt || Date.now()).toLocaleString("zh-CN")}</span>
         </div>
         <nav>
           <a href="./health-city.html">总览</a>
+          <a href="./workbench.html">工作台</a>
           <a href="./index.html">卫健委</a>
           <a href="./institution.html">医疗机构</a>
           <a href="./insurance.html">医保</a>
@@ -96,7 +147,7 @@
       bar.innerHTML = `
         <div>
           <strong>未登录</strong>
-          <span>请先选择角色进入四端协同系统</span>
+          <span>请先选择角色进入健康城市系统</span>
         </div>
         <nav><a href="./login.html?redirect=${encodeURIComponent(currentPage())}">登录</a></nav>`;
     }
@@ -109,6 +160,8 @@
     login,
     logout,
     getUser,
+    authHeaders,
+    authFetch,
     requireRole,
     redirectAfterLogin,
     renderSessionBar

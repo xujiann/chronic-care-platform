@@ -94,7 +94,7 @@ function renderDataMaturity(state) {
     ["健康档案标准", Boolean(state.healthArchiveStandard), "32 类基础数据集已经进入个人端和医生端。"],
     ["分级诊疗模型", Boolean(state.referralSystem), "基层首诊、转诊、医保支付和家庭医生服务已入模。"],
     ["县域医共体模型", Boolean(state.countyConsortium), "36 项功能清单和运营监管已入模。"],
-    ["登录权限", Boolean(state.authUsers?.length), "当前为前端演示会话，待后端真实认证。"],
+    ["登录权限", Boolean(state.authUsers?.length && state.securityEvents?.length), "已具备后端会话、角色校验和安全事件日志第一版。"],
     ["持久化数据库", false, "当前为 JSON 文件，下一步升级 SQLite。"]
   ];
   document.querySelector("#data-maturity").innerHTML = rows.map(([name, ok, detail]) => `<section class="item">
@@ -206,8 +206,8 @@ function defaultRoadmap() {
       title: "真实认证、角色权限和审计闭环",
       reason: "健康档案和电子病历属于敏感数据，当前登录仍是前端演示，需要后端会话、接口权限和审计。",
       scope: ["登录", "权限", "审计", "API"],
-      status: "待开发",
-      nextAction: "新增后端认证接口、会话校验和角色权限中间件。"
+      status: "进行中",
+      nextAction: "已完成后端会话、接口权限和安全事件第一版；下一步接入真实身份源、密码哈希和机构级权限。"
     },
     {
       priority: "P0",

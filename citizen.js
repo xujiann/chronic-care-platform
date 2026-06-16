@@ -644,7 +644,7 @@ async function addPersonalRecord(record) {
     try {
       const response = await fetch(`${API_BASE}/personal-records`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: window.HealthCityAuth?.authHeaders({ "Content-Type": "application/json" }) || { "Content-Type": "application/json" },
         body: JSON.stringify(record)
       });
       if (response.ok) {
@@ -738,7 +738,7 @@ async function revokeAuthorization(id) {
     try {
       const response = await fetch(`${API_BASE}/personal-records/${encodeURIComponent(id)}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: window.HealthCityAuth?.authHeaders({ "Content-Type": "application/json" }) || { "Content-Type": "application/json" },
         body: JSON.stringify(patch)
       });
       if (response.ok) {
