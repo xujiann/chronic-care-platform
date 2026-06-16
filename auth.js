@@ -1,6 +1,6 @@
 (function () {
   const SESSION_KEY = "health-city-auth-session";
-  const API_BASE = location.protocol === "file:" ? "" : "/api";
+  const API_BASE = isStaticPreview() ? "" : "/api";
   const demoUsers = [
     { id: "u1", username: "whjw", password: "123456", name: "卫健委管理员", role: "commission", roleName: "卫生健康委端", home: "index.html" },
     { id: "u2", username: "doctor", password: "123456", name: "刘医生", role: "institution", roleName: "医疗机构端", home: "institution.html" },
@@ -37,7 +37,9 @@
           localStorage.setItem(SESSION_KEY, JSON.stringify(session));
           return { ok: true, user: session };
         }
-        return { ok: false, message: payload.message || "账号或密码不正确" };
+        if (response.status === 401 || response.status === 403) {
+          return { ok: false, message: payload.message || "账号或密码不正确" };
+        }
       } catch (error) {
         // Static preview and offline demos fall back to local demo users.
       }
@@ -54,6 +56,10 @@
   function sanitizeUser(user) {
     const { password, ...safeUser } = user;
     return safeUser;
+  }
+
+  function isStaticPreview() {
+    return location.protocol === "file:" || location.hostname.endsWith("github.io");
   }
 
   function getUser() {
