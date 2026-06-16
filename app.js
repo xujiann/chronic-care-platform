@@ -507,6 +507,7 @@ function renderAnalytics() {
   renderBars("#disease-bars", countBy(state.diseases.map((item) => item.type)), ["高血压", "糖尿病", "冠心病", "脑卒中"]);
   renderBars("#org-bars", countBy(state.residents.map((item) => item.organization)), organizations);
   renderStatisticsAnalytics();
+  renderHealthBulletin2024();
 }
 
 function renderGovernance() {
@@ -850,6 +851,63 @@ function renderStatisticsAnalytics() {
     <span>${rule.detail}</span>
     <span class="badge info">${rule.status}</span>
   </article>`).join("");
+}
+
+function renderHealthBulletin2024() {
+  const bulletin = getHealthBulletin2024();
+  document.querySelector("#bulletin-summary").textContent = `${bulletin.year} · ${bulletin.source}`;
+  document.querySelector("#bulletin-key-cards").innerHTML = (bulletin.keyIndicators || []).map((item) => `<article class="metric-card">
+    <span>${item.label}</span>
+    <strong>${formatNumber(item.value)}${item.unit}</strong>
+    <em>${item.hint}</em>
+  </article>`).join("");
+
+  document.querySelector("#bulletin-domain-grid").innerHTML = (bulletin.domains || []).map((item) => `<article>
+    <span>${item.name}</span>
+    <strong>${item.value}</strong>
+    <p>${item.detail}</p>
+    <small>${item.status}</small>
+  </article>`).join("");
+
+  document.querySelector("#bulletin-trend-bars").innerHTML = (bulletin.trends || []).map((item) => {
+    const max = Math.max(Number(item.previous || 0), Number(item.current || 0), 1);
+    const previousWidth = Math.max(3, (Number(item.previous || 0) / max) * 100);
+    const currentWidth = Math.max(3, (Number(item.current || 0) / max) * 100);
+    const diff = Number(item.current || 0) - Number(item.previous || 0);
+    const change = item.previous ? ((diff / Number(item.previous)) * 100).toFixed(1) : "0.0";
+    return `<section class="bulletin-bar">
+      <header>
+        <strong>${item.label}</strong>
+        <span>${diff >= 0 ? "+" : ""}${formatNumber(diff)}${item.unit} · ${change}%</span>
+      </header>
+      <div class="compare-row"><span>2023</span><div class="compare-track"><i style="width:${previousWidth}%"></i></div><em>${formatNumber(item.previous)}${item.unit}</em></div>
+      <div class="compare-row current"><span>2024</span><div class="compare-track"><i style="width:${currentWidth}%"></i></div><em>${formatNumber(item.current)}${item.unit}</em></div>
+    </section>`;
+  }).join("");
+
+  document.querySelector("#bulletin-detail-table").innerHTML = `<table>
+    <thead><tr><th>领域</th><th>指标</th><th>2023</th><th>2024</th><th>变化</th></tr></thead>
+    <tbody>${(bulletin.details || []).map((row) => `<tr>
+      <td>${row.domain}</td>
+      <td>${row.indicator}</td>
+      <td>${row.value2023}</td>
+      <td>${row.value2024}</td>
+      <td>${row.change}</td>
+    </tr>`).join("")}</tbody>
+  </table>`;
+}
+
+function getHealthBulletin2024() {
+  return state.healthBulletin2024 || {
+    title: "2024 年我国卫生健康事业发展统计公报",
+    source: "统计公报",
+    year: 2024,
+    summary: "",
+    keyIndicators: [],
+    domains: [],
+    trends: [],
+    details: []
+  };
 }
 
 function getHealthStatistics() {

@@ -112,6 +112,7 @@ function seedState() {
     ],
     medicalResources: seedMedicalResources(),
     healthStatistics: seedHealthStatistics(),
+    healthBulletin2024: seedHealthBulletin2024(),
     careOrders: seedCareOrders(),
     medicationPickups: seedMedicationPickups(),
     institutionSupervisions: seedInstitutionSupervisions(),
@@ -456,6 +457,63 @@ function seedHealthStatistics() {
   };
 }
 
+function seedHealthBulletin2024() {
+  return {
+    title: "2024 年我国卫生健康事业发展统计公报",
+    source: "国家卫生健康委统计公报 PDF",
+    year: 2024,
+    summary: "围绕卫生资源、医疗服务、基层卫生、中医药、医药费用、公共卫生、妇幼健康、卫生监督和人口家庭发展形成全国年度画像。",
+    keyIndicators: [
+      { label: "居民人均预期寿命", value: 79.0, unit: "岁", hint: "人民健康水平" },
+      { label: "孕产妇死亡率", value: 14.3, unit: "/10万", hint: "妇幼健康" },
+      { label: "婴儿死亡率", value: 4.0, unit: "‰", hint: "妇幼健康" },
+      { label: "医疗卫生机构", value: 1093551, unit: "个", hint: "全国机构总量" },
+      { label: "医疗卫生机构床位", value: 1029.8, unit: "万张", hint: "每千人口 7.32 张" },
+      { label: "卫生人员总数", value: 1578.0, unit: "万人", hint: "卫生技术人员 1302.0 万人" },
+      { label: "总诊疗量", value: 101.5, unit: "亿人次", hint: "同比增长 6.2%" },
+      { label: "入院人次", value: 31192.0, unit: "万人次", hint: "同比增长 3.3%" }
+    ],
+    domains: [
+      { name: "卫生资源", value: "109.4 万个机构", detail: "医院 3.87 万个，基层医疗卫生机构 104.0 万个，床位 1029.8 万张。", status: "资源扩容" },
+      { name: "卫生人员", value: "1578.0 万人", detail: "执业（助理）医师 508.2 万人，注册护士 585.5 万人。", status: "人员增长" },
+      { name: "医疗服务", value: "101.5 亿人次", detail: "全国总诊疗量 101.5 亿人次，入院 31192.0 万人次。", status: "服务增长" },
+      { name: "基层卫生", value: "52.9 亿人次", detail: "基层医疗卫生机构诊疗 52.9 亿人次，乡镇卫生院诊疗 13.8 亿人次。", status: "基层承接" },
+      { name: "中医药服务", value: "16.8 亿人次", detail: "中医类医疗卫生机构诊疗 16.8 亿人次，出院 5271.0 万人次。", status: "服务提升" },
+      { name: "医药费用", value: "361.0 元", detail: "医院次均门诊费用 361.0 元，次均住院费用 9870.0 元。", status: "费用下降" },
+      { name: "公共卫生", value: "485 个示范区", detail: "国家级慢性病综合防控示范区 485 个，公共卫生监测覆盖多领域。", status: "防控强化" },
+      { name: "妇幼老龄", value: "99.95%", detail: "住院分娩率 99.95%，二级及以上综合医院设老年医学科 7436 个。", status: "服务完善" }
+    ],
+    trends: [
+      { label: "医疗卫生机构", unit: "个", previous: 1070785, current: 1093551 },
+      { label: "床位数", unit: "万张", previous: 1017.4, current: 1029.8 },
+      { label: "卫生人员总数", unit: "万人", previous: 1523.7, current: 1578.0 },
+      { label: "执业（助理）医师", unit: "万人", previous: 478.2, current: 508.2 },
+      { label: "注册护士", unit: "万人", previous: 563.7, current: 585.5 },
+      { label: "总诊疗量", unit: "亿人次", previous: 95.5, current: 101.5 },
+      { label: "入院人次", unit: "万人次", previous: 30187.3, current: 31192.0 },
+      { label: "基层诊疗量", unit: "亿人次", previous: 49.4, current: 52.9 },
+      { label: "中医诊疗量", unit: "万人次", previous: 153500.8, current: 168186.4 },
+      { label: "医院病床使用率", unit: "%", previous: 79.4, current: 78.8 }
+    ],
+    details: [
+      { domain: "卫生资源", indicator: "医院", value2024: "38710 个", value2023: "38355 个", change: "+355 个" },
+      { domain: "卫生资源", indicator: "基层医疗卫生机构", value2024: "1040023 个", value2023: "1016238 个", change: "+23785 个" },
+      { domain: "卫生资源", indicator: "三级医院", value2024: "4111 个", value2023: "3855 个", change: "+256 个" },
+      { domain: "卫生人员", indicator: "每千人口执业（助理）医师", value2024: "3.61 人", value2023: "3.40 人", change: "+0.21 人" },
+      { domain: "卫生人员", indicator: "每千人口注册护士", value2024: "4.16 人", value2023: "4.00 人", change: "+0.16 人" },
+      { domain: "卫生费用", indicator: "卫生总费用", value2024: "90895.5 亿元", value2023: "90575.8 亿元", change: "+319.7 亿元" },
+      { domain: "医疗服务", indicator: "医院诊疗量", value2024: "45.0 亿人次", value2023: "42.6 亿人次", change: "+2.4 亿人次" },
+      { domain: "医疗服务", indicator: "医院入院人次", value2024: "25462.0 万人次", value2023: "24500.1 万人次", change: "+961.9 万人次" },
+      { domain: "病床使用", indicator: "医院出院者平均住院日", value2024: "8.6 日", value2023: "8.8 日", change: "-0.2 日" },
+      { domain: "基层卫生", indicator: "乡镇卫生院诊疗人次", value2024: "13.8 亿人次", value2023: "13.1 亿人次", change: "+0.7 亿人次" },
+      { domain: "基层卫生", indicator: "社区卫生服务中心诊疗人次", value2024: "9.3 亿人次", value2023: "8.3 亿人次", change: "+1.0 亿人次" },
+      { domain: "中医药", indicator: "中医类机构诊疗人次", value2024: "168186.4 万人次", value2023: "153500.8 万人次", change: "+14685.6 万人次" },
+      { domain: "妇幼健康", indicator: "5 岁以下儿童死亡率", value2024: "5.6‰", value2023: "6.2‰", change: "-0.6‰" },
+      { domain: "人口家庭", indicator: "托位总数", value2024: "573.7 万", value2023: "477.3 万", change: "+20.2%" }
+    ]
+  };
+}
+
 function seedCareOrders() {
   return [
     {
@@ -666,6 +724,7 @@ function normalizeState(data) {
     followups: Array.isArray(data.followups) ? data.followups : [],
     medicalResources: Array.isArray(data.medicalResources) ? data.medicalResources : seedMedicalResources(),
     healthStatistics: data.healthStatistics && typeof data.healthStatistics === "object" ? data.healthStatistics : seedHealthStatistics(),
+    healthBulletin2024: data.healthBulletin2024 && typeof data.healthBulletin2024 === "object" ? data.healthBulletin2024 : seedHealthBulletin2024(),
     careOrders: Array.isArray(data.careOrders) ? data.careOrders : seedCareOrders(),
     medicationPickups: Array.isArray(data.medicationPickups) ? data.medicationPickups : seedMedicationPickups(),
     institutionSupervisions: Array.isArray(data.institutionSupervisions) ? data.institutionSupervisions : seedInstitutionSupervisions(),

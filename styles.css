@@ -501,6 +501,12 @@ th {
   gap: 10px;
 }
 
+.bulletin-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
 .governance-grid article {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -508,6 +514,7 @@ th {
   background: #f8fbfd;
 }
 
+.bulletin-grid article,
 .rules-grid article {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -515,27 +522,96 @@ th {
   background: #f8fbfd;
 }
 
+.bulletin-grid span,
 .governance-grid span,
 .governance-grid small {
   display: block;
   color: var(--muted);
 }
 
+.bulletin-grid p,
 .rules-grid span {
   display: block;
   color: var(--muted);
   line-height: 1.55;
 }
 
+.bulletin-grid strong,
 .governance-grid strong {
   display: block;
   margin: 8px 0;
   font-size: 24px;
 }
 
+.bulletin-grid small {
+  display: inline-flex;
+  margin-top: 10px;
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: #eaf2ff;
+  color: #184a91;
+  font-weight: 700;
+}
+
 .rules-grid strong {
   display: block;
   margin-bottom: 8px;
+}
+
+.bulletin-bars {
+  display: grid;
+  gap: 12px;
+}
+
+.bulletin-bar {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fbfd;
+}
+
+.bulletin-bar header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.bulletin-bar header span {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.compare-row {
+  display: grid;
+  grid-template-columns: 48px 1fr 120px;
+  gap: 10px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.compare-row span,
+.compare-row em {
+  color: var(--muted);
+  font-style: normal;
+}
+
+.compare-track {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e8eef3;
+}
+
+.compare-track i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #7b8da1;
+}
+
+.compare-row.current .compare-track i {
+  background: var(--blue);
 }
 
 dialog {
@@ -728,9 +804,11 @@ dialog::backdrop {
   .metrics-grid,
   .governance-grid,
   .rules-grid,
+  .bulletin-grid,
   .content-grid,
   .split,
   .timeline,
+  .compare-row,
   .detail-grid,
   .vitals,
   .detail-row,
