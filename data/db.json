@@ -887,5 +887,51 @@
       "createdAt": "2026-06-15T05:55:39.990Z",
       "personIndex": "210203197505203427#13800010002"
     }
+  ],
+  "digitalCredentials": [
+    {
+      "id": "dc1",
+      "residentId": "r1",
+      "type": "电子健康码",
+      "provider": "区域全民健康信息平台",
+      "credentialNo": "HC-210204-3219",
+      "status": "已绑定",
+      "lastVerified": "2026-06-15",
+      "usage": "就医身份识别、健康档案调阅",
+      "personIndex": "210204196802113219#13800010001"
+    },
+    {
+      "id": "dc2",
+      "residentId": "r1",
+      "type": "医保电子凭证",
+      "provider": "医保信息平台",
+      "credentialNo": "MI-13800010001",
+      "status": "已激活",
+      "lastVerified": "2026-06-15",
+      "usage": "门诊慢特病结算、固定取药审核",
+      "personIndex": "210204196802113219#13800010001"
+    },
+    {
+      "id": "dc3",
+      "residentId": "r2",
+      "type": "医保电子凭证",
+      "provider": "医保信息平台",
+      "credentialNo": "MI-13800010002",
+      "status": "待核验",
+      "lastVerified": "2026-06-12",
+      "usage": "门诊统筹结算",
+      "personIndex": "210203197505203427#13800010002"
+    },
+    {
+      "id": "dc4",
+      "residentId": "r4",
+      "type": "居民一卡通",
+      "provider": "城市服务平台",
+      "credentialNo": "CC-210213-3521",
+      "status": "家属代办",
+      "lastVerified": "2026-06-10",
+      "usage": "线下帮办、家属代取药",
+      "personIndex": "210213196410013521#13800010004"
+    }
   ]
 }

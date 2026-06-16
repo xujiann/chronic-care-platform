@@ -116,6 +116,7 @@ function seedState() {
     emergencySignals: seedEmergencySignals(),
     seniorServices: seedSeniorServices(),
     dataAccessLogs: seedDataAccessLogs(),
+    digitalCredentials: seedDigitalCredentials(),
     personalRecords: seedPersonalRecords()
   };
 }
@@ -142,6 +143,15 @@ function seedDataAccessLogs() {
     { id: "al2", residentId: "r1", at: "2026-06-15 10:35", actor: "大连市中心医院", role: "医疗机构", scope: "电子病历摘要、用药处方", purpose: "专科复诊", result: "允许" },
     { id: "al3", residentId: "r2", at: "2026-06-15 11:20", actor: "医保端审核员", role: "医保监管", scope: "医保结算、诊断摘要", purpose: "慢病结算审核", result: "允许" },
     { id: "al4", residentId: "r4", at: "2026-06-15 14:08", actor: "未授权机构", role: "外部机构", scope: "完整电子病历", purpose: "未知", result: "拒绝" }
+  ];
+}
+
+function seedDigitalCredentials() {
+  return [
+    { id: "dc1", residentId: "r1", type: "电子健康码", provider: "区域全民健康信息平台", credentialNo: "HC-210204-3219", status: "已绑定", lastVerified: "2026-06-15", usage: "就医身份识别、健康档案调阅" },
+    { id: "dc2", residentId: "r1", type: "医保电子凭证", provider: "医保信息平台", credentialNo: "MI-13800010001", status: "已激活", lastVerified: "2026-06-15", usage: "门诊慢特病结算、固定取药审核" },
+    { id: "dc3", residentId: "r2", type: "医保电子凭证", provider: "医保信息平台", credentialNo: "MI-13800010002", status: "待核验", lastVerified: "2026-06-12", usage: "门诊统筹结算" },
+    { id: "dc4", residentId: "r4", type: "居民一卡通", provider: "城市服务平台", credentialNo: "CC-210213-3521", status: "家属代办", lastVerified: "2026-06-10", usage: "线下帮办、家属代取药" }
   ];
 }
 
@@ -385,6 +395,7 @@ function normalizeState(data) {
     emergencySignals: Array.isArray(data.emergencySignals) ? data.emergencySignals : seedEmergencySignals(),
     seniorServices: Array.isArray(data.seniorServices) ? data.seniorServices : seedSeniorServices(),
     dataAccessLogs: Array.isArray(data.dataAccessLogs) ? data.dataAccessLogs : seedDataAccessLogs(),
+    digitalCredentials: Array.isArray(data.digitalCredentials) ? data.digitalCredentials : seedDigitalCredentials(),
     personalRecords: Array.isArray(data.personalRecords) ? data.personalRecords : seedPersonalRecords()
   };
   return normalizePersonIndexes(state);
@@ -417,7 +428,7 @@ function normalizePersonIndexes(state) {
     resident.identityIndex = resident.personIndex;
   });
   const residentMap = new Map(residents.map((resident) => [resident.id, resident]));
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials"].forEach((key) => {
     (Array.isArray(state[key]) ? state[key] : []).forEach((item) => {
       item.personIndex = item.personIndex || personIndexForResident(residentMap, item.residentId);
     });

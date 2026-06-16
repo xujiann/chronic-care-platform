@@ -233,6 +233,7 @@ function renderCitizen(residentId) {
   renderFollowups(followups);
   renderPickups(resident.id);
   renderSeniorServices(resident.id);
+  renderDigitalCredentials(resident.id);
   renderAccessLogs(resident.id);
 }
 
@@ -408,6 +409,25 @@ function renderSeniorServices(residentId) {
       <span class="status ${item.status === "待开通" ? "warn" : ""}">${item.status}</span>
     </article>`)
     .join("") || `<p class="muted">暂无适老服务配置。</p>`;
+}
+
+function renderDigitalCredentials(residentId) {
+  const target = document.querySelector("#credential-cards");
+  if (!target) return;
+  const credentials = (state.digitalCredentials || []).filter((item) => item.residentId === residentId);
+  target.innerHTML = credentials
+    .map((item) => `<article class="mini-card">
+      <h3>${item.type}</h3>
+      <p class="muted">${item.provider} · ${item.lastVerified}</p>
+      <p>${maskCredential(item.credentialNo)} · ${item.usage}</p>
+      <span class="status ${item.status === "待核验" ? "warn" : ""}">${item.status}</span>
+    </article>`)
+    .join("") || `<p class="muted">暂无电子健康码或医保电子凭证。</p>`;
+}
+
+function maskCredential(value) {
+  const text = String(value || "");
+  return text.length > 6 ? `${text.slice(0, 3)}****${text.slice(-4)}` : text;
 }
 
 function renderAccessLogs(residentId) {

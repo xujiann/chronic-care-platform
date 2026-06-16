@@ -515,7 +515,7 @@ function renderPlanning() {
   const items = state.policyAlignment || policyAlignmentDefaults;
   const started = items.filter((item) => ["已启动", "原型完成", "已纳入", "数据底座完成"].includes(item.status)).length;
   const pending = items.length - started;
-  const sharedCollections = ["residents", "personalRecords", "diseases", "followups", "careOrders", "insuranceClaims", "medicationPickups", "seniorServices"];
+  const sharedCollections = ["residents", "personalRecords", "diseases", "followups", "careOrders", "insuranceClaims", "medicationPickups", "seniorServices", "digitalCredentials"];
   const indexedCollections = sharedCollections.filter((key) => (state[key] || []).some((item) => item.personIndex));
   document.querySelector("#planning-cards").innerHTML = [
     ["规划映射", items.length, "国家信息化规划能力项"],

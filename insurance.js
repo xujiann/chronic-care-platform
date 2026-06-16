@@ -6,6 +6,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderClaims(state);
   renderSupervisions(state);
   renderPickupAudits(state);
+  renderCredentialChecks(state);
   renderInsuranceAudit(state);
 });
 
@@ -76,6 +77,23 @@ function renderPickupAudits(state) {
       <span class="badge ${badge}">${item.insuranceReview || "待审核"}</span>
     </section>`;
   }).join("") || `<p class="muted">暂无固定取药审核事项。</p>`;
+}
+
+function renderCredentialChecks(state) {
+  const items = (state.digitalCredentials || []).filter((item) => item.type.includes("医保"));
+  document.querySelector("#credential-check-count").textContent = `${items.length} 项`;
+  document.querySelector("#credential-check-list").innerHTML = items.map((item) => {
+    const resident = residentOf(state, item.residentId);
+    const badge = item.status === "待核验" ? "warn" : "info";
+    return `<section class="item">
+      <div>
+        <h3>${resident?.name || "未知居民"} · ${item.type}</h3>
+        <p>${item.provider} · ${item.lastVerified}</p>
+        <p>${item.usage} · ${item.personIndex || "待索引"}</p>
+      </div>
+      <span class="badge ${badge}">${item.status}</span>
+    </section>`;
+  }).join("") || `<p class="muted">暂无医保电子凭证核验事项。</p>`;
 }
 
 function renderInsuranceAudit(state) {
