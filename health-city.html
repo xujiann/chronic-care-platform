@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>健康城市四端协同系统</title>
+    <title>健康城市协同系统</title>
     <link rel="stylesheet" href="./portal.css" />
   </head>
   <body>
@@ -11,14 +11,15 @@
       <header class="portal-header">
         <div>
           <span>开源健康城市系统</span>
-          <h1>四端协同总览</h1>
-          <p>以居民健康账户为核心，贯通卫生健康委、医疗机构、医保和个人端，支撑慢病管理、资源监管、结算审核和固定取药。</p>
+          <h1>健康城市协同总览</h1>
+          <p>以居民健康账户为核心，贯通卫生健康委、医疗机构、医保、个人端和县域医共体平台，支撑慢病管理、资源监管、结算审核、固定取药和县乡村一体化协同。</p>
         </div>
         <nav>
           <a href="./login.html">登录</a>
           <a href="./index.html">卫健委端</a>
           <a href="./institution.html">医疗机构端</a>
           <a href="./insurance.html">医保端</a>
+          <a href="./county.html">医共体平台</a>
           <a href="./citizen.html">个人端</a>
         </nav>
       </header>
@@ -27,7 +28,7 @@
         <article class="metric-card">
           <span>系统定位</span>
           <strong>健康城市</strong>
-          <small>四端协同开源 MVP</small>
+          <small>四端 + 医共体开源 MVP</small>
         </article>
         <article class="metric-card">
           <span>核心数据</span>
@@ -54,12 +55,12 @@
       <section class="portal-grid">
         <article class="panel wide">
           <div class="panel-title">
-            <h2>四端功能</h2>
+            <h2>系统功能</h2>
           </div>
           <div class="capability-grid">
             <a class="capability-card" href="./index.html">
               <strong>卫生健康委端</strong>
-              <span>监管总览、慢病医防整合、公共卫生应急、数据安全审计、医疗资源监管、机构绩效、风险预警、数据质量、四端运行监测。</span>
+              <span>监管总览、慢病医防整合、公共卫生应急、数据安全审计、医疗资源监管、机构绩效、风险预警、数据质量、系统运行监测。</span>
             </a>
             <a class="capability-card" href="./institution.html">
               <strong>医疗机构端</strong>
@@ -68,6 +69,10 @@
             <a class="capability-card" href="./insurance.html">
               <strong>医保端</strong>
               <span>慢病结算审核、基金支付、控费规则、医疗机构监管。</span>
+            </a>
+            <a class="capability-card" href="./county.html">
+              <strong>县域医共体平台</strong>
+              <span>36项功能清单、区域医技共享、便民惠民、医疗管理、公卫协同、人财物和绩效统一管理。</span>
             </a>
             <a class="capability-card" href="./citizen.html">
               <strong>个人端</strong>
@@ -84,7 +89,8 @@
             <div><strong>居民主索引</strong><span>以身份证号 + 手机号形成 personIndex，贯通个人账户、家属、慢病、随访、医保、取药。</span></div>
             <div><strong>个人健康信息库</strong><span>统一保存电子病历、检查检验、用药、过敏、接种、住院、授权。</span></div>
             <div><strong>协同业务</strong><span>医疗协同、医保结算、固定取药和资源监管共用同一数据底座。</span></div>
-            <div><strong>规划对齐</strong><span>对齐普惠数字医疗、数据共享互认、互联网医疗监管、公共卫生应急和适老化服务。</span></div>
+            <div><strong>县域医共体</strong><span>把县级总医院、乡镇卫生院、村卫生室、公卫机构纳入同一协同平台。</span></div>
+          <div><strong>规划对齐</strong><span>对齐普惠数字医疗、数据共享互认、互联网医疗监管、公共卫生应急和适老化服务。</span></div>
           </div>
         </article>
       </section>
@@ -111,7 +117,7 @@
           <div><strong>普惠数字医疗</strong><span>个人健康信息库、电子病历、检查检验、慢病服务。</span></div>
           <div><strong>档案病历贯通</strong><span>以居民为中心形成健康时间线，连接健康档案、电子病历、检查和用药。</span></div>
           <div><strong>医疗数据共享互认</strong><span>统一 personIndex，支撑机构间业务协同和数据复用。</span></div>
-          <div><strong>互联网医疗监管</strong><span>卫健委端四端运行监测、机构绩效、风险预警、数据质量。</span></div>
+          <div><strong>互联网医疗监管</strong><span>卫健委端系统运行监测、机构绩效、风险预警、数据质量。</span></div>
           <div><strong>医保电子凭证方向</strong><span>医保端结算审核与个人端取药计划预留凭证对接。</span></div>
           <div><strong>电子凭证贯通</strong><span>个人端展示电子健康码、医保电子凭证、居民一卡通，医保端核验使用状态。</span></div>
           <div><strong>公共卫生应急</strong><span>预留多点触发预警、资源调配、早发现早报告早处置能力。</span></div>
@@ -133,7 +139,8 @@
           <div><strong>personalRecords</strong><span>个人健康信息库</span></div>
           <div><strong>medicalResources</strong><span>医疗资源监管数据</span></div>
           <div><strong>careOrders</strong><span>医疗机构协同任务</span></div>
-          <div><strong>medicationPickups</strong><span>每月固定取药计划与四端闭环状态</span></div>
+          <div><strong>medicationPickups</strong><span>每月固定取药计划与跨端闭环状态</span></div>
+          <div><strong>countyConsortium</strong><span>县域医共体组织网络、36 项功能、任务、流程、指标和治理要求</span></div>
           <div><strong>insuranceClaims</strong><span>医保结算审核</span></div>
           <div><strong>institutionSupervisions</strong><span>医保端医疗机构监管事项</span></div>
           <div><strong>emergencySignals</strong><span>公共卫生应急多点触发预警</span></div>

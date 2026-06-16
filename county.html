@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>县域医共体平台 · 健康城市系统</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+    <script>window.HealthCityAuth.requireRole(["county", "commission", "institution"])</script>
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>紧密型县域医共体平台</span>
+          <h1>县乡村一体化协同驾驶舱</h1>
+          <p>依据《紧密型县域医共体信息化功能指引》，整合区域医技共享、便民惠民、医疗管理、公卫协同和人财物综合管理。</p>
+        </div>
+        <nav>
+          <a href="./health-city.html">系统总览</a>
+          <a href="./index.html">卫健委端</a>
+          <a href="./institution.html">医疗机构端</a>
+          <a href="./insurance.html">医保端</a>
+          <a href="./citizen.html">个人端</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" id="county-metrics"></section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>县域组织网络</h2>
+          <span>县级总医院、乡镇卫生院、村卫生室、公共卫生机构一体协同</span>
+        </div>
+        <div id="county-network" class="county-network"></div>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>36 项功能建设清单</h2>
+            <select id="capability-filter" aria-label="筛选功能域"></select>
+          </div>
+          <div id="county-capabilities" class="county-capabilities"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>重点协同任务</h2>
+            <span id="county-task-count"></span>
+          </div>
+          <div id="county-tasks" class="list"></div>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>业务闭环流程</h2>
+          <span>基层首诊、县级诊断、结果互认、医保协同、公卫管理</span>
+        </div>
+        <div id="county-workflows" class="workflow-grid"></div>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel">
+          <div class="panel-title">
+            <h2>运营监管指标</h2>
+          </div>
+          <div id="county-indicators" class="list compact"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>建设模式与安全</h2>
+          </div>
+          <div id="county-governance" class="rules"></div>
+        </article>
+      </section>
+    </main>
+
+    <script src="./shared.js"></script>
+    <script src="./county.js"></script>
+  </body>
+</html>

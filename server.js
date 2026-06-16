@@ -119,6 +119,7 @@ function seedState() {
     digitalCredentials: seedDigitalCredentials(),
     healthArchiveStandard: seedHealthArchiveStandard(),
     authUsers: seedAuthUsers(),
+    countyConsortium: seedCountyConsortium(),
     personalRecords: seedPersonalRecords()
   };
 }
@@ -128,8 +129,56 @@ function seedAuthUsers() {
     { id: "u1", username: "whjw", name: "卫健委管理员", role: "commission", roleName: "卫生健康委端", home: "index.html", status: "启用" },
     { id: "u2", username: "doctor", name: "刘医生", role: "institution", roleName: "医疗机构端", home: "institution.html", status: "启用" },
     { id: "u3", username: "insurance", name: "医保审核员", role: "insurance", roleName: "医保端", home: "insurance.html", status: "启用" },
-    { id: "u4", username: "citizen", name: "王建国", role: "citizen", roleName: "个人端", home: "citizen.html", residentId: "r1", accountId: "a1", status: "启用" }
+    { id: "u4", username: "citizen", name: "王建国", role: "citizen", roleName: "个人端", home: "citizen.html", residentId: "r1", accountId: "a1", status: "启用" },
+    { id: "u5", username: "county", name: "医共体办公室", role: "county", roleName: "县域医共体平台", home: "county.html", status: "启用" }
   ];
+}
+
+function seedCountyConsortium() {
+  const domains = [
+    ["区域医疗服务协同", ["医学影像诊断资源共享中心", "心电诊断资源共享中心", "医学检验资源共享中心", "病理诊断资源共享中心", "远程会诊资源共享中心", "消毒供应资源共享中心", "县域智慧医疗急救中心"]],
+    ["便民惠民服务协同", ["电子健康卡应用", "互联网+诊疗服务", "互联网+慢病协同管理", "互联网+家庭医生签约服务", "预约诊疗服务", "中医智能辅诊服务", "中药智能药学服务", "基层缺药登记服务", "居民用药监测服务"]],
+    ["医疗管理服务协同", ["检验检查结果互认服务", "合理用药审核及药事管理协同服务", "医保业务协同服务", "远程医学教育", "县域中医药适宜技术推广"]],
+    ["公共卫生服务协同", ["慢性病业务协同服务", "老年健康业务协同服务", "妇幼保健业务协同服务", "疫苗接种业务协同服务", "突发公共卫生事件应急处置指挥协同管理", "基层医疗卫生机构和公共卫生业务协同服务", "其他卫生业务协同服务"]],
+    ["基层医疗卫生综合管理", ["综合决策管理统一可视化展示", "人力资源统一协同管理", "财务统一协同管理", "物资统一协同管理", "药品耗材统一协同管理", "行政统一协同管理", "医共体绩效统一协同管理", "医疗废弃物统一协同管理"]]
+  ];
+  let no = 1;
+  return {
+    organizations: [
+      { name: "县域医共体总医院", level: "牵头医院", role: "医技共享、远程会诊、质控、绩效和运营管理", systems: ["HIS", "EMR", "运营监管"] },
+      { name: "乡镇卫生院", level: "成员单位", role: "基层首诊、签约服务、慢病随访、转诊申请", systems: ["基层医疗", "公卫", "家医签约"] },
+      { name: "村卫生室", level: "网底机构", role: "健康监测、取药登记、随访提醒", systems: ["移动随访", "电子健康卡"] },
+      { name: "疾控/妇幼/急救中心", level: "公共卫生", role: "疾控、妇幼、疫苗、应急和院前急救", systems: ["疾控", "妇幼", "急救"] }
+    ],
+    capabilities: domains.flatMap(([domain, names]) => names.map((name) => ({
+      no: no++,
+      domain,
+      name,
+      summary: "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+      owner: domain.includes("综合") ? "医共体办公室" : "牵头医院",
+      status: no % 4 === 0 ? "建设中" : no % 7 === 0 ? "待启动" : "运行中",
+      functions: ["申请", "协同", "质控", "统计"],
+      risk: no % 7 === 0 ? "需推进" : "正常"
+    }))),
+    tasks: [
+      { title: "检验检查结果互认规则上线", owner: "医共体办公室", due: "2026-07-15", action: "统一互认项目、质控标准和不互认理由。", status: "进行中", level: "高" },
+      { title: "基层缺药登记与药物配供闭环", owner: "总医院药学中心", due: "2026-07-30", action: "接入固定取药、延伸处方和配送状态。", status: "进行中", level: "中" }
+    ],
+    workflows: [
+      { name: "医技共享", steps: ["基层申请", "中心诊断", "报告回传", "结果互认"] },
+      { name: "双向转诊", steps: ["转诊申请", "资源预约", "接诊反馈", "下转随访"] },
+      { name: "慢病协同", steps: ["筛查建档", "风险分级", "干预随访", "用药监测"] }
+    ],
+    indicators: [
+      { name: "县域内就诊率", value: "82.4%", target: "逐季提升", source: "HIS/医保结算", trend: "正常" },
+      { name: "基层首诊率", value: "61.8%", target: "提升基层能力", source: "预约与门诊记录", trend: "正常" },
+      { name: "检验检查互认率", value: "46.2%", target: "减少重复检查", source: "医技共享中心", trend: "预警" }
+    ],
+    governance: [
+      { title: "省市统筹、县域落地", detail: "依托全民健康信息平台，统一网络、标准、接口和安全要求。" },
+      { title: "数据安全与最小授权", detail: "健康档案、电子病历、医保、药品和绩效数据分级授权、访问留痕。" }
+    ]
+  };
 }
 
 function seedHealthArchiveStandard() {
@@ -464,6 +513,7 @@ function normalizeState(data) {
     digitalCredentials: Array.isArray(data.digitalCredentials) ? data.digitalCredentials : seedDigitalCredentials(),
     healthArchiveStandard: data.healthArchiveStandard && typeof data.healthArchiveStandard === "object" ? data.healthArchiveStandard : seedHealthArchiveStandard(),
     authUsers: Array.isArray(data.authUsers) ? data.authUsers : seedAuthUsers(),
+    countyConsortium: data.countyConsortium && typeof data.countyConsortium === "object" ? data.countyConsortium : seedCountyConsortium(),
     personalRecords: Array.isArray(data.personalRecords) ? data.personalRecords : seedPersonalRecords()
   };
   return normalizePersonIndexes(state);

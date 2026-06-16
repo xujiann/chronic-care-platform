@@ -9,11 +9,13 @@ flowchart TB
   Login --> Institution["医疗机构端"]
   Login --> Insurance["医保端"]
   Login --> Commission["卫生健康委端"]
+  Login --> County["县域医共体平台"]
 
   Citizen --> PersonIndex["统一个人主索引 personIndex\n身份证号 + 手机号"]
   Institution --> PersonIndex
   Insurance --> PersonIndex
   Commission --> PersonIndex
+  County --> PersonIndex
 
   PersonIndex --> Archive["个人健康信息库\n健康档案、电子病历、检查检验、用药、接种、过敏、住院、授权"]
   Archive --> Standard["健康档案标准模型\n三维架构 + 32类基础数据集"]
@@ -28,6 +30,10 @@ flowchart TB
 
   Insurance --> Claim["慢病结算审核"]
   Insurance --> Supervision["医疗机构监管"]
+
+  County --> SharedCenters["区域医技共享中心\n影像、心电、检验、病理、会诊、急救、消毒供应"]
+  County --> CountyPublicHealth["公共卫生协同\n慢病、老年、妇幼、疫苗、应急"]
+  County --> CountyOps["基层综合管理\n人财物、药耗、行政、绩效、医废"]
 
   Citizen --> Pickup["每月固定取药申请"]
   Pickup --> Institution
@@ -51,6 +57,7 @@ flowchart LR
   InsuranceReview --> Pharmacy["药房取药/家属代取"]
   Pharmacy --> Audit["闭环状态与访问留痕"]
   Audit --> Commission["卫健委监管看板"]
+  Audit --> County["县域医共体运营监管"]
 ```
 
 ## 3. 健康档案与电子病历贯通

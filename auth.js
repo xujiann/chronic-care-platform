@@ -4,14 +4,16 @@
     { id: "u1", username: "whjw", password: "123456", name: "卫健委管理员", role: "commission", roleName: "卫生健康委端", home: "index.html" },
     { id: "u2", username: "doctor", password: "123456", name: "刘医生", role: "institution", roleName: "医疗机构端", home: "institution.html" },
     { id: "u3", username: "insurance", password: "123456", name: "医保审核员", role: "insurance", roleName: "医保端", home: "insurance.html" },
-    { id: "u4", username: "citizen", password: "123456", name: "王建国", role: "citizen", roleName: "个人端", home: "citizen.html", residentId: "r1", accountId: "a1" }
+    { id: "u4", username: "citizen", password: "123456", name: "王建国", role: "citizen", roleName: "个人端", home: "citizen.html", residentId: "r1", accountId: "a1" },
+    { id: "u5", username: "county", password: "123456", name: "医共体办公室", role: "county", roleName: "县域医共体平台", home: "county.html" }
   ];
 
   const roleHome = {
     commission: "index.html",
     institution: "institution.html",
     insurance: "insurance.html",
-    citizen: "citizen.html"
+    citizen: "citizen.html",
+    county: "county.html"
   };
 
   function login(username, password) {
@@ -86,6 +88,7 @@
           <a href="./index.html">卫健委</a>
           <a href="./institution.html">医疗机构</a>
           <a href="./insurance.html">医保</a>
+          <a href="./county.html">医共体</a>
           <a href="./citizen.html">个人</a>
           <button type="button" data-logout>退出</button>
         </nav>`;
