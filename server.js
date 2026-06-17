@@ -1163,6 +1163,21 @@ function appendDataAccessLog(data, user, residentId, scope, purpose, result = "�
   ].slice(0, 120);
 }
 
+function normalizeHealthStatisticsImportJob(payload, user) {
+  return {
+    id: payload.id || `stat-job-${randomUUID()}`,
+    name: String(payload.name || "未命名统计导入任务").trim(),
+    source: String(payload.source || "报表导入").trim(),
+    period: String(payload.period || "未指定周期").trim(),
+    status: String(payload.status || "待解析").trim(),
+    quality: String(payload.quality || "待质控").trim(),
+    target: String(payload.target || "healthStatistics").trim(),
+    nextAction: String(payload.nextAction || "完成字段映射和人工复核。").trim(),
+    createdAt: new Date().toISOString(),
+    createdBy: user?.username || user?.name || "system"
+  };
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -1229,6 +1244,34 @@ async function handleApi(req, res) {
     ].slice(0, 120);
     writeDatabase(data);
     sendJson(res, 200, data);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/health-statistics/import-jobs") {
+    const user = requireApiRole(req, res, ["commission"], "/api/health-statistics/import-jobs");
+    if (!user) return;
+    const data = readDatabase();
+    const job = normalizeHealthStatisticsImportJob(await collectJson(req), user);
+    data.healthStatisticsIngestion = data.healthStatisticsIngestion || seedHealthStatisticsIngestion();
+    data.healthStatisticsIngestion.jobs = [
+      job,
+      ...(Array.isArray(data.healthStatisticsIngestion.jobs) ? data.healthStatisticsIngestion.jobs : [])
+    ].slice(0, 80);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "登记统计导入任务",
+        target: job.target,
+        result: "允许",
+        detail: `${job.source} · ${job.period} · ${job.name}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 201, job);
     return;
   }
 

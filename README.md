@@ -43,6 +43,9 @@ http://localhost:5173/login.html
 - 个人端：`citizen / 123456`
 - 县域医共体平台：`county / 123456`
 
+统计导入任务接口：卫健委端登录后可调用 `POST /api/health-statistics/import-jobs` 登记 PDF/Excel 报表导入、统计直报系统接口或医疗机构接口对账任务，任务会进入 `healthStatisticsIngestion.jobs` 并写入安全审计。
+使用 PowerShell 手工联调包含中文的 JSON 时，请用 UTF-8 字节提交请求体；浏览器 `fetch` 默认可正常提交 UTF-8。
+
 如果你的 PowerShell 没有限制脚本执行，也可以使用 `npm run dev`。
 
 如果浏览器提示 `localhost:5173` 无法打开，说明服务窗口没有运行。请重新双击 `open-localhost.cmd`，或者在命令行执行 `npm.cmd run dev` 后保持该窗口不要关闭。
