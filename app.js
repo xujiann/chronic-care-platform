@@ -119,7 +119,7 @@ function normalizePersonIndexes() {
     resident.identityIndex = resident.personIndex;
   });
   const residentMap = new Map(residents.map((resident) => [resident.id, resident]));
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "deathCertificates"].forEach((key) => {
     (Array.isArray(state[key]) ? state[key] : []).forEach((item) => {
       item.personIndex = item.personIndex || personIndexForResident(residentMap, item.residentId);
     });
@@ -517,6 +517,7 @@ function renderGovernance() {
   renderWarnings();
   renderMedicalResources();
   renderHealthStatistics();
+  renderDeathStatistics();
   renderPerformanceTable();
   renderQualityBars();
 }
@@ -831,6 +832,63 @@ function renderHealthStatistics() {
   </table>`;
 }
 
+function renderDeathStatistics() {
+  const death = getDeathStatistics();
+  const metrics = death.metrics || {};
+  const summary = document.querySelector("#death-stat-summary");
+  const cards = document.querySelector("#death-stat-cards");
+  const sources = document.querySelector("#death-stat-sources");
+  const causeTable = document.querySelector("#death-cause-ranking");
+  const regionTable = document.querySelector("#death-region-table");
+  const rules = document.querySelector("#death-stat-rules");
+  if (!summary || !cards || !sources || !causeTable || !regionTable || !rules) return;
+
+  summary.textContent = `${formatPeriod(death.period)} · 医疗机构死亡医学证明系统 + 人口死亡信息登记系统`;
+  cards.innerHTML = [
+    ["死亡证明", metrics.total || 0, "医疗机构登记个案"],
+    ["已签发", metrics.signed || 0, "正常死亡 1 日内"],
+    ["已上报", metrics.reported || 0, "人口死亡信息登记"],
+    ["电子证照", metrics.electronicLicenses || 0, "省级/国家平台"],
+    ["纸质证明", metrics.paperCertificates || 0, "公安、近亲属、存根联"],
+    ["待处理", metrics.pending || 0, "待签发或待上报"],
+    ["院外死亡", metrics.homeOrOtherPlace || 0, "家中、民政或其他场所"],
+    ["质控通过", metrics.qualityPass || 0, "死因链与编码"]
+  ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${formatNumber(value)}</strong><em>${hint}</em></article>`).join("");
+
+  sources.innerHTML = (death.sources || []).map((source) => `<article>
+    <span>${source.name}</span>
+    <strong>${source.status}</strong>
+    <small>${source.scope}</small>
+  </article>`).join("");
+
+  causeTable.innerHTML = `<table>
+    <thead><tr><th>死因类别</th><th>ICD-10</th><th>死亡数</th><th>占比</th><th>趋势</th></tr></thead>
+    <tbody>${(death.causeRanking || []).map((row) => `<tr>
+      <td>${row.cause}</td>
+      <td>${row.icd10Range}</td>
+      <td>${row.deaths}</td>
+      <td>${row.share}</td>
+      <td><span class="badge ${row.trend === "需关注" ? "warn" : "info"}">${row.trend}</span></td>
+    </tr>`).join("")}</tbody>
+  </table>`;
+
+  regionTable.innerHTML = `<table>
+    <thead><tr><th>地区</th><th>死亡证明数</th><th>粗死亡率</th><th>上报率</th><th>逾期</th></tr></thead>
+    <tbody>${(death.regionStats || []).map((row) => `<tr>
+      <td>${row.region}</td>
+      <td>${row.deaths}</td>
+      <td>${row.crudeMortality}</td>
+      <td>${row.reportedRate}</td>
+      <td>${row.overdue}</td>
+    </tr>`).join("")}</tbody>
+  </table>`;
+
+  rules.innerHTML = [
+    ...(death.workflowRules || []),
+    ...(death.dataSharing || []).map((item) => ({ rule: item.target, deadline: item.data, owner: item.status, status: item.status }))
+  ].map((item) => `<div><strong>${item.rule}</strong><span>${item.deadline || item.detail}<br>${item.owner || ""} · ${item.status || ""}</span></div>`).join("");
+}
+
 function renderStatisticsAnalytics() {
   const statistics = getHealthStatistics();
   const resourceTotals = sumNested(statistics.resourceReports, "interfaceData", ["beds", "doctors", "nurses"]);
@@ -1011,6 +1069,19 @@ function getHealthStatistics() {
     })),
     serviceReports: [],
     qualityRules: []
+  };
+}
+
+function getDeathStatistics() {
+  return state.deathStatistics || {
+    period: "2026-06",
+    title: "居民死亡医学证明与死亡统计",
+    sources: [],
+    metrics: {},
+    causeRanking: [],
+    regionStats: [],
+    workflowRules: [],
+    dataSharing: []
   };
 }
 

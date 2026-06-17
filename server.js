@@ -14,7 +14,7 @@ const DEMO_PASSWORD = "123456";
 const sessions = new Map();
 let sqliteModule = null;
 let sqliteError = null;
-const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals"]);
+const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals", "deathCertificates"]);
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -117,6 +117,9 @@ function seedState() {
     ],
     medicalResources: seedMedicalResources(),
     healthStatistics: seedHealthStatistics(),
+    deathCertificates: seedDeathCertificates(),
+    deathCertificateForms: seedDeathCertificateForms(),
+    deathStatistics: seedDeathStatistics(),
     healthBulletin2024: seedHealthBulletin2024(),
     dalianHealthStatistics2025: seedDalianHealthStatistics2025(),
     healthStatisticsIngestion: seedHealthStatisticsIngestion(),
@@ -131,7 +134,9 @@ function seedState() {
     securityEvents: seedSecurityEvents(),
     digitalCredentials: seedDigitalCredentials(),
     healthArchiveStandard: seedHealthArchiveStandard(),
+    authOrganizations: seedAuthOrganizations(),
     authUsers: seedAuthUsers(),
+    interfaceRequirements: seedInterfaceRequirements(),
     countyConsortium: seedCountyConsortium(),
     referralSystem: seedReferralSystem(),
     platformRoadmap: seedPlatformRoadmap(),
@@ -259,11 +264,41 @@ function seedReferralSystem() {
 
 function seedAuthUsers() {
   return [
-    { id: "u1", username: "whjw", name: "卫健委管理员", role: "commission", roleName: "卫生健康委端", home: "index.html", status: "启用" },
-    { id: "u2", username: "doctor", name: "刘医生", role: "institution", roleName: "医疗机构端", home: "institution.html", status: "启用" },
-    { id: "u3", username: "insurance", name: "医保审核员", role: "insurance", roleName: "医保端", home: "insurance.html", status: "启用" },
-    { id: "u4", username: "citizen", name: "演示居民A", role: "citizen", roleName: "个人端", home: "citizen.html", residentId: "r1", accountId: "a1", status: "启用" },
-    { id: "u5", username: "county", name: "医共体办公室", role: "county", roleName: "县域医共体平台", home: "county.html", status: "启用" }
+    { id: "u-city", username: "city", name: "市级管理员", role: "commission", roleName: "市级健康城市管理", orgCode: "ORG-CITY-DL", orgName: "大连市健康城市平台", orgType: "city", orgLevel: "市级", dataScope: "全市", home: "workbench.html", status: "启用" },
+    { id: "u-district", username: "district", name: "区市县管理员", role: "commission", roleName: "区市县管理端", orgCode: "ORG-DIST-ZS", orgName: "中山区健康城市平台", orgType: "district", orgLevel: "区市县", dataScope: "中山区", home: "workbench.html", status: "启用" },
+    { id: "u-health", username: "health", name: "卫健行政管理员", role: "commission", roleName: "卫生健康行政部门", orgCode: "ORG-HEALTH-DL", orgName: "大连市卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "卫生健康行政管理", home: "index.html", status: "启用" },
+    { id: "u-mi", username: "mi", name: "医保局管理员", role: "insurance", roleName: "医保局管理端", orgCode: "ORG-MI-DL", orgName: "大连市医保局", orgType: "insurance_bureau", orgLevel: "市级", dataScope: "医保结算与基金监管", home: "insurance.html", status: "启用" },
+    { id: "u-hospital", username: "hospital", name: "医疗机构管理员", role: "institution", roleName: "医疗机构端", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构", home: "institution.html", status: "启用" },
+    { id: "u-community", username: "community", name: "基层机构管理员", role: "institution", roleName: "基层医疗机构端", orgCode: "MR3", orgName: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", dataScope: "本机构与签约居民", home: "institution.html", status: "启用" },
+    { id: "u1", username: "whjw", name: "卫健委管理员", role: "commission", roleName: "卫生健康委端", orgCode: "ORG-HEALTH-DL", orgName: "大连市卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "全市", home: "index.html", status: "启用" },
+    { id: "u2", username: "doctor", name: "刘医生", role: "institution", roleName: "医疗机构端", orgCode: "MR3", orgName: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", dataScope: "签约居民", home: "institution.html", status: "启用" },
+    { id: "u3", username: "insurance", name: "医保审核员", role: "insurance", roleName: "医保端", orgCode: "ORG-MI-DL", orgName: "大连市医保局", orgType: "insurance_bureau", orgLevel: "市级", dataScope: "医保审核", home: "insurance.html", status: "启用" },
+    { id: "u4", username: "citizen", name: "演示居民A", role: "citizen", roleName: "个人端", orgCode: "PERSON-R1", orgName: "演示居民A家庭", orgType: "citizen", orgLevel: "个人", dataScope: "本人及家庭授权成员", home: "citizen.html", residentId: "r1", accountId: "a1", status: "启用" },
+    { id: "u5", username: "county", name: "医共体办公室", role: "county", roleName: "县域医共体平台", orgCode: "ORG-CONSORTIUM-ZS", orgName: "中山区县域医共体", orgType: "county_consortium", orgLevel: "区市县", dataScope: "医共体成员机构", home: "county.html", status: "启用" }
+  ];
+}
+
+function seedAuthOrganizations() {
+  return [
+    { orgCode: "ORG-CITY-DL", name: "大连市健康城市平台", orgType: "city", orgLevel: "市级", parentCode: "", portal: "workbench.html", dataScope: "全市总览、跨部门协同、运行监测", interfaces: ["统一认证", "人口主索引", "城市运行指标"] },
+    { orgCode: "ORG-DIST-ZS", name: "中山区健康城市平台", orgType: "district", orgLevel: "区市县", parentCode: "ORG-CITY-DL", portal: "workbench.html", dataScope: "本区市县居民、机构、公共卫生和慢病管理", interfaces: ["区县数据交换", "基层治理平台"] },
+    { orgCode: "ORG-HEALTH-DL", name: "大连市卫生健康委", orgType: "health_admin", orgLevel: "市级", parentCode: "ORG-CITY-DL", portal: "index.html", dataScope: "医疗资源、统计直报、公共卫生、分级诊疗监管", interfaces: ["卫生健康统计直报", "全民健康信息平台", "电子病历共享"] },
+    { orgCode: "ORG-MI-DL", name: "大连市医保局", orgType: "insurance_bureau", orgLevel: "市级", parentCode: "ORG-CITY-DL", portal: "insurance.html", dataScope: "医保结算、基金监管、慢病待遇和电子凭证", interfaces: ["医保结算", "医保电子凭证", "基金监管"] },
+    { orgCode: "MR1", name: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", parentCode: "ORG-HEALTH-DL", portal: "institution.html", dataScope: "本机构诊疗、转诊接诊、病历与检查检验", interfaces: ["HIS", "EMR", "LIS", "PACS", "住院管理"] },
+    { orgCode: "MR3", name: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", parentCode: "ORG-DIST-ZS", portal: "institution.html", dataScope: "签约居民、慢病随访、长期处方、固定取药", interfaces: ["基层医疗", "公卫", "家医签约"] }
+  ];
+}
+
+function seedInterfaceRequirements() {
+  return [
+    { id: "ir-auth", domain: "统一认证", keepExisting: "保留 /api/auth/login、/api/auth/me、/api/auth/logout 和 Bearer token 机制", need: "对接政务统一身份认证、机构账号目录、医保电子凭证、电子健康码或短信/CA/人脸核验", owner: "市级平台", priority: "P0", status: "待对接" },
+    { id: "ir-org", domain: "组织机构目录", keepExisting: "保留 authUsers、authOrganizations、medicalResources 的 orgCode/institutionId 映射", need: "接入市、区市县、卫健行政部门、医保局、医疗机构统一社会信用代码和机构编码", owner: "卫健行政部门", priority: "P0", status: "已建模" },
+    { id: "ir-person", domain: "居民主索引", keepExisting: "保留 personIndex=身份证号#手机号 的演示索引和 personalRecords API", need: "对接人口库、电子健康码、居民健康档案主索引，支持身份证、手机号、电子健康卡号多键匹配", owner: "市级平台", priority: "P0", status: "待对接" },
+    { id: "ir-emr", domain: "电子病历与检查检验", keepExisting: "保留 personalRecords、健康档案/电子病历时间线和居民授权机制", need: "对接医疗机构 HIS/EMR/LIS/PACS，支持文档索引、检查检验互认、病历摘要、用药处方和授权访问审计", owner: "各医疗机构", priority: "P1", status: "待对接" },
+    { id: "ir-death", domain: "死亡医学证明与死亡统计", keepExisting: "保留 deathCertificates、deathCertificateForms、deathStatistics 和 /api/death-certificates", need: "对接人口死亡信息登记系统、电子证照平台、疾控死因监测、公安户籍注销和民政殡葬服务共享", owner: "医疗机构/卫生健康行政部门", priority: "P1", status: "已建模" },
+    { id: "ir-stat", domain: "卫生健康统计", keepExisting: "保留 healthStatistics、dalianHealthStatistics2025、healthStatisticsIngestion 和 /api/health-statistics/import-jobs", need: "对接国家卫生统计信息网络直报系统、机构资源月报年报、服务量和住院量数据导入", owner: "卫生健康行政部门", priority: "P1", status: "进行中" },
+    { id: "ir-mi", domain: "医保结算监管", keepExisting: "保留 insuranceClaims、institutionSupervisions、medicationPickups 和 /api/workflow-actions", need: "对接医保结算、医保电子凭证、慢病待遇、基金监管和支付审核规则", owner: "医保局", priority: "P1", status: "待对接" },
+    { id: "ir-workflow", domain: "跨端业务闭环", keepExisting: "保留 /api/workflow-actions 更新转诊、取药、随访、医保审核等状态", need: "形成跨系统消息通知、状态回调、幂等业务单号、失败重试和全链路审计", owner: "市级平台", priority: "P1", status: "进行中" }
   ];
 }
 
@@ -460,6 +495,206 @@ function seedHealthStatistics() {
       { rule: "资源口径一致", detail: "床位、执业医生、注册护士以机构接口与统计直报系统双源比对，差异超过 1% 标记复核。", status: "已配置" },
       { rule: "诊疗量完整", detail: "门急诊、入院、出院、实际占用总床日按月汇总，缺报或异常波动进入质量清单。", status: "已配置" },
       { rule: "报送责任留痕", detail: "按机构、周期、来源记录采集状态和复核状态，支持卫健委端追踪。", status: "已配置" }
+    ]
+  };
+}
+
+function seedDeathCertificates() {
+  return [
+    {
+      id: "death-cert-001",
+      certificateNo: "DC-210202-20260612001",
+      residentId: "r4",
+      deceasedName: "演示居民D",
+      gender: "女",
+      age: 61,
+      documentType: "居民身份证",
+      documentNo: "DEMO-ID-R4",
+      deathDateTime: "2026-06-12 07:30",
+      deathPlace: "家中",
+      deathPlaceCode: "3",
+      deathType: "正常死亡",
+      deathReasonType: "非传染病",
+      immediateCause: "心力衰竭",
+      antecedentCause: "高血压性心脏病",
+      underlyingCause: "高血压病",
+      otherCondition: "2型糖尿病",
+      icd10: "I11.9",
+      causeCategory: "循环系统疾病",
+      diagnosisBasis: "临床+理化",
+      highestDiagnosisUnit: "社区卫生服务中心",
+      issuingInstitutionId: "mr3",
+      issuingInstitution: "青泥洼桥社区卫生服务中心",
+      issuingPhysician: "刘医生",
+      applicantName: "演示家属A",
+      applicantRelation: "子女",
+      applicantPhone: "DEMO-MOBILE-R1",
+      applicationType: "近亲属申领",
+      materials: ["电子证照", "纸质版", "申报单"],
+      certificateForm: "电子证照+纸质版",
+      status: "已签发",
+      electronicLicenseStatus: "已生成",
+      reportChannel: "人口死亡信息登记系统",
+      cdcReportStatus: "已上报",
+      nationalPlatformStatus: "待同步",
+      publicSecuritySync: "待共享",
+      civilAffairsSync: "待共享",
+      qualityCheck: "通过",
+      issueDeadline: "死亡或申报后 1 日内",
+      reportDeadline: "签发后 15 个工作日内",
+      electronicReportDeadline: "电子证照 5 个工作日内上报国家平台",
+      lastUpdated: "2026-06-12T10:30:00.000Z"
+    },
+    {
+      id: "death-cert-002",
+      certificateNo: "DC-210211-20260615001",
+      residentId: "r3",
+      deceasedName: "演示居民C",
+      gender: "男",
+      age: 37,
+      documentType: "居民身份证",
+      documentNo: "DEMO-ID-R3",
+      deathDateTime: "2026-06-15 21:20",
+      deathPlace: "医疗卫生机构",
+      deathPlaceCode: "1",
+      deathType: "正常死亡",
+      deathReasonType: "传染病",
+      immediateCause: "重症肺炎",
+      antecedentCause: "呼吸衰竭",
+      underlyingCause: "病毒性肺炎",
+      otherCondition: "无",
+      icd10: "J12.9",
+      causeCategory: "呼吸系统疾病",
+      diagnosisBasis: "临床+理化",
+      highestDiagnosisUnit: "三级医院",
+      issuingInstitutionId: "mr1",
+      issuingInstitution: "大连市中心医院",
+      issuingPhysician: "王医生",
+      applicantName: "演示家属C",
+      applicantRelation: "配偶",
+      applicantPhone: "DEMO-MOBILE-R3",
+      applicationType: "近亲属申领",
+      materials: ["电子证照", "纸质版"],
+      certificateForm: "电子证照",
+      status: "待上报",
+      electronicLicenseStatus: "待生成",
+      reportChannel: "省级全民健康信息平台",
+      cdcReportStatus: "待上报",
+      nationalPlatformStatus: "待提交",
+      publicSecuritySync: "待共享",
+      civilAffairsSync: "待共享",
+      qualityCheck: "待复核",
+      issueDeadline: "死亡或申报后 1 日内",
+      reportDeadline: "签发后 15 个工作日内",
+      electronicReportDeadline: "电子证照 5 个工作日内上报国家平台",
+      lastUpdated: "2026-06-16T09:10:00.000Z"
+    },
+    {
+      id: "death-cert-003",
+      certificateNo: "DC-210204-20260616001",
+      residentId: "r1",
+      deceasedName: "演示居民A",
+      gender: "男",
+      age: 58,
+      documentType: "居民身份证",
+      documentNo: "DEMO-ID-R1",
+      deathDateTime: "2026-06-16 05:40",
+      deathPlace: "民政服务机构",
+      deathPlaceCode: "4",
+      deathType: "正常死亡",
+      deathReasonType: "老死",
+      immediateCause: "多器官功能衰竭",
+      antecedentCause: "慢性阻塞性肺疾病",
+      underlyingCause: "慢性病长期进展",
+      otherCondition: "高血压",
+      icd10: "J44.9",
+      causeCategory: "呼吸系统疾病",
+      diagnosisBasis: "死后推断",
+      highestDiagnosisUnit: "社区卫生服务中心",
+      issuingInstitutionId: "mr4",
+      issuingInstitution: "星海湾社区卫生服务中心",
+      issuingPhysician: "赵医生",
+      applicantName: "演示受托人",
+      applicantRelation: "受委托人",
+      applicantPhone: "DEMO-MOBILE-R2",
+      applicationType: "委托办理",
+      materials: ["纸质版", "委托书", "申报单"],
+      certificateForm: "纸质版",
+      status: "待签发",
+      electronicLicenseStatus: "不适用",
+      reportChannel: "人口死亡信息登记系统",
+      cdcReportStatus: "未上报",
+      nationalPlatformStatus: "不适用",
+      publicSecuritySync: "未共享",
+      civilAffairsSync: "未共享",
+      qualityCheck: "待补正",
+      issueDeadline: "申报后 1 日内",
+      reportDeadline: "签发后 15 个工作日内",
+      electronicReportDeadline: "如生成电子证照，5 个工作日内上报国家平台",
+      lastUpdated: "2026-06-16T11:20:00.000Z"
+    }
+  ];
+}
+
+function seedDeathCertificateForms() {
+  return [
+    { id: "death-form-electronic", name: "居民死亡医学证明（电子证照）", sourceFile: "1.居民死亡医学证明（电子证照）-20260227100657821.pdf", scope: "电子证照签发、电子章、国家平台共享", keyFields: ["逝者身份", "死亡日期地点", "死亡原因", "死因编码", "近亲属", "医疗卫生机构", "医师签名"], status: "已建模" },
+    { id: "death-form-paper", name: "居民死亡医学证明（纸质版）", sourceFile: "2.居民死亡医学证明（纸质版）.pdf", scope: "医疗卫生机构存根、公安部门保存、近亲属保存、殡葬服务", keyFields: ["死因链", "死亡调查记录", "公安签章", "殡葬服务电话"], status: "已建模" },
+    { id: "death-form-auth", name: "居民死亡医学证明办理委托书", sourceFile: "3.居民死亡医学证明办理委托书.pdf", scope: "近亲属委托他人申领、补办或办理其他事项", keyFields: ["委托人", "被委托人", "逝者", "委托事项", "家族病史和生前疾病史"], status: "已建模" },
+    { id: "death-form-application", name: "居民死亡医学证明申报单", sourceFile: "4.居民死亡医学证明申报单.pdf", scope: "在家、民政服务机构或其他场所正常死亡申报", keyFields: ["逝者信息", "死亡地点", "初步死因判断", "申办人承诺"], status: "已建模" }
+  ];
+}
+
+function seedDeathStatistics() {
+  return {
+    period: "2026-06",
+    title: "居民死亡医学证明与死亡统计",
+    policyBasis: "依据居民死亡医学证明信息登记和电子证照管理要求，医疗机构签发证明，死亡登记信息汇入人口死亡信息登记系统，并向卫健委统计模块形成死因与时效质量分析。",
+    sources: [
+      { id: "death-cert", name: "医疗机构死亡医学证明系统", scope: "个案登记、签发、材料、医师、死因编码", status: "已接入" },
+      { id: "death-registry", name: "人口死亡信息登记系统", scope: "签发后 15 个工作日内报告纸质证明信息", status: "待接口" },
+      { id: "health-platform", name: "省级全民健康信息平台/国家智慧健康平台", scope: "电子证照 5 个工作日内上报", status: "待接口" },
+      { id: "public-security-civil", name: "公安与民政共享", scope: "户籍注销、殡葬服务和政府服务共享", status: "待共享" }
+    ],
+    metrics: {
+      total: 3,
+      signed: 2,
+      reported: 1,
+      electronicLicenses: 1,
+      paperCertificates: 2,
+      pending: 2,
+      overdue: 0,
+      homeOrOtherPlace: 2,
+      institutionDeaths: 1,
+      normalDeaths: 3,
+      abnormalDeaths: 0,
+      qualityPass: 1
+    },
+    causeRanking: [
+      { cause: "呼吸系统疾病", icd10Range: "J00-J99", deaths: 2, share: "66.7%", trend: "需关注" },
+      { cause: "循环系统疾病", icd10Range: "I00-I99", deaths: 1, share: "33.3%", trend: "稳定" }
+    ],
+    regionStats: [
+      { region: "中山区", deaths: 1, crudeMortality: "演示口径", reportedRate: "100%", overdue: 0 },
+      { region: "沙河口区", deaths: 1, crudeMortality: "演示口径", reportedRate: "0%", overdue: 0 },
+      { region: "甘井子区", deaths: 1, crudeMortality: "演示口径", reportedRate: "0%", overdue: 0 }
+    ],
+    workflowRules: [
+      { rule: "明确死因的正常死亡", deadline: "死亡或申报后 1 日内签发", owner: "负责救治或调查的医疗卫生机构", status: "已配置" },
+      { rule: "纸质证明信息报告", deadline: "签发后 15 个工作日内报告第一联信息", owner: "签发医疗机构", status: "已配置" },
+      { rule: "无网络离线上报", deadline: "医疗机构 10 个工作日内送县区疾控，疾控 5 个工作日内代报", owner: "医疗机构/疾控机构", status: "已配置" },
+      { rule: "电子证照上报", deadline: "5 个工作日内通过省级平台报送国家智慧健康平台", owner: "省级平台/医疗机构", status: "待接口" }
+    ],
+    dataSharing: [
+      { target: "卫生健康委统计模块", data: "死亡证明个案、死因分类、地区汇总、时效质量", status: "已贯通" },
+      { target: "疾控机构", data: "人口死亡信息、死因链、ICD 编码", status: "待接口" },
+      { target: "公安部门", data: "户籍注销所需证明联与共享状态", status: "待共享" },
+      { target: "民政部门", data: "殡葬服务和政府服务共享状态", status: "待共享" }
+    ],
+    qualityRules: [
+      { rule: "身份唯一索引", detail: "以身份证号和手机号生成 personIndex；无有效证件时预留机构代码+年度序号规则。", status: "已纳入" },
+      { rule: "死因编码质控", detail: "区分直接死因、引起死因、根本死因和 ICD-10 编码，异常或无法判断进入复核。", status: "已纳入" },
+      { rule: "用途限制", detail: "死亡信息仅用于人口管理、统计分析和政府服务，禁止超范围使用和泄露隐私。", status: "已纳入" }
     ]
   };
 }
@@ -964,6 +1199,9 @@ function normalizeState(data) {
     followups: Array.isArray(data.followups) ? data.followups : [],
     medicalResources: Array.isArray(data.medicalResources) ? data.medicalResources : seedMedicalResources(),
     healthStatistics: data.healthStatistics && typeof data.healthStatistics === "object" ? data.healthStatistics : seedHealthStatistics(),
+    deathCertificates: mergeByKey(seedDeathCertificates(), data.deathCertificates, "id"),
+    deathCertificateForms: mergeByKey(seedDeathCertificateForms(), data.deathCertificateForms, "id"),
+    deathStatistics: data.deathStatistics && typeof data.deathStatistics === "object" ? data.deathStatistics : seedDeathStatistics(),
     healthBulletin2024: data.healthBulletin2024 && typeof data.healthBulletin2024 === "object" ? data.healthBulletin2024 : seedHealthBulletin2024(),
     dalianHealthStatistics2025: data.dalianHealthStatistics2025 && typeof data.dalianHealthStatistics2025 === "object" ? data.dalianHealthStatistics2025 : seedDalianHealthStatistics2025(),
     healthStatisticsIngestion: data.healthStatisticsIngestion && typeof data.healthStatisticsIngestion === "object" ? data.healthStatisticsIngestion : seedHealthStatisticsIngestion(),
@@ -978,12 +1216,15 @@ function normalizeState(data) {
     securityEvents: Array.isArray(data.securityEvents) ? data.securityEvents : seedSecurityEvents(),
     digitalCredentials: Array.isArray(data.digitalCredentials) ? data.digitalCredentials : seedDigitalCredentials(),
     healthArchiveStandard: data.healthArchiveStandard && typeof data.healthArchiveStandard === "object" ? data.healthArchiveStandard : seedHealthArchiveStandard(),
-    authUsers: Array.isArray(data.authUsers) ? data.authUsers : seedAuthUsers(),
+    authOrganizations: mergeByKey(seedAuthOrganizations(), data.authOrganizations, "orgCode"),
+    authUsers: mergeByKey(seedAuthUsers(), data.authUsers, "username"),
+    interfaceRequirements: mergeByKey(seedInterfaceRequirements(), data.interfaceRequirements, "id"),
     countyConsortium: data.countyConsortium && typeof data.countyConsortium === "object" ? data.countyConsortium : seedCountyConsortium(),
     referralSystem: data.referralSystem && typeof data.referralSystem === "object" ? data.referralSystem : seedReferralSystem(),
     platformRoadmap: Array.isArray(data.platformRoadmap) ? data.platformRoadmap : seedPlatformRoadmap(),
     personalRecords: Array.isArray(data.personalRecords) ? data.personalRecords : seedPersonalRecords()
   };
+  refreshDeathStatistics(state);
   return normalizePersonIndexes(state);
 }
 
@@ -1007,6 +1248,127 @@ function normalizePersonalRecord(data) {
   };
 }
 
+function normalizeDeathCertificate(payload, user, state) {
+  const residentId = String(payload.residentId || "").trim();
+  if (!residentId) throw new Error("residentId 不能为空");
+  const resident = (state.residents || []).find((item) => item.id === residentId);
+  const now = new Date().toISOString();
+  const residentMap = new Map((state.residents || []).map((item) => [item.id, item]));
+  return {
+    id: payload.id || `death-cert-${randomUUID()}`,
+    certificateNo: String(payload.certificateNo || `DC-${Date.now()}`).trim(),
+    residentId,
+    personIndex: payload.personIndex || personIndexForResident(residentMap, residentId),
+    deceasedName: String(payload.deceasedName || resident?.name || "未命名逝者").trim(),
+    gender: String(payload.gender || resident?.gender || "").trim(),
+    age: Number(payload.age || (resident?.birthDate ? ageFromBirthDate(resident.birthDate) : 0)),
+    documentType: String(payload.documentType || "居民身份证").trim(),
+    documentNo: String(payload.documentNo || resident?.idCard || "").trim(),
+    deathDateTime: String(payload.deathDateTime || new Date().toLocaleString("zh-CN", { hour12: false })).trim(),
+    deathPlace: String(payload.deathPlace || "医疗卫生机构").trim(),
+    deathPlaceCode: String(payload.deathPlaceCode || "").trim(),
+    deathType: String(payload.deathType || "正常死亡").trim(),
+    deathReasonType: String(payload.deathReasonType || "非传染病").trim(),
+    immediateCause: String(payload.immediateCause || "").trim(),
+    antecedentCause: String(payload.antecedentCause || "").trim(),
+    underlyingCause: String(payload.underlyingCause || "").trim(),
+    otherCondition: String(payload.otherCondition || "").trim(),
+    icd10: String(payload.icd10 || "").trim(),
+    causeCategory: String(payload.causeCategory || "待编码").trim(),
+    diagnosisBasis: String(payload.diagnosisBasis || "待确认").trim(),
+    highestDiagnosisUnit: String(payload.highestDiagnosisUnit || "待确认").trim(),
+    issuingInstitutionId: String(payload.issuingInstitutionId || user?.orgCode || "").trim(),
+    issuingInstitution: String(payload.issuingInstitution || user?.orgName || "").trim(),
+    issuingPhysician: String(payload.issuingPhysician || user?.name || "").trim(),
+    applicantName: String(payload.applicantName || "").trim(),
+    applicantRelation: String(payload.applicantRelation || "").trim(),
+    applicantPhone: String(payload.applicantPhone || "").trim(),
+    applicationType: String(payload.applicationType || "近亲属申领").trim(),
+    materials: Array.isArray(payload.materials) ? payload.materials.map(String) : [],
+    certificateForm: String(payload.certificateForm || "电子证照+纸质版").trim(),
+    status: String(payload.status || "待签发").trim(),
+    electronicLicenseStatus: String(payload.electronicLicenseStatus || "待生成").trim(),
+    reportChannel: String(payload.reportChannel || "人口死亡信息登记系统").trim(),
+    cdcReportStatus: String(payload.cdcReportStatus || "未上报").trim(),
+    nationalPlatformStatus: String(payload.nationalPlatformStatus || "待提交").trim(),
+    publicSecuritySync: String(payload.publicSecuritySync || "未共享").trim(),
+    civilAffairsSync: String(payload.civilAffairsSync || "未共享").trim(),
+    qualityCheck: String(payload.qualityCheck || "待复核").trim(),
+    issueDeadline: String(payload.issueDeadline || "死亡或申报后 1 日内").trim(),
+    reportDeadline: String(payload.reportDeadline || "签发后 15 个工作日内").trim(),
+    electronicReportDeadline: String(payload.electronicReportDeadline || "电子证照 5 个工作日内上报国家平台").trim(),
+    createdBy: user?.username || user?.role || "system",
+    createdByName: user?.name || "",
+    createdAt: now,
+    lastUpdated: now
+  };
+}
+
+function ageFromBirthDate(birthDate) {
+  const birth = new Date(birthDate);
+  if (Number.isNaN(birth.getTime())) return 0;
+  const now = new Date();
+  let age = now.getFullYear() - birth.getFullYear();
+  const monthDiff = now.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) age -= 1;
+  return age;
+}
+
+function refreshDeathStatistics(state) {
+  const records = Array.isArray(state.deathCertificates) ? state.deathCertificates : [];
+  const base = state.deathStatistics && typeof state.deathStatistics === "object" ? state.deathStatistics : seedDeathStatistics();
+  const resources = new Map((state.medicalResources || []).map((item) => [String(item.id || "").toLowerCase(), item]));
+  const residents = new Map((state.residents || []).map((item) => [item.id, item]));
+  const causeCounts = new Map();
+  const regionCounts = new Map();
+  records.forEach((item) => {
+    const cause = item.causeCategory || "未编码";
+    causeCounts.set(cause, (causeCounts.get(cause) || 0) + 1);
+    const resource = resources.get(String(item.issuingInstitutionId || "").toLowerCase());
+    const resident = residents.get(item.residentId);
+    const region = resource?.region || resident?.organization || "未明确地区";
+    const current = regionCounts.get(region) || { deaths: 0, reported: 0, overdue: 0 };
+    current.deaths += 1;
+    if (String(item.cdcReportStatus || "").includes("已上报")) current.reported += 1;
+    if (String(item.status || "").includes("逾期")) current.overdue += 1;
+    regionCounts.set(region, current);
+  });
+  const total = records.length;
+  state.deathStatistics = {
+    ...base,
+    metrics: {
+      total,
+      signed: records.filter((item) => ["已签发", "已上报"].includes(item.status)).length,
+      reported: records.filter((item) => String(item.cdcReportStatus || "").includes("已上报")).length,
+      electronicLicenses: records.filter((item) => String(item.electronicLicenseStatus || "").includes("已生成")).length,
+      paperCertificates: records.filter((item) => String(item.certificateForm || "").includes("纸质")).length,
+      pending: records.filter((item) => ["待签发", "待上报"].includes(item.status)).length,
+      overdue: records.filter((item) => String(item.status || "").includes("逾期")).length,
+      homeOrOtherPlace: records.filter((item) => !["医疗卫生机构", "来院途中"].includes(item.deathPlace)).length,
+      institutionDeaths: records.filter((item) => ["医疗卫生机构", "来院途中"].includes(item.deathPlace)).length,
+      normalDeaths: records.filter((item) => item.deathType !== "非正常死亡").length,
+      abnormalDeaths: records.filter((item) => item.deathType === "非正常死亡").length,
+      qualityPass: records.filter((item) => item.qualityCheck === "通过").length
+    },
+    causeRanking: [...causeCounts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([cause, deaths]) => ({
+        cause,
+        icd10Range: records.find((item) => item.causeCategory === cause)?.icd10 || "待编码",
+        deaths,
+        share: total ? `${((deaths / total) * 100).toFixed(1)}%` : "0.0%",
+        trend: deaths >= 2 ? "需关注" : "稳定"
+      })),
+    regionStats: [...regionCounts.entries()].map(([region, item]) => ({
+      region,
+      deaths: item.deaths,
+      crudeMortality: "演示口径",
+      reportedRate: item.deaths ? `${Math.round((item.reported / item.deaths) * 100)}%` : "0%",
+      overdue: item.overdue
+    }))
+  };
+}
+
 function normalizePersonIndexes(state) {
   const residents = Array.isArray(state.residents) ? state.residents : [];
   residents.forEach((resident) => {
@@ -1014,7 +1376,7 @@ function normalizePersonIndexes(state) {
     resident.identityIndex = resident.personIndex;
   });
   const residentMap = new Map(residents.map((resident) => [resident.id, resident]));
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates"].forEach((key) => {
     (Array.isArray(state[key]) ? state[key] : []).forEach((item) => {
       item.personIndex = item.personIndex || personIndexForResident(residentMap, item.residentId);
     });
@@ -1031,6 +1393,16 @@ function normalizePersonIndexes(state) {
     });
   });
   return state;
+}
+
+function mergeByKey(defaultRows, currentRows, key) {
+  const merged = new Map();
+  (Array.isArray(defaultRows) ? defaultRows : []).forEach((item) => merged.set(item[key], item));
+  (Array.isArray(currentRows) ? currentRows : []).forEach((item) => {
+    if (!item?.[key]) return;
+    merged.set(item[key], { ...(merged.get(item[key]) || {}), ...item });
+  });
+  return [...merged.values()];
 }
 
 function personIndexFromParts(idCard, phone) {
@@ -1291,6 +1663,57 @@ async function handleApi(req, res) {
     ].slice(0, 120);
     writeDatabase(data);
     sendJson(res, 201, job);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/death-certificates") {
+    const user = requireApiRole(req, res, ["institution", "commission"], "/api/death-certificates");
+    if (!user) return;
+    const data = readDatabase();
+    const residentId = url.searchParams.get("residentId");
+    if (!canAccessResident(user, residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "访问死亡医学证明", target: residentId || "all", result: "拒绝", detail: "超出居民授权范围" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权访问该居民死亡证明" });
+      return;
+    }
+    const certificates = (data.deathCertificates || []).filter((item) => !residentId || item.residentId === residentId);
+    sendJson(res, 200, { certificates, statistics: data.deathStatistics, forms: data.deathCertificateForms });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/death-certificates") {
+    const user = requireApiRole(req, res, ["institution", "commission"], "/api/death-certificates");
+    if (!user) return;
+    const data = readDatabase();
+    let certificate;
+    try {
+      certificate = normalizeDeathCertificate(await collectJson(req), user, data);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    if (!canAccessResident(user, certificate.residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "登记死亡医学证明", target: certificate.residentId, result: "拒绝", detail: "超出居民授权范围" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权登记该居民死亡证明" });
+      return;
+    }
+    data.deathCertificates = [certificate, ...(Array.isArray(data.deathCertificates) ? data.deathCertificates : [])].slice(0, 200);
+    refreshDeathStatistics(data);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "登记死亡医学证明",
+        target: certificate.certificateNo,
+        result: "允许",
+        detail: `${certificate.deceasedName} · ${certificate.deathReasonType} · ${certificate.reportChannel}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(normalizeState(data));
+    sendJson(res, 201, certificate);
     return;
   }
 

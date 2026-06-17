@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>登录 · 健康城市四端协同系统</title>
+    <title>登录 · 健康城市协同系统</title>
     <link rel="stylesheet" href="./portal.css" />
   </head>
   <body data-auth-page="login">
@@ -11,12 +11,12 @@
       <section class="login-layout">
         <article class="login-intro">
           <span>健康城市统一认证</span>
-          <h1>按角色进入四端协同系统</h1>
-          <p>本地服务运行时，登录会签发后端会话令牌并写入安全审计；静态预览时自动降级为前端演示会话。真实部署可继续接入政务统一身份认证、电子健康码、医保电子凭证、短信验证和人脸核验。</p>
+          <h1>按组织和角色进入协同系统</h1>
+          <p>本地服务运行时，登录会签发后端会话令牌并写入安全审计；静态预览时自动降级为前端演示会话。真实部署可继续接入政务统一身份认证、电子健康码、医保电子凭证、短信验证、CA 证书和人脸核验。</p>
           <div class="login-flow">
             <div><strong>1</strong><span>身份识别</span></div>
-            <div><strong>2</strong><span>角色授权</span></div>
-            <div><strong>3</strong><span>接口校验</span></div>
+            <div><strong>2</strong><span>组织定位</span></div>
+            <div><strong>3</strong><span>角色授权</span></div>
             <div><strong>4</strong><span>访问留痕</span></div>
           </div>
         </article>
@@ -45,10 +45,10 @@
     <script>
       const select = document.querySelector("#login-user");
       const accounts = window.HealthCityAuth.demoUsers;
-      select.innerHTML = accounts.map((user) => `<option value="${user.username}">${user.roleName} · ${user.name} · ${user.username}</option>`).join("");
+      select.innerHTML = accounts.map((user) => `<option value="${user.username}">${user.roleName} · ${user.orgName || user.name} · ${user.username}</option>`).join("");
       document.querySelector("#demo-accounts").innerHTML = accounts.map((user) => `<button type="button" data-user="${user.username}">
         <strong>${user.roleName}</strong>
-        <span>${user.username} / 123456</span>
+        <span>${user.orgName || user.name}<br>${user.username} / 123456<br>${user.dataScope || ""}</span>
       </button>`).join("");
       document.querySelectorAll("[data-user]").forEach((button) => {
         button.addEventListener("click", () => {

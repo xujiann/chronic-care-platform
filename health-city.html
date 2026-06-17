@@ -69,7 +69,7 @@
             </a>
             <a class="capability-card" href="./institution.html">
               <strong>医疗机构端</strong>
-              <span>协同任务、授权健康档案、医保贯通提示、固定取药协同。</span>
+              <span>协同任务、授权健康档案、医保贯通提示、固定取药协同、居民死亡医学证明办理。</span>
             </a>
             <a class="capability-card" href="./insurance.html">
               <strong>医保端</strong>
@@ -145,6 +145,9 @@
           <div><strong>personalRecords</strong><span>个人健康信息库</span></div>
           <div><strong>medicalResources</strong><span>医疗资源监管数据</span></div>
           <div><strong>healthStatistics</strong><span>卫生健康统计资源、诊疗量、住院量和直报对账数据</span></div>
+          <div><strong>deathCertificates</strong><span>居民死亡医学证明个案、签发、上报、材料和共享状态</span></div>
+          <div><strong>deathCertificateForms</strong><span>电子证照、纸质版、委托书、申报单模板字段</span></div>
+          <div><strong>deathStatistics</strong><span>死亡统计、死因排名、地区汇总、时效质控和共享去向</span></div>
           <div><strong>healthBulletin2024</strong><span>2024 年卫生健康事业发展统计公报可视化数据</span></div>
           <div><strong>dalianHealthStatistics2025</strong><span>2025 年大连市卫生健康统计提要与国家公报对比数据</span></div>
           <div><strong>healthStatisticsIngestion</strong><span>统计报表导入、直报系统接口、质控入库和发布留痕流程</span></div>
@@ -159,8 +162,28 @@
           <div><strong>emergencySignals</strong><span>公共卫生应急多点触发预警</span></div>
           <div><strong>seniorServices</strong><span>适老化与家属代办服务</span></div>
           <div><strong>dataAccessLogs</strong><span>个人健康信息访问审计</span></div>
+          <div><strong>authOrganizations</strong><span>市、区市县、卫健行政部门、医保局和医疗机构组织登录目录</span></div>
+          <div><strong>authUsers</strong><span>组织账号、角色权限、入口页面和数据范围</span></div>
+          <div><strong>interfaceRequirements</strong><span>保留原有系统接口和未来对接接口需求清单</span></div>
           <div><strong>securityEvents</strong><span>登录、退出、接口拒绝和敏感操作安全事件</span></div>
           <div><strong>digitalCredentials</strong><span>电子健康码、医保电子凭证、居民一卡通</span></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>组织登录与接口需求</h2>
+          <span>保留现有前后端接口，逐步对接真实业务系统</span>
+        </div>
+        <div class="model-grid">
+          <div><strong>市级平台</strong><span>账号 city，进入总控台，查看全市运行、跨部门协同和系统建设路线图。</span></div>
+          <div><strong>区市县平台</strong><span>账号 district，进入总控台，按区市县管理居民、机构、公卫和基层服务。</span></div>
+          <div><strong>卫生健康行政部门</strong><span>账号 health，进入卫健委端，管理医疗资源、统计直报、公共卫生、分级诊疗和数据质量。</span></div>
+          <div><strong>医保局</strong><span>账号 mi，进入医保端，管理医保结算、基金监管、慢病待遇、固定取药审核和电子凭证。</span></div>
+          <div><strong>各医疗机构</strong><span>账号 hospital/community，进入医疗机构端，处理电子病历、检查检验、转诊接诊、长期处方和固定取药。</span></div>
+          <div><strong>保留原接口</strong><span>/api/auth/*、/api/state、/api/personal-records、/api/workflow-actions、/api/health-statistics/import-jobs、/api/death-certificates 继续兼容。</span></div>
+          <div><strong>新增对接需求</strong><span>统一认证、组织机构编码、居民主索引、HIS/EMR/LIS/PACS、医保结算、统计直报、人口死亡登记、电子证照、消息回调。</span></div>
+          <div><strong>安全要求</strong><span>按组织、角色、数据范围和居民授权进行最小权限控制，所有敏感访问写入审计。</span></div>
         </div>
       </section>
     </main>

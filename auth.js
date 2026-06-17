@@ -2,11 +2,17 @@
   const SESSION_KEY = "health-city-auth-session";
   const API_BASE = isStaticPreview() ? "" : "/api";
   const demoUsers = [
-    { id: "u1", username: "whjw", password: "123456", name: "卫健委管理员", role: "commission", roleName: "卫生健康委端", home: "index.html" },
-    { id: "u2", username: "doctor", password: "123456", name: "刘医生", role: "institution", roleName: "医疗机构端", home: "institution.html" },
-    { id: "u3", username: "insurance", password: "123456", name: "医保审核员", role: "insurance", roleName: "医保端", home: "insurance.html" },
-    { id: "u4", username: "citizen", password: "123456", name: "王建国", role: "citizen", roleName: "个人端", home: "citizen.html", residentId: "r1", accountId: "a1" },
-    { id: "u5", username: "county", password: "123456", name: "医共体办公室", role: "county", roleName: "县域医共体平台", home: "county.html" }
+    { id: "u-city", username: "city", password: "123456", name: "市级管理员", role: "commission", roleName: "市级健康城市管理", orgCode: "ORG-CITY-DL", orgName: "大连市健康城市平台", orgType: "city", orgLevel: "市级", dataScope: "全市", home: "workbench.html" },
+    { id: "u-district", username: "district", password: "123456", name: "区市县管理员", role: "commission", roleName: "区市县管理端", orgCode: "ORG-DIST-ZS", orgName: "中山区健康城市平台", orgType: "district", orgLevel: "区市县", dataScope: "中山区", home: "workbench.html" },
+    { id: "u-health", username: "health", password: "123456", name: "卫健行政管理员", role: "commission", roleName: "卫生健康行政部门", orgCode: "ORG-HEALTH-DL", orgName: "大连市卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "卫生健康行政管理", home: "index.html" },
+    { id: "u-mi", username: "mi", password: "123456", name: "医保局管理员", role: "insurance", roleName: "医保局管理端", orgCode: "ORG-MI-DL", orgName: "大连市医保局", orgType: "insurance_bureau", orgLevel: "市级", dataScope: "医保结算与基金监管", home: "insurance.html" },
+    { id: "u-hospital", username: "hospital", password: "123456", name: "医疗机构管理员", role: "institution", roleName: "医疗机构端", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构", home: "institution.html" },
+    { id: "u-community", username: "community", password: "123456", name: "基层机构管理员", role: "institution", roleName: "基层医疗机构端", orgCode: "MR3", orgName: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", dataScope: "本机构与签约居民", home: "institution.html" },
+    { id: "u1", username: "whjw", password: "123456", name: "卫健委管理员", role: "commission", roleName: "卫生健康委端", orgCode: "ORG-HEALTH-DL", orgName: "大连市卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "全市", home: "index.html" },
+    { id: "u2", username: "doctor", password: "123456", name: "刘医生", role: "institution", roleName: "医疗机构端", orgCode: "MR3", orgName: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", dataScope: "签约居民", home: "institution.html" },
+    { id: "u3", username: "insurance", password: "123456", name: "医保审核员", role: "insurance", roleName: "医保端", orgCode: "ORG-MI-DL", orgName: "大连市医保局", orgType: "insurance_bureau", orgLevel: "市级", dataScope: "医保审核", home: "insurance.html" },
+    { id: "u4", username: "citizen", password: "123456", name: "演示居民A", role: "citizen", roleName: "个人端", orgCode: "PERSON-R1", orgName: "演示居民A家庭", orgType: "citizen", orgLevel: "个人", dataScope: "本人及家庭授权成员", home: "citizen.html", residentId: "r1", accountId: "a1" },
+    { id: "u5", username: "county", password: "123456", name: "医共体办公室", role: "county", roleName: "县域医共体平台", orgCode: "ORG-CONSORTIUM-ZS", orgName: "中山区县域医共体", orgType: "county_consortium", orgLevel: "区市县", dataScope: "医共体成员机构", home: "county.html" }
   ];
 
   const roleHome = {
@@ -137,7 +143,7 @@
       bar.innerHTML = `
         <div>
           <strong>${user.name}</strong>
-          <span>${user.roleName} · ${user.authMode === "server" ? "后端会话" : "本地演示"} · ${new Date(user.loginAt || Date.now()).toLocaleString("zh-CN")}</span>
+          <span>${user.roleName} · ${user.orgName || "未绑定机构"} · ${user.dataScope || "默认范围"} · ${user.authMode === "server" ? "后端会话" : "本地演示"} · ${new Date(user.loginAt || Date.now()).toLocaleString("zh-CN")}</span>
         </div>
         <nav>
           <a href="./health-city.html">总览</a>

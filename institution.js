@@ -1,4 +1,4 @@
-const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [] };
+const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], deathCertificates: [], deathCertificateForms: [], deathStatistics: {} };
 
 document.addEventListener("DOMContentLoaded", async () => {
   const state = await loadPlatformState(fallbackState);
@@ -12,6 +12,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderStandardArchiveProfiles(state);
   renderInstitutionAudit(state);
   renderPickups(state);
+  renderDeathCertificates(state);
 });
 
 function residentOf(state, id) {
@@ -199,4 +200,48 @@ function renderPickups(state) {
       <span class="badge ${badge}">${item.status}</span>
     </section>`;
   }).join("") || `<p class="muted">暂无固定取药计划。</p>`;
+}
+
+function renderDeathCertificates(state) {
+  const certificates = state.deathCertificates || [];
+  const forms = state.deathCertificateForms || [];
+  const statistics = state.deathStatistics || {};
+  const metrics = statistics.metrics || {};
+  const countEl = document.querySelector("#death-certificate-count");
+  const metricEl = document.querySelector("#death-certificate-metrics");
+  const listEl = document.querySelector("#death-certificate-list");
+  const formsEl = document.querySelector("#death-certificate-forms");
+  if (!countEl || !metricEl || !listEl || !formsEl) return;
+
+  countEl.textContent = `${certificates.length} 张证明`;
+  metricEl.innerHTML = [
+    ["已签发", metrics.signed || certificates.filter((item) => item.status === "已签发").length, "1 日内签发"],
+    ["已上报", metrics.reported || certificates.filter((item) => String(item.cdcReportStatus || "").includes("已上报")).length, "人口死亡信息登记"],
+    ["电子证照", metrics.electronicLicenses || certificates.filter((item) => String(item.electronicLicenseStatus || "").includes("已生成")).length, "省级平台/国家平台"],
+    ["待处理", metrics.pending || certificates.filter((item) => ["待签发", "待上报"].includes(item.status)).length, "补正、签发或上报"]
+  ].map(([label, value, hint]) => `<article class="claim-card">
+    <strong>${label}</strong>
+    <span>${value}<br>${hint}</span>
+  </article>`).join("");
+
+  listEl.innerHTML = certificates.map((item) => {
+    const resident = residentOf(state, item.residentId);
+    const badge = item.status === "待签发" || item.status === "待上报" ? "warn" : item.qualityCheck === "待补正" ? "danger" : "info";
+    return `<section class="item">
+      <div>
+        <h3>${item.deceasedName || resident?.name || "未知居民"} · ${item.certificateNo}</h3>
+        <p>${item.deathDateTime} · ${item.deathPlace} · ${item.deathType} · ${item.deathReasonType}</p>
+        <p>死因：${item.immediateCause || "待填"} / 根本死因 ${item.underlyingCause || "待编码"} · ICD ${item.icd10 || "待编码"}</p>
+        <p>签发：${item.issuingInstitution || "待明确"} · ${item.issuingPhysician || "待签名"} · 材料 ${Array.isArray(item.materials) ? item.materials.join("、") : "待补齐"}</p>
+        <p>上报：${item.reportChannel || "人口死亡信息登记系统"} · ${item.cdcReportStatus || "未上报"} · 国家平台 ${item.nationalPlatformStatus || "待提交"}</p>
+        <p>共享：公安 ${item.publicSecuritySync || "未共享"} · 民政 ${item.civilAffairsSync || "未共享"} · 质控 ${item.qualityCheck || "待复核"}</p>
+      </div>
+      <span class="badge ${badge}">${item.status || "待处理"}</span>
+    </section>`;
+  }).join("") || `<p class="muted">暂无居民死亡医学证明记录。</p>`;
+
+  formsEl.innerHTML = forms.map((form) => `<article class="claim-card">
+    <strong>${form.name}</strong>
+    <span>${form.scope}<br>${(form.keyFields || []).slice(0, 4).join("、")}<br>${form.status}</span>
+  </article>`).join("") || `<p class="muted">暂无死亡证明材料模板。</p>`;
 }
