@@ -233,6 +233,7 @@ function renderCitizen(residentId) {
   renderDiseases(diseases, risk);
   renderFollowups(followups);
   renderReferrals(resident.id);
+  renderBirthHealth(resident.id);
   renderPickups(resident.id);
   renderSeniorServices(resident.id);
   renderDigitalCredentials(resident.id);
@@ -493,6 +494,24 @@ function renderReferrals(residentId) {
       <span class="status">就医指引</span>
     </article>`)
   ].join("") || `<p class="muted">暂无转诊服务。常见病、慢性病稳定期建议优先基层首诊。</p>`;
+}
+
+function renderBirthHealth(residentId) {
+  const container = document.querySelector("#birth-health-cards");
+  if (!container) return;
+  const certificates = (state.birthCertificates || []).filter((item) => item.maternalResidentId === residentId || item.residentId === residentId);
+  container.innerHTML = certificates.map((item) => {
+    const badge = item.healthManagementStatus?.includes("待") || item.status?.includes("待") ? "warn" : "info";
+    return `<article class="card">
+      <div>
+        <strong>${item.newbornName || "未命名新生儿"} · ${item.certificateNo}</strong>
+        <p>${item.birthDateTime || "出生时间待确认"} · ${item.newbornGender || "性别待确认"} · ${item.birthWeight || "-"}g</p>
+        <p>出生证明：${item.status || "待处理"} · 电子证照 ${item.electronicLicenseStatus || "待生成"} · 公安 ${item.publicSecuritySync || "未共享"}</p>
+        <p>健康管理：${item.healthManagementStatus || "待建档"} · ${item.nextService || "新生儿访视与预防接种提醒"}</p>
+      </div>
+      <span class="badge ${badge}">${item.issueType || "首次签发"}</span>
+    </article>`;
+  }).join("") || `<p class="muted">当前家庭成员暂无出生医学证明或新生儿健康管理任务。</p>`;
 }
 
 function renderPickups(residentId) {

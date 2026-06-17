@@ -828,6 +828,295 @@
       }
     ]
   },
+  "birthCertificates": [
+    {
+      "id": "birth-cert-001",
+      "certificateNo": "BC-G210200-20260601001",
+      "certificateVersion": "第七版",
+      "issueType": "首次签发",
+      "newbornName": "演示新生儿A",
+      "newbornGender": "女",
+      "birthDateTime": "2026-06-01 09:18",
+      "gestationalWeeks": 39,
+      "birthWeight": 3250,
+      "birthLength": 50,
+      "birthPlace": "医疗卫生机构",
+      "deliveryMode": "顺产",
+      "maternalResidentId": "r4",
+      "motherName": "演示居民D",
+      "motherDocumentNo": "DEMO-ID-R4",
+      "fatherName": "演示父亲A",
+      "fatherDocumentNo": "DEMO-ID-F1",
+      "issuingInstitutionId": "mr1",
+      "issuingInstitution": "大连市中心医院",
+      "issuingPhysician": "王医师",
+      "applicantName": "演示居民D",
+      "applicantRelation": "母亲",
+      "materials": [
+        "母亲身份证",
+        "父亲身份证",
+        "首次签发登记表",
+        "分娩信息核验"
+      ],
+      "status": "已签发",
+      "electronicLicenseStatus": "已生成",
+      "publicSecuritySync": "已共享",
+      "maternalChildSync": "已入册",
+      "qualityCheck": "通过",
+      "issueDeadline": "出生后及时办理，首次签发登记留痕",
+      "healthManagementStatus": "产后访视已建档",
+      "nextService": "新生儿家庭访视与预防接种提醒",
+      "lastUpdated": "2026-06-01T10:30:00.000Z",
+      "personIndex": ""
+    },
+    {
+      "id": "birth-cert-002",
+      "certificateNo": "BC-G210211-20260608001",
+      "certificateVersion": "第七版",
+      "issueType": "首次签发",
+      "newbornName": "演示新生儿B",
+      "newbornGender": "男",
+      "birthDateTime": "2026-06-08 16:42",
+      "gestationalWeeks": 38,
+      "birthWeight": 2980,
+      "birthLength": 49,
+      "birthPlace": "医疗卫生机构",
+      "deliveryMode": "剖宫产",
+      "maternalResidentId": "r2",
+      "motherName": "演示居民B",
+      "motherDocumentNo": "DEMO-ID-R2",
+      "fatherName": "演示父亲B",
+      "fatherDocumentNo": "DEMO-ID-F2",
+      "issuingInstitutionId": "mr2",
+      "issuingInstitution": "大连医科大学附属医院",
+      "issuingPhysician": "赵医师",
+      "applicantName": "演示居民B",
+      "applicantRelation": "母亲",
+      "materials": [
+        "母亲身份证",
+        "父亲身份证",
+        "首次签发登记表"
+      ],
+      "status": "待上报",
+      "electronicLicenseStatus": "待生成",
+      "publicSecuritySync": "待共享",
+      "maternalChildSync": "待入册",
+      "qualityCheck": "待复核",
+      "issueDeadline": "首次签发后同步电子证照与妇幼系统",
+      "healthManagementStatus": "待新生儿访视",
+      "nextService": "黄疸复测与出生缺陷筛查结果确认",
+      "lastUpdated": "2026-06-08T17:20:00.000Z",
+      "personIndex": ""
+    },
+    {
+      "id": "birth-cert-003",
+      "certificateNo": "BC-G210204-20260612001",
+      "certificateVersion": "第七版",
+      "issueType": "换发",
+      "newbornName": "演示新生儿C",
+      "newbornGender": "女",
+      "birthDateTime": "2026-06-12 07:35",
+      "gestationalWeeks": 37,
+      "birthWeight": 2650,
+      "birthLength": 48,
+      "birthPlace": "医疗卫生机构",
+      "deliveryMode": "顺产",
+      "maternalResidentId": "r1",
+      "motherName": "演示母亲C",
+      "motherDocumentNo": "DEMO-ID-M3",
+      "fatherName": "演示父亲C",
+      "fatherDocumentNo": "DEMO-ID-F3",
+      "issuingInstitutionId": "mr5",
+      "issuingInstitution": "甘井子区人民医院",
+      "issuingPhysician": "孙医师",
+      "applicantName": "演示监护人C",
+      "applicantRelation": "监护人",
+      "materials": [
+        "原证正副页",
+        "户口登记机关证明",
+        "换发原因登记"
+      ],
+      "status": "待签发",
+      "electronicLicenseStatus": "待生成",
+      "publicSecuritySync": "未共享",
+      "maternalChildSync": "已入册",
+      "qualityCheck": "待补正",
+      "issueDeadline": "换发后原证归档保存",
+      "healthManagementStatus": "低体重儿专案随访",
+      "nextService": "出生体重复测与喂养指导",
+      "lastUpdated": "2026-06-12T09:00:00.000Z",
+      "personIndex": ""
+    }
+  ],
+  "birthCertificateForms": [
+    {
+      "id": "birth-form-first",
+      "name": "出生医学证明首次签发登记表",
+      "sourceFile": "43d7f977c2004b50831be87451e07ed2.docx",
+      "scope": "首次签发、父母身份核验、分娩信息登记",
+      "keyFields": [
+        "新生儿信息",
+        "父母信息",
+        "分娩机构",
+        "签发登记"
+      ],
+      "status": "已建模"
+    },
+    {
+      "id": "birth-form-requirements",
+      "name": "出生医学证明首次签发要求",
+      "sourceFile": "50938309974d4613bb84deb1c8c856c4.docx",
+      "scope": "签发流程、材料核验、告知承诺",
+      "keyFields": [
+        "首次签发",
+        "材料核验",
+        "专章管理",
+        "档案保存"
+      ],
+      "status": "已建模"
+    },
+    {
+      "id": "birth-form-annual-plan",
+      "name": "全年母婴三证申领计划表",
+      "sourceFile": "1732845680882_57578.doc",
+      "scope": "空白证件年度计划申领",
+      "keyFields": [
+        "年度计划",
+        "证件数量",
+        "管理机构",
+        "验收回执"
+      ],
+      "status": "已建模"
+    },
+    {
+      "id": "birth-form-quarter",
+      "name": "母婴三证申领单",
+      "sourceFile": "1732845680945_18497.doc",
+      "scope": "季度申领与配发",
+      "keyFields": [
+        "季度申领",
+        "空白证件",
+        "配发记录",
+        "签收"
+      ],
+      "status": "已建模"
+    },
+    {
+      "id": "birth-form-distribution",
+      "name": "出生医学证明季度配发表",
+      "sourceFile": "1732845680925_63456.doc",
+      "scope": "第七版证件配发、旧版清理、废证管理",
+      "keyFields": [
+        "配发数量",
+        "证件编号",
+        "废证登记",
+        "销毁记录"
+      ],
+      "status": "已建模"
+    }
+  ],
+  "birthStatistics": {
+    "period": "2026-06",
+    "title": "出生医学证明与出生人口统计",
+    "basis": "依据出生医学证明管理要求，围绕首次签发、换发、补发、空白证件、废证、电子证照、公安入户和妇幼健康管理形成闭环统计。",
+    "sources": [
+      {
+        "id": "birth-cert",
+        "name": "医疗机构出生医学证明系统",
+        "scope": "个案登记、签发、材料、医师、专章和证件编号",
+        "status": "已接入"
+      },
+      {
+        "id": "mch",
+        "name": "妇幼健康管理系统",
+        "scope": "孕产妇保健、新生儿访视、筛查、预防接种提醒",
+        "status": "待接口"
+      },
+      {
+        "id": "police",
+        "name": "公安户籍登记共享",
+        "scope": "出生登记所需法定医学证明信息",
+        "status": "待共享"
+      }
+    ],
+    "metrics": {
+      "total": 3,
+      "firstIssued": 2,
+      "reissued": 1,
+      "signed": 1,
+      "reported": 3,
+      "electronicLicenses": 1,
+      "publicSecuritySynced": 1,
+      "maternalChildSynced": 2,
+      "pending": 2,
+      "lowBirthWeight": 0,
+      "qualityPass": 1
+    },
+    "regionStats": [
+      {
+        "region": "市级",
+        "births": 2,
+        "firstIssueRate": "100%",
+        "publicSecuritySyncRate": "50%",
+        "lowBirthWeight": 0
+      },
+      {
+        "region": "甘井子区",
+        "births": 1,
+        "firstIssueRate": "0%",
+        "publicSecuritySyncRate": "0%",
+        "lowBirthWeight": 0
+      }
+    ],
+    "workflowRules": [
+      {
+        "rule": "首次签发",
+        "deadline": "具有助产技术服务资质的机构为本机构内出生新生儿直接签发",
+        "owner": "签发机构",
+        "status": "已建模"
+      },
+      {
+        "rule": "换发/补发",
+        "deadline": "按原因登记、材料审验、原证归档或补发专章要求闭环办理",
+        "owner": "签发机构/区县级卫生健康行政部门",
+        "status": "已建模"
+      },
+      {
+        "rule": "空白证件与废证",
+        "deadline": "证件申领、配发、作废、清理和销毁全流程留痕",
+        "owner": "卫生健康行政部门",
+        "status": "已建模"
+      },
+      {
+        "rule": "第七版证件",
+        "deadline": "启用第七版编号/条形码口径，旧版证件按要求清理",
+        "owner": "卫生健康行政部门/公安机关",
+        "status": "已建模"
+      }
+    ],
+    "healthManagement": [
+      {
+        "service": "新生儿家庭访视",
+        "target": "出生后 7 天内或出院后一周内",
+        "status": "2 人待跟进"
+      },
+      {
+        "service": "出生缺陷筛查",
+        "target": "听力、遗传代谢病、先天性心脏病等筛查结果归集",
+        "status": "1 人待确认"
+      },
+      {
+        "service": "预防接种提醒",
+        "target": "乙肝、卡介苗及后续免疫规划提醒",
+        "status": "已纳入居民端"
+      },
+      {
+        "service": "低体重儿专案",
+        "target": "低出生体重或早产儿纳入专案随访",
+        "status": "1 人管理中"
+      }
+    ]
+  },
   "healthBulletin2024": {
     "title": "2024 年我国卫生健康事业发展统计公报",
     "source": "国家卫生健康委统计公报 PDF",
@@ -1789,6 +2078,46 @@
     }
   ],
   "securityEvents": [
+    {
+      "id": "87c6a3a9-a942-407e-b194-71da07537998",
+      "at": "2026/6/17 13:32:58",
+      "actor": "演示居民A",
+      "role": "citizen",
+      "action": "登录",
+      "target": "citizen.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "22c3c739-6707-4630-ad98-fcb6dfbf308c",
+      "at": "2026/6/17 13:32:58",
+      "actor": "医疗机构管理员",
+      "role": "institution",
+      "action": "登录",
+      "target": "institution.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "8040ae9a-d017-4dbe-b078-0f503a473885",
+      "at": "2026/6/17 13:32:33",
+      "actor": "resident1",
+      "role": "unknown",
+      "action": "登录",
+      "target": "统一认证",
+      "result": "拒绝",
+      "detail": "账号或密码错误"
+    },
+    {
+      "id": "06201879-5ccb-4323-a54a-03ff8c5b6463",
+      "at": "2026/6/17 13:32:33",
+      "actor": "医疗机构管理员",
+      "role": "institution",
+      "action": "登录",
+      "target": "institution.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
     {
       "id": "7ff882aa-5080-498d-a8b5-b9769cbe46a3",
       "at": "2026/6/17 10:30:13",

@@ -1,4 +1,4 @@
-const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], deathCertificates: [], deathCertificateForms: [], deathStatistics: {} };
+const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthStatistics: {} };
 
 document.addEventListener("DOMContentLoaded", async () => {
   const state = await loadPlatformState(fallbackState);
@@ -13,10 +13,55 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderInstitutionAudit(state);
   renderPickups(state);
   renderDeathCertificates(state);
+  renderBirthCertificates(state);
 });
 
 function residentOf(state, id) {
   return state.residents.find((item) => item.id === id);
+}
+
+function renderBirthCertificates(state) {
+  const certificates = state.birthCertificates || [];
+  const forms = state.birthCertificateForms || [];
+  const statistics = state.birthStatistics || {};
+  const metrics = statistics.metrics || {};
+  const countEl = document.querySelector("#birth-certificate-count");
+  const metricEl = document.querySelector("#birth-certificate-metrics");
+  const listEl = document.querySelector("#birth-certificate-list");
+  const formsEl = document.querySelector("#birth-certificate-forms");
+  if (!countEl || !metricEl || !listEl || !formsEl) return;
+
+  countEl.textContent = `${certificates.length} 张证明`;
+  metricEl.innerHTML = [
+    ["首次签发", metrics.firstIssued || certificates.filter((item) => item.issueType === "首次签发").length, "机构内出生直接签发"],
+    ["电子证照", metrics.electronicLicenses || certificates.filter((item) => String(item.electronicLicenseStatus || "").includes("已生成")).length, "第七版编号/条形码"],
+    ["公安共享", metrics.publicSecuritySynced || certificates.filter((item) => String(item.publicSecuritySync || "").includes("已共享")).length, "户口出生登记依据"],
+    ["待处理", metrics.pending || certificates.filter((item) => ["待签发", "待上报"].includes(item.status)).length, "补正、签发或上报"]
+  ].map(([label, value, hint]) => `<article class="claim-card">
+    <strong>${label}</strong>
+    <span>${value}<br>${hint}</span>
+  </article>`).join("");
+
+  listEl.innerHTML = certificates.map((item) => {
+    const resident = residentOf(state, item.maternalResidentId || item.residentId);
+    const badge = item.status === "待签发" || item.status === "待上报" ? "warn" : item.qualityCheck === "待补正" ? "danger" : "info";
+    return `<section class="item">
+      <div>
+        <h3>${item.newbornName || "未命名新生儿"} · ${item.certificateNo}</h3>
+        <p>${item.certificateVersion || "第七版"} · ${item.issueType || "首次签发"} · ${item.birthDateTime} · ${item.newbornGender || "性别待确认"}</p>
+        <p>母亲：${item.motherName || resident?.name || "待核验"} · 父亲：${item.fatherName || "待核验"} · 出生体重 ${item.birthWeight || "-"}g</p>
+        <p>签发：${item.issuingInstitution || "待明确"} · ${item.issuingPhysician || "待签名"} · 材料 ${Array.isArray(item.materials) ? item.materials.join("、") : "待补齐"}</p>
+        <p>共享：电子证照 ${item.electronicLicenseStatus || "待生成"} · 公安 ${item.publicSecuritySync || "未共享"} · 妇幼 ${item.maternalChildSync || "待入册"}</p>
+        <p>健康管理：${item.healthManagementStatus || "待建档"} · ${item.nextService || "新生儿访视与接种提醒"}</p>
+      </div>
+      <span class="badge ${badge}">${item.status || "待处理"}</span>
+    </section>`;
+  }).join("") || `<p class="muted">暂无出生医学证明记录。</p>`;
+
+  formsEl.innerHTML = forms.map((form) => `<article class="claim-card">
+    <strong>${form.name}</strong>
+    <span>${form.scope}<br>${(form.keyFields || []).slice(0, 4).join("、")}<br>${form.status}</span>
+  </article>`).join("") || `<p class="muted">暂无出生证明材料模板。</p>`;
 }
 
 function renderMetrics(state) {

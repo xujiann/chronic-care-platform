@@ -119,7 +119,7 @@ function normalizePersonIndexes() {
     resident.identityIndex = resident.personIndex;
   });
   const residentMap = new Map(residents.map((resident) => [resident.id, resident]));
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "deathCertificates"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "deathCertificates", "birthCertificates"].forEach((key) => {
     (Array.isArray(state[key]) ? state[key] : []).forEach((item) => {
       item.personIndex = item.personIndex || personIndexForResident(residentMap, item.residentId);
     });
@@ -508,6 +508,7 @@ function renderAnalytics() {
   renderBars("#org-bars", countBy(state.residents.map((item) => item.organization)), organizations);
   renderStatisticsAnalytics();
   renderDalianHealthStatistics2025();
+  renderBirthHealthManagement();
   renderHealthStatisticsIngestion();
   renderHealthBulletin2024();
 }
@@ -518,6 +519,7 @@ function renderGovernance() {
   renderMedicalResources();
   renderHealthStatistics();
   renderDeathStatistics();
+  renderBirthStatistics();
   renderPerformanceTable();
   renderQualityBars();
 }
@@ -889,6 +891,70 @@ function renderDeathStatistics() {
   ].map((item) => `<div><strong>${item.rule}</strong><span>${item.deadline || item.detail}<br>${item.owner || ""} · ${item.status || ""}</span></div>`).join("");
 }
 
+function renderBirthStatistics() {
+  const birth = getBirthStatistics();
+  const metrics = birth.metrics || {};
+  const summary = document.querySelector("#birth-stat-summary");
+  const cards = document.querySelector("#birth-stat-cards");
+  const sources = document.querySelector("#birth-stat-sources");
+  const regionTable = document.querySelector("#birth-region-table");
+  const rules = document.querySelector("#birth-stat-rules");
+  if (!summary || !cards || !sources || !regionTable || !rules) return;
+
+  summary.textContent = `${formatPeriod(birth.period)} · 出生医学证明系统 + 妇幼健康管理 + 公安户籍共享`;
+  cards.innerHTML = [
+    ["出生证明", metrics.total || 0, "医疗机构登记个案"],
+    ["首次签发", metrics.firstIssued || 0, "机构内出生直接签发"],
+    ["换发补发", metrics.reissued || 0, "原因登记与原证归档"],
+    ["电子证照", metrics.electronicLicenses || 0, "第七版证件同步"],
+    ["公安共享", metrics.publicSecuritySynced || 0, "出生登记依据"],
+    ["妇幼入册", metrics.maternalChildSynced || 0, "新生儿健康管理"],
+    ["低体重儿", metrics.lowBirthWeight || 0, "专案随访"],
+    ["待处理", metrics.pending || 0, "待签发或待上报"]
+  ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${formatNumber(value)}</strong><em>${hint}</em></article>`).join("");
+
+  sources.innerHTML = (birth.sources || []).map((source) => `<article>
+    <span>${source.name}</span>
+    <strong>${source.status}</strong>
+    <small>${source.scope}</small>
+  </article>`).join("");
+
+  regionTable.innerHTML = `<table>
+    <thead><tr><th>地区</th><th>出生证明数</th><th>首次签发率</th><th>公安共享率</th><th>低体重儿</th></tr></thead>
+    <tbody>${(birth.regionStats || []).map((row) => `<tr>
+      <td>${row.region}</td>
+      <td>${row.births}</td>
+      <td>${row.firstIssueRate}</td>
+      <td>${row.publicSecuritySyncRate}</td>
+      <td>${row.lowBirthWeight}</td>
+    </tr>`).join("")}</tbody>
+  </table>`;
+
+  rules.innerHTML = (birth.workflowRules || []).map((item) => `<div><strong>${item.rule}</strong><span>${item.deadline || item.detail}<br>${item.owner || ""} · ${item.status || ""}</span></div>`).join("");
+}
+
+function renderBirthHealthManagement() {
+  const birth = getBirthStatistics();
+  const metrics = birth.metrics || {};
+  const summary = document.querySelector("#birth-health-summary");
+  const cards = document.querySelector("#birth-health-cards");
+  const services = document.querySelector("#birth-health-services");
+  if (!summary || !cards || !services) return;
+
+  summary.textContent = `${formatPeriod(birth.period)} · 出生证明自动触发新生儿健康管理任务`;
+  cards.innerHTML = [
+    ["妇幼入册", metrics.maternalChildSynced || 0, "出生个案转健康管理"],
+    ["待访视", metrics.pending || 0, "待签发/待上报同步处理"],
+    ["低体重儿", metrics.lowBirthWeight || 0, "专案随访"],
+    ["质控通过", metrics.qualityPass || 0, "材料与证件编号核验"]
+  ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${formatNumber(value)}</strong><em>${hint}</em></article>`).join("");
+  services.innerHTML = (birth.healthManagement || []).map((item) => `<article>
+    <strong>${item.service}</strong>
+    <span>${item.target}</span>
+    <span class="badge info">${item.status}</span>
+  </article>`).join("");
+}
+
 function renderStatisticsAnalytics() {
   const statistics = getHealthStatistics();
   const resourceTotals = sumNested(statistics.resourceReports, "interfaceData", ["beds", "doctors", "nurses"]);
@@ -1082,6 +1148,18 @@ function getDeathStatistics() {
     regionStats: [],
     workflowRules: [],
     dataSharing: []
+  };
+}
+
+function getBirthStatistics() {
+  return state.birthStatistics || {
+    period: "2026-06",
+    title: "出生医学证明与出生人口统计",
+    sources: [],
+    metrics: {},
+    regionStats: [],
+    workflowRules: [],
+    healthManagement: []
   };
 }
 

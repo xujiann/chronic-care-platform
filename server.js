@@ -14,7 +14,7 @@ const DEMO_PASSWORD = "123456";
 const sessions = new Map();
 let sqliteModule = null;
 let sqliteError = null;
-const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals", "deathCertificates"]);
+const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals", "deathCertificates", "birthCertificates"]);
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -120,6 +120,9 @@ function seedState() {
     deathCertificates: seedDeathCertificates(),
     deathCertificateForms: seedDeathCertificateForms(),
     deathStatistics: seedDeathStatistics(),
+    birthCertificates: seedBirthCertificates(),
+    birthCertificateForms: seedBirthCertificateForms(),
+    birthStatistics: seedBirthStatistics(),
     healthBulletin2024: seedHealthBulletin2024(),
     dalianHealthStatistics2025: seedDalianHealthStatistics2025(),
     healthStatisticsIngestion: seedHealthStatisticsIngestion(),
@@ -699,6 +702,166 @@ function seedDeathStatistics() {
   };
 }
 
+function seedBirthCertificates() {
+  return [
+    {
+      id: "birth-cert-001",
+      certificateNo: "BC-G210200-20260601001",
+      certificateVersion: "第七版",
+      issueType: "首次签发",
+      newbornName: "演示新生儿A",
+      newbornGender: "女",
+      birthDateTime: "2026-06-01 09:18",
+      gestationalWeeks: 39,
+      birthWeight: 3250,
+      birthLength: 50,
+      birthPlace: "医疗卫生机构",
+      deliveryMode: "顺产",
+      maternalResidentId: "r4",
+      motherName: "演示居民D",
+      motherDocumentNo: "DEMO-ID-R4",
+      fatherName: "演示父亲A",
+      fatherDocumentNo: "DEMO-ID-F1",
+      issuingInstitutionId: "mr1",
+      issuingInstitution: "大连市中心医院",
+      issuingPhysician: "王医师",
+      applicantName: "演示居民D",
+      applicantRelation: "母亲",
+      materials: ["母亲身份证", "父亲身份证", "首次签发登记表", "分娩信息核验"],
+      status: "已签发",
+      electronicLicenseStatus: "已生成",
+      publicSecuritySync: "已共享",
+      maternalChildSync: "已入册",
+      qualityCheck: "通过",
+      issueDeadline: "出生后及时办理，首次签发登记留痕",
+      healthManagementStatus: "产后访视已建档",
+      nextService: "新生儿家庭访视与预防接种提醒",
+      lastUpdated: "2026-06-01T10:30:00.000Z"
+    },
+    {
+      id: "birth-cert-002",
+      certificateNo: "BC-G210211-20260608001",
+      certificateVersion: "第七版",
+      issueType: "首次签发",
+      newbornName: "演示新生儿B",
+      newbornGender: "男",
+      birthDateTime: "2026-06-08 16:42",
+      gestationalWeeks: 38,
+      birthWeight: 2980,
+      birthLength: 49,
+      birthPlace: "医疗卫生机构",
+      deliveryMode: "剖宫产",
+      maternalResidentId: "r2",
+      motherName: "演示居民B",
+      motherDocumentNo: "DEMO-ID-R2",
+      fatherName: "演示父亲B",
+      fatherDocumentNo: "DEMO-ID-F2",
+      issuingInstitutionId: "mr2",
+      issuingInstitution: "大连医科大学附属医院",
+      issuingPhysician: "赵医师",
+      applicantName: "演示居民B",
+      applicantRelation: "母亲",
+      materials: ["母亲身份证", "父亲身份证", "首次签发登记表"],
+      status: "待上报",
+      electronicLicenseStatus: "待生成",
+      publicSecuritySync: "待共享",
+      maternalChildSync: "待入册",
+      qualityCheck: "待复核",
+      issueDeadline: "首次签发后同步电子证照与妇幼系统",
+      healthManagementStatus: "待新生儿访视",
+      nextService: "黄疸复测与出生缺陷筛查结果确认",
+      lastUpdated: "2026-06-08T17:20:00.000Z"
+    },
+    {
+      id: "birth-cert-003",
+      certificateNo: "BC-G210204-20260612001",
+      certificateVersion: "第七版",
+      issueType: "换发",
+      newbornName: "演示新生儿C",
+      newbornGender: "女",
+      birthDateTime: "2026-06-12 07:35",
+      gestationalWeeks: 37,
+      birthWeight: 2650,
+      birthLength: 48,
+      birthPlace: "医疗卫生机构",
+      deliveryMode: "顺产",
+      maternalResidentId: "r1",
+      motherName: "演示母亲C",
+      motherDocumentNo: "DEMO-ID-M3",
+      fatherName: "演示父亲C",
+      fatherDocumentNo: "DEMO-ID-F3",
+      issuingInstitutionId: "mr5",
+      issuingInstitution: "甘井子区人民医院",
+      issuingPhysician: "孙医师",
+      applicantName: "演示监护人C",
+      applicantRelation: "监护人",
+      materials: ["原证正副页", "户口登记机关证明", "换发原因登记"],
+      status: "待签发",
+      electronicLicenseStatus: "待生成",
+      publicSecuritySync: "未共享",
+      maternalChildSync: "已入册",
+      qualityCheck: "待补正",
+      issueDeadline: "换发后原证归档保存",
+      healthManagementStatus: "低体重儿专案随访",
+      nextService: "出生体重复测与喂养指导",
+      lastUpdated: "2026-06-12T09:00:00.000Z"
+    }
+  ];
+}
+
+function seedBirthCertificateForms() {
+  return [
+    { id: "birth-form-first", name: "出生医学证明首次签发登记表", sourceFile: "43d7f977c2004b50831be87451e07ed2.docx", scope: "首次签发、父母身份核验、分娩信息登记", keyFields: ["新生儿信息", "父母信息", "分娩机构", "签发登记"], status: "已建模" },
+    { id: "birth-form-requirements", name: "出生医学证明首次签发要求", sourceFile: "50938309974d4613bb84deb1c8c856c4.docx", scope: "签发流程、材料核验、告知承诺", keyFields: ["首次签发", "材料核验", "专章管理", "档案保存"], status: "已建模" },
+    { id: "birth-form-annual-plan", name: "全年母婴三证申领计划表", sourceFile: "1732845680882_57578.doc", scope: "空白证件年度计划申领", keyFields: ["年度计划", "证件数量", "管理机构", "验收回执"], status: "已建模" },
+    { id: "birth-form-quarter", name: "母婴三证申领单", sourceFile: "1732845680945_18497.doc", scope: "季度申领与配发", keyFields: ["季度申领", "空白证件", "配发记录", "签收"], status: "已建模" },
+    { id: "birth-form-distribution", name: "出生医学证明季度配发表", sourceFile: "1732845680925_63456.doc", scope: "第七版证件配发、旧版清理、废证管理", keyFields: ["配发数量", "证件编号", "废证登记", "销毁记录"], status: "已建模" }
+  ];
+}
+
+function seedBirthStatistics() {
+  return {
+    period: "2026-06",
+    title: "出生医学证明与出生人口统计",
+    basis: "依据出生医学证明管理要求，围绕首次签发、换发、补发、空白证件、废证、电子证照、公安入户和妇幼健康管理形成闭环统计。",
+    sources: [
+      { id: "birth-cert", name: "医疗机构出生医学证明系统", scope: "个案登记、签发、材料、医师、专章和证件编号", status: "已接入" },
+      { id: "mch", name: "妇幼健康管理系统", scope: "孕产妇保健、新生儿访视、筛查、预防接种提醒", status: "待接口" },
+      { id: "police", name: "公安户籍登记共享", scope: "出生登记所需法定医学证明信息", status: "待共享" }
+    ],
+    metrics: {
+      total: 3,
+      firstIssued: 2,
+      reissued: 1,
+      signed: 1,
+      reported: 1,
+      electronicLicenses: 1,
+      publicSecuritySynced: 1,
+      maternalChildSynced: 2,
+      pending: 2,
+      lowBirthWeight: 1,
+      qualityPass: 1
+    },
+    regionStats: [
+      { region: "市级", births: 1, firstIssueRate: "100%", publicSecuritySyncRate: "100%", lowBirthWeight: 0 },
+      { region: "市级", births: 1, firstIssueRate: "100%", publicSecuritySyncRate: "0%", lowBirthWeight: 0 },
+      { region: "甘井子区", births: 1, firstIssueRate: "0%", publicSecuritySyncRate: "0%", lowBirthWeight: 1 }
+    ],
+    workflowRules: [
+      { rule: "首次签发", deadline: "具有助产技术服务资质的机构为本机构内出生新生儿直接签发", owner: "签发机构", status: "已建模" },
+      { rule: "换发/补发", deadline: "按原因登记、材料审验、原证归档或补发专章要求闭环办理", owner: "签发机构/区县级卫生健康行政部门", status: "已建模" },
+      { rule: "空白证件与废证", deadline: "证件申领、配发、作废、清理和销毁全流程留痕", owner: "卫生健康行政部门", status: "已建模" },
+      { rule: "第七版证件", deadline: "启用第七版编号/条形码口径，旧版证件按要求清理", owner: "卫生健康行政部门/公安机关", status: "已建模" }
+    ],
+    healthManagement: [
+      { service: "新生儿家庭访视", target: "出生后 7 天内或出院后一周内", status: "2 人待跟进" },
+      { service: "出生缺陷筛查", target: "听力、遗传代谢病、先天性心脏病等筛查结果归集", status: "1 人待确认" },
+      { service: "预防接种提醒", target: "乙肝、卡介苗及后续免疫规划提醒", status: "已纳入居民端" },
+      { service: "低体重儿专案", target: "低出生体重或早产儿纳入专案随访", status: "1 人管理中" }
+    ]
+  };
+}
+
 function seedHealthBulletin2024() {
   return {
     title: "2024 年我国卫生健康事业发展统计公报",
@@ -1202,6 +1365,9 @@ function normalizeState(data) {
     deathCertificates: mergeByKey(seedDeathCertificates(), data.deathCertificates, "id"),
     deathCertificateForms: mergeByKey(seedDeathCertificateForms(), data.deathCertificateForms, "id"),
     deathStatistics: data.deathStatistics && typeof data.deathStatistics === "object" ? data.deathStatistics : seedDeathStatistics(),
+    birthCertificates: mergeByKey(seedBirthCertificates(), data.birthCertificates, "id"),
+    birthCertificateForms: mergeByKey(seedBirthCertificateForms(), data.birthCertificateForms, "id"),
+    birthStatistics: data.birthStatistics && typeof data.birthStatistics === "object" ? data.birthStatistics : seedBirthStatistics(),
     healthBulletin2024: data.healthBulletin2024 && typeof data.healthBulletin2024 === "object" ? data.healthBulletin2024 : seedHealthBulletin2024(),
     dalianHealthStatistics2025: data.dalianHealthStatistics2025 && typeof data.dalianHealthStatistics2025 === "object" ? data.dalianHealthStatistics2025 : seedDalianHealthStatistics2025(),
     healthStatisticsIngestion: data.healthStatisticsIngestion && typeof data.healthStatisticsIngestion === "object" ? data.healthStatisticsIngestion : seedHealthStatisticsIngestion(),
@@ -1225,6 +1391,7 @@ function normalizeState(data) {
     personalRecords: Array.isArray(data.personalRecords) ? data.personalRecords : seedPersonalRecords()
   };
   refreshDeathStatistics(state);
+  refreshBirthStatistics(state);
   return normalizePersonIndexes(state);
 }
 
@@ -1304,6 +1471,53 @@ function normalizeDeathCertificate(payload, user, state) {
   };
 }
 
+function normalizeBirthCertificate(payload, user, state) {
+  const maternalResidentId = String(payload.maternalResidentId || payload.residentId || "").trim();
+  if (!maternalResidentId) throw new Error("maternalResidentId 不能为空");
+  const mother = (state.residents || []).find((item) => item.id === maternalResidentId);
+  const now = new Date().toISOString();
+  const residentMap = new Map((state.residents || []).map((item) => [item.id, item]));
+  return {
+    id: payload.id || `birth-cert-${randomUUID()}`,
+    certificateNo: String(payload.certificateNo || `BC-G${Date.now()}`).trim(),
+    certificateVersion: String(payload.certificateVersion || "第七版").trim(),
+    issueType: String(payload.issueType || "首次签发").trim(),
+    newbornName: String(payload.newbornName || "未命名新生儿").trim(),
+    newbornGender: String(payload.newbornGender || "").trim(),
+    birthDateTime: String(payload.birthDateTime || new Date().toLocaleString("zh-CN", { hour12: false })).trim(),
+    gestationalWeeks: Number(payload.gestationalWeeks || 40),
+    birthWeight: Number(payload.birthWeight || 0),
+    birthLength: Number(payload.birthLength || 0),
+    birthPlace: String(payload.birthPlace || "医疗卫生机构").trim(),
+    deliveryMode: String(payload.deliveryMode || "").trim(),
+    residentId: maternalResidentId,
+    maternalResidentId,
+    personIndex: payload.personIndex || personIndexForResident(residentMap, maternalResidentId),
+    motherName: String(payload.motherName || mother?.name || "").trim(),
+    motherDocumentNo: String(payload.motherDocumentNo || mother?.idCard || "").trim(),
+    fatherName: String(payload.fatherName || "").trim(),
+    fatherDocumentNo: String(payload.fatherDocumentNo || "").trim(),
+    issuingInstitutionId: String(payload.issuingInstitutionId || user?.orgCode || "").trim(),
+    issuingInstitution: String(payload.issuingInstitution || user?.orgName || "").trim(),
+    issuingPhysician: String(payload.issuingPhysician || user?.name || "").trim(),
+    applicantName: String(payload.applicantName || mother?.name || "").trim(),
+    applicantRelation: String(payload.applicantRelation || "母亲").trim(),
+    materials: Array.isArray(payload.materials) ? payload.materials.map(String) : [],
+    status: String(payload.status || "待签发").trim(),
+    electronicLicenseStatus: String(payload.electronicLicenseStatus || "待生成").trim(),
+    publicSecuritySync: String(payload.publicSecuritySync || "未共享").trim(),
+    maternalChildSync: String(payload.maternalChildSync || "待入册").trim(),
+    qualityCheck: String(payload.qualityCheck || "待复核").trim(),
+    issueDeadline: String(payload.issueDeadline || "出生后及时办理，签发登记留痕").trim(),
+    healthManagementStatus: String(payload.healthManagementStatus || "待新生儿访视").trim(),
+    nextService: String(payload.nextService || "新生儿家庭访视与预防接种提醒").trim(),
+    createdBy: user?.username || user?.role || "system",
+    createdByName: user?.name || "",
+    createdAt: now,
+    lastUpdated: now
+  };
+}
+
 function ageFromBirthDate(birthDate) {
   const birth = new Date(birthDate);
   if (Number.isNaN(birth.getTime())) return 0;
@@ -1369,6 +1583,47 @@ function refreshDeathStatistics(state) {
   };
 }
 
+function refreshBirthStatistics(state) {
+  const records = Array.isArray(state.birthCertificates) ? state.birthCertificates : [];
+  const base = state.birthStatistics && typeof state.birthStatistics === "object" ? state.birthStatistics : seedBirthStatistics();
+  const resources = new Map((state.medicalResources || []).map((item) => [String(item.id || "").toLowerCase(), item]));
+  const regionCounts = new Map();
+  records.forEach((item) => {
+    const resource = resources.get(String(item.issuingInstitutionId || "").toLowerCase());
+    const region = resource?.region || item.issuingInstitution || "未明确地区";
+    const current = regionCounts.get(region) || { births: 0, firstIssued: 0, publicSecuritySynced: 0, lowBirthWeight: 0 };
+    current.births += 1;
+    if (item.issueType === "首次签发") current.firstIssued += 1;
+    if (String(item.publicSecuritySync || "").includes("已共享")) current.publicSecuritySynced += 1;
+    if (Number(item.birthWeight || 0) > 0 && Number(item.birthWeight || 0) < 2500) current.lowBirthWeight += 1;
+    regionCounts.set(region, current);
+  });
+  const total = records.length;
+  state.birthStatistics = {
+    ...base,
+    metrics: {
+      total,
+      firstIssued: records.filter((item) => item.issueType === "首次签发").length,
+      reissued: records.filter((item) => ["换发", "补发"].includes(item.issueType)).length,
+      signed: records.filter((item) => ["已签发", "已上报"].includes(item.status)).length,
+      reported: records.filter((item) => String(item.status || "").includes("上报") || String(item.maternalChildSync || "").includes("已入册")).length,
+      electronicLicenses: records.filter((item) => String(item.electronicLicenseStatus || "").includes("已生成")).length,
+      publicSecuritySynced: records.filter((item) => String(item.publicSecuritySync || "").includes("已共享")).length,
+      maternalChildSynced: records.filter((item) => String(item.maternalChildSync || "").includes("已入册")).length,
+      pending: records.filter((item) => ["待签发", "待上报"].includes(item.status)).length,
+      lowBirthWeight: records.filter((item) => Number(item.birthWeight || 0) > 0 && Number(item.birthWeight || 0) < 2500).length,
+      qualityPass: records.filter((item) => item.qualityCheck === "通过").length
+    },
+    regionStats: [...regionCounts.entries()].map(([region, item]) => ({
+      region,
+      births: item.births,
+      firstIssueRate: item.births ? `${Math.round((item.firstIssued / item.births) * 100)}%` : "0%",
+      publicSecuritySyncRate: item.births ? `${Math.round((item.publicSecuritySynced / item.births) * 100)}%` : "0%",
+      lowBirthWeight: item.lowBirthWeight
+    }))
+  };
+}
+
 function normalizePersonIndexes(state) {
   const residents = Array.isArray(state.residents) ? state.residents : [];
   residents.forEach((resident) => {
@@ -1376,7 +1631,7 @@ function normalizePersonIndexes(state) {
     resident.identityIndex = resident.personIndex;
   });
   const residentMap = new Map(residents.map((resident) => [resident.id, resident]));
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates"].forEach((key) => {
     (Array.isArray(state[key]) ? state[key] : []).forEach((item) => {
       item.personIndex = item.personIndex || personIndexForResident(residentMap, item.residentId);
     });
@@ -1663,6 +1918,57 @@ async function handleApi(req, res) {
     ].slice(0, 120);
     writeDatabase(data);
     sendJson(res, 201, job);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/birth-certificates") {
+    const user = requireApiRole(req, res, ["institution", "commission", "citizen"], "/api/birth-certificates");
+    if (!user) return;
+    const data = readDatabase();
+    const residentId = url.searchParams.get("residentId");
+    if (!canAccessResident(user, residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "访问出生医学证明", target: residentId || "all", result: "拒绝", detail: "超出居民授权范围" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权访问该居民出生医学证明" });
+      return;
+    }
+    const certificates = (data.birthCertificates || []).filter((item) => !residentId || item.maternalResidentId === residentId || item.residentId === residentId);
+    sendJson(res, 200, { certificates, statistics: data.birthStatistics, forms: data.birthCertificateForms });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/birth-certificates") {
+    const user = requireApiRole(req, res, ["institution", "commission"], "/api/birth-certificates");
+    if (!user) return;
+    const data = readDatabase();
+    let certificate;
+    try {
+      certificate = normalizeBirthCertificate(await collectJson(req), user, data);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    if (!canAccessResident(user, certificate.maternalResidentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "登记出生医学证明", target: certificate.maternalResidentId, result: "拒绝", detail: "超出居民授权范围" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权登记该居民出生医学证明" });
+      return;
+    }
+    data.birthCertificates = [certificate, ...(Array.isArray(data.birthCertificates) ? data.birthCertificates : [])].slice(0, 200);
+    refreshBirthStatistics(data);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "登记出生医学证明",
+        target: certificate.certificateNo,
+        result: "允许",
+        detail: `${certificate.newbornName} · ${certificate.issueType} · ${certificate.issuingInstitution}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(normalizeState(data));
+    sendJson(res, 201, certificate);
     return;
   }
 
