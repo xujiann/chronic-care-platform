@@ -230,8 +230,8 @@ function defaultRoadmap() {
       title: "业务动作闭环",
       reason: "当前多数状态为展示型，下一步要能接诊、审核、下转、完成取药、完成随访。",
       scope: ["分级诊疗", "医保", "取药", "随访"],
-      status: "待开发",
-      nextAction: "为转诊、医保审核、固定取药增加状态操作。"
+      status: "进行中",
+      nextAction: "已新增通用业务闭环状态接口 /api/workflow-actions，并验证固定取药从机构确认到医保审核通过；下一步把四端页面按钮接入该接口。"
     },
     {
       priority: "P1",

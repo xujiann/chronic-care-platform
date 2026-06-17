@@ -1191,16 +1191,16 @@
       "pickupDay": 15,
       "pharmacy": "青泥洼桥社区卫生服务中心药房",
       "nextPickup": "2026-07-15",
-      "status": "待确认",
+      "status": "待取药",
       "coverage": "基层慢病服务包",
       "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4",
       "applyMode": "家属代办",
       "requestStatus": "已申请",
-      "institutionReview": "待确认",
-      "insuranceReview": "待审核",
-      "pharmacyStatus": "待确认",
+      "institutionReview": "已确认",
+      "insuranceReview": "已通过",
+      "pharmacyStatus": "待取药",
       "deliveryMode": "家属代取",
-      "lastUpdated": "2026-06-15"
+      "lastUpdated": "2026-06-17T01:30:52.674Z"
     }
   ],
   "institutionSupervisions": [
@@ -1434,6 +1434,46 @@
     }
   ],
   "securityEvents": [
+    {
+      "id": "f24e78df-ce2b-4e59-bfba-3d83ad874ba3",
+      "at": "2026/6/17 09:30:52",
+      "actor": "医保审核员",
+      "role": "insurance",
+      "action": "更新业务闭环",
+      "target": "medicationPickups/mp4",
+      "result": "允许",
+      "detail": "医保审核通过，流转社区药房取药。"
+    },
+    {
+      "id": "5b9ae500-fdad-4ce4-9ed8-fc59f8acf587",
+      "at": "2026/6/17 09:30:52",
+      "actor": "医保审核员",
+      "role": "insurance",
+      "action": "登录",
+      "target": "insurance.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "e8f6b37f-6aff-4103-9214-b1654ef92418",
+      "at": "2026/6/17 09:30:04",
+      "actor": "刘医生",
+      "role": "institution",
+      "action": "更新业务闭环",
+      "target": "medicationPickups/mp4",
+      "result": "允许",
+      "detail": "机构已确认固定取药申请，流转医保审核。"
+    },
+    {
+      "id": "f2e248f2-a1a5-4c61-9493-6004e52aad79",
+      "at": "2026/6/17 09:30:04",
+      "actor": "刘医生",
+      "role": "institution",
+      "action": "登录",
+      "target": "institution.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
     {
       "id": "483a5dff-b63d-45cd-8811-2209e57fdd62",
       "at": "2026/6/16 20:00:23",
@@ -2870,8 +2910,8 @@
         "取药",
         "随访"
       ],
-      "status": "待开发",
-      "nextAction": "为转诊、医保审核、固定取药增加状态操作。"
+      "status": "进行中",
+      "nextAction": "已新增通用业务闭环状态接口 /api/workflow-actions，并验证固定取药从机构确认到医保审核通过；下一步把四端页面按钮接入该接口。"
     },
     {
       "priority": "P1",

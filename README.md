@@ -46,6 +46,8 @@ http://localhost:5173/login.html
 统计导入任务接口：卫健委端登录后可调用 `POST /api/health-statistics/import-jobs` 登记 PDF/Excel 报表导入、统计直报系统接口或医疗机构接口对账任务，任务会进入 `healthStatisticsIngestion.jobs` 并写入安全审计。
 使用 PowerShell 手工联调包含中文的 JSON 时，请用 UTF-8 字节提交请求体；浏览器 `fetch` 默认可正常提交 UTF-8。
 
+业务闭环状态接口：登录后可调用 `POST /api/workflow-actions` 更新 `careOrders`、`medicationPickups`、`insuranceClaims`、`followups`、`referrals` 的状态和简单字段，并写入安全事件。
+
 如果你的 PowerShell 没有限制脚本执行，也可以使用 `npm run dev`。
 
 如果浏览器提示 `localhost:5173` 无法打开，说明服务窗口没有运行。请重新双击 `open-localhost.cmd`，或者在命令行执行 `npm.cmd run dev` 后保持该窗口不要关闭。

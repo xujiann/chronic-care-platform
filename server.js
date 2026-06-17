@@ -14,6 +14,7 @@ const DEMO_PASSWORD = "123456";
 const sessions = new Map();
 let sqliteModule = null;
 let sqliteError = null;
+const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals"]);
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -177,8 +178,8 @@ function seedPlatformRoadmap() {
       title: "业务动作闭环",
       reason: "当前多数状态为展示型，下一步要能接诊、审核、下转、完成取药、完成随访。",
       scope: ["分级诊疗", "医保", "取药", "随访"],
-      status: "待开发",
-      nextAction: "为转诊、医保审核、固定取药增加状态操作。"
+      status: "进行中",
+      nextAction: "已新增通用业务闭环状态接口 /api/workflow-actions，并验证固定取药从机构确认到医保审核通过；下一步把四端页面按钮接入该接口。"
     },
     {
       priority: "P1",
@@ -1178,6 +1179,24 @@ function normalizeHealthStatisticsImportJob(payload, user) {
   };
 }
 
+function cleanWorkflowUpdates(updates) {
+  return Object.entries(updates && typeof updates === "object" ? updates : {}).reduce((result, [key, value]) => {
+    if (["string", "number", "boolean"].includes(typeof value) || value === null) {
+      result[key] = value;
+    }
+    return result;
+  }, {});
+}
+
+function findWorkflowCollection(data, collection) {
+  if (collection === "referrals") {
+    data.referralSystem = data.referralSystem || seedReferralSystem();
+    data.referralSystem.referrals = Array.isArray(data.referralSystem.referrals) ? data.referralSystem.referrals : [];
+    return data.referralSystem.referrals;
+  }
+  return Array.isArray(data[collection]) ? data[collection] : null;
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -1272,6 +1291,48 @@ async function handleApi(req, res) {
     ].slice(0, 120);
     writeDatabase(data);
     sendJson(res, 201, job);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/workflow-actions") {
+    const user = requireApiRole(req, res, ["citizen", "institution", "insurance", "county", "commission"], "/api/workflow-actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const collection = String(payload.collection || "").trim();
+    if (!WORKFLOW_COLLECTIONS.has(collection)) {
+      sendJson(res, 400, { error: "Bad Request", message: "不支持的业务集合" });
+      return;
+    }
+    const data = readDatabase();
+    const rows = findWorkflowCollection(data, collection);
+    const item = rows?.find((row) => row.id === payload.id);
+    if (!item) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到业务记录" });
+      return;
+    }
+    if (!canAccessResident(user, item.residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "更新业务闭环", target: `${collection}/${payload.id}`, result: "拒绝", detail: "超出居民授权范围" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权更新该居民业务记录" });
+      return;
+    }
+    Object.assign(item, cleanWorkflowUpdates(payload.updates));
+    if (payload.status) item.status = String(payload.status);
+    item.lastUpdated = new Date().toISOString();
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "更新业务闭环",
+        target: `${collection}/${item.id}`,
+        result: "允许",
+        detail: payload.note || `状态更新为 ${item.status || "已更新"}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, item);
     return;
   }
 

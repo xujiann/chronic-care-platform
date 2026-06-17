@@ -6,8 +6,8 @@ const fallbackState = {
   accounts: [
     {
       id: "a1",
-      name: "王建国账户",
-      phone: "13800010001",
+      name: "演示居民A账户",
+      phone: "DEMO-MOBILE-R1",
       role: "本人",
       members: [{ residentId: "r1", relation: "本人" }]
     }
@@ -15,14 +15,14 @@ const fallbackState = {
   residents: [
     {
       id: "r1",
-      name: "王建国",
-      idCard: "210204196802113219",
+      name: "演示居民A",
+      idCard: "DEMO-ID-R1",
       gender: "男",
       birthDate: "1968-02-11",
-      phone: "13800010001",
+      phone: "DEMO-MOBILE-R1",
       organization: "青泥洼桥社区卫生服务中心",
       familyDoctor: "刘医生",
-      address: "中山区人民路 18 号",
+      address: "演示地址A",
       metrics: { systolic: 166, diastolic: 96, glucose: 6.8, bmi: 29.4 }
     }
   ],
