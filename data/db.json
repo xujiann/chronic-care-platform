@@ -2663,7 +2663,8 @@
         "priority": "高",
         "date": "2026-06-16",
         "reservedResource": "心内科号源 2 个，床位 1 张",
-        "insurancePolicy": "基层逐级转诊，住院起付线连续计算"
+        "insurancePolicy": "基层逐级转诊，住院起付线连续计算",
+        "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
       },
       {
         "id": "rf2",
@@ -2677,7 +2678,8 @@
         "priority": "中",
         "date": "2026-06-18",
         "reservedResource": "内分泌复诊号源 3 个",
-        "insurancePolicy": "门诊报销按转诊路径执行差异化支付"
+        "insurancePolicy": "门诊报销按转诊路径执行差异化支付",
+        "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
       },
       {
         "id": "rf3",
@@ -2691,7 +2693,8 @@
         "priority": "中",
         "date": "2026-06-20",
         "reservedResource": "家庭医生随访 1 次，长期处方 8 周",
-        "insurancePolicy": "同一疾病周期下转基层不另设住院起付线"
+        "insurancePolicy": "同一疾病周期下转基层不另设住院起付线",
+        "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
       }
     ],
     "reservedResources": [
@@ -2754,7 +2757,8 @@
           "用药指导"
         ],
         "fulfillment": "履约中",
-        "nextAction": "补充家庭血压记录并评估上转结果"
+        "nextAction": "补充家庭血压记录并评估上转结果",
+        "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
       },
       {
         "residentId": "r2",
@@ -2767,7 +2771,8 @@
           "用药指导"
         ],
         "fulfillment": "待随访",
-        "nextAction": "复查糖化血红蛋白后调整随访计划"
+        "nextAction": "复查糖化血红蛋白后调整随访计划",
+        "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
       },
       {
         "residentId": "r4",
@@ -2780,7 +2785,8 @@
           "长期处方"
         ],
         "fulfillment": "履约中",
-        "nextAction": "承接下转后开具 8 周处方"
+        "nextAction": "承接下转后开具 8 周处方",
+        "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
       }
     ],
     "education": [
@@ -2851,8 +2857,8 @@
         "医疗机构端",
         "健康档案"
       ],
-      "status": "待开发",
-      "nextAction": "新增居民全景详情页和血压、血糖、BMI 趋势。"
+      "status": "进行中",
+      "nextAction": "已在卫健委端居民详情中加入 360 总览、健康指标趋势、档案病历、协同闭环和访问审计；下一步接入真实连续指标。"
     },
     {
       "priority": "P1",

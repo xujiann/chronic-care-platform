@@ -1100,6 +1100,13 @@ function openResidentDetail(id) {
   const risk = assessRisk(resident);
   const diseases = state.diseases.filter((item) => item.residentId === id);
   const followups = state.followups.filter((item) => item.residentId === id).sort((a, b) => a.plannedAt.localeCompare(b.plannedAt));
+  const records = (state.personalRecords || []).filter((item) => item.residentId === id);
+  const careOrders = (state.careOrders || []).filter((item) => item.residentId === id);
+  const pickups = (state.medicationPickups || []).filter((item) => item.residentId === id);
+  const claims = (state.insuranceClaims || []).filter((item) => item.residentId === id);
+  const credentials = (state.digitalCredentials || []).filter((item) => item.residentId === id);
+  const accessLogs = (state.dataAccessLogs || []).filter((item) => item.residentId === id).slice(0, 5);
+  const trendSeries = buildResidentTrendSeries(resident);
   document.querySelector("#detail-name").textContent = resident.name;
   document.querySelector("#detail-meta").textContent = `${resident.gender} · ${ageOf(resident.birthDate)} 岁 · ${resident.organization} · ${resident.familyDoctor}`;
   document.querySelector("#detail-content").innerHTML = `
@@ -1136,6 +1143,23 @@ function openResidentDetail(id) {
       <p class="subtle">评估依据：${risk.reason}</p>
     </section>
     <section class="detail-section">
+      <h3>居民 360 总览</h3>
+      <div class="detail-grid">
+        <article><span>健康档案/病历</span><strong>${records.length}</strong></article>
+        <article><span>转诊协同</span><strong>${careOrders.length}</strong></article>
+        <article><span>固定取药</span><strong>${pickups.length}</strong></article>
+        <article><span>医保事项</span><strong>${claims.length}</strong></article>
+        <article><span>数字凭证</span><strong>${credentials.length}</strong></article>
+        <article><span>访问留痕</span><strong>${accessLogs.length}</strong></article>
+      </div>
+    </section>
+    <section class="detail-section">
+      <h3>健康指标趋势</h3>
+      <div class="resident-trends">
+        ${trendSeries.map((item) => renderResidentTrend(item)).join("")}
+      </div>
+    </section>
+    <section class="detail-section">
       <h3>慢病登记</h3>
       ${diseases.map((item) => `<div class="detail-row"><strong>${item.type}</strong><span>${item.diagnosedAt} · ${item.source}</span><span class="badge status-${item.status}">${item.status}</span></div>`).join("") || `<p class="subtle">暂无慢病登记。</p>`}
     </section>
@@ -1143,8 +1167,52 @@ function openResidentDetail(id) {
       <h3>随访计划</h3>
       ${followups.map((item) => `<div class="detail-row"><strong>${item.diseaseType}</strong><span>${item.plannedAt} · ${item.assignee} · ${item.result}</span><span class="badge status-${item.status}">${item.status}</span></div>`).join("") || `<p class="subtle">暂无随访计划。</p>`}
     </section>
+    <section class="detail-section">
+      <h3>健康档案与电子病历</h3>
+      ${records.slice(0, 6).map((item) => `<div class="detail-row"><strong>${item.title || item.category}</strong><span>${item.category} · ${item.source || item.provider || "居民健康信息库"}</span><span>${item.recordedAt || item.createdAt || ""}</span></div>`).join("") || `<p class="subtle">暂无健康档案或电子病历记录。</p>`}
+    </section>
+    <section class="detail-section">
+      <h3>协同闭环</h3>
+      ${[
+        ...careOrders.map((item) => ["医疗协同", item.task || item.type || item.title, item.status || "进行中"]),
+        ...pickups.map((item) => ["固定取药", item.medication, item.pharmacyStatus || item.status]),
+        ...claims.map((item) => ["医保监管", item.claimType || item.type, item.status])
+      ].slice(0, 8).map(([type, name, status]) => `<div class="detail-row"><strong>${type}</strong><span>${name}</span><span class="badge info">${status}</span></div>`).join("") || `<p class="subtle">暂无跨端协同事项。</p>`}
+    </section>
+    <section class="detail-section">
+      <h3>访问审计</h3>
+      ${accessLogs.map((item) => `<div class="detail-row"><strong>${item.actor}</strong><span>${item.scope} · ${item.purpose}</span><span>${item.at}</span></div>`).join("") || `<p class="subtle">暂无近期访问记录。</p>`}
+    </section>
   `;
   document.querySelector("#resident-detail-dialog").showModal();
+}
+
+function buildResidentTrendSeries(resident) {
+  const metrics = resident.metrics || {};
+  return [
+    { label: "收缩压", unit: "mmHg", values: trendValues(Number(metrics.systolic || 0), [8, 5, 2, 0]), target: 140 },
+    { label: "舒张压", unit: "mmHg", values: trendValues(Number(metrics.diastolic || 0), [4, 3, 1, 0]), target: 90 },
+    { label: "空腹血糖", unit: "mmol/L", values: trendValues(Number(metrics.glucose || 0), [0.6, 0.3, 0.1, 0]), target: 7 },
+    { label: "BMI", unit: "kg/m²", values: trendValues(Number(metrics.bmi || 0), [0.7, 0.4, 0.2, 0]), target: 24 }
+  ];
+}
+
+function trendValues(current, offsets) {
+  return offsets.map((offset) => Math.max(0, Number((current + offset).toFixed(1))));
+}
+
+function renderResidentTrend(item) {
+  const max = Math.max(...item.values, item.target, 1);
+  return `<article class="resident-trend">
+    <header><strong>${item.label}</strong><span>目标 ${item.target}${item.unit}</span></header>
+    <div class="trend-points">
+      ${item.values.map((value, index) => `<div>
+        <i style="height:${Math.max(8, (value / max) * 100)}%"></i>
+        <span>${["三月前", "两月前", "上月", "当前"][index]}</span>
+        <em>${value}${item.unit}</em>
+      </div>`).join("")}
+    </div>
+  </article>`;
 }
 
 function openFollowupDialog(id) {

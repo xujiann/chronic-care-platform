@@ -287,6 +287,64 @@ h1 {
   font-size: 12px;
 }
 
+.resident-trends {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.resident-trend {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fbfdff;
+}
+
+.resident-trend header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.resident-trend header span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.trend-points {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  align-items: end;
+  min-height: 130px;
+}
+
+.trend-points div {
+  display: grid;
+  grid-template-rows: 76px auto auto;
+  gap: 5px;
+  align-items: end;
+  text-align: center;
+  min-width: 0;
+}
+
+.trend-points i {
+  display: block;
+  width: 100%;
+  align-self: end;
+  border-radius: 6px 6px 2px 2px;
+  background: linear-gradient(180deg, #4f9f8f, #245f73);
+}
+
+.trend-points span,
+.trend-points em {
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  color: var(--muted);
+  font-style: normal;
+}
+
 .content-grid,
 .split {
   display: grid;
