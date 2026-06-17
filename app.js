@@ -143,7 +143,8 @@ function personIndexForResident(residentMap, residentId) {
 async function loadState() {
   if (API_BASE) {
     try {
-      const response = await fetch(`${API_BASE}/state`);
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/state`);
       if (response.ok) {
         apiEnabled = true;
         showToast("已连接本地服务，数据保存到 data/db.json");

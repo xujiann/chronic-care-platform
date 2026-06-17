@@ -1739,7 +1739,7 @@ function requireApiRole(req, res, roles, target) {
     sendJson(res, 401, { error: "Unauthorized", message: "请先登录后再访问该接口" });
     return null;
   }
-  if (!allowed.includes(session.user.role) && session.user.role !== "commission") {
+  if (!allowed.includes(session.user.role)) {
     appendSecurityEvent({ actor: session.user.name, role: session.user.role, action: "访问接口", target, result: "拒绝", detail: `需要角色：${allowed.join("、")}` });
     sendJson(res, 403, { error: "Forbidden", message: "当前角色无权访问该接口" });
     return null;
@@ -1753,6 +1753,37 @@ function canAccessResident(user, residentId, data) {
   if (user.residentId === residentId) return true;
   const account = data.accounts.find((item) => item.id === user.accountId);
   return Boolean(account?.members?.some((member) => member.residentId === residentId));
+}
+
+function scopeStateForUser(data, user) {
+  const scoped = structuredClone(data);
+  if (user.role === "commission") return scoped;
+
+  delete scoped.authUsers;
+  delete scoped.authOrganizations;
+  delete scoped.securityEvents;
+  delete scoped.interfaceRequirements;
+  delete scoped.platformRoadmap;
+
+  if (user.role !== "citizen") return scoped;
+
+  const account = (data.accounts || []).find((item) => item.id === user.accountId);
+  const allowedIds = new Set([
+    user.residentId,
+    ...(account?.members || []).map((member) => member.residentId)
+  ].filter(Boolean));
+  const hasAllowedResident = (item) => allowedIds.has(item?.residentId) || allowedIds.has(item?.maternalResidentId);
+
+  scoped.accounts = account ? [account] : [];
+  scoped.residents = (data.residents || []).filter((item) => allowedIds.has(item.id));
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates"].forEach((key) => {
+    scoped[key] = (data[key] || []).filter(hasAllowedResident);
+  });
+  if (scoped.referralSystem) {
+    scoped.referralSystem.referrals = (data.referralSystem?.referrals || []).filter(hasAllowedResident);
+    scoped.referralSystem.familyDoctorServices = (data.referralSystem?.familyDoctorServices || []).filter(hasAllowedResident);
+  }
+  return scoped;
 }
 
 function appendSecurityEvent(event) {
@@ -1867,7 +1898,9 @@ async function handleApi(req, res) {
   }
 
   if (req.method === "GET" && url.pathname === "/api/state") {
-    sendJson(res, 200, readDatabase());
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance", "citizen", "county"], "/api/state");
+    if (!user) return;
+    sendJson(res, 200, scopeStateForUser(readDatabase(), user));
     return;
   }
 

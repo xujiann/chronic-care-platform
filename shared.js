@@ -4,7 +4,8 @@ const STORAGE_KEY = "chronic-care-platform-state";
 async function loadPlatformState(fallback) {
   if (API_BASE) {
     try {
-      const response = await fetch(`${API_BASE}/state`);
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/state`);
       if (response.ok) return normalizePlatformState(await response.json());
     } catch (error) {
       // Static fallback below.

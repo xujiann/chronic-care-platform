@@ -152,7 +152,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 async function loadState() {
   if (API_BASE) {
     try {
-      const response = await fetch(`${API_BASE}/state`);
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/state`);
       if (response.ok) return await response.json();
     } catch (error) {
       // Fall back to browser data below.
@@ -228,6 +229,7 @@ function renderCitizen(residentId) {
   riskPill.className = `risk-pill risk-${risk.level}`;
 
   renderSummary(resident, diseases, followups, records);
+  renderLifeCycle(resident, diseases, followups, records);
   renderVault(resident, diseases, followups, records);
   renderEmr(records, resident, diseases, followups);
   renderDiseases(diseases, risk);
@@ -421,6 +423,81 @@ function renderSummary(resident, diseases, followups, records) {
   document.querySelector("#summary-grid").innerHTML = cards
     .map(([label, value, hint]) => `<article class="summary-card"><span>${label}</span><strong>${value}</strong><small>${hint}</small></article>`)
     .join("");
+}
+
+function renderLifeCycle(resident, diseases, followups, records) {
+  const container = document.querySelector("#lifecycle-cards");
+  if (!container) return;
+  const birthCertificates = getBirthCertificatesForResident(resident.id);
+  const deathCertificates = getDeathCertificatesForResident(resident.id);
+  const labs = getPersonalRecords(resident.id, "labs");
+  const vaccines = getPersonalRecords(resident.id, "vaccines");
+  const medications = getPersonalRecords(resident.id, "medications");
+  const senior = (state.seniorServices || []).filter((item) => item.residentId === resident.id);
+  const age = ageOf(resident.birthDate);
+  const latestRecord = [records[0], labs[0], medications[0]].filter(Boolean).sort(sortByDateDesc)[0];
+  const pendingFollowups = followups.filter((item) => item.status !== "已完成");
+  const stages = [
+    {
+      title: "出生与建档",
+      status: birthCertificates.length ? "已归集" : "待归集",
+      detail: birthCertificates[0]
+        ? `${birthCertificates[0].newbornName || resident.name} · ${birthCertificates[0].certificateNo} · ${birthCertificates[0].healthManagementStatus || "新生儿管理"}`
+        : "出生医学证明、母婴三证和新生儿访视信息待接入。",
+      action: birthCertificates[0]?.nextService || "补齐出生证、出生筛查和接种起始记录"
+    },
+    {
+      title: "儿童青少年",
+      status: vaccines.length ? "有记录" : age < 18 ? "待跟进" : "历史阶段",
+      detail: vaccines[0] ? `${vaccines.length} 条免疫接种记录，最近：${vaccines[0].name}` : "儿童体检、免疫规划、发育评估和学校健康记录可持续归集。",
+      action: age < 18 ? "关注体检、接种、发育和视力口腔管理" : "保留历史儿童保健和接种档案"
+    },
+    {
+      title: "成人健康",
+      status: latestRecord ? "持续更新" : "待补齐",
+      detail: latestRecord ? `${latestRecord.date} · ${latestRecord.name} · ${latestRecord.source}` : "体检、门诊病历、检查检验和用药处方待补齐。",
+      action: "保持年度体检、授权共享和异常指标随访"
+    },
+    {
+      title: "慢病与康复",
+      status: diseases.length ? "管理中" : "未登记慢病",
+      detail: diseases.length ? diseases.map((item) => `${item.type}/${item.status}`).join("、") : "暂无慢病登记，继续风险筛查和健康教育。",
+      action: pendingFollowups.length ? `${pendingFollowups.length} 项随访待处理` : "按需开展慢病筛查、复诊和康复管理"
+    },
+    {
+      title: "老年与照护",
+      status: age >= 60 || senior.length ? "已纳入" : "预备阶段",
+      detail: senior.length ? senior.map((item) => `${item.serviceName || item.type || "适老服务"} · ${item.status || "服务中"}`).join("、") : "适老服务、家庭代办、长期处方、失能评估和照护资源可接续。",
+      action: age >= 60 ? "完善老年健康评估、用药安全和照护计划" : "提前建立家庭联系人和授权代办"
+    },
+    {
+      title: "死亡与身后事项",
+      status: deathCertificates.length ? "已归档" : "未发生",
+      detail: deathCertificates[0]
+        ? `${deathCertificates[0].certificateNo} · ${deathCertificates[0].deathDateTime} · ${deathCertificates[0].qualityCheck || "待质控"}`
+        : "死亡医学证明、公安民政共享和家属事项尚未触发。",
+      action: deathCertificates[0] ? `${deathCertificates[0].publicSecuritySync || "公安待共享"} · ${deathCertificates[0].civilAffairsSync || "民政待共享"}` : "保留预立授权、紧急联系人和身后事务指引"
+    }
+  ];
+  document.querySelector("#lifecycle-summary").textContent = `${resident.name} · ${age} 岁 · ${stages.filter((item) => ["已归集", "有记录", "持续更新", "管理中", "已纳入", "已归档"].includes(item.status)).length}/6 个阶段已有数据`;
+  container.innerHTML = stages.map((stage, index) => `<article class="lifecycle-card">
+    <span>${String(index + 1).padStart(2, "0")}</span>
+    <strong>${stage.title}</strong>
+    <p>${stage.detail}</p>
+    <small>${stage.status} · ${stage.action}</small>
+  </article>`).join("");
+}
+
+function getBirthCertificatesForResident(residentId) {
+  return (state.birthCertificates || [])
+    .filter((item) => item.maternalResidentId === residentId || item.residentId === residentId)
+    .sort((a, b) => String(b.birthDateTime || b.lastUpdated || "").localeCompare(String(a.birthDateTime || a.lastUpdated || "")));
+}
+
+function getDeathCertificatesForResident(residentId) {
+  return (state.deathCertificates || [])
+    .filter((item) => item.residentId === residentId)
+    .sort((a, b) => String(b.deathDateTime || b.lastUpdated || "").localeCompare(String(a.deathDateTime || a.lastUpdated || "")));
 }
 
 function renderEmr(records, resident, diseases, followups) {

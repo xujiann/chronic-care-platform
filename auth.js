@@ -23,6 +23,26 @@
     county: "county.html"
   };
 
+  const routeAccess = {
+    "index.html": ["commission"],
+    "workbench.html": ["commission"],
+    "institution.html": ["institution"],
+    "insurance.html": ["insurance"],
+    "county.html": ["county"],
+    "citizen.html": ["citizen"],
+    "mobile-preview.html": ["citizen"],
+    "health-city.html": ["commission", "institution", "insurance", "citizen", "county"],
+    "login.html": ["commission", "institution", "insurance", "citizen", "county"]
+  };
+
+  const roleLinks = {
+    commission: [["health-city.html", "总览"], ["workbench.html", "工作台"], ["index.html", "卫健管理"]],
+    institution: [["health-city.html", "总览"], ["institution.html", "医疗机构"]],
+    insurance: [["health-city.html", "总览"], ["insurance.html", "医保"]],
+    citizen: [["health-city.html", "总览"], ["citizen.html", "个人端"], ["mobile-preview.html", "手机预览"]],
+    county: [["health-city.html", "总览"], ["county.html", "医共体"]]
+  };
+
   async function login(username, password) {
     if (API_BASE) {
       try {
@@ -113,7 +133,7 @@
       window.location.replace(`./login.html?redirect=${encodeURIComponent(currentPage())}&expired=1`);
       return false;
     }
-    if (!allowed.includes(user.role) && user.role !== "commission") {
+    if (!allowed.includes(user.role)) {
       const target = roleHome[user.role] || "health-city.html";
       window.location.replace(`./${target}?denied=${encodeURIComponent(currentPage())}`);
       return false;
@@ -132,6 +152,35 @@
     window.location.href = redirect.startsWith("http") ? "./health-city.html" : `./${redirect.replace(/^\.\//, "")}`;
   }
 
+  function normalizePageName(href) {
+    try {
+      const url = new URL(href, location.href);
+      if (url.origin !== location.origin) return "";
+      return url.pathname.split("/").pop() || "health-city.html";
+    } catch (error) {
+      return "";
+    }
+  }
+
+  function canAccessPage(pageName, user) {
+    if (!pageName || pageName.startsWith("#")) return true;
+    if (!user) return pageName === "login.html" || pageName === "health-city.html";
+    if (pageName === "login.html") return false;
+    const allowed = routeAccess[pageName];
+    return !allowed || allowed.includes(user.role);
+  }
+
+  function filterRoleLinks() {
+    if (document.body?.dataset.authPage === "login") return;
+    const user = getUser();
+    document.querySelectorAll("a[href]").forEach((link) => {
+      const pageName = normalizePageName(link.getAttribute("href"));
+      if (!canAccessPage(pageName, user)) {
+        link.remove();
+      }
+    });
+  }
+
   function renderSessionBar() {
     if (document.body?.dataset.authPage === "login") return;
     const shell = document.querySelector(".portal-shell, .citizen-shell, .app");
@@ -140,6 +189,9 @@
     const bar = document.createElement("section");
     bar.className = "auth-bar";
     if (user) {
+      const linksHtml = (roleLinks[user.role] || [["health-city.html", "总览"]])
+        .map(([href, label]) => `<a href="./${href}">${label}</a>`)
+        .join("");
       bar.innerHTML = `
         <div>
           <strong>${user.name}</strong>
@@ -155,6 +207,8 @@
           <a href="./citizen.html">个人</a>
           <button type="button" data-logout>退出</button>
         </nav>`;
+      bar.querySelector("span").textContent = `${user.roleName} · ${user.orgName || "未绑定机构"} · ${user.dataScope || "默认范围"} · ${user.authMode === "server" ? "后端会话" : "本地演示"} · ${new Date(user.loginAt || Date.now()).toLocaleString("zh-CN")}`;
+      bar.querySelector("nav").innerHTML = `${linksHtml}<button type="button" data-logout>退出</button>`;
     } else {
       bar.innerHTML = `
         <div>
@@ -164,7 +218,13 @@
         <nav><a href="./login.html?redirect=${encodeURIComponent(currentPage())}">登录</a></nav>`;
     }
     shell.prepend(bar);
+    if (!user) {
+      bar.querySelector("strong").textContent = "未登录";
+      bar.querySelector("span").textContent = "请先选择角色进入健康城市系统";
+      bar.querySelector("nav a").textContent = "登录";
+    }
     bar.querySelector("[data-logout]")?.addEventListener("click", logout);
+    filterRoleLinks();
   }
 
   window.HealthCityAuth = {
@@ -176,8 +236,12 @@
     authFetch,
     requireRole,
     redirectAfterLogin,
-    renderSessionBar
+    renderSessionBar,
+    filterRoleLinks
   };
 
-  document.addEventListener("DOMContentLoaded", renderSessionBar);
+  document.addEventListener("DOMContentLoaded", () => {
+    renderSessionBar();
+    filterRoleLinks();
+  });
 })();

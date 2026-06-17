@@ -266,6 +266,52 @@ select,
   color: var(--muted);
 }
 
+.lifecycle-panel {
+  margin-bottom: 16px;
+}
+
+.lifecycle-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.lifecycle-card {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 8px;
+  min-height: 172px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fbfd;
+}
+
+.lifecycle-card strong,
+.lifecycle-card span,
+.lifecycle-card small {
+  display: block;
+}
+
+.lifecycle-card strong {
+  font-size: 15px;
+}
+
+.lifecycle-card span {
+  color: var(--teal);
+  font-weight: 800;
+}
+
+.lifecycle-card p {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.lifecycle-card small {
+  color: var(--ink);
+  font-weight: 700;
+}
+
 .two-column {
   display: grid;
   grid-template-columns: 1.35fr 0.9fr;
@@ -808,6 +854,7 @@ dialog::backdrop {
   }
 
   .summary-grid,
+  .lifecycle-grid,
   .two-column,
   .account-panel,
   .completeness,
