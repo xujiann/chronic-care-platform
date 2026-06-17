@@ -172,9 +172,10 @@ async function saveState() {
   normalizePersonIndexes();
   if (apiEnabled) {
     try {
-      const response = await fetch(`${API_BASE}/state`, {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/state`, {
         method: "PUT",
-        headers: window.HealthCityAuth?.authHeaders({ "Content-Type": "application/json" }) || { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(state)
       });
       if (response.ok) return;
@@ -191,10 +192,8 @@ function bindNavigation() {
   });
   document.querySelector("#seed-data").addEventListener("click", async () => {
     if (apiEnabled) {
-      const response = await fetch(`${API_BASE}/reset`, {
-        method: "POST",
-        headers: window.HealthCityAuth?.authHeaders() || {}
-      });
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/reset`, { method: "POST" });
       state = await response.json();
     } else {
       state = structuredClone(seedState);

@@ -738,9 +738,10 @@ function bindDialogs() {
 async function addPersonalRecord(record) {
   if (API_BASE) {
     try {
-      const response = await fetch(`${API_BASE}/personal-records`, {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/personal-records`, {
         method: "POST",
-        headers: window.HealthCityAuth?.authHeaders({ "Content-Type": "application/json" }) || { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(record)
       });
       if (response.ok) {
@@ -832,9 +833,10 @@ async function revokeAuthorization(id) {
   const patch = { meta: { status: "revoked", revokedAt: todayOffset(0) } };
   if (API_BASE) {
     try {
-      const response = await fetch(`${API_BASE}/personal-records/${encodeURIComponent(id)}`, {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/personal-records/${encodeURIComponent(id)}`, {
         method: "PATCH",
-        headers: window.HealthCityAuth?.authHeaders({ "Content-Type": "application/json" }) || { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patch)
       });
       if (response.ok) {

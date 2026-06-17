@@ -188,41 +188,37 @@
     const user = getUser();
     const bar = document.createElement("section");
     bar.className = "auth-bar";
+
+    const identity = document.createElement("div");
+    const name = document.createElement("strong");
+    const detail = document.createElement("span");
+    identity.append(name, detail);
+
+    const nav = document.createElement("nav");
     if (user) {
-      const linksHtml = (roleLinks[user.role] || [["health-city.html", "总览"]])
-        .map(([href, label]) => `<a href="./${href}">${label}</a>`)
-        .join("");
-      bar.innerHTML = `
-        <div>
-          <strong>${user.name}</strong>
-          <span>${user.roleName} · ${user.orgName || "未绑定机构"} · ${user.dataScope || "默认范围"} · ${user.authMode === "server" ? "后端会话" : "本地演示"} · ${new Date(user.loginAt || Date.now()).toLocaleString("zh-CN")}</span>
-        </div>
-        <nav>
-          <a href="./health-city.html">总览</a>
-          <a href="./workbench.html">工作台</a>
-          <a href="./index.html">卫健委</a>
-          <a href="./institution.html">医疗机构</a>
-          <a href="./insurance.html">医保</a>
-          <a href="./county.html">医共体</a>
-          <a href="./citizen.html">个人</a>
-          <button type="button" data-logout>退出</button>
-        </nav>`;
-      bar.querySelector("span").textContent = `${user.roleName} · ${user.orgName || "未绑定机构"} · ${user.dataScope || "默认范围"} · ${user.authMode === "server" ? "后端会话" : "本地演示"} · ${new Date(user.loginAt || Date.now()).toLocaleString("zh-CN")}`;
-      bar.querySelector("nav").innerHTML = `${linksHtml}<button type="button" data-logout>退出</button>`;
+      name.textContent = user.name;
+      detail.textContent = `${user.roleName} · ${user.orgName || "未绑定机构"} · ${user.dataScope || "默认范围"} · ${user.authMode === "server" ? "后端会话" : "本地演示"} · ${new Date(user.loginAt || Date.now()).toLocaleString("zh-CN")}`;
+      (roleLinks[user.role] || [["health-city.html", "总览"]]).forEach(([href, label]) => {
+        const link = document.createElement("a");
+        link.href = `./${href}`;
+        link.textContent = label;
+        nav.append(link);
+      });
+      const logoutButton = document.createElement("button");
+      logoutButton.type = "button";
+      logoutButton.dataset.logout = "";
+      logoutButton.textContent = "退出";
+      nav.append(logoutButton);
     } else {
-      bar.innerHTML = `
-        <div>
-          <strong>未登录</strong>
-          <span>请先选择角色进入健康城市系统</span>
-        </div>
-        <nav><a href="./login.html?redirect=${encodeURIComponent(currentPage())}">登录</a></nav>`;
+      name.textContent = "未登录";
+      detail.textContent = "请先选择角色进入健康城市系统";
+      const loginLink = document.createElement("a");
+      loginLink.href = `./login.html?redirect=${encodeURIComponent(currentPage())}`;
+      loginLink.textContent = "登录";
+      nav.append(loginLink);
     }
+    bar.append(identity, nav);
     shell.prepend(bar);
-    if (!user) {
-      bar.querySelector("strong").textContent = "未登录";
-      bar.querySelector("span").textContent = "请先选择角色进入健康城市系统";
-      bar.querySelector("nav a").textContent = "登录";
-    }
     bar.querySelector("[data-logout]")?.addEventListener("click", logout);
     filterRoleLinks();
   }
