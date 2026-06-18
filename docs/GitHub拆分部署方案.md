@@ -1,162 +1,81 @@
-# 慢病平台 GitHub 拆分部署方案
+# GitHub 拆分部署方案
 
-生成日期：2026-06-15
+更新日期：2026-06-18
 
-## 一、是否可以拆成两个系统
+当前项目建议继续采用单仓库推进，等接口和权限模型稳定后再拆分前端与 API。这样能避免在 MVP 阶段因为目录迁移影响演示路径。
 
-可以。建议拆成两个前端系统、一个共享后端服务。
-
-```mermaid
-flowchart TB
-    A["管理端系统<br/>chronic-care-admin"] --> C["健康数据 API<br/>chronic-care-api"]
-    B["居民端系统<br/>chronic-care-citizen"] --> C
-    C --> D["数据存储<br/>SQLite/PostgreSQL/JSON"]
-
-    A --> A1["医生/管理人员<br/>居民档案、慢病登记、随访、统计"]
-    B --> B1["居民/家庭成员<br/>健康档案、电子病历、上传资料、授权共享"]
-```
-
-## 二、推荐仓库结构
-
-### 方案 A：一个 GitHub 仓库，分目录部署
-
-适合当前阶段，管理最简单。
+## 1. 当前仓库形态
 
 ```text
 chronic-care-platform/
-  admin/
-    index.html
-    app.js
-    styles.css
-  citizen/
-    citizen.html
-    citizen.js
-    citizen.css
-    mobile-preview.html
-  api/
-    server.js
-    data/
+  login.html
+  health-city.html
+  workbench.html
+  index.html
+  county.html
+  institution.html
+  insurance.html
+  citizen.html
+  mobile-preview.html
+  server.js
+  data/
   docs/
 ```
 
-优点：
+当前页面仍放在根目录，便于 GitHub Pages 静态预览，也便于本地 Node 服务直接提供页面和 API。
 
-- 方便统一维护。
-- 前后端代码都在一个仓库。
-- 适合 MVP 和演示阶段。
+## 2. 推荐部署阶段
 
-缺点：
+| 阶段 | 方式 | 适用目标 |
+|---|---|---|
+| 阶段 1 | 单仓库 + 本地 Node 服务 | 演示、审计、功能验证 |
+| 阶段 2 | 单仓库 + GitHub Pages 静态预览 | 展示页面和文档，不保留服务端写入 |
+| 阶段 3 | 前端静态托管 + Node API | 多角色共用数据、保留写入和审计 |
+| 阶段 4 | 拆分 admin/citizen/api 仓库 | 团队协作、独立发布、正式运维 |
 
-- 后续团队协作、独立发布时边界不够清晰。
+## 3. GitHub Pages 能做什么
 
-### 方案 B：两个 GitHub 仓库 + 一个 API 仓库
+适合：
 
-适合后续正式开发。
+- 展示登录页、各端页面和文档。
+- 展示静态演示数据和页面交互。
+- 发布项目说明、流程图和 README。
 
-```text
-chronic-care-admin
-chronic-care-citizen
-chronic-care-api
-```
+不适合：
 
-优点：
+- 运行 `server.js`。
+- 提供 `/api/state`、`/api/personal-records` 等写入接口。
+- 持久化 `data/db.json`。
+- 承担真实认证、权限和审计。
 
-- 管理端和居民端可以独立迭代、独立发布。
-- API 可以单独部署、扩展和加权限。
+## 4. 后续拆分建议
 
-缺点：
-
-- 初期维护成本略高。
-
-## 三、GitHub Pages 能部署什么
-
-GitHub Pages 适合部署静态前端：
-
-- 管理端页面。
-- 居民端页面。
-- 手机预览页面。
-- 设计文档和架构图。
-
-GitHub Pages 不适合直接运行：
-
-- Node.js 后端 `server.js`。
-- `/api/state`。
-- `/api/personal-records`。
-- 需要写入 `data/db.json` 的服务端逻辑。
-
-因此，如果只用 GitHub Pages，可以运行“静态演示模式”；如果要保留数据写入和 API，需要把后端部署到支持 Node.js 的平台。
-
-## 四、部署路径建议
-
-### 第一阶段：GitHub Pages 静态演示
-
-部署内容：
-
-- 管理端静态页面。
-- 居民端静态页面。
-- 手机预览页面。
-
-能力：
-
-- 页面可访问。
-- 居民端可用浏览器 localStorage 保存上传资料。
-- 不支持多人共享数据。
-- 不支持真正后端 API。
-
-### 第二阶段：前端 GitHub Pages + 后端 Node 服务
-
-部署内容：
-
-- 管理端：GitHub Pages。
-- 居民端：GitHub Pages。
-- API：Node.js 服务，后续可部署到云服务器、Render、Railway、Fly.io、Vercel Serverless 或自有服务器。
-- 数据库：从 JSON 升级到 SQLite 或 PostgreSQL。
-
-能力：
-
-- 管理端和居民端共享同一套数据。
-- 个人健康信息库统一保存。
-- 授权共享、上传资料、随访管理都可持久化。
-
-## 五、当前项目拆分建议
-
-当前目录可以先这样重组：
+正式拆分时可采用：
 
 ```text
-chronic-care-platform/
-  admin/
-    index.html
-    app.js
-    styles.css
-  citizen/
-    citizen.html
-    citizen.js
-    citizen.css
-    mobile-preview.html
-    mobile-preview.css
-  api/
-    server.js
-    package.json
-    data/db.json
-  docs/
-    C端居民端设计方案.md
-    C端全流程审计与优化清单.md
-    慢病平台系统结构图与优化建议.md
+health-admin-web
+health-citizen-web
+health-platform-api
+health-platform-docs
 ```
 
-为了避免一次性移动文件导致路径混乱，建议下一步先做“逻辑拆分”：
+拆分条件建议至少满足：
 
-1. 在文档和 README 中明确三个模块。
-2. 保持当前目录可运行。
-3. 后续确认部署方式后，再进行目录重构。
+- API 路由稳定，状态模型不再频繁重命名。
+- 登录认证、角色权限、居民授权和审计模型成型。
+- 前端页面已明确哪些属于管理端、居民端、机构端和医保端。
+- 自动化测试能覆盖登录、状态读取、居民端和运营工作台关键路径。
 
-## 六、下一步最优操作
+## 5. 当前推送策略
 
-建议下一步做：
+当前远端分支为 `codex/complete-health-platform`。建议每轮完成一个清晰主题后提交：
 
-1. 增加 `docs/` 目录，集中放架构与设计文档。
-2. 增加部署说明 `DEPLOYMENT.md`。
-3. 增加 `.gitignore`，避免日志和本地临时文件入库。
-4. 再决定是否把当前项目拆成 `admin/ citizen/ api/`。
+```powershell
+git status --short
+npm.cmd run check
+git add <files>
+git commit -m "说明本轮主题"
+git push -u origin codex/complete-health-platform
+```
 
-如果要正式发布到 GitHub，建议先保留一个仓库，采用 monorepo。等功能稳定后，再拆成两个或三个仓库。
+若要打开 PR，需要先完成 `gh auth login`，否则只能完成 Git 推送，不能通过 GitHub CLI 创建草稿 PR。

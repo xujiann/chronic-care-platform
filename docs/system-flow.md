@@ -1,130 +1,87 @@
-# 健康城市四端协同系统整体流程结构图
+# 卫生健康信息平台全流程说明
 
-## 1. 整体系统结构
+更新日期：2026-06-18
+
+本文按当前代码已经能运行的能力整理系统流程。当前平台是一个本地可运行的卫生健康信息平台 MVP，重点覆盖慢病医防融合、全民健康信息、县域医共体、分级诊疗、医保协同、居民端服务和运营审计。
+
+## 1. 总体入口
 
 ```mermaid
 flowchart TB
-  Login["统一登录与角色授权"] --> Portal["健康城市系统总览"]
-  Login --> Workbench["统一运营工作台<br/>系统结构、跨端待办、开发优先级"]
-  Login --> Citizen["个人端"]
-  Login --> Institution["医疗机构端"]
-  Login --> Insurance["医保端"]
-  Login --> Commission["卫生健康委端"]
-  Login --> County["县域医共体平台"]
+  Login["统一登录 login.html"] --> City["健康城市总览 health-city.html"]
+  Login --> Workbench["运营工作台 workbench.html"]
+  Login --> Chronic["卫健委慢病管理 index.html"]
+  Login --> County["县域医共体 county.html"]
+  Login --> Institution["医疗机构端 institution.html"]
+  Login --> Insurance["医保端 insurance.html"]
+  Login --> Citizen["居民端 citizen.html"]
+  Citizen --> Mobile["手机预览 mobile-preview.html"]
 
-  Workbench --> Portal
-  Workbench --> Commission
-  Workbench --> County
-  Workbench --> Institution
-  Workbench --> Insurance
-  Workbench --> Citizen
-
-  Citizen --> PersonIndex["统一个人主索引 personIndex<br/>身份证号 + 手机号"]
-  Institution --> PersonIndex
-  Insurance --> PersonIndex
-  Commission --> PersonIndex
-  County --> PersonIndex
-
-  PersonIndex --> Archive["个人健康信息库<br/>健康档案、电子病历、检查检验、用药、接种、过敏、住院、授权"]
-  Archive --> Standard["健康档案标准模型<br/>三维架构 + 32 类基础数据集"]
-  Archive --> Audit["访问审计与授权留痕"]
-
-  Commission --> Chronic["慢病医防整合管理模块"]
-  Commission --> Resource["医疗资源监管"]
-  Commission --> Emergency["公共卫生应急"]
-  Commission --> Quality["数据质量与规划对齐"]
-
-  Institution --> CareOrder["转诊、复诊、随访协同任务"]
-  Institution --> EMR["电子病历补充与标准档案视图"]
-  Institution --> ReferralCenter["分级诊疗转诊中心<br/>上转、下转、号源床位预留"]
-
-  Insurance --> Claim["慢病结算审核"]
-  Insurance --> Supervision["医疗机构监管"]
-  Insurance --> PaymentGuide["分级诊疗支付引导<br/>连续起付线、差异化报销、长期处方"]
-
-  County --> SharedCenters["区域医技共享中心<br/>影像、心电、检验、病理、会诊、急救、消毒供应"]
-  County --> CountyPublicHealth["公共卫生协同<br/>慢病、老年、妇幼、疫苗、应急"]
-  County --> CountyOps["基层综合管理<br/>人财物、药耗、行政、绩效、医废"]
-  County --> ReferralBuild["分级诊疗体系建设<br/>紧密型医联体、基层首诊、双向转诊"]
-
-  Citizen --> Pickup["每月固定取药申请"]
-  Pickup --> Institution
-  Pickup --> Insurance
-  Pickup --> Commission
-  Pickup --> County
+  Workbench --> Audit["平台审计与全流程矩阵"]
+  Workbench --> Roadmap["模块建设路线图"]
+  Workbench --> Tasks["跨端待办和风险"]
 ```
 
-## 2. 慢病医防整合与固定取药闭环
+## 2. 核心数据流
 
 ```mermaid
 flowchart LR
-  Screening["基层筛查/体检/居民上传"] --> Register["慢病登记"]
-  Register --> Risk["风险评估"]
-  Risk --> Followup["家庭医生随访"]
-  Followup --> Referral["医疗机构复诊/转诊"]
-  Referral --> EMR["电子病历与检查检验回流"]
-  EMR --> Archive["个人健康信息库更新"]
-  Archive --> Pickup["居民每月固定取药"]
-  Pickup --> InstitutionReview["医疗机构确认处方和用药"]
-  InstitutionReview --> InsuranceReview["医保审核支付范围"]
-  InsuranceReview --> Pharmacy["药房取药/家属代取"]
-  Pharmacy --> Audit["闭环状态与访问留痕"]
-  Audit --> Commission["卫健委监管看板"]
-  Audit --> County["县域医共体运营监管"]
+  Resident["居民档案"] --> ChronicReg["慢病登记"]
+  Resident --> Followup["随访计划"]
+  Resident --> PersonalRecords["个人健康信息库"]
+  ChronicReg --> Risk["风险评估"]
+  Risk --> Followup
+  Followup --> Doctor["家庭医生/机构协同"]
+  Doctor --> Referral["转诊与复诊"]
+  Referral --> Insurance["医保审核"]
+  PersonalRecords --> Citizen["居民端查看"]
+  PersonalRecords --> Audit["数据访问与授权审计"]
 ```
 
-## 3. 健康档案与电子病历贯通
+当前演示数据主要保存在 `data/db.json`。健康城市总览另使用 `data/health-city.sqlite` 展示卫生资源、人口、机构、服务量等城市级指标。
+
+## 3. 慢病医防融合闭环
+
+当前已实现：
+
+- 居民档案维护、慢病登记、随访计划、风险分层和统计汇总。
+- 慢病协同任务、固定取药、复诊转诊和医保提示的演示闭环。
+- 居民端可查看个人健康档案、电子病历、检查检验、用药、过敏、接种、住院和授权记录。
+- 运营工作台可查看慢病、医共体、分级诊疗等流程的建设状态和待办。
+
+待生产化：
+
+- 接入真实 EMR、LIS、PACS、医保和公卫系统。
+- 将演示账号替换为真实认证和细粒度授权。
+- 将 JSON 存储升级为正式数据库，并增加审计不可篡改策略。
+
+## 4. 县域医共体流程
 
 ```mermaid
 flowchart TB
-  Sources["信息来源"] --> PublicHealth["公共卫生服务记录"]
-  Sources --> EMR["门诊/住院电子病历"]
-  Sources --> PersonalUpload["居民上传资料"]
-  Sources --> InsuranceData["医保结算和取药记录"]
-
-  PublicHealth --> Archive["个人健康信息库"]
-  EMR --> Archive
-  PersonalUpload --> Archive
-  InsuranceData --> Archive
-
-  Archive --> LifeStage["生命阶段"]
-  Archive --> Problem["健康和疾病问题"]
-  Archive --> Activity["卫生服务活动"]
-
-  LifeStage --> StandardDatasets["32 类基础数据集映射"]
-  Problem --> StandardDatasets
-  Activity --> StandardDatasets
-
-  StandardDatasets --> CitizenView["居民查看：已归集/待补齐"]
-  StandardDatasets --> DoctorView["医生查看：授权标准档案视图"]
-  StandardDatasets --> GovView["卫健委查看：质量和覆盖率"]
+  County["县域医共体驾驶舱"] --> Centers["共享中心"]
+  County --> Referral["双向转诊"]
+  County --> PublicHealth["公共卫生协同"]
+  County --> Operations["基层运营管理"]
+  County --> Performance["绩效和质量"]
 ```
 
-## 4. 登录与权限流程
+当前 `county.html` 覆盖县域概览、共享中心、双向转诊、公共卫生协同、运营监测和绩效质量。数据来自 `countyConsortium`、`countySharedCenters`、`countyReferrals` 等集合。
 
-```mermaid
-sequenceDiagram
-  participant U as 用户
-  participant L as 登录页
-  participant A as 认证模块
-  participant P as 端系统
-  participant Log as 审计日志
+## 5. 角色与权限边界
 
-  U->>L: 选择角色账号并登录
-  L->>A: 校验账号、生成会话
-  A-->>L: 返回角色、姓名、首页
-  L->>P: 跳转到角色端系统或统一运营工作台
-  P->>A: requireRole 校验当前角色
-  A-->>P: 允许访问或重定向
-  P->>Log: 查看健康档案、病历、医保数据时留痕
-```
+平台现在使用演示账号登录，并按角色跳转页面。当前能力足够支撑演示和流程审计，但还不是正式安全模型：
 
-## 5. 后续生产化方向
+- 已有角色入口：市级、区县、卫健委、医院、基层机构、医生、医保、居民、医共体。
+- 已有页面级访问控制和会话信息。
+- 尚未实现短信、政务身份、医保电子凭证或 OAuth 等真实身份认证。
+- 尚未实现字段级授权、数据脱敏、授权撤销后的历史访问复核。
 
-- 前端演示账号替换为后端认证接口。
-- 密码改为加盐哈希存储，不在前端保存明文凭据。
-- 增加短信验证码、电子健康码、医保电子凭证、政务统一身份认证。
-- 后端签发短期访问令牌和刷新令牌。
-- 按角色、机构、居民授权范围做细粒度接口权限。
-- 所有健康档案、电子病历、医保数据访问写入 `dataAccessLogs`。
-- 将 `data/db.json` 迁移到 SQLite，再逐步升级 PostgreSQL。
+## 6. 运营审计流程
+
+运营工作台当前承担两个审计视角：
+
+- `platformAudit`：按模块审计当前能力、缺口、风险和后续动作。
+- `platformProcessAudit`：按全流程审计从居民建档、慢病登记、随访、转诊、医保、取药、居民端查看到数据治理的闭环。
+
+这两个集合用于把“系统能做什么、还缺什么、下一步做什么”集中展示，便于继续推进医共体和慢病建设。

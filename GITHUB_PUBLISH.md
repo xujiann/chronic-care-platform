@@ -1,78 +1,89 @@
-# GitHub Publish Guide
+# GitHub 发布说明
 
-## Current Windows Status
-
-Git is already installed:
+当前仓库：
 
 ```text
-git version 2.53.0.windows.1
+https://github.com/xujiann/chronic-care-platform.git
 ```
 
-Git path:
+当前推荐分支：
 
 ```text
-C:\Program Files\Git\cmd\git.exe
+codex/complete-health-platform
 ```
 
-GitHub CLI `gh` is not installed. It is optional. You can publish with Git only.
+## 常用发布流程
 
-## Recommended First Publish Flow
+查看改动：
 
-1. Open GitHub in a browser.
-2. Create a new repository, for example:
+```powershell
+git status -sb
+git diff --stat
+```
+
+提交：
+
+```powershell
+git add -- README.md DEPLOYMENT.md GITHUB_PUBLISH.md docs
+git commit -m "update platform documentation"
+```
+
+推送：
+
+```powershell
+git push -u origin codex/complete-health-platform
+```
+
+## GitHub CLI 状态
+
+当前机器已安装 `gh`，但可能未登录。检查：
+
+```powershell
+gh auth status
+```
+
+如果需要创建 PR：
+
+```powershell
+gh auth login
+gh pr create --draft --fill --head codex/complete-health-platform
+```
+
+只推送代码时，`git push` 通常已足够。
+
+## GitHub Pages
+
+GitHub Pages 只能托管静态页面：
+
+- HTML
+- CSS
+- JS
+- `data/db.json`
+- Markdown 文档
+
+Node.js 后端 `server.js` 不能直接运行在 GitHub Pages 上。
+
+## 建议仓库策略
+
+当前阶段继续使用单仓库：
 
 ```text
 chronic-care-platform
 ```
 
-3. In PowerShell, run:
+原因：
 
-```powershell
-cd "C:\Users\drxuj\OneDrive\3.信息化\0.高质量发展 信息化\chronic-care-platform"
-git init
-git add .
-git commit -m "Initial chronic care platform MVP"
-git branch -M main
-git remote add origin https://github.com/YOUR_NAME/chronic-care-platform.git
-git push -u origin main
-```
+- 所有演示页面共享同一套数据快照。
+- 统一运营工作台需要横跨各端读取状态。
+- 目前仍处于 MVP 和方案验证阶段，频繁拆仓会增加同步成本。
 
-Replace `YOUR_NAME` with your GitHub username or organization name.
-
-## If Git Asks Who You Are
-
-Run:
-
-```powershell
-git config --global user.name "Your Name"
-git config --global user.email "your-email@example.com"
-```
-
-Then run the commit command again.
-
-## Recommended Repository Strategy
-
-Use one repository first:
+后续生产化可拆分为：
 
 ```text
-chronic-care-platform
+health-platform-admin
+health-platform-citizen
+health-platform-api
+health-platform-docs
 ```
 
-Later, split into:
-
-```text
-chronic-care-admin
-chronic-care-citizen
-chronic-care-api
-```
-
-## GitHub Pages Note
-
-GitHub Pages can host static pages only:
-
-- `index.html`
-- `citizen.html`
-- `mobile-preview.html`
-- CSS and JS files
-
-The Node.js API in `server.js` cannot run on GitHub Pages. For API deployment, use a Node-capable platform or server.
+拆分前应先完成 API 契约、数据库表结构和权限边界。
