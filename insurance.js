@@ -1,7 +1,13 @@
 const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [] };
+let platformState = fallbackState;
 
 document.addEventListener("DOMContentLoaded", async () => {
-  const state = await loadPlatformState(fallbackState);
+  platformState = await loadPlatformState(fallbackState);
+  bindInsuranceActions();
+  renderAll(platformState);
+});
+
+function renderAll(state) {
   renderMetrics(state);
   renderClaims(state);
   renderSupervisions(state);
@@ -9,7 +15,23 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderPickupAudits(state);
   renderCredentialChecks(state);
   renderInsuranceAudit(state);
-});
+}
+
+function bindInsuranceActions() {
+  document.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-workflow-action]");
+    if (!button) return;
+    const updates = JSON.parse(button.dataset.updates || "{}");
+    button.disabled = true;
+    const result = await updateWorkflowAction(platformState, button.dataset.collection, button.dataset.id, updates, button.dataset.note || "医保端更新业务状态");
+    button.disabled = false;
+    if (result.ok) renderAll(platformState);
+  });
+}
+
+function actionButton(collection, id, label, updates, note) {
+  return `<button class="inline-action" type="button" data-workflow-action data-collection="${collection}" data-id="${id}" data-updates='${JSON.stringify(updates)}' data-note="${note || label}">${label}</button>`;
+}
 
 function residentOf(state, id) {
   return state.residents.find((item) => item.id === id);
@@ -40,6 +62,10 @@ function renderClaims(state) {
         <p>${claim.institution} · ${claim.diseaseType} · ${claim.date}</p>
         <p>总费用 ${money(claim.totalAmount)}，医保支付 ${money(claim.insurancePay)}，自付 ${money(claim.selfPay)}</p>
         <p>关联健康资料 ${records} 条 · ${claim.risk}</p>
+        <div class="action-row">
+          ${claim.status !== "已通过" ? actionButton("insuranceClaims", claim.id, "审核通过", { status: "已通过", reviewResult: "合规通过" }, "医保结算审核通过") : ""}
+          ${claim.status !== "退回补正" ? actionButton("insuranceClaims", claim.id, "退回补正", { status: "退回补正", reviewResult: "需补充病历或处方依据" }, "医保结算退回补正") : ""}
+        </div>
       </div>
       <span class="badge ${risk}">${claim.status}</span>
     </section>`;
@@ -92,6 +118,10 @@ function renderPickupAudits(state) {
         <h3>${resident?.name || "未知居民"} · ${item.medication}</h3>
         <p>${item.coverage} · ${item.dosage} · ${item.nextPickup}</p>
         <p>机构确认：${item.institutionReview || "待确认"} · 药房状态：${item.pharmacyStatus || item.status}</p>
+        <div class="action-row">
+          ${item.insuranceReview !== "已通过" ? actionButton("medicationPickups", item.id, "医保通过", { insuranceReview: "已通过", status: "待取药" }, "医保通过固定取药审核") : ""}
+          ${item.insuranceReview !== "退回补正" ? actionButton("medicationPickups", item.id, "退回补正", { insuranceReview: "退回补正", status: "待补正" }, "固定取药医保退回补正") : ""}
+        </div>
       </div>
       <span class="badge ${badge}">${item.insuranceReview || "待审核"}</span>
     </section>`;
@@ -109,6 +139,9 @@ function renderCredentialChecks(state) {
         <h3>${resident?.name || "未知居民"} · ${item.type}</h3>
         <p>${item.provider} · ${item.lastVerified}</p>
         <p>${item.usage} · ${item.personIndex || "待索引"}</p>
+        <div class="action-row">
+          ${item.status === "待核验" ? actionButton("digitalCredentials", item.id, "核验通过", { status: "已核验", lastVerified: new Date().toISOString().slice(0, 10) }, "医保凭证核验通过") : ""}
+        </div>
       </div>
       <span class="badge ${badge}">${item.status}</span>
     </section>`;

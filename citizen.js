@@ -1,5 +1,6 @@
 const STORAGE_KEY = "chronic-care-platform-state";
 const CITIZEN_EXTRA_KEY = "chronic-care-citizen-extra";
+const LARGE_MODE_KEY = "chronic-care-large-mode";
 const API_BASE = location.protocol === "file:" ? "" : "/api";
 
 const fallbackState = {
@@ -136,6 +137,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   state = await loadState();
   ensureAccounts();
   populateAccounts();
+  bindLargeMode();
   document.querySelector("#account-select").addEventListener("change", (event) => {
     currentAccountId = event.target.value;
     const account = getCurrentAccount();
@@ -229,6 +231,7 @@ function renderCitizen(residentId) {
   riskPill.className = `risk-pill risk-${risk.level}`;
 
   renderSummary(resident, diseases, followups, records);
+  renderReminderCenter(resident.id);
   renderLifeCycle(resident, diseases, followups, records);
   renderVault(resident, diseases, followups, records);
   renderEmr(records, resident, diseases, followups);
@@ -240,6 +243,53 @@ function renderCitizen(residentId) {
   renderSeniorServices(resident.id);
   renderDigitalCredentials(resident.id);
   renderAccessLogs(resident.id);
+}
+
+function bindLargeMode() {
+  const button = document.querySelector("#large-mode");
+  const enabled = localStorage.getItem(LARGE_MODE_KEY) === "1";
+  document.body.classList.toggle("large-mode", enabled);
+  button.setAttribute("aria-pressed", String(enabled));
+  button.addEventListener("click", () => {
+    const next = !document.body.classList.contains("large-mode");
+    document.body.classList.toggle("large-mode", next);
+    button.setAttribute("aria-pressed", String(next));
+    localStorage.setItem(LARGE_MODE_KEY, next ? "1" : "0");
+  });
+}
+
+function renderReminderCenter(residentId) {
+  const reminders = [
+    ...state.followups.filter((item) => item.residentId === residentId && item.status !== "已完成").map((item) => ({
+      title: `${item.diseaseType}随访`,
+      detail: `${item.plannedAt} · ${item.assignee} · ${item.advice || "按计划随访"}`,
+      status: item.status
+    })),
+    ...(state.medicationPickups || []).filter((item) => item.residentId === residentId && !["已完成", "已取药"].includes(item.status)).map((item) => ({
+      title: `${item.medication}固定取药`,
+      detail: `${item.nextPickup} · ${item.pharmacy} · ${item.insuranceReview || "待医保审核"}`,
+      status: item.status
+    })),
+    ...(state.referralSystem?.referrals || []).filter((item) => item.residentId === residentId && !["已完成", "基层承接"].includes(item.status)).map((item) => ({
+      title: `${item.type}转诊`,
+      detail: `${item.from} -> ${item.to} · ${item.reservedResource}`,
+      status: item.status
+    })),
+    ...getPersonalRecords(residentId, "authorizations").filter((item) => !isRevoked(item) && item.date <= todayOffset(30)).map((item) => ({
+      title: `${item.name}授权`,
+      detail: `${item.result} · 有效期至 ${item.date}`,
+      status: item.date < todayOffset(0) ? "已过期" : "即将到期"
+    }))
+  ];
+  const countEl = document.querySelector("#reminder-count");
+  const listEl = document.querySelector("#reminder-cards");
+  if (!countEl || !listEl) return;
+  countEl.textContent = `${reminders.length} 项待办`;
+  listEl.innerHTML = reminders.map((item) => `<article class="mini-card">
+    <h3>${item.title}</h3>
+    <p class="muted">${item.detail}</p>
+    <span class="status ${["已逾期", "已过期"].includes(item.status) ? "danger" : String(item.status).includes("待") ? "warn" : ""}">${item.status}</span>
+  </article>`).join("") || `<p class="muted">暂无待办提醒。</p>`;
 }
 
 function renderVault(resident, diseases, followups, records) {

@@ -29,7 +29,7 @@ function normalizePlatformState(data) {
     resident.identityIndex = resident.personIndex;
   });
   const residentMap = new Map(residents.map((resident) => [resident.id, resident]));
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "multiPracticeApplications"].forEach((key) => {
     (Array.isArray(state[key]) ? state[key] : []).forEach((item) => {
       item.personIndex = item.personIndex || personIndexForResident(residentMap, item.residentId);
     });
@@ -69,4 +69,45 @@ function assessRisk(resident) {
 
 function money(value) {
   return Number(value || 0).toLocaleString("zh-CN", { style: "currency", currency: "CNY" });
+}
+
+function workflowRows(state, collection) {
+  if (collection === "referrals") return state.referralSystem?.referrals || [];
+  if (collection === "multiPracticeApplications") return state.multiPracticeApplications || [];
+  return Array.isArray(state[collection]) ? state[collection] : [];
+}
+
+async function updateWorkflowAction(state, collection, id, updates, note) {
+  const payload = {
+    collection,
+    id,
+    status: updates.status,
+    updates,
+    note
+  };
+  if (API_BASE) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/workflow-actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (response.ok) {
+        const saved = await response.json();
+        const rows = workflowRows(state, collection);
+        const index = rows.findIndex((item) => item.id === id);
+        if (index >= 0) rows[index] = saved;
+        return { ok: true, item: saved };
+      }
+    } catch (error) {
+      // Static preview falls back to local mutation below.
+    }
+  }
+  const rows = workflowRows(state, collection);
+  const item = rows.find((row) => row.id === id);
+  if (!item) return { ok: false, message: "未找到业务记录" };
+  Object.assign(item, updates, { lastUpdated: new Date().toISOString() });
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  return { ok: true, item };
 }

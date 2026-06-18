@@ -424,6 +424,61 @@ function renderChronicModule() {
       </tr>`;
     }).join("")}</tbody>
   </table>`;
+
+  renderChronicProjectBlueprint();
+}
+
+function renderChronicProjectBlueprint() {
+  const blueprint = state.chronicProjectBlueprint || {};
+  const architecture = blueprint.architecture || [];
+  const networks = blueprint.networks || [];
+  const aiAgents = blueprint.aiAgents || [];
+  const studentCommonDisease = blueprint.studentCommonDisease || [];
+  const assetRows = [
+    ["专病库", (blueprint.diseaseLibraries || []).join("、")],
+    ["筛查模型", (blueprint.screeningModels || []).join("、")],
+    ["外部接口", (blueprint.externalInterfaces || []).join("、")],
+    ["安全要求", (blueprint.security || []).join("、")]
+  ];
+
+  const architectureEl = document.querySelector("#chronic-blueprint-architecture");
+  if (architectureEl) {
+    architectureEl.innerHTML = architecture.map((item) => `<article class="metric-card">
+      <span>${item.name}</span>
+      <strong>${item.status || "已入模"}</strong>
+      <em>${item.detail}</em>
+    </article>`).join("");
+  }
+
+  const networksEl = document.querySelector("#chronic-blueprint-networks");
+  if (networksEl) {
+    networksEl.innerHTML = networks.map((item) => `<div>
+      <strong>${item.name}</strong>
+      <span>${item.users}：${(item.functions || []).join("、")}</span>
+    </div>`).join("");
+  }
+
+  const aiEl = document.querySelector("#chronic-ai-agents");
+  if (aiEl) {
+    aiEl.innerHTML = aiAgents.map((item) => `<div>
+      <strong>${item.name}</strong>
+      <span>${item.scenario} 输出：${item.output}</span>
+    </div>`).join("");
+  }
+
+  const assetsEl = document.querySelector("#chronic-blueprint-assets");
+  if (assetsEl) {
+    assetsEl.innerHTML = `<table>
+      <thead><tr><th>类别</th><th>申报材料要求</th></tr></thead>
+      <tbody>
+        ${assetRows.map(([name, detail]) => `<tr><td>${name}</td><td>${detail || "待配置"}</td></tr>`).join("")}
+        <tr>
+          <td>学生常见病</td>
+          <td>${studentCommonDisease.map((item) => `${item.name}：${item.workflow}，${item.output}`).join("；") || "待配置"}</td>
+        </tr>
+      </tbody>
+    </table>`;
+  }
 }
 
 function renderResidents() {

@@ -45,6 +45,7 @@ http://localhost:5173/login.html
 - 基层医疗机构：`community / 123456`
 - 卫健委端：`whjw / 123456`
 - 医疗机构端：`doctor / 123456`
+- 医生账户：`doctor_wang / 123456`
 - 医保端：`insurance / 123456`
 - 个人端：`citizen / 123456`
 - 县域医共体平台：`county / 123456`
@@ -54,9 +55,11 @@ http://localhost:5173/login.html
 统计导入任务接口：卫健委端登录后可调用 `POST /api/health-statistics/import-jobs` 登记 PDF/Excel 报表导入、统计直报系统接口或医疗机构接口对账任务，任务会进入 `healthStatisticsIngestion.jobs` 并写入安全审计。
 使用 PowerShell 手工联调包含中文的 JSON 时，请用 UTF-8 字节提交请求体；浏览器 `fetch` 默认可正常提交 UTF-8。
 
-业务闭环状态接口：登录后可调用 `POST /api/workflow-actions` 更新 `careOrders`、`medicationPickups`、`insuranceClaims`、`followups`、`referrals`、`deathCertificates` 的状态和简单字段，并写入安全事件。
+业务闭环状态接口：登录后可调用 `POST /api/workflow-actions` 更新 `careOrders`、`medicationPickups`、`insuranceClaims`、`followups`、`referrals`、`deathCertificates`、`birthCertificates`、`multiPracticeApplications`、`digitalCredentials` 的状态和简单字段，并写入安全事件。
 
 死亡医学证明接口：医疗机构端或卫健委端登录后可调用 `GET /api/death-certificates` 查看死亡证明、材料模板和死亡统计，调用 `POST /api/death-certificates` 登记死亡医学证明个案，并同步刷新卫健委统计模块。
+
+医生账户与多点执业接口：医疗机构端医生登录后可调用 `GET /api/doctors/me` 查看当前医生档案、关联功能和多点执业政策；医疗机构端或卫健委端可调用 `GET /api/multi-practice-applications` 查看可访问的多点执业申请，调用 `POST /api/multi-practice-applications` 登记申请，并通过 `/api/workflow-actions` 推进备案、审核、退回等状态。
 
 接口需求清单保存在 `interfaceRequirements`：保留 `/api/auth/*`、`/api/state`、`/api/personal-records`、`/api/workflow-actions`、`/api/health-statistics/import-jobs`、`/api/death-certificates`，后续对接统一认证、组织机构编码、居民主索引、HIS/EMR/LIS/PACS、医保结算、统计直报、人口死亡信息登记、电子证照平台、公安民政共享和消息回调。
 
@@ -93,6 +96,8 @@ http://localhost:5173/login.html
 - 居民端身份模型：支持个人账户和家庭成员切换，不再只是全量居民下拉选择。
 - 授权共享闭环：授权记录支持有效期判断、过期提示和撤销授权。
 - 医疗机构端：查看协同任务、授权健康档案、医保贯通提示。
+- 医生账户：在医疗机构端绑定医生档案，展示执业证号、职称、执业范围、注册有效期、定期考核和可用业务功能。
+- 医师多点执业：依据国卫医发〔2014〕86 号文件，建模第一执业地点、拟执业机构、执业期限、时间安排、工作任务、医疗责任、薪酬、保险、第一执业地点同意/报备、注册或备案状态和信息公开，并进行职称、年限、考核、类别、范围和协议完整性校验。
 - 医疗机构端标准档案视图：医生按授权查看患者标准健康档案归集度、适用数据集、慢病管理、门诊诊疗、检查检验、用药和待补齐项。
 - 医疗机构端补充：慢病固定取药协同、授权与审计留痕。
 - 医疗机构端死亡证明系统：医生或机构管理员可查看死亡证明个案、材料清单、电子证照状态、人口死亡信息登记上报状态和公安民政共享状态。
@@ -170,6 +175,9 @@ data/db.json
 - `healthBulletin2024`：2024 年卫生健康事业发展统计公报可视化数据，包含关键指标、领域概览、趋势对比和明细指标。
 - `dalianHealthStatistics2025`：2025 年大连市卫生健康统计提要结构化摘要，包含大连关键指标、与国家公报对比、报表导入和统计直报系统接入路径。
 - `healthStatisticsIngestion`：卫生健康统计数据接入流程，覆盖报表采集、解析、指标映射、质控、入库、发布和审计留痕。
+- `doctorProfiles`：医生账户档案，关联登录用户、第一执业地点、执业证号、职称、执业类别/范围、定期考核和可用业务功能。
+- `multiPracticePolicy`：医师多点执业政策规则，覆盖资格条件、除外事项、协议字段、责任保险和监管要求。
+- `multiPracticeApplications`：多点执业申请与备案台账，覆盖目标机构、执业时间任务、协议责任、薪酬保险、状态和合规校验。
 - `storageMeta`：本地 SQLite 主存储和 GitHub Pages JSON 快照的存储状态说明。
 - `careOrders`：医疗机构端协同任务。
 - `medicationPickups`：个人端每月固定取药计划。
@@ -196,10 +204,10 @@ data/db.json
 
 直接打开 `index.html` 时，数据保存在浏览器 `localStorage` 中。点击页面右上角“重置演示数据”可恢复内置样例数据。
 
-## 下一步
+## 现场实施配置
 
-- P0：继续深化真实认证、角色权限和审计闭环，接入真实身份源、密码哈希和机构级权限。
-- P0：继续深化 SQLite 数据库迁移，拆分居民、电子病历、统计、公卫、医保等结构化表和索引。
-- P1：增加居民 360 详情页和健康指标趋势图。
-- P1：增加转诊、医保审核、固定取药、随访等业务动作闭环。
-- P2：增加统计报表、机构绩效考核、移动端和适老化深化。
+- 接入真实政务统一身份认证、短信/CA/人脸核验、电子健康码和医保电子凭证。
+- 按部署数据库把当前集合级 SQLite 主存储拆分为居民、病历、统计、公卫、医保等业务表。
+- 配置真实 HIS/EMR/LIS/PACS、医保结算、统计直报、人口死亡信息登记、电子证照和公安民政共享接口。
+- 配置跨系统消息中间件、失败重试、接口幂等、生产监控和容灾备份。
+- 用真实机构、医生、居民和业务规则替换演示数据，并完成等保、密评和上线验收。

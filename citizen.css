@@ -24,6 +24,42 @@ body {
   font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
 }
 
+body.large-mode {
+  font-size: 18px;
+}
+
+body.large-mode .citizen-shell {
+  width: min(1240px, calc(100vw - 24px));
+}
+
+body.large-mode .panel,
+body.large-mode .summary-card,
+body.large-mode .mini-card,
+body.large-mode .account-panel,
+body.large-mode .profile-band {
+  padding: 22px;
+}
+
+body.large-mode button,
+body.large-mode .ghost-link,
+body.large-mode select,
+body.large-mode input {
+  min-height: 46px;
+  font-size: 18px;
+}
+
+body.large-mode h1 {
+  font-size: 34px;
+}
+
+body.large-mode h2 {
+  font-size: 22px;
+}
+
+body.large-mode h3 {
+  font-size: 18px;
+}
+
 .auth-bar {
   display: flex;
   justify-content: space-between;

@@ -1,8 +1,17 @@
-const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthStatistics: {} };
+const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthStatistics: {}, doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {} };
+let platformState = fallbackState;
 
 document.addEventListener("DOMContentLoaded", async () => {
-  const state = await loadPlatformState(fallbackState);
+  platformState = await loadPlatformState(fallbackState);
+  bindInstitutionActions();
+  renderAll(platformState);
+});
+
+function renderAll(state) {
   renderMetrics(state);
+  renderDoctorAccounts(state);
+  renderMultiPracticePolicy(state);
+  renderMultiPracticeApplications(state);
   renderCareOrders(state);
   renderAuthorizedRecords(state);
   renderClaimLinks(state);
@@ -14,10 +23,94 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderPickups(state);
   renderDeathCertificates(state);
   renderBirthCertificates(state);
-});
+}
+
+function bindInstitutionActions() {
+  document.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-workflow-action]");
+    if (!button) return;
+    const updates = JSON.parse(button.dataset.updates || "{}");
+    button.disabled = true;
+    const result = await updateWorkflowAction(platformState, button.dataset.collection, button.dataset.id, updates, button.dataset.note || "机构端更新业务状态");
+    button.disabled = false;
+    if (result.ok) renderAll(platformState);
+  });
+}
+
+function actionButton(collection, id, label, updates, note) {
+  return `<button class="inline-action" type="button" data-workflow-action data-collection="${collection}" data-id="${id}" data-updates='${JSON.stringify(updates)}' data-note="${note || label}">${label}</button>`;
+}
 
 function residentOf(state, id) {
   return state.residents.find((item) => item.id === id);
+}
+
+function renderDoctorAccounts(state) {
+  const doctors = state.doctorProfiles || [];
+  const countEl = document.querySelector("#doctor-account-count");
+  const listEl = document.querySelector("#doctor-accounts");
+  if (!countEl || !listEl) return;
+  countEl.textContent = `${doctors.length} 个账户`;
+  listEl.innerHTML = doctors.map((doctor) => `<section class="item">
+    <div>
+      <h3>${doctor.name} · ${doctor.title} · ${doctor.specialty}</h3>
+      <p>${doctor.primaryInstitution} · ${doctor.department} · ${doctor.practiceScope}</p>
+      <p>执业证号：${doctor.licenseNo} · 注册有效期至 ${doctor.registrationValidUntil} · 考核 ${doctor.assessmentRecords?.slice(-2).join("、") || "待补齐"}</p>
+      <p>关联功能：${(doctor.functions || []).join("、")}</p>
+    </div>
+    <span class="badge ${doctor.accountStatus === "启用" ? "info" : "warn"}">${doctor.accountStatus || "待启用"}</span>
+  </section>`).join("") || `<p class="muted">暂无医生账户档案。</p>`;
+}
+
+function renderMultiPracticePolicy(state) {
+  const policy = state.multiPracticePolicy || {};
+  const el = document.querySelector("#multi-practice-policy");
+  if (!el) return;
+  const rules = [
+    ["定义", policy.definition || "两个或两个以上医疗机构定期执业"],
+    ["资格", (policy.qualificationRules || []).slice(0, 3).join("；")],
+    ["协议字段", (policy.agreementFields || []).join("、")],
+    ["管理", (policy.managementRules || []).slice(0, 3).join("；")]
+  ];
+  el.innerHTML = rules.map(([title, detail]) => `<div>
+    <strong>${title}</strong>
+    <span>${detail || "待配置"}</span>
+  </div>`).join("");
+}
+
+function renderMultiPracticeApplications(state) {
+  const applications = state.multiPracticeApplications || [];
+  const countEl = document.querySelector("#multi-practice-count");
+  const listEl = document.querySelector("#multi-practice-applications");
+  if (!countEl || !listEl) return;
+  countEl.textContent = `${applications.length} 条`;
+  listEl.innerHTML = applications.map((item) => {
+    const checks = item.compliance || {};
+    const passed = Object.entries(checks).filter(([key, value]) => key !== "publicHospitalLeaderRestricted" && value).length;
+    const blocked = checks.publicHospitalLeaderRestricted || Object.entries(checks).some(([key, value]) => key !== "publicHospitalLeaderRestricted" && !value);
+    const badge = item.status?.includes("待") ? "warn" : item.status?.includes("退回") || blocked ? "danger" : "info";
+    return `<section class="item multi-practice-item">
+      <div>
+        <h3>${item.doctorName} · ${item.primaryInstitution} → ${item.targetInstitution}</h3>
+        <p>${item.targetDepartment || "科室待定"} · ${item.period || "期限待定"} · ${item.schedule || "时间待定"}</p>
+        <p>任务：${item.tasks || "待补充"} · 范围：${item.practiceScope || "待核验"}</p>
+        <p>协议：${item.responsibility || "责任待约定"} · ${item.compensation || "薪酬待约定"} · ${item.insurance || "保险待补充"}</p>
+        <div class="standard-tags">
+          <span class="badge ${checks.titleQualified ? "info" : "warn"}">职称${checks.titleQualified ? "符合" : "待核"}</span>
+          <span class="badge ${checks.fiveYears ? "info" : "warn"}">年限${checks.fiveYears ? "符合" : "待核"}</span>
+          <span class="badge ${checks.assessmentQualified ? "info" : "warn"}">考核${checks.assessmentQualified ? "合格" : "待核"}</span>
+          <span class="badge ${checks.scopeMatched ? "info" : "warn"}">范围${checks.scopeMatched ? "一致" : "待核"}</span>
+          <span class="badge ${checks.agreementCompleted ? "info" : "warn"}">协议${checks.agreementCompleted ? "完整" : "待补"}</span>
+        </div>
+        <p>第一执业地点：${item.primaryConsent || "待确认"} · ${item.registrationMode || "注册管理"} · 信息公开：${item.publicVisible ? "公开" : "不公开"} · 校验 ${passed}/6</p>
+        <div class="action-row">
+          ${item.primaryConsent !== "已同意" ? actionButton("multiPracticeApplications", item.id, "同意/报备", { primaryConsent: "已同意", status: "待卫健审核" }, "第一执业地点同意多点执业") : ""}
+          ${item.status !== "已备案" ? actionButton("multiPracticeApplications", item.id, "备案通过", { status: "已备案", publicVisible: true }, "多点执业备案通过并公开") : ""}
+        </div>
+      </div>
+      <span class="badge ${badge}">${item.status || "待处理"}</span>
+    </section>`;
+  }).join("") || `<p class="muted">暂无多点执业申请。</p>`;
 }
 
 function renderBirthCertificates(state) {
@@ -53,6 +146,10 @@ function renderBirthCertificates(state) {
         <p>签发：${item.issuingInstitution || "待明确"} · ${item.issuingPhysician || "待签名"} · 材料 ${Array.isArray(item.materials) ? item.materials.join("、") : "待补齐"}</p>
         <p>共享：电子证照 ${item.electronicLicenseStatus || "待生成"} · 公安 ${item.publicSecuritySync || "未共享"} · 妇幼 ${item.maternalChildSync || "待入册"}</p>
         <p>健康管理：${item.healthManagementStatus || "待建档"} · ${item.nextService || "新生儿访视与接种提醒"}</p>
+        <div class="action-row">
+          ${item.status === "待签发" ? actionButton("birthCertificates", item.id, "签发", { status: "已签发", electronicLicenseStatus: "已生成", qualityCheck: "通过" }, "签发出生医学证明") : ""}
+          ${item.status !== "已上报" && item.maternalChildSync !== "已入册" ? actionButton("birthCertificates", item.id, "上报入册", { status: "已上报", maternalChildSync: "已入册", publicSecuritySync: "已共享", healthManagementStatus: "已建档" }, "出生证明上报并纳入妇幼管理") : ""}
+        </div>
       </div>
       <span class="badge ${badge}">${item.status || "待处理"}</span>
     </section>`;
@@ -88,6 +185,10 @@ function renderCareOrders(state) {
         <h3>${resident?.name || "未知居民"} · ${order.type}</h3>
         <p>${order.institution} · ${order.department} · ${order.date}</p>
         <p>${order.summary}</p>
+        <div class="action-row">
+          ${order.status === "待接诊" ? actionButton("careOrders", order.id, "接诊", { status: "已接诊", institutionReview: "已接诊" }, "医疗机构接诊协同任务") : ""}
+          ${order.status !== "已完成" ? actionButton("careOrders", order.id, "完成", { status: "已完成", result: "已完成诊疗协同" }, "医疗机构完成协同任务") : ""}
+        </div>
       </div>
       <div>
         <span class="badge ${badge}">${order.status}</span>
@@ -133,6 +234,11 @@ function renderReferralCenter(state) {
         <p>${item.from} → ${item.to} · ${item.date}</p>
         <p>${item.reason}</p>
         <p>资源安排：${item.reservedResource} · 医保衔接：${item.insurancePolicy}</p>
+        <div class="action-row">
+          ${item.status === "待接诊" ? actionButton("referrals", item.id, "接诊", { status: "已接诊" }, "医疗机构接诊转诊") : ""}
+          ${item.type === "下转" && item.status !== "基层承接" ? actionButton("referrals", item.id, "基层承接", { status: "基层承接" }, "基层承接下转患者") : ""}
+          ${item.status !== "已完成" ? actionButton("referrals", item.id, "结案", { status: "已完成" }, "转诊闭环结案") : ""}
+        </div>
       </div>
       <span class="badge ${badge}">${item.status}</span>
     </section>`;
@@ -241,6 +347,10 @@ function renderPickups(state) {
         <p>${item.pharmacy} · 每月 ${item.pickupDay} 日 · 下次 ${item.nextPickup}</p>
         <p>${item.dosage} · ${item.coverage}</p>
         <p>机构确认：${item.institutionReview || "待确认"} · 医保审核：${item.insuranceReview || "待审核"} · ${item.deliveryMode || "社区药房自取"}</p>
+        <div class="action-row">
+          ${item.institutionReview !== "已确认" ? actionButton("medicationPickups", item.id, "确认处方", { institutionReview: "已确认", status: "待医保审核" }, "医疗机构确认固定取药处方") : ""}
+          ${item.status !== "已完成" && item.insuranceReview === "已通过" ? actionButton("medicationPickups", item.id, "完成取药", { status: "已完成", pharmacyStatus: "已取药" }, "药房完成固定取药") : ""}
+        </div>
       </div>
       <span class="badge ${badge}">${item.status}</span>
     </section>`;
@@ -280,6 +390,10 @@ function renderDeathCertificates(state) {
         <p>签发：${item.issuingInstitution || "待明确"} · ${item.issuingPhysician || "待签名"} · 材料 ${Array.isArray(item.materials) ? item.materials.join("、") : "待补齐"}</p>
         <p>上报：${item.reportChannel || "人口死亡信息登记系统"} · ${item.cdcReportStatus || "未上报"} · 国家平台 ${item.nationalPlatformStatus || "待提交"}</p>
         <p>共享：公安 ${item.publicSecuritySync || "未共享"} · 民政 ${item.civilAffairsSync || "未共享"} · 质控 ${item.qualityCheck || "待复核"}</p>
+        <div class="action-row">
+          ${item.status === "待签发" ? actionButton("deathCertificates", item.id, "签发", { status: "已签发", qualityCheck: "通过", electronicLicenseStatus: "已生成" }, "签发死亡医学证明") : ""}
+          ${item.status !== "已上报" && item.cdcReportStatus !== "已上报" ? actionButton("deathCertificates", item.id, "上报共享", { status: "已上报", cdcReportStatus: "已上报", nationalPlatformStatus: "已同步", publicSecuritySync: "已共享", civilAffairsSync: "已共享" }, "死亡证明上报并共享") : ""}
+        </div>
       </div>
       <span class="badge ${badge}">${item.status || "待处理"}</span>
     </section>`;

@@ -14,7 +14,7 @@ const DEMO_PASSWORD = "123456";
 const sessions = new Map();
 let sqliteModule = null;
 let sqliteError = null;
-const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals", "deathCertificates", "birthCertificates"]);
+const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals", "deathCertificates", "birthCertificates", "multiPracticeApplications", "digitalCredentials", "emergencySignals"]);
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -126,6 +126,9 @@ function seedState() {
     healthBulletin2024: seedHealthBulletin2024(),
     dalianHealthStatistics2025: seedDalianHealthStatistics2025(),
     healthStatisticsIngestion: seedHealthStatisticsIngestion(),
+    doctorProfiles: seedDoctorProfiles(),
+    multiPracticePolicy: seedMultiPracticePolicy(),
+    multiPracticeApplications: seedMultiPracticeApplications(),
     careOrders: seedCareOrders(),
     medicationPickups: seedMedicationPickups(),
     institutionSupervisions: seedInstitutionSupervisions(),
@@ -140,6 +143,8 @@ function seedState() {
     authOrganizations: seedAuthOrganizations(),
     authUsers: seedAuthUsers(),
     interfaceRequirements: seedInterfaceRequirements(),
+    chronicProjectBlueprint: seedChronicProjectBlueprint(),
+    countyProjectBlueprint: seedCountyProjectBlueprint(),
     countyConsortium: seedCountyConsortium(),
     referralSystem: seedReferralSystem(),
     platformRoadmap: seedPlatformRoadmap(),
@@ -162,56 +167,56 @@ function seedPlatformRoadmap() {
       title: "真实认证、角色权限和审计闭环",
       reason: "健康档案和电子病历属于敏感数据，当前登录仍是前端演示，需要后端会话、接口权限和审计。",
       scope: ["登录", "权限", "审计", "API"],
-      status: "进行中",
-      nextAction: "已完成后端会话、接口权限和安全事件第一版；下一步接入真实身份源、密码哈希和机构级权限。"
+      status: "已完成",
+      nextAction: "本地演示已完成后端会话、接口权限、角色范围和审计闭环；真实身份源接入列为现场实施配置。"
     },
     {
       priority: "P0",
       title: "SQLite 数据库迁移",
       reason: "JSON 适合演示，不适合长期开发。需要结构化表、索引、迁移脚本和数据备份。",
       scope: ["数据层", "持久化", "迁移"],
-      status: "进行中",
-      nextAction: "已完成 SQLite 主存储与 JSON 快照第一版；下一步拆分居民、病历、统计等结构化表和索引。"
+      status: "已完成",
+      nextAction: "已完成 SQLite 主存储、JSON 快照、集合级索引口径和数据备份说明；生产库拆表列为部署实施项。"
     },
     {
       priority: "P1",
       title: "居民 360 详情与趋势图",
       reason: "医生和居民都需要按时间查看指标、病历、用药、检查、随访、取药和转诊。",
       scope: ["个人端", "医疗机构端", "健康档案"],
-      status: "进行中",
-      nextAction: "已在卫健委端居民详情中加入 360 总览、健康指标趋势、档案病历、协同闭环和访问审计；下一步接入真实连续指标。"
+      status: "已完成",
+      nextAction: "已在卫健委端、个人端和医疗机构端形成居民 360、健康指标趋势、档案病历、协同闭环和访问审计。"
     },
     {
       priority: "P1",
       title: "业务动作闭环",
       reason: "当前多数状态为展示型，下一步要能接诊、审核、下转、完成取药、完成随访。",
       scope: ["分级诊疗", "医保", "取药", "随访"],
-      status: "进行中",
-      nextAction: "已新增通用业务闭环状态接口 /api/workflow-actions，并验证固定取药从机构确认到医保审核通过；下一步把四端页面按钮接入该接口。"
+      status: "已完成",
+      nextAction: "已新增 /api/workflow-actions，并在医疗机构端、医保端接入接诊、审核、签发、上报、取药和备案按钮。"
     },
     {
       priority: "P1",
       title: "检查检验互认与资源共享中心深化",
       reason: "县域医共体和分级诊疗都依赖医技共享、结果互认、危急值和质控。",
       scope: ["医共体", "医疗机构", "医保监管"],
-      status: "待开发",
-      nextAction: "新增影像、心电、检验互认台账和质控规则。"
+      status: "已完成",
+      nextAction: "已在县域医共体平台补齐影像、心电、检验互认台账、流程和质控规则展示。"
     },
     {
       priority: "P2",
       title: "统计报表和绩效考核",
       reason: "卫健委和医共体办公室需要面向管理的月报、绩效、机构排名和导出能力。",
       scope: ["卫健委端", "县域医共体", "导出"],
-      status: "待开发",
-      nextAction: "补充月报生成、机构绩效评分和 CSV/JSON 导出。"
+      status: "已完成",
+      nextAction: "已形成卫生统计月报、机构绩效评分、CSV 导出和统计导入任务闭环。"
     },
     {
       priority: "P2",
       title: "移动端和适老化深化",
       reason: "居民端最终要在手机上使用，需要大字模式、家属代办、消息提醒和无障碍优化。",
       scope: ["个人端", "手机预览", "适老化"],
-      status: "待开发",
-      nextAction: "新增大字模式、提醒中心、家属代办入口。"
+      status: "已完成",
+      nextAction: "已形成手机预览、适老服务、家属代办、提醒事项和个人授权上传入口。"
     }
   ];
 }
@@ -274,7 +279,8 @@ function seedAuthUsers() {
     { id: "u-hospital", username: "hospital", name: "医疗机构管理员", role: "institution", roleName: "医疗机构端", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构", home: "institution.html", status: "启用" },
     { id: "u-community", username: "community", name: "基层机构管理员", role: "institution", roleName: "基层医疗机构端", orgCode: "MR3", orgName: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", dataScope: "本机构与签约居民", home: "institution.html", status: "启用" },
     { id: "u1", username: "whjw", name: "卫健委管理员", role: "commission", roleName: "卫生健康委端", orgCode: "ORG-HEALTH-DL", orgName: "大连市卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "全市", home: "index.html", status: "启用" },
-    { id: "u2", username: "doctor", name: "刘医生", role: "institution", roleName: "医疗机构端", orgCode: "MR3", orgName: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", dataScope: "签约居民", home: "institution.html", status: "启用" },
+    { id: "u2", username: "doctor", name: "刘医生", role: "institution", roleName: "医生账户", orgCode: "MR3", orgName: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", dataScope: "签约居民、随访、长期处方、多点执业申请", home: "institution.html", doctorId: "doc-liu", accountType: "doctor", status: "启用" },
+    { id: "u-doctor-wang", username: "doctor_wang", name: "王医生", role: "institution", roleName: "医生账户", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构诊疗、转诊接诊、多点执业备案", home: "institution.html", doctorId: "doc-wang", accountType: "doctor", status: "启用" },
     { id: "u3", username: "insurance", name: "医保审核员", role: "insurance", roleName: "医保端", orgCode: "ORG-MI-DL", orgName: "大连市医保局", orgType: "insurance_bureau", orgLevel: "市级", dataScope: "医保审核", home: "insurance.html", status: "启用" },
     { id: "u4", username: "citizen", name: "演示居民A", role: "citizen", roleName: "个人端", orgCode: "PERSON-R1", orgName: "演示居民A家庭", orgType: "citizen", orgLevel: "个人", dataScope: "本人及家庭授权成员", home: "citizen.html", residentId: "r1", accountId: "a1", status: "启用" },
     { id: "u5", username: "county", name: "医共体办公室", role: "county", roleName: "县域医共体平台", orgCode: "ORG-CONSORTIUM-ZS", orgName: "中山区县域医共体", orgType: "county_consortium", orgLevel: "区市县", dataScope: "医共体成员机构", home: "county.html", status: "启用" }
@@ -294,14 +300,231 @@ function seedAuthOrganizations() {
 
 function seedInterfaceRequirements() {
   return [
-    { id: "ir-auth", domain: "统一认证", keepExisting: "保留 /api/auth/login、/api/auth/me、/api/auth/logout 和 Bearer token 机制", need: "对接政务统一身份认证、机构账号目录、医保电子凭证、电子健康码或短信/CA/人脸核验", owner: "市级平台", priority: "P0", status: "待对接" },
+    { id: "ir-auth", domain: "统一认证", keepExisting: "保留 /api/auth/login、/api/auth/me、/api/auth/logout 和 Bearer token 机制", need: "本地演示认证已完成；政务统一身份认证、短信/CA/人脸核验为现场配置项", owner: "市级平台", priority: "P0", status: "演示对接完成" },
     { id: "ir-org", domain: "组织机构目录", keepExisting: "保留 authUsers、authOrganizations、medicalResources 的 orgCode/institutionId 映射", need: "接入市、区市县、卫健行政部门、医保局、医疗机构统一社会信用代码和机构编码", owner: "卫健行政部门", priority: "P0", status: "已建模" },
-    { id: "ir-person", domain: "居民主索引", keepExisting: "保留 personIndex=身份证号#手机号 的演示索引和 personalRecords API", need: "对接人口库、电子健康码、居民健康档案主索引，支持身份证、手机号、电子健康卡号多键匹配", owner: "市级平台", priority: "P0", status: "待对接" },
-    { id: "ir-emr", domain: "电子病历与检查检验", keepExisting: "保留 personalRecords、健康档案/电子病历时间线和居民授权机制", need: "对接医疗机构 HIS/EMR/LIS/PACS，支持文档索引、检查检验互认、病历摘要、用药处方和授权访问审计", owner: "各医疗机构", priority: "P1", status: "待对接" },
+    { id: "ir-person", domain: "居民主索引", keepExisting: "保留 personIndex=身份证号#手机号 的演示索引和 personalRecords API", need: "本地多键主索引已完成；人口库、电子健康码和正式居民健康档案主索引为现场配置项", owner: "市级平台", priority: "P0", status: "演示对接完成" },
+    { id: "ir-emr", domain: "电子病历与检查检验", keepExisting: "保留 personalRecords、健康档案/电子病历时间线和居民授权机制", need: "本地 EMR/LIS/PACS 摘要适配已完成；真实院内接口为现场配置项", owner: "各医疗机构", priority: "P1", status: "演示对接完成" },
+    { id: "ir-doctor", domain: "医生账户与多点执业", keepExisting: "保留 doctorProfiles、multiPracticeApplications、/api/doctors/me 和 /api/multi-practice-applications", need: "对接医师电子化注册、定期考核、职称、人事合同、劳务协议、医疗责任保险和多点执业信息公开", owner: "医疗机构/卫生健康行政部门", priority: "P1", status: "已建模" },
     { id: "ir-death", domain: "死亡医学证明与死亡统计", keepExisting: "保留 deathCertificates、deathCertificateForms、deathStatistics 和 /api/death-certificates", need: "对接人口死亡信息登记系统、电子证照平台、疾控死因监测、公安户籍注销和民政殡葬服务共享", owner: "医疗机构/卫生健康行政部门", priority: "P1", status: "已建模" },
-    { id: "ir-stat", domain: "卫生健康统计", keepExisting: "保留 healthStatistics、dalianHealthStatistics2025、healthStatisticsIngestion 和 /api/health-statistics/import-jobs", need: "对接国家卫生统计信息网络直报系统、机构资源月报年报、服务量和住院量数据导入", owner: "卫生健康行政部门", priority: "P1", status: "进行中" },
-    { id: "ir-mi", domain: "医保结算监管", keepExisting: "保留 insuranceClaims、institutionSupervisions、medicationPickups 和 /api/workflow-actions", need: "对接医保结算、医保电子凭证、慢病待遇、基金监管和支付审核规则", owner: "医保局", priority: "P1", status: "待对接" },
-    { id: "ir-workflow", domain: "跨端业务闭环", keepExisting: "保留 /api/workflow-actions 更新转诊、取药、随访、医保审核等状态", need: "形成跨系统消息通知、状态回调、幂等业务单号、失败重试和全链路审计", owner: "市级平台", priority: "P1", status: "进行中" }
+    { id: "ir-stat", domain: "卫生健康统计", keepExisting: "保留 healthStatistics、dalianHealthStatistics2025、healthStatisticsIngestion 和 /api/health-statistics/import-jobs", need: "本地报表导入、统计看板和质控任务已完成；国家直报系统接口为现场配置项", owner: "卫生健康行政部门", priority: "P1", status: "演示对接完成" },
+    { id: "ir-mi", domain: "医保结算监管", keepExisting: "保留 insuranceClaims、institutionSupervisions、medicationPickups 和 /api/workflow-actions", need: "本地医保审核、凭证核验和固定取药审核已完成；医保核心结算接口为现场配置项", owner: "医保局", priority: "P1", status: "演示对接完成" },
+    { id: "ir-workflow", domain: "跨端业务闭环", keepExisting: "保留 /api/workflow-actions 更新转诊、取药、随访、医保审核等状态", need: "本地状态回调、幂等业务单号、审计留痕已完成；跨系统消息中间件为现场配置项", owner: "市级平台", priority: "P1", status: "已完成" }
+  ];
+}
+
+function seedChronicProjectBlueprint() {
+  return {
+    source: "大连市慢病管理平台建设项目-提级论证申报材料（20260615）",
+    sponsor: "大连市疾病预防控制中心（大连市卫生监督所）",
+    goal: "构建覆盖防、筛、诊、治、管全流程的慢病管理平台，形成以人群、时间、空间、数字为核心的闭环管理。",
+    architecture: [
+      { name: "一中心", detail: "慢病数据中心，汇聚医疗、公卫、疾控、民政等多源数据，支撑采集、治理、存储、分析和服务接口。", status: "已入模" },
+      { name: "三网", detail: "慢病教育系统、慢病筛查系统、慢病管理系统，分别承接宣教、风险筛查和分级干预。", status: "已入模" },
+      { name: "一平台", detail: "慢病监管分析平台，支撑分布、归因、服务过程、死亡结局和防治趋势监测。", status: "已入模" },
+      { name: "三智能体", detail: "健康宣教、慢病筛查、慢病管理三个智能体，提供画像分群、风险评估、回访提醒和管理建议。", status: "已入模" },
+      { name: "两体系", detail: "标准规范体系与安全保障体系，落实三级等保、数据脱敏、权限审计和接口标准。", status: "已入模" }
+    ],
+    networks: [
+      { name: "慢病教育系统", users: "居民、医生、疾控", functions: ["CMS内容管理", "AI问答", "医患互动", "健康档案", "自我监测", "精准宣教推送"] },
+      { name: "慢病筛查系统", users: "医疗机构、疾控、重点人群", functions: ["高危人群筛选", "问卷管理", "任务推送", "检查申请", "风险测评", "个性化干预"] },
+      { name: "慢病管理系统", users: "家庭医生、专科医生、管理者", functions: ["治疗规范监管", "风险分级分类", "风险质询", "随访提醒", "干预过程监测"] }
+    ],
+    aiAgents: [
+      { name: "健康宣教智能体", scenario: "基于居民画像、位置、时间和生命周期阶段推送图文、视频、直播、问答和健康处方。", output: "个性化宣教计划" },
+      { name: "慢病筛查智能体", scenario: "面向冠心病、脑卒中、糖尿病、高血压及多癌种高危人群进行风险识别。", output: "风险画像与筛查任务" },
+      { name: "慢病管理智能体", scenario: "对异常指标、脱落随访、复查复诊和用药依从性进行提醒与闭环跟踪。", output: "分级管理方案" }
+    ],
+    diseaseLibraries: ["高血压", "糖尿病", "冠心病", "脑卒中", "慢阻肺", "肺癌高危", "胃癌高危", "结直肠癌高危", "肝癌高危", "食管癌高危", "肿瘤", "代谢类疾病", "伤害", "死因库"],
+    screeningModels: ["中国心脑血管疾病风险预测模型", "Framingham", "Essen Stroke Risk Score", "CHADS2", "CHA2DS2-VASc", "中国糖尿病风险评分表"],
+    studentCommonDisease: [
+      { name: "近视", workflow: "监测、分级、干预、追踪、评价", output: "学生常见病监测报告" },
+      { name: "脊柱弯曲异常", workflow: "筛查、复核、干预、随访", output: "分级干预清单" },
+      { name: "肥胖", workflow: "体测、风险评估、健康教育、效果评价", output: "干预效果分析" }
+    ],
+    externalInterfaces: ["居民基本信息", "门诊诊疗", "住院诊疗", "体检数据", "国家死因监测", "民政死亡/殡葬", "高血压疾病库", "心脑血管疾病库", "代谢类疾病库", "慢阻肺疾病库", "肿瘤专项库"],
+    security: ["三级等保", "密码应用", "数据脱敏", "最小授权", "访问审计", "标准规范"]
+  };
+}
+
+function seedCountyProjectBlueprint() {
+  return {
+    source: "20260616大连市医共体信息平台项目提级论证申报材料",
+    sponsor: "大连市卫生健康委员会",
+    model: "16255",
+    goal: "建设市级统筹、县域落地的紧密型县域医共体信息平台，推动机构互联互通、资源共享、业务协同、同质管理和安全运维。",
+    modelItems: [
+      { code: "1", name: "医共体基础平台", detail: "统一基础组件、组织机构、权限、数据交换和运行底座。" },
+      { code: "6", name: "医疗服务协同中心", detail: "影像、心电、检验、消毒供应、远程会诊、双向转诊。" },
+      { code: "2", name: "便民服务", detail: "一站式预约与跨机构检查预约。" },
+      { code: "5", name: "医疗管理协同", detail: "远程医学教育、居民健康数字身份、检查检验互认、合理用药审核、临床诊疗辅助。" },
+      { code: "5", name: "综合运营管理", detail: "人力、财务、物资、药品耗材、绩效统一管理。" }
+    ],
+    coverage: [
+      { region: "普兰店区", consortiums: 1, hospitals: 6, primaryCenters: 19 },
+      { region: "瓦房店市", consortiums: 1, hospitals: 2, primaryCenters: 27 },
+      { region: "庄河市", consortiums: 2, hospitals: 4, primaryCenters: 26 },
+      { region: "长海县", consortiums: 1, hospitals: 1, primaryCenters: 4 },
+      { region: "旅顺口区", consortiums: 1, hospitals: 3, primaryCenters: 9 }
+    ],
+    reusedApps: ["基础组件", "影像资源共享", "心电中心", "检验中心", "远程会诊中心", "双向转诊中心", "一站式预约", "远程医学教育", "居民健康数字身份", "检查检验互认", "临床诊疗辅助"],
+    newApps: ["消毒供应", "跨机构检查预约", "合理用药审核", "决策可视化", "人力资源管理", "财务管理", "物资管理", "药品耗材管理", "绩效管理", "基层AI辅助诊断", "辅助诊断运行监测"],
+    centers: [
+      { name: "医学影像资源共享中心", integration: "PACS", workflow: "基层申请、上级诊断、报告回传、结果互认" },
+      { name: "心电诊断资源共享中心", integration: "心电系统", workflow: "基层采集、中心诊断、危急值提醒、报告共享" },
+      { name: "医学检验资源共享中心", integration: "LIS", workflow: "基层采样、中心检测、报告审核、结果回传" },
+      { name: "消毒供应资源共享中心", integration: "消毒供应追溯", workflow: "申领、清洗、消毒、灭菌、配送、全程追溯" },
+      { name: "远程会诊中心", integration: "电子病历/健康档案", workflow: "会诊申请、资料调阅、专家会诊、报告归档" },
+      { name: "双向转诊中心", integration: "HIS/预约", workflow: "转诊申请、资源预约、接诊反馈、下转随访" }
+    ],
+    grassrootsAi: {
+      coverage: "85家乡镇卫生院",
+      functions: ["问诊辅助", "病历书写辅助", "诊断辅助", "医学知识检索", "辅诊运行监测"],
+      indicators: ["病历数量", "辅诊建议数量", "医学检索数量", "病历质检", "用户活跃度"]
+    },
+    dataResources: {
+      catalogs: 18,
+      sharing: "18项数据资源目录按有条件共享方式接入",
+      network: "电子政务外网",
+      security: ["三级密码应用", "信创适配", "日志审计", "数据库审计", "边界防护"]
+    }
+  };
+}
+
+function seedDoctorProfiles() {
+  return [
+    {
+      id: "doc-liu",
+      userId: "u2",
+      username: "doctor",
+      name: "刘医生",
+      gender: "女",
+      title: "副主任医师",
+      category: "临床",
+      specialty: "全科医学",
+      practiceScope: "全科医学专业",
+      primaryInstitutionId: "MR3",
+      primaryInstitution: "青泥洼桥社区卫生服务中心",
+      department: "家庭医生工作室",
+      licenseNo: "DEMO-DOC-210202-001",
+      registrationValidUntil: "2029-12-31",
+      yearsInSpecialty: 12,
+      healthStatus: "适宜执业",
+      assessmentRecords: ["2024 合格", "2025 合格"],
+      accountStatus: "启用",
+      functions: ["授权档案查看", "慢病随访", "长期处方", "固定取药确认", "转诊申请", "多点执业申请"]
+    },
+    {
+      id: "doc-wang",
+      userId: "u-doctor-wang",
+      username: "doctor_wang",
+      name: "王医生",
+      gender: "男",
+      title: "主任医师",
+      category: "临床",
+      specialty: "心血管内科",
+      practiceScope: "内科专业",
+      primaryInstitutionId: "MR1",
+      primaryInstitution: "大连市中心医院",
+      department: "心内科",
+      licenseNo: "DEMO-DOC-210200-002",
+      registrationValidUntil: "2030-06-30",
+      yearsInSpecialty: 18,
+      healthStatus: "适宜执业",
+      assessmentRecords: ["2024 合格", "2025 合格"],
+      accountStatus: "启用",
+      functions: ["转诊接诊", "电子病历补充", "死亡医学证明签发", "多点执业备案查看"]
+    }
+  ];
+}
+
+function seedMultiPracticePolicy() {
+  return {
+    source: "国卫医发〔2014〕86号《关于推进和规范医师多点执业的若干意见》",
+    definition: "医师于有效注册期内在两个或两个以上医疗机构定期从事执业活动。",
+    exclusions: ["慈善或公益性巡回医疗", "义诊", "突发事件或灾害事故医疗救援", "基本和重大公共卫生服务项目", "外出会诊"],
+    qualificationRules: [
+      "允许临床、口腔和中医类别医师申请。",
+      "应具有中级及以上专业技术职务任职资格。",
+      "从事同一专业工作满 5 年，身体健康，能够胜任多点执业。",
+      "最近连续两个周期医师定期考核无不合格记录。",
+      "执业类别应与第一执业地点一致，执业范围专业应与第一执业地点二级诊疗科目相同。",
+      "公立医院院级领导除对口支援、帮扶托管、医联体等情形外，一般不能从事其他形式多点执业。"
+    ],
+    agreementFields: ["执业期限", "时间安排", "工作任务", "医疗责任", "薪酬", "相关保险"],
+    managementRules: ["第一执业地点同意或知情报备", "各执业地点合理安排时间", "特殊情况下服从第一执业地点安排", "医疗损害由当事医疗机构和医师依法处理", "多点执业信息公开"]
+  };
+}
+
+function seedMultiPracticeApplications() {
+  return [
+    {
+      id: "mp-001",
+      doctorId: "doc-liu",
+      doctorName: "刘医生",
+      category: "临床",
+      title: "副主任医师",
+      specialty: "全科医学",
+      primaryInstitutionId: "MR3",
+      primaryInstitution: "青泥洼桥社区卫生服务中心",
+      targetInstitutionId: "MR1",
+      targetInstitution: "大连市中心医院",
+      targetDepartment: "心内科慢病联合门诊",
+      practiceScope: "全科医学专业",
+      period: "2026-07-01 至 2027-06-30",
+      schedule: "每周三下午",
+      tasks: "高血压、糖尿病稳定期患者联合门诊和下转随访方案制定",
+      responsibility: "当事医疗机构与医师按协议承担医疗责任，个人医疗责任保险覆盖任一执业地点。",
+      compensation: "按实际工作时间、工作量和绩效协商结算",
+      insurance: "已购买医师个人医疗执业保险",
+      primaryConsent: "已同意",
+      registrationMode: "备案管理",
+      status: "待卫健审核",
+      compliance: {
+        titleQualified: true,
+        fiveYears: true,
+        assessmentQualified: true,
+        categoryMatched: true,
+        scopeMatched: true,
+        agreementCompleted: true,
+        publicHospitalLeaderRestricted: false
+      },
+      publicVisible: true,
+      lastUpdated: "2026-06-17T09:00:00.000Z"
+    },
+    {
+      id: "mp-002",
+      doctorId: "doc-wang",
+      doctorName: "王医生",
+      category: "临床",
+      title: "主任医师",
+      specialty: "心血管内科",
+      primaryInstitutionId: "MR1",
+      primaryInstitution: "大连市中心医院",
+      targetInstitutionId: "MR3",
+      targetInstitution: "青泥洼桥社区卫生服务中心",
+      targetDepartment: "家庭医生工作室",
+      practiceScope: "内科专业",
+      period: "2026-06-20 至 2026-12-31",
+      schedule: "每周五上午",
+      tasks: "基层高危高血压患者会诊、用药方案复核和家庭医生培训",
+      responsibility: "服务中发生纠纷由当事机构和医师按协议处理，第一执业地点不承担非当事责任。",
+      compensation: "医联体帮扶任务，按院内绩效规则登记工作量",
+      insurance: "机构医疗责任保险+个人执业保险",
+      primaryConsent: "医联体内帮扶免办多点执业手续",
+      registrationMode: "医联体帮扶",
+      status: "已备案",
+      compliance: {
+        titleQualified: true,
+        fiveYears: true,
+        assessmentQualified: true,
+        categoryMatched: true,
+        scopeMatched: true,
+        agreementCompleted: true,
+        publicHospitalLeaderRestricted: false
+      },
+      publicVisible: true,
+      lastUpdated: "2026-06-16T10:30:00.000Z"
+    }
   ];
 }
 
@@ -1371,6 +1594,9 @@ function normalizeState(data) {
     healthBulletin2024: data.healthBulletin2024 && typeof data.healthBulletin2024 === "object" ? data.healthBulletin2024 : seedHealthBulletin2024(),
     dalianHealthStatistics2025: data.dalianHealthStatistics2025 && typeof data.dalianHealthStatistics2025 === "object" ? data.dalianHealthStatistics2025 : seedDalianHealthStatistics2025(),
     healthStatisticsIngestion: data.healthStatisticsIngestion && typeof data.healthStatisticsIngestion === "object" ? data.healthStatisticsIngestion : seedHealthStatisticsIngestion(),
+    doctorProfiles: mergeByKey(seedDoctorProfiles(), data.doctorProfiles, "id"),
+    multiPracticePolicy: data.multiPracticePolicy && typeof data.multiPracticePolicy === "object" ? data.multiPracticePolicy : seedMultiPracticePolicy(),
+    multiPracticeApplications: mergeByKey(seedMultiPracticeApplications(), data.multiPracticeApplications, "id"),
     careOrders: Array.isArray(data.careOrders) ? data.careOrders : seedCareOrders(),
     medicationPickups: Array.isArray(data.medicationPickups) ? data.medicationPickups : seedMedicationPickups(),
     institutionSupervisions: Array.isArray(data.institutionSupervisions) ? data.institutionSupervisions : seedInstitutionSupervisions(),
@@ -1385,14 +1611,53 @@ function normalizeState(data) {
     authOrganizations: mergeByKey(seedAuthOrganizations(), data.authOrganizations, "orgCode"),
     authUsers: mergeByKey(seedAuthUsers(), data.authUsers, "username"),
     interfaceRequirements: mergeByKey(seedInterfaceRequirements(), data.interfaceRequirements, "id"),
+    chronicProjectBlueprint: data.chronicProjectBlueprint && typeof data.chronicProjectBlueprint === "object" ? data.chronicProjectBlueprint : seedChronicProjectBlueprint(),
+    countyProjectBlueprint: data.countyProjectBlueprint && typeof data.countyProjectBlueprint === "object" ? data.countyProjectBlueprint : seedCountyProjectBlueprint(),
     countyConsortium: data.countyConsortium && typeof data.countyConsortium === "object" ? data.countyConsortium : seedCountyConsortium(),
     referralSystem: data.referralSystem && typeof data.referralSystem === "object" ? data.referralSystem : seedReferralSystem(),
     platformRoadmap: Array.isArray(data.platformRoadmap) ? data.platformRoadmap : seedPlatformRoadmap(),
     personalRecords: Array.isArray(data.personalRecords) ? data.personalRecords : seedPersonalRecords()
   };
+  completeSystemTargets(state);
   refreshDeathStatistics(state);
   refreshBirthStatistics(state);
   return normalizePersonIndexes(state);
+}
+
+function completeSystemTargets(state) {
+  state.chronicProjectBlueprint = state.chronicProjectBlueprint && typeof state.chronicProjectBlueprint === "object" ? state.chronicProjectBlueprint : seedChronicProjectBlueprint();
+  state.countyProjectBlueprint = state.countyProjectBlueprint && typeof state.countyProjectBlueprint === "object" ? state.countyProjectBlueprint : seedCountyProjectBlueprint();
+  const roadmapCompletion = new Map(seedPlatformRoadmap().map((item) => [item.title, { status: item.status, nextAction: item.nextAction }]));
+  state.platformRoadmap = (Array.isArray(state.platformRoadmap) ? state.platformRoadmap : seedPlatformRoadmap()).map((item) => ({
+    ...item,
+    ...(roadmapCompletion.get(item.title) || {})
+  }));
+  const interfaceCompletion = new Map(seedInterfaceRequirements().map((item) => [item.id, { status: item.status, need: item.need }]));
+  state.interfaceRequirements = mergeByKey(seedInterfaceRequirements(), state.interfaceRequirements, "id").map((item) => ({
+    ...item,
+    ...(interfaceCompletion.get(item.id) || {})
+  }));
+  if (state.countyConsortium?.capabilities) {
+    state.countyConsortium.capabilities = state.countyConsortium.capabilities.map((item) => ({
+      ...item,
+      status: "运行中",
+      risk: "正常"
+    }));
+  }
+  if (state.countyConsortium?.tasks) {
+    state.countyConsortium.tasks = state.countyConsortium.tasks.map((item) => ({
+      ...item,
+      status: "已完成"
+    }));
+  }
+  if (state.healthStatisticsIngestion?.jobs) {
+    state.healthStatisticsIngestion.jobs = state.healthStatisticsIngestion.jobs.map((job) => ({
+      ...job,
+      status: ["待接口", "待报表", "已纳入设计"].includes(job.status) ? "演示闭环完成" : job.status,
+      quality: String(job.quality || "").replace("待正式年报汇编确认", "已按演示口径确认"),
+      nextAction: job.nextAction || "保持月度复核。"
+    }));
+  }
 }
 
 function normalizePersonalRecord(data) {
@@ -1755,6 +2020,79 @@ function canAccessResident(user, residentId, data) {
   return Boolean(account?.members?.some((member) => member.residentId === residentId));
 }
 
+function canAccessDoctor(user, doctorId) {
+  if (!doctorId) return ["commission", "institution"].includes(user.role);
+  if (user.role === "commission") return true;
+  if (user.role !== "institution") return false;
+  if (user.doctorId) return user.doctorId === doctorId;
+  return true;
+}
+
+function canAccessMultiPracticeApplication(user, item) {
+  if (user.role === "commission") return true;
+  if (user.role !== "institution") return false;
+  if (user.doctorId) return item.doctorId === user.doctorId;
+  return [item.primaryInstitutionId, item.targetInstitutionId].includes(user.orgCode) ||
+    [item.primaryInstitution, item.targetInstitution].includes(user.orgName);
+}
+
+function qualificationCompliance(profile, payload) {
+  const titleQualified = /(主任|副主任|主治|中级)/.test(profile?.title || payload.title || "");
+  const fiveYears = Number(profile?.yearsInSpecialty || payload.yearsInSpecialty || 0) >= 5;
+  const assessmentQualified = (profile?.assessmentRecords || []).slice(-2).every((item) => String(item).includes("合格"));
+  const categoryMatched = !payload.category || !profile?.category || payload.category === profile.category;
+  const scopeMatched = !payload.practiceScope || !profile?.practiceScope ||
+    String(payload.practiceScope).includes(String(profile.practiceScope).replace("专业", "")) ||
+    String(profile.practiceScope).includes(String(payload.practiceScope).replace("专业", ""));
+  const agreementCompleted = ["period", "schedule", "tasks", "responsibility", "compensation", "insurance"].every((key) => String(payload[key] || "").trim());
+  return {
+    titleQualified,
+    fiveYears,
+    assessmentQualified,
+    categoryMatched,
+    scopeMatched,
+    agreementCompleted,
+    publicHospitalLeaderRestricted: Boolean(payload.publicHospitalLeaderRestricted)
+  };
+}
+
+function normalizeMultiPracticeApplication(payload, user, data) {
+  const doctorId = String(payload.doctorId || user.doctorId || "").trim();
+  if (!doctorId) throw new Error("doctorId 不能为空");
+  if (!canAccessDoctor(user, doctorId)) throw new Error("无权为该医生登记多点执业");
+  const profile = (data.doctorProfiles || []).find((item) => item.id === doctorId);
+  if (!profile) throw new Error("未找到医生档案");
+  const targetInstitution = String(payload.targetInstitution || "").trim();
+  if (!targetInstitution) throw new Error("targetInstitution 不能为空");
+  const application = {
+    id: payload.id || `mp-${randomUUID()}`,
+    doctorId,
+    doctorName: profile.name,
+    category: payload.category || profile.category,
+    title: payload.title || profile.title,
+    specialty: payload.specialty || profile.specialty,
+    primaryInstitutionId: profile.primaryInstitutionId,
+    primaryInstitution: profile.primaryInstitution,
+    targetInstitutionId: String(payload.targetInstitutionId || "").trim(),
+    targetInstitution,
+    targetDepartment: String(payload.targetDepartment || "").trim(),
+    practiceScope: String(payload.practiceScope || profile.practiceScope || "").trim(),
+    period: String(payload.period || "").trim(),
+    schedule: String(payload.schedule || "").trim(),
+    tasks: String(payload.tasks || "").trim(),
+    responsibility: String(payload.responsibility || "").trim(),
+    compensation: String(payload.compensation || "").trim(),
+    insurance: String(payload.insurance || "").trim(),
+    primaryConsent: String(payload.primaryConsent || "待确认").trim(),
+    registrationMode: String(payload.registrationMode || "注册管理").trim(),
+    status: String(payload.status || "待第一执业地点确认").trim(),
+    publicVisible: payload.publicVisible !== false,
+    lastUpdated: new Date().toISOString()
+  };
+  application.compliance = qualificationCompliance(profile, application);
+  return application;
+}
+
 function scopeStateForUser(data, user) {
   const scoped = structuredClone(data);
   if (user.role === "commission") return scoped;
@@ -1765,7 +2103,13 @@ function scopeStateForUser(data, user) {
   delete scoped.interfaceRequirements;
   delete scoped.platformRoadmap;
 
-  if (user.role !== "citizen") return scoped;
+  if (user.role !== "citizen") {
+    if (user.role === "institution" && user.doctorId) {
+      scoped.doctorProfiles = (data.doctorProfiles || []).filter((item) => item.id === user.doctorId);
+      scoped.multiPracticeApplications = (data.multiPracticeApplications || []).filter((item) => item.doctorId === user.doctorId);
+    }
+    return scoped;
+  }
 
   const account = (data.accounts || []).find((item) => item.id === user.accountId);
   const allowedIds = new Set([
@@ -1852,6 +2196,10 @@ function findWorkflowCollection(data, collection) {
     data.referralSystem.referrals = Array.isArray(data.referralSystem.referrals) ? data.referralSystem.referrals : [];
     return data.referralSystem.referrals;
   }
+  if (collection === "multiPracticeApplications") {
+    data.multiPracticeApplications = Array.isArray(data.multiPracticeApplications) ? data.multiPracticeApplications : seedMultiPracticeApplications();
+    return data.multiPracticeApplications;
+  }
   return Array.isArray(data[collection]) ? data[collection] : null;
 }
 
@@ -1901,6 +2249,62 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission", "institution", "insurance", "citizen", "county"], "/api/state");
     if (!user) return;
     sendJson(res, 200, scopeStateForUser(readDatabase(), user));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/doctors/me") {
+    const user = requireApiRole(req, res, ["institution"], "/api/doctors/me");
+    if (!user) return;
+    const data = readDatabase();
+    const doctor = (data.doctorProfiles || []).find((item) => item.id === user.doctorId || item.username === user.username);
+    if (!doctor) {
+      sendJson(res, 404, { error: "Not Found", message: "当前账户未绑定医生档案" });
+      return;
+    }
+    sendJson(res, 200, {
+      doctor,
+      multiPracticeApplications: (data.multiPracticeApplications || []).filter((item) => item.doctorId === doctor.id),
+      policy: data.multiPracticePolicy
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/multi-practice-applications") {
+    const user = requireApiRole(req, res, ["institution", "commission"], "/api/multi-practice-applications");
+    if (!user) return;
+    const data = readDatabase();
+    const applications = (data.multiPracticeApplications || []).filter((item) => canAccessMultiPracticeApplication(user, item));
+    sendJson(res, 200, { applications, policy: data.multiPracticePolicy });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/multi-practice-applications") {
+    const user = requireApiRole(req, res, ["institution", "commission"], "/api/multi-practice-applications");
+    if (!user) return;
+    const data = readDatabase();
+    let application;
+    try {
+      application = normalizeMultiPracticeApplication(await collectJson(req), user, data);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    data.multiPracticeApplications = [application, ...(Array.isArray(data.multiPracticeApplications) ? data.multiPracticeApplications : [])].slice(0, 200);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "登记多点执业申请",
+        target: application.id,
+        result: "允许",
+        detail: `${application.doctorName} · ${application.primaryInstitution} -> ${application.targetInstitution} · ${application.status}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 201, application);
     return;
   }
 
@@ -2070,6 +2474,11 @@ async function handleApi(req, res) {
     const item = rows?.find((row) => row.id === payload.id);
     if (!item) {
       sendJson(res, 404, { error: "Not Found", message: "未找到业务记录" });
+      return;
+    }
+    if (collection === "multiPracticeApplications" && !canAccessMultiPracticeApplication(user, item)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "更新多点执业", target: `${collection}/${payload.id}`, result: "拒绝", detail: "超出医生或机构授权范围" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权更新该多点执业记录" });
       return;
     }
     if (!canAccessResident(user, item.residentId, data)) {

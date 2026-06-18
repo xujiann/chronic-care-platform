@@ -392,6 +392,36 @@ h1 { margin-top: 4px; font-size: 28px; }
 .badge.danger { background: #fde9e7; color: var(--red); }
 .badge.info { background: #eaf2ff; color: #184a91; }
 
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.inline-action {
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.inline-action:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.inline-action:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 .compact .item {
   grid-template-columns: 1fr;
 }

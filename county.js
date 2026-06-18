@@ -1,10 +1,11 @@
-const fallbackState = { countyConsortium: null, residents: [], medicalResources: [], personalRecords: [] };
+const fallbackState = { countyConsortium: null, countyProjectBlueprint: null, residents: [], medicalResources: [], personalRecords: [] };
 
 document.addEventListener("DOMContentLoaded", async () => {
   const state = await loadPlatformState(fallbackState);
   const county = state.countyConsortium || buildCountyConsortiumDefaults(state);
   renderCountyMetrics(county, state);
   renderCountyNetwork(county);
+  renderCountyProjectBlueprint(state);
   renderCapabilityFilter(county);
   renderCountyCapabilities(county, "all");
   renderCountyTasks(county);
@@ -35,6 +36,81 @@ function renderCountyNetwork(county) {
     <p>${org.role}</p>
     <small>${org.systems.join("、")}</small>
   </article>`).join("");
+}
+
+function renderCountyProjectBlueprint(state) {
+  const blueprint = state.countyProjectBlueprint || {};
+  const coverage = blueprint.coverage || [];
+  const centers = blueprint.centers || [];
+  const ai = blueprint.grassrootsAi || {};
+  const dataResources = blueprint.dataResources || {};
+  const totalHospitals = coverage.reduce((sum, item) => sum + Number(item.hospitals || 0), 0);
+  const totalPrimary = coverage.reduce((sum, item) => sum + Number(item.primaryCenters || 0), 0);
+
+  const sourceEl = document.querySelector("#county-blueprint-source");
+  if (sourceEl) {
+    sourceEl.textContent = blueprint.source || "";
+  }
+
+  const modelEl = document.querySelector("#county-16255");
+  if (modelEl) {
+    modelEl.innerHTML = (blueprint.modelItems || []).map((item) => `<article class="capability-row">
+      <div class="capability-index">${item.code}</div>
+      <div>
+        <h3>${item.name}</h3>
+        <p>${item.detail}</p>
+      </div>
+      <div class="capability-side">
+        <span class="badge info">${blueprint.model || "16255"}</span>
+      </div>
+    </article>`).join("");
+  }
+
+  const coverageEl = document.querySelector("#county-coverage");
+  if (coverageEl) {
+    coverageEl.innerHTML = [
+      { region: "合计", consortiums: coverage.reduce((sum, item) => sum + Number(item.consortiums || 0), 0), hospitals: totalHospitals, primaryCenters: totalPrimary },
+      ...coverage
+    ].map((item) => `<section class="item">
+      <div>
+        <h3>${item.region}</h3>
+        <p>${item.consortiums} 个医共体 / ${item.hospitals} 家医院 / ${item.primaryCenters} 家乡镇卫生院</p>
+      </div>
+      <span class="badge info">${item.primaryCenters}</span>
+    </section>`).join("");
+  }
+
+  const appsEl = document.querySelector("#county-apps");
+  if (appsEl) {
+    appsEl.innerHTML = [
+      ["复用全民健康信息平台", blueprint.reusedApps || []],
+      ["新建医共体专项应用", blueprint.newApps || []],
+      ["数据资源与安全", [`${dataResources.catalogs || 0} 项目录`, dataResources.sharing, dataResources.network, ...(dataResources.security || [])].filter(Boolean)]
+    ].map(([title, items]) => `<div>
+      <strong>${title}</strong>
+      <span>${items.join("、")}</span>
+    </div>`).join("");
+  }
+
+  const aiEl = document.querySelector("#county-grassroots-ai");
+  if (aiEl) {
+    aiEl.innerHTML = [
+      ["覆盖范围", ai.coverage || "待配置"],
+      ["辅助能力", (ai.functions || []).join("、")],
+      ["运行监测", (ai.indicators || []).join("、")]
+    ].map(([title, text]) => `<div><strong>${title}</strong><span>${text}</span></div>`).join("");
+  }
+
+  const centersEl = document.querySelector("#county-resource-centers");
+  if (centersEl) {
+    centersEl.innerHTML = centers.map((item) => `<article>
+      <strong>${item.name}</strong>
+      <div class="flow-steps">
+        <span>1. 接入：${item.integration}</span>
+        <span>2. 流程：${item.workflow}</span>
+      </div>
+    </article>`).join("");
+  }
 }
 
 function renderCapabilityFilter(county) {

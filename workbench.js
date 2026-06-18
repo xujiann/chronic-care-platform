@@ -7,6 +7,8 @@ const fallbackState = {
   medicationPickups: [],
   emergencySignals: [],
   countyConsortium: null,
+  chronicProjectBlueprint: null,
+  countyProjectBlueprint: null,
   referralSystem: null,
   platformRoadmap: []
 };
@@ -16,6 +18,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const tasks = collectUnifiedTasks(state);
   const roadmap = state.platformRoadmap?.length ? state.platformRoadmap : defaultRoadmap();
   renderMetrics(state, tasks, roadmap);
+  renderSourceAlignment(state);
   renderPlatformMap(state);
   renderPriorityList(roadmap);
   renderUnifiedTasks(tasks);
@@ -35,6 +38,43 @@ function renderMetrics(state, tasks, roadmap) {
     ["居民主索引", state.residents?.length || 0, "身份证号 + 手机号"],
     ["开源阶段", "MVP", "可演示、可继续拆分"]
   ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><small>${hint}</small></article>`).join("");
+}
+
+function renderSourceAlignment(state) {
+  const chronic = state.chronicProjectBlueprint || {};
+  const county = state.countyProjectBlueprint || {};
+  const coverage = county.coverage || [];
+  const chronicSourceEl = document.querySelector("#source-alignment-chronic-source");
+  const countySourceEl = document.querySelector("#source-alignment-county-source");
+  if (chronicSourceEl) chronicSourceEl.textContent = chronic.source || "";
+  if (countySourceEl) countySourceEl.textContent = county.source || "";
+
+  const chronicEl = document.querySelector("#source-alignment-chronic");
+  if (chronicEl) {
+    chronicEl.innerHTML = [
+      ["总体目标", chronic.goal || "待配置"],
+      ["建设架构", `${(chronic.architecture || []).length} 项：${(chronic.architecture || []).map((item) => item.name).join("、")}`],
+      ["三网三智能体", `${(chronic.networks || []).length} 张业务网 / ${(chronic.aiAgents || []).length} 个智能体`],
+      ["专病与模型", `${(chronic.diseaseLibraries || []).length} 个病种库 / ${(chronic.screeningModels || []).length} 个筛查模型`],
+      ["外部接口", `${(chronic.externalInterfaces || []).length} 类接口`]
+    ].map(([title, text]) => `<div><strong>${title}</strong><span>${text}</span></div>`).join("");
+  }
+
+  const countyEl = document.querySelector("#source-alignment-county");
+  if (countyEl) {
+    const totals = coverage.reduce((acc, item) => ({
+      consortiums: acc.consortiums + Number(item.consortiums || 0),
+      hospitals: acc.hospitals + Number(item.hospitals || 0),
+      primaryCenters: acc.primaryCenters + Number(item.primaryCenters || 0)
+    }), { consortiums: 0, hospitals: 0, primaryCenters: 0 });
+    countyEl.innerHTML = [
+      ["总体目标", county.goal || "待配置"],
+      ["建设模型", `${county.model || "16255"}：${(county.modelItems || []).map((item) => item.name).join("、")}`],
+      ["覆盖范围", `${coverage.length} 个区县 / ${totals.consortiums} 个医共体 / ${totals.hospitals} 家医院 / ${totals.primaryCenters} 家乡镇卫生院`],
+      ["应用清单", `${(county.reusedApps || []).length} 个复用应用 / ${(county.newApps || []).length} 个新建应用`],
+      ["资源与安全", `${(county.centers || []).length} 个协同中心 / ${county.dataResources?.catalogs || 0} 项数据资源目录`]
+    ].map(([title, text]) => `<div><strong>${title}</strong><span>${text}</span></div>`).join("");
+  }
 }
 
 function renderPlatformMap(state) {
