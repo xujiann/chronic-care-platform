@@ -6,6 +6,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   platformState = state;
   const county = state.countyConsortium || buildCountyConsortiumDefaults(state);
   renderCountyMetrics(county, state);
+  renderCountyAudit(state, county);
   renderCountyNetwork(county);
   renderCountyProjectBlueprint(state);
   renderCountyBusinessOperations(state);
@@ -31,6 +32,27 @@ function renderCountyMetrics(county, state) {
     ["个人健康档案", state.residents.length, "与健康城市系统贯通"],
     ["共享数据集", 8, "档案、病历、医技、医保、公卫"]
   ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><small>${hint}</small></article>`).join("");
+}
+
+function renderCountyAudit(state, county) {
+  const auditEl = document.querySelector("#county-audit-grid");
+  if (!auditEl) return;
+  const ordersOpen = (state.countyCollaborationOrders || []).filter((item) => !["已回传", "已完成"].includes(item.status)).length;
+  const recognitionOpen = (state.countyMutualRecognitionRecords || []).filter((item) => item.status !== "已互认").length;
+  const aiOpen = (state.countyAiDiagnosisCases || []).filter((item) => item.status !== "已完成").length;
+  const newApps = state.countyProjectBlueprint?.newApps?.length || 0;
+  const warningCapabilities = (county.capabilities || []).filter((item) => item.risk === "需推进").length;
+  auditEl.innerHTML = [
+    ["协同工单", `${ordersOpen} 项`, ordersOpen ? "仍需中心诊断、报告回传或跨机构确认。" : "协同工单已闭环。"],
+    ["互认闭环", `${recognitionOpen} 项`, recognitionOpen ? "仍需质控通过、不互认原因或医保调阅回写。" : "互认记录已闭环。"],
+    ["基层 AI", `${aiOpen} 项`, aiOpen ? "仍需医生采纳、转诊跟踪或病历质检。" : "AI 辅诊病例已闭环。"],
+    ["新建应用", `${newApps} 个`, "消毒供应、合理用药、绩效、人财物等仍需排期建设。"],
+    ["待推进模块", `${warningCapabilities} 个`, "功能清单中待启动模块需要形成责任单位和验收指标。"]
+  ].map(([label, value, hint]) => `<article class="metric-card">
+    <span>${label}</span>
+    <strong>${value}</strong>
+    <small>${hint}</small>
+  </article>`).join("");
 }
 
 function renderCountyNetwork(county) {

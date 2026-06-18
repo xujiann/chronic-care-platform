@@ -371,6 +371,8 @@ function renderChronicModule() {
     ["主索引贯通", linkedIndexes.size, "身份证号 + 手机号"]
   ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><em>${hint}</em></article>`).join("");
 
+  renderChronicAudit();
+
   document.querySelector("#chronic-flow").innerHTML = [
     "筛查建档",
     "慢病登记",
@@ -427,6 +429,26 @@ function renderChronicModule() {
 
   renderChronicProjectBlueprint();
   renderChronicOperations();
+}
+
+function renderChronicAudit() {
+  const auditEl = document.querySelector("#chronic-audit-grid");
+  if (!auditEl) return;
+  const screeningOpen = (state.chronicScreeningTasks || []).filter((item) => !["已评估", "已推送干预"].includes(item.status)).length;
+  const educationOpen = (state.chronicEducationPushes || []).filter((item) => !["已确认", "已阅读"].includes(item.status)).length;
+  const planOpen = (state.chronicManagementPlans || []).filter((item) => item.status !== "已复核").length;
+  const interfaces = state.chronicProjectBlueprint?.externalInterfaces?.length || 0;
+  const diseaseLibraries = state.chronicProjectBlueprint?.diseaseLibraries?.length || 0;
+  auditEl.innerHTML = [
+    ["筛查闭环", `${screeningOpen} 项`, screeningOpen ? "仍需完成风险评估、检查申请或干预推送。" : "筛查任务已闭环。"],
+    ["宣教闭环", `${educationOpen} 项`, educationOpen ? "仍需确认推送触达、居民阅读和反馈。" : "宣教推送已闭环。"],
+    ["分级管理", `${planOpen} 项`, planOpen ? "仍需完成复核、预警升级或方案调整。" : "分级管理计划已复核。"],
+    ["专病与接口", `${diseaseLibraries}/${interfaces}`, "专病库和外部接口已入模，真实系统对接仍需实施。"]
+  ].map(([label, value, hint]) => `<article class="metric-card">
+    <span>${label}</span>
+    <strong>${value}</strong>
+    <em>${hint}</em>
+  </article>`).join("");
 }
 
 function renderChronicProjectBlueprint() {

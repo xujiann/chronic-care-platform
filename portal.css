@@ -581,6 +581,14 @@ h1 { margin-top: 4px; font-size: 28px; }
   line-height: 1.55;
 }
 
+#process-audit-matrix .priority-row {
+  grid-template-columns: 58px minmax(0, 1fr) minmax(240px, 0.62fr);
+}
+
+#process-audit-matrix .capability-side {
+  justify-items: stretch;
+}
+
 .priority-rank {
   width: 48px;
   height: 36px;

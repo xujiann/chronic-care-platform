@@ -10,7 +10,9 @@ const fallbackState = {
   chronicProjectBlueprint: null,
   countyProjectBlueprint: null,
   referralSystem: null,
-  platformRoadmap: []
+  platformRoadmap: [],
+  platformAudit: [],
+  platformProcessAudit: []
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -19,6 +21,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const roadmap = state.platformRoadmap?.length ? state.platformRoadmap : defaultRoadmap();
   renderMetrics(state, tasks, roadmap);
   renderSourceAlignment(state);
+  renderAudit(state, tasks);
+  renderProcessAudit(state);
   renderPlatformMap(state);
   renderPriorityList(roadmap);
   renderUnifiedTasks(tasks);
@@ -38,6 +42,100 @@ function renderMetrics(state, tasks, roadmap) {
     ["居民主索引", state.residents?.length || 0, "身份证号 + 手机号"],
     ["开源阶段", "MVP", "可演示、可继续拆分"]
   ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><small>${hint}</small></article>`).join("");
+}
+
+function renderAudit(state, tasks) {
+  const chronicOpen = countOpen(state.chronicScreeningTasks, ["已评估", "已推送干预"]) +
+    countOpen(state.chronicEducationPushes, ["已确认", "已阅读"]) +
+    countOpen(state.chronicManagementPlans, ["已复核"]);
+  const countyOpen = countOpen(state.countyCollaborationOrders, ["已回传", "已完成"]) +
+    countOpen(state.countyMutualRecognitionRecords, ["已互认"]) +
+    countOpen(state.countyAiDiagnosisCases, ["已完成"]);
+  const interfaceCount = state.chronicProjectBlueprint?.externalInterfaces?.length || 0;
+  const countyNewApps = state.countyProjectBlueprint?.newApps?.length || 0;
+  const activeRisks = tasks.filter((item) => item.level === "高").length;
+
+  const summaryEl = document.querySelector("#audit-summary");
+  if (summaryEl) {
+    summaryEl.innerHTML = [
+      ["慢病业务闭环", chronicOpen === 0, chronicOpen ? `${chronicOpen} 项筛查、宣教或分级管理任务仍需推进。` : "演示台账已闭环。"],
+      ["医共体业务闭环", countyOpen === 0, countyOpen ? `${countyOpen} 项协同工单、互认或 AI 辅诊事项仍需推进。` : "演示台账已闭环。"],
+      ["慢病外部接口", false, `${interfaceCount} 类接口已列入蓝图，仍需现场对接真实业务系统。`],
+      ["医共体新建应用", false, `${countyNewApps} 个专项应用已列入清单，需继续完成实施排期和验收口径。`],
+      ["跨端高风险待办", activeRisks === 0, activeRisks ? `${activeRisks} 项高风险事项需优先处理。` : "暂无高风险待办。"]
+    ].map(([name, ok, detail]) => `<section class="item">
+      <div>
+        <h3>${name}</h3>
+        <p>${detail}</p>
+      </div>
+      <span class="badge ${ok ? "info" : "warn"}">${ok ? "已闭环" : "需推进"}</span>
+    </section>`).join("");
+  }
+
+  const gapsEl = document.querySelector("#audit-gaps");
+  if (gapsEl) {
+    const gaps = (state.platformAudit || []).length ? state.platformAudit.map((item) => [item.module, `${item.issue} 下一步：${item.nextAction}`]) : [
+      ["慢病", "把筛查任务、宣教推送、分级管理计划从展示台账推进到可追踪的责任人、截止日期、结果回写和质控复核。"],
+      ["慢病", "对接居民基本信息、门诊/住院、体检、死因监测、民政死亡、专病库等外部接口，并标注接口状态。"],
+      ["医共体", "把影像、心电、检验、消毒供应、跨机构预约、合理用药、绩效等新建应用拆成上线批次。"],
+      ["医共体", "建立互认规则、不互认原因、危急值、报告回传、医保调阅和质控复核的闭环验收指标。"]
+    ];
+    gapsEl.innerHTML = gaps.map(([module, detail]) => `<div><strong>${module}</strong><span>${detail}</span></div>`).join("");
+  }
+}
+
+function countOpen(rows, closedStatuses) {
+  const closed = new Set(closedStatuses);
+  return (rows || []).filter((item) => !closed.has(item.status)).length;
+}
+
+function renderProcessAudit(state) {
+  const container = document.querySelector("#process-audit-matrix");
+  if (!container) return;
+  const rows = state.platformProcessAudit?.length ? state.platformProcessAudit : buildProcessAudit(state);
+  container.innerHTML = rows.map((item, index) => {
+    const badge = item.status === "已闭环" ? "info" : item.status === "进行中" ? "warn" : "danger";
+    return `<article class="priority-row">
+      <div class="priority-rank ${badge}">${index + 1}</div>
+      <div>
+        <h3>${item.process}</h3>
+        <p>${item.auditPoint}</p>
+        <div class="standard-tags">
+          <span class="badge info">${item.owner}</span>
+          <span class="badge ${badge}">${item.status}</span>
+          <span class="badge warn">${item.risk}</span>
+        </div>
+      </div>
+      <div class="capability-side">
+        <small>${item.evidence}</small>
+        <small>${item.nextAction}</small>
+      </div>
+    </article>`;
+  }).join("");
+}
+
+function buildProcessAudit(state) {
+  const hasAuth = Boolean(state.authUsers?.length && state.securityEvents?.length);
+  const hasIndex = Boolean(state.residents?.every((item) => item.personIndex || item.identityIndex));
+  const pendingFollowups = countOpen(state.followups, ["已完成"]);
+  const pendingReferrals = countOpen(state.referralSystem?.referrals, ["已完成", "已接诊", "基层承接"]);
+  const pendingPickups = countOpen(state.medicationPickups, ["已取药", "已完成"]);
+  const pendingClaims = countOpen(state.insuranceClaims, ["已通过"]);
+  const pendingCounty = countOpen(state.countyCollaborationOrders, ["已回传", "已完成"]);
+  const pendingEmergency = countOpen(state.emergencySignals, ["已处置"]);
+  return [
+    { process: "统一登录与角色权限", owner: "市级平台", status: hasAuth ? "进行中" : "待补齐", risk: "真实身份源待接入", auditPoint: "核查账号、角色、机构范围、拒绝访问和安全事件是否留痕。", evidence: `${state.authUsers?.length || 0} 个演示账号 / ${state.securityEvents?.length || 0} 条安全事件`, nextAction: "接入政务统一认证、密码哈希和机构级权限。" },
+    { process: "居民主索引与个人健康信息库", owner: "市级平台", status: hasIndex ? "已闭环" : "待补齐", risk: "正式人口主索引待接入", auditPoint: "核查居民、档案、病历、授权、取药、医保是否使用同一 personIndex。", evidence: `${state.residents?.length || 0} 名居民 / ${state.personalRecords?.length || 0} 条个人健康记录`, nextAction: "对接人口库、电子健康码和正式健康档案主索引。" },
+    { process: "慢病筛查、随访与分级管理", owner: "疾控/卫健委", status: pendingFollowups ? "进行中" : "已闭环", risk: "外部专病库与质控待接入", auditPoint: "核查筛查建档、风险分层、随访、宣教、分级管理是否形成闭环。", evidence: `${state.chronicScreeningTasks?.length || 0} 个筛查任务 / ${pendingFollowups} 个随访待办`, nextAction: "补齐模型版本、触发阈值、人工复核和质控抽查。" },
+    { process: "分级诊疗与双向转诊", owner: "转诊中心", status: pendingReferrals ? "进行中" : "已闭环", risk: "真实号源床位接口待接入", auditPoint: "核查基层评估、上转、接诊、下转、随访和医保引导。", evidence: `${state.referralSystem?.referrals?.length || 0} 条转诊记录 / ${pendingReferrals} 条待处理`, nextAction: "接入预约号源、床位、接诊反馈和下转随访消息。" },
+    { process: "固定取药与长期处方", owner: "基层机构/医保局", status: pendingPickups ? "进行中" : "已闭环", risk: "药房库存与医保结算接口待接入", auditPoint: "核查个人申请、机构确认、医保审核、药房取药和状态回流。", evidence: `${state.medicationPickups?.length || 0} 条取药计划 / ${pendingPickups} 条待处理`, nextAction: "对接处方、药房库存、配送和医保结算状态。" },
+    { process: "医保审核与监管", owner: "医保局", status: pendingClaims ? "进行中" : "已闭环", risk: "医保核心系统待接入", auditPoint: "核查慢病结算、支付引导、凭证核验、机构监管和审核留痕。", evidence: `${state.insuranceClaims?.length || 0} 条医保审核 / ${pendingClaims} 条待审核`, nextAction: "接入医保核心结算、门慢门特、双通道和异地转诊规则。" },
+    { process: "县域医共体协同", owner: "医共体办公室", status: pendingCounty ? "进行中" : "已闭环", risk: "新建应用批次与验收待细化", auditPoint: "核查医技共享、互认、基层 AI、绩效、人财物和药耗协同。", evidence: `${state.countyProjectBlueprint?.newApps?.length || 0} 个新建应用 / ${pendingCounty} 个协同工单待处理`, nextAction: "拆分上线批次，建立互认、危急值、报告回传和绩效验收指标。" },
+    { process: "公共卫生应急预警", owner: "卫健委端", status: pendingEmergency ? "进行中" : "已闭环", risk: "多点触发真实数据源待接入", auditPoint: "核查风险信号、资源调度、处置反馈和复盘记录。", evidence: `${state.emergencySignals?.length || 0} 条预警信号 / ${pendingEmergency} 条待处置`, nextAction: "接入疾控、医疗资源、基层随访和医保异常监测。" },
+    { process: "出生死亡证明与人口统计", owner: "医疗机构/卫健委", status: "进行中", risk: "国家平台与公安民政共享待接入", auditPoint: "核查证照签发、材料、上报、共享、质控和统计回流。", evidence: `${state.birthCertificates?.length || 0} 条出生证明 / ${state.deathCertificates?.length || 0} 条死亡证明`, nextAction: "对接电子证照、人口死亡登记、公安户籍和民政殡葬共享。" },
+    { process: "卫生统计导入与发布", owner: "规划发展与信息化处", status: "进行中", risk: "国家直报系统接口待接入", auditPoint: "核查采集、解析、指标映射、质控、入库、发布和审计留痕。", evidence: `${state.healthStatisticsIngestion?.jobs?.length || 0} 个导入任务 / ${state.healthStatistics?.resourceReports?.length || 0} 条资源报表`, nextAction: "固化指标口径、映射规则、版本发布和差异复核。" },
+    { process: "数据安全与访问审计", owner: "安全管理岗", status: state.dataAccessLogs?.length ? "进行中" : "待补齐", risk: "生产级脱敏、密评、等保待实施", auditPoint: "核查授权、访问、拒绝、脱敏、敏感写操作和审计日志。", evidence: `${state.dataAccessLogs?.length || 0} 条访问日志 / ${state.securityEvents?.length || 0} 条安全事件`, nextAction: "补齐生产级日志保全、脱敏策略、密评和等保验收证据。" }
+  ];
 }
 
 function renderSourceAlignment(state) {

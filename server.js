@@ -154,6 +154,8 @@ function seedState() {
     countyConsortium: seedCountyConsortium(),
     referralSystem: seedReferralSystem(),
     platformRoadmap: seedPlatformRoadmap(),
+    platformAudit: seedPlatformAudit(),
+    platformProcessAudit: seedPlatformProcessAudit(),
     personalRecords: seedPersonalRecords()
   };
 }
@@ -205,25 +207,50 @@ function seedPlatformRoadmap() {
       title: "检查检验互认与资源共享中心深化",
       reason: "县域医共体和分级诊疗都依赖医技共享、结果互认、危急值和质控。",
       scope: ["医共体", "医疗机构", "医保监管"],
-      status: "已完成",
-      nextAction: "已在县域医共体平台补齐影像、心电、检验互认台账、流程和质控规则展示。"
+      status: "进行中",
+      nextAction: "已补齐县域医共体页面的协同工单、互认台账和质控展示；下一步完成真实互认规则、危急值、医保调阅和报告回传接口。"
     },
     {
       priority: "P2",
       title: "统计报表和绩效考核",
       reason: "卫健委和医共体办公室需要面向管理的月报、绩效、机构排名和导出能力。",
       scope: ["卫健委端", "县域医共体", "导出"],
-      status: "已完成",
-      nextAction: "已形成卫生统计月报、机构绩效评分、CSV 导出和统计导入任务闭环。"
+      status: "进行中",
+      nextAction: "已形成演示月报和绩效视图；下一步把医共体绩效、人财物、药耗、基层履约指标拆成可导出的验收报表。"
     },
     {
       priority: "P2",
       title: "移动端和适老化深化",
       reason: "居民端最终要在手机上使用，需要大字模式、家属代办、消息提醒和无障碍优化。",
       scope: ["个人端", "手机预览", "适老化"],
-      status: "已完成",
-      nextAction: "已形成手机预览、适老服务、家属代办、提醒事项和个人授权上传入口。"
+      status: "进行中",
+      nextAction: "居民端已有手机预览、家属代办和授权上传入口；下一步补消息触达、线下帮办和无障碍验收。"
     }
+  ];
+}
+
+function seedPlatformAudit() {
+  return [
+    { module: "慢病", issue: "筛查、宣教、分级管理已有演示台账和操作按钮，但仍需接入真实外部接口与运营质控。", priority: "P1", owner: "疾控/卫健委", status: "进行中", nextAction: "按接口清单逐项标注来源系统、数据项、更新频率、责任人和验收规则。" },
+    { module: "慢病", issue: "专病库和风险模型已入模，但缺少模型版本、适用人群、触发阈值和人工复核记录。", priority: "P1", owner: "慢病中心", status: "待细化", nextAction: "为每个筛查模型补版本、阈值、复核人和输出处置路径。" },
+    { module: "医共体", issue: "16255 建设模型已入模，但新建应用尚未拆成实施批次和验收指标。", priority: "P1", owner: "医共体办公室", status: "进行中", nextAction: "按消毒供应、跨机构预约、合理用药、人财物、绩效、基层 AI 分批排期。" },
+    { module: "医共体", issue: "影像、心电、检验共享中心已有台账，但互认规则、危急值、医保调阅、不互认原因仍需接口化。", priority: "P1", owner: "医技质控中心", status: "进行中", nextAction: "建立互认规则字典、质控复核流、报告回传记录和医保调阅日志。" }
+  ];
+}
+
+function seedPlatformProcessAudit() {
+  return [
+    { process: "统一登录与角色权限", owner: "市级平台", status: "进行中", risk: "真实身份源待接入", auditPoint: "核查账号、角色、机构范围、拒绝访问和安全事件是否留痕。", evidence: "演示账号、Bearer 会话和安全事件已建模。", nextAction: "接入政务统一认证、密码哈希和机构级权限。" },
+    { process: "居民主索引与个人健康信息库", owner: "市级平台", status: "已闭环", risk: "正式人口主索引待接入", auditPoint: "核查居民、档案、病历、授权、取药、医保是否使用同一 personIndex。", evidence: "居民、慢病、随访、个人健康记录、取药和医保数据均保留 personIndex。", nextAction: "对接人口库、电子健康码和正式健康档案主索引。" },
+    { process: "慢病筛查、随访与分级管理", owner: "疾控/卫健委", status: "进行中", risk: "外部专病库与质控待接入", auditPoint: "核查筛查建档、风险分层、随访、宣教、分级管理是否形成闭环。", evidence: "筛查任务、宣教推送、管理计划和随访台账已进入系统。", nextAction: "补齐模型版本、触发阈值、人工复核和质控抽查。" },
+    { process: "分级诊疗与双向转诊", owner: "转诊中心", status: "进行中", risk: "真实号源床位接口待接入", auditPoint: "核查基层评估、上转、接诊、下转、随访和医保引导。", evidence: "转诊规则、预留资源、医保引导和居民宣教已入模。", nextAction: "接入预约号源、床位、接诊反馈和下转随访消息。" },
+    { process: "固定取药与长期处方", owner: "基层机构/医保局", status: "进行中", risk: "药房库存与医保结算接口待接入", auditPoint: "核查个人申请、机构确认、医保审核、药房取药和状态回流。", evidence: "个人端取药计划、机构确认、医保审核和药房状态已建模。", nextAction: "对接处方、药房库存、配送和医保结算状态。" },
+    { process: "医保审核与监管", owner: "医保局", status: "进行中", risk: "医保核心系统待接入", auditPoint: "核查慢病结算、支付引导、凭证核验、机构监管和审核留痕。", evidence: "医保审核、医疗机构监管和凭证核验已建模。", nextAction: "接入医保核心结算、门慢门特、双通道和异地转诊规则。" },
+    { process: "县域医共体协同", owner: "医共体办公室", status: "进行中", risk: "新建应用批次与验收待细化", auditPoint: "核查医技共享、互认、基层 AI、绩效、人财物和药耗协同。", evidence: "16255 模型、协同工单、互认记录和基层 AI 病例已入模。", nextAction: "拆分上线批次，建立互认、危急值、报告回传和绩效验收指标。" },
+    { process: "公共卫生应急预警", owner: "卫健委端", status: "进行中", risk: "多点触发真实数据源待接入", auditPoint: "核查风险信号、资源调度、处置反馈和复盘记录。", evidence: "风险信号、区域、级别、处置动作已入模。", nextAction: "接入疾控、医疗资源、基层随访和医保异常监测。" },
+    { process: "出生死亡证明与人口统计", owner: "医疗机构/卫健委", status: "进行中", risk: "国家平台与公安民政共享待接入", auditPoint: "核查证照签发、材料、上报、共享、质控和统计回流。", evidence: "出生证明、死亡证明、统计主题和共享去向已建模。", nextAction: "对接电子证照、人口死亡登记、公安户籍和民政殡葬共享。" },
+    { process: "卫生统计导入与发布", owner: "规划发展与信息化处", status: "进行中", risk: "国家直报系统接口待接入", auditPoint: "核查采集、解析、指标映射、质控、入库、发布和审计留痕。", evidence: "统计导入流程、任务、资源报表和公报数据已建模。", nextAction: "固化指标口径、映射规则、版本发布和差异复核。" },
+    { process: "数据安全与访问审计", owner: "安全管理岗", status: "进行中", risk: "生产级脱敏、密评、等保待实施", auditPoint: "核查授权、访问、拒绝、脱敏、敏感写操作和审计日志。", evidence: "访问日志、安全事件、接口拒绝和授权记录已进入审计视图。", nextAction: "补齐生产级日志保全、脱敏策略、密评和等保验收证据。" }
   ];
 }
 
@@ -1676,6 +1703,8 @@ function normalizeState(data) {
     countyConsortium: data.countyConsortium && typeof data.countyConsortium === "object" ? data.countyConsortium : seedCountyConsortium(),
     referralSystem: data.referralSystem && typeof data.referralSystem === "object" ? data.referralSystem : seedReferralSystem(),
     platformRoadmap: Array.isArray(data.platformRoadmap) ? data.platformRoadmap : seedPlatformRoadmap(),
+    platformAudit: Array.isArray(data.platformAudit) ? data.platformAudit : seedPlatformAudit(),
+    platformProcessAudit: Array.isArray(data.platformProcessAudit) ? data.platformProcessAudit : seedPlatformProcessAudit(),
     personalRecords: Array.isArray(data.personalRecords) ? data.personalRecords : seedPersonalRecords()
   };
   completeSystemTargets(state);
@@ -1692,6 +1721,8 @@ function completeSystemTargets(state) {
     ...item,
     ...(roadmapCompletion.get(item.title) || {})
   }));
+  state.platformAudit = Array.isArray(state.platformAudit) && state.platformAudit.length ? state.platformAudit : seedPlatformAudit();
+  state.platformProcessAudit = Array.isArray(state.platformProcessAudit) && state.platformProcessAudit.length ? state.platformProcessAudit : seedPlatformProcessAudit();
   const interfaceCompletion = new Map(seedInterfaceRequirements().map((item) => [item.id, { status: item.status, need: item.need }]));
   state.interfaceRequirements = mergeByKey(seedInterfaceRequirements(), state.interfaceRequirements, "id").map((item) => ({
     ...item,
