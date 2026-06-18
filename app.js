@@ -119,7 +119,7 @@ function normalizePersonIndexes() {
     resident.identityIndex = resident.personIndex;
   });
   const residentMap = new Map(residents.map((resident) => [resident.id, resident]));
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "deathCertificates", "birthCertificates"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords"].forEach((key) => {
     (Array.isArray(state[key]) ? state[key] : []).forEach((item) => {
       item.personIndex = item.personIndex || personIndexForResident(residentMap, item.residentId);
     });
@@ -426,6 +426,7 @@ function renderChronicModule() {
   </table>`;
 
   renderChronicProjectBlueprint();
+  renderChronicOperations();
 }
 
 function renderChronicProjectBlueprint() {
@@ -479,6 +480,74 @@ function renderChronicProjectBlueprint() {
       </tbody>
     </table>`;
   }
+}
+
+function renderChronicOperations() {
+  const screeningEl = document.querySelector("#chronic-screening-tasks");
+  if (screeningEl) {
+    const rows = state.chronicScreeningTasks || [];
+    screeningEl.innerHTML = `<table>
+      <thead><tr><th>居民</th><th>任务</th><th>模型</th><th>风险</th><th>责任人</th><th>截止</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody>${rows.map((item) => {
+        const resident = findResident(item.residentId);
+        return `<tr>
+          <td>${resident?.name || "未知居民"}</td>
+          <td>${item.taskName}<br><small>${item.nextStep}</small></td>
+          <td>${item.model}</td>
+          <td><span class="badge ${item.riskLevel === "高危" ? "danger" : "warn"}">${item.riskLevel}</span></td>
+          <td>${item.assignee}<br><small>${item.institution}</small></td>
+          <td>${item.due}</td>
+          <td>${item.status}</td>
+          <td>
+            ${chronicActionButton("chronicScreeningTasks", item.id, "完成评估", { status: "已评估", result: "已生成风险分级和干预建议" })}
+            ${chronicActionButton("chronicScreeningTasks", item.id, "推送干预", { status: "已推送干预", result: "已推送筛查后干预任务" })}
+          </td>
+        </tr>`;
+      }).join("")}</tbody>
+    </table>`;
+  }
+
+  const educationEl = document.querySelector("#chronic-education-pushes");
+  if (educationEl) {
+    educationEl.innerHTML = (state.chronicEducationPushes || []).map((item) => {
+      const resident = findResident(item.residentId);
+      return `<div>
+        <strong>${resident?.name || "未知居民"} · ${item.topic}</strong>
+        <span>${item.channel} · ${item.trigger} · ${item.status} · ${item.feedback}</span>
+        ${chronicActionButton("chronicEducationPushes", item.id, "确认推送", { status: "已推送", feedback: "待阅读" })}
+        ${chronicActionButton("chronicEducationPushes", item.id, "居民已读", { status: "已确认", feedback: "已阅读并确认" })}
+      </div>`;
+    }).join("");
+  }
+
+  const planEl = document.querySelector("#chronic-management-plans");
+  if (planEl) {
+    planEl.innerHTML = (state.chronicManagementPlans || []).map((item) => {
+      const resident = findResident(item.residentId);
+      return `<div>
+        <strong>${resident?.name || "未知居民"} · ${item.diseaseType} · ${item.grade}</strong>
+        <span>${item.plan}；指标：${(item.indicators || []).join("、")}；下次复核：${item.nextReview}</span>
+        ${chronicActionButton("chronicManagementPlans", item.id, "复核完成", { status: "已复核", intervention: "已完成阶段复核并更新管理方案" })}
+        ${chronicActionButton("chronicManagementPlans", item.id, "升级预警", { status: "预警中", intervention: "已升级为重点预警管理" })}
+      </div>`;
+    }).join("");
+  }
+
+  document.querySelectorAll("[data-chronic-action]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const collection = button.dataset.collection;
+      const item = (state[collection] || []).find((row) => row.id === button.dataset.id);
+      if (!item) return;
+      Object.assign(item, JSON.parse(button.dataset.updates), { lastUpdated: new Date().toISOString() });
+      await saveState();
+      renderChronicModule();
+      showToast("慢病业务状态已更新");
+    });
+  });
+}
+
+function chronicActionButton(collection, id, label, updates) {
+  return `<button class="action-link" type="button" data-chronic-action data-collection="${collection}" data-id="${id}" data-updates='${JSON.stringify(updates)}'>${label}</button>`;
 }
 
 function renderResidents() {

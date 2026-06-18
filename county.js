@@ -1,11 +1,14 @@
-const fallbackState = { countyConsortium: null, countyProjectBlueprint: null, residents: [], medicalResources: [], personalRecords: [] };
+const fallbackState = { countyConsortium: null, countyProjectBlueprint: null, countyCollaborationOrders: [], countyAiDiagnosisCases: [], countyMutualRecognitionRecords: [], residents: [], medicalResources: [], personalRecords: [] };
+let platformState = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
   const state = await loadPlatformState(fallbackState);
+  platformState = state;
   const county = state.countyConsortium || buildCountyConsortiumDefaults(state);
   renderCountyMetrics(county, state);
   renderCountyNetwork(county);
   renderCountyProjectBlueprint(state);
+  renderCountyBusinessOperations(state);
   renderCapabilityFilter(county);
   renderCountyCapabilities(county, "all");
   renderCountyTasks(county);
@@ -13,6 +16,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderCountyReferral(state);
   renderCountyIndicators(county);
   renderCountyGovernance(county);
+  bindCountyActions();
 });
 
 function renderCountyMetrics(county, state) {
@@ -111,6 +115,90 @@ function renderCountyProjectBlueprint(state) {
       </div>
     </article>`).join("");
   }
+}
+
+function renderCountyBusinessOperations(state) {
+  const orderEl = document.querySelector("#county-collaboration-orders");
+  if (orderEl) {
+    orderEl.innerHTML = `<table>
+      <thead><tr><th>中心</th><th>区县</th><th>居民</th><th>工单</th><th>流向</th><th>时限</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody>${(state.countyCollaborationOrders || []).map((item) => {
+        const resident = residentOf(state, item.residentId);
+        return `<tr>
+          <td>${item.center}</td>
+          <td>${item.region}</td>
+          <td>${resident?.name || "未知居民"}</td>
+          <td>${item.orderType}<br><small>${item.result}</small></td>
+          <td>${item.fromInstitution} -> ${item.toInstitution}</td>
+          <td>${item.due}</td>
+          <td><span class="badge ${item.priority === "高" ? "danger" : "info"}">${item.status}</span></td>
+          <td>
+            ${countyActionButton("countyCollaborationOrders", item.id, "中心接收", { status: "中心已接收", result: "已进入中心处理队列" })}
+            ${countyActionButton("countyCollaborationOrders", item.id, "报告回传", { status: "已回传", result: "报告已回传并进入互认" })}
+          </td>
+        </tr>`;
+      }).join("")}</tbody>
+    </table>`;
+  }
+
+  const recogEl = document.querySelector("#county-mutual-recognition");
+  if (recogEl) {
+    recogEl.innerHTML = (state.countyMutualRecognitionRecords || []).map((item) => {
+      const resident = residentOf(state, item.residentId);
+      return `<section class="item">
+        <div>
+          <h3>${resident?.name || "未知居民"} · ${item.item}</h3>
+          <p>${item.sourceInstitution} -> ${item.targetInstitution}</p>
+          <p>${item.reason} · 预计减少重复费用 ${money(item.savedCost)}</p>
+          ${countyActionButton("countyMutualRecognitionRecords", item.id, "互认通过", { status: "已互认", reason: "质控通过，结果已互认" })}
+          ${countyActionButton("countyMutualRecognitionRecords", item.id, "退回复核", { status: "退回复核", reason: "质控未通过，退回复核" })}
+        </div>
+        <span class="badge ${item.status === "已互认" ? "info" : "warn"}">${item.status}</span>
+      </section>`;
+    }).join("");
+  }
+
+  const aiEl = document.querySelector("#county-ai-cases");
+  if (aiEl) {
+    aiEl.innerHTML = (state.countyAiDiagnosisCases || []).map((item, index) => {
+      const resident = residentOf(state, item.residentId);
+      return `<article class="capability-row">
+        <div class="capability-index">${index + 1}</div>
+        <div>
+          <h3>${item.region} · ${item.institution}</h3>
+          <p>${resident?.name || "未知居民"}：${item.chiefComplaint}</p>
+          <p>${item.suggestion}</p>
+          <div class="standard-tags">
+            <span class="badge info">${item.quality}</span>
+            <span class="badge ${item.status === "已完成" ? "info" : "warn"}">${item.status}</span>
+          </div>
+        </div>
+        <div class="capability-side">
+          ${countyActionButton("countyAiDiagnosisCases", item.id, "医生采纳", { status: "已完成", doctorAction: "已采纳", quality: "病历质检通过" })}
+          ${countyActionButton("countyAiDiagnosisCases", item.id, "转诊跟踪", { status: "转诊中", doctorAction: "已上转", quality: "重点病例" })}
+        </div>
+      </article>`;
+    }).join("");
+  }
+}
+
+function bindCountyActions() {
+  document.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-county-action]");
+    if (!button || !platformState) return;
+    const updates = JSON.parse(button.dataset.updates || "{}");
+    const result = await updateWorkflowAction(platformState, button.dataset.collection, button.dataset.id, updates, button.dataset.note || "县域医共体更新业务状态");
+    if (!result.ok) return;
+    renderCountyBusinessOperations(platformState);
+  });
+}
+
+function countyActionButton(collection, id, label, updates) {
+  return `<button class="inline-action" type="button" data-county-action data-collection="${collection}" data-id="${id}" data-updates='${JSON.stringify(updates)}' data-note="${label}">${label}</button>`;
+}
+
+function residentOf(state, id) {
+  return (state.residents || []).find((item) => item.id === id);
 }
 
 function renderCapabilityFilter(county) {

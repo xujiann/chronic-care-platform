@@ -210,6 +210,71 @@ function collectUnifiedTasks(state) {
       level: item.level
     });
   });
+  (state.chronicScreeningTasks || []).filter((item) => !["已评估", "已推送干预"].includes(item.status)).forEach((item) => {
+    const resident = residentOf(state, item.residentId);
+    tasks.push({
+      title: `${resident?.name || "未知居民"} · ${item.taskName}`,
+      owner: item.assignee,
+      module: "慢病筛查任务中心",
+      detail: `${item.model} · ${item.nextStep}`,
+      status: item.status,
+      level: item.riskLevel === "高危" ? "高" : "中"
+    });
+  });
+  (state.chronicEducationPushes || []).filter((item) => !["已确认", "已阅读"].includes(item.status)).forEach((item) => {
+    const resident = residentOf(state, item.residentId);
+    tasks.push({
+      title: `${resident?.name || "未知居民"} · ${item.topic}`,
+      owner: "健康宣教智能体",
+      module: "慢病精准宣教",
+      detail: `${item.channel} · ${item.trigger}`,
+      status: item.status,
+      level: "中"
+    });
+  });
+  (state.chronicManagementPlans || []).filter((item) => item.status !== "已复核").forEach((item) => {
+    const resident = residentOf(state, item.residentId);
+    tasks.push({
+      title: `${resident?.name || "未知居民"} · ${item.diseaseType}管理计划`,
+      owner: item.owner,
+      module: "慢病分级管理",
+      detail: `${item.grade} · ${item.intervention}`,
+      status: item.status,
+      level: item.grade === "高危" ? "高" : "中"
+    });
+  });
+  (state.countyCollaborationOrders || []).filter((item) => !["已回传", "已完成"].includes(item.status)).forEach((item) => {
+    tasks.push({
+      title: `${item.region} · ${item.orderType}`,
+      owner: item.center,
+      module: "医共体协同中心",
+      detail: `${item.fromInstitution} -> ${item.toInstitution} · ${item.result}`,
+      status: item.status,
+      level: item.priority === "高" ? "高" : "中"
+    });
+  });
+  (state.countyMutualRecognitionRecords || []).filter((item) => item.status !== "已互认").forEach((item) => {
+    const resident = residentOf(state, item.residentId);
+    tasks.push({
+      title: `${resident?.name || "未知居民"} · ${item.item}互认`,
+      owner: "医共体质控中心",
+      module: "检查检验结果互认",
+      detail: `${item.sourceInstitution} -> ${item.targetInstitution} · ${item.reason}`,
+      status: item.status,
+      level: item.status === "退回复核" ? "高" : "中"
+    });
+  });
+  (state.countyAiDiagnosisCases || []).filter((item) => item.status !== "已完成").forEach((item) => {
+    const resident = residentOf(state, item.residentId);
+    tasks.push({
+      title: `${resident?.name || "未知居民"} · AI辅诊确认`,
+      owner: item.institution,
+      module: "基层AI辅助诊断",
+      detail: `${item.chiefComplaint} · ${item.suggestion}`,
+      status: item.status,
+      level: item.status === "转诊中" ? "高" : "中"
+    });
+  });
   (state.countyConsortium?.tasks || []).filter((item) => item.status !== "已完成").forEach((item) => {
     tasks.push({
       title: item.title,

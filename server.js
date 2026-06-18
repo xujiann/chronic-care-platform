@@ -14,7 +14,7 @@ const DEMO_PASSWORD = "123456";
 const sessions = new Map();
 let sqliteModule = null;
 let sqliteError = null;
-const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals", "deathCertificates", "birthCertificates", "multiPracticeApplications", "digitalCredentials", "emergencySignals"]);
+const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals", "deathCertificates", "birthCertificates", "multiPracticeApplications", "digitalCredentials", "emergencySignals", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords"]);
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -129,6 +129,12 @@ function seedState() {
     doctorProfiles: seedDoctorProfiles(),
     multiPracticePolicy: seedMultiPracticePolicy(),
     multiPracticeApplications: seedMultiPracticeApplications(),
+    chronicScreeningTasks: seedChronicScreeningTasks(),
+    chronicEducationPushes: seedChronicEducationPushes(),
+    chronicManagementPlans: seedChronicManagementPlans(),
+    countyCollaborationOrders: seedCountyCollaborationOrders(),
+    countyAiDiagnosisCases: seedCountyAiDiagnosisCases(),
+    countyMutualRecognitionRecords: seedCountyMutualRecognitionRecords(),
     careOrders: seedCareOrders(),
     medicationPickups: seedMedicationPickups(),
     institutionSupervisions: seedInstitutionSupervisions(),
@@ -525,6 +531,54 @@ function seedMultiPracticeApplications() {
       publicVisible: true,
       lastUpdated: "2026-06-16T10:30:00.000Z"
     }
+  ];
+}
+
+function seedChronicScreeningTasks() {
+  return [
+    { id: "cst-001", residentId: "r1", taskName: "冠心病高危筛查", model: "Framingham + 中国心脑血管疾病风险预测模型", source: "门诊血压、BMI、用药与家族史", riskLevel: "高危", institution: "青泥洼桥社区卫生服务中心", assignee: "刘医生", due: todayOffset(2), status: "待筛查", nextStep: "完善问卷并申请心电图、血脂检查", result: "待评估" },
+    { id: "cst-002", residentId: "r2", taskName: "糖尿病并发症筛查", model: "中国糖尿病风险评分表", source: "空腹血糖、BMI、随访记录", riskLevel: "中危", institution: "星海湾社区卫生服务中心", assignee: "赵医生", due: todayOffset(4), status: "检查申请", nextStep: "复查糖化血红蛋白、尿微量白蛋白", result: "待检查" },
+    { id: "cst-003", residentId: "r4", taskName: "脑卒中风险筛查", model: "Essen Stroke Risk Score + CHA2DS2-VASc", source: "高血压、年龄、体检记录", riskLevel: "高危", institution: "青泥洼桥社区卫生服务中心", assignee: "刘医生", due: todayOffset(1), status: "待干预", nextStep: "建立高危台账并推送专科复核", result: "已生成风险画像" }
+  ];
+}
+
+function seedChronicEducationPushes() {
+  return [
+    { id: "cep-001", residentId: "r1", topic: "高血压家庭血压监测", channel: "居民端 + 短信", trigger: "连续两次收缩压高于 160", contentType: "图文+视频", targetGroup: "高血压高危人群", status: "待推送", pushAt: todayOffset(0), feedback: "待居民确认" },
+    { id: "cep-002", residentId: "r2", topic: "糖尿病饮食与运动处方", channel: "居民端", trigger: "空腹血糖偏高", contentType: "健康处方", targetGroup: "糖尿病管理人群", status: "已推送", pushAt: todayOffset(-1), feedback: "已阅读" },
+    { id: "cep-003", residentId: "r4", topic: "脑卒中预警症状识别", channel: "居民端 + 家属代办提醒", trigger: "脑卒中筛查高危", contentType: "问答卡片", targetGroup: "老年高危人群", status: "待确认", pushAt: todayOffset(1), feedback: "待家属确认" }
+  ];
+}
+
+function seedChronicManagementPlans() {
+  return [
+    { id: "cmp-001", residentId: "r1", diseaseType: "高血压", grade: "高危", owner: "刘医生", plan: "每周血压上传、两周电话随访、一个月专科复诊", indicators: ["血压", "BMI", "服药依从性"], status: "执行中", nextReview: todayOffset(7), intervention: "调整生活方式并复核长期处方" },
+    { id: "cmp-002", residentId: "r2", diseaseType: "糖尿病", grade: "中危", owner: "赵医生", plan: "每月血糖复测、季度糖化血红蛋白、饮食运动干预", indicators: ["空腹血糖", "糖化血红蛋白", "体重"], status: "待复核", nextReview: todayOffset(10), intervention: "补充并发症筛查结果" },
+    { id: "cmp-003", residentId: "r4", diseaseType: "高血压/脑卒中高危", grade: "高危", owner: "刘医生", plan: "纳入重点人群，每周提醒、家属协同、必要时转诊", indicators: ["血压", "心电", "卒中风险评分"], status: "预警中", nextReview: todayOffset(3), intervention: "推送卒中宣教并预约专科会诊" }
+  ];
+}
+
+function seedCountyCollaborationOrders() {
+  return [
+    { id: "cco-001", center: "医学影像资源共享中心", region: "普兰店区", fromInstitution: "普兰店区乡镇卫生院", toInstitution: "普兰店区中心医院", residentId: "r1", orderType: "胸部CT远程诊断", status: "待中心诊断", priority: "高", requestedAt: todayOffset(-1), due: todayOffset(0), result: "待报告回传" },
+    { id: "cco-002", center: "医学检验资源共享中心", region: "瓦房店市", fromInstitution: "瓦房店市乡镇卫生院", toInstitution: "瓦房店市中心医院", residentId: "r2", orderType: "糖化血红蛋白集中检测", status: "样本运输中", priority: "中", requestedAt: todayOffset(0), due: todayOffset(2), result: "待检测" },
+    { id: "cco-003", center: "双向转诊中心", region: "庄河市", fromInstitution: "庄河市基层医疗机构", toInstitution: "庄河市中心医院", residentId: "r4", orderType: "高危慢病上转复核", status: "待接诊", priority: "高", requestedAt: todayOffset(0), due: todayOffset(1), result: "待接诊反馈" }
+  ];
+}
+
+function seedCountyAiDiagnosisCases() {
+  return [
+    { id: "cad-001", region: "旅顺口区", institution: "旅顺口区乡镇卫生院", residentId: "r1", chiefComplaint: "头晕伴血压升高", suggestion: "高血压控制不佳，建议复测血压、完善心电图并评估用药依从性", doctorAction: "已采纳", quality: "病历质检通过", status: "已完成", at: todayOffset(-1) },
+    { id: "cad-002", region: "长海县", institution: "长海县乡镇卫生院", residentId: "r2", chiefComplaint: "乏力、口干，血糖偏高", suggestion: "提示糖尿病控制风险，建议复查糖化血红蛋白并开展饮食运动干预", doctorAction: "待确认", quality: "待质检", status: "待医生确认", at: todayOffset(0) },
+    { id: "cad-003", region: "庄河市", institution: "庄河市乡镇卫生院", residentId: "r4", chiefComplaint: "短暂肢体麻木", suggestion: "脑卒中高危预警，建议立即上转并完成影像检查", doctorAction: "已上转", quality: "重点病例", status: "转诊中", at: todayOffset(0) }
+  ];
+}
+
+function seedCountyMutualRecognitionRecords() {
+  return [
+    { id: "cmr-001", residentId: "r1", item: "心电图", sourceInstitution: "青泥洼桥社区卫生服务中心", targetInstitution: "大连市中心医院", status: "已互认", savedCost: 86, reason: "同质质控通过", at: todayOffset(-2) },
+    { id: "cmr-002", residentId: "r2", item: "糖化血红蛋白", sourceInstitution: "星海湾社区卫生服务中心", targetInstitution: "大连医科大学附属医院", status: "待互认", savedCost: 120, reason: "等待中心实验室报告", at: todayOffset(0) },
+    { id: "cmr-003", residentId: "r4", item: "颈动脉超声", sourceInstitution: "庄河市基层医疗机构", targetInstitution: "庄河市中心医院", status: "退回复核", savedCost: 180, reason: "图像质量不足，需要复核", at: todayOffset(-1) }
   ];
 }
 
@@ -1597,6 +1651,12 @@ function normalizeState(data) {
     doctorProfiles: mergeByKey(seedDoctorProfiles(), data.doctorProfiles, "id"),
     multiPracticePolicy: data.multiPracticePolicy && typeof data.multiPracticePolicy === "object" ? data.multiPracticePolicy : seedMultiPracticePolicy(),
     multiPracticeApplications: mergeByKey(seedMultiPracticeApplications(), data.multiPracticeApplications, "id"),
+    chronicScreeningTasks: mergeByKey(seedChronicScreeningTasks(), data.chronicScreeningTasks, "id"),
+    chronicEducationPushes: mergeByKey(seedChronicEducationPushes(), data.chronicEducationPushes, "id"),
+    chronicManagementPlans: mergeByKey(seedChronicManagementPlans(), data.chronicManagementPlans, "id"),
+    countyCollaborationOrders: mergeByKey(seedCountyCollaborationOrders(), data.countyCollaborationOrders, "id"),
+    countyAiDiagnosisCases: mergeByKey(seedCountyAiDiagnosisCases(), data.countyAiDiagnosisCases, "id"),
+    countyMutualRecognitionRecords: mergeByKey(seedCountyMutualRecognitionRecords(), data.countyMutualRecognitionRecords, "id"),
     careOrders: Array.isArray(data.careOrders) ? data.careOrders : seedCareOrders(),
     medicationPickups: Array.isArray(data.medicationPickups) ? data.medicationPickups : seedMedicationPickups(),
     institutionSupervisions: Array.isArray(data.institutionSupervisions) ? data.institutionSupervisions : seedInstitutionSupervisions(),
@@ -1896,7 +1956,7 @@ function normalizePersonIndexes(state) {
     resident.identityIndex = resident.personIndex;
   });
   const residentMap = new Map(residents.map((resident) => [resident.id, resident]));
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords"].forEach((key) => {
     (Array.isArray(state[key]) ? state[key] : []).forEach((item) => {
       item.personIndex = item.personIndex || personIndexForResident(residentMap, item.residentId);
     });
@@ -2120,7 +2180,7 @@ function scopeStateForUser(data, user) {
 
   scoped.accounts = account ? [account] : [];
   scoped.residents = (data.residents || []).filter((item) => allowedIds.has(item.id));
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords"].forEach((key) => {
     scoped[key] = (data[key] || []).filter(hasAllowedResident);
   });
   if (scoped.referralSystem) {

@@ -237,6 +237,7 @@ function renderCitizen(residentId) {
   renderEmr(records, resident, diseases, followups);
   renderDiseases(diseases, risk);
   renderFollowups(followups);
+  renderChronicServices(resident.id);
   renderReferrals(resident.id);
   renderBirthHealth(resident.id);
   renderPickups(resident.id);
@@ -263,6 +264,16 @@ function renderReminderCenter(residentId) {
     ...state.followups.filter((item) => item.residentId === residentId && item.status !== "已完成").map((item) => ({
       title: `${item.diseaseType}随访`,
       detail: `${item.plannedAt} · ${item.assignee} · ${item.advice || "按计划随访"}`,
+      status: item.status
+    })),
+    ...(state.chronicScreeningTasks || []).filter((item) => item.residentId === residentId && !["已评估", "已推送干预"].includes(item.status)).map((item) => ({
+      title: `${item.taskName}筛查`,
+      detail: `${item.due} · ${item.institution} · ${item.nextStep}`,
+      status: item.status
+    })),
+    ...(state.chronicEducationPushes || []).filter((item) => item.residentId === residentId && !["已确认", "已阅读"].includes(item.status)).map((item) => ({
+      title: `${item.topic}宣教`,
+      detail: `${item.pushAt} · ${item.channel} · ${item.feedback}`,
       status: item.status
     })),
     ...(state.medicationPickups || []).filter((item) => item.residentId === residentId && !["已完成", "已取药"].includes(item.status)).map((item) => ({
@@ -591,6 +602,37 @@ function renderFollowups(followups) {
       <span class="status ${item.status === "已逾期" ? "danger" : item.status === "待随访" ? "warn" : ""}">${item.status}</span>
     </article>`)
     .join("") || `<p class="muted">暂无随访提醒。</p>`;
+}
+
+function renderChronicServices(residentId) {
+  const target = document.querySelector("#chronic-service-cards");
+  if (!target) return;
+  const cards = [
+    ...(state.chronicScreeningTasks || []).filter((item) => item.residentId === residentId).map((item) => ({
+      title: item.taskName,
+      detail: `${item.riskLevel} · ${item.model}`,
+      meta: `${item.institution} · ${item.due}`,
+      status: item.status
+    })),
+    ...(state.chronicEducationPushes || []).filter((item) => item.residentId === residentId).map((item) => ({
+      title: item.topic,
+      detail: `${item.contentType} · ${item.trigger}`,
+      meta: `${item.channel} · ${item.feedback}`,
+      status: item.status
+    })),
+    ...(state.chronicManagementPlans || []).filter((item) => item.residentId === residentId).map((item) => ({
+      title: `${item.diseaseType}管理计划`,
+      detail: `${item.grade} · ${item.plan}`,
+      meta: `下次复核 ${item.nextReview}`,
+      status: item.status
+    }))
+  ];
+  target.innerHTML = cards.map((item) => `<article class="mini-card">
+    <h3>${item.title}</h3>
+    <p>${item.detail}</p>
+    <p class="muted">${item.meta}</p>
+    <span class="status ${String(item.status).includes("预警") ? "danger" : ""}">${item.status}</span>
+  </article>`).join("") || `<p class="muted">暂无慢病筛查、宣教或管理计划。</p>`;
 }
 
 function renderReferrals(residentId) {
