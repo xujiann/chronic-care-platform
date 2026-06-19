@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>大连市全民健康信息平台</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+    <script>window.HealthCityAuth.requireRole(["commission"])</script>
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>大连市卫生健康信息平台</span>
+          <h1>全民健康信息平台建设驾驶舱</h1>
+          <p>围绕申报材料建设内容，将城市级医疗健康大数据平台、助医、惠民、辅政、科研、区级实施、互联互通测评、安全信创和已上线模块整合纳入同一建设视图。</p>
+        </div>
+        <nav>
+          <a href="./health-city.html">系统总览</a>
+          <a href="./workbench.html">运营工作台</a>
+          <a href="./index.html">卫健委端</a>
+          <a href="./county.html">医共体</a>
+          <a href="./citizen.html">居民端</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" id="platform-metrics"></section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>建设范围</h2>
+            <span id="scope-summary"></span>
+          </div>
+          <div id="capability-matrix" class="capability-list"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>存量整合</h2>
+            <span>一平台交互、一平台管理、一平台服务</span>
+          </div>
+          <div id="integration-registry" class="rules"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>接口衔接清单</h2>
+            <span>保留既有接口，补齐申报材料要求的外部对接</span>
+          </div>
+          <div id="interface-table" class="table-wrap"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>同源数据</h2>
+            <span>直接复用现有项目数据集合</span>
+          </div>
+          <div id="data-foundation" class="rules"></div>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>开发批次</h2>
+          <span>按平台底座优先、业务闭环同步、测评材料持续沉淀推进</span>
+        </div>
+        <div id="delivery-roadmap" class="priority-list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>验收证据库</h2>
+          <span>按申报材料、互联互通、安全合规、接口联调和上线验收归档</span>
+        </div>
+        <div id="platform-evidence-library" class="evidence-grid"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>最近维护记录</h2>
+          <span>自动记录建设项状态、责任方和下一步动作变更</span>
+        </div>
+        <div id="platform-change-logs" class="priority-list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>周报素材</h2>
+          <span>按责任方、状态、建设类别和维护时间汇总，可直接导出 Markdown</span>
+        </div>
+        <div class="filter-grid" id="platform-report-filters">
+          <label>
+            开始日期
+            <input type="date" id="report-date-from" />
+          </label>
+          <label>
+            结束日期
+            <input type="date" id="report-date-to" />
+          </label>
+          <label>
+            责任方
+            <select id="report-owner-filter">
+              <option value="">全部责任方</option>
+            </select>
+          </label>
+          <label>
+            状态
+            <select id="report-status-filter">
+              <option value="">全部状态</option>
+            </select>
+          </label>
+          <label>
+            建设类别
+            <select id="report-type-filter">
+              <option value="">全部类别</option>
+              <option value="建设域">建设域</option>
+              <option value="存量整合">存量整合</option>
+              <option value="接口衔接">接口衔接</option>
+              <option value="开发批次">开发批次</option>
+            </select>
+          </label>
+        </div>
+        <div class="action-row">
+          <button class="inline-action" type="button" id="reset-platform-report-filters">重置筛选</button>
+          <button class="inline-action" type="button" id="export-platform-report">导出 Markdown</button>
+        </div>
+        <div id="platform-report-summary" class="report-grid"></div>
+      </section>
+    </main>
+
+    <dialog id="platform-edit-dialog">
+      <form method="dialog" class="dialog-form" id="platform-edit-form">
+        <header>
+          <h2 id="platform-edit-title">建设项维护</h2>
+          <button type="button" class="icon-button" data-close>×</button>
+        </header>
+        <input type="hidden" name="collection" />
+        <input type="hidden" name="id" />
+        <div class="form-grid">
+          <label class="full">名称<input name="name" readonly /></label>
+          <label>状态<input name="status" required /></label>
+          <label>责任方<input name="owner" /></label>
+          <label class="full">下一步动作<textarea name="next" rows="4"></textarea></label>
+        </div>
+        <footer>
+          <button type="button" class="ghost-button" data-close>取消</button>
+          <button class="primary-button" value="save">保存</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <script src="./shared.js"></script>
+    <script src="./platform.js"></script>
+  </body>
+</html>

@@ -153,11 +153,81 @@ function seedState() {
     countyProjectBlueprint: seedCountyProjectBlueprint(),
     countyConsortium: seedCountyConsortium(),
     referralSystem: seedReferralSystem(),
+    platformCapabilities: seedPlatformCapabilities(),
+    platformIntegrations: seedPlatformIntegrations(),
+    platformInterfaces: seedPlatformInterfaces(),
+    platformDeliveryBatches: seedPlatformDeliveryBatches(),
+    platformEvidence: seedPlatformEvidence(),
+    platformChangeLogs: seedPlatformChangeLogs(),
     platformRoadmap: seedPlatformRoadmap(),
     platformAudit: seedPlatformAudit(),
     platformProcessAudit: seedPlatformProcessAudit(),
     personalRecords: seedPersonalRecords()
   };
+}
+
+function seedPlatformChangeLogs() {
+  return [
+    { id: "pcl-001", at: "2026-06-18 15:10", actor: "市级管理员", role: "commission", collection: "platformCapabilities", itemId: "cap-data-platform", itemName: "城市级医疗健康大数据平台", action: "初始化建设台账", before: "无", after: "开发中", note: "按申报材料建立建设域、整合项、接口域和开发批次数据。" }
+  ];
+}
+
+function seedPlatformCapabilities() {
+  return [
+    { id: "cap-data-platform", group: "城市级医疗健康大数据平台", source: "申报材料（五）项目建设目标及内容、七（二）本期建设方案", target: "统一平台底座、区域医疗健康大数据中心、全域互联互通、数据资产管理、信创及国产密码改造", existing: ["residents", "personalRecords", "healthStatistics", "dataAccessLogs", "securityEvents"], status: "开发中", next: "补齐共享文档、信息资源中心、运行监控、标签模型、数据资产目录和存量模块统一纳管。" },
+    { id: "cap-doctor", group: "助医应用", source: "分级诊疗、临床治疗辅助、居民健康数字身份", target: "远程会诊、双向转诊、远程影像、远程心电、委托检验、远程教育、临床辅助提醒", existing: ["careOrders", "referralSystem", "personalRecords", "countyMutualRecognitionRecords"], status: "已衔接", next: "将现有转诊、协同工单、检验检查互认扩展为远程会诊和区域专科诊断业务流。" },
+    { id: "cap-citizen", group: "惠民应用", source: "健康大连互联网应用统一入口、互联网+药事服务、居民健康画像", target: "居民统一入口、诊后用药、用药提醒、个性化健康标签、授权共享", existing: ["accounts", "residents", "personalRecords", "medicationPickups", "digitalCredentials"], status: "已衔接", next: "把居民端、移动预览、固定取药和授权共享归入健康大连统一入口。" },
+    { id: "cap-governance", group: "辅政应用", source: "数智健康大脑、卫生统计质控共享、医疗机构信用评价", target: "综合监管专题、统计直报质控、数据可视化、信用评价、公示", existing: ["healthStatistics", "healthStatisticsIngestion", "platformAudit", "platformProcessAudit"], status: "开发中", next: "新增医疗机构信用评价模型，并把统计质控问题沉淀为闭环工单。" },
+    { id: "cap-research", group: "医疗科研创新平台", source: "专病库、多模态医疗数据集、科研研究落地验证", target: "结构化、标准化、高质量、可计算数据集，支撑专病库和科研协作", existing: ["diseases", "chronicScreeningTasks", "chronicManagementPlans", "personalRecords"], status: "待深化", next: "在慢病专病库基础上补充病种版本、数据脱敏、伦理审批、科研项目授权和数据集发布流程。" },
+    { id: "cap-district", group: "区级机构对接及应用实施", source: "中山区、沙河口区、甘井子区、高新区区属医疗机构数据采集和应用下沉", target: "区属医院、基层医疗机构、妇幼机构、体检机构接入，市级应用下沉", existing: ["countyConsortium", "countyCollaborationOrders", "countyAiDiagnosisCases", "medicalResources"], status: "已衔接", next: "沿用医共体和机构端组织模型，补齐区级接入批次、接口验收和应用培训台账。" },
+    { id: "cap-evaluation", group: "互联互通测评服务", source: "互联互通四甲、五乙测评材料、模拟演练、现场查验", target: "标准化改造、健康医疗数据归集、文审材料、模拟演练、测评证据", existing: ["interfaceRequirements", "platformProcessAudit", "platformRoadmap"], status: "待深化", next: "建立测评证据库，按共享文档、术语标准、主索引、互联互通交易逐项归档。" },
+    { id: "cap-security", group: "安全可靠和密码应用", source: "等保三级、密码应用安全性评估、信创适配", target: "统一认证、国密传输、数据库关键信息加密、日志审计、国产软硬件适配", existing: ["authUsers", "authOrganizations", "securityEvents", "dataAccessLogs"], status: "开发中", next: "把当前登录、角色、审计能力升级为等保和密评验收清单。" }
+  ];
+}
+
+function seedPlatformIntegrations() {
+  return [
+    { id: "int-health-1-2", name: "全民健康信息平台一、二期", approach: "原生升级", keep: "主索引、注册服务、四大数据库、业务协同、监管和便民能力", target: "市级平台底座", owner: "市级平台", status: "已纳入" },
+    { id: "int-pharmacy", name: "医疗机构药事管理平台", approach: "接口接入+场景合并", keep: "药事管理数据、药事服务流程", target: "互联网+药事服务、固定取药、医保审核", owner: "药政/医保", status: "开发中" },
+    { id: "int-care", name: "保健管理系统", approach: "数据回流+门户集成", keep: "医疗管理、健康管理、综合管理、统计分析", target: "居民健康画像、行业治理专题", owner: "保健管理", status: "待接口" },
+    { id: "int-emergency-video", name: "疫情防控应急指挥视频通讯平台", approach: "能力复用", keep: "视频会议、应急指挥调度、可视化政务管理", target: "公共卫生应急、远程会诊、远程教育", owner: "应急管理", status: "待接口" },
+    { id: "int-chronic", name: "慢病管理平台", approach: "模块纳管", keep: "筛查、建档、风险分级、随访、宣教、固定取药", target: "医疗科研专病库、医防协同和居民画像", owner: "疾控/基层", status: "已纳入" },
+    { id: "int-county", name: "医共体信息平台", approach: "能力复用+边界清晰", keep: "县乡村一体化、医技共享、基层AI辅助、协同工单", target: "区级应用下沉、分级诊疗和区域诊断中心", owner: "医共体办公室", status: "已纳入" }
+  ];
+}
+
+function seedPlatformInterfaces() {
+  return [
+    { id: "if-auth", domain: "统一认证", existing: "现有登录、角色、会话、审计", next: "政务统一认证、CA、短信、人脸核验", priority: "P0", owner: "市级平台", status: "开发中" },
+    { id: "if-person-index", domain: "居民主索引", existing: "personIndex、居民档案、家庭成员", next: "人口库、电子健康码、标准健康档案主索引", priority: "P0", owner: "市级平台", status: "开发中" },
+    { id: "if-medical", domain: "医疗机构业务系统", existing: "个人健康信息库、机构端协同", next: "HIS、EMR、LIS、PACS、心电、体检系统", priority: "P0", owner: "医疗机构", status: "待接口" },
+    { id: "if-referral", domain: "分级诊疗", existing: "转诊规则、协同工单、预留资源", next: "远程会诊、双向转诊、远程影像、心电、检验、教育", priority: "P0", owner: "医政医管", status: "开发中" },
+    { id: "if-insurance", domain: "医保结算监管", existing: "医保审核、凭证核验、固定取药审核", next: "医保核心结算、门慢门特、异地转诊规则", priority: "P1", owner: "医保局", status: "演示对接完成" },
+    { id: "if-statistics", domain: "卫生统计", existing: "统计导入任务、资源直报对账、质控看板", next: "辽宁省卫统直报、国家统计直报系统", priority: "P1", owner: "规划信息", status: "演示对接完成" },
+    { id: "if-license", domain: "电子证照", existing: "出生/死亡医学证明模型和统计", next: "电子证照平台、公安户籍、民政殡葬、疾控死因监测", priority: "P1", owner: "医政/妇幼", status: "已建模" },
+    { id: "if-evaluation", domain: "互联互通测评", existing: "接口需求清单、流程审计、路线图", next: "共享文档、术语标准、交易服务、测评文审材料", priority: "P1", owner: "项目办", status: "待深化" },
+    { id: "if-security", domain: "安全信创", existing: "角色权限、安全事件、访问日志", next: "国密传输、数据库加密、日志保全、密评和等保证据", priority: "P0", owner: "安全管理", status: "开发中" }
+  ];
+}
+
+function seedPlatformDeliveryBatches() {
+  return [
+    { id: "batch-foundation", phase: "第一批：平台底座和存量纳管", owner: "市级平台", items: ["统一应用目录", "统一身份认证", "数据资源目录", "存量模块登记", "运行监控"], status: "启动" },
+    { id: "batch-doctor", phase: "第二批：助医和分级诊疗闭环", owner: "医政医管/医疗机构", items: ["双向转诊", "远程会诊", "区域影像", "区域心电", "委托检验", "远程教育"], status: "衔接现有机构端和医共体模块" },
+    { id: "batch-citizen", phase: "第三批：惠民统一入口", owner: "基层卫生/居民端", items: ["健康大连统一入口", "互联网+药事服务", "居民健康画像", "授权共享", "固定取药提醒"], status: "衔接居民端和慢病模块" },
+    { id: "batch-governance", phase: "第四批：辅政和科研", owner: "规划信息/科研管理", items: ["数智健康大脑", "统计质控共享", "信用评价", "专病库", "科研数据集"], status: "补齐治理和科研能力" },
+    { id: "batch-acceptance", phase: "第五批：测评、安全和验收", owner: "项目办/安全管理", items: ["互联互通五乙材料", "等保三级", "密评", "信创适配", "接口验收"], status: "贯穿全周期沉淀证据" }
+  ];
+}
+
+function seedPlatformEvidence() {
+  return [
+    { id: "ev-application", category: "申报材料", name: "提级论证申报材料闭环", owner: "项目办", source: "项目申报材料、建设方案、预算和论证意见", artifacts: ["建设范围矩阵", "存量模块合并清单", "开发批次计划", "周报素材"], status: "已建档", next: "持续补充需求变更、会议纪要和专家论证反馈。" },
+    { id: "ev-interoperability", category: "互联互通测评", name: "四甲/五乙测评证据包", owner: "项目办/标准管理", source: "共享文档、术语字典、主索引、交易服务、测评文审材料", artifacts: ["接口清单", "标准映射", "交易样例", "整改记录"], status: "待补齐", next: "按接口域逐项挂接截图、报文样例、测试记录和整改状态。" },
+    { id: "ev-security", category: "安全合规", name: "等保、密评和信创适配证据", owner: "安全管理岗", source: "统一认证、访问审计、安全事件、数据访问日志、信创适配清单", artifacts: ["权限矩阵", "审计日志", "安全事件", "密评整改项"], status: "开发中", next: "补齐国密传输、数据库加密、日志保全和国产化适配证明。" },
+    { id: "ev-interface", category: "接口联调", name: "外部系统接口联调验收", owner: "市级平台/医疗机构", source: "HIS、EMR、LIS、PACS、医保、电子证照、卫生统计等对接计划", artifacts: ["联调计划", "字段映射", "异常清单", "回归测试"], status: "开发中", next: "为每个接口域建立责任人、环境、频率、样例和验收规则。" },
+    { id: "ev-launch", category: "上线验收", name: "区级实施和应用上线材料", owner: "实施组", source: "中山、沙河口、甘井子、高新区实施批次和应用培训记录", artifacts: ["上线确认", "培训签到", "试运行问题", "用户反馈"], status: "待启动", next: "按区县、机构、应用和批次沉淀上线确认与问题闭环。" }
+  ];
 }
 
 function seedPlatformRoadmap() {
@@ -1702,6 +1772,12 @@ function normalizeState(data) {
     countyProjectBlueprint: data.countyProjectBlueprint && typeof data.countyProjectBlueprint === "object" ? data.countyProjectBlueprint : seedCountyProjectBlueprint(),
     countyConsortium: data.countyConsortium && typeof data.countyConsortium === "object" ? data.countyConsortium : seedCountyConsortium(),
     referralSystem: data.referralSystem && typeof data.referralSystem === "object" ? data.referralSystem : seedReferralSystem(),
+    platformCapabilities: mergeByKey(seedPlatformCapabilities(), data.platformCapabilities, "id"),
+    platformIntegrations: mergeByKey(seedPlatformIntegrations(), data.platformIntegrations, "id"),
+    platformInterfaces: mergeByKey(seedPlatformInterfaces(), data.platformInterfaces, "id"),
+    platformDeliveryBatches: mergeByKey(seedPlatformDeliveryBatches(), data.platformDeliveryBatches, "id"),
+    platformEvidence: mergeByKey(seedPlatformEvidence(), data.platformEvidence, "id"),
+    platformChangeLogs: Array.isArray(data.platformChangeLogs) ? data.platformChangeLogs : seedPlatformChangeLogs(),
     platformRoadmap: Array.isArray(data.platformRoadmap) ? data.platformRoadmap : seedPlatformRoadmap(),
     platformAudit: Array.isArray(data.platformAudit) ? data.platformAudit : seedPlatformAudit(),
     platformProcessAudit: Array.isArray(data.platformProcessAudit) ? data.platformProcessAudit : seedPlatformProcessAudit(),
@@ -1723,6 +1799,12 @@ function completeSystemTargets(state) {
   }));
   state.platformAudit = Array.isArray(state.platformAudit) && state.platformAudit.length ? state.platformAudit : seedPlatformAudit();
   state.platformProcessAudit = Array.isArray(state.platformProcessAudit) && state.platformProcessAudit.length ? state.platformProcessAudit : seedPlatformProcessAudit();
+  state.platformCapabilities = mergeByKey(seedPlatformCapabilities(), state.platformCapabilities, "id");
+  state.platformIntegrations = mergeByKey(seedPlatformIntegrations(), state.platformIntegrations, "id");
+  state.platformInterfaces = mergeByKey(seedPlatformInterfaces(), state.platformInterfaces, "id");
+  state.platformDeliveryBatches = mergeByKey(seedPlatformDeliveryBatches(), state.platformDeliveryBatches, "id");
+  state.platformEvidence = mergeByKey(seedPlatformEvidence(), state.platformEvidence, "id");
+  state.platformChangeLogs = Array.isArray(state.platformChangeLogs) && state.platformChangeLogs.length ? state.platformChangeLogs.slice(0, 200) : seedPlatformChangeLogs();
   const interfaceCompletion = new Map(seedInterfaceRequirements().map((item) => [item.id, { status: item.status, need: item.need }]));
   state.interfaceRequirements = mergeByKey(seedInterfaceRequirements(), state.interfaceRequirements, "id").map((item) => ({
     ...item,
@@ -2192,6 +2274,12 @@ function scopeStateForUser(data, user) {
   delete scoped.authOrganizations;
   delete scoped.securityEvents;
   delete scoped.interfaceRequirements;
+  delete scoped.platformCapabilities;
+  delete scoped.platformIntegrations;
+  delete scoped.platformInterfaces;
+  delete scoped.platformDeliveryBatches;
+  delete scoped.platformEvidence;
+  delete scoped.platformChangeLogs;
   delete scoped.platformRoadmap;
 
   if (user.role !== "citizen") {
