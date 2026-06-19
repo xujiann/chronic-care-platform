@@ -128,8 +128,8 @@ function buildProcessAudit(state) {
     { process: "居民主索引与个人健康信息库", owner: "市级平台", status: hasIndex ? "已闭环" : "待补齐", risk: "正式人口主索引待接入", auditPoint: "核查居民、档案、病历、授权、取药、医保是否使用同一 personIndex。", evidence: `${state.residents?.length || 0} 名居民 / ${state.personalRecords?.length || 0} 条个人健康记录`, nextAction: "对接人口库、电子健康码和正式健康档案主索引。" },
     { process: "慢病筛查、随访与分级管理", owner: "疾控/卫健委", status: pendingFollowups ? "进行中" : "已闭环", risk: "外部专病库与质控待接入", auditPoint: "核查筛查建档、风险分层、随访、宣教、分级管理是否形成闭环。", evidence: `${state.chronicScreeningTasks?.length || 0} 个筛查任务 / ${pendingFollowups} 个随访待办`, nextAction: "补齐模型版本、触发阈值、人工复核和质控抽查。" },
     { process: "分级诊疗与双向转诊", owner: "转诊中心", status: pendingReferrals ? "进行中" : "已闭环", risk: "真实号源床位接口待接入", auditPoint: "核查基层评估、上转、接诊、下转、随访和医保引导。", evidence: `${state.referralSystem?.referrals?.length || 0} 条转诊记录 / ${pendingReferrals} 条待处理`, nextAction: "接入预约号源、床位、接诊反馈和下转随访消息。" },
-    { process: "固定取药与长期处方", owner: "基层机构/医保局", status: pendingPickups ? "进行中" : "已闭环", risk: "药房库存与医保结算接口待接入", auditPoint: "核查个人申请、机构确认、医保审核、药房取药和状态回流。", evidence: `${state.medicationPickups?.length || 0} 条取药计划 / ${pendingPickups} 条待处理`, nextAction: "对接处方、药房库存、配送和医保结算状态。" },
-    { process: "医保审核与监管", owner: "医保局", status: pendingClaims ? "进行中" : "已闭环", risk: "医保核心系统待接入", auditPoint: "核查慢病结算、支付引导、凭证核验、机构监管和审核留痕。", evidence: `${state.insuranceClaims?.length || 0} 条医保审核 / ${pendingClaims} 条待审核`, nextAction: "接入医保核心结算、门慢门特、双通道和异地转诊规则。" },
+    { process: "固定取药与长期处方", owner: "基层机构/医保中心", status: pendingPickups ? "进行中" : "已闭环", risk: "药房库存与医保结算接口待接入", auditPoint: "核查个人申请、机构确认、医保中心审核、药房取药和状态回流。", evidence: `${state.medicationPickups?.length || 0} 条取药计划 / ${pendingPickups} 条待处理`, nextAction: "对接处方、药房库存、配送和医保结算状态。" },
+    { process: "医保审核与监管", owner: "医保局/医保中心/区市县医保局", status: pendingClaims ? "进行中" : "已闭环", risk: "医保核心系统待接入", auditPoint: "核查慢病结算、支付引导、凭证核验、机构监管和审核留痕，区分行政监管、经办审核和属地监管职责。", evidence: `${state.insuranceClaims?.length || 0} 条医保审核 / ${pendingClaims} 条待审核`, nextAction: "接入医保核心结算、门慢门特、双通道和异地转诊规则。" },
     { process: "县域医共体协同", owner: "医共体办公室", status: pendingCounty ? "进行中" : "已闭环", risk: "新建应用批次与验收待细化", auditPoint: "核查医技共享、互认、基层 AI、绩效、人财物和药耗协同。", evidence: `${state.countyProjectBlueprint?.newApps?.length || 0} 个新建应用 / ${pendingCounty} 个协同工单待处理`, nextAction: "拆分上线批次，建立互认、危急值、报告回传和绩效验收指标。" },
     { process: "公共卫生应急预警", owner: "卫健委端", status: pendingEmergency ? "进行中" : "已闭环", risk: "多点触发真实数据源待接入", auditPoint: "核查风险信号、资源调度、处置反馈和复盘记录。", evidence: `${state.emergencySignals?.length || 0} 条预警信号 / ${pendingEmergency} 条待处置`, nextAction: "接入疾控、医疗资源、基层随访和医保异常监测。" },
     { process: "出生死亡证明与人口统计", owner: "医疗机构/卫健委", status: "进行中", risk: "国家平台与公安民政共享待接入", auditPoint: "核查证照签发、材料、上报、共享、质控和统计回流。", evidence: `${state.birthCertificates?.length || 0} 条出生证明 / ${state.deathCertificates?.length || 0} 条死亡证明`, nextAction: "对接电子证照、人口死亡登记、公安户籍和民政殡葬共享。" },
@@ -181,7 +181,7 @@ function renderPlatformMap(state) {
     ["卫健委端", "index.html", "监管总览、慢病医防整合、分级诊疗、公共卫生应急、数据安全审计。"],
     ["县域医共体平台", "county.html", "36 项功能、医技共享、基层综合管理、分级诊疗建设。"],
     ["医疗机构端", "institution.html", "授权档案、标准健康档案、转诊中心、固定取药协同。"],
-    ["医保端", "insurance.html", "结算审核、支付引导、凭证核验、医疗机构监管。"],
+    ["医保管理与经办", "insurance.html", "医保局政策与基金监管、医保中心经办审核、区市县医保局属地监管。"],
     ["个人端", "citizen.html", "个人健康信息库、电子病历、固定取药、分级诊疗服务。"],
     ["统一数据底座", "data/db.json / server.js", `${Object.keys(state).length} 类数据集合，后续升级 SQLite/PostgreSQL。`],
     ["标准模型", "health-archive-standard.js / referralSystem", "健康档案标准、分级诊疗、县域医共体、个人主索引。"]
@@ -280,7 +280,7 @@ function collectUnifiedTasks(state) {
     const resident = residentOf(state, item.residentId);
     tasks.push({
       title: `${resident?.name || "未知居民"} · ${item.claimType}`,
-      owner: "医保端",
+      owner: "医保中心经办端",
       module: "医保审核",
       detail: `${item.institution} · ${money(item.totalAmount)} · ${item.risk}`,
       status: item.status,

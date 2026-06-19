@@ -1,6 +1,6 @@
 # 大连卫生健康信息平台 MVP
 
-这是一个面向卫生健康信息化场景的本地演示系统，用于验证卫健委端、医疗机构端、医保端、居民端、县域医共体平台和统一运营工作台之间的数据贯通、业务闭环和审计管理。
+这是一个面向卫生健康信息化场景的本地演示系统，用于验证大连市卫生健康委、医疗机构、医保局/医保中心/区市县医保局、居民端、县域医共体平台和统一运营工作台之间的数据贯通、业务闭环和审计管理。
 
 系统当前重点覆盖：
 
@@ -40,14 +40,15 @@ http://localhost:5173/login.html
 |---|---|---|
 | `city` | `workbench.html` | 市级健康城市管理 |
 | `district` | `workbench.html` | 区市县管理端 |
-| `health` | `index.html` | 卫生健康行政部门 |
-| `whjw` | `index.html` | 卫健委端 |
+| `health` | `index.html` | 大连市卫生健康委 |
+| `whjw` | `index.html` | 大连市卫生健康委（同一机构入口别名） |
 | `hospital` | `institution.html` | 三级医疗机构 |
 | `community` | `institution.html` | 基层医疗机构 |
 | `doctor` | `institution.html` | 医疗机构端 |
 | `doctor_wang` | `institution.html` | 医生账户 |
-| `mi` | `insurance.html` | 医保局 |
-| `insurance` | `insurance.html` | 医保端 |
+| `mi` | `insurance.html` | 大连市医保局管理端 |
+| `insurance` | `insurance.html` | 大连市医保中心经办端 |
+| `district_mi` | `insurance.html` | 区市县医保局管理端 |
 | `citizen` | `citizen.html` | 居民端 |
 | `county` | `county.html` | 县域医共体平台 |
 
@@ -58,9 +59,9 @@ http://localhost:5173/login.html
 | `login.html` | 统一登录入口 |
 | `health-city.html` | 健康城市系统总览 |
 | `workbench.html` | 统一运营工作台，含全流程审计矩阵 |
-| `index.html` | 卫健委端，含慢病、统计、应急、审计等模块 |
+| `index.html` | 大连市卫生健康委，含慢病、统计、应急、审计等模块 |
 | `institution.html` | 医疗机构端，含授权档案、转诊、死亡证明、多点执业 |
-| `insurance.html` | 医保端，含审核、控费、凭证核验、固定取药 |
+| `insurance.html` | 医保管理与经办，区分医保局、医保中心、区市县医保局职责 |
 | `citizen.html` | 居民端个人健康信息库 |
 | `mobile-preview.html` | 居民端手机预览 |
 | `county.html` | 县域医共体平台 |
@@ -75,7 +76,7 @@ http://localhost:5173/login.html
 - 全流程审计矩阵，覆盖 11 条业务链路。
 - 平台结构图、跨端待办、数据成熟度、继续开发队列。
 
-### 卫健委端
+### 大连市卫生健康委
 
 - 监管总览：建档人数、慢病人数、高危人数、随访、控制率。
 - 慢病医防整合：筛查任务、精准宣教、分级管理计划、固定取药监管、慢病推进审计。
@@ -96,7 +97,7 @@ http://localhost:5173/login.html
 - 死亡医学证明办理。
 - 医生档案和多点执业申请。
 
-### 医保端
+### 医保管理与经办
 
 - 慢病结算审核。
 - 医保支付和控费规则。
@@ -104,6 +105,7 @@ http://localhost:5173/login.html
 - 医保电子凭证核验。
 - 固定取药审核。
 - 审核访问留痕。
+- 大连市医保局负责政策、待遇和基金监管；大连市医保中心负责经办审核；区市县医保局负责属地监管协同。
 
 ### 居民端
 

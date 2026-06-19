@@ -13,7 +13,7 @@ flowchart TB
   Login --> Chronic["卫健委慢病管理 index.html"]
   Login --> County["县域医共体 county.html"]
   Login --> Institution["医疗机构端 institution.html"]
-  Login --> Insurance["医保端 insurance.html"]
+  Login --> Insurance["医保管理与经办 insurance.html"]
   Login --> Citizen["居民端 citizen.html"]
   Citizen --> Mobile["手机预览 mobile-preview.html"]
 

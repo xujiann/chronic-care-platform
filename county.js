@@ -347,7 +347,7 @@ function buildCountyConsortiumDefaults(state) {
       { name: "检验检查互认率", value: "46.2%", target: "减少重复检查", source: "医技共享中心", trend: "预警" },
       { name: "慢病规范管理率", value: "73.5%", target: "防筛诊治管闭环", source: "健康档案/随访", trend: "正常" },
       { name: "家庭医生履约率", value: "68.9%", target: "按服务包评价", source: "签约服务系统", trend: "预警" },
-      { name: "医保协同审核通过率", value: "91.6%", target: "结算合规", source: "医保端", trend: "正常" }
+      { name: "医保协同审核通过率", value: "91.6%", target: "结算合规", source: "医保中心", trend: "正常" }
     ],
     governance: [
       { title: "省市统筹、县域落地", detail: "依托全民健康信息平台，统一网络、标准、接口和安全要求，避免重复建设。" },

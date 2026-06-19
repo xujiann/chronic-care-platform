@@ -71,7 +71,7 @@ const seedState = {
 let state = structuredClone(seedState);
 
 const titles = {
-  dashboard: ["监管总览", "卫生健康委端：统筹居民、医疗机构、医保和基层随访协同。"],
+  dashboard: ["监管总览", "大连市卫生健康委：统筹居民、医疗机构、医保组织和基层随访协同。"],
   chronic: ["慢病医防整合", "作为卫健委端独立管理模块，统一管理筛查建档、慢病登记、随访干预、转诊协同、医保审核和固定取药。"],
   residents: ["居民档案", "管理居民基础信息、家庭医生和关键健康指标。"],
   diseases: ["慢病登记", "登记重点病种并基于指标生成风险分层。"],
@@ -86,11 +86,11 @@ const titles = {
 
 const policyAlignmentDefaults = [
   { domain: "普惠数字医疗", requirement: "建设权威统一、互通共享的全民健康信息平台，推动医疗卫生机构数据共享互认和业务协同。", capability: "以个人健康信息库聚合电子病历、检查检验、用药、授权和慢病管理数据。", status: "已启动" },
-  { domain: "医疗全流程在线办理", requirement: "加快异地转诊、就医、住院、医保等医疗全流程在线办理。", capability: "医疗机构端承接转诊协同，医保端承接结算审核，个人端承接固定取药和授权共享。", status: "原型完成" },
-  { domain: "互联网医疗监管", requirement: "完善互联网医疗服务监管体系，推进互联网+监管和智慧监管。", capability: "卫健委端建设四端运行监测、机构绩效、风险预警和数据质量看板。", status: "已纳入" },
+  { domain: "医疗全流程在线办理", requirement: "加快异地转诊、就医、住院、医保等医疗全流程在线办理。", capability: "医疗机构端承接转诊协同，医保中心承接结算经办审核，医保局保留基金监管视图，个人端承接固定取药和授权共享。", status: "原型完成" },
+  { domain: "互联网医疗监管", requirement: "完善互联网医疗服务监管体系，推进互联网+监管和智慧监管。", capability: "大连市卫生健康委建设四端运行监测、机构绩效、风险预警和数据质量看板。", status: "已纳入" },
   { domain: "电子健康码与医保凭证", requirement: "普及居民电子健康码，加快医保电子凭证推广应用。", capability: "以身份证号+手机号形成 personIndex，后续可对接电子健康码、医保电子凭证和居民一卡通。", status: "数据底座完成" },
   { domain: "公共卫生应急", requirement: "建立智慧化预警多点触发机制，支持公共卫生机构和医疗机构数据共享，做到早发现、早报告、早处置。", capability: "在风险预警中汇聚慢病高危、随访逾期、医保异常和资源负荷，预留公共卫生应急监测入口。", status: "待扩展" },
-  { domain: "基层智慧治理", requirement: "以数据驱动、信息共享提升基层治理和疫情防控能力。", capability: "基层机构、家庭医生、居民端、医保端共用同一居民主索引和慢病闭环台账。", status: "已启动" },
+  { domain: "基层智慧治理", requirement: "以数据驱动、信息共享提升基层治理和疫情防控能力。", capability: "基层机构、家庭医生、居民端、医保中心和区市县医保局共用同一居民主索引和慢病闭环台账。", status: "已启动" },
   { domain: "数据安全与合规", requirement: "完善数据脱敏、加密保护、合规评估和安全保障体系。", capability: "增加授权共享、撤销授权、数据质量审计，后续补充分级权限、脱敏展示和日志留痕。", status: "待扩展" },
   { domain: "适老化与无障碍", requirement: "优化信息无障碍环境，解决老年人等群体数字鸿沟。", capability: "个人端按手机视口设计，后续补充大字模式、家属代办、语音提示和线下帮办。", status: "待扩展" }
 ];
@@ -868,7 +868,7 @@ function renderSecurity() {
 
   document.querySelector("#security-rules").innerHTML = [
     ["身份证与手机号脱敏", "列表默认只展示后四位，完整 personIndex 仅在授权详情、审计导出或管理员权限下查看。"],
-    ["最小必要授权", "医疗机构、医保端和基层团队按诊疗、审核、随访、取药等用途申请不同数据范围。"],
+    ["最小必要授权", "医疗机构、医保中心、区市县医保局和基层团队按诊疗、审核、随访、取药等用途申请不同数据范围。"],
     ["全量访问留痕", "所有查看电子病历、检查检验、医保结算和授权记录的动作写入 dataAccessLogs。"],
     ["异常访问预警", "拒绝访问、非工作时间批量查看、跨机构查看等行为进入协同监管和安全审计看板。"]
   ].map(([title, text]) => `<div><strong>${title}</strong><span>${text}</span></div>`).join("");
@@ -878,8 +878,8 @@ function renderPortalGrid() {
   const portals = [
     ["居民端", state.accounts?.length || 0, "个人账户"],
     ["医疗机构端", state.careOrders?.length || 0, "协同任务"],
-    ["医保端", state.insuranceClaims?.length || 0, "结算审核"],
-    ["卫健委端", state.residents.length, "监管对象"]
+    ["医保管理与经办", state.insuranceClaims?.length || 0, "结算审核"],
+    ["大连市卫生健康委", state.residents.length, "监管对象"]
   ];
   document.querySelector("#portal-health").textContent = "运行中";
   document.querySelector("#portal-grid").innerHTML = portals

@@ -8,6 +8,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 function renderAll(state) {
+  renderInsuranceOrgScope();
   renderMetrics(state);
   renderClaims(state);
   renderSupervisions(state);
@@ -23,10 +24,26 @@ function bindInsuranceActions() {
     if (!button) return;
     const updates = JSON.parse(button.dataset.updates || "{}");
     button.disabled = true;
-    const result = await updateWorkflowAction(platformState, button.dataset.collection, button.dataset.id, updates, button.dataset.note || "医保端更新业务状态");
+    const result = await updateWorkflowAction(platformState, button.dataset.collection, button.dataset.id, updates, button.dataset.note || "医保经办/监管更新业务状态");
     button.disabled = false;
     if (result.ok) renderAll(platformState);
   });
+}
+
+function renderInsuranceOrgScope() {
+  const user = window.HealthCityAuth?.getUser?.();
+  const typeMap = {
+    insurance_bureau: ["医保行政监管", "政策、待遇、基金监管、跨区县监督"],
+    insurance_center: ["医保经办服务", "结算审核、凭证核验、固定取药审核、经办留痕"],
+    district_insurance_bureau: ["区市县医保监管", "本区机构监管、慢病待遇协同、基层医保服务监督"]
+  };
+  const [label, scope] = typeMap[user?.orgType] || ["医保协同", user?.dataScope || "医保审核与基金监管"];
+  document.querySelector("#insurance-org-type").textContent = label;
+  document.querySelector("#insurance-org-scope").innerHTML = `
+    <div><strong>${user?.orgName || "未登录机构"}</strong><span>${user?.roleName || "医保角色"} · ${user?.orgLevel || ""}</span></div>
+    <div><strong>职责范围</strong><span>${scope}</span></div>
+    <div><strong>数据范围</strong><span>${user?.dataScope || "按账号授权范围展示"}</span></div>
+  `;
 }
 
 function actionButton(collection, id, label, updates, note) {

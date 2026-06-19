@@ -170,7 +170,7 @@ function renderMetrics(state) {
     ["协同患者", state.residents.length, "来自基层和居民授权"],
     ["高危患者", highRisk, "需专科关注"],
     ["待处理任务", pending, "转诊/复诊/随访"],
-    ["医保结算", claims, "与医保端贯通"]
+    ["医保结算", claims, "与医保中心经办贯通"]
   ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><small>${hint}</small></article>`).join("");
 }
 

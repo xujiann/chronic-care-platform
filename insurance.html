@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>医保端 · 支付审核</title>
+    <title>医保管理与经办 · 支付审核</title>
     <link rel="stylesheet" href="./portal.css" />
     <script src="./auth.js"></script>
     <script>window.HealthCityAuth.requireRole(["insurance"])</script>
@@ -12,14 +12,22 @@
     <main class="portal-shell">
       <header class="portal-header">
         <div>
-          <span>医保端</span>
-          <h1>慢病支付与控费审核</h1>
-          <p>围绕门诊慢特病、基层慢病服务包、长期处方和结算风险进行协同审核。</p>
+          <span>医保管理与经办</span>
+          <h1>医保支付、经办审核与基金监管</h1>
+          <p>区分大连市医保局、大连市医保中心和区市县医保局职责，围绕慢病待遇、结算经办、固定取药和基金风险进行协同审核。</p>
         </div>
         <nav>
           <a href="./health-city.html">系统总览</a>
         </nav>
       </header>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>当前医保机构</h2>
+          <span id="insurance-org-type"></span>
+        </div>
+        <div id="insurance-org-scope" class="rules"></div>
+      </section>
 
       <section class="metric-grid" id="insurance-metrics"></section>
 
@@ -37,9 +45,9 @@
             <h2>控费规则</h2>
           </div>
           <div class="rules">
-            <div><strong>门诊慢特病</strong><span>核验病种、用药、长期处方和授权病历摘要。</span></div>
-            <div><strong>基层服务包</strong><span>匹配家庭医生随访、健康档案和慢病管理状态。</span></div>
-            <div><strong>异常提醒</strong><span>高频就诊、重复用药、费用异常进入人工复核。</span></div>
+          <div><strong>大连市医保局</strong><span>负责政策、待遇、基金监管和跨区县监督。</span></div>
+          <div><strong>大连市医保中心</strong><span>负责结算经办、凭证核验、固定取药审核和经办留痕。</span></div>
+          <div><strong>区市县医保局</strong><span>负责本区机构监管、慢病待遇协同和基层医保服务监督。</span></div>
           </div>
         </article>
       </section>

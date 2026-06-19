@@ -12,7 +12,7 @@
         <div>
           <span>开源健康城市系统</span>
           <h1>健康城市协同总览</h1>
-          <p>以居民健康账户为核心，贯通卫生健康委、医疗机构、医保、个人端和县域医共体平台，支撑慢病管理、资源监管、结算审核、固定取药和县乡村一体化协同。</p>
+          <p>以居民健康账户为核心，贯通大连市卫生健康委、医疗机构、医保局/医保中心/区市县医保局、个人端和县域医共体平台，支撑慢病管理、资源监管、结算审核、固定取药和县乡村一体化协同。</p>
         </div>
         <nav>
           <a href="./platform.html">全民健康平台</a>
@@ -20,7 +20,7 @@
           <a href="./workbench.html">工作台</a>
           <a href="./index.html">卫健委端</a>
           <a href="./institution.html">医疗机构端</a>
-          <a href="./insurance.html">医保端</a>
+          <a href="./insurance.html">医保管理与经办</a>
           <a href="./county.html">医共体平台</a>
           <a href="./citizen.html">个人端</a>
         </nav>
@@ -73,8 +73,8 @@
               <span>协同任务、授权健康档案、医保贯通提示、固定取药协同、居民死亡医学证明办理。</span>
             </a>
             <a class="capability-card" href="./insurance.html">
-              <strong>医保端</strong>
-              <span>慢病结算审核、基金支付、控费规则、医疗机构监管。</span>
+              <strong>医保管理与经办</strong>
+              <span>大连市医保局负责政策和基金监管，大连市医保中心负责结算经办，区市县医保局负责属地机构监管。</span>
             </a>
             <a class="capability-card" href="./county.html">
               <strong>县域医共体平台</strong>
@@ -107,8 +107,8 @@
           <span>统一认证、按角色授权、跨端访问留痕</span>
         </div>
         <div class="auth-flow-grid">
-          <div><strong>统一登录</strong><span>居民、医生、医保审核员、卫健委管理员从同一入口进入。</span></div>
-          <div><strong>角色路由</strong><span>根据角色进入个人端、医疗机构端、医保端或卫生健康委端。</span></div>
+          <div><strong>统一登录</strong><span>居民、医生、大连市医保局/医保中心/区市县医保局、卫健委管理员从同一入口进入。</span></div>
+          <div><strong>角色路由</strong><span>根据角色进入个人端、医疗机构端、医保管理与经办页面或大连市卫生健康委页面。</span></div>
           <div><strong>最小权限</strong><span>端系统只展示当前角色需要处理的数据范围。</span></div>
           <div><strong>访问留痕</strong><span>健康档案、电子病历、医保审核和授权共享进入审计日志。</span></div>
         </div>
@@ -125,8 +125,8 @@
           <div><strong>医疗数据共享互认</strong><span>统一 personIndex，支撑机构间业务协同和数据复用。</span></div>
           <div><strong>分级诊疗体系</strong><span>落实基层首诊、双向转诊、预留号源床位、医保支付引导和家庭医生签约服务。</span></div>
           <div><strong>互联网医疗监管</strong><span>卫健委端系统运行监测、机构绩效、风险预警、数据质量。</span></div>
-          <div><strong>医保电子凭证方向</strong><span>医保端结算审核与个人端取药计划预留凭证对接。</span></div>
-          <div><strong>电子凭证贯通</strong><span>个人端展示电子健康码、医保电子凭证、居民一卡通，医保端核验使用状态。</span></div>
+          <div><strong>医保电子凭证方向</strong><span>医保中心经办审核与个人端取药计划预留凭证对接，医保局侧保留监管视图。</span></div>
+          <div><strong>电子凭证贯通</strong><span>个人端展示电子健康码、医保电子凭证、居民一卡通，医保中心核验使用状态。</span></div>
           <div><strong>公共卫生应急</strong><span>预留多点触发预警、资源调配、早发现早报告早处置能力。</span></div>
           <div><strong>数据安全审计</strong><span>授权状态、访问留痕、脱敏策略、拒绝访问和合规审计。</span></div>
           <div><strong>适老化服务</strong><span>手机预览、家属成员管理、固定取药提醒、家属代办、线下帮办。</span></div>
@@ -159,11 +159,11 @@
           <div><strong>platformRoadmap</strong><span>全系统继续开发优先级、建设原因、涉及范围和下一步动作</span></div>
           <div><strong>storageMeta</strong><span>SQLite 主存储与 JSON 静态快照状态</span></div>
           <div><strong>insuranceClaims</strong><span>医保结算审核</span></div>
-          <div><strong>institutionSupervisions</strong><span>医保端医疗机构监管事项</span></div>
+          <div><strong>institutionSupervisions</strong><span>医保局/区市县医保局医疗机构监管事项</span></div>
           <div><strong>emergencySignals</strong><span>公共卫生应急多点触发预警</span></div>
           <div><strong>seniorServices</strong><span>适老化与家属代办服务</span></div>
           <div><strong>dataAccessLogs</strong><span>个人健康信息访问审计</span></div>
-          <div><strong>authOrganizations</strong><span>市、区市县、卫健行政部门、医保局和医疗机构组织登录目录</span></div>
+          <div><strong>authOrganizations</strong><span>市、区市县、大连市卫生健康委、大连市医保局、医保中心、区市县医保局和医疗机构组织登录目录</span></div>
           <div><strong>authUsers</strong><span>组织账号、角色权限、入口页面和数据范围</span></div>
           <div><strong>interfaceRequirements</strong><span>保留原有系统接口和未来对接接口需求清单</span></div>
           <div><strong>securityEvents</strong><span>登录、退出、接口拒绝和敏感操作安全事件</span></div>
@@ -179,8 +179,8 @@
         <div class="model-grid">
           <div><strong>市级平台</strong><span>账号 city，进入总控台，查看全市运行、跨部门协同和系统建设路线图。</span></div>
           <div><strong>区市县平台</strong><span>账号 district，进入总控台，按区市县管理居民、机构、公卫和基层服务。</span></div>
-          <div><strong>卫生健康行政部门</strong><span>账号 health，进入卫健委端，管理医疗资源、统计直报、公共卫生、分级诊疗和数据质量。</span></div>
-          <div><strong>医保局</strong><span>账号 mi，进入医保端，管理医保结算、基金监管、慢病待遇、固定取药审核和电子凭证。</span></div>
+          <div><strong>大连市卫生健康委</strong><span>账号 health/whjw，进入同一卫健委端，管理医疗资源、统计直报、公共卫生、分级诊疗和数据质量。</span></div>
+          <div><strong>医保组织</strong><span>账号 mi 为大连市医保局，insurance 为大连市医保中心，district_mi 为区市县医保局，统一进入医保管理与经办页面。</span></div>
           <div><strong>各医疗机构</strong><span>账号 hospital/community，进入医疗机构端，处理电子病历、检查检验、转诊接诊、长期处方和固定取药。</span></div>
           <div><strong>保留原接口</strong><span>/api/auth/*、/api/state、/api/personal-records、/api/workflow-actions、/api/health-statistics/import-jobs、/api/death-certificates 继续兼容。</span></div>
           <div><strong>新增对接需求</strong><span>统一认证、组织机构编码、居民主索引、HIS/EMR/LIS/PACS、医保结算、统计直报、人口死亡登记、电子证照、消息回调。</span></div>
