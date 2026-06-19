@@ -153,6 +153,37 @@
       </form>
     </dialog>
 
+    <dialog id="evidence-edit-dialog">
+      <form method="dialog" class="dialog-form" id="evidence-edit-form">
+        <header>
+          <h2 id="evidence-edit-title">验收证据登记</h2>
+          <button type="button" class="icon-button" data-close>×</button>
+        </header>
+        <input type="hidden" name="id" />
+        <div class="form-grid">
+          <label class="full">证据项<input name="name" readonly /></label>
+          <label>整改状态
+            <select name="status" required>
+              <option value="已建档">已建档</option>
+              <option value="开发中">开发中</option>
+              <option value="待补齐">待补齐</option>
+              <option value="待启动">待启动</option>
+              <option value="已闭环">已闭环</option>
+            </select>
+          </label>
+          <label>责任人<input name="owner" /></label>
+          <label>文件名<input name="fileName" placeholder="例：互联互通交易样例-20260619.pdf" /></label>
+          <label>截图/链接<input name="link" placeholder="例：https://... 或 本地归档路径" /></label>
+          <label class="full">测试记录<textarea name="testRecord" rows="3" placeholder="记录测试环境、样例、结果和问题编号"></textarea></label>
+          <label class="full">整改闭环动作<textarea name="next" rows="3"></textarea></label>
+        </div>
+        <footer>
+          <button type="button" class="ghost-button" data-close>取消</button>
+          <button class="primary-button" value="save">保存证据</button>
+        </footer>
+      </form>
+    </dialog>
+
     <script src="./shared.js"></script>
     <script src="./platform.js"></script>
   </body>

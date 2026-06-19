@@ -128,11 +128,11 @@ const defaultDeliveryRoadmap = [
 ];
 
 const defaultPlatformEvidence = [
-  { id: "ev-application", category: "申报材料", name: "提级论证申报材料闭环", owner: "项目办", source: "项目申报材料、建设方案、预算和论证意见", artifacts: ["建设范围矩阵", "存量模块合并清单", "开发批次计划", "周报素材"], status: "已建档", next: "持续补充需求变更、会议纪要和专家论证反馈。" },
-  { id: "ev-interoperability", category: "互联互通测评", name: "四甲/五乙测评证据包", owner: "项目办/标准管理", source: "共享文档、术语字典、主索引、交易服务、测评文审材料", artifacts: ["接口清单", "标准映射", "交易样例", "整改记录"], status: "待补齐", next: "按接口域逐项挂接截图、报文样例、测试记录和整改状态。" },
-  { id: "ev-security", category: "安全合规", name: "等保、密评和信创适配证据", owner: "安全管理岗", source: "统一认证、访问审计、安全事件、数据访问日志、信创适配清单", artifacts: ["权限矩阵", "审计日志", "安全事件", "密评整改项"], status: "开发中", next: "补齐国密传输、数据库加密、日志保全和国产化适配证明。" },
-  { id: "ev-interface", category: "接口联调", name: "外部系统接口联调验收", owner: "市级平台/医疗机构", source: "HIS、EMR、LIS、PACS、医保、电子证照、卫生统计等对接计划", artifacts: ["联调计划", "字段映射", "异常清单", "回归测试"], status: "开发中", next: "为每个接口域建立责任人、环境、频率、样例和验收规则。" },
-  { id: "ev-launch", category: "上线验收", name: "区级实施和应用上线材料", owner: "实施组", source: "中山、沙河口、甘井子、高新区实施批次和应用培训记录", artifacts: ["上线确认", "培训签到", "试运行问题", "用户反馈"], status: "待启动", next: "按区县、机构、应用和批次沉淀上线确认与问题闭环。" }
+  { id: "ev-application", category: "申报材料", name: "提级论证申报材料闭环", owner: "项目办", source: "项目申报材料、建设方案、预算和论证意见", artifacts: ["建设范围矩阵", "存量模块合并清单", "开发批次计划", "周报素材"], status: "已建档", next: "持续补充需求变更、会议纪要和专家论证反馈。", records: [] },
+  { id: "ev-interoperability", category: "互联互通测评", name: "四甲/五乙测评证据包", owner: "项目办/标准管理", source: "共享文档、术语字典、主索引、交易服务、测评文审材料", artifacts: ["接口清单", "标准映射", "交易样例", "整改记录"], status: "待补齐", next: "按接口域逐项挂接截图、报文样例、测试记录和整改状态。", records: [] },
+  { id: "ev-security", category: "安全合规", name: "等保、密评和信创适配证据", owner: "安全管理岗", source: "统一认证、访问审计、安全事件、数据访问日志、信创适配清单", artifacts: ["权限矩阵", "审计日志", "安全事件", "密评整改项"], status: "开发中", next: "补齐国密传输、数据库加密、日志保全和国产化适配证明。", records: [] },
+  { id: "ev-interface", category: "接口联调", name: "外部系统接口联调验收", owner: "市级平台/医疗机构", source: "HIS、EMR、LIS、PACS、医保、电子证照、卫生统计等对接计划", artifacts: ["联调计划", "字段映射", "异常清单", "回归测试"], status: "开发中", next: "为每个接口域建立责任人、环境、频率、样例和验收规则。", records: [] },
+  { id: "ev-launch", category: "上线验收", name: "区级实施和应用上线材料", owner: "实施组", source: "中山、沙河口、甘井子、高新区实施批次和应用培训记录", artifacts: ["上线确认", "培训签到", "试运行问题", "用户反馈"], status: "待启动", next: "按区县、机构、应用和批次沉淀上线确认与问题闭环。", records: [] }
 ];
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -182,6 +182,10 @@ function ensureEditablePlatformData(state) {
   if (!Array.isArray(state.platformEvidence) || !state.platformEvidence.length) {
     state.platformEvidence = structuredClone(defaultPlatformEvidence);
   }
+  state.platformEvidence = state.platformEvidence.map((item) => ({
+    ...item,
+    records: Array.isArray(item.records) ? item.records : []
+  }));
   if (!Array.isArray(state.platformChangeLogs)) state.platformChangeLogs = [];
 }
 
@@ -303,12 +307,28 @@ function renderEvidenceLibrary(evidence) {
       <div class="evidence-tags">
         ${(item.artifacts || []).map((artifact) => `<span>${artifact}</span>`).join("")}
       </div>
+      <div class="evidence-records">
+        ${renderEvidenceRecords(item.records)}
+      </div>
       <footer>
         <strong>${item.owner}</strong>
         <small>${item.next}</small>
+        <button class="inline-action" type="button" data-edit-evidence="${item.id}">登记证据</button>
       </footer>
     </article>
   `).join("") || `<div class="muted">暂无验收证据。</div>`;
+}
+
+function renderEvidenceRecords(records) {
+  const latest = (Array.isArray(records) ? records : []).slice(0, 2);
+  if (!latest.length) return `<p class="muted">暂无文件、截图或测试记录。</p>`;
+  return latest.map((record) => `
+    <p>
+      <strong>${record.fileName || "未命名材料"}</strong>
+      <span>${record.at || ""} · ${record.status || "待确认"}</span>
+      <small>${record.testRecord || record.link || ""}</small>
+    </p>
+  `).join("");
 }
 
 function statusBadge(status) {
@@ -322,6 +342,11 @@ function bindPlatformEditor() {
     const editButton = event.target.closest("[data-edit-platform]");
     if (editButton) {
       openPlatformEditor(editButton.dataset.editPlatform, editButton.dataset.id);
+      return;
+    }
+    const evidenceButton = event.target.closest("[data-edit-evidence]");
+    if (evidenceButton) {
+      openEvidenceEditor(evidenceButton.dataset.editEvidence);
       return;
     }
     if (event.target.matches("[data-close]")) {
@@ -350,6 +375,35 @@ function bindPlatformEditor() {
     renderPlatform();
   });
 
+  document.querySelector("#evidence-edit-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const data = Object.fromEntries(new FormData(form));
+    const item = findEvidenceItem(data.id);
+    if (!item) return;
+    const before = summarizeEvidenceItem(item);
+    item.status = data.status.trim();
+    item.owner = data.owner.trim();
+    item.next = data.next.trim();
+    item.records = [
+      {
+        id: crypto.randomUUID ? crypto.randomUUID() : `evr-${Date.now()}`,
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        fileName: data.fileName.trim(),
+        link: data.link.trim(),
+        testRecord: data.testRecord.trim(),
+        status: item.status,
+        owner: item.owner
+      },
+      ...(Array.isArray(item.records) ? item.records : [])
+    ].filter((record) => record.fileName || record.link || record.testRecord).slice(0, 20);
+    const after = summarizeEvidenceItem(item);
+    if (before !== after) appendPlatformChangeLog("platformEvidence", item, before, after);
+    await savePlatformState();
+    form.closest("dialog").close();
+    renderPlatform();
+  });
+
   document.querySelector("#export-platform-report")?.addEventListener("click", exportPlatformReport);
   const filters = document.querySelector("#platform-report-filters");
   filters?.addEventListener("input", refreshReportSummary);
@@ -360,6 +414,28 @@ function bindPlatformEditor() {
     });
     refreshReportSummary();
   });
+}
+
+function openEvidenceEditor(id) {
+  const item = findEvidenceItem(id);
+  if (!item) return;
+  const dialog = document.querySelector("#evidence-edit-dialog");
+  const form = document.querySelector("#evidence-edit-form");
+  const latest = Array.isArray(item.records) ? item.records[0] : null;
+  form.elements.namedItem("id").value = item.id;
+  form.elements.namedItem("name").value = item.name;
+  form.elements.namedItem("status").value = item.status || "待补齐";
+  form.elements.namedItem("owner").value = item.owner || "";
+  form.elements.namedItem("fileName").value = "";
+  form.elements.namedItem("link").value = "";
+  form.elements.namedItem("testRecord").value = latest?.testRecord || "";
+  form.elements.namedItem("next").value = item.next || "";
+  document.querySelector("#evidence-edit-title").textContent = `登记证据：${item.name}`;
+  dialog.showModal();
+}
+
+function findEvidenceItem(id) {
+  return (platformState.platformEvidence || []).find((item) => item.id === id);
 }
 
 function openPlatformEditor(collection, id) {
@@ -407,6 +483,18 @@ function summarizeEditableItem(item) {
   return parts.join("；");
 }
 
+function summarizeEvidenceItem(item) {
+  const recordCount = Array.isArray(item.records) ? item.records.length : 0;
+  const latest = recordCount ? item.records[0] : null;
+  return [
+    `状态=${item.status || "未填"}`,
+    `责任人=${item.owner || "未填"}`,
+    `材料=${recordCount}份`,
+    `最新=${latest?.fileName || latest?.link || "无"}`,
+    `整改=${item.next || "未填"}`
+  ].join("；");
+}
+
 function appendPlatformChangeLog(collection, item, before, after) {
   const user = window.HealthCityAuth?.getUser?.();
   platformState.platformChangeLogs = [
@@ -432,7 +520,8 @@ function collectionKey(collection) {
     capabilities: "platformCapabilities",
     integrations: "platformIntegrations",
     interfaces: "platformInterfaces",
-    deliveryBatches: "platformDeliveryBatches"
+    deliveryBatches: "platformDeliveryBatches",
+    platformEvidence: "platformEvidence"
   }[collection] || collection;
 }
 
@@ -470,6 +559,7 @@ function renderReportSummary(platform, logs) {
   const filters = reportFilters();
   const allItems = filteredReportItems(platform, filters);
   const reportLogs = filteredReportLogs(logs, filters);
+  const evidence = Array.isArray(platform.evidence) ? platform.evidence : [];
   const byStatus = countBy(allItems.map((item) => item.status || "未填"));
   const byOwner = countBy(allItems.map((item) => item.owner || "未填"));
   const pending = allItems.filter((item) => /待|开发中|启动/.test(item.status || "")).slice(0, 8);
@@ -491,6 +581,10 @@ function renderReportSummary(platform, logs) {
     <article class="wide">
       <h3>本周重点推进</h3>
       ${pending.map((item) => `<p><strong>${item.name}</strong><span>${item.status} · ${item.owner || "未填"} · ${item.next || "待补充下一步"}</span></p>`).join("") || `<p class="muted">暂无待推进事项。</p>`}
+    </article>
+    <article class="wide">
+      <h3>证据归档</h3>
+      ${evidence.map((item) => `<p><strong>${item.category}</strong><span>${item.status} · ${item.owner || "未填"} · ${Array.isArray(item.records) ? item.records.length : 0} 份材料</span></p>`).join("") || `<p class="muted">暂无证据项。</p>`}
     </article>
     <article class="wide">
       <h3>最近维护</h3>
@@ -588,6 +682,7 @@ function exportPlatformReport() {
   const platform = platformModel(platformState);
   const filters = reportFilters();
   const allItems = filteredReportItems(platform, filters);
+  const evidence = Array.isArray(platform.evidence) ? platform.evidence : [];
   const byStatus = countBy(allItems.map((item) => item.status || "未填"));
   const byOwner = countBy(allItems.map((item) => item.owner || "未填"));
   const logs = filteredReportLogs(platformState.platformChangeLogs || [], filters).slice(0, 10);
@@ -628,6 +723,10 @@ function exportPlatformReport() {
     "## 五、最近维护记录",
     "",
     ...(logs.length ? logs.map((log) => `- ${log.at || ""} ${log.actor || ""} 维护【${log.itemName || log.itemId}】：${log.before || "无"} -> ${log.after || "无"}`) : ["- 暂无维护记录。"]),
+    "",
+    "## 六、验收证据归档",
+    "",
+    ...(evidence.length ? evidence.map((item) => `- 【${item.category}】${item.name}：${item.status}；责任人：${item.owner || "未填"}；已登记材料：${Array.isArray(item.records) ? item.records.length : 0} 份；下一步：${item.next || "待补充"}`) : ["- 暂无证据项。"]),
     ""
   ];
   downloadText(`全民健康信息平台建设周报素材-${todayStamp()}.md`, lines.join("\n"));

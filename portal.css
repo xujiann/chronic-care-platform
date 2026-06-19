@@ -475,6 +475,7 @@ dialog::backdrop {
 }
 
 .form-grid input,
+.form-grid select,
 .form-grid textarea {
   width: 100%;
   border: 1px solid var(--line);
@@ -736,6 +737,24 @@ dialog::backdrop {
   gap: 6px;
   border-top: 1px solid rgba(216, 226, 231, 0.72);
   padding-top: 10px;
+}
+
+.evidence-records {
+  display: grid;
+  gap: 8px;
+}
+
+.evidence-records p {
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(216, 226, 231, 0.72);
+  border-radius: 8px;
+  padding: 8px;
+  background: #fff;
+}
+
+.evidence-records strong {
+  overflow-wrap: anywhere;
 }
 
 .evidence-tags {
