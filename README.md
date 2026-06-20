@@ -76,6 +76,14 @@ http://localhost:5173/login.html
 - 全流程审计矩阵，覆盖 11 条业务链路。
 - 平台结构图、跨端待办、数据成熟度、继续开发队列。
 
+### 全民健康信息平台建设驾驶舱
+
+- 统一应用目录：来源系统、接口方式、责任处室、复用方式、上线批次和验收证据。
+- 医疗机构信用评价：评价周期、分项指标、得分等级和整改闭环。
+- 互联互通测评证据库：文件、链接、测试记录和整改状态归档。
+- 安全信创验收台账：等保、密评、国密改造和信创适配分账管理。
+- 所有建设治理事项统一写入维护日志和周报素材。
+
 ### 大连市卫生健康委
 
 - 监管总览：建档人数、慢病人数、高危人数、随访、控制率。
@@ -155,6 +163,8 @@ data/db.json
 - `healthStatistics`、`healthStatisticsIngestion`
 - `securityEvents`、`dataAccessLogs`
 - `platformAudit`、`platformProcessAudit`、`platformRoadmap`
+- `applicationCatalog`、`institutionCreditEvaluations`
+- `securityAcceptanceLedger`、`platformEvidence`、`platformChangeLogs`
 
 ## 后端 API
 
@@ -180,6 +190,8 @@ data/db.json
 ## 当前边界
 
 这是可运行 MVP，不是生产系统。真实上线仍需：
+
+后续开发的 P0/P1/P2 排序和验收标准见 [全民健康信息平台后续开发优先级](./docs/后续开发优先级.md)。
 
 - 对接政务统一认证、短信/CA/人脸核验。
 - 对接正式人口库、电子健康码、医保电子凭证。
