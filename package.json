@@ -5,7 +5,7 @@
   "description": "慢病医防融合管理平台本地 MVP",
   "scripts": {
     "dev": "node server.js",
-    "check": "node --check app.js && node --check server.js && node --check platform.js"
+    "check": "node --check app.js && node --check auth.js && node --check citizen.js && node --check county.js && node --check health-archive-standard.js && node --check institution.js && node --check insurance.js && node --check platform.js && node --check shared.js && node --check workbench.js && node --check server.js"
   },
   "engines": {
     "node": ">=18"

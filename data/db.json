@@ -147,43 +147,40 @@
       "id": "f1",
       "residentId": "r1",
       "diseaseType": "高血压",
-      "plannedAt": "2026-06-13",
+      "plannedAt": "2026-06-17",
       "assignee": "刘医生",
-      "status": "已完成",
-      "result": "控制良好",
+      "status": "已逾期",
+      "result": "未记录",
       "advice": "补充电话随访",
-      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
-      "lastUpdated": "2026-06-18T02:57:03.353Z"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "f2",
       "residentId": "r2",
       "diseaseType": "糖尿病",
-      "plannedAt": "2026-06-15",
+      "plannedAt": "2026-06-19",
       "assignee": "赵医生",
-      "status": "已完成",
-      "result": "控制良好",
+      "status": "待随访",
+      "result": "未记录",
       "advice": "复测空腹血糖",
-      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2",
-      "lastUpdated": "2026-06-18T02:57:03.374Z"
+      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
       "id": "f3",
       "residentId": "r4",
       "diseaseType": "高血压",
-      "plannedAt": "2026-06-20",
+      "plannedAt": "2026-06-24",
       "assignee": "刘医生",
-      "status": "已完成",
-      "result": "控制良好",
+      "status": "待随访",
+      "result": "未记录",
       "advice": "记录家庭血压",
-      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4",
-      "lastUpdated": "2026-06-18T02:57:03.392Z"
+      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     },
     {
       "id": "f4",
       "residentId": "r3",
       "diseaseType": "健康管理",
-      "plannedAt": "2026-06-10",
+      "plannedAt": "2026-06-14",
       "assignee": "孙医生",
       "status": "已完成",
       "result": "控制良好",
@@ -512,18 +509,18 @@
         "申报单"
       ],
       "certificateForm": "电子证照+纸质版",
-      "status": "已上报",
+      "status": "已签发",
       "electronicLicenseStatus": "已生成",
       "reportChannel": "人口死亡信息登记系统",
       "cdcReportStatus": "已上报",
-      "nationalPlatformStatus": "已同步",
-      "publicSecuritySync": "已共享",
-      "civilAffairsSync": "已共享",
+      "nationalPlatformStatus": "待同步",
+      "publicSecuritySync": "待共享",
+      "civilAffairsSync": "待共享",
       "qualityCheck": "通过",
       "issueDeadline": "死亡或申报后 1 日内",
       "reportDeadline": "签发后 15 个工作日内",
       "electronicReportDeadline": "电子证照 5 个工作日内上报国家平台",
-      "lastUpdated": "2026-06-18T02:57:03.563Z",
+      "lastUpdated": "2026-06-12T10:30:00.000Z",
       "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     },
     {
@@ -560,18 +557,18 @@
         "纸质版"
       ],
       "certificateForm": "电子证照",
-      "status": "已上报",
+      "status": "待上报",
       "electronicLicenseStatus": "待生成",
       "reportChannel": "省级全民健康信息平台",
-      "cdcReportStatus": "已上报",
-      "nationalPlatformStatus": "已同步",
-      "publicSecuritySync": "已共享",
-      "civilAffairsSync": "已共享",
-      "qualityCheck": "通过",
+      "cdcReportStatus": "待上报",
+      "nationalPlatformStatus": "待提交",
+      "publicSecuritySync": "待共享",
+      "civilAffairsSync": "待共享",
+      "qualityCheck": "待复核",
       "issueDeadline": "死亡或申报后 1 日内",
       "reportDeadline": "签发后 15 个工作日内",
       "electronicReportDeadline": "电子证照 5 个工作日内上报国家平台",
-      "lastUpdated": "2026-06-18T02:57:03.582Z",
+      "lastUpdated": "2026-06-16T09:10:00.000Z",
       "personIndex": "DEMO-ID-R3#DEMO-MOBILE-R3"
     },
     {
@@ -609,18 +606,18 @@
         "申报单"
       ],
       "certificateForm": "纸质版",
-      "status": "已上报",
+      "status": "待签发",
       "electronicLicenseStatus": "不适用",
       "reportChannel": "人口死亡信息登记系统",
-      "cdcReportStatus": "已上报",
-      "nationalPlatformStatus": "已同步",
-      "publicSecuritySync": "已共享",
-      "civilAffairsSync": "已共享",
-      "qualityCheck": "通过",
+      "cdcReportStatus": "未上报",
+      "nationalPlatformStatus": "不适用",
+      "publicSecuritySync": "未共享",
+      "civilAffairsSync": "未共享",
+      "qualityCheck": "待补正",
       "issueDeadline": "申报后 1 日内",
       "reportDeadline": "签发后 15 个工作日内",
       "electronicReportDeadline": "如生成电子证照，5 个工作日内上报国家平台",
-      "lastUpdated": "2026-06-18T02:57:03.601Z",
+      "lastUpdated": "2026-06-16T11:20:00.000Z",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     }
   ],
@@ -714,17 +711,17 @@
     ],
     "metrics": {
       "total": 3,
-      "signed": 3,
-      "reported": 3,
+      "signed": 1,
+      "reported": 1,
       "electronicLicenses": 1,
       "paperCertificates": 2,
-      "pending": 0,
+      "pending": 2,
       "overdue": 0,
       "homeOrOtherPlace": 2,
       "institutionDeaths": 1,
       "normalDeaths": 3,
       "abnormalDeaths": 0,
-      "qualityPass": 3
+      "qualityPass": 1
     },
     "causeRanking": [
       {
@@ -754,14 +751,14 @@
         "region": "市级",
         "deaths": 1,
         "crudeMortality": "演示口径",
-        "reportedRate": "100%",
+        "reportedRate": "0%",
         "overdue": 0
       },
       {
         "region": "沙河口区",
         "deaths": 1,
         "crudeMortality": "演示口径",
-        "reportedRate": "100%",
+        "reportedRate": "0%",
         "overdue": 0
       }
     ],
@@ -861,15 +858,15 @@
         "首次签发登记表",
         "分娩信息核验"
       ],
-      "status": "已上报",
+      "status": "已签发",
       "electronicLicenseStatus": "已生成",
       "publicSecuritySync": "已共享",
       "maternalChildSync": "已入册",
       "qualityCheck": "通过",
       "issueDeadline": "出生后及时办理，首次签发登记留痕",
-      "healthManagementStatus": "已建档",
+      "healthManagementStatus": "产后访视已建档",
       "nextService": "新生儿家庭访视与预防接种提醒",
-      "lastUpdated": "2026-06-18T02:57:03.621Z",
+      "lastUpdated": "2026-06-01T10:30:00.000Z",
       "personIndex": ""
     },
     {
@@ -900,15 +897,15 @@
         "父亲身份证",
         "首次签发登记表"
       ],
-      "status": "已上报",
-      "electronicLicenseStatus": "已生成",
-      "publicSecuritySync": "已共享",
-      "maternalChildSync": "已入册",
-      "qualityCheck": "通过",
+      "status": "待上报",
+      "electronicLicenseStatus": "待生成",
+      "publicSecuritySync": "待共享",
+      "maternalChildSync": "待入册",
+      "qualityCheck": "待复核",
       "issueDeadline": "首次签发后同步电子证照与妇幼系统",
-      "healthManagementStatus": "已建档",
+      "healthManagementStatus": "待新生儿访视",
       "nextService": "黄疸复测与出生缺陷筛查结果确认",
-      "lastUpdated": "2026-06-18T02:57:03.641Z",
+      "lastUpdated": "2026-06-08T17:20:00.000Z",
       "personIndex": ""
     },
     {
@@ -939,15 +936,15 @@
         "户口登记机关证明",
         "换发原因登记"
       ],
-      "status": "已上报",
-      "electronicLicenseStatus": "已生成",
-      "publicSecuritySync": "已共享",
+      "status": "待签发",
+      "electronicLicenseStatus": "待生成",
+      "publicSecuritySync": "未共享",
       "maternalChildSync": "已入册",
-      "qualityCheck": "通过",
+      "qualityCheck": "待补正",
       "issueDeadline": "换发后原证归档保存",
-      "healthManagementStatus": "已建档",
+      "healthManagementStatus": "低体重儿专案随访",
       "nextService": "出生体重复测与喂养指导",
-      "lastUpdated": "2026-06-18T02:57:03.660Z",
+      "lastUpdated": "2026-06-12T09:00:00.000Z",
       "personIndex": ""
     }
   ],
@@ -1046,28 +1043,28 @@
       "total": 3,
       "firstIssued": 2,
       "reissued": 1,
-      "signed": 3,
+      "signed": 1,
       "reported": 3,
-      "electronicLicenses": 3,
-      "publicSecuritySynced": 3,
-      "maternalChildSynced": 3,
-      "pending": 0,
+      "electronicLicenses": 1,
+      "publicSecuritySynced": 1,
+      "maternalChildSynced": 2,
+      "pending": 2,
       "lowBirthWeight": 0,
-      "qualityPass": 3
+      "qualityPass": 1
     },
     "regionStats": [
       {
         "region": "市级",
         "births": 2,
         "firstIssueRate": "100%",
-        "publicSecuritySyncRate": "100%",
+        "publicSecuritySyncRate": "50%",
         "lowBirthWeight": 0
       },
       {
         "region": "甘井子区",
         "births": 1,
         "firstIssueRate": "0%",
-        "publicSecuritySyncRate": "100%",
+        "publicSecuritySyncRate": "0%",
         "lowBirthWeight": 0
       }
     ],
@@ -1081,19 +1078,19 @@
       {
         "rule": "换发/补发",
         "deadline": "按原因登记、材料审验、原证归档或补发专章要求闭环办理",
-        "owner": "签发机构/区县级卫生健康行政部门",
+        "owner": "签发机构/大连市卫生健康委",
         "status": "已建模"
       },
       {
         "rule": "空白证件与废证",
         "deadline": "证件申领、配发、作废、清理和销毁全流程留痕",
-        "owner": "卫生健康行政部门",
+        "owner": "大连市卫生健康委",
         "status": "已建模"
       },
       {
         "rule": "第七版证件",
         "deadline": "启用第七版编号/条形码口径，旧版证件按要求清理",
-        "owner": "卫生健康行政部门/公安机关",
+        "owner": "大连市卫生健康委/公安机关",
         "status": "已建模"
       }
     ],
@@ -1681,18 +1678,6 @@
     ],
     "jobs": [
       {
-        "id": "stat-job-dalian-2025-final-yearbook",
-        "name": "2025 年大连市卫生健康统计年报汇编正式版更新",
-        "source": "正式年报汇编导入",
-        "period": "2025 年报",
-        "status": "演示闭环完成",
-        "quality": "等待正式汇编发布后复核提要口径",
-        "target": "dalianHealthStatistics2025",
-        "nextAction": "收到正式年报汇编后替换提要状态并补充区县机构明细。",
-        "createdAt": "2026-06-16T12:00:23.509Z",
-        "createdBy": "whjw"
-      },
-      {
         "id": "stat-job-dalian-2025",
         "name": "2025 年大连市卫生健康统计提要",
         "source": "PDF 报表导入",
@@ -1852,7 +1837,7 @@
       "insurance": "已购买医师个人医疗执业保险",
       "primaryConsent": "已同意",
       "registrationMode": "备案管理",
-      "status": "已备案",
+      "status": "待卫健审核",
       "compliance": {
         "titleQualified": true,
         "fiveYears": true,
@@ -1863,7 +1848,7 @@
         "publicHospitalLeaderRestricted": false
       },
       "publicVisible": true,
-      "lastUpdated": "2026-06-18T02:57:03.681Z"
+      "lastUpdated": "2026-06-17T09:00:00.000Z"
     },
     {
       "id": "mp-002",
@@ -1910,12 +1895,11 @@
       "riskLevel": "高危",
       "institution": "青泥洼桥社区卫生服务中心",
       "assignee": "刘医生",
-      "due": "2026-06-20",
+      "due": "2026-06-21",
       "status": "待筛查",
       "nextStep": "完善问卷并申请心电图、血脂检查",
       "result": "待评估",
-      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
-      "lastUpdated": "2026-06-18T03:46:37.901Z"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "cst-002",
@@ -1926,7 +1910,7 @@
       "riskLevel": "中危",
       "institution": "星海湾社区卫生服务中心",
       "assignee": "赵医生",
-      "due": "2026-06-22",
+      "due": "2026-06-23",
       "status": "检查申请",
       "nextStep": "复查糖化血红蛋白、尿微量白蛋白",
       "result": "待检查",
@@ -1941,7 +1925,7 @@
       "riskLevel": "高危",
       "institution": "青泥洼桥社区卫生服务中心",
       "assignee": "刘医生",
-      "due": "2026-06-19",
+      "due": "2026-06-20",
       "status": "待干预",
       "nextStep": "建立高危台账并推送专科复核",
       "result": "已生成风险画像",
@@ -1958,7 +1942,7 @@
       "contentType": "图文+视频",
       "targetGroup": "高血压高危人群",
       "status": "待推送",
-      "pushAt": "2026-06-18",
+      "pushAt": "2026-06-19",
       "feedback": "待居民确认",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
@@ -1971,7 +1955,7 @@
       "contentType": "健康处方",
       "targetGroup": "糖尿病管理人群",
       "status": "已推送",
-      "pushAt": "2026-06-17",
+      "pushAt": "2026-06-18",
       "feedback": "已阅读",
       "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
@@ -1984,7 +1968,7 @@
       "contentType": "问答卡片",
       "targetGroup": "老年高危人群",
       "status": "待确认",
-      "pushAt": "2026-06-19",
+      "pushAt": "2026-06-20",
       "feedback": "待家属确认",
       "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     }
@@ -2003,7 +1987,7 @@
         "服药依从性"
       ],
       "status": "执行中",
-      "nextReview": "2026-06-25",
+      "nextReview": "2026-06-26",
       "intervention": "调整生活方式并复核长期处方",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
@@ -2020,7 +2004,7 @@
         "体重"
       ],
       "status": "待复核",
-      "nextReview": "2026-06-28",
+      "nextReview": "2026-06-29",
       "intervention": "补充并发症筛查结果",
       "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
@@ -2037,7 +2021,7 @@
         "卒中风险评分"
       ],
       "status": "预警中",
-      "nextReview": "2026-06-21",
+      "nextReview": "2026-06-22",
       "intervention": "推送卒中宣教并预约专科会诊",
       "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     }
@@ -2053,11 +2037,10 @@
       "orderType": "胸部CT远程诊断",
       "status": "待中心诊断",
       "priority": "高",
-      "requestedAt": "2026-06-17",
-      "due": "2026-06-18",
+      "requestedAt": "2026-06-18",
+      "due": "2026-06-19",
       "result": "待报告回传",
-      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
-      "lastUpdated": "2026-06-18T03:46:37.929Z"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "cco-002",
@@ -2069,8 +2052,8 @@
       "orderType": "糖化血红蛋白集中检测",
       "status": "样本运输中",
       "priority": "中",
-      "requestedAt": "2026-06-18",
-      "due": "2026-06-20",
+      "requestedAt": "2026-06-19",
+      "due": "2026-06-21",
       "result": "待检测",
       "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
@@ -2084,8 +2067,8 @@
       "orderType": "高危慢病上转复核",
       "status": "待接诊",
       "priority": "高",
-      "requestedAt": "2026-06-18",
-      "due": "2026-06-19",
+      "requestedAt": "2026-06-19",
+      "due": "2026-06-20",
       "result": "待接诊反馈",
       "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     }
@@ -2101,7 +2084,7 @@
       "doctorAction": "已采纳",
       "quality": "病历质检通过",
       "status": "已完成",
-      "at": "2026-06-17",
+      "at": "2026-06-18",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
@@ -2114,7 +2097,7 @@
       "doctorAction": "待确认",
       "quality": "待质检",
       "status": "待医生确认",
-      "at": "2026-06-18",
+      "at": "2026-06-19",
       "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
@@ -2127,7 +2110,7 @@
       "doctorAction": "已上转",
       "quality": "重点病例",
       "status": "转诊中",
-      "at": "2026-06-18",
+      "at": "2026-06-19",
       "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     }
   ],
@@ -2141,7 +2124,7 @@
       "status": "已互认",
       "savedCost": 86,
       "reason": "同质质控通过",
-      "at": "2026-06-16",
+      "at": "2026-06-17",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
@@ -2153,7 +2136,7 @@
       "status": "待互认",
       "savedCost": 120,
       "reason": "等待中心实验室报告",
-      "at": "2026-06-18",
+      "at": "2026-06-19",
       "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
@@ -2165,7 +2148,7 @@
       "status": "退回复核",
       "savedCost": 180,
       "reason": "图像质量不足，需要复核",
-      "at": "2026-06-17",
+      "at": "2026-06-18",
       "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     }
   ],
@@ -2176,13 +2159,11 @@
       "institution": "大连市中心医院",
       "department": "心内科",
       "type": "专科复诊",
-      "status": "已完成",
+      "status": "待接诊",
       "priority": "高",
-      "date": "2026-06-16",
+      "date": "2026-06-20",
       "summary": "高血压控制不佳，建议专科复诊并调整用药。",
-      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
-      "result": "已完成诊疗协同",
-      "lastUpdated": "2026-06-18T02:57:03.291Z"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "co2",
@@ -2190,13 +2171,11 @@
       "institution": "大连医科大学附属医院",
       "department": "内分泌科",
       "type": "糖尿病复查",
-      "status": "已完成",
+      "status": "已接诊",
       "priority": "中",
-      "date": "2026-06-18",
+      "date": "2026-06-22",
       "summary": "空腹血糖偏高，建议复查糖化血红蛋白。",
-      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2",
-      "result": "已完成诊疗协同",
-      "lastUpdated": "2026-06-18T02:57:03.313Z"
+      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
       "id": "co3",
@@ -2204,13 +2183,11 @@
       "institution": "青泥洼桥社区卫生服务中心",
       "department": "家庭医生工作室",
       "type": "基层随访",
-      "status": "已完成",
+      "status": "管理中",
       "priority": "中",
-      "date": "2026-06-20",
+      "date": "2026-06-24",
       "summary": "稳定管理，继续季度随访。",
-      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4",
-      "result": "已完成诊疗协同",
-      "lastUpdated": "2026-06-18T02:57:03.334Z"
+      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     }
   ],
   "medicationPickups": [
@@ -2222,16 +2199,16 @@
       "pickupDay": 5,
       "pharmacy": "青泥洼桥社区卫生服务中心药房",
       "nextPickup": "2026-07-05",
-      "status": "已完成",
+      "status": "待取药",
       "coverage": "门诊慢特病",
-      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
       "applyMode": "本人申请",
       "requestStatus": "已申请",
       "institutionReview": "已确认",
       "insuranceReview": "已通过",
-      "pharmacyStatus": "已取药",
+      "pharmacyStatus": "待取药",
       "deliveryMode": "社区药房自取",
-      "lastUpdated": "2026-06-18T02:57:03.488Z"
+      "lastUpdated": "2026-06-15",
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "mp2",
@@ -2241,16 +2218,16 @@
       "pickupDay": 5,
       "pharmacy": "青泥洼桥社区卫生服务中心药房",
       "nextPickup": "2026-07-05",
-      "status": "已完成",
+      "status": "待取药",
       "coverage": "门诊慢特病",
-      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
       "applyMode": "本人申请",
       "requestStatus": "已申请",
       "institutionReview": "已确认",
       "insuranceReview": "已通过",
-      "pharmacyStatus": "已取药",
+      "pharmacyStatus": "待取药",
       "deliveryMode": "社区药房自取",
-      "lastUpdated": "2026-06-18T02:57:03.506Z"
+      "lastUpdated": "2026-06-15",
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "mp3",
@@ -2260,16 +2237,16 @@
       "pickupDay": 10,
       "pharmacy": "星海湾社区卫生服务中心药房",
       "nextPickup": "2026-07-10",
-      "status": "已完成",
+      "status": "已预约",
       "coverage": "门诊统筹",
-      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2",
       "applyMode": "本人申请",
       "requestStatus": "已申请",
       "institutionReview": "已确认",
-      "insuranceReview": "已通过",
-      "pharmacyStatus": "已取药",
+      "insuranceReview": "待审核",
+      "pharmacyStatus": "已预约",
       "deliveryMode": "社区药房自取",
-      "lastUpdated": "2026-06-18T02:57:03.525Z"
+      "lastUpdated": "2026-06-15",
+      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
       "id": "mp4",
@@ -2279,16 +2256,16 @@
       "pickupDay": 15,
       "pharmacy": "青泥洼桥社区卫生服务中心药房",
       "nextPickup": "2026-07-15",
-      "status": "已完成",
+      "status": "待确认",
       "coverage": "基层慢病服务包",
-      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4",
       "applyMode": "家属代办",
       "requestStatus": "已申请",
-      "institutionReview": "已确认",
-      "insuranceReview": "已通过",
-      "pharmacyStatus": "已取药",
+      "institutionReview": "待确认",
+      "insuranceReview": "待审核",
+      "pharmacyStatus": "待确认",
       "deliveryMode": "家属代取",
-      "lastUpdated": "2026-06-18T02:57:03.543Z"
+      "lastUpdated": "2026-06-15",
+      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     }
   ],
   "institutionSupervisions": [
@@ -2327,12 +2304,10 @@
       "totalAmount": 386.5,
       "insurancePay": 251.2,
       "selfPay": 135.3,
-      "status": "已通过",
+      "status": "待审核",
       "risk": "需核验长期处方",
       "date": "2026-05-21",
-      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
-      "reviewResult": "合规通过",
-      "lastUpdated": "2026-06-18T02:56:06.333Z"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "ic2",
@@ -2357,12 +2332,10 @@
       "totalAmount": 96,
       "insurancePay": 76.8,
       "selfPay": 19.2,
-      "status": "已通过",
+      "status": "智能初审",
       "risk": "基层服务包匹配",
       "date": "2026-03-30",
-      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4",
-      "reviewResult": "合规通过",
-      "lastUpdated": "2026-06-18T02:57:03.469Z"
+      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     }
   ],
   "policyAlignment": [
@@ -2375,7 +2348,7 @@
     {
       "domain": "医疗全流程在线办理",
       "requirement": "加快异地转诊、就医、住院、医保等医疗全流程在线办理。",
-      "capability": "医疗机构端承接转诊协同，医保端承接结算审核，个人端承接固定取药和授权共享。",
+      "capability": "医疗机构端承接转诊协同，医保中心承接结算经办审核，医保局保留基金监管视图，个人端承接固定取药和授权共享。",
       "status": "原型完成"
     },
     {
@@ -2399,7 +2372,7 @@
     {
       "domain": "基层智慧治理",
       "requirement": "以数据驱动、信息共享提升基层治理和疫情防控能力。",
-      "capability": "基层机构、家庭医生、居民端、医保端共用同一居民主索引和慢病闭环台账。",
+      "capability": "基层机构、家庭医生、居民端、医保中心和区市县医保局共用同一居民主索引和慢病闭环台账。",
       "status": "已启动"
     },
     {
@@ -2422,11 +2395,9 @@
       "source": "家庭医生随访",
       "region": "中山区",
       "level": "高",
-      "status": "已处置",
-      "date": "2026-06-15",
-      "action": "通知基层机构补充电话随访并评估转诊需求",
-      "result": "已完成处置反馈",
-      "lastUpdated": "2026-06-18T02:57:03.776Z"
+      "status": "待处置",
+      "date": "2026-06-19",
+      "action": "通知基层机构补充电话随访并评估转诊需求"
     },
     {
       "id": "es2",
@@ -2434,11 +2405,9 @@
       "source": "医保审核",
       "region": "市级",
       "level": "中",
-      "status": "已处置",
-      "date": "2026-06-15",
-      "action": "联动医保端核验处方、诊断和取药记录",
-      "result": "已完成处置反馈",
-      "lastUpdated": "2026-06-18T02:57:03.796Z"
+      "status": "研判中",
+      "date": "2026-06-19",
+      "action": "联动医保中心核验处方、诊断和取药记录，医保局保留监管复核"
     },
     {
       "id": "es3",
@@ -2446,11 +2415,9 @@
       "source": "医疗资源监测",
       "region": "沙河口区",
       "level": "中",
-      "status": "已处置",
-      "date": "2026-06-16",
-      "action": "协调区级医院支援复诊号源和药品保障",
-      "result": "已完成处置反馈",
-      "lastUpdated": "2026-06-18T02:57:03.819Z"
+      "status": "已派单",
+      "date": "2026-06-20",
+      "action": "协调区级医院支援复诊号源和药品保障"
     }
   ],
   "seniorServices": [
@@ -2512,8 +2479,8 @@
       "id": "al3",
       "residentId": "r2",
       "at": "2026-06-15 11:20",
-      "actor": "医保端审核员",
-      "role": "医保监管",
+      "actor": "大连市医保中心审核员",
+      "role": "医保经办",
       "scope": "医保结算、诊断摘要",
       "purpose": "慢病结算审核",
       "result": "允许",
@@ -2533,8 +2500,278 @@
   ],
   "securityEvents": [
     {
-      "id": "be2496a3-868c-4fcc-81fa-8a4e0233e260",
-      "at": "2026/6/18 13:45:56",
+      "id": "0dad9245-4063-4b99-8ef6-167281e3f615",
+      "at": "2026/6/20 14:16:25",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "更新数据",
+      "target": "/api/state",
+      "result": "允许",
+      "detail": "全量保存平台数据"
+    },
+    {
+      "id": "048daa79-e7a2-43b6-93e3-6514215d47ff",
+      "at": "2026/6/20 14:16:25",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "56be4c3b-e9ea-4f15-9940-516c428827dc",
+      "at": "2026/6/20 14:15:51",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "更新数据",
+      "target": "/api/state",
+      "result": "允许",
+      "detail": "全量保存平台数据"
+    },
+    {
+      "id": "e62c1837-b9c3-4f2c-9ab3-e961b20640fe",
+      "at": "2026/6/20 14:15:51",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "0207e69d-2b5a-4ecb-b01b-d68267c31f4b",
+      "at": "2026/6/20 14:15:27",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "更新数据",
+      "target": "/api/state",
+      "result": "允许",
+      "detail": "全量保存平台数据"
+    },
+    {
+      "id": "520a7742-a7cb-4896-a12d-bfeae26f9496",
+      "at": "2026/6/20 14:15:27",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "a61a76c7-7a7b-41de-a62a-7b297a0ccd9c",
+      "at": "2026/6/20 14:14:56",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "8cf5bd7d-1b76-47e9-8519-8818848d5c5a",
+      "at": "2026/6/19 21:14:02",
+      "actor": "区市县医保局管理员",
+      "role": "insurance",
+      "action": "登录",
+      "target": "insurance.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "08170a07-7113-46cf-a406-20d6ec5464ef",
+      "at": "2026/6/19 21:14:02",
+      "actor": "大连市医保中心审核员",
+      "role": "insurance",
+      "action": "登录",
+      "target": "insurance.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "d6a633dd-d89a-4555-ab91-b0ff0c3447b1",
+      "at": "2026/6/19 21:14:02",
+      "actor": "大连市医保局管理员",
+      "role": "insurance",
+      "action": "登录",
+      "target": "insurance.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "d5ccab94-859d-45bb-9a75-b077d50382ac",
+      "at": "2026/6/19 21:14:02",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "e44c5c89-c05f-4610-af91-849a9c94de32",
+      "at": "2026/6/19 21:14:02",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "5fa12f91-02f6-4d49-a0b0-050583727df1",
+      "at": "2026/6/19 21:08:16",
+      "actor": "区市县医保局管理员",
+      "role": "insurance",
+      "action": "登录",
+      "target": "insurance.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "f1c6f21c-4fb3-4a31-9b0b-8bf2ad5ff707",
+      "at": "2026/6/19 21:08:16",
+      "actor": "大连市医保中心审核员",
+      "role": "insurance",
+      "action": "登录",
+      "target": "insurance.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "8a00f6a6-434e-4258-a2a0-f8f37f4507ef",
+      "at": "2026/6/19 21:08:16",
+      "actor": "大连市医保局管理员",
+      "role": "insurance",
+      "action": "登录",
+      "target": "insurance.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "5e4d5530-29c5-417d-b729-7d6a43004f93",
+      "at": "2026/6/19 21:08:16",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "56973aa9-3298-4d9b-a5f7-fafab32e3e14",
+      "at": "2026/6/19 21:08:15",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "466b08dd-9bfe-42cc-97e9-96e8b0410a5b",
+      "at": "2026/6/19 21:05:28",
+      "actor": "区市县医保局管理员",
+      "role": "insurance",
+      "action": "登录",
+      "target": "insurance.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "77bd93c3-25dc-42be-8e7e-e4d3edce379c",
+      "at": "2026/6/19 21:05:28",
+      "actor": "大连市医保中心审核员",
+      "role": "insurance",
+      "action": "登录",
+      "target": "insurance.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "45407426-1f96-4ca0-9da3-02ca1ed0fa69",
+      "at": "2026/6/19 21:05:28",
+      "actor": "大连市医保局管理员",
+      "role": "insurance",
+      "action": "登录",
+      "target": "insurance.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "c4aca3bc-2102-4b6b-86c6-6a02961d16f6",
+      "at": "2026/6/19 21:05:27",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "aca9c043-946a-4cde-937c-7bf95cd8bfbf",
+      "at": "2026/6/19 21:05:27",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "d6c7a16a-1dfd-4972-8ea4-e057eb62164a",
+      "at": "2026/6/19 21:02:42",
+      "actor": "区市县医保局管理员",
+      "role": "insurance",
+      "action": "登录",
+      "target": "insurance.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "c740f2da-e4b2-44e5-a795-8521e7228ed3",
+      "at": "2026/6/19 21:02:42",
+      "actor": "大连市医保中心审核员",
+      "role": "insurance",
+      "action": "登录",
+      "target": "insurance.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "d8821b09-9da3-4dad-baab-8068b775069c",
+      "at": "2026/6/19 21:02:42",
+      "actor": "大连市医保局管理员",
+      "role": "insurance",
+      "action": "登录",
+      "target": "insurance.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "5052fa09-a19b-4d65-a364-2077b3d5a595",
+      "at": "2026/6/19 21:02:41",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "cf42de82-4c1a-40a2-8480-ae2f66f21fef",
+      "at": "2026/6/19 21:02:41",
+      "actor": "��连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "2bb5d27c-7013-4727-ac83-5e29b12fadde",
+      "at": "2026/6/19 21:02:29",
       "actor": "anonymous",
       "role": "anonymous",
       "action": "访问接口",
@@ -2543,828 +2780,8 @@
       "detail": "未登录或会话已过期"
     },
     {
-      "id": "d0652bed-763d-4ceb-8066-b3a6b6d944e2",
-      "at": "2026/6/18 11:46:37",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "countyCollaborationOrders/cco-001",
-      "result": "允许",
-      "detail": "恢复医共体工单演示状态"
-    },
-    {
-      "id": "80106dde-0799-466b-b5f2-47c59a0e160f",
-      "at": "2026/6/18 11:46:37",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "chronicScreeningTasks/cst-001",
-      "result": "允许",
-      "detail": "恢复慢病筛查演示状态"
-    },
-    {
-      "id": "e70f7add-b4c4-49e4-b62a-30cfeb5e1df1",
-      "at": "2026/6/18 11:46:37",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "登录",
-      "target": "index.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "2cb67a6a-fc8d-4ea1-bb63-45ce79508e20",
-      "at": "2026/6/18 11:46:21",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "countyCollaborationOrders/cco-001",
-      "result": "允许",
-      "detail": "验证医共体工单更新"
-    },
-    {
-      "id": "14c2bbac-13b9-4daf-966e-556ccb6d51d2",
-      "at": "2026/6/18 11:46:21",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "chronicScreeningTasks/cst-001",
-      "result": "允许",
-      "detail": "验证慢病筛查更新"
-    },
-    {
-      "id": "6baaeca2-bd4d-49df-831e-bad59815b4a5",
-      "at": "2026/6/18 11:46:21",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "登录",
-      "target": "index.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "e74c8f48-8e38-4430-bac6-7d755f1c5792",
-      "at": "2026/6/18 11:23:42",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "登录",
-      "target": "index.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "01a26e76-398d-41b2-aff0-3609b284aecb",
-      "at": "2026/6/18 11:22:18",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "登录",
-      "target": "index.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "3046d5d1-ceb9-4140-a27c-3152bf18effa",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "emergencySignals/es3",
-      "result": "允许",
-      "detail": "批量完成应急信号处置"
-    },
-    {
-      "id": "065d7e83-40f0-499a-bb7a-1e314ee5a529",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "emergencySignals/es2",
-      "result": "允许",
-      "detail": "批量完成应急信号处置"
-    },
-    {
-      "id": "8689390e-eb84-422a-939c-93a08aef6945",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "emergencySignals/es1",
-      "result": "允许",
-      "detail": "批量完成应急信号处置"
-    },
-    {
-      "id": "7ee27991-283d-465f-a173-4fd3f25b5931",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "digitalCredentials/dc4",
-      "result": "允许",
-      "detail": "批量完成凭证核验"
-    },
-    {
-      "id": "fe8b0472-17b8-442a-a993-3cd684ae9e1e",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "digitalCredentials/dc3",
-      "result": "允许",
-      "detail": "批量完成凭证核验"
-    },
-    {
-      "id": "21cbdaf8-02bc-4248-bb6e-9c0a2c30b846",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "digitalCredentials/dc2",
-      "result": "允许",
-      "detail": "批量完成凭证核验"
-    },
-    {
-      "id": "aa9571f4-5a73-4d82-8c2b-e2bab1f49ae9",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "digitalCredentials/dc1",
-      "result": "允许",
-      "detail": "批量完成凭证核验"
-    },
-    {
-      "id": "79689f6d-1a34-4dd8-a089-dc7354fc9329",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "multiPracticeApplications/mp-001",
-      "result": "允许",
-      "detail": "批量完成多点执业备案"
-    },
-    {
-      "id": "4ef7e58d-78eb-4baa-b38d-f95b5419325e",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "birthCertificates/birth-cert-003",
-      "result": "允许",
-      "detail": "批量完成出生证明上报入册"
-    },
-    {
-      "id": "83023830-e384-4d58-9314-cd2345359dfb",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "birthCertificates/birth-cert-002",
-      "result": "允许",
-      "detail": "批量完成出生证明上报入册"
-    },
-    {
-      "id": "b492a5a5-50ff-4d35-8785-10fddbe50913",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "birthCertificates/birth-cert-001",
-      "result": "允许",
-      "detail": "批量完成出生证明上报入册"
-    },
-    {
-      "id": "2ff5edc5-e75b-46ed-96ec-d1c722c069ad",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "deathCertificates/death-cert-003",
-      "result": "允许",
-      "detail": "批量完成死亡证明上报共享"
-    },
-    {
-      "id": "07ac8013-64ed-4a40-bdb6-8591b175c342",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "deathCertificates/death-cert-002",
-      "result": "允许",
-      "detail": "批量完成死亡证明上报共享"
-    },
-    {
-      "id": "80d2ec69-eaa4-43d0-8caf-2559d669a5d5",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "deathCertificates/death-cert-001",
-      "result": "允许",
-      "detail": "批量完成死亡证明上报共享"
-    },
-    {
-      "id": "c90ed165-faea-4d4d-b94e-2a7665441b51",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "medicationPickups/mp4",
-      "result": "允许",
-      "detail": "批量完成固定取药"
-    },
-    {
-      "id": "8bdec51e-d809-44bd-b8c1-48315a6bb875",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "medicationPickups/mp3",
-      "result": "允许",
-      "detail": "批量完成固定取药"
-    },
-    {
-      "id": "3e150ec9-4bee-466d-a5ee-3d9fe48f164d",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "medicationPickups/mp2",
-      "result": "允许",
-      "detail": "批量完成固定取药"
-    },
-    {
-      "id": "39856325-d0a8-453b-881b-065acc49e11c",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "medicationPickups/mp1",
-      "result": "允许",
-      "detail": "批量完成固定取药"
-    },
-    {
-      "id": "42466ac5-791a-4567-9838-60cfceba2c23",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "insuranceClaims/ic3",
-      "result": "允许",
-      "detail": "批量完成医保审核"
-    },
-    {
-      "id": "a7a414c2-90b8-4215-94da-04ed5d4bfb6b",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "referrals/rf3",
-      "result": "允许",
-      "detail": "批量完成转诊闭环"
-    },
-    {
-      "id": "9282d353-7065-466d-9d24-11eaca1bcb83",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "referrals/rf2",
-      "result": "允许",
-      "detail": "批量完成转诊闭环"
-    },
-    {
-      "id": "c892a403-139c-4bc7-829d-602e51735181",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "referrals/rf1",
-      "result": "允许",
-      "detail": "批量完成转诊闭环"
-    },
-    {
-      "id": "0f80073c-5f24-4c48-9fde-bb42a160ceb1",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "followups/f3",
-      "result": "允许",
-      "detail": "批量完成随访"
-    },
-    {
-      "id": "1fd665e8-6cbb-48d5-b1e1-0ae66e33bc4b",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "followups/f2",
-      "result": "允许",
-      "detail": "批量完成随访"
-    },
-    {
-      "id": "6a6d613b-afef-4825-895e-9dc73c2dec3b",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "followups/f1",
-      "result": "允许",
-      "detail": "批量完成随访"
-    },
-    {
-      "id": "f2041826-cb82-450c-b19b-fca3fff80e13",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "careOrders/co3",
-      "result": "允许",
-      "detail": "批量结案协同任务"
-    },
-    {
-      "id": "688bade1-1c8a-4793-b454-0b39cd9c7e94",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "careOrders/co2",
-      "result": "允许",
-      "detail": "批量结案协同任务"
-    },
-    {
-      "id": "3481fe56-15ec-4bb9-89e7-2bd91c64c857",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "更新业务闭环",
-      "target": "careOrders/co1",
-      "result": "允许",
-      "detail": "批量结案协同任务"
-    },
-    {
-      "id": "4075c638-2193-44b6-a8d9-2150e48944fb",
-      "at": "2026/6/18 10:57:03",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "登录",
-      "target": "index.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "be525832-9db7-4160-84cc-aaa3ad83a2b0",
-      "at": "2026/6/18 10:56:06",
-      "actor": "医保审核员",
-      "role": "insurance",
-      "action": "更新业务闭环",
-      "target": "insuranceClaims/ic1",
-      "result": "允许",
-      "detail": "接口验证：医保审核通过"
-    },
-    {
-      "id": "67d577cb-9c6e-4456-b6be-4c8c9df5891e",
-      "at": "2026/6/18 10:56:06",
-      "actor": "医保审核员",
-      "role": "insurance",
-      "action": "登录",
-      "target": "insurance.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "2a2191c7-664c-4fd3-a769-b3f3f50ecc34",
-      "at": "2026/6/18 10:55:16",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "登录",
-      "target": "index.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "332584ac-9bf2-4471-a628-3dfa63de181f",
-      "at": "2026/6/18 10:53:35",
-      "actor": "医保局管理员",
-      "role": "insurance",
-      "action": "登录",
-      "target": "insurance.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "11db00ce-03ae-4553-be60-e763434ef051",
-      "at": "2026/6/17 16:22:42",
-      "actor": "王医生",
-      "role": "institution",
-      "action": "登录",
-      "target": "institution.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "9713b0fd-90f1-4175-97d4-55872078c0e6",
-      "at": "2026/6/17 16:21:11",
-      "actor": "刘医生",
-      "role": "institution",
-      "action": "登录",
-      "target": "institution.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "15bb1004-f94c-4678-9606-66bf3586c4d1",
-      "at": "2026/6/17 16:06:49",
-      "actor": "卫健行政管理员",
-      "role": "commission",
-      "action": "登录",
-      "target": "index.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "b5ad5360-d707-4977-96c3-c0f6e76c3ce4",
-      "at": "2026/6/17 16:06:49",
-      "actor": "医疗机构管理员",
-      "role": "institution",
-      "action": "访问接口",
-      "target": "/api/health-statistics/import-jobs",
-      "result": "拒绝",
-      "detail": "需要角色：commission"
-    },
-    {
-      "id": "fc5f6faf-e51f-4447-afcb-36f93491facf",
-      "at": "2026/6/17 16:06:49",
-      "actor": "医疗机构管理员",
-      "role": "institution",
-      "action": "登录",
-      "target": "institution.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "708e6d54-a927-4256-b5de-eacb2db31d7f",
-      "at": "2026/6/17 16:06:49",
-      "actor": "医保审核员",
-      "role": "insurance",
-      "action": "访问接口",
-      "target": "/api/birth-certificates",
-      "result": "拒绝",
-      "detail": "需要角色：institution、commission"
-    },
-    {
-      "id": "1e6b9c64-7731-4c85-9987-232489770cf1",
-      "at": "2026/6/17 16:06:49",
-      "actor": "医保审核员",
-      "role": "insurance",
-      "action": "登录",
-      "target": "insurance.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "37eb6b20-9651-40c6-b1a5-a5b5aa39df1b",
-      "at": "2026/6/17 16:06:49",
-      "actor": "演示居民A",
-      "role": "citizen",
-      "action": "访问接口",
-      "target": "/api/health-statistics/import-jobs",
-      "result": "拒绝",
-      "detail": "需要角色：commission"
-    },
-    {
-      "id": "7eef1f1e-55ea-48fe-9ae5-e7421ffd313e",
-      "at": "2026/6/17 16:06:49",
-      "actor": "演示居民A",
-      "role": "citizen",
-      "action": "登录",
-      "target": "citizen.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "cd0e372d-e2f2-4281-8880-649bb6017f83",
-      "at": "2026/6/17 16:06:49",
-      "actor": "anonymous",
-      "role": "anonymous",
-      "action": "访问接口",
-      "target": "/api/state",
-      "result": "拒绝",
-      "detail": "未登录或会话已过期"
-    },
-    {
-      "id": "2e2dbbe9-97ef-42cd-9555-e4f1c48494d5",
-      "at": "2026/6/17 16:06:16",
-      "actor": "演示居民A",
-      "role": "citizen",
-      "action": "登录",
-      "target": "citizen.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "2e4a4721-bef2-4e81-a60a-88df98710d27",
-      "at": "2026/6/17 16:05:54",
-      "actor": "anonymous",
-      "role": "anonymous",
-      "action": "访问接口",
-      "target": "/api/state",
-      "result": "拒绝",
-      "detail": "未登录或会话已过期"
-    },
-    {
-      "id": "a505939a-fcd9-4b9f-9415-9e1d288408e5",
-      "at": "2026/6/17 16:05:54",
-      "actor": "卫健行政管理员",
-      "role": "commission",
-      "action": "登录",
-      "target": "index.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "0251fc69-b7e0-4d16-a30a-1ac50b62ac2f",
-      "at": "2026/6/17 16:05:54",
-      "actor": "anonymous",
-      "role": "anonymous",
-      "action": "访问接口",
-      "target": "/api/health-statistics/import-jobs",
-      "result": "拒绝",
-      "detail": "未登录或会话已过期"
-    },
-    {
-      "id": "59373069-bcb2-4748-9659-4cfe3d48ea7e",
-      "at": "2026/6/17 16:05:54",
-      "actor": "医疗机构管理员",
-      "role": "institution",
-      "action": "登录",
-      "target": "institution.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "cc080924-b64a-443e-b7eb-ac14a229894b",
-      "at": "2026/6/17 16:05:54",
-      "actor": "anonymous",
-      "role": "anonymous",
-      "action": "访问接口",
-      "target": "/api/birth-certificates",
-      "result": "拒绝",
-      "detail": "未登录或会话已过期"
-    },
-    {
-      "id": "63df1d57-7698-4587-ad18-b5e8e1af13b1",
-      "at": "2026/6/17 16:05:54",
-      "actor": "医保审核员",
-      "role": "insurance",
-      "action": "登录",
-      "target": "insurance.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "e36bbf78-b6c3-4971-a627-e44a866200ed",
-      "at": "2026/6/17 16:05:54",
-      "actor": "anonymous",
-      "role": "anonymous",
-      "action": "访问接口",
-      "target": "/api/health-statistics/import-jobs",
-      "result": "拒绝",
-      "detail": "未登录或会话已过期"
-    },
-    {
-      "id": "f1f4ae9c-b3c4-462e-87bc-f32189c91da5",
-      "at": "2026/6/17 16:05:54",
-      "actor": "anonymous",
-      "role": "anonymous",
-      "action": "访问接口",
-      "target": "/api/state",
-      "result": "拒绝",
-      "detail": "未登录或会话已过期"
-    },
-    {
-      "id": "4a23b3be-f7e8-4b7b-90e1-e16fdda7d85f",
-      "at": "2026/6/17 16:05:54",
-      "actor": "演示居民A",
-      "role": "citizen",
-      "action": "登录",
-      "target": "citizen.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "33b674f3-a2fa-434d-a033-9ff12509bc69",
-      "at": "2026/6/17 16:05:54",
-      "actor": "anonymous",
-      "role": "anonymous",
-      "action": "访问接口",
-      "target": "/api/state",
-      "result": "拒绝",
-      "detail": "未登录或会话已过期"
-    },
-    {
-      "id": "7e273daa-a014-4a0e-8ed8-7f415625a3b1",
-      "at": "2026/6/17 15:20:42",
-      "actor": "卫健行政管理员",
-      "role": "commission",
-      "action": "登录",
-      "target": "index.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "d65f372f-d36d-45d5-8337-ac16fc0d3ed4",
-      "at": "2026/6/17 15:20:42",
-      "actor": "医保审核员",
-      "role": "insurance",
-      "action": "访问接口",
-      "target": "/api/birth-certificates",
-      "result": "拒绝",
-      "detail": "需要角色：institution、commission"
-    },
-    {
-      "id": "f0428141-ec8a-4852-bb96-c2d5db72c5b5",
-      "at": "2026/6/17 15:20:42",
-      "actor": "医保审核员",
-      "role": "insurance",
-      "action": "登录",
-      "target": "insurance.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "63417477-3d0c-4720-b4ec-6e0bb1fc15cd",
-      "at": "2026/6/17 15:20:42",
-      "actor": "医疗机构管理员",
-      "role": "institution",
-      "action": "访问接口",
-      "target": "/api/health-statistics/import-jobs",
-      "result": "拒绝",
-      "detail": "需要角色：commission"
-    },
-    {
-      "id": "2aaeb025-4732-46ef-a884-665578fd4c11",
-      "at": "2026/6/17 15:20:42",
-      "actor": "医疗机构管理员",
-      "role": "institution",
-      "action": "登录",
-      "target": "institution.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "397fd8d6-3c92-485a-b804-a99b64a8fc11",
-      "at": "2026/6/17 15:20:42",
-      "actor": "演示居民A",
-      "role": "citizen",
-      "action": "登录",
-      "target": "citizen.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "943f74ed-e05b-4bc2-bacf-12f7408834c3",
-      "at": "2026/6/17 15:20:42",
-      "actor": "anonymous",
-      "role": "anonymous",
-      "action": "访问接口",
-      "target": "/api/state",
-      "result": "拒绝",
-      "detail": "未登录或会话已过期"
-    },
-    {
-      "id": "87c6a3a9-a942-407e-b194-71da07537998",
-      "at": "2026/6/17 13:32:58",
-      "actor": "演示居民A",
-      "role": "citizen",
-      "action": "登录",
-      "target": "citizen.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "22c3c739-6707-4630-ad98-fcb6dfbf308c",
-      "at": "2026/6/17 13:32:58",
-      "actor": "医疗机构管理员",
-      "role": "institution",
-      "action": "登录",
-      "target": "institution.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "8040ae9a-d017-4dbe-b078-0f503a473885",
-      "at": "2026/6/17 13:32:33",
-      "actor": "resident1",
-      "role": "unknown",
-      "action": "登录",
-      "target": "统一认证",
-      "result": "拒绝",
-      "detail": "账号或密码错误"
-    },
-    {
-      "id": "06201879-5ccb-4323-a54a-03ff8c5b6463",
-      "at": "2026/6/17 13:32:33",
-      "actor": "医疗机构管理员",
-      "role": "institution",
-      "action": "登录",
-      "target": "institution.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "7ff882aa-5080-498d-a8b5-b9769cbe46a3",
-      "at": "2026/6/17 10:30:13",
-      "actor": "医疗机构管理员",
-      "role": "institution",
-      "action": "登录",
-      "target": "institution.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "727d9c5c-9756-4cc6-b403-e0c03658e147",
-      "at": "2026/6/17 09:44:09",
-      "actor": "医保审核员",
-      "role": "insurance",
-      "action": "登录",
-      "target": "insurance.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "e3f319a8-da5f-4a60-b8ce-b4473c0c6d4a",
-      "at": "2026/6/17 09:44:09",
-      "actor": "刘医生",
-      "role": "institution",
-      "action": "登录",
-      "target": "institution.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "5604b6c9-c910-4b28-b95e-c1ad5b8366f6",
-      "at": "2026/6/17 09:44:09",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "登录",
-      "target": "index.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "1826340f-73cc-4bc9-bf30-581883f9117b",
-      "at": "2026/6/17 09:44:09",
-      "actor": "基层机构管理员",
-      "role": "institution",
-      "action": "登录",
-      "target": "institution.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "ad13038c-2a1f-4dee-b572-83bc8cfabe29",
-      "at": "2026/6/17 09:44:09",
-      "actor": "医疗机构管理员",
-      "role": "institution",
-      "action": "登录",
-      "target": "institution.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "21345e21-d4ce-40f2-8e93-48ea347fa701",
-      "at": "2026/6/17 09:44:09",
-      "actor": "医保局管理员",
-      "role": "insurance",
-      "action": "登录",
-      "target": "insurance.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "249e3c10-7a93-4429-93de-189440b1502b",
-      "at": "2026/6/17 09:44:09",
-      "actor": "卫健行政管理员",
-      "role": "commission",
-      "action": "登录",
-      "target": "index.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "b2b4c4a6-3bfc-4f70-b068-be9cdbc9082b",
-      "at": "2026/6/17 09:44:09",
-      "actor": "区市县管理员",
-      "role": "commission",
-      "action": "登录",
-      "target": "workbench.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "dc235c13-8418-4d8d-9e4e-bbdc0a3be7be",
-      "at": "2026/6/17 09:44:09",
+      "id": "dd7251ad-f953-4a72-a729-bcaae0c7558a",
+      "at": "2026/6/19 20:55:14",
       "actor": "市级管理员",
       "role": "commission",
       "action": "登录",
@@ -3373,9 +2790,9 @@
       "detail": "后端会话已签发"
     },
     {
-      "id": "b8799abe-7ec0-4d64-95c8-9b658b7efcb8",
-      "at": "2026/6/17 09:43:25",
-      "actor": "医保审核员",
+      "id": "1ba02545-1352-405d-b9db-67b6f95aa885",
+      "at": "2026/6/19 20:54:55",
+      "actor": "区市县医保局管理员",
       "role": "insurance",
       "action": "登录",
       "target": "insurance.html",
@@ -3383,99 +2800,9 @@
       "detail": "后端会话已签发"
     },
     {
-      "id": "bfc622e5-0f4b-429b-b6e4-5f198e534bd2",
-      "at": "2026/6/17 09:43:25",
-      "actor": "刘医生",
-      "role": "institution",
-      "action": "登录",
-      "target": "institution.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "aa602b96-cebf-4a4c-982a-0af87d192956",
-      "at": "2026/6/17 09:43:25",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "登录",
-      "target": "index.html",
-      "result": "允许",
-      "detail": "后端会话已签发"
-    },
-    {
-      "id": "73d030a7-8c28-44ea-9315-aabe147a5b53",
-      "at": "2026/6/17 09:43:25",
-      "actor": "community",
-      "role": "unknown",
-      "action": "登录",
-      "target": "统一认证",
-      "result": "拒绝",
-      "detail": "账号或密码错误"
-    },
-    {
-      "id": "abd5de60-1806-4cbc-86bf-304c334e2cc1",
-      "at": "2026/6/17 09:43:25",
-      "actor": "hospital",
-      "role": "unknown",
-      "action": "登录",
-      "target": "统一认证",
-      "result": "拒绝",
-      "detail": "账号或密码错误"
-    },
-    {
-      "id": "97d8cb41-15a6-4957-a937-c88d142a2a11",
-      "at": "2026/6/17 09:43:25",
-      "actor": "mi",
-      "role": "unknown",
-      "action": "登录",
-      "target": "统一认证",
-      "result": "拒绝",
-      "detail": "账号或密码错误"
-    },
-    {
-      "id": "429072d0-b645-4bd1-b969-3d98f81f310b",
-      "at": "2026/6/17 09:43:24",
-      "actor": "health",
-      "role": "unknown",
-      "action": "登录",
-      "target": "统一认证",
-      "result": "拒绝",
-      "detail": "账号或密码错误"
-    },
-    {
-      "id": "075c2bd2-7f1b-4258-85d5-473845641f98",
-      "at": "2026/6/17 09:43:24",
-      "actor": "district",
-      "role": "unknown",
-      "action": "登录",
-      "target": "统一认证",
-      "result": "拒绝",
-      "detail": "账号或密码错误"
-    },
-    {
-      "id": "1598f4f6-750d-432e-b6ba-78a6ba2add6a",
-      "at": "2026/6/17 09:43:24",
-      "actor": "city",
-      "role": "unknown",
-      "action": "登录",
-      "target": "统一认证",
-      "result": "拒绝",
-      "detail": "账号或密码错误"
-    },
-    {
-      "id": "f24e78df-ce2b-4e59-bfba-3d83ad874ba3",
-      "at": "2026/6/17 09:30:52",
-      "actor": "医保审核员",
-      "role": "insurance",
-      "action": "更新业务闭环",
-      "target": "medicationPickups/mp4",
-      "result": "允许",
-      "detail": "医保审核通过，流转社区药房取药。"
-    },
-    {
-      "id": "5b9ae500-fdad-4ce4-9ed8-fc59f8acf587",
-      "at": "2026/6/17 09:30:52",
-      "actor": "医保审核员",
+      "id": "fee2c95b-aebe-4ba8-90b7-9701b762a783",
+      "at": "2026/6/19 20:54:55",
+      "actor": "大连市医保中心审核员",
       "role": "insurance",
       "action": "登录",
       "target": "insurance.html",
@@ -3483,44 +2810,84 @@
       "detail": "后端会话已签发"
     },
     {
-      "id": "e8f6b37f-6aff-4103-9214-b1654ef92418",
-      "at": "2026/6/17 09:30:04",
-      "actor": "刘医生",
-      "role": "institution",
-      "action": "更新业务闭环",
-      "target": "medicationPickups/mp4",
-      "result": "允许",
-      "detail": "机构已确认固定取药申请，流转医保审核。"
-    },
-    {
-      "id": "f2e248f2-a1a5-4c61-9493-6004e52aad79",
-      "at": "2026/6/17 09:30:04",
-      "actor": "刘医生",
-      "role": "institution",
+      "id": "41a7be06-3f65-4abf-bcbb-a9f60ed9cee1",
+      "at": "2026/6/19 20:54:55",
+      "actor": "大连市医保局管理员",
+      "role": "insurance",
       "action": "登录",
-      "target": "institution.html",
+      "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发"
     },
     {
-      "id": "483a5dff-b63d-45cd-8811-2209e57fdd62",
-      "at": "2026/6/16 20:00:23",
-      "actor": "卫健委管理员",
-      "role": "commission",
-      "action": "登记统计导入任务",
-      "target": "dalianHealthStatistics2025",
-      "result": "允许",
-      "detail": "正式年报汇编导入 · 2025 年报 · 2025 年大连市卫生健康统计年报汇编正式版更新"
-    },
-    {
-      "id": "bc82b7e7-dde8-478f-b0f0-bfe11dc2e06f",
-      "at": "2026/6/16 20:00:23",
-      "actor": "卫健委管理员",
+      "id": "890cd595-61c3-4f9c-b6e3-b49a105b86c2",
+      "at": "2026/6/19 20:54:55",
+      "actor": "大连市卫生健康委管理员",
       "role": "commission",
       "action": "登录",
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发"
+    },
+    {
+      "id": "78371aba-2921-472b-8ff2-1a6bf702c2b3",
+      "at": "2026/6/19 20:54:55",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "9e798d89-8bcb-4ff3-ad08-dff7bf2d2c05",
+      "at": "2026/6/19 20:38:35",
+      "actor": "[编码损坏，待核验]A",
+      "role": "citizen",
+      "action": "登录",
+      "target": "citizen.html",
+      "result": "允许",
+      "detail": "后端会话已签发"
+    },
+    {
+      "id": "332941e5-4685-4b80-91cf-fffab5bc49f0",
+      "at": "2026/6/19 20:38:35",
+      "actor": "市级管理员",
+      "role": "commission",
+      "action": "更新数据",
+      "target": "/api/state",
+      "result": "允许",
+      "detail": "全量保存平台数据"
+    },
+    {
+      "id": "8b7567e0-071b-4bd2-aa20-3f8c9a3f33ee",
+      "at": "2026/6/19 20:38:35",
+      "actor": "[编码损坏，待核验]",
+      "role": "commission",
+      "action": "[编码损坏，待核验]",
+      "target": "workbench.html",
+      "result": "[编码损坏，待核验]",
+      "detail": "[编码损坏，待核验]"
+    },
+    {
+      "id": "0dd0de07-fbc0-451b-9b31-9c78a9afc022",
+      "at": "2026/6/19 20:25:19",
+      "actor": "[编码损坏，待核验]A",
+      "role": "citizen",
+      "action": "[编码损坏，待核验]",
+      "target": "citizen.html",
+      "result": "[编码损坏，待核验]",
+      "detail": "[编码损坏，待核验]"
+    },
+    {
+      "id": "b6aab847-e7dd-45f0-8e05-6606c035f289",
+      "at": "2026/6/19 20:25:19",
+      "actor": "[编码损坏，待核验]",
+      "role": "commission",
+      "action": "[编码损坏，待核验]",
+      "target": "/api/reset",
+      "result": "[编码损坏，待核验]",
+      "detail": "[编码损坏，待核验]"
     },
     {
       "id": "se1",
@@ -3535,12 +2902,12 @@
     {
       "id": "se2",
       "at": "2026-06-15 10:20",
-      "actor": "医保审核员",
+      "actor": "大连市医保中心审核员",
       "role": "insurance",
       "action": "访问接口",
       "target": "/api/state",
       "result": "允许",
-      "detail": "读取结算审核与机构监管数据"
+      "detail": "读取结算经办与机构监管数据"
     },
     {
       "id": "se3",
@@ -3560,11 +2927,10 @@
       "type": "电子健康码",
       "provider": "区域全民健康信息平台",
       "credentialNo": "HC-210204-3219",
-      "status": "已核验",
-      "lastVerified": "2026-06-18",
+      "status": "已绑定",
+      "lastVerified": "2026-06-15",
       "usage": "就医身份识别、健康档案调阅",
-      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
-      "lastUpdated": "2026-06-18T02:57:03.699Z"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "dc2",
@@ -3572,11 +2938,10 @@
       "type": "医保电子凭证",
       "provider": "医保信息平台",
       "credentialNo": "MI-DEMO-MOBILE-R1",
-      "status": "已核验",
-      "lastVerified": "2026-06-18",
+      "status": "已激活",
+      "lastVerified": "2026-06-15",
       "usage": "门诊慢特病结算、固定取药审核",
-      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
-      "lastUpdated": "2026-06-18T02:57:03.717Z"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "dc3",
@@ -3584,11 +2949,10 @@
       "type": "医保电子凭证",
       "provider": "医保信息平台",
       "credentialNo": "MI-DEMO-MOBILE-R2",
-      "status": "已核验",
-      "lastVerified": "2026-06-18",
+      "status": "待核验",
+      "lastVerified": "2026-06-12",
       "usage": "门诊统筹结算",
-      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2",
-      "lastUpdated": "2026-06-18T02:57:03.737Z"
+      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
       "id": "dc4",
@@ -3596,11 +2960,10 @@
       "type": "居民一卡通",
       "provider": "城市服务平台",
       "credentialNo": "CC-210213-3521",
-      "status": "已核验",
-      "lastVerified": "2026-06-18",
+      "status": "家属代办",
+      "lastVerified": "2026-06-10",
       "usage": "线下帮办、家属代取药",
-      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4",
-      "lastUpdated": "2026-06-18T02:57:03.756Z"
+      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     }
   ],
   "healthArchiveStandard": {
@@ -3609,17 +2972,17 @@
       {
         "key": "lifeStage",
         "title": "生命阶段",
-        "detail": "按婴儿、儿童、青少年、成年、中年、老年等阶段组织全生命周期档案。"
+        "detail": "按生命阶段组织居民全生命周期档案。"
       },
       {
         "key": "healthProblem",
         "title": "健康和疾病问题",
-        "detail": "围绕慢病、风险因素、过敏史、健康指标和重大疾病问题持续更新。"
+        "detail": "围绕风险因素、慢病、重大疾病和健康问题持续更新。"
       },
       {
         "key": "serviceActivity",
         "title": "卫生服务活动",
-        "detail": "归集预防、医疗、保健、康复、健康教育和随访干预记录。"
+        "detail": "归集预防、医疗、保健、康复、健康教育和随访干预。"
       }
     ],
     "contentGroups": [
@@ -3930,11 +3293,12 @@
       "orgLevel": "市级",
       "parentCode": "ORG-CITY-DL",
       "portal": "insurance.html",
-      "dataScope": "医保结算、基金监管、慢病待遇和电子凭证",
+      "dataScope": "医保政策、基金监管、待遇管理、跨区县监督和部门协同",
       "interfaces": [
-        "医保结算",
-        "医保电子凭证",
-        "基金监管"
+        "医保政策管理",
+        "基金监管",
+        "待遇管理",
+        "跨区县监督"
       ]
     },
     {
@@ -3965,6 +3329,35 @@
         "基层医疗",
         "公卫",
         "家医签约"
+      ]
+    },
+    {
+      "orgCode": "ORG-MI-CENTER-DL",
+      "name": "大连市医保中心",
+      "orgType": "insurance_center",
+      "orgLevel": "市级",
+      "parentCode": "ORG-MI-DL",
+      "portal": "insurance.html",
+      "dataScope": "医保结算经办、凭证核验、固定取药审核和业务留痕",
+      "interfaces": [
+        "医保结算经办",
+        "医保电子凭证",
+        "慢病待遇经办",
+        "固定取药审核"
+      ]
+    },
+    {
+      "orgCode": "ORG-MI-DIST-ZS",
+      "name": "中山区医保局",
+      "orgType": "district_insurance_bureau",
+      "orgLevel": "区市县",
+      "parentCode": "ORG-MI-DL",
+      "portal": "insurance.html",
+      "dataScope": "本区医保基金监管、机构监管、慢病待遇协同和基层服务监督",
+      "interfaces": [
+        "区县医保监管",
+        "机构监管",
+        "基层待遇协同"
       ]
     }
   ],
@@ -4000,28 +3393,28 @@
     {
       "id": "u-health",
       "username": "health",
-      "name": "卫健行政管理员",
+      "name": "大连市卫生健康委管理员",
       "role": "commission",
-      "roleName": "卫生健康行政部门",
+      "roleName": "大连市卫生健康委",
       "orgCode": "ORG-HEALTH-DL",
       "orgName": "大连市卫生健康委",
       "orgType": "health_admin",
       "orgLevel": "市级",
-      "dataScope": "卫生健康行政管理",
+      "dataScope": "医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管",
       "home": "index.html",
       "status": "启用"
     },
     {
       "id": "u-mi",
       "username": "mi",
-      "name": "医保局管理员",
+      "name": "大连市医保局管理员",
       "role": "insurance",
-      "roleName": "医保局管理端",
+      "roleName": "大连市医保局管理端",
       "orgCode": "ORG-MI-DL",
       "orgName": "大连市医保局",
       "orgType": "insurance_bureau",
       "orgLevel": "市级",
-      "dataScope": "医保结算与基金监管",
+      "dataScope": "医保政策、基金监管、待遇管理和跨区县监督",
       "home": "insurance.html",
       "status": "启用"
     },
@@ -4056,14 +3449,14 @@
     {
       "id": "u1",
       "username": "whjw",
-      "name": "卫健委管理员",
+      "name": "大连市卫生健康委管理员",
       "role": "commission",
-      "roleName": "卫生健康委端",
+      "roleName": "大连市卫生健康委",
       "orgCode": "ORG-HEALTH-DL",
       "orgName": "大连市卫生健康委",
       "orgType": "health_admin",
       "orgLevel": "市级",
-      "dataScope": "全市",
+      "dataScope": "医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管",
       "home": "index.html",
       "status": "启用"
     },
@@ -4072,12 +3465,12 @@
       "username": "doctor",
       "name": "刘医生",
       "role": "institution",
-      "roleName": "医疗机构端",
+      "roleName": "医生账户",
       "orgCode": "MR3",
       "orgName": "青泥洼桥社区卫生服务中心",
       "orgType": "medical_institution",
       "orgLevel": "基层医疗机构",
-      "dataScope": "签约居民",
+      "dataScope": "签约居民、随访、长期处方、多点执业申请",
       "home": "institution.html",
       "doctorId": "doc-liu",
       "accountType": "doctor",
@@ -4102,14 +3495,14 @@
     {
       "id": "u3",
       "username": "insurance",
-      "name": "医保审核员",
+      "name": "大连市医保中心审核员",
       "role": "insurance",
-      "roleName": "医保端",
-      "orgCode": "ORG-MI-DL",
-      "orgName": "大连市医保局",
-      "orgType": "insurance_bureau",
+      "roleName": "大连市医保中心经办端",
+      "orgCode": "ORG-MI-CENTER-DL",
+      "orgName": "大连市医保中心",
+      "orgType": "insurance_center",
       "orgLevel": "市级",
-      "dataScope": "医保审核",
+      "dataScope": "医保结算经办、凭证核验、固定取药审核和经办留痕",
       "home": "insurance.html",
       "status": "启用"
     },
@@ -4142,6 +3535,20 @@
       "dataScope": "医共体成员机构",
       "home": "county.html",
       "status": "启用"
+    },
+    {
+      "id": "u-mi-district",
+      "username": "district_mi",
+      "name": "区市县医保局管理员",
+      "role": "insurance",
+      "roleName": "区市县医保局管理端",
+      "orgCode": "ORG-MI-DIST-ZS",
+      "orgName": "中山区医保局",
+      "orgType": "district_insurance_bureau",
+      "orgLevel": "区市县",
+      "dataScope": "本区医保基金监管、机构监管和慢病待遇协同",
+      "home": "insurance.html",
+      "status": "启用"
     }
   ],
   "interfaceRequirements": [
@@ -4158,8 +3565,8 @@
       "id": "ir-org",
       "domain": "组织机构目录",
       "keepExisting": "保留 authUsers、authOrganizations、medicalResources 的 orgCode/institutionId 映射",
-      "need": "接入市、区市县、卫健行政部门、医保局、医疗机构统一社会信用代码和机构编码",
-      "owner": "卫健行政部门",
+      "need": "接入市、区市县、大连市卫生健康委、医保局、医保中心、区市县医保局、医疗机构统一社会信用代码和机构编码",
+      "owner": "大连市卫生健康委",
       "priority": "P0",
       "status": "已建模"
     },
@@ -4186,7 +3593,7 @@
       "domain": "医生账户与多点执业",
       "keepExisting": "保留 doctorProfiles、multiPracticeApplications、/api/doctors/me 和 /api/multi-practice-applications",
       "need": "对接医师电子化注册、定期考核、职称、人事合同、劳务协议、医疗责任保险和多点执业信息公开",
-      "owner": "医疗机构/卫生健康行政部门",
+      "owner": "医疗机构/大连市卫生健康委",
       "priority": "P1",
       "status": "已建模"
     },
@@ -4195,7 +3602,7 @@
       "domain": "死亡医学证明与死亡统计",
       "keepExisting": "保留 deathCertificates、deathCertificateForms、deathStatistics 和 /api/death-certificates",
       "need": "对接人口死亡信息登记系统、电子证照平台、疾控死因监测、公安户籍注销和民政殡葬服务共享",
-      "owner": "医疗机构/卫生健康行政部门",
+      "owner": "医疗机构/大连市卫生健康委",
       "priority": "P1",
       "status": "已建模"
     },
@@ -4204,7 +3611,7 @@
       "domain": "卫生健康统计",
       "keepExisting": "保留 healthStatistics、dalianHealthStatistics2025、healthStatisticsIngestion 和 /api/health-statistics/import-jobs",
       "need": "本地报表导入、统计看板和质控任务已完成；国家直报系统接口为现场配置项",
-      "owner": "卫生健康行政部门",
+      "owner": "大连市卫生健康委",
       "priority": "P1",
       "status": "演示对接完成"
     },
@@ -4213,7 +3620,7 @@
       "domain": "医保结算监管",
       "keepExisting": "保留 insuranceClaims、institutionSupervisions、medicationPickups 和 /api/workflow-actions",
       "need": "本地医保审核、凭证核验和固定取药审核已完成；医保核心结算接口为现场配置项",
-      "owner": "医保局",
+      "owner": "医保局/医保中心/区市县医保局",
       "priority": "P1",
       "status": "演示对接完成"
     },
@@ -4403,8 +3810,8 @@
       },
       {
         "code": "5",
-        "name": "综合运营管理",
-        "detail": "人力、财务、物资、药品耗材、绩效统一管理。"
+        "name": "医疗管理协同",
+        "detail": "远程医学教育、居民健康数字身份、检查检验互认、合理用药审核、临床诊疗辅助。"
       }
     ],
     "coverage": [
@@ -4532,28 +3939,17 @@
       {
         "name": "县域医共体总医院",
         "level": "牵头医院",
-        "role": "统一医技中心、远程会诊、质控、绩效和运营管理",
+        "role": "医技共享、远程会诊、质控、绩效和运营管理",
         "systems": [
           "HIS",
           "EMR",
-          "医技共享",
           "运营监管"
-        ]
-      },
-      {
-        "name": "县中医医院",
-        "level": "专科牵头",
-        "role": "中医智能辅诊、中药共享药房、中医适宜技术推广",
-        "systems": [
-          "中医知识库",
-          "中药房",
-          "远程中医"
         ]
       },
       {
         "name": "乡镇卫生院",
         "level": "成员单位",
-        "role": "基层首诊、签约服务、慢病随访、样本采集和转诊申请",
+        "role": "基层首诊、签约服务、慢病随访、转诊申请",
         "systems": [
           "基层医疗",
           "公卫",
@@ -4563,7 +3959,7 @@
       {
         "name": "村卫生室",
         "level": "网底机构",
-        "role": "健康监测、随访提醒、取药登记、检查申请和居民服务触点",
+        "role": "健康监测、取药登记、随访提醒",
         "systems": [
           "移动随访",
           "电子健康卡"
@@ -4572,7 +3968,7 @@
       {
         "name": "疾控/妇幼/急救中心",
         "level": "公共卫生",
-        "role": "疾控协同、妇幼保健、疫苗接种、应急指挥和院前急救",
+        "role": "疾控、妇幼、疫苗、应急和院前急救",
         "systems": [
           "疾控",
           "妇幼",
@@ -4585,14 +3981,14 @@
         "no": 1,
         "domain": "区域医疗服务协同",
         "name": "医学影像诊断资源共享中心",
-        "summary": "基层检查、上级诊断、影像报告回传与互认。",
-        "owner": "总医院影像中心",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "申请管理",
-          "影像质控",
-          "报告发布",
-          "危急值"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
@@ -4600,14 +3996,14 @@
         "no": 2,
         "domain": "区域医疗服务协同",
         "name": "心电诊断资源共享中心",
-        "summary": "基层采集心电波形，县级中心诊断并回传报告。",
-        "owner": "总医院心电中心",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "心电采集",
-          "任务分配",
-          "移动诊断",
-          "危急值"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
@@ -4615,14 +4011,14 @@
         "no": 3,
         "domain": "区域医疗服务协同",
         "name": "医学检验资源共享中心",
-        "summary": "基层采样、冷链转运、中心检测、报告实时查阅。",
-        "owner": "医学检验中心",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "检验申请",
-          "样本运输",
-          "结果审核",
-          "质控"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
@@ -4630,14 +4026,14 @@
         "no": 4,
         "domain": "区域医疗服务协同",
         "name": "病理诊断资源共享中心",
-        "summary": "县域机构申请病理诊断，牵头医院审核出具报告。",
-        "owner": "病理中心",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "标本核收",
-          "诊断分析",
-          "图文报告",
-          "权限管理"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
@@ -4645,14 +4041,14 @@
         "no": 5,
         "domain": "区域医疗服务协同",
         "name": "远程会诊资源共享中心",
-        "summary": "向上联通省市医院，向下连接基层机构，实现会诊全过程管理。",
-        "owner": "远程会诊中心",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "会诊申请",
-          "病历调阅",
-          "健康档案调阅",
-          "评估"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
@@ -4660,14 +4056,14 @@
         "no": 6,
         "domain": "区域医疗服务协同",
         "name": "消毒供应资源共享中心",
-        "summary": "复用器械清洗、消毒、灭菌、配送和全流程追溯。",
-        "owner": "消毒供应中心",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "物品申领",
-          "追溯",
-          "配送监管",
-          "成本核算"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
@@ -4675,14 +4071,14 @@
         "no": 7,
         "domain": "区域医疗服务协同",
         "name": "县域智慧医疗急救中心",
-        "summary": "院前院内急救信息共享，救护车定位和生命体征实时传输。",
-        "owner": "急救中心",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "急救病历",
-          "车辆定位",
-          "联合质控",
-          "指挥调度"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
@@ -4690,14 +4086,14 @@
         "no": 8,
         "domain": "便民惠民服务协同",
         "name": "电子健康卡应用",
-        "summary": "统一身份主索引，一码通用，跨机构统一认证。",
-        "owner": "数字健康中心",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "实名认证",
-          "授权",
-          "一码通",
-          "主索引"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
@@ -4705,14 +4101,14 @@
         "no": 9,
         "domain": "便民惠民服务协同",
         "name": "互联网+诊疗服务",
-        "summary": "咨询、复诊、续方、支付、报告查询、护理服务一体化。",
-        "owner": "互联网医院",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "在线咨询",
-          "复诊续方",
-          "在线支付",
-          "处方流转"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
@@ -4720,29 +4116,29 @@
         "no": 10,
         "domain": "便民惠民服务协同",
         "name": "互联网+慢病协同管理",
-        "summary": "为高血压、糖尿病、慢阻肺等人群提供线上线下一体化管理。",
-        "owner": "慢病中心",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "筛查",
-          "建档",
-          "评估",
-          "随访"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
       {
         "no": 11,
         "domain": "便民惠民服务协同",
-        "name": "互联网+家庭医生签约",
-        "summary": "线上签约、健康咨询、随访、转诊和履约评价。",
-        "owner": "基层机构",
+        "name": "互联网+家庭医生签约服务",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "协议管理",
-          "服务包",
-          "满意度",
-          "绩效"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
@@ -4750,14 +4146,14 @@
         "no": 12,
         "domain": "便民惠民服务协同",
         "name": "预约诊疗服务",
-        "summary": "挂号、检查、检验、体检、住院、转诊预约统一管理。",
-        "owner": "预约转诊中心",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "资源同步",
-          "转诊申请",
-          "接诊",
-          "结案"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
@@ -4765,14 +4161,14 @@
         "no": 13,
         "domain": "便民惠民服务协同",
         "name": "中医智能辅诊服务",
-        "summary": "智能辨证、体质辨识、中医处方推荐和知识库支持。",
-        "owner": "县中医医院",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "智能问诊",
-          "辅助诊疗",
-          "体质辨识",
-          "知识库"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
@@ -4780,14 +4176,14 @@
         "no": 14,
         "domain": "便民惠民服务协同",
         "name": "中药智能药学服务",
-        "summary": "共享中药房，中药库存、调剂、煎药、配送和追溯。",
-        "owner": "共享中药房",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "库存",
-          "调剂",
-          "煎药",
-          "配送"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
@@ -4795,13 +4191,13 @@
         "no": 15,
         "domain": "便民惠民服务协同",
         "name": "基层缺药登记服务",
-        "summary": "基层缺药登记、采购申请、配送到登记机构。",
-        "owner": "药物配供中心",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "药品登记",
-          "采购申请",
-          "使用管理",
+          "申请",
+          "协同",
+          "质控",
           "统计"
         ],
         "risk": "正常"
@@ -4810,13 +4206,13 @@
         "no": 16,
         "domain": "便民惠民服务协同",
         "name": "居民用药监测服务",
-        "summary": "形成居民用药地图、用药画像和供应风险评估。",
-        "owner": "药学中心",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "自动采集",
-          "用药提醒",
-          "供应评估",
+          "申请",
+          "协同",
+          "质控",
           "统计"
         ],
         "risk": "正常"
@@ -4825,13 +4221,13 @@
         "no": 17,
         "domain": "医疗管理服务协同",
         "name": "检验检查结果互认服务",
-        "summary": "医共体内检查检验结果互认、参保人查询、医保调阅。",
-        "owner": "医技质控中心",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "互认规则",
-          "不互认理由",
-          "互认监管",
+          "申请",
+          "协同",
+          "质控",
           "统计"
         ],
         "risk": "正常"
@@ -4839,15 +4235,15 @@
       {
         "no": 18,
         "domain": "医疗管理服务协同",
-        "name": "合理用药审核及药事管理",
-        "summary": "前置审方、药师审方、处方点评和用药跟踪。",
-        "owner": "审方中心",
+        "name": "合理用药审核及药事管理协同服务",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "智能审方",
-          "药师审方",
-          "处方点评",
-          "知识库"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
@@ -4855,14 +4251,14 @@
         "no": 19,
         "domain": "医疗管理服务协同",
         "name": "医保业务协同服务",
-        "summary": "医保结算、异地转诊、特殊病种和双通道申报协同。",
-        "owner": "医保管理中心",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "医保结算",
-          "转诊证明",
-          "特殊病种",
-          "监测"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
@@ -4870,13 +4266,13 @@
         "no": 20,
         "domain": "医疗管理服务协同",
         "name": "远程医学教育",
-        "summary": "在线直播、课程点播、疑难病案讨论和培训考核。",
-        "owner": "医教科研中心",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "课程",
-          "直播",
-          "考核",
+          "申请",
+          "协同",
+          "质控",
           "统计"
         ],
         "risk": "正常"
@@ -4885,14 +4281,14 @@
         "no": 21,
         "domain": "医疗管理服务协同",
         "name": "县域中医药适宜技术推广",
-        "summary": "技术库、师资库、培训交流、远程指导和考核评估。",
-        "owner": "中医药推广中心",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "教学",
-          "实训",
-          "技术库",
-          "考核"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
@@ -4900,14 +4296,14 @@
         "no": 22,
         "domain": "公共卫生服务协同",
         "name": "慢性病业务协同服务",
-        "summary": "防、筛、诊、治、管全流程慢病协同管理。",
-        "owner": "医防融合中心",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "筛查",
-          "分级分组",
-          "预警",
-          "转诊"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
@@ -4915,14 +4311,14 @@
         "no": 23,
         "domain": "公共卫生服务协同",
         "name": "老年健康业务协同服务",
-        "summary": "预防、筛查、诊治、护理、康复、安宁疗护一体管理。",
-        "owner": "老年健康中心",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "自理评估",
-          "体检",
-          "预警",
-          "指导"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
@@ -4930,13 +4326,13 @@
         "no": 24,
         "domain": "公共卫生服务协同",
         "name": "妇幼保健业务协同服务",
-        "summary": "妇女儿童全生命周期健康服务与数据共享。",
-        "owner": "妇幼保健机构",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "孕产保健",
-          "儿童保健",
-          "高危管理",
+          "申请",
+          "协同",
+          "质控",
           "统计"
         ],
         "risk": "正常"
@@ -4945,44 +4341,44 @@
         "no": 25,
         "domain": "公共卫生服务协同",
         "name": "疫苗接种业务协同服务",
-        "summary": "接种史、禁忌、异常反应和免疫规划信息共享。",
-        "owner": "疾控中心",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "接种查询",
-          "禁忌评估",
-          "异常反应",
-          "分析"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
       {
         "no": 26,
         "domain": "公共卫生服务协同",
-        "name": "突发公共卫生事件应急指挥",
-        "summary": "多渠道数据整合、智能预警、指挥调度和处置反馈。",
-        "owner": "应急指挥中心",
+        "name": "突发公共卫生事件应急处置指挥协同管理",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "监测",
-          "预警",
-          "调度",
-          "复盘"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
       {
         "no": 27,
         "domain": "公共卫生服务协同",
-        "name": "基层医疗与公卫业务协同",
-        "summary": "把预防融入临床诊治全过程，诊间建档、签约、随访。",
-        "owner": "基层机构",
+        "name": "基层医疗卫生机构和公共卫生业务协同服务",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "诊间建档",
-          "诊间随访",
-          "公卫提醒",
-          "协同"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
@@ -4990,13 +4386,13 @@
         "no": 28,
         "domain": "公共卫生服务协同",
         "name": "其他卫生业务协同服务",
-        "summary": "营养、环境、职业、放射、学校卫生等业务协同。",
-        "owner": "公共卫生机构",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "牵头医院",
         "status": "运行中",
         "functions": [
-          "数据共享",
-          "监测",
-          "填报",
+          "申请",
+          "协同",
+          "质控",
           "统计"
         ],
         "risk": "正常"
@@ -5004,15 +4400,15 @@
       {
         "no": 29,
         "domain": "基层医疗卫生综合管理",
-        "name": "综合决策统一可视化展示",
-        "summary": "医共体运营监管驾驶舱，医疗、医保、医药、公卫一图统览。",
+        "name": "综合决策管理统一可视化展示",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
         "owner": "医共体办公室",
         "status": "运行中",
         "functions": [
-          "驾驶舱",
-          "预警",
-          "资源配置",
-          "绩效"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
@@ -5020,14 +4416,14 @@
         "no": 30,
         "domain": "基层医疗卫生综合管理",
         "name": "人力资源统一协同管理",
-        "summary": "组织、人员、变动、合同、岗位、薪酬和排班统筹。",
-        "owner": "人力资源中心",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "医共体办公室",
         "status": "运行中",
         "functions": [
-          "组织机构",
-          "人员档案",
-          "排班",
-          "薪酬"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
@@ -5035,14 +4431,14 @@
         "no": 31,
         "domain": "基层医疗卫生综合管理",
         "name": "财务统一协同管理",
-        "summary": "统一管理、集中核算、预算执行、成本和绩效分析。",
-        "owner": "财务审计中心",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "医共体办公室",
         "status": "运行中",
         "functions": [
-          "集中核算",
-          "预算",
-          "成本",
-          "报表"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
@@ -5050,14 +4446,14 @@
         "no": 32,
         "domain": "基层医疗卫生综合管理",
         "name": "物资统一协同管理",
-        "summary": "非医疗设备、办公用品分类、编码、采购、库存和调拨。",
-        "owner": "后勤中心",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "医共体办公室",
         "status": "运行中",
         "functions": [
-          "分类编码",
-          "采购",
-          "库存",
-          "调拨"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
@@ -5065,14 +4461,14 @@
         "no": 33,
         "domain": "基层医疗卫生综合管理",
         "name": "药品耗材统一协同管理",
-        "summary": "药品耗材集中采购、入库、调拨、盘点、出库和追溯。",
-        "owner": "药耗管理中心",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "医共体办公室",
         "status": "运行中",
         "functions": [
-          "采购",
-          "调拨",
-          "盘点",
-          "追溯"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
@@ -5080,14 +4476,14 @@
         "no": 34,
         "domain": "基层医疗卫生综合管理",
         "name": "行政统一协同管理",
-        "summary": "一体化办公、流程、公文、会议、信息发布和督办。",
-        "owner": "行政管理中心",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "医共体办公室",
         "status": "运行中",
         "functions": [
-          "门户",
-          "流程",
-          "公文",
-          "督办"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
@@ -5095,14 +4491,14 @@
         "no": 35,
         "domain": "基层医疗卫生综合管理",
         "name": "医共体绩效统一协同管理",
-        "summary": "工作指标、质量、效率、服务、费用和满意度综合评价。",
-        "owner": "绩效考核中心",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "医共体办公室",
         "status": "运行中",
         "functions": [
-          "指标",
-          "考核",
-          "分配",
-          "分析"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       },
@@ -5110,14 +4506,14 @@
         "no": 36,
         "domain": "基层医疗卫生综合管理",
         "name": "医疗废弃物统一协同管理",
-        "summary": "医废收集、暂存、交接、转运和处置全过程追溯。",
-        "owner": "后勤安全中心",
+        "summary": "依据紧密型县域医共体信息化功能指引建设，支撑县乡村一体化协同。",
+        "owner": "医共体办公室",
         "status": "运行中",
         "functions": [
-          "追溯码",
-          "交接",
-          "转运",
-          "监管"
+          "申请",
+          "协同",
+          "质控",
+          "统计"
         ],
         "risk": "正常"
       }
@@ -5127,7 +4523,7 @@
         "title": "检验检查结果互认规则上线",
         "owner": "医共体办公室",
         "due": "2026-07-15",
-        "action": "统一互认项目、质控标准和不互认理由填报。",
+        "action": "统一互认项目、质控标准和不互认理由。",
         "status": "已完成",
         "level": "高"
       },
@@ -5135,70 +4531,37 @@
         "title": "基层缺药登记与药物配供闭环",
         "owner": "总医院药学中心",
         "due": "2026-07-30",
-        "action": "接入固定取药、延伸处方、中心药房配送状态。",
-        "status": "已完成",
-        "level": "中"
-      },
-      {
-        "title": "家庭医生签约履约评价",
-        "owner": "基层医疗卫生机构",
-        "due": "2026-08-10",
-        "action": "把签约、咨询、随访、转诊和满意度纳入绩效。",
-        "status": "已完成",
-        "level": "中"
-      },
-      {
-        "title": "医疗废弃物追溯监管",
-        "owner": "后勤安全中心",
-        "due": "2026-08-30",
-        "action": "建设收集、暂存、交接、转运、处置追溯台账。",
+        "action": "接入固定取药、延伸处方和配送状态。",
         "status": "已完成",
         "level": "中"
       }
     ],
     "workflows": [
       {
-        "name": "影像/心电/检验共享",
+        "name": "医技共享",
         "steps": [
           "基层申请",
-          "数据采集",
           "中心诊断",
           "报告回传",
-          "结果互认",
-          "医保/质控监管"
+          "结果互认"
         ]
       },
       {
-        "name": "双向转诊预约",
+        "name": "双向转诊",
         "steps": [
-          "基层评估",
-          "电子病历调阅",
           "转诊申请",
-          "号源/床位预约",
+          "资源预约",
           "接诊反馈",
           "下转随访"
         ]
       },
       {
-        "name": "互联网+慢病",
+        "name": "慢病协同",
         "steps": [
           "筛查建档",
-          "风险评估",
-          "分级分组",
+          "风险分级",
           "干预随访",
-          "转诊复诊",
-          "长期用药监测"
-        ]
-      },
-      {
-        "name": "公共卫生应急",
-        "steps": [
-          "多源监测",
-          "智能预警",
-          "指挥调度",
-          "资源联动",
-          "处置反馈",
-          "复盘评估"
+          "用药监测"
         ]
       }
     ],
@@ -5223,45 +4586,16 @@
         "target": "减少重复检查",
         "source": "医技共享中心",
         "trend": "预警"
-      },
-      {
-        "name": "慢病规范管理率",
-        "value": "73.5%",
-        "target": "防筛诊治管闭环",
-        "source": "健康档案/随访",
-        "trend": "正常"
-      },
-      {
-        "name": "家庭医生履约率",
-        "value": "68.9%",
-        "target": "按服务包评价",
-        "source": "签约服务系统",
-        "trend": "预警"
-      },
-      {
-        "name": "医保协同审核通过率",
-        "value": "91.6%",
-        "target": "结算合规",
-        "source": "医保端",
-        "trend": "正常"
       }
     ],
     "governance": [
       {
         "title": "省市统筹、县域落地",
-        "detail": "依托全民健康信息平台，统一网络、标准、接口和安全要求，避免重复建设。"
-      },
-      {
-        "title": "一平台一中心一张图",
-        "detail": "建设医共体基础平台、大数据中心和运营监管驾驶舱，支撑县乡村一体化治理。"
+        "detail": "依托全民健康信息平台，统一网络、标准、接口和安全要求。"
       },
       {
         "title": "数据安全与最小授权",
-        "detail": "健康档案、电子病历、医保、药品、绩效和人财物数据分级授权、访问留痕。"
-      },
-      {
-        "title": "信创与网络安全",
-        "detail": "预留信创适配、专网接入、边界防护、入侵检测、容灾备份和数据质控能力。"
+        "detail": "健康档案、电子病历、医保、药品和绩效数据分级授权、访问留痕。"
       }
     ]
   },
@@ -5328,13 +4662,12 @@
         "from": "青泥洼桥社区卫生服务中心",
         "to": "大连市中心医院 · 心内科",
         "reason": "血压控制不佳，需专科调整方案",
-        "status": "已完成",
+        "status": "待接诊",
         "priority": "高",
         "date": "2026-06-16",
         "reservedResource": "心内科号源 2 个，床位 1 张",
         "insurancePolicy": "基层逐级转诊，住院起付线连续计算",
-        "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
-        "lastUpdated": "2026-06-18T02:57:03.411Z"
+        "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
       },
       {
         "id": "rf2",
@@ -5344,13 +4677,12 @@
         "from": "星海湾社区卫生服务中心",
         "to": "大连医科大学附属医院 · 内分泌科",
         "reason": "空腹血糖偏高，需复查糖化血红蛋白",
-        "status": "已完成",
+        "status": "已接诊",
         "priority": "中",
         "date": "2026-06-18",
         "reservedResource": "内分泌复诊号源 3 个",
         "insurancePolicy": "门诊报销按转诊路径执行差异化支付",
-        "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2",
-        "lastUpdated": "2026-06-18T02:57:03.432Z"
+        "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
       },
       {
         "id": "rf3",
@@ -5360,13 +4692,12 @@
         "from": "大连市中心医院",
         "to": "青泥洼桥社区卫生服务中心 · 家庭医生工作室",
         "reason": "病情稳定，转回基层长期随访和续方",
-        "status": "已完成",
+        "status": "基层承接",
         "priority": "中",
         "date": "2026-06-20",
         "reservedResource": "家庭医生随访 1 次，长期处方 8 周",
         "insurancePolicy": "同一疾病周期下转基层不另设住院起付线",
-        "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4",
-        "lastUpdated": "2026-06-18T02:57:03.451Z"
+        "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
       }
     ],
     "reservedResources": [
@@ -5478,10 +4809,593 @@
         "title": "长期处方与固定取药",
         "audience": "慢病患者",
         "message": "符合条件的慢病患者基层单次可开具不超过 12 周长期处方，并与固定取药闭环联动。",
-        "channel": "个人端、医保端"
+        "channel": "个人端、医保中心经办端"
       }
     ]
   },
+  "platformCapabilities": [
+    {
+      "id": "cap-data-platform",
+      "group": "城市级医疗健康大数据平台",
+      "source": "申报材料（五）项目建设目标及内容、七（二）本期建设方案",
+      "target": "统一平台底座、区域医疗健康大数据中心、全域互联互通、数据资产管理、信创及国产密码改造",
+      "existing": [
+        "residents",
+        "personalRecords",
+        "healthStatistics",
+        "dataAccessLogs",
+        "securityEvents"
+      ],
+      "status": "开发中",
+      "next": "补齐共享文档、信息资源中心、运行监控、标签模型、数据资产目录和存量模块统一纳管。"
+    },
+    {
+      "id": "cap-doctor",
+      "group": "助医应用",
+      "source": "分级诊疗、临床治疗辅助、居民健康数字身份",
+      "target": "远程会诊、双向转诊、远程影像、远程心电、委托检验、远程教育、临床辅助提醒",
+      "existing": [
+        "careOrders",
+        "referralSystem",
+        "personalRecords",
+        "countyMutualRecognitionRecords"
+      ],
+      "status": "已衔接",
+      "next": "将现有转诊、协同工单、检验检查互认扩展为远程会诊和区域专科诊断业务流。"
+    },
+    {
+      "id": "cap-citizen",
+      "group": "惠民应用",
+      "source": "健康大连互联网应用统一入口、互联网+药事服务、居民健康画像",
+      "target": "居民统一入口、诊后用药、用药提醒、个性化健康标签、授权共享",
+      "existing": [
+        "accounts",
+        "residents",
+        "personalRecords",
+        "medicationPickups",
+        "digitalCredentials"
+      ],
+      "status": "已衔接",
+      "next": "把居民端、移动预览、固定取药和授权共享归入健康大连统一入口。"
+    },
+    {
+      "id": "cap-governance",
+      "group": "辅政应用",
+      "source": "数智健康大脑、卫生统计质控共享、医疗机构信用评价",
+      "target": "综合监管专题、统计直报质控、数据可视化、信用评价、公示",
+      "existing": [
+        "healthStatistics",
+        "healthStatisticsIngestion",
+        "platformAudit",
+        "platformProcessAudit"
+      ],
+      "status": "开发中",
+      "next": "新增医疗机构信用评价模型，并把统计质控问题沉淀为闭环工单。"
+    },
+    {
+      "id": "cap-research",
+      "group": "医疗科研创新平台",
+      "source": "专病库、多模态医疗数据集、科研研究落地验证",
+      "target": "结构化、标准化、高质量、可计算数据集，支撑专病库和科研协作",
+      "existing": [
+        "diseases",
+        "chronicScreeningTasks",
+        "chronicManagementPlans",
+        "personalRecords"
+      ],
+      "status": "待深化",
+      "next": "在慢病专病库基础上补充病种版本、数据脱敏、伦理审批、科研项目授权和数据集发布流程。"
+    },
+    {
+      "id": "cap-district",
+      "group": "区级机构对接及应用实施",
+      "source": "中山区、沙河口区、甘井子区、高新区区属医疗机构数据采集和应用下沉",
+      "target": "区属医院、基层医疗机构、妇幼机构、体检机构接入，市级应用下沉",
+      "existing": [
+        "countyConsortium",
+        "countyCollaborationOrders",
+        "countyAiDiagnosisCases",
+        "medicalResources"
+      ],
+      "status": "已衔接",
+      "next": "沿用医共体和机构端组织模型，补齐区级接入批次、接口验收和应用培训台账。"
+    },
+    {
+      "id": "cap-evaluation",
+      "group": "互联互通测评服务",
+      "source": "互联互通四甲、五乙测评材料、模拟演练、现场查验",
+      "target": "标准化改造、健康医疗数据归集、文审材料、模拟演练、测评证据",
+      "existing": [
+        "interfaceRequirements",
+        "platformProcessAudit",
+        "platformRoadmap"
+      ],
+      "status": "待深化",
+      "next": "建立测评证据库，按共享文档、术语标准、主索引、互联互通交易逐项归档。"
+    },
+    {
+      "id": "cap-security",
+      "group": "安全可靠和密码应用",
+      "source": "等保三级、密码应用安全性评估、信创适配",
+      "target": "统一认证、国密传输、数据库关键信息加密、日志审计、国产软硬件适配",
+      "existing": [
+        "authUsers",
+        "authOrganizations",
+        "securityEvents",
+        "dataAccessLogs"
+      ],
+      "status": "开发中",
+      "next": "把当前登录、角色、审计能力升级为等保和密评验收清单。"
+    }
+  ],
+  "platformIntegrations": [
+    {
+      "id": "int-health-1-2",
+      "name": "全民健康信息平台一、二期",
+      "approach": "原生升级",
+      "keep": "主索引、注册服务、四大数据库、业务协同、监管和便民能力",
+      "target": "市级平台底座",
+      "owner": "市级平台",
+      "status": "已纳入"
+    },
+    {
+      "id": "int-pharmacy",
+      "name": "医疗机构药事管理平台",
+      "approach": "接口接入+场景合并",
+      "keep": "药事管理数据、药事服务流程",
+      "target": "互联网+药事服务、固定取药、医保审核",
+      "owner": "药政/医保中心",
+      "status": "开发中"
+    },
+    {
+      "id": "int-care",
+      "name": "保健管理系统",
+      "approach": "数据回流+门户集成",
+      "keep": "医疗管理、健康管理、综合管理、统计分析",
+      "target": "居民健康画像、行业治理专题",
+      "owner": "保健管理",
+      "status": "待接口"
+    },
+    {
+      "id": "int-emergency-video",
+      "name": "疫情防控应急指挥视频通讯平台",
+      "approach": "能力复用",
+      "keep": "视频会议、应急指挥调度、可视化政务管理",
+      "target": "公共卫生应急、远程会诊、远程教育",
+      "owner": "应急管理",
+      "status": "待接口"
+    },
+    {
+      "id": "int-chronic",
+      "name": "慢病管理平台",
+      "approach": "模块纳管",
+      "keep": "筛查、建档、风险分级、随访、宣教、固定取药",
+      "target": "医疗科研专病库、医防协同和居民画像",
+      "owner": "疾控/基层",
+      "status": "已纳入"
+    },
+    {
+      "id": "int-county",
+      "name": "医共体信息平台",
+      "approach": "能力复用+边界清晰",
+      "keep": "县乡村一体化、医技共享、基层AI辅助、协同工单",
+      "target": "区级应用下沉、分级诊疗和区域诊断中心",
+      "owner": "医共体办公室",
+      "status": "已纳入"
+    }
+  ],
+  "platformInterfaces": [
+    {
+      "id": "if-auth",
+      "domain": "统一认证",
+      "existing": "现有登录、角色、会话、审计",
+      "next": "政务统一认证、CA、短信、人脸核验",
+      "priority": "P0",
+      "owner": "市级平台",
+      "status": "开发中"
+    },
+    {
+      "id": "if-person-index",
+      "domain": "居民主索引",
+      "existing": "personIndex、居民档案、家庭成员",
+      "next": "人口库、电子健康码、标准健康档案主索引",
+      "priority": "P0",
+      "owner": "市级平台",
+      "status": "开发中"
+    },
+    {
+      "id": "if-medical",
+      "domain": "医疗机构业务系统",
+      "existing": "个人健康信息库、机构端协同",
+      "next": "HIS、EMR、LIS、PACS、心电、体检系统",
+      "priority": "P0",
+      "owner": "医疗机构",
+      "status": "待接口"
+    },
+    {
+      "id": "if-referral",
+      "domain": "分级诊疗",
+      "existing": "转诊规则、协同工单、预留资源",
+      "next": "远程会诊、双向转诊、远程影像、心电、检验、教育",
+      "priority": "P0",
+      "owner": "医政医管",
+      "status": "开发中"
+    },
+    {
+      "id": "if-insurance",
+      "domain": "医保结算监管",
+      "existing": "医保审核、凭证核验、固定取药审核",
+      "next": "医保核心结算、门慢门特、异地转诊规则",
+      "priority": "P1",
+      "owner": "医保局/医保中心/区市县医保局",
+      "status": "演示对接完成"
+    },
+    {
+      "id": "if-statistics",
+      "domain": "卫生统计",
+      "existing": "统计导入任务、资源直报对账、质控看板",
+      "next": "辽宁省卫统直报、国家统计直报系统",
+      "priority": "P1",
+      "owner": "规划信息",
+      "status": "演示对接完成"
+    },
+    {
+      "id": "if-license",
+      "domain": "电子证照",
+      "existing": "出生/死亡医学证明模型和统计",
+      "next": "电子证照平台、公安户籍、民政殡葬、疾控死因监测",
+      "priority": "P1",
+      "owner": "医政/妇幼",
+      "status": "已建模"
+    },
+    {
+      "id": "if-evaluation",
+      "domain": "互联互通测评",
+      "existing": "接口需求清单、流程审计、路线图",
+      "next": "共享文档、术语标准、交易服务、测评文审材料",
+      "priority": "P1",
+      "owner": "项目办",
+      "status": "待深化"
+    },
+    {
+      "id": "if-security",
+      "domain": "安全信创",
+      "existing": "角色权限、安全事件、访问日志",
+      "next": "国密传输、数据库加密、日志保全、密评和等保证据",
+      "priority": "P0",
+      "owner": "安全管理",
+      "status": "开发中"
+    }
+  ],
+  "platformDeliveryBatches": [
+    {
+      "id": "batch-foundation",
+      "phase": "第一批：平台底座和存量纳管",
+      "owner": "市级平台",
+      "items": [
+        "统一应用目录",
+        "统一身份认证",
+        "数据资源目录",
+        "存量模块登记",
+        "运行监控"
+      ],
+      "status": "启动"
+    },
+    {
+      "id": "batch-doctor",
+      "phase": "第二批：助医和分级诊疗闭环",
+      "owner": "医政医管/医疗机构",
+      "items": [
+        "双向转诊",
+        "远程会诊",
+        "区域影像",
+        "区域心电",
+        "委托检验",
+        "远程教育"
+      ],
+      "status": "衔接现有机构端和医共体模块"
+    },
+    {
+      "id": "batch-citizen",
+      "phase": "第三批：惠民统一入口",
+      "owner": "基层卫生/居民端",
+      "items": [
+        "健康大连统一入口",
+        "互联网+药事服务",
+        "居民健康画像",
+        "授权共享",
+        "固定取药提醒"
+      ],
+      "status": "衔接居民端和慢病模块"
+    },
+    {
+      "id": "batch-governance",
+      "phase": "第四批：辅政和科研",
+      "owner": "规划信息/科研管理",
+      "items": [
+        "数智健康大脑",
+        "统计质控共享",
+        "信用评价",
+        "专病库",
+        "科研数据集"
+      ],
+      "status": "补齐治理和科研能力"
+    },
+    {
+      "id": "batch-acceptance",
+      "phase": "第五批：测评、安全和验收",
+      "owner": "项目办/安全管理",
+      "items": [
+        "互联互通五乙材料",
+        "等保三级",
+        "密评",
+        "信创适配",
+        "接口验收"
+      ],
+      "status": "贯穿全周期沉淀证据"
+    }
+  ],
+  "platformEvidence": [
+    {
+      "id": "ev-application",
+      "category": "申报材料",
+      "name": "提级论证申报材料闭环",
+      "owner": "项目办",
+      "source": "项目申报材料、建设方案、预算和论证意见",
+      "artifacts": [
+        "建设范围矩阵",
+        "存量模块合并清单",
+        "开发批次计划",
+        "周报素材"
+      ],
+      "status": "已建档",
+      "next": "持续补充需求变更、会议纪要和专家论证反馈。",
+      "records": []
+    },
+    {
+      "id": "ev-interoperability",
+      "category": "互联互通测评",
+      "name": "四甲/五乙测评证据包",
+      "owner": "项目办/标准管理",
+      "source": "共享文档、术语字典、主索引、交易服务、测评文审材料",
+      "artifacts": [
+        "接口清单",
+        "标准映射",
+        "交易样例",
+        "整改记录"
+      ],
+      "status": "待补齐",
+      "next": "按接口域逐项挂接截图、报文样例、测试记录和整改状态。",
+      "records": [
+        {
+          "id": "evr-api-test",
+          "owner": "[编码损坏，待核验]/[编码损坏，待核验]",
+          "testRecord": "API [编码损坏，待核验]",
+          "at": "2026-06-19 12:00:00",
+          "link": "https://example.test/evidence",
+          "fileName": "[编码损坏，待核验]-[编码损坏，待核验].md",
+          "status": "[编码损坏，待核验]"
+        }
+      ]
+    },
+    {
+      "id": "ev-security",
+      "category": "安全合规",
+      "name": "等保、密评和信创适配证据",
+      "owner": "安全管理岗",
+      "source": "统一认证、访问审计、安全事件、数据访问日志、信创适配清单",
+      "artifacts": [
+        "权限矩阵",
+        "审计日志",
+        "安全事件",
+        "密评整改项"
+      ],
+      "status": "开发中",
+      "next": "补齐国密传输、数据库加密、日志保全和国产化适配证明。",
+      "records": []
+    },
+    {
+      "id": "ev-interface",
+      "category": "接口联调",
+      "name": "外部系统接口联调验收",
+      "owner": "市级平台/医疗机构",
+      "source": "HIS、EMR、LIS、PACS、医保、电子证照、卫生统计等对接计划",
+      "artifacts": [
+        "联调计划",
+        "字段映射",
+        "异常清单",
+        "回归测试"
+      ],
+      "status": "开发中",
+      "next": "为每个接口域建立责任人、环境、频率、样例和验收规则。",
+      "records": []
+    },
+    {
+      "id": "ev-launch",
+      "category": "上线验收",
+      "name": "区级实施和应用上线材料",
+      "owner": "实施组",
+      "source": "中山、沙河口、甘井子、高新区实施批次和应用培训记录",
+      "artifacts": [
+        "上线确认",
+        "培训签到",
+        "试运行问题",
+        "用户反馈"
+      ],
+      "status": "待启动",
+      "next": "按区县、机构、应用和批次沉淀上线确认与问题闭环。",
+      "records": []
+    }
+  ],
+  "applicationCatalog": [
+    {
+      "id": "app-health-platform",
+      "name": "全民健康信息平台一、二期",
+      "sourceSystem": "市级存量平台",
+      "interfaceMode": "原生升级",
+      "owner": "规划信息处",
+      "reuseMode": "底座复用",
+      "batch": "第一批",
+      "evidence": "平台现状清单/架构图",
+      "status": "已纳管",
+      "next": "补齐运行监控和数据资源目录关联。"
+    },
+    {
+      "id": "app-chronic",
+      "name": "慢病医防融合管理",
+      "sourceSystem": "慢病管理平台",
+      "interfaceMode": "模块纳管",
+      "owner": "基层卫生处/疾控",
+      "reuseMode": "业务与数据复用",
+      "batch": "第一批",
+      "evidence": "筛查随访闭环/接口清单",
+      "status": "已纳管",
+      "next": "挂接专病库版本和科研数据集目录。"
+    },
+    {
+      "id": "app-county",
+      "name": "县域医共体协同",
+      "sourceSystem": "医共体信息平台",
+      "interfaceMode": "API/能力复用",
+      "owner": "医政医管处",
+      "reuseMode": "协同中心复用",
+      "batch": "第二批",
+      "evidence": "16255 功能清单/工单样例",
+      "status": "已纳管",
+      "next": "补齐区级实施批次和培训证据。"
+    },
+    {
+      "id": "app-institution",
+      "name": "医疗机构业务协同",
+      "sourceSystem": "HIS/EMR/LIS/PACS",
+      "interfaceMode": "标准接口",
+      "owner": "医疗机构",
+      "reuseMode": "门户集成+数据回流",
+      "batch": "第二批",
+      "evidence": "字段映射/联调记录",
+      "status": "开发中",
+      "next": "按机构登记接口环境、版本和联调责任人。"
+    },
+    {
+      "id": "app-citizen",
+      "name": "健康大连居民服务",
+      "sourceSystem": "居民端/健康码",
+      "interfaceMode": "统一入口",
+      "owner": "基层卫生处",
+      "reuseMode": "入口整合",
+      "batch": "第三批",
+      "evidence": "居民旅程/授权记录",
+      "status": "已纳管",
+      "next": "接入政务身份源和正式消息服务。"
+    },
+    {
+      "id": "app-insurance",
+      "name": "医保结算监管协同",
+      "sourceSystem": "医保核心平台",
+      "interfaceMode": "接口接入",
+      "owner": "医保局/医保中心",
+      "reuseMode": "业务协同",
+      "batch": "第三批",
+      "evidence": "结算审核/凭证核验样例",
+      "status": "演示对接完成",
+      "next": "确认生产接口规范和联调窗口。"
+    }
+  ],
+  "institutionCreditEvaluations": [
+    {
+      "id": "credit-central",
+      "name": "大连市中心医院",
+      "institutionType": "三级医院",
+      "period": "2026上半年",
+      "score": 92,
+      "grade": "A",
+      "indicators": "依法执业98/质量安全90/数据报送88/服务信用92",
+      "owner": "医政医管处",
+      "status": "已评价",
+      "next": "保持月度数据质量复核并公示优秀项。"
+    },
+    {
+      "id": "credit-ganjingzi",
+      "name": "甘井子区人民医院",
+      "institutionType": "二级医院",
+      "period": "2026上半年",
+      "score": 84,
+      "grade": "B",
+      "indicators": "依法执业92/质量安全86/数据报送76/服务信用82",
+      "owner": "属地卫生行政部门",
+      "status": "整改中",
+      "next": "30日内完成统计迟报和接口数据缺项整改。"
+    },
+    {
+      "id": "credit-community",
+      "name": "青泥洼桥社区卫生服务中心",
+      "institutionType": "基层机构",
+      "period": "2026上半年",
+      "score": 88,
+      "grade": "B+",
+      "indicators": "依法执业95/质量安全87/数据报送85/服务信用86",
+      "owner": "中山区卫生健康局",
+      "status": "已评价",
+      "next": "补齐家庭医生签约数据质控证据。"
+    }
+  ],
+  "securityAcceptanceLedger": [
+    {
+      "id": "security-level3",
+      "name": "网络安全等级保护三级",
+      "category": "等保",
+      "control": "定级备案、差距测评、安全整改、复测",
+      "evidence": "定级报告/备案证明/测评报告/整改记录",
+      "owner": "安全管理岗",
+      "status": "开发中",
+      "next": "完成生产环境定级备案和测评机构进场计划。"
+    },
+    {
+      "id": "security-crypto",
+      "name": "密码应用安全性评估",
+      "category": "密评",
+      "control": "国密传输、身份鉴别、存储加密、密钥管理",
+      "evidence": "密码应用方案/检测记录/密评报告",
+      "owner": "密码应用责任人",
+      "status": "待测评",
+      "next": "确定密码设备和电子签名边界，形成测评对象清单。"
+    },
+    {
+      "id": "security-gm",
+      "name": "国产密码改造",
+      "category": "国密改造",
+      "control": "SM2/SM3/SM4、国密SSL、关键字段加密",
+      "evidence": "改造清单/配置截图/兼容性测试",
+      "owner": "平台技术组",
+      "status": "方案设计",
+      "next": "完成接口、数据库和证书链的国密改造排期。"
+    },
+    {
+      "id": "security-domestic",
+      "name": "信创适配",
+      "category": "信创适配",
+      "control": "国产CPU、操作系统、数据库、中间件和浏览器",
+      "evidence": "适配矩阵/测试报告/问题闭环",
+      "owner": "基础设施组",
+      "status": "待测试",
+      "next": "建立软硬件版本矩阵并执行功能、性能和容灾测试。"
+    }
+  ],
+  "platformChangeLogs": [
+    {
+      "id": "pcl-001",
+      "at": "2026-06-18 15:10",
+      "actor": "市级管理员",
+      "role": "commission",
+      "collection": "platformCapabilities",
+      "itemId": "cap-data-platform",
+      "itemName": "城市级医疗健康大数据平台",
+      "action": "初始化建设台账",
+      "before": "无",
+      "after": "开发中",
+      "note": "按申报材料建立建设域、整合项、接口域和开发批次数据。"
+    }
+  ],
   "platformRoadmap": [
     {
       "priority": "P0",
@@ -5543,7 +5457,7 @@
         "随访"
       ],
       "status": "已完成",
-      "nextAction": "已新增 /api/workflow-actions，并在医疗机构端、医保端接入接诊、审核、签发、上报、取药和备案按钮。"
+      "nextAction": "已新增 /api/workflow-actions，并在医疗机构端、医保中心经办端接入接诊、审核、签发、上报、取药和备案按钮。"
     },
     {
       "priority": "P1",
@@ -5609,7 +5523,7 @@
     },
     {
       "module": "医共体",
-      "issue": "影像、心电、检验共享中心已有台账，但互认规则、危急值、医保调阅、不互认原因仍需接口化。",
+      "issue": "影像、心电、检验共享中心已有台账，但互认规则、危急值、医���调阅、不互认原因仍需接口化。",
       "priority": "P1",
       "owner": "医技质控中心",
       "status": "进行中",
@@ -5633,7 +5547,7 @@
       "risk": "正式人口主索引待接入",
       "auditPoint": "核查居民、档案、病历、授权、取药、医保是否使用同一 personIndex。",
       "evidence": "居民、慢病、随访、个人健康记录、取药和医保数据均保留 personIndex。",
-      "nextAction": "对接人口库、电子健康码和正式健康档案主索引。"
+      "nextAction": "对接人口库、电子健康码和正式健���档案主索引。"
     },
     {
       "process": "慢病筛查、随访与分级管理",
@@ -5655,20 +5569,20 @@
     },
     {
       "process": "固定取药与长期处方",
-      "owner": "基层机构/医保局",
+      "owner": "基层机构/医保中心",
       "status": "进行中",
       "risk": "药房库存与医保结算接口待接入",
-      "auditPoint": "核查个人申请、机构确认、医保审核、药房取药和状态回流。",
-      "evidence": "个人端取药计划、机构确认、医保审核和药房状态已建模。",
+      "auditPoint": "核查个人申请、机构确认、医保中心审核、药房取药和状态回流。",
+      "evidence": "个人端取药计划、机构确认、医保中心审核和药房状态已建模。",
       "nextAction": "对接处方、药房库存、配送和医保结算状态。"
     },
     {
       "process": "医保审核与监管",
-      "owner": "医保局",
+      "owner": "医保局/医保中心/区市县医保局",
       "status": "进行中",
       "risk": "医保核心系统待接入",
-      "auditPoint": "核查慢病结算、支付引导、凭证核验、机构监管和审核留痕。",
-      "evidence": "医保审核、医疗机构监管和凭证核验已建模。",
+      "auditPoint": "核查慢病结算、支付引导、凭证核验、机构监管和审核留痕，并区分行政监管、经办审核和属地监管职责。",
+      "evidence": "医保中心审核、医保局基金监管、区市县医保局属地监管和凭证核验已建模。",
       "nextAction": "接入医保核心结算、门慢门特、双通道和异地转诊规则。"
     },
     {
@@ -5719,298 +5633,298 @@
   ],
   "personalRecords": [
     {
-      "id": "f9f54626-0cf0-4c63-b384-5e996631a5fb",
+      "id": "1c4f1498-b1f1-4a9f-951a-cd5307202d50",
       "residentId": "r1",
       "category": "emr",
       "date": "2026-05-21",
-      "name": "原发性高血压 2 级",
-      "result": "复诊血压偏高，建议调整生活方式并规律服药。",
-      "source": "大连市中心医院 · 心内科",
+      "name": "[编码损坏，待核验] 2 [编码损坏，待核验]",
+      "result": "[编码损坏，待核验],[编码损坏，待核验]",
+      "source": "[编码损坏，待核验] � [编码损坏，待核验]",
       "meta": {
-        "visitType": "门诊",
+        "visitType": "[编码损坏，待核验]",
         "exams": [
-          "心电图：窦性心律",
-          "肾功能：未见明显异常"
+          "[编码损坏，待核验]:[编码损坏，待核验]",
+          "[编码损坏，待核验]:[编码损坏，待核验]"
         ],
         "medications": [
-          "苯磺酸氨氯地平片",
-          "厄贝沙坦片"
+          "[编码损坏，待核验]",
+          "[编码损坏，待核验]"
         ]
       },
       "createdBy": "system",
-      "createdAt": "2026-06-15T05:55:39.990Z",
+      "createdAt": "2026-06-19T12:25:19.116Z",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
-      "id": "97404359-7171-4069-b3b0-ce5f823acc68",
+      "id": "43c562cd-568c-4f79-bdab-0d47c0ac0cf3",
       "residentId": "r1",
       "category": "emr",
       "date": "2026-04-12",
-      "name": "高血压随访",
-      "result": "家庭血压记录不规律，已进行用药依从性宣教。",
-      "source": "青泥洼桥社区卫生服务中心 · 全科门诊",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验],[编码损坏，待核验]",
+      "source": "[编码损坏，待核验] � [编码损坏，待核验]",
       "meta": {
-        "visitType": "随访",
+        "visitType": "[编码损坏，待核验]",
         "exams": [
-          "血压：158/92 mmHg"
+          "[编码损坏，待核验]:158/92 mmHg"
         ],
         "medications": [
-          "继续原方案"
+          "[编码损坏，待核验]"
         ]
       },
       "createdBy": "system",
-      "createdAt": "2026-06-15T05:55:39.990Z",
+      "createdAt": "2026-06-19T12:25:19.116Z",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
-      "id": "274d4826-4618-46c3-9499-9e315457dbbc",
+      "id": "75ac21c3-86e3-41d2-b621-dc9dfc1f3606",
       "residentId": "r2",
       "category": "emr",
       "date": "2026-05-18",
-      "name": "2 型糖尿病",
-      "result": "空腹血糖控制不佳，建议复查糖化血红蛋白。",
-      "source": "大连医科大学附属医院 · 内分泌科",
+      "name": "2 [编码损坏，待核验]",
+      "result": "[编码损坏，待核验],[编码损坏，待核验]",
+      "source": "[编码损坏，待核验] � [编码损坏，待核验]",
       "meta": {
-        "visitType": "门诊",
+        "visitType": "[编码损坏，待核验]",
         "exams": [
-          "空腹血糖：7.8 mmol/L",
-          "糖化血红蛋白：待复查"
+          "[编码损坏，待核验]:7.8 mmol/L",
+          "[编码损坏，待核验]:[编码损坏，待核验]"
         ],
         "medications": [
-          "二甲双胍片"
+          "[编码损坏，待核验]"
         ]
       },
       "createdBy": "system",
-      "createdAt": "2026-06-15T05:55:39.990Z",
+      "createdAt": "2026-06-19T12:25:19.116Z",
       "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
-      "id": "3fad59ff-1adc-4d9a-ae3d-a21862b6a273",
+      "id": "ce5ac582-e265-4ea0-b7b5-3cfd52e6a2a9",
       "residentId": "r4",
       "category": "emr",
       "date": "2026-03-30",
-      "name": "高血压稳定管理",
-      "result": "血压较前稳定，继续季度随访。",
-      "source": "青泥洼桥社区卫生服务中心 · 家庭医生工作室",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验],[编码损坏，待核验]",
+      "source": "[编码损坏，待核验] � [编码损坏，待核验]",
       "meta": {
-        "visitType": "签约服务",
+        "visitType": "[编码损坏，待核验]",
         "exams": [
-          "血压：148/88 mmHg"
+          "[编码损坏，待核验]:148/88 mmHg"
         ],
         "medications": [
-          "继续原用药"
+          "[编码损坏，待核验]"
         ]
       },
       "createdBy": "system",
-      "createdAt": "2026-06-15T05:55:39.990Z",
+      "createdAt": "2026-06-19T12:25:19.116Z",
       "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     },
     {
-      "id": "80dff619-fe74-46cd-91be-b41eae312ccc",
+      "id": "681af361-aed9-477e-9970-9b0a25788805",
       "residentId": "r1",
       "category": "labs",
       "date": "2026-05-21",
-      "name": "肾功能",
-      "result": "未见明显异常",
-      "source": "大连市中心医院",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-15T05:55:39.990Z",
+      "createdAt": "2026-06-19T12:25:19.116Z",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
-      "id": "ac1369e5-4834-412b-a2b2-a2809679b4b9",
+      "id": "a7bcefc4-7cc1-40c4-9ce6-c44166e82151",
       "residentId": "r1",
       "category": "labs",
       "date": "2026-05-21",
-      "name": "心电图",
-      "result": "窦性心律",
-      "source": "大连市中心医院",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-15T05:55:39.990Z",
+      "createdAt": "2026-06-19T12:25:19.116Z",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
-      "id": "dd3fad41-33ce-4812-8482-22a6cef348af",
+      "id": "458c6881-4d92-4940-9122-d193e167a4cf",
       "residentId": "r2",
       "category": "labs",
       "date": "2026-05-18",
-      "name": "空腹血糖",
-      "result": "7.8 mmol/L，偏高",
-      "source": "大连医科大学附属医院",
+      "name": "[编码损坏，待核验]",
+      "result": "7.8 mmol/L,[编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-15T05:55:39.990Z",
+      "createdAt": "2026-06-19T12:25:19.116Z",
       "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
-      "id": "039562f5-a5f0-4e41-9cd3-c6867d777a4e",
+      "id": "24c8829b-b4f2-470b-8ec6-3514bd1be96b",
       "residentId": "r4",
       "category": "labs",
       "date": "2026-03-30",
-      "name": "血压复测",
+      "name": "[编码损坏，待核验]",
       "result": "148/88 mmHg",
-      "source": "青泥洼桥社区卫生服务中心",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-15T05:55:39.990Z",
+      "createdAt": "2026-06-19T12:25:19.116Z",
       "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     },
     {
-      "id": "51fa52bb-5fed-43d3-821b-b1c3ca6afcd5",
+      "id": "56924f99-e6ba-4bc8-bd61-0a3402e77930",
       "residentId": "r1",
       "category": "medications",
       "date": "2026-05-21",
-      "name": "苯磺酸氨氯地平片",
-      "result": "每日 1 次",
-      "source": "心内科门诊",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验] 1 [编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-15T05:55:39.990Z",
+      "createdAt": "2026-06-19T12:25:19.116Z",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
-      "id": "02200cb1-3c33-4c71-b3db-efdc60eca38e",
+      "id": "4e5ae05b-bc23-4f2c-810d-f21cf686c2b8",
       "residentId": "r1",
       "category": "medications",
       "date": "2026-05-21",
-      "name": "厄贝沙坦片",
-      "result": "每日 1 次",
-      "source": "心内科门诊",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验] 1 [编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-15T05:55:39.990Z",
+      "createdAt": "2026-06-19T12:25:19.116Z",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
-      "id": "3621411f-b5fd-4444-b906-61130b479593",
+      "id": "63aec00d-a53d-4551-ab9c-a6380798a6c7",
       "residentId": "r2",
       "category": "medications",
       "date": "2026-05-18",
-      "name": "二甲双胍片",
-      "result": "每日 2 次",
-      "source": "内分泌科门诊",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验] 2 [编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-15T05:55:39.990Z",
+      "createdAt": "2026-06-19T12:25:19.116Z",
       "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
-      "id": "2b6ce28a-98c3-47cc-9a43-eeba66b5f121",
+      "id": "89ffe72e-ca0a-41c4-8fca-09661b51ec62",
       "residentId": "r1",
       "category": "allergies",
       "date": "2025-10-02",
-      "name": "青霉素",
-      "result": "既往皮疹",
-      "source": "居民自述",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-15T05:55:39.990Z",
+      "createdAt": "2026-06-19T12:25:19.116Z",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
-      "id": "cd86af40-e45c-4d6f-ba8d-86a41f07af7d",
+      "id": "a3673ebe-1cb5-40ac-88d8-16e33078228e",
       "residentId": "r2",
       "category": "allergies",
       "date": "2025-08-14",
-      "name": "无明确药物过敏史",
-      "result": "已确认",
-      "source": "门诊问诊",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-15T05:55:39.990Z",
+      "createdAt": "2026-06-19T12:25:19.116Z",
       "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
-      "id": "bc1c39d1-9e84-439a-a07b-b39d14536a0f",
+      "id": "fcb04527-7e3d-42c8-a896-c943769e5dff",
       "residentId": "r1",
       "category": "vaccines",
       "date": "2025-11-01",
-      "name": "流感疫苗",
-      "result": "已接种",
-      "source": "社区卫生服务中心",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-15T05:55:39.990Z",
+      "createdAt": "2026-06-19T12:25:19.116Z",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
-      "id": "b4fe6020-d549-451d-9c93-22db83cc20b6",
+      "id": "143ee795-33bd-4880-b6d1-f5b373cf95a1",
       "residentId": "r4",
       "category": "vaccines",
       "date": "2025-11-05",
-      "name": "流感疫苗",
-      "result": "已接种",
-      "source": "社区卫生服务中心",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-15T05:55:39.990Z",
+      "createdAt": "2026-06-19T12:25:19.116Z",
       "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     },
     {
-      "id": "020fd902-091a-470a-b857-60072d844054",
+      "id": "e2fb683b-290a-455c-8410-3c94e016e5c8",
       "residentId": "r1",
       "category": "admissions",
       "date": "2024-06-18",
-      "name": "日间观察",
-      "result": "血压波动观察，未住院",
-      "source": "大连市中心医院",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验],[编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-15T05:55:39.990Z",
+      "createdAt": "2026-06-19T12:25:19.116Z",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
-      "id": "1d27b7bd-e8a5-4cce-a99c-e359d5fe0206",
+      "id": "e44798af-60e0-4033-90a4-80d5aa8efd74",
       "residentId": "r3",
       "category": "admissions",
       "date": "2025-12-09",
-      "name": "体检中心",
-      "result": "年度体检，无住院记录",
-      "source": "甘井子区人民医院",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验],[编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-15T05:55:39.990Z",
+      "createdAt": "2026-06-19T12:25:19.116Z",
       "personIndex": "DEMO-ID-R3#DEMO-MOBILE-R3"
     },
     {
-      "id": "192cd2f6-c297-4bd0-855c-f520043f75da",
+      "id": "1b2cbee0-969e-4b4b-b697-7252cb42a6dc",
       "residentId": "r1",
       "category": "authorizations",
       "date": "2026-01-01",
-      "name": "家庭医生团队",
-      "result": "允许查看健康档案和随访记录",
-      "source": "居民授权",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-15T05:55:39.990Z",
+      "createdAt": "2026-06-19T12:25:19.116Z",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
-      "id": "6845bfaa-53b1-4b95-9893-9a2e5a081d69",
+      "id": "ce192cf1-b9c3-4a43-aca1-4ee4a10ac80f",
       "residentId": "r1",
       "category": "authorizations",
       "date": "2026-01-01",
-      "name": "区域医疗机构",
-      "result": "允许查看电子病历摘要",
-      "source": "居民授权",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-15T05:55:39.990Z",
+      "createdAt": "2026-06-19T12:25:19.116Z",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
-      "id": "b2149847-9a97-4918-98f0-0ec95761832b",
+      "id": "7bfa4319-9b38-4bf9-9178-f24cd35bd382",
       "residentId": "r2",
       "category": "authorizations",
       "date": "2026-01-01",
-      "name": "家庭医生团队",
-      "result": "允许查看慢病管理信息",
-      "source": "居民授权",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-15T05:55:39.990Z",
+      "createdAt": "2026-06-19T12:25:19.116Z",
       "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     }
   ],

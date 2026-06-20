@@ -158,6 +158,9 @@ function seedState() {
     platformInterfaces: seedPlatformInterfaces(),
     platformDeliveryBatches: seedPlatformDeliveryBatches(),
     platformEvidence: seedPlatformEvidence(),
+    applicationCatalog: seedApplicationCatalog(),
+    institutionCreditEvaluations: seedInstitutionCreditEvaluations(),
+    securityAcceptanceLedger: seedSecurityAcceptanceLedger(),
     platformChangeLogs: seedPlatformChangeLogs(),
     platformRoadmap: seedPlatformRoadmap(),
     platformAudit: seedPlatformAudit(),
@@ -227,6 +230,34 @@ function seedPlatformEvidence() {
     { id: "ev-security", category: "安全合规", name: "等保、密评和信创适配证据", owner: "安全管理岗", source: "统一认证、访问审计、安全事件、数据访问日志、信创适配清单", artifacts: ["权限矩阵", "审计日志", "安全事件", "密评整改项"], status: "开发中", next: "补齐国密传输、数据库加密、日志保全和国产化适配证明。", records: [] },
     { id: "ev-interface", category: "接口联调", name: "外部系统接口联调验收", owner: "市级平台/医疗机构", source: "HIS、EMR、LIS、PACS、医保、电子证照、卫生统计等对接计划", artifacts: ["联调计划", "字段映射", "异常清单", "回归测试"], status: "开发中", next: "为每个接口域建立责任人、环境、频率、样例和验收规则。", records: [] },
     { id: "ev-launch", category: "上线验收", name: "区级实施和应用上线材料", owner: "实施组", source: "中山、沙河口、甘井子、高新区实施批次和应用培训记录", artifacts: ["上线确认", "培训签到", "试运行问题", "用户反馈"], status: "待启动", next: "按区县、机构、应用和批次沉淀上线确认与问题闭环。", records: [] }
+  ];
+}
+
+function seedApplicationCatalog() {
+  return [
+    { id: "app-health-platform", name: "全民健康信息平台一、二期", sourceSystem: "市级存量平台", interfaceMode: "原生升级", owner: "规划信息处", reuseMode: "底座复用", batch: "第一批", evidence: "平台现状清单/架构图", status: "已纳管", next: "补齐运行监控和数据资源目录关联。" },
+    { id: "app-chronic", name: "慢病医防融合管理", sourceSystem: "慢病管理平台", interfaceMode: "模块纳管", owner: "基层卫生处/疾控", reuseMode: "业务与数据复用", batch: "第一批", evidence: "筛查随访闭环/接口清单", status: "已纳管", next: "挂接专病库版本和科研数据集目录。" },
+    { id: "app-county", name: "县域医共体协同", sourceSystem: "医共体信息平台", interfaceMode: "API/能力复用", owner: "医政医管处", reuseMode: "协同中心复用", batch: "第二批", evidence: "16255 功能清单/工单样例", status: "已纳管", next: "补齐区级实施批次和培训证据。" },
+    { id: "app-institution", name: "医疗机构业务协同", sourceSystem: "HIS/EMR/LIS/PACS", interfaceMode: "标准接口", owner: "医疗机构", reuseMode: "门户集成+数据回流", batch: "第二批", evidence: "字段映射/联调记录", status: "开发中", next: "按机构登记接口环境、版本和联调责任人。" },
+    { id: "app-citizen", name: "健康大连居民服务", sourceSystem: "居民端/健康码", interfaceMode: "统一入口", owner: "基层卫生处", reuseMode: "入口整合", batch: "第三批", evidence: "居民旅程/授权记录", status: "已纳管", next: "接入政务身份源和正式消息服务。" },
+    { id: "app-insurance", name: "医保结算监管协同", sourceSystem: "医保核心平台", interfaceMode: "接口接入", owner: "医保局/医保中心", reuseMode: "业务协同", batch: "第三批", evidence: "结算审核/凭证核验样例", status: "演示对接完成", next: "确认生产接口规范和联调窗口。" }
+  ];
+}
+
+function seedInstitutionCreditEvaluations() {
+  return [
+    { id: "credit-central", name: "大连市中心医院", institutionType: "三级医院", period: "2026上半年", score: 92, grade: "A", indicators: "依法执业98/质量安全90/数据报送88/服务信用92", owner: "医政医管处", status: "已评价", next: "保持月度数据质量复核并公示优秀项。" },
+    { id: "credit-ganjingzi", name: "甘井子区人民医院", institutionType: "二级医院", period: "2026上半年", score: 84, grade: "B", indicators: "依法执业92/质量安全86/数据报送76/服务信用82", owner: "属地卫生行政部门", status: "整改中", next: "30日内完成统计迟报和接口数据缺项整改。" },
+    { id: "credit-community", name: "青泥洼桥社区卫生服务中心", institutionType: "基层机构", period: "2026上半年", score: 88, grade: "B+", indicators: "依法执业95/质量安全87/数据报送85/服务信用86", owner: "中山区卫生健康局", status: "已评价", next: "补齐家庭医生签约数据质控证据。" }
+  ];
+}
+
+function seedSecurityAcceptanceLedger() {
+  return [
+    { id: "security-level3", name: "网络安全等级保护三级", category: "等保", control: "定级备案、差距测评、安全整改、复测", evidence: "定级报告/备案证明/测评报告/整改记录", owner: "安全管理岗", status: "开发中", next: "完成生产环境定级备案和测评机构进场计划。" },
+    { id: "security-crypto", name: "密码应用安全性评估", category: "密评", control: "国密传输、身份鉴别、存储加密、密钥管理", evidence: "密码应用方案/检测记录/密评报告", owner: "密码应用责任人", status: "待测评", next: "确定密码设备和电子签名边界，形成测评对象清单。" },
+    { id: "security-gm", name: "国产密码改造", category: "国密改造", control: "SM2/SM3/SM4、国密SSL、关键字段加密", evidence: "改造清单/配置截图/兼容性测试", owner: "平台技术组", status: "方案设计", next: "完成接口、数据库和证书链的国密改造排期。" },
+    { id: "security-domestic", name: "信创适配", category: "信创适配", control: "国产CPU、操作系统、数据库、中间件和浏览器", evidence: "适配矩阵/测试报告/问题闭环", owner: "基础设施组", status: "待测试", next: "建立软硬件版本矩阵并执行功能、性能和容灾测试。" }
   ];
 }
 
@@ -1732,6 +1763,7 @@ function collectJson(req) {
 }
 
 function normalizeState(data) {
+  data = restoreCorruptedStrings(seedState(), data);
   const state = {
     accounts: Array.isArray(data.accounts) ? data.accounts : seedState().accounts,
     residents: Array.isArray(data.residents) ? data.residents : [],
@@ -1780,6 +1812,9 @@ function normalizeState(data) {
     platformInterfaces: mergeByKey(seedPlatformInterfaces(), data.platformInterfaces, "id"),
     platformDeliveryBatches: mergeByKey(seedPlatformDeliveryBatches(), data.platformDeliveryBatches, "id"),
     platformEvidence: mergeByKey(seedPlatformEvidence(), data.platformEvidence, "id"),
+    applicationCatalog: mergeByKey(seedApplicationCatalog(), data.applicationCatalog, "id"),
+    institutionCreditEvaluations: mergeByKey(seedInstitutionCreditEvaluations(), data.institutionCreditEvaluations, "id"),
+    securityAcceptanceLedger: mergeByKey(seedSecurityAcceptanceLedger(), data.securityAcceptanceLedger, "id"),
     platformChangeLogs: Array.isArray(data.platformChangeLogs) ? data.platformChangeLogs : seedPlatformChangeLogs(),
     platformRoadmap: Array.isArray(data.platformRoadmap) ? data.platformRoadmap : seedPlatformRoadmap(),
     platformAudit: Array.isArray(data.platformAudit) ? data.platformAudit : seedPlatformAudit(),
@@ -1790,6 +1825,31 @@ function normalizeState(data) {
   refreshDeathStatistics(state);
   refreshBirthStatistics(state);
   return normalizePersonIndexes(state);
+}
+
+function restoreCorruptedStrings(defaultValue, currentValue) {
+  if (typeof currentValue === "string") {
+    if (currentValue.includes("?") && typeof defaultValue === "string" && !defaultValue.includes("?")) return defaultValue;
+    return currentValue;
+  }
+  if (Array.isArray(currentValue)) {
+    const defaults = Array.isArray(defaultValue) ? defaultValue : [];
+    return currentValue.map((item, index) => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) return restoreCorruptedStrings(defaults[index], item);
+      const identityKey = ["id", "username", "orgCode", "certificateNo", "code"].find((key) => item[key]);
+      const matchingDefault = identityKey
+        ? defaults.find((candidate) => candidate && candidate[identityKey] === item[identityKey])
+        : defaults[index];
+      return restoreCorruptedStrings(matchingDefault, item);
+    });
+  }
+  if (currentValue && typeof currentValue === "object") {
+    return Object.fromEntries(Object.entries(currentValue).map(([key, value]) => [
+      key,
+      restoreCorruptedStrings(defaultValue && typeof defaultValue === "object" ? defaultValue[key] : undefined, value)
+    ]));
+  }
+  return currentValue;
 }
 
 function completeSystemTargets(state) {
@@ -1810,6 +1870,9 @@ function completeSystemTargets(state) {
     ...item,
     records: Array.isArray(item.records) ? item.records.slice(0, 20) : []
   }));
+  state.applicationCatalog = mergeByKey(seedApplicationCatalog(), state.applicationCatalog, "id");
+  state.institutionCreditEvaluations = mergeByKey(seedInstitutionCreditEvaluations(), state.institutionCreditEvaluations, "id");
+  state.securityAcceptanceLedger = mergeByKey(seedSecurityAcceptanceLedger(), state.securityAcceptanceLedger, "id");
   state.platformChangeLogs = Array.isArray(state.platformChangeLogs) && state.platformChangeLogs.length ? state.platformChangeLogs.slice(0, 200) : seedPlatformChangeLogs();
   const interfaceCompletion = new Map(seedInterfaceRequirements().map((item) => [item.id, { status: item.status, need: item.need }]));
   state.interfaceRequirements = mergeByKey(seedInterfaceRequirements(), state.interfaceRequirements, "id").map((item) => ({
@@ -2287,6 +2350,11 @@ function scopeStateForUser(data, user) {
   delete scoped.platformEvidence;
   delete scoped.platformChangeLogs;
   delete scoped.platformRoadmap;
+  delete scoped.platformAudit;
+  delete scoped.platformProcessAudit;
+  delete scoped.applicationCatalog;
+  delete scoped.institutionCreditEvaluations;
+  delete scoped.securityAcceptanceLedger;
 
   if (user.role !== "citizen") {
     if (user.role === "institution" && user.doctorId) {

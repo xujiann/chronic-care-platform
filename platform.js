@@ -22,6 +22,9 @@ const fallbackPlatformState = {
   platformInterfaces: [],
   platformDeliveryBatches: [],
   platformEvidence: [],
+  applicationCatalog: [],
+  institutionCreditEvaluations: [],
+  securityAcceptanceLedger: [],
   platformChangeLogs: []
 };
 
@@ -135,6 +138,28 @@ const defaultPlatformEvidence = [
   { id: "ev-launch", category: "上线验收", name: "区级实施和应用上线材料", owner: "实施组", source: "中山、沙河口、甘井子、高新区实施批次和应用培训记录", artifacts: ["上线确认", "培训签到", "试运行问题", "用户反馈"], status: "待启动", next: "按区县、机构、应用和批次沉淀上线确认与问题闭环。", records: [] }
 ];
 
+const defaultApplicationCatalog = [
+  { id: "app-health-platform", name: "全民健康信息平台一、二期", sourceSystem: "市级存量平台", interfaceMode: "原生升级", owner: "规划信息处", reuseMode: "底座复用", batch: "第一批", evidence: "平台现状清单/架构图", status: "已纳管", next: "补齐运行监控和数据资源目录关联。" },
+  { id: "app-chronic", name: "慢病医防融合管理", sourceSystem: "慢病管理平台", interfaceMode: "模块纳管", owner: "基层卫生处/疾控", reuseMode: "业务与数据复用", batch: "第一批", evidence: "筛查随访闭环/接口清单", status: "已纳管", next: "挂接专病库版本和科研数据集目录。" },
+  { id: "app-county", name: "县域医共体协同", sourceSystem: "医共体信息平台", interfaceMode: "API/能力复用", owner: "医政医管处", reuseMode: "协同中心复用", batch: "第二批", evidence: "16255 功能清单/工单样例", status: "已纳管", next: "补齐区级实施批次和培训证据。" },
+  { id: "app-institution", name: "医疗机构业务协同", sourceSystem: "HIS/EMR/LIS/PACS", interfaceMode: "标准接口", owner: "医疗机构", reuseMode: "门户集成+数据回流", batch: "第二批", evidence: "字段映射/联调记录", status: "开发中", next: "按机构登记接口环境、版本和联调责任人。" },
+  { id: "app-citizen", name: "健康大连居民服务", sourceSystem: "居民端/健康码", interfaceMode: "统一入口", owner: "基层卫生处", reuseMode: "入口整合", batch: "第三批", evidence: "居民旅程/授权记录", status: "已纳管", next: "接入政务身份源和正式消息服务。" },
+  { id: "app-insurance", name: "医保结算监管协同", sourceSystem: "医保核心平台", interfaceMode: "接口接入", owner: "医保局/医保中心", reuseMode: "业务协同", batch: "第三批", evidence: "结算审核/凭证核验样例", status: "演示对接完成", next: "确认生产接口规范和联调窗口。" }
+];
+
+const defaultInstitutionCreditEvaluations = [
+  { id: "credit-central", name: "大连市中心医院", institutionType: "三级医院", period: "2026上半年", score: 92, grade: "A", indicators: "依法执业98/质量安全90/数据报送88/服务信用92", owner: "医政医管处", status: "已评价", next: "保持月度数据质量复核并公示优秀项。" },
+  { id: "credit-ganjingzi", name: "甘井子区人民医院", institutionType: "二级医院", period: "2026上半年", score: 84, grade: "B", indicators: "依法执业92/质量安全86/数据报送76/服务信用82", owner: "属地卫生行政部门", status: "整改中", next: "30日内完成统计迟报和接口数据缺项整改。" },
+  { id: "credit-community", name: "青泥洼桥社区卫生服务中心", institutionType: "基层机构", period: "2026上半年", score: 88, grade: "B+", indicators: "依法执业95/质量安全87/数据报送85/服务信用86", owner: "中山区卫生健康局", status: "已评价", next: "补齐家庭医生签约数据质控证据。" }
+];
+
+const defaultSecurityAcceptanceLedger = [
+  { id: "security-level3", name: "网络安全等级保护三级", category: "等保", control: "定级备案、差距测评、安全整改、复测", evidence: "定级报告/备案证明/测评报告/整改记录", owner: "安全管理岗", status: "开发中", next: "完成生产环境定级备案和测评机构进场计划。" },
+  { id: "security-crypto", name: "密码应用安全性评估", category: "密评", control: "国密传输、身份鉴别、存储加密、密钥管理", evidence: "密码应用方案/检测记录/密评报告", owner: "密码应用责任人", status: "待测评", next: "确定密码设备和电子签名边界，形成测评对象清单。" },
+  { id: "security-gm", name: "国产密码改造", category: "国密改造", control: "SM2/SM3/SM4、国密SSL、关键字段加密", evidence: "改造清单/配置截图/兼容性测试", owner: "平台技术组", status: "方案设计", next: "完成接口、数据库和证书链的国密改造排期。" },
+  { id: "security-domestic", name: "信创适配", category: "信创适配", control: "国产CPU、操作系统、数据库、中间件和浏览器", evidence: "适配矩阵/测试报告/问题闭环", owner: "基础设施组", status: "待测试", next: "建立软硬件版本矩阵并执行功能、性能和容灾测试。" }
+];
+
 document.addEventListener("DOMContentLoaded", async () => {
   platformState = await loadPlatformState(fallbackPlatformState);
   ensureEditablePlatformData(platformState);
@@ -150,6 +175,9 @@ function renderPlatform() {
   renderInterfacePlan(platformData.interfaces);
   renderDataFoundation(platformState);
   renderRoadmap(platformData.deliveryBatches);
+  renderApplicationCatalog(platformData.applicationCatalog);
+  renderInstitutionCreditEvaluations(platformData.creditEvaluations);
+  renderSecurityAcceptanceLedger(platformData.securityLedger);
   renderEvidenceLibrary(platformData.evidence);
   renderChangeLogs(platformState.platformChangeLogs || []);
   renderReportFilters(platformData);
@@ -162,7 +190,10 @@ function platformModel(state) {
     integrations: Array.isArray(state.platformIntegrations) && state.platformIntegrations.length ? state.platformIntegrations : defaultIntegrationRegistry,
     interfaces: Array.isArray(state.platformInterfaces) && state.platformInterfaces.length ? state.platformInterfaces : defaultInterfacePlan,
     deliveryBatches: Array.isArray(state.platformDeliveryBatches) && state.platformDeliveryBatches.length ? state.platformDeliveryBatches : defaultDeliveryRoadmap,
-    evidence: Array.isArray(state.platformEvidence) && state.platformEvidence.length ? state.platformEvidence : defaultPlatformEvidence
+    evidence: Array.isArray(state.platformEvidence) && state.platformEvidence.length ? state.platformEvidence : defaultPlatformEvidence,
+    applicationCatalog: Array.isArray(state.applicationCatalog) && state.applicationCatalog.length ? state.applicationCatalog : defaultApplicationCatalog,
+    creditEvaluations: Array.isArray(state.institutionCreditEvaluations) && state.institutionCreditEvaluations.length ? state.institutionCreditEvaluations : defaultInstitutionCreditEvaluations,
+    securityLedger: Array.isArray(state.securityAcceptanceLedger) && state.securityAcceptanceLedger.length ? state.securityAcceptanceLedger : defaultSecurityAcceptanceLedger
   };
 }
 
@@ -186,6 +217,9 @@ function ensureEditablePlatformData(state) {
     ...item,
     records: Array.isArray(item.records) ? item.records : []
   }));
+  if (!Array.isArray(state.applicationCatalog) || !state.applicationCatalog.length) state.applicationCatalog = structuredClone(defaultApplicationCatalog);
+  if (!Array.isArray(state.institutionCreditEvaluations) || !state.institutionCreditEvaluations.length) state.institutionCreditEvaluations = structuredClone(defaultInstitutionCreditEvaluations);
+  if (!Array.isArray(state.securityAcceptanceLedger) || !state.securityAcceptanceLedger.length) state.securityAcceptanceLedger = structuredClone(defaultSecurityAcceptanceLedger);
   if (!Array.isArray(state.platformChangeLogs)) state.platformChangeLogs = [];
 }
 
@@ -197,6 +231,9 @@ function renderMetrics(state, platform) {
     ["健康记录", count(state.personalRecords), "电子病历、检查检验、用药、授权等"],
     ["业务闭环", count(state.careOrders) + count(state.medicationPickups) + count(state.insuranceClaims), "转诊、取药、医保审核等跨端流程"],
     ["审计留痕", count(state.securityEvents) + count(state.dataAccessLogs), "登录、访问、业务操作和拒绝访问"],
+    ["纳管应用", count(state.applicationCatalog), "来源、接口、责任、批次和验收证据统一登记"],
+    ["信用评价", count(state.institutionCreditEvaluations), "机构评分、等级与整改闭环"],
+    ["安全信创", count(state.securityAcceptanceLedger), "等保、密评、国密和信创分账验收"],
     ["验收证据", count(state.platformEvidence), "申报、测评、安全、联调、上线材料统一归档"]
   ];
   document.querySelector("#platform-metrics").innerHTML = metrics.map(([label, value, hint]) => `
@@ -292,6 +329,45 @@ function renderRoadmap(deliveryBatches) {
       </div>
     </div>
   `).join("");
+}
+
+function renderApplicationCatalog(items) {
+  document.querySelector("#application-catalog").innerHTML = `
+    <table>
+      <thead><tr><th>应用/模块</th><th>来源系统</th><th>接口方式</th><th>责任处室</th><th>复用方式</th><th>批次</th><th>验收证据</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody>${items.map((item) => `
+        <tr>
+          <td><strong>${item.name}</strong></td><td>${item.sourceSystem}</td><td>${item.interfaceMode}</td>
+          <td>${item.owner}</td><td>${item.reuseMode}</td><td>${item.batch}</td><td>${item.evidence}</td>
+          <td>${statusBadge(item.status)}</td>
+          <td><button class="inline-action" type="button" data-edit-platform="applicationCatalog" data-id="${item.id}">维护</button></td>
+        </tr>`).join("")}</tbody>
+    </table>`;
+}
+
+function renderInstitutionCreditEvaluations(items) {
+  document.querySelector("#institution-credit-evaluations").innerHTML = `
+    <table>
+      <thead><tr><th>机构</th><th>类型</th><th>周期</th><th>得分/等级</th><th>指标明细</th><th>状态</th><th>整改责任</th><th>操作</th></tr></thead>
+      <tbody>${items.map((item) => `
+        <tr>
+          <td><strong>${item.name}</strong></td><td>${item.institutionType}</td><td>${item.period}</td>
+          <td><strong>${item.score}</strong> / ${item.grade}</td><td>${item.indicators}</td><td>${statusBadge(item.status)}</td>
+          <td>${item.owner}</td>
+          <td><button class="inline-action" type="button" data-edit-platform="creditEvaluations" data-id="${item.id}">维护</button></td>
+        </tr>`).join("")}</tbody>
+    </table>`;
+}
+
+function renderSecurityAcceptanceLedger(items) {
+  document.querySelector("#security-acceptance-ledger").innerHTML = items.map((item) => `
+    <div>
+      <strong>${item.category} · ${item.name}</strong>
+      <span>${item.control}</span>
+      <span>证据：${item.evidence}</span>
+      <span>${item.owner} · ${statusBadge(item.status)}</span>
+      <button class="inline-action" type="button" data-edit-platform="securityLedger" data-id="${item.id}">维护</button>
+    </div>`).join("");
 }
 
 function renderEvidenceLibrary(evidence) {
@@ -466,7 +542,10 @@ function findEditableItem(collection, id) {
     capabilities: "platformCapabilities",
     integrations: "platformIntegrations",
     interfaces: "platformInterfaces",
-    deliveryBatches: "platformDeliveryBatches"
+    deliveryBatches: "platformDeliveryBatches",
+    applicationCatalog: "applicationCatalog",
+    creditEvaluations: "institutionCreditEvaluations",
+    securityLedger: "securityAcceptanceLedger"
   }[collection];
   if (!key) return null;
   return (platformState[key] || []).find((item) => item.id === id);
@@ -521,7 +600,10 @@ function collectionKey(collection) {
     integrations: "platformIntegrations",
     interfaces: "platformInterfaces",
     deliveryBatches: "platformDeliveryBatches",
-    platformEvidence: "platformEvidence"
+    platformEvidence: "platformEvidence",
+    applicationCatalog: "applicationCatalog",
+    creditEvaluations: "institutionCreditEvaluations",
+    securityLedger: "securityAcceptanceLedger"
   }[collection] || collection;
 }
 
@@ -598,7 +680,10 @@ function reportItems(platform) {
     ...platform.capabilities.map((item) => ({ type: "建设域", name: item.group, status: item.status, owner: item.owner, next: item.next })),
     ...platform.integrations.map((item) => ({ type: "存量整合", name: item.name, status: item.status, owner: item.owner, next: item.target })),
     ...platform.interfaces.map((item) => ({ type: "接口衔接", name: item.domain, status: item.status, owner: item.owner, next: item.next })),
-    ...platform.deliveryBatches.map((item) => ({ type: "开发批次", name: item.phase, status: item.status, owner: item.owner, next: Array.isArray(item.items) ? item.items.join("、") : "" }))
+    ...platform.deliveryBatches.map((item) => ({ type: "开发批次", name: item.phase, status: item.status, owner: item.owner, next: Array.isArray(item.items) ? item.items.join("、") : "" })),
+    ...platform.applicationCatalog.map((item) => ({ type: "应用目录", name: item.name, status: item.status, owner: item.owner, next: item.next })),
+    ...platform.creditEvaluations.map((item) => ({ type: "信用评价", name: item.name, status: item.status, owner: item.owner, next: item.next })),
+    ...platform.securityLedger.map((item) => ({ type: "安全信创", name: item.name, status: item.status, owner: item.owner, next: item.next }))
   ];
 }
 
@@ -649,7 +734,10 @@ function collectionTypeName(collection) {
     platformCapabilities: "建设域",
     platformIntegrations: "存量整合",
     platformInterfaces: "接口衔接",
-    platformDeliveryBatches: "开发批次"
+    platformDeliveryBatches: "开发批次",
+    applicationCatalog: "应用目录",
+    institutionCreditEvaluations: "信用评价",
+    securityAcceptanceLedger: "安全信创"
   }[collection] || "";
 }
 
