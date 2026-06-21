@@ -3001,6 +3001,49 @@ function updateIntegrationEvent(data, eventId, updater) {
   return updated;
 }
 
+function integrationSampleValue(field, contract, sequence) {
+  const values = {
+    externalId: `${contract.domain}-${String(sequence).padStart(3, "0")}`,
+    residentId: "r1",
+    institution: "大连市中心医院",
+    visitedAt: "2026-06-21T10:00:00.000Z",
+    diagnosis: "高血压复诊",
+    recordDate: "2026-06-21",
+    item: "血糖",
+    result: "6.1 mmol/L",
+    reportedAt: "2026-06-21T11:00:00.000Z",
+    modality: "CT",
+    conclusion: "未见急性异常",
+    claimStatus: "已结算",
+    amount: 128.5,
+    certificateNo: `CERT-${String(sequence).padStart(6, "0")}`,
+    status: "有效",
+    period: "2026-06",
+    metrics: { outpatientVisits: 1280, chronicFollowups: 320 }
+  };
+  return values[field] ?? `${field}-${sequence}`;
+}
+
+function buildIntegrationSample(contract, sequence = 1) {
+  const payload = {
+    contractId: contract.id,
+    idempotencyKey: `${contract.id}-sample-${String(sequence).padStart(3, "0")}`,
+    externalId: integrationSampleValue("externalId", contract, sequence),
+    payload: {}
+  };
+  (contract.requiredFields || []).forEach((field) => {
+    const value = integrationSampleValue(field, contract, sequence);
+    payload[field] = value;
+    payload.payload[field] = value;
+  });
+  return {
+    contractId: contract.id,
+    domain: contract.domain,
+    payload,
+    signature: integrationSignatureFor(payload)
+  };
+}
+
 function personIndexFromParts(idCard, phone) {
   return `${String(idCard || "").trim()}#${String(phone || "").trim()}`;
 }
@@ -3564,6 +3607,20 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/integration/samples") {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/integration/samples");
+    if (!user) return;
+    const data = readDatabase();
+    const contractId = url.searchParams.get("contractId");
+    const contracts = contractId ? data.integrationContracts.filter((item) => item.id === contractId) : data.integrationContracts;
+    if (contractId && contracts.length === 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到接口契约" });
+      return;
+    }
+    sendJson(res, 200, { samples: contracts.map((contract, index) => buildIntegrationSample(contract, index + 1)) });
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/integration/events") {
     const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/integration/events");
     if (!user) return;
@@ -3610,6 +3667,46 @@ async function handleApi(req, res) {
     ].slice(0, 120);
     writeDatabase(data);
     sendJson(res, 202, event);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/integration/simulate") {
+    const user = requireApiRole(req, res, ["commission"], "/api/integration/simulate");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const contract = data.integrationContracts.find((item) => item.id === payload.contractId);
+    if (!contract) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到接口契约" });
+      return;
+    }
+    const sample = buildIntegrationSample(contract, Number(payload.sequence || 1));
+    const duplicate = (data.integrationGatewayEvents || []).find((item) => item.idempotencyKey === sample.payload.idempotencyKey);
+    if (duplicate) {
+      sendJson(res, 200, { sample, event: { ...duplicate, idempotentReplay: true } });
+      return;
+    }
+    const event = {
+      ...normalizeIntegrationEvent(sample.payload, user, contract),
+      simulated: true,
+      simulatorSignature: sample.signature
+    };
+    data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "模拟集成网关联调",
+        target: `${contract.domain}/${sample.payload.externalId}`,
+        result: "允许",
+        detail: `${contract.id} · ${sample.payload.idempotencyKey}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 202, { sample, event });
     return;
   }
 

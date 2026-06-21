@@ -322,6 +322,12 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(contracts.response.status, 200);
     assert.equal(contracts.body.contracts.some((item) => item.id === "his-patient-v1"), true);
 
+    const samples = await api(baseUrl, "/api/integration/samples?contractId=his-patient-v1", authorized(institution.body.token));
+    assert.equal(samples.response.status, 200);
+    assert.equal(samples.body.samples.length, 1);
+    assert.equal(samples.body.samples[0].payload.contractId, "his-patient-v1");
+    assert.equal(samples.body.samples[0].signature, integrationSignature(samples.body.samples[0].payload));
+
     const eventPayload = {
       contractId: "his-patient-v1",
       idempotencyKey: "his-r1-visit-001",
@@ -380,6 +386,23 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(monitor.body.summary.total >= 1, true);
     assert.equal(monitor.body.summary.deadLetters >= 1, true);
     assert.equal(monitor.body.summary.byStatus.failed >= 1, true);
+
+    const simulated = await api(baseUrl, "/api/integration/simulate", authorized(commission.body.token, {
+      method: "POST",
+      body: JSON.stringify({ contractId: "insurance-settlement-v1", sequence: 7 })
+    }));
+    assert.equal(simulated.response.status, 202);
+    assert.equal(simulated.body.event.contractId, "insurance-settlement-v1");
+    assert.equal(simulated.body.event.simulated, true);
+    assert.equal(simulated.body.sample.signature, integrationSignature(simulated.body.sample.payload));
+
+    const simulatedReplay = await api(baseUrl, "/api/integration/simulate", authorized(commission.body.token, {
+      method: "POST",
+      body: JSON.stringify({ contractId: "insurance-settlement-v1", sequence: 7 })
+    }));
+    assert.equal(simulatedReplay.response.status, 200);
+    assert.equal(simulatedReplay.body.event.id, simulated.body.event.id);
+    assert.equal(simulatedReplay.body.event.idempotentReplay, true);
   });
 
   await t.test("enforces workflow collection ownership and protects structural fields", async () => {
