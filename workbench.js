@@ -110,6 +110,10 @@ function renderSystemReadiness(readiness) {
   }).join("");
 
   const dependencyRows = dependencies.slice(0, 6).map((item) => `<span class="badge warn">${item.name || item}</span>`).join("");
+  const productionEnv = readiness.productionEnvironment || null;
+  const productionEnvRows = (productionEnv?.checks || []).map((item) =>
+    `<span class="badge ${item.passed ? "info" : "warn"}">${item.name}: ${item.detail}</span>`
+  ).join("");
 
   container.innerHTML = `<article class="priority-row">
     <div class="priority-rank ${readiness.passed ? "info" : "danger"}">${readiness.passed ? "OK" : "!"}</div>
@@ -117,6 +121,7 @@ function renderSystemReadiness(readiness) {
       <h3>${readiness.service || "系统"}发布就绪总览</h3>
       <p>生成时间：${readiness.generatedAt || "未知"}；P2 集合、审计链和运行负载已纳入统一检查。</p>
       <div class="standard-tags">${dependencyRows || `<span class="badge info">暂无外部依赖提示</span>`}</div>
+      <div class="standard-tags">${productionEnvRows || `<span class="badge warn">生产环境门禁待运行</span>`}</div>
     </div>
     <div class="capability-side">
       <span class="badge ${readiness.passed ? "info" : "danger"}">${readiness.passed ? "代码闭环通过" : "仍需处理"}</span>

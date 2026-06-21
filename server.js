@@ -2807,6 +2807,31 @@ function buildRuntimeMetrics(data) {
   };
 }
 
+function secretReady(value, minLength = 32) {
+  const text = String(value || "");
+  return text.length >= minLength && !/replace-with|change-me|changeme|demo-|demo_|example|placeholder/i.test(text);
+}
+
+function buildProductionEnvironmentStatus() {
+  const storageEngine = String(process.env.STORAGE_ENGINE || "auto").toLowerCase();
+  const sessionSecrets = String(process.env.SESSION_SECRETS || process.env.SESSION_SECRET || "").split(",").map((item) => item.trim()).filter(Boolean);
+  const checks = [
+    { id: "node-env", name: "NODE_ENV=production", passed: process.env.NODE_ENV === "production", detail: process.env.NODE_ENV || "missing" },
+    { id: "storage-engine", name: "production storage engine", passed: storageEngine !== "json", detail: storageEngine },
+    { id: "session-secrets", name: "session secret quality", passed: sessionSecrets.length > 0 && sessionSecrets.every((item) => secretReady(item)), detail: `${sessionSecrets.length} configured` },
+    { id: "gateway-secret", name: "integration gateway secret quality", passed: secretReady(process.env.INTEGRATION_GATEWAY_SECRET), detail: process.env.INTEGRATION_GATEWAY_SECRET ? "configured" : "missing" },
+    { id: "database-url", name: "database url for postgres", passed: !["postgres", "postgresql"].includes(storageEngine) || Boolean(process.env.DATABASE_URL), detail: process.env.DATABASE_URL ? "configured" : "not required" },
+    { id: "identity-adapter", name: "government identity adapter", passed: Boolean(process.env.OIDC_ISSUER_URL && process.env.OIDC_CLIENT_ID && process.env.OIDC_CLIENT_SECRET), detail: process.env.OIDC_ISSUER_URL ? "issuer configured" : "OIDC missing" },
+    { id: "audit-retention", name: "audit retention target", passed: Boolean(process.env.AUDIT_EXPORT_PATH || process.env.SIEM_ENDPOINT), detail: process.env.AUDIT_EXPORT_PATH || process.env.SIEM_ENDPOINT ? "configured" : "missing" }
+  ];
+  return {
+    profile: process.env.NODE_ENV || "development",
+    storageEngine,
+    passed: checks.every((item) => item.passed),
+    checks
+  };
+}
+
 function buildSystemReadinessReport(data) {
   const p2Collections = {
     institutionCreditEvaluations: Array.isArray(data.institutionCreditEvaluations) ? data.institutionCreditEvaluations.length : 0,
@@ -2848,6 +2873,7 @@ function buildSystemReadinessReport(data) {
     checks,
     p2Collections,
     productionDeploymentPlan,
+    productionEnvironment: buildProductionEnvironmentStatus(),
     runtime: runtime.workload,
     externalDependencies: [
       "政务统一身份源",
