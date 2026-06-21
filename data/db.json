@@ -6486,6 +6486,83 @@
       "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     }
   ],
+  "productionDeploymentPlan": [
+    {
+      "id": "prod-env-gate",
+      "track": "release-governance",
+      "name": "Production environment gate",
+      "owner": "platform-ops",
+      "status": "ready",
+      "requiredConfig": [
+        "NODE_ENV",
+        "STORAGE_ENGINE",
+        "SESSION_SECRETS",
+        "INTEGRATION_GATEWAY_SECRET"
+      ],
+      "evidence": [
+        "npm run env:check",
+        "npm run release:report"
+      ],
+      "nextAction": "Run env:check:production with site-specific .env before production cutover."
+    },
+    {
+      "id": "prod-storage-adapter",
+      "track": "database",
+      "name": "Production database adapter path",
+      "owner": "data-platform",
+      "status": "planned",
+      "requiredConfig": [
+        "DATABASE_URL",
+        "STORAGE_ENGINE=postgres",
+        "backup policy",
+        "migration window"
+      ],
+      "evidence": [
+        "SQLite v7 mirror tables",
+        "storage backup and restore rehearsal",
+        "release readiness report"
+      ],
+      "nextAction": "Implement PostgreSQL adapter behind the existing storage API and rehearse migration with masked data."
+    },
+    {
+      "id": "prod-identity-adapter",
+      "track": "identity",
+      "name": "Government identity adapter path",
+      "owner": "identity-integration",
+      "status": "planned",
+      "requiredConfig": [
+        "OIDC/SAML endpoint",
+        "client credentials",
+        "org mapping",
+        "CA/SMS/person verification policy"
+      ],
+      "evidence": [
+        "role scoped /api/state",
+        "session rotation support",
+        "security event trail"
+      ],
+      "nextAction": "Map external identity claims to authUsers, authOrganizations, orgCode and role home pages."
+    },
+    {
+      "id": "prod-audit-retention",
+      "track": "security",
+      "name": "Audit retention and immutable export path",
+      "owner": "security-admin",
+      "status": "planned",
+      "requiredConfig": [
+        "log retention period",
+        "WORM/archive target",
+        "SIEM endpoint",
+        "security assessment owner"
+      ],
+      "evidence": [
+        "/api/audit/verify",
+        "/api/audit/export",
+        "/api/security/compliance-report"
+      ],
+      "nextAction": "Export hash-chain audit trails to production log retention infrastructure and attach assessment evidence."
+    }
+  ],
   "storageMeta": {
     "engine": "json",
     "mode": "JSON 文件存储",

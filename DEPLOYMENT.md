@@ -149,6 +149,8 @@ npm.cmd run release:report:full
 
 `release:report` 默认生成 `release/release-report.json` 和 `release/release-report.md`，汇总代码文件、关键脚本、静态快照、P2 完成状态、验收证据和环境校验；`release:report:full` 会额外执行 `check`、`test`、`deploy:check` 和 `npm audit --omit=dev`。发布归档时建议保存这两个报告文件，作为上线前人工审查材料。
 
+静态快照中的 `productionDeploymentPlan` 是 P0 生产化路线台账，覆盖发布门禁、PostgreSQL/正式数据库适配、政务统一身份适配和审计保全。`/api/system/readiness` 与 `release:report` 都会检查该台账是否存在，避免生产化路径只停留在文档中。
+
 ## 存储迁移与备份
 
 SQLite 启动时会通过 `schema_migrations` 自动执行幂等迁移，当前 schema 版本为 7。部署升级前应先停止写入并创建备份。v7 已把机构信用评价、科研数据集、专病库模型和无障碍验收清单纳入结构化镜像表：

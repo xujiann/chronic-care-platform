@@ -100,6 +100,7 @@ function snapshotChecks(data) {
     "authUsers",
     "platformRoadmap",
     "platformEvidence",
+    "productionDeploymentPlan",
     "institutionCreditEvaluations",
     "researchDatasets",
     "diseaseRegistryModels",
@@ -110,11 +111,13 @@ function snapshotChecks(data) {
   const p2 = (data.platformRoadmap || []).filter((item) => item.priority === "P2");
   const evidence = Array.isArray(data.platformEvidence) ? data.platformEvidence : [];
   const acceptanceRecords = evidence.flatMap((item) => item.records || []);
+  const productionDeploymentPlan = Array.isArray(data.productionDeploymentPlan) ? data.productionDeploymentPlan : [];
 
   return [
     check("snapshot:collections", requiredCollections.every((key) => data[key]), requiredCollections.filter((key) => !data[key]).join(",") || "all present", "error", "snapshot"),
     check("snapshot:p2Complete", p2.length > 0 && p2.every((item) => item.status === "已完成"), p2.map((item) => `${item.title}:${item.status}`).join(";"), "error", "snapshot"),
     check("snapshot:acceptanceEvidence", acceptanceRecords.length >= 2, `${acceptanceRecords.length} evidence records`, "error", "snapshot"),
+    check("snapshot:productionDeploymentPlan", productionDeploymentPlan.length >= 4 && productionDeploymentPlan.every((item) => item.id && item.owner && item.nextAction), `${productionDeploymentPlan.length} deployment tracks`, "error", "snapshot"),
     check("snapshot:noCorruptedPlaceholders", !/编码损坏|缂栫爜鎹熷潖|\?\?\?/.test(raw), "no known corrupted placeholders", "error", "snapshot"),
     check("snapshot:accessibility", Array.isArray(data.accessibilityChecklist) && data.accessibilityChecklist.length >= 5, `${data.accessibilityChecklist?.length || 0} checklist items`, "error", "snapshot")
   ];

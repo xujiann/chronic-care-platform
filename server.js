@@ -540,6 +540,7 @@ function seedState() {
     platformInterfaces: seedPlatformInterfaces(),
     platformDeliveryBatches: seedPlatformDeliveryBatches(),
     platformEvidence: seedPlatformEvidence(),
+    productionDeploymentPlan: seedProductionDeploymentPlan(),
     applicationCatalog: seedApplicationCatalog(),
     institutionCreditEvaluations: seedInstitutionCreditEvaluations(),
     creditEvaluationRules: seedCreditEvaluationRules(),
@@ -618,6 +619,51 @@ function seedPlatformEvidence() {
     { id: "ev-security", category: "安全合规", name: "等保、密评和信创适配证据", owner: "安全管理岗", source: "统一认证、访问审计、安全事件、数据访问日志、信创适配清单", artifacts: ["权限矩阵", "审计日志", "安全事件", "密评整改项"], status: "开发中", next: "补齐国密传输、数据库加密、日志保全和国产化适配证明。", records: [] },
     { id: "ev-interface", category: "接口联调", name: "外部系统接口联调验收", owner: "市级平台/医疗机构", source: "HIS、EMR、LIS、PACS、医保、电子证照、卫生统计等对接计划", artifacts: ["联调计划", "字段映射", "异常清单", "回归测试"], status: "开发中", next: "为每个接口域建立责任人、环境、频率、样例和验收规则。", records: [] },
     { id: "ev-launch", category: "上线验收", name: "区级实施和应用上线材料", owner: "实施组", source: "中山、沙河口、甘井子、高新区实施批次和应用培训记录", artifacts: ["上线确认", "培训签到", "试运行问题", "用户反馈"], status: "待启动", next: "按区县、机构、应用和批次沉淀上线确认与问题闭环。", records: [] }
+  ];
+}
+
+function seedProductionDeploymentPlan() {
+  return [
+    {
+      id: "prod-env-gate",
+      track: "release-governance",
+      name: "Production environment gate",
+      owner: "platform-ops",
+      status: "ready",
+      requiredConfig: ["NODE_ENV", "STORAGE_ENGINE", "SESSION_SECRETS", "INTEGRATION_GATEWAY_SECRET"],
+      evidence: ["npm run env:check", "npm run release:report"],
+      nextAction: "Run env:check:production with site-specific .env before production cutover."
+    },
+    {
+      id: "prod-storage-adapter",
+      track: "database",
+      name: "Production database adapter path",
+      owner: "data-platform",
+      status: "planned",
+      requiredConfig: ["DATABASE_URL", "STORAGE_ENGINE=postgres", "backup policy", "migration window"],
+      evidence: ["SQLite v7 mirror tables", "storage backup and restore rehearsal", "release readiness report"],
+      nextAction: "Implement PostgreSQL adapter behind the existing storage API and rehearse migration with masked data."
+    },
+    {
+      id: "prod-identity-adapter",
+      track: "identity",
+      name: "Government identity adapter path",
+      owner: "identity-integration",
+      status: "planned",
+      requiredConfig: ["OIDC/SAML endpoint", "client credentials", "org mapping", "CA/SMS/person verification policy"],
+      evidence: ["role scoped /api/state", "session rotation support", "security event trail"],
+      nextAction: "Map external identity claims to authUsers, authOrganizations, orgCode and role home pages."
+    },
+    {
+      id: "prod-audit-retention",
+      track: "security",
+      name: "Audit retention and immutable export path",
+      owner: "security-admin",
+      status: "planned",
+      requiredConfig: ["log retention period", "WORM/archive target", "SIEM endpoint", "security assessment owner"],
+      evidence: ["/api/audit/verify", "/api/audit/export", "/api/security/compliance-report"],
+      nextAction: "Export hash-chain audit trails to production log retention infrastructure and attach assessment evidence."
+    }
   ];
 }
 
@@ -2781,12 +2827,17 @@ function buildSystemReadinessReport(data) {
     const text = JSON.stringify(item);
     return item.owner && item.testRecord && item.status && !text.includes("编码损坏，待核验");
   });
+  const productionDeploymentPlan = Array.isArray(data.productionDeploymentPlan) ? data.productionDeploymentPlan : [];
+  const productionPlanReady = productionDeploymentPlan.length >= 4 && productionDeploymentPlan.every((item) =>
+    item.id && item.track && item.owner && item.status && item.nextAction && Array.isArray(item.requiredConfig) && item.requiredConfig.length
+  );
   const runtime = buildRuntimeMetrics(data);
   const checks = [
     { id: "storage-meta", name: "存储元信息", passed: Boolean(runtime.storage.jsonFile), detail: runtime.storage.mode },
     { id: "p2-roadmap", name: "P2 路线图完成", passed: p2Complete, detail: roadmap.filter((item) => item.priority === "P2").map((item) => `${item.title}:${item.status}`).join(";") },
     { id: "p2-collections", name: "P2 集合完整", passed: Object.values(p2Collections).every(Boolean), detail: JSON.stringify(p2Collections) },
     { id: "acceptance-evidence", name: "验收证据台账", passed: evidenceClean && evidenceRecords.length >= 2, detail: `records=${evidenceRecords.length}` },
+    { id: "production-deployment-plan", name: "生产部署路径", passed: productionPlanReady, detail: `tracks=${productionDeploymentPlan.length}` },
     { id: "audit-chain", name: "审计哈希链", passed: Object.values(auditTrails).every((item) => item.passed), detail: `security=${auditTrails.securityEvents.broken.length}, access=${auditTrails.dataAccessLogs.broken.length}` },
     { id: "runtime-workload", name: "运行负载可观测", passed: Number.isFinite(runtime.workload.unifiedTasks), detail: `tasks=${runtime.workload.unifiedTasks}, quality=${runtime.workload.dataQualityIssues}` }
   ];
@@ -2796,6 +2847,7 @@ function buildSystemReadinessReport(data) {
     service: runtime.service,
     checks,
     p2Collections,
+    productionDeploymentPlan,
     runtime: runtime.workload,
     externalDependencies: [
       "政务统一身份源",
@@ -2900,6 +2952,7 @@ function normalizeState(data) {
     platformInterfaces: mergeByKey(seedPlatformInterfaces(), data.platformInterfaces, "id"),
     platformDeliveryBatches: mergeByKey(seedPlatformDeliveryBatches(), data.platformDeliveryBatches, "id"),
     platformEvidence: mergeByKey(seedPlatformEvidence(), data.platformEvidence, "id"),
+    productionDeploymentPlan: mergeByKey(seedProductionDeploymentPlan(), data.productionDeploymentPlan, "id"),
     applicationCatalog: mergeByKey(seedApplicationCatalog(), data.applicationCatalog, "id"),
     institutionCreditEvaluations: mergeByKey(seedInstitutionCreditEvaluations(), data.institutionCreditEvaluations, "id"),
     creditEvaluationRules: data.creditEvaluationRules && typeof data.creditEvaluationRules === "object" ? data.creditEvaluationRules : seedCreditEvaluationRules(),
@@ -2962,6 +3015,11 @@ function completeSystemTargets(state) {
   state.platformEvidence = mergeByKey(seedPlatformEvidence(), state.platformEvidence, "id").map((item) => ({
     ...item,
     records: Array.isArray(item.records) ? item.records.slice(0, 20) : []
+  }));
+  state.productionDeploymentPlan = mergeByKey(seedProductionDeploymentPlan(), state.productionDeploymentPlan, "id").map((item) => ({
+    ...item,
+    requiredConfig: Array.isArray(item.requiredConfig) ? item.requiredConfig : [],
+    evidence: Array.isArray(item.evidence) ? item.evidence : []
   }));
   state.applicationCatalog = mergeByKey(seedApplicationCatalog(), state.applicationCatalog, "id");
   state.institutionCreditEvaluations = mergeByKey(seedInstitutionCreditEvaluations(), state.institutionCreditEvaluations, "id");
@@ -3819,6 +3877,7 @@ function scopeStateForUser(data, user) {
   delete scoped.platformInterfaces;
   delete scoped.platformDeliveryBatches;
   delete scoped.platformEvidence;
+  delete scoped.productionDeploymentPlan;
   delete scoped.platformChangeLogs;
   delete scoped.platformRoadmap;
   delete scoped.platformAudit;

@@ -134,6 +134,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(readiness.body.passed, true);
     assert.equal(readiness.body.p2Collections.researchDatasets >= 2, true);
     assert.equal(readiness.body.checks.some((item) => item.id === "acceptance-evidence" && item.passed), true);
+    assert.equal(readiness.body.checks.some((item) => item.id === "production-deployment-plan" && item.passed), true);
+    assert.equal(readiness.body.productionDeploymentPlan.some((item) => item.id === "prod-identity-adapter"), true);
     assert.equal(readiness.body.checks.some((item) => item.id === "audit-chain" && item.passed), true);
     assert.equal(readiness.body.externalDependencies.includes("政务统一身份源"), true);
   });
@@ -172,6 +174,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       if (role !== "commission") {
         assert.equal(scopedState.body.applicationCatalog, undefined, `${username} 不应读取平台建设目录`);
         assert.equal(scopedState.body.securityAcceptanceLedger, undefined, `${username} 不应读取安全验收台账`);
+        assert.equal(scopedState.body.productionDeploymentPlan, undefined, `${username} should not read production deployment plan`);
       }
     }
   });
@@ -189,7 +192,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(body.applicationCatalog.length, 6);
     assert.equal(body.institutionCreditEvaluations.length, 3);
     assert.equal(body.securityAcceptanceLedger.length, 4);
-    ["residents", "personalRecords", "platformEvidence", "applicationCatalog", "institutionCreditEvaluations", "securityAcceptanceLedger"].forEach((key) => {
+    assert.equal(body.productionDeploymentPlan.length, 4);
+    ["residents", "personalRecords", "platformEvidence", "productionDeploymentPlan", "applicationCatalog", "institutionCreditEvaluations", "securityAcceptanceLedger"].forEach((key) => {
       assert.ok(Array.isArray(body[key]), `${key} 应保持数组契约`);
     });
   });
@@ -213,6 +217,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       "securityEvents",
       "platformAudit",
       "platformProcessAudit",
+      "productionDeploymentPlan",
       "applicationCatalog",
       "institutionCreditEvaluations",
       "securityAcceptanceLedger"
@@ -702,6 +707,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(saved.body.applicationCatalog.length, 6);
     assert.equal(saved.body.institutionCreditEvaluations.length, 3);
     assert.equal(saved.body.securityAcceptanceLedger.length, 4);
+    assert.equal(saved.body.productionDeploymentPlan.length, 4);
   });
 
   await t.test("verifies audit hash chains and detects tampering", async () => {

@@ -52,6 +52,8 @@ test("static snapshot keeps completed P2 governance collections", () => {
   assert.equal(data.mobileExperienceSettings.weakNetworkMode, "cache-last-state");
   assert.equal(Array.isArray(data.accessibilityChecklist), true);
   assert.equal(data.accessibilityChecklist.some((item) => item.id === "a11y-large-font"), true);
+  assert.equal(Array.isArray(data.productionDeploymentPlan), true);
+  assert.equal(data.productionDeploymentPlan.some((item) => item.id === "prod-storage-adapter"), true);
   assert.equal(data.platformRoadmap.filter((item) => item.priority === "P2").every((item) => item.status === "已完成"), true);
 });
 
