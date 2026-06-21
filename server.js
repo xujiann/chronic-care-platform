@@ -456,6 +456,7 @@ function seedState() {
     platformEvidence: seedPlatformEvidence(),
     applicationCatalog: seedApplicationCatalog(),
     institutionCreditEvaluations: seedInstitutionCreditEvaluations(),
+    creditEvaluationRules: seedCreditEvaluationRules(),
     securityAcceptanceLedger: seedSecurityAcceptanceLedger(),
     platformChangeLogs: seedPlatformChangeLogs(),
     platformRoadmap: seedPlatformRoadmap(),
@@ -547,6 +548,29 @@ function seedInstitutionCreditEvaluations() {
     { id: "credit-ganjingzi", name: "甘井子区人民医院", institutionType: "二级医院", period: "2026上半年", score: 84, grade: "B", indicators: "依法执业92/质量安全86/数据报送76/服务信用82", owner: "属地卫生行政部门", status: "整改中", next: "30日内完成统计迟报和接口数据缺项整改。" },
     { id: "credit-community", name: "青泥洼桥社区卫生服务中心", institutionType: "基层机构", period: "2026上半年", score: 88, grade: "B+", indicators: "依法执业95/质量安全87/数据报送85/服务信用86", owner: "中山区卫生健康局", status: "已评价", next: "补齐家庭医生签约数据质控证据。" }
   ];
+}
+
+function seedCreditEvaluationRules() {
+  return {
+    version: "credit-rules-2026.1",
+    period: "2026H1",
+    baseScore: 100,
+    dimensions: [
+      { key: "legalPractice", name: "依法执业", weight: 25, source: "执业监管台账", maxDeduction: 8 },
+      { key: "qualitySafety", name: "质量安全", weight: 30, source: "质控复核与危急值处置", maxDeduction: 12 },
+      { key: "dataReporting", name: "数据报送", weight: 25, source: "数据质量问题与接口死信", maxDeduction: 15 },
+      { key: "serviceCredit", name: "服务信用", weight: 20, source: "任务超时、居民消息回执和整改闭环", maxDeduction: 10 }
+    ],
+    gradeBands: [
+      { grade: "A", minScore: 90 },
+      { grade: "B+", minScore: 85 },
+      { grade: "B", minScore: 80 },
+      { grade: "C", minScore: 70 },
+      { grade: "D", minScore: 0 }
+    ],
+    appealFlow: ["机构提交申诉", "属地初审", "市级复核", "公示结果更新"],
+    publicationFlow: ["月度试算", "机构确认", "异议处理", "官网/政务端公示"]
+  };
 }
 
 function seedSecurityAcceptanceLedger() {
@@ -2556,6 +2580,7 @@ function normalizeState(data) {
     platformEvidence: mergeByKey(seedPlatformEvidence(), data.platformEvidence, "id"),
     applicationCatalog: mergeByKey(seedApplicationCatalog(), data.applicationCatalog, "id"),
     institutionCreditEvaluations: mergeByKey(seedInstitutionCreditEvaluations(), data.institutionCreditEvaluations, "id"),
+    creditEvaluationRules: data.creditEvaluationRules && typeof data.creditEvaluationRules === "object" ? data.creditEvaluationRules : seedCreditEvaluationRules(),
     securityAcceptanceLedger: mergeByKey(seedSecurityAcceptanceLedger(), data.securityAcceptanceLedger, "id"),
     platformChangeLogs: Array.isArray(data.platformChangeLogs) ? data.platformChangeLogs : seedPlatformChangeLogs(),
     platformRoadmap: Array.isArray(data.platformRoadmap) ? data.platformRoadmap : seedPlatformRoadmap(),
@@ -2614,6 +2639,7 @@ function completeSystemTargets(state) {
   }));
   state.applicationCatalog = mergeByKey(seedApplicationCatalog(), state.applicationCatalog, "id");
   state.institutionCreditEvaluations = mergeByKey(seedInstitutionCreditEvaluations(), state.institutionCreditEvaluations, "id");
+  state.creditEvaluationRules = state.creditEvaluationRules && typeof state.creditEvaluationRules === "object" ? state.creditEvaluationRules : seedCreditEvaluationRules();
   state.securityAcceptanceLedger = mergeByKey(seedSecurityAcceptanceLedger(), state.securityAcceptanceLedger, "id");
   state.platformChangeLogs = Array.isArray(state.platformChangeLogs) && state.platformChangeLogs.length ? state.platformChangeLogs.slice(0, 200) : seedPlatformChangeLogs();
   const interfaceCompletion = new Map(seedInterfaceRequirements().map((item) => [item.id, { status: item.status, need: item.need }]));
@@ -3868,6 +3894,40 @@ function highRiskSecurityEvents(data) {
   );
 }
 
+function creditGrade(score, rules) {
+  return (rules.gradeBands || seedCreditEvaluationRules().gradeBands).find((band) => score >= band.minScore)?.grade || "D";
+}
+
+function calculateCreditEvaluations(data) {
+  const rules = data.creditEvaluationRules || seedCreditEvaluationRules();
+  const qualityIssues = buildDataQualityIssues(data).filter((issue) => issue.status !== "closed");
+  const deadLetters = (data.integrationGatewayEvents || []).filter((event) => event.deadLetter);
+  const overdueTasks = buildUnifiedTasks(data, { role: "commission", username: "system" }).filter((task) => task.overdue);
+  return (data.institutionCreditEvaluations || []).map((institution) => {
+    const name = institution.name || institution.institution || "";
+    const matchedIssues = qualityIssues.filter((issue) => !issue.institution || issue.institution === name);
+    const matchedDeadLetters = deadLetters.filter((event) => !event.payload?.institution || event.payload.institution === name);
+    const matchedOverdue = overdueTasks.filter((task) => !task.owner || task.owner === name || task.title.includes(name));
+    const deductions = [
+      { dimension: "legalPractice", points: 0, source: "执业监管台账", reason: "未发现新增扣分项" },
+      { dimension: "qualitySafety", points: Math.min(12, matchedIssues.filter((issue) => issue.type === "abnormal_value").length * 4), source: "数据质量扫描", reason: "异常值或质控问题" },
+      { dimension: "dataReporting", points: Math.min(15, matchedIssues.length * 2 + matchedDeadLetters.length * 5), source: "数据质量/接口网关", reason: "质量问题或接口死信" },
+      { dimension: "serviceCredit", points: Math.min(10, matchedOverdue.length * 2), source: "统一任务中心", reason: "超时任务" }
+    ].filter((item) => item.points > 0 || item.dimension === "legalPractice");
+    const score = Math.max(0, Number(rules.baseScore || 100) - deductions.reduce((sum, item) => sum + item.points, 0));
+    return {
+      ...institution,
+      ruleVersion: rules.version,
+      period: rules.period || institution.period,
+      calculatedScore: score,
+      calculatedGrade: creditGrade(score, rules),
+      deductions,
+      appealStatus: institution.appealStatus || "not_submitted",
+      publicationStatus: score >= 90 ? "ready_for_publication" : "pending_confirmation"
+    };
+  });
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -4081,6 +4141,40 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/data-quality/scorecard");
     if (!user) return;
     sendJson(res, 200, buildDataQualityScorecard(readDatabase()));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/credit-evaluations/calculate") {
+    const user = requireApiRole(req, res, ["commission"], "/api/credit-evaluations/calculate");
+    if (!user) return;
+    const data = readDatabase();
+    sendJson(res, 200, { rules: data.creditEvaluationRules, evaluations: calculateCreditEvaluations(data) });
+    return;
+  }
+
+  const creditActionMatch = url.pathname.match(/^\/api\/credit-evaluations\/([^/]+)\/actions$/);
+  if (req.method === "POST" && creditActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/credit-evaluations/:id/actions");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(creditActionMatch[1]);
+    const index = (data.institutionCreditEvaluations || []).findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到机构信用评价" });
+      return;
+    }
+    const payload = await collectJson(req);
+    data.institutionCreditEvaluations[index] = {
+      ...data.institutionCreditEvaluations[index],
+      appealStatus: String(payload.appealStatus || data.institutionCreditEvaluations[index].appealStatus || "not_submitted").trim(),
+      publicationStatus: String(payload.publicationStatus || data.institutionCreditEvaluations[index].publicationStatus || "pending_confirmation").trim(),
+      appealComment: String(payload.appealComment || data.institutionCreditEvaluations[index].appealComment || "").trim(),
+      lastAction: String(payload.action || "update-credit-workflow").trim(),
+      updatedAt: new Date().toISOString(),
+      updatedBy: user.username || user.role
+    };
+    writeDatabase(data);
+    sendJson(res, 200, data.institutionCreditEvaluations[index]);
     return;
   }
 

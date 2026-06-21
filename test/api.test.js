@@ -559,6 +559,18 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(scorecard.body.trustedSources.some((item) => item.collection === "diagnosticReports"), true);
     assert.equal(Number.isFinite(scorecard.body.score), true);
 
+    const credit = await api(baseUrl, "/api/credit-evaluations/calculate", authorized(commissionToken));
+    assert.equal(credit.response.status, 200);
+    assert.equal(credit.body.rules.version, "credit-rules-2026.1");
+    assert.equal(credit.body.evaluations.length, 3);
+    assert.equal(credit.body.evaluations.every((item) => Array.isArray(item.deductions)), true);
+    const creditAction = await api(baseUrl, `/api/credit-evaluations/${credit.body.evaluations[0].id}/actions`, authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({ appealStatus: "submitted", publicationStatus: "pending_appeal", appealComment: "Institution submitted supporting evidence." })
+    }));
+    assert.equal(creditAction.response.status, 200);
+    assert.equal(creditAction.body.appealStatus, "submitted");
+
     const denied = await api(baseUrl, "/api/mutual-recognition/reports", authorized(citizen.body.token, {
       method: "POST",
       body: JSON.stringify({ residentId: "r2", item: "HbA1c" })
