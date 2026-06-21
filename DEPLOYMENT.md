@@ -116,10 +116,11 @@ npm.cmd run storage:backup
 
 ```powershell
 node scripts/storage-admin.js verify "data/backups/<备份目录>"
+node scripts/storage-admin.js rehearse "data/backups/<备份目录>"
 node scripts/storage-admin.js restore "data/backups/<备份目录>" --confirm
 ```
 
-恢复操作会先自动创建 `pre-restore` 安全备份。真实生产数据库仍需使用数据库原生在线备份、时间点恢复和异地副本。
+恢复演练会把备份恢复到临时目录并重新校验清单，不覆盖当前 `data`。正式恢复操作会先自动创建 `pre-restore` 安全备份。真实生产数据库仍需使用数据库原生在线备份、时间点恢复和异地副本。
 
 ## 现场实施待办
 

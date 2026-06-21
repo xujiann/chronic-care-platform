@@ -1836,7 +1836,7 @@ function writeDatabase(data) {
   const normalized = normalizeState(data);
   normalized.storageMeta = data.storageMeta || storageMeta();
   if (shouldUseSqlite()) {
-    writeSqliteState(normalized);
+    writeSqliteState(normalized, "write-state", data.storageMeta?.collectionVersions);
   }
   const snapshot = {
     ...normalized,
@@ -1945,13 +1945,14 @@ function readSqliteStateFromConnection(db) {
   }, {});
 }
 
-function writeSqliteState(data, event = "write-state") {
+function writeSqliteState(data, event = "write-state", expectedVersions = null) {
   const db = openSqliteDatabase();
   const now = new Date().toISOString();
   try {
     db.exec("PRAGMA foreign_keys = ON");
     db.exec("BEGIN");
     const entries = Object.entries(data).filter(([key]) => key !== "storageMeta");
+    verifySqliteCollectionVersions(db, entries.map(([key]) => key), expectedVersions);
     const incomingKeys = new Set(entries.map(([key]) => key));
     const deleteStatement = db.prepare("DELETE FROM state_collections WHERE key = ?");
     db.prepare("SELECT key FROM state_collections").all().forEach((row) => {
@@ -1977,6 +1978,20 @@ function writeSqliteState(data, event = "write-state") {
   } finally {
     db.close();
   }
+}
+
+function verifySqliteCollectionVersions(db, keys, expectedVersions) {
+  if (!expectedVersions || typeof expectedVersions !== "object") return;
+  const getVersion = db.prepare("SELECT version FROM state_collections WHERE key = ?");
+  keys.forEach((key) => {
+    if (!Object.hasOwn(expectedVersions, key)) return;
+    const row = getVersion.get(key);
+    const currentVersion = row ? Number(row.version) : 0;
+    const expectedVersion = Number(expectedVersions[key]);
+    if (Number.isFinite(expectedVersion) && currentVersion !== expectedVersion) {
+      throw new Error(`SQLite optimistic lock conflict on ${key}: expected ${expectedVersion}, current ${currentVersion}`);
+    }
+  });
 }
 
 function syncSqliteIdentityTables(db, data, event = "sync-identity-mirrors", at = new Date().toISOString()) {
@@ -2222,8 +2237,24 @@ function storageMeta() {
     jsonFile: relativeProjectPath(DB_FILE),
     sqliteAvailable: sqlite,
     schemaVersion: sqlite ? STORAGE_SCHEMA_VERSION : 0,
+    collectionVersions: sqlite ? sqliteCollectionVersions() : {},
     sqliteError: sqliteError ? sqliteError.message : ""
   };
+}
+
+function sqliteCollectionVersions() {
+  if (!fs.existsSync(SQLITE_FILE)) return {};
+  const db = openSqliteDatabase();
+  try {
+    const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'state_collections'").get();
+    if (!table) return {};
+    return db.prepare("SELECT key, version FROM state_collections").all().reduce((versions, row) => {
+      versions[row.key] = Number(row.version);
+      return versions;
+    }, {});
+  } finally {
+    db.close();
+  }
 }
 
 function relativeProjectPath(filePath) {

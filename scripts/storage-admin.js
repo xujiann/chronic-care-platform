@@ -23,7 +23,7 @@ function createBackup(options = {}) {
   const label = String(options.label || "manual").replace(/[^a-zA-Z0-9_-]/g, "-");
   const destination = path.join(backupRoot, `${timestamp()}-${label}-${randomUUID().slice(0, 8)}`);
   const available = STORAGE_FILES.filter((name) => fs.existsSync(path.join(dataDir, name)));
-  if (!available.length) throw new Error(`没有可备份的存储文件：${dataDir}`);
+  if (!available.length) throw new Error(`No storage files are available for backup: ${dataDir}`);
 
   fs.mkdirSync(destination, { recursive: true });
   const files = available.map((name) => {
@@ -40,22 +40,22 @@ function createBackup(options = {}) {
 function verifyBackup(backupDir) {
   const directory = path.resolve(backupDir);
   const manifestFile = path.join(directory, "manifest.json");
-  if (!fs.existsSync(manifestFile)) throw new Error("备份缺少 manifest.json");
+  if (!fs.existsSync(manifestFile)) throw new Error("Backup is missing manifest.json");
   const manifest = JSON.parse(fs.readFileSync(manifestFile, "utf8"));
-  if (manifest.formatVersion !== 1 || !Array.isArray(manifest.files) || !manifest.files.length) throw new Error("备份清单格式无效");
+  if (manifest.formatVersion !== 1 || !Array.isArray(manifest.files) || !manifest.files.length) throw new Error("Backup manifest is invalid");
   manifest.files.forEach((entry) => {
-    if (!STORAGE_FILES.includes(entry.name)) throw new Error(`备份包含不允许的文件：${entry.name}`);
+    if (!STORAGE_FILES.includes(entry.name)) throw new Error(`Backup contains disallowed file: ${entry.name}`);
     const file = path.join(directory, entry.name);
-    if (!fs.existsSync(file)) throw new Error(`备份文件缺失：${entry.name}`);
-    if (fs.statSync(file).size !== entry.bytes) throw new Error(`备份文件大小不匹配：${entry.name}`);
-    if (sha256(file) !== entry.sha256) throw new Error(`备份校验失败：${entry.name}`);
+    if (!fs.existsSync(file)) throw new Error(`Backup file is missing: ${entry.name}`);
+    if (fs.statSync(file).size !== entry.bytes) throw new Error(`Backup file size mismatch: ${entry.name}`);
+    if (sha256(file) !== entry.sha256) throw new Error(`Backup checksum failed: ${entry.name}`);
     if (entry.name === "db.json") JSON.parse(fs.readFileSync(file, "utf8"));
   });
   return manifest;
 }
 
 function restoreBackup(backupDir, options = {}) {
-  if (!options.confirm) throw new Error("恢复操作必须显式传入 confirm=true，并确保服务已停止");
+  if (!options.confirm) throw new Error("Restore requires confirm=true and the service must be stopped");
   const dataDir = resolveDataDir(options.dataDir);
   const backupRoot = path.resolve(options.backupRoot || path.join(dataDir, "backups"));
   const manifest = verifyBackup(backupDir);
@@ -71,12 +71,32 @@ function restoreBackup(backupDir, options = {}) {
   return { restoredFrom: path.resolve(backupDir), safetyBackup: safety.destination, files: manifest.files.map((item) => item.name) };
 }
 
+function rehearseRestore(backupDir, options = {}) {
+  const rehearsalRoot = path.resolve(options.rehearsalRoot || path.join(path.resolve(backupDir), "..", "restore-rehearsals"));
+  const rehearsalDataDir = path.join(rehearsalRoot, `${timestamp()}-rehearsal-${randomUUID().slice(0, 8)}`);
+  fs.mkdirSync(rehearsalDataDir, { recursive: true });
+  const manifest = verifyBackup(backupDir);
+  manifest.files.forEach((entry) => {
+    fs.copyFileSync(path.join(path.resolve(backupDir), entry.name), path.join(rehearsalDataDir, entry.name));
+  });
+  const rehearsalBackup = createBackup({ dataDir: rehearsalDataDir, backupRoot: path.join(rehearsalDataDir, "backups"), label: "rehearsal-check" });
+  const restored = verifyBackup(rehearsalBackup.destination);
+  return {
+    ok: true,
+    sourceBackup: path.resolve(backupDir),
+    rehearsalDataDir,
+    rehearsalBackup: rehearsalBackup.destination,
+    files: restored.files.map((item) => item.name)
+  };
+}
+
 function runCli() {
   const [command, target, ...flags] = process.argv.slice(2);
   if (command === "backup") return console.log(JSON.stringify(createBackup(), null, 2));
   if (command === "verify" && target) return console.log(JSON.stringify(verifyBackup(target), null, 2));
+  if (command === "rehearse" && target) return console.log(JSON.stringify(rehearseRestore(target), null, 2));
   if (command === "restore" && target) return console.log(JSON.stringify(restoreBackup(target, { confirm: flags.includes("--confirm") }), null, 2));
-  throw new Error("用法：storage-admin.js backup | verify <备份目录> | restore <备份目录> --confirm");
+  throw new Error("Usage: storage-admin.js backup | verify <backup-dir> | rehearse <backup-dir> | restore <backup-dir> --confirm");
 }
 
 if (require.main === module) {
@@ -88,4 +108,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { createBackup, restoreBackup, verifyBackup };
+module.exports = { createBackup, rehearseRestore, restoreBackup, verifyBackup };

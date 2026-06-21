@@ -146,6 +146,16 @@ test("SQLite migrations are idempotent and collection versions change only on wr
       assert.equal(db.prepare("SELECT result FROM personal_records WHERE id = ?").get(recordId).result, updatedResult);
     });
 
+    const firstWriterState = storage.readDatabase();
+    const staleWriterState = storage.readDatabase();
+    firstWriterState.residents[0].address = "first-writer-address";
+    storage.writeDatabase(firstWriterState);
+    staleWriterState.residents[0].address = "stale-writer-address";
+    assert.throws(() => {
+      storage.writeDatabase(staleWriterState);
+    }, /optimistic lock conflict/);
+    assert.equal(storage.readDatabase().residents[0].address, "first-writer-address");
+
     assert.throws(() => {
       const duplicateIndexState = storage.readDatabase();
       duplicateIndexState.residents[1].idCard = duplicateIndexState.residents[0].idCard;
