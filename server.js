@@ -457,6 +457,7 @@ function seedState() {
     applicationCatalog: seedApplicationCatalog(),
     institutionCreditEvaluations: seedInstitutionCreditEvaluations(),
     creditEvaluationRules: seedCreditEvaluationRules(),
+    researchDatasets: seedResearchDatasets(),
     securityAcceptanceLedger: seedSecurityAcceptanceLedger(),
     platformChangeLogs: seedPlatformChangeLogs(),
     platformRoadmap: seedPlatformRoadmap(),
@@ -571,6 +572,13 @@ function seedCreditEvaluationRules() {
     appealFlow: ["机构提交申诉", "属地初审", "市级复核", "公示结果更新"],
     publicationFlow: ["月度试算", "机构确认", "异议处理", "官网/政务端公示"]
   };
+}
+
+function seedResearchDatasets() {
+  return [
+    { id: "rd-hypertension-001", diseaseType: "hypertension", name: "Hypertension chronic management cohort", version: "1.0.0", ethicsApproval: "IRB-DEMO-HTN-2026", anonymization: "k-anonymity-demo", authorizationStatus: "approved", records: 2, status: "published", usageAudit: [], outcomes: [] },
+    { id: "rd-diabetes-001", diseaseType: "diabetes", name: "Diabetes follow-up and HbA1c cohort", version: "1.0.0", ethicsApproval: "IRB-DEMO-DM-2026", anonymization: "k-anonymity-demo", authorizationStatus: "approved", records: 1, status: "published", usageAudit: [], outcomes: [] }
+  ];
 }
 
 function seedSecurityAcceptanceLedger() {
@@ -2581,6 +2589,7 @@ function normalizeState(data) {
     applicationCatalog: mergeByKey(seedApplicationCatalog(), data.applicationCatalog, "id"),
     institutionCreditEvaluations: mergeByKey(seedInstitutionCreditEvaluations(), data.institutionCreditEvaluations, "id"),
     creditEvaluationRules: data.creditEvaluationRules && typeof data.creditEvaluationRules === "object" ? data.creditEvaluationRules : seedCreditEvaluationRules(),
+    researchDatasets: mergeByKey(seedResearchDatasets(), data.researchDatasets, "id"),
     securityAcceptanceLedger: mergeByKey(seedSecurityAcceptanceLedger(), data.securityAcceptanceLedger, "id"),
     platformChangeLogs: Array.isArray(data.platformChangeLogs) ? data.platformChangeLogs : seedPlatformChangeLogs(),
     platformRoadmap: Array.isArray(data.platformRoadmap) ? data.platformRoadmap : seedPlatformRoadmap(),
@@ -2640,6 +2649,7 @@ function completeSystemTargets(state) {
   state.applicationCatalog = mergeByKey(seedApplicationCatalog(), state.applicationCatalog, "id");
   state.institutionCreditEvaluations = mergeByKey(seedInstitutionCreditEvaluations(), state.institutionCreditEvaluations, "id");
   state.creditEvaluationRules = state.creditEvaluationRules && typeof state.creditEvaluationRules === "object" ? state.creditEvaluationRules : seedCreditEvaluationRules();
+  state.researchDatasets = mergeByKey(seedResearchDatasets(), state.researchDatasets, "id");
   state.securityAcceptanceLedger = mergeByKey(seedSecurityAcceptanceLedger(), state.securityAcceptanceLedger, "id");
   state.platformChangeLogs = Array.isArray(state.platformChangeLogs) && state.platformChangeLogs.length ? state.platformChangeLogs.slice(0, 200) : seedPlatformChangeLogs();
   const interfaceCompletion = new Map(seedInterfaceRequirements().map((item) => [item.id, { status: item.status, need: item.need }]));
@@ -4191,6 +4201,50 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission", "county"], "/api/performance/consortium-report");
     if (!user) return;
     sendJson(res, 200, buildConsortiumPerformanceReport(readDatabase()));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/research/datasets") {
+    const user = requireApiRole(req, res, ["commission"], "/api/research/datasets");
+    if (!user) return;
+    sendJson(res, 200, { datasets: readDatabase().researchDatasets || [] });
+    return;
+  }
+
+  const researchDatasetActionMatch = url.pathname.match(/^\/api\/research\/datasets\/([^/]+)\/actions$/);
+  if (req.method === "POST" && researchDatasetActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/research/datasets/:id/actions");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(researchDatasetActionMatch[1]);
+    const index = (data.researchDatasets || []).findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到科研数据集" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const action = String(payload.action || "usage-audit").trim();
+    const now = new Date().toISOString();
+    data.researchDatasets[index] = {
+      ...data.researchDatasets[index],
+      version: String(payload.version || data.researchDatasets[index].version || "1.0.0").trim(),
+      ethicsApproval: String(payload.ethicsApproval || data.researchDatasets[index].ethicsApproval || "").trim(),
+      anonymization: String(payload.anonymization || data.researchDatasets[index].anonymization || "").trim(),
+      authorizationStatus: String(payload.authorizationStatus || data.researchDatasets[index].authorizationStatus || "pending").trim(),
+      status: String(payload.status || data.researchDatasets[index].status || "draft").trim(),
+      usageAudit: action === "usage-audit" ? [
+        { at: now, by: user.username || user.role, purpose: String(payload.purpose || "research analysis").trim(), result: String(payload.result || "allowed").trim() },
+        ...(data.researchDatasets[index].usageAudit || [])
+      ].slice(0, 50) : (data.researchDatasets[index].usageAudit || []),
+      outcomes: action === "outcome-return" ? [
+        { at: now, title: String(payload.title || "research outcome").trim(), summary: String(payload.summary || "").trim() },
+        ...(data.researchDatasets[index].outcomes || [])
+      ].slice(0, 50) : (data.researchDatasets[index].outcomes || []),
+      updatedAt: now,
+      updatedBy: user.username || user.role
+    };
+    writeDatabase(data);
+    sendJson(res, 200, data.researchDatasets[index]);
     return;
   }
 

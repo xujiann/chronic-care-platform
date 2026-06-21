@@ -578,6 +578,22 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(performance.body.peopleFinanceMaterials.doctors >= 1, true);
     assert.equal(Number.isFinite(performance.body.primaryCareFulfillment.completionRate), true);
 
+    const datasets = await api(baseUrl, "/api/research/datasets", authorized(commissionToken));
+    assert.equal(datasets.response.status, 200);
+    assert.equal(datasets.body.datasets.some((item) => item.diseaseType === "hypertension"), true);
+    const usage = await api(baseUrl, "/api/research/datasets/rd-hypertension-001/actions", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "usage-audit", purpose: "risk stratification model validation", result: "allowed" })
+    }));
+    assert.equal(usage.response.status, 200);
+    assert.equal(usage.body.usageAudit[0].purpose, "risk stratification model validation");
+    const outcome = await api(baseUrl, "/api/research/datasets/rd-hypertension-001/actions", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "outcome-return", title: "Hypertension model calibration", summary: "Returned model threshold evidence." })
+    }));
+    assert.equal(outcome.response.status, 200);
+    assert.equal(outcome.body.outcomes[0].title, "Hypertension model calibration");
+
     const denied = await api(baseUrl, "/api/mutual-recognition/reports", authorized(citizen.body.token, {
       method: "POST",
       body: JSON.stringify({ residentId: "r2", item: "HbA1c" })
