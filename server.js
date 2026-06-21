@@ -3676,6 +3676,72 @@ function sanitizeUser(user) {
   return safeUser;
 }
 
+function roleFromExternalClaims(claims, organization) {
+  const rawRoles = [claims.role, claims.roles, claims.realm_access?.roles, claims.groups].flat().filter(Boolean).map((item) => String(item).toLowerCase());
+  if (rawRoles.some((item) => /citizen|resident|个人|居民/.test(item))) return "citizen";
+  if (rawRoles.some((item) => /insurance|医保/.test(item))) return "insurance";
+  if (rawRoles.some((item) => /county|consortium|医共体/.test(item))) return "county";
+  if (rawRoles.some((item) => /hospital|doctor|institution|medical|医院|医生|机构/.test(item))) return "institution";
+  if (rawRoles.some((item) => /commission|admin|health|卫健|管理/.test(item))) return "commission";
+  const orgType = String(organization?.orgType || "").toLowerCase();
+  if (orgType.includes("insurance")) return "insurance";
+  if (orgType.includes("medical")) return "institution";
+  if (orgType.includes("county")) return "county";
+  if (orgType.includes("citizen")) return "citizen";
+  return "commission";
+}
+
+function homeForRole(role, organization) {
+  if (organization?.portal) return organization.portal;
+  return {
+    commission: "index.html",
+    institution: "institution.html",
+    insurance: "insurance.html",
+    citizen: "citizen.html",
+    county: "county.html"
+  }[role] || "health-city.html";
+}
+
+function mapExternalIdentityClaims(claims, data) {
+  const subject = String(claims.sub || claims.openid || claims.uid || "").trim();
+  const username = String(claims.preferred_username || claims.username || claims.loginName || subject || "").trim();
+  const orgCode = String(claims.orgCode || claims.org_code || claims.organizationCode || claims.dept_code || claims.departmentCode || "").trim();
+  const organization = (data.authOrganizations || []).find((item) => item.orgCode === orgCode);
+  const existing = (data.authUsers || []).find((item) => item.username === username || (subject && item.externalSubject === subject));
+  if (existing) {
+    return {
+      status: "matched-existing-user",
+      warnings: [],
+      user: sanitizeUser(existing),
+      organization: organization || (data.authOrganizations || []).find((item) => item.orgCode === existing.orgCode) || null
+    };
+  }
+  const role = roleFromExternalClaims(claims, organization);
+  const warnings = [];
+  if (!username) warnings.push("missing username/sub");
+  if (!organization) warnings.push("organization not found; using claim fallback");
+  return {
+    status: warnings.length ? "mapped-with-warnings" : "mapped",
+    warnings,
+    user: sanitizeUser({
+      id: `external-${createHash("sha1").update(`${subject}:${username}:${orgCode}`).digest("hex").slice(0, 12)}`,
+      username: username || `external-${Date.now()}`,
+      externalSubject: subject,
+      name: String(claims.name || claims.displayName || username || subject || "external user").trim(),
+      role,
+      roleName: String(claims.roleName || `${role} external account`).trim(),
+      orgCode: orgCode || organization?.orgCode || "",
+      orgName: organization?.name || String(claims.orgName || claims.organizationName || "external organization").trim(),
+      orgType: organization?.orgType || String(claims.orgType || "").trim(),
+      orgLevel: organization?.orgLevel || String(claims.orgLevel || "").trim(),
+      dataScope: organization?.dataScope || String(claims.dataScope || "external identity scope pending").trim(),
+      home: homeForRole(role, organization),
+      status: "待绑定"
+    }),
+    organization: organization || null
+  };
+}
+
 function authSecrets() {
   const configured = [
     ...(process.env.SESSION_SECRETS || "").split(","),
@@ -4443,6 +4509,19 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/system/readiness");
     if (!user) return;
     sendJson(res, 200, buildSystemReadinessReport(readDatabase()));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/auth/identity/preview") {
+    const user = requireApiRole(req, res, ["commission"], "/api/auth/identity/preview");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const claims = payload.claims && typeof payload.claims === "object" ? payload.claims : payload;
+    sendJson(res, 200, {
+      ok: true,
+      mappedAt: new Date().toISOString(),
+      mapping: mapExternalIdentityClaims(claims, readDatabase())
+    });
     return;
   }
 

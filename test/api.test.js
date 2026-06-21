@@ -140,6 +140,23 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(readiness.body.productionEnvironment.checks.some((item) => item.id === "identity-adapter"), true);
     assert.equal(readiness.body.checks.some((item) => item.id === "audit-chain" && item.passed), true);
     assert.equal(readiness.body.externalDependencies.includes("政务统一身份源"), true);
+
+    const identityPreview = await api(baseUrl, "/api/auth/identity/preview", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        claims: {
+          sub: "oidc-doctor-001",
+          preferred_username: "external_doctor",
+          name: "外部医生",
+          org_code: "MR1",
+          roles: ["doctor"]
+        }
+      })
+    }));
+    assert.equal(identityPreview.response.status, 200);
+    assert.equal(identityPreview.body.mapping.user.role, "institution");
+    assert.equal(identityPreview.body.mapping.user.orgCode, "MR1");
+    assert.equal(identityPreview.body.mapping.user.home, "institution.html");
   });
 
   await t.test("rejects invalid credentials and unauthenticated state reads", async () => {
