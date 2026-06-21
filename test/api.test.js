@@ -154,6 +154,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const { response, body } = await api(baseUrl, "/api/state", authorized(commissionToken));
     assert.equal(response.status, 200);
     assert.equal(body.accounts[0].name, "演示居民A账户");
+    assert.equal(body.residents[0].idCard, "DEMO-ID-R1");
+    assert.equal(body.residents[0].phone, "DEMO-MOBILE-R1");
     assert.equal(body.applicationCatalog.length, 6);
     assert.equal(body.institutionCreditEvaluations.length, 3);
     assert.equal(body.securityAcceptanceLedger.length, 4);
@@ -170,6 +172,11 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const { response, body } = await api(baseUrl, "/api/state", authorized(citizenToken));
     assert.equal(response.status, 200);
     assert.deepEqual(body.residents.map((item) => item.id).sort(), ["r1", "r4"]);
+    assert.match(body.residents[0].idCard, /^已脱敏-/);
+    assert.match(body.residents[0].phone, /^已脱敏-/);
+    assert.match(body.residents[0].address, /^已脱敏-/);
+    assert.match(body.residents[0].personIndex, /^已脱敏-/);
+    assert.notEqual(body.digitalCredentials[0].credentialNo, "MI-DEMO-MOBILE-R1");
     [
       "authUsers",
       "authOrganizations",
@@ -186,6 +193,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const ownRecords = await api(baseUrl, "/api/personal-records?residentId=r1", authorized(citizenToken));
     assert.equal(ownRecords.response.status, 200);
     assert.ok(Array.isArray(ownRecords.body));
+    assert.match(ownRecords.body[0].personIndex, /^已脱敏-/);
 
     const otherRecords = await api(baseUrl, "/api/personal-records?residentId=r2", authorized(citizenToken));
     assert.equal(otherRecords.response.status, 403);
@@ -219,6 +227,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const ownBirth = await api(baseUrl, "/api/birth-certificates?residentId=r1", authorized(citizenToken));
     assert.equal(ownBirth.response.status, 200);
     assert.ok(ownBirth.body.certificates.every((item) => item.maternalResidentId === "r1" || item.residentId === "r1"));
+    assert.match(ownBirth.body.certificates[0].certificateNo, /^已脱敏-/);
+    assert.match(ownBirth.body.certificates[0].motherDocumentNo, /^已脱敏-/);
 
     const otherBirth = await api(baseUrl, "/api/birth-certificates?residentId=r2", authorized(citizenToken));
     assert.equal(otherBirth.response.status, 403);

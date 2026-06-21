@@ -297,6 +297,7 @@ const WORKFLOW_PROTECTED_FIELDS = new Set(["id", "residentId", "maternalResident
 const PERSONAL_RECORD_PROTECTED_FIELDS = new Set(["id", "residentId", "personIndex", "createdAt", "createdBy", "createdByName", "updatedAt", "updatedBy", "updatedByName", "expectedVersion"]);
 const RESIDENT_PROTECTED_FIELDS = new Set(["id", "idCard", "phone", "personIndex", "identityIndex"]);
 const MULTI_PRACTICE_PROTECTED_FIELDS = new Set(["id", "doctorId", "doctorName", "category", "title", "specialty", "primaryInstitutionId", "primaryInstitution", "targetInstitutionId", "targetInstitution", "compliance", "lastUpdated", "updatedBy", "updatedByName", "expectedVersion"]);
+const SENSITIVE_RESPONSE_FIELDS = new Set(["idCard", "phone", "applicantPhone", "documentNo", "motherDocumentNo", "fatherDocumentNo", "certificateNo", "credentialNo", "personIndex", "identityIndex", "address"]);
 const COLLECTION_WRITE_KEYS = new Set([
   "residents",
   "personalRecords",
@@ -3045,6 +3046,29 @@ function canAccessMultiPracticeApplication(user, item) {
     [item.primaryInstitution, item.targetInstitution].includes(user.orgName);
 }
 
+function redactSensitiveResponse(value, user) {
+  if (!user || user.role === "commission") return value;
+  return redactSensitiveValue(value);
+}
+
+function redactSensitiveValue(value, key = "") {
+  if (Array.isArray(value)) return value.map((item) => redactSensitiveValue(item));
+  if (!value || typeof value !== "object") {
+    return SENSITIVE_RESPONSE_FIELDS.has(key) && value !== undefined && value !== null && String(value).trim() !== "" ? maskSensitiveValue(value) : value;
+  }
+  return Object.fromEntries(Object.entries(value).map(([entryKey, entryValue]) => [
+    entryKey,
+    redactSensitiveValue(entryValue, entryKey)
+  ]));
+}
+
+function maskSensitiveValue(value) {
+  const text = String(value || "");
+  if (!text) return text;
+  const suffix = text.length > 4 ? text.slice(-4) : "";
+  return suffix ? `已脱敏-${suffix}` : "已脱敏";
+}
+
 function qualificationCompliance(profile, payload) {
   const titleQualified = /(主任|副主任|主治|中级)/.test(profile?.title || payload.title || "");
   const fiveYears = Number(profile?.yearsInSpecialty || payload.yearsInSpecialty || 0) >= 5;
@@ -3385,7 +3409,7 @@ async function handleApi(req, res) {
   if (req.method === "GET" && url.pathname === "/api/state") {
     const user = requireApiRole(req, res, ["commission", "institution", "insurance", "citizen", "county"], "/api/state");
     if (!user) return;
-    sendJson(res, 200, scopeStateForUser(readDatabase(), user));
+    sendJson(res, 200, redactSensitiveResponse(scopeStateForUser(readDatabase(), user), user));
     return;
   }
 
@@ -3807,7 +3831,7 @@ async function handleApi(req, res) {
       return;
     }
     const certificates = (data.birthCertificates || []).filter((item) => !residentId || item.maternalResidentId === residentId || item.residentId === residentId);
-    sendJson(res, 200, { certificates, statistics: data.birthStatistics, forms: data.birthCertificateForms });
+    sendJson(res, 200, redactSensitiveResponse({ certificates, statistics: data.birthStatistics, forms: data.birthCertificateForms }, user));
     return;
   }
 
@@ -3865,7 +3889,7 @@ async function handleApi(req, res) {
       return;
     }
     const certificates = (data.deathCertificates || []).filter((item) => !residentId || item.residentId === residentId);
-    sendJson(res, 200, { certificates, statistics: data.deathStatistics, forms: data.deathCertificateForms });
+    sendJson(res, 200, redactSensitiveResponse({ certificates, statistics: data.deathStatistics, forms: data.deathCertificateForms }, user));
     return;
   }
 
@@ -3986,7 +4010,7 @@ async function handleApi(req, res) {
       appendDataAccessLog(data, user, residentId, "个人健康信息库", `查询 ${category || "全部"} 记录`);
       writeDatabase(data);
     }
-    sendJson(res, 200, records);
+    sendJson(res, 200, redactSensitiveResponse(records, user));
     return;
   }
 
