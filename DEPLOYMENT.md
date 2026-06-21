@@ -110,7 +110,15 @@ INTEGRATION_GATEWAY_SECRET=replace-with-integration-secret
 
 生产化如迁移 PostgreSQL 或正式数据库，再增加 `DATABASE_URL`、身份源配置、短信/CA/网关地址等现场变量。
 
-## 验证
+生产环境上线前应执行严格环境校验：
+
+```powershell
+npm.cmd run env:check:production
+```
+
+该命令读取 `.env`，会拒绝占位密钥、过短密钥、`STORAGE_ENGINE=json`，并在 PostgreSQL 模式下要求 `DATABASE_URL`。
+
+## 验证与发布验收
 
 ```powershell
 npm.cmd run check
@@ -118,6 +126,8 @@ npm.cmd test
 npm.cmd run test:coverage
 npm.cmd run test:e2e
 npm.cmd run deploy:check
+npm.cmd run env:check
+npm.cmd run release:report
 ```
 
 本地服务启动后可访问：
@@ -134,7 +144,10 @@ http://localhost:5173/api/health
 
 ```powershell
 npm.cmd run deploy:check:full
+npm.cmd run release:report:full
 ```
+
+`release:report` 默认生成 `release/release-report.json` 和 `release/release-report.md`，汇总代码文件、关键脚本、静态快照、P2 完成状态、验收证据和环境校验；`release:report:full` 会额外执行 `check`、`test`、`deploy:check` 和 `npm audit --omit=dev`。发布归档时建议保存这两个报告文件，作为上线前人工审查材料。
 
 ## 存储迁移与备份
 

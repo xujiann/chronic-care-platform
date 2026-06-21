@@ -149,9 +149,14 @@ npm.cmd audit --omit=dev
 ```powershell
 npm.cmd run deploy:check
 npm.cmd run deploy:check:full
+npm.cmd run env:check
+npm.cmd run release:report
+npm.cmd run release:report:full
 ```
 
 `deploy:check` 会检查 README、部署文档、静态快照、P2 集合、P2 完成状态、环境脚本和关键 npm scripts；`deploy:check:full` 还会串行执行 `check` 和 `test`。
+
+`env:check` 使用 `.env.example` 做演示/模板级校验，不要求真实密钥；`env:check:production` 会读取 `.env`，并按生产规则校验 `NODE_ENV=production`、非 JSON 存储、非占位且不少于 32 位的 `SESSION_SECRETS` 和 `INTEGRATION_GATEWAY_SECRET`，当 `STORAGE_ENGINE=postgres` 或 `postgresql` 时还要求 `DATABASE_URL`。`release:report` 会汇总代码文件、关键 npm scripts、静态快照、P2 完成状态、验收证据和环境配置，默认输出 `release/release-report.json` 与 `release/release-report.md`；`release:report:full` 额外执行 `check`、`test`、`deploy:check` 和 `npm audit --omit=dev`。
 
 ## 备份、脱敏与回滚
 
