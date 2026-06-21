@@ -3709,25 +3709,38 @@ function taskTitle(item, category) {
   return item.taskName || item.topic || item.plan || item.orderType || item.claimType || item.medication || item.item || item.title || item.name || item.service || category;
 }
 
+function isClosedTaskStatus(status) {
+  return /完成|已完成|closed|resolved|read|recognized|approved/i.test(String(status || ""));
+}
+
+function isOverdueTask(task, now = new Date()) {
+  if (!task.dueAt || isClosedTaskStatus(task.status)) return false;
+  const dueTime = new Date(task.dueAt).getTime();
+  return Number.isFinite(dueTime) && dueTime < now.getTime();
+}
+
 function buildUnifiedTasks(data, user) {
   return TASK_SOURCES.flatMap(([collection, role, category, dueField]) => {
     const roles = Array.isArray(role) ? role : [role];
     if (user.role !== "commission" && !roles.includes(user.role)) return [];
     const rows = collection === "referrals" ? data.referralSystem?.referrals : data[collection];
-    return (Array.isArray(rows) ? rows : []).filter((item) => canAccessResident(user, item.residentId || item.maternalResidentId, data)).map((item) => ({
-      id: `${collection}:${item.id}`,
-      collection,
-      sourceId: item.id,
-      category,
-      role: roles.includes(user.role) ? user.role : roles[0],
-      residentId: item.residentId || item.maternalResidentId || "",
-      title: taskTitle(item, category),
-      status: item.status || item.reviewStatus || "pending",
-      priority: item.priority || item.level || item.riskLevel || "normal",
-      dueAt: item[dueField] || item.due || item.nextReview || item.lastUpdated || "",
-      owner: item.assignee || item.owner || item.institution || item.sourceInstitution || item.targetInstitution || "",
-      source: collection
-    }));
+    return (Array.isArray(rows) ? rows : []).filter((item) => canAccessResident(user, item.residentId || item.maternalResidentId, data)).map((item) => {
+      const task = {
+        id: `${collection}:${item.id}`,
+        collection,
+        sourceId: item.id,
+        category,
+        role: roles.includes(user.role) ? user.role : roles[0],
+        residentId: item.residentId || item.maternalResidentId || "",
+        title: taskTitle(item, category),
+        status: item.status || item.reviewStatus || "pending",
+        priority: item.priority || item.level || item.riskLevel || "normal",
+        dueAt: item[dueField] || item.due || item.nextReview || item.lastUpdated || "",
+        owner: item.assignee || item.owner || item.institution || item.sourceInstitution || item.targetInstitution || "",
+        source: collection
+      };
+      return { ...task, overdue: isOverdueTask(task), escalationLevel: isOverdueTask(task) ? "level-1" : "" };
+    });
   }).sort((left, right) => String(left.dueAt || "").localeCompare(String(right.dueAt || "")));
 }
 
@@ -3842,6 +3855,44 @@ async function handleApi(req, res) {
         return result;
       }, { total: 0, byRole: {}, byStatus: {} })
     });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/tasks/escalations") {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/tasks/escalations");
+    if (!user) return;
+    const overdue = buildUnifiedTasks(readDatabase(), user).filter((task) => task.overdue);
+    sendJson(res, 200, { overdue, summary: { total: overdue.length } });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/tasks/escalations/run") {
+    const user = requireApiRole(req, res, ["commission"], "/api/tasks/escalations/run");
+    if (!user) return;
+    const data = readDatabase();
+    const overdue = buildUnifiedTasks(data, user).filter((task) => task.overdue);
+    const now = new Date().toISOString();
+    const existingKeys = new Set((data.taskMessages || []).map((message) => message.escalationKey).filter(Boolean));
+    const messages = overdue.filter((task) => !existingKeys.has(`${task.id}:${task.escalationLevel}`)).map((task) => ({
+      id: `msg-${randomUUID()}`,
+      taskId: task.id,
+      collection: task.collection,
+      sourceId: task.sourceId,
+      residentId: task.residentId || "",
+      targetRole: task.role,
+      channel: "in_app",
+      title: `Overdue task escalation: ${task.title}`,
+      body: `Task ${task.id} is overdue and requires ${task.role} follow-up.`,
+      status: "sent",
+      escalationKey: `${task.id}:${task.escalationLevel}`,
+      receipts: [],
+      createdAt: now,
+      createdBy: user.username || user.role,
+      createdByName: user.name
+    }));
+    data.taskMessages = [...messages, ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
+    writeDatabase(data);
+    sendJson(res, 201, { messages, summary: { created: messages.length, overdue: overdue.length } });
     return;
   }
 

@@ -523,6 +523,24 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(receipt.body.status, "read");
     assert.equal(receipt.body.receipts[0].by, citizen.body.user.username);
 
+    const escalations = await api(baseUrl, "/api/tasks/escalations", authorized(commissionToken));
+    assert.equal(escalations.response.status, 200);
+    assert.equal(escalations.body.overdue.some((item) => item.overdue === true), true);
+
+    const escalationRun = await api(baseUrl, "/api/tasks/escalations/run", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({})
+    }));
+    assert.equal(escalationRun.response.status, 201);
+    assert.equal(escalationRun.body.summary.created > 0, true);
+
+    const escalationReplay = await api(baseUrl, "/api/tasks/escalations/run", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({})
+    }));
+    assert.equal(escalationReplay.response.status, 201);
+    assert.equal(escalationReplay.body.summary.created, 0);
+
     const denied = await api(baseUrl, "/api/mutual-recognition/reports", authorized(citizen.body.token, {
       method: "POST",
       body: JSON.stringify({ residentId: "r2", item: "HbA1c" })
