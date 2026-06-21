@@ -191,4 +191,32 @@ test("SQLite stale state writes return an API conflict contract", { skip: !sqlit
   assert.equal(staleWorkflowWrite.response.status, 409);
   assert.equal(staleWorkflowWrite.body.code, "STORAGE_CONFLICT");
   assert.equal(staleWorkflowWrite.body.collection, "careOrders");
+
+  const certificateRead = await api(baseUrl, "/api/state", authorized(token));
+  const deathVersion = certificateRead.body.storageMeta.collectionVersions.deathCertificates;
+  const deathWrite = await api(baseUrl, "/api/death-certificates", authorized(token, {
+    method: "POST",
+    body: JSON.stringify({
+      expectedVersion: deathVersion,
+      residentId: "r1",
+      certificateNo: "DC-VERSIONED-001",
+      immediateCause: "versioned-cause",
+      underlyingCause: "versioned-underlying-cause"
+    })
+  }));
+  assert.equal(deathWrite.response.status, 201);
+  assert.equal(deathWrite.body.certificateNo, "DC-VERSIONED-001");
+
+  const staleDeathWrite = await api(baseUrl, "/api/death-certificates", authorized(token, {
+    method: "POST",
+    body: JSON.stringify({
+      expectedVersion: deathVersion,
+      residentId: "r1",
+      certificateNo: "DC-VERSIONED-002",
+      immediateCause: "stale-cause",
+      underlyingCause: "stale-underlying-cause"
+    })
+  }));
+  assert.equal(staleDeathWrite.response.status, 409);
+  assert.equal(staleDeathWrite.body.collection, "deathCertificates");
 });

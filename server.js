@@ -3425,9 +3425,10 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["institution", "commission"], "/api/birth-certificates");
     if (!user) return;
     const data = readDatabase();
+    const payload = await collectJson(req);
     let certificate;
     try {
-      certificate = normalizeBirthCertificate(await collectJson(req), user, data);
+      certificate = normalizeBirthCertificate(payload, user, data);
     } catch (error) {
       sendJson(res, 400, { error: "Bad Request", message: error.message });
       return;
@@ -3452,7 +3453,13 @@ async function handleApi(req, res) {
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
     ].slice(0, 120);
-    writeDatabase(normalizeState(data));
+    const normalized = normalizeState(data);
+    if (Object.hasOwn(payload, "expectedVersion")) {
+      normalized.storageMeta = {
+        collectionVersions: { birthCertificates: Number(payload.expectedVersion) }
+      };
+    }
+    writeDatabase(normalized);
     sendJson(res, 201, certificate);
     return;
   }
@@ -3476,9 +3483,10 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["institution", "commission"], "/api/death-certificates");
     if (!user) return;
     const data = readDatabase();
+    const payload = await collectJson(req);
     let certificate;
     try {
-      certificate = normalizeDeathCertificate(await collectJson(req), user, data);
+      certificate = normalizeDeathCertificate(payload, user, data);
     } catch (error) {
       sendJson(res, 400, { error: "Bad Request", message: error.message });
       return;
@@ -3503,7 +3511,13 @@ async function handleApi(req, res) {
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
     ].slice(0, 120);
-    writeDatabase(normalizeState(data));
+    const normalized = normalizeState(data);
+    if (Object.hasOwn(payload, "expectedVersion")) {
+      normalized.storageMeta = {
+        collectionVersions: { deathCertificates: Number(payload.expectedVersion) }
+      };
+    }
+    writeDatabase(normalized);
     sendJson(res, 201, certificate);
     return;
   }
