@@ -2528,6 +2528,7 @@ function normalizeState(data) {
     mutualRecognitionRules: mergeByKey(seedMutualRecognitionRules(), data.mutualRecognitionRules, "id"),
     diagnosticReports: mergeByKey(seedDiagnosticReports(), data.diagnosticReports, "id"),
     taskMessages: Array.isArray(data.taskMessages) ? data.taskMessages : [],
+    dataQualityIssues: Array.isArray(data.dataQualityIssues) ? data.dataQualityIssues : [],
     careOrders: Array.isArray(data.careOrders) ? data.careOrders : seedCareOrders(),
     medicationPickups: Array.isArray(data.medicationPickups) ? data.medicationPickups : seedMedicationPickups(),
     institutionSupervisions: Array.isArray(data.institutionSupervisions) ? data.institutionSupervisions : seedInstitutionSupervisions(),
@@ -3771,6 +3772,37 @@ function createTaskMessage({ task, payload, user }) {
   };
 }
 
+function buildDataQualityIssues(data) {
+  const issues = [];
+  const indexes = new Map();
+  (data.residents || []).forEach((resident) => {
+    const index = resident.personIndex || resident.identityIndex || personIndexFromParts(resident.idCard, resident.phone);
+    if (!index) {
+      issues.push({ id: `dq-missing-index-${resident.id}`, type: "missing_person_index", severity: "high", residentId: resident.id, title: "Resident missing person index", status: "open", ownerRole: "commission" });
+      return;
+    }
+    indexes.set(index, [...(indexes.get(index) || []), resident.id]);
+    ["name", "idCard", "phone"].forEach((field) => {
+      if (!String(resident[field] || "").trim()) {
+        issues.push({ id: `dq-missing-${field}-${resident.id}`, type: "missing_required_field", severity: "medium", residentId: resident.id, title: `Resident missing ${field}`, status: "open", ownerRole: "commission" });
+      }
+    });
+  });
+  indexes.forEach((residentIds, index) => {
+    if (residentIds.length > 1) {
+      issues.push({ id: `dq-duplicate-index-${createHash("sha1").update(index).digest("hex").slice(0, 12)}`, type: "duplicate_person_index", severity: "critical", residentIds, title: "Duplicate resident person index", status: "open", ownerRole: "commission" });
+    }
+  });
+  (data.integrationGatewayEvents || []).filter((event) => event.deadLetter).forEach((event) => {
+    issues.push({ id: `dq-integration-dead-letter-${event.id}`, type: "integration_dead_letter", severity: "high", eventId: event.id, title: `Integration dead letter: ${event.contractId}`, status: "open", ownerRole: "commission" });
+  });
+  (data.institutionCreditEvaluations || []).filter((item) => String(item.status || "").includes("整改")).forEach((item) => {
+    issues.push({ id: `dq-credit-${item.id}`, type: "institution_credit_rectification", severity: "medium", institution: item.name, title: item.next || "Institution credit rectification required", status: "open", ownerRole: "commission" });
+  });
+  const overrides = new Map((data.dataQualityIssues || []).map((issue) => [issue.id, issue]));
+  return issues.map((issue) => ({ ...issue, ...(overrides.get(issue.id) || {}) }));
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -3893,6 +3925,49 @@ async function handleApi(req, res) {
     data.taskMessages = [...messages, ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
     writeDatabase(data);
     sendJson(res, 201, { messages, summary: { created: messages.length, overdue: overdue.length } });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/data-quality/issues") {
+    const user = requireApiRole(req, res, ["commission"], "/api/data-quality/issues");
+    if (!user) return;
+    const issues = buildDataQualityIssues(readDatabase());
+    sendJson(res, 200, {
+      issues,
+      summary: issues.reduce((result, issue) => {
+        result.total += 1;
+        result.byType[issue.type] = (result.byType[issue.type] || 0) + 1;
+        result.byStatus[issue.status] = (result.byStatus[issue.status] || 0) + 1;
+        return result;
+      }, { total: 0, byType: {}, byStatus: {} })
+    });
+    return;
+  }
+
+  const dataQualityActionMatch = url.pathname.match(/^\/api\/data-quality\/issues\/([^/]+)\/actions$/);
+  if (req.method === "POST" && dataQualityActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/data-quality/issues/:id/actions");
+    if (!user) return;
+    const data = readDatabase();
+    const issueId = decodeURIComponent(dataQualityActionMatch[1]);
+    const issue = buildDataQualityIssues(data).find((item) => item.id === issueId);
+    if (!issue) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到数据质量问题" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const updated = {
+      ...issue,
+      status: String(payload.status || "in_progress").trim(),
+      action: String(payload.action || "rectify").trim(),
+      owner: String(payload.owner || user.name || "").trim(),
+      comment: String(payload.comment || "").trim(),
+      updatedAt: new Date().toISOString(),
+      updatedBy: user.username || user.role
+    };
+    data.dataQualityIssues = [updated, ...(data.dataQualityIssues || []).filter((item) => item.id !== issueId)].slice(0, 300);
+    writeDatabase(data);
+    sendJson(res, 200, updated);
     return;
   }
 

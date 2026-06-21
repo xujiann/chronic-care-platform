@@ -541,6 +541,18 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(escalationReplay.response.status, 201);
     assert.equal(escalationReplay.body.summary.created, 0);
 
+    const qualityIssues = await api(baseUrl, "/api/data-quality/issues", authorized(commissionToken));
+    assert.equal(qualityIssues.response.status, 200);
+    assert.equal(qualityIssues.body.issues.some((item) => item.type === "integration_dead_letter"), true);
+    assert.equal(qualityIssues.body.issues.some((item) => item.type === "institution_credit_rectification"), true);
+    const issue = qualityIssues.body.issues.find((item) => item.type === "institution_credit_rectification");
+    const issueAction = await api(baseUrl, `/api/data-quality/issues/${issue.id}/actions`, authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({ status: "closed", action: "rectified", comment: "Institution uploaded missing quality evidence." })
+    }));
+    assert.equal(issueAction.response.status, 200);
+    assert.equal(issueAction.body.status, "closed");
+
     const denied = await api(baseUrl, "/api/mutual-recognition/reports", authorized(citizen.body.token, {
       method: "POST",
       body: JSON.stringify({ residentId: "r2", item: "HbA1c" })
