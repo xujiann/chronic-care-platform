@@ -9,7 +9,8 @@
     "test": "node --test test/api.test.js test/conflict-api.test.js test/security.test.js test/static.test.js test/storage-admin.test.js test/storage.test.js",
     "test:coverage": "c8 --include=server.js --reporter=text --reporter=json-summary --check-coverage --lines 85 --functions 85 --branches 55 node --test test/api.test.js test/conflict-api.test.js test/security.test.js test/static.test.js test/storage-admin.test.js test/storage.test.js",
     "test:e2e": "playwright test",
-    "storage:backup": "node scripts/storage-admin.js backup"
+    "storage:backup": "node scripts/storage-admin.js backup",
+    "storage:sanitize": "node scripts/storage-admin.js sanitize"
   },
   "engines": {
     "node": ">=22.5"

@@ -4,7 +4,7 @@ const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 
-const { createBackup, rehearseRestore, restoreBackup, verifyBackup } = require("../scripts/storage-admin");
+const { createBackup, createSanitizedSnapshot, rehearseRestore, restoreBackup, verifyBackup } = require("../scripts/storage-admin");
 
 test("storage backup verifies checksums, rehearses restore, and restores with a safety copy", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "health-platform-backup-"));
@@ -63,6 +63,74 @@ test("storage backup verifies checksums, rehearses restore, and restores with a 
 
     fs.appendFileSync(path.join(backup.destination, "db.json"), "tampered");
     assert.throws(() => verifyBackup(backup.destination), /size mismatch|checksum failed/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("storage admin creates a sanitized JSON snapshot and report", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "health-platform-sanitize-"));
+  const dataDir = path.join(root, "data");
+  const outputDir = path.join(root, "sanitized");
+  fs.mkdirSync(dataDir, { recursive: true });
+    fs.writeFileSync(path.join(dataDir, "db.json"), JSON.stringify({
+      accounts: [{
+        id: "a1",
+        name: "账户一",
+        phone: "13900001111"
+      }],
+      residents: [{
+        id: "r1",
+        name: "居民一",
+      idCard: "210200199001010011",
+      phone: "13900001111",
+      address: "大连市演示区真实地址",
+      personIndex: "210200199001010011#13900001111"
+    }],
+    birthCertificates: [{
+      id: "bc1",
+      residentId: "r1",
+      certificateNo: "BC-001",
+      documentNo: "DOC-001",
+      motherDocumentNo: "MOM-001"
+    }],
+    digitalCredentials: [{
+      id: "dc1",
+      residentId: "r1",
+      credentialNo: "MI-13900001111"
+    }],
+    seniorServices: [{
+      id: "ss1",
+      residentId: "r1",
+      contact: "家属姓名"
+    }]
+  }), "utf8");
+
+  try {
+    const sanitized = createSanitizedSnapshot({ dataDir, outputDir, fileName: "db.sanitized.json" });
+    assert.ok(fs.existsSync(sanitized.outputFile));
+    assert.ok(fs.existsSync(sanitized.reportFile));
+    const snapshot = JSON.parse(fs.readFileSync(sanitized.outputFile, "utf8"));
+    const report = JSON.parse(fs.readFileSync(sanitized.reportFile, "utf8"));
+
+    assert.equal(snapshot.residents[0].id, "r1");
+    assert.equal(snapshot.residents[0].name, "居民一");
+    assert.match(snapshot.residents[0].idCard, /^DEMO-ID-/);
+    assert.match(snapshot.residents[0].phone, /^DEMO-MOBILE-/);
+    assert.equal(snapshot.accounts[0].phone, snapshot.residents[0].phone);
+    assert.match(snapshot.residents[0].address, /^演示地址-/);
+    assert.match(snapshot.residents[0].personIndex, /^DEMO-ID-/);
+    assert.match(snapshot.birthCertificates[0].documentNo, /^DEMO-ID-/);
+    assert.match(snapshot.birthCertificates[0].motherDocumentNo, /^DEMO-ID-/);
+    assert.match(snapshot.birthCertificates[0].certificateNo, /^DEMO-ID-/);
+    assert.match(snapshot.digitalCredentials[0].credentialNo, /^DEMO-ID-/);
+    assert.match(snapshot.seniorServices[0].contact, /^演示联系人-/);
+    assert.equal(JSON.stringify(snapshot).includes("210200199001010011"), false);
+    assert.equal(JSON.stringify(snapshot).includes("13900001111"), false);
+    assert.equal(JSON.stringify(snapshot).includes("大连市演示区真实地址"), false);
+    assert.equal(report.totalMasked, 10);
+    assert.equal(report.fieldsMasked["residents.idCard"], 1);
+    assert.equal(snapshot.storageMeta.sanitizedSnapshot.totalMasked, 10);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

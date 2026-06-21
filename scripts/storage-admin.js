@@ -4,6 +4,12 @@ const path = require("node:path");
 
 const ROOT = path.resolve(__dirname, "..");
 const STORAGE_FILES = ["db.json", "health-city.sqlite"];
+const SENSITIVE_FIELD_RULES = [
+  { pattern: /^(idCard|documentNo|motherDocumentNo|fatherDocumentNo|certificateNo|credentialNo|personIndex|identityIndex)$/i, replacement: "DEMO-ID" },
+  { pattern: /(phone|mobile|tel)$/i, replacement: "DEMO-MOBILE" },
+  { pattern: /address$/i, replacement: "演示地址" },
+  { pattern: /contact$/i, replacement: "演示联系人" }
+];
 
 function sha256(file) {
   return createHash("sha256").update(fs.readFileSync(file)).digest("hex");
@@ -35,6 +41,61 @@ function createBackup(options = {}) {
   const manifest = { formatVersion: 1, createdAt: new Date().toISOString(), label, sourceDataDir: dataDir, files };
   fs.writeFileSync(path.join(destination, "manifest.json"), JSON.stringify(manifest, null, 2), "utf8");
   return { destination, manifest };
+}
+
+function createSanitizedSnapshot(options = {}) {
+  const dataDir = resolveDataDir(options.dataDir);
+  const source = path.join(dataDir, "db.json");
+  if (!fs.existsSync(source)) throw new Error(`Source snapshot is missing: ${source}`);
+
+  const outputDir = path.resolve(options.outputDir || path.join(dataDir, "sanitized"));
+  const outputFile = path.join(outputDir, options.fileName || `db.sanitized.${timestamp()}.json`);
+  const snapshot = JSON.parse(fs.readFileSync(source, "utf8"));
+  const report = {
+    createdAt: new Date().toISOString(),
+    source,
+    outputFile,
+    sourceSha256: sha256(source),
+    fieldsMasked: {},
+    totalMasked: 0
+  };
+  const sanitized = sanitizeValue(snapshot, [], report);
+  sanitized.storageMeta = {
+    ...(sanitized.storageMeta || {}),
+    sanitizedSnapshot: {
+      generatedAt: report.createdAt,
+      sourceSha256: report.sourceSha256,
+      totalMasked: report.totalMasked
+    }
+  };
+
+  fs.mkdirSync(outputDir, { recursive: true });
+  fs.writeFileSync(outputFile, JSON.stringify(sanitized, null, 2), "utf8");
+  const reportFile = `${outputFile}.report.json`;
+  report.outputSha256 = sha256(outputFile);
+  fs.writeFileSync(reportFile, JSON.stringify(report, null, 2), "utf8");
+  return { outputFile, reportFile, report };
+}
+
+function sanitizeValue(value, pathSegments, report) {
+  if (Array.isArray(value)) return value.map((item, index) => sanitizeValue(item, [...pathSegments, String(index)], report));
+  if (!value || typeof value !== "object") return value;
+
+  return Object.fromEntries(Object.entries(value).map(([key, entryValue]) => {
+    const rule = SENSITIVE_FIELD_RULES.find((item) => item.pattern.test(key));
+    if (rule && entryValue !== undefined && entryValue !== null && String(entryValue).trim() !== "") {
+      const masked = `${rule.replacement}-${stableToken(String(entryValue))}`;
+      const reportKey = [...pathSegments.filter((segment) => !/^\d+$/.test(segment)), key].join(".");
+      report.fieldsMasked[reportKey] = (report.fieldsMasked[reportKey] || 0) + 1;
+      report.totalMasked += 1;
+      return [key, masked];
+    }
+    return [key, sanitizeValue(entryValue, [...pathSegments, key], report)];
+  }));
+}
+
+function stableToken(value) {
+  return createHash("sha256").update(value).digest("hex").slice(0, 8).toUpperCase();
 }
 
 function verifyBackup(backupDir) {
@@ -193,13 +254,19 @@ function numberFlag(flags, name) {
   return value === undefined ? undefined : Number(value);
 }
 
+function stringFlag(flags, name) {
+  const prefix = `${name}=`;
+  return flags.find((flag) => flag.startsWith(prefix))?.slice(prefix.length);
+}
+
 function runCli() {
   const [command, target, ...flags] = process.argv.slice(2);
   if (command === "backup") return console.log(JSON.stringify(createBackup(), null, 2));
+  if (command === "sanitize") return console.log(JSON.stringify(createSanitizedSnapshot({ outputDir: target, fileName: stringFlag(flags, "--file-name") }), null, 2));
   if (command === "verify" && target) return console.log(JSON.stringify(verifyBackup(target), null, 2));
   if (command === "rehearse" && target) return console.log(JSON.stringify(rehearseRestore(target, { maxDurationMs: numberFlag(flags, "--max-duration-ms") }), null, 2));
   if (command === "restore" && target) return console.log(JSON.stringify(restoreBackup(target, { confirm: flags.includes("--confirm") }), null, 2));
-  throw new Error("Usage: storage-admin.js backup | verify <backup-dir> | rehearse <backup-dir> [--max-duration-ms=N] | restore <backup-dir> --confirm");
+  throw new Error("Usage: storage-admin.js backup | sanitize [output-dir] | verify <backup-dir> | rehearse <backup-dir> [--max-duration-ms=N] | restore <backup-dir> --confirm");
 }
 
 if (require.main === module) {
@@ -211,4 +278,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { createBackup, rehearseRestore, restoreBackup, verifyBackup };
+module.exports = { createBackup, createSanitizedSnapshot, rehearseRestore, restoreBackup, verifyBackup };

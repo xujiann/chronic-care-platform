@@ -52,6 +52,20 @@ https://xujiann.github.io/chronic-care-platform/
 - 静态演示数据。
 - 居民端本地上传和授权记录。
 
+发布静态快照前，先生成脱敏副本，避免把正式居民证件号、手机号、地址、证照编号等敏感字段带入演示发布物：
+
+```powershell
+npm.cmd run storage:sanitize
+```
+
+默认输出到 `data/sanitized/`，同时生成 `.report.json` 脱敏报告。报告会记录源文件 SHA-256、输出文件 SHA-256、脱敏字段计数和总脱敏数量。静态站或外发演示包应使用脱敏副本，不直接外发生产 `data/db.json`。
+
+如需生成固定文件名用于静态发布流水线，可显式指定输出目录和文件名：
+
+```powershell
+node scripts/storage-admin.js sanitize data/sanitized --file-name=db.json
+```
+
 不可运行：
 
 - Node.js API。
@@ -128,7 +142,7 @@ node scripts/storage-admin.js restore "data/backups/<备份目录>" --confirm
 
 1. 停止写入或确认当前为演示/维护窗口。
 2. 执行 `npm.cmd run storage:backup` 生成新备份。
-3. 执行 `node scripts/storage-admin.js verify "data/backups/<备份目录>"` 校验清单、大小和 SHA-256。
+3. 执行 `node scripts/storage-admin.js verify "data/backups/<备份目录>"` 校验清单、大小、SHA-256 和 JSON 快照基础数据质量。
 4. 执行 `node scripts/storage-admin.js rehearse "data/backups/<备份目录>" --max-duration-ms=60000` 将备份恢复到临时目录并重新校验。
 5. 确认演练输出 `ok: true`、`objectives.passed: true`，并记录 `rehearsalDataDir`、备份目录、执行人、时间和 `metrics.durationMs`、`metrics.totalBytes`。
 6. 只有在真实恢复时，才执行 `node scripts/storage-admin.js restore "data/backups/<备份目录>" --confirm`。
