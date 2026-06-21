@@ -104,6 +104,23 @@ http://localhost:5173/login.html
 http://localhost:5173/workbench.html
 ```
 
+## 存储迁移与备份
+
+SQLite 启动时会通过 `schema_migrations` 自动执行幂等迁移，当前 schema 版本为 4。部署升级前应先停止写入并创建备份：
+
+```powershell
+npm.cmd run storage:backup
+```
+
+备份保存在 `data/backups/`，清单记录文件大小和 SHA-256。恢复前必须停止服务并先校验：
+
+```powershell
+node scripts/storage-admin.js verify "data/backups/<备份目录>"
+node scripts/storage-admin.js restore "data/backups/<备份目录>" --confirm
+```
+
+恢复操作会先自动创建 `pre-restore` 安全备份。真实生产数据库仍需使用数据库原生在线备份、时间点恢复和异地副本。
+
 ## 现场实施待办
 
 - 政务统一认证和机构权限。

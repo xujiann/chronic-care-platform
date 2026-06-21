@@ -1,20 +1,148 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const { randomUUID } = require("crypto");
+const { createHash, randomUUID } = require("crypto");
 
 const PORT = Number(process.env.PORT || 5173);
 const ROOT = __dirname;
-const DATA_DIR = path.join(ROOT, "data");
+const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(ROOT, "data");
 const DB_FILE = path.join(DATA_DIR, "db.json");
 const SQLITE_FILE = path.join(DATA_DIR, "health-city.sqlite");
 const STORAGE_ENGINE = String(process.env.STORAGE_ENGINE || "auto").toLowerCase();
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const DEMO_PASSWORD = "123456";
+const STORAGE_SCHEMA_VERSION = 4;
 const sessions = new Map();
 let sqliteModule = null;
 let sqliteError = null;
+const SQLITE_MIGRATIONS = [
+  {
+    version: 1,
+    name: "create collection state and storage events",
+    apply(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS state_collections (
+          key TEXT PRIMARY KEY,
+          payload TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS storage_events (
+          id TEXT PRIMARY KEY,
+          at TEXT NOT NULL,
+          event TEXT NOT NULL,
+          detail TEXT NOT NULL
+        );
+      `);
+    }
+  },
+  {
+    version: 2,
+    name: "add collection versions and update index",
+    apply(db) {
+      const columns = db.prepare("PRAGMA table_info(state_collections)").all();
+      if (!columns.some((column) => column.name === "version")) {
+        db.exec("ALTER TABLE state_collections ADD COLUMN version INTEGER NOT NULL DEFAULT 1");
+      }
+      db.exec("CREATE INDEX IF NOT EXISTS idx_state_collections_updated_at ON state_collections(updated_at)");
+    }
+  },
+  {
+    version: 3,
+    name: "add structured identity mirror tables",
+    apply(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS residents (
+          id TEXT PRIMARY KEY,
+          person_index TEXT,
+          name TEXT NOT NULL,
+          id_card TEXT,
+          phone TEXT,
+          gender TEXT,
+          birth_date TEXT,
+          organization TEXT,
+          family_doctor TEXT,
+          address TEXT,
+          payload TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_residents_person_index
+          ON residents(person_index)
+          WHERE person_index IS NOT NULL AND person_index != '';
+        CREATE TABLE IF NOT EXISTS accounts (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          phone TEXT,
+          role TEXT,
+          payload TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS account_members (
+          account_id TEXT NOT NULL,
+          resident_id TEXT NOT NULL,
+          relation TEXT,
+          person_index TEXT,
+          payload TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY (account_id, resident_id),
+          FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE,
+          FOREIGN KEY (resident_id) REFERENCES residents(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_account_members_resident_id
+          ON account_members(resident_id);
+        CREATE INDEX IF NOT EXISTS idx_account_members_person_index
+          ON account_members(person_index);
+        CREATE TABLE IF NOT EXISTS person_indexes (
+          person_index TEXT PRIMARY KEY,
+          resident_id TEXT NOT NULL UNIQUE,
+          id_card TEXT,
+          phone TEXT,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (resident_id) REFERENCES residents(id) ON DELETE CASCADE
+        );
+      `);
+    }
+  },
+  {
+    version: 4,
+    name: "add structured personal record mirror table",
+    apply(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS personal_records (
+          id TEXT PRIMARY KEY,
+          resident_id TEXT NOT NULL,
+          person_index TEXT,
+          category TEXT NOT NULL,
+          record_date TEXT,
+          name TEXT NOT NULL,
+          result TEXT,
+          source TEXT,
+          created_by TEXT,
+          created_at TEXT,
+          updated_by TEXT,
+          updated_at TEXT,
+          payload TEXT NOT NULL,
+          synced_at TEXT NOT NULL,
+          FOREIGN KEY (resident_id) REFERENCES residents(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_personal_records_resident_category
+          ON personal_records(resident_id, category);
+        CREATE INDEX IF NOT EXISTS idx_personal_records_person_index
+          ON personal_records(person_index);
+        CREATE INDEX IF NOT EXISTS idx_personal_records_record_date
+          ON personal_records(record_date);
+      `);
+    }
+  }
+];
 const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals", "deathCertificates", "birthCertificates", "multiPracticeApplications", "digitalCredentials", "emergencySignals", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords"]);
+const WORKFLOW_ROLE_COLLECTIONS = {
+  commission: WORKFLOW_COLLECTIONS,
+  institution: new Set(["careOrders", "medicationPickups", "followups", "referrals", "deathCertificates", "birthCertificates", "multiPracticeApplications", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans"]),
+  insurance: new Set(["insuranceClaims", "medicationPickups", "digitalCredentials"]),
+  county: new Set(["countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords"])
+};
+const WORKFLOW_PROTECTED_FIELDS = new Set(["id", "residentId", "maternalResidentId", "personIndex", "createdAt", "createdBy", "createdByName", "lastUpdated", "updatedAt", "updatedBy", "updatedByName"]);
+const PERSONAL_RECORD_PROTECTED_FIELDS = new Set(["id", "residentId", "personIndex", "createdAt", "createdBy", "createdByName", "updatedAt", "updatedBy", "updatedByName"]);
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -1607,9 +1735,12 @@ function ensureDatabase() {
 function readDatabase() {
   ensureDatabase();
   const raw = shouldUseSqlite() ? readSqliteState() : JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
-  const data = normalizeState(raw);
+  const comparableRaw = { ...raw };
+  delete comparableRaw.storageMeta;
+  const data = normalizeState(comparableRaw);
+  const changed = JSON.stringify(comparableRaw) !== JSON.stringify(data);
   data.storageMeta = storageMeta();
-  writeDatabase(data);
+  if (changed) writeDatabase(data);
   return data;
 }
 
@@ -1658,21 +1789,14 @@ function ensureSqliteDatabase() {
   const db = openSqliteDatabase();
   let needsSeed = false;
   try {
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS state_collections (
-        key TEXT PRIMARY KEY,
-        payload TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-      CREATE TABLE IF NOT EXISTS storage_events (
-        id TEXT PRIMARY KEY,
-        at TEXT NOT NULL,
-        event TEXT NOT NULL,
-        detail TEXT NOT NULL
-      );
-    `);
+    applySqliteMigrations(db);
     const row = db.prepare("SELECT COUNT(*) AS count FROM state_collections").get();
     needsSeed = !row.count;
+    const identityMirrorRow = db.prepare("SELECT COUNT(*) AS count FROM residents").get();
+    const personalRecordMirrorRow = db.prepare("SELECT COUNT(*) AS count FROM personal_records").get();
+    if (!needsSeed && (!identityMirrorRow.count || !personalRecordMirrorRow.count)) {
+      syncSqliteIdentityTables(db, readSqliteStateFromConnection(db), "migrate-identity-mirrors");
+    }
   } finally {
     db.close();
   }
@@ -1682,32 +1806,75 @@ function ensureSqliteDatabase() {
   }
 }
 
+function applySqliteMigrations(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      version INTEGER PRIMARY KEY,
+      name TEXT NOT NULL,
+      checksum TEXT NOT NULL,
+      applied_at TEXT NOT NULL
+    )
+  `);
+  const applied = new Set(db.prepare("SELECT version FROM schema_migrations").all().map((row) => Number(row.version)));
+  SQLITE_MIGRATIONS.forEach((migration) => {
+    if (applied.has(migration.version)) return;
+    const now = new Date().toISOString();
+    const checksum = createHash("sha256").update(`${migration.version}:${migration.name}`).digest("hex");
+    try {
+      db.exec("BEGIN");
+      migration.apply(db);
+      db.prepare("INSERT INTO schema_migrations (version, name, checksum, applied_at) VALUES (?, ?, ?, ?)")
+        .run(migration.version, migration.name, checksum, now);
+      db.exec("COMMIT");
+    } catch (error) {
+      db.exec("ROLLBACK");
+      throw new Error(`SQLite migration ${migration.version} failed: ${error.message}`);
+    }
+  });
+}
+
 function readSqliteState() {
   const db = openSqliteDatabase();
   try {
-    const rows = db.prepare("SELECT key, payload FROM state_collections").all();
-    if (!rows.length) return JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
-    return rows.reduce((state, row) => {
-      state[row.key] = JSON.parse(row.payload);
-      return state;
-    }, {});
+    return readSqliteStateFromConnection(db);
   } finally {
     db.close();
   }
+}
+
+function readSqliteStateFromConnection(db) {
+  const rows = db.prepare("SELECT key, payload FROM state_collections").all();
+  if (!rows.length) return JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
+  return rows.reduce((state, row) => {
+    state[row.key] = JSON.parse(row.payload);
+    return state;
+  }, {});
 }
 
 function writeSqliteState(data, event = "write-state") {
   const db = openSqliteDatabase();
   const now = new Date().toISOString();
   try {
+    db.exec("PRAGMA foreign_keys = ON");
     db.exec("BEGIN");
-    const deleteStatement = db.prepare("DELETE FROM state_collections");
-    deleteStatement.run();
-    const insertStatement = db.prepare("INSERT INTO state_collections (key, payload, updated_at) VALUES (?, ?, ?)");
-    Object.entries(data).forEach(([key, value]) => {
-      if (key === "storageMeta") return;
-      insertStatement.run(key, JSON.stringify(value), now);
+    const entries = Object.entries(data).filter(([key]) => key !== "storageMeta");
+    const incomingKeys = new Set(entries.map(([key]) => key));
+    const deleteStatement = db.prepare("DELETE FROM state_collections WHERE key = ?");
+    db.prepare("SELECT key FROM state_collections").all().forEach((row) => {
+      if (!incomingKeys.has(row.key)) deleteStatement.run(row.key);
     });
+    const upsertStatement = db.prepare(`
+      INSERT INTO state_collections (key, payload, updated_at, version) VALUES (?, ?, ?, 1)
+      ON CONFLICT(key) DO UPDATE SET
+        payload = excluded.payload,
+        updated_at = excluded.updated_at,
+        version = state_collections.version + 1
+    `);
+    entries.forEach(([key, value]) => {
+      if (key === "storageMeta") return;
+      upsertStatement.run(key, JSON.stringify(value), now);
+    });
+    syncSqliteIdentityTables(db, data, event, now);
     db.prepare("INSERT INTO storage_events (id, at, event, detail) VALUES (?, ?, ?, ?)").run(randomUUID(), now, event, "platform state persisted");
     db.exec("COMMIT");
   } catch (error) {
@@ -1718,6 +1885,117 @@ function writeSqliteState(data, event = "write-state") {
   }
 }
 
+function syncSqliteIdentityTables(db, data, event = "sync-identity-mirrors", at = new Date().toISOString()) {
+  db.prepare("DELETE FROM personal_records").run();
+  db.prepare("DELETE FROM account_members").run();
+  db.prepare("DELETE FROM person_indexes").run();
+  db.prepare("DELETE FROM accounts").run();
+  db.prepare("DELETE FROM residents").run();
+
+  const residentStatement = db.prepare(`
+    INSERT INTO residents (
+      id, person_index, name, id_card, phone, gender, birth_date,
+      organization, family_doctor, address, payload, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const personIndexStatement = db.prepare(`
+    INSERT INTO person_indexes (person_index, resident_id, id_card, phone, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+  `);
+  const residents = Array.isArray(data.residents) ? data.residents : [];
+  residents.forEach((resident) => {
+    const personIndex = cleanSqliteText(resident.personIndex || resident.identityIndex);
+    residentStatement.run(
+      resident.id,
+      personIndex,
+      cleanSqliteText(resident.name) || resident.id,
+      cleanSqliteText(resident.idCard),
+      cleanSqliteText(resident.phone),
+      cleanSqliteText(resident.gender),
+      cleanSqliteText(resident.birthDate),
+      cleanSqliteText(resident.organization),
+      cleanSqliteText(resident.familyDoctor),
+      cleanSqliteText(resident.address),
+      JSON.stringify(resident),
+      at
+    );
+    if (personIndex) {
+      personIndexStatement.run(
+        personIndex,
+        resident.id,
+        cleanSqliteText(resident.idCard),
+        cleanSqliteText(resident.phone),
+        at
+      );
+    }
+  });
+
+  const accountStatement = db.prepare(`
+    INSERT INTO accounts (id, name, phone, role, payload, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  const memberStatement = db.prepare(`
+    INSERT INTO account_members (account_id, resident_id, relation, person_index, payload, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  const accounts = Array.isArray(data.accounts) ? data.accounts : [];
+  accounts.forEach((account) => {
+    accountStatement.run(
+      account.id,
+      cleanSqliteText(account.name) || account.id,
+      cleanSqliteText(account.phone),
+      cleanSqliteText(account.role),
+      JSON.stringify(account),
+      at
+    );
+    (Array.isArray(account.members) ? account.members : []).forEach((member) => {
+      memberStatement.run(
+        account.id,
+        member.residentId,
+        cleanSqliteText(member.relation),
+        cleanSqliteText(member.personIndex),
+        JSON.stringify(member),
+        at
+      );
+    });
+  });
+
+  const personalRecordStatement = db.prepare(`
+    INSERT INTO personal_records (
+      id, resident_id, person_index, category, record_date, name, result, source,
+      created_by, created_at, updated_by, updated_at, payload, synced_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const personalRecords = Array.isArray(data.personalRecords) ? data.personalRecords : [];
+  personalRecords.forEach((recordItem) => {
+    personalRecordStatement.run(
+      recordItem.id,
+      recordItem.residentId,
+      cleanSqliteText(recordItem.personIndex),
+      cleanSqliteText(recordItem.category) || "unknown",
+      cleanSqliteText(recordItem.date),
+      cleanSqliteText(recordItem.name) || recordItem.id,
+      cleanSqliteText(recordItem.result),
+      cleanSqliteText(recordItem.source),
+      cleanSqliteText(recordItem.createdBy),
+      cleanSqliteText(recordItem.createdAt),
+      cleanSqliteText(recordItem.updatedBy),
+      cleanSqliteText(recordItem.updatedAt),
+      JSON.stringify(recordItem),
+      at
+    );
+  });
+
+  db.prepare("INSERT INTO storage_events (id, at, event, detail) VALUES (?, ?, ?, ?)")
+    .run(randomUUID(), at, event, "structured mirror tables synchronized");
+}
+
+function cleanSqliteText(value) {
+  if (value === undefined || value === null) return null;
+  const text = String(value);
+  return text ? text : null;
+}
+
 function storageMeta() {
   const sqlite = shouldUseSqlite();
   return {
@@ -1726,6 +2004,7 @@ function storageMeta() {
     sqliteFile: sqlite ? relativeProjectPath(SQLITE_FILE) : "",
     jsonFile: relativeProjectPath(DB_FILE),
     sqliteAvailable: sqlite,
+    schemaVersion: sqlite ? STORAGE_SCHEMA_VERSION : 0,
     sqliteError: sqliteError ? sqliteError.message : ""
   };
 }
@@ -2436,6 +2715,7 @@ function normalizeHealthStatisticsImportJob(payload, user) {
 
 function cleanWorkflowUpdates(updates) {
   return Object.entries(updates && typeof updates === "object" ? updates : {}).reduce((result, [key, value]) => {
+    if (WORKFLOW_PROTECTED_FIELDS.has(key)) return result;
     if (["string", "number", "boolean"].includes(typeof value) || value === null) {
       result[key] = value;
     }
@@ -2714,12 +2994,17 @@ async function handleApi(req, res) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/workflow-actions") {
-    const user = requireApiRole(req, res, ["citizen", "institution", "insurance", "county", "commission"], "/api/workflow-actions");
+    const user = requireApiRole(req, res, ["institution", "insurance", "county", "commission"], "/api/workflow-actions");
     if (!user) return;
     const payload = await collectJson(req);
     const collection = String(payload.collection || "").trim();
     if (!WORKFLOW_COLLECTIONS.has(collection)) {
       sendJson(res, 400, { error: "Bad Request", message: "不支持的业务集合" });
+      return;
+    }
+    if (!WORKFLOW_ROLE_COLLECTIONS[user.role]?.has(collection)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "更新业务闭环", target: collection, result: "拒绝", detail: "角色无权更新该业务集合" });
+      sendJson(res, 403, { error: "Forbidden", message: "当前角色无权更新该业务集合" });
       return;
     }
     const data = readDatabase();
@@ -2791,6 +3076,7 @@ async function handleApi(req, res) {
       return;
     }
     const residentMap = new Map(data.residents.map((resident) => [resident.id, resident]));
+    recordData.id = randomUUID();
     recordData.personIndex = recordData.personIndex || personIndexForResident(residentMap, recordData.residentId);
     recordData.createdBy = user.username || user.role;
     recordData.createdByName = user.name;
@@ -2817,12 +3103,13 @@ async function handleApi(req, res) {
       sendJson(res, 403, { error: "Forbidden", message: "无权更新该居民健康信息" });
       return;
     }
+    const safePatch = Object.fromEntries(Object.entries(patch).filter(([key]) => !PERSONAL_RECORD_PROTECTED_FIELDS.has(key)));
     data.personalRecords[index] = {
       ...data.personalRecords[index],
-      ...patch,
+      ...safePatch,
       meta: {
         ...(data.personalRecords[index].meta || {}),
-        ...(patch.meta || {})
+        ...(safePatch.meta && typeof safePatch.meta === "object" ? safePatch.meta : {})
       },
       updatedBy: user.username || user.role,
       updatedByName: user.name,
@@ -2878,7 +3165,30 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => {
-  ensureDatabase();
-  console.log(`慢病医防融合管理平台已启动：http://localhost:${PORT}`);
-});
+function startServer(port = PORT) {
+  return server.listen(port, () => {
+    ensureDatabase();
+    const address = server.address();
+    const actualPort = typeof address === "object" && address ? address.port : port;
+    console.log(`慢病医防融合管理平台已启动：http://localhost:${actualPort}`);
+  });
+}
+
+function stopServer() {
+  return new Promise((resolve) => {
+    if (!server.listening) return resolve();
+    server.close(resolve);
+  });
+}
+
+if (require.main === module) {
+  startServer();
+  const shutdown = async () => {
+    await stopServer();
+    process.exit(0);
+  };
+  process.once("SIGINT", shutdown);
+  process.once("SIGTERM", shutdown);
+}
+
+module.exports = { ensureDatabase, openSqliteDatabase, readDatabase, server, startServer, stopServer, storageMeta, writeDatabase };

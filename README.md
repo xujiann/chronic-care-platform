@@ -203,6 +203,9 @@ data/db.json
 
 ```powershell
 npm.cmd run check
+npm.cmd test
+npm.cmd run test:coverage
+npm.cmd run test:e2e
 ```
 
-该命令会检查核心 JavaScript 语法。
+上述命令依次检查 JavaScript 语法、API 与静态安全回归、后端覆盖率门禁和 Chromium 端到端角色旅程。所有动态测试均使用隔离的临时数据目录。

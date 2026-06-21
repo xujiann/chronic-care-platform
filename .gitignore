@@ -5,7 +5,11 @@ server.err.log
 data/*.sqlite
 data/*.sqlite-shm
 data/*.sqlite-wal
+data/backups/
 tmp/
+coverage/
+playwright-report/
+test-results/
 .DS_Store
 Thumbs.db
 
