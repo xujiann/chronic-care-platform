@@ -270,4 +270,50 @@ test("SQLite stale state writes return an API conflict contract", { skip: !sqlit
   }));
   assert.equal(staleChronicPatch.response.status, 409);
   assert.equal(staleChronicPatch.body.collection, "chronicManagementPlans");
+
+  const countyRead = await api(baseUrl, "/api/state", authorized(token));
+  const collaborationVersion = countyRead.body.storageMeta.collectionVersions.countyCollaborationOrders;
+  const collaborationPatch = await api(baseUrl, "/api/county-collaboration-orders/cco-001", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({ expectedVersion: collaborationVersion, status: "versioned-county-diagnosis", residentId: "r3" })
+  }));
+  assert.equal(collaborationPatch.response.status, 200);
+  assert.equal(collaborationPatch.body.status, "versioned-county-diagnosis");
+  assert.notEqual(collaborationPatch.body.residentId, "r3");
+  const staleCollaborationPatch = await api(baseUrl, "/api/county-collaboration-orders/cco-001", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({ expectedVersion: collaborationVersion, status: "stale-county-diagnosis" })
+  }));
+  assert.equal(staleCollaborationPatch.response.status, 409);
+  assert.equal(staleCollaborationPatch.body.collection, "countyCollaborationOrders");
+
+  const aiRead = await api(baseUrl, "/api/state", authorized(token));
+  const aiVersion = aiRead.body.storageMeta.collectionVersions.countyAiDiagnosisCases;
+  const aiPatch = await api(baseUrl, "/api/county-ai-diagnosis-cases/cad-001", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({ expectedVersion: aiVersion, status: "versioned-ai-review", doctorAction: "versioned-adopted" })
+  }));
+  assert.equal(aiPatch.response.status, 200);
+  assert.equal(aiPatch.body.doctorAction, "versioned-adopted");
+  const staleAiPatch = await api(baseUrl, "/api/county-ai-diagnosis-cases/cad-001", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({ expectedVersion: aiVersion, doctorAction: "stale-adopted" })
+  }));
+  assert.equal(staleAiPatch.response.status, 409);
+  assert.equal(staleAiPatch.body.collection, "countyAiDiagnosisCases");
+
+  const mutualRead = await api(baseUrl, "/api/state", authorized(token));
+  const mutualVersion = mutualRead.body.storageMeta.collectionVersions.countyMutualRecognitionRecords;
+  const mutualPatch = await api(baseUrl, "/api/county-mutual-recognition-records/cmr-001", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({ expectedVersion: mutualVersion, status: "versioned-recognized", savedCost: 99 })
+  }));
+  assert.equal(mutualPatch.response.status, 200);
+  assert.equal(mutualPatch.body.savedCost, 99);
+  const staleMutualPatch = await api(baseUrl, "/api/county-mutual-recognition-records/cmr-001", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({ expectedVersion: mutualVersion, savedCost: 100 })
+  }));
+  assert.equal(staleMutualPatch.response.status, 409);
+  assert.equal(staleMutualPatch.body.collection, "countyMutualRecognitionRecords");
 });

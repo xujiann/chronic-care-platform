@@ -3500,6 +3500,51 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "PATCH" && url.pathname.startsWith("/api/county-collaboration-orders/")) {
+    const user = requireApiRole(req, res, ["county", "commission"], "/api/county-collaboration-orders/:id");
+    if (!user) return;
+    const result = patchBusinessCollectionItem({
+      data: readDatabase(),
+      collection: "countyCollaborationOrders",
+      id: decodeURIComponent(url.pathname.replace("/api/county-collaboration-orders/", "")),
+      patch: await collectJson(req),
+      user,
+      action: "更新县域协同工单"
+    });
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "PATCH" && url.pathname.startsWith("/api/county-ai-diagnosis-cases/")) {
+    const user = requireApiRole(req, res, ["county", "commission"], "/api/county-ai-diagnosis-cases/:id");
+    if (!user) return;
+    const result = patchBusinessCollectionItem({
+      data: readDatabase(),
+      collection: "countyAiDiagnosisCases",
+      id: decodeURIComponent(url.pathname.replace("/api/county-ai-diagnosis-cases/", "")),
+      patch: await collectJson(req),
+      user,
+      action: "更新县域 AI 诊断"
+    });
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "PATCH" && url.pathname.startsWith("/api/county-mutual-recognition-records/")) {
+    const user = requireApiRole(req, res, ["county", "commission"], "/api/county-mutual-recognition-records/:id");
+    if (!user) return;
+    const result = patchBusinessCollectionItem({
+      data: readDatabase(),
+      collection: "countyMutualRecognitionRecords",
+      id: decodeURIComponent(url.pathname.replace("/api/county-mutual-recognition-records/", "")),
+      patch: await collectJson(req),
+      user,
+      action: "更新县域检查互认"
+    });
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/birth-certificates") {
     const user = requireApiRole(req, res, ["institution", "commission", "citizen"], "/api/birth-certificates");
     if (!user) return;
