@@ -286,12 +286,12 @@ const SQLITE_MIGRATIONS = [
     }
   }
 ];
-const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals", "deathCertificates", "birthCertificates", "multiPracticeApplications", "digitalCredentials", "emergencySignals", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords"]);
+const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals", "deathCertificates", "birthCertificates", "multiPracticeApplications", "digitalCredentials", "emergencySignals", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports"]);
 const WORKFLOW_ROLE_COLLECTIONS = {
   commission: WORKFLOW_COLLECTIONS,
   institution: new Set(["careOrders", "medicationPickups", "followups", "referrals", "deathCertificates", "birthCertificates", "multiPracticeApplications", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans"]),
   insurance: new Set(["insuranceClaims", "medicationPickups", "digitalCredentials"]),
-  county: new Set(["countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords"])
+  county: new Set(["countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports"])
 };
 const WORKFLOW_PROTECTED_FIELDS = new Set(["id", "residentId", "maternalResidentId", "personIndex", "credentialNo", "certificateNo", "documentNo", "motherDocumentNo", "fatherDocumentNo", "createdAt", "createdBy", "createdByName", "lastUpdated", "updatedAt", "updatedBy", "updatedByName"]);
 const PERSONAL_RECORD_PROTECTED_FIELDS = new Set(["id", "residentId", "personIndex", "createdAt", "createdBy", "createdByName", "updatedAt", "updatedBy", "updatedByName", "expectedVersion"]);
@@ -1018,6 +1018,20 @@ function seedCountyMutualRecognitionRecords() {
     { id: "cmr-001", residentId: "r1", item: "心电图", sourceInstitution: "青泥洼桥社区卫生服务中心", targetInstitution: "大连市中心医院", status: "已互认", savedCost: 86, reason: "同质质控通过", at: todayOffset(-2) },
     { id: "cmr-002", residentId: "r2", item: "糖化血红蛋白", sourceInstitution: "星海湾社区卫生服务中心", targetInstitution: "大连医科大学附属医院", status: "待互认", savedCost: 120, reason: "等待中心实验室报告", at: todayOffset(0) },
     { id: "cmr-003", residentId: "r4", item: "颈动脉超声", sourceInstitution: "庄河市基层医疗机构", targetInstitution: "庄河市中心医院", status: "退回复核", savedCost: 180, reason: "图像质量不足，需要复核", at: todayOffset(-1) }
+  ];
+}
+
+function seedMutualRecognitionRules() {
+  return [
+    { id: "mrr-ecg-001", item: "ECG", category: "electrocardiogram", validDays: 7, sourceLevels: ["primary", "secondary", "tertiary"], targetLevels: ["secondary", "tertiary"], qualityStandard: "waveform-readable", autoRecognize: true, savedCost: 86, nonRecognitionReasons: ["poor-quality", "expired", "clinical-change"], status: "active" },
+    { id: "mrr-hba1c-001", item: "HbA1c", category: "lab", validDays: 30, sourceLevels: ["secondary", "tertiary"], targetLevels: ["secondary", "tertiary"], qualityStandard: "lab-qc-passed", autoRecognize: true, savedCost: 120, nonRecognitionReasons: ["qc-failed", "expired", "missing-calibration"], status: "active" },
+    { id: "mrr-ct-001", item: "Chest CT", category: "imaging", validDays: 14, sourceLevels: ["secondary", "tertiary"], targetLevels: ["tertiary"], qualityStandard: "dicom-complete", autoRecognize: false, savedCost: 260, nonRecognitionReasons: ["missing-dicom", "poor-quality", "clinical-change"], status: "active" }
+  ];
+}
+
+function seedDiagnosticReports() {
+  return [
+    { id: "dr-001", externalId: "LIS-DEMO-001", residentId: "r2", item: "HbA1c", category: "lab", sourceInstitution: "Wafangdian Central Hospital", targetInstitution: "Dalian Medical University Hospital", result: "6.8%", conclusion: "HbA1c is elevated; continue chronic disease follow-up.", reportedAt: todayOffset(-1), status: "recognized", recognitionRecordId: "cmr-002" }
   ];
 }
 
@@ -2379,7 +2393,8 @@ function syncSqliteServiceTables(db, data, at) {
   [
     ["countyCollaborationOrders", "orderType", "requestedAt"],
     ["countyAiDiagnosisCases", "chiefComplaint", "at"],
-    ["countyMutualRecognitionRecords", "item", "at"]
+    ["countyMutualRecognitionRecords", "item", "at"],
+    ["diagnosticReports", "item", "reportedAt"]
   ].forEach(([collection, typeField, dateField]) => {
     (Array.isArray(data[collection]) ? data[collection] : []).forEach((item) => {
       countyWorkflowStatement.run(
@@ -2509,6 +2524,8 @@ function normalizeState(data) {
     countyCollaborationOrders: mergeByKey(seedCountyCollaborationOrders(), data.countyCollaborationOrders, "id"),
     countyAiDiagnosisCases: mergeByKey(seedCountyAiDiagnosisCases(), data.countyAiDiagnosisCases, "id"),
     countyMutualRecognitionRecords: mergeByKey(seedCountyMutualRecognitionRecords(), data.countyMutualRecognitionRecords, "id"),
+    mutualRecognitionRules: mergeByKey(seedMutualRecognitionRules(), data.mutualRecognitionRules, "id"),
+    diagnosticReports: mergeByKey(seedDiagnosticReports(), data.diagnosticReports, "id"),
     careOrders: Array.isArray(data.careOrders) ? data.careOrders : seedCareOrders(),
     medicationPickups: Array.isArray(data.medicationPickups) ? data.medicationPickups : seedMedicationPickups(),
     institutionSupervisions: Array.isArray(data.institutionSupervisions) ? data.institutionSupervisions : seedInstitutionSupervisions(),
@@ -2860,7 +2877,7 @@ function normalizePersonIndexes(state) {
     resident.identityIndex = resident.personIndex;
   });
   const residentMap = new Map(residents.map((resident) => [resident.id, resident]));
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports"].forEach((key) => {
     (Array.isArray(state[key]) ? state[key] : []).forEach((item) => {
       item.personIndex = item.personIndex || personIndexForResident(residentMap, item.residentId);
     });
@@ -3042,6 +3059,86 @@ function buildIntegrationSample(contract, sequence = 1) {
     payload,
     signature: integrationSignatureFor(payload)
   };
+}
+
+function findMutualRecognitionRule(data, payload) {
+  const item = String(payload.item || "").trim().toLowerCase();
+  const category = String(payload.category || "").trim().toLowerCase();
+  return (data.mutualRecognitionRules || []).find((rule) =>
+    rule.status === "active" &&
+    String(rule.item || "").trim().toLowerCase() === item &&
+    (!category || String(rule.category || "").trim().toLowerCase() === category)
+  );
+}
+
+function normalizeDiagnosticReport(payload, user, data) {
+  const residentId = String(payload.residentId || "").trim();
+  const item = String(payload.item || "").trim();
+  if (!residentId) throw new Error("residentId is required");
+  if (!item) throw new Error("item is required");
+  if (!canAccessResident(user, residentId, data)) throw new Error("forbidden resident scope");
+  const now = new Date().toISOString();
+  const rule = findMutualRecognitionRule(data, payload);
+  const recognized = Boolean(rule?.autoRecognize && String(payload.qualityStatus || "passed") === "passed");
+  const reportId = `dr-${randomUUID()}`;
+  const recognitionId = `cmr-${randomUUID()}`;
+  const sourceInstitution = String(payload.sourceInstitution || user.orgName || user.name || "").trim();
+  const targetInstitution = String(payload.targetInstitution || "regional-sharing-center").trim();
+  const reportedAt = String(payload.reportedAt || now).trim();
+  const report = {
+    id: reportId,
+    externalId: String(payload.externalId || reportId).trim(),
+    residentId,
+    item,
+    category: String(payload.category || rule?.category || "diagnostic").trim(),
+    sourceInstitution,
+    targetInstitution,
+    result: String(payload.result || "").trim(),
+    conclusion: String(payload.conclusion || payload.result || "").trim(),
+    reportedAt,
+    qualityStatus: String(payload.qualityStatus || "passed").trim(),
+    status: recognized ? "recognized" : "pending_review",
+    ruleId: rule?.id || "",
+    recognitionRecordId: recognitionId,
+    createdAt: now,
+    createdBy: user.username || user.role,
+    createdByName: user.name
+  };
+  const recognition = {
+    id: recognitionId,
+    residentId,
+    item,
+    sourceInstitution,
+    targetInstitution,
+    status: recognized ? "recognized" : "pending_review",
+    savedCost: Number(rule?.savedCost || payload.savedCost || 0),
+    reason: recognized ? `matched rule ${rule.id}` : (rule ? "requires manual review" : "no matching recognition rule"),
+    ruleId: rule?.id || "",
+    reportId,
+    at: reportedAt,
+    qualityStatus: report.qualityStatus,
+    nonRecognitionReasons: rule?.nonRecognitionReasons || [],
+    createdAt: now,
+    createdBy: user.username || user.role
+  };
+  const personalRecord = {
+    id: `pr-${randomUUID()}`,
+    residentId,
+    category: "diagnostic-report",
+    recordDate: reportedAt.slice(0, 10),
+    name: item,
+    result: report.conclusion || report.result,
+    source: sourceInstitution,
+    reportId,
+    recognitionRecordId: recognitionId,
+    createdAt: now,
+    createdBy: user.username || user.role,
+    createdByName: user.name,
+    updatedAt: now,
+    updatedBy: user.username || user.role,
+    updatedByName: user.name
+  };
+  return { report, recognition, personalRecord, rule };
 }
 
 function personIndexFromParts(idCard, phone) {
@@ -3334,7 +3431,7 @@ function scopeStateForUser(data, user) {
 
   scoped.accounts = account ? [account] : [];
   scoped.residents = (data.residents || []).filter((item) => allowedIds.has(item.id));
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports"].forEach((key) => {
     scoped[key] = (data[key] || []).filter(hasAllowedResident);
   });
   if (scoped.referralSystem) {
@@ -3789,6 +3886,52 @@ async function handleApi(req, res) {
     ].slice(0, 120);
     writeDatabase(data);
     sendJson(res, 200, event);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/mutual-recognition/rules") {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/mutual-recognition/rules");
+    if (!user) return;
+    const data = readDatabase();
+    sendJson(res, 200, { rules: data.mutualRecognitionRules || [] });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/mutual-recognition/reports") {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/mutual-recognition/reports");
+    if (!user) return;
+    const data = readDatabase();
+    const payload = await collectJson(req);
+    let normalized;
+    try {
+      normalized = normalizeDiagnosticReport(payload, user, data);
+    } catch (error) {
+      if (error.message === "forbidden resident scope") {
+        appendSecurityEvent({ actor: user.name, role: user.role, action: "submit diagnostic report", target: payload.residentId || "", result: "denied", detail: "resident scope denied" });
+        sendJson(res, 403, { error: "Forbidden", message: "无权回传该居民报告" });
+        return;
+      }
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    data.diagnosticReports = [normalized.report, ...(Array.isArray(data.diagnosticReports) ? data.diagnosticReports : [])].slice(0, 300);
+    data.countyMutualRecognitionRecords = [normalized.recognition, ...(Array.isArray(data.countyMutualRecognitionRecords) ? data.countyMutualRecognitionRecords : [])].slice(0, 300);
+    data.personalRecords = [normalized.personalRecord, ...(Array.isArray(data.personalRecords) ? data.personalRecords : [])].slice(0, 500);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "submit diagnostic report",
+        target: `${normalized.report.residentId}/${normalized.report.item}`,
+        result: "allowed",
+        detail: `${normalized.report.status} · ${normalized.report.ruleId || "no-rule"}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 201, normalized);
     return;
   }
 

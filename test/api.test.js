@@ -405,6 +405,46 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(simulatedReplay.body.event.idempotentReplay, true);
   });
 
+  await t.test("closes mutual recognition report callback into resident records", async () => {
+    const county = await login(baseUrl, "county");
+    const rules = await api(baseUrl, "/api/mutual-recognition/rules", authorized(county.body.token));
+    assert.equal(rules.response.status, 200);
+    assert.equal(rules.body.rules.some((item) => item.id === "mrr-hba1c-001"), true);
+
+    const report = await api(baseUrl, "/api/mutual-recognition/reports", authorized(county.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        externalId: "LIS-CALLBACK-001",
+        residentId: "r2",
+        item: "HbA1c",
+        category: "lab",
+        sourceInstitution: "Wafangdian Central Hospital",
+        targetInstitution: "Dalian Medical University Hospital",
+        result: "6.7%",
+        conclusion: "HbA1c follow-up result returned from county lab center.",
+        qualityStatus: "passed",
+        reportedAt: "2026-06-21T12:00:00.000Z"
+      })
+    }));
+    assert.equal(report.response.status, 201);
+    assert.equal(report.body.report.status, "recognized");
+    assert.equal(report.body.report.ruleId, "mrr-hba1c-001");
+    assert.equal(report.body.recognition.status, "recognized");
+    assert.equal(report.body.personalRecord.reportId, report.body.report.id);
+
+    const state = await api(baseUrl, "/api/state", authorized(county.body.token));
+    assert.equal(state.body.diagnosticReports.some((item) => item.id === report.body.report.id), true);
+    assert.equal(state.body.countyMutualRecognitionRecords.some((item) => item.id === report.body.recognition.id), true);
+    assert.equal(state.body.personalRecords.some((item) => item.reportId === report.body.report.id), true);
+
+    const citizen = await login(baseUrl, "citizen");
+    const denied = await api(baseUrl, "/api/mutual-recognition/reports", authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({ residentId: "r2", item: "HbA1c" })
+    }));
+    assert.equal(denied.response.status, 403);
+  });
+
   await t.test("enforces workflow collection ownership and protects structural fields", async () => {
     const institution = await login(baseUrl, "hospital");
     const insurance = await login(baseUrl, "insurance");

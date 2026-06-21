@@ -84,7 +84,7 @@ test("SQLite migrations are idempotent and collection versions change only on wr
       assert.equal(Number(db.prepare("SELECT COUNT(*) AS count FROM medication_pickup_records").get().count), currentState.medicationPickups.length);
       assert.equal(
         Number(db.prepare("SELECT COUNT(*) AS count FROM county_workflow_records").get().count),
-        currentState.countyCollaborationOrders.length + currentState.countyAiDiagnosisCases.length + currentState.countyMutualRecognitionRecords.length
+        currentState.countyCollaborationOrders.length + currentState.countyAiDiagnosisCases.length + currentState.countyMutualRecognitionRecords.length + currentState.diagnosticReports.length
       );
       assert.equal(
         db.prepare("SELECT resident_id FROM person_indexes WHERE person_index = ?").get("DEMO-ID-R1#DEMO-MOBILE-R1").resident_id,
