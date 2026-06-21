@@ -139,4 +139,32 @@ test("SQLite stale state writes return an API conflict contract", { skip: !sqlit
   }));
   assert.equal(staleResidentPatch.response.status, 409);
   assert.equal(staleResidentPatch.body.collection, "residents");
+
+  const workflowRead = await api(baseUrl, "/api/state", authorized(token));
+  const careOrdersVersion = workflowRead.body.storageMeta.collectionVersions.careOrders;
+  const workflowWrite = await api(baseUrl, "/api/workflow-actions", authorized(token, {
+    method: "POST",
+    body: JSON.stringify({
+      collection: "careOrders",
+      id: "co1",
+      expectedVersion: careOrdersVersion,
+      status: "workflow-versioned-update",
+      updates: { institutionReview: "versioned" }
+    })
+  }));
+  assert.equal(workflowWrite.response.status, 200);
+  assert.equal(workflowWrite.body.status, "workflow-versioned-update");
+
+  const staleWorkflowWrite = await api(baseUrl, "/api/workflow-actions", authorized(token, {
+    method: "POST",
+    body: JSON.stringify({
+      collection: "careOrders",
+      id: "co1",
+      expectedVersion: careOrdersVersion,
+      status: "stale-workflow-update"
+    })
+  }));
+  assert.equal(staleWorkflowWrite.response.status, 409);
+  assert.equal(staleWorkflowWrite.body.code, "STORAGE_CONFLICT");
+  assert.equal(staleWorkflowWrite.body.collection, "careOrders");
 });

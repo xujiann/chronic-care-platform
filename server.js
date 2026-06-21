@@ -3172,6 +3172,11 @@ function findWorkflowCollection(data, collection) {
   return Array.isArray(data[collection]) ? data[collection] : null;
 }
 
+function workflowStateCollectionKey(collection) {
+  if (collection === "referrals") return "referralSystem";
+  return collection;
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -3550,6 +3555,12 @@ async function handleApi(req, res) {
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
     ].slice(0, 120);
+    if (Object.hasOwn(payload, "expectedVersion")) {
+      data.storageMeta = {
+        ...(data.storageMeta || {}),
+        collectionVersions: { [workflowStateCollectionKey(collection)]: Number(payload.expectedVersion) }
+      };
+    }
     writeDatabase(data);
     sendJson(res, 200, item);
     return;
