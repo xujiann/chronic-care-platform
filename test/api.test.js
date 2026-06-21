@@ -466,6 +466,19 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(handled.response.status, 200);
     assert.equal(handled.body.status, "acknowledged");
 
+    const rejectedReview = await api(baseUrl, `/api/mutual-recognition/records/${critical.body.recognition.id}/review`, authorized(county.body.token, {
+      method: "POST",
+      body: JSON.stringify({ decision: "reject", reasonCode: "poor-quality", comment: "DICOM package is incomplete." })
+    }));
+    assert.equal(rejectedReview.response.status, 200);
+    assert.equal(rejectedReview.body.status, "rejected");
+    assert.equal(rejectedReview.body.nonRecognitionReason, "poor-quality");
+
+    const reviewedState = await api(baseUrl, "/api/state", authorized(county.body.token));
+    const reviewedReport = reviewedState.body.diagnosticReports.find((item) => item.id === critical.body.report.id);
+    assert.equal(reviewedReport.status, "not_recognized");
+    assert.equal(reviewedReport.reviewReasonCode, "poor-quality");
+
     const citizen = await login(baseUrl, "citizen");
     const denied = await api(baseUrl, "/api/mutual-recognition/reports", authorized(citizen.body.token, {
       method: "POST",

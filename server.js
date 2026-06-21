@@ -3159,6 +3159,42 @@ function normalizeDiagnosticReport(payload, user, data) {
   return { report, recognition, personalRecord, criticalSignal, rule };
 }
 
+function reviewMutualRecognitionRecord(data, id, payload, user) {
+  const records = Array.isArray(data.countyMutualRecognitionRecords) ? data.countyMutualRecognitionRecords : [];
+  const index = records.findIndex((item) => item.id === id);
+  if (index < 0) return null;
+  const decision = String(payload.decision || "").trim();
+  const approved = decision === "recognize" || decision === "approved";
+  const rejected = decision === "reject" || decision === "rejected";
+  if (!approved && !rejected) throw new Error("decision must be recognize or reject");
+  const now = new Date().toISOString();
+  const reasonCode = String(payload.reasonCode || (approved ? "qc-passed" : "manual-reject")).trim();
+  const updated = {
+    ...records[index],
+    status: approved ? "recognized" : "rejected",
+    reviewStatus: approved ? "approved" : "rejected",
+    reviewReasonCode: reasonCode,
+    reviewComment: String(payload.comment || "").trim(),
+    reviewedAt: now,
+    reviewedBy: user.username || user.role,
+    reviewedByName: user.name,
+    nonRecognitionReason: rejected ? reasonCode : ""
+  };
+  records[index] = updated;
+  data.countyMutualRecognitionRecords = records;
+  if (updated.reportId && Array.isArray(data.diagnosticReports)) {
+    data.diagnosticReports = data.diagnosticReports.map((report) => report.id === updated.reportId ? {
+      ...report,
+      status: approved ? "recognized" : "not_recognized",
+      reviewStatus: updated.reviewStatus,
+      reviewReasonCode: reasonCode,
+      reviewedAt: now,
+      reviewedBy: user.username || user.role
+    } : report);
+  }
+  return updated;
+}
+
 function personIndexFromParts(idCard, phone) {
   return `${String(idCard || "").trim()}#${String(phone || "").trim()}`;
 }
@@ -3953,6 +3989,41 @@ async function handleApi(req, res) {
     ].slice(0, 120);
     writeDatabase(data);
     sendJson(res, 201, normalized);
+    return;
+  }
+
+  const mutualRecognitionReviewMatch = url.pathname.match(/^\/api\/mutual-recognition\/records\/([^/]+)\/review$/);
+  if (req.method === "POST" && mutualRecognitionReviewMatch) {
+    const user = requireApiRole(req, res, ["county", "commission"], "/api/mutual-recognition/records/:id/review");
+    if (!user) return;
+    const data = readDatabase();
+    const payload = await collectJson(req);
+    let reviewed;
+    try {
+      reviewed = reviewMutualRecognitionRecord(data, decodeURIComponent(mutualRecognitionReviewMatch[1]), payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    if (!reviewed) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到互认记录" });
+      return;
+    }
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "review mutual recognition",
+        target: reviewed.id,
+        result: "allowed",
+        detail: `${reviewed.reviewStatus} · ${reviewed.reviewReasonCode}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, reviewed);
     return;
   }
 
