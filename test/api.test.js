@@ -553,6 +553,12 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(issueAction.response.status, 200);
     assert.equal(issueAction.body.status, "closed");
 
+    const scorecard = await api(baseUrl, "/api/data-quality/scorecard", authorized(commissionToken));
+    assert.equal(scorecard.response.status, 200);
+    assert.equal(scorecard.body.residentIndexCompleteness, 100);
+    assert.equal(scorecard.body.trustedSources.some((item) => item.collection === "diagnosticReports"), true);
+    assert.equal(Number.isFinite(scorecard.body.score), true);
+
     const denied = await api(baseUrl, "/api/mutual-recognition/reports", authorized(citizen.body.token, {
       method: "POST",
       body: JSON.stringify({ residentId: "r2", item: "HbA1c" })

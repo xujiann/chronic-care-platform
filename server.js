@@ -3799,8 +3799,43 @@ function buildDataQualityIssues(data) {
   (data.institutionCreditEvaluations || []).filter((item) => String(item.status || "").includes("整改")).forEach((item) => {
     issues.push({ id: `dq-credit-${item.id}`, type: "institution_credit_rectification", severity: "medium", institution: item.name, title: item.next || "Institution credit rectification required", status: "open", ownerRole: "commission" });
   });
+  (data.residents || []).forEach((resident) => {
+    const systolic = Number(resident.metrics?.systolic);
+    const glucose = Number(resident.metrics?.glucose);
+    if (Number.isFinite(systolic) && (systolic < 70 || systolic > 220)) {
+      issues.push({ id: `dq-abnormal-systolic-${resident.id}`, type: "abnormal_value", severity: "high", residentId: resident.id, title: "Abnormal systolic blood pressure", status: "open", ownerRole: "commission" });
+    }
+    if (Number.isFinite(glucose) && (glucose < 2.5 || glucose > 25)) {
+      issues.push({ id: `dq-abnormal-glucose-${resident.id}`, type: "abnormal_value", severity: "high", residentId: resident.id, title: "Abnormal glucose value", status: "open", ownerRole: "commission" });
+    }
+  });
   const overrides = new Map((data.dataQualityIssues || []).map((issue) => [issue.id, issue]));
   return issues.map((issue) => ({ ...issue, ...(overrides.get(issue.id) || {}) }));
+}
+
+function buildDataQualityScorecard(data) {
+  const residents = data.residents || [];
+  const issues = buildDataQualityIssues(data);
+  const indexedResidents = residents.filter((resident) => resident.personIndex || resident.identityIndex);
+  const trustedSources = ["diagnosticReports", "integrationGatewayEvents", "personalRecords"].map((collection) => {
+    const rows = Array.isArray(data[collection]) ? data[collection] : [];
+    const total = rows.length;
+    const trusted = rows.filter((item) =>
+      item.signature || item.simulatorSignature || item.ruleId || item.source || item.sourceInstitution || item.receivedAt
+    ).length;
+    return { collection, total, trusted, trustRate: total ? Math.round((trusted / total) * 100) : 100 };
+  });
+  return {
+    residentIndexCompleteness: residents.length ? Math.round((indexedResidents.length / residents.length) * 100) : 100,
+    openIssues: issues.filter((issue) => issue.status !== "closed").length,
+    closedIssues: issues.filter((issue) => issue.status === "closed").length,
+    byType: issues.reduce((result, issue) => {
+      result[issue.type] = (result[issue.type] || 0) + 1;
+      return result;
+    }, {}),
+    trustedSources,
+    score: Math.max(0, 100 - issues.filter((issue) => issue.status !== "closed").length * 5)
+  };
 }
 
 async function handleApi(req, res) {
@@ -3941,6 +3976,13 @@ async function handleApi(req, res) {
         return result;
       }, { total: 0, byType: {}, byStatus: {} })
     });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/data-quality/scorecard") {
+    const user = requireApiRole(req, res, ["commission"], "/api/data-quality/scorecard");
+    if (!user) return;
+    sendJson(res, 200, buildDataQualityScorecard(readDatabase()));
     return;
   }
 
