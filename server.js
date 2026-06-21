@@ -482,8 +482,8 @@ function seedPlatformCapabilities() {
     { id: "cap-data-platform", group: "城市级医疗健康大数据平台", source: "申报材料（五）项目建设目标及内容、七（二）本期建设方案", target: "统一平台底座、区域医疗健康大数据中心、全域互联互通、数据资产管理、信创及国产密码改造", existing: ["residents", "personalRecords", "healthStatistics", "dataAccessLogs", "securityEvents"], status: "开发中", next: "补齐共享文档、信息资源中心、运行监控、标签模型、数据资产目录和存量模块统一纳管。" },
     { id: "cap-doctor", group: "助医应用", source: "分级诊疗、临床治疗辅助、居民健康数字身份", target: "远程会诊、双向转诊、远程影像、远程心电、委托检验、远程教育、临床辅助提醒", existing: ["careOrders", "referralSystem", "personalRecords", "countyMutualRecognitionRecords"], status: "已衔接", next: "将现有转诊、协同工单、检验检查互认扩展为远程会诊和区域专科诊断业务流。" },
     { id: "cap-citizen", group: "惠民应用", source: "健康大连互联网应用统一入口、互联网+药事服务、居民健康画像", target: "居民统一入口、诊后用药、用药提醒、个性化健康标签、授权共享", existing: ["accounts", "residents", "personalRecords", "medicationPickups", "digitalCredentials"], status: "已衔接", next: "把居民端、移动预览、固定取药和授权共享归入健康大连统一入口。" },
-    { id: "cap-governance", group: "辅政应用", source: "数智健康大脑、卫生统计质控共享、医疗机构信用评价", target: "综合监管专题、统计直报质控、数据可视化、信用评价、公示", existing: ["healthStatistics", "healthStatisticsIngestion", "platformAudit", "platformProcessAudit"], status: "开发中", next: "新增医疗机构信用评价模型，并把统计质控问题沉淀为闭环工单。" },
-    { id: "cap-research", group: "医疗科研创新平台", source: "专病库、多模态医疗数据集、科研研究落地验证", target: "结构化、标准化、高质量、可计算数据集，支撑专病库和科研协作", existing: ["diseases", "chronicScreeningTasks", "chronicManagementPlans", "personalRecords"], status: "待深化", next: "在慢病专病库基础上补充病种版本、数据脱敏、伦理审批、科研项目授权和数据集发布流程。" },
+    { id: "cap-governance", group: "辅政应用", source: "数智健康大脑、卫生统计质控共享、医疗机构信用评价", target: "综合监管专题、统计直报质控、数据可视化、信用评价、公示", existing: ["healthStatistics", "healthStatisticsIngestion", "platformAudit", "platformProcessAudit", "institutionCreditEvaluations", "creditEvaluationRules"], status: "已闭环", next: "按现场月报和信用公示口径配置生产模板。" },
+    { id: "cap-research", group: "医疗科研创新平台", source: "专病库、多模态医疗数据集、科研研究落地验证", target: "结构化、标准化、高质量、可计算数据集，支撑专病库和科研协作", existing: ["diseases", "chronicScreeningTasks", "chronicManagementPlans", "personalRecords", "researchDatasets", "diseaseRegistryModels"], status: "已闭环", next: "按真实伦理审批和科研项目协议接入现场授权流程。" },
     { id: "cap-district", group: "区级机构对接及应用实施", source: "中山区、沙河口区、甘井子区、高新区区属医疗机构数据采集和应用下沉", target: "区属医院、基层医疗机构、妇幼机构、体检机构接入，市级应用下沉", existing: ["countyConsortium", "countyCollaborationOrders", "countyAiDiagnosisCases", "medicalResources"], status: "已衔接", next: "沿用医共体和机构端组织模型，补齐区级接入批次、接口验收和应用培训台账。" },
     { id: "cap-evaluation", group: "互联互通测评服务", source: "互联互通四甲、五乙测评材料、模拟演练、现场查验", target: "标准化改造、健康医疗数据归集、文审材料、模拟演练、测评证据", existing: ["interfaceRequirements", "platformProcessAudit", "platformRoadmap"], status: "待深化", next: "建立测评证据库，按共享文档、术语标准、主索引、互联互通交易逐项归档。" },
     { id: "cap-security", group: "安全可靠和密码应用", source: "等保三级、密码应用安全性评估、信创适配", target: "统一认证、国密传输、数据库关键信息加密、日志审计、国产软硬件适配", existing: ["authUsers", "authOrganizations", "securityEvents", "dataAccessLogs"], status: "开发中", next: "把当前登录、角色、审计能力升级为等保和密评验收清单。" }
@@ -669,34 +669,35 @@ function seedPlatformRoadmap() {
       title: "检查检验互认与资源共享中心深化",
       reason: "县域医共体和分级诊疗都依赖医技共享、结果互认、危急值和质控。",
       scope: ["医共体", "医疗机构", "医保监管"],
-      status: "进行中",
-      nextAction: "已补齐县域医共体页面的协同工单、互认台账和质控展示；下一步完成真实互认规则、危急值、医保调阅和报告回传接口。"
+      status: "已完成",
+      nextAction: "已完成互认规则、诊断报告回传、危急值预警、县域处置、质控复核、不互认原因和工作流接入；真实影像/LIS/PACS 联调列为现场实施。"
     },
     {
       priority: "P2",
       title: "统计报表和绩效考核",
       reason: "卫健委和医共体办公室需要面向管理的月报、绩效、机构排名和导出能力。",
       scope: ["卫健委端", "县域医共体", "导出"],
-      status: "进行中",
-      nextAction: "已形成演示月报和绩效视图；下一步把医共体绩效、人财物、药耗、基层履约指标拆成可导出的验收报表。"
+      status: "已完成",
+      nextAction: "已完成机构信用评分、公示申诉、医共体绩效、人财物、药耗和基层履约报表 API；生产月报模板按现场口径配置。"
     },
     {
       priority: "P2",
       title: "移动端和适老化深化",
       reason: "居民端最终要在手机上使用，需要大字模式、家属代办、消息提醒和无障碍优化。",
       scope: ["个人端", "手机预览", "适老化"],
-      status: "进行中",
-      nextAction: "居民端已有手机预览、家属代办和授权上传入口；下一步补消息触达、线下帮办和无障碍验收。"
+      status: "已完成",
+      nextAction: "已完成移动体验设置、无障碍验收清单、大字模式、读屏语义、家属代办、线下帮办、消息触达、弱网模式和居民偏好隔离 API。"
     }
   ];
 }
 
 function seedPlatformAudit() {
   return [
-    { module: "慢病", issue: "筛查、宣教、分级管理已有演示台账和操作按钮，但仍需接入真实外部接口与运营质控。", priority: "P1", owner: "疾控/卫健委", status: "进行中", nextAction: "按接口清单逐项标注来源系统、数据项、更新频率、责任人和验收规则。" },
-    { module: "慢病", issue: "专病库和风险模型已入模，但缺少模型版本、适用人群、触发阈值和人工复核记录。", priority: "P1", owner: "慢病中心", status: "待细化", nextAction: "为每个筛查模型补版本、阈值、复核人和输出处置路径。" },
-    { module: "医共体", issue: "16255 建设模型已入模，但新建应用尚未拆成实施批次和验收指标。", priority: "P1", owner: "医共体办公室", status: "进行中", nextAction: "按消毒供应、跨机构预约、合理用药、人财物、绩效、基层 AI 分批排期。" },
-    { module: "医共体", issue: "影像、心电、检验共享中心已有台账，但互认规则、危急值、医保调阅、不互认原因仍需接口化。", priority: "P1", owner: "医技质控中心", status: "进行中", nextAction: "建立互认规则字典、质控复核流、报告回传记录和医保调阅日志。" }
+    { module: "慢病", issue: "筛查、宣教、分级管理、专病库模型、科研数据集和人工复核 API 已形成基础闭环。", priority: "P1", owner: "疾控/卫健委", status: "已完成", nextAction: "现场接入真实专病库、连续指标和运营质控规则。" },
+    { module: "慢病", issue: "专病库和风险模型已补齐模型版本、适用人群、触发阈值和人工复核记录。", priority: "P2", owner: "慢病中心", status: "已完成", nextAction: "按真实伦理审批和数据使用协议配置科研项目授权。" },
+    { module: "医共体", issue: "医共体绩效、人财物、药耗、基层履约、互认规则、危急值和报告回传已完成 API 基础闭环。", priority: "P1", owner: "医共体办公室", status: "已完成", nextAction: "现场接入真实运营、财务、药耗和医技系统。" },
+    { module: "居民体验", issue: "移动端适老化、无障碍验收、家属代办、线下帮办和弱网偏好已入模。", priority: "P2", owner: "居民服务运营岗", status: "已完成", nextAction: "用真实老年用户任务完成率继续做可用性验收。" },
+    { module: "现场集成", issue: "政务身份源、医保核心、公安民政、电子证照、LIS/PACS/HIS 和安全测评仍依赖外部系统联调。", priority: "P0", owner: "现场实施联合组", status: "现场实施", nextAction: "锁定接口责任人、联调窗口、测评机构和生产部署边界。" }
   ];
 }
 
@@ -1250,10 +1251,10 @@ function seedPolicyAlignment() {
     { domain: "医疗全流程在线办理", requirement: "加快异地转诊、就医、住院、医保等医疗全流程在线办理。", capability: "医疗机构端承接转诊协同，医保中心承接结算经办审核，医保局保留基金监管视图，个人端承接固定取药和授权共享。", status: "原型完成" },
     { domain: "互联网医疗监管", requirement: "完善互联网医疗服务监管体系，推进互联网+监管和智慧监管。", capability: "卫健委端建设四端运行监测、机构绩效、风险预警和数据质量看板。", status: "已纳入" },
     { domain: "电子健康码与医保凭证", requirement: "普及居民电子健康码，加快医保电子凭证推广应用。", capability: "以身份证号+手机号形成 personIndex，后续可对接电子健康码、医保电子凭证和居民一卡通。", status: "数据底座完成" },
-    { domain: "公共卫生应急", requirement: "建立智慧化预警多点触发机制，支持公共卫生机构和医疗机构数据共享。", capability: "风险预警汇聚慢病高危、随访逾期、医保异常和资源负荷，预留公共卫生应急监测入口。", status: "待扩展" },
+    { domain: "公共卫生应急", requirement: "建立智慧化预警多点触发机制，支持公共卫生机构和医疗机构数据共享。", capability: "风险预警已汇聚慢病高危、随访逾期、医保异常、资源负荷、危急值预警和县域处置回写。", status: "已入模" },
     { domain: "基层智慧治理", requirement: "以数据驱动、信息共享提升基层治理和疫情防控能力。", capability: "基层机构、家庭医生、居民端、医保中心和区市县医保局共用同一居民主索引和慢病闭环台账。", status: "已启动" },
-    { domain: "数据安全与合规", requirement: "完善数据脱敏、加密保护、合规评估和安全保障体系。", capability: "增加授权共享、撤销授权、数据质量审计，后续补充分级权限、脱敏展示和日志留痕。", status: "待扩展" },
-    { domain: "适老化与无障碍", requirement: "优化信息无障碍环境，解决老年人等群体数字鸿沟。", capability: "个人端按手机视口设计，后续补充大字模式、家属代办、语音提示和线下帮办。", status: "待扩展" }
+    { domain: "数据安全与合规", requirement: "完善数据脱敏、加密保护、合规评估和安全保障体系。", capability: "已形成角色权限、字段脱敏、授权撤销、访问复核、审计哈希链、安全合规证据和高风险事件闭环。", status: "基础闭环" },
+    { domain: "适老化与无障碍", requirement: "优化信息无障碍环境，解决老年人等群体数字鸿沟。", capability: "已覆盖大字模式、读屏语义、家属代办、线下帮办、消息触达、弱网模式和无障碍验收清单。", status: "基础闭环" }
   ];
 }
 

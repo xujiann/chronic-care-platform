@@ -2152,6 +2152,96 @@
       "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     }
   ],
+  "mutualRecognitionRules": [
+    {
+      "id": "mrr-ecg-001",
+      "item": "ECG",
+      "category": "electrocardiogram",
+      "validDays": 7,
+      "sourceLevels": [
+        "primary",
+        "secondary",
+        "tertiary"
+      ],
+      "targetLevels": [
+        "secondary",
+        "tertiary"
+      ],
+      "qualityStandard": "waveform-readable",
+      "autoRecognize": true,
+      "savedCost": 86,
+      "nonRecognitionReasons": [
+        "poor-quality",
+        "expired",
+        "clinical-change"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "mrr-hba1c-001",
+      "item": "HbA1c",
+      "category": "lab",
+      "validDays": 30,
+      "sourceLevels": [
+        "secondary",
+        "tertiary"
+      ],
+      "targetLevels": [
+        "secondary",
+        "tertiary"
+      ],
+      "qualityStandard": "lab-qc-passed",
+      "autoRecognize": true,
+      "savedCost": 120,
+      "nonRecognitionReasons": [
+        "qc-failed",
+        "expired",
+        "missing-calibration"
+      ],
+      "status": "active"
+    },
+    {
+      "id": "mrr-ct-001",
+      "item": "Chest CT",
+      "category": "imaging",
+      "validDays": 14,
+      "sourceLevels": [
+        "secondary",
+        "tertiary"
+      ],
+      "targetLevels": [
+        "tertiary"
+      ],
+      "qualityStandard": "dicom-complete",
+      "autoRecognize": false,
+      "savedCost": 260,
+      "nonRecognitionReasons": [
+        "missing-dicom",
+        "poor-quality",
+        "clinical-change"
+      ],
+      "status": "active"
+    }
+  ],
+  "diagnosticReports": [
+    {
+      "id": "dr-001",
+      "externalId": "LIS-DEMO-001",
+      "residentId": "r2",
+      "item": "HbA1c",
+      "category": "lab",
+      "sourceInstitution": "Wafangdian Central Hospital",
+      "targetInstitution": "Dalian Medical University Hospital",
+      "result": "6.8%",
+      "conclusion": "HbA1c is elevated; continue chronic disease follow-up.",
+      "reportedAt": "2026-06-20",
+      "status": "recognized",
+      "recognitionRecordId": "cmr-002",
+      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
+    }
+  ],
+  "taskMessages": [],
+  "dataQualityIssues": [],
   "careOrders": [
     {
       "id": "co1",
@@ -2462,7 +2552,9 @@
       "scope": "健康档案、随访记录",
       "purpose": "慢病随访",
       "result": "允许",
-      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
+      "previousAuditHash": "d1ac454dbd1694d6743d2fc4526000e90118ce2f99f8732c0fbd8947aad628f3",
+      "auditHash": "724e15a086a78f0f0c882d55a0182621f656be5da01bfc31dd1aa2acd65dc7e6"
     },
     {
       "id": "al2",
@@ -2473,7 +2565,9 @@
       "scope": "电子病历摘要、用药处方",
       "purpose": "专科复诊",
       "result": "允许",
-      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
+      "previousAuditHash": "8d60cbd9ef8f26ae2d6ca79e94fd5e01bf5e35e6a80de0577a89c5071514f05b",
+      "auditHash": "d1ac454dbd1694d6743d2fc4526000e90118ce2f99f8732c0fbd8947aad628f3"
     },
     {
       "id": "al3",
@@ -2484,7 +2578,9 @@
       "scope": "医保结算、诊断摘要",
       "purpose": "慢病结算审核",
       "result": "允许",
-      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
+      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2",
+      "previousAuditHash": "d932a7612b481d930fa756af9aeadc4df0071bd057a58399064761b609f42a9e",
+      "auditHash": "8d60cbd9ef8f26ae2d6ca79e94fd5e01bf5e35e6a80de0577a89c5071514f05b"
     },
     {
       "id": "al4",
@@ -2495,10 +2591,60 @@
       "scope": "完整电子病历",
       "purpose": "未知",
       "result": "拒绝",
-      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
+      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4",
+      "previousAuditHash": "",
+      "auditHash": "d932a7612b481d930fa756af9aeadc4df0071bd057a58399064761b609f42a9e"
     }
   ],
   "securityEvents": [
+    {
+      "id": "cf2d9f52-30c6-424d-beed-eb6cc34f0acc",
+      "at": "2026/6/21 22:36:54",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "签名会话已签发，支持密钥轮换校验",
+      "previousAuditHash": "cf76478c0802d349ba695b76f2469fd8cdd3123f556b9c6575344c4af4b50f8a",
+      "auditHash": "c475053b09254c374d6962788df5cf47de796e13a67290dfefd27a950656c4fb"
+    },
+    {
+      "id": "74497c1d-186f-44c8-8bcc-4ef2467a3d64",
+      "at": "2026/6/21 22:36:54",
+      "actor": "anonymous",
+      "role": "anonymous",
+      "action": "访问接口",
+      "target": "/api/state",
+      "result": "拒绝",
+      "detail": "未登录或会话已过期",
+      "previousAuditHash": "0ed619cdad2eed86e5fca325a1db60c70b5d2763a1ef88ae913a5470c7668d65",
+      "auditHash": "cf76478c0802d349ba695b76f2469fd8cdd3123f556b9c6575344c4af4b50f8a"
+    },
+    {
+      "id": "f8a90648-2c44-436c-b8e5-a8676dbdf66b",
+      "at": "2026/6/21 22:33:46",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "签名会话已签发，支持密钥轮换校验",
+      "previousAuditHash": "140ab687241cc466465370ebeb233a8c4a3ce5ce2759d03559526332c1ba7302",
+      "auditHash": "0ed619cdad2eed86e5fca325a1db60c70b5d2763a1ef88ae913a5470c7668d65"
+    },
+    {
+      "id": "1a57fb5e-3488-4ec7-9acc-9d6ac3bf628a",
+      "at": "2026/6/21 22:33:46",
+      "actor": "anonymous",
+      "role": "anonymous",
+      "action": "访问接口",
+      "target": "/api/state",
+      "result": "拒绝",
+      "detail": "未登录或会话已过期",
+      "previousAuditHash": "eb7122027367d292ea45e1b8fe28a13a2fe6ccc44302920c079701f151418abd",
+      "auditHash": "140ab687241cc466465370ebeb233a8c4a3ce5ce2759d03559526332c1ba7302"
+    },
     {
       "id": "0dad9245-4063-4b99-8ef6-167281e3f615",
       "at": "2026/6/20 14:16:25",
@@ -2507,7 +2653,9 @@
       "action": "更新数据",
       "target": "/api/state",
       "result": "允许",
-      "detail": "全量保存平台数据"
+      "detail": "全量保存平台数据",
+      "previousAuditHash": "0748e9cdfb34314ed78896f3a579108960761ab9463494bf4536ca7872ccb72b",
+      "auditHash": "eb7122027367d292ea45e1b8fe28a13a2fe6ccc44302920c079701f151418abd"
     },
     {
       "id": "048daa79-e7a2-43b6-93e3-6514215d47ff",
@@ -2517,7 +2665,9 @@
       "action": "登录",
       "target": "index.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "7afc02b263e9002183ead57fc45e3a509b00ecf08d2848e463d5966948eb885e",
+      "auditHash": "0748e9cdfb34314ed78896f3a579108960761ab9463494bf4536ca7872ccb72b"
     },
     {
       "id": "56be4c3b-e9ea-4f15-9940-516c428827dc",
@@ -2527,7 +2677,9 @@
       "action": "更新数据",
       "target": "/api/state",
       "result": "允许",
-      "detail": "全量保存平台数据"
+      "detail": "全量保存平台数据",
+      "previousAuditHash": "fec62587e923c62eb8759da6323211c08685c222e362340baf021f63e5784da7",
+      "auditHash": "7afc02b263e9002183ead57fc45e3a509b00ecf08d2848e463d5966948eb885e"
     },
     {
       "id": "e62c1837-b9c3-4f2c-9ab3-e961b20640fe",
@@ -2537,7 +2689,9 @@
       "action": "登录",
       "target": "index.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "aa20c4261810cb581243a5f68fc57c8678a46efa3435ee94711e7dce9fc64a3c",
+      "auditHash": "fec62587e923c62eb8759da6323211c08685c222e362340baf021f63e5784da7"
     },
     {
       "id": "0207e69d-2b5a-4ecb-b01b-d68267c31f4b",
@@ -2547,7 +2701,9 @@
       "action": "更新数据",
       "target": "/api/state",
       "result": "允许",
-      "detail": "全量保存平台数据"
+      "detail": "全量保存平台数据",
+      "previousAuditHash": "65e511aead5e1de0e64d6d0ccc01f2f8b5a1f74bff9dd43eecfac3b3f1913bf3",
+      "auditHash": "aa20c4261810cb581243a5f68fc57c8678a46efa3435ee94711e7dce9fc64a3c"
     },
     {
       "id": "520a7742-a7cb-4896-a12d-bfeae26f9496",
@@ -2557,7 +2713,9 @@
       "action": "登录",
       "target": "index.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "acdb331f6be76adbd779208c1e2be13cffa64d95489f9902efaca81dc1e29e28",
+      "auditHash": "65e511aead5e1de0e64d6d0ccc01f2f8b5a1f74bff9dd43eecfac3b3f1913bf3"
     },
     {
       "id": "a61a76c7-7a7b-41de-a62a-7b297a0ccd9c",
@@ -2567,7 +2725,9 @@
       "action": "登录",
       "target": "index.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "275a8ec96ea92d80abe87ee00fc26c23f8f57be6f30af72c5c0aa2505be512ee",
+      "auditHash": "acdb331f6be76adbd779208c1e2be13cffa64d95489f9902efaca81dc1e29e28"
     },
     {
       "id": "8cf5bd7d-1b76-47e9-8519-8818848d5c5a",
@@ -2577,7 +2737,9 @@
       "action": "登录",
       "target": "insurance.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "301afafd306f1be9298e45ec9cc39c316783aca212f748416e5d1cb517b8b8c2",
+      "auditHash": "275a8ec96ea92d80abe87ee00fc26c23f8f57be6f30af72c5c0aa2505be512ee"
     },
     {
       "id": "08170a07-7113-46cf-a406-20d6ec5464ef",
@@ -2587,7 +2749,9 @@
       "action": "登录",
       "target": "insurance.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "e73d436ac6563b3a9d9fcda8c3997b230d5a518b4542f2633504c7a5c3796104",
+      "auditHash": "301afafd306f1be9298e45ec9cc39c316783aca212f748416e5d1cb517b8b8c2"
     },
     {
       "id": "d6a633dd-d89a-4555-ab91-b0ff0c3447b1",
@@ -2597,7 +2761,9 @@
       "action": "登录",
       "target": "insurance.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "c0517e2fd1dbd1258ccbe42dcf4a26014a1f66de8f9719ea804c06ff69109f39",
+      "auditHash": "e73d436ac6563b3a9d9fcda8c3997b230d5a518b4542f2633504c7a5c3796104"
     },
     {
       "id": "d5ccab94-859d-45bb-9a75-b077d50382ac",
@@ -2607,7 +2773,9 @@
       "action": "登录",
       "target": "index.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "9ef89c74b20e67f5f501c65b0f7bcb3ded3d7af3271d8b757352f1be984db373",
+      "auditHash": "c0517e2fd1dbd1258ccbe42dcf4a26014a1f66de8f9719ea804c06ff69109f39"
     },
     {
       "id": "e44c5c89-c05f-4610-af91-849a9c94de32",
@@ -2617,7 +2785,9 @@
       "action": "登录",
       "target": "index.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "329a3c4c990f2bae84a1a222efb6e4599acf40500ce9ee07acbadcd96999d869",
+      "auditHash": "9ef89c74b20e67f5f501c65b0f7bcb3ded3d7af3271d8b757352f1be984db373"
     },
     {
       "id": "5fa12f91-02f6-4d49-a0b0-050583727df1",
@@ -2627,7 +2797,9 @@
       "action": "登录",
       "target": "insurance.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "ddbb2143e2bf127fdf7e40e2dac0724ffa675896aa0f3e8f18161d1811864c40",
+      "auditHash": "329a3c4c990f2bae84a1a222efb6e4599acf40500ce9ee07acbadcd96999d869"
     },
     {
       "id": "f1c6f21c-4fb3-4a31-9b0b-8bf2ad5ff707",
@@ -2637,7 +2809,9 @@
       "action": "登录",
       "target": "insurance.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "38525662bef6370d7612f90036521a6b218d3fb717295a2e3d98b972a82c108c",
+      "auditHash": "ddbb2143e2bf127fdf7e40e2dac0724ffa675896aa0f3e8f18161d1811864c40"
     },
     {
       "id": "8a00f6a6-434e-4258-a2a0-f8f37f4507ef",
@@ -2647,7 +2821,9 @@
       "action": "登录",
       "target": "insurance.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "0e1d933fab57a78471d54b18ecc3bb6759223e17167ba2ae33bd961faacade6e",
+      "auditHash": "38525662bef6370d7612f90036521a6b218d3fb717295a2e3d98b972a82c108c"
     },
     {
       "id": "5e4d5530-29c5-417d-b729-7d6a43004f93",
@@ -2657,7 +2833,9 @@
       "action": "登录",
       "target": "index.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "bdb6ee4112fbb1818357030f2a50108893e4420a24e151f6e0c3674bc9ca22ed",
+      "auditHash": "0e1d933fab57a78471d54b18ecc3bb6759223e17167ba2ae33bd961faacade6e"
     },
     {
       "id": "56973aa9-3298-4d9b-a5f7-fafab32e3e14",
@@ -2667,7 +2845,9 @@
       "action": "登录",
       "target": "index.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "31377f226bb03bdaa2bee1a6d8a0096786b9c18dc67c149f3144568afc694812",
+      "auditHash": "bdb6ee4112fbb1818357030f2a50108893e4420a24e151f6e0c3674bc9ca22ed"
     },
     {
       "id": "466b08dd-9bfe-42cc-97e9-96e8b0410a5b",
@@ -2677,7 +2857,9 @@
       "action": "登录",
       "target": "insurance.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "7ed3e732d1c2d24f5811c05ba073f54d88679b6b9d1afa4cb323f63902fe686b",
+      "auditHash": "31377f226bb03bdaa2bee1a6d8a0096786b9c18dc67c149f3144568afc694812"
     },
     {
       "id": "77bd93c3-25dc-42be-8e7e-e4d3edce379c",
@@ -2687,7 +2869,9 @@
       "action": "登录",
       "target": "insurance.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "85bda0c60ec93a47a9f6c7a8b14660678e217f7e4e68d1896081070ce5072e98",
+      "auditHash": "7ed3e732d1c2d24f5811c05ba073f54d88679b6b9d1afa4cb323f63902fe686b"
     },
     {
       "id": "45407426-1f96-4ca0-9da3-02ca1ed0fa69",
@@ -2697,7 +2881,9 @@
       "action": "登录",
       "target": "insurance.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "0dd44b0924db5e8e24d951f2b92bde5cc5da8cf29d858ca30d495ad486828196",
+      "auditHash": "85bda0c60ec93a47a9f6c7a8b14660678e217f7e4e68d1896081070ce5072e98"
     },
     {
       "id": "c4aca3bc-2102-4b6b-86c6-6a02961d16f6",
@@ -2707,7 +2893,9 @@
       "action": "登录",
       "target": "index.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "6ff71c96a355d991933552f91c17d8b69ae4a6299fc93083bb020bdf9076fd86",
+      "auditHash": "0dd44b0924db5e8e24d951f2b92bde5cc5da8cf29d858ca30d495ad486828196"
     },
     {
       "id": "aca9c043-946a-4cde-937c-7bf95cd8bfbf",
@@ -2717,7 +2905,9 @@
       "action": "登录",
       "target": "index.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "3593832ae6691b41a30b4808436e6cb4ccd7f35d4d96d6be1bffc31ef1f002fd",
+      "auditHash": "6ff71c96a355d991933552f91c17d8b69ae4a6299fc93083bb020bdf9076fd86"
     },
     {
       "id": "d6c7a16a-1dfd-4972-8ea4-e057eb62164a",
@@ -2727,7 +2917,9 @@
       "action": "登录",
       "target": "insurance.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "0b40ffa67b23b8f4aeb14ebbc5aed4f7a6a8fa0c4bf4ee1e9d1a697642c17e30",
+      "auditHash": "3593832ae6691b41a30b4808436e6cb4ccd7f35d4d96d6be1bffc31ef1f002fd"
     },
     {
       "id": "c740f2da-e4b2-44e5-a795-8521e7228ed3",
@@ -2737,7 +2929,9 @@
       "action": "登录",
       "target": "insurance.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "66ae8cf2bff752bbdbe277436b1a054ea53d9536295df627e3862ac0d3c8bc50",
+      "auditHash": "0b40ffa67b23b8f4aeb14ebbc5aed4f7a6a8fa0c4bf4ee1e9d1a697642c17e30"
     },
     {
       "id": "d8821b09-9da3-4dad-baab-8068b775069c",
@@ -2747,7 +2941,9 @@
       "action": "登录",
       "target": "insurance.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "27094133f06eac4c79d174aa7ffb30299aea6221f21729e3cf8a065e91ad0520",
+      "auditHash": "66ae8cf2bff752bbdbe277436b1a054ea53d9536295df627e3862ac0d3c8bc50"
     },
     {
       "id": "5052fa09-a19b-4d65-a364-2077b3d5a595",
@@ -2757,7 +2953,9 @@
       "action": "登录",
       "target": "index.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "56b2686f328224ea27764cd58a5e702f7c5048ba5249a61ab0bf0b1b4329c8f9",
+      "auditHash": "27094133f06eac4c79d174aa7ffb30299aea6221f21729e3cf8a065e91ad0520"
     },
     {
       "id": "cf42de82-4c1a-40a2-8480-ae2f66f21fef",
@@ -2767,7 +2965,9 @@
       "action": "登录",
       "target": "index.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "d9c0ae0d111438d0bf7ec03bf6f2f86ce0a89327a4fcf49297677275bd55c26f",
+      "auditHash": "56b2686f328224ea27764cd58a5e702f7c5048ba5249a61ab0bf0b1b4329c8f9"
     },
     {
       "id": "2bb5d27c-7013-4727-ac83-5e29b12fadde",
@@ -2777,7 +2977,9 @@
       "action": "访问接口",
       "target": "/api/state",
       "result": "拒绝",
-      "detail": "未登录或会话已过期"
+      "detail": "未登录或会话已过期",
+      "previousAuditHash": "e20a8d110ea025a366764fcf64eba04bfd49ef1d8c539abf2cd0271033b42926",
+      "auditHash": "d9c0ae0d111438d0bf7ec03bf6f2f86ce0a89327a4fcf49297677275bd55c26f"
     },
     {
       "id": "dd7251ad-f953-4a72-a729-bcaae0c7558a",
@@ -2787,7 +2989,9 @@
       "action": "登录",
       "target": "workbench.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "5020a3a683741eddf29323ebbe1aaafc12b24c290be750807999e3102a1a6ca5",
+      "auditHash": "e20a8d110ea025a366764fcf64eba04bfd49ef1d8c539abf2cd0271033b42926"
     },
     {
       "id": "1ba02545-1352-405d-b9db-67b6f95aa885",
@@ -2797,7 +3001,9 @@
       "action": "登录",
       "target": "insurance.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "6bc0e5145cf0645112e4992aa273d6ba57fea625b01c6bc50ce78ceb09a9c5c0",
+      "auditHash": "5020a3a683741eddf29323ebbe1aaafc12b24c290be750807999e3102a1a6ca5"
     },
     {
       "id": "fee2c95b-aebe-4ba8-90b7-9701b762a783",
@@ -2807,7 +3013,9 @@
       "action": "登录",
       "target": "insurance.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "e0bfdfe06e6c6dfd79b9236644e32ea2a5f5b66b142b669efe8875ccd234a4b8",
+      "auditHash": "6bc0e5145cf0645112e4992aa273d6ba57fea625b01c6bc50ce78ceb09a9c5c0"
     },
     {
       "id": "41a7be06-3f65-4abf-bcbb-a9f60ed9cee1",
@@ -2817,7 +3025,9 @@
       "action": "登录",
       "target": "insurance.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "af600eea7265b8e65e641ac9207c886245c8de84b150f9314e45c9116b0f88ed",
+      "auditHash": "e0bfdfe06e6c6dfd79b9236644e32ea2a5f5b66b142b669efe8875ccd234a4b8"
     },
     {
       "id": "890cd595-61c3-4f9c-b6e3-b49a105b86c2",
@@ -2827,7 +3037,9 @@
       "action": "登录",
       "target": "index.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "df0179c4d277566acdcf06ea1d48fb9077b88b9cf279c3d83b2f3dc959364435",
+      "auditHash": "af600eea7265b8e65e641ac9207c886245c8de84b150f9314e45c9116b0f88ed"
     },
     {
       "id": "78371aba-2921-472b-8ff2-1a6bf702c2b3",
@@ -2837,7 +3049,9 @@
       "action": "登录",
       "target": "index.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "083a85b18b3ed2e6d5dee86f08026ad78942e92ad1ad799a0df9974920211282",
+      "auditHash": "df0179c4d277566acdcf06ea1d48fb9077b88b9cf279c3d83b2f3dc959364435"
     },
     {
       "id": "9e798d89-8bcb-4ff3-ad08-dff7bf2d2c05",
@@ -2847,7 +3061,9 @@
       "action": "登录",
       "target": "citizen.html",
       "result": "允许",
-      "detail": "后端会话已签发"
+      "detail": "后端会话已签发",
+      "previousAuditHash": "c440d692846181d4a90ec1d32f893519c32a6b2d0fcaf1c4b062e89c92d51b03",
+      "auditHash": "083a85b18b3ed2e6d5dee86f08026ad78942e92ad1ad799a0df9974920211282"
     },
     {
       "id": "332941e5-4685-4b80-91cf-fffab5bc49f0",
@@ -2857,7 +3073,9 @@
       "action": "更新数据",
       "target": "/api/state",
       "result": "允许",
-      "detail": "全量保存平台数据"
+      "detail": "全量保存平台数据",
+      "previousAuditHash": "0a173906e493a1cf7e60b83049072a6f249a71b31efbf05ddbdf7acd325785fb",
+      "auditHash": "c440d692846181d4a90ec1d32f893519c32a6b2d0fcaf1c4b062e89c92d51b03"
     },
     {
       "id": "8b7567e0-071b-4bd2-aa20-3f8c9a3f33ee",
@@ -2867,7 +3085,9 @@
       "action": "[编码损坏，待核验]",
       "target": "workbench.html",
       "result": "[编码损坏，待核验]",
-      "detail": "[编码损坏，待核验]"
+      "detail": "[编码损坏，待核验]",
+      "previousAuditHash": "8bbf4f3b98474a4bcdd6f7bdc9e29d7efcb63e37b8034311ef34035ca87cdfa7",
+      "auditHash": "0a173906e493a1cf7e60b83049072a6f249a71b31efbf05ddbdf7acd325785fb"
     },
     {
       "id": "0dd0de07-fbc0-451b-9b31-9c78a9afc022",
@@ -2877,7 +3097,9 @@
       "action": "[编码损坏，待核验]",
       "target": "citizen.html",
       "result": "[编码损坏，待核验]",
-      "detail": "[编码损坏，待核验]"
+      "detail": "[编码损坏，待核验]",
+      "previousAuditHash": "21d9af4ec33bbe57d6f3e034b894c7008a57620d6d84f3cce27a53bd0591837d",
+      "auditHash": "8bbf4f3b98474a4bcdd6f7bdc9e29d7efcb63e37b8034311ef34035ca87cdfa7"
     },
     {
       "id": "b6aab847-e7dd-45f0-8e05-6606c035f289",
@@ -2887,7 +3109,9 @@
       "action": "[编码损坏，待核验]",
       "target": "/api/reset",
       "result": "[编码损坏，待核验]",
-      "detail": "[编码损坏，待核验]"
+      "detail": "[编码损坏，待核验]",
+      "previousAuditHash": "df17fcbdd806857a8822566f7d57876ca5ff6be57cf9b73dcbc6e20ee722b67e",
+      "auditHash": "21d9af4ec33bbe57d6f3e034b894c7008a57620d6d84f3cce27a53bd0591837d"
     },
     {
       "id": "se1",
@@ -2897,7 +3121,9 @@
       "action": "登录",
       "target": "卫生健康委端",
       "result": "允许",
-      "detail": "演示账号进入监管总览"
+      "detail": "演示账号进入监管总览",
+      "previousAuditHash": "2039c0fde29c3b641612cf5d0c610fb997514c8289e448cd70bbfdeb017bed50",
+      "auditHash": "df17fcbdd806857a8822566f7d57876ca5ff6be57cf9b73dcbc6e20ee722b67e"
     },
     {
       "id": "se2",
@@ -2907,7 +3133,9 @@
       "action": "访问接口",
       "target": "/api/state",
       "result": "允许",
-      "detail": "读取结算经办与机构监管数据"
+      "detail": "读取结算经办与机构监管数据",
+      "previousAuditHash": "770c1efdaddc5590ea07ce41d60121e58a3423fa9c3db2126574faacf1324305",
+      "auditHash": "2039c0fde29c3b641612cf5d0c610fb997514c8289e448cd70bbfdeb017bed50"
     },
     {
       "id": "se3",
@@ -2917,7 +3145,9 @@
       "action": "访问个人健康信息",
       "target": "完整电子病历",
       "result": "拒绝",
-      "detail": "未取得居民授权或角色权限"
+      "detail": "未取得居民授权或角色权限",
+      "previousAuditHash": "",
+      "auditHash": "770c1efdaddc5590ea07ce41d60121e58a3423fa9c3db2126574faacf1324305"
     }
   ],
   "digitalCredentials": [
@@ -3302,6 +3532,35 @@
       ]
     },
     {
+      "orgCode": "ORG-MI-CENTER-DL",
+      "name": "大连市医保中心",
+      "orgType": "insurance_center",
+      "orgLevel": "市级",
+      "parentCode": "ORG-MI-DL",
+      "portal": "insurance.html",
+      "dataScope": "医保结算经办、凭证核验、固定取药审核和业务留痕",
+      "interfaces": [
+        "医保结算经办",
+        "医保电子凭证",
+        "慢病待遇经办",
+        "固定取药审核"
+      ]
+    },
+    {
+      "orgCode": "ORG-MI-DIST-ZS",
+      "name": "中山区医保局",
+      "orgType": "district_insurance_bureau",
+      "orgLevel": "区市县",
+      "parentCode": "ORG-MI-DL",
+      "portal": "insurance.html",
+      "dataScope": "本区医保基金监管、机构监管、慢病待遇协同和基层服务监督",
+      "interfaces": [
+        "区县医保监管",
+        "机构监管",
+        "基层待遇协同"
+      ]
+    },
+    {
       "orgCode": "MR1",
       "name": "大连市中心医院",
       "orgType": "medical_institution",
@@ -3329,35 +3588,6 @@
         "基层医疗",
         "公卫",
         "家医签约"
-      ]
-    },
-    {
-      "orgCode": "ORG-MI-CENTER-DL",
-      "name": "大连市医保中心",
-      "orgType": "insurance_center",
-      "orgLevel": "市级",
-      "parentCode": "ORG-MI-DL",
-      "portal": "insurance.html",
-      "dataScope": "医保结算经办、凭证核验、固定取药审核和业务留痕",
-      "interfaces": [
-        "医保结算经办",
-        "医保电子凭证",
-        "慢病待遇经办",
-        "固定取药审核"
-      ]
-    },
-    {
-      "orgCode": "ORG-MI-DIST-ZS",
-      "name": "中山区医保局",
-      "orgType": "district_insurance_bureau",
-      "orgLevel": "区市县",
-      "parentCode": "ORG-MI-DL",
-      "portal": "insurance.html",
-      "dataScope": "本区医保基金监管、机构监管、慢病待遇协同和基层服务监督",
-      "interfaces": [
-        "区县医保监管",
-        "机构监管",
-        "基层待遇协同"
       ]
     }
   ],
@@ -3507,6 +3737,20 @@
       "status": "启用"
     },
     {
+      "id": "u-mi-district",
+      "username": "district_mi",
+      "name": "区市县医保局管理员",
+      "role": "insurance",
+      "roleName": "区市县医保局管理端",
+      "orgCode": "ORG-MI-DIST-ZS",
+      "orgName": "中山区医保局",
+      "orgType": "district_insurance_bureau",
+      "orgLevel": "区市县",
+      "dataScope": "本区医保基金监管、机构监管和慢病待遇协同",
+      "home": "insurance.html",
+      "status": "启用"
+    },
+    {
       "id": "u4",
       "username": "citizen",
       "name": "演示居民A",
@@ -3534,20 +3778,6 @@
       "orgLevel": "区市县",
       "dataScope": "医共体成员机构",
       "home": "county.html",
-      "status": "启用"
-    },
-    {
-      "id": "u-mi-district",
-      "username": "district_mi",
-      "name": "区市县医保局管理员",
-      "role": "insurance",
-      "roleName": "区市县医保局管理端",
-      "orgCode": "ORG-MI-DIST-ZS",
-      "orgName": "中山区医保局",
-      "orgType": "district_insurance_bureau",
-      "orgLevel": "区市县",
-      "dataScope": "本区医保基金监管、机构监管和慢病待遇协同",
-      "home": "insurance.html",
       "status": "启用"
     }
   ],
@@ -3634,6 +3864,129 @@
       "status": "已完成"
     }
   ],
+  "integrationContracts": [
+    {
+      "id": "his-patient-v1",
+      "domain": "HIS",
+      "version": "1.0.0",
+      "direction": "inbound",
+      "resource": "PatientVisit",
+      "requiredFields": [
+        "externalId",
+        "residentId",
+        "institution",
+        "visitedAt"
+      ],
+      "idempotencyKey": "externalId",
+      "signature": "HMAC-SHA256",
+      "retryPolicy": "3 次指数退避",
+      "status": "ready"
+    },
+    {
+      "id": "emr-summary-v1",
+      "domain": "EMR",
+      "version": "1.0.0",
+      "direction": "inbound",
+      "resource": "MedicalSummary",
+      "requiredFields": [
+        "externalId",
+        "residentId",
+        "diagnosis",
+        "recordDate"
+      ],
+      "idempotencyKey": "externalId",
+      "signature": "HMAC-SHA256",
+      "retryPolicy": "3 次指数退避",
+      "status": "ready"
+    },
+    {
+      "id": "lis-report-v1",
+      "domain": "LIS",
+      "version": "1.0.0",
+      "direction": "inbound",
+      "resource": "LabReport",
+      "requiredFields": [
+        "externalId",
+        "residentId",
+        "item",
+        "result",
+        "reportedAt"
+      ],
+      "idempotencyKey": "externalId",
+      "signature": "HMAC-SHA256",
+      "retryPolicy": "3 次指数退避",
+      "status": "ready"
+    },
+    {
+      "id": "pacs-report-v1",
+      "domain": "PACS",
+      "version": "1.0.0",
+      "direction": "inbound",
+      "resource": "ImagingReport",
+      "requiredFields": [
+        "externalId",
+        "residentId",
+        "modality",
+        "conclusion",
+        "reportedAt"
+      ],
+      "idempotencyKey": "externalId",
+      "signature": "HMAC-SHA256",
+      "retryPolicy": "3 次指数退避",
+      "status": "ready"
+    },
+    {
+      "id": "insurance-settlement-v1",
+      "domain": "医保",
+      "version": "1.0.0",
+      "direction": "bidirectional",
+      "resource": "SettlementStatus",
+      "requiredFields": [
+        "externalId",
+        "residentId",
+        "claimStatus",
+        "amount"
+      ],
+      "idempotencyKey": "externalId",
+      "signature": "HMAC-SHA256",
+      "retryPolicy": "失败进入补偿队列",
+      "status": "ready"
+    },
+    {
+      "id": "certificate-sync-v1",
+      "domain": "电子证照",
+      "version": "1.0.0",
+      "direction": "outbound",
+      "resource": "CertificateStatus",
+      "requiredFields": [
+        "externalId",
+        "certificateNo",
+        "status"
+      ],
+      "idempotencyKey": "externalId",
+      "signature": "HMAC-SHA256",
+      "retryPolicy": "失败进入补偿队列",
+      "status": "ready"
+    },
+    {
+      "id": "statistics-report-v1",
+      "domain": "卫生统计",
+      "version": "1.0.0",
+      "direction": "inbound",
+      "resource": "HealthStatistics",
+      "requiredFields": [
+        "externalId",
+        "period",
+        "institution",
+        "metrics"
+      ],
+      "idempotencyKey": "externalId",
+      "signature": "HMAC-SHA256",
+      "retryPolicy": "人工复核后重放",
+      "status": "ready"
+    }
+  ],
+  "integrationGatewayEvents": [],
   "chronicProjectBlueprint": {
     "source": "大连市慢病管理平台建设项目-提级论证申报材料（20260615）",
     "sponsor": "大连市疾病预防控制中心（大连市卫生监督所）",
@@ -5339,6 +5692,194 @@
       "next": "补齐家庭医生签约数据质控证据。"
     }
   ],
+  "creditEvaluationRules": {
+    "version": "credit-rules-2026.1",
+    "period": "2026H1",
+    "baseScore": 100,
+    "dimensions": [
+      {
+        "key": "legalPractice",
+        "name": "依法执业",
+        "weight": 25,
+        "source": "执业监管台账",
+        "maxDeduction": 8
+      },
+      {
+        "key": "qualitySafety",
+        "name": "质量安全",
+        "weight": 30,
+        "source": "质控复核与危急值处置",
+        "maxDeduction": 12
+      },
+      {
+        "key": "dataReporting",
+        "name": "数据报送",
+        "weight": 25,
+        "source": "数据质量问题与接口死信",
+        "maxDeduction": 15
+      },
+      {
+        "key": "serviceCredit",
+        "name": "服务信用",
+        "weight": 20,
+        "source": "任务超时、居民消息回执和整改闭环",
+        "maxDeduction": 10
+      }
+    ],
+    "gradeBands": [
+      {
+        "grade": "A",
+        "minScore": 90
+      },
+      {
+        "grade": "B+",
+        "minScore": 85
+      },
+      {
+        "grade": "B",
+        "minScore": 80
+      },
+      {
+        "grade": "C",
+        "minScore": 70
+      },
+      {
+        "grade": "D",
+        "minScore": 0
+      }
+    ],
+    "appealFlow": [
+      "机构提交申诉",
+      "属地初审",
+      "市级复核",
+      "公示结果更新"
+    ],
+    "publicationFlow": [
+      "月度试算",
+      "机构确认",
+      "异议处理",
+      "官网/政务端公示"
+    ]
+  },
+  "researchDatasets": [
+    {
+      "id": "rd-hypertension-001",
+      "diseaseType": "hypertension",
+      "name": "Hypertension chronic management cohort",
+      "version": "1.0.0",
+      "ethicsApproval": "IRB-DEMO-HTN-2026",
+      "anonymization": "k-anonymity-demo",
+      "authorizationStatus": "approved",
+      "records": 2,
+      "status": "published",
+      "usageAudit": [],
+      "outcomes": []
+    },
+    {
+      "id": "rd-diabetes-001",
+      "diseaseType": "diabetes",
+      "name": "Diabetes follow-up and HbA1c cohort",
+      "version": "1.0.0",
+      "ethicsApproval": "IRB-DEMO-DM-2026",
+      "anonymization": "k-anonymity-demo",
+      "authorizationStatus": "approved",
+      "records": 1,
+      "status": "published",
+      "usageAudit": [],
+      "outcomes": []
+    }
+  ],
+  "diseaseRegistryModels": [
+    {
+      "id": "dm-hypertension-risk-v1",
+      "diseaseType": "hypertension",
+      "version": "1.0.0",
+      "population": "registered hypertension or high-risk residents",
+      "threshold": "systolic>=140 or riskLevel=high",
+      "reviewStatus": "active",
+      "reviewer": "chronic-center",
+      "outputs": [
+        "follow-up plan",
+        "specialist review"
+      ]
+    },
+    {
+      "id": "dm-diabetes-risk-v1",
+      "diseaseType": "diabetes",
+      "version": "1.0.0",
+      "population": "diabetes or impaired glucose residents",
+      "threshold": "glucose>=7.0 or HbA1c>=6.5",
+      "reviewStatus": "active",
+      "reviewer": "chronic-center",
+      "outputs": [
+        "diet intervention",
+        "HbA1c review"
+      ]
+    }
+  ],
+  "mobileExperienceSettings": {
+    "largeModeDefault": false,
+    "weakNetworkMode": "cache-last-state",
+    "screenReaderLandmarks": [
+      "banner",
+      "navigation",
+      "main",
+      "status"
+    ],
+    "offlineHelpChannels": [
+      "community-service-station",
+      "family-proxy",
+      "hotline"
+    ],
+    "messageTouchpoints": [
+      "in_app",
+      "family_proxy"
+    ],
+    "seniorTaskCompletionCriteria": [
+      "font-readable",
+      "one-hand-navigation",
+      "proxy-authorized",
+      "offline-help-available"
+    ],
+    "userPreferences": {}
+  },
+  "accessibilityChecklist": [
+    {
+      "id": "a11y-large-font",
+      "category": "large_font",
+      "item": "Large font mode",
+      "status": "passed",
+      "evidence": "citizen large mode toggle"
+    },
+    {
+      "id": "a11y-screen-reader",
+      "category": "screen_reader",
+      "item": "Screen reader semantics",
+      "status": "ready",
+      "evidence": "aria labels and landmark roles"
+    },
+    {
+      "id": "a11y-family-proxy",
+      "category": "family_proxy",
+      "item": "Family proxy handling",
+      "status": "passed",
+      "evidence": "family members and delegated pickup records"
+    },
+    {
+      "id": "a11y-offline-help",
+      "category": "offline_help",
+      "item": "Offline assisted service",
+      "status": "ready",
+      "evidence": "senior service offline help records"
+    },
+    {
+      "id": "a11y-weak-network",
+      "category": "weak_network",
+      "item": "Weak network fallback",
+      "status": "ready",
+      "evidence": "local state fallback and mobile preview"
+    }
+  ],
   "securityAcceptanceLedger": [
     {
       "id": "security-level3",
@@ -5468,8 +6009,8 @@
         "医疗机构",
         "医保监管"
       ],
-      "status": "进行中",
-      "nextAction": "已补齐县域医共体页面的协同工单、互认台账和质控展示；下一步完成真实互认规则、危急值、医保调阅和报告回传接口。"
+      "status": "已完成",
+      "nextAction": "已完成互认规则、诊断报告回传、危急值预警、县域处置、质控复核、不互认原因和工作流接入；真实影像/LIS/PACS 联调列为现场实施。"
     },
     {
       "priority": "P2",
@@ -5480,8 +6021,8 @@
         "县域医共体",
         "导出"
       ],
-      "status": "进行中",
-      "nextAction": "已形成演示月报和绩效视图；下一步把医共体绩效、人财物、药耗、基层履约指标拆成可导出的验收报表。"
+      "status": "已完成",
+      "nextAction": "已完成机构信用评分、公示申诉、医共体绩效、人财物、药耗和基层履约报表 API；生产月报模板按现场口径配置。"
     },
     {
       "priority": "P2",
@@ -5492,42 +6033,50 @@
         "手机预览",
         "适老化"
       ],
-      "status": "进行中",
-      "nextAction": "居民端已有手机预览、家属代办和授权上传入口；下一步补消息触达、线下帮办和无障碍验收。"
+      "status": "已完成",
+      "nextAction": "已完成移动体验设置、无障碍验收清单、大字模式、读屏语义、家属代办、线下帮办、消息触达、弱网模式和居民偏好隔离 API。"
     }
   ],
   "platformAudit": [
     {
       "module": "慢病",
-      "issue": "筛查、宣教、分级管理已有演示台账和操作按钮，但仍需接入真实外部接口与运营质控。",
+      "issue": "筛查、宣教、分级管理、专病库模型、科研数据集和人工复核 API 已形成基础闭环。",
       "priority": "P1",
       "owner": "疾控/卫健委",
-      "status": "进行中",
-      "nextAction": "按接口清单逐项标注来源系统、数据项、更新频率、责任人和验收规则。"
+      "status": "已完成",
+      "nextAction": "现场接入真实专病库、连续指标和运营质控规则。"
     },
     {
       "module": "慢病",
-      "issue": "专病库和风险模型已入模，但缺少模型版本、适用人群、触发阈值和人工复核记录。",
-      "priority": "P1",
+      "issue": "专病库和风险模型已补齐模型版本、适用人群、触发阈值和人工复核记录。",
+      "priority": "P2",
       "owner": "慢病中心",
-      "status": "待细化",
-      "nextAction": "为每个筛查模型补版本、阈值、复核人和输出处置路径。"
+      "status": "已完成",
+      "nextAction": "按真实伦理审批和数据使用协议配置科研项目授权。"
     },
     {
       "module": "医共体",
-      "issue": "16255 建设模型已入模，但新建应用尚未拆成实施批次和验收指标。",
+      "issue": "医共体绩效、人财物、药耗、基层履约、互认规则、危急值和报告回传已完成 API 基础闭环。",
       "priority": "P1",
       "owner": "医共体办公室",
-      "status": "进行中",
-      "nextAction": "按消毒供应、跨机构预约、合理用药、人财物、绩效、基层 AI 分批排期。"
+      "status": "已完成",
+      "nextAction": "现场接入真实运营、财务、药耗和医技系统。"
     },
     {
-      "module": "医共体",
-      "issue": "影像、心电、检验共享中心已有台账，但互认规则、危急值、医���调阅、不互认原因仍需接口化。",
-      "priority": "P1",
-      "owner": "医技质控中心",
-      "status": "进行中",
-      "nextAction": "建立互认规则字典、质控复核流、报告回传记录和医保调阅日志。"
+      "module": "居民体验",
+      "issue": "移动端适老化、无障碍验收、家属代办、线下帮办和弱网偏好已入模。",
+      "priority": "P2",
+      "owner": "居民服务运营岗",
+      "status": "已完成",
+      "nextAction": "用真实老年用户任务完成率继续做可用性验收。"
+    },
+    {
+      "module": "现场集成",
+      "issue": "政务身份源、医保核心、公安民政、电子证照、LIS/PACS/HIS 和安全测评仍依赖外部系统联调。",
+      "priority": "P0",
+      "owner": "现场实施联合组",
+      "status": "现场实施",
+      "nextAction": "锁定接口责任人、联调窗口、测评机构和生产部署边界。"
     }
   ],
   "platformProcessAudit": [
@@ -5929,11 +6478,13 @@
     }
   ],
   "storageMeta": {
-    "engine": "json-snapshot",
-    "mode": "GitHub Pages 静态预览 JSON 快照",
-    "sqliteFile": "data/health-city.sqlite",
+    "engine": "json",
+    "mode": "JSON 文件存储",
+    "sqliteFile": "",
     "jsonFile": "data/db.json",
-    "sqliteAvailable": true,
+    "sqliteAvailable": false,
+    "schemaVersion": 0,
+    "collectionVersions": {},
     "sqliteError": ""
   }
 }

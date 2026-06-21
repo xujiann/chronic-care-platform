@@ -41,3 +41,16 @@ test("application pages avoid placeholder navigation", () => {
   const pages = ["citizen.html", "mobile-preview.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html"];
   pages.forEach((file) => assert.doesNotMatch(read(file), /href=["']#["']/, `${file} 存在空链接占位`));
 });
+
+test("static snapshot keeps completed P2 governance collections", () => {
+  const data = JSON.parse(read("data/db.json"));
+  assert.equal(data.creditEvaluationRules.version, "credit-rules-2026.1");
+  assert.equal(Array.isArray(data.researchDatasets), true);
+  assert.equal(data.researchDatasets.some((item) => item.id === "rd-hypertension-001"), true);
+  assert.equal(Array.isArray(data.diseaseRegistryModels), true);
+  assert.equal(data.diseaseRegistryModels.some((item) => item.id === "dm-hypertension-risk-v1"), true);
+  assert.equal(data.mobileExperienceSettings.weakNetworkMode, "cache-last-state");
+  assert.equal(Array.isArray(data.accessibilityChecklist), true);
+  assert.equal(data.accessibilityChecklist.some((item) => item.id === "a11y-large-font"), true);
+  assert.equal(data.platformRoadmap.filter((item) => item.priority === "P2").every((item) => item.status === "已完成"), true);
+});

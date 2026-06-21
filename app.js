@@ -89,10 +89,10 @@ const policyAlignmentDefaults = [
   { domain: "医疗全流程在线办理", requirement: "加快异地转诊、就医、住院、医保等医疗全流程在线办理。", capability: "医疗机构端承接转诊协同，医保中心承接结算经办审核，医保局保留基金监管视图，个人端承接固定取药和授权共享。", status: "原型完成" },
   { domain: "互联网医疗监管", requirement: "完善互联网医疗服务监管体系，推进互联网+监管和智慧监管。", capability: "大连市卫生健康委建设四端运行监测、机构绩效、风险预警和数据质量看板。", status: "已纳入" },
   { domain: "电子健康码与医保凭证", requirement: "普及居民电子健康码，加快医保电子凭证推广应用。", capability: "以身份证号+手机号形成 personIndex，后续可对接电子健康码、医保电子凭证和居民一卡通。", status: "数据底座完成" },
-  { domain: "公共卫生应急", requirement: "建立智慧化预警多点触发机制，支持公共卫生机构和医疗机构数据共享，做到早发现、早报告、早处置。", capability: "在风险预警中汇聚慢病高危、随访逾期、医保异常和资源负荷，预留公共卫生应急监测入口。", status: "待扩展" },
+  { domain: "公共卫生应急", requirement: "建立智慧化预警多点触发机制，支持公共卫生机构和医疗机构数据共享，做到早发现、早报告、早处置。", capability: "风险预警已汇聚慢病高危、随访逾期、医保异常、资源负荷、危急值预警和县域处置回写。", status: "已入模" },
   { domain: "基层智慧治理", requirement: "以数据驱动、信息共享提升基层治理和疫情防控能力。", capability: "基层机构、家庭医生、居民端、医保中心和区市县医保局共用同一居民主索引和慢病闭环台账。", status: "已启动" },
-  { domain: "数据安全与合规", requirement: "完善数据脱敏、加密保护、合规评估和安全保障体系。", capability: "增加授权共享、撤销授权、数据质量审计，后续补充分级权限、脱敏展示和日志留痕。", status: "待扩展" },
-  { domain: "适老化与无障碍", requirement: "优化信息无障碍环境，解决老年人等群体数字鸿沟。", capability: "个人端按手机视口设计，后续补充大字模式、家属代办、语音提示和线下帮办。", status: "待扩展" }
+  { domain: "数据安全与合规", requirement: "完善数据脱敏、加密保护、合规评估和安全保障体系。", capability: "已形成角色权限、字段脱敏、授权撤销、访问复核、审计哈希链、安全合规证据和高风险事件闭环。", status: "基础闭环" },
+  { domain: "适老化与无障碍", requirement: "优化信息无障碍环境，解决老年人等群体数字鸿沟。", capability: "已覆盖大字模式、读屏语义、家属代办、线下帮办、消息触达、弱网模式和无障碍验收清单。", status: "基础闭环" }
 ];
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -744,7 +744,7 @@ function renderPlanning() {
   document.querySelector("#planning-cards").innerHTML = [
     ["规划映射", items.length, "国家信息化规划能力项"],
     ["已落地/已启动", started, "可在当前 MVP 中演示"],
-    ["待扩展", pending, "安全、应急、适老化深化"],
+    ["基础闭环", pending, "安全、应急、适老化已入模"],
     ["共享数据集", indexedCollections.length, "已接入 personIndex"],
     ["授权记录", (state.personalRecords || []).filter((item) => item.category === "authorizations").length, "居民授权共享"],
     ["监管预警", document.querySelectorAll("#warning-list .list-item").length || 0, "风险识别入口"]
@@ -766,7 +766,7 @@ function renderPlanning() {
     ["数据最小够用", "演示环境只使用样例身份证号和手机号；真实部署需采用脱敏、加密、分级授权和审计日志。"],
     ["授权优先", "个人健康信息库通过授权记录控制医疗机构、家庭医生和区域平台的数据查看范围。"],
     ["应急预留", "公共卫生应急可从风险预警扩展，接入传染病、资源负荷、药品物资和多点触发预警。"],
-    ["适老化预留", "居民端后续增加大字模式、家属代办、固定取药提醒、线下服务二维码和无障碍标签。"]
+    ["适老化闭环", "居民端已增加大字模式、家属代办、固定取药提醒、线下帮办、弱网偏好和无障碍验收清单。"]
   ].map(([title, text]) => `<div><strong>${title}</strong><span>${text}</span></div>`).join("");
 }
 
