@@ -458,6 +458,7 @@ function seedState() {
     institutionCreditEvaluations: seedInstitutionCreditEvaluations(),
     creditEvaluationRules: seedCreditEvaluationRules(),
     researchDatasets: seedResearchDatasets(),
+    diseaseRegistryModels: seedDiseaseRegistryModels(),
     securityAcceptanceLedger: seedSecurityAcceptanceLedger(),
     platformChangeLogs: seedPlatformChangeLogs(),
     platformRoadmap: seedPlatformRoadmap(),
@@ -578,6 +579,13 @@ function seedResearchDatasets() {
   return [
     { id: "rd-hypertension-001", diseaseType: "hypertension", name: "Hypertension chronic management cohort", version: "1.0.0", ethicsApproval: "IRB-DEMO-HTN-2026", anonymization: "k-anonymity-demo", authorizationStatus: "approved", records: 2, status: "published", usageAudit: [], outcomes: [] },
     { id: "rd-diabetes-001", diseaseType: "diabetes", name: "Diabetes follow-up and HbA1c cohort", version: "1.0.0", ethicsApproval: "IRB-DEMO-DM-2026", anonymization: "k-anonymity-demo", authorizationStatus: "approved", records: 1, status: "published", usageAudit: [], outcomes: [] }
+  ];
+}
+
+function seedDiseaseRegistryModels() {
+  return [
+    { id: "dm-hypertension-risk-v1", diseaseType: "hypertension", version: "1.0.0", population: "registered hypertension or high-risk residents", threshold: "systolic>=140 or riskLevel=high", reviewStatus: "active", reviewer: "chronic-center", outputs: ["follow-up plan", "specialist review"] },
+    { id: "dm-diabetes-risk-v1", diseaseType: "diabetes", version: "1.0.0", population: "diabetes or impaired glucose residents", threshold: "glucose>=7.0 or HbA1c>=6.5", reviewStatus: "active", reviewer: "chronic-center", outputs: ["diet intervention", "HbA1c review"] }
   ];
 }
 
@@ -2590,6 +2598,7 @@ function normalizeState(data) {
     institutionCreditEvaluations: mergeByKey(seedInstitutionCreditEvaluations(), data.institutionCreditEvaluations, "id"),
     creditEvaluationRules: data.creditEvaluationRules && typeof data.creditEvaluationRules === "object" ? data.creditEvaluationRules : seedCreditEvaluationRules(),
     researchDatasets: mergeByKey(seedResearchDatasets(), data.researchDatasets, "id"),
+    diseaseRegistryModels: mergeByKey(seedDiseaseRegistryModels(), data.diseaseRegistryModels, "id"),
     securityAcceptanceLedger: mergeByKey(seedSecurityAcceptanceLedger(), data.securityAcceptanceLedger, "id"),
     platformChangeLogs: Array.isArray(data.platformChangeLogs) ? data.platformChangeLogs : seedPlatformChangeLogs(),
     platformRoadmap: Array.isArray(data.platformRoadmap) ? data.platformRoadmap : seedPlatformRoadmap(),
@@ -2650,6 +2659,7 @@ function completeSystemTargets(state) {
   state.institutionCreditEvaluations = mergeByKey(seedInstitutionCreditEvaluations(), state.institutionCreditEvaluations, "id");
   state.creditEvaluationRules = state.creditEvaluationRules && typeof state.creditEvaluationRules === "object" ? state.creditEvaluationRules : seedCreditEvaluationRules();
   state.researchDatasets = mergeByKey(seedResearchDatasets(), state.researchDatasets, "id");
+  state.diseaseRegistryModels = mergeByKey(seedDiseaseRegistryModels(), state.diseaseRegistryModels, "id");
   state.securityAcceptanceLedger = mergeByKey(seedSecurityAcceptanceLedger(), state.securityAcceptanceLedger, "id");
   state.platformChangeLogs = Array.isArray(state.platformChangeLogs) && state.platformChangeLogs.length ? state.platformChangeLogs.slice(0, 200) : seedPlatformChangeLogs();
   const interfaceCompletion = new Map(seedInterfaceRequirements().map((item) => [item.id, { status: item.status, need: item.need }]));
@@ -4208,6 +4218,40 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/research/datasets");
     if (!user) return;
     sendJson(res, 200, { datasets: readDatabase().researchDatasets || [] });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/research/disease-models") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/disease-models");
+    if (!user) return;
+    sendJson(res, 200, { models: readDatabase().diseaseRegistryModels || [] });
+    return;
+  }
+
+  const diseaseModelReviewMatch = url.pathname.match(/^\/api\/research\/disease-models\/([^/]+)\/review$/);
+  if (req.method === "POST" && diseaseModelReviewMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/research/disease-models/:id/review");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(diseaseModelReviewMatch[1]);
+    const index = (data.diseaseRegistryModels || []).findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到专病库模型" });
+      return;
+    }
+    const payload = await collectJson(req);
+    data.diseaseRegistryModels[index] = {
+      ...data.diseaseRegistryModels[index],
+      version: String(payload.version || data.diseaseRegistryModels[index].version || "").trim(),
+      population: String(payload.population || data.diseaseRegistryModels[index].population || "").trim(),
+      threshold: String(payload.threshold || data.diseaseRegistryModels[index].threshold || "").trim(),
+      reviewStatus: String(payload.reviewStatus || "reviewed").trim(),
+      reviewComment: String(payload.reviewComment || "").trim(),
+      reviewedAt: new Date().toISOString(),
+      reviewedBy: user.username || user.role
+    };
+    writeDatabase(data);
+    sendJson(res, 200, data.diseaseRegistryModels[index]);
     return;
   }
 

@@ -594,6 +594,17 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(outcome.response.status, 200);
     assert.equal(outcome.body.outcomes[0].title, "Hypertension model calibration");
 
+    const models = await api(baseUrl, "/api/research/disease-models", authorized(commissionToken));
+    assert.equal(models.response.status, 200);
+    assert.equal(models.body.models.some((item) => item.id === "dm-hypertension-risk-v1"), true);
+    const modelReview = await api(baseUrl, "/api/research/disease-models/dm-hypertension-risk-v1/review", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({ version: "1.1.0", threshold: "systolic>=145 or riskLevel=high", reviewStatus: "reviewed", reviewComment: "Threshold reviewed by chronic disease expert group." })
+    }));
+    assert.equal(modelReview.response.status, 200);
+    assert.equal(modelReview.body.version, "1.1.0");
+    assert.equal(modelReview.body.reviewStatus, "reviewed");
+
     const denied = await api(baseUrl, "/api/mutual-recognition/reports", authorized(citizen.body.token, {
       method: "POST",
       body: JSON.stringify({ residentId: "r2", item: "HbA1c" })
