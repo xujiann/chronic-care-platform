@@ -88,13 +88,15 @@ function rehearseRestore(backupDir, options = {}) {
   });
   const rehearsalBackup = createBackup({ dataDir: rehearsalDataDir, backupRoot: path.join(rehearsalDataDir, "backups"), label: "rehearsal-check" });
   const restored = verifyBackup(rehearsalBackup.destination);
+  const metrics = recoveryMetrics(restored, startedAt);
   return {
     ok: true,
     sourceBackup: path.resolve(backupDir),
     rehearsalDataDir,
     rehearsalBackup: rehearsalBackup.destination,
     files: restored.files.map((item) => item.name),
-    metrics: recoveryMetrics(restored, startedAt)
+    metrics,
+    objectives: recoveryObjectives(metrics, options)
   };
 }
 
@@ -106,13 +108,36 @@ function recoveryMetrics(manifest, startedAt) {
   };
 }
 
+function recoveryObjectives(metrics, options = {}) {
+  const maxDurationMs = Number(options.maxDurationMs);
+  const checks = [];
+  if (Number.isFinite(maxDurationMs) && maxDurationMs >= 0) {
+    checks.push({
+      name: "maxDurationMs",
+      expected: maxDurationMs,
+      actual: metrics.durationMs,
+      passed: metrics.durationMs <= maxDurationMs
+    });
+  }
+  return {
+    passed: checks.every((item) => item.passed),
+    checks
+  };
+}
+
+function numberFlag(flags, name) {
+  const prefix = `${name}=`;
+  const value = flags.find((flag) => flag.startsWith(prefix))?.slice(prefix.length);
+  return value === undefined ? undefined : Number(value);
+}
+
 function runCli() {
   const [command, target, ...flags] = process.argv.slice(2);
   if (command === "backup") return console.log(JSON.stringify(createBackup(), null, 2));
   if (command === "verify" && target) return console.log(JSON.stringify(verifyBackup(target), null, 2));
-  if (command === "rehearse" && target) return console.log(JSON.stringify(rehearseRestore(target), null, 2));
+  if (command === "rehearse" && target) return console.log(JSON.stringify(rehearseRestore(target, { maxDurationMs: numberFlag(flags, "--max-duration-ms") }), null, 2));
   if (command === "restore" && target) return console.log(JSON.stringify(restoreBackup(target, { confirm: flags.includes("--confirm") }), null, 2));
-  throw new Error("Usage: storage-admin.js backup | verify <backup-dir> | rehearse <backup-dir> | restore <backup-dir> --confirm");
+  throw new Error("Usage: storage-admin.js backup | verify <backup-dir> | rehearse <backup-dir> [--max-duration-ms=N] | restore <backup-dir> --confirm");
 }
 
 if (require.main === module) {

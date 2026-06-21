@@ -20,15 +20,22 @@ test("storage backup verifies checksums, rehearses restore, and restores with a 
     const manifest = verifyBackup(backup.destination);
     assert.deepEqual(manifest.files.map((item) => item.name).sort(), ["db.json", "health-city.sqlite"]);
 
-    const rehearsal = rehearseRestore(backup.destination, { rehearsalRoot: path.join(root, "restore-rehearsals") });
+    const rehearsal = rehearseRestore(backup.destination, { rehearsalRoot: path.join(root, "restore-rehearsals"), maxDurationMs: 60_000 });
     assert.equal(rehearsal.ok, true);
     assert.deepEqual(rehearsal.files.sort(), ["db.json", "health-city.sqlite"]);
     assert.equal(rehearsal.metrics.fileCount, 2);
     assert.equal(rehearsal.metrics.totalBytes > 0, true);
     assert.equal(rehearsal.metrics.durationMs >= 0, true);
+    assert.equal(rehearsal.objectives.passed, true);
+    assert.equal(rehearsal.objectives.checks[0].name, "maxDurationMs");
     assert.ok(fs.existsSync(path.join(rehearsal.rehearsalDataDir, "db.json")));
     assert.ok(fs.existsSync(path.join(rehearsal.rehearsalBackup, "manifest.json")));
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dataDir, "db.json"), "utf8")), original);
+
+    const failedObjective = rehearseRestore(backup.destination, { rehearsalRoot: path.join(root, "restore-rehearsals"), maxDurationMs: -1 });
+    assert.equal(failedObjective.objectives.passed, true, "negative objectives are ignored");
+    const impossibleObjective = rehearseRestore(backup.destination, { rehearsalRoot: path.join(root, "restore-rehearsals"), maxDurationMs: 0 });
+    assert.equal(typeof impossibleObjective.objectives.passed, "boolean");
 
     fs.writeFileSync(path.join(dataDir, "db.json"), JSON.stringify({ residents: [] }), "utf8");
     assert.throws(() => restoreBackup(backup.destination, { dataDir, backupRoot }), /confirm=true/);
