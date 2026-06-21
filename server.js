@@ -459,6 +459,8 @@ function seedState() {
     creditEvaluationRules: seedCreditEvaluationRules(),
     researchDatasets: seedResearchDatasets(),
     diseaseRegistryModels: seedDiseaseRegistryModels(),
+    mobileExperienceSettings: seedMobileExperienceSettings(),
+    accessibilityChecklist: seedAccessibilityChecklist(),
     securityAcceptanceLedger: seedSecurityAcceptanceLedger(),
     platformChangeLogs: seedPlatformChangeLogs(),
     platformRoadmap: seedPlatformRoadmap(),
@@ -587,6 +589,28 @@ function seedDiseaseRegistryModels() {
     { id: "dm-hypertension-risk-v1", diseaseType: "hypertension", version: "1.0.0", population: "registered hypertension or high-risk residents", threshold: "systolic>=140 or riskLevel=high", reviewStatus: "active", reviewer: "chronic-center", outputs: ["follow-up plan", "specialist review"] },
     { id: "dm-diabetes-risk-v1", diseaseType: "diabetes", version: "1.0.0", population: "diabetes or impaired glucose residents", threshold: "glucose>=7.0 or HbA1c>=6.5", reviewStatus: "active", reviewer: "chronic-center", outputs: ["diet intervention", "HbA1c review"] }
   ];
+}
+
+function seedAccessibilityChecklist() {
+  return [
+    { id: "a11y-large-font", category: "large_font", item: "Large font mode", status: "passed", evidence: "citizen large mode toggle" },
+    { id: "a11y-screen-reader", category: "screen_reader", item: "Screen reader semantics", status: "ready", evidence: "aria labels and landmark roles" },
+    { id: "a11y-family-proxy", category: "family_proxy", item: "Family proxy handling", status: "passed", evidence: "family members and delegated pickup records" },
+    { id: "a11y-offline-help", category: "offline_help", item: "Offline assisted service", status: "ready", evidence: "senior service offline help records" },
+    { id: "a11y-weak-network", category: "weak_network", item: "Weak network fallback", status: "ready", evidence: "local state fallback and mobile preview" }
+  ];
+}
+
+function seedMobileExperienceSettings() {
+  return {
+    largeModeDefault: false,
+    weakNetworkMode: "cache-last-state",
+    screenReaderLandmarks: ["banner", "navigation", "main", "status"],
+    offlineHelpChannels: ["community-service-station", "family-proxy", "hotline"],
+    messageTouchpoints: ["in_app", "family_proxy"],
+    seniorTaskCompletionCriteria: ["font-readable", "one-hand-navigation", "proxy-authorized", "offline-help-available"],
+    userPreferences: {}
+  };
 }
 
 function seedSecurityAcceptanceLedger() {
@@ -2599,6 +2623,8 @@ function normalizeState(data) {
     creditEvaluationRules: data.creditEvaluationRules && typeof data.creditEvaluationRules === "object" ? data.creditEvaluationRules : seedCreditEvaluationRules(),
     researchDatasets: mergeByKey(seedResearchDatasets(), data.researchDatasets, "id"),
     diseaseRegistryModels: mergeByKey(seedDiseaseRegistryModels(), data.diseaseRegistryModels, "id"),
+    mobileExperienceSettings: data.mobileExperienceSettings && typeof data.mobileExperienceSettings === "object" ? { ...seedMobileExperienceSettings(), ...data.mobileExperienceSettings } : seedMobileExperienceSettings(),
+    accessibilityChecklist: mergeByKey(seedAccessibilityChecklist(), data.accessibilityChecklist, "id"),
     securityAcceptanceLedger: mergeByKey(seedSecurityAcceptanceLedger(), data.securityAcceptanceLedger, "id"),
     platformChangeLogs: Array.isArray(data.platformChangeLogs) ? data.platformChangeLogs : seedPlatformChangeLogs(),
     platformRoadmap: Array.isArray(data.platformRoadmap) ? data.platformRoadmap : seedPlatformRoadmap(),
@@ -2660,6 +2686,8 @@ function completeSystemTargets(state) {
   state.creditEvaluationRules = state.creditEvaluationRules && typeof state.creditEvaluationRules === "object" ? state.creditEvaluationRules : seedCreditEvaluationRules();
   state.researchDatasets = mergeByKey(seedResearchDatasets(), state.researchDatasets, "id");
   state.diseaseRegistryModels = mergeByKey(seedDiseaseRegistryModels(), state.diseaseRegistryModels, "id");
+  state.mobileExperienceSettings = state.mobileExperienceSettings && typeof state.mobileExperienceSettings === "object" ? { ...seedMobileExperienceSettings(), ...state.mobileExperienceSettings } : seedMobileExperienceSettings();
+  state.accessibilityChecklist = mergeByKey(seedAccessibilityChecklist(), state.accessibilityChecklist, "id");
   state.securityAcceptanceLedger = mergeByKey(seedSecurityAcceptanceLedger(), state.securityAcceptanceLedger, "id");
   state.platformChangeLogs = Array.isArray(state.platformChangeLogs) && state.platformChangeLogs.length ? state.platformChangeLogs.slice(0, 200) : seedPlatformChangeLogs();
   const interfaceCompletion = new Map(seedInterfaceRequirements().map((item) => [item.id, { status: item.status, need: item.need }]));
@@ -3522,6 +3550,7 @@ function scopeStateForUser(data, user) {
       scoped.doctorProfiles = (data.doctorProfiles || []).filter((item) => item.id === user.doctorId);
       scoped.multiPracticeApplications = (data.multiPracticeApplications || []).filter((item) => item.doctorId === user.doctorId);
     }
+    if (scoped.mobileExperienceSettings) scoped.mobileExperienceSettings = { ...scoped.mobileExperienceSettings, userPreferences: undefined };
     return scoped;
   }
 
@@ -3534,6 +3563,11 @@ function scopeStateForUser(data, user) {
 
   scoped.accounts = account ? [account] : [];
   scoped.residents = (data.residents || []).filter((item) => allowedIds.has(item.id));
+  if (scoped.mobileExperienceSettings) {
+    const preferences = scoped.mobileExperienceSettings.userPreferences || {};
+    const preferenceKey = user.residentId || user.accountId || user.username;
+    scoped.mobileExperienceSettings = { ...scoped.mobileExperienceSettings, userPreferences: { [preferenceKey]: preferences[preferenceKey] || {} } };
+  }
   ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "taskMessages"].forEach((key) => {
     scoped[key] = (data[key] || []).filter(hasAllowedResident);
   });
@@ -3542,6 +3576,37 @@ function scopeStateForUser(data, user) {
     scoped.referralSystem.familyDoctorServices = (data.referralSystem?.familyDoctorServices || []).filter(hasAllowedResident);
   }
   return scoped;
+}
+
+function allowedResidentIdsForUser(data, user) {
+  if (!user || user.role !== "citizen") return null;
+  const account = (data.accounts || []).find((item) => item.id === user.accountId);
+  return new Set([
+    user.residentId,
+    ...(account?.members || []).map((member) => member.residentId)
+  ].filter(Boolean));
+}
+
+function buildMobileExperience(data, user) {
+  const settings = data.mobileExperienceSettings && typeof data.mobileExperienceSettings === "object" ? data.mobileExperienceSettings : seedMobileExperienceSettings();
+  const allowedIds = allowedResidentIdsForUser(data, user);
+  const services = Array.isArray(data.seniorServices) ? data.seniorServices : [];
+  const preferences = settings.userPreferences && typeof settings.userPreferences === "object" ? settings.userPreferences : {};
+  if (!allowedIds) {
+    return {
+      settings: { ...settings, userPreferences: undefined },
+      preferences,
+      seniorServices: services,
+      accessibilityChecklist: data.accessibilityChecklist || seedAccessibilityChecklist()
+    };
+  }
+  const preferenceKey = user.residentId || user.accountId || user.username;
+  return {
+    settings: { ...settings, userPreferences: undefined },
+    preferences: preferences[preferenceKey] || {},
+    seniorServices: services.filter((item) => allowedIds.has(item?.residentId)),
+    accessibilityChecklist: data.accessibilityChecklist || seedAccessibilityChecklist()
+  };
 }
 
 function appendSecurityEvent(event) {
@@ -4225,6 +4290,71 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/disease-models");
     if (!user) return;
     sendJson(res, 200, { models: readDatabase().diseaseRegistryModels || [] });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/mobile/accessibility-checklist") {
+    const user = requireApiRole(req, res, ["commission", "citizen"], "/api/mobile/accessibility-checklist");
+    if (!user) return;
+    sendJson(res, 200, { checklist: readDatabase().accessibilityChecklist || seedAccessibilityChecklist() });
+    return;
+  }
+
+  const accessibilityActionMatch = url.pathname.match(/^\/api\/mobile\/accessibility-checklist\/([^/]+)\/actions$/);
+  if (req.method === "POST" && accessibilityActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/mobile/accessibility-checklist/:id/actions");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(accessibilityActionMatch[1]);
+    const checklist = Array.isArray(data.accessibilityChecklist) ? data.accessibilityChecklist : seedAccessibilityChecklist();
+    const index = checklist.findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Accessibility checklist item not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    checklist[index] = {
+      ...checklist[index],
+      status: String(payload.status || checklist[index].status || "ready").trim(),
+      evidence: String(payload.evidence || checklist[index].evidence || "").trim(),
+      tester: String(payload.tester || user.name || user.username || "").trim(),
+      action: String(payload.action || "update-accessibility-evidence").trim(),
+      updatedAt: new Date().toISOString(),
+      updatedBy: user.username || user.role
+    };
+    data.accessibilityChecklist = checklist;
+    writeDatabase(data);
+    sendJson(res, 200, checklist[index]);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/mobile/experience") {
+    const user = requireApiRole(req, res, ["commission", "citizen"], "/api/mobile/experience");
+    if (!user) return;
+    sendJson(res, 200, buildMobileExperience(readDatabase(), user));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/mobile/experience") {
+    const user = requireApiRole(req, res, ["citizen"], "/api/mobile/experience");
+    if (!user) return;
+    const data = readDatabase();
+    const payload = await collectJson(req);
+    const settings = data.mobileExperienceSettings && typeof data.mobileExperienceSettings === "object" ? data.mobileExperienceSettings : seedMobileExperienceSettings();
+    const preferenceKey = user.residentId || user.accountId || user.username;
+    const preferences = settings.userPreferences && typeof settings.userPreferences === "object" ? settings.userPreferences : {};
+    preferences[preferenceKey] = {
+      largeMode: payload.largeMode === undefined ? Boolean(preferences[preferenceKey]?.largeMode) : Boolean(payload.largeMode),
+      weakNetworkMode: String(payload.weakNetworkMode || preferences[preferenceKey]?.weakNetworkMode || settings.weakNetworkMode || "cache-last-state").trim(),
+      proxyContact: String(payload.proxyContact || preferences[preferenceKey]?.proxyContact || "").trim(),
+      offlineHelpPreferred: payload.offlineHelpPreferred === undefined ? Boolean(preferences[preferenceKey]?.offlineHelpPreferred) : Boolean(payload.offlineHelpPreferred),
+      messageTouchpoint: String(payload.messageTouchpoint || preferences[preferenceKey]?.messageTouchpoint || "in_app").trim(),
+      updatedAt: new Date().toISOString(),
+      updatedBy: user.username || user.role
+    };
+    data.mobileExperienceSettings = { ...settings, userPreferences: preferences };
+    writeDatabase(data);
+    sendJson(res, 200, { preferences: preferences[preferenceKey], experience: buildMobileExperience(data, user) });
     return;
   }
 

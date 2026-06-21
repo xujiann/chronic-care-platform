@@ -605,6 +605,30 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(modelReview.body.version, "1.1.0");
     assert.equal(modelReview.body.reviewStatus, "reviewed");
 
+    const accessibility = await api(baseUrl, "/api/mobile/accessibility-checklist", authorized(commissionToken));
+    assert.equal(accessibility.response.status, 200);
+    assert.equal(accessibility.body.checklist.some((item) => item.id === "a11y-large-font"), true);
+    const accessibilityAction = await api(baseUrl, "/api/mobile/accessibility-checklist/a11y-screen-reader/actions", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({ status: "passed", evidence: "Landmark and aria-label review passed.", tester: "accessibility-reviewer" })
+    }));
+    assert.equal(accessibilityAction.response.status, 200);
+    assert.equal(accessibilityAction.body.status, "passed");
+    assert.equal(accessibilityAction.body.tester, "accessibility-reviewer");
+
+    const mobileExperience = await api(baseUrl, "/api/mobile/experience", authorized(citizen.body.token));
+    assert.equal(mobileExperience.response.status, 200);
+    assert.equal(mobileExperience.body.settings.weakNetworkMode, "cache-last-state");
+    assert.equal(mobileExperience.body.seniorServices.every((item) => ["r1", "r4"].includes(item.residentId)), true);
+    assert.equal(mobileExperience.body.accessibilityChecklist.some((item) => item.category === "family_proxy"), true);
+    const mobilePreference = await api(baseUrl, "/api/mobile/experience", authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({ largeMode: true, weakNetworkMode: "cache-last-state", proxyContact: "family", offlineHelpPreferred: true, messageTouchpoint: "family_proxy" })
+    }));
+    assert.equal(mobilePreference.response.status, 200);
+    assert.equal(mobilePreference.body.preferences.largeMode, true);
+    assert.equal(mobilePreference.body.experience.preferences.proxyContact, "family");
+
     const denied = await api(baseUrl, "/api/mutual-recognition/reports", authorized(citizen.body.token, {
       method: "POST",
       body: JSON.stringify({ residentId: "r2", item: "HbA1c" })
