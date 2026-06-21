@@ -14,9 +14,14 @@ test("commission user reaches the governance dashboard and opens maintenance", a
 
   await expect(page.getByRole("heading", { name: "统一应用目录" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "医疗机构信用评价" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "科研数据集与专病库治理" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "移动适老化与无障碍" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "安全信创验收台账" })).toBeVisible();
   await expect(page.locator("#application-catalog tbody tr")).toHaveCount(6);
   await expect(page.locator("#institution-credit-evaluations tbody tr")).toHaveCount(3);
+  await expect(page.locator("#research-governance table").first().locator("tbody tr")).toHaveCount(2);
+  await expect(page.locator("#research-governance table").nth(1).locator("tbody tr")).toHaveCount(2);
+  await expect(page.locator("#mobile-accessibility-governance > div")).toHaveCount(10);
   await expect(page.locator("#security-acceptance-ledger > div")).toHaveCount(4);
 
   const applicationRow = page.locator("#application-catalog tbody tr", { hasText: "全民健康信息平台一、二期" });

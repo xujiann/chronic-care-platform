@@ -17,9 +17,10 @@ const fallbackState = {
 
 document.addEventListener("DOMContentLoaded", async () => {
   const state = await loadPlatformState(fallbackState);
+  const operations = await loadOperationalMetrics();
   const tasks = collectUnifiedTasks(state);
   const roadmap = state.platformRoadmap?.length ? state.platformRoadmap : defaultRoadmap();
-  renderMetrics(state, tasks, roadmap);
+  renderMetrics(state, tasks, roadmap, operations);
   renderSourceAlignment(state);
   renderAudit(state, tasks);
   renderProcessAudit(state);
@@ -30,7 +31,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderNextQueue(roadmap);
 });
 
-function renderMetrics(state, tasks, roadmap) {
+async function loadOperationalMetrics() {
+  if (location.protocol === "file:") return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request("/api/metrics");
+    if (!response.ok) return null;
+    return response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+function renderMetrics(state, tasks, roadmap, operations) {
   const dataCollections = Object.keys(state).filter((key) => Array.isArray(state[key]) || (state[key] && typeof state[key] === "object")).length;
   const p0 = roadmap.filter((item) => item.priority === "P0").length;
   const activeTasks = tasks.filter((item) => !["已完成", "已取药", "已通过"].includes(item.status)).length;
@@ -38,9 +51,11 @@ function renderMetrics(state, tasks, roadmap) {
     ["业务端", 5, "卫健委、机构、医保、个人、医共体"],
     ["核心数据集", dataCollections, "data/db.json 当前集合"],
     ["跨端待办", activeTasks, "自动从业务数据汇总"],
+    ["运行请求", operations?.http?.apiRequests ?? "静态", operations ? "来自 /api/metrics" : "静态预览不运行 API"],
+    ["慢请求", operations?.http?.slowRequests?.length ?? 0, "500ms 以上请求采样"],
+    ["数据质量", operations?.workload?.dataQualityIssues ?? 0, "运行指标中的质量问题数"],
     ["P0 优先项", p0, "先补平台底座"],
-    ["居民主索引", state.residents?.length || 0, "身份证号 + 手机号"],
-    ["开源阶段", "MVP", "可演示、可继续拆分"]
+    ["居民主索引", state.residents?.length || 0, "身份证号 + 手机号"]
   ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><small>${hint}</small></article>`).join("");
 }
 

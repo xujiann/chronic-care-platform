@@ -178,6 +178,8 @@ function renderPlatform() {
   renderApplicationCatalog(platformData.applicationCatalog);
   renderInstitutionCreditEvaluations(platformData.creditEvaluations);
   renderSecurityAcceptanceLedger(platformData.securityLedger);
+  renderResearchGovernance(platformData);
+  renderMobileAccessibilityGovernance(platformData);
   renderEvidenceLibrary(platformData.evidence);
   renderChangeLogs(platformState.platformChangeLogs || []);
   renderReportFilters(platformData);
@@ -193,7 +195,11 @@ function platformModel(state) {
     evidence: Array.isArray(state.platformEvidence) && state.platformEvidence.length ? state.platformEvidence : defaultPlatformEvidence,
     applicationCatalog: Array.isArray(state.applicationCatalog) && state.applicationCatalog.length ? state.applicationCatalog : defaultApplicationCatalog,
     creditEvaluations: Array.isArray(state.institutionCreditEvaluations) && state.institutionCreditEvaluations.length ? state.institutionCreditEvaluations : defaultInstitutionCreditEvaluations,
-    securityLedger: Array.isArray(state.securityAcceptanceLedger) && state.securityAcceptanceLedger.length ? state.securityAcceptanceLedger : defaultSecurityAcceptanceLedger
+    securityLedger: Array.isArray(state.securityAcceptanceLedger) && state.securityAcceptanceLedger.length ? state.securityAcceptanceLedger : defaultSecurityAcceptanceLedger,
+    researchDatasets: Array.isArray(state.researchDatasets) ? state.researchDatasets : [],
+    diseaseRegistryModels: Array.isArray(state.diseaseRegistryModels) ? state.diseaseRegistryModels : [],
+    accessibilityChecklist: Array.isArray(state.accessibilityChecklist) ? state.accessibilityChecklist : [],
+    mobileExperienceSettings: state.mobileExperienceSettings && typeof state.mobileExperienceSettings === "object" ? state.mobileExperienceSettings : {}
   };
 }
 
@@ -220,6 +226,9 @@ function ensureEditablePlatformData(state) {
   if (!Array.isArray(state.applicationCatalog) || !state.applicationCatalog.length) state.applicationCatalog = structuredClone(defaultApplicationCatalog);
   if (!Array.isArray(state.institutionCreditEvaluations) || !state.institutionCreditEvaluations.length) state.institutionCreditEvaluations = structuredClone(defaultInstitutionCreditEvaluations);
   if (!Array.isArray(state.securityAcceptanceLedger) || !state.securityAcceptanceLedger.length) state.securityAcceptanceLedger = structuredClone(defaultSecurityAcceptanceLedger);
+  if (!Array.isArray(state.researchDatasets)) state.researchDatasets = [];
+  if (!Array.isArray(state.diseaseRegistryModels)) state.diseaseRegistryModels = [];
+  if (!Array.isArray(state.accessibilityChecklist)) state.accessibilityChecklist = [];
   if (!Array.isArray(state.platformChangeLogs)) state.platformChangeLogs = [];
 }
 
@@ -233,6 +242,9 @@ function renderMetrics(state, platform) {
     ["审计留痕", count(state.securityEvents) + count(state.dataAccessLogs), "登录、访问、业务操作和拒绝访问"],
     ["纳管应用", count(state.applicationCatalog), "来源、接口、责任、批次和验收证据统一登记"],
     ["信用评价", count(state.institutionCreditEvaluations), "机构评分、等级与整改闭环"],
+    ["科研数据集", count(state.researchDatasets), "伦理、脱敏、授权和成果回流"],
+    ["专病模型", count(state.diseaseRegistryModels), "版本、阈值和人工复核"],
+    ["无障碍项", count(state.accessibilityChecklist), "移动适老化验收清单"],
     ["安全信创", count(state.securityAcceptanceLedger), "等保、密评、国密和信创分账验收"],
     ["验收证据", count(state.platformEvidence), "申报、测评、安全、联调、上线材料统一归档"]
   ];
@@ -368,6 +380,62 @@ function renderSecurityAcceptanceLedger(items) {
       <span>${item.owner} · ${statusBadge(item.status)}</span>
       <button class="inline-action" type="button" data-edit-platform="securityLedger" data-id="${item.id}">维护</button>
     </div>`).join("");
+}
+
+function renderResearchGovernance(platform) {
+  const datasetRows = platform.researchDatasets.map((item) => `
+    <tr>
+      <td><strong>${item.name}</strong></td>
+      <td>${item.diseaseType}</td>
+      <td>${item.version}</td>
+      <td>${item.ethicsApproval || "待登记"}</td>
+      <td>${item.anonymization || "待登记"}</td>
+      <td>${statusBadge(item.authorizationStatus || item.status)}</td>
+      <td>${item.records || 0}</td>
+      <td>${(item.usageAudit || []).length} / ${(item.outcomes || []).length}</td>
+    </tr>
+  `).join("");
+  const modelRows = platform.diseaseRegistryModels.map((item) => `
+    <tr>
+      <td><strong>${item.id}</strong></td>
+      <td>${item.diseaseType}</td>
+      <td>${item.version}</td>
+      <td>${item.population}</td>
+      <td>${item.threshold}</td>
+      <td>${statusBadge(item.reviewStatus)}</td>
+      <td>${(item.outputs || []).join("、")}</td>
+      <td>${item.reviewedBy || item.reviewer || "待复核"}</td>
+    </tr>
+  `).join("");
+  document.querySelector("#research-governance").innerHTML = `
+    <table>
+      <thead><tr><th>数据集</th><th>病种</th><th>版本</th><th>伦理审批</th><th>脱敏</th><th>授权</th><th>记录数</th><th>审计/成果</th></tr></thead>
+      <tbody>${datasetRows || `<tr><td colspan="8">暂无科研数据集。</td></tr>`}</tbody>
+    </table>
+    <table>
+      <thead><tr><th>模型</th><th>病种</th><th>版本</th><th>适用人群</th><th>触发阈值</th><th>复核状态</th><th>输出</th><th>复核人</th></tr></thead>
+      <tbody>${modelRows || `<tr><td colspan="8">暂无专病库模型。</td></tr>`}</tbody>
+    </table>
+  `;
+}
+
+function renderMobileAccessibilityGovernance(platform) {
+  const settings = platform.mobileExperienceSettings || {};
+  const checklist = platform.accessibilityChecklist || [];
+  const passed = checklist.filter((item) => item.status === "passed").length;
+  document.querySelector("#mobile-accessibility-governance").innerHTML = [
+    ["弱网策略", settings.weakNetworkMode || "待配置"],
+    ["读屏地标", (settings.screenReaderLandmarks || []).join("、") || "待配置"],
+    ["线下帮办渠道", (settings.offlineHelpChannels || []).join("、") || "待配置"],
+    ["消息触达", (settings.messageTouchpoints || []).join("、") || "待配置"],
+    ["验收通过", `${passed}/${checklist.length} 项`]
+  ].map(([label, detail]) => `<div><strong>${label}</strong><span>${detail}</span></div>`).join("") + checklist.map((item) => `
+    <div>
+      <strong>${item.item}</strong>
+      <span>${item.category} · ${statusBadge(item.status)}</span>
+      <span>${item.evidence || "待补证据"}</span>
+    </div>
+  `).join("");
 }
 
 function renderEvidenceLibrary(evidence) {

@@ -60,7 +60,7 @@ http://localhost:5173/login.html
 | `login.html` | 统一登录入口 |
 | `health-city.html` | 健康城市系统总览 |
 | `workbench.html` | 统一运营工作台、全流程审计矩阵、路线图 |
-| `platform.html` | 平台建设驾驶舱、应用目录、信用评价、安全信创台账 |
+| `platform.html` | 平台建设驾驶舱、应用目录、信用评价、科研专病库治理、移动无障碍治理、安全信创台账 |
 | `index.html` | 卫健委端：慢病、统计、应急、质量、审计、互认、绩效 |
 | `institution.html` | 医疗机构端：授权档案、转诊、固定取药、证照、多点执业 |
 | `insurance.html` | 医保局/医保中心/区市县医保局：审核、监管、凭证、取药 |
@@ -96,7 +96,7 @@ data/db.json
 | API | 说明 |
 |---|---|
 | `GET /api/health` | 健康检查，返回服务版本、环境、uptime 和存储元信息 |
-| `GET /api/metrics` | 管理端运行指标，返回请求数、状态码、慢请求、任务堆积、死信、质量问题 |
+| `GET /api/metrics` | 管理端运行指标，返回请求数、状态码、慢请求、任务堆积、死信、质量问题；运营工作台会在服务模式下展示部分指标 |
 | `POST /api/auth/login` / `GET /api/auth/me` / `POST /api/auth/logout` | 登录、会话、退出 |
 | `GET /api/state` / `PUT /api/state` | 按角色裁剪读取和管理端持久化状态 |
 | `GET/POST/PATCH /api/personal-records` | 个人健康档案读写 |
