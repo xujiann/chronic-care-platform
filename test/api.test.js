@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const { pbkdf2Sync } = require("node:crypto");
 const { once } = require("node:events");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -45,10 +46,28 @@ function authorized(token, options = {}) {
   };
 }
 
+function passwordHash(password, salt = "test-salt", iterations = 120_000) {
+  return `pbkdf2-sha256$${iterations}$${salt}$${pbkdf2Sync(password, salt, iterations, 32, "sha256").toString("base64url")}`;
+}
+
 test("API authentication, scoping and governance regression suite", async (t) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "health-platform-test-"));
   const fixture = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "db.json"), "utf8"));
   fixture.accounts[0].name = "????A??";
+  fixture.authUsers.push({
+    id: "u-hashed-test",
+    username: "hashed_commission",
+    name: "哈希账号",
+    role: "commission",
+    roleName: "哈希认证测试账号",
+    orgCode: "ORG-HEALTH-DL",
+    orgName: "大连市卫生健康委",
+    orgType: "health_admin",
+    dataScope: "测试",
+    home: "index.html",
+    status: "启用",
+    passwordHash: passwordHash("hashed-pass")
+  });
   fs.writeFileSync(path.join(dataDir, "db.json"), JSON.stringify(fixture, null, 2), "utf8");
 
   process.env.DATA_DIR = dataDir;
@@ -78,6 +97,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
 
     const accountLogin = await login(baseUrl, "health");
     assert.equal(typeof accountLogin.body.token, "string");
+    assert.equal(accountLogin.body.token.split(".").length, 4);
     assert.equal(typeof accountLogin.body.expiresAt, "string");
     assert.equal(accountLogin.body.user.username, "health");
     assert.equal(accountLogin.body.user.password, undefined);
@@ -94,6 +114,16 @@ test("API authentication, scoping and governance regression suite", async (t) =>
 
     const state = await api(baseUrl, "/api/state");
     assert.equal(state.response.status, 401);
+
+    const hashedLogin = await login(baseUrl, "hashed_commission", "hashed-pass");
+    assert.equal(hashedLogin.response.status, 200);
+    assert.equal(hashedLogin.body.user.passwordHash, undefined);
+    const badHashedLogin = await login(baseUrl, "hashed_commission", "123456");
+    assert.equal(badHashedLogin.response.status, 401);
+
+    const tamperedToken = `${hashedLogin.body.token.slice(0, -1)}x`;
+    const tamperedState = await api(baseUrl, "/api/state", authorized(tamperedToken));
+    assert.equal(tamperedState.response.status, 401);
   });
 
   await t.test("authenticates every documented role and scopes management collections", async () => {

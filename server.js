@@ -1,7 +1,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const { createHash, randomUUID } = require("crypto");
+const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
 
 const PORT = Number(process.env.PORT || 5173);
 const ROOT = __dirname;
@@ -11,6 +11,7 @@ const SQLITE_FILE = path.join(DATA_DIR, "health-city.sqlite");
 const STORAGE_ENGINE = String(process.env.STORAGE_ENGINE || "auto").toLowerCase();
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const DEMO_PASSWORD = "123456";
+const PASSWORD_HASH_ITERATIONS = 120_000;
 const STORAGE_SCHEMA_VERSION = 6;
 const sessions = new Map();
 let sqliteModule = null;
@@ -2506,8 +2507,8 @@ function normalizeState(data) {
     securityEvents: Array.isArray(data.securityEvents) ? data.securityEvents : seedSecurityEvents(),
     digitalCredentials: Array.isArray(data.digitalCredentials) ? data.digitalCredentials : seedDigitalCredentials(),
     healthArchiveStandard: data.healthArchiveStandard && typeof data.healthArchiveStandard === "object" ? data.healthArchiveStandard : seedHealthArchiveStandard(),
-    authOrganizations: mergeByKey(data.authOrganizations, seedAuthOrganizations(), "orgCode"),
-    authUsers: mergeByKey(data.authUsers, seedAuthUsers(), "username"),
+    authOrganizations: mergeByKey(seedAuthOrganizations(), data.authOrganizations, "orgCode"),
+    authUsers: mergeByKey(seedAuthUsers(), data.authUsers, "username"),
     interfaceRequirements: mergeByKey(seedInterfaceRequirements(), data.interfaceRequirements, "id"),
     chronicProjectBlueprint: data.chronicProjectBlueprint && typeof data.chronicProjectBlueprint === "object" ? data.chronicProjectBlueprint : seedChronicProjectBlueprint(),
     countyProjectBlueprint: data.countyProjectBlueprint && typeof data.countyProjectBlueprint === "object" ? data.countyProjectBlueprint : seedCountyProjectBlueprint(),
@@ -2911,22 +2912,80 @@ function sanitizeUser(user) {
   return safeUser;
 }
 
+function authSecrets() {
+  const configured = [
+    ...(process.env.SESSION_SECRETS || "").split(","),
+    process.env.SESSION_SECRET
+  ].map((item) => String(item || "").trim()).filter(Boolean);
+  return configured.length ? configured : ["health-platform-demo-session-secret"];
+}
+
+function signSessionPayload(payload, secret = authSecrets()[0]) {
+  return createHmac("sha256", secret).update(payload).digest("base64url");
+}
+
+function createSignedSessionToken(sessionId, issuedAt, expiresAt) {
+  const payload = `${sessionId}.${issuedAt}.${expiresAt}`;
+  return `${payload}.${signSessionPayload(payload)}`;
+}
+
+function verifySignedSessionToken(token) {
+  const parts = String(token || "").split(".");
+  if (parts.length !== 4) return null;
+  const [sessionId, issuedAt, expiresAt, signature] = parts;
+  const payload = `${sessionId}.${issuedAt}.${expiresAt}`;
+  const signatureBuffer = Buffer.from(signature);
+  const valid = authSecrets().some((secret) => {
+    const expected = Buffer.from(signSessionPayload(payload, secret));
+    return expected.length === signatureBuffer.length && timingSafeEqual(expected, signatureBuffer);
+  });
+  if (!valid) return null;
+  return { sessionId, issuedAt, expiresAt };
+}
+
+function verifyPassword(user, password) {
+  if (!user) return false;
+  const rawPassword = String(password || "");
+  if (user.passwordHash) return verifyPasswordHash(rawPassword, user.passwordHash);
+  if (user.password) return timingSafeTextEqual(rawPassword, String(user.password));
+  return timingSafeTextEqual(rawPassword, DEMO_PASSWORD);
+}
+
+function verifyPasswordHash(password, passwordHash) {
+  const [algorithm, iterationText, salt, expectedHash] = String(passwordHash || "").split("$");
+  if (algorithm !== "pbkdf2-sha256" || !salt || !expectedHash) return false;
+  const iterations = Number(iterationText || PASSWORD_HASH_ITERATIONS);
+  if (!Number.isInteger(iterations) || iterations <= 0) return false;
+  const actual = pbkdf2Sync(password, salt, iterations, 32, "sha256").toString("base64url");
+  return timingSafeTextEqual(actual, expectedHash);
+}
+
+function timingSafeTextEqual(left, right) {
+  const leftBuffer = Buffer.from(String(left));
+  const rightBuffer = Buffer.from(String(right));
+  return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
+}
+
 function findAuthUser(username) {
   const data = readDatabase();
   return data.authUsers.find((user) => user.username === username && user.status !== "停用");
 }
 
 function createSession(user) {
-  const token = randomUUID();
+  const sessionId = randomUUID();
   const now = Date.now();
+  const issuedAt = new Date(now).toISOString();
+  const expiresAt = new Date(now + SESSION_TTL_MS).toISOString();
+  const token = createSignedSessionToken(sessionId, Buffer.from(issuedAt).toString("base64url"), Buffer.from(expiresAt).toString("base64url"));
   const safeUser = sanitizeUser(user);
   const session = {
     token,
+    sessionId,
     user: safeUser,
-    issuedAt: new Date(now).toISOString(),
-    expiresAt: new Date(now + SESSION_TTL_MS).toISOString()
+    issuedAt,
+    expiresAt
   };
-  sessions.set(token, session);
+  sessions.set(sessionId, session);
   return session;
 }
 
@@ -2935,10 +2994,12 @@ function currentSession(req) {
   const bearer = auth.match(/^Bearer\s+(.+)$/i);
   const token = bearer?.[1] || req.headers["x-auth-token"];
   if (!token) return null;
-  const session = sessions.get(token);
+  const verified = verifySignedSessionToken(token);
+  if (!verified) return null;
+  const session = sessions.get(verified.sessionId);
   if (!session) return null;
   if (new Date(session.expiresAt).getTime() < Date.now()) {
-    sessions.delete(token);
+    sessions.delete(verified.sessionId);
     return null;
   }
   return session;
@@ -3290,13 +3351,13 @@ async function handleApi(req, res) {
   if (req.method === "POST" && url.pathname === "/api/auth/login") {
     const credentials = await collectJson(req);
     const user = findAuthUser(String(credentials.username || "").trim());
-    if (!user || credentials.password !== DEMO_PASSWORD) {
+    if (!user || !verifyPassword(user, credentials.password)) {
       appendSecurityEvent({ actor: credentials.username || "unknown", role: "unknown", action: "登录", target: "统一认证", result: "拒绝", detail: "账号或密码错误" });
       sendJson(res, 401, { ok: false, message: "账号或密码不正确" });
       return;
     }
     const session = createSession(user);
-    appendSecurityEvent({ actor: user.name, role: user.role, action: "登录", target: user.home, result: "允许", detail: "后端会话已签发" });
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "登录", target: user.home, result: "允许", detail: "签名会话已签发，支持密钥轮换校验" });
     sendJson(res, 200, { ok: true, token: session.token, expiresAt: session.expiresAt, user: session.user });
     return;
   }
@@ -3314,7 +3375,7 @@ async function handleApi(req, res) {
   if (req.method === "POST" && url.pathname === "/api/auth/logout") {
     const session = currentSession(req);
     if (session) {
-      sessions.delete(session.token);
+      sessions.delete(session.sessionId);
       appendSecurityEvent({ actor: session.user.name, role: session.user.role, action: "退出登录", target: "统一认证", result: "允许", detail: "后端会话已注销" });
     }
     sendJson(res, 200, { ok: true });
