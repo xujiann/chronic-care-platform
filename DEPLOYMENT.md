@@ -130,7 +130,7 @@ node scripts/storage-admin.js restore "data/backups/<备份目录>" --confirm
 2. 执行 `npm.cmd run storage:backup` 生成新备份。
 3. 执行 `node scripts/storage-admin.js verify "data/backups/<备份目录>"` 校验清单、大小和 SHA-256。
 4. 执行 `node scripts/storage-admin.js rehearse "data/backups/<备份目录>"` 将备份恢复到临时目录并重新校验。
-5. 确认演练输出 `ok: true`，并记录 `rehearsalDataDir`、备份目录、执行人和时间。
+5. 确认演练输出 `ok: true`，并记录 `rehearsalDataDir`、备份目录、执行人、时间和 `metrics.durationMs`、`metrics.totalBytes`。
 6. 只有在真实恢复时，才执行 `node scripts/storage-admin.js restore "data/backups/<备份目录>" --confirm`。
 
 恢复演练通过不等于生产级容灾完成；正式环境仍需补充数据库原生备份、跨机房副本、恢复时间目标和恢复点目标验收。

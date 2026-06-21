@@ -55,6 +55,7 @@ function verifyBackup(backupDir) {
 }
 
 function restoreBackup(backupDir, options = {}) {
+  const startedAt = Date.now();
   if (!options.confirm) throw new Error("Restore requires confirm=true and the service must be stopped");
   const dataDir = resolveDataDir(options.dataDir);
   const backupRoot = path.resolve(options.backupRoot || path.join(dataDir, "backups"));
@@ -68,10 +69,16 @@ function restoreBackup(backupDir, options = {}) {
     if (fs.existsSync(target)) fs.rmSync(target);
     fs.renameSync(temporary, target);
   });
-  return { restoredFrom: path.resolve(backupDir), safetyBackup: safety.destination, files: manifest.files.map((item) => item.name) };
+  return {
+    restoredFrom: path.resolve(backupDir),
+    safetyBackup: safety.destination,
+    files: manifest.files.map((item) => item.name),
+    metrics: recoveryMetrics(manifest, startedAt)
+  };
 }
 
 function rehearseRestore(backupDir, options = {}) {
+  const startedAt = Date.now();
   const rehearsalRoot = path.resolve(options.rehearsalRoot || path.join(path.resolve(backupDir), "..", "restore-rehearsals"));
   const rehearsalDataDir = path.join(rehearsalRoot, `${timestamp()}-rehearsal-${randomUUID().slice(0, 8)}`);
   fs.mkdirSync(rehearsalDataDir, { recursive: true });
@@ -86,7 +93,16 @@ function rehearseRestore(backupDir, options = {}) {
     sourceBackup: path.resolve(backupDir),
     rehearsalDataDir,
     rehearsalBackup: rehearsalBackup.destination,
-    files: restored.files.map((item) => item.name)
+    files: restored.files.map((item) => item.name),
+    metrics: recoveryMetrics(restored, startedAt)
+  };
+}
+
+function recoveryMetrics(manifest, startedAt) {
+  return {
+    durationMs: Date.now() - startedAt,
+    fileCount: manifest.files.length,
+    totalBytes: manifest.files.reduce((sum, item) => sum + Number(item.bytes || 0), 0)
   };
 }
 

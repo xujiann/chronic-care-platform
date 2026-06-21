@@ -23,6 +23,9 @@ test("storage backup verifies checksums, rehearses restore, and restores with a 
     const rehearsal = rehearseRestore(backup.destination, { rehearsalRoot: path.join(root, "restore-rehearsals") });
     assert.equal(rehearsal.ok, true);
     assert.deepEqual(rehearsal.files.sort(), ["db.json", "health-city.sqlite"]);
+    assert.equal(rehearsal.metrics.fileCount, 2);
+    assert.equal(rehearsal.metrics.totalBytes > 0, true);
+    assert.equal(rehearsal.metrics.durationMs >= 0, true);
     assert.ok(fs.existsSync(path.join(rehearsal.rehearsalDataDir, "db.json")));
     assert.ok(fs.existsSync(path.join(rehearsal.rehearsalBackup, "manifest.json")));
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dataDir, "db.json"), "utf8")), original);
@@ -32,6 +35,9 @@ test("storage backup verifies checksums, rehearses restore, and restores with a 
     const restored = restoreBackup(backup.destination, { dataDir, backupRoot, confirm: true });
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dataDir, "db.json"), "utf8")), original);
     assert.ok(fs.existsSync(path.join(restored.safetyBackup, "manifest.json")));
+    assert.equal(restored.metrics.fileCount, 2);
+    assert.equal(restored.metrics.totalBytes > 0, true);
+    assert.equal(restored.metrics.durationMs >= 0, true);
 
     fs.appendFileSync(path.join(backup.destination, "db.json"), "tampered");
     assert.throws(() => verifyBackup(backup.destination), /size mismatch|checksum failed/);
