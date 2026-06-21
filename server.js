@@ -3838,6 +3838,30 @@ function buildDataQualityScorecard(data) {
   };
 }
 
+function buildComplianceReport(data) {
+  const audit = {
+    securityEvents: verifyAuditTrail(data.securityEvents),
+    dataAccessLogs: verifyAuditTrail(data.dataAccessLogs)
+  };
+  const ledger = data.securityAcceptanceLedger || [];
+  return {
+    generatedAt: new Date().toISOString(),
+    environment: {
+      storageEngine: STORAGE_ENGINE,
+      sessionSecretConfigured: Boolean(process.env.SESSION_SECRET || process.env.SESSION_SECRETS),
+      integrationGatewaySecretConfigured: Boolean(process.env.INTEGRATION_GATEWAY_SECRET),
+      demoFallbacksActive: !(process.env.SESSION_SECRET || process.env.SESSION_SECRETS) || !process.env.INTEGRATION_GATEWAY_SECRET
+    },
+    auditChains: audit,
+    ledger,
+    summary: {
+      totalControls: ledger.length,
+      completedControls: ledger.filter((item) => /完成|通过|已/.test(String(item.status || ""))).length,
+      auditPassed: audit.securityEvents.passed && audit.dataAccessLogs.passed
+    }
+  };
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -3859,6 +3883,27 @@ async function handleApi(req, res) {
       verifiedAt: new Date().toISOString(),
       trails
     });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/audit/export") {
+    const user = requireApiRole(req, res, ["commission"], "/api/audit/export");
+    if (!user) return;
+    const data = readDatabase();
+    const trail = url.searchParams.get("trail") || "all";
+    sendJson(res, 200, {
+      exportedAt: new Date().toISOString(),
+      trail,
+      securityEvents: trail === "all" || trail === "securityEvents" ? data.securityEvents || [] : [],
+      dataAccessLogs: trail === "all" || trail === "dataAccessLogs" ? data.dataAccessLogs || [] : []
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/security/compliance-report") {
+    const user = requireApiRole(req, res, ["commission"], "/api/security/compliance-report");
+    if (!user) return;
+    sendJson(res, 200, buildComplianceReport(readDatabase()));
     return;
   }
 

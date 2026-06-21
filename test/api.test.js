@@ -623,6 +623,16 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(verified.body.trails.securityEvents.passed, true);
     assert.equal(verified.body.trails.dataAccessLogs.passed, true);
 
+    const auditExport = await api(baseUrl, "/api/audit/export?trail=securityEvents", authorized(commissionToken));
+    assert.equal(auditExport.response.status, 200);
+    assert.equal(auditExport.body.securityEvents.length > 0, true);
+    assert.equal(auditExport.body.dataAccessLogs.length, 0);
+
+    const compliance = await api(baseUrl, "/api/security/compliance-report", authorized(commissionToken));
+    assert.equal(compliance.response.status, 200);
+    assert.equal(compliance.body.summary.auditPassed, true);
+    assert.equal(compliance.body.ledger.length, 4);
+
     const current = await api(baseUrl, "/api/state", authorized(commissionToken));
     current.body.securityEvents[0].detail = "tampered audit detail";
     const tamperedSave = await api(baseUrl, "/api/state", authorized(commissionToken, {
