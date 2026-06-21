@@ -223,6 +223,30 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(forbiddenCreate.response.status, 403);
   });
 
+  await t.test("supports authorization revocation and access history review", async () => {
+    const authorizations = await api(baseUrl, "/api/personal-records?residentId=r1&category=authorizations", authorized(citizenToken));
+    assert.equal(authorizations.response.status, 200);
+    assert.ok(authorizations.body.length > 0);
+    const authorizationId = authorizations.body[0].id;
+
+    const revoked = await api(baseUrl, `/api/authorizations/${authorizationId}/revoke`, authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ reason: "居民主动撤销测试授权" })
+    }));
+    assert.equal(revoked.response.status, 200);
+    assert.equal(revoked.body.status, "已撤销");
+    assert.equal(revoked.body.revokeReason, "居民主动撤销测试授权");
+
+    const review = await api(baseUrl, "/api/access-reviews?residentId=r1", authorized(citizenToken));
+    assert.equal(review.response.status, 200);
+    assert.equal(review.body.authorizations.some((item) => item.id === authorizationId && item.status === "已撤销"), true);
+    assert.equal(review.body.accessLogs.some((item) => item.scope === "授权撤销"), true);
+    assert.match(review.body.accessLogs[0].personIndex, /^已脱敏-/);
+
+    const forbiddenReview = await api(baseUrl, "/api/access-reviews?residentId=r2", authorized(citizenToken));
+    assert.equal(forbiddenReview.response.status, 403);
+  });
+
   await t.test("enforces certificate roles and resident scope", async () => {
     const ownBirth = await api(baseUrl, "/api/birth-certificates?residentId=r1", authorized(citizenToken));
     assert.equal(ownBirth.response.status, 200);

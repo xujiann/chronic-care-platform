@@ -3994,6 +3994,76 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "POST" && url.pathname.startsWith("/api/authorizations/") && url.pathname.endsWith("/revoke")) {
+    const user = requireApiRole(req, res, ["citizen", "commission"], "/api/authorizations/:id/revoke");
+    if (!user) return;
+    const id = decodeURIComponent(url.pathname.replace("/api/authorizations/", "").replace("/revoke", ""));
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const index = data.personalRecords.findIndex((item) => item.id === id && item.category === "authorizations");
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到授权记录" });
+      return;
+    }
+    const authorization = data.personalRecords[index];
+    if (!canAccessResident(user, authorization.residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "撤销居民授权", target: id, result: "拒绝", detail: "超出居民授权范围" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权撤销该居民授权" });
+      return;
+    }
+    data.personalRecords[index] = {
+      ...authorization,
+      result: `已撤销：${authorization.result}`,
+      status: "已撤销",
+      revokedAt: new Date().toISOString(),
+      revokedBy: user.username || user.role,
+      revokedByName: user.name,
+      revokeReason: String(payload.reason || "居民撤销授权").trim(),
+      updatedAt: new Date().toISOString()
+    };
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "撤销居民授权",
+        target: id,
+        result: "允许",
+        detail: data.personalRecords[index].revokeReason
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    if (Object.hasOwn(payload, "expectedVersion")) {
+      data.storageMeta = {
+        ...(data.storageMeta || {}),
+        collectionVersions: { personalRecords: Number(payload.expectedVersion) }
+      };
+    }
+    appendDataAccessLog(data, user, authorization.residentId, "授权撤销", data.personalRecords[index].revokeReason, "允许");
+    writeDatabase(data);
+    sendJson(res, 200, redactSensitiveResponse(data.personalRecords[index], user));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/access-reviews") {
+    const user = requireApiRole(req, res, ["citizen", "commission"], "/api/access-reviews");
+    if (!user) return;
+    const residentId = url.searchParams.get("residentId");
+    const data = readDatabase();
+    if (!canAccessResident(user, residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "复核居民访问历史", target: residentId || "all", result: "拒绝", detail: "超出居民授权范围" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权复核该居民访问历史" });
+      return;
+    }
+    const authorizations = (data.personalRecords || []).filter((item) => item.residentId === residentId && item.category === "authorizations");
+    const accessLogs = (data.dataAccessLogs || []).filter((item) => item.residentId === residentId);
+    appendDataAccessLog(data, user, residentId, "授权与访问历史", "复核居民授权与访问记录");
+    writeDatabase(data);
+    sendJson(res, 200, redactSensitiveResponse({ residentId, authorizations, accessLogs }, user));
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/personal-records") {
     const user = requireApiRole(req, res, ["citizen", "institution", "insurance", "county", "commission"], "/api/personal-records");
     if (!user) return;
