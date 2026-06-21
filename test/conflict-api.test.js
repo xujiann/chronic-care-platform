@@ -112,6 +112,30 @@ test("SQLite stale state writes return an API conflict contract", { skip: !sqlit
   assert.equal(staleCollectionWrite.body.code, "STORAGE_CONFLICT");
   assert.equal(staleCollectionWrite.body.collection, "personalRecords");
 
+  const personalPatchRead = await api(baseUrl, "/api/state", authorized(token));
+  const personalVersion = personalPatchRead.body.storageMeta.collectionVersions.personalRecords;
+  const personalRecordId = personalPatchRead.body.personalRecords[0].id;
+  const personalPatch = await api(baseUrl, `/api/personal-records/${personalRecordId}`, authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({
+      expectedVersion: personalVersion,
+      result: "personal-record-versioned-patch"
+    })
+  }));
+  assert.equal(personalPatch.response.status, 200);
+  assert.equal(personalPatch.body.result, "personal-record-versioned-patch");
+  assert.equal(personalPatch.body.expectedVersion, undefined);
+
+  const stalePersonalPatch = await api(baseUrl, `/api/personal-records/${personalRecordId}`, authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({
+      expectedVersion: personalVersion,
+      result: "stale-personal-record-patch"
+    })
+  }));
+  assert.equal(stalePersonalPatch.response.status, 409);
+  assert.equal(stalePersonalPatch.body.collection, "personalRecords");
+
   const residentPatchRead = await api(baseUrl, "/api/state", authorized(token));
   const residentPatchVersion = residentPatchRead.body.storageMeta.collectionVersions.residents;
   const residentPatch = await api(baseUrl, "/api/residents/r1", authorized(token, {

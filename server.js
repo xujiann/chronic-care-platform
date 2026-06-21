@@ -293,7 +293,7 @@ const WORKFLOW_ROLE_COLLECTIONS = {
   county: new Set(["countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords"])
 };
 const WORKFLOW_PROTECTED_FIELDS = new Set(["id", "residentId", "maternalResidentId", "personIndex", "createdAt", "createdBy", "createdByName", "lastUpdated", "updatedAt", "updatedBy", "updatedByName"]);
-const PERSONAL_RECORD_PROTECTED_FIELDS = new Set(["id", "residentId", "personIndex", "createdAt", "createdBy", "createdByName", "updatedAt", "updatedBy", "updatedByName"]);
+const PERSONAL_RECORD_PROTECTED_FIELDS = new Set(["id", "residentId", "personIndex", "createdAt", "createdBy", "createdByName", "updatedAt", "updatedBy", "updatedByName", "expectedVersion"]);
 const RESIDENT_PROTECTED_FIELDS = new Set(["id", "idCard", "phone", "personIndex", "identityIndex"]);
 const COLLECTION_WRITE_KEYS = new Set([
   "residents",
@@ -3590,7 +3590,8 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["citizen", "institution", "commission"], "/api/personal-records");
     if (!user) return;
     const data = readDatabase();
-    const recordData = normalizePersonalRecord(await collectJson(req));
+    const payload = await collectJson(req);
+    const recordData = normalizePersonalRecord(payload);
     if (!canAccessResident(user, recordData.residentId, data)) {
       appendSecurityEvent({ actor: user.name, role: user.role, action: "新增个人健康信息", target: recordData.residentId, result: "拒绝", detail: "超出居民授权范围" });
       sendJson(res, 403, { error: "Forbidden", message: "无权新增该居民健康信息" });
@@ -3602,6 +3603,12 @@ async function handleApi(req, res) {
     recordData.createdBy = user.username || user.role;
     recordData.createdByName = user.name;
     data.personalRecords.push(recordData);
+    if (Object.hasOwn(payload, "expectedVersion")) {
+      data.storageMeta = {
+        ...(data.storageMeta || {}),
+        collectionVersions: { personalRecords: Number(payload.expectedVersion) }
+      };
+    }
     appendDataAccessLog(data, user, recordData.residentId, "个人健康信息库", `新增 ${recordData.category} 记录`);
     writeDatabase(data);
     sendJson(res, 201, recordData);
@@ -3637,6 +3644,12 @@ async function handleApi(req, res) {
       updatedAt: new Date().toISOString()
     };
     appendDataAccessLog(data, user, data.personalRecords[index].residentId, "个人健康信息库", `更新 ${data.personalRecords[index].category} 记录`);
+    if (Object.hasOwn(patch, "expectedVersion")) {
+      data.storageMeta = {
+        ...(data.storageMeta || {}),
+        collectionVersions: { personalRecords: Number(patch.expectedVersion) }
+      };
+    }
     writeDatabase(data);
     sendJson(res, 200, data.personalRecords[index]);
     return;
