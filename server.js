@@ -2504,8 +2504,8 @@ function normalizeState(data) {
     policyAlignment: Array.isArray(data.policyAlignment) ? data.policyAlignment : seedPolicyAlignment(),
     emergencySignals: Array.isArray(data.emergencySignals) ? data.emergencySignals : seedEmergencySignals(),
     seniorServices: Array.isArray(data.seniorServices) ? data.seniorServices : seedSeniorServices(),
-    dataAccessLogs: Array.isArray(data.dataAccessLogs) ? data.dataAccessLogs : seedDataAccessLogs(),
-    securityEvents: Array.isArray(data.securityEvents) ? data.securityEvents : seedSecurityEvents(),
+    dataAccessLogs: sealAuditTrail(Array.isArray(data.dataAccessLogs) ? data.dataAccessLogs : seedDataAccessLogs()),
+    securityEvents: sealAuditTrail(Array.isArray(data.securityEvents) ? data.securityEvents : seedSecurityEvents()),
     digitalCredentials: Array.isArray(data.digitalCredentials) ? data.digitalCredentials : seedDigitalCredentials(),
     healthArchiveStandard: data.healthArchiveStandard && typeof data.healthArchiveStandard === "object" ? data.healthArchiveStandard : seedHealthArchiveStandard(),
     authOrganizations: mergeByKey(seedAuthOrganizations(), data.authOrganizations, "orgCode"),
@@ -2873,6 +2873,51 @@ function mergeByKey(defaultRows, currentRows, key) {
     merged.set(item[key], { ...(merged.get(item[key]) || {}), ...item });
   });
   return [...merged.values()];
+}
+
+function sealAuditTrail(rows) {
+  const items = (Array.isArray(rows) ? rows : []).map((item) => ({ ...item }));
+  let previousHash = "";
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index];
+    if (!item.previousAuditHash) item.previousAuditHash = previousHash;
+    if (!item.auditHash) item.auditHash = auditHashFor(item);
+    previousHash = item.auditHash;
+  }
+  return items;
+}
+
+function verifyAuditTrail(rows) {
+  const items = Array.isArray(rows) ? rows : [];
+  const broken = [];
+  let previousHash = "";
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    const item = items[index];
+    const expectedHash = auditHashFor({ ...item, previousAuditHash: item.previousAuditHash || previousHash });
+    const expectedPreviousHash = previousHash;
+    if (item.previousAuditHash !== expectedPreviousHash || item.auditHash !== expectedHash) {
+      broken.push({ index, id: item.id || "", expectedPreviousHash, actualPreviousHash: item.previousAuditHash || "", expectedHash, actualHash: item.auditHash || "" });
+    }
+    previousHash = item.auditHash || expectedHash;
+  }
+  return {
+    passed: broken.length === 0,
+    count: items.length,
+    broken
+  };
+}
+
+function auditHashFor(item) {
+  const { auditHash, ...payload } = item || {};
+  return createHash("sha256").update(stableStringify(payload)).digest("hex");
+}
+
+function stableStringify(value) {
+  if (Array.isArray(value)) return `[${value.map((item) => stableStringify(item)).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
 }
 
 function personIndexFromParts(idCard, phone) {
@@ -3369,6 +3414,22 @@ async function handleApi(req, res) {
 
   if (req.method === "GET" && req.url === "/api/health") {
     sendJson(res, 200, { ok: true, storage: storageMeta() });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/audit/verify") {
+    const user = requireApiRole(req, res, ["commission"], "/api/audit/verify");
+    if (!user) return;
+    const data = readDatabase();
+    const trails = {
+      securityEvents: verifyAuditTrail(data.securityEvents),
+      dataAccessLogs: verifyAuditTrail(data.dataAccessLogs)
+    };
+    sendJson(res, 200, {
+      passed: Object.values(trails).every((item) => item.passed),
+      verifiedAt: new Date().toISOString(),
+      trails
+    });
     return;
   }
 

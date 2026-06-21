@@ -354,6 +354,28 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(saved.body.securityAcceptanceLedger.length, 4);
   });
 
+  await t.test("verifies audit hash chains and detects tampering", async () => {
+    const verified = await api(baseUrl, "/api/audit/verify", authorized(commissionToken));
+    assert.equal(verified.response.status, 200);
+    assert.equal(verified.body.passed, true);
+    assert.equal(verified.body.trails.securityEvents.passed, true);
+    assert.equal(verified.body.trails.dataAccessLogs.passed, true);
+
+    const current = await api(baseUrl, "/api/state", authorized(commissionToken));
+    current.body.securityEvents[0].detail = "tampered audit detail";
+    const tamperedSave = await api(baseUrl, "/api/state", authorized(commissionToken, {
+      method: "PUT",
+      body: JSON.stringify(current.body)
+    }));
+    assert.equal(tamperedSave.response.status, 200);
+
+    const tamperedVerify = await api(baseUrl, "/api/audit/verify", authorized(commissionToken));
+    assert.equal(tamperedVerify.response.status, 200);
+    assert.equal(tamperedVerify.body.passed, false);
+    assert.equal(tamperedVerify.body.trails.securityEvents.passed, false);
+    assert.ok(tamperedVerify.body.trails.securityEvents.broken.length > 0);
+  });
+
   await t.test("invalidates a session after logout", async () => {
     const session = await login(baseUrl, "county");
     const logout = await api(baseUrl, "/api/auth/logout", authorized(session.body.token, { method: "POST" }));
