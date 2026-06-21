@@ -131,10 +131,19 @@ npm.cmd run storage:backup
 ```powershell
 node scripts/storage-admin.js verify "data/backups/<备份目录>"
 node scripts/storage-admin.js rehearse "data/backups/<备份目录>" --max-duration-ms=60000
+node scripts/storage-admin.js assess "data/backups/<备份目录>" --max-backup-age-ms=86400000 --max-duration-ms=60000 --min-file-count=2 --min-total-bytes=1 --required-files=db.json,health-city.sqlite
 node scripts/storage-admin.js restore "data/backups/<备份目录>" --confirm
 ```
 
 恢复演练会把备份恢复到临时目录并重新校验清单，不覆盖当前 `data`。正式恢复操作会先自动创建 `pre-restore` 安全备份。真实生产数据库仍需使用数据库原生在线备份、时间点恢复和异地副本。
+
+`assess` 会在校验备份后执行一次恢复演练，并输出可机器判断的验收报告：
+
+- `maxBackupAgeMs`：备份年龄，作为 RPO 近似约束。
+- `maxDurationMs`：恢复演练耗时，作为 RTO 近似约束。
+- `requiredFiles`：必须存在的恢复文件。
+- `minFileCount` / `minTotalBytes`：防止空备份或不完整备份误判通过。
+- `dataQuality`：复用 JSON 快照基础质量校验。
 
 ### 恢复演练操作手册
 
@@ -144,8 +153,9 @@ node scripts/storage-admin.js restore "data/backups/<备份目录>" --confirm
 2. 执行 `npm.cmd run storage:backup` 生成新备份。
 3. 执行 `node scripts/storage-admin.js verify "data/backups/<备份目录>"` 校验清单、大小、SHA-256 和 JSON 快照基础数据质量。
 4. 执行 `node scripts/storage-admin.js rehearse "data/backups/<备份目录>" --max-duration-ms=60000` 将备份恢复到临时目录并重新校验。
-5. 确认演练输出 `ok: true`、`objectives.passed: true`，并记录 `rehearsalDataDir`、备份目录、执行人、时间和 `metrics.durationMs`、`metrics.totalBytes`。
-6. 只有在真实恢复时，才执行 `node scripts/storage-admin.js restore "data/backups/<备份目录>" --confirm`。
+5. 执行 `node scripts/storage-admin.js assess "data/backups/<备份目录>" --max-backup-age-ms=86400000 --max-duration-ms=60000 --min-file-count=2 --min-total-bytes=1 --required-files=db.json,health-city.sqlite` 生成机器可读验收报告。
+6. 确认演练输出 `ok: true`、`objectives.passed: true`，且验收报告 `passed: true`，并记录 `rehearsalDataDir`、备份目录、执行人、时间、`metrics.backupAgeMs`、`metrics.rehearsalDurationMs`、`metrics.totalBytes` 和所有未通过检查。
+7. 只有在真实恢复时，才执行 `node scripts/storage-admin.js restore "data/backups/<备份目录>" --confirm`。
 
 恢复演练通过不等于生产级容灾完成；正式环境仍需补充数据库原生备份、跨机房副本、恢复时间目标和恢复点目标验收。
 

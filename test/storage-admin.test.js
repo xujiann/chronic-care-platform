@@ -4,7 +4,7 @@ const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 
-const { createBackup, createSanitizedSnapshot, rehearseRestore, restoreBackup, verifyBackup } = require("../scripts/storage-admin");
+const { assessRecoveryReadiness, createBackup, createSanitizedSnapshot, rehearseRestore, restoreBackup, verifyBackup } = require("../scripts/storage-admin");
 
 test("storage backup verifies checksums, rehearses restore, and restores with a safety copy", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "health-platform-backup-"));
@@ -43,6 +43,39 @@ test("storage backup verifies checksums, rehearses restore, and restores with a 
     const impossibleObjective = rehearseRestore(backup.destination, { rehearsalRoot: path.join(root, "restore-rehearsals"), maxDurationMs: 0 });
     assert.equal(typeof impossibleObjective.objectives.passed, "boolean");
 
+    const assessment = assessRecoveryReadiness(backup.destination, {
+      rehearsalRoot: path.join(root, "restore-assessments"),
+      maxBackupAgeMs: 60_000,
+      maxDurationMs: 60_000,
+      minFileCount: 2,
+      minTotalBytes: 1,
+      requiredFiles: ["db.json", "health-city.sqlite"]
+    });
+    assert.equal(assessment.passed, true);
+    assert.equal(assessment.metrics.fileCount, 2);
+    assert.equal(assessment.metrics.backupAgeMs >= 0, true);
+    assert.equal(assessment.metrics.rehearsalDurationMs >= 0, true);
+    assert.deepEqual(assessment.checks.map((item) => item.name), [
+      "maxBackupAgeMs",
+      "requiredFiles",
+      "minFileCount",
+      "minTotalBytes",
+      "dataQuality",
+      "restoreRehearsal"
+    ]);
+
+    const failedAssessment = assessRecoveryReadiness(backup.destination, {
+      rehearsalRoot: path.join(root, "restore-assessments"),
+      maxBackupAgeMs: -1,
+      maxDurationMs: 60_000,
+      minFileCount: 3,
+      minTotalBytes: 1,
+      requiredFiles: ["db.json", "health-city.sqlite", "missing.sqlite"]
+    });
+    assert.equal(failedAssessment.passed, false);
+    assert.equal(failedAssessment.checks.find((item) => item.name === "requiredFiles").missing[0], "missing.sqlite");
+    assert.equal(failedAssessment.checks.find((item) => item.name === "minFileCount").passed, false);
+
     fs.writeFileSync(path.join(dataDir, "db.json"), JSON.stringify({ residents: [] }), "utf8");
     assert.throws(() => restoreBackup(backup.destination, { dataDir, backupRoot }), /confirm=true/);
     const restored = restoreBackup(backup.destination, { dataDir, backupRoot, confirm: true });
@@ -73,15 +106,15 @@ test("storage admin creates a sanitized JSON snapshot and report", () => {
   const dataDir = path.join(root, "data");
   const outputDir = path.join(root, "sanitized");
   fs.mkdirSync(dataDir, { recursive: true });
-    fs.writeFileSync(path.join(dataDir, "db.json"), JSON.stringify({
-      accounts: [{
-        id: "a1",
-        name: "账户一",
-        phone: "13900001111"
-      }],
-      residents: [{
-        id: "r1",
-        name: "居民一",
+  fs.writeFileSync(path.join(dataDir, "db.json"), JSON.stringify({
+    accounts: [{
+      id: "a1",
+      name: "账户一",
+      phone: "13900001111"
+    }],
+    residents: [{
+      id: "r1",
+      name: "居民一",
       idCard: "210200199001010011",
       phone: "13900001111",
       address: "大连市演示区真实地址",

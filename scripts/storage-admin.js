@@ -200,6 +200,94 @@ function restoreBackup(backupDir, options = {}) {
   };
 }
 
+function assessRecoveryReadiness(backupDir, options = {}) {
+  const startedAt = Date.now();
+  const manifest = verifyBackup(backupDir);
+  const rehearsal = rehearseRestore(backupDir, {
+    rehearsalRoot: options.rehearsalRoot,
+    maxDurationMs: options.maxDurationMs
+  });
+  const checks = [
+    backupAgeCheck(manifest, options, startedAt),
+    requiredFilesCheck(manifest, options),
+    minimumFileCountCheck(manifest, options),
+    minimumTotalBytesCheck(manifest, options),
+    {
+      name: "dataQuality",
+      passed: manifest.dataQuality?.passed === true,
+      detail: manifest.dataQuality?.checks || []
+    },
+    {
+      name: "restoreRehearsal",
+      passed: rehearsal.ok === true && rehearsal.objectives.passed === true,
+      detail: rehearsal.objectives.checks
+    }
+  ].filter(Boolean);
+
+  return {
+    passed: checks.every((item) => item.passed),
+    assessedAt: new Date(startedAt).toISOString(),
+    sourceBackup: path.resolve(backupDir),
+    files: manifest.files.map((item) => item.name),
+    metrics: {
+      backupAgeMs: startedAt - Date.parse(manifest.createdAt),
+      rehearsalDurationMs: rehearsal.metrics.durationMs,
+      fileCount: manifest.files.length,
+      totalBytes: manifest.files.reduce((sum, item) => sum + Number(item.bytes || 0), 0)
+    },
+    checks,
+    rehearsal
+  };
+}
+
+function backupAgeCheck(manifest, options, nowMs) {
+  const maxBackupAgeMs = Number(options.maxBackupAgeMs);
+  if (!Number.isFinite(maxBackupAgeMs) || maxBackupAgeMs < 0) return null;
+  const actual = nowMs - Date.parse(manifest.createdAt);
+  return {
+    name: "maxBackupAgeMs",
+    expected: maxBackupAgeMs,
+    actual,
+    passed: Number.isFinite(actual) && actual <= maxBackupAgeMs
+  };
+}
+
+function requiredFilesCheck(manifest, options) {
+  const requiredFiles = Array.isArray(options.requiredFiles) && options.requiredFiles.length ? options.requiredFiles : STORAGE_FILES;
+  const present = new Set(manifest.files.map((item) => item.name));
+  const missing = requiredFiles.filter((name) => !present.has(name));
+  return {
+    name: "requiredFiles",
+    expected: requiredFiles,
+    actual: manifest.files.map((item) => item.name),
+    passed: missing.length === 0,
+    missing
+  };
+}
+
+function minimumFileCountCheck(manifest, options) {
+  const minFileCount = Number(options.minFileCount);
+  if (!Number.isFinite(minFileCount) || minFileCount < 0) return null;
+  return {
+    name: "minFileCount",
+    expected: minFileCount,
+    actual: manifest.files.length,
+    passed: manifest.files.length >= minFileCount
+  };
+}
+
+function minimumTotalBytesCheck(manifest, options) {
+  const minTotalBytes = Number(options.minTotalBytes);
+  if (!Number.isFinite(minTotalBytes) || minTotalBytes < 0) return null;
+  const totalBytes = manifest.files.reduce((sum, item) => sum + Number(item.bytes || 0), 0);
+  return {
+    name: "minTotalBytes",
+    expected: minTotalBytes,
+    actual: totalBytes,
+    passed: totalBytes >= minTotalBytes
+  };
+}
+
 function rehearseRestore(backupDir, options = {}) {
   const startedAt = Date.now();
   const rehearsalRoot = path.resolve(options.rehearsalRoot || path.join(path.resolve(backupDir), "..", "restore-rehearsals"));
@@ -259,14 +347,30 @@ function stringFlag(flags, name) {
   return flags.find((flag) => flag.startsWith(prefix))?.slice(prefix.length);
 }
 
+function listFlag(flags, name) {
+  return String(stringFlag(flags, name) || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 function runCli() {
   const [command, target, ...flags] = process.argv.slice(2);
   if (command === "backup") return console.log(JSON.stringify(createBackup(), null, 2));
   if (command === "sanitize") return console.log(JSON.stringify(createSanitizedSnapshot({ outputDir: target, fileName: stringFlag(flags, "--file-name") }), null, 2));
   if (command === "verify" && target) return console.log(JSON.stringify(verifyBackup(target), null, 2));
   if (command === "rehearse" && target) return console.log(JSON.stringify(rehearseRestore(target, { maxDurationMs: numberFlag(flags, "--max-duration-ms") }), null, 2));
+  if (command === "assess" && target) {
+    return console.log(JSON.stringify(assessRecoveryReadiness(target, {
+      maxBackupAgeMs: numberFlag(flags, "--max-backup-age-ms"),
+      maxDurationMs: numberFlag(flags, "--max-duration-ms"),
+      minFileCount: numberFlag(flags, "--min-file-count"),
+      minTotalBytes: numberFlag(flags, "--min-total-bytes"),
+      requiredFiles: listFlag(flags, "--required-files")
+    }), null, 2));
+  }
   if (command === "restore" && target) return console.log(JSON.stringify(restoreBackup(target, { confirm: flags.includes("--confirm") }), null, 2));
-  throw new Error("Usage: storage-admin.js backup | sanitize [output-dir] | verify <backup-dir> | rehearse <backup-dir> [--max-duration-ms=N] | restore <backup-dir> --confirm");
+  throw new Error("Usage: storage-admin.js backup | sanitize [output-dir] | verify <backup-dir> | rehearse <backup-dir> [--max-duration-ms=N] | assess <backup-dir> [--max-backup-age-ms=N] [--max-duration-ms=N] [--min-file-count=N] [--min-total-bytes=N] [--required-files=a,b] | restore <backup-dir> --confirm");
 }
 
 if (require.main === module) {
@@ -278,4 +382,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { createBackup, createSanitizedSnapshot, rehearseRestore, restoreBackup, verifyBackup };
+module.exports = { assessRecoveryReadiness, createBackup, createSanitizedSnapshot, rehearseRestore, restoreBackup, verifyBackup };
