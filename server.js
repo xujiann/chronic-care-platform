@@ -2968,6 +2968,39 @@ function normalizeIntegrationEvent(payload, user, contract) {
   };
 }
 
+function summarizeIntegrationGateway(events = []) {
+  const summary = {
+    total: events.length,
+    byStatus: {},
+    byDomain: {},
+    deadLetters: 0,
+    pendingReconciliation: 0,
+    retrying: 0
+  };
+  events.forEach((event) => {
+    summary.byStatus[event.status] = (summary.byStatus[event.status] || 0) + 1;
+    summary.byDomain[event.domain] = (summary.byDomain[event.domain] || 0) + 1;
+    if (event.deadLetter) summary.deadLetters += 1;
+    if (event.status === "retrying") summary.retrying += 1;
+    if (event.reconciliationStatus !== "matched") summary.pendingReconciliation += 1;
+  });
+  return summary;
+}
+
+function updateIntegrationEvent(data, eventId, updater) {
+  const events = Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [];
+  const index = events.findIndex((event) => event.id === eventId);
+  if (index < 0) return null;
+  const updated = {
+    ...events[index],
+    ...updater(events[index]),
+    updatedAt: new Date().toISOString()
+  };
+  events[index] = updated;
+  data.integrationGatewayEvents = events;
+  return updated;
+}
+
 function personIndexFromParts(idCard, phone) {
   return `${String(idCard || "").trim()}#${String(phone || "").trim()}`;
 }
@@ -3577,6 +3610,88 @@ async function handleApi(req, res) {
     ].slice(0, 120);
     writeDatabase(data);
     sendJson(res, 202, event);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/integration/monitor") {
+    const user = requireApiRole(req, res, ["commission"], "/api/integration/monitor");
+    if (!user) return;
+    const data = readDatabase();
+    const events = Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [];
+    sendJson(res, 200, {
+      summary: summarizeIntegrationGateway(events),
+      recentEvents: events.slice(0, 30)
+    });
+    return;
+  }
+
+  const integrationRetryMatch = url.pathname.match(/^\/api\/integration\/events\/([^/]+)\/retry$/);
+  if (req.method === "POST" && integrationRetryMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/integration/events/:id/retry");
+    if (!user) return;
+    const data = readDatabase();
+    const event = updateIntegrationEvent(data, integrationRetryMatch[1], (current) => ({
+      status: "retrying",
+      retryCount: Number(current.retryCount || 0) + 1,
+      deadLetter: false,
+      deadLetterReason: "",
+      lastRetriedAt: new Date().toISOString(),
+      reconciliationStatus: "retrying"
+    }));
+    if (!event) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到集成网关事件" });
+      return;
+    }
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "重试集成网关事件",
+        target: event.id,
+        result: "允许",
+        detail: `${event.contractId} · ${event.idempotencyKey} · retry=${event.retryCount}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, event);
+    return;
+  }
+
+  const integrationDeadLetterMatch = url.pathname.match(/^\/api\/integration\/events\/([^/]+)\/dead-letter$/);
+  if (req.method === "POST" && integrationDeadLetterMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/integration/events/:id/dead-letter");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const event = updateIntegrationEvent(data, integrationDeadLetterMatch[1], () => ({
+      status: "failed",
+      deadLetter: true,
+      deadLetterReason: String(payload.reason || "manual-compensation-required").slice(0, 200),
+      failedAt: new Date().toISOString(),
+      reconciliationStatus: "dead-letter"
+    }));
+    if (!event) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到集成网关事件" });
+      return;
+    }
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "标记集成网关死信",
+        target: event.id,
+        result: "允许",
+        detail: `${event.contractId} · ${event.idempotencyKey} · ${event.deadLetterReason}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, event);
     return;
   }
 

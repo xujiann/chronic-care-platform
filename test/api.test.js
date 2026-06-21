@@ -355,6 +355,31 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(replay.response.status, 200);
     assert.equal(replay.body.id, accepted.body.id);
     assert.equal(replay.body.idempotentReplay, true);
+
+    const commission = await login(baseUrl, "health");
+    const retry = await api(baseUrl, `/api/integration/events/${accepted.body.id}/retry`, authorized(commission.body.token, {
+      method: "POST",
+      body: JSON.stringify({ reason: "upstream-timeout" })
+    }));
+    assert.equal(retry.response.status, 200);
+    assert.equal(retry.body.status, "retrying");
+    assert.equal(retry.body.retryCount, 1);
+    assert.equal(retry.body.deadLetter, false);
+
+    const deadLetter = await api(baseUrl, `/api/integration/events/${accepted.body.id}/dead-letter`, authorized(commission.body.token, {
+      method: "POST",
+      body: JSON.stringify({ reason: "schema-mapping-failed" })
+    }));
+    assert.equal(deadLetter.response.status, 200);
+    assert.equal(deadLetter.body.status, "failed");
+    assert.equal(deadLetter.body.deadLetter, true);
+    assert.equal(deadLetter.body.deadLetterReason, "schema-mapping-failed");
+
+    const monitor = await api(baseUrl, "/api/integration/monitor", authorized(commission.body.token));
+    assert.equal(monitor.response.status, 200);
+    assert.equal(monitor.body.summary.total >= 1, true);
+    assert.equal(monitor.body.summary.deadLetters >= 1, true);
+    assert.equal(monitor.body.summary.byStatus.failed >= 1, true);
   });
 
   await t.test("enforces workflow collection ownership and protects structural fields", async () => {
