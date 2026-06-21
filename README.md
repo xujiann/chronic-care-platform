@@ -127,6 +127,13 @@ STORAGE_ENGINE=auto
 DATA_DIR=/var/lib/chronic-care-platform
 SESSION_SECRETS=replace-with-long-random-secret
 INTEGRATION_GATEWAY_SECRET=replace-with-integration-secret
+DATABASE_URL=postgres://health:replace-with-password@postgres.internal:5432/chronic_care
+OIDC_ISSUER_URL=https://identity.example.gov.cn/real-issuer
+OIDC_CLIENT_ID=replace-with-oidc-client-id
+OIDC_CLIENT_SECRET=replace-with-oidc-client-secret
+AUDIT_EXPORT_PATH=/var/log/chronic-care-platform/audit
+SIEM_ENDPOINT=https://siem.example.gov.cn/ingest
+RETENTION_POLICY=10y-worm
 ```
 
 说明：
@@ -134,6 +141,7 @@ INTEGRATION_GATEWAY_SECRET=replace-with-integration-secret
 - `STORAGE_ENGINE=auto` 会在 Node 支持 `node:sqlite` 时使用 SQLite，并继续维护 `data/db.json` 静态快照。
 - `SESSION_SECRETS` 支持逗号分隔多密钥，便于会话密钥轮换。
 - `INTEGRATION_GATEWAY_SECRET` 用于接口网关 HMAC 签名模拟。
+- `DATABASE_URL`、`OIDC_*`、`AUDIT_EXPORT_PATH`/`SIEM_ENDPOINT` 和 `RETENTION_POLICY` 是生产部署路径的正式数据库、政务身份和审计保全配置项。
 
 ## 验证与质量门禁
 
@@ -157,7 +165,7 @@ npm.cmd run release:report:full
 
 `deploy:check` 会检查 README、部署文档、静态快照、P2 集合、P2 完成状态、环境脚本和关键 npm scripts；`deploy:check:full` 还会串行执行 `check` 和 `test`。
 
-`env:check` 使用 `.env.example` 做演示/模板级校验，不要求真实密钥；`env:check:production` 会读取 `.env`，并按生产规则校验 `NODE_ENV=production`、非 JSON 存储、非占位且不少于 32 位的 `SESSION_SECRETS` 和 `INTEGRATION_GATEWAY_SECRET`，当 `STORAGE_ENGINE=postgres` 或 `postgresql` 时还要求 `DATABASE_URL`。`release:report` 会汇总代码文件、关键 npm scripts、静态快照、P2 完成状态、验收证据和环境配置，默认输出 `release/release-report.json` 与 `release/release-report.md`；`release:report:full` 额外执行 `check`、`test`、`deploy:check` 和 `npm audit --omit=dev`。
+`env:check` 使用 `.env.example` 做演示/模板级校验，不要求真实密钥；`env:check:production` 会读取 `.env`，并按生产规则校验 `NODE_ENV=production`、非 JSON 存储、非占位且不少于 32 位的 `SESSION_SECRETS` 和 `INTEGRATION_GATEWAY_SECRET`，当 `STORAGE_ENGINE=postgres` 或 `postgresql` 时还要求 `DATABASE_URL`，并要求政务身份 `OIDC_ISSUER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET` 与审计保全 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT` 至少一项可用。`release:report` 会汇总代码文件、关键 npm scripts、静态快照、P2 完成状态、验收证据和环境配置，默认输出 `release/release-report.json` 与 `release/release-report.md`；`release:report:full` 额外执行 `check`、`test`、`deploy:check` 和 `npm audit --omit=dev`。
 
 ## 备份、脱敏与回滚
 

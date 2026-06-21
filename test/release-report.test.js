@@ -36,10 +36,21 @@ test("release report validates demo and production environment profiles", () => 
       STORAGE_ENGINE: "postgres",
       DATABASE_URL: "postgres://health:secret@example.internal:5432/health",
       SESSION_SECRETS: "0123456789abcdef0123456789abcdef,abcdef0123456789abcdef0123456789",
-      INTEGRATION_GATEWAY_SECRET: "fedcba9876543210fedcba9876543210"
+      INTEGRATION_GATEWAY_SECRET: "fedcba9876543210fedcba9876543210",
+      OIDC_ISSUER_URL: "https://identity.example.internal",
+      OIDC_CLIENT_ID: "health-platform",
+      OIDC_CLIENT_SECRET: "abcdef0123456789abcdef0123456789",
+      AUDIT_EXPORT_PATH: "/var/log/chronic-care-platform/audit"
     }
   });
   assert.equal(production.passed, true);
+
+  const missingEnvFile = validateProductionConfig({
+    profile: "production",
+    envFile: ".env.missing"
+  });
+  assert.equal(missingEnvFile.passed, false);
+  assert.equal(missingEnvFile.checks.some((item) => item.name === "env:file" && !item.passed), true);
 });
 
 test("release report summarizes repository readiness and renders markdown", () => {
@@ -65,9 +76,9 @@ test("release report summarizes repository readiness and renders markdown", () =
 });
 
 test("release report CLI argument parser keeps command and flags", () => {
-  const parsed = parseArgs(["report", "--profile=production", "--env-file=.env", "--run-commands"]);
+  const parsed = parseArgs(["report", "--profile=production", "--config-env=.env", "--run-commands"]);
   assert.equal(parsed.command, "report");
   assert.equal(parsed.flags.profile, "production");
-  assert.equal(parsed.flags["env-file"], ".env");
+  assert.equal(parsed.flags["config-env"], ".env");
   assert.equal(parsed.flags["run-commands"], true);
 });

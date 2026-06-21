@@ -13,7 +13,7 @@
     "storage:sanitize": "node scripts/storage-admin.js sanitize",
     "storage:assess": "node scripts/storage-admin.js assess",
     "env:check": "node scripts/release-report.js env-check --profile=demo",
-    "env:check:production": "node scripts/release-report.js env-check --profile=production --env-file=.env",
+    "env:check:production": "node scripts/release-report.js env-check --profile=production --config-env=.env",
     "release:report": "node scripts/release-report.js report --profile=demo",
     "release:report:full": "node scripts/release-report.js report --profile=demo --run-commands",
     "deploy:check": "node scripts/deploy-check.js",

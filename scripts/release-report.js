@@ -56,6 +56,7 @@ function check(name, passed, detail, severity = "error", category = "release") {
 function validateProductionConfig(options = {}) {
   const profile = String(options.profile || "demo").toLowerCase();
   const envFile = options.envFile || ".env.example";
+  const envFileExists = !envFile || fs.existsSync(path.resolve(ROOT, envFile));
   const env = { ...readEnvFile(envFile), ...options.env };
   const strict = profile === "production" || options.strict === true;
   const sessionSecrets = String(env.SESSION_SECRETS || env.SESSION_SECRET || "");
@@ -65,6 +66,7 @@ function validateProductionConfig(options = {}) {
   const nodeEnv = String(env.NODE_ENV || "");
 
   const checks = [
+    check("env:file", envFileExists, envFileExists ? envFile : `${envFile} missing`, strict ? "error" : "warn", "environment"),
     check("env:NODE_ENV", Boolean(nodeEnv), nodeEnv || "missing", strict ? "error" : "warn", "environment"),
     check("env:STORAGE_ENGINE", ["auto", "json", "sqlite", "postgres", "postgresql"].includes(storageEngine), storageEngine, "error", "environment"),
     check("env:SESSION_SECRETS.present", sessionSecretItems.length > 0, `${sessionSecretItems.length} configured`, "error", "environment"),
@@ -77,7 +79,9 @@ function validateProductionConfig(options = {}) {
     checks.push(
       check("env:NODE_ENV.production", nodeEnv === "production", nodeEnv || "missing", "error", "environment"),
       check("env:STORAGE_ENGINE.production", storageEngine !== "json", "json storage is demo-only", "error", "environment"),
-      check("env:DATABASE_URL.requiredForPostgres", !["postgres", "postgresql"].includes(storageEngine) || Boolean(env.DATABASE_URL), env.DATABASE_URL ? "configured" : "missing", "error", "environment")
+      check("env:DATABASE_URL.requiredForPostgres", !["postgres", "postgresql"].includes(storageEngine) || Boolean(env.DATABASE_URL), env.DATABASE_URL ? "configured" : "missing", "error", "environment"),
+      check("env:OIDC.identityAdapter", Boolean(env.OIDC_ISSUER_URL && env.OIDC_CLIENT_ID && env.OIDC_CLIENT_SECRET), env.OIDC_ISSUER_URL && env.OIDC_CLIENT_ID && env.OIDC_CLIENT_SECRET ? "configured" : "missing OIDC_ISSUER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET", "error", "environment"),
+      check("env:AUDIT.retentionTarget", Boolean(env.AUDIT_EXPORT_PATH || env.SIEM_ENDPOINT), env.AUDIT_EXPORT_PATH || env.SIEM_ENDPOINT ? "configured" : "missing AUDIT_EXPORT_PATH or SIEM_ENDPOINT", "error", "environment")
     );
   }
 
@@ -234,7 +238,7 @@ function runCli() {
   const { command, flags } = parseArgs();
   const options = {
     profile: flags.profile || "demo",
-    envFile: flags["env-file"] || ".env.example",
+    envFile: flags["config-env"] || flags["env-file"] || ".env.example",
     runCommands: flags["run-commands"] === true
   };
   if (command === "env-check") {
@@ -254,7 +258,7 @@ function runCli() {
     if (!report.ok) process.exitCode = 1;
     return;
   }
-  throw new Error("Usage: release-report.js env-check|report [--profile=demo|production] [--env-file=.env] [--run-commands] [--output=path] [--markdown=path]");
+  throw new Error("Usage: release-report.js env-check|report [--profile=demo|production] [--config-env=.env] [--run-commands] [--output=path] [--markdown=path]");
 }
 
 if (require.main === module) {

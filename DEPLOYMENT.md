@@ -106,9 +106,16 @@ STORAGE_ENGINE=auto
 DATA_DIR=/var/lib/chronic-care-platform
 SESSION_SECRETS=replace-with-long-random-secret
 INTEGRATION_GATEWAY_SECRET=replace-with-integration-secret
+DATABASE_URL=postgres://health:replace-with-password@postgres.internal:5432/chronic_care
+OIDC_ISSUER_URL=https://identity.example.gov.cn/real-issuer
+OIDC_CLIENT_ID=replace-with-oidc-client-id
+OIDC_CLIENT_SECRET=replace-with-oidc-client-secret
+AUDIT_EXPORT_PATH=/var/log/chronic-care-platform/audit
+SIEM_ENDPOINT=https://siem.example.gov.cn/ingest
+RETENTION_POLICY=10y-worm
 ```
 
-生产化如迁移 PostgreSQL 或正式数据库，再增加 `DATABASE_URL`、身份源配置、短信/CA/网关地址等现场变量。
+生产化如迁移 PostgreSQL 或正式数据库，需要填入 `DATABASE_URL`；接入政务统一认证时需要填入 `OIDC_ISSUER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET`；审计保全至少配置 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT`，并补充现场短信、CA、网关地址等变量。
 
 生产环境上线前应执行严格环境校验：
 
@@ -116,7 +123,7 @@ INTEGRATION_GATEWAY_SECRET=replace-with-integration-secret
 npm.cmd run env:check:production
 ```
 
-该命令读取 `.env`，会拒绝占位密钥、过短密钥、`STORAGE_ENGINE=json`，并在 PostgreSQL 模式下要求 `DATABASE_URL`。
+该命令读取 `.env`，会拒绝缺失环境文件、占位密钥、过短密钥、`STORAGE_ENGINE=json`，并在 PostgreSQL 模式下要求 `DATABASE_URL`；生产模式还会要求 OIDC 身份适配和审计保全目标配置到位。
 
 ## 验证与发布验收
 

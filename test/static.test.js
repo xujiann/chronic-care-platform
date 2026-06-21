@@ -77,6 +77,8 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal(Boolean(pkg.scripts["rollback:snapshot"]), true);
   assert.match(read(".env.example"), /SESSION_SECRETS=/);
   assert.match(read(".env.example"), /INTEGRATION_GATEWAY_SECRET=/);
+  assert.match(read(".env.example"), /OIDC_ISSUER_URL=/);
+  assert.match(read(".env.example"), /AUDIT_EXPORT_PATH=/);
   assert.match(read("README.md"), /\/api\/health/);
   assert.match(read("README.md"), /deploy:check/);
   assert.match(read("README.md"), /release:report/);
