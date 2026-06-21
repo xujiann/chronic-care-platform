@@ -219,4 +219,55 @@ test("SQLite stale state writes return an API conflict contract", { skip: !sqlit
   }));
   assert.equal(staleDeathWrite.response.status, 409);
   assert.equal(staleDeathWrite.body.collection, "deathCertificates");
+
+  const insuranceRead = await api(baseUrl, "/api/state", authorized(token));
+  const insuranceVersion = insuranceRead.body.storageMeta.collectionVersions.insuranceClaims;
+  const insurancePatch = await api(baseUrl, "/api/insurance-claims/ic1", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({
+      expectedVersion: insuranceVersion,
+      status: "claim-versioned-accepted",
+      residentId: "r3"
+    })
+  }));
+  assert.equal(insurancePatch.response.status, 200);
+  assert.equal(insurancePatch.body.status, "claim-versioned-accepted");
+  assert.notEqual(insurancePatch.body.residentId, "r3");
+
+  const staleInsurancePatch = await api(baseUrl, "/api/insurance-claims/ic1", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({ expectedVersion: insuranceVersion, status: "stale-claim-update" })
+  }));
+  assert.equal(staleInsurancePatch.response.status, 409);
+  assert.equal(staleInsurancePatch.body.collection, "insuranceClaims");
+
+  const medicationRead = await api(baseUrl, "/api/state", authorized(token));
+  const medicationVersion = medicationRead.body.storageMeta.collectionVersions.medicationPickups;
+  const medicationPatch = await api(baseUrl, "/api/medication-pickups/mp1", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({ expectedVersion: medicationVersion, pharmacyStatus: "versioned-ready" })
+  }));
+  assert.equal(medicationPatch.response.status, 200);
+  assert.equal(medicationPatch.body.pharmacyStatus, "versioned-ready");
+  const staleMedicationPatch = await api(baseUrl, "/api/medication-pickups/mp1", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({ expectedVersion: medicationVersion, pharmacyStatus: "stale-ready" })
+  }));
+  assert.equal(staleMedicationPatch.response.status, 409);
+  assert.equal(staleMedicationPatch.body.collection, "medicationPickups");
+
+  const chronicRead = await api(baseUrl, "/api/state", authorized(token));
+  const chronicVersion = chronicRead.body.storageMeta.collectionVersions.chronicManagementPlans;
+  const chronicPatch = await api(baseUrl, "/api/chronic-management-plans/cmp-001", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({ expectedVersion: chronicVersion, status: "versioned-followup", intervention: "versioned intervention" })
+  }));
+  assert.equal(chronicPatch.response.status, 200);
+  assert.equal(chronicPatch.body.status, "versioned-followup");
+  const staleChronicPatch = await api(baseUrl, "/api/chronic-management-plans/cmp-001", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({ expectedVersion: chronicVersion, status: "stale-followup" })
+  }));
+  assert.equal(staleChronicPatch.response.status, 409);
+  assert.equal(staleChronicPatch.body.collection, "chronicManagementPlans");
 });

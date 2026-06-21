@@ -3159,6 +3159,55 @@ function cleanResidentPatch(patch) {
   }, {});
 }
 
+function cleanBusinessPatch(patch) {
+  return Object.entries(patch && typeof patch === "object" ? patch : {}).reduce((result, [key, value]) => {
+    if (WORKFLOW_PROTECTED_FIELDS.has(key) || key === "expectedVersion") return result;
+    if (["string", "number", "boolean"].includes(typeof value) || value === null || Array.isArray(value) || (value && typeof value === "object")) {
+      result[key] = value;
+    }
+    return result;
+  }, {});
+}
+
+function patchBusinessCollectionItem({ data, collection, id, patch, user, action }) {
+  const rows = Array.isArray(data[collection]) ? data[collection] : [];
+  const index = rows.findIndex((item) => item.id === id);
+  if (index < 0) return { status: 404, body: { error: "Not Found", message: "未找到业务记录" } };
+  if (!canAccessResident(user, rows[index].residentId, data)) {
+    appendSecurityEvent({ actor: user.name, role: user.role, action, target: `${collection}/${id}`, result: "拒绝", detail: "超出居民授权范围" });
+    return { status: 403, body: { error: "Forbidden", message: "无权更新该居民业务记录" } };
+  }
+  rows[index] = {
+    ...rows[index],
+    ...cleanBusinessPatch(patch),
+    updatedBy: user.username || user.role,
+    updatedByName: user.name,
+    lastUpdated: new Date().toISOString()
+  };
+  data[collection] = rows;
+  if (Object.hasOwn(patch, "expectedVersion")) {
+    data.storageMeta = {
+      ...(data.storageMeta || {}),
+      collectionVersions: { [collection]: Number(patch.expectedVersion) }
+    };
+  }
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action,
+      target: `${collection}/${id}`,
+      result: "允许",
+      detail: `业务级更新 ${collection}`
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+  writeDatabase(data);
+  return { status: 200, body: rows[index] };
+}
+
 function findWorkflowCollection(data, collection) {
   if (collection === "referrals") {
     data.referralSystem = data.referralSystem || seedReferralSystem();
@@ -3403,6 +3452,51 @@ async function handleApi(req, res) {
     ].slice(0, 120);
     writeDatabase(data);
     sendJson(res, 201, job);
+    return;
+  }
+
+  if (req.method === "PATCH" && url.pathname.startsWith("/api/insurance-claims/")) {
+    const user = requireApiRole(req, res, ["insurance", "commission"], "/api/insurance-claims/:id");
+    if (!user) return;
+    const result = patchBusinessCollectionItem({
+      data: readDatabase(),
+      collection: "insuranceClaims",
+      id: decodeURIComponent(url.pathname.replace("/api/insurance-claims/", "")),
+      patch: await collectJson(req),
+      user,
+      action: "更新医保理赔"
+    });
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "PATCH" && url.pathname.startsWith("/api/medication-pickups/")) {
+    const user = requireApiRole(req, res, ["institution", "insurance", "commission"], "/api/medication-pickups/:id");
+    if (!user) return;
+    const result = patchBusinessCollectionItem({
+      data: readDatabase(),
+      collection: "medicationPickups",
+      id: decodeURIComponent(url.pathname.replace("/api/medication-pickups/", "")),
+      patch: await collectJson(req),
+      user,
+      action: "更新固定取药"
+    });
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "PATCH" && url.pathname.startsWith("/api/chronic-management-plans/")) {
+    const user = requireApiRole(req, res, ["institution", "commission"], "/api/chronic-management-plans/:id");
+    if (!user) return;
+    const result = patchBusinessCollectionItem({
+      data: readDatabase(),
+      collection: "chronicManagementPlans",
+      id: decodeURIComponent(url.pathname.replace("/api/chronic-management-plans/", "")),
+      patch: await collectJson(req),
+      user,
+      action: "更新慢病管理计划"
+    });
+    sendJson(res, result.status, result.body);
     return;
   }
 
