@@ -289,9 +289,9 @@ const SQLITE_MIGRATIONS = [
 const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals", "deathCertificates", "birthCertificates", "multiPracticeApplications", "digitalCredentials", "emergencySignals", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports"]);
 const WORKFLOW_ROLE_COLLECTIONS = {
   commission: WORKFLOW_COLLECTIONS,
-  institution: new Set(["careOrders", "medicationPickups", "followups", "referrals", "deathCertificates", "birthCertificates", "multiPracticeApplications", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans"]),
+  institution: new Set(["careOrders", "medicationPickups", "followups", "referrals", "deathCertificates", "birthCertificates", "multiPracticeApplications", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "emergencySignals"]),
   insurance: new Set(["insuranceClaims", "medicationPickups", "digitalCredentials"]),
-  county: new Set(["countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports"])
+  county: new Set(["countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "emergencySignals"])
 };
 const WORKFLOW_PROTECTED_FIELDS = new Set(["id", "residentId", "maternalResidentId", "personIndex", "credentialNo", "certificateNo", "documentNo", "motherDocumentNo", "fatherDocumentNo", "createdAt", "createdBy", "createdByName", "lastUpdated", "updatedAt", "updatedBy", "updatedByName"]);
 const PERSONAL_RECORD_PROTECTED_FIELDS = new Set(["id", "residentId", "personIndex", "createdAt", "createdBy", "createdByName", "updatedAt", "updatedBy", "updatedByName", "expectedVersion"]);
@@ -3685,6 +3685,50 @@ function workflowStateCollectionKey(collection) {
   return collection;
 }
 
+const TASK_SOURCES = [
+  ["followups", "institution", "随访任务", "plannedAt"],
+  ["chronicScreeningTasks", "institution", "慢病筛查", "due"],
+  ["chronicEducationPushes", "institution", "宣教推送", "pushAt"],
+  ["chronicManagementPlans", "institution", "慢病管理", "nextReview"],
+  ["careOrders", "institution", "诊疗工单", "orderDate"],
+  ["medicationPickups", "insurance", "固定取药", "nextPickup"],
+  ["insuranceClaims", "insurance", "医保审核", "claimDate"],
+  ["digitalCredentials", "insurance", "数字凭证", "lastUpdated"],
+  ["birthCertificates", "institution", "出生证明", "createdAt"],
+  ["deathCertificates", "institution", "死亡证明", "createdAt"],
+  ["emergencySignals", ["institution", "county"], "危急值/预警", "date"],
+  ["countyCollaborationOrders", "county", "县域协同", "due"],
+  ["countyAiDiagnosisCases", "county", "AI诊断", "at"],
+  ["countyMutualRecognitionRecords", "county", "检查互认", "at"],
+  ["diagnosticReports", "county", "报告回传", "reportedAt"]
+];
+
+function taskTitle(item, category) {
+  return item.taskName || item.topic || item.plan || item.orderType || item.claimType || item.medication || item.item || item.title || item.name || item.service || category;
+}
+
+function buildUnifiedTasks(data, user) {
+  return TASK_SOURCES.flatMap(([collection, role, category, dueField]) => {
+    const roles = Array.isArray(role) ? role : [role];
+    if (user.role !== "commission" && !roles.includes(user.role)) return [];
+    const rows = collection === "referrals" ? data.referralSystem?.referrals : data[collection];
+    return (Array.isArray(rows) ? rows : []).filter((item) => canAccessResident(user, item.residentId || item.maternalResidentId, data)).map((item) => ({
+      id: `${collection}:${item.id}`,
+      collection,
+      sourceId: item.id,
+      category,
+      role: roles.includes(user.role) ? user.role : roles[0],
+      residentId: item.residentId || item.maternalResidentId || "",
+      title: taskTitle(item, category),
+      status: item.status || item.reviewStatus || "pending",
+      priority: item.priority || item.level || item.riskLevel || "normal",
+      dueAt: item[dueField] || item.due || item.nextReview || item.lastUpdated || "",
+      owner: item.assignee || item.owner || item.institution || item.sourceInstitution || item.targetInstitution || "",
+      source: collection
+    }));
+  }).sort((left, right) => String(left.dueAt || "").localeCompare(String(right.dueAt || "")));
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -3747,6 +3791,85 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission", "institution", "insurance", "citizen", "county"], "/api/state");
     if (!user) return;
     sendJson(res, 200, redactSensitiveResponse(scopeStateForUser(readDatabase(), user), user));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/tasks") {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/tasks");
+    if (!user) return;
+    const data = readDatabase();
+    const status = url.searchParams.get("status");
+    const role = url.searchParams.get("role");
+    const tasks = buildUnifiedTasks(data, user).filter((task) =>
+      (!status || task.status === status) &&
+      (!role || task.role === role)
+    );
+    sendJson(res, 200, {
+      tasks,
+      summary: tasks.reduce((result, task) => {
+        result.total += 1;
+        result.byRole[task.role] = (result.byRole[task.role] || 0) + 1;
+        result.byStatus[task.status] = (result.byStatus[task.status] || 0) + 1;
+        return result;
+      }, { total: 0, byRole: {}, byStatus: {} })
+    });
+    return;
+  }
+
+  const taskActionMatch = url.pathname.match(/^\/api\/tasks\/([^/]+)\/actions$/);
+  if (req.method === "POST" && taskActionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/tasks/:id/actions");
+    if (!user) return;
+    const taskId = decodeURIComponent(taskActionMatch[1]);
+    const [collection, id] = taskId.split(":");
+    if (!WORKFLOW_COLLECTIONS.has(collection)) {
+      sendJson(res, 400, { error: "Bad Request", message: "不支持的任务来源" });
+      return;
+    }
+    if (!WORKFLOW_ROLE_COLLECTIONS[user.role]?.has(collection)) {
+      sendJson(res, 403, { error: "Forbidden", message: "当前角色无权处理该任务" });
+      return;
+    }
+    const data = readDatabase();
+    const rows = findWorkflowCollection(data, collection);
+    if (!rows) {
+      sendJson(res, 400, { error: "Bad Request", message: "不支持的任务集合" });
+      return;
+    }
+    const index = rows.findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到任务" });
+      return;
+    }
+    if (!canAccessResident(user, rows[index].residentId || rows[index].maternalResidentId, data)) {
+      sendJson(res, 403, { error: "Forbidden", message: "无权处理该居民任务" });
+      return;
+    }
+    const payload = await collectJson(req);
+    rows[index] = {
+      ...rows[index],
+      status: String(payload.status || rows[index].status || "processing").trim(),
+      taskAction: String(payload.action || "update").trim(),
+      taskComment: String(payload.comment || "").trim(),
+      handledAt: new Date().toISOString(),
+      handledBy: user.username || user.role,
+      handledByName: user.name
+    };
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "handle unified task",
+        target: taskId,
+        result: "allowed",
+        detail: rows[index].status
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, rows[index]);
     return;
   }
 

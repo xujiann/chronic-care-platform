@@ -466,6 +466,18 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(handled.response.status, 200);
     assert.equal(handled.body.status, "acknowledged");
 
+    const countyTasks = await api(baseUrl, "/api/tasks", authorized(county.body.token));
+    assert.equal(countyTasks.response.status, 200);
+    assert.equal(countyTasks.body.tasks.some((item) => item.id === `emergencySignals:${critical.body.criticalSignal.id}`), true);
+    assert.equal(countyTasks.body.tasks.some((item) => item.collection === "insuranceClaims"), false);
+
+    const taskHandled = await api(baseUrl, `/api/tasks/${encodeURIComponent(`emergencySignals:${critical.body.criticalSignal.id}`)}/actions`, authorized(county.body.token, {
+      method: "POST",
+      body: JSON.stringify({ status: "resolved", action: "close-critical-alert", comment: "Disposition completed." })
+    }));
+    assert.equal(taskHandled.response.status, 200);
+    assert.equal(taskHandled.body.status, "resolved");
+
     const rejectedReview = await api(baseUrl, `/api/mutual-recognition/records/${critical.body.recognition.id}/review`, authorized(county.body.token, {
       method: "POST",
       body: JSON.stringify({ decision: "reject", reasonCode: "poor-quality", comment: "DICOM package is incomplete." })
@@ -478,6 +490,12 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const reviewedReport = reviewedState.body.diagnosticReports.find((item) => item.id === critical.body.report.id);
     assert.equal(reviewedReport.status, "not_recognized");
     assert.equal(reviewedReport.reviewReasonCode, "poor-quality");
+
+    const insurance = await login(baseUrl, "insurance");
+    const insuranceTasks = await api(baseUrl, "/api/tasks", authorized(insurance.body.token));
+    assert.equal(insuranceTasks.response.status, 200);
+    assert.equal(insuranceTasks.body.tasks.some((item) => item.collection === "insuranceClaims"), true);
+    assert.equal(insuranceTasks.body.tasks.some((item) => item.collection === "chronicScreeningTasks"), false);
 
     const citizen = await login(baseUrl, "citizen");
     const denied = await api(baseUrl, "/api/mutual-recognition/reports", authorized(citizen.body.token, {
