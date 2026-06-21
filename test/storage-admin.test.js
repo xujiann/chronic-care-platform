@@ -19,6 +19,12 @@ test("storage backup verifies checksums, rehearses restore, and restores with a 
     const backup = createBackup({ dataDir, backupRoot, label: "test" });
     const manifest = verifyBackup(backup.destination);
     assert.deepEqual(manifest.files.map((item) => item.name).sort(), ["db.json", "health-city.sqlite"]);
+    assert.equal(manifest.dataQuality.passed, true);
+    assert.deepEqual(manifest.dataQuality.checks.map((item) => item.name), [
+      "jsonSnapshotReadable",
+      "uniqueCollectionIds",
+      "residentReferencesExist"
+    ]);
 
     const rehearsal = rehearseRestore(backup.destination, { rehearsalRoot: path.join(root, "restore-rehearsals"), maxDurationMs: 60_000 });
     assert.equal(rehearsal.ok, true);
@@ -45,6 +51,15 @@ test("storage backup verifies checksums, rehearses restore, and restores with a 
     assert.equal(restored.metrics.fileCount, 2);
     assert.equal(restored.metrics.totalBytes > 0, true);
     assert.equal(restored.metrics.durationMs >= 0, true);
+
+    const invalidDataDir = path.join(root, "invalid-data");
+    fs.mkdirSync(invalidDataDir, { recursive: true });
+    fs.writeFileSync(path.join(invalidDataDir, "db.json"), JSON.stringify({
+      residents: [{ id: "r1" }, { id: "r1" }],
+      chronicManagementPlans: [{ id: "cmp-1", residentId: "missing-resident" }]
+    }), "utf8");
+    const invalidBackup = createBackup({ dataDir: invalidDataDir, backupRoot: path.join(root, "invalid-backups"), label: "invalid" });
+    assert.throws(() => verifyBackup(invalidBackup.destination), /Backup data quality failed: uniqueCollectionIds, residentReferencesExist/);
 
     fs.appendFileSync(path.join(backup.destination, "db.json"), "tampered");
     assert.throws(() => verifyBackup(backup.destination), /size mismatch|checksum failed/);

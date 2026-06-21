@@ -51,7 +51,69 @@ function verifyBackup(backupDir) {
     if (sha256(file) !== entry.sha256) throw new Error(`Backup checksum failed: ${entry.name}`);
     if (entry.name === "db.json") JSON.parse(fs.readFileSync(file, "utf8"));
   });
-  return manifest;
+  const dataQuality = verifyBackupDataQuality(manifest, directory);
+  if (!dataQuality.passed) {
+    throw new Error(`Backup data quality failed: ${dataQuality.checks.filter((item) => !item.passed).map((item) => item.name).join(", ")}`);
+  }
+  return { ...manifest, dataQuality };
+}
+
+function verifyBackupDataQuality(manifest, directory) {
+  const checks = [];
+  const dbEntry = manifest.files.find((entry) => entry.name === "db.json");
+  if (!dbEntry) {
+    checks.push({ name: "jsonSnapshotPresent", passed: false, detail: "db.json is required for data quality checks" });
+    return { passed: false, checks };
+  }
+
+  const snapshot = JSON.parse(fs.readFileSync(path.join(directory, dbEntry.name), "utf8"));
+  checks.push({ name: "jsonSnapshotReadable", passed: true });
+
+  const duplicateCollections = findDuplicateIds(snapshot);
+  checks.push({
+    name: "uniqueCollectionIds",
+    passed: duplicateCollections.length === 0,
+    detail: duplicateCollections
+  });
+
+  const danglingResidentRefs = findDanglingResidentRefs(snapshot);
+  checks.push({
+    name: "residentReferencesExist",
+    passed: danglingResidentRefs.length === 0,
+    detail: danglingResidentRefs
+  });
+
+  return {
+    passed: checks.every((item) => item.passed),
+    checks
+  };
+}
+
+function findDuplicateIds(snapshot) {
+  return Object.entries(snapshot)
+    .filter(([, value]) => Array.isArray(value))
+    .flatMap(([collection, items]) => {
+      const seen = new Set();
+      const duplicates = new Set();
+      items.forEach((item) => {
+        if (!item || typeof item !== "object" || Array.isArray(item) || item.id === undefined) return;
+        const id = String(item.id);
+        if (seen.has(id)) duplicates.add(id);
+        seen.add(id);
+      });
+      return [...duplicates].map((id) => ({ collection, id }));
+    });
+}
+
+function findDanglingResidentRefs(snapshot) {
+  const residentIds = new Set(Array.isArray(snapshot.residents) ? snapshot.residents.map((resident) => String(resident.id)) : []);
+  if (!residentIds.size) return [];
+  return Object.entries(snapshot)
+    .filter(([, value]) => Array.isArray(value))
+    .flatMap(([collection, items]) => items
+      .filter((item) => item && typeof item === "object" && !Array.isArray(item) && item.residentId !== undefined)
+      .filter((item) => !residentIds.has(String(item.residentId)))
+      .map((item) => ({ collection, id: String(item.id || ""), residentId: String(item.residentId) })));
 }
 
 function restoreBackup(backupDir, options = {}) {
