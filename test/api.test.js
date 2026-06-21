@@ -128,6 +128,13 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(metrics.body.http.apiRequests >= 1, true);
     assert.equal(typeof metrics.body.workload.unifiedTasks, "number");
     assert.equal(typeof metrics.body.workload.dataQualityIssues, "number");
+
+    const readiness = await api(baseUrl, "/api/system/readiness", authorized(accountLogin.body.token));
+    assert.equal(readiness.response.status, 200);
+    assert.equal(readiness.body.passed, true);
+    assert.equal(readiness.body.p2Collections.researchDatasets >= 2, true);
+    assert.equal(readiness.body.checks.some((item) => item.id === "audit-chain" && item.passed), true);
+    assert.equal(readiness.body.externalDependencies.includes("政务统一身份源"), true);
   });
 
   await t.test("rejects invalid credentials and unauthenticated state reads", async () => {

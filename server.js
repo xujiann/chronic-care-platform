@@ -2761,6 +2761,47 @@ function buildRuntimeMetrics(data) {
   };
 }
 
+function buildSystemReadinessReport(data) {
+  const p2Collections = {
+    institutionCreditEvaluations: Array.isArray(data.institutionCreditEvaluations) ? data.institutionCreditEvaluations.length : 0,
+    creditEvaluationRules: data.creditEvaluationRules?.version || "",
+    researchDatasets: Array.isArray(data.researchDatasets) ? data.researchDatasets.length : 0,
+    diseaseRegistryModels: Array.isArray(data.diseaseRegistryModels) ? data.diseaseRegistryModels.length : 0,
+    accessibilityChecklist: Array.isArray(data.accessibilityChecklist) ? data.accessibilityChecklist.length : 0,
+    mobileExperienceSettings: Boolean(data.mobileExperienceSettings?.weakNetworkMode)
+  };
+  const roadmap = Array.isArray(data.platformRoadmap) ? data.platformRoadmap : [];
+  const p2Complete = roadmap.filter((item) => item.priority === "P2").every((item) => item.status === "已完成");
+  const auditTrails = {
+    securityEvents: verifyAuditTrail(data.securityEvents),
+    dataAccessLogs: verifyAuditTrail(data.dataAccessLogs)
+  };
+  const runtime = buildRuntimeMetrics(data);
+  const checks = [
+    { id: "storage-meta", name: "存储元信息", passed: Boolean(runtime.storage.jsonFile), detail: runtime.storage.mode },
+    { id: "p2-roadmap", name: "P2 路线图完成", passed: p2Complete, detail: roadmap.filter((item) => item.priority === "P2").map((item) => `${item.title}:${item.status}`).join(";") },
+    { id: "p2-collections", name: "P2 集合完整", passed: Object.values(p2Collections).every(Boolean), detail: JSON.stringify(p2Collections) },
+    { id: "audit-chain", name: "审计哈希链", passed: Object.values(auditTrails).every((item) => item.passed), detail: `security=${auditTrails.securityEvents.broken.length}, access=${auditTrails.dataAccessLogs.broken.length}` },
+    { id: "runtime-workload", name: "运行负载可观测", passed: Number.isFinite(runtime.workload.unifiedTasks), detail: `tasks=${runtime.workload.unifiedTasks}, quality=${runtime.workload.dataQualityIssues}` }
+  ];
+  return {
+    passed: checks.every((item) => item.passed),
+    generatedAt: new Date().toISOString(),
+    service: runtime.service,
+    checks,
+    p2Collections,
+    runtime: runtime.workload,
+    externalDependencies: [
+      "政务统一身份源",
+      "HIS/EMR/LIS/PACS/心电",
+      "医保核心与电子凭证",
+      "电子证照、公安、民政、妇幼、疾控",
+      "等保、密评、信创、专线、国密设备",
+      "生产数据库原生备份、异地副本和 RTO/RPO 验收"
+    ]
+  };
+}
+
 function isStorageConflict(error) {
   return error?.message?.includes("SQLite optimistic lock conflict");
 }
@@ -4304,6 +4345,13 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/metrics");
     if (!user) return;
     sendJson(res, 200, buildRuntimeMetrics(readDatabase()));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/system/readiness") {
+    const user = requireApiRole(req, res, ["commission"], "/api/system/readiness");
+    if (!user) return;
+    sendJson(res, 200, buildSystemReadinessReport(readDatabase()));
     return;
   }
 
