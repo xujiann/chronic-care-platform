@@ -1,5 +1,5 @@
 const assert = require("node:assert/strict");
-const { pbkdf2Sync } = require("node:crypto");
+const { createHmac, pbkdf2Sync } = require("node:crypto");
 const { once } = require("node:events");
 const fs = require("node:fs");
 const os = require("node:os");
@@ -48,6 +48,18 @@ function authorized(token, options = {}) {
 
 function passwordHash(password, salt = "test-salt", iterations = 120_000) {
   return `pbkdf2-sha256$${iterations}$${salt}$${pbkdf2Sync(password, salt, iterations, 32, "sha256").toString("base64url")}`;
+}
+
+function stableStringify(value) {
+  if (Array.isArray(value)) return `[${value.map((item) => stableStringify(item)).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function integrationSignature(payload) {
+  return createHmac("sha256", "health-platform-demo-integration-secret").update(stableStringify(payload)).digest("hex");
 }
 
 test("API authentication, scoping and governance regression suite", async (t) => {
@@ -302,6 +314,47 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       body: JSON.stringify({ collection: "insuranceClaims", id: "ic1", status: "已通过" })
     }));
     assert.equal(workflowWrite.response.status, 403);
+  });
+
+  await t.test("accepts signed idempotent integration gateway events", async () => {
+    const institution = await login(baseUrl, "hospital");
+    const contracts = await api(baseUrl, "/api/integration/contracts", authorized(institution.body.token));
+    assert.equal(contracts.response.status, 200);
+    assert.equal(contracts.body.contracts.some((item) => item.id === "his-patient-v1"), true);
+
+    const eventPayload = {
+      contractId: "his-patient-v1",
+      idempotencyKey: "his-r1-visit-001",
+      externalId: "HIS-VISIT-001",
+      residentId: "r1",
+      institution: "大连市中心医院",
+      visitedAt: "2026-06-21T10:00:00.000Z",
+      payload: { diagnosis: "高血压复诊" }
+    };
+    const unsigned = await api(baseUrl, "/api/integration/events", authorized(institution.body.token, {
+      method: "POST",
+      body: JSON.stringify(eventPayload)
+    }));
+    assert.equal(unsigned.response.status, 401);
+
+    const accepted = await api(baseUrl, "/api/integration/events", authorized(institution.body.token, {
+      method: "POST",
+      headers: { "x-integration-signature": integrationSignature(eventPayload) },
+      body: JSON.stringify(eventPayload)
+    }));
+    assert.equal(accepted.response.status, 202);
+    assert.equal(accepted.body.contractId, "his-patient-v1");
+    assert.equal(accepted.body.idempotencyKey, "his-r1-visit-001");
+    assert.equal(accepted.body.reconciliationStatus, "待对账");
+
+    const replay = await api(baseUrl, "/api/integration/events", authorized(institution.body.token, {
+      method: "POST",
+      headers: { "x-integration-signature": integrationSignature(eventPayload) },
+      body: JSON.stringify(eventPayload)
+    }));
+    assert.equal(replay.response.status, 200);
+    assert.equal(replay.body.id, accepted.body.id);
+    assert.equal(replay.body.idempotentReplay, true);
   });
 
   await t.test("enforces workflow collection ownership and protects structural fields", async () => {

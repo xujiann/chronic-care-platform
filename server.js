@@ -745,6 +745,18 @@ function seedInterfaceRequirements() {
   ];
 }
 
+function seedIntegrationContracts() {
+  return [
+    { id: "his-patient-v1", domain: "HIS", version: "1.0.0", direction: "inbound", resource: "PatientVisit", requiredFields: ["externalId", "residentId", "institution", "visitedAt"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "3 次指数退避", status: "ready" },
+    { id: "emr-summary-v1", domain: "EMR", version: "1.0.0", direction: "inbound", resource: "MedicalSummary", requiredFields: ["externalId", "residentId", "diagnosis", "recordDate"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "3 次指数退避", status: "ready" },
+    { id: "lis-report-v1", domain: "LIS", version: "1.0.0", direction: "inbound", resource: "LabReport", requiredFields: ["externalId", "residentId", "item", "result", "reportedAt"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "3 次指数退避", status: "ready" },
+    { id: "pacs-report-v1", domain: "PACS", version: "1.0.0", direction: "inbound", resource: "ImagingReport", requiredFields: ["externalId", "residentId", "modality", "conclusion", "reportedAt"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "3 次指数退避", status: "ready" },
+    { id: "insurance-settlement-v1", domain: "医保", version: "1.0.0", direction: "bidirectional", resource: "SettlementStatus", requiredFields: ["externalId", "residentId", "claimStatus", "amount"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "失败进入补偿队列", status: "ready" },
+    { id: "certificate-sync-v1", domain: "电子证照", version: "1.0.0", direction: "outbound", resource: "CertificateStatus", requiredFields: ["externalId", "certificateNo", "status"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "失败进入补偿队列", status: "ready" },
+    { id: "statistics-report-v1", domain: "卫生统计", version: "1.0.0", direction: "inbound", resource: "HealthStatistics", requiredFields: ["externalId", "period", "institution", "metrics"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "人工复核后重放", status: "ready" }
+  ];
+}
+
 function seedChronicProjectBlueprint() {
   return {
     source: "大连市慢病管理平台建设项目-提级论证申报材料（20260615）",
@@ -2511,6 +2523,8 @@ function normalizeState(data) {
     authOrganizations: mergeByKey(seedAuthOrganizations(), data.authOrganizations, "orgCode"),
     authUsers: mergeByKey(seedAuthUsers(), data.authUsers, "username"),
     interfaceRequirements: mergeByKey(seedInterfaceRequirements(), data.interfaceRequirements, "id"),
+    integrationContracts: mergeByKey(seedIntegrationContracts(), data.integrationContracts, "id"),
+    integrationGatewayEvents: Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [],
     chronicProjectBlueprint: data.chronicProjectBlueprint && typeof data.chronicProjectBlueprint === "object" ? data.chronicProjectBlueprint : seedChronicProjectBlueprint(),
     countyProjectBlueprint: data.countyProjectBlueprint && typeof data.countyProjectBlueprint === "object" ? data.countyProjectBlueprint : seedCountyProjectBlueprint(),
     countyConsortium: data.countyConsortium && typeof data.countyConsortium === "object" ? data.countyConsortium : seedCountyConsortium(),
@@ -2920,6 +2934,40 @@ function stableStringify(value) {
   return JSON.stringify(value);
 }
 
+function integrationGatewaySecret() {
+  return String(process.env.INTEGRATION_GATEWAY_SECRET || "health-platform-demo-integration-secret");
+}
+
+function integrationSignatureFor(payload) {
+  return createHmac("sha256", integrationGatewaySecret()).update(stableStringify(payload)).digest("hex");
+}
+
+function verifyIntegrationSignature(payload, signature) {
+  const expected = Buffer.from(integrationSignatureFor(payload));
+  const actual = Buffer.from(String(signature || ""));
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
+function normalizeIntegrationEvent(payload, user, contract) {
+  const now = new Date().toISOString();
+  return {
+    id: `igw-${randomUUID()}`,
+    idempotencyKey: String(payload.idempotencyKey || "").trim(),
+    externalId: String(payload.externalId || "").trim(),
+    contractId: contract.id,
+    domain: contract.domain,
+    resource: contract.resource,
+    residentId: String(payload.residentId || "").trim(),
+    status: "accepted",
+    receivedAt: now,
+    receivedBy: user.username || user.role,
+    payload: payload.payload && typeof payload.payload === "object" ? payload.payload : {},
+    retryCount: 0,
+    deadLetter: false,
+    reconciliationStatus: "待对账"
+  };
+}
+
 function personIndexFromParts(idCard, phone) {
   return `${String(idCard || "").trim()}#${String(phone || "").trim()}`;
 }
@@ -3179,6 +3227,7 @@ function scopeStateForUser(data, user) {
   delete scoped.authOrganizations;
   delete scoped.securityEvents;
   delete scoped.interfaceRequirements;
+  delete scoped.integrationGatewayEvents;
   delete scoped.platformCapabilities;
   delete scoped.platformIntegrations;
   delete scoped.platformInterfaces;
@@ -3471,6 +3520,63 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission", "institution", "insurance", "citizen", "county"], "/api/state");
     if (!user) return;
     sendJson(res, 200, redactSensitiveResponse(scopeStateForUser(readDatabase(), user), user));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/integration/contracts") {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/integration/contracts");
+    if (!user) return;
+    const data = readDatabase();
+    sendJson(res, 200, { contracts: data.integrationContracts });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/integration/events") {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/integration/events");
+    if (!user) return;
+    const payload = await collectJson(req);
+    if (!payload.idempotencyKey) {
+      sendJson(res, 400, { error: "Bad Request", message: "集成事件必须提供 idempotencyKey" });
+      return;
+    }
+    if (!verifyIntegrationSignature(payload, req.headers["x-integration-signature"])) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "集成网关验签", target: payload.contractId || "", result: "拒绝", detail: "签名不匹配" });
+      sendJson(res, 401, { error: "Unauthorized", message: "集成事件签名校验失败" });
+      return;
+    }
+    const data = readDatabase();
+    const contract = data.integrationContracts.find((item) => item.id === payload.contractId);
+    if (!contract) {
+      sendJson(res, 400, { error: "Bad Request", message: "未找到接口契约" });
+      return;
+    }
+    const missingFields = (contract.requiredFields || []).filter((field) => payload[field] === undefined && payload.payload?.[field] === undefined);
+    if (missingFields.length) {
+      sendJson(res, 400, { error: "Bad Request", message: "集成事件缺少必填字段", missingFields });
+      return;
+    }
+    const duplicate = (data.integrationGatewayEvents || []).find((item) => item.idempotencyKey === payload.idempotencyKey);
+    if (duplicate) {
+      sendJson(res, 200, { ...duplicate, idempotentReplay: true });
+      return;
+    }
+    const event = normalizeIntegrationEvent(payload, user, contract);
+    data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "接收集成事件",
+        target: `${contract.domain}/${payload.externalId}`,
+        result: "允许",
+        detail: `${contract.id} · ${event.idempotencyKey}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 202, event);
     return;
   }
 
