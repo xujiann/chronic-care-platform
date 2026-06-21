@@ -294,6 +294,7 @@ const WORKFLOW_ROLE_COLLECTIONS = {
 };
 const WORKFLOW_PROTECTED_FIELDS = new Set(["id", "residentId", "maternalResidentId", "personIndex", "createdAt", "createdBy", "createdByName", "lastUpdated", "updatedAt", "updatedBy", "updatedByName"]);
 const PERSONAL_RECORD_PROTECTED_FIELDS = new Set(["id", "residentId", "personIndex", "createdAt", "createdBy", "createdByName", "updatedAt", "updatedBy", "updatedByName"]);
+const RESIDENT_PROTECTED_FIELDS = new Set(["id", "idCard", "phone", "personIndex", "identityIndex"]);
 const COLLECTION_WRITE_KEYS = new Set([
   "residents",
   "personalRecords",
@@ -3148,6 +3149,16 @@ function cleanWorkflowUpdates(updates) {
   }, {});
 }
 
+function cleanResidentPatch(patch) {
+  return Object.entries(patch && typeof patch === "object" ? patch : {}).reduce((result, [key, value]) => {
+    if (RESIDENT_PROTECTED_FIELDS.has(key) || key === "expectedVersion") return result;
+    if (["string", "number", "boolean"].includes(typeof value) || value === null || Array.isArray(value) || (value && typeof value === "object")) {
+      result[key] = value;
+    }
+    return result;
+  }, {});
+}
+
 function findWorkflowCollection(data, collection) {
   if (collection === "referrals") {
     data.referralSystem = data.referralSystem || seedReferralSystem();
@@ -3326,6 +3337,39 @@ async function handleApi(req, res) {
     writeDatabase(data);
     const versions = storageMeta().collectionVersions;
     sendJson(res, 200, { ok: true, collection, version: versions[collection] ?? null, count: value.length });
+    return;
+  }
+
+  if (req.method === "PATCH" && url.pathname.startsWith("/api/residents/")) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/residents/:id");
+    if (!user) return;
+    const residentId = decodeURIComponent(url.pathname.replace("/api/residents/", "")).trim();
+    const patch = await collectJson(req);
+    const data = readDatabase();
+    const index = data.residents.findIndex((item) => item.id === residentId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到居民" });
+      return;
+    }
+    if (!canAccessResident(user, residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "更新居民档案", target: residentId, result: "拒绝", detail: "超出居民授权范围" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权更新该居民档案" });
+      return;
+    }
+    data.residents[index] = {
+      ...data.residents[index],
+      ...cleanResidentPatch(patch),
+      updatedBy: user.username || user.role,
+      updatedByName: user.name,
+      updatedAt: new Date().toISOString()
+    };
+    data.storageMeta = {
+      ...(data.storageMeta || {}),
+      collectionVersions: Object.hasOwn(patch, "expectedVersion") ? { residents: Number(patch.expectedVersion) } : {}
+    };
+    appendDataAccessLog(data, user, residentId, "居民主索引与健康档案", "更新居民基础档案");
+    writeDatabase(data);
+    sendJson(res, 200, data.residents[index]);
     return;
   }
 

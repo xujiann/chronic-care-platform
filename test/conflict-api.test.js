@@ -111,4 +111,32 @@ test("SQLite stale state writes return an API conflict contract", { skip: !sqlit
   assert.equal(staleCollectionWrite.response.status, 409);
   assert.equal(staleCollectionWrite.body.code, "STORAGE_CONFLICT");
   assert.equal(staleCollectionWrite.body.collection, "personalRecords");
+
+  const residentPatchRead = await api(baseUrl, "/api/state", authorized(token));
+  const residentPatchVersion = residentPatchRead.body.storageMeta.collectionVersions.residents;
+  const residentPatch = await api(baseUrl, "/api/residents/r1", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({
+      expectedVersion: residentPatchVersion,
+      address: "resident-patch-address",
+      idCard: "tampered-id-card",
+      phone: "tampered-phone"
+    })
+  }));
+  assert.equal(residentPatch.response.status, 200);
+  assert.equal(residentPatch.body.address, "resident-patch-address");
+  assert.notEqual(residentPatch.body.idCard, "tampered-id-card");
+  assert.notEqual(residentPatch.body.phone, "tampered-phone");
+
+  const afterResidentPatch = await api(baseUrl, "/api/state", authorized(token));
+  assert.equal(afterResidentPatch.body.storageMeta.collectionVersions.residents, residentPatchVersion + 1);
+  const staleResidentPatch = await api(baseUrl, "/api/residents/r1", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({
+      expectedVersion: residentPatchVersion,
+      address: "stale-resident-patch-address"
+    })
+  }));
+  assert.equal(staleResidentPatch.response.status, 409);
+  assert.equal(staleResidentPatch.body.collection, "residents");
 });
