@@ -571,6 +571,13 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(creditAction.response.status, 200);
     assert.equal(creditAction.body.appealStatus, "submitted");
 
+    const performance = await api(baseUrl, "/api/performance/consortium-report", authorized(commissionToken));
+    assert.equal(performance.response.status, 200);
+    assert.equal(performance.body.medicalConsortium.totalOrders >= 1, true);
+    assert.equal(performance.body.pharmacyAndConsumables.medicationPlans >= 1, true);
+    assert.equal(performance.body.peopleFinanceMaterials.doctors >= 1, true);
+    assert.equal(Number.isFinite(performance.body.primaryCareFulfillment.completionRate), true);
+
     const denied = await api(baseUrl, "/api/mutual-recognition/reports", authorized(citizen.body.token, {
       method: "POST",
       body: JSON.stringify({ residentId: "r2", item: "HbA1c" })

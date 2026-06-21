@@ -3928,6 +3928,41 @@ function calculateCreditEvaluations(data) {
   });
 }
 
+function buildConsortiumPerformanceReport(data) {
+  const tasks = buildUnifiedTasks(data, { role: "commission", username: "system" });
+  const countyOrders = data.countyCollaborationOrders || [];
+  const medication = data.medicationPickups || [];
+  const credit = calculateCreditEvaluations(data);
+  const totalTasks = tasks.length || 1;
+  return {
+    generatedAt: new Date().toISOString(),
+    period: data.creditEvaluationRules?.period || "2026H1",
+    medicalConsortium: {
+      totalOrders: countyOrders.length,
+      completedOrders: countyOrders.filter((item) => isClosedTaskStatus(item.status)).length,
+      mutualRecognitionRecords: (data.countyMutualRecognitionRecords || []).length,
+      criticalAlerts: (data.emergencySignals || []).filter((item) => item.sourceReportId).length
+    },
+    pharmacyAndConsumables: {
+      medicationPlans: medication.length,
+      completedPickups: medication.filter((item) => isClosedTaskStatus(item.status)).length,
+      insuranceClaims: (data.insuranceClaims || []).length
+    },
+    peopleFinanceMaterials: {
+      doctors: (data.doctorProfiles || []).length,
+      multiPracticeApplications: (data.multiPracticeApplications || []).length,
+      creditInstitutions: credit.length,
+      averageCreditScore: credit.length ? Math.round(credit.reduce((sum, item) => sum + item.calculatedScore, 0) / credit.length) : 100
+    },
+    primaryCareFulfillment: {
+      chronicScreeningTasks: (data.chronicScreeningTasks || []).length,
+      followups: (data.followups || []).length,
+      overdueTasks: tasks.filter((task) => task.overdue).length,
+      completionRate: Math.round((tasks.filter((task) => isClosedTaskStatus(task.status)).length / totalTasks) * 100)
+    }
+  };
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -4149,6 +4184,13 @@ async function handleApi(req, res) {
     if (!user) return;
     const data = readDatabase();
     sendJson(res, 200, { rules: data.creditEvaluationRules, evaluations: calculateCreditEvaluations(data) });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/performance/consortium-report") {
+    const user = requireApiRole(req, res, ["commission", "county"], "/api/performance/consortium-report");
+    if (!user) return;
+    sendJson(res, 200, buildConsortiumPerformanceReport(readDatabase()));
     return;
   }
 
