@@ -271,6 +271,87 @@ test("SQLite stale state writes return an API conflict contract", { skip: !sqlit
   assert.equal(staleChronicPatch.response.status, 409);
   assert.equal(staleChronicPatch.body.collection, "chronicManagementPlans");
 
+  const careOrderRead = await api(baseUrl, "/api/state", authorized(token));
+  const careOrderVersion = careOrderRead.body.storageMeta.collectionVersions.careOrders;
+  const careOrderPatch = await api(baseUrl, "/api/care-orders/co1", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({ expectedVersion: careOrderVersion, status: "versioned-triaged", priority: "加急", residentId: "r3" })
+  }));
+  assert.equal(careOrderPatch.response.status, 200);
+  assert.equal(careOrderPatch.body.status, "versioned-triaged");
+  assert.equal(careOrderPatch.body.priority, "加急");
+  assert.notEqual(careOrderPatch.body.residentId, "r3");
+  const staleCareOrderPatch = await api(baseUrl, "/api/care-orders/co1", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({ expectedVersion: careOrderVersion, status: "stale-triaged" })
+  }));
+  assert.equal(staleCareOrderPatch.response.status, 409);
+  assert.equal(staleCareOrderPatch.body.collection, "careOrders");
+
+  const followupRead = await api(baseUrl, "/api/state", authorized(token));
+  const followupVersion = followupRead.body.storageMeta.collectionVersions.followups;
+  const followupPatch = await api(baseUrl, "/api/followups/f1", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({ expectedVersion: followupVersion, status: "versioned-completed", result: "血压已复测" })
+  }));
+  assert.equal(followupPatch.response.status, 200);
+  assert.equal(followupPatch.body.status, "versioned-completed");
+  assert.equal(followupPatch.body.result, "血压已复测");
+  const staleFollowupPatch = await api(baseUrl, "/api/followups/f1", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({ expectedVersion: followupVersion, status: "stale-completed" })
+  }));
+  assert.equal(staleFollowupPatch.response.status, 409);
+  assert.equal(staleFollowupPatch.body.collection, "followups");
+
+  const screeningRead = await api(baseUrl, "/api/state", authorized(token));
+  const screeningVersion = screeningRead.body.storageMeta.collectionVersions.chronicScreeningTasks;
+  const screeningPatch = await api(baseUrl, "/api/chronic-screening-tasks/cst-001", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({ expectedVersion: screeningVersion, status: "versioned-screened", riskLevel: "高风险" })
+  }));
+  assert.equal(screeningPatch.response.status, 200);
+  assert.equal(screeningPatch.body.status, "versioned-screened");
+  assert.equal(screeningPatch.body.riskLevel, "高风险");
+  const staleScreeningPatch = await api(baseUrl, "/api/chronic-screening-tasks/cst-001", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({ expectedVersion: screeningVersion, status: "stale-screened" })
+  }));
+  assert.equal(staleScreeningPatch.response.status, 409);
+  assert.equal(staleScreeningPatch.body.collection, "chronicScreeningTasks");
+
+  const educationRead = await api(baseUrl, "/api/state", authorized(token));
+  const educationVersion = educationRead.body.storageMeta.collectionVersions.chronicEducationPushes;
+  const educationPatch = await api(baseUrl, "/api/chronic-education-pushes/cep-001", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({ expectedVersion: educationVersion, status: "versioned-pushed", channel: "家庭医生App" })
+  }));
+  assert.equal(educationPatch.response.status, 200);
+  assert.equal(educationPatch.body.status, "versioned-pushed");
+  assert.equal(educationPatch.body.channel, "家庭医生App");
+  const staleEducationPatch = await api(baseUrl, "/api/chronic-education-pushes/cep-001", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({ expectedVersion: educationVersion, status: "stale-pushed" })
+  }));
+  assert.equal(staleEducationPatch.response.status, 409);
+  assert.equal(staleEducationPatch.body.collection, "chronicEducationPushes");
+
+  const credentialRead = await api(baseUrl, "/api/state", authorized(token));
+  const credentialVersion = credentialRead.body.storageMeta.collectionVersions.digitalCredentials;
+  const credentialPatch = await api(baseUrl, "/api/digital-credentials/dc1", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({ expectedVersion: credentialVersion, status: "versioned-verified", credentialNo: "tampered-credential" })
+  }));
+  assert.equal(credentialPatch.response.status, 200);
+  assert.equal(credentialPatch.body.status, "versioned-verified");
+  assert.notEqual(credentialPatch.body.credentialNo, "tampered-credential");
+  const staleCredentialPatch = await api(baseUrl, "/api/digital-credentials/dc1", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({ expectedVersion: credentialVersion, status: "stale-verified" })
+  }));
+  assert.equal(staleCredentialPatch.response.status, 409);
+  assert.equal(staleCredentialPatch.body.collection, "digitalCredentials");
+
   const countyRead = await api(baseUrl, "/api/state", authorized(token));
   const collaborationVersion = countyRead.body.storageMeta.collectionVersions.countyCollaborationOrders;
   const collaborationPatch = await api(baseUrl, "/api/county-collaboration-orders/cco-001", authorized(token, {

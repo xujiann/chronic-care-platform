@@ -292,7 +292,7 @@ const WORKFLOW_ROLE_COLLECTIONS = {
   insurance: new Set(["insuranceClaims", "medicationPickups", "digitalCredentials"]),
   county: new Set(["countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords"])
 };
-const WORKFLOW_PROTECTED_FIELDS = new Set(["id", "residentId", "maternalResidentId", "personIndex", "createdAt", "createdBy", "createdByName", "lastUpdated", "updatedAt", "updatedBy", "updatedByName"]);
+const WORKFLOW_PROTECTED_FIELDS = new Set(["id", "residentId", "maternalResidentId", "personIndex", "credentialNo", "certificateNo", "documentNo", "motherDocumentNo", "fatherDocumentNo", "createdAt", "createdBy", "createdByName", "lastUpdated", "updatedAt", "updatedBy", "updatedByName"]);
 const PERSONAL_RECORD_PROTECTED_FIELDS = new Set(["id", "residentId", "personIndex", "createdAt", "createdBy", "createdByName", "updatedAt", "updatedBy", "updatedByName", "expectedVersion"]);
 const RESIDENT_PROTECTED_FIELDS = new Set(["id", "idCard", "phone", "personIndex", "identityIndex"]);
 const COLLECTION_WRITE_KEYS = new Set([
@@ -3495,6 +3495,81 @@ async function handleApi(req, res) {
       patch: await collectJson(req),
       user,
       action: "更新慢病管理计划"
+    });
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "PATCH" && url.pathname.startsWith("/api/care-orders/")) {
+    const user = requireApiRole(req, res, ["institution", "commission"], "/api/care-orders/:id");
+    if (!user) return;
+    const result = patchBusinessCollectionItem({
+      data: readDatabase(),
+      collection: "careOrders",
+      id: decodeURIComponent(url.pathname.replace("/api/care-orders/", "")),
+      patch: await collectJson(req),
+      user,
+      action: "更新诊疗工单"
+    });
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "PATCH" && url.pathname.startsWith("/api/followups/")) {
+    const user = requireApiRole(req, res, ["institution", "commission"], "/api/followups/:id");
+    if (!user) return;
+    const result = patchBusinessCollectionItem({
+      data: readDatabase(),
+      collection: "followups",
+      id: decodeURIComponent(url.pathname.replace("/api/followups/", "")),
+      patch: await collectJson(req),
+      user,
+      action: "更新随访记录"
+    });
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "PATCH" && url.pathname.startsWith("/api/chronic-screening-tasks/")) {
+    const user = requireApiRole(req, res, ["institution", "commission"], "/api/chronic-screening-tasks/:id");
+    if (!user) return;
+    const result = patchBusinessCollectionItem({
+      data: readDatabase(),
+      collection: "chronicScreeningTasks",
+      id: decodeURIComponent(url.pathname.replace("/api/chronic-screening-tasks/", "")),
+      patch: await collectJson(req),
+      user,
+      action: "更新慢病筛查任务"
+    });
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "PATCH" && url.pathname.startsWith("/api/chronic-education-pushes/")) {
+    const user = requireApiRole(req, res, ["institution", "commission"], "/api/chronic-education-pushes/:id");
+    if (!user) return;
+    const result = patchBusinessCollectionItem({
+      data: readDatabase(),
+      collection: "chronicEducationPushes",
+      id: decodeURIComponent(url.pathname.replace("/api/chronic-education-pushes/", "")),
+      patch: await collectJson(req),
+      user,
+      action: "更新慢病宣教推送"
+    });
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "PATCH" && url.pathname.startsWith("/api/digital-credentials/")) {
+    const user = requireApiRole(req, res, ["insurance", "commission"], "/api/digital-credentials/:id");
+    if (!user) return;
+    const result = patchBusinessCollectionItem({
+      data: readDatabase(),
+      collection: "digitalCredentials",
+      id: decodeURIComponent(url.pathname.replace("/api/digital-credentials/", "")),
+      patch: await collectJson(req),
+      user,
+      action: "更新数字健康凭证"
     });
     sendJson(res, result.status, result.body);
     return;
