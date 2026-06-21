@@ -295,6 +295,7 @@ const WORKFLOW_ROLE_COLLECTIONS = {
 const WORKFLOW_PROTECTED_FIELDS = new Set(["id", "residentId", "maternalResidentId", "personIndex", "credentialNo", "certificateNo", "documentNo", "motherDocumentNo", "fatherDocumentNo", "createdAt", "createdBy", "createdByName", "lastUpdated", "updatedAt", "updatedBy", "updatedByName"]);
 const PERSONAL_RECORD_PROTECTED_FIELDS = new Set(["id", "residentId", "personIndex", "createdAt", "createdBy", "createdByName", "updatedAt", "updatedBy", "updatedByName", "expectedVersion"]);
 const RESIDENT_PROTECTED_FIELDS = new Set(["id", "idCard", "phone", "personIndex", "identityIndex"]);
+const MULTI_PRACTICE_PROTECTED_FIELDS = new Set(["id", "doctorId", "doctorName", "category", "title", "specialty", "primaryInstitutionId", "primaryInstitution", "targetInstitutionId", "targetInstitution", "compliance", "lastUpdated", "updatedBy", "updatedByName", "expectedVersion"]);
 const COLLECTION_WRITE_KEYS = new Set([
   "residents",
   "personalRecords",
@@ -3169,6 +3170,16 @@ function cleanBusinessPatch(patch) {
   }, {});
 }
 
+function cleanMultiPracticePatch(patch) {
+  return Object.entries(patch && typeof patch === "object" ? patch : {}).reduce((result, [key, value]) => {
+    if (MULTI_PRACTICE_PROTECTED_FIELDS.has(key)) return result;
+    if (["string", "number", "boolean"].includes(typeof value) || value === null || Array.isArray(value) || (value && typeof value === "object")) {
+      result[key] = value;
+    }
+    return result;
+  }, {});
+}
+
 function patchBusinessCollectionItem({ data, collection, id, patch, user, action }) {
   const rows = Array.isArray(data[collection]) ? data[collection] : [];
   const index = rows.findIndex((item) => item.id === id);
@@ -3328,6 +3339,53 @@ async function handleApi(req, res) {
     ].slice(0, 120);
     writeDatabase(data);
     sendJson(res, 201, application);
+    return;
+  }
+
+  if (req.method === "PATCH" && url.pathname.startsWith("/api/multi-practice-applications/")) {
+    const user = requireApiRole(req, res, ["institution", "commission"], "/api/multi-practice-applications/:id");
+    if (!user) return;
+    const id = decodeURIComponent(url.pathname.replace("/api/multi-practice-applications/", ""));
+    const patch = await collectJson(req);
+    const data = readDatabase();
+    const index = data.multiPracticeApplications.findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到多点执业申请" });
+      return;
+    }
+    if (!canAccessMultiPracticeApplication(user, data.multiPracticeApplications[index])) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "更新多点执业申请", target: id, result: "拒绝", detail: "超出医生或机构授权范围" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权更新该多点执业申请" });
+      return;
+    }
+    data.multiPracticeApplications[index] = {
+      ...data.multiPracticeApplications[index],
+      ...cleanMultiPracticePatch(patch),
+      updatedBy: user.username || user.role,
+      updatedByName: user.name,
+      lastUpdated: new Date().toISOString()
+    };
+    if (Object.hasOwn(patch, "expectedVersion")) {
+      data.storageMeta = {
+        ...(data.storageMeta || {}),
+        collectionVersions: { multiPracticeApplications: Number(patch.expectedVersion) }
+      };
+    }
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "更新多点执业申请",
+        target: id,
+        result: "允许",
+        detail: `状态更新为 ${data.multiPracticeApplications[index].status || "已更新"}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, data.multiPracticeApplications[index]);
     return;
   }
 

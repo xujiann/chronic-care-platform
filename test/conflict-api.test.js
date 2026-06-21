@@ -192,6 +192,28 @@ test("SQLite stale state writes return an API conflict contract", { skip: !sqlit
   assert.equal(staleWorkflowWrite.body.code, "STORAGE_CONFLICT");
   assert.equal(staleWorkflowWrite.body.collection, "careOrders");
 
+  const multiPracticeRead = await api(baseUrl, "/api/state", authorized(token));
+  const multiPracticeVersion = multiPracticeRead.body.storageMeta.collectionVersions.multiPracticeApplications;
+  const multiPracticePatch = await api(baseUrl, "/api/multi-practice-applications/mp-001", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({
+      expectedVersion: multiPracticeVersion,
+      status: "versioned-health-approval",
+      primaryConsent: "版本化复核通过",
+      doctorId: "tampered-doctor"
+    })
+  }));
+  assert.equal(multiPracticePatch.response.status, 200);
+  assert.equal(multiPracticePatch.body.status, "versioned-health-approval");
+  assert.equal(multiPracticePatch.body.primaryConsent, "版本化复核通过");
+  assert.notEqual(multiPracticePatch.body.doctorId, "tampered-doctor");
+  const staleMultiPracticePatch = await api(baseUrl, "/api/multi-practice-applications/mp-001", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({ expectedVersion: multiPracticeVersion, status: "stale-health-approval" })
+  }));
+  assert.equal(staleMultiPracticePatch.response.status, 409);
+  assert.equal(staleMultiPracticePatch.body.collection, "multiPracticeApplications");
+
   const certificateRead = await api(baseUrl, "/api/state", authorized(token));
   const deathVersion = certificateRead.body.storageMeta.collectionVersions.deathCertificates;
   const deathWrite = await api(baseUrl, "/api/death-certificates", authorized(token, {
