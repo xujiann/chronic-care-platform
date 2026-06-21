@@ -103,7 +103,10 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const healthResponse = await fetch(`${baseUrl}/api/health`);
     assert.match(healthResponse.headers.get("content-type") || "", /^application\/json/);
     const healthBody = await healthResponse.json();
-    assert.deepEqual(Object.keys(healthBody).sort(), ["ok", "storage"]);
+    assert.deepEqual(Object.keys(healthBody).sort(), ["ok", "service", "storage"]);
+    assert.equal(healthBody.service.name, "chronic-care-platform");
+    assert.equal(typeof healthBody.service.version, "string");
+    assert.equal(typeof healthBody.service.uptimeSeconds, "number");
     assert.equal(typeof healthBody.storage.mode, "string");
     assert.equal(typeof healthBody.storage.jsonFile, "string");
 
@@ -118,6 +121,13 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const missing = await api(baseUrl, "/api/not-found", authorized(accountLogin.body.token));
     assert.equal(missing.response.status, 404);
     assert.equal(typeof missing.body.error, "string");
+
+    const metrics = await api(baseUrl, "/api/metrics", authorized(accountLogin.body.token));
+    assert.equal(metrics.response.status, 200);
+    assert.equal(metrics.body.service.name, "chronic-care-platform");
+    assert.equal(metrics.body.http.apiRequests >= 1, true);
+    assert.equal(typeof metrics.body.workload.unifiedTasks, "number");
+    assert.equal(typeof metrics.body.workload.dataQualityIssues, "number");
   });
 
   await t.test("rejects invalid credentials and unauthenticated state reads", async () => {

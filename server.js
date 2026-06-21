@@ -13,6 +13,22 @@ const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const DEMO_PASSWORD = "123456";
 const PASSWORD_HASH_ITERATIONS = 120_000;
 const STORAGE_SCHEMA_VERSION = 6;
+const PROJECT_VERSION = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version || "0.0.0";
+  } catch (error) {
+    return "0.0.0";
+  }
+})();
+const RUNTIME_STARTED_AT = new Date();
+const runtimeMetrics = {
+  requests: 0,
+  apiRequests: 0,
+  staticRequests: 0,
+  responses: {},
+  slowRequests: [],
+  lastRequestAt: ""
+};
 const sessions = new Map();
 let sqliteModule = null;
 let sqliteError = null;
@@ -2527,6 +2543,52 @@ function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
+function recordRequestMetrics(req, res, startedAt) {
+  const durationMs = Date.now() - startedAt;
+  runtimeMetrics.requests += 1;
+  runtimeMetrics.lastRequestAt = new Date().toISOString();
+  if (String(req.url || "").startsWith("/api/")) {
+    runtimeMetrics.apiRequests += 1;
+  } else {
+    runtimeMetrics.staticRequests += 1;
+  }
+  const statusKey = String(res.statusCode || 0);
+  runtimeMetrics.responses[statusKey] = (runtimeMetrics.responses[statusKey] || 0) + 1;
+  if (durationMs >= 500) {
+    runtimeMetrics.slowRequests = [
+      { at: runtimeMetrics.lastRequestAt, method: req.method, path: String(req.url || "").split("?")[0], status: res.statusCode, durationMs },
+      ...runtimeMetrics.slowRequests
+    ].slice(0, 20);
+  }
+}
+
+function buildRuntimeMetrics(data) {
+  const tasks = buildUnifiedTasks(data, { role: "commission", username: "system", name: "系统监控" });
+  return {
+    ok: true,
+    service: {
+      name: "chronic-care-platform",
+      version: PROJECT_VERSION,
+      environment: process.env.NODE_ENV || "development",
+      startedAt: RUNTIME_STARTED_AT.toISOString(),
+      uptimeSeconds: Math.round((Date.now() - RUNTIME_STARTED_AT.getTime()) / 1000)
+    },
+    http: {
+      ...runtimeMetrics,
+      responses: { ...runtimeMetrics.responses },
+      slowRequests: [...runtimeMetrics.slowRequests]
+    },
+    storage: storageMeta(),
+    workload: {
+      unifiedTasks: tasks.length,
+      overdueTasks: tasks.filter((task) => task.overdue).length,
+      taskMessages: Array.isArray(data.taskMessages) ? data.taskMessages.length : 0,
+      integrationDeadLetters: (data.integrationGatewayEvents || []).filter((item) => item.status === "dead_letter").length,
+      dataQualityIssues: buildDataQualityIssues(data).length
+    }
+  };
+}
+
 function isStorageConflict(error) {
   return error?.message?.includes("SQLite optimistic lock conflict");
 }
@@ -4053,7 +4115,23 @@ async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
   if (req.method === "GET" && req.url === "/api/health") {
-    sendJson(res, 200, { ok: true, storage: storageMeta() });
+    sendJson(res, 200, {
+      ok: true,
+      service: {
+        name: "chronic-care-platform",
+        version: PROJECT_VERSION,
+        environment: process.env.NODE_ENV || "development",
+        uptimeSeconds: Math.round((Date.now() - RUNTIME_STARTED_AT.getTime()) / 1000)
+      },
+      storage: storageMeta()
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/metrics") {
+    const user = requireApiRole(req, res, ["commission"], "/api/metrics");
+    if (!user) return;
+    sendJson(res, 200, buildRuntimeMetrics(readDatabase()));
     return;
   }
 
@@ -5656,6 +5734,8 @@ async function handleApi(req, res) {
 }
 
 const server = http.createServer(async (req, res) => {
+  const startedAt = Date.now();
+  res.on("finish", () => recordRequestMetrics(req, res, startedAt));
   try {
     if (req.url.startsWith("/api/")) {
       await handleApi(req, res);

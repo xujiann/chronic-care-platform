@@ -22,6 +22,7 @@ http://localhost:5173/login.html
 - SQLite 主存储。
 - 同步生成 `data/db.json` 静态快照。
 - 安全事件和访问日志留痕。
+- `/api/health` 健康检查和 `/api/metrics` 管理端运行指标。
 
 ## 静态预览模式
 
@@ -96,19 +97,27 @@ node scripts/storage-admin.js sanitize data/sanitized --file-name=db.json
 
 ## 环境变量建议
 
-当前 MVP 不强依赖环境变量。生产化建议增加：
+复制 `.env.example` 作为环境模板。当前支持：
 
 ```text
 PORT=5173
-DATABASE_URL=postgres://...
-SESSION_SECRET=...
-AUTH_PROVIDER=...
+NODE_ENV=production
+STORAGE_ENGINE=auto
+DATA_DIR=/var/lib/chronic-care-platform
+SESSION_SECRETS=replace-with-long-random-secret
+INTEGRATION_GATEWAY_SECRET=replace-with-integration-secret
 ```
+
+生产化如迁移 PostgreSQL 或正式数据库，再增加 `DATABASE_URL`、身份源配置、短信/CA/网关地址等现场变量。
 
 ## 验证
 
 ```powershell
 npm.cmd run check
+npm.cmd test
+npm.cmd run test:coverage
+npm.cmd run test:e2e
+npm.cmd run deploy:check
 ```
 
 本地服务启动后可访问：
@@ -116,6 +125,15 @@ npm.cmd run check
 ```text
 http://localhost:5173/login.html
 http://localhost:5173/workbench.html
+http://localhost:5173/api/health
+```
+
+`/api/metrics` 需要卫健委管理端 token，可用于检查请求数、状态码、慢请求、统一任务堆积、死信事件和数据质量问题。
+
+部署前如需执行完整命令门禁：
+
+```powershell
+npm.cmd run deploy:check:full
 ```
 
 ## 存储迁移与备份
@@ -133,9 +151,12 @@ node scripts/storage-admin.js verify "data/backups/<备份目录>"
 node scripts/storage-admin.js rehearse "data/backups/<备份目录>" --max-duration-ms=60000
 node scripts/storage-admin.js assess "data/backups/<备份目录>" --max-backup-age-ms=86400000 --max-duration-ms=60000 --min-file-count=2 --min-total-bytes=1 --required-files=db.json,health-city.sqlite
 node scripts/storage-admin.js restore "data/backups/<备份目录>" --confirm
+npm.cmd run rollback:snapshot -- "data/backups/<备份目录>"
 ```
 
 恢复演练会把备份恢复到临时目录并重新校验清单，不覆盖当前 `data`。正式恢复操作会先自动创建 `pre-restore` 安全备份。真实生产数据库仍需使用数据库原生在线备份、时间点恢复和异地副本。
+
+`rollback:snapshot` 面向静态快照和演示数据快速回退：它会先创建 `pre-rollback-*` 安全副本，再从指定备份目录恢复 `db.json` 和可选的 `health-city.sqlite`。
 
 `assess` 会在校验备份后执行一次恢复演练，并输出可机器判断的验收报告：
 
