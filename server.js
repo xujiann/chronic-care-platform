@@ -12,7 +12,7 @@ const STORAGE_ENGINE = String(process.env.STORAGE_ENGINE || "auto").toLowerCase(
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const DEMO_PASSWORD = "123456";
 const PASSWORD_HASH_ITERATIONS = 120_000;
-const STORAGE_SCHEMA_VERSION = 6;
+const STORAGE_SCHEMA_VERSION = 7;
 const PROJECT_VERSION = (() => {
   try {
     return JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version || "0.0.0";
@@ -298,6 +298,76 @@ const SQLITE_MIGRATIONS = [
           ON county_workflow_records(resident_id);
         CREATE INDEX IF NOT EXISTS idx_county_workflow_records_event_at
           ON county_workflow_records(event_at);
+      `);
+    }
+  },
+  {
+    version: 7,
+    name: "add governance research and accessibility mirror tables",
+    apply(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS institution_credit_evaluation_records (
+          id TEXT PRIMARY KEY,
+          institution_name TEXT NOT NULL,
+          institution_type TEXT,
+          period TEXT,
+          score REAL,
+          grade TEXT,
+          status TEXT,
+          owner TEXT,
+          appeal_status TEXT,
+          publication_status TEXT,
+          payload TEXT NOT NULL,
+          synced_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_credit_evaluation_grade_status
+          ON institution_credit_evaluation_records(grade, status);
+        CREATE INDEX IF NOT EXISTS idx_credit_evaluation_period
+          ON institution_credit_evaluation_records(period);
+        CREATE TABLE IF NOT EXISTS research_dataset_records (
+          id TEXT PRIMARY KEY,
+          disease_type TEXT NOT NULL,
+          name TEXT NOT NULL,
+          version TEXT,
+          ethics_approval TEXT,
+          anonymization TEXT,
+          authorization_status TEXT,
+          records_count INTEGER,
+          status TEXT,
+          usage_audit_count INTEGER,
+          outcome_count INTEGER,
+          payload TEXT NOT NULL,
+          synced_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_research_dataset_disease_status
+          ON research_dataset_records(disease_type, status);
+        CREATE TABLE IF NOT EXISTS disease_registry_model_records (
+          id TEXT PRIMARY KEY,
+          disease_type TEXT NOT NULL,
+          version TEXT,
+          population TEXT,
+          threshold_rule TEXT,
+          review_status TEXT,
+          reviewer TEXT,
+          output_count INTEGER,
+          payload TEXT NOT NULL,
+          synced_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_disease_registry_model_disease_review
+          ON disease_registry_model_records(disease_type, review_status);
+        CREATE TABLE IF NOT EXISTS accessibility_checklist_records (
+          id TEXT PRIMARY KEY,
+          category TEXT NOT NULL,
+          item TEXT NOT NULL,
+          status TEXT,
+          evidence TEXT,
+          tester TEXT,
+          updated_at TEXT,
+          payload TEXT NOT NULL,
+          synced_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_accessibility_checklist_category_status
+          ON accessibility_checklist_records(category, status);
       `);
     }
   }
@@ -2080,7 +2150,14 @@ function ensureSqliteDatabase() {
         (SELECT COUNT(*) FROM medication_pickup_records) +
         (SELECT COUNT(*) FROM county_workflow_records) AS count
     `).get();
-    if (!needsSeed && (!identityMirrorRow.count || !personalRecordMirrorRow.count || !businessMirrorRow.count)) {
+    const governanceMirrorRow = db.prepare(`
+      SELECT
+        (SELECT COUNT(*) FROM institution_credit_evaluation_records) +
+        (SELECT COUNT(*) FROM research_dataset_records) +
+        (SELECT COUNT(*) FROM disease_registry_model_records) +
+        (SELECT COUNT(*) FROM accessibility_checklist_records) AS count
+    `).get();
+    if (!needsSeed && (!identityMirrorRow.count || !personalRecordMirrorRow.count || !businessMirrorRow.count || !governanceMirrorRow.count)) {
       syncSqliteIdentityTables(db, readSqliteStateFromConnection(db), "migrate-identity-mirrors");
     }
   } finally {
@@ -2190,6 +2267,10 @@ function verifySqliteCollectionVersions(db, keys, expectedVersions) {
 }
 
 function syncSqliteIdentityTables(db, data, event = "sync-identity-mirrors", at = new Date().toISOString()) {
+  db.prepare("DELETE FROM accessibility_checklist_records").run();
+  db.prepare("DELETE FROM disease_registry_model_records").run();
+  db.prepare("DELETE FROM research_dataset_records").run();
+  db.prepare("DELETE FROM institution_credit_evaluation_records").run();
   db.prepare("DELETE FROM county_workflow_records").run();
   db.prepare("DELETE FROM medication_pickup_records").run();
   db.prepare("DELETE FROM care_order_records").run();
@@ -2299,9 +2380,100 @@ function syncSqliteIdentityTables(db, data, event = "sync-identity-mirrors", at 
 
   syncSqliteBusinessTables(db, data, at);
   syncSqliteServiceTables(db, data, at);
+  syncSqliteGovernanceTables(db, data, at);
 
   db.prepare("INSERT INTO storage_events (id, at, event, detail) VALUES (?, ?, ?, ?)")
     .run(randomUUID(), at, event, "structured mirror tables synchronized");
+}
+
+function syncSqliteGovernanceTables(db, data, at) {
+  const creditStatement = db.prepare(`
+    INSERT INTO institution_credit_evaluation_records (
+      id, institution_name, institution_type, period, score, grade, status,
+      owner, appeal_status, publication_status, payload, synced_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  (Array.isArray(data.institutionCreditEvaluations) ? data.institutionCreditEvaluations : []).forEach((item) => {
+    creditStatement.run(
+      item.id,
+      cleanSqliteText(item.name || item.institutionName) || item.id,
+      cleanSqliteText(item.institutionType),
+      cleanSqliteText(item.period),
+      Number.isFinite(Number(item.score)) ? Number(item.score) : Number.isFinite(Number(item.calculatedScore)) ? Number(item.calculatedScore) : null,
+      cleanSqliteText(item.grade),
+      cleanSqliteText(item.status),
+      cleanSqliteText(item.owner),
+      cleanSqliteText(item.appealStatus),
+      cleanSqliteText(item.publicationStatus),
+      JSON.stringify(item),
+      at
+    );
+  });
+
+  const datasetStatement = db.prepare(`
+    INSERT INTO research_dataset_records (
+      id, disease_type, name, version, ethics_approval, anonymization,
+      authorization_status, records_count, status, usage_audit_count,
+      outcome_count, payload, synced_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  (Array.isArray(data.researchDatasets) ? data.researchDatasets : []).forEach((item) => {
+    datasetStatement.run(
+      item.id,
+      cleanSqliteText(item.diseaseType) || "unknown",
+      cleanSqliteText(item.name) || item.id,
+      cleanSqliteText(item.version),
+      cleanSqliteText(item.ethicsApproval),
+      cleanSqliteText(item.anonymization),
+      cleanSqliteText(item.authorizationStatus),
+      Number.isFinite(Number(item.records)) ? Number(item.records) : null,
+      cleanSqliteText(item.status),
+      Array.isArray(item.usageAudit) ? item.usageAudit.length : 0,
+      Array.isArray(item.outcomes) ? item.outcomes.length : 0,
+      JSON.stringify(item),
+      at
+    );
+  });
+
+  const modelStatement = db.prepare(`
+    INSERT INTO disease_registry_model_records (
+      id, disease_type, version, population, threshold_rule, review_status,
+      reviewer, output_count, payload, synced_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  (Array.isArray(data.diseaseRegistryModels) ? data.diseaseRegistryModels : []).forEach((item) => {
+    modelStatement.run(
+      item.id,
+      cleanSqliteText(item.diseaseType) || "unknown",
+      cleanSqliteText(item.version),
+      cleanSqliteText(item.population),
+      cleanSqliteText(item.threshold),
+      cleanSqliteText(item.reviewStatus),
+      cleanSqliteText(item.reviewedBy || item.reviewer),
+      Array.isArray(item.outputs) ? item.outputs.length : 0,
+      JSON.stringify(item),
+      at
+    );
+  });
+
+  const accessibilityStatement = db.prepare(`
+    INSERT INTO accessibility_checklist_records (
+      id, category, item, status, evidence, tester, updated_at, payload, synced_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  (Array.isArray(data.accessibilityChecklist) ? data.accessibilityChecklist : []).forEach((item) => {
+    accessibilityStatement.run(
+      item.id,
+      cleanSqliteText(item.category) || "unknown",
+      cleanSqliteText(item.item) || item.id,
+      cleanSqliteText(item.status),
+      cleanSqliteText(item.evidence),
+      cleanSqliteText(item.tester),
+      cleanSqliteText(item.updatedAt),
+      JSON.stringify(item),
+      at
+    );
+  });
 }
 
 function syncSqliteBusinessTables(db, data, at) {

@@ -138,7 +138,7 @@ npm.cmd run deploy:check:full
 
 ## 存储迁移与备份
 
-SQLite 启动时会通过 `schema_migrations` 自动执行幂等迁移，当前 schema 版本为 6。部署升级前应先停止写入并创建备份：
+SQLite 启动时会通过 `schema_migrations` 自动执行幂等迁移，当前 schema 版本为 7。部署升级前应先停止写入并创建备份。v7 已把机构信用评价、科研数据集、专病库模型和无障碍验收清单纳入结构化镜像表：
 
 ```powershell
 npm.cmd run storage:backup

@@ -34,7 +34,7 @@ test("SQLite migrations are idempotent and collection versions change only on wr
 
     withDatabase(storage, (db) => {
       const migrations = db.prepare("SELECT version, name, checksum FROM schema_migrations ORDER BY version").all();
-      assert.deepEqual(migrations.map((item) => Number(item.version)), [1, 2, 3, 4, 5, 6]);
+      assert.deepEqual(migrations.map((item) => Number(item.version)), [1, 2, 3, 4, 5, 6, 7]);
       assert.ok(migrations.every((item) => item.name && /^[a-f0-9]{64}$/.test(item.checksum)));
 
       const columns = db.prepare("PRAGMA table_info(state_collections)").all().map((item) => item.name);
@@ -55,7 +55,11 @@ test("SQLite migrations are idempotent and collection versions change only on wr
         "certificate_records",
         "care_order_records",
         "medication_pickup_records",
-        "county_workflow_records"
+        "county_workflow_records",
+        "institution_credit_evaluation_records",
+        "research_dataset_records",
+        "disease_registry_model_records",
+        "accessibility_checklist_records"
       ].forEach((tableName) => {
         assert.ok(tableNames.includes(tableName), `${tableName} mirror table should exist`);
       });
@@ -86,6 +90,10 @@ test("SQLite migrations are idempotent and collection versions change only on wr
         Number(db.prepare("SELECT COUNT(*) AS count FROM county_workflow_records").get().count),
         currentState.countyCollaborationOrders.length + currentState.countyAiDiagnosisCases.length + currentState.countyMutualRecognitionRecords.length + currentState.diagnosticReports.length
       );
+      assert.equal(Number(db.prepare("SELECT COUNT(*) AS count FROM institution_credit_evaluation_records").get().count), currentState.institutionCreditEvaluations.length);
+      assert.equal(Number(db.prepare("SELECT COUNT(*) AS count FROM research_dataset_records").get().count), currentState.researchDatasets.length);
+      assert.equal(Number(db.prepare("SELECT COUNT(*) AS count FROM disease_registry_model_records").get().count), currentState.diseaseRegistryModels.length);
+      assert.equal(Number(db.prepare("SELECT COUNT(*) AS count FROM accessibility_checklist_records").get().count), currentState.accessibilityChecklist.length);
       assert.equal(
         db.prepare("SELECT resident_id FROM person_indexes WHERE person_index = ?").get("DEMO-ID-R1#DEMO-MOBILE-R1").resident_id,
         "r1"
@@ -130,6 +138,22 @@ test("SQLite migrations are idempotent and collection versions change only on wr
       assert.equal(
         db.prepare("SELECT collection FROM county_workflow_records WHERE id = ?").get("cco-001").collection,
         "countyCollaborationOrders"
+      );
+      assert.equal(
+        db.prepare("SELECT grade FROM institution_credit_evaluation_records WHERE id = ?").get("credit-central").grade,
+        "A"
+      );
+      assert.equal(
+        db.prepare("SELECT authorization_status FROM research_dataset_records WHERE id = ?").get("rd-hypertension-001").authorization_status,
+        "approved"
+      );
+      assert.equal(
+        db.prepare("SELECT review_status FROM disease_registry_model_records WHERE id = ?").get("dm-hypertension-risk-v1").review_status,
+        "active"
+      );
+      assert.equal(
+        db.prepare("SELECT status FROM accessibility_checklist_records WHERE id = ?").get("a11y-large-font").status,
+        "passed"
       );
     });
 
@@ -198,7 +222,7 @@ test("SQLite migrations are idempotent and collection versions change only on wr
       orphanServiceState.careOrders[0].residentId = "missing-resident";
       storage.writeDatabase(orphanServiceState);
     }, /FOREIGN KEY constraint failed/);
-    assert.equal(storage.storageMeta().schemaVersion, 6);
+    assert.equal(storage.storageMeta().schemaVersion, 7);
   } finally {
     fs.rmSync(dataDir, { recursive: true, force: true });
   }

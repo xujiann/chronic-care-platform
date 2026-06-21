@@ -9,7 +9,7 @@
 | 范围 | 已完成能力 |
 |---|---|
 | P0 测试与 CI | Node API、隔离测试数据、角色权限、居民数据裁剪、静态页面守卫、敏感信息扫描、API 契约、覆盖率门禁、Chromium 端到端角色旅程 |
-| P0 数据与恢复 | SQLite/JSON 双路径、schema v1-v6 幂等迁移、集合版本、乐观锁、409 冲突契约、业务级 PATCH、备份、恢复演练、脱敏快照、恢复指标验收 |
+| P0 数据与恢复 | SQLite/JSON 双路径、schema v1-v7 幂等迁移、集合版本、乐观锁、409 冲突契约、业务级 PATCH、备份、恢复演练、脱敏快照、恢复指标验收 |
 | P0 认证与隐私 | PBKDF2 密码哈希兼容、签名会话、密钥轮换、token 篡改拒绝、字段脱敏、授权撤销、访问历史复核、审计哈希链 |
 | P0 接口网关 | HIS/EMR/LIS/PACS/医保/电子证照/卫生统计接口契约、HMAC 签名、幂等键、事件落库、失败重试、死信补偿、对账监控、模拟接入 |
 | P1 区域闭环 | 检查检验互认、诊断报告回传、危急值预警、统一任务中心、站内消息、送达回执、超时升级、数据质量问题与评分卡、安全合规证据 |
@@ -88,6 +88,8 @@ data/db.json
 - 治理审计：`securityEvents`、`dataAccessLogs`、`platformRoadmap`、`platformAudit`、`platformProcessAudit`
 - P2 治理：`institutionCreditEvaluations`、`creditEvaluationRules`、`researchDatasets`、`diseaseRegistryModels`
 - P2 体验：`mobileExperienceSettings`、`accessibilityChecklist`、`seniorServices`
+
+SQLite 结构化镜像已覆盖居民、账户、主索引、个人健康档案、慢病业务、随访、医保、证照、诊疗工单、固定取药、县域业务，以及 P2 的机构信用评价、科研数据集、专病库模型和无障碍验收清单。
 
 ## 后端 API
 
