@@ -29,12 +29,28 @@ test("release report validates demo and production environment profiles", () => 
   assert.equal(failedProduction.checks.some((item) => item.name === "env:STORAGE_ENGINE.production" && !item.passed), true);
   assert.equal(failedProduction.checks.some((item) => item.name === "env:SESSION_SECRETS.productionQuality" && !item.passed), true);
 
-  const production = validateProductionConfig({
+  const postgresBeforeAdapter = validateProductionConfig({
     profile: "production",
     env: {
       NODE_ENV: "production",
       STORAGE_ENGINE: "postgres",
       DATABASE_URL: "postgres://health:secret@example.internal:5432/health",
+      SESSION_SECRETS: "0123456789abcdef0123456789abcdef",
+      INTEGRATION_GATEWAY_SECRET: "fedcba9876543210fedcba9876543210",
+      OIDC_ISSUER_URL: "https://identity.example.internal",
+      OIDC_CLIENT_ID: "health-platform",
+      OIDC_CLIENT_SECRET: "abcdef0123456789abcdef0123456789",
+      AUDIT_EXPORT_PATH: "/var/log/chronic-care-platform/audit"
+    }
+  });
+  assert.equal(postgresBeforeAdapter.passed, false);
+  assert.equal(postgresBeforeAdapter.checks.some((item) => item.name === "env:STORAGE_ENGINE.runtimeAdapter" && !item.passed), true);
+
+  const production = validateProductionConfig({
+    profile: "production",
+    env: {
+      NODE_ENV: "production",
+      STORAGE_ENGINE: "sqlite",
       SESSION_SECRETS: "0123456789abcdef0123456789abcdef,abcdef0123456789abcdef0123456789",
       INTEGRATION_GATEWAY_SECRET: "fedcba9876543210fedcba9876543210",
       OIDC_ISSUER_URL: "https://identity.example.internal",

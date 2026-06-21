@@ -9,6 +9,7 @@ const DATA_DIR = process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : pat
 const DB_FILE = path.join(DATA_DIR, "db.json");
 const SQLITE_FILE = path.join(DATA_DIR, "health-city.sqlite");
 const STORAGE_ENGINE = String(process.env.STORAGE_ENGINE || "auto").toLowerCase();
+const RUNTIME_STORAGE_ENGINES = new Set(["auto", "json", "sqlite"]);
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const DEMO_PASSWORD = "123456";
 const PASSWORD_HASH_ITERATIONS = 120_000;
@@ -2164,7 +2165,13 @@ function loadSqliteModule() {
   return sqliteModule;
 }
 
+function assertSupportedStorageEngine() {
+  if (RUNTIME_STORAGE_ENGINES.has(STORAGE_ENGINE)) return;
+  throw new Error(`Unsupported STORAGE_ENGINE=${STORAGE_ENGINE}. PostgreSQL is tracked in productionDeploymentPlan but the runtime adapter is not enabled yet.`);
+}
+
 function shouldUseSqlite() {
+  assertSupportedStorageEngine();
   if (STORAGE_ENGINE === "json") return false;
   return Boolean(loadSqliteModule()?.DatabaseSync);
 }

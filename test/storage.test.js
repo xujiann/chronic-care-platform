@@ -227,3 +227,18 @@ test("SQLite migrations are idempotent and collection versions change only on wr
     fs.rmSync(dataDir, { recursive: true, force: true });
   }
 });
+
+test("unsupported production storage adapters fail loudly before fallback", () => {
+  const serverPath = path.join(ROOT, "server.js");
+  delete require.cache[serverPath];
+  const previousStorageEngine = process.env.STORAGE_ENGINE;
+  process.env.STORAGE_ENGINE = "postgres";
+  const storage = require(serverPath);
+  try {
+    assert.throws(() => storage.storageMeta(), /PostgreSQL is tracked in productionDeploymentPlan/);
+  } finally {
+    if (previousStorageEngine === undefined) delete process.env.STORAGE_ENGINE;
+    else process.env.STORAGE_ENGINE = previousStorageEngine;
+    delete require.cache[serverPath];
+  }
+});
