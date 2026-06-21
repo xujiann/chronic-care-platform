@@ -76,9 +76,39 @@ test("SQLite stale state writes return an API conflict contract", { skip: !sqlit
   assert.equal(staleWrite.response.status, 409);
   assert.equal(staleWrite.body.error, "Conflict");
   assert.equal(staleWrite.body.code, "STORAGE_CONFLICT");
-  assert.equal(staleWrite.body.collection, "accounts");
+  assert.equal(staleWrite.body.collection, "residents");
   assert.equal(staleWrite.body.expectedVersion < staleWrite.body.currentVersion, true);
 
   const finalRead = await api(baseUrl, "/api/state", authorized(token));
   assert.equal(finalRead.body.residents[0].address, "first-api-writer");
+
+  const collectionRead = await api(baseUrl, "/api/state", authorized(token));
+  const residentsVersion = collectionRead.body.storageMeta.collectionVersions.residents;
+  const personalRecordsVersion = collectionRead.body.storageMeta.collectionVersions.personalRecords;
+  collectionRead.body.personalRecords[0].result = "collection-level-save";
+  const collectionWrite = await api(baseUrl, "/api/state-collections/personalRecords", authorized(token, {
+    method: "PUT",
+    body: JSON.stringify({
+      expectedVersion: personalRecordsVersion,
+      value: collectionRead.body.personalRecords
+    })
+  }));
+  assert.equal(collectionWrite.response.status, 200);
+  assert.equal(collectionWrite.body.collection, "personalRecords");
+  assert.equal(collectionWrite.body.version, personalRecordsVersion + 1);
+
+  const afterCollectionWrite = await api(baseUrl, "/api/state", authorized(token));
+  assert.equal(afterCollectionWrite.body.storageMeta.collectionVersions.residents, residentsVersion);
+  assert.equal(afterCollectionWrite.body.personalRecords[0].result, "collection-level-save");
+
+  const staleCollectionWrite = await api(baseUrl, "/api/state-collections/personalRecords", authorized(token, {
+    method: "PUT",
+    body: JSON.stringify({
+      expectedVersion: personalRecordsVersion,
+      value: afterCollectionWrite.body.personalRecords
+    })
+  }));
+  assert.equal(staleCollectionWrite.response.status, 409);
+  assert.equal(staleCollectionWrite.body.code, "STORAGE_CONFLICT");
+  assert.equal(staleCollectionWrite.body.collection, "personalRecords");
 });

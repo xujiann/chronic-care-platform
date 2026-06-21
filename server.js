@@ -230,6 +230,19 @@ const WORKFLOW_ROLE_COLLECTIONS = {
 };
 const WORKFLOW_PROTECTED_FIELDS = new Set(["id", "residentId", "maternalResidentId", "personIndex", "createdAt", "createdBy", "createdByName", "lastUpdated", "updatedAt", "updatedBy", "updatedByName"]);
 const PERSONAL_RECORD_PROTECTED_FIELDS = new Set(["id", "residentId", "personIndex", "createdAt", "createdBy", "createdByName", "updatedAt", "updatedBy", "updatedByName"]);
+const COLLECTION_WRITE_KEYS = new Set([
+  "residents",
+  "personalRecords",
+  "careOrders",
+  "medicationPickups",
+  "insuranceClaims",
+  "followups",
+  "deathCertificates",
+  "birthCertificates",
+  "chronicScreeningTasks",
+  "chronicEducationPushes",
+  "chronicManagementPlans"
+]);
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -1954,20 +1967,23 @@ function writeSqliteState(data, event = "write-state", expectedVersions = null) 
     const entries = Object.entries(data).filter(([key]) => key !== "storageMeta");
     verifySqliteCollectionVersions(db, entries.map(([key]) => key), expectedVersions);
     const incomingKeys = new Set(entries.map(([key]) => key));
+    const existingPayloads = new Map(db.prepare("SELECT key, payload FROM state_collections").all().map((row) => [row.key, row.payload]));
     const deleteStatement = db.prepare("DELETE FROM state_collections WHERE key = ?");
-    db.prepare("SELECT key FROM state_collections").all().forEach((row) => {
-      if (!incomingKeys.has(row.key)) deleteStatement.run(row.key);
+    existingPayloads.forEach((_, key) => {
+      if (!incomingKeys.has(key)) deleteStatement.run(key);
     });
-    const upsertStatement = db.prepare(`
-      INSERT INTO state_collections (key, payload, updated_at, version) VALUES (?, ?, ?, 1)
-      ON CONFLICT(key) DO UPDATE SET
-        payload = excluded.payload,
-        updated_at = excluded.updated_at,
-        version = state_collections.version + 1
-    `);
+    const insertStatement = db.prepare("INSERT INTO state_collections (key, payload, updated_at, version) VALUES (?, ?, ?, 1)");
+    const updateStatement = db.prepare("UPDATE state_collections SET payload = ?, updated_at = ?, version = version + 1 WHERE key = ?");
     entries.forEach(([key, value]) => {
       if (key === "storageMeta") return;
-      upsertStatement.run(key, JSON.stringify(value), now);
+      const payload = JSON.stringify(value);
+      if (!existingPayloads.has(key)) {
+        insertStatement.run(key, payload, now);
+        return;
+      }
+      if (existingPayloads.get(key) !== payload) {
+        updateStatement.run(payload, now, key);
+      }
     });
     syncSqliteIdentityTables(db, data, event, now);
     db.prepare("INSERT INTO storage_events (id, at, event, detail) VALUES (?, ?, ?, ?)").run(randomUUID(), now, event, "platform state persisted");
@@ -3126,6 +3142,45 @@ async function handleApi(req, res) {
     ].slice(0, 120);
     writeDatabase(data);
     sendJson(res, 200, data);
+    return;
+  }
+
+  if (req.method === "PUT" && url.pathname.startsWith("/api/state-collections/")) {
+    const user = requireApiRole(req, res, ["commission"], "/api/state-collections/:collection");
+    if (!user) return;
+    const collection = decodeURIComponent(url.pathname.replace("/api/state-collections/", "")).trim();
+    if (!COLLECTION_WRITE_KEYS.has(collection)) {
+      sendJson(res, 400, { error: "Bad Request", message: "不支持集合级保存该数据集合" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const value = Array.isArray(payload.value) ? payload.value : payload[collection];
+    if (!Array.isArray(value)) {
+      sendJson(res, 400, { error: "Bad Request", message: "集合级保存必须提交数组 value" });
+      return;
+    }
+    const data = readDatabase();
+    data[collection] = value;
+    data.storageMeta = {
+      ...(data.storageMeta || {}),
+      collectionVersions: Object.hasOwn(payload, "expectedVersion") ? { [collection]: Number(payload.expectedVersion) } : {}
+    };
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "集合级保存数据",
+        target: collection,
+        result: "允许",
+        detail: `保存 ${collection}，记录数 ${value.length}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    const versions = storageMeta().collectionVersions;
+    sendJson(res, 200, { ok: true, collection, version: versions[collection] ?? null, count: value.length });
     return;
   }
 

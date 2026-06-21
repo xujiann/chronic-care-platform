@@ -138,12 +138,18 @@ test("SQLite migrations are idempotent and collection versions change only on wr
     });
 
     const recordState = storage.readDatabase();
+    const residentsVersionBeforeRecordWrite = withDatabase(storage, (db) => Number(db.prepare("SELECT version FROM state_collections WHERE key = 'residents'").get().version));
     const recordId = recordState.personalRecords.find((item) => item.residentId === "r1" && item.category === "emr").id;
     const updatedResult = "structured-record-sync";
     recordState.personalRecords.find((item) => item.id === recordId).result = updatedResult;
     storage.writeDatabase(recordState);
     withDatabase(storage, (db) => {
       assert.equal(db.prepare("SELECT result FROM personal_records WHERE id = ?").get(recordId).result, updatedResult);
+      assert.equal(
+        Number(db.prepare("SELECT version FROM state_collections WHERE key = 'residents'").get().version),
+        residentsVersionBeforeRecordWrite,
+        "unrelated collection versions should not change"
+      );
     });
 
     const firstWriterState = storage.readDatabase();
