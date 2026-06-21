@@ -3180,6 +3180,48 @@ function cleanMultiPracticePatch(patch) {
   }, {});
 }
 
+function patchCollectionItem({ data, collection, id, patch, user, action, protectedFields = WORKFLOW_PROTECTED_FIELDS }) {
+  const rows = Array.isArray(data[collection]) ? data[collection] : [];
+  const index = rows.findIndex((item) => item.id === id);
+  if (index < 0) return { status: 404, body: { error: "Not Found", message: "未找到业务记录" } };
+  const safePatch = Object.entries(patch && typeof patch === "object" ? patch : {}).reduce((result, [key, value]) => {
+    if (protectedFields.has(key) || key === "expectedVersion") return result;
+    if (["string", "number", "boolean"].includes(typeof value) || value === null || Array.isArray(value) || (value && typeof value === "object")) {
+      result[key] = value;
+    }
+    return result;
+  }, {});
+  rows[index] = {
+    ...rows[index],
+    ...safePatch,
+    updatedBy: user.username || user.role,
+    updatedByName: user.name,
+    lastUpdated: new Date().toISOString()
+  };
+  data[collection] = rows;
+  if (Object.hasOwn(patch, "expectedVersion")) {
+    data.storageMeta = {
+      ...(data.storageMeta || {}),
+      collectionVersions: { [collection]: Number(patch.expectedVersion) }
+    };
+  }
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action,
+      target: `${collection}/${id}`,
+      result: "允许",
+      detail: `集合项更新 ${collection}`
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+  writeDatabase(data);
+  return { status: 200, body: rows[index] };
+}
+
 function patchBusinessCollectionItem({ data, collection, id, patch, user, action }) {
   const rows = Array.isArray(data[collection]) ? data[collection] : [];
   const index = rows.findIndex((item) => item.id === id);
@@ -3568,6 +3610,21 @@ async function handleApi(req, res) {
       patch: await collectJson(req),
       user,
       action: "更新诊疗工单"
+    });
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "PATCH" && url.pathname.startsWith("/api/emergency-signals/")) {
+    const user = requireApiRole(req, res, ["commission"], "/api/emergency-signals/:id");
+    if (!user) return;
+    const result = patchCollectionItem({
+      data: readDatabase(),
+      collection: "emergencySignals",
+      id: decodeURIComponent(url.pathname.replace("/api/emergency-signals/", "")),
+      patch: await collectJson(req),
+      user,
+      action: "更新公卫预警"
     });
     sendJson(res, result.status, result.body);
     return;

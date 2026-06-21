@@ -214,6 +214,28 @@ test("SQLite stale state writes return an API conflict contract", { skip: !sqlit
   assert.equal(staleMultiPracticePatch.response.status, 409);
   assert.equal(staleMultiPracticePatch.body.collection, "multiPracticeApplications");
 
+  const emergencyRead = await api(baseUrl, "/api/state", authorized(token));
+  const emergencyVersion = emergencyRead.body.storageMeta.collectionVersions.emergencySignals;
+  const emergencyPatch = await api(baseUrl, "/api/emergency-signals/es1", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({
+      expectedVersion: emergencyVersion,
+      status: "versioned-dispatched",
+      action: "已派发应急处置单",
+      id: "tampered-emergency-id"
+    })
+  }));
+  assert.equal(emergencyPatch.response.status, 200);
+  assert.equal(emergencyPatch.body.status, "versioned-dispatched");
+  assert.equal(emergencyPatch.body.action, "已派发应急处置单");
+  assert.notEqual(emergencyPatch.body.id, "tampered-emergency-id");
+  const staleEmergencyPatch = await api(baseUrl, "/api/emergency-signals/es1", authorized(token, {
+    method: "PATCH",
+    body: JSON.stringify({ expectedVersion: emergencyVersion, status: "stale-dispatched" })
+  }));
+  assert.equal(staleEmergencyPatch.response.status, 409);
+  assert.equal(staleEmergencyPatch.body.collection, "emergencySignals");
+
   const certificateRead = await api(baseUrl, "/api/state", authorized(token));
   const deathVersion = certificateRead.body.storageMeta.collectionVersions.deathCertificates;
   const deathWrite = await api(baseUrl, "/api/death-certificates", authorized(token, {
