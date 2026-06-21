@@ -11,7 +11,7 @@ const SQLITE_FILE = path.join(DATA_DIR, "health-city.sqlite");
 const STORAGE_ENGINE = String(process.env.STORAGE_ENGINE || "auto").toLowerCase();
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const DEMO_PASSWORD = "123456";
-const STORAGE_SCHEMA_VERSION = 5;
+const STORAGE_SCHEMA_VERSION = 6;
 const sessions = new Map();
 let sqliteModule = null;
 let sqliteError = null;
@@ -217,6 +217,70 @@ const SQLITE_MIGRATIONS = [
           ON certificate_records(resident_id);
         CREATE INDEX IF NOT EXISTS idx_certificate_records_event_at
           ON certificate_records(event_at);
+      `);
+    }
+  },
+  {
+    version: 6,
+    name: "add service and county workflow mirror tables",
+    apply(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS care_order_records (
+          id TEXT PRIMARY KEY,
+          resident_id TEXT NOT NULL,
+          person_index TEXT,
+          institution TEXT,
+          department TEXT,
+          order_type TEXT,
+          status TEXT,
+          priority TEXT,
+          order_date TEXT,
+          payload TEXT NOT NULL,
+          synced_at TEXT NOT NULL,
+          FOREIGN KEY (resident_id) REFERENCES residents(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_care_order_records_resident_status
+          ON care_order_records(resident_id, status);
+        CREATE INDEX IF NOT EXISTS idx_care_order_records_order_date
+          ON care_order_records(order_date);
+        CREATE TABLE IF NOT EXISTS medication_pickup_records (
+          id TEXT PRIMARY KEY,
+          resident_id TEXT NOT NULL,
+          person_index TEXT,
+          medication TEXT NOT NULL,
+          pharmacy TEXT,
+          next_pickup TEXT,
+          status TEXT,
+          coverage TEXT,
+          delivery_mode TEXT,
+          payload TEXT NOT NULL,
+          synced_at TEXT NOT NULL,
+          FOREIGN KEY (resident_id) REFERENCES residents(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_medication_pickup_records_resident_status
+          ON medication_pickup_records(resident_id, status);
+        CREATE INDEX IF NOT EXISTS idx_medication_pickup_records_next_pickup
+          ON medication_pickup_records(next_pickup);
+        CREATE TABLE IF NOT EXISTS county_workflow_records (
+          id TEXT PRIMARY KEY,
+          collection TEXT NOT NULL,
+          resident_id TEXT NOT NULL,
+          person_index TEXT,
+          region TEXT,
+          institution TEXT,
+          workflow_type TEXT,
+          status TEXT,
+          event_at TEXT,
+          payload TEXT NOT NULL,
+          synced_at TEXT NOT NULL,
+          FOREIGN KEY (resident_id) REFERENCES residents(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_county_workflow_records_collection_status
+          ON county_workflow_records(collection, status);
+        CREATE INDEX IF NOT EXISTS idx_county_workflow_records_resident
+          ON county_workflow_records(resident_id);
+        CREATE INDEX IF NOT EXISTS idx_county_workflow_records_event_at
+          ON county_workflow_records(event_at);
       `);
     }
   }
@@ -1899,7 +1963,10 @@ function ensureSqliteDatabase() {
         (SELECT COUNT(*) FROM chronic_records) +
         (SELECT COUNT(*) FROM followup_records) +
         (SELECT COUNT(*) FROM insurance_claim_records) +
-        (SELECT COUNT(*) FROM certificate_records) AS count
+        (SELECT COUNT(*) FROM certificate_records) +
+        (SELECT COUNT(*) FROM care_order_records) +
+        (SELECT COUNT(*) FROM medication_pickup_records) +
+        (SELECT COUNT(*) FROM county_workflow_records) AS count
     `).get();
     if (!needsSeed && (!identityMirrorRow.count || !personalRecordMirrorRow.count || !businessMirrorRow.count)) {
       syncSqliteIdentityTables(db, readSqliteStateFromConnection(db), "migrate-identity-mirrors");
@@ -2011,6 +2078,9 @@ function verifySqliteCollectionVersions(db, keys, expectedVersions) {
 }
 
 function syncSqliteIdentityTables(db, data, event = "sync-identity-mirrors", at = new Date().toISOString()) {
+  db.prepare("DELETE FROM county_workflow_records").run();
+  db.prepare("DELETE FROM medication_pickup_records").run();
+  db.prepare("DELETE FROM care_order_records").run();
   db.prepare("DELETE FROM certificate_records").run();
   db.prepare("DELETE FROM insurance_claim_records").run();
   db.prepare("DELETE FROM followup_records").run();
@@ -2116,6 +2186,7 @@ function syncSqliteIdentityTables(db, data, event = "sync-identity-mirrors", at 
   });
 
   syncSqliteBusinessTables(db, data, at);
+  syncSqliteServiceTables(db, data, at);
 
   db.prepare("INSERT INTO storage_events (id, at, event, detail) VALUES (?, ?, ?, ?)")
     .run(randomUUID(), at, event, "structured mirror tables synchronized");
@@ -2235,6 +2306,80 @@ function syncSqliteBusinessTables(db, data, at) {
       JSON.stringify(item),
       at
     );
+  });
+}
+
+function syncSqliteServiceTables(db, data, at) {
+  const careOrderStatement = db.prepare(`
+    INSERT INTO care_order_records (
+      id, resident_id, person_index, institution, department, order_type,
+      status, priority, order_date, payload, synced_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  (Array.isArray(data.careOrders) ? data.careOrders : []).forEach((item) => {
+    careOrderStatement.run(
+      item.id,
+      item.residentId,
+      cleanSqliteText(item.personIndex),
+      cleanSqliteText(item.institution),
+      cleanSqliteText(item.department),
+      cleanSqliteText(item.type),
+      cleanSqliteText(item.status),
+      cleanSqliteText(item.priority),
+      cleanSqliteText(item.date),
+      JSON.stringify(item),
+      at
+    );
+  });
+
+  const medicationPickupStatement = db.prepare(`
+    INSERT INTO medication_pickup_records (
+      id, resident_id, person_index, medication, pharmacy, next_pickup,
+      status, coverage, delivery_mode, payload, synced_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  (Array.isArray(data.medicationPickups) ? data.medicationPickups : []).forEach((item) => {
+    medicationPickupStatement.run(
+      item.id,
+      item.residentId,
+      cleanSqliteText(item.personIndex),
+      cleanSqliteText(item.medication) || item.id,
+      cleanSqliteText(item.pharmacy),
+      cleanSqliteText(item.nextPickup),
+      cleanSqliteText(item.status),
+      cleanSqliteText(item.coverage),
+      cleanSqliteText(item.deliveryMode),
+      JSON.stringify(item),
+      at
+    );
+  });
+
+  const countyWorkflowStatement = db.prepare(`
+    INSERT INTO county_workflow_records (
+      id, collection, resident_id, person_index, region, institution,
+      workflow_type, status, event_at, payload, synced_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  [
+    ["countyCollaborationOrders", "orderType", "requestedAt"],
+    ["countyAiDiagnosisCases", "chiefComplaint", "at"],
+    ["countyMutualRecognitionRecords", "item", "at"]
+  ].forEach(([collection, typeField, dateField]) => {
+    (Array.isArray(data[collection]) ? data[collection] : []).forEach((item) => {
+      countyWorkflowStatement.run(
+        item.id,
+        collection,
+        item.residentId,
+        cleanSqliteText(item.personIndex),
+        cleanSqliteText(item.region),
+        cleanSqliteText(item.institution || item.fromInstitution || item.sourceInstitution),
+        cleanSqliteText(item[typeField]),
+        cleanSqliteText(item.status),
+        cleanSqliteText(item[dateField]),
+        JSON.stringify(item),
+        at
+      );
+    });
   });
 }
 

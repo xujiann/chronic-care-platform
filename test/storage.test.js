@@ -34,7 +34,7 @@ test("SQLite migrations are idempotent and collection versions change only on wr
 
     withDatabase(storage, (db) => {
       const migrations = db.prepare("SELECT version, name, checksum FROM schema_migrations ORDER BY version").all();
-      assert.deepEqual(migrations.map((item) => Number(item.version)), [1, 2, 3, 4, 5]);
+      assert.deepEqual(migrations.map((item) => Number(item.version)), [1, 2, 3, 4, 5, 6]);
       assert.ok(migrations.every((item) => item.name && /^[a-f0-9]{64}$/.test(item.checksum)));
 
       const columns = db.prepare("PRAGMA table_info(state_collections)").all().map((item) => item.name);
@@ -52,7 +52,10 @@ test("SQLite migrations are idempotent and collection versions change only on wr
         "chronic_records",
         "followup_records",
         "insurance_claim_records",
-        "certificate_records"
+        "certificate_records",
+        "care_order_records",
+        "medication_pickup_records",
+        "county_workflow_records"
       ].forEach((tableName) => {
         assert.ok(tableNames.includes(tableName), `${tableName} mirror table should exist`);
       });
@@ -76,6 +79,12 @@ test("SQLite migrations are idempotent and collection versions change only on wr
       assert.equal(
         Number(db.prepare("SELECT COUNT(*) AS count FROM certificate_records").get().count),
         currentState.deathCertificates.length + currentState.birthCertificates.length
+      );
+      assert.equal(Number(db.prepare("SELECT COUNT(*) AS count FROM care_order_records").get().count), currentState.careOrders.length);
+      assert.equal(Number(db.prepare("SELECT COUNT(*) AS count FROM medication_pickup_records").get().count), currentState.medicationPickups.length);
+      assert.equal(
+        Number(db.prepare("SELECT COUNT(*) AS count FROM county_workflow_records").get().count),
+        currentState.countyCollaborationOrders.length + currentState.countyAiDiagnosisCases.length + currentState.countyMutualRecognitionRecords.length
       );
       assert.equal(
         db.prepare("SELECT resident_id FROM person_indexes WHERE person_index = ?").get("DEMO-ID-R1#DEMO-MOBILE-R1").resident_id,
@@ -115,6 +124,12 @@ test("SQLite migrations are idempotent and collection versions change only on wr
       assert.equal(
         db.prepare("SELECT certificate_type FROM certificate_records WHERE certificate_no = ?").get("DC-210202-20260612001").certificate_type,
         "death"
+      );
+      assert.equal(db.prepare("SELECT priority FROM care_order_records WHERE id = ?").get("co1").priority, currentState.careOrders.find((item) => item.id === "co1").priority);
+      assert.equal(db.prepare("SELECT next_pickup FROM medication_pickup_records WHERE id = ?").get("mp1").next_pickup, "2026-07-05");
+      assert.equal(
+        db.prepare("SELECT collection FROM county_workflow_records WHERE id = ?").get("cco-001").collection,
+        "countyCollaborationOrders"
       );
     });
 
@@ -178,7 +193,12 @@ test("SQLite migrations are idempotent and collection versions change only on wr
       orphanBusinessState.insuranceClaims[0].residentId = "missing-resident";
       storage.writeDatabase(orphanBusinessState);
     }, /FOREIGN KEY constraint failed/);
-    assert.equal(storage.storageMeta().schemaVersion, 5);
+    assert.throws(() => {
+      const orphanServiceState = storage.readDatabase();
+      orphanServiceState.careOrders[0].residentId = "missing-resident";
+      storage.writeDatabase(orphanServiceState);
+    }, /FOREIGN KEY constraint failed/);
+    assert.equal(storage.storageMeta().schemaVersion, 6);
   } finally {
     fs.rmSync(dataDir, { recursive: true, force: true });
   }
