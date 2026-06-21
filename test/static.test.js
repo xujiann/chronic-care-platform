@@ -68,11 +68,15 @@ test("deployment baseline documents scripts and environment template", () => {
 test("platform and workbench expose P2 governance and runtime panels", () => {
   const platformHtml = read("platform.html");
   const platformJs = read("platform.js");
+  const workbenchHtml = read("workbench.html");
   const workbenchJs = read("workbench.js");
   assert.match(platformHtml, /research-governance/);
   assert.match(platformHtml, /mobile-accessibility-governance/);
   assert.match(platformJs, /renderResearchGovernance/);
   assert.match(platformJs, /renderMobileAccessibilityGovernance/);
+  assert.match(workbenchHtml, /system-readiness/);
   assert.match(workbenchJs, /loadOperationalMetrics/);
+  assert.match(workbenchJs, /loadSystemReadiness/);
   assert.match(workbenchJs, /\/api\/metrics/);
+  assert.match(workbenchJs, /\/api\/system\/readiness/);
 });

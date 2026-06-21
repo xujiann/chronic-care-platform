@@ -59,7 +59,7 @@ http://localhost:5173/login.html
 |---|---|
 | `login.html` | 统一登录入口 |
 | `health-city.html` | 健康城市系统总览 |
-| `workbench.html` | 统一运营工作台、全流程审计矩阵、路线图 |
+| `workbench.html` | 统一运营工作台、全流程审计矩阵、路线图、系统就绪报告 |
 | `platform.html` | 平台建设驾驶舱、应用目录、信用评价、科研专病库治理、移动无障碍治理、安全信创台账 |
 | `index.html` | 卫健委端：慢病、统计、应急、质量、审计、互认、绩效 |
 | `institution.html` | 医疗机构端：授权档案、转诊、固定取药、证照、多点执业 |

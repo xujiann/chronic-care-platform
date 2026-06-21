@@ -24,6 +24,12 @@ test("commission user reaches the governance dashboard and opens maintenance", a
   await expect(page.locator("#mobile-accessibility-governance > div")).toHaveCount(10);
   await expect(page.locator("#security-acceptance-ledger > div")).toHaveCount(4);
 
+  await page.goto("/workbench.html");
+  await expect(page.locator("#system-readiness")).toBeVisible();
+  await expect(page.locator("#system-readiness .priority-row")).toHaveCount(6);
+
+  await page.goto("/platform.html");
+
   const applicationRow = page.locator("#application-catalog tbody tr", { hasText: "全民健康信息平台一、二期" });
   await applicationRow.getByRole("button", { name: "维护" }).click();
   await expect(page.locator("#platform-edit-dialog")).toHaveAttribute("open", "");

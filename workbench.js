@@ -18,9 +18,11 @@ const fallbackState = {
 document.addEventListener("DOMContentLoaded", async () => {
   const state = await loadPlatformState(fallbackState);
   const operations = await loadOperationalMetrics();
+  const readiness = await loadSystemReadiness();
   const tasks = collectUnifiedTasks(state);
   const roadmap = state.platformRoadmap?.length ? state.platformRoadmap : defaultRoadmap();
   renderMetrics(state, tasks, roadmap, operations);
+  renderSystemReadiness(readiness);
   renderSourceAlignment(state);
   renderAudit(state, tasks);
   renderProcessAudit(state);
@@ -43,6 +45,18 @@ async function loadOperationalMetrics() {
   }
 }
 
+async function loadSystemReadiness() {
+  if (location.protocol === "file:") return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request("/api/system/readiness");
+    if (!response.ok) return null;
+    return response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
 function renderMetrics(state, tasks, roadmap, operations) {
   const dataCollections = Object.keys(state).filter((key) => Array.isArray(state[key]) || (state[key] && typeof state[key] === "object")).length;
   const p0 = roadmap.filter((item) => item.priority === "P0").length;
@@ -57,6 +71,58 @@ function renderMetrics(state, tasks, roadmap, operations) {
     ["P0 优先项", p0, "先补平台底座"],
     ["居民主索引", state.residents?.length || 0, "身份证号 + 手机号"]
   ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><small>${hint}</small></article>`).join("");
+}
+
+function renderSystemReadiness(readiness) {
+  const container = document.querySelector("#system-readiness");
+  if (!container) return;
+
+  if (!readiness) {
+    container.innerHTML = `<article class="priority-row">
+      <div class="priority-rank warn">API</div>
+      <div>
+        <h3>静态预览模式</h3>
+        <p>请通过 Node 服务登录后查看实时系统就绪报告；GitHub Pages 只展示静态快照。</p>
+      </div>
+      <div class="capability-side">
+        <span class="badge warn">未运行</span>
+        <small>/api/system/readiness</small>
+      </div>
+    </article>`;
+    return;
+  }
+
+  const checks = readiness.checks || [];
+  const dependencies = readiness.externalDependencies || [];
+  const checkRows = checks.map((item, index) => {
+    const ok = Boolean(item.passed);
+    return `<article class="priority-row">
+      <div class="priority-rank ${ok ? "info" : "danger"}">${index + 1}</div>
+      <div>
+        <h3>${item.name}</h3>
+        <p>${item.detail}</p>
+      </div>
+      <div class="capability-side">
+        <span class="badge ${ok ? "info" : "danger"}">${ok ? "通过" : "需处理"}</span>
+        <small>${item.id}</small>
+      </div>
+    </article>`;
+  }).join("");
+
+  const dependencyRows = dependencies.slice(0, 6).map((item) => `<span class="badge warn">${item.name || item}</span>`).join("");
+
+  container.innerHTML = `<article class="priority-row">
+    <div class="priority-rank ${readiness.passed ? "info" : "danger"}">${readiness.passed ? "OK" : "!"}</div>
+    <div>
+      <h3>${readiness.service || "系统"}发布就绪总览</h3>
+      <p>生成时间：${readiness.generatedAt || "未知"}；P2 集合、审计链和运行负载已纳入统一检查。</p>
+      <div class="standard-tags">${dependencyRows || `<span class="badge info">暂无外部依赖提示</span>`}</div>
+    </div>
+    <div class="capability-side">
+      <span class="badge ${readiness.passed ? "info" : "danger"}">${readiness.passed ? "代码闭环通过" : "仍需处理"}</span>
+      <small>现场依赖需按部署计划另行验收</small>
+    </div>
+  </article>${checkRows}`;
 }
 
 function renderAudit(state, tasks) {
