@@ -437,6 +437,35 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(state.body.countyMutualRecognitionRecords.some((item) => item.id === report.body.recognition.id), true);
     assert.equal(state.body.personalRecords.some((item) => item.reportId === report.body.report.id), true);
 
+    const critical = await api(baseUrl, "/api/mutual-recognition/reports", authorized(county.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        externalId: "PACS-CRITICAL-001",
+        residentId: "r1",
+        item: "Chest CT",
+        category: "imaging",
+        sourceInstitution: "Pulandian Township Hospital",
+        targetInstitution: "Pulandian Central Hospital",
+        result: "urgent imaging finding",
+        conclusion: "Critical value: suspected acute chest condition.",
+        qualityStatus: "passed",
+        critical: true,
+        criticalLevel: "high",
+        criticalAction: "Call receiving physician within 15 minutes.",
+        reportedAt: "2026-06-21T13:00:00.000Z"
+      })
+    }));
+    assert.equal(critical.response.status, 201);
+    assert.equal(critical.body.criticalSignal.status, "pending_acknowledgement");
+    assert.equal(critical.body.criticalSignal.sourceReportId, critical.body.report.id);
+
+    const handled = await api(baseUrl, `/api/emergency-signals/${critical.body.criticalSignal.id}`, authorized(county.body.token, {
+      method: "PATCH",
+      body: JSON.stringify({ status: "acknowledged", action: "Receiving physician notified and disposition recorded." })
+    }));
+    assert.equal(handled.response.status, 200);
+    assert.equal(handled.body.status, "acknowledged");
+
     const citizen = await login(baseUrl, "citizen");
     const denied = await api(baseUrl, "/api/mutual-recognition/reports", authorized(citizen.body.token, {
       method: "POST",

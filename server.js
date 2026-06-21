@@ -3138,7 +3138,25 @@ function normalizeDiagnosticReport(payload, user, data) {
     updatedBy: user.username || user.role,
     updatedByName: user.name
   };
-  return { report, recognition, personalRecord, rule };
+  const criticalSignal = payload.critical || payload.criticalLevel ? {
+    id: `es-${randomUUID()}`,
+    residentId,
+    title: `Critical diagnostic value: ${item}`,
+    source: "diagnostic-report",
+    sourceReportId: reportId,
+    recognitionRecordId: recognitionId,
+    region: String(payload.region || "regional-sharing-center").trim(),
+    level: String(payload.criticalLevel || "high").trim(),
+    status: "pending_acknowledgement",
+    date: reportedAt,
+    action: String(payload.criticalAction || "Notify responsible institution and complete disposition record.").trim(),
+    ownerRole: "institution",
+    sourceInstitution,
+    targetInstitution,
+    createdAt: now,
+    createdBy: user.username || user.role
+  } : null;
+  return { report, recognition, personalRecord, criticalSignal, rule };
 }
 
 function personIndexFromParts(idCard, phone) {
@@ -3917,6 +3935,9 @@ async function handleApi(req, res) {
     data.diagnosticReports = [normalized.report, ...(Array.isArray(data.diagnosticReports) ? data.diagnosticReports : [])].slice(0, 300);
     data.countyMutualRecognitionRecords = [normalized.recognition, ...(Array.isArray(data.countyMutualRecognitionRecords) ? data.countyMutualRecognitionRecords : [])].slice(0, 300);
     data.personalRecords = [normalized.personalRecord, ...(Array.isArray(data.personalRecords) ? data.personalRecords : [])].slice(0, 500);
+    if (normalized.criticalSignal) {
+      data.emergencySignals = [normalized.criticalSignal, ...(Array.isArray(data.emergencySignals) ? data.emergencySignals : [])].slice(0, 200);
+    }
     data.securityEvents = [
       {
         id: randomUUID(),
@@ -3926,7 +3947,7 @@ async function handleApi(req, res) {
         action: "submit diagnostic report",
         target: `${normalized.report.residentId}/${normalized.report.item}`,
         result: "allowed",
-        detail: `${normalized.report.status} · ${normalized.report.ruleId || "no-rule"}`
+        detail: `${normalized.report.status} · ${normalized.report.ruleId || "no-rule"}${normalized.criticalSignal ? " · critical" : ""}`
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
     ].slice(0, 120);
@@ -4223,7 +4244,7 @@ async function handleApi(req, res) {
   }
 
   if (req.method === "PATCH" && url.pathname.startsWith("/api/emergency-signals/")) {
-    const user = requireApiRole(req, res, ["commission"], "/api/emergency-signals/:id");
+    const user = requireApiRole(req, res, ["institution", "county", "commission"], "/api/emergency-signals/:id");
     if (!user) return;
     const result = patchCollectionItem({
       data: readDatabase(),
