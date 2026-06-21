@@ -633,6 +633,18 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(compliance.body.summary.auditPassed, true);
     assert.equal(compliance.body.ledger.length, 4);
 
+    const highRisk = await api(baseUrl, "/api/security/high-risk-events", authorized(commissionToken));
+    assert.equal(highRisk.response.status, 200);
+    assert.equal(highRisk.body.events.length > 0, true);
+
+    const controlId = compliance.body.ledger[0].id;
+    const controlAction = await api(baseUrl, `/api/security/controls/${controlId}/actions`, authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({ status: "证据已归档", evidence: "audit-export-and-compliance-report", action: "archive-evidence" })
+    }));
+    assert.equal(controlAction.response.status, 200);
+    assert.equal(controlAction.body.evidence, "audit-export-and-compliance-report");
+
     const current = await api(baseUrl, "/api/state", authorized(commissionToken));
     current.body.securityEvents[0].detail = "tampered audit detail";
     const tamperedSave = await api(baseUrl, "/api/state", authorized(commissionToken, {

@@ -3862,6 +3862,12 @@ function buildComplianceReport(data) {
   };
 }
 
+function highRiskSecurityEvents(data) {
+  return (data.securityEvents || []).filter((event) =>
+    /拒绝|denied|撤销|tamper|dead-letter|敏感|授权|导出|审计|高风险/i.test(`${event.result || ""} ${event.action || ""} ${event.detail || ""}`)
+  );
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -3904,6 +3910,53 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/security/compliance-report");
     if (!user) return;
     sendJson(res, 200, buildComplianceReport(readDatabase()));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/security/high-risk-events") {
+    const user = requireApiRole(req, res, ["commission"], "/api/security/high-risk-events");
+    if (!user) return;
+    const events = highRiskSecurityEvents(readDatabase());
+    sendJson(res, 200, { events, summary: { total: events.length } });
+    return;
+  }
+
+  const securityControlActionMatch = url.pathname.match(/^\/api\/security\/controls\/([^/]+)\/actions$/);
+  if (req.method === "POST" && securityControlActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/security/controls/:id/actions");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(securityControlActionMatch[1]);
+    const index = (data.securityAcceptanceLedger || []).findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到安全合规控制项" });
+      return;
+    }
+    const payload = await collectJson(req);
+    data.securityAcceptanceLedger[index] = {
+      ...data.securityAcceptanceLedger[index],
+      status: String(payload.status || data.securityAcceptanceLedger[index].status || "").trim(),
+      evidence: String(payload.evidence || data.securityAcceptanceLedger[index].evidence || "").trim(),
+      next: String(payload.next || data.securityAcceptanceLedger[index].next || "").trim(),
+      lastAction: String(payload.action || "update-evidence").trim(),
+      updatedAt: new Date().toISOString(),
+      updatedBy: user.username || user.role
+    };
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "update security compliance evidence",
+        target: id,
+        result: "allowed",
+        detail: data.securityAcceptanceLedger[index].status
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, data.securityAcceptanceLedger[index]);
     return;
   }
 
