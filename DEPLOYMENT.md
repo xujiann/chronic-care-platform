@@ -122,6 +122,19 @@ node scripts/storage-admin.js restore "data/backups/<备份目录>" --confirm
 
 恢复演练会把备份恢复到临时目录并重新校验清单，不覆盖当前 `data`。正式恢复操作会先自动创建 `pre-restore` 安全备份。真实生产数据库仍需使用数据库原生在线备份、时间点恢复和异地副本。
 
+### 恢复演练操作手册
+
+建议每次部署前至少执行一次离线恢复演练：
+
+1. 停止写入或确认当前为演示/维护窗口。
+2. 执行 `npm.cmd run storage:backup` 生成新备份。
+3. 执行 `node scripts/storage-admin.js verify "data/backups/<备份目录>"` 校验清单、大小和 SHA-256。
+4. 执行 `node scripts/storage-admin.js rehearse "data/backups/<备份目录>"` 将备份恢复到临时目录并重新校验。
+5. 确认演练输出 `ok: true`，并记录 `rehearsalDataDir`、备份目录、执行人和时间。
+6. 只有在真实恢复时，才执行 `node scripts/storage-admin.js restore "data/backups/<备份目录>" --confirm`。
+
+恢复演练通过不等于生产级容灾完成；正式环境仍需补充数据库原生备份、跨机房副本、恢复时间目标和恢复点目标验收。
+
 ## 现场实施待办
 
 - 政务统一认证和机构权限。

@@ -2269,6 +2269,22 @@ function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
+function isStorageConflict(error) {
+  return error?.message?.includes("SQLite optimistic lock conflict");
+}
+
+function sendStorageConflict(res, error) {
+  const match = /on ([^:]+): expected (\d+), current (\d+)/.exec(error.message || "");
+  sendJson(res, 409, {
+    error: "Conflict",
+    code: "STORAGE_CONFLICT",
+    message: "数据已被其他写入更新，请刷新后重试。",
+    collection: match?.[1] || "",
+    expectedVersion: match ? Number(match[2]) : null,
+    currentVersion: match ? Number(match[3]) : null
+  });
+}
+
 function collectJson(req) {
   return new Promise((resolve, reject) => {
     let body = "";
@@ -3092,7 +3108,9 @@ async function handleApi(req, res) {
   if (req.method === "PUT" && url.pathname === "/api/state") {
     const user = requireApiRole(req, res, ["commission"], "/api/state");
     if (!user) return;
-    const data = normalizeState(await collectJson(req));
+    const payload = await collectJson(req);
+    const data = normalizeState(payload);
+    data.storageMeta = payload.storageMeta;
     data.securityEvents = [
       {
         id: randomUUID(),
@@ -3409,6 +3427,10 @@ const server = http.createServer(async (req, res) => {
     }
     serveStatic(req, res);
   } catch (error) {
+    if (isStorageConflict(error)) {
+      sendStorageConflict(res, error);
+      return;
+    }
     sendJson(res, 500, { error: error.message });
   }
 });

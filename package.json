@@ -5,9 +5,9 @@
   "description": "慢病医防融合管理平台本地 MVP",
   "scripts": {
     "dev": "node server.js",
-    "check": "node --check app.js && node --check auth.js && node --check citizen.js && node --check county.js && node --check health-archive-standard.js && node --check institution.js && node --check insurance.js && node --check platform.js && node --check shared.js && node --check workbench.js && node --check server.js && node --check playwright.config.js && node --check scripts/storage-admin.js && node --check test/api.test.js && node --check test/e2e/roles.spec.js && node --check test/e2e/test-server.js && node --check test/security.test.js && node --check test/static.test.js && node --check test/storage-admin.test.js && node --check test/storage.test.js",
-    "test": "node --test test/api.test.js test/security.test.js test/static.test.js test/storage-admin.test.js test/storage.test.js",
-    "test:coverage": "c8 --include=server.js --reporter=text --reporter=json-summary --check-coverage --lines 85 --functions 85 --branches 55 node --test test/api.test.js test/security.test.js test/static.test.js test/storage-admin.test.js test/storage.test.js",
+    "check": "node --check app.js && node --check auth.js && node --check citizen.js && node --check county.js && node --check health-archive-standard.js && node --check institution.js && node --check insurance.js && node --check platform.js && node --check shared.js && node --check workbench.js && node --check server.js && node --check playwright.config.js && node --check scripts/storage-admin.js && node --check test/api.test.js && node --check test/conflict-api.test.js && node --check test/e2e/roles.spec.js && node --check test/e2e/test-server.js && node --check test/security.test.js && node --check test/static.test.js && node --check test/storage-admin.test.js && node --check test/storage.test.js",
+    "test": "node --test test/api.test.js test/conflict-api.test.js test/security.test.js test/static.test.js test/storage-admin.test.js test/storage.test.js",
+    "test:coverage": "c8 --include=server.js --reporter=text --reporter=json-summary --check-coverage --lines 85 --functions 85 --branches 55 node --test test/api.test.js test/conflict-api.test.js test/security.test.js test/static.test.js test/storage-admin.test.js test/storage.test.js",
     "test:e2e": "playwright test",
     "storage:backup": "node scripts/storage-admin.js backup"
   },
