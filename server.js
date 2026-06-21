@@ -461,7 +461,8 @@ function seedState() {
     platformRoadmap: seedPlatformRoadmap(),
     platformAudit: seedPlatformAudit(),
     platformProcessAudit: seedPlatformProcessAudit(),
-    personalRecords: seedPersonalRecords()
+    personalRecords: seedPersonalRecords(),
+    taskMessages: []
   };
 }
 
@@ -2526,6 +2527,7 @@ function normalizeState(data) {
     countyMutualRecognitionRecords: mergeByKey(seedCountyMutualRecognitionRecords(), data.countyMutualRecognitionRecords, "id"),
     mutualRecognitionRules: mergeByKey(seedMutualRecognitionRules(), data.mutualRecognitionRules, "id"),
     diagnosticReports: mergeByKey(seedDiagnosticReports(), data.diagnosticReports, "id"),
+    taskMessages: Array.isArray(data.taskMessages) ? data.taskMessages : [],
     careOrders: Array.isArray(data.careOrders) ? data.careOrders : seedCareOrders(),
     medicationPickups: Array.isArray(data.medicationPickups) ? data.medicationPickups : seedMedicationPickups(),
     institutionSupervisions: Array.isArray(data.institutionSupervisions) ? data.institutionSupervisions : seedInstitutionSupervisions(),
@@ -2877,7 +2879,7 @@ function normalizePersonIndexes(state) {
     resident.identityIndex = resident.personIndex;
   });
   const residentMap = new Map(residents.map((resident) => [resident.id, resident]));
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "taskMessages"].forEach((key) => {
     (Array.isArray(state[key]) ? state[key] : []).forEach((item) => {
       item.personIndex = item.personIndex || personIndexForResident(residentMap, item.residentId);
     });
@@ -3485,7 +3487,7 @@ function scopeStateForUser(data, user) {
 
   scoped.accounts = account ? [account] : [];
   scoped.residents = (data.residents || []).filter((item) => allowedIds.has(item.id));
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "taskMessages"].forEach((key) => {
     scoped[key] = (data[key] || []).filter(hasAllowedResident);
   });
   if (scoped.referralSystem) {
@@ -3729,6 +3731,33 @@ function buildUnifiedTasks(data, user) {
   }).sort((left, right) => String(left.dueAt || "").localeCompare(String(right.dueAt || "")));
 }
 
+function canAccessTaskMessage(user, message, data) {
+  if (user.role === "commission") return true;
+  if (message.targetRole === user.role) return true;
+  if (message.residentId && canAccessResident(user, message.residentId, data)) return true;
+  return message.createdBy === user.username;
+}
+
+function createTaskMessage({ task, payload, user }) {
+  const now = new Date().toISOString();
+  return {
+    id: `msg-${randomUUID()}`,
+    taskId: task.id,
+    collection: task.collection,
+    sourceId: task.sourceId,
+    residentId: task.residentId || "",
+    targetRole: String(payload.targetRole || task.role || "institution").trim(),
+    channel: String(payload.channel || "in_app").trim(),
+    title: String(payload.title || task.title || "task message").trim(),
+    body: String(payload.body || payload.message || "").trim(),
+    status: "sent",
+    receipts: [],
+    createdAt: now,
+    createdBy: user.username || user.role,
+    createdByName: user.name
+  };
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -3813,6 +3842,79 @@ async function handleApi(req, res) {
         return result;
       }, { total: 0, byRole: {}, byStatus: {} })
     });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/messages") {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county", "citizen"], "/api/messages");
+    if (!user) return;
+    const data = readDatabase();
+    const messages = (Array.isArray(data.taskMessages) ? data.taskMessages : []).filter((message) => canAccessTaskMessage(user, message, data));
+    sendJson(res, 200, { messages });
+    return;
+  }
+
+  const taskMessageMatch = url.pathname.match(/^\/api\/tasks\/([^/]+)\/messages$/);
+  if (req.method === "POST" && taskMessageMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/tasks/:id/messages");
+    if (!user) return;
+    const data = readDatabase();
+    const taskId = decodeURIComponent(taskMessageMatch[1]);
+    const task = buildUnifiedTasks(data, user).find((item) => item.id === taskId);
+    if (!task) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到可发送消息的任务" });
+      return;
+    }
+    const message = createTaskMessage({ task, payload: await collectJson(req), user });
+    data.taskMessages = [message, ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "send task message",
+        target: taskId,
+        result: "allowed",
+        detail: `${message.targetRole} · ${message.channel}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 201, message);
+    return;
+  }
+
+  const messageReceiptMatch = url.pathname.match(/^\/api\/messages\/([^/]+)\/receipt$/);
+  if (req.method === "POST" && messageReceiptMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county", "citizen"], "/api/messages/:id/receipt");
+    if (!user) return;
+    const data = readDatabase();
+    const messages = Array.isArray(data.taskMessages) ? data.taskMessages : [];
+    const index = messages.findIndex((message) => message.id === decodeURIComponent(messageReceiptMatch[1]));
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到消息" });
+      return;
+    }
+    if (!canAccessTaskMessage(user, messages[index], data)) {
+      sendJson(res, 403, { error: "Forbidden", message: "无权回执该消息" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const receipt = {
+      at: new Date().toISOString(),
+      by: user.username || user.role,
+      byName: user.name,
+      status: String(payload.status || "read").trim()
+    };
+    messages[index] = {
+      ...messages[index],
+      status: receipt.status,
+      receipts: [receipt, ...(Array.isArray(messages[index].receipts) ? messages[index].receipts : [])].slice(0, 20)
+    };
+    data.taskMessages = messages;
+    writeDatabase(data);
+    sendJson(res, 200, messages[index]);
     return;
   }
 

@@ -478,6 +478,19 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(taskHandled.response.status, 200);
     assert.equal(taskHandled.body.status, "resolved");
 
+    const taskMessage = await api(baseUrl, `/api/tasks/${encodeURIComponent(`emergencySignals:${critical.body.criticalSignal.id}`)}/messages`, authorized(county.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        targetRole: "citizen",
+        channel: "in_app",
+        title: "Critical result handled",
+        body: "Your critical diagnostic result has been handled by the regional center."
+      })
+    }));
+    assert.equal(taskMessage.response.status, 201);
+    assert.equal(taskMessage.body.residentId, "r1");
+    assert.equal(taskMessage.body.status, "sent");
+
     const rejectedReview = await api(baseUrl, `/api/mutual-recognition/records/${critical.body.recognition.id}/review`, authorized(county.body.token, {
       method: "POST",
       body: JSON.stringify({ decision: "reject", reasonCode: "poor-quality", comment: "DICOM package is incomplete." })
@@ -498,6 +511,18 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(insuranceTasks.body.tasks.some((item) => item.collection === "chronicScreeningTasks"), false);
 
     const citizen = await login(baseUrl, "citizen");
+    const citizenMessages = await api(baseUrl, "/api/messages", authorized(citizen.body.token));
+    assert.equal(citizenMessages.response.status, 200);
+    assert.equal(citizenMessages.body.messages.some((item) => item.id === taskMessage.body.id), true);
+
+    const receipt = await api(baseUrl, `/api/messages/${taskMessage.body.id}/receipt`, authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({ status: "read" })
+    }));
+    assert.equal(receipt.response.status, 200);
+    assert.equal(receipt.body.status, "read");
+    assert.equal(receipt.body.receipts[0].by, citizen.body.user.username);
+
     const denied = await api(baseUrl, "/api/mutual-recognition/reports", authorized(citizen.body.token, {
       method: "POST",
       body: JSON.stringify({ residentId: "r2", item: "HbA1c" })
