@@ -11,7 +11,7 @@ const SQLITE_FILE = path.join(DATA_DIR, "health-city.sqlite");
 const STORAGE_ENGINE = String(process.env.STORAGE_ENGINE || "auto").toLowerCase();
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const DEMO_PASSWORD = "123456";
-const STORAGE_SCHEMA_VERSION = 4;
+const STORAGE_SCHEMA_VERSION = 5;
 const sessions = new Map();
 let sqliteModule = null;
 let sqliteError = null;
@@ -130,6 +130,93 @@ const SQLITE_MIGRATIONS = [
           ON personal_records(person_index);
         CREATE INDEX IF NOT EXISTS idx_personal_records_record_date
           ON personal_records(record_date);
+      `);
+    }
+  },
+  {
+    version: 5,
+    name: "add structured business workflow mirror tables",
+    apply(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS chronic_records (
+          id TEXT PRIMARY KEY,
+          collection TEXT NOT NULL,
+          resident_id TEXT NOT NULL,
+          person_index TEXT,
+          disease_type TEXT,
+          title TEXT NOT NULL,
+          status TEXT,
+          owner TEXT,
+          due_date TEXT,
+          payload TEXT NOT NULL,
+          synced_at TEXT NOT NULL,
+          FOREIGN KEY (resident_id) REFERENCES residents(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_chronic_records_collection_status
+          ON chronic_records(collection, status);
+        CREATE INDEX IF NOT EXISTS idx_chronic_records_resident
+          ON chronic_records(resident_id);
+        CREATE INDEX IF NOT EXISTS idx_chronic_records_due_date
+          ON chronic_records(due_date);
+        CREATE TABLE IF NOT EXISTS followup_records (
+          id TEXT PRIMARY KEY,
+          resident_id TEXT NOT NULL,
+          person_index TEXT,
+          disease_type TEXT,
+          planned_at TEXT,
+          assignee TEXT,
+          status TEXT,
+          result TEXT,
+          payload TEXT NOT NULL,
+          synced_at TEXT NOT NULL,
+          FOREIGN KEY (resident_id) REFERENCES residents(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_followup_records_resident_status
+          ON followup_records(resident_id, status);
+        CREATE INDEX IF NOT EXISTS idx_followup_records_planned_at
+          ON followup_records(planned_at);
+        CREATE TABLE IF NOT EXISTS insurance_claim_records (
+          id TEXT PRIMARY KEY,
+          resident_id TEXT NOT NULL,
+          person_index TEXT,
+          institution TEXT,
+          claim_type TEXT,
+          disease_type TEXT,
+          total_amount REAL,
+          insurance_pay REAL,
+          self_pay REAL,
+          status TEXT,
+          claim_date TEXT,
+          payload TEXT NOT NULL,
+          synced_at TEXT NOT NULL,
+          FOREIGN KEY (resident_id) REFERENCES residents(id) ON DELETE CASCADE
+        );
+        CREATE INDEX IF NOT EXISTS idx_insurance_claim_records_resident_status
+          ON insurance_claim_records(resident_id, status);
+        CREATE INDEX IF NOT EXISTS idx_insurance_claim_records_claim_date
+          ON insurance_claim_records(claim_date);
+        CREATE TABLE IF NOT EXISTS certificate_records (
+          id TEXT PRIMARY KEY,
+          certificate_type TEXT NOT NULL,
+          certificate_no TEXT,
+          resident_id TEXT,
+          person_index TEXT,
+          subject_name TEXT,
+          issuing_institution TEXT,
+          status TEXT,
+          electronic_license_status TEXT,
+          event_at TEXT,
+          last_updated TEXT,
+          payload TEXT NOT NULL,
+          synced_at TEXT NOT NULL,
+          FOREIGN KEY (resident_id) REFERENCES residents(id) ON DELETE SET NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_certificate_records_type_status
+          ON certificate_records(certificate_type, status);
+        CREATE INDEX IF NOT EXISTS idx_certificate_records_resident
+          ON certificate_records(resident_id);
+        CREATE INDEX IF NOT EXISTS idx_certificate_records_event_at
+          ON certificate_records(event_at);
       `);
     }
   }
@@ -1794,7 +1881,14 @@ function ensureSqliteDatabase() {
     needsSeed = !row.count;
     const identityMirrorRow = db.prepare("SELECT COUNT(*) AS count FROM residents").get();
     const personalRecordMirrorRow = db.prepare("SELECT COUNT(*) AS count FROM personal_records").get();
-    if (!needsSeed && (!identityMirrorRow.count || !personalRecordMirrorRow.count)) {
+    const businessMirrorRow = db.prepare(`
+      SELECT
+        (SELECT COUNT(*) FROM chronic_records) +
+        (SELECT COUNT(*) FROM followup_records) +
+        (SELECT COUNT(*) FROM insurance_claim_records) +
+        (SELECT COUNT(*) FROM certificate_records) AS count
+    `).get();
+    if (!needsSeed && (!identityMirrorRow.count || !personalRecordMirrorRow.count || !businessMirrorRow.count)) {
       syncSqliteIdentityTables(db, readSqliteStateFromConnection(db), "migrate-identity-mirrors");
     }
   } finally {
@@ -1886,6 +1980,10 @@ function writeSqliteState(data, event = "write-state") {
 }
 
 function syncSqliteIdentityTables(db, data, event = "sync-identity-mirrors", at = new Date().toISOString()) {
+  db.prepare("DELETE FROM certificate_records").run();
+  db.prepare("DELETE FROM insurance_claim_records").run();
+  db.prepare("DELETE FROM followup_records").run();
+  db.prepare("DELETE FROM chronic_records").run();
   db.prepare("DELETE FROM personal_records").run();
   db.prepare("DELETE FROM account_members").run();
   db.prepare("DELETE FROM person_indexes").run();
@@ -1986,8 +2084,127 @@ function syncSqliteIdentityTables(db, data, event = "sync-identity-mirrors", at 
     );
   });
 
+  syncSqliteBusinessTables(db, data, at);
+
   db.prepare("INSERT INTO storage_events (id, at, event, detail) VALUES (?, ?, ?, ?)")
     .run(randomUUID(), at, event, "structured mirror tables synchronized");
+}
+
+function syncSqliteBusinessTables(db, data, at) {
+  const chronicStatement = db.prepare(`
+    INSERT INTO chronic_records (
+      id, collection, resident_id, person_index, disease_type, title,
+      status, owner, due_date, payload, synced_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  [
+    ["chronicScreeningTasks", "screening"],
+    ["chronicEducationPushes", "education"],
+    ["chronicManagementPlans", "management"]
+  ].forEach(([collection, fallbackType]) => {
+    (Array.isArray(data[collection]) ? data[collection] : []).forEach((item) => {
+      chronicStatement.run(
+        item.id,
+        collection,
+        item.residentId,
+        cleanSqliteText(item.personIndex),
+        cleanSqliteText(item.diseaseType || item.riskLevel || fallbackType),
+        cleanSqliteText(item.taskName || item.topic || item.plan || item.intervention) || item.id,
+        cleanSqliteText(item.status),
+        cleanSqliteText(item.assignee || item.owner),
+        cleanSqliteText(item.due || item.pushAt || item.nextReview),
+        JSON.stringify(item),
+        at
+      );
+    });
+  });
+
+  const followupStatement = db.prepare(`
+    INSERT INTO followup_records (
+      id, resident_id, person_index, disease_type, planned_at, assignee,
+      status, result, payload, synced_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  (Array.isArray(data.followups) ? data.followups : []).forEach((item) => {
+    followupStatement.run(
+      item.id,
+      item.residentId,
+      cleanSqliteText(item.personIndex),
+      cleanSqliteText(item.diseaseType),
+      cleanSqliteText(item.plannedAt),
+      cleanSqliteText(item.assignee),
+      cleanSqliteText(item.status),
+      cleanSqliteText(item.result),
+      JSON.stringify(item),
+      at
+    );
+  });
+
+  const claimStatement = db.prepare(`
+    INSERT INTO insurance_claim_records (
+      id, resident_id, person_index, institution, claim_type, disease_type,
+      total_amount, insurance_pay, self_pay, status, claim_date, payload, synced_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  (Array.isArray(data.insuranceClaims) ? data.insuranceClaims : []).forEach((item) => {
+    claimStatement.run(
+      item.id,
+      item.residentId,
+      cleanSqliteText(item.personIndex),
+      cleanSqliteText(item.institution),
+      cleanSqliteText(item.claimType),
+      cleanSqliteText(item.diseaseType),
+      Number.isFinite(Number(item.totalAmount)) ? Number(item.totalAmount) : null,
+      Number.isFinite(Number(item.insurancePay)) ? Number(item.insurancePay) : null,
+      Number.isFinite(Number(item.selfPay)) ? Number(item.selfPay) : null,
+      cleanSqliteText(item.status),
+      cleanSqliteText(item.date),
+      JSON.stringify(item),
+      at
+    );
+  });
+
+  const certificateStatement = db.prepare(`
+    INSERT INTO certificate_records (
+      id, certificate_type, certificate_no, resident_id, person_index, subject_name,
+      issuing_institution, status, electronic_license_status, event_at, last_updated,
+      payload, synced_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  (Array.isArray(data.deathCertificates) ? data.deathCertificates : []).forEach((item) => {
+    certificateStatement.run(
+      item.id,
+      "death",
+      cleanSqliteText(item.certificateNo),
+      cleanSqliteText(item.residentId),
+      cleanSqliteText(item.personIndex),
+      cleanSqliteText(item.deceasedName),
+      cleanSqliteText(item.issuingInstitution),
+      cleanSqliteText(item.status),
+      cleanSqliteText(item.electronicLicenseStatus),
+      cleanSqliteText(item.deathDateTime),
+      cleanSqliteText(item.lastUpdated),
+      JSON.stringify(item),
+      at
+    );
+  });
+  (Array.isArray(data.birthCertificates) ? data.birthCertificates : []).forEach((item) => {
+    certificateStatement.run(
+      item.id,
+      "birth",
+      cleanSqliteText(item.certificateNo),
+      cleanSqliteText(item.maternalResidentId),
+      cleanSqliteText(item.personIndex),
+      cleanSqliteText(item.newbornName),
+      cleanSqliteText(item.issuingInstitution),
+      cleanSqliteText(item.status),
+      cleanSqliteText(item.electronicLicenseStatus),
+      cleanSqliteText(item.birthDateTime),
+      cleanSqliteText(item.lastUpdated),
+      JSON.stringify(item),
+      at
+    );
+  });
 }
 
 function cleanSqliteText(value) {

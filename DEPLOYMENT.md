@@ -106,7 +106,7 @@ http://localhost:5173/workbench.html
 
 ## 存储迁移与备份
 
-SQLite 启动时会通过 `schema_migrations` 自动执行幂等迁移，当前 schema 版本为 4。部署升级前应先停止写入并创建备份：
+SQLite 启动时会通过 `schema_migrations` 自动执行幂等迁移，当前 schema 版本为 5。部署升级前应先停止写入并创建备份：
 
 ```powershell
 npm.cmd run storage:backup

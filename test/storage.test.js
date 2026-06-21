@@ -34,7 +34,7 @@ test("SQLite migrations are idempotent and collection versions change only on wr
 
     withDatabase(storage, (db) => {
       const migrations = db.prepare("SELECT version, name, checksum FROM schema_migrations ORDER BY version").all();
-      assert.deepEqual(migrations.map((item) => Number(item.version)), [1, 2, 3, 4]);
+      assert.deepEqual(migrations.map((item) => Number(item.version)), [1, 2, 3, 4, 5]);
       assert.ok(migrations.every((item) => item.name && /^[a-f0-9]{64}$/.test(item.checksum)));
 
       const columns = db.prepare("PRAGMA table_info(state_collections)").all().map((item) => item.name);
@@ -43,7 +43,17 @@ test("SQLite migrations are idempotent and collection versions change only on wr
       assert.ok(indexes.includes("idx_state_collections_updated_at"));
 
       const tableNames = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((item) => item.name);
-      ["residents", "accounts", "account_members", "person_indexes", "personal_records"].forEach((tableName) => {
+      [
+        "residents",
+        "accounts",
+        "account_members",
+        "person_indexes",
+        "personal_records",
+        "chronic_records",
+        "followup_records",
+        "insurance_claim_records",
+        "certificate_records"
+      ].forEach((tableName) => {
         assert.ok(tableNames.includes(tableName), `${tableName} mirror table should exist`);
       });
     });
@@ -57,6 +67,16 @@ test("SQLite migrations are idempotent and collection versions change only on wr
         currentState.accounts.reduce((sum, account) => sum + account.members.length, 0)
       );
       assert.equal(Number(db.prepare("SELECT COUNT(*) AS count FROM personal_records").get().count), currentState.personalRecords.length);
+      assert.equal(
+        Number(db.prepare("SELECT COUNT(*) AS count FROM chronic_records").get().count),
+        currentState.chronicScreeningTasks.length + currentState.chronicEducationPushes.length + currentState.chronicManagementPlans.length
+      );
+      assert.equal(Number(db.prepare("SELECT COUNT(*) AS count FROM followup_records").get().count), currentState.followups.length);
+      assert.equal(Number(db.prepare("SELECT COUNT(*) AS count FROM insurance_claim_records").get().count), currentState.insuranceClaims.length);
+      assert.equal(
+        Number(db.prepare("SELECT COUNT(*) AS count FROM certificate_records").get().count),
+        currentState.deathCertificates.length + currentState.birthCertificates.length
+      );
       assert.equal(
         db.prepare("SELECT resident_id FROM person_indexes WHERE person_index = ?").get("DEMO-ID-R1#DEMO-MOBILE-R1").resident_id,
         "r1"
@@ -80,6 +100,22 @@ test("SQLite migrations are idempotent and collection versions change only on wr
       assert.equal(recordRow.resident_id, "r1");
       assert.equal(recordRow.category, "emr");
       assert.ok(recordRow.name);
+      assert.equal(
+        db.prepare("SELECT status FROM chronic_records WHERE collection = ? AND resident_id = ?").get("chronicScreeningTasks", "r1").status,
+        "待筛查"
+      );
+      assert.equal(
+        db.prepare("SELECT status FROM followup_records WHERE resident_id = ? AND disease_type = ?").get("r1", "高血压").status,
+        "已逾期"
+      );
+      assert.equal(
+        db.prepare("SELECT total_amount FROM insurance_claim_records WHERE id = ?").get("ic1").total_amount,
+        386.5
+      );
+      assert.equal(
+        db.prepare("SELECT certificate_type FROM certificate_records WHERE certificate_no = ?").get("DC-210202-20260612001").certificate_type,
+        "death"
+      );
     });
 
     storage.readDatabase();
@@ -121,7 +157,12 @@ test("SQLite migrations are idempotent and collection versions change only on wr
       orphanRecordState.personalRecords[0].residentId = "missing-resident";
       storage.writeDatabase(orphanRecordState);
     }, /FOREIGN KEY constraint failed/);
-    assert.equal(storage.storageMeta().schemaVersion, 4);
+    assert.throws(() => {
+      const orphanBusinessState = storage.readDatabase();
+      orphanBusinessState.insuranceClaims[0].residentId = "missing-resident";
+      storage.writeDatabase(orphanBusinessState);
+    }, /FOREIGN KEY constraint failed/);
+    assert.equal(storage.storageMeta().schemaVersion, 5);
   } finally {
     fs.rmSync(dataDir, { recursive: true, force: true });
   }
