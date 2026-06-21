@@ -133,6 +133,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(readiness.response.status, 200);
     assert.equal(readiness.body.passed, true);
     assert.equal(readiness.body.p2Collections.researchDatasets >= 2, true);
+    assert.equal(readiness.body.checks.some((item) => item.id === "acceptance-evidence" && item.passed), true);
     assert.equal(readiness.body.checks.some((item) => item.id === "audit-chain" && item.passed), true);
     assert.equal(readiness.body.externalDependencies.includes("政务统一身份源"), true);
   });

@@ -55,6 +55,18 @@ test("static snapshot keeps completed P2 governance collections", () => {
   assert.equal(data.platformRoadmap.filter((item) => item.priority === "P2").every((item) => item.status === "已完成"), true);
 });
 
+test("static snapshot keeps acceptance evidence clean and actionable", () => {
+  const raw = read("data/db.json");
+  const data = JSON.parse(raw);
+  assert.doesNotMatch(raw, /编码损坏，待核验/);
+  assert.doesNotMatch(raw, /\?\?\?/);
+  const interoperability = data.platformEvidence.find((item) => item.id === "ev-interoperability");
+  assert.equal(interoperability.status, "已建档");
+  assert.equal(interoperability.records.length >= 2, true);
+  assert.equal(interoperability.records.every((item) => item.owner && item.testRecord && item.status), true);
+  assert.equal(interoperability.records.some((item) => item.link === "/api/system/readiness"), true);
+});
+
 test("deployment baseline documents scripts and environment template", () => {
   const pkg = JSON.parse(read("package.json"));
   assert.equal(Boolean(pkg.scripts["deploy:check"]), true);

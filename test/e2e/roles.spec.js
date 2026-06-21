@@ -26,7 +26,7 @@ test("commission user reaches the governance dashboard and opens maintenance", a
 
   await page.goto("/workbench.html");
   await expect(page.locator("#system-readiness")).toBeVisible();
-  await expect(page.locator("#system-readiness .priority-row")).toHaveCount(6);
+  await expect(page.locator("#system-readiness .priority-row")).toHaveCount(7);
 
   await page.goto("/platform.html");
 

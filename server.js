@@ -2776,11 +2776,17 @@ function buildSystemReadinessReport(data) {
     securityEvents: verifyAuditTrail(data.securityEvents),
     dataAccessLogs: verifyAuditTrail(data.dataAccessLogs)
   };
+  const evidenceRecords = (Array.isArray(data.platformEvidence) ? data.platformEvidence : []).flatMap((item) => item.records || []);
+  const evidenceClean = evidenceRecords.every((item) => {
+    const text = JSON.stringify(item);
+    return item.owner && item.testRecord && item.status && !text.includes("编码损坏，待核验");
+  });
   const runtime = buildRuntimeMetrics(data);
   const checks = [
     { id: "storage-meta", name: "存储元信息", passed: Boolean(runtime.storage.jsonFile), detail: runtime.storage.mode },
     { id: "p2-roadmap", name: "P2 路线图完成", passed: p2Complete, detail: roadmap.filter((item) => item.priority === "P2").map((item) => `${item.title}:${item.status}`).join(";") },
     { id: "p2-collections", name: "P2 集合完整", passed: Object.values(p2Collections).every(Boolean), detail: JSON.stringify(p2Collections) },
+    { id: "acceptance-evidence", name: "验收证据台账", passed: evidenceClean && evidenceRecords.length >= 2, detail: `records=${evidenceRecords.length}` },
     { id: "audit-chain", name: "审计哈希链", passed: Object.values(auditTrails).every((item) => item.passed), detail: `security=${auditTrails.securityEvents.broken.length}, access=${auditTrails.dataAccessLogs.broken.length}` },
     { id: "runtime-workload", name: "运行负载可观测", passed: Number.isFinite(runtime.workload.unifiedTasks), detail: `tasks=${runtime.workload.unifiedTasks}, quality=${runtime.workload.dataQualityIssues}` }
   ];
