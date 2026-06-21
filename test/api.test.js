@@ -65,7 +65,7 @@ function integrationSignature(payload) {
 test("API authentication, scoping and governance regression suite", async (t) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "health-platform-test-"));
   const fixture = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "db.json"), "utf8"));
-  fixture.accounts[0].name = "????A??";
+  fixture.accounts[0].name = "Needs normalization?";
   fixture.authUsers.push({
     id: "u-hashed-test",
     username: "hashed_commission",
