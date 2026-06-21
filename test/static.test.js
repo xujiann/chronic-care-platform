@@ -89,8 +89,10 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   const workbenchJs = read("workbench.js");
   assert.match(platformHtml, /research-governance/);
   assert.match(platformHtml, /mobile-accessibility-governance/);
+  assert.match(platformHtml, /production-deployment-plan/);
   assert.match(platformJs, /renderResearchGovernance/);
   assert.match(platformJs, /renderMobileAccessibilityGovernance/);
+  assert.match(platformJs, /renderProductionDeploymentPlan/);
   assert.match(workbenchHtml, /system-readiness/);
   assert.match(workbenchJs, /loadOperationalMetrics/);
   assert.match(workbenchJs, /loadSystemReadiness/);

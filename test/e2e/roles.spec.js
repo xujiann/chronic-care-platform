@@ -23,6 +23,7 @@ test("commission user reaches the governance dashboard and opens maintenance", a
   await expect(page.locator("#research-governance table").nth(1).locator("tbody tr")).toHaveCount(2);
   await expect(page.locator("#mobile-accessibility-governance > div")).toHaveCount(10);
   await expect(page.locator("#security-acceptance-ledger > div")).toHaveCount(4);
+  await expect(page.locator("#production-deployment-plan .priority-row")).toHaveCount(4);
 
   await page.goto("/workbench.html");
   await expect(page.locator("#system-readiness")).toBeVisible();

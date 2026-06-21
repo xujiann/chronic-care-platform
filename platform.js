@@ -25,6 +25,7 @@ const fallbackPlatformState = {
   applicationCatalog: [],
   institutionCreditEvaluations: [],
   securityAcceptanceLedger: [],
+  productionDeploymentPlan: [],
   platformChangeLogs: []
 };
 
@@ -160,6 +161,49 @@ const defaultSecurityAcceptanceLedger = [
   { id: "security-domestic", name: "信创适配", category: "信创适配", control: "国产CPU、操作系统、数据库、中间件和浏览器", evidence: "适配矩阵/测试报告/问题闭环", owner: "基础设施组", status: "待测试", next: "建立软硬件版本矩阵并执行功能、性能和容灾测试。" }
 ];
 
+const defaultProductionDeploymentPlan = [
+  {
+    id: "prod-env-gate",
+    name: "Release readiness gate",
+    track: "release-governance",
+    status: "ready",
+    owner: "platform lead",
+    nextAction: "Run env:check, release:report:full, deploy:check, coverage, e2e, and audit before every production tag.",
+    requiredConfig: ["NODE_ENV", "SESSION_SECRETS", "INTEGRATION_GATEWAY_SECRET"],
+    evidence: ["scripts/release-report.js", "scripts/deploy-check.js", "release-report"]
+  },
+  {
+    id: "prod-storage-adapter",
+    name: "Production database adapter",
+    track: "database",
+    status: "planned",
+    owner: "data platform",
+    nextAction: "Provision PostgreSQL, set DATABASE_URL, run restore rehearsal, and freeze a migration window.",
+    requiredConfig: ["STORAGE_ENGINE=postgres", "DATABASE_URL", "BACKUP_RETENTION_DAYS"],
+    evidence: ["snapshot", "restore rehearsal", "migration checklist"]
+  },
+  {
+    id: "prod-identity-adapter",
+    name: "Government identity adapter",
+    track: "identity",
+    status: "planned",
+    owner: "identity integration",
+    nextAction: "Connect OIDC/SAML, CA, SMS, and citizen verification sources through a staged adapter.",
+    requiredConfig: ["OIDC_ISSUER_URL", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET"],
+    evidence: ["role mapping", "login audit", "fallback login plan"]
+  },
+  {
+    id: "prod-audit-retention",
+    name: "Audit retention and evidence preservation",
+    track: "security",
+    status: "planned",
+    owner: "security operations",
+    nextAction: "Route audit logs to SIEM/WORM storage and define retention, export, and incident review procedures.",
+    requiredConfig: ["AUDIT_EXPORT_PATH", "SIEM_ENDPOINT", "RETENTION_POLICY"],
+    evidence: ["security ledger", "data access logs", "retention policy"]
+  }
+];
+
 document.addEventListener("DOMContentLoaded", async () => {
   platformState = await loadPlatformState(fallbackPlatformState);
   ensureEditablePlatformData(platformState);
@@ -178,6 +222,7 @@ function renderPlatform() {
   renderApplicationCatalog(platformData.applicationCatalog);
   renderInstitutionCreditEvaluations(platformData.creditEvaluations);
   renderSecurityAcceptanceLedger(platformData.securityLedger);
+  renderProductionDeploymentPlan(platformData.productionDeploymentPlan);
   renderResearchGovernance(platformData);
   renderMobileAccessibilityGovernance(platformData);
   renderEvidenceLibrary(platformData.evidence);
@@ -196,6 +241,7 @@ function platformModel(state) {
     applicationCatalog: Array.isArray(state.applicationCatalog) && state.applicationCatalog.length ? state.applicationCatalog : defaultApplicationCatalog,
     creditEvaluations: Array.isArray(state.institutionCreditEvaluations) && state.institutionCreditEvaluations.length ? state.institutionCreditEvaluations : defaultInstitutionCreditEvaluations,
     securityLedger: Array.isArray(state.securityAcceptanceLedger) && state.securityAcceptanceLedger.length ? state.securityAcceptanceLedger : defaultSecurityAcceptanceLedger,
+    productionDeploymentPlan: Array.isArray(state.productionDeploymentPlan) && state.productionDeploymentPlan.length ? state.productionDeploymentPlan : defaultProductionDeploymentPlan,
     researchDatasets: Array.isArray(state.researchDatasets) ? state.researchDatasets : [],
     diseaseRegistryModels: Array.isArray(state.diseaseRegistryModels) ? state.diseaseRegistryModels : [],
     accessibilityChecklist: Array.isArray(state.accessibilityChecklist) ? state.accessibilityChecklist : [],
@@ -226,6 +272,7 @@ function ensureEditablePlatformData(state) {
   if (!Array.isArray(state.applicationCatalog) || !state.applicationCatalog.length) state.applicationCatalog = structuredClone(defaultApplicationCatalog);
   if (!Array.isArray(state.institutionCreditEvaluations) || !state.institutionCreditEvaluations.length) state.institutionCreditEvaluations = structuredClone(defaultInstitutionCreditEvaluations);
   if (!Array.isArray(state.securityAcceptanceLedger) || !state.securityAcceptanceLedger.length) state.securityAcceptanceLedger = structuredClone(defaultSecurityAcceptanceLedger);
+  if (!Array.isArray(state.productionDeploymentPlan) || !state.productionDeploymentPlan.length) state.productionDeploymentPlan = structuredClone(defaultProductionDeploymentPlan);
   if (!Array.isArray(state.researchDatasets)) state.researchDatasets = [];
   if (!Array.isArray(state.diseaseRegistryModels)) state.diseaseRegistryModels = [];
   if (!Array.isArray(state.accessibilityChecklist)) state.accessibilityChecklist = [];
@@ -246,6 +293,7 @@ function renderMetrics(state, platform) {
     ["专病模型", count(state.diseaseRegistryModels), "版本、阈值和人工复核"],
     ["无障碍项", count(state.accessibilityChecklist), "移动适老化验收清单"],
     ["安全信创", count(state.securityAcceptanceLedger), "等保、密评、国密和信创分账验收"],
+    ["生产轨道", count(state.productionDeploymentPlan), "发布门禁、正式数据库、政务身份和审计保全"],
     ["验收证据", count(state.platformEvidence), "申报、测评、安全、联调、上线材料统一归档"]
   ];
   document.querySelector("#platform-metrics").innerHTML = metrics.map(([label, value, hint]) => `
@@ -382,6 +430,32 @@ function renderSecurityAcceptanceLedger(items) {
     </div>`).join("");
 }
 
+function renderProductionDeploymentPlan(items) {
+  const container = document.querySelector("#production-deployment-plan");
+  if (!container) return;
+  container.innerHTML = items.map((item, index) => {
+    const badge = item.status === "ready" ? "info" : item.status === "blocked" ? "danger" : "warn";
+    const configs = (item.requiredConfig || []).map((config) => `<span class="badge info">${config}</span>`).join("");
+    const evidence = (item.evidence || []).slice(0, 3).map((entry) => `<small>${entry}</small>`).join("");
+    return `
+      <article class="priority-row">
+        <div class="priority-rank ${badge}">${index + 1}</div>
+        <div>
+          <h3>${item.name}</h3>
+          <p>${item.nextAction || item.next || ""}</p>
+          <div class="standard-tags">${configs}</div>
+        </div>
+        <div class="capability-side">
+          <span class="badge ${badge}">${item.status || "planned"}</span>
+          <small>${item.owner || "owner pending"} · ${item.track || "production"}</small>
+          ${evidence}
+          <button class="inline-action" type="button" data-edit-platform="productionDeploymentPlan" data-id="${item.id}">维护</button>
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
 function renderResearchGovernance(platform) {
   const datasetRows = platform.researchDatasets.map((item) => `
     <tr>
@@ -508,6 +582,7 @@ function bindPlatformEditor() {
     item.status = data.status.trim();
     if ("owner" in item || data.owner.trim()) item.owner = data.owner.trim();
     if ("next" in item) item.next = data.next.trim();
+    else if ("nextAction" in item) item.nextAction = data.next.trim();
     else if ("target" in item) item.target = data.next.trim();
     else if ("items" in item) item.items = data.next.split(/[、,\n]/).map((entry) => entry.trim()).filter(Boolean);
     const after = summarizeEditableItem(item);
@@ -600,6 +675,7 @@ function openPlatformEditor(collection, id) {
 
 function editableNextValue(item) {
   if ("next" in item) return item.next || "";
+  if ("nextAction" in item) return item.nextAction || "";
   if ("target" in item) return item.target || "";
   if (Array.isArray(item.items)) return item.items.join("、");
   return "";
@@ -613,7 +689,8 @@ function findEditableItem(collection, id) {
     deliveryBatches: "platformDeliveryBatches",
     applicationCatalog: "applicationCatalog",
     creditEvaluations: "institutionCreditEvaluations",
-    securityLedger: "securityAcceptanceLedger"
+    securityLedger: "securityAcceptanceLedger",
+    productionDeploymentPlan: "productionDeploymentPlan"
   }[collection];
   if (!key) return null;
   return (platformState[key] || []).find((item) => item.id === id);
@@ -625,6 +702,7 @@ function summarizeEditableItem(item) {
     `责任方=${item.owner || "未填"}`
   ];
   if ("next" in item) parts.push(`下一步=${item.next || "未填"}`);
+  else if ("nextAction" in item) parts.push(`下一步=${item.nextAction || "未填"}`);
   else if ("target" in item) parts.push(`目标=${item.target || "未填"}`);
   else if (Array.isArray(item.items)) parts.push(`任务=${item.items.join("、") || "未填"}`);
   return parts.join("；");
@@ -671,7 +749,8 @@ function collectionKey(collection) {
     platformEvidence: "platformEvidence",
     applicationCatalog: "applicationCatalog",
     creditEvaluations: "institutionCreditEvaluations",
-    securityLedger: "securityAcceptanceLedger"
+    securityLedger: "securityAcceptanceLedger",
+    productionDeploymentPlan: "productionDeploymentPlan"
   }[collection] || collection;
 }
 
@@ -751,7 +830,8 @@ function reportItems(platform) {
     ...platform.deliveryBatches.map((item) => ({ type: "开发批次", name: item.phase, status: item.status, owner: item.owner, next: Array.isArray(item.items) ? item.items.join("、") : "" })),
     ...platform.applicationCatalog.map((item) => ({ type: "应用目录", name: item.name, status: item.status, owner: item.owner, next: item.next })),
     ...platform.creditEvaluations.map((item) => ({ type: "信用评价", name: item.name, status: item.status, owner: item.owner, next: item.next })),
-    ...platform.securityLedger.map((item) => ({ type: "安全信创", name: item.name, status: item.status, owner: item.owner, next: item.next }))
+    ...platform.securityLedger.map((item) => ({ type: "安全信创", name: item.name, status: item.status, owner: item.owner, next: item.next })),
+    ...platform.productionDeploymentPlan.map((item) => ({ type: "生产部署", name: item.name, status: item.status, owner: item.owner, next: item.nextAction }))
   ];
 }
 
@@ -805,7 +885,8 @@ function collectionTypeName(collection) {
     platformDeliveryBatches: "开发批次",
     applicationCatalog: "应用目录",
     institutionCreditEvaluations: "信用评价",
-    securityAcceptanceLedger: "安全信创"
+    securityAcceptanceLedger: "安全信创",
+    productionDeploymentPlan: "生产部署"
   }[collection] || "";
 }
 
