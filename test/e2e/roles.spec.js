@@ -94,6 +94,22 @@ test("commission workbench renders live release gates and site templates", async
   expect(serviceAcceptance.serviceAcceptance.county.openActions.some((item) => item.id === "cco-001")).toBe(true);
 });
 
+test("about page explains runnable platform capabilities", async ({ page }) => {
+  await page.goto("/about.html");
+
+  await expect(page.locator("[data-about-section='runtime-capabilities']")).toBeVisible();
+  await expect(page.locator("[data-about-section='role-portals']")).toBeVisible();
+  await expect(page.locator("[data-about-capability='service-acceptance']")).toContainText("/api/service-acceptance-summary");
+  await expect(page.locator("[data-about-capability='site-template-readmes']")).toContainText("/api/site-template-readmes");
+  await expect(page.locator("[data-about-capability='workflow-tasks']")).toContainText("/api/tasks");
+  await expect(page.locator("[data-about-capability='release-gates']")).toContainText("npm run deploy:check");
+  await expect(page.locator("[data-about-section='external-dependencies']")).toBeVisible();
+
+  await login(page, "health", "index.html");
+  await page.goto("/about.html");
+  await expect(page.locator(".auth-bar a[href='./about.html']")).toHaveCount(1);
+});
+
 test("citizen stays in the household experience and cannot open commission pages", async ({ page }) => {
   await login(page, "citizen", "citizen.html");
   await expect(page.getByRole("heading", { name: "个人健康信息库" })).toBeVisible();

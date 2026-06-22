@@ -38,8 +38,30 @@ test("citizen pages do not expose cross-role module links or management collecti
 });
 
 test("application pages avoid placeholder navigation", () => {
-  const pages = ["citizen.html", "mobile-preview.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html"];
+  const pages = ["about.html", "citizen.html", "mobile-preview.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html"];
   pages.forEach((file) => assert.doesNotMatch(read(file), /href=["']#["']/, `${file} 存在空链接占位`));
+});
+
+test("about page documents runnable platform capabilities", () => {
+  const about = read("about.html");
+  const auth = read("auth.js");
+  assert.match(about, /data-about-section="runtime-capabilities"/);
+  assert.match(about, /data-about-section="role-portals"/);
+  assert.match(about, /data-about-capability="service-acceptance"/);
+  assert.match(about, /data-about-capability="site-template-readmes"/);
+  assert.match(about, /data-about-capability="workflow-tasks"/);
+  assert.match(about, /data-about-capability="chronic-care"/);
+  assert.match(about, /data-about-capability="county-consortium"/);
+  assert.match(about, /\/api\/service-acceptance-summary/);
+  assert.match(about, /\/api\/site-template-readmes/);
+  assert.match(about, /\/api\/tasks/);
+  assert.match(about, /npm run deploy:check/);
+  assert.match(read("index.html"), /href="\.\/about\.html"/);
+  assert.match(read("platform.html"), /href="\.\/about\.html"/);
+  assert.match(read("health-city.html"), /href="\.\/about\.html"/);
+  assert.match(auth, /\["about\.html", "关于"\]/);
+  assert.match(auth, /pageName === "about\.html"/);
+  assert.doesNotMatch(about, /requireRole/);
 });
 
 test("static snapshot keeps completed P2 governance collections", () => {
