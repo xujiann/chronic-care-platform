@@ -86,6 +86,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "snapshot:securityAcceptance" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "snapshot:productionDeploymentPlan" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "snapshot:interfaceReadiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "snapshot:externalDependencyRisks" && item.passed), true);
 
   const markdown = renderMarkdown(report);
   assert.match(markdown, /Release readiness report/);
@@ -93,6 +94,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(markdown, /snapshot:securityAcceptance/);
   assert.match(markdown, /snapshot:productionDeploymentPlan/);
   assert.match(markdown, /snapshot:interfaceReadiness/);
+  assert.match(markdown, /snapshot:externalDependencyRisks/);
 });
 
 test("release report CLI argument parser keeps command and flags", () => {
