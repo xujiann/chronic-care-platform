@@ -4,6 +4,7 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { buildAuditRetentionReport, renderMarkdown: renderAuditRetentionMarkdown } = require("./audit-retention");
 const { buildIdentityContract, renderMarkdown: renderIdentityContractMarkdown } = require("./identity-contract");
+const { buildIntegrationReadinessReport, renderMarkdown: renderIntegrationReadinessMarkdown } = require("./integration-readiness");
 const { inspectStorageModel } = require("./storage-admin");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -223,6 +224,14 @@ function auditRetentionChecks(auditRetention) {
   ];
 }
 
+function integrationReadinessChecks(integrationReadiness) {
+  return [
+    check("integration:readiness", integrationReadiness.ok, integrationReadiness.ok ? "integration readiness checks passed" : "integration readiness checks failed", "error", "integration"),
+    check("integration:contractsReady", integrationReadiness.contracts?.every((item) => item.status === "ready"), `${integrationReadiness.contractCount || 0} contracts`, "error", "integration"),
+    check("integration:p0Coverage", integrationReadiness.p0Coverage?.every((item) => item.ready), `${integrationReadiness.p0InterfaceCount || 0} P0 interfaces`, "error", "integration")
+  ];
+}
+
 function packageChecks(pkg) {
   const requiredScripts = [
     "check",
@@ -234,6 +243,7 @@ function packageChecks(pkg) {
     "release:report",
     "identity:contract",
     "audit:retention",
+    "integration:readiness",
     "storage:backup",
     "storage:inspect",
     "storage:assess",
@@ -279,6 +289,7 @@ function buildReleaseReport(options = {}) {
   const storageModel = inspectStorageModel({ dataDir: path.join(ROOT, "data") });
   const identityContract = buildIdentityContract({ data });
   const auditRetention = buildAuditRetentionReport({ data, env: options.env || process.env });
+  const integrationReadiness = buildIntegrationReadinessReport({ data });
   const checks = [
     assertFile("README.md"),
     assertFile("DEPLOYMENT.md"),
@@ -291,6 +302,7 @@ function buildReleaseReport(options = {}) {
     ...storageModelChecks(storageModel),
     ...identityContractChecks(identityContract),
     ...auditRetentionChecks(auditRetention),
+    ...integrationReadinessChecks(integrationReadiness),
     ...env.checks,
     ...commandChecks(options.runCommands)
   ];
@@ -312,7 +324,8 @@ function buildReleaseReport(options = {}) {
     productionCutover: env.cutoverChecklist,
     storageModel,
     identityContract,
-    auditRetention
+    auditRetention,
+    integrationReadiness
   };
 }
 
@@ -402,6 +415,10 @@ function renderMarkdown(report) {
     "## Audit retention report",
     "",
     "See `audit-retention-report.json` and `audit-retention-report.md` for audit-chain verification, export digest, retention targets, and security acceptance evidence.",
+    "",
+    "## Integration readiness report",
+    "",
+    "See `integration-readiness-report.json` and `integration-readiness-report.md` for P0 interface coverage, external contract readiness, idempotency, signature, and retry policy evidence.",
     ""
   ].join("\n");
 }
@@ -460,6 +477,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       auditRetention: report.auditRetention
     }, null, 2), "utf8");
+    const integrationJson = path.join(path.dirname(output), "integration-readiness-report.json");
+    fs.writeFileSync(integrationJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      integrationReadiness: report.integrationReadiness
+    }, null, 2), "utf8");
   }
   if (flags.markdown) {
     const markdown = path.resolve(ROOT, String(flags.markdown));
@@ -473,6 +498,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(identityMarkdown, renderIdentityContractMarkdown(report.identityContract), "utf8");
     const auditMarkdown = path.join(path.dirname(markdown), "audit-retention-report.md");
     fs.writeFileSync(auditMarkdown, renderAuditRetentionMarkdown(report.auditRetention), "utf8");
+    const integrationMarkdown = path.join(path.dirname(markdown), "integration-readiness-report.md");
+    fs.writeFileSync(integrationMarkdown, renderIntegrationReadinessMarkdown(report.integrationReadiness), "utf8");
   }
 }
 

@@ -43,6 +43,8 @@ jobs:
         run: npm run identity:contract
       - name: Generate audit retention report
         run: npm run audit:retention
+      - name: Generate integration readiness report
+        run: npm run integration:readiness
       - name: Generate release readiness report
         run: npm run release:report
       - name: Upload release readiness report

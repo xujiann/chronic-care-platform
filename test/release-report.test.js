@@ -103,6 +103,8 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.identityContract.ok, true);
   assert.equal(report.checks.some((item) => item.name === "audit:retention" && item.passed), true);
   assert.equal(report.auditRetention.ok, true);
+  assert.equal(report.checks.some((item) => item.name === "integration:readiness" && item.passed), true);
+  assert.equal(report.integrationReadiness.ok, true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-env-file"), true);
 
   const markdown = renderMarkdown(report);
@@ -111,6 +113,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(markdown, /Storage model inspection/);
   assert.match(markdown, /Identity integration contract/);
   assert.match(markdown, /Audit retention report/);
+  assert.match(markdown, /Integration readiness report/);
   assert.match(markdown, /cutover-identity/);
   assert.match(markdown, /snapshot:acceptanceEvidence/);
   assert.match(markdown, /snapshot:securityAcceptance/);
@@ -154,6 +157,8 @@ test("release report writes standalone production cutover and storage artifacts"
   const identityMarkdown = fs.readFileSync(path.join(outputDir, "identity-contract.md"), "utf8");
   const auditJson = JSON.parse(fs.readFileSync(path.join(outputDir, "audit-retention-report.json"), "utf8"));
   const auditMarkdown = fs.readFileSync(path.join(outputDir, "audit-retention-report.md"), "utf8");
+  const integrationJson = JSON.parse(fs.readFileSync(path.join(outputDir, "integration-readiness-report.json"), "utf8"));
+  const integrationMarkdown = fs.readFileSync(path.join(outputDir, "integration-readiness-report.md"), "utf8");
   assert.equal(cutoverJson.checklist.some((item) => item.id === "cutover-identity"), true);
   assert.match(cutoverMarkdown, /cutover-storage-adapter/);
   assert.equal(storageJson.storageModel.jsonSnapshot.present, true);
@@ -163,6 +168,8 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(identityMarkdown, /Required external claims/);
   assert.equal(auditJson.auditRetention.ok, true);
   assert.match(auditMarkdown, /Audit chains/);
+  assert.equal(integrationJson.integrationReadiness.ok, true);
+  assert.match(integrationMarkdown, /P0 coverage/);
 });
 
 test("release report CLI argument parser keeps command and flags", () => {

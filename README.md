@@ -174,6 +174,8 @@ npm.cmd run release:report:full
 
 `audit:retention` 会生成 `release/audit-retention-report.json` 与 `release/audit-retention-report.md`，离线验证安全事件和数据访问日志哈希链，记录导出摘要、保全目标和安全验收台账；未配置 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT` 时只作为演示环境提示，生产切换仍由 `env:check:production` 阻断。
 
+`integration:readiness` 会生成 `release/integration-readiness-report.json` 与 `release/integration-readiness-report.md`，检查 P0 接口台账、HIS/EMR/LIS/PACS/医保/证照/统计契约、幂等键、签名和重试策略，并把身份、主索引、安全审计等 P0 覆盖关系纳入发布取证。
+
 ## 备份、脱敏与回滚
 
 ```powershell
