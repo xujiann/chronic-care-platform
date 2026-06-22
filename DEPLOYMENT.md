@@ -154,7 +154,7 @@ npm.cmd run deploy:check:full
 npm.cmd run release:report:full
 ```
 
-`release:report` 默认生成 `release/release-report.json` 和 `release/release-report.md`，汇总代码文件、关键脚本、静态快照、P2 完成状态、验收证据和环境校验；`release:report:full` 会额外执行 `check`、`test`、`test:coverage`、`test:e2e`、`deploy:check` 和 `npm audit --omit=dev`。发布归档时建议保存这两个报告文件，作为上线前人工审查材料。
+`release:report` 默认生成 `release/release-report.json` 和 `release/release-report.md`，汇总代码文件、关键脚本、静态快照、P2 完成状态、接口准备度、安全验收、生产部署计划、验收证据和环境校验；`release:report:full` 会额外执行 `check`、`test`、`test:coverage`、`test:e2e`、`deploy:check` 和 `npm audit --omit=dev`。CI 会上传 `release-readiness-report` artifact；发布归档时建议保存这两个报告文件和对应 CI artifact，作为上线前人工审查材料。
 
 静态快照中的 `productionDeploymentPlan` 是 P0 生产化路线台账，覆盖发布门禁、PostgreSQL/正式数据库适配、政务统一身份适配和审计保全。`/api/system/readiness` 与 `release:report` 都会检查该台账是否存在，避免生产化路径只停留在文档中。
 
