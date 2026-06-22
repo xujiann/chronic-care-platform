@@ -3,7 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 
-const { buildReleaseReport, parseArgs, renderCutoverMarkdown, renderMarkdown, validateProductionConfig, writeOutput } = require("../scripts/release-report");
+const { buildReleaseReport, parseArgs, renderCutoverMarkdown, renderMarkdown, renderStorageModelMarkdown, validateProductionConfig, writeOutput } = require("../scripts/release-report");
 
 const ROOT = path.resolve(__dirname, "..");
 
@@ -95,11 +95,16 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "snapshot:productionDeploymentPlan" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "snapshot:interfaceReadiness" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "snapshot:externalDependencyRisks" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "storage:jsonSnapshot.present" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "storage:jsonSnapshot.collections" && item.passed), true);
+  assert.equal(report.storageModel.jsonSnapshot.present, true);
+  assert.equal(report.storageModel.jsonSnapshot.collections >= 40, true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-env-file"), true);
 
   const markdown = renderMarkdown(report);
   assert.match(markdown, /Release readiness report/);
   assert.match(markdown, /Production cutover checklist/);
+  assert.match(markdown, /Storage model inspection/);
   assert.match(markdown, /cutover-identity/);
   assert.match(markdown, /snapshot:acceptanceEvidence/);
   assert.match(markdown, /snapshot:securityAcceptance/);
@@ -110,9 +115,14 @@ test("release report summarizes repository readiness and renders markdown", () =
   const cutoverMarkdown = renderCutoverMarkdown(report);
   assert.match(cutoverMarkdown, /Production cutover checklist/);
   assert.match(cutoverMarkdown, /cutover-audit-retention/);
+
+  const storageMarkdown = renderStorageModelMarkdown(report);
+  assert.match(storageMarkdown, /Storage model inspection/);
+  assert.match(storageMarkdown, /JSON snapshot/);
+  assert.match(storageMarkdown, /SQLite store/);
 });
 
-test("release report writes standalone production cutover artifacts", (t) => {
+test("release report writes standalone production cutover and storage artifacts", (t) => {
   const outputDir = path.join(ROOT, "tmp", "release-report-test");
   t.after(() => fs.rmSync(outputDir, { recursive: true, force: true }));
   const report = buildReleaseReport({
@@ -132,8 +142,13 @@ test("release report writes standalone production cutover artifacts", (t) => {
 
   const cutoverJson = JSON.parse(fs.readFileSync(path.join(outputDir, "production-cutover-checklist.json"), "utf8"));
   const cutoverMarkdown = fs.readFileSync(path.join(outputDir, "production-cutover-checklist.md"), "utf8");
+  const storageJson = JSON.parse(fs.readFileSync(path.join(outputDir, "storage-model-inspection.json"), "utf8"));
+  const storageMarkdown = fs.readFileSync(path.join(outputDir, "storage-model-inspection.md"), "utf8");
   assert.equal(cutoverJson.checklist.some((item) => item.id === "cutover-identity"), true);
   assert.match(cutoverMarkdown, /cutover-storage-adapter/);
+  assert.equal(storageJson.storageModel.jsonSnapshot.present, true);
+  assert.match(storageMarkdown, /Storage model inspection/);
+  assert.match(storageMarkdown, /Largest/);
 });
 
 test("release report CLI argument parser keeps command and flags", () => {

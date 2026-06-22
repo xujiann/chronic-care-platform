@@ -2,6 +2,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
+const { inspectStorageModel } = require("./storage-admin");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_RELEASE_DIR = path.join(ROOT, "release");
@@ -193,6 +194,17 @@ function snapshotChecks(data) {
   ];
 }
 
+function storageModelChecks(storageModel) {
+  const json = storageModel.jsonSnapshot || {};
+  const sqlite = storageModel.sqlite || {};
+  return [
+    check("storage:jsonSnapshot.present", json.present, json.file || "missing", "error", "storage"),
+    check("storage:jsonSnapshot.collections", Number(json.collections || 0) >= 40, `${json.collections || 0} collections`, "error", "storage"),
+    check("storage:jsonSnapshot.records", Number(json.totalRecords || 0) >= 1, `${json.totalRecords || 0} records`, "error", "storage"),
+    check("storage:sqlite.inspectable", !sqlite.present || sqlite.available, sqlite.present ? (sqlite.available ? `${sqlite.tableCount || 0} tables` : sqlite.error || "unavailable") : "sqlite file not present in this checkout", sqlite.present ? "error" : "warn", "storage")
+  ];
+}
+
 function packageChecks(pkg) {
   const requiredScripts = [
     "check",
@@ -244,6 +256,7 @@ function buildReleaseReport(options = {}) {
   const pkg = readJson("package.json");
   const data = readJson("data/db.json");
   const env = validateProductionConfig(options);
+  const storageModel = inspectStorageModel({ dataDir: path.join(ROOT, "data") });
   const checks = [
     assertFile("README.md"),
     assertFile("DEPLOYMENT.md"),
@@ -253,6 +266,7 @@ function buildReleaseReport(options = {}) {
     assertFile("scripts/storage-admin.js"),
     ...packageChecks(pkg),
     ...snapshotChecks(data),
+    ...storageModelChecks(storageModel),
     ...env.checks,
     ...commandChecks(options.runCommands)
   ];
@@ -271,13 +285,64 @@ function buildReleaseReport(options = {}) {
       warnings: checks.filter((item) => item.severity === "warn" && !item.passed).length
     },
     checks,
-    productionCutover: env.cutoverChecklist
+    productionCutover: env.cutoverChecklist,
+    storageModel
   };
+}
+
+function renderStorageModelMarkdown(report) {
+  const json = report.storageModel?.jsonSnapshot || {};
+  const sqlite = report.storageModel?.sqlite || {};
+  const largestRows = (json.largestCollections || []).map((item) => `| ${item.name} | ${item.records} |`);
+  const tableRows = (sqlite.tables || []).map((name) => `| ${name} |`);
+  const migrationRows = (sqlite.schemaMigrations || []).map((item) => `| ${item.version} | ${item.name || ""} | ${item.applied_at || ""} | ${item.checksum || ""} |`);
+  return [
+    "# Storage model inspection",
+    "",
+    `- Project: ${report.project}`,
+    `- Version: ${report.version}`,
+    `- Profile: ${report.profile}`,
+    `- Generated at: ${report.generatedAt}`,
+    `- Data directory: ${report.storageModel?.dataDir || ""}`,
+    "",
+    "## JSON snapshot",
+    "",
+    `- Present: ${json.present ? "yes" : "no"}`,
+    `- Collections: ${json.collections || 0}`,
+    `- Array collections: ${json.arrayCollections || 0}`,
+    `- Total records: ${json.totalRecords || 0}`,
+    `- SHA-256: ${json.sha256 || "n/a"}`,
+    "",
+    "### Largest JSON collections",
+    "",
+    "| Collection | Records |",
+    "|---|---|",
+    ...largestRows,
+    "",
+    "## SQLite store",
+    "",
+    `- Present: ${sqlite.present ? "yes" : "no"}`,
+    `- Inspectable: ${sqlite.available ? "yes" : "no"}`,
+    `- Tables: ${sqlite.tableCount || 0}`,
+    `- Schema version: ${sqlite.schemaVersion || 0}`,
+    `- SHA-256: ${sqlite.sha256 || "n/a"}`,
+    sqlite.error ? `- Error: ${sqlite.error}` : "",
+    "",
+    "| Table |",
+    "|---|",
+    ...tableRows,
+    "",
+    "| Version | Name | Applied at | Checksum |",
+    "|---|---|---|---|",
+    ...migrationRows,
+    ""
+  ].join("\n");
 }
 
 function renderMarkdown(report) {
   const rows = report.checks.map((item) => `| ${item.passed ? "PASS" : item.severity.toUpperCase()} | ${item.category} | ${item.name} | ${String(item.detail || "").replace(/\|/g, "/")} |`);
   const cutoverRows = (report.productionCutover || []).map((item) => `| ${item.passed ? "PASS" : "BLOCKED"} | ${item.phase} | ${item.owner} | ${item.id} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`);
+  const storage = report.storageModel || {};
   return [
     `# Release readiness report`,
     "",
@@ -287,6 +352,8 @@ function renderMarkdown(report) {
     `- Generated at: ${report.generatedAt}`,
     `- Result: ${report.ok ? "PASS" : "FAIL"}`,
     `- Checks: ${report.summary.passed}/${report.summary.total} passed, ${report.summary.failed} failed, ${report.summary.warnings} warnings`,
+    `- Storage snapshot: ${storage.jsonSnapshot?.collections || 0} collections / ${storage.jsonSnapshot?.totalRecords || 0} records`,
+    `- SQLite model: ${storage.sqlite?.present ? `${storage.sqlite?.tableCount || 0} tables, schema v${storage.sqlite?.schemaVersion || 0}` : "not present in this checkout"}`,
     "",
     "| Result | Category | Check | Detail |",
     "|---|---|---|---|",
@@ -297,6 +364,10 @@ function renderMarkdown(report) {
     "| Result | Phase | Owner | Item | Next action |",
     "|---|---|---|---|---|",
     ...cutoverRows,
+    "",
+    "## Storage model inspection",
+    "",
+    "See `storage-model-inspection.json` and `storage-model-inspection.md` for collection counts, largest collections, SQLite tables, and migration metadata.",
     ""
   ].join("\n");
 }
@@ -331,6 +402,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       checklist: report.productionCutover || []
     }, null, 2), "utf8");
+    const storageJson = path.join(path.dirname(output), "storage-model-inspection.json");
+    fs.writeFileSync(storageJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      storageModel: report.storageModel
+    }, null, 2), "utf8");
   }
   if (flags.markdown) {
     const markdown = path.resolve(ROOT, String(flags.markdown));
@@ -338,6 +417,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(markdown, renderMarkdown(report), "utf8");
     const cutoverMarkdown = path.join(path.dirname(markdown), "production-cutover-checklist.md");
     fs.writeFileSync(cutoverMarkdown, renderCutoverMarkdown(report), "utf8");
+    const storageMarkdown = path.join(path.dirname(markdown), "storage-model-inspection.md");
+    fs.writeFileSync(storageMarkdown, renderStorageModelMarkdown(report), "utf8");
   }
 }
 
@@ -377,4 +458,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { buildProductionCutoverChecklist, buildReleaseReport, parseArgs, readEnvFile, renderCutoverMarkdown, renderMarkdown, validateProductionConfig, writeOutput };
+module.exports = { buildProductionCutoverChecklist, buildReleaseReport, parseArgs, readEnvFile, renderCutoverMarkdown, renderMarkdown, renderStorageModelMarkdown, validateProductionConfig, writeOutput };
