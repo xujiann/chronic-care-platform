@@ -165,6 +165,8 @@ function renderReleaseEvidenceGates(state, readiness, operations) {
   const externalSummary = readiness?.externalDependencySummary || null;
   const interoperability = (state.platformEvidence || []).find((item) => item.id === "ev-interoperability") || {};
   const securityLedger = state.securityAcceptanceLedger || readiness?.securityAcceptanceLedger || [];
+  const chronicAcceptance = state.chronicAcceptanceLedger || [];
+  const countyAcceptance = state.countyAcceptanceLedger || [];
   const productionTracks = state.productionDeploymentPlan || readiness?.productionDeploymentPlan || [];
   const p0Interfaces = (state.platformInterfaces || []).filter((item) => item.priority === "P0");
   const residentsWithIndex = (state.residents || []).filter((item) => item.personIndex || item.identityIndex).length;
@@ -206,6 +208,13 @@ function renderReleaseEvidenceGates(state, readiness, operations) {
       passed: Boolean(checksById["audit-chain"]?.passed && securityLedger.length >= 4),
       detail: `${securityLedger.length} security controls; audit=${checksById["audit-chain"]?.detail || "static preview"}`,
       evidence: "release/audit-retention-report.md"
+    },
+    {
+      id: "process:audit",
+      title: "Full process audit",
+      passed: Boolean((state.platformProcessAudit || []).length >= 10 && chronicAcceptance.length >= 5 && countyAcceptance.length >= 4 && securityLedger.length >= 4 && productionTracks.length >= 4),
+      detail: `${state.platformProcessAudit?.length || 0} process rows; chronic=${chronicAcceptance.length}; county=${countyAcceptance.length}; security=${securityLedger.length}; cutover=${productionTracks.length}`,
+      evidence: "release/process-audit-report.md"
     },
     {
       id: "release:report",
