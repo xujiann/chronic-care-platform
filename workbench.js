@@ -20,11 +20,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   const operations = await loadOperationalMetrics();
   const readiness = await loadSystemReadiness();
   const processAudit = await loadProcessAudit();
+  const acceptanceLedgers = await loadAcceptanceLedgers();
   const tasks = collectUnifiedTasks(state);
   const roadmap = state.platformRoadmap?.length ? state.platformRoadmap : defaultRoadmap();
   renderMetrics(state, tasks, roadmap, operations);
   renderSystemReadiness(readiness);
   renderReleaseEvidenceGates(state, readiness, operations, processAudit);
+  renderAcceptanceLedgers(state, acceptanceLedgers);
   renderSourceAlignment(state);
   renderAudit(state, tasks);
   renderProcessAudit(state, processAudit);
@@ -66,6 +68,23 @@ async function loadProcessAudit() {
     const response = await request("/api/process-audit");
     if (!response.ok) return null;
     return response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+async function loadAcceptanceLedgers() {
+  if (location.protocol === "file:") return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const [chronic, county] = await Promise.all([
+      request("/api/chronic/acceptance-ledger"),
+      request("/api/county/acceptance-ledger")
+    ]);
+    return {
+      chronic: chronic.ok ? await chronic.json() : null,
+      county: county.ok ? await county.json() : null
+    };
   } catch (error) {
     return null;
   }
@@ -257,6 +276,56 @@ function renderReleaseEvidenceGates(state, readiness, operations, processAudit) 
       <small>${readiness || processAudit ? "live API evidence" : "static snapshot evidence"}</small>
     </div>
   </article>`).join("");
+}
+
+function renderAcceptanceLedgers(state, acceptanceLedgers) {
+  const container = document.querySelector("#acceptance-ledgers");
+  if (!container) return;
+
+  const fallbackChronic = {
+    ok: (state.chronicAcceptanceLedger || []).length >= 5,
+    summary: {
+      total: (state.chronicAcceptanceLedger || []).length,
+      ready: (state.chronicAcceptanceLedger || []).filter((item) => /ready|建档|归档|闭环|完成|通过|已/.test(String(item.acceptanceStatus || item.status || ""))).length
+    },
+    ledger: state.chronicAcceptanceLedger || []
+  };
+  const fallbackCounty = {
+    ok: (state.countyAcceptanceLedger || []).length >= 4,
+    summary: {
+      total: (state.countyAcceptanceLedger || []).length,
+      ready: (state.countyAcceptanceLedger || []).filter((item) => /ready|建档|归档|闭环|完成|通过|已/.test(String(item.acceptanceStatus || item.status || ""))).length
+    },
+    ledger: state.countyAcceptanceLedger || []
+  };
+  const ledgers = [
+    { id: "chronic", title: "Chronic care acceptance", source: "/api/chronic/acceptance-ledger", report: acceptanceLedgers?.chronic || fallbackChronic },
+    { id: "county", title: "County consortium acceptance", source: "/api/county/acceptance-ledger", report: acceptanceLedgers?.county || fallbackCounty }
+  ];
+
+  container.innerHTML = ledgers.map((group) => {
+    const summary = group.report?.summary || {};
+    const rows = (group.report?.ledger || []).map((item) => {
+      const ready = String(item.acceptanceStatus || item.status || "").includes("ready") || /建档|归档|闭环|完成|通过|已/.test(String(item.acceptanceStatus || item.status || ""));
+      return `<div>
+        <strong>${item.name || item.id}</strong>
+        <span>${item.metric?.detail || item.evidence || "evidence pending"}<br>${item.owner || "owner pending"} · ${item.next || item.nextAction || "next action pending"}</span>
+        <span class="badge ${ready ? "info" : "warn"}">${item.acceptanceStatus || item.status || "review"}</span>
+      </div>`;
+    }).join("");
+    return `<article class="priority-row" data-acceptance-ledger="${group.id}">
+      <div class="priority-rank ${group.report?.ok ? "info" : "warn"}">${summary.ready || 0}/${summary.total || 0}</div>
+      <div>
+        <h3>${group.title}</h3>
+        <p>${summary.needsFollowUp || 0} rows need follow-up; source ${group.source}.</p>
+        <div class="rules">${rows}</div>
+      </div>
+      <div class="capability-side">
+        <span class="badge ${group.report?.ok ? "info" : "warn"}">${group.report?.ok ? "PASS" : "REVIEW"}</span>
+        <small>${acceptanceLedgers ? "live API ledger" : "static snapshot ledger"}</small>
+      </div>
+    </article>`;
+  }).join("");
 }
 
 function renderAudit(state, tasks) {

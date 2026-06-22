@@ -222,8 +222,10 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.doesNotMatch(platformJs, /domain: "医疗机构业务系统"[^\n]*status: "待接口"/);
   assert.match(workbenchHtml, /system-readiness/);
   assert.match(workbenchHtml, /release-evidence-gates/);
+  assert.match(workbenchHtml, /acceptance-ledgers/);
   assert.match(workbenchJs, /loadOperationalMetrics/);
   assert.match(workbenchJs, /loadSystemReadiness/);
+  assert.match(workbenchJs, /loadAcceptanceLedgers/);
   assert.match(workbenchJs, /renderReleaseEvidenceGates/);
   assert.match(workbenchJs, /data-quality:report/);
   assert.match(workbenchJs, /operations:readiness/);
@@ -232,6 +234,8 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(workbenchJs, /\/api\/metrics/);
   assert.match(workbenchJs, /\/api\/system\/readiness/);
   assert.match(workbenchJs, /\/api\/process-audit/);
+  assert.match(workbenchJs, /\/api\/chronic\/acceptance-ledger/);
+  assert.match(workbenchJs, /\/api\/county\/acceptance-ledger/);
   assert.match(read("server.js"), /\/api\/process-audit/);
 });
 
