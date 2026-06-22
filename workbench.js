@@ -19,14 +19,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   const state = await loadPlatformState(fallbackState);
   const operations = await loadOperationalMetrics();
   const readiness = await loadSystemReadiness();
+  const processAudit = await loadProcessAudit();
   const tasks = collectUnifiedTasks(state);
   const roadmap = state.platformRoadmap?.length ? state.platformRoadmap : defaultRoadmap();
   renderMetrics(state, tasks, roadmap, operations);
   renderSystemReadiness(readiness);
-  renderReleaseEvidenceGates(state, readiness, operations);
+  renderReleaseEvidenceGates(state, readiness, operations, processAudit);
   renderSourceAlignment(state);
   renderAudit(state, tasks);
-  renderProcessAudit(state);
+  renderProcessAudit(state, processAudit);
   renderPlatformMap(state);
   renderPriorityList(roadmap);
   renderUnifiedTasks(tasks);
@@ -51,6 +52,18 @@ async function loadSystemReadiness() {
   try {
     const request = window.HealthCityAuth?.authFetch || fetch;
     const response = await request("/api/system/readiness");
+    if (!response.ok) return null;
+    return response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+async function loadProcessAudit() {
+  if (location.protocol === "file:") return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request("/api/process-audit");
     if (!response.ok) return null;
     return response.json();
   } catch (error) {
@@ -157,7 +170,7 @@ function renderSystemReadiness(readiness) {
   </article>${checkRows}${dependencyDetailRows}`;
 }
 
-function renderReleaseEvidenceGates(state, readiness, operations) {
+function renderReleaseEvidenceGates(state, readiness, operations, processAudit) {
   const container = document.querySelector("#release-evidence-gates");
   if (!container) return;
 
@@ -172,6 +185,8 @@ function renderReleaseEvidenceGates(state, readiness, operations) {
   const residentsWithIndex = (state.residents || []).filter((item) => item.personIndex || item.identityIndex).length;
   const residentCompleteness = state.residents?.length ? Math.round((residentsWithIndex / state.residents.length) * 100) : 0;
   const runtime = readiness?.runtime || operations?.workload || {};
+  const processLedger = processAudit?.ledgers || null;
+  const processSummary = processAudit?.summary || null;
 
   const gates = [
     {
@@ -212,8 +227,10 @@ function renderReleaseEvidenceGates(state, readiness, operations) {
     {
       id: "process:audit",
       title: "Full process audit",
-      passed: Boolean((state.platformProcessAudit || []).length >= 10 && chronicAcceptance.length >= 5 && countyAcceptance.length >= 4 && securityLedger.length >= 4 && productionTracks.length >= 4),
-      detail: `${state.platformProcessAudit?.length || 0} process rows; chronic=${chronicAcceptance.length}; county=${countyAcceptance.length}; security=${securityLedger.length}; cutover=${productionTracks.length}`,
+      passed: processAudit ? Boolean(processAudit.ok) : Boolean((state.platformProcessAudit || []).length >= 10 && chronicAcceptance.length >= 5 && countyAcceptance.length >= 4 && securityLedger.length >= 4 && productionTracks.length >= 4),
+      detail: processAudit
+        ? `${processSummary?.passedDomains || 0}/${processSummary?.evidenceDomains || 0} evidence domains; chronic=${processLedger?.chronic?.ready || 0}/${processLedger?.chronic?.total || 0}; county=${processLedger?.county?.ready || 0}/${processLedger?.county?.total || 0}`
+        : `${state.platformProcessAudit?.length || 0} process rows; chronic=${chronicAcceptance.length}; county=${countyAcceptance.length}; security=${securityLedger.length}; cutover=${productionTracks.length}`,
       evidence: "release/process-audit-report.md"
     },
     {
@@ -237,7 +254,7 @@ function renderReleaseEvidenceGates(state, readiness, operations) {
     </div>
     <div class="capability-side">
       <small>${gate.evidence}</small>
-      <small>${readiness ? "live API evidence" : "static snapshot evidence"}</small>
+      <small>${readiness || processAudit ? "live API evidence" : "static snapshot evidence"}</small>
     </div>
   </article>`).join("");
 }
@@ -287,10 +304,13 @@ function countOpen(rows, closedStatuses) {
   return (rows || []).filter((item) => !closed.has(item.status)).length;
 }
 
-function renderProcessAudit(state) {
+function renderProcessAudit(state, processAudit) {
   const container = document.querySelector("#process-audit-matrix");
   if (!container) return;
-  const rows = state.platformProcessAudit?.length ? state.platformProcessAudit : buildProcessAudit(state);
+  const rows = processAudit?.processRows?.length ? processAudit.processRows : (state.platformProcessAudit?.length ? state.platformProcessAudit : buildProcessAudit(state));
+  const domains = (processAudit?.evidenceDomains || []).map((item) =>
+    `<span class="badge ${item.passed ? "info" : "warn"}">${item.id}</span>`
+  ).join("");
   container.innerHTML = rows.map((item, index) => {
     const badge = item.status === "已闭环" ? "info" : item.status === "进行中" ? "warn" : "danger";
     return `<article class="priority-row">
@@ -309,7 +329,18 @@ function renderProcessAudit(state) {
         <small>${item.nextAction}</small>
       </div>
     </article>`;
-  }).join("");
+  }).join("") + (domains ? `<article class="priority-row">
+    <div class="priority-rank ${processAudit?.ok ? "info" : "warn"}">${processAudit?.ok ? "OK" : "!"}</div>
+    <div>
+      <h3>Full process evidence domains</h3>
+      <p>${processAudit?.summary?.passedDomains || 0}/${processAudit?.summary?.evidenceDomains || 0} evidence domains passed from /api/process-audit.</p>
+      <div class="standard-tags">${domains}</div>
+    </div>
+    <div class="capability-side">
+      <small>/api/process-audit</small>
+      <small>release/process-audit-report.md</small>
+    </div>
+  </article>` : "");
 }
 
 function buildProcessAudit(state) {
