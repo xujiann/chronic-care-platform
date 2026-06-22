@@ -13,6 +13,7 @@ const { buildMonitoringReadinessReport, renderMarkdown: renderMonitoringReadines
 const { buildOperationsReadinessReport, renderMarkdown: renderOperationsReadinessMarkdown } = require("./operations-readiness");
 const { buildProcessAuditReport, renderMarkdown: renderProcessAuditMarkdown } = require("./process-audit");
 const { buildProductionDbReadinessReport, renderMarkdown: renderProductionDbReadinessMarkdown } = require("./production-db-readiness");
+const { buildSiteReadinessPack, renderMarkdown: renderSiteReadinessMarkdown } = require("./site-readiness-pack");
 const { inspectStorageModel } = require("./storage-admin");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -341,6 +342,14 @@ function processAuditChecks(processAudit) {
   ];
 }
 
+function siteReadinessChecks(siteReadinessPack) {
+  return [
+    check("sitePack:readiness", siteReadinessPack.ok, siteReadinessPack.ok ? "site readiness pack checks passed" : "site readiness pack failed", "error", "site-pack"),
+    check("sitePack:templates", siteReadinessPack.summary?.templateRows >= 20, `${siteReadinessPack.summary?.templateRows || 0} template rows`, "error", "site-pack"),
+    check("sitePack:signoff", siteReadinessPack.templates?.signoff?.length >= 8, `${siteReadinessPack.templates?.signoff?.length || 0} signoff templates`, "error", "site-pack")
+  ];
+}
+
 function packageChecks(pkg) {
   const requiredScripts = [
     "check",
@@ -359,6 +368,7 @@ function packageChecks(pkg) {
     "monitoring:readiness",
     "operations:readiness",
     "process:audit",
+    "site:pack",
     "production-db:readiness",
     "evaluation:evidence",
     "storage:backup",
@@ -415,6 +425,7 @@ function buildReleaseReport(options = {}) {
   const productionDbReadiness = buildProductionDbReadinessReport({ data, pkg, storageModel });
   const evaluationEvidence = buildEvaluationEvidenceReport({ data });
   const environmentMatrix = buildEnvironmentMatrixReport({ data, pkg });
+  const siteReadinessPack = buildSiteReadinessPack({ data, pkg, envFile: options.envFile || ".env.example", env: options.env || process.env, identityContract, interfaceMapping, monitoringReadiness });
   const checks = [
     assertFile("README.md"),
     assertFile("DEPLOYMENT.md"),
@@ -433,6 +444,7 @@ function buildReleaseReport(options = {}) {
     ...monitoringReadinessChecks(monitoringReadiness),
     ...operationsReadinessChecks(operationsReadiness),
     ...processAuditChecks(processAudit),
+    ...siteReadinessChecks(siteReadinessPack),
     ...productionDbReadinessChecks(productionDbReadiness),
     ...evaluationEvidenceChecks(evaluationEvidence),
     ...environmentMatrixChecks(environmentMatrix),
@@ -464,6 +476,7 @@ function buildReleaseReport(options = {}) {
     monitoringReadiness,
     operationsReadiness,
     processAudit,
+    siteReadinessPack,
     productionDbReadiness,
     evaluationEvidence,
     environmentMatrix
@@ -576,6 +589,10 @@ function renderMarkdown(report) {
     "## Full process audit report",
     "",
     "See `process-audit-report.json` and `process-audit-report.md` for resident, chronic disease, county consortium, insurance, statistics, certificate, security, and cutover process evidence.",
+    "",
+    "## Site readiness pack",
+    "",
+    "See `site-readiness-pack.json` and `site-readiness-pack.md` for identity source mapping, interface joint-test, monitoring/on-call, and production signoff templates.",
     "",
     "## Monitoring readiness report",
     "",
@@ -690,6 +707,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       processAudit: report.processAudit
     }, null, 2), "utf8");
+    const siteReadinessJson = path.join(path.dirname(output), "site-readiness-pack.json");
+    fs.writeFileSync(siteReadinessJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      siteReadinessPack: report.siteReadinessPack
+    }, null, 2), "utf8");
     const monitoringJson = path.join(path.dirname(output), "monitoring-readiness-report.json");
     fs.writeFileSync(monitoringJson, JSON.stringify({
       project: report.project,
@@ -745,6 +770,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(operationsMarkdown, renderOperationsReadinessMarkdown(report.operationsReadiness), "utf8");
     const processAuditMarkdown = path.join(path.dirname(markdown), "process-audit-report.md");
     fs.writeFileSync(processAuditMarkdown, renderProcessAuditMarkdown(report.processAudit), "utf8");
+    const siteReadinessMarkdown = path.join(path.dirname(markdown), "site-readiness-pack.md");
+    fs.writeFileSync(siteReadinessMarkdown, renderSiteReadinessMarkdown(report.siteReadinessPack), "utf8");
     const monitoringMarkdown = path.join(path.dirname(markdown), "monitoring-readiness-report.md");
     fs.writeFileSync(monitoringMarkdown, renderMonitoringReadinessMarkdown(report.monitoringReadiness), "utf8");
     const productionDbMarkdown = path.join(path.dirname(markdown), "production-db-readiness-report.md");

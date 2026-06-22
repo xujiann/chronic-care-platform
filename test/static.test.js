@@ -135,6 +135,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal(Boolean(pkg.scripts["monitoring:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["operations:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["process:audit"]), true);
+  assert.equal(Boolean(pkg.scripts["site:pack"]), true);
   assert.equal(Boolean(pkg.scripts["production-db:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["evaluation:evidence"]), true);
   assert.match(read(".env.example"), /SESSION_SECRETS=/);
@@ -160,6 +161,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /monitoring-readiness-report\.md/);
   assert.match(read("README.md"), /operations-readiness-report\.md/);
   assert.match(read("README.md"), /process-audit-report\.md/);
+  assert.match(read("README.md"), /site-readiness-pack\.md/);
   assert.match(read("README.md"), /production-db-readiness-report\.md/);
   assert.match(read("README.md"), /evaluation-evidence-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /storage-model-inspection\.md/);
@@ -172,6 +174,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("DEPLOYMENT.md"), /monitoring-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /operations-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /process-audit-report\.md/);
+  assert.match(read("DEPLOYMENT.md"), /site-readiness-pack\.md/);
   assert.match(read("DEPLOYMENT.md"), /production-db-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /evaluation-evidence-report\.md/);
   assert.match(read("scripts/deploy-check.js"), /test:coverage/);
@@ -186,6 +189,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/deploy-check.js"), /monitoring:readiness/);
   assert.match(read("scripts/deploy-check.js"), /operations:readiness/);
   assert.match(read("scripts/deploy-check.js"), /process:audit/);
+  assert.match(read("scripts/deploy-check.js"), /site:pack/);
   assert.match(read("scripts/deploy-check.js"), /production-db:readiness/);
   assert.match(read("scripts/deploy-check.js"), /evaluation:evidence/);
   assert.match(read("scripts/deploy-check.js"), /process\.platform === "win32" \? "npm\.cmd" : "npm"/);
@@ -198,6 +202,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".github/workflows/ci.yml"), /npm run interface:mapping/);
   assert.match(read(".github/workflows/ci.yml"), /npm run monitoring:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run operations:readiness/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run site:pack/);
   assert.match(read(".github/workflows/ci.yml"), /npm run production-db:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run evaluation:evidence/);
   assert.match(read(".github/workflows/ci.yml"), /npm run release:report/);

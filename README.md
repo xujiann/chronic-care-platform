@@ -191,6 +191,8 @@ npm.cmd run release:report:full
 
 `process:audit` 会生成 `release/process-audit-report.json` 与 `release/process-audit-report.md`，把居民主索引、慢病验收、医共体验收、医保取药、统计证照、安全合规和生产切换汇总为全流程审计证据域；`release:report` 会同步归档该报告。
 
+`site:pack` 会生成 `release/site-readiness-pack.json` 与 `release/site-readiness-pack.md`，把政务身份源、HIS/EMR/LIS/PACS/医保/证照接口联调、监控值守和生产签字事项转换为现场可填写的字段映射、样例报文、告警、值班和签字模板；`release:report` 会同步归档该准备包。
+
 `monitoring:readiness` 会生成 `release/monitoring-readiness-report.json` 与 `release/monitoring-readiness-report.md`，专项检查健康检查、运行指标、慢请求、状态码、死信、数据质量、SLO 阈值、告警信号和 on-call escalation 证据；真实 Prometheus/OpenTelemetry 或平台日志绑定完成后，再用 `CUTOVER_MONITORING_SIGNOFF` 作为现场签字信号。
 
 `evaluation:evidence` 会生成 `release/evaluation-evidence-report.json` 与 `release/evaluation-evidence-report.md`，汇总互联互通四甲/五乙测评所需接口清单、标准映射、交易样例、整改记录、P1 接口需求和流程审计证据。
