@@ -526,6 +526,7 @@ function seedState() {
     countyCollaborationOrders: seedCountyCollaborationOrders(),
     countyAiDiagnosisCases: seedCountyAiDiagnosisCases(),
     countyMutualRecognitionRecords: seedCountyMutualRecognitionRecords(),
+    countyAcceptanceLedger: seedCountyAcceptanceLedger(),
     careOrders: seedCareOrders(),
     medicationPickups: seedMedicationPickups(),
     institutionSupervisions: seedInstitutionSupervisions(),
@@ -1314,6 +1315,15 @@ function seedCountyMutualRecognitionRecords() {
     { id: "cmr-001", residentId: "r1", item: "心电图", sourceInstitution: "青泥洼桥社区卫生服务中心", targetInstitution: "大连市中心医院", status: "已互认", savedCost: 86, reason: "同质质控通过", at: todayOffset(-2) },
     { id: "cmr-002", residentId: "r2", item: "糖化血红蛋白", sourceInstitution: "星海湾社区卫生服务中心", targetInstitution: "大连医科大学附属医院", status: "待互认", savedCost: 120, reason: "等待中心实验室报告", at: todayOffset(0) },
     { id: "cmr-003", residentId: "r4", item: "颈动脉超声", sourceInstitution: "庄河市基层医疗机构", targetInstitution: "庄河市中心医院", status: "退回复核", savedCost: 180, reason: "图像质量不足，需要复核", at: todayOffset(-1) }
+  ];
+}
+
+function seedCountyAcceptanceLedger() {
+  return [
+    { id: "county-accept-report-return", milestone: "report-return", owner: "county-consortium-office", target: "Regional imaging, ECG, lab and referral reports are returned to originating institutions and resident records.", evidence: "countyCollaborationOrders / diagnosticReports / personalRecords", status: "evidence-ready", metricKey: "reportReturn", nextAction: "Archive signed joint-test screenshots and receiving physician confirmation from each pilot county." },
+    { id: "county-accept-mutual-recognition", milestone: "mutual-recognition", owner: "medical-quality-center", target: "Recognizable diagnostic results carry a rule, QC status, saving estimate, and non-recognition reason when rejected.", evidence: "countyMutualRecognitionRecords / mutualRecognitionRules", status: "evidence-ready", metricKey: "mutualRecognition", nextAction: "Bind live LIS/PACS QC rules and insurer query feedback before production acceptance." },
+    { id: "county-accept-critical-alert", milestone: "critical-alert", owner: "emergency-command-center", target: "Critical diagnostic values create emergency signals, county tasks, acknowledgements, disposition notes, and resident messages.", evidence: "emergencySignals / taskMessages / diagnosticReports", status: "evidence-ready", metricKey: "criticalAlert", nextAction: "Confirm site alert routing, phone acknowledgement, and escalation timeout with the duty team." },
+    { id: "county-accept-performance", milestone: "performance-settlement", owner: "performance-center", target: "Consortium performance covers orders, recognition, pharmacy, people, finance, materials, chronic care, and overdue tasks.", evidence: "performance consortium report / creditEvaluationRules", status: "evidence-ready", metricKey: "performance", nextAction: "Map final monthly assessment formulas and distribution rules from the production consortium office." }
   ];
 }
 
@@ -3195,6 +3205,7 @@ function normalizeState(data) {
     countyCollaborationOrders: mergeByKey(seedCountyCollaborationOrders(), data.countyCollaborationOrders, "id"),
     countyAiDiagnosisCases: mergeByKey(seedCountyAiDiagnosisCases(), data.countyAiDiagnosisCases, "id"),
     countyMutualRecognitionRecords: mergeByKey(seedCountyMutualRecognitionRecords(), data.countyMutualRecognitionRecords, "id"),
+    countyAcceptanceLedger: mergeByKey(seedCountyAcceptanceLedger(), data.countyAcceptanceLedger, "id"),
     mutualRecognitionRules: mergeByKey(seedMutualRecognitionRules(), data.mutualRecognitionRules, "id"),
     diagnosticReports: mergeByKey(seedDiagnosticReports(), data.diagnosticReports, "id"),
     taskMessages: Array.isArray(data.taskMessages) ? data.taskMessages : [],
@@ -4234,6 +4245,7 @@ function scopeStateForUser(data, user) {
   delete scoped.applicationCatalog;
   delete scoped.institutionCreditEvaluations;
   delete scoped.securityAcceptanceLedger;
+  if (user.role !== "county") delete scoped.countyAcceptanceLedger;
 
   if (user.role !== "citizen") {
     if (user.role === "institution" && user.doctorId) {
@@ -4743,6 +4755,58 @@ function buildConsortiumPerformanceReport(data) {
   };
 }
 
+function buildCountyAcceptanceLedger(data) {
+  const ledger = mergeByKey(seedCountyAcceptanceLedger(), data.countyAcceptanceLedger, "id");
+  const orders = Array.isArray(data.countyCollaborationOrders) ? data.countyCollaborationOrders : [];
+  const reports = Array.isArray(data.diagnosticReports) ? data.diagnosticReports : [];
+  const recognition = Array.isArray(data.countyMutualRecognitionRecords) ? data.countyMutualRecognitionRecords : [];
+  const criticalSignals = (Array.isArray(data.emergencySignals) ? data.emergencySignals : []).filter((item) => item.sourceReportId);
+  const performance = buildConsortiumPerformanceReport(data);
+  const metrics = {
+    reportReturn: {
+      numerator: reports.length + orders.filter((item) => isClosedTaskStatus(item.status)).length,
+      denominator: Math.max(1, reports.length + orders.length),
+      detail: `${reports.length} diagnostic reports, ${orders.filter((item) => isClosedTaskStatus(item.status)).length}/${orders.length} closed collaboration orders`
+    },
+    mutualRecognition: {
+      numerator: recognition.filter((item) => /recognized|已|互认/.test(String(item.status || ""))).length,
+      denominator: Math.max(1, recognition.length),
+      detail: `${recognition.length} recognition records`
+    },
+    criticalAlert: {
+      numerator: criticalSignals.filter((item) => /acknowledged|resolved|closed|已/.test(String(item.status || ""))).length,
+      denominator: Math.max(1, criticalSignals.length),
+      detail: `${criticalSignals.length} critical diagnostic alerts`
+    },
+    performance: {
+      numerator: performance.primaryCareFulfillment.completionRate,
+      denominator: 100,
+      detail: `primary care task completion ${performance.primaryCareFulfillment.completionRate}%`
+    }
+  };
+  const rows = ledger.map((item) => {
+    const metric = metrics[item.metricKey] || { numerator: 0, denominator: 1, detail: "metric missing" };
+    const rate = Math.round((Number(metric.numerator || 0) / Number(metric.denominator || 1)) * 100);
+    return {
+      ...item,
+      metric,
+      rate,
+      acceptanceStatus: rate >= 80 || item.status === "evidence-ready" ? "evidence-ready" : "needs-follow-up"
+    };
+  });
+  return {
+    generatedAt: new Date().toISOString(),
+    ok: rows.every((item) => item.acceptanceStatus === "evidence-ready"),
+    summary: {
+      total: rows.length,
+      ready: rows.filter((item) => item.acceptanceStatus === "evidence-ready").length,
+      needsFollowUp: rows.filter((item) => item.acceptanceStatus !== "evidence-ready").length
+    },
+    ledger: rows,
+    performance
+  };
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -5007,6 +5071,13 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission", "county"], "/api/performance/consortium-report");
     if (!user) return;
     sendJson(res, 200, buildConsortiumPerformanceReport(readDatabase()));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/county/acceptance-ledger") {
+    const user = requireApiRole(req, res, ["commission", "county"], "/api/county/acceptance-ledger");
+    if (!user) return;
+    sendJson(res, 200, buildCountyAcceptanceLedger(readDatabase()));
     return;
   }
 

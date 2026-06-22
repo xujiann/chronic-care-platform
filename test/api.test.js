@@ -555,8 +555,17 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const reviewedReport = reviewedState.body.diagnosticReports.find((item) => item.id === critical.body.report.id);
     assert.equal(reviewedReport.status, "not_recognized");
     assert.equal(reviewedReport.reviewReasonCode, "poor-quality");
+    assert.equal(Array.isArray(reviewedState.body.countyAcceptanceLedger), true);
+
+    const acceptance = await api(baseUrl, "/api/county/acceptance-ledger", authorized(county.body.token));
+    assert.equal(acceptance.response.status, 200);
+    assert.equal(acceptance.body.ok, true);
+    assert.equal(acceptance.body.ledger.some((item) => item.id === "county-accept-report-return"), true);
+    assert.equal(acceptance.body.ledger.some((item) => item.metricKey === "criticalAlert" && item.metric.denominator >= 1), true);
 
     const insurance = await login(baseUrl, "insurance");
+    const insuranceAcceptance = await api(baseUrl, "/api/county/acceptance-ledger", authorized(insurance.body.token));
+    assert.equal(insuranceAcceptance.response.status, 403);
     const insuranceTasks = await api(baseUrl, "/api/tasks", authorized(insurance.body.token));
     assert.equal(insuranceTasks.response.status, 200);
     assert.equal(insuranceTasks.body.tasks.some((item) => item.collection === "insuranceClaims"), true);
