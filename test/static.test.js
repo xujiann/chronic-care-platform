@@ -71,7 +71,15 @@ test("static snapshot keeps acceptance evidence clean and actionable", () => {
   const interoperability = data.platformEvidence.find((item) => item.id === "ev-interoperability");
   assert.equal(interoperability.status, "已建档");
   assert.equal(interoperability.records.length >= 2, true);
+  const security = data.platformEvidence.find((item) => item.id === "ev-security");
+  assert.equal(security.status, "已建档");
+  assert.equal(security.records.length >= 3, true);
+  const launch = data.platformEvidence.find((item) => item.id === "ev-launch");
+  assert.equal(launch.status, "演示验收建档");
+  assert.equal(launch.records.length >= 3, true);
   assert.equal(interoperability.records.every((item) => item.owner && item.testRecord && item.status), true);
+  assert.equal(security.records.every((item) => item.owner && item.testRecord && item.status), true);
+  assert.equal(launch.records.every((item) => item.owner && item.testRecord && item.status), true);
   assert.equal(interoperability.records.some((item) => item.link === "/api/system/readiness"), true);
 });
 

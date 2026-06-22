@@ -137,13 +137,19 @@ const defaultPlatformEvidence = [
     { id: "evr-interoperability-contracts", owner: "项目办/标准管理", testRecord: "接口契约、主索引、交易样例和测评整改清单已完成演示归档", at: "2026-06-22 07:20:00", link: "/api/system/readiness", fileName: "interoperability-contracts-readiness-2026-06-22.md", status: "演示证据已归档" },
     { id: "evr-interoperability-gateway", owner: "平台技术组/接口联调", testRecord: "HMAC 签名、幂等键、死信重试和回调事件通过 API 自动化测试", at: "2026-06-22 07:25:00", link: "test/api.test.js", fileName: "integration-gateway-api-regression.md", status: "自动化测试通过" }
   ] },
-  { id: "ev-security", category: "安全合规", name: "等保、密评和信创适配证据", owner: "安全管理岗", source: "统一认证、访问审计、安全事件、数据访问日志、信创适配清单", artifacts: ["权限矩阵", "审计日志", "安全事件", "密评整改项"], status: "开发中", next: "补齐国密传输、数据库加密、日志保全和国产化适配证明。", records: [
-    { id: "evr-audit-retention", owner: "安全管理岗", testRecord: "审计哈希链、导出摘要、安全验收台账和保全目标已纳入发布报告", at: "2026-06-22 07:30:00", link: "release/audit-retention-report.md", fileName: "audit-retention-report.md", status: "自动化证据已归档" }
+  { id: "ev-security", category: "安全合规", name: "等保、密评和信创适配证据", owner: "安全管理岗", source: "统一认证、访问审计、安全事件、数据访问日志、信创适配清单", artifacts: ["权限矩阵", "审计日志", "安全事件", "密评整改项"], status: "已建档", next: "继续补充国密传输、数据库加密、第三方密评和等保测评现场材料。", records: [
+    { id: "evr-audit-retention", owner: "安全管理岗", testRecord: "审计哈希链、导出摘要、安全验收台账和保全目标已纳入发布报告", at: "2026-06-22 07:30:00", link: "release/audit-retention-report.md", fileName: "audit-retention-report.md", status: "自动化证据已归档" },
+    { id: "evr-identity-contract", owner: "统一认证组", testRecord: "政务身份 claims、角色门户映射和机构覆盖度已形成身份契约", at: "2026-06-22 07:32:00", link: "release/identity-contract.md", fileName: "identity-contract.md", status: "自动化证据已归档" },
+    { id: "evr-security-regression", owner: "安全测试组", testRecord: "拒绝访问、字段脱敏、会话篡改拒绝和审计哈希链已通过回归测试", at: "2026-06-22 07:34:00", link: "test/security.test.js", fileName: "security-regression.md", status: "自动化测试通过" }
   ] },
   { id: "ev-interface", category: "接口联调", name: "外部系统接口联调验收", owner: "市级平台/医疗机构", source: "HIS、EMR、LIS、PACS、医保、电子证照、卫生统计等对接计划", artifacts: ["联调计划", "字段映射", "异常清单", "回归测试"], status: "演示对接完成", next: "真实院内系统、医保核心和电子证照联调仍按现场窗口推进。", records: [
     { id: "evr-integration-readiness", owner: "平台技术组/接口联调", testRecord: "HIS/EMR/LIS/PACS/医保/证照/统计接口契约、签名、幂等和重试策略已完成演示门禁", at: "2026-06-22 07:35:00", link: "release/integration-readiness-report.md", fileName: "integration-readiness-report.md", status: "自动化证据已归档" }
   ] },
-  { id: "ev-launch", category: "上线验收", name: "区级实施和应用上线材料", owner: "实施组", source: "中山、沙河口、甘井子、高新区实施批次和应用培训记录", artifacts: ["上线确认", "培训签到", "试运行问题", "用户反馈"], status: "待启动", next: "按区县、机构、应用和批次沉淀上线确认与问题闭环。", records: [] }
+  { id: "ev-launch", category: "上线验收", name: "区级实施和应用上线材料", owner: "实施组", source: "中山、沙河口、甘井子、高新区实施批次和应用培训记录", artifacts: ["上线确认", "培训签到", "试运行问题", "用户反馈"], status: "演示验收建档", next: "按真实区县、机构、应用和批次补充上线签字、培训签到、试运行问题和用户反馈。", records: [
+    { id: "evr-operations-readiness", owner: "实施组/运维组", testRecord: "健康检查、运行指标、外部依赖和生产运维脚本已形成运维就绪证据", at: "2026-06-22 07:40:00", link: "release/operations-readiness-report.md", fileName: "operations-readiness-report.md", status: "自动化证据已归档" },
+    { id: "evr-release-readiness", owner: "项目办/发布经理", testRecord: "发布门禁、生产切换清单、存储模型和测评证据已纳入 release report", at: "2026-06-22 07:42:00", link: "release/release-report.md", fileName: "release-report.md", status: "自动化证据已归档" },
+    { id: "evr-mobile-pwa", owner: "居民端实施组", testRecord: "居民端 manifest、service worker、弱网回退和移动入口已通过静态测试", at: "2026-06-22 07:44:00", link: "citizen.html", fileName: "citizen-pwa-static-check.md", status: "居民端 PWA 壳已验证" }
+  ] }
 ];
 
 const defaultApplicationCatalog = [

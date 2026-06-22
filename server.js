@@ -628,9 +628,20 @@ function seedPlatformEvidence() {
       { id: "evr-interoperability-contracts", owner: "接口联调组", artifact: "接口清单/标准映射", testRecord: "integration-readiness-report.md", status: "已归档", link: "/api/system/readiness" },
       { id: "evr-interoperability-samples", owner: "测评材料组", artifact: "交易样例/整改记录", testRecord: "interface-mapping-report.md", status: "已归档", link: "release/interface-mapping-report.md" }
     ] },
-    { id: "ev-security", category: "安全合规", name: "等保、密评和信创适配证据", owner: "安全管理岗", source: "统一认证、访问审计、安全事件、数据访问日志、信创适配清单", artifacts: ["权限矩阵", "审计日志", "安全事件", "密评整改项"], status: "开发中", next: "补齐国密传输、数据库加密、日志保全和国产化适配证明。", records: [] },
-    { id: "ev-interface", category: "接口联调", name: "外部系统接口联调验收", owner: "市级平台/医疗机构", source: "HIS、EMR、LIS、PACS、医保、电子证照、卫生统计等对接计划", artifacts: ["联调计划", "字段映射", "异常清单", "回归测试"], status: "开发中", next: "为每个接口域建立责任人、环境、频率、样例和验收规则。", records: [] },
-    { id: "ev-launch", category: "上线验收", name: "区级实施和应用上线材料", owner: "实施组", source: "中山、沙河口、甘井子、高新区实施批次和应用培训记录", artifacts: ["上线确认", "培训签到", "试运行问题", "用户反馈"], status: "待启动", next: "按区县、机构、应用和批次沉淀上线确认与问题闭环。", records: [] }
+    { id: "ev-security", category: "安全合规", name: "等保、密评和信创适配证据", owner: "安全管理岗", source: "统一认证、访问审计、安全事件、数据访问日志、信创适配清单", artifacts: ["权限矩阵", "审计日志", "安全事件", "密评整改项"], status: "已建档", next: "继续补充国密传输、数据库加密、第三方密评和等保测评现场材料。", records: [
+      { id: "evr-audit-retention", owner: "安全管理岗", artifact: "审计日志/安全事件", testRecord: "audit-retention-report.md", status: "已归档", link: "release/audit-retention-report.md" },
+      { id: "evr-identity-contract", owner: "统一认证组", artifact: "权限矩阵/身份映射", testRecord: "identity-contract.md", status: "已归档", link: "release/identity-contract.md" },
+      { id: "evr-security-regression", owner: "安全测试组", artifact: "拒绝访问/脱敏/哈希链", testRecord: "security.test.js api.test.js", status: "自动化测试通过", link: "test/security.test.js" }
+    ] },
+    { id: "ev-interface", category: "接口联调", name: "外部系统接口联调验收", owner: "市级平台/医疗机构", source: "HIS、EMR、LIS、PACS、医保、电子证照、卫生统计等对接计划", artifacts: ["联调计划", "字段映射", "异常清单", "回归测试"], status: "演示对接完成", next: "真实院内系统、医保核心和电子证照联调仍按现场窗口推进。", records: [
+      { id: "evr-integration-readiness", owner: "接口联调组", artifact: "联调计划/回归测试", testRecord: "integration-readiness-report.md", status: "已归档", link: "release/integration-readiness-report.md" },
+      { id: "evr-interface-mapping", owner: "接口联调组", artifact: "字段映射/异常清单", testRecord: "interface-mapping-report.md", status: "已归档", link: "release/interface-mapping-report.md" }
+    ] },
+    { id: "ev-launch", category: "上线验收", name: "区级实施和应用上线材料", owner: "实施组", source: "中山、沙河口、甘井子、高新区实施批次和应用培训记录", artifacts: ["上线确认", "培训签到", "试运行问题", "用户反馈"], status: "演示验收建档", next: "按真实区县、机构、应用和批次补充上线签字、培训签到、试运行问题和用户反馈。", records: [
+      { id: "evr-operations-readiness", owner: "实施组/运维组", artifact: "上线确认/试运行问题", testRecord: "operations-readiness-report.md", status: "已归档", link: "release/operations-readiness-report.md" },
+      { id: "evr-release-readiness", owner: "项目办/发布经理", artifact: "上线确认/发布门禁", testRecord: "release-report.md", status: "已归档", link: "release/release-report.md" },
+      { id: "evr-mobile-pwa", owner: "居民端实施组", artifact: "用户反馈/移动端培训材料", testRecord: "static.test.js", status: "居民端 PWA 壳已验证", link: "citizen.html" }
+    ] }
   ];
 }
 
