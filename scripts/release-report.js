@@ -2,6 +2,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
+const { buildAuditRetentionReport, renderMarkdown: renderAuditRetentionMarkdown } = require("./audit-retention");
 const { buildIdentityContract, renderMarkdown: renderIdentityContractMarkdown } = require("./identity-contract");
 const { inspectStorageModel } = require("./storage-admin");
 
@@ -214,6 +215,14 @@ function identityContractChecks(identityContract) {
   ];
 }
 
+function auditRetentionChecks(auditRetention) {
+  return [
+    check("audit:retention", auditRetention.ok, auditRetention.ok ? "audit retention checks passed" : "audit retention checks failed", "error", "audit"),
+    check("audit:exportDigest", Boolean(auditRetention.exportDigest), auditRetention.exportDigest || "missing", "error", "audit"),
+    check("audit:retentionTargetConfigured", auditRetention.retentionTargets?.some((item) => item.configured), "production target is required during site cutover", "warn", "audit")
+  ];
+}
+
 function packageChecks(pkg) {
   const requiredScripts = [
     "check",
@@ -224,6 +233,7 @@ function packageChecks(pkg) {
     "env:check",
     "release:report",
     "identity:contract",
+    "audit:retention",
     "storage:backup",
     "storage:inspect",
     "storage:assess",
@@ -268,6 +278,7 @@ function buildReleaseReport(options = {}) {
   const env = validateProductionConfig(options);
   const storageModel = inspectStorageModel({ dataDir: path.join(ROOT, "data") });
   const identityContract = buildIdentityContract({ data });
+  const auditRetention = buildAuditRetentionReport({ data, env: options.env || process.env });
   const checks = [
     assertFile("README.md"),
     assertFile("DEPLOYMENT.md"),
@@ -279,6 +290,7 @@ function buildReleaseReport(options = {}) {
     ...snapshotChecks(data),
     ...storageModelChecks(storageModel),
     ...identityContractChecks(identityContract),
+    ...auditRetentionChecks(auditRetention),
     ...env.checks,
     ...commandChecks(options.runCommands)
   ];
@@ -299,7 +311,8 @@ function buildReleaseReport(options = {}) {
     checks,
     productionCutover: env.cutoverChecklist,
     storageModel,
-    identityContract
+    identityContract,
+    auditRetention
   };
 }
 
@@ -385,6 +398,10 @@ function renderMarkdown(report) {
     "## Identity integration contract",
     "",
     "See `identity-contract.json` and `identity-contract.md` for required external claims, role-to-portal mappings, organization coverage, and sample claim mappings.",
+    "",
+    "## Audit retention report",
+    "",
+    "See `audit-retention-report.json` and `audit-retention-report.md` for audit-chain verification, export digest, retention targets, and security acceptance evidence.",
     ""
   ].join("\n");
 }
@@ -435,6 +452,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       identityContract: report.identityContract
     }, null, 2), "utf8");
+    const auditJson = path.join(path.dirname(output), "audit-retention-report.json");
+    fs.writeFileSync(auditJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      auditRetention: report.auditRetention
+    }, null, 2), "utf8");
   }
   if (flags.markdown) {
     const markdown = path.resolve(ROOT, String(flags.markdown));
@@ -446,6 +471,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(storageMarkdown, renderStorageModelMarkdown(report), "utf8");
     const identityMarkdown = path.join(path.dirname(markdown), "identity-contract.md");
     fs.writeFileSync(identityMarkdown, renderIdentityContractMarkdown(report.identityContract), "utf8");
+    const auditMarkdown = path.join(path.dirname(markdown), "audit-retention-report.md");
+    fs.writeFileSync(auditMarkdown, renderAuditRetentionMarkdown(report.auditRetention), "utf8");
   }
 }
 

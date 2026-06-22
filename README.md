@@ -172,6 +172,8 @@ npm.cmd run release:report:full
 
 `identity:contract` 会生成 `release/identity-contract.json` 与 `release/identity-contract.md`，固化政务统一身份接入所需 claims、角色到门户映射、机构覆盖度和样例 claim 映射；`release:report` 与 CI 会同步归档该契约，便于现场 OIDC/SAML 联调前逐项确认。
 
+`audit:retention` 会生成 `release/audit-retention-report.json` 与 `release/audit-retention-report.md`，离线验证安全事件和数据访问日志哈希链，记录导出摘要、保全目标和安全验收台账；未配置 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT` 时只作为演示环境提示，生产切换仍由 `env:check:production` 阻断。
+
 ## 备份、脱敏与回滚
 
 ```powershell

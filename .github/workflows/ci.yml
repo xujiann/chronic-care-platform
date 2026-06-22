@@ -41,6 +41,8 @@ jobs:
         run: npm run storage:inspect
       - name: Generate identity integration contract
         run: npm run identity:contract
+      - name: Generate audit retention report
+        run: npm run audit:retention
       - name: Generate release readiness report
         run: npm run release:report
       - name: Upload release readiness report
