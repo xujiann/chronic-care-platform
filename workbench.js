@@ -32,7 +32,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderMetrics(state, tasks, roadmap, operations);
   renderSystemReadiness(readiness);
   renderReleaseEvidenceGates(state, readiness, operations, processAudit, serviceAcceptanceSummary, siteReadinessPack, releaseReport, productionCutover, releaseArtifactManifest);
-  renderAcceptanceLedgers(state, acceptanceLedgers);
+  renderAcceptanceLedgers(state, acceptanceLedgers, serviceAcceptanceSummary);
   renderSiteReadinessPack(siteReadinessPack, siteTemplateReadmes);
   renderSourceAlignment(state);
   renderAudit(state, tasks);
@@ -401,7 +401,7 @@ function renderReleaseEvidenceGates(state, readiness, operations, processAudit, 
   </article>`).join("");
 }
 
-function renderAcceptanceLedgers(state, acceptanceLedgers) {
+function renderAcceptanceLedgers(state, acceptanceLedgers, serviceAcceptanceSummary) {
   const container = document.querySelector("#acceptance-ledgers");
   if (!container) return;
 
@@ -426,10 +426,13 @@ function renderAcceptanceLedgers(state, acceptanceLedgers) {
     { id: "county", title: "County consortium acceptance", source: "/api/county/acceptance-ledger", report: acceptanceLedgers?.county || fallbackCounty }
   ];
 
+  const serviceAcceptance = serviceAcceptanceSummary?.serviceAcceptance || null;
+
   container.innerHTML = ledgers.map((group) => {
     const summary = group.report?.summary || {};
     const serviceSummary = group.report?.serviceSummary?.summary || null;
     const openServiceItems = serviceSummary?.openWorkflowItems ?? serviceSummary?.openCollaborationOrders ?? 0;
+    const serviceActions = (serviceAcceptance?.[group.id]?.openActions || []).slice(0, 5);
     const rows = (group.report?.ledger || []).map((item) => {
       const ready = String(item.acceptanceStatus || item.status || "").includes("ready") || /建档|归档|闭环|完成|通过|已/.test(String(item.acceptanceStatus || item.status || ""));
       return `<div>
@@ -438,12 +441,17 @@ function renderAcceptanceLedgers(state, acceptanceLedgers) {
         <span class="badge ${ready ? "info" : "warn"}">${item.acceptanceStatus || item.status || "review"}</span>
       </div>`;
     }).join("");
+    const actionRows = serviceActions.map((item) => `<div data-service-open-action="${group.id}:${item.id}">
+      <strong>${item.subject || item.id}</strong>
+      <span>${item.collection} · ${item.owner} · ${item.nextAction || "next action pending"}</span>
+      <span class="badge warn">${item.status}</span>
+    </div>`).join("");
     return `<article class="priority-row" data-acceptance-ledger="${group.id}">
       <div class="priority-rank ${group.report?.ok ? "info" : "warn"}">${summary.ready || 0}/${summary.total || 0}</div>
       <div>
         <h3>${group.title}</h3>
         <p>${serviceSummary ? `${serviceSummary.readyDomains}/${serviceSummary.domains} service domains ready; ${openServiceItems} open items; ` : ""}${summary.needsFollowUp || 0} rows need follow-up; source ${group.source}.</p>
-        <div class="rules">${rows}</div>
+        <div class="rules">${rows}${actionRows ? `<div><strong>Open action preview</strong><span>${serviceActions.length} runtime actions from /api/service-acceptance-summary</span><span class="badge warn">ACTION</span></div>${actionRows}` : ""}</div>
       </div>
       <div class="capability-side">
         <span class="badge ${group.report?.ok ? "info" : "warn"}">${group.report?.ok ? "PASS" : "REVIEW"}</span>
