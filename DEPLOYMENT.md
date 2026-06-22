@@ -125,6 +125,8 @@ npm.cmd run env:check:production
 
 该命令读取 `.env`，会拒绝缺失环境文件、占位密钥、过短密钥、`STORAGE_ENGINE=json` 和尚未启用的 `postgres/postgresql` 运行时适配器；生产模式还会要求 OIDC 身份适配和审计保全目标配置到位。
 
+`env:check:production` 和 `release:report` 还会输出 `cutoverChecklist` / `productionCutover`，按环境文件、生产密钥、统一身份、审计保全和存储适配五类列出责任方、阻断状态、当前证据和下一步动作。真实参数到位后，应先让这五类全部通过，再进入外部接口联调和现场测评。
+
 ## 验证与发布验收
 
 ```powershell

@@ -28,6 +28,8 @@ test("release report validates demo and production environment profiles", () => 
   assert.equal(failedProduction.passed, false);
   assert.equal(failedProduction.checks.some((item) => item.name === "env:STORAGE_ENGINE.production" && !item.passed), true);
   assert.equal(failedProduction.checks.some((item) => item.name === "env:SESSION_SECRETS.productionQuality" && !item.passed), true);
+  assert.equal(failedProduction.cutoverChecklist.some((item) => item.id === "cutover-secrets" && !item.passed), true);
+  assert.equal(failedProduction.cutoverChecklist.some((item) => item.id === "cutover-identity" && !item.passed), true);
 
   const postgresBeforeAdapter = validateProductionConfig({
     profile: "production",
@@ -60,6 +62,8 @@ test("release report validates demo and production environment profiles", () => 
     }
   });
   assert.equal(production.passed, true);
+  assert.equal(production.cutoverChecklist.some((item) => item.id === "cutover-identity" && item.passed), true);
+  assert.equal(production.cutoverChecklist.some((item) => item.id === "cutover-audit-retention" && item.passed), true);
 
   const missingEnvFile = validateProductionConfig({
     profile: "production",
@@ -87,9 +91,12 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "snapshot:productionDeploymentPlan" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "snapshot:interfaceReadiness" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "snapshot:externalDependencyRisks" && item.passed), true);
+  assert.equal(report.productionCutover.some((item) => item.id === "cutover-env-file"), true);
 
   const markdown = renderMarkdown(report);
   assert.match(markdown, /Release readiness report/);
+  assert.match(markdown, /Production cutover checklist/);
+  assert.match(markdown, /cutover-identity/);
   assert.match(markdown, /snapshot:acceptanceEvidence/);
   assert.match(markdown, /snapshot:securityAcceptance/);
   assert.match(markdown, /snapshot:productionDeploymentPlan/);

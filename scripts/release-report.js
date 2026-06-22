@@ -53,6 +53,55 @@ function check(name, passed, detail, severity = "error", category = "release") {
   return { name, category, severity, passed: Boolean(passed), detail };
 }
 
+function buildProductionCutoverChecklist(env, checks) {
+  const byName = Object.fromEntries(checks.map((item) => [item.name, item]));
+  const ready = (...names) => names.every((name) => byName[name]?.passed);
+  const detail = (...names) => names.map((name) => `${name}: ${byName[name]?.detail || "missing"}`).join("; ");
+  const storageEngine = String(env.STORAGE_ENGINE || "auto").toLowerCase();
+  return [
+    {
+      id: "cutover-env-file",
+      phase: "environment",
+      owner: "platform-ops",
+      passed: ready("env:file", "env:NODE_ENV.production", "env:STORAGE_ENGINE", "env:STORAGE_ENGINE.production"),
+      evidence: detail("env:file", "env:NODE_ENV.production", "env:STORAGE_ENGINE", "env:STORAGE_ENGINE.production"),
+      nextAction: "在目标服务器创建真实 .env，设置 NODE_ENV=production，并确认不使用 JSON 作为生产主存储。"
+    },
+    {
+      id: "cutover-secrets",
+      phase: "security",
+      owner: "security-admin",
+      passed: ready("env:SESSION_SECRETS.present", "env:SESSION_SECRETS.productionQuality", "env:INTEGRATION_GATEWAY_SECRET.present", "env:INTEGRATION_GATEWAY_SECRET.productionQuality"),
+      evidence: detail("env:SESSION_SECRETS.present", "env:SESSION_SECRETS.productionQuality", "env:INTEGRATION_GATEWAY_SECRET.present", "env:INTEGRATION_GATEWAY_SECRET.productionQuality"),
+      nextAction: "生成不少于 32 位、非占位的会话密钥和接口网关 HMAC 密钥；按轮换策略把新密钥放在 SESSION_SECRETS 首位。"
+    },
+    {
+      id: "cutover-identity",
+      phase: "identity",
+      owner: "identity-integration",
+      passed: ready("env:OIDC.identityAdapter"),
+      evidence: detail("env:OIDC.identityAdapter"),
+      nextAction: "确认政务统一认证 OIDC/SAML 参数、客户端密钥、回调地址、机构目录和医生身份源映射。"
+    },
+    {
+      id: "cutover-audit-retention",
+      phase: "audit",
+      owner: "security-admin",
+      passed: ready("env:AUDIT.retentionTarget"),
+      evidence: detail("env:AUDIT.retentionTarget"),
+      nextAction: "配置 AUDIT_EXPORT_PATH 或 SIEM_ENDPOINT，并确认日志保全、留存年限、访问审计和导出权限。"
+    },
+    {
+      id: "cutover-storage-adapter",
+      phase: "storage",
+      owner: "data-platform",
+      passed: ready("env:STORAGE_ENGINE.runtimeAdapter", "env:DATABASE_URL.requiredForPostgres") && !["postgres", "postgresql"].includes(storageEngine),
+      evidence: detail("env:STORAGE_ENGINE.runtimeAdapter", "env:DATABASE_URL.requiredForPostgres"),
+      nextAction: "当前运行时支持 auto/sqlite；如切换 PostgreSQL，需先完成正式数据库适配器、迁移、回滚和原生备份演练。"
+    }
+  ];
+}
+
 function validateProductionConfig(options = {}) {
   const profile = String(options.profile || "demo").toLowerCase();
   const envFile = options.envFile || ".env.example";
@@ -90,7 +139,8 @@ function validateProductionConfig(options = {}) {
     profile,
     envFile,
     passed: checks.every((item) => item.severity !== "error" || item.passed),
-    checks
+    checks,
+    cutoverChecklist: buildProductionCutoverChecklist(env, checks)
   };
 }
 
@@ -219,12 +269,14 @@ function buildReleaseReport(options = {}) {
       failed: failed.length,
       warnings: checks.filter((item) => item.severity === "warn" && !item.passed).length
     },
-    checks
+    checks,
+    productionCutover: env.cutoverChecklist
   };
 }
 
 function renderMarkdown(report) {
   const rows = report.checks.map((item) => `| ${item.passed ? "PASS" : item.severity.toUpperCase()} | ${item.category} | ${item.name} | ${String(item.detail || "").replace(/\|/g, "/")} |`);
+  const cutoverRows = (report.productionCutover || []).map((item) => `| ${item.passed ? "PASS" : "BLOCKED"} | ${item.phase} | ${item.owner} | ${item.id} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`);
   return [
     `# Release readiness report`,
     "",
@@ -238,6 +290,12 @@ function renderMarkdown(report) {
     "| Result | Category | Check | Detail |",
     "|---|---|---|---|",
     ...rows,
+    "",
+    "## Production cutover checklist",
+    "",
+    "| Result | Phase | Owner | Item | Next action |",
+    "|---|---|---|---|---|",
+    ...cutoverRows,
     ""
   ].join("\n");
 }
@@ -291,4 +349,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { buildReleaseReport, parseArgs, readEnvFile, renderMarkdown, validateProductionConfig };
+module.exports = { buildProductionCutoverChecklist, buildReleaseReport, parseArgs, readEnvFile, renderMarkdown, validateProductionConfig };
