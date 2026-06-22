@@ -7,6 +7,7 @@ const { buildDataQualityReport, renderMarkdown: renderDataQualityMarkdown } = re
 const { buildEvaluationEvidenceReport, renderMarkdown: renderEvaluationEvidenceMarkdown } = require("./evaluation-evidence");
 const { buildIdentityContract, renderMarkdown: renderIdentityContractMarkdown } = require("./identity-contract");
 const { buildIntegrationReadinessReport, renderMarkdown: renderIntegrationReadinessMarkdown } = require("./integration-readiness");
+const { buildInterfaceMappingReport, renderMarkdown: renderInterfaceMappingMarkdown } = require("./interface-mapping");
 const { buildMonitoringReadinessReport, renderMarkdown: renderMonitoringReadinessMarkdown } = require("./monitoring-readiness");
 const { buildOperationsReadinessReport, renderMarkdown: renderOperationsReadinessMarkdown } = require("./operations-readiness");
 const { buildProductionDbReadinessReport, renderMarkdown: renderProductionDbReadinessMarkdown } = require("./production-db-readiness");
@@ -117,8 +118,8 @@ function buildProductionCutoverChecklist(env, checks = []) {
       id: "cutover-institution-interfaces",
       phase: "integration",
       owner: "institution-integration",
-      passed: ready("integration:p0Coverage", "integration:contractsReady") && envFlagEnabled(env, "CUTOVER_SITE_INTERFACE_SIGNOFF"),
-      evidence: `${detail("integration:p0Coverage", "integration:contractsReady")}; ${signoff("CUTOVER_SITE_INTERFACE_SIGNOFF")}`,
+      passed: ready("integration:p0Coverage", "integration:contractsReady", "interfaceMapping:report", "interfaceMapping:requiredFields") && envFlagEnabled(env, "CUTOVER_SITE_INTERFACE_SIGNOFF"),
+      evidence: `${detail("integration:p0Coverage", "integration:contractsReady", "interfaceMapping:report", "interfaceMapping:requiredFields")}; ${signoff("CUTOVER_SITE_INTERFACE_SIGNOFF")}`,
       nextAction: "Archive signed HIS/EMR/LIS/PACS and referral joint-test records from the target site before production cutover."
     },
     {
@@ -274,6 +275,14 @@ function integrationReadinessChecks(integrationReadiness) {
   ];
 }
 
+function interfaceMappingChecks(interfaceMapping) {
+  return [
+    check("interfaceMapping:report", interfaceMapping.ok, interfaceMapping.ok ? "interface field mappings passed" : "interface field mappings failed", "error", "integration"),
+    check("interfaceMapping:requiredFields", interfaceMapping.mappings?.every((item) => item.fieldCoverage?.every((field) => field.mapped)), `${interfaceMapping.contractCount || 0} contracts mapped`, "error", "integration"),
+    check("interfaceMapping:idempotency", interfaceMapping.mappings?.every((item) => item.idempotencyMapped), "idempotency keys mapped to platform fields", "error", "integration")
+  ];
+}
+
 function evaluationEvidenceChecks(evaluationEvidence) {
   return [
     check("evaluation:evidence", evaluationEvidence.ok, evaluationEvidence.ok ? "evaluation evidence checks passed" : "evaluation evidence checks failed", "error", "evaluation"),
@@ -327,6 +336,7 @@ function packageChecks(pkg) {
     "audit:retention",
     "data-quality:report",
     "integration:readiness",
+    "interface:mapping",
     "monitoring:readiness",
     "operations:readiness",
     "production-db:readiness",
@@ -378,6 +388,7 @@ function buildReleaseReport(options = {}) {
   const auditRetention = buildAuditRetentionReport({ data, env: options.env || process.env });
   const dataQuality = buildDataQualityReport({ data });
   const integrationReadiness = buildIntegrationReadinessReport({ data });
+  const interfaceMapping = buildInterfaceMappingReport({ data, pkg });
   const monitoringReadiness = buildMonitoringReadinessReport({ data, pkg });
   const operationsReadiness = buildOperationsReadinessReport({ data, pkg });
   const productionDbReadiness = buildProductionDbReadinessReport({ data, pkg, storageModel });
@@ -396,6 +407,7 @@ function buildReleaseReport(options = {}) {
     ...auditRetentionChecks(auditRetention),
     ...dataQualityChecks(dataQuality),
     ...integrationReadinessChecks(integrationReadiness),
+    ...interfaceMappingChecks(interfaceMapping),
     ...monitoringReadinessChecks(monitoringReadiness),
     ...operationsReadinessChecks(operationsReadiness),
     ...productionDbReadinessChecks(productionDbReadiness),
@@ -424,6 +436,7 @@ function buildReleaseReport(options = {}) {
     auditRetention,
     dataQuality,
     integrationReadiness,
+    interfaceMapping,
     monitoringReadiness,
     operationsReadiness,
     productionDbReadiness,
@@ -522,6 +535,10 @@ function renderMarkdown(report) {
     "",
     "See `integration-readiness-report.json` and `integration-readiness-report.md` for P0 interface coverage, external contract readiness, idempotency, signature, and retry policy evidence.",
     "",
+    "## Interface mapping report",
+    "",
+    "See `interface-mapping-report.json` and `interface-mapping-report.md` for contract-to-platform collection mappings, required field coverage, idempotency field mapping, signature, and retry evidence.",
+    "",
     "## Data quality and master index report",
     "",
     "See `data-quality-report.json` and `data-quality-report.md` for resident master index completeness, resident reference checks, source traceability, and rectification issue evidence.",
@@ -615,6 +632,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       integrationReadiness: report.integrationReadiness
     }, null, 2), "utf8");
+    const interfaceMappingJson = path.join(path.dirname(output), "interface-mapping-report.json");
+    fs.writeFileSync(interfaceMappingJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      interfaceMapping: report.interfaceMapping
+    }, null, 2), "utf8");
     const operationsJson = path.join(path.dirname(output), "operations-readiness-report.json");
     fs.writeFileSync(operationsJson, JSON.stringify({
       project: report.project,
@@ -664,6 +689,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(dataQualityMarkdown, renderDataQualityMarkdown(report.dataQuality), "utf8");
     const integrationMarkdown = path.join(path.dirname(markdown), "integration-readiness-report.md");
     fs.writeFileSync(integrationMarkdown, renderIntegrationReadinessMarkdown(report.integrationReadiness), "utf8");
+    const interfaceMappingMarkdown = path.join(path.dirname(markdown), "interface-mapping-report.md");
+    fs.writeFileSync(interfaceMappingMarkdown, renderInterfaceMappingMarkdown(report.interfaceMapping), "utf8");
     const operationsMarkdown = path.join(path.dirname(markdown), "operations-readiness-report.md");
     fs.writeFileSync(operationsMarkdown, renderOperationsReadinessMarkdown(report.operationsReadiness), "utf8");
     const monitoringMarkdown = path.join(path.dirname(markdown), "monitoring-readiness-report.md");

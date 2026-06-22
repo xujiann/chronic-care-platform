@@ -47,6 +47,8 @@ jobs:
         run: npm run data-quality:report
       - name: Generate integration readiness report
         run: npm run integration:readiness
+      - name: Generate interface mapping report
+        run: npm run interface:mapping
       - name: Generate monitoring readiness report
         run: npm run monitoring:readiness
       - name: Generate operations readiness report

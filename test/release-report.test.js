@@ -109,6 +109,8 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.dataQuality.ok, true);
   assert.equal(report.checks.some((item) => item.name === "integration:readiness" && item.passed), true);
   assert.equal(report.integrationReadiness.ok, true);
+  assert.equal(report.checks.some((item) => item.name === "interfaceMapping:report" && item.passed), true);
+  assert.equal(report.interfaceMapping.ok, true);
   assert.equal(report.checks.some((item) => item.name === "monitoring:readiness" && item.passed), true);
   assert.equal(report.monitoringReadiness.ok, true);
   assert.equal(report.checks.some((item) => item.name === "operations:readiness" && item.passed), true);
@@ -130,6 +132,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(markdown, /Identity integration contract/);
   assert.match(markdown, /Audit retention report/);
   assert.match(markdown, /Integration readiness report/);
+  assert.match(markdown, /Interface mapping report/);
   assert.match(markdown, /Data quality and master index report/);
   assert.match(markdown, /Monitoring readiness report/);
   assert.match(markdown, /Operations readiness report/);
@@ -200,6 +203,8 @@ test("release report writes standalone production cutover and storage artifacts"
   const dataQualityMarkdown = fs.readFileSync(path.join(outputDir, "data-quality-report.md"), "utf8");
   const integrationJson = JSON.parse(fs.readFileSync(path.join(outputDir, "integration-readiness-report.json"), "utf8"));
   const integrationMarkdown = fs.readFileSync(path.join(outputDir, "integration-readiness-report.md"), "utf8");
+  const interfaceMappingJson = JSON.parse(fs.readFileSync(path.join(outputDir, "interface-mapping-report.json"), "utf8"));
+  const interfaceMappingMarkdown = fs.readFileSync(path.join(outputDir, "interface-mapping-report.md"), "utf8");
   const monitoringJson = JSON.parse(fs.readFileSync(path.join(outputDir, "monitoring-readiness-report.json"), "utf8"));
   const monitoringMarkdown = fs.readFileSync(path.join(outputDir, "monitoring-readiness-report.md"), "utf8");
   const operationsJson = JSON.parse(fs.readFileSync(path.join(outputDir, "operations-readiness-report.json"), "utf8"));
@@ -221,6 +226,8 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(dataQualityMarkdown, /Resident-linked collections/);
   assert.equal(integrationJson.integrationReadiness.ok, true);
   assert.match(integrationMarkdown, /P0 coverage/);
+  assert.equal(interfaceMappingJson.interfaceMapping.ok, true);
+  assert.match(interfaceMappingMarkdown, /Contract field mappings/);
   assert.equal(monitoringJson.monitoringReadiness.ok, true);
   assert.match(monitoringMarkdown, /SLO targets/);
   assert.equal(operationsJson.operationsReadiness.ok, true);
