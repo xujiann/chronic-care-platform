@@ -23,12 +23,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   const acceptanceLedgers = await loadAcceptanceLedgers();
   const siteReadinessPack = await loadSiteReadinessPack();
   const releaseReport = await loadReleaseReport();
+  const productionCutover = await loadProductionCutoverChecklist();
   const releaseArtifactManifest = await loadReleaseArtifactManifest();
   const tasks = collectUnifiedTasks(state);
   const roadmap = state.platformRoadmap?.length ? state.platformRoadmap : defaultRoadmap();
   renderMetrics(state, tasks, roadmap, operations);
   renderSystemReadiness(readiness);
-  renderReleaseEvidenceGates(state, readiness, operations, processAudit, siteReadinessPack, releaseReport, releaseArtifactManifest);
+  renderReleaseEvidenceGates(state, readiness, operations, processAudit, siteReadinessPack, releaseReport, productionCutover, releaseArtifactManifest);
   renderAcceptanceLedgers(state, acceptanceLedgers);
   renderSiteReadinessPack(siteReadinessPack);
   renderSourceAlignment(state);
@@ -111,6 +112,18 @@ async function loadReleaseReport() {
   try {
     const request = window.HealthCityAuth?.authFetch || fetch;
     const response = await request("/api/release-report");
+    if (!response.ok) return null;
+    return response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+async function loadProductionCutoverChecklist() {
+  if (location.protocol === "file:") return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request("/api/production-cutover-checklist");
     if (!response.ok) return null;
     return response.json();
   } catch (error) {
@@ -229,7 +242,7 @@ function renderSystemReadiness(readiness) {
   </article>${checkRows}${dependencyDetailRows}`;
 }
 
-function renderReleaseEvidenceGates(state, readiness, operations, processAudit, siteReadinessPack, releaseReport, releaseArtifactManifest) {
+function renderReleaseEvidenceGates(state, readiness, operations, processAudit, siteReadinessPack, releaseReport, productionCutover, releaseArtifactManifest) {
   const container = document.querySelector("#release-evidence-gates");
   if (!container) return;
 
@@ -312,6 +325,15 @@ function renderReleaseEvidenceGates(state, readiness, operations, processAudit, 
       evidence: "release/release-report.md"
     },
     {
+      id: "production:cutover",
+      title: "Production cutover checklist",
+      passed: productionCutover ? Boolean(productionCutover.ok) : Boolean(releaseReport?.productionCutover?.every((item) => item.passed)),
+      detail: productionCutover
+        ? `${productionCutover.summary?.passed || 0}/${productionCutover.summary?.total || 0} cutover items passed; blocked=${productionCutover.summary?.blocked || 0}`
+        : "site signoff checklist is available from release report",
+      evidence: "release/production-cutover-checklist.md"
+    },
+    {
       id: "release:manifest",
       title: "Release artifact manifest",
       passed: releaseArtifactManifest ? Boolean(releaseArtifactManifest.ok) : Boolean(releaseReport?.ok),
@@ -334,7 +356,7 @@ function renderReleaseEvidenceGates(state, readiness, operations, processAudit, 
     </div>
     <div class="capability-side">
       <small>${gate.evidence}</small>
-      <small>${readiness || processAudit || siteReadinessPack || releaseReport || releaseArtifactManifest ? "live API evidence" : "static snapshot evidence"}</small>
+      <small>${readiness || processAudit || siteReadinessPack || releaseReport || productionCutover || releaseArtifactManifest ? "live API evidence" : "static snapshot evidence"}</small>
     </div>
   </article>`).join("");
 }

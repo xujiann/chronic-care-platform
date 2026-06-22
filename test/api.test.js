@@ -171,6 +171,12 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(releaseReport.body.checks.some((item) => item.name === "sitePack:readiness" && item.passed), true);
     assert.equal(releaseReport.body.siteReadinessPack.templates.signoff.some((item) => item.id === "signoff-cutover-monitoring"), true);
 
+    const cutoverChecklist = await api(baseUrl, "/api/production-cutover-checklist", authorized(accountLogin.body.token));
+    assert.equal(cutoverChecklist.response.status, 200);
+    assert.equal(cutoverChecklist.body.ok, false);
+    assert.equal(cutoverChecklist.body.summary.blocked >= 1, true);
+    assert.equal(cutoverChecklist.body.checklist.some((item) => item.id === "cutover-monitoring"), true);
+
     const releaseManifest = await api(baseUrl, "/api/release-artifact-manifest", authorized(accountLogin.body.token));
     assert.equal(releaseManifest.response.status, 200);
     assert.equal(releaseManifest.body.ok, true);

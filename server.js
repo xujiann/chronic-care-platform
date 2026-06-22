@@ -4955,6 +4955,24 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/production-cutover-checklist") {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-cutover-checklist");
+    if (!user) return;
+    const releaseReport = buildReleaseReport({ data: readDatabase(), env: process.env, profile: "demo" });
+    sendJson(res, 200, {
+      ok: releaseReport.productionCutover.every((item) => item.passed),
+      generatedAt: releaseReport.generatedAt,
+      profile: releaseReport.profile,
+      summary: {
+        total: releaseReport.productionCutover.length,
+        passed: releaseReport.productionCutover.filter((item) => item.passed).length,
+        blocked: releaseReport.productionCutover.filter((item) => !item.passed).length
+      },
+      checklist: releaseReport.productionCutover
+    });
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/release-artifact-manifest") {
     const user = requireApiRole(req, res, ["commission"], "/api/release-artifact-manifest");
     if (!user) return;

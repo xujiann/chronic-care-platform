@@ -46,10 +46,11 @@ test("commission workbench renders live release gates and site templates", async
   await page.goto("/workbench.html");
 
   const releaseGates = page.locator("#release-evidence-gates .release-evidence-gate");
-  await expect(releaseGates).toHaveCount(9);
+  await expect(releaseGates).toHaveCount(10);
   await expect(page.locator("[data-gate='process:audit']")).toContainText("PASS");
   await expect(page.locator("[data-gate='site:pack']")).toContainText("PASS");
   await expect(page.locator("[data-gate='release:report']")).toContainText("release checks passed");
+  await expect(page.locator("[data-gate='production:cutover']")).toContainText("blocked");
   await expect(page.locator("[data-gate='release:manifest']")).toContainText("artifacts");
   await expect(page.locator("[data-gate='release:report']")).toContainText("live API evidence");
 
