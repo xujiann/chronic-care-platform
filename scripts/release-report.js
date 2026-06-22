@@ -60,10 +60,15 @@ function check(name, passed, detail, severity = "error", category = "release") {
   return { name, category, severity, passed: Boolean(passed), detail };
 }
 
-function buildProductionCutoverChecklist(env, checks) {
+function envFlagEnabled(env, name) {
+  return /^(1|true|yes|ready|signed|approved)$/i.test(String(env[name] || "").trim());
+}
+
+function buildProductionCutoverChecklist(env, checks = []) {
   const byName = Object.fromEntries(checks.map((item) => [item.name, item]));
   const ready = (...names) => names.every((name) => byName[name]?.passed);
   const detail = (...names) => names.map((name) => `${name}: ${byName[name]?.detail || "missing"}`).join("; ");
+  const signoff = (name) => `${name}: ${envFlagEnabled(env, name) ? "signed" : "missing site signoff"}`;
   const storageEngine = String(env.STORAGE_ENGINE || "auto").toLowerCase();
   return [
     {
@@ -105,6 +110,38 @@ function buildProductionCutoverChecklist(env, checks) {
       passed: ready("env:STORAGE_ENGINE.runtimeAdapter", "env:DATABASE_URL.requiredForPostgres") && !["postgres", "postgresql"].includes(storageEngine),
       evidence: detail("env:STORAGE_ENGINE.runtimeAdapter", "env:DATABASE_URL.requiredForPostgres"),
       nextAction: "当前运行时支持 auto/sqlite；如切换 PostgreSQL，需先完成正式数据库适配器、迁移、回滚和原生备份演练。"
+    },
+    {
+      id: "cutover-institution-interfaces",
+      phase: "integration",
+      owner: "institution-integration",
+      passed: ready("integration:p0Coverage", "integration:contractsReady") && envFlagEnabled(env, "CUTOVER_SITE_INTERFACE_SIGNOFF"),
+      evidence: `${detail("integration:p0Coverage", "integration:contractsReady")}; ${signoff("CUTOVER_SITE_INTERFACE_SIGNOFF")}`,
+      nextAction: "Archive signed HIS/EMR/LIS/PACS and referral joint-test records from the target site before production cutover."
+    },
+    {
+      id: "cutover-insurance-certificate",
+      phase: "integration",
+      owner: "cross-agency-integration",
+      passed: ready("integration:contractsReady") && envFlagEnabled(env, "CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF"),
+      evidence: `${detail("integration:contractsReady")}; ${signoff("CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF")}`,
+      nextAction: "Attach signed insurance settlement, electronic certificate, and statistics exchange acceptance evidence from upstream agencies."
+    },
+    {
+      id: "cutover-monitoring",
+      phase: "operations",
+      owner: "platform-ops",
+      passed: ready("operations:readiness", "operations:routes", "operations:externalDependencies") && envFlagEnabled(env, "CUTOVER_MONITORING_SIGNOFF"),
+      evidence: `${detail("operations:readiness", "operations:routes", "operations:externalDependencies")}; ${signoff("CUTOVER_MONITORING_SIGNOFF")}`,
+      nextAction: "Bind /api/health, /api/metrics, readiness, alert routing, and on-call escalation to the production monitoring platform."
+    },
+    {
+      id: "cutover-dr-rehearsal",
+      phase: "resilience",
+      owner: "data-platform",
+      passed: ready("operations:externalDependencies", "storage:jsonSnapshot.present") && envFlagEnabled(env, "CUTOVER_DR_REHEARSAL_SIGNOFF"),
+      evidence: `${detail("operations:externalDependencies", "storage:jsonSnapshot.present")}; ${signoff("CUTOVER_DR_REHEARSAL_SIGNOFF")}`,
+      nextAction: "Complete production-grade backup, cross-site replica, RTO/RPO, and restore rehearsal signoff; demo snapshot rehearsal is not sufficient."
     }
   ];
 }
@@ -357,7 +394,7 @@ function buildReleaseReport(options = {}) {
       warnings: checks.filter((item) => item.severity === "warn" && !item.passed).length
     },
     checks,
-    productionCutover: env.cutoverChecklist,
+    productionCutover: buildProductionCutoverChecklist({ ...readEnvFile(options.envFile || ".env.example"), ...(options.env || {}) }, checks),
     storageModel,
     identityContract,
     auditRetention,

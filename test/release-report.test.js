@@ -68,6 +68,8 @@ test("release report validates demo and production environment profiles", () => 
   assert.equal(production.passed, true);
   assert.equal(production.cutoverChecklist.some((item) => item.id === "cutover-identity" && item.passed), true);
   assert.equal(production.cutoverChecklist.some((item) => item.id === "cutover-audit-retention" && item.passed), true);
+  assert.equal(production.cutoverChecklist.some((item) => item.id === "cutover-institution-interfaces" && !item.passed), true);
+  assert.equal(production.cutoverChecklist.some((item) => item.id === "cutover-monitoring" && /missing site signoff/.test(item.evidence)), true);
 
   const missingEnvFile = validateProductionConfig({
     profile: "production",
@@ -112,6 +114,10 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "evaluation:evidence" && item.passed), true);
   assert.equal(report.evaluationEvidence.ok, true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-env-file"), true);
+  assert.equal(report.productionCutover.some((item) => item.id === "cutover-institution-interfaces" && !item.passed), true);
+  assert.equal(report.productionCutover.some((item) => item.id === "cutover-insurance-certificate" && !item.passed), true);
+  assert.equal(report.productionCutover.some((item) => item.id === "cutover-monitoring" && !item.passed), true);
+  assert.equal(report.productionCutover.some((item) => item.id === "cutover-dr-rehearsal" && !item.passed), true);
 
   const markdown = renderMarkdown(report);
   assert.match(markdown, /Release readiness report/);
@@ -133,6 +139,24 @@ test("release report summarizes repository readiness and renders markdown", () =
   const cutoverMarkdown = renderCutoverMarkdown(report);
   assert.match(cutoverMarkdown, /Production cutover checklist/);
   assert.match(cutoverMarkdown, /cutover-audit-retention/);
+  assert.match(cutoverMarkdown, /cutover-institution-interfaces/);
+  assert.match(cutoverMarkdown, /missing site signoff/);
+
+  const signedReport = buildReleaseReport({
+    profile: "demo",
+    env: {
+      NODE_ENV: "production",
+      STORAGE_ENGINE: "auto",
+      SESSION_SECRETS: "replace-with-long-random-secret",
+      INTEGRATION_GATEWAY_SECRET: "replace-with-integration-secret",
+      CUTOVER_SITE_INTERFACE_SIGNOFF: "signed",
+      CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF: "signed",
+      CUTOVER_MONITORING_SIGNOFF: "signed",
+      CUTOVER_DR_REHEARSAL_SIGNOFF: "signed"
+    }
+  });
+  assert.equal(signedReport.productionCutover.some((item) => item.id === "cutover-institution-interfaces" && item.passed), true);
+  assert.equal(signedReport.productionCutover.some((item) => item.id === "cutover-monitoring" && item.passed), true);
 
   const storageMarkdown = renderStorageModelMarkdown(report);
   assert.match(storageMarkdown, /Storage model inspection/);
