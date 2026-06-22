@@ -2820,6 +2820,10 @@ function secretReady(value, minLength = 32) {
   return text.length >= minLength && !/replace-with|change-me|changeme|demo-|demo_|example|placeholder/i.test(text);
 }
 
+function cutoverSignoffReady(name) {
+  return /^(1|true|yes|ready|signed|approved)$/i.test(String(process.env[name] || "").trim());
+}
+
 function buildProductionEnvironmentStatus() {
   const storageEngine = String(process.env.STORAGE_ENGINE || "auto").toLowerCase();
   const sessionSecrets = String(process.env.SESSION_SECRETS || process.env.SESSION_SECRET || "").split(",").map((item) => item.trim()).filter(Boolean);
@@ -2830,7 +2834,11 @@ function buildProductionEnvironmentStatus() {
     { id: "gateway-secret", name: "integration gateway secret quality", passed: secretReady(process.env.INTEGRATION_GATEWAY_SECRET), detail: process.env.INTEGRATION_GATEWAY_SECRET ? "configured" : "missing" },
     { id: "database-url", name: "database url for postgres", passed: !["postgres", "postgresql"].includes(storageEngine) || Boolean(process.env.DATABASE_URL), detail: process.env.DATABASE_URL ? "configured" : "not required" },
     { id: "identity-adapter", name: "government identity adapter", passed: Boolean(process.env.OIDC_ISSUER_URL && process.env.OIDC_CLIENT_ID && process.env.OIDC_CLIENT_SECRET), detail: process.env.OIDC_ISSUER_URL ? "issuer configured" : "OIDC missing" },
-    { id: "audit-retention", name: "audit retention target", passed: Boolean(process.env.AUDIT_EXPORT_PATH || process.env.SIEM_ENDPOINT), detail: process.env.AUDIT_EXPORT_PATH || process.env.SIEM_ENDPOINT ? "configured" : "missing" }
+    { id: "audit-retention", name: "audit retention target", passed: Boolean(process.env.AUDIT_EXPORT_PATH || process.env.SIEM_ENDPOINT), detail: process.env.AUDIT_EXPORT_PATH || process.env.SIEM_ENDPOINT ? "configured" : "missing" },
+    { id: "site-interface-signoff", name: "site interface joint-test signoff", passed: cutoverSignoffReady("CUTOVER_SITE_INTERFACE_SIGNOFF"), detail: process.env.CUTOVER_SITE_INTERFACE_SIGNOFF || "missing" },
+    { id: "insurance-certificate-signoff", name: "insurance and certificate exchange signoff", passed: cutoverSignoffReady("CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF"), detail: process.env.CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF || "missing" },
+    { id: "monitoring-signoff", name: "monitoring and on-call signoff", passed: cutoverSignoffReady("CUTOVER_MONITORING_SIGNOFF"), detail: process.env.CUTOVER_MONITORING_SIGNOFF || "missing" },
+    { id: "dr-rehearsal-signoff", name: "disaster recovery rehearsal signoff", passed: cutoverSignoffReady("CUTOVER_DR_REHEARSAL_SIGNOFF"), detail: process.env.CUTOVER_DR_REHEARSAL_SIGNOFF || "missing" }
   ];
   return {
     profile: process.env.NODE_ENV || "development",

@@ -89,6 +89,8 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal(Boolean(pkg.scripts["evaluation:evidence"]), true);
   assert.match(read(".env.example"), /SESSION_SECRETS=/);
   assert.match(read(".env.example"), /INTEGRATION_GATEWAY_SECRET=/);
+  assert.match(read(".env.example"), /CUTOVER_SITE_INTERFACE_SIGNOFF/);
+  assert.match(read(".env.example"), /CUTOVER_DR_REHEARSAL_SIGNOFF/);
   assert.match(read(".env.example"), /OIDC_ISSUER_URL=/);
   assert.match(read(".env.example"), /AUDIT_EXPORT_PATH=/);
   assert.match(read("README.md"), /\/api\/health/);
