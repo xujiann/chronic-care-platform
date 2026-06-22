@@ -91,6 +91,9 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/deploy-check.js"), /test:e2e/);
   assert.match(read("scripts/deploy-check.js"), /audit/);
   assert.match(read("scripts/deploy-check.js"), /process\.platform === "win32" \? "npm\.cmd" : "npm"/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run deploy:check/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run release:report/);
+  assert.match(read(".github/workflows/ci.yml"), /npm audit --omit=dev/);
 });
 
 test("platform and workbench expose P2 governance and runtime panels", () => {
