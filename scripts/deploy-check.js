@@ -64,7 +64,10 @@ function main() {
   const runCommands = process.argv.includes("--run-commands");
   const commandResults = runCommands ? [
     run("npm.cmd", ["run", "check"]),
-    run("npm.cmd", ["test"])
+    run("npm.cmd", ["test"]),
+    run("npm.cmd", ["run", "test:coverage"]),
+    run("npm.cmd", ["run", "test:e2e"]),
+    run("npm.cmd", ["audit", "--omit=dev"])
   ] : [];
   const allChecks = [...checks, ...commandResults.map((item) => ({ name: `command:${item.command}`, ok: item.ok, detail: item.ok ? "passed" : item.stderr || item.stdout }))];
   const report = {
