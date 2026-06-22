@@ -353,6 +353,13 @@ function pickFirst(item, fields) {
   return field ? item[field] : "";
 }
 
+function actionPriorityOf(item) {
+  const text = [item?.priority, item?.risk, item?.riskLevel, item?.grade, item?.status].filter(Boolean).join(" ");
+  if (/高|危急|预警|逾期|紧急|high|urgent/i.test(text)) return "high";
+  if (/中|待|需|warning|medium/i.test(text)) return "medium";
+  return "normal";
+}
+
 function buildOpenActions(collection, domain, items, closedStatuses = []) {
   if (!closedStatuses.length) return [];
   const closed = new Set(closedStatuses);
@@ -366,9 +373,11 @@ function buildOpenActions(collection, domain, items, closedStatuses = []) {
       status: item.status || "open",
       owner: pickFirst(item, ["owner", "assignee", "provider", "institution", "center", "toInstitution", "sourceInstitution"]) || "owner-pending",
       due: pickFirst(item, ["due", "nextReview", "pushAt", "at", "requestedAt"]),
+      priority: actionPriorityOf(item),
       nextAction: pickFirst(item, ["nextAction", "nextStep", "intervention", "result", "shortageAction", "current", "reason", "suggestion", "quality"]) || "next-action-pending",
       residentId: item.residentId || ""
-    }));
+    }))
+    .sort((a, b) => ({ high: 3, medium: 2, normal: 1 }[b.priority] || 0) - ({ high: 3, medium: 2, normal: 1 }[a.priority] || 0));
 }
 
 function buildServiceAcceptanceSummary(data) {
@@ -632,7 +641,7 @@ function renderServiceAcceptanceMarkdown(report) {
     ...(report.serviceAcceptance?.chronic?.openActions || []).slice(0, 12).map((item) => ["chronic", item]),
     ...(report.serviceAcceptance?.county?.openActions || []).slice(0, 8).map((item) => ["county", item])
   ].map(([group, item]) =>
-    `| ${group} | ${item.collection} | ${item.id} | ${String(item.subject || "").replace(/\|/g, "/")} | ${item.status} | ${item.owner} | ${item.due || ""} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`
+    `| ${group} | ${item.priority} | ${item.collection} | ${item.id} | ${String(item.subject || "").replace(/\|/g, "/")} | ${item.status} | ${item.owner} | ${item.due || ""} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`
   );
   return [
     "# Service acceptance summary",
@@ -650,8 +659,8 @@ function renderServiceAcceptanceMarkdown(report) {
     "",
     "## Open action preview",
     "",
-    "| Group | Collection | Item | Subject | Status | Owner | Due | Next action |",
-    "|---|---|---|---|---|---|---|---|",
+    "| Group | Priority | Collection | Item | Subject | Status | Owner | Due | Next action |",
+    "|---|---|---|---|---|---|---|---|---|",
     ...openRows,
     ""
   ].join("\n");
@@ -668,7 +677,7 @@ function renderMarkdown(report) {
     ...(report.serviceAcceptance?.chronic?.openActions || []).slice(0, 6).map((item) => ["chronic", item]),
     ...(report.serviceAcceptance?.county?.openActions || []).slice(0, 6).map((item) => ["county", item])
   ].map(([group, item]) =>
-    `| ${group} | ${item.collection} | ${item.id} | ${String(item.subject || "").replace(/\|/g, "/")} | ${item.status} | ${item.owner} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`
+    `| ${group} | ${item.priority} | ${item.collection} | ${item.id} | ${String(item.subject || "").replace(/\|/g, "/")} | ${item.status} | ${item.owner} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`
   );
   const storage = report.storageModel || {};
   return [
@@ -698,8 +707,8 @@ function renderMarkdown(report) {
     "",
     "### Service open action preview",
     "",
-    "| Group | Collection | Item | Subject | Status | Owner | Next action |",
-    "|---|---|---|---|---|---|---|",
+    "| Group | Priority | Collection | Item | Subject | Status | Owner | Next action |",
+    "|---|---|---|---|---|---|---|---|",
     ...serviceOpenRows,
     "",
     "## Production cutover checklist",

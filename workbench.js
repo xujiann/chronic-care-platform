@@ -444,7 +444,7 @@ function renderAcceptanceLedgers(state, acceptanceLedgers, serviceAcceptanceSumm
     const actionRows = serviceActions.map((item) => `<div data-service-open-action="${group.id}:${item.id}">
       <strong>${item.subject || item.id}</strong>
       <span>${item.collection} · ${item.owner} · ${item.nextAction || "next action pending"}</span>
-      <span class="badge warn">${item.status}</span>
+      <span class="badge ${item.priority === "high" ? "danger" : item.priority === "medium" ? "warn" : "info"}">${item.priority || "normal"} · ${item.status}</span>
     </div>`).join("");
     return `<article class="priority-row" data-acceptance-ledger="${group.id}">
       <div class="priority-rank ${group.report?.ok ? "info" : "warn"}">${summary.ready || 0}/${summary.total || 0}</div>

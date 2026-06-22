@@ -123,6 +123,8 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.serviceAcceptance.county.summary.domains, 5);
   assert.equal(report.serviceAcceptance.chronic.openActions.some((item) => item.id === "cst-001" && item.collection === "chronicScreeningTasks"), true);
   assert.equal(report.serviceAcceptance.county.openActions.some((item) => item.id === "cco-001" && item.collection === "countyCollaborationOrders"), true);
+  assert.equal(report.serviceAcceptance.chronic.openActions.find((item) => item.id === "cst-001").priority, "high");
+  assert.equal(report.serviceAcceptance.county.openActions.find((item) => item.id === "cco-001").priority, "high");
   assert.equal(report.checks.some((item) => item.name === "sitePack:readiness" && item.passed), true);
   assert.equal(report.siteReadinessPack.ok, true);
   assert.equal(report.checks.some((item) => item.name === "productionDb:readiness" && item.passed), true);
@@ -199,6 +201,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(serviceMarkdown, /County domains: 5\/5 modeled/);
   assert.match(serviceMarkdown, /Open action preview/);
   assert.match(serviceMarkdown, /cco-001/);
+  assert.match(serviceMarkdown, /\| chronic \| high \| chronicScreeningTasks \| cst-001/);
 });
 
 test("release report writes standalone production cutover and storage artifacts", (t) => {

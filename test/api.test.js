@@ -164,6 +164,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(serviceAcceptance.body.ok, true);
     assert.equal(serviceAcceptance.body.serviceAcceptance.chronic.openActions.some((item) => item.id === "cst-001"), true);
     assert.equal(serviceAcceptance.body.serviceAcceptance.county.openActions.some((item) => item.id === "cco-001"), true);
+    assert.equal(serviceAcceptance.body.serviceAcceptance.chronic.openActions.find((item) => item.id === "cst-001").priority, "high");
 
     const sitePack = await api(baseUrl, "/api/site-readiness-pack", authorized(accountLogin.body.token));
     assert.equal(sitePack.response.status, 200);
