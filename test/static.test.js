@@ -58,7 +58,12 @@ test("static snapshot keeps completed P2 governance collections", () => {
   assert.equal(data.platformInterfaces.filter((item) => item.priority === "P0").every((item) => item.owner && item.status && item.next), true);
   assert.equal(data.platformInterfaces.filter((item) => item.priority === "P0").every((item) => item.status === "演示对接完成"), true);
   assert.equal(data.platformInterfaces.some((item) => item.id === "if-medical" && /HIS\/EMR\/LIS\/PACS/.test(item.existing)), true);
+  assert.equal(data.platformCapabilities.some((item) => item.id === "cap-data-platform" && item.status === "演示底座闭环"), true);
+  assert.equal(data.platformCapabilities.some((item) => item.id === "cap-evaluation" && item.status === "测评证据已建档"), true);
+  assert.equal(data.platformCapabilities.some((item) => item.id === "cap-security" && item.status === "安全证据已建档"), true);
+  assert.equal(data.applicationCatalog.some((item) => item.id === "app-institution" && item.status === "演示对接完成"), true);
   assert.equal(data.securityAcceptanceLedger.every((item) => item.id && item.category && item.owner && item.status && item.next), true);
+  assert.equal(data.securityAcceptanceLedger.every((item) => /建档/.test(item.status)), true);
   assert.equal(data.platformRoadmap.filter((item) => item.priority === "P2").every((item) => item.status === "已完成"), true);
 });
 

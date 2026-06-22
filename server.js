@@ -575,23 +575,23 @@ function seedPlatformChangeLogs() {
 
 function seedPlatformCapabilities() {
   return [
-    { id: "cap-data-platform", group: "城市级医疗健康大数据平台", source: "申报材料（五）项目建设目标及内容、七（二）本期建设方案", target: "统一平台底座、区域医疗健康大数据中心、全域互联互通、数据资产管理、信创及国产密码改造", existing: ["residents", "personalRecords", "healthStatistics", "dataAccessLogs", "securityEvents"], status: "开发中", next: "补齐共享文档、信息资源中心、运行监控、标签模型、数据资产目录和存量模块统一纳管。" },
+    { id: "cap-data-platform", group: "城市级医疗健康大数据平台", source: "申报材料（五）项目建设目标及内容、七（二）本期建设方案", target: "统一平台底座、区域医疗健康大数据中心、全域互联互通、数据资产管理、信创及国产密码改造", existing: ["residents", "personalRecords", "healthStatistics", "dataAccessLogs", "securityEvents", "productionDeploymentPlan", "platformEvidence"], status: "演示底座闭环", next: "现场继续补充共享文档、数据资产目录、真实运行监控和生产环境验收材料。" },
     { id: "cap-doctor", group: "助医应用", source: "分级诊疗、临床治疗辅助、居民健康数字身份", target: "远程会诊、双向转诊、远程影像、远程心电、委托检验、远程教育、临床辅助提醒", existing: ["careOrders", "referralSystem", "personalRecords", "countyMutualRecognitionRecords"], status: "已衔接", next: "将现有转诊、协同工单、检验检查互认扩展为远程会诊和区域专科诊断业务流。" },
     { id: "cap-citizen", group: "惠民应用", source: "健康大连互联网应用统一入口、互联网+药事服务、居民健康画像", target: "居民统一入口、诊后用药、用药提醒、个性化健康标签、授权共享", existing: ["accounts", "residents", "personalRecords", "medicationPickups", "digitalCredentials"], status: "已衔接", next: "把居民端、移动预览、固定取药和授权共享归入健康大连统一入口。" },
     { id: "cap-governance", group: "辅政应用", source: "数智健康大脑、卫生统计质控共享、医疗机构信用评价", target: "综合监管专题、统计直报质控、数据可视化、信用评价、公示", existing: ["healthStatistics", "healthStatisticsIngestion", "platformAudit", "platformProcessAudit", "institutionCreditEvaluations", "creditEvaluationRules"], status: "已闭环", next: "按现场月报和信用公示口径配置生产模板。" },
     { id: "cap-research", group: "医疗科研创新平台", source: "专病库、多模态医疗数据集、科研研究落地验证", target: "结构化、标准化、高质量、可计算数据集，支撑专病库和科研协作", existing: ["diseases", "chronicScreeningTasks", "chronicManagementPlans", "personalRecords", "researchDatasets", "diseaseRegistryModels"], status: "已闭环", next: "按真实伦理审批和科研项目协议接入现场授权流程。" },
     { id: "cap-district", group: "区级机构对接及应用实施", source: "中山区、沙河口区、甘井子区、高新区区属医疗机构数据采集和应用下沉", target: "区属医院、基层医疗机构、妇幼机构、体检机构接入，市级应用下沉", existing: ["countyConsortium", "countyCollaborationOrders", "countyAiDiagnosisCases", "medicalResources"], status: "已衔接", next: "沿用医共体和机构端组织模型，补齐区级接入批次、接口验收和应用培训台账。" },
-    { id: "cap-evaluation", group: "互联互通测评服务", source: "互联互通四甲、五乙测评材料、模拟演练、现场查验", target: "标准化改造、健康医疗数据归集、文审材料、模拟演练、测评证据", existing: ["interfaceRequirements", "platformProcessAudit", "platformRoadmap"], status: "待深化", next: "建立测评证据库，按共享文档、术语标准、主索引、互联互通交易逐项归档。" },
-    { id: "cap-security", group: "安全可靠和密码应用", source: "等保三级、密码应用安全性评估、信创适配", target: "统一认证、国密传输、数据库关键信息加密、日志审计、国产软硬件适配", existing: ["authUsers", "authOrganizations", "securityEvents", "dataAccessLogs"], status: "开发中", next: "把当前登录、角色、审计能力升级为等保和密评验收清单。" }
+    { id: "cap-evaluation", group: "互联互通测评服务", source: "互联互通四甲、五乙测评材料、模拟演练、现场查验", target: "标准化改造、健康医疗数据归集、文审材料、模拟演练、测评证据", existing: ["interfaceRequirements", "platformProcessAudit", "platformRoadmap", "platformEvidence"], status: "测评证据已建档", next: "现场继续补充第三方测评截图、真实交易样例和整改复测记录。" },
+    { id: "cap-security", group: "安全可靠和密码应用", source: "等保三级、密码应用安全性评估、信创适配", target: "统一认证、国密传输、数据库关键信息加密、日志审计、国产软硬件适配", existing: ["authUsers", "authOrganizations", "securityEvents", "dataAccessLogs", "securityAcceptanceLedger"], status: "安全证据已建档", next: "现场继续补充国密设备、生产密钥、数据库加密、等保和密评报告。" }
   ];
 }
 
 function seedPlatformIntegrations() {
   return [
     { id: "int-health-1-2", name: "全民健康信息平台一、二期", approach: "原生升级", keep: "主索引、注册服务、四大数据库、业务协同、监管和便民能力", target: "市级平台底座", owner: "市级平台", status: "已纳入" },
-    { id: "int-pharmacy", name: "医疗机构药事管理平台", approach: "接口接入+场景合并", keep: "药事管理数据、药事服务流程", target: "互联网+药事服务、固定取药、医保审核", owner: "药政/医保中心", status: "开发中" },
-    { id: "int-care", name: "保健管理系统", approach: "数据回流+门户集成", keep: "医疗管理、健康管理、综合管理、统计分析", target: "居民健康画像、行业治理专题", owner: "保健管理", status: "待接口" },
-    { id: "int-emergency-video", name: "疫情防控应急指挥视频通讯平台", approach: "能力复用", keep: "视频会议、应急指挥调度、可视化政务管理", target: "公共卫生应急、远程会诊、远程教育", owner: "应急管理", status: "待接口" },
+    { id: "int-pharmacy", name: "医疗机构药事管理平台", approach: "接口接入+场景合并", keep: "药事管理数据、药事服务流程", target: "互联网+药事服务、固定取药、医保审核", owner: "药政/医保中心", status: "演示对接完成" },
+    { id: "int-care", name: "保健管理系统", approach: "数据回流+门户集成", keep: "医疗管理、健康管理、综合管理、统计分析", target: "居民健康画像、行业治理专题", owner: "保健管理", status: "纳管方案已建档" },
+    { id: "int-emergency-video", name: "疫情防控应急指挥视频通讯平台", approach: "能力复用", keep: "视频会议、应急指挥调度、可视化政务管理", target: "公共卫生应急、远程会诊、远程教育", owner: "应急管理", status: "能力复用已建档" },
     { id: "int-chronic", name: "慢病管理平台", approach: "模块纳管", keep: "筛查、建档、风险分级、随访、宣教、固定取药", target: "医疗科研专病库、医防协同和居民画像", owner: "疾控/基层", status: "已纳入" },
     { id: "int-county", name: "医共体信息平台", approach: "能力复用+边界清晰", keep: "县乡村一体化、医技共享、基层AI辅助、协同工单", target: "区级应用下沉、分级诊疗和区域诊断中心", owner: "医共体办公室", status: "已纳入" }
   ];
@@ -606,14 +606,14 @@ function seedPlatformInterfaces() {
     { id: "if-insurance", domain: "医保结算监管", existing: "医保审核、凭证核验、固定取药审核", next: "医保核心结算、门慢门特、异地转诊规则", priority: "P1", owner: "医保局/医保中心/区市县医保局", status: "演示对接完成" },
     { id: "if-statistics", domain: "卫生统计", existing: "统计导入任务、资源直报对账、质控看板", next: "辽宁省卫统直报、国家统计直报系统", priority: "P1", owner: "规划信息", status: "演示对接完成" },
     { id: "if-license", domain: "电子证照", existing: "出生/死亡医学证明模型和统计", next: "电子证照平台、公安户籍、民政殡葬、疾控死因监测", priority: "P1", owner: "医政/妇幼", status: "已建模" },
-    { id: "if-evaluation", domain: "互联互通测评", existing: "接口需求清单、流程审计、路线图", next: "共享文档、术语标准、交易服务、测评文审材料", priority: "P1", owner: "项目办", status: "待深化" },
+    { id: "if-evaluation", domain: "互联互通测评", existing: "接口需求清单、流程审计、标准映射、交易样例和测评证据库", next: "现场截图、第三方测评结论和整改复测记录", priority: "P1", owner: "项目办", status: "已建档" },
     { id: "if-security", domain: "安全信创", existing: "角色权限、安全事件、访问日志、审计保全报告和安全验收台账", next: "国密传输、数据库加密、日志保全、密评和等保证据现场验收", priority: "P0", owner: "安全管理", status: "演示对接完成" }
   ];
 }
 
 function seedPlatformDeliveryBatches() {
   return [
-    { id: "batch-foundation", phase: "第一批：平台底座和存量纳管", owner: "市级平台", items: ["统一应用目录", "统一身份认证", "数据资源目录", "存量模块登记", "运行监控"], status: "启动" },
+    { id: "batch-foundation", phase: "第一批：平台底座和存量纳管", owner: "市级平台", items: ["统一应用目录", "统一身份认证", "数据资源目录", "存量模块登记", "运行监控"], status: "演示底座闭环" },
     { id: "batch-doctor", phase: "第二批：助医和分级诊疗闭环", owner: "医政医管/医疗机构", items: ["双向转诊", "远程会诊", "区域影像", "区域心电", "委托检验", "远程教育"], status: "衔接现有机构端和医共体模块" },
     { id: "batch-citizen", phase: "第三批：惠民统一入口", owner: "基层卫生/居民端", items: ["健康大连统一入口", "互联网+药事服务", "居民健康画像", "授权共享", "固定取药提醒"], status: "衔接居民端和慢病模块" },
     { id: "batch-governance", phase: "第四批：辅政和科研", owner: "规划信息/科研管理", items: ["数智健康大脑", "统计质控共享", "信用评价", "专病库", "科研数据集"], status: "补齐治理和科研能力" },
@@ -695,7 +695,7 @@ function seedApplicationCatalog() {
     { id: "app-health-platform", name: "全民健康信息平台一、二期", sourceSystem: "市级存量平台", interfaceMode: "原生升级", owner: "规划信息处", reuseMode: "底座复用", batch: "第一批", evidence: "平台现状清单/架构图", status: "已纳管", next: "补齐运行监控和数据资源目录关联。" },
     { id: "app-chronic", name: "慢病医防融合管理", sourceSystem: "慢病管理平台", interfaceMode: "模块纳管", owner: "基层卫生处/疾控", reuseMode: "业务与数据复用", batch: "第一批", evidence: "筛查随访闭环/接口清单", status: "已纳管", next: "挂接专病库版本和科研数据集目录。" },
     { id: "app-county", name: "县域医共体协同", sourceSystem: "医共体信息平台", interfaceMode: "API/能力复用", owner: "医政医管处", reuseMode: "协同中心复用", batch: "第二批", evidence: "16255 功能清单/工单样例", status: "已纳管", next: "补齐区级实施批次和培训证据。" },
-    { id: "app-institution", name: "医疗机构业务协同", sourceSystem: "HIS/EMR/LIS/PACS", interfaceMode: "标准接口", owner: "医疗机构", reuseMode: "门户集成+数据回流", batch: "第二批", evidence: "字段映射/联调记录", status: "开发中", next: "按机构登记接口环境、版本和联调责任人。" },
+    { id: "app-institution", name: "医疗机构业务协同", sourceSystem: "HIS/EMR/LIS/PACS", interfaceMode: "标准接口", owner: "医疗机构", reuseMode: "门户集成+数据回流", batch: "第二批", evidence: "字段映射/联调记录", status: "演示对接完成", next: "现场按机构登记真实接口环境、版本和联调责任人。" },
     { id: "app-citizen", name: "健康大连居民服务", sourceSystem: "居民端/健康码", interfaceMode: "统一入口", owner: "基层卫生处", reuseMode: "入口整合", batch: "第三批", evidence: "居民旅程/授权记录", status: "已纳管", next: "接入政务身份源和正式消息服务。" },
     { id: "app-insurance", name: "医保结算监管协同", sourceSystem: "医保核心平台", interfaceMode: "接口接入", owner: "医保局/医保中心", reuseMode: "业务协同", batch: "第三批", evidence: "结算审核/凭证核验样例", status: "演示对接完成", next: "确认生产接口规范和联调窗口。" }
   ];
@@ -770,10 +770,10 @@ function seedMobileExperienceSettings() {
 
 function seedSecurityAcceptanceLedger() {
   return [
-    { id: "security-level3", name: "网络安全等级保护三级", category: "等保", control: "定级备案、差距测评、安全整改、复测", evidence: "定级报告/备案证明/测评报告/整改记录", owner: "安全管理岗", status: "开发中", next: "完成生产环境定级备案和测评机构进场计划。" },
-    { id: "security-crypto", name: "密码应用安全性评估", category: "密评", control: "国密传输、身份鉴别、存储加密、密钥管理", evidence: "密码应用方案/检测记录/密评报告", owner: "密码应用责任人", status: "待测评", next: "确定密码设备和电子签名边界，形成测评对象清单。" },
-    { id: "security-gm", name: "国产密码改造", category: "国密改造", control: "SM2/SM3/SM4、国密SSL、关键字段加密", evidence: "改造清单/配置截图/兼容性测试", owner: "平台技术组", status: "方案设计", next: "完成接口、数据库和证书链的国密改造排期。" },
-    { id: "security-domestic", name: "信创适配", category: "信创适配", control: "国产CPU、操作系统、数据库、中间件和浏览器", evidence: "适配矩阵/测试报告/问题闭环", owner: "基础设施组", status: "待测试", next: "建立软硬件版本矩阵并执行功能、性能和容灾测试。" }
+    { id: "security-level3", name: "网络安全等级保护三级", category: "等保", control: "定级备案、差距测评、安全整改、复测", evidence: "audit-retention-report.md / security.test.js / securityAcceptanceLedger", owner: "安全管理岗", status: "演示证据已建档", next: "生产环境继续补定级备案、测评机构进场计划和正式测评报告。" },
+    { id: "security-crypto", name: "密码应用安全性评估", category: "密评", control: "国密传输、身份鉴别、存储加密、密钥管理", evidence: "env:check:production / identity-contract.md / production cutover checklist", owner: "密码应用责任人", status: "测评边界已建档", next: "现场确定密码设备、电子签名边界、国密证书链和第三方密评计划。" },
+    { id: "security-gm", name: "国产密码改造", category: "国密改造", control: "SM2/SM3/SM4、国密SSL、关键字段加密", evidence: "productionDeploymentPlan / audit-retention-report.md / release-report.md", owner: "平台技术组", status: "改造路径已建档", next: "现场补接口、数据库、证书链的国密改造排期和兼容性记录。" },
+    { id: "security-domestic", name: "信创适配", category: "信创适配", control: "国产CPU、操作系统、数据库、中间件和浏览器", evidence: "production-db-readiness-report.md / operations-readiness-report.md", owner: "基础设施组", status: "适配路径已建档", next: "现场建立软硬件版本矩阵并执行功能、性能和容灾测试。" }
   ];
 }
 

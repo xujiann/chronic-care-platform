@@ -3061,8 +3061,8 @@
   ],
   "securityEvents": [
     {
-      "id": "8264715f-0b80-408e-92c9-7ada8099bed7",
-      "at": "2026/6/22 20:25:57",
+      "id": "c3e9b7aa-b583-41e3-8e88-6e6e5bf4778a",
+      "at": "2026/6/22 20:39:06",
       "actor": "大连市卫生健康委管理员",
       "role": "commission",
       "action": "重置数据",
@@ -3070,7 +3070,7 @@
       "result": "允许",
       "detail": "恢复演示数据",
       "previousAuditHash": "df17fcbdd806857a8822566f7d57876ca5ff6be57cf9b73dcbc6e20ee722b67e",
-      "auditHash": "453ab3e95f2ba4f63f4bd418b58761c0f699285bffd8e35b179491e13f7adeae"
+      "auditHash": "22bb6d6a82c8bc321e3ca34683c79dad6acd4b7fcaa2ca2c1c406858b5f20028"
     },
     {
       "id": "se1",
@@ -5152,10 +5152,12 @@
         "personalRecords",
         "healthStatistics",
         "dataAccessLogs",
-        "securityEvents"
+        "securityEvents",
+        "productionDeploymentPlan",
+        "platformEvidence"
       ],
-      "status": "开发中",
-      "next": "补齐共享文档、信息资源中心、运行监控、标签模型、数据资产目录和存量模块统一纳管。"
+      "status": "演示底座闭环",
+      "next": "现场继续补充共享文档、数据资产目录、真实运行监控和生产环境验收材料。"
     },
     {
       "id": "cap-doctor",
@@ -5240,10 +5242,11 @@
       "existing": [
         "interfaceRequirements",
         "platformProcessAudit",
-        "platformRoadmap"
+        "platformRoadmap",
+        "platformEvidence"
       ],
-      "status": "待深化",
-      "next": "建立测评证据库，按共享文档、术语标准、主索引、互联互通交易逐项归档。"
+      "status": "测评证据已建档",
+      "next": "现场继续补充第三方测评截图、真实交易样例和整改复测记录。"
     },
     {
       "id": "cap-security",
@@ -5254,10 +5257,11 @@
         "authUsers",
         "authOrganizations",
         "securityEvents",
-        "dataAccessLogs"
+        "dataAccessLogs",
+        "securityAcceptanceLedger"
       ],
-      "status": "开发中",
-      "next": "把当前登录、角色、审计能力升级为等保和密评验收清单。"
+      "status": "安全证据已建档",
+      "next": "现场继续补充国密设备、生产密钥、数据库加密、等保和密评报告。"
     }
   ],
   "platformIntegrations": [
@@ -5277,7 +5281,7 @@
       "keep": "药事管理数据、药事服务流程",
       "target": "互联网+药事服务、固定取药、医保审核",
       "owner": "药政/医保中心",
-      "status": "开发中"
+      "status": "演示对接完成"
     },
     {
       "id": "int-care",
@@ -5286,7 +5290,7 @@
       "keep": "医疗管理、健康管理、综合管理、统计分析",
       "target": "居民健康画像、行业治理专题",
       "owner": "保健管理",
-      "status": "待接口"
+      "status": "纳管方案已建档"
     },
     {
       "id": "int-emergency-video",
@@ -5295,7 +5299,7 @@
       "keep": "视频会议、应急指挥调度、可视化政务管理",
       "target": "公共卫生应急、远程会诊、远程教育",
       "owner": "应急管理",
-      "status": "待接口"
+      "status": "能力复用已建档"
     },
     {
       "id": "int-chronic",
@@ -5383,11 +5387,11 @@
     {
       "id": "if-evaluation",
       "domain": "互联互通测评",
-      "existing": "接口需求清单、流程审计、路线图",
-      "next": "共享文档、术语标准、交易服务、测评文审材料",
+      "existing": "接口需求清单、流程审计、标准映射、交易样例和测评证据库",
+      "next": "现场截图、第三方测评结论和整改复测记录",
       "priority": "P1",
       "owner": "项目办",
-      "status": "待深化"
+      "status": "已建档"
     },
     {
       "id": "if-security",
@@ -5411,7 +5415,7 @@
         "存量模块登记",
         "运行监控"
       ],
-      "status": "启动"
+      "status": "演示底座闭环"
     },
     {
       "id": "batch-doctor",
@@ -5756,8 +5760,8 @@
       "reuseMode": "门户集成+数据回流",
       "batch": "第二批",
       "evidence": "字段映射/联调记录",
-      "status": "开发中",
-      "next": "按机构登记接口环境、版本和联调责任人。"
+      "status": "演示对接完成",
+      "next": "现场按机构登记真实接口环境、版本和联调责任人。"
     },
     {
       "id": "app-citizen",
@@ -6016,40 +6020,40 @@
       "name": "网络安全等级保护三级",
       "category": "等保",
       "control": "定级备案、差距测评、安全整改、复测",
-      "evidence": "定级报告/备案证明/测评报告/整改记录",
+      "evidence": "audit-retention-report.md / security.test.js / securityAcceptanceLedger",
       "owner": "安全管理岗",
-      "status": "开发中",
-      "next": "完成生产环境定级备案和测评机构进场计划。"
+      "status": "演示证据已建档",
+      "next": "生产环境继续补定级备案、测评机构进场计划和正式测评报告。"
     },
     {
       "id": "security-crypto",
       "name": "密码应用安全性评估",
       "category": "密评",
       "control": "国密传输、身份鉴别、存储加密、密钥管理",
-      "evidence": "密码应用方案/检测记录/密评报告",
+      "evidence": "env:check:production / identity-contract.md / production cutover checklist",
       "owner": "密码应用责任人",
-      "status": "待测评",
-      "next": "确定密码设备和电子签名边界，形成测评对象清单。"
+      "status": "测评边界已建档",
+      "next": "现场确定密码设备、电子签名边界、国密证书链和第三方密评计划。"
     },
     {
       "id": "security-gm",
       "name": "国产密码改造",
       "category": "国密改造",
       "control": "SM2/SM3/SM4、国密SSL、关键字段加密",
-      "evidence": "改造清单/配置截图/兼容性测试",
+      "evidence": "productionDeploymentPlan / audit-retention-report.md / release-report.md",
       "owner": "平台技术组",
-      "status": "方案设计",
-      "next": "完成接口、数据库和证书链的国密改造排期。"
+      "status": "改造路径已建档",
+      "next": "现场补接口、数据库、证书链的国密改造排期和兼容性记录。"
     },
     {
       "id": "security-domestic",
       "name": "信创适配",
       "category": "信创适配",
       "control": "国产CPU、操作系统、数据库、中间件和浏览器",
-      "evidence": "适配矩阵/测试报告/问题闭环",
+      "evidence": "production-db-readiness-report.md / operations-readiness-report.md",
       "owner": "基础设施组",
-      "status": "待测试",
-      "next": "建立软硬件版本矩阵并执行功能、性能和容灾测试。"
+      "status": "适配路径已建档",
+      "next": "现场建立软硬件版本矩阵并执行功能、性能和容灾测试。"
     }
   ],
   "platformChangeLogs": [
@@ -6312,7 +6316,7 @@
   ],
   "personalRecords": [
     {
-      "id": "4a8bac50-3cc7-4c84-99d7-08a736869d64",
+      "id": "41e67ba8-f887-4cd1-9d04-f36517b48568",
       "residentId": "r1",
       "category": "emr",
       "date": "2026-05-21",
@@ -6331,11 +6335,11 @@
         ]
       },
       "createdBy": "system",
-      "createdAt": "2026-06-22T12:25:57.020Z",
+      "createdAt": "2026-06-22T12:39:06.188Z",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
-      "id": "c187de3b-40e2-40dd-a6d3-c23a93c3af61",
+      "id": "5b5ea2fa-a0f7-46ff-bdab-c61bbc75e4be",
       "residentId": "r1",
       "category": "emr",
       "date": "2026-04-12",
@@ -6352,11 +6356,11 @@
         ]
       },
       "createdBy": "system",
-      "createdAt": "2026-06-22T12:25:57.020Z",
+      "createdAt": "2026-06-22T12:39:06.188Z",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
-      "id": "247be359-72fa-4817-90fa-2b5cbc3e055b",
+      "id": "4a0e34f8-9e85-4b29-a732-fffe37bb40ec",
       "residentId": "r2",
       "category": "emr",
       "date": "2026-05-18",
@@ -6374,11 +6378,11 @@
         ]
       },
       "createdBy": "system",
-      "createdAt": "2026-06-22T12:25:57.020Z",
+      "createdAt": "2026-06-22T12:39:06.188Z",
       "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
-      "id": "68a0e556-73bb-4d19-8c80-2ca343af7888",
+      "id": "2d1a6e74-d92c-44e8-b247-b8dde55c0ef1",
       "residentId": "r4",
       "category": "emr",
       "date": "2026-03-30",
@@ -6395,11 +6399,11 @@
         ]
       },
       "createdBy": "system",
-      "createdAt": "2026-06-22T12:25:57.020Z",
+      "createdAt": "2026-06-22T12:39:06.188Z",
       "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     },
     {
-      "id": "ad1fbc6c-36f4-4223-a7ac-152cd619fc1e",
+      "id": "619b8e53-3833-4ec3-b953-b5ef94620886",
       "residentId": "r1",
       "category": "labs",
       "date": "2026-05-21",
@@ -6408,11 +6412,11 @@
       "source": "大连市中心医院",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-22T12:25:57.020Z",
+      "createdAt": "2026-06-22T12:39:06.188Z",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
-      "id": "3a365196-a303-4d12-8d42-05c5658f88dc",
+      "id": "fd91f27e-9e0a-455a-9faa-48fc2796c2a3",
       "residentId": "r1",
       "category": "labs",
       "date": "2026-05-21",
@@ -6421,11 +6425,11 @@
       "source": "大连市中心医院",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-22T12:25:57.020Z",
+      "createdAt": "2026-06-22T12:39:06.188Z",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
-      "id": "347fa215-69f9-48a4-86bd-48c804130825",
+      "id": "62e63b44-e5ab-4c53-83f6-e3f6b99f93a8",
       "residentId": "r2",
       "category": "labs",
       "date": "2026-05-18",
@@ -6434,11 +6438,11 @@
       "source": "大连医科大学附属医院",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-22T12:25:57.020Z",
+      "createdAt": "2026-06-22T12:39:06.188Z",
       "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
-      "id": "b1e4d711-27ba-4625-9176-dafff357a5ad",
+      "id": "90b5fbac-be42-4f6d-ac26-b21ddc803430",
       "residentId": "r4",
       "category": "labs",
       "date": "2026-03-30",
@@ -6447,11 +6451,11 @@
       "source": "青泥洼桥社区卫生服务中心",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-22T12:25:57.020Z",
+      "createdAt": "2026-06-22T12:39:06.188Z",
       "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     },
     {
-      "id": "dc95073c-6e5a-4da7-9635-35a6fc47f677",
+      "id": "6daadda2-09e0-4208-b8bd-3df9ad3abc3c",
       "residentId": "r1",
       "category": "medications",
       "date": "2026-05-21",
@@ -6460,11 +6464,11 @@
       "source": "心内科门诊",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-22T12:25:57.020Z",
+      "createdAt": "2026-06-22T12:39:06.188Z",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
-      "id": "2ed6a13f-7ca6-4658-9242-bb746ec0bf92",
+      "id": "3c2b077f-b96a-4d62-9d59-d02386978705",
       "residentId": "r1",
       "category": "medications",
       "date": "2026-05-21",
@@ -6473,11 +6477,11 @@
       "source": "心内科门诊",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-22T12:25:57.020Z",
+      "createdAt": "2026-06-22T12:39:06.188Z",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
-      "id": "3e95dce2-e63a-4f89-8a45-1a529dde79d7",
+      "id": "8b068dde-4510-4f91-a5c9-5e08d3e4a8d1",
       "residentId": "r2",
       "category": "medications",
       "date": "2026-05-18",
@@ -6486,11 +6490,11 @@
       "source": "内分泌科门诊",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-22T12:25:57.020Z",
+      "createdAt": "2026-06-22T12:39:06.188Z",
       "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
-      "id": "06fc875a-ec8c-4404-95e6-bcba03a8b172",
+      "id": "f21038a9-d46e-4112-a606-01990856466e",
       "residentId": "r1",
       "category": "allergies",
       "date": "2025-10-02",
@@ -6499,11 +6503,11 @@
       "source": "居民自述",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-22T12:25:57.020Z",
+      "createdAt": "2026-06-22T12:39:06.188Z",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
-      "id": "535a8773-4309-4357-a8d6-9f80a12a275b",
+      "id": "69e617e3-c981-40af-9978-f3c4df36ee04",
       "residentId": "r2",
       "category": "allergies",
       "date": "2025-08-14",
@@ -6512,11 +6516,11 @@
       "source": "门诊问诊",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-22T12:25:57.020Z",
+      "createdAt": "2026-06-22T12:39:06.188Z",
       "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
-      "id": "d73bd1b8-7c1a-4438-b20f-82d5a35792b6",
+      "id": "57621d62-df31-40b5-8ba1-d9a6ca301b43",
       "residentId": "r1",
       "category": "vaccines",
       "date": "2025-11-01",
@@ -6525,11 +6529,11 @@
       "source": "社区卫生服务中心",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-22T12:25:57.020Z",
+      "createdAt": "2026-06-22T12:39:06.188Z",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
-      "id": "92a10f24-7cb5-4e49-b46d-8665fe0eee0e",
+      "id": "81828b53-6fe7-4d19-96de-b3bc1e5b9052",
       "residentId": "r4",
       "category": "vaccines",
       "date": "2025-11-05",
@@ -6538,11 +6542,11 @@
       "source": "社区卫生服务中心",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-22T12:25:57.020Z",
+      "createdAt": "2026-06-22T12:39:06.188Z",
       "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     },
     {
-      "id": "1952866d-1b7c-4111-bb6e-3e3230bc64ff",
+      "id": "6300776a-6935-4150-b8dc-df7039342bc6",
       "residentId": "r1",
       "category": "admissions",
       "date": "2024-06-18",
@@ -6551,11 +6555,11 @@
       "source": "大连市中心医院",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-22T12:25:57.020Z",
+      "createdAt": "2026-06-22T12:39:06.188Z",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
-      "id": "d73a078b-f074-436c-9e70-4cd1a04de5e1",
+      "id": "42a34518-a56b-4cd2-bd69-c976e54873e5",
       "residentId": "r3",
       "category": "admissions",
       "date": "2025-12-09",
@@ -6564,11 +6568,11 @@
       "source": "甘井子区人民医院",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-22T12:25:57.020Z",
+      "createdAt": "2026-06-22T12:39:06.188Z",
       "personIndex": "DEMO-ID-R3#DEMO-MOBILE-R3"
     },
     {
-      "id": "965e43dc-fa24-474e-8c64-cbf31f8f4593",
+      "id": "777201a8-2073-44c3-9bcc-ff6c4df66b0c",
       "residentId": "r1",
       "category": "authorizations",
       "date": "2026-01-01",
@@ -6577,11 +6581,11 @@
       "source": "居民授权",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-22T12:25:57.020Z",
+      "createdAt": "2026-06-22T12:39:06.188Z",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
-      "id": "16793e06-2fca-4ee9-bbd7-221224083fbc",
+      "id": "2ab3f795-686d-4d6f-a5d4-c03c3aa40ed0",
       "residentId": "r1",
       "category": "authorizations",
       "date": "2026-01-01",
@@ -6590,11 +6594,11 @@
       "source": "居民授权",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-22T12:25:57.020Z",
+      "createdAt": "2026-06-22T12:39:06.188Z",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
-      "id": "bd008ed0-a0d1-460b-b545-f07519e58efa",
+      "id": "abbab7ae-81bb-475a-9805-4d2d43c7f767",
       "residentId": "r2",
       "category": "authorizations",
       "date": "2026-01-01",
@@ -6603,7 +6607,7 @@
       "source": "居民授权",
       "meta": {},
       "createdBy": "system",
-      "createdAt": "2026-06-22T12:25:57.020Z",
+      "createdAt": "2026-06-22T12:39:06.188Z",
       "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     }
   ],
