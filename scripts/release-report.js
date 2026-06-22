@@ -11,6 +11,7 @@ const { buildIntegrationReadinessReport, renderMarkdown: renderIntegrationReadin
 const { buildInterfaceMappingReport, renderMarkdown: renderInterfaceMappingMarkdown } = require("./interface-mapping");
 const { buildMonitoringReadinessReport, renderMarkdown: renderMonitoringReadinessMarkdown } = require("./monitoring-readiness");
 const { buildOperationsReadinessReport, renderMarkdown: renderOperationsReadinessMarkdown } = require("./operations-readiness");
+const { buildProcessAuditReport, renderMarkdown: renderProcessAuditMarkdown } = require("./process-audit");
 const { buildProductionDbReadinessReport, renderMarkdown: renderProductionDbReadinessMarkdown } = require("./production-db-readiness");
 const { inspectStorageModel } = require("./storage-admin");
 
@@ -332,6 +333,14 @@ function productionDbReadinessChecks(productionDbReadiness) {
   ];
 }
 
+function processAuditChecks(processAudit) {
+  return [
+    check("process:audit", processAudit.ok, processAudit.ok ? "full process audit checks passed" : "full process audit checks failed", "error", "process-audit"),
+    check("process:evidenceDomains", processAudit.evidenceDomains?.every((item) => item.passed), `${processAudit.summary?.passedDomains || 0}/${processAudit.summary?.evidenceDomains || 0} evidence domains`, "error", "process-audit"),
+    check("process:matrixRows", processAudit.processRows?.length >= 10, `${processAudit.processRows?.length || 0} process rows`, "error", "process-audit")
+  ];
+}
+
 function packageChecks(pkg) {
   const requiredScripts = [
     "check",
@@ -349,6 +358,7 @@ function packageChecks(pkg) {
     "interface:mapping",
     "monitoring:readiness",
     "operations:readiness",
+    "process:audit",
     "production-db:readiness",
     "evaluation:evidence",
     "storage:backup",
@@ -401,6 +411,7 @@ function buildReleaseReport(options = {}) {
   const interfaceMapping = buildInterfaceMappingReport({ data, pkg });
   const monitoringReadiness = buildMonitoringReadinessReport({ data, pkg });
   const operationsReadiness = buildOperationsReadinessReport({ data, pkg });
+  const processAudit = buildProcessAuditReport({ data });
   const productionDbReadiness = buildProductionDbReadinessReport({ data, pkg, storageModel });
   const evaluationEvidence = buildEvaluationEvidenceReport({ data });
   const environmentMatrix = buildEnvironmentMatrixReport({ data, pkg });
@@ -421,6 +432,7 @@ function buildReleaseReport(options = {}) {
     ...interfaceMappingChecks(interfaceMapping),
     ...monitoringReadinessChecks(monitoringReadiness),
     ...operationsReadinessChecks(operationsReadiness),
+    ...processAuditChecks(processAudit),
     ...productionDbReadinessChecks(productionDbReadiness),
     ...evaluationEvidenceChecks(evaluationEvidence),
     ...environmentMatrixChecks(environmentMatrix),
@@ -451,6 +463,7 @@ function buildReleaseReport(options = {}) {
     interfaceMapping,
     monitoringReadiness,
     operationsReadiness,
+    processAudit,
     productionDbReadiness,
     evaluationEvidence,
     environmentMatrix
@@ -560,6 +573,10 @@ function renderMarkdown(report) {
     "",
     "See `operations-readiness-report.json` and `operations-readiness-report.md` for operation routes, production deployment tracks, external dependency risks, and release operation scripts.",
     "",
+    "## Full process audit report",
+    "",
+    "See `process-audit-report.json` and `process-audit-report.md` for resident, chronic disease, county consortium, insurance, statistics, certificate, security, and cutover process evidence.",
+    "",
     "## Monitoring readiness report",
     "",
     "See `monitoring-readiness-report.json` and `monitoring-readiness-report.md` for health and metrics routes, runtime metric signals, alert signals, SLO targets, and on-call escalation evidence.",
@@ -665,6 +682,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       operationsReadiness: report.operationsReadiness
     }, null, 2), "utf8");
+    const processAuditJson = path.join(path.dirname(output), "process-audit-report.json");
+    fs.writeFileSync(processAuditJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      processAudit: report.processAudit
+    }, null, 2), "utf8");
     const monitoringJson = path.join(path.dirname(output), "monitoring-readiness-report.json");
     fs.writeFileSync(monitoringJson, JSON.stringify({
       project: report.project,
@@ -718,6 +743,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(interfaceMappingMarkdown, renderInterfaceMappingMarkdown(report.interfaceMapping), "utf8");
     const operationsMarkdown = path.join(path.dirname(markdown), "operations-readiness-report.md");
     fs.writeFileSync(operationsMarkdown, renderOperationsReadinessMarkdown(report.operationsReadiness), "utf8");
+    const processAuditMarkdown = path.join(path.dirname(markdown), "process-audit-report.md");
+    fs.writeFileSync(processAuditMarkdown, renderProcessAuditMarkdown(report.processAudit), "utf8");
     const monitoringMarkdown = path.join(path.dirname(markdown), "monitoring-readiness-report.md");
     fs.writeFileSync(monitoringMarkdown, renderMonitoringReadinessMarkdown(report.monitoringReadiness), "utf8");
     const productionDbMarkdown = path.join(path.dirname(markdown), "production-db-readiness-report.md");
