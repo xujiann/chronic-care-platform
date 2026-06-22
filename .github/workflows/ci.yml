@@ -37,6 +37,8 @@ jobs:
         run: npm run test:e2e
       - name: Run deployment readiness gate
         run: npm run deploy:check
+      - name: Inspect storage model
+        run: npm run storage:inspect
       - name: Generate release readiness report
         run: npm run release:report
       - name: Upload release readiness report
