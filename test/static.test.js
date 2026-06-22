@@ -175,3 +175,21 @@ test("citizen portal exposes P1 record details trends and source labels", () => 
   assert.match(citizenCss, /source-badge/);
   assert.match(citizenCss, /record-detail/);
 });
+
+test("citizen portal exposes PWA install and offline shell assets", () => {
+  const citizenHtml = read("citizen.html");
+  const manifest = JSON.parse(read("manifest.webmanifest"));
+  const serviceWorker = read("service-worker.js");
+  assert.match(citizenHtml, /rel="manifest"/);
+  assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
+  assert.equal(manifest.start_url, "./citizen.html");
+  assert.equal(manifest.display, "standalone");
+  assert.equal(manifest.icons.some((item) => item.src === "./pwa-icon.svg"), true);
+  assert.match(serviceWorker, /CACHE_NAME/);
+  assert.match(serviceWorker, /citizen\.html/);
+  assert.match(serviceWorker, /mobile-preview\.html/);
+  assert.match(serviceWorker, /data\/db\.json/);
+  assert.match(read("package.json"), /node --check service-worker\.js/);
+  assert.match(read("README.md"), /manifest\.webmanifest/);
+  assert.match(read("README.md"), /service-worker\.js/);
+});

@@ -1,0 +1,32 @@
+{
+  "name": "慢病医防融合居民端",
+  "short_name": "慢病居民端",
+  "description": "居民健康档案、电子病历、随访提醒和授权共享的移动端入口。",
+  "start_url": "./citizen.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f8fb",
+  "theme_color": "#1d4ed8",
+  "lang": "zh-CN",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "./pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "健康档案",
+      "short_name": "档案",
+      "url": "./citizen.html#vault"
+    },
+    {
+      "name": "手机预览",
+      "short_name": "预览",
+      "url": "./mobile-preview.html"
+    }
+  ]
+}

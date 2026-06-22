@@ -68,6 +68,8 @@ http://localhost:5173/login.html
 | `mobile-preview.html` | 居民端手机预览 |
 | `county.html` | 县域医共体平台、16255 模型、协同工单、互认、基层 AI |
 
+居民端已提供 PWA 基础壳：`manifest.webmanifest`、`service-worker.js` 和 `pwa-icon.svg` 支持浏览器安装入口、静态资源缓存和弱网/离线回退到居民端健康档案页面；正式上线时仍需结合生产域名、HTTPS 和现场移动端策略复核。
+
 ## 数据与存储
 
 本地服务优先使用 SQLite 能力，并持续维护 GitHub Pages 可读的静态快照：

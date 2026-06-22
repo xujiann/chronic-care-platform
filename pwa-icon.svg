@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="慢病居民端图标">
+  <rect width="512" height="512" rx="112" fill="#1d4ed8"/>
+  <path fill="#ffffff" d="M256 116c61 0 110 49 110 110 0 83-87 136-110 151-23-15-110-68-110-151 0-61 49-110 110-110Z" opacity=".92"/>
+  <path fill="#1d4ed8" d="M238 178h36v60h60v36h-60v60h-36v-60h-60v-36h60v-60Z"/>
+  <path fill="#38bdf8" d="M151 388h210c13 0 24 11 24 24s-11 24-24 24H151c-13 0-24-11-24-24s11-24 24-24Z"/>
+</svg>

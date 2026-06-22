@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>居民端 · 健康档案与电子病历</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <meta name="theme-color" content="#1d4ed8" />
     <link rel="stylesheet" href="./citizen.css" />
     <script src="./auth.js"></script>
     <script>window.HealthCityAuth.requireRole(["citizen"])</script>
@@ -216,5 +218,10 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="./health-archive-standard.js"></script>
     <script src="./citizen.js"></script>
+    <script>
+      if ("serviceWorker" in navigator && location.protocol !== "file:") {
+        window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));
+      }
+    </script>
   </body>
 </html>
