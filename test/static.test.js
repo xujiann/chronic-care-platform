@@ -56,6 +56,8 @@ test("static snapshot keeps completed P2 governance collections", () => {
   assert.equal(data.productionDeploymentPlan.some((item) => item.id === "prod-storage-adapter"), true);
   assert.equal(Array.isArray(data.platformInterfaces), true);
   assert.equal(data.platformInterfaces.filter((item) => item.priority === "P0").every((item) => item.owner && item.status && item.next), true);
+  assert.equal(data.platformInterfaces.filter((item) => item.priority === "P0").every((item) => item.status === "演示对接完成"), true);
+  assert.equal(data.platformInterfaces.some((item) => item.id === "if-medical" && /HIS\/EMR\/LIS\/PACS/.test(item.existing)), true);
   assert.equal(data.securityAcceptanceLedger.every((item) => item.id && item.category && item.owner && item.status && item.next), true);
   assert.equal(data.platformRoadmap.filter((item) => item.priority === "P2").every((item) => item.status === "已完成"), true);
 });

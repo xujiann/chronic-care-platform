@@ -142,7 +142,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(readiness.body.productionEnvironment.checks.some((item) => item.id === "identity-adapter"), true);
     assert.equal(readiness.body.checks.some((item) => item.id === "interface-readiness" && item.passed), true);
     assert.equal(readiness.body.interfaceReadiness.p0Total >= 4, true);
-    assert.equal(readiness.body.interfaceReadiness.rows.some((item) => item.id === "if-medical" && item.externalBlocked), true);
+    assert.equal(readiness.body.interfaceReadiness.rows.some((item) => item.id === "if-medical" && item.status === "演示对接完成" && item.externalBlocked), true);
     assert.equal(readiness.body.checks.some((item) => item.id === "audit-chain" && item.passed), true);
     assert.equal(readiness.body.externalDependencies.some((item) => item.id === "identity-source" && item.severity === "high"), true);
     assert.equal(readiness.body.externalDependencies.some((item) => item.id === "institution-systems" && item.nextAction), true);
