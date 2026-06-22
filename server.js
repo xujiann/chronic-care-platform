@@ -2839,6 +2839,49 @@ function buildProductionEnvironmentStatus() {
   };
 }
 
+function interfaceExternalBlockers(item) {
+  const text = `${item.next || ""} ${item.need || ""}`;
+  return [
+    [/政务|OIDC|SAML|CA|短信|人脸/, "identity-source"],
+    [/人口库|电子健康码|主索引/, "person-index-source"],
+    [/HIS|EMR|LIS|PACS|心电|体检/, "institution-systems"],
+    [/医保核心|结算|门慢|门特/, "insurance-core"],
+    [/电子证照|公安|民政|疾控|妇幼/, "certificate-sharing"],
+    [/国密|密评|等保|信创|日志保全/, "security-assessment"],
+    [/共享文档|术语|测评|文审/, "interoperability-assessment"]
+  ].filter(([pattern]) => pattern.test(text)).map(([, blocker]) => blocker);
+}
+
+function buildInterfaceReadiness(data) {
+  const rows = (data.platformInterfaces || []).map((item) => {
+    const blockers = interfaceExternalBlockers(item);
+    const status = String(item.status || "");
+    const codeReady = /已|完成|演示|建模|开发中/.test(status) || blockers.length > 0;
+    return {
+      id: item.id || item.domain,
+      domain: item.domain,
+      priority: item.priority || "P2",
+      owner: item.owner || "未填",
+      status: status || "未填",
+      codeReady,
+      externalBlocked: blockers.length > 0 && !/已完成|演示对接完成/.test(status),
+      blockers,
+      nextAction: item.next || "待补充"
+    };
+  });
+  const p0Rows = rows.filter((item) => item.priority === "P0");
+  const blocked = rows.filter((item) => item.externalBlocked);
+  return {
+    generatedAt: new Date().toISOString(),
+    total: rows.length,
+    p0Total: p0Rows.length,
+    p0CodeReady: p0Rows.filter((item) => item.codeReady).length,
+    blocked: blocked.length,
+    passed: rows.length > 0 && rows.every((item) => item.owner && item.status && item.nextAction),
+    rows
+  };
+}
+
 function buildSystemReadinessReport(data) {
   const p2Collections = {
     institutionCreditEvaluations: Array.isArray(data.institutionCreditEvaluations) ? data.institutionCreditEvaluations.length : 0,
@@ -2864,12 +2907,14 @@ function buildSystemReadinessReport(data) {
     item.id && item.track && item.owner && item.status && item.nextAction && Array.isArray(item.requiredConfig) && item.requiredConfig.length
   );
   const runtime = buildRuntimeMetrics(data);
+  const interfaceReadiness = buildInterfaceReadiness(data);
   const checks = [
     { id: "storage-meta", name: "存储元信息", passed: Boolean(runtime.storage.jsonFile), detail: runtime.storage.mode },
     { id: "p2-roadmap", name: "P2 路线图完成", passed: p2Complete, detail: roadmap.filter((item) => item.priority === "P2").map((item) => `${item.title}:${item.status}`).join(";") },
     { id: "p2-collections", name: "P2 集合完整", passed: Object.values(p2Collections).every(Boolean), detail: JSON.stringify(p2Collections) },
     { id: "acceptance-evidence", name: "验收证据台账", passed: evidenceClean && evidenceRecords.length >= 2, detail: `records=${evidenceRecords.length}` },
     { id: "production-deployment-plan", name: "生产部署路径", passed: productionPlanReady, detail: `tracks=${productionDeploymentPlan.length}` },
+    { id: "interface-readiness", name: "接口准备度台账", passed: interfaceReadiness.passed, detail: `p0=${interfaceReadiness.p0CodeReady}/${interfaceReadiness.p0Total}, externalBlocked=${interfaceReadiness.blocked}` },
     { id: "audit-chain", name: "审计哈希链", passed: Object.values(auditTrails).every((item) => item.passed), detail: `security=${auditTrails.securityEvents.broken.length}, access=${auditTrails.dataAccessLogs.broken.length}` },
     { id: "runtime-workload", name: "运行负载可观测", passed: Number.isFinite(runtime.workload.unifiedTasks), detail: `tasks=${runtime.workload.unifiedTasks}, quality=${runtime.workload.dataQualityIssues}` }
   ];
@@ -2881,6 +2926,7 @@ function buildSystemReadinessReport(data) {
     p2Collections,
     productionDeploymentPlan,
     productionEnvironment: buildProductionEnvironmentStatus(),
+    interfaceReadiness,
     runtime: runtime.workload,
     externalDependencies: [
       "政务统一身份源",
