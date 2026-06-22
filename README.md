@@ -178,6 +178,8 @@ npm.cmd run release:report:full
 
 `data-quality:report` 会生成 `release/data-quality-report.json` 与 `release/data-quality-report.md`，检查居民主索引完整度、跨集合居民引用、personIndex 一致性、来源可追溯和整改闭环。
 
+`operations:readiness` 会生成 `release/operations-readiness-report.json` 与 `release/operations-readiness-report.md`，检查 `/api/health`、`/api/metrics`、`/api/system/readiness`、生产部署轨道、外部依赖风险和发布运维脚本。
+
 `evaluation:evidence` 会生成 `release/evaluation-evidence-report.json` 与 `release/evaluation-evidence-report.md`，汇总互联互通四甲/五乙测评所需接口清单、标准映射、交易样例、整改记录、P1 接口需求和流程审计证据。
 
 ## 备份、脱敏与回滚
@@ -213,7 +215,7 @@ GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下
 1. 生产部署基线：已完成环境模板、健康检查、后端部署说明、发布/部署门禁、CI artifact 取证和静态快照回滚；后续按真实部署平台补环境分层和密钥注入。
 2. 可观测性：已完成 `/api/metrics`、请求状态、慢请求、任务堆积、死信、数据质量和 `/api/system/readiness`；后续接入 Prometheus/OpenTelemetry 或平台日志服务。
 3. 数据模型深化：已完成 SQLite schema v7、集合版本、乐观锁、恢复演练和 P2 结构化镜像表；后续继续补生产数据库约束、索引、回滚脚本和原生备份证据。
-4. 发布取证：已完成 release report、deploy check、外部依赖风险台账、安全验收台账、数据质量/主索引证据和 CI 报告归档；后续在真实环境挂接测评报告、联调记录和上线签字。
+4. 发布取证：已完成 release report、deploy check、外部依赖风险台账、安全验收台账、数据质量/主索引证据、运维就绪证据和 CI 报告归档；后续在真实环境挂接测评报告、联调记录和上线签字。
 5. 测试深化：已覆盖 API 回归、覆盖率、E2E、并发冲突、静态快照、备份恢复、接口网关和发布门禁；后续围绕真实接口字段差异、移动弱网和现场权限边界继续扩展。
 
 必须现场资源才能完成：

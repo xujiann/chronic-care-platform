@@ -7,6 +7,7 @@ const { buildDataQualityReport, renderMarkdown: renderDataQualityMarkdown } = re
 const { buildEvaluationEvidenceReport, renderMarkdown: renderEvaluationEvidenceMarkdown } = require("./evaluation-evidence");
 const { buildIdentityContract, renderMarkdown: renderIdentityContractMarkdown } = require("./identity-contract");
 const { buildIntegrationReadinessReport, renderMarkdown: renderIntegrationReadinessMarkdown } = require("./integration-readiness");
+const { buildOperationsReadinessReport, renderMarkdown: renderOperationsReadinessMarkdown } = require("./operations-readiness");
 const { inspectStorageModel } = require("./storage-admin");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -250,6 +251,14 @@ function dataQualityChecks(dataQuality) {
   ];
 }
 
+function operationsReadinessChecks(operationsReadiness) {
+  return [
+    check("operations:readiness", operationsReadiness.ok, operationsReadiness.ok ? "operations readiness checks passed" : "operations readiness checks failed", "error", "operations"),
+    check("operations:routes", operationsReadiness.operationRoutes?.every((item) => item.present && item.documented), `${operationsReadiness.operationRoutes?.length || 0} operation routes`, "error", "operations"),
+    check("operations:externalDependencies", operationsReadiness.externalDependencies?.every((item) => item.present), `${operationsReadiness.externalDependencies?.length || 0} external dependencies`, "error", "operations")
+  ];
+}
+
 function packageChecks(pkg) {
   const requiredScripts = [
     "check",
@@ -263,6 +272,7 @@ function packageChecks(pkg) {
     "audit:retention",
     "data-quality:report",
     "integration:readiness",
+    "operations:readiness",
     "evaluation:evidence",
     "storage:backup",
     "storage:inspect",
@@ -311,6 +321,7 @@ function buildReleaseReport(options = {}) {
   const auditRetention = buildAuditRetentionReport({ data, env: options.env || process.env });
   const dataQuality = buildDataQualityReport({ data });
   const integrationReadiness = buildIntegrationReadinessReport({ data });
+  const operationsReadiness = buildOperationsReadinessReport({ data, pkg });
   const evaluationEvidence = buildEvaluationEvidenceReport({ data });
   const checks = [
     assertFile("README.md"),
@@ -326,6 +337,7 @@ function buildReleaseReport(options = {}) {
     ...auditRetentionChecks(auditRetention),
     ...dataQualityChecks(dataQuality),
     ...integrationReadinessChecks(integrationReadiness),
+    ...operationsReadinessChecks(operationsReadiness),
     ...evaluationEvidenceChecks(evaluationEvidence),
     ...env.checks,
     ...commandChecks(options.runCommands)
@@ -351,6 +363,7 @@ function buildReleaseReport(options = {}) {
     auditRetention,
     dataQuality,
     integrationReadiness,
+    operationsReadiness,
     evaluationEvidence
   };
 }
@@ -450,6 +463,10 @@ function renderMarkdown(report) {
     "",
     "See `data-quality-report.json` and `data-quality-report.md` for resident master index completeness, resident reference checks, source traceability, and rectification issue evidence.",
     "",
+    "## Operations readiness report",
+    "",
+    "See `operations-readiness-report.json` and `operations-readiness-report.md` for operation routes, production deployment tracks, external dependency risks, and release operation scripts.",
+    "",
     "## Interoperability evaluation evidence report",
     "",
     "See `evaluation-evidence-report.json` and `evaluation-evidence-report.md` for interoperability artifacts, P1 interface requirements, transaction samples, and rectification evidence.",
@@ -527,6 +544,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       integrationReadiness: report.integrationReadiness
     }, null, 2), "utf8");
+    const operationsJson = path.join(path.dirname(output), "operations-readiness-report.json");
+    fs.writeFileSync(operationsJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      operationsReadiness: report.operationsReadiness
+    }, null, 2), "utf8");
     const evaluationJson = path.join(path.dirname(output), "evaluation-evidence-report.json");
     fs.writeFileSync(evaluationJson, JSON.stringify({
       project: report.project,
@@ -552,6 +577,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(dataQualityMarkdown, renderDataQualityMarkdown(report.dataQuality), "utf8");
     const integrationMarkdown = path.join(path.dirname(markdown), "integration-readiness-report.md");
     fs.writeFileSync(integrationMarkdown, renderIntegrationReadinessMarkdown(report.integrationReadiness), "utf8");
+    const operationsMarkdown = path.join(path.dirname(markdown), "operations-readiness-report.md");
+    fs.writeFileSync(operationsMarkdown, renderOperationsReadinessMarkdown(report.operationsReadiness), "utf8");
     const evaluationMarkdown = path.join(path.dirname(markdown), "evaluation-evidence-report.md");
     fs.writeFileSync(evaluationMarkdown, renderEvaluationEvidenceMarkdown(report.evaluationEvidence), "utf8");
   }
