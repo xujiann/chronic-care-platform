@@ -4837,6 +4837,48 @@ function buildCountyAcceptanceLedger(data) {
   };
 }
 
+function buildChronicServiceSummary(data) {
+  const domainSpecs = [
+    ["serviceRoles", "Service role network", data.chronicServiceRoles, (item) => item.role && item.responsibility],
+    ["capabilityConditions", "Capability conditions", data.chronicCapabilityConditions, (item) => item.item && item.requirement],
+    ["servicePathways", "Prevention-screening-treatment-care pathway", data.chronicServicePathways, (item) => item.stage && item.action],
+    ["comorbidity", "Comorbidity management", data.chronicComorbidityPlans, (item) => Array.isArray(item.diseases) && item.diseases.length >= 2 && item.pharmacistTask],
+    ["tcmServices", "TCM service integration", data.chronicTcmServices, (item) => item.intervention || item.nextService],
+    ["selfManagement", "Resident self-management", data.chronicSelfManagement, (item) => item.latestValue && item.nextAction],
+    ["medicationSupport", "Medication support", data.chronicMedicationSupport, (item) => item.prescription && item.stockStatus],
+    ["qualityMetrics", "Quality metrics", data.chronicQualityMetrics, (item) => item.evidence && item.owner && item.status]
+  ];
+  const domains = domainSpecs.map(([id, name, rows, predicate]) => {
+    const items = Array.isArray(rows) ? rows : [];
+    const ready = items.filter(predicate).length;
+    return {
+      id,
+      name,
+      total: items.length,
+      ready,
+      needsFollowUp: Math.max(0, items.length - ready),
+      readyRate: Math.round((ready / Math.max(1, items.length)) * 100)
+    };
+  });
+  const openWorkflowItems = [
+    ...(data.chronicScreeningTasks || []).filter((item) => !["已评估", "已推送干预"].includes(item.status)),
+    ...(data.chronicEducationPushes || []).filter((item) => !["已确认", "已阅读"].includes(item.status)),
+    ...(data.chronicManagementPlans || []).filter((item) => item.status !== "已复核")
+  ];
+  return {
+    ok: domains.every((item) => item.total > 0 && item.readyRate >= 80),
+    generatedAt: new Date().toISOString(),
+    summary: {
+      domains: domains.length,
+      readyDomains: domains.filter((item) => item.readyRate >= 80).length,
+      totalRows: domains.reduce((sum, item) => sum + item.total, 0),
+      rowsNeedingFollowUp: domains.reduce((sum, item) => sum + item.needsFollowUp, 0),
+      openWorkflowItems: openWorkflowItems.length
+    },
+    domains
+  };
+}
+
 function buildChronicAcceptanceLedger(data) {
   const ledger = mergeByKey(seedChronicAcceptanceLedger(), data.chronicAcceptanceLedger, "id");
   const screening = Array.isArray(data.chronicScreeningTasks) ? data.chronicScreeningTasks : [];
@@ -4894,6 +4936,7 @@ function buildChronicAcceptanceLedger(data) {
       needsFollowUp: rows.filter((item) => item.acceptanceStatus !== "evidence-ready").length
     },
     ledger: rows,
+    serviceSummary: buildChronicServiceSummary(data),
     policyCollections: {
       serviceRoles: data.chronicServiceRoles?.length || 0,
       capabilityConditions: data.chronicCapabilityConditions?.length || 0,

@@ -55,6 +55,7 @@ test("commission workbench renders live release gates and site templates", async
   await expect(page.locator("[data-gate='release:report']")).toContainText("live API evidence");
 
   await expect(page.locator("#acceptance-ledgers .priority-row")).toHaveCount(2);
+  await expect(page.locator("[data-acceptance-ledger='chronic']")).toContainText("service domains ready");
   await expect(page.locator("#site-readiness-pack .priority-row")).toHaveCount(4);
   await expect(page.locator("#site-readiness-pack")).toContainText("release/site-readiness-pack.md");
   await expect(page.locator("#process-audit-matrix")).toContainText("site-readiness");

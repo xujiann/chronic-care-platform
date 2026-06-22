@@ -677,6 +677,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(chronicAcceptance.body.ledger.some((item) => item.id === "chronic-accept-screening"), true);
     assert.equal(chronicAcceptance.body.ledger.some((item) => item.metricKey === "quality" && item.rate >= 80), true);
     assert.equal(chronicAcceptance.body.policyCollections.servicePathways >= 5, true);
+    assert.equal(chronicAcceptance.body.serviceSummary.summary.domains, 8);
+    assert.equal(chronicAcceptance.body.serviceSummary.domains.some((item) => item.id === "medicationSupport"), true);
 
     const chronicDenied = await api(baseUrl, "/api/chronic/acceptance-ledger", authorized(insurance.body.token));
     assert.equal(chronicDenied.response.status, 403);
