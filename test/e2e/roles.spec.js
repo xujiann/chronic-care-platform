@@ -41,6 +41,31 @@ test("commission user reaches the governance dashboard and opens maintenance", a
   await expect(page.locator("#platform-edit-form [name='owner']")).toHaveValue("规划信息处");
 });
 
+test("commission workbench renders live release gates and site templates", async ({ page }) => {
+  await login(page, "health", "index.html");
+  await page.goto("/workbench.html");
+
+  const releaseGates = page.locator("#release-evidence-gates .release-evidence-gate");
+  await expect(releaseGates).toHaveCount(8);
+  await expect(page.locator("[data-gate='process:audit']")).toContainText("PASS");
+  await expect(page.locator("[data-gate='site:pack']")).toContainText("PASS");
+  await expect(page.locator("[data-gate='release:report']")).toContainText("release checks passed");
+  await expect(page.locator("[data-gate='release:report']")).toContainText("live API evidence");
+
+  await expect(page.locator("#acceptance-ledgers .priority-row")).toHaveCount(2);
+  await expect(page.locator("#site-readiness-pack .priority-row")).toHaveCount(4);
+  await expect(page.locator("#site-readiness-pack")).toContainText("release/site-readiness-pack.md");
+  await expect(page.locator("#process-audit-matrix")).toContainText("site-readiness");
+  await expect(page.locator("#process-audit-matrix")).toContainText("evidence domains passed");
+
+  const releaseReport = await page.evaluate(async () => {
+    const response = await window.HealthCityAuth.authFetch("/api/release-report");
+    return response.json();
+  });
+  expect(releaseReport.ok).toBe(true);
+  expect(releaseReport.siteReadinessPack.summary.packs).toBe(4);
+});
+
 test("citizen stays in the household experience and cannot open commission pages", async ({ page }) => {
   await login(page, "citizen", "citizen.html");
   await expect(page.getByRole("heading", { name: "个人健康信息库" })).toBeVisible();
