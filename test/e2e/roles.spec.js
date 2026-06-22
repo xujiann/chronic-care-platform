@@ -80,6 +80,13 @@ test("commission workbench renders live release gates and site templates", async
   });
   expect(templateReadmes.ok).toBe(true);
   expect(templateReadmes.summary.readmes).toBe(4);
+
+  const serviceAcceptance = await page.evaluate(async () => {
+    const response = await window.HealthCityAuth.authFetch("/api/service-acceptance-summary");
+    return response.json();
+  });
+  expect(serviceAcceptance.ok).toBe(true);
+  expect(serviceAcceptance.serviceAcceptance.county.openActions.some((item) => item.id === "cco-001")).toBe(true);
 });
 
 test("citizen stays in the household experience and cannot open commission pages", async ({ page }) => {

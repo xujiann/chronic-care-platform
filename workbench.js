@@ -20,6 +20,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const operations = await loadOperationalMetrics();
   const readiness = await loadSystemReadiness();
   const processAudit = await loadProcessAudit();
+  const serviceAcceptanceSummary = await loadServiceAcceptanceSummary();
   const acceptanceLedgers = await loadAcceptanceLedgers();
   const siteReadinessPack = await loadSiteReadinessPack();
   const siteTemplateReadmes = await loadSiteTemplateReadmes();
@@ -30,7 +31,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const roadmap = state.platformRoadmap?.length ? state.platformRoadmap : defaultRoadmap();
   renderMetrics(state, tasks, roadmap, operations);
   renderSystemReadiness(readiness);
-  renderReleaseEvidenceGates(state, readiness, operations, processAudit, siteReadinessPack, releaseReport, productionCutover, releaseArtifactManifest);
+  renderReleaseEvidenceGates(state, readiness, operations, processAudit, serviceAcceptanceSummary, siteReadinessPack, releaseReport, productionCutover, releaseArtifactManifest);
   renderAcceptanceLedgers(state, acceptanceLedgers);
   renderSiteReadinessPack(siteReadinessPack, siteTemplateReadmes);
   renderSourceAlignment(state);
@@ -72,6 +73,18 @@ async function loadProcessAudit() {
   try {
     const request = window.HealthCityAuth?.authFetch || fetch;
     const response = await request("/api/process-audit");
+    if (!response.ok) return null;
+    return response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+async function loadServiceAcceptanceSummary() {
+  if (location.protocol === "file:") return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request("/api/service-acceptance-summary");
     if (!response.ok) return null;
     return response.json();
   } catch (error) {
@@ -255,7 +268,7 @@ function renderSystemReadiness(readiness) {
   </article>${checkRows}${dependencyDetailRows}`;
 }
 
-function renderReleaseEvidenceGates(state, readiness, operations, processAudit, siteReadinessPack, releaseReport, productionCutover, releaseArtifactManifest) {
+function renderReleaseEvidenceGates(state, readiness, operations, processAudit, serviceAcceptanceSummary, siteReadinessPack, releaseReport, productionCutover, releaseArtifactManifest) {
   const container = document.querySelector("#release-evidence-gates");
   if (!container) return;
 
@@ -273,7 +286,7 @@ function renderReleaseEvidenceGates(state, readiness, operations, processAudit, 
   const processLedger = processAudit?.ledgers || null;
   const processSummary = processAudit?.summary || null;
   const sitePackSummary = siteReadinessPack?.summary || null;
-  const serviceAcceptance = releaseReport?.serviceAcceptance || null;
+  const serviceAcceptance = serviceAcceptanceSummary?.serviceAcceptance || releaseReport?.serviceAcceptance || null;
   const chronicService = serviceAcceptance?.chronic?.summary || null;
   const countyService = serviceAcceptance?.county?.summary || null;
 
@@ -383,7 +396,7 @@ function renderReleaseEvidenceGates(state, readiness, operations, processAudit, 
     </div>
     <div class="capability-side">
       <small>${gate.evidence}</small>
-      <small>${readiness || processAudit || siteReadinessPack || releaseReport || productionCutover || releaseArtifactManifest ? "live API evidence" : "static snapshot evidence"}</small>
+      <small>${readiness || processAudit || serviceAcceptanceSummary || siteReadinessPack || releaseReport || productionCutover || releaseArtifactManifest ? "live API evidence" : "static snapshot evidence"}</small>
     </div>
   </article>`).join("");
 }

@@ -995,4 +995,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { buildProductionCutoverChecklist, buildReleaseReport, parseArgs, readEnvFile, renderCutoverMarkdown, renderMarkdown, renderServiceAcceptanceMarkdown, renderStorageModelMarkdown, validateProductionConfig, writeOutput };
+module.exports = { buildProductionCutoverChecklist, buildReleaseReport, buildServiceAcceptanceSummary, parseArgs, readEnvFile, renderCutoverMarkdown, renderMarkdown, renderServiceAcceptanceMarkdown, renderStorageModelMarkdown, validateProductionConfig, writeOutput };

@@ -159,6 +159,12 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(processAudit.body.evidenceDomains.some((item) => item.id === "chronic-care" && item.passed), true);
     assert.equal(processAudit.body.evidenceDomains.some((item) => item.id === "county-consortium" && item.passed), true);
 
+    const serviceAcceptance = await api(baseUrl, "/api/service-acceptance-summary", authorized(accountLogin.body.token));
+    assert.equal(serviceAcceptance.response.status, 200);
+    assert.equal(serviceAcceptance.body.ok, true);
+    assert.equal(serviceAcceptance.body.serviceAcceptance.chronic.openActions.some((item) => item.id === "cst-001"), true);
+    assert.equal(serviceAcceptance.body.serviceAcceptance.county.openActions.some((item) => item.id === "cco-001"), true);
+
     const sitePack = await api(baseUrl, "/api/site-readiness-pack", authorized(accountLogin.body.token));
     assert.equal(sitePack.response.status, 200);
     assert.equal(sitePack.body.ok, true);
@@ -691,6 +697,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
 
     const chronicDenied = await api(baseUrl, "/api/chronic/acceptance-ledger", authorized(insurance.body.token));
     assert.equal(chronicDenied.response.status, 403);
+    const serviceAcceptanceDenied = await api(baseUrl, "/api/service-acceptance-summary", authorized(insurance.body.token));
+    assert.equal(serviceAcceptanceDenied.response.status, 403);
 
     const datasets = await api(baseUrl, "/api/research/datasets", authorized(commissionToken));
     assert.equal(datasets.response.status, 200);

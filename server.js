@@ -4,7 +4,7 @@ const path = require("path");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
 const { buildProcessAuditReport } = require("./scripts/process-audit");
 const { buildSiteReadinessPack, renderTemplateReadmes } = require("./scripts/site-readiness-pack");
-const { buildReleaseReport } = require("./scripts/release-report");
+const { buildReleaseReport, buildServiceAcceptanceSummary } = require("./scripts/release-report");
 const { buildReleaseArtifactManifest } = require("./scripts/release-artifact-manifest");
 
 const PORT = Number(process.env.PORT || 5173);
@@ -5084,6 +5084,18 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/process-audit");
     if (!user) return;
     sendJson(res, 200, buildProcessAuditReport({ data: readDatabase() }));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/service-acceptance-summary") {
+    const user = requireApiRole(req, res, ["commission"], "/api/service-acceptance-summary");
+    if (!user) return;
+    const serviceAcceptance = buildServiceAcceptanceSummary(readDatabase());
+    sendJson(res, 200, {
+      ok: serviceAcceptance.ok,
+      generatedAt: new Date().toISOString(),
+      serviceAcceptance
+    });
     return;
   }
 
