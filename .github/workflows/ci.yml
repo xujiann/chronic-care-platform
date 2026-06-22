@@ -49,6 +49,8 @@ jobs:
         run: npm run integration:readiness
       - name: Generate operations readiness report
         run: npm run operations:readiness
+      - name: Generate production database readiness report
+        run: npm run production-db:readiness
       - name: Generate interoperability evaluation evidence
         run: npm run evaluation:evidence
       - name: Generate release readiness report

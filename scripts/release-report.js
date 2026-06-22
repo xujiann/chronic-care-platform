@@ -8,6 +8,7 @@ const { buildEvaluationEvidenceReport, renderMarkdown: renderEvaluationEvidenceM
 const { buildIdentityContract, renderMarkdown: renderIdentityContractMarkdown } = require("./identity-contract");
 const { buildIntegrationReadinessReport, renderMarkdown: renderIntegrationReadinessMarkdown } = require("./integration-readiness");
 const { buildOperationsReadinessReport, renderMarkdown: renderOperationsReadinessMarkdown } = require("./operations-readiness");
+const { buildProductionDbReadinessReport, renderMarkdown: renderProductionDbReadinessMarkdown } = require("./production-db-readiness");
 const { inspectStorageModel } = require("./storage-admin");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -296,6 +297,14 @@ function operationsReadinessChecks(operationsReadiness) {
   ];
 }
 
+function productionDbReadinessChecks(productionDbReadiness) {
+  return [
+    check("productionDb:readiness", productionDbReadiness.ok, productionDbReadiness.ok ? "production database readiness checks passed" : "production database readiness checks failed", "error", "production-db"),
+    check("productionDb:runtimeBlock", productionDbReadiness.migrationEvidence?.runtimePostgresBlocked, "postgres runtime remains blocked until adapter cutover", "error", "production-db"),
+    check("productionDb:rehearsalDocs", productionDbReadiness.rehearsalEvidence && Object.values(productionDbReadiness.rehearsalEvidence).every(Boolean), "backup, restore, RTO/RPO, and release artifact docs", "error", "production-db")
+  ];
+}
+
 function packageChecks(pkg) {
   const requiredScripts = [
     "check",
@@ -310,6 +319,7 @@ function packageChecks(pkg) {
     "data-quality:report",
     "integration:readiness",
     "operations:readiness",
+    "production-db:readiness",
     "evaluation:evidence",
     "storage:backup",
     "storage:inspect",
@@ -359,6 +369,7 @@ function buildReleaseReport(options = {}) {
   const dataQuality = buildDataQualityReport({ data });
   const integrationReadiness = buildIntegrationReadinessReport({ data });
   const operationsReadiness = buildOperationsReadinessReport({ data, pkg });
+  const productionDbReadiness = buildProductionDbReadinessReport({ data, pkg, storageModel });
   const evaluationEvidence = buildEvaluationEvidenceReport({ data });
   const checks = [
     assertFile("README.md"),
@@ -375,6 +386,7 @@ function buildReleaseReport(options = {}) {
     ...dataQualityChecks(dataQuality),
     ...integrationReadinessChecks(integrationReadiness),
     ...operationsReadinessChecks(operationsReadiness),
+    ...productionDbReadinessChecks(productionDbReadiness),
     ...evaluationEvidenceChecks(evaluationEvidence),
     ...env.checks,
     ...commandChecks(options.runCommands)
@@ -401,6 +413,7 @@ function buildReleaseReport(options = {}) {
     dataQuality,
     integrationReadiness,
     operationsReadiness,
+    productionDbReadiness,
     evaluationEvidence
   };
 }
@@ -504,6 +517,10 @@ function renderMarkdown(report) {
     "",
     "See `operations-readiness-report.json` and `operations-readiness-report.md` for operation routes, production deployment tracks, external dependency risks, and release operation scripts.",
     "",
+    "## Production database readiness report",
+    "",
+    "See `production-db-readiness-report.json` and `production-db-readiness-report.md` for PostgreSQL cutover prerequisites, current SQLite/JSON model evidence, backup rehearsal documentation, and runtime adapter guardrails.",
+    "",
     "## Interoperability evaluation evidence report",
     "",
     "See `evaluation-evidence-report.json` and `evaluation-evidence-report.md` for interoperability artifacts, P1 interface requirements, transaction samples, and rectification evidence.",
@@ -589,6 +606,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       operationsReadiness: report.operationsReadiness
     }, null, 2), "utf8");
+    const productionDbJson = path.join(path.dirname(output), "production-db-readiness-report.json");
+    fs.writeFileSync(productionDbJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      productionDbReadiness: report.productionDbReadiness
+    }, null, 2), "utf8");
     const evaluationJson = path.join(path.dirname(output), "evaluation-evidence-report.json");
     fs.writeFileSync(evaluationJson, JSON.stringify({
       project: report.project,
@@ -616,6 +641,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(integrationMarkdown, renderIntegrationReadinessMarkdown(report.integrationReadiness), "utf8");
     const operationsMarkdown = path.join(path.dirname(markdown), "operations-readiness-report.md");
     fs.writeFileSync(operationsMarkdown, renderOperationsReadinessMarkdown(report.operationsReadiness), "utf8");
+    const productionDbMarkdown = path.join(path.dirname(markdown), "production-db-readiness-report.md");
+    fs.writeFileSync(productionDbMarkdown, renderProductionDbReadinessMarkdown(report.productionDbReadiness), "utf8");
     const evaluationMarkdown = path.join(path.dirname(markdown), "evaluation-evidence-report.md");
     fs.writeFileSync(evaluationMarkdown, renderEvaluationEvidenceMarkdown(report.evaluationEvidence), "utf8");
   }
