@@ -21,12 +21,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   const readiness = await loadSystemReadiness();
   const processAudit = await loadProcessAudit();
   const acceptanceLedgers = await loadAcceptanceLedgers();
+  const siteReadinessPack = await loadSiteReadinessPack();
   const tasks = collectUnifiedTasks(state);
   const roadmap = state.platformRoadmap?.length ? state.platformRoadmap : defaultRoadmap();
   renderMetrics(state, tasks, roadmap, operations);
   renderSystemReadiness(readiness);
   renderReleaseEvidenceGates(state, readiness, operations, processAudit);
   renderAcceptanceLedgers(state, acceptanceLedgers);
+  renderSiteReadinessPack(siteReadinessPack);
   renderSourceAlignment(state);
   renderAudit(state, tasks);
   renderProcessAudit(state, processAudit);
@@ -85,6 +87,18 @@ async function loadAcceptanceLedgers() {
       chronic: chronic.ok ? await chronic.json() : null,
       county: county.ok ? await county.json() : null
     };
+  } catch (error) {
+    return null;
+  }
+}
+
+async function loadSiteReadinessPack() {
+  if (location.protocol === "file:") return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request("/api/site-readiness-pack");
+    if (!response.ok) return null;
+    return response.json();
   } catch (error) {
     return null;
   }
@@ -323,6 +337,45 @@ function renderAcceptanceLedgers(state, acceptanceLedgers) {
       <div class="capability-side">
         <span class="badge ${group.report?.ok ? "info" : "warn"}">${group.report?.ok ? "PASS" : "REVIEW"}</span>
         <small>${acceptanceLedgers ? "live API ledger" : "static snapshot ledger"}</small>
+      </div>
+    </article>`;
+  }).join("");
+}
+
+function renderSiteReadinessPack(siteReadinessPack) {
+  const container = document.querySelector("#site-readiness-pack");
+  if (!container) return;
+
+  if (!siteReadinessPack) {
+    container.innerHTML = `<article class="priority-row">
+      <div class="priority-rank warn">API</div>
+      <div>
+        <h3>Site readiness pack</h3>
+        <p>Run Node service and sign in as commission to view live identity, interface, monitoring, and signoff templates.</p>
+      </div>
+      <div class="capability-side">
+        <span class="badge warn">static preview</span>
+        <small>/api/site-readiness-pack</small>
+      </div>
+    </article>`;
+    return;
+  }
+
+  container.innerHTML = (siteReadinessPack.packs || []).map((pack, index) => {
+    const ready = pack.status === "template-ready";
+    return `<article class="priority-row" data-site-pack="${pack.id}">
+      <div class="priority-rank ${ready ? "info" : "warn"}">${index + 1}</div>
+      <div>
+        <h3>${pack.name}</h3>
+        <p>${pack.rows} template rows; required artifacts: ${(pack.requiredArtifacts || []).join(", ")}</p>
+        <div class="standard-tags">
+          <span class="badge ${ready ? "info" : "warn"}">${pack.status}</span>
+          <span class="badge info">${pack.owner}</span>
+        </div>
+      </div>
+      <div class="capability-side">
+        <small>/api/site-readiness-pack</small>
+        <small>release/site-readiness-pack.md</small>
       </div>
     </article>`;
   }).join("");

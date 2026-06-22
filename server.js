@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
 const { buildProcessAuditReport } = require("./scripts/process-audit");
+const { buildSiteReadinessPack } = require("./scripts/site-readiness-pack");
 
 const PORT = Number(process.env.PORT || 5173);
 const ROOT = __dirname;
@@ -4928,6 +4929,13 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/process-audit");
     if (!user) return;
     sendJson(res, 200, buildProcessAuditReport({ data: readDatabase() }));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/site-readiness-pack") {
+    const user = requireApiRole(req, res, ["commission"], "/api/site-readiness-pack");
+    if (!user) return;
+    sendJson(res, 200, buildSiteReadinessPack({ data: readDatabase(), env: process.env }));
     return;
   }
 

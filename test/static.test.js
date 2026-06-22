@@ -231,9 +231,11 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(workbenchHtml, /system-readiness/);
   assert.match(workbenchHtml, /release-evidence-gates/);
   assert.match(workbenchHtml, /acceptance-ledgers/);
+  assert.match(workbenchHtml, /site-readiness-pack/);
   assert.match(workbenchJs, /loadOperationalMetrics/);
   assert.match(workbenchJs, /loadSystemReadiness/);
   assert.match(workbenchJs, /loadAcceptanceLedgers/);
+  assert.match(workbenchJs, /loadSiteReadinessPack/);
   assert.match(workbenchJs, /renderReleaseEvidenceGates/);
   assert.match(workbenchJs, /data-quality:report/);
   assert.match(workbenchJs, /operations:readiness/);
@@ -242,9 +244,11 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(workbenchJs, /\/api\/metrics/);
   assert.match(workbenchJs, /\/api\/system\/readiness/);
   assert.match(workbenchJs, /\/api\/process-audit/);
+  assert.match(workbenchJs, /\/api\/site-readiness-pack/);
   assert.match(workbenchJs, /\/api\/chronic\/acceptance-ledger/);
   assert.match(workbenchJs, /\/api\/county\/acceptance-ledger/);
   assert.match(read("server.js"), /\/api\/process-audit/);
+  assert.match(read("server.js"), /\/api\/site-readiness-pack/);
 });
 
 test("system structure documentation reflects completed local governance loops", () => {

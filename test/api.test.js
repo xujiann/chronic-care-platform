@@ -157,6 +157,12 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(processAudit.body.evidenceDomains.some((item) => item.id === "chronic-care" && item.passed), true);
     assert.equal(processAudit.body.evidenceDomains.some((item) => item.id === "county-consortium" && item.passed), true);
 
+    const sitePack = await api(baseUrl, "/api/site-readiness-pack", authorized(accountLogin.body.token));
+    assert.equal(sitePack.response.status, 200);
+    assert.equal(sitePack.body.ok, true);
+    assert.equal(sitePack.body.templates.identity.some((item) => item.field === "sub"), true);
+    assert.equal(sitePack.body.templates.signoff.some((item) => item.id === "signoff-cutover-monitoring"), true);
+
     const identityPreview = await api(baseUrl, "/api/auth/identity/preview", authorized(accountLogin.body.token, {
       method: "POST",
       body: JSON.stringify({
