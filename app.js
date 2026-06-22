@@ -119,7 +119,7 @@ function normalizePersonIndexes() {
     resident.identityIndex = resident.personIndex;
   });
   const residentMap = new Map(residents.map((resident) => [resident.id, resident]));
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords"].forEach((key) => {
     (Array.isArray(state[key]) ? state[key] : []).forEach((item) => {
       item.personIndex = item.personIndex || personIndexForResident(residentMap, item.residentId);
     });
@@ -429,6 +429,7 @@ function renderChronicModule() {
 
   renderChronicProjectBlueprint();
   renderChronicOperations();
+  renderChronicPolicyServices();
 }
 
 function renderChronicAudit() {
@@ -504,6 +505,133 @@ function renderChronicProjectBlueprint() {
   }
 }
 
+function renderChronicPolicyServices() {
+  const rolesEl = document.querySelector("#chronic-service-roles");
+  if (rolesEl) {
+    rolesEl.innerHTML = (state.chronicServiceRoles || []).map((item) => `<article>
+      <strong>${item.role}</strong>
+      <span>${item.institutionType}</span>
+      <p>${item.policyBasis}</p>
+      <small>${(item.capabilities || []).join("、")}</small>
+      <small>${item.nextAction}</small>
+    </article>`).join("");
+  }
+
+  const conditionsEl = document.querySelector("#chronic-capability-conditions");
+  if (conditionsEl) {
+    conditionsEl.innerHTML = `<table>
+      <thead><tr><th>维度</th><th>基本条件</th><th>拓展条件</th><th>状态</th></tr></thead>
+      <tbody>${(state.chronicCapabilityConditions || []).map((item) => `<tr>
+        <td>${item.dimension}</td>
+        <td>${(item.basic || []).join("；")}</td>
+        <td>${(item.extension || []).join("；") || "无"}</td>
+        <td><span class="badge ${item.status === "已映射" ? "info" : "warn"}">${item.status}</span></td>
+      </tr>`).join("")}</tbody>
+    </table>`;
+  }
+
+  const pathwaysEl = document.querySelector("#chronic-service-pathways");
+  if (pathwaysEl) {
+    pathwaysEl.innerHTML = (state.chronicServicePathways || []).map((item) => `<div>
+      <strong>${item.stage}</strong>
+      <span>${item.systemAction}</span>
+      <small>${item.trigger}</small>
+    </div>`).join("");
+  }
+
+  const comorbidityEl = document.querySelector("#chronic-comorbidity-table");
+  if (comorbidityEl) {
+    comorbidityEl.innerHTML = `<table>
+      <thead><tr><th>居民</th><th>共病组合</th><th>风险</th><th>综合评估</th><th>整合方案</th><th>药师任务</th><th>随访频次</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody>${(state.chronicComorbidityPlans || []).map((item) => {
+        const resident = findResident(item.residentId);
+        return `<tr>
+          <td>${resident?.name || "未知居民"}</td>
+          <td>${(item.diseases || []).join("、")}</td>
+          <td><span class="badge ${item.risk === "高危" ? "danger" : "warn"}">${item.risk}</span></td>
+          <td>${item.assessment}</td>
+          <td>${item.integratedPlan}</td>
+          <td>${item.pharmacistTask}</td>
+          <td>${item.followupFrequency}</td>
+          <td>${item.status}</td>
+          <td>
+            ${chronicActionButton("chronicComorbidityPlans", item.id, "完成共管复核", { status: "已复核", assessment: "已完成多病共管综合复核" })}
+            ${chronicActionButton("chronicComorbidityPlans", item.id, "升级重点随访", { status: "重点随访", followupFrequency: "每2周一次" })}
+          </td>
+        </tr>`;
+      }).join("")}</tbody>
+    </table>`;
+  }
+
+  const tcmEl = document.querySelector("#chronic-tcm-services");
+  if (tcmEl) {
+    tcmEl.innerHTML = (state.chronicTcmServices || []).map((item) => {
+      const resident = findResident(item.residentId);
+      return `<div>
+        <strong>${resident?.name || "未知居民"} · ${item.service}</strong>
+        <span>${item.tcmAssessment} · ${item.intervention} · ${item.provider}</span>
+        <span class="badge info">${item.status}</span>
+        ${chronicActionButton("chronicTcmServices", item.id, "完成辨证服务", { status: "已完成", intervention: "已完成中医体质辨识和适宜技术服务" })}
+        ${chronicActionButton("chronicTcmServices", item.id, "纳入复诊", { status: "待复诊", nextService: "7天内复诊评估" })}
+      </div>`;
+    }).join("");
+  }
+
+  const selfEl = document.querySelector("#chronic-self-management");
+  if (selfEl) {
+    selfEl.innerHTML = (state.chronicSelfManagement || []).map((item) => {
+      const resident = findResident(item.residentId);
+      return `<div>
+        <strong>${resident?.name || "未知居民"} · ${item.device}</strong>
+        <span>${item.latestValue} · ${item.uploadSource} · ${item.group}</span>
+        <span>${item.incentive}；${item.nextAction}</span>
+        ${chronicActionButton("chronicSelfManagement", item.id, "确认上传", { status: "已确认", nextAction: "已纳入家庭医生随访复核" })}
+        ${chronicActionButton("chronicSelfManagement", item.id, "触发预警", { status: "预警中", nextAction: "已触发异常指标预警" })}
+      </div>`;
+    }).join("");
+  }
+
+  const medicationEl = document.querySelector("#chronic-medication-support");
+  if (medicationEl) {
+    medicationEl.innerHTML = `<table>
+      <thead><tr><th>病种</th><th>药品</th><th>机构</th><th>处方</th><th>库存</th><th>缺药处理</th><th>医保协同</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody>${(state.chronicMedicationSupport || []).map((item) => `<tr>
+        <td>${item.diseaseType}</td>
+        <td>${item.medication}</td>
+        <td>${item.institution}</td>
+        <td>${item.prescription}</td>
+        <td>${item.stockStatus}</td>
+        <td>${item.shortageAction}</td>
+        <td>${item.insurancePolicy}</td>
+        <td><span class="badge ${item.status === "运行中" ? "info" : "warn"}">${item.status}</span></td>
+        <td>
+          ${chronicActionButton("chronicMedicationSupport", item.id, "库存确认", { status: "运行中", stockStatus: "已完成库存复核" })}
+          ${chronicActionButton("chronicMedicationSupport", item.id, "登记缺药", { status: "需协调", shortageAction: "已登记缺药并发起采购协调" })}
+        </td>
+      </tr>`).join("")}</tbody>
+    </table>`;
+  }
+
+  const qualityEl = document.querySelector("#chronic-quality-metrics");
+  if (qualityEl) {
+    qualityEl.innerHTML = `<table>
+      <thead><tr><th>评价指标</th><th>2027目标</th><th>当前系统证据</th><th>责任方</th><th>证据集合</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody>${(state.chronicQualityMetrics || []).map((item) => `<tr>
+        <td>${item.metric}</td>
+        <td>${item.target2027}</td>
+        <td>${item.current}</td>
+        <td>${item.owner}</td>
+        <td>${item.evidence}</td>
+        <td><span class="badge ${item.status === "新增" ? "warn" : "info"}">${item.status}</span></td>
+        <td>
+          ${chronicActionButton("chronicQualityMetrics", item.id, "完成核验", { status: "已核验", current: "已完成本轮质控核验" })}
+          ${chronicActionButton("chronicQualityMetrics", item.id, "纳入整改", { status: "整改中", current: "已纳入质控整改台账" })}
+        </td>
+      </tr>`).join("")}</tbody>
+    </table>`;
+  }
+}
+
 function renderChronicOperations() {
   const screeningEl = document.querySelector("#chronic-screening-tasks");
   if (screeningEl) {
@@ -560,12 +688,45 @@ function renderChronicOperations() {
       const collection = button.dataset.collection;
       const item = (state[collection] || []).find((row) => row.id === button.dataset.id);
       if (!item) return;
-      Object.assign(item, JSON.parse(button.dataset.updates), { lastUpdated: new Date().toISOString() });
-      await saveState();
+      const updates = JSON.parse(button.dataset.updates);
+      await applyChronicWorkflowAction(collection, item, updates, button.textContent.trim());
       renderChronicModule();
       showToast("慢病业务状态已更新");
     });
   });
+}
+
+async function applyChronicWorkflowAction(collection, item, updates, note) {
+  Object.assign(item, updates, { lastUpdated: new Date().toISOString() });
+  if (apiEnabled) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const version = state.storageMeta?.collectionVersions?.[collection];
+      const response = await request(`${API_BASE}/workflow-actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          collection,
+          id: item.id,
+          status: updates.status || item.status,
+          updates,
+          note,
+          ...(Number.isFinite(version) ? { expectedVersion: version } : {})
+        })
+      });
+      if (response.ok) {
+        const saved = await response.json();
+        Object.assign(item, saved);
+        if (state.storageMeta?.collectionVersions && Number.isFinite(version)) {
+          state.storageMeta.collectionVersions[collection] = version + 1;
+        }
+        return;
+      }
+    } catch (error) {
+      apiEnabled = false;
+    }
+  }
+  await saveState();
 }
 
 function chronicActionButton(collection, id, label, updates) {

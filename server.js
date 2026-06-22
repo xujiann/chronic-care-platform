@@ -373,10 +373,10 @@ const SQLITE_MIGRATIONS = [
     }
   }
 ];
-const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals", "deathCertificates", "birthCertificates", "multiPracticeApplications", "digitalCredentials", "emergencySignals", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports"]);
+const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals", "deathCertificates", "birthCertificates", "multiPracticeApplications", "digitalCredentials", "emergencySignals", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports"]);
 const WORKFLOW_ROLE_COLLECTIONS = {
   commission: WORKFLOW_COLLECTIONS,
-  institution: new Set(["careOrders", "medicationPickups", "followups", "referrals", "deathCertificates", "birthCertificates", "multiPracticeApplications", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "emergencySignals"]),
+  institution: new Set(["careOrders", "medicationPickups", "followups", "referrals", "deathCertificates", "birthCertificates", "multiPracticeApplications", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "emergencySignals"]),
   insurance: new Set(["insuranceClaims", "medicationPickups", "digitalCredentials"]),
   county: new Set(["countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "emergencySignals"])
 };
@@ -515,6 +515,14 @@ function seedState() {
     chronicScreeningTasks: seedChronicScreeningTasks(),
     chronicEducationPushes: seedChronicEducationPushes(),
     chronicManagementPlans: seedChronicManagementPlans(),
+    chronicServiceRoles: seedChronicServiceRoles(),
+    chronicCapabilityConditions: seedChronicCapabilityConditions(),
+    chronicServicePathways: seedChronicServicePathways(),
+    chronicComorbidityPlans: seedChronicComorbidityPlans(),
+    chronicTcmServices: seedChronicTcmServices(),
+    chronicSelfManagement: seedChronicSelfManagement(),
+    chronicMedicationSupport: seedChronicMedicationSupport(),
+    chronicQualityMetrics: seedChronicQualityMetrics(),
     countyCollaborationOrders: seedCountyCollaborationOrders(),
     countyAiDiagnosisCases: seedCountyAiDiagnosisCases(),
     countyMutualRecognitionRecords: seedCountyMutualRecognitionRecords(),
@@ -616,7 +624,10 @@ function seedPlatformDeliveryBatches() {
 function seedPlatformEvidence() {
   return [
     { id: "ev-application", category: "申报材料", name: "提级论证申报材料闭环", owner: "项目办", source: "项目申报材料、建设方案、预算和论证意见", artifacts: ["建设范围矩阵", "存量模块合并清单", "开发批次计划", "周报素材"], status: "已建档", next: "持续补充需求变更、会议纪要和专家论证反馈。", records: [] },
-    { id: "ev-interoperability", category: "互联互通测评", name: "四甲/五乙测评证据包", owner: "项目办/标准管理", source: "共享文档、术语字典、主索引、交易服务、测评文审材料", artifacts: ["接口清单", "标准映射", "交易样例", "整改记录"], status: "待补齐", next: "按接口域逐项挂接截图、报文样例、测试记录和整改状态。", records: [] },
+    { id: "ev-interoperability", category: "互联互通测评", name: "四甲/五乙测评证据包", owner: "项目办/标准管理", source: "共享文档、术语字典、主索引、交易服务、测评文审材料", artifacts: ["接口清单", "标准映射", "交易样例", "整改记录"], status: "已建档", next: "按现场接口域继续挂接截图、真实报文样例、测试记录和整改状态。", records: [
+      { id: "evr-interoperability-contracts", owner: "接口联调组", artifact: "接口清单/标准映射", testRecord: "integration-readiness-report.md", status: "已归档", link: "/api/system/readiness" },
+      { id: "evr-interoperability-samples", owner: "测评材料组", artifact: "交易样例/整改记录", testRecord: "interface-mapping-report.md", status: "已归档", link: "release/interface-mapping-report.md" }
+    ] },
     { id: "ev-security", category: "安全合规", name: "等保、密评和信创适配证据", owner: "安全管理岗", source: "统一认证、访问审计、安全事件、数据访问日志、信创适配清单", artifacts: ["权限矩阵", "审计日志", "安全事件", "密评整改项"], status: "开发中", next: "补齐国密传输、数据库加密、日志保全和国产化适配证明。", records: [] },
     { id: "ev-interface", category: "接口联调", name: "外部系统接口联调验收", owner: "市级平台/医疗机构", source: "HIS、EMR、LIS、PACS、医保、电子证照、卫生统计等对接计划", artifacts: ["联调计划", "字段映射", "异常清单", "回归测试"], status: "开发中", next: "为每个接口域建立责任人、环境、频率、样例和验收规则。", records: [] },
     { id: "ev-launch", category: "上线验收", name: "区级实施和应用上线材料", owner: "实施组", source: "中山、沙河口、甘井子、高新区实施批次和应用培训记录", artifacts: ["上线确认", "培训签到", "试运行问题", "用户反馈"], status: "待启动", next: "按区县、机构、应用和批次沉淀上线确认与问题闭环。", records: [] }
@@ -1194,6 +1205,80 @@ function seedChronicManagementPlans() {
     { id: "cmp-001", residentId: "r1", diseaseType: "高血压", grade: "高危", owner: "刘医生", plan: "每周血压上传、两周电话随访、一个月专科复诊", indicators: ["血压", "BMI", "服药依从性"], status: "执行中", nextReview: todayOffset(7), intervention: "调整生活方式并复核长期处方" },
     { id: "cmp-002", residentId: "r2", diseaseType: "糖尿病", grade: "中危", owner: "赵医生", plan: "每月血糖复测、季度糖化血红蛋白、饮食运动干预", indicators: ["空腹血糖", "糖化血红蛋白", "体重"], status: "待复核", nextReview: todayOffset(10), intervention: "补充并发症筛查结果" },
     { id: "cmp-003", residentId: "r4", diseaseType: "高血压/脑卒中高危", grade: "高危", owner: "刘医生", plan: "纳入重点人群，每周提醒、家属协同、必要时转诊", indicators: ["血压", "心电", "卒中风险评分"], status: "预警中", nextReview: todayOffset(3), intervention: "推送卒中宣教并预约专科会诊" }
+  ];
+}
+
+function seedChronicServiceRoles() {
+  return [
+    { id: "csr-center", role: "基层慢病健康管理中心", institutionType: "乡镇卫生院/社区卫生服务中心", policyBasis: "发挥枢纽作用，整合预防、诊疗、随访和中医服务，可建设一站式慢病健康管理中心。", capabilities: ["辖区预防诊疗组织", "转诊对接", "健康状况汇总分析", "家庭医生签约引导"], dataNeed: "慢病患者健康状况、转诊流转、随访和签约服务记录", status: "已入模", nextAction: "把一站式中心能力映射到机构端任务和绩效指标。" },
+    { id: "csr-station", role: "村卫生室/社区卫生服务站", institutionType: "基层网底", policyBasis: "发挥基础性作用，开展健康教育、评估、随访、分类干预和健康咨询。", capabilities: ["电子血压计", "体重秤", "便携式血糖仪", "腰围尺", "健康自检指导"], dataNeed: "自检数据、高风险发现、健康指导和转介记录", status: "已入模", nextAction: "居民端自测数据上传后自动生成基层随访任务。" },
+    { id: "csr-leading-hospital", role: "紧密型医联体牵头医院/上级医院", institutionType: "二三级医院/牵头医院", policyBasis: "加强慢病危象及严重并发症患者管理，支持基层培训、质控和效果评估。", capabilities: ["专病科室支持", "上下转诊", "危象管理", "基层培训", "质量控制"], dataNeed: "上转接诊、下转随访、培训质控和专科复核记录", status: "已入模", nextAction: "转诊中心补齐危象分级和下转随访回写。" },
+    { id: "csr-cdc", role: "专业公共卫生机构", institutionType: "疾控中心等专业公卫机构", policyBasis: "加强技术指导，推进慢病及危险因素监测、综合防治、适宜技术推广和效果评估。", capabilities: ["危险因素监测", "综合防治", "适宜技术推广", "效果评估"], dataNeed: "监测指标、干预覆盖、服务质量和健康改善结果", status: "已入模", nextAction: "纳入卫健委端质控评价和年度监测报表。" }
+  ];
+}
+
+function seedChronicCapabilityConditions() {
+  return [
+    { id: "ccc-coverage", dimension: "涵盖功能", basic: ["按基层慢病防治指南和规范开展全流程健康管理服务", "明确人员能力、设备、用药、信息化、质量管理要求", "与紧密型医联体牵头医院或上级医院建立双向转诊和信息共享机制"], extension: ["提供智能辅助慢病健康管理服务", "开展智能辅助临床用药决策、区域双向转诊、质量管理", "区域内机构间双向转诊患者信息共享"], status: "已映射" },
+    { id: "ccc-service", dimension: "服务内容", basic: ["健康咨询与健康科普", "筛查、诊断、治疗、随访、用药指导", "并发症筛查", "中医适宜技术", "危险因素健康评估", "健康自测服务", "个性化健康指导", "家庭医生签约服务", "病情评估、动态监测、分类干预", "牵头医院号源预约", "膳食运动控烟限酒指导", "慢性呼吸系统疾病筛查", "远程会诊", "健康体重管理", "全科和专科多学科联合服务", "组建健康管理小组和同伴教育", "协同公卫委员会指导居民小组"], extension: ["智能辅助健康监测", "移动终端健康管理", "高血压和糖尿病视网膜病变筛查", "脑卒中风险因素筛查", "家庭病床和远程健康监测", "线上互动课程"], status: "已映射" },
+    { id: "ccc-staff", dimension: "人员配置", basic: ["至少2名中级及以上职称且具备慢病预防、诊治及管理能力的医生", "至少3名护士", "紧密型医联体医院长期派驻专科医生带教指导"], extension: ["至少1名副高级及以上全科医师", "至少1名中医医师", "社会工作者、志愿者、医生助理等经培训后协助服务"], status: "新增" },
+    { id: "ccc-staff-capability", dimension: "人员能力", basic: ["建立慢病电子健康档案", "识别慢病高风险人群", "开展诊断并制定个性化诊疗方案", "不能诊断和治疗时及时转诊", "掌握筛查和设备操作", "评估并发症和危险因素", "识别急性并发症并初步处理转诊", "具备健康体重、膳食、运动、控烟限酒等指导能力", "完成慢病管理培训"], extension: [], status: "新增" },
+    { id: "ccc-equipment", dimension: "设备配置", basic: ["雾化吸入装置", "指脉氧仪", "24小时动态血压监测设备", "糖化血红蛋白检测设备", "动态血糖监测仪", "人体成分分析仪"], extension: ["动脉硬化检测仪", "免散瞳眼底相机", "峰流速仪", "肺功能检测仪", "一氧化氮检测仪"], status: "新增" },
+    { id: "ccc-medication", dimension: "用药管理", basic: ["执行国家基本药物目录和医保目录", "慢病用药不受一品两规限制", "开展长期处方服务", "落实缺药登记和采购制度"], extension: ["临床用药辅助决策系统", "人工智能辅助合理用药监管", "药师参与慢病健康管理服务"], status: "新增" },
+    { id: "ccc-digital", dimension: "信息化建设", basic: ["健康档案电子化管理", "电子健康档案向居民开放", "健康档案与诊疗信息互联互通和信息共享", "与牵头医院或上级医院建立双向转诊平台"], extension: ["人工智能辅助诊断、随访等服务", "慢病智能预警与个性化管理", "物联网和移动终端健康监测"], status: "新增" },
+    { id: "ccc-quality", dimension: "质量控制", basic: ["严格执行慢病健康管理服务指南", "接受牵头医院或上级医院专病科室监督管理", "建立患者满意度调查机制"], extension: ["人工智能辅助质量控制", "质量控制制度持续改进"], status: "新增" }
+  ];
+}
+
+function seedChronicServicePathways() {
+  return [
+    { id: "csp-risk-discovery", stage: "高风险发现", policyFocus: "通过基本公共卫生服务、健康体检、个人自检等方式及早发现慢病高风险人群。", trigger: "血压、血糖、BMI、腰围、自检或体检异常", systemAction: "自动生成筛查任务并推介至基层慢病健康管理中心", status: "已入模", evidence: "chronicScreeningTasks" },
+    { id: "csp-classified-care", stage: "分类分级管理", policyFocus: "确诊患者依据病情分类分级；稳定者长期连续管理，控制不佳者调整方案，需转诊者上转并稳定后下转。", trigger: "确诊、控制不佳、并发症风险或转诊指征", systemAction: "生成分级管理计划、随访频次和转诊协同任务", status: "已入模", evidence: "chronicManagementPlans/referralSystem" },
+    { id: "csp-comorbidity", stage: "多病共管", policyFocus: "对同时患有2种及以上慢病患者开展综合评估，整合服务内容和随访频次。", trigger: "同一居民登记2种及以上慢病或合并高危因素", systemAction: "合并随访表、生成多病共管方案和药师用药指导任务", status: "新增", evidence: "chronicComorbidityPlans" },
+    { id: "csp-tcm", stage: "中医药服务", policyFocus: "将中医治未病、健康教育、康复方案和适宜技术融入慢病健康管理全流程。", trigger: "居民偏好、中医体质辨识、康复或生活方式干预需求", systemAction: "记录中医药服务包、适宜技术和康复建议", status: "新增", evidence: "chronicTcmServices" },
+    { id: "csp-self-management", stage: "自我健康管理", policyFocus: "通过互助小组、自我监测、智能终端上传、家庭医生服务包和健康积分增强获得感。", trigger: "居民端上传自测数据或加入互助小组", systemAction: "归集终端数据，生成居民端提醒和家庭医生复核任务", status: "新增", evidence: "chronicSelfManagement" }
+  ];
+}
+
+function seedChronicComorbidityPlans() {
+  return [
+    { id: "ccp-001", residentId: "r1", diseases: ["高血压", "冠心病高危"], risk: "高危", assessment: "血压控制不佳并伴心血管高危因素。", integratedPlan: "合并血压、心电图、血脂复查和用药依从性随访，避免重复上门。", pharmacistTask: "复核降压药与抗血小板用药相互作用，指导连续用药记录。", followupFrequency: "每2周电话随访，每月基层门诊复核", status: "执行中" },
+    { id: "ccp-002", residentId: "r2", diseases: ["糖尿病", "肥胖"], risk: "中危", assessment: "血糖偏高，BMI 超重，需整合饮食运动干预。", integratedPlan: "合并糖化血红蛋白、体重、腰围和运动处方随访。", pharmacistTask: "核对降糖药服用时间，提示低血糖风险。", followupFrequency: "每月随访，季度评估", status: "待复核" },
+    { id: "ccp-003", residentId: "r4", diseases: ["高血压", "脑卒中高危"], risk: "高危", assessment: "老年高血压合并卒中风险，需家属协同。", integratedPlan: "合并血压自测、卒中预警宣教、专科会诊和家属代办提醒。", pharmacistTask: "核对长期处方和用药禁忌。", followupFrequency: "每周提醒，必要时上转", status: "预警中" }
+  ];
+}
+
+function seedChronicTcmServices() {
+  return [
+    { id: "cts-001", residentId: "r1", service: "高血压中医治未病服务包", tcmAssessment: "肝阳上亢倾向", intervention: "耳穴压豆、八段锦、限盐饮食和睡眠调摄", provider: "社区中医馆", status: "已开立", nextReview: todayOffset(14) },
+    { id: "cts-002", residentId: "r2", service: "糖尿病中医康复指导", tcmAssessment: "气阴两虚倾向", intervention: "药膳宣教、足部护理、运动处方和体重管理", provider: "基层慢病一体化门诊", status: "执行中", nextReview: todayOffset(21) },
+    { id: "cts-003", residentId: "r4", service: "脑卒中高危康复预防", tcmAssessment: "痰瘀阻络风险", intervention: "平衡训练、穴位保健、家属识别卒中预警症状", provider: "医联体康复团队", status: "待评估", nextReview: todayOffset(7) }
+  ];
+}
+
+function seedChronicSelfManagement() {
+  return [
+    { id: "csm-001", residentId: "r1", device: "电子血压计", latestValue: "166/96 mmHg", uploadSource: "居民端自测", group: "高血压互助小组", incentive: "连续上传7天可兑换健康积分", status: "需医生复核", nextAction: "家庭医生电话随访并判断是否上转" },
+    { id: "csm-002", residentId: "r2", device: "智能体重秤+血糖仪", latestValue: "空腹血糖 7.8 mmol/L，BMI 25.1", uploadSource: "居民端自测", group: "糖尿病饮食运动小组", incentive: "完成运动打卡纳入签约服务包", status: "持续监测", nextAction: "推送饮食运动处方并预约复查糖化血红蛋白" },
+    { id: "csm-003", residentId: "r4", device: "可穿戴提醒设备", latestValue: "步数下降，血压偏高", uploadSource: "家属代办上传", group: "老年慢病互助小组", incentive: "家属代办服务记录纳入线下帮办", status: "预警中", nextAction: "家属确认卒中预警宣教并安排基层复核" }
+  ];
+}
+
+function seedChronicMedicationSupport() {
+  return [
+    { id: "cms-001", diseaseType: "高血压", medication: "苯磺酸氨氯地平片", institution: "基层医疗卫生机构", supplyPolicy: "优化紧密型医联体用药目录，保障长期处方服务。", prescription: "8周长期处方", stockStatus: "库存充足", shortageAction: "缺药登记配送", insurancePolicy: "医保目录内费用按规定保障", status: "运行中" },
+    { id: "cms-002", diseaseType: "2型糖尿病", medication: "二甲双胍缓释片", institution: "基层慢病一体化门诊", supplyPolicy: "支持基层配备糖尿病常用药品。", prescription: "4周处方，可续方", stockStatus: "低库存预警", shortageAction: "医联体药品调拨", insurancePolicy: "探索按人头付费和慢病管理结合", status: "需调拨" },
+    { id: "cms-003", diseaseType: "慢阻肺病", medication: "吸入制剂", institution: "医联体牵头医院+基层机构", supplyPolicy: "加强慢阻肺等慢病药品配备。", prescription: "专科评估后基层续方", stockStatus: "待目录确认", shortageAction: "牵头医院处方流转", insurancePolicy: "按医保目录和地方政策执行", status: "待完善" }
+  ];
+}
+
+function seedChronicQualityMetrics() {
+  return [
+    { id: "cqm-001", metric: "基层慢病全流程服务覆盖率", target2027: "开展紧密型医联体建设的县区基本实现全流程服务", current: "演示闭环已覆盖筛查、登记、随访、转诊、取药、医保", owner: "卫生健康行政部门", evidence: "platformProcessAudit", status: "进行中" },
+    { id: "cqm-002", metric: "控制不佳患者方案调整率", target2027: "控制不佳患者获得生活方式干预、用药调整和增加随访频次", current: "分级管理计划已记录干预和下次复核", owner: "基层慢病健康管理中心", evidence: "chronicManagementPlans", status: "进行中" },
+    { id: "cqm-003", metric: "多病共管整合随访率", target2027: "多病患者整合服务内容和随访频次", current: "新增多病共管方案台账", owner: "家庭医生团队", evidence: "chronicComorbidityPlans", status: "新增" },
+    { id: "cqm-004", metric: "居民自我监测数据回写率", target2027: "智能终端数据在安全要求下上传至电子健康档案和医保信息平台", current: "居民端自测数据已入模，待接入真实终端", owner: "信息化与家庭医生团队", evidence: "chronicSelfManagement", status: "新增" },
+    { id: "cqm-005", metric: "质控和效果评估闭环", target2027: "牵头医院、专业公卫机构和基层内部质量管理协同", current: "质控指标进入卫健委端审计视图", owner: "牵头医院/疾控中心", evidence: "chronicQualityMetrics", status: "新增" }
   ];
 }
 
@@ -3088,6 +3173,14 @@ function normalizeState(data) {
     chronicScreeningTasks: mergeByKey(seedChronicScreeningTasks(), data.chronicScreeningTasks, "id"),
     chronicEducationPushes: mergeByKey(seedChronicEducationPushes(), data.chronicEducationPushes, "id"),
     chronicManagementPlans: mergeByKey(seedChronicManagementPlans(), data.chronicManagementPlans, "id"),
+    chronicServiceRoles: mergeByKey(seedChronicServiceRoles(), data.chronicServiceRoles, "id"),
+    chronicCapabilityConditions: mergeByKey(seedChronicCapabilityConditions(), data.chronicCapabilityConditions, "id"),
+    chronicServicePathways: mergeByKey(seedChronicServicePathways(), data.chronicServicePathways, "id"),
+    chronicComorbidityPlans: mergeByKey(seedChronicComorbidityPlans(), data.chronicComorbidityPlans, "id"),
+    chronicTcmServices: mergeByKey(seedChronicTcmServices(), data.chronicTcmServices, "id"),
+    chronicSelfManagement: mergeByKey(seedChronicSelfManagement(), data.chronicSelfManagement, "id"),
+    chronicMedicationSupport: mergeByKey(seedChronicMedicationSupport(), data.chronicMedicationSupport, "id"),
+    chronicQualityMetrics: mergeByKey(seedChronicQualityMetrics(), data.chronicQualityMetrics, "id"),
     countyCollaborationOrders: mergeByKey(seedCountyCollaborationOrders(), data.countyCollaborationOrders, "id"),
     countyAiDiagnosisCases: mergeByKey(seedCountyAiDiagnosisCases(), data.countyAiDiagnosisCases, "id"),
     countyMutualRecognitionRecords: mergeByKey(seedCountyMutualRecognitionRecords(), data.countyMutualRecognitionRecords, "id"),
@@ -3143,8 +3236,11 @@ function normalizeState(data) {
 
 function restoreCorruptedStrings(defaultValue, currentValue) {
   if (typeof currentValue === "string") {
-    if (currentValue.includes("?") && typeof defaultValue === "string" && !defaultValue.includes("?")) return defaultValue;
-    return currentValue;
+    if ((currentValue.includes("?") || currentValue.includes("�")) && typeof defaultValue === "string" && !defaultValue.includes("?") && !defaultValue.includes("�")) return defaultValue;
+    return currentValue
+      .replace(/��连/g, "大连")
+      .replace(/健���/g, "健康")
+      .replace(/已��发/g, "已签发");
   }
   if (Array.isArray(currentValue)) {
     const defaults = Array.isArray(defaultValue) ? defaultValue : [];
@@ -3194,6 +3290,14 @@ function completeSystemTargets(state) {
   state.creditEvaluationRules = state.creditEvaluationRules && typeof state.creditEvaluationRules === "object" ? state.creditEvaluationRules : seedCreditEvaluationRules();
   state.researchDatasets = mergeByKey(seedResearchDatasets(), state.researchDatasets, "id");
   state.diseaseRegistryModels = mergeByKey(seedDiseaseRegistryModels(), state.diseaseRegistryModels, "id");
+  state.chronicServiceRoles = mergeByKey(seedChronicServiceRoles(), state.chronicServiceRoles, "id");
+  state.chronicCapabilityConditions = mergeByKey(seedChronicCapabilityConditions(), state.chronicCapabilityConditions, "id");
+  state.chronicServicePathways = mergeByKey(seedChronicServicePathways(), state.chronicServicePathways, "id");
+  state.chronicComorbidityPlans = mergeByKey(seedChronicComorbidityPlans(), state.chronicComorbidityPlans, "id");
+  state.chronicTcmServices = mergeByKey(seedChronicTcmServices(), state.chronicTcmServices, "id");
+  state.chronicSelfManagement = mergeByKey(seedChronicSelfManagement(), state.chronicSelfManagement, "id");
+  state.chronicMedicationSupport = mergeByKey(seedChronicMedicationSupport(), state.chronicMedicationSupport, "id");
+  state.chronicQualityMetrics = mergeByKey(seedChronicQualityMetrics(), state.chronicQualityMetrics, "id");
   state.mobileExperienceSettings = state.mobileExperienceSettings && typeof state.mobileExperienceSettings === "object" ? { ...seedMobileExperienceSettings(), ...state.mobileExperienceSettings } : seedMobileExperienceSettings();
   state.accessibilityChecklist = mergeByKey(seedAccessibilityChecklist(), state.accessibilityChecklist, "id");
   state.securityAcceptanceLedger = mergeByKey(seedSecurityAcceptanceLedger(), state.securityAcceptanceLedger, "id");
@@ -3462,7 +3566,7 @@ function normalizePersonIndexes(state) {
     resident.identityIndex = resident.personIndex;
   });
   const residentMap = new Map(residents.map((resident) => [resident.id, resident]));
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "taskMessages"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "taskMessages"].forEach((key) => {
     (Array.isArray(state[key]) ? state[key] : []).forEach((item) => {
       item.personIndex = item.personIndex || personIndexForResident(residentMap, item.residentId);
     });
@@ -4143,7 +4247,7 @@ function scopeStateForUser(data, user) {
     const preferenceKey = user.residentId || user.accountId || user.username;
     scoped.mobileExperienceSettings = { ...scoped.mobileExperienceSettings, userPreferences: { [preferenceKey]: preferences[preferenceKey] || {} } };
   }
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "taskMessages"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "taskMessages"].forEach((key) => {
     scoped[key] = (data[key] || []).filter(hasAllowedResident);
   });
   if (scoped.referralSystem) {
@@ -4375,6 +4479,11 @@ function workflowStateCollectionKey(collection) {
 }
 
 const TASK_SOURCES = [
+  ["chronicComorbidityPlans", "institution", "多病共管", "nextReview"],
+  ["chronicTcmServices", "institution", "中医药服务", "nextService"],
+  ["chronicSelfManagement", "institution", "自我健康管理", "nextCheck"],
+  ["chronicMedicationSupport", "institution", "用药保障", "nextActionAt"],
+  ["chronicQualityMetrics", "institution", "慢病质控", "due"],
   ["followups", "institution", "随访任务", "plannedAt"],
   ["chronicScreeningTasks", "institution", "慢病筛查", "due"],
   ["chronicEducationPushes", "institution", "宣教推送", "pushAt"],
@@ -4670,7 +4779,7 @@ async function handleApi(req, res) {
   if (req.method === "GET" && url.pathname === "/api/audit/verify") {
     const user = requireApiRole(req, res, ["commission"], "/api/audit/verify");
     if (!user) return;
-    const data = readDatabase();
+    const data = normalizeState(readDatabase());
     const trails = {
       securityEvents: verifyAuditTrail(data.securityEvents),
       dataAccessLogs: verifyAuditTrail(data.dataAccessLogs)
@@ -4700,7 +4809,7 @@ async function handleApi(req, res) {
   if (req.method === "GET" && url.pathname === "/api/security/compliance-report") {
     const user = requireApiRole(req, res, ["commission"], "/api/security/compliance-report");
     if (!user) return;
-    sendJson(res, 200, buildComplianceReport(readDatabase()));
+    sendJson(res, 200, buildComplianceReport(normalizeState(readDatabase())));
     return;
   }
 
@@ -5760,6 +5869,81 @@ async function handleApi(req, res) {
       patch: await collectJson(req),
       user,
       action: "更新慢病管理计划"
+    });
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "PATCH" && url.pathname.startsWith("/api/chronic-comorbidity-plans/")) {
+    const user = requireApiRole(req, res, ["institution", "commission"], "/api/chronic-comorbidity-plans/:id");
+    if (!user) return;
+    const result = patchBusinessCollectionItem({
+      data: readDatabase(),
+      collection: "chronicComorbidityPlans",
+      id: decodeURIComponent(url.pathname.replace("/api/chronic-comorbidity-plans/", "")),
+      patch: await collectJson(req),
+      user,
+      action: "更新多病共管计划"
+    });
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "PATCH" && url.pathname.startsWith("/api/chronic-tcm-services/")) {
+    const user = requireApiRole(req, res, ["institution", "commission"], "/api/chronic-tcm-services/:id");
+    if (!user) return;
+    const result = patchBusinessCollectionItem({
+      data: readDatabase(),
+      collection: "chronicTcmServices",
+      id: decodeURIComponent(url.pathname.replace("/api/chronic-tcm-services/", "")),
+      patch: await collectJson(req),
+      user,
+      action: "更新中医药慢病服务"
+    });
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "PATCH" && url.pathname.startsWith("/api/chronic-self-management/")) {
+    const user = requireApiRole(req, res, ["institution", "commission"], "/api/chronic-self-management/:id");
+    if (!user) return;
+    const result = patchBusinessCollectionItem({
+      data: readDatabase(),
+      collection: "chronicSelfManagement",
+      id: decodeURIComponent(url.pathname.replace("/api/chronic-self-management/", "")),
+      patch: await collectJson(req),
+      user,
+      action: "更新居民自我健康管理"
+    });
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "PATCH" && url.pathname.startsWith("/api/chronic-medication-support/")) {
+    const user = requireApiRole(req, res, ["institution", "commission"], "/api/chronic-medication-support/:id");
+    if (!user) return;
+    const result = patchBusinessCollectionItem({
+      data: readDatabase(),
+      collection: "chronicMedicationSupport",
+      id: decodeURIComponent(url.pathname.replace("/api/chronic-medication-support/", "")),
+      patch: await collectJson(req),
+      user,
+      action: "更新慢病用药保障"
+    });
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "PATCH" && url.pathname.startsWith("/api/chronic-quality-metrics/")) {
+    const user = requireApiRole(req, res, ["institution", "commission"], "/api/chronic-quality-metrics/:id");
+    if (!user) return;
+    const result = patchBusinessCollectionItem({
+      data: readDatabase(),
+      collection: "chronicQualityMetrics",
+      id: decodeURIComponent(url.pathname.replace("/api/chronic-quality-metrics/", "")),
+      patch: await collectJson(req),
+      user,
+      action: "更新慢病质控指标"
     });
     sendJson(res, result.status, result.body);
     return;

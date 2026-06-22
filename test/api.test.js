@@ -711,6 +711,12 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     }));
     assert.equal(countyMedicationWrite.response.status, 403);
 
+    const insuranceChronicWrite = await api(baseUrl, "/api/workflow-actions", authorized(insurance.body.token, {
+      method: "POST",
+      body: JSON.stringify({ collection: "chronicComorbidityPlans", id: "ccp-001", status: "已复核" })
+    }));
+    assert.equal(insuranceChronicWrite.response.status, 403);
+
     const allowed = await api(baseUrl, "/api/workflow-actions", authorized(institution.body.token, {
       method: "POST",
       body: JSON.stringify({
@@ -724,6 +730,32 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(allowed.body.id, "co1");
     assert.notEqual(allowed.body.residentId, "r3");
     assert.equal(allowed.body.institutionReview, "已接诊");
+
+    const chronicAllowed = await api(baseUrl, "/api/workflow-actions", authorized(institution.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        collection: "chronicComorbidityPlans",
+        id: "ccp-001",
+        status: "已复核",
+        updates: { residentId: "r3", assessment: "已完成多病共管复核" }
+      })
+    }));
+    assert.equal(chronicAllowed.response.status, 200);
+    assert.equal(chronicAllowed.body.id, "ccp-001");
+    assert.notEqual(chronicAllowed.body.residentId, "r3");
+    assert.equal(chronicAllowed.body.assessment, "已完成多病共管复核");
+
+    const medicationSupportAllowed = await api(baseUrl, "/api/workflow-actions", authorized(institution.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        collection: "chronicMedicationSupport",
+        id: "cms-001",
+        status: "运行中",
+        updates: { stockStatus: "已完成库存复核" }
+      })
+    }));
+    assert.equal(medicationSupportAllowed.response.status, 200);
+    assert.equal(medicationSupportAllowed.body.stockStatus, "已完成库存复核");
   });
 
   await t.test("allows commission state persistence without losing governance collections", async () => {

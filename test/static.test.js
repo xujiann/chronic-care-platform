@@ -67,11 +67,34 @@ test("static snapshot keeps acceptance evidence clean and actionable", () => {
   const data = JSON.parse(raw);
   assert.doesNotMatch(raw, /编码损坏，待核验/);
   assert.doesNotMatch(raw, /\?\?\?/);
+  assert.doesNotMatch(raw, /�/);
   const interoperability = data.platformEvidence.find((item) => item.id === "ev-interoperability");
   assert.equal(interoperability.status, "已建档");
   assert.equal(interoperability.records.length >= 2, true);
   assert.equal(interoperability.records.every((item) => item.owner && item.testRecord && item.status), true);
   assert.equal(interoperability.records.some((item) => item.link === "/api/system/readiness"), true);
+});
+
+test("chronic disease policy module exposes 2025 service capacity workflow", () => {
+  const data = JSON.parse(read("data/db.json"));
+  const html = read("index.html");
+  const app = read("app.js");
+  const server = read("server.js");
+  ["chronicServiceRoles", "chronicCapabilityConditions", "chronicServicePathways", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics"].forEach((key) => {
+    assert.equal(Array.isArray(data[key]), true, `${key} should be seeded`);
+    assert.equal(data[key].length > 0, true, `${key} should not be empty`);
+  });
+  ["chronic-service-roles", "chronic-capability-conditions", "chronic-service-pathways", "chronic-comorbidity-table", "chronic-tcm-services", "chronic-self-management", "chronic-medication-support", "chronic-quality-metrics"].forEach((id) => {
+    assert.match(html, new RegExp(id), `${id} panel should be present`);
+  });
+  assert.match(app, /renderChronicPolicyServices/);
+  assert.match(app, /applyChronicWorkflowAction/);
+  assert.match(app, /chronicComorbidityPlans/);
+  assert.match(app, /chronicMedicationSupport/);
+  assert.match(server, /chronic-comorbidity-plans/);
+  assert.match(server, /chronicMedicationSupport/);
+  assert.match(server, /多病共管/);
+  assert.match(server, /基层慢病健康管理中心/);
 });
 
 test("deployment baseline documents scripts and environment template", () => {
