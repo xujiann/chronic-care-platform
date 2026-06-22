@@ -78,6 +78,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal(Boolean(pkg.scripts["env:check"]), true);
   assert.equal(Boolean(pkg.scripts["release:report"]), true);
   assert.equal(Boolean(pkg.scripts["rollback:snapshot"]), true);
+  assert.equal(Boolean(pkg.scripts["storage:inspect"]), true);
   assert.match(read(".env.example"), /SESSION_SECRETS=/);
   assert.match(read(".env.example"), /INTEGRATION_GATEWAY_SECRET=/);
   assert.match(read(".env.example"), /OIDC_ISSUER_URL=/);

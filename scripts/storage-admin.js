@@ -200,6 +200,81 @@ function restoreBackup(backupDir, options = {}) {
   };
 }
 
+function inspectStorageModel(options = {}) {
+  const dataDir = resolveDataDir(options.dataDir);
+  const jsonFile = path.join(dataDir, "db.json");
+  const sqliteFile = path.join(dataDir, "health-city.sqlite");
+  const report = {
+    inspectedAt: new Date().toISOString(),
+    dataDir,
+    jsonSnapshot: inspectJsonSnapshot(jsonFile),
+    sqlite: inspectSqliteStore(sqliteFile)
+  };
+  return report;
+}
+
+function inspectJsonSnapshot(jsonFile) {
+  if (!fs.existsSync(jsonFile)) {
+    return { present: false, file: jsonFile, collections: 0, arrayCollections: 0, totalRecords: 0, largestCollections: [] };
+  }
+  const snapshot = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
+  const collections = Object.entries(snapshot);
+  const arrays = collections.filter(([, value]) => Array.isArray(value));
+  return {
+    present: true,
+    file: jsonFile,
+    sha256: sha256(jsonFile),
+    collections: collections.length,
+    arrayCollections: arrays.length,
+    totalRecords: arrays.reduce((sum, [, value]) => sum + value.length, 0),
+    largestCollections: arrays
+      .map(([name, value]) => ({ name, records: value.length }))
+      .sort((a, b) => b.records - a.records || a.name.localeCompare(b.name))
+      .slice(0, 10)
+  };
+}
+
+function inspectSqliteStore(sqliteFile) {
+  if (!fs.existsSync(sqliteFile)) {
+    return { present: false, file: sqliteFile, available: false, tables: [], schemaMigrations: [], schemaVersion: 0 };
+  }
+  try {
+    const sqlite = require("node:sqlite");
+    if (!sqlite?.DatabaseSync) throw new Error("node:sqlite DatabaseSync unavailable");
+    const db = new sqlite.DatabaseSync(sqliteFile);
+    try {
+      const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").all().map((row) => row.name);
+      const hasMigrations = tables.includes("schema_migrations");
+      const schemaMigrations = hasMigrations
+        ? db.prepare("SELECT version, name, checksum, applied_at FROM schema_migrations ORDER BY version").all()
+        : [];
+      return {
+        present: true,
+        file: sqliteFile,
+        available: true,
+        sha256: sha256(sqliteFile),
+        tables,
+        tableCount: tables.length,
+        schemaMigrations,
+        schemaVersion: schemaMigrations.length ? Math.max(...schemaMigrations.map((item) => Number(item.version))) : 0
+      };
+    } finally {
+      db.close();
+    }
+  } catch (error) {
+    return {
+      present: true,
+      file: sqliteFile,
+      available: false,
+      error: error.message,
+      sha256: sha256(sqliteFile),
+      tables: [],
+      schemaMigrations: [],
+      schemaVersion: 0
+    };
+  }
+}
+
 function assessRecoveryReadiness(backupDir, options = {}) {
   const startedAt = Date.now();
   const manifest = verifyBackup(backupDir);
@@ -370,7 +445,8 @@ function runCli() {
     }), null, 2));
   }
   if (command === "restore" && target) return console.log(JSON.stringify(restoreBackup(target, { confirm: flags.includes("--confirm") }), null, 2));
-  throw new Error("Usage: storage-admin.js backup | sanitize [output-dir] | verify <backup-dir> | rehearse <backup-dir> [--max-duration-ms=N] | assess <backup-dir> [--max-backup-age-ms=N] [--max-duration-ms=N] [--min-file-count=N] [--min-total-bytes=N] [--required-files=a,b] | restore <backup-dir> --confirm");
+  if (command === "inspect") return console.log(JSON.stringify(inspectStorageModel({ dataDir: target }), null, 2));
+  throw new Error("Usage: storage-admin.js backup | sanitize [output-dir] | verify <backup-dir> | rehearse <backup-dir> [--max-duration-ms=N] | assess <backup-dir> [--max-backup-age-ms=N] [--max-duration-ms=N] [--min-file-count=N] [--min-total-bytes=N] [--required-files=a,b] | restore <backup-dir> --confirm | inspect [data-dir]");
 }
 
 if (require.main === module) {
@@ -382,4 +458,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { assessRecoveryReadiness, createBackup, createSanitizedSnapshot, rehearseRestore, restoreBackup, verifyBackup };
+module.exports = { assessRecoveryReadiness, createBackup, createSanitizedSnapshot, inspectStorageModel, rehearseRestore, restoreBackup, verifyBackup };

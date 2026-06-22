@@ -166,6 +166,7 @@ SQLite 启动时会通过 `schema_migrations` 自动执行幂等迁移，当前 
 
 ```powershell
 npm.cmd run storage:backup
+npm.cmd run storage:inspect
 ```
 
 备份保存在 `data/backups/`，清单记录文件大小和 SHA-256。恢复前必须停止服务并先校验：
@@ -177,6 +178,8 @@ node scripts/storage-admin.js assess "data/backups/<备份目录>" --max-backup-
 node scripts/storage-admin.js restore "data/backups/<备份目录>" --confirm
 npm.cmd run rollback:snapshot -- "data/backups/<备份目录>"
 ```
+
+`storage:inspect` 会输出当前 JSON 快照集合数量、数组集合数量、记录量、最大集合，以及 SQLite 文件、表、`schema_migrations` 和 schema 版本；用于迁移前后比对正式数据模型是否完整。
 
 恢复演练会把备份恢复到临时目录并重新校验清单，不覆盖当前 `data`。正式恢复操作会先自动创建 `pre-restore` 安全备份。真实生产数据库仍需使用数据库原生在线备份、时间点恢复和异地副本。
 

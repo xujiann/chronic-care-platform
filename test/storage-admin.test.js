@@ -4,7 +4,7 @@ const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 
-const { assessRecoveryReadiness, createBackup, createSanitizedSnapshot, rehearseRestore, restoreBackup, verifyBackup } = require("../scripts/storage-admin");
+const { assessRecoveryReadiness, createBackup, createSanitizedSnapshot, inspectStorageModel, rehearseRestore, restoreBackup, verifyBackup } = require("../scripts/storage-admin");
 
 test("storage backup verifies checksums, rehearses restore, and restores with a safety copy", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "health-platform-backup-"));
@@ -164,6 +164,32 @@ test("storage admin creates a sanitized JSON snapshot and report", () => {
     assert.equal(report.totalMasked, 10);
     assert.equal(report.fieldsMasked["residents.idCard"], 1);
     assert.equal(snapshot.storageMeta.sanitizedSnapshot.totalMasked, 10);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("storage admin inspects JSON and SQLite model inventory", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "health-platform-inspect-"));
+  const dataDir = path.join(root, "data");
+  fs.mkdirSync(dataDir, { recursive: true });
+  fs.writeFileSync(path.join(dataDir, "db.json"), JSON.stringify({
+    residents: [{ id: "r1" }, { id: "r2" }],
+    personalRecords: [{ id: "pr1", residentId: "r1" }],
+    storageMeta: { schemaVersion: 7 }
+  }), "utf8");
+  fs.writeFileSync(path.join(dataDir, "health-city.sqlite"), Buffer.from("not-a-real-sqlite-file"));
+
+  try {
+    const report = inspectStorageModel({ dataDir });
+    assert.equal(report.jsonSnapshot.present, true);
+    assert.equal(report.jsonSnapshot.collections, 3);
+    assert.equal(report.jsonSnapshot.arrayCollections, 2);
+    assert.equal(report.jsonSnapshot.totalRecords, 3);
+    assert.equal(report.jsonSnapshot.largestCollections[0].name, "residents");
+    assert.equal(report.sqlite.present, true);
+    assert.equal(report.sqlite.available, false);
+    assert.match(report.sqlite.error, /SQLite|database|file|malformed|not/i);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

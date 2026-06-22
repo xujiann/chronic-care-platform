@@ -12,6 +12,7 @@
     "storage:backup": "node scripts/storage-admin.js backup",
     "storage:sanitize": "node scripts/storage-admin.js sanitize",
     "storage:assess": "node scripts/storage-admin.js assess",
+    "storage:inspect": "node scripts/storage-admin.js inspect",
     "env:check": "node scripts/release-report.js env-check --profile=demo",
     "env:check:production": "node scripts/release-report.js env-check --profile=production --config-env=.env",
     "release:report": "node scripts/release-report.js report --profile=demo",

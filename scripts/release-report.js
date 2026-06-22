@@ -203,6 +203,7 @@ function packageChecks(pkg) {
     "env:check",
     "release:report",
     "storage:backup",
+    "storage:inspect",
     "storage:assess",
     "rollback:snapshot"
   ];
