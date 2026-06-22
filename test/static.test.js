@@ -148,6 +148,9 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(platformJs, /evr-interoperability-contracts/);
   assert.match(platformJs, /integration-readiness-report\.md/);
   assert.match(platformJs, /audit-retention-report\.md/);
+  assert.match(platformJs, /HIS\/EMR\/LIS\/PACS 契约和网关模拟接入/);
+  assert.doesNotMatch(platformJs, /domain: "统一认证"[^\n]*status: "开发中"/);
+  assert.doesNotMatch(platformJs, /domain: "医疗机构业务系统"[^\n]*status: "待接口"/);
   assert.match(workbenchHtml, /system-readiness/);
   assert.match(workbenchHtml, /release-evidence-gates/);
   assert.match(workbenchJs, /loadOperationalMetrics/);
@@ -158,6 +161,14 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(workbenchJs, /evaluation:evidence/);
   assert.match(workbenchJs, /\/api\/metrics/);
   assert.match(workbenchJs, /\/api\/system\/readiness/);
+});
+
+test("system structure documentation reflects completed local governance loops", () => {
+  const systemDoc = read("docs/慢病平台系统结构图与优化建议.md");
+  assert.match(systemDoc, /后续优先级边界/);
+  assert.match(systemDoc, /本地已完成签名会话、接口级权限/);
+  assert.match(systemDoc, /已完成 HIS\/EMR\/LIS\/PACS\/医保\/证照\/统计契约/);
+  assert.match(systemDoc, /生产切换证据深化/);
 });
 
 test("citizen portal exposes P1 record details trends and source labels", () => {

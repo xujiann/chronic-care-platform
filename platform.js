@@ -112,15 +112,15 @@ const defaultIntegrationRegistry = [
 ];
 
 const defaultInterfacePlan = [
-  { domain: "统一认证", existing: "现有登录、角色、会话、审计", next: "政务统一认证、CA、短信、人脸核验", priority: "P0", owner: "市级平台", status: "开发中" },
-  { domain: "居民主索引", existing: "personIndex、居民档案、家庭成员", next: "人口库、电子健康码、标准健康档案主索引", priority: "P0", owner: "市级平台", status: "开发中" },
-  { domain: "医疗机构业务系统", existing: "个人健康信息库、机构端协同", next: "HIS、EMR、LIS、PACS、心电、体检系统", priority: "P0", owner: "医疗机构", status: "待接口" },
-  { domain: "分级诊疗", existing: "转诊规则、协同工单、预留资源", next: "远程会诊、双向转诊、远程影像、心电、检验、教育", priority: "P0", owner: "医政医管", status: "开发中" },
+  { domain: "统一认证", existing: "现有登录、角色、签名会话、接口权限和审计", next: "政务统一认证、CA、短信、人脸核验作为现场身份源配置", priority: "P0", owner: "市级平台", status: "演示对接完成" },
+  { domain: "居民主索引", existing: "personIndex、居民档案、家庭成员、主索引质量报告", next: "人口库、电子健康码、标准健康档案主索引作为现场数据源配置", priority: "P0", owner: "市级平台", status: "演示对接完成" },
+  { domain: "医疗机构业务系统", existing: "个人健康信息库、机构端协同、HIS/EMR/LIS/PACS 契约和网关模拟接入", next: "真实 HIS、EMR、LIS、PACS、心电、体检系统联调", priority: "P0", owner: "医疗机构", status: "演示对接完成" },
+  { domain: "分级诊疗", existing: "转诊规则、协同工单、预留资源、接诊回写和居民宣教", next: "远程会诊、真实号源床位、远程影像、心电、检验和教育系统联调", priority: "P0", owner: "医政医管", status: "演示对接完成" },
   { domain: "医保结算监管", existing: "医保审核、凭证核验、固定取药审核", next: "医保核心结算、门慢门特、异地转诊规则", priority: "P1", owner: "医保局/医保中心/区市县医保局", status: "演示对接完成" },
   { domain: "卫生统计", existing: "统计导入任务、资源直报对账、质控看板", next: "辽宁省卫统直报、国家统计直报系统", priority: "P1", owner: "规划信息", status: "演示对接完成" },
   { domain: "电子证照", existing: "出生/死亡医学证明模型和统计", next: "电子证照平台、公安户籍、民政殡葬、疾控死因监测", priority: "P1", owner: "医政/妇幼", status: "已建模" },
-  { domain: "互联互通测评", existing: "接口需求清单、流程审计、路线图", next: "共享文档、术语标准、交易服务、测评文审材料", priority: "P1", owner: "项目办", status: "待深化" },
-  { domain: "安全信创", existing: "角色权限、安全事件、访问日志", next: "国密传输、数据库加密、日志保全、密评和等保证据", priority: "P0", owner: "安全管理", status: "开发中" }
+  { domain: "互联互通测评", existing: "接口需求清单、流程审计、标准映射、交易样例和测评证据包", next: "现场截图、第三方测评结论和整改复测记录", priority: "P1", owner: "项目办", status: "已建档" },
+  { domain: "安全信创", existing: "角色权限、安全事件、访问日志、审计哈希链、安全合规证据和发布门禁", next: "国密传输、数据库加密、日志保全、密评和等保证据现场归档", priority: "P0", owner: "安全管理", status: "演示闭环完成" }
 ];
 
 const defaultDeliveryRoadmap = [
