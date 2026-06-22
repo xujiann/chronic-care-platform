@@ -343,6 +343,64 @@ function processAuditChecks(processAudit) {
   ];
 }
 
+function countOpen(items, closedStatuses = []) {
+  const closed = new Set(closedStatuses);
+  return (Array.isArray(items) ? items : []).filter((item) => !closed.has(item.status)).length;
+}
+
+function buildServiceAcceptanceSummary(data) {
+  const chronicDomains = [
+    ["screening", "Screening and risk stratification", data.chronicScreeningTasks, ["已评估", "已推送干预"]],
+    ["education", "Precision education", data.chronicEducationPushes, ["已确认", "已阅读"]],
+    ["managementPlans", "Tiered management plans", data.chronicManagementPlans, ["已复核"]],
+    ["comorbidity", "Comorbidity management", data.chronicComorbidityPlans, ["已复核"]],
+    ["tcm", "TCM appropriate services", data.chronicTcmServices, ["已完成"]],
+    ["selfManagement", "Self-management uploads", data.chronicSelfManagement, ["已确认"]],
+    ["medicationSupport", "Medication support", data.chronicMedicationSupport, ["运行中"]],
+    ["quality", "Quality metrics", data.chronicQualityMetrics, ["已核验"]]
+  ].map(([id, name, items, closedStatuses]) => ({
+    id,
+    name,
+    rows: Array.isArray(items) ? items.length : 0,
+    openItems: countOpen(items, closedStatuses),
+    modeled: Array.isArray(items) && items.length > 0
+  }));
+
+  const countyDomains = [
+    ["collaboration", "Collaboration orders", data.countyCollaborationOrders, ["已回传", "已完成"]],
+    ["mutualRecognition", "Mutual recognition", data.countyMutualRecognitionRecords, ["已互认"]],
+    ["aiDiagnosis", "AI-assisted diagnosis", data.countyAiDiagnosisCases, ["已完成"]],
+    ["diagnosticReports", "Diagnostic reports", data.diagnosticReports, ["recognized", "completed", "已互认"]],
+    ["performance", "Consortium performance", data.performanceIndicators || data.countyPerformanceIndicators || data.medicalResources, []]
+  ].map(([id, name, items, closedStatuses]) => ({
+    id,
+    name,
+    rows: Array.isArray(items) ? items.length : 0,
+    openItems: closedStatuses.length ? countOpen(items, closedStatuses) : 0,
+    modeled: Array.isArray(items) && items.length > 0
+  }));
+
+  const summarize = (domains) => ({
+    domains: domains.length,
+    modeledDomains: domains.filter((item) => item.modeled).length,
+    openItems: domains.reduce((sum, item) => sum + item.openItems, 0),
+    rows: domains.reduce((sum, item) => sum + item.rows, 0)
+  });
+
+  return {
+    ok: chronicDomains.every((item) => item.modeled) && countyDomains.every((item) => item.modeled),
+    chronic: { summary: summarize(chronicDomains), domains: chronicDomains },
+    county: { summary: summarize(countyDomains), domains: countyDomains }
+  };
+}
+
+function serviceAcceptanceChecks(serviceAcceptance) {
+  return [
+    check("service:chronicDomains", serviceAcceptance.chronic.summary.modeledDomains === serviceAcceptance.chronic.summary.domains, `${serviceAcceptance.chronic.summary.modeledDomains}/${serviceAcceptance.chronic.summary.domains} chronic service domains modeled; open=${serviceAcceptance.chronic.summary.openItems}`, "error", "service"),
+    check("service:countyDomains", serviceAcceptance.county.summary.modeledDomains === serviceAcceptance.county.summary.domains, `${serviceAcceptance.county.summary.modeledDomains}/${serviceAcceptance.county.summary.domains} county service domains modeled; open=${serviceAcceptance.county.summary.openItems}`, "error", "service")
+  ];
+}
+
 function siteReadinessChecks(siteReadinessPack) {
   return [
     check("sitePack:readiness", siteReadinessPack.ok, siteReadinessPack.ok ? "site readiness pack checks passed" : "site readiness pack failed", "error", "site-pack"),
@@ -424,6 +482,7 @@ function buildReleaseReport(options = {}) {
   const monitoringReadiness = buildMonitoringReadinessReport({ data, pkg });
   const operationsReadiness = buildOperationsReadinessReport({ data, pkg });
   const processAudit = buildProcessAuditReport({ data });
+  const serviceAcceptance = buildServiceAcceptanceSummary(data);
   const productionDbReadiness = buildProductionDbReadinessReport({ data, pkg, storageModel });
   const evaluationEvidence = buildEvaluationEvidenceReport({ data });
   const environmentMatrix = buildEnvironmentMatrixReport({ data, pkg });
@@ -446,6 +505,7 @@ function buildReleaseReport(options = {}) {
     ...monitoringReadinessChecks(monitoringReadiness),
     ...operationsReadinessChecks(operationsReadiness),
     ...processAuditChecks(processAudit),
+    ...serviceAcceptanceChecks(serviceAcceptance),
     ...siteReadinessChecks(siteReadinessPack),
     ...productionDbReadinessChecks(productionDbReadiness),
     ...evaluationEvidenceChecks(evaluationEvidence),
@@ -478,6 +538,7 @@ function buildReleaseReport(options = {}) {
     monitoringReadiness,
     operationsReadiness,
     processAudit,
+    serviceAcceptance,
     siteReadinessPack,
     productionDbReadiness,
     evaluationEvidence,
@@ -534,9 +595,35 @@ function renderStorageModelMarkdown(report) {
   ].join("\n");
 }
 
+function renderServiceAcceptanceMarkdown(report) {
+  const rows = [
+    ...(report.serviceAcceptance?.chronic?.domains || []).map((item) => ["chronic", item]),
+    ...(report.serviceAcceptance?.county?.domains || []).map((item) => ["county", item])
+  ].map(([group, item]) => `| ${group} | ${item.modeled ? "MODELED" : "MISSING"} | ${item.name} | ${item.rows} | ${item.openItems} |`);
+  return [
+    "# Service acceptance summary",
+    "",
+    `- Project: ${report.project}`,
+    `- Version: ${report.version}`,
+    `- Profile: ${report.profile}`,
+    `- Generated at: ${report.generatedAt}`,
+    `- Chronic domains: ${report.serviceAcceptance?.chronic?.summary?.modeledDomains || 0}/${report.serviceAcceptance?.chronic?.summary?.domains || 0} modeled; open items ${report.serviceAcceptance?.chronic?.summary?.openItems || 0}`,
+    `- County domains: ${report.serviceAcceptance?.county?.summary?.modeledDomains || 0}/${report.serviceAcceptance?.county?.summary?.domains || 0} modeled; open items ${report.serviceAcceptance?.county?.summary?.openItems || 0}`,
+    "",
+    "| Group | Status | Domain | Rows | Open items |",
+    "|---|---|---|---:|---:|",
+    ...rows,
+    ""
+  ].join("\n");
+}
+
 function renderMarkdown(report) {
   const rows = report.checks.map((item) => `| ${item.passed ? "PASS" : item.severity.toUpperCase()} | ${item.category} | ${item.name} | ${String(item.detail || "").replace(/\|/g, "/")} |`);
   const cutoverRows = (report.productionCutover || []).map((item) => `| ${item.passed ? "PASS" : "BLOCKED"} | ${item.phase} | ${item.owner} | ${item.id} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`);
+  const serviceRows = [
+    ...(report.serviceAcceptance?.chronic?.domains || []).map((item) => ["chronic", item]),
+    ...(report.serviceAcceptance?.county?.domains || []).map((item) => ["county", item])
+  ].map(([group, item]) => `| ${group} | ${item.modeled ? "MODELED" : "MISSING"} | ${item.name} | ${item.rows} | ${item.openItems} |`);
   const storage = report.storageModel || {};
   return [
     `# Release readiness report`,
@@ -553,6 +640,15 @@ function renderMarkdown(report) {
     "| Result | Category | Check | Detail |",
     "|---|---|---|---|",
     ...rows,
+    "",
+    "## Service acceptance summary",
+    "",
+    `- Chronic domains: ${report.serviceAcceptance?.chronic?.summary?.modeledDomains || 0}/${report.serviceAcceptance?.chronic?.summary?.domains || 0} modeled; open items ${report.serviceAcceptance?.chronic?.summary?.openItems || 0}`,
+    `- County domains: ${report.serviceAcceptance?.county?.summary?.modeledDomains || 0}/${report.serviceAcceptance?.county?.summary?.domains || 0} modeled; open items ${report.serviceAcceptance?.county?.summary?.openItems || 0}`,
+    "",
+    "| Group | Status | Domain | Rows | Open items |",
+    "|---|---|---|---:|---:|",
+    ...serviceRows,
     "",
     "## Production cutover checklist",
     "",
@@ -713,6 +809,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       processAudit: report.processAudit
     }, null, 2), "utf8");
+    const serviceAcceptanceJson = path.join(path.dirname(output), "service-acceptance-summary.json");
+    fs.writeFileSync(serviceAcceptanceJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      serviceAcceptance: report.serviceAcceptance
+    }, null, 2), "utf8");
     const siteReadinessJson = path.join(path.dirname(output), "site-readiness-pack.json");
     fs.writeFileSync(siteReadinessJson, JSON.stringify({
       project: report.project,
@@ -785,6 +889,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(operationsMarkdown, renderOperationsReadinessMarkdown(report.operationsReadiness), "utf8");
     const processAuditMarkdown = path.join(path.dirname(markdown), "process-audit-report.md");
     fs.writeFileSync(processAuditMarkdown, renderProcessAuditMarkdown(report.processAudit), "utf8");
+    const serviceAcceptanceMarkdown = path.join(path.dirname(markdown), "service-acceptance-summary.md");
+    fs.writeFileSync(serviceAcceptanceMarkdown, renderServiceAcceptanceMarkdown(report), "utf8");
     const siteReadinessMarkdown = path.join(path.dirname(markdown), "site-readiness-pack.md");
     fs.writeFileSync(siteReadinessMarkdown, renderSiteReadinessMarkdown(report.siteReadinessPack), "utf8");
     writeTemplateReadmes(report.siteReadinessPack, path.join(path.dirname(path.relative(ROOT, markdown)), "templates"));
@@ -837,4 +943,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { buildProductionCutoverChecklist, buildReleaseReport, parseArgs, readEnvFile, renderCutoverMarkdown, renderMarkdown, renderStorageModelMarkdown, validateProductionConfig, writeOutput };
+module.exports = { buildProductionCutoverChecklist, buildReleaseReport, parseArgs, readEnvFile, renderCutoverMarkdown, renderMarkdown, renderServiceAcceptanceMarkdown, renderStorageModelMarkdown, validateProductionConfig, writeOutput };

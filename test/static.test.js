@@ -165,6 +165,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /monitoring-readiness-report\.md/);
   assert.match(read("README.md"), /operations-readiness-report\.md/);
   assert.match(read("README.md"), /process-audit-report\.md/);
+  assert.match(read("README.md"), /service-acceptance-summary\.md/);
   assert.match(read("README.md"), /site-readiness-pack\.md/);
   assert.match(read("README.md"), /release\/templates\/\*\/README\.md/);
   assert.match(read("README.md"), /\/api\/site-template-readmes/);
@@ -184,6 +185,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("DEPLOYMENT.md"), /site-readiness-pack\.md/);
   assert.match(read("DEPLOYMENT.md"), /release\/templates\/\*\/README\.md/);
   assert.match(read("DEPLOYMENT.md"), /\/api\/site-template-readmes/);
+  assert.match(read("DEPLOYMENT.md"), /service-acceptance-summary\.md/);
   assert.match(read("DEPLOYMENT.md"), /production-db-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /evaluation-evidence-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /release-artifact-manifest\.md/);

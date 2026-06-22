@@ -3,7 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 
-const { buildReleaseReport, parseArgs, renderCutoverMarkdown, renderMarkdown, renderStorageModelMarkdown, validateProductionConfig, writeOutput } = require("../scripts/release-report");
+const { buildReleaseReport, parseArgs, renderCutoverMarkdown, renderMarkdown, renderServiceAcceptanceMarkdown, renderStorageModelMarkdown, validateProductionConfig, writeOutput } = require("../scripts/release-report");
 
 const ROOT = path.resolve(__dirname, "..");
 
@@ -117,6 +117,10 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.operationsReadiness.ok, true);
   assert.equal(report.checks.some((item) => item.name === "process:audit" && item.passed), true);
   assert.equal(report.processAudit.ok, true);
+  assert.equal(report.checks.some((item) => item.name === "service:chronicDomains" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "service:countyDomains" && item.passed), true);
+  assert.equal(report.serviceAcceptance.chronic.summary.domains, 8);
+  assert.equal(report.serviceAcceptance.county.summary.domains, 5);
   assert.equal(report.checks.some((item) => item.name === "sitePack:readiness" && item.passed), true);
   assert.equal(report.siteReadinessPack.ok, true);
   assert.equal(report.checks.some((item) => item.name === "productionDb:readiness" && item.passed), true);
@@ -144,6 +148,8 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(markdown, /Monitoring readiness report/);
   assert.match(markdown, /Operations readiness report/);
   assert.match(markdown, /Full process audit report/);
+  assert.match(markdown, /Service acceptance summary/);
+  assert.match(markdown, /service:chronicDomains/);
   assert.match(markdown, /Site readiness pack/);
   assert.match(markdown, /Production database readiness report/);
   assert.match(markdown, /Interoperability evaluation evidence report/);
@@ -182,6 +188,11 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(storageMarkdown, /Storage model inspection/);
   assert.match(storageMarkdown, /JSON snapshot/);
   assert.match(storageMarkdown, /SQLite store/);
+
+  const serviceMarkdown = renderServiceAcceptanceMarkdown(report);
+  assert.match(serviceMarkdown, /Service acceptance summary/);
+  assert.match(serviceMarkdown, /Chronic domains: 8\/8 modeled/);
+  assert.match(serviceMarkdown, /County domains: 5\/5 modeled/);
 });
 
 test("release report writes standalone production cutover and storage artifacts", (t) => {
@@ -222,6 +233,8 @@ test("release report writes standalone production cutover and storage artifacts"
   const operationsMarkdown = fs.readFileSync(path.join(outputDir, "operations-readiness-report.md"), "utf8");
   const processAuditJson = JSON.parse(fs.readFileSync(path.join(outputDir, "process-audit-report.json"), "utf8"));
   const processAuditMarkdown = fs.readFileSync(path.join(outputDir, "process-audit-report.md"), "utf8");
+  const serviceAcceptanceJson = JSON.parse(fs.readFileSync(path.join(outputDir, "service-acceptance-summary.json"), "utf8"));
+  const serviceAcceptanceMarkdown = fs.readFileSync(path.join(outputDir, "service-acceptance-summary.md"), "utf8");
   const siteReadinessJson = JSON.parse(fs.readFileSync(path.join(outputDir, "site-readiness-pack.json"), "utf8"));
   const siteReadinessMarkdown = fs.readFileSync(path.join(outputDir, "site-readiness-pack.md"), "utf8");
   const identityTemplateReadme = fs.readFileSync(path.join(outputDir, "templates", "identity-source-mapping", "README.md"), "utf8");
@@ -257,6 +270,8 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(operationsMarkdown, /External dependency risks/);
   assert.equal(processAuditJson.processAudit.ok, true);
   assert.match(processAuditMarkdown, /Full process audit report/);
+  assert.equal(serviceAcceptanceJson.serviceAcceptance.ok, true);
+  assert.match(serviceAcceptanceMarkdown, /Service acceptance summary/);
   assert.equal(siteReadinessJson.siteReadinessPack.ok, true);
   assert.match(siteReadinessMarkdown, /Site signoff template/);
   assert.match(identityTemplateReadme, /Identity source mapping template/);
@@ -270,7 +285,9 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.equal(environmentJson.environmentMatrix.ok, true);
   assert.match(environmentMarkdown, /Environment matrix report/);
   assert.equal(manifestJson.releaseArtifactManifest.ok, true);
+  assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "service-acceptance"), true);
   assert.match(manifestMarkdown, /Release artifact manifest/);
+  assert.match(manifestMarkdown, /service-acceptance-summary\.md/);
   assert.match(manifestMarkdown, /release\/templates\/identity-source-mapping\/README\.md/);
 });
 
