@@ -23,6 +23,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const roadmap = state.platformRoadmap?.length ? state.platformRoadmap : defaultRoadmap();
   renderMetrics(state, tasks, roadmap, operations);
   renderSystemReadiness(readiness);
+  renderReleaseEvidenceGates(state, readiness, operations);
   renderSourceAlignment(state);
   renderAudit(state, tasks);
   renderProcessAudit(state);
@@ -154,6 +155,82 @@ function renderSystemReadiness(readiness) {
       <small>现场依赖需按部署计划另行验收</small>
     </div>
   </article>${checkRows}${dependencyDetailRows}`;
+}
+
+function renderReleaseEvidenceGates(state, readiness, operations) {
+  const container = document.querySelector("#release-evidence-gates");
+  if (!container) return;
+
+  const checksById = Object.fromEntries((readiness?.checks || []).map((item) => [item.id, item]));
+  const externalSummary = readiness?.externalDependencySummary || null;
+  const interoperability = (state.platformEvidence || []).find((item) => item.id === "ev-interoperability") || {};
+  const securityLedger = state.securityAcceptanceLedger || readiness?.securityAcceptanceLedger || [];
+  const productionTracks = state.productionDeploymentPlan || readiness?.productionDeploymentPlan || [];
+  const p0Interfaces = (state.platformInterfaces || []).filter((item) => item.priority === "P0");
+  const residentsWithIndex = (state.residents || []).filter((item) => item.personIndex || item.identityIndex).length;
+  const residentCompleteness = state.residents?.length ? Math.round((residentsWithIndex / state.residents.length) * 100) : 0;
+  const runtime = readiness?.runtime || operations?.workload || {};
+
+  const gates = [
+    {
+      id: "data-quality:report",
+      title: "Data quality / master index",
+      passed: residentCompleteness === 100 && Number(runtime.dataQualityIssues || 0) === 0,
+      detail: `${residentCompleteness}% resident index completeness; ${Number(runtime.dataQualityIssues || 0)} runtime quality issues`,
+      evidence: "release/data-quality-report.md"
+    },
+    {
+      id: "integration:readiness",
+      title: "Integration readiness",
+      passed: Boolean(checksById["interface-readiness"]?.passed || p0Interfaces.length >= 5),
+      detail: `${p0Interfaces.length} P0 interface tracks; external blocked=${readiness?.interfaceReadiness?.blocked ?? "n/a"}`,
+      evidence: "release/integration-readiness-report.md"
+    },
+    {
+      id: "operations:readiness",
+      title: "Operations readiness",
+      passed: Boolean(checksById["production-deployment-plan"]?.passed && checksById["runtime-workload"]?.passed),
+      detail: `${productionTracks.length} production tracks; external risks high=${externalSummary?.high ?? "n/a"}`,
+      evidence: "release/operations-readiness-report.md"
+    },
+    {
+      id: "evaluation:evidence",
+      title: "Interoperability evaluation evidence",
+      passed: Boolean(interoperability.records?.length >= 2 && interoperability.artifacts?.length >= 4),
+      detail: `${interoperability.records?.length || 0} records; ${(interoperability.artifacts || []).join(", ") || "no artifacts"}`,
+      evidence: "release/evaluation-evidence-report.md"
+    },
+    {
+      id: "audit:retention",
+      title: "Audit retention / security acceptance",
+      passed: Boolean(checksById["audit-chain"]?.passed && securityLedger.length >= 4),
+      detail: `${securityLedger.length} security controls; audit=${checksById["audit-chain"]?.detail || "static preview"}`,
+      evidence: "release/audit-retention-report.md"
+    },
+    {
+      id: "release:report",
+      title: "Release readiness aggregate",
+      passed: readiness ? Boolean(readiness.passed) : Boolean(state.platformRoadmap?.length),
+      detail: readiness ? `${readiness.checks?.filter((item) => item.passed).length || 0}/${readiness.checks?.length || 0} readiness checks passed` : "static snapshot preview; run Node API for live readiness",
+      evidence: "release/release-report.md"
+    }
+  ];
+
+  container.innerHTML = gates.map((gate, index) => `<article class="priority-row release-evidence-gate" data-gate="${gate.id}">
+    <div class="priority-rank ${gate.passed ? "info" : "warn"}">${index + 1}</div>
+    <div>
+      <h3>${gate.title}</h3>
+      <p>${gate.detail}</p>
+      <div class="standard-tags">
+        <span class="badge ${gate.passed ? "info" : "warn"}">${gate.passed ? "PASS" : "REVIEW"}</span>
+        <span class="badge info">${gate.id}</span>
+      </div>
+    </div>
+    <div class="capability-side">
+      <small>${gate.evidence}</small>
+      <small>${readiness ? "live API evidence" : "static snapshot evidence"}</small>
+    </div>
+  </article>`).join("");
 }
 
 function renderAudit(state, tasks) {
