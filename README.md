@@ -184,6 +184,8 @@ npm.cmd run release:report:full
 
 `data-quality:report` 会生成 `release/data-quality-report.json` 与 `release/data-quality-report.md`，检查居民主索引完整度、跨集合居民引用、personIndex 一致性、来源可追溯和整改闭环。
 
+`environment:matrix` 会生成 `release/environment-matrix-report.json` 与 `release/environment-matrix-report.md`，把 demo、staging、production 三层环境的必填变量、阻断变量、责任人、门禁脚本和上线验收规则固化为可检查矩阵；`release:report` 会同步归档该矩阵，便于生产切换前逐项确认环境分层和签字证据。
+
 `operations:readiness` 会生成 `release/operations-readiness-report.json` 与 `release/operations-readiness-report.md`，检查 `/api/health`、`/api/metrics`、`/api/system/readiness`、生产部署轨道、外部依赖风险和发布运维脚本。
 
 `monitoring:readiness` 会生成 `release/monitoring-readiness-report.json` 与 `release/monitoring-readiness-report.md`，专项检查健康检查、运行指标、慢请求、状态码、死信、数据质量、SLO 阈值、告警信号和 on-call escalation 证据；真实 Prometheus/OpenTelemetry 或平台日志绑定完成后，再用 `CUTOVER_MONITORING_SIGNOFF` 作为现场签字信号。
@@ -220,7 +222,7 @@ GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下
 
 代码库内可继续推进：
 
-1. 生产部署基线：已完成环境模板、健康检查、后端部署说明、发布/部署门禁、CI artifact 取证和静态快照回滚；后续按真实部署平台补环境分层和密钥注入。
+1. 生产部署基线：已完成环境模板、demo/staging/production 环境矩阵、健康检查、后端部署说明、发布/部署门禁、CI artifact 取证和静态快照回滚；后续按真实部署平台补密钥注入、现场签字和环境差异参数。
 2. 可观测性：已完成 `/api/metrics`、请求状态、慢请求、任务堆积、死信、数据质量和 `/api/system/readiness`；后续接入 Prometheus/OpenTelemetry 或平台日志服务。
 3. 数据模型深化：已完成 SQLite schema v7、集合版本、乐观锁、恢复演练和 P2 结构化镜像表；后续继续补生产数据库约束、索引、回滚脚本和原生备份证据。
 4. 发布取证：已完成 release report、deploy check、外部依赖风险台账、安全验收台账、数据质量/主索引证据、运维就绪证据和 CI 报告归档；后续在真实环境挂接测评报告、联调记录和上线签字。

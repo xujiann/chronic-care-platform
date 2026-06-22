@@ -5,6 +5,7 @@ const { spawnSync } = require("node:child_process");
 const { buildAuditRetentionReport, renderMarkdown: renderAuditRetentionMarkdown } = require("./audit-retention");
 const { buildDataQualityReport, renderMarkdown: renderDataQualityMarkdown } = require("./data-quality-report");
 const { buildEvaluationEvidenceReport, renderMarkdown: renderEvaluationEvidenceMarkdown } = require("./evaluation-evidence");
+const { buildEnvironmentMatrixReport, renderMarkdown: renderEnvironmentMatrixMarkdown } = require("./environment-matrix");
 const { buildIdentityContract, renderMarkdown: renderIdentityContractMarkdown } = require("./identity-contract");
 const { buildIntegrationReadinessReport, renderMarkdown: renderIntegrationReadinessMarkdown } = require("./integration-readiness");
 const { buildInterfaceMappingReport, renderMarkdown: renderInterfaceMappingMarkdown } = require("./interface-mapping");
@@ -291,6 +292,14 @@ function evaluationEvidenceChecks(evaluationEvidence) {
   ];
 }
 
+function environmentMatrixChecks(environmentMatrix) {
+  return [
+    check("environment:matrix", environmentMatrix.ok, environmentMatrix.ok ? "environment matrix checks passed" : "environment matrix checks failed", "error", "environment"),
+    check("environment:profiles", environmentMatrix.profiles?.length === 3, `${environmentMatrix.profiles?.length || 0} environment profiles`, "error", "environment"),
+    check("environment:gateScripts", environmentMatrix.profiles?.every((item) => item.missingScripts?.length === 0), "demo, staging, and production gate scripts mapped", "error", "environment")
+  ];
+}
+
 function dataQualityChecks(dataQuality) {
   return [
     check("dataQuality:report", dataQuality.ok, dataQuality.ok ? "data quality checks passed" : "data quality checks failed", "error", "data-quality"),
@@ -335,6 +344,7 @@ function packageChecks(pkg) {
     "identity:contract",
     "audit:retention",
     "data-quality:report",
+    "environment:matrix",
     "integration:readiness",
     "interface:mapping",
     "monitoring:readiness",
@@ -393,6 +403,7 @@ function buildReleaseReport(options = {}) {
   const operationsReadiness = buildOperationsReadinessReport({ data, pkg });
   const productionDbReadiness = buildProductionDbReadinessReport({ data, pkg, storageModel });
   const evaluationEvidence = buildEvaluationEvidenceReport({ data });
+  const environmentMatrix = buildEnvironmentMatrixReport({ data, pkg });
   const checks = [
     assertFile("README.md"),
     assertFile("DEPLOYMENT.md"),
@@ -412,6 +423,7 @@ function buildReleaseReport(options = {}) {
     ...operationsReadinessChecks(operationsReadiness),
     ...productionDbReadinessChecks(productionDbReadiness),
     ...evaluationEvidenceChecks(evaluationEvidence),
+    ...environmentMatrixChecks(environmentMatrix),
     ...env.checks,
     ...commandChecks(options.runCommands)
   ];
@@ -440,7 +452,8 @@ function buildReleaseReport(options = {}) {
     monitoringReadiness,
     operationsReadiness,
     productionDbReadiness,
-    evaluationEvidence
+    evaluationEvidence,
+    environmentMatrix
   };
 }
 
@@ -558,6 +571,10 @@ function renderMarkdown(report) {
     "## Interoperability evaluation evidence report",
     "",
     "See `evaluation-evidence-report.json` and `evaluation-evidence-report.md` for interoperability artifacts, P1 interface requirements, transaction samples, and rectification evidence.",
+    "",
+    "## Environment matrix report",
+    "",
+    "See `environment-matrix-report.json` and `environment-matrix-report.md` for demo, staging, and production environment variables, gate scripts, owners, and blocking rules.",
     ""
   ].join("\n");
 }
@@ -672,6 +689,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       evaluationEvidence: report.evaluationEvidence
     }, null, 2), "utf8");
+    const environmentJson = path.join(path.dirname(output), "environment-matrix-report.json");
+    fs.writeFileSync(environmentJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      environmentMatrix: report.environmentMatrix
+    }, null, 2), "utf8");
   }
   if (flags.markdown) {
     const markdown = path.resolve(ROOT, String(flags.markdown));
@@ -699,6 +724,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(productionDbMarkdown, renderProductionDbReadinessMarkdown(report.productionDbReadiness), "utf8");
     const evaluationMarkdown = path.join(path.dirname(markdown), "evaluation-evidence-report.md");
     fs.writeFileSync(evaluationMarkdown, renderEvaluationEvidenceMarkdown(report.evaluationEvidence), "utf8");
+    const environmentMarkdown = path.join(path.dirname(markdown), "environment-matrix-report.md");
+    fs.writeFileSync(environmentMarkdown, renderEnvironmentMatrixMarkdown(report.environmentMatrix), "utf8");
   }
 }
 

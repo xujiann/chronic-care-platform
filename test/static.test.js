@@ -120,6 +120,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal(Boolean(pkg.scripts["identity:contract"]), true);
   assert.equal(Boolean(pkg.scripts["audit:retention"]), true);
   assert.equal(Boolean(pkg.scripts["data-quality:report"]), true);
+  assert.equal(Boolean(pkg.scripts["environment:matrix"]), true);
   assert.equal(Boolean(pkg.scripts["integration:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["interface:mapping"]), true);
   assert.equal(Boolean(pkg.scripts["monitoring:readiness"]), true);
@@ -143,6 +144,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /identity-contract\.md/);
   assert.match(read("README.md"), /audit-retention-report\.md/);
   assert.match(read("README.md"), /data-quality-report\.md/);
+  assert.match(read("README.md"), /environment-matrix-report\.md/);
   assert.match(read("README.md"), /integration-readiness-report\.md/);
   assert.match(read("README.md"), /interface-mapping-report\.md/);
   assert.match(read("README.md"), /monitoring-readiness-report\.md/);
@@ -153,6 +155,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("DEPLOYMENT.md"), /identity-contract\.md/);
   assert.match(read("DEPLOYMENT.md"), /audit-retention-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /data-quality-report\.md/);
+  assert.match(read("DEPLOYMENT.md"), /environment-matrix-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /integration-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /interface-mapping-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /monitoring-readiness-report\.md/);
@@ -165,6 +168,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/deploy-check.js"), /identity:contract/);
   assert.match(read("scripts/deploy-check.js"), /audit:retention/);
   assert.match(read("scripts/deploy-check.js"), /data-quality:report/);
+  assert.match(read("scripts/deploy-check.js"), /environment:matrix/);
   assert.match(read("scripts/deploy-check.js"), /integration:readiness/);
   assert.match(read("scripts/deploy-check.js"), /interface:mapping/);
   assert.match(read("scripts/deploy-check.js"), /monitoring:readiness/);

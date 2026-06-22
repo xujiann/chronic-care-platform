@@ -119,6 +119,9 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.productionDbReadiness.ok, true);
   assert.equal(report.checks.some((item) => item.name === "evaluation:evidence" && item.passed), true);
   assert.equal(report.evaluationEvidence.ok, true);
+  assert.equal(report.checks.some((item) => item.name === "environment:matrix" && item.passed), true);
+  assert.equal(report.environmentMatrix.ok, true);
+  assert.equal(report.environmentMatrix.profiles.some((item) => item.id === "staging"), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-env-file"), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-institution-interfaces" && !item.passed), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-insurance-certificate" && !item.passed), true);
@@ -138,6 +141,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(markdown, /Operations readiness report/);
   assert.match(markdown, /Production database readiness report/);
   assert.match(markdown, /Interoperability evaluation evidence report/);
+  assert.match(markdown, /Environment matrix report/);
   assert.match(markdown, /cutover-identity/);
   assert.match(markdown, /snapshot:acceptanceEvidence/);
   assert.match(markdown, /snapshot:securityAcceptance/);
@@ -213,6 +217,8 @@ test("release report writes standalone production cutover and storage artifacts"
   const productionDbMarkdown = fs.readFileSync(path.join(outputDir, "production-db-readiness-report.md"), "utf8");
   const evaluationJson = JSON.parse(fs.readFileSync(path.join(outputDir, "evaluation-evidence-report.json"), "utf8"));
   const evaluationMarkdown = fs.readFileSync(path.join(outputDir, "evaluation-evidence-report.md"), "utf8");
+  const environmentJson = JSON.parse(fs.readFileSync(path.join(outputDir, "environment-matrix-report.json"), "utf8"));
+  const environmentMarkdown = fs.readFileSync(path.join(outputDir, "environment-matrix-report.md"), "utf8");
   assert.equal(cutoverJson.checklist.some((item) => item.id === "cutover-identity"), true);
   assert.match(cutoverMarkdown, /cutover-storage-adapter/);
   assert.equal(storageJson.storageModel.jsonSnapshot.present, true);
@@ -236,6 +242,8 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(productionDbMarkdown, /Production database readiness report/);
   assert.equal(evaluationJson.evaluationEvidence.ok, true);
   assert.match(evaluationMarkdown, /Artifact coverage/);
+  assert.equal(environmentJson.environmentMatrix.ok, true);
+  assert.match(environmentMarkdown, /Environment matrix report/);
 });
 
 test("release report CLI argument parser keeps command and flags", () => {
