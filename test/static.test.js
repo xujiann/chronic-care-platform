@@ -145,6 +145,9 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(platformJs, /renderResearchGovernance/);
   assert.match(platformJs, /renderMobileAccessibilityGovernance/);
   assert.match(platformJs, /renderProductionDeploymentPlan/);
+  assert.match(platformJs, /evr-interoperability-contracts/);
+  assert.match(platformJs, /integration-readiness-report\.md/);
+  assert.match(platformJs, /audit-retention-report\.md/);
   assert.match(workbenchHtml, /system-readiness/);
   assert.match(workbenchHtml, /release-evidence-gates/);
   assert.match(workbenchJs, /loadOperationalMetrics/);

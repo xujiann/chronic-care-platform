@@ -133,9 +133,16 @@ const defaultDeliveryRoadmap = [
 
 const defaultPlatformEvidence = [
   { id: "ev-application", category: "申报材料", name: "提级论证申报材料闭环", owner: "项目办", source: "项目申报材料、建设方案、预算和论证意见", artifacts: ["建设范围矩阵", "存量模块合并清单", "开发批次计划", "周报素材"], status: "已建档", next: "持续补充需求变更、会议纪要和专家论证反馈。", records: [] },
-  { id: "ev-interoperability", category: "互联互通测评", name: "四甲/五乙测评证据包", owner: "项目办/标准管理", source: "共享文档、术语字典、主索引、交易服务、测评文审材料", artifacts: ["接口清单", "标准映射", "交易样例", "整改记录"], status: "待补齐", next: "按接口域逐项挂接截图、报文样例、测试记录和整改状态。", records: [] },
-  { id: "ev-security", category: "安全合规", name: "等保、密评和信创适配证据", owner: "安全管理岗", source: "统一认证、访问审计、安全事件、数据访问日志、信创适配清单", artifacts: ["权限矩阵", "审计日志", "安全事件", "密评整改项"], status: "开发中", next: "补齐国密传输、数据库加密、日志保全和国产化适配证明。", records: [] },
-  { id: "ev-interface", category: "接口联调", name: "外部系统接口联调验收", owner: "市级平台/医疗机构", source: "HIS、EMR、LIS、PACS、医保、电子证照、卫生统计等对接计划", artifacts: ["联调计划", "字段映射", "异常清单", "回归测试"], status: "开发中", next: "为每个接口域建立责任人、环境、频率、样例和验收规则。", records: [] },
+  { id: "ev-interoperability", category: "互联互通测评", name: "四甲/五乙测评证据包", owner: "项目办/标准管理", source: "共享文档、术语字典、主索引、交易服务、测评文审材料", artifacts: ["接口清单", "标准映射", "交易样例", "整改记录"], status: "已建档", next: "持续补充现场截图、第三方测评结论和整改复测记录。", records: [
+    { id: "evr-interoperability-contracts", owner: "项目办/标准管理", testRecord: "接口契约、主索引、交易样例和测评整改清单已完成演示归档", at: "2026-06-22 07:20:00", link: "/api/system/readiness", fileName: "interoperability-contracts-readiness-2026-06-22.md", status: "演示证据已归档" },
+    { id: "evr-interoperability-gateway", owner: "平台技术组/接口联调", testRecord: "HMAC 签名、幂等键、死信重试和回调事件通过 API 自动化测试", at: "2026-06-22 07:25:00", link: "test/api.test.js", fileName: "integration-gateway-api-regression.md", status: "自动化测试通过" }
+  ] },
+  { id: "ev-security", category: "安全合规", name: "等保、密评和信创适配证据", owner: "安全管理岗", source: "统一认证、访问审计、安全事件、数据访问日志、信创适配清单", artifacts: ["权限矩阵", "审计日志", "安全事件", "密评整改项"], status: "开发中", next: "补齐国密传输、数据库加密、日志保全和国产化适配证明。", records: [
+    { id: "evr-audit-retention", owner: "安全管理岗", testRecord: "审计哈希链、导出摘要、安全验收台账和保全目标已纳入发布报告", at: "2026-06-22 07:30:00", link: "release/audit-retention-report.md", fileName: "audit-retention-report.md", status: "自动化证据已归档" }
+  ] },
+  { id: "ev-interface", category: "接口联调", name: "外部系统接口联调验收", owner: "市级平台/医疗机构", source: "HIS、EMR、LIS、PACS、医保、电子证照、卫生统计等对接计划", artifacts: ["联调计划", "字段映射", "异常清单", "回归测试"], status: "演示对接完成", next: "真实院内系统、医保核心和电子证照联调仍按现场窗口推进。", records: [
+    { id: "evr-integration-readiness", owner: "平台技术组/接口联调", testRecord: "HIS/EMR/LIS/PACS/医保/证照/统计接口契约、签名、幂等和重试策略已完成演示门禁", at: "2026-06-22 07:35:00", link: "release/integration-readiness-report.md", fileName: "integration-readiness-report.md", status: "自动化证据已归档" }
+  ] },
   { id: "ev-launch", category: "上线验收", name: "区级实施和应用上线材料", owner: "实施组", source: "中山、沙河口、甘井子、高新区实施批次和应用培训记录", artifacts: ["上线确认", "培训签到", "试运行问题", "用户反馈"], status: "待启动", next: "按区县、机构、应用和批次沉淀上线确认与问题闭环。", records: [] }
 ];
 
