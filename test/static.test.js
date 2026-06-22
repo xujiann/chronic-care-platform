@@ -93,6 +93,8 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/deploy-check.js"), /process\.platform === "win32" \? "npm\.cmd" : "npm"/);
   assert.match(read(".github/workflows/ci.yml"), /npm run deploy:check/);
   assert.match(read(".github/workflows/ci.yml"), /npm run release:report/);
+  assert.match(read(".github/workflows/ci.yml"), /actions\/upload-artifact@v4/);
+  assert.match(read(".github/workflows/ci.yml"), /release-readiness-report/);
   assert.match(read(".github/workflows/ci.yml"), /npm audit --omit=dev/);
 });
 
