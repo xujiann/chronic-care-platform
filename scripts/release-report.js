@@ -410,8 +410,8 @@ function commandChecks(runCommands) {
 }
 
 function buildReleaseReport(options = {}) {
-  const pkg = readJson("package.json");
-  const data = readJson("data/db.json");
+  const pkg = options.pkg || readJson("package.json");
+  const data = options.data || readJson("data/db.json");
   const env = validateProductionConfig(options);
   const storageModel = inspectStorageModel({ dataDir: path.join(ROOT, "data") });
   const identityContract = buildIdentityContract({ data });
