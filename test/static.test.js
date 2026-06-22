@@ -207,4 +207,6 @@ test("citizen portal exposes P2 imaging and attachment archive categories", () =
   assert.match(read("citizen.css"), /attachment-meta/);
   assert.match(citizenJs, /buildHealthTimeline\(archive, records, labs, medications, allergies, vaccines, admissions, imaging, attachments\)/);
   assert.match(read("README.md"), /影像资料和附件资料/);
+  assert.match(read("docs/C端全流程审计与优化清单.md"), /PWA manifest/);
+  assert.match(read("docs/C端全流程审计与优化清单.md"), /影像资料、附件资料/);
 });
