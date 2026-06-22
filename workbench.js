@@ -329,7 +329,7 @@ function renderReleaseEvidenceGates(state, readiness, operations, processAudit, 
         ? Boolean(chronicService?.modeledDomains === chronicService?.domains && countyService?.modeledDomains === countyService?.domains)
         : Boolean(chronicAcceptance.length >= 5 && countyAcceptance.length >= 4),
       detail: serviceAcceptance
-        ? `chronic=${chronicService?.modeledDomains || 0}/${chronicService?.domains || 0} domains, open=${chronicService?.openItems || 0}; county=${countyService?.modeledDomains || 0}/${countyService?.domains || 0} domains, open=${countyService?.openItems || 0}`
+        ? `chronic=${chronicService?.modeledDomains || 0}/${chronicService?.domains || 0} domains, open=${chronicService?.openItems || 0}, actions=${chronicService?.openActions || 0}; county=${countyService?.modeledDomains || 0}/${countyService?.domains || 0} domains, open=${countyService?.openItems || 0}, actions=${countyService?.openActions || 0}`
         : `static ledgers chronic=${chronicAcceptance.length}; county=${countyAcceptance.length}`,
       evidence: "release/service-acceptance-summary.md"
     },

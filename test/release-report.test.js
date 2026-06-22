@@ -121,6 +121,8 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "service:countyDomains" && item.passed), true);
   assert.equal(report.serviceAcceptance.chronic.summary.domains, 8);
   assert.equal(report.serviceAcceptance.county.summary.domains, 5);
+  assert.equal(report.serviceAcceptance.chronic.openActions.some((item) => item.id === "cst-001" && item.collection === "chronicScreeningTasks"), true);
+  assert.equal(report.serviceAcceptance.county.openActions.some((item) => item.id === "cco-001" && item.collection === "countyCollaborationOrders"), true);
   assert.equal(report.checks.some((item) => item.name === "sitePack:readiness" && item.passed), true);
   assert.equal(report.siteReadinessPack.ok, true);
   assert.equal(report.checks.some((item) => item.name === "productionDb:readiness" && item.passed), true);
@@ -150,6 +152,8 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(markdown, /Full process audit report/);
   assert.match(markdown, /Service acceptance summary/);
   assert.match(markdown, /service:chronicDomains/);
+  assert.match(markdown, /Service open action preview/);
+  assert.match(markdown, /cst-001/);
   assert.match(markdown, /Site readiness pack/);
   assert.match(markdown, /Production database readiness report/);
   assert.match(markdown, /Interoperability evaluation evidence report/);
@@ -193,6 +197,8 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(serviceMarkdown, /Service acceptance summary/);
   assert.match(serviceMarkdown, /Chronic domains: 8\/8 modeled/);
   assert.match(serviceMarkdown, /County domains: 5\/5 modeled/);
+  assert.match(serviceMarkdown, /Open action preview/);
+  assert.match(serviceMarkdown, /cco-001/);
 });
 
 test("release report writes standalone production cutover and storage artifacts", (t) => {
@@ -271,7 +277,9 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.equal(processAuditJson.processAudit.ok, true);
   assert.match(processAuditMarkdown, /Full process audit report/);
   assert.equal(serviceAcceptanceJson.serviceAcceptance.ok, true);
+  assert.equal(serviceAcceptanceJson.serviceAcceptance.chronic.openActions.some((item) => item.id === "cst-001"), true);
   assert.match(serviceAcceptanceMarkdown, /Service acceptance summary/);
+  assert.match(serviceAcceptanceMarkdown, /Open action preview/);
   assert.equal(siteReadinessJson.siteReadinessPack.ok, true);
   assert.match(siteReadinessMarkdown, /Site signoff template/);
   assert.match(identityTemplateReadme, /Identity source mapping template/);

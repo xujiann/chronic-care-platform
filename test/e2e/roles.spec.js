@@ -49,6 +49,7 @@ test("commission workbench renders live release gates and site templates", async
   await expect(releaseGates).toHaveCount(11);
   await expect(page.locator("[data-gate='process:audit']")).toContainText("PASS");
   await expect(page.locator("[data-gate='service:acceptance']")).toContainText("domains");
+  await expect(page.locator("[data-gate='service:acceptance']")).toContainText("actions");
   await expect(page.locator("[data-gate='service:acceptance']")).toContainText("release/service-acceptance-summary.md");
   await expect(page.locator("[data-gate='site:pack']")).toContainText("PASS");
   await expect(page.locator("[data-gate='release:report']")).toContainText("release checks passed");

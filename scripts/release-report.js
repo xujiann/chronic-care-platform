@@ -348,35 +348,62 @@ function countOpen(items, closedStatuses = []) {
   return (Array.isArray(items) ? items : []).filter((item) => !closed.has(item.status)).length;
 }
 
+function pickFirst(item, fields) {
+  const field = fields.find((name) => item?.[name]);
+  return field ? item[field] : "";
+}
+
+function buildOpenActions(collection, domain, items, closedStatuses = []) {
+  if (!closedStatuses.length) return [];
+  const closed = new Set(closedStatuses);
+  return (Array.isArray(items) ? items : [])
+    .filter((item) => !closed.has(item.status))
+    .map((item) => ({
+      id: item.id || `${collection}-${item.residentId || item.status || "open"}`,
+      collection,
+      domain,
+      subject: pickFirst(item, ["taskName", "topic", "diseaseType", "service", "metric", "medication", "orderType", "item", "chiefComplaint", "id"]),
+      status: item.status || "open",
+      owner: pickFirst(item, ["owner", "assignee", "provider", "institution", "center", "toInstitution", "sourceInstitution"]) || "owner-pending",
+      due: pickFirst(item, ["due", "nextReview", "pushAt", "at", "requestedAt"]),
+      nextAction: pickFirst(item, ["nextAction", "nextStep", "intervention", "result", "shortageAction", "current", "reason", "suggestion", "quality"]) || "next-action-pending",
+      residentId: item.residentId || ""
+    }));
+}
+
 function buildServiceAcceptanceSummary(data) {
   const chronicDomains = [
-    ["screening", "Screening and risk stratification", data.chronicScreeningTasks, ["已评估", "已推送干预"]],
-    ["education", "Precision education", data.chronicEducationPushes, ["已确认", "已阅读"]],
-    ["managementPlans", "Tiered management plans", data.chronicManagementPlans, ["已复核"]],
-    ["comorbidity", "Comorbidity management", data.chronicComorbidityPlans, ["已复核"]],
-    ["tcm", "TCM appropriate services", data.chronicTcmServices, ["已完成"]],
-    ["selfManagement", "Self-management uploads", data.chronicSelfManagement, ["已确认"]],
-    ["medicationSupport", "Medication support", data.chronicMedicationSupport, ["运行中"]],
-    ["quality", "Quality metrics", data.chronicQualityMetrics, ["已核验"]]
-  ].map(([id, name, items, closedStatuses]) => ({
+    ["screening", "Screening and risk stratification", "chronicScreeningTasks", data.chronicScreeningTasks, ["已评估", "已推送干预"]],
+    ["education", "Precision education", "chronicEducationPushes", data.chronicEducationPushes, ["已确认", "已阅读"]],
+    ["managementPlans", "Tiered management plans", "chronicManagementPlans", data.chronicManagementPlans, ["已复核"]],
+    ["comorbidity", "Comorbidity management", "chronicComorbidityPlans", data.chronicComorbidityPlans, ["已复核"]],
+    ["tcm", "TCM appropriate services", "chronicTcmServices", data.chronicTcmServices, ["已完成"]],
+    ["selfManagement", "Self-management uploads", "chronicSelfManagement", data.chronicSelfManagement, ["已确认"]],
+    ["medicationSupport", "Medication support", "chronicMedicationSupport", data.chronicMedicationSupport, ["运行中"]],
+    ["quality", "Quality metrics", "chronicQualityMetrics", data.chronicQualityMetrics, ["已核验"]]
+  ].map(([id, name, collection, items, closedStatuses]) => ({
     id,
     name,
+    collection,
     rows: Array.isArray(items) ? items.length : 0,
     openItems: countOpen(items, closedStatuses),
+    openActions: buildOpenActions(collection, id, items, closedStatuses),
     modeled: Array.isArray(items) && items.length > 0
   }));
 
   const countyDomains = [
-    ["collaboration", "Collaboration orders", data.countyCollaborationOrders, ["已回传", "已完成"]],
-    ["mutualRecognition", "Mutual recognition", data.countyMutualRecognitionRecords, ["已互认"]],
-    ["aiDiagnosis", "AI-assisted diagnosis", data.countyAiDiagnosisCases, ["已完成"]],
-    ["diagnosticReports", "Diagnostic reports", data.diagnosticReports, ["recognized", "completed", "已互认"]],
-    ["performance", "Consortium performance", data.performanceIndicators || data.countyPerformanceIndicators || data.medicalResources, []]
-  ].map(([id, name, items, closedStatuses]) => ({
+    ["collaboration", "Collaboration orders", "countyCollaborationOrders", data.countyCollaborationOrders, ["已回传", "已完成"]],
+    ["mutualRecognition", "Mutual recognition", "countyMutualRecognitionRecords", data.countyMutualRecognitionRecords, ["已互认"]],
+    ["aiDiagnosis", "AI-assisted diagnosis", "countyAiDiagnosisCases", data.countyAiDiagnosisCases, ["已完成"]],
+    ["diagnosticReports", "Diagnostic reports", "diagnosticReports", data.diagnosticReports, ["recognized", "completed", "已互认"]],
+    ["performance", "Consortium performance", "medicalResources", data.performanceIndicators || data.countyPerformanceIndicators || data.medicalResources, []]
+  ].map(([id, name, collection, items, closedStatuses]) => ({
     id,
     name,
+    collection,
     rows: Array.isArray(items) ? items.length : 0,
     openItems: closedStatuses.length ? countOpen(items, closedStatuses) : 0,
+    openActions: buildOpenActions(collection, id, items, closedStatuses),
     modeled: Array.isArray(items) && items.length > 0
   }));
 
@@ -384,13 +411,14 @@ function buildServiceAcceptanceSummary(data) {
     domains: domains.length,
     modeledDomains: domains.filter((item) => item.modeled).length,
     openItems: domains.reduce((sum, item) => sum + item.openItems, 0),
+    openActions: domains.reduce((sum, item) => sum + item.openActions.length, 0),
     rows: domains.reduce((sum, item) => sum + item.rows, 0)
   });
 
   return {
     ok: chronicDomains.every((item) => item.modeled) && countyDomains.every((item) => item.modeled),
-    chronic: { summary: summarize(chronicDomains), domains: chronicDomains },
-    county: { summary: summarize(countyDomains), domains: countyDomains }
+    chronic: { summary: summarize(chronicDomains), domains: chronicDomains, openActions: chronicDomains.flatMap((item) => item.openActions) },
+    county: { summary: summarize(countyDomains), domains: countyDomains, openActions: countyDomains.flatMap((item) => item.openActions) }
   };
 }
 
@@ -600,6 +628,12 @@ function renderServiceAcceptanceMarkdown(report) {
     ...(report.serviceAcceptance?.chronic?.domains || []).map((item) => ["chronic", item]),
     ...(report.serviceAcceptance?.county?.domains || []).map((item) => ["county", item])
   ].map(([group, item]) => `| ${group} | ${item.modeled ? "MODELED" : "MISSING"} | ${item.name} | ${item.rows} | ${item.openItems} |`);
+  const openRows = [
+    ...(report.serviceAcceptance?.chronic?.openActions || []).slice(0, 12).map((item) => ["chronic", item]),
+    ...(report.serviceAcceptance?.county?.openActions || []).slice(0, 8).map((item) => ["county", item])
+  ].map(([group, item]) =>
+    `| ${group} | ${item.collection} | ${item.id} | ${String(item.subject || "").replace(/\|/g, "/")} | ${item.status} | ${item.owner} | ${item.due || ""} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`
+  );
   return [
     "# Service acceptance summary",
     "",
@@ -613,6 +647,12 @@ function renderServiceAcceptanceMarkdown(report) {
     "| Group | Status | Domain | Rows | Open items |",
     "|---|---|---|---:|---:|",
     ...rows,
+    "",
+    "## Open action preview",
+    "",
+    "| Group | Collection | Item | Subject | Status | Owner | Due | Next action |",
+    "|---|---|---|---|---|---|---|---|",
+    ...openRows,
     ""
   ].join("\n");
 }
@@ -624,6 +664,12 @@ function renderMarkdown(report) {
     ...(report.serviceAcceptance?.chronic?.domains || []).map((item) => ["chronic", item]),
     ...(report.serviceAcceptance?.county?.domains || []).map((item) => ["county", item])
   ].map(([group, item]) => `| ${group} | ${item.modeled ? "MODELED" : "MISSING"} | ${item.name} | ${item.rows} | ${item.openItems} |`);
+  const serviceOpenRows = [
+    ...(report.serviceAcceptance?.chronic?.openActions || []).slice(0, 6).map((item) => ["chronic", item]),
+    ...(report.serviceAcceptance?.county?.openActions || []).slice(0, 6).map((item) => ["county", item])
+  ].map(([group, item]) =>
+    `| ${group} | ${item.collection} | ${item.id} | ${String(item.subject || "").replace(/\|/g, "/")} | ${item.status} | ${item.owner} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`
+  );
   const storage = report.storageModel || {};
   return [
     `# Release readiness report`,
@@ -649,6 +695,12 @@ function renderMarkdown(report) {
     "| Group | Status | Domain | Rows | Open items |",
     "|---|---|---|---:|---:|",
     ...serviceRows,
+    "",
+    "### Service open action preview",
+    "",
+    "| Group | Collection | Item | Subject | Status | Owner | Next action |",
+    "|---|---|---|---|---|---|---|",
+    ...serviceOpenRows,
     "",
     "## Production cutover checklist",
     "",
