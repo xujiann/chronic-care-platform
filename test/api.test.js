@@ -568,6 +568,9 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(countyTasks.response.status, 200);
     assert.equal(countyTasks.body.tasks.some((item) => item.id === `emergencySignals:${critical.body.criticalSignal.id}`), true);
     assert.equal(countyTasks.body.tasks.some((item) => item.collection === "insuranceClaims"), false);
+    const countyServiceTask = countyTasks.body.tasks.find((item) => item.collection === "countyCollaborationOrders");
+    assert.equal(countyServiceTask.serviceDomain, "collaboration");
+    assert.equal(countyServiceTask.priorityLevel, "high");
 
     const taskHandled = await api(baseUrl, `/api/tasks/${encodeURIComponent(`emergencySignals:${critical.body.criticalSignal.id}`)}/actions`, authorized(county.body.token, {
       method: "POST",
@@ -635,6 +638,10 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const escalations = await api(baseUrl, "/api/tasks/escalations", authorized(commissionToken));
     assert.equal(escalations.response.status, 200);
     assert.equal(escalations.body.overdue.some((item) => item.overdue === true), true);
+    const commissionTasks = await api(baseUrl, "/api/tasks", authorized(commissionToken));
+    const chronicServiceTask = commissionTasks.body.tasks.find((item) => item.collection === "chronicScreeningTasks" && item.sourceId === "cst-001");
+    assert.equal(chronicServiceTask.serviceDomain, "screening");
+    assert.equal(chronicServiceTask.priorityLevel, "high");
 
     const escalationRun = await api(baseUrl, "/api/tasks/escalations/run", authorized(commissionToken, {
       method: "POST",

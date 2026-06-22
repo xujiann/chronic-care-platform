@@ -4554,6 +4554,28 @@ const TASK_SOURCES = [
   ["diagnosticReports", "county", "报告回传", "reportedAt"]
 ];
 
+const SERVICE_DOMAIN_BY_COLLECTION = {
+  chronicScreeningTasks: "screening",
+  chronicEducationPushes: "education",
+  chronicManagementPlans: "managementPlans",
+  chronicComorbidityPlans: "comorbidity",
+  chronicTcmServices: "tcm",
+  chronicSelfManagement: "selfManagement",
+  chronicMedicationSupport: "medicationSupport",
+  chronicQualityMetrics: "quality",
+  countyCollaborationOrders: "collaboration",
+  countyAiDiagnosisCases: "aiDiagnosis",
+  countyMutualRecognitionRecords: "mutualRecognition",
+  diagnosticReports: "diagnosticReports"
+};
+
+function taskPriorityLevel(item) {
+  const text = [item?.priority, item?.risk, item?.riskLevel, item?.grade, item?.status, item?.level].filter(Boolean).join(" ");
+  if (/高|危急|预警|逾期|紧急|high|urgent/i.test(text)) return "high";
+  if (/中|待|需|warning|medium/i.test(text)) return "medium";
+  return "normal";
+}
+
 function taskTitle(item, category) {
   return item.taskName || item.topic || item.plan || item.orderType || item.claimType || item.medication || item.item || item.title || item.name || item.service || category;
 }
@@ -4584,6 +4606,8 @@ function buildUnifiedTasks(data, user) {
         title: taskTitle(item, category),
         status: item.status || item.reviewStatus || "pending",
         priority: item.priority || item.level || item.riskLevel || "normal",
+        priorityLevel: taskPriorityLevel(item),
+        serviceDomain: SERVICE_DOMAIN_BY_COLLECTION[collection] || "",
         dueAt: item[dueField] || item.due || item.nextReview || item.lastUpdated || "",
         owner: item.assignee || item.owner || item.institution || item.sourceInstitution || item.targetInstitution || "",
         source: collection

@@ -282,6 +282,8 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("server.js"), /\/api\/process-audit/);
   assert.match(read("server.js"), /\/api\/service-acceptance-summary/);
   assert.match(read("server.js"), /\/api\/site-readiness-pack/);
+  assert.match(read("server.js"), /SERVICE_DOMAIN_BY_COLLECTION/);
+  assert.match(read("server.js"), /priorityLevel/);
   assert.match(read("server.js"), /\/api\/site-template-readmes/);
   assert.match(read("server.js"), /\/api\/release-report/);
   assert.match(read("server.js"), /\/api\/production-cutover-checklist/);
