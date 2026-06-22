@@ -2902,6 +2902,10 @@ function buildSystemReadinessReport(data) {
     const text = JSON.stringify(item);
     return item.owner && item.testRecord && item.status && !text.includes("编码损坏，待核验");
   });
+  const securityAcceptanceLedger = Array.isArray(data.securityAcceptanceLedger) ? data.securityAcceptanceLedger : [];
+  const securityAcceptanceReady = securityAcceptanceLedger.length >= 4 && securityAcceptanceLedger.every((item) =>
+    item.id && item.category && item.owner && item.status && item.next
+  );
   const productionDeploymentPlan = Array.isArray(data.productionDeploymentPlan) ? data.productionDeploymentPlan : [];
   const productionPlanReady = productionDeploymentPlan.length >= 4 && productionDeploymentPlan.every((item) =>
     item.id && item.track && item.owner && item.status && item.nextAction && Array.isArray(item.requiredConfig) && item.requiredConfig.length
@@ -2913,6 +2917,7 @@ function buildSystemReadinessReport(data) {
     { id: "p2-roadmap", name: "P2 路线图完成", passed: p2Complete, detail: roadmap.filter((item) => item.priority === "P2").map((item) => `${item.title}:${item.status}`).join(";") },
     { id: "p2-collections", name: "P2 集合完整", passed: Object.values(p2Collections).every(Boolean), detail: JSON.stringify(p2Collections) },
     { id: "acceptance-evidence", name: "验收证据台账", passed: evidenceClean && evidenceRecords.length >= 2, detail: `records=${evidenceRecords.length}` },
+    { id: "security-acceptance", name: "安全信创验收台账", passed: securityAcceptanceReady, detail: `items=${securityAcceptanceLedger.length}` },
     { id: "production-deployment-plan", name: "生产部署路径", passed: productionPlanReady, detail: `tracks=${productionDeploymentPlan.length}` },
     { id: "interface-readiness", name: "接口准备度台账", passed: interfaceReadiness.passed, detail: `p0=${interfaceReadiness.p0CodeReady}/${interfaceReadiness.p0Total}, externalBlocked=${interfaceReadiness.blocked}` },
     { id: "audit-chain", name: "审计哈希链", passed: Object.values(auditTrails).every((item) => item.passed), detail: `security=${auditTrails.securityEvents.broken.length}, access=${auditTrails.dataAccessLogs.broken.length}` },
@@ -2924,6 +2929,7 @@ function buildSystemReadinessReport(data) {
     service: runtime.service,
     checks,
     p2Collections,
+    securityAcceptanceLedger,
     productionDeploymentPlan,
     productionEnvironment: buildProductionEnvironmentStatus(),
     interfaceReadiness,

@@ -134,6 +134,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(readiness.body.passed, true);
     assert.equal(readiness.body.p2Collections.researchDatasets >= 2, true);
     assert.equal(readiness.body.checks.some((item) => item.id === "acceptance-evidence" && item.passed), true);
+    assert.equal(readiness.body.checks.some((item) => item.id === "security-acceptance" && item.passed), true);
+    assert.equal(readiness.body.securityAcceptanceLedger.length >= 4, true);
     assert.equal(readiness.body.checks.some((item) => item.id === "production-deployment-plan" && item.passed), true);
     assert.equal(readiness.body.productionDeploymentPlan.some((item) => item.id === "prod-identity-adapter"), true);
     assert.equal(Array.isArray(readiness.body.productionEnvironment.checks), true);

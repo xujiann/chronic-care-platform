@@ -83,12 +83,14 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.summary.failed, 0);
   assert.equal(report.checks.some((item) => item.name === "package:scripts" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "snapshot:acceptanceEvidence" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "snapshot:securityAcceptance" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "snapshot:productionDeploymentPlan" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "snapshot:interfaceReadiness" && item.passed), true);
 
   const markdown = renderMarkdown(report);
   assert.match(markdown, /Release readiness report/);
   assert.match(markdown, /snapshot:acceptanceEvidence/);
+  assert.match(markdown, /snapshot:securityAcceptance/);
   assert.match(markdown, /snapshot:productionDeploymentPlan/);
   assert.match(markdown, /snapshot:interfaceReadiness/);
 });
