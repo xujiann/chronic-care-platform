@@ -146,6 +146,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(readiness.body.checks.some((item) => item.id === "audit-chain" && item.passed), true);
     assert.equal(readiness.body.externalDependencies.some((item) => item.id === "identity-source" && item.severity === "high"), true);
     assert.equal(readiness.body.externalDependencies.some((item) => item.id === "institution-systems" && item.nextAction), true);
+    assert.equal(readiness.body.externalDependencySummary.total, readiness.body.externalDependencies.length);
+    assert.equal(readiness.body.externalDependencySummary.high >= 3, true);
 
     const identityPreview = await api(baseUrl, "/api/auth/identity/preview", authorized(accountLogin.body.token, {
       method: "POST",

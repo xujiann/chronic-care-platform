@@ -130,6 +130,7 @@ function renderSystemReadiness(readiness) {
     </article>`;
   }).join("");
   const productionEnv = readiness.productionEnvironment || null;
+  const dependencySummary = readiness.externalDependencySummary || null;
   const productionEnvRows = (productionEnv?.checks || []).map((item) =>
     `<span class="badge ${item.passed ? "info" : "warn"}">${item.name}: ${item.detail}</span>`
   ).join("");
@@ -143,6 +144,7 @@ function renderSystemReadiness(readiness) {
     <div>
       <h3>${readiness.service || "系统"}发布就绪总览</h3>
       <p>生成时间：${readiness.generatedAt || "未知"}；P2 集合、审计链和运行负载已纳入统一检查。</p>
+      <div class="standard-tags">${dependencySummary ? `<span class="badge danger">现场高风险依赖：${dependencySummary.high}</span><span class="badge warn">现场中风险依赖：${dependencySummary.medium}</span>` : ""}</div>
       <div class="standard-tags">${dependencyRows || `<span class="badge info">暂无外部依赖提示</span>`}</div>
       <div class="standard-tags">${productionEnvRows || `<span class="badge warn">生产环境门禁待运行</span>`}</div>
       <div class="standard-tags">${interfaceRows || `<span class="badge warn">接口准备度待生成</span>`}</div>

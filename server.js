@@ -2982,6 +2982,15 @@ function buildSystemReadinessReport(data) {
   const runtime = buildRuntimeMetrics(data);
   const interfaceReadiness = buildInterfaceReadiness(data);
   const externalDependencies = buildExternalDependencyRisks(data);
+  const externalDependencySummary = {
+    total: externalDependencies.length,
+    high: externalDependencies.filter((item) => item.severity === "high").length,
+    medium: externalDependencies.filter((item) => item.severity === "medium").length,
+    categories: Object.fromEntries([...new Set(externalDependencies.map((item) => item.category))].map((category) => [
+      category,
+      externalDependencies.filter((item) => item.category === category).length
+    ]))
+  };
   const checks = [
     { id: "storage-meta", name: "存储元信息", passed: Boolean(runtime.storage.jsonFile), detail: runtime.storage.mode },
     { id: "p2-roadmap", name: "P2 路线图完成", passed: p2Complete, detail: roadmap.filter((item) => item.priority === "P2").map((item) => `${item.title}:${item.status}`).join(";") },
@@ -3003,6 +3012,7 @@ function buildSystemReadinessReport(data) {
     productionDeploymentPlan,
     productionEnvironment: buildProductionEnvironmentStatus(),
     interfaceReadiness,
+    externalDependencySummary,
     runtime: runtime.workload,
     externalDependencies
   };
