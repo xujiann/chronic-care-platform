@@ -231,6 +231,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(workbenchJs, /evaluation:evidence/);
   assert.match(workbenchJs, /\/api\/metrics/);
   assert.match(workbenchJs, /\/api\/system\/readiness/);
+  assert.match(read("server.js"), /\/api\/process-audit/);
 });
 
 test("system structure documentation reflects completed local governance loops", () => {
