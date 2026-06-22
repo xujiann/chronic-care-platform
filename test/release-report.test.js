@@ -1,7 +1,11 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 const test = require("node:test");
 
-const { buildReleaseReport, parseArgs, renderMarkdown, validateProductionConfig } = require("../scripts/release-report");
+const { buildReleaseReport, parseArgs, renderCutoverMarkdown, renderMarkdown, validateProductionConfig, writeOutput } = require("../scripts/release-report");
+
+const ROOT = path.resolve(__dirname, "..");
 
 test("release report validates demo and production environment profiles", () => {
   const demo = validateProductionConfig({
@@ -102,6 +106,34 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(markdown, /snapshot:productionDeploymentPlan/);
   assert.match(markdown, /snapshot:interfaceReadiness/);
   assert.match(markdown, /snapshot:externalDependencyRisks/);
+
+  const cutoverMarkdown = renderCutoverMarkdown(report);
+  assert.match(cutoverMarkdown, /Production cutover checklist/);
+  assert.match(cutoverMarkdown, /cutover-audit-retention/);
+});
+
+test("release report writes standalone production cutover artifacts", (t) => {
+  const outputDir = path.join(ROOT, "tmp", "release-report-test");
+  t.after(() => fs.rmSync(outputDir, { recursive: true, force: true }));
+  const report = buildReleaseReport({
+    profile: "demo",
+    env: {
+      NODE_ENV: "production",
+      STORAGE_ENGINE: "auto",
+      SESSION_SECRETS: "replace-with-long-random-secret",
+      INTEGRATION_GATEWAY_SECRET: "replace-with-integration-secret"
+    }
+  });
+
+  writeOutput(report, {
+    output: path.join("tmp", "release-report-test", "release-report.json"),
+    markdown: path.join("tmp", "release-report-test", "release-report.md")
+  });
+
+  const cutoverJson = JSON.parse(fs.readFileSync(path.join(outputDir, "production-cutover-checklist.json"), "utf8"));
+  const cutoverMarkdown = fs.readFileSync(path.join(outputDir, "production-cutover-checklist.md"), "utf8");
+  assert.equal(cutoverJson.checklist.some((item) => item.id === "cutover-identity"), true);
+  assert.match(cutoverMarkdown, /cutover-storage-adapter/);
 });
 
 test("release report CLI argument parser keeps command and flags", () => {

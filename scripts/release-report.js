@@ -300,16 +300,43 @@ function renderMarkdown(report) {
   ].join("\n");
 }
 
+function renderCutoverMarkdown(report) {
+  const rows = (report.productionCutover || []).map((item) => `| ${item.passed ? "PASS" : "BLOCKED"} | ${item.phase} | ${item.owner} | ${item.id} | ${String(item.evidence || "").replace(/\|/g, "/")} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`);
+  return [
+    "# Production cutover checklist",
+    "",
+    `- Project: ${report.project}`,
+    `- Version: ${report.version}`,
+    `- Profile: ${report.profile}`,
+    `- Generated at: ${report.generatedAt}`,
+    "",
+    "| Result | Phase | Owner | Item | Evidence | Next action |",
+    "|---|---|---|---|---|---|",
+    ...rows,
+    ""
+  ].join("\n");
+}
+
 function writeOutput(report, flags) {
   if (flags.output) {
     const output = path.resolve(ROOT, String(flags.output));
     fs.mkdirSync(path.dirname(output), { recursive: true });
     fs.writeFileSync(output, JSON.stringify(report, null, 2), "utf8");
+    const cutoverJson = path.join(path.dirname(output), "production-cutover-checklist.json");
+    fs.writeFileSync(cutoverJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      checklist: report.productionCutover || []
+    }, null, 2), "utf8");
   }
   if (flags.markdown) {
     const markdown = path.resolve(ROOT, String(flags.markdown));
     fs.mkdirSync(path.dirname(markdown), { recursive: true });
     fs.writeFileSync(markdown, renderMarkdown(report), "utf8");
+    const cutoverMarkdown = path.join(path.dirname(markdown), "production-cutover-checklist.md");
+    fs.writeFileSync(cutoverMarkdown, renderCutoverMarkdown(report), "utf8");
   }
 }
 
@@ -349,4 +376,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { buildProductionCutoverChecklist, buildReleaseReport, parseArgs, readEnvFile, renderMarkdown, validateProductionConfig };
+module.exports = { buildProductionCutoverChecklist, buildReleaseReport, parseArgs, readEnvFile, renderCutoverMarkdown, renderMarkdown, validateProductionConfig, writeOutput };
