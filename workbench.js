@@ -22,6 +22,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const processAudit = await loadProcessAudit();
   const acceptanceLedgers = await loadAcceptanceLedgers();
   const siteReadinessPack = await loadSiteReadinessPack();
+  const siteTemplateReadmes = await loadSiteTemplateReadmes();
   const releaseReport = await loadReleaseReport();
   const productionCutover = await loadProductionCutoverChecklist();
   const releaseArtifactManifest = await loadReleaseArtifactManifest();
@@ -31,7 +32,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderSystemReadiness(readiness);
   renderReleaseEvidenceGates(state, readiness, operations, processAudit, siteReadinessPack, releaseReport, productionCutover, releaseArtifactManifest);
   renderAcceptanceLedgers(state, acceptanceLedgers);
-  renderSiteReadinessPack(siteReadinessPack);
+  renderSiteReadinessPack(siteReadinessPack, siteTemplateReadmes);
   renderSourceAlignment(state);
   renderAudit(state, tasks);
   renderProcessAudit(state, processAudit);
@@ -100,6 +101,18 @@ async function loadSiteReadinessPack() {
   try {
     const request = window.HealthCityAuth?.authFetch || fetch;
     const response = await request("/api/site-readiness-pack");
+    if (!response.ok) return null;
+    return response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+async function loadSiteTemplateReadmes() {
+  if (location.protocol === "file:") return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request("/api/site-template-readmes");
     if (!response.ok) return null;
     return response.json();
   } catch (error) {
@@ -413,7 +426,7 @@ function renderAcceptanceLedgers(state, acceptanceLedgers) {
   }).join("");
 }
 
-function renderSiteReadinessPack(siteReadinessPack) {
+function renderSiteReadinessPack(siteReadinessPack, siteTemplateReadmes) {
   const container = document.querySelector("#site-readiness-pack");
   if (!container) return;
 
@@ -432,8 +445,16 @@ function renderSiteReadinessPack(siteReadinessPack) {
     return;
   }
 
-  container.innerHTML = (siteReadinessPack.packs || []).map((pack, index) => {
+  const readmeById = Object.fromEntries((siteTemplateReadmes?.readmes || []).map((item) => [item.id, item]));
+  const readmeIdByPack = {
+    "identity-source-pack": "identity-source-mapping",
+    "interface-joint-test-pack": "interface-joint-test",
+    "monitoring-operations-pack": "monitoring-on-call",
+    "production-signoff-pack": "production-signoff"
+  };
+  const packRows = (siteReadinessPack.packs || []).map((pack, index) => {
     const ready = pack.status === "template-ready";
+    const readme = readmeById[readmeIdByPack[pack.id]];
     return `<article class="priority-row" data-site-pack="${pack.id}">
       <div class="priority-rank ${ready ? "info" : "warn"}">${index + 1}</div>
       <div>
@@ -442,14 +463,45 @@ function renderSiteReadinessPack(siteReadinessPack) {
         <div class="standard-tags">
           <span class="badge ${ready ? "info" : "warn"}">${pack.status}</span>
           <span class="badge info">${pack.owner}</span>
+          ${readme ? `<span class="badge info">README rows ${readme.rows}</span>` : ""}
         </div>
       </div>
       <div class="capability-side">
         <small>/api/site-readiness-pack</small>
+        ${readme ? `<small>${readme.file}</small>` : ""}
         <small>release/site-readiness-pack.md</small>
       </div>
     </article>`;
   }).join("");
+
+  const readmeRows = (siteTemplateReadmes?.readmes || []).map((readme) => `<article class="priority-row site-template-readme" data-template-readme="${readme.id}">
+    <div class="priority-rank ${readme.status === "template-ready" ? "info" : "warn"}">MD</div>
+    <div>
+      <h3>${readme.title}</h3>
+      <p>${readme.rows} rows; ${readme.requiredArtifacts?.length || 0} artifact types; ${readme.liveEvidence}</p>
+      <div class="standard-tags">
+        <span class="badge info">${readme.owner}</span>
+        <span class="badge ${readme.status === "template-ready" ? "info" : "warn"}">${readme.status}</span>
+        <span class="badge info">README generated</span>
+      </div>
+    </div>
+    <div class="capability-side">
+      <small>${readme.file}</small>
+      <small>/api/site-template-readmes</small>
+    </div>
+  </article>`).join("");
+
+  container.innerHTML = `${packRows}${readmeRows || `<article class="priority-row">
+    <div class="priority-rank warn">MD</div>
+    <div>
+      <h3>Template README bundle</h3>
+      <p>Run Node service and sign in as commission to view generated template README content.</p>
+    </div>
+    <div class="capability-side">
+      <span class="badge warn">static preview</span>
+      <small>/api/site-template-readmes</small>
+    </div>
+  </article>`}`;
 }
 
 function renderAudit(state, tasks) {

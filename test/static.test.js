@@ -167,6 +167,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /process-audit-report\.md/);
   assert.match(read("README.md"), /site-readiness-pack\.md/);
   assert.match(read("README.md"), /release\/templates\/\*\/README\.md/);
+  assert.match(read("README.md"), /\/api\/site-template-readmes/);
   assert.match(read("README.md"), /production-db-readiness-report\.md/);
   assert.match(read("README.md"), /evaluation-evidence-report\.md/);
   assert.match(read("README.md"), /release-artifact-manifest\.md/);
@@ -182,6 +183,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("DEPLOYMENT.md"), /process-audit-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /site-readiness-pack\.md/);
   assert.match(read("DEPLOYMENT.md"), /release\/templates\/\*\/README\.md/);
+  assert.match(read("DEPLOYMENT.md"), /\/api\/site-template-readmes/);
   assert.match(read("DEPLOYMENT.md"), /production-db-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /evaluation-evidence-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /release-artifact-manifest\.md/);
@@ -246,6 +248,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(workbenchJs, /loadSystemReadiness/);
   assert.match(workbenchJs, /loadAcceptanceLedgers/);
   assert.match(workbenchJs, /loadSiteReadinessPack/);
+  assert.match(workbenchJs, /loadSiteTemplateReadmes/);
   assert.match(workbenchJs, /loadReleaseReport/);
   assert.match(workbenchJs, /loadProductionCutoverChecklist/);
   assert.match(workbenchJs, /loadReleaseArtifactManifest/);
@@ -262,6 +265,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(workbenchJs, /\/api\/system\/readiness/);
   assert.match(workbenchJs, /\/api\/process-audit/);
   assert.match(workbenchJs, /\/api\/site-readiness-pack/);
+  assert.match(workbenchJs, /\/api\/site-template-readmes/);
   assert.match(workbenchJs, /\/api\/release-report/);
   assert.match(workbenchJs, /\/api\/production-cutover-checklist/);
   assert.match(workbenchJs, /\/api\/release-artifact-manifest/);
@@ -269,6 +273,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(workbenchJs, /\/api\/county\/acceptance-ledger/);
   assert.match(read("server.js"), /\/api\/process-audit/);
   assert.match(read("server.js"), /\/api\/site-readiness-pack/);
+  assert.match(read("server.js"), /\/api\/site-template-readmes/);
   assert.match(read("server.js"), /\/api\/release-report/);
   assert.match(read("server.js"), /\/api\/production-cutover-checklist/);
   assert.match(read("server.js"), /\/api\/release-artifact-manifest/);

@@ -57,8 +57,10 @@ test("commission workbench renders live release gates and site templates", async
   await expect(page.locator("#acceptance-ledgers .priority-row")).toHaveCount(2);
   await expect(page.locator("[data-acceptance-ledger='chronic']")).toContainText("service domains ready");
   await expect(page.locator("[data-acceptance-ledger='county']")).toContainText("service domains ready");
-  await expect(page.locator("#site-readiness-pack .priority-row")).toHaveCount(4);
+  await expect(page.locator("#site-readiness-pack .priority-row")).toHaveCount(8);
+  await expect(page.locator("#site-readiness-pack .site-template-readme")).toHaveCount(4);
   await expect(page.locator("#site-readiness-pack")).toContainText("release/site-readiness-pack.md");
+  await expect(page.locator("[data-template-readme='identity-source-mapping']")).toContainText("README generated");
   await expect(page.locator("#process-audit-matrix")).toContainText("site-readiness");
   await expect(page.locator("#process-audit-matrix")).toContainText("evidence domains passed");
 
@@ -68,6 +70,13 @@ test("commission workbench renders live release gates and site templates", async
   });
   expect(releaseReport.ok).toBe(true);
   expect(releaseReport.siteReadinessPack.summary.packs).toBe(4);
+
+  const templateReadmes = await page.evaluate(async () => {
+    const response = await window.HealthCityAuth.authFetch("/api/site-template-readmes");
+    return response.json();
+  });
+  expect(templateReadmes.ok).toBe(true);
+  expect(templateReadmes.summary.readmes).toBe(4);
 });
 
 test("citizen stays in the household experience and cannot open commission pages", async ({ page }) => {

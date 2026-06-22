@@ -165,6 +165,13 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(sitePack.body.templates.identity.some((item) => item.field === "sub"), true);
     assert.equal(sitePack.body.templates.signoff.some((item) => item.id === "signoff-cutover-monitoring"), true);
 
+    const templateReadmes = await api(baseUrl, "/api/site-template-readmes", authorized(accountLogin.body.token));
+    assert.equal(templateReadmes.response.status, 200);
+    assert.equal(templateReadmes.body.ok, true);
+    assert.equal(templateReadmes.body.summary.readmes, 4);
+    assert.equal(templateReadmes.body.readmes.some((item) => item.file === "release/templates/identity-source-mapping/README.md"), true);
+    assert.equal(templateReadmes.body.readmes.every((item) => item.content.includes("Current implementation coverage")), true);
+
     const releaseReport = await api(baseUrl, "/api/release-report", authorized(accountLogin.body.token));
     assert.equal(releaseReport.response.status, 200);
     assert.equal(releaseReport.body.ok, true);

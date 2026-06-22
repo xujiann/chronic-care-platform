@@ -310,6 +310,10 @@ function renderTemplateReadmes(report) {
       "",
       section.capability,
       "",
+      "## Current implementation coverage",
+      "",
+      `This README is generated from the live site readiness pack. It currently covers ${section.rows.length} rows, ${section.pack?.requiredArtifacts?.length || 0} required artifact types, owner ${section.pack?.owner || "owner-pending"}, and status ${section.pack?.status || "unknown"}.`,
+      "",
       "## Inputs to collect",
       "",
       section.input,
@@ -327,6 +331,12 @@ function renderTemplateReadmes(report) {
       "| Item | Owner | Evidence or mapping |",
       "|---|---|---|",
       ...rows,
+      "",
+      "## How to verify now",
+      "",
+      `- Run: npm.cmd run site:pack`,
+      `- Read API: ${section.apiEvidence}`,
+      `- Review generated file: release/templates/${section.file}`,
       ""
     ].join("\n");
     return [section.file, content];

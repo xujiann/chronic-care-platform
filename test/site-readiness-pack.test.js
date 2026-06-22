@@ -46,6 +46,7 @@ test("site readiness pack renders and writes release artifacts", (t) => {
   assert.match(markdown, /Interface joint-test template/);
   assert.match(markdown, /Site signoff template/);
   assert.match(readmes["identity-source-mapping/README.md"], /What this template supports now/);
+  assert.match(readmes["identity-source-mapping/README.md"], /Current implementation coverage/);
   assert.match(readmes["interface-joint-test/README.md"], /\/api\/integrations\/gateway/);
   assert.match(readmes["monitoring-on-call/README.md"], /\/api\/metrics/);
   assert.match(readmes["production-signoff/README.md"], /production-cutover-checklist\.md/);
@@ -62,6 +63,7 @@ test("site readiness pack renders and writes release artifacts", (t) => {
   assert.equal(writtenJson.ok, true);
   assert.match(writtenMarkdown, /Monitoring and on-call template/);
   assert.match(identityReadme, /Current status: template-ready/);
+  assert.match(identityReadme, /How to verify now/);
   assert.match(interfaceReadme, /Rows preview/);
 });
 

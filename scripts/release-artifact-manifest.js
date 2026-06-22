@@ -26,10 +26,10 @@ const ARTIFACTS = [
 ];
 
 const TEMPLATE_READMES = [
-  ["identity-source-mapping", "Identity source mapping template", "release/templates/identity-source-mapping/README.md", "site:pack", "/api/auth/identity/preview"],
-  ["interface-joint-test", "Interface joint-test template", "release/templates/interface-joint-test/README.md", "site:pack", "/api/integrations/gateway"],
-  ["monitoring-on-call", "Monitoring and on-call template", "release/templates/monitoring-on-call/README.md", "site:pack", "/api/metrics"],
-  ["production-signoff", "Production cutover signoff template", "release/templates/production-signoff/README.md", "site:pack", "/api/release-report"]
+  ["identity-source-mapping", "Identity source mapping template", "release/templates/identity-source-mapping/README.md", "site:pack", "/api/site-template-readmes"],
+  ["interface-joint-test", "Interface joint-test template", "release/templates/interface-joint-test/README.md", "site:pack", "/api/site-template-readmes"],
+  ["monitoring-on-call", "Monitoring and on-call template", "release/templates/monitoring-on-call/README.md", "site:pack", "/api/site-template-readmes"],
+  ["production-signoff", "Production cutover signoff template", "release/templates/production-signoff/README.md", "site:pack", "/api/site-template-readmes"]
 ];
 
 function readJson(relativePath) {

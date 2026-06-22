@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
 const { buildProcessAuditReport } = require("./scripts/process-audit");
-const { buildSiteReadinessPack } = require("./scripts/site-readiness-pack");
+const { buildSiteReadinessPack, renderTemplateReadmes } = require("./scripts/site-readiness-pack");
 const { buildReleaseReport } = require("./scripts/release-report");
 const { buildReleaseArtifactManifest } = require("./scripts/release-artifact-manifest");
 
@@ -5004,6 +5004,51 @@ function buildChronicAcceptanceLedger(data) {
   };
 }
 
+function buildSiteTemplateReadmes(data) {
+  const sitePack = buildSiteReadinessPack({ data, env: process.env });
+  const contentByFile = renderTemplateReadmes(sitePack);
+  const packByTemplate = {
+    "identity-source-mapping": sitePack.packs.find((item) => item.id === "identity-source-pack"),
+    "interface-joint-test": sitePack.packs.find((item) => item.id === "interface-joint-test-pack"),
+    "monitoring-on-call": sitePack.packs.find((item) => item.id === "monitoring-operations-pack"),
+    "production-signoff": sitePack.packs.find((item) => item.id === "production-signoff-pack")
+  };
+  const rowsByTemplate = {
+    "identity-source-mapping": sitePack.templates.identity || [],
+    "interface-joint-test": sitePack.templates.interfaces || [],
+    "monitoring-on-call": sitePack.templates.monitoring || [],
+    "production-signoff": sitePack.templates.signoff || []
+  };
+  const readmes = Object.entries(contentByFile).map(([file, content]) => {
+    const id = file.split("/")[0];
+    const pack = packByTemplate[id] || {};
+    const title = content.match(/^#\s+(.+)$/m)?.[1] || id;
+    const liveEvidence = content.match(/^- Live evidence:\s+(.+)$/m)?.[1] || "/api/site-readiness-pack";
+    return {
+      id,
+      file: `release/templates/${file}`,
+      title,
+      status: pack.status || "unknown",
+      owner: pack.owner || "owner-pending",
+      rows: rowsByTemplate[id]?.length || 0,
+      requiredArtifacts: pack.requiredArtifacts || [],
+      liveEvidence,
+      content,
+      preview: content.split(/\r?\n/).slice(0, 18).join("\n")
+    };
+  });
+  return {
+    ok: sitePack.ok && readmes.length === 4 && readmes.every((item) => item.content.includes("## What this template supports now")),
+    generatedAt: sitePack.generatedAt,
+    summary: {
+      readmes: readmes.length,
+      rows: readmes.reduce((sum, item) => sum + item.rows, 0),
+      requiredArtifacts: readmes.reduce((sum, item) => sum + item.requiredArtifacts.length, 0)
+    },
+    readmes
+  };
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -5046,6 +5091,13 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/site-readiness-pack");
     if (!user) return;
     sendJson(res, 200, buildSiteReadinessPack({ data: readDatabase(), env: process.env }));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/site-template-readmes") {
+    const user = requireApiRole(req, res, ["commission"], "/api/site-template-readmes");
+    if (!user) return;
+    sendJson(res, 200, buildSiteTemplateReadmes(readDatabase()));
     return;
   }
 
