@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { buildAuditRetentionReport, renderMarkdown: renderAuditRetentionMarkdown } = require("./audit-retention");
+const { buildEvaluationEvidenceReport, renderMarkdown: renderEvaluationEvidenceMarkdown } = require("./evaluation-evidence");
 const { buildIdentityContract, renderMarkdown: renderIdentityContractMarkdown } = require("./identity-contract");
 const { buildIntegrationReadinessReport, renderMarkdown: renderIntegrationReadinessMarkdown } = require("./integration-readiness");
 const { inspectStorageModel } = require("./storage-admin");
@@ -232,6 +233,14 @@ function integrationReadinessChecks(integrationReadiness) {
   ];
 }
 
+function evaluationEvidenceChecks(evaluationEvidence) {
+  return [
+    check("evaluation:evidence", evaluationEvidence.ok, evaluationEvidence.ok ? "evaluation evidence checks passed" : "evaluation evidence checks failed", "error", "evaluation"),
+    check("evaluation:records", evaluationEvidence.interoperabilityEvidence?.records?.length >= 2, `${evaluationEvidence.interoperabilityEvidence?.records?.length || 0} evidence records`, "error", "evaluation"),
+    check("evaluation:p1Requirements", evaluationEvidence.p1Requirements?.length >= 5, `${evaluationEvidence.p1Requirements?.length || 0} P1 requirements`, "error", "evaluation")
+  ];
+}
+
 function packageChecks(pkg) {
   const requiredScripts = [
     "check",
@@ -244,6 +253,7 @@ function packageChecks(pkg) {
     "identity:contract",
     "audit:retention",
     "integration:readiness",
+    "evaluation:evidence",
     "storage:backup",
     "storage:inspect",
     "storage:assess",
@@ -290,6 +300,7 @@ function buildReleaseReport(options = {}) {
   const identityContract = buildIdentityContract({ data });
   const auditRetention = buildAuditRetentionReport({ data, env: options.env || process.env });
   const integrationReadiness = buildIntegrationReadinessReport({ data });
+  const evaluationEvidence = buildEvaluationEvidenceReport({ data });
   const checks = [
     assertFile("README.md"),
     assertFile("DEPLOYMENT.md"),
@@ -303,6 +314,7 @@ function buildReleaseReport(options = {}) {
     ...identityContractChecks(identityContract),
     ...auditRetentionChecks(auditRetention),
     ...integrationReadinessChecks(integrationReadiness),
+    ...evaluationEvidenceChecks(evaluationEvidence),
     ...env.checks,
     ...commandChecks(options.runCommands)
   ];
@@ -325,7 +337,8 @@ function buildReleaseReport(options = {}) {
     storageModel,
     identityContract,
     auditRetention,
-    integrationReadiness
+    integrationReadiness,
+    evaluationEvidence
   };
 }
 
@@ -419,6 +432,10 @@ function renderMarkdown(report) {
     "## Integration readiness report",
     "",
     "See `integration-readiness-report.json` and `integration-readiness-report.md` for P0 interface coverage, external contract readiness, idempotency, signature, and retry policy evidence.",
+    "",
+    "## Interoperability evaluation evidence report",
+    "",
+    "See `evaluation-evidence-report.json` and `evaluation-evidence-report.md` for interoperability artifacts, P1 interface requirements, transaction samples, and rectification evidence.",
     ""
   ].join("\n");
 }
@@ -485,6 +502,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       integrationReadiness: report.integrationReadiness
     }, null, 2), "utf8");
+    const evaluationJson = path.join(path.dirname(output), "evaluation-evidence-report.json");
+    fs.writeFileSync(evaluationJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      evaluationEvidence: report.evaluationEvidence
+    }, null, 2), "utf8");
   }
   if (flags.markdown) {
     const markdown = path.resolve(ROOT, String(flags.markdown));
@@ -500,6 +525,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(auditMarkdown, renderAuditRetentionMarkdown(report.auditRetention), "utf8");
     const integrationMarkdown = path.join(path.dirname(markdown), "integration-readiness-report.md");
     fs.writeFileSync(integrationMarkdown, renderIntegrationReadinessMarkdown(report.integrationReadiness), "utf8");
+    const evaluationMarkdown = path.join(path.dirname(markdown), "evaluation-evidence-report.md");
+    fs.writeFileSync(evaluationMarkdown, renderEvaluationEvidenceMarkdown(report.evaluationEvidence), "utf8");
   }
 }
 
