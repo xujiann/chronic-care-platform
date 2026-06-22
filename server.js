@@ -4833,7 +4833,65 @@ function buildCountyAcceptanceLedger(data) {
       needsFollowUp: rows.filter((item) => item.acceptanceStatus !== "evidence-ready").length
     },
     ledger: rows,
+    serviceSummary: buildCountyServiceSummary(data, performance),
     performance
+  };
+}
+
+function buildCountyServiceSummary(data, performance = buildConsortiumPerformanceReport(data)) {
+  const orders = Array.isArray(data.countyCollaborationOrders) ? data.countyCollaborationOrders : [];
+  const reports = Array.isArray(data.diagnosticReports) ? data.diagnosticReports : [];
+  const recognition = Array.isArray(data.countyMutualRecognitionRecords) ? data.countyMutualRecognitionRecords : [];
+  const aiCases = Array.isArray(data.countyAiDiagnosisCases) ? data.countyAiDiagnosisCases : [];
+  const signals = (Array.isArray(data.emergencySignals) ? data.emergencySignals : []).filter((item) => item.sourceReportId);
+  const rules = Array.isArray(data.mutualRecognitionRules) ? data.mutualRecognitionRules : [];
+  const domains = [
+    {
+      id: "reportReturn",
+      name: "Diagnostic report return",
+      total: reports.length + orders.length,
+      ready: reports.length + orders.filter((item) => isClosedTaskStatus(item.status)).length
+    },
+    {
+      id: "mutualRecognition",
+      name: "Mutual recognition",
+      total: recognition.length + rules.length,
+      ready: recognition.filter((item) => /recognized|已互认/.test(String(item.status || ""))).length + rules.filter((item) => item.id && item.condition).length
+    },
+    {
+      id: "criticalAlerts",
+      name: "Critical diagnostic alerts",
+      total: signals.length,
+      ready: signals.filter((item) => /acknowledged|resolved|closed|已/.test(String(item.status || ""))).length
+    },
+    {
+      id: "aiSupport",
+      name: "Primary AI support",
+      total: aiCases.length,
+      ready: aiCases.filter((item) => item.status && item.recommendation).length
+    },
+    {
+      id: "performance",
+      name: "Consortium performance",
+      total: 100,
+      ready: performance.primaryCareFulfillment?.completionRate || 0
+    }
+  ].map((item) => ({
+    ...item,
+    needsFollowUp: Math.max(0, item.total - item.ready),
+    readyRate: Math.round((Number(item.ready || 0) / Math.max(1, Number(item.total || 0))) * 100)
+  }));
+  return {
+    ok: domains.every((item) => item.readyRate >= 80),
+    generatedAt: new Date().toISOString(),
+    summary: {
+      domains: domains.length,
+      readyDomains: domains.filter((item) => item.readyRate >= 80).length,
+      totalRows: domains.reduce((sum, item) => sum + item.total, 0),
+      rowsNeedingFollowUp: domains.reduce((sum, item) => sum + item.needsFollowUp, 0),
+      openCollaborationOrders: orders.filter((item) => !isClosedTaskStatus(item.status)).length
+    },
+    domains
   };
 }
 

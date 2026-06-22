@@ -113,6 +113,7 @@ test("chronic disease policy module exposes 2025 service capacity workflow", () 
   assert.match(server, /\/api\/chronic\/acceptance-ledger/);
   assert.match(server, /chronicMedicationSupport/);
   assert.match(server, /buildChronicServiceSummary/);
+  assert.match(server, /buildCountyServiceSummary/);
   assert.match(server, /DEMO_TODAY/);
   assert.match(server, /2026-06-22/);
   assert.match(server, /changed && !shouldUseSqlite\(\)/);

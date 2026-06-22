@@ -389,6 +389,7 @@ function renderAcceptanceLedgers(state, acceptanceLedgers) {
   container.innerHTML = ledgers.map((group) => {
     const summary = group.report?.summary || {};
     const serviceSummary = group.report?.serviceSummary?.summary || null;
+    const openServiceItems = serviceSummary?.openWorkflowItems ?? serviceSummary?.openCollaborationOrders ?? 0;
     const rows = (group.report?.ledger || []).map((item) => {
       const ready = String(item.acceptanceStatus || item.status || "").includes("ready") || /建档|归档|闭环|完成|通过|已/.test(String(item.acceptanceStatus || item.status || ""));
       return `<div>
@@ -401,7 +402,7 @@ function renderAcceptanceLedgers(state, acceptanceLedgers) {
       <div class="priority-rank ${group.report?.ok ? "info" : "warn"}">${summary.ready || 0}/${summary.total || 0}</div>
       <div>
         <h3>${group.title}</h3>
-        <p>${serviceSummary ? `${serviceSummary.readyDomains}/${serviceSummary.domains} service domains ready; ${serviceSummary.openWorkflowItems} open workflow items; ` : ""}${summary.needsFollowUp || 0} rows need follow-up; source ${group.source}.</p>
+        <p>${serviceSummary ? `${serviceSummary.readyDomains}/${serviceSummary.domains} service domains ready; ${openServiceItems} open items; ` : ""}${summary.needsFollowUp || 0} rows need follow-up; source ${group.source}.</p>
         <div class="rules">${rows}</div>
       </div>
       <div class="capability-side">

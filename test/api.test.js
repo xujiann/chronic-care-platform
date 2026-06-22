@@ -594,6 +594,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(acceptance.body.ok, true);
     assert.equal(acceptance.body.ledger.some((item) => item.id === "county-accept-report-return"), true);
     assert.equal(acceptance.body.ledger.some((item) => item.metricKey === "criticalAlert" && item.metric.denominator >= 1), true);
+    assert.equal(acceptance.body.serviceSummary.summary.domains, 5);
+    assert.equal(acceptance.body.serviceSummary.domains.some((item) => item.id === "performance"), true);
 
     const insurance = await login(baseUrl, "insurance");
     const insuranceAcceptance = await api(baseUrl, "/api/county/acceptance-ledger", authorized(insurance.body.token));
