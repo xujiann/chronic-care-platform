@@ -523,6 +523,7 @@ function seedState() {
     chronicSelfManagement: seedChronicSelfManagement(),
     chronicMedicationSupport: seedChronicMedicationSupport(),
     chronicQualityMetrics: seedChronicQualityMetrics(),
+    chronicAcceptanceLedger: seedChronicAcceptanceLedger(),
     countyCollaborationOrders: seedCountyCollaborationOrders(),
     countyAiDiagnosisCases: seedCountyAiDiagnosisCases(),
     countyMutualRecognitionRecords: seedCountyMutualRecognitionRecords(),
@@ -1291,6 +1292,16 @@ function seedChronicQualityMetrics() {
     { id: "cqm-003", metric: "多病共管整合随访率", target2027: "多病患者整合服务内容和随访频次", current: "新增多病共管方案台账", owner: "家庭医生团队", evidence: "chronicComorbidityPlans", status: "新增" },
     { id: "cqm-004", metric: "居民自我监测数据回写率", target2027: "智能终端数据在安全要求下上传至电子健康档案和医保信息平台", current: "居民端自测数据已入模，待接入真实终端", owner: "信息化与家庭医生团队", evidence: "chronicSelfManagement", status: "新增" },
     { id: "cqm-005", metric: "质控和效果评估闭环", target2027: "牵头医院、专业公卫机构和基层内部质量管理协同", current: "质控指标进入卫健委端审计视图", owner: "牵头医院/疾控中心", evidence: "chronicQualityMetrics", status: "新增" }
+  ];
+}
+
+function seedChronicAcceptanceLedger() {
+  return [
+    { id: "chronic-accept-screening", stage: "risk-screening", owner: "primary-chronic-center", target: "High-risk discovery, screening task generation, and risk grading are traceable to residents and source indicators.", evidence: "chronicScreeningTasks / diseases / residents.metrics", status: "evidence-ready", metricKey: "screening", nextAction: "Bind real device uploads, health examination feeds, and CDC screening rules." },
+    { id: "chronic-accept-classified-care", stage: "classified-management", owner: "family-doctor-team", target: "Confirmed chronic patients have classified management plans, follow-up frequency, intervention notes, and referral linkage.", evidence: "chronicManagementPlans / followups / referralSystem", status: "evidence-ready", metricKey: "classifiedCare", nextAction: "Archive site-specific grading rules and down-referral follow-up requirements." },
+    { id: "chronic-accept-comorbidity", stage: "comorbidity-care", owner: "family-doctor-pharmacist-team", target: "Patients with two or more chronic risks receive integrated follow-up, medication review, and combined intervention plans.", evidence: "chronicComorbidityPlans / chronicMedicationSupport", status: "evidence-ready", metricKey: "comorbidity", nextAction: "Connect pharmacist review, contraindication checks, and long-prescription rules." },
+    { id: "chronic-accept-self-management", stage: "self-management", owner: "resident-service-team", target: "Resident self-monitoring, TCM services, education pushes, and family proxy reminders are available for closed-loop management.", evidence: "chronicSelfManagement / chronicTcmServices / chronicEducationPushes", status: "evidence-ready", metricKey: "selfManagement", nextAction: "Connect real IoT terminals, family doctor service packs, and satisfaction survey evidence." },
+    { id: "chronic-accept-quality", stage: "quality-evaluation", owner: "chronic-quality-office", target: "Quality metrics cover service coverage, uncontrolled patient adjustment, comorbidity follow-up, self-monitoring writeback, and evaluation improvement.", evidence: "chronicQualityMetrics / platformProcessAudit", status: "evidence-ready", metricKey: "quality", nextAction: "Load production quality sampling, annual monitoring, and expert review conclusions." }
   ];
 }
 
@@ -3202,6 +3213,7 @@ function normalizeState(data) {
     chronicSelfManagement: mergeByKey(seedChronicSelfManagement(), data.chronicSelfManagement, "id"),
     chronicMedicationSupport: mergeByKey(seedChronicMedicationSupport(), data.chronicMedicationSupport, "id"),
     chronicQualityMetrics: mergeByKey(seedChronicQualityMetrics(), data.chronicQualityMetrics, "id"),
+    chronicAcceptanceLedger: mergeByKey(seedChronicAcceptanceLedger(), data.chronicAcceptanceLedger, "id"),
     countyCollaborationOrders: mergeByKey(seedCountyCollaborationOrders(), data.countyCollaborationOrders, "id"),
     countyAiDiagnosisCases: mergeByKey(seedCountyAiDiagnosisCases(), data.countyAiDiagnosisCases, "id"),
     countyMutualRecognitionRecords: mergeByKey(seedCountyMutualRecognitionRecords(), data.countyMutualRecognitionRecords, "id"),
@@ -4246,6 +4258,7 @@ function scopeStateForUser(data, user) {
   delete scoped.institutionCreditEvaluations;
   delete scoped.securityAcceptanceLedger;
   if (user.role !== "county") delete scoped.countyAcceptanceLedger;
+  if (user.role !== "institution") delete scoped.chronicAcceptanceLedger;
 
   if (user.role !== "citizen") {
     if (user.role === "institution" && user.doctorId) {
@@ -4807,6 +4820,72 @@ function buildCountyAcceptanceLedger(data) {
   };
 }
 
+function buildChronicAcceptanceLedger(data) {
+  const ledger = mergeByKey(seedChronicAcceptanceLedger(), data.chronicAcceptanceLedger, "id");
+  const screening = Array.isArray(data.chronicScreeningTasks) ? data.chronicScreeningTasks : [];
+  const plans = Array.isArray(data.chronicManagementPlans) ? data.chronicManagementPlans : [];
+  const followups = Array.isArray(data.followups) ? data.followups : [];
+  const comorbidity = Array.isArray(data.chronicComorbidityPlans) ? data.chronicComorbidityPlans : [];
+  const medication = Array.isArray(data.chronicMedicationSupport) ? data.chronicMedicationSupport : [];
+  const selfManagement = Array.isArray(data.chronicSelfManagement) ? data.chronicSelfManagement : [];
+  const tcm = Array.isArray(data.chronicTcmServices) ? data.chronicTcmServices : [];
+  const education = Array.isArray(data.chronicEducationPushes) ? data.chronicEducationPushes : [];
+  const quality = Array.isArray(data.chronicQualityMetrics) ? data.chronicQualityMetrics : [];
+  const metrics = {
+    screening: {
+      numerator: screening.filter((item) => item.residentId && item.riskLevel && item.nextStep).length,
+      denominator: Math.max(1, screening.length),
+      detail: `${screening.length} screening tasks with resident linkage and next steps`
+    },
+    classifiedCare: {
+      numerator: plans.filter((item) => item.residentId && item.grade && item.nextReview).length + followups.filter((item) => item.status).length,
+      denominator: Math.max(1, plans.length + followups.length),
+      detail: `${plans.length} management plans, ${followups.length} follow-up records`
+    },
+    comorbidity: {
+      numerator: comorbidity.filter((item) => Array.isArray(item.diseases) && item.diseases.length >= 2 && item.pharmacistTask).length + medication.filter((item) => item.prescription && item.stockStatus).length,
+      denominator: Math.max(1, comorbidity.length + medication.length),
+      detail: `${comorbidity.length} comorbidity plans, ${medication.length} medication support records`
+    },
+    selfManagement: {
+      numerator: selfManagement.filter((item) => item.latestValue && item.nextAction).length + tcm.filter((item) => item.intervention).length + education.filter((item) => item.channel).length,
+      denominator: Math.max(1, selfManagement.length + tcm.length + education.length),
+      detail: `${selfManagement.length} self-monitoring, ${tcm.length} TCM, ${education.length} education records`
+    },
+    quality: {
+      numerator: quality.filter((item) => item.evidence && item.owner && item.status).length,
+      denominator: Math.max(1, quality.length),
+      detail: `${quality.length} chronic quality metrics`
+    }
+  };
+  const rows = ledger.map((item) => {
+    const metric = metrics[item.metricKey] || { numerator: 0, denominator: 1, detail: "metric missing" };
+    const rate = Math.round((Number(metric.numerator || 0) / Number(metric.denominator || 1)) * 100);
+    return {
+      ...item,
+      metric,
+      rate,
+      acceptanceStatus: rate >= 80 || item.status === "evidence-ready" ? "evidence-ready" : "needs-follow-up"
+    };
+  });
+  return {
+    generatedAt: new Date().toISOString(),
+    ok: rows.every((item) => item.acceptanceStatus === "evidence-ready"),
+    summary: {
+      total: rows.length,
+      ready: rows.filter((item) => item.acceptanceStatus === "evidence-ready").length,
+      needsFollowUp: rows.filter((item) => item.acceptanceStatus !== "evidence-ready").length
+    },
+    ledger: rows,
+    policyCollections: {
+      serviceRoles: data.chronicServiceRoles?.length || 0,
+      capabilityConditions: data.chronicCapabilityConditions?.length || 0,
+      servicePathways: data.chronicServicePathways?.length || 0,
+      qualityMetrics: quality.length
+    }
+  };
+}
+
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -5078,6 +5157,13 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission", "county"], "/api/county/acceptance-ledger");
     if (!user) return;
     sendJson(res, 200, buildCountyAcceptanceLedger(readDatabase()));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/chronic/acceptance-ledger") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/chronic/acceptance-ledger");
+    if (!user) return;
+    sendJson(res, 200, buildChronicAcceptanceLedger(readDatabase()));
     return;
   }
 

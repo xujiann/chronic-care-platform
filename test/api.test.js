@@ -639,6 +639,16 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(performance.body.peopleFinanceMaterials.doctors >= 1, true);
     assert.equal(Number.isFinite(performance.body.primaryCareFulfillment.completionRate), true);
 
+    const chronicAcceptance = await api(baseUrl, "/api/chronic/acceptance-ledger", authorized(commissionToken));
+    assert.equal(chronicAcceptance.response.status, 200);
+    assert.equal(chronicAcceptance.body.ok, true);
+    assert.equal(chronicAcceptance.body.ledger.some((item) => item.id === "chronic-accept-screening"), true);
+    assert.equal(chronicAcceptance.body.ledger.some((item) => item.metricKey === "quality" && item.rate >= 80), true);
+    assert.equal(chronicAcceptance.body.policyCollections.servicePathways >= 5, true);
+
+    const chronicDenied = await api(baseUrl, "/api/chronic/acceptance-ledger", authorized(insurance.body.token));
+    assert.equal(chronicDenied.response.status, 403);
+
     const datasets = await api(baseUrl, "/api/research/datasets", authorized(commissionToken));
     assert.equal(datasets.response.status, 200);
     assert.equal(datasets.body.datasets.some((item) => item.diseaseType === "hypertension"), true);

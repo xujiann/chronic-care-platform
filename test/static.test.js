@@ -96,10 +96,12 @@ test("chronic disease policy module exposes 2025 service capacity workflow", () 
   const html = read("index.html");
   const app = read("app.js");
   const server = read("server.js");
-  ["chronicServiceRoles", "chronicCapabilityConditions", "chronicServicePathways", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics"].forEach((key) => {
+  ["chronicServiceRoles", "chronicCapabilityConditions", "chronicServicePathways", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "chronicAcceptanceLedger"].forEach((key) => {
     assert.equal(Array.isArray(data[key]), true, `${key} should be seeded`);
     assert.equal(data[key].length > 0, true, `${key} should not be empty`);
   });
+  assert.equal(data.chronicAcceptanceLedger.some((item) => item.id === "chronic-accept-quality"), true);
+  assert.equal(data.chronicAcceptanceLedger.some((item) => item.metricKey === "selfManagement"), true);
   ["chronic-service-roles", "chronic-capability-conditions", "chronic-service-pathways", "chronic-comorbidity-table", "chronic-tcm-services", "chronic-self-management", "chronic-medication-support", "chronic-quality-metrics"].forEach((id) => {
     assert.match(html, new RegExp(id), `${id} panel should be present`);
   });
@@ -108,6 +110,7 @@ test("chronic disease policy module exposes 2025 service capacity workflow", () 
   assert.match(app, /chronicComorbidityPlans/);
   assert.match(app, /chronicMedicationSupport/);
   assert.match(server, /chronic-comorbidity-plans/);
+  assert.match(server, /\/api\/chronic\/acceptance-ledger/);
   assert.match(server, /chronicMedicationSupport/);
   assert.match(server, /多病共管/);
   assert.match(server, /基层慢病健康管理中心/);
