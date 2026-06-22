@@ -13,7 +13,7 @@ const { buildMonitoringReadinessReport, renderMarkdown: renderMonitoringReadines
 const { buildOperationsReadinessReport, renderMarkdown: renderOperationsReadinessMarkdown } = require("./operations-readiness");
 const { buildProcessAuditReport, renderMarkdown: renderProcessAuditMarkdown } = require("./process-audit");
 const { buildProductionDbReadinessReport, renderMarkdown: renderProductionDbReadinessMarkdown } = require("./production-db-readiness");
-const { buildSiteReadinessPack, renderMarkdown: renderSiteReadinessMarkdown } = require("./site-readiness-pack");
+const { buildSiteReadinessPack, renderMarkdown: renderSiteReadinessMarkdown, writeTemplateReadmes } = require("./site-readiness-pack");
 const { inspectStorageModel } = require("./storage-admin");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -772,6 +772,7 @@ function writeOutput(report, flags) {
     fs.writeFileSync(processAuditMarkdown, renderProcessAuditMarkdown(report.processAudit), "utf8");
     const siteReadinessMarkdown = path.join(path.dirname(markdown), "site-readiness-pack.md");
     fs.writeFileSync(siteReadinessMarkdown, renderSiteReadinessMarkdown(report.siteReadinessPack), "utf8");
+    writeTemplateReadmes(report.siteReadinessPack, path.join(path.dirname(path.relative(ROOT, markdown)), "templates"));
     const monitoringMarkdown = path.join(path.dirname(markdown), "monitoring-readiness-report.md");
     fs.writeFileSync(monitoringMarkdown, renderMonitoringReadinessMarkdown(report.monitoringReadiness), "utf8");
     const productionDbMarkdown = path.join(path.dirname(markdown), "production-db-readiness-report.md");

@@ -244,6 +244,106 @@ function renderMarkdown(report) {
   ].join("\n");
 }
 
+function renderTemplateReadmes(report) {
+  const templates = report.templates || {};
+  const packById = Object.fromEntries((report.packs || []).map((pack) => [pack.id, pack]));
+  const sections = [
+    {
+      file: "identity-source-mapping/README.md",
+      title: "Identity source mapping template",
+      pack: packById["identity-source-pack"],
+      rows: templates.identity || [],
+      capability: "Maps government OIDC/SAML claims, role codes, organization scope, and resident identity signals into the platform login and authorization model.",
+      input: "OIDC/SAML metadata, sample signed token, role and organization directory, callback URL, and identity source owner confirmation.",
+      output: "Claim mapping table, role-to-portal mapping, organization scope evidence, and signoff-ready identity integration notes.",
+      apiEvidence: "/api/auth/login, /api/auth/me, /api/system/readiness, /api/site-readiness-pack"
+    },
+    {
+      file: "interface-joint-test/README.md",
+      title: "Interface joint-test template",
+      pack: packById["interface-joint-test-pack"],
+      rows: templates.interfaces || [],
+      capability: "Turns HIS/EMR/LIS/PACS/insurance/certificate/statistics contracts into field mapping, sample message, signature, retry, and receiving confirmation evidence.",
+      input: "Contract field dictionary, sample request and response, gateway signature log, idempotency key, replay or retry record, and receiving user confirmation.",
+      output: "Joint-test field table, target collection mapping, required field coverage, and implementation evidence for release review.",
+      apiEvidence: "/api/integrations/gateway, /api/system/readiness, /api/process-audit, /api/site-readiness-pack"
+    },
+    {
+      file: "monitoring-on-call/README.md",
+      title: "Monitoring and on-call template",
+      pack: packById["monitoring-operations-pack"],
+      rows: templates.monitoring || [],
+      capability: "Converts runtime health, metrics, SLO, alert, dead-letter, and escalation signals into an operations readiness checklist.",
+      input: "Health route screenshot, metrics scrape target, dashboard panel, alert rule, duty roster, escalation receiver, and drill record.",
+      output: "Route watch list, SLO threshold table, alert ownership, on-call escalation evidence, and cutover monitoring signoff material.",
+      apiEvidence: "/api/health, /api/metrics, /api/system/readiness, /api/site-readiness-pack"
+    },
+    {
+      file: "production-signoff/README.md",
+      title: "Production cutover signoff template",
+      pack: packById["production-signoff-pack"],
+      rows: templates.signoff || [],
+      capability: "Collects production environment, secrets, identity, audit retention, database, interface, monitoring, and disaster recovery signatures before cutover.",
+      input: ".env review, production secrets proof, database and backup rehearsal, external interface acceptance, monitoring binding, DR rehearsal, and issue-cleared checklist.",
+      output: "Signoff rows with owner, evidence requirement, blocking condition, and required signature roles for final release review.",
+      apiEvidence: "/api/system/readiness, /api/process-audit, /api/site-readiness-pack, release/production-cutover-checklist.md"
+    }
+  ];
+
+  return Object.fromEntries(sections.map((section) => {
+    const rows = section.rows.slice(0, 12).map((row) => {
+      const name = row.field || row.sourceSystem || row.signal || row.phase || row.id;
+      const owner = row.owner || section.pack?.owner || "owner-pending";
+      const evidence = row.evidence || row.expectedSource || row.targetCollection || (row.requiredEvidence || row.evidenceToAttach || []).join(", ") || row.blockingUntil || "evidence-pending";
+      return `| ${String(name || "").replace(/\|/g, "/")} | ${String(owner).replace(/\|/g, "/")} | ${String(evidence).replace(/\|/g, "/")} |`;
+    });
+    const content = [
+      `# ${section.title}`,
+      "",
+      `- Current status: ${section.pack?.status || "unknown"}`,
+      `- Owner: ${section.pack?.owner || "owner-pending"}`,
+      `- Template rows: ${section.rows.length}`,
+      `- Source command: npm.cmd run site:pack`,
+      `- Live evidence: ${section.apiEvidence}`,
+      "",
+      "## What this template supports now",
+      "",
+      section.capability,
+      "",
+      "## Inputs to collect",
+      "",
+      section.input,
+      "",
+      "## Outputs produced",
+      "",
+      section.output,
+      "",
+      "## Required artifacts",
+      "",
+      ...(section.pack?.requiredArtifacts || []).map((item) => `- ${item}`),
+      "",
+      "## Rows preview",
+      "",
+      "| Item | Owner | Evidence or mapping |",
+      "|---|---|---|",
+      ...rows,
+      ""
+    ].join("\n");
+    return [section.file, content];
+  }));
+}
+
+function writeTemplateReadmes(report, baseDir) {
+  const root = path.resolve(ROOT, baseDir || path.join("release", "templates"));
+  const readmes = renderTemplateReadmes(report);
+  Object.entries(readmes).forEach(([file, content]) => {
+    const target = path.join(root, file);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, content, "utf8");
+  });
+  return Object.keys(readmes).map((file) => path.join(root, file));
+}
+
 function writeOutput(report, flags = {}) {
   const output = path.resolve(ROOT, String(flags.output || DEFAULT_OUTPUT));
   const markdown = path.resolve(ROOT, String(flags.markdown || DEFAULT_MARKDOWN));
@@ -251,6 +351,7 @@ function writeOutput(report, flags = {}) {
   fs.writeFileSync(output, JSON.stringify(report, null, 2), "utf8");
   fs.mkdirSync(path.dirname(markdown), { recursive: true });
   fs.writeFileSync(markdown, renderMarkdown(report), "utf8");
+  writeTemplateReadmes(report, path.join(path.dirname(path.relative(ROOT, markdown)), "templates"));
 }
 
 function runCli() {
@@ -274,5 +375,7 @@ module.exports = {
   buildSiteReadinessPack,
   parseArgs,
   renderMarkdown,
+  renderTemplateReadmes,
+  writeTemplateReadmes,
   writeOutput
 };

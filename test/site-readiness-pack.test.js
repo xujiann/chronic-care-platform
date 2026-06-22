@@ -3,7 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const test = require("node:test");
 
-const { buildSiteReadinessPack, parseArgs, renderMarkdown, writeOutput } = require("../scripts/site-readiness-pack");
+const { buildSiteReadinessPack, parseArgs, renderMarkdown, renderTemplateReadmes, writeOutput } = require("../scripts/site-readiness-pack");
 
 const ROOT = path.resolve(__dirname, "..");
 
@@ -40,10 +40,15 @@ test("site readiness pack renders and writes release artifacts", (t) => {
   t.after(() => fs.rmSync(outputDir, { recursive: true, force: true }));
   const report = buildSiteReadinessPack();
   const markdown = renderMarkdown(report);
+  const readmes = renderTemplateReadmes(report);
   assert.match(markdown, /Site readiness pack/);
   assert.match(markdown, /Identity source mapping template/);
   assert.match(markdown, /Interface joint-test template/);
   assert.match(markdown, /Site signoff template/);
+  assert.match(readmes["identity-source-mapping/README.md"], /What this template supports now/);
+  assert.match(readmes["interface-joint-test/README.md"], /\/api\/integrations\/gateway/);
+  assert.match(readmes["monitoring-on-call/README.md"], /\/api\/metrics/);
+  assert.match(readmes["production-signoff/README.md"], /production-cutover-checklist\.md/);
 
   writeOutput(report, {
     output: path.join("tmp", "site-readiness-pack-test", "site-readiness-pack.json"),
@@ -52,8 +57,12 @@ test("site readiness pack renders and writes release artifacts", (t) => {
 
   const writtenJson = JSON.parse(fs.readFileSync(path.join(outputDir, "site-readiness-pack.json"), "utf8"));
   const writtenMarkdown = fs.readFileSync(path.join(outputDir, "site-readiness-pack.md"), "utf8");
+  const identityReadme = fs.readFileSync(path.join(outputDir, "templates", "identity-source-mapping", "README.md"), "utf8");
+  const interfaceReadme = fs.readFileSync(path.join(outputDir, "templates", "interface-joint-test", "README.md"), "utf8");
   assert.equal(writtenJson.ok, true);
   assert.match(writtenMarkdown, /Monitoring and on-call template/);
+  assert.match(identityReadme, /Current status: template-ready/);
+  assert.match(interfaceReadme, /Rows preview/);
 });
 
 test("site readiness CLI parser keeps output and env flags", () => {

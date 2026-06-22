@@ -223,6 +223,10 @@ test("release report writes standalone production cutover and storage artifacts"
   const processAuditMarkdown = fs.readFileSync(path.join(outputDir, "process-audit-report.md"), "utf8");
   const siteReadinessJson = JSON.parse(fs.readFileSync(path.join(outputDir, "site-readiness-pack.json"), "utf8"));
   const siteReadinessMarkdown = fs.readFileSync(path.join(outputDir, "site-readiness-pack.md"), "utf8");
+  const identityTemplateReadme = fs.readFileSync(path.join(outputDir, "templates", "identity-source-mapping", "README.md"), "utf8");
+  const interfaceTemplateReadme = fs.readFileSync(path.join(outputDir, "templates", "interface-joint-test", "README.md"), "utf8");
+  const monitoringTemplateReadme = fs.readFileSync(path.join(outputDir, "templates", "monitoring-on-call", "README.md"), "utf8");
+  const signoffTemplateReadme = fs.readFileSync(path.join(outputDir, "templates", "production-signoff", "README.md"), "utf8");
   const productionDbJson = JSON.parse(fs.readFileSync(path.join(outputDir, "production-db-readiness-report.json"), "utf8"));
   const productionDbMarkdown = fs.readFileSync(path.join(outputDir, "production-db-readiness-report.md"), "utf8");
   const evaluationJson = JSON.parse(fs.readFileSync(path.join(outputDir, "evaluation-evidence-report.json"), "utf8"));
@@ -252,6 +256,10 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(processAuditMarkdown, /Full process audit report/);
   assert.equal(siteReadinessJson.siteReadinessPack.ok, true);
   assert.match(siteReadinessMarkdown, /Site signoff template/);
+  assert.match(identityTemplateReadme, /Identity source mapping template/);
+  assert.match(interfaceTemplateReadme, /Interface joint-test template/);
+  assert.match(monitoringTemplateReadme, /Monitoring and on-call template/);
+  assert.match(signoffTemplateReadme, /Production cutover signoff template/);
   assert.equal(productionDbJson.productionDbReadiness.ok, true);
   assert.match(productionDbMarkdown, /Production database readiness report/);
   assert.equal(evaluationJson.evaluationEvidence.ok, true);
