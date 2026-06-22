@@ -3119,6 +3119,7 @@ function buildSystemReadinessReport(data) {
   const runtime = buildRuntimeMetrics(data);
   const interfaceReadiness = buildInterfaceReadiness(data);
   const externalDependencies = buildExternalDependencyRisks(data);
+  const releaseArtifactManifest = buildReleaseArtifactManifest();
   const externalDependencySummary = {
     total: externalDependencies.length,
     high: externalDependencies.filter((item) => item.severity === "high").length,
@@ -3136,6 +3137,7 @@ function buildSystemReadinessReport(data) {
     { id: "security-acceptance", name: "安全信创验收台账", passed: securityAcceptanceReady, detail: `items=${securityAcceptanceLedger.length}` },
     { id: "production-deployment-plan", name: "生产部署路径", passed: productionPlanReady, detail: `tracks=${productionDeploymentPlan.length}` },
     { id: "interface-readiness", name: "接口准备度台账", passed: interfaceReadiness.passed, detail: `p0=${interfaceReadiness.p0CodeReady}/${interfaceReadiness.p0Total}, externalBlocked=${interfaceReadiness.blocked}` },
+    { id: "release-artifact-manifest", name: "发布包目录清单", passed: releaseArtifactManifest.ok, detail: `artifacts=${releaseArtifactManifest.summary.artifacts}, templates=${releaseArtifactManifest.summary.templateReadmes}` },
     { id: "audit-chain", name: "审计哈希链", passed: Object.values(auditTrails).every((item) => item.passed), detail: `security=${auditTrails.securityEvents.broken.length}, access=${auditTrails.dataAccessLogs.broken.length}` },
     { id: "runtime-workload", name: "运行负载可观测", passed: Number.isFinite(runtime.workload.unifiedTasks), detail: `tasks=${runtime.workload.unifiedTasks}, quality=${runtime.workload.dataQualityIssues}` }
   ];
@@ -3148,6 +3150,11 @@ function buildSystemReadinessReport(data) {
     securityAcceptanceLedger,
     productionDeploymentPlan,
     productionEnvironment: buildProductionEnvironmentStatus(),
+    releaseArtifactManifest: {
+      ok: releaseArtifactManifest.ok,
+      summary: releaseArtifactManifest.summary,
+      checks: releaseArtifactManifest.checks
+    },
     interfaceReadiness,
     externalDependencySummary,
     runtime: runtime.workload,

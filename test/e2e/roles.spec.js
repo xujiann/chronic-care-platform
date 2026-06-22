@@ -27,7 +27,7 @@ test("commission user reaches the governance dashboard and opens maintenance", a
 
   await page.goto("/workbench.html");
   await expect(page.locator("#system-readiness")).toBeVisible();
-  await expect(page.locator("#system-readiness .priority-row")).toHaveCount(14);
+  await expect(page.locator("#system-readiness .priority-row")).toHaveCount(15);
   await expect(page.locator("#system-readiness")).toContainText("现场高风险依赖");
   await expect(page.locator("#system-readiness")).toContainText("政务统一身份源");
   await expect(page.locator("#system-readiness")).toContainText("HIS/EMR/LIS/PACS/心电");
