@@ -51,11 +51,22 @@ function summarizeStructuredRows(rows, expected, predicate) {
 
 function buildProcessAuditReport(options = {}) {
   const data = options.data || readJson("data/db.json");
+  const pkg = options.pkg || readJson("package.json");
+  const readme = options.readme ?? fs.readFileSync(path.join(ROOT, "README.md"), "utf8");
+  const deployment = options.deployment ?? fs.readFileSync(path.join(ROOT, "DEPLOYMENT.md"), "utf8");
+  const serverSource = options.serverSource ?? fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
+  const workbenchSource = options.workbenchSource ?? fs.readFileSync(path.join(ROOT, "workbench.js"), "utf8");
   const processRows = Array.isArray(data.platformProcessAudit) ? data.platformProcessAudit : [];
   const chronic = summarizeLedger(data.chronicAcceptanceLedger, 5);
   const county = summarizeLedger(data.countyAcceptanceLedger, 4);
   const security = summarizeLedger(data.securityAcceptanceLedger, 4);
   const production = summarizeStructuredRows(data.productionDeploymentPlan, 4, (item) => item.id && item.owner && item.nextAction);
+  const sitePack = {
+    script: Boolean(pkg.scripts?.["site:pack"]),
+    documented: /site-readiness-pack\.md/.test(readme) && /site-readiness-pack\.md/.test(deployment),
+    api: /\/api\/site-readiness-pack/.test(serverSource),
+    workbench: /site-readiness-pack/.test(workbenchSource)
+  };
   const evidenceDomains = [
     {
       id: "resident-master-index",
@@ -92,6 +103,12 @@ function buildProcessAuditReport(options = {}) {
       owner: "security-and-operations",
       evidence: ["securityAcceptanceLedger", "productionDeploymentPlan", "dataAccessLogs", "securityEvents"],
       passed: security.passed && production.passed
+    },
+    {
+      id: "site-readiness",
+      owner: "project-office-and-site-team",
+      evidence: ["site-readiness-pack", "release-report", "workbench", "site signoff templates"],
+      passed: Object.values(sitePack).every(Boolean)
     }
   ];
   const checks = [
@@ -100,6 +117,7 @@ function buildProcessAuditReport(options = {}) {
     check("process:countyAcceptance", county.passed, `${county.ready}/${county.total} county acceptance rows ready`),
     check("process:securityAcceptance", security.passed, `${security.ready}/${security.total} security acceptance rows ready`),
     check("process:productionCutover", production.passed, `${production.ready}/${production.total} production deployment tracks ready`),
+    check("process:siteReadinessPack", Object.values(sitePack).every(Boolean), Object.entries(sitePack).map(([key, value]) => `${key}:${value ? "yes" : "no"}`).join("; ")),
     check("process:evidenceDomains", evidenceDomains.every((item) => item.passed), evidenceDomains.map((item) => `${item.id}:${item.passed ? "pass" : "blocked"}`).join("; "))
   ];
   return {
@@ -112,7 +130,7 @@ function buildProcessAuditReport(options = {}) {
     },
     checks,
     evidenceDomains,
-    ledgers: { chronic, county, security, production },
+    ledgers: { chronic, county, security, production, sitePack },
     processRows
   };
 }

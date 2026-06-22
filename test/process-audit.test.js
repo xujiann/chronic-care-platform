@@ -12,6 +12,8 @@ test("process audit validates full process evidence domains", () => {
   assert.equal(report.ok, true);
   assert.equal(report.evidenceDomains.length >= 6, true);
   assert.equal(report.evidenceDomains.every((item) => item.passed), true);
+  assert.equal(report.evidenceDomains.some((item) => item.id === "site-readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "process:siteReadinessPack" && item.passed), true);
   assert.equal(report.ledgers.chronic.total >= 5, true);
   assert.equal(report.ledgers.county.total >= 4, true);
   assert.equal(report.processRows.length >= 10, true);
@@ -25,6 +27,21 @@ test("process audit fails when chronic and county ledgers are absent", () => {
   assert.equal(report.ok, false);
   assert.equal(report.checks.some((item) => item.id === "process:chronicAcceptance" && !item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "process:countyAcceptance" && !item.passed), true);
+});
+
+test("process audit fails when site readiness pack evidence is absent", () => {
+  const data = JSON.parse(fs.readFileSync(path.join(ROOT, "data/db.json"), "utf8"));
+  const report = buildProcessAuditReport({
+    data,
+    pkg: { scripts: {} },
+    readme: "",
+    deployment: "",
+    serverSource: "",
+    workbenchSource: ""
+  });
+  assert.equal(report.ok, false);
+  assert.equal(report.checks.some((item) => item.id === "process:siteReadinessPack" && !item.passed), true);
+  assert.equal(report.evidenceDomains.some((item) => item.id === "site-readiness" && !item.passed), true);
 });
 
 test("process audit renders and writes release artifacts", (t) => {
@@ -45,6 +62,7 @@ test("process audit renders and writes release artifacts", (t) => {
   const writtenMarkdown = fs.readFileSync(path.join(outputDir, "process-audit-report.md"), "utf8");
   assert.equal(writtenJson.ok, true);
   assert.match(writtenMarkdown, /security-and-cutover/);
+  assert.match(writtenMarkdown, /site-readiness/);
 });
 
 test("process audit CLI parser keeps output flags", () => {
