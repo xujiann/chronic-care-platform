@@ -85,6 +85,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal(Boolean(pkg.scripts["audit:retention"]), true);
   assert.equal(Boolean(pkg.scripts["data-quality:report"]), true);
   assert.equal(Boolean(pkg.scripts["integration:readiness"]), true);
+  assert.equal(Boolean(pkg.scripts["monitoring:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["operations:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["production-db:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["evaluation:evidence"]), true);
@@ -106,6 +107,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /audit-retention-report\.md/);
   assert.match(read("README.md"), /data-quality-report\.md/);
   assert.match(read("README.md"), /integration-readiness-report\.md/);
+  assert.match(read("README.md"), /monitoring-readiness-report\.md/);
   assert.match(read("README.md"), /operations-readiness-report\.md/);
   assert.match(read("README.md"), /production-db-readiness-report\.md/);
   assert.match(read("README.md"), /evaluation-evidence-report\.md/);
@@ -114,6 +116,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("DEPLOYMENT.md"), /audit-retention-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /data-quality-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /integration-readiness-report\.md/);
+  assert.match(read("DEPLOYMENT.md"), /monitoring-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /operations-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /production-db-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /evaluation-evidence-report\.md/);
@@ -124,6 +127,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/deploy-check.js"), /audit:retention/);
   assert.match(read("scripts/deploy-check.js"), /data-quality:report/);
   assert.match(read("scripts/deploy-check.js"), /integration:readiness/);
+  assert.match(read("scripts/deploy-check.js"), /monitoring:readiness/);
   assert.match(read("scripts/deploy-check.js"), /operations:readiness/);
   assert.match(read("scripts/deploy-check.js"), /production-db:readiness/);
   assert.match(read("scripts/deploy-check.js"), /evaluation:evidence/);
@@ -134,6 +138,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".github/workflows/ci.yml"), /npm run audit:retention/);
   assert.match(read(".github/workflows/ci.yml"), /npm run data-quality:report/);
   assert.match(read(".github/workflows/ci.yml"), /npm run integration:readiness/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run monitoring:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run operations:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run production-db:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run evaluation:evidence/);

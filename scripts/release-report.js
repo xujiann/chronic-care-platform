@@ -7,6 +7,7 @@ const { buildDataQualityReport, renderMarkdown: renderDataQualityMarkdown } = re
 const { buildEvaluationEvidenceReport, renderMarkdown: renderEvaluationEvidenceMarkdown } = require("./evaluation-evidence");
 const { buildIdentityContract, renderMarkdown: renderIdentityContractMarkdown } = require("./identity-contract");
 const { buildIntegrationReadinessReport, renderMarkdown: renderIntegrationReadinessMarkdown } = require("./integration-readiness");
+const { buildMonitoringReadinessReport, renderMarkdown: renderMonitoringReadinessMarkdown } = require("./monitoring-readiness");
 const { buildOperationsReadinessReport, renderMarkdown: renderOperationsReadinessMarkdown } = require("./operations-readiness");
 const { buildProductionDbReadinessReport, renderMarkdown: renderProductionDbReadinessMarkdown } = require("./production-db-readiness");
 const { inspectStorageModel } = require("./storage-admin");
@@ -132,8 +133,8 @@ function buildProductionCutoverChecklist(env, checks = []) {
       id: "cutover-monitoring",
       phase: "operations",
       owner: "platform-ops",
-      passed: ready("operations:readiness", "operations:routes", "operations:externalDependencies") && envFlagEnabled(env, "CUTOVER_MONITORING_SIGNOFF"),
-      evidence: `${detail("operations:readiness", "operations:routes", "operations:externalDependencies")}; ${signoff("CUTOVER_MONITORING_SIGNOFF")}`,
+      passed: ready("operations:readiness", "operations:routes", "operations:externalDependencies", "monitoring:readiness", "monitoring:sloTargets") && envFlagEnabled(env, "CUTOVER_MONITORING_SIGNOFF"),
+      evidence: `${detail("operations:readiness", "operations:routes", "operations:externalDependencies", "monitoring:readiness", "monitoring:sloTargets")}; ${signoff("CUTOVER_MONITORING_SIGNOFF")}`,
       nextAction: "Bind /api/health, /api/metrics, readiness, alert routing, and on-call escalation to the production monitoring platform."
     },
     {
@@ -297,6 +298,14 @@ function operationsReadinessChecks(operationsReadiness) {
   ];
 }
 
+function monitoringReadinessChecks(monitoringReadiness) {
+  return [
+    check("monitoring:readiness", monitoringReadiness.ok, monitoringReadiness.ok ? "monitoring readiness checks passed" : "monitoring readiness checks failed", "error", "monitoring"),
+    check("monitoring:metricSignals", monitoringReadiness.metricSignals?.every((item) => item.present), `${monitoringReadiness.metricSignals?.length || 0} metric signals`, "error", "monitoring"),
+    check("monitoring:sloTargets", monitoringReadiness.sloTargets?.every((item) => item.covered), `${monitoringReadiness.sloTargets?.length || 0} SLO targets`, "error", "monitoring")
+  ];
+}
+
 function productionDbReadinessChecks(productionDbReadiness) {
   return [
     check("productionDb:readiness", productionDbReadiness.ok, productionDbReadiness.ok ? "production database readiness checks passed" : "production database readiness checks failed", "error", "production-db"),
@@ -318,6 +327,7 @@ function packageChecks(pkg) {
     "audit:retention",
     "data-quality:report",
     "integration:readiness",
+    "monitoring:readiness",
     "operations:readiness",
     "production-db:readiness",
     "evaluation:evidence",
@@ -368,6 +378,7 @@ function buildReleaseReport(options = {}) {
   const auditRetention = buildAuditRetentionReport({ data, env: options.env || process.env });
   const dataQuality = buildDataQualityReport({ data });
   const integrationReadiness = buildIntegrationReadinessReport({ data });
+  const monitoringReadiness = buildMonitoringReadinessReport({ data, pkg });
   const operationsReadiness = buildOperationsReadinessReport({ data, pkg });
   const productionDbReadiness = buildProductionDbReadinessReport({ data, pkg, storageModel });
   const evaluationEvidence = buildEvaluationEvidenceReport({ data });
@@ -385,6 +396,7 @@ function buildReleaseReport(options = {}) {
     ...auditRetentionChecks(auditRetention),
     ...dataQualityChecks(dataQuality),
     ...integrationReadinessChecks(integrationReadiness),
+    ...monitoringReadinessChecks(monitoringReadiness),
     ...operationsReadinessChecks(operationsReadiness),
     ...productionDbReadinessChecks(productionDbReadiness),
     ...evaluationEvidenceChecks(evaluationEvidence),
@@ -412,6 +424,7 @@ function buildReleaseReport(options = {}) {
     auditRetention,
     dataQuality,
     integrationReadiness,
+    monitoringReadiness,
     operationsReadiness,
     productionDbReadiness,
     evaluationEvidence
@@ -517,6 +530,10 @@ function renderMarkdown(report) {
     "",
     "See `operations-readiness-report.json` and `operations-readiness-report.md` for operation routes, production deployment tracks, external dependency risks, and release operation scripts.",
     "",
+    "## Monitoring readiness report",
+    "",
+    "See `monitoring-readiness-report.json` and `monitoring-readiness-report.md` for health and metrics routes, runtime metric signals, alert signals, SLO targets, and on-call escalation evidence.",
+    "",
     "## Production database readiness report",
     "",
     "See `production-db-readiness-report.json` and `production-db-readiness-report.md` for PostgreSQL cutover prerequisites, current SQLite/JSON model evidence, backup rehearsal documentation, and runtime adapter guardrails.",
@@ -606,6 +623,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       operationsReadiness: report.operationsReadiness
     }, null, 2), "utf8");
+    const monitoringJson = path.join(path.dirname(output), "monitoring-readiness-report.json");
+    fs.writeFileSync(monitoringJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      monitoringReadiness: report.monitoringReadiness
+    }, null, 2), "utf8");
     const productionDbJson = path.join(path.dirname(output), "production-db-readiness-report.json");
     fs.writeFileSync(productionDbJson, JSON.stringify({
       project: report.project,
@@ -641,6 +666,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(integrationMarkdown, renderIntegrationReadinessMarkdown(report.integrationReadiness), "utf8");
     const operationsMarkdown = path.join(path.dirname(markdown), "operations-readiness-report.md");
     fs.writeFileSync(operationsMarkdown, renderOperationsReadinessMarkdown(report.operationsReadiness), "utf8");
+    const monitoringMarkdown = path.join(path.dirname(markdown), "monitoring-readiness-report.md");
+    fs.writeFileSync(monitoringMarkdown, renderMonitoringReadinessMarkdown(report.monitoringReadiness), "utf8");
     const productionDbMarkdown = path.join(path.dirname(markdown), "production-db-readiness-report.md");
     fs.writeFileSync(productionDbMarkdown, renderProductionDbReadinessMarkdown(report.productionDbReadiness), "utf8");
     const evaluationMarkdown = path.join(path.dirname(markdown), "evaluation-evidence-report.md");
