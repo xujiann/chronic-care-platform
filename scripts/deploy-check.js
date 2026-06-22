@@ -28,7 +28,7 @@ function assertFile(relativePath) {
   return { name: `file:${relativePath}`, ok: fs.existsSync(file), detail: fs.existsSync(file) ? "present" : "missing" };
 }
 
-function main() {
+function buildDeployCheckReport(options = {}) {
   const pkg = readJson("package.json");
   const data = readJson("data/db.json");
   const requiredCollections = [
@@ -61,7 +61,7 @@ function main() {
     { name: "snapshot:storageMeta", ok: Boolean(data.storageMeta?.engine && data.storageMeta?.mode), detail: data.storageMeta ? `${data.storageMeta.engine}/${data.storageMeta.mode}` : "missing" }
   ];
 
-  const runCommands = process.argv.includes("--run-commands");
+  const runCommands = options.runCommands === true;
   const commandResults = runCommands ? [
     run("npm.cmd", ["run", "check"]),
     run("npm.cmd", ["test"]),
@@ -77,8 +77,20 @@ function main() {
     version: pkg.version,
     checks: allChecks
   };
+  return report;
+}
+
+function main() {
+  const report = buildDeployCheckReport({
+    runCommands: process.argv.includes("--run-commands")
+  });
   console.log(JSON.stringify(report, null, 2));
   if (!report.ok) process.exit(1);
 }
 
 if (require.main === module) main();
+
+module.exports = {
+  buildDeployCheckReport,
+  run
+};
