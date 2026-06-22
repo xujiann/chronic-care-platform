@@ -273,6 +273,9 @@ function renderReleaseEvidenceGates(state, readiness, operations, processAudit, 
   const processLedger = processAudit?.ledgers || null;
   const processSummary = processAudit?.summary || null;
   const sitePackSummary = siteReadinessPack?.summary || null;
+  const serviceAcceptance = releaseReport?.serviceAcceptance || null;
+  const chronicService = serviceAcceptance?.chronic?.summary || null;
+  const countyService = serviceAcceptance?.county?.summary || null;
 
   const gates = [
     {
@@ -318,6 +321,17 @@ function renderReleaseEvidenceGates(state, readiness, operations, processAudit, 
         ? `${processSummary?.passedDomains || 0}/${processSummary?.evidenceDomains || 0} evidence domains; chronic=${processLedger?.chronic?.ready || 0}/${processLedger?.chronic?.total || 0}; county=${processLedger?.county?.ready || 0}/${processLedger?.county?.total || 0}`
         : `${state.platformProcessAudit?.length || 0} process rows; chronic=${chronicAcceptance.length}; county=${countyAcceptance.length}; security=${securityLedger.length}; cutover=${productionTracks.length}`,
       evidence: "release/process-audit-report.md"
+    },
+    {
+      id: "service:acceptance",
+      title: "Service acceptance summary",
+      passed: serviceAcceptance
+        ? Boolean(chronicService?.modeledDomains === chronicService?.domains && countyService?.modeledDomains === countyService?.domains)
+        : Boolean(chronicAcceptance.length >= 5 && countyAcceptance.length >= 4),
+      detail: serviceAcceptance
+        ? `chronic=${chronicService?.modeledDomains || 0}/${chronicService?.domains || 0} domains, open=${chronicService?.openItems || 0}; county=${countyService?.modeledDomains || 0}/${countyService?.domains || 0} domains, open=${countyService?.openItems || 0}`
+        : `static ledgers chronic=${chronicAcceptance.length}; county=${countyAcceptance.length}`,
+      evidence: "release/service-acceptance-summary.md"
     },
     {
       id: "site:pack",

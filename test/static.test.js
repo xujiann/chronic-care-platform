@@ -258,6 +258,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(workbenchJs, /data-quality:report/);
   assert.match(workbenchJs, /operations:readiness/);
   assert.match(workbenchJs, /process:audit/);
+  assert.match(workbenchJs, /service:acceptance/);
   assert.match(workbenchJs, /site:pack/);
   assert.match(workbenchJs, /release:manifest/);
   assert.match(workbenchJs, /production:cutover/);
