@@ -193,3 +193,18 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(read("README.md"), /manifest\.webmanifest/);
   assert.match(read("README.md"), /service-worker\.js/);
 });
+
+test("citizen portal exposes P2 imaging and attachment archive categories", () => {
+  const citizenHtml = read("citizen.html");
+  const citizenJs = read("citizen.js");
+  assert.match(citizenHtml, /value="imaging"/);
+  assert.match(citizenHtml, /value="attachments"/);
+  assert.match(citizenJs, /key: "imaging"/);
+  assert.match(citizenJs, /key: "attachments"/);
+  assert.match(citizenJs, /PACS/);
+  assert.match(citizenJs, /attachmentType/);
+  assert.match(citizenJs, /renderAttachmentMeta/);
+  assert.match(read("citizen.css"), /attachment-meta/);
+  assert.match(citizenJs, /buildHealthTimeline\(archive, records, labs, medications, allergies, vaccines, admissions, imaging, attachments\)/);
+  assert.match(read("README.md"), /影像资料和附件资料/);
+});

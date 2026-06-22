@@ -106,6 +106,14 @@ const personalHealthData = {
     { residentId: "r1", date: "2024-06-18", name: "日间观察", result: "血压波动观察，未住院", source: "大连市中心医院" },
     { residentId: "r3", date: "2025-12-09", name: "体检中心", result: "年度体检，无住院记录", source: "甘井子区人民医院" }
   ],
+  imaging: [
+    { residentId: "r1", date: "2026-05-21", name: "胸部 CT 影像索引", result: "影像号 IMG-DEMO-20260521，结论摘要已归档，原始 DICOM 待院内 PACS 授权调阅。", source: "大连市中心医院 PACS", meta: { attachmentType: "影像", fileName: "IMG-DEMO-20260521.dcm", accessMode: "院内授权调阅" } },
+    { residentId: "r2", date: "2026-05-18", name: "眼底照相报告", result: "糖尿病眼底筛查未见明显新生血管，建议年度复查。", source: "大连医科大学附属医院", meta: { attachmentType: "图片", fileName: "fundus-r2-20260518.jpg", accessMode: "报告摘要" } }
+  ],
+  attachments: [
+    { residentId: "r1", date: "2026-05-22", name: "门诊报告 PDF", result: "心内科复诊报告、检查摘要和用药建议已归档。", source: "居民上传", meta: { attachmentType: "PDF", fileName: "cardiology-visit-r1-20260522.pdf", accessMode: "居民端留存" } },
+    { residentId: "r1", date: "2026-04-12", name: "家庭血压记录照片", result: "连续 7 天家庭血压手写记录照片，供家庭医生复核。", source: "个人上传", meta: { attachmentType: "图片", fileName: "home-bp-r1-20260412.jpg", accessMode: "居民端留存" } }
+  ],
   authorizations: [
     { residentId: "r1", date: "2026-01-01", name: "家庭医生团队", result: "允许查看健康档案和随访记录", source: "居民授权" },
     { residentId: "r1", date: "2026-01-01", name: "区域医疗机构", result: "允许查看电子病历摘要", source: "居民授权" },
@@ -123,6 +131,8 @@ const vaultSections = [
   { key: "allergies", label: "过敏史" },
   { key: "vaccines", label: "免疫接种" },
   { key: "admissions", label: "手术住院" },
+  { key: "imaging", label: "影像资料" },
+  { key: "attachments", label: "附件资料" },
   { key: "authorizations", label: "授权共享" }
 ];
 
@@ -340,6 +350,7 @@ function renderVault(resident, diseases, followups, records) {
         <p>${item.result}</p>
         ${item.categoryLabel ? `<p class="muted">${item.categoryLabel}${item.related ? ` · ${item.related}` : ""}</p>` : ""}
         ${renderSourceBadge(item)}
+        ${renderAttachmentMeta(item)}
         ${activeVaultSection === "authorizations" ? renderAuthorizationState(item) : ""}
       </div>
       <span>${item.date}<br>${item.source}</span>
@@ -357,6 +368,8 @@ function collectVaultData(resident, diseases, followups, records) {
   const allergies = getPersonalRecords(resident.id, "allergies");
   const vaccines = getPersonalRecords(resident.id, "vaccines");
   const admissions = getPersonalRecords(resident.id, "admissions");
+  const imaging = getPersonalRecords(resident.id, "imaging");
+  const attachments = getPersonalRecords(resident.id, "attachments");
   const authorizations = getPersonalRecords(resident.id, "authorizations");
   const archive = [
     { date: todayOffset(0), name: "基础档案", result: `${resident.gender}，${ageOf(resident.birthDate)} 岁，${resident.address}`, source: resident.organization, categoryLabel: "健康档案" },
@@ -365,7 +378,7 @@ function collectVaultData(resident, diseases, followups, records) {
     ...followups.map((item) => ({ date: item.plannedAt, name: `${item.diseaseType}随访`, result: `${item.status} · ${item.advice || item.result}`, source: item.assignee, categoryLabel: "随访管理" }))
   ];
   return {
-    timeline: buildHealthTimeline(archive, records, labs, medications, allergies, vaccines, admissions),
+    timeline: buildHealthTimeline(archive, records, labs, medications, allergies, vaccines, admissions, imaging, attachments),
     standard: buildStandardArchiveItems(resident.id),
     archive,
     emr: records.map((item) => ({ ...item, categoryLabel: "电子病历", related: relatedArchiveSummary(diseases, followups) })),
@@ -374,6 +387,8 @@ function collectVaultData(resident, diseases, followups, records) {
     allergies,
     vaccines,
     admissions,
+    imaging,
+    attachments,
     authorizations
   };
 }
@@ -453,7 +468,7 @@ function getStandardCoverage(residentId) {
   return { standard: { dimensions: [], contentGroups: [], datasets: [] }, datasets: [], score: 0, applicableCompleted: 0, applicableTotal: 0, activities: [], problems: [] };
 }
 
-function buildHealthTimeline(archive, records, labs, medications, allergies, vaccines, admissions) {
+function buildHealthTimeline(archive, records, labs, medications, allergies, vaccines, admissions, imaging = [], attachments = []) {
   return [
     ...archive,
     ...records.map((item) => ({ ...item, categoryLabel: "电子病历" })),
@@ -461,7 +476,9 @@ function buildHealthTimeline(archive, records, labs, medications, allergies, vac
     ...medications.map((item) => ({ ...item, categoryLabel: "用药处方" })),
     ...allergies.map((item) => ({ ...item, categoryLabel: "过敏史" })),
     ...vaccines.map((item) => ({ ...item, categoryLabel: "免疫接种" })),
-    ...admissions.map((item) => ({ ...item, categoryLabel: "手术住院" }))
+    ...admissions.map((item) => ({ ...item, categoryLabel: "手术住院" })),
+    ...imaging.map((item) => ({ ...item, categoryLabel: "影像资料" })),
+    ...attachments.map((item) => ({ ...item, categoryLabel: "附件资料" }))
   ].sort(sortByDateDesc);
 }
 
@@ -932,6 +949,12 @@ function sortByDateDesc(a, b) {
 function renderSourceBadge(item) {
   const source = classifyDataSource(item);
   return `<span class="source-badge source-${source.key}">来源：${source.label}</span>`;
+}
+
+function renderAttachmentMeta(item) {
+  if (!["imaging", "attachments"].includes(item.category) && !["影像资料", "附件资料"].includes(item.categoryLabel)) return "";
+  const meta = item.meta || {};
+  return `<p class="attachment-meta">${meta.attachmentType || "资料"} · ${meta.fileName || item.name} · ${meta.accessMode || "需授权调阅"}</p>`;
 }
 
 function classifyDataSource(item) {

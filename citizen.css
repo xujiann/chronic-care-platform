@@ -857,6 +857,13 @@ select,
   color: var(--amber);
 }
 
+.attachment-meta {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .record-detail {
   margin-top: 10px;
   border: 1px dashed var(--line);
