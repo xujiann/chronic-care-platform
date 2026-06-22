@@ -5,6 +5,7 @@ const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = requ
 const { buildProcessAuditReport } = require("./scripts/process-audit");
 const { buildSiteReadinessPack } = require("./scripts/site-readiness-pack");
 const { buildReleaseReport } = require("./scripts/release-report");
+const { buildReleaseArtifactManifest } = require("./scripts/release-artifact-manifest");
 
 const PORT = Number(process.env.PORT || 5173);
 const ROOT = __dirname;
@@ -4944,6 +4945,14 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/release-report");
     if (!user) return;
     sendJson(res, 200, buildReleaseReport({ data: readDatabase(), env: process.env, profile: "demo" }));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/release-artifact-manifest") {
+    const user = requireApiRole(req, res, ["commission"], "/api/release-artifact-manifest");
+    if (!user) return;
+    const releaseReport = buildReleaseReport({ data: readDatabase(), env: process.env, profile: "demo" });
+    sendJson(res, 200, buildReleaseArtifactManifest({ releaseReport }));
     return;
   }
 

@@ -169,6 +169,12 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(releaseReport.body.checks.some((item) => item.name === "sitePack:readiness" && item.passed), true);
     assert.equal(releaseReport.body.siteReadinessPack.templates.signoff.some((item) => item.id === "signoff-cutover-monitoring"), true);
 
+    const releaseManifest = await api(baseUrl, "/api/release-artifact-manifest", authorized(accountLogin.body.token));
+    assert.equal(releaseManifest.response.status, 200);
+    assert.equal(releaseManifest.body.ok, true);
+    assert.equal(releaseManifest.body.artifacts.some((item) => item.id === "release-artifact-manifest"), true);
+    assert.equal(releaseManifest.body.templateReadmes.some((item) => item.file === "release/templates/production-signoff/README.md"), true);
+
     const identityPreview = await api(baseUrl, "/api/auth/identity/preview", authorized(accountLogin.body.token, {
       method: "POST",
       body: JSON.stringify({

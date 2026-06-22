@@ -23,11 +23,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   const acceptanceLedgers = await loadAcceptanceLedgers();
   const siteReadinessPack = await loadSiteReadinessPack();
   const releaseReport = await loadReleaseReport();
+  const releaseArtifactManifest = await loadReleaseArtifactManifest();
   const tasks = collectUnifiedTasks(state);
   const roadmap = state.platformRoadmap?.length ? state.platformRoadmap : defaultRoadmap();
   renderMetrics(state, tasks, roadmap, operations);
   renderSystemReadiness(readiness);
-  renderReleaseEvidenceGates(state, readiness, operations, processAudit, siteReadinessPack, releaseReport);
+  renderReleaseEvidenceGates(state, readiness, operations, processAudit, siteReadinessPack, releaseReport, releaseArtifactManifest);
   renderAcceptanceLedgers(state, acceptanceLedgers);
   renderSiteReadinessPack(siteReadinessPack);
   renderSourceAlignment(state);
@@ -110,6 +111,18 @@ async function loadReleaseReport() {
   try {
     const request = window.HealthCityAuth?.authFetch || fetch;
     const response = await request("/api/release-report");
+    if (!response.ok) return null;
+    return response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+async function loadReleaseArtifactManifest() {
+  if (location.protocol === "file:") return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request("/api/release-artifact-manifest");
     if (!response.ok) return null;
     return response.json();
   } catch (error) {
@@ -216,7 +229,7 @@ function renderSystemReadiness(readiness) {
   </article>${checkRows}${dependencyDetailRows}`;
 }
 
-function renderReleaseEvidenceGates(state, readiness, operations, processAudit, siteReadinessPack, releaseReport) {
+function renderReleaseEvidenceGates(state, readiness, operations, processAudit, siteReadinessPack, releaseReport, releaseArtifactManifest) {
   const container = document.querySelector("#release-evidence-gates");
   if (!container) return;
 
@@ -297,6 +310,15 @@ function renderReleaseEvidenceGates(state, readiness, operations, processAudit, 
         ? `${releaseReport.summary?.passed || 0}/${releaseReport.summary?.total || 0} release checks passed; warnings=${releaseReport.summary?.warnings || 0}`
         : readiness ? `${readiness.checks?.filter((item) => item.passed).length || 0}/${readiness.checks?.length || 0} readiness checks passed` : "static snapshot preview; run Node API for live readiness",
       evidence: "release/release-report.md"
+    },
+    {
+      id: "release:manifest",
+      title: "Release artifact manifest",
+      passed: releaseArtifactManifest ? Boolean(releaseArtifactManifest.ok) : Boolean(releaseReport?.ok),
+      detail: releaseArtifactManifest
+        ? `${releaseArtifactManifest.summary?.artifacts || 0} artifacts; ${releaseArtifactManifest.summary?.templateReadmes || 0} template READMEs; ${releaseArtifactManifest.summary?.releaseChecks || 0} release checks indexed`
+        : "run Node API for release artifact index",
+      evidence: "release/release-artifact-manifest.md"
     }
   ];
 
@@ -312,7 +334,7 @@ function renderReleaseEvidenceGates(state, readiness, operations, processAudit, 
     </div>
     <div class="capability-side">
       <small>${gate.evidence}</small>
-      <small>${readiness || processAudit || siteReadinessPack || releaseReport ? "live API evidence" : "static snapshot evidence"}</small>
+      <small>${readiness || processAudit || siteReadinessPack || releaseReport || releaseArtifactManifest ? "live API evidence" : "static snapshot evidence"}</small>
     </div>
   </article>`).join("");
 }
