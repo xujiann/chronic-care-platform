@@ -148,6 +148,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(markdown, /Production database readiness report/);
   assert.match(markdown, /Interoperability evaluation evidence report/);
   assert.match(markdown, /Environment matrix report/);
+  assert.match(markdown, /Release artifact manifest/);
   assert.match(markdown, /cutover-identity/);
   assert.match(markdown, /snapshot:acceptanceEvidence/);
   assert.match(markdown, /snapshot:securityAcceptance/);
@@ -233,6 +234,8 @@ test("release report writes standalone production cutover and storage artifacts"
   const evaluationMarkdown = fs.readFileSync(path.join(outputDir, "evaluation-evidence-report.md"), "utf8");
   const environmentJson = JSON.parse(fs.readFileSync(path.join(outputDir, "environment-matrix-report.json"), "utf8"));
   const environmentMarkdown = fs.readFileSync(path.join(outputDir, "environment-matrix-report.md"), "utf8");
+  const manifestJson = JSON.parse(fs.readFileSync(path.join(outputDir, "release-artifact-manifest.json"), "utf8"));
+  const manifestMarkdown = fs.readFileSync(path.join(outputDir, "release-artifact-manifest.md"), "utf8");
   assert.equal(cutoverJson.checklist.some((item) => item.id === "cutover-identity"), true);
   assert.match(cutoverMarkdown, /cutover-storage-adapter/);
   assert.equal(storageJson.storageModel.jsonSnapshot.present, true);
@@ -266,6 +269,9 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(evaluationMarkdown, /Artifact coverage/);
   assert.equal(environmentJson.environmentMatrix.ok, true);
   assert.match(environmentMarkdown, /Environment matrix report/);
+  assert.equal(manifestJson.releaseArtifactManifest.ok, true);
+  assert.match(manifestMarkdown, /Release artifact manifest/);
+  assert.match(manifestMarkdown, /release\/templates\/identity-source-mapping\/README\.md/);
 });
 
 test("release report CLI argument parser keeps command and flags", () => {

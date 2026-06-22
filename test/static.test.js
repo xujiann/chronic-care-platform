@@ -124,6 +124,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal(Boolean(pkg.scripts["deploy:check"]), true);
   assert.equal(Boolean(pkg.scripts["env:check"]), true);
   assert.equal(Boolean(pkg.scripts["release:report"]), true);
+  assert.equal(Boolean(pkg.scripts["release:manifest"]), true);
   assert.equal(Boolean(pkg.scripts["rollback:snapshot"]), true);
   assert.equal(Boolean(pkg.scripts["storage:inspect"]), true);
   assert.equal(Boolean(pkg.scripts["identity:contract"]), true);
@@ -147,6 +148,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /\/api\/health/);
   assert.match(read("README.md"), /deploy:check/);
   assert.match(read("README.md"), /release:report/);
+  assert.match(read("README.md"), /release:manifest/);
   assert.match(read("scripts/release-report.js"), /test:coverage/);
   assert.match(read("scripts/release-report.js"), /test:e2e/);
   assert.match(read("scripts/release-report.js"), /Production cutover checklist/);
@@ -165,6 +167,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /release\/templates\/\*\/README\.md/);
   assert.match(read("README.md"), /production-db-readiness-report\.md/);
   assert.match(read("README.md"), /evaluation-evidence-report\.md/);
+  assert.match(read("README.md"), /release-artifact-manifest\.md/);
   assert.match(read("DEPLOYMENT.md"), /storage-model-inspection\.md/);
   assert.match(read("DEPLOYMENT.md"), /identity-contract\.md/);
   assert.match(read("DEPLOYMENT.md"), /audit-retention-report\.md/);
@@ -179,6 +182,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("DEPLOYMENT.md"), /release\/templates\/\*\/README\.md/);
   assert.match(read("DEPLOYMENT.md"), /production-db-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /evaluation-evidence-report\.md/);
+  assert.match(read("DEPLOYMENT.md"), /release-artifact-manifest\.md/);
   assert.match(read("scripts/deploy-check.js"), /test:coverage/);
   assert.match(read("scripts/deploy-check.js"), /test:e2e/);
   assert.match(read("scripts/deploy-check.js"), /audit/);
@@ -192,6 +196,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/deploy-check.js"), /operations:readiness/);
   assert.match(read("scripts/deploy-check.js"), /process:audit/);
   assert.match(read("scripts/deploy-check.js"), /site:pack/);
+  assert.match(read("scripts/deploy-check.js"), /release:manifest/);
   assert.match(read("scripts/deploy-check.js"), /production-db:readiness/);
   assert.match(read("scripts/deploy-check.js"), /evaluation:evidence/);
   assert.match(read("scripts/deploy-check.js"), /process\.platform === "win32" \? "npm\.cmd" : "npm"/);
@@ -207,6 +212,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".github/workflows/ci.yml"), /npm run site:pack/);
   assert.match(read(".github/workflows/ci.yml"), /npm run production-db:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run evaluation:evidence/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run release:manifest/);
   assert.match(read(".github/workflows/ci.yml"), /npm run release:report/);
   assert.match(read(".github/workflows/ci.yml"), /actions\/upload-artifact@v4/);
   assert.match(read(".github/workflows/ci.yml"), /release-readiness-report/);

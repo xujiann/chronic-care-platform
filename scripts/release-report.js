@@ -13,6 +13,7 @@ const { buildMonitoringReadinessReport, renderMarkdown: renderMonitoringReadines
 const { buildOperationsReadinessReport, renderMarkdown: renderOperationsReadinessMarkdown } = require("./operations-readiness");
 const { buildProcessAuditReport, renderMarkdown: renderProcessAuditMarkdown } = require("./process-audit");
 const { buildProductionDbReadinessReport, renderMarkdown: renderProductionDbReadinessMarkdown } = require("./production-db-readiness");
+const { buildReleaseArtifactManifest, renderMarkdown: renderReleaseArtifactManifestMarkdown } = require("./release-artifact-manifest");
 const { buildSiteReadinessPack, renderMarkdown: renderSiteReadinessMarkdown, writeTemplateReadmes } = require("./site-readiness-pack");
 const { inspectStorageModel } = require("./storage-admin");
 
@@ -359,6 +360,7 @@ function packageChecks(pkg) {
     "deploy:check",
     "env:check",
     "release:report",
+    "release:manifest",
     "identity:contract",
     "audit:retention",
     "data-quality:report",
@@ -609,6 +611,10 @@ function renderMarkdown(report) {
     "## Environment matrix report",
     "",
     "See `environment-matrix-report.json` and `environment-matrix-report.md` for demo, staging, and production environment variables, gate scripts, owners, and blocking rules.",
+    "",
+    "## Release artifact manifest",
+    "",
+    "See `release-artifact-manifest.json` and `release-artifact-manifest.md` for the release package index, template READMEs, generation commands, and API evidence links.",
     ""
   ].join("\n");
 }
@@ -747,6 +753,15 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       environmentMatrix: report.environmentMatrix
     }, null, 2), "utf8");
+    const releaseArtifactManifest = buildReleaseArtifactManifest({ releaseReport: report });
+    const releaseArtifactManifestJson = path.join(path.dirname(output), "release-artifact-manifest.json");
+    fs.writeFileSync(releaseArtifactManifestJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      releaseArtifactManifest
+    }, null, 2), "utf8");
   }
   if (flags.markdown) {
     const markdown = path.resolve(ROOT, String(flags.markdown));
@@ -781,6 +796,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(evaluationMarkdown, renderEvaluationEvidenceMarkdown(report.evaluationEvidence), "utf8");
     const environmentMarkdown = path.join(path.dirname(markdown), "environment-matrix-report.md");
     fs.writeFileSync(environmentMarkdown, renderEnvironmentMatrixMarkdown(report.environmentMatrix), "utf8");
+    const releaseArtifactManifestMarkdown = path.join(path.dirname(markdown), "release-artifact-manifest.md");
+    fs.writeFileSync(releaseArtifactManifestMarkdown, renderReleaseArtifactManifestMarkdown(buildReleaseArtifactManifest({ releaseReport: report })), "utf8");
   }
 }
 

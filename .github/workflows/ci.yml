@@ -59,6 +59,8 @@ jobs:
         run: npm run production-db:readiness
       - name: Generate interoperability evaluation evidence
         run: npm run evaluation:evidence
+      - name: Generate release artifact manifest
+        run: npm run release:manifest
       - name: Generate release readiness report
         run: npm run release:report
       - name: Upload release readiness report
