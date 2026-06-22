@@ -62,12 +62,13 @@ function buildDeployCheckReport(options = {}) {
   ];
 
   const runCommands = options.runCommands === true;
+  const npm = process.platform === "win32" ? "npm.cmd" : "npm";
   const commandResults = runCommands ? [
-    run("npm.cmd", ["run", "check"]),
-    run("npm.cmd", ["test"]),
-    run("npm.cmd", ["run", "test:coverage"]),
-    run("npm.cmd", ["run", "test:e2e"]),
-    run("npm.cmd", ["audit", "--omit=dev"])
+    run(npm, ["run", "check"]),
+    run(npm, ["test"]),
+    run(npm, ["run", "test:coverage"]),
+    run(npm, ["run", "test:e2e"]),
+    run(npm, ["audit", "--omit=dev"])
   ] : [];
   const allChecks = [...checks, ...commandResults.map((item) => ({ name: `command:${item.command}`, ok: item.ok, detail: item.ok ? "passed" : item.stderr || item.stdout }))];
   const report = {
