@@ -79,6 +79,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal(Boolean(pkg.scripts["release:report"]), true);
   assert.equal(Boolean(pkg.scripts["rollback:snapshot"]), true);
   assert.equal(Boolean(pkg.scripts["storage:inspect"]), true);
+  assert.equal(Boolean(pkg.scripts["identity:contract"]), true);
   assert.match(read(".env.example"), /SESSION_SECRETS=/);
   assert.match(read(".env.example"), /INTEGRATION_GATEWAY_SECRET=/);
   assert.match(read(".env.example"), /OIDC_ISSUER_URL=/);
@@ -91,13 +92,17 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/release-report.js"), /Production cutover checklist/);
   assert.match(read("README.md"), /production-cutover-checklist\.md/);
   assert.match(read("README.md"), /storage-model-inspection\.md/);
+  assert.match(read("README.md"), /identity-contract\.md/);
   assert.match(read("DEPLOYMENT.md"), /storage-model-inspection\.md/);
+  assert.match(read("DEPLOYMENT.md"), /identity-contract\.md/);
   assert.match(read("scripts/deploy-check.js"), /test:coverage/);
   assert.match(read("scripts/deploy-check.js"), /test:e2e/);
   assert.match(read("scripts/deploy-check.js"), /audit/);
+  assert.match(read("scripts/deploy-check.js"), /identity:contract/);
   assert.match(read("scripts/deploy-check.js"), /process\.platform === "win32" \? "npm\.cmd" : "npm"/);
   assert.match(read(".github/workflows/ci.yml"), /npm run deploy:check/);
   assert.match(read(".github/workflows/ci.yml"), /npm run storage:inspect/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run identity:contract/);
   assert.match(read(".github/workflows/ci.yml"), /npm run release:report/);
   assert.match(read(".github/workflows/ci.yml"), /actions\/upload-artifact@v4/);
   assert.match(read(".github/workflows/ci.yml"), /release-readiness-report/);

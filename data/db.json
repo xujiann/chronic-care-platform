@@ -3589,6 +3589,22 @@
         "公卫",
         "家医签约"
       ]
+    },
+    {
+      "orgCode": "ORG-CONSORTIUM-ZS",
+      "name": "中山区县域医共体",
+      "orgType": "county_consortium",
+      "orgLevel": "区市县",
+      "parentCode": "ORG-DIST-ZS",
+      "portal": "county.html",
+      "dataScope": "医共体成员机构、医技共享、互认质控、绩效和协同工单",
+      "interfaces": [
+        "医共体协同",
+        "远程会诊",
+        "双向转诊",
+        "医技共享",
+        "绩效监管"
+      ]
     }
   ],
   "authUsers": [

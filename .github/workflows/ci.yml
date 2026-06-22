@@ -39,6 +39,8 @@ jobs:
         run: npm run deploy:check
       - name: Inspect storage model
         run: npm run storage:inspect
+      - name: Generate identity integration contract
+        run: npm run identity:contract
       - name: Generate release readiness report
         run: npm run release:report
       - name: Upload release readiness report

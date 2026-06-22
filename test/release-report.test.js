@@ -99,12 +99,15 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "storage:jsonSnapshot.collections" && item.passed), true);
   assert.equal(report.storageModel.jsonSnapshot.present, true);
   assert.equal(report.storageModel.jsonSnapshot.collections >= 40, true);
+  assert.equal(report.checks.some((item) => item.name === "identity:contract" && item.passed), true);
+  assert.equal(report.identityContract.ok, true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-env-file"), true);
 
   const markdown = renderMarkdown(report);
   assert.match(markdown, /Release readiness report/);
   assert.match(markdown, /Production cutover checklist/);
   assert.match(markdown, /Storage model inspection/);
+  assert.match(markdown, /Identity integration contract/);
   assert.match(markdown, /cutover-identity/);
   assert.match(markdown, /snapshot:acceptanceEvidence/);
   assert.match(markdown, /snapshot:securityAcceptance/);
@@ -144,11 +147,15 @@ test("release report writes standalone production cutover and storage artifacts"
   const cutoverMarkdown = fs.readFileSync(path.join(outputDir, "production-cutover-checklist.md"), "utf8");
   const storageJson = JSON.parse(fs.readFileSync(path.join(outputDir, "storage-model-inspection.json"), "utf8"));
   const storageMarkdown = fs.readFileSync(path.join(outputDir, "storage-model-inspection.md"), "utf8");
+  const identityJson = JSON.parse(fs.readFileSync(path.join(outputDir, "identity-contract.json"), "utf8"));
+  const identityMarkdown = fs.readFileSync(path.join(outputDir, "identity-contract.md"), "utf8");
   assert.equal(cutoverJson.checklist.some((item) => item.id === "cutover-identity"), true);
   assert.match(cutoverMarkdown, /cutover-storage-adapter/);
   assert.equal(storageJson.storageModel.jsonSnapshot.present, true);
   assert.match(storageMarkdown, /Storage model inspection/);
   assert.match(storageMarkdown, /Largest/);
+  assert.equal(identityJson.identityContract.ok, true);
+  assert.match(identityMarkdown, /Required external claims/);
 });
 
 test("release report CLI argument parser keeps command and flags", () => {

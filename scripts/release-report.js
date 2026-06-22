@@ -2,6 +2,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
+const { buildIdentityContract, renderMarkdown: renderIdentityContractMarkdown } = require("./identity-contract");
 const { inspectStorageModel } = require("./storage-admin");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -205,6 +206,14 @@ function storageModelChecks(storageModel) {
   ];
 }
 
+function identityContractChecks(identityContract) {
+  return [
+    check("identity:contract", identityContract.ok, identityContract.ok ? "all identity contract checks passed" : "identity contract failed", "error", "identity"),
+    check("identity:requiredClaims", identityContract.requiredClaims?.filter((item) => item.required).length >= 5, `${identityContract.requiredClaims?.length || 0} claims`, "error", "identity"),
+    check("identity:sampleMappings", identityContract.sampleMappings?.every((item) => item.passed), `${identityContract.sampleMappings?.length || 0} samples`, "error", "identity")
+  ];
+}
+
 function packageChecks(pkg) {
   const requiredScripts = [
     "check",
@@ -214,6 +223,7 @@ function packageChecks(pkg) {
     "deploy:check",
     "env:check",
     "release:report",
+    "identity:contract",
     "storage:backup",
     "storage:inspect",
     "storage:assess",
@@ -257,6 +267,7 @@ function buildReleaseReport(options = {}) {
   const data = readJson("data/db.json");
   const env = validateProductionConfig(options);
   const storageModel = inspectStorageModel({ dataDir: path.join(ROOT, "data") });
+  const identityContract = buildIdentityContract({ data });
   const checks = [
     assertFile("README.md"),
     assertFile("DEPLOYMENT.md"),
@@ -267,6 +278,7 @@ function buildReleaseReport(options = {}) {
     ...packageChecks(pkg),
     ...snapshotChecks(data),
     ...storageModelChecks(storageModel),
+    ...identityContractChecks(identityContract),
     ...env.checks,
     ...commandChecks(options.runCommands)
   ];
@@ -286,7 +298,8 @@ function buildReleaseReport(options = {}) {
     },
     checks,
     productionCutover: env.cutoverChecklist,
-    storageModel
+    storageModel,
+    identityContract
   };
 }
 
@@ -368,6 +381,10 @@ function renderMarkdown(report) {
     "## Storage model inspection",
     "",
     "See `storage-model-inspection.json` and `storage-model-inspection.md` for collection counts, largest collections, SQLite tables, and migration metadata.",
+    "",
+    "## Identity integration contract",
+    "",
+    "See `identity-contract.json` and `identity-contract.md` for required external claims, role-to-portal mappings, organization coverage, and sample claim mappings.",
     ""
   ].join("\n");
 }
@@ -410,6 +427,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       storageModel: report.storageModel
     }, null, 2), "utf8");
+    const identityJson = path.join(path.dirname(output), "identity-contract.json");
+    fs.writeFileSync(identityJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      identityContract: report.identityContract
+    }, null, 2), "utf8");
   }
   if (flags.markdown) {
     const markdown = path.resolve(ROOT, String(flags.markdown));
@@ -419,6 +444,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(cutoverMarkdown, renderCutoverMarkdown(report), "utf8");
     const storageMarkdown = path.join(path.dirname(markdown), "storage-model-inspection.md");
     fs.writeFileSync(storageMarkdown, renderStorageModelMarkdown(report), "utf8");
+    const identityMarkdown = path.join(path.dirname(markdown), "identity-contract.md");
+    fs.writeFileSync(identityMarkdown, renderIdentityContractMarkdown(report.identityContract), "utf8");
   }
 }
 

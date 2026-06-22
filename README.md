@@ -170,6 +170,8 @@ npm.cmd run release:report:full
 
 `release:report` 同时输出 `release/storage-model-inspection.json` 与 `release/storage-model-inspection.md`，记录 JSON 快照集合数、记录量、最大集合，以及 SQLite 表、schema 版本和迁移元数据；SQLite 文件在干净 checkout 中不存在时只作为提示，不阻断 CI。
 
+`identity:contract` 会生成 `release/identity-contract.json` 与 `release/identity-contract.md`，固化政务统一身份接入所需 claims、角色到门户映射、机构覆盖度和样例 claim 映射；`release:report` 与 CI 会同步归档该契约，便于现场 OIDC/SAML 联调前逐项确认。
+
 ## 备份、脱敏与回滚
 
 ```powershell

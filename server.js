@@ -926,7 +926,8 @@ function seedAuthOrganizations() {
     { orgCode: "ORG-MI-CENTER-DL", name: "大连市医保中心", orgType: "insurance_center", orgLevel: "市级", parentCode: "ORG-MI-DL", portal: "insurance.html", dataScope: "医保结算经办、凭证核验、固定取药审核和业务留痕", interfaces: ["医保结算经办", "医保电子凭证", "慢病待遇经办", "固定取药审核"] },
     { orgCode: "ORG-MI-DIST-ZS", name: "中山区医保局", orgType: "district_insurance_bureau", orgLevel: "区市县", parentCode: "ORG-MI-DL", portal: "insurance.html", dataScope: "本区医保基金监管、机构监管、慢病待遇协同和基层服务监督", interfaces: ["区县医保监管", "机构监管", "基层待遇协同"] },
     { orgCode: "MR1", name: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", parentCode: "ORG-HEALTH-DL", portal: "institution.html", dataScope: "本机构诊疗、转诊接诊、病历与检查检验", interfaces: ["HIS", "EMR", "LIS", "PACS", "住院管理"] },
-    { orgCode: "MR3", name: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", parentCode: "ORG-DIST-ZS", portal: "institution.html", dataScope: "签约居民、慢病随访、长期处方、固定取药", interfaces: ["基层医疗", "公卫", "家医签约"] }
+    { orgCode: "MR3", name: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", parentCode: "ORG-DIST-ZS", portal: "institution.html", dataScope: "签约居民、慢病随访、长期处方、固定取药", interfaces: ["基层医疗", "公卫", "家医签约"] },
+    { orgCode: "ORG-CONSORTIUM-ZS", name: "中山区县域医共体", orgType: "county_consortium", orgLevel: "区市县", parentCode: "ORG-DIST-ZS", portal: "county.html", dataScope: "医共体成员机构、医技共享、互认质控、绩效和协同工单", interfaces: ["医共体协同", "远程会诊", "双向转诊", "医技共享", "绩效监管"] }
   ];
 }
 
