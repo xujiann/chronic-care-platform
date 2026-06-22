@@ -159,3 +159,19 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(workbenchJs, /\/api\/metrics/);
   assert.match(workbenchJs, /\/api\/system\/readiness/);
 });
+
+test("citizen portal exposes P1 record details trends and source labels", () => {
+  const citizenHtml = read("citizen.html");
+  const citizenJs = read("citizen.js");
+  const citizenCss = read("citizen.css");
+  assert.match(citizenHtml, /citizen-trend-grid/);
+  assert.match(citizenJs, /renderHealthTrends/);
+  assert.match(citizenJs, /buildCitizenTrendSeries/);
+  assert.match(citizenJs, /renderCitizenTrend/);
+  assert.match(citizenJs, /record-detail/);
+  assert.match(citizenJs, /renderSourceBadge/);
+  assert.match(citizenJs, /classifyDataSource/);
+  assert.match(citizenCss, /citizen-trend-card/);
+  assert.match(citizenCss, /source-badge/);
+  assert.match(citizenCss, /record-detail/);
+});

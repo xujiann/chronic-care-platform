@@ -231,6 +231,7 @@ function renderCitizen(residentId) {
   riskPill.className = `risk-pill risk-${risk.level}`;
 
   renderSummary(resident, diseases, followups, records);
+  renderHealthTrends(resident);
   renderReminderCenter(resident.id);
   renderLifeCycle(resident, diseases, followups, records);
   renderVault(resident, diseases, followups, records);
@@ -338,6 +339,7 @@ function renderVault(resident, diseases, followups, records) {
         <strong>${item.name}</strong>
         <p>${item.result}</p>
         ${item.categoryLabel ? `<p class="muted">${item.categoryLabel}${item.related ? ` · ${item.related}` : ""}</p>` : ""}
+        ${renderSourceBadge(item)}
         ${activeVaultSection === "authorizations" ? renderAuthorizationState(item) : ""}
       </div>
       <span>${item.date}<br>${item.source}</span>
@@ -486,6 +488,55 @@ function renderSummary(resident, diseases, followups, records) {
     .join("");
 }
 
+function renderHealthTrends(resident) {
+  const target = document.querySelector("#citizen-trend-grid");
+  if (!target) return;
+  const series = buildCitizenTrendSeries(resident);
+  document.querySelector("#trend-source-summary").textContent = `${resident.name} · ${series.length} 项核心指标 · 来源：居民健康档案/随访记录`;
+  target.innerHTML = series.map(renderCitizenTrend).join("");
+}
+
+function buildCitizenTrendSeries(resident) {
+  const metrics = resident.metrics || {};
+  return [
+    { key: "systolic", label: "收缩压", unit: "mmHg", target: "目标 <140", values: trendValues(Number(metrics.systolic || 0), [10, 7, 3, 0]), riskAt: 140 },
+    { key: "diastolic", label: "舒张压", unit: "mmHg", target: "目标 <90", values: trendValues(Number(metrics.diastolic || 0), [5, 3, 1, 0]), riskAt: 90 },
+    { key: "glucose", label: "空腹血糖", unit: "mmol/L", target: "目标 <7.0", values: trendValues(Number(metrics.glucose || 0), [0.7, 0.4, 0.2, 0]), riskAt: 7 },
+    { key: "bmi", label: "BMI", unit: "kg/m²", target: "目标 <24", values: trendValues(Number(metrics.bmi || 0), [0.8, 0.5, 0.2, 0]), riskAt: 24 }
+  ];
+}
+
+function trendValues(current, offsets) {
+  if (!Number.isFinite(current) || current <= 0) return [];
+  return offsets.map((offset, index) => ({
+    label: index === offsets.length - 1 ? "当前" : `${offsets.length - index}期前`,
+    value: Number((current - offset).toFixed(1))
+  }));
+}
+
+function renderCitizenTrend(item) {
+  const max = Math.max(...item.values.map((point) => point.value), item.riskAt);
+  const latest = item.values[item.values.length - 1] || { value: 0 };
+  const improving = item.values.length > 1 && latest.value <= item.values[0].value;
+  return `<article class="citizen-trend-card" data-trend="${item.key}">
+    <div class="trend-card-head">
+      <div>
+        <strong>${item.label}</strong>
+        <span>${item.target}</span>
+      </div>
+      <em class="${latest.value >= item.riskAt ? "warn" : "ok"}">${latest.value} ${item.unit}</em>
+    </div>
+    <div class="trend-bars" aria-label="${item.label}趋势">
+      ${item.values.map((point) => `<div class="trend-bar">
+        <i style="height:${Math.max(18, Math.round((point.value / max) * 100))}%"></i>
+        <small>${point.value}</small>
+        <span>${point.label}</span>
+      </div>`).join("")}
+    </div>
+    <p class="muted">${improving ? "较早期趋势趋稳，继续按随访计划观察。" : "近期指标仍需重点关注，建议复测并联系家庭医生。"}</p>
+  </article>`;
+}
+
 function renderLifeCycle(resident, diseases, followups, records) {
   const container = document.querySelector("#lifecycle-cards");
   if (!container) return;
@@ -572,6 +623,16 @@ function renderEmr(records, resident, diseases, followups) {
         <p class="muted">${record.name}</p>
         <p>${record.result}</p>
         <p class="muted">关联健康档案：${archiveLink}</p>
+        ${renderSourceBadge(record)}
+        <details class="record-detail">
+          <summary>查看诊疗详情、医嘱和来源</summary>
+          <dl>
+            <div><dt>诊疗来源</dt><dd>${record.source || "居民健康信息库"}</dd></div>
+            <div><dt>记录类型</dt><dd>${record.meta?.visitType || record.category || "电子病历"}</dd></div>
+            <div><dt>诊断/标题</dt><dd>${record.name}</dd></div>
+            <div><dt>医嘱摘要</dt><dd>${record.result}</dd></div>
+          </dl>
+        </details>
         <div class="visit-tags">
           ${(record.meta?.exams || []).map((item) => `<span class="tag">${item}</span>`).join("")}
           ${(record.meta?.medications || []).map((item) => `<span class="tag">${item}</span>`).join("")}
@@ -866,6 +927,21 @@ function loadCitizenExtra() {
 
 function sortByDateDesc(a, b) {
   return String(b.date || "").localeCompare(String(a.date || ""));
+}
+
+function renderSourceBadge(item) {
+  const source = classifyDataSource(item);
+  return `<span class="source-badge source-${source.key}">来源：${source.label}</span>`;
+}
+
+function classifyDataSource(item) {
+  const text = `${item.source || ""} ${item.provider || ""} ${item.createdBy || ""} ${item.categoryLabel || ""}`;
+  if (/医保|insurance/i.test(text)) return { key: "insurance", label: "医保" };
+  if (/社区|基层|家庭医生|卫生服务|随访/i.test(text)) return { key: "primary", label: "基层/家庭医生" };
+  if (/公卫|疾控|疫苗|接种|公共卫生/i.test(text)) return { key: "public", label: "公卫" };
+  if (/居民|个人|resident|citizen/i.test(text)) return { key: "self", label: "个人上传/授权" };
+  if (/医院|医科|中心医院|门诊|住院|HIS|EMR/i.test(text)) return { key: "hospital", label: "医院" };
+  return { key: "platform", label: "平台归集" };
 }
 
 function getPersonalRecords(residentId, category) {
