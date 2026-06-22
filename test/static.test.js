@@ -258,6 +258,8 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(workbenchJs, /loadReleaseReport/);
   assert.match(workbenchJs, /loadProductionCutoverChecklist/);
   assert.match(workbenchJs, /loadReleaseArtifactManifest/);
+  assert.match(workbenchJs, /loadUnifiedTaskReport/);
+  assert.match(workbenchJs, /data-unified-task/);
   assert.match(workbenchJs, /renderReleaseEvidenceGates/);
   assert.match(workbenchJs, /data-quality:report/);
   assert.match(workbenchJs, /operations:readiness/);
@@ -277,6 +279,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(workbenchJs, /\/api\/release-report/);
   assert.match(workbenchJs, /\/api\/production-cutover-checklist/);
   assert.match(workbenchJs, /\/api\/release-artifact-manifest/);
+  assert.match(workbenchJs, /\/api\/tasks/);
   assert.match(workbenchJs, /\/api\/chronic\/acceptance-ledger/);
   assert.match(workbenchJs, /\/api\/county\/acceptance-ledger/);
   assert.match(read("server.js"), /\/api\/process-audit/);

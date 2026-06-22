@@ -27,7 +27,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   const releaseReport = await loadReleaseReport();
   const productionCutover = await loadProductionCutoverChecklist();
   const releaseArtifactManifest = await loadReleaseArtifactManifest();
-  const tasks = collectUnifiedTasks(state);
+  const unifiedTaskReport = await loadUnifiedTaskReport();
+  const tasks = unifiedTaskReport?.tasks?.length ? normalizeApiTasks(unifiedTaskReport.tasks) : collectUnifiedTasks(state);
   const roadmap = state.platformRoadmap?.length ? state.platformRoadmap : defaultRoadmap();
   renderMetrics(state, tasks, roadmap, operations);
   renderSystemReadiness(readiness);
@@ -167,6 +168,38 @@ async function loadReleaseArtifactManifest() {
   } catch (error) {
     return null;
   }
+}
+
+async function loadUnifiedTaskReport() {
+  if (location.protocol === "file:") return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request("/api/tasks");
+    if (!response.ok) return null;
+    return response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+function normalizeApiTasks(tasks) {
+  const priorityWeight = { high: 3, medium: 2, normal: 1 };
+  return tasks.map((task) => ({
+    title: task.title,
+    owner: task.owner || "owner pending",
+    module: task.category || task.collection,
+    detail: [task.serviceDomain, task.collection, task.dueAt ? `due ${task.dueAt}` : ""].filter(Boolean).join(" · "),
+    status: task.status,
+    level: task.priorityLevel === "high" ? "高" : task.priorityLevel === "medium" ? "中" : "低",
+    priorityLevel: task.priorityLevel || "normal",
+    serviceDomain: task.serviceDomain || "",
+    collection: task.collection || "",
+    id: task.id || `${task.collection}:${task.sourceId}`,
+    overdue: Boolean(task.overdue)
+  })).sort((left, right) =>
+    (priorityWeight[right.priorityLevel] || 0) - (priorityWeight[left.priorityLevel] || 0) ||
+    Number(right.overdue) - Number(left.overdue)
+  );
 }
 
 function renderMetrics(state, tasks, roadmap, operations) {
@@ -725,13 +758,14 @@ function renderPriorityList(roadmap) {
 
 function renderUnifiedTasks(tasks) {
   document.querySelector("#task-count").textContent = `${tasks.length} 项`;
-  document.querySelector("#unified-tasks").innerHTML = tasks.slice(0, 12).map((task) => `<section class="item">
+  document.querySelector("#unified-tasks").innerHTML = tasks.slice(0, 16).map((task) => `<section class="item" data-unified-task="${task.id || task.title}">
     <div>
       <h3>${task.title}</h3>
       <p>${task.owner} · ${task.module}</p>
       <p>${task.detail}</p>
+      ${task.serviceDomain ? `<p><span class="badge info">${task.serviceDomain}</span> <span class="badge ${task.priorityLevel === "high" ? "danger" : task.priorityLevel === "medium" ? "warn" : "info"}">${task.priorityLevel}</span></p>` : ""}
     </div>
-    <span class="badge ${task.level === "高" ? "danger" : task.level === "中" ? "warn" : "info"}">${task.status}</span>
+    <span class="badge ${task.priorityLevel === "high" || task.level === "高" ? "danger" : task.priorityLevel === "medium" || task.level === "中" ? "warn" : "info"}">${task.status}</span>
   </section>`).join("") || `<p class="muted">暂无跨端待办。</p>`;
 }
 

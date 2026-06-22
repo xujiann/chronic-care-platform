@@ -69,6 +69,8 @@ test("commission workbench renders live release gates and site templates", async
   await expect(page.locator("[data-template-readme='identity-source-mapping']")).toContainText("README generated");
   await expect(page.locator("#process-audit-matrix")).toContainText("site-readiness");
   await expect(page.locator("#process-audit-matrix")).toContainText("evidence domains passed");
+  await expect(page.locator("[data-unified-task='chronicScreeningTasks:cst-001']")).toContainText("screening");
+  await expect(page.locator("[data-unified-task='chronicScreeningTasks:cst-001']")).toContainText("high");
 
   const releaseReport = await page.evaluate(async () => {
     const response = await window.HealthCityAuth.authFetch("/api/release-report");
