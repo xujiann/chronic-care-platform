@@ -109,7 +109,26 @@ function renderSystemReadiness(readiness) {
     </article>`;
   }).join("");
 
-  const dependencyRows = dependencies.slice(0, 6).map((item) => `<span class="badge warn">${item.name || item}</span>`).join("");
+  const dependencyRows = dependencies.slice(0, 6).map((item) => {
+    const severity = item.severity || "medium";
+    const label = item.name || item;
+    return `<span class="badge ${severity === "high" ? "danger" : "warn"}">${label}</span>`;
+  }).join("");
+  const dependencyDetailRows = dependencies.slice(0, 4).map((item) => {
+    if (!item || typeof item === "string") return "";
+    return `<article class="priority-row">
+      <div class="priority-rank ${item.severity === "high" ? "danger" : "warn"}">${item.severity === "high" ? "高" : "中"}</div>
+      <div>
+        <h3>${item.name}</h3>
+        <p>${item.reason}</p>
+        <small>下一步：${item.nextAction}</small>
+      </div>
+      <div class="capability-side">
+        <span class="badge warn">${item.owner}</span>
+        <small>${item.evidence || item.id}</small>
+      </div>
+    </article>`;
+  }).join("");
   const productionEnv = readiness.productionEnvironment || null;
   const productionEnvRows = (productionEnv?.checks || []).map((item) =>
     `<span class="badge ${item.passed ? "info" : "warn"}">${item.name}: ${item.detail}</span>`
@@ -132,7 +151,7 @@ function renderSystemReadiness(readiness) {
       <span class="badge ${readiness.passed ? "info" : "danger"}">${readiness.passed ? "代码闭环通过" : "仍需处理"}</span>
       <small>现场依赖需按部署计划另行验收</small>
     </div>
-  </article>${checkRows}`;
+  </article>${checkRows}${dependencyDetailRows}`;
 }
 
 function renderAudit(state, tasks) {

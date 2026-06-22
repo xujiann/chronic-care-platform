@@ -2882,6 +2882,75 @@ function buildInterfaceReadiness(data) {
   };
 }
 
+function buildExternalDependencyRisks(data) {
+  const productionTracks = Array.isArray(data.productionDeploymentPlan) ? data.productionDeploymentPlan : [];
+  const interfaceRows = buildInterfaceReadiness(data).rows;
+  const riskItems = [
+    {
+      id: "identity-source",
+      name: "政务统一身份源",
+      owner: "政务身份平台/市级平台",
+      severity: "high",
+      category: "identity",
+      reason: "生产登录、机构目录、医生身份和居民实名关系必须由真实身份源确认。",
+      nextAction: "确认 OIDC/SAML/CA 对接窗口、机构编码口径和生产回调地址。",
+      evidence: productionTracks.find((item) => item.id === "prod-identity-adapter")?.status || "待现场接入"
+    },
+    {
+      id: "institution-systems",
+      name: "HIS/EMR/LIS/PACS/心电",
+      owner: "医疗机构/接口厂商",
+      severity: "high",
+      category: "interfaces",
+      reason: "患者、病历、检验检查、心电和转诊链路需要真实院内系统联调。",
+      nextAction: "按 P0 接口清单确认字段映射、联调环境、样例报文和回归窗口。",
+      evidence: `${interfaceRows.filter((item) => item.blockers.includes("institution-systems")).length} 条接口轨道仍依赖院内系统`
+    },
+    {
+      id: "insurance-core",
+      name: "医保核心与电子凭证",
+      owner: "医保局/医保中心",
+      severity: "high",
+      category: "interfaces",
+      reason: "慢病待遇、基金监管、结算状态和医保电子凭证需接入医保核心系统。",
+      nextAction: "确认医保核心接口、门慢门特规则、双通道和异地转诊结算口径。",
+      evidence: `${interfaceRows.filter((item) => item.blockers.includes("insurance-core")).length} 条接口轨道涉及医保核心`
+    },
+    {
+      id: "certificate-sharing",
+      name: "电子证照、公安、民政、妇幼、疾控共享",
+      owner: "电子证照/公安/民政/妇幼/疾控",
+      severity: "medium",
+      category: "data-sharing",
+      reason: "出生死亡证照、人口状态、妇幼入册和疾控上报需要跨部门共享授权。",
+      nextAction: "明确共享目录、授权依据、回执格式、异常补正和对账频率。",
+      evidence: `${interfaceRows.filter((item) => item.blockers.includes("certificate-sharing")).length} 条接口轨道涉及跨部门共享`
+    },
+    {
+      id: "security-assessment",
+      name: "等保、密评、信创、专线、国密设备",
+      owner: "安全管理岗/基础设施组",
+      severity: "high",
+      category: "security",
+      reason: "生产上线前需要完成测评、整改、国密边界和专线网络验收。",
+      nextAction: "挂接测评计划、设备清单、整改记录、复测报告和信创适配矩阵。",
+      evidence: productionTracks.find((item) => item.id === "prod-audit-retention")?.status || "待测评"
+    },
+    {
+      id: "disaster-recovery",
+      name: "生产数据库原生备份、异地副本和 RTO/RPO 验收",
+      owner: "基础设施组/数据库管理员",
+      severity: "medium",
+      category: "operations",
+      reason: "本地恢复演练已覆盖 JSON/SQLite 快照，但生产数据库需要原生在线备份和异地恢复证据。",
+      nextAction: "在真实数据库上执行备份、时间点恢复、异地副本切换和 RTO/RPO 验收。",
+      evidence: productionTracks.find((item) => item.id === "prod-storage-adapter")?.status || "待生产数据库适配"
+    }
+  ];
+  const rank = { high: 0, medium: 1, low: 2 };
+  return riskItems.sort((a, b) => (rank[a.severity] ?? 9) - (rank[b.severity] ?? 9) || a.id.localeCompare(b.id));
+}
+
 function buildSystemReadinessReport(data) {
   const p2Collections = {
     institutionCreditEvaluations: Array.isArray(data.institutionCreditEvaluations) ? data.institutionCreditEvaluations.length : 0,
@@ -2912,6 +2981,7 @@ function buildSystemReadinessReport(data) {
   );
   const runtime = buildRuntimeMetrics(data);
   const interfaceReadiness = buildInterfaceReadiness(data);
+  const externalDependencies = buildExternalDependencyRisks(data);
   const checks = [
     { id: "storage-meta", name: "存储元信息", passed: Boolean(runtime.storage.jsonFile), detail: runtime.storage.mode },
     { id: "p2-roadmap", name: "P2 路线图完成", passed: p2Complete, detail: roadmap.filter((item) => item.priority === "P2").map((item) => `${item.title}:${item.status}`).join(";") },
@@ -2934,14 +3004,7 @@ function buildSystemReadinessReport(data) {
     productionEnvironment: buildProductionEnvironmentStatus(),
     interfaceReadiness,
     runtime: runtime.workload,
-    externalDependencies: [
-      "政务统一身份源",
-      "HIS/EMR/LIS/PACS/心电",
-      "医保核心与电子凭证",
-      "电子证照、公安、民政、妇幼、疾控",
-      "等保、密评、信创、专线、国密设备",
-      "生产数据库原生备份、异地副本和 RTO/RPO 验收"
-    ]
+    externalDependencies
   };
 }
 
