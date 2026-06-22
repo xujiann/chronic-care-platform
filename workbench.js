@@ -26,7 +26,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const roadmap = state.platformRoadmap?.length ? state.platformRoadmap : defaultRoadmap();
   renderMetrics(state, tasks, roadmap, operations);
   renderSystemReadiness(readiness);
-  renderReleaseEvidenceGates(state, readiness, operations, processAudit);
+  renderReleaseEvidenceGates(state, readiness, operations, processAudit, siteReadinessPack);
   renderAcceptanceLedgers(state, acceptanceLedgers);
   renderSiteReadinessPack(siteReadinessPack);
   renderSourceAlignment(state);
@@ -203,7 +203,7 @@ function renderSystemReadiness(readiness) {
   </article>${checkRows}${dependencyDetailRows}`;
 }
 
-function renderReleaseEvidenceGates(state, readiness, operations, processAudit) {
+function renderReleaseEvidenceGates(state, readiness, operations, processAudit, siteReadinessPack) {
   const container = document.querySelector("#release-evidence-gates");
   if (!container) return;
 
@@ -220,6 +220,7 @@ function renderReleaseEvidenceGates(state, readiness, operations, processAudit) 
   const runtime = readiness?.runtime || operations?.workload || {};
   const processLedger = processAudit?.ledgers || null;
   const processSummary = processAudit?.summary || null;
+  const sitePackSummary = siteReadinessPack?.summary || null;
 
   const gates = [
     {
@@ -267,6 +268,15 @@ function renderReleaseEvidenceGates(state, readiness, operations, processAudit) 
       evidence: "release/process-audit-report.md"
     },
     {
+      id: "site:pack",
+      title: "Site readiness pack",
+      passed: siteReadinessPack ? Boolean(siteReadinessPack.ok) : Boolean(productionTracks.length >= 4 && p0Interfaces.length >= 5),
+      detail: siteReadinessPack
+        ? `${sitePackSummary?.packs || 0} packs; ${sitePackSummary?.templateRows || 0} template rows; ${siteReadinessPack.templates?.signoff?.length || 0} signoff templates`
+        : `${productionTracks.length} production tracks; ${p0Interfaces.length} P0 interfaces; run Node API for live templates`,
+      evidence: "release/site-readiness-pack.md"
+    },
+    {
       id: "release:report",
       title: "Release readiness aggregate",
       passed: readiness ? Boolean(readiness.passed) : Boolean(state.platformRoadmap?.length),
@@ -287,7 +297,7 @@ function renderReleaseEvidenceGates(state, readiness, operations, processAudit) 
     </div>
     <div class="capability-side">
       <small>${gate.evidence}</small>
-      <small>${readiness || processAudit ? "live API evidence" : "static snapshot evidence"}</small>
+      <small>${readiness || processAudit || siteReadinessPack ? "live API evidence" : "static snapshot evidence"}</small>
     </div>
   </article>`).join("");
 }
