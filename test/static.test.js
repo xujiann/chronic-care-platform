@@ -85,6 +85,8 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /\/api\/health/);
   assert.match(read("README.md"), /deploy:check/);
   assert.match(read("README.md"), /release:report/);
+  assert.match(read("scripts/release-report.js"), /test:coverage/);
+  assert.match(read("scripts/release-report.js"), /test:e2e/);
 });
 
 test("platform and workbench expose P2 governance and runtime panels", () => {

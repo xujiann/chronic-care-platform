@@ -10,9 +10,12 @@ function readJson(relativePath) {
 }
 
 function run(command, args) {
-  const result = spawnSync(command, args, { cwd: ROOT, stdio: "pipe", shell: process.platform === "win32", encoding: "utf8" });
+  const commandLine = [command, ...args].join(" ");
+  const result = process.platform === "win32"
+    ? spawnSync(commandLine, { cwd: ROOT, stdio: "pipe", shell: true, encoding: "utf8" })
+    : spawnSync(command, args, { cwd: ROOT, stdio: "pipe", shell: false, encoding: "utf8" });
   return {
-    command: [command, ...args].join(" "),
+    command: commandLine,
     status: result.status,
     ok: result.status === 0,
     stdout: result.stdout.trim(),
