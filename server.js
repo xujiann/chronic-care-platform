@@ -409,8 +409,14 @@ const mimeTypes = {
   ".svg": "image/svg+xml"
 };
 
+function demoBaseDate() {
+  const configured = String(process.env.DEMO_TODAY || "2026-06-22").trim();
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(configured) ? configured : "2026-06-22";
+  return new Date(`${normalized}T00:00:00.000Z`);
+}
+
 function todayOffset(days) {
-  const date = new Date();
+  const date = demoBaseDate();
   date.setDate(date.getDate() + days);
   return date.toISOString().slice(0, 10);
 }
@@ -2252,7 +2258,7 @@ function readDatabase() {
   const data = normalizeState(comparableRaw);
   const changed = JSON.stringify(comparableRaw) !== JSON.stringify(data);
   data.storageMeta = storageMeta();
-  if (changed) writeDatabase(data);
+  if (changed && !shouldUseSqlite()) writeDatabase(data);
   return data;
 }
 

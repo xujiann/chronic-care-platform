@@ -112,6 +112,9 @@ test("chronic disease policy module exposes 2025 service capacity workflow", () 
   assert.match(server, /chronic-comorbidity-plans/);
   assert.match(server, /\/api\/chronic\/acceptance-ledger/);
   assert.match(server, /chronicMedicationSupport/);
+  assert.match(server, /DEMO_TODAY/);
+  assert.match(server, /2026-06-22/);
+  assert.match(server, /changed && !shouldUseSqlite\(\)/);
   assert.match(server, /多病共管/);
   assert.match(server, /基层慢病健康管理中心/);
 });
