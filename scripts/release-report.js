@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { buildAuditRetentionReport, renderMarkdown: renderAuditRetentionMarkdown } = require("./audit-retention");
+const { buildDataQualityReport, renderMarkdown: renderDataQualityMarkdown } = require("./data-quality-report");
 const { buildEvaluationEvidenceReport, renderMarkdown: renderEvaluationEvidenceMarkdown } = require("./evaluation-evidence");
 const { buildIdentityContract, renderMarkdown: renderIdentityContractMarkdown } = require("./identity-contract");
 const { buildIntegrationReadinessReport, renderMarkdown: renderIntegrationReadinessMarkdown } = require("./integration-readiness");
@@ -241,6 +242,14 @@ function evaluationEvidenceChecks(evaluationEvidence) {
   ];
 }
 
+function dataQualityChecks(dataQuality) {
+  return [
+    check("dataQuality:report", dataQuality.ok, dataQuality.ok ? "data quality checks passed" : "data quality checks failed", "error", "data-quality"),
+    check("dataQuality:masterIndexCompleteness", dataQuality.scorecard?.residentIndexCompleteness === 100, `${dataQuality.scorecard?.residentIndexCompleteness || 0}% resident index completeness`, "error", "data-quality"),
+    check("dataQuality:residentReferences", dataQuality.issues?.missingReferences?.length === 0, `${dataQuality.issues?.missingReferences?.length || 0} broken resident references`, "error", "data-quality")
+  ];
+}
+
 function packageChecks(pkg) {
   const requiredScripts = [
     "check",
@@ -252,6 +261,7 @@ function packageChecks(pkg) {
     "release:report",
     "identity:contract",
     "audit:retention",
+    "data-quality:report",
     "integration:readiness",
     "evaluation:evidence",
     "storage:backup",
@@ -299,6 +309,7 @@ function buildReleaseReport(options = {}) {
   const storageModel = inspectStorageModel({ dataDir: path.join(ROOT, "data") });
   const identityContract = buildIdentityContract({ data });
   const auditRetention = buildAuditRetentionReport({ data, env: options.env || process.env });
+  const dataQuality = buildDataQualityReport({ data });
   const integrationReadiness = buildIntegrationReadinessReport({ data });
   const evaluationEvidence = buildEvaluationEvidenceReport({ data });
   const checks = [
@@ -313,6 +324,7 @@ function buildReleaseReport(options = {}) {
     ...storageModelChecks(storageModel),
     ...identityContractChecks(identityContract),
     ...auditRetentionChecks(auditRetention),
+    ...dataQualityChecks(dataQuality),
     ...integrationReadinessChecks(integrationReadiness),
     ...evaluationEvidenceChecks(evaluationEvidence),
     ...env.checks,
@@ -337,6 +349,7 @@ function buildReleaseReport(options = {}) {
     storageModel,
     identityContract,
     auditRetention,
+    dataQuality,
     integrationReadiness,
     evaluationEvidence
   };
@@ -433,6 +446,10 @@ function renderMarkdown(report) {
     "",
     "See `integration-readiness-report.json` and `integration-readiness-report.md` for P0 interface coverage, external contract readiness, idempotency, signature, and retry policy evidence.",
     "",
+    "## Data quality and master index report",
+    "",
+    "See `data-quality-report.json` and `data-quality-report.md` for resident master index completeness, resident reference checks, source traceability, and rectification issue evidence.",
+    "",
     "## Interoperability evaluation evidence report",
     "",
     "See `evaluation-evidence-report.json` and `evaluation-evidence-report.md` for interoperability artifacts, P1 interface requirements, transaction samples, and rectification evidence.",
@@ -494,6 +511,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       auditRetention: report.auditRetention
     }, null, 2), "utf8");
+    const dataQualityJson = path.join(path.dirname(output), "data-quality-report.json");
+    fs.writeFileSync(dataQualityJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      dataQuality: report.dataQuality
+    }, null, 2), "utf8");
     const integrationJson = path.join(path.dirname(output), "integration-readiness-report.json");
     fs.writeFileSync(integrationJson, JSON.stringify({
       project: report.project,
@@ -523,6 +548,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(identityMarkdown, renderIdentityContractMarkdown(report.identityContract), "utf8");
     const auditMarkdown = path.join(path.dirname(markdown), "audit-retention-report.md");
     fs.writeFileSync(auditMarkdown, renderAuditRetentionMarkdown(report.auditRetention), "utf8");
+    const dataQualityMarkdown = path.join(path.dirname(markdown), "data-quality-report.md");
+    fs.writeFileSync(dataQualityMarkdown, renderDataQualityMarkdown(report.dataQuality), "utf8");
     const integrationMarkdown = path.join(path.dirname(markdown), "integration-readiness-report.md");
     fs.writeFileSync(integrationMarkdown, renderIntegrationReadinessMarkdown(report.integrationReadiness), "utf8");
     const evaluationMarkdown = path.join(path.dirname(markdown), "evaluation-evidence-report.md");
