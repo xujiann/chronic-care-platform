@@ -23,6 +23,11 @@ async function loadPlatformState(fallback) {
 
 function normalizePlatformState(data) {
   const state = data || {};
+  if (!state.creditEvaluationRules) state.creditEvaluationRules = defaultCreditEvaluationRules();
+  if (!Array.isArray(state.researchDatasets)) state.researchDatasets = defaultResearchDatasets();
+  if (!Array.isArray(state.diseaseRegistryModels)) state.diseaseRegistryModels = defaultDiseaseRegistryModels();
+  if (!state.mobileExperienceSettings || typeof state.mobileExperienceSettings !== "object") state.mobileExperienceSettings = defaultMobileExperienceSettings();
+  if (!Array.isArray(state.accessibilityChecklist)) state.accessibilityChecklist = defaultAccessibilityChecklist();
   const residents = Array.isArray(state.residents) ? state.residents : [];
   residents.forEach((resident) => {
     resident.personIndex = personIndexFromParts(resident.idCard, resident.phone);
@@ -40,6 +45,61 @@ function normalizePlatformState(data) {
     });
   });
   return state;
+}
+
+function defaultCreditEvaluationRules() {
+  return {
+    version: "credit-rules-2026.1",
+    dimensions: [
+      { key: "legalPractice", name: "依法执业", weight: 25, source: "执业监管台账", maxDeduction: 8 },
+      { key: "qualitySafety", name: "质量安全", weight: 30, source: "质控复核与危急值处置", maxDeduction: 12 },
+      { key: "dataReporting", name: "数据报送", weight: 25, source: "数据质量问题与接口死信", maxDeduction: 15 },
+      { key: "serviceCredit", name: "服务信用", weight: 20, source: "任务超时、居民消息回执和整改闭环", maxDeduction: 10 }
+    ],
+    gradeBands: [
+      { grade: "A", minScore: 90 },
+      { grade: "B+", minScore: 85 },
+      { grade: "B", minScore: 80 },
+      { grade: "C", minScore: 70 },
+      { grade: "D", minScore: 0 }
+    ]
+  };
+}
+
+function defaultResearchDatasets() {
+  return [
+    { id: "rd-hypertension-001", diseaseType: "hypertension", name: "Hypertension chronic management cohort", version: "1.0.0", ethicsApproval: "IRB-DEMO-HTN-2026", anonymization: "k-anonymity-demo", authorizationStatus: "approved", records: 2, status: "published", usageAudit: [], outcomes: [] },
+    { id: "rd-diabetes-001", diseaseType: "diabetes", name: "Diabetes follow-up and HbA1c cohort", version: "1.0.0", ethicsApproval: "IRB-DEMO-DM-2026", anonymization: "k-anonymity-demo", authorizationStatus: "approved", records: 1, status: "published", usageAudit: [], outcomes: [] }
+  ];
+}
+
+function defaultDiseaseRegistryModels() {
+  return [
+    { id: "dm-hypertension-risk-v1", diseaseType: "hypertension", version: "1.0.0", population: "registered hypertension or high-risk residents", threshold: "systolic>=140 or riskLevel=high", reviewStatus: "active", reviewer: "chronic-center", outputs: ["follow-up plan", "specialist review"] },
+    { id: "dm-diabetes-risk-v1", diseaseType: "diabetes", version: "1.0.0", population: "diabetes or impaired glucose residents", threshold: "glucose>=7.0 or HbA1c>=6.5", reviewStatus: "active", reviewer: "chronic-center", outputs: ["diet intervention", "HbA1c review"] }
+  ];
+}
+
+function defaultAccessibilityChecklist() {
+  return [
+    { id: "a11y-large-font", category: "large_font", item: "Large font mode", status: "passed", evidence: "citizen large mode toggle" },
+    { id: "a11y-screen-reader", category: "screen_reader", item: "Screen reader semantics", status: "ready", evidence: "aria labels and landmark roles" },
+    { id: "a11y-family-proxy", category: "family_proxy", item: "Family proxy handling", status: "passed", evidence: "family members and delegated pickup records" },
+    { id: "a11y-offline-help", category: "offline_help", item: "Offline assisted service", status: "ready", evidence: "senior service offline help records" },
+    { id: "a11y-weak-network", category: "weak_network", item: "Weak network fallback", status: "ready", evidence: "local state fallback and mobile preview" }
+  ];
+}
+
+function defaultMobileExperienceSettings() {
+  return {
+    largeModeDefault: false,
+    weakNetworkMode: "cache-last-state",
+    screenReaderLandmarks: ["banner", "navigation", "main", "status"],
+    offlineHelpChannels: ["community-service-station", "family-proxy", "hotline"],
+    messageTouchpoints: ["in_app", "family_proxy"],
+    seniorTaskCompletionCriteria: ["font-readable", "one-hand-navigation", "proxy-authorized", "offline-help-available"],
+    userPreferences: {}
+  };
 }
 
 function personIndexFromParts(idCard, phone) {

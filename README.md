@@ -1,22 +1,26 @@
 # 大连卫生健康信息平台 MVP
 
-这是一个面向卫生健康信息化场景的本地演示系统，用于验证大连市卫生健康委、医疗机构、医保局/医保中心/区市县医保局、居民端、县域医共体平台和统一运营工作台之间的数据贯通、业务闭环和审计管理。
+这是一个面向卫生健康信息化场景的可运行 MVP，用于验证大连市卫生健康委、医疗机构、医保局/医保中心/区市县医保局、居民端、县域医共体平台和统一运营工作台之间的数据贯通、业务闭环、权限隔离、审计保全和静态展示发布。
 
-系统当前重点覆盖：
+当前仓库已经完成 P0/P1/P2 的本地演示级与 API 基础闭环；剩余生产化事项主要依赖真实身份源、医疗机构接口、医保核心系统、公安民政共享、安全测评和现场部署资源。
 
-- 慢病医防融合：筛查、建档、风险分级、随访、宣教、分级管理、固定取药。
-- 全民健康信息：居民主索引、个人健康信息库、标准健康档案、电子病历、检查检验、用药、授权共享。
-- 县域医共体：16255 建设模型、医技共享、结果互认、基层 AI 辅诊、协同工单、运营指标。
-- 分级诊疗：基层首诊、双向转诊、号源床位预留、医保支付引导、长期处方。
-- 卫生统计与证照：卫生统计导入、统计公报、出生医学证明、死亡医学证明。
-- 安全审计：统一登录、角色权限、访问日志、安全事件、接口拒绝留痕。
+## 当前能力总览
 
-## 启动方式
+| 范围 | 已完成能力 |
+|---|---|
+| P0 测试与 CI | Node API、隔离测试数据、角色权限、居民数据裁剪、静态页面守卫、敏感信息扫描、API 契约、覆盖率门禁、Chromium 端到端角色旅程 |
+| P0 数据与恢复 | SQLite/JSON 双路径、schema v1-v7 幂等迁移、集合版本、乐观锁、409 冲突契约、业务级 PATCH、备份、恢复演练、脱敏快照、恢复指标验收 |
+| P0 认证与隐私 | PBKDF2 密码哈希兼容、签名会话、密钥轮换、token 篡改拒绝、字段脱敏、授权撤销、访问历史复核、审计哈希链 |
+| P0 接口网关 | HIS/EMR/LIS/PACS/医保/电子证照/卫生统计接口契约、HMAC 签名、幂等键、事件落库、失败重试、死信补偿、对账监控、模拟接入 |
+| P1 区域闭环 | 检查检验互认、诊断报告回传、危急值预警、统一任务中心、站内消息、送达回执、超时升级、数据质量问题与评分卡、安全合规证据 |
+| P1 慢病医防融合 | 对照 2025 年基层慢性病健康管理服务要求，已补齐基层慢病健康管理中心、村站、牵头医院、公卫机构职责，能力建设条件、防筛诊治管康路径、多病共管、中医药服务、居民自我管理、用药保障和质控指标 |
+| P2 治理科研体验 | 信用评价、绩效报表、科研数据集、专病库模型、人工复核、移动体验设置、无障碍清单、大字模式、家属代办、线下帮办、弱网模式 |
 
-推荐本地服务模式：
+## 快速启动
 
 ```powershell
 cd "C:\Users\drxuj\OneDrive\3.信息化\0.高质量发展 信息化\chronic-care-platform"
+npm.cmd install
 npm.cmd run dev
 ```
 
@@ -26,11 +30,11 @@ npm.cmd run dev
 http://localhost:5173/login.html
 ```
 
-如果只查看静态页面，也可以直接打开 HTML 文件或使用 `open-static.cmd`。静态模式会降级为浏览器本地存储，不能使用后端 API。
+静态预览可以直接打开 HTML 或通过 GitHub Pages 发布根目录页面。静态模式只能读取 `data/db.json` 快照，不能执行 Node API 写入、会话、审计和工作流动作。
 
 ## 演示账号
 
-统一密码均为：
+统一密码：
 
 ```text
 123456
@@ -40,12 +44,10 @@ http://localhost:5173/login.html
 |---|---|---|
 | `city` | `workbench.html` | 市级健康城市管理 |
 | `district` | `workbench.html` | 区市县管理端 |
-| `health` | `index.html` | 大连市卫生健康委 |
-| `whjw` | `index.html` | 大连市卫生健康委（同一机构入口别名） |
+| `health` / `whjw` | `index.html` | 大连市卫生健康委 |
 | `hospital` | `institution.html` | 三级医疗机构 |
 | `community` | `institution.html` | 基层医疗机构 |
-| `doctor` | `institution.html` | 医疗机构端 |
-| `doctor_wang` | `institution.html` | 医生账户 |
+| `doctor` / `doctor_wang` | `institution.html` | 医生账户 |
 | `mi` | `insurance.html` | 大连市医保局管理端 |
 | `insurance` | `insurance.html` | 大连市医保中心经办端 |
 | `district_mi` | `insurance.html` | 区市县医保局管理端 |
@@ -58,151 +60,207 @@ http://localhost:5173/login.html
 |---|---|
 | `login.html` | 统一登录入口 |
 | `health-city.html` | 健康城市系统总览 |
-| `workbench.html` | 统一运营工作台，含全流程审计矩阵 |
-| `index.html` | 大连市卫生健康委，含慢病、统计、应急、审计等模块 |
-| `institution.html` | 医疗机构端，含授权档案、转诊、死亡证明、多点执业 |
-| `insurance.html` | 医保管理与经办，区分医保局、医保中心、区市县医保局职责 |
-| `citizen.html` | 居民端个人健康信息库 |
+| `workbench.html` | 统一运营工作台、全流程审计矩阵、路线图、系统就绪报告 |
+| `platform.html` | 平台建设驾驶舱、应用目录、信用评价、科研专病库治理、移动无障碍治理、安全信创台账 |
+| `index.html` | 卫健委端：慢病、统计、应急、质量、审计、互认、绩效 |
+| `institution.html` | 医疗机构端：授权档案、转诊、固定取药、证照、多点执业 |
+| `insurance.html` | 医保局/医保中心/区市县医保局：审核、监管、凭证、取药 |
+| `citizen.html` | 居民端个人健康信息库、家庭成员、授权共享、适老化服务 |
 | `mobile-preview.html` | 居民端手机预览 |
-| `county.html` | 县域医共体平台 |
+| `county.html` | 县域医共体平台、16255 模型、协同工单、互认、基层 AI |
 
-## 当前已实现功能
-
-### 统一运营工作台
-
-- 系统入口和跨端导航。
-- 慢病、医共体申报材料对齐。
-- 审计结论、专项缺口推进。
-- 全流程审计矩阵，覆盖 11 条业务链路。
-- 平台结构图、跨端待办、数据成熟度、继续开发队列。
-
-### 全民健康信息平台建设驾驶舱
-
-- 统一应用目录：来源系统、接口方式、责任处室、复用方式、上线批次和验收证据。
-- 医疗机构信用评价：评价周期、分项指标、得分等级和整改闭环。
-- 互联互通测评证据库：文件、链接、测试记录和整改状态归档。
-- 安全信创验收台账：等保、密评、国密改造和信创适配分账管理。
-- 所有建设治理事项统一写入维护日志和周报素材。
-
-### 大连市卫生健康委
-
-- 监管总览：建档人数、慢病人数、高危人数、随访、控制率。
-- 慢病医防整合：筛查任务、精准宣教、分级管理计划、固定取药监管、慢病推进审计。
-- 居民档案：新增、编辑、检索、详情、居民 360 总览。
-- 慢病登记：高血压、糖尿病、冠心病、脑卒中等示例病种。
-- 随访管理：待随访、逾期识别、一键完成。
-- 卫生统计：资源报表、服务量、统计导入、统计公报。
-- 出生/死亡医学证明统计。
-- 公共卫生应急：多点触发预警和处置任务。
-- 数据安全审计：访问日志、安全事件、授权记录、拒绝访问。
-
-### 医疗机构端
-
-- 授权健康档案查看。
-- 标准健康档案视图。
-- 转诊中心与协同任务。
-- 固定取药处方确认。
-- 死亡医学证明办理。
-- 医生档案和多点执业申请。
-
-### 医保管理与经办
-
-- 慢病结算审核。
-- 医保支付和控费规则。
-- 医疗机构监管事项。
-- 医保电子凭证核验。
-- 固定取药审核。
-- 审核访问留痕。
-- 大连市医保局负责政策、待遇和基金监管；大连市医保中心负责经办审核；区市县医保局负责属地监管协同。
-
-### 居民端
-
-- 个人/家庭成员切换。
-- 个人健康信息库。
-- 标准健康档案完整度。
-- 电子病历、检查检验、用药处方、过敏史、免疫接种、手术住院。
-- 慢病管理、筛查宣教、出生人口健康管理。
-- 固定取药、分级诊疗服务、健康码凭证。
-- 健康资料上传、授权共享、访问透明。
-- 手机预览和适老化服务入口。
-
-### 县域医共体平台
-
-- 县乡村一体化组织网络。
-- 16255 建设模型。
-- 36 项功能清单。
-- 六大医疗服务协同中心。
-- 协同中心工单、检查检验互认、基层 AI 辅诊运行病例。
-- 分级诊疗体系建设。
-- 运营监管指标和建设缺口审计。
+居民端已提供 PWA 基础壳：`manifest.webmanifest`、`service-worker.js` 和 `pwa-icon.svg` 支持浏览器安装入口、静态资源缓存和弱网/离线回退到居民端健康档案页面；个人健康信息库已细分电子病历、检查检验、用药处方、影像资料和附件资料，正式上线时仍需结合生产域名、HTTPS、PACS/文档存储授权和现场移动端策略复核。
 
 ## 数据与存储
 
-本地服务启动后优先使用：
+本地服务优先使用 SQLite 能力，并持续维护 GitHub Pages 可读的静态快照：
 
 ```text
 data/health-city.sqlite
-```
-
-同时维护 GitHub Pages 可读的静态快照：
-
-```text
 data/db.json
 ```
 
 核心集合包括：
 
-- `residents`、`accounts`、`personalRecords`
-- `diseases`、`followups`、`chronicScreeningTasks`
-- `chronicEducationPushes`、`chronicManagementPlans`
-- `careOrders`、`medicationPickups`、`insuranceClaims`
-- `countyConsortium`、`countyCollaborationOrders`
-- `countyMutualRecognitionRecords`、`countyAiDiagnosisCases`
-- `referralSystem`、`healthArchiveStandard`
-- `deathCertificates`、`birthCertificates`
-- `healthStatistics`、`healthStatisticsIngestion`
-- `securityEvents`、`dataAccessLogs`
-- `platformAudit`、`platformProcessAudit`、`platformRoadmap`
-- `applicationCatalog`、`institutionCreditEvaluations`
-- `securityAcceptanceLedger`、`platformEvidence`、`platformChangeLogs`
+- 居民与身份：`accounts`、`residents`、`authUsers`、`authOrganizations`
+- 健康档案：`personalRecords`、`healthArchiveStandard`、`diseases`、`followups`
+- 慢病闭环：`chronicScreeningTasks`、`chronicEducationPushes`、`chronicManagementPlans`、`chronicServiceRoles`、`chronicCapabilityConditions`、`chronicServicePathways`、`chronicComorbidityPlans`、`chronicTcmServices`、`chronicSelfManagement`、`chronicMedicationSupport`、`chronicQualityMetrics`
+- 协同业务：`careOrders`、`medicationPickups`、`insuranceClaims`、`referralSystem`
+- 县域医共体：`countyConsortium`、`countyCollaborationOrders`、`countyMutualRecognitionRecords`、`countyAiDiagnosisCases`
+- 证照统计：`deathCertificates`、`birthCertificates`、`healthStatistics`、`healthStatisticsIngestion`
+- 治理审计：`securityEvents`、`dataAccessLogs`、`platformRoadmap`、`platformAudit`、`platformProcessAudit`
+- 生产部署：`productionDeploymentPlan` 记录发布门禁、正式数据库适配、政务身份适配和审计保全路径
+- P2 治理：`institutionCreditEvaluations`、`creditEvaluationRules`、`researchDatasets`、`diseaseRegistryModels`
+- P2 体验：`mobileExperienceSettings`、`accessibilityChecklist`、`seniorServices`
+
+SQLite 结构化镜像已覆盖居民、账户、主索引、个人健康档案、慢病业务、随访、医保、证照、诊疗工单、固定取药、县域业务，以及 P2 的机构信用评价、科研数据集、专病库模型和无障碍验收清单。
 
 ## 后端 API
 
-服务端在 `server.js` 中，当前支持：
+主要 API：
 
-- `POST /api/auth/login`
-- `GET /api/auth/me`
-- `POST /api/auth/logout`
-- `GET /api/state`
-- `PUT /api/state`
-- `POST /api/reset`
-- `GET /api/personal-records`
-- `POST /api/personal-records`
-- `PATCH /api/personal-records/:id`
-- `GET /api/death-certificates`
-- `POST /api/death-certificates`
-- `GET /api/doctors/me`
-- `GET /api/multi-practice-applications`
-- `POST /api/multi-practice-applications`
-- `POST /api/health-statistics/import-jobs`
-- `POST /api/workflow-actions`
+| API | 说明 |
+|---|---|
+| `GET /api/health` | 健康检查，返回服务版本、环境、uptime 和存储元信息 |
+| `GET /api/metrics` | 管理端运行指标，返回请求数、状态码、慢请求、任务堆积、死信、质量问题；运营工作台会在服务模式下展示部分指标 |
+| `GET /api/system/readiness` | 管理端系统就绪报告，汇总 P2 集合、接口准备度、审计链、运行负载和现场外部依赖边界 |
+| `GET /api/process-audit` | 管理端全流程审计报告，汇总居民、慢病、医共体、医保取药、统计证照、安全合规和生产切换证据域 |
+| `POST /api/auth/login` / `GET /api/auth/me` / `POST /api/auth/logout` | 登录、会话、退出 |
+| `GET /api/state` / `PUT /api/state` | 按角色裁剪读取和管理端持久化状态 |
+| `GET/POST/PATCH /api/personal-records` | 个人健康档案读写 |
+| `POST /api/workflow-actions` | 通用工作流动作 |
+| `PATCH /api/chronic-management-plans/:id`、`/api/chronic-comorbidity-plans/:id`、`/api/chronic-tcm-services/:id`、`/api/chronic-self-management/:id`、`/api/chronic-medication-support/:id`、`/api/chronic-quality-metrics/:id` | 慢病管理计划、多病共管、中医药、自我管理、用药保障和质控记录的单条更新，支持机构/卫健委权限、居民授权范围和乐观锁 |
+| `GET /api/tasks` / `POST /api/tasks/:id/actions` | 统一任务中心 |
+| `GET /api/messages` / `POST /api/messages/:id/receipt` | 站内消息与送达回执 |
+| `GET /api/data-quality/issues` / `GET /api/data-quality/scorecard` | 数据质量治理 |
+| `GET /api/security/compliance-report` / `GET /api/security/high-risk-events` | 安全合规证据 |
+| `GET /api/credit-evaluations/calculate` | 信用评价自动计算 |
+| `GET /api/performance/consortium-report` | 医共体绩效、人财物、药耗、基层履约报表 |
+| `GET /api/research/datasets` / `POST /api/research/datasets/:id/actions` | 科研数据集治理 |
+| `GET /api/research/disease-models` / `POST /api/research/disease-models/:id/review` | 专病库模型和人工复核 |
+| `POST /api/auth/identity/preview` | 政务身份 claims 到角色、机构和首页的接入预映射 |
+| `GET /api/mobile/experience` / `POST /api/mobile/experience` | 移动体验和居民偏好 |
+| `GET /api/mobile/accessibility-checklist` | 无障碍验收清单 |
+| `GET /api/service-acceptance-summary` | 慢病和医共体服务域建模、开放事项和 open actions 摘要 |
+| `GET /api/site-template-readmes` | 运行时输出 `release/templates/*/README.md` 的当前模板说明、证据接口、行数和预览内容 |
 
-## 当前边界
+## 环境变量
 
-这是可运行 MVP，不是生产系统。真实上线仍需：
+复制 `.env.example` 作为部署环境配置参考：
 
-后续开发的 P0/P1/P2 排序和验收标准见 [全民健康信息平台后续开发优先级](./docs/后续开发优先级.md)。
+```text
+PORT=5173
+NODE_ENV=production
+STORAGE_ENGINE=auto
+DATA_DIR=/var/lib/chronic-care-platform
+SESSION_SECRETS=replace-with-long-random-secret
+INTEGRATION_GATEWAY_SECRET=replace-with-integration-secret
+DATABASE_URL=postgres://health:replace-with-password@postgres.internal:5432/chronic_care
+OIDC_ISSUER_URL=https://identity.example.gov.cn/real-issuer
+OIDC_CLIENT_ID=replace-with-oidc-client-id
+OIDC_CLIENT_SECRET=replace-with-oidc-client-secret
+AUDIT_EXPORT_PATH=/var/log/chronic-care-platform/audit
+SIEM_ENDPOINT=https://siem.example.gov.cn/ingest
+RETENTION_POLICY=10y-worm
+```
 
-- 对接政务统一认证、短信/CA/人脸核验。
-- 对接正式人口库、电子健康码、医保电子凭证。
-- 对接 HIS、EMR、LIS、PACS、医保结算、统计直报、电子证照、公安民政共享。
-- 将当前集合级 SQLite/JSON 存储拆分为生产数据库表。
-- 完成等保、密评、日志保全、脱敏和容灾。
+说明：
 
-## 验证命令
+- `STORAGE_ENGINE=auto` 会在 Node 支持 `node:sqlite` 时使用 SQLite，并继续维护 `data/db.json` 静态快照。
+- `SESSION_SECRETS` 支持逗号分隔多密钥，便于会话密钥轮换。
+- `INTEGRATION_GATEWAY_SECRET` 用于接口网关 HMAC 签名模拟。
+- `DATABASE_URL`、`OIDC_*`、`AUDIT_EXPORT_PATH`/`SIEM_ENDPOINT` 和 `RETENTION_POLICY` 是生产部署路径的正式数据库、政务身份和审计保全配置项。
+
+## 验证与质量门禁
 
 ```powershell
 npm.cmd run check
+npm.cmd test
+npm.cmd run test:coverage
+npm.cmd run test:e2e
+npm.cmd audit --omit=dev
 ```
 
-该命令会检查核心 JavaScript 语法。
+补充部署前检查：
+
+```powershell
+npm.cmd run deploy:check
+npm.cmd run deploy:check:full
+npm.cmd run env:check
+npm.cmd run release:report
+npm.cmd run release:report:full
+npm.cmd run release:manifest
+```
+
+`deploy:check` 会检查 README、部署文档、静态快照、P2 集合、P2 完成状态、P0 接口准备度、安全验收台账、环境脚本和关键 npm scripts；`deploy:check:full` 还会串行执行 `check`、`test`、`test:coverage`、`test:e2e` 和 `npm audit --omit=dev`。
+
+`env:check` 使用 `.env.example` 做演示/模板级校验，不要求真实密钥；`env:check:production` 会读取 `.env`，并按生产规则校验 `NODE_ENV=production`、非 JSON 存储、非占位且不少于 32 位的 `SESSION_SECRETS` 和 `INTEGRATION_GATEWAY_SECRET`。当前运行时正式支持 `STORAGE_ENGINE=auto` 或 `sqlite`；`postgres/postgresql` 仍在 `productionDeploymentPlan` 中作为后续适配项，配置后会被门禁拦截，避免静默回落。生产模式还要求政务身份 `OIDC_ISSUER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET` 与审计保全 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT` 至少一项可用。`env:check:production` 与 `release:report` 会附带生产切换清单，按环境文件、生产密钥、统一身份、审计保全、存储适配、现场接口联调、医保/证照交换、监控值守和灾备演练列出责任方、阻断状态和下一步动作；外部系统项必须有 `CUTOVER_SITE_INTERFACE_SIGNOFF`、`CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF`、`CUTOVER_MONITORING_SIGNOFF`、`CUTOVER_DR_REHEARSAL_SIGNOFF` 等现场签字信号才会通过。`release:report` 会汇总代码文件、关键 npm scripts、静态快照、P2 完成状态、接口准备度、安全验收、生产部署计划、验收证据和环境配置，默认输出 `release/release-report.json`、`release/release-report.md`、`release/production-cutover-checklist.json` 与 `release/production-cutover-checklist.md`；`release:manifest` 会生成 `release/release-artifact-manifest.json` 与 `release/release-artifact-manifest.md`，把所有发布报告、模板 README、生成命令和 API 证据整理成发布包目录清单；`release:report:full` 额外执行 `check`、`test`、`test:coverage`、`test:e2e`、`deploy:check` 和 `npm audit --omit=dev`。CI 会在每次检查中生成并上传 `release-readiness-report` artifact，便于发布取证。
+
+`release:report` 同时输出 `release/storage-model-inspection.json` 与 `release/storage-model-inspection.md`，记录 JSON 快照集合数、记录量、最大集合，以及 SQLite 表、schema 版本和迁移元数据；SQLite 文件在干净 checkout 中不存在时只作为提示，不阻断 CI。`production-db:readiness` 会生成 `release/production-db-readiness-report.json` 与 `release/production-db-readiness-report.md`，把 PostgreSQL/正式数据库切换前的 `productionDeploymentPlan`、当前 SQLite/JSON 模型、备份恢复演练文档、RTO/RPO 说明和运行时 PostgreSQL 阻断汇总为专项证据包。
+
+`identity:contract` 会生成 `release/identity-contract.json` 与 `release/identity-contract.md`，固化政务统一身份接入所需 claims、角色到门户映射、机构覆盖度和样例 claim 映射；`release:report` 与 CI 会同步归档该契约，便于现场 OIDC/SAML 联调前逐项确认。
+
+`audit:retention` 会生成 `release/audit-retention-report.json` 与 `release/audit-retention-report.md`，离线验证安全事件和数据访问日志哈希链，记录导出摘要、保全目标和安全验收台账；未配置 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT` 时只作为演示环境提示，生产切换仍由 `env:check:production` 阻断。
+
+`integration:readiness` 会生成 `release/integration-readiness-report.json` 与 `release/integration-readiness-report.md`，检查 P0 接口台账、HIS/EMR/LIS/PACS/医保/证照/统计契约、幂等键、签名和重试策略，并把身份、主索引、安全审计等 P0 覆盖关系纳入发布取证。
+
+`interface:mapping` 会生成 `release/interface-mapping-report.json` 与 `release/interface-mapping-report.md`，逐项归档 HIS/EMR/LIS/PACS/医保/电子证照/统计契约字段到平台集合和字段的映射、必填字段覆盖、幂等字段落点、签名与重试证据，作为现场接口字段差异确认和联调整改的前置材料。
+
+`data-quality:report` 会生成 `release/data-quality-report.json` 与 `release/data-quality-report.md`，检查居民主索引完整度、跨集合居民引用、personIndex 一致性、来源可追溯和整改闭环。
+
+`environment:matrix` 会生成 `release/environment-matrix-report.json` 与 `release/environment-matrix-report.md`，把 demo、staging、production 三层环境的必填变量、阻断变量、责任人、门禁脚本和上线验收规则固化为可检查矩阵；`release:report` 会同步归档该矩阵，便于生产切换前逐项确认环境分层和签字证据。
+
+`operations:readiness` 会生成 `release/operations-readiness-report.json` 与 `release/operations-readiness-report.md`，检查 `/api/health`、`/api/metrics`、`/api/system/readiness`、生产部署轨道、外部依赖风险和发布运维脚本。
+
+`process:audit` 会生成 `release/process-audit-report.json` 与 `release/process-audit-report.md`，把居民主索引、慢病验收、医共体验收、医保取药、统计证照、安全合规和生产切换汇总为全流程审计证据域；`release:report` 会同步归档该报告。
+
+`release:report` 会额外生成 `release/service-acceptance-summary.json` 与 `release/service-acceptance-summary.md`，把慢病和医共体服务域的建模情况、记录行数、开放事项数和 open actions 整理为单独验收摘要，便于从发布包直接核对 `/api/service-acceptance-summary` 的运行时结果。
+
+`site:pack` 会生成 `release/site-readiness-pack.json` 与 `release/site-readiness-pack.md`，把政务身份源、HIS/EMR/LIS/PACS/医保/证照接口联调、监控值守和生产签字事项转换为现场可填写的字段映射、样例报文、告警、值班和签字模板；同时生成 `release/templates/*/README.md`，按身份源映射、接口联调、监控值守、生产签字四类模板说明当前系统可实现的能力、需收集的输入、产出物和 API 证据。`GET /api/site-template-readmes` 会把这 4 个模板 README 作为运行时审计数据返回，工作台会展示每个模板的状态、责任方、行数、附件类型和 live evidence；`release:report` 会同步归档该准备包与模板 README。
+
+`monitoring:readiness` 会生成 `release/monitoring-readiness-report.json` 与 `release/monitoring-readiness-report.md`，专项检查健康检查、运行指标、慢请求、状态码、死信、数据质量、SLO 阈值、告警信号和 on-call escalation 证据；真实 Prometheus/OpenTelemetry 或平台日志绑定完成后，再用 `CUTOVER_MONITORING_SIGNOFF` 作为现场签字信号。
+
+`evaluation:evidence` 会生成 `release/evaluation-evidence-report.json` 与 `release/evaluation-evidence-report.md`，汇总互联互通四甲/五乙测评所需接口清单、标准映射、交易样例、整改记录、P1 接口需求和流程审计证据。
+
+## 备份、脱敏与回滚
+
+```powershell
+npm.cmd run storage:backup
+npm.cmd run storage:sanitize
+npm.cmd run storage:assess
+npm.cmd run rollback:snapshot -- "data/backups/<备份目录>"
+```
+
+- `storage:backup`：备份 `db.json` 和 `health-city.sqlite`，生成 SHA-256 清单。
+- `storage:sanitize`：生成脱敏演示快照。
+- `storage:assess`：生成恢复演练验收报告。
+- `rollback:snapshot`：从指定备份或最新备份恢复静态快照，并先创建 `pre-rollback` 安全副本。
+
+## 发布边界
+
+GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下能力必须部署 Node 后端才能使用：
+
+- 登录会话和角色 API 权限
+- SQLite 主存储、集合版本和乐观锁
+- 工作流动作、任务消息、审计写入
+- 接口网关签名、幂等、重试、死信
+- `/api/health` 和 `/api/metrics`
+
+在独立后端、身份源、专线网关、生产数据库和现场联调完成前，不应将当前演示站描述为生产系统。
+
+## 后续优化计划
+
+代码库内可继续推进：
+
+1. 生产部署基线：已完成环境模板、demo/staging/production 环境矩阵、健康检查、后端部署说明、发布/部署门禁、CI artifact 取证和静态快照回滚；后续按真实部署平台补密钥注入、现场签字和环境差异参数。
+2. 可观测性：已完成 `/api/metrics`、请求状态、慢请求、任务堆积、死信、数据质量和 `/api/system/readiness`；后续接入 Prometheus/OpenTelemetry 或平台日志服务。
+3. 数据模型深化：已完成 SQLite schema v7、集合版本、乐观锁、恢复演练和 P2 结构化镜像表；后续继续补生产数据库约束、索引、回滚脚本和原生备份证据。
+4. 发布取证：已完成 release report、deploy check、外部依赖风险台账、安全验收台账、慢病/医共体验收台账、全流程审计报告、数据质量/主索引证据、运维就绪证据和 CI 报告归档；后续在真实环境挂接测评报告、联调记录和上线签字。
+5. 测试深化：已覆盖 API 回归、覆盖率、E2E、并发冲突、静态快照、备份恢复、接口网关和发布门禁；后续围绕真实接口字段差异、移动弱网和现场权限边界继续扩展。
+
+必须现场资源才能完成：
+
+- 政务统一身份源、机构目录、医生身份源、居民实名关系。
+- HIS、EMR、LIS、PACS、心电、医保核心、电子证照、公安民政、妇幼和疾控系统。
+- 等保、密评、信创、专线、国密设备、生产密钥和测评报告。
+- 数据库原生在线备份、异地副本、RTO/RPO 验收、生产级恢复演练。
+- 真实老年用户可用性测试、机构信用公示口径、科研伦理审批和数据使用协议。
+
+更多细节见：
+
+- [部署说明](./DEPLOYMENT.md)
+- [后续开发优先级](./docs/后续开发优先级.md)
+- [GitHub 拆分部署方案](./docs/GitHub拆分部署方案.md)
+
+## Priority app 3: medical quality and safety supervision
+
+- Runnable portal: `quality-safety.html`
+- Role access: commission dispatches and reviews; institution/county users can open the same portal for scoped dashboard and rectification feedback.
+- API evidence: `/api/quality-safety/dashboard`, `/api/quality-safety/issues/:id/dispatch`, `/api/quality-safety/rectifications/:id/feedback`, `/api/quality-safety/rectifications/:id/review`
+- Seed collections: `qualitySafetyEvents`, `criticalValueAlerts`, `clinicalPathwayCases`, `medicalRecordQualityReviews`, `mutualRecognitionQualityReviews`, `qualityRectificationOrders`
+- Reused collections: `diagnosticReports`, `countyMutualRecognitionRecords`, `dataQualityIssues`, `institutionCreditEvaluations`, `securityEvents`, `hospitalInteroperabilityFunctions`
+- Release artifact: `quality-safety-report.md` / `quality-safety-report.json` from `npm.cmd run quality-safety:report`
+- SLA evidence: rectification orders include due-date status, evidence completeness, and commission escalation records.
+- Risk ranking: the portal and release report derive institution priority from severity, open issues, SLA pressure, missing feedback, and escalations.
+
+Site joint-testing boundary: production HIS/EMR/LIS/PACS critical-value rules, real clinical pathway dictionaries, signed medical-record sampling forms, mutual-recognition QC rules, department sign-off evidence, and notification channels remain site-owned inputs.

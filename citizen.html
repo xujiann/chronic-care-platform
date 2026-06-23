@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>居民端 · 健康档案与电子病历</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <meta name="theme-color" content="#1d4ed8" />
     <link rel="stylesheet" href="./citizen.css" />
     <script src="./auth.js"></script>
     <script>window.HealthCityAuth.requireRole(["citizen"])</script>
@@ -42,6 +44,14 @@
       </section>
 
       <section class="summary-grid" id="summary-grid"></section>
+
+      <section class="panel citizen-trend-panel">
+        <div class="panel-title">
+          <h2>健康指标趋势</h2>
+          <span id="trend-source-summary">血压、血糖、BMI 连续观察</span>
+        </div>
+        <div id="citizen-trend-grid" class="citizen-trend-grid"></div>
+      </section>
 
       <section class="panel">
         <div class="panel-title">
@@ -172,6 +182,8 @@
               <option value="allergies">过敏史</option>
               <option value="vaccines">免疫接种</option>
               <option value="admissions">手术住院</option>
+              <option value="imaging">影像资料</option>
+              <option value="attachments">附件资料</option>
             </select>
           </label>
           <label>日期<input name="date" type="date" required /></label>
@@ -208,5 +220,10 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="./health-archive-standard.js"></script>
     <script src="./citizen.js"></script>
+    <script>
+      if ("serviceWorker" in navigator && location.protocol !== "file:") {
+        window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));
+      }
+    </script>
   </body>
 </html>

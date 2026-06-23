@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "codex/**"]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Check JavaScript syntax
+        run: npm run check
+      - name: Run API regression tests
+        run: npm run test:coverage
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run browser end-to-end tests
+        run: npm run test:e2e
+      - name: Run deployment readiness gate
+        run: npm run deploy:check
+      - name: Inspect storage model
+        run: npm run storage:inspect
+      - name: Generate identity integration contract
+        run: npm run identity:contract
+      - name: Generate audit retention report
+        run: npm run audit:retention
+      - name: Generate data quality report
+        run: npm run data-quality:report
+      - name: Generate medical quality and safety report
+        run: npm run quality-safety:report
+      - name: Generate integration readiness report
+        run: npm run integration:readiness
+      - name: Generate interface mapping report
+        run: npm run interface:mapping
+      - name: Generate monitoring readiness report
+        run: npm run monitoring:readiness
+      - name: Generate operations readiness report
+        run: npm run operations:readiness
+      - name: Generate site readiness pack
+        run: npm run site:pack
+      - name: Generate production database readiness report
+        run: npm run production-db:readiness
+      - name: Generate interoperability evaluation evidence
+        run: npm run evaluation:evidence
+      - name: Generate release artifact manifest
+        run: npm run release:manifest
+      - name: Generate release readiness report
+        run: npm run release:report
+      - name: Upload release readiness report
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-readiness-report
+          path: release/
+          if-no-files-found: error
+      - name: Audit production dependencies
+        run: npm audit --omit=dev

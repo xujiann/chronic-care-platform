@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>关于平台 · 大连市全民健康信息平台</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>关于平台</span>
+          <h1>大连市全民健康信息平台可运行功能说明</h1>
+          <p>本页按照当前代码和本地服务已实现的能力，说明可以直接打开、登录、调用、审计和发布的功能边界。</p>
+        </div>
+        <nav>
+          <a href="./health-city.html">系统总览</a>
+          <a href="./platform.html">平台首页</a>
+          <a href="./workbench.html">运营工作台</a>
+          <a href="./index.html">卫健委端</a>
+          <a href="./login.html">登录</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" data-about-section="runtime-metrics">
+        <article class="metric-card">
+          <span>前端页面</span>
+          <strong>8 类</strong>
+          <small>首页、总览、工作台、卫健、机构、医保、医共体、居民端</small>
+        </article>
+        <article class="metric-card">
+          <span>演示角色</span>
+          <strong>5 类</strong>
+          <small>卫健、医疗机构、医保、居民、县域医共体</small>
+        </article>
+        <article class="metric-card">
+          <span>核心 API</span>
+          <strong>可调用</strong>
+          <small>认证、状态、任务、慢病、验收、发布报告</small>
+        </article>
+        <article class="metric-card">
+          <span>发布门禁</span>
+          <strong>脚本化</strong>
+          <small>check、test、e2e、deploy:check、release:report</small>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide" data-about-section="role-portals">
+          <div class="panel-title">
+            <h2>可直接运行的角色端</h2>
+            <span>同一套演示账号和权限过滤，支持本地 API 与静态预览降级</span>
+          </div>
+          <div class="capability-grid">
+            <a class="capability-card" href="./workbench.html" data-about-capability="workbench">
+              <strong>统一运营工作台</strong>
+              <span>查看系统成熟度、发布证据门禁、跨模块待办、服务验收摘要、模板 README、全流程审计与发布产物。</span>
+            </a>
+            <a class="capability-card" href="./index.html" data-about-capability="commission">
+              <strong>卫健委管理端</strong>
+              <span>运行监管总览、慢病医防整合、居民档案、慢病登记、随访管理、资源监管、绩效、风险预警、数据质量和系统运行监测。</span>
+            </a>
+            <a class="capability-card" href="./institution.html" data-about-capability="institution">
+              <strong>医疗机构端</strong>
+              <span>处理诊疗协同、签约居民、随访、长期处方、多点执业、固定取药、死亡医学证明和机构侧任务。</span>
+            </a>
+            <a class="capability-card" href="./insurance.html" data-about-capability="insurance">
+              <strong>医保管理与经办端</strong>
+              <span>演示医保待遇协同、结算经办、凭证核验、固定取药审核、基金监管和区县医保协同。</span>
+            </a>
+            <a class="capability-card" href="./county.html" data-about-capability="county">
+              <strong>县域医共体平台</strong>
+              <span>展示县域资源共享、基层慢病、公共卫生协同、统一绩效、人财物管理和医共体服务清单。</span>
+            </a>
+            <a class="capability-card" href="./citizen.html" data-about-capability="citizen">
+              <strong>居民端与手机预览</strong>
+              <span>居民可查看个人健康信息库、家庭成员、授权共享、电子病历、检验检查、用药和固定取药信息。</span>
+            </a>
+          </div>
+        </article>
+
+        <article class="panel" data-about-section="login-model">
+          <div class="panel-title">
+            <h2>登录与权限</h2>
+            <span>演示密码统一为 123456</span>
+          </div>
+          <div class="rules">
+            <div><strong>统一登录</strong><span>通过 <code>/api/auth/login</code> 签发后端会话令牌；静态预览时自动降级为本地演示会话。</span></div>
+            <div><strong>角色路由</strong><span><code>auth.js</code> 按角色过滤导航和页面访问，居民端不会暴露管理端入口。</span></div>
+            <div><strong>接口授权</strong><span>前端通过 <code>authFetch</code> 携带令牌访问受保护 API，服务端记录登录和登出审计。</span></div>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel" data-about-section="runtime-capabilities">
+        <div class="panel-title">
+          <h2>当前可运行的能力</h2>
+          <span>面向演示、验收、审计和继续开发的实际功能面</span>
+        </div>
+        <div class="capability-grid">
+          <article class="capability-card" data-about-capability="role-auth">
+            <strong>统一认证与状态接口</strong>
+            <span>可调用 <code>/api/auth/login</code>、<code>/api/auth/me</code>、<code>/api/state</code>，并按用户组织范围返回数据。</span>
+          </article>
+          <article class="capability-card" data-about-capability="workflow-tasks">
+            <strong>统一任务与开放动作</strong>
+            <span>可调用 <code>/api/tasks</code> 汇总慢病、医共体、上线验收、模板和服务补齐任务，工作台支持一键打开相关证据。</span>
+          </article>
+          <article class="capability-card" data-about-capability="chronic-care">
+            <strong>基层慢病管理</strong>
+            <span>已实现慢病服务角色、能力条件、服务路径、多病共管、中医药服务、自我管理、用药支持和质量指标看板。</span>
+          </article>
+          <article class="capability-card" data-about-capability="county-consortium">
+            <strong>县域医共体协同</strong>
+            <span>已覆盖医共体成员机构、资源共享、基层服务、公共卫生协同、绩效管理和县域服务验收闭环。</span>
+          </article>
+          <article class="capability-card" data-about-capability="service-acceptance">
+            <strong>服务验收摘要</strong>
+            <span>可调用 <code>/api/service-acceptance-summary</code>，输出各服务域、未关闭动作、证据路径和工作台跳转入口。</span>
+          </article>
+          <article class="capability-card" data-about-capability="site-template-readmes">
+            <strong>模板 README</strong>
+            <span>可调用 <code>/api/site-template-readmes</code> 查看已按当前功能重写的模板说明，并纳入站点就绪包。</span>
+          </article>
+          <article class="capability-card" data-about-capability="release-gates">
+            <strong>发布与审计门禁</strong>
+            <span>可运行 <code>npm run check</code>、<code>npm test</code>、<code>npm run test:e2e</code>、<code>npm run deploy:check</code>、<code>npm run release:report</code>。</span>
+          </article>
+          <article class="capability-card" data-about-capability="integration-gateway">
+            <strong>集成与外部接口准备</strong>
+            <span>已建成接口映射、集成就绪、生产库就绪和监控就绪报告；真实上线需替换统一身份、HIS/EMR/LIS/PACS、医保和短信等外部系统。</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide" data-about-section="audit-flow">
+          <div class="panel-title">
+            <h2>全流程审计路径</h2>
+            <span>从页面到脚本，再到发布产物</span>
+          </div>
+          <div class="priority-list">
+            <div class="priority-row"><strong>01</strong><div><h3>页面功能巡检</h3><p>打开平台首页、系统总览、工作台和各角色端，验证导航、权限、数据渲染、任务入口和移动预览。</p></div><span>浏览器可验</span></div>
+            <div class="priority-row"><strong>02</strong><div><h3>API 与证据巡检</h3><p>检查 <code>/api/system/readiness</code>、<code>/api/process-audit</code>、<code>/api/service-acceptance-summary</code>、<code>/api/release-report</code> 等接口。</p></div><span>本地服务可验</span></div>
+            <div class="priority-row"><strong>03</strong><div><h3>脚本门禁巡检</h3><p>用自动化脚本生成部署、接口、监控、运维、生产库、评价证据和发布清单，确保 README 与工作台同步。</p></div><span>CI 可复用</span></div>
+          </div>
+        </article>
+
+        <article class="panel" data-about-section="external-dependencies">
+          <div class="panel-title">
+            <h2>真实上线依赖</h2>
+            <span>演示已建档，现场需接入</span>
+          </div>
+          <div class="rules">
+            <div><strong>身份与电子凭证</strong><span>政务统一身份、电子健康码、医保电子凭证、CA、人脸与短信能力。</span></div>
+            <div><strong>医疗业务系统</strong><span>HIS、EMR、LIS、PACS、心电、处方流转和区域全民健康信息平台真实接口。</span></div>
+            <div><strong>生产运维条件</strong><span>生产数据库、对象存储、审计留存、告警通道、灾备演练和等保信创验收签字。</span></div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

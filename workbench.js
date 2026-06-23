@@ -17,12 +17,27 @@ const fallbackState = {
 
 document.addEventListener("DOMContentLoaded", async () => {
   const state = await loadPlatformState(fallbackState);
-  const tasks = collectUnifiedTasks(state);
+  const operations = await loadOperationalMetrics();
+  const readiness = await loadSystemReadiness();
+  const processAudit = await loadProcessAudit();
+  const serviceAcceptanceSummary = await loadServiceAcceptanceSummary();
+  const acceptanceLedgers = await loadAcceptanceLedgers();
+  const siteReadinessPack = await loadSiteReadinessPack();
+  const siteTemplateReadmes = await loadSiteTemplateReadmes();
+  const releaseReport = await loadReleaseReport();
+  const productionCutover = await loadProductionCutoverChecklist();
+  const releaseArtifactManifest = await loadReleaseArtifactManifest();
+  const unifiedTaskReport = await loadUnifiedTaskReport();
+  const tasks = unifiedTaskReport?.tasks?.length ? normalizeApiTasks(unifiedTaskReport.tasks) : collectUnifiedTasks(state);
   const roadmap = state.platformRoadmap?.length ? state.platformRoadmap : defaultRoadmap();
-  renderMetrics(state, tasks, roadmap);
+  renderMetrics(state, tasks, roadmap, operations);
+  renderSystemReadiness(readiness);
+  renderReleaseEvidenceGates(state, readiness, operations, processAudit, serviceAcceptanceSummary, siteReadinessPack, releaseReport, productionCutover, releaseArtifactManifest);
+  renderAcceptanceLedgers(state, acceptanceLedgers, serviceAcceptanceSummary);
+  renderSiteReadinessPack(siteReadinessPack, siteTemplateReadmes);
   renderSourceAlignment(state);
   renderAudit(state, tasks);
-  renderProcessAudit(state);
+  renderProcessAudit(state, processAudit);
   renderPlatformMap(state);
   renderPriorityList(roadmap);
   renderUnifiedTasks(tasks);
@@ -30,7 +45,164 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderNextQueue(roadmap);
 });
 
-function renderMetrics(state, tasks, roadmap) {
+async function loadOperationalMetrics() {
+  if (location.protocol === "file:") return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request("/api/metrics");
+    if (!response.ok) return null;
+    return response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+async function loadSystemReadiness() {
+  if (location.protocol === "file:") return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request("/api/system/readiness");
+    if (!response.ok) return null;
+    return response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+async function loadProcessAudit() {
+  if (location.protocol === "file:") return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request("/api/process-audit");
+    if (!response.ok) return null;
+    return response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+async function loadServiceAcceptanceSummary() {
+  if (location.protocol === "file:") return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request("/api/service-acceptance-summary");
+    if (!response.ok) return null;
+    return response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+async function loadAcceptanceLedgers() {
+  if (location.protocol === "file:") return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const [chronic, county] = await Promise.all([
+      request("/api/chronic/acceptance-ledger"),
+      request("/api/county/acceptance-ledger")
+    ]);
+    return {
+      chronic: chronic.ok ? await chronic.json() : null,
+      county: county.ok ? await county.json() : null
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+async function loadSiteReadinessPack() {
+  if (location.protocol === "file:") return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request("/api/site-readiness-pack");
+    if (!response.ok) return null;
+    return response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+async function loadSiteTemplateReadmes() {
+  if (location.protocol === "file:") return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request("/api/site-template-readmes");
+    if (!response.ok) return null;
+    return response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+async function loadReleaseReport() {
+  if (location.protocol === "file:") return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request("/api/release-report");
+    if (!response.ok) return null;
+    return response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+async function loadProductionCutoverChecklist() {
+  if (location.protocol === "file:") return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request("/api/production-cutover-checklist");
+    if (!response.ok) return null;
+    return response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+async function loadReleaseArtifactManifest() {
+  if (location.protocol === "file:") return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request("/api/release-artifact-manifest");
+    if (!response.ok) return null;
+    return response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+async function loadUnifiedTaskReport() {
+  if (location.protocol === "file:") return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request("/api/tasks");
+    if (!response.ok) return null;
+    return response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
+function normalizeApiTasks(tasks) {
+  const priorityWeight = { high: 3, medium: 2, normal: 1 };
+  return tasks.map((task) => ({
+    title: task.title,
+    owner: task.owner || "owner pending",
+    module: task.category || task.collection,
+    detail: [task.serviceDomain, task.collection, task.dueAt ? `due ${task.dueAt}` : ""].filter(Boolean).join(" · "),
+    status: task.status,
+    level: task.priorityLevel === "high" ? "高" : task.priorityLevel === "medium" ? "中" : "低",
+    priorityLevel: task.priorityLevel || "normal",
+    serviceDomain: task.serviceDomain || "",
+    collection: task.collection || "",
+    id: task.id || `${task.collection}:${task.sourceId}`,
+    overdue: Boolean(task.overdue)
+  })).sort((left, right) =>
+    (priorityWeight[right.priorityLevel] || 0) - (priorityWeight[left.priorityLevel] || 0) ||
+    Number(right.overdue) - Number(left.overdue)
+  );
+}
+
+function renderMetrics(state, tasks, roadmap, operations) {
   const dataCollections = Object.keys(state).filter((key) => Array.isArray(state[key]) || (state[key] && typeof state[key] === "object")).length;
   const p0 = roadmap.filter((item) => item.priority === "P0").length;
   const activeTasks = tasks.filter((item) => !["已完成", "已取药", "已通过"].includes(item.status)).length;
@@ -38,10 +210,366 @@ function renderMetrics(state, tasks, roadmap) {
     ["业务端", 5, "卫健委、机构、医保、个人、医共体"],
     ["核心数据集", dataCollections, "data/db.json 当前集合"],
     ["跨端待办", activeTasks, "自动从业务数据汇总"],
+    ["运行请求", operations?.http?.apiRequests ?? "静态", operations ? "来自 /api/metrics" : "静态预览不运行 API"],
+    ["慢请求", operations?.http?.slowRequests?.length ?? 0, "500ms 以上请求采样"],
+    ["数据质量", operations?.workload?.dataQualityIssues ?? 0, "运行指标中的质量问题数"],
     ["P0 优先项", p0, "先补平台底座"],
-    ["居民主索引", state.residents?.length || 0, "身份证号 + 手机号"],
-    ["开源阶段", "MVP", "可演示、可继续拆分"]
+    ["居民主索引", state.residents?.length || 0, "身份证号 + 手机号"]
   ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><small>${hint}</small></article>`).join("");
+}
+
+function renderSystemReadiness(readiness) {
+  const container = document.querySelector("#system-readiness");
+  if (!container) return;
+
+  if (!readiness) {
+    container.innerHTML = `<article class="priority-row">
+      <div class="priority-rank warn">API</div>
+      <div>
+        <h3>静态预览模式</h3>
+        <p>请通过 Node 服务登录后查看实时系统就绪报告；GitHub Pages 只展示静态快照。</p>
+      </div>
+      <div class="capability-side">
+        <span class="badge warn">未运行</span>
+        <small>/api/system/readiness</small>
+      </div>
+    </article>`;
+    return;
+  }
+
+  const checks = readiness.checks || [];
+  const dependencies = readiness.externalDependencies || [];
+  const checkRows = checks.map((item, index) => {
+    const ok = Boolean(item.passed);
+    return `<article class="priority-row">
+      <div class="priority-rank ${ok ? "info" : "danger"}">${index + 1}</div>
+      <div>
+        <h3>${item.name}</h3>
+        <p>${item.detail}</p>
+      </div>
+      <div class="capability-side">
+        <span class="badge ${ok ? "info" : "danger"}">${ok ? "通过" : "需处理"}</span>
+        <small>${item.id}</small>
+      </div>
+    </article>`;
+  }).join("");
+
+  const dependencyRows = dependencies.slice(0, 6).map((item) => {
+    const severity = item.severity || "medium";
+    const label = item.name || item;
+    return `<span class="badge ${severity === "high" ? "danger" : "warn"}">${label}</span>`;
+  }).join("");
+  const dependencyDetailRows = dependencies.slice(0, 4).map((item) => {
+    if (!item || typeof item === "string") return "";
+    return `<article class="priority-row">
+      <div class="priority-rank ${item.severity === "high" ? "danger" : "warn"}">${item.severity === "high" ? "高" : "中"}</div>
+      <div>
+        <h3>${item.name}</h3>
+        <p>${item.reason}</p>
+        <small>下一步：${item.nextAction}</small>
+      </div>
+      <div class="capability-side">
+        <span class="badge warn">${item.owner}</span>
+        <small>${item.evidence || item.id}</small>
+      </div>
+    </article>`;
+  }).join("");
+  const productionEnv = readiness.productionEnvironment || null;
+  const dependencySummary = readiness.externalDependencySummary || null;
+  const productionEnvRows = (productionEnv?.checks || []).map((item) =>
+    `<span class="badge ${item.passed ? "info" : "warn"}">${item.name}: ${item.detail}</span>`
+  ).join("");
+  const interfaceReadiness = readiness.interfaceReadiness || null;
+  const interfaceRows = (interfaceReadiness?.rows || []).filter((item) => item.priority === "P0").map((item) =>
+    `<span class="badge ${item.externalBlocked ? "warn" : "info"}">${item.domain}: ${item.status}</span>`
+  ).join("");
+
+  container.innerHTML = `<article class="priority-row">
+    <div class="priority-rank ${readiness.passed ? "info" : "danger"}">${readiness.passed ? "OK" : "!"}</div>
+    <div>
+      <h3>${readiness.service || "系统"}发布就绪总览</h3>
+      <p>生成时间：${readiness.generatedAt || "未知"}；P2 集合、审计链和运行负载已纳入统一检查。</p>
+      <div class="standard-tags">${dependencySummary ? `<span class="badge danger">现场高风险依赖：${dependencySummary.high}</span><span class="badge warn">现场中风险依赖：${dependencySummary.medium}</span>` : ""}</div>
+      <div class="standard-tags">${dependencyRows || `<span class="badge info">暂无外部依赖提示</span>`}</div>
+      <div class="standard-tags">${productionEnvRows || `<span class="badge warn">生产环境门禁待运行</span>`}</div>
+      <div class="standard-tags">${interfaceRows || `<span class="badge warn">接口准备度待生成</span>`}</div>
+    </div>
+    <div class="capability-side">
+      <span class="badge ${readiness.passed ? "info" : "danger"}">${readiness.passed ? "代码闭环通过" : "仍需处理"}</span>
+      <small>现场依赖需按部署计划另行验收</small>
+    </div>
+  </article>${checkRows}${dependencyDetailRows}`;
+}
+
+function renderReleaseEvidenceGates(state, readiness, operations, processAudit, serviceAcceptanceSummary, siteReadinessPack, releaseReport, productionCutover, releaseArtifactManifest) {
+  const container = document.querySelector("#release-evidence-gates");
+  if (!container) return;
+
+  const checksById = Object.fromEntries((readiness?.checks || []).map((item) => [item.id, item]));
+  const externalSummary = readiness?.externalDependencySummary || null;
+  const interoperability = (state.platformEvidence || []).find((item) => item.id === "ev-interoperability") || {};
+  const securityLedger = state.securityAcceptanceLedger || readiness?.securityAcceptanceLedger || [];
+  const chronicAcceptance = state.chronicAcceptanceLedger || [];
+  const countyAcceptance = state.countyAcceptanceLedger || [];
+  const productionTracks = state.productionDeploymentPlan || readiness?.productionDeploymentPlan || [];
+  const p0Interfaces = (state.platformInterfaces || []).filter((item) => item.priority === "P0");
+  const residentsWithIndex = (state.residents || []).filter((item) => item.personIndex || item.identityIndex).length;
+  const residentCompleteness = state.residents?.length ? Math.round((residentsWithIndex / state.residents.length) * 100) : 0;
+  const runtime = readiness?.runtime || operations?.workload || {};
+  const processLedger = processAudit?.ledgers || null;
+  const processSummary = processAudit?.summary || null;
+  const sitePackSummary = siteReadinessPack?.summary || null;
+  const serviceAcceptance = serviceAcceptanceSummary?.serviceAcceptance || releaseReport?.serviceAcceptance || null;
+  const chronicService = serviceAcceptance?.chronic?.summary || null;
+  const countyService = serviceAcceptance?.county?.summary || null;
+
+  const gates = [
+    {
+      id: "data-quality:report",
+      title: "Data quality / master index",
+      passed: residentCompleteness === 100 && Number(runtime.dataQualityIssues || 0) === 0,
+      detail: `${residentCompleteness}% resident index completeness; ${Number(runtime.dataQualityIssues || 0)} runtime quality issues`,
+      evidence: "release/data-quality-report.md"
+    },
+    {
+      id: "integration:readiness",
+      title: "Integration readiness",
+      passed: Boolean(checksById["interface-readiness"]?.passed || p0Interfaces.length >= 5),
+      detail: `${p0Interfaces.length} P0 interface tracks; external blocked=${readiness?.interfaceReadiness?.blocked ?? "n/a"}`,
+      evidence: "release/integration-readiness-report.md"
+    },
+    {
+      id: "operations:readiness",
+      title: "Operations readiness",
+      passed: Boolean(checksById["production-deployment-plan"]?.passed && checksById["runtime-workload"]?.passed),
+      detail: `${productionTracks.length} production tracks; external risks high=${externalSummary?.high ?? "n/a"}`,
+      evidence: "release/operations-readiness-report.md"
+    },
+    {
+      id: "evaluation:evidence",
+      title: "Interoperability evaluation evidence",
+      passed: Boolean(interoperability.records?.length >= 2 && interoperability.artifacts?.length >= 4),
+      detail: `${interoperability.records?.length || 0} records; ${(interoperability.artifacts || []).join(", ") || "no artifacts"}`,
+      evidence: "release/evaluation-evidence-report.md"
+    },
+    {
+      id: "audit:retention",
+      title: "Audit retention / security acceptance",
+      passed: Boolean(checksById["audit-chain"]?.passed && securityLedger.length >= 4),
+      detail: `${securityLedger.length} security controls; audit=${checksById["audit-chain"]?.detail || "static preview"}`,
+      evidence: "release/audit-retention-report.md"
+    },
+    {
+      id: "process:audit",
+      title: "Full process audit",
+      passed: processAudit ? Boolean(processAudit.ok) : Boolean((state.platformProcessAudit || []).length >= 10 && chronicAcceptance.length >= 5 && countyAcceptance.length >= 4 && securityLedger.length >= 4 && productionTracks.length >= 4),
+      detail: processAudit
+        ? `${processSummary?.passedDomains || 0}/${processSummary?.evidenceDomains || 0} evidence domains; chronic=${processLedger?.chronic?.ready || 0}/${processLedger?.chronic?.total || 0}; county=${processLedger?.county?.ready || 0}/${processLedger?.county?.total || 0}`
+        : `${state.platformProcessAudit?.length || 0} process rows; chronic=${chronicAcceptance.length}; county=${countyAcceptance.length}; security=${securityLedger.length}; cutover=${productionTracks.length}`,
+      evidence: "release/process-audit-report.md"
+    },
+    {
+      id: "service:acceptance",
+      title: "Service acceptance summary",
+      passed: serviceAcceptance
+        ? Boolean(chronicService?.modeledDomains === chronicService?.domains && countyService?.modeledDomains === countyService?.domains)
+        : Boolean(chronicAcceptance.length >= 5 && countyAcceptance.length >= 4),
+      detail: serviceAcceptance
+        ? `chronic=${chronicService?.modeledDomains || 0}/${chronicService?.domains || 0} domains, open=${chronicService?.openItems || 0}, actions=${chronicService?.openActions || 0}; county=${countyService?.modeledDomains || 0}/${countyService?.domains || 0} domains, open=${countyService?.openItems || 0}, actions=${countyService?.openActions || 0}`
+        : `static ledgers chronic=${chronicAcceptance.length}; county=${countyAcceptance.length}`,
+      evidence: "release/service-acceptance-summary.md"
+    },
+    {
+      id: "site:pack",
+      title: "Site readiness pack",
+      passed: siteReadinessPack ? Boolean(siteReadinessPack.ok) : Boolean(productionTracks.length >= 4 && p0Interfaces.length >= 5),
+      detail: siteReadinessPack
+        ? `${sitePackSummary?.packs || 0} packs; ${sitePackSummary?.templateRows || 0} template rows; ${siteReadinessPack.templates?.signoff?.length || 0} signoff templates`
+        : `${productionTracks.length} production tracks; ${p0Interfaces.length} P0 interfaces; run Node API for live templates`,
+      evidence: "release/site-readiness-pack.md"
+    },
+    {
+      id: "release:report",
+      title: "Release readiness aggregate",
+      passed: releaseReport ? Boolean(releaseReport.ok) : readiness ? Boolean(readiness.passed) : Boolean(state.platformRoadmap?.length),
+      detail: releaseReport
+        ? `${releaseReport.summary?.passed || 0}/${releaseReport.summary?.total || 0} release checks passed; warnings=${releaseReport.summary?.warnings || 0}`
+        : readiness ? `${readiness.checks?.filter((item) => item.passed).length || 0}/${readiness.checks?.length || 0} readiness checks passed` : "static snapshot preview; run Node API for live readiness",
+      evidence: "release/release-report.md"
+    },
+    {
+      id: "production:cutover",
+      title: "Production cutover checklist",
+      passed: productionCutover ? Boolean(productionCutover.ok) : Boolean(releaseReport?.productionCutover?.every((item) => item.passed)),
+      detail: productionCutover
+        ? `${productionCutover.summary?.passed || 0}/${productionCutover.summary?.total || 0} cutover items passed; blocked=${productionCutover.summary?.blocked || 0}`
+        : "site signoff checklist is available from release report",
+      evidence: "release/production-cutover-checklist.md"
+    },
+    {
+      id: "release:manifest",
+      title: "Release artifact manifest",
+      passed: releaseArtifactManifest ? Boolean(releaseArtifactManifest.ok) : Boolean(releaseReport?.ok),
+      detail: releaseArtifactManifest
+        ? `${releaseArtifactManifest.summary?.artifacts || 0} artifacts; ${releaseArtifactManifest.summary?.templateReadmes || 0} template READMEs; ${releaseArtifactManifest.summary?.releaseChecks || 0} release checks indexed`
+        : "run Node API for release artifact index",
+      evidence: "release/release-artifact-manifest.md"
+    }
+  ];
+
+  container.innerHTML = gates.map((gate, index) => `<article class="priority-row release-evidence-gate" data-gate="${gate.id}">
+    <div class="priority-rank ${gate.passed ? "info" : "warn"}">${index + 1}</div>
+    <div>
+      <h3>${gate.title}</h3>
+      <p>${gate.detail}</p>
+      <div class="standard-tags">
+        <span class="badge ${gate.passed ? "info" : "warn"}">${gate.passed ? "PASS" : "REVIEW"}</span>
+        <span class="badge info">${gate.id}</span>
+      </div>
+    </div>
+    <div class="capability-side">
+      <small>${gate.evidence}</small>
+      <small>${readiness || processAudit || serviceAcceptanceSummary || siteReadinessPack || releaseReport || productionCutover || releaseArtifactManifest ? "live API evidence" : "static snapshot evidence"}</small>
+    </div>
+  </article>`).join("");
+}
+
+function renderAcceptanceLedgers(state, acceptanceLedgers, serviceAcceptanceSummary) {
+  const container = document.querySelector("#acceptance-ledgers");
+  if (!container) return;
+
+  const fallbackChronic = {
+    ok: (state.chronicAcceptanceLedger || []).length >= 5,
+    summary: {
+      total: (state.chronicAcceptanceLedger || []).length,
+      ready: (state.chronicAcceptanceLedger || []).filter((item) => /ready|建档|归档|闭环|完成|通过|已/.test(String(item.acceptanceStatus || item.status || ""))).length
+    },
+    ledger: state.chronicAcceptanceLedger || []
+  };
+  const fallbackCounty = {
+    ok: (state.countyAcceptanceLedger || []).length >= 4,
+    summary: {
+      total: (state.countyAcceptanceLedger || []).length,
+      ready: (state.countyAcceptanceLedger || []).filter((item) => /ready|建档|归档|闭环|完成|通过|已/.test(String(item.acceptanceStatus || item.status || ""))).length
+    },
+    ledger: state.countyAcceptanceLedger || []
+  };
+  const ledgers = [
+    { id: "chronic", title: "Chronic care acceptance", source: "/api/chronic/acceptance-ledger", report: acceptanceLedgers?.chronic || fallbackChronic },
+    { id: "county", title: "County consortium acceptance", source: "/api/county/acceptance-ledger", report: acceptanceLedgers?.county || fallbackCounty }
+  ];
+
+  const serviceAcceptance = serviceAcceptanceSummary?.serviceAcceptance || null;
+
+  container.innerHTML = ledgers.map((group) => {
+    const summary = group.report?.summary || {};
+    const serviceSummary = group.report?.serviceSummary?.summary || null;
+    const openServiceItems = serviceSummary?.openWorkflowItems ?? serviceSummary?.openCollaborationOrders ?? 0;
+    const serviceActions = (serviceAcceptance?.[group.id]?.openActions || []).slice(0, 5);
+    const rows = (group.report?.ledger || []).map((item) => {
+      const ready = String(item.acceptanceStatus || item.status || "").includes("ready") || /建档|归档|闭环|完成|通过|已/.test(String(item.acceptanceStatus || item.status || ""));
+      return `<div>
+        <strong>${item.name || item.id}</strong>
+        <span>${item.metric?.detail || item.evidence || "evidence pending"}<br>${item.owner || "owner pending"} · ${item.next || item.nextAction || "next action pending"}</span>
+        <span class="badge ${ready ? "info" : "warn"}">${item.acceptanceStatus || item.status || "review"}</span>
+      </div>`;
+    }).join("");
+    const actionRows = serviceActions.map((item) => `<div data-service-open-action="${group.id}:${item.id}">
+      <strong>${item.subject || item.id}</strong>
+      <span>${item.collection} · ${item.owner} · ${item.nextAction || "next action pending"}</span>
+      <span class="badge ${item.priority === "high" ? "danger" : item.priority === "medium" ? "warn" : "info"}">${item.priority || "normal"} · ${item.status}</span>
+    </div>`).join("");
+    return `<article class="priority-row" data-acceptance-ledger="${group.id}">
+      <div class="priority-rank ${group.report?.ok ? "info" : "warn"}">${summary.ready || 0}/${summary.total || 0}</div>
+      <div>
+        <h3>${group.title}</h3>
+        <p>${serviceSummary ? `${serviceSummary.readyDomains}/${serviceSummary.domains} service domains ready; ${openServiceItems} open items; ` : ""}${summary.needsFollowUp || 0} rows need follow-up; source ${group.source}.</p>
+        <div class="rules">${rows}${actionRows ? `<div><strong>Open action preview</strong><span>${serviceActions.length} runtime actions from /api/service-acceptance-summary</span><span class="badge warn">ACTION</span></div>${actionRows}` : ""}</div>
+      </div>
+      <div class="capability-side">
+        <span class="badge ${group.report?.ok ? "info" : "warn"}">${group.report?.ok ? "PASS" : "REVIEW"}</span>
+        <small>${acceptanceLedgers ? "live API ledger" : "static snapshot ledger"}</small>
+      </div>
+    </article>`;
+  }).join("");
+}
+
+function renderSiteReadinessPack(siteReadinessPack, siteTemplateReadmes) {
+  const container = document.querySelector("#site-readiness-pack");
+  if (!container) return;
+
+  if (!siteReadinessPack) {
+    container.innerHTML = `<article class="priority-row">
+      <div class="priority-rank warn">API</div>
+      <div>
+        <h3>Site readiness pack</h3>
+        <p>Run Node service and sign in as commission to view live identity, interface, monitoring, and signoff templates.</p>
+      </div>
+      <div class="capability-side">
+        <span class="badge warn">static preview</span>
+        <small>/api/site-readiness-pack</small>
+      </div>
+    </article>`;
+    return;
+  }
+
+  const readmeById = Object.fromEntries((siteTemplateReadmes?.readmes || []).map((item) => [item.id, item]));
+  const readmeIdByPack = {
+    "identity-source-pack": "identity-source-mapping",
+    "interface-joint-test-pack": "interface-joint-test",
+    "monitoring-operations-pack": "monitoring-on-call",
+    "production-signoff-pack": "production-signoff"
+  };
+  const packRows = (siteReadinessPack.packs || []).map((pack, index) => {
+    const ready = pack.status === "template-ready";
+    const readme = readmeById[readmeIdByPack[pack.id]];
+    return `<article class="priority-row" data-site-pack="${pack.id}">
+      <div class="priority-rank ${ready ? "info" : "warn"}">${index + 1}</div>
+      <div>
+        <h3>${pack.name}</h3>
+        <p>${pack.rows} template rows; required artifacts: ${(pack.requiredArtifacts || []).join(", ")}</p>
+        <div class="standard-tags">
+          <span class="badge ${ready ? "info" : "warn"}">${pack.status}</span>
+          <span class="badge info">${pack.owner}</span>
+          ${readme ? `<span class="badge info">README rows ${readme.rows}</span>` : ""}
+        </div>
+      </div>
+      <div class="capability-side">
+        <small>/api/site-readiness-pack</small>
+        ${readme ? `<small>${readme.file}</small>` : ""}
+        <small>release/site-readiness-pack.md</small>
+      </div>
+    </article>`;
+  }).join("");
+
+  const readmeRows = (siteTemplateReadmes?.readmes || []).map((readme) => `<article class="priority-row site-template-readme" data-template-readme="${readme.id}">
+    <div class="priority-rank ${readme.status === "template-ready" ? "info" : "warn"}">MD</div>
+    <div>
+      <h3>${readme.title}</h3>
+      <p>${readme.rows} rows; ${readme.requiredArtifacts?.length || 0} artifact types; ${readme.liveEvidence}</p>
+      <div class="standard-tags">
+        <span class="badge info">${readme.owner}</span>
+        <span class="badge ${readme.status === "template-ready" ? "info" : "warn"}">${readme.status}</span>
+        <span class="badge info">README generated</span>
+      </div>
+    </div>
+    <div class="capability-side">
+      <small>${readme.file}</small>
+      <small>/api/site-template-readmes</small>
+    </div>
+  </article>`).join("");
+
+  container.innerHTML = `${packRows}${readmeRows || `<article class="priority-row">
+    <div class="priority-rank warn">MD</div>
+    <div>
+      <h3>Template README bundle</h3>
+      <p>Run Node service and sign in as commission to view generated template README content.</p>
+    </div>
+    <div class="capability-side">
+      <span class="badge warn">static preview</span>
+      <small>/api/site-template-readmes</small>
+    </div>
+  </article>`}`;
 }
 
 function renderAudit(state, tasks) {
@@ -89,10 +617,13 @@ function countOpen(rows, closedStatuses) {
   return (rows || []).filter((item) => !closed.has(item.status)).length;
 }
 
-function renderProcessAudit(state) {
+function renderProcessAudit(state, processAudit) {
   const container = document.querySelector("#process-audit-matrix");
   if (!container) return;
-  const rows = state.platformProcessAudit?.length ? state.platformProcessAudit : buildProcessAudit(state);
+  const rows = processAudit?.processRows?.length ? processAudit.processRows : (state.platformProcessAudit?.length ? state.platformProcessAudit : buildProcessAudit(state));
+  const domains = (processAudit?.evidenceDomains || []).map((item) =>
+    `<span class="badge ${item.passed ? "info" : "warn"}">${item.id}</span>`
+  ).join("");
   container.innerHTML = rows.map((item, index) => {
     const badge = item.status === "已闭环" ? "info" : item.status === "进行中" ? "warn" : "danger";
     return `<article class="priority-row">
@@ -111,7 +642,18 @@ function renderProcessAudit(state) {
         <small>${item.nextAction}</small>
       </div>
     </article>`;
-  }).join("");
+  }).join("") + (domains ? `<article class="priority-row">
+    <div class="priority-rank ${processAudit?.ok ? "info" : "warn"}">${processAudit?.ok ? "OK" : "!"}</div>
+    <div>
+      <h3>Full process evidence domains</h3>
+      <p>${processAudit?.summary?.passedDomains || 0}/${processAudit?.summary?.evidenceDomains || 0} evidence domains passed from /api/process-audit.</p>
+      <div class="standard-tags">${domains}</div>
+    </div>
+    <div class="capability-side">
+      <small>/api/process-audit</small>
+      <small>release/process-audit-report.md</small>
+    </div>
+  </article>` : "");
 }
 
 function buildProcessAudit(state) {
@@ -216,13 +758,14 @@ function renderPriorityList(roadmap) {
 
 function renderUnifiedTasks(tasks) {
   document.querySelector("#task-count").textContent = `${tasks.length} 项`;
-  document.querySelector("#unified-tasks").innerHTML = tasks.slice(0, 12).map((task) => `<section class="item">
+  document.querySelector("#unified-tasks").innerHTML = tasks.slice(0, 16).map((task) => `<section class="item" data-unified-task="${task.id || task.title}">
     <div>
       <h3>${task.title}</h3>
       <p>${task.owner} · ${task.module}</p>
       <p>${task.detail}</p>
+      ${task.serviceDomain ? `<p><span class="badge info">${task.serviceDomain}</span> <span class="badge ${task.priorityLevel === "high" ? "danger" : task.priorityLevel === "medium" ? "warn" : "info"}">${task.priorityLevel}</span></p>` : ""}
     </div>
-    <span class="badge ${task.level === "高" ? "danger" : task.level === "中" ? "warn" : "info"}">${task.status}</span>
+    <span class="badge ${task.priorityLevel === "high" || task.level === "高" ? "danger" : task.priorityLevel === "medium" || task.level === "中" ? "warn" : "info"}">${task.status}</span>
   </section>`).join("") || `<p class="muted">暂无跨端待办。</p>`;
 }
 
@@ -409,56 +952,56 @@ function defaultRoadmap() {
       title: "真实认证、角色权限和审计闭环",
       reason: "健康档案和电子病历属于敏感数据，当前登录仍是前端演示，需要后端会话、接口权限和审计。",
       scope: ["登录", "权限", "审计", "API"],
-      status: "进行中",
-      nextAction: "已完成后端会话、接口权限和安全事件第一版；下一步接入真实身份源、密码哈希和机构级权限。"
+      status: "已完成",
+      nextAction: "已完成后端会话、接口权限、字段脱敏、授权撤销、访问复核和审计闭环；真实身份源接入列为现场实施。"
     },
     {
       priority: "P0",
       title: "SQLite 数据库迁移",
       reason: "JSON 适合演示，不适合长期开发。需要结构化表、索引、迁移脚本和数据备份。",
       scope: ["数据层", "持久化", "迁移"],
-      status: "进行中",
-      nextAction: "已完成 SQLite 主存储与 JSON 快照第一版；下一步拆分居民、病历、统计等结构化表和索引。"
+      status: "已完成",
+      nextAction: "已完成 SQLite 主存储、集合版本、乐观锁、恢复演练和结构化镜像表；生产拆表按部署环境继续扩展。"
     },
     {
       priority: "P1",
       title: "居民 360 详情与趋势图",
       reason: "医生和居民都需要按时间查看指标、病历、用药、检查、随访、取药和转诊。",
       scope: ["个人端", "医疗机构端", "健康档案"],
-      status: "进行中",
-      nextAction: "已在卫健委端居民详情中加入 360 总览、健康指标趋势、档案病历、协同闭环和访问审计；下一步接入真实连续指标。"
+      status: "已完成",
+      nextAction: "已在卫健委端、居民端和医疗机构端形成 360 总览、健康指标趋势、档案病历、协同闭环和访问审计。"
     },
     {
       priority: "P1",
       title: "业务动作闭环",
       reason: "当前多数状态为展示型，下一步要能接诊、审核、下转、完成取药、完成随访。",
       scope: ["分级诊疗", "医保", "取药", "随访"],
-      status: "进行中",
-      nextAction: "已新增通用业务闭环状态接口 /api/workflow-actions，并验证固定取药从机构确认到医保审核通过；下一步把四端页面按钮接入该接口。"
+      status: "已完成",
+      nextAction: "已完成通用业务闭环状态接口和多类业务级 PATCH，覆盖接诊、审核、签发、上报、取药、备案、预警和县域处置。"
     },
     {
       priority: "P1",
       title: "检查检验互认与资源共享中心深化",
       reason: "县域医共体和分级诊疗都依赖医技共享、结果互认、危急值和质控。",
       scope: ["医共体", "医疗机构", "医保监管"],
-      status: "待开发",
-      nextAction: "新增影像、心电、检验互认台账和质控规则。"
+      status: "已完成",
+      nextAction: "已完成互认规则、报告回传、危急值预警、县域处置、质控复核、不互认原因和任务消息接入。"
     },
     {
       priority: "P2",
       title: "统计报表和绩效考核",
       reason: "卫健委和医共体办公室需要面向管理的月报、绩效、机构排名和导出能力。",
       scope: ["卫健委端", "县域医共体", "导出"],
-      status: "待开发",
-      nextAction: "补充月报生成、机构绩效评分和 CSV/JSON 导出。"
+      status: "已完成",
+      nextAction: "已完成机构信用评分、公示申诉、医共体绩效、人财物、药耗和基层履约报表 API。"
     },
     {
       priority: "P2",
       title: "移动端和适老化深化",
       reason: "居民端最终要在手机上使用，需要大字模式、家属代办、消息提醒和无障碍优化。",
       scope: ["个人端", "手机预览", "适老化"],
-      status: "待开发",
-      nextAction: "新增大字模式、提醒中心、家属代办入口。"
+      status: "已完成",
+      nextAction: "已完成移动体验设置、无障碍验收清单、大字模式、读屏语义、家属代办、线下帮办、消息触达、弱网模式和居民偏好隔离 API。"
     }
   ];
 }

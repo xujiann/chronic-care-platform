@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Medical Quality and Safety Supervision</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+    <script>window.HealthCityAuth.requireRole(["commission", "institution", "county"])</script>
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>Priority application 3</span>
+          <h1>Medical quality and safety supervision</h1>
+          <p>Quality dashboard, issue dispatch, rectification feedback, and commission review for critical values, clinical pathways, record QC, mutual recognition QC, and safety events.</p>
+        </div>
+        <nav>
+          <a href="./workbench.html">Workbench</a>
+          <a href="./platform.html">Platform</a>
+          <a href="./index.html">Commission</a>
+          <a href="./institution.html">Institution</a>
+          <a href="./county.html">County</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" id="quality-safety-metrics"></section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>Regulatory priority</h2>
+          <span>Institution risk ranking</span>
+        </div>
+        <div id="quality-safety-risks" class="table-wrap"></div>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>Issue queue</h2>
+            <span id="quality-safety-updated"></span>
+          </div>
+          <div id="quality-safety-issues" class="table-wrap"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>Reuse map</h2>
+            <span>Existing platform collections</span>
+          </div>
+          <div id="quality-safety-reuse" class="rules"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>Rectification loop</h2>
+            <span>Dispatch, feedback, and review</span>
+          </div>
+          <div id="quality-safety-rectifications" class="table-wrap"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>Critical values</h2>
+            <span>LIS/PACS/HIS closed loop</span>
+          </div>
+          <div id="quality-safety-critical" class="rules"></div>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>Boundary evidence</h2>
+          <span>Pathway, medical record, and mutual recognition QC</span>
+        </div>
+        <div id="quality-safety-boundaries" class="table-wrap"></div>
+      </section>
+    </main>
+
+    <script src="./quality-safety.js"></script>
+  </body>
+</html>
