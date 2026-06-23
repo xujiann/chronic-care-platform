@@ -1,4 +1,5 @@
 const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthStatistics: {}, doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {} };
+const institutionApiBase = location.protocol === "file:" || location.hostname.endsWith("github.io") ? "" : "/api";
 let platformState = fallbackState;
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -8,6 +9,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 function renderAll(state) {
+  populateBirthCertificateForm(state);
   renderMetrics(state);
   renderDoctorAccounts(state);
   renderMultiPracticePolicy(state);
@@ -35,6 +37,9 @@ function bindInstitutionActions() {
     button.disabled = false;
     if (result.ok) renderAll(platformState);
   });
+  document.querySelector("#birth-certificate-form")?.addEventListener("submit", submitBirthCertificate);
+  document.querySelector("#birth-status-filter")?.addEventListener("change", () => renderBirthCertificates(platformState));
+  document.querySelector("#birth-risk-filter")?.addEventListener("change", () => renderBirthCertificates(platformState));
 }
 
 function actionButton(collection, id, label, updates, note) {
@@ -43,6 +48,77 @@ function actionButton(collection, id, label, updates, note) {
 
 function residentOf(state, id) {
   return state.residents.find((item) => item.id === id);
+}
+
+function formatBirthDateTime(value) {
+  if (!value) return new Date().toLocaleString("zh-CN", { hour12: false });
+  return String(value).replace("T", " ");
+}
+
+function birthCertificateNo() {
+  const year = new Date().getFullYear();
+  const count = (platformState.birthCertificates || []).length + 1;
+  return `B${year}${String(count).padStart(6, "0")}`;
+}
+
+function populateBirthCertificateForm(state) {
+  const select = document.querySelector("#birth-certificate-form select[name='maternalResidentId']");
+  if (!select) return;
+  select.innerHTML = (state.residents || []).map((resident) => `<option value="${resident.id}">${resident.name} · ${resident.idCard || resident.phone || resident.organization}</option>`).join("");
+  const dateInput = document.querySelector("#birth-certificate-form input[name='birthDateTime']");
+  if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0, 16);
+}
+
+async function submitBirthCertificate(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const formData = Object.fromEntries(new FormData(form));
+  const mother = residentOf(platformState, formData.maternalResidentId);
+  const weight = Number(formData.birthWeight || 0);
+  const payload = {
+    certificateNo: birthCertificateNo(),
+    certificateVersion: "第七版",
+    issueType: formData.issueType || "首次签发",
+    maternalResidentId: formData.maternalResidentId,
+    motherName: mother?.name || "待核验",
+    fatherName: formData.fatherName || "待核验",
+    newbornName: formData.newbornName || "未命名新生儿",
+    newbornGender: formData.newbornGender || "待确认",
+    birthDateTime: formatBirthDateTime(formData.birthDateTime),
+    birthWeight: weight,
+    birthLength: Number(formData.birthLength || 0),
+    birthPlace: "医疗卫生机构",
+    issuingInstitution: mother?.organization || "本机构",
+    issuingPhysician: formData.issuingPhysician || "签发医师待确认",
+    materials: ["父母有效身份证件", "分娩信息核验", "首次签发登记表"],
+    status: formData.status || "待签发",
+    electronicLicenseStatus: formData.status === "已签发" ? "已生成" : "待生成",
+    publicSecuritySync: "未共享",
+    maternalChildSync: "待入册",
+    healthManagementStatus: weight > 0 && weight < 2500 ? "低体重儿专案待建档" : "待建档",
+    qualityCheck: "待质控",
+    nextService: formData.nextService || (weight > 0 && weight < 2500 ? "低体重儿专案随访与喂养指导" : "新生儿访视、出生缺陷筛查和接种提醒")
+  };
+  form.querySelector("button[type='submit']").disabled = true;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    if (!institutionApiBase) throw new Error("静态预览模式暂不支持登记出生医学证明，请使用本地服务或部署 API");
+    const response = await request(`${institutionApiBase}/birth-certificates`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error(`出生证明登记失败：${response.status}`);
+    await response.json();
+    platformState = await loadPlatformState(fallbackState);
+    form.reset();
+    populateBirthCertificateForm(platformState);
+    renderAll(platformState);
+  } catch (error) {
+    alert(error.message || "出生证明登记失败，请检查登录角色和网络连接");
+  } finally {
+    form.querySelector("button[type='submit']").disabled = false;
+  }
 }
 
 function renderDoctorAccounts(state) {
@@ -122,9 +198,32 @@ function renderBirthCertificates(state) {
   const metricEl = document.querySelector("#birth-certificate-metrics");
   const listEl = document.querySelector("#birth-certificate-list");
   const formsEl = document.querySelector("#birth-certificate-forms");
+  const alertsEl = document.querySelector("#birth-certificate-alerts");
   if (!countEl || !metricEl || !listEl || !formsEl) return;
 
-  countEl.textContent = `${certificates.length} 张证明`;
+  const statusFilter = document.querySelector("#birth-status-filter")?.value || "";
+  const riskFilter = document.querySelector("#birth-risk-filter")?.value || "";
+  const filtered = certificates.filter((item) => {
+    const statusMatched = !statusFilter || item.status === statusFilter;
+    const riskMatched = !riskFilter
+      || (riskFilter === "low-weight" && Number(item.birthWeight || 0) > 0 && Number(item.birthWeight || 0) < 2500)
+      || (riskFilter === "pending-sync" && (item.publicSecuritySync !== "已共享" || item.maternalChildSync !== "已入册"));
+    return statusMatched && riskMatched;
+  });
+  const alerts = [
+    ["待签发", certificates.filter((item) => item.status === "待签发").length, "签发医师、材料和证件编号需核验"],
+    ["待入册共享", certificates.filter((item) => item.publicSecuritySync !== "已共享" || item.maternalChildSync !== "已入册").length, "公安户籍和妇幼健康管理未闭环"],
+    ["低体重儿", certificates.filter((item) => Number(item.birthWeight || 0) > 0 && Number(item.birthWeight || 0) < 2500).length, "需纳入专案访视和喂养指导"],
+    ["质控补正", certificates.filter((item) => ["待质控", "待复核", "待补正"].includes(item.qualityCheck)).length, "材料、编号、签章或共享状态需复核"]
+  ];
+
+  countEl.textContent = `${filtered.length}/${certificates.length} 张证明`;
+  if (alertsEl) {
+    alertsEl.innerHTML = alerts.map(([label, value, hint]) => `<article class="claim-card">
+      <strong>${label}</strong>
+      <span>${value}<br>${hint}</span>
+    </article>`).join("");
+  }
   metricEl.innerHTML = [
     ["首次签发", metrics.firstIssued || certificates.filter((item) => item.issueType === "首次签发").length, "机构内出生直接签发"],
     ["电子证照", metrics.electronicLicenses || certificates.filter((item) => String(item.electronicLicenseStatus || "").includes("已生成")).length, "第七版编号/条形码"],
@@ -135,7 +234,7 @@ function renderBirthCertificates(state) {
     <span>${value}<br>${hint}</span>
   </article>`).join("");
 
-  listEl.innerHTML = certificates.map((item) => {
+  listEl.innerHTML = filtered.map((item) => {
     const resident = residentOf(state, item.maternalResidentId || item.residentId);
     const badge = item.status === "待签发" || item.status === "待上报" ? "warn" : item.qualityCheck === "待补正" ? "danger" : "info";
     return `<section class="item">

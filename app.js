@@ -1203,10 +1203,12 @@ function renderBirthStatistics() {
   const metrics = birth.metrics || {};
   const summary = document.querySelector("#birth-stat-summary");
   const cards = document.querySelector("#birth-stat-cards");
+  const alerts = document.querySelector("#birth-stat-alerts");
   const sources = document.querySelector("#birth-stat-sources");
   const regionTable = document.querySelector("#birth-region-table");
   const rules = document.querySelector("#birth-stat-rules");
   if (!summary || !cards || !sources || !regionTable || !rules) return;
+  const certificates = state.birthCertificates || [];
 
   summary.textContent = `${formatPeriod(birth.period)} · 出生医学证明系统 + 妇幼健康管理 + 公安户籍共享`;
   cards.innerHTML = [
@@ -1219,6 +1221,21 @@ function renderBirthStatistics() {
     ["低体重儿", metrics.lowBirthWeight || 0, "专案随访"],
     ["待处理", metrics.pending || 0, "待签发或待上报"]
   ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${formatNumber(value)}</strong><em>${hint}</em></article>`).join("");
+
+  if (alerts) {
+    const alertItems = [
+      ["待签发", certificates.filter((item) => item.status === "待签发").length, "督促签发机构完成材料核验、签章和编号登记"],
+      ["待公安共享", certificates.filter((item) => item.publicSecuritySync !== "已共享").length, "影响户籍出生登记和跨部门人口库更新"],
+      ["待妇幼入册", certificates.filter((item) => item.maternalChildSync !== "已入册").length, "新生儿访视、筛查和接种提醒未闭环"],
+      ["低体重儿", certificates.filter((item) => Number(item.birthWeight || 0) > 0 && Number(item.birthWeight || 0) < 2500).length, "需建立专案随访和喂养指导"],
+      ["质控补正", certificates.filter((item) => ["待质控", "待复核", "待补正"].includes(item.qualityCheck)).length, "证件编号、父母身份、签发材料或共享结果需复核"]
+    ];
+    alerts.innerHTML = alertItems.map(([label, value, hint]) => `<article>
+      <span>${label}</span>
+      <strong>${formatNumber(value)}</strong>
+      <small>${hint}</small>
+    </article>`).join("");
+  }
 
   sources.innerHTML = (birth.sources || []).map((source) => `<article>
     <span>${source.name}</span>

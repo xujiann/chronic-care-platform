@@ -748,12 +748,22 @@ function renderBirthHealth(residentId) {
   if (!container) return;
   const certificates = (state.birthCertificates || []).filter((item) => item.maternalResidentId === residentId || item.residentId === residentId);
   container.innerHTML = certificates.map((item) => {
-    const badge = item.healthManagementStatus?.includes("待") || item.status?.includes("待") ? "warn" : "info";
+    const lowWeight = Number(item.birthWeight || 0) > 0 && Number(item.birthWeight || 0) < 2500;
+    const pending = item.healthManagementStatus?.includes("待") || item.status?.includes("待") || item.publicSecuritySync !== "已共享" || item.maternalChildSync !== "已入册";
+    const badge = pending || lowWeight ? "warn" : "info";
+    const services = [
+      ["出生证明", item.status || "待处理"],
+      ["电子证照", item.electronicLicenseStatus || "待生成"],
+      ["公安共享", item.publicSecuritySync || "未共享"],
+      ["妇幼入册", item.maternalChildSync || "待入册"],
+      ["新生儿访视", item.healthManagementStatus || "待建档"],
+      lowWeight ? ["低体重儿专案", "需随访"] : ["出生体重", `${item.birthWeight || "-"}g`]
+    ];
     return `<article class="card">
       <div>
         <strong>${item.newbornName || "未命名新生儿"} · ${item.certificateNo}</strong>
         <p>${item.birthDateTime || "出生时间待确认"} · ${item.newbornGender || "性别待确认"} · ${item.birthWeight || "-"}g</p>
-        <p>出生证明：${item.status || "待处理"} · 电子证照 ${item.electronicLicenseStatus || "待生成"} · 公安 ${item.publicSecuritySync || "未共享"}</p>
+        <p>${services.map(([name, status]) => `${name}：${status}`).join(" · ")}</p>
         <p>健康管理：${item.healthManagementStatus || "待建档"} · ${item.nextService || "新生儿访视与预防接种提醒"}</p>
       </div>
       <span class="badge ${badge}">${item.issueType || "首次签发"}</span>
