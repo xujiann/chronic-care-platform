@@ -2026,6 +2026,85 @@
       "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     }
   ],
+  "chronicFollowupStatusPolicy": {
+    "version": "chronic-followup-2026.1",
+    "boundaries": [
+      "screening-risk-stratification",
+      "tiered-management-plan",
+      "post-discharge-followup",
+      "return-visit-reminder",
+      "medication-adherence",
+      "family-doctor-collaboration",
+      "resident-feedback-loop"
+    ],
+    "statusGroups": {
+      "open": [
+        "寰呯瓫鏌?",
+        "妫€鏌ョ敵璇?",
+        "寰呭共棰?",
+        "寰呭鏍?",
+        "鎵ц涓?",
+        "棰勮涓?",
+        "宸查€炬湡",
+        "寰呴殢璁?",
+        "寰呭彇鑽?",
+        "寰呯‘璁?"
+      ],
+      "active": [
+        "鎵ц涓?",
+        "棰勮涓?",
+        "寰呴殢璁?",
+        "寰呭共棰?",
+        "寰呭尰淇濆鏍?"
+      ],
+      "closed": [
+        "宸茶瘎浼?",
+        "宸叉帹閫佸共棰?",
+        "宸插鏍?",
+        "宸插畬鎴?",
+        "宸插彇鑽?",
+        "宸茬‘璁?",
+        "宸查槄璇?"
+      ],
+      "escalated": [
+        "宸查€炬湡",
+        "棰勮涓?",
+        "楂樺嵄"
+      ]
+    },
+    "requiredEvidence": {
+      "screening": [
+        "residentId",
+        "riskLevel",
+        "nextStep"
+      ],
+      "managementPlan": [
+        "residentId",
+        "grade",
+        "nextReview",
+        "intervention"
+      ],
+      "followup": [
+        "residentId",
+        "plannedAt",
+        "assignee",
+        "status"
+      ],
+      "medication": [
+        "residentId",
+        "nextPickup",
+        "institutionReview",
+        "insuranceReview",
+        "pharmacyStatus"
+      ],
+      "feedback": [
+        "residentId",
+        "category",
+        "source",
+        "meta.followupFeedback"
+      ]
+    }
+  },
   "chronicServiceRoles": [
     {
       "id": "csr-center",
@@ -6409,6 +6488,27 @@
     }
   ],
   "personalRecords": [
+    {
+      "id": "pr-chronic-feedback-001",
+      "residentId": "r1",
+      "category": "chronic-feedback",
+      "date": "2026-06-23",
+      "name": "院后随访居民反馈",
+      "result": "已按医嘱服药，近三日家庭血压仍偏高，希望家庭医生电话复核。",
+      "source": "居民端主动反馈",
+      "meta": {
+        "followupFeedback": true,
+        "followupId": "f1",
+        "medicationTaken": true,
+        "symptoms": "偶有头晕",
+        "satisfaction": "需要电话复核",
+        "nextRequest": "家庭医生回访"
+      },
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
+      "createdBy": "citizen",
+      "createdByName": "演示居民A",
+      "createdAt": "2026-06-23T09:00:00.000Z"
+    },
     {
       "id": "d69f6a58-b2fa-44dc-a1ee-19b67c9a64fc",
       "residentId": "r1",

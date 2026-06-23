@@ -43,6 +43,8 @@ jobs:
         run: npm run identity:contract
       - name: Generate audit retention report
         run: npm run audit:retention
+      - name: Generate chronic follow-up readiness report
+        run: npm run chronic:followup-readiness
       - name: Generate data quality report
         run: npm run data-quality:report
       - name: Generate integration readiness report

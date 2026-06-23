@@ -903,6 +903,28 @@ select,
   gap: 10px;
 }
 
+.feedback-form {
+  display: grid;
+  gap: 10px;
+}
+
+.feedback-form label {
+  display: grid;
+  gap: 6px;
+  color: #475569;
+  font-size: 13px;
+}
+
+.feedback-form input,
+.feedback-form select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 10px;
+  color: #0f172a;
+  background: #fff;
+}
+
 .mini-card {
   border: 1px solid var(--line);
   border-radius: 8px;

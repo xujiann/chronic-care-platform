@@ -155,6 +155,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderCitizen(account.members[0]?.residentId);
   });
   bindDialogs();
+  bindFollowupFeedback();
   currentAccountId = state.accounts[0]?.id;
   const account = getCurrentAccount();
   renderAccount(account);
@@ -248,6 +249,7 @@ function renderCitizen(residentId) {
   renderEmr(records, resident, diseases, followups);
   renderDiseases(diseases, risk);
   renderFollowups(followups);
+  renderFollowupFeedback(resident.id, followups);
   renderChronicServices(resident.id);
   renderReferrals(resident.id);
   renderBirthHealth(resident.id);
@@ -680,6 +682,69 @@ function renderFollowups(followups) {
       <span class="status ${item.status === "已逾期" ? "danger" : item.status === "待随访" ? "warn" : ""}">${item.status}</span>
     </article>`)
     .join("") || `<p class="muted">暂无随访提醒。</p>`;
+}
+
+function renderFollowupFeedback(residentId, followups) {
+  const form = document.querySelector("#followup-feedback-form");
+  const status = document.querySelector("#followup-feedback-status");
+  if (!form || !status) return;
+  const select = form.querySelector("select[name='followupId']");
+  const available = followups.length ? followups : (state.followups || []).filter((item) => item.residentId === residentId);
+  select.innerHTML = available.map((item) => `<option value="${item.id}">${item.diseaseType} · ${item.plannedAt} · ${item.status}</option>`).join("");
+  const feedback = (state.personalRecords || []).filter((item) => item.residentId === residentId && (item.category === "chronic-feedback" || item.meta?.followupFeedback));
+  status.textContent = feedback.length ? `${feedback.length} 条已反馈` : "待反馈";
+}
+
+function bindFollowupFeedback() {
+  const form = document.querySelector("#followup-feedback-form");
+  if (!form) return;
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(form));
+    const followup = (state.followups || []).find((item) => item.id === data.followupId);
+    const payload = {
+      residentId: currentResidentId,
+      followupId: data.followupId,
+      name: "院后随访居民反馈",
+      result: `${data.medicationTaken === "true" ? "已按医嘱服药" : "未完全按医嘱服药"}；${data.symptoms || "暂无明显不适"}；${data.nextRequest || "继续按计划随访"}`,
+      source: "居民端主动反馈",
+      medicationTaken: data.medicationTaken === "true",
+      symptoms: data.symptoms || "",
+      nextRequest: data.nextRequest || "",
+      satisfaction: data.nextRequest ? "需要协助" : "继续观察"
+    };
+    const submit = form.querySelector("button[type='submit']");
+    submit.disabled = true;
+    try {
+      let saved;
+      if (API_BASE) {
+        const request = window.HealthCityAuth?.authFetch || fetch;
+        const response = await request(`${API_BASE}/chronic/followup-feedback`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (!response.ok) throw new Error(`feedback failed: ${response.status}`);
+        saved = await response.json();
+      } else {
+        saved = { ...payload, id: crypto.randomUUID(), category: "chronic-feedback", date: todayOffset(0), meta: { followupFeedback: true, followupId: data.followupId, medicationTaken: payload.medicationTaken, symptoms: payload.symptoms, nextRequest: payload.nextRequest, satisfaction: payload.satisfaction }, createdAt: new Date().toISOString() };
+      }
+      if (!Array.isArray(state.personalRecords)) state.personalRecords = [];
+      state.personalRecords.unshift(saved);
+      if (followup) {
+        followup.feedbackStatus = "received";
+        followup.feedbackSummary = saved.result;
+        followup.medicationTaken = payload.medicationTaken;
+      }
+      form.reset();
+      renderCitizen(currentResidentId);
+      showToast("院后随访反馈已提交，家庭医生可在机构端处置");
+    } catch (error) {
+      showToast(error.message || "反馈提交失败，请检查登录状态和网络连接");
+    } finally {
+      submit.disabled = false;
+    }
+  });
 }
 
 function renderChronicServices(residentId) {

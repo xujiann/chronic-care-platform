@@ -400,7 +400,8 @@ const COLLECTION_WRITE_KEYS = new Set([
   "birthCertificates",
   "chronicScreeningTasks",
   "chronicEducationPushes",
-  "chronicManagementPlans"
+  "chronicManagementPlans",
+  "chronicFollowupStatusPolicy"
 ]);
 
 const mimeTypes = {
@@ -525,6 +526,7 @@ function seedState() {
     chronicScreeningTasks: seedChronicScreeningTasks(),
     chronicEducationPushes: seedChronicEducationPushes(),
     chronicManagementPlans: seedChronicManagementPlans(),
+    chronicFollowupStatusPolicy: seedChronicFollowupStatusPolicy(),
     chronicServiceRoles: seedChronicServiceRoles(),
     chronicCapabilityConditions: seedChronicCapabilityConditions(),
     chronicServicePathways: seedChronicServicePathways(),
@@ -1315,6 +1317,34 @@ function seedChronicManagementPlans() {
     { id: "cmp-002", residentId: "r2", diseaseType: "糖尿病", grade: "中危", owner: "赵医生", plan: "每月血糖复测、季度糖化血红蛋白、饮食运动干预", indicators: ["空腹血糖", "糖化血红蛋白", "体重"], status: "待复核", nextReview: todayOffset(10), intervention: "补充并发症筛查结果" },
     { id: "cmp-003", residentId: "r4", diseaseType: "高血压/脑卒中高危", grade: "高危", owner: "刘医生", plan: "纳入重点人群，每周提醒、家属协同、必要时转诊", indicators: ["血压", "心电", "卒中风险评分"], status: "预警中", nextReview: todayOffset(3), intervention: "推送卒中宣教并预约专科会诊" }
   ];
+}
+
+function seedChronicFollowupStatusPolicy() {
+  return {
+    version: "chronic-followup-2026.1",
+    boundaries: [
+      "screening-risk-stratification",
+      "tiered-management-plan",
+      "post-discharge-followup",
+      "return-visit-reminder",
+      "medication-adherence",
+      "family-doctor-collaboration",
+      "resident-feedback-loop"
+    ],
+    statusGroups: {
+      open: ["寰呯瓫鏌?", "妫€鏌ョ敵璇?", "寰呭共棰?", "寰呭鏍?", "鎵ц涓?", "棰勮涓?", "宸查€炬湡", "寰呴殢璁?", "寰呭彇鑽?", "寰呯‘璁?"],
+      active: ["鎵ц涓?", "棰勮涓?", "寰呴殢璁?", "寰呭共棰?", "寰呭尰淇濆鏍?"],
+      closed: ["宸茶瘎浼?", "宸叉帹閫佸共棰?", "宸插鏍?", "宸插畬鎴?", "宸插彇鑽?", "宸茬‘璁?", "宸查槄璇?"],
+      escalated: ["宸查€炬湡", "棰勮涓?", "楂樺嵄"]
+    },
+    requiredEvidence: {
+      screening: ["residentId", "riskLevel", "nextStep"],
+      managementPlan: ["residentId", "grade", "nextReview", "intervention"],
+      followup: ["residentId", "plannedAt", "assignee", "status"],
+      medication: ["residentId", "nextPickup", "institutionReview", "insuranceReview", "pharmacyStatus"],
+      feedback: ["residentId", "category", "source", "meta.followupFeedback"]
+    }
+  };
 }
 
 function seedChronicServiceRoles() {
@@ -3308,6 +3338,7 @@ function normalizeState(data) {
     chronicScreeningTasks: mergeByKey(seedChronicScreeningTasks(), data.chronicScreeningTasks, "id"),
     chronicEducationPushes: mergeByKey(seedChronicEducationPushes(), data.chronicEducationPushes, "id"),
     chronicManagementPlans: mergeByKey(seedChronicManagementPlans(), data.chronicManagementPlans, "id"),
+    chronicFollowupStatusPolicy: data.chronicFollowupStatusPolicy && typeof data.chronicFollowupStatusPolicy === "object" ? { ...seedChronicFollowupStatusPolicy(), ...data.chronicFollowupStatusPolicy } : seedChronicFollowupStatusPolicy(),
     chronicServiceRoles: mergeByKey(seedChronicServiceRoles(), data.chronicServiceRoles, "id"),
     chronicCapabilityConditions: mergeByKey(seedChronicCapabilityConditions(), data.chronicCapabilityConditions, "id"),
     chronicServicePathways: mergeByKey(seedChronicServicePathways(), data.chronicServicePathways, "id"),
@@ -4444,6 +4475,200 @@ function buildMobileExperience(data, user) {
     seniorServices: services.filter((item) => allowedIds.has(item?.residentId)),
     accessibilityChecklist: data.accessibilityChecklist || seedAccessibilityChecklist()
   };
+}
+
+function statusInPolicy(policy, group, status) {
+  return (policy?.statusGroups?.[group] || []).some((item) => String(status || "").includes(item) || String(item || "").includes(String(status || "")));
+}
+
+function latestRecord(records, residentId, category) {
+  return (records || [])
+    .filter((item) => item.residentId === residentId && (!category || item.category === category))
+    .sort((a, b) => String(b.date || b.createdAt || "").localeCompare(String(a.date || a.createdAt || "")))[0];
+}
+
+function medicationAdherenceForResident(data, residentId) {
+  const pickups = (data.medicationPickups || []).filter((item) => item.residentId === residentId);
+  const completed = pickups.filter((item) => /宸插畬鎴?|宸插彇鑽?|completed|picked/i.test(String(item.status || item.pharmacyStatus || ""))).length;
+  return {
+    total: pickups.length,
+    completed,
+    pending: pickups.length - completed,
+    rate: pickups.length ? Math.round((completed / pickups.length) * 100) : 0,
+    pickups
+  };
+}
+
+function buildChronicFollowupSummary(data, user, residentId = "") {
+  const scoped = scopeStateForUser(data, user);
+  const targetResidents = (scoped.residents || []).filter((resident) => !residentId || resident.id === residentId);
+  const policy = data.chronicFollowupStatusPolicy || seedChronicFollowupStatusPolicy();
+  const feedbackRecords = (scoped.personalRecords || []).filter((item) => item.category === "chronic-feedback");
+  const residents = targetResidents.map((resident) => {
+    const screenings = (scoped.chronicScreeningTasks || []).filter((item) => item.residentId === resident.id);
+    const plans = (scoped.chronicManagementPlans || []).filter((item) => item.residentId === resident.id);
+    const followups = (scoped.followups || []).filter((item) => item.residentId === resident.id);
+    const records = (scoped.personalRecords || []).filter((item) => item.residentId === resident.id);
+    const adherence = medicationAdherenceForResident(scoped, resident.id);
+    const latestFeedback = latestRecord(feedbackRecords, resident.id);
+    const openItems = [
+      ...screenings.filter((item) => !statusInPolicy(policy, "closed", item.status)),
+      ...plans.filter((item) => !statusInPolicy(policy, "closed", item.status)),
+      ...followups.filter((item) => !statusInPolicy(policy, "closed", item.status)),
+      ...adherence.pickups.filter((item) => !statusInPolicy(policy, "closed", item.status || item.pharmacyStatus))
+    ];
+    const highPriority = [
+      ...screenings,
+      ...plans,
+      ...followups
+    ].some((item) => statusInPolicy(policy, "escalated", item.status) || statusInPolicy(policy, "escalated", item.riskLevel || item.grade));
+    return {
+      residentId: resident.id,
+      residentName: resident.name,
+      organization: resident.organization,
+      familyDoctor: resident.familyDoctor,
+      riskLevel: highPriority ? "high" : openItems.length ? "medium" : "stable",
+      screeningTasks: screenings,
+      managementPlans: plans,
+      followups,
+      returnVisitReminders: followups.filter((item) => !statusInPolicy(policy, "closed", item.status)).map((item) => ({
+        id: item.id,
+        plannedAt: item.plannedAt,
+        assignee: item.assignee,
+        status: item.status,
+        advice: item.advice
+      })),
+      medicationAdherence: adherence,
+      familyDoctorCollaboration: {
+        doctor: resident.familyDoctor || plans[0]?.owner || followups[0]?.assignee || "",
+        openItems: openItems.length,
+        nextAction: openItems[0]?.nextStep || openItems[0]?.intervention || openItems[0]?.advice || "continue routine follow-up"
+      },
+      residentFeedback: {
+        latest: latestFeedback || null,
+        count: feedbackRecords.filter((item) => item.residentId === resident.id).length
+      },
+      archiveEvidence: {
+        authorizations: records.filter((item) => item.category === "authorizations").length,
+        emr: records.filter((item) => item.category === "emr").length,
+        labs: records.filter((item) => item.category === "labs").length
+      }
+    };
+  });
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    policy,
+    summary: {
+      residents: residents.length,
+      highPriority: residents.filter((item) => item.riskLevel === "high").length,
+      openFollowups: residents.reduce((sum, item) => sum + item.returnVisitReminders.length, 0),
+      medicationPending: residents.reduce((sum, item) => sum + item.medicationAdherence.pending, 0),
+      feedbackRecords: residents.reduce((sum, item) => sum + item.residentFeedback.count, 0)
+    },
+    residents
+  };
+}
+
+function normalizeChronicFeedback(payload, user) {
+  const residentId = String(payload.residentId || user.residentId || "").trim();
+  if (!residentId) throw new Error("residentId is required");
+  const now = new Date().toISOString();
+  return {
+    id: randomUUID(),
+    residentId,
+    category: "chronic-feedback",
+    date: String(payload.date || now.slice(0, 10)),
+    name: String(payload.name || "chronic follow-up feedback").trim(),
+    result: String(payload.result || payload.feedback || "").trim(),
+    source: String(payload.source || (user.role === "citizen" ? "resident portal" : "institution portal")).trim(),
+    meta: {
+      followupFeedback: true,
+      followupId: String(payload.followupId || "").trim(),
+      medicationTaken: payload.medicationTaken === undefined ? null : Boolean(payload.medicationTaken),
+      symptoms: String(payload.symptoms || "").trim(),
+      satisfaction: String(payload.satisfaction || "").trim(),
+      nextRequest: String(payload.nextRequest || "").trim(),
+      submittedBy: user.username || user.role,
+      submittedByName: user.name,
+      submittedAt: now
+    },
+    createdBy: user.username || user.role,
+    createdByName: user.name,
+    createdAt: now
+  };
+}
+
+function upsertChronicFeedback(data, user, payload) {
+  const feedback = normalizeChronicFeedback(payload, user);
+  if (!canAccessResident(user, feedback.residentId, data)) {
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "submit chronic feedback", target: feedback.residentId, result: "denied", detail: "resident scope denied" });
+    return { status: 403, body: { error: "Forbidden", message: "resident scope denied" } };
+  }
+  const residentMap = new Map((data.residents || []).map((resident) => [resident.id, resident]));
+  feedback.personIndex = personIndexForResident(residentMap, feedback.residentId);
+  data.personalRecords = [feedback, ...(Array.isArray(data.personalRecords) ? data.personalRecords : [])].slice(0, 500);
+  if (feedback.meta.followupId) {
+    const followup = (data.followups || []).find((item) => item.id === feedback.meta.followupId && item.residentId === feedback.residentId);
+    if (followup) {
+      followup.feedbackStatus = "received";
+      followup.feedbackSummary = feedback.result;
+      followup.medicationTaken = feedback.meta.medicationTaken;
+      followup.lastUpdated = feedback.createdAt;
+    }
+  }
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "submit chronic follow-up feedback",
+      target: feedback.residentId,
+      result: "allowed",
+      detail: feedback.name
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+  appendDataAccessLog(data, user, feedback.residentId, "chronic follow-up feedback", feedback.result || feedback.name);
+  writeDatabase(normalizeState(data));
+  return { status: 201, body: feedback };
+}
+
+function dispatchChronicFollowupAction(data, user, payload) {
+  const collection = String(payload.collection || "").trim();
+  const allowed = new Set(["chronicScreeningTasks", "chronicManagementPlans", "followups", "medicationPickups"]);
+  if (!allowed.has(collection)) return { status: 400, body: { error: "Bad Request", message: "unsupported chronic follow-up collection" } };
+  const rows = Array.isArray(data[collection]) ? data[collection] : [];
+  const item = rows.find((row) => row.id === payload.id);
+  if (!item) return { status: 404, body: { error: "Not Found", message: "business item not found" } };
+  if (!canAccessResident(user, item.residentId, data)) {
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "dispatch chronic follow-up", target: `${collection}/${payload.id}`, result: "denied", detail: "resident scope denied" });
+    return { status: 403, body: { error: "Forbidden", message: "resident scope denied" } };
+  }
+  Object.assign(item, cleanBusinessPatch(payload.updates));
+  if (payload.status) item.status = String(payload.status);
+  item.disposition = String(payload.disposition || item.disposition || "handled").trim();
+  item.dispositionNote = String(payload.note || item.dispositionNote || "").trim();
+  item.dispositionBy = user.username || user.role;
+  item.dispositionByName = user.name;
+  item.lastUpdated = new Date().toISOString();
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "dispatch chronic follow-up",
+      target: `${collection}/${item.id}`,
+      result: "allowed",
+      detail: item.dispositionNote || item.status || item.disposition
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+  appendDataAccessLog(data, user, item.residentId, "chronic follow-up disposition", item.dispositionNote || item.status || collection);
+  writeDatabase(data);
+  return { status: 200, body: item };
 }
 
 function appendSecurityEvent(event) {
@@ -5655,6 +5880,42 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/chronic/risk-stratification");
     if (!user) return;
     sendJson(res, 200, redactSensitiveResponse(buildChronicRiskStratification(scopeStateForUser(readDatabase(), user)), user));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/chronic/followup-summary") {
+    const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/chronic/followup-summary");
+    if (!user) return;
+    const data = readDatabase();
+    const residentId = url.searchParams.get("residentId") || "";
+    if (residentId && !canAccessResident(user, residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "read chronic follow-up summary", target: residentId, result: "denied", detail: "resident scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "resident scope denied" });
+      return;
+    }
+    sendJson(res, 200, redactSensitiveResponse(buildChronicFollowupSummary(data, user, residentId), user));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/chronic/followup-feedback") {
+    const user = requireApiRole(req, res, ["citizen", "institution", "commission"], "/api/chronic/followup-feedback");
+    if (!user) return;
+    let result;
+    try {
+      result = upsertChronicFeedback(readDatabase(), user, await collectJson(req));
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    sendJson(res, result.status, redactSensitiveResponse(result.body, user));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/chronic/followup-dispatch") {
+    const user = requireApiRole(req, res, ["institution", "commission"], "/api/chronic/followup-dispatch");
+    if (!user) return;
+    const result = dispatchChronicFollowupAction(readDatabase(), user, await collectJson(req));
+    sendJson(res, result.status, redactSensitiveResponse(result.body, user));
     return;
   }
 
