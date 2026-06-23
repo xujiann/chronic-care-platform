@@ -254,3 +254,5 @@ Run `npm.cmd run quality-safety:report` before release. The generated `release/q
 Site joint testing still requires live HIS/EMR/LIS/PACS feeds, production critical-value acknowledgement routing, medical-record sampling signatures, clinical pathway rule dictionaries, mutual-recognition QC rules, and department rectification sign-off attachments.
 
 Role boundary: commission owns dispatch and final review; institution and county roles use the same portal for scoped dashboard access and feedback submission. Citizen and insurance roles remain excluded from quality-safety regulatory collections.
+
+SLA boundary: the demo computes rectification due-date status and supports commission escalation. Production joint testing must confirm site SLA thresholds, notification recipients, escalation levels, and signed evidence retention rules.

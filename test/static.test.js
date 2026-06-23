@@ -348,13 +348,17 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(js, /dispatchIssue/);
   assert.match(js, /submitFeedback/);
   assert.match(js, /reviewOrder/);
+  assert.match(js, /escalateOrder/);
   assert.match(js, /canDispatch/);
   assert.match(js, /canReview/);
   assert.match(js, /canFeedback/);
+  assert.match(js, /canEscalate/);
   assert.match(server, /\/api\/quality-safety\/dashboard/);
   assert.match(server, /\/api\/quality-safety\/issues\/:id\/dispatch/);
   assert.match(server, /\/api\/quality-safety\/rectifications\/:id\/feedback/);
   assert.match(server, /\/api\/quality-safety\/rectifications\/:id\/review/);
+  assert.match(server, /\/api\/quality-safety\/rectifications\/:id\/escalate/);
+  assert.match(server, /qualitySafetySlaState/);
   assert.match(read("scripts/release-report.js"), /qualitySafety:report/);
   assert.match(read("platform.html"), /quality-safety\.html/);
   assert.match(read("workbench.html"), /quality-safety\.html/);

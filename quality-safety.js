@@ -40,7 +40,9 @@ function renderMetrics(summary) {
     ["In progress", summary.inProgress],
     ["Reviewing", summary.reviewing],
     ["Closed", summary.closed],
-    ["Rectifications", summary.rectifications]
+    ["Rectifications", summary.rectifications],
+    ["Due soon", summary.sla?.dueSoon || 0],
+    ["Overdue", summary.sla?.overdue || 0]
   ];
   setHtml("quality-safety-metrics", metrics.map(([label, value]) => `
     <article class="metric-card">
@@ -84,19 +86,22 @@ function renderRectifications(rows) {
   const role = qualitySafetyState?.role || "";
   const canReview = role === "commission";
   const canFeedback = ["institution", "county", "commission"].includes(role);
+  const canEscalate = role === "commission";
   setHtml("quality-safety-rectifications", `
     <table>
-      <thead><tr><th>Order</th><th>Requirement</th><th>Status</th><th>Feedback</th><th>Action</th></tr></thead>
+      <thead><tr><th>Order</th><th>Requirement</th><th>Status</th><th>SLA</th><th>Evidence</th><th>Action</th></tr></thead>
       <tbody>
         ${rows.map((item) => `
           <tr>
             <td><strong>${item.id}</strong><br /><small>${text(item.institutionName)}</small></td>
             <td>${text(item.requirement)}</td>
             <td>${statusLabel(item.normalizedStatus || item.status)}</td>
-            <td>${(item.feedback || []).length}</td>
+            <td>${statusLabel(item.slaStatus)}<br /><small>${item.daysRemaining === null ? "-" : `${item.daysRemaining} days`}</small></td>
+            <td>${item.evidenceComplete ? "complete" : "pending"}<br /><small>${(item.feedback || []).length} feedback</small></td>
             <td>
               ${canFeedback ? `<button class="inline-action" type="button" data-feedback="${item.id}">Feedback</button>` : ""}
               ${canReview ? `<button class="inline-action" type="button" data-review="${item.id}">Review</button>` : ""}
+              ${canEscalate && item.normalizedStatus !== "closed" ? `<button class="inline-action" type="button" data-escalate="${item.id}">Escalate</button>` : ""}
             </td>
           </tr>
         `).join("")}
@@ -192,13 +197,25 @@ async function reviewOrder(orderId) {
   await loadQualitySafety();
 }
 
+async function escalateOrder(orderId) {
+  await qualityApi(`/quality-safety/rectifications/${encodeURIComponent(orderId)}/escalate`, {
+    method: "POST",
+    body: JSON.stringify({
+      reason: "Manual escalation from the quality-safety portal."
+    })
+  });
+  await loadQualitySafety();
+}
+
 document.addEventListener("click", (event) => {
   const dispatch = event.target.closest("[data-dispatch]");
   const feedback = event.target.closest("[data-feedback]");
   const review = event.target.closest("[data-review]");
+  const escalate = event.target.closest("[data-escalate]");
   if (dispatch) dispatchIssue(dispatch.dataset.dispatch).catch((error) => alert(error.message));
   if (feedback) submitFeedback(feedback.dataset.feedback).catch((error) => alert(error.message));
   if (review) reviewOrder(review.dataset.review).catch((error) => alert(error.message));
+  if (escalate) escalateOrder(escalate.dataset.escalate).catch((error) => alert(error.message));
 });
 
 loadQualitySafety();

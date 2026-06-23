@@ -44,8 +44,12 @@ test("quality safety report covers boundaries, reuse and routes", () => {
   assert.equal(report.reusedCollections.some((item) => item.collection === "countyMutualRecognitionRecords" && item.present), true);
   assert.equal(report.reusedCollections.some((item) => item.collection === "securityEvents" && item.present), true);
   assert.equal(report.routes.every((item) => item.present), true);
+  assert.equal(report.routes.some((item) => item.route.includes("escalate") && item.present), true);
+  assert.equal(report.checks.some((item) => item.id === "quality-safety:sla" && item.passed), true);
+  assert.equal(report.rectifications.some((item) => item.slaStatus && item.evidenceComplete), true);
   assert.match(renderMarkdown(report), /Medical quality and safety supervision report/);
   assert.match(renderMarkdown(report), /mutual-recognition-qc/);
+  assert.match(renderMarkdown(report), /Rectification SLA/);
 });
 
 test("quality safety API supports dashboard, dispatch, feedback and review", async (t) => {
@@ -101,6 +105,14 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
   const countyDashboard = await api(baseUrl, "/api/quality-safety/dashboard", authorized(countyLogin.body.token));
   assert.equal(countyDashboard.response.status, 200);
   assert.equal(countyDashboard.body.role, "county");
+
+  const escalation = await api(baseUrl, `/api/quality-safety/rectifications/${encodeURIComponent(dispatch.body.id)}/escalate`, authorized(token, {
+    method: "POST",
+    body: JSON.stringify({ reason: "Escalate before site feedback window closes." })
+  }));
+  assert.equal(escalation.response.status, 200);
+  assert.equal(escalation.body.status, "escalated");
+  assert.equal(typeof escalation.body.slaStatus, "string");
 
   const feedback = await api(baseUrl, `/api/quality-safety/rectifications/${encodeURIComponent(dispatch.body.id)}/feedback`, authorized(institutionLogin.body.token, {
     method: "POST",

@@ -4961,9 +4961,33 @@ function normalizeQualitySafetyStatus(status) {
   const text = String(status || "open").trim().toLowerCase();
   if (/closed|resolved|approved|review_passed|completed|recognized/.test(text)) return "closed";
   if (/feedback|submitted|review/.test(text)) return "reviewing";
-  if (/dispatch|in_progress|pending_disposition|variance_open/.test(text)) return "in_progress";
+  if (/dispatch|in_progress|pending_disposition|variance_open|escalat/.test(text)) return "in_progress";
   if (/reject|returned|overdue/.test(text)) return "returned";
   return "open";
+}
+
+function qualitySafetySlaState(item, now = new Date()) {
+  const normalizedStatus = normalizeQualitySafetyStatus(item.status);
+  const closed = normalizedStatus === "closed";
+  const dueAt = String(item.dueAt || "").trim();
+  const dueTime = dueAt ? new Date(dueAt).getTime() : NaN;
+  const nowTime = now.getTime();
+  const daysRemaining = Number.isFinite(dueTime) ? Math.ceil((dueTime - nowTime) / 86400000) : null;
+  const feedbackComplete = Array.isArray(item.feedback) && item.feedback.length > 0;
+  const reviewComplete = Array.isArray(item.review) && item.review.length > 0;
+  const auditReady = Array.isArray(item.auditTrail) && item.auditTrail.length > 0;
+  let slaStatus = "unscheduled";
+  if (closed) slaStatus = "closed";
+  else if (Number.isFinite(dueTime) && dueTime < nowTime) slaStatus = "overdue";
+  else if (Number.isFinite(dueTime) && daysRemaining <= 7) slaStatus = "due_soon";
+  else if (Number.isFinite(dueTime)) slaStatus = "on_track";
+  return {
+    slaStatus,
+    daysRemaining,
+    feedbackComplete,
+    reviewComplete,
+    evidenceComplete: feedbackComplete && auditReady && (closed ? reviewComplete : true)
+  };
 }
 
 function qualitySafetyVisibleRows(rows, user) {
@@ -5035,7 +5059,14 @@ function buildQualitySafetyIssues(data) {
 function buildQualitySafetyDashboard(data, user) {
   const issues = qualitySafetyVisibleRows(buildQualitySafetyIssues(data), user);
   const rectifications = qualitySafetyVisibleRows(Array.isArray(data.qualityRectificationOrders) ? data.qualityRectificationOrders : [], user)
-    .map((item) => ({ ...item, normalizedStatus: normalizeQualitySafetyStatus(item.status) }));
+    .map((item) => ({ ...item, normalizedStatus: normalizeQualitySafetyStatus(item.status), ...qualitySafetySlaState(item) }));
+  const slaSummary = {
+    overdue: rectifications.filter((item) => item.slaStatus === "overdue").length,
+    dueSoon: rectifications.filter((item) => item.slaStatus === "due_soon").length,
+    onTrack: rectifications.filter((item) => item.slaStatus === "on_track").length,
+    missingFeedback: rectifications.filter((item) => !item.feedbackComplete && item.normalizedStatus !== "closed").length,
+    evidenceComplete: rectifications.filter((item) => item.evidenceComplete).length
+  };
   const summary = {
     issues: issues.length,
     open: issues.filter((item) => item.normalizedStatus === "open").length,
@@ -5043,6 +5074,7 @@ function buildQualitySafetyDashboard(data, user) {
     reviewing: issues.filter((item) => item.normalizedStatus === "reviewing").length,
     closed: issues.filter((item) => item.normalizedStatus === "closed").length,
     rectifications: rectifications.length,
+    sla: slaSummary,
     criticalValues: Array.isArray(data.criticalValueAlerts) ? data.criticalValueAlerts.length : 0,
     clinicalPathways: Array.isArray(data.clinicalPathwayCases) ? data.clinicalPathwayCases.length : 0,
     medicalRecordReviews: Array.isArray(data.medicalRecordQualityReviews) ? data.medicalRecordQualityReviews.length : 0,
@@ -6022,6 +6054,48 @@ async function handleApi(req, res) {
     appendQualitySafetyAudit(data, user, "quality-safety review", id, `${decision}: ${review.comment}`);
     writeDatabase(data);
     sendJson(res, 200, orders[index]);
+    return;
+  }
+
+  const qualityEscalationMatch = url.pathname.match(/^\/api\/quality-safety\/rectifications\/([^/]+)\/escalate$/);
+  if (req.method === "POST" && qualityEscalationMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/quality-safety/rectifications/:id/escalate");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(qualityEscalationMatch[1]);
+    const orders = Array.isArray(data.qualityRectificationOrders) ? data.qualityRectificationOrders : [];
+    const index = orders.findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Quality rectification order not found" });
+      return;
+    }
+    if (normalizeQualitySafetyStatus(orders[index].status) === "closed") {
+      sendJson(res, 400, { error: "Bad Request", message: "Closed rectification orders cannot be escalated" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const now = new Date().toISOString();
+    const sla = qualitySafetySlaState(orders[index], new Date(now));
+    const escalation = {
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      level: String(payload.level || (sla.slaStatus === "overdue" ? "overdue" : "watch")).trim(),
+      reason: String(payload.reason || payload.comment || "Manual quality-safety escalation.").trim(),
+      slaStatus: sla.slaStatus,
+      daysRemaining: sla.daysRemaining
+    };
+    orders[index] = {
+      ...orders[index],
+      status: "escalated",
+      escalationLevel: escalation.level,
+      escalations: [escalation, ...(orders[index].escalations || [])].slice(0, 50),
+      auditTrail: [{ at: now, by: user.username || user.role, action: "escalate", note: escalation.reason }, ...(orders[index].auditTrail || [])].slice(0, 50)
+    };
+    data.qualityRectificationOrders = orders;
+    appendQualitySafetyAudit(data, user, "quality-safety escalation", id, `${escalation.level}: ${escalation.reason}`);
+    writeDatabase(data);
+    sendJson(res, 200, { ...orders[index], ...qualitySafetySlaState(orders[index], new Date(now)) });
     return;
   }
 
