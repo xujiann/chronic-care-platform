@@ -4026,14 +4026,16 @@ function reviewMutualRecognitionRecord(data, id, payload, user) {
   return updated;
 }
 
+
+
 function seedRegionalDataSharingScope() {
   return {
     id: "regional-data-sharing",
     name: "区域诊疗数据共享平台",
     boundary: [
-      "居民主索引下的诊疗摘要、检查检验报告、互认记录和授权调阅",
-      "管理端按区域、机构、接口和质量状态监管共享闭环",
-      "机构端按本机构来源或目标居民共享包完成调阅、确认和留痕"
+      "在居民主索引下共享诊疗摘要、检查检验报告、互认记录和授权调阅记录。",
+      "管理端按区域、机构、接口、质量状态和审计留痕监管共享闭环。",
+      "机构端按本机构来源或目标居民共享包完成调阅、确认和留痕。"
     ],
     roles: [
       { role: "commission", name: "管理端", permissions: ["共享网络总览", "质量与合规监管", "跨机构审计追踪", "现场联调证据归档"] },
@@ -4041,16 +4043,16 @@ function seedRegionalDataSharingScope() {
       { role: "citizen", name: "居民端", permissions: ["通过既有个人健康档案和授权记录查看结果"], via: "citizen.html / personalRecords" }
     ],
     coreLoop: [
-      "机构接口或人工回传形成 diagnosticReports / personalRecords",
-      "区域规则生成 countyMutualRecognitionRecords 和共享包",
-      "目标机构调阅共享包并登记 regionalSharingAccessReviews",
-      "管理端用质量、授权、互认、审计和接口证据验收闭环"
+      "机构接口或人工回传形成诊断报告和个人健康档案摘要。",
+      "区域规则生成互认记录和共享包。",
+      "目标机构调阅共享包并登记调阅审计。",
+      "管理端用质量、授权、互认、审计和接口证据验收闭环。"
     ],
     exclusions: [
-      "不替代院内 HIS/EMR/LIS/PACS 原系统",
-      "不直接承载医保结算、电子票据或费用清分",
-      "不绕过居民授权、机构职责边界和现场接口签名验收",
-      "不把科研脱敏数据集作为临床诊疗直接来源"
+      "不替代院内 HIS/EMR/LIS/PACS 原系统。",
+      "不承载医保结算、票据或费用清分。",
+      "不绕过居民授权、机构职责边界和现场接口签名验收。",
+      "不把科研脱敏数据集作为临床诊疗直接来源。"
     ],
     reusedCollections: [
       "residents",
@@ -4072,6 +4074,7 @@ function seedRegionalDataSharingScope() {
   };
 }
 
+
 function seedRegionalSharingPackages() {
   return [
     {
@@ -4082,7 +4085,7 @@ function seedRegionalSharingPackages() {
       sourceOrgCode: "MR3",
       targetInstitutions: ["大连市中心医院", "中山区县域医共体"],
       targetOrgCodes: ["MR1", "ORG-CONSORTIUM-ZS"],
-      category: "chronic-followup",
+      category: "慢病复查",
       title: "高血压复查共享包",
       sharedCollections: ["personalRecords", "followups", "diagnosticReports"],
       recordRefs: ["pr-001", "dr-seed-001"],
@@ -4102,7 +4105,7 @@ function seedRegionalSharingPackages() {
       sourceOrgCode: "MR1",
       targetInstitutions: ["星海湾社区卫生服务中心", "中山区县域医共体"],
       targetOrgCodes: ["MR4", "ORG-CONSORTIUM-ZS"],
-      category: "diagnostic-report",
+      category: "检查报告互认",
       title: "糖尿病检验报告互认共享包",
       sharedCollections: ["diagnosticReports", "countyMutualRecognitionRecords", "personalRecords"],
       recordRefs: ["dr-seed-002", "cmr-seed-002"],
@@ -4122,7 +4125,7 @@ function seedRegionalSharingPackages() {
       sourceOrgCode: "MR5",
       targetInstitutions: ["大连医科大学附属医院"],
       targetOrgCodes: ["MR2"],
-      category: "imaging",
+      category: "影像复核",
       title: "影像报告复核共享包",
       sharedCollections: ["diagnosticReports", "integrationGatewayEvents"],
       recordRefs: ["dr-seed-003"],
@@ -4137,6 +4140,7 @@ function seedRegionalSharingPackages() {
   ];
 }
 
+
 function seedRegionalSharingSnapshots() {
   return {
     generatedAt: "2026-06-22T10:30:00.000Z",
@@ -4145,22 +4149,23 @@ function seedRegionalSharingSnapshots() {
       residentId: "居民主索引关联",
       sourceOrgCode: "来源机构代码",
       targetOrgCodes: "目标机构代码列表",
-      status: "ready | pending_review | blocked | archived",
-      consentStatus: "active | pending | revoked",
-      qualityStatus: "passed | manual_review | failed",
-      contractRefs: "integrationContracts.id 列表",
-      recordRefs: "personalRecords / diagnosticReports / countyMutualRecognitionRecords 引用"
+      status: "可共享 / 待复核 / 暂缓共享 / 已归档",
+      consentStatus: "授权有效 / 授权待确认 / 授权已撤销",
+      qualityStatus: "质控通过 / 人工复核 / 质控未通过",
+      contractRefs: "接口契约编号列表",
+      recordRefs: "个人健康档案、诊断报告、互认记录引用"
     },
     statusNorms: seedRegionalDataSharingScope().statusNorms,
     staticEvidence: [
-      "residents.personIndex",
-      "personalRecords.reportId",
-      "diagnosticReports.recognitionRecordId",
-      "integrationContracts.requiredFields",
-      "interface-mapping-report.md"
+      "居民主索引 personIndex",
+      "个人健康档案 reportId",
+      "诊断报告 recognitionRecordId",
+      "接口契约必填字段",
+      "接口字段映射报告"
     ]
   };
 }
+
 
 function seedRegionalSharingAccessReviews() {
   return [

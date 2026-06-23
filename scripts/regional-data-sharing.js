@@ -54,7 +54,8 @@ function buildRegionalDataSharingReport(options = {}) {
     { id: "regional:contractRefs", passed: contractRefs.length >= 4 && contractRefs.every((id) => contracts.has(id)), detail: [...new Set(contractRefs)].join(",") },
     { id: "regional:accessReviews", passed: reviews.length >= 1 && reviews.every((item) => item.packageId && item.residentId && item.purpose && item.decision), detail: `${reviews.length} reviews` },
     { id: "regional:apiRoutes", passed: /\/api\/regional-data-sharing/.test(server) && /createRegionalSharingAccessReview/.test(server), detail: "GET and POST regional routes present" },
-    { id: "regional:frontendEntry", passed: /regional-data-sharing\.js/.test(html) && /登记留痕/.test(html) && /authFetch/.test(client), detail: "page and client workflow present" },
+    { id: "regional:frontendEntry", passed: /regional-data-sharing\.js/.test(html) && /regional-access-form/.test(html) && /authFetch/.test(client), detail: "page and client workflow present" },
+    { id: "regional:frontendWorkflow", passed: /regional-sharing-loop/.test(html) && /regional-selected-package/.test(html) && /regional-access-feedback/.test(html) && /selectRegionalPackage/.test(client) && /renderRegionalLoop/.test(client), detail: "loop, selection and access feedback present" },
     { id: "regional:releaseScript", passed: Boolean(pkg.scripts?.["regional-data-sharing:report"]), detail: pkg.scripts?.["regional-data-sharing:report"] || "missing" }
   ];
   return {
@@ -90,31 +91,31 @@ function buildRegionalDataSharingReport(options = {}) {
 
 function renderMarkdown(report) {
   return [
-    "# Regional data sharing report",
+    "# 区域诊疗数据共享平台验收报告",
     "",
-    `- Generated at: ${report.generatedAt}`,
-    `- Result: ${report.ok ? "PASS" : "FAIL"}`,
-    `- Packages: ${report.summary.packages}`,
-    `- Ready packages: ${report.summary.ready}`,
-    `- Access reviews: ${report.summary.accessReviews}`,
+    `- 生成时间：${report.generatedAt}`,
+    `- 结果：${report.ok ? "通过" : "未通过"}`,
+    `- 共享包：${report.summary.packages}`,
+    `- 可共享包：${report.summary.ready}`,
+    `- 调阅留痕：${report.summary.accessReviews}`,
     "",
-    "## Checks",
+    "## 检查项",
     "",
-    "| Result | Check | Detail |",
+    "| 结果 | 检查项 | 详情 |",
     "|---|---|---|",
-    ...report.checks.map((item) => `| ${item.passed ? "PASS" : "FAIL"} | ${item.id} | ${String(item.detail || "").replace(/\|/g, "/")} |`),
+    ...report.checks.map((item) => `| ${item.passed ? "通过" : "未通过"} | ${item.id} | ${String(item.detail || "").replace(/\|/g, "/")} |`),
     "",
-    "## Packages",
+    "## 共享包",
     "",
-    "| Package | Resident | Source | Targets | Status | Contracts |",
+    "| 共享包 | 居民 | 来源 | 目标机构 | 状态 | 契约 |",
     "|---|---|---|---|---|---|",
     ...report.packages.map((item) => `| ${item.id} | ${item.residentId} | ${item.sourceOrgCode} | ${(item.targetOrgCodes || []).join(", ")} | ${item.status} | ${(item.contractRefs || []).join(", ")} |`),
     "",
-    "## Site Joint-Test Boundary",
+    "## 现场联调边界",
     "",
-    "- Confirm production resident master index and authorization source before enabling real cross-institution access.",
-    "- Confirm HIS/EMR/LIS/PACS payload signatures, idempotency keys, report identifiers, and receiving physician acknowledgement screenshots.",
-    "- Keep insurance settlement, billing, research de-identification, and cross-agency certificates outside this application unless separate signoff is provided.",
+    "- 开启真实跨机构调阅前，先确认生产居民主索引和授权来源。",
+    "- 确认 HIS/EMR/LIS/PACS 报文签名、幂等键、报告标识和接收医师确认截图。",
+    "- 医保结算、票据清分、科研脱敏和跨部门证照不纳入本应用，除非另行签字确认。",
     ""
   ].join("\n");
 }

@@ -29,6 +29,24 @@
       <section class="portal-grid">
         <article class="panel wide">
           <div class="panel-title">
+            <h2>闭环进度</h2>
+            <span id="regional-loop-summary"></span>
+          </div>
+          <div id="regional-sharing-loop" class="regional-loop"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>当前共享包</h2>
+            <span id="regional-selected-package-status"></span>
+          </div>
+          <div id="regional-selected-package" class="regional-selected-package"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
             <h2>共享包队列</h2>
             <span id="regional-sharing-scope"></span>
           </div>
@@ -87,6 +105,7 @@
             </label>
             <button class="primary-button" type="submit">登记留痕</button>
           </form>
+          <div id="regional-access-feedback" class="regional-access-feedback muted"></div>
           <div id="regional-sharing-reviews" class="priority-list"></div>
         </article>
 
@@ -101,6 +120,6 @@
     </main>
 
     <script src="./shared.js"></script>
-    <script src="./regional-data-sharing.js"></script>
+    <script src="./regional-data-sharing.js?v=20260623-cn"></script>
   </body>
 </html>

@@ -6902,51 +6902,51 @@
     "id": "regional-data-sharing",
     "name": "区域诊疗数据共享平台",
     "boundary": [
-      "Clinical summaries, diagnostic reports, mutual recognition records, and authorized access under resident master index.",
-      "Management-side supervision by region, institution, interface, quality status, and audit trail.",
-      "Institution-side access review for packages where the institution is source or target."
+      "在居民主索引下共享诊疗摘要、检查检验报告、互认记录和授权调阅记录。",
+      "管理端按区域、机构、接口、质量状态和审计留痕监管共享闭环。",
+      "机构端按本机构来源或目标居民共享包完成调阅、确认和留痕。"
     ],
     "roles": [
       {
         "role": "commission",
-        "name": "management",
+        "name": "管理端",
         "permissions": [
-          "network overview",
-          "quality supervision",
-          "cross-institution audit",
-          "joint-test evidence"
+          "共享网络总览",
+          "质量与合规监管",
+          "跨机构审计追踪",
+          "现场联调证据归档"
         ]
       },
       {
         "role": "institution",
-        "name": "institution",
+        "name": "机构端",
         "permissions": [
-          "scoped package access",
-          "report return confirmation",
-          "recognition confirmation",
-          "issue closure"
+          "本机构共享包调阅",
+          "报告回传确认",
+          "互认结果确认",
+          "问题闭环登记"
         ]
       },
       {
         "role": "citizen",
-        "name": "resident",
+        "name": "居民端",
         "permissions": [
-          "view through existing personal records and authorization flows"
+          "通过既有个人健康档案和授权记录查看结果"
         ],
         "via": "citizen.html / personalRecords"
       }
     ],
     "coreLoop": [
-      "Institution interface or manual callback writes diagnosticReports / personalRecords.",
-      "Regional rules create countyMutualRecognitionRecords and sharing packages.",
-      "Target institution registers access in regionalSharingAccessReviews.",
-      "Commission validates quality, authorization, recognition, audit, and interface evidence."
+      "机构接口或人工回传形成诊断报告和个人健康档案摘要。",
+      "区域规则生成互认记录和共享包。",
+      "目标机构调阅共享包并登记调阅审计。",
+      "管理端用质量、授权、互认、审计和接口证据验收闭环。"
     ],
     "exclusions": [
-      "Does not replace hospital HIS/EMR/LIS/PACS systems.",
-      "Does not carry insurance settlement, billing, or fund clearing.",
-      "Does not bypass resident authorization, organization scope, or signed interface acceptance.",
-      "Does not use research de-identified datasets as direct clinical sources."
+      "不替代院内 HIS/EMR/LIS/PACS 原系统。",
+      "不承载医保结算、票据或费用清分。",
+      "不绕过居民授权、机构职责边界和现场接口签名验收。",
+      "不把科研脱敏数据集作为临床诊疗直接来源。"
     ],
     "reusedCollections": [
       "residents",
@@ -6960,10 +6960,10 @@
       "securityEvents"
     ],
     "statusNorms": {
-      "ready": "shareable",
-      "pending_review": "pending review",
-      "blocked": "blocked",
-      "archived": "archived"
+      "ready": "可共享",
+      "pending_review": "待复核",
+      "blocked": "暂缓共享",
+      "archived": "已归档"
     }
   },
   "regionalSharingPackages": [
@@ -6971,18 +6971,18 @@
       "id": "rsp-r1-hypertension",
       "residentId": "r1",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
-      "sourceInstitution": "Qingniwaqiao Community Health Center",
+      "sourceInstitution": "青泥洼桥社区卫生服务中心",
       "sourceOrgCode": "MR3",
       "targetInstitutions": [
-        "Dalian Central Hospital",
-        "Zhongshan County Consortium"
+        "大连市中心医院",
+        "中山区县域医共体"
       ],
       "targetOrgCodes": [
         "MR1",
         "ORG-CONSORTIUM-ZS"
       ],
-      "category": "chronic-followup",
-      "title": "Hypertension review sharing package",
+      "category": "慢病复查",
+      "title": "高血压复查共享包",
       "sharedCollections": [
         "personalRecords",
         "followups",
@@ -7001,25 +7001,25 @@
       "qualityStatus": "passed",
       "status": "ready",
       "lastSharedAt": "2026-06-22T09:20:00.000Z",
-      "owner": "primary-care-admin",
-      "nextAction": "Receiving hospital writes back visit opinion."
+      "owner": "基层机构管理员",
+      "nextAction": "上级医院调阅后回写接诊意见。"
     },
     {
       "id": "rsp-r2-diabetes",
       "residentId": "r2",
       "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2",
-      "sourceInstitution": "Dalian Central Hospital",
+      "sourceInstitution": "大连市中心医院",
       "sourceOrgCode": "MR1",
       "targetInstitutions": [
-        "Xinghaiwan Community Health Center",
-        "Zhongshan County Consortium"
+        "星海湾社区卫生服务中心",
+        "中山区县域医共体"
       ],
       "targetOrgCodes": [
         "MR4",
         "ORG-CONSORTIUM-ZS"
       ],
-      "category": "diagnostic-report",
-      "title": "Diabetes lab mutual-recognition package",
+      "category": "检查报告互认",
+      "title": "糖尿病检验报告互认共享包",
       "sharedCollections": [
         "diagnosticReports",
         "countyMutualRecognitionRecords",
@@ -7037,23 +7037,23 @@
       "qualityStatus": "passed",
       "status": "ready",
       "lastSharedAt": "2026-06-22T10:15:00.000Z",
-      "owner": "hospital-admin",
-      "nextAction": "Primary institution confirms recognition and avoids duplicate test."
+      "owner": "医疗机构管理员",
+      "nextAction": "基层机构确认互认并减少重复检验。"
     },
     {
       "id": "rsp-r3-imaging",
       "residentId": "r3",
       "personIndex": "DEMO-ID-R3#DEMO-MOBILE-R3",
-      "sourceInstitution": "Ganjingzi District Hospital",
+      "sourceInstitution": "甘井子区人民医院",
       "sourceOrgCode": "MR5",
       "targetInstitutions": [
-        "Dalian Medical University Hospital"
+        "大连医科大学附属医院"
       ],
       "targetOrgCodes": [
         "MR2"
       ],
-      "category": "imaging",
-      "title": "Imaging report review sharing package",
+      "category": "影像复核",
+      "title": "影像报告复核共享包",
       "sharedCollections": [
         "diagnosticReports",
         "integrationGatewayEvents"
@@ -7068,35 +7068,35 @@
       "qualityStatus": "manual_review",
       "status": "pending_review",
       "lastSharedAt": "",
-      "owner": "regional-diagnosis-center",
-      "nextAction": "Complete resident authorization and imaging quality review before access."
+      "owner": "区域诊断中心",
+      "nextAction": "补齐居民授权和影像质控结论后开放调阅。"
     }
   ],
   "regionalSharingSnapshots": {
     "generatedAt": "2026-06-22T10:30:00.000Z",
     "fields": {
-      "packageId": "sharing package primary key",
-      "residentId": "resident master-index link",
-      "sourceOrgCode": "source organization code",
-      "targetOrgCodes": "target organization code list",
-      "status": "ready | pending_review | blocked | archived",
-      "consentStatus": "active | pending | revoked",
-      "qualityStatus": "passed | manual_review | failed",
-      "contractRefs": "integrationContracts.id list",
-      "recordRefs": "personalRecords / diagnosticReports / countyMutualRecognitionRecords references"
+      "packageId": "共享包主键",
+      "residentId": "居民主索引关联",
+      "sourceOrgCode": "来源机构代码",
+      "targetOrgCodes": "目标机构代码列表",
+      "status": "可共享 / 待复核 / 暂缓共享 / 已归档",
+      "consentStatus": "授权有效 / 授权待确认 / 授权已撤销",
+      "qualityStatus": "质控通过 / 人工复核 / 质控未通过",
+      "contractRefs": "接口契约编号列表",
+      "recordRefs": "个人健康档案、诊断报告、互认记录引用"
     },
     "statusNorms": {
-      "ready": "shareable",
-      "pending_review": "pending review",
-      "blocked": "blocked",
-      "archived": "archived"
+      "ready": "可共享",
+      "pending_review": "待复核",
+      "blocked": "暂缓共享",
+      "archived": "已归档"
     },
     "staticEvidence": [
-      "residents.personIndex",
-      "personalRecords.reportId",
-      "diagnosticReports.recognitionRecordId",
-      "integrationContracts.requiredFields",
-      "interface-mapping-report.md"
+      "居民主索引 personIndex",
+      "个人健康档案 reportId",
+      "诊断报告 recognitionRecordId",
+      "接口契约必填字段",
+      "接口字段映射报告"
     ]
   },
   "regionalSharingAccessReviews": [
@@ -7104,14 +7104,14 @@
       "id": "rsar-seed-001",
       "packageId": "rsp-r1-hypertension",
       "residentId": "r1",
-      "actor": "hospital-admin",
+      "actor": "医疗机构管理员",
       "role": "institution",
-      "organization": "Dalian Central Hospital",
-      "purpose": "Review chronic follow-up and lab summary before upward referral visit.",
+      "organization": "大连市中心医院",
+      "purpose": "上转接诊前调阅慢病随访和检验摘要",
       "decision": "approved",
       "status": "completed",
       "at": "2026-06-22T10:40:00.000Z",
-      "note": "Access scope limited to this encounter package."
+      "note": "调阅范围限定为本次接诊所需共享包。"
     }
   ]
 }

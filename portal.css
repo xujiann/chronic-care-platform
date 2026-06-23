@@ -675,6 +675,12 @@ dialog::backdrop {
   background: #f8fbfd;
 }
 
+.priority-row.is-selected {
+  border-color: rgba(22, 119, 255, 0.48);
+  background: #f4f8ff;
+  box-shadow: inset 3px 0 0 #1677ff;
+}
+
 .priority-row h3 {
   margin-bottom: 6px;
 }
@@ -852,6 +858,81 @@ dialog::backdrop {
   color: var(--ink);
 }
 
+.regional-loop {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.regional-loop article {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 8px 10px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fbfd;
+}
+
+.regional-loop article span {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  grid-row: span 2;
+  border-radius: 8px;
+  background: #edf3f8;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.regional-loop article.is-done span {
+  background: #e6f7ef;
+  color: var(--green);
+}
+
+.regional-loop strong,
+.regional-loop small {
+  display: block;
+}
+
+.regional-loop small,
+.regional-selected-package span,
+.regional-access-feedback {
+  color: var(--muted);
+}
+
+.regional-selected-package {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.regional-selected-package h3 {
+  font-size: 16px;
+}
+
+.regional-selected-package p {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 8px;
+  border-top: 1px solid rgba(216, 226, 231, 0.72);
+  padding-top: 8px;
+  line-height: 1.55;
+}
+
+.regional-selected-package strong {
+  color: var(--ink);
+}
+
+.regional-access-feedback {
+  min-height: 20px;
+  margin: 10px 0;
+  font-weight: 800;
+}
+
 .priority-rank {
   width: 48px;
   height: 36px;
@@ -991,6 +1072,7 @@ dialog::backdrop {
   .evidence-grid,
   .filter-grid,
   .report-grid,
+  .regional-loop,
   .login-flow,
   .demo-accounts,
   .item {
