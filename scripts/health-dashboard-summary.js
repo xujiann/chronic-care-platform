@@ -168,6 +168,8 @@ function buildHealthDashboardSummary(options = {}) {
   const releaseReport = options.releaseReport || null;
   const applications = APPLICATIONS.map((app) => summarizeApplication(data, app));
   const openActions = collectOpenActions(data);
+  const sourceOpenActions = applications.reduce((sum, item) => sum + item.openActions, 0);
+  const previewOpenActions = openActions.length;
   const interfaceRows = rows(data, "platformInterfaces");
   const evidenceRecords = rows(data, "platformEvidence").flatMap((item) => item.records || []);
   const siteDependencies = rows(data, "productionDeploymentPlan").filter((item) => isOpen(item) || /missing|待|寰|blocked/i.test(JSON.stringify(item)));
@@ -175,7 +177,7 @@ function buildHealthDashboardSummary(options = {}) {
     { id: "dashboard:applications", passed: applications.length === 7 && applications.every((item) => item.entry && item.collections.length), detail: `${applications.length} applications` },
     { id: "dashboard:source-boundary", passed: applications.every((item) => /source application/.test(item.boundary)), detail: "dashboard is aggregate-only" },
     { id: "dashboard:metrics", passed: applications.reduce((sum, item) => sum + item.records, 0) > 0, detail: `${applications.reduce((sum, item) => sum + item.records, 0)} source records` },
-    { id: "dashboard:actions", passed: openActions.length > 0, detail: `${openActions.length} open actions previewed` },
+    { id: "dashboard:actions", passed: previewOpenActions > 0 && sourceOpenActions >= previewOpenActions, detail: `${previewOpenActions} preview / ${sourceOpenActions} source open actions` },
     { id: "dashboard:interfaces", passed: interfaceRows.length >= 4, detail: `${interfaceRows.length} interface rows` },
     { id: "dashboard:evidence", passed: evidenceRecords.length >= 2, detail: `${evidenceRecords.length} evidence records` }
   ];
@@ -189,7 +191,9 @@ function buildHealthDashboardSummary(options = {}) {
     totals: {
       applications: applications.length,
       sourceRecords: applications.reduce((sum, item) => sum + item.records, 0),
-      openActions: openActions.length,
+      openActions: previewOpenActions,
+      previewOpenActions,
+      sourceOpenActions,
       highRisks: applications.reduce((sum, item) => sum + item.highRisks, 0),
       interfaceTracks: interfaceRows.length,
       evidenceRecords: evidenceRecords.length,
@@ -245,7 +249,8 @@ function renderMarkdown(report) {
     `- Result: ${report.ok ? "PASS" : "FAIL"}`,
     `- Applications: ${report.totals.applications}`,
     `- Source records: ${report.totals.sourceRecords}`,
-    `- Open actions: ${report.totals.openActions}`,
+    `- Source open actions: ${report.totals.sourceOpenActions ?? report.totals.openActions}`,
+    `- Preview open actions: ${report.totals.previewOpenActions ?? report.totals.openActions}`,
     `- High risks: ${report.totals.highRisks}`,
     `- Interface tracks: ${report.totals.interfaceTracks}`,
     `- Evidence records: ${report.totals.evidenceRecords}`,

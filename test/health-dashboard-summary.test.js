@@ -23,6 +23,9 @@ test("health dashboard summary aggregates the first seven applications without r
   assert.equal(report.totals.sourceRecords > 0, true);
   assert.equal(report.totals.interfaceTracks >= 4, true);
   assert.equal(report.totals.evidenceRecords >= 2, true);
+  assert.equal(report.totals.previewOpenActions, report.openActions.length);
+  assert.equal(report.totals.openActions, report.totals.previewOpenActions);
+  assert.equal(report.totals.sourceOpenActions >= report.totals.previewOpenActions, true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:source-boundary" && item.passed), true);
   assert.equal(report.openActions.every((item) => item.applicationId && item.application && item.entry), true);
   assert.equal(report.openActions.some((item) => item.entry === "county.html" || item.entry === "institution.html"), true);
@@ -32,6 +35,8 @@ test("health dashboard summary aggregates the first seven applications without r
   assert.match(markdown, /commission-supervision/);
   assert.match(markdown, /operations-workbench/);
   assert.match(markdown, /Open action preview/);
+  assert.match(markdown, /Source open actions/);
+  assert.match(markdown, /Preview open actions/);
   assert.match(markdown, /Application \| Entry \| Collection/);
 });
 

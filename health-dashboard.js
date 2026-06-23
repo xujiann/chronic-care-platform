@@ -76,6 +76,7 @@ function buildStaticDashboardSummary(state) {
     openActions: actionSummary[item.id]?.openActions || 0,
     highRisks: actionSummary[item.id]?.highRisks || 0
   }));
+  const sourceOpenActions = enrichedApplications.reduce((sum, item) => sum + item.openActions, 0);
   const risks = enrichedApplications
     .filter((item) => item.highRisks > 0 || item.openActions > 0)
     .map((item) => ({
@@ -95,6 +96,8 @@ function buildStaticDashboardSummary(state) {
       applications: enrichedApplications.length,
       sourceRecords: enrichedApplications.reduce((sum, item) => sum + item.records, 0),
       openActions: openActions.length,
+      previewOpenActions: openActions.length,
+      sourceOpenActions,
       highRisks: openActions.filter((item) => item.priority === "high").length,
       interfaceTracks: interfaces.length,
       evidenceRecords: evidence.reduce((sum, item) => sum + (Array.isArray(item.records) ? item.records.length : 0), 0),
@@ -141,7 +144,8 @@ function renderMetrics(summary) {
   document.querySelector("#dashboard-metrics").innerHTML = [
     ["应用入口", totals.applications || 0, "前 7 个应用汇总"],
     ["源记录", totals.sourceRecords || 0, "来自 data/db.json 与业务 API"],
-    ["Open actions", totals.openActions || 0, "跨端待闭环"],
+    ["源待办", totals.sourceOpenActions ?? totals.openActions ?? 0, "源应用全部待闭环"],
+    ["预览待办", totals.previewOpenActions ?? totals.openActions ?? 0, "驾驶舱优先展示"],
     ["高风险", totals.highRisks || 0, "状态/优先级归一化"],
     ["接口轨道", totals.interfaceTracks || 0, "platformInterfaces"],
     ["验收证据", totals.evidenceRecords || 0, "platformEvidence records"],
