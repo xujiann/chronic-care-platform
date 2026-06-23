@@ -204,6 +204,40 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(managementFunctions.body.functions.some((item) => item.id === "mgmt-medical-quality" && item.ready), true);
     assert.equal(managementFunctions.body.functions.some((item) => item.id === "mgmt-public-health" && item.sourceSystems.length >= 4), true);
 
+    const operationsDashboard = await api(baseUrl, "/api/operations/dashboard", authorized(accountLogin.body.token));
+    assert.equal(operationsDashboard.response.status, 200);
+    assert.equal(operationsDashboard.body.ok, true);
+    assert.equal(operationsDashboard.body.summary.institutions >= 3, true);
+    assert.equal(operationsDashboard.body.summary.openDispatchRequests >= 2, true);
+    assert.equal(operationsDashboard.body.snapshots.some((item) => item.normalizedStatus === "critical"), true);
+    assert.equal(operationsDashboard.body.reusedCollections.includes("healthStatisticsIngestion"), true);
+
+    const dispatchAction = await api(baseUrl, "/api/operations/dispatch", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        id: "dispatch-api-test",
+        category: "equipment",
+        priority: "high",
+        status: "assigned",
+        sourceInstitution: "Qingniwaqiao Community Health Service Center",
+        targetInstitution: "Dalian Central Hospital",
+        resourceType: "ct-slot",
+        quantity: 2,
+        reason: "API regression dispatch"
+      })
+    }));
+    assert.equal(dispatchAction.response.status, 201);
+    assert.equal(dispatchAction.body.id, "dispatch-api-test");
+    assert.equal(dispatchAction.body.auditTrail.some((item) => item.action === "upsert"), true);
+
+    const reconReview = await api(baseUrl, "/api/operations/reconciliation/recon-mr1-20260622-am/review", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ status: "approved", reviewNote: "API regression approved" })
+    }));
+    assert.equal(reconReview.response.status, 200);
+    assert.equal(reconReview.body.status, "approved");
+    assert.equal(reconReview.body.reviewedBy, "health");
+
     const identityPreview = await api(baseUrl, "/api/auth/identity/preview", authorized(accountLogin.body.token, {
       method: "POST",
       body: JSON.stringify({

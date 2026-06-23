@@ -9,6 +9,7 @@ const { buildEnvironmentMatrixReport, renderMarkdown: renderEnvironmentMatrixMar
 const { buildIdentityContract, renderMarkdown: renderIdentityContractMarkdown } = require("./identity-contract");
 const { buildIntegrationReadinessReport, renderMarkdown: renderIntegrationReadinessMarkdown } = require("./integration-readiness");
 const { buildInterfaceMappingReport, renderMarkdown: renderInterfaceMappingMarkdown } = require("./interface-mapping");
+const { buildHospitalOperationsReadinessReport, renderMarkdown: renderHospitalOperationsReadinessMarkdown } = require("./hospital-operations-readiness");
 const { buildMonitoringReadinessReport, renderMarkdown: renderMonitoringReadinessMarkdown } = require("./monitoring-readiness");
 const { buildOperationsReadinessReport, renderMarkdown: renderOperationsReadinessMarkdown } = require("./operations-readiness");
 const { buildProcessAuditReport, renderMarkdown: renderProcessAuditMarkdown } = require("./process-audit");
@@ -344,6 +345,15 @@ function operationsReadinessChecks(operationsReadiness) {
   ];
 }
 
+function hospitalOperationsReadinessChecks(hospitalOperationsReadiness) {
+  return [
+    check("hospitalOps:readiness", hospitalOperationsReadiness.ok, hospitalOperationsReadiness.ok ? "hospital operations readiness checks passed" : "hospital operations readiness checks failed", "error", "operations"),
+    check("hospitalOps:snapshots", hospitalOperationsReadiness.summary?.snapshots >= 3, `${hospitalOperationsReadiness.summary?.snapshots || 0} operation snapshots`, "error", "operations"),
+    check("hospitalOps:dispatch", hospitalOperationsReadiness.summary?.dispatchRequests >= 2, `${hospitalOperationsReadiness.summary?.dispatchRequests || 0} dispatch requests`, "error", "operations"),
+    check("hospitalOps:reconciliation", hospitalOperationsReadiness.summary?.reconciliationReviews >= 2, `${hospitalOperationsReadiness.summary?.reconciliationReviews || 0} reconciliation reviews`, "error", "operations")
+  ];
+}
+
 function monitoringReadinessChecks(monitoringReadiness) {
   return [
     check("monitoring:readiness", monitoringReadiness.ok, monitoringReadiness.ok ? "monitoring readiness checks passed" : "monitoring readiness checks failed", "error", "monitoring"),
@@ -494,6 +504,7 @@ function packageChecks(pkg) {
     "data-quality:report",
     "quality-safety:report",
     "environment:matrix",
+    "hospital-operations:readiness",
     "integration:readiness",
     "interface:mapping",
     "monitoring:readiness",
@@ -554,6 +565,7 @@ function buildReleaseReport(options = {}) {
   const integrationReadiness = buildIntegrationReadinessReport({ data });
   const interfaceMapping = buildInterfaceMappingReport({ data, pkg });
   const regionalDataSharing = buildRegionalDataSharingReport({ data, pkg });
+  const hospitalOperationsReadiness = buildHospitalOperationsReadinessReport({ data, pkg });
   const monitoringReadiness = buildMonitoringReadinessReport({ data, pkg });
   const referralTeleconsultationReadiness = buildReferralTeleconsultationReadinessReport({ data, pkg });
   const operationsReadiness = buildOperationsReadinessReport({ data, pkg });
@@ -580,6 +592,7 @@ function buildReleaseReport(options = {}) {
     ...integrationReadinessChecks(integrationReadiness),
     ...interfaceMappingChecks(interfaceMapping),
     ...regionalDataSharingChecks(regionalDataSharing),
+    ...hospitalOperationsReadinessChecks(hospitalOperationsReadiness),
     ...monitoringReadinessChecks(monitoringReadiness),
     ...referralTeleconsultationChecks(referralTeleconsultationReadiness),
     ...operationsReadinessChecks(operationsReadiness),
@@ -616,6 +629,7 @@ function buildReleaseReport(options = {}) {
     integrationReadiness,
     interfaceMapping,
     regionalDataSharing,
+    hospitalOperationsReadiness,
     monitoringReadiness,
     referralTeleconsultationReadiness,
     operationsReadiness,
@@ -794,6 +808,10 @@ function renderMarkdown(report) {
     "",
     "See `operations-readiness-report.json` and `operations-readiness-report.md` for operation routes, production deployment tracks, external dependency risks, and release operation scripts.",
     "",
+    "## Hospital operations readiness report",
+    "",
+    "See `hospital-operations-readiness-report.json` and `hospital-operations-readiness-report.md` for hospital operation snapshots, resource dispatch, direct-report reconciliation, alert rules, API permissions, and audit evidence.",
+    "",
     "## Full process audit report",
     "",
     "See `process-audit-report.json` and `process-audit-report.md` for resident, chronic disease, county consortium, insurance, statistics, certificate, security, and cutover process evidence.",
@@ -931,6 +949,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       operationsReadiness: report.operationsReadiness
     }, null, 2), "utf8");
+    const hospitalOperationsJson = path.join(path.dirname(output), "hospital-operations-readiness-report.json");
+    fs.writeFileSync(hospitalOperationsJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      hospitalOperationsReadiness: report.hospitalOperationsReadiness
+    }, null, 2), "utf8");
     const processAuditJson = path.join(path.dirname(output), "process-audit-report.json");
     fs.writeFileSync(processAuditJson, JSON.stringify({
       project: report.project,
@@ -1029,6 +1055,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(regionalDataSharingMarkdown, renderRegionalDataSharingMarkdown(report.regionalDataSharing), "utf8");
     const operationsMarkdown = path.join(path.dirname(markdown), "operations-readiness-report.md");
     fs.writeFileSync(operationsMarkdown, renderOperationsReadinessMarkdown(report.operationsReadiness), "utf8");
+    const hospitalOperationsMarkdown = path.join(path.dirname(markdown), "hospital-operations-readiness-report.md");
+    fs.writeFileSync(hospitalOperationsMarkdown, renderHospitalOperationsReadinessMarkdown(report.hospitalOperationsReadiness), "utf8");
     const processAuditMarkdown = path.join(path.dirname(markdown), "process-audit-report.md");
     fs.writeFileSync(processAuditMarkdown, renderProcessAuditMarkdown(report.processAudit), "utf8");
     const serviceAcceptanceMarkdown = path.join(path.dirname(markdown), "service-acceptance-summary.md");

@@ -31,6 +31,7 @@
     "platform.html": ["commission"],
     "regional-data-sharing.html": ["commission", "institution"],
     "quality-safety.html": ["commission"],
+    "operations.html": ["commission"],
     "institution.html": ["institution"],
     "insurance.html": ["insurance"],
     "county.html": ["county"],
@@ -41,7 +42,7 @@
   };
 
   const roleLinks = {
-    commission: [["platform.html", "全民健康平台"], ["regional-data-sharing.html", "区域共享"], ["quality-safety.html", "质量安全"], ["health-city.html", "总览"], ["about.html", "关于"], ["workbench.html", "工作台"], ["index.html", "卫健管理"]],
+    commission: [["platform.html", "全民健康平台"], ["regional-data-sharing.html", "区域共享"], ["quality-safety.html", "质量安全"], ["operations.html", "运行调度"], ["health-city.html", "总览"], ["about.html", "关于"], ["workbench.html", "工作台"], ["index.html", "卫健管理"]],
     institution: [["health-city.html", "总览"], ["regional-data-sharing.html", "区域共享"], ["about.html", "关于"], ["institution.html", "医疗机构"]],
     insurance: [["health-city.html", "总览"], ["about.html", "关于"], ["insurance.html", "医保"]],
     citizen: [["health-city.html", "总览"], ["about.html", "关于"], ["citizen.html", "个人端"], ["mobile-preview.html", "手机预览"]],

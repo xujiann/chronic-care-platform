@@ -163,6 +163,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal(Boolean(pkg.scripts["data-quality:report"]), true);
   assert.equal(Boolean(pkg.scripts["quality-safety:report"]), true);
   assert.equal(Boolean(pkg.scripts["environment:matrix"]), true);
+  assert.equal(Boolean(pkg.scripts["hospital-operations:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["integration:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["interface:mapping"]), true);
   assert.equal(Boolean(pkg.scripts["regional-data-sharing:report"]), true);
@@ -198,6 +199,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/release-report.js"), /regional-data-sharing-report\.md/);
   assert.match(read("README.md"), /monitoring-readiness-report\.md/);
   assert.match(read("README.md"), /operations-readiness-report\.md/);
+  assert.match(read("README.md"), /hospital-operations-readiness-report\.md/);
   assert.match(read("README.md"), /process-audit-report\.md/);
   assert.match(read("README.md"), /service-acceptance-summary\.md/);
   assert.match(read("README.md"), /\/api\/service-acceptance-summary/);
@@ -217,6 +219,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("DEPLOYMENT.md"), /interface-mapping-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /monitoring-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /operations-readiness-report\.md/);
+  assert.match(read("DEPLOYMENT.md"), /hospital-operations-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /process-audit-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /site-readiness-pack\.md/);
   assert.match(read("DEPLOYMENT.md"), /release\/templates\/\*\/README\.md/);
@@ -240,6 +243,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/deploy-check.js"), /monitoring:readiness/);
   assert.match(read("scripts/deploy-check.js"), /referral:readiness/);
   assert.match(read("scripts/deploy-check.js"), /operations:readiness/);
+  assert.match(read("scripts/deploy-check.js"), /hospital-operations:readiness/);
   assert.match(read("scripts/deploy-check.js"), /process:audit/);
   assert.match(read("scripts/deploy-check.js"), /site:pack/);
   assert.match(read("scripts/deploy-check.js"), /release:manifest/);
@@ -296,6 +300,8 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   const platformJs = read("platform.js");
   const workbenchHtml = read("workbench.html");
   const workbenchJs = read("workbench.js");
+  const operationsHtml = read("operations.html");
+  const operationsJs = read("operations.js");
   assert.match(platformHtml, /research-governance/);
   assert.match(platformHtml, /mobile-accessibility-governance/);
   assert.match(platformHtml, /production-deployment-plan/);
@@ -355,6 +361,16 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("server.js"), /\/api\/release-report/);
   assert.match(read("server.js"), /\/api\/production-cutover-checklist/);
   assert.match(read("server.js"), /\/api\/release-artifact-manifest/);
+  assert.match(operationsHtml, /operations-snapshots/);
+  assert.match(operationsHtml, /dispatch-form/);
+  assert.match(operationsHtml, /reconciliation-reviews/);
+  assert.match(operationsJs, /fetchOperationsDashboard/);
+  assert.match(operationsJs, /\/operations\/dashboard/);
+  assert.match(operationsJs, /\/operations\/dispatch/);
+  assert.match(operationsJs, /\/operations\/reconciliation/);
+  assert.match(read("server.js"), /\/api\/operations\/dashboard/);
+  assert.match(read("server.js"), /operations-dispatch/);
+  assert.match(read("server.js"), /statistics-reconciliation-review/);
 });
 
 test("quality safety supervision app exposes runnable portal, API and release evidence", () => {
