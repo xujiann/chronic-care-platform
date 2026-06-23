@@ -6478,6 +6478,29 @@
   ],
   "personalRecords": [
     {
+      "id": "pr-rtc-002-report",
+      "residentId": "r2",
+      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2",
+      "category": "teleconsultation-report",
+      "date": "2026-06-21",
+      "recordDate": "2026-06-21",
+      "name": "Endocrinology teleconsultation report",
+      "result": "Recheck HbA1c in three months; primary institution continues diet and exercise intervention and monitors hypoglycemia risk.",
+      "source": "Dalian Medical University Hospital",
+      "teleconsultationId": "rtc-002",
+      "referralId": "rf2",
+      "externalReportId": "EMR-RTC-002",
+      "idempotencyKey": "rtc-002-report-seed",
+      "reportReturnedAt": "2026-06-21T10:30:00.000Z",
+      "createdBy": "system",
+      "createdAt": "2026-06-21T10:30:00.000Z",
+      "meta": {
+        "sourceInstitution": "Xinghaiwan Community Health Service Center",
+        "targetInstitution": "Dalian Medical University Hospital",
+        "reportStatus": "returned"
+      }
+    },
+    {
       "id": "d69f6a58-b2fa-44dc-a1ee-19b67c9a64fc",
       "residentId": "r1",
       "category": "emr",

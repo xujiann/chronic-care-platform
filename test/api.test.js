@@ -690,6 +690,9 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(signedCallback.body.teleconsultation.performance.reportReturnHours, 6);
     assert.equal(signedCallback.body.integrationEvent.contractId, "referral-report-callback-v1");
     assert.equal(signedCallback.body.integrationEvent.reconciliationStatus, "matched");
+    assert.equal(signedCallback.body.personalRecord.category, "teleconsultation-report");
+    assert.equal(signedCallback.body.personalRecord.teleconsultationId, createdTeleconsultation.body.id);
+    assert.equal(signedCallback.body.personalRecord.externalReportId, "EMR-RTC-REPORT-001");
     const replayCallback = await api(baseUrl, `/api/referral-teleconsultations/${createdTeleconsultation.body.id}/report-callback`, authorized(institution.body.token, {
       method: "POST",
       headers: { "x-integration-signature": integrationSignature(callbackPayload) },
@@ -698,6 +701,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(replayCallback.response.status, 200);
     assert.equal(replayCallback.body.integrationEvent.id, signedCallback.body.integrationEvent.id);
     assert.equal(replayCallback.body.integrationEvent.idempotentReplay, true);
+    const callbackState = await api(baseUrl, "/api/state", authorized(institution.body.token));
+    assert.equal(callbackState.body.personalRecords.some((item) => item.category === "teleconsultation-report" && item.teleconsultationId === createdTeleconsultation.body.id), true);
 
     const taskHandled = await api(baseUrl, `/api/tasks/${encodeURIComponent(`emergencySignals:${critical.body.criticalSignal.id}`)}/actions`, authorized(county.body.token, {
       method: "POST",

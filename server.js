@@ -4998,6 +4998,39 @@ function normalizeReferralTeleconsultationScheduleCallback(payload, item) {
   };
 }
 
+function buildReferralTeleconsultationPersonalRecord(data, item, callback, user) {
+  const now = new Date().toISOString();
+  const residentMap = new Map((Array.isArray(data.residents) ? data.residents : []).map((resident) => [resident.id, resident]));
+  return {
+    id: `pr-rtc-${randomUUID()}`,
+    residentId: item.residentId,
+    personIndex: personIndexForResident(residentMap, item.residentId),
+    category: "teleconsultation-report",
+    date: callback.reportReturnedAt.slice(0, 10),
+    recordDate: callback.reportReturnedAt.slice(0, 10),
+    name: `${item.department || item.type || "Teleconsultation"} report`,
+    result: callback.reportSummary,
+    source: callback.sourceSystem || item.targetInstitution || "referral teleconsultation",
+    teleconsultationId: item.id,
+    referralId: item.referralId,
+    externalReportId: callback.externalId,
+    idempotencyKey: callback.idempotencyKey,
+    reportReturnedAt: callback.reportReturnedAt,
+    createdAt: now,
+    createdBy: user.username || user.role,
+    createdByName: user.name,
+    updatedAt: now,
+    updatedBy: user.username || user.role,
+    updatedByName: user.name,
+    meta: {
+      sourceInstitution: item.sourceInstitution,
+      targetInstitution: item.targetInstitution,
+      receivingDoctor: item.receivingDoctor,
+      reportStatus: "returned"
+    }
+  };
+}
+
 function buildDataQualityIssues(data) {
   const issues = [];
   const indexes = new Map();
@@ -5894,17 +5927,23 @@ async function handleApi(req, res) {
         sendJson(res, 200, { teleconsultation: rows[index], integrationEvent: { ...duplicate, idempotentReplay: true } });
         return;
       }
-      rows[index] = applyReferralTeleconsultationAction(rows[index], {
-        status: rows[index].reportStatus === "returned" ? rows[index].status : normalizeReferralTeleconsultationStatus(callback.scheduleStatus),
-        updates: {
-          meetingWindow: callback.meetingWindow,
-          targetInstitution: callback.targetInstitution,
-          targetInstitutionCode: callback.targetInstitutionCode,
-          department: callback.department,
-          receivingDoctor: callback.receivingDoctor
-        },
-        note: `${callback.sourceSystem} schedule callback`
-      }, user);
+      const scheduleStatus = rows[index].reportStatus === "returned" ? rows[index].status : normalizeReferralTeleconsultationStatus(callback.scheduleStatus);
+      rows[index] = {
+        ...rows[index],
+        status: scheduleStatus,
+        meetingWindow: callback.meetingWindow,
+        targetInstitution: callback.targetInstitution,
+        targetInstitutionCode: callback.targetInstitutionCode,
+        department: callback.department,
+        receivingDoctor: callback.receivingDoctor,
+        lastUpdated: new Date().toISOString(),
+        updatedBy: user.username || user.role,
+        updatedByName: user.name,
+        auditTrail: [
+          { at: new Date().toISOString(), actor: user.username || user.role, action: "schedule-callback", note: `${callback.sourceSystem} schedule callback` },
+          ...(Array.isArray(rows[index].auditTrail) ? rows[index].auditTrail : [])
+        ].slice(0, 40)
+      };
       if (callback.performance && typeof callback.performance === "object") {
         rows[index].performance = { ...(rows[index].performance || {}), ...callback.performance };
       }
@@ -6008,6 +6047,12 @@ async function handleApi(req, res) {
         targetCollection: "referralTeleconsultations",
         targetId: rows[index].id
       };
+      const existingRecord = (Array.isArray(data.personalRecords) ? data.personalRecords : [])
+        .find((record) => record.category === "teleconsultation-report" && record.teleconsultationId === rows[index].id && record.idempotencyKey === callback.idempotencyKey);
+      const personalRecord = existingRecord || buildReferralTeleconsultationPersonalRecord(data, rows[index], callback, user);
+      if (!existingRecord) {
+        data.personalRecords = [personalRecord, ...(Array.isArray(data.personalRecords) ? data.personalRecords : [])].slice(0, 500);
+      }
       data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
       data.securityEvents = [
         {
@@ -6024,7 +6069,7 @@ async function handleApi(req, res) {
       ].slice(0, 120);
       appendDataAccessLog(data, user, rows[index].residentId, "referral teleconsultation", "external report callback", "allowed");
       writeDatabase(data);
-      sendJson(res, 200, { teleconsultation: rows[index], integrationEvent: event });
+      sendJson(res, 200, { teleconsultation: rows[index], integrationEvent: event, personalRecord });
     } catch (error) {
       sendJson(res, 400, { error: "Bad Request", message: error.message });
     }
