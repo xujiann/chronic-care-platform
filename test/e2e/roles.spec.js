@@ -101,6 +101,28 @@ test("commission workbench renders live release gates and site templates", async
   expect(serviceAcceptance.serviceAcceptance.county.openActions.some((item) => item.id === "cco-001")).toBe(true);
 });
 
+test("commission health dashboard filters live source actions and drills into source app", async ({ page }) => {
+  await login(page, "health", "index.html");
+  await page.goto("/health-dashboard.html");
+
+  await expect(page.locator("#dashboard-api-state")).toHaveAttribute("data-source-mode", "api");
+  await expect(page.locator("#dashboard-metrics .metric-card")).toHaveCount(9);
+  await expect(page.locator("#dashboard-metrics")).toContainText("170");
+  await expect(page.locator("#dashboard-metrics")).toContainText("12");
+  await expect(page.locator("#dashboard-applications tbody tr")).toHaveCount(7);
+
+  await page.locator("#dashboard-application-filter").selectOption("county-consortium");
+  await page.locator("#dashboard-priority-filter").selectOption("high");
+  await expect(page.locator("#dashboard-filter-summary")).toContainText("2 open actions");
+  await expect(page.locator("#dashboard-actions .priority-row")).toHaveCount(2);
+  await expect(page.locator("#dashboard-actions")).toContainText("countyCollaborationOrders");
+
+  const countyLinks = page.locator("#dashboard-actions a[href='./county.html']");
+  await expect(countyLinks).toHaveCount(2);
+  await countyLinks.first().click();
+  await expect(page).toHaveURL(/county\.html$/);
+});
+
 test("about page explains runnable platform capabilities", async ({ page }) => {
   await page.goto("/about.html");
 

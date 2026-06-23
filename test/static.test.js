@@ -120,6 +120,7 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(js, /HealthDashboardApplications/);
   assert.match(js, /renderDataState/);
   assert.match(js, /sourceMode/);
+  assert.match(js, /dataset\.sourceMode/);
   assert.match(js, /源待办/);
   assert.match(js, /预览待办/);
   assert.match(js, /源应用/);

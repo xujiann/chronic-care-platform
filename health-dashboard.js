@@ -126,6 +126,8 @@ function renderDataState(summary) {
   const state = document.querySelector("#dashboard-api-state");
   const boundary = document.querySelector("#dashboard-data-boundary");
   if (state) {
+    state.dataset.sourceMode = summary.sourceMode || "unknown";
+    state.dataset.sourceReason = summary.sourceReason || "";
     state.textContent = summary.sourceMode === "api"
       ? `${summary.sourceLabel || "管理端动态汇总"} / ${summary.generatedAt || ""}`
       : `${summary.sourceLabel || "静态快照兜底"} / ${summary.sourceReason || "本地数据"}`;
