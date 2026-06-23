@@ -9,49 +9,49 @@ const DEFAULT_MARKDOWN = path.join(ROOT, "release", "health-dashboard-summary.md
 const APPLICATIONS = [
   {
     id: "commission-supervision",
-    name: "Health commission operations",
+    name: "卫健委综合监管",
     entry: "index.html",
     owner: "commission",
     collections: ["residents", "diseases", "followups", "emergencySignals", "healthStatistics", "platformProcessAudit"]
   },
   {
     id: "institution-services",
-    name: "Medical institution services",
+    name: "医疗机构服务",
     entry: "institution.html",
     owner: "institution",
     collections: ["personalRecords", "careOrders", "medicationPickups", "birthCertificates", "deathCertificates", "multiPracticeApplications"]
   },
   {
     id: "insurance-governance",
-    name: "Insurance governance",
+    name: "医保治理协同",
     entry: "insurance.html",
     owner: "insurance",
     collections: ["insuranceClaims", "digitalCredentials", "medicationPickups"]
   },
   {
     id: "citizen-portal",
-    name: "Citizen portal",
+    name: "居民健康门户",
     entry: "citizen.html",
     owner: "citizen",
     collections: ["accounts", "residents", "personalRecords", "authorizations", "seniorServices", "digitalCredentials"]
   },
   {
     id: "county-consortium",
-    name: "County consortium",
+    name: "县域医共体协同",
     entry: "county.html",
     owner: "county",
     collections: ["countyCollaborationOrders", "countyMutualRecognitionRecords", "countyAiDiagnosisCases", "countyAcceptanceLedger"]
   },
   {
     id: "platform-governance",
-    name: "Platform governance",
+    name: "平台治理与接口",
     entry: "platform.html",
     owner: "commission",
     collections: ["platformCapabilities", "platformInterfaces", "platformEvidence", "hospitalInteroperabilityFunctions", "applicationCatalog"]
   },
   {
     id: "operations-workbench",
-    name: "Operations workbench",
+    name: "运维验收工作台",
     entry: "workbench.html",
     owner: "commission",
     collections: ["platformRoadmap", "platformProcessAudit", "productionDeploymentPlan", "securityAcceptanceLedger"]
@@ -60,6 +60,10 @@ const APPLICATIONS = [
 
 const CLOSED_STATUS_PATTERN = /closed|resolved|approved|recognized|completed|passed|ready|signed|done|宸插畬鎴|宸查€氳繃|宸插彇鑽|宸插洖浼|宸蹭簰璁|宸叉牳楠|宸查棴鐜|已完成|已通过|已闭环/;
 const HIGH_RISK_PATTERN = /high|urgent|critical|overdue|dead_letter|楂|绱|閫炬湡|critical|高|逾期|危急/;
+
+const APPLICATION_BY_COLLECTION = Object.fromEntries(
+  APPLICATIONS.flatMap((app) => app.collections.map((collection) => [collection, app]))
+);
 
 function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(ROOT, relativePath), "utf8"));
@@ -137,15 +141,21 @@ function collectOpenActions(data, limit = 12) {
     "dataQualityIssues",
     "integrationGatewayEvents"
   ];
-  return taskCollections.flatMap((collection) => rows(data, collection).filter(isOpen).map((item) => ({
-    id: item.id || `${collection}-${item.residentId || item.status || "open"}`,
-    collection,
-    title: item.title || item.taskName || item.topic || item.orderType || item.item || item.claimType || item.medication || item.name || collection,
-    owner: item.owner || item.assignee || item.institution || item.center || item.sourceInstitution || item.targetInstitution || "owner-pending",
-    status: statusOf(item) || "open",
-    priority: riskLevel(item),
-    dueAt: item.dueAt || item.due || item.nextReview || item.plannedAt || item.requestedAt || item.lastUpdated || ""
-  }))).sort((left, right) =>
+  return taskCollections.flatMap((collection) => rows(data, collection).filter(isOpen).map((item) => {
+    const app = APPLICATION_BY_COLLECTION[collection] || APPLICATIONS[0];
+    return {
+      id: item.id || `${collection}-${item.residentId || item.status || "open"}`,
+      collection,
+      applicationId: app.id,
+      application: app.name,
+      entry: app.entry,
+      title: item.title || item.taskName || item.topic || item.orderType || item.item || item.claimType || item.medication || item.name || collection,
+      owner: item.owner || item.assignee || item.institution || item.center || item.sourceInstitution || item.targetInstitution || "owner-pending",
+      status: statusOf(item) || "open",
+      priority: riskLevel(item),
+      dueAt: item.dueAt || item.due || item.nextReview || item.plannedAt || item.requestedAt || item.lastUpdated || ""
+    };
+  })).sort((left, right) =>
     ({ high: 3, medium: 2, normal: 1 }[right.priority] || 0) - ({ high: 3, medium: 2, normal: 1 }[left.priority] || 0) ||
     String(left.dueAt || "").localeCompare(String(right.dueAt || ""))
   ).slice(0, limit);
@@ -226,7 +236,7 @@ function buildHealthDashboardSummary(options = {}) {
 
 function renderMarkdown(report) {
   const appRows = report.applications.map((item) => `| ${item.id} | ${item.entry} | ${item.records} | ${item.openActions} | ${item.highRisks} | ${item.status} |`);
-  const actionRows = report.openActions.map((item) => `| ${item.priority} | ${item.collection} | ${item.id} | ${String(item.title || "").replace(/\|/g, "/")} | ${item.status} | ${item.owner} |`);
+  const actionRows = report.openActions.map((item) => `| ${item.priority} | ${item.application || ""} | ${item.entry || ""} | ${item.collection} | ${item.id} | ${String(item.title || "").replace(/\|/g, "/")} | ${item.status} | ${item.owner} |`);
   const checkRows = report.checks.map((item) => `| ${item.passed ? "PASS" : "FAIL"} | ${item.id} | ${String(item.detail || "").replace(/\|/g, "/")} |`);
   return [
     "# Health dashboard summary",
@@ -258,8 +268,8 @@ function renderMarkdown(report) {
     "",
     "## Open action preview",
     "",
-    "| Priority | Collection | ID | Title | Status | Owner |",
-    "|---|---|---|---|---|---|",
+    "| Priority | Application | Entry | Collection | ID | Title | Status | Owner |",
+    "|---|---|---|---|---|---|---|---|",
     ...actionRows,
     ""
   ].join("\n");

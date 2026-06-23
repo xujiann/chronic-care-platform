@@ -1,9 +1,12 @@
 const DASHBOARD_API_BASE = location.protocol === "file:" ? "" : "/api";
 const DASHBOARD_SUMMARY_ROUTE = "/api/health-dashboard/summary";
 const DASHBOARD_SUMMARY_PATH = DASHBOARD_SUMMARY_ROUTE.replace(/^\/api/, "");
+let currentDashboardSummary = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
   const summary = await loadDashboardSummary();
+  currentDashboardSummary = summary;
+  bindDashboardFilters();
   renderDashboard(summary);
 });
 
@@ -48,6 +51,28 @@ function buildStaticDashboardSummary(state) {
   const evidence = Array.isArray(state.platformEvidence) ? state.platformEvidence : [];
   const interfaces = Array.isArray(state.platformInterfaces) ? state.platformInterfaces : [];
   const dependencies = Array.isArray(state.productionDeploymentPlan) ? state.productionDeploymentPlan : [];
+  const openActions = collectStaticOpenActions(state, applications);
+  const actionSummary = openActions.reduce((summary, item) => {
+    const current = summary[item.applicationId] || { openActions: 0, highRisks: 0 };
+    current.openActions += 1;
+    if (item.priority === "high") current.highRisks += 1;
+    summary[item.applicationId] = current;
+    return summary;
+  }, {});
+  const enrichedApplications = applications.map((item) => ({
+    ...item,
+    openActions: actionSummary[item.id]?.openActions || 0,
+    highRisks: actionSummary[item.id]?.highRisks || 0
+  }));
+  const risks = enrichedApplications
+    .filter((item) => item.highRisks > 0 || item.openActions > 0)
+    .map((item) => ({
+      applicationId: item.id,
+      application: item.name,
+      highRisks: item.highRisks,
+      openActions: item.openActions,
+      nextAction: item.highRisks > 0 ? "回到源应用复核高风险记录。" : "回到源应用闭环待办。"
+    }));
   return {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -55,17 +80,17 @@ function buildStaticDashboardSummary(state) {
       rule: "静态预览模式：仅汇总本地快照，不替代源业务应用。"
     },
     totals: {
-      applications: applications.length,
-      sourceRecords: applications.reduce((sum, item) => sum + item.records, 0),
-      openActions: 0,
-      highRisks: 0,
+      applications: enrichedApplications.length,
+      sourceRecords: enrichedApplications.reduce((sum, item) => sum + item.records, 0),
+      openActions: openActions.length,
+      highRisks: openActions.filter((item) => item.priority === "high").length,
       interfaceTracks: interfaces.length,
       evidenceRecords: evidence.reduce((sum, item) => sum + (Array.isArray(item.records) ? item.records.length : 0), 0),
       siteDependencies: dependencies.length
     },
-    applications,
-    risks: [],
-    openActions: [],
+    applications: enrichedApplications,
+    risks,
+    openActions,
     interfaces: interfaces.map((item) => ({ id: item.id, domain: item.domain || item.name, priority: item.priority, owner: item.owner, status: item.status, nextAction: item.next })),
     evidence: evidence.map((item) => ({ id: item.id, name: item.name || item.category, owner: item.owner, status: item.status, records: Array.isArray(item.records) ? item.records.length : 0, nextAction: item.next })),
     siteDependencies: dependencies.map((item) => ({ id: item.id, track: item.track || item.name, owner: item.owner, status: item.status, nextAction: item.nextAction || item.next }))
@@ -75,12 +100,14 @@ function buildStaticDashboardSummary(state) {
 function renderDashboard(summary) {
   renderMetrics(summary);
   document.querySelector("#dashboard-scope").textContent = summary.scope?.rule || "";
+  renderFilterOptions(summary);
   renderApplications(summary.applications || []);
   renderRisks(summary.risks || []);
-  renderActions(summary.openActions || []);
+  renderActions(filteredDashboardActions(summary));
   renderDependencies(summary.siteDependencies || []);
   renderInterfaces(summary.interfaces || []);
   renderEvidence(summary.evidence || []);
+  renderFilterSummary(summary);
 }
 
 function renderMetrics(summary) {
@@ -124,13 +151,59 @@ function renderActions(actions) {
     <div class="priority-rank ${item.priority === "high" ? "danger" : item.priority === "medium" ? "warn" : "info"}">${index + 1}</div>
     <div>
       <h3>${item.title}</h3>
-      <p>${item.collection} / ${item.status}</p>
+      <p>${item.application || item.collection} / ${item.collection} / ${item.status}</p>
     </div>
     <div class="capability-side">
       <span class="badge ${item.priority === "high" ? "danger" : item.priority === "medium" ? "warn" : "info"}">${item.priority}</span>
+      ${item.entry ? `<a href="./${item.entry}">源应用</a>` : ""}
       <small>${item.owner || "owner-pending"}</small>
     </div>
   </article>`).join("") || `<article class="priority-row"><div class="priority-rank info">0</div><div><h3>暂无跨应用待办</h3><p>源应用 open action 完成后这里会归零。</p></div></article>`;
+}
+
+function bindDashboardFilters() {
+  ["#dashboard-application-filter", "#dashboard-priority-filter"].forEach((selector) => {
+    const control = document.querySelector(selector);
+    if (!control || control.dataset.bound === "true") return;
+    control.dataset.bound = "true";
+    control.addEventListener("change", () => {
+      if (currentDashboardSummary) renderDashboard(currentDashboardSummary);
+    });
+  });
+}
+
+function renderFilterOptions(summary) {
+  const select = document.querySelector("#dashboard-application-filter");
+  if (!select || select.dataset.ready === "1") return;
+  const options = (summary.applications || []).map((item) => `<option value="${item.id}">${item.name}</option>`);
+  select.innerHTML = [`<option value="">全部应用</option>`, ...options].join("");
+  select.dataset.ready = "1";
+}
+
+function dashboardFilters() {
+  return {
+    applicationId: document.querySelector("#dashboard-application-filter")?.value || "",
+    priority: document.querySelector("#dashboard-priority-filter")?.value || ""
+  };
+}
+
+function filteredDashboardActions(summary) {
+  const filters = dashboardFilters();
+  return (summary.openActions || []).filter((item) =>
+    (!filters.applicationId || item.applicationId === filters.applicationId) &&
+    (!filters.priority || item.priority === filters.priority)
+  );
+}
+
+function renderFilterSummary(summary) {
+  const filters = dashboardFilters();
+  const app = (summary.applications || []).find((item) => item.id === filters.applicationId);
+  const count = filteredDashboardActions(summary).length;
+  document.querySelector("#dashboard-filter-summary").textContent = [
+    app?.name || "全部应用",
+    filters.priority || "全部优先级",
+    `${count} open actions`
+  ].join(" / ");
 }
 
 function renderDependencies(items) {
@@ -155,6 +228,38 @@ function renderEvidence(items) {
     <span>${item.status || "pending"} / ${item.records || 0} records</span>
     <small>${item.owner || ""}</small>
   </div>`).join("") || `<div><strong>暂无验收证据</strong><span>等待平台证据归档。</span></div>`;
+}
+
+function collectStaticOpenActions(state, applications) {
+  const appByCollection = Object.fromEntries(applications.flatMap((app) =>
+    app.collections.map((item) => [item.collection, app])
+  ));
+  return ["followups", "careOrders", "medicationPickups", "insuranceClaims", "emergencySignals", "countyCollaborationOrders", "countyMutualRecognitionRecords", "countyAiDiagnosisCases"]
+    .flatMap((collection) => {
+      const app = appByCollection[collection] || applications[0];
+      return (Array.isArray(state[collection]) ? state[collection] : []).filter((item) => !isClosedDashboardStatus(item.status)).map((item) => ({
+        id: item.id || `${collection}-open`,
+        collection,
+        applicationId: app.id,
+        application: app.name,
+        entry: app.entry,
+        title: item.title || item.taskName || item.orderType || item.item || item.claimType || item.medication || collection,
+        owner: item.owner || item.assignee || item.institution || item.center || "owner-pending",
+        status: item.status || "open",
+        priority: dashboardPriority(item)
+      }));
+    }).slice(0, 12);
+}
+
+function isClosedDashboardStatus(status) {
+  return /closed|resolved|approved|recognized|completed|passed|ready|signed|done|已完成|已通过|已闭环/.test(String(status || ""));
+}
+
+function dashboardPriority(item) {
+  const text = [item.priority, item.level, item.risk, item.riskLevel, item.status].filter(Boolean).join(" ");
+  if (/high|urgent|critical|overdue|高|逾期|危急/i.test(text)) return "high";
+  if (/medium|warning|中|待/i.test(text)) return "medium";
+  return "normal";
 }
 
 function countRows(value) {

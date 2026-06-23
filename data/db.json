@@ -1835,6 +1835,37 @@
       "responsibility": "当事医疗机构与医师按协议承担医疗责任，个人医疗责任保险覆盖任一执业地点。",
       "compensation": "按实际工作时间、工作量和绩效协商结算",
       "insurance": "已购买医师个人医疗执业保险",
+      "documentChecks": {
+        "firstPracticeConsent": true,
+        "cooperationAgreement": true,
+        "liabilityInsurance": true,
+        "scheduleConflict": false,
+        "publicDisclosure": true
+      },
+      "lifecycle": [
+        {
+          "at": "2026-06-17 09:00",
+          "actor": "刘医生",
+          "action": "提交申请",
+          "note": "补齐执业期限、责任保险和工作任务"
+        },
+        {
+          "at": "2026-06-17 11:20",
+          "actor": "青泥洼桥社区卫生服务中心",
+          "action": "第一执业地点同意",
+          "note": "同意在医联体内开展慢病联合门诊"
+        }
+      ],
+      "disclosureItems": [
+        "医师姓名",
+        "执业类别",
+        "执业范围",
+        "第一执业地点",
+        "拟执业机构",
+        "执业期限",
+        "监管状态"
+      ],
+      "riskFlags": [],
       "primaryConsent": "已同意",
       "registrationMode": "备案管理",
       "status": "待卫健审核",
@@ -1869,6 +1900,37 @@
       "responsibility": "服务中发生纠纷由当事机构和医师按协议处理，第一执业地点不承担非当事责任。",
       "compensation": "医联体帮扶任务，按院内绩效规则登记工作量",
       "insurance": "机构医疗责任保险+个人执业保险",
+      "documentChecks": {
+        "firstPracticeConsent": true,
+        "cooperationAgreement": true,
+        "liabilityInsurance": true,
+        "scheduleConflict": false,
+        "publicDisclosure": true
+      },
+      "lifecycle": [
+        {
+          "at": "2026-06-16 10:30",
+          "actor": "王医生",
+          "action": "医联体帮扶登记",
+          "note": "纳入基层高危慢病帮扶排班"
+        },
+        {
+          "at": "2026-06-16 15:00",
+          "actor": "大连市中心医院",
+          "action": "备案通过",
+          "note": "按医联体帮扶任务管理"
+        }
+      ],
+      "disclosureItems": [
+        "医师姓名",
+        "执业类别",
+        "执业范围",
+        "第一执业地点",
+        "拟执业机构",
+        "执业期限",
+        "监管状态"
+      ],
+      "riskFlags": [],
       "primaryConsent": "医联体内帮扶免办多点执业手续",
       "registrationMode": "医联体帮扶",
       "status": "已备案",
@@ -3931,6 +3993,189 @@
       "owner": "市级平台",
       "priority": "P1",
       "status": "已完成"
+    }
+  ],
+  "hospitalInteroperabilityFunctions": [
+    {
+      "id": "mgmt-medical-quality",
+      "functionName": "医疗质量与安全监管",
+      "owner": "医政医管处/质控中心",
+      "sourceSystems": [
+        "EMR",
+        "LIS",
+        "PACS",
+        "HIS"
+      ],
+      "platformCollections": [
+        "personalRecords",
+        "diagnosticReports",
+        "countyMutualRecognitionRecords",
+        "dataQualityIssues"
+      ],
+      "managementActions": [
+        "临床路径监管",
+        "危急值闭环",
+        "检查检验互认质控",
+        "病历质检抽查"
+      ],
+      "evidence": [
+        "emr-summary-v1",
+        "lis-report-v1",
+        "pacs-report-v1",
+        "integration-readiness-report.md"
+      ],
+      "status": "demo-ready",
+      "nextAction": "Bind live EMR/LIS/PACS quality rules and site critical-value acknowledgement records."
+    },
+    {
+      "id": "mgmt-referral-coordination",
+      "functionName": "分级诊疗与医联体协同",
+      "owner": "医政医管处/医共体办公室",
+      "sourceSystems": [
+        "HIS",
+        "EMR",
+        "PACS",
+        "LIS"
+      ],
+      "platformCollections": [
+        "referralSystem",
+        "careOrders",
+        "countyCollaborationOrders",
+        "diagnosticReports"
+      ],
+      "managementActions": [
+        "双向转诊",
+        "远程会诊",
+        "资源预约",
+        "报告回传"
+      ],
+      "evidence": [
+        "his-patient-v1",
+        "emr-summary-v1",
+        "workflow-actions",
+        "countyAcceptanceLedger"
+      ],
+      "status": "demo-ready",
+      "nextAction": "Collect signed referral, consultation, and receiving-physician confirmations from pilot hospitals."
+    },
+    {
+      "id": "mgmt-resource-operations",
+      "functionName": "资源运行与运营监管",
+      "owner": "规划信息处/运行监测组",
+      "sourceSystems": [
+        "HIS",
+        "住院管理",
+        "人力资源",
+        "设备物联"
+      ],
+      "platformCollections": [
+        "healthStatistics",
+        "healthStatisticsIngestion",
+        "medicalResources",
+        "platformProcessAudit"
+      ],
+      "managementActions": [
+        "床位监测",
+        "门急诊与住院运行",
+        "设备利用",
+        "统计直报对账"
+      ],
+      "evidence": [
+        "statistics-report-v1",
+        "operations-readiness-report.md",
+        "healthStatisticsIngestion"
+      ],
+      "status": "demo-ready",
+      "nextAction": "Replace demo statistics with daily institution feeds and define variance thresholds for manual review."
+    },
+    {
+      "id": "mgmt-drug-insurance",
+      "functionName": "药品耗材与医保协同监管",
+      "owner": "药政处/医保局/医保中心",
+      "sourceSystems": [
+        "HIS",
+        "药品耗材",
+        "医保核心"
+      ],
+      "platformCollections": [
+        "medicationPickups",
+        "insuranceClaims",
+        "institutionSupervisions",
+        "securityEvents"
+      ],
+      "managementActions": [
+        "合理用药",
+        "固定取药审核",
+        "医保结算监管",
+        "高值耗材线索留痕"
+      ],
+      "evidence": [
+        "insurance-settlement-v1",
+        "medicationPickups",
+        "insuranceClaims"
+      ],
+      "status": "demo-ready",
+      "nextAction": "Confirm production insurance settlement fields and drug-consumable catalog version mapping."
+    },
+    {
+      "id": "mgmt-public-health",
+      "functionName": "公共卫生与慢病管理",
+      "owner": "基层卫生处/疾控中心",
+      "sourceSystems": [
+        "EMR",
+        "LIS",
+        "公卫系统",
+        "慢病平台"
+      ],
+      "platformCollections": [
+        "chronicScreeningTasks",
+        "chronicManagementPlans",
+        "followups",
+        "personalRecords"
+      ],
+      "managementActions": [
+        "慢病筛查",
+        "分级随访",
+        "院后管理",
+        "重点人群闭环"
+      ],
+      "evidence": [
+        "chronicAcceptanceLedger",
+        "personal-records-api",
+        "emr-summary-v1"
+      ],
+      "status": "demo-ready",
+      "nextAction": "Connect public-health disease registry feeds and production follow-up message delivery."
+    },
+    {
+      "id": "mgmt-research-data",
+      "functionName": "科研数据资产与合规共享",
+      "owner": "科研管理/数据资产管理",
+      "sourceSystems": [
+        "EMR",
+        "LIS",
+        "PACS",
+        "专病库"
+      ],
+      "platformCollections": [
+        "researchDatasets",
+        "diseaseRegistryModels",
+        "dataAccessLogs",
+        "securityAcceptanceLedger"
+      ],
+      "managementActions": [
+        "数据集治理",
+        "伦理审批",
+        "脱敏发布",
+        "使用审计"
+      ],
+      "evidence": [
+        "researchDatasets",
+        "diseaseRegistryModels",
+        "audit-retention-report.md"
+      ],
+      "status": "demo-ready",
+      "nextAction": "Attach live IRB approval, data-use agreement, and sandbox access records before production sharing."
     }
   ],
   "integrationContracts": [
@@ -6165,6 +6410,37 @@
       "note": "按申报材料建立建设域、整合项、接口域和开发批次数据。"
     }
   ],
+  "healthDashboardSnapshots": [
+    {
+      "id": "health-dashboard-demo-20260623",
+      "generatedAt": "2026-06-23T09:00:00.000Z",
+      "sourceApplications": [
+        "index.html",
+        "institution.html",
+        "insurance.html",
+        "citizen.html",
+        "county.html",
+        "platform.html",
+        "workbench.html"
+      ],
+      "status": "demo-compatible",
+      "boundary": "Aggregate metrics, risks, actions, interfaces, evidence, and site dependencies only; source applications remain the system of record.",
+      "staticFields": [
+        "applicationId",
+        "entry",
+        "records",
+        "openActions",
+        "highRisks",
+        "evidenceRecords",
+        "status"
+      ],
+      "normalization": {
+        "openActionStatus": "Any source workflow status not matching a closed or accepted state remains open.",
+        "riskLevel": "Source priority, level, status, dead-letter, and overdue signals normalize to high, medium, or normal.",
+        "emptyState": "If a previous application thread has not produced data yet, the dashboard shows empty-ready with the source boundary."
+      }
+    }
+  ],
   "platformRoadmap": [
     {
       "priority": "P0",
@@ -6706,227 +6982,93 @@
     }
   ],
   "storageMeta": {
-    "engine": "json",
-    "mode": "JSON 文件存储",
-    "sqliteFile": "",
+    "engine": "json-snapshot",
+    "mode": "GitHub Pages 静态预览 JSON 快照",
+    "sqliteFile": "data/health-city.sqlite",
     "jsonFile": "data/db.json",
-    "sqliteAvailable": false,
-    "schemaVersion": 0,
-    "collectionVersions": {},
+    "sqliteAvailable": true,
+    "schemaVersion": 7,
+    "collectionVersions": {
+      "accounts": 1,
+      "residents": 1,
+      "diseases": 1,
+      "followups": 1,
+      "medicalResources": 1,
+      "healthStatistics": 1,
+      "deathCertificates": 1,
+      "deathCertificateForms": 1,
+      "deathStatistics": 1,
+      "birthCertificates": 1,
+      "birthCertificateForms": 1,
+      "birthStatistics": 1,
+      "healthBulletin2024": 1,
+      "dalianHealthStatistics2025": 1,
+      "healthStatisticsIngestion": 1,
+      "doctorProfiles": 1,
+      "multiPracticePolicy": 1,
+      "multiPracticeApplications": 2,
+      "chronicScreeningTasks": 1,
+      "chronicEducationPushes": 1,
+      "chronicManagementPlans": 1,
+      "chronicServiceRoles": 1,
+      "chronicCapabilityConditions": 1,
+      "chronicServicePathways": 1,
+      "chronicComorbidityPlans": 1,
+      "chronicTcmServices": 1,
+      "chronicSelfManagement": 1,
+      "chronicMedicationSupport": 1,
+      "chronicQualityMetrics": 1,
+      "chronicAcceptanceLedger": 1,
+      "countyCollaborationOrders": 1,
+      "countyAiDiagnosisCases": 1,
+      "countyMutualRecognitionRecords": 1,
+      "countyAcceptanceLedger": 1,
+      "mutualRecognitionRules": 1,
+      "diagnosticReports": 1,
+      "taskMessages": 1,
+      "dataQualityIssues": 1,
+      "careOrders": 1,
+      "medicationPickups": 1,
+      "institutionSupervisions": 1,
+      "insuranceClaims": 1,
+      "policyAlignment": 1,
+      "emergencySignals": 1,
+      "seniorServices": 1,
+      "dataAccessLogs": 1,
+      "securityEvents": 9,
+      "digitalCredentials": 1,
+      "healthArchiveStandard": 1,
+      "authOrganizations": 1,
+      "authUsers": 1,
+      "interfaceRequirements": 1,
+      "integrationContracts": 1,
+      "integrationGatewayEvents": 1,
+      "chronicProjectBlueprint": 1,
+      "countyProjectBlueprint": 1,
+      "countyConsortium": 1,
+      "referralSystem": 1,
+      "platformCapabilities": 1,
+      "platformIntegrations": 1,
+      "platformInterfaces": 1,
+      "platformDeliveryBatches": 1,
+      "platformEvidence": 1,
+      "productionDeploymentPlan": 1,
+      "applicationCatalog": 1,
+      "institutionCreditEvaluations": 1,
+      "creditEvaluationRules": 1,
+      "researchDatasets": 1,
+      "diseaseRegistryModels": 1,
+      "mobileExperienceSettings": 1,
+      "accessibilityChecklist": 1,
+      "securityAcceptanceLedger": 1,
+      "platformChangeLogs": 1,
+      "platformRoadmap": 1,
+      "platformAudit": 1,
+      "platformProcessAudit": 1,
+      "personalRecords": 1,
+      "hospitalInteroperabilityFunctions": 1,
+      "healthDashboardSnapshots": 1
+    },
     "sqliteError": ""
-  },
-  "hospitalInteroperabilityFunctions": [
-    {
-      "id": "mgmt-medical-quality",
-      "functionName": "医疗质量与安全监管",
-      "owner": "医政医管处/质控中心",
-      "sourceSystems": [
-        "EMR",
-        "LIS",
-        "PACS",
-        "HIS"
-      ],
-      "platformCollections": [
-        "personalRecords",
-        "diagnosticReports",
-        "countyMutualRecognitionRecords",
-        "dataQualityIssues"
-      ],
-      "managementActions": [
-        "临床路径监管",
-        "危急值闭环",
-        "检查检验互认质控",
-        "病历质检抽查"
-      ],
-      "evidence": [
-        "emr-summary-v1",
-        "lis-report-v1",
-        "pacs-report-v1",
-        "integration-readiness-report.md"
-      ],
-      "status": "demo-ready",
-      "nextAction": "Bind live EMR/LIS/PACS quality rules and site critical-value acknowledgement records."
-    },
-    {
-      "id": "mgmt-referral-coordination",
-      "functionName": "分级诊疗与医联体协同",
-      "owner": "医政医管处/医共体办公室",
-      "sourceSystems": [
-        "HIS",
-        "EMR",
-        "PACS",
-        "LIS"
-      ],
-      "platformCollections": [
-        "referralSystem",
-        "careOrders",
-        "countyCollaborationOrders",
-        "diagnosticReports"
-      ],
-      "managementActions": [
-        "双向转诊",
-        "远程会诊",
-        "资源预约",
-        "报告回传"
-      ],
-      "evidence": [
-        "his-patient-v1",
-        "emr-summary-v1",
-        "workflow-actions",
-        "countyAcceptanceLedger"
-      ],
-      "status": "demo-ready",
-      "nextAction": "Collect signed referral, consultation, and receiving-physician confirmations from pilot hospitals."
-    },
-    {
-      "id": "mgmt-resource-operations",
-      "functionName": "资源运行与运营监管",
-      "owner": "规划信息处/运行监测组",
-      "sourceSystems": [
-        "HIS",
-        "住院管理",
-        "人力资源",
-        "设备物联"
-      ],
-      "platformCollections": [
-        "healthStatistics",
-        "healthStatisticsIngestion",
-        "medicalResources",
-        "platformProcessAudit"
-      ],
-      "managementActions": [
-        "床位监测",
-        "门急诊与住院运行",
-        "设备利用",
-        "统计直报对账"
-      ],
-      "evidence": [
-        "statistics-report-v1",
-        "operations-readiness-report.md",
-        "healthStatisticsIngestion"
-      ],
-      "status": "demo-ready",
-      "nextAction": "Replace demo statistics with daily institution feeds and define variance thresholds for manual review."
-    },
-    {
-      "id": "mgmt-drug-insurance",
-      "functionName": "药品耗材与医保协同监管",
-      "owner": "药政处/医保局/医保中心",
-      "sourceSystems": [
-        "HIS",
-        "药品耗材",
-        "医保核心"
-      ],
-      "platformCollections": [
-        "medicationPickups",
-        "insuranceClaims",
-        "institutionSupervisions",
-        "securityEvents"
-      ],
-      "managementActions": [
-        "合理用药",
-        "固定取药审核",
-        "医保结算监管",
-        "高值耗材线索留痕"
-      ],
-      "evidence": [
-        "insurance-settlement-v1",
-        "medicationPickups",
-        "insuranceClaims"
-      ],
-      "status": "demo-ready",
-      "nextAction": "Confirm production insurance settlement fields and drug-consumable catalog version mapping."
-    },
-    {
-      "id": "mgmt-public-health",
-      "functionName": "公共卫生与慢病管理",
-      "owner": "基层卫生处/疾控中心",
-      "sourceSystems": [
-        "EMR",
-        "LIS",
-        "公卫系统",
-        "慢病平台"
-      ],
-      "platformCollections": [
-        "chronicScreeningTasks",
-        "chronicManagementPlans",
-        "followups",
-        "personalRecords"
-      ],
-      "managementActions": [
-        "慢病筛查",
-        "分级随访",
-        "院后管理",
-        "重点人群闭环"
-      ],
-      "evidence": [
-        "chronicAcceptanceLedger",
-        "personal-records-api",
-        "emr-summary-v1"
-      ],
-      "status": "demo-ready",
-      "nextAction": "Connect public-health disease registry feeds and production follow-up message delivery."
-    },
-    {
-      "id": "mgmt-research-data",
-      "functionName": "科研数据资产与合规共享",
-      "owner": "科研管理/数据资产管理",
-      "sourceSystems": [
-        "EMR",
-        "LIS",
-        "PACS",
-        "专病库"
-      ],
-      "platformCollections": [
-        "researchDatasets",
-        "diseaseRegistryModels",
-        "dataAccessLogs",
-        "securityAcceptanceLedger"
-      ],
-      "managementActions": [
-        "数据集治理",
-        "伦理审批",
-        "脱敏发布",
-        "使用审计"
-      ],
-      "evidence": [
-        "researchDatasets",
-        "diseaseRegistryModels",
-        "audit-retention-report.md"
-      ],
-      "status": "demo-ready",
-      "nextAction": "Attach live IRB approval, data-use agreement, and sandbox access records before production sharing."
-    }
-  ],
-  "healthDashboardSnapshots": [
-    {
-      "id": "health-dashboard-demo-20260623",
-      "generatedAt": "2026-06-23T09:00:00.000Z",
-      "sourceApplications": [
-        "index.html",
-        "institution.html",
-        "insurance.html",
-        "citizen.html",
-        "county.html",
-        "platform.html",
-        "workbench.html"
-      ],
-      "status": "demo-compatible",
-      "boundary": "Aggregate metrics, risks, actions, interfaces, evidence, and site dependencies only; source applications remain the system of record.",
-      "staticFields": [
-        "applicationId",
-        "entry",
-        "records",
-        "openActions",
-        "highRisks",
-        "evidenceRecords",
-        "status"
-      ],
-      "normalization": {
-        "openActionStatus": "Any source workflow status not matching a closed or accepted state remains open.",
-        "riskLevel": "Source priority, level, status, dead-letter, and overdue signals normalize to high, medium, or normal.",
-        "emptyState": "If a previous application thread has not produced data yet, the dashboard shows empty-ready with the source boundary."
-      }
-    }
-  ]
+  }
 }

@@ -108,8 +108,14 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(html, /dashboard-interfaces/);
   assert.match(html, /dashboard-evidence/);
   assert.match(html, /dashboard-dependencies/);
+  assert.match(html, /dashboard-application-filter/);
+  assert.match(html, /dashboard-priority-filter/);
   assert.match(js, /\/api\/health-dashboard\/summary/);
   assert.match(js, /source application/);
+  assert.match(js, /filteredDashboardActions/);
+  assert.match(js, /collectStaticOpenActions/);
+  assert.match(js, /源应用/);
+  assert.match(read("auth.js"), /"health-dashboard\.html", "综合驾驶舱"/);
   assert.match(server, /\/api\/health-dashboard\/summary/);
   assert.match(server, /buildHealthDashboardSummary/);
   assert.match(release, /health-dashboard-summary/);

@@ -24,12 +24,15 @@ test("health dashboard summary aggregates the first seven applications without r
   assert.equal(report.totals.interfaceTracks >= 4, true);
   assert.equal(report.totals.evidenceRecords >= 2, true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:source-boundary" && item.passed), true);
+  assert.equal(report.openActions.every((item) => item.applicationId && item.application && item.entry), true);
+  assert.equal(report.openActions.some((item) => item.entry === "county.html" || item.entry === "institution.html"), true);
 
   const markdown = renderMarkdown(report);
   assert.match(markdown, /Health dashboard summary/);
   assert.match(markdown, /commission-supervision/);
   assert.match(markdown, /operations-workbench/);
   assert.match(markdown, /Open action preview/);
+  assert.match(markdown, /Application \| Entry \| Collection/);
 });
 
 test("health dashboard summary supports empty source application boundaries", () => {
