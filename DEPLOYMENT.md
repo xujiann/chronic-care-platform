@@ -246,3 +246,8 @@ npm.cmd run rollback:snapshot -- "data/backups/<备份目录>"
 - 出生/死亡电子证照。
 - 公安、民政共享。
 - 等保、密评、日志保全、脱敏和容灾。
+## Health Dashboard Deployment Evidence
+
+- Open `health-dashboard.html` after commission login to review the aggregate health dashboard.
+- Run `npm.cmd run health-dashboard:summary` to generate `release/health-dashboard-summary.json` and `release/health-dashboard-summary.md`.
+- The dashboard remains blocked on real site joint-test inputs for identity, HIS/EMR/LIS/PACS, insurance, certificates, statistics, monitoring, and disaster recovery signoff.

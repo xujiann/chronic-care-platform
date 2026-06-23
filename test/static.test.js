@@ -17,6 +17,7 @@ test("role pages keep explicit page guards", () => {
     "insurance.html": "insurance",
     "county.html": "county",
     "index.html": "commission",
+    "health-dashboard.html": "commission",
     "platform.html": "commission",
     "workbench.html": "commission"
   };
@@ -27,7 +28,7 @@ test("role pages keep explicit page guards", () => {
 
 test("citizen pages do not expose cross-role module links or management collections", () => {
   const citizenHtml = `${read("citizen.html")}\n${read("mobile-preview.html")}`;
-  ["institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html"].forEach((target) => {
+  ["institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html", "health-dashboard.html"].forEach((target) => {
     assert.doesNotMatch(citizenHtml, new RegExp(`href=[\\"']\\./${target}`), `居民页面不应链接到 ${target}`);
   });
 
@@ -38,7 +39,7 @@ test("citizen pages do not expose cross-role module links or management collecti
 });
 
 test("application pages avoid placeholder navigation", () => {
-  const pages = ["about.html", "citizen.html", "mobile-preview.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html"];
+  const pages = ["about.html", "citizen.html", "mobile-preview.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html", "health-dashboard.html"];
   pages.forEach((file) => assert.doesNotMatch(read(file), /href=["']#["']/, `${file} 存在空链接占位`));
 });
 
@@ -76,6 +77,8 @@ test("static snapshot keeps completed P2 governance collections", () => {
   assert.equal(data.accessibilityChecklist.some((item) => item.id === "a11y-large-font"), true);
   assert.equal(Array.isArray(data.productionDeploymentPlan), true);
   assert.equal(data.productionDeploymentPlan.some((item) => item.id === "prod-storage-adapter"), true);
+  assert.equal(Array.isArray(data.healthDashboardSnapshots), true);
+  assert.equal(data.healthDashboardSnapshots.some((item) => item.sourceApplications.length === 7), true);
   assert.equal(Array.isArray(data.countyAcceptanceLedger), true);
   assert.equal(data.countyAcceptanceLedger.some((item) => item.id === "county-accept-report-return"), true);
   assert.equal(data.countyAcceptanceLedger.some((item) => item.metricKey === "criticalAlert"), true);
@@ -90,6 +93,27 @@ test("static snapshot keeps completed P2 governance collections", () => {
   assert.equal(data.securityAcceptanceLedger.every((item) => item.id && item.category && item.owner && item.status && item.next), true);
   assert.equal(data.securityAcceptanceLedger.every((item) => /建档/.test(item.status)), true);
   assert.equal(data.platformRoadmap.filter((item) => item.priority === "P2").every((item) => item.status === "已完成"), true);
+});
+
+test("health dashboard exposes the aggregate application entry and API contract", () => {
+  const html = read("health-dashboard.html");
+  const js = read("health-dashboard.js");
+  const server = read("server.js");
+  const release = read("scripts/release-report.js");
+  const deploy = read("scripts/deploy-check.js");
+
+  assert.match(html, /卫生健康综合驾驶舱/);
+  assert.match(html, /dashboard-applications/);
+  assert.match(html, /dashboard-actions/);
+  assert.match(html, /dashboard-interfaces/);
+  assert.match(html, /dashboard-evidence/);
+  assert.match(html, /dashboard-dependencies/);
+  assert.match(js, /\/api\/health-dashboard\/summary/);
+  assert.match(js, /source application/);
+  assert.match(server, /\/api\/health-dashboard\/summary/);
+  assert.match(server, /buildHealthDashboardSummary/);
+  assert.match(release, /health-dashboard-summary/);
+  assert.match(deploy, /snapshot:healthDashboard/);
 });
 
 test("static snapshot keeps acceptance evidence clean and actionable", () => {

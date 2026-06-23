@@ -6897,5 +6897,36 @@
       "status": "demo-ready",
       "nextAction": "Attach live IRB approval, data-use agreement, and sandbox access records before production sharing."
     }
+  ],
+  "healthDashboardSnapshots": [
+    {
+      "id": "health-dashboard-demo-20260623",
+      "generatedAt": "2026-06-23T09:00:00.000Z",
+      "sourceApplications": [
+        "index.html",
+        "institution.html",
+        "insurance.html",
+        "citizen.html",
+        "county.html",
+        "platform.html",
+        "workbench.html"
+      ],
+      "status": "demo-compatible",
+      "boundary": "Aggregate metrics, risks, actions, interfaces, evidence, and site dependencies only; source applications remain the system of record.",
+      "staticFields": [
+        "applicationId",
+        "entry",
+        "records",
+        "openActions",
+        "highRisks",
+        "evidenceRecords",
+        "status"
+      ],
+      "normalization": {
+        "openActionStatus": "Any source workflow status not matching a closed or accepted state remains open.",
+        "riskLevel": "Source priority, level, status, dead-letter, and overdue signals normalize to high, medium, or normal.",
+        "emptyState": "If a previous application thread has not produced data yet, the dashboard shows empty-ready with the source boundary."
+      }
+    }
   ]
 }

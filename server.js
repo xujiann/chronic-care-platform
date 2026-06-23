@@ -4,6 +4,7 @@ const path = require("path");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
 const { buildProcessAuditReport } = require("./scripts/process-audit");
 const { buildSiteReadinessPack, renderTemplateReadmes } = require("./scripts/site-readiness-pack");
+const { buildHealthDashboardSummary } = require("./scripts/health-dashboard-summary");
 const { buildReleaseReport, buildServiceAcceptanceSummary } = require("./scripts/release-report");
 const { buildReleaseArtifactManifest } = require("./scripts/release-artifact-manifest");
 
@@ -572,6 +573,7 @@ function seedState() {
     accessibilityChecklist: seedAccessibilityChecklist(),
     securityAcceptanceLedger: seedSecurityAcceptanceLedger(),
     platformChangeLogs: seedPlatformChangeLogs(),
+    healthDashboardSnapshots: seedHealthDashboardSnapshots(),
     platformRoadmap: seedPlatformRoadmap(),
     platformAudit: seedPlatformAudit(),
     platformProcessAudit: seedPlatformProcessAudit(),
@@ -583,6 +585,32 @@ function seedState() {
 function seedPlatformChangeLogs() {
   return [
     { id: "pcl-001", at: "2026-06-18 15:10", actor: "市级管理员", role: "commission", collection: "platformCapabilities", itemId: "cap-data-platform", itemName: "城市级医疗健康大数据平台", action: "初始化建设台账", before: "无", after: "开发中", note: "按申报材料建立建设域、整合项、接口域和开发批次数据。" }
+  ];
+}
+
+function seedHealthDashboardSnapshots() {
+  return [
+    {
+      id: "health-dashboard-demo-20260623",
+      generatedAt: "2026-06-23T09:00:00.000Z",
+      sourceApplications: [
+        "index.html",
+        "institution.html",
+        "insurance.html",
+        "citizen.html",
+        "county.html",
+        "platform.html",
+        "workbench.html"
+      ],
+      status: "demo-compatible",
+      boundary: "Aggregate metrics, risks, actions, interfaces, evidence, and site dependencies only; source applications remain the system of record.",
+      staticFields: ["applicationId", "entry", "records", "openActions", "highRisks", "evidenceRecords", "status"],
+      normalization: {
+        openActionStatus: "Any source workflow status not matching a closed or accepted state remains open.",
+        riskLevel: "Source priority, level, status, dead-letter, and overdue signals normalize to high, medium, or normal.",
+        emptyState: "If a previous application thread has not produced data yet, the dashboard shows empty-ready with the source boundary."
+      }
+    }
   ];
 }
 
@@ -3361,6 +3389,7 @@ function normalizeState(data) {
     accessibilityChecklist: mergeByKey(seedAccessibilityChecklist(), data.accessibilityChecklist, "id"),
     securityAcceptanceLedger: mergeByKey(seedSecurityAcceptanceLedger(), data.securityAcceptanceLedger, "id"),
     platformChangeLogs: Array.isArray(data.platformChangeLogs) ? data.platformChangeLogs : seedPlatformChangeLogs(),
+    healthDashboardSnapshots: mergeByKey(seedHealthDashboardSnapshots(), data.healthDashboardSnapshots, "id"),
     platformRoadmap: Array.isArray(data.platformRoadmap) ? data.platformRoadmap : seedPlatformRoadmap(),
     platformAudit: Array.isArray(data.platformAudit) ? data.platformAudit : seedPlatformAudit(),
     platformProcessAudit: Array.isArray(data.platformProcessAudit) ? data.platformProcessAudit : seedPlatformProcessAudit(),
@@ -4373,6 +4402,7 @@ function scopeStateForUser(data, user) {
   delete scoped.platformEvidence;
   delete scoped.productionDeploymentPlan;
   delete scoped.platformChangeLogs;
+  delete scoped.healthDashboardSnapshots;
   delete scoped.platformRoadmap;
   delete scoped.platformAudit;
   delete scoped.platformProcessAudit;
@@ -5332,6 +5362,26 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/system/readiness");
     if (!user) return;
     sendJson(res, 200, buildSystemReadinessReport(readDatabase()));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/health-dashboard/summary") {
+    const user = requireApiRole(req, res, ["commission"], "/api/health-dashboard/summary");
+    if (!user) return;
+    const data = readDatabase();
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "health-dashboard-summary",
+      target: "/api/health-dashboard/summary",
+      result: "allowed",
+      detail: "Commission dashboard aggregate summary read."
+    });
+    sendJson(res, 200, buildHealthDashboardSummary({
+      data,
+      runtime: buildRuntimeMetrics(data),
+      readiness: buildSystemReadinessReport(data)
+    }));
     return;
   }
 

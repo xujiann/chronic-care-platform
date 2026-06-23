@@ -1,0 +1,164 @@
+const DASHBOARD_API_BASE = location.protocol === "file:" ? "" : "/api";
+const DASHBOARD_SUMMARY_ROUTE = "/api/health-dashboard/summary";
+const DASHBOARD_SUMMARY_PATH = DASHBOARD_SUMMARY_ROUTE.replace(/^\/api/, "");
+
+document.addEventListener("DOMContentLoaded", async () => {
+  const summary = await loadDashboardSummary();
+  renderDashboard(summary);
+});
+
+async function loadDashboardSummary() {
+  if (DASHBOARD_API_BASE) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${DASHBOARD_API_BASE}${DASHBOARD_SUMMARY_PATH}`);
+      if (response.ok) return response.json();
+    } catch (error) {
+      // Static preview falls back to local data.
+    }
+  }
+  const state = await loadPlatformState({});
+  return buildStaticDashboardSummary(state);
+}
+
+function buildStaticDashboardSummary(state) {
+  const applications = [
+    ["commission-supervision", "卫健委端", "index.html", ["residents", "diseases", "followups", "emergencySignals", "healthStatistics"]],
+    ["institution-services", "医疗机构端", "institution.html", ["personalRecords", "careOrders", "medicationPickups", "birthCertificates", "deathCertificates"]],
+    ["insurance-governance", "医保治理", "insurance.html", ["insuranceClaims", "digitalCredentials", "medicationPickups"]],
+    ["citizen-portal", "居民端", "citizen.html", ["accounts", "residents", "personalRecords", "seniorServices"]],
+    ["county-consortium", "县域医共体", "county.html", ["countyCollaborationOrders", "countyMutualRecognitionRecords", "countyAiDiagnosisCases"]],
+    ["platform-governance", "平台建设", "platform.html", ["platformCapabilities", "platformInterfaces", "platformEvidence", "hospitalInteroperabilityFunctions"]],
+    ["operations-workbench", "运营工作台", "workbench.html", ["platformRoadmap", "platformProcessAudit", "productionDeploymentPlan"]]
+  ].map(([id, name, entry, collections]) => {
+    const records = collections.reduce((sum, collection) => sum + countRows(state[collection]), 0);
+    return {
+      id,
+      name,
+      entry,
+      collections: collections.map((collection) => ({ collection, records: countRows(state[collection]) })),
+      records,
+      openActions: 0,
+      highRisks: 0,
+      evidenceRecords: 0,
+      status: records ? "modeled" : "empty-ready",
+      boundary: "Aggregated in the dashboard; detailed workflow remains in the source application."
+    };
+  });
+  const evidence = Array.isArray(state.platformEvidence) ? state.platformEvidence : [];
+  const interfaces = Array.isArray(state.platformInterfaces) ? state.platformInterfaces : [];
+  const dependencies = Array.isArray(state.productionDeploymentPlan) ? state.productionDeploymentPlan : [];
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    scope: {
+      rule: "静态预览模式：仅汇总本地快照，不替代源业务应用。"
+    },
+    totals: {
+      applications: applications.length,
+      sourceRecords: applications.reduce((sum, item) => sum + item.records, 0),
+      openActions: 0,
+      highRisks: 0,
+      interfaceTracks: interfaces.length,
+      evidenceRecords: evidence.reduce((sum, item) => sum + (Array.isArray(item.records) ? item.records.length : 0), 0),
+      siteDependencies: dependencies.length
+    },
+    applications,
+    risks: [],
+    openActions: [],
+    interfaces: interfaces.map((item) => ({ id: item.id, domain: item.domain || item.name, priority: item.priority, owner: item.owner, status: item.status, nextAction: item.next })),
+    evidence: evidence.map((item) => ({ id: item.id, name: item.name || item.category, owner: item.owner, status: item.status, records: Array.isArray(item.records) ? item.records.length : 0, nextAction: item.next })),
+    siteDependencies: dependencies.map((item) => ({ id: item.id, track: item.track || item.name, owner: item.owner, status: item.status, nextAction: item.nextAction || item.next }))
+  };
+}
+
+function renderDashboard(summary) {
+  renderMetrics(summary);
+  document.querySelector("#dashboard-scope").textContent = summary.scope?.rule || "";
+  renderApplications(summary.applications || []);
+  renderRisks(summary.risks || []);
+  renderActions(summary.openActions || []);
+  renderDependencies(summary.siteDependencies || []);
+  renderInterfaces(summary.interfaces || []);
+  renderEvidence(summary.evidence || []);
+}
+
+function renderMetrics(summary) {
+  const totals = summary.totals || {};
+  document.querySelector("#dashboard-metrics").innerHTML = [
+    ["应用入口", totals.applications || 0, "前 7 个应用汇总"],
+    ["源记录", totals.sourceRecords || 0, "来自 data/db.json 与业务 API"],
+    ["Open actions", totals.openActions || 0, "跨端待闭环"],
+    ["高风险", totals.highRisks || 0, "状态/优先级归一化"],
+    ["接口轨道", totals.interfaceTracks || 0, "platformInterfaces"],
+    ["验收证据", totals.evidenceRecords || 0, "platformEvidence records"],
+    ["现场依赖", totals.siteDependencies || 0, "生产切换签字项"],
+    ["就绪状态", summary.ok ? "OK" : "Check", summary.generatedAt || ""]
+  ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><small>${hint}</small></article>`).join("");
+}
+
+function renderApplications(applications) {
+  document.querySelector("#dashboard-applications").innerHTML = `<table>
+    <thead><tr><th>应用</th><th>入口</th><th>源记录</th><th>Open actions</th><th>高风险</th><th>状态</th></tr></thead>
+    <tbody>${applications.map((item) => `<tr>
+      <td>${item.name}</td>
+      <td><a href="./${item.entry}">${item.entry}</a></td>
+      <td>${item.records}</td>
+      <td>${item.openActions}</td>
+      <td>${item.highRisks}</td>
+      <td><span class="badge ${item.status === "modeled" ? "info" : "warn"}">${item.status}</span></td>
+    </tr>`).join("")}</tbody>
+  </table>`;
+}
+
+function renderRisks(risks) {
+  document.querySelector("#dashboard-risks").innerHTML = risks.map((item) => `<div>
+    <strong>${item.application}</strong>
+    <span>${item.highRisks} high / ${item.openActions} open</span>
+    <small>${item.nextAction}</small>
+  </div>`).join("") || `<div><strong>暂无高风险汇总</strong><span>等待源应用产生风险或现场联调数据。</span></div>`;
+}
+
+function renderActions(actions) {
+  document.querySelector("#dashboard-actions").innerHTML = actions.map((item, index) => `<article class="priority-row">
+    <div class="priority-rank ${item.priority === "high" ? "danger" : item.priority === "medium" ? "warn" : "info"}">${index + 1}</div>
+    <div>
+      <h3>${item.title}</h3>
+      <p>${item.collection} / ${item.status}</p>
+    </div>
+    <div class="capability-side">
+      <span class="badge ${item.priority === "high" ? "danger" : item.priority === "medium" ? "warn" : "info"}">${item.priority}</span>
+      <small>${item.owner || "owner-pending"}</small>
+    </div>
+  </article>`).join("") || `<article class="priority-row"><div class="priority-rank info">0</div><div><h3>暂无跨应用待办</h3><p>源应用 open action 完成后这里会归零。</p></div></article>`;
+}
+
+function renderDependencies(items) {
+  document.querySelector("#dashboard-dependencies").innerHTML = items.map((item) => `<div>
+    <strong>${item.track || item.id}</strong>
+    <span>${item.status || "pending"} / ${item.owner || "owner-pending"}</span>
+    <small>${item.nextAction || ""}</small>
+  </div>`).join("") || `<div><strong>暂无现场依赖</strong><span>生产签字项尚未进入快照。</span></div>`;
+}
+
+function renderInterfaces(items) {
+  document.querySelector("#dashboard-interfaces").innerHTML = items.slice(0, 8).map((item) => `<div>
+    <strong>${item.domain || item.id}</strong>
+    <span>${item.priority || "P2"} / ${item.status || "pending"}</span>
+    <small>${item.nextAction || ""}</small>
+  </div>`).join("") || `<div><strong>暂无接口轨道</strong><span>等待 platformInterfaces 数据。</span></div>`;
+}
+
+function renderEvidence(items) {
+  document.querySelector("#dashboard-evidence").innerHTML = items.slice(0, 8).map((item) => `<div>
+    <strong>${item.name || item.id}</strong>
+    <span>${item.status || "pending"} / ${item.records || 0} records</span>
+    <small>${item.owner || ""}</small>
+  </div>`).join("") || `<div><strong>暂无验收证据</strong><span>等待平台证据归档。</span></div>`;
+}
+
+function countRows(value) {
+  if (Array.isArray(value)) return value.length;
+  if (value && typeof value === "object") return Object.values(value).reduce((sum, item) => sum + (Array.isArray(item) ? item.length : 0), 0);
+  return 0;
+}

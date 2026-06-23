@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>卫生健康综合驾驶舱</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+    <script>window.HealthCityAuth.requireRole(["commission"])</script>
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>优先应用 8</span>
+          <h1>卫生健康综合驾驶舱</h1>
+          <p>面向前 7 个应用的汇总入口，集中展示指标、风险、任务、接口、验收证据和现场依赖；业务办理仍回到各源应用完成。</p>
+        </div>
+        <nav>
+          <a href="./platform.html">平台建设</a>
+          <a href="./workbench.html">运营工作台</a>
+          <a href="./index.html">卫健委端</a>
+          <a href="./county.html">医共体</a>
+          <a href="./health-city.html">总览</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" id="dashboard-metrics"></section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>应用汇总</h2>
+            <span id="dashboard-scope"></span>
+          </div>
+          <div id="dashboard-applications" class="table-wrap"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>风险预警</h2>
+            <span>来自源应用状态归一化</span>
+          </div>
+          <div id="dashboard-risks" class="rules"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>任务闭环</h2>
+            <span>仅展示跨应用 open action，办理入口保留在源业务端</span>
+          </div>
+          <div id="dashboard-actions" class="priority-list"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>现场依赖</h2>
+            <span>上线前需现场签字或联调确认</span>
+          </div>
+          <div id="dashboard-dependencies" class="rules"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel">
+          <div class="panel-title">
+            <h2>接口联调</h2>
+            <span>复用 platformInterfaces 和联调证据</span>
+          </div>
+          <div id="dashboard-interfaces" class="rules"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>验收证据</h2>
+            <span>复用 platformEvidence 与 release artifacts</span>
+          </div>
+          <div id="dashboard-evidence" class="rules"></div>
+        </article>
+      </section>
+    </main>
+
+    <script src="./shared.js"></script>
+    <script src="./health-dashboard.js"></script>
+  </body>
+</html>
