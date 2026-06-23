@@ -295,6 +295,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.match(body.residents[0].address, /^已脱敏-/);
     assert.match(body.residents[0].personIndex, /^已脱敏-/);
     assert.notEqual(body.digitalCredentials[0].credentialNo, "MI-DEMO-MOBILE-R1");
+    assert.equal(body.drugConsumableSupervisions.every((item) => ["r1", "r4"].includes(item.residentId)), true);
     [
       "authUsers",
       "authOrganizations",
@@ -630,7 +631,15 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const insuranceTasks = await api(baseUrl, "/api/tasks", authorized(insurance.body.token));
     assert.equal(insuranceTasks.response.status, 200);
     assert.equal(insuranceTasks.body.tasks.some((item) => item.collection === "insuranceClaims"), true);
+    assert.equal(insuranceTasks.body.tasks.some((item) => item.collection === "drugConsumableSupervisions" && item.serviceDomain === "drugConsumable"), true);
     assert.equal(insuranceTasks.body.tasks.some((item) => item.collection === "chronicScreeningTasks"), false);
+
+    const drugTaskAction = await api(baseUrl, "/api/tasks/drugConsumableSupervisions:dcs-rational-r1/actions", authorized(insurance.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "review", status: "task-reviewed", comment: "Unified task review writes business audit trail." })
+    }));
+    assert.equal(drugTaskAction.response.status, 200);
+    assert.equal(drugTaskAction.body.auditTrail[0].action, "unified-task-action");
 
     const citizen = await login(baseUrl, "citizen");
     const citizenMessages = await api(baseUrl, "/api/messages", authorized(citizen.body.token));
@@ -853,6 +862,21 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       })
     }));
     assert.equal(medicationSupportAllowed.response.status, 200);
+    const workflowDrugConsumableAllowed = await api(baseUrl, "/api/workflow-actions", authorized(insurance.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        collection: "drugConsumableSupervisions",
+        id: "dcs-fixed-pickup-r2",
+        status: "workflow-review",
+        updates: { residentId: "r3", reviewStatus: "workflow-reviewed", insuranceStatus: "benefit-scope-confirmed" },
+        note: "Drug consumable fixed-pickup workflow review"
+      })
+    }));
+    assert.equal(workflowDrugConsumableAllowed.response.status, 200);
+    assert.equal(workflowDrugConsumableAllowed.body.id, "dcs-fixed-pickup-r2");
+    assert.notEqual(workflowDrugConsumableAllowed.body.residentId, "r3");
+    assert.equal(workflowDrugConsumableAllowed.body.reviewStatus, "workflow-reviewed");
+    assert.equal(workflowDrugConsumableAllowed.body.auditTrail[0].action, "workflow-action");
     assert.equal(medicationSupportAllowed.body.stockStatus, "已完成库存复核");
   });
 

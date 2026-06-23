@@ -297,6 +297,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.doesNotMatch(platformJs, /domain: "医疗机构业务系统"[^\n]*status: "待接口"/);
   assert.match(workbenchHtml, /system-readiness/);
   assert.match(workbenchHtml, /release-evidence-gates/);
+  assert.match(workbenchHtml, /drug-consumable-supervision-panel/);
   assert.match(workbenchHtml, /acceptance-ledgers/);
   assert.match(workbenchHtml, /site-readiness-pack/);
   assert.match(workbenchJs, /loadOperationalMetrics/);
@@ -310,6 +311,8 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(workbenchJs, /loadProductionCutoverChecklist/);
   assert.match(workbenchJs, /loadReleaseArtifactManifest/);
   assert.match(workbenchJs, /loadUnifiedTaskReport/);
+  assert.match(workbenchJs, /loadDrugConsumableSupervision/);
+  assert.match(workbenchJs, /renderDrugConsumableSupervision/);
   assert.match(workbenchJs, /data-unified-task/);
   assert.match(workbenchJs, /renderReleaseEvidenceGates/);
   assert.match(workbenchJs, /data-quality:report/);
@@ -331,12 +334,14 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(workbenchJs, /\/api\/production-cutover-checklist/);
   assert.match(workbenchJs, /\/api\/release-artifact-manifest/);
   assert.match(workbenchJs, /\/api\/tasks/);
+  assert.match(workbenchJs, /\/api\/drug-consumable-supervision/);
   assert.match(workbenchJs, /\/api\/chronic\/acceptance-ledger/);
   assert.match(workbenchJs, /\/api\/county\/acceptance-ledger/);
   assert.match(read("server.js"), /\/api\/process-audit/);
   assert.match(read("server.js"), /\/api\/service-acceptance-summary/);
   assert.match(read("server.js"), /\/api\/site-readiness-pack/);
   assert.match(read("server.js"), /SERVICE_DOMAIN_BY_COLLECTION/);
+  assert.match(read("server.js"), /drugConsumableSupervisions: "drugConsumable"/);
   assert.match(read("server.js"), /priorityLevel/);
   assert.match(read("server.js"), /\/api\/site-template-readmes/);
   assert.match(read("server.js"), /\/api\/release-report/);

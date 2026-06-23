@@ -15,12 +15,13 @@ test("release artifact manifest indexes reports templates commands and evidence"
     }
   });
   assert.equal(report.ok, true);
-  assert.equal(report.artifacts.length >= 17, true);
+  assert.equal(report.artifacts.length >= 18, true);
   assert.equal(report.templateReadmes.length, 4);
   assert.equal(report.artifacts.some((item) => item.id === "release-report" && item.command === "release:report"), true);
   assert.equal(report.artifacts.some((item) => item.id === "release-artifact-manifest" && item.command === "release:manifest"), true);
   assert.equal(report.artifacts.some((item) => item.id === "site-readiness" && item.evidence === "/api/site-readiness-pack"), true);
   assert.equal(report.artifacts.some((item) => item.id === "service-acceptance" && item.markdown === "release/service-acceptance-summary.md" && item.evidence === "/api/service-acceptance-summary"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "drug-consumable-readiness" && item.markdown === "release/drug-consumable-readiness-report.md" && item.evidence === "/api/drug-consumable-supervision"), true);
   assert.equal(report.templateReadmes.some((item) => item.file === "release/templates/interface-joint-test/README.md"), true);
   assert.equal(report.templateReadmes.every((item) => item.evidence === "/api/site-template-readmes"), true);
   assert.equal(report.checks.every((item) => item.passed), true);
@@ -34,6 +35,7 @@ test("release artifact manifest renders and writes artifacts", (t) => {
   assert.match(markdown, /Release artifact manifest/);
   assert.match(markdown, /Template READMEs/);
   assert.match(markdown, /release-artifact-manifest\.md/);
+  assert.match(markdown, /drug-consumable-readiness-report\.md/);
 
   writeOutput(report, {
     output: path.join("tmp", "release-artifact-manifest-test", "release-artifact-manifest.json"),

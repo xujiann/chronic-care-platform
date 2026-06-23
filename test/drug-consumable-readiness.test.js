@@ -17,7 +17,9 @@ test("drug consumable readiness covers required supervision boundaries", () => {
   assert.equal(report.requiredBoundaries.includes("insurance-settlement"), true);
   assert.equal(report.requiredBoundaries.includes("remediation-loop"), true);
   assert.equal(report.summary.supervisionRows >= 3, true);
+  assert.equal(report.summary.workflowReuseReady, true);
   assert.equal(report.linkedRows.every((item) => item.auditTrailPresent), true);
+  assert.equal(report.checks.some((item) => item.id === "drug-consumable:workflow-reuse" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "drug-consumable:frontend" && item.passed), true);
   assert.equal(normalizeStatus("pending-review"), "pending");
   assert.equal(normalizeStatus("completed"), "closed");

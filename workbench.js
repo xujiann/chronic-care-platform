@@ -10,6 +10,7 @@ const fallbackState = {
   chronicProjectBlueprint: null,
   countyProjectBlueprint: null,
   referralSystem: null,
+  drugConsumableSupervisions: [],
   platformRoadmap: [],
   platformAudit: [],
   platformProcessAudit: []
@@ -28,9 +29,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   const productionCutover = await loadProductionCutoverChecklist();
   const releaseArtifactManifest = await loadReleaseArtifactManifest();
   const unifiedTaskReport = await loadUnifiedTaskReport();
+  const drugConsumableSupervision = await loadDrugConsumableSupervision();
   const tasks = unifiedTaskReport?.tasks?.length ? normalizeApiTasks(unifiedTaskReport.tasks) : collectUnifiedTasks(state);
   const roadmap = state.platformRoadmap?.length ? state.platformRoadmap : defaultRoadmap();
   renderMetrics(state, tasks, roadmap, operations);
+  renderDrugConsumableSupervision(drugConsumableSupervision, state);
   renderSystemReadiness(readiness);
   renderReleaseEvidenceGates(state, readiness, operations, processAudit, serviceAcceptanceSummary, siteReadinessPack, releaseReport, productionCutover, releaseArtifactManifest);
   renderAcceptanceLedgers(state, acceptanceLedgers, serviceAcceptanceSummary);
@@ -182,6 +185,18 @@ async function loadUnifiedTaskReport() {
   }
 }
 
+async function loadDrugConsumableSupervision() {
+  if (location.protocol === "file:") return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request("/api/drug-consumable-supervision");
+    if (!response.ok) return null;
+    return response.json();
+  } catch (error) {
+    return null;
+  }
+}
+
 function normalizeApiTasks(tasks) {
   const priorityWeight = { high: 3, medium: 2, normal: 1 };
   return tasks.map((task) => ({
@@ -216,6 +231,57 @@ function renderMetrics(state, tasks, roadmap, operations) {
     ["P0 优先项", p0, "先补平台底座"],
     ["居民主索引", state.residents?.length || 0, "身份证号 + 手机号"]
   ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><small>${hint}</small></article>`).join("");
+}
+
+function renderDrugConsumableSupervision(report, state) {
+  const container = document.querySelector("#drug-consumable-supervision");
+  const countEl = document.querySelector("#drug-consumable-supervision-count");
+  if (!container || !countEl) return;
+
+  const fallbackRows = (state.drugConsumableSupervisions || []).map((item) => ({
+    ...item,
+    normalizedStatus: /closed|complete|通过|完成/i.test(String(item.status || "")) ? "closed" : "open",
+    auditCount: Array.isArray(item.auditTrail) ? item.auditTrail.length : 0
+  }));
+  const rows = report?.rows?.length ? report.rows : fallbackRows;
+  const boundaries = report?.boundaries || [];
+  const summary = report?.summary || {
+    total: rows.length,
+    open: rows.filter((item) => item.normalizedStatus !== "closed").length,
+    highRisk: rows.filter((item) => item.riskLevel === "high").length
+  };
+
+  countEl.textContent = `${summary.open ?? rows.length}/${summary.total ?? rows.length} open`;
+  const boundaryRows = boundaries.length ? boundaries.map((item) => `<div><strong>${item.name}</strong><span>${item.source} · ${item.count}</span></div>`).join("") : "";
+  const supervisionRows = rows.slice(0, 6).map((item, index) => {
+    const resident = residentOf(state, item.residentId);
+    const badge = item.riskLevel === "high" ? "danger" : item.normalizedStatus === "pending" ? "warn" : "info";
+    return `<article class="priority-row" data-drug-consumable-supervision="${item.id}">
+      <div class="priority-rank ${badge}">${index + 1}</div>
+      <div>
+        <h3>${resident?.name || item.residentId || "Unknown resident"} · ${item.category || item.boundary}</h3>
+        <p>${item.institution || "institution pending"} · ${item.issue || item.nextAction || "Drug consumable supervision item"}</p>
+        <small>${item.boundary || ""}</small>
+        <small>${item.nextAction || ""}</small>
+      </div>
+      <span class="badge ${badge}">${item.riskLevel || item.normalizedStatus || item.status}</span>
+    </article>`;
+  }).join("");
+
+  container.innerHTML = `
+    <article class="priority-row" data-drug-consumable-summary>
+      <div class="priority-rank ${summary.highRisk ? "danger" : "info"}">${summary.highRisk || 0}</div>
+      <div>
+        <h3>Drug, consumable and rational-use supervision</h3>
+        <p>${summary.total || rows.length} supervision rows · ${summary.open || 0} open · ${summary.pendingInsurance || 0} pending insurance coordination.</p>
+        <small>/api/drug-consumable-supervision</small>
+        <small>release/drug-consumable-readiness-report.md</small>
+      </div>
+      <span class="badge ${summary.highRisk ? "danger" : "info"}">${summary.contractReady === false ? "contract pending" : "demo-ready"}</span>
+    </article>
+    ${boundaryRows ? `<article class="priority-row"><div class="priority-rank info">B</div><div class="rules">${boundaryRows}</div><span class="badge info">boundaries</span></article>` : ""}
+    ${supervisionRows || `<article class="priority-row"><div class="priority-rank warn">0</div><div><h3>No drug consumable supervision rows</h3><p>Run the local API or seed data to review this app.</p></div><span class="badge warn">empty</span></article>`}
+  `;
 }
 
 function renderSystemReadiness(readiness) {

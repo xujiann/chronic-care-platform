@@ -3776,7 +3776,7 @@ function normalizePersonIndexes(state) {
     resident.identityIndex = resident.personIndex;
   });
   const residentMap = new Map(residents.map((resident) => [resident.id, resident]));
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "taskMessages"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "drugConsumableSupervisions", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "taskMessages"].forEach((key) => {
     (Array.isArray(state[key]) ? state[key] : []).forEach((item) => {
       item.personIndex = item.personIndex || personIndexForResident(residentMap, item.residentId);
     });
@@ -4477,7 +4477,7 @@ function scopeStateForUser(data, user) {
     const preferenceKey = user.residentId || user.accountId || user.username;
     scoped.mobileExperienceSettings = { ...scoped.mobileExperienceSettings, userPreferences: { [preferenceKey]: preferences[preferenceKey] || {} } };
   }
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "taskMessages"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "drugConsumableSupervisions", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "taskMessages"].forEach((key) => {
     scoped[key] = (data[key] || []).filter(hasAllowedResident);
   });
   if (scoped.referralSystem) {
@@ -4577,6 +4577,21 @@ function cleanWorkflowUpdates(updates) {
     }
     return result;
   }, {});
+}
+
+function appendDrugConsumableAuditTrail(item, user, action, detail) {
+  if (!item || typeof item !== "object") return;
+  item.auditTrail = [
+    {
+      at: new Date().toISOString(),
+      actor: user?.username || user?.role || "system",
+      role: user?.role || "system",
+      action,
+      result: item.status || item.reviewStatus || item.remediationStatus || "updated",
+      detail: String(detail || item.nextAction || "").trim()
+    },
+    ...(Array.isArray(item.auditTrail) ? item.auditTrail : [])
+  ].slice(0, 20);
 }
 
 function cleanResidentPatch(patch) {
@@ -4743,6 +4758,8 @@ const TASK_SOURCES = [
   ["diagnosticReports", "county", "报告回传", "reportedAt"]
 ];
 
+TASK_SOURCES.splice(13, 0, ["drugConsumableSupervisions", ["commission", "insurance", "institution"], "Drug consumable supervision", "lastUpdated"]);
+
 const SERVICE_DOMAIN_BY_COLLECTION = {
   chronicScreeningTasks: "screening",
   chronicEducationPushes: "education",
@@ -4755,7 +4772,8 @@ const SERVICE_DOMAIN_BY_COLLECTION = {
   countyCollaborationOrders: "collaboration",
   countyAiDiagnosisCases: "aiDiagnosis",
   countyMutualRecognitionRecords: "mutualRecognition",
-  diagnosticReports: "diagnosticReports"
+  diagnosticReports: "diagnosticReports",
+  drugConsumableSupervisions: "drugConsumable"
 };
 
 function taskPriorityLevel(item) {
@@ -4766,7 +4784,7 @@ function taskPriorityLevel(item) {
 }
 
 function taskTitle(item, category) {
-  return item.taskName || item.topic || item.plan || item.orderType || item.claimType || item.medication || item.item || item.title || item.name || item.service || category;
+  return item.taskName || item.topic || item.plan || item.orderType || item.claimType || item.medication || item.issue || item.item || item.title || item.name || item.service || category;
 }
 
 function isClosedTaskStatus(status) {
@@ -6191,6 +6209,9 @@ async function handleApi(req, res) {
       handledBy: user.username || user.role,
       handledByName: user.name
     };
+    if (collection === "drugConsumableSupervisions") {
+      appendDrugConsumableAuditTrail(rows[index], user, "unified-task-action", payload.comment || payload.action);
+    }
     data.securityEvents = [
       {
         id: randomUUID(),
@@ -7170,6 +7191,9 @@ async function handleApi(req, res) {
     Object.assign(item, cleanWorkflowUpdates(payload.updates));
     if (payload.status) item.status = String(payload.status);
     item.lastUpdated = new Date().toISOString();
+    if (collection === "drugConsumableSupervisions") {
+      appendDrugConsumableAuditTrail(item, user, "workflow-action", payload.note || item.nextAction);
+    }
     data.securityEvents = [
       {
         id: randomUUID(),

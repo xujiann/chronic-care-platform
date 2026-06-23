@@ -89,8 +89,8 @@ function buildProcessAuditReport(options = {}) {
     {
       id: "insurance-and-pharmacy",
       owner: "insurance-and-primary-care",
-      evidence: ["insuranceClaims", "medicationPickups", "careOrders"],
-      passed: Array.isArray(data.insuranceClaims) && data.insuranceClaims.length > 0 && Array.isArray(data.medicationPickups) && data.medicationPickups.length > 0
+      evidence: ["insuranceClaims", "medicationPickups", "drugConsumableSupervisions", "careOrders"],
+      passed: Array.isArray(data.insuranceClaims) && data.insuranceClaims.length > 0 && Array.isArray(data.medicationPickups) && data.medicationPickups.length > 0 && Array.isArray(data.drugConsumableSupervisions) && data.drugConsumableSupervisions.length > 0
     },
     {
       id: "statistics-and-certificates",
