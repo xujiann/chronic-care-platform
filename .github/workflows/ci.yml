@@ -47,6 +47,8 @@ jobs:
         run: npm run data-quality:report
       - name: Generate medical quality and safety report
         run: npm run quality-safety:report
+      - name: Generate drug consumable readiness report
+        run: npm run drug-consumable:readiness
       - name: Generate integration readiness report
         run: npm run integration:readiness
       - name: Generate interface mapping report

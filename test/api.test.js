@@ -951,6 +951,49 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(medicationSupportAllowed.body.stockStatus, "已完成库存复核");
   });
 
+  await t.test("supports drug consumable supervision roles, review, remediation and insurance sync", async () => {
+    const insurance = await login(baseUrl, "insurance");
+    const institution = await login(baseUrl, "hospital");
+    const citizen = await login(baseUrl, "citizen");
+
+    const denied = await api(baseUrl, "/api/drug-consumable-supervision", authorized(citizen.body.token));
+    assert.equal(denied.response.status, 403);
+
+    const supervision = await api(baseUrl, "/api/drug-consumable-supervision", authorized(insurance.body.token));
+    assert.equal(supervision.response.status, 200);
+    assert.equal(supervision.body.summary.total >= 3, true);
+    assert.equal(supervision.body.boundaries.some((item) => item.id === "rational-medication"), true);
+    assert.equal(supervision.body.insuranceCoordination.contractId, "insurance-settlement-v1");
+
+    const review = await api(baseUrl, "/api/drug-consumable-supervision/dcs-rational-r1/review", authorized(insurance.body.token, {
+      method: "POST",
+      body: JSON.stringify({ reviewStatus: "review-passed", insuranceStatus: "coordinating", status: "in-review" })
+    }));
+    assert.equal(review.response.status, 200);
+    assert.equal(review.body.reviewStatus, "review-passed");
+    assert.equal(review.body.auditTrail[0].action, "drug-consumable-review");
+
+    const syncDenied = await api(baseUrl, "/api/drug-consumable-supervision/dcs-rational-r1/insurance-sync", authorized(institution.body.token, {
+      method: "POST",
+      body: JSON.stringify({ insuranceStatus: "synced" })
+    }));
+    assert.equal(syncDenied.response.status, 403);
+
+    const remediation = await api(baseUrl, "/api/drug-consumable-supervision/dcs-consumable-mr1/remediation", authorized(institution.body.token, {
+      method: "POST",
+      body: JSON.stringify({ remediationStatus: "submitted", evidence: "institution-uploaded-catalog-version" })
+    }));
+    assert.equal(remediation.response.status, 200);
+    assert.equal(remediation.body.remediationStatus, "submitted");
+
+    const sync = await api(baseUrl, "/api/drug-consumable-supervision/dcs-rational-r1/insurance-sync", authorized(insurance.body.token, {
+      method: "POST",
+      body: JSON.stringify({ insuranceStatus: "synced", settlementBatch: "batch-202606" })
+    }));
+    assert.equal(sync.response.status, 200);
+    assert.equal(sync.body.settlementBatch, "batch-202606");
+  });
+
   await t.test("allows commission state persistence without losing governance collections", async () => {
     const current = await api(baseUrl, "/api/state", authorized(commissionToken));
     const saved = await api(baseUrl, "/api/state", authorized(commissionToken, {
