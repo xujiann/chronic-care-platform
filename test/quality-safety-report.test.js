@@ -87,6 +87,21 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
 
   const institutionLogin = await login(baseUrl, "hospital");
   assert.equal(institutionLogin.response.status, 200);
+  const institutionDashboard = await api(baseUrl, "/api/quality-safety/dashboard", authorized(institutionLogin.body.token));
+  assert.equal(institutionDashboard.response.status, 200);
+  assert.equal(institutionDashboard.body.role, "institution");
+  const forbiddenDispatch = await api(baseUrl, `/api/quality-safety/issues/${encodeURIComponent(issue.id)}/dispatch`, authorized(institutionLogin.body.token, {
+    method: "POST",
+    body: JSON.stringify({ ownerRole: "institution", requirement: "Should be forbidden." })
+  }));
+  assert.equal(forbiddenDispatch.response.status, 403);
+
+  const countyLogin = await login(baseUrl, "county");
+  assert.equal(countyLogin.response.status, 200);
+  const countyDashboard = await api(baseUrl, "/api/quality-safety/dashboard", authorized(countyLogin.body.token));
+  assert.equal(countyDashboard.response.status, 200);
+  assert.equal(countyDashboard.body.role, "county");
+
   const feedback = await api(baseUrl, `/api/quality-safety/rectifications/${encodeURIComponent(dispatch.body.id)}/feedback`, authorized(institutionLogin.body.token, {
     method: "POST",
     body: JSON.stringify({ content: "Evidence uploaded.", attachments: ["qc-evidence"] })

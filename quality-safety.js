@@ -61,6 +61,7 @@ function renderReuse(rows) {
 }
 
 function renderIssues(rows) {
+  const canDispatch = qualitySafetyState?.role === "commission";
   setHtml("quality-safety-issues", `
     <table>
       <thead><tr><th>Domain</th><th>Issue</th><th>Status</th><th>Owner</th><th>Action</th></tr></thead>
@@ -71,7 +72,7 @@ function renderIssues(rows) {
             <td><strong>${text(item.title)}</strong><br /><small>${text(item.sourceCollection)} ${text(item.sourceId)}</small></td>
             <td>${statusLabel(item.normalizedStatus || item.status)}</td>
             <td>${text(item.owner || item.institutionName)}</td>
-            <td><button class="inline-action" type="button" data-dispatch="${item.id}">Dispatch</button></td>
+            <td>${canDispatch ? `<button class="inline-action" type="button" data-dispatch="${item.id}">Dispatch</button>` : statusLabel(item.ownerRole || "view")}</td>
           </tr>
         `).join("")}
       </tbody>
@@ -80,6 +81,9 @@ function renderIssues(rows) {
 }
 
 function renderRectifications(rows) {
+  const role = qualitySafetyState?.role || "";
+  const canReview = role === "commission";
+  const canFeedback = ["institution", "county", "commission"].includes(role);
   setHtml("quality-safety-rectifications", `
     <table>
       <thead><tr><th>Order</th><th>Requirement</th><th>Status</th><th>Feedback</th><th>Action</th></tr></thead>
@@ -91,8 +95,8 @@ function renderRectifications(rows) {
             <td>${statusLabel(item.normalizedStatus || item.status)}</td>
             <td>${(item.feedback || []).length}</td>
             <td>
-              <button class="inline-action" type="button" data-feedback="${item.id}">Feedback</button>
-              <button class="inline-action" type="button" data-review="${item.id}">Review</button>
+              ${canFeedback ? `<button class="inline-action" type="button" data-feedback="${item.id}">Feedback</button>` : ""}
+              ${canReview ? `<button class="inline-action" type="button" data-review="${item.id}">Review</button>` : ""}
             </td>
           </tr>
         `).join("")}

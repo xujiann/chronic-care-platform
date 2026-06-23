@@ -11,18 +11,20 @@ function read(file) {
 
 test("role pages keep explicit page guards", () => {
   const guards = {
-    "citizen.html": "citizen",
-    "mobile-preview.html": "citizen",
-    "institution.html": "institution",
-    "insurance.html": "insurance",
-    "county.html": "county",
-    "index.html": "commission",
-    "platform.html": "commission",
-    "workbench.html": "commission",
-    "quality-safety.html": "commission"
+    "citizen.html": ["citizen"],
+    "mobile-preview.html": ["citizen"],
+    "institution.html": ["institution"],
+    "insurance.html": ["insurance"],
+    "county.html": ["county"],
+    "index.html": ["commission"],
+    "platform.html": ["commission"],
+    "workbench.html": ["commission"],
+    "quality-safety.html": ["commission", "institution", "county"]
   };
-  Object.entries(guards).forEach(([file, role]) => {
-    assert.match(read(file), new RegExp(`requireRole\\(\\[\\"${role}\\"\\]\\)`), `${file} 缺少 ${role} 页面守卫`);
+  Object.entries(guards).forEach(([file, roles]) => {
+    roles.forEach((role) => {
+      assert.match(read(file), new RegExp(`requireRole\\([^\\)]*\\"${role}\\"`), `${file} 缺少 ${role} 页面守卫`);
+    });
   });
 });
 
@@ -346,6 +348,9 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(js, /dispatchIssue/);
   assert.match(js, /submitFeedback/);
   assert.match(js, /reviewOrder/);
+  assert.match(js, /canDispatch/);
+  assert.match(js, /canReview/);
+  assert.match(js, /canFeedback/);
   assert.match(server, /\/api\/quality-safety\/dashboard/);
   assert.match(server, /\/api\/quality-safety\/issues\/:id\/dispatch/);
   assert.match(server, /\/api\/quality-safety\/rectifications\/:id\/feedback/);

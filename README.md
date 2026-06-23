@@ -255,6 +255,7 @@ GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下
 ## Priority app 3: medical quality and safety supervision
 
 - Runnable portal: `quality-safety.html`
+- Role access: commission dispatches and reviews; institution/county users can open the same portal for scoped dashboard and rectification feedback.
 - API evidence: `/api/quality-safety/dashboard`, `/api/quality-safety/issues/:id/dispatch`, `/api/quality-safety/rectifications/:id/feedback`, `/api/quality-safety/rectifications/:id/review`
 - Seed collections: `qualitySafetyEvents`, `criticalValueAlerts`, `clinicalPathwayCases`, `medicalRecordQualityReviews`, `mutualRecognitionQualityReviews`, `qualityRectificationOrders`
 - Reused collections: `diagnosticReports`, `countyMutualRecognitionRecords`, `dataQualityIssues`, `institutionCreditEvaluations`, `securityEvents`, `hospitalInteroperabilityFunctions`
