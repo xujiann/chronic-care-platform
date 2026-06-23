@@ -246,3 +246,10 @@ npm.cmd run rollback:snapshot -- "data/backups/<备份目录>"
 - 出生/死亡电子证照。
 - 公安、民政共享。
 - 等保、密评、日志保全、脱敏和容灾。
+
+
+## Hospital Operations Dispatch
+
+operations.html is the runnable management entry for hospital operation monitoring and resource dispatch. It uses GET /api/operations/dashboard, POST /api/operations/dispatch, and POST /api/operations/reconciliation/:id/review to cover bed, staff, equipment, outpatient, emergency, inpatient, dispatch, alert, and statistics direct-report reconciliation boundaries.
+
+hospital-operations:readiness generates release/hospital-operations-readiness-report.json and release/hospital-operations-readiness-report.md. The report reuses healthStatistics, healthStatisticsIngestion, medicalResources, operations-readiness, /api/metrics, and platformProcessAudit evidence, and is included by release:report and deploy:check.

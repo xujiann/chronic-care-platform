@@ -6897,5 +6897,294 @@
       "status": "demo-ready",
       "nextAction": "Attach live IRB approval, data-use agreement, and sandbox access records before production sharing."
     }
+  ],
+  "hospitalOperationSnapshots": [
+    {
+      "id": "ops-mr1-2026-06-22-am",
+      "institutionId": "MR1",
+      "institution": "Dalian Central Hospital",
+      "district": "city",
+      "snapshotAt": "2026-06-22T08:00:00+08:00",
+      "normalizedStatus": "warning",
+      "beds": {
+        "total": 1460,
+        "open": 1398,
+        "occupied": 1292,
+        "icuTotal": 72,
+        "icuOccupied": 66,
+        "emergencyObservation": 38
+      },
+      "staff": {
+        "doctorsOnDuty": 186,
+        "nursesOnDuty": 412,
+        "emergencyDoctors": 28,
+        "shortage": 6
+      },
+      "equipment": {
+        "ctTotal": 8,
+        "ctAvailable": 7,
+        "ventilatorsTotal": 96,
+        "ventilatorsAvailable": 18,
+        "ambulancesAvailable": 5
+      },
+      "outpatient": {
+        "visitsToday": 4820,
+        "emergencyVisits": 612,
+        "feverClinicVisits": 86,
+        "waitingOver30Min": 74
+      },
+      "inpatient": {
+        "admissionsToday": 196,
+        "dischargesToday": 171,
+        "surgeryScheduled": 82,
+        "averageLengthOfStay": 7.8
+      },
+      "reporting": {
+        "directReportBatch": "stat-20260622-am",
+        "source": "healthStatisticsIngestion",
+        "reconciled": false,
+        "varianceRate": 0.034
+      },
+      "alerts": [
+        "bed-occupancy-high",
+        "ed-waiting-high"
+      ],
+      "dispatchSuggestion": "Open 30 step-down beds and transfer two CT time slots to emergency priority."
+    },
+    {
+      "id": "ops-mr2-2026-06-22-am",
+      "institutionId": "MR2",
+      "institution": "Dalian Women and Children Medical Center",
+      "district": "shahekou",
+      "snapshotAt": "2026-06-22T08:00:00+08:00",
+      "normalizedStatus": "normal",
+      "beds": {
+        "total": 820,
+        "open": 804,
+        "occupied": 682,
+        "icuTotal": 36,
+        "icuOccupied": 27,
+        "emergencyObservation": 19
+      },
+      "staff": {
+        "doctorsOnDuty": 94,
+        "nursesOnDuty": 236,
+        "emergencyDoctors": 12,
+        "shortage": 0
+      },
+      "equipment": {
+        "ctTotal": 4,
+        "ctAvailable": 4,
+        "ventilatorsTotal": 42,
+        "ventilatorsAvailable": 15,
+        "ambulancesAvailable": 3
+      },
+      "outpatient": {
+        "visitsToday": 2190,
+        "emergencyVisits": 246,
+        "feverClinicVisits": 31,
+        "waitingOver30Min": 18
+      },
+      "inpatient": {
+        "admissionsToday": 88,
+        "dischargesToday": 96,
+        "surgeryScheduled": 44,
+        "averageLengthOfStay": 6.1
+      },
+      "reporting": {
+        "directReportBatch": "stat-20260622-am",
+        "source": "healthStatisticsIngestion",
+        "reconciled": true,
+        "varianceRate": 0.008
+      },
+      "alerts": [],
+      "dispatchSuggestion": "Keep pediatric emergency surge reserve and confirm afternoon obstetric bed turnover."
+    },
+    {
+      "id": "ops-mr3-2026-06-22-am",
+      "institutionId": "MR3",
+      "institution": "Qingniwaqiao Community Health Service Center",
+      "district": "zhongshan",
+      "snapshotAt": "2026-06-22T08:00:00+08:00",
+      "normalizedStatus": "critical",
+      "beds": {
+        "total": 120,
+        "open": 112,
+        "occupied": 109,
+        "icuTotal": 0,
+        "icuOccupied": 0,
+        "emergencyObservation": 11
+      },
+      "staff": {
+        "doctorsOnDuty": 18,
+        "nursesOnDuty": 34,
+        "emergencyDoctors": 3,
+        "shortage": 4
+      },
+      "equipment": {
+        "ctTotal": 1,
+        "ctAvailable": 1,
+        "ventilatorsTotal": 4,
+        "ventilatorsAvailable": 1,
+        "ambulancesAvailable": 1
+      },
+      "outpatient": {
+        "visitsToday": 860,
+        "emergencyVisits": 96,
+        "feverClinicVisits": 42,
+        "waitingOver30Min": 31
+      },
+      "inpatient": {
+        "admissionsToday": 31,
+        "dischargesToday": 18,
+        "surgeryScheduled": 0,
+        "averageLengthOfStay": 5.4
+      },
+      "reporting": {
+        "directReportBatch": "stat-20260622-am",
+        "source": "healthStatisticsIngestion",
+        "reconciled": false,
+        "varianceRate": 0.071
+      },
+      "alerts": [
+        "bed-occupancy-critical",
+        "staff-shortage",
+        "reporting-variance-high"
+      ],
+      "dispatchSuggestion": "Shift chronic follow-up visits to telehealth and request district nurse support before 14:00."
+    }
+  ],
+  "resourceDispatchRequests": [
+    {
+      "id": "dispatch-bed-mr3-001",
+      "category": "bed",
+      "priority": "high",
+      "status": "pending",
+      "sourceInstitutionId": "MR3",
+      "sourceInstitution": "Qingniwaqiao Community Health Service Center",
+      "targetInstitutionId": "MR1",
+      "targetInstitution": "Dalian Central Hospital",
+      "resourceType": "step-down-bed",
+      "quantity": 12,
+      "requestedAt": "2026-06-22T08:30:00+08:00",
+      "requiredBy": "2026-06-22T14:00:00+08:00",
+      "reason": "Community bed occupancy above 95% with emergency observation growth.",
+      "auditTrail": [
+        {
+          "at": "2026-06-22T08:30:00+08:00",
+          "actor": "system",
+          "action": "created",
+          "note": "Generated from operation snapshot alert."
+        }
+      ]
+    },
+    {
+      "id": "dispatch-staff-mr3-001",
+      "category": "staff",
+      "priority": "medium",
+      "status": "assigned",
+      "sourceInstitutionId": "MR3",
+      "sourceInstitution": "Qingniwaqiao Community Health Service Center",
+      "targetInstitutionId": "MR2",
+      "targetInstitution": "Dalian Women and Children Medical Center",
+      "resourceType": "nurse-support",
+      "quantity": 4,
+      "requestedAt": "2026-06-22T08:45:00+08:00",
+      "requiredBy": "2026-06-22T16:00:00+08:00",
+      "reason": "Primary-care nurse shortage during fever-clinic peak.",
+      "auditTrail": [
+        {
+          "at": "2026-06-22T09:10:00+08:00",
+          "actor": "operations",
+          "action": "assigned",
+          "note": "District reserve team assigned."
+        }
+      ]
+    }
+  ],
+  "statisticsReconciliationReviews": [
+    {
+      "id": "recon-mr1-20260622-am",
+      "institutionId": "MR1",
+      "institution": "Dalian Central Hospital",
+      "period": "2026-06-22 AM",
+      "sourceBatch": "stat-20260622-am",
+      "status": "pending-review",
+      "varianceRate": 0.034,
+      "fields": [
+        "outpatient.visitsToday",
+        "inpatient.admissionsToday",
+        "beds.occupied"
+      ],
+      "platformValue": 4820,
+      "directReportValue": 4662,
+      "owner": "statistics-office",
+      "reviewedBy": "",
+      "reviewNote": "Outpatient daily feed is higher than direct-report staging table.",
+      "evidence": [
+        "healthStatistics",
+        "healthStatisticsIngestion",
+        "hospitalOperationSnapshots"
+      ]
+    },
+    {
+      "id": "recon-mr3-20260622-am",
+      "institutionId": "MR3",
+      "institution": "Qingniwaqiao Community Health Service Center",
+      "period": "2026-06-22 AM",
+      "sourceBatch": "stat-20260622-am",
+      "status": "blocked",
+      "varianceRate": 0.071,
+      "fields": [
+        "outpatient.feverClinicVisits",
+        "staff.shortage"
+      ],
+      "platformValue": 42,
+      "directReportValue": 35,
+      "owner": "statistics-office",
+      "reviewedBy": "",
+      "reviewNote": "Fever-clinic and staffing variance must be confirmed before report submission.",
+      "evidence": [
+        "healthStatisticsIngestion",
+        "operationAlertRules"
+      ]
+    }
+  ],
+  "operationAlertRules": [
+    {
+      "id": "bed-occupancy-high",
+      "domain": "beds",
+      "severity": "warning",
+      "threshold": "occupied/open >= 0.90",
+      "dispatchBoundary": "Open hospital reserve bed or start cross-institution transfer."
+    },
+    {
+      "id": "bed-occupancy-critical",
+      "domain": "beds",
+      "severity": "critical",
+      "threshold": "occupied/open >= 0.95",
+      "dispatchBoundary": "City operations desk must approve bed dispatch within 4 hours."
+    },
+    {
+      "id": "staff-shortage",
+      "domain": "staff",
+      "severity": "warning",
+      "threshold": "shortage > 0",
+      "dispatchBoundary": "District reserve staff can be assigned after institution confirmation."
+    },
+    {
+      "id": "ed-waiting-high",
+      "domain": "outpatient",
+      "severity": "warning",
+      "threshold": "waitingOver30Min >= 50",
+      "dispatchBoundary": "Adjust outpatient queue, emergency triage, and CT priority slots."
+    },
+    {
+      "id": "reporting-variance-high",
+      "domain": "statistics",
+      "severity": "critical",
+      "threshold": "varianceRate >= 0.05",
+      "dispatchBoundary": "Block direct-report submission until reconciliation review closes."
+    }
   ]
 }

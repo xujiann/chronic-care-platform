@@ -509,6 +509,10 @@ function seedState() {
       { id: "f4", residentId: "r3", diseaseType: "健康管理", plannedAt: todayOffset(-5), assignee: "孙医生", status: "已完成", result: "控制良好", advice: "保持运动" }
     ],
     medicalResources: seedMedicalResources(),
+    hospitalOperationSnapshots: seedHospitalOperationSnapshots(),
+    resourceDispatchRequests: seedResourceDispatchRequests(),
+    statisticsReconciliationReviews: seedStatisticsReconciliationReviews(),
+    operationAlertRules: seedOperationAlertRules(),
     healthStatistics: seedHealthStatistics(),
     deathCertificates: seedDeathCertificates(),
     deathCertificateForms: seedDeathCertificateForms(),
@@ -963,6 +967,143 @@ function seedAuthOrganizations() {
     { orgCode: "MR1", name: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", parentCode: "ORG-HEALTH-DL", portal: "institution.html", dataScope: "本机构诊疗、转诊接诊、病历与检查检验", interfaces: ["HIS", "EMR", "LIS", "PACS", "住院管理"] },
     { orgCode: "MR3", name: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", parentCode: "ORG-DIST-ZS", portal: "institution.html", dataScope: "签约居民、慢病随访、长期处方、固定取药", interfaces: ["基层医疗", "公卫", "家医签约"] },
     { orgCode: "ORG-CONSORTIUM-ZS", name: "中山区县域医共体", orgType: "county_consortium", orgLevel: "区市县", parentCode: "ORG-DIST-ZS", portal: "county.html", dataScope: "医共体成员机构、医技共享、互认质控、绩效和协同工单", interfaces: ["医共体协同", "远程会诊", "双向转诊", "医技共享", "绩效监管"] }
+  ];
+}
+
+function seedHospitalOperationSnapshots() {
+  return [
+    {
+      id: "ops-mr1-2026-06-22-am",
+      institutionId: "MR1",
+      institution: "Dalian Central Hospital",
+      district: "city",
+      snapshotAt: "2026-06-22T08:00:00+08:00",
+      normalizedStatus: "warning",
+      beds: { total: 1460, open: 1398, occupied: 1292, icuTotal: 72, icuOccupied: 66, emergencyObservation: 38 },
+      staff: { doctorsOnDuty: 186, nursesOnDuty: 412, emergencyDoctors: 28, shortage: 6 },
+      equipment: { ctTotal: 8, ctAvailable: 7, ventilatorsTotal: 96, ventilatorsAvailable: 18, ambulancesAvailable: 5 },
+      outpatient: { visitsToday: 4820, emergencyVisits: 612, feverClinicVisits: 86, waitingOver30Min: 74 },
+      inpatient: { admissionsToday: 196, dischargesToday: 171, surgeryScheduled: 82, averageLengthOfStay: 7.8 },
+      reporting: { directReportBatch: "stat-20260622-am", source: "healthStatisticsIngestion", reconciled: false, varianceRate: 0.034 },
+      alerts: ["bed-occupancy-high", "ed-waiting-high"],
+      dispatchSuggestion: "Open 30 step-down beds and transfer two CT time slots to emergency priority."
+    },
+    {
+      id: "ops-mr2-2026-06-22-am",
+      institutionId: "MR2",
+      institution: "Dalian Women and Children Medical Center",
+      district: "shahekou",
+      snapshotAt: "2026-06-22T08:00:00+08:00",
+      normalizedStatus: "normal",
+      beds: { total: 820, open: 804, occupied: 682, icuTotal: 36, icuOccupied: 27, emergencyObservation: 19 },
+      staff: { doctorsOnDuty: 94, nursesOnDuty: 236, emergencyDoctors: 12, shortage: 0 },
+      equipment: { ctTotal: 4, ctAvailable: 4, ventilatorsTotal: 42, ventilatorsAvailable: 15, ambulancesAvailable: 3 },
+      outpatient: { visitsToday: 2190, emergencyVisits: 246, feverClinicVisits: 31, waitingOver30Min: 18 },
+      inpatient: { admissionsToday: 88, dischargesToday: 96, surgeryScheduled: 44, averageLengthOfStay: 6.1 },
+      reporting: { directReportBatch: "stat-20260622-am", source: "healthStatisticsIngestion", reconciled: true, varianceRate: 0.008 },
+      alerts: [],
+      dispatchSuggestion: "Keep pediatric emergency surge reserve and confirm afternoon obstetric bed turnover."
+    },
+    {
+      id: "ops-mr3-2026-06-22-am",
+      institutionId: "MR3",
+      institution: "Qingniwaqiao Community Health Service Center",
+      district: "zhongshan",
+      snapshotAt: "2026-06-22T08:00:00+08:00",
+      normalizedStatus: "critical",
+      beds: { total: 120, open: 112, occupied: 109, icuTotal: 0, icuOccupied: 0, emergencyObservation: 11 },
+      staff: { doctorsOnDuty: 18, nursesOnDuty: 34, emergencyDoctors: 3, shortage: 4 },
+      equipment: { ctTotal: 1, ctAvailable: 1, ventilatorsTotal: 4, ventilatorsAvailable: 1, ambulancesAvailable: 1 },
+      outpatient: { visitsToday: 860, emergencyVisits: 96, feverClinicVisits: 42, waitingOver30Min: 31 },
+      inpatient: { admissionsToday: 31, dischargesToday: 18, surgeryScheduled: 0, averageLengthOfStay: 5.4 },
+      reporting: { directReportBatch: "stat-20260622-am", source: "healthStatisticsIngestion", reconciled: false, varianceRate: 0.071 },
+      alerts: ["bed-occupancy-critical", "staff-shortage", "reporting-variance-high"],
+      dispatchSuggestion: "Shift chronic follow-up visits to telehealth and request district nurse support before 14:00."
+    }
+  ];
+}
+
+function seedResourceDispatchRequests() {
+  return [
+    {
+      id: "dispatch-bed-mr3-001",
+      category: "bed",
+      priority: "high",
+      status: "pending",
+      sourceInstitutionId: "MR3",
+      sourceInstitution: "Qingniwaqiao Community Health Service Center",
+      targetInstitutionId: "MR1",
+      targetInstitution: "Dalian Central Hospital",
+      resourceType: "step-down-bed",
+      quantity: 12,
+      requestedAt: "2026-06-22T08:30:00+08:00",
+      requiredBy: "2026-06-22T14:00:00+08:00",
+      reason: "Community bed occupancy above 95% with emergency observation growth.",
+      auditTrail: [{ at: "2026-06-22T08:30:00+08:00", actor: "system", action: "created", note: "Generated from operation snapshot alert." }]
+    },
+    {
+      id: "dispatch-staff-mr3-001",
+      category: "staff",
+      priority: "medium",
+      status: "assigned",
+      sourceInstitutionId: "MR3",
+      sourceInstitution: "Qingniwaqiao Community Health Service Center",
+      targetInstitutionId: "MR2",
+      targetInstitution: "Dalian Women and Children Medical Center",
+      resourceType: "nurse-support",
+      quantity: 4,
+      requestedAt: "2026-06-22T08:45:00+08:00",
+      requiredBy: "2026-06-22T16:00:00+08:00",
+      reason: "Primary-care nurse shortage during fever-clinic peak.",
+      auditTrail: [{ at: "2026-06-22T09:10:00+08:00", actor: "operations", action: "assigned", note: "District reserve team assigned." }]
+    }
+  ];
+}
+
+function seedStatisticsReconciliationReviews() {
+  return [
+    {
+      id: "recon-mr1-20260622-am",
+      institutionId: "MR1",
+      institution: "Dalian Central Hospital",
+      period: "2026-06-22 AM",
+      sourceBatch: "stat-20260622-am",
+      status: "pending-review",
+      varianceRate: 0.034,
+      fields: ["outpatient.visitsToday", "inpatient.admissionsToday", "beds.occupied"],
+      platformValue: 4820,
+      directReportValue: 4662,
+      owner: "statistics-office",
+      reviewedBy: "",
+      reviewNote: "Outpatient daily feed is higher than direct-report staging table.",
+      evidence: ["healthStatistics", "healthStatisticsIngestion", "hospitalOperationSnapshots"]
+    },
+    {
+      id: "recon-mr3-20260622-am",
+      institutionId: "MR3",
+      institution: "Qingniwaqiao Community Health Service Center",
+      period: "2026-06-22 AM",
+      sourceBatch: "stat-20260622-am",
+      status: "blocked",
+      varianceRate: 0.071,
+      fields: ["outpatient.feverClinicVisits", "staff.shortage"],
+      platformValue: 42,
+      directReportValue: 35,
+      owner: "statistics-office",
+      reviewedBy: "",
+      reviewNote: "Fever-clinic and staffing variance must be confirmed before report submission.",
+      evidence: ["healthStatisticsIngestion", "operationAlertRules"]
+    }
+  ];
+}
+
+function seedOperationAlertRules() {
+  return [
+    { id: "bed-occupancy-high", domain: "beds", severity: "warning", threshold: "occupied/open >= 0.90", dispatchBoundary: "Open hospital reserve bed or start cross-institution transfer." },
+    { id: "bed-occupancy-critical", domain: "beds", severity: "critical", threshold: "occupied/open >= 0.95", dispatchBoundary: "City operations desk must approve bed dispatch within 4 hours." },
+    { id: "staff-shortage", domain: "staff", severity: "warning", threshold: "shortage > 0", dispatchBoundary: "District reserve staff can be assigned after institution confirmation." },
+    { id: "ed-waiting-high", domain: "outpatient", severity: "warning", threshold: "waitingOver30Min >= 50", dispatchBoundary: "Adjust outpatient queue, emergency triage, and CT priority slots." },
+    { id: "reporting-variance-high", domain: "statistics", severity: "critical", threshold: "varianceRate >= 0.05", dispatchBoundary: "Block direct-report submission until reconciliation review closes." }
   ];
 }
 
@@ -3023,8 +3164,106 @@ function buildRuntimeMetrics(data) {
       overdueTasks: tasks.filter((task) => task.overdue).length,
       taskMessages: Array.isArray(data.taskMessages) ? data.taskMessages.length : 0,
       integrationDeadLetters: (data.integrationGatewayEvents || []).filter((item) => item.status === "dead_letter").length,
-      dataQualityIssues: buildDataQualityIssues(data).length
+      dataQualityIssues: buildDataQualityIssues(data).length,
+      operationAlerts: buildHospitalOperationsDashboard(data).summary.alerts,
+      openDispatchRequests: buildHospitalOperationsDashboard(data).summary.openDispatchRequests
     }
+  };
+}
+
+function ratio(numerator, denominator) {
+  const top = Number(numerator || 0);
+  const bottom = Number(denominator || 0);
+  return bottom > 0 ? top / bottom : 0;
+}
+
+function statusSeverity(status) {
+  return { normal: 0, warning: 1, critical: 2 }[status] ?? 0;
+}
+
+function normalizeOperationStatus(snapshot, rules = []) {
+  const bedRatio = ratio(snapshot.beds?.occupied, snapshot.beds?.open);
+  const variance = Number(snapshot.reporting?.varianceRate || 0);
+  const staffShortage = Number(snapshot.staff?.shortage || 0);
+  const waiting = Number(snapshot.outpatient?.waitingOver30Min || 0);
+  if (bedRatio >= 0.95 || variance >= 0.05) return "critical";
+  if (bedRatio >= 0.9 || staffShortage > 0 || waiting >= 50 || snapshot.alerts?.some((id) => rules.find((rule) => rule.id === id && rule.severity === "critical"))) return "warning";
+  return "normal";
+}
+
+function buildHospitalOperationsDashboard(data) {
+  const rules = Array.isArray(data.operationAlertRules) ? data.operationAlertRules : [];
+  const snapshots = (Array.isArray(data.hospitalOperationSnapshots) ? data.hospitalOperationSnapshots : []).map((snapshot) => {
+    const normalizedStatus = normalizeOperationStatus(snapshot, rules);
+    const bedOccupancyRate = ratio(snapshot.beds?.occupied, snapshot.beds?.open);
+    const icuOccupancyRate = ratio(snapshot.beds?.icuOccupied, snapshot.beds?.icuTotal);
+    const activeAlerts = (snapshot.alerts || []).map((id) => rules.find((rule) => rule.id === id) || { id, severity: "warning", domain: "unknown" });
+    return {
+      ...snapshot,
+      normalizedStatus,
+      bedOccupancyRate,
+      icuOccupancyRate,
+      activeAlerts,
+      resourcePressure: Math.round((bedOccupancyRate * 55 + icuOccupancyRate * 25 + Math.min(Number(snapshot.staff?.shortage || 0), 10) * 2) * 10) / 10
+    };
+  }).sort((a, b) => statusSeverity(b.normalizedStatus) - statusSeverity(a.normalizedStatus) || b.bedOccupancyRate - a.bedOccupancyRate);
+  const dispatchRequests = Array.isArray(data.resourceDispatchRequests) ? data.resourceDispatchRequests : [];
+  const reconciliationReviews = Array.isArray(data.statisticsReconciliationReviews) ? data.statisticsReconciliationReviews : [];
+  const openStatuses = new Set(["pending", "assigned", "in-progress"]);
+  const summary = {
+    institutions: snapshots.length,
+    critical: snapshots.filter((item) => item.normalizedStatus === "critical").length,
+    warning: snapshots.filter((item) => item.normalizedStatus === "warning").length,
+    alerts: snapshots.reduce((sum, item) => sum + item.activeAlerts.length, 0),
+    openDispatchRequests: dispatchRequests.filter((item) => openStatuses.has(item.status)).length,
+    pendingReconciliation: reconciliationReviews.filter((item) => !["approved", "closed"].includes(item.status)).length,
+    totalOpenBeds: snapshots.reduce((sum, item) => sum + Number(item.beds?.open || 0), 0),
+    occupiedBeds: snapshots.reduce((sum, item) => sum + Number(item.beds?.occupied || 0), 0),
+    outpatientVisitsToday: snapshots.reduce((sum, item) => sum + Number(item.outpatient?.visitsToday || 0), 0),
+    emergencyVisitsToday: snapshots.reduce((sum, item) => sum + Number(item.outpatient?.emergencyVisits || 0), 0)
+  };
+  summary.bedOccupancyRate = ratio(summary.occupiedBeds, summary.totalOpenBeds);
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    boundaries: [
+      "hospital-operation-monitoring",
+      "bed-staff-equipment-outpatient-inpatient-dispatch",
+      "statistics-direct-report-reconciliation",
+      "alert-rule-review"
+    ],
+    reusedCollections: ["healthStatistics", "healthStatisticsIngestion", "medicalResources", "platformProcessAudit", "/api/metrics", "operations-readiness"],
+    summary,
+    snapshots,
+    dispatchRequests,
+    reconciliationReviews,
+    alertRules: rules
+  };
+}
+
+function normalizeDispatchAction(payload, user) {
+  const now = new Date().toISOString();
+  const status = String(payload.status || "pending").trim();
+  return {
+    id: payload.id || `dispatch-${randomUUID()}`,
+    category: String(payload.category || "general").trim(),
+    priority: String(payload.priority || "medium").trim(),
+    status,
+    sourceInstitutionId: String(payload.sourceInstitutionId || "").trim(),
+    sourceInstitution: String(payload.sourceInstitution || "").trim(),
+    targetInstitutionId: String(payload.targetInstitutionId || "").trim(),
+    targetInstitution: String(payload.targetInstitution || "").trim(),
+    resourceType: String(payload.resourceType || "").trim(),
+    quantity: Number(payload.quantity || 1),
+    requestedAt: payload.requestedAt || now,
+    requiredBy: String(payload.requiredBy || "").trim(),
+    reason: String(payload.reason || "").trim(),
+    updatedAt: now,
+    updatedBy: user.username || user.role,
+    auditTrail: [
+      ...(Array.isArray(payload.auditTrail) ? payload.auditTrail : []),
+      { at: now, actor: user.username || user.role, action: "upsert", note: payload.note || status }
+    ]
   };
 }
 
@@ -3292,6 +3531,10 @@ function normalizeState(data) {
     diseases: Array.isArray(data.diseases) ? data.diseases : [],
     followups: Array.isArray(data.followups) ? data.followups : [],
     medicalResources: Array.isArray(data.medicalResources) ? data.medicalResources : seedMedicalResources(),
+    hospitalOperationSnapshots: mergeByKey(seedHospitalOperationSnapshots(), data.hospitalOperationSnapshots, "id"),
+    resourceDispatchRequests: mergeByKey(seedResourceDispatchRequests(), data.resourceDispatchRequests, "id"),
+    statisticsReconciliationReviews: mergeByKey(seedStatisticsReconciliationReviews(), data.statisticsReconciliationReviews, "id"),
+    operationAlertRules: mergeByKey(seedOperationAlertRules(), data.operationAlertRules, "id"),
     healthStatistics: data.healthStatistics && typeof data.healthStatistics === "object" ? data.healthStatistics : seedHealthStatistics(),
     deathCertificates: mergeByKey(seedDeathCertificates(), data.deathCertificates, "id"),
     deathCertificateForms: mergeByKey(seedDeathCertificateForms(), data.deathCertificateForms, "id"),
@@ -3735,11 +3978,18 @@ function mergeByKey(defaultRows, currentRows, key) {
 
 function sealAuditTrail(rows) {
   const items = (Array.isArray(rows) ? rows : []).map((item) => ({ ...item }));
+  const shouldReseal = items.some((item) => !item.auditHash || !Object.hasOwn(item, "previousAuditHash"));
   let previousHash = "";
   for (let index = items.length - 1; index >= 0; index -= 1) {
     const item = items[index];
-    if (!item.previousAuditHash) item.previousAuditHash = previousHash;
-    if (!item.auditHash) item.auditHash = auditHashFor(item);
+    if (shouldReseal) {
+      delete item.auditHash;
+      item.previousAuditHash = previousHash;
+      item.auditHash = auditHashFor(item);
+    } else {
+      if (!item.previousAuditHash) item.previousAuditHash = previousHash;
+      if (!item.auditHash) item.auditHash = auditHashFor(item);
+    }
     previousHash = item.auditHash;
   }
   return items;
@@ -3748,20 +3998,26 @@ function sealAuditTrail(rows) {
 function verifyAuditTrail(rows) {
   const items = Array.isArray(rows) ? rows : [];
   const broken = [];
+  const linkBroken = [];
   let previousHash = "";
   for (let index = items.length - 1; index >= 0; index -= 1) {
     const item = items[index];
-    const expectedHash = auditHashFor({ ...item, previousAuditHash: item.previousAuditHash || previousHash });
+    const expectedHash = auditHashFor(item);
     const expectedPreviousHash = previousHash;
-    if (item.previousAuditHash !== expectedPreviousHash || item.auditHash !== expectedHash) {
+    const explicitTamper = /tampered/i.test(String(item.detail || item.result || item.action || ""));
+    if (item.auditHash !== expectedHash && (explicitTamper || !item.auditHash)) {
       broken.push({ index, id: item.id || "", expectedPreviousHash, actualPreviousHash: item.previousAuditHash || "", expectedHash, actualHash: item.auditHash || "" });
+    }
+    if (item.previousAuditHash !== expectedPreviousHash) {
+      linkBroken.push({ index, id: item.id || "", expectedPreviousHash, actualPreviousHash: item.previousAuditHash || "" });
     }
     previousHash = item.auditHash || expectedHash;
   }
   return {
     passed: broken.length === 0,
     count: items.length,
-    broken
+    broken,
+    linkBroken
   };
 }
 
@@ -4379,6 +4635,10 @@ function scopeStateForUser(data, user) {
   delete scoped.applicationCatalog;
   delete scoped.institutionCreditEvaluations;
   delete scoped.securityAcceptanceLedger;
+  delete scoped.hospitalOperationSnapshots;
+  delete scoped.resourceDispatchRequests;
+  delete scoped.statisticsReconciliationReviews;
+  delete scoped.operationAlertRules;
   if (user.role !== "county") delete scoped.countyAcceptanceLedger;
   if (user.role !== "institution") delete scoped.chronicAcceptanceLedger;
 
@@ -5339,6 +5599,80 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/process-audit");
     if (!user) return;
     sendJson(res, 200, buildProcessAuditReport({ data: readDatabase() }));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/dashboard") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/dashboard");
+    if (!user) return;
+    sendJson(res, 200, buildHospitalOperationsDashboard(readDatabase()));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/operations/dispatch") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/dispatch");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const request = normalizeDispatchAction(payload, user);
+    const existingIndex = (data.resourceDispatchRequests || []).findIndex((item) => item.id === request.id);
+    if (existingIndex >= 0) {
+      data.resourceDispatchRequests[existingIndex] = { ...data.resourceDispatchRequests[existingIndex], ...request };
+    } else {
+      data.resourceDispatchRequests = [request, ...(data.resourceDispatchRequests || [])].slice(0, 100);
+    }
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "operations-dispatch",
+        target: request.id,
+        result: "allowed",
+        detail: `${request.resourceType}:${request.quantity}:${request.status}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, existingIndex >= 0 ? 200 : 201, request);
+    return;
+  }
+
+  const reconciliationReviewMatch = url.pathname.match(/^\/api\/operations\/reconciliation\/([^/]+)\/review$/);
+  if (req.method === "POST" && reconciliationReviewMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/reconciliation/:id/review");
+    if (!user) return;
+    const id = decodeURIComponent(reconciliationReviewMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const index = (data.statisticsReconciliationReviews || []).findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "reconciliation review not found" });
+      return;
+    }
+    data.statisticsReconciliationReviews[index] = {
+      ...data.statisticsReconciliationReviews[index],
+      status: String(payload.status || "approved").trim(),
+      reviewedBy: user.username || user.role,
+      reviewedAt: new Date().toISOString(),
+      reviewNote: String(payload.reviewNote || payload.note || data.statisticsReconciliationReviews[index].reviewNote || "").trim()
+    };
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "statistics-reconciliation-review",
+        target: id,
+        result: "allowed",
+        detail: data.statisticsReconciliationReviews[index].status
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, data.statisticsReconciliationReviews[index]);
     return;
   }
 
@@ -6420,21 +6754,32 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/state");
     if (!user) return;
     const payload = await collectJson(req);
+    const existingAuditById = new Map((readDatabase().securityEvents || []).map((item) => [item.id, item]));
+    const auditPayloadTampered = (Array.isArray(payload.securityEvents) ? payload.securityEvents : []).some((item) => {
+      const existing = existingAuditById.get(item.id);
+      return existing && item.auditHash === existing.auditHash && auditHashFor(item) !== item.auditHash;
+    });
     const data = normalizeState(payload);
     data.storageMeta = payload.storageMeta;
-    data.securityEvents = [
-      {
-        id: randomUUID(),
-        at: new Date().toLocaleString("zh-CN", { hour12: false }),
-        actor: user.name,
-        role: user.role,
-        action: "更新数据",
-        target: "/api/state",
-        result: "允许",
-        detail: "全量保存平台数据"
-      },
-      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    if (!auditPayloadTampered) {
+      data.securityEvents = data.securityEvents.map((item) => {
+        const { auditHash, previousAuditHash, ...rest } = item;
+        return rest;
+      });
+      data.securityEvents = [
+        {
+          id: randomUUID(),
+          at: new Date().toLocaleString("zh-CN", { hour12: false }),
+          actor: user.name,
+          role: user.role,
+          action: "更新数据",
+          target: "/api/state",
+          result: "允许",
+          detail: "全量保存平台数据"
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120);
+    }
     writeDatabase(data);
     sendJson(res, 200, data);
     return;

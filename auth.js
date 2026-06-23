@@ -29,6 +29,7 @@
     "index.html": ["commission"],
     "workbench.html": ["commission"],
     "platform.html": ["commission"],
+    "operations.html": ["commission"],
     "institution.html": ["institution"],
     "insurance.html": ["insurance"],
     "county.html": ["county"],
