@@ -13,6 +13,7 @@ const { buildMonitoringReadinessReport, renderMarkdown: renderMonitoringReadines
 const { buildOperationsReadinessReport, renderMarkdown: renderOperationsReadinessMarkdown } = require("./operations-readiness");
 const { buildProcessAuditReport, renderMarkdown: renderProcessAuditMarkdown } = require("./process-audit");
 const { buildProductionDbReadinessReport, renderMarkdown: renderProductionDbReadinessMarkdown } = require("./production-db-readiness");
+const { buildRegionalDataSharingReport, renderMarkdown: renderRegionalDataSharingMarkdown } = require("./regional-data-sharing");
 const { buildReleaseArtifactManifest, renderMarkdown: renderReleaseArtifactManifestMarkdown } = require("./release-artifact-manifest");
 const { buildSiteReadinessPack, renderMarkdown: renderSiteReadinessMarkdown, writeTemplateReadmes } = require("./site-readiness-pack");
 const { inspectStorageModel } = require("./storage-admin");
@@ -212,6 +213,10 @@ function snapshotChecks(data) {
     "researchDatasets",
     "diseaseRegistryModels",
     "accessibilityChecklist",
+    "regionalDataSharingScope",
+    "regionalSharingPackages",
+    "regionalSharingSnapshots",
+    "regionalSharingAccessReviews",
     "securityAcceptanceLedger"
   ];
   const raw = fs.readFileSync(path.join(ROOT, "data", "db.json"), "utf8");
@@ -284,6 +289,14 @@ function interfaceMappingChecks(interfaceMapping) {
     check("interfaceMapping:report", interfaceMapping.ok, interfaceMapping.ok ? "interface field mappings passed" : "interface field mappings failed", "error", "integration"),
     check("interfaceMapping:requiredFields", interfaceMapping.mappings?.every((item) => item.fieldCoverage?.every((field) => field.mapped)), `${interfaceMapping.contractCount || 0} contracts mapped`, "error", "integration"),
     check("interfaceMapping:idempotency", interfaceMapping.mappings?.every((item) => item.idempotencyMapped), "idempotency keys mapped to platform fields", "error", "integration")
+  ];
+}
+
+function regionalDataSharingChecks(regionalDataSharing) {
+  return [
+    check("regionalDataSharing:report", regionalDataSharing.ok, regionalDataSharing.ok ? "regional data sharing checks passed" : "regional data sharing checks failed", "error", "regional-data-sharing"),
+    check("regionalDataSharing:packages", regionalDataSharing.summary?.packages >= 3, `${regionalDataSharing.summary?.packages || 0} packages`, "error", "regional-data-sharing"),
+    check("regionalDataSharing:accessReviews", regionalDataSharing.summary?.accessReviews >= 1, `${regionalDataSharing.summary?.accessReviews || 0} access reviews`, "error", "regional-data-sharing")
   ];
 }
 
@@ -468,6 +481,7 @@ function packageChecks(pkg) {
     "site:pack",
     "production-db:readiness",
     "evaluation:evidence",
+    "regional-data-sharing:report",
     "storage:backup",
     "storage:inspect",
     "storage:assess",
@@ -516,6 +530,7 @@ function buildReleaseReport(options = {}) {
   const dataQuality = buildDataQualityReport({ data });
   const integrationReadiness = buildIntegrationReadinessReport({ data });
   const interfaceMapping = buildInterfaceMappingReport({ data, pkg });
+  const regionalDataSharing = buildRegionalDataSharingReport({ data, pkg });
   const monitoringReadiness = buildMonitoringReadinessReport({ data, pkg });
   const operationsReadiness = buildOperationsReadinessReport({ data, pkg });
   const processAudit = buildProcessAuditReport({ data });
@@ -539,6 +554,7 @@ function buildReleaseReport(options = {}) {
     ...dataQualityChecks(dataQuality),
     ...integrationReadinessChecks(integrationReadiness),
     ...interfaceMappingChecks(interfaceMapping),
+    ...regionalDataSharingChecks(regionalDataSharing),
     ...monitoringReadinessChecks(monitoringReadiness),
     ...operationsReadinessChecks(operationsReadiness),
     ...processAuditChecks(processAudit),
@@ -572,6 +588,7 @@ function buildReleaseReport(options = {}) {
     dataQuality,
     integrationReadiness,
     interfaceMapping,
+    regionalDataSharing,
     monitoringReadiness,
     operationsReadiness,
     processAudit,
@@ -854,6 +871,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       interfaceMapping: report.interfaceMapping
     }, null, 2), "utf8");
+    const regionalDataSharingJson = path.join(path.dirname(output), "regional-data-sharing-report.json");
+    fs.writeFileSync(regionalDataSharingJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      regionalDataSharing: report.regionalDataSharing
+    }, null, 2), "utf8");
     const operationsJson = path.join(path.dirname(output), "operations-readiness-report.json");
     fs.writeFileSync(operationsJson, JSON.stringify({
       project: report.project,
@@ -946,6 +971,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(integrationMarkdown, renderIntegrationReadinessMarkdown(report.integrationReadiness), "utf8");
     const interfaceMappingMarkdown = path.join(path.dirname(markdown), "interface-mapping-report.md");
     fs.writeFileSync(interfaceMappingMarkdown, renderInterfaceMappingMarkdown(report.interfaceMapping), "utf8");
+    const regionalDataSharingMarkdown = path.join(path.dirname(markdown), "regional-data-sharing-report.md");
+    fs.writeFileSync(regionalDataSharingMarkdown, renderRegionalDataSharingMarkdown(report.regionalDataSharing), "utf8");
     const operationsMarkdown = path.join(path.dirname(markdown), "operations-readiness-report.md");
     fs.writeFileSync(operationsMarkdown, renderOperationsReadinessMarkdown(report.operationsReadiness), "utf8");
     const processAuditMarkdown = path.join(path.dirname(markdown), "process-audit-report.md");

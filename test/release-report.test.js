@@ -111,6 +111,8 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.integrationReadiness.ok, true);
   assert.equal(report.checks.some((item) => item.name === "interfaceMapping:report" && item.passed), true);
   assert.equal(report.interfaceMapping.ok, true);
+  assert.equal(report.checks.some((item) => item.name === "regionalDataSharing:report" && item.passed), true);
+  assert.equal(report.regionalDataSharing.ok, true);
   assert.equal(report.checks.some((item) => item.name === "monitoring:readiness" && item.passed), true);
   assert.equal(report.monitoringReadiness.ok, true);
   assert.equal(report.checks.some((item) => item.name === "operations:readiness" && item.passed), true);
