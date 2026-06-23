@@ -46,9 +46,13 @@ test("quality safety report covers boundaries, reuse and routes", () => {
   assert.equal(report.routes.every((item) => item.present), true);
   assert.equal(report.routes.some((item) => item.route.includes("escalate") && item.present), true);
   assert.equal(report.checks.some((item) => item.id === "quality-safety:sla" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "quality-safety:risk-ranking" && item.passed), true);
+  assert.equal(report.institutionRisks.length > 0, true);
+  assert.equal(report.institutionRisks[0].score > 0, true);
   assert.equal(report.rectifications.some((item) => item.slaStatus && item.evidenceComplete), true);
   assert.match(renderMarkdown(report), /Medical quality and safety supervision report/);
   assert.match(renderMarkdown(report), /mutual-recognition-qc/);
+  assert.match(renderMarkdown(report), /Institution risk ranking/);
   assert.match(renderMarkdown(report), /Rectification SLA/);
 });
 
@@ -75,6 +79,8 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
   const dashboard = await api(baseUrl, "/api/quality-safety/dashboard", authorized(token));
   assert.equal(dashboard.response.status, 200);
   assert.equal(dashboard.body.summary.issues >= 3, true);
+  assert.equal(dashboard.body.institutionRisks.length > 0, true);
+  assert.equal(dashboard.body.institutionRisks[0].score > 0, true);
   assert.equal(dashboard.body.reusedCollections.some((item) => item.collection === "hospitalInteroperabilityFunctions"), true);
 
   const issue = dashboard.body.issues.find((item) => item.id === "qse-path-001") || dashboard.body.issues[0];
@@ -94,6 +100,7 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
   const institutionDashboard = await api(baseUrl, "/api/quality-safety/dashboard", authorized(institutionLogin.body.token));
   assert.equal(institutionDashboard.response.status, 200);
   assert.equal(institutionDashboard.body.role, "institution");
+  assert.equal(Array.isArray(institutionDashboard.body.institutionRisks), true);
   const forbiddenDispatch = await api(baseUrl, `/api/quality-safety/issues/${encodeURIComponent(issue.id)}/dispatch`, authorized(institutionLogin.body.token, {
     method: "POST",
     body: JSON.stringify({ ownerRole: "institution", requirement: "Should be forbidden." })

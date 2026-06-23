@@ -256,3 +256,5 @@ Site joint testing still requires live HIS/EMR/LIS/PACS feeds, production critic
 Role boundary: commission owns dispatch and final review; institution and county roles use the same portal for scoped dashboard access and feedback submission. Citizen and insurance roles remain excluded from quality-safety regulatory collections.
 
 SLA boundary: the demo computes rectification due-date status and supports commission escalation. Production joint testing must confirm site SLA thresholds, notification recipients, escalation levels, and signed evidence retention rules.
+
+Risk-ranking boundary: institution priority is derived from demo severity, open issue, SLA, feedback, evidence, and escalation signals. Production joint testing must confirm scoring weights, per-specialty thresholds, and whether county consortium views inherit city-wide or member-only ranking scopes.

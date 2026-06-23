@@ -68,6 +68,95 @@ function slaState(item, now = new Date()) {
   };
 }
 
+function severityPoints(severity) {
+  const text = String(severity || "").trim().toLowerCase();
+  if (/critical|severe|重大|危急/.test(text)) return 6;
+  if (/high|高/.test(text)) return 4;
+  if (/medium|中/.test(text)) return 2;
+  if (/low|低/.test(text)) return 1;
+  return 2;
+}
+
+function buildInstitutionRisks(issues, rectifications) {
+  const rows = new Map();
+  function ensure(name) {
+    const key = String(name || "Unknown institution").trim() || "Unknown institution";
+    if (!rows.has(key)) {
+      rows.set(key, {
+        institutionName: key,
+        score: 0,
+        issueCount: 0,
+        openIssues: 0,
+        highSeverity: 0,
+        overdue: 0,
+        dueSoon: 0,
+        missingFeedback: 0,
+        escalated: 0,
+        domains: new Set(),
+        drivers: new Set()
+      });
+    }
+    return rows.get(key);
+  }
+  issues.forEach((issue) => {
+    const row = ensure(issue.institutionName || issue.owner || issue.sourceCollection);
+    const points = severityPoints(issue.severity);
+    const closed = statusClosed(issue.status);
+    row.issueCount += 1;
+    row.score += points;
+    row.domains.add(issue.domain || issue.type || "quality");
+    if (points >= 4) {
+      row.highSeverity += 1;
+      row.drivers.add("high-severity issue");
+    }
+    if (!closed) {
+      row.openIssues += 1;
+      row.score += 2;
+    }
+    if (/critical|medical_quality|safety_event/i.test(`${issue.domain || ""} ${issue.type || ""}`)) {
+      row.score += 2;
+      row.drivers.add("critical value or safety signal");
+    }
+  });
+  rectifications.forEach((order) => {
+    const row = ensure(order.institutionName || order.owner);
+    row.score += 1;
+    if (order.slaStatus === "overdue") {
+      row.overdue += 1;
+      row.score += 6;
+      row.drivers.add("overdue rectification");
+    } else if (order.slaStatus === "due_soon") {
+      row.dueSoon += 1;
+      row.score += 3;
+      row.drivers.add("SLA due soon");
+    }
+    if (!order.feedbackComplete && !order.closed) {
+      row.missingFeedback += 1;
+      row.score += 2;
+      row.drivers.add("feedback missing");
+    }
+    if (/escalat/i.test(String(order.status || ""))) {
+      row.escalated += 1;
+      row.score += 4;
+      row.drivers.add("commission escalation");
+    }
+    if (!order.evidenceComplete && !order.closed) {
+      row.score += 1;
+      row.drivers.add("evidence incomplete");
+    }
+  });
+  return Array.from(rows.values())
+    .map((row) => ({
+      ...row,
+      domains: Array.from(row.domains).slice(0, 5),
+      drivers: Array.from(row.drivers).slice(0, 4),
+      riskLevel: row.score >= 12 ? "high" : row.score >= 6 ? "medium" : "watch",
+      nextAction: row.overdue > 0 ? "Start overdue escalation and require leadership sign-off." : row.score >= 12 ? "Assign focused review and require a department correction plan." : row.dueSoon > 0 ? "Confirm evidence upload before SLA deadline." : "Keep routine QC tracking active."
+    }))
+    .sort((a, b) => b.score - a.score || b.openIssues - a.openIssues || a.institutionName.localeCompare(b.institutionName))
+    .slice(0, 10);
+}
+
 function buildQualitySafetyReport(options = {}) {
   const data = options.data || readJson("data/db.json");
   const server = options.serverSource || read("server.js");
@@ -101,9 +190,12 @@ function buildQualitySafetyReport(options = {}) {
     return {
       id: item.id,
       issueId: item.issueId,
+      institutionName: item.institutionName,
+      owner: item.owner,
       status: item.status || "open",
       slaStatus: sla.status,
       daysRemaining: sla.daysRemaining,
+      feedbackComplete: sla.feedbackComplete,
       feedbackCount: Array.isArray(item.feedback) ? item.feedback.length : 0,
       reviewCount: Array.isArray(item.review) ? item.review.length : 0,
       auditCount: Array.isArray(item.auditTrail) ? item.auditTrail.length : 0,
@@ -117,6 +209,7 @@ function buildQualitySafetyReport(options = {}) {
     onTrack: stateRows.filter((item) => item.slaStatus === "on_track").length,
     evidenceComplete: stateRows.filter((item) => item.evidenceComplete).length
   };
+  const institutionRisks = buildInstitutionRisks(qualityEvents, stateRows);
   const checks = [
     { id: "quality-safety:boundaries", passed: boundaryRows.every((item) => item.modeled), detail: `${boundaryRows.filter((item) => item.modeled).length}/${boundaryRows.length} boundaries modeled` },
     { id: "quality-safety:collections", passed: collectionRows.every((item) => item.present && item.rows > 0), detail: collectionRows.map((item) => `${item.collection}:${item.rows}`).join(";") },
@@ -124,7 +217,8 @@ function buildQualitySafetyReport(options = {}) {
     { id: "quality-safety:routes", passed: routeRows.every((item) => item.present), detail: routeRows.map((item) => `${item.route}:${item.present}`).join(";") },
     { id: "quality-safety:closed-loop", passed: stateRows.some((item) => item.feedbackCount > 0 && item.auditCount > 0), detail: `${stateRows.length} rectification orders` },
     { id: "quality-safety:sla", passed: stateRows.every((item) => item.slaStatus !== "unscheduled"), detail: `overdue=${slaSummary.overdue}, dueSoon=${slaSummary.dueSoon}, onTrack=${slaSummary.onTrack}` },
-    { id: "quality-safety:evidence", passed: stateRows.some((item) => item.evidenceComplete), detail: `${slaSummary.evidenceComplete}/${stateRows.length} rectifications have feedback and audit evidence` }
+    { id: "quality-safety:evidence", passed: stateRows.some((item) => item.evidenceComplete), detail: `${slaSummary.evidenceComplete}/${stateRows.length} rectifications have feedback and audit evidence` },
+    { id: "quality-safety:risk-ranking", passed: institutionRisks.length > 0 && institutionRisks[0].score > 0, detail: `${institutionRisks.length} ranked institutions` }
   ];
   return {
     ok: checks.every((item) => item.passed),
@@ -135,12 +229,14 @@ function buildQualitySafetyReport(options = {}) {
       collections: collectionRows.length,
       reusedCollections: reusedRows.length,
       openRectifications: stateRows.filter((item) => !item.closed).length,
-      sla: slaSummary
+      sla: slaSummary,
+      riskHotspots: institutionRisks.filter((item) => item.riskLevel === "high").length
     },
     boundaries: boundaryRows,
     collections: collectionRows,
     reusedCollections: reusedRows,
     routes: routeRows,
+    institutionRisks,
     rectifications: stateRows,
     checks
   };
@@ -155,6 +251,7 @@ function renderMarkdown(report) {
     `- Modeled boundaries: ${report.summary.modeledBoundaries}/${report.summary.boundaries}`,
     `- Open rectifications: ${report.summary.openRectifications}`,
     `- SLA: overdue ${report.summary.sla.overdue}, due soon ${report.summary.sla.dueSoon}, on track ${report.summary.sla.onTrack}`,
+    `- Risk hotspots: ${report.summary.riskHotspots}`,
     "",
     "## Checks",
     "",
@@ -173,6 +270,12 @@ function renderMarkdown(report) {
     "| Collection | Rows |",
     "|---|---:|",
     ...report.reusedCollections.map((item) => `| ${item.collection} | ${item.rows} |`),
+    "",
+    "## Institution risk ranking",
+    "",
+    "| Institution | Level | Score | Open issues | Due soon | Overdue | Drivers |",
+    "|---|---|---:|---:|---:|---:|---|",
+    ...report.institutionRisks.map((item) => `| ${item.institutionName} | ${item.riskLevel} | ${item.score} | ${item.openIssues} | ${item.dueSoon} | ${item.overdue} | ${item.drivers.join(", ")} |`),
     "",
     "## Rectification SLA",
     "",

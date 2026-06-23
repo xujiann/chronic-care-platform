@@ -62,6 +62,25 @@ function renderReuse(rows) {
   `).join(""));
 }
 
+function renderRisks(rows) {
+  setHtml("quality-safety-risks", `
+    <table>
+      <thead><tr><th>Institution</th><th>Level</th><th>Score</th><th>Signals</th><th>Next</th></tr></thead>
+      <tbody>
+        ${rows.map((item) => `
+          <tr>
+            <td><strong>${text(item.institutionName)}</strong><br /><small>${(item.domains || []).map(statusLabel).join(", ")}</small></td>
+            <td>${statusLabel(item.riskLevel)}</td>
+            <td>${item.score}</td>
+            <td>${text((item.drivers || []).join(", "))}<br /><small>${item.openIssues || 0} open, ${item.dueSoon || 0} due soon, ${item.overdue || 0} overdue</small></td>
+            <td>${text(item.nextAction)}</td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  `);
+}
+
 function renderIssues(rows) {
   const canDispatch = qualitySafetyState?.role === "commission";
   setHtml("quality-safety-issues", `
@@ -146,6 +165,7 @@ function renderBoundaries(data) {
 function renderQualitySafety(data) {
   qualitySafetyState = data;
   renderMetrics(data.summary || {});
+  renderRisks(data.institutionRisks || []);
   renderReuse(data.reusedCollections || []);
   renderIssues(data.issues || []);
   renderRectifications(data.rectifications || []);

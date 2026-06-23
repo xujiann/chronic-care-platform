@@ -4990,6 +4990,95 @@ function qualitySafetySlaState(item, now = new Date()) {
   };
 }
 
+function qualitySafetySeverityPoints(severity) {
+  const text = String(severity || "").trim().toLowerCase();
+  if (/critical|severe|重大|危急/.test(text)) return 6;
+  if (/high|高/.test(text)) return 4;
+  if (/medium|中/.test(text)) return 2;
+  if (/low|低/.test(text)) return 1;
+  return 2;
+}
+
+function buildQualitySafetyInstitutionRisks(issues, rectifications) {
+  const rows = new Map();
+  function ensure(name) {
+    const key = String(name || "Unknown institution").trim() || "Unknown institution";
+    if (!rows.has(key)) {
+      rows.set(key, {
+        institutionName: key,
+        score: 0,
+        issueCount: 0,
+        openIssues: 0,
+        highSeverity: 0,
+        overdue: 0,
+        dueSoon: 0,
+        missingFeedback: 0,
+        escalated: 0,
+        domains: new Set(),
+        drivers: new Set()
+      });
+    }
+    return rows.get(key);
+  }
+  issues.forEach((issue) => {
+    const row = ensure(issue.institutionName || issue.owner || issue.sourceCollection);
+    const severityPoints = qualitySafetySeverityPoints(issue.severity);
+    const normalizedStatus = normalizeQualitySafetyStatus(issue.status);
+    row.issueCount += 1;
+    row.score += severityPoints;
+    row.domains.add(issue.domain || issue.type || "quality");
+    if (severityPoints >= 4) {
+      row.highSeverity += 1;
+      row.drivers.add("high-severity issue");
+    }
+    if (normalizedStatus !== "closed") {
+      row.openIssues += 1;
+      row.score += 2;
+    }
+    if (/critical|medical_quality|safety_event/i.test(`${issue.domain || ""} ${issue.type || ""}`)) {
+      row.score += 2;
+      row.drivers.add("critical value or safety signal");
+    }
+  });
+  rectifications.forEach((order) => {
+    const row = ensure(order.institutionName || order.owner);
+    row.score += 1;
+    if (order.slaStatus === "overdue") {
+      row.overdue += 1;
+      row.score += 6;
+      row.drivers.add("overdue rectification");
+    } else if (order.slaStatus === "due_soon") {
+      row.dueSoon += 1;
+      row.score += 3;
+      row.drivers.add("SLA due soon");
+    }
+    if (!order.feedbackComplete && order.normalizedStatus !== "closed") {
+      row.missingFeedback += 1;
+      row.score += 2;
+      row.drivers.add("feedback missing");
+    }
+    if (/escalat/i.test(String(order.status || ""))) {
+      row.escalated += 1;
+      row.score += 4;
+      row.drivers.add("commission escalation");
+    }
+    if (!order.evidenceComplete && order.normalizedStatus !== "closed") {
+      row.score += 1;
+      row.drivers.add("evidence incomplete");
+    }
+  });
+  return Array.from(rows.values())
+    .map((row) => ({
+      ...row,
+      domains: Array.from(row.domains).slice(0, 5),
+      drivers: Array.from(row.drivers).slice(0, 4),
+      riskLevel: row.score >= 12 ? "high" : row.score >= 6 ? "medium" : "watch",
+      nextAction: row.overdue > 0 ? "Start overdue escalation and require leadership sign-off." : row.score >= 12 ? "Assign focused review and require a department correction plan." : row.dueSoon > 0 ? "Confirm evidence upload before SLA deadline." : "Keep routine QC tracking active."
+    }))
+    .sort((a, b) => b.score - a.score || b.openIssues - a.openIssues || a.institutionName.localeCompare(b.institutionName))
+    .slice(0, 10);
+}
+
 function qualitySafetyVisibleRows(rows, user) {
   if (user.role === "commission") return rows;
   if (user.role === "county") {
@@ -5060,6 +5149,7 @@ function buildQualitySafetyDashboard(data, user) {
   const issues = qualitySafetyVisibleRows(buildQualitySafetyIssues(data), user);
   const rectifications = qualitySafetyVisibleRows(Array.isArray(data.qualityRectificationOrders) ? data.qualityRectificationOrders : [], user)
     .map((item) => ({ ...item, normalizedStatus: normalizeQualitySafetyStatus(item.status), ...qualitySafetySlaState(item) }));
+  const institutionRisks = buildQualitySafetyInstitutionRisks(issues, rectifications);
   const slaSummary = {
     overdue: rectifications.filter((item) => item.slaStatus === "overdue").length,
     dueSoon: rectifications.filter((item) => item.slaStatus === "due_soon").length,
@@ -5104,6 +5194,7 @@ function buildQualitySafetyDashboard(data, user) {
     generatedAt: new Date().toISOString(),
     role: user.role,
     summary,
+    institutionRisks,
     issues,
     rectifications,
     criticalValueAlerts: Array.isArray(data.criticalValueAlerts) ? data.criticalValueAlerts : [],
