@@ -24,6 +24,12 @@ function readText(relativePath) {
   return fs.readFileSync(path.join(ROOT, relativePath), "utf8");
 }
 
+function averagePerformance(rows, field) {
+  const values = rows.map((item) => Number(item.performance?.[field])).filter(Number.isFinite);
+  if (!values.length) return null;
+  return Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1));
+}
+
 function buildReferralTeleconsultationReadinessReport(options = {}) {
   const data = options.data ?? readJson("data/db.json");
   const pkg = options.pkg ?? readJson("package.json");
@@ -38,6 +44,8 @@ function buildReferralTeleconsultationReadinessReport(options = {}) {
   const referralIds = new Set((data.referralSystem?.referrals || []).map((item) => item.id));
   const statusSet = new Set(teleconsultations.map((item) => item.status));
   const reportReturned = teleconsultations.filter((item) => item.reportStatus === "returned" || item.status === "report-returned");
+  const avgResponseHours = averagePerformance(teleconsultations, "responseHours");
+  const avgReportReturnHours = averagePerformance(teleconsultations, "reportReturnHours");
   const boundaryEvidence = {
     referral: teleconsultations.every((item) => item.referralId),
     teleconsultation: teleconsultations.every((item) => item.meetingWindow || item.type),
@@ -53,8 +61,9 @@ function buildReferralTeleconsultationReadinessReport(options = {}) {
     { id: "referral:residentAuthorization", passed: teleconsultations.every((item) => item.authorizationStatus === "authorized" && authorizations.has(item.residentAuthorizationId)), detail: `${teleconsultations.filter((item) => authorizations.has(item.residentAuthorizationId)).length}/${teleconsultations.length} authorized` },
     { id: "referral:reusePoints", passed: teleconsultations.every((item) => referralIds.has(item.referralId) && collaborationOrderIds.has(item.collaborationOrderId)), detail: "referralSystem and countyCollaborationOrders linked" },
     { id: "referral:reportReturn", passed: reportReturned.length >= 1 && teleconsultations.every((item) => item.reportStatus), detail: `${reportReturned.length} returned reports` },
-    { id: "referral:api", passed: /\/api\/referral-teleconsultations/.test(server) && /canAccessReferralTeleconsultation/.test(server) && /appendDataAccessLog/.test(server), detail: "specialized API, role guard, and audit log present" },
-    { id: "referral:frontend", passed: /teleconsultation-loop/.test(institution) && /county-teleconsultation-loop/.test(county), detail: "institution and county runnable entries present" },
+    { id: "referral:performance", passed: avgResponseHours !== null && avgReportReturnHours !== null && /county-teleconsultation-performance/.test(county), detail: `avg response ${avgResponseHours}h, avg report return ${avgReportReturnHours}h` },
+    { id: "referral:api", passed: /\/api\/referral-teleconsultations/.test(server) && /schedule-callback/.test(server) && /report-callback/.test(server) && /verifyIntegrationSignature/.test(server) && /canAccessReferralTeleconsultation/.test(server) && /appendDataAccessLog/.test(server), detail: "specialized API, signed schedule/report callbacks, role guard, and audit log present" },
+    { id: "referral:frontend", passed: /teleconsultation-form/.test(institution) && /teleconsultation-action-form/.test(institution) && /teleconsultation-loop/.test(institution) && /county-teleconsultation-loop/.test(county) && /county-teleconsultation-status-filter/.test(county), detail: "institution create form, feedback form, institution loop, and county command entry present" },
     { id: "referral:releaseScript", passed: Boolean(pkg.scripts?.["referral:readiness"]), detail: pkg.scripts?.["referral:readiness"] || "missing" }
   ];
   return {
@@ -65,7 +74,9 @@ function buildReferralTeleconsultationReadinessReport(options = {}) {
     summary: {
       total: teleconsultations.length,
       reportReturned: reportReturned.length,
-      collaborationOrders: teleconsultations.filter((item) => collaborationOrderIds.has(item.collaborationOrderId)).length
+      collaborationOrders: teleconsultations.filter((item) => collaborationOrderIds.has(item.collaborationOrderId)).length,
+      avgResponseHours,
+      avgReportReturnHours
     },
     teleconsultations: teleconsultations.map((item) => ({
       id: item.id,
@@ -76,6 +87,7 @@ function buildReferralTeleconsultationReadinessReport(options = {}) {
       sourceInstitution: item.sourceInstitution,
       targetInstitution: item.targetInstitution,
       collaborationOrderId: item.collaborationOrderId,
+      performance: item.performance,
       auditEvents: Array.isArray(item.auditTrail) ? item.auditTrail.length : 0
     })),
     checks
@@ -93,6 +105,8 @@ function renderMarkdown(report) {
     `- Teleconsultations: ${report.summary.total}`,
     `- Returned reports: ${report.summary.reportReturned}`,
     `- Linked collaboration orders: ${report.summary.collaborationOrders}`,
+    `- Avg response hours: ${report.summary.avgResponseHours ?? "-"}`,
+    `- Avg report return hours: ${report.summary.avgReportReturnHours ?? "-"}`,
     "",
     "## Boundary",
     "",

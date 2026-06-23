@@ -4083,6 +4083,44 @@
       "signature": "HMAC-SHA256",
       "retryPolicy": "人工复核后重放",
       "status": "ready"
+    },
+    {
+      "id": "referral-schedule-callback-v1",
+      "domain": "Referral",
+      "version": "1.0.0",
+      "direction": "inbound",
+      "resource": "TeleconsultationSchedule",
+      "requiredFields": [
+        "externalId",
+        "teleconsultationId",
+        "residentId",
+        "meetingWindow",
+        "targetInstitution",
+        "department"
+      ],
+      "idempotencyKey": "externalId",
+      "signature": "HMAC-SHA256",
+      "retryPolicy": "idempotent replay with manual reconciliation",
+      "status": "ready"
+    },
+    {
+      "id": "referral-report-callback-v1",
+      "domain": "Referral",
+      "version": "1.0.0",
+      "direction": "inbound",
+      "resource": "TeleconsultationReport",
+      "requiredFields": [
+        "externalId",
+        "teleconsultationId",
+        "residentId",
+        "reportSummary",
+        "reportReturnedAt",
+        "sourceSystem"
+      ],
+      "idempotencyKey": "externalId",
+      "signature": "HMAC-SHA256",
+      "retryPolicy": "idempotent replay with manual reconciliation",
+      "status": "ready"
     }
   ],
   "integrationGatewayEvents": [],

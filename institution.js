@@ -11,6 +11,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 function renderAll(state) {
   populateBirthCertificateForm(state);
   populateMultiPracticeForm(state);
+  populateTeleconsultationForm(state);
   renderMetrics(state);
   renderDoctorAccounts(state);
   renderMultiPracticePolicy(state);
@@ -43,6 +44,8 @@ function bindInstitutionActions() {
   document.querySelector("#birth-status-filter")?.addEventListener("change", () => renderBirthCertificates(platformState));
   document.querySelector("#birth-risk-filter")?.addEventListener("change", () => renderBirthCertificates(platformState));
   document.querySelector("#multi-practice-form")?.addEventListener("submit", submitMultiPracticeApplication);
+  document.querySelector("#teleconsultation-form")?.addEventListener("submit", submitTeleconsultation);
+  document.addEventListener("submit", submitTeleconsultationAction);
 }
 
 function actionButton(collection, id, label, updates, note) {
@@ -69,6 +72,115 @@ function populateMultiPracticeForm(state) {
   if (compensation && !compensation.value) compensation.value = "按实际工作时间、工作量和绩效协商结算";
   const insurance = form.querySelector("input[name='insurance']");
   if (insurance && !insurance.value) insurance.value = "已购买医师个人医疗执业保险";
+}
+
+function populateTeleconsultationForm(state) {
+  const form = document.querySelector("#teleconsultation-form");
+  if (!form) return;
+  const authSelect = form.querySelector("select[name='residentAuthorizationId']");
+  const referralSelect = form.querySelector("select[name='referralId']");
+  const authorizations = (state.personalRecords || [])
+    .filter((item) => item.category === "authorizations" && item.status !== "revoked" && item.meta?.status !== "revoked");
+  authSelect.innerHTML = authorizations.map((record) => {
+    const resident = residentOf(state, record.residentId);
+    return `<option value="${record.id}" data-resident-id="${record.residentId}">${resident?.name || record.residentId} · ${record.name || "authorization"}</option>`;
+  }).join("");
+  const referrals = state.referralSystem?.referrals || [];
+  referralSelect.innerHTML = [`<option value="">No linked referral</option>`, ...referrals.map((item) => {
+    const resident = residentOf(state, item.residentId);
+    return `<option value="${item.id}">${resident?.name || item.residentId} · ${item.type || "referral"} · ${item.status || ""}</option>`;
+  })].join("");
+  const target = form.querySelector("input[name='targetInstitution']");
+  const targetCode = form.querySelector("input[name='targetInstitutionCode']");
+  const department = form.querySelector("input[name='department']");
+  if (target && !target.value) target.value = "Dalian Central Hospital";
+  if (targetCode && !targetCode.value) targetCode.value = "MR1";
+  if (department && !department.value) department.value = "Cardiology";
+}
+
+async function submitTeleconsultation(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const selected = form.querySelector("select[name='residentAuthorizationId']")?.selectedOptions?.[0];
+  const formData = Object.fromEntries(new FormData(form));
+  const doctor = (platformState.doctorProfiles || [])[0] || {};
+  const payload = {
+    ...formData,
+    residentId: selected?.dataset.residentId || "",
+    sourceInstitution: doctor.primaryInstitution || "",
+    sourceInstitutionCode: doctor.primaryInstitutionId || "",
+    applicantDoctor: doctor.id || "",
+    type: "teleconsultation",
+    status: "requested",
+    materials: ["EMR summary", "resident authorization", "primary care note"],
+    note: "Created from institution teleconsultation form"
+  };
+  const submit = form.querySelector("button[type='submit']");
+  submit.disabled = true;
+  try {
+    let saved;
+    if (institutionApiBase) {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${institutionApiBase}/referral-teleconsultations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || `Teleconsultation creation failed: ${response.status}`);
+      }
+      saved = await response.json();
+    } else {
+      saved = {
+        ...payload,
+        id: `rtc-local-${Date.now()}`,
+        authorizationStatus: "authorized",
+        reportStatus: "pending-return",
+        receivingFeedback: "",
+        reportSummary: "",
+        auditTrail: [{ at: new Date().toISOString(), actor: "local-preview", action: "created", note: payload.note }],
+        performance: { responseHours: 0, reportReturnHours: 0, satisfaction: "pending" },
+        createdAt: new Date().toISOString(),
+        lastUpdated: new Date().toISOString()
+      };
+    }
+    platformState.referralTeleconsultations = [saved, ...(platformState.referralTeleconsultations || [])];
+    form.reset();
+    populateTeleconsultationForm(platformState);
+    renderTeleconsultationLoop(platformState);
+  } catch (error) {
+    alert(error.message || "Teleconsultation creation failed. Check resident authorization and role scope.");
+  } finally {
+    submit.disabled = false;
+  }
+}
+
+async function submitTeleconsultationAction(event) {
+  const form = event.target.closest(".teleconsultation-action-form");
+  if (!form) return;
+  event.preventDefault();
+  const formData = Object.fromEntries(new FormData(form));
+  const updates = {
+    status: formData.status,
+    receivingFeedback: formData.receivingFeedback,
+    reportSummary: formData.reportSummary
+  };
+  if (formData.status === "report-returned") updates.reportStatus = "returned";
+  Object.keys(updates).forEach((key) => {
+    if (!updates[key]) delete updates[key];
+  });
+  const submit = form.querySelector("button[type='submit']");
+  submit.disabled = true;
+  const result = await updateWorkflowAction(
+    platformState,
+    "referralTeleconsultations",
+    form.dataset.id,
+    updates,
+    formData.note || "Referral teleconsultation feedback updated"
+  );
+  submit.disabled = false;
+  if (result.ok) renderAll(platformState);
 }
 
 async function submitMultiPracticeApplication(event) {
@@ -415,6 +527,23 @@ function renderTeleconsultationLoop(state) {
         <p>${item.sourceInstitution || "-"} -> ${item.targetInstitution || "-"} · ${item.meetingWindow || item.due || "-"}</p>
         <p>${item.clinicalQuestion || item.receivingFeedback || item.reportSummary || "Pending clinical note"}</p>
         <p>Authorization: ${item.authorizationStatus || "pending"} · Report: ${item.reportStatus || "pending"}</p>
+        <form class="filter-grid teleconsultation-action-form" data-id="${item.id}">
+          <label>Status
+            <select name="status">
+              ${["accepted", "feedback-returned", "report-returned", "closed"].map((status) => `<option value="${status}" ${item.status === status ? "selected" : ""}>${status}</option>`).join("")}
+            </select>
+          </label>
+          <label>Receiving feedback
+            <input name="receivingFeedback" value="${item.receivingFeedback || ""}" placeholder="Receiving institution feedback" />
+          </label>
+          <label>Report summary
+            <input name="reportSummary" value="${item.reportSummary || ""}" placeholder="Returned report summary" />
+          </label>
+          <label>Audit note
+            <input name="note" value="Institution closed-loop update" />
+          </label>
+          <button class="inline-action" type="submit">Save feedback</button>
+        </form>
         <div class="action-row">
           ${item.status === "requested" ? actionButton("referralTeleconsultations", item.id, "Accept", { status: "accepted", receivingFeedback: "Receiving institution accepted the teleconsultation." }, "Accept referral teleconsultation") : ""}
           ${item.reportStatus !== "returned" ? actionButton("referralTeleconsultations", item.id, "Return report", { status: "report-returned", reportStatus: "returned", reportSummary: "Consultation report returned to the originating institution." }, "Return teleconsultation report") : ""}

@@ -206,20 +206,36 @@ function renderCountyBusinessOperations(state) {
 }
 
 function renderCountyTeleconsultationLoop(state) {
-  const rows = state.referralTeleconsultations || [];
+  const rows = filterCountyTeleconsultations(state.referralTeleconsultations || []);
   const countEl = document.querySelector("#county-teleconsultation-count");
   const tableEl = document.querySelector("#county-teleconsultation-loop");
+  const performanceEl = document.querySelector("#county-teleconsultation-performance");
   if (!countEl || !tableEl) return;
-  countEl.textContent = `${rows.length} items`;
+  const allRows = state.referralTeleconsultations || [];
+  countEl.textContent = `${rows.length}/${allRows.length} items`;
+  if (performanceEl) {
+    const reportReturned = rows.filter((item) => item.reportStatus === "returned" || item.status === "report-returned").length;
+    const avgResponse = averagePerformance(rows, "responseHours");
+    const avgReportReturn = averagePerformance(rows, "reportReturnHours");
+    performanceEl.innerHTML = [
+      ["Returned reports", `${reportReturned}/${rows.length || 0}`, rows.length ? `${Math.round((reportReturned / rows.length) * 100)}% return rate` : "No filtered records"],
+      ["Avg response", Number.isFinite(avgResponse) ? `${avgResponse.toFixed(1)}h` : "-", "Receiving feedback timeliness"],
+      ["Avg report return", Number.isFinite(avgReportReturn) ? `${avgReportReturn.toFixed(1)}h` : "-", "Report callback timeliness"],
+      ["High priority", rows.filter((item) => item.priority === "high").length, "County follow-up queue"]
+    ].map(([label, value, hint]) => `<article class="claim-card"><strong>${label}</strong><span>${value}<br>${hint}</span></article>`).join("");
+  }
   tableEl.innerHTML = `<table>
-    <thead><tr><th>Resident</th><th>Pathway</th><th>Question</th><th>Status</th><th>Report</th><th>Action</th></tr></thead>
+    <thead><tr><th>Resident</th><th>Pathway</th><th>Question</th><th>Status</th><th>Performance</th><th>Report</th><th>Action</th></tr></thead>
     <tbody>${rows.map((item) => {
       const resident = residentOf(state, item.residentId);
+      const responseHours = Number(item.performance?.responseHours);
+      const reportReturnHours = Number(item.performance?.reportReturnHours);
       return `<tr>
         <td>${resident?.name || item.residentId || "Unknown"}</td>
         <td>${item.sourceInstitution || "-"} -> ${item.targetInstitution || "-"}<br><small>${item.department || item.type || ""}</small></td>
         <td>${item.clinicalQuestion || item.receivingFeedback || item.reportSummary || "-"}</td>
         <td><span class="badge ${item.priority === "high" ? "danger" : "info"}">${item.status}</span></td>
+        <td>Response ${Number.isFinite(responseHours) ? `${responseHours}h` : "-"}<br><small>Report ${Number.isFinite(reportReturnHours) ? `${reportReturnHours}h` : "-"}</small></td>
         <td>${item.reportStatus || "pending"}</td>
         <td>
           ${countyActionButton("referralTeleconsultations", item.id, "County follow-up", { status: "feedback-returned", receivingFeedback: "County consortium office followed up receiving feedback." })}
@@ -230,7 +246,25 @@ function renderCountyTeleconsultationLoop(state) {
   </table>`;
 }
 
+function filterCountyTeleconsultations(rows) {
+  const status = document.querySelector("#county-teleconsultation-status-filter")?.value || "all";
+  const priority = document.querySelector("#county-teleconsultation-priority-filter")?.value || "all";
+  return rows.filter((item) => {
+    const statusMatched = status === "all" || item.status === status;
+    const priorityMatched = priority === "all" || item.priority === priority;
+    return statusMatched && priorityMatched;
+  });
+}
+
+function averagePerformance(rows, field) {
+  const values = rows.map((item) => Number(item.performance?.[field])).filter(Number.isFinite);
+  if (!values.length) return Number.NaN;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
 function bindCountyActions() {
+  document.querySelector("#county-teleconsultation-status-filter")?.addEventListener("change", () => renderCountyTeleconsultationLoop(platformState));
+  document.querySelector("#county-teleconsultation-priority-filter")?.addEventListener("change", () => renderCountyTeleconsultationLoop(platformState));
   document.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-county-action]");
     if (!button || !platformState) return;

@@ -147,6 +147,40 @@
           <h2>Referral teleconsultation loop</h2>
           <span id="teleconsultation-count"></span>
         </div>
+        <form id="teleconsultation-form" class="filter-grid">
+          <label>Authorized resident
+            <select name="residentAuthorizationId" required></select>
+          </label>
+          <label>Linked referral
+            <select name="referralId"></select>
+          </label>
+          <label>Target institution
+            <input name="targetInstitution" placeholder="Dalian Central Hospital" required />
+          </label>
+          <label>Target institution code
+            <input name="targetInstitutionCode" placeholder="MR1" />
+          </label>
+          <label>Department
+            <input name="department" placeholder="Cardiology" required />
+          </label>
+          <label>Priority
+            <select name="priority">
+              <option value="normal">normal</option>
+              <option value="medium">medium</option>
+              <option value="high">high</option>
+            </select>
+          </label>
+          <label>Due date
+            <input name="due" type="date" />
+          </label>
+          <label>Meeting window
+            <input name="meetingWindow" placeholder="2026-06-23 15:00-15:30" />
+          </label>
+          <label class="full">Clinical question
+            <input name="clinicalQuestion" placeholder="Describe the referral or consultation question" required />
+          </label>
+          <button class="inline-action" type="submit">Create teleconsultation</button>
+        </form>
         <div id="teleconsultation-loop" class="list"></div>
       </section>
 
@@ -295,4 +329,3 @@
     <script src="./institution.js"></script>
   </body>
 </html>
-

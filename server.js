@@ -1055,7 +1055,9 @@ function seedIntegrationContracts() {
     { id: "pacs-report-v1", domain: "PACS", version: "1.0.0", direction: "inbound", resource: "ImagingReport", requiredFields: ["externalId", "residentId", "modality", "conclusion", "reportedAt"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "3 次指数退避", status: "ready" },
     { id: "insurance-settlement-v1", domain: "医保", version: "1.0.0", direction: "bidirectional", resource: "SettlementStatus", requiredFields: ["externalId", "residentId", "claimStatus", "amount"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "失败进入补偿队列", status: "ready" },
     { id: "certificate-sync-v1", domain: "电子证照", version: "1.0.0", direction: "outbound", resource: "CertificateStatus", requiredFields: ["externalId", "certificateNo", "status"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "失败进入补偿队列", status: "ready" },
-    { id: "statistics-report-v1", domain: "卫生统计", version: "1.0.0", direction: "inbound", resource: "HealthStatistics", requiredFields: ["externalId", "period", "institution", "metrics"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "人工复核后重放", status: "ready" }
+    { id: "statistics-report-v1", domain: "卫生统计", version: "1.0.0", direction: "inbound", resource: "HealthStatistics", requiredFields: ["externalId", "period", "institution", "metrics"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "人工复核后重放", status: "ready" },
+    { id: "referral-schedule-callback-v1", domain: "Referral", version: "1.0.0", direction: "inbound", resource: "TeleconsultationSchedule", requiredFields: ["externalId", "teleconsultationId", "residentId", "meetingWindow", "targetInstitution", "department"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "idempotent replay with manual reconciliation", status: "ready" },
+    { id: "referral-report-callback-v1", domain: "Referral", version: "1.0.0", direction: "inbound", resource: "TeleconsultationReport", requiredFields: ["externalId", "teleconsultationId", "residentId", "reportSummary", "reportReturnedAt", "sourceSystem"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "idempotent replay with manual reconciliation", status: "ready" }
   ];
 }
 
@@ -4940,7 +4942,7 @@ function applyReferralTeleconsultationAction(item, payload, user) {
   };
   if (payload.feedback || updates.receivingFeedback) {
     next.receivingFeedback = String(payload.feedback || updates.receivingFeedback).trim();
-    if (nextStatus === item.status) next.status = "feedback-returned";
+    if (!payload.status && !updates.status && nextStatus === item.status) next.status = "feedback-returned";
   }
   if (payload.reportSummary || updates.reportSummary || next.status === "report-returned") {
     next.reportStatus = "returned";
@@ -4952,6 +4954,48 @@ function applyReferralTeleconsultationAction(item, payload, user) {
     ...(Array.isArray(item.auditTrail) ? item.auditTrail : [])
   ].slice(0, 40);
   return next;
+}
+
+function normalizeReferralTeleconsultationCallback(payload, item) {
+  const idempotencyKey = String(payload.idempotencyKey || "").trim();
+  if (!idempotencyKey) throw new Error("idempotencyKey is required");
+  const reportSummary = String(payload.reportSummary || payload.payload?.reportSummary || "").trim();
+  if (!reportSummary) throw new Error("reportSummary is required");
+  return {
+    contractId: "referral-report-callback-v1",
+    idempotencyKey,
+    externalId: String(payload.externalId || payload.payload?.externalId || idempotencyKey).trim(),
+    residentId: String(payload.residentId || item.residentId || "").trim(),
+    reportSummary,
+    receivingFeedback: String(payload.receivingFeedback || payload.payload?.receivingFeedback || item.receivingFeedback || "").trim(),
+    reportStatus: "returned",
+    reportReturnedAt: String(payload.reportReturnedAt || payload.payload?.reportReturnedAt || new Date().toISOString()).trim(),
+    sourceSystem: String(payload.sourceSystem || payload.payload?.sourceSystem || "external-his-emr").trim(),
+    performance: payload.performance && typeof payload.performance === "object" ? payload.performance : payload.payload?.performance,
+    payload: payload.payload && typeof payload.payload === "object" ? payload.payload : {}
+  };
+}
+
+function normalizeReferralTeleconsultationScheduleCallback(payload, item) {
+  const idempotencyKey = String(payload.idempotencyKey || "").trim();
+  if (!idempotencyKey) throw new Error("idempotencyKey is required");
+  const meetingWindow = String(payload.meetingWindow || payload.payload?.meetingWindow || "").trim();
+  if (!meetingWindow) throw new Error("meetingWindow is required");
+  return {
+    contractId: "referral-schedule-callback-v1",
+    idempotencyKey,
+    externalId: String(payload.externalId || payload.payload?.externalId || idempotencyKey).trim(),
+    residentId: String(payload.residentId || item.residentId || "").trim(),
+    meetingWindow,
+    targetInstitution: String(payload.targetInstitution || payload.payload?.targetInstitution || item.targetInstitution || "").trim(),
+    targetInstitutionCode: String(payload.targetInstitutionCode || payload.payload?.targetInstitutionCode || item.targetInstitutionCode || "").trim(),
+    department: String(payload.department || payload.payload?.department || item.department || "").trim(),
+    receivingDoctor: String(payload.receivingDoctor || payload.payload?.receivingDoctor || item.receivingDoctor || "").trim(),
+    scheduleStatus: String(payload.scheduleStatus || payload.payload?.scheduleStatus || "scheduled").trim(),
+    sourceSystem: String(payload.sourceSystem || payload.payload?.sourceSystem || "external-scheduling").trim(),
+    performance: payload.performance && typeof payload.performance === "object" ? payload.performance : payload.payload?.performance,
+    payload: payload.payload && typeof payload.payload === "object" ? payload.payload : {}
+  };
 }
 
 function buildDataQualityIssues(data) {
@@ -5818,6 +5862,172 @@ async function handleApi(req, res) {
     appendDataAccessLog(data, user, rows[index].residentId, "referral teleconsultation", payload.note || rows[index].status, "allowed");
     writeDatabase(data);
     sendJson(res, 200, rows[index]);
+    return;
+  }
+
+  const teleconsultationScheduleCallbackMatch = url.pathname.match(/^\/api\/referral-teleconsultations\/([^/]+)\/schedule-callback$/);
+  if (req.method === "POST" && teleconsultationScheduleCallbackMatch) {
+    const user = requireApiRole(req, res, ["institution", "county", "commission"], "/api/referral-teleconsultations/:id/schedule-callback");
+    if (!user) return;
+    const payload = await collectJson(req);
+    if (!verifyIntegrationSignature(payload, req.headers["x-integration-signature"])) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "referral teleconsultation schedule callback", target: decodeURIComponent(teleconsultationScheduleCallbackMatch[1]), result: "denied", detail: "signature mismatch" });
+      sendJson(res, 401, { error: "Unauthorized", message: "integration signature verification failed" });
+      return;
+    }
+    const data = readDatabase();
+    const rows = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
+    const index = rows.findIndex((item) => item.id === decodeURIComponent(teleconsultationScheduleCallbackMatch[1]));
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "referral teleconsultation not found" });
+      return;
+    }
+    if (!canAccessReferralTeleconsultation(user, rows[index], data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "referral teleconsultation schedule callback", target: rows[index].id, result: "denied", detail: "scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
+      return;
+    }
+    try {
+      const callback = normalizeReferralTeleconsultationScheduleCallback(payload, rows[index]);
+      const duplicate = (data.integrationGatewayEvents || []).find((item) => item.contractId === callback.contractId && item.idempotencyKey === callback.idempotencyKey);
+      if (duplicate) {
+        sendJson(res, 200, { teleconsultation: rows[index], integrationEvent: { ...duplicate, idempotentReplay: true } });
+        return;
+      }
+      rows[index] = applyReferralTeleconsultationAction(rows[index], {
+        status: rows[index].reportStatus === "returned" ? rows[index].status : normalizeReferralTeleconsultationStatus(callback.scheduleStatus),
+        updates: {
+          meetingWindow: callback.meetingWindow,
+          targetInstitution: callback.targetInstitution,
+          targetInstitutionCode: callback.targetInstitutionCode,
+          department: callback.department,
+          receivingDoctor: callback.receivingDoctor
+        },
+        note: `${callback.sourceSystem} schedule callback`
+      }, user);
+      if (callback.performance && typeof callback.performance === "object") {
+        rows[index].performance = { ...(rows[index].performance || {}), ...callback.performance };
+      }
+      data.referralTeleconsultations = rows;
+      const event = {
+        id: `igw-${randomUUID()}`,
+        idempotencyKey: callback.idempotencyKey,
+        externalId: callback.externalId,
+        contractId: callback.contractId,
+        domain: "referral-teleconsultation",
+        resource: "schedule-callback",
+        residentId: callback.residentId,
+        status: "matched",
+        receivedAt: new Date().toISOString(),
+        receivedBy: user.username || user.role,
+        payload: { ...callback.payload, meetingWindow: callback.meetingWindow, sourceSystem: callback.sourceSystem },
+        retryCount: 0,
+        deadLetter: false,
+        reconciliationStatus: "matched",
+        targetCollection: "referralTeleconsultations",
+        targetId: rows[index].id
+      };
+      data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
+      data.securityEvents = [
+        {
+          id: randomUUID(),
+          at: new Date().toLocaleString("zh-CN", { hour12: false }),
+          actor: user.name,
+          role: user.role,
+          action: "referral teleconsultation schedule callback",
+          target: rows[index].id,
+          result: "allowed",
+          detail: `${callback.sourceSystem} / ${callback.idempotencyKey}`
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120);
+      appendDataAccessLog(data, user, rows[index].residentId, "referral teleconsultation", "external schedule callback", "allowed");
+      writeDatabase(data);
+      sendJson(res, 200, { teleconsultation: rows[index], integrationEvent: event });
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+    }
+    return;
+  }
+
+  const teleconsultationCallbackMatch = url.pathname.match(/^\/api\/referral-teleconsultations\/([^/]+)\/report-callback$/);
+  if (req.method === "POST" && teleconsultationCallbackMatch) {
+    const user = requireApiRole(req, res, ["institution", "county", "commission"], "/api/referral-teleconsultations/:id/report-callback");
+    if (!user) return;
+    const payload = await collectJson(req);
+    if (!verifyIntegrationSignature(payload, req.headers["x-integration-signature"])) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "referral teleconsultation report callback", target: decodeURIComponent(teleconsultationCallbackMatch[1]), result: "denied", detail: "signature mismatch" });
+      sendJson(res, 401, { error: "Unauthorized", message: "integration signature verification failed" });
+      return;
+    }
+    const data = readDatabase();
+    const rows = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
+    const index = rows.findIndex((item) => item.id === decodeURIComponent(teleconsultationCallbackMatch[1]));
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "referral teleconsultation not found" });
+      return;
+    }
+    if (!canAccessReferralTeleconsultation(user, rows[index], data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "referral teleconsultation report callback", target: rows[index].id, result: "denied", detail: "scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
+      return;
+    }
+    try {
+      const callback = normalizeReferralTeleconsultationCallback(payload, rows[index]);
+      const duplicate = (data.integrationGatewayEvents || []).find((item) => item.contractId === callback.contractId && item.idempotencyKey === callback.idempotencyKey);
+      if (duplicate) {
+        sendJson(res, 200, { teleconsultation: rows[index], integrationEvent: { ...duplicate, idempotentReplay: true } });
+        return;
+      }
+      rows[index] = applyReferralTeleconsultationAction(rows[index], {
+        status: "report-returned",
+        feedback: callback.receivingFeedback,
+        reportSummary: callback.reportSummary,
+        note: `${callback.sourceSystem} report callback`
+      }, user);
+      rows[index].reportReturnedAt = callback.reportReturnedAt;
+      if (callback.performance && typeof callback.performance === "object") {
+        rows[index].performance = { ...(rows[index].performance || {}), ...callback.performance };
+      }
+      data.referralTeleconsultations = rows;
+      const event = {
+        id: `igw-${randomUUID()}`,
+        idempotencyKey: callback.idempotencyKey,
+        externalId: callback.externalId,
+        contractId: callback.contractId,
+        domain: "referral-teleconsultation",
+        resource: "report-callback",
+        residentId: callback.residentId,
+        status: "matched",
+        receivedAt: new Date().toISOString(),
+        receivedBy: user.username || user.role,
+        payload: { ...callback.payload, reportSummary: callback.reportSummary, sourceSystem: callback.sourceSystem },
+        retryCount: 0,
+        deadLetter: false,
+        reconciliationStatus: "matched",
+        targetCollection: "referralTeleconsultations",
+        targetId: rows[index].id
+      };
+      data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
+      data.securityEvents = [
+        {
+          id: randomUUID(),
+          at: new Date().toLocaleString("zh-CN", { hour12: false }),
+          actor: user.name,
+          role: user.role,
+          action: "referral teleconsultation report callback",
+          target: rows[index].id,
+          result: "allowed",
+          detail: `${callback.sourceSystem} / ${callback.idempotencyKey}`
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120);
+      appendDataAccessLog(data, user, rows[index].residentId, "referral teleconsultation", "external report callback", "allowed");
+      writeDatabase(data);
+      sendJson(res, 200, { teleconsultation: rows[index], integrationEvent: event });
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+    }
     return;
   }
 

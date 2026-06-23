@@ -77,6 +77,30 @@ const FIELD_MAPPINGS = {
       institution: "institution",
       metrics: "metrics"
     }
+  },
+  "referral-schedule-callback-v1": {
+    targetCollection: "referralTeleconsultations",
+    owner: "referral-center",
+    fields: {
+      externalId: "externalScheduleId",
+      teleconsultationId: "id",
+      residentId: "residentId",
+      meetingWindow: "meetingWindow",
+      targetInstitution: "targetInstitution",
+      department: "department"
+    }
+  },
+  "referral-report-callback-v1": {
+    targetCollection: "referralTeleconsultations",
+    owner: "referral-center",
+    fields: {
+      externalId: "externalReportId",
+      teleconsultationId: "id",
+      residentId: "residentId",
+      reportSummary: "reportSummary",
+      reportReturnedAt: "reportReturnedAt",
+      sourceSystem: "reportSourceSystem"
+    }
   }
 };
 
