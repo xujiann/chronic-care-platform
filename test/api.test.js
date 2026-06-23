@@ -786,6 +786,52 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(denied.response.status, 403);
   });
 
+  await t.test("supports regional diagnosis data sharing with role scoping and access audit", async () => {
+    const commission = await api(baseUrl, "/api/regional-data-sharing", authorized(commissionToken));
+    assert.equal(commission.response.status, 200);
+    assert.equal(commission.body.scope.name, "区域诊疗数据共享平台");
+    assert.equal(commission.body.summary.totalPackages >= 3, true);
+    assert.equal(commission.body.packages.some((item) => item.id === "rsp-r3-imaging"), true);
+    assert.equal(commission.body.scope.exclusions.some((item) => item.includes("HIS")), true);
+
+    const hospital = await login(baseUrl, "hospital");
+    const institutionView = await api(baseUrl, "/api/regional-data-sharing", authorized(hospital.body.token));
+    assert.equal(institutionView.response.status, 200);
+    assert.equal(institutionView.body.packages.some((item) => item.id === "rsp-r1-hypertension"), true);
+    assert.equal(institutionView.body.packages.some((item) => item.id === "rsp-r2-diabetes"), true);
+    assert.equal(institutionView.body.packages.some((item) => item.id === "rsp-r3-imaging"), false);
+    assert.equal(institutionView.body.packages.every((item) => !String(item.resident?.idCard || "").startsWith("DEMO-ID-")), true);
+
+    const accessReview = await api(baseUrl, "/api/regional-data-sharing/access-reviews", authorized(hospital.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        packageId: "rsp-r2-diabetes",
+        decision: "approved",
+        purpose: "接续糖尿病复查前调阅区域检验报告",
+        note: "机构端确认本次调阅范围。"
+      })
+    }));
+    assert.equal(accessReview.response.status, 201);
+    assert.equal(accessReview.body.review.packageId, "rsp-r2-diabetes");
+    assert.equal(accessReview.body.package.lastAccessReviewId, accessReview.body.review.id);
+
+    const refreshed = await api(baseUrl, "/api/regional-data-sharing", authorized(hospital.body.token));
+    assert.equal(refreshed.body.accessReviews.some((item) => item.id === accessReview.body.review.id), true);
+    const commissionState = await api(baseUrl, "/api/state", authorized(commissionToken));
+    assert.equal(commissionState.body.dataAccessLogs.some((item) => item.scope === "regionalDataSharing" && item.residentId === "r2"), true);
+
+    const community = await login(baseUrl, "community");
+    const deniedPackage = await api(baseUrl, "/api/regional-data-sharing/access-reviews", authorized(community.body.token, {
+      method: "POST",
+      body: JSON.stringify({ packageId: "rsp-r3-imaging", decision: "approved", purpose: "越权调阅测试" })
+    }));
+    assert.equal(deniedPackage.response.status, 403);
+
+    const insurance = await login(baseUrl, "insurance");
+    const insuranceView = await api(baseUrl, "/api/regional-data-sharing", authorized(insurance.body.token));
+    assert.equal(insuranceView.response.status, 403);
+  });
+
   await t.test("enforces workflow collection ownership and protects structural fields", async () => {
     const institution = await login(baseUrl, "hospital");
     const insurance = await login(baseUrl, "insurance");

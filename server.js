@@ -3323,6 +3323,10 @@ function normalizeState(data) {
     countyAcceptanceLedger: mergeByKey(seedCountyAcceptanceLedger(), data.countyAcceptanceLedger, "id"),
     mutualRecognitionRules: mergeByKey(seedMutualRecognitionRules(), data.mutualRecognitionRules, "id"),
     diagnosticReports: mergeByKey(seedDiagnosticReports(), data.diagnosticReports, "id"),
+    regionalDataSharingScope: data.regionalDataSharingScope && typeof data.regionalDataSharingScope === "object" ? { ...seedRegionalDataSharingScope(), ...data.regionalDataSharingScope } : seedRegionalDataSharingScope(),
+    regionalSharingPackages: normalizeRegionalSharingPackages(mergeByKey(seedRegionalSharingPackages(), data.regionalSharingPackages, "id")),
+    regionalSharingSnapshots: data.regionalSharingSnapshots && typeof data.regionalSharingSnapshots === "object" ? { ...seedRegionalSharingSnapshots(), ...data.regionalSharingSnapshots } : seedRegionalSharingSnapshots(),
+    regionalSharingAccessReviews: Array.isArray(data.regionalSharingAccessReviews) ? data.regionalSharingAccessReviews : seedRegionalSharingAccessReviews(),
     taskMessages: Array.isArray(data.taskMessages) ? data.taskMessages : [],
     dataQualityIssues: Array.isArray(data.dataQualityIssues) ? data.dataQualityIssues : [],
     careOrders: Array.isArray(data.careOrders) ? data.careOrders : seedCareOrders(),
@@ -4022,6 +4026,300 @@ function reviewMutualRecognitionRecord(data, id, payload, user) {
   return updated;
 }
 
+function seedRegionalDataSharingScope() {
+  return {
+    id: "regional-data-sharing",
+    name: "区域诊疗数据共享平台",
+    boundary: [
+      "居民主索引下的诊疗摘要、检查检验报告、互认记录和授权调阅",
+      "管理端按区域、机构、接口和质量状态监管共享闭环",
+      "机构端按本机构来源或目标居民共享包完成调阅、确认和留痕"
+    ],
+    roles: [
+      { role: "commission", name: "管理端", permissions: ["共享网络总览", "质量与合规监管", "跨机构审计追踪", "现场联调证据归档"] },
+      { role: "institution", name: "机构端", permissions: ["本机构共享包调阅", "报告回传确认", "互认结果确认", "问题闭环登记"] },
+      { role: "citizen", name: "居民端", permissions: ["通过既有个人健康档案和授权记录查看结果"], via: "citizen.html / personalRecords" }
+    ],
+    coreLoop: [
+      "机构接口或人工回传形成 diagnosticReports / personalRecords",
+      "区域规则生成 countyMutualRecognitionRecords 和共享包",
+      "目标机构调阅共享包并登记 regionalSharingAccessReviews",
+      "管理端用质量、授权、互认、审计和接口证据验收闭环"
+    ],
+    exclusions: [
+      "不替代院内 HIS/EMR/LIS/PACS 原系统",
+      "不直接承载医保结算、电子票据或费用清分",
+      "不绕过居民授权、机构职责边界和现场接口签名验收",
+      "不把科研脱敏数据集作为临床诊疗直接来源"
+    ],
+    reusedCollections: [
+      "residents",
+      "personalRecords",
+      "diagnosticReports",
+      "countyMutualRecognitionRecords",
+      "integrationContracts",
+      "hospitalInteroperabilityFunctions",
+      "platformEvidence",
+      "dataAccessLogs",
+      "securityEvents"
+    ],
+    statusNorms: {
+      ready: "可共享",
+      pending_review: "待复核",
+      blocked: "暂缓共享",
+      archived: "已归档"
+    }
+  };
+}
+
+function seedRegionalSharingPackages() {
+  return [
+    {
+      id: "rsp-r1-hypertension",
+      residentId: "r1",
+      personIndex: "DEMO-ID-R1#DEMO-MOBILE-R1",
+      sourceInstitution: "青泥洼桥社区卫生服务中心",
+      sourceOrgCode: "MR3",
+      targetInstitutions: ["大连市中心医院", "中山区县域医共体"],
+      targetOrgCodes: ["MR1", "ORG-CONSORTIUM-ZS"],
+      category: "chronic-followup",
+      title: "高血压复查共享包",
+      sharedCollections: ["personalRecords", "followups", "diagnosticReports"],
+      recordRefs: ["pr-001", "dr-seed-001"],
+      contractRefs: ["his-patient-v1", "emr-summary-v1", "lis-report-v1"],
+      consentStatus: "active",
+      qualityStatus: "passed",
+      status: "ready",
+      lastSharedAt: "2026-06-22T09:20:00.000Z",
+      owner: "基层机构管理员",
+      nextAction: "上级医院调阅后回写接诊意见。"
+    },
+    {
+      id: "rsp-r2-diabetes",
+      residentId: "r2",
+      personIndex: "DEMO-ID-R2#DEMO-MOBILE-R2",
+      sourceInstitution: "大连市中心医院",
+      sourceOrgCode: "MR1",
+      targetInstitutions: ["星海湾社区卫生服务中心", "中山区县域医共体"],
+      targetOrgCodes: ["MR4", "ORG-CONSORTIUM-ZS"],
+      category: "diagnostic-report",
+      title: "糖尿病检验报告互认共享包",
+      sharedCollections: ["diagnosticReports", "countyMutualRecognitionRecords", "personalRecords"],
+      recordRefs: ["dr-seed-002", "cmr-seed-002"],
+      contractRefs: ["lis-report-v1", "pacs-report-v1"],
+      consentStatus: "active",
+      qualityStatus: "passed",
+      status: "ready",
+      lastSharedAt: "2026-06-22T10:15:00.000Z",
+      owner: "医疗机构管理员",
+      nextAction: "基层机构确认互认并减少重复检验。"
+    },
+    {
+      id: "rsp-r3-imaging",
+      residentId: "r3",
+      personIndex: "DEMO-ID-R3#DEMO-MOBILE-R3",
+      sourceInstitution: "甘井子区人民医院",
+      sourceOrgCode: "MR5",
+      targetInstitutions: ["大连医科大学附属医院"],
+      targetOrgCodes: ["MR2"],
+      category: "imaging",
+      title: "影像报告复核共享包",
+      sharedCollections: ["diagnosticReports", "integrationGatewayEvents"],
+      recordRefs: ["dr-seed-003"],
+      contractRefs: ["pacs-report-v1"],
+      consentStatus: "pending",
+      qualityStatus: "manual_review",
+      status: "pending_review",
+      lastSharedAt: "",
+      owner: "区域诊断中心",
+      nextAction: "补齐居民授权和影像质控结论后开放调阅。"
+    }
+  ];
+}
+
+function seedRegionalSharingSnapshots() {
+  return {
+    generatedAt: "2026-06-22T10:30:00.000Z",
+    fields: {
+      packageId: "共享包主键",
+      residentId: "居民主索引关联",
+      sourceOrgCode: "来源机构代码",
+      targetOrgCodes: "目标机构代码列表",
+      status: "ready | pending_review | blocked | archived",
+      consentStatus: "active | pending | revoked",
+      qualityStatus: "passed | manual_review | failed",
+      contractRefs: "integrationContracts.id 列表",
+      recordRefs: "personalRecords / diagnosticReports / countyMutualRecognitionRecords 引用"
+    },
+    statusNorms: seedRegionalDataSharingScope().statusNorms,
+    staticEvidence: [
+      "residents.personIndex",
+      "personalRecords.reportId",
+      "diagnosticReports.recognitionRecordId",
+      "integrationContracts.requiredFields",
+      "interface-mapping-report.md"
+    ]
+  };
+}
+
+function seedRegionalSharingAccessReviews() {
+  return [
+    {
+      id: "rsar-seed-001",
+      packageId: "rsp-r1-hypertension",
+      residentId: "r1",
+      actor: "医疗机构管理员",
+      role: "institution",
+      organization: "大连市中心医院",
+      purpose: "上转接诊前调阅慢病随访和检验摘要",
+      decision: "approved",
+      status: "completed",
+      at: "2026-06-22T10:40:00.000Z",
+      note: "调阅范围限定为本次接诊所需共享包。"
+    }
+  ];
+}
+
+function normalizeRegionalSharingStatus(packageItem) {
+  const status = String(packageItem.status || "").trim();
+  const consent = String(packageItem.consentStatus || "").trim();
+  const quality = String(packageItem.qualityStatus || "").trim();
+  if (consent === "revoked" || quality === "failed") return "blocked";
+  if (status === "archived") return "archived";
+  if (consent !== "active" || quality === "manual_review") return "pending_review";
+  return status || "ready";
+}
+
+function normalizeRegionalSharingPackages(packages) {
+  return (Array.isArray(packages) ? packages : []).map((item) => ({
+    ...item,
+    targetInstitutions: Array.isArray(item.targetInstitutions) ? item.targetInstitutions : [],
+    targetOrgCodes: Array.isArray(item.targetOrgCodes) ? item.targetOrgCodes : [],
+    sharedCollections: Array.isArray(item.sharedCollections) ? item.sharedCollections : [],
+    recordRefs: Array.isArray(item.recordRefs) ? item.recordRefs : [],
+    contractRefs: Array.isArray(item.contractRefs) ? item.contractRefs : [],
+    status: normalizeRegionalSharingStatus(item)
+  }));
+}
+
+function canAccessRegionalSharingPackage(user, item) {
+  if (user.role === "commission") return true;
+  if (user.role !== "institution") return false;
+  return item.sourceOrgCode === user.orgCode ||
+    item.sourceInstitution === user.orgName ||
+    (item.targetOrgCodes || []).includes(user.orgCode) ||
+    (item.targetInstitutions || []).includes(user.orgName);
+}
+
+function buildRegionalDataSharingView(data, user) {
+  const packages = normalizeRegionalSharingPackages(data.regionalSharingPackages || seedRegionalSharingPackages())
+    .filter((item) => canAccessRegionalSharingPackage(user, item));
+  const residentsById = new Map((data.residents || []).map((item) => [item.id, item]));
+  const contractsById = new Map((data.integrationContracts || []).map((item) => [item.id, item]));
+  const diagnosticReports = data.diagnosticReports || [];
+  const personalRecords = data.personalRecords || [];
+  const recognitionRecords = data.countyMutualRecognitionRecords || [];
+  const enrichedPackages = packages.map((item) => {
+    const relatedReports = diagnosticReports.filter((report) => report.residentId === item.residentId || item.recordRefs.includes(report.id));
+    const relatedPersonalRecords = personalRecords.filter((record) => record.residentId === item.residentId && (item.recordRefs.includes(record.id) || item.sharedCollections.includes("personalRecords")));
+    const relatedRecognition = recognitionRecords.filter((record) => record.residentId === item.residentId || item.recordRefs.includes(record.id));
+    const contracts = item.contractRefs.map((id) => contractsById.get(id)).filter(Boolean);
+    return {
+      ...item,
+      resident: residentsById.get(item.residentId) || null,
+      contracts: contracts.map((contract) => ({
+        id: contract.id,
+        domain: contract.domain,
+        resource: contract.resource,
+        status: contract.status
+      })),
+      evidenceCounts: {
+        diagnosticReports: relatedReports.length,
+        personalRecords: relatedPersonalRecords.length,
+        mutualRecognitionRecords: relatedRecognition.length,
+        contracts: contracts.length
+      },
+      latestRecords: [
+        ...relatedReports.slice(0, 3).map((record) => ({ type: "diagnosticReports", id: record.id, name: record.item, status: record.status, at: record.reportedAt })),
+        ...relatedPersonalRecords.slice(0, 3).map((record) => ({ type: "personalRecords", id: record.id, name: record.name, status: record.status || record.category, at: record.recordDate || record.date })),
+        ...relatedRecognition.slice(0, 3).map((record) => ({ type: "countyMutualRecognitionRecords", id: record.id, name: record.item, status: record.status, at: record.at }))
+      ].sort((left, right) => String(right.at || "").localeCompare(String(left.at || ""))).slice(0, 5)
+    };
+  });
+  const reviews = (data.regionalSharingAccessReviews || []).filter((review) =>
+    packages.some((item) => item.id === review.packageId)
+  );
+  return {
+    scope: data.regionalDataSharingScope || seedRegionalDataSharingScope(),
+    snapshots: data.regionalSharingSnapshots || seedRegionalSharingSnapshots(),
+    summary: {
+      totalPackages: enrichedPackages.length,
+      ready: enrichedPackages.filter((item) => item.status === "ready").length,
+      pendingReview: enrichedPackages.filter((item) => item.status === "pending_review").length,
+      blocked: enrichedPackages.filter((item) => item.status === "blocked").length,
+      accessReviews: reviews.length,
+      institutions: new Set(enrichedPackages.flatMap((item) => [item.sourceInstitution, ...(item.targetInstitutions || [])]).filter(Boolean)).size,
+      contracts: new Set(enrichedPackages.flatMap((item) => item.contractRefs || [])).size
+    },
+    packages: enrichedPackages,
+    accessReviews: reviews.slice(0, 50)
+  };
+}
+
+function createRegionalSharingAccessReview(data, payload, user) {
+  const packages = normalizeRegionalSharingPackages(data.regionalSharingPackages || seedRegionalSharingPackages());
+  const packageId = String(payload.packageId || "").trim();
+  const index = packages.findIndex((item) => item.id === packageId);
+  if (index < 0) return { status: 404, body: { error: "Not Found", message: "regional sharing package not found" } };
+  if (!canAccessRegionalSharingPackage(user, packages[index])) {
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "regional sharing access review", target: packageId, result: "denied", detail: "organization scope denied" });
+    return { status: 403, body: { error: "Forbidden", message: "organization scope denied" } };
+  }
+  if (!canAccessResident(user, packages[index].residentId, data)) {
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "regional sharing access review", target: packages[index].residentId, result: "denied", detail: "resident scope denied" });
+    return { status: 403, body: { error: "Forbidden", message: "resident scope denied" } };
+  }
+  const now = new Date().toISOString();
+  const decision = String(payload.decision || "approved").trim();
+  const review = {
+    id: `rsar-${randomUUID()}`,
+    packageId,
+    residentId: packages[index].residentId,
+    actor: user.name,
+    role: user.role,
+    organization: user.orgName || "",
+    purpose: String(payload.purpose || "regional diagnosis data sharing").trim(),
+    decision,
+    status: decision === "approved" ? "completed" : "denied",
+    at: now,
+    note: String(payload.note || "").trim()
+  };
+  packages[index] = {
+    ...packages[index],
+    status: decision === "approved" ? normalizeRegionalSharingStatus({ ...packages[index], status: "ready" }) : packages[index].status,
+    lastSharedAt: decision === "approved" ? now : packages[index].lastSharedAt,
+    lastAccessReviewId: review.id
+  };
+  data.regionalSharingPackages = packages;
+  data.regionalSharingAccessReviews = [review, ...(Array.isArray(data.regionalSharingAccessReviews) ? data.regionalSharingAccessReviews : [])].slice(0, 200);
+  appendDataAccessLog(data, user, packages[index].residentId, "regionalDataSharing", review.purpose, decision === "approved" ? "允许" : "拒绝");
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "regional sharing access review",
+      target: packageId,
+      result: decision === "approved" ? "allowed" : "denied",
+      detail: review.purpose
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+  writeDatabase(data);
+  return { status: 201, body: { review, package: packages[index] } };
+}
+
 function personIndexFromParts(idCard, phone) {
   return `${String(idCard || "").trim()}#${String(phone || "").trim()}`;
 }
@@ -4379,6 +4677,17 @@ function scopeStateForUser(data, user) {
   delete scoped.applicationCatalog;
   delete scoped.institutionCreditEvaluations;
   delete scoped.securityAcceptanceLedger;
+  if (user.role !== "institution") {
+    delete scoped.regionalDataSharingScope;
+    delete scoped.regionalSharingPackages;
+    delete scoped.regionalSharingSnapshots;
+    delete scoped.regionalSharingAccessReviews;
+  } else {
+    scoped.regionalSharingPackages = (data.regionalSharingPackages || []).filter((item) => canAccessRegionalSharingPackage(user, item));
+    scoped.regionalSharingAccessReviews = (data.regionalSharingAccessReviews || []).filter((review) =>
+      scoped.regionalSharingPackages.some((item) => item.id === review.packageId)
+    );
+  }
   if (user.role !== "county") delete scoped.countyAcceptanceLedger;
   if (user.role !== "institution") delete scoped.chronicAcceptanceLedger;
 
@@ -5536,6 +5845,21 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission", "institution", "insurance", "citizen", "county"], "/api/state");
     if (!user) return;
     sendJson(res, 200, redactSensitiveResponse(scopeStateForUser(readDatabase(), user), user));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/regional-data-sharing") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/regional-data-sharing");
+    if (!user) return;
+    sendJson(res, 200, redactSensitiveResponse(buildRegionalDataSharingView(readDatabase(), user), user));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/regional-data-sharing/access-reviews") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/regional-data-sharing/access-reviews");
+    if (!user) return;
+    const result = createRegionalSharingAccessReview(readDatabase(), await collectJson(req), user);
+    sendJson(res, result.status, redactSensitiveResponse(result.body, user));
     return;
   }
 

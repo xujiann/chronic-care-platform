@@ -13,6 +13,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "file:DEPLOYMENT.md",
     "package:scripts",
     "snapshot:collections",
+    "snapshot:regionalDataSharing",
     "snapshot:interfaceReadiness",
     "snapshot:securityAcceptance",
     "snapshot:externalDependencyRisks",

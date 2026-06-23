@@ -6897,5 +6897,221 @@
       "status": "demo-ready",
       "nextAction": "Attach live IRB approval, data-use agreement, and sandbox access records before production sharing."
     }
+  ],
+  "regionalDataSharingScope": {
+    "id": "regional-data-sharing",
+    "name": "区域诊疗数据共享平台",
+    "boundary": [
+      "Clinical summaries, diagnostic reports, mutual recognition records, and authorized access under resident master index.",
+      "Management-side supervision by region, institution, interface, quality status, and audit trail.",
+      "Institution-side access review for packages where the institution is source or target."
+    ],
+    "roles": [
+      {
+        "role": "commission",
+        "name": "management",
+        "permissions": [
+          "network overview",
+          "quality supervision",
+          "cross-institution audit",
+          "joint-test evidence"
+        ]
+      },
+      {
+        "role": "institution",
+        "name": "institution",
+        "permissions": [
+          "scoped package access",
+          "report return confirmation",
+          "recognition confirmation",
+          "issue closure"
+        ]
+      },
+      {
+        "role": "citizen",
+        "name": "resident",
+        "permissions": [
+          "view through existing personal records and authorization flows"
+        ],
+        "via": "citizen.html / personalRecords"
+      }
+    ],
+    "coreLoop": [
+      "Institution interface or manual callback writes diagnosticReports / personalRecords.",
+      "Regional rules create countyMutualRecognitionRecords and sharing packages.",
+      "Target institution registers access in regionalSharingAccessReviews.",
+      "Commission validates quality, authorization, recognition, audit, and interface evidence."
+    ],
+    "exclusions": [
+      "Does not replace hospital HIS/EMR/LIS/PACS systems.",
+      "Does not carry insurance settlement, billing, or fund clearing.",
+      "Does not bypass resident authorization, organization scope, or signed interface acceptance.",
+      "Does not use research de-identified datasets as direct clinical sources."
+    ],
+    "reusedCollections": [
+      "residents",
+      "personalRecords",
+      "diagnosticReports",
+      "countyMutualRecognitionRecords",
+      "integrationContracts",
+      "hospitalInteroperabilityFunctions",
+      "platformEvidence",
+      "dataAccessLogs",
+      "securityEvents"
+    ],
+    "statusNorms": {
+      "ready": "shareable",
+      "pending_review": "pending review",
+      "blocked": "blocked",
+      "archived": "archived"
+    }
+  },
+  "regionalSharingPackages": [
+    {
+      "id": "rsp-r1-hypertension",
+      "residentId": "r1",
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
+      "sourceInstitution": "Qingniwaqiao Community Health Center",
+      "sourceOrgCode": "MR3",
+      "targetInstitutions": [
+        "Dalian Central Hospital",
+        "Zhongshan County Consortium"
+      ],
+      "targetOrgCodes": [
+        "MR1",
+        "ORG-CONSORTIUM-ZS"
+      ],
+      "category": "chronic-followup",
+      "title": "Hypertension review sharing package",
+      "sharedCollections": [
+        "personalRecords",
+        "followups",
+        "diagnosticReports"
+      ],
+      "recordRefs": [
+        "pr-001",
+        "dr-seed-001"
+      ],
+      "contractRefs": [
+        "his-patient-v1",
+        "emr-summary-v1",
+        "lis-report-v1"
+      ],
+      "consentStatus": "active",
+      "qualityStatus": "passed",
+      "status": "ready",
+      "lastSharedAt": "2026-06-22T09:20:00.000Z",
+      "owner": "primary-care-admin",
+      "nextAction": "Receiving hospital writes back visit opinion."
+    },
+    {
+      "id": "rsp-r2-diabetes",
+      "residentId": "r2",
+      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2",
+      "sourceInstitution": "Dalian Central Hospital",
+      "sourceOrgCode": "MR1",
+      "targetInstitutions": [
+        "Xinghaiwan Community Health Center",
+        "Zhongshan County Consortium"
+      ],
+      "targetOrgCodes": [
+        "MR4",
+        "ORG-CONSORTIUM-ZS"
+      ],
+      "category": "diagnostic-report",
+      "title": "Diabetes lab mutual-recognition package",
+      "sharedCollections": [
+        "diagnosticReports",
+        "countyMutualRecognitionRecords",
+        "personalRecords"
+      ],
+      "recordRefs": [
+        "dr-seed-002",
+        "cmr-seed-002"
+      ],
+      "contractRefs": [
+        "lis-report-v1",
+        "pacs-report-v1"
+      ],
+      "consentStatus": "active",
+      "qualityStatus": "passed",
+      "status": "ready",
+      "lastSharedAt": "2026-06-22T10:15:00.000Z",
+      "owner": "hospital-admin",
+      "nextAction": "Primary institution confirms recognition and avoids duplicate test."
+    },
+    {
+      "id": "rsp-r3-imaging",
+      "residentId": "r3",
+      "personIndex": "DEMO-ID-R3#DEMO-MOBILE-R3",
+      "sourceInstitution": "Ganjingzi District Hospital",
+      "sourceOrgCode": "MR5",
+      "targetInstitutions": [
+        "Dalian Medical University Hospital"
+      ],
+      "targetOrgCodes": [
+        "MR2"
+      ],
+      "category": "imaging",
+      "title": "Imaging report review sharing package",
+      "sharedCollections": [
+        "diagnosticReports",
+        "integrationGatewayEvents"
+      ],
+      "recordRefs": [
+        "dr-seed-003"
+      ],
+      "contractRefs": [
+        "pacs-report-v1"
+      ],
+      "consentStatus": "pending",
+      "qualityStatus": "manual_review",
+      "status": "pending_review",
+      "lastSharedAt": "",
+      "owner": "regional-diagnosis-center",
+      "nextAction": "Complete resident authorization and imaging quality review before access."
+    }
+  ],
+  "regionalSharingSnapshots": {
+    "generatedAt": "2026-06-22T10:30:00.000Z",
+    "fields": {
+      "packageId": "sharing package primary key",
+      "residentId": "resident master-index link",
+      "sourceOrgCode": "source organization code",
+      "targetOrgCodes": "target organization code list",
+      "status": "ready | pending_review | blocked | archived",
+      "consentStatus": "active | pending | revoked",
+      "qualityStatus": "passed | manual_review | failed",
+      "contractRefs": "integrationContracts.id list",
+      "recordRefs": "personalRecords / diagnosticReports / countyMutualRecognitionRecords references"
+    },
+    "statusNorms": {
+      "ready": "shareable",
+      "pending_review": "pending review",
+      "blocked": "blocked",
+      "archived": "archived"
+    },
+    "staticEvidence": [
+      "residents.personIndex",
+      "personalRecords.reportId",
+      "diagnosticReports.recognitionRecordId",
+      "integrationContracts.requiredFields",
+      "interface-mapping-report.md"
+    ]
+  },
+  "regionalSharingAccessReviews": [
+    {
+      "id": "rsar-seed-001",
+      "packageId": "rsp-r1-hypertension",
+      "residentId": "r1",
+      "actor": "hospital-admin",
+      "role": "institution",
+      "organization": "Dalian Central Hospital",
+      "purpose": "Review chronic follow-up and lab summary before upward referral visit.",
+      "decision": "approved",
+      "status": "completed",
+      "at": "2026-06-22T10:40:00.000Z",
+      "note": "Access scope limited to this encounter package."
+    }
   ]
 }

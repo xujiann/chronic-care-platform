@@ -163,6 +163,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal(Boolean(pkg.scripts["environment:matrix"]), true);
   assert.equal(Boolean(pkg.scripts["integration:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["interface:mapping"]), true);
+  assert.equal(Boolean(pkg.scripts["regional-data-sharing:report"]), true);
   assert.equal(Boolean(pkg.scripts["monitoring:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["operations:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["process:audit"]), true);
@@ -190,6 +191,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /environment-matrix-report\.md/);
   assert.match(read("README.md"), /integration-readiness-report\.md/);
   assert.match(read("README.md"), /interface-mapping-report\.md/);
+  assert.match(read("scripts/release-report.js"), /regional-data-sharing-report\.md/);
   assert.match(read("README.md"), /monitoring-readiness-report\.md/);
   assert.match(read("README.md"), /operations-readiness-report\.md/);
   assert.match(read("README.md"), /process-audit-report\.md/);
@@ -228,6 +230,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/deploy-check.js"), /environment:matrix/);
   assert.match(read("scripts/deploy-check.js"), /integration:readiness/);
   assert.match(read("scripts/deploy-check.js"), /interface:mapping/);
+  assert.match(read("scripts/deploy-check.js"), /regional-data-sharing:report/);
   assert.match(read("scripts/deploy-check.js"), /monitoring:readiness/);
   assert.match(read("scripts/deploy-check.js"), /operations:readiness/);
   assert.match(read("scripts/deploy-check.js"), /process:audit/);
@@ -243,6 +246,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".github/workflows/ci.yml"), /npm run data-quality:report/);
   assert.match(read(".github/workflows/ci.yml"), /npm run integration:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run interface:mapping/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run regional-data-sharing:report/);
   assert.match(read(".github/workflows/ci.yml"), /npm run monitoring:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run operations:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run site:pack/);
@@ -253,6 +257,27 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".github/workflows/ci.yml"), /actions\/upload-artifact@v4/);
   assert.match(read(".github/workflows/ci.yml"), /release-readiness-report/);
   assert.match(read(".github/workflows/ci.yml"), /npm audit --omit=dev/);
+});
+
+test("regional data sharing application has runnable entry, API and evidence script", () => {
+  const html = read("regional-data-sharing.html");
+  const client = read("regional-data-sharing.js");
+  const server = read("server.js");
+  const script = read("scripts/regional-data-sharing.js");
+  const data = JSON.parse(read("data/db.json"));
+
+  assert.match(html, /区域诊疗数据共享平台/);
+  assert.match(html, /regional-data-sharing\.js/);
+  assert.match(client, /\/api\/regional-data-sharing/);
+  assert.match(client, /调阅留痕/);
+  assert.match(server, /seedRegionalDataSharingScope/);
+  assert.match(server, /createRegionalSharingAccessReview/);
+  assert.match(server, /\/api\/regional-data-sharing\/access-reviews/);
+  assert.match(script, /buildRegionalDataSharingReport/);
+  assert.equal(data.regionalDataSharingScope.reusedCollections.includes("residents"), true);
+  assert.equal(data.regionalDataSharingScope.exclusions.length >= 3, true);
+  assert.equal(data.regionalSharingPackages.length >= 3, true);
+  assert.equal(data.regionalSharingPackages.every((item) => ["ready", "pending_review", "blocked", "archived"].includes(item.status)), true);
 });
 
 test("platform and workbench expose P2 governance and runtime panels", () => {

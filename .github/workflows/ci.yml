@@ -49,6 +49,8 @@ jobs:
         run: npm run integration:readiness
       - name: Generate interface mapping report
         run: npm run interface:mapping
+      - name: Generate regional data sharing report
+        run: npm run regional-data-sharing:report
       - name: Generate monitoring readiness report
         run: npm run monitoring:readiness
       - name: Generate operations readiness report
