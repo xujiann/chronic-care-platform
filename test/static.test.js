@@ -18,7 +18,8 @@ test("role pages keep explicit page guards", () => {
     "county.html": "county",
     "index.html": "commission",
     "platform.html": "commission",
-    "workbench.html": "commission"
+    "workbench.html": "commission",
+    "quality-safety.html": "commission"
   };
   Object.entries(guards).forEach(([file, role]) => {
     assert.match(read(file), new RegExp(`requireRole\\(\\[\\"${role}\\"\\]\\)`), `${file} 缺少 ${role} 页面守卫`);
@@ -27,7 +28,7 @@ test("role pages keep explicit page guards", () => {
 
 test("citizen pages do not expose cross-role module links or management collections", () => {
   const citizenHtml = `${read("citizen.html")}\n${read("mobile-preview.html")}`;
-  ["institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html"].forEach((target) => {
+  ["institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html", "quality-safety.html"].forEach((target) => {
     assert.doesNotMatch(citizenHtml, new RegExp(`href=[\\"']\\./${target}`), `居民页面不应链接到 ${target}`);
   });
 
@@ -38,7 +39,7 @@ test("citizen pages do not expose cross-role module links or management collecti
 });
 
 test("application pages avoid placeholder navigation", () => {
-  const pages = ["about.html", "citizen.html", "mobile-preview.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html"];
+  const pages = ["about.html", "citizen.html", "mobile-preview.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html", "quality-safety.html"];
   pages.forEach((file) => assert.doesNotMatch(read(file), /href=["']#["']/, `${file} 存在空链接占位`));
 });
 
@@ -160,6 +161,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal(Boolean(pkg.scripts["identity:contract"]), true);
   assert.equal(Boolean(pkg.scripts["audit:retention"]), true);
   assert.equal(Boolean(pkg.scripts["data-quality:report"]), true);
+  assert.equal(Boolean(pkg.scripts["quality-safety:report"]), true);
   assert.equal(Boolean(pkg.scripts["environment:matrix"]), true);
   assert.equal(Boolean(pkg.scripts["integration:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["interface:mapping"]), true);
@@ -189,6 +191,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /identity-contract\.md/);
   assert.match(read("README.md"), /audit-retention-report\.md/);
   assert.match(read("README.md"), /data-quality-report\.md/);
+  assert.match(read("README.md"), /quality-safety-report\.md/);
   assert.match(read("README.md"), /environment-matrix-report\.md/);
   assert.match(read("README.md"), /integration-readiness-report\.md/);
   assert.match(read("README.md"), /interface-mapping-report\.md/);
@@ -208,6 +211,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("DEPLOYMENT.md"), /identity-contract\.md/);
   assert.match(read("DEPLOYMENT.md"), /audit-retention-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /data-quality-report\.md/);
+  assert.match(read("DEPLOYMENT.md"), /quality-safety-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /environment-matrix-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /integration-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /interface-mapping-report\.md/);
@@ -228,6 +232,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/deploy-check.js"), /identity:contract/);
   assert.match(read("scripts/deploy-check.js"), /audit:retention/);
   assert.match(read("scripts/deploy-check.js"), /data-quality:report/);
+  assert.match(read("scripts/deploy-check.js"), /quality-safety:report/);
   assert.match(read("scripts/deploy-check.js"), /environment:matrix/);
   assert.match(read("scripts/deploy-check.js"), /integration:readiness/);
   assert.match(read("scripts/deploy-check.js"), /interface:mapping/);
@@ -246,6 +251,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".github/workflows/ci.yml"), /npm run identity:contract/);
   assert.match(read(".github/workflows/ci.yml"), /npm run audit:retention/);
   assert.match(read(".github/workflows/ci.yml"), /npm run data-quality:report/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run quality-safety:report/);
   assert.match(read(".github/workflows/ci.yml"), /npm run integration:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run interface:mapping/);
   assert.match(read(".github/workflows/ci.yml"), /npm run regional-data-sharing:report/);
@@ -349,6 +355,35 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("server.js"), /\/api\/release-report/);
   assert.match(read("server.js"), /\/api\/production-cutover-checklist/);
   assert.match(read("server.js"), /\/api\/release-artifact-manifest/);
+});
+
+test("quality safety supervision app exposes runnable portal, API and release evidence", () => {
+  const data = JSON.parse(read("data/db.json"));
+  const html = read("quality-safety.html");
+  const js = read("quality-safety.js");
+  const server = read("server.js");
+  ["qualitySafetyEvents", "criticalValueAlerts", "clinicalPathwayCases", "medicalRecordQualityReviews", "mutualRecognitionQualityReviews", "qualityRectificationOrders"].forEach((key) => {
+    assert.equal(Array.isArray(data[key]), true, `${key} should be seeded`);
+    assert.equal(data[key].length > 0, true, `${key} should not be empty`);
+  });
+  ["diagnosticReports", "countyMutualRecognitionRecords", "dataQualityIssues", "institutionCreditEvaluations", "securityEvents", "hospitalInteroperabilityFunctions"].forEach((key) => {
+    assert.match(read("scripts/quality-safety-report.js"), new RegExp(key));
+  });
+  assert.match(html, /quality-safety-metrics/);
+  assert.match(html, /quality-safety-issues/);
+  assert.match(html, /quality-safety-rectifications/);
+  assert.match(js, /loadQualitySafety/);
+  assert.match(js, /dispatchIssue/);
+  assert.match(js, /submitFeedback/);
+  assert.match(js, /reviewOrder/);
+  assert.match(server, /\/api\/quality-safety\/dashboard/);
+  assert.match(server, /\/api\/quality-safety\/issues\/:id\/dispatch/);
+  assert.match(server, /\/api\/quality-safety\/rectifications\/:id\/feedback/);
+  assert.match(server, /\/api\/quality-safety\/rectifications\/:id\/review/);
+  assert.match(read("scripts/release-report.js"), /qualitySafety:report/);
+  assert.match(read("platform.html"), /quality-safety\.html/);
+  assert.match(read("workbench.html"), /quality-safety\.html/);
+  assert.match(read("auth.js"), /quality-safety\.html/);
 });
 
 test("system structure documentation reflects completed local governance loops", () => {

@@ -253,3 +253,13 @@ GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下
 - [部署说明](./DEPLOYMENT.md)
 - [后续开发优先级](./docs/后续开发优先级.md)
 - [GitHub 拆分部署方案](./docs/GitHub拆分部署方案.md)
+
+## Priority app 3: medical quality and safety supervision
+
+- Runnable portal: `quality-safety.html`
+- API evidence: `/api/quality-safety/dashboard`, `/api/quality-safety/issues/:id/dispatch`, `/api/quality-safety/rectifications/:id/feedback`, `/api/quality-safety/rectifications/:id/review`
+- Seed collections: `qualitySafetyEvents`, `criticalValueAlerts`, `clinicalPathwayCases`, `medicalRecordQualityReviews`, `mutualRecognitionQualityReviews`, `qualityRectificationOrders`
+- Reused collections: `diagnosticReports`, `countyMutualRecognitionRecords`, `dataQualityIssues`, `institutionCreditEvaluations`, `securityEvents`, `hospitalInteroperabilityFunctions`
+- Release artifact: `quality-safety-report.md` / `quality-safety-report.json` from `npm.cmd run quality-safety:report`
+
+Site joint-testing boundary: production HIS/EMR/LIS/PACS critical-value rules, real clinical pathway dictionaries, signed medical-record sampling forms, mutual-recognition QC rules, department sign-off evidence, and notification channels remain site-owned inputs.

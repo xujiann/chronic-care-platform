@@ -538,6 +538,12 @@ function seedState() {
     countyAiDiagnosisCases: seedCountyAiDiagnosisCases(),
     countyMutualRecognitionRecords: seedCountyMutualRecognitionRecords(),
     countyAcceptanceLedger: seedCountyAcceptanceLedger(),
+    qualitySafetyEvents: seedQualitySafetyEvents(),
+    criticalValueAlerts: seedCriticalValueAlerts(),
+    clinicalPathwayCases: seedClinicalPathwayCases(),
+    medicalRecordQualityReviews: seedMedicalRecordQualityReviews(),
+    mutualRecognitionQualityReviews: seedMutualRecognitionQualityReviews(),
+    qualityRectificationOrders: seedQualityRectificationOrders(),
     careOrders: seedCareOrders(),
     medicationPickups: seedMedicationPickups(),
     institutionSupervisions: seedInstitutionSupervisions(),
@@ -1126,6 +1132,118 @@ function seedHospitalInteroperabilityFunctions() {
       evidence: ["researchDatasets", "diseaseRegistryModels", "audit-retention-report.md"],
       status: "demo-ready",
       nextAction: "Attach live IRB approval, data-use agreement, and sandbox access records before production sharing."
+    }
+  ];
+}
+
+function seedQualitySafetyEvents() {
+  return [
+    {
+      id: "qse-med-001",
+      domain: "medical_quality",
+      type: "safety_event",
+      severity: "high",
+      institutionId: "ORG-HOSPITAL-001",
+      institutionName: "Dalian Central Hospital",
+      department: "Endocrinology",
+      residentId: "r2",
+      sourceCollection: "diagnosticReports",
+      sourceId: "dr-001",
+      title: "Critical glucose value acknowledgement overdue",
+      description: "LIS report reached critical threshold and needs closed-loop acknowledgement.",
+      reportedAt: "2026-06-22T09:12:00.000Z",
+      dueAt: "2026-06-23T09:12:00.000Z",
+      status: "dispatched",
+      ownerRole: "institution",
+      owner: "Medical quality office",
+      staticSnapshot: { reportItem: "glucose", trigger: "critical-value", sourceSystem: "LIS" },
+      auditTrail: [{ at: "2026-06-22T09:20:00.000Z", by: "health", action: "seed-dispatch", note: "Initial quality-safety seed event." }]
+    },
+    {
+      id: "qse-path-001",
+      domain: "clinical_pathway",
+      type: "pathway_variance",
+      severity: "medium",
+      institutionId: "ORG-HOSPITAL-001",
+      institutionName: "Dalian Central Hospital",
+      department: "Cardiology",
+      residentId: "r1",
+      sourceCollection: "personalRecords",
+      sourceId: "pr-001",
+      title: "Hypertension pathway follow-up evidence missing",
+      description: "Clinical pathway milestone lacks follow-up assessment and medication education evidence.",
+      reportedAt: "2026-06-21T10:00:00.000Z",
+      dueAt: "2026-06-28T10:00:00.000Z",
+      status: "open",
+      ownerRole: "institution",
+      owner: "Clinical pathway office",
+      staticSnapshot: { pathway: "hypertension-standard-pathway", variance: "missing-followup-evidence" },
+      auditTrail: [{ at: "2026-06-21T10:00:00.000Z", by: "health", action: "seed-open", note: "Pathway variance captured from EMR summary." }]
+    },
+    {
+      id: "qse-record-001",
+      domain: "medical_record_qc",
+      type: "record_defect",
+      severity: "medium",
+      institutionId: "ORG-COMMUNITY-001",
+      institutionName: "Qingniwaqiao Community Health Service Center",
+      department: "General practice",
+      residentId: "r4",
+      sourceCollection: "dataQualityIssues",
+      sourceId: "dq-credit-credit-community",
+      title: "Medical record quality sampling requires rectification",
+      description: "Sampling found incomplete chronic disease assessment fields and missing physician sign-off.",
+      reportedAt: "2026-06-20T14:30:00.000Z",
+      dueAt: "2026-06-27T14:30:00.000Z",
+      status: "feedback_submitted",
+      ownerRole: "institution",
+      owner: "Community quality manager",
+      staticSnapshot: { sampleRate: "5%", defectLevel: "B", sourceSystem: "EMR" },
+      auditTrail: [{ at: "2026-06-20T14:30:00.000Z", by: "health", action: "seed-review", note: "Medical record QC sampling event." }]
+    }
+  ];
+}
+
+function seedCriticalValueAlerts() {
+  return [
+    { id: "cva-001", eventId: "qse-med-001", reportId: "dr-001", residentId: "r2", item: "glucose", value: "26.1 mmol/L", threshold: ">25 mmol/L", level: "high", sourceInstitution: "Dalian Central Hospital", targetInstitution: "Dalian Central Hospital", reportedAt: "2026-06-22T09:12:00.000Z", acknowledgedAt: "", disposedAt: "", status: "pending_disposition", action: "Notify responsible physician and complete disposition note." }
+  ];
+}
+
+function seedClinicalPathwayCases() {
+  return [
+    { id: "cpc-001", eventId: "qse-path-001", residentId: "r1", pathwayCode: "HTN-2026", pathwayName: "Hypertension standard pathway", institutionName: "Dalian Central Hospital", currentNode: "follow-up-after-medication", varianceType: "missing_evidence", varianceReason: "Follow-up result not written back to EMR.", status: "variance_open", owner: "Clinical pathway office", dueAt: "2026-06-28T10:00:00.000Z" }
+  ];
+}
+
+function seedMedicalRecordQualityReviews() {
+  return [
+    { id: "mrq-001", eventId: "qse-record-001", institutionName: "Qingniwaqiao Community Health Service Center", sampleNo: "MRQ-2026-06-001", sampleScope: "Chronic disease outpatient records", defectCount: 3, score: 86, grade: "B", reviewer: "City medical record QC group", reviewedAt: "2026-06-20T14:30:00.000Z", status: "feedback_submitted", nextAction: "Upload corrected EMR screenshots and physician sign-off." }
+  ];
+}
+
+function seedMutualRecognitionQualityReviews() {
+  return [
+    { id: "mrqr-001", recognitionRecordId: "cmr-001", reportId: "dr-001", institutionName: "Dalian Central Hospital", item: "glucose", qcStatus: "manual_review_required", issueType: "critical_value_followup", status: "open", owner: "Regional mutual recognition QC", dueAt: "2026-06-24T18:00:00.000Z", nextAction: "Verify critical value acknowledgement before recognition." }
+  ];
+}
+
+function seedQualityRectificationOrders() {
+  return [
+    {
+      id: "qro-001",
+      issueId: "qse-record-001",
+      sourceType: "medical_record_qc",
+      institutionName: "Qingniwaqiao Community Health Service Center",
+      ownerRole: "institution",
+      owner: "Community quality manager",
+      requirement: "Complete missing assessment fields and physician sign-off.",
+      status: "feedback_submitted",
+      dispatchedAt: "2026-06-20T15:00:00.000Z",
+      dueAt: "2026-06-27T15:00:00.000Z",
+      feedback: [{ at: "2026-06-22T16:00:00.000Z", by: "community", byName: "Community doctor", content: "Corrected assessment fields have been uploaded for review.", attachments: ["emr-correction-screenshot"] }],
+      review: [],
+      auditTrail: [{ at: "2026-06-20T15:00:00.000Z", by: "health", action: "dispatch", note: "Seed rectification order." }]
     }
   ];
 }
@@ -3388,6 +3506,12 @@ function normalizeState(data) {
     countyAiDiagnosisCases: mergeByKey(seedCountyAiDiagnosisCases(), data.countyAiDiagnosisCases, "id"),
     countyMutualRecognitionRecords: mergeByKey(seedCountyMutualRecognitionRecords(), data.countyMutualRecognitionRecords, "id"),
     countyAcceptanceLedger: mergeByKey(seedCountyAcceptanceLedger(), data.countyAcceptanceLedger, "id"),
+    qualitySafetyEvents: mergeByKey(seedQualitySafetyEvents(), data.qualitySafetyEvents, "id"),
+    criticalValueAlerts: mergeByKey(seedCriticalValueAlerts(), data.criticalValueAlerts, "id"),
+    clinicalPathwayCases: mergeByKey(seedClinicalPathwayCases(), data.clinicalPathwayCases, "id"),
+    medicalRecordQualityReviews: mergeByKey(seedMedicalRecordQualityReviews(), data.medicalRecordQualityReviews, "id"),
+    mutualRecognitionQualityReviews: mergeByKey(seedMutualRecognitionQualityReviews(), data.mutualRecognitionQualityReviews, "id"),
+    qualityRectificationOrders: mergeByKey(seedQualityRectificationOrders(), data.qualityRectificationOrders, "id"),
     mutualRecognitionRules: mergeByKey(seedMutualRecognitionRules(), data.mutualRecognitionRules, "id"),
     diagnosticReports: mergeByKey(seedDiagnosticReports(), data.diagnosticReports, "id"),
     regionalDataSharingScope: data.regionalDataSharingScope && typeof data.regionalDataSharingScope === "object" ? { ...seedRegionalDataSharingScope(), ...data.regionalDataSharingScope } : seedRegionalDataSharingScope(),
@@ -4777,6 +4901,12 @@ function scopeStateForUser(data, user) {
       scoped.regionalSharingPackages.some((item) => item.id === review.packageId)
     );
   }
+  delete scoped.qualitySafetyEvents;
+  delete scoped.criticalValueAlerts;
+  delete scoped.clinicalPathwayCases;
+  delete scoped.medicalRecordQualityReviews;
+  delete scoped.mutualRecognitionQualityReviews;
+  delete scoped.qualityRectificationOrders;
   if (user.role !== "county") delete scoped.countyAcceptanceLedger;
   if (user.role !== "institution") delete scoped.chronicAcceptanceLedger;
 
@@ -5327,6 +5457,147 @@ function buildDataQualityScorecard(data) {
     trustedSources,
     score: Math.max(0, 100 - issues.filter((issue) => issue.status !== "closed").length * 5)
   };
+}
+
+function normalizeQualitySafetyStatus(status) {
+  const text = String(status || "open").trim().toLowerCase();
+  if (/closed|resolved|approved|review_passed|completed|recognized/.test(text)) return "closed";
+  if (/feedback|submitted|review/.test(text)) return "reviewing";
+  if (/dispatch|in_progress|pending_disposition|variance_open/.test(text)) return "in_progress";
+  if (/reject|returned|overdue/.test(text)) return "returned";
+  return "open";
+}
+
+function qualitySafetyVisibleRows(rows, user) {
+  if (user.role === "commission") return rows;
+  if (user.role === "county") {
+    return rows.filter((item) => /county|regional|recognition/i.test(`${item.ownerRole || ""} ${item.sourceCollection || ""} ${item.type || ""} ${item.domain || ""}`));
+  }
+  if (user.role === "institution") {
+    return rows.filter((item) => ["institution", ""].includes(String(item.ownerRole || "")) || /hospital|community|institution/i.test(`${item.institutionName || ""}${item.owner || ""}`));
+  }
+  return [];
+}
+
+function buildQualitySafetyIssues(data) {
+  const eventRows = (Array.isArray(data.qualitySafetyEvents) ? data.qualitySafetyEvents : []).map((item) => ({
+    ...item,
+    sourceType: item.type || "quality_safety_event",
+    normalizedStatus: normalizeQualitySafetyStatus(item.status)
+  }));
+  const dataQualityRows = buildDataQualityIssues(data).map((issue) => ({
+    id: `qs-${issue.id}`,
+    domain: "data_quality",
+    type: issue.type || "data_quality_issue",
+    severity: issue.severity || "medium",
+    residentId: issue.residentId || "",
+    sourceCollection: "dataQualityIssues",
+    sourceId: issue.id,
+    title: issue.title || issue.type || "Data quality issue",
+    description: issue.comment || issue.nextAction || "",
+    status: issue.status || "open",
+    normalizedStatus: normalizeQualitySafetyStatus(issue.status),
+    ownerRole: issue.ownerRole || "commission",
+    owner: issue.owner || "Data quality steward"
+  }));
+  const creditRows = (Array.isArray(data.institutionCreditEvaluations) ? data.institutionCreditEvaluations : [])
+    .filter((item) => /rectification|整改|鏁存敼/i.test(`${item.status || ""}${item.next || ""}`))
+    .map((item) => ({
+      id: `qs-credit-${item.id}`,
+      domain: "institution_credit",
+      type: "credit_rectification",
+      severity: Number(item.score || 0) < 85 ? "medium" : "low",
+      institutionName: item.name,
+      sourceCollection: "institutionCreditEvaluations",
+      sourceId: item.id,
+      title: `Institution credit rectification: ${item.name}`,
+      description: item.next || "",
+      status: item.status || "open",
+      normalizedStatus: normalizeQualitySafetyStatus(item.status),
+      ownerRole: "commission",
+      owner: item.owner || ""
+    }));
+  const securityRows = highRiskSecurityEvents(data).slice(0, 20).map((item) => ({
+    id: `qs-security-${item.id}`,
+    domain: "security_audit",
+    type: "security_event",
+    severity: /denied|拒绝|鎷掔粷/i.test(`${item.result || ""}${item.detail || ""}`) ? "high" : "medium",
+    sourceCollection: "securityEvents",
+    sourceId: item.id,
+    title: `Security event: ${item.action || item.target || item.id}`,
+    description: item.detail || "",
+    status: "open",
+    normalizedStatus: "open",
+    ownerRole: "commission",
+    owner: item.actor || ""
+  }));
+  return [...eventRows, ...dataQualityRows, ...creditRows, ...securityRows];
+}
+
+function buildQualitySafetyDashboard(data, user) {
+  const issues = qualitySafetyVisibleRows(buildQualitySafetyIssues(data), user);
+  const rectifications = qualitySafetyVisibleRows(Array.isArray(data.qualityRectificationOrders) ? data.qualityRectificationOrders : [], user)
+    .map((item) => ({ ...item, normalizedStatus: normalizeQualitySafetyStatus(item.status) }));
+  const summary = {
+    issues: issues.length,
+    open: issues.filter((item) => item.normalizedStatus === "open").length,
+    inProgress: issues.filter((item) => item.normalizedStatus === "in_progress").length,
+    reviewing: issues.filter((item) => item.normalizedStatus === "reviewing").length,
+    closed: issues.filter((item) => item.normalizedStatus === "closed").length,
+    rectifications: rectifications.length,
+    criticalValues: Array.isArray(data.criticalValueAlerts) ? data.criticalValueAlerts.length : 0,
+    clinicalPathways: Array.isArray(data.clinicalPathwayCases) ? data.clinicalPathwayCases.length : 0,
+    medicalRecordReviews: Array.isArray(data.medicalRecordQualityReviews) ? data.medicalRecordQualityReviews.length : 0,
+    mutualRecognitionReviews: Array.isArray(data.mutualRecognitionQualityReviews) ? data.mutualRecognitionQualityReviews.length : 0
+  };
+  const reusableCollections = [
+    "diagnosticReports",
+    "countyMutualRecognitionRecords",
+    "dataQualityIssues",
+    "institutionCreditEvaluations",
+    "securityEvents",
+    "hospitalInteroperabilityFunctions"
+  ].map((collection) => ({
+    collection,
+    rows: Array.isArray(data[collection]) ? data[collection].length : 0,
+    reusedFor: {
+      diagnosticReports: "critical value and report quality signals",
+      countyMutualRecognitionRecords: "mutual recognition QC",
+      dataQualityIssues: "master-data issue dispatch",
+      institutionCreditEvaluations: "institution rectification context",
+      securityEvents: "audit trail and high-risk event evidence",
+      hospitalInteroperabilityFunctions: "HIS/EMR/LIS/PACS management boundary"
+    }[collection]
+  }));
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    role: user.role,
+    summary,
+    issues,
+    rectifications,
+    criticalValueAlerts: Array.isArray(data.criticalValueAlerts) ? data.criticalValueAlerts : [],
+    clinicalPathwayCases: Array.isArray(data.clinicalPathwayCases) ? data.clinicalPathwayCases : [],
+    medicalRecordQualityReviews: Array.isArray(data.medicalRecordQualityReviews) ? data.medicalRecordQualityReviews : [],
+    mutualRecognitionQualityReviews: Array.isArray(data.mutualRecognitionQualityReviews) ? data.mutualRecognitionQualityReviews : [],
+    reusedCollections: reusableCollections
+  };
+}
+
+function appendQualitySafetyAudit(data, user, action, target, detail) {
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action,
+      target,
+      result: "allowed",
+      detail
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
 }
 
 function buildComplianceReport(data) {
@@ -6225,6 +6496,138 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/data-quality/scorecard");
     if (!user) return;
     sendJson(res, 200, buildDataQualityScorecard(readDatabase()));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/quality-safety/dashboard") {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/quality-safety/dashboard");
+    if (!user) return;
+    sendJson(res, 200, buildQualitySafetyDashboard(readDatabase(), user));
+    return;
+  }
+
+  const qualityDispatchMatch = url.pathname.match(/^\/api\/quality-safety\/issues\/([^/]+)\/dispatch$/);
+  if (req.method === "POST" && qualityDispatchMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/quality-safety/issues/:id/dispatch");
+    if (!user) return;
+    const data = readDatabase();
+    const issueId = decodeURIComponent(qualityDispatchMatch[1]);
+    const issue = buildQualitySafetyIssues(data).find((item) => item.id === issueId || item.sourceId === issueId);
+    if (!issue) {
+      sendJson(res, 404, { error: "Not Found", message: "Quality safety issue not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const now = new Date().toISOString();
+    const order = {
+      id: `qro-${randomUUID()}`,
+      issueId: issue.id,
+      sourceType: issue.type || issue.sourceType || "quality_safety_issue",
+      institutionName: String(payload.institutionName || issue.institutionName || issue.owner || "site-pending").trim(),
+      ownerRole: String(payload.ownerRole || issue.ownerRole || "institution").trim(),
+      owner: String(payload.owner || issue.owner || user.name || "").trim(),
+      requirement: String(payload.requirement || issue.description || issue.title || "Complete quality-safety rectification.").trim(),
+      status: "dispatched",
+      dispatchedAt: now,
+      dueAt: String(payload.dueAt || issue.dueAt || "").trim(),
+      feedback: [],
+      review: [],
+      auditTrail: [{ at: now, by: user.username || user.role, action: "dispatch", note: String(payload.comment || "").trim() }]
+    };
+    data.qualityRectificationOrders = [order, ...(Array.isArray(data.qualityRectificationOrders) ? data.qualityRectificationOrders : [])].slice(0, 300);
+    data.qualitySafetyEvents = (Array.isArray(data.qualitySafetyEvents) ? data.qualitySafetyEvents : []).map((item) => item.id === issue.sourceId || item.id === issue.id ? {
+      ...item,
+      status: "dispatched",
+      rectificationOrderId: order.id,
+      auditTrail: [{ at: now, by: user.username || user.role, action: "dispatch", note: order.requirement }, ...(item.auditTrail || [])].slice(0, 50)
+    } : item);
+    appendQualitySafetyAudit(data, user, "quality-safety dispatch", issue.id, order.requirement);
+    writeDatabase(data);
+    sendJson(res, 201, order);
+    return;
+  }
+
+  const qualityFeedbackMatch = url.pathname.match(/^\/api\/quality-safety\/rectifications\/([^/]+)\/feedback$/);
+  if (req.method === "POST" && qualityFeedbackMatch) {
+    const user = requireApiRole(req, res, ["institution", "county", "commission"], "/api/quality-safety/rectifications/:id/feedback");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(qualityFeedbackMatch[1]);
+    const orders = Array.isArray(data.qualityRectificationOrders) ? data.qualityRectificationOrders : [];
+    const index = orders.findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Quality rectification order not found" });
+      return;
+    }
+    if (user.role !== "commission" && ![user.role, ""].includes(String(orders[index].ownerRole || ""))) {
+      sendJson(res, 403, { error: "Forbidden", message: "Current role cannot submit this rectification feedback" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const now = new Date().toISOString();
+    const feedback = {
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      content: String(payload.content || payload.feedback || "").trim(),
+      attachments: Array.isArray(payload.attachments) ? payload.attachments.map((item) => String(item).trim()).filter(Boolean) : []
+    };
+    orders[index] = {
+      ...orders[index],
+      status: "feedback_submitted",
+      feedback: [feedback, ...(orders[index].feedback || [])].slice(0, 50),
+      auditTrail: [{ at: now, by: user.username || user.role, action: "feedback", note: feedback.content }, ...(orders[index].auditTrail || [])].slice(0, 50)
+    };
+    data.qualityRectificationOrders = orders;
+    appendQualitySafetyAudit(data, user, "quality-safety feedback", id, feedback.content);
+    writeDatabase(data);
+    sendJson(res, 200, orders[index]);
+    return;
+  }
+
+  const qualityReviewMatch = url.pathname.match(/^\/api\/quality-safety\/rectifications\/([^/]+)\/review$/);
+  if (req.method === "POST" && qualityReviewMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/quality-safety/rectifications/:id/review");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(qualityReviewMatch[1]);
+    const orders = Array.isArray(data.qualityRectificationOrders) ? data.qualityRectificationOrders : [];
+    const index = orders.findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Quality rectification order not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const decision = String(payload.decision || "approved").trim();
+    if (!["approved", "returned", "closed"].includes(decision)) {
+      sendJson(res, 400, { error: "Bad Request", message: "decision must be approved, returned or closed" });
+      return;
+    }
+    const now = new Date().toISOString();
+    const review = {
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      decision,
+      comment: String(payload.comment || "").trim()
+    };
+    const status = decision === "returned" ? "returned" : "closed";
+    orders[index] = {
+      ...orders[index],
+      status,
+      review: [review, ...(orders[index].review || [])].slice(0, 50),
+      auditTrail: [{ at: now, by: user.username || user.role, action: "review", note: `${decision}: ${review.comment}` }, ...(orders[index].auditTrail || [])].slice(0, 50)
+    };
+    data.qualityRectificationOrders = orders;
+    data.qualitySafetyEvents = (Array.isArray(data.qualitySafetyEvents) ? data.qualitySafetyEvents : []).map((item) => item.id === orders[index].issueId ? {
+      ...item,
+      status,
+      reviewedAt: now,
+      reviewedBy: user.username || user.role
+    } : item);
+    appendQualitySafetyAudit(data, user, "quality-safety review", id, `${decision}: ${review.comment}`);
+    writeDatabase(data);
+    sendJson(res, 200, orders[index]);
     return;
   }
 

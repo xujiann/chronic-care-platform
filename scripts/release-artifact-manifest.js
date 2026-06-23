@@ -14,6 +14,7 @@ const ARTIFACTS = [
   ["identity-contract", "identity", "Identity integration contract", "release/identity-contract.json", "release/identity-contract.md", "identity:contract", "/api/auth/identity/preview"],
   ["audit-retention", "security", "Audit retention report", "release/audit-retention-report.json", "release/audit-retention-report.md", "audit:retention", "/api/audit/verify"],
   ["data-quality", "data", "Data quality report", "release/data-quality-report.json", "release/data-quality-report.md", "data-quality:report", "/api/data-quality/scorecard"],
+  ["quality-safety", "quality", "Medical quality and safety supervision report", "release/quality-safety-report.json", "release/quality-safety-report.md", "quality-safety:report", "/api/quality-safety/dashboard"],
   ["environment-matrix", "environment", "Environment matrix report", "release/environment-matrix-report.json", "release/environment-matrix-report.md", "environment:matrix", "env:check:production"],
   ["integration-readiness", "integration", "Integration readiness report", "release/integration-readiness-report.json", "release/integration-readiness-report.md", "integration:readiness", "/api/integration/contracts"],
   ["interface-mapping", "integration", "Interface mapping report", "release/interface-mapping-report.json", "release/interface-mapping-report.md", "interface:mapping", "/api/integrations/gateway"],
