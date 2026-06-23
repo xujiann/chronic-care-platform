@@ -11,17 +11,29 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 async function loadDashboardSummary() {
+  let fallbackReason = "静态预览";
   if (DASHBOARD_API_BASE) {
     try {
       const request = window.HealthCityAuth?.authFetch || fetch;
       const response = await request(`${DASHBOARD_API_BASE}${DASHBOARD_SUMMARY_PATH}`);
-      if (response.ok) return response.json();
+      if (response.ok) {
+        const summary = await response.json();
+        summary.sourceMode = "api";
+        summary.sourceLabel = "管理端动态汇总";
+        return summary;
+      }
+      fallbackReason = `接口返回 ${response.status}`;
     } catch (error) {
+      fallbackReason = "接口不可用";
       // Static preview falls back to local data.
     }
   }
   const state = await loadPlatformState({});
-  return buildStaticDashboardSummary(state);
+  const summary = buildStaticDashboardSummary(state);
+  summary.sourceMode = "static";
+  summary.sourceLabel = "静态快照兜底";
+  summary.sourceReason = fallbackReason;
+  return summary;
 }
 
 function buildStaticDashboardSummary(state) {
@@ -99,6 +111,7 @@ function buildStaticDashboardSummary(state) {
 
 function renderDashboard(summary) {
   renderMetrics(summary);
+  renderDataState(summary);
   document.querySelector("#dashboard-scope").textContent = summary.scope?.rule || "";
   renderFilterOptions(summary);
   renderApplications(summary.applications || []);
@@ -108,6 +121,19 @@ function renderDashboard(summary) {
   renderInterfaces(summary.interfaces || []);
   renderEvidence(summary.evidence || []);
   renderFilterSummary(summary);
+}
+
+function renderDataState(summary) {
+  const state = document.querySelector("#dashboard-api-state");
+  const boundary = document.querySelector("#dashboard-data-boundary");
+  if (state) {
+    state.textContent = summary.sourceMode === "api"
+      ? `${summary.sourceLabel || "管理端动态汇总"} / ${summary.generatedAt || ""}`
+      : `${summary.sourceLabel || "静态快照兜底"} / ${summary.sourceReason || "本地数据"}`;
+  }
+  if (boundary) {
+    boundary.textContent = summary.scope?.rule || "综合驾驶舱只汇总源应用，不替代源业务办理。";
+  }
 }
 
 function renderMetrics(summary) {
