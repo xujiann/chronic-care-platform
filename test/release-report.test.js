@@ -105,6 +105,9 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.identityContract.ok, true);
   assert.equal(report.checks.some((item) => item.name === "audit:retention" && item.passed), true);
   assert.equal(report.auditRetention.ok, true);
+  assert.equal(report.checks.some((item) => item.name === "chronicFollowup:readiness" && item.passed), true);
+  assert.equal(report.chronicFollowup.ok, true);
+  assert.equal(report.chronicFollowup.apiSurface.includes("POST /api/chronic/followup-feedback"), true);
   assert.equal(report.checks.some((item) => item.name === "dataQuality:report" && item.passed), true);
   assert.equal(report.dataQuality.ok, true);
   assert.equal(report.checks.some((item) => item.name === "drugConsumable:readiness" && item.passed), true);
@@ -238,6 +241,8 @@ test("release report writes standalone production cutover and storage artifacts"
   const identityMarkdown = fs.readFileSync(path.join(outputDir, "identity-contract.md"), "utf8");
   const auditJson = JSON.parse(fs.readFileSync(path.join(outputDir, "audit-retention-report.json"), "utf8"));
   const auditMarkdown = fs.readFileSync(path.join(outputDir, "audit-retention-report.md"), "utf8");
+  const chronicFollowupJson = JSON.parse(fs.readFileSync(path.join(outputDir, "chronic-followup-readiness-report.json"), "utf8"));
+  const chronicFollowupMarkdown = fs.readFileSync(path.join(outputDir, "chronic-followup-readiness-report.md"), "utf8");
   const dataQualityJson = JSON.parse(fs.readFileSync(path.join(outputDir, "data-quality-report.json"), "utf8"));
   const dataQualityMarkdown = fs.readFileSync(path.join(outputDir, "data-quality-report.md"), "utf8");
   const drugConsumableJson = JSON.parse(fs.readFileSync(path.join(outputDir, "drug-consumable-readiness-report.json"), "utf8"));
@@ -279,6 +284,8 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(identityMarkdown, /Required external claims/);
   assert.equal(auditJson.auditRetention.ok, true);
   assert.match(auditMarkdown, /Audit chains/);
+  assert.equal(chronicFollowupJson.chronicFollowup.ok, true);
+  assert.match(chronicFollowupMarkdown, /resident-feedback/);
   assert.equal(dataQualityJson.dataQuality.ok, true);
   assert.match(dataQualityMarkdown, /Resident-linked collections/);
   assert.equal(drugConsumableJson.drugConsumable.ok, true);
@@ -314,6 +321,7 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.equal(manifestJson.releaseArtifactManifest.ok, true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "service-acceptance"), true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "referral-teleconsultation"), true);
+  assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "chronic-followup"), true);
   assert.match(manifestMarkdown, /Release artifact manifest/);
   assert.match(manifestMarkdown, /service-acceptance-summary\.md/);
   assert.match(manifestMarkdown, /release\/templates\/identity-source-mapping\/README\.md/);

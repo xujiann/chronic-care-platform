@@ -16,6 +16,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "snapshot:regionalDataSharing",
     "snapshot:interfaceReadiness",
     "snapshot:securityAcceptance",
+    "snapshot:chronicFollowupStatusPolicy",
     "snapshot:externalDependencyRisks",
     "snapshot:p2-complete",
     "snapshot:accessibility",

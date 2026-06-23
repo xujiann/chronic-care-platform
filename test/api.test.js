@@ -770,6 +770,56 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(chronicRisk.body.queue.some((item) => item.residentId === "r1" && item.priority === "high"), true);
     assert.equal(chronicRisk.body.queue.every((item) => item.nextAction && item.serviceLevel && item.openCounts), true);
 
+    const chronicFollowupSummary = await api(baseUrl, "/api/chronic/followup-summary", authorized(commissionToken));
+    assert.equal(chronicFollowupSummary.response.status, 200);
+    assert.equal(chronicFollowupSummary.body.ok, true);
+    assert.equal(chronicFollowupSummary.body.summary.feedbackRecords >= 1, true);
+    assert.equal(chronicFollowupSummary.body.residents.some((item) => item.residentId === "r1" && item.medicationAdherence.total >= 1), true);
+
+    const citizenFollowupSummary = await api(baseUrl, "/api/chronic/followup-summary?residentId=r1", authorized(citizen.body.token));
+    assert.equal(citizenFollowupSummary.response.status, 200);
+    assert.equal(citizenFollowupSummary.body.residents.every((item) => ["r1"].includes(item.residentId)), true);
+
+    const feedback = await api(baseUrl, "/api/chronic/followup-feedback", authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        followupId: "f1",
+        medicationTaken: true,
+        symptoms: "home blood pressure remains high",
+        nextRequest: "family doctor phone review"
+      })
+    }));
+    assert.equal(feedback.response.status, 201);
+    assert.equal(feedback.body.category, "chronic-feedback");
+    assert.equal(feedback.body.meta.followupId, "f1");
+
+    const feedbackDenied = await api(baseUrl, "/api/chronic/followup-feedback", authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({ residentId: "r2", followupId: "f2", feedback: "tampered resident" })
+    }));
+    assert.equal(feedbackDenied.response.status, 403);
+
+    const dispatched = await api(baseUrl, "/api/chronic/followup-dispatch", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({
+        collection: "followups",
+        id: "f1",
+        status: "已完成",
+        updates: { result: "completed after resident feedback" },
+        note: "closed by commission regression test"
+      })
+    }));
+    assert.equal(dispatched.response.status, 200);
+    assert.equal(dispatched.body.status, "已完成");
+    assert.equal(dispatched.body.disposition, "handled");
+
+    const dispatchDenied = await api(baseUrl, "/api/chronic/followup-dispatch", authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({ collection: "followups", id: "f2", status: "已完成" })
+    }));
+    assert.equal(dispatchDenied.response.status, 403);
+
     const chronicDenied = await api(baseUrl, "/api/chronic/acceptance-ledger", authorized(insurance.body.token));
     assert.equal(chronicDenied.response.status, 403);
     const chronicRiskDenied = await api(baseUrl, "/api/chronic/risk-stratification", authorized(insurance.body.token));

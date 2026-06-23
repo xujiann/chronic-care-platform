@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { buildAuditRetentionReport, renderMarkdown: renderAuditRetentionMarkdown } = require("./audit-retention");
+const { buildChronicFollowupReadinessReport, renderMarkdown: renderChronicFollowupMarkdown } = require("./chronic-followup-readiness");
 const { buildDataQualityReport, renderMarkdown: renderDataQualityMarkdown } = require("./data-quality-report");
 const { buildDrugConsumableReadinessReport, renderMarkdown: renderDrugConsumableMarkdown } = require("./drug-consumable-readiness");
 const { buildEvaluationEvidenceReport, renderMarkdown: renderEvaluationEvidenceMarkdown } = require("./evaluation-evidence");
@@ -279,6 +280,14 @@ function auditRetentionChecks(auditRetention) {
     check("audit:retention", auditRetention.ok, auditRetention.ok ? "audit retention checks passed" : "audit retention checks failed", "error", "audit"),
     check("audit:exportDigest", Boolean(auditRetention.exportDigest), auditRetention.exportDigest || "missing", "error", "audit"),
     check("audit:retentionTargetConfigured", auditRetention.retentionTargets?.some((item) => item.configured), "production target is required during site cutover", "warn", "audit")
+  ];
+}
+
+function chronicFollowupChecks(chronicFollowup) {
+  return [
+    check("chronicFollowup:readiness", chronicFollowup.ok, chronicFollowup.ok ? "chronic follow-up readiness checks passed" : "chronic follow-up readiness checks failed", "error", "chronic-followup"),
+    check("chronicFollowup:boundaries", chronicFollowup.summary?.passed === chronicFollowup.summary?.boundaries, `${chronicFollowup.summary?.passed || 0}/${chronicFollowup.summary?.boundaries || 0} boundaries`, "error", "chronic-followup"),
+    check("chronicFollowup:feedback", chronicFollowup.summary?.feedbackRecords >= 1, `${chronicFollowup.summary?.feedbackRecords || 0} feedback records`, "error", "chronic-followup")
   ];
 }
 
@@ -569,6 +578,7 @@ function buildReleaseReport(options = {}) {
   const storageModel = inspectStorageModel({ dataDir: path.join(ROOT, "data") });
   const identityContract = buildIdentityContract({ data });
   const auditRetention = buildAuditRetentionReport({ data, env: options.env || process.env });
+  const chronicFollowup = buildChronicFollowupReadinessReport({ data });
   const dataQuality = buildDataQualityReport({ data });
   const qualitySafety = buildQualitySafetyReport({ data });
   const drugConsumable = buildDrugConsumableReadinessReport({ data, pkg });
@@ -597,6 +607,7 @@ function buildReleaseReport(options = {}) {
     ...storageModelChecks(storageModel),
     ...identityContractChecks(identityContract),
     ...auditRetentionChecks(auditRetention),
+    ...chronicFollowupChecks(chronicFollowup),
     ...dataQualityChecks(dataQuality),
     ...qualitySafetyChecks(qualitySafety),
     ...drugConsumableChecks(drugConsumable),
@@ -635,6 +646,7 @@ function buildReleaseReport(options = {}) {
     storageModel,
     identityContract,
     auditRetention,
+    chronicFollowup,
     dataQuality,
     qualitySafety,
     drugConsumable,
@@ -800,6 +812,10 @@ function renderMarkdown(report) {
     "",
     "See `audit-retention-report.json` and `audit-retention-report.md` for audit-chain verification, export digest, retention targets, and security acceptance evidence.",
     "",
+    "## Chronic follow-up readiness report",
+    "",
+    "See `chronic-followup-readiness-report.json` and `chronic-followup-readiness-report.md` for screening, tiered management, post-discharge follow-up, return visit reminders, medication adherence, family doctor collaboration, and resident feedback evidence.",
+    "",
     "## Integration readiness report",
     "",
     "See `integration-readiness-report.json` and `integration-readiness-report.md` for P0 interface coverage, external contract readiness, idempotency, signature, and retry policy evidence.",
@@ -915,6 +931,14 @@ function writeOutput(report, flags) {
       profile: report.profile,
       generatedAt: report.generatedAt,
       auditRetention: report.auditRetention
+    }, null, 2), "utf8");
+    const chronicFollowupJson = path.join(path.dirname(output), "chronic-followup-readiness-report.json");
+    fs.writeFileSync(chronicFollowupJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      chronicFollowup: report.chronicFollowup
     }, null, 2), "utf8");
     const dataQualityJson = path.join(path.dirname(output), "data-quality-report.json");
     fs.writeFileSync(dataQualityJson, JSON.stringify({
@@ -1066,6 +1090,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(identityMarkdown, renderIdentityContractMarkdown(report.identityContract), "utf8");
     const auditMarkdown = path.join(path.dirname(markdown), "audit-retention-report.md");
     fs.writeFileSync(auditMarkdown, renderAuditRetentionMarkdown(report.auditRetention), "utf8");
+    const chronicFollowupMarkdown = path.join(path.dirname(markdown), "chronic-followup-readiness-report.md");
+    fs.writeFileSync(chronicFollowupMarkdown, renderChronicFollowupMarkdown(report.chronicFollowup), "utf8");
     const dataQualityMarkdown = path.join(path.dirname(markdown), "data-quality-report.md");
     fs.writeFileSync(dataQualityMarkdown, renderDataQualityMarkdown(report.dataQuality), "utf8");
     const qualitySafetyMarkdown = path.join(path.dirname(markdown), "quality-safety-report.md");

@@ -178,6 +178,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal(Boolean(pkg.scripts["storage:inspect"]), true);
   assert.equal(Boolean(pkg.scripts["identity:contract"]), true);
   assert.equal(Boolean(pkg.scripts["audit:retention"]), true);
+  assert.equal(Boolean(pkg.scripts["chronic:followup-readiness"]), true);
   assert.equal(Boolean(pkg.scripts["data-quality:report"]), true);
   assert.equal(Boolean(pkg.scripts["quality-safety:report"]), true);
   assert.equal(Boolean(pkg.scripts["drug-consumable:readiness"]), true);
@@ -210,6 +211,8 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /storage-model-inspection\.md/);
   assert.match(read("README.md"), /identity-contract\.md/);
   assert.match(read("README.md"), /audit-retention-report\.md/);
+  assert.match(read("docs/chronic-followup-readiness.md"), /chronic-followup-readiness-report\.md/);
+  assert.match(read("docs/chronic-followup-readiness.md"), /\/api\/chronic\/followup-feedback/);
   assert.match(read("README.md"), /data-quality-report\.md/);
   assert.match(read("README.md"), /quality-safety-report\.md/);
   assert.match(read("README.md"), /drug-consumable-readiness-report\.md/);
@@ -255,6 +258,8 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/deploy-check.js"), /audit/);
   assert.match(read("scripts/deploy-check.js"), /identity:contract/);
   assert.match(read("scripts/deploy-check.js"), /audit:retention/);
+  assert.match(read("scripts/deploy-check.js"), /chronic:followup-readiness/);
+  assert.match(read("scripts/deploy-check.js"), /chronicFollowupStatusPolicy/);
   assert.match(read("scripts/deploy-check.js"), /data-quality:report/);
   assert.match(read("scripts/deploy-check.js"), /quality-safety:report/);
   assert.match(read("scripts/deploy-check.js"), /drug-consumable:readiness/);
@@ -276,6 +281,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".github/workflows/ci.yml"), /npm run storage:inspect/);
   assert.match(read(".github/workflows/ci.yml"), /npm run identity:contract/);
   assert.match(read(".github/workflows/ci.yml"), /npm run audit:retention/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run chronic:followup-readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run data-quality:report/);
   assert.match(read(".github/workflows/ci.yml"), /npm run quality-safety:report/);
   assert.match(read(".github/workflows/ci.yml"), /npm run drug-consumable:readiness/);
@@ -423,6 +429,13 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(read("platform.html"), /quality-safety\.html/);
   assert.match(read("workbench.html"), /quality-safety\.html/);
   assert.match(read("auth.js"), /quality-safety\.html/);
+  assert.match(read("server.js"), /\/api\/chronic\/followup-summary/);
+  assert.match(read("server.js"), /\/api\/chronic\/followup-feedback/);
+  assert.match(read("server.js"), /\/api\/chronic\/followup-dispatch/);
+  assert.match(read("institution.html"), /chronic-followup-workbench/);
+  assert.match(read("institution.js"), /dispatchChronicFollowup/);
+  assert.match(read("citizen.html"), /followup-feedback-form/);
+  assert.match(read("citizen.js"), /bindFollowupFeedback/);
 });
 
 test("system structure documentation reflects completed local governance loops", () => {
