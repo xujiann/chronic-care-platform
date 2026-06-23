@@ -4961,6 +4961,120 @@ function buildChronicServiceSummary(data) {
   };
 }
 
+function buildChronicRiskStratification(data) {
+  const residents = Array.isArray(data.residents) ? data.residents : [];
+  const diseases = Array.isArray(data.diseases) ? data.diseases : [];
+  const followups = Array.isArray(data.followups) ? data.followups : [];
+  const screenings = Array.isArray(data.chronicScreeningTasks) ? data.chronicScreeningTasks : [];
+  const plans = Array.isArray(data.chronicManagementPlans) ? data.chronicManagementPlans : [];
+  const selfManagement = Array.isArray(data.chronicSelfManagement) ? data.chronicSelfManagement : [];
+  const comorbidity = Array.isArray(data.chronicComorbidityPlans) ? data.chronicComorbidityPlans : [];
+  const managedResidentIds = new Set([
+    ...diseases.map((item) => item.residentId),
+    ...followups.map((item) => item.residentId),
+    ...screenings.map((item) => item.residentId),
+    ...plans.map((item) => item.residentId),
+    ...selfManagement.map((item) => item.residentId),
+    ...comorbidity.map((item) => item.residentId)
+  ].filter(Boolean));
+  const today = todayOffset(0);
+  const queue = residents.filter((resident) => managedResidentIds.has(resident.id) || chronicResidentRisk(resident).level !== "低危").map((resident) => {
+    const residentDiseases = diseases.filter((item) => item.residentId === resident.id);
+    const residentFollowups = followups.filter((item) => item.residentId === resident.id);
+    const residentScreenings = screenings.filter((item) => item.residentId === resident.id);
+    const residentPlans = plans.filter((item) => item.residentId === resident.id);
+    const residentSelf = selfManagement.filter((item) => item.residentId === resident.id);
+    const residentComorbidity = comorbidity.filter((item) => item.residentId === resident.id);
+    const openScreenings = residentScreenings.filter((item) => !["已评估", "已推送干预"].includes(item.status));
+    const openFollowups = residentFollowups.filter((item) => item.status !== "已完成");
+    const overdueFollowups = openFollowups.filter((item) => item.status === "已逾期" || String(item.plannedAt || "") < today);
+    const planPending = residentPlans.filter((item) => item.status !== "已复核");
+    const selfAlerts = residentSelf.filter((item) => /预警|复核|异常|偏高/.test(`${item.status || ""}${item.latestValue || ""}${item.nextAction || ""}`));
+    const risk = chronicResidentRisk(resident);
+    const highRisk = risk.level === "高危" || residentScreenings.some((item) => item.riskLevel === "高危") || residentPlans.some((item) => item.grade === "高危");
+    const score = Math.min(100,
+      (risk.level === "高危" ? 45 : risk.level === "中危" ? 25 : 8) +
+      overdueFollowups.length * 20 +
+      openScreenings.length * 12 +
+      selfAlerts.length * 10 +
+      planPending.length * 8 +
+      residentComorbidity.length * 6 +
+      (highRisk ? 12 : 0)
+    );
+    const priority = score >= 80 ? "high" : score >= 55 ? "medium" : "routine";
+    const signals = [
+      highRisk ? `risk:${risk.level}` : "",
+      overdueFollowups.length ? `overdue-followups:${overdueFollowups.length}` : "",
+      openScreenings.length ? `open-screenings:${openScreenings.length}` : "",
+      selfAlerts.length ? `self-monitoring-alerts:${selfAlerts.length}` : "",
+      planPending.length ? `plan-review:${planPending.length}` : "",
+      residentComorbidity.length ? "comorbidity" : ""
+    ].filter(Boolean);
+    const dueAt = [
+      ...openFollowups.map((item) => item.plannedAt),
+      ...openScreenings.map((item) => item.due),
+      ...planPending.map((item) => item.nextReview)
+    ].filter(Boolean).sort()[0] || "";
+    return {
+      residentId: resident.id,
+      personIndex: resident.personIndex || resident.identityIndex || personIndexFromParts(resident.idCard, resident.phone),
+      name: resident.name,
+      organization: resident.organization,
+      owner: resident.familyDoctor || planPending[0]?.owner || openScreenings[0]?.assignee || "family-doctor-team",
+      diseaseTypes: residentDiseases.map((item) => item.type),
+      riskLevel: risk.level,
+      riskReason: risk.reason,
+      score,
+      priority,
+      serviceLevel: priority === "high" ? "重点管理" : priority === "medium" ? "强化管理" : "常规管理",
+      signals,
+      openCounts: {
+        overdueFollowups: overdueFollowups.length,
+        openScreenings: openScreenings.length,
+        selfAlerts: selfAlerts.length,
+        planReviews: planPending.length,
+        comorbidityPlans: residentComorbidity.length
+      },
+      nextAction: chronicRiskNextAction({ priority, overdueFollowups, openScreenings, selfAlerts, planPending, residentComorbidity }),
+      dueAt
+    };
+  }).sort((left, right) => right.score - left.score || String(left.dueAt || "").localeCompare(String(right.dueAt || "")));
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    summary: {
+      total: queue.length,
+      highPriority: queue.filter((item) => item.priority === "high").length,
+      mediumPriority: queue.filter((item) => item.priority === "medium").length,
+      routine: queue.filter((item) => item.priority === "routine").length,
+      overdueFollowups: followups.filter((item) => item.status === "已逾期" || (item.status !== "已完成" && String(item.plannedAt || "") < today)).length,
+      openScreeningTasks: screenings.filter((item) => !["已评估", "已推送干预"].includes(item.status)).length,
+      familyDoctors: new Set(queue.map((item) => item.owner).filter(Boolean)).size
+    },
+    queue
+  };
+}
+
+function chronicResidentRisk(resident) {
+  const metrics = resident?.metrics || {};
+  const systolic = Number(metrics.systolic || 0);
+  const glucose = Number(metrics.glucose || 0);
+  const bmi = Number(metrics.bmi || 0);
+  const reason = `systolic=${systolic}; glucose=${glucose}; bmi=${bmi}`;
+  if (systolic >= 160 || glucose >= 7 || bmi >= 30) return { level: "高危", reason };
+  if (systolic >= 140 || glucose >= 6.1 || bmi >= 28) return { level: "中危", reason };
+  return { level: "低危", reason };
+}
+
+function chronicRiskNextAction({ priority, overdueFollowups, openScreenings, selfAlerts, planPending, residentComorbidity }) {
+  if (overdueFollowups.length) return "补齐随访记录，必要时由家庭医生电话复核并登记结果。";
+  if (openScreenings.length) return "完成筛查评估、检查申请或干预推送，并回写风险分级。";
+  if (selfAlerts.length) return "复核居民端自测异常，判断是否升级重点随访或转诊。";
+  if (planPending.length) return "复核分级管理方案，明确下次随访频次和指标目标。";
+  if (residentComorbidity.length) return "合并随访事项，完成多病共管与用药指导。";
+  return priority === "high" ? "保持重点人群周提醒和专科复核。" : "维持常规随访和健康教育。";
+}
+
 function buildChronicAcceptanceLedger(data) {
   const ledger = mergeByKey(seedChronicAcceptanceLedger(), data.chronicAcceptanceLedger, "id");
   const screening = Array.isArray(data.chronicScreeningTasks) ? data.chronicScreeningTasks : [];
@@ -5417,6 +5531,13 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission", "institution"], "/api/chronic/acceptance-ledger");
     if (!user) return;
     sendJson(res, 200, buildChronicAcceptanceLedger(readDatabase()));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/chronic/risk-stratification") {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/chronic/risk-stratification");
+    if (!user) return;
+    sendJson(res, 200, redactSensitiveResponse(buildChronicRiskStratification(scopeStateForUser(readDatabase(), user)), user));
     return;
   }
 

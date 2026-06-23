@@ -127,12 +127,18 @@ test("chronic disease policy module exposes 2025 service capacity workflow", () 
   ["chronic-service-roles", "chronic-capability-conditions", "chronic-service-pathways", "chronic-comorbidity-table", "chronic-tcm-services", "chronic-self-management", "chronic-medication-support", "chronic-quality-metrics"].forEach((id) => {
     assert.match(html, new RegExp(id), `${id} panel should be present`);
   });
+  assert.match(html, /chronic-risk-summary/);
+  assert.match(html, /chronic-risk-stratification/);
   assert.match(app, /renderChronicPolicyServices/);
   assert.match(app, /applyChronicWorkflowAction/);
+  assert.match(app, /renderChronicRiskStratification/);
+  assert.match(app, /buildChronicRiskStratification/);
   assert.match(app, /chronicComorbidityPlans/);
   assert.match(app, /chronicMedicationSupport/);
   assert.match(server, /chronic-comorbidity-plans/);
   assert.match(server, /\/api\/chronic\/acceptance-ledger/);
+  assert.match(server, /\/api\/chronic\/risk-stratification/);
+  assert.match(server, /buildChronicRiskStratification/);
   assert.match(server, /chronicMedicationSupport/);
   assert.match(server, /buildChronicServiceSummary/);
   assert.match(server, /buildCountyServiceSummary/);

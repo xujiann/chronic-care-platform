@@ -703,8 +703,18 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(chronicAcceptance.body.serviceSummary.summary.domains, 8);
     assert.equal(chronicAcceptance.body.serviceSummary.domains.some((item) => item.id === "medicationSupport"), true);
 
+    const chronicRisk = await api(baseUrl, "/api/chronic/risk-stratification", authorized(commissionToken));
+    assert.equal(chronicRisk.response.status, 200);
+    assert.equal(chronicRisk.body.ok, true);
+    assert.equal(chronicRisk.body.summary.highPriority >= 1, true);
+    assert.equal(chronicRisk.body.summary.openScreeningTasks >= 1, true);
+    assert.equal(chronicRisk.body.queue.some((item) => item.residentId === "r1" && item.priority === "high"), true);
+    assert.equal(chronicRisk.body.queue.every((item) => item.nextAction && item.serviceLevel && item.openCounts), true);
+
     const chronicDenied = await api(baseUrl, "/api/chronic/acceptance-ledger", authorized(insurance.body.token));
     assert.equal(chronicDenied.response.status, 403);
+    const chronicRiskDenied = await api(baseUrl, "/api/chronic/risk-stratification", authorized(insurance.body.token));
+    assert.equal(chronicRiskDenied.response.status, 403);
     const serviceAcceptanceDenied = await api(baseUrl, "/api/service-acceptance-summary", authorized(insurance.body.token));
     assert.equal(serviceAcceptanceDenied.response.status, 403);
 

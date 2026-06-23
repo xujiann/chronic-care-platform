@@ -10,6 +10,13 @@ async function login(page, username, expectedPage) {
 
 test("commission user reaches the governance dashboard and opens maintenance", async ({ page }) => {
   await login(page, "health", "index.html");
+
+  await page.locator("[data-view='chronic']").click();
+  await expect(page.locator("#chronic-risk-summary")).toBeVisible();
+  await expect(page.locator("#chronic-risk-stratification tbody tr")).toHaveCount(4);
+  await expect(page.locator("[data-chronic-risk-resident='r1']")).toContainText("重点管理");
+  await expect(page.locator("[data-chronic-risk-resident='r1']")).toContainText("逾期随访");
+
   await page.goto("/platform.html");
 
   await expect(page.getByRole("heading", { name: "统一应用目录" })).toBeVisible();
