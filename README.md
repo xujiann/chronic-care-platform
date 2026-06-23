@@ -279,5 +279,7 @@ hospital-operations:readiness generates release/hospital-operations-readiness-re
 
 - `health-dashboard.html` is priority application 8: the aggregate entry for the first seven applications.
 - `GET /api/health-dashboard/summary` returns application metrics, risk counts, open actions, interface tracks, acceptance evidence, and site dependencies for commission users.
+- Every application in the summary carries the unified development template: functional boundary, reuse points, data collections, API routes, frontend entry, test evidence, and acceptance artifacts.
 - `npm.cmd run health-dashboard:summary` writes `release/health-dashboard-summary.json` and `release/health-dashboard-summary.md`.
+- `release:manifest` indexes `health-dashboard-summary.md` as the release artifact for the eight-application template and aggregate dashboard evidence.
 - Boundary: the dashboard does not replace source workflows; source applications remain the system of record for business operations and acceptance.

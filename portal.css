@@ -292,6 +292,10 @@ h1 { margin-top: 4px; font-size: 28px; }
   margin-bottom: 16px;
 }
 
+.portal-grid.single {
+  grid-template-columns: 1fr;
+}
+
 .panel {
   padding: 18px;
 }
@@ -557,6 +561,30 @@ dialog::backdrop {
 .rules span,
 .claim-card span {
   color: var(--muted);
+}
+
+.template-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.template-meta span {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  color: var(--muted);
+  background: #fff;
+  overflow-wrap: anywhere;
+}
+
+.template-meta strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--ink);
+  font-size: 12px;
 }
 
 .capability-grid,
@@ -993,6 +1021,7 @@ dialog::backdrop {
   .report-grid,
   .login-flow,
   .demo-accounts,
+  .template-meta,
   .item {
     grid-template-columns: 1fr;
   }

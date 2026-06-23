@@ -61,6 +61,7 @@ function buildDeployCheckReport(options = {}) {
   const p0Interfaces = (Array.isArray(data.platformInterfaces) ? data.platformInterfaces : []).filter((item) => item.priority === "P0");
   const securityAcceptanceLedger = Array.isArray(data.securityAcceptanceLedger) ? data.securityAcceptanceLedger : [];
   const serverSource = fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
+  const manifestSource = fs.readFileSync(path.join(ROOT, "scripts", "release-artifact-manifest.js"), "utf8");
   const externalDependencyRiskIds = [
     "identity-source",
     "institution-systems",
@@ -92,6 +93,7 @@ function buildDeployCheckReport(options = {}) {
     { name: "snapshot:p2-complete", ok: (data.platformRoadmap || []).filter((item) => item.priority === "P2").every((item) => item.status === "已完成"), detail: (data.platformRoadmap || []).filter((item) => item.priority === "P2").map((item) => `${item.title}:${item.status}`).join(";") },
     { name: "snapshot:accessibility", ok: Array.isArray(data.accessibilityChecklist) && data.accessibilityChecklist.length >= 5, detail: `${data.accessibilityChecklist?.length || 0} checklist items` },
     { name: "snapshot:healthDashboard", ok: Array.isArray(data.healthDashboardSnapshots) && data.healthDashboardSnapshots.some((item) => Array.isArray(item.sourceApplications) && item.sourceApplications.length === 7), detail: `${data.healthDashboardSnapshots?.length || 0} dashboard snapshots` },
+    { name: "manifest:healthDashboardSummary", ok: manifestSource.includes("health-dashboard-summary.md") && manifestSource.includes("health-dashboard:summary"), detail: "health dashboard summary artifact is indexed" },
     { name: "snapshot:storageMeta", ok: Boolean(data.storageMeta?.engine && data.storageMeta?.mode), detail: data.storageMeta ? `${data.storageMeta.engine}/${data.storageMeta.mode}` : "missing" }
   ];
 

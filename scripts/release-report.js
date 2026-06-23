@@ -349,7 +349,8 @@ function environmentMatrixChecks(environmentMatrix) {
 function healthDashboardChecks(healthDashboard) {
   return [
     check("healthDashboard:summary", healthDashboard.ok, healthDashboard.ok ? "health dashboard summary checks passed" : "health dashboard summary failed", "error", "health-dashboard"),
-    check("healthDashboard:applications", healthDashboard.applications?.length === 7, `${healthDashboard.applications?.length || 0} source applications`, "error", "health-dashboard"),
+    check("healthDashboard:applications", healthDashboard.applications?.length === 8 && healthDashboard.totals?.sourceApplications === 7, `${healthDashboard.applications?.length || 0} applications; ${healthDashboard.totals?.sourceApplications || 0} source applications`, "error", "health-dashboard"),
+    check("healthDashboard:developmentTemplate", healthDashboard.applications?.every((item) => item.functionalBoundary && item.reusePoints?.length && item.dataCollections?.length && item.apiRoutes?.length && item.frontendEntry && item.testEvidence?.length && item.acceptanceEvidence?.length), "boundary, reuse, data, API, frontend, test, and acceptance fields", "error", "health-dashboard"),
     check("healthDashboard:boundary", /source business applications|source applications/.test(healthDashboard.scope?.rule || ""), healthDashboard.scope?.rule || "missing", "error", "health-dashboard")
   ];
 }

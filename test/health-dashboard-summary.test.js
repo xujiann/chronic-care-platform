@@ -11,24 +11,30 @@ const {
 
 const ROOT = path.resolve(__dirname, "..");
 
-test("health dashboard summary aggregates the first seven applications without replacing them", () => {
+test("health dashboard summary tracks the eight priority applications without replacing source workflows", () => {
   const data = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "db.json"), "utf8"));
   const report = buildHealthDashboardSummary({ data });
 
   assert.equal(report.ok, true);
-  assert.equal(APPLICATIONS.length, 7);
-  assert.equal(report.applications.length, 7);
+  assert.equal(APPLICATIONS.length, 8);
+  assert.equal(report.applications.length, 8);
+  assert.equal(report.totals.sourceApplications, 7);
   assert.equal(report.applications.every((item) => item.entry.endsWith(".html")), true);
-  assert.equal(report.applications.every((item) => /source application/.test(item.boundary)), true);
+  assert.equal(report.applications.every((item) => item.functionalBoundary && item.reusePoints.length && item.dataCollections.length && item.apiRoutes.length && item.frontendEntry && item.testEvidence.length && item.acceptanceEvidence.length), true);
+  assert.equal(report.applications.filter((item) => item.id !== "health-dashboard").every((item) => /source application/.test(item.boundary)), true);
+  assert.match(report.applications.find((item) => item.id === "health-dashboard").boundary, /first seven source applications/);
   assert.equal(report.totals.sourceRecords > 0, true);
   assert.equal(report.totals.interfaceTracks >= 4, true);
-  assert.equal(report.totals.evidenceRecords >= 2, true);
+  assert.equal(report.totals.evidenceRecords >= 1, true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:source-boundary" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "dashboard:aggregate-boundary" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "dashboard:development-template" && item.passed), true);
 
   const markdown = renderMarkdown(report);
   assert.match(markdown, /Health dashboard summary/);
-  assert.match(markdown, /commission-supervision/);
-  assert.match(markdown, /operations-workbench/);
+  assert.match(markdown, /Development template/);
+  assert.match(markdown, /regional-data-sharing/);
+  assert.match(markdown, /health-dashboard/);
   assert.match(markdown, /Open action preview/);
 });
 
@@ -41,6 +47,6 @@ test("health dashboard summary supports empty source application boundaries", ()
   });
 
   assert.equal(report.applications.some((item) => item.status === "empty-ready"), true);
-  assert.equal(report.scope.role, "summary-entry-for-seven-applications");
+  assert.equal(report.scope.role, "priority-eight-application-portfolio");
   assert.equal(report.checks.some((item) => item.id === "dashboard:source-boundary" && item.passed), true);
 });

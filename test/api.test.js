@@ -156,9 +156,12 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const healthDashboard = await api(baseUrl, "/api/health-dashboard/summary", authorized(accountLogin.body.token));
     assert.equal(healthDashboard.response.status, 200);
     assert.equal(healthDashboard.body.ok, true);
-    assert.equal(healthDashboard.body.applications.length, 7);
-    assert.equal(healthDashboard.body.scope.role, "summary-entry-for-seven-applications");
-    assert.equal(healthDashboard.body.applications.some((item) => item.entry === "workbench.html"), true);
+    assert.equal(healthDashboard.body.applications.length, 8);
+    assert.equal(healthDashboard.body.totals.sourceApplications, 7);
+    assert.equal(healthDashboard.body.scope.role, "priority-eight-application-portfolio");
+    assert.equal(healthDashboard.body.applications.some((item) => item.entry === "health-dashboard.html"), true);
+    assert.equal(healthDashboard.body.applications.every((item) => item.functionalBoundary && item.apiRoutes?.length && item.frontendEntry && item.testEvidence?.length && item.acceptanceEvidence?.length), true);
+    assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:development-template" && item.passed), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:source-boundary" && item.passed), true);
 
     const processAudit = await api(baseUrl, "/api/process-audit", authorized(accountLogin.body.token));

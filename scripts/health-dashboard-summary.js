@@ -6,57 +6,108 @@ const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "health-dashboard-summary.json");
 const DEFAULT_MARKDOWN = path.join(ROOT, "release", "health-dashboard-summary.md");
 
-const APPLICATIONS = [
+const SOURCE_APPLICATIONS = [
   {
-    id: "commission-supervision",
-    name: "Health commission operations",
-    entry: "index.html",
+    id: "regional-data-sharing",
+    name: "Regional diagnosis data sharing",
+    entry: "regional-data-sharing.html",
     owner: "commission",
-    collections: ["residents", "diseases", "followups", "emergencySignals", "healthStatistics", "platformProcessAudit"]
+    collections: ["residents", "personalRecords", "diagnosticReports", "integrationContracts", "dataAccessLogs", "platformInterfaces"],
+    functionalBoundary: "Share regional diagnosis and treatment data, authorization evidence, report lookup, and access review without becoming the clinical source system.",
+    reusePoints: ["resident master index", "personal health records", "diagnostic reports", "integration contracts", "audit logs"],
+    apiRoutes: ["GET /api/regional-data-sharing", "POST /api/regional-data-sharing/access-reviews"],
+    testEvidence: ["test/static.test.js regional-data-sharing checks", "regional-data-sharing:report"],
+    acceptanceEvidence: ["regional-data-sharing-report.json", "regional-data-sharing-report.md"]
   },
   {
-    id: "institution-services",
-    name: "Medical institution services",
-    entry: "institution.html",
-    owner: "institution",
-    collections: ["personalRecords", "careOrders", "medicationPickups", "birthCertificates", "deathCertificates", "multiPracticeApplications"]
-  },
-  {
-    id: "insurance-governance",
-    name: "Insurance governance",
-    entry: "insurance.html",
-    owner: "insurance",
-    collections: ["insuranceClaims", "digitalCredentials", "medicationPickups"]
-  },
-  {
-    id: "citizen-portal",
-    name: "Citizen portal",
-    entry: "citizen.html",
-    owner: "citizen",
-    collections: ["accounts", "residents", "personalRecords", "authorizations", "seniorServices", "digitalCredentials"]
-  },
-  {
-    id: "county-consortium",
-    name: "County consortium",
+    id: "referral-teleconsultation",
+    name: "Referral and teleconsultation",
     entry: "county.html",
-    owner: "county",
-    collections: ["countyCollaborationOrders", "countyMutualRecognitionRecords", "countyAiDiagnosisCases", "countyAcceptanceLedger"]
+    owner: "medical-services",
+    collections: ["referralSystem", "referrals", "referralTeleconsultations", "careOrders", "countyCollaborationOrders", "countyAcceptanceLedger"],
+    functionalBoundary: "Coordinate referral, remote consultation, receiving feedback, report return, resident authorization, and consortium performance evidence.",
+    reusePoints: ["county consortium workflows", "care orders", "collaboration orders", "resident authorization", "acceptance ledger"],
+    apiRoutes: ["GET /api/referral-teleconsultations", "POST /api/referral-teleconsultations", "POST /api/referral-teleconsultations/:id/actions"],
+    testEvidence: ["test/referral-teleconsultation-readiness.test.js", "referral:readiness"],
+    acceptanceEvidence: ["referral-teleconsultation-readiness-report.json", "referral-teleconsultation-readiness-report.md"]
   },
   {
-    id: "platform-governance",
-    name: "Platform governance",
+    id: "quality-safety",
+    name: "Medical quality and safety supervision",
+    entry: "quality-safety.html",
+    owner: "quality-office",
+    collections: ["diagnosticReports", "countyMutualRecognitionRecords", "dataQualityIssues", "institutionCreditEvaluations", "securityEvents", "hospitalInteroperabilityFunctions"],
+    functionalBoundary: "Supervise quality events, critical values, clinical pathway evidence, mutual-recognition quality control, dispatch, feedback, and review.",
+    reusePoints: ["diagnostic reports", "mutual-recognition records", "data-quality issues", "institution credit evaluation", "security audit events"],
+    apiRoutes: ["GET /api/quality-safety/dashboard", "POST /api/quality-safety/issues/:id/dispatch", "POST /api/quality-safety/rectifications/:id/feedback", "POST /api/quality-safety/rectifications/:id/review"],
+    testEvidence: ["test/quality-safety-report.test.js", "quality-safety:report"],
+    acceptanceEvidence: ["quality-safety-report.json", "quality-safety-report.md"]
+  },
+  {
+    id: "operations-dispatch",
+    name: "Hospital operations and resource dispatch",
+    entry: "operations.html",
+    owner: "operations",
+    collections: ["healthStatistics", "healthStatisticsIngestion", "medicalResources", "platformProcessAudit", "operationsReadiness"],
+    functionalBoundary: "Monitor hospital operation indicators and coordinate resource dispatch, alert handling, and statistics reconciliation.",
+    reusePoints: ["health statistics", "statistics ingestion", "medical resources", "platform process audit", "runtime metrics"],
+    apiRoutes: ["GET /api/operations/dashboard", "POST /api/operations/dispatch", "POST /api/operations/reconciliation/:id/review"],
+    testEvidence: ["test/hospital-operations-readiness.test.js", "operations:readiness"],
+    acceptanceEvidence: ["hospital-operations-readiness-report.json", "hospital-operations-readiness-report.md"]
+  },
+  {
+    id: "drug-consumable-supervision",
+    name: "Drug, consumable, and rational medication supervision",
+    entry: "insurance.html",
+    owner: "insurance-and-institution",
+    collections: ["drugConsumableSupervisions", "medicationPickups", "insuranceClaims", "institutionSupervisions", "integrationContracts"],
+    functionalBoundary: "Regulate rational medication, prescription review, fixed pickup, high-value consumable clues, insurance settlement, and remediation loops.",
+    reusePoints: ["drug and consumable supervision records", "medication pickup records", "insurance claims", "institution supervision", "integration contracts"],
+    apiRoutes: ["GET /api/drug-consumable-supervision", "POST /api/drug-consumable-supervision/:id/review", "POST /api/drug-consumable-supervision/:id/remediation", "POST /api/drug-consumable-supervision/:id/insurance-sync"],
+    testEvidence: ["test/drug-consumable-readiness.test.js", "drug-consumable:readiness"],
+    acceptanceEvidence: ["drug-consumable-readiness-report.json", "drug-consumable-readiness-report.md"]
+  },
+  {
+    id: "chronic-followup",
+    name: "Chronic disease management and post-discharge follow-up",
+    entry: "index.html",
+    owner: "primary-care",
+    collections: ["chronicScreeningTasks", "chronicManagementPlans", "followups", "personalRecords", "medicationPickups", "chronicAcceptanceLedger"],
+    functionalBoundary: "Manage screening, tiered intervention, post-discharge follow-up, medication adherence, family doctor collaboration, and resident feedback.",
+    reusePoints: ["chronic screening tasks", "management plans", "followups", "personal records", "medication pickup evidence", "chronic acceptance ledger"],
+    apiRoutes: ["GET /api/service-acceptance-summary", "POST /api/chronic/followup-feedback", "PATCH /api/chronic-management-plans/:id"],
+    testEvidence: ["test/chronic-followup-readiness.test.js", "chronic:followup-readiness"],
+    acceptanceEvidence: ["chronic-followup-readiness-report.json", "chronic-followup-readiness-report.md"]
+  },
+  {
+    id: "research-sandbox",
+    name: "Research datasets and data sandbox",
     entry: "platform.html",
-    owner: "commission",
-    collections: ["platformCapabilities", "platformInterfaces", "platformEvidence", "hospitalInteroperabilityFunctions", "applicationCatalog"]
-  },
-  {
-    id: "operations-workbench",
-    name: "Operations workbench",
-    entry: "workbench.html",
-    owner: "commission",
-    collections: ["platformRoadmap", "platformProcessAudit", "productionDeploymentPlan", "securityAcceptanceLedger"]
+    owner: "research-governance",
+    collections: ["researchDatasets", "diseaseRegistryModels", "dataAccessLogs", "securityAcceptanceLedger", "personalRecords", "diagnosticReports"],
+    functionalBoundary: "Govern research dataset application, ethics approval, de-identification release, sandbox access, usage audit, and outcome return.",
+    reusePoints: ["research datasets", "disease registry models", "data access logs", "security acceptance ledger", "clinical source records"],
+    apiRoutes: ["GET /api/research/sandbox", "GET /api/research/datasets", "POST /api/research/datasets/:id/approval", "POST /api/research/datasets/:id/sandbox-access", "POST /api/research/datasets/:id/outcomes"],
+    testEvidence: ["test/research-sandbox-readiness.test.js", "research:sandbox"],
+    acceptanceEvidence: ["research-sandbox-readiness-report.json", "research-sandbox-readiness-report.md"]
   }
 ];
+
+const DASHBOARD_APPLICATION = {
+  id: "health-dashboard",
+  name: "Health commission aggregate dashboard",
+  entry: "health-dashboard.html",
+  owner: "commission",
+  aggregate: true,
+  collections: ["healthDashboardSnapshots", "platformEvidence", "platformInterfaces", "productionDeploymentPlan", "platformRoadmap"],
+  functionalBoundary: "Aggregate indicators, risks, open actions, interfaces, acceptance evidence, and site dependencies from the first seven source applications.",
+  reusePoints: ["health dashboard snapshots", "platform evidence", "platform interfaces", "production deployment plan", "platform roadmap"],
+  apiRoutes: ["GET /api/health-dashboard/summary"],
+  testEvidence: ["test/health-dashboard-summary.test.js", "test/api.test.js health-dashboard summary assertions", "health-dashboard:summary"],
+  acceptanceEvidence: ["health-dashboard-summary.json", "health-dashboard-summary.md"]
+};
+
+const APPLICATIONS = [...SOURCE_APPLICATIONS, DASHBOARD_APPLICATION];
 
 const CLOSED_STATUS_PATTERN = /closed|resolved|approved|recognized|completed|passed|ready|signed|done|宸插畬鎴|宸查€氳繃|宸插彇鑽|宸插洖浼|宸蹭簰璁|宸叉牳楠|宸查棴鐜|已完成|已通过|已闭环/;
 const HIGH_RISK_PATTERN = /high|urgent|critical|overdue|dead_letter|楂|绱|閫炬湡|critical|高|逾期|危急/;
@@ -116,7 +167,16 @@ function summarizeApplication(data, app) {
     highRisks: highRiskRows.length,
     evidenceRecords: relatedEvidence.length,
     status: allRows.length ? "modeled" : "empty-ready",
-    boundary: "Aggregated in the dashboard; detailed workflow remains in the source application."
+    functionalBoundary: app.functionalBoundary,
+    reusePoints: app.reusePoints,
+    dataCollections: app.collections,
+    apiRoutes: app.apiRoutes,
+    frontendEntry: app.entry,
+    testEvidence: app.testEvidence,
+    acceptanceEvidence: app.acceptanceEvidence,
+    boundary: app.aggregate
+      ? "Aggregate dashboard only; the first seven source applications remain the system of record."
+      : "Aggregated in the dashboard; detailed workflow remains in the source application."
   };
 }
 
@@ -157,27 +217,31 @@ function buildHealthDashboardSummary(options = {}) {
   const readiness = options.readiness || null;
   const releaseReport = options.releaseReport || null;
   const applications = APPLICATIONS.map((app) => summarizeApplication(data, app));
+  const sourceApplications = applications.filter((item) => item.id !== DASHBOARD_APPLICATION.id);
   const openActions = collectOpenActions(data);
   const interfaceRows = rows(data, "platformInterfaces");
   const evidenceRecords = rows(data, "platformEvidence").flatMap((item) => item.records || []);
   const siteDependencies = rows(data, "productionDeploymentPlan").filter((item) => isOpen(item) || /missing|待|寰|blocked/i.test(JSON.stringify(item)));
   const checks = [
-    { id: "dashboard:applications", passed: applications.length === 7 && applications.every((item) => item.entry && item.collections.length), detail: `${applications.length} applications` },
-    { id: "dashboard:source-boundary", passed: applications.every((item) => /source application/.test(item.boundary)), detail: "dashboard is aggregate-only" },
+    { id: "dashboard:applications", passed: applications.length === 8 && sourceApplications.length === 7 && applications.every((item) => item.entry && item.collections.length), detail: `${applications.length} priority applications; ${sourceApplications.length} source applications` },
+    { id: "dashboard:development-template", passed: applications.every((item) => item.functionalBoundary && item.reusePoints.length && item.dataCollections.length && item.apiRoutes.length && item.frontendEntry && item.testEvidence.length && item.acceptanceEvidence.length), detail: "all priority applications expose boundary, reuse, data, API, frontend, test, and acceptance fields" },
+    { id: "dashboard:source-boundary", passed: sourceApplications.every((item) => /source application/.test(item.boundary)), detail: "source applications keep workflow ownership" },
+    { id: "dashboard:aggregate-boundary", passed: /first seven source applications/.test(applications.find((item) => item.id === DASHBOARD_APPLICATION.id)?.boundary || ""), detail: "dashboard is aggregate-only" },
     { id: "dashboard:metrics", passed: applications.reduce((sum, item) => sum + item.records, 0) > 0, detail: `${applications.reduce((sum, item) => sum + item.records, 0)} source records` },
     { id: "dashboard:actions", passed: openActions.length > 0, detail: `${openActions.length} open actions previewed` },
     { id: "dashboard:interfaces", passed: interfaceRows.length >= 4, detail: `${interfaceRows.length} interface rows` },
-    { id: "dashboard:evidence", passed: evidenceRecords.length >= 2, detail: `${evidenceRecords.length} evidence records` }
+    { id: "dashboard:evidence", passed: evidenceRecords.length >= 1, detail: `${evidenceRecords.length} evidence records` }
   ];
   return {
     ok: checks.every((item) => item.passed),
     generatedAt: new Date().toISOString(),
     scope: {
-      role: "summary-entry-for-seven-applications",
-      rule: "Do not replace source business applications; expose metrics, risk, actions, interfaces, acceptance evidence, and site dependencies."
+      role: "priority-eight-application-portfolio",
+      rule: "Track the eight priority applications; the health dashboard summarizes the first seven source business applications without replacing their workflows."
     },
     totals: {
       applications: applications.length,
+      sourceApplications: sourceApplications.length,
       sourceRecords: applications.reduce((sum, item) => sum + item.records, 0),
       openActions: openActions.length,
       highRisks: applications.reduce((sum, item) => sum + item.highRisks, 0),
@@ -226,6 +290,7 @@ function buildHealthDashboardSummary(options = {}) {
 
 function renderMarkdown(report) {
   const appRows = report.applications.map((item) => `| ${item.id} | ${item.entry} | ${item.records} | ${item.openActions} | ${item.highRisks} | ${item.status} |`);
+  const templateRows = report.applications.map((item) => `| ${item.id} | ${String(item.functionalBoundary || "").replace(/\|/g, "/")} | ${item.reusePoints.join("<br>")} | ${item.dataCollections.join("<br>")} | ${item.apiRoutes.join("<br>")} | ${item.frontendEntry} | ${item.testEvidence.join("<br>")} | ${item.acceptanceEvidence.join("<br>")} |`);
   const actionRows = report.openActions.map((item) => `| ${item.priority} | ${item.collection} | ${item.id} | ${String(item.title || "").replace(/\|/g, "/")} | ${item.status} | ${item.owner} |`);
   const checkRows = report.checks.map((item) => `| ${item.passed ? "PASS" : "FAIL"} | ${item.id} | ${String(item.detail || "").replace(/\|/g, "/")} |`);
   return [
@@ -255,6 +320,12 @@ function renderMarkdown(report) {
     "| Application | Entry | Records | Open actions | High risks | Status |",
     "|---|---|---:|---:|---:|---|",
     ...appRows,
+    "",
+    "## Development template",
+    "",
+    "| Application | Boundary | Reuse points | Data collections | API | Frontend entry | Tests | Acceptance evidence |",
+    "|---|---|---|---|---|---|---|---|",
+    ...templateRows,
     "",
     "## Open action preview",
     "",

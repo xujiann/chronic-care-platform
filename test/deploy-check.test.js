@@ -20,6 +20,8 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "snapshot:externalDependencyRisks",
     "snapshot:p2-complete",
     "snapshot:accessibility",
+    "snapshot:healthDashboard",
+    "manifest:healthDashboardSummary",
     "snapshot:storageMeta"
   ].forEach((name) => assert.equal(checkNames.has(name), true, `${name} should be checked`));
 });

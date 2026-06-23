@@ -26,6 +26,7 @@ const ARTIFACTS = [
   ["operations-readiness", "operations", "Operations readiness report", "release/operations-readiness-report.json", "release/operations-readiness-report.md", "operations:readiness", "/api/system/readiness"],
   ["process-audit", "process", "Full process audit report", "release/process-audit-report.json", "release/process-audit-report.md", "process:audit", "/api/process-audit"],
   ["service-acceptance", "process", "Service acceptance summary", "release/service-acceptance-summary.json", "release/service-acceptance-summary.md", "release:report", "/api/service-acceptance-summary"],
+  ["health-dashboard", "dashboard", "Health dashboard and eight-application template summary", "release/health-dashboard-summary.json", "release/health-dashboard-summary.md", "health-dashboard:summary", "/api/health-dashboard/summary"],
   ["site-readiness", "site", "Site readiness pack", "release/site-readiness-pack.json", "release/site-readiness-pack.md", "site:pack", "/api/site-readiness-pack"],
   ["production-db", "data", "Production database readiness report", "release/production-db-readiness-report.json", "release/production-db-readiness-report.md", "production-db:readiness", "STORAGE_ENGINE=sqlite"],
   ["evaluation-evidence", "evaluation", "Interoperability evaluation evidence report", "release/evaluation-evidence-report.json", "release/evaluation-evidence-report.md", "evaluation:evidence", "release/evaluation-evidence-report.md"]
