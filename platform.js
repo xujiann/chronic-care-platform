@@ -23,6 +23,7 @@ const fallbackPlatformState = {
   platformDeliveryBatches: [],
   platformEvidence: [],
   applicationCatalog: [],
+  hospitalInteroperabilityFunctions: [],
   institutionCreditEvaluations: [],
   securityAcceptanceLedger: [],
   productionDeploymentPlan: [],
@@ -161,6 +162,15 @@ const defaultApplicationCatalog = [
   { id: "app-insurance", name: "医保结算监管协同", sourceSystem: "医保核心平台", interfaceMode: "接口接入", owner: "医保局/医保中心", reuseMode: "业务协同", batch: "第三批", evidence: "结算审核/凭证核验样例", status: "演示对接完成", next: "确认生产接口规范和联调窗口。" }
 ];
 
+const defaultHospitalInteroperabilityFunctions = [
+  { id: "mgmt-medical-quality", functionName: "医疗质量与安全监管", owner: "医政医管处/质控中心", sourceSystems: ["EMR", "LIS", "PACS", "HIS"], platformCollections: ["personalRecords", "diagnosticReports", "countyMutualRecognitionRecords", "dataQualityIssues"], managementActions: ["临床路径监管", "危急值闭环", "检查检验互认质控", "病历质检抽查"], evidence: ["emr-summary-v1", "lis-report-v1", "pacs-report-v1"], status: "demo-ready", nextAction: "接入真实质控规则和危急值确认记录。" },
+  { id: "mgmt-referral-coordination", functionName: "分级诊疗与医联体协同", owner: "医政医管处/医共体办公室", sourceSystems: ["HIS", "EMR", "PACS", "LIS"], platformCollections: ["referralSystem", "careOrders", "countyCollaborationOrders", "diagnosticReports"], managementActions: ["双向转诊", "远程会诊", "资源预约", "报告回传"], evidence: ["his-patient-v1", "emr-summary-v1", "workflow-actions"], status: "demo-ready", nextAction: "补齐试点医院签字确认和接诊回执。" },
+  { id: "mgmt-resource-operations", functionName: "资源运行与运营监管", owner: "规划信息处/运行监测组", sourceSystems: ["HIS", "住院管理", "人力资源", "设备物联"], platformCollections: ["healthStatistics", "healthStatisticsIngestion", "medicalResources", "platformProcessAudit"], managementActions: ["床位监测", "门急诊与住院运行", "设备利用", "统计直报对账"], evidence: ["statistics-report-v1", "operations-readiness-report.md"], status: "demo-ready", nextAction: "接入机构日/月报并设置差异复核阈值。" },
+  { id: "mgmt-drug-insurance", functionName: "药品耗材与医保协同监管", owner: "药政处/医保局/医保中心", sourceSystems: ["HIS", "药品耗材", "医保核心"], platformCollections: ["medicationPickups", "insuranceClaims", "institutionSupervisions", "securityEvents"], managementActions: ["合理用药", "固定取药审核", "医保结算监管", "高值耗材线索留痕"], evidence: ["insurance-settlement-v1", "medicationPickups"], status: "demo-ready", nextAction: "确认医保结算字段和药耗目录版本。" },
+  { id: "mgmt-public-health", functionName: "公共卫生与慢病管理", owner: "基层卫生处/疾控中心", sourceSystems: ["EMR", "LIS", "公卫系统", "慢病平台"], platformCollections: ["chronicScreeningTasks", "chronicManagementPlans", "followups", "personalRecords"], managementActions: ["慢病筛查", "分级随访", "院后管理", "重点人群闭环"], evidence: ["chronicAcceptanceLedger", "personal-records-api"], status: "demo-ready", nextAction: "接入公卫专病登记和正式随访消息服务。" },
+  { id: "mgmt-research-data", functionName: "科研数据资产与合规共享", owner: "科研管理/数据资产管理", sourceSystems: ["EMR", "LIS", "PACS", "专病库"], platformCollections: ["researchDatasets", "diseaseRegistryModels", "dataAccessLogs", "securityAcceptanceLedger"], managementActions: ["数据集治理", "伦理审批", "脱敏发布", "使用审计"], evidence: ["researchDatasets", "diseaseRegistryModels"], status: "demo-ready", nextAction: "归档伦理批件、数据使用协议和沙箱访问记录。" }
+];
+
 const defaultInstitutionCreditEvaluations = [
   { id: "credit-central", name: "大连市中心医院", institutionType: "三级医院", period: "2026上半年", score: 92, grade: "A", indicators: "依法执业98/质量安全90/数据报送88/服务信用92", owner: "医政医管处", status: "已评价", next: "保持月度数据质量复核并公示优秀项。" },
   { id: "credit-ganjingzi", name: "甘井子区人民医院", institutionType: "二级医院", period: "2026上半年", score: 84, grade: "B", indicators: "依法执业92/质量安全86/数据报送76/服务信用82", owner: "属地卫生行政部门", status: "整改中", next: "30日内完成统计迟报和接口数据缺项整改。" },
@@ -232,6 +242,7 @@ function renderPlatform() {
   renderInterfacePlan(platformData.interfaces);
   renderDataFoundation(platformState);
   renderRoadmap(platformData.deliveryBatches);
+  renderHospitalManagementFunctions(platformData.hospitalManagementFunctions);
   renderApplicationCatalog(platformData.applicationCatalog);
   renderInstitutionCreditEvaluations(platformData.creditEvaluations);
   renderSecurityAcceptanceLedger(platformData.securityLedger);
@@ -252,6 +263,7 @@ function platformModel(state) {
     deliveryBatches: Array.isArray(state.platformDeliveryBatches) && state.platformDeliveryBatches.length ? state.platformDeliveryBatches : defaultDeliveryRoadmap,
     evidence: Array.isArray(state.platformEvidence) && state.platformEvidence.length ? state.platformEvidence : defaultPlatformEvidence,
     applicationCatalog: Array.isArray(state.applicationCatalog) && state.applicationCatalog.length ? state.applicationCatalog : defaultApplicationCatalog,
+    hospitalManagementFunctions: Array.isArray(state.hospitalInteroperabilityFunctions) && state.hospitalInteroperabilityFunctions.length ? state.hospitalInteroperabilityFunctions : defaultHospitalInteroperabilityFunctions,
     creditEvaluations: Array.isArray(state.institutionCreditEvaluations) && state.institutionCreditEvaluations.length ? state.institutionCreditEvaluations : defaultInstitutionCreditEvaluations,
     securityLedger: Array.isArray(state.securityAcceptanceLedger) && state.securityAcceptanceLedger.length ? state.securityAcceptanceLedger : defaultSecurityAcceptanceLedger,
     productionDeploymentPlan: Array.isArray(state.productionDeploymentPlan) && state.productionDeploymentPlan.length ? state.productionDeploymentPlan : defaultProductionDeploymentPlan,
@@ -283,6 +295,7 @@ function ensureEditablePlatformData(state) {
     records: Array.isArray(item.records) ? item.records : []
   }));
   if (!Array.isArray(state.applicationCatalog) || !state.applicationCatalog.length) state.applicationCatalog = structuredClone(defaultApplicationCatalog);
+  if (!Array.isArray(state.hospitalInteroperabilityFunctions) || !state.hospitalInteroperabilityFunctions.length) state.hospitalInteroperabilityFunctions = structuredClone(defaultHospitalInteroperabilityFunctions);
   if (!Array.isArray(state.institutionCreditEvaluations) || !state.institutionCreditEvaluations.length) state.institutionCreditEvaluations = structuredClone(defaultInstitutionCreditEvaluations);
   if (!Array.isArray(state.securityAcceptanceLedger) || !state.securityAcceptanceLedger.length) state.securityAcceptanceLedger = structuredClone(defaultSecurityAcceptanceLedger);
   if (!Array.isArray(state.productionDeploymentPlan) || !state.productionDeploymentPlan.length) state.productionDeploymentPlan = structuredClone(defaultProductionDeploymentPlan);
@@ -301,6 +314,7 @@ function renderMetrics(state, platform) {
     ["业务闭环", count(state.careOrders) + count(state.medicationPickups) + count(state.insuranceClaims), "转诊、取药、医保审核等跨端流程"],
     ["审计留痕", count(state.securityEvents) + count(state.dataAccessLogs), "登录、访问、业务操作和拒绝访问"],
     ["纳管应用", count(state.applicationCatalog), "来源、接口、责任、批次和验收证据统一登记"],
+    ["管理职能", count(state.hospitalInteroperabilityFunctions), "医院系统数据支撑医政、质控、运营、公卫和科研管理"],
     ["信用评价", count(state.institutionCreditEvaluations), "机构评分、等级与整改闭环"],
     ["科研数据集", count(state.researchDatasets), "伦理、脱敏、授权和成果回流"],
     ["专病模型", count(state.diseaseRegistryModels), "版本、阈值和人工复核"],
@@ -365,6 +379,28 @@ function renderInterfacePlan(interfaces) {
           <td><span class="badge info">${item.priority}</span></td>
           <td>${statusBadge(item.status)}</td>
           <td><button class="inline-action" type="button" data-edit-platform="interfaces" data-id="${item.id}">维护</button></td>
+        </tr>
+      `).join("")}</tbody>
+    </table>
+  `;
+}
+
+function renderHospitalManagementFunctions(items) {
+  const target = document.querySelector("#hospital-management-functions");
+  if (!target) return;
+  target.innerHTML = `
+    <table>
+      <thead><tr><th>管理职能</th><th>来源系统</th><th>平台集合</th><th>管理动作</th><th>责任方</th><th>证据</th><th>状态</th><th>下一步</th></tr></thead>
+      <tbody>${items.map((item) => `
+        <tr>
+          <td><strong>${item.functionName}</strong></td>
+          <td>${listText(item.sourceSystems)}</td>
+          <td>${listText(item.platformCollections)}</td>
+          <td>${listText(item.managementActions)}</td>
+          <td>${item.owner || ""}</td>
+          <td>${listText(item.evidence)}</td>
+          <td>${statusBadge(item.status)}</td>
+          <td>${item.nextAction || ""}</td>
         </tr>
       `).join("")}</tbody>
     </table>
@@ -566,6 +602,10 @@ function statusBadge(status) {
   const value = status || "待确认";
   const cls = value.includes("待") ? "warn" : value.includes("完成") || value.includes("已") ? "info" : "";
   return `<span class="badge ${cls}">${value}</span>`;
+}
+
+function listText(value) {
+  return Array.isArray(value) ? value.join("、") : (value || "");
 }
 
 function bindPlatformEditor() {
@@ -841,6 +881,7 @@ function reportItems(platform) {
     ...platform.integrations.map((item) => ({ type: "存量整合", name: item.name, status: item.status, owner: item.owner, next: item.target })),
     ...platform.interfaces.map((item) => ({ type: "接口衔接", name: item.domain, status: item.status, owner: item.owner, next: item.next })),
     ...platform.deliveryBatches.map((item) => ({ type: "开发批次", name: item.phase, status: item.status, owner: item.owner, next: Array.isArray(item.items) ? item.items.join("、") : "" })),
+    ...platform.hospitalManagementFunctions.map((item) => ({ type: "管理职能", name: item.functionName, status: item.status, owner: item.owner, next: item.nextAction })),
     ...platform.applicationCatalog.map((item) => ({ type: "应用目录", name: item.name, status: item.status, owner: item.owner, next: item.next })),
     ...platform.creditEvaluations.map((item) => ({ type: "信用评价", name: item.name, status: item.status, owner: item.owner, next: item.next })),
     ...platform.securityLedger.map((item) => ({ type: "安全信创", name: item.name, status: item.status, owner: item.owner, next: item.next })),

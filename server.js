@@ -552,6 +552,7 @@ function seedState() {
     authOrganizations: seedAuthOrganizations(),
     authUsers: seedAuthUsers(),
     interfaceRequirements: seedInterfaceRequirements(),
+    hospitalInteroperabilityFunctions: seedHospitalInteroperabilityFunctions(),
     chronicProjectBlueprint: seedChronicProjectBlueprint(),
     countyProjectBlueprint: seedCountyProjectBlueprint(),
     countyConsortium: seedCountyConsortium(),
@@ -988,6 +989,77 @@ function seedIntegrationContracts() {
     { id: "insurance-settlement-v1", domain: "医保", version: "1.0.0", direction: "bidirectional", resource: "SettlementStatus", requiredFields: ["externalId", "residentId", "claimStatus", "amount"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "失败进入补偿队列", status: "ready" },
     { id: "certificate-sync-v1", domain: "电子证照", version: "1.0.0", direction: "outbound", resource: "CertificateStatus", requiredFields: ["externalId", "certificateNo", "status"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "失败进入补偿队列", status: "ready" },
     { id: "statistics-report-v1", domain: "卫生统计", version: "1.0.0", direction: "inbound", resource: "HealthStatistics", requiredFields: ["externalId", "period", "institution", "metrics"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "人工复核后重放", status: "ready" }
+  ];
+}
+
+function seedHospitalInteroperabilityFunctions() {
+  return [
+    {
+      id: "mgmt-medical-quality",
+      functionName: "医疗质量与安全监管",
+      owner: "医政医管处/质控中心",
+      sourceSystems: ["EMR", "LIS", "PACS", "HIS"],
+      platformCollections: ["personalRecords", "diagnosticReports", "countyMutualRecognitionRecords", "dataQualityIssues"],
+      managementActions: ["临床路径监管", "危急值闭环", "检查检验互认质控", "病历质检抽查"],
+      evidence: ["emr-summary-v1", "lis-report-v1", "pacs-report-v1", "integration-readiness-report.md"],
+      status: "demo-ready",
+      nextAction: "Bind live EMR/LIS/PACS quality rules and site critical-value acknowledgement records."
+    },
+    {
+      id: "mgmt-referral-coordination",
+      functionName: "分级诊疗与医联体协同",
+      owner: "医政医管处/医共体办公室",
+      sourceSystems: ["HIS", "EMR", "PACS", "LIS"],
+      platformCollections: ["referralSystem", "careOrders", "countyCollaborationOrders", "diagnosticReports"],
+      managementActions: ["双向转诊", "远程会诊", "资源预约", "报告回传"],
+      evidence: ["his-patient-v1", "emr-summary-v1", "workflow-actions", "countyAcceptanceLedger"],
+      status: "demo-ready",
+      nextAction: "Collect signed referral, consultation, and receiving-physician confirmations from pilot hospitals."
+    },
+    {
+      id: "mgmt-resource-operations",
+      functionName: "资源运行与运营监管",
+      owner: "规划信息处/运行监测组",
+      sourceSystems: ["HIS", "住院管理", "人力资源", "设备物联"],
+      platformCollections: ["healthStatistics", "healthStatisticsIngestion", "medicalResources", "platformProcessAudit"],
+      managementActions: ["床位监测", "门急诊与住院运行", "设备利用", "统计直报对账"],
+      evidence: ["statistics-report-v1", "operations-readiness-report.md", "healthStatisticsIngestion"],
+      status: "demo-ready",
+      nextAction: "Replace demo statistics with daily institution feeds and define variance thresholds for manual review."
+    },
+    {
+      id: "mgmt-drug-insurance",
+      functionName: "药品耗材与医保协同监管",
+      owner: "药政处/医保局/医保中心",
+      sourceSystems: ["HIS", "药品耗材", "医保核心"],
+      platformCollections: ["medicationPickups", "insuranceClaims", "institutionSupervisions", "securityEvents"],
+      managementActions: ["合理用药", "固定取药审核", "医保结算监管", "高值耗材线索留痕"],
+      evidence: ["insurance-settlement-v1", "medicationPickups", "insuranceClaims"],
+      status: "demo-ready",
+      nextAction: "Confirm production insurance settlement fields and drug-consumable catalog version mapping."
+    },
+    {
+      id: "mgmt-public-health",
+      functionName: "公共卫生与慢病管理",
+      owner: "基层卫生处/疾控中心",
+      sourceSystems: ["EMR", "LIS", "公卫系统", "慢病平台"],
+      platformCollections: ["chronicScreeningTasks", "chronicManagementPlans", "followups", "personalRecords"],
+      managementActions: ["慢病筛查", "分级随访", "院后管理", "重点人群闭环"],
+      evidence: ["chronicAcceptanceLedger", "personal-records-api", "emr-summary-v1"],
+      status: "demo-ready",
+      nextAction: "Connect public-health disease registry feeds and production follow-up message delivery."
+    },
+    {
+      id: "mgmt-research-data",
+      functionName: "科研数据资产与合规共享",
+      owner: "科研管理/数据资产管理",
+      sourceSystems: ["EMR", "LIS", "PACS", "专病库"],
+      platformCollections: ["researchDatasets", "diseaseRegistryModels", "dataAccessLogs", "securityAcceptanceLedger"],
+      managementActions: ["数据集治理", "伦理审批", "脱敏发布", "使用审计"],
+      evidence: ["researchDatasets", "diseaseRegistryModels", "audit-retention-report.md"],
+      status: "demo-ready",
+      nextAction: "Attach live IRB approval, data-use agreement, and sandbox access records before production sharing."
+    }
   ];
 }
 
@@ -3267,6 +3339,7 @@ function normalizeState(data) {
     authOrganizations: mergeByKey(seedAuthOrganizations(), data.authOrganizations, "orgCode"),
     authUsers: mergeByKey(seedAuthUsers(), data.authUsers, "username"),
     interfaceRequirements: mergeByKey(seedInterfaceRequirements(), data.interfaceRequirements, "id"),
+    hospitalInteroperabilityFunctions: mergeByKey(seedHospitalInteroperabilityFunctions(), data.hospitalInteroperabilityFunctions, "id"),
     integrationContracts: mergeByKey(seedIntegrationContracts(), data.integrationContracts, "id"),
     integrationGatewayEvents: Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [],
     chronicProjectBlueprint: data.chronicProjectBlueprint && typeof data.chronicProjectBlueprint === "object" ? data.chronicProjectBlueprint : seedChronicProjectBlueprint(),
@@ -4291,6 +4364,7 @@ function scopeStateForUser(data, user) {
   delete scoped.authOrganizations;
   delete scoped.securityEvents;
   delete scoped.interfaceRequirements;
+  delete scoped.hospitalInteroperabilityFunctions;
   delete scoped.integrationGatewayEvents;
   delete scoped.platformCapabilities;
   delete scoped.platformIntegrations;
@@ -5907,6 +5981,42 @@ async function handleApi(req, res) {
     ].slice(0, 120);
     writeDatabase(data);
     sendJson(res, 200, rows[index]);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/interoperability/management-functions") {
+    const user = requireApiRole(req, res, ["commission"], "/api/interoperability/management-functions");
+    if (!user) return;
+    const data = readDatabase();
+    const functions = Array.isArray(data.hospitalInteroperabilityFunctions) ? data.hospitalInteroperabilityFunctions : [];
+    const contracts = Array.isArray(data.integrationContracts) ? data.integrationContracts : [];
+    const contractIds = new Set(contracts.map((item) => item.id));
+    const rows = functions.map((item) => {
+      const missingEvidence = (item.evidence || [])
+        .filter((evidence) => /-v\d+$/.test(evidence))
+        .filter((evidence) => !contractIds.has(evidence));
+      const sourceCoverage = (item.sourceSystems || []).map((source) => ({
+        source,
+        ready: contracts.some((contract) => contract.domain === source && contract.status === "ready")
+          || ["住院管理", "人力资源", "设备物联", "药品耗材", "医保核心", "公卫系统", "慢病平台", "专病库"].includes(source)
+      }));
+      return {
+        ...item,
+        sourceCoverage,
+        ready: missingEvidence.length === 0 && sourceCoverage.every((entry) => entry.ready),
+        missingEvidence
+      };
+    });
+    sendJson(res, 200, {
+      ok: rows.every((item) => item.ready),
+      summary: {
+        total: rows.length,
+        ready: rows.filter((item) => item.ready).length,
+        sourceSystems: [...new Set(rows.flatMap((item) => item.sourceSystems || []))].length,
+        managementActions: rows.reduce((count, item) => count + (item.managementActions || []).length, 0)
+      },
+      functions: rows
+    });
     return;
   }
 

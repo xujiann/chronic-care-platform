@@ -197,6 +197,13 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(releaseManifest.body.artifacts.some((item) => item.id === "release-artifact-manifest"), true);
     assert.equal(releaseManifest.body.templateReadmes.some((item) => item.file === "release/templates/production-signoff/README.md"), true);
 
+    const managementFunctions = await api(baseUrl, "/api/interoperability/management-functions", authorized(accountLogin.body.token));
+    assert.equal(managementFunctions.response.status, 200);
+    assert.equal(managementFunctions.body.ok, true);
+    assert.equal(managementFunctions.body.summary.total >= 6, true);
+    assert.equal(managementFunctions.body.functions.some((item) => item.id === "mgmt-medical-quality" && item.ready), true);
+    assert.equal(managementFunctions.body.functions.some((item) => item.id === "mgmt-public-health" && item.sourceSystems.length >= 4), true);
+
     const identityPreview = await api(baseUrl, "/api/auth/identity/preview", authorized(accountLogin.body.token, {
       method: "POST",
       body: JSON.stringify({
@@ -250,6 +257,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
         assert.equal(scopedState.body.applicationCatalog, undefined, `${username} 不应读取平台建设目录`);
         assert.equal(scopedState.body.securityAcceptanceLedger, undefined, `${username} 不应读取安全验收台账`);
         assert.equal(scopedState.body.productionDeploymentPlan, undefined, `${username} should not read production deployment plan`);
+        assert.equal(scopedState.body.hospitalInteroperabilityFunctions, undefined, `${username} should not read hospital interoperability management functions`);
       }
     }
   });
@@ -265,11 +273,12 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(body.residents[0].idCard, "DEMO-ID-R1");
     assert.equal(body.residents[0].phone, "DEMO-MOBILE-R1");
     assert.equal(body.applicationCatalog.length, 6);
+    assert.equal(body.hospitalInteroperabilityFunctions.length, 6);
     assert.equal(body.institutionCreditEvaluations.length, 3);
     assert.equal(body.securityAcceptanceLedger.length, 4);
     assert.equal(body.productionDeploymentPlan.length, 4);
-    ["residents", "personalRecords", "platformEvidence", "productionDeploymentPlan", "applicationCatalog", "institutionCreditEvaluations", "securityAcceptanceLedger"].forEach((key) => {
-      assert.ok(Array.isArray(body[key]), `${key} 应保持数组契约`);
+    ["residents", "personalRecords", "platformEvidence", "productionDeploymentPlan", "applicationCatalog", "hospitalInteroperabilityFunctions", "institutionCreditEvaluations", "securityAcceptanceLedger"].forEach((key) => {
+      assert.ok(Array.isArray(body[key]), `${key} should keep array contract`);
     });
   });
 
@@ -294,6 +303,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       "platformProcessAudit",
       "productionDeploymentPlan",
       "applicationCatalog",
+      "hospitalInteroperabilityFunctions",
       "institutionCreditEvaluations",
       "securityAcceptanceLedger"
     ].forEach((key) => assert.equal(body[key], undefined, `${key} 不应返回给居民端`));
@@ -854,6 +864,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     }));
     assert.equal(saved.response.status, 200);
     assert.equal(saved.body.applicationCatalog.length, 6);
+    assert.equal(saved.body.hospitalInteroperabilityFunctions.length, 6);
     assert.equal(saved.body.institutionCreditEvaluations.length, 3);
     assert.equal(saved.body.securityAcceptanceLedger.length, 4);
     assert.equal(saved.body.productionDeploymentPlan.length, 4);
