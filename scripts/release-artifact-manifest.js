@@ -18,6 +18,7 @@ const ARTIFACTS = [
   ["integration-readiness", "integration", "Integration readiness report", "release/integration-readiness-report.json", "release/integration-readiness-report.md", "integration:readiness", "/api/integration/contracts"],
   ["interface-mapping", "integration", "Interface mapping report", "release/interface-mapping-report.json", "release/interface-mapping-report.md", "interface:mapping", "/api/integrations/gateway"],
   ["monitoring-readiness", "operations", "Monitoring readiness report", "release/monitoring-readiness-report.json", "release/monitoring-readiness-report.md", "monitoring:readiness", "/api/metrics"],
+  ["referral-teleconsultation", "referral", "Referral teleconsultation readiness report", "release/referral-teleconsultation-readiness-report.json", "release/referral-teleconsultation-readiness-report.md", "referral:readiness", "/api/referral-teleconsultations"],
   ["operations-readiness", "operations", "Operations readiness report", "release/operations-readiness-report.json", "release/operations-readiness-report.md", "operations:readiness", "/api/system/readiness"],
   ["process-audit", "process", "Full process audit report", "release/process-audit-report.json", "release/process-audit-report.md", "process:audit", "/api/process-audit"],
   ["service-acceptance", "process", "Service acceptance summary", "release/service-acceptance-summary.json", "release/service-acceptance-summary.md", "release:report", "/api/service-acceptance-summary"],

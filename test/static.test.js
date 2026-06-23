@@ -164,6 +164,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal(Boolean(pkg.scripts["integration:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["interface:mapping"]), true);
   assert.equal(Boolean(pkg.scripts["monitoring:readiness"]), true);
+  assert.equal(Boolean(pkg.scripts["referral:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["operations:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["process:audit"]), true);
   assert.equal(Boolean(pkg.scripts["site:pack"]), true);
@@ -229,6 +230,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/deploy-check.js"), /integration:readiness/);
   assert.match(read("scripts/deploy-check.js"), /interface:mapping/);
   assert.match(read("scripts/deploy-check.js"), /monitoring:readiness/);
+  assert.match(read("scripts/deploy-check.js"), /referral:readiness/);
   assert.match(read("scripts/deploy-check.js"), /operations:readiness/);
   assert.match(read("scripts/deploy-check.js"), /process:audit/);
   assert.match(read("scripts/deploy-check.js"), /site:pack/);
@@ -244,6 +246,9 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".github/workflows/ci.yml"), /npm run integration:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run interface:mapping/);
   assert.match(read(".github/workflows/ci.yml"), /npm run monitoring:readiness/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run referral:readiness/);
+  assert.match(read("institution.html"), /teleconsultation-loop/);
+  assert.match(read("county.html"), /county-teleconsultation-loop/);
   assert.match(read(".github/workflows/ci.yml"), /npm run operations:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run site:pack/);
   assert.match(read(".github/workflows/ci.yml"), /npm run production-db:readiness/);

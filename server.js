@@ -377,12 +377,12 @@ const SQLITE_MIGRATIONS = [
     }
   }
 ];
-const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals", "deathCertificates", "birthCertificates", "multiPracticeApplications", "digitalCredentials", "emergencySignals", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports"]);
+const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals", "referralTeleconsultations", "deathCertificates", "birthCertificates", "multiPracticeApplications", "digitalCredentials", "emergencySignals", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports"]);
 const WORKFLOW_ROLE_COLLECTIONS = {
   commission: WORKFLOW_COLLECTIONS,
-  institution: new Set(["careOrders", "medicationPickups", "followups", "referrals", "deathCertificates", "birthCertificates", "multiPracticeApplications", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "emergencySignals"]),
+  institution: new Set(["careOrders", "medicationPickups", "followups", "referrals", "referralTeleconsultations", "deathCertificates", "birthCertificates", "multiPracticeApplications", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "emergencySignals"]),
   insurance: new Set(["insuranceClaims", "medicationPickups", "digitalCredentials"]),
-  county: new Set(["countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "emergencySignals"])
+  county: new Set(["referralTeleconsultations", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "emergencySignals"])
 };
 const WORKFLOW_PROTECTED_FIELDS = new Set(["id", "residentId", "maternalResidentId", "personIndex", "credentialNo", "certificateNo", "documentNo", "motherDocumentNo", "fatherDocumentNo", "createdAt", "createdBy", "createdByName", "lastUpdated", "updatedAt", "updatedBy", "updatedByName"]);
 const PERSONAL_RECORD_PROTECTED_FIELDS = new Set(["id", "residentId", "personIndex", "createdAt", "createdBy", "createdByName", "updatedAt", "updatedBy", "updatedByName", "expectedVersion"]);
@@ -932,6 +932,73 @@ function seedReferralSystem() {
       { title: "长期处方与固定取药", audience: "慢病患者", message: "符合条件的慢病患者基层单次可开具不超过 12 周长期处方，并与固定取药闭环联动。", channel: "个人端、医保中心经办端" }
     ]
   };
+}
+
+function seedReferralTeleconsultations() {
+  return [
+    {
+      id: "rtc-001",
+      referralId: "rf1",
+      residentId: "r1",
+      type: "teleconsultation",
+      diseaseType: "hypertension",
+      sourceInstitution: "Qingniwaqiao Community Health Service Center",
+      targetInstitution: "Dalian Central Hospital",
+      department: "Cardiology",
+      applicantDoctor: "doc-liu",
+      receivingDoctor: "doc-wang",
+      residentAuthorizationId: "pr-auth-r1",
+      authorizationStatus: "authorized",
+      status: "scheduled",
+      priority: "high",
+      requestedAt: todayOffset(-1),
+      due: todayOffset(0),
+      meetingWindow: "2026-06-23 15:00-15:30",
+      clinicalQuestion: "Blood pressure remains uncontrolled after primary care adjustment; request medication plan review.",
+      materials: ["EMR summary", "blood pressure log", "current prescription"],
+      receivingFeedback: "Specialist slot reserved; review current prescription before video consultation.",
+      reportStatus: "pending-return",
+      reportReturnedAt: "",
+      reportSummary: "",
+      collaborationOrderId: "cco-004",
+      performance: { responseHours: 4, reportReturnHours: 0, satisfaction: "pending" },
+      auditTrail: [
+        { at: todayOffset(-1), actor: "doc-liu", action: "created", note: "Primary institution submitted teleconsultation request." },
+        { at: todayOffset(0), actor: "doc-wang", action: "scheduled", note: "Receiving hospital accepted the request and reserved a consultation window." }
+      ]
+    },
+    {
+      id: "rtc-002",
+      referralId: "rf3",
+      residentId: "r4",
+      type: "down-referral-feedback",
+      diseaseType: "hypertension rehabilitation",
+      sourceInstitution: "Dalian Central Hospital",
+      targetInstitution: "Qingniwaqiao Community Health Service Center",
+      department: "Family doctor studio",
+      applicantDoctor: "doc-wang",
+      receivingDoctor: "doc-liu",
+      residentAuthorizationId: "pr-auth-r4",
+      authorizationStatus: "authorized",
+      status: "report-returned",
+      priority: "medium",
+      requestedAt: todayOffset(-3),
+      due: todayOffset(-1),
+      meetingWindow: "2026-06-21 10:00-10:20",
+      clinicalQuestion: "Confirm home follow-up plan after specialist discharge and down-referral.",
+      materials: ["discharge summary", "medication plan"],
+      receivingFeedback: "Primary institution received the down-referral task and follow-up plan.",
+      reportStatus: "returned",
+      reportReturnedAt: todayOffset(-1),
+      reportSummary: "Continue eight-week long prescription follow-up and weekly blood pressure upload.",
+      collaborationOrderId: "cco-005",
+      performance: { responseHours: 2, reportReturnHours: 18, satisfaction: "good" },
+      auditTrail: [
+        { at: todayOffset(-3), actor: "doc-wang", action: "created", note: "Tertiary hospital initiated down-referral consultation." },
+        { at: todayOffset(-1), actor: "doc-liu", action: "report-returned", note: "Primary institution confirmed follow-up report return." }
+      ]
+    }
+  ];
 }
 
 function seedAuthUsers() {
@@ -3323,6 +3390,7 @@ function normalizeState(data) {
     countyAcceptanceLedger: mergeByKey(seedCountyAcceptanceLedger(), data.countyAcceptanceLedger, "id"),
     mutualRecognitionRules: mergeByKey(seedMutualRecognitionRules(), data.mutualRecognitionRules, "id"),
     diagnosticReports: mergeByKey(seedDiagnosticReports(), data.diagnosticReports, "id"),
+    referralTeleconsultations: mergeByKey(seedReferralTeleconsultations(), data.referralTeleconsultations, "id"),
     taskMessages: Array.isArray(data.taskMessages) ? data.taskMessages : [],
     dataQualityIssues: Array.isArray(data.dataQualityIssues) ? data.dataQualityIssues : [],
     careOrders: Array.isArray(data.careOrders) ? data.careOrders : seedCareOrders(),
@@ -3704,7 +3772,7 @@ function normalizePersonIndexes(state) {
     resident.identityIndex = resident.personIndex;
   });
   const residentMap = new Map(residents.map((resident) => [resident.id, resident]));
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "taskMessages"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "referralTeleconsultations", "taskMessages"].forEach((key) => {
     (Array.isArray(state[key]) ? state[key] : []).forEach((item) => {
       item.personIndex = item.personIndex || personIndexForResident(residentMap, item.residentId);
     });
@@ -4259,6 +4327,27 @@ function canAccessMultiPracticeApplication(user, item) {
     [item.primaryInstitution, item.targetInstitution].includes(user.orgName);
 }
 
+function hasResidentAuthorization(data, residentId, authorizationId) {
+  const records = Array.isArray(data.personalRecords) ? data.personalRecords : [];
+  return records.some((record) =>
+    record.category === "authorizations" &&
+    record.residentId === residentId &&
+    (!authorizationId || record.id === authorizationId) &&
+    record.status !== "revoked" &&
+    record.meta?.status !== "revoked"
+  );
+}
+
+function canAccessReferralTeleconsultation(user, item, data) {
+  if (!canAccessResident(user, item.residentId, data)) return false;
+  if (user.role === "commission" || user.role === "county") return true;
+  if (user.role !== "institution") return false;
+  if (user.doctorId && ![item.applicantDoctor, item.receivingDoctor].includes(user.doctorId)) return false;
+  return [item.sourceInstitution, item.targetInstitution].some((name) => name && name === user.orgName) ||
+    [item.sourceInstitutionCode, item.targetInstitutionCode].some((code) => code && code === user.orgCode) ||
+    Boolean(user.doctorId && [item.applicantDoctor, item.receivingDoctor].includes(user.doctorId));
+}
+
 function redactSensitiveResponse(value, user) {
   if (!user || user.role === "commission") return value;
   return redactSensitiveValue(value);
@@ -4387,6 +4476,7 @@ function scopeStateForUser(data, user) {
       scoped.doctorProfiles = (data.doctorProfiles || []).filter((item) => item.id === user.doctorId);
       scoped.multiPracticeApplications = (data.multiPracticeApplications || []).filter((item) => item.doctorId === user.doctorId);
     }
+    scoped.referralTeleconsultations = (data.referralTeleconsultations || []).filter((item) => canAccessReferralTeleconsultation(user, item, data));
     if (scoped.mobileExperienceSettings) scoped.mobileExperienceSettings = { ...scoped.mobileExperienceSettings, userPreferences: undefined };
     return scoped;
   }
@@ -4405,7 +4495,7 @@ function scopeStateForUser(data, user) {
     const preferenceKey = user.residentId || user.accountId || user.username;
     scoped.mobileExperienceSettings = { ...scoped.mobileExperienceSettings, userPreferences: { [preferenceKey]: preferences[preferenceKey] || {} } };
   }
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "taskMessages"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "referralTeleconsultations", "taskMessages"].forEach((key) => {
     scoped[key] = (data[key] || []).filter(hasAllowedResident);
   });
   if (scoped.referralSystem) {
@@ -4659,6 +4749,7 @@ const TASK_SOURCES = [
   ["chronicEducationPushes", "institution", "宣教推送", "pushAt"],
   ["chronicManagementPlans", "institution", "慢病管理", "nextReview"],
   ["careOrders", "institution", "诊疗工单", "orderDate"],
+  ["referralTeleconsultations", ["institution", "county"], "referral teleconsultation", "due"],
   ["medicationPickups", "insurance", "固定取药", "nextPickup"],
   ["insuranceClaims", "insurance", "医保审核", "claimDate"],
   ["digitalCredentials", "insurance", "数字凭证", "lastUpdated"],
@@ -4683,7 +4774,8 @@ const SERVICE_DOMAIN_BY_COLLECTION = {
   countyCollaborationOrders: "collaboration",
   countyAiDiagnosisCases: "aiDiagnosis",
   countyMutualRecognitionRecords: "mutualRecognition",
-  diagnosticReports: "diagnosticReports"
+  diagnosticReports: "diagnosticReports",
+  referralTeleconsultations: "referralTeleconsultation"
 };
 
 function taskPriorityLevel(item) {
@@ -4712,7 +4804,11 @@ function buildUnifiedTasks(data, user) {
     const roles = Array.isArray(role) ? role : [role];
     if (user.role !== "commission" && !roles.includes(user.role)) return [];
     const rows = collection === "referrals" ? data.referralSystem?.referrals : data[collection];
-    return (Array.isArray(rows) ? rows : []).filter((item) => canAccessResident(user, item.residentId || item.maternalResidentId, data)).map((item) => {
+    return (Array.isArray(rows) ? rows : []).filter((item) =>
+      collection === "referralTeleconsultations"
+        ? canAccessReferralTeleconsultation(user, item, data)
+        : canAccessResident(user, item.residentId || item.maternalResidentId, data)
+    ).map((item) => {
       const task = {
         id: `${collection}:${item.id}`,
         collection,
@@ -4759,6 +4855,103 @@ function createTaskMessage({ task, payload, user }) {
     createdBy: user.username || user.role,
     createdByName: user.name
   };
+}
+
+function normalizeReferralTeleconsultation(payload, user, data) {
+  const residentId = String(payload.residentId || "").trim();
+  if (!residentId) throw new Error("residentId is required");
+  if (!canAccessResident(user, residentId, data)) throw new Error("resident scope denied");
+  const authorizationId = String(payload.residentAuthorizationId || "").trim();
+  if (!hasResidentAuthorization(data, residentId, authorizationId || undefined)) {
+    throw new Error("resident authorization is required before referral teleconsultation");
+  }
+  const now = new Date().toISOString();
+  const consultation = {
+    id: payload.id || `rtc-${randomUUID()}`,
+    referralId: String(payload.referralId || "").trim(),
+    residentId,
+    type: String(payload.type || "teleconsultation").trim(),
+    diseaseType: String(payload.diseaseType || "").trim(),
+    sourceInstitution: String(payload.sourceInstitution || user.orgName || "").trim(),
+    sourceInstitutionCode: String(payload.sourceInstitutionCode || user.orgCode || "").trim(),
+    targetInstitution: String(payload.targetInstitution || "").trim(),
+    targetInstitutionCode: String(payload.targetInstitutionCode || "").trim(),
+    department: String(payload.department || "").trim(),
+    applicantDoctor: String(payload.applicantDoctor || user.doctorId || user.username || "").trim(),
+    receivingDoctor: String(payload.receivingDoctor || "").trim(),
+    residentAuthorizationId: authorizationId,
+    authorizationStatus: "authorized",
+    status: normalizeReferralTeleconsultationStatus(payload.status || "requested"),
+    priority: String(payload.priority || "normal").trim(),
+    requestedAt: now,
+    due: String(payload.due || "").trim(),
+    meetingWindow: String(payload.meetingWindow || "").trim(),
+    clinicalQuestion: String(payload.clinicalQuestion || "").trim(),
+    materials: Array.isArray(payload.materials) ? payload.materials.map(String).filter(Boolean) : [],
+    receivingFeedback: "",
+    reportStatus: "pending-return",
+    reportReturnedAt: "",
+    reportSummary: "",
+    collaborationOrderId: String(payload.collaborationOrderId || "").trim(),
+    performance: { responseHours: 0, reportReturnHours: 0, satisfaction: "pending" },
+    auditTrail: [
+      { at: now, actor: user.username || user.role, action: "created", note: String(payload.note || "referral teleconsultation created").trim() }
+    ],
+    createdAt: now,
+    createdBy: user.username || user.role,
+    createdByName: user.name,
+    lastUpdated: now
+  };
+  if (!consultation.targetInstitution) throw new Error("targetInstitution is required");
+  return consultation;
+}
+
+function normalizeReferralTeleconsultationStatus(status) {
+  const value = String(status || "").trim().toLowerCase();
+  const aliases = {
+    request: "requested",
+    requested: "requested",
+    accept: "accepted",
+    accepted: "accepted",
+    scheduled: "scheduled",
+    feedback: "feedback-returned",
+    "feedback-returned": "feedback-returned",
+    report: "report-returned",
+    "report-returned": "report-returned",
+    closed: "closed",
+    cancel: "cancelled",
+    cancelled: "cancelled"
+  };
+  return aliases[value] || String(status || "requested").trim();
+}
+
+function applyReferralTeleconsultationAction(item, payload, user) {
+  const now = new Date().toISOString();
+  const action = String(payload.action || payload.status || "update").trim();
+  const updates = cleanWorkflowUpdates(payload.updates);
+  const nextStatus = normalizeReferralTeleconsultationStatus(payload.status || updates.status || item.status);
+  const next = {
+    ...item,
+    ...updates,
+    status: nextStatus,
+    lastUpdated: now,
+    updatedBy: user.username || user.role,
+    updatedByName: user.name
+  };
+  if (payload.feedback || updates.receivingFeedback) {
+    next.receivingFeedback = String(payload.feedback || updates.receivingFeedback).trim();
+    if (nextStatus === item.status) next.status = "feedback-returned";
+  }
+  if (payload.reportSummary || updates.reportSummary || next.status === "report-returned") {
+    next.reportStatus = "returned";
+    next.reportReturnedAt = now;
+    next.reportSummary = String(payload.reportSummary || updates.reportSummary || next.reportSummary || "").trim();
+  }
+  next.auditTrail = [
+    { at: now, actor: user.username || user.role, action, note: String(payload.note || next.status || "updated").trim() },
+    ...(Array.isArray(item.auditTrail) ? item.auditTrail : [])
+  ].slice(0, 40);
+  return next;
 }
 
 function buildDataQualityIssues(data) {
@@ -5536,6 +5729,95 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission", "institution", "insurance", "citizen", "county"], "/api/state");
     if (!user) return;
     sendJson(res, 200, redactSensitiveResponse(scopeStateForUser(readDatabase(), user), user));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/referral-teleconsultations") {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/referral-teleconsultations");
+    if (!user) return;
+    const data = readDatabase();
+    const rows = (Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [])
+      .filter((item) => canAccessReferralTeleconsultation(user, item, data));
+    sendJson(res, 200, {
+      teleconsultations: rows,
+      summary: {
+        total: rows.length,
+        pending: rows.filter((item) => !isClosedTaskStatus(item.status) && item.reportStatus !== "returned").length,
+        reportReturned: rows.filter((item) => item.reportStatus === "returned" || item.status === "report-returned").length
+      }
+    });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/referral-teleconsultations") {
+    const user = requireApiRole(req, res, ["institution", "county", "commission"], "/api/referral-teleconsultations");
+    if (!user) return;
+    const data = readDatabase();
+    try {
+      const consultation = normalizeReferralTeleconsultation(await collectJson(req), user, data);
+      if (!canAccessReferralTeleconsultation(user, consultation, data)) {
+        appendSecurityEvent({ actor: user.name, role: user.role, action: "create referral teleconsultation", target: consultation.residentId, result: "denied", detail: "organization scope denied" });
+        sendJson(res, 403, { error: "Forbidden", message: "organization scope denied" });
+        return;
+      }
+      data.referralTeleconsultations = [consultation, ...(Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [])].slice(0, 300);
+      data.securityEvents = [
+        {
+          id: randomUUID(),
+          at: new Date().toLocaleString("zh-CN", { hour12: false }),
+          actor: user.name,
+          role: user.role,
+          action: "create referral teleconsultation",
+          target: consultation.id,
+          result: "allowed",
+          detail: `${consultation.sourceInstitution} -> ${consultation.targetInstitution}`
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120);
+      appendDataAccessLog(data, user, consultation.residentId, "referral teleconsultation", "create teleconsultation with resident authorization", "allowed");
+      writeDatabase(data);
+      sendJson(res, 201, consultation);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+    }
+    return;
+  }
+
+  const teleconsultationActionMatch = url.pathname.match(/^\/api\/referral-teleconsultations\/([^/]+)\/actions$/);
+  if (req.method === "POST" && teleconsultationActionMatch) {
+    const user = requireApiRole(req, res, ["institution", "county", "commission"], "/api/referral-teleconsultations/:id/actions");
+    if (!user) return;
+    const data = readDatabase();
+    const rows = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
+    const index = rows.findIndex((item) => item.id === decodeURIComponent(teleconsultationActionMatch[1]));
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "referral teleconsultation not found" });
+      return;
+    }
+    if (!canAccessReferralTeleconsultation(user, rows[index], data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "update referral teleconsultation", target: rows[index].id, result: "denied", detail: "scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
+      return;
+    }
+    const payload = await collectJson(req);
+    rows[index] = applyReferralTeleconsultationAction(rows[index], payload, user);
+    data.referralTeleconsultations = rows;
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "update referral teleconsultation",
+        target: rows[index].id,
+        result: "allowed",
+        detail: rows[index].status
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    appendDataAccessLog(data, user, rows[index].residentId, "referral teleconsultation", payload.note || rows[index].status, "allowed");
+    writeDatabase(data);
+    sendJson(res, 200, rows[index]);
     return;
   }
 
@@ -6937,12 +7219,21 @@ async function handleApi(req, res) {
       sendJson(res, 403, { error: "Forbidden", message: "无权更新该多点执业记录" });
       return;
     }
+    if (collection === "referralTeleconsultations" && !canAccessReferralTeleconsultation(user, item, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "update referral teleconsultation", target: `${collection}/${payload.id}`, result: "denied", detail: "scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
+      return;
+    }
     if (!canAccessResident(user, item.residentId, data)) {
       appendSecurityEvent({ actor: user.name, role: user.role, action: "更新业务闭环", target: `${collection}/${payload.id}`, result: "拒绝", detail: "超出居民授权范围" });
       sendJson(res, 403, { error: "Forbidden", message: "无权更新该居民业务记录" });
       return;
     }
-    Object.assign(item, cleanWorkflowUpdates(payload.updates));
+    if (collection === "referralTeleconsultations") {
+      Object.assign(item, applyReferralTeleconsultationAction(item, payload, user));
+    } else {
+      Object.assign(item, cleanWorkflowUpdates(payload.updates));
+    }
     if (payload.status) item.status = String(payload.status);
     item.lastUpdated = new Date().toISOString();
     data.securityEvents = [

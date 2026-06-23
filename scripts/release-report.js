@@ -14,6 +14,7 @@ const { buildOperationsReadinessReport, renderMarkdown: renderOperationsReadines
 const { buildProcessAuditReport, renderMarkdown: renderProcessAuditMarkdown } = require("./process-audit");
 const { buildProductionDbReadinessReport, renderMarkdown: renderProductionDbReadinessMarkdown } = require("./production-db-readiness");
 const { buildReleaseArtifactManifest, renderMarkdown: renderReleaseArtifactManifestMarkdown } = require("./release-artifact-manifest");
+const { buildReferralTeleconsultationReadinessReport, renderMarkdown: renderReferralTeleconsultationReadinessMarkdown } = require("./referral-teleconsultation-readiness");
 const { buildSiteReadinessPack, renderMarkdown: renderSiteReadinessMarkdown, writeTemplateReadmes } = require("./site-readiness-pack");
 const { inspectStorageModel } = require("./storage-admin");
 
@@ -327,6 +328,14 @@ function monitoringReadinessChecks(monitoringReadiness) {
   ];
 }
 
+function referralTeleconsultationChecks(referralTeleconsultationReadiness) {
+  return [
+    check("referralTeleconsultation:readiness", referralTeleconsultationReadiness.ok, referralTeleconsultationReadiness.ok ? "referral teleconsultation readiness checks passed" : "referral teleconsultation readiness checks failed", "error", "referral"),
+    check("referralTeleconsultation:authorization", referralTeleconsultationReadiness.checks?.some((item) => item.id === "referral:residentAuthorization" && item.passed), "resident authorization evidence present", "error", "referral"),
+    check("referralTeleconsultation:frontend", referralTeleconsultationReadiness.checks?.some((item) => item.id === "referral:frontend" && item.passed), "institution and county runnable entries present", "error", "referral")
+  ];
+}
+
 function productionDbReadinessChecks(productionDbReadiness) {
   return [
     check("productionDb:readiness", productionDbReadiness.ok, productionDbReadiness.ok ? "production database readiness checks passed" : "production database readiness checks failed", "error", "production-db"),
@@ -463,6 +472,7 @@ function packageChecks(pkg) {
     "integration:readiness",
     "interface:mapping",
     "monitoring:readiness",
+    "referral:readiness",
     "operations:readiness",
     "process:audit",
     "site:pack",
@@ -517,6 +527,7 @@ function buildReleaseReport(options = {}) {
   const integrationReadiness = buildIntegrationReadinessReport({ data });
   const interfaceMapping = buildInterfaceMappingReport({ data, pkg });
   const monitoringReadiness = buildMonitoringReadinessReport({ data, pkg });
+  const referralTeleconsultationReadiness = buildReferralTeleconsultationReadinessReport({ data, pkg });
   const operationsReadiness = buildOperationsReadinessReport({ data, pkg });
   const processAudit = buildProcessAuditReport({ data });
   const serviceAcceptance = buildServiceAcceptanceSummary(data);
@@ -540,6 +551,7 @@ function buildReleaseReport(options = {}) {
     ...integrationReadinessChecks(integrationReadiness),
     ...interfaceMappingChecks(interfaceMapping),
     ...monitoringReadinessChecks(monitoringReadiness),
+    ...referralTeleconsultationChecks(referralTeleconsultationReadiness),
     ...operationsReadinessChecks(operationsReadiness),
     ...processAuditChecks(processAudit),
     ...serviceAcceptanceChecks(serviceAcceptance),
@@ -573,6 +585,7 @@ function buildReleaseReport(options = {}) {
     integrationReadiness,
     interfaceMapping,
     monitoringReadiness,
+    referralTeleconsultationReadiness,
     operationsReadiness,
     processAudit,
     serviceAcceptance,
@@ -757,6 +770,10 @@ function renderMarkdown(report) {
     "",
     "See `monitoring-readiness-report.json` and `monitoring-readiness-report.md` for health and metrics routes, runtime metric signals, alert signals, SLO targets, and on-call escalation evidence.",
     "",
+    "## Referral teleconsultation readiness report",
+    "",
+    "See `referral-teleconsultation-readiness-report.json` and `referral-teleconsultation-readiness-report.md` for referral, teleconsultation, receiving feedback, report return, collaboration order, resident authorization, and performance evidence.",
+    "",
     "## Production database readiness report",
     "",
     "See `production-db-readiness-report.json` and `production-db-readiness-report.md` for PostgreSQL cutover prerequisites, current SQLite/JSON model evidence, backup rehearsal documentation, and runtime adapter guardrails.",
@@ -894,6 +911,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       monitoringReadiness: report.monitoringReadiness
     }, null, 2), "utf8");
+    const referralTeleconsultationJson = path.join(path.dirname(output), "referral-teleconsultation-readiness-report.json");
+    fs.writeFileSync(referralTeleconsultationJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      referralTeleconsultationReadiness: report.referralTeleconsultationReadiness
+    }, null, 2), "utf8");
     const productionDbJson = path.join(path.dirname(output), "production-db-readiness-report.json");
     fs.writeFileSync(productionDbJson, JSON.stringify({
       project: report.project,
@@ -957,6 +982,8 @@ function writeOutput(report, flags) {
     writeTemplateReadmes(report.siteReadinessPack, path.join(path.dirname(path.relative(ROOT, markdown)), "templates"));
     const monitoringMarkdown = path.join(path.dirname(markdown), "monitoring-readiness-report.md");
     fs.writeFileSync(monitoringMarkdown, renderMonitoringReadinessMarkdown(report.monitoringReadiness), "utf8");
+    const referralTeleconsultationMarkdown = path.join(path.dirname(markdown), "referral-teleconsultation-readiness-report.md");
+    fs.writeFileSync(referralTeleconsultationMarkdown, renderReferralTeleconsultationReadinessMarkdown(report.referralTeleconsultationReadiness), "utf8");
     const productionDbMarkdown = path.join(path.dirname(markdown), "production-db-readiness-report.md");
     fs.writeFileSync(productionDbMarkdown, renderProductionDbReadinessMarkdown(report.productionDbReadiness), "utf8");
     const evaluationMarkdown = path.join(path.dirname(markdown), "evaluation-evidence-report.md");

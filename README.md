@@ -85,7 +85,7 @@ data/db.json
 - 居民与身份：`accounts`、`residents`、`authUsers`、`authOrganizations`
 - 健康档案：`personalRecords`、`healthArchiveStandard`、`diseases`、`followups`
 - 慢病闭环：`chronicScreeningTasks`、`chronicEducationPushes`、`chronicManagementPlans`、`chronicServiceRoles`、`chronicCapabilityConditions`、`chronicServicePathways`、`chronicComorbidityPlans`、`chronicTcmServices`、`chronicSelfManagement`、`chronicMedicationSupport`、`chronicQualityMetrics`
-- 协同业务：`careOrders`、`medicationPickups`、`insuranceClaims`、`referralSystem`
+- 协同业务：`careOrders`、`medicationPickups`、`insuranceClaims`、`referralSystem`、`referralTeleconsultations`
 - 县域医共体：`countyConsortium`、`countyCollaborationOrders`、`countyMutualRecognitionRecords`、`countyAiDiagnosisCases`
 - 证照统计：`deathCertificates`、`birthCertificates`、`healthStatistics`、`healthStatisticsIngestion`
 - 治理审计：`securityEvents`、`dataAccessLogs`、`platformRoadmap`、`platformAudit`、`platformProcessAudit`
@@ -199,6 +199,8 @@ npm.cmd run release:manifest
 `site:pack` 会生成 `release/site-readiness-pack.json` 与 `release/site-readiness-pack.md`，把政务身份源、HIS/EMR/LIS/PACS/医保/证照接口联调、监控值守和生产签字事项转换为现场可填写的字段映射、样例报文、告警、值班和签字模板；同时生成 `release/templates/*/README.md`，按身份源映射、接口联调、监控值守、生产签字四类模板说明当前系统可实现的能力、需收集的输入、产出物和 API 证据。`GET /api/site-template-readmes` 会把这 4 个模板 README 作为运行时审计数据返回，工作台会展示每个模板的状态、责任方、行数、附件类型和 live evidence；`release:report` 会同步归档该准备包与模板 README。
 
 `monitoring:readiness` 会生成 `release/monitoring-readiness-report.json` 与 `release/monitoring-readiness-report.md`，专项检查健康检查、运行指标、慢请求、状态码、死信、数据质量、SLO 阈值、告警信号和 on-call escalation 证据；真实 Prometheus/OpenTelemetry 或平台日志绑定完成后，再用 `CUTOVER_MONITORING_SIGNOFF` 作为现场签字信号。
+
+`referral:readiness` 会生成 `release/referral-teleconsultation-readiness-report.json` 与 `release/referral-teleconsultation-readiness-report.md`，检查医联体转诊、远程会诊、接诊反馈、报告回传、协同工单、绩效评价、居民授权、审计留痕、专用 API 与机构端/县域端入口，作为 HIS/EMR、预约号源、远程视频、PACS/LIS 报告和医共体绩效公式现场联调前的闭环证据。
 
 `evaluation:evidence` 会生成 `release/evaluation-evidence-report.json` 与 `release/evaluation-evidence-report.md`，汇总互联互通四甲/五乙测评所需接口清单、标准映射、交易样例、整改记录、P1 接口需求和流程审计证据。
 

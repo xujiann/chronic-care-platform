@@ -113,6 +113,8 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.interfaceMapping.ok, true);
   assert.equal(report.checks.some((item) => item.name === "monitoring:readiness" && item.passed), true);
   assert.equal(report.monitoringReadiness.ok, true);
+  assert.equal(report.checks.some((item) => item.name === "referralTeleconsultation:readiness" && item.passed), true);
+  assert.equal(report.referralTeleconsultationReadiness.ok, true);
   assert.equal(report.checks.some((item) => item.name === "operations:readiness" && item.passed), true);
   assert.equal(report.operationsReadiness.ok, true);
   assert.equal(report.checks.some((item) => item.name === "process:audit" && item.passed), true);
@@ -150,6 +152,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(markdown, /Interface mapping report/);
   assert.match(markdown, /Data quality and master index report/);
   assert.match(markdown, /Monitoring readiness report/);
+  assert.match(markdown, /Referral teleconsultation readiness report/);
   assert.match(markdown, /Operations readiness report/);
   assert.match(markdown, /Full process audit report/);
   assert.match(markdown, /Service acceptance summary/);
@@ -238,6 +241,8 @@ test("release report writes standalone production cutover and storage artifacts"
   const interfaceMappingMarkdown = fs.readFileSync(path.join(outputDir, "interface-mapping-report.md"), "utf8");
   const monitoringJson = JSON.parse(fs.readFileSync(path.join(outputDir, "monitoring-readiness-report.json"), "utf8"));
   const monitoringMarkdown = fs.readFileSync(path.join(outputDir, "monitoring-readiness-report.md"), "utf8");
+  const referralJson = JSON.parse(fs.readFileSync(path.join(outputDir, "referral-teleconsultation-readiness-report.json"), "utf8"));
+  const referralMarkdown = fs.readFileSync(path.join(outputDir, "referral-teleconsultation-readiness-report.md"), "utf8");
   const operationsJson = JSON.parse(fs.readFileSync(path.join(outputDir, "operations-readiness-report.json"), "utf8"));
   const operationsMarkdown = fs.readFileSync(path.join(outputDir, "operations-readiness-report.md"), "utf8");
   const processAuditJson = JSON.parse(fs.readFileSync(path.join(outputDir, "process-audit-report.json"), "utf8"));
@@ -275,6 +280,8 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(interfaceMappingMarkdown, /Contract field mappings/);
   assert.equal(monitoringJson.monitoringReadiness.ok, true);
   assert.match(monitoringMarkdown, /SLO targets/);
+  assert.equal(referralJson.referralTeleconsultationReadiness.ok, true);
+  assert.match(referralMarkdown, /Referral teleconsultation readiness report/);
   assert.equal(operationsJson.operationsReadiness.ok, true);
   assert.match(operationsMarkdown, /External dependency risks/);
   assert.equal(processAuditJson.processAudit.ok, true);
@@ -297,6 +304,7 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(environmentMarkdown, /Environment matrix report/);
   assert.equal(manifestJson.releaseArtifactManifest.ok, true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "service-acceptance"), true);
+  assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "referral-teleconsultation"), true);
   assert.match(manifestMarkdown, /Release artifact manifest/);
   assert.match(manifestMarkdown, /service-acceptance-summary\.md/);
   assert.match(manifestMarkdown, /release\/templates\/identity-source-mapping\/README\.md/);

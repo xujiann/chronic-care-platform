@@ -2586,6 +2586,36 @@
       "due": "2026-06-23",
       "result": "待接诊反馈",
       "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
+    },
+    {
+      "id": "cco-004",
+      "center": "Teleconsultation Center",
+      "region": "Zhongshan District",
+      "fromInstitution": "Qingniwaqiao Community Health Service Center",
+      "toInstitution": "Dalian Central Hospital",
+      "residentId": "r1",
+      "orderType": "Hypertension upward referral teleconsultation",
+      "status": "accepted-by-center",
+      "priority": "high",
+      "requestedAt": "2026-06-22",
+      "due": "2026-06-23",
+      "result": "Waiting for consultation report return",
+      "teleconsultationId": "rtc-001"
+    },
+    {
+      "id": "cco-005",
+      "center": "Teleconsultation Center",
+      "region": "Zhongshan District",
+      "fromInstitution": "Xinghaiwan Community Health Service Center",
+      "toInstitution": "Dalian Medical University Hospital",
+      "residentId": "r2",
+      "orderType": "Diabetes teleconsultation report return",
+      "status": "report-returned",
+      "priority": "medium",
+      "requestedAt": "2026-06-20",
+      "due": "2026-06-22",
+      "result": "Report returned and linked to follow-up plan",
+      "teleconsultationId": "rtc-002"
     }
   ],
   "countyAiDiagnosisCases": [
@@ -6896,6 +6926,109 @@
       ],
       "status": "demo-ready",
       "nextAction": "Attach live IRB approval, data-use agreement, and sandbox access records before production sharing."
+    }
+  ],
+  "referralTeleconsultations": [
+    {
+      "id": "rtc-001",
+      "referralId": "rf1",
+      "residentId": "r1",
+      "type": "teleconsultation",
+      "diseaseType": "hypertension",
+      "sourceInstitution": "Qingniwaqiao Community Health Service Center",
+      "sourceInstitutionCode": "MR3",
+      "targetInstitution": "Dalian Central Hospital",
+      "targetInstitutionCode": "MR1",
+      "department": "Cardiology",
+      "applicantDoctor": "doc-liu",
+      "receivingDoctor": "doc-wang",
+      "residentAuthorizationId": "a1248b5f-1fe9-4c41-bd51-f9e6c68bb4b0",
+      "authorizationStatus": "authorized",
+      "status": "scheduled",
+      "priority": "high",
+      "requestedAt": "2026-06-22",
+      "due": "2026-06-23",
+      "meetingWindow": "2026-06-23 15:00-15:30",
+      "clinicalQuestion": "Blood pressure remains uncontrolled after primary care adjustment; request specialist medication review and admission assessment.",
+      "materials": [
+        "EMR summary",
+        "home blood pressure log",
+        "long prescription"
+      ],
+      "receivingFeedback": "Cardiology teleconsultation window reserved; waiting for video consultation.",
+      "reportStatus": "pending-return",
+      "reportReturnedAt": "",
+      "reportSummary": "",
+      "collaborationOrderId": "cco-004",
+      "performance": {
+        "responseHours": 4,
+        "reportReturnHours": 0,
+        "satisfaction": "pending"
+      },
+      "auditTrail": [
+        {
+          "at": "2026-06-22T09:10:00.000Z",
+          "actor": "doc-liu",
+          "action": "created",
+          "note": "Primary institution submitted upward referral teleconsultation."
+        },
+        {
+          "at": "2026-06-23T09:30:00.000Z",
+          "actor": "doc-wang",
+          "action": "scheduled",
+          "note": "Receiving hospital accepted and reserved consultation window."
+        }
+      ]
+    },
+    {
+      "id": "rtc-002",
+      "referralId": "rf2",
+      "residentId": "r2",
+      "type": "teleconsultation-report",
+      "diseaseType": "diabetes",
+      "sourceInstitution": "Xinghaiwan Community Health Service Center",
+      "sourceInstitutionCode": "MR3",
+      "targetInstitution": "Dalian Medical University Hospital",
+      "targetInstitutionCode": "MR2",
+      "department": "Endocrinology",
+      "applicantDoctor": "doc-liu",
+      "receivingDoctor": "doc-wang",
+      "residentAuthorizationId": "97ae1a58-e5c4-4239-9319-aee89dcd8527",
+      "authorizationStatus": "authorized",
+      "status": "report-returned",
+      "priority": "medium",
+      "requestedAt": "2026-06-20",
+      "due": "2026-06-22",
+      "meetingWindow": "2026-06-21 10:00-10:20",
+      "clinicalQuestion": "Review diet, exercise, and medication plan after elevated HbA1c.",
+      "materials": [
+        "lab report",
+        "follow-up record"
+      ],
+      "receivingFeedback": "Endocrinology specialist consultation completed.",
+      "reportStatus": "returned",
+      "reportReturnedAt": "2026-06-22T11:30:00.000Z",
+      "reportSummary": "Recheck HbA1c in three months; primary institution continues diet and exercise intervention and monitors hypoglycemia risk.",
+      "collaborationOrderId": "cco-005",
+      "performance": {
+        "responseHours": 3,
+        "reportReturnHours": 25,
+        "satisfaction": "good"
+      },
+      "auditTrail": [
+        {
+          "at": "2026-06-20T14:00:00.000Z",
+          "actor": "doc-liu",
+          "action": "created",
+          "note": "Primary institution submitted diabetes teleconsultation."
+        },
+        {
+          "at": "2026-06-22T11:30:00.000Z",
+          "actor": "doc-wang",
+          "action": "report-returned",
+          "note": "Specialist report returned to primary institution."
+        }
+      ]
     }
   ]
 }

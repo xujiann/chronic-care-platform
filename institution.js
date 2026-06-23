@@ -1,4 +1,4 @@
-const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthStatistics: {}, doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {} };
+const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], referralTeleconsultations: [], deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthStatistics: {}, doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {} };
 const institutionApiBase = location.protocol === "file:" || location.hostname.endsWith("github.io") ? "" : "/api";
 let platformState = fallbackState;
 
@@ -19,6 +19,7 @@ function renderAll(state) {
   renderAuthorizedRecords(state);
   renderClaimLinks(state);
   renderReferralCenter(state);
+  renderTeleconsultationLoop(state);
   renderReservedResources(state);
   renderIntegratedProfiles(state);
   renderStandardArchiveProfiles(state);
@@ -397,6 +398,32 @@ function renderReferralCenter(state) {
       <span class="badge ${badge}">${item.status}</span>
     </section>`;
   }).join("") || `<p class="muted">暂无转诊中心任务。</p>`;
+}
+
+function renderTeleconsultationLoop(state) {
+  const rows = state.referralTeleconsultations || [];
+  const countEl = document.querySelector("#teleconsultation-count");
+  const listEl = document.querySelector("#teleconsultation-loop");
+  if (!countEl || !listEl) return;
+  countEl.textContent = `${rows.length} items`;
+  listEl.innerHTML = rows.map((item) => {
+    const resident = residentOf(state, item.residentId);
+    const badge = item.priority === "high" ? "danger" : item.reportStatus === "returned" ? "info" : "warn";
+    return `<section class="item">
+      <div>
+        <h3>${resident?.name || "Unknown resident"} · ${item.department || item.diseaseType || "Teleconsultation"}</h3>
+        <p>${item.sourceInstitution || "-"} -> ${item.targetInstitution || "-"} · ${item.meetingWindow || item.due || "-"}</p>
+        <p>${item.clinicalQuestion || item.receivingFeedback || item.reportSummary || "Pending clinical note"}</p>
+        <p>Authorization: ${item.authorizationStatus || "pending"} · Report: ${item.reportStatus || "pending"}</p>
+        <div class="action-row">
+          ${item.status === "requested" ? actionButton("referralTeleconsultations", item.id, "Accept", { status: "accepted", receivingFeedback: "Receiving institution accepted the teleconsultation." }, "Accept referral teleconsultation") : ""}
+          ${item.reportStatus !== "returned" ? actionButton("referralTeleconsultations", item.id, "Return report", { status: "report-returned", reportStatus: "returned", reportSummary: "Consultation report returned to the originating institution." }, "Return teleconsultation report") : ""}
+          ${item.status !== "closed" ? actionButton("referralTeleconsultations", item.id, "Close", { status: "closed" }, "Close referral teleconsultation loop") : ""}
+        </div>
+      </div>
+      <span class="badge ${badge}">${item.status}</span>
+    </section>`;
+  }).join("") || `<p class="muted">No referral teleconsultation tasks.</p>`;
 }
 
 function renderReservedResources(state) {
