@@ -2941,6 +2941,98 @@
       "status": "整改中"
     }
   ],
+  "drugConsumableSupervisions": [
+    {
+      "id": "dcs-rational-r1",
+      "residentId": "r1",
+      "category": "rational-use",
+      "boundary": "rational-medication",
+      "institution": "Dalian Central Hospital",
+      "sourceCollection": "insuranceClaims",
+      "sourceId": "ic1",
+      "relatedPickupId": "mp1",
+      "relatedClaimId": "ic1",
+      "issue": "Long-term prescription and settlement claim need prescription-review evidence.",
+      "riskLevel": "warning",
+      "reviewStatus": "pending-review",
+      "insuranceStatus": "pending-audit",
+      "remediationStatus": "open",
+      "status": "open",
+      "ownerRole": "insurance",
+      "nextAction": "Attach prescription-review note and medication-use basis before settlement approval.",
+      "auditTrail": [
+        {
+          "at": "2026-06-20T09:00:00.000Z",
+          "actor": "system",
+          "role": "commission",
+          "action": "seed",
+          "result": "created"
+        }
+      ],
+      "lastUpdated": "2026-06-20T09:00:00.000Z",
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
+    },
+    {
+      "id": "dcs-fixed-pickup-r2",
+      "residentId": "r2",
+      "category": "fixed-pickup",
+      "boundary": "fixed-pharmacy",
+      "institution": "Xinghaiwan Community Health Service Center",
+      "sourceCollection": "medicationPickups",
+      "sourceId": "mp3",
+      "relatedPickupId": "mp3",
+      "relatedClaimId": "ic2",
+      "issue": "Fixed pickup request waits for insurance review and pharmacy confirmation.",
+      "riskLevel": "attention",
+      "reviewStatus": "institution-confirmed",
+      "insuranceStatus": "pending-audit",
+      "remediationStatus": "tracking",
+      "status": "in-progress",
+      "ownerRole": "insurance",
+      "nextAction": "Insurance center confirms benefit scope and pickup cycle.",
+      "auditTrail": [
+        {
+          "at": "2026-06-20T09:05:00.000Z",
+          "actor": "system",
+          "role": "commission",
+          "action": "seed",
+          "result": "created"
+        }
+      ],
+      "lastUpdated": "2026-06-20T09:05:00.000Z",
+      "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
+    },
+    {
+      "id": "dcs-consumable-mr1",
+      "residentId": "r4",
+      "category": "high-value-consumable",
+      "boundary": "consumable-clue",
+      "institution": "Dalian Central Hospital",
+      "sourceCollection": "institutionSupervisions",
+      "sourceId": "is1",
+      "relatedPickupId": "mp4",
+      "relatedClaimId": "ic3",
+      "issue": "High-value consumable clue needs institution explanation and insurance settlement cross-check.",
+      "riskLevel": "high",
+      "reviewStatus": "clue-registered",
+      "insuranceStatus": "coordinating",
+      "remediationStatus": "open",
+      "status": "open",
+      "ownerRole": "commission",
+      "nextAction": "Health commission asks institution to upload consumable catalog version and rectification evidence.",
+      "auditTrail": [
+        {
+          "at": "2026-06-20T09:10:00.000Z",
+          "actor": "system",
+          "role": "commission",
+          "action": "seed",
+          "result": "created"
+        }
+      ],
+      "lastUpdated": "2026-06-20T09:10:00.000Z",
+      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
+    }
+  ],
   "insuranceClaims": [
     {
       "id": "ic1",

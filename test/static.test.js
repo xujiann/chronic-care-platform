@@ -71,6 +71,9 @@ test("static snapshot keeps completed P2 governance collections", () => {
   assert.equal(data.researchDatasets.some((item) => item.id === "rd-hypertension-001"), true);
   assert.equal(Array.isArray(data.diseaseRegistryModels), true);
   assert.equal(data.diseaseRegistryModels.some((item) => item.id === "dm-hypertension-risk-v1"), true);
+  assert.equal(Array.isArray(data.drugConsumableSupervisions), true);
+  assert.equal(data.drugConsumableSupervisions.some((item) => item.id === "dcs-rational-r1" && item.boundary === "rational-medication"), true);
+  assert.equal(data.drugConsumableSupervisions.some((item) => item.id === "dcs-consumable-mr1" && item.boundary === "consumable-clue"), true);
   assert.equal(data.mobileExperienceSettings.weakNetworkMode, "cache-last-state");
   assert.equal(Array.isArray(data.accessibilityChecklist), true);
   assert.equal(data.accessibilityChecklist.some((item) => item.id === "a11y-large-font"), true);
@@ -149,6 +152,21 @@ test("chronic disease policy module exposes 2025 service capacity workflow", () 
   assert.match(server, /基层慢病健康管理中心/);
 });
 
+test("insurance portal exposes actionable drug consumable supervision workflow", () => {
+  const html = read("insurance.html");
+  const js = read("insurance.js");
+  const server = read("server.js");
+  assert.match(html, /drug-consumable-panel/);
+  assert.match(js, /renderDrugConsumableSupervision/);
+  assert.match(js, /postDrugConsumableAction/);
+  assert.match(js, /data-drug-action/);
+  assert.match(server, /buildDrugConsumableSupervision/);
+  assert.match(server, /\/api\/drug-consumable-supervision/);
+  assert.match(server, /drug-consumable-review/);
+  assert.match(server, /drug-consumable-remediation/);
+  assert.match(server, /drug-consumable-insurance-sync/);
+});
+
 test("deployment baseline documents scripts and environment template", () => {
   const pkg = JSON.parse(read("package.json"));
   assert.equal(Boolean(pkg.scripts["deploy:check"]), true);
@@ -160,6 +178,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal(Boolean(pkg.scripts["identity:contract"]), true);
   assert.equal(Boolean(pkg.scripts["audit:retention"]), true);
   assert.equal(Boolean(pkg.scripts["data-quality:report"]), true);
+  assert.equal(Boolean(pkg.scripts["drug-consumable:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["environment:matrix"]), true);
   assert.equal(Boolean(pkg.scripts["integration:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["interface:mapping"]), true);
@@ -187,6 +206,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /identity-contract\.md/);
   assert.match(read("README.md"), /audit-retention-report\.md/);
   assert.match(read("README.md"), /data-quality-report\.md/);
+  assert.match(read("README.md"), /drug-consumable-readiness-report\.md/);
   assert.match(read("README.md"), /environment-matrix-report\.md/);
   assert.match(read("README.md"), /integration-readiness-report\.md/);
   assert.match(read("README.md"), /interface-mapping-report\.md/);
@@ -205,6 +225,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("DEPLOYMENT.md"), /identity-contract\.md/);
   assert.match(read("DEPLOYMENT.md"), /audit-retention-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /data-quality-report\.md/);
+  assert.match(read("DEPLOYMENT.md"), /drug-consumable-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /environment-matrix-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /integration-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /interface-mapping-report\.md/);
@@ -225,6 +246,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/deploy-check.js"), /identity:contract/);
   assert.match(read("scripts/deploy-check.js"), /audit:retention/);
   assert.match(read("scripts/deploy-check.js"), /data-quality:report/);
+  assert.match(read("scripts/deploy-check.js"), /drug-consumable:readiness/);
   assert.match(read("scripts/deploy-check.js"), /environment:matrix/);
   assert.match(read("scripts/deploy-check.js"), /integration:readiness/);
   assert.match(read("scripts/deploy-check.js"), /interface:mapping/);
@@ -241,6 +263,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".github/workflows/ci.yml"), /npm run identity:contract/);
   assert.match(read(".github/workflows/ci.yml"), /npm run audit:retention/);
   assert.match(read(".github/workflows/ci.yml"), /npm run data-quality:report/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run drug-consumable:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run integration:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run interface:mapping/);
   assert.match(read(".github/workflows/ci.yml"), /npm run monitoring:readiness/);

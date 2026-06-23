@@ -377,11 +377,11 @@ const SQLITE_MIGRATIONS = [
     }
   }
 ];
-const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals", "deathCertificates", "birthCertificates", "multiPracticeApplications", "digitalCredentials", "emergencySignals", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports"]);
+const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals", "deathCertificates", "birthCertificates", "multiPracticeApplications", "digitalCredentials", "emergencySignals", "drugConsumableSupervisions", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports"]);
 const WORKFLOW_ROLE_COLLECTIONS = {
   commission: WORKFLOW_COLLECTIONS,
-  institution: new Set(["careOrders", "medicationPickups", "followups", "referrals", "deathCertificates", "birthCertificates", "multiPracticeApplications", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "emergencySignals"]),
-  insurance: new Set(["insuranceClaims", "medicationPickups", "digitalCredentials"]),
+  institution: new Set(["careOrders", "medicationPickups", "followups", "referrals", "deathCertificates", "birthCertificates", "multiPracticeApplications", "drugConsumableSupervisions", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "emergencySignals"]),
+  insurance: new Set(["insuranceClaims", "medicationPickups", "digitalCredentials", "drugConsumableSupervisions"]),
   county: new Set(["countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "emergencySignals"])
 };
 const WORKFLOW_PROTECTED_FIELDS = new Set(["id", "residentId", "maternalResidentId", "personIndex", "credentialNo", "certificateNo", "documentNo", "motherDocumentNo", "fatherDocumentNo", "createdAt", "createdBy", "createdByName", "lastUpdated", "updatedAt", "updatedBy", "updatedByName"]);
@@ -2273,6 +2273,77 @@ function seedInstitutionSupervisions() {
   ];
 }
 
+function seedDrugConsumableSupervisions() {
+  return [
+    {
+      id: "dcs-rational-r1",
+      residentId: "r1",
+      category: "rational-use",
+      boundary: "rational-medication",
+      institution: "Dalian Central Hospital",
+      sourceCollection: "insuranceClaims",
+      sourceId: "ic1",
+      relatedPickupId: "mp1",
+      relatedClaimId: "ic1",
+      issue: "Long-term prescription and settlement claim need prescription-review evidence.",
+      riskLevel: "warning",
+      reviewStatus: "pending-review",
+      insuranceStatus: "pending-audit",
+      remediationStatus: "open",
+      status: "open",
+      ownerRole: "insurance",
+      nextAction: "Attach prescription-review note and medication-use basis before settlement approval.",
+      auditTrail: [{ at: "2026-06-20T09:00:00.000Z", actor: "system", role: "commission", action: "seed", result: "created" }],
+      lastUpdated: "2026-06-20T09:00:00.000Z",
+      personIndex: "DEMO-ID-R1#DEMO-MOBILE-R1"
+    },
+    {
+      id: "dcs-fixed-pickup-r2",
+      residentId: "r2",
+      category: "fixed-pickup",
+      boundary: "fixed-pharmacy",
+      institution: "Xinghaiwan Community Health Service Center",
+      sourceCollection: "medicationPickups",
+      sourceId: "mp3",
+      relatedPickupId: "mp3",
+      relatedClaimId: "ic2",
+      issue: "Fixed pickup request waits for insurance review and pharmacy confirmation.",
+      riskLevel: "attention",
+      reviewStatus: "institution-confirmed",
+      insuranceStatus: "pending-audit",
+      remediationStatus: "tracking",
+      status: "in-progress",
+      ownerRole: "insurance",
+      nextAction: "Insurance center confirms benefit scope and pickup cycle.",
+      auditTrail: [{ at: "2026-06-20T09:05:00.000Z", actor: "system", role: "commission", action: "seed", result: "created" }],
+      lastUpdated: "2026-06-20T09:05:00.000Z",
+      personIndex: "DEMO-ID-R2#DEMO-MOBILE-R2"
+    },
+    {
+      id: "dcs-consumable-mr1",
+      residentId: "r4",
+      category: "high-value-consumable",
+      boundary: "consumable-clue",
+      institution: "Dalian Central Hospital",
+      sourceCollection: "institutionSupervisions",
+      sourceId: "is1",
+      relatedPickupId: "mp4",
+      relatedClaimId: "ic3",
+      issue: "High-value consumable clue needs institution explanation and insurance settlement cross-check.",
+      riskLevel: "high",
+      reviewStatus: "clue-registered",
+      insuranceStatus: "coordinating",
+      remediationStatus: "open",
+      status: "open",
+      ownerRole: "commission",
+      nextAction: "Health commission asks institution to upload consumable catalog version and rectification evidence.",
+      auditTrail: [{ at: "2026-06-20T09:10:00.000Z", actor: "system", role: "commission", action: "seed", result: "created" }],
+      lastUpdated: "2026-06-20T09:10:00.000Z",
+      personIndex: "DEMO-ID-R4#DEMO-MOBILE-R4"
+    }
+  ];
+}
+
 function seedPersonalRecords() {
   return [
     record("r1", "emr", "2026-05-21", "原发性高血压 2 级", "复诊血压偏高，建议调整生活方式并规律服药。", "大连市中心医院 · 心内科", {
@@ -3328,6 +3399,7 @@ function normalizeState(data) {
     careOrders: Array.isArray(data.careOrders) ? data.careOrders : seedCareOrders(),
     medicationPickups: Array.isArray(data.medicationPickups) ? data.medicationPickups : seedMedicationPickups(),
     institutionSupervisions: Array.isArray(data.institutionSupervisions) ? data.institutionSupervisions : seedInstitutionSupervisions(),
+    drugConsumableSupervisions: mergeByKey(seedDrugConsumableSupervisions(), data.drugConsumableSupervisions, "id"),
     insuranceClaims: Array.isArray(data.insuranceClaims) ? data.insuranceClaims : seedInsuranceClaims(),
     policyAlignment: Array.isArray(data.policyAlignment) ? data.policyAlignment : seedPolicyAlignment(),
     emergencySignals: Array.isArray(data.emergencySignals) ? data.emergencySignals : seedEmergencySignals(),
@@ -4926,6 +4998,107 @@ function buildConsortiumPerformanceReport(data) {
   };
 }
 
+function drugConsumableStatus(value) {
+  const text = String(value || "").toLowerCase();
+  if (/closed|passed|complete|done|resolved|通过|完成/.test(text)) return "closed";
+  if (/reject|return|补正|整改|退回/.test(text)) return "remediation";
+  if (/pending|wait|待|初审|review/.test(text)) return "pending";
+  return text || "tracking";
+}
+
+function buildDrugConsumableSupervision(data) {
+  const supervisions = Array.isArray(data.drugConsumableSupervisions) ? data.drugConsumableSupervisions : seedDrugConsumableSupervisions();
+  const pickups = Array.isArray(data.medicationPickups) ? data.medicationPickups : [];
+  const claims = Array.isArray(data.insuranceClaims) ? data.insuranceClaims : [];
+  const institutionSupervisions = Array.isArray(data.institutionSupervisions) ? data.institutionSupervisions : [];
+  const contracts = Array.isArray(data.integrationContracts) ? data.integrationContracts : [];
+  const rows = supervisions.map((item) => {
+    const pickup = pickups.find((row) => row.id === item.relatedPickupId || row.id === item.sourceId);
+    const claim = claims.find((row) => row.id === item.relatedClaimId || row.id === item.sourceId);
+    const institutionIssue = institutionSupervisions.find((row) => row.id === item.sourceId || row.institution === item.institution);
+    return {
+      ...item,
+      normalizedStatus: drugConsumableStatus(item.status || item.reviewStatus || item.insuranceStatus),
+      pickup,
+      claim,
+      institutionIssue,
+      auditCount: Array.isArray(item.auditTrail) ? item.auditTrail.length : 0
+    };
+  });
+  const openRows = rows.filter((item) => item.normalizedStatus !== "closed");
+  const insuranceContract = contracts.find((item) => item.id === "insurance-settlement-v1");
+  return {
+    generatedAt: new Date().toISOString(),
+    boundaries: [
+      { id: "rational-medication", name: "Rational medication", source: "medicationPickups + personalRecords", count: rows.filter((item) => item.boundary === "rational-medication").length },
+      { id: "prescription-review", name: "Prescription and pharmacist review", source: "drugConsumableSupervisions.reviewStatus", count: rows.filter((item) => /review|rational/.test(item.boundary)).length },
+      { id: "fixed-pharmacy", name: "Fixed pickup", source: "medicationPickups", count: pickups.length },
+      { id: "consumable-clue", name: "High-value consumable clues", source: "institutionSupervisions + drugConsumableSupervisions", count: rows.filter((item) => item.boundary === "consumable-clue").length },
+      { id: "insurance-settlement", name: "Insurance settlement coordination", source: "insuranceClaims + integrationContracts", count: claims.length },
+      { id: "remediation-loop", name: "Remediation loop", source: "workflow-actions + securityEvents", count: rows.filter((item) => item.remediationStatus && item.remediationStatus !== "closed").length }
+    ],
+    summary: {
+      total: rows.length,
+      open: openRows.length,
+      highRisk: rows.filter((item) => item.riskLevel === "high").length,
+      pendingInsurance: rows.filter((item) => drugConsumableStatus(item.insuranceStatus) === "pending").length,
+      fixedPickup: pickups.length,
+      claims: claims.length,
+      contractReady: Boolean(insuranceContract?.status === "ready" && insuranceContract.signature && insuranceContract.retryPolicy)
+    },
+    rows,
+    insuranceCoordination: {
+      contractId: insuranceContract?.id || "",
+      status: insuranceContract?.status || "missing",
+      requiredFields: insuranceContract?.requiredFields || [],
+      claimIds: claims.map((item) => item.id),
+      openClaimIds: claims.filter((item) => drugConsumableStatus(item.status) !== "closed").map((item) => item.id)
+    }
+  };
+}
+
+function updateDrugConsumableSupervision(data, id, patch, user, action) {
+  data.drugConsumableSupervisions = Array.isArray(data.drugConsumableSupervisions) ? data.drugConsumableSupervisions : seedDrugConsumableSupervisions();
+  const index = data.drugConsumableSupervisions.findIndex((item) => item.id === id);
+  if (index < 0) return { status: 404, body: { error: "Not Found", message: "drug consumable supervision not found" } };
+  const current = data.drugConsumableSupervisions[index];
+  if (!canAccessResident(user, current.residentId, data)) {
+    appendSecurityEvent({ actor: user.name, role: user.role, action, target: `drugConsumableSupervisions/${id}`, result: "denied", detail: "resident scope denied" });
+    return { status: 403, body: { error: "Forbidden", message: "resident scope denied" } };
+  }
+  const safePatch = cleanBusinessPatch(patch);
+  const event = {
+    at: new Date().toISOString(),
+    actor: user.name,
+    role: user.role,
+    action,
+    result: safePatch.status || safePatch.reviewStatus || safePatch.remediationStatus || "updated"
+  };
+  data.drugConsumableSupervisions[index] = {
+    ...current,
+    ...safePatch,
+    auditTrail: [event, ...(Array.isArray(current.auditTrail) ? current.auditTrail : [])].slice(0, 20),
+    updatedBy: user.username || user.role,
+    updatedByName: user.name,
+    lastUpdated: new Date().toISOString()
+  };
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action,
+      target: `drugConsumableSupervisions/${id}`,
+      result: "allowed",
+      detail: safePatch.nextAction || safePatch.status || "drug consumable supervision updated"
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+  writeDatabase(data);
+  return { status: 200, body: data.drugConsumableSupervisions[index] };
+}
+
 function buildCountyAcceptanceLedger(data) {
   const ledger = mergeByKey(seedCountyAcceptanceLedger(), data.countyAcceptanceLedger, "id");
   const orders = Array.isArray(data.countyCollaborationOrders) ? data.countyCollaborationOrders : [];
@@ -5339,6 +5512,58 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/process-audit");
     if (!user) return;
     sendJson(res, 200, buildProcessAuditReport({ data: readDatabase() }));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/drug-consumable-supervision") {
+    const user = requireApiRole(req, res, ["commission", "insurance", "institution"], "/api/drug-consumable-supervision");
+    if (!user) return;
+    sendJson(res, 200, redactSensitiveResponse(buildDrugConsumableSupervision(scopeStateForUser(readDatabase(), user)), user));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname.startsWith("/api/drug-consumable-supervision/") && url.pathname.endsWith("/review")) {
+    const user = requireApiRole(req, res, ["commission", "insurance"], "/api/drug-consumable-supervision/:id/review");
+    if (!user) return;
+    const id = decodeURIComponent(url.pathname.replace("/api/drug-consumable-supervision/", "").replace("/review", ""));
+    const payload = await collectJson(req);
+    const result = updateDrugConsumableSupervision(readDatabase(), id, {
+      reviewStatus: String(payload.reviewStatus || payload.status || "reviewed"),
+      insuranceStatus: String(payload.insuranceStatus || "coordinating"),
+      status: String(payload.status || "in-review"),
+      nextAction: String(payload.nextAction || payload.note || "Continue insurance and institution coordination.")
+    }, user, "drug-consumable-review");
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname.startsWith("/api/drug-consumable-supervision/") && url.pathname.endsWith("/remediation")) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/drug-consumable-supervision/:id/remediation");
+    if (!user) return;
+    const id = decodeURIComponent(url.pathname.replace("/api/drug-consumable-supervision/", "").replace("/remediation", ""));
+    const payload = await collectJson(req);
+    const result = updateDrugConsumableSupervision(readDatabase(), id, {
+      remediationStatus: String(payload.remediationStatus || payload.status || "submitted"),
+      status: String(payload.status || "remediation-submitted"),
+      evidence: String(payload.evidence || ""),
+      nextAction: String(payload.nextAction || payload.note || "Regulator reviews remediation evidence.")
+    }, user, "drug-consumable-remediation");
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname.startsWith("/api/drug-consumable-supervision/") && url.pathname.endsWith("/insurance-sync")) {
+    const user = requireApiRole(req, res, ["commission", "insurance"], "/api/drug-consumable-supervision/:id/insurance-sync");
+    if (!user) return;
+    const id = decodeURIComponent(url.pathname.replace("/api/drug-consumable-supervision/", "").replace("/insurance-sync", ""));
+    const payload = await collectJson(req);
+    const result = updateDrugConsumableSupervision(readDatabase(), id, {
+      insuranceStatus: String(payload.insuranceStatus || "synced"),
+      settlementBatch: String(payload.settlementBatch || "demo-batch"),
+      status: String(payload.status || "insurance-synced"),
+      nextAction: String(payload.nextAction || payload.note || "Archive settlement coordination evidence.")
+    }, user, "drug-consumable-insurance-sync");
+    sendJson(res, result.status, result.body);
     return;
   }
 

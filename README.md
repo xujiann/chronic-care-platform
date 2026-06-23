@@ -251,3 +251,6 @@ GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下
 - [部署说明](./DEPLOYMENT.md)
 - [后续开发优先级](./docs/后续开发优先级.md)
 - [GitHub 拆分部署方案](./docs/GitHub拆分部署方案.md)
+## Drug Consumable Supervision Evidence
+
+`drug-consumable:readiness` generates `release/drug-consumable-readiness-report.json` and `release/drug-consumable-readiness-report.md`, covering rational medication, prescription review, fixed pickup, high-value consumable clues, insurance settlement coordination, and remediation-loop evidence for the drug and consumable supervision app.

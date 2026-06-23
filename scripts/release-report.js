@@ -4,6 +4,7 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { buildAuditRetentionReport, renderMarkdown: renderAuditRetentionMarkdown } = require("./audit-retention");
 const { buildDataQualityReport, renderMarkdown: renderDataQualityMarkdown } = require("./data-quality-report");
+const { buildDrugConsumableReadinessReport, renderMarkdown: renderDrugConsumableMarkdown } = require("./drug-consumable-readiness");
 const { buildEvaluationEvidenceReport, renderMarkdown: renderEvaluationEvidenceMarkdown } = require("./evaluation-evidence");
 const { buildEnvironmentMatrixReport, renderMarkdown: renderEnvironmentMatrixMarkdown } = require("./environment-matrix");
 const { buildIdentityContract, renderMarkdown: renderIdentityContractMarkdown } = require("./identity-contract");
@@ -311,6 +312,14 @@ function dataQualityChecks(dataQuality) {
   ];
 }
 
+function drugConsumableChecks(drugConsumable) {
+  return [
+    check("drugConsumable:readiness", drugConsumable.ok, drugConsumable.ok ? "drug consumable supervision checks passed" : "drug consumable supervision checks failed", "error", "drug-consumable"),
+    check("drugConsumable:boundaries", drugConsumable.requiredBoundaries?.every((boundary) => drugConsumable.checks?.find((item) => item.id === "drug-consumable:boundaries")?.detail?.includes(`${boundary}:present`)), `${drugConsumable.requiredBoundaries?.length || 0} boundaries`, "error", "drug-consumable"),
+    check("drugConsumable:links", drugConsumable.linkedRows?.every((item) => item.pickupLinked && item.claimLinked && item.auditTrailPresent), `${drugConsumable.linkedRows?.length || 0} linked supervision rows`, "error", "drug-consumable")
+  ];
+}
+
 function operationsReadinessChecks(operationsReadiness) {
   return [
     check("operations:readiness", operationsReadiness.ok, operationsReadiness.ok ? "operations readiness checks passed" : "operations readiness checks failed", "error", "operations"),
@@ -514,6 +523,7 @@ function buildReleaseReport(options = {}) {
   const identityContract = buildIdentityContract({ data });
   const auditRetention = buildAuditRetentionReport({ data, env: options.env || process.env });
   const dataQuality = buildDataQualityReport({ data });
+  const drugConsumable = buildDrugConsumableReadinessReport({ data, pkg });
   const integrationReadiness = buildIntegrationReadinessReport({ data });
   const interfaceMapping = buildInterfaceMappingReport({ data, pkg });
   const monitoringReadiness = buildMonitoringReadinessReport({ data, pkg });
@@ -537,6 +547,7 @@ function buildReleaseReport(options = {}) {
     ...identityContractChecks(identityContract),
     ...auditRetentionChecks(auditRetention),
     ...dataQualityChecks(dataQuality),
+    ...drugConsumableChecks(drugConsumable),
     ...integrationReadinessChecks(integrationReadiness),
     ...interfaceMappingChecks(interfaceMapping),
     ...monitoringReadinessChecks(monitoringReadiness),
@@ -570,6 +581,7 @@ function buildReleaseReport(options = {}) {
     identityContract,
     auditRetention,
     dataQuality,
+    drugConsumable,
     integrationReadiness,
     interfaceMapping,
     monitoringReadiness,
@@ -741,6 +753,10 @@ function renderMarkdown(report) {
     "",
     "See `data-quality-report.json` and `data-quality-report.md` for resident master index completeness, resident reference checks, source traceability, and rectification issue evidence.",
     "",
+    "## Drug consumable readiness report",
+    "",
+    "See `drug-consumable-readiness-report.json` and `drug-consumable-readiness-report.md` for rational medication, prescription review, fixed pickup, high-value consumable clues, insurance settlement coordination, and remediation-loop evidence.",
+    "",
     "## Operations readiness report",
     "",
     "See `operations-readiness-report.json` and `operations-readiness-report.md` for operation routes, production deployment tracks, external dependency risks, and release operation scripts.",
@@ -854,6 +870,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       interfaceMapping: report.interfaceMapping
     }, null, 2), "utf8");
+    const drugConsumableJson = path.join(path.dirname(output), "drug-consumable-readiness-report.json");
+    fs.writeFileSync(drugConsumableJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      drugConsumable: report.drugConsumable
+    }, null, 2), "utf8");
     const operationsJson = path.join(path.dirname(output), "operations-readiness-report.json");
     fs.writeFileSync(operationsJson, JSON.stringify({
       project: report.project,
@@ -946,6 +970,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(integrationMarkdown, renderIntegrationReadinessMarkdown(report.integrationReadiness), "utf8");
     const interfaceMappingMarkdown = path.join(path.dirname(markdown), "interface-mapping-report.md");
     fs.writeFileSync(interfaceMappingMarkdown, renderInterfaceMappingMarkdown(report.interfaceMapping), "utf8");
+    const drugConsumableMarkdown = path.join(path.dirname(markdown), "drug-consumable-readiness-report.md");
+    fs.writeFileSync(drugConsumableMarkdown, renderDrugConsumableMarkdown(report.drugConsumable), "utf8");
     const operationsMarkdown = path.join(path.dirname(markdown), "operations-readiness-report.md");
     fs.writeFileSync(operationsMarkdown, renderOperationsReadinessMarkdown(report.operationsReadiness), "utf8");
     const processAuditMarkdown = path.join(path.dirname(markdown), "process-audit-report.md");

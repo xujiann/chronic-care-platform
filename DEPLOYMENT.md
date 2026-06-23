@@ -246,3 +246,6 @@ npm.cmd run rollback:snapshot -- "data/backups/<备份目录>"
 - 出生/死亡电子证照。
 - 公安、民政共享。
 - 等保、密评、日志保全、脱敏和容灾。
+## Drug Consumable Supervision Evidence
+
+Before site joint testing for the drug and consumable supervision app, run `npm.cmd run drug-consumable:readiness` and archive `release/drug-consumable-readiness-report.json` plus `release/drug-consumable-readiness-report.md`. The report is the pre-field evidence bundle for rational medication, prescription review, fixed pickup, high-value consumable clues, insurance settlement coordination, and remediation-loop signoff.
