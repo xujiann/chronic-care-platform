@@ -13,6 +13,7 @@ const { buildMonitoringReadinessReport, renderMarkdown: renderMonitoringReadines
 const { buildOperationsReadinessReport, renderMarkdown: renderOperationsReadinessMarkdown } = require("./operations-readiness");
 const { buildProcessAuditReport, renderMarkdown: renderProcessAuditMarkdown } = require("./process-audit");
 const { buildProductionDbReadinessReport, renderMarkdown: renderProductionDbReadinessMarkdown } = require("./production-db-readiness");
+const { buildQualitySafetyReport, renderMarkdown: renderQualitySafetyMarkdown } = require("./quality-safety-report");
 const { buildReleaseArtifactManifest, renderMarkdown: renderReleaseArtifactManifestMarkdown } = require("./release-artifact-manifest");
 const { buildSiteReadinessPack, renderMarkdown: renderSiteReadinessMarkdown, writeTemplateReadmes } = require("./site-readiness-pack");
 const { inspectStorageModel } = require("./storage-admin");
@@ -211,6 +212,8 @@ function snapshotChecks(data) {
     "institutionCreditEvaluations",
     "researchDatasets",
     "diseaseRegistryModels",
+    "qualitySafetyEvents",
+    "qualityRectificationOrders",
     "accessibilityChecklist",
     "securityAcceptanceLedger"
   ];
@@ -308,6 +311,14 @@ function dataQualityChecks(dataQuality) {
     check("dataQuality:report", dataQuality.ok, dataQuality.ok ? "data quality checks passed" : "data quality checks failed", "error", "data-quality"),
     check("dataQuality:masterIndexCompleteness", dataQuality.scorecard?.residentIndexCompleteness === 100, `${dataQuality.scorecard?.residentIndexCompleteness || 0}% resident index completeness`, "error", "data-quality"),
     check("dataQuality:residentReferences", dataQuality.issues?.missingReferences?.length === 0, `${dataQuality.issues?.missingReferences?.length || 0} broken resident references`, "error", "data-quality")
+  ];
+}
+
+function qualitySafetyChecks(qualitySafety) {
+  return [
+    check("qualitySafety:report", qualitySafety.ok, qualitySafety.ok ? "quality and safety supervision checks passed" : "quality and safety supervision checks failed", "error", "quality-safety"),
+    check("qualitySafety:boundaries", qualitySafety.summary?.modeledBoundaries === qualitySafety.summary?.boundaries, `${qualitySafety.summary?.modeledBoundaries || 0}/${qualitySafety.summary?.boundaries || 0} boundaries modeled`, "error", "quality-safety"),
+    check("qualitySafety:reuse", qualitySafety.reusedCollections?.every((item) => item.present), `${qualitySafety.summary?.reusedCollections || 0} reused collections`, "error", "quality-safety")
   ];
 }
 
@@ -459,6 +470,7 @@ function packageChecks(pkg) {
     "identity:contract",
     "audit:retention",
     "data-quality:report",
+    "quality-safety:report",
     "environment:matrix",
     "integration:readiness",
     "interface:mapping",
@@ -514,6 +526,7 @@ function buildReleaseReport(options = {}) {
   const identityContract = buildIdentityContract({ data });
   const auditRetention = buildAuditRetentionReport({ data, env: options.env || process.env });
   const dataQuality = buildDataQualityReport({ data });
+  const qualitySafety = buildQualitySafetyReport({ data });
   const integrationReadiness = buildIntegrationReadinessReport({ data });
   const interfaceMapping = buildInterfaceMappingReport({ data, pkg });
   const monitoringReadiness = buildMonitoringReadinessReport({ data, pkg });
@@ -537,6 +550,7 @@ function buildReleaseReport(options = {}) {
     ...identityContractChecks(identityContract),
     ...auditRetentionChecks(auditRetention),
     ...dataQualityChecks(dataQuality),
+    ...qualitySafetyChecks(qualitySafety),
     ...integrationReadinessChecks(integrationReadiness),
     ...interfaceMappingChecks(interfaceMapping),
     ...monitoringReadinessChecks(monitoringReadiness),
@@ -570,6 +584,7 @@ function buildReleaseReport(options = {}) {
     identityContract,
     auditRetention,
     dataQuality,
+    qualitySafety,
     integrationReadiness,
     interfaceMapping,
     monitoringReadiness,
@@ -741,6 +756,10 @@ function renderMarkdown(report) {
     "",
     "See `data-quality-report.json` and `data-quality-report.md` for resident master index completeness, resident reference checks, source traceability, and rectification issue evidence.",
     "",
+    "## Medical quality and safety supervision report",
+    "",
+    "See `quality-safety-report.json` and `quality-safety-report.md` for medical quality, safety event, critical value, clinical pathway, medical record QC, mutual recognition QC, dispatch, feedback, and review evidence.",
+    "",
     "## Operations readiness report",
     "",
     "See `operations-readiness-report.json` and `operations-readiness-report.md` for operation routes, production deployment tracks, external dependency risks, and release operation scripts.",
@@ -837,6 +856,14 @@ function writeOutput(report, flags) {
       profile: report.profile,
       generatedAt: report.generatedAt,
       dataQuality: report.dataQuality
+    }, null, 2), "utf8");
+    const qualitySafetyJson = path.join(path.dirname(output), "quality-safety-report.json");
+    fs.writeFileSync(qualitySafetyJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      qualitySafety: report.qualitySafety
     }, null, 2), "utf8");
     const integrationJson = path.join(path.dirname(output), "integration-readiness-report.json");
     fs.writeFileSync(integrationJson, JSON.stringify({
@@ -942,6 +969,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(auditMarkdown, renderAuditRetentionMarkdown(report.auditRetention), "utf8");
     const dataQualityMarkdown = path.join(path.dirname(markdown), "data-quality-report.md");
     fs.writeFileSync(dataQualityMarkdown, renderDataQualityMarkdown(report.dataQuality), "utf8");
+    const qualitySafetyMarkdown = path.join(path.dirname(markdown), "quality-safety-report.md");
+    fs.writeFileSync(qualitySafetyMarkdown, renderQualitySafetyMarkdown(report.qualitySafety), "utf8");
     const integrationMarkdown = path.join(path.dirname(markdown), "integration-readiness-report.md");
     fs.writeFileSync(integrationMarkdown, renderIntegrationReadinessMarkdown(report.integrationReadiness), "utf8");
     const interfaceMappingMarkdown = path.join(path.dirname(markdown), "interface-mapping-report.md");

@@ -6897,5 +6897,202 @@
       "status": "demo-ready",
       "nextAction": "Attach live IRB approval, data-use agreement, and sandbox access records before production sharing."
     }
+  ],
+  "qualitySafetyEvents": [
+    {
+      "id": "qse-med-001",
+      "domain": "medical_quality",
+      "type": "safety_event",
+      "severity": "high",
+      "institutionId": "ORG-HOSPITAL-001",
+      "institutionName": "Dalian Central Hospital",
+      "department": "Endocrinology",
+      "residentId": "r2",
+      "sourceCollection": "diagnosticReports",
+      "sourceId": "dr-001",
+      "title": "Critical glucose value acknowledgement overdue",
+      "description": "LIS report reached critical threshold and needs closed-loop acknowledgement.",
+      "reportedAt": "2026-06-22T09:12:00.000Z",
+      "dueAt": "2026-06-23T09:12:00.000Z",
+      "status": "dispatched",
+      "ownerRole": "institution",
+      "owner": "Medical quality office",
+      "staticSnapshot": {
+        "reportItem": "glucose",
+        "trigger": "critical-value",
+        "sourceSystem": "LIS"
+      },
+      "auditTrail": [
+        {
+          "at": "2026-06-22T09:20:00.000Z",
+          "by": "health",
+          "action": "seed-dispatch",
+          "note": "Initial quality-safety seed event."
+        }
+      ]
+    },
+    {
+      "id": "qse-path-001",
+      "domain": "clinical_pathway",
+      "type": "pathway_variance",
+      "severity": "medium",
+      "institutionId": "ORG-HOSPITAL-001",
+      "institutionName": "Dalian Central Hospital",
+      "department": "Cardiology",
+      "residentId": "r1",
+      "sourceCollection": "personalRecords",
+      "sourceId": "pr-001",
+      "title": "Hypertension pathway follow-up evidence missing",
+      "description": "Clinical pathway milestone lacks follow-up assessment and medication education evidence.",
+      "reportedAt": "2026-06-21T10:00:00.000Z",
+      "dueAt": "2026-06-28T10:00:00.000Z",
+      "status": "open",
+      "ownerRole": "institution",
+      "owner": "Clinical pathway office",
+      "staticSnapshot": {
+        "pathway": "hypertension-standard-pathway",
+        "variance": "missing-followup-evidence"
+      },
+      "auditTrail": [
+        {
+          "at": "2026-06-21T10:00:00.000Z",
+          "by": "health",
+          "action": "seed-open",
+          "note": "Pathway variance captured from EMR summary."
+        }
+      ]
+    },
+    {
+      "id": "qse-record-001",
+      "domain": "medical_record_qc",
+      "type": "record_defect",
+      "severity": "medium",
+      "institutionId": "ORG-COMMUNITY-001",
+      "institutionName": "Qingniwaqiao Community Health Service Center",
+      "department": "General practice",
+      "residentId": "r4",
+      "sourceCollection": "dataQualityIssues",
+      "sourceId": "dq-credit-credit-community",
+      "title": "Medical record quality sampling requires rectification",
+      "description": "Sampling found incomplete chronic disease assessment fields and missing physician sign-off.",
+      "reportedAt": "2026-06-20T14:30:00.000Z",
+      "dueAt": "2026-06-27T14:30:00.000Z",
+      "status": "feedback_submitted",
+      "ownerRole": "institution",
+      "owner": "Community quality manager",
+      "staticSnapshot": {
+        "sampleRate": "5%",
+        "defectLevel": "B",
+        "sourceSystem": "EMR"
+      },
+      "auditTrail": [
+        {
+          "at": "2026-06-20T14:30:00.000Z",
+          "by": "health",
+          "action": "seed-review",
+          "note": "Medical record QC sampling event."
+        }
+      ]
+    }
+  ],
+  "criticalValueAlerts": [
+    {
+      "id": "cva-001",
+      "eventId": "qse-med-001",
+      "reportId": "dr-001",
+      "residentId": "r2",
+      "item": "glucose",
+      "value": "26.1 mmol/L",
+      "threshold": ">25 mmol/L",
+      "level": "high",
+      "sourceInstitution": "Dalian Central Hospital",
+      "targetInstitution": "Dalian Central Hospital",
+      "reportedAt": "2026-06-22T09:12:00.000Z",
+      "acknowledgedAt": "",
+      "disposedAt": "",
+      "status": "pending_disposition",
+      "action": "Notify responsible physician and complete disposition note."
+    }
+  ],
+  "clinicalPathwayCases": [
+    {
+      "id": "cpc-001",
+      "eventId": "qse-path-001",
+      "residentId": "r1",
+      "pathwayCode": "HTN-2026",
+      "pathwayName": "Hypertension standard pathway",
+      "institutionName": "Dalian Central Hospital",
+      "currentNode": "follow-up-after-medication",
+      "varianceType": "missing_evidence",
+      "varianceReason": "Follow-up result not written back to EMR.",
+      "status": "variance_open",
+      "owner": "Clinical pathway office",
+      "dueAt": "2026-06-28T10:00:00.000Z"
+    }
+  ],
+  "medicalRecordQualityReviews": [
+    {
+      "id": "mrq-001",
+      "eventId": "qse-record-001",
+      "institutionName": "Qingniwaqiao Community Health Service Center",
+      "sampleNo": "MRQ-2026-06-001",
+      "sampleScope": "Chronic disease outpatient records",
+      "defectCount": 3,
+      "score": 86,
+      "grade": "B",
+      "reviewer": "City medical record QC group",
+      "reviewedAt": "2026-06-20T14:30:00.000Z",
+      "status": "feedback_submitted",
+      "nextAction": "Upload corrected EMR screenshots and physician sign-off."
+    }
+  ],
+  "mutualRecognitionQualityReviews": [
+    {
+      "id": "mrqr-001",
+      "recognitionRecordId": "cmr-001",
+      "reportId": "dr-001",
+      "institutionName": "Dalian Central Hospital",
+      "item": "glucose",
+      "qcStatus": "manual_review_required",
+      "issueType": "critical_value_followup",
+      "status": "open",
+      "owner": "Regional mutual recognition QC",
+      "dueAt": "2026-06-24T18:00:00.000Z",
+      "nextAction": "Verify critical value acknowledgement before recognition."
+    }
+  ],
+  "qualityRectificationOrders": [
+    {
+      "id": "qro-001",
+      "issueId": "qse-record-001",
+      "sourceType": "medical_record_qc",
+      "institutionName": "Qingniwaqiao Community Health Service Center",
+      "ownerRole": "institution",
+      "owner": "Community quality manager",
+      "requirement": "Complete missing assessment fields and physician sign-off.",
+      "status": "feedback_submitted",
+      "dispatchedAt": "2026-06-20T15:00:00.000Z",
+      "dueAt": "2026-06-27T15:00:00.000Z",
+      "feedback": [
+        {
+          "at": "2026-06-22T16:00:00.000Z",
+          "by": "community",
+          "byName": "Community doctor",
+          "content": "Corrected assessment fields have been uploaded for review.",
+          "attachments": [
+            "emr-correction-screenshot"
+          ]
+        }
+      ],
+      "review": [],
+      "auditTrail": [
+        {
+          "at": "2026-06-20T15:00:00.000Z",
+          "by": "health",
+          "action": "dispatch",
+          "note": "Seed rectification order."
+        }
+      ]
+    }
   ]
 }
