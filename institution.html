@@ -46,7 +46,68 @@
           <h2>医师多点执业</h2>
           <span id="multi-practice-count"></span>
         </div>
+        <form id="multi-practice-form" class="filter-grid">
+          <label>申请医师
+            <select name="doctorId" required></select>
+          </label>
+          <label>拟执业机构
+            <input name="targetInstitution" placeholder="例如：大连市中心医院" required />
+          </label>
+          <label>拟执业科室
+            <input name="targetDepartment" placeholder="例如：心内科慢病联合门诊" />
+          </label>
+          <label>执业范围
+            <input name="practiceScope" placeholder="与第一执业地点一致" />
+          </label>
+          <label>执业期限
+            <input name="period" placeholder="2026-07-01 至 2027-06-30" required />
+          </label>
+          <label>时间安排
+            <input name="schedule" placeholder="每周三下午" required />
+          </label>
+          <label class="full">工作任务
+            <input name="tasks" placeholder="会诊、联合门诊、基层帮扶、慢病管理等" required />
+          </label>
+          <label class="full">医疗责任约定
+            <input name="responsibility" placeholder="由当事医疗机构和医师按协议依法承担" required />
+          </label>
+          <label>薪酬约定
+            <input name="compensation" placeholder="按工作量/绩效结算" required />
+          </label>
+          <label>责任保险
+            <input name="insurance" placeholder="个人执业保险/机构责任保险" required />
+          </label>
+          <label>第一执业地点意见
+            <select name="primaryConsent">
+              <option>待确认</option>
+              <option>已同意</option>
+              <option>知情报备</option>
+              <option>医联体内帮扶免办多点执业手续</option>
+            </select>
+          </label>
+          <label>登记方式
+            <select name="registrationMode">
+              <option>备案管理</option>
+              <option>注册管理</option>
+              <option>医联体帮扶</option>
+            </select>
+          </label>
+          <label class="checkbox-line">
+            <input name="scheduleConflict" type="checkbox" />
+            存在排班冲突
+          </label>
+          <label class="checkbox-line">
+            <input name="publicVisible" type="checkbox" checked />
+            允许信息公开
+          </label>
+          <button class="inline-action" type="submit">提交多点执业申请</button>
+        </form>
+        <div id="multi-practice-dashboard" class="claim-grid"></div>
         <div id="multi-practice-applications" class="list"></div>
+        <div class="panel-title">
+          <h2>多点执业公开备案台账</h2>
+        </div>
+        <div id="multi-practice-public-ledger" class="table-wrap"></div>
       </section>
 
       <section class="portal-grid">

@@ -956,6 +956,7 @@ function renderAnalytics() {
 function renderGovernance() {
   renderPortalGrid();
   renderWarnings();
+  renderMultiPracticeGovernance();
   renderMedicalResources();
   renderHealthStatistics();
   renderDeathStatistics();
@@ -1197,6 +1198,69 @@ function renderWarnings() {
   document.querySelector("#warning-list").innerHTML = warnings
     .map(([name, title, detail, level]) => `<div class="list-item"><div><strong>${name} · ${title}</strong><br><small>${detail}</small></div><span class="badge ${level}">${level === "danger" ? "高" : level === "warn" ? "中" : "提示"}</span></div>`)
     .join("") || `<div class="subtle">暂无风险预警。</div>`;
+}
+
+function renderMultiPracticeGovernance() {
+  const applications = state.multiPracticeApplications || [];
+  const summaryEl = document.querySelector("#multi-practice-governance-summary");
+  const cardsEl = document.querySelector("#multi-practice-governance-cards");
+  const tableEl = document.querySelector("#multi-practice-governance-table");
+  if (!summaryEl || !cardsEl || !tableEl) return;
+  const pending = applications.filter((item) => String(item.status || "").includes("待")).length;
+  const filed = applications.filter((item) => String(item.status || "").includes("备案")).length;
+  const publicRows = applications.filter((item) => item.publicVisible).length;
+  const riskRows = applications.filter((item) => hasMultiPracticeGovernanceRisk(item)).length;
+  summaryEl.textContent = `${applications.length} 条申请 · ${pending} 条待审 · ${publicRows} 条公开`;
+  cardsEl.innerHTML = [
+    ["申请总数", applications.length, "医生账户关联申请"],
+    ["待审核", pending, "第一执业地点或卫健委待处理"],
+    ["已备案", filed, "完成备案或医联体帮扶登记"],
+    ["公开台账", publicRows, "可向社会公开执业信息"],
+    ["风险补正", riskRows, "资格、材料、保险或排班需复核"]
+  ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><em>${hint}</em></article>`).join("");
+  tableEl.innerHTML = `<table>
+    <thead><tr><th>医师</th><th>第一执业地点</th><th>拟执业机构</th><th>期限/排班</th><th>材料核验</th><th>状态</th></tr></thead>
+    <tbody>${applications.map((item) => {
+      const compliance = item.compliance || {};
+      const documents = item.documentChecks || {};
+      const checks = [
+        compliance.titleQualified ? "职称" : "职称待核",
+        compliance.fiveYears ? "年限" : "年限待核",
+        compliance.scopeMatched ? "范围" : "范围待核",
+        documents.firstPracticeConsent ? "地点同意" : "地点待确认",
+        documents.cooperationAgreement ? "协议" : "协议待补",
+        documents.liabilityInsurance ? "保险" : "保险待补",
+        documents.scheduleConflict ? "排班冲突" : "排班通过"
+      ];
+      const risk = hasMultiPracticeGovernanceRisk(item);
+      return `<tr>
+        <td>${item.doctorName || "-"}<br><small>${item.title || item.specialty || ""}</small></td>
+        <td>${item.primaryInstitution || "待核验"}</td>
+        <td>${item.targetInstitution || "待核验"}<br><small>${item.targetDepartment || ""}</small></td>
+        <td>${item.period || "待核验"}<br><small>${item.schedule || ""}</small></td>
+        <td>${checks.join("、")}</td>
+        <td><span class="badge ${risk ? "warn" : "info"}">${item.status || "待处理"}</span></td>
+      </tr>`;
+    }).join("")}</tbody>
+  </table>`;
+  if (!applications.length) tableEl.innerHTML = `<div class="subtle">暂无多点执业监管记录。</div>`;
+}
+
+function hasMultiPracticeGovernanceRisk(item) {
+  const compliance = item.compliance || {};
+  const documents = item.documentChecks || {};
+  const complianceBlocked = Object.entries(compliance)
+    .some(([key, value]) => key !== "publicHospitalLeaderRestricted" && !value);
+  return Boolean(
+    compliance.publicHospitalLeaderRestricted ||
+    complianceBlocked ||
+    documents.scheduleConflict ||
+    documents.firstPracticeConsent === false ||
+    documents.cooperationAgreement === false ||
+    documents.liabilityInsurance === false ||
+    String(item.status || "").includes("退回") ||
+    String(item.status || "").includes("补正")
+  );
 }
 
 function renderMedicalResources() {

@@ -10,6 +10,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 function renderAll(state) {
   populateBirthCertificateForm(state);
+  populateMultiPracticeForm(state);
   renderMetrics(state);
   renderDoctorAccounts(state);
   renderMultiPracticePolicy(state);
@@ -40,6 +41,7 @@ function bindInstitutionActions() {
   document.querySelector("#birth-certificate-form")?.addEventListener("submit", submitBirthCertificate);
   document.querySelector("#birth-status-filter")?.addEventListener("change", () => renderBirthCertificates(platformState));
   document.querySelector("#birth-risk-filter")?.addEventListener("change", () => renderBirthCertificates(platformState));
+  document.querySelector("#multi-practice-form")?.addEventListener("submit", submitMultiPracticeApplication);
 }
 
 function actionButton(collection, id, label, updates, note) {
@@ -48,6 +50,59 @@ function actionButton(collection, id, label, updates, note) {
 
 function residentOf(state, id) {
   return state.residents.find((item) => item.id === id);
+}
+
+function populateMultiPracticeForm(state) {
+  const form = document.querySelector("#multi-practice-form");
+  const select = form?.querySelector("select[name='doctorId']");
+  if (!form || !select) return;
+  const doctors = state.doctorProfiles || [];
+  select.innerHTML = doctors.map((doctor) => `<option value="${doctor.id}">${doctor.name} · ${doctor.title} · ${doctor.primaryInstitution}</option>`).join("");
+  const doctor = doctors[0];
+  if (!doctor) return;
+  const scopeInput = form.querySelector("input[name='practiceScope']");
+  if (scopeInput && !scopeInput.value) scopeInput.value = doctor.practiceScope || "";
+  const responsibility = form.querySelector("input[name='responsibility']");
+  if (responsibility && !responsibility.value) responsibility.value = "由当事医疗机构和医师按协议依法承担医疗责任";
+  const compensation = form.querySelector("input[name='compensation']");
+  if (compensation && !compensation.value) compensation.value = "按实际工作时间、工作量和绩效协商结算";
+  const insurance = form.querySelector("input[name='insurance']");
+  if (insurance && !insurance.value) insurance.value = "已购买医师个人医疗执业保险";
+}
+
+async function submitMultiPracticeApplication(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const formData = Object.fromEntries(new FormData(form));
+  const payload = {
+    ...formData,
+    scheduleConflict: form.querySelector("input[name='scheduleConflict']")?.checked || false,
+    publicVisible: form.querySelector("input[name='publicVisible']")?.checked !== false
+  };
+  const submit = form.querySelector("button[type='submit']");
+  submit.disabled = true;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    if (!institutionApiBase) throw new Error("静态预览模式暂不支持提交多点执业申请，请使用本地服务或部署 API");
+    const response = await request(`${institutionApiBase}/multi-practice-applications`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.message || `多点执业申请提交失败：${response.status}`);
+    }
+    const saved = await response.json();
+    platformState.multiPracticeApplications = [saved, ...(platformState.multiPracticeApplications || [])];
+    form.reset();
+    populateMultiPracticeForm(platformState);
+    renderMultiPracticeApplications(platformState);
+  } catch (error) {
+    alert(error.message || "多点执业申请提交失败，请检查登录角色和网络连接");
+  } finally {
+    submit.disabled = false;
+  }
 }
 
 function formatBirthDateTime(value) {

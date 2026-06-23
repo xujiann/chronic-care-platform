@@ -1155,6 +1155,13 @@ function seedMultiPracticeApplications() {
       responsibility: "当事医疗机构与医师按协议承担医疗责任，个人医疗责任保险覆盖任一执业地点。",
       compensation: "按实际工作时间、工作量和绩效协商结算",
       insurance: "已购买医师个人医疗执业保险",
+      documentChecks: { firstPracticeConsent: true, cooperationAgreement: true, liabilityInsurance: true, scheduleConflict: false, publicDisclosure: true },
+      lifecycle: [
+        { at: "2026-06-17 09:00", actor: "刘医生", action: "提交申请", note: "补齐执业期限、责任保险和工作任务" },
+        { at: "2026-06-17 11:20", actor: "青泥洼桥社区卫生服务中心", action: "第一执业地点同意", note: "同意在医联体内开展慢病联合门诊" }
+      ],
+      disclosureItems: ["医师姓名", "执业类别", "执业范围", "第一执业地点", "拟执业机构", "执业期限", "监管状态"],
+      riskFlags: [],
       primaryConsent: "已同意",
       registrationMode: "备案管理",
       status: "待卫健审核",
@@ -1189,6 +1196,13 @@ function seedMultiPracticeApplications() {
       responsibility: "服务中发生纠纷由当事机构和医师按协议处理，第一执业地点不承担非当事责任。",
       compensation: "医联体帮扶任务，按院内绩效规则登记工作量",
       insurance: "机构医疗责任保险+个人执业保险",
+      documentChecks: { firstPracticeConsent: true, cooperationAgreement: true, liabilityInsurance: true, scheduleConflict: false, publicDisclosure: true },
+      lifecycle: [
+        { at: "2026-06-16 10:30", actor: "王医生", action: "医联体帮扶登记", note: "纳入基层高危慢病帮扶排班" },
+        { at: "2026-06-16 15:00", actor: "大连市中心医院", action: "备案通过", note: "按医联体帮扶任务管理" }
+      ],
+      disclosureItems: ["医师姓名", "执业类别", "执业范围", "第一执业地点", "拟执业机构", "执业期限", "监管状态"],
+      riskFlags: [],
       primaryConsent: "医联体内帮扶免办多点执业手续",
       registrationMode: "医联体帮扶",
       status: "已备案",
@@ -4242,6 +4256,23 @@ function normalizeMultiPracticeApplication(payload, user, data) {
     responsibility: String(payload.responsibility || "").trim(),
     compensation: String(payload.compensation || "").trim(),
     insurance: String(payload.insurance || "").trim(),
+    documentChecks: {
+      firstPracticeConsent: ["已同意", "知情报备", "医联体内帮扶免办多点执业手续"].some((text) => String(payload.primaryConsent || "").includes(text)),
+      cooperationAgreement: Boolean(String(payload.responsibility || "").trim() && String(payload.compensation || "").trim()),
+      liabilityInsurance: Boolean(String(payload.insurance || "").trim()),
+      scheduleConflict: Boolean(payload.scheduleConflict),
+      publicDisclosure: payload.publicVisible !== false
+    },
+    lifecycle: [
+      {
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name || profile.name,
+        action: "提交多点执业申请",
+        note: String(payload.tasks || "待补充工作任务").trim()
+      }
+    ],
+    disclosureItems: ["医师姓名", "执业类别", "执业范围", "第一执业地点", "拟执业机构", "执业期限", "监管状态"],
+    riskFlags: [],
     primaryConsent: String(payload.primaryConsent || "待确认").trim(),
     registrationMode: String(payload.registrationMode || "注册管理").trim(),
     status: String(payload.status || "待第一执业地点确认").trim(),
@@ -4430,6 +4461,18 @@ function cleanMultiPracticePatch(patch) {
     }
     return result;
   }, {});
+}
+
+function syncMultiPracticeDocumentChecks(application) {
+  const previous = application.documentChecks && typeof application.documentChecks === "object" ? application.documentChecks : {};
+  return {
+    ...previous,
+    firstPracticeConsent: ["已同意", "知情报备", "医联体内帮扶免办多点执业手续"].some((text) => String(application.primaryConsent || "").includes(text)),
+    cooperationAgreement: Boolean(String(application.responsibility || "").trim() && String(application.compensation || "").trim()),
+    liabilityInsurance: Boolean(String(application.insurance || "").trim()),
+    scheduleConflict: Boolean(application.scheduleConflict),
+    publicDisclosure: application.publicVisible !== false
+  };
 }
 
 function patchCollectionItem({ data, collection, id, patch, user, action, protectedFields = WORKFLOW_PROTECTED_FIELDS }) {
@@ -6216,12 +6259,28 @@ async function handleApi(req, res) {
       sendJson(res, 403, { error: "Forbidden", message: "无权更新该多点执业申请" });
       return;
     }
-    data.multiPracticeApplications[index] = {
-      ...data.multiPracticeApplications[index],
-      ...cleanMultiPracticePatch(patch),
+    const safePatch = cleanMultiPracticePatch(patch);
+    const previousApplication = data.multiPracticeApplications[index];
+    const nextLifecycle = [
+      {
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        action: safePatch.status ? `状态更新为 ${safePatch.status}` : "更新申请材料",
+        note: String(patch.note || safePatch.reviewOpinion || safePatch.correctionRequired || "").trim()
+      },
+      ...(Array.isArray(previousApplication.lifecycle) ? previousApplication.lifecycle : [])
+    ].slice(0, 20);
+    const nextApplication = {
+      ...previousApplication,
+      ...safePatch,
+      lifecycle: nextLifecycle,
       updatedBy: user.username || user.role,
       updatedByName: user.name,
       lastUpdated: new Date().toISOString()
+    };
+    data.multiPracticeApplications[index] = {
+      ...nextApplication,
+      documentChecks: syncMultiPracticeDocumentChecks(nextApplication)
     };
     if (Object.hasOwn(patch, "expectedVersion")) {
       data.storageMeta = {
