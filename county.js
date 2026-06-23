@@ -1,4 +1,4 @@
-const fallbackState = { countyConsortium: null, countyProjectBlueprint: null, countyCollaborationOrders: [], countyAiDiagnosisCases: [], countyMutualRecognitionRecords: [], residents: [], medicalResources: [], personalRecords: [] };
+const fallbackState = { countyConsortium: null, countyProjectBlueprint: null, countyCollaborationOrders: [], countyAiDiagnosisCases: [], countyMutualRecognitionRecords: [], referralTeleconsultations: [], residents: [], medicalResources: [], personalRecords: [] };
 let platformState = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -10,6 +10,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderCountyNetwork(county);
   renderCountyProjectBlueprint(state);
   renderCountyBusinessOperations(state);
+  renderCountyTeleconsultationLoop(state);
   renderCapabilityFilter(county);
   renderCountyCapabilities(county, "all");
   renderCountyTasks(county);
@@ -204,6 +205,31 @@ function renderCountyBusinessOperations(state) {
   }
 }
 
+function renderCountyTeleconsultationLoop(state) {
+  const rows = state.referralTeleconsultations || [];
+  const countEl = document.querySelector("#county-teleconsultation-count");
+  const tableEl = document.querySelector("#county-teleconsultation-loop");
+  if (!countEl || !tableEl) return;
+  countEl.textContent = `${rows.length} items`;
+  tableEl.innerHTML = `<table>
+    <thead><tr><th>Resident</th><th>Pathway</th><th>Question</th><th>Status</th><th>Report</th><th>Action</th></tr></thead>
+    <tbody>${rows.map((item) => {
+      const resident = residentOf(state, item.residentId);
+      return `<tr>
+        <td>${resident?.name || item.residentId || "Unknown"}</td>
+        <td>${item.sourceInstitution || "-"} -> ${item.targetInstitution || "-"}<br><small>${item.department || item.type || ""}</small></td>
+        <td>${item.clinicalQuestion || item.receivingFeedback || item.reportSummary || "-"}</td>
+        <td><span class="badge ${item.priority === "high" ? "danger" : "info"}">${item.status}</span></td>
+        <td>${item.reportStatus || "pending"}</td>
+        <td>
+          ${countyActionButton("referralTeleconsultations", item.id, "County follow-up", { status: "feedback-returned", receivingFeedback: "County consortium office followed up receiving feedback." })}
+          ${countyActionButton("referralTeleconsultations", item.id, "Report returned", { status: "report-returned", reportStatus: "returned", reportSummary: "County office confirmed report return evidence." })}
+        </td>
+      </tr>`;
+    }).join("")}</tbody>
+  </table>`;
+}
+
 function bindCountyActions() {
   document.addEventListener("click", async (event) => {
     const button = event.target.closest("[data-county-action]");
@@ -212,6 +238,7 @@ function bindCountyActions() {
     const result = await updateWorkflowAction(platformState, button.dataset.collection, button.dataset.id, updates, button.dataset.note || "县域医共体更新业务状态");
     if (!result.ok) return;
     renderCountyBusinessOperations(platformState);
+    renderCountyTeleconsultationLoop(platformState);
   });
 }
 

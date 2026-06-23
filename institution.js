@@ -1,4 +1,5 @@
-const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthStatistics: {}, doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {} };
+const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], referralTeleconsultations: [], medicationPickups: [], chronicScreeningTasks: [], chronicManagementPlans: [], chronicFollowupStatusPolicy: {}, deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthStatistics: {}, doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {} };
+const institutionApiBase = location.protocol === "file:" || location.hostname.endsWith("github.io") ? "" : "/api";
 let platformState = fallbackState;
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -8,6 +9,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 function renderAll(state) {
+  renderChronicFollowupWorkbench(state);
+  populateBirthCertificateForm(state);
+  populateMultiPracticeForm(state);
   renderMetrics(state);
   renderDoctorAccounts(state);
   renderMultiPracticePolicy(state);
@@ -16,6 +20,7 @@ function renderAll(state) {
   renderAuthorizedRecords(state);
   renderClaimLinks(state);
   renderReferralCenter(state);
+  renderTeleconsultationLoop(state);
   renderReservedResources(state);
   renderIntegratedProfiles(state);
   renderStandardArchiveProfiles(state);
@@ -27,22 +32,234 @@ function renderAll(state) {
 
 function bindInstitutionActions() {
   document.addEventListener("click", async (event) => {
-    const button = event.target.closest("[data-workflow-action]");
-    if (!button) return;
+      const button = event.target.closest("[data-workflow-action]");
+      if (!button) return;
+    if (button.dataset.chronicDispatch) {
+      button.disabled = true;
+      const result = await dispatchChronicFollowup(button.dataset.collection, button.dataset.id, JSON.parse(button.dataset.updates || "{}"), button.dataset.note || "chronic follow-up disposition");
+      button.disabled = false;
+      if (result.ok) renderAll(platformState);
+      return;
+    }
     const updates = JSON.parse(button.dataset.updates || "{}");
     button.disabled = true;
     const result = await updateWorkflowAction(platformState, button.dataset.collection, button.dataset.id, updates, button.dataset.note || "机构端更新业务状态");
     button.disabled = false;
     if (result.ok) renderAll(platformState);
   });
+  document.querySelector("#birth-certificate-form")?.addEventListener("submit", submitBirthCertificate);
+  document.querySelector("#birth-status-filter")?.addEventListener("change", () => renderBirthCertificates(platformState));
+  document.querySelector("#birth-risk-filter")?.addEventListener("change", () => renderBirthCertificates(platformState));
+  document.querySelector("#multi-practice-form")?.addEventListener("submit", submitMultiPracticeApplication);
 }
 
 function actionButton(collection, id, label, updates, note) {
   return `<button class="inline-action" type="button" data-workflow-action data-collection="${collection}" data-id="${id}" data-updates='${JSON.stringify(updates)}' data-note="${note || label}">${label}</button>`;
 }
 
+function chronicDispatchButton(collection, id, label, updates, note) {
+  return `<button class="inline-action" type="button" data-workflow-action data-chronic-dispatch="true" data-collection="${collection}" data-id="${id}" data-updates='${JSON.stringify(updates)}' data-note="${note || label}">${label}</button>`;
+}
+
+function chronicClosed(state, status) {
+  const closed = state.chronicFollowupStatusPolicy?.statusGroups?.closed || [];
+  return closed.some((item) => String(status || "").includes(item) || String(item || "").includes(String(status || "")));
+}
+
+function renderChronicFollowupWorkbench(state) {
+  const summaryEl = document.querySelector("#chronic-followup-summary");
+  const metricsEl = document.querySelector("#chronic-followup-metrics");
+  const listEl = document.querySelector("#chronic-followup-workbench");
+  if (!summaryEl || !metricsEl || !listEl) return;
+  const feedback = (state.personalRecords || []).filter((item) => item.category === "chronic-feedback" || item.meta?.followupFeedback);
+  const openFollowups = (state.followups || []).filter((item) => !chronicClosed(state, item.status));
+  const openPlans = (state.chronicManagementPlans || []).filter((item) => !chronicClosed(state, item.status));
+  const openScreenings = (state.chronicScreeningTasks || []).filter((item) => !chronicClosed(state, item.status));
+  const pendingMedication = (state.medicationPickups || []).filter((item) => !chronicClosed(state, item.status || item.pharmacyStatus));
+  summaryEl.textContent = `${openFollowups.length + openPlans.length + openScreenings.length} 项待处置`;
+  metricsEl.innerHTML = [
+    ["筛查分级", openScreenings.length, "高风险发现与分级评估"],
+    ["管理计划", openPlans.length, "复核、升级预警、下次随访"],
+    ["院后随访", openFollowups.length, "逾期、待随访、复诊提醒"],
+    ["用药依从", pendingMedication.length, "固定取药与长处方闭环"],
+    ["居民反馈", feedback.length, "居民端主动回填"]
+  ].map(([label, value, hint]) => `<article class="claim-card"><strong>${label}</strong><span>${value}<br>${hint}</span></article>`).join("");
+
+  const rows = [
+    ...openScreenings.map((item) => ({ ...item, collection: "chronicScreeningTasks", title: item.taskName, due: item.due, primary: "完成评估", updates: { status: "已评估", result: "已生成风险分级和干预建议" } })),
+    ...openPlans.map((item) => ({ ...item, collection: "chronicManagementPlans", title: `${item.diseaseType}管理计划`, due: item.nextReview, primary: "复核完成", updates: { status: "已复核", intervention: "已完成阶段复核并更新管理方案" } })),
+    ...openFollowups.map((item) => ({ ...item, collection: "followups", title: `${item.diseaseType}随访`, due: item.plannedAt, primary: "完成随访", updates: { status: "已完成", result: "已完成院后随访并同步居民反馈" } })),
+    ...pendingMedication.map((item) => ({ ...item, collection: "medicationPickups", title: item.medication, due: item.nextPickup, primary: "确认依从", updates: { status: "已完成", pharmacyStatus: "已取药" } }))
+  ].slice(0, 12);
+  listEl.innerHTML = rows.map((item) => {
+    const resident = residentOf(state, item.residentId);
+    const latestFeedback = feedback.find((record) => record.residentId === item.residentId);
+    return `<section class="item">
+      <div>
+        <h3>${resident?.name || "未知居民"} · ${item.title || item.id}</h3>
+        <p>${item.collection} · ${item.status || "待处理"} · ${item.due || "待排期"} · ${item.assignee || item.owner || item.pharmacy || "责任人待定"}</p>
+        <p>${item.nextStep || item.intervention || item.advice || item.result || "按慢病随访计划处置"}</p>
+        <p>居民反馈：${latestFeedback ? `${latestFeedback.result} · ${latestFeedback.meta?.nextRequest || ""}` : "暂无新增反馈"}</p>
+        <div class="action-row">
+          ${chronicDispatchButton(item.collection, item.id, item.primary, item.updates, `慢病随访处置：${item.primary}`)}
+          ${item.collection === "chronicManagementPlans" ? chronicDispatchButton(item.collection, item.id, "升级预警", { status: "预警中", intervention: "已升级家庭医生重点管理" }, "慢病管理计划升级预警") : ""}
+        </div>
+      </div>
+      <span class="badge ${String(item.status || "").includes("逾期") || String(item.status || "").includes("预警") ? "danger" : "warn"}">${item.status || "待处理"}</span>
+    </section>`;
+  }).join("") || `<p class="muted">暂无待处置慢病随访事项。</p>`;
+}
+
+async function dispatchChronicFollowup(collection, id, updates, note) {
+  if (!institutionApiBase) {
+    Object.assign((platformState[collection] || []).find((item) => item.id === id) || {}, updates, { lastUpdated: new Date().toISOString() });
+    return { ok: true };
+  }
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/chronic/followup-dispatch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ collection, id, updates, status: updates.status, note })
+    });
+    if (!response.ok) throw new Error(`dispatch failed: ${response.status}`);
+    const saved = await response.json();
+    const rows = platformState[collection] || [];
+    const index = rows.findIndex((item) => item.id === id);
+    if (index >= 0) rows[index] = saved;
+    return { ok: true, saved };
+  } catch (error) {
+    alert(error.message || "慢病随访处置失败，请检查登录状态和网络连接");
+    return { ok: false };
+  }
+}
+
 function residentOf(state, id) {
   return state.residents.find((item) => item.id === id);
+}
+
+function populateMultiPracticeForm(state) {
+  const form = document.querySelector("#multi-practice-form");
+  const select = form?.querySelector("select[name='doctorId']");
+  if (!form || !select) return;
+  const doctors = state.doctorProfiles || [];
+  select.innerHTML = doctors.map((doctor) => `<option value="${doctor.id}">${doctor.name} · ${doctor.title} · ${doctor.primaryInstitution}</option>`).join("");
+  const doctor = doctors[0];
+  if (!doctor) return;
+  const scopeInput = form.querySelector("input[name='practiceScope']");
+  if (scopeInput && !scopeInput.value) scopeInput.value = doctor.practiceScope || "";
+  const responsibility = form.querySelector("input[name='responsibility']");
+  if (responsibility && !responsibility.value) responsibility.value = "由当事医疗机构和医师按协议依法承担医疗责任";
+  const compensation = form.querySelector("input[name='compensation']");
+  if (compensation && !compensation.value) compensation.value = "按实际工作时间、工作量和绩效协商结算";
+  const insurance = form.querySelector("input[name='insurance']");
+  if (insurance && !insurance.value) insurance.value = "已购买医师个人医疗执业保险";
+}
+
+async function submitMultiPracticeApplication(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const formData = Object.fromEntries(new FormData(form));
+  const payload = {
+    ...formData,
+    scheduleConflict: form.querySelector("input[name='scheduleConflict']")?.checked || false,
+    publicVisible: form.querySelector("input[name='publicVisible']")?.checked !== false
+  };
+  const submit = form.querySelector("button[type='submit']");
+  submit.disabled = true;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    if (!institutionApiBase) throw new Error("静态预览模式暂不支持提交多点执业申请，请使用本地服务或部署 API");
+    const response = await request(`${institutionApiBase}/multi-practice-applications`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new Error(error.message || `多点执业申请提交失败：${response.status}`);
+    }
+    const saved = await response.json();
+    platformState.multiPracticeApplications = [saved, ...(platformState.multiPracticeApplications || [])];
+    form.reset();
+    populateMultiPracticeForm(platformState);
+    renderMultiPracticeApplications(platformState);
+  } catch (error) {
+    alert(error.message || "多点执业申请提交失败，请检查登录角色和网络连接");
+  } finally {
+    submit.disabled = false;
+  }
+}
+
+function formatBirthDateTime(value) {
+  if (!value) return new Date().toLocaleString("zh-CN", { hour12: false });
+  return String(value).replace("T", " ");
+}
+
+function birthCertificateNo() {
+  const year = new Date().getFullYear();
+  const count = (platformState.birthCertificates || []).length + 1;
+  return `B${year}${String(count).padStart(6, "0")}`;
+}
+
+function populateBirthCertificateForm(state) {
+  const select = document.querySelector("#birth-certificate-form select[name='maternalResidentId']");
+  if (!select) return;
+  select.innerHTML = (state.residents || []).map((resident) => `<option value="${resident.id}">${resident.name} · ${resident.idCard || resident.phone || resident.organization}</option>`).join("");
+  const dateInput = document.querySelector("#birth-certificate-form input[name='birthDateTime']");
+  if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0, 16);
+}
+
+async function submitBirthCertificate(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const formData = Object.fromEntries(new FormData(form));
+  const mother = residentOf(platformState, formData.maternalResidentId);
+  const weight = Number(formData.birthWeight || 0);
+  const payload = {
+    certificateNo: birthCertificateNo(),
+    certificateVersion: "第七版",
+    issueType: formData.issueType || "首次签发",
+    maternalResidentId: formData.maternalResidentId,
+    motherName: mother?.name || "待核验",
+    fatherName: formData.fatherName || "待核验",
+    newbornName: formData.newbornName || "未命名新生儿",
+    newbornGender: formData.newbornGender || "待确认",
+    birthDateTime: formatBirthDateTime(formData.birthDateTime),
+    birthWeight: weight,
+    birthLength: Number(formData.birthLength || 0),
+    birthPlace: "医疗卫生机构",
+    issuingInstitution: mother?.organization || "本机构",
+    issuingPhysician: formData.issuingPhysician || "签发医师待确认",
+    materials: ["父母有效身份证件", "分娩信息核验", "首次签发登记表"],
+    status: formData.status || "待签发",
+    electronicLicenseStatus: formData.status === "已签发" ? "已生成" : "待生成",
+    publicSecuritySync: "未共享",
+    maternalChildSync: "待入册",
+    healthManagementStatus: weight > 0 && weight < 2500 ? "低体重儿专案待建档" : "待建档",
+    qualityCheck: "待质控",
+    nextService: formData.nextService || (weight > 0 && weight < 2500 ? "低体重儿专案随访与喂养指导" : "新生儿访视、出生缺陷筛查和接种提醒")
+  };
+  form.querySelector("button[type='submit']").disabled = true;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    if (!institutionApiBase) throw new Error("静态预览模式暂不支持登记出生医学证明，请使用本地服务或部署 API");
+    const response = await request(`${institutionApiBase}/birth-certificates`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error(`出生证明登记失败：${response.status}`);
+    await response.json();
+    platformState = await loadPlatformState(fallbackState);
+    form.reset();
+    populateBirthCertificateForm(platformState);
+    renderAll(platformState);
+  } catch (error) {
+    alert(error.message || "出生证明登记失败，请检查登录角色和网络连接");
+  } finally {
+    form.querySelector("button[type='submit']").disabled = false;
+  }
 }
 
 function renderDoctorAccounts(state) {
@@ -122,9 +339,32 @@ function renderBirthCertificates(state) {
   const metricEl = document.querySelector("#birth-certificate-metrics");
   const listEl = document.querySelector("#birth-certificate-list");
   const formsEl = document.querySelector("#birth-certificate-forms");
+  const alertsEl = document.querySelector("#birth-certificate-alerts");
   if (!countEl || !metricEl || !listEl || !formsEl) return;
 
-  countEl.textContent = `${certificates.length} 张证明`;
+  const statusFilter = document.querySelector("#birth-status-filter")?.value || "";
+  const riskFilter = document.querySelector("#birth-risk-filter")?.value || "";
+  const filtered = certificates.filter((item) => {
+    const statusMatched = !statusFilter || item.status === statusFilter;
+    const riskMatched = !riskFilter
+      || (riskFilter === "low-weight" && Number(item.birthWeight || 0) > 0 && Number(item.birthWeight || 0) < 2500)
+      || (riskFilter === "pending-sync" && (item.publicSecuritySync !== "已共享" || item.maternalChildSync !== "已入册"));
+    return statusMatched && riskMatched;
+  });
+  const alerts = [
+    ["待签发", certificates.filter((item) => item.status === "待签发").length, "签发医师、材料和证件编号需核验"],
+    ["待入册共享", certificates.filter((item) => item.publicSecuritySync !== "已共享" || item.maternalChildSync !== "已入册").length, "公安户籍和妇幼健康管理未闭环"],
+    ["低体重儿", certificates.filter((item) => Number(item.birthWeight || 0) > 0 && Number(item.birthWeight || 0) < 2500).length, "需纳入专案访视和喂养指导"],
+    ["质控补正", certificates.filter((item) => ["待质控", "待复核", "待补正"].includes(item.qualityCheck)).length, "材料、编号、签章或共享状态需复核"]
+  ];
+
+  countEl.textContent = `${filtered.length}/${certificates.length} 张证明`;
+  if (alertsEl) {
+    alertsEl.innerHTML = alerts.map(([label, value, hint]) => `<article class="claim-card">
+      <strong>${label}</strong>
+      <span>${value}<br>${hint}</span>
+    </article>`).join("");
+  }
   metricEl.innerHTML = [
     ["首次签发", metrics.firstIssued || certificates.filter((item) => item.issueType === "首次签发").length, "机构内出生直接签发"],
     ["电子证照", metrics.electronicLicenses || certificates.filter((item) => String(item.electronicLicenseStatus || "").includes("已生成")).length, "第七版编号/条形码"],
@@ -135,7 +375,7 @@ function renderBirthCertificates(state) {
     <span>${value}<br>${hint}</span>
   </article>`).join("");
 
-  listEl.innerHTML = certificates.map((item) => {
+  listEl.innerHTML = filtered.map((item) => {
     const resident = residentOf(state, item.maternalResidentId || item.residentId);
     const badge = item.status === "待签发" || item.status === "待上报" ? "warn" : item.qualityCheck === "待补正" ? "danger" : "info";
     return `<section class="item">
@@ -243,6 +483,32 @@ function renderReferralCenter(state) {
       <span class="badge ${badge}">${item.status}</span>
     </section>`;
   }).join("") || `<p class="muted">暂无转诊中心任务。</p>`;
+}
+
+function renderTeleconsultationLoop(state) {
+  const rows = state.referralTeleconsultations || [];
+  const countEl = document.querySelector("#teleconsultation-count");
+  const listEl = document.querySelector("#teleconsultation-loop");
+  if (!countEl || !listEl) return;
+  countEl.textContent = `${rows.length} items`;
+  listEl.innerHTML = rows.map((item) => {
+    const resident = residentOf(state, item.residentId);
+    const badge = item.priority === "high" ? "danger" : item.reportStatus === "returned" ? "info" : "warn";
+    return `<section class="item">
+      <div>
+        <h3>${resident?.name || "Unknown resident"} · ${item.department || item.diseaseType || "Teleconsultation"}</h3>
+        <p>${item.sourceInstitution || "-"} -> ${item.targetInstitution || "-"} · ${item.meetingWindow || item.due || "-"}</p>
+        <p>${item.clinicalQuestion || item.receivingFeedback || item.reportSummary || "Pending clinical note"}</p>
+        <p>Authorization: ${item.authorizationStatus || "pending"} · Report: ${item.reportStatus || "pending"}</p>
+        <div class="action-row">
+          ${item.status === "requested" ? actionButton("referralTeleconsultations", item.id, "Accept", { status: "accepted", receivingFeedback: "Receiving institution accepted the teleconsultation." }, "Accept referral teleconsultation") : ""}
+          ${item.reportStatus !== "returned" ? actionButton("referralTeleconsultations", item.id, "Return report", { status: "report-returned", reportStatus: "returned", reportSummary: "Consultation report returned to the originating institution." }, "Return teleconsultation report") : ""}
+          ${item.status !== "closed" ? actionButton("referralTeleconsultations", item.id, "Close", { status: "closed" }, "Close referral teleconsultation loop") : ""}
+        </div>
+      </div>
+      <span class="badge ${badge}">${item.status}</span>
+    </section>`;
+  }).join("") || `<p class="muted">No referral teleconsultation tasks.</p>`;
 }
 
 function renderReservedResources(state) {

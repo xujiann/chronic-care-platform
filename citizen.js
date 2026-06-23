@@ -106,6 +106,14 @@ const personalHealthData = {
     { residentId: "r1", date: "2024-06-18", name: "日间观察", result: "血压波动观察，未住院", source: "大连市中心医院" },
     { residentId: "r3", date: "2025-12-09", name: "体检中心", result: "年度体检，无住院记录", source: "甘井子区人民医院" }
   ],
+  imaging: [
+    { residentId: "r1", date: "2026-05-21", name: "胸部 CT 影像索引", result: "影像号 IMG-DEMO-20260521，结论摘要已归档，原始 DICOM 待院内 PACS 授权调阅。", source: "大连市中心医院 PACS", meta: { attachmentType: "影像", fileName: "IMG-DEMO-20260521.dcm", accessMode: "院内授权调阅" } },
+    { residentId: "r2", date: "2026-05-18", name: "眼底照相报告", result: "糖尿病眼底筛查未见明显新生血管，建议年度复查。", source: "大连医科大学附属医院", meta: { attachmentType: "图片", fileName: "fundus-r2-20260518.jpg", accessMode: "报告摘要" } }
+  ],
+  attachments: [
+    { residentId: "r1", date: "2026-05-22", name: "门诊报告 PDF", result: "心内科复诊报告、检查摘要和用药建议已归档。", source: "居民上传", meta: { attachmentType: "PDF", fileName: "cardiology-visit-r1-20260522.pdf", accessMode: "居民端留存" } },
+    { residentId: "r1", date: "2026-04-12", name: "家庭血压记录照片", result: "连续 7 天家庭血压手写记录照片，供家庭医生复核。", source: "个人上传", meta: { attachmentType: "图片", fileName: "home-bp-r1-20260412.jpg", accessMode: "居民端留存" } }
+  ],
   authorizations: [
     { residentId: "r1", date: "2026-01-01", name: "家庭医生团队", result: "允许查看健康档案和随访记录", source: "居民授权" },
     { residentId: "r1", date: "2026-01-01", name: "区域医疗机构", result: "允许查看电子病历摘要", source: "居民授权" },
@@ -123,6 +131,8 @@ const vaultSections = [
   { key: "allergies", label: "过敏史" },
   { key: "vaccines", label: "免疫接种" },
   { key: "admissions", label: "手术住院" },
+  { key: "imaging", label: "影像资料" },
+  { key: "attachments", label: "附件资料" },
   { key: "authorizations", label: "授权共享" }
 ];
 
@@ -145,6 +155,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderCitizen(account.members[0]?.residentId);
   });
   bindDialogs();
+  bindFollowupFeedback();
   currentAccountId = state.accounts[0]?.id;
   const account = getCurrentAccount();
   renderAccount(account);
@@ -231,12 +242,14 @@ function renderCitizen(residentId) {
   riskPill.className = `risk-pill risk-${risk.level}`;
 
   renderSummary(resident, diseases, followups, records);
+  renderHealthTrends(resident);
   renderReminderCenter(resident.id);
   renderLifeCycle(resident, diseases, followups, records);
   renderVault(resident, diseases, followups, records);
   renderEmr(records, resident, diseases, followups);
   renderDiseases(diseases, risk);
   renderFollowups(followups);
+  renderFollowupFeedback(resident.id, followups);
   renderChronicServices(resident.id);
   renderReferrals(resident.id);
   renderBirthHealth(resident.id);
@@ -338,6 +351,8 @@ function renderVault(resident, diseases, followups, records) {
         <strong>${item.name}</strong>
         <p>${item.result}</p>
         ${item.categoryLabel ? `<p class="muted">${item.categoryLabel}${item.related ? ` · ${item.related}` : ""}</p>` : ""}
+        ${renderSourceBadge(item)}
+        ${renderAttachmentMeta(item)}
         ${activeVaultSection === "authorizations" ? renderAuthorizationState(item) : ""}
       </div>
       <span>${item.date}<br>${item.source}</span>
@@ -355,6 +370,8 @@ function collectVaultData(resident, diseases, followups, records) {
   const allergies = getPersonalRecords(resident.id, "allergies");
   const vaccines = getPersonalRecords(resident.id, "vaccines");
   const admissions = getPersonalRecords(resident.id, "admissions");
+  const imaging = getPersonalRecords(resident.id, "imaging");
+  const attachments = getPersonalRecords(resident.id, "attachments");
   const authorizations = getPersonalRecords(resident.id, "authorizations");
   const archive = [
     { date: todayOffset(0), name: "基础档案", result: `${resident.gender}，${ageOf(resident.birthDate)} 岁，${resident.address}`, source: resident.organization, categoryLabel: "健康档案" },
@@ -363,7 +380,7 @@ function collectVaultData(resident, diseases, followups, records) {
     ...followups.map((item) => ({ date: item.plannedAt, name: `${item.diseaseType}随访`, result: `${item.status} · ${item.advice || item.result}`, source: item.assignee, categoryLabel: "随访管理" }))
   ];
   return {
-    timeline: buildHealthTimeline(archive, records, labs, medications, allergies, vaccines, admissions),
+    timeline: buildHealthTimeline(archive, records, labs, medications, allergies, vaccines, admissions, imaging, attachments),
     standard: buildStandardArchiveItems(resident.id),
     archive,
     emr: records.map((item) => ({ ...item, categoryLabel: "电子病历", related: relatedArchiveSummary(diseases, followups) })),
@@ -372,6 +389,8 @@ function collectVaultData(resident, diseases, followups, records) {
     allergies,
     vaccines,
     admissions,
+    imaging,
+    attachments,
     authorizations
   };
 }
@@ -451,7 +470,7 @@ function getStandardCoverage(residentId) {
   return { standard: { dimensions: [], contentGroups: [], datasets: [] }, datasets: [], score: 0, applicableCompleted: 0, applicableTotal: 0, activities: [], problems: [] };
 }
 
-function buildHealthTimeline(archive, records, labs, medications, allergies, vaccines, admissions) {
+function buildHealthTimeline(archive, records, labs, medications, allergies, vaccines, admissions, imaging = [], attachments = []) {
   return [
     ...archive,
     ...records.map((item) => ({ ...item, categoryLabel: "电子病历" })),
@@ -459,7 +478,9 @@ function buildHealthTimeline(archive, records, labs, medications, allergies, vac
     ...medications.map((item) => ({ ...item, categoryLabel: "用药处方" })),
     ...allergies.map((item) => ({ ...item, categoryLabel: "过敏史" })),
     ...vaccines.map((item) => ({ ...item, categoryLabel: "免疫接种" })),
-    ...admissions.map((item) => ({ ...item, categoryLabel: "手术住院" }))
+    ...admissions.map((item) => ({ ...item, categoryLabel: "手术住院" })),
+    ...imaging.map((item) => ({ ...item, categoryLabel: "影像资料" })),
+    ...attachments.map((item) => ({ ...item, categoryLabel: "附件资料" }))
   ].sort(sortByDateDesc);
 }
 
@@ -484,6 +505,55 @@ function renderSummary(resident, diseases, followups, records) {
   document.querySelector("#summary-grid").innerHTML = cards
     .map(([label, value, hint]) => `<article class="summary-card"><span>${label}</span><strong>${value}</strong><small>${hint}</small></article>`)
     .join("");
+}
+
+function renderHealthTrends(resident) {
+  const target = document.querySelector("#citizen-trend-grid");
+  if (!target) return;
+  const series = buildCitizenTrendSeries(resident);
+  document.querySelector("#trend-source-summary").textContent = `${resident.name} · ${series.length} 项核心指标 · 来源：居民健康档案/随访记录`;
+  target.innerHTML = series.map(renderCitizenTrend).join("");
+}
+
+function buildCitizenTrendSeries(resident) {
+  const metrics = resident.metrics || {};
+  return [
+    { key: "systolic", label: "收缩压", unit: "mmHg", target: "目标 <140", values: trendValues(Number(metrics.systolic || 0), [10, 7, 3, 0]), riskAt: 140 },
+    { key: "diastolic", label: "舒张压", unit: "mmHg", target: "目标 <90", values: trendValues(Number(metrics.diastolic || 0), [5, 3, 1, 0]), riskAt: 90 },
+    { key: "glucose", label: "空腹血糖", unit: "mmol/L", target: "目标 <7.0", values: trendValues(Number(metrics.glucose || 0), [0.7, 0.4, 0.2, 0]), riskAt: 7 },
+    { key: "bmi", label: "BMI", unit: "kg/m²", target: "目标 <24", values: trendValues(Number(metrics.bmi || 0), [0.8, 0.5, 0.2, 0]), riskAt: 24 }
+  ];
+}
+
+function trendValues(current, offsets) {
+  if (!Number.isFinite(current) || current <= 0) return [];
+  return offsets.map((offset, index) => ({
+    label: index === offsets.length - 1 ? "当前" : `${offsets.length - index}期前`,
+    value: Number((current - offset).toFixed(1))
+  }));
+}
+
+function renderCitizenTrend(item) {
+  const max = Math.max(...item.values.map((point) => point.value), item.riskAt);
+  const latest = item.values[item.values.length - 1] || { value: 0 };
+  const improving = item.values.length > 1 && latest.value <= item.values[0].value;
+  return `<article class="citizen-trend-card" data-trend="${item.key}">
+    <div class="trend-card-head">
+      <div>
+        <strong>${item.label}</strong>
+        <span>${item.target}</span>
+      </div>
+      <em class="${latest.value >= item.riskAt ? "warn" : "ok"}">${latest.value} ${item.unit}</em>
+    </div>
+    <div class="trend-bars" aria-label="${item.label}趋势">
+      ${item.values.map((point) => `<div class="trend-bar">
+        <i style="height:${Math.max(18, Math.round((point.value / max) * 100))}%"></i>
+        <small>${point.value}</small>
+        <span>${point.label}</span>
+      </div>`).join("")}
+    </div>
+    <p class="muted">${improving ? "较早期趋势趋稳，继续按随访计划观察。" : "近期指标仍需重点关注，建议复测并联系家庭医生。"}</p>
+  </article>`;
 }
 
 function renderLifeCycle(resident, diseases, followups, records) {
@@ -572,6 +642,16 @@ function renderEmr(records, resident, diseases, followups) {
         <p class="muted">${record.name}</p>
         <p>${record.result}</p>
         <p class="muted">关联健康档案：${archiveLink}</p>
+        ${renderSourceBadge(record)}
+        <details class="record-detail">
+          <summary>查看诊疗详情、医嘱和来源</summary>
+          <dl>
+            <div><dt>诊疗来源</dt><dd>${record.source || "居民健康信息库"}</dd></div>
+            <div><dt>记录类型</dt><dd>${record.meta?.visitType || record.category || "电子病历"}</dd></div>
+            <div><dt>诊断/标题</dt><dd>${record.name}</dd></div>
+            <div><dt>医嘱摘要</dt><dd>${record.result}</dd></div>
+          </dl>
+        </details>
         <div class="visit-tags">
           ${(record.meta?.exams || []).map((item) => `<span class="tag">${item}</span>`).join("")}
           ${(record.meta?.medications || []).map((item) => `<span class="tag">${item}</span>`).join("")}
@@ -602,6 +682,69 @@ function renderFollowups(followups) {
       <span class="status ${item.status === "已逾期" ? "danger" : item.status === "待随访" ? "warn" : ""}">${item.status}</span>
     </article>`)
     .join("") || `<p class="muted">暂无随访提醒。</p>`;
+}
+
+function renderFollowupFeedback(residentId, followups) {
+  const form = document.querySelector("#followup-feedback-form");
+  const status = document.querySelector("#followup-feedback-status");
+  if (!form || !status) return;
+  const select = form.querySelector("select[name='followupId']");
+  const available = followups.length ? followups : (state.followups || []).filter((item) => item.residentId === residentId);
+  select.innerHTML = available.map((item) => `<option value="${item.id}">${item.diseaseType} · ${item.plannedAt} · ${item.status}</option>`).join("");
+  const feedback = (state.personalRecords || []).filter((item) => item.residentId === residentId && (item.category === "chronic-feedback" || item.meta?.followupFeedback));
+  status.textContent = feedback.length ? `${feedback.length} 条已反馈` : "待反馈";
+}
+
+function bindFollowupFeedback() {
+  const form = document.querySelector("#followup-feedback-form");
+  if (!form) return;
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(form));
+    const followup = (state.followups || []).find((item) => item.id === data.followupId);
+    const payload = {
+      residentId: currentResidentId,
+      followupId: data.followupId,
+      name: "院后随访居民反馈",
+      result: `${data.medicationTaken === "true" ? "已按医嘱服药" : "未完全按医嘱服药"}；${data.symptoms || "暂无明显不适"}；${data.nextRequest || "继续按计划随访"}`,
+      source: "居民端主动反馈",
+      medicationTaken: data.medicationTaken === "true",
+      symptoms: data.symptoms || "",
+      nextRequest: data.nextRequest || "",
+      satisfaction: data.nextRequest ? "需要协助" : "继续观察"
+    };
+    const submit = form.querySelector("button[type='submit']");
+    submit.disabled = true;
+    try {
+      let saved;
+      if (API_BASE) {
+        const request = window.HealthCityAuth?.authFetch || fetch;
+        const response = await request(`${API_BASE}/chronic/followup-feedback`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (!response.ok) throw new Error(`feedback failed: ${response.status}`);
+        saved = await response.json();
+      } else {
+        saved = { ...payload, id: crypto.randomUUID(), category: "chronic-feedback", date: todayOffset(0), meta: { followupFeedback: true, followupId: data.followupId, medicationTaken: payload.medicationTaken, symptoms: payload.symptoms, nextRequest: payload.nextRequest, satisfaction: payload.satisfaction }, createdAt: new Date().toISOString() };
+      }
+      if (!Array.isArray(state.personalRecords)) state.personalRecords = [];
+      state.personalRecords.unshift(saved);
+      if (followup) {
+        followup.feedbackStatus = "received";
+        followup.feedbackSummary = saved.result;
+        followup.medicationTaken = payload.medicationTaken;
+      }
+      form.reset();
+      renderCitizen(currentResidentId);
+      showToast("院后随访反馈已提交，家庭医生可在机构端处置");
+    } catch (error) {
+      showToast(error.message || "反馈提交失败，请检查登录状态和网络连接");
+    } finally {
+      submit.disabled = false;
+    }
+  });
 }
 
 function renderChronicServices(residentId) {
@@ -670,12 +813,22 @@ function renderBirthHealth(residentId) {
   if (!container) return;
   const certificates = (state.birthCertificates || []).filter((item) => item.maternalResidentId === residentId || item.residentId === residentId);
   container.innerHTML = certificates.map((item) => {
-    const badge = item.healthManagementStatus?.includes("待") || item.status?.includes("待") ? "warn" : "info";
+    const lowWeight = Number(item.birthWeight || 0) > 0 && Number(item.birthWeight || 0) < 2500;
+    const pending = item.healthManagementStatus?.includes("待") || item.status?.includes("待") || item.publicSecuritySync !== "已共享" || item.maternalChildSync !== "已入册";
+    const badge = pending || lowWeight ? "warn" : "info";
+    const services = [
+      ["出生证明", item.status || "待处理"],
+      ["电子证照", item.electronicLicenseStatus || "待生成"],
+      ["公安共享", item.publicSecuritySync || "未共享"],
+      ["妇幼入册", item.maternalChildSync || "待入册"],
+      ["新生儿访视", item.healthManagementStatus || "待建档"],
+      lowWeight ? ["低体重儿专案", "需随访"] : ["出生体重", `${item.birthWeight || "-"}g`]
+    ];
     return `<article class="card">
       <div>
         <strong>${item.newbornName || "未命名新生儿"} · ${item.certificateNo}</strong>
         <p>${item.birthDateTime || "出生时间待确认"} · ${item.newbornGender || "性别待确认"} · ${item.birthWeight || "-"}g</p>
-        <p>出生证明：${item.status || "待处理"} · 电子证照 ${item.electronicLicenseStatus || "待生成"} · 公安 ${item.publicSecuritySync || "未共享"}</p>
+        <p>${services.map(([name, status]) => `${name}：${status}`).join(" · ")}</p>
         <p>健康管理：${item.healthManagementStatus || "待建档"} · ${item.nextService || "新生儿访视与预防接种提醒"}</p>
       </div>
       <span class="badge ${badge}">${item.issueType || "首次签发"}</span>
@@ -866,6 +1019,27 @@ function loadCitizenExtra() {
 
 function sortByDateDesc(a, b) {
   return String(b.date || "").localeCompare(String(a.date || ""));
+}
+
+function renderSourceBadge(item) {
+  const source = classifyDataSource(item);
+  return `<span class="source-badge source-${source.key}">来源：${source.label}</span>`;
+}
+
+function renderAttachmentMeta(item) {
+  if (!["imaging", "attachments"].includes(item.category) && !["影像资料", "附件资料"].includes(item.categoryLabel)) return "";
+  const meta = item.meta || {};
+  return `<p class="attachment-meta">${meta.attachmentType || "资料"} · ${meta.fileName || item.name} · ${meta.accessMode || "需授权调阅"}</p>`;
+}
+
+function classifyDataSource(item) {
+  const text = `${item.source || ""} ${item.provider || ""} ${item.createdBy || ""} ${item.categoryLabel || ""}`;
+  if (/医保|insurance/i.test(text)) return { key: "insurance", label: "医保" };
+  if (/社区|基层|家庭医生|卫生服务|随访/i.test(text)) return { key: "primary", label: "基层/家庭医生" };
+  if (/公卫|疾控|疫苗|接种|公共卫生/i.test(text)) return { key: "public", label: "公卫" };
+  if (/居民|个人|resident|citizen/i.test(text)) return { key: "self", label: "个人上传/授权" };
+  if (/医院|医科|中心医院|门诊|住院|HIS|EMR/i.test(text)) return { key: "hospital", label: "医院" };
+  return { key: "platform", label: "平台归集" };
 }
 
 function getPersonalRecords(residentId, category) {

@@ -41,7 +41,9 @@
         <div class="topbar-actions">
           <span class="source-badge" id="data-source">连接中</span>
           <a class="ghost-button link-button" href="./health-city.html">系统总览</a>
+          <a class="ghost-button link-button" href="./about.html">关于</a>
           <a class="ghost-button link-button" href="./workbench.html">工作台</a>
+          <a class="ghost-button link-button" href="./quality-safety.html">Quality safety</a>
           <button class="ghost-button" id="export-data">导出 CSV</button>
           <button class="ghost-button" id="seed-data">重置演示数据</button>
           <button class="primary-button" id="quick-add">新增居民</button>
@@ -75,6 +77,14 @@
             <span>区分已入模、已闭环、待接口和待运营事项</span>
           </div>
           <div class="metrics-grid compact-grid" id="chronic-audit-grid"></div>
+        </section>
+        <section class="panel">
+          <div class="panel-header">
+            <h2>慢病分层随访调度</h2>
+            <span>按指标异常、筛查任务、逾期随访、自测预警和方案复核形成优先级队列</span>
+          </div>
+          <div class="metrics-grid compact-grid" id="chronic-risk-summary"></div>
+          <div class="table-wrap" id="chronic-risk-stratification"></div>
         </section>
         <div class="content-grid">
           <section class="panel wide">
@@ -137,6 +147,60 @@
           </section>
           <section class="panel wide">
             <div class="panel-header">
+              <h2>基层慢病服务能力建设</h2>
+              <span>依据国卫基层发〔2025〕15号：枢纽、网底、牵头医院、疾控协同</span>
+            </div>
+            <div class="rules-grid" id="chronic-service-roles"></div>
+          </section>
+          <section class="panel wide">
+            <div class="panel-header">
+              <h2>能力建设条件对照</h2>
+              <span>依据《基层慢性病健康管理服务能力建设指引》：基本条件与拓展条件</span>
+            </div>
+            <div class="table-wrap" id="chronic-capability-conditions"></div>
+          </section>
+          <section class="panel wide">
+            <div class="panel-header">
+              <h2>防筛诊治管康全流程路径</h2>
+              <span>高风险发现、分类分级、多病共管、中医药、自我管理</span>
+            </div>
+            <div class="timeline policy-timeline" id="chronic-service-pathways"></div>
+          </section>
+          <section class="panel wide">
+            <div class="panel-header">
+              <h2>多病共管与用药指导</h2>
+              <span>综合评估、整合随访频次、临床药师参与、连续用药记录</span>
+            </div>
+            <div class="table-wrap" id="chronic-comorbidity-table"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-header">
+              <h2>中医药健康服务</h2>
+            </div>
+            <div class="rule-list" id="chronic-tcm-services"></div>
+          </section>
+          <section class="panel">
+            <div class="panel-header">
+              <h2>居民自我健康管理</h2>
+            </div>
+            <div class="rule-list" id="chronic-self-management"></div>
+          </section>
+          <section class="panel wide">
+            <div class="panel-header">
+              <h2>用药保障与长期处方</h2>
+              <span>药品配备、长期处方、缺药登记配送、医保政策协同</span>
+            </div>
+            <div class="table-wrap" id="chronic-medication-support"></div>
+          </section>
+          <section class="panel wide">
+            <div class="panel-header">
+              <h2>质控评价与工作落实</h2>
+              <span>覆盖率、控制改善、多病共管、自测回写、满意度和质控责任</span>
+            </div>
+            <div class="table-wrap" id="chronic-quality-metrics"></div>
+          </section>
+          <section class="panel wide">
+            <div class="panel-header">
               <h2>慢病纳管台账</h2>
               <span>以身份证号 + 手机号统一索引</span>
             </div>
@@ -167,6 +231,14 @@
               <span id="warning-count"></span>
             </div>
             <div id="warning-list" class="list"></div>
+          </section>
+          <section class="panel wide">
+            <div class="panel-header">
+              <h2>医师多点执业监管</h2>
+              <span id="multi-practice-governance-summary"></span>
+            </div>
+            <div id="multi-practice-governance-cards" class="metrics-grid compact-grid"></div>
+            <div id="multi-practice-governance-table" class="table-wrap"></div>
           </section>
           <section class="panel wide">
             <div class="panel-header">
@@ -214,6 +286,7 @@
               <span id="birth-stat-summary"></span>
             </div>
             <div id="birth-stat-cards" class="metrics-grid compact-grid"></div>
+            <div id="birth-stat-alerts" class="governance-grid"></div>
             <div id="birth-stat-sources" class="governance-grid"></div>
             <div id="birth-region-table" class="table-wrap"></div>
             <div id="birth-stat-rules" class="rule-list"></div>

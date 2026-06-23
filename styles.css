@@ -547,6 +547,27 @@ th {
   text-align: center;
 }
 
+.policy-timeline div {
+  place-items: stretch;
+  align-content: start;
+  gap: 6px;
+  color: var(--ink);
+  font-weight: 400;
+  text-align: left;
+}
+
+.policy-timeline strong,
+.policy-timeline span,
+.policy-timeline small {
+  display: block;
+}
+
+.policy-timeline span,
+.policy-timeline small {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
 .governance-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -590,6 +611,14 @@ th {
 .bulletin-grid p,
 .rules-grid span {
   display: block;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.rules-grid p,
+.rules-grid small {
+  display: block;
+  margin: 6px 0 0;
   color: var(--muted);
   line-height: 1.55;
 }

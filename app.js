@@ -89,10 +89,10 @@ const policyAlignmentDefaults = [
   { domain: "医疗全流程在线办理", requirement: "加快异地转诊、就医、住院、医保等医疗全流程在线办理。", capability: "医疗机构端承接转诊协同，医保中心承接结算经办审核，医保局保留基金监管视图，个人端承接固定取药和授权共享。", status: "原型完成" },
   { domain: "互联网医疗监管", requirement: "完善互联网医疗服务监管体系，推进互联网+监管和智慧监管。", capability: "大连市卫生健康委建设四端运行监测、机构绩效、风险预警和数据质量看板。", status: "已纳入" },
   { domain: "电子健康码与医保凭证", requirement: "普及居民电子健康码，加快医保电子凭证推广应用。", capability: "以身份证号+手机号形成 personIndex，后续可对接电子健康码、医保电子凭证和居民一卡通。", status: "数据底座完成" },
-  { domain: "公共卫生应急", requirement: "建立智慧化预警多点触发机制，支持公共卫生机构和医疗机构数据共享，做到早发现、早报告、早处置。", capability: "在风险预警中汇聚慢病高危、随访逾期、医保异常和资源负荷，预留公共卫生应急监测入口。", status: "待扩展" },
+  { domain: "公共卫生应急", requirement: "建立智慧化预警多点触发机制，支持公共卫生机构和医疗机构数据共享，做到早发现、早报告、早处置。", capability: "风险预警已汇聚慢病高危、随访逾期、医保异常、资源负荷、危急值预警和县域处置回写。", status: "已入模" },
   { domain: "基层智慧治理", requirement: "以数据驱动、信息共享提升基层治理和疫情防控能力。", capability: "基层机构、家庭医生、居民端、医保中心和区市县医保局共用同一居民主索引和慢病闭环台账。", status: "已启动" },
-  { domain: "数据安全与合规", requirement: "完善数据脱敏、加密保护、合规评估和安全保障体系。", capability: "增加授权共享、撤销授权、数据质量审计，后续补充分级权限、脱敏展示和日志留痕。", status: "待扩展" },
-  { domain: "适老化与无障碍", requirement: "优化信息无障碍环境，解决老年人等群体数字鸿沟。", capability: "个人端按手机视口设计，后续补充大字模式、家属代办、语音提示和线下帮办。", status: "待扩展" }
+  { domain: "数据安全与合规", requirement: "完善数据脱敏、加密保护、合规评估和安全保障体系。", capability: "已形成角色权限、字段脱敏、授权撤销、访问复核、审计哈希链、安全合规证据和高风险事件闭环。", status: "基础闭环" },
+  { domain: "适老化与无障碍", requirement: "优化信息无障碍环境，解决老年人等群体数字鸿沟。", capability: "已覆盖大字模式、读屏语义、家属代办、线下帮办、消息触达、弱网模式和无障碍验收清单。", status: "基础闭环" }
 ];
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -119,7 +119,7 @@ function normalizePersonIndexes() {
     resident.identityIndex = resident.personIndex;
   });
   const residentMap = new Map(residents.map((resident) => [resident.id, resident]));
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "referralTeleconsultations"].forEach((key) => {
     (Array.isArray(state[key]) ? state[key] : []).forEach((item) => {
       item.personIndex = item.personIndex || personIndexForResident(residentMap, item.residentId);
     });
@@ -372,6 +372,7 @@ function renderChronicModule() {
   ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><em>${hint}</em></article>`).join("");
 
   renderChronicAudit();
+  renderChronicRiskStratification();
 
   document.querySelector("#chronic-flow").innerHTML = [
     "筛查建档",
@@ -429,6 +430,7 @@ function renderChronicModule() {
 
   renderChronicProjectBlueprint();
   renderChronicOperations();
+  renderChronicPolicyServices();
 }
 
 function renderChronicAudit() {
@@ -449,6 +451,138 @@ function renderChronicAudit() {
     <strong>${value}</strong>
     <em>${hint}</em>
   </article>`).join("");
+}
+
+function renderChronicRiskStratification() {
+  const summaryEl = document.querySelector("#chronic-risk-summary");
+  const queueEl = document.querySelector("#chronic-risk-stratification");
+  if (!summaryEl || !queueEl) return;
+  const report = buildChronicRiskStratification(state);
+  summaryEl.innerHTML = [
+    ["重点队列", report.summary.highPriority, "需要24小时内复核或上转判断"],
+    ["强化管理", report.summary.mediumPriority, "需要7天内随访、复测或方案调整"],
+    ["逾期随访", report.summary.overdueFollowups, "已超过计划日期或标记逾期"],
+    ["筛查未闭环", report.summary.openScreeningTasks, "待评估、待检查或待干预"],
+    ["责任医生", report.summary.familyDoctors, "涉及家庭医生或基层中心"]
+  ].map(([label, value, hint]) => `<article class="metric-card">
+    <span>${label}</span>
+    <strong>${value}</strong>
+    <em>${hint}</em>
+  </article>`).join("");
+  queueEl.innerHTML = `<table>
+    <thead><tr><th>居民</th><th>管理等级</th><th>风险信号</th><th>未闭环事项</th><th>责任团队</th><th>建议动作</th><th>最早节点</th></tr></thead>
+    <tbody>${report.queue.map((item) => `<tr data-chronic-risk-resident="${item.residentId}">
+      <td>${item.name}<br><small>${item.personIndex || item.residentId}</small><br><small>${item.diseaseTypes.join("、") || "未登记慢病"}</small></td>
+      <td><span class="badge ${item.priority === "high" ? "danger" : item.priority === "medium" ? "warn" : "info"}">${item.serviceLevel}</span><br><small>${item.riskLevel} · ${item.score} 分</small></td>
+      <td>${item.signals.join("；") || item.riskReason}</td>
+      <td>逾期 ${item.openCounts.overdueFollowups} · 筛查 ${item.openCounts.openScreeningTasks}<br>自测 ${item.openCounts.selfAlerts} · 方案 ${item.openCounts.planReviews} · 共病 ${item.openCounts.comorbidityPlans}</td>
+      <td>${item.owner}<br><small>${item.organization}</small></td>
+      <td>${item.nextAction}</td>
+      <td>${item.dueAt || "持续监测"}</td>
+    </tr>`).join("")}</tbody>
+  </table>`;
+}
+
+function buildChronicRiskStratification(data) {
+  const residents = Array.isArray(data.residents) ? data.residents : [];
+  const diseases = Array.isArray(data.diseases) ? data.diseases : [];
+  const followups = Array.isArray(data.followups) ? data.followups : [];
+  const screenings = Array.isArray(data.chronicScreeningTasks) ? data.chronicScreeningTasks : [];
+  const plans = Array.isArray(data.chronicManagementPlans) ? data.chronicManagementPlans : [];
+  const selfManagement = Array.isArray(data.chronicSelfManagement) ? data.chronicSelfManagement : [];
+  const comorbidity = Array.isArray(data.chronicComorbidityPlans) ? data.chronicComorbidityPlans : [];
+  const managedResidentIds = new Set([
+    ...diseases.map((item) => item.residentId),
+    ...followups.map((item) => item.residentId),
+    ...screenings.map((item) => item.residentId),
+    ...plans.map((item) => item.residentId),
+    ...selfManagement.map((item) => item.residentId),
+    ...comorbidity.map((item) => item.residentId)
+  ].filter(Boolean));
+  const today = todayOffset(0);
+  const queue = residents.filter((resident) => managedResidentIds.has(resident.id) || assessRisk(resident).level !== "低危").map((resident) => {
+    const residentDiseases = diseases.filter((item) => item.residentId === resident.id);
+    const residentFollowups = followups.filter((item) => item.residentId === resident.id);
+    const residentScreenings = screenings.filter((item) => item.residentId === resident.id);
+    const residentPlans = plans.filter((item) => item.residentId === resident.id);
+    const residentSelf = selfManagement.filter((item) => item.residentId === resident.id);
+    const residentComorbidity = comorbidity.filter((item) => item.residentId === resident.id);
+    const openScreenings = residentScreenings.filter((item) => !["已评估", "已推送干预"].includes(item.status));
+    const openFollowups = residentFollowups.filter((item) => item.status !== "已完成");
+    const overdueFollowups = openFollowups.filter((item) => item.status === "已逾期" || String(item.plannedAt || "") < today);
+    const planPending = residentPlans.filter((item) => item.status !== "已复核");
+    const selfAlerts = residentSelf.filter((item) => /预警|复核|异常|偏高/.test(`${item.status || ""}${item.latestValue || ""}${item.nextAction || ""}`));
+    const risk = assessRisk(resident);
+    const highRisk = risk.level === "高危" || residentScreenings.some((item) => item.riskLevel === "高危") || residentPlans.some((item) => item.grade === "高危");
+    const score = Math.min(100,
+      (risk.level === "高危" ? 45 : risk.level === "中危" ? 25 : 8) +
+      overdueFollowups.length * 20 +
+      openScreenings.length * 12 +
+      selfAlerts.length * 10 +
+      planPending.length * 8 +
+      residentComorbidity.length * 6 +
+      (highRisk ? 12 : 0)
+    );
+    const priority = score >= 80 ? "high" : score >= 55 ? "medium" : "routine";
+    const signals = [
+      highRisk ? `风险分层：${risk.level}` : "",
+      overdueFollowups.length ? `逾期随访 ${overdueFollowups.length} 项` : "",
+      openScreenings.length ? `筛查未闭环 ${openScreenings.length} 项` : "",
+      selfAlerts.length ? `自测/家属预警 ${selfAlerts.length} 项` : "",
+      planPending.length ? `管理方案待复核 ${planPending.length} 项` : "",
+      residentComorbidity.length ? "多病共管" : ""
+    ].filter(Boolean);
+    const dueAt = [
+      ...openFollowups.map((item) => item.plannedAt),
+      ...openScreenings.map((item) => item.due),
+      ...planPending.map((item) => item.nextReview)
+    ].filter(Boolean).sort()[0] || "";
+    return {
+      residentId: resident.id,
+      personIndex: resident.personIndex || resident.identityIndex || personIndexFromParts(resident.idCard, resident.phone),
+      name: resident.name,
+      organization: resident.organization,
+      owner: resident.familyDoctor || planPending[0]?.owner || openScreenings[0]?.assignee || "家庭医生团队",
+      diseases: residentDiseases.map((item) => item.type),
+      diseaseTypes: residentDiseases.map((item) => item.type),
+      riskLevel: risk.level,
+      score,
+      priority,
+      serviceLevel: priority === "high" ? "重点管理" : priority === "medium" ? "强化管理" : "常规管理",
+      riskReason: risk.reason,
+      signals,
+      openCounts: {
+        overdueFollowups: overdueFollowups.length,
+        openScreeningTasks: openScreenings.length,
+        selfAlerts: selfAlerts.length,
+        planReviews: planPending.length,
+        comorbidityPlans: residentComorbidity.length
+      },
+      nextAction: chronicRiskNextAction({ priority, overdueFollowups, openScreenings, selfAlerts, planPending, residentComorbidity }),
+      dueAt
+    };
+  }).sort((left, right) => right.score - left.score || String(left.dueAt || "").localeCompare(String(right.dueAt || "")));
+  return {
+    summary: {
+      total: queue.length,
+      highPriority: queue.filter((item) => item.priority === "high").length,
+      mediumPriority: queue.filter((item) => item.priority === "medium").length,
+      routine: queue.filter((item) => item.priority === "routine").length,
+      overdueFollowups: followups.filter((item) => item.status === "已逾期" || (item.status !== "已完成" && String(item.plannedAt || "") < today)).length,
+      openScreeningTasks: screenings.filter((item) => !["已评估", "已推送干预"].includes(item.status)).length,
+      familyDoctors: new Set(queue.map((item) => item.owner).filter(Boolean)).size
+    },
+    queue
+  };
+}
+
+function chronicRiskNextAction({ priority, overdueFollowups, openScreenings, selfAlerts, planPending, residentComorbidity }) {
+  if (overdueFollowups.length) return "补齐随访记录，必要时由家庭医生电话复核并登记结果。";
+  if (openScreenings.length) return "完成筛查评估、检查申请或干预推送，并回写风险分级。";
+  if (selfAlerts.length) return "复核居民端自测异常，判断是否升级重点随访或转诊。";
+  if (planPending.length) return "复核分级管理方案，明确下次随访频次和指标目标。";
+  if (residentComorbidity.length) return "合并随访事项，完成多病共管与用药指导。";
+  return priority === "high" ? "保持重点人群周提醒和专科复核。" : "维持常规随访和健康教育。";
 }
 
 function renderChronicProjectBlueprint() {
@@ -500,6 +634,133 @@ function renderChronicProjectBlueprint() {
           <td>${studentCommonDisease.map((item) => `${item.name}：${item.workflow}，${item.output}`).join("；") || "待配置"}</td>
         </tr>
       </tbody>
+    </table>`;
+  }
+}
+
+function renderChronicPolicyServices() {
+  const rolesEl = document.querySelector("#chronic-service-roles");
+  if (rolesEl) {
+    rolesEl.innerHTML = (state.chronicServiceRoles || []).map((item) => `<article>
+      <strong>${item.role}</strong>
+      <span>${item.institutionType}</span>
+      <p>${item.policyBasis}</p>
+      <small>${(item.capabilities || []).join("、")}</small>
+      <small>${item.nextAction}</small>
+    </article>`).join("");
+  }
+
+  const conditionsEl = document.querySelector("#chronic-capability-conditions");
+  if (conditionsEl) {
+    conditionsEl.innerHTML = `<table>
+      <thead><tr><th>维度</th><th>基本条件</th><th>拓展条件</th><th>状态</th></tr></thead>
+      <tbody>${(state.chronicCapabilityConditions || []).map((item) => `<tr>
+        <td>${item.dimension}</td>
+        <td>${(item.basic || []).join("；")}</td>
+        <td>${(item.extension || []).join("；") || "无"}</td>
+        <td><span class="badge ${item.status === "已映射" ? "info" : "warn"}">${item.status}</span></td>
+      </tr>`).join("")}</tbody>
+    </table>`;
+  }
+
+  const pathwaysEl = document.querySelector("#chronic-service-pathways");
+  if (pathwaysEl) {
+    pathwaysEl.innerHTML = (state.chronicServicePathways || []).map((item) => `<div>
+      <strong>${item.stage}</strong>
+      <span>${item.systemAction}</span>
+      <small>${item.trigger}</small>
+    </div>`).join("");
+  }
+
+  const comorbidityEl = document.querySelector("#chronic-comorbidity-table");
+  if (comorbidityEl) {
+    comorbidityEl.innerHTML = `<table>
+      <thead><tr><th>居民</th><th>共病组合</th><th>风险</th><th>综合评估</th><th>整合方案</th><th>药师任务</th><th>随访频次</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody>${(state.chronicComorbidityPlans || []).map((item) => {
+        const resident = findResident(item.residentId);
+        return `<tr>
+          <td>${resident?.name || "未知居民"}</td>
+          <td>${(item.diseases || []).join("、")}</td>
+          <td><span class="badge ${item.risk === "高危" ? "danger" : "warn"}">${item.risk}</span></td>
+          <td>${item.assessment}</td>
+          <td>${item.integratedPlan}</td>
+          <td>${item.pharmacistTask}</td>
+          <td>${item.followupFrequency}</td>
+          <td>${item.status}</td>
+          <td>
+            ${chronicActionButton("chronicComorbidityPlans", item.id, "完成共管复核", { status: "已复核", assessment: "已完成多病共管综合复核" })}
+            ${chronicActionButton("chronicComorbidityPlans", item.id, "升级重点随访", { status: "重点随访", followupFrequency: "每2周一次" })}
+          </td>
+        </tr>`;
+      }).join("")}</tbody>
+    </table>`;
+  }
+
+  const tcmEl = document.querySelector("#chronic-tcm-services");
+  if (tcmEl) {
+    tcmEl.innerHTML = (state.chronicTcmServices || []).map((item) => {
+      const resident = findResident(item.residentId);
+      return `<div>
+        <strong>${resident?.name || "未知居民"} · ${item.service}</strong>
+        <span>${item.tcmAssessment} · ${item.intervention} · ${item.provider}</span>
+        <span class="badge info">${item.status}</span>
+        ${chronicActionButton("chronicTcmServices", item.id, "完成辨证服务", { status: "已完成", intervention: "已完成中医体质辨识和适宜技术服务" })}
+        ${chronicActionButton("chronicTcmServices", item.id, "纳入复诊", { status: "待复诊", nextService: "7天内复诊评估" })}
+      </div>`;
+    }).join("");
+  }
+
+  const selfEl = document.querySelector("#chronic-self-management");
+  if (selfEl) {
+    selfEl.innerHTML = (state.chronicSelfManagement || []).map((item) => {
+      const resident = findResident(item.residentId);
+      return `<div>
+        <strong>${resident?.name || "未知居民"} · ${item.device}</strong>
+        <span>${item.latestValue} · ${item.uploadSource} · ${item.group}</span>
+        <span>${item.incentive}；${item.nextAction}</span>
+        ${chronicActionButton("chronicSelfManagement", item.id, "确认上传", { status: "已确认", nextAction: "已纳入家庭医生随访复核" })}
+        ${chronicActionButton("chronicSelfManagement", item.id, "触发预警", { status: "预警中", nextAction: "已触发异常指标预警" })}
+      </div>`;
+    }).join("");
+  }
+
+  const medicationEl = document.querySelector("#chronic-medication-support");
+  if (medicationEl) {
+    medicationEl.innerHTML = `<table>
+      <thead><tr><th>病种</th><th>药品</th><th>机构</th><th>处方</th><th>库存</th><th>缺药处理</th><th>医保协同</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody>${(state.chronicMedicationSupport || []).map((item) => `<tr>
+        <td>${item.diseaseType}</td>
+        <td>${item.medication}</td>
+        <td>${item.institution}</td>
+        <td>${item.prescription}</td>
+        <td>${item.stockStatus}</td>
+        <td>${item.shortageAction}</td>
+        <td>${item.insurancePolicy}</td>
+        <td><span class="badge ${item.status === "运行中" ? "info" : "warn"}">${item.status}</span></td>
+        <td>
+          ${chronicActionButton("chronicMedicationSupport", item.id, "库存确认", { status: "运行中", stockStatus: "已完成库存复核" })}
+          ${chronicActionButton("chronicMedicationSupport", item.id, "登记缺药", { status: "需协调", shortageAction: "已登记缺药并发起采购协调" })}
+        </td>
+      </tr>`).join("")}</tbody>
+    </table>`;
+  }
+
+  const qualityEl = document.querySelector("#chronic-quality-metrics");
+  if (qualityEl) {
+    qualityEl.innerHTML = `<table>
+      <thead><tr><th>评价指标</th><th>2027目标</th><th>当前系统证据</th><th>责任方</th><th>证据集合</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody>${(state.chronicQualityMetrics || []).map((item) => `<tr>
+        <td>${item.metric}</td>
+        <td>${item.target2027}</td>
+        <td>${item.current}</td>
+        <td>${item.owner}</td>
+        <td>${item.evidence}</td>
+        <td><span class="badge ${item.status === "新增" ? "warn" : "info"}">${item.status}</span></td>
+        <td>
+          ${chronicActionButton("chronicQualityMetrics", item.id, "完成核验", { status: "已核验", current: "已完成本轮质控核验" })}
+          ${chronicActionButton("chronicQualityMetrics", item.id, "纳入整改", { status: "整改中", current: "已纳入质控整改台账" })}
+        </td>
+      </tr>`).join("")}</tbody>
     </table>`;
   }
 }
@@ -560,12 +821,45 @@ function renderChronicOperations() {
       const collection = button.dataset.collection;
       const item = (state[collection] || []).find((row) => row.id === button.dataset.id);
       if (!item) return;
-      Object.assign(item, JSON.parse(button.dataset.updates), { lastUpdated: new Date().toISOString() });
-      await saveState();
+      const updates = JSON.parse(button.dataset.updates);
+      await applyChronicWorkflowAction(collection, item, updates, button.textContent.trim());
       renderChronicModule();
       showToast("慢病业务状态已更新");
     });
   });
+}
+
+async function applyChronicWorkflowAction(collection, item, updates, note) {
+  Object.assign(item, updates, { lastUpdated: new Date().toISOString() });
+  if (apiEnabled) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const version = state.storageMeta?.collectionVersions?.[collection];
+      const response = await request(`${API_BASE}/workflow-actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          collection,
+          id: item.id,
+          status: updates.status || item.status,
+          updates,
+          note,
+          ...(Number.isFinite(version) ? { expectedVersion: version } : {})
+        })
+      });
+      if (response.ok) {
+        const saved = await response.json();
+        Object.assign(item, saved);
+        if (state.storageMeta?.collectionVersions && Number.isFinite(version)) {
+          state.storageMeta.collectionVersions[collection] = version + 1;
+        }
+        return;
+      }
+    } catch (error) {
+      apiEnabled = false;
+    }
+  }
+  await saveState();
 }
 
 function chronicActionButton(collection, id, label, updates) {
@@ -662,6 +956,7 @@ function renderAnalytics() {
 function renderGovernance() {
   renderPortalGrid();
   renderWarnings();
+  renderMultiPracticeGovernance();
   renderMedicalResources();
   renderHealthStatistics();
   renderDeathStatistics();
@@ -744,7 +1039,7 @@ function renderPlanning() {
   document.querySelector("#planning-cards").innerHTML = [
     ["规划映射", items.length, "国家信息化规划能力项"],
     ["已落地/已启动", started, "可在当前 MVP 中演示"],
-    ["待扩展", pending, "安全、应急、适老化深化"],
+    ["基础闭环", pending, "安全、应急、适老化已入模"],
     ["共享数据集", indexedCollections.length, "已接入 personIndex"],
     ["授权记录", (state.personalRecords || []).filter((item) => item.category === "authorizations").length, "居民授权共享"],
     ["监管预警", document.querySelectorAll("#warning-list .list-item").length || 0, "风险识别入口"]
@@ -766,7 +1061,7 @@ function renderPlanning() {
     ["数据最小够用", "演示环境只使用样例身份证号和手机号；真实部署需采用脱敏、加密、分级授权和审计日志。"],
     ["授权优先", "个人健康信息库通过授权记录控制医疗机构、家庭医生和区域平台的数据查看范围。"],
     ["应急预留", "公共卫生应急可从风险预警扩展，接入传染病、资源负荷、药品物资和多点触发预警。"],
-    ["适老化预留", "居民端后续增加大字模式、家属代办、固定取药提醒、线下服务二维码和无障碍标签。"]
+    ["适老化闭环", "居民端已增加大字模式、家属代办、固定取药提醒、线下帮办、弱网偏好和无障碍验收清单。"]
   ].map(([title, text]) => `<div><strong>${title}</strong><span>${text}</span></div>`).join("");
 }
 
@@ -903,6 +1198,69 @@ function renderWarnings() {
   document.querySelector("#warning-list").innerHTML = warnings
     .map(([name, title, detail, level]) => `<div class="list-item"><div><strong>${name} · ${title}</strong><br><small>${detail}</small></div><span class="badge ${level}">${level === "danger" ? "高" : level === "warn" ? "中" : "提示"}</span></div>`)
     .join("") || `<div class="subtle">暂无风险预警。</div>`;
+}
+
+function renderMultiPracticeGovernance() {
+  const applications = state.multiPracticeApplications || [];
+  const summaryEl = document.querySelector("#multi-practice-governance-summary");
+  const cardsEl = document.querySelector("#multi-practice-governance-cards");
+  const tableEl = document.querySelector("#multi-practice-governance-table");
+  if (!summaryEl || !cardsEl || !tableEl) return;
+  const pending = applications.filter((item) => String(item.status || "").includes("待")).length;
+  const filed = applications.filter((item) => String(item.status || "").includes("备案")).length;
+  const publicRows = applications.filter((item) => item.publicVisible).length;
+  const riskRows = applications.filter((item) => hasMultiPracticeGovernanceRisk(item)).length;
+  summaryEl.textContent = `${applications.length} 条申请 · ${pending} 条待审 · ${publicRows} 条公开`;
+  cardsEl.innerHTML = [
+    ["申请总数", applications.length, "医生账户关联申请"],
+    ["待审核", pending, "第一执业地点或卫健委待处理"],
+    ["已备案", filed, "完成备案或医联体帮扶登记"],
+    ["公开台账", publicRows, "可向社会公开执业信息"],
+    ["风险补正", riskRows, "资格、材料、保险或排班需复核"]
+  ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><em>${hint}</em></article>`).join("");
+  tableEl.innerHTML = `<table>
+    <thead><tr><th>医师</th><th>第一执业地点</th><th>拟执业机构</th><th>期限/排班</th><th>材料核验</th><th>状态</th></tr></thead>
+    <tbody>${applications.map((item) => {
+      const compliance = item.compliance || {};
+      const documents = item.documentChecks || {};
+      const checks = [
+        compliance.titleQualified ? "职称" : "职称待核",
+        compliance.fiveYears ? "年限" : "年限待核",
+        compliance.scopeMatched ? "范围" : "范围待核",
+        documents.firstPracticeConsent ? "地点同意" : "地点待确认",
+        documents.cooperationAgreement ? "协议" : "协议待补",
+        documents.liabilityInsurance ? "保险" : "保险待补",
+        documents.scheduleConflict ? "排班冲突" : "排班通过"
+      ];
+      const risk = hasMultiPracticeGovernanceRisk(item);
+      return `<tr>
+        <td>${item.doctorName || "-"}<br><small>${item.title || item.specialty || ""}</small></td>
+        <td>${item.primaryInstitution || "待核验"}</td>
+        <td>${item.targetInstitution || "待核验"}<br><small>${item.targetDepartment || ""}</small></td>
+        <td>${item.period || "待核验"}<br><small>${item.schedule || ""}</small></td>
+        <td>${checks.join("、")}</td>
+        <td><span class="badge ${risk ? "warn" : "info"}">${item.status || "待处理"}</span></td>
+      </tr>`;
+    }).join("")}</tbody>
+  </table>`;
+  if (!applications.length) tableEl.innerHTML = `<div class="subtle">暂无多点执业监管记录。</div>`;
+}
+
+function hasMultiPracticeGovernanceRisk(item) {
+  const compliance = item.compliance || {};
+  const documents = item.documentChecks || {};
+  const complianceBlocked = Object.entries(compliance)
+    .some(([key, value]) => key !== "publicHospitalLeaderRestricted" && !value);
+  return Boolean(
+    compliance.publicHospitalLeaderRestricted ||
+    complianceBlocked ||
+    documents.scheduleConflict ||
+    documents.firstPracticeConsent === false ||
+    documents.cooperationAgreement === false ||
+    documents.liabilityInsurance === false ||
+    String(item.status || "").includes("退回") ||
+    String(item.status || "").includes("补正")
+  );
 }
 
 function renderMedicalResources() {
@@ -1042,10 +1400,12 @@ function renderBirthStatistics() {
   const metrics = birth.metrics || {};
   const summary = document.querySelector("#birth-stat-summary");
   const cards = document.querySelector("#birth-stat-cards");
+  const alerts = document.querySelector("#birth-stat-alerts");
   const sources = document.querySelector("#birth-stat-sources");
   const regionTable = document.querySelector("#birth-region-table");
   const rules = document.querySelector("#birth-stat-rules");
   if (!summary || !cards || !sources || !regionTable || !rules) return;
+  const certificates = state.birthCertificates || [];
 
   summary.textContent = `${formatPeriod(birth.period)} · 出生医学证明系统 + 妇幼健康管理 + 公安户籍共享`;
   cards.innerHTML = [
@@ -1058,6 +1418,21 @@ function renderBirthStatistics() {
     ["低体重儿", metrics.lowBirthWeight || 0, "专案随访"],
     ["待处理", metrics.pending || 0, "待签发或待上报"]
   ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${formatNumber(value)}</strong><em>${hint}</em></article>`).join("");
+
+  if (alerts) {
+    const alertItems = [
+      ["待签发", certificates.filter((item) => item.status === "待签发").length, "督促签发机构完成材料核验、签章和编号登记"],
+      ["待公安共享", certificates.filter((item) => item.publicSecuritySync !== "已共享").length, "影响户籍出生登记和跨部门人口库更新"],
+      ["待妇幼入册", certificates.filter((item) => item.maternalChildSync !== "已入册").length, "新生儿访视、筛查和接种提醒未闭环"],
+      ["低体重儿", certificates.filter((item) => Number(item.birthWeight || 0) > 0 && Number(item.birthWeight || 0) < 2500).length, "需建立专案随访和喂养指导"],
+      ["质控补正", certificates.filter((item) => ["待质控", "待复核", "待补正"].includes(item.qualityCheck)).length, "证件编号、父母身份、签发材料或共享结果需复核"]
+    ];
+    alerts.innerHTML = alertItems.map(([label, value, hint]) => `<article>
+      <span>${label}</span>
+      <strong>${formatNumber(value)}</strong>
+      <small>${hint}</small>
+    </article>`).join("");
+  }
 
   sources.innerHTML = (birth.sources || []).map((source) => `<article>
     <span>${source.name}</span>

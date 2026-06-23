@@ -17,13 +17,46 @@
           <p>把大连市卫生健康委、医疗机构、医保局/医保中心/区市县医保局、个人端和县域医共体平台的功能、数据、待办、风险和继续开发优先级统一梳理。</p>
         </div>
         <nav>
-          <a href="./platform.html">全民健康平台</a>
+          
+          <a href="./quality-safety.html">Quality safety</a><a href="./platform.html">全民健康平台</a>
           <a href="./health-city.html">系统总览</a>
           <a href="./index.html">卫健委端</a>
         </nav>
       </header>
 
       <section class="metric-grid" id="workbench-metrics"></section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>系统就绪报告</h2>
+          <span>来自 /api/system/readiness，区分代码闭环和现场依赖</span>
+        </div>
+        <div id="system-readiness" class="priority-list"></div>
+      </section>
+
+      <section class="panel" id="release-evidence-panel">
+        <div class="panel-title">
+          <h2>Release evidence gates</h2>
+          <span>CI artifact, release report and operations evidence review</span>
+        </div>
+        <div id="release-evidence-gates" class="priority-list"></div>
+      </section>
+
+      <section class="panel" id="acceptance-ledger-panel">
+        <div class="panel-title">
+          <h2>Acceptance ledgers</h2>
+          <span>Live chronic care and county consortium acceptance evidence</span>
+        </div>
+        <div id="acceptance-ledgers" class="priority-list"></div>
+      </section>
+
+      <section class="panel" id="site-readiness-panel">
+        <div class="panel-title">
+          <h2>Site readiness pack</h2>
+          <span>Identity, interface, monitoring and signoff templates</span>
+        </div>
+        <div id="site-readiness-pack" class="priority-list"></div>
+      </section>
 
       <section class="portal-grid">
         <article class="panel">

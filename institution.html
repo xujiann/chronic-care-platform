@@ -23,6 +23,15 @@
 
       <section class="metric-grid" id="institution-metrics"></section>
 
+      <section class="panel">
+        <div class="panel-title">
+          <h2>慢病管理与院后随访闭环</h2>
+          <span id="chronic-followup-summary"></span>
+        </div>
+        <div id="chronic-followup-metrics" class="claim-grid"></div>
+        <div id="chronic-followup-workbench" class="list"></div>
+      </section>
+
       <section class="portal-grid">
         <article class="panel">
           <div class="panel-title">
@@ -46,7 +55,68 @@
           <h2>医师多点执业</h2>
           <span id="multi-practice-count"></span>
         </div>
+        <form id="multi-practice-form" class="filter-grid">
+          <label>申请医师
+            <select name="doctorId" required></select>
+          </label>
+          <label>拟执业机构
+            <input name="targetInstitution" placeholder="例如：大连市中心医院" required />
+          </label>
+          <label>拟执业科室
+            <input name="targetDepartment" placeholder="例如：心内科慢病联合门诊" />
+          </label>
+          <label>执业范围
+            <input name="practiceScope" placeholder="与第一执业地点一致" />
+          </label>
+          <label>执业期限
+            <input name="period" placeholder="2026-07-01 至 2027-06-30" required />
+          </label>
+          <label>时间安排
+            <input name="schedule" placeholder="每周三下午" required />
+          </label>
+          <label class="full">工作任务
+            <input name="tasks" placeholder="会诊、联合门诊、基层帮扶、慢病管理等" required />
+          </label>
+          <label class="full">医疗责任约定
+            <input name="responsibility" placeholder="由当事医疗机构和医师按协议依法承担" required />
+          </label>
+          <label>薪酬约定
+            <input name="compensation" placeholder="按工作量/绩效结算" required />
+          </label>
+          <label>责任保险
+            <input name="insurance" placeholder="个人执业保险/机构责任保险" required />
+          </label>
+          <label>第一执业地点意见
+            <select name="primaryConsent">
+              <option>待确认</option>
+              <option>已同意</option>
+              <option>知情报备</option>
+              <option>医联体内帮扶免办多点执业手续</option>
+            </select>
+          </label>
+          <label>登记方式
+            <select name="registrationMode">
+              <option>备案管理</option>
+              <option>注册管理</option>
+              <option>医联体帮扶</option>
+            </select>
+          </label>
+          <label class="checkbox-line">
+            <input name="scheduleConflict" type="checkbox" />
+            存在排班冲突
+          </label>
+          <label class="checkbox-line">
+            <input name="publicVisible" type="checkbox" checked />
+            允许信息公开
+          </label>
+          <button class="inline-action" type="submit">提交多点执业申请</button>
+        </form>
+        <div id="multi-practice-dashboard" class="claim-grid"></div>
         <div id="multi-practice-applications" class="list"></div>
+        <div class="panel-title">
+          <h2>多点执业公开备案台账</h2>
+        </div>
+        <div id="multi-practice-public-ledger" class="table-wrap"></div>
       </section>
 
       <section class="portal-grid">
@@ -79,6 +149,14 @@
           <span id="referral-center-count"></span>
         </div>
         <div id="referral-center" class="list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>Referral teleconsultation loop</h2>
+          <span id="teleconsultation-count"></span>
+        </div>
+        <div id="teleconsultation-loop" class="list"></div>
       </section>
 
       <section class="panel">
@@ -135,6 +213,71 @@
           <h2>出生医学证明办理</h2>
           <span id="birth-certificate-count"></span>
         </div>
+        <form id="birth-certificate-form" class="filter-grid">
+          <label>母亲
+            <select name="maternalResidentId" required></select>
+          </label>
+          <label>新生儿姓名
+            <input name="newbornName" placeholder="未命名可填新生儿" required />
+          </label>
+          <label>性别
+            <select name="newbornGender">
+              <option>男</option>
+              <option>女</option>
+              <option>待确认</option>
+            </select>
+          </label>
+          <label>出生时间
+            <input name="birthDateTime" type="datetime-local" required />
+          </label>
+          <label>出生体重(g)
+            <input name="birthWeight" type="number" min="300" max="7000" step="1" required />
+          </label>
+          <label>出生身长(cm)
+            <input name="birthLength" type="number" min="20" max="80" step="0.1" required />
+          </label>
+          <label>父亲姓名
+            <input name="fatherName" placeholder="待核验" />
+          </label>
+          <label>签发医师
+            <input name="issuingPhysician" placeholder="签发医师" />
+          </label>
+          <label>办理类型
+            <select name="issueType">
+              <option>首次签发</option>
+              <option>换发</option>
+              <option>补发</option>
+            </select>
+          </label>
+          <label>办理状态
+            <select name="status">
+              <option>待签发</option>
+              <option>已签发</option>
+            </select>
+          </label>
+          <label class="full">下一步健康服务
+            <input name="nextService" placeholder="新生儿访视、出生缺陷筛查、接种提醒" />
+          </label>
+          <button class="inline-action" type="submit">登记出生证明</button>
+        </form>
+        <div class="filter-grid">
+          <label>办理状态
+            <select id="birth-status-filter">
+              <option value="">全部</option>
+              <option>待签发</option>
+              <option>已签发</option>
+              <option>已上报</option>
+            </select>
+          </label>
+          <label>健康风险
+            <select id="birth-risk-filter">
+              <option value="">全部</option>
+              <option value="low-weight">低体重儿</option>
+              <option value="pending-sync">待共享/入册</option>
+            </select>
+          </label>
+        </div>
+        <div id="birth-certificate-alerts" class="claim-grid"></div>
         <div id="birth-certificate-metrics" class="claim-grid"></div>
         <div id="birth-certificate-list" class="list"></div>
       </section>
@@ -161,3 +304,4 @@
     <script src="./institution.js"></script>
   </body>
 </html>
+

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>医院运行监测与资源调度平台</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+    <script>window.HealthCityAuth.requireRole(["commission"])</script>
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>医院运行监测与资源调度平台</span>
+          <h1>运行监测、资源调度、统计直报对账</h1>
+          <p>围绕床位、人员、设备、门急诊、住院运行和直报差异复核形成管理端可操作闭环。</p>
+        </div>
+        <nav>
+          <a href="./platform.html">平台驾驶舱</a>
+          <a href="./workbench.html">运营工作台</a>
+          <a href="./index.html">卫健委端</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" id="operations-metrics"></section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>运行监测</h2>
+            <span id="operations-boundary"></span>
+          </div>
+          <div id="operations-snapshots" class="table-wrap"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>预警规则</h2>
+            <span>床位、人员、设备、门急诊、统计对账</span>
+          </div>
+          <div id="operations-alert-rules" class="rules"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>资源调度</h2>
+            <span>管理端发起、分派和关闭调度工单</span>
+          </div>
+          <div id="dispatch-requests" class="table-wrap"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>新增调度</h2>
+            <span>写入审计留痕</span>
+          </div>
+          <form id="dispatch-form" class="filter-grid">
+            <label>来源机构<input name="sourceInstitution" value="Qingniwaqiao Community Health Service Center" /></label>
+            <label>目标机构<input name="targetInstitution" value="Dalian Central Hospital" /></label>
+            <label>资源类型<input name="resourceType" value="step-down-bed" /></label>
+            <label>数量<input name="quantity" type="number" min="1" value="6" /></label>
+            <label>优先级
+              <select name="priority">
+                <option value="high">high</option>
+                <option value="medium">medium</option>
+                <option value="low">low</option>
+              </select>
+            </label>
+            <label>状态
+              <select name="status">
+                <option value="pending">pending</option>
+                <option value="assigned">assigned</option>
+                <option value="closed">closed</option>
+              </select>
+            </label>
+            <label class="full">原因<textarea name="reason" rows="3">Bed occupancy alert triggered manual dispatch review.</textarea></label>
+            <button class="inline-action" type="submit">提交调度</button>
+          </form>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>统计直报对账复核</h2>
+          <span>关联 healthStatistics、healthStatisticsIngestion 与运行快照</span>
+        </div>
+        <div id="reconciliation-reviews" class="table-wrap"></div>
+      </section>
+    </main>
+
+    <script src="./shared.js"></script>
+    <script src="./operations.js"></script>
+  </body>
+</html>
