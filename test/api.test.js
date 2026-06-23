@@ -153,6 +153,14 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(readiness.body.externalDependencySummary.total, readiness.body.externalDependencies.length);
     assert.equal(readiness.body.externalDependencySummary.high >= 3, true);
 
+    const healthDashboard = await api(baseUrl, "/api/health-dashboard/summary", authorized(accountLogin.body.token));
+    assert.equal(healthDashboard.response.status, 200);
+    assert.equal(healthDashboard.body.ok, true);
+    assert.equal(healthDashboard.body.applications.length, 7);
+    assert.equal(healthDashboard.body.scope.role, "summary-entry-for-seven-applications");
+    assert.equal(healthDashboard.body.applications.some((item) => item.entry === "workbench.html"), true);
+    assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:source-boundary" && item.passed), true);
+
     const processAudit = await api(baseUrl, "/api/process-audit", authorized(accountLogin.body.token));
     assert.equal(processAudit.response.status, 200);
     assert.equal(processAudit.body.ok, true);
@@ -311,7 +319,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(body.institutionCreditEvaluations.length, 3);
     assert.equal(body.securityAcceptanceLedger.length, 4);
     assert.equal(body.productionDeploymentPlan.length, 4);
-    ["residents", "personalRecords", "platformEvidence", "productionDeploymentPlan", "applicationCatalog", "hospitalInteroperabilityFunctions", "institutionCreditEvaluations", "securityAcceptanceLedger"].forEach((key) => {
+    assert.equal(body.healthDashboardSnapshots.length, 1);
+    ["residents", "personalRecords", "platformEvidence", "productionDeploymentPlan", "applicationCatalog", "hospitalInteroperabilityFunctions", "institutionCreditEvaluations", "securityAcceptanceLedger", "healthDashboardSnapshots"].forEach((key) => {
       assert.ok(Array.isArray(body[key]), `${key} should keep array contract`);
     });
   });
@@ -336,6 +345,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       "platformAudit",
       "platformProcessAudit",
       "productionDeploymentPlan",
+      "healthDashboardSnapshots",
       "applicationCatalog",
       "hospitalInteroperabilityFunctions",
       "institutionCreditEvaluations",

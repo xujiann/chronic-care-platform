@@ -265,3 +265,8 @@ hospital-operations:readiness generates release/hospital-operations-readiness-re
 ## Drug Consumable Supervision Evidence
 
 Before site joint testing for the drug and consumable supervision app, run `npm.cmd run drug-consumable:readiness` and archive `release/drug-consumable-readiness-report.json` plus `release/drug-consumable-readiness-report.md`. The report is the pre-field evidence bundle for rational medication, prescription review, fixed pickup, high-value consumable clues, insurance settlement coordination, and remediation-loop signoff.
+## Health Dashboard Deployment Evidence
+
+- Open `health-dashboard.html` after commission login to review the aggregate health dashboard.
+- Run `npm.cmd run health-dashboard:summary` to generate `release/health-dashboard-summary.json` and `release/health-dashboard-summary.md`.
+- The dashboard remains blocked on real site joint-test inputs for identity, HIS/EMR/LIS/PACS, insurance, certificates, statistics, monitoring, and disaster recovery signoff.

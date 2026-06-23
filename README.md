@@ -275,3 +275,9 @@ hospital-operations:readiness generates release/hospital-operations-readiness-re
 ## Drug Consumable Supervision Evidence
 
 `drug-consumable:readiness` generates `release/drug-consumable-readiness-report.json` and `release/drug-consumable-readiness-report.md`, covering rational medication, prescription review, fixed pickup, high-value consumable clues, insurance settlement coordination, and remediation-loop evidence for the drug and consumable supervision app.
+## Health Dashboard Aggregate Entry
+
+- `health-dashboard.html` is priority application 8: the aggregate entry for the first seven applications.
+- `GET /api/health-dashboard/summary` returns application metrics, risk counts, open actions, interface tracks, acceptance evidence, and site dependencies for commission users.
+- `npm.cmd run health-dashboard:summary` writes `release/health-dashboard-summary.json` and `release/health-dashboard-summary.md`.
+- Boundary: the dashboard does not replace source workflows; source applications remain the system of record for business operations and acceptance.

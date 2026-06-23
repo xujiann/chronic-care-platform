@@ -27,6 +27,7 @@
 
   const routeAccess = {
     "index.html": ["commission"],
+    "health-dashboard.html": ["commission"],
     "workbench.html": ["commission"],
     "platform.html": ["commission"],
     "regional-data-sharing.html": ["commission", "institution"],

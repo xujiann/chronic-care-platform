@@ -8,6 +8,7 @@ const { buildDataQualityReport, renderMarkdown: renderDataQualityMarkdown } = re
 const { buildDrugConsumableReadinessReport, renderMarkdown: renderDrugConsumableMarkdown } = require("./drug-consumable-readiness");
 const { buildEvaluationEvidenceReport, renderMarkdown: renderEvaluationEvidenceMarkdown } = require("./evaluation-evidence");
 const { buildEnvironmentMatrixReport, renderMarkdown: renderEnvironmentMatrixMarkdown } = require("./environment-matrix");
+const { buildHealthDashboardSummary, renderMarkdown: renderHealthDashboardMarkdown } = require("./health-dashboard-summary");
 const { buildIdentityContract, renderMarkdown: renderIdentityContractMarkdown } = require("./identity-contract");
 const { buildIntegrationReadinessReport, renderMarkdown: renderIntegrationReadinessMarkdown } = require("./integration-readiness");
 const { buildInterfaceMappingReport, renderMarkdown: renderInterfaceMappingMarkdown } = require("./interface-mapping");
@@ -226,7 +227,8 @@ function snapshotChecks(data) {
     "regionalSharingPackages",
     "regionalSharingSnapshots",
     "regionalSharingAccessReviews",
-    "securityAcceptanceLedger"
+    "securityAcceptanceLedger",
+    "healthDashboardSnapshots"
   ];
   const raw = fs.readFileSync(path.join(ROOT, "data", "db.json"), "utf8");
   const p2 = (data.platformRoadmap || []).filter((item) => item.priority === "P2");
@@ -255,7 +257,8 @@ function snapshotChecks(data) {
     check("snapshot:researchSandbox", (data.researchDatasets || []).some((item) => item.authorizationStatus === "approved" && (item.deidentificationStatus === "released" || item.anonymization) && (item.sandbox?.status === "active" || item.status === "published")) && (data.dataAccessLogs || []).some((item) => /research|科研|数据集|沙箱/i.test(`${item.scope || ""} ${item.purpose || ""}`)), `${data.researchDatasets?.length || 0} datasets / ${data.dataAccessLogs?.length || 0} audit logs`, "error", "snapshot"),
     check("snapshot:externalDependencyRisks", externalDependencyRiskIds.every((id) => serverSource.includes(id)), `${externalDependencyRiskIds.length} external dependency risks`, "error", "snapshot"),
     check("snapshot:noCorruptedPlaceholders", !/编码损坏|缂栫爜鎹熷潖|\?\?\?/.test(raw), "no known corrupted placeholders", "error", "snapshot"),
-    check("snapshot:accessibility", Array.isArray(data.accessibilityChecklist) && data.accessibilityChecklist.length >= 5, `${data.accessibilityChecklist?.length || 0} checklist items`, "error", "snapshot")
+    check("snapshot:accessibility", Array.isArray(data.accessibilityChecklist) && data.accessibilityChecklist.length >= 5, `${data.accessibilityChecklist?.length || 0} checklist items`, "error", "snapshot"),
+    check("snapshot:healthDashboard", Array.isArray(data.healthDashboardSnapshots) && data.healthDashboardSnapshots.some((item) => Array.isArray(item.sourceApplications) && item.sourceApplications.length === 7), `${data.healthDashboardSnapshots?.length || 0} dashboard snapshots`, "error", "snapshot")
   ];
 }
 
@@ -340,6 +343,14 @@ function environmentMatrixChecks(environmentMatrix) {
     check("environment:matrix", environmentMatrix.ok, environmentMatrix.ok ? "environment matrix checks passed" : "environment matrix checks failed", "error", "environment"),
     check("environment:profiles", environmentMatrix.profiles?.length === 3, `${environmentMatrix.profiles?.length || 0} environment profiles`, "error", "environment"),
     check("environment:gateScripts", environmentMatrix.profiles?.every((item) => item.missingScripts?.length === 0), "demo, staging, and production gate scripts mapped", "error", "environment")
+  ];
+}
+
+function healthDashboardChecks(healthDashboard) {
+  return [
+    check("healthDashboard:summary", healthDashboard.ok, healthDashboard.ok ? "health dashboard summary checks passed" : "health dashboard summary failed", "error", "health-dashboard"),
+    check("healthDashboard:applications", healthDashboard.applications?.length === 7, `${healthDashboard.applications?.length || 0} source applications`, "error", "health-dashboard"),
+    check("healthDashboard:boundary", /source business applications|source applications/.test(healthDashboard.scope?.rule || ""), healthDashboard.scope?.rule || "missing", "error", "health-dashboard")
   ];
 }
 
@@ -535,6 +546,7 @@ function packageChecks(pkg) {
     "quality-safety:report",
     "environment:matrix",
     "hospital-operations:readiness",
+    "health-dashboard:summary",
     "integration:readiness",
     "interface:mapping",
     "monitoring:readiness",
@@ -607,6 +619,7 @@ function buildReleaseReport(options = {}) {
   const productionDbReadiness = buildProductionDbReadinessReport({ data, pkg, storageModel });
   const evaluationEvidence = buildEvaluationEvidenceReport({ data });
   const environmentMatrix = buildEnvironmentMatrixReport({ data, pkg });
+  const healthDashboard = buildHealthDashboardSummary({ data });
   const siteReadinessPack = buildSiteReadinessPack({ data, pkg, envFile: options.envFile || ".env.example", env: options.env || process.env, identityContract, interfaceMapping, monitoringReadiness });
   const checks = [
     assertFile("README.md"),
@@ -638,6 +651,7 @@ function buildReleaseReport(options = {}) {
     ...productionDbReadinessChecks(productionDbReadiness),
     ...evaluationEvidenceChecks(evaluationEvidence),
     ...environmentMatrixChecks(environmentMatrix),
+    ...healthDashboardChecks(healthDashboard),
     ...env.checks,
     ...commandChecks(options.runCommands)
   ];
@@ -677,7 +691,8 @@ function buildReleaseReport(options = {}) {
     siteReadinessPack,
     productionDbReadiness,
     evaluationEvidence,
-    environmentMatrix
+    environmentMatrix,
+    healthDashboard
   };
 }
 
@@ -890,6 +905,10 @@ function renderMarkdown(report) {
     "",
     "See `environment-matrix-report.json` and `environment-matrix-report.md` for demo, staging, and production environment variables, gate scripts, owners, and blocking rules.",
     "",
+    "## Health dashboard summary",
+    "",
+    "See `health-dashboard-summary.json` and `health-dashboard-summary.md` for the aggregate entry across the first seven applications, open actions, interface tracks, evidence, and site dependencies.",
+    "",
     "## Release artifact manifest",
     "",
     "See `release-artifact-manifest.json` and `release-artifact-manifest.md` for the release package index, template READMEs, generation commands, and API evidence links.",
@@ -1095,6 +1114,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       environmentMatrix: report.environmentMatrix
     }, null, 2), "utf8");
+    const healthDashboardJson = path.join(path.dirname(output), "health-dashboard-summary.json");
+    fs.writeFileSync(healthDashboardJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      healthDashboard: report.healthDashboard
+    }, null, 2), "utf8");
     const releaseArtifactManifest = buildReleaseArtifactManifest({ releaseReport: report });
     const releaseArtifactManifestJson = path.join(path.dirname(output), "release-artifact-manifest.json");
     fs.writeFileSync(releaseArtifactManifestJson, JSON.stringify({
@@ -1154,6 +1181,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(evaluationMarkdown, renderEvaluationEvidenceMarkdown(report.evaluationEvidence), "utf8");
     const environmentMarkdown = path.join(path.dirname(markdown), "environment-matrix-report.md");
     fs.writeFileSync(environmentMarkdown, renderEnvironmentMatrixMarkdown(report.environmentMatrix), "utf8");
+    const healthDashboardMarkdown = path.join(path.dirname(markdown), "health-dashboard-summary.md");
+    fs.writeFileSync(healthDashboardMarkdown, renderHealthDashboardMarkdown(report.healthDashboard), "utf8");
     const releaseArtifactManifestMarkdown = path.join(path.dirname(markdown), "release-artifact-manifest.md");
     fs.writeFileSync(releaseArtifactManifestMarkdown, renderReleaseArtifactManifestMarkdown(buildReleaseArtifactManifest({ releaseReport: report })), "utf8");
   }
