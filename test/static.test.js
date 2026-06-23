@@ -112,10 +112,12 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(html, /dashboard-dependencies/);
   assert.match(html, /dashboard-application-filter/);
   assert.match(html, /dashboard-priority-filter/);
+  assert.match(html, /health-dashboard-applications\.js/);
   assert.match(js, /\/api\/health-dashboard\/summary/);
   assert.match(js, /source application/);
   assert.match(js, /filteredDashboardActions/);
   assert.match(js, /collectStaticOpenActions/);
+  assert.match(js, /HealthDashboardApplications/);
   assert.match(js, /renderDataState/);
   assert.match(js, /sourceMode/);
   assert.match(js, /源待办/);
@@ -124,6 +126,7 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(read("auth.js"), /"health-dashboard\.html", "综合驾驶舱"/);
   assert.match(server, /\/api\/health-dashboard\/summary/);
   assert.match(server, /buildHealthDashboardSummary/);
+  assert.match(read("package.json"), /health-dashboard-applications\.js/);
   assert.match(release, /health-dashboard-summary/);
   assert.match(deploy, /snapshot:healthDashboard/);
 });

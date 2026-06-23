@@ -8,6 +8,7 @@ const {
   buildHealthDashboardSummary,
   renderMarkdown
 } = require("../scripts/health-dashboard-summary");
+const healthDashboardApplications = require("../health-dashboard-applications");
 
 const ROOT = path.resolve(__dirname, "..");
 
@@ -17,6 +18,7 @@ test("health dashboard summary aggregates the first seven applications without r
 
   assert.equal(report.ok, true);
   assert.equal(APPLICATIONS.length, 7);
+  assert.equal(APPLICATIONS, healthDashboardApplications);
   assert.equal(report.applications.length, 7);
   assert.equal(report.applications.every((item) => item.entry.endsWith(".html")), true);
   assert.equal(report.applications.every((item) => /source application/.test(item.boundary)), true);

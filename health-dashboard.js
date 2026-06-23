@@ -37,15 +37,7 @@ async function loadDashboardSummary() {
 }
 
 function buildStaticDashboardSummary(state) {
-  const applications = [
-    ["commission-supervision", "卫健委端", "index.html", ["residents", "diseases", "followups", "emergencySignals", "healthStatistics"]],
-    ["institution-services", "医疗机构端", "institution.html", ["personalRecords", "careOrders", "medicationPickups", "birthCertificates", "deathCertificates"]],
-    ["insurance-governance", "医保治理", "insurance.html", ["insuranceClaims", "digitalCredentials", "medicationPickups"]],
-    ["citizen-portal", "居民端", "citizen.html", ["accounts", "residents", "personalRecords", "seniorServices"]],
-    ["county-consortium", "县域医共体", "county.html", ["countyCollaborationOrders", "countyMutualRecognitionRecords", "countyAiDiagnosisCases"]],
-    ["platform-governance", "平台建设", "platform.html", ["platformCapabilities", "platformInterfaces", "platformEvidence", "hospitalInteroperabilityFunctions"]],
-    ["operations-workbench", "运营工作台", "workbench.html", ["platformRoadmap", "platformProcessAudit", "productionDeploymentPlan"]]
-  ].map(([id, name, entry, collections]) => {
+  const applications = healthDashboardApplications().map(({ id, name, entry, collections }) => {
     const records = collections.reduce((sum, collection) => sum + countRows(state[collection]), 0);
     return {
       id,
@@ -110,6 +102,10 @@ function buildStaticDashboardSummary(state) {
     evidence: evidence.map((item) => ({ id: item.id, name: item.name || item.category, owner: item.owner, status: item.status, records: Array.isArray(item.records) ? item.records.length : 0, nextAction: item.next })),
     siteDependencies: dependencies.map((item) => ({ id: item.id, track: item.track || item.name, owner: item.owner, status: item.status, nextAction: item.nextAction || item.next }))
   };
+}
+
+function healthDashboardApplications() {
+  return Array.isArray(window.HealthDashboardApplications) ? window.HealthDashboardApplications : [];
 }
 
 function renderDashboard(summary) {
