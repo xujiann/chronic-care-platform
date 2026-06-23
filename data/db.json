@@ -2827,7 +2827,42 @@
       "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     }
   ],
-  "taskMessages": [],
+  "taskMessages": [
+    {
+      "id": "msg-rtc-002-report-citizen",
+      "taskId": "referralTeleconsultations:rtc-002",
+      "collection": "referralTeleconsultations",
+      "sourceId": "rtc-002",
+      "residentId": "r2",
+      "targetRole": "citizen",
+      "channel": "in_app",
+      "title": "Teleconsultation report returned",
+      "body": "Report returned from Dalian Medical University Hospital: Recheck HbA1c in three months; primary institution continues diet and exercise intervention.",
+      "status": "sent",
+      "notificationKey": "referralTeleconsultations:rtc-002:report:rtc-002-report-seed:citizen",
+      "receipts": [],
+      "createdAt": "2026-06-21T10:31:00.000Z",
+      "createdBy": "system",
+      "createdByName": "System"
+    },
+    {
+      "id": "msg-rtc-002-report-institution",
+      "taskId": "referralTeleconsultations:rtc-002",
+      "collection": "referralTeleconsultations",
+      "sourceId": "rtc-002",
+      "residentId": "r2",
+      "targetRole": "institution",
+      "channel": "in_app",
+      "title": "Teleconsultation report returned",
+      "body": "Report returned from Dalian Medical University Hospital and archived to the resident longitudinal record.",
+      "status": "sent",
+      "notificationKey": "referralTeleconsultations:rtc-002:report:rtc-002-report-seed:institution",
+      "receipts": [],
+      "createdAt": "2026-06-21T10:31:00.000Z",
+      "createdBy": "system",
+      "createdByName": "System"
+    }
+  ],
   "dataQualityIssues": [],
   "careOrders": [
     {

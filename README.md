@@ -256,8 +256,8 @@ GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下
 
 ## Referral Teleconsultation Callback
 
-Scheduling systems can use `POST /api/referral-teleconsultations/:id/schedule-callback` with `idempotencyKey` and `x-integration-signature`; accepted callbacks update `meetingWindow`, receiving doctor, target institution fields, performance evidence, and a matched integration gateway event.
+Scheduling systems can use `POST /api/referral-teleconsultations/:id/schedule-callback` with `idempotencyKey` and `x-integration-signature`; accepted callbacks update `meetingWindow`, receiving doctor, target institution fields, performance evidence, create institution/resident `taskMessages`, and write a matched integration gateway event.
 
-HIS/EMR report callback can use `POST /api/referral-teleconsultations/:id/report-callback` with `idempotencyKey` and `x-integration-signature`; accepted callbacks update report return status, append audit evidence, and create a matched integration gateway event.
+HIS/EMR report callback can use `POST /api/referral-teleconsultations/:id/report-callback` with `idempotencyKey` and `x-integration-signature`; accepted callbacks update report return status, append audit evidence, archive a `teleconsultation-report` personal record, create institution/resident `taskMessages`, and write a matched integration gateway event.
 
 The field contracts are tracked as `referral-schedule-callback-v1` and `referral-report-callback-v1` in the interface mapping report.

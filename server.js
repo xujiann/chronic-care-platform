@@ -576,8 +576,47 @@ function seedState() {
     platformAudit: seedPlatformAudit(),
     platformProcessAudit: seedPlatformProcessAudit(),
     personalRecords: seedPersonalRecords(),
-    taskMessages: []
+    taskMessages: seedTaskMessages()
   };
+}
+
+function seedTaskMessages() {
+  return [
+    {
+      id: "msg-rtc-002-report-citizen",
+      taskId: "referralTeleconsultations:rtc-002",
+      collection: "referralTeleconsultations",
+      sourceId: "rtc-002",
+      residentId: "r2",
+      targetRole: "citizen",
+      channel: "in_app",
+      title: "Teleconsultation report returned",
+      body: "Report returned from Dalian Medical University Hospital: Recheck HbA1c in three months; primary institution continues diet and exercise intervention.",
+      status: "sent",
+      notificationKey: "referralTeleconsultations:rtc-002:report:rtc-002-report-seed:citizen",
+      receipts: [],
+      createdAt: "2026-06-21T10:31:00.000Z",
+      createdBy: "system",
+      createdByName: "System"
+    },
+    {
+      id: "msg-rtc-002-report-institution",
+      taskId: "referralTeleconsultations:rtc-002",
+      collection: "referralTeleconsultations",
+      sourceId: "rtc-002",
+      residentId: "r2",
+      targetRole: "institution",
+      channel: "in_app",
+      title: "Teleconsultation report returned",
+      body: "Report returned from Dalian Medical University Hospital and archived to the resident longitudinal record.",
+      status: "sent",
+      notificationKey: "referralTeleconsultations:rtc-002:report:rtc-002-report-seed:institution",
+      receipts: [],
+      createdAt: "2026-06-21T10:31:00.000Z",
+      createdBy: "system",
+      createdByName: "System"
+    }
+  ];
 }
 
 function seedPlatformChangeLogs() {
@@ -4834,7 +4873,12 @@ function buildUnifiedTasks(data, user) {
 
 function canAccessTaskMessage(user, message, data) {
   if (user.role === "commission") return true;
-  if (message.targetRole === user.role) return true;
+  if (message.targetRole === user.role) {
+    if (user.role === "citizen" && message.residentId) {
+      return canAccessResident(user, message.residentId, data);
+    }
+    return true;
+  }
   if (message.residentId && canAccessResident(user, message.residentId, data)) return true;
   return message.createdBy === user.username;
 }
@@ -4857,6 +4901,47 @@ function createTaskMessage({ task, payload, user }) {
     createdBy: user.username || user.role,
     createdByName: user.name
   };
+}
+
+function createReferralTeleconsultationNotification({ item, callback, kind, targetRole, user }) {
+  const now = new Date().toISOString();
+  const isReport = kind === "report";
+  const idempotencyKey = callback.idempotencyKey || callback.externalId || item.id;
+  const title = isReport ? "Teleconsultation report returned" : "Teleconsultation scheduled";
+  const body = isReport
+    ? `Report returned from ${callback.sourceSystem || item.targetInstitution || "receiving institution"}: ${callback.reportSummary || item.reportSummary || "specialist report is ready."}`
+    : `Teleconsultation scheduled for ${callback.meetingWindow || item.meetingWindow || "the confirmed appointment window"} at ${callback.targetInstitution || item.targetInstitution || "receiving institution"}.`;
+  return {
+    id: `msg-${randomUUID()}`,
+    taskId: `referralTeleconsultations:${item.id}`,
+    collection: "referralTeleconsultations",
+    sourceId: item.id,
+    residentId: item.residentId || "",
+    targetRole,
+    channel: "in_app",
+    title,
+    body,
+    status: "sent",
+    notificationKey: `referralTeleconsultations:${item.id}:${kind}:${idempotencyKey}:${targetRole}`,
+    receipts: [],
+    createdAt: now,
+    createdBy: user.username || user.role,
+    createdByName: user.name
+  };
+}
+
+function appendReferralTeleconsultationNotifications(data, item, kind, callback, user) {
+  const existing = Array.isArray(data.taskMessages) ? data.taskMessages : [];
+  const existingKeys = new Set(existing.map((message) => message.notificationKey).filter(Boolean));
+  const messages = ["institution", "citizen"]
+    .map((targetRole) => createReferralTeleconsultationNotification({ item, callback, kind, targetRole, user }))
+    .filter((message) => !existingKeys.has(message.notificationKey));
+  if (messages.length) {
+    data.taskMessages = [...messages, ...existing].slice(0, 300);
+  } else {
+    data.taskMessages = existing;
+  }
+  return messages;
 }
 
 function normalizeReferralTeleconsultation(payload, user, data) {
@@ -5967,6 +6052,7 @@ async function handleApi(req, res) {
         targetId: rows[index].id
       };
       data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
+      const messages = appendReferralTeleconsultationNotifications(data, rows[index], "schedule", callback, user);
       data.securityEvents = [
         {
           id: randomUUID(),
@@ -5982,7 +6068,7 @@ async function handleApi(req, res) {
       ].slice(0, 120);
       appendDataAccessLog(data, user, rows[index].residentId, "referral teleconsultation", "external schedule callback", "allowed");
       writeDatabase(data);
-      sendJson(res, 200, { teleconsultation: rows[index], integrationEvent: event });
+      sendJson(res, 200, { teleconsultation: rows[index], integrationEvent: event, messages });
     } catch (error) {
       sendJson(res, 400, { error: "Bad Request", message: error.message });
     }
@@ -6054,6 +6140,7 @@ async function handleApi(req, res) {
         data.personalRecords = [personalRecord, ...(Array.isArray(data.personalRecords) ? data.personalRecords : [])].slice(0, 500);
       }
       data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
+      const messages = appendReferralTeleconsultationNotifications(data, rows[index], "report", callback, user);
       data.securityEvents = [
         {
           id: randomUUID(),
@@ -6069,7 +6156,7 @@ async function handleApi(req, res) {
       ].slice(0, 120);
       appendDataAccessLog(data, user, rows[index].residentId, "referral teleconsultation", "external report callback", "allowed");
       writeDatabase(data);
-      sendJson(res, 200, { teleconsultation: rows[index], integrationEvent: event, personalRecord });
+      sendJson(res, 200, { teleconsultation: rows[index], integrationEvent: event, personalRecord, messages });
     } catch (error) {
       sendJson(res, 400, { error: "Bad Request", message: error.message });
     }

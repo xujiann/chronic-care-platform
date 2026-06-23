@@ -256,10 +256,13 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("county.html"), /county-teleconsultation-performance/);
   assert.match(read("county.js"), /averagePerformance/);
   assert.match(read("server.js"), /schedule-callback/);
+  assert.match(read("server.js"), /appendReferralTeleconsultationNotifications/);
   assert.match(read("README.md"), /referral-teleconsultations\/:id\/report-callback/);
   assert.match(read("README.md"), /referral-schedule-callback-v1/);
+  assert.match(read("README.md"), /taskMessages/);
   assert.match(read("DEPLOYMENT.md"), /x-integration-signature/);
   assert.match(read("DEPLOYMENT.md"), /referral-report-callback-v1/);
+  assert.match(read("DEPLOYMENT.md"), /institution\/resident `taskMessages`/);
   assert.match(read("county.html"), /county-teleconsultation-loop/);
   assert.match(read(".github/workflows/ci.yml"), /npm run operations:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run site:pack/);
