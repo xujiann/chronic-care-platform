@@ -49,6 +49,8 @@ jobs:
         run: npm run integration:readiness
       - name: Generate interface mapping report
         run: npm run interface:mapping
+      - name: Generate research sandbox readiness report
+        run: npm run research:sandbox
       - name: Generate monitoring readiness report
         run: npm run monitoring:readiness
       - name: Generate operations readiness report

@@ -747,8 +747,8 @@ function seedCreditEvaluationRules() {
 
 function seedResearchDatasets() {
   return [
-    { id: "rd-hypertension-001", diseaseType: "hypertension", name: "Hypertension chronic management cohort", version: "1.0.0", ethicsApproval: "IRB-DEMO-HTN-2026", anonymization: "k-anonymity-demo", authorizationStatus: "approved", records: 2, status: "published", usageAudit: [], outcomes: [] },
-    { id: "rd-diabetes-001", diseaseType: "diabetes", name: "Diabetes follow-up and HbA1c cohort", version: "1.0.0", ethicsApproval: "IRB-DEMO-DM-2026", anonymization: "k-anonymity-demo", authorizationStatus: "approved", records: 1, status: "published", usageAudit: [], outcomes: [] }
+    { id: "rd-hypertension-001", diseaseType: "hypertension", name: "Hypertension chronic management cohort", version: "1.0.0", ethicsApproval: "IRB-DEMO-HTN-2026", ethicsStatus: "approved", anonymization: "k-anonymity-demo", deidentificationStatus: "released", authorizationStatus: "approved", records: 2, sourceCollections: ["personalRecords", "diagnosticReports", "chronicManagementPlans"], sandbox: { status: "active", environment: "demo-safe-sandbox", lastAccessAt: "" }, accessRequests: [], usageAudit: [], outcomes: [], status: "published" },
+    { id: "rd-diabetes-001", diseaseType: "diabetes", name: "Diabetes follow-up and HbA1c cohort", version: "1.0.0", ethicsApproval: "IRB-DEMO-DM-2026", ethicsStatus: "approved", anonymization: "k-anonymity-demo", deidentificationStatus: "released", authorizationStatus: "approved", records: 1, sourceCollections: ["personalRecords", "diagnosticReports", "followups"], sandbox: { status: "active", environment: "demo-safe-sandbox", lastAccessAt: "" }, accessRequests: [], usageAudit: [], outcomes: [], status: "published" }
   ];
 }
 
@@ -3488,6 +3488,146 @@ function normalizePersonalRecord(data) {
   };
 }
 
+function normalizeResearchDatasetApplication(payload, user, data) {
+  const diseaseType = String(payload.diseaseType || "").trim();
+  const name = String(payload.name || "").trim();
+  if (!diseaseType || !name) throw new Error("diseaseType and name are required");
+  const requestedSources = Array.isArray(payload.sourceCollections) && payload.sourceCollections.length
+    ? payload.sourceCollections.map((item) => String(item).trim()).filter(Boolean)
+    : ["personalRecords", "diagnosticReports"];
+  const allowedSources = new Set(["personalRecords", "diagnosticReports", "diseases", "followups", "chronicScreeningTasks", "chronicManagementPlans", "diseaseRegistryModels"]);
+  const sourceCollections = requestedSources.filter((item) => allowedSources.has(item));
+  if (!sourceCollections.length) throw new Error("sourceCollections must use approved research sources");
+  const records = estimateResearchDatasetRecords(data, sourceCollections, diseaseType);
+  const now = new Date().toISOString();
+  return {
+    id: payload.id || `rd-${diseaseType.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-${Date.now()}`,
+    diseaseType,
+    name,
+    version: String(payload.version || "0.1.0").trim(),
+    ethicsApproval: String(payload.ethicsApproval || "").trim(),
+    ethicsStatus: "pending",
+    anonymization: String(payload.anonymization || "pending-policy").trim(),
+    deidentificationStatus: "pending",
+    authorizationStatus: "pending",
+    records,
+    sourceCollections,
+    sandbox: { status: "pending", environment: String(payload.environment || "demo-safe-sandbox").trim(), lastAccessAt: "" },
+    accessRequests: [{
+      at: now,
+      by: user.username || user.role,
+      role: user.role,
+      purpose: String(payload.purpose || "research dataset application").trim(),
+      status: "submitted"
+    }],
+    usageAudit: [],
+    outcomes: [],
+    status: "requested",
+    createdAt: now,
+    createdBy: user.username || user.role,
+    updatedAt: now,
+    updatedBy: user.username || user.role
+  };
+}
+
+function estimateResearchDatasetRecords(data, sourceCollections, diseaseType) {
+  const disease = diseaseType.toLowerCase();
+  const residentIds = new Set();
+  sourceCollections.forEach((collection) => {
+    const rows = Array.isArray(data[collection]) ? data[collection] : [];
+    rows.forEach((item) => {
+      const haystack = JSON.stringify(item || {}).toLowerCase();
+      if (!disease || haystack.includes(disease)) {
+        if (item.residentId) residentIds.add(item.residentId);
+        else if (item.id) residentIds.add(`${collection}:${item.id}`);
+      }
+    });
+  });
+  return residentIds.size || sourceCollections.reduce((sum, collection) => sum + (Array.isArray(data[collection]) ? data[collection].length : 0), 0);
+}
+
+function normalizeResearchApproval(dataset, payload, user) {
+  const approved = String(payload.decision || payload.status || "approved").trim() === "approved";
+  const now = new Date().toISOString();
+  return {
+    ...dataset,
+    version: String(payload.version || dataset.version || "1.0.0").trim(),
+    ethicsApproval: String(payload.ethicsApproval || dataset.ethicsApproval || "").trim(),
+    ethicsStatus: approved ? "approved" : "rejected",
+    anonymization: String(payload.anonymization || dataset.anonymization || "k-anonymity-demo").trim(),
+    deidentificationStatus: approved ? String(payload.deidentificationStatus || "released").trim() : "blocked",
+    authorizationStatus: approved ? "approved" : "rejected",
+    status: approved ? String(payload.publishStatus || "published").trim() : "rejected",
+    sandbox: {
+      ...(dataset.sandbox || {}),
+      status: approved ? "active" : "blocked",
+      environment: String(payload.environment || dataset.sandbox?.environment || "demo-safe-sandbox").trim()
+    },
+    approval: {
+      at: now,
+      by: user.username || user.role,
+      decision: approved ? "approved" : "rejected",
+      note: String(payload.note || "").trim()
+    },
+    updatedAt: now,
+    updatedBy: user.username || user.role
+  };
+}
+
+function requireDatasetSandboxAccess(dataset) {
+  const approved = dataset.authorizationStatus === "approved" && (dataset.ethicsStatus === "approved" || (!dataset.ethicsStatus && dataset.ethicsApproval));
+  const deidentified = ["released", "approved", "completed"].includes(String(dataset.deidentificationStatus || "").trim()) || (!dataset.deidentificationStatus && Boolean(dataset.anonymization));
+  const active = ["published", "active"].includes(String(dataset.status || "").trim()) && (!dataset.sandbox || dataset.sandbox.status === "active");
+  return approved && deidentified && active;
+}
+
+function appendResearchAudit(data, user, dataset, action, detail, result = "allowed") {
+  const now = new Date().toISOString();
+  dataset.usageAudit = [
+    { at: now, by: user.username || user.role, role: user.role, action, purpose: detail, result },
+    ...(Array.isArray(dataset.usageAudit) ? dataset.usageAudit : [])
+  ].slice(0, 50);
+  appendDataAccessLog(data, user, "", "research-sandbox", `${dataset.id}:${action}:${detail}`, result);
+  dataset.updatedAt = now;
+  dataset.updatedBy = user.username || user.role;
+}
+
+function buildResearchSandboxSummary(data) {
+  const datasets = Array.isArray(data.researchDatasets) ? data.researchDatasets : [];
+  const models = Array.isArray(data.diseaseRegistryModels) ? data.diseaseRegistryModels : [];
+  const auditLogs = (Array.isArray(data.dataAccessLogs) ? data.dataAccessLogs : []).filter((item) => String(item.scope || "").includes("research"));
+  const activeDatasets = datasets.filter(requireDatasetSandboxAccess);
+  return {
+    ok: datasets.length >= 2 && activeDatasets.length >= 1 && auditLogs.length >= 1,
+    boundaries: ["research dataset", "disease registry", "ethics approval", "de-identification release", "sandbox access", "usage audit", "outcome return"],
+    summary: {
+      datasets: datasets.length,
+      activeDatasets: activeDatasets.length,
+      pendingApplications: datasets.filter((item) => item.status === "requested" || item.authorizationStatus === "pending").length,
+      diseaseModels: models.length,
+      usageAudits: datasets.reduce((sum, item) => sum + (Array.isArray(item.usageAudit) ? item.usageAudit.length : 0), 0),
+      outcomes: datasets.reduce((sum, item) => sum + (Array.isArray(item.outcomes) ? item.outcomes.length : 0), 0),
+      auditLogs: auditLogs.length
+    },
+    datasets: datasets.map((item) => ({
+      id: item.id,
+      diseaseType: item.diseaseType,
+      name: item.name,
+      status: item.status,
+      ethicsStatus: item.ethicsStatus || (item.ethicsApproval ? "approved" : "pending"),
+      deidentificationStatus: item.deidentificationStatus || "pending",
+      authorizationStatus: item.authorizationStatus,
+      sandboxStatus: item.sandbox?.status || "pending",
+      sourceCollections: item.sourceCollections || [],
+      records: item.records || 0,
+      usageAuditCount: Array.isArray(item.usageAudit) ? item.usageAudit.length : 0,
+      outcomeCount: Array.isArray(item.outcomes) ? item.outcomes.length : 0
+    })),
+    models: models.map((item) => ({ id: item.id, diseaseType: item.diseaseType, version: item.version, reviewStatus: item.reviewStatus })),
+    reusableCollections: ["researchDatasets", "diseaseRegistryModels", "dataAccessLogs", "securityAcceptanceLedger", "personalRecords", "diagnosticReports"]
+  };
+}
+
 function normalizeDeathCertificate(payload, user, state) {
   const residentId = String(payload.residentId || "").trim();
   if (!residentId) throw new Error("residentId 不能为空");
@@ -3733,13 +3873,13 @@ function mergeByKey(defaultRows, currentRows, key) {
   return [...merged.values()];
 }
 
-function sealAuditTrail(rows) {
+function sealAuditTrail(rows, options = {}) {
   const items = (Array.isArray(rows) ? rows : []).map((item) => ({ ...item }));
   let previousHash = "";
   for (let index = items.length - 1; index >= 0; index -= 1) {
     const item = items[index];
-    if (!item.previousAuditHash) item.previousAuditHash = previousHash;
-    if (!item.auditHash) item.auditHash = auditHashFor(item);
+    if (options.recompute || !item.previousAuditHash) item.previousAuditHash = previousHash;
+    if (options.recompute || !item.auditHash) item.auditHash = auditHashFor(item);
     previousHash = item.auditHash;
   }
   return items;
@@ -4461,6 +4601,7 @@ function appendSecurityEvent(event) {
     },
     ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
   ].slice(0, 120);
+  data.securityEvents = sealAuditTrail(data.securityEvents, { recompute: true });
   writeDatabase(data);
 }
 
@@ -4480,6 +4621,7 @@ function appendDataAccessLog(data, user, residentId, scope, purpose, result = "�
     },
     ...(Array.isArray(data.dataAccessLogs) ? data.dataAccessLogs : [])
   ].slice(0, 120);
+  data.dataAccessLogs = sealAuditTrail(data.dataAccessLogs, { recompute: true });
 }
 
 function normalizeHealthStatisticsImportJob(payload, user) {
@@ -5665,6 +5807,30 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/research/sandbox") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/sandbox");
+    if (!user) return;
+    sendJson(res, 200, buildResearchSandboxSummary(readDatabase()));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/research/datasets") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/datasets");
+    if (!user) return;
+    const data = readDatabase();
+    try {
+      const payload = await collectJson(req);
+      const dataset = normalizeResearchDatasetApplication(payload, user, data);
+      data.researchDatasets = [dataset, ...(Array.isArray(data.researchDatasets) ? data.researchDatasets : [])].slice(0, 80);
+      appendResearchAudit(data, user, dataset, "application-submit", dataset.accessRequests[0].purpose, "submitted");
+      writeDatabase(data);
+      sendJson(res, 201, dataset);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+    }
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/research/disease-models") {
     const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/disease-models");
     if (!user) return;
@@ -5796,6 +5962,91 @@ async function handleApi(req, res) {
       updatedAt: now,
       updatedBy: user.username || user.role
     };
+    writeDatabase(data);
+    sendJson(res, 200, data.researchDatasets[index]);
+    return;
+  }
+
+  const researchDatasetApprovalMatch = url.pathname.match(/^\/api\/research\/datasets\/([^/]+)\/approval$/);
+  if (req.method === "POST" && researchDatasetApprovalMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/research/datasets/:id/approval");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(researchDatasetApprovalMatch[1]);
+    const index = (data.researchDatasets || []).findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Research dataset not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    data.researchDatasets[index] = normalizeResearchApproval(data.researchDatasets[index], payload, user);
+    appendResearchAudit(data, user, data.researchDatasets[index], "ethics-approval", data.researchDatasets[index].approval?.decision || "approved");
+    writeDatabase(data);
+    sendJson(res, 200, data.researchDatasets[index]);
+    return;
+  }
+
+  const researchSandboxAccessMatch = url.pathname.match(/^\/api\/research\/datasets\/([^/]+)\/sandbox-access$/);
+  if (req.method === "POST" && researchSandboxAccessMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/datasets/:id/sandbox-access");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(researchSandboxAccessMatch[1]);
+    const index = (data.researchDatasets || []).findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Research dataset not found" });
+      return;
+    }
+    if (!requireDatasetSandboxAccess(data.researchDatasets[index])) {
+      appendResearchAudit(data, user, data.researchDatasets[index], "sandbox-access", "blocked by ethics/de-identification/authorization status", "denied");
+      writeDatabase(data);
+      sendJson(res, 403, { error: "Forbidden", message: "Dataset is not approved, de-identified, and active for sandbox access" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const purpose = String(payload.purpose || "approved sandbox analysis").trim();
+    data.researchDatasets[index].sandbox = {
+      ...(data.researchDatasets[index].sandbox || {}),
+      status: "active",
+      lastAccessAt: new Date().toISOString(),
+      lastAccessBy: user.username || user.role
+    };
+    appendResearchAudit(data, user, data.researchDatasets[index], "sandbox-access", purpose);
+    writeDatabase(data);
+    sendJson(res, 200, {
+      datasetId: id,
+      sandboxToken: `sandbox-${id}-${Date.now()}`,
+      deidentified: true,
+      records: data.researchDatasets[index].records || 0,
+      sourceCollections: data.researchDatasets[index].sourceCollections || [],
+      expiresInMinutes: 120
+    });
+    return;
+  }
+
+  const researchOutcomeMatch = url.pathname.match(/^\/api\/research\/datasets\/([^/]+)\/outcomes$/);
+  if (req.method === "POST" && researchOutcomeMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/datasets/:id/outcomes");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(researchOutcomeMatch[1]);
+    const index = (data.researchDatasets || []).findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Research dataset not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const now = new Date().toISOString();
+    const outcome = {
+      at: now,
+      by: user.username || user.role,
+      title: String(payload.title || "research outcome").trim(),
+      summary: String(payload.summary || "").trim(),
+      registryImpact: String(payload.registryImpact || "").trim(),
+      returnedTo: Array.isArray(payload.returnedTo) ? payload.returnedTo.map((item) => String(item).trim()).filter(Boolean) : ["diseaseRegistryModels"]
+    };
+    data.researchDatasets[index].outcomes = [outcome, ...(Array.isArray(data.researchDatasets[index].outcomes) ? data.researchDatasets[index].outcomes : [])].slice(0, 50);
+    appendResearchAudit(data, user, data.researchDatasets[index], "outcome-return", outcome.title);
     writeDatabase(data);
     sendJson(res, 200, data.researchDatasets[index]);
     return;
