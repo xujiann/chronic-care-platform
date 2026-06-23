@@ -422,6 +422,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       body: JSON.stringify({ collection: "insuranceClaims", id: "ic1", status: "已通过" })
     }));
     assert.equal(workflowWrite.response.status, 403);
+    const referralTeleconsultations = await api(baseUrl, "/api/referral-teleconsultations", authorized(citizenToken));
+    assert.equal(referralTeleconsultations.response.status, 403);
   });
 
   await t.test("accepts signed idempotent integration gateway events", async () => {
@@ -581,6 +583,19 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const countyServiceTask = countyTasks.body.tasks.find((item) => item.collection === "countyCollaborationOrders");
     assert.equal(countyServiceTask.serviceDomain, "collaboration");
     assert.equal(countyServiceTask.priorityLevel, "high");
+    const countyTeleconsultationTask = countyTasks.body.tasks.find((item) => item.collection === "referralTeleconsultations");
+    assert.equal(countyTeleconsultationTask.serviceDomain, "referralTeleconsultation");
+
+    const teleconsultations = await api(baseUrl, "/api/referral-teleconsultations", authorized(county.body.token));
+    assert.equal(teleconsultations.response.status, 200);
+    assert.equal(teleconsultations.body.summary.total >= 2, true);
+    assert.equal(teleconsultations.body.summary.reportReturned >= 1, true);
+    const teleconsultationAction = await api(baseUrl, "/api/referral-teleconsultations/rtc-001/actions", authorized(county.body.token, {
+      method: "POST",
+      body: JSON.stringify({ status: "feedback-returned", feedback: "County office confirmed receiving feedback.", note: "county follow-up" })
+    }));
+    assert.equal(teleconsultationAction.response.status, 200);
+    assert.equal(teleconsultationAction.body.status, "feedback-returned");
 
     const taskHandled = await api(baseUrl, `/api/tasks/${encodeURIComponent(`emergencySignals:${critical.body.criticalSignal.id}`)}/actions`, authorized(county.body.token, {
       method: "POST",
