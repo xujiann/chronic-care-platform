@@ -830,6 +830,48 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const datasets = await api(baseUrl, "/api/research/datasets", authorized(commissionToken));
     assert.equal(datasets.response.status, 200);
     assert.equal(datasets.body.datasets.some((item) => item.diseaseType === "hypertension"), true);
+    const sandboxSummary = await api(baseUrl, "/api/research/sandbox", authorized(commissionToken));
+    assert.equal(sandboxSummary.response.status, 200);
+    assert.equal(sandboxSummary.body.reusableCollections.includes("personalRecords"), true);
+    assert.equal(sandboxSummary.body.boundaries.includes("sandbox access"), true);
+    const researchInstitution = await login(baseUrl, "hospital");
+    const application = await api(baseUrl, "/api/research/datasets", authorized(researchInstitution.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        diseaseType: "copd",
+        name: "COPD pulmonary rehabilitation cohort",
+        purpose: "sandbox feasibility assessment",
+        sourceCollections: ["personalRecords", "diagnosticReports"]
+      })
+    }));
+    assert.equal(application.response.status, 201);
+    assert.equal(application.body.authorizationStatus, "pending");
+    assert.equal(application.body.sourceCollections.includes("diagnosticReports"), true);
+    const blockedSandbox = await api(baseUrl, `/api/research/datasets/${application.body.id}/sandbox-access`, authorized(researchInstitution.body.token, {
+      method: "POST",
+      body: JSON.stringify({ purpose: "try before approval" })
+    }));
+    assert.equal(blockedSandbox.response.status, 403);
+    const approval = await api(baseUrl, `/api/research/datasets/${application.body.id}/approval`, authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({ ethicsApproval: "IRB-DEMO-COPD-2026", anonymization: "k-anonymity-demo", deidentificationStatus: "released" })
+    }));
+    assert.equal(approval.response.status, 200);
+    assert.equal(approval.body.ethicsStatus, "approved");
+    assert.equal(approval.body.sandbox.status, "active");
+    const sandboxAccess = await api(baseUrl, `/api/research/datasets/${application.body.id}/sandbox-access`, authorized(researchInstitution.body.token, {
+      method: "POST",
+      body: JSON.stringify({ purpose: "approved de-identified sandbox analysis" })
+    }));
+    assert.equal(sandboxAccess.response.status, 200);
+    assert.equal(sandboxAccess.body.deidentified, true);
+    assert.equal(sandboxAccess.body.sourceCollections.includes("personalRecords"), true);
+    const returnedOutcome = await api(baseUrl, `/api/research/datasets/${application.body.id}/outcomes`, authorized(researchInstitution.body.token, {
+      method: "POST",
+      body: JSON.stringify({ title: "COPD rehab feature set", summary: "Returned candidate model variables.", registryImpact: "Add pulmonary rehabilitation flags." })
+    }));
+    assert.equal(returnedOutcome.response.status, 200);
+    assert.equal(returnedOutcome.body.outcomes[0].registryImpact, "Add pulmonary rehabilitation flags.");
     const usage = await api(baseUrl, "/api/research/datasets/rd-hypertension-001/actions", authorized(commissionToken, {
       method: "POST",
       body: JSON.stringify({ action: "usage-audit", purpose: "risk stratification model validation", result: "allowed" })

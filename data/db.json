@@ -6278,6 +6278,19 @@
   ],
   "dataAccessLogs": [
     {
+      "id": "dal-research-sandbox-001",
+      "residentId": "",
+      "personIndex": "",
+      "at": "2026-06-23 09:00:00",
+      "actor": "health",
+      "role": "commission",
+      "scope": "research-sandbox",
+      "purpose": "rd-hypertension-001:sandbox-access:de-identified cohort validation",
+      "result": "allowed",
+      "previousAuditHash": "724e15a086a78f0f0c882d55a0182621f656be5da01bfc31dd1aa2acd65dc7e6",
+      "auditHash": "24983c3c7380378e93a4d678298f4f4f12622a7689d44d0b95dd397378bf3b69"
+    },
+    {
       "id": "al1",
       "residentId": "r1",
       "at": "2026-06-15 09:12",
@@ -11101,7 +11114,20 @@
       "records": 2,
       "status": "published",
       "usageAudit": [],
-      "outcomes": []
+      "outcomes": [],
+      "ethicsStatus": "approved",
+      "deidentificationStatus": "released",
+      "sourceCollections": [
+        "personalRecords",
+        "diagnosticReports",
+        "chronicManagementPlans"
+      ],
+      "sandbox": {
+        "status": "active",
+        "environment": "demo-safe-sandbox",
+        "lastAccessAt": ""
+      },
+      "accessRequests": []
     },
     {
       "id": "rd-diabetes-001",
@@ -11114,7 +11140,20 @@
       "records": 1,
       "status": "published",
       "usageAudit": [],
-      "outcomes": []
+      "outcomes": [],
+      "ethicsStatus": "approved",
+      "deidentificationStatus": "released",
+      "sourceCollections": [
+        "personalRecords",
+        "diagnosticReports",
+        "followups"
+      ],
+      "sandbox": {
+        "status": "active",
+        "environment": "demo-safe-sandbox",
+        "lastAccessAt": ""
+      },
+      "accessRequests": []
     }
   ],
   "diseaseRegistryModels": [

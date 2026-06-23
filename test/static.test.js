@@ -70,6 +70,8 @@ test("static snapshot keeps completed P2 governance collections", () => {
   assert.equal(data.creditEvaluationRules.version, "credit-rules-2026.1");
   assert.equal(Array.isArray(data.researchDatasets), true);
   assert.equal(data.researchDatasets.some((item) => item.id === "rd-hypertension-001"), true);
+  assert.equal(data.researchDatasets.every((item) => item.ethicsStatus && item.deidentificationStatus && item.sandbox && Array.isArray(item.sourceCollections)), true);
+  assert.equal(data.dataAccessLogs.some((item) => /research/i.test(`${item.scope || ""} ${item.purpose || ""}`)), true);
   assert.equal(Array.isArray(data.diseaseRegistryModels), true);
   assert.equal(data.diseaseRegistryModels.some((item) => item.id === "dm-hypertension-risk-v1"), true);
   assert.equal(Array.isArray(data.drugConsumableSupervisions), true);
@@ -187,6 +189,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal(Boolean(pkg.scripts["integration:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["interface:mapping"]), true);
   assert.equal(Boolean(pkg.scripts["regional-data-sharing:report"]), true);
+  assert.equal(Boolean(pkg.scripts["research:sandbox"]), true);
   assert.equal(Boolean(pkg.scripts["monitoring:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["referral:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["operations:readiness"]), true);
@@ -220,6 +223,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /integration-readiness-report\.md/);
   assert.match(read("README.md"), /interface-mapping-report\.md/);
   assert.match(read("scripts/release-report.js"), /regional-data-sharing-report\.md/);
+  assert.match(read("README.md"), /research-sandbox-readiness-report\.md/);
   assert.match(read("README.md"), /monitoring-readiness-report\.md/);
   assert.match(read("README.md"), /operations-readiness-report\.md/);
   assert.match(read("README.md"), /hospital-operations-readiness-report\.md/);
@@ -241,6 +245,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("DEPLOYMENT.md"), /environment-matrix-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /integration-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /interface-mapping-report\.md/);
+  assert.match(read("DEPLOYMENT.md"), /research-sandbox-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /monitoring-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /operations-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /hospital-operations-readiness-report\.md/);
@@ -332,6 +337,9 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   const operationsHtml = read("operations.html");
   const operationsJs = read("operations.js");
   assert.match(platformHtml, /research-governance/);
+  assert.match(platformJs, /runResearchDatasetAction/);
+  assert.match(platformJs, /sandbox-access/);
+  assert.match(platformJs, /outcome-return/);
   assert.match(platformHtml, /mobile-accessibility-governance/);
   assert.match(platformHtml, /production-deployment-plan/);
   assert.match(platformJs, /renderResearchGovernance/);
