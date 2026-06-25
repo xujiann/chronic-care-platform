@@ -92,11 +92,13 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.ok, true);
   assert.equal(report.summary.failed, 0);
   assert.equal(report.checks.some((item) => item.name === "package:scripts" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "file:drug-consumable-about.html" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "snapshot:acceptanceEvidence" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "snapshot:securityAcceptance" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "snapshot:productionDeploymentPlan" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "snapshot:interfaceReadiness" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "snapshot:externalDependencyRisks" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "snapshot:drugTraceabilityPolicySources" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "storage:jsonSnapshot.present" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "storage:jsonSnapshot.collections" && item.passed), true);
   assert.equal(report.storageModel.jsonSnapshot.present, true);
@@ -108,6 +110,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "dataQuality:report" && item.passed), true);
   assert.equal(report.dataQuality.ok, true);
   assert.equal(report.checks.some((item) => item.name === "drugConsumable:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "drugConsumable:traceabilityPolicy" && item.passed), true);
   assert.equal(report.drugConsumable.ok, true);
   assert.equal(report.checks.some((item) => item.name === "integration:readiness" && item.passed), true);
   assert.equal(report.integrationReadiness.ok, true);
@@ -170,6 +173,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(markdown, /snapshot:productionDeploymentPlan/);
   assert.match(markdown, /snapshot:interfaceReadiness/);
   assert.match(markdown, /snapshot:externalDependencyRisks/);
+  assert.match(markdown, /snapshot:drugTraceabilityPolicySources/);
 
   const cutoverMarkdown = renderCutoverMarkdown(report);
   assert.match(cutoverMarkdown, /Production cutover checklist/);
@@ -276,6 +280,7 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(dataQualityMarkdown, /Resident-linked collections/);
   assert.equal(drugConsumableJson.drugConsumable.ok, true);
   assert.match(drugConsumableMarkdown, /Drug consumable readiness report/);
+  assert.match(drugConsumableMarkdown, /Traceability policy sources/);
   assert.equal(integrationJson.integrationReadiness.ok, true);
   assert.match(integrationMarkdown, /P0 coverage/);
   assert.equal(interfaceMappingJson.interfaceMapping.ok, true);
@@ -291,7 +296,9 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(serviceAcceptanceMarkdown, /Service acceptance summary/);
   assert.match(serviceAcceptanceMarkdown, /Open action preview/);
   assert.equal(siteReadinessJson.siteReadinessPack.ok, true);
+  assert.equal(siteReadinessJson.siteReadinessPack.policySourceRules.sources.length >= 5, true);
   assert.match(siteReadinessMarkdown, /Site signoff template/);
+  assert.match(siteReadinessMarkdown, /Platform policy source rule/);
   assert.match(identityTemplateReadme, /Identity source mapping template/);
   assert.match(interfaceTemplateReadme, /Interface joint-test template/);
   assert.match(monitoringTemplateReadme, /Monitoring and on-call template/);

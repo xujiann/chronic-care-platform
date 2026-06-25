@@ -35,15 +35,16 @@
     "citizen.html": ["citizen"],
     "mobile-preview.html": ["citizen"],
     "health-city.html": ["commission", "institution", "insurance", "citizen", "county"],
+    "drug-consumable-about.html": ["commission", "institution", "insurance", "citizen", "county"],
     "login.html": ["commission", "institution", "insurance", "citizen", "county"]
   };
 
   const roleLinks = {
-    commission: [["platform.html", "全民健康平台"], ["health-city.html", "总览"], ["about.html", "关于"], ["workbench.html", "工作台"], ["index.html", "卫健管理"]],
-    institution: [["health-city.html", "总览"], ["about.html", "关于"], ["institution.html", "医疗机构"]],
-    insurance: [["health-city.html", "总览"], ["about.html", "关于"], ["insurance.html", "医保"]],
-    citizen: [["health-city.html", "总览"], ["about.html", "关于"], ["citizen.html", "个人端"], ["mobile-preview.html", "手机预览"]],
-    county: [["health-city.html", "总览"], ["about.html", "关于"], ["county.html", "医共体"]]
+    commission: [["platform.html", "全民健康平台"], ["health-city.html", "总览"], ["about.html", "关于"], ["drug-consumable-about.html", "药耗政策"], ["workbench.html", "工作台"], ["index.html", "卫健管理"]],
+    institution: [["health-city.html", "总览"], ["about.html", "关于"], ["drug-consumable-about.html", "药耗政策"], ["institution.html", "医疗机构"]],
+    insurance: [["health-city.html", "总览"], ["about.html", "关于"], ["drug-consumable-about.html", "药耗政策"], ["insurance.html", "医保"]],
+    citizen: [["health-city.html", "总览"], ["about.html", "关于"], ["drug-consumable-about.html", "药耗政策"], ["citizen.html", "个人端"], ["mobile-preview.html", "手机预览"]],
+    county: [["health-city.html", "总览"], ["about.html", "关于"], ["drug-consumable-about.html", "药耗政策"], ["county.html", "医共体"]]
   };
 
   async function login(username, password) {
@@ -167,7 +168,7 @@
 
   function canAccessPage(pageName, user) {
     if (!pageName || pageName.startsWith("#")) return true;
-    if (!user) return pageName === "login.html" || pageName === "health-city.html" || pageName === "about.html";
+    if (!user) return pageName === "login.html" || pageName === "health-city.html" || pageName === "about.html" || pageName === "drug-consumable-about.html";
     if (pageName === "login.html") return false;
     const allowed = routeAccess[pageName];
     return !allowed || allowed.includes(user.role);

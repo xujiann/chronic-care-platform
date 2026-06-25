@@ -41,12 +41,14 @@ function buildDeployCheckReport(options = {}) {
     "researchDatasets",
     "diseaseRegistryModels",
     "drugConsumableSupervisions",
+    "drugTraceabilityPolicySources",
     "mobileExperienceSettings",
     "accessibilityChecklist",
     "securityAcceptanceLedger"
   ];
   const p0Interfaces = (Array.isArray(data.platformInterfaces) ? data.platformInterfaces : []).filter((item) => item.priority === "P0");
   const securityAcceptanceLedger = Array.isArray(data.securityAcceptanceLedger) ? data.securityAcceptanceLedger : [];
+  const traceabilityPolicySources = Array.isArray(data.drugTraceabilityPolicySources) ? data.drugTraceabilityPolicySources : [];
   const serverSource = fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
   const externalDependencyRiskIds = [
     "identity-source",
@@ -60,6 +62,7 @@ function buildDeployCheckReport(options = {}) {
     assertFile("README.md"),
     assertFile("DEPLOYMENT.md"),
     assertFile("data/db.json"),
+    assertFile("drug-consumable-about.html"),
     assertFile("server.js"),
     assertFile("scripts/storage-admin.js"),
     { name: "package:scripts", ok: Boolean(pkg.scripts?.check && pkg.scripts?.test && pkg.scripts?.["test:coverage"] && pkg.scripts?.["test:e2e"] && pkg.scripts?.["env:check"] && pkg.scripts?.["release:report"] && pkg.scripts?.["release:manifest"] && pkg.scripts?.["storage:inspect"] && pkg.scripts?.["identity:contract"] && pkg.scripts?.["audit:retention"] && pkg.scripts?.["data-quality:report"] && pkg.scripts?.["drug-consumable:readiness"] && pkg.scripts?.["environment:matrix"] && pkg.scripts?.["integration:readiness"] && pkg.scripts?.["interface:mapping"] && pkg.scripts?.["monitoring:readiness"] && pkg.scripts?.["operations:readiness"] && pkg.scripts?.["process:audit"] && pkg.scripts?.["site:pack"] && pkg.scripts?.["production-db:readiness"] && pkg.scripts?.["evaluation:evidence"]), detail: Object.keys(pkg.scripts || {}).join(",") },
@@ -67,6 +70,7 @@ function buildDeployCheckReport(options = {}) {
     { name: "snapshot:interfaceReadiness", ok: p0Interfaces.length >= 4 && p0Interfaces.every((item) => item.id && item.owner && item.status && item.next), detail: `${p0Interfaces.length} P0 interface tracks` },
     { name: "snapshot:securityAcceptance", ok: securityAcceptanceLedger.length >= 4 && securityAcceptanceLedger.every((item) => item.id && item.category && item.owner && item.status && item.next), detail: `${securityAcceptanceLedger.length} security acceptance items` },
     { name: "snapshot:externalDependencyRisks", ok: externalDependencyRiskIds.every((id) => serverSource.includes(id)), detail: `${externalDependencyRiskIds.length} external dependency risks` },
+    { name: "snapshot:drugTraceabilityPolicySources", ok: traceabilityPolicySources.length >= 5 && traceabilityPolicySources.every((item) => /^https:\/\/(www\.)?(nhsa|nmpa)\.gov\.cn\//.test(item.url || "")), detail: `${traceabilityPolicySources.length} official traceability policy sources` },
     { name: "snapshot:p2-complete", ok: (data.platformRoadmap || []).filter((item) => item.priority === "P2").every((item) => item.status === "已完成"), detail: (data.platformRoadmap || []).filter((item) => item.priority === "P2").map((item) => `${item.title}:${item.status}`).join(";") },
     { name: "snapshot:accessibility", ok: Array.isArray(data.accessibilityChecklist) && data.accessibilityChecklist.length >= 5, detail: `${data.accessibilityChecklist?.length || 0} checklist items` },
     { name: "snapshot:storageMeta", ok: Boolean(data.storageMeta?.engine && data.storageMeta?.mode), detail: data.storageMeta ? `${data.storageMeta.engine}/${data.storageMeta.mode}` : "missing" }

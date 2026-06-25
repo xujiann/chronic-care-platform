@@ -72,6 +72,16 @@ function toRows(items, mapper) {
   return (Array.isArray(items) ? items : []).map(mapper);
 }
 
+function buildPolicySourceRules(data) {
+  const drugTraceability = Array.isArray(data.drugTraceabilityPolicySources) ? data.drugTraceabilityPolicySources : [];
+  return {
+    required: true,
+    rule: "If a platform page, template, joint-test table, remediation record, or generated artifact references a policy, standard, attachment, or source file, the related page and about.html must expose the policy basis, source link, applicability boundary, and verification evidence.",
+    aboutSection: "policy-source-rules",
+    sources: drugTraceability
+  };
+}
+
 function buildSiteReadinessPack(options = {}) {
   const data = options.data || readJson("data/db.json");
   const pkg = options.pkg || readJson("package.json");
@@ -126,6 +136,7 @@ function buildSiteReadinessPack(options = {}) {
   ];
 
   const signoffTemplates = buildSignoffTemplates(env);
+  const policySourceRules = buildPolicySourceRules(data);
 
   const packs = [
     {
@@ -167,7 +178,8 @@ function buildSiteReadinessPack(options = {}) {
     { id: "site-pack:interfaces", passed: interfaceTemplates.length >= 5 && interfaceTemplates.every((item) => item.targetCollection), detail: `${interfaceTemplates.length} interface mapping rows` },
     { id: "site-pack:monitoring", passed: monitoringTemplates.length >= 4, detail: `${monitoringTemplates.length} monitoring rows` },
     { id: "site-pack:signoff", passed: signoffTemplates.length >= 8, detail: `${signoffTemplates.length} signoff rows` },
-    { id: "site-pack:artifacts", passed: packs.every((item) => item.requiredArtifacts.length >= 4), detail: `${packs.length} packs with artifact lists` }
+    { id: "site-pack:artifacts", passed: packs.every((item) => item.requiredArtifacts.length >= 4), detail: `${packs.length} packs with artifact lists` },
+    { id: "site-pack:policy-source-links", passed: policySourceRules.sources.length >= 5 && policySourceRules.sources.every((item) => /^https:\/\/(www\.)?(nhsa|nmpa)\.gov\.cn\//.test(item.url || "")), detail: `${policySourceRules.sources.length} official drug traceability policy links` }
   ];
 
   return {
@@ -177,9 +189,11 @@ function buildSiteReadinessPack(options = {}) {
     summary: {
       packs: packs.length,
       templateRows: identityTemplates.length + interfaceTemplates.length + monitoringTemplates.length + signoffTemplates.length,
-      requiredArtifacts: packs.reduce((sum, item) => sum + item.requiredArtifacts.length, 0)
+      requiredArtifacts: packs.reduce((sum, item) => sum + item.requiredArtifacts.length, 0),
+      policySources: policySourceRules.sources.length
     },
     packs,
+    policySourceRules,
     templates: {
       identity: identityTemplates,
       interfaces: interfaceTemplates,
@@ -197,6 +211,7 @@ function renderMarkdown(report) {
   const interfaceRows = report.templates.interfaces.map((item) => `| ${item.sourceSystem || item.id} | ${item.owner} | ${item.targetCollection || ""} | ${(item.requiredFields || []).join(", ")} |`);
   const monitoringRows = report.templates.monitoring.map((item) => `| ${item.signal || item.id} | ${item.owner} | ${item.template} | ${(item.requiredEvidence || []).join(", ")} |`);
   const signoffRows = report.templates.signoff.map((item) => `| ${item.phase || ""} | ${item.owner || ""} | ${item.id} | ${(item.requiredSignatures || []).join(", ")} |`);
+  const policyRows = (report.policySourceRules?.sources || []).map((item) => `| ${item.authority || ""} | ${item.documentNo || ""} | ${item.title || ""} | ${item.url || ""} |`);
   return [
     "# Site readiness pack",
     "",
@@ -216,6 +231,14 @@ function renderMarkdown(report) {
     "| Status | Pack | Owner | Rows | Required artifacts |",
     "|---|---|---|---:|---|",
     ...packRows,
+    "",
+    "## Platform policy source rule",
+    "",
+    report.policySourceRules?.rule || "",
+    "",
+    "| Authority | Document | Title | Source link |",
+    "|---|---|---|---|",
+    ...policyRows,
     "",
     "## Identity source mapping template",
     "",
@@ -247,6 +270,8 @@ function renderMarkdown(report) {
 function renderTemplateReadmes(report) {
   const templates = report.templates || {};
   const packById = Object.fromEntries((report.packs || []).map((pack) => [pack.id, pack]));
+  const policyRule = report.policySourceRules?.rule || "";
+  const policyRows = (report.policySourceRules?.sources || []).map((item) => `| ${String(item.documentNo || "").replace(/\|/g, "/")} | ${String(item.title || "").replace(/\|/g, "/")} | ${String(item.url || "").replace(/\|/g, "/")} |`);
   const sections = [
     {
       file: "identity-source-mapping/README.md",
@@ -325,6 +350,18 @@ function renderTemplateReadmes(report) {
       "## Required artifacts",
       "",
       ...(section.pack?.requiredArtifacts || []).map((item) => `- ${item}`),
+      "",
+      "## Platform policy source rule",
+      "",
+      policyRule,
+      "",
+      "Any related page should also point users to `about.html#policy-source-rules` or the `data-about-section=\"policy-source-rules\"` section.",
+      "",
+      "### Drug traceability policy sources",
+      "",
+      "| Document | Title | Source link |",
+      "|---|---|---|",
+      ...policyRows,
       "",
       "## Rows preview",
       "",

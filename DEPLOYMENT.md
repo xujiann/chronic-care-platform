@@ -249,3 +249,7 @@ npm.cmd run rollback:snapshot -- "data/backups/<备份目录>"
 ## Drug Consumable Supervision Evidence
 
 Before site joint testing for the drug and consumable supervision app, run `npm.cmd run drug-consumable:readiness` and archive `release/drug-consumable-readiness-report.json` plus `release/drug-consumable-readiness-report.md`. The report is the pre-field evidence bundle for rational medication, prescription review, fixed pickup, high-value consumable clues, insurance settlement coordination, and remediation-loop signoff.
+
+Before publishing any platform template, page, remediation record, joint-test file, or generated artifact that cites a policy, standard, attachment, or source file, keep the related runnable page and `about.html#policy-source-rules` aligned with the policy basis, official source link, applicability boundary, and verification evidence. The drug traceability-code source list is seeded as `drugTraceabilityPolicySources` and is validated by `drug-consumable:readiness`, `site:pack`, `deploy:check`, and `release:report`.
+
+Use `drug-consumable-about.html` during site walkthroughs as the policy explanation page for drug traceability-code collection, rational medication review, fixed pickup, high-value consumable clues, insurance settlement coordination, remediation evidence, role boundaries, and remaining field integration work.

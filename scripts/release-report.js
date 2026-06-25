@@ -212,6 +212,7 @@ function snapshotChecks(data) {
     "institutionCreditEvaluations",
     "researchDatasets",
     "diseaseRegistryModels",
+    "drugTraceabilityPolicySources",
     "accessibilityChecklist",
     "securityAcceptanceLedger"
   ];
@@ -221,6 +222,7 @@ function snapshotChecks(data) {
   const acceptanceRecords = evidence.flatMap((item) => item.records || []);
   const securityAcceptanceLedger = Array.isArray(data.securityAcceptanceLedger) ? data.securityAcceptanceLedger : [];
   const productionDeploymentPlan = Array.isArray(data.productionDeploymentPlan) ? data.productionDeploymentPlan : [];
+  const traceabilityPolicySources = Array.isArray(data.drugTraceabilityPolicySources) ? data.drugTraceabilityPolicySources : [];
   const p0Interfaces = (Array.isArray(data.platformInterfaces) ? data.platformInterfaces : []).filter((item) => item.priority === "P0");
   const serverSource = fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
   const externalDependencyRiskIds = [
@@ -240,6 +242,7 @@ function snapshotChecks(data) {
     check("snapshot:productionDeploymentPlan", productionDeploymentPlan.length >= 4 && productionDeploymentPlan.every((item) => item.id && item.owner && item.nextAction), `${productionDeploymentPlan.length} deployment tracks`, "error", "snapshot"),
     check("snapshot:interfaceReadiness", p0Interfaces.length >= 4 && p0Interfaces.every((item) => item.id && item.owner && item.status && item.next), `${p0Interfaces.length} P0 interface tracks`, "error", "snapshot"),
     check("snapshot:externalDependencyRisks", externalDependencyRiskIds.every((id) => serverSource.includes(id)), `${externalDependencyRiskIds.length} external dependency risks`, "error", "snapshot"),
+    check("snapshot:drugTraceabilityPolicySources", traceabilityPolicySources.length >= 5 && traceabilityPolicySources.every((item) => /^https:\/\/(www\.)?(nhsa|nmpa)\.gov\.cn\//.test(item.url || "")), `${traceabilityPolicySources.length} official traceability policy sources`, "error", "snapshot"),
     check("snapshot:noCorruptedPlaceholders", !/编码损坏|缂栫爜鎹熷潖|\?\?\?/.test(raw), "no known corrupted placeholders", "error", "snapshot"),
     check("snapshot:accessibility", Array.isArray(data.accessibilityChecklist) && data.accessibilityChecklist.length >= 5, `${data.accessibilityChecklist?.length || 0} checklist items`, "error", "snapshot")
   ];
@@ -316,7 +319,8 @@ function drugConsumableChecks(drugConsumable) {
   return [
     check("drugConsumable:readiness", drugConsumable.ok, drugConsumable.ok ? "drug consumable supervision checks passed" : "drug consumable supervision checks failed", "error", "drug-consumable"),
     check("drugConsumable:boundaries", drugConsumable.requiredBoundaries?.every((boundary) => drugConsumable.checks?.find((item) => item.id === "drug-consumable:boundaries")?.detail?.includes(`${boundary}:present`)), `${drugConsumable.requiredBoundaries?.length || 0} boundaries`, "error", "drug-consumable"),
-    check("drugConsumable:links", drugConsumable.linkedRows?.every((item) => item.pickupLinked && item.claimLinked && item.auditTrailPresent), `${drugConsumable.linkedRows?.length || 0} linked supervision rows`, "error", "drug-consumable")
+    check("drugConsumable:links", drugConsumable.linkedRows?.every((item) => item.pickupLinked && item.claimLinked && item.auditTrailPresent), `${drugConsumable.linkedRows?.length || 0} linked supervision rows`, "error", "drug-consumable"),
+    check("drugConsumable:traceabilityPolicy", drugConsumable.summary?.traceabilityPolicySources >= 5 && drugConsumable.checks?.some((item) => item.id === "drug-consumable:traceability-policy" && item.passed), `${drugConsumable.summary?.traceabilityPolicySources || 0} official traceability policy sources`, "error", "drug-consumable")
   ];
 }
 
@@ -539,6 +543,7 @@ function buildReleaseReport(options = {}) {
     assertFile("DEPLOYMENT.md"),
     assertFile(".env.example"),
     assertFile("data/db.json"),
+    assertFile("drug-consumable-about.html"),
     assertFile("server.js"),
     assertFile("scripts/storage-admin.js"),
     ...packageChecks(pkg),
@@ -755,7 +760,7 @@ function renderMarkdown(report) {
     "",
     "## Drug consumable readiness report",
     "",
-    "See `drug-consumable-readiness-report.json` and `drug-consumable-readiness-report.md` for rational medication, prescription review, fixed pickup, high-value consumable clues, insurance settlement coordination, and remediation-loop evidence.",
+    "See `drug-consumable-readiness-report.json` and `drug-consumable-readiness-report.md` for rational medication, prescription review, fixed pickup, high-value consumable clues, insurance settlement coordination, traceability policy sources, and remediation-loop evidence.",
     "",
     "## Operations readiness report",
     "",
@@ -767,7 +772,7 @@ function renderMarkdown(report) {
     "",
     "## Site readiness pack",
     "",
-    "See `site-readiness-pack.json` and `site-readiness-pack.md` for identity source mapping, interface joint-test, monitoring/on-call, and production signoff templates.",
+    "See `site-readiness-pack.json` and `site-readiness-pack.md` for identity source mapping, interface joint-test, monitoring/on-call, production signoff templates, and the platform policy source rule.",
     "",
     "## Monitoring readiness report",
     "",

@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>药品耗材与合理用药监管说明</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>药品耗材监管 about 页</span>
+          <h1>药品耗材与合理用药监管平台政策说明</h1>
+          <p>本页说明药品追溯码、合理用药、处方审方、固定取药、高值耗材线索、医保结算协同和整改闭环的政策依据、系统落点和现场联调边界。</p>
+        </div>
+        <nav>
+          <a href="./about.html#policy-source-rules">全平台来源规则</a>
+          <a href="./insurance.html">医保端</a>
+          <a href="./institution.html">机构端</a>
+          <a href="./workbench.html">工作台</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" data-drug-consumable-about="summary">
+        <article class="metric-card">
+          <span>官方政策来源</span>
+          <strong>5 项</strong>
+          <small>国家医保局、国家药监局政策公告和药品追溯码标识规范。</small>
+        </article>
+        <article class="metric-card">
+          <span>监管边界</span>
+          <strong>6 类</strong>
+          <small>合理用药、审方、固定取药、耗材线索、医保协同、整改闭环。</small>
+        </article>
+        <article class="metric-card">
+          <span>系统证据</span>
+          <strong>可审计</strong>
+          <small>API、审计轨迹、模板 README、发布报告和 about 页同步取证。</small>
+        </article>
+        <article class="metric-card">
+          <span>现场边界</span>
+          <strong>需联调</strong>
+          <small>真实扫码设备、医保核心、HIS/EMR/药房/耗材系统仍需现场接入。</small>
+        </article>
+      </section>
+
+      <section class="panel" data-drug-consumable-about="policy-sources">
+        <div class="panel-title">
+          <h2>药品追溯码政策依据</h2>
+          <span>相关页面和模板均需保留来源链接</span>
+        </div>
+        <div class="rules">
+          <div><strong>医保发〔2025〕7号</strong><span><a href="https://www.nhsa.gov.cn/art/2025/3/19/art_104_16045.html">国家医保局等四部门通知</a>要求在医疗保障和工伤保险领域加强药品追溯码采集应用；系统将该要求落到医保结算协同、扫码证据、异常重复销售和部门协同处置。</span></div>
+          <div><strong>2024-09-30 医保公告</strong><span><a href="https://www.nhsa.gov.cn/art/2024/9/30/art_109_14042.html">国家医保局办公室公告</a>明确采集范围、企业上传接口、追溯码/医保编码/商品码映射和包装级联映射；系统模板据此区分暂不采集场景、无码库、设备服务边界和映射证据。</span></div>
+          <div><strong>国药监药管〔2018〕35号</strong><span><a href="https://www.nmpa.gov.cn/directory/web/nmpa/xxgk/fgwj/gzwj/gzwjyp/20181101100801272.html">国家药监局指导意见</a>强调药品信息化追溯体系、企业主体责任和一物一码、物码同追；系统将其作为追溯线索、整改闭环和审计报告的监管口径。</span></div>
+          <div><strong>2019年第32号公告</strong><span><a href="https://www.nmpa.gov.cn/directory/web/nmpa/////////zwgk/ghcw/ghjh/20190428164801603.html">国家药监局标准公告</a>发布药品信息化追溯体系建设导则和药品追溯码编码要求；接口联调模板需保留编码规则、包装层级、发码机构和追溯系统地址解析字段。</span></div>
+          <div><strong>NMPAB/T 1011-2022</strong><span><a href="https://www.nmpa.gov.cn/directory/web/nmpa/images/1656320881524098380.pdf">药品追溯码标识规范</a>要求追溯码唯一标识各级销售包装单元，且清晰、显著、可被设备和人眼识读；机构端和医保端需记录可识读性、扫码失败原因、人工核验和整改证据。</span></div>
+        </div>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide" data-drug-consumable-about="system-boundaries">
+          <div class="panel-title">
+            <h2>系统功能边界</h2>
+            <span>围绕可监管、可审核、可整改设计</span>
+          </div>
+          <div class="capability-grid">
+            <article class="capability-card">
+              <strong>合理用药</strong>
+              <span>复用 medicationPickups、个人健康记录和慢病用药支持，识别重复用药、超量取药、长期处方与固定取药不一致等风险。</span>
+            </article>
+            <article class="capability-card">
+              <strong>处方与审方</strong>
+              <span>医保端可发起 review，机构端按处方来源、药师审核、追溯码采集和人工核验补充证据。</span>
+            </article>
+            <article class="capability-card">
+              <strong>固定取药</strong>
+              <span>固定药店、药房库存、取药状态、医保待遇和居民授权形成可追溯链路，异常进入整改或医保协同。</span>
+            </article>
+            <article class="capability-card">
+              <strong>高值耗材线索</strong>
+              <span>复用 institutionSupervisions，聚焦高值耗材目录、批次、使用记录、收费项目和医保结算一致性。</span>
+            </article>
+            <article class="capability-card">
+              <strong>医保结算协同</strong>
+              <span>复用 insuranceClaims 和 insurance-settlement-v1 合同，区分医保局监管、医保中心经办和区县属地职责。</span>
+            </article>
+            <article class="capability-card">
+              <strong>整改闭环</strong>
+              <span>通过 workflow-actions、审计轨迹和 securityEvents 记录整改提交、审核退回、医保同步和跨角色留痕。</span>
+            </article>
+          </div>
+        </article>
+
+        <article class="panel" data-drug-consumable-about="role-boundary">
+          <div class="panel-title">
+            <h2>角色边界</h2>
+            <span>职责清晰，留痕一致</span>
+          </div>
+          <div class="rules">
+            <div><strong>卫健委</strong><span>查看全局风险、跨机构整改和发布证据，不直接替代医保经办审核。</span></div>
+            <div><strong>医保局/医保中心</strong><span>负责基金监管、待遇政策、结算审核、凭证核验和追溯码医保协同。</span></div>
+            <div><strong>医疗机构</strong><span>负责处方、审方、扫码、人工核验、耗材使用和整改材料提交。</span></div>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel" data-drug-consumable-about="acceptance-boundary">
+        <div class="panel-title">
+          <h2>现场联调与验收边界</h2>
+          <span>当前系统已建模，真实生产仍需接入</span>
+        </div>
+        <div class="rules">
+          <div><strong>已在本系统完成</strong><span>seed 数据、静态快照、API 汇总、医保审核、机构整改、审计留痕、发布报告、模板 README 和 about 页政策来源说明。</span></div>
+          <div><strong>现场需补齐</strong><span>扫码设备或手持终端、药房/药库系统、HIS/EMR、耗材管理系统、医保核心结算、生产流通企业上传接口和真实追溯码解析服务。</span></div>
+          <div><strong>验收证据</strong><span>运行 <code>npm.cmd run drug-consumable:readiness</code>、<code>npm.cmd run site:pack</code>、<code>npm.cmd run deploy:check</code> 和 <code>npm.cmd run release:report</code>，并归档政策来源链接、扫码样例、映射表、整改材料和现场签字。</span></div>
+        </div>
+      </section>
+    </main>
+    <script>window.HealthCityAuth?.initAuthBar?.()</script>
+  </body>
+</html>

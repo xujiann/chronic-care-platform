@@ -543,6 +543,7 @@ function seedState() {
     institutionSupervisions: seedInstitutionSupervisions(),
     insuranceClaims: seedInsuranceClaims(),
     policyAlignment: seedPolicyAlignment(),
+    drugTraceabilityPolicySources: seedDrugTraceabilityPolicySources(),
     emergencySignals: seedEmergencySignals(),
     seniorServices: seedSeniorServices(),
     dataAccessLogs: seedDataAccessLogs(),
@@ -1602,6 +1603,61 @@ function seedPolicyAlignment() {
     { domain: "基层智慧治理", requirement: "以数据驱动、信息共享提升基层治理和疫情防控能力。", capability: "基层机构、家庭医生、居民端、医保中心和区市县医保局共用同一居民主索引和慢病闭环台账。", status: "已启动" },
     { domain: "数据安全与合规", requirement: "完善数据脱敏、加密保护、合规评估和安全保障体系。", capability: "已形成角色权限、字段脱敏、授权撤销、访问复核、审计哈希链、安全合规证据和高风险事件闭环。", status: "基础闭环" },
     { domain: "适老化与无障碍", requirement: "优化信息无障碍环境，解决老年人等群体数字鸿沟。", capability: "已覆盖大字模式、读屏语义、家属代办、线下帮办、消息触达、弱网模式和无障碍验收清单。", status: "基础闭环" }
+  ];
+}
+
+function seedDrugTraceabilityPolicySources() {
+  return [
+    {
+      id: "nhsa-2025-7",
+      authority: "国家医保局等四部门",
+      title: "关于加强药品追溯码在医疗保障和工伤保险领域采集应用的通知",
+      documentNo: "医保发〔2025〕7号",
+      issuedAt: "2025-03-19",
+      url: "https://www.nhsa.gov.cn/art/2025/3/19/art_104_16045.html",
+      rule: "2025-07-01 起销售环节按要求扫码后方可进行医保基金结算；2026-01-01 起所有医药机构实现药品追溯码全量采集上传。",
+      platformImpact: "药耗监管、医保结算协同、机构整改和工作台模板必须记录追溯码采集、上传、无码库、异常重复销售和部门协同处置证据。"
+    },
+    {
+      id: "nhsa-2024-collection",
+      authority: "国家医疗保障局办公室",
+      title: "关于进一步做好医保药品耗材追溯码信息采集工作有关事项的公告",
+      documentNo: "2024-04-00056",
+      issuedAt: "2024-09-30",
+      url: "https://www.nhsa.gov.cn/art/2024/9/30/art_109_14042.html",
+      rule: "明确采集范围、生产流通企业上传接口、三码映射库、包装级联映射库和地方医保部门不得一刀切、不得指定设备服务商等注意事项。",
+      platformImpact: "模板需区分暂不采集场景、医保编码/商品码/追溯码映射、生产流通企业可选上传和现场设备服务边界。"
+    },
+    {
+      id: "nmpa-2018-guidance",
+      authority: "国家药监局",
+      title: "国家药监局关于药品信息化追溯体系建设的指导意见",
+      documentNo: "国药监药管〔2018〕35号",
+      issuedAt: "2018-11-01",
+      url: "https://www.nmpa.gov.cn/directory/web/nmpa/xxgk/fgwj/gzwj/gzwjyp/20181101100801272.html",
+      rule: "以保障公众用药安全为目标，以落实企业主体责任为基础，按一物一码、物码同追方向建设药品信息化追溯体系。",
+      platformImpact: "药品追溯线索、整改闭环和审计报告需以主体责任、全流程追溯和公众用药安全为基本监管口径。"
+    },
+    {
+      id: "nmpa-2019-32",
+      authority: "国家药监局",
+      title: "关于发布《药品信息化追溯体系建设导则》《药品追溯码编码要求》两项信息化标准的公告",
+      documentNo: "2019年第32号",
+      issuedAt: "2019-04-28",
+      url: "https://www.nmpa.gov.cn/directory/web/nmpa/////////zwgk/ghcw/ghjh/20190428164801603.html",
+      rule: "发布药品信息化追溯体系建设导则和药品追溯码编码要求，作为追溯体系与编码规范基础。",
+      platformImpact: "接口联调模板需留出追溯码编码规则、各级包装关联、发码机构和追溯系统地址解析字段。"
+    },
+    {
+      id: "nmpa-2022-label",
+      authority: "国家药监局",
+      title: "药品追溯码标识规范",
+      documentNo: "NMPAB/T 1011-2022",
+      issuedAt: "2022-06-23",
+      url: "https://www.nmpa.gov.cn/directory/web/nmpa/images/1656320881524098380.pdf",
+      rule: "药品追溯码用于唯一标识药品各级销售包装单元；标识应清晰、显著、可被设备和人眼识读，并包含文字、可识读字符和条码符号。",
+      platformImpact: "机构端和医保端模板需记录追溯码可识读性、包装级别、扫码失败原因、人工核验和整改证据。"
+    }
   ];
 }
 
@@ -3402,6 +3458,7 @@ function normalizeState(data) {
     drugConsumableSupervisions: mergeByKey(seedDrugConsumableSupervisions(), data.drugConsumableSupervisions, "id"),
     insuranceClaims: Array.isArray(data.insuranceClaims) ? data.insuranceClaims : seedInsuranceClaims(),
     policyAlignment: Array.isArray(data.policyAlignment) ? data.policyAlignment : seedPolicyAlignment(),
+    drugTraceabilityPolicySources: mergeByKey(seedDrugTraceabilityPolicySources(), data.drugTraceabilityPolicySources, "id"),
     emergencySignals: Array.isArray(data.emergencySignals) ? data.emergencySignals : seedEmergencySignals(),
     seniorServices: Array.isArray(data.seniorServices) ? data.seniorServices : seedSeniorServices(),
     dataAccessLogs: sealAuditTrail(Array.isArray(data.dataAccessLogs) ? data.dataAccessLogs : seedDataAccessLogs()),
@@ -5026,6 +5083,7 @@ function drugConsumableStatus(value) {
 
 function buildDrugConsumableSupervision(data) {
   const supervisions = Array.isArray(data.drugConsumableSupervisions) ? data.drugConsumableSupervisions : seedDrugConsumableSupervisions();
+  const traceabilityPolicySources = Array.isArray(data.drugTraceabilityPolicySources) ? data.drugTraceabilityPolicySources : seedDrugTraceabilityPolicySources();
   const pickups = Array.isArray(data.medicationPickups) ? data.medicationPickups : [];
   const claims = Array.isArray(data.insuranceClaims) ? data.insuranceClaims : [];
   const institutionSupervisions = Array.isArray(data.institutionSupervisions) ? data.institutionSupervisions : [];
@@ -5062,9 +5120,11 @@ function buildDrugConsumableSupervision(data) {
       pendingInsurance: rows.filter((item) => drugConsumableStatus(item.insuranceStatus) === "pending").length,
       fixedPickup: pickups.length,
       claims: claims.length,
+      traceabilityPolicySources: traceabilityPolicySources.length,
       contractReady: Boolean(insuranceContract?.status === "ready" && insuranceContract.signature && insuranceContract.retryPolicy)
     },
     rows,
+    traceabilityPolicySources,
     insuranceCoordination: {
       contractId: insuranceContract?.id || "",
       status: insuranceContract?.status || "missing",

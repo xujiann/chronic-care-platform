@@ -11,11 +11,13 @@ test("deploy check report covers release-critical snapshot gates", () => {
   [
     "file:README.md",
     "file:DEPLOYMENT.md",
+    "file:drug-consumable-about.html",
     "package:scripts",
     "snapshot:collections",
     "snapshot:interfaceReadiness",
     "snapshot:securityAcceptance",
     "snapshot:externalDependencyRisks",
+    "snapshot:drugTraceabilityPolicySources",
     "snapshot:p2-complete",
     "snapshot:accessibility",
     "snapshot:storageMeta"

@@ -35,6 +35,7 @@ function buildDrugConsumableReadinessReport(options = {}) {
   const pkg = options.pkg ?? readJson("package.json");
   const readme = options.readme ?? readText("README.md");
   const deployment = options.deployment ?? readText("DEPLOYMENT.md");
+  const aboutPage = options.aboutPage ?? readText("about.html");
   const server = options.server ?? readText("server.js");
   const insurancePage = options.insurancePage ?? readText("insurance.html");
   const insuranceJs = options.insuranceJs ?? readText("insurance.js");
@@ -47,6 +48,7 @@ function buildDrugConsumableReadinessReport(options = {}) {
   const claims = Array.isArray(data.insuranceClaims) ? data.insuranceClaims : [];
   const institutionSupervisions = Array.isArray(data.institutionSupervisions) ? data.institutionSupervisions : [];
   const contracts = Array.isArray(data.integrationContracts) ? data.integrationContracts : [];
+  const policySources = Array.isArray(data.drugTraceabilityPolicySources) ? data.drugTraceabilityPolicySources : [];
   const insuranceContract = contracts.find((item) => item.id === "insurance-settlement-v1");
   const boundaries = new Set(rows.map((item) => item.boundary));
   if (pickups.length) boundaries.add("fixed-pharmacy");
@@ -70,6 +72,7 @@ function buildDrugConsumableReadinessReport(options = {}) {
     { id: "drug-consumable:audit", passed: linkedRows.every((item) => item.auditTrailPresent) && /drug-consumable-review/.test(server) && /drug-consumable-remediation/.test(server), detail: "business auditTrail and securityEvents actions are wired" },
     { id: "drug-consumable:insurance-contract", passed: Boolean(insuranceContract?.status === "ready" && insuranceContract.signature && insuranceContract.retryPolicy), detail: insuranceContract ? `${insuranceContract.id}:${insuranceContract.status}` : "missing insurance-settlement-v1" },
     { id: "drug-consumable:workflow-reuse", passed: /WORKFLOW_COLLECTIONS[\s\S]*drugConsumableSupervisions/.test(server) && /appendDrugConsumableAuditTrail/.test(server) && /unified-task-action/.test(server) && /workflow-action/.test(server), detail: "/api/workflow-actions and /api/tasks/:id/actions reuse drugConsumableSupervisions with audit trail" },
+    { id: "drug-consumable:traceability-policy", passed: policySources.length >= 5 && policySources.some((item) => item.id === "nhsa-2025-7") && policySources.some((item) => item.id === "nmpa-2022-label") && policySources.every((item) => /^https:\/\/(www\.)?(nhsa|nmpa)\.gov\.cn\//.test(item.url || "")) && /policy-source-rules/.test(aboutPage), detail: `${policySources.length} official traceability policy sources; about policy section ${/policy-source-rules/.test(aboutPage) ? "present" : "missing"}` },
     { id: "drug-consumable:frontend", passed: /drug-consumable-panel/.test(insurancePage) && /renderDrugConsumableSupervision/.test(insuranceJs) && /institution-drug-consumable-panel/.test(institutionPage) && /renderInstitutionDrugConsumableSupervision/.test(institutionJs) && /postInstitutionDrugConsumableRemediation/.test(institutionJs) && /drug-consumable-supervision-panel/.test(workbenchPage) && /loadDrugConsumableSupervision/.test(workbenchJs), detail: "insurance portal, institution remediation panel, and commission workbench render actionable drug consumable supervision entries" },
     { id: "drug-consumable:release", passed: Boolean(pkg.scripts?.["drug-consumable:readiness"] && docsMentionArtifacts), detail: docsMentionArtifacts ? "script and docs present" : "missing script or docs" }
   ];
@@ -83,11 +86,13 @@ function buildDrugConsumableReadinessReport(options = {}) {
       medicationPickups: pickups.length,
       insuranceClaims: claims.length,
       institutionSupervisions: institutionSupervisions.length,
+      traceabilityPolicySources: policySources.length,
       insuranceContractReady: Boolean(insuranceContract?.status === "ready"),
       workflowReuseReady: checks.some((item) => item.id === "drug-consumable:workflow-reuse" && item.passed),
       institutionRemediationReady: checks.some((item) => item.id === "drug-consumable:frontend" && item.passed)
     },
     linkedRows,
+    policySources,
     checks
   };
 }
@@ -95,6 +100,7 @@ function buildDrugConsumableReadinessReport(options = {}) {
 function renderMarkdown(report) {
   const checkRows = report.checks.map((item) => `| ${item.passed ? "PASS" : "FAIL"} | ${item.id} | ${String(item.detail || "").replace(/\|/g, "/")} |`);
   const rowLines = report.linkedRows.map((item) => `| ${item.id} | ${item.boundary} | ${item.normalizedStatus} | ${item.pickupLinked ? "yes" : "no"} | ${item.claimLinked ? "yes" : "no"} | ${item.auditTrailPresent ? "yes" : "no"} |`);
+  const policyRows = (report.policySources || []).map((item) => `| ${String(item.documentNo || "").replace(/\|/g, "/")} | ${String(item.title || "").replace(/\|/g, "/")} | ${String(item.url || "").replace(/\|/g, "/")} |`);
   return [
     "# Drug consumable readiness report",
     "",
@@ -114,6 +120,12 @@ function renderMarkdown(report) {
     "| Row | Boundary | Status | Pickup | Claim | Audit |",
     "|---|---|---|---|---|---|",
     ...rowLines,
+    "",
+    "## Traceability policy sources",
+    "",
+    "| Document | Title | Source link |",
+    "|---|---|---|",
+    ...policyRows,
     ""
   ].join("\n");
 }

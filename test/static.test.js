@@ -38,7 +38,7 @@ test("citizen pages do not expose cross-role module links or management collecti
 });
 
 test("application pages avoid placeholder navigation", () => {
-  const pages = ["about.html", "citizen.html", "mobile-preview.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html"];
+  const pages = ["about.html", "drug-consumable-about.html", "citizen.html", "mobile-preview.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html"];
   pages.forEach((file) => assert.doesNotMatch(read(file), /href=["']#["']/, `${file} 存在空链接占位`));
 });
 
@@ -47,6 +47,13 @@ test("about page documents runnable platform capabilities", () => {
   const auth = read("auth.js");
   assert.match(about, /data-about-section="runtime-capabilities"/);
   assert.match(about, /data-about-section="role-portals"/);
+  assert.match(about, /id="policy-source-rules"/);
+  assert.match(about, /data-about-section="policy-source-rules"/);
+  assert.match(about, /drug-consumable-about\.html/);
+  assert.match(about, /医保发〔2025〕7号/);
+  assert.match(about, /NMPAB\/T 1011-2022/);
+  assert.match(about, /https:\/\/www\.nhsa\.gov\.cn\/art\/2025\/3\/19\/art_104_16045\.html/);
+  assert.match(about, /https:\/\/www\.nmpa\.gov\.cn\/directory\/web\/nmpa\/images\/1656320881524098380\.pdf/);
   assert.match(about, /data-about-capability="service-acceptance"/);
   assert.match(about, /data-about-capability="site-template-readmes"/);
   assert.match(about, /data-about-capability="workflow-tasks"/);
@@ -61,7 +68,28 @@ test("about page documents runnable platform capabilities", () => {
   assert.match(read("health-city.html"), /href="\.\/about\.html"/);
   assert.match(auth, /\["about\.html", "关于"\]/);
   assert.match(auth, /pageName === "about\.html"/);
+  assert.match(auth, /drug-consumable-about\.html/);
   assert.doesNotMatch(about, /requireRole/);
+});
+
+test("drug consumable about page documents policy sources and field boundaries", () => {
+  const page = read("drug-consumable-about.html");
+  assert.match(page, /data-drug-consumable-about="policy-sources"/);
+  assert.match(page, /data-drug-consumable-about="system-boundaries"/);
+  assert.match(page, /data-drug-consumable-about="role-boundary"/);
+  assert.match(page, /data-drug-consumable-about="acceptance-boundary"/);
+  assert.match(page, /https:\/\/www\.nhsa\.gov\.cn\/art\/2025\/3\/19\/art_104_16045\.html/);
+  assert.match(page, /https:\/\/www\.nhsa\.gov\.cn\/art\/2024\/9\/30\/art_109_14042\.html/);
+  assert.match(page, /https:\/\/www\.nmpa\.gov\.cn\/directory\/web\/nmpa\/images\/1656320881524098380\.pdf/);
+  assert.match(page, /medicationPickups/);
+  assert.match(page, /insuranceClaims/);
+  assert.match(page, /institutionSupervisions/);
+  assert.match(page, /workflow-actions/);
+  assert.match(page, /npm\.cmd run drug-consumable:readiness/);
+  assert.match(read("insurance.html"), /drug-consumable-about\.html/);
+  assert.match(read("institution.html"), /drug-consumable-about\.html/);
+  assert.match(read("workbench.html"), /drug-consumable-about\.html/);
+  assert.doesNotMatch(page, /requireRole/);
 });
 
 test("static snapshot keeps completed P2 governance collections", () => {
@@ -74,6 +102,10 @@ test("static snapshot keeps completed P2 governance collections", () => {
   assert.equal(Array.isArray(data.drugConsumableSupervisions), true);
   assert.equal(data.drugConsumableSupervisions.some((item) => item.id === "dcs-rational-r1" && item.boundary === "rational-medication"), true);
   assert.equal(data.drugConsumableSupervisions.some((item) => item.id === "dcs-consumable-mr1" && item.boundary === "consumable-clue"), true);
+  assert.equal(Array.isArray(data.drugTraceabilityPolicySources), true);
+  assert.equal(data.drugTraceabilityPolicySources.some((item) => item.id === "nhsa-2025-7" && item.documentNo === "医保发〔2025〕7号"), true);
+  assert.equal(data.drugTraceabilityPolicySources.some((item) => item.id === "nmpa-2022-label" && item.documentNo === "NMPAB/T 1011-2022"), true);
+  assert.equal(data.drugTraceabilityPolicySources.every((item) => /^https:\/\/(www\.)?(nhsa|nmpa)\.gov\.cn\//.test(item.url)), true);
   assert.equal(data.mobileExperienceSettings.weakNetworkMode, "cache-last-state");
   assert.equal(Array.isArray(data.accessibilityChecklist), true);
   assert.equal(data.accessibilityChecklist.some((item) => item.id === "a11y-large-font"), true);
@@ -170,6 +202,7 @@ test("insurance portal exposes actionable drug consumable supervision workflow",
   assert.match(institutionJs, /\/drug-consumable-supervision\/\$\{encodeURIComponent\(id\)\}\/remediation/);
   assert.match(server, /buildDrugConsumableSupervision/);
   assert.match(server, /\/api\/drug-consumable-supervision/);
+  assert.match(server, /traceabilityPolicySources/);
   assert.match(server, /drug-consumable-review/);
   assert.match(server, /drug-consumable-remediation/);
   assert.match(server, /drug-consumable-insurance-sync/);
@@ -215,6 +248,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /audit-retention-report\.md/);
   assert.match(read("README.md"), /data-quality-report\.md/);
   assert.match(read("README.md"), /drug-consumable-readiness-report\.md/);
+  assert.match(read("README.md"), /drug-consumable-about\.html/);
   assert.match(read("README.md"), /environment-matrix-report\.md/);
   assert.match(read("README.md"), /integration-readiness-report\.md/);
   assert.match(read("README.md"), /interface-mapping-report\.md/);
@@ -234,6 +268,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("DEPLOYMENT.md"), /audit-retention-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /data-quality-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /drug-consumable-readiness-report\.md/);
+  assert.match(read("DEPLOYMENT.md"), /drug-consumable-about\.html/);
   assert.match(read("DEPLOYMENT.md"), /environment-matrix-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /integration-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /interface-mapping-report\.md/);
@@ -255,6 +290,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/deploy-check.js"), /audit:retention/);
   assert.match(read("scripts/deploy-check.js"), /data-quality:report/);
   assert.match(read("scripts/deploy-check.js"), /drug-consumable:readiness/);
+  assert.match(read("scripts/deploy-check.js"), /drug-consumable-about\.html/);
   assert.match(read("scripts/deploy-check.js"), /environment:matrix/);
   assert.match(read("scripts/deploy-check.js"), /integration:readiness/);
   assert.match(read("scripts/deploy-check.js"), /interface:mapping/);
