@@ -17,8 +17,10 @@ test("role pages keep explicit page guards", () => {
     "insurance.html": "insurance",
     "county.html": "county",
     "index.html": "commission",
+    "health-dashboard.html": "commission",
     "platform.html": "commission",
-    "workbench.html": "commission"
+    "workbench.html": "commission",
+    "quality-safety.html": "commission"
   };
   Object.entries(guards).forEach(([file, role]) => {
     assert.match(read(file), new RegExp(`requireRole\\(\\[\\"${role}\\"\\]\\)`), `${file} 缺少 ${role} 页面守卫`);
@@ -27,7 +29,7 @@ test("role pages keep explicit page guards", () => {
 
 test("citizen pages do not expose cross-role module links or management collections", () => {
   const citizenHtml = `${read("citizen.html")}\n${read("mobile-preview.html")}`;
-  ["institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html"].forEach((target) => {
+  ["institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html", "quality-safety.html", "health-dashboard.html"].forEach((target) => {
     assert.doesNotMatch(citizenHtml, new RegExp(`href=[\\"']\\./${target}`), `居民页面不应链接到 ${target}`);
   });
 
@@ -38,7 +40,7 @@ test("citizen pages do not expose cross-role module links or management collecti
 });
 
 test("application pages avoid placeholder navigation", () => {
-  const pages = ["about.html", "research-sandbox-about.html", "citizen.html", "mobile-preview.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html"];
+  const pages = ["about.html", "research-sandbox-about.html", "citizen.html", "mobile-preview.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html", "quality-safety.html", "health-dashboard.html", "regional-data-sharing.html", "operations.html"];
   pages.forEach((file) => assert.doesNotMatch(read(file), /href=["']#["']/, `${file} 存在空链接占位`));
 });
 
@@ -90,11 +92,16 @@ test("static snapshot keeps completed P2 governance collections", () => {
   assert.equal(data.dataAccessLogs.some((item) => /research/i.test(`${item.scope || ""} ${item.purpose || ""}`)), true);
   assert.equal(Array.isArray(data.diseaseRegistryModels), true);
   assert.equal(data.diseaseRegistryModels.some((item) => item.id === "dm-hypertension-risk-v1"), true);
+  assert.equal(Array.isArray(data.drugConsumableSupervisions), true);
+  assert.equal(data.drugConsumableSupervisions.some((item) => item.id === "dcs-rational-r1" && item.boundary === "rational-medication"), true);
+  assert.equal(data.drugConsumableSupervisions.some((item) => item.id === "dcs-consumable-mr1" && item.boundary === "consumable-clue"), true);
   assert.equal(data.mobileExperienceSettings.weakNetworkMode, "cache-last-state");
   assert.equal(Array.isArray(data.accessibilityChecklist), true);
   assert.equal(data.accessibilityChecklist.some((item) => item.id === "a11y-large-font"), true);
   assert.equal(Array.isArray(data.productionDeploymentPlan), true);
   assert.equal(data.productionDeploymentPlan.some((item) => item.id === "prod-storage-adapter"), true);
+  assert.equal(Array.isArray(data.healthDashboardSnapshots), true);
+  assert.equal(data.healthDashboardSnapshots.some((item) => item.sourceApplications.length === 7), true);
   assert.equal(Array.isArray(data.countyAcceptanceLedger), true);
   assert.equal(data.countyAcceptanceLedger.some((item) => item.id === "county-accept-report-return"), true);
   assert.equal(data.countyAcceptanceLedger.some((item) => item.metricKey === "criticalAlert"), true);
@@ -109,6 +116,30 @@ test("static snapshot keeps completed P2 governance collections", () => {
   assert.equal(data.securityAcceptanceLedger.every((item) => item.id && item.category && item.owner && item.status && item.next), true);
   assert.equal(data.securityAcceptanceLedger.every((item) => /建档/.test(item.status)), true);
   assert.equal(data.platformRoadmap.filter((item) => item.priority === "P2").every((item) => item.status === "已完成"), true);
+});
+
+test("health dashboard exposes the aggregate application entry and API contract", () => {
+  const html = read("health-dashboard.html");
+  const js = read("health-dashboard.js");
+  const server = read("server.js");
+  const release = read("scripts/release-report.js");
+  const deploy = read("scripts/deploy-check.js");
+
+  assert.match(html, /卫生健康综合驾驶舱/);
+  assert.match(html, /dashboard-applications/);
+  assert.match(html, /dashboard-templates/);
+  assert.match(html, /dashboard-actions/);
+  assert.match(html, /dashboard-interfaces/);
+  assert.match(html, /dashboard-evidence/);
+  assert.match(html, /dashboard-dependencies/);
+  assert.match(js, /\/api\/health-dashboard\/summary/);
+  assert.match(js, /functionalBoundary/);
+  assert.match(js, /renderTemplates/);
+  assert.match(js, /source application/);
+  assert.match(server, /\/api\/health-dashboard\/summary/);
+  assert.match(server, /buildHealthDashboardSummary/);
+  assert.match(release, /health-dashboard-summary/);
+  assert.match(deploy, /snapshot:healthDashboard/);
 });
 
 test("static snapshot keeps acceptance evidence clean and actionable", () => {
@@ -168,6 +199,21 @@ test("chronic disease policy module exposes 2025 service capacity workflow", () 
   assert.match(server, /基层慢病健康管理中心/);
 });
 
+test("insurance portal exposes actionable drug consumable supervision workflow", () => {
+  const html = read("insurance.html");
+  const js = read("insurance.js");
+  const server = read("server.js");
+  assert.match(html, /drug-consumable-panel/);
+  assert.match(js, /renderDrugConsumableSupervision/);
+  assert.match(js, /postDrugConsumableAction/);
+  assert.match(js, /data-drug-action/);
+  assert.match(server, /buildDrugConsumableSupervision/);
+  assert.match(server, /\/api\/drug-consumable-supervision/);
+  assert.match(server, /drug-consumable-review/);
+  assert.match(server, /drug-consumable-remediation/);
+  assert.match(server, /drug-consumable-insurance-sync/);
+});
+
 test("deployment baseline documents scripts and environment template", () => {
   const pkg = JSON.parse(read("package.json"));
   assert.equal(Boolean(pkg.scripts["deploy:check"]), true);
@@ -178,12 +224,18 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal(Boolean(pkg.scripts["storage:inspect"]), true);
   assert.equal(Boolean(pkg.scripts["identity:contract"]), true);
   assert.equal(Boolean(pkg.scripts["audit:retention"]), true);
+  assert.equal(Boolean(pkg.scripts["chronic:followup-readiness"]), true);
   assert.equal(Boolean(pkg.scripts["data-quality:report"]), true);
+  assert.equal(Boolean(pkg.scripts["quality-safety:report"]), true);
+  assert.equal(Boolean(pkg.scripts["drug-consumable:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["environment:matrix"]), true);
+  assert.equal(Boolean(pkg.scripts["hospital-operations:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["integration:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["interface:mapping"]), true);
+  assert.equal(Boolean(pkg.scripts["regional-data-sharing:report"]), true);
   assert.equal(Boolean(pkg.scripts["research:sandbox"]), true);
   assert.equal(Boolean(pkg.scripts["monitoring:readiness"]), true);
+  assert.equal(Boolean(pkg.scripts["referral:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["operations:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["process:audit"]), true);
   assert.equal(Boolean(pkg.scripts["site:pack"]), true);
@@ -206,13 +258,19 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /storage-model-inspection\.md/);
   assert.match(read("README.md"), /identity-contract\.md/);
   assert.match(read("README.md"), /audit-retention-report\.md/);
+  assert.match(read("docs/chronic-followup-readiness.md"), /chronic-followup-readiness-report\.md/);
+  assert.match(read("docs/chronic-followup-readiness.md"), /\/api\/chronic\/followup-feedback/);
   assert.match(read("README.md"), /data-quality-report\.md/);
+  assert.match(read("README.md"), /quality-safety-report\.md/);
+  assert.match(read("README.md"), /drug-consumable-readiness-report\.md/);
   assert.match(read("README.md"), /environment-matrix-report\.md/);
   assert.match(read("README.md"), /integration-readiness-report\.md/);
   assert.match(read("README.md"), /interface-mapping-report\.md/);
+  assert.match(read("scripts/release-report.js"), /regional-data-sharing-report\.md/);
   assert.match(read("README.md"), /research-sandbox-readiness-report\.md/);
   assert.match(read("README.md"), /monitoring-readiness-report\.md/);
   assert.match(read("README.md"), /operations-readiness-report\.md/);
+  assert.match(read("README.md"), /hospital-operations-readiness-report\.md/);
   assert.match(read("README.md"), /process-audit-report\.md/);
   assert.match(read("README.md"), /service-acceptance-summary\.md/);
   assert.match(read("README.md"), /\/api\/service-acceptance-summary/);
@@ -226,12 +284,15 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("DEPLOYMENT.md"), /identity-contract\.md/);
   assert.match(read("DEPLOYMENT.md"), /audit-retention-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /data-quality-report\.md/);
+  assert.match(read("DEPLOYMENT.md"), /quality-safety-report\.md/);
+  assert.match(read("DEPLOYMENT.md"), /drug-consumable-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /environment-matrix-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /integration-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /interface-mapping-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /research-sandbox-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /monitoring-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /operations-readiness-report\.md/);
+  assert.match(read("DEPLOYMENT.md"), /hospital-operations-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /process-audit-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /site-readiness-pack\.md/);
   assert.match(read("DEPLOYMENT.md"), /release\/templates\/\*\/README\.md/);
@@ -246,12 +307,19 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/deploy-check.js"), /audit/);
   assert.match(read("scripts/deploy-check.js"), /identity:contract/);
   assert.match(read("scripts/deploy-check.js"), /audit:retention/);
+  assert.match(read("scripts/deploy-check.js"), /chronic:followup-readiness/);
+  assert.match(read("scripts/deploy-check.js"), /chronicFollowupStatusPolicy/);
   assert.match(read("scripts/deploy-check.js"), /data-quality:report/);
+  assert.match(read("scripts/deploy-check.js"), /quality-safety:report/);
+  assert.match(read("scripts/deploy-check.js"), /drug-consumable:readiness/);
   assert.match(read("scripts/deploy-check.js"), /environment:matrix/);
   assert.match(read("scripts/deploy-check.js"), /integration:readiness/);
   assert.match(read("scripts/deploy-check.js"), /interface:mapping/);
+  assert.match(read("scripts/deploy-check.js"), /regional-data-sharing:report/);
   assert.match(read("scripts/deploy-check.js"), /monitoring:readiness/);
+  assert.match(read("scripts/deploy-check.js"), /referral:readiness/);
   assert.match(read("scripts/deploy-check.js"), /operations:readiness/);
+  assert.match(read("scripts/deploy-check.js"), /hospital-operations:readiness/);
   assert.match(read("scripts/deploy-check.js"), /process:audit/);
   assert.match(read("scripts/deploy-check.js"), /site:pack/);
   assert.match(read("scripts/deploy-check.js"), /release:manifest/);
@@ -262,10 +330,17 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".github/workflows/ci.yml"), /npm run storage:inspect/);
   assert.match(read(".github/workflows/ci.yml"), /npm run identity:contract/);
   assert.match(read(".github/workflows/ci.yml"), /npm run audit:retention/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run chronic:followup-readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run data-quality:report/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run quality-safety:report/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run drug-consumable:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run integration:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run interface:mapping/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run regional-data-sharing:report/);
   assert.match(read(".github/workflows/ci.yml"), /npm run monitoring:readiness/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run referral:readiness/);
+  assert.match(read("institution.html"), /teleconsultation-loop/);
+  assert.match(read("county.html"), /county-teleconsultation-loop/);
   assert.match(read(".github/workflows/ci.yml"), /npm run operations:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run site:pack/);
   assert.match(read(".github/workflows/ci.yml"), /npm run production-db:readiness/);
@@ -277,11 +352,34 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".github/workflows/ci.yml"), /npm audit --omit=dev/);
 });
 
+test("regional data sharing application has runnable entry, API and evidence script", () => {
+  const html = read("regional-data-sharing.html");
+  const client = read("regional-data-sharing.js");
+  const server = read("server.js");
+  const script = read("scripts/regional-data-sharing.js");
+  const data = JSON.parse(read("data/db.json"));
+
+  assert.match(html, /区域诊疗数据共享平台/);
+  assert.match(html, /regional-data-sharing\.js/);
+  assert.match(client, /\/api\/regional-data-sharing/);
+  assert.match(client, /调阅留痕/);
+  assert.match(server, /seedRegionalDataSharingScope/);
+  assert.match(server, /createRegionalSharingAccessReview/);
+  assert.match(server, /\/api\/regional-data-sharing\/access-reviews/);
+  assert.match(script, /buildRegionalDataSharingReport/);
+  assert.equal(data.regionalDataSharingScope.reusedCollections.includes("residents"), true);
+  assert.equal(data.regionalDataSharingScope.exclusions.length >= 3, true);
+  assert.equal(data.regionalSharingPackages.length >= 3, true);
+  assert.equal(data.regionalSharingPackages.every((item) => ["ready", "pending_review", "blocked", "archived"].includes(item.status)), true);
+});
+
 test("platform and workbench expose P2 governance and runtime panels", () => {
   const platformHtml = read("platform.html");
   const platformJs = read("platform.js");
   const workbenchHtml = read("workbench.html");
   const workbenchJs = read("workbench.js");
+  const operationsHtml = read("operations.html");
+  const operationsJs = read("operations.js");
   assert.match(platformHtml, /research-governance/);
   assert.match(platformJs, /research-application-form/);
   assert.match(platformJs, /refreshResearchSandboxSummary/);
@@ -354,6 +452,52 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("server.js"), /\/api\/release-report/);
   assert.match(read("server.js"), /\/api\/production-cutover-checklist/);
   assert.match(read("server.js"), /\/api\/release-artifact-manifest/);
+  assert.match(operationsHtml, /operations-snapshots/);
+  assert.match(operationsHtml, /dispatch-form/);
+  assert.match(operationsHtml, /reconciliation-reviews/);
+  assert.match(operationsJs, /fetchOperationsDashboard/);
+  assert.match(operationsJs, /\/operations\/dashboard/);
+  assert.match(operationsJs, /\/operations\/dispatch/);
+  assert.match(operationsJs, /\/operations\/reconciliation/);
+  assert.match(read("server.js"), /\/api\/operations\/dashboard/);
+  assert.match(read("server.js"), /operations-dispatch/);
+  assert.match(read("server.js"), /statistics-reconciliation-review/);
+});
+
+test("quality safety supervision app exposes runnable portal, API and release evidence", () => {
+  const data = JSON.parse(read("data/db.json"));
+  const html = read("quality-safety.html");
+  const js = read("quality-safety.js");
+  const server = read("server.js");
+  ["qualitySafetyEvents", "criticalValueAlerts", "clinicalPathwayCases", "medicalRecordQualityReviews", "mutualRecognitionQualityReviews", "qualityRectificationOrders"].forEach((key) => {
+    assert.equal(Array.isArray(data[key]), true, `${key} should be seeded`);
+    assert.equal(data[key].length > 0, true, `${key} should not be empty`);
+  });
+  ["diagnosticReports", "countyMutualRecognitionRecords", "dataQualityIssues", "institutionCreditEvaluations", "securityEvents", "hospitalInteroperabilityFunctions"].forEach((key) => {
+    assert.match(read("scripts/quality-safety-report.js"), new RegExp(key));
+  });
+  assert.match(html, /quality-safety-metrics/);
+  assert.match(html, /quality-safety-issues/);
+  assert.match(html, /quality-safety-rectifications/);
+  assert.match(js, /loadQualitySafety/);
+  assert.match(js, /dispatchIssue/);
+  assert.match(js, /submitFeedback/);
+  assert.match(js, /reviewOrder/);
+  assert.match(server, /\/api\/quality-safety\/dashboard/);
+  assert.match(server, /\/api\/quality-safety\/issues\/:id\/dispatch/);
+  assert.match(server, /\/api\/quality-safety\/rectifications\/:id\/feedback/);
+  assert.match(server, /\/api\/quality-safety\/rectifications\/:id\/review/);
+  assert.match(read("scripts/release-report.js"), /qualitySafety:report/);
+  assert.match(read("platform.html"), /quality-safety\.html/);
+  assert.match(read("workbench.html"), /quality-safety\.html/);
+  assert.match(read("auth.js"), /quality-safety\.html/);
+  assert.match(read("server.js"), /\/api\/chronic\/followup-summary/);
+  assert.match(read("server.js"), /\/api\/chronic\/followup-feedback/);
+  assert.match(read("server.js"), /\/api\/chronic\/followup-dispatch/);
+  assert.match(read("institution.html"), /chronic-followup-workbench/);
+  assert.match(read("institution.js"), /dispatchChronicFollowup/);
+  assert.match(read("citizen.html"), /followup-feedback-form/);
+  assert.match(read("citizen.js"), /bindFollowupFeedback/);
 });
 
 test("system structure documentation reflects completed local governance loops", () => {

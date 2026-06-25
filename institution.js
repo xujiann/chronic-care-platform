@@ -1,4 +1,4 @@
-const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthStatistics: {}, doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {} };
+const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], referralTeleconsultations: [], medicationPickups: [], chronicScreeningTasks: [], chronicManagementPlans: [], chronicFollowupStatusPolicy: {}, deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthStatistics: {}, doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {} };
 const institutionApiBase = location.protocol === "file:" || location.hostname.endsWith("github.io") ? "" : "/api";
 let platformState = fallbackState;
 
@@ -9,6 +9,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 function renderAll(state) {
+  renderChronicFollowupWorkbench(state);
   populateBirthCertificateForm(state);
   populateMultiPracticeForm(state);
   renderMetrics(state);
@@ -19,6 +20,7 @@ function renderAll(state) {
   renderAuthorizedRecords(state);
   renderClaimLinks(state);
   renderReferralCenter(state);
+  renderTeleconsultationLoop(state);
   renderReservedResources(state);
   renderIntegratedProfiles(state);
   renderStandardArchiveProfiles(state);
@@ -30,8 +32,15 @@ function renderAll(state) {
 
 function bindInstitutionActions() {
   document.addEventListener("click", async (event) => {
-    const button = event.target.closest("[data-workflow-action]");
-    if (!button) return;
+      const button = event.target.closest("[data-workflow-action]");
+      if (!button) return;
+    if (button.dataset.chronicDispatch) {
+      button.disabled = true;
+      const result = await dispatchChronicFollowup(button.dataset.collection, button.dataset.id, JSON.parse(button.dataset.updates || "{}"), button.dataset.note || "chronic follow-up disposition");
+      button.disabled = false;
+      if (result.ok) renderAll(platformState);
+      return;
+    }
     const updates = JSON.parse(button.dataset.updates || "{}");
     button.disabled = true;
     const result = await updateWorkflowAction(platformState, button.dataset.collection, button.dataset.id, updates, button.dataset.note || "机构端更新业务状态");
@@ -46,6 +55,83 @@ function bindInstitutionActions() {
 
 function actionButton(collection, id, label, updates, note) {
   return `<button class="inline-action" type="button" data-workflow-action data-collection="${collection}" data-id="${id}" data-updates='${JSON.stringify(updates)}' data-note="${note || label}">${label}</button>`;
+}
+
+function chronicDispatchButton(collection, id, label, updates, note) {
+  return `<button class="inline-action" type="button" data-workflow-action data-chronic-dispatch="true" data-collection="${collection}" data-id="${id}" data-updates='${JSON.stringify(updates)}' data-note="${note || label}">${label}</button>`;
+}
+
+function chronicClosed(state, status) {
+  const closed = state.chronicFollowupStatusPolicy?.statusGroups?.closed || [];
+  return closed.some((item) => String(status || "").includes(item) || String(item || "").includes(String(status || "")));
+}
+
+function renderChronicFollowupWorkbench(state) {
+  const summaryEl = document.querySelector("#chronic-followup-summary");
+  const metricsEl = document.querySelector("#chronic-followup-metrics");
+  const listEl = document.querySelector("#chronic-followup-workbench");
+  if (!summaryEl || !metricsEl || !listEl) return;
+  const feedback = (state.personalRecords || []).filter((item) => item.category === "chronic-feedback" || item.meta?.followupFeedback);
+  const openFollowups = (state.followups || []).filter((item) => !chronicClosed(state, item.status));
+  const openPlans = (state.chronicManagementPlans || []).filter((item) => !chronicClosed(state, item.status));
+  const openScreenings = (state.chronicScreeningTasks || []).filter((item) => !chronicClosed(state, item.status));
+  const pendingMedication = (state.medicationPickups || []).filter((item) => !chronicClosed(state, item.status || item.pharmacyStatus));
+  summaryEl.textContent = `${openFollowups.length + openPlans.length + openScreenings.length} 项待处置`;
+  metricsEl.innerHTML = [
+    ["筛查分级", openScreenings.length, "高风险发现与分级评估"],
+    ["管理计划", openPlans.length, "复核、升级预警、下次随访"],
+    ["院后随访", openFollowups.length, "逾期、待随访、复诊提醒"],
+    ["用药依从", pendingMedication.length, "固定取药与长处方闭环"],
+    ["居民反馈", feedback.length, "居民端主动回填"]
+  ].map(([label, value, hint]) => `<article class="claim-card"><strong>${label}</strong><span>${value}<br>${hint}</span></article>`).join("");
+
+  const rows = [
+    ...openScreenings.map((item) => ({ ...item, collection: "chronicScreeningTasks", title: item.taskName, due: item.due, primary: "完成评估", updates: { status: "已评估", result: "已生成风险分级和干预建议" } })),
+    ...openPlans.map((item) => ({ ...item, collection: "chronicManagementPlans", title: `${item.diseaseType}管理计划`, due: item.nextReview, primary: "复核完成", updates: { status: "已复核", intervention: "已完成阶段复核并更新管理方案" } })),
+    ...openFollowups.map((item) => ({ ...item, collection: "followups", title: `${item.diseaseType}随访`, due: item.plannedAt, primary: "完成随访", updates: { status: "已完成", result: "已完成院后随访并同步居民反馈" } })),
+    ...pendingMedication.map((item) => ({ ...item, collection: "medicationPickups", title: item.medication, due: item.nextPickup, primary: "确认依从", updates: { status: "已完成", pharmacyStatus: "已取药" } }))
+  ].slice(0, 12);
+  listEl.innerHTML = rows.map((item) => {
+    const resident = residentOf(state, item.residentId);
+    const latestFeedback = feedback.find((record) => record.residentId === item.residentId);
+    return `<section class="item">
+      <div>
+        <h3>${resident?.name || "未知居民"} · ${item.title || item.id}</h3>
+        <p>${item.collection} · ${item.status || "待处理"} · ${item.due || "待排期"} · ${item.assignee || item.owner || item.pharmacy || "责任人待定"}</p>
+        <p>${item.nextStep || item.intervention || item.advice || item.result || "按慢病随访计划处置"}</p>
+        <p>居民反馈：${latestFeedback ? `${latestFeedback.result} · ${latestFeedback.meta?.nextRequest || ""}` : "暂无新增反馈"}</p>
+        <div class="action-row">
+          ${chronicDispatchButton(item.collection, item.id, item.primary, item.updates, `慢病随访处置：${item.primary}`)}
+          ${item.collection === "chronicManagementPlans" ? chronicDispatchButton(item.collection, item.id, "升级预警", { status: "预警中", intervention: "已升级家庭医生重点管理" }, "慢病管理计划升级预警") : ""}
+        </div>
+      </div>
+      <span class="badge ${String(item.status || "").includes("逾期") || String(item.status || "").includes("预警") ? "danger" : "warn"}">${item.status || "待处理"}</span>
+    </section>`;
+  }).join("") || `<p class="muted">暂无待处置慢病随访事项。</p>`;
+}
+
+async function dispatchChronicFollowup(collection, id, updates, note) {
+  if (!institutionApiBase) {
+    Object.assign((platformState[collection] || []).find((item) => item.id === id) || {}, updates, { lastUpdated: new Date().toISOString() });
+    return { ok: true };
+  }
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/chronic/followup-dispatch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ collection, id, updates, status: updates.status, note })
+    });
+    if (!response.ok) throw new Error(`dispatch failed: ${response.status}`);
+    const saved = await response.json();
+    const rows = platformState[collection] || [];
+    const index = rows.findIndex((item) => item.id === id);
+    if (index >= 0) rows[index] = saved;
+    return { ok: true, saved };
+  } catch (error) {
+    alert(error.message || "慢病随访处置失败，请检查登录状态和网络连接");
+    return { ok: false };
+  }
 }
 
 function residentOf(state, id) {
@@ -397,6 +483,32 @@ function renderReferralCenter(state) {
       <span class="badge ${badge}">${item.status}</span>
     </section>`;
   }).join("") || `<p class="muted">暂无转诊中心任务。</p>`;
+}
+
+function renderTeleconsultationLoop(state) {
+  const rows = state.referralTeleconsultations || [];
+  const countEl = document.querySelector("#teleconsultation-count");
+  const listEl = document.querySelector("#teleconsultation-loop");
+  if (!countEl || !listEl) return;
+  countEl.textContent = `${rows.length} items`;
+  listEl.innerHTML = rows.map((item) => {
+    const resident = residentOf(state, item.residentId);
+    const badge = item.priority === "high" ? "danger" : item.reportStatus === "returned" ? "info" : "warn";
+    return `<section class="item">
+      <div>
+        <h3>${resident?.name || "Unknown resident"} · ${item.department || item.diseaseType || "Teleconsultation"}</h3>
+        <p>${item.sourceInstitution || "-"} -> ${item.targetInstitution || "-"} · ${item.meetingWindow || item.due || "-"}</p>
+        <p>${item.clinicalQuestion || item.receivingFeedback || item.reportSummary || "Pending clinical note"}</p>
+        <p>Authorization: ${item.authorizationStatus || "pending"} · Report: ${item.reportStatus || "pending"}</p>
+        <div class="action-row">
+          ${item.status === "requested" ? actionButton("referralTeleconsultations", item.id, "Accept", { status: "accepted", receivingFeedback: "Receiving institution accepted the teleconsultation." }, "Accept referral teleconsultation") : ""}
+          ${item.reportStatus !== "returned" ? actionButton("referralTeleconsultations", item.id, "Return report", { status: "report-returned", reportStatus: "returned", reportSummary: "Consultation report returned to the originating institution." }, "Return teleconsultation report") : ""}
+          ${item.status !== "closed" ? actionButton("referralTeleconsultations", item.id, "Close", { status: "closed" }, "Close referral teleconsultation loop") : ""}
+        </div>
+      </div>
+      <span class="badge ${badge}">${item.status}</span>
+    </section>`;
+  }).join("") || `<p class="muted">No referral teleconsultation tasks.</p>`;
 }
 
 function renderReservedResources(state) {

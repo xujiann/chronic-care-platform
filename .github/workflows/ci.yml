@@ -43,12 +43,20 @@ jobs:
         run: npm run identity:contract
       - name: Generate audit retention report
         run: npm run audit:retention
+      - name: Generate chronic follow-up readiness report
+        run: npm run chronic:followup-readiness
       - name: Generate data quality report
         run: npm run data-quality:report
+      - name: Generate medical quality and safety report
+        run: npm run quality-safety:report
+      - name: Generate drug consumable readiness report
+        run: npm run drug-consumable:readiness
       - name: Generate integration readiness report
         run: npm run integration:readiness
       - name: Generate interface mapping report
         run: npm run interface:mapping
+      - name: Generate regional data sharing report
+        run: npm run regional-data-sharing:report
       - name: Generate research sandbox readiness report
         run: npm run research:sandbox
       - name: Generate monitoring readiness report
@@ -61,6 +69,8 @@ jobs:
         run: npm run production-db:readiness
       - name: Generate interoperability evaluation evidence
         run: npm run evaluation:evidence
+      - name: Generate referral teleconsultation readiness report
+        run: npm run referral:readiness
       - name: Generate release artifact manifest
         run: npm run release:manifest
       - name: Generate release readiness report

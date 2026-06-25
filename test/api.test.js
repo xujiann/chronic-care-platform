@@ -153,6 +153,17 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(readiness.body.externalDependencySummary.total, readiness.body.externalDependencies.length);
     assert.equal(readiness.body.externalDependencySummary.high >= 3, true);
 
+    const healthDashboard = await api(baseUrl, "/api/health-dashboard/summary", authorized(accountLogin.body.token));
+    assert.equal(healthDashboard.response.status, 200);
+    assert.equal(healthDashboard.body.ok, true);
+    assert.equal(healthDashboard.body.applications.length, 8);
+    assert.equal(healthDashboard.body.totals.sourceApplications, 7);
+    assert.equal(healthDashboard.body.scope.role, "priority-eight-application-portfolio");
+    assert.equal(healthDashboard.body.applications.some((item) => item.entry === "health-dashboard.html"), true);
+    assert.equal(healthDashboard.body.applications.every((item) => item.functionalBoundary && item.apiRoutes?.length && item.frontendEntry && item.testEvidence?.length && item.acceptanceEvidence?.length), true);
+    assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:development-template" && item.passed), true);
+    assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:source-boundary" && item.passed), true);
+
     const processAudit = await api(baseUrl, "/api/process-audit", authorized(accountLogin.body.token));
     assert.equal(processAudit.response.status, 200);
     assert.equal(processAudit.body.ok, true);
@@ -203,6 +214,40 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(managementFunctions.body.summary.total >= 6, true);
     assert.equal(managementFunctions.body.functions.some((item) => item.id === "mgmt-medical-quality" && item.ready), true);
     assert.equal(managementFunctions.body.functions.some((item) => item.id === "mgmt-public-health" && item.sourceSystems.length >= 4), true);
+
+    const operationsDashboard = await api(baseUrl, "/api/operations/dashboard", authorized(accountLogin.body.token));
+    assert.equal(operationsDashboard.response.status, 200);
+    assert.equal(operationsDashboard.body.ok, true);
+    assert.equal(operationsDashboard.body.summary.institutions >= 3, true);
+    assert.equal(operationsDashboard.body.summary.openDispatchRequests >= 2, true);
+    assert.equal(operationsDashboard.body.snapshots.some((item) => item.normalizedStatus === "critical"), true);
+    assert.equal(operationsDashboard.body.reusedCollections.includes("healthStatisticsIngestion"), true);
+
+    const dispatchAction = await api(baseUrl, "/api/operations/dispatch", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        id: "dispatch-api-test",
+        category: "equipment",
+        priority: "high",
+        status: "assigned",
+        sourceInstitution: "Qingniwaqiao Community Health Service Center",
+        targetInstitution: "Dalian Central Hospital",
+        resourceType: "ct-slot",
+        quantity: 2,
+        reason: "API regression dispatch"
+      })
+    }));
+    assert.equal(dispatchAction.response.status, 201);
+    assert.equal(dispatchAction.body.id, "dispatch-api-test");
+    assert.equal(dispatchAction.body.auditTrail.some((item) => item.action === "upsert"), true);
+
+    const reconReview = await api(baseUrl, "/api/operations/reconciliation/recon-mr1-20260622-am/review", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ status: "approved", reviewNote: "API regression approved" })
+    }));
+    assert.equal(reconReview.response.status, 200);
+    assert.equal(reconReview.body.status, "approved");
+    assert.equal(reconReview.body.reviewedBy, "health");
 
     const identityPreview = await api(baseUrl, "/api/auth/identity/preview", authorized(accountLogin.body.token, {
       method: "POST",
@@ -277,7 +322,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(body.institutionCreditEvaluations.length, 3);
     assert.equal(body.securityAcceptanceLedger.length, 4);
     assert.equal(body.productionDeploymentPlan.length, 4);
-    ["residents", "personalRecords", "platformEvidence", "productionDeploymentPlan", "applicationCatalog", "hospitalInteroperabilityFunctions", "institutionCreditEvaluations", "securityAcceptanceLedger"].forEach((key) => {
+    assert.equal(body.healthDashboardSnapshots.length, 1);
+    ["residents", "personalRecords", "platformEvidence", "productionDeploymentPlan", "applicationCatalog", "hospitalInteroperabilityFunctions", "institutionCreditEvaluations", "securityAcceptanceLedger", "healthDashboardSnapshots"].forEach((key) => {
       assert.ok(Array.isArray(body[key]), `${key} should keep array contract`);
     });
   });
@@ -302,6 +348,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       "platformAudit",
       "platformProcessAudit",
       "productionDeploymentPlan",
+      "healthDashboardSnapshots",
       "applicationCatalog",
       "hospitalInteroperabilityFunctions",
       "institutionCreditEvaluations",
@@ -422,6 +469,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       body: JSON.stringify({ collection: "insuranceClaims", id: "ic1", status: "已通过" })
     }));
     assert.equal(workflowWrite.response.status, 403);
+    const referralTeleconsultations = await api(baseUrl, "/api/referral-teleconsultations", authorized(citizenToken));
+    assert.equal(referralTeleconsultations.response.status, 403);
   });
 
   await t.test("accepts signed idempotent integration gateway events", async () => {
@@ -581,6 +630,19 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const countyServiceTask = countyTasks.body.tasks.find((item) => item.collection === "countyCollaborationOrders");
     assert.equal(countyServiceTask.serviceDomain, "collaboration");
     assert.equal(countyServiceTask.priorityLevel, "high");
+    const countyTeleconsultationTask = countyTasks.body.tasks.find((item) => item.collection === "referralTeleconsultations");
+    assert.equal(countyTeleconsultationTask.serviceDomain, "referralTeleconsultation");
+
+    const teleconsultations = await api(baseUrl, "/api/referral-teleconsultations", authorized(county.body.token));
+    assert.equal(teleconsultations.response.status, 200);
+    assert.equal(teleconsultations.body.summary.total >= 2, true);
+    assert.equal(teleconsultations.body.summary.reportReturned >= 1, true);
+    const teleconsultationAction = await api(baseUrl, "/api/referral-teleconsultations/rtc-001/actions", authorized(county.body.token, {
+      method: "POST",
+      body: JSON.stringify({ status: "feedback-returned", feedback: "County office confirmed receiving feedback.", note: "county follow-up" })
+    }));
+    assert.equal(teleconsultationAction.response.status, 200);
+    assert.equal(teleconsultationAction.body.status, "feedback-returned");
 
     const taskHandled = await api(baseUrl, `/api/tasks/${encodeURIComponent(`emergencySignals:${critical.body.criticalSignal.id}`)}/actions`, authorized(county.body.token, {
       method: "POST",
@@ -721,6 +783,56 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(chronicRisk.body.queue.some((item) => item.residentId === "r1" && item.priority === "high"), true);
     assert.equal(chronicRisk.body.queue.every((item) => item.nextAction && item.serviceLevel && item.openCounts), true);
 
+    const chronicFollowupSummary = await api(baseUrl, "/api/chronic/followup-summary", authorized(commissionToken));
+    assert.equal(chronicFollowupSummary.response.status, 200);
+    assert.equal(chronicFollowupSummary.body.ok, true);
+    assert.equal(chronicFollowupSummary.body.summary.feedbackRecords >= 1, true);
+    assert.equal(chronicFollowupSummary.body.residents.some((item) => item.residentId === "r1" && item.medicationAdherence.total >= 1), true);
+
+    const citizenFollowupSummary = await api(baseUrl, "/api/chronic/followup-summary?residentId=r1", authorized(citizen.body.token));
+    assert.equal(citizenFollowupSummary.response.status, 200);
+    assert.equal(citizenFollowupSummary.body.residents.every((item) => ["r1"].includes(item.residentId)), true);
+
+    const feedback = await api(baseUrl, "/api/chronic/followup-feedback", authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        followupId: "f1",
+        medicationTaken: true,
+        symptoms: "home blood pressure remains high",
+        nextRequest: "family doctor phone review"
+      })
+    }));
+    assert.equal(feedback.response.status, 201);
+    assert.equal(feedback.body.category, "chronic-feedback");
+    assert.equal(feedback.body.meta.followupId, "f1");
+
+    const feedbackDenied = await api(baseUrl, "/api/chronic/followup-feedback", authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({ residentId: "r2", followupId: "f2", feedback: "tampered resident" })
+    }));
+    assert.equal(feedbackDenied.response.status, 403);
+
+    const dispatched = await api(baseUrl, "/api/chronic/followup-dispatch", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({
+        collection: "followups",
+        id: "f1",
+        status: "已完成",
+        updates: { result: "completed after resident feedback" },
+        note: "closed by commission regression test"
+      })
+    }));
+    assert.equal(dispatched.response.status, 200);
+    assert.equal(dispatched.body.status, "已完成");
+    assert.equal(dispatched.body.disposition, "handled");
+
+    const dispatchDenied = await api(baseUrl, "/api/chronic/followup-dispatch", authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({ collection: "followups", id: "f2", status: "已完成" })
+    }));
+    assert.equal(dispatchDenied.response.status, 403);
+
     const chronicDenied = await api(baseUrl, "/api/chronic/acceptance-ledger", authorized(insurance.body.token));
     assert.equal(chronicDenied.response.status, 403);
     const chronicRiskDenied = await api(baseUrl, "/api/chronic/risk-stratification", authorized(insurance.body.token));
@@ -837,6 +949,52 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(denied.response.status, 403);
   });
 
+  await t.test("supports regional diagnosis data sharing with role scoping and access audit", async () => {
+    const commission = await api(baseUrl, "/api/regional-data-sharing", authorized(commissionToken));
+    assert.equal(commission.response.status, 200);
+    assert.equal(commission.body.scope.name, "区域诊疗数据共享平台");
+    assert.equal(commission.body.summary.totalPackages >= 3, true);
+    assert.equal(commission.body.packages.some((item) => item.id === "rsp-r3-imaging"), true);
+    assert.equal(commission.body.scope.exclusions.some((item) => item.includes("HIS")), true);
+
+    const hospital = await login(baseUrl, "hospital");
+    const institutionView = await api(baseUrl, "/api/regional-data-sharing", authorized(hospital.body.token));
+    assert.equal(institutionView.response.status, 200);
+    assert.equal(institutionView.body.packages.some((item) => item.id === "rsp-r1-hypertension"), true);
+    assert.equal(institutionView.body.packages.some((item) => item.id === "rsp-r2-diabetes"), true);
+    assert.equal(institutionView.body.packages.some((item) => item.id === "rsp-r3-imaging"), false);
+    assert.equal(institutionView.body.packages.every((item) => !String(item.resident?.idCard || "").startsWith("DEMO-ID-")), true);
+
+    const accessReview = await api(baseUrl, "/api/regional-data-sharing/access-reviews", authorized(hospital.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        packageId: "rsp-r2-diabetes",
+        decision: "approved",
+        purpose: "接续糖尿病复查前调阅区域检验报告",
+        note: "机构端确认本次调阅范围。"
+      })
+    }));
+    assert.equal(accessReview.response.status, 201);
+    assert.equal(accessReview.body.review.packageId, "rsp-r2-diabetes");
+    assert.equal(accessReview.body.package.lastAccessReviewId, accessReview.body.review.id);
+
+    const refreshed = await api(baseUrl, "/api/regional-data-sharing", authorized(hospital.body.token));
+    assert.equal(refreshed.body.accessReviews.some((item) => item.id === accessReview.body.review.id), true);
+    const commissionState = await api(baseUrl, "/api/state", authorized(commissionToken));
+    assert.equal(commissionState.body.dataAccessLogs.some((item) => item.scope === "regionalDataSharing" && item.residentId === "r2"), true);
+
+    const community = await login(baseUrl, "community");
+    const deniedPackage = await api(baseUrl, "/api/regional-data-sharing/access-reviews", authorized(community.body.token, {
+      method: "POST",
+      body: JSON.stringify({ packageId: "rsp-r3-imaging", decision: "approved", purpose: "越权调阅测试" })
+    }));
+    assert.equal(deniedPackage.response.status, 403);
+
+    const insurance = await login(baseUrl, "insurance");
+    const insuranceView = await api(baseUrl, "/api/regional-data-sharing", authorized(insurance.body.token));
+    assert.equal(insuranceView.response.status, 403);
+  });
+
   await t.test("enforces workflow collection ownership and protects structural fields", async () => {
     const institution = await login(baseUrl, "hospital");
     const insurance = await login(baseUrl, "insurance");
@@ -905,6 +1063,49 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     }));
     assert.equal(medicationSupportAllowed.response.status, 200);
     assert.equal(medicationSupportAllowed.body.stockStatus, "已完成库存复核");
+  });
+
+  await t.test("supports drug consumable supervision roles, review, remediation and insurance sync", async () => {
+    const insurance = await login(baseUrl, "insurance");
+    const institution = await login(baseUrl, "hospital");
+    const citizen = await login(baseUrl, "citizen");
+
+    const denied = await api(baseUrl, "/api/drug-consumable-supervision", authorized(citizen.body.token));
+    assert.equal(denied.response.status, 403);
+
+    const supervision = await api(baseUrl, "/api/drug-consumable-supervision", authorized(insurance.body.token));
+    assert.equal(supervision.response.status, 200);
+    assert.equal(supervision.body.summary.total >= 3, true);
+    assert.equal(supervision.body.boundaries.some((item) => item.id === "rational-medication"), true);
+    assert.equal(supervision.body.insuranceCoordination.contractId, "insurance-settlement-v1");
+
+    const review = await api(baseUrl, "/api/drug-consumable-supervision/dcs-rational-r1/review", authorized(insurance.body.token, {
+      method: "POST",
+      body: JSON.stringify({ reviewStatus: "review-passed", insuranceStatus: "coordinating", status: "in-review" })
+    }));
+    assert.equal(review.response.status, 200);
+    assert.equal(review.body.reviewStatus, "review-passed");
+    assert.equal(review.body.auditTrail[0].action, "drug-consumable-review");
+
+    const syncDenied = await api(baseUrl, "/api/drug-consumable-supervision/dcs-rational-r1/insurance-sync", authorized(institution.body.token, {
+      method: "POST",
+      body: JSON.stringify({ insuranceStatus: "synced" })
+    }));
+    assert.equal(syncDenied.response.status, 403);
+
+    const remediation = await api(baseUrl, "/api/drug-consumable-supervision/dcs-consumable-mr1/remediation", authorized(institution.body.token, {
+      method: "POST",
+      body: JSON.stringify({ remediationStatus: "submitted", evidence: "institution-uploaded-catalog-version" })
+    }));
+    assert.equal(remediation.response.status, 200);
+    assert.equal(remediation.body.remediationStatus, "submitted");
+
+    const sync = await api(baseUrl, "/api/drug-consumable-supervision/dcs-rational-r1/insurance-sync", authorized(insurance.body.token, {
+      method: "POST",
+      body: JSON.stringify({ insuranceStatus: "synced", settlementBatch: "batch-202606" })
+    }));
+    assert.equal(sync.response.status, 200);
+    assert.equal(sync.body.settlementBatch, "batch-202606");
   });
 
   await t.test("allows commission state persistence without losing governance collections", async () => {
