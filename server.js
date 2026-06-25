@@ -4959,9 +4959,9 @@ function buildDataQualityScorecard(data) {
 
 function normalizeQualitySafetyStatus(status) {
   const text = String(status || "open").trim().toLowerCase();
-  if (/closed|resolved|approved|review_passed|completed|recognized/.test(text)) return "closed";
+  if (/closed|resolved|approved|review_passed|completed|recognized|disposed/.test(text)) return "closed";
   if (/feedback|submitted|review/.test(text)) return "reviewing";
-  if (/dispatch|in_progress|pending_disposition|variance_open|escalat/.test(text)) return "in_progress";
+  if (/dispatch|in_progress|pending_disposition|acknowledg|variance_open|escalat/.test(text)) return "in_progress";
   if (/reject|returned|overdue/.test(text)) return "returned";
   return "open";
 }
@@ -5079,6 +5079,20 @@ function buildQualitySafetyInstitutionRisks(issues, rectifications) {
     .slice(0, 10);
 }
 
+function buildQualitySafetyCriticalAlerts(data, user) {
+  const rows = (Array.isArray(data.criticalValueAlerts) ? data.criticalValueAlerts : []).map((item) => ({
+    ...item,
+    ownerRole: "institution",
+    institutionName: item.targetInstitution || item.sourceInstitution,
+    sourceCollection: "criticalValueAlerts",
+    sourceId: item.id,
+    normalizedStatus: normalizeQualitySafetyStatus(item.status),
+    acknowledgementComplete: Boolean(item.acknowledgedAt),
+    dispositionComplete: Boolean(item.disposedAt)
+  }));
+  return qualitySafetyVisibleRows(rows, user);
+}
+
 function qualitySafetyVisibleRows(rows, user) {
   if (user.role === "commission") return rows;
   if (user.role === "county") {
@@ -5149,6 +5163,7 @@ function buildQualitySafetyDashboard(data, user) {
   const issues = qualitySafetyVisibleRows(buildQualitySafetyIssues(data), user);
   const rectifications = qualitySafetyVisibleRows(Array.isArray(data.qualityRectificationOrders) ? data.qualityRectificationOrders : [], user)
     .map((item) => ({ ...item, normalizedStatus: normalizeQualitySafetyStatus(item.status), ...qualitySafetySlaState(item) }));
+  const criticalValueAlerts = buildQualitySafetyCriticalAlerts(data, user);
   const institutionRisks = buildQualitySafetyInstitutionRisks(issues, rectifications);
   const slaSummary = {
     overdue: rectifications.filter((item) => item.slaStatus === "overdue").length,
@@ -5165,7 +5180,9 @@ function buildQualitySafetyDashboard(data, user) {
     closed: issues.filter((item) => item.normalizedStatus === "closed").length,
     rectifications: rectifications.length,
     sla: slaSummary,
-    criticalValues: Array.isArray(data.criticalValueAlerts) ? data.criticalValueAlerts.length : 0,
+    criticalValues: criticalValueAlerts.length,
+    criticalValuesPending: criticalValueAlerts.filter((item) => item.normalizedStatus !== "closed").length,
+    criticalValuesDisposed: criticalValueAlerts.filter((item) => item.dispositionComplete).length,
     clinicalPathways: Array.isArray(data.clinicalPathwayCases) ? data.clinicalPathwayCases.length : 0,
     medicalRecordReviews: Array.isArray(data.medicalRecordQualityReviews) ? data.medicalRecordQualityReviews.length : 0,
     mutualRecognitionReviews: Array.isArray(data.mutualRecognitionQualityReviews) ? data.mutualRecognitionQualityReviews.length : 0
@@ -5197,7 +5214,7 @@ function buildQualitySafetyDashboard(data, user) {
     institutionRisks,
     issues,
     rectifications,
-    criticalValueAlerts: Array.isArray(data.criticalValueAlerts) ? data.criticalValueAlerts : [],
+    criticalValueAlerts,
     clinicalPathwayCases: Array.isArray(data.clinicalPathwayCases) ? data.clinicalPathwayCases : [],
     medicalRecordQualityReviews: Array.isArray(data.medicalRecordQualityReviews) ? data.medicalRecordQualityReviews : [],
     mutualRecognitionQualityReviews: Array.isArray(data.mutualRecognitionQualityReviews) ? data.mutualRecognitionQualityReviews : [],
@@ -6187,6 +6204,82 @@ async function handleApi(req, res) {
     appendQualitySafetyAudit(data, user, "quality-safety escalation", id, `${escalation.level}: ${escalation.reason}`);
     writeDatabase(data);
     sendJson(res, 200, { ...orders[index], ...qualitySafetySlaState(orders[index], new Date(now)) });
+    return;
+  }
+
+  const qualityCriticalAckMatch = url.pathname.match(/^\/api\/quality-safety\/critical-values\/([^/]+)\/acknowledge$/);
+  if (req.method === "POST" && qualityCriticalAckMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/quality-safety/critical-values/:id/acknowledge");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(qualityCriticalAckMatch[1]);
+    const alerts = Array.isArray(data.criticalValueAlerts) ? data.criticalValueAlerts : [];
+    const index = alerts.findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Critical value alert not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const now = new Date().toISOString();
+    const acknowledgement = {
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      note: String(payload.note || payload.comment || "Critical value acknowledged.").trim()
+    };
+    alerts[index] = {
+      ...alerts[index],
+      status: normalizeQualitySafetyStatus(alerts[index].status) === "closed" ? alerts[index].status : "acknowledged",
+      acknowledgedAt: alerts[index].acknowledgedAt || now,
+      acknowledgement,
+      auditTrail: [{ at: now, by: user.username || user.role, action: "acknowledge", note: acknowledgement.note }, ...(alerts[index].auditTrail || [])].slice(0, 50)
+    };
+    data.criticalValueAlerts = alerts;
+    appendQualitySafetyAudit(data, user, "quality-safety critical value acknowledgement", id, acknowledgement.note);
+    writeDatabase(data);
+    sendJson(res, 200, { ...alerts[index], normalizedStatus: normalizeQualitySafetyStatus(alerts[index].status), acknowledgementComplete: true, dispositionComplete: Boolean(alerts[index].disposedAt) });
+    return;
+  }
+
+  const qualityCriticalDisposeMatch = url.pathname.match(/^\/api\/quality-safety\/critical-values\/([^/]+)\/dispose$/);
+  if (req.method === "POST" && qualityCriticalDisposeMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/quality-safety/critical-values/:id/dispose");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(qualityCriticalDisposeMatch[1]);
+    const alerts = Array.isArray(data.criticalValueAlerts) ? data.criticalValueAlerts : [];
+    const index = alerts.findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Critical value alert not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const now = new Date().toISOString();
+    const disposition = {
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      action: String(payload.action || payload.disposition || "Responsible physician notified and disposition note completed.").trim(),
+      outcome: String(payload.outcome || "disposed").trim()
+    };
+    alerts[index] = {
+      ...alerts[index],
+      status: "disposed",
+      acknowledgedAt: alerts[index].acknowledgedAt || now,
+      disposedAt: now,
+      disposition,
+      action: disposition.action,
+      auditTrail: [{ at: now, by: user.username || user.role, action: "dispose", note: disposition.action }, ...(alerts[index].auditTrail || [])].slice(0, 50)
+    };
+    data.criticalValueAlerts = alerts;
+    data.qualitySafetyEvents = (Array.isArray(data.qualitySafetyEvents) ? data.qualitySafetyEvents : []).map((item) => item.id === alerts[index].eventId ? {
+      ...item,
+      status: "closed",
+      auditTrail: [{ at: now, by: user.username || user.role, action: "critical-value-disposition", note: disposition.action }, ...(item.auditTrail || [])].slice(0, 50)
+    } : item);
+    appendQualitySafetyAudit(data, user, "quality-safety critical value disposition", id, disposition.action);
+    writeDatabase(data);
+    sendJson(res, 200, { ...alerts[index], normalizedStatus: normalizeQualitySafetyStatus(alerts[index].status), acknowledgementComplete: true, dispositionComplete: true });
     return;
   }
 

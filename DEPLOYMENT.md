@@ -249,7 +249,7 @@ npm.cmd run rollback:snapshot -- "data/backups/<备份目录>"
 
 ## Medical quality and safety supervision release boundary
 
-Run `npm.cmd run quality-safety:report` before release. The generated `release/quality-safety-report.md` and `release/quality-safety-report.json` prove the demo boundary for medical quality, safety events, critical values, clinical pathways, medical record QC, mutual-recognition QC, dispatch, feedback, review, permission trimming, and audit evidence.
+Run `npm.cmd run quality-safety:report` before release. The generated `release/quality-safety-report.md` and `release/quality-safety-report.json` prove the demo boundary for medical quality, safety events, critical value acknowledgement and disposition, clinical pathways, medical record QC, mutual-recognition QC, dispatch, feedback, review, permission trimming, and audit evidence.
 
 Site joint testing still requires live HIS/EMR/LIS/PACS feeds, production critical-value acknowledgement routing, medical-record sampling signatures, clinical pathway rule dictionaries, mutual-recognition QC rules, and department rectification sign-off attachments.
 
@@ -258,3 +258,5 @@ Role boundary: commission owns dispatch and final review; institution and county
 SLA boundary: the demo computes rectification due-date status and supports commission escalation. Production joint testing must confirm site SLA thresholds, notification recipients, escalation levels, and signed evidence retention rules.
 
 Risk-ranking boundary: institution priority is derived from demo severity, open issue, SLA, feedback, evidence, and escalation signals. Production joint testing must confirm scoring weights, per-specialty thresholds, and whether county consortium views inherit city-wide or member-only ranking scopes.
+
+Critical-value boundary: the demo records acknowledgement and disposition actions with audit trail updates. Production joint testing must bind real LIS/PACS/HIS alerts, phone or message acknowledgement receipts, responsible physician identity, disposition note signatures, and timeout escalation rules.

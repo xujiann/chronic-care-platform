@@ -130,11 +130,15 @@ function renderRectifications(rows) {
 }
 
 function renderCritical(rows) {
+  const canHandleCritical = ["institution", "commission"].includes(qualitySafetyState?.role || "");
   setHtml("quality-safety-critical", rows.map((item) => `
     <div class="rule-card">
       <strong>${text(item.item)} ${text(item.value)}</strong>
       <span>${statusLabel(item.status)}</span>
       <p>${text(item.action)}</p>
+      <small>${item.acknowledgementComplete ? "acknowledged" : "pending acknowledgement"} / ${item.dispositionComplete ? "disposed" : "pending disposition"}</small>
+      ${canHandleCritical && !item.acknowledgementComplete ? `<button class="inline-action" type="button" data-critical-ack="${item.id}">Acknowledge</button>` : ""}
+      ${canHandleCritical && item.acknowledgementComplete && !item.dispositionComplete ? `<button class="inline-action" type="button" data-critical-dispose="${item.id}">Dispose</button>` : ""}
     </div>
   `).join(""));
 }
@@ -227,15 +231,40 @@ async function escalateOrder(orderId) {
   await loadQualitySafety();
 }
 
+async function acknowledgeCritical(alertId) {
+  await qualityApi(`/quality-safety/critical-values/${encodeURIComponent(alertId)}/acknowledge`, {
+    method: "POST",
+    body: JSON.stringify({
+      note: "Critical value acknowledged from the quality-safety portal."
+    })
+  });
+  await loadQualitySafety();
+}
+
+async function disposeCritical(alertId) {
+  await qualityApi(`/quality-safety/critical-values/${encodeURIComponent(alertId)}/dispose`, {
+    method: "POST",
+    body: JSON.stringify({
+      action: "Responsible physician notified; disposition note completed in the source system.",
+      outcome: "disposed"
+    })
+  });
+  await loadQualitySafety();
+}
+
 document.addEventListener("click", (event) => {
   const dispatch = event.target.closest("[data-dispatch]");
   const feedback = event.target.closest("[data-feedback]");
   const review = event.target.closest("[data-review]");
   const escalate = event.target.closest("[data-escalate]");
+  const criticalAck = event.target.closest("[data-critical-ack]");
+  const criticalDispose = event.target.closest("[data-critical-dispose]");
   if (dispatch) dispatchIssue(dispatch.dataset.dispatch).catch((error) => alert(error.message));
   if (feedback) submitFeedback(feedback.dataset.feedback).catch((error) => alert(error.message));
   if (review) reviewOrder(review.dataset.review).catch((error) => alert(error.message));
   if (escalate) escalateOrder(escalate.dataset.escalate).catch((error) => alert(error.message));
+  if (criticalAck) acknowledgeCritical(criticalAck.dataset.criticalAck).catch((error) => alert(error.message));
+  if (criticalDispose) disposeCritical(criticalDispose.dataset.criticalDispose).catch((error) => alert(error.message));
 });
 
 loadQualitySafety();

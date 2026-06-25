@@ -29,7 +29,9 @@ const REQUIRED_ROUTES = [
   "/api/quality-safety/issues/:id/dispatch",
   "/api/quality-safety/rectifications/:id/feedback",
   "/api/quality-safety/rectifications/:id/review",
-  "/api/quality-safety/rectifications/:id/escalate"
+  "/api/quality-safety/rectifications/:id/escalate",
+  "/api/quality-safety/critical-values/:id/acknowledge",
+  "/api/quality-safety/critical-values/:id/dispose"
 ];
 
 function readJson(relativePath) {
@@ -161,6 +163,17 @@ function buildQualitySafetyReport(options = {}) {
   const data = options.data || readJson("data/db.json");
   const server = options.serverSource || read("server.js");
   const qualityEvents = arrayOf(data, "qualitySafetyEvents");
+  const criticalRows = arrayOf(data, "criticalValueAlerts").map((item) => ({
+    id: item.id,
+    eventId: item.eventId,
+    item: item.item,
+    value: item.value,
+    threshold: item.threshold,
+    status: item.status || "open",
+    acknowledged: Boolean(item.acknowledgedAt),
+    disposed: Boolean(item.disposedAt),
+    action: item.action || item.disposition?.action || ""
+  }));
   const rectifications = arrayOf(data, "qualityRectificationOrders");
   const boundaryRows = [
     { id: "medical-quality", collection: "qualitySafetyEvents", modeled: qualityEvents.some((item) => item.domain === "medical_quality") },
@@ -218,7 +231,8 @@ function buildQualitySafetyReport(options = {}) {
     { id: "quality-safety:closed-loop", passed: stateRows.some((item) => item.feedbackCount > 0 && item.auditCount > 0), detail: `${stateRows.length} rectification orders` },
     { id: "quality-safety:sla", passed: stateRows.every((item) => item.slaStatus !== "unscheduled"), detail: `overdue=${slaSummary.overdue}, dueSoon=${slaSummary.dueSoon}, onTrack=${slaSummary.onTrack}` },
     { id: "quality-safety:evidence", passed: stateRows.some((item) => item.evidenceComplete), detail: `${slaSummary.evidenceComplete}/${stateRows.length} rectifications have feedback and audit evidence` },
-    { id: "quality-safety:risk-ranking", passed: institutionRisks.length > 0 && institutionRisks[0].score > 0, detail: `${institutionRisks.length} ranked institutions` }
+    { id: "quality-safety:risk-ranking", passed: institutionRisks.length > 0 && institutionRisks[0].score > 0, detail: `${institutionRisks.length} ranked institutions` },
+    { id: "quality-safety:critical-value-loop", passed: criticalRows.length > 0 && criticalRows.every((item) => item.threshold && item.action), detail: `${criticalRows.length} critical value alerts; ${criticalRows.filter((item) => item.disposed).length} disposed` }
   ];
   return {
     ok: checks.every((item) => item.passed),
@@ -230,13 +244,20 @@ function buildQualitySafetyReport(options = {}) {
       reusedCollections: reusedRows.length,
       openRectifications: stateRows.filter((item) => !item.closed).length,
       sla: slaSummary,
-      riskHotspots: institutionRisks.filter((item) => item.riskLevel === "high").length
+      riskHotspots: institutionRisks.filter((item) => item.riskLevel === "high").length,
+      criticalValues: {
+        total: criticalRows.length,
+        acknowledged: criticalRows.filter((item) => item.acknowledged).length,
+        disposed: criticalRows.filter((item) => item.disposed).length,
+        pending: criticalRows.filter((item) => !item.disposed).length
+      }
     },
     boundaries: boundaryRows,
     collections: collectionRows,
     reusedCollections: reusedRows,
     routes: routeRows,
     institutionRisks,
+    criticalValues: criticalRows,
     rectifications: stateRows,
     checks
   };
@@ -252,6 +273,7 @@ function renderMarkdown(report) {
     `- Open rectifications: ${report.summary.openRectifications}`,
     `- SLA: overdue ${report.summary.sla.overdue}, due soon ${report.summary.sla.dueSoon}, on track ${report.summary.sla.onTrack}`,
     `- Risk hotspots: ${report.summary.riskHotspots}`,
+    `- Critical values: ${report.summary.criticalValues.total}, pending disposition ${report.summary.criticalValues.pending}`,
     "",
     "## Checks",
     "",
@@ -276,6 +298,12 @@ function renderMarkdown(report) {
     "| Institution | Level | Score | Open issues | Due soon | Overdue | Drivers |",
     "|---|---|---:|---:|---:|---:|---|",
     ...report.institutionRisks.map((item) => `| ${item.institutionName} | ${item.riskLevel} | ${item.score} | ${item.openIssues} | ${item.dueSoon} | ${item.overdue} | ${item.drivers.join(", ")} |`),
+    "",
+    "## Critical Value Loop",
+    "",
+    "| Alert | Item | Threshold | Status | Acknowledged | Disposed | Action |",
+    "|---|---|---|---|---|---|---|",
+    ...report.criticalValues.map((item) => `| ${item.id} | ${item.item} ${item.value} | ${item.threshold} | ${item.status} | ${item.acknowledged ? "yes" : "no"} | ${item.disposed ? "yes" : "no"} | ${String(item.action || "").replace(/\|/g, "/")} |`),
     "",
     "## Rectification SLA",
     "",
