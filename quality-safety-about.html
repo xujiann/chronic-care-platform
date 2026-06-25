@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>关于医疗质量与安全监管平台</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+    <script>window.HealthCityAuth.requireRole(["commission", "institution", "county"])</script>
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>Priority application 3</span>
+          <h1>关于医疗质量与安全监管平台</h1>
+          <p>面向卫健监管、医疗机构质控和县域医共体协同，说明本应用的政策依据、功能边界、数据来源、审计要求和现场联调范围。</p>
+        </div>
+        <nav>
+          <a href="./quality-safety.html">监管平台</a>
+          <a href="./workbench.html">工作台</a>
+          <a href="./platform.html">平台总览</a>
+          <a href="./about.html">全站关于</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" data-quality-safety-about="summary">
+        <article class="metric-card">
+          <span>监管对象</span>
+          <strong>6 类</strong>
+          <small>质量事件、危急值、临床路径、病历质控、互认质控、整改闭环</small>
+        </article>
+        <article class="metric-card">
+          <span>可用角色</span>
+          <strong>3 类</strong>
+          <small>卫健监管、医疗机构、县域医共体；居民和医保角色不进入监管集合</small>
+        </article>
+        <article class="metric-card">
+          <span>证据形态</span>
+          <strong>可审计</strong>
+          <small>看板、派发、反馈、复核、升级、危急值处置和路径复核均保留审计轨迹</small>
+        </article>
+        <article class="metric-card">
+          <span>发布证据</span>
+          <strong>脚本化</strong>
+          <small><code>quality-safety:report</code> 输出 JSON 和 Markdown 验收证据</small>
+        </article>
+      </section>
+
+      <section class="panel" data-quality-safety-about="policy-basis">
+        <div class="panel-title">
+          <h2>政策依据</h2>
+          <span>官方文件和本应用映射关系</span>
+        </div>
+        <div class="capability-grid">
+          <article class="capability-card" data-policy-ref="medical-quality-management">
+            <strong>《医疗质量管理办法》</strong>
+            <span>明确医疗质量管理适用于各级卫生行政部门和各级各类医疗机构，并将医疗质量管理作为医疗管理核心。本应用把机构、科室、事件、整改、复核和审计作为监管主线。</span>
+            <span><a href="https://www.nhc.gov.cn/fzs/c100048/201808/6f3f7915d59943e09768b7469679b857.shtml">国家卫生健康委政策文件</a></span>
+          </article>
+          <article class="capability-card" data-policy-ref="core-safety-systems">
+            <strong>《医疗质量安全核心制度要点》</strong>
+            <span>18项核心制度强调诊疗连续性、记录可追溯和危急值等关键制度落地。本应用将危急值确认、处置、病历质控、复核结论和整改证据纳入闭环。</span>
+            <span><a href="https://www.nhc.gov.cn/yzygj/c100068/201804/42ab2552298047679cd6ec733f233862.shtml">国家卫生健康委通知</a></span>
+          </article>
+          <article class="capability-card" data-policy-ref="quality-action-2023-2025">
+            <strong>全面提升医疗质量行动（2023-2025年）</strong>
+            <span>行动计划要求健全院科两级质量安全管理体系、完善制度、优化工作机制并强化重点环节管理。本应用对应监管看板、风险排序、SLA升级和整改复核。</span>
+            <span><a href="https://www.nhc.gov.cn/yzygj/c100068/202305/68bcfaf610d94c638f64c53aff5de994.shtml">国家卫生健康委通知</a></span>
+          </article>
+          <article class="capability-card" data-policy-ref="mutual-recognition">
+            <strong>检查检验结果互认管理办法</strong>
+            <span>互认以保障质量安全和质量控制合格为前提。本应用复用检查检验报告、互认记录和互认质控数据，支持互认项目的质量抽查和未互认原因追踪。</span>
+            <span><a href="https://www.nhc.gov.cn/yzygj/c100068/202202/ef4a28ddc74447eea85f93fe05107200.shtml">国卫医发〔2022〕6号</a></span>
+          </article>
+          <article class="capability-card" data-policy-ref="quality-goals-2025">
+            <strong>2025年国家医疗质量安全改进目标</strong>
+            <span>2025年将提高医疗机构检查检验结果互认率纳入国家医疗质量安全改进目标。本应用把互认率、质控状态和整改证据作为现场联调指标。</span>
+            <span><a href="https://www.nhc.gov.cn/yzygj/c100067/202503/e9a3bd9bfaa24b28973d86c9d329b8c2.shtml">政策解读</a></span>
+          </article>
+          <article class="capability-card" data-policy-ref="clinical-pathway">
+            <strong>临床路径管理指导原则解读</strong>
+            <span>临床路径管理强调与医疗质量控制、绩效考核、费用调整、支付方式改革和信息化建设相结合。本应用把路径偏离、EMR证据、复核结论和关联质量事件纳入监管闭环。</span>
+            <span><a href="https://www.nhc.gov.cn/zwgk/jdjd/201709/e717bffb5fc445bcb4fa99e7063755c8.shtml">国家卫生健康委解读</a></span>
+          </article>
+        </div>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide" data-quality-safety-about="capability-map">
+          <div class="panel-title">
+            <h2>功能映射</h2>
+            <span>从政策要求到可运行能力</span>
+          </div>
+          <div class="priority-list">
+            <div class="priority-row"><strong>01</strong><div><h3>质量安全事件</h3><p>汇总医疗质量、安全事件、数据质量、信用整改和高风险审计信号，形成统一 issue queue，并按角色裁剪可见范围。</p></div><span>看板与派发</span></div>
+            <div class="priority-row"><strong>02</strong><div><h3>危急值闭环</h3><p>从检查检验报告映射危急值提醒，支持机构确认、处置、联动关闭质量事件，并写入安全审计。</p></div><span>LIS/PACS/HIS</span></div>
+            <div class="priority-row"><strong>03</strong><div><h3>临床路径复核</h3><p>记录路径偏离、当前节点、EMR证据和复核结论；监管端可通过门户关闭或退回路径偏离事件。</p></div><span>路径与病历</span></div>
+            <div class="priority-row"><strong>04</strong><div><h3>整改闭环</h3><p>支持监管派发、机构反馈、监管复核、SLA状态、证据完整性和手动升级。</p></div><span>闭环管理</span></div>
+            <div class="priority-row"><strong>05</strong><div><h3>互认质控</h3><p>复用检查检验互认记录，围绕互认项目、时效、质量要求和未互认原因开展监管抽查。</p></div><span>互认监管</span></div>
+          </div>
+        </article>
+
+        <article class="panel" data-quality-safety-about="role-boundary">
+          <div class="panel-title">
+            <h2>角色边界</h2>
+            <span>最小权限和审计留痕</span>
+          </div>
+          <div class="rules">
+            <div><strong>卫健监管</strong><span>查看全量质量安全信号，执行派发、复核、升级和临床路径复核。</span></div>
+            <div><strong>医疗机构</strong><span>查看本机构相关事件，提交整改反馈，确认和处置本机构危急值。</span></div>
+            <div><strong>县域医共体</strong><span>查看医共体、区域互认和协同质控相关信号，提交职责范围内反馈。</span></div>
+            <div><strong>排除角色</strong><span>居民端和医保端不暴露质量安全监管集合，避免跨角色管理信息泄露。</span></div>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel" data-quality-safety-about="joint-testing">
+        <div class="panel-title">
+          <h2>现场联调边界</h2>
+          <span>演示已建模，生产需签收</span>
+        </div>
+        <div class="workflow-grid">
+          <article><strong>数据源</strong><span>真实 HIS、EMR、LIS、PACS、病案首页、检查检验互认平台和医共体共享中心接口。</span></article>
+          <article><strong>规则字典</strong><span>危急值规则、临床路径字典、病历质控评分表、互认项目清单、负面清单和时效规则。</span></article>
+          <article><strong>证据附件</strong><span>科室整改签收、病历抽样签名、危急值处置截图、EMR路径偏离证据和互认质控抽查记录。</span></article>
+          <article><strong>运维审计</strong><span>生产身份源、消息通知、日志留存、SIEM或审计导出、监控告警和灾备演练签收。</span></article>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

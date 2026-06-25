@@ -30,6 +30,7 @@
     "workbench.html": ["commission"],
     "platform.html": ["commission"],
     "quality-safety.html": ["commission", "institution", "county"],
+    "quality-safety-about.html": ["commission", "institution", "county"],
     "institution.html": ["institution"],
     "insurance.html": ["insurance"],
     "county.html": ["county"],

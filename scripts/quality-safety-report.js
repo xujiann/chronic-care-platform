@@ -35,6 +35,15 @@ const REQUIRED_ROUTES = [
   "/api/quality-safety/clinical-pathways/:id/review"
 ];
 
+const REQUIRED_POLICY_REFERENCES = [
+  { id: "medical-quality-management", title: "医疗质量管理办法", url: "https://www.nhc.gov.cn/fzs/c100048/201808/6f3f7915d59943e09768b7469679b857.shtml" },
+  { id: "core-safety-systems", title: "医疗质量安全核心制度要点", url: "https://www.nhc.gov.cn/yzygj/c100068/201804/42ab2552298047679cd6ec733f233862.shtml" },
+  { id: "quality-action-2023-2025", title: "全面提升医疗质量行动", url: "https://www.nhc.gov.cn/yzygj/c100068/202305/68bcfaf610d94c638f64c53aff5de994.shtml" },
+  { id: "mutual-recognition", title: "检查检验结果互认管理办法", url: "https://www.nhc.gov.cn/yzygj/c100068/202202/ef4a28ddc74447eea85f93fe05107200.shtml" },
+  { id: "quality-goals-2025", title: "2025年国家医疗质量安全改进目标", url: "https://www.nhc.gov.cn/yzygj/c100067/202503/e9a3bd9bfaa24b28973d86c9d329b8c2.shtml" },
+  { id: "clinical-pathway", title: "临床路径管理指导原则", url: "https://www.nhc.gov.cn/zwgk/jdjd/201709/e717bffb5fc445bcb4fa99e7063755c8.shtml" }
+];
+
 function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(ROOT, relativePath), "utf8"));
 }
@@ -163,6 +172,7 @@ function buildInstitutionRisks(issues, rectifications) {
 function buildQualitySafetyReport(options = {}) {
   const data = options.data || readJson("data/db.json");
   const server = options.serverSource || read("server.js");
+  const aboutSource = options.aboutSource || read("quality-safety-about.html");
   const qualityEvents = arrayOf(data, "qualitySafetyEvents");
   const criticalRows = arrayOf(data, "criticalValueAlerts").map((item) => ({
     id: item.id,
@@ -213,6 +223,10 @@ function buildQualitySafetyReport(options = {}) {
     route,
     present: server.includes(route)
   }));
+  const policyRows = REQUIRED_POLICY_REFERENCES.map((item) => ({
+    ...item,
+    present: aboutSource.includes(item.url) && aboutSource.includes(`data-policy-ref="${item.id}"`)
+  }));
   const stateRows = rectifications.map((item) => {
     const sla = slaState(item);
     return {
@@ -248,7 +262,8 @@ function buildQualitySafetyReport(options = {}) {
     { id: "quality-safety:evidence", passed: stateRows.some((item) => item.evidenceComplete), detail: `${slaSummary.evidenceComplete}/${stateRows.length} rectifications have feedback and audit evidence` },
     { id: "quality-safety:risk-ranking", passed: institutionRisks.length > 0 && institutionRisks[0].score > 0, detail: `${institutionRisks.length} ranked institutions` },
     { id: "quality-safety:critical-value-loop", passed: criticalRows.length > 0 && criticalRows.every((item) => item.threshold && item.action), detail: `${criticalRows.length} critical value alerts; ${criticalRows.filter((item) => item.disposed).length} disposed` },
-    { id: "quality-safety:clinical-pathway-loop", passed: clinicalPathwayRows.length > 0 && clinicalPathwayRows.every((item) => item.eventId && item.dueAt) && server.includes("/api/quality-safety/clinical-pathways/:id/review"), detail: `${clinicalPathwayRows.length} pathway variances; ${clinicalPathwayRows.filter((item) => item.reviewed).length} reviewed` }
+    { id: "quality-safety:clinical-pathway-loop", passed: clinicalPathwayRows.length > 0 && clinicalPathwayRows.every((item) => item.eventId && item.dueAt) && server.includes("/api/quality-safety/clinical-pathways/:id/review"), detail: `${clinicalPathwayRows.length} pathway variances; ${clinicalPathwayRows.filter((item) => item.reviewed).length} reviewed` },
+    { id: "quality-safety:policy-basis", passed: policyRows.every((item) => item.present), detail: `${policyRows.filter((item) => item.present).length}/${policyRows.length} policy references linked` }
   ];
   return {
     ok: checks.every((item) => item.passed),
@@ -271,12 +286,14 @@ function buildQualitySafetyReport(options = {}) {
         total: clinicalPathwayRows.length,
         reviewed: clinicalPathwayRows.filter((item) => item.reviewed).length,
         pending: clinicalPathwayRows.filter((item) => !item.reviewed).length
-      }
+      },
+      policyReferences: policyRows.filter((item) => item.present).length
     },
     boundaries: boundaryRows,
     collections: collectionRows,
     reusedCollections: reusedRows,
     routes: routeRows,
+    policyReferences: policyRows,
     institutionRisks,
     criticalValues: criticalRows,
     clinicalPathways: clinicalPathwayRows,
@@ -297,6 +314,7 @@ function renderMarkdown(report) {
     `- Risk hotspots: ${report.summary.riskHotspots}`,
     `- Critical values: ${report.summary.criticalValues.total}, pending disposition ${report.summary.criticalValues.pending}`,
     `- Clinical pathways: ${report.summary.clinicalPathways.total}, pending review ${report.summary.clinicalPathways.pending}`,
+    `- Policy references: ${report.summary.policyReferences}/${report.policyReferences.length}`,
     "",
     "## Checks",
     "",
@@ -315,6 +333,12 @@ function renderMarkdown(report) {
     "| Collection | Rows |",
     "|---|---:|",
     ...report.reusedCollections.map((item) => `| ${item.collection} | ${item.rows} |`),
+    "",
+    "## Policy Basis",
+    "",
+    "| Policy | Reference | Linked |",
+    "|---|---|---|",
+    ...report.policyReferences.map((item) => `| ${item.title} | ${item.url} | ${item.present ? "yes" : "no"} |`),
     "",
     "## Institution risk ranking",
     "",
@@ -379,4 +403,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { REQUIRED_COLLECTIONS, REUSED_COLLECTIONS, REQUIRED_ROUTES, buildQualitySafetyReport, parseArgs, renderMarkdown, writeOutput };
+module.exports = { REQUIRED_COLLECTIONS, REUSED_COLLECTIONS, REQUIRED_ROUTES, REQUIRED_POLICY_REFERENCES, buildQualitySafetyReport, parseArgs, renderMarkdown, writeOutput };

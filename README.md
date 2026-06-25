@@ -255,6 +255,7 @@ GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下
 ## Priority app 3: medical quality and safety supervision
 
 - Runnable portal: `quality-safety.html`
+- About and policy page: `quality-safety-about.html`
 - Role access: commission dispatches and reviews; institution/county users can open the same portal for scoped dashboard and rectification feedback.
 - API evidence: `/api/quality-safety/dashboard`, `/api/quality-safety/issues/:id/dispatch`, `/api/quality-safety/rectifications/:id/feedback`, `/api/quality-safety/rectifications/:id/review`, `/api/quality-safety/critical-values/:id/acknowledge`, `/api/quality-safety/critical-values/:id/dispose`, `/api/quality-safety/clinical-pathways/:id/review`
 - Seed collections: `qualitySafetyEvents`, `criticalValueAlerts`, `clinicalPathwayCases`, `medicalRecordQualityReviews`, `mutualRecognitionQualityReviews`, `qualityRectificationOrders`
@@ -264,5 +265,6 @@ GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下
 - Risk ranking: the portal and release report derive institution priority from severity, open issues, SLA pressure, missing feedback, and escalations.
 - Critical-value loop: institution and commission users can acknowledge and dispose critical value alerts with audit records and linked event status updates.
 - Clinical-pathway loop: commission users can review pathway variance cases from the runnable portal, close or return the linked quality event, and preserve audit evidence.
+- Policy basis: the about page links the module to the Medical Quality Management Measures, 18 core safety systems, 2023-2025 quality action plan, inspection/test mutual-recognition rules, 2025 national improvement goals, and clinical pathway guidance.
 
 Site joint-testing boundary: production HIS/EMR/LIS/PACS critical-value rules, real clinical pathway dictionaries, signed medical-record sampling forms, mutual-recognition QC rules, department sign-off evidence, and notification channels remain site-owned inputs.

@@ -19,7 +19,8 @@ test("role pages keep explicit page guards", () => {
     "index.html": ["commission"],
     "platform.html": ["commission"],
     "workbench.html": ["commission"],
-    "quality-safety.html": ["commission", "institution", "county"]
+    "quality-safety.html": ["commission", "institution", "county"],
+    "quality-safety-about.html": ["commission", "institution", "county"]
   };
   Object.entries(guards).forEach(([file, roles]) => {
     roles.forEach((role) => {
@@ -30,7 +31,7 @@ test("role pages keep explicit page guards", () => {
 
 test("citizen pages do not expose cross-role module links or management collections", () => {
   const citizenHtml = `${read("citizen.html")}\n${read("mobile-preview.html")}`;
-  ["institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html", "quality-safety.html"].forEach((target) => {
+  ["institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html", "quality-safety.html", "quality-safety-about.html"].forEach((target) => {
     assert.doesNotMatch(citizenHtml, new RegExp(`href=[\\"']\\./${target}`), `居民页面不应链接到 ${target}`);
   });
 
@@ -41,7 +42,7 @@ test("citizen pages do not expose cross-role module links or management collecti
 });
 
 test("application pages avoid placeholder navigation", () => {
-  const pages = ["about.html", "citizen.html", "mobile-preview.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html", "quality-safety.html"];
+  const pages = ["about.html", "citizen.html", "mobile-preview.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html", "quality-safety.html", "quality-safety-about.html"];
   pages.forEach((file) => assert.doesNotMatch(read(file), /href=["']#["']/, `${file} 存在空链接占位`));
 });
 
@@ -332,6 +333,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
 test("quality safety supervision app exposes runnable portal, API and release evidence", () => {
   const data = JSON.parse(read("data/db.json"));
   const html = read("quality-safety.html");
+  const about = read("quality-safety-about.html");
   const js = read("quality-safety.js");
   const server = read("server.js");
   ["qualitySafetyEvents", "criticalValueAlerts", "clinicalPathwayCases", "medicalRecordQualityReviews", "mutualRecognitionQualityReviews", "qualityRectificationOrders"].forEach((key) => {
@@ -345,6 +347,13 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(html, /quality-safety-risks/);
   assert.match(html, /quality-safety-issues/);
   assert.match(html, /quality-safety-rectifications/);
+  assert.match(html, /quality-safety-about\.html/);
+  assert.match(about, /data-quality-safety-about="policy-basis"/);
+  assert.match(about, /data-quality-safety-about="joint-testing"/);
+  assert.match(about, /data-policy-ref="medical-quality-management"/);
+  assert.match(about, /data-policy-ref="core-safety-systems"/);
+  assert.match(about, /data-policy-ref="mutual-recognition"/);
+  assert.match(about, /data-policy-ref="clinical-pathway"/);
   assert.match(js, /loadQualitySafety/);
   assert.match(js, /renderRisks/);
   assert.match(js, /dispatchIssue/);
@@ -370,6 +379,7 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(server, /buildQualitySafetyInstitutionRisks/);
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:risk-ranking/);
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:clinical-pathway-loop/);
+  assert.match(read("scripts/quality-safety-report.js"), /quality-safety:policy-basis/);
   assert.match(read("scripts/release-report.js"), /qualitySafety:report/);
   assert.match(read("platform.html"), /quality-safety\.html/);
   assert.match(read("workbench.html"), /quality-safety\.html/);
