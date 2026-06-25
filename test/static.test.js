@@ -54,16 +54,52 @@ test("about page documents runnable platform capabilities", () => {
   assert.match(about, /data-about-capability="workflow-tasks"/);
   assert.match(about, /data-about-capability="chronic-care"/);
   assert.match(about, /data-about-capability="county-consortium"/);
+  assert.match(about, /data-about-section="policy-basis"/);
+  assert.match(about, /data-policy-id="chronic-care-2025"/);
+  assert.match(about, /data-policy-id="tiered-care-2026"/);
+  assert.match(about, /data-about-section="multi-practice-policy"/);
+  assert.match(about, /docs\/政策依据说明\.md/);
+  assert.match(about, /\/api\/multi-practice-registry/);
   assert.match(about, /\/api\/service-acceptance-summary/);
   assert.match(about, /\/api\/site-template-readmes/);
   assert.match(about, /\/api\/tasks/);
   assert.match(about, /npm run deploy:check/);
   assert.match(read("index.html"), /href="\.\/about\.html"/);
+  assert.match(read("institution.html"), /href="\.\/about\.html"/);
+  assert.match(read("insurance.html"), /href="\.\/about\.html"/);
+  assert.match(read("county.html"), /href="\.\/about\.html"/);
+  assert.match(read("citizen.html"), /href="\.\/about\.html"/);
+  assert.match(read("workbench.html"), /href="\.\/about\.html"/);
   assert.match(read("platform.html"), /href="\.\/about\.html"/);
   assert.match(read("health-city.html"), /href="\.\/about\.html"/);
   assert.match(auth, /\["about\.html", "关于"\]/);
   assert.match(auth, /pageName === "about\.html"/);
   assert.doesNotMatch(about, /requireRole/);
+});
+
+test("policy basis document maps policies to runnable platform evidence", () => {
+  const doc = read("docs/政策依据说明.md");
+  assert.match(doc, /国卫基层发〔2025〕15号/);
+  assert.match(doc, /国卫办基层函〔2025〕439号/);
+  assert.match(doc, /国办发〔2026〕11号/);
+  assert.match(doc, /国卫医发〔2014〕86号/);
+  assert.match(doc, /flowchart TD/);
+  assert.match(doc, /\/api\/chronic\/risk-stratification/);
+  assert.match(doc, /\/api\/multi-practice-registry/);
+  assert.match(doc, /npm\.cmd run priority-apps:templates/);
+});
+
+test("about page documents doctor multi-practice policy boundaries", () => {
+  const about = read("about.html");
+  const doc = read("docs/医师多点执业政策说明.md");
+  assert.match(about, /医生账户与多点执业政策说明/);
+  assert.match(about, /国卫医发〔2014〕86号/);
+  assert.match(about, /医联体帮扶/);
+  assert.match(doc, /国卫医发〔2014〕86号/);
+  assert.match(doc, /适用边界/);
+  assert.match(doc, /\/api\/multi-practice-registry/);
+  assert.match(doc, /flowchart LR/);
+  assert.match(doc, /医生账户只能查看本人多点执业申请/);
 });
 
 test("static snapshot keeps completed P2 governance collections", () => {
@@ -221,6 +257,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal(Boolean(pkg.scripts["env:check"]), true);
   assert.equal(Boolean(pkg.scripts["release:report"]), true);
   assert.equal(Boolean(pkg.scripts["release:manifest"]), true);
+  assert.equal(Boolean(pkg.scripts["priority-apps:templates"]), true);
   assert.equal(Boolean(pkg.scripts["rollback:snapshot"]), true);
   assert.equal(Boolean(pkg.scripts["storage:inspect"]), true);
   assert.equal(Boolean(pkg.scripts["identity:contract"]), true);
@@ -281,6 +318,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /production-db-readiness-report\.md/);
   assert.match(read("README.md"), /evaluation-evidence-report\.md/);
   assert.match(read("README.md"), /release-artifact-manifest\.md/);
+  assert.match(read("README.md"), /priority-application-templates\.md/);
   assert.match(read("DEPLOYMENT.md"), /storage-model-inspection\.md/);
   assert.match(read("DEPLOYMENT.md"), /identity-contract\.md/);
   assert.match(read("DEPLOYMENT.md"), /audit-retention-report\.md/);
@@ -303,6 +341,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("DEPLOYMENT.md"), /production-db-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /evaluation-evidence-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /release-artifact-manifest\.md/);
+  assert.match(read("DEPLOYMENT.md"), /priority-application-templates\.md/);
   assert.match(read("scripts/deploy-check.js"), /test:coverage/);
   assert.match(read("scripts/deploy-check.js"), /test:e2e/);
   assert.match(read("scripts/deploy-check.js"), /audit/);
@@ -324,6 +363,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/deploy-check.js"), /process:audit/);
   assert.match(read("scripts/deploy-check.js"), /site:pack/);
   assert.match(read("scripts/deploy-check.js"), /release:manifest/);
+  assert.match(read("scripts/deploy-check.js"), /priority-apps:templates/);
   assert.match(read("scripts/deploy-check.js"), /production-db:readiness/);
   assert.match(read("scripts/deploy-check.js"), /evaluation:evidence/);
   assert.match(read("scripts/deploy-check.js"), /process\.platform === "win32" \? "npm\.cmd" : "npm"/);
@@ -347,6 +387,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".github/workflows/ci.yml"), /npm run production-db:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run evaluation:evidence/);
   assert.match(read(".github/workflows/ci.yml"), /npm run release:manifest/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run priority-apps:templates/);
   assert.match(read(".github/workflows/ci.yml"), /npm run release:report/);
   assert.match(read(".github/workflows/ci.yml"), /actions\/upload-artifact@v4/);
   assert.match(read(".github/workflows/ci.yml"), /release-readiness-report/);

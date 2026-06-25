@@ -172,6 +172,7 @@ npm.cmd run env:check
 npm.cmd run release:report
 npm.cmd run release:report:full
 npm.cmd run release:manifest
+npm.cmd run priority-apps:templates
 ```
 
 `deploy:check` 会检查 README、部署文档、静态快照、P2 集合、P2 完成状态、P0 接口准备度、安全验收台账、环境脚本和关键 npm scripts；`deploy:check:full` 还会串行执行 `check`、`test`、`test:coverage`、`test:e2e` 和 `npm audit --omit=dev`。
@@ -283,6 +284,8 @@ hospital-operations:readiness generates release/hospital-operations-readiness-re
 - `GET /api/priority-applications/templates` returns the eight independent conversation handoff templates, including the Chinese conversation titles and the required boundary, reuse, data, API, frontend, test, acceptance, About-page description, module documentation, and workflow-diagram fields.
 - Every application in the summary carries the unified development template: functional boundary, reuse points, data collections, API routes, frontend entry, test evidence, and acceptance artifacts.
 - Unified template rule: every platform template must include an About feature section, a module document under `docs/`, and a workflow diagram covering data source, business workflow, sharing/collaboration, citizen visibility, and management statistics or alerts. `docs/妇幼健康全模块说明.md` is the reference implementation for this rule.
+- Maternal-child policy About page: `maternal-child-about.html` documents the birth certificate policy basis, seventh-version certificate transition, three-role functional boundary, data workflow diagram, and acceptance rule. `docs/maternal-child-policy.md` keeps the policy-to-system mapping for release review.
 - `npm.cmd run health-dashboard:summary` writes `release/health-dashboard-summary.json` and `release/health-dashboard-summary.md`.
+- `npm.cmd run priority-apps:templates` writes `release/priority-application-templates.json` and `release/priority-application-templates.md` for the eight independent application handoff templates.
 - `release:manifest` indexes `health-dashboard-summary.md` as the release artifact for the eight-application template and aggregate dashboard evidence.
 - Boundary: the dashboard does not replace source workflows; source applications remain the system of record for business operations and acceptance.

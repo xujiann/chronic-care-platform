@@ -8,7 +8,7 @@ const { buildDataQualityReport, renderMarkdown: renderDataQualityMarkdown } = re
 const { buildDrugConsumableReadinessReport, renderMarkdown: renderDrugConsumableMarkdown } = require("./drug-consumable-readiness");
 const { buildEvaluationEvidenceReport, renderMarkdown: renderEvaluationEvidenceMarkdown } = require("./evaluation-evidence");
 const { buildEnvironmentMatrixReport, renderMarkdown: renderEnvironmentMatrixMarkdown } = require("./environment-matrix");
-const { buildHealthDashboardSummary, renderMarkdown: renderHealthDashboardMarkdown } = require("./health-dashboard-summary");
+const { buildHealthDashboardSummary, buildPriorityApplicationTemplates, renderMarkdown: renderHealthDashboardMarkdown } = require("./health-dashboard-summary");
 const { buildIdentityContract, renderMarkdown: renderIdentityContractMarkdown } = require("./identity-contract");
 const { buildIntegrationReadinessReport, renderMarkdown: renderIntegrationReadinessMarkdown } = require("./integration-readiness");
 const { buildInterfaceMappingReport, renderMarkdown: renderInterfaceMappingMarkdown } = require("./interface-mapping");
@@ -17,6 +17,7 @@ const { buildMonitoringReadinessReport, renderMarkdown: renderMonitoringReadines
 const { buildOperationsReadinessReport, renderMarkdown: renderOperationsReadinessMarkdown } = require("./operations-readiness");
 const { buildProcessAuditReport, renderMarkdown: renderProcessAuditMarkdown } = require("./process-audit");
 const { buildProductionDbReadinessReport, renderMarkdown: renderProductionDbReadinessMarkdown } = require("./production-db-readiness");
+const { renderMarkdown: renderPriorityApplicationTemplatesMarkdown } = require("./priority-application-templates");
 const { buildRegionalDataSharingReport, renderMarkdown: renderRegionalDataSharingMarkdown } = require("./regional-data-sharing");
 const { buildQualitySafetyReport, renderMarkdown: renderQualitySafetyMarkdown } = require("./quality-safety-report");
 const { buildReleaseArtifactManifest, renderMarkdown: renderReleaseArtifactManifestMarkdown } = require("./release-artifact-manifest");
@@ -355,6 +356,14 @@ function healthDashboardChecks(healthDashboard) {
   ];
 }
 
+function priorityApplicationTemplateChecks(priorityApplicationTemplates) {
+  return [
+    check("priorityApps:templates", priorityApplicationTemplates.ok, priorityApplicationTemplates.ok ? "priority application templates passed" : "priority application templates failed", "error", "priority-apps"),
+    check("priorityApps:count", priorityApplicationTemplates.summary?.applications === 8 && priorityApplicationTemplates.summary?.sourceApplications === 7, `${priorityApplicationTemplates.summary?.applications || 0} applications; ${priorityApplicationTemplates.summary?.sourceApplications || 0} source applications`, "error", "priority-apps"),
+    check("priorityApps:conversationTitles", priorityApplicationTemplates.templates?.every((item) => item.conversationTitle), "conversation titles present", "error", "priority-apps")
+  ];
+}
+
 function dataQualityChecks(dataQuality) {
   return [
     check("dataQuality:report", dataQuality.ok, dataQuality.ok ? "data quality checks passed" : "data quality checks failed", "error", "data-quality"),
@@ -548,6 +557,7 @@ function packageChecks(pkg) {
     "environment:matrix",
     "hospital-operations:readiness",
     "health-dashboard:summary",
+    "priority-apps:templates",
     "integration:readiness",
     "interface:mapping",
     "monitoring:readiness",
@@ -621,6 +631,7 @@ function buildReleaseReport(options = {}) {
   const evaluationEvidence = buildEvaluationEvidenceReport({ data });
   const environmentMatrix = buildEnvironmentMatrixReport({ data, pkg });
   const healthDashboard = buildHealthDashboardSummary({ data });
+  const priorityApplicationTemplates = buildPriorityApplicationTemplates({ data });
   const siteReadinessPack = buildSiteReadinessPack({ data, pkg, envFile: options.envFile || ".env.example", env: options.env || process.env, identityContract, interfaceMapping, monitoringReadiness });
   const checks = [
     assertFile("README.md"),
@@ -653,6 +664,7 @@ function buildReleaseReport(options = {}) {
     ...evaluationEvidenceChecks(evaluationEvidence),
     ...environmentMatrixChecks(environmentMatrix),
     ...healthDashboardChecks(healthDashboard),
+    ...priorityApplicationTemplateChecks(priorityApplicationTemplates),
     ...env.checks,
     ...commandChecks(options.runCommands)
   ];
@@ -693,7 +705,8 @@ function buildReleaseReport(options = {}) {
     productionDbReadiness,
     evaluationEvidence,
     environmentMatrix,
-    healthDashboard
+    healthDashboard,
+    priorityApplicationTemplates
   };
 }
 
@@ -910,6 +923,7 @@ function renderMarkdown(report) {
     "",
     "See `health-dashboard-summary.json` and `health-dashboard-summary.md` for the aggregate entry across the first seven applications, open actions, interface tracks, evidence, and site dependencies.",
     "`GET /api/priority-applications/templates` exposes the live eight-application handoff templates for independent conversation work.",
+    "See `priority-application-templates.json` and `priority-application-templates.md` for the standalone release artifact version of that handoff contract.",
     "",
     "## Release artifact manifest",
     "",
@@ -1124,6 +1138,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       healthDashboard: report.healthDashboard
     }, null, 2), "utf8");
+    const priorityApplicationTemplatesJson = path.join(path.dirname(output), "priority-application-templates.json");
+    fs.writeFileSync(priorityApplicationTemplatesJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      priorityApplicationTemplates: report.priorityApplicationTemplates
+    }, null, 2), "utf8");
     const releaseArtifactManifest = buildReleaseArtifactManifest({ releaseReport: report });
     const releaseArtifactManifestJson = path.join(path.dirname(output), "release-artifact-manifest.json");
     fs.writeFileSync(releaseArtifactManifestJson, JSON.stringify({
@@ -1185,6 +1207,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(environmentMarkdown, renderEnvironmentMatrixMarkdown(report.environmentMatrix), "utf8");
     const healthDashboardMarkdown = path.join(path.dirname(markdown), "health-dashboard-summary.md");
     fs.writeFileSync(healthDashboardMarkdown, renderHealthDashboardMarkdown(report.healthDashboard), "utf8");
+    const priorityApplicationTemplatesMarkdown = path.join(path.dirname(markdown), "priority-application-templates.md");
+    fs.writeFileSync(priorityApplicationTemplatesMarkdown, renderPriorityApplicationTemplatesMarkdown(report.priorityApplicationTemplates), "utf8");
     const releaseArtifactManifestMarkdown = path.join(path.dirname(markdown), "release-artifact-manifest.md");
     fs.writeFileSync(releaseArtifactManifestMarkdown, renderReleaseArtifactManifestMarkdown(buildReleaseArtifactManifest({ releaseReport: report })), "utf8");
   }

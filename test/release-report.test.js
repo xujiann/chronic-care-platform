@@ -273,6 +273,8 @@ test("release report writes standalone production cutover and storage artifacts"
   const evaluationMarkdown = fs.readFileSync(path.join(outputDir, "evaluation-evidence-report.md"), "utf8");
   const environmentJson = JSON.parse(fs.readFileSync(path.join(outputDir, "environment-matrix-report.json"), "utf8"));
   const environmentMarkdown = fs.readFileSync(path.join(outputDir, "environment-matrix-report.md"), "utf8");
+  const priorityTemplatesJson = JSON.parse(fs.readFileSync(path.join(outputDir, "priority-application-templates.json"), "utf8"));
+  const priorityTemplatesMarkdown = fs.readFileSync(path.join(outputDir, "priority-application-templates.md"), "utf8");
   const manifestJson = JSON.parse(fs.readFileSync(path.join(outputDir, "release-artifact-manifest.json"), "utf8"));
   const manifestMarkdown = fs.readFileSync(path.join(outputDir, "release-artifact-manifest.md"), "utf8");
   assert.equal(cutoverJson.checklist.some((item) => item.id === "cutover-identity"), true);
@@ -318,10 +320,15 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(evaluationMarkdown, /Artifact coverage/);
   assert.equal(environmentJson.environmentMatrix.ok, true);
   assert.match(environmentMarkdown, /Environment matrix report/);
+  assert.equal(priorityTemplatesJson.priorityApplicationTemplates.ok, true);
+  assert.equal(priorityTemplatesJson.priorityApplicationTemplates.templates.length, 8);
+  assert.match(priorityTemplatesMarkdown, /Priority application templates/);
+  assert.match(priorityTemplatesMarkdown, /卫生健康综合驾驶舱/);
   assert.equal(manifestJson.releaseArtifactManifest.ok, true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "service-acceptance"), true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "referral-teleconsultation"), true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "chronic-followup"), true);
+  assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "priority-application-templates"), true);
   assert.match(manifestMarkdown, /Release artifact manifest/);
   assert.match(manifestMarkdown, /service-acceptance-summary\.md/);
   assert.match(manifestMarkdown, /release\/templates\/identity-source-mapping\/README\.md/);
