@@ -7727,7 +7727,7 @@ async function handleApi(req, res) {
     const payload = await collectJson(req);
     const recordData = normalizePersonalRecord(payload);
     if (!canAccessResident(user, recordData.residentId, data)) {
-      appendSecurityEvent({ actor: user.name, role: user.role, action: "新增个人健康信息", target: recordData.residentId, result: "拒绝", detail: "超出居民授权范围" });
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "create personal health record", target: recordData.residentId, result: "拒绝", detail: "超出居民授权范围" });
       sendJson(res, 403, { error: "Forbidden", message: "无权新增该居民健康信息" });
       return;
     }
