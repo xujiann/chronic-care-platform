@@ -1145,7 +1145,7 @@ function seedCriticalValueAlerts() {
 
 function seedClinicalPathwayCases() {
   return [
-    { id: "cpc-001", eventId: "qse-path-001", residentId: "r1", pathwayCode: "HTN-2026", pathwayName: "Hypertension standard pathway", institutionName: "Dalian Central Hospital", currentNode: "follow-up-after-medication", varianceType: "missing_evidence", varianceReason: "Follow-up result not written back to EMR.", status: "variance_open", owner: "Clinical pathway office", dueAt: "2026-06-28T10:00:00.000Z" }
+    { id: "cpc-001", eventId: "qse-path-001", residentId: "r1", pathwayCode: "HTN-2026", pathwayName: "Hypertension standard pathway", institutionName: "Dalian Central Hospital", currentNode: "follow-up-after-medication", varianceType: "missing_evidence", varianceReason: "Follow-up result not written back to EMR.", status: "variance_open", owner: "Clinical pathway office", dueAt: "2026-06-28T10:00:00.000Z", auditTrail: [{ at: "2026-06-21T10:00:00.000Z", by: "health", action: "seed-variance", note: "Clinical pathway variance captured from EMR summary." }] }
   ];
 }
 
@@ -5093,6 +5093,19 @@ function buildQualitySafetyCriticalAlerts(data, user) {
   return qualitySafetyVisibleRows(rows, user);
 }
 
+function buildQualitySafetyClinicalPathways(data, user) {
+  const rows = (Array.isArray(data.clinicalPathwayCases) ? data.clinicalPathwayCases : []).map((item) => ({
+    ...item,
+    ownerRole: item.ownerRole || "institution",
+    sourceCollection: "clinicalPathwayCases",
+    sourceId: item.id,
+    normalizedStatus: normalizeQualitySafetyStatus(item.status),
+    reviewComplete: normalizeQualitySafetyStatus(item.status) === "closed",
+    evidenceComplete: Boolean(item.eventId && item.dueAt && Array.isArray(item.auditTrail) && item.auditTrail.length > 0)
+  }));
+  return qualitySafetyVisibleRows(rows, user);
+}
+
 function qualitySafetyVisibleRows(rows, user) {
   if (user.role === "commission") return rows;
   if (user.role === "county") {
@@ -5164,6 +5177,7 @@ function buildQualitySafetyDashboard(data, user) {
   const rectifications = qualitySafetyVisibleRows(Array.isArray(data.qualityRectificationOrders) ? data.qualityRectificationOrders : [], user)
     .map((item) => ({ ...item, normalizedStatus: normalizeQualitySafetyStatus(item.status), ...qualitySafetySlaState(item) }));
   const criticalValueAlerts = buildQualitySafetyCriticalAlerts(data, user);
+  const clinicalPathwayCases = buildQualitySafetyClinicalPathways(data, user);
   const institutionRisks = buildQualitySafetyInstitutionRisks(issues, rectifications);
   const slaSummary = {
     overdue: rectifications.filter((item) => item.slaStatus === "overdue").length,
@@ -5183,7 +5197,9 @@ function buildQualitySafetyDashboard(data, user) {
     criticalValues: criticalValueAlerts.length,
     criticalValuesPending: criticalValueAlerts.filter((item) => item.normalizedStatus !== "closed").length,
     criticalValuesDisposed: criticalValueAlerts.filter((item) => item.dispositionComplete).length,
-    clinicalPathways: Array.isArray(data.clinicalPathwayCases) ? data.clinicalPathwayCases.length : 0,
+    clinicalPathways: clinicalPathwayCases.length,
+    clinicalPathwaysOpen: clinicalPathwayCases.filter((item) => item.normalizedStatus !== "closed").length,
+    clinicalPathwaysReviewed: clinicalPathwayCases.filter((item) => item.reviewComplete).length,
     medicalRecordReviews: Array.isArray(data.medicalRecordQualityReviews) ? data.medicalRecordQualityReviews.length : 0,
     mutualRecognitionReviews: Array.isArray(data.mutualRecognitionQualityReviews) ? data.mutualRecognitionQualityReviews.length : 0
   };
@@ -5215,7 +5231,7 @@ function buildQualitySafetyDashboard(data, user) {
     issues,
     rectifications,
     criticalValueAlerts,
-    clinicalPathwayCases: Array.isArray(data.clinicalPathwayCases) ? data.clinicalPathwayCases : [],
+    clinicalPathwayCases,
     medicalRecordQualityReviews: Array.isArray(data.medicalRecordQualityReviews) ? data.medicalRecordQualityReviews : [],
     mutualRecognitionQualityReviews: Array.isArray(data.mutualRecognitionQualityReviews) ? data.mutualRecognitionQualityReviews : [],
     reusedCollections: reusableCollections
@@ -6280,6 +6296,56 @@ async function handleApi(req, res) {
     appendQualitySafetyAudit(data, user, "quality-safety critical value disposition", id, disposition.action);
     writeDatabase(data);
     sendJson(res, 200, { ...alerts[index], normalizedStatus: normalizeQualitySafetyStatus(alerts[index].status), acknowledgementComplete: true, dispositionComplete: true });
+    return;
+  }
+
+  const qualityPathwayReviewMatch = url.pathname.match(/^\/api\/quality-safety\/clinical-pathways\/([^/]+)\/review$/);
+  if (req.method === "POST" && qualityPathwayReviewMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/quality-safety/clinical-pathways/:id/review");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(qualityPathwayReviewMatch[1]);
+    const cases = Array.isArray(data.clinicalPathwayCases) ? data.clinicalPathwayCases : [];
+    const index = cases.findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Clinical pathway case not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const decision = String(payload.decision || "approved").trim();
+    if (!["approved", "returned"].includes(decision)) {
+      sendJson(res, 400, { error: "Bad Request", message: "decision must be approved or returned" });
+      return;
+    }
+    const now = new Date().toISOString();
+    const review = {
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      decision,
+      comment: String(payload.comment || "").trim(),
+      evidence: Array.isArray(payload.evidence) ? payload.evidence.map((item) => String(item).trim()).filter(Boolean) : []
+    };
+    const status = decision === "approved" ? "review_passed" : "returned";
+    cases[index] = {
+      ...cases[index],
+      status,
+      reviewedAt: now,
+      reviewedBy: user.username || user.role,
+      reviewTrail: [review, ...(cases[index].reviewTrail || [])].slice(0, 50),
+      auditTrail: [{ at: now, by: user.username || user.role, action: "clinical-pathway-review", note: `${decision}: ${review.comment}` }, ...(cases[index].auditTrail || [])].slice(0, 50)
+    };
+    data.clinicalPathwayCases = cases;
+    data.qualitySafetyEvents = (Array.isArray(data.qualitySafetyEvents) ? data.qualitySafetyEvents : []).map((item) => item.id === cases[index].eventId ? {
+      ...item,
+      status: decision === "approved" ? "closed" : "returned",
+      reviewedAt: now,
+      reviewedBy: user.username || user.role,
+      auditTrail: [{ at: now, by: user.username || user.role, action: "clinical-pathway-review", note: `${decision}: ${review.comment}` }, ...(item.auditTrail || [])].slice(0, 50)
+    } : item);
+    appendQualitySafetyAudit(data, user, "quality-safety clinical pathway review", id, `${decision}: ${review.comment}`);
+    writeDatabase(data);
+    sendJson(res, 200, { ...cases[index], normalizedStatus: normalizeQualitySafetyStatus(cases[index].status), reviewComplete: normalizeQualitySafetyStatus(cases[index].status) === "closed" });
     return;
   }
 

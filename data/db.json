@@ -7027,7 +7027,15 @@
       "varianceReason": "Follow-up result not written back to EMR.",
       "status": "variance_open",
       "owner": "Clinical pathway office",
-      "dueAt": "2026-06-28T10:00:00.000Z"
+      "dueAt": "2026-06-28T10:00:00.000Z",
+      "auditTrail": [
+        {
+          "at": "2026-06-21T10:00:00.000Z",
+          "by": "health",
+          "action": "seed-variance",
+          "note": "Clinical pathway variance captured from EMR summary."
+        }
+      ]
     }
   ],
   "medicalRecordQualityReviews": [

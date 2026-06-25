@@ -353,6 +353,7 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(js, /escalateOrder/);
   assert.match(js, /acknowledgeCritical/);
   assert.match(js, /disposeCritical/);
+  assert.match(js, /reviewClinicalPathway/);
   assert.match(js, /canDispatch/);
   assert.match(js, /canReview/);
   assert.match(js, /canFeedback/);
@@ -364,9 +365,11 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(server, /\/api\/quality-safety\/rectifications\/:id\/escalate/);
   assert.match(server, /\/api\/quality-safety\/critical-values\/:id\/acknowledge/);
   assert.match(server, /\/api\/quality-safety\/critical-values\/:id\/dispose/);
+  assert.match(server, /\/api\/quality-safety\/clinical-pathways\/:id\/review/);
   assert.match(server, /qualitySafetySlaState/);
   assert.match(server, /buildQualitySafetyInstitutionRisks/);
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:risk-ranking/);
+  assert.match(read("scripts/quality-safety-report.js"), /quality-safety:clinical-pathway-loop/);
   assert.match(read("scripts/release-report.js"), /qualitySafety:report/);
   assert.match(read("platform.html"), /quality-safety\.html/);
   assert.match(read("workbench.html"), /quality-safety\.html/);

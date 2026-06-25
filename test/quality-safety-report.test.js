@@ -47,16 +47,20 @@ test("quality safety report covers boundaries, reuse and routes", () => {
   assert.equal(report.routes.some((item) => item.route.includes("escalate") && item.present), true);
   assert.equal(report.routes.some((item) => item.route.includes("critical-values") && item.route.includes("acknowledge") && item.present), true);
   assert.equal(report.routes.some((item) => item.route.includes("critical-values") && item.route.includes("dispose") && item.present), true);
+  assert.equal(report.routes.some((item) => item.route.includes("clinical-pathways") && item.route.includes("review") && item.present), true);
   assert.equal(report.checks.some((item) => item.id === "quality-safety:sla" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "quality-safety:critical-value-loop" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "quality-safety:clinical-pathway-loop" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "quality-safety:risk-ranking" && item.passed), true);
   assert.equal(report.institutionRisks.length > 0, true);
   assert.equal(report.institutionRisks[0].score > 0, true);
   assert.equal(report.criticalValues.length > 0, true);
+  assert.equal(report.clinicalPathways.length > 0, true);
   assert.equal(report.rectifications.some((item) => item.slaStatus && item.evidenceComplete), true);
   assert.match(renderMarkdown(report), /Medical quality and safety supervision report/);
   assert.match(renderMarkdown(report), /mutual-recognition-qc/);
   assert.match(renderMarkdown(report), /Critical Value Loop/);
+  assert.match(renderMarkdown(report), /Clinical Pathway Loop/);
   assert.match(renderMarkdown(report), /Institution risk ranking/);
   assert.match(renderMarkdown(report), /Rectification SLA/);
 });
@@ -85,10 +89,12 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
   assert.equal(dashboard.response.status, 200);
   assert.equal(dashboard.body.summary.issues >= 3, true);
   assert.equal(dashboard.body.summary.criticalValuesPending >= 1, true);
+  assert.equal(dashboard.body.summary.clinicalPathwaysOpen >= 1, true);
   assert.equal(dashboard.body.institutionRisks.length > 0, true);
   assert.equal(dashboard.body.institutionRisks[0].score > 0, true);
   assert.equal(dashboard.body.reusedCollections.some((item) => item.collection === "hospitalInteroperabilityFunctions"), true);
   const critical = dashboard.body.criticalValueAlerts[0];
+  const pathway = dashboard.body.clinicalPathwayCases[0];
 
   const issue = dashboard.body.issues.find((item) => item.id === "qse-path-001") || dashboard.body.issues[0];
   const dispatch = await api(baseUrl, `/api/quality-safety/issues/${encodeURIComponent(issue.id)}/dispatch`, authorized(token, {
@@ -126,6 +132,11 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
     body: JSON.stringify({ ownerRole: "institution", requirement: "Should be forbidden." })
   }));
   assert.equal(forbiddenDispatch.response.status, 403);
+  const forbiddenPathwayReview = await api(baseUrl, `/api/quality-safety/clinical-pathways/${encodeURIComponent(pathway.id)}/review`, authorized(institutionLogin.body.token, {
+    method: "POST",
+    body: JSON.stringify({ decision: "approved", comment: "Should be forbidden." })
+  }));
+  assert.equal(forbiddenPathwayReview.response.status, 403);
 
   const countyLogin = await login(baseUrl, "county");
   assert.equal(countyLogin.response.status, 200);
@@ -155,9 +166,17 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
   }));
   assert.equal(review.response.status, 200);
   assert.equal(review.body.status, "closed");
+  const pathwayReview = await api(baseUrl, `/api/quality-safety/clinical-pathways/${encodeURIComponent(pathway.id)}/review`, authorized(token, {
+    method: "POST",
+    body: JSON.stringify({ decision: "approved", comment: "Pathway variance closed.", evidence: ["emr-follow-up-note"] })
+  }));
+  assert.equal(pathwayReview.response.status, 200);
+  assert.equal(pathwayReview.body.status, "review_passed");
+  assert.equal(pathwayReview.body.reviewComplete, true);
 
   const audit = await api(baseUrl, "/api/audit/export?trail=securityEvents", authorized(token));
   assert.equal(audit.response.status, 200);
   assert.equal(JSON.stringify(audit.body).includes("quality-safety review"), true);
   assert.equal(JSON.stringify(audit.body).includes("quality-safety critical value disposition"), true);
+  assert.equal(JSON.stringify(audit.body).includes("quality-safety clinical pathway review"), true);
 });

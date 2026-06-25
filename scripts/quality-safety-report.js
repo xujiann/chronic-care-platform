@@ -31,7 +31,8 @@ const REQUIRED_ROUTES = [
   "/api/quality-safety/rectifications/:id/review",
   "/api/quality-safety/rectifications/:id/escalate",
   "/api/quality-safety/critical-values/:id/acknowledge",
-  "/api/quality-safety/critical-values/:id/dispose"
+  "/api/quality-safety/critical-values/:id/dispose",
+  "/api/quality-safety/clinical-pathways/:id/review"
 ];
 
 function readJson(relativePath) {
@@ -174,6 +175,20 @@ function buildQualitySafetyReport(options = {}) {
     disposed: Boolean(item.disposedAt),
     action: item.action || item.disposition?.action || ""
   }));
+  const clinicalPathwayRows = arrayOf(data, "clinicalPathwayCases").map((item) => ({
+    id: item.id,
+    eventId: item.eventId,
+    pathwayCode: item.pathwayCode,
+    pathwayName: item.pathwayName,
+    institutionName: item.institutionName,
+    currentNode: item.currentNode,
+    varianceType: item.varianceType,
+    status: item.status || "open",
+    dueAt: item.dueAt || "",
+    reviewed: statusClosed(item.status),
+    auditCount: Array.isArray(item.auditTrail) ? item.auditTrail.length : 0,
+    reviewCount: Array.isArray(item.reviewTrail) ? item.reviewTrail.length : 0
+  }));
   const rectifications = arrayOf(data, "qualityRectificationOrders");
   const boundaryRows = [
     { id: "medical-quality", collection: "qualitySafetyEvents", modeled: qualityEvents.some((item) => item.domain === "medical_quality") },
@@ -232,7 +247,8 @@ function buildQualitySafetyReport(options = {}) {
     { id: "quality-safety:sla", passed: stateRows.every((item) => item.slaStatus !== "unscheduled"), detail: `overdue=${slaSummary.overdue}, dueSoon=${slaSummary.dueSoon}, onTrack=${slaSummary.onTrack}` },
     { id: "quality-safety:evidence", passed: stateRows.some((item) => item.evidenceComplete), detail: `${slaSummary.evidenceComplete}/${stateRows.length} rectifications have feedback and audit evidence` },
     { id: "quality-safety:risk-ranking", passed: institutionRisks.length > 0 && institutionRisks[0].score > 0, detail: `${institutionRisks.length} ranked institutions` },
-    { id: "quality-safety:critical-value-loop", passed: criticalRows.length > 0 && criticalRows.every((item) => item.threshold && item.action), detail: `${criticalRows.length} critical value alerts; ${criticalRows.filter((item) => item.disposed).length} disposed` }
+    { id: "quality-safety:critical-value-loop", passed: criticalRows.length > 0 && criticalRows.every((item) => item.threshold && item.action), detail: `${criticalRows.length} critical value alerts; ${criticalRows.filter((item) => item.disposed).length} disposed` },
+    { id: "quality-safety:clinical-pathway-loop", passed: clinicalPathwayRows.length > 0 && clinicalPathwayRows.every((item) => item.eventId && item.dueAt) && server.includes("/api/quality-safety/clinical-pathways/:id/review"), detail: `${clinicalPathwayRows.length} pathway variances; ${clinicalPathwayRows.filter((item) => item.reviewed).length} reviewed` }
   ];
   return {
     ok: checks.every((item) => item.passed),
@@ -250,6 +266,11 @@ function buildQualitySafetyReport(options = {}) {
         acknowledged: criticalRows.filter((item) => item.acknowledged).length,
         disposed: criticalRows.filter((item) => item.disposed).length,
         pending: criticalRows.filter((item) => !item.disposed).length
+      },
+      clinicalPathways: {
+        total: clinicalPathwayRows.length,
+        reviewed: clinicalPathwayRows.filter((item) => item.reviewed).length,
+        pending: clinicalPathwayRows.filter((item) => !item.reviewed).length
       }
     },
     boundaries: boundaryRows,
@@ -258,6 +279,7 @@ function buildQualitySafetyReport(options = {}) {
     routes: routeRows,
     institutionRisks,
     criticalValues: criticalRows,
+    clinicalPathways: clinicalPathwayRows,
     rectifications: stateRows,
     checks
   };
@@ -274,6 +296,7 @@ function renderMarkdown(report) {
     `- SLA: overdue ${report.summary.sla.overdue}, due soon ${report.summary.sla.dueSoon}, on track ${report.summary.sla.onTrack}`,
     `- Risk hotspots: ${report.summary.riskHotspots}`,
     `- Critical values: ${report.summary.criticalValues.total}, pending disposition ${report.summary.criticalValues.pending}`,
+    `- Clinical pathways: ${report.summary.clinicalPathways.total}, pending review ${report.summary.clinicalPathways.pending}`,
     "",
     "## Checks",
     "",
@@ -304,6 +327,12 @@ function renderMarkdown(report) {
     "| Alert | Item | Threshold | Status | Acknowledged | Disposed | Action |",
     "|---|---|---|---|---|---|---|",
     ...report.criticalValues.map((item) => `| ${item.id} | ${item.item} ${item.value} | ${item.threshold} | ${item.status} | ${item.acknowledged ? "yes" : "no"} | ${item.disposed ? "yes" : "no"} | ${String(item.action || "").replace(/\|/g, "/")} |`),
+    "",
+    "## Clinical Pathway Loop",
+    "",
+    "| Case | Pathway | Institution | Variance | Status | Due at | Reviewed |",
+    "|---|---|---|---|---|---|---|",
+    ...report.clinicalPathways.map((item) => `| ${item.id} | ${item.pathwayName} | ${item.institutionName} | ${item.varianceType} | ${item.status} | ${item.dueAt} | ${item.reviewed ? "yes" : "no"} |`),
     "",
     "## Rectification SLA",
     "",

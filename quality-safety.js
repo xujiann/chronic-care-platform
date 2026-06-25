@@ -41,6 +41,7 @@ function renderMetrics(summary) {
     ["Reviewing", summary.reviewing],
     ["Closed", summary.closed],
     ["Rectifications", summary.rectifications],
+    ["Pathway open", summary.clinicalPathwaysOpen || 0],
     ["Due soon", summary.sla?.dueSoon || 0],
     ["Overdue", summary.sla?.overdue || 0]
   ];
@@ -144,14 +145,15 @@ function renderCritical(rows) {
 }
 
 function renderBoundaries(data) {
+  const canReviewPathway = qualitySafetyState?.role === "commission";
   const rows = [
-    ...(data.clinicalPathwayCases || []).map((item) => ({ type: "Clinical pathway", name: item.pathwayName, status: item.status, next: item.varianceReason || item.currentNode })),
-    ...(data.medicalRecordQualityReviews || []).map((item) => ({ type: "Medical record QC", name: item.sampleNo, status: item.status, next: item.nextAction })),
-    ...(data.mutualRecognitionQualityReviews || []).map((item) => ({ type: "Mutual recognition QC", name: item.item, status: item.status, next: item.nextAction }))
+    ...(data.clinicalPathwayCases || []).map((item) => ({ id: item.id, type: "Clinical pathway", name: item.pathwayName, status: item.normalizedStatus || item.status, next: item.varianceReason || item.currentNode, reviewable: item.normalizedStatus !== "closed" })),
+    ...(data.medicalRecordQualityReviews || []).map((item) => ({ id: item.id, type: "Medical record QC", name: item.sampleNo, status: item.status, next: item.nextAction })),
+    ...(data.mutualRecognitionQualityReviews || []).map((item) => ({ id: item.id, type: "Mutual recognition QC", name: item.item, status: item.status, next: item.nextAction }))
   ];
   setHtml("quality-safety-boundaries", `
     <table>
-      <thead><tr><th>Boundary</th><th>Name</th><th>Status</th><th>Next</th></tr></thead>
+      <thead><tr><th>Boundary</th><th>Name</th><th>Status</th><th>Next</th><th>Action</th></tr></thead>
       <tbody>
         ${rows.map((item) => `
           <tr>
@@ -159,6 +161,7 @@ function renderBoundaries(data) {
             <td>${text(item.name)}</td>
             <td>${statusLabel(item.status)}</td>
             <td>${text(item.next)}</td>
+            <td>${canReviewPathway && item.reviewable ? `<button class="inline-action" type="button" data-pathway-review="${item.id}">Review pathway</button>` : statusLabel(item.type === "Clinical pathway" ? "tracked" : "view")}</td>
           </tr>
         `).join("")}
       </tbody>
@@ -252,6 +255,18 @@ async function disposeCritical(alertId) {
   await loadQualitySafety();
 }
 
+async function reviewClinicalPathway(caseId) {
+  await qualityApi(`/quality-safety/clinical-pathways/${encodeURIComponent(caseId)}/review`, {
+    method: "POST",
+    body: JSON.stringify({
+      decision: "approved",
+      comment: "Clinical pathway variance reviewed and closed from the quality-safety portal.",
+      evidence: ["emr-follow-up-note"]
+    })
+  });
+  await loadQualitySafety();
+}
+
 document.addEventListener("click", (event) => {
   const dispatch = event.target.closest("[data-dispatch]");
   const feedback = event.target.closest("[data-feedback]");
@@ -259,12 +274,14 @@ document.addEventListener("click", (event) => {
   const escalate = event.target.closest("[data-escalate]");
   const criticalAck = event.target.closest("[data-critical-ack]");
   const criticalDispose = event.target.closest("[data-critical-dispose]");
+  const pathwayReview = event.target.closest("[data-pathway-review]");
   if (dispatch) dispatchIssue(dispatch.dataset.dispatch).catch((error) => alert(error.message));
   if (feedback) submitFeedback(feedback.dataset.feedback).catch((error) => alert(error.message));
   if (review) reviewOrder(review.dataset.review).catch((error) => alert(error.message));
   if (escalate) escalateOrder(escalate.dataset.escalate).catch((error) => alert(error.message));
   if (criticalAck) acknowledgeCritical(criticalAck.dataset.criticalAck).catch((error) => alert(error.message));
   if (criticalDispose) disposeCritical(criticalDispose.dataset.criticalDispose).catch((error) => alert(error.message));
+  if (pathwayReview) reviewClinicalPathway(pathwayReview.dataset.pathwayReview).catch((error) => alert(error.message));
 });
 
 loadQualitySafety();
