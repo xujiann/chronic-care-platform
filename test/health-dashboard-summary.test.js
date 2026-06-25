@@ -5,6 +5,7 @@ const test = require("node:test");
 
 const {
   APPLICATIONS,
+  DOCUMENTATION_RULE,
   buildHealthDashboardSummary,
   buildPriorityApplicationTemplates,
   renderMarkdown
@@ -30,10 +31,15 @@ test("health dashboard summary tracks the eight priority applications without re
   assert.equal(report.checks.some((item) => item.id === "dashboard:source-boundary" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:aggregate-boundary" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:development-template" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "dashboard:documentation-rule" && item.passed), true);
+  assert.equal(report.applications.every((item) => item.documentationRule.aboutPage === DOCUMENTATION_RULE.aboutPage && item.documentationRule.requiredDocument === DOCUMENTATION_RULE.requiredDocument), true);
 
   const markdown = renderMarkdown(report);
   assert.match(markdown, /Health dashboard summary/);
   assert.match(markdown, /Development template/);
+  assert.match(markdown, /Documentation rule/);
+  assert.match(markdown, /docs\/<module-name>\.md/);
+  assert.match(markdown, /docs\/妇幼健康全模块说明\.md/);
   assert.match(markdown, /regional-data-sharing/);
   assert.match(markdown, /health-dashboard/);
   assert.match(markdown, /Open action preview/);
