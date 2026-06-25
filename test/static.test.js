@@ -155,11 +155,19 @@ test("chronic disease policy module exposes 2025 service capacity workflow", () 
 test("insurance portal exposes actionable drug consumable supervision workflow", () => {
   const html = read("insurance.html");
   const js = read("insurance.js");
+  const institutionHtml = read("institution.html");
+  const institutionJs = read("institution.js");
   const server = read("server.js");
   assert.match(html, /drug-consumable-panel/);
   assert.match(js, /renderDrugConsumableSupervision/);
   assert.match(js, /postDrugConsumableAction/);
   assert.match(js, /data-drug-action/);
+  assert.match(institutionHtml, /institution-drug-consumable-panel/);
+  assert.match(institutionJs, /loadInstitutionDrugConsumableSupervision/);
+  assert.match(institutionJs, /renderInstitutionDrugConsumableSupervision/);
+  assert.match(institutionJs, /postInstitutionDrugConsumableRemediation/);
+  assert.match(institutionJs, /data-institution-drug-action/);
+  assert.match(institutionJs, /\/drug-consumable-supervision\/\$\{encodeURIComponent\(id\)\}\/remediation/);
   assert.match(server, /buildDrugConsumableSupervision/);
   assert.match(server, /\/api\/drug-consumable-supervision/);
   assert.match(server, /drug-consumable-review/);

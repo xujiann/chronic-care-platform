@@ -1,9 +1,11 @@
-const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthStatistics: {}, doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {} };
+const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], drugConsumableSupervisions: [], deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthStatistics: {}, doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {} };
 const institutionApiBase = location.protocol === "file:" || location.hostname.endsWith("github.io") ? "" : "/api";
 let platformState = fallbackState;
+let institutionDrugConsumableState = { boundaries: [], rows: [], summary: {} };
 
 document.addEventListener("DOMContentLoaded", async () => {
   platformState = await loadPlatformState(fallbackState);
+  institutionDrugConsumableState = await loadInstitutionDrugConsumableSupervision(platformState);
   bindInstitutionActions();
   renderAll(platformState);
 });
@@ -18,6 +20,7 @@ function renderAll(state) {
   renderCareOrders(state);
   renderAuthorizedRecords(state);
   renderClaimLinks(state);
+  renderInstitutionDrugConsumableSupervision(institutionDrugConsumableState, state);
   renderReferralCenter(state);
   renderReservedResources(state);
   renderIntegratedProfiles(state);
@@ -30,6 +33,15 @@ function renderAll(state) {
 
 function bindInstitutionActions() {
   document.addEventListener("click", async (event) => {
+    const drugButton = event.target.closest("[data-institution-drug-action]");
+    if (drugButton) {
+      drugButton.disabled = true;
+      const payload = JSON.parse(drugButton.dataset.payload || "{}");
+      await postInstitutionDrugConsumableRemediation(drugButton.dataset.id, payload);
+      drugButton.disabled = false;
+      return;
+    }
+
     const button = event.target.closest("[data-workflow-action]");
     if (!button) return;
     const updates = JSON.parse(button.dataset.updates || "{}");
@@ -44,8 +56,54 @@ function bindInstitutionActions() {
   document.querySelector("#multi-practice-form")?.addEventListener("submit", submitMultiPracticeApplication);
 }
 
+async function loadInstitutionDrugConsumableSupervision(state = platformState) {
+  if (!institutionApiBase) {
+    const rows = (state.drugConsumableSupervisions || []).map((item) => ({
+      ...item,
+      normalizedStatus: /closed|complete|done|passed/i.test(String(item.status || "")) ? "closed" : "open",
+      auditCount: Array.isArray(item.auditTrail) ? item.auditTrail.length : 0
+    }));
+    return {
+      rows,
+      boundaries: [],
+      summary: {
+        total: rows.length,
+        open: rows.filter((item) => item.normalizedStatus !== "closed").length,
+        highRisk: rows.filter((item) => item.riskLevel === "high").length
+      }
+    };
+  }
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/drug-consumable-supervision`);
+    if (!response.ok) return { boundaries: [], rows: [], summary: {} };
+    return response.json();
+  } catch {
+    return { boundaries: [], rows: [], summary: {} };
+  }
+}
+
+async function postInstitutionDrugConsumableRemediation(id, body) {
+  if (!institutionApiBase) return false;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  const response = await request(`${institutionApiBase}/drug-consumable-supervision/${encodeURIComponent(id)}/remediation`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  if (!response.ok) return false;
+  institutionDrugConsumableState = await loadInstitutionDrugConsumableSupervision(platformState);
+  platformState = await loadPlatformState(fallbackState);
+  renderAll(platformState);
+  return true;
+}
+
 function actionButton(collection, id, label, updates, note) {
   return `<button class="inline-action" type="button" data-workflow-action data-collection="${collection}" data-id="${id}" data-updates='${JSON.stringify(updates)}' data-note="${note || label}">${label}</button>`;
+}
+
+function institutionDrugActionButton(id, label, payload) {
+  return `<button class="inline-action" type="button" data-institution-drug-action data-id="${id}" data-payload='${JSON.stringify(payload)}'>${label}</button>`;
 }
 
 function residentOf(state, id) {
@@ -374,6 +432,41 @@ function renderClaimLinks(state) {
       <span>${claim.institution}<br>${money(claim.totalAmount)} · ${claim.status}</span>
     </article>`;
   }).join("");
+}
+
+function renderInstitutionDrugConsumableSupervision(report, state) {
+  const countEl = document.querySelector("#institution-drug-consumable-count");
+  const boundaryEl = document.querySelector("#institution-drug-consumable-boundaries");
+  const listEl = document.querySelector("#institution-drug-consumable-list");
+  if (!countEl || !boundaryEl || !listEl) return;
+
+  const fallbackRows = (state.drugConsumableSupervisions || []).map((item) => ({
+    ...item,
+    normalizedStatus: /closed|complete|done|passed/i.test(String(item.status || "")) ? "closed" : "open",
+    auditCount: Array.isArray(item.auditTrail) ? item.auditTrail.length : 0
+  }));
+  const rows = report?.rows?.length ? report.rows : fallbackRows;
+  const openRows = rows.filter((item) => item.normalizedStatus !== "closed");
+  const boundaries = report?.boundaries || [];
+  countEl.textContent = `${openRows.length}/${rows.length} open`;
+  boundaryEl.innerHTML = boundaries.map((item) => `<div><strong>${item.name}</strong><span>${item.source} · ${item.count}</span></div>`).join("") || `<div><strong>Institution remediation</strong><span>Drug, consumable, fixed-pickup and catalog evidence</span></div>`;
+  listEl.innerHTML = openRows.map((item) => {
+    const resident = residentOf(state, item.residentId);
+    const badge = item.riskLevel === "high" ? "danger" : item.normalizedStatus === "pending" ? "warn" : "info";
+    return `<section class="item" data-institution-drug-consumable="${item.id}">
+      <div>
+        <h3>${resident?.name || item.residentId || "Unknown resident"} · ${item.category || item.boundary}</h3>
+        <p>${item.institution || "institution pending"} · ${item.issue || item.nextAction || "Drug consumable supervision item"}</p>
+        <p>Review ${item.reviewStatus || "pending"} · Insurance ${item.insuranceStatus || "pending"} · Remediation ${item.remediationStatus || "open"} · Audit ${item.auditCount || 0}</p>
+        <p>${item.nextAction || "Upload institution remediation evidence and wait for regulator review."}</p>
+        <div class="action-row">
+          ${institutionDrugActionButton(item.id, "Submit remediation", { remediationStatus: "submitted", status: "remediation-submitted", evidence: "institution-remediation-evidence", nextAction: "Regulator reviews institution remediation evidence." })}
+          ${institutionDrugActionButton(item.id, "Catalog version uploaded", { remediationStatus: "catalog-version-uploaded", status: "remediation-evidence-uploaded", evidence: "institution-uploaded-catalog-version", nextAction: "Insurance center cross-checks settlement and catalog version." })}
+        </div>
+      </div>
+      <span class="badge ${badge}">${item.riskLevel || item.normalizedStatus || item.status}</span>
+    </section>`;
+  }).join("") || `<p class="muted">No open drug consumable remediation rows.</p>`;
 }
 
 function renderReferralCenter(state) {
