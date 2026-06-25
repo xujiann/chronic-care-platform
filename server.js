@@ -5809,6 +5809,109 @@ function syncMultiPracticeDocumentChecks(application) {
   };
 }
 
+function hasMultiPracticeRisk(application) {
+  const compliance = application.compliance || {};
+  const documents = syncMultiPracticeDocumentChecks(application);
+  const complianceBlocked = Object.entries(compliance)
+    .some(([key, value]) => key !== "publicHospitalLeaderRestricted" && !value);
+  return Boolean(
+    compliance.publicHospitalLeaderRestricted ||
+    complianceBlocked ||
+    documents.scheduleConflict ||
+    documents.firstPracticeConsent === false ||
+    documents.cooperationAgreement === false ||
+    documents.liabilityInsurance === false ||
+    String(application.status || "").includes("退回") ||
+    String(application.status || "").includes("补正")
+  );
+}
+
+function multiPracticeRiskFlags(application) {
+  const compliance = application.compliance || {};
+  const documents = syncMultiPracticeDocumentChecks(application);
+  return [
+    compliance.publicHospitalLeaderRestricted ? "public-hospital-leader-restricted" : "",
+    compliance.titleQualified === false ? "title-not-qualified" : "",
+    compliance.fiveYears === false ? "years-not-qualified" : "",
+    compliance.assessmentQualified === false ? "assessment-not-qualified" : "",
+    compliance.scopeMatched === false ? "scope-not-matched" : "",
+    compliance.agreementCompleted === false ? "agreement-incomplete" : "",
+    documents.firstPracticeConsent === false ? "first-practice-consent-missing" : "",
+    documents.cooperationAgreement === false ? "cooperation-agreement-missing" : "",
+    documents.liabilityInsurance === false ? "liability-insurance-missing" : "",
+    documents.scheduleConflict ? "schedule-conflict" : "",
+    String(application.status || "").includes("退回") ? "returned" : "",
+    String(application.status || "").includes("补正") ? "correction-required" : ""
+  ].filter(Boolean);
+}
+
+function buildMultiPracticeRegistry(data, user) {
+  const applications = (data.multiPracticeApplications || [])
+    .filter((item) => canAccessMultiPracticeApplication(user, item))
+    .map((item) => {
+      const documentChecks = syncMultiPracticeDocumentChecks(item);
+      const riskFlags = multiPracticeRiskFlags(item);
+      return {
+        id: item.id,
+        doctorId: item.doctorId,
+        doctorName: item.doctorName,
+        title: item.title,
+        specialty: item.specialty,
+        practiceScope: item.practiceScope,
+        primaryInstitution: item.primaryInstitution,
+        targetInstitution: item.targetInstitution,
+        targetDepartment: item.targetDepartment,
+        period: item.period,
+        schedule: item.schedule,
+        registrationMode: item.registrationMode || "备案管理",
+        primaryConsent: item.primaryConsent,
+        status: item.status || "待处理",
+        publicVisible: item.publicVisible !== false,
+        compliance: item.compliance || {},
+        documentChecks,
+        risk: riskFlags.length > 0,
+        riskFlags,
+        disclosureItems: item.disclosureItems || [],
+        lifecycle: Array.isArray(item.lifecycle) ? item.lifecycle.slice(0, 5) : [],
+        lastUpdated: item.lastUpdated
+      };
+    });
+  const publicLedger = applications.filter((item) => item.publicVisible).map((item) => ({
+    id: item.id,
+    doctorName: item.doctorName,
+    title: item.title,
+    specialty: item.specialty,
+    practiceScope: item.practiceScope,
+    primaryInstitution: item.primaryInstitution,
+    targetInstitution: item.targetInstitution,
+    targetDepartment: item.targetDepartment,
+    period: item.period,
+    schedule: item.schedule,
+    registrationMode: item.registrationMode,
+    status: item.status
+  }));
+  const reviewQueue = applications
+    .filter((item) => item.risk || String(item.status || "").includes("待"))
+    .sort((left, right) => Number(right.risk) - Number(left.risk) || String(right.lastUpdated || "").localeCompare(String(left.lastUpdated || "")));
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    summary: {
+      total: applications.length,
+      pending: applications.filter((item) => String(item.status || "").includes("待")).length,
+      filed: applications.filter((item) => String(item.status || "").includes("备案")).length,
+      publicVisible: publicLedger.length,
+      risk: applications.filter((item) => item.risk).length,
+      firstPracticeConsentMissing: applications.filter((item) => item.documentChecks.firstPracticeConsent === false).length,
+      scheduleConflicts: applications.filter((item) => item.documentChecks.scheduleConflict).length
+    },
+    publicLedger,
+    reviewQueue,
+    applications,
+    policy: data.multiPracticePolicy || seedMultiPracticePolicy()
+  };
+}
+
 function patchCollectionItem({ data, collection, id, patch, user, action, protectedFields = WORKFLOW_PROTECTED_FIELDS }) {
   const rows = Array.isArray(data[collection]) ? data[collection] : [];
   const index = rows.findIndex((item) => item.id === id);
@@ -8468,6 +8571,13 @@ async function handleApi(req, res) {
     const data = readDatabase();
     const applications = (data.multiPracticeApplications || []).filter((item) => canAccessMultiPracticeApplication(user, item));
     sendJson(res, 200, { applications, policy: data.multiPracticePolicy });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/multi-practice-registry") {
+    const user = requireApiRole(req, res, ["institution", "commission"], "/api/multi-practice-registry");
+    if (!user) return;
+    sendJson(res, 200, redactSensitiveResponse(buildMultiPracticeRegistry(readDatabase(), user), user));
     return;
   }
 

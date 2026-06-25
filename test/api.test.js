@@ -338,6 +338,27 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     });
   });
 
+  await t.test("exposes scoped multi-practice registry for supervision and public ledger", async () => {
+    const registry = await api(baseUrl, "/api/multi-practice-registry", authorized(commissionToken));
+    assert.equal(registry.response.status, 200);
+    assert.equal(registry.body.ok, true);
+    assert.equal(registry.body.summary.total >= 2, true);
+    assert.equal(registry.body.summary.publicVisible, registry.body.publicLedger.length);
+    assert.equal(registry.body.publicLedger.every((item) => item.doctorName && item.primaryInstitution && item.targetInstitution), true);
+    assert.equal(registry.body.applications.every((item) => Array.isArray(item.riskFlags) && item.documentChecks), true);
+    assert.equal(registry.body.reviewQueue.every((item) => item.risk || String(item.status || "").includes("待")), true);
+
+    const doctorLogin = await login(baseUrl, "doctor");
+    const doctorRegistry = await api(baseUrl, "/api/multi-practice-registry", authorized(doctorLogin.body.token));
+    assert.equal(doctorRegistry.response.status, 200);
+    assert.equal(doctorRegistry.body.applications.length >= 1, true);
+    assert.equal(doctorRegistry.body.applications.every((item) => item.doctorId === doctorLogin.body.user.doctorId), true);
+
+    const insuranceLogin = await login(baseUrl, "insurance");
+    const deniedRegistry = await api(baseUrl, "/api/multi-practice-registry", authorized(insuranceLogin.body.token));
+    assert.equal(deniedRegistry.response.status, 403);
+  });
+
   const citizenLogin = await login(baseUrl, "citizen");
   assert.equal(citizenLogin.response.status, 200);
   const citizenToken = citizenLogin.body.token;
