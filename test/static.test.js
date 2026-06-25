@@ -47,10 +47,15 @@ test("about page documents runnable platform capabilities", () => {
   const auth = read("auth.js");
   assert.match(about, /data-about-section="runtime-capabilities"/);
   assert.match(about, /data-about-section="role-portals"/);
+  assert.match(about, /data-about-section="chronic-followup-policy"/);
   assert.match(about, /data-about-capability="service-acceptance"/);
   assert.match(about, /data-about-capability="site-template-readmes"/);
   assert.match(about, /data-about-capability="workflow-tasks"/);
   assert.match(about, /data-about-capability="chronic-care"/);
+  assert.match(about, /data-about-capability="chronic-followup-loop"/);
+  assert.match(about, /国卫基层发〔2025〕15号/);
+  assert.match(about, /基层慢性病健康管理服务能力建设指引/);
+  assert.match(about, /\/api\/chronic\/followup-feedback/);
   assert.match(about, /data-about-capability="county-consortium"/);
   assert.match(about, /\/api\/service-acceptance-summary/);
   assert.match(about, /\/api\/site-template-readmes/);
@@ -59,6 +64,8 @@ test("about page documents runnable platform capabilities", () => {
   assert.match(read("index.html"), /href="\.\/about\.html"/);
   assert.match(read("platform.html"), /href="\.\/about\.html"/);
   assert.match(read("health-city.html"), /href="\.\/about\.html"/);
+  assert.match(read("citizen.html"), /href="\.\/about\.html"/);
+  assert.match(read("institution.html"), /href="\.\/about\.html"/);
   assert.match(auth, /\["about\.html", "关于"\]/);
   assert.match(auth, /pageName === "about\.html"/);
   assert.doesNotMatch(about, /requireRole/);
@@ -189,6 +196,8 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /audit-retention-report\.md/);
   assert.match(read("docs/chronic-followup-readiness.md"), /chronic-followup-readiness-report\.md/);
   assert.match(read("docs/chronic-followup-readiness.md"), /\/api\/chronic\/followup-feedback/);
+  assert.match(read("docs/chronic-followup-readiness.md"), /国卫基层发〔2025〕15号/);
+  assert.match(read("docs/chronic-followup-readiness.md"), /基层慢性病健康管理服务能力建设指引/);
   assert.match(read("README.md"), /data-quality-report\.md/);
   assert.match(read("README.md"), /environment-matrix-report\.md/);
   assert.match(read("README.md"), /integration-readiness-report\.md/);
