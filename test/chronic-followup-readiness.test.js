@@ -17,9 +17,10 @@ test("chronic follow-up readiness covers all priority application boundaries", (
   const report = buildChronicFollowupReadinessReport({ data });
 
   assert.equal(report.ok, true);
-  assert.equal(report.boundaries.length, 8);
+  assert.equal(report.boundaries.length, 9);
   assert.equal(report.boundaries.every((item) => item.passed), true);
   assert.equal(report.summary.feedbackRecords >= 1, true);
+  assert.equal(report.summary.notificationMessages >= 1, true);
   assert.equal(report.reusePoints.includes("chronicScreeningTasks"), true);
   assert.equal(report.reusePoints.includes("citizen.html"), true);
   assert.equal(report.apiSurface.includes("POST /api/chronic/followup-feedback"), true);
@@ -32,6 +33,15 @@ test("chronic follow-up readiness fails without resident feedback evidence", () 
 
   assert.equal(report.ok, false);
   assert.equal(report.boundaries.find((item) => item.id === "resident-feedback").passed, false);
+});
+
+test("chronic follow-up readiness fails without feedback notification messages", () => {
+  const data = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "db.json"), "utf8"));
+  data.taskMessages = [];
+  const report = buildChronicFollowupReadinessReport({ data });
+
+  assert.equal(report.ok, false);
+  assert.equal(report.boundaries.find((item) => item.id === "feedback-notification").passed, false);
 });
 
 test("chronic follow-up readiness renders and writes release artifacts", (t) => {

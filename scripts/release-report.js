@@ -276,7 +276,8 @@ function chronicFollowupChecks(chronicFollowup) {
   return [
     check("chronicFollowup:readiness", chronicFollowup.ok, chronicFollowup.ok ? "chronic follow-up readiness checks passed" : "chronic follow-up readiness checks failed", "error", "chronic-followup"),
     check("chronicFollowup:boundaries", chronicFollowup.summary?.passed === chronicFollowup.summary?.boundaries, `${chronicFollowup.summary?.passed || 0}/${chronicFollowup.summary?.boundaries || 0} boundaries`, "error", "chronic-followup"),
-    check("chronicFollowup:feedback", chronicFollowup.summary?.feedbackRecords >= 1, `${chronicFollowup.summary?.feedbackRecords || 0} feedback records`, "error", "chronic-followup")
+    check("chronicFollowup:feedback", chronicFollowup.summary?.feedbackRecords >= 1, `${chronicFollowup.summary?.feedbackRecords || 0} feedback records`, "error", "chronic-followup"),
+    check("chronicFollowup:notifications", chronicFollowup.summary?.notificationMessages >= 1, `${chronicFollowup.summary?.notificationMessages || 0} notification messages`, "error", "chronic-followup")
   ];
 }
 

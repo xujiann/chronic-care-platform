@@ -4504,6 +4504,7 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
   const targetResidents = (scoped.residents || []).filter((resident) => !residentId || resident.id === residentId);
   const policy = data.chronicFollowupStatusPolicy || seedChronicFollowupStatusPolicy();
   const feedbackRecords = (scoped.personalRecords || []).filter((item) => item.category === "chronic-feedback");
+  const followupMessages = (scoped.taskMessages || []).filter((item) => item.chronicFollowup);
   const residents = targetResidents.map((resident) => {
     const screenings = (scoped.chronicScreeningTasks || []).filter((item) => item.residentId === resident.id);
     const plans = (scoped.chronicManagementPlans || []).filter((item) => item.residentId === resident.id);
@@ -4548,6 +4549,10 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
         latest: latestFeedback || null,
         count: feedbackRecords.filter((item) => item.residentId === resident.id).length
       },
+      notifications: {
+        count: followupMessages.filter((item) => item.residentId === resident.id).length,
+        unread: followupMessages.filter((item) => item.residentId === resident.id && isOpenChronicFollowupMessage(item)).length
+      },
       archiveEvidence: {
         authorizations: records.filter((item) => item.category === "authorizations").length,
         emr: records.filter((item) => item.category === "emr").length,
@@ -4564,7 +4569,8 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
       highPriority: residents.filter((item) => item.riskLevel === "high").length,
       openFollowups: residents.reduce((sum, item) => sum + item.returnVisitReminders.length, 0),
       medicationPending: residents.reduce((sum, item) => sum + item.medicationAdherence.pending, 0),
-      feedbackRecords: residents.reduce((sum, item) => sum + item.residentFeedback.count, 0)
+      feedbackRecords: residents.reduce((sum, item) => sum + item.residentFeedback.count, 0),
+      notifications: residents.reduce((sum, item) => sum + item.notifications.count, 0)
     },
     residents
   };
@@ -4599,6 +4605,59 @@ function normalizeChronicFeedback(payload, user) {
   };
 }
 
+function appendChronicFollowupMessage(data, { residentId, taskId, collection, sourceId, targetRole, title, body, user }) {
+  const now = new Date().toISOString();
+  const message = {
+    id: `msg-${randomUUID()}`,
+    taskId: taskId || `${collection || "chronicFollowup"}:${sourceId || residentId}`,
+    collection: collection || "chronicFollowup",
+    sourceId: sourceId || "",
+    residentId,
+    targetRole,
+    channel: "in_app",
+    title,
+    body,
+    status: "sent",
+    chronicFollowup: true,
+    receipts: [],
+    createdAt: now,
+    createdBy: user?.username || user?.role || "system",
+    createdByName: user?.name || "system"
+  };
+  data.taskMessages = [message, ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
+  return message;
+}
+
+function isOpenChronicFollowupMessage(message) {
+  return !["read", "handled"].includes(String(message.status || "").toLowerCase());
+}
+
+function closeChronicFollowupMessages(data, { residentId, taskId, targetRole, user }) {
+  const now = new Date().toISOString();
+  let closed = 0;
+  data.taskMessages = (Array.isArray(data.taskMessages) ? data.taskMessages : []).map((message) => {
+    if (!message.chronicFollowup || message.residentId !== residentId || message.taskId !== taskId || message.targetRole !== targetRole || !isOpenChronicFollowupMessage(message)) {
+      return message;
+    }
+    closed += 1;
+    return {
+      ...message,
+      status: "handled",
+      handledAt: now,
+      receipts: [
+        {
+          at: now,
+          by: user.username || user.role,
+          byName: user.name,
+          status: "handled"
+        },
+        ...(Array.isArray(message.receipts) ? message.receipts : [])
+      ].slice(0, 20)
+    };
+  });
+  return closed;
+}
+
 function upsertChronicFeedback(data, user, payload) {
   const feedback = normalizeChronicFeedback(payload, user);
   if (!canAccessResident(user, feedback.residentId, data)) {
@@ -4617,6 +4676,16 @@ function upsertChronicFeedback(data, user, payload) {
       followup.lastUpdated = feedback.createdAt;
     }
   }
+  const message = appendChronicFollowupMessage(data, {
+    residentId: feedback.residentId,
+    taskId: feedback.meta.followupId ? `followups:${feedback.meta.followupId}` : `chronicFeedback:${feedback.id}`,
+    collection: "followups",
+    sourceId: feedback.meta.followupId || feedback.id,
+    targetRole: "institution",
+    title: "Chronic follow-up feedback received",
+    body: feedback.result || feedback.name,
+    user
+  });
   data.securityEvents = [
     {
       id: randomUUID(),
@@ -4632,7 +4701,7 @@ function upsertChronicFeedback(data, user, payload) {
   ].slice(0, 120);
   appendDataAccessLog(data, user, feedback.residentId, "chronic follow-up feedback", feedback.result || feedback.name);
   writeDatabase(normalizeState(data));
-  return { status: 201, body: feedback };
+  return { status: 201, body: { ...feedback, messageId: message.id } };
 }
 
 function dispatchChronicFollowupAction(data, user, payload) {
@@ -4667,6 +4736,22 @@ function dispatchChronicFollowupAction(data, user, payload) {
     ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
   ].slice(0, 120);
   appendDataAccessLog(data, user, item.residentId, "chronic follow-up disposition", item.dispositionNote || item.status || collection);
+  closeChronicFollowupMessages(data, {
+    residentId: item.residentId,
+    taskId: `${collection}:${item.id}`,
+    targetRole: "institution",
+    user
+  });
+  appendChronicFollowupMessage(data, {
+    residentId: item.residentId,
+    taskId: `${collection}:${item.id}`,
+    collection,
+    sourceId: item.id,
+    targetRole: "citizen",
+    title: "Chronic follow-up disposition updated",
+    body: item.dispositionNote || item.result || item.status || "Your follow-up task was updated.",
+    user
+  });
   writeDatabase(data);
   return { status: 200, body: item };
 }

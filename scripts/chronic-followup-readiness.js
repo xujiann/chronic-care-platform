@@ -34,6 +34,7 @@ function count(items, predicate) {
 function buildChronicFollowupReadinessReport(options = {}) {
   const data = options.data || readJson("data/db.json");
   const feedback = (data.personalRecords || []).filter((item) => item.category === "chronic-feedback" || item.meta?.followupFeedback);
+  const followupMessages = (data.taskMessages || []).filter((item) => item.chronicFollowup);
   const screeningResidents = recordsByResident(data, "chronicScreeningTasks");
   const planResidents = recordsByResident(data, "chronicManagementPlans");
   const followupResidents = recordsByResident(data, "followups");
@@ -84,6 +85,12 @@ function buildChronicFollowupReadinessReport(options = {}) {
       evidence: "personalRecords[category=chronic-feedback]"
     },
     {
+      id: "feedback-notification",
+      name: "Feedback notification loop",
+      passed: followupMessages.length >= 1 && followupMessages.every((item) => item.residentId && item.targetRole && item.status),
+      evidence: "taskMessages[chronicFollowup=true]"
+    },
+    {
       id: "status-policy",
       name: "Status normalization policy",
       passed: Boolean(policy.version && policy.statusGroups?.open && policy.statusGroups?.closed && policy.requiredEvidence?.followup),
@@ -107,6 +114,7 @@ function buildChronicFollowupReadinessReport(options = {}) {
       passed: boundaries.filter((item) => item.passed).length,
       residents: residentCoverage.length,
       feedbackRecords: feedback.length,
+      notificationMessages: followupMessages.length,
       highRiskScreenings: count(data.chronicScreeningTasks, (item) => /楂樺嵄|high/i.test(String(item.riskLevel || ""))),
       openFollowups: count(data.followups, (item) => item.status !== "宸插畬鎴?")
     },

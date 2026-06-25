@@ -328,10 +328,17 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("server.js"), /\/api\/chronic\/followup-summary/);
   assert.match(read("server.js"), /\/api\/chronic\/followup-feedback/);
   assert.match(read("server.js"), /\/api\/chronic\/followup-dispatch/);
+  assert.match(read("server.js"), /appendChronicFollowupMessage/);
+  assert.match(read("server.js"), /closeChronicFollowupMessages/);
+  assert.match(read("data/db.json"), /"chronicFollowup": true/);
+  assert.match(read("docs/chronic-followup-readiness.md"), /\/api\/messages/);
   assert.match(read("institution.html"), /chronic-followup-workbench/);
   assert.match(read("institution.js"), /dispatchChronicFollowup/);
+  assert.match(read("institution.js"), /followupMessages/);
+  assert.match(read("institution.js"), /随访消息/);
   assert.match(read("citizen.html"), /followup-feedback-form/);
   assert.match(read("citizen.js"), /bindFollowupFeedback/);
+  assert.match(read("citizen.js"), /state\.taskMessages/);
 });
 
 test("system structure documentation reflects completed local governance loops", () => {

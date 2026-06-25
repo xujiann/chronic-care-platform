@@ -27,6 +27,8 @@ Priority application 6 covers chronic screening, tiered management, post-dischar
 
 The API keeps resident authorization checks, role-gated institution handling, data access logs, and security event audit trails in the existing server model.
 
+Resident feedback also creates `taskMessages` for institution follow-up, and institution dispositions create resident-facing messages through the existing `/api/messages` channel.
+
 ## Release Evidence
 
 Run `npm run chronic:followup-readiness` to generate:

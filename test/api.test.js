@@ -744,6 +744,10 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(feedback.response.status, 201);
     assert.equal(feedback.body.category, "chronic-feedback");
     assert.equal(feedback.body.meta.followupId, "f1");
+    assert.equal(typeof feedback.body.messageId, "string");
+
+    const institutionMessages = await api(baseUrl, "/api/messages", authorized(commissionToken));
+    assert.equal(institutionMessages.body.messages.some((item) => item.id === feedback.body.messageId && item.targetRole === "institution" && item.chronicFollowup), true);
 
     const feedbackDenied = await api(baseUrl, "/api/chronic/followup-feedback", authorized(citizen.body.token, {
       method: "POST",
@@ -764,6 +768,14 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(dispatched.response.status, 200);
     assert.equal(dispatched.body.status, "已完成");
     assert.equal(dispatched.body.disposition, "handled");
+
+    const closedInstitutionMessages = await api(baseUrl, "/api/messages", authorized(commissionToken));
+    const closedFeedbackMessage = closedInstitutionMessages.body.messages.find((item) => item.id === feedback.body.messageId);
+    assert.equal(closedFeedbackMessage.status, "handled");
+    assert.equal(closedFeedbackMessage.receipts[0].status, "handled");
+
+    const chronicCitizenMessages = await api(baseUrl, "/api/messages", authorized(citizen.body.token));
+    assert.equal(chronicCitizenMessages.body.messages.some((item) => item.taskId === "followups:f1" && item.targetRole === "citizen" && item.chronicFollowup), true);
 
     const dispatchDenied = await api(baseUrl, "/api/chronic/followup-dispatch", authorized(citizen.body.token, {
       method: "POST",

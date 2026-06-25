@@ -75,12 +75,14 @@ function renderChronicFollowupWorkbench(state) {
   const openPlans = (state.chronicManagementPlans || []).filter((item) => !chronicClosed(state, item.status));
   const openScreenings = (state.chronicScreeningTasks || []).filter((item) => !chronicClosed(state, item.status));
   const pendingMedication = (state.medicationPickups || []).filter((item) => !chronicClosed(state, item.status || item.pharmacyStatus));
-  summaryEl.textContent = `${openFollowups.length + openPlans.length + openScreenings.length} 项待处置`;
+  const followupMessages = (state.taskMessages || []).filter((item) => item.chronicFollowup && item.targetRole === "institution" && !["read", "handled"].includes(String(item.status || "").toLowerCase()));
+  summaryEl.textContent = `${openFollowups.length + openPlans.length + openScreenings.length + followupMessages.length} 项待处置`;
   metricsEl.innerHTML = [
     ["筛查分级", openScreenings.length, "高风险发现与分级评估"],
     ["管理计划", openPlans.length, "复核、升级预警、下次随访"],
     ["院后随访", openFollowups.length, "逾期、待随访、复诊提醒"],
     ["用药依从", pendingMedication.length, "固定取药与长处方闭环"],
+    ["随访消息", followupMessages.length, "居民反馈到机构处置提醒"],
     ["居民反馈", feedback.length, "居民端主动回填"]
   ].map(([label, value, hint]) => `<article class="claim-card"><strong>${label}</strong><span>${value}<br>${hint}</span></article>`).join("");
 
@@ -93,12 +95,14 @@ function renderChronicFollowupWorkbench(state) {
   listEl.innerHTML = rows.map((item) => {
     const resident = residentOf(state, item.residentId);
     const latestFeedback = feedback.find((record) => record.residentId === item.residentId);
+    const latestMessage = followupMessages.find((message) => message.residentId === item.residentId);
     return `<section class="item">
       <div>
         <h3>${resident?.name || "未知居民"} · ${item.title || item.id}</h3>
         <p>${item.collection} · ${item.status || "待处理"} · ${item.due || "待排期"} · ${item.assignee || item.owner || item.pharmacy || "责任人待定"}</p>
         <p>${item.nextStep || item.intervention || item.advice || item.result || "按慢病随访计划处置"}</p>
         <p>居民反馈：${latestFeedback ? `${latestFeedback.result} · ${latestFeedback.meta?.nextRequest || ""}` : "暂无新增反馈"}</p>
+        <p>随访消息：${latestMessage ? `${latestMessage.title} · ${latestMessage.body || ""}` : "暂无待处理消息"}</p>
         <div class="action-row">
           ${chronicDispatchButton(item.collection, item.id, item.primary, item.updates, `慢病随访处置：${item.primary}`)}
           ${item.collection === "chronicManagementPlans" ? chronicDispatchButton(item.collection, item.id, "升级预警", { status: "预警中", intervention: "已升级家庭医生重点管理" }, "慢病管理计划升级预警") : ""}

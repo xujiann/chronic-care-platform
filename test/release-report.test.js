@@ -106,7 +106,9 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "audit:retention" && item.passed), true);
   assert.equal(report.auditRetention.ok, true);
   assert.equal(report.checks.some((item) => item.name === "chronicFollowup:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "chronicFollowup:notifications" && item.passed), true);
   assert.equal(report.chronicFollowup.ok, true);
+  assert.equal(report.chronicFollowup.summary.notificationMessages >= 1, true);
   assert.equal(report.chronicFollowup.apiSurface.includes("POST /api/chronic/followup-feedback"), true);
   assert.equal(report.checks.some((item) => item.name === "dataQuality:report" && item.passed), true);
   assert.equal(report.dataQuality.ok, true);
@@ -273,6 +275,7 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.equal(auditJson.auditRetention.ok, true);
   assert.match(auditMarkdown, /Audit chains/);
   assert.equal(chronicFollowupJson.chronicFollowup.ok, true);
+  assert.equal(chronicFollowupJson.chronicFollowup.summary.notificationMessages >= 1, true);
   assert.match(chronicFollowupMarkdown, /resident-feedback/);
   assert.equal(dataQualityJson.dataQuality.ok, true);
   assert.match(dataQualityMarkdown, /Resident-linked collections/);

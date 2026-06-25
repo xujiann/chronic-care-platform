@@ -2876,7 +2876,25 @@
       "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     }
   ],
-  "taskMessages": [],
+  "taskMessages": [
+    {
+      "id": "msg-chronic-followup-001",
+      "taskId": "followups:f1",
+      "collection": "followups",
+      "sourceId": "f1",
+      "residentId": "r1",
+      "targetRole": "institution",
+      "channel": "in_app",
+      "title": "Chronic follow-up feedback received",
+      "body": "居民反馈血压仍偏高，请家庭医生电话复核。",
+      "status": "sent",
+      "chronicFollowup": true,
+      "receipts": [],
+      "createdAt": "2026-06-23T09:05:00.000Z",
+      "createdBy": "citizen",
+      "createdByName": "演示居民A"
+    }
+  ],
   "dataQualityIssues": [],
   "careOrders": [
     {

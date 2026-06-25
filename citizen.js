@@ -294,6 +294,11 @@ function renderReminderCenter(residentId) {
       detail: `${item.nextPickup} · ${item.pharmacy} · ${item.insuranceReview || "待医保审核"}`,
       status: item.status
     })),
+    ...(state.taskMessages || []).filter((item) => item.residentId === residentId && item.targetRole === "citizen" && item.chronicFollowup && !["read", "handled"].includes(String(item.status || "").toLowerCase())).map((item) => ({
+      title: item.title || "慢病随访处置",
+      detail: `${item.createdAt ? item.createdAt.slice(0, 10) : ""} · ${item.body || "请查看家庭医生处置意见"}`,
+      status: item.status || "sent"
+    })),
     ...(state.referralSystem?.referrals || []).filter((item) => item.residentId === residentId && !["已完成", "基层承接"].includes(item.status)).map((item) => ({
       title: `${item.type}转诊`,
       detail: `${item.from} -> ${item.to} · ${item.reservedResource}`,
