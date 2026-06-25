@@ -18,6 +18,7 @@ test("role pages keep explicit page guards", () => {
     "county.html": "county",
     "index.html": "commission",
     "health-dashboard.html": "commission",
+    "health-dashboard-about.html": "commission",
     "platform.html": "commission",
     "workbench.html": "commission"
   };
@@ -39,7 +40,7 @@ test("citizen pages do not expose cross-role module links or management collecti
 });
 
 test("application pages avoid placeholder navigation", () => {
-  const pages = ["about.html", "citizen.html", "mobile-preview.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html", "health-dashboard.html"];
+  const pages = ["about.html", "citizen.html", "mobile-preview.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html", "health-dashboard.html", "health-dashboard-about.html"];
   pages.forEach((file) => assert.doesNotMatch(read(file), /href=["']#["']/, `${file} 存在空链接占位`));
 });
 
@@ -107,6 +108,9 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(html, /dashboard-actions/);
   assert.match(html, /dashboard-api-state/);
   assert.match(html, /dashboard-data-boundary/);
+  assert.match(html, /dashboard-policy-notes/);
+  assert.match(html, /data-dashboard-policy="certificates"/);
+  assert.match(html, /health-dashboard-about\.html/);
   assert.match(html, /population-service-board/);
   assert.match(html, /population-period-controls/);
   assert.match(html, /population-metric-cards/);
@@ -138,11 +142,29 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(js, /预览待办/);
   assert.match(js, /源应用/);
   assert.match(read("auth.js"), /"health-dashboard\.html", "综合驾驶舱"/);
+  assert.match(read("auth.js"), /"health-dashboard-about\.html", "驾驶舱说明"/);
   assert.match(server, /\/api\/health-dashboard\/summary/);
   assert.match(server, /buildHealthDashboardSummary/);
   assert.match(read("package.json"), /health-dashboard-applications\.js/);
   assert.match(release, /health-dashboard-summary/);
   assert.match(deploy, /snapshot:healthDashboard/);
+});
+
+test("health dashboard about page documents policies data boundary and site cutover", () => {
+  const html = read("health-dashboard-about.html");
+  const auth = read("auth.js");
+
+  assert.match(html, /requireRole\(\["commission"\]\)/);
+  assert.match(html, /data-dashboard-about-section="policy-basis"/);
+  assert.match(html, /data-dashboard-about-section="data-boundary"/);
+  assert.match(html, /data-dashboard-about-section="api-evidence"/);
+  assert.match(html, /data-dashboard-about-section="site-cutover"/);
+  assert.match(html, /data-dashboard-policy="certificates"/);
+  assert.match(html, /\/api\/health-dashboard\/summary/);
+  assert.match(html, /healthDashboard:populationServiceBoard/);
+  assert.match(html, /birthCertificates\.birthDateTime/);
+  assert.match(html, /healthStatistics\.serviceReports/);
+  assert.match(auth, /"health-dashboard-about\.html": \["commission"\]/);
 });
 
 test("static snapshot keeps acceptance evidence clean and actionable", () => {

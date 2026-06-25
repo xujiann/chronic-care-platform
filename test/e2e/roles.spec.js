@@ -111,6 +111,9 @@ test("commission health dashboard filters live source actions and drills into so
   await expect(page.locator("#dashboard-metrics")).toContainText("170");
   await expect(page.locator("#dashboard-metrics")).toContainText("12");
   await expect(page.locator("#dashboard-applications tbody tr")).toHaveCount(7);
+  await expect(page.locator("#dashboard-policy-notes")).toBeVisible();
+  await expect(page.locator("[data-dashboard-policy='certificates']")).toContainText("出生");
+  await expect(page.locator("#dashboard-policy-notes a[href='./health-dashboard-about.html']")).toHaveCount(1);
   await expect(page.locator("#population-service-board")).toBeVisible();
   await expect(page.locator("#population-service-board")).toHaveAttribute("data-active-period", "day");
   await expect(page.locator("#population-metric-cards [data-population-metric]")).toHaveCount(4);
@@ -163,6 +166,13 @@ test("about page explains runnable platform capabilities", async ({ page }) => {
   await login(page, "health", "index.html");
   await page.goto("/about.html");
   await expect(page.locator(".auth-bar a[href='./about.html']")).toHaveCount(1);
+
+  await page.goto("/health-dashboard-about.html");
+  await expect(page.locator("[data-dashboard-about-section='policy-basis']")).toBeVisible();
+  await expect(page.locator("[data-dashboard-policy='certificates']")).toContainText("出生");
+  await expect(page.locator("[data-dashboard-about-section='data-boundary']")).toContainText("birthCertificates.birthDateTime");
+  await expect(page.locator("[data-dashboard-about-section='api-evidence']")).toContainText("/api/health-dashboard/summary");
+  await expect(page.locator("[data-dashboard-about-section='site-cutover']")).toBeVisible();
 });
 
 test("citizen stays in the household experience and cannot open commission pages", async ({ page }) => {

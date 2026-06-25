@@ -28,6 +28,7 @@
   const routeAccess = {
     "index.html": ["commission"],
     "health-dashboard.html": ["commission"],
+    "health-dashboard-about.html": ["commission"],
     "workbench.html": ["commission"],
     "platform.html": ["commission"],
     "institution.html": ["institution"],
@@ -40,7 +41,7 @@
   };
 
   const roleLinks = {
-    commission: [["health-dashboard.html", "综合驾驶舱"], ["platform.html", "全民健康平台"], ["health-city.html", "总览"], ["about.html", "关于"], ["workbench.html", "工作台"], ["index.html", "卫健管理"]],
+    commission: [["health-dashboard.html", "综合驾驶舱"], ["health-dashboard-about.html", "驾驶舱说明"], ["platform.html", "全民健康平台"], ["health-city.html", "总览"], ["about.html", "关于"], ["workbench.html", "工作台"], ["index.html", "卫健管理"]],
     institution: [["health-city.html", "总览"], ["about.html", "关于"], ["institution.html", "医疗机构"]],
     insurance: [["health-city.html", "总览"], ["about.html", "关于"], ["insurance.html", "医保"]],
     citizen: [["health-city.html", "总览"], ["about.html", "关于"], ["citizen.html", "个人端"], ["mobile-preview.html", "手机预览"]],

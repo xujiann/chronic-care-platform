@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>驾驶舱说明 · 卫生健康综合驾驶舱</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+    <script>window.HealthCityAuth.requireRole(["commission"])</script>
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>优先应用 8 · 关于驾驶舱</span>
+          <h1>卫生健康综合驾驶舱说明</h1>
+          <p>本页说明综合驾驶舱的政策依据、数据口径、接口边界和验收证据。驾驶舱作为前 7 个应用的汇总入口，不替代卫健委端、医疗机构端、医保端、居民端、医共体端、平台治理和运维工作台的源业务办理。</p>
+        </div>
+        <nav>
+          <a href="./health-dashboard.html">综合驾驶舱</a>
+          <a href="./platform.html">平台建设</a>
+          <a href="./workbench.html">运营工作台</a>
+          <a href="./about.html">平台关于</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" data-dashboard-about-section="scope-metrics">
+        <article class="metric-card">
+          <span>汇总边界</span>
+          <strong>7</strong>
+          <small>前 7 个源应用入口</small>
+        </article>
+        <article class="metric-card">
+          <span>核心指标</span>
+          <strong>4</strong>
+          <small>出生、死亡、就诊、入院</small>
+        </article>
+        <article class="metric-card">
+          <span>统计周期</span>
+          <strong>4</strong>
+          <small>日、周、月、年</small>
+        </article>
+        <article class="metric-card">
+          <span>验收证据</span>
+          <strong>API</strong>
+          <small>/api/health-dashboard/summary</small>
+        </article>
+      </section>
+
+      <section class="panel" data-dashboard-about-section="policy-basis">
+        <div class="panel-title">
+          <h2>相关政策说明</h2>
+          <span>从政策要求映射到当前可运行能力</span>
+        </div>
+        <div class="capability-grid">
+          <article class="capability-card" data-dashboard-policy="platform-sharing">
+            <strong>全民健康信息平台互通共享</strong>
+            <span>围绕互通共享的全民健康信息平台建设要求，驾驶舱汇聚源应用指标、接口、证据和现场依赖，形成管理端统一观察入口。</span>
+          </article>
+          <article class="capability-card" data-dashboard-policy="online-workflow">
+            <strong>医疗全流程在线办理</strong>
+            <span>转诊、就医、住院、医保、取药和授权共享等流程通过源应用办理；驾驶舱只负责跨域汇总、预警和 open action 闭环。</span>
+          </article>
+          <article class="capability-card" data-dashboard-policy="smart-supervision">
+            <strong>互联网医疗监管与智慧监管</strong>
+            <span>风险预警、任务闭环、接口联调和验收证据在驾驶舱集中呈现，支持卫健委对医疗服务、公共卫生和平台运行进行智慧化监管。</span>
+          </article>
+          <article class="capability-card" data-dashboard-policy="certificates">
+            <strong>出生死亡证明与电子证照</strong>
+            <span>出生、死亡指标按医学证明日期统计；现场联调需接入出生医学证明、死亡医学证明、电子证照、公安户籍、民政殡葬和疾控死因监测链路。</span>
+          </article>
+          <article class="capability-card" data-dashboard-policy="hierarchical-care">
+            <strong>分级诊疗和县域医共体协同</strong>
+            <span>就诊、入院、转诊、床位和远程诊断数据需与 HIS、EMR、LIS、PACS、心电和医共体协同系统联调，驾驶舱保留汇总视图。</span>
+          </article>
+          <article class="capability-card" data-dashboard-policy="security-audit">
+            <strong>数据安全、授权和审计合规</strong>
+            <span>驾驶舱仅允许管理端访问，接口读取写入审计链；生产上线需完成统一身份、日志留存、脱敏授权、密评等保和灾备演练证据。</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide" data-dashboard-about-section="data-boundary">
+          <div class="panel-title">
+            <h2>数据口径</h2>
+            <span>当前演示数据与现场接口的替换关系</span>
+          </div>
+          <div class="priority-list">
+            <div class="priority-row">
+              <strong>01</strong>
+              <div>
+                <h3>出生与死亡</h3>
+                <p>当前从 <code>birthCertificates.birthDateTime</code> 和 <code>deathCertificates.deathDateTime</code> 统计。现场需确认医学证明签发、登记、撤销、补正和跨部门交换的最终口径。</p>
+              </div>
+              <span>证照链路</span>
+            </div>
+            <div class="priority-row">
+              <strong>02</strong>
+              <div>
+                <h3>就诊与入院</h3>
+                <p>当前从 <code>healthStatistics.serviceReports</code> 月度门急诊和入院接口总量折算日、周、月、年。现场日报接口接入后应替换为真实分时统计。</p>
+              </div>
+              <span>卫生统计</span>
+            </div>
+            <div class="priority-row">
+              <strong>03</strong>
+              <div>
+                <h3>风险、任务和验收证据</h3>
+                <p>驾驶舱只汇总源应用 open action、风险等级、接口轨道、平台证据和现场依赖；处置、签收、办理、复核仍回到对应源应用。</p>
+              </div>
+              <span>汇总入口</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel" data-dashboard-about-section="api-evidence">
+          <div class="panel-title">
+            <h2>验收证据</h2>
+            <span>发布与审计可复用</span>
+          </div>
+          <div class="rules">
+            <div><strong>摘要接口</strong><span><code>/api/health-dashboard/summary</code> 返回应用、风险、任务、接口、证据、现场依赖和人口服务看板。</span></div>
+            <div><strong>发布报告</strong><span><code>release-report</code> 已检查 <code>healthDashboard:populationServiceBoard</code>，确保四周期四指标存在。</span></div>
+            <div><strong>静态兜底</strong><span>API 不可用时，驾驶舱从本地快照构建相同看板，保留演示数据和空状态边界。</span></div>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel" data-dashboard-about-section="site-cutover">
+        <div class="panel-title">
+          <h2>现场联调边界</h2>
+          <span>演示已兼容，生产需替换真实系统</span>
+        </div>
+        <div class="capability-grid">
+          <article class="capability-card" data-dashboard-site="identity">
+            <strong>统一身份和管理端权限</strong>
+            <span>对接政务统一认证、CA、短信、人脸核验和机构目录，确认卫健委管理端角色、区县范围和审计留痕。</span>
+          </article>
+          <article class="capability-card" data-dashboard-site="medical">
+            <strong>院内业务系统</strong>
+            <span>联调 HIS、EMR、LIS、PACS、心电、体检、床位和远程会诊接口，确认就诊、入院、转诊、检查检验互认口径。</span>
+          </article>
+          <article class="capability-card" data-dashboard-site="certificate">
+            <strong>证照与人口死亡登记</strong>
+            <span>联调出生医学证明、死亡医学证明、电子证照、公安户籍、民政殡葬、疾控死因监测和统计直报。</span>
+          </article>
+          <article class="capability-card" data-dashboard-site="operation">
+            <strong>生产运维与安全验收</strong>
+            <span>补齐生产数据库、对象存储、日志留存、监控告警、备份恢复、等保密评、信创适配和上线签字证据。</span>
+          </article>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

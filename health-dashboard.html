@@ -19,6 +19,7 @@
         <nav>
           <a href="./platform.html">平台建设</a>
           <a href="./workbench.html">运营工作台</a>
+          <a href="./health-dashboard-about.html">驾驶舱说明</a>
           <a href="./index.html">卫健委端</a>
           <a href="./county.html">医共体</a>
           <a href="./health-city.html">总览</a>
@@ -26,6 +27,34 @@
       </header>
 
       <section class="metric-grid" id="dashboard-metrics"></section>
+
+      <section class="panel" id="dashboard-policy-notes">
+        <div class="panel-title">
+          <h2>相关政策说明</h2>
+          <span>政策对齐只解释驾驶舱口径，业务办理仍回到源应用</span>
+        </div>
+        <div class="capability-grid">
+          <article class="capability-card" data-dashboard-policy="platform">
+            <strong>全民健康信息平台互通共享</strong>
+            <span>驾驶舱汇聚前 7 个应用的指标、风险、任务、接口和证据，支撑居民健康信息、医疗服务、公共卫生与监管数据在同一入口形成运行视图。</span>
+          </article>
+          <article class="capability-card" data-dashboard-policy="online-service">
+            <strong>医疗全流程在线办理</strong>
+            <span>就诊、入院、转诊、医保、取药、授权共享等流程仍由源应用承办，驾驶舱只做跨域看板和闭环追踪，避免替代业务系统。</span>
+          </article>
+          <article class="capability-card" data-dashboard-policy="certificates">
+            <strong>电子证照与出生死亡管理</strong>
+            <span>出生、死亡指标来自医学证明日期；后续现场联调需对接出生医学证明、死亡医学证明、电子证照、公安户籍和民政殡葬相关交换链路。</span>
+          </article>
+          <article class="capability-card" data-dashboard-policy="security">
+            <strong>数据安全与审计合规</strong>
+            <span>驾驶舱接口限管理端访问，摘要读取进入审计链；生产发布还需落实统一身份、日志留存、密评等保、备份恢复和现场签字证据。</span>
+          </article>
+        </div>
+        <div class="action-row">
+          <a class="inline-action" href="./health-dashboard-about.html">查看驾驶舱关于页</a>
+        </div>
+      </section>
 
       <section class="panel population-board" id="population-service-board" data-active-period="day">
         <div class="panel-title">
