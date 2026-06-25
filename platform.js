@@ -506,7 +506,13 @@ function renderProductionDeploymentPlan(items) {
 }
 
 function renderResearchGovernance(platform) {
-  const datasetRows = platform.researchDatasets.map((item) => `
+  const datasets = Array.isArray(platform.researchDatasets) ? platform.researchDatasets : [];
+  const models = Array.isArray(platform.diseaseRegistryModels) ? platform.diseaseRegistryModels : [];
+  const activeSandboxCount = datasets.filter((item) => item.authorizationStatus === "approved" && (item.sandbox?.status === "active" || item.status === "published")).length;
+  const pendingApplications = datasets.filter((item) => item.authorizationStatus === "pending" || item.status === "requested").length;
+  const usageAuditCount = datasets.reduce((sum, item) => sum + (Array.isArray(item.usageAudit) ? item.usageAudit.length : 0), 0);
+  const outcomeCount = datasets.reduce((sum, item) => sum + (Array.isArray(item.outcomes) ? item.outcomes.length : 0), 0);
+  const datasetRows = datasets.map((item) => `
     <tr>
       <td><strong>${item.name}</strong></td>
       <td>${item.diseaseType}</td>
@@ -517,13 +523,13 @@ function renderResearchGovernance(platform) {
       <td>${item.records || 0}</td>
       <td>${(item.usageAudit || []).length} / ${(item.outcomes || []).length}</td>
       <td>
-        <button class="inline-action" type="button" data-research-action="sandbox-access" data-id="${item.id}">Sandbox</button>
-        <button class="inline-action" type="button" data-research-action="outcome-return" data-id="${item.id}">Outcome</button>
-        <button class="inline-action" type="button" data-research-action="approve" data-id="${item.id}">Approve</button>
+        <button class="inline-action" type="button" data-research-action="sandbox-access" data-id="${item.id}">沙箱访问</button>
+        <button class="inline-action" type="button" data-research-action="outcome-return" data-id="${item.id}">成果回流</button>
+        <button class="inline-action" type="button" data-research-action="approve" data-id="${item.id}">审批发布</button>
       </td>
     </tr>
   `).join("");
-  const modelRows = platform.diseaseRegistryModels.map((item) => `
+  const modelRows = models.map((item) => `
     <tr>
       <td><strong>${item.id}</strong></td>
       <td>${item.diseaseType}</td>
@@ -536,6 +542,37 @@ function renderResearchGovernance(platform) {
     </tr>
   `).join("");
   document.querySelector("#research-governance").innerHTML = `
+    <div class="research-sandbox-summary">
+      <div><strong>${datasets.length}</strong><span>数据集</span></div>
+      <div><strong>${activeSandboxCount}</strong><span>已开放沙箱</span></div>
+      <div><strong>${pendingApplications}</strong><span>待审批申请</span></div>
+      <div><strong>${models.length}</strong><span>专病模型</span></div>
+      <div><strong>${usageAuditCount} / ${outcomeCount}</strong><span>审计 / 成果</span></div>
+    </div>
+    <form class="research-application-form" id="research-application-form">
+      <label>
+        病种
+        <input name="diseaseType" value="copd" required />
+      </label>
+      <label>
+        数据集名称
+        <input name="name" value="COPD pulmonary rehabilitation cohort" required />
+      </label>
+      <label>
+        研究目的
+        <input name="purpose" value="sandbox feasibility assessment" required />
+      </label>
+      <label>
+        来源集合
+        <select name="sourceProfile">
+          <option value="clinical">personalRecords + diagnosticReports</option>
+          <option value="chronic">personalRecords + diagnosticReports + chronicManagementPlans</option>
+          <option value="followup">personalRecords + diagnosticReports + followups</option>
+        </select>
+      </label>
+      <button class="inline-action" type="submit">提交申请</button>
+    </form>
+    <p class="research-status" id="research-status" role="status"></p>
     <table>
       <thead><tr><th>数据集</th><th>病种</th><th>版本</th><th>伦理审批</th><th>脱敏</th><th>授权/沙箱</th><th>记录数</th><th>审计/成果</th><th>Action</th></tr></thead>
       <tbody>${datasetRows || `<tr><td colspan="9">暂无科研数据集。</td></tr>`}</tbody>
@@ -614,6 +651,13 @@ function listText(value) {
 }
 
 function bindPlatformEditor() {
+  document.addEventListener("submit", async (event) => {
+    if (event.target?.id === "research-application-form") {
+      event.preventDefault();
+      await submitResearchDatasetApplication(event.target);
+    }
+  });
+
   document.addEventListener("click", (event) => {
     const editButton = event.target.closest("[data-edit-platform]");
     if (editButton) {
@@ -713,16 +757,71 @@ async function runResearchDatasetAction(action, id) {
       ? `/research/datasets/${encodeURIComponent(id)}/outcomes`
       : `/research/datasets/${encodeURIComponent(id)}/sandbox-access`;
   try {
+    setResearchStatus("正在提交操作...");
     const response = await request(`${PLATFORM_API_BASE}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
     });
-    if (!response.ok) return;
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      setResearchStatus(error.message || "操作未通过，请检查审批、脱敏和授权状态。", true);
+      return;
+    }
     await refreshPlatformState();
+    setResearchStatus(action === "sandbox-access" ? "沙箱访问已审计留痕。" : action === "outcome-return" ? "成果已回流登记。" : "数据集已审批发布。");
   } catch (error) {
-    // Keep the static fallback usable when the page is opened directly.
+    setResearchStatus("当前为静态预览或服务不可用，操作未提交。", true);
   }
+}
+
+async function submitResearchDatasetApplication(form) {
+  if (!PLATFORM_API_BASE) {
+    setResearchStatus("当前为静态预览，申请未提交。", true);
+    return;
+  }
+  const data = Object.fromEntries(new FormData(form));
+  const sourceProfiles = {
+    clinical: ["personalRecords", "diagnosticReports"],
+    chronic: ["personalRecords", "diagnosticReports", "chronicManagementPlans"],
+    followup: ["personalRecords", "diagnosticReports", "followups"]
+  };
+  const payload = {
+    diseaseType: String(data.diseaseType || "").trim(),
+    name: String(data.name || "").trim(),
+    purpose: String(data.purpose || "").trim(),
+    sourceCollections: sourceProfiles[data.sourceProfile] || sourceProfiles.clinical
+  };
+  if (!payload.diseaseType || !payload.name || !payload.purpose) {
+    setResearchStatus("请补齐病种、数据集名称和研究目的。", true);
+    return;
+  }
+  try {
+    setResearchStatus("正在提交科研数据集申请...");
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${PLATFORM_API_BASE}/research/datasets`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      setResearchStatus(error.message || "申请提交失败。", true);
+      return;
+    }
+    const created = await response.json();
+    await refreshPlatformState();
+    setResearchStatus(`申请已提交：${created.name}，等待伦理审批和脱敏发布。`);
+  } catch (error) {
+    setResearchStatus("服务不可用，申请未提交。", true);
+  }
+}
+
+function setResearchStatus(message, isError = false) {
+  const status = document.querySelector("#research-status");
+  if (!status) return;
+  status.textContent = message || "";
+  status.dataset.state = isError ? "error" : "ok";
 }
 
 async function refreshPlatformState() {
