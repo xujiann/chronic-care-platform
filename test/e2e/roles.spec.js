@@ -126,6 +126,16 @@ test("about page explains runnable platform capabilities", async ({ page }) => {
   await expect(page.locator(".auth-bar a[href='./about.html']")).toHaveCount(1);
 });
 
+test("research sandbox about page exposes policy and acceptance boundaries", async ({ page }) => {
+  await page.goto("/research-sandbox-about.html");
+
+  await expect(page.locator("[data-about-section='research-policy-sources']")).toBeVisible();
+  await expect(page.locator("[data-policy-source='pipl']")).toContainText("中华人民共和国个人信息保护法");
+  await expect(page.locator("[data-policy-source='ethics-review']")).toContainText("涉及人的生命科学和医学研究伦理审查办法");
+  await expect(page.locator("[data-about-section='research-sandbox-runtime']")).toContainText("/api/research/sandbox");
+  await expect(page.locator("[data-about-section='research-release-evidence']")).toContainText("research-sandbox-readiness-report.md");
+});
+
 test("citizen stays in the household experience and cannot open commission pages", async ({ page }) => {
   await login(page, "citizen", "citizen.html");
   await expect(page.getByRole("heading", { name: "个人健康信息库" })).toBeVisible();

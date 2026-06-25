@@ -38,7 +38,7 @@ test("citizen pages do not expose cross-role module links or management collecti
 });
 
 test("application pages avoid placeholder navigation", () => {
-  const pages = ["about.html", "citizen.html", "mobile-preview.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html"];
+  const pages = ["about.html", "research-sandbox-about.html", "citizen.html", "mobile-preview.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html"];
   pages.forEach((file) => assert.doesNotMatch(read(file), /href=["']#["']/, `${file} 存在空链接占位`));
 });
 
@@ -52,16 +52,33 @@ test("about page documents runnable platform capabilities", () => {
   assert.match(about, /data-about-capability="workflow-tasks"/);
   assert.match(about, /data-about-capability="chronic-care"/);
   assert.match(about, /data-about-capability="county-consortium"/);
+  assert.match(about, /data-about-capability="research-sandbox-policy"/);
   assert.match(about, /\/api\/service-acceptance-summary/);
   assert.match(about, /\/api\/site-template-readmes/);
   assert.match(about, /\/api\/tasks/);
   assert.match(about, /npm run deploy:check/);
   assert.match(read("index.html"), /href="\.\/about\.html"/);
   assert.match(read("platform.html"), /href="\.\/about\.html"/);
+  assert.match(read("platform.html"), /href="\.\/research-sandbox-about\.html"/);
   assert.match(read("health-city.html"), /href="\.\/about\.html"/);
   assert.match(auth, /\["about\.html", "关于"\]/);
+  assert.match(auth, /research-sandbox-about\.html/);
   assert.match(auth, /pageName === "about\.html"/);
   assert.doesNotMatch(about, /requireRole/);
+});
+
+test("research sandbox about page documents policy and release boundaries", () => {
+  const page = read("research-sandbox-about.html");
+  assert.match(page, /data-about-section="research-policy-sources"/);
+  assert.match(page, /中华人民共和国个人信息保护法/);
+  assert.match(page, /中华人民共和国数据安全法/);
+  assert.match(page, /网络数据安全管理条例/);
+  assert.match(page, /涉及人的生命科学和医学研究伦理审查办法/);
+  assert.match(page, /国家健康医疗大数据标准、安全和服务管理办法/);
+  assert.match(page, /\/api\/research\/sandbox/);
+  assert.match(page, /research-sandbox-readiness-report\.md/);
+  assert.match(read("README.md"), /research-sandbox-about\.html/);
+  assert.doesNotMatch(page, /requireRole/);
 });
 
 test("static snapshot keeps completed P2 governance collections", () => {

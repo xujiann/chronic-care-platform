@@ -39,7 +39,7 @@
   };
 
   const roleLinks = {
-    commission: [["platform.html", "全民健康平台"], ["health-city.html", "总览"], ["about.html", "关于"], ["workbench.html", "工作台"], ["index.html", "卫健管理"]],
+    commission: [["platform.html", "全民健康平台"], ["health-city.html", "总览"], ["about.html", "关于"], ["research-sandbox-about.html", "科研沙箱"], ["workbench.html", "工作台"], ["index.html", "卫健管理"]],
     institution: [["health-city.html", "总览"], ["about.html", "关于"], ["institution.html", "医疗机构"]],
     insurance: [["health-city.html", "总览"], ["about.html", "关于"], ["insurance.html", "医保"]],
     citizen: [["health-city.html", "总览"], ["about.html", "关于"], ["citizen.html", "个人端"], ["mobile-preview.html", "手机预览"]],
@@ -167,7 +167,7 @@
 
   function canAccessPage(pageName, user) {
     if (!pageName || pageName.startsWith("#")) return true;
-    if (!user) return pageName === "login.html" || pageName === "health-city.html" || pageName === "about.html";
+    if (!user) return pageName === "login.html" || pageName === "health-city.html" || pageName === "about.html" || pageName === "research-sandbox-about.html";
     if (pageName === "login.html") return false;
     const allowed = routeAccess[pageName];
     return !allowed || allowed.includes(user.role);

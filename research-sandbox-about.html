@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>科研数据沙箱政策说明 | 大连市全民健康信息平台</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>科研数据集与数据沙箱平台</span>
+          <h1>科研数据沙箱政策说明与运行边界</h1>
+          <p>面向科研数据集申请、专病库治理、伦理审批、脱敏发布、沙箱访问、使用审计和成果回流，说明当前演示系统已经实现的能力，以及现场上线前必须补齐的政策、协议和安全证据。</p>
+        </div>
+        <nav>
+          <a href="./platform.html">平台驾驶舱</a>
+          <a href="./about.html">关于平台</a>
+          <a href="./workbench.html">运营工作台</a>
+          <a href="./health-city.html">系统总览</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" data-about-section="research-policy-metrics">
+        <article class="metric-card">
+          <span>治理边界</span>
+          <strong>7 项</strong>
+          <small>数据集、专病库、伦理审批、脱敏发布、沙箱访问、使用审计、成果回流</small>
+        </article>
+        <article class="metric-card">
+          <span>复用集合</span>
+          <strong>6 类</strong>
+          <small>researchDatasets、diseaseRegistryModels、dataAccessLogs、securityAcceptanceLedger、personalRecords、diagnosticReports</small>
+        </article>
+        <article class="metric-card">
+          <span>接口证据</span>
+          <strong>可调用</strong>
+          <small>/api/research/sandbox、/api/research/datasets、/api/research/disease-models</small>
+        </article>
+        <article class="metric-card">
+          <span>政策校验</span>
+          <strong>待现场确认</strong>
+          <small>以正式伦理批件、数据使用协议、脱敏规则和安全留存方案为准</small>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide" data-about-section="research-policy-sources">
+          <div class="panel-title">
+            <h2>政策依据</h2>
+            <span>基于 2026-06-25 查询到的官方公开文件整理</span>
+          </div>
+          <div class="capability-grid">
+            <a class="capability-card" href="https://www.cac.gov.cn/2021-08/20/c_1631050028355286.htm" data-policy-source="pipl">
+              <strong>中华人民共和国个人信息保护法</strong>
+              <span>用于约束个人信息处理的合法、正当、必要、最小范围、告知同意、敏感个人信息保护和个人权利响应。</span>
+            </a>
+            <a class="capability-card" href="https://www.cac.gov.cn/2021-06/11/c_1624994566919140.htm" data-policy-source="data-security-law">
+              <strong>中华人民共和国数据安全法</strong>
+              <span>用于约束数据处理全流程安全、分类分级保护、风险监测、应急处置和重要数据管理。</span>
+            </a>
+            <a class="capability-card" href="https://www.cac.gov.cn/2024-09/30/c_1729384452307680.htm" data-policy-source="network-data-regulation">
+              <strong>网络数据安全管理条例</strong>
+              <span>用于补齐网络数据处理活动的安全管理、个人信息保护、重要数据处理和监督检查要求。</span>
+            </a>
+            <a class="capability-card" href="https://www.nhc.gov.cn/qjjys/c100016/202302/6b6e447b3edc4338856c9a652a85f44b.shtml" data-policy-source="ethics-review">
+              <strong>涉及人的生命科学和医学研究伦理审查办法</strong>
+              <span>用于约束涉及人的医学研究立项、伦理审查、知情同意、持续跟踪和研究参与者权益保护。</span>
+            </a>
+            <a class="capability-card" href="https://www.nhc.gov.cn/guihuaxxs/c100133/201809/c5e3e58313a24fdeb26d3dc07003d56e.shtml" data-policy-source="healthcare-big-data">
+              <strong>国家健康医疗大数据标准、安全和服务管理办法（试行）</strong>
+              <span>用于健康医疗大数据标准管理、安全管理、服务管理、知情权、使用权和个人隐私保护边界。</span>
+            </a>
+          </div>
+        </article>
+
+        <article class="panel" data-about-section="research-sandbox-runtime">
+          <div class="panel-title">
+            <h2>当前系统实现</h2>
+            <span>演示系统可运行，生产开放需补齐现场证据</span>
+          </div>
+          <div class="rules">
+            <div><strong>申请</strong><span><code>POST /api/research/datasets</code> 创建科研数据集申请，记录来源集合、用途、申请人和待审批状态。</span></div>
+            <div><strong>审批</strong><span><code>POST /api/research/datasets/:id/approval</code> 写入伦理批件、脱敏策略、授权状态和沙箱启用状态。</span></div>
+            <div><strong>访问</strong><span><code>POST /api/research/datasets/:id/sandbox-access</code> 仅允许已审批、已脱敏、已发布的数据集进入沙箱，并写入审计。</span></div>
+            <div><strong>成果</strong><span><code>POST /api/research/datasets/:id/outcomes</code> 登记成果回流，关联专病库模型复核。</span></div>
+            <div><strong>摘要</strong><span><code>GET /api/research/sandbox</code> 汇总边界、复用集合、待审批队列、审计和成果。</span></div>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel" data-about-section="research-policy-mapping">
+        <div class="panel-title">
+          <h2>政策要求到系统控制点</h2>
+          <span>现场联调时按此表补齐签字件、配置和验证记录</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>政策关注点</th><th>系统控制点</th><th>现场验收证据</th></tr></thead>
+            <tbody>
+              <tr><td>合法、正当、必要和最小范围</td><td>申请表记录研究目的与来源集合，接口限定 approved research sources。</td><td>研究方案、数据使用协议、数据字段清单、最小化评审记录。</td></tr>
+              <tr><td>敏感个人信息与健康医疗数据保护</td><td>脱敏状态、沙箱状态、授权状态同时满足后才签发沙箱访问令牌。</td><td>脱敏规则、重识别风险评估、数据出域或不出域说明。</td></tr>
+              <tr><td>伦理审查与持续跟踪</td><td>审批接口记录 ethicsApproval、ethicsStatus、approval note 和操作人。</td><td>伦理批件、知情同意豁免或同意材料、持续审查记录。</td></tr>
+              <tr><td>数据安全分类分级与审计留痕</td><td>dataAccessLogs 与 usageAudit 同步记录申请、拒绝、访问和成果回流。</td><td>分类分级目录、日志保全策略、SIEM/WORM 留存配置。</td></tr>
+              <tr><td>成果回流与专病库模型复核</td><td>成果登记后进入 outcomes，并标记 returnedTo diseaseRegistryModels。</td><td>成果登记单、模型阈值复核意见、临床专家确认。</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide" data-about-section="research-sandbox-boundary">
+          <div class="panel-title">
+            <h2>生产开放边界</h2>
+            <span>当前演示能力不等同于真实科研共享许可</span>
+          </div>
+          <div class="priority-list">
+            <div class="priority-row"><strong>01</strong><div><h3>先审批后发布</h3><p>没有伦理批件、数据使用协议、字段最小化评审和脱敏发布记录的数据集，只能停留在 requested/pending 状态。</p></div><span>上线前必查</span></div>
+            <div class="priority-row"><strong>02</strong><div><h3>沙箱不直接暴露原始标识</h3><p>沙箱访问只返回脱敏标志、记录数、来源集合和短期 token；真实环境应绑定隔离计算环境、导出审批和水印追踪。</p></div><span>安全边界</span></div>
+            <div class="priority-row"><strong>03</strong><div><h3>审计与成果可追溯</h3><p>每次申请、拒绝、访问、审批和成果回流都进入审计链；成果必须回流到专病库模型复核或质量改进任务。</p></div><span>闭环证据</span></div>
+          </div>
+        </article>
+
+        <article class="panel" data-about-section="research-release-evidence">
+          <div class="panel-title">
+            <h2>发布证据</h2>
+            <span>自动化脚本与页面入口</span>
+          </div>
+          <div class="rules">
+            <div><strong>就绪脚本</strong><span><code>npm run research:sandbox</code> 生成 <code>release/research-sandbox-readiness-report.md</code>。</span></div>
+            <div><strong>发布总报</strong><span><code>npm run release:report</code> 汇总 researchSandbox readiness、边界和复用集合。</span></div>
+            <div><strong>页面入口</strong><span><a href="./platform.html">平台驾驶舱</a> 展示申请、审批、沙箱访问、审计和成果回流。</span></div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>
