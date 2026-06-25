@@ -310,7 +310,8 @@ function healthDashboardChecks(healthDashboard) {
   return [
     check("healthDashboard:summary", healthDashboard.ok, healthDashboard.ok ? "health dashboard summary checks passed" : "health dashboard summary failed", "error", "health-dashboard"),
     check("healthDashboard:applications", healthDashboard.applications?.length === 7, `${healthDashboard.applications?.length || 0} source applications`, "error", "health-dashboard"),
-    check("healthDashboard:boundary", /source business applications|source applications/.test(healthDashboard.scope?.rule || ""), healthDashboard.scope?.rule || "missing", "error", "health-dashboard")
+    check("healthDashboard:boundary", /source business applications|source applications/.test(healthDashboard.scope?.rule || ""), healthDashboard.scope?.rule || "missing", "error", "health-dashboard"),
+    check("healthDashboard:populationServiceBoard", healthDashboard.populationServiceBoard?.periods?.length === 4, `${healthDashboard.populationServiceBoard?.periods?.length || 0} population/service periods`, "error", "health-dashboard")
   ];
 }
 

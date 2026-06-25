@@ -27,6 +27,22 @@
 
       <section class="metric-grid" id="dashboard-metrics"></section>
 
+      <section class="panel population-board" id="population-service-board" data-active-period="day">
+        <div class="panel-title">
+          <h2>出生死亡与医疗服务看板</h2>
+          <span id="population-board-range">日 / 正在加载</span>
+        </div>
+        <div class="period-switch" id="population-period-controls" aria-label="人口与服务统计周期">
+          <button type="button" data-population-period="day" class="active">日</button>
+          <button type="button" data-population-period="week">周</button>
+          <button type="button" data-population-period="month">月</button>
+          <button type="button" data-population-period="year">年</button>
+        </div>
+        <div class="population-metric-grid" id="population-metric-cards"></div>
+        <div class="population-chart" id="population-chart" aria-label="出生、死亡、就诊、入院统计图"></div>
+        <p class="muted population-source" id="population-board-source">正在汇总出生、死亡、就诊、入院数据。</p>
+      </section>
+
       <section class="panel">
         <div class="panel-title">
           <h2>数据状态</h2>

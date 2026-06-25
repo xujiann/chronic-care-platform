@@ -111,6 +111,102 @@ function collectOpenActions(data, limit = 12) {
   ).slice(0, limit);
 }
 
+function parseDate(value) {
+  if (!value) return null;
+  const date = new Date(String(value).replace(" ", "T"));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatDate(date) {
+  if (!date) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function daysInMonthFromPeriod(period, fallbackDate) {
+  const match = /^(\d{4})-(\d{2})$/.exec(String(period || ""));
+  if (match) return new Date(Number(match[1]), Number(match[2]), 0).getDate();
+  const date = fallbackDate || new Date();
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+}
+
+function latestAvailableDate(...values) {
+  return values
+    .flat()
+    .map(parseDate)
+    .filter(Boolean)
+    .sort((left, right) => right.getTime() - left.getTime())[0] || null;
+}
+
+function countInWindow(items, field, anchor, periodId) {
+  if (!anchor) return 0;
+  const start = new Date(anchor);
+  const end = new Date(anchor);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+  if (periodId === "week") start.setDate(start.getDate() - 6);
+  if (periodId === "month") start.setDate(1);
+  if (periodId === "year") start.setMonth(0, 1);
+  return items.filter((item) => {
+    const date = parseDate(item[field]);
+    return date && date >= start && date <= end;
+  }).length;
+}
+
+function periodRangeLabel(anchor, periodId) {
+  if (!anchor) return "No dated records";
+  const start = new Date(anchor);
+  if (periodId === "week") start.setDate(start.getDate() - 6);
+  if (periodId === "month") start.setDate(1);
+  if (periodId === "year") start.setMonth(0, 1);
+  return `${formatDate(start)} to ${formatDate(anchor)}`;
+}
+
+function buildPopulationServiceBoard(data) {
+  const birthRows = rows(data, "birthCertificates");
+  const deathRows = rows(data, "deathCertificates");
+  const healthStatistics = data.healthStatistics && typeof data.healthStatistics === "object" ? data.healthStatistics : {};
+  const serviceReports = Array.isArray(healthStatistics.serviceReports) ? healthStatistics.serviceReports : [];
+  const statisticsPeriod = healthStatistics.period || "";
+  const periodAnchor = parseDate(`${statisticsPeriod || ""}-01`);
+  const eventAnchor = latestAvailableDate(
+    birthRows.map((item) => item.birthDateTime),
+    deathRows.map((item) => item.deathDateTime)
+  ) || periodAnchor || new Date();
+  const monthDays = daysInMonthFromPeriod(statisticsPeriod, eventAnchor);
+  const serviceTotals = serviceReports.reduce((totals, item) => {
+    const interfaceData = item.interfaceData || {};
+    totals.visits += Number(interfaceData.outpatientVisits || 0) + Number(interfaceData.emergencyVisits || 0);
+    totals.admissions += Number(interfaceData.inpatientAdmissions || 0);
+    return totals;
+  }, { visits: 0, admissions: 0 });
+  const periods = [
+    { id: "day", label: "日", serviceFactor: 1 / monthDays },
+    { id: "week", label: "周", serviceFactor: 7 / monthDays },
+    { id: "month", label: "月", serviceFactor: 1 },
+    { id: "year", label: "年", serviceFactor: 12 }
+  ].map((period) => ({
+    id: period.id,
+    label: period.label,
+    rangeLabel: periodRangeLabel(eventAnchor, period.id),
+    metrics: [
+      { id: "births", label: "出生", value: countInWindow(birthRows, "birthDateTime", eventAnchor, period.id), unit: "例", tone: "birth", sourceLabel: "出生医学证明日期", source: "birthCertificates.birthDateTime" },
+      { id: "deaths", label: "死亡", value: countInWindow(deathRows, "deathDateTime", eventAnchor, period.id), unit: "例", tone: "death", sourceLabel: "死亡医学证明日期", source: "deathCertificates.deathDateTime" },
+      { id: "visits", label: "就诊", value: Math.round(serviceTotals.visits * period.serviceFactor), unit: "人次", tone: "visit", sourceLabel: "月度门急诊接口折算", source: "healthStatistics.serviceReports.interfaceData.outpatientVisits + emergencyVisits" },
+      { id: "admissions", label: "入院", value: Math.round(serviceTotals.admissions * period.serviceFactor), unit: "人次", tone: "admission", sourceLabel: "月度入院接口折算", source: "healthStatistics.serviceReports.interfaceData.inpatientAdmissions" }
+    ]
+  }));
+  return {
+    defaultPeriod: "day",
+    eventAnchor: formatDate(eventAnchor),
+    statisticsPeriod,
+    sourceNote: "出生、死亡按证书日期统计；就诊、入院先使用月度接口总量折算日、周、月、年，现场日报接口接入后可替换为真实分时数据。",
+    periods
+  };
+}
+
 function buildHealthDashboardSummary(options = {}) {
   const data = options.data || readJson("data/db.json");
   const runtime = options.runtime || null;
@@ -123,13 +219,15 @@ function buildHealthDashboardSummary(options = {}) {
   const interfaceRows = rows(data, "platformInterfaces");
   const evidenceRecords = rows(data, "platformEvidence").flatMap((item) => item.records || []);
   const siteDependencies = rows(data, "productionDeploymentPlan").filter((item) => isOpen(item) || /missing|待|寰|blocked/i.test(JSON.stringify(item)));
+  const populationServiceBoard = buildPopulationServiceBoard(data);
   const checks = [
     { id: "dashboard:applications", passed: applications.length === 7 && applications.every((item) => item.entry && item.collections.length), detail: `${applications.length} applications` },
     { id: "dashboard:source-boundary", passed: applications.every((item) => /source application/.test(item.boundary)), detail: "dashboard is aggregate-only" },
     { id: "dashboard:metrics", passed: applications.reduce((sum, item) => sum + item.records, 0) > 0, detail: `${applications.reduce((sum, item) => sum + item.records, 0)} source records` },
     { id: "dashboard:actions", passed: previewOpenActions > 0 && sourceOpenActions >= previewOpenActions, detail: `${previewOpenActions} preview / ${sourceOpenActions} source open actions` },
     { id: "dashboard:interfaces", passed: interfaceRows.length >= 4, detail: `${interfaceRows.length} interface rows` },
-    { id: "dashboard:evidence", passed: evidenceRecords.length >= 2, detail: `${evidenceRecords.length} evidence records` }
+    { id: "dashboard:evidence", passed: evidenceRecords.length >= 2, detail: `${evidenceRecords.length} evidence records` },
+    { id: "dashboard:population-service-board", passed: populationServiceBoard.periods.length === 4 && populationServiceBoard.periods.every((period) => period.metrics.length === 4), detail: "birth, death, visit, admission board for day/week/month/year" }
   ];
   return {
     ok: checks.every((item) => item.passed),
@@ -161,6 +259,7 @@ function buildHealthDashboardSummary(options = {}) {
       nextAction: item.highRisks ? "Review high-risk source records in the owning application." : "Close source workflow actions in the owning application."
     })),
     openActions,
+    populationServiceBoard,
     interfaces: interfaceRows.map((item) => ({
       id: item.id || item.domain,
       domain: item.domain || item.name || item.id,
@@ -192,6 +291,8 @@ function renderMarkdown(report) {
   const appRows = report.applications.map((item) => `| ${item.id} | ${item.entry} | ${item.records} | ${item.openActions} | ${item.highRisks} | ${item.status} |`);
   const actionRows = report.openActions.map((item) => `| ${item.priority} | ${item.application || ""} | ${item.entry || ""} | ${item.collection} | ${item.id} | ${String(item.title || "").replace(/\|/g, "/")} | ${item.status} | ${item.owner} |`);
   const checkRows = report.checks.map((item) => `| ${item.passed ? "PASS" : "FAIL"} | ${item.id} | ${String(item.detail || "").replace(/\|/g, "/")} |`);
+  const boardPeriods = report.populationServiceBoard?.periods || [];
+  const boardRows = boardPeriods.flatMap((period) => (period.metrics || []).map((metric) => `| ${period.label} | ${period.rangeLabel} | ${metric.label} | ${metric.value} ${metric.unit || ""} | ${metric.source || ""} |`));
   return [
     "# Health dashboard summary",
     "",
@@ -220,6 +321,14 @@ function renderMarkdown(report) {
     "| Application | Entry | Records | Open actions | High risks | Status |",
     "|---|---|---:|---:|---:|---|",
     ...appRows,
+    "",
+    "## Population and service board",
+    "",
+    report.populationServiceBoard?.sourceNote || "No board source note.",
+    "",
+    "| Period | Range | Metric | Value | Source |",
+    "|---|---|---|---:|---|",
+    ...boardRows,
     "",
     "## Open action preview",
     "",
@@ -266,4 +375,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { APPLICATIONS, buildHealthDashboardSummary, parseArgs, renderMarkdown, writeOutput };
+module.exports = { APPLICATIONS, buildHealthDashboardSummary, buildPopulationServiceBoard, parseArgs, renderMarkdown, writeOutput };

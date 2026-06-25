@@ -111,6 +111,17 @@ test("commission health dashboard filters live source actions and drills into so
   await expect(page.locator("#dashboard-metrics")).toContainText("170");
   await expect(page.locator("#dashboard-metrics")).toContainText("12");
   await expect(page.locator("#dashboard-applications tbody tr")).toHaveCount(7);
+  await expect(page.locator("#population-service-board")).toBeVisible();
+  await expect(page.locator("#population-service-board")).toHaveAttribute("data-active-period", "day");
+  await expect(page.locator("#population-metric-cards [data-population-metric]")).toHaveCount(4);
+  await expect(page.locator("#population-chart .population-bar-row")).toHaveCount(4);
+  await expect(page.locator("#population-metric-cards [data-population-metric='deaths']")).toContainText("1");
+  await page.locator("[data-population-period='month']").click();
+  await expect(page.locator("#population-service-board")).toHaveAttribute("data-active-period", "month");
+  await expect(page.locator("#population-metric-cards [data-population-metric='births']")).toContainText("3");
+  await expect(page.locator("#population-metric-cards [data-population-metric='visits']")).toContainText("414,780");
+  await page.locator("[data-population-period='year']").click();
+  await expect(page.locator("#population-service-board")).toHaveAttribute("data-active-period", "year");
 
   await page.locator("#dashboard-application-filter").selectOption("county-consortium");
   await page.locator("#dashboard-priority-filter").selectOption("high");

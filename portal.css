@@ -422,6 +422,140 @@ h1 { margin-top: 4px; font-size: 28px; }
   opacity: 0.55;
 }
 
+.population-board {
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.period-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.period-switch button {
+  min-width: 44px;
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 12px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.period-switch button.active,
+.period-switch button:hover {
+  border-color: var(--blue);
+  background: #eaf2ff;
+  color: #184a91;
+}
+
+.population-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.population-metric-card,
+.population-empty {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--blue);
+  border-radius: 8px;
+  padding: 14px;
+  background: #f8fbfd;
+}
+
+.population-metric-card.birth { border-left-color: var(--green); }
+.population-metric-card.death { border-left-color: var(--red); }
+.population-metric-card.visit { border-left-color: var(--blue); }
+.population-metric-card.admission { border-left-color: var(--amber); }
+
+.population-metric-card span,
+.population-metric-card strong,
+.population-metric-card small {
+  display: block;
+}
+
+.population-metric-card span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.population-metric-card strong {
+  margin-top: 6px;
+  font-size: 26px;
+}
+
+.population-metric-card small {
+  margin-top: 8px;
+  color: var(--muted);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.population-chart {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(216, 226, 231, 0.8);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+
+.population-bar-row {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr) 120px;
+  gap: 10px;
+  align-items: center;
+}
+
+.population-bar-row span,
+.population-bar-row strong {
+  font-size: 13px;
+}
+
+.population-bar-row span {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.population-bar-row strong {
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.population-bar-track {
+  position: relative;
+  height: 18px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #edf3f6;
+}
+
+.population-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--bar-width);
+  border-radius: inherit;
+  background: var(--blue);
+}
+
+.population-bar-fill.birth { background: var(--green); }
+.population-bar-fill.death { background: var(--red); }
+.population-bar-fill.visit { background: var(--blue); }
+.population-bar-fill.admission { background: var(--amber); }
+
+.population-source {
+  margin-top: 10px;
+  line-height: 1.55;
+}
+
 dialog {
   width: min(760px, calc(100vw - 28px));
   border: 0;
@@ -978,6 +1112,7 @@ dialog::backdrop {
     justify-content: flex-start;
   }
   .metric-grid,
+  .population-metric-grid,
   .portal-grid,
   .claim-grid,
   .capability-grid,
@@ -995,6 +1130,14 @@ dialog::backdrop {
   .demo-accounts,
   .item {
     grid-template-columns: 1fr;
+  }
+
+  .population-bar-row {
+    grid-template-columns: 1fr;
+  }
+
+  .population-bar-row strong {
+    text-align: left;
   }
 
   .capability-side {

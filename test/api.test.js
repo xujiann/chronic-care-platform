@@ -160,7 +160,10 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(healthDashboard.body.scope.role, "summary-entry-for-seven-applications");
     assert.equal(healthDashboard.body.applications.some((item) => item.entry === "workbench.html"), true);
     assert.equal(healthDashboard.body.openActions.every((item) => item.applicationId && item.application && item.entry), true);
+    assert.deepEqual(healthDashboard.body.populationServiceBoard.periods.map((item) => item.id), ["day", "week", "month", "year"]);
+    assert.equal(healthDashboard.body.populationServiceBoard.periods.find((item) => item.id === "month").metrics.some((item) => item.id === "visits" && item.value === 414780), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:source-boundary" && item.passed), true);
+    assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:population-service-board" && item.passed), true);
 
     const processAudit = await api(baseUrl, "/api/process-audit", authorized(accountLogin.body.token));
     assert.equal(processAudit.response.status, 200);

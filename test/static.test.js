@@ -107,6 +107,10 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(html, /dashboard-actions/);
   assert.match(html, /dashboard-api-state/);
   assert.match(html, /dashboard-data-boundary/);
+  assert.match(html, /population-service-board/);
+  assert.match(html, /population-period-controls/);
+  assert.match(html, /population-metric-cards/);
+  assert.match(html, /population-chart/);
   assert.match(html, /dashboard-export-json/);
   assert.match(html, /dashboard-interfaces/);
   assert.match(html, /dashboard-evidence/);
@@ -118,6 +122,9 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(js, /source application/);
   assert.match(js, /filteredDashboardActions/);
   assert.match(js, /collectStaticOpenActions/);
+  assert.match(js, /buildStaticPopulationServiceBoard/);
+  assert.match(js, /renderPopulationServiceBoard/);
+  assert.match(js, /bindPopulationBoardPeriod/);
   assert.match(js, /bindDashboardExport/);
   assert.match(js, /exportDashboardSummary/);
   assert.match(js, /filteredOpenActions/);
@@ -125,6 +132,8 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(js, /renderDataState/);
   assert.match(js, /sourceMode/);
   assert.match(js, /dataset\.sourceMode/);
+  assert.match(read("portal.css"), /population-metric-card/);
+  assert.match(read("portal.css"), /population-bar-fill/);
   assert.match(js, /源待办/);
   assert.match(js, /预览待办/);
   assert.match(js, /源应用/);

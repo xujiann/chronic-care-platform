@@ -2,12 +2,14 @@ const DASHBOARD_API_BASE = location.protocol === "file:" ? "" : "/api";
 const DASHBOARD_SUMMARY_ROUTE = "/api/health-dashboard/summary";
 const DASHBOARD_SUMMARY_PATH = DASHBOARD_SUMMARY_ROUTE.replace(/^\/api/, "");
 let currentDashboardSummary = null;
+let currentPopulationPeriod = "day";
 
 document.addEventListener("DOMContentLoaded", async () => {
   const summary = await loadDashboardSummary();
   currentDashboardSummary = summary;
   bindDashboardFilters();
   bindDashboardExport();
+  bindPopulationBoardPeriod();
   renderDashboard(summary);
 });
 
@@ -99,6 +101,7 @@ function buildStaticDashboardSummary(state) {
     applications: enrichedApplications,
     risks,
     openActions,
+    populationServiceBoard: buildStaticPopulationServiceBoard(state),
     interfaces: interfaces.map((item) => ({ id: item.id, domain: item.domain || item.name, priority: item.priority, owner: item.owner, status: item.status, nextAction: item.next })),
     evidence: evidence.map((item) => ({ id: item.id, name: item.name || item.category, owner: item.owner, status: item.status, records: Array.isArray(item.records) ? item.records.length : 0, nextAction: item.next })),
     siteDependencies: dependencies.map((item) => ({ id: item.id, track: item.track || item.name, owner: item.owner, status: item.status, nextAction: item.nextAction || item.next }))
@@ -109,9 +112,105 @@ function healthDashboardApplications() {
   return Array.isArray(window.HealthDashboardApplications) ? window.HealthDashboardApplications : [];
 }
 
+function buildStaticPopulationServiceBoard(state) {
+  const birthRows = Array.isArray(state.birthCertificates) ? state.birthCertificates : [];
+  const deathRows = Array.isArray(state.deathCertificates) ? state.deathCertificates : [];
+  const healthStatistics = state.healthStatistics && typeof state.healthStatistics === "object" ? state.healthStatistics : {};
+  const serviceReports = Array.isArray(healthStatistics.serviceReports) ? healthStatistics.serviceReports : [];
+  const statisticsPeriod = healthStatistics.period || "";
+  const eventAnchor = latestDashboardDate(
+    birthRows.map((item) => item.birthDateTime),
+    deathRows.map((item) => item.deathDateTime)
+  ) || parseDashboardDate(`${statisticsPeriod || ""}-01`) || new Date();
+  const monthDays = dashboardDaysInMonth(statisticsPeriod, eventAnchor);
+  const serviceTotals = serviceReports.reduce((totals, item) => {
+    const interfaceData = item.interfaceData || {};
+    totals.visits += Number(interfaceData.outpatientVisits || 0) + Number(interfaceData.emergencyVisits || 0);
+    totals.admissions += Number(interfaceData.inpatientAdmissions || 0);
+    return totals;
+  }, { visits: 0, admissions: 0 });
+  const periods = [
+    { id: "day", label: "日", serviceFactor: 1 / monthDays },
+    { id: "week", label: "周", serviceFactor: 7 / monthDays },
+    { id: "month", label: "月", serviceFactor: 1 },
+    { id: "year", label: "年", serviceFactor: 12 }
+  ].map((period) => ({
+    id: period.id,
+    label: period.label,
+    rangeLabel: dashboardPeriodRange(eventAnchor, period.id),
+    metrics: [
+      { id: "births", label: "出生", value: countDashboardWindow(birthRows, "birthDateTime", eventAnchor, period.id), unit: "例", tone: "birth", sourceLabel: "出生医学证明日期", source: "birthCertificates.birthDateTime" },
+      { id: "deaths", label: "死亡", value: countDashboardWindow(deathRows, "deathDateTime", eventAnchor, period.id), unit: "例", tone: "death", sourceLabel: "死亡医学证明日期", source: "deathCertificates.deathDateTime" },
+      { id: "visits", label: "就诊", value: Math.round(serviceTotals.visits * period.serviceFactor), unit: "人次", tone: "visit", sourceLabel: "月度门急诊接口折算", source: "healthStatistics.serviceReports 门急诊" },
+      { id: "admissions", label: "入院", value: Math.round(serviceTotals.admissions * period.serviceFactor), unit: "人次", tone: "admission", sourceLabel: "月度入院接口折算", source: "healthStatistics.serviceReports 入院" }
+    ]
+  }));
+  return {
+    defaultPeriod: "day",
+    eventAnchor: formatDashboardDate(eventAnchor),
+    statisticsPeriod,
+    sourceNote: "出生、死亡来自证书日期；就诊、入院来自月度接口快照并折算为日、周、月、年视图，现场日报接口接入后可替换为真实分时数据。",
+    periods
+  };
+}
+
+function parseDashboardDate(value) {
+  if (!value) return null;
+  const date = new Date(String(value).replace(" ", "T"));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatDashboardDate(date) {
+  if (!date) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function latestDashboardDate(...values) {
+  return values
+    .flat()
+    .map(parseDashboardDate)
+    .filter(Boolean)
+    .sort((left, right) => right.getTime() - left.getTime())[0] || null;
+}
+
+function dashboardDaysInMonth(period, fallbackDate) {
+  const match = /^(\d{4})-(\d{2})$/.exec(String(period || ""));
+  if (match) return new Date(Number(match[1]), Number(match[2]), 0).getDate();
+  const date = fallbackDate || new Date();
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+}
+
+function countDashboardWindow(items, field, anchor, periodId) {
+  if (!anchor) return 0;
+  const start = new Date(anchor);
+  const end = new Date(anchor);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+  if (periodId === "week") start.setDate(start.getDate() - 6);
+  if (periodId === "month") start.setDate(1);
+  if (periodId === "year") start.setMonth(0, 1);
+  return items.filter((item) => {
+    const date = parseDashboardDate(item[field]);
+    return date && date >= start && date <= end;
+  }).length;
+}
+
+function dashboardPeriodRange(anchor, periodId) {
+  if (!anchor) return "等待日期";
+  const start = new Date(anchor);
+  if (periodId === "week") start.setDate(start.getDate() - 6);
+  if (periodId === "month") start.setDate(1);
+  if (periodId === "year") start.setMonth(0, 1);
+  return `${formatDashboardDate(start)} to ${formatDashboardDate(anchor)}`;
+}
+
 function renderDashboard(summary) {
   renderMetrics(summary);
   renderDataState(summary);
+  renderPopulationServiceBoard(summary);
   document.querySelector("#dashboard-scope").textContent = summary.scope?.rule || "";
   renderFilterOptions(summary);
   renderApplications(summary.applications || []);
@@ -151,6 +250,65 @@ function renderMetrics(summary) {
     ["现场依赖", totals.siteDependencies || 0, "生产切换签字项"],
     ["就绪状态", summary.ok ? "OK" : "Check", summary.generatedAt || ""]
   ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><small>${hint}</small></article>`).join("");
+}
+
+function bindPopulationBoardPeriod() {
+  const controls = document.querySelector("#population-period-controls");
+  if (!controls || controls.dataset.bound === "true") return;
+  controls.dataset.bound = "true";
+  controls.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-population-period]");
+    if (!button) return;
+    currentPopulationPeriod = button.dataset.populationPeriod || "day";
+    if (currentDashboardSummary) renderPopulationServiceBoard(currentDashboardSummary);
+  });
+}
+
+function renderPopulationServiceBoard(summary) {
+  const board = summary.populationServiceBoard || {};
+  const section = document.querySelector("#population-service-board");
+  const controls = document.querySelector("#population-period-controls");
+  const cards = document.querySelector("#population-metric-cards");
+  const chart = document.querySelector("#population-chart");
+  const range = document.querySelector("#population-board-range");
+  const source = document.querySelector("#population-board-source");
+  if (!section || !controls || !cards || !chart) return;
+  const periods = Array.isArray(board.periods) ? board.periods : [];
+  const selected = periods.find((period) => period.id === currentPopulationPeriod) || periods.find((period) => period.id === board.defaultPeriod) || periods[0];
+  if (!selected) {
+    section.dataset.activePeriod = "empty";
+    controls.innerHTML = "";
+    cards.innerHTML = `<article class="population-empty">暂无出生、死亡、就诊、入院数据</article>`;
+    chart.innerHTML = "";
+    if (range) range.textContent = "等待数据";
+    if (source) source.textContent = "等待前 7 个应用或现场接口写入统计快照。";
+    return;
+  }
+  currentPopulationPeriod = selected.id;
+  section.dataset.activePeriod = selected.id;
+  controls.innerHTML = periods.map((period) => `<button type="button" data-population-period="${period.id}" class="${period.id === selected.id ? "active" : ""}">${period.label}</button>`).join("");
+  if (range) range.textContent = `${selected.label} / ${selected.rangeLabel || board.eventAnchor || ""}`;
+  if (source) source.textContent = board.sourceNote || "";
+  const metrics = Array.isArray(selected.metrics) ? selected.metrics : [];
+  cards.innerHTML = metrics.map((metric) => `<article class="population-metric-card ${metric.tone || metric.id}" data-population-metric="${metric.id}">
+    <span>${metric.label}</span>
+    <strong>${formatDashboardNumber(metric.value)}</strong>
+    <small>${metric.unit || ""} / ${metric.sourceLabel || metric.source || ""}</small>
+  </article>`).join("");
+  const maxValue = Math.max(1, ...metrics.map((metric) => Number(metric.value) || 0));
+  chart.innerHTML = metrics.map((metric) => {
+    const value = Number(metric.value) || 0;
+    const width = Math.max(value === 0 ? 0 : 4, Math.round((value / maxValue) * 100));
+    return `<div class="population-bar-row" data-population-metric="${metric.id}">
+      <span>${metric.label}</span>
+      <div class="population-bar-track"><i class="population-bar-fill ${metric.tone || metric.id}" style="--bar-width:${width}%"></i></div>
+      <strong>${formatDashboardNumber(value)}${metric.unit || ""}</strong>
+    </div>`;
+  }).join("");
+}
+
+function formatDashboardNumber(value) {
+  return Number(value || 0).toLocaleString("zh-CN");
 }
 
 function renderApplications(applications) {

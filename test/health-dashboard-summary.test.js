@@ -28,7 +28,14 @@ test("health dashboard summary aggregates the first seven applications without r
   assert.equal(report.totals.previewOpenActions, report.openActions.length);
   assert.equal(report.totals.openActions, report.totals.previewOpenActions);
   assert.equal(report.totals.sourceOpenActions >= report.totals.previewOpenActions, true);
+  assert.equal(report.populationServiceBoard.periods.length, 4);
+  assert.deepEqual(report.populationServiceBoard.periods.map((item) => item.id), ["day", "week", "month", "year"]);
+  assert.equal(report.populationServiceBoard.periods.every((period) => period.metrics.length === 4), true);
+  assert.equal(report.populationServiceBoard.periods.every((period) => ["births", "deaths", "visits", "admissions"].every((id) => period.metrics.some((metric) => metric.id === id))), true);
+  assert.equal(report.populationServiceBoard.periods.find((item) => item.id === "month").metrics.find((item) => item.id === "visits").value, 414780);
+  assert.equal(report.populationServiceBoard.periods.find((item) => item.id === "month").metrics.find((item) => item.id === "admissions").value, 23786);
   assert.equal(report.checks.some((item) => item.id === "dashboard:source-boundary" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "dashboard:population-service-board" && item.passed), true);
   assert.equal(report.openActions.every((item) => item.applicationId && item.application && item.entry), true);
   assert.equal(report.openActions.some((item) => item.entry === "county.html" || item.entry === "institution.html"), true);
 
@@ -40,6 +47,8 @@ test("health dashboard summary aggregates the first seven applications without r
   assert.match(markdown, /Source open actions/);
   assert.match(markdown, /Preview open actions/);
   assert.match(markdown, /Application \| Entry \| Collection/);
+  assert.match(markdown, /Population and service board/);
+  assert.match(markdown, /414780/);
 });
 
 test("health dashboard summary supports empty source application boundaries", () => {
