@@ -35,6 +35,7 @@ const PLATFORM_STORAGE_KEY = "chronic-care-platform-state";
 let platformState = structuredClone(fallbackPlatformState);
 let platformData = null;
 let activeEditSnapshot = null;
+let researchSandboxSummary = null;
 
 const defaultPlatformCapabilities = [
   {
@@ -232,6 +233,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   ensureEditablePlatformData(platformState);
   bindPlatformEditor();
   renderPlatform();
+  refreshResearchSandboxSummary();
 });
 
 function renderPlatform() {
@@ -505,13 +507,19 @@ function renderProductionDeploymentPlan(items) {
   }).join("");
 }
 
-function renderResearchGovernance(platform) {
+function renderResearchGovernance(platform, sandboxSummary = null) {
   const datasets = Array.isArray(platform.researchDatasets) ? platform.researchDatasets : [];
   const models = Array.isArray(platform.diseaseRegistryModels) ? platform.diseaseRegistryModels : [];
-  const activeSandboxCount = datasets.filter((item) => item.authorizationStatus === "approved" && (item.sandbox?.status === "active" || item.status === "published")).length;
-  const pendingApplications = datasets.filter((item) => item.authorizationStatus === "pending" || item.status === "requested").length;
-  const usageAuditCount = datasets.reduce((sum, item) => sum + (Array.isArray(item.usageAudit) ? item.usageAudit.length : 0), 0);
-  const outcomeCount = datasets.reduce((sum, item) => sum + (Array.isArray(item.outcomes) ? item.outcomes.length : 0), 0);
+  const summary = sandboxSummary?.summary || {};
+  const boundaries = Array.isArray(sandboxSummary?.boundaries) ? sandboxSummary.boundaries : ["research dataset", "disease registry", "ethics approval", "de-identification release", "sandbox access", "usage audit", "outcome return"];
+  const reusableCollections = Array.isArray(sandboxSummary?.reusableCollections) ? sandboxSummary.reusableCollections : ["researchDatasets", "diseaseRegistryModels", "dataAccessLogs", "securityAcceptanceLedger", "personalRecords", "diagnosticReports"];
+  const activeSandboxCount = Number.isFinite(summary.activeDatasets) ? summary.activeDatasets : datasets.filter((item) => item.authorizationStatus === "approved" && (item.sandbox?.status === "active" || item.status === "published")).length;
+  const pendingApplications = Number.isFinite(summary.pendingApplications) ? summary.pendingApplications : datasets.filter((item) => item.authorizationStatus === "pending" || item.status === "requested").length;
+  const usageAuditCount = Number.isFinite(summary.usageAudits) ? summary.usageAudits : datasets.reduce((sum, item) => sum + (Array.isArray(item.usageAudit) ? item.usageAudit.length : 0), 0);
+  const outcomeCount = Number.isFinite(summary.outcomes) ? summary.outcomes : datasets.reduce((sum, item) => sum + (Array.isArray(item.outcomes) ? item.outcomes.length : 0), 0);
+  const previousStatus = document.querySelector("#research-status");
+  const statusText = previousStatus?.textContent || "";
+  const statusState = previousStatus?.dataset.state || "";
   const datasetRows = datasets.map((item) => `
     <tr>
       <td><strong>${item.name}</strong></td>
@@ -541,6 +549,9 @@ function renderResearchGovernance(platform) {
       <td>${item.reviewedBy || item.reviewer || "待复核"}</td>
     </tr>
   `).join("");
+  const pendingRows = researchPendingRows(sandboxSummary?.pendingApplications, datasets);
+  const auditRows = researchAuditRows(sandboxSummary?.recentAudits, datasets);
+  const outcomeRows = researchOutcomeRows(sandboxSummary?.recentOutcomes, datasets);
   document.querySelector("#research-governance").innerHTML = `
     <div class="research-sandbox-summary">
       <div><strong>${datasets.length}</strong><span>数据集</span></div>
@@ -572,7 +583,26 @@ function renderResearchGovernance(platform) {
       </label>
       <button class="inline-action" type="submit">提交申请</button>
     </form>
-    <p class="research-status" id="research-status" role="status"></p>
+    <p class="research-status" id="research-status" role="status" data-state="${statusState}">${statusText}</p>
+    <div class="research-governance-board">
+      <article>
+        <h3>边界与复用集合</h3>
+        <div class="research-pill-list research-boundary-list">
+          ${boundaries.map((item) => `<span class="badge info">${researchBoundaryLabel(item)}</span>`).join("")}
+        </div>
+        <div class="research-pill-list research-reuse-list">
+          ${reusableCollections.map((item) => `<span>${item}</span>`).join("")}
+        </div>
+      </article>
+      <article>
+        <h3>审批队列</h3>
+        <ul class="research-queue">${pendingRows}</ul>
+      </article>
+      <article>
+        <h3>审计与成果回流</h3>
+        <ul class="research-audit-feed">${auditRows}${outcomeRows}</ul>
+      </article>
+    </div>
     <table>
       <thead><tr><th>数据集</th><th>病种</th><th>版本</th><th>伦理审批</th><th>脱敏</th><th>授权/沙箱</th><th>记录数</th><th>审计/成果</th><th>Action</th></tr></thead>
       <tbody>${datasetRows || `<tr><td colspan="9">暂无科研数据集。</td></tr>`}</tbody>
@@ -582,6 +612,91 @@ function renderResearchGovernance(platform) {
       <tbody>${modelRows || `<tr><td colspan="8">暂无专病库模型。</td></tr>`}</tbody>
     </table>
   `;
+}
+
+function researchBoundaryLabel(value) {
+  return {
+    "research dataset": "科研数据集",
+    "disease registry": "专病库",
+    "ethics approval": "伦理审批",
+    "de-identification release": "脱敏发布",
+    "sandbox access": "沙箱访问",
+    "usage audit": "使用审计",
+    "outcome return": "成果回流"
+  }[value] || value;
+}
+
+function researchPendingRows(pendingApplications, datasets) {
+  const rows = Array.isArray(pendingApplications) && pendingApplications.length
+    ? pendingApplications
+    : datasets
+      .filter((item) => item.status === "requested" || item.authorizationStatus === "pending")
+      .map((item) => ({
+        id: item.id,
+        diseaseType: item.diseaseType,
+        name: item.name,
+        requestedBy: item.createdBy || item.accessRequests?.[0]?.by || "",
+        requestedAt: item.createdAt || item.accessRequests?.[0]?.at || "",
+        purpose: item.accessRequests?.[0]?.purpose || "",
+        ethicsStatus: item.ethicsStatus || "pending",
+        deidentificationStatus: item.deidentificationStatus || "pending"
+      }));
+  if (!rows.length) return `<li><strong>暂无待审批申请</strong><span>当前数据集均已完成伦理、脱敏和授权闭环。</span></li>`;
+  return rows.slice(0, 4).map((item) => `
+    <li>
+      <strong>${item.name || item.id}</strong>
+      <span>${item.diseaseType || "未标注病种"} / ${item.ethicsStatus || "pending"} / ${item.deidentificationStatus || "pending"}</span>
+      <small>${item.requestedBy || "申请方待确认"} ${formatResearchTime(item.requestedAt)} ${item.purpose || ""}</small>
+    </li>
+  `).join("");
+}
+
+function researchAuditRows(recentAudits, datasets) {
+  const rows = Array.isArray(recentAudits) && recentAudits.length
+    ? recentAudits
+    : datasets.flatMap((item) => (Array.isArray(item.usageAudit) ? item.usageAudit : []).map((audit) => ({
+      at: audit.at,
+      actor: audit.by,
+      role: audit.role,
+      action: audit.action || "usage-audit",
+      target: `${item.id}:${audit.purpose || ""}`,
+      result: audit.result || "allowed"
+    })));
+  if (!rows.length) return `<li><strong>暂无实时审计</strong><span>沙箱申请、拒绝、访问和成果回流会写入审计。</span></li>`;
+  return rows.slice(0, 4).map((item) => `
+    <li>
+      <strong>${item.action || "research-sandbox"} / ${item.result || "allowed"}</strong>
+      <span>${item.actor || "system"} ${item.role ? `(${item.role})` : ""}</span>
+      <small>${formatResearchTime(item.at)} ${item.target || ""}</small>
+    </li>
+  `).join("");
+}
+
+function researchOutcomeRows(recentOutcomes, datasets) {
+  const rows = Array.isArray(recentOutcomes) && recentOutcomes.length
+    ? recentOutcomes
+    : datasets.flatMap((item) => (Array.isArray(item.outcomes) ? item.outcomes : []).map((outcome) => ({
+      datasetId: item.id,
+      datasetName: item.name,
+      at: outcome.at,
+      by: outcome.by,
+      title: outcome.title,
+      registryImpact: outcome.registryImpact
+    })));
+  return rows.slice(0, 2).map((item) => `
+    <li>
+      <strong>成果回流 / ${item.datasetName || item.datasetId || "dataset"}</strong>
+      <span>${item.title || "research outcome"}</span>
+      <small>${formatResearchTime(item.at)} ${item.registryImpact || ""}</small>
+    </li>
+  `).join("");
+}
+
+function formatResearchTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("zh-CN", { hour12: false });
 }
 
 function renderMobileAccessibilityGovernance(platform) {
@@ -828,9 +943,23 @@ async function refreshPlatformState() {
   platformState = await loadPlatformState(fallbackPlatformState);
   ensureEditablePlatformData(platformState);
   platformData = platformModel(platformState);
-  renderResearchGovernance(platformData);
+  renderResearchGovernance(platformData, researchSandboxSummary);
   renderMetrics(platformState, platformData);
   renderReportSummary(platformData, platformState.platformChangeLogs || []);
+  refreshResearchSandboxSummary();
+}
+
+async function refreshResearchSandboxSummary() {
+  if (!PLATFORM_API_BASE) return;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${PLATFORM_API_BASE}/research/sandbox`);
+    if (!response.ok) return;
+    researchSandboxSummary = await response.json();
+    renderResearchGovernance(platformData || platformModel(platformState), researchSandboxSummary);
+  } catch (error) {
+    // Static fallback keeps the page usable without the API.
+  }
 }
 
 function openEvidenceEditor(id) {

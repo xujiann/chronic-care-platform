@@ -267,12 +267,17 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   const workbenchJs = read("workbench.js");
   assert.match(platformHtml, /research-governance/);
   assert.match(platformJs, /research-application-form/);
+  assert.match(platformJs, /refreshResearchSandboxSummary/);
+  assert.match(platformJs, /research-governance-board/);
+  assert.match(platformJs, /researchPendingRows/);
   assert.match(platformJs, /submitResearchDatasetApplication/);
   assert.match(platformJs, /runResearchDatasetAction/);
   assert.match(platformJs, /sandbox-access/);
   assert.match(platformJs, /成果回流/);
   assert.match(read("portal.css"), /research-sandbox-summary/);
   assert.match(read("portal.css"), /research-application-form/);
+  assert.match(read("portal.css"), /research-governance-board/);
+  assert.match(read("portal.css"), /research-audit-feed/);
   assert.match(platformJs, /outcome-return/);
   assert.match(platformHtml, /mobile-accessibility-governance/);
   assert.match(platformHtml, /production-deployment-plan/);

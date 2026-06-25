@@ -34,6 +34,9 @@ test("commission user reaches the governance dashboard and opens maintenance", a
   await expect(page.locator("#research-application-form input[name='name']")).toHaveValue("COPD pulmonary rehabilitation cohort");
   await expect(page.locator("#research-application-form button[type='submit']")).toHaveText("提交申请");
   await expect(page.locator("#research-governance [data-research-action='sandbox-access']").first()).toHaveText("沙箱访问");
+  await expect(page.locator(".research-governance-board > article")).toHaveCount(3);
+  await expect(page.locator(".research-boundary-list .badge")).toHaveCount(7);
+  await expect(page.locator(".research-reuse-list span")).toHaveCount(6);
   await expect(page.locator("#mobile-accessibility-governance > div")).toHaveCount(10);
   await expect(page.locator("#security-acceptance-ledger > div")).toHaveCount(4);
   await expect(page.locator("#production-deployment-plan .priority-row")).toHaveCount(4);

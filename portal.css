@@ -498,6 +498,80 @@ h1 { margin-top: 4px; font-size: 28px; }
   color: var(--red);
 }
 
+.research-governance-board {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr 1.15fr;
+  gap: 10px;
+  margin: 10px 0 12px;
+}
+
+.research-governance-board article {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+
+.research-governance-board h3 {
+  margin: 0 0 9px;
+  font-size: 14px;
+}
+
+.research-pill-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.research-reuse-list {
+  margin-top: 9px;
+}
+
+.research-reuse-list span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 7px;
+  color: var(--muted);
+  font-size: 12px;
+  background: #f8fafc;
+}
+
+.research-queue,
+.research-audit-feed {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.research-queue li,
+.research-audit-feed li {
+  display: grid;
+  gap: 3px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.research-queue li:last-child,
+.research-audit-feed li:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.research-queue strong,
+.research-audit-feed strong {
+  font-size: 13px;
+}
+
+.research-queue span,
+.research-audit-feed span,
+.research-queue small,
+.research-audit-feed small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 dialog {
   width: min(760px, calc(100vw - 28px));
   border: 0;
@@ -1067,6 +1141,7 @@ dialog::backdrop {
   .evidence-grid,
   .filter-grid,
   .research-application-form,
+  .research-governance-board,
   .research-sandbox-summary,
   .report-grid,
   .login-flow,

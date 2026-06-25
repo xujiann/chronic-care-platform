@@ -3597,6 +3597,35 @@ function buildResearchSandboxSummary(data) {
   const models = Array.isArray(data.diseaseRegistryModels) ? data.diseaseRegistryModels : [];
   const auditLogs = (Array.isArray(data.dataAccessLogs) ? data.dataAccessLogs : []).filter((item) => String(item.scope || "").includes("research"));
   const activeDatasets = datasets.filter(requireDatasetSandboxAccess);
+  const pendingApplications = datasets.filter((item) => item.status === "requested" || item.authorizationStatus === "pending");
+  const recentAudits = [
+    ...auditLogs.map((item) => ({
+      at: item.at,
+      actor: item.actor,
+      role: item.role,
+      action: item.scope || "research-sandbox",
+      target: item.purpose,
+      result: item.result
+    })),
+    ...datasets.flatMap((item) => (Array.isArray(item.usageAudit) ? item.usageAudit : []).map((audit) => ({
+      at: audit.at,
+      actor: audit.by,
+      role: audit.role,
+      action: audit.action || "usage-audit",
+      target: `${item.id}:${audit.purpose || ""}`,
+      result: audit.result || "allowed"
+    })))
+  ].sort((a, b) => Date.parse(b.at || "") - Date.parse(a.at || "")).slice(0, 8);
+  const recentOutcomes = datasets.flatMap((item) => (Array.isArray(item.outcomes) ? item.outcomes : []).map((outcome) => ({
+    datasetId: item.id,
+    datasetName: item.name,
+    at: outcome.at,
+    by: outcome.by,
+    title: outcome.title,
+    summary: outcome.summary,
+    registryImpact: outcome.registryImpact,
+    returnedTo: outcome.returnedTo || ["diseaseRegistryModels"]
+  }))).sort((a, b) => Date.parse(b.at || "") - Date.parse(a.at || "")).slice(0, 8);
   return {
     ok: datasets.length >= 2 && activeDatasets.length >= 1 && auditLogs.length >= 1,
     boundaries: ["research dataset", "disease registry", "ethics approval", "de-identification release", "sandbox access", "usage audit", "outcome return"],
@@ -3624,6 +3653,18 @@ function buildResearchSandboxSummary(data) {
       outcomeCount: Array.isArray(item.outcomes) ? item.outcomes.length : 0
     })),
     models: models.map((item) => ({ id: item.id, diseaseType: item.diseaseType, version: item.version, reviewStatus: item.reviewStatus })),
+    pendingApplications: pendingApplications.map((item) => ({
+      id: item.id,
+      diseaseType: item.diseaseType,
+      name: item.name,
+      requestedBy: item.createdBy || item.accessRequests?.[0]?.by || "",
+      requestedAt: item.createdAt || item.accessRequests?.[0]?.at || "",
+      purpose: item.accessRequests?.[0]?.purpose || "",
+      ethicsStatus: item.ethicsStatus || "pending",
+      deidentificationStatus: item.deidentificationStatus || "pending"
+    })).slice(0, 8),
+    recentAudits,
+    recentOutcomes,
     reusableCollections: ["researchDatasets", "diseaseRegistryModels", "dataAccessLogs", "securityAcceptanceLedger", "personalRecords", "diagnosticReports"]
   };
 }

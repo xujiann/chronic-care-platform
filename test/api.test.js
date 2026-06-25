@@ -735,6 +735,10 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(sandboxSummary.response.status, 200);
     assert.equal(sandboxSummary.body.reusableCollections.includes("personalRecords"), true);
     assert.equal(sandboxSummary.body.boundaries.includes("sandbox access"), true);
+    assert.equal(sandboxSummary.body.summary.activeDatasets >= 1, true);
+    assert.equal(Array.isArray(sandboxSummary.body.pendingApplications), true);
+    assert.equal(Array.isArray(sandboxSummary.body.recentAudits), true);
+    assert.equal(Array.isArray(sandboxSummary.body.recentOutcomes), true);
     const researchInstitution = await login(baseUrl, "hospital");
     const application = await api(baseUrl, "/api/research/datasets", authorized(researchInstitution.body.token, {
       method: "POST",
@@ -773,6 +777,11 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     }));
     assert.equal(returnedOutcome.response.status, 200);
     assert.equal(returnedOutcome.body.outcomes[0].registryImpact, "Add pulmonary rehabilitation flags.");
+    const sandboxSummaryAfterOutcome = await api(baseUrl, "/api/research/sandbox", authorized(commissionToken));
+    assert.equal(sandboxSummaryAfterOutcome.response.status, 200);
+    assert.equal(sandboxSummaryAfterOutcome.body.pendingApplications.some((item) => item.id === application.body.id), false);
+    assert.equal(sandboxSummaryAfterOutcome.body.recentAudits.some((item) => String(item.target || "").includes(application.body.id)), true);
+    assert.equal(sandboxSummaryAfterOutcome.body.recentOutcomes.some((item) => item.datasetId === application.body.id), true);
     const usage = await api(baseUrl, "/api/research/datasets/rd-hypertension-001/actions", authorized(commissionToken, {
       method: "POST",
       body: JSON.stringify({ action: "usage-audit", purpose: "risk stratification model validation", result: "allowed" })
