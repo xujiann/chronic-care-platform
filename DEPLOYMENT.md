@@ -271,5 +271,6 @@ Before site joint testing for the drug and consumable supervision app, run `npm.
 - Run `npm.cmd run health-dashboard:summary` to generate `release/health-dashboard-summary.json` and `release/health-dashboard-summary.md`.
 - Use `GET /api/priority-applications/templates` as the live handoff API for the eight independent application conversations.
 - Archive the generated development-template section as the handoff checklist for each of the eight application conversations: boundary, reuse, data, API, frontend entry, tests, and acceptance evidence.
+- Enforce the unified template rule for every platform module: About feature description, `docs/` module document, workflow diagram, API/data/test/acceptance evidence. Use `docs/妇幼健康全模块说明.md` as the reference module package.
 - `release:manifest` must include `health-dashboard-summary.md` so the eight-application template is part of the formal release package.
 - The dashboard remains blocked on real site joint-test inputs for identity, HIS/EMR/LIS/PACS, insurance, certificates, statistics, monitoring, and disaster recovery signoff.

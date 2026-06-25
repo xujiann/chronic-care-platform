@@ -128,6 +128,21 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(deploy, /snapshot:healthDashboard/);
 });
 
+test("about page documents maternal child module and unified template flow rule", () => {
+  const about = read("about.html");
+  const doc = read("docs/妇幼健康全模块说明.md");
+  const templates = read("scripts/health-dashboard-summary.js");
+
+  assert.match(about, /妇幼健康全模块/);
+  assert.match(about, /data-about-flow="maternal-child"/);
+  assert.match(about, /统一模板规则/);
+  assert.match(doc, /flowchart TD/);
+  assert.match(doc, /出生医学证明/);
+  assert.match(doc, /统一模板规则/);
+  assert.match(templates, /documentationRule/);
+  assert.match(templates, /flowDiagram/);
+});
+
 test("static snapshot keeps acceptance evidence clean and actionable", () => {
   const raw = read("data/db.json");
   const data = JSON.parse(raw);

@@ -191,6 +191,13 @@ function summarizeApplication(data, app) {
 
 function buildPriorityApplicationTemplates(options = {}) {
   const summary = buildHealthDashboardSummary(options);
+  const documentationRule = {
+    aboutPage: "about.html",
+    requiredDocument: "docs/<module-name>.md",
+    flowDiagram: "Each template must include a flow diagram covering data source, business workflow, sharing/collaboration, citizen visibility, and management statistics or alerts.",
+    requiredSections: ["功能边界", "角色入口", "数据对象", "API 权限", "页面入口", "测试证据", "验收证据", "流程图"],
+    maternalChildReference: "docs/妇幼健康全模块说明.md"
+  };
   const templates = summary.applications.map((item, index) => ({
     sequence: index + 1,
     id: item.id,
@@ -209,12 +216,14 @@ function buildPriorityApplicationTemplates(options = {}) {
     status: item.status,
     records: item.records,
     openActions: item.openActions,
-    highRisks: item.highRisks
+    highRisks: item.highRisks,
+    documentationRule
   }));
   const checks = [
     { id: "templates:count", passed: templates.length === 8, detail: `${templates.length} templates` },
     { id: "templates:titles", passed: templates.every((item) => item.conversationTitle), detail: "all templates expose conversation titles" },
     { id: "templates:required-fields", passed: templates.every((item) => item.functionalBoundary && item.reusePoints.length && item.dataCollections.length && item.apiRoutes.length && item.frontendEntry && item.testEvidence.length && item.acceptanceEvidence.length), detail: "all template fields populated" },
+    { id: "templates:documentation-rule", passed: templates.every((item) => item.documentationRule?.aboutPage && item.documentationRule?.requiredDocument && item.documentationRule?.flowDiagram), detail: "all templates require About docs and flow diagrams" },
     { id: "templates:source-boundary", passed: templates.filter((item) => item.sourceApplication).length === 7 && templates.filter((item) => item.aggregateApplication).length === 1, detail: "7 source applications and 1 aggregate dashboard" }
   ];
   return {
@@ -222,7 +231,7 @@ function buildPriorityApplicationTemplates(options = {}) {
     generatedAt: summary.generatedAt,
     scope: {
       role: "priority-application-development-templates",
-      rule: "Each template is the handoff contract for one independent application conversation: boundary, reuse, data, API, frontend, tests, and acceptance evidence."
+      rule: "Each template is the handoff contract for one independent application conversation: boundary, reuse, data, API, frontend, tests, acceptance evidence, About-page feature description, module documentation, and a workflow diagram."
     },
     summary: {
       applications: templates.length,
