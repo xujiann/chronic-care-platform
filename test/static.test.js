@@ -179,6 +179,30 @@ test("about page documents maternal child module and unified template flow rule"
   assert.match(templates, /flowDiagram/);
 });
 
+test("maternal child about page documents policy basis and release evidence", () => {
+  const page = read("maternal-child-about.html");
+  const policy = read("docs/maternal-child-policy.md");
+  const moduleDoc = read("docs/妇幼健康全模块说明.md");
+  const readme = read("README.md");
+  const deployment = read("DEPLOYMENT.md");
+  const workflow = read(".github/workflows/ci.yml");
+
+  assert.match(read("about.html"), /maternal-child-about\.html/);
+  assert.match(page, /data-maternal-about="policy-basis"/);
+  assert.match(page, /第七版出生医学证明/);
+  assert.match(page, /data-about-flow="maternal-child-policy"/);
+  assert.match(page, /卫健管理端/);
+  assert.match(page, /医疗机构端/);
+  assert.match(page, /个人用户端/);
+  assert.match(policy, /卫妇社发〔2009〕96 号/);
+  assert.match(policy, /国卫办妇幼发〔2023〕4 号/);
+  assert.match(policy, /flowchart TD/);
+  assert.match(moduleDoc, /政策依据摘要/);
+  assert.match(readme, /maternal-child-about\.html/);
+  assert.match(deployment, /maternal-child-policy\.md/);
+  assert.match(workflow, /priority-apps:templates/);
+});
+
 test("static snapshot keeps acceptance evidence clean and actionable", () => {
   const raw = read("data/db.json");
   const data = JSON.parse(raw);

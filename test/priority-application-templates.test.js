@@ -17,14 +17,16 @@ test("priority application template artifact renders every application handoff",
 
   assert.equal(report.ok, true);
   assert.equal(report.templates.length, 8);
-  assert.equal(report.templates.some((item) => item.conversationTitle === "区域诊疗数据共享平台"), true);
-  assert.equal(report.templates.some((item) => item.conversationTitle === "卫生健康综合驾驶舱" && item.aggregateApplication), true);
+  assert.equal(report.templates.some((item) => item.id === "regional-data-sharing"), true);
+  assert.equal(report.templates.some((item) => item.id === "health-dashboard" && item.aggregateApplication), true);
   assert.match(markdown, /Priority application templates/);
   assert.match(markdown, /Conversation handoff/);
   assert.match(markdown, /Policy and documentation/);
-  assert.match(markdown, /docs\/政策依据说明\.md/);
+  assert.match(markdown, /docs\/maternal-child-policy\.md/);
   assert.match(markdown, /docs\/<module-name>\.md/);
-  assert.match(markdown, /科研数据集与数据沙箱平台/);
+  assert.match(markdown, /docs\/妇幼健康全模块说明\.md/);
+  assert.match(markdown, /regional-data-sharing/);
+  assert.match(markdown, /health-dashboard/);
 
   writeOutput(report, {
     output: path.join("tmp", "priority-application-templates-test", "priority-application-templates.json"),
@@ -34,8 +36,7 @@ test("priority application template artifact renders every application handoff",
   const writtenJson = JSON.parse(fs.readFileSync(path.join(outputDir, "priority-application-templates.json"), "utf8"));
   const writtenMarkdown = fs.readFileSync(path.join(outputDir, "priority-application-templates.md"), "utf8");
   assert.equal(writtenJson.summary.applications, 8);
-  assert.match(writtenMarkdown, /医联体转诊与远程会诊平台/);
-  assert.match(writtenMarkdown, /docs\/政策依据说明\.md/);
+  assert.match(writtenMarkdown, /docs\/maternal-child-policy\.md/);
 });
 
 test("priority application template CLI parser keeps output flags", () => {
