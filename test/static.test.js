@@ -120,8 +120,11 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(js, /renderTemplates/);
   assert.match(js, /source application/);
   assert.match(server, /\/api\/health-dashboard\/summary/);
+  assert.match(server, /\/api\/priority-applications\/templates/);
+  assert.match(server, /buildPriorityApplicationTemplates/);
   assert.match(server, /buildHealthDashboardSummary/);
   assert.match(release, /health-dashboard-summary/);
+  assert.match(release, /\/api\/priority-applications\/templates/);
   assert.match(deploy, /snapshot:healthDashboard/);
 });
 

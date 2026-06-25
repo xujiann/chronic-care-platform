@@ -10,6 +10,7 @@ const SOURCE_APPLICATIONS = [
   {
     id: "regional-data-sharing",
     name: "Regional diagnosis data sharing",
+    conversationTitle: "区域诊疗数据共享平台",
     entry: "regional-data-sharing.html",
     owner: "commission",
     collections: ["residents", "personalRecords", "diagnosticReports", "integrationContracts", "dataAccessLogs", "platformInterfaces"],
@@ -22,6 +23,7 @@ const SOURCE_APPLICATIONS = [
   {
     id: "referral-teleconsultation",
     name: "Referral and teleconsultation",
+    conversationTitle: "医联体转诊与远程会诊平台",
     entry: "county.html",
     owner: "medical-services",
     collections: ["referralSystem", "referrals", "referralTeleconsultations", "careOrders", "countyCollaborationOrders", "countyAcceptanceLedger"],
@@ -34,6 +36,7 @@ const SOURCE_APPLICATIONS = [
   {
     id: "quality-safety",
     name: "Medical quality and safety supervision",
+    conversationTitle: "医疗质量与安全监管平台",
     entry: "quality-safety.html",
     owner: "quality-office",
     collections: ["diagnosticReports", "countyMutualRecognitionRecords", "dataQualityIssues", "institutionCreditEvaluations", "securityEvents", "hospitalInteroperabilityFunctions"],
@@ -46,6 +49,7 @@ const SOURCE_APPLICATIONS = [
   {
     id: "operations-dispatch",
     name: "Hospital operations and resource dispatch",
+    conversationTitle: "医院运行监测与资源调度平台",
     entry: "operations.html",
     owner: "operations",
     collections: ["healthStatistics", "healthStatisticsIngestion", "medicalResources", "platformProcessAudit", "operationsReadiness"],
@@ -58,6 +62,7 @@ const SOURCE_APPLICATIONS = [
   {
     id: "drug-consumable-supervision",
     name: "Drug, consumable, and rational medication supervision",
+    conversationTitle: "药品耗材与合理用药监管平台",
     entry: "insurance.html",
     owner: "insurance-and-institution",
     collections: ["drugConsumableSupervisions", "medicationPickups", "insuranceClaims", "institutionSupervisions", "integrationContracts"],
@@ -70,6 +75,7 @@ const SOURCE_APPLICATIONS = [
   {
     id: "chronic-followup",
     name: "Chronic disease management and post-discharge follow-up",
+    conversationTitle: "慢病管理与院后随访平台",
     entry: "index.html",
     owner: "primary-care",
     collections: ["chronicScreeningTasks", "chronicManagementPlans", "followups", "personalRecords", "medicationPickups", "chronicAcceptanceLedger"],
@@ -82,6 +88,7 @@ const SOURCE_APPLICATIONS = [
   {
     id: "research-sandbox",
     name: "Research datasets and data sandbox",
+    conversationTitle: "科研数据集与数据沙箱平台",
     entry: "platform.html",
     owner: "research-governance",
     collections: ["researchDatasets", "diseaseRegistryModels", "dataAccessLogs", "securityAcceptanceLedger", "personalRecords", "diagnosticReports"],
@@ -96,6 +103,7 @@ const SOURCE_APPLICATIONS = [
 const DASHBOARD_APPLICATION = {
   id: "health-dashboard",
   name: "Health commission aggregate dashboard",
+  conversationTitle: "卫生健康综合驾驶舱",
   entry: "health-dashboard.html",
   owner: "commission",
   aggregate: true,
@@ -159,6 +167,7 @@ function summarizeApplication(data, app) {
   return {
     id: app.id,
     name: app.name,
+    conversationTitle: app.conversationTitle || app.name,
     entry: app.entry,
     owner: app.owner,
     collections: collectionRows.map((item) => ({ collection: item.collection, records: item.rows.length })),
@@ -177,6 +186,54 @@ function summarizeApplication(data, app) {
     boundary: app.aggregate
       ? "Aggregate dashboard only; the first seven source applications remain the system of record."
       : "Aggregated in the dashboard; detailed workflow remains in the source application."
+  };
+}
+
+function buildPriorityApplicationTemplates(options = {}) {
+  const summary = buildHealthDashboardSummary(options);
+  const templates = summary.applications.map((item, index) => ({
+    sequence: index + 1,
+    id: item.id,
+    conversationTitle: item.conversationTitle,
+    name: item.name,
+    owner: item.owner,
+    functionalBoundary: item.functionalBoundary,
+    reusePoints: item.reusePoints,
+    dataCollections: item.dataCollections,
+    apiRoutes: item.apiRoutes,
+    frontendEntry: item.frontendEntry,
+    testEvidence: item.testEvidence,
+    acceptanceEvidence: item.acceptanceEvidence,
+    sourceApplication: item.id !== DASHBOARD_APPLICATION.id,
+    aggregateApplication: item.id === DASHBOARD_APPLICATION.id,
+    status: item.status,
+    records: item.records,
+    openActions: item.openActions,
+    highRisks: item.highRisks
+  }));
+  const checks = [
+    { id: "templates:count", passed: templates.length === 8, detail: `${templates.length} templates` },
+    { id: "templates:titles", passed: templates.every((item) => item.conversationTitle), detail: "all templates expose conversation titles" },
+    { id: "templates:required-fields", passed: templates.every((item) => item.functionalBoundary && item.reusePoints.length && item.dataCollections.length && item.apiRoutes.length && item.frontendEntry && item.testEvidence.length && item.acceptanceEvidence.length), detail: "all template fields populated" },
+    { id: "templates:source-boundary", passed: templates.filter((item) => item.sourceApplication).length === 7 && templates.filter((item) => item.aggregateApplication).length === 1, detail: "7 source applications and 1 aggregate dashboard" }
+  ];
+  return {
+    ok: summary.ok && checks.every((item) => item.passed),
+    generatedAt: summary.generatedAt,
+    scope: {
+      role: "priority-application-development-templates",
+      rule: "Each template is the handoff contract for one independent application conversation: boundary, reuse, data, API, frontend, tests, and acceptance evidence."
+    },
+    summary: {
+      applications: templates.length,
+      sourceApplications: templates.filter((item) => item.sourceApplication).length,
+      aggregateApplications: templates.filter((item) => item.aggregateApplication).length,
+      apiRoutes: templates.reduce((sum, item) => sum + item.apiRoutes.length, 0),
+      dataCollections: new Set(templates.flatMap((item) => item.dataCollections)).size,
+      acceptanceArtifacts: templates.reduce((sum, item) => sum + item.acceptanceEvidence.length, 0)
+    },
+    templates,
+    checks
   };
 }
 
@@ -372,4 +429,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { APPLICATIONS, buildHealthDashboardSummary, parseArgs, renderMarkdown, writeOutput };
+module.exports = { APPLICATIONS, buildHealthDashboardSummary, buildPriorityApplicationTemplates, parseArgs, renderMarkdown, writeOutput };

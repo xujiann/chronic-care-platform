@@ -253,6 +253,7 @@ function renderCitizen(residentId) {
   renderChronicServices(resident.id);
   renderReferrals(resident.id);
   renderBirthHealth(resident.id);
+  renderMaternalChildContinuity(resident.id);
   renderPickups(resident.id);
   renderSeniorServices(resident.id);
   renderDigitalCredentials(resident.id);
@@ -834,6 +835,34 @@ function renderBirthHealth(residentId) {
       <span class="badge ${badge}">${item.issueType || "首次签发"}</span>
     </article>`;
   }).join("") || `<p class="muted">当前家庭成员暂无出生医学证明或新生儿健康管理任务。</p>`;
+}
+
+function renderMaternalChildContinuity(residentId) {
+  const container = document.querySelector("#mch-continuity-cards");
+  if (!container) return;
+  const certificates = (state.birthCertificates || [])
+    .filter((item) => item.maternalResidentId === residentId || item.residentId === residentId)
+    .sort((a, b) => String(b.birthDateTime || "").localeCompare(String(a.birthDateTime || "")));
+  if (!certificates.length) {
+    container.innerHTML = `<p class="muted">暂无妇幼接续清单。出生证明接入后将自动生成访视、筛查、接种和儿童保健提醒。</p>`;
+    return;
+  }
+  const rows = certificates.flatMap((item) => {
+    const lowWeight = Number(item.birthWeight || 0) > 0 && Number(item.birthWeight || 0) < 2500;
+    return [
+      { title: "出生医学证明", status: item.status || "待处理", detail: `${item.certificateNo} · ${item.issueType || "首次签发"}`, urgent: String(item.status || "").includes("待") },
+      { title: "妇幼健康入册", status: item.maternalChildSync || "待入册", detail: "同步孕产妇与新生儿健康管理系统", urgent: item.maternalChildSync !== "已入册" },
+      { title: "新生儿家庭访视", status: item.healthManagementStatus || "待建档", detail: item.nextService || "出生后 7 天内或出院后一周内访视", urgent: /待|复测|确认/.test(`${item.healthManagementStatus || ""}${item.nextService || ""}`) },
+      { title: "出生缺陷筛查", status: /筛查|黄疸|听力|遗传/.test(item.nextService || "") ? "待确认" : "持续关注", detail: "听力、遗传代谢病、先心病和黄疸复测结果归集", urgent: /筛查|黄疸|听力|遗传/.test(item.nextService || "") },
+      { title: lowWeight ? "低体重儿专案" : "儿童保健接续", status: lowWeight ? "需随访" : "按月龄管理", detail: lowWeight ? "喂养指导、体重复测和高危儿随访" : "预防接种、儿童体检、发育评估和体弱儿童管理", urgent: lowWeight }
+    ].map((row) => ({ ...row, newbornName: item.newbornName || "新生儿", birthDateTime: item.birthDateTime || "出生时间待确认" }));
+  });
+  container.innerHTML = rows.map((row) => `<article class="mini-card">
+    <h3>${row.title} · ${row.newbornName}</h3>
+    <p class="muted">${row.birthDateTime}</p>
+    <p>${row.detail}</p>
+    <span class="status ${row.urgent ? "warn" : ""}">${row.status}</span>
+  </article>`).join("");
 }
 
 function renderPickups(residentId) {

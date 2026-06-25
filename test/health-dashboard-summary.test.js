@@ -6,6 +6,7 @@ const test = require("node:test");
 const {
   APPLICATIONS,
   buildHealthDashboardSummary,
+  buildPriorityApplicationTemplates,
   renderMarkdown
 } = require("../scripts/health-dashboard-summary");
 
@@ -36,6 +37,21 @@ test("health dashboard summary tracks the eight priority applications without re
   assert.match(markdown, /regional-data-sharing/);
   assert.match(markdown, /health-dashboard/);
   assert.match(markdown, /Open action preview/);
+});
+
+test("priority application templates expose the eight conversation handoff contracts", () => {
+  const data = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "db.json"), "utf8"));
+  const report = buildPriorityApplicationTemplates({ data });
+
+  assert.equal(report.ok, true);
+  assert.equal(report.scope.role, "priority-application-development-templates");
+  assert.equal(report.summary.applications, 8);
+  assert.equal(report.summary.sourceApplications, 7);
+  assert.equal(report.summary.aggregateApplications, 1);
+  assert.equal(report.templates[0].conversationTitle, "区域诊疗数据共享平台");
+  assert.equal(report.templates.some((item) => item.conversationTitle === "卫生健康综合驾驶舱" && item.aggregateApplication), true);
+  assert.equal(report.templates.every((item) => item.functionalBoundary && item.reusePoints.length && item.dataCollections.length && item.apiRoutes.length && item.frontendEntry && item.testEvidence.length && item.acceptanceEvidence.length), true);
+  assert.equal(report.checks.every((item) => item.passed), true);
 });
 
 test("health dashboard summary supports empty source application boundaries", () => {

@@ -4,7 +4,7 @@ const path = require("path");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
 const { buildProcessAuditReport } = require("./scripts/process-audit");
 const { buildSiteReadinessPack, renderTemplateReadmes } = require("./scripts/site-readiness-pack");
-const { buildHealthDashboardSummary } = require("./scripts/health-dashboard-summary");
+const { buildHealthDashboardSummary, buildPriorityApplicationTemplates } = require("./scripts/health-dashboard-summary");
 const { buildReleaseReport, buildServiceAcceptanceSummary } = require("./scripts/release-report");
 const { buildReleaseArtifactManifest } = require("./scripts/release-artifact-manifest");
 
@@ -6957,6 +6957,22 @@ async function handleApi(req, res) {
       runtime: buildRuntimeMetrics(data),
       readiness: buildSystemReadinessReport(data)
     }));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/priority-applications/templates") {
+    const user = requireApiRole(req, res, ["commission"], "/api/priority-applications/templates");
+    if (!user) return;
+    const data = readDatabase();
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "priority-application-templates",
+      target: "/api/priority-applications/templates",
+      result: "allowed",
+      detail: "Eight priority application development templates read."
+    });
+    sendJson(res, 200, buildPriorityApplicationTemplates({ data }));
     return;
   }
 

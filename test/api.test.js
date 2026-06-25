@@ -164,6 +164,16 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:development-template" && item.passed), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:source-boundary" && item.passed), true);
 
+    const priorityTemplates = await api(baseUrl, "/api/priority-applications/templates", authorized(accountLogin.body.token));
+    assert.equal(priorityTemplates.response.status, 200);
+    assert.equal(priorityTemplates.body.ok, true);
+    assert.equal(priorityTemplates.body.scope.role, "priority-application-development-templates");
+    assert.equal(priorityTemplates.body.summary.applications, 8);
+    assert.equal(priorityTemplates.body.summary.sourceApplications, 7);
+    assert.equal(priorityTemplates.body.templates.some((item) => item.conversationTitle === "医联体转诊与远程会诊平台" && item.apiRoutes.length >= 3), true);
+    assert.equal(priorityTemplates.body.templates.some((item) => item.conversationTitle === "卫生健康综合驾驶舱" && item.aggregateApplication), true);
+    assert.equal(priorityTemplates.body.checks.every((item) => item.passed), true);
+
     const processAudit = await api(baseUrl, "/api/process-audit", authorized(accountLogin.body.token));
     assert.equal(processAudit.response.status, 200);
     assert.equal(processAudit.body.ok, true);

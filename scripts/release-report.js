@@ -909,6 +909,7 @@ function renderMarkdown(report) {
     "## Health dashboard summary",
     "",
     "See `health-dashboard-summary.json` and `health-dashboard-summary.md` for the aggregate entry across the first seven applications, open actions, interface tracks, evidence, and site dependencies.",
+    "`GET /api/priority-applications/templates` exposes the live eight-application handoff templates for independent conversation work.",
     "",
     "## Release artifact manifest",
     "",
