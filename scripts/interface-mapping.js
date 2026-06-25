@@ -78,6 +78,18 @@ const FIELD_MAPPINGS = {
       metrics: "metrics"
     }
   },
+  "referral-feedback-callback-v1": {
+    targetCollection: "referralTeleconsultations",
+    owner: "referral-center",
+    fields: {
+      externalId: "externalFeedbackId",
+      teleconsultationId: "id",
+      residentId: "residentId",
+      receivingFeedback: "receivingFeedback",
+      feedbackAt: "feedbackAt",
+      sourceSystem: "feedbackSourceSystem"
+    }
+  },
   "referral-schedule-callback-v1": {
     targetCollection: "referralTeleconsultations",
     owner: "referral-center",

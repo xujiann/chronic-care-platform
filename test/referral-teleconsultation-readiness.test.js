@@ -20,13 +20,15 @@ test("referral teleconsultation readiness validates closed-loop evidence", () =>
   assert.equal(report.summary.reportReturned >= 1, true);
   assert.equal(report.summary.archivedReports >= 1, true);
   assert.equal(report.summary.notifications >= 1, true);
+  assert.equal(report.summary.feedbackNotifications >= 1, true);
   assert.equal(Number.isFinite(report.summary.avgResponseHours), true);
   assert.equal(Number.isFinite(report.summary.avgReportReturnHours), true);
   assert.equal(report.checks.some((item) => item.id === "referral:residentAuthorization" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:api" && item.passed), true);
-  assert.match(report.checks.find((item) => item.id === "referral:api").detail, /schedule\/report callbacks/);
+  assert.match(report.checks.find((item) => item.id === "referral:api").detail, /feedback\/schedule\/report callbacks/);
   assert.equal(report.checks.some((item) => item.id === "referral:reportArchive" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:notifications" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "referral:feedbackCallback" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:performance" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:frontend" && item.passed), true);
   assert.match(renderMarkdown(report), /Referral teleconsultation readiness report/);
@@ -46,5 +48,6 @@ test("referral teleconsultation readiness writes release artifacts", (t) => {
   assert.match(md, /Linked collaboration orders/);
   assert.match(md, /Archived reports/);
   assert.match(md, /Referral notifications/);
+  assert.match(md, /Feedback notifications/);
   assert.match(md, /Avg response hours/);
 });

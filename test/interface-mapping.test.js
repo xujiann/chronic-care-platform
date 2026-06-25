@@ -13,6 +13,7 @@ test("interface mapping validates every contract required field", () => {
   assert.equal(report.mappings.length >= 7, true);
   assert.equal(report.mappings.every((item) => item.ready), true);
   assert.equal(report.mappings.every((item) => item.idempotencyMapped), true);
+  assert.equal(report.mappings.some((item) => item.contractId === "referral-feedback-callback-v1" && item.targetCollection === "referralTeleconsultations"), true);
   assert.equal(report.mappings.some((item) => item.contractId === "referral-schedule-callback-v1" && item.targetCollection === "referralTeleconsultations"), true);
   assert.equal(report.mappings.some((item) => item.contractId === "referral-report-callback-v1" && item.targetCollection === "referralTeleconsultations"), true);
 });
@@ -48,6 +49,7 @@ test("interface mapping renders and writes release artifacts", (t) => {
   const writtenMarkdown = fs.readFileSync(path.join(outputDir, "interface-mapping-report.md"), "utf8");
   assert.equal(writtenJson.ok, true);
   assert.match(writtenMarkdown, /his-patient-v1/);
+  assert.match(writtenMarkdown, /referral-feedback-callback-v1/);
   assert.match(writtenMarkdown, /referral-schedule-callback-v1/);
 });
 

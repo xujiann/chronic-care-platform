@@ -251,8 +251,10 @@ npm.cmd run rollback:snapshot -- "data/backups/<备份目录>"
 
 ## Referral Teleconsultation Callback
 
+Use `POST /api/referral-teleconsultations/:id/feedback-callback` for receiving-hospital acceptance, triage note, or down-referral acceptance joint testing. Requests must include `idempotencyKey` and `x-integration-signature`; successful callbacks update `receivingFeedback`, feedback timestamp, performance evidence, audit/data-access logs, institution/resident `taskMessages`, and a matched `integrationGatewayEvents` record.
+
 Use `POST /api/referral-teleconsultations/:id/schedule-callback` for appointment-slot, bed-resource, or tele-video room callback joint testing. Requests must include `idempotencyKey` and `x-integration-signature`; successful callbacks update `meetingWindow`, target institution fields, receiving doctor, performance evidence, audit/data-access logs, institution/resident `taskMessages`, and a matched `integrationGatewayEvents` record.
 
 Use `POST /api/referral-teleconsultations/:id/report-callback` for HIS/EMR report return joint testing. Requests must include `idempotencyKey` and `x-integration-signature`; successful callbacks move the teleconsultation to `report-returned`, merge performance evidence, archive the `teleconsultation-report` personal record, append audit/data-access logs, create institution/resident `taskMessages`, and create a matched `integrationGatewayEvents` record.
 
-Before onsite testing, compare `referral-schedule-callback-v1` and `referral-report-callback-v1` in `release/interface-mapping-report.md` with the real HIS/EMR scheduling and report payloads.
+Before onsite testing, compare `referral-feedback-callback-v1`, `referral-schedule-callback-v1`, and `referral-report-callback-v1` in `release/interface-mapping-report.md` with the real HIS/EMR scheduling, receiving feedback, and report payloads.

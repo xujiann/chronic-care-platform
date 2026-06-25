@@ -617,6 +617,37 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(createdTeleconsultation.response.status, 201);
     assert.equal(createdTeleconsultation.body.authorizationStatus, "authorized");
     assert.equal(createdTeleconsultation.body.status, "requested");
+    const feedbackPayload = {
+      idempotencyKey: "rtc-created-feedback-callback-001",
+      externalId: "FB-RTC-001",
+      residentId: authorization.residentId,
+      sourceSystem: "referral-center",
+      receivingFeedback: "Receiving specialist accepted the referral and requested updated blood pressure logs.",
+      feedbackAt: "2026-06-24T08:30:00.000Z",
+      feedbackStatus: "feedback-returned",
+      performance: { responseHours: 1 },
+      payload: { triageLevel: "priority-review" }
+    };
+    const feedbackTeleconsultation = await api(baseUrl, `/api/referral-teleconsultations/${createdTeleconsultation.body.id}/feedback-callback`, authorized(institution.body.token, {
+      method: "POST",
+      headers: { "x-integration-signature": integrationSignature(feedbackPayload) },
+      body: JSON.stringify(feedbackPayload)
+    }));
+    assert.equal(feedbackTeleconsultation.response.status, 200);
+    assert.equal(feedbackTeleconsultation.body.teleconsultation.status, "feedback-returned");
+    assert.match(feedbackTeleconsultation.body.teleconsultation.receivingFeedback, /accepted the referral/);
+    assert.equal(feedbackTeleconsultation.body.teleconsultation.performance.responseHours, 1);
+    assert.equal(feedbackTeleconsultation.body.integrationEvent.contractId, "referral-feedback-callback-v1");
+    assert.equal(feedbackTeleconsultation.body.messages.length, 2);
+    assert.equal(feedbackTeleconsultation.body.messages.some((item) => item.notificationKey.includes(":feedback:") && item.targetRole === "institution"), true);
+    const replayFeedback = await api(baseUrl, `/api/referral-teleconsultations/${createdTeleconsultation.body.id}/feedback-callback`, authorized(institution.body.token, {
+      method: "POST",
+      headers: { "x-integration-signature": integrationSignature(feedbackPayload) },
+      body: JSON.stringify(feedbackPayload)
+    }));
+    assert.equal(replayFeedback.response.status, 200);
+    assert.equal(replayFeedback.body.integrationEvent.id, feedbackTeleconsultation.body.integrationEvent.id);
+    assert.equal(replayFeedback.body.integrationEvent.idempotentReplay, true);
     const returnedTeleconsultation = await api(baseUrl, `/api/referral-teleconsultations/${createdTeleconsultation.body.id}/actions`, authorized(institution.body.token, {
       method: "POST",
       body: JSON.stringify({

@@ -39,6 +39,7 @@ function buildReferralTeleconsultationReadinessReport(options = {}) {
   const teleconsultations = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
   const taskMessages = (Array.isArray(data.taskMessages) ? data.taskMessages : [])
     .filter((item) => item.collection === "referralTeleconsultations" && item.sourceId);
+  const contractIds = new Set((Array.isArray(data.integrationContracts) ? data.integrationContracts : []).map((item) => item.id));
   const authorizations = new Set((data.personalRecords || [])
     .filter((item) => item.category === "authorizations" && item.status !== "revoked" && item.meta?.status !== "revoked")
     .map((item) => item.id));
@@ -51,6 +52,9 @@ function buildReferralTeleconsultationReadinessReport(options = {}) {
     .map((item) => item.teleconsultationId));
   const notifiedReportIds = new Set(taskMessages
     .filter((item) => item.notificationKey && item.notificationKey.includes(":report:"))
+    .map((item) => item.sourceId));
+  const notifiedFeedbackIds = new Set(taskMessages
+    .filter((item) => item.notificationKey && item.notificationKey.includes(":feedback:"))
     .map((item) => item.sourceId));
   const avgResponseHours = averagePerformance(teleconsultations, "responseHours");
   const avgReportReturnHours = averagePerformance(teleconsultations, "reportReturnHours");
@@ -71,8 +75,9 @@ function buildReferralTeleconsultationReadinessReport(options = {}) {
     { id: "referral:reportReturn", passed: reportReturned.length >= 1 && teleconsultations.every((item) => item.reportStatus), detail: `${reportReturned.length} returned reports` },
     { id: "referral:reportArchive", passed: reportReturned.length >= 1 && reportReturned.every((item) => archivedReportIds.has(item.id)), detail: `${reportReturned.filter((item) => archivedReportIds.has(item.id)).length}/${reportReturned.length} returned reports archived` },
     { id: "referral:notifications", passed: reportReturned.length >= 1 && reportReturned.every((item) => notifiedReportIds.has(item.id)) && /appendReferralTeleconsultationNotifications/.test(server), detail: `${reportReturned.filter((item) => notifiedReportIds.has(item.id)).length}/${reportReturned.length} returned reports notified` },
+    { id: "referral:feedbackCallback", passed: contractIds.has("referral-feedback-callback-v1") && /feedback-callback/.test(server) && teleconsultations.some((item) => item.receivingFeedback && notifiedFeedbackIds.has(item.id)), detail: `${notifiedFeedbackIds.size} feedback notifications with signed callback contract` },
     { id: "referral:performance", passed: avgResponseHours !== null && avgReportReturnHours !== null && /county-teleconsultation-performance/.test(county), detail: `avg response ${avgResponseHours}h, avg report return ${avgReportReturnHours}h` },
-    { id: "referral:api", passed: /\/api\/referral-teleconsultations/.test(server) && /schedule-callback/.test(server) && /report-callback/.test(server) && /verifyIntegrationSignature/.test(server) && /canAccessReferralTeleconsultation/.test(server) && /appendDataAccessLog/.test(server), detail: "specialized API, signed schedule/report callbacks, role guard, and audit log present" },
+    { id: "referral:api", passed: /\/api\/referral-teleconsultations/.test(server) && /feedback-callback/.test(server) && /schedule-callback/.test(server) && /report-callback/.test(server) && /verifyIntegrationSignature/.test(server) && /canAccessReferralTeleconsultation/.test(server) && /appendDataAccessLog/.test(server), detail: "specialized API, signed feedback/schedule/report callbacks, role guard, and audit log present" },
     { id: "referral:frontend", passed: /teleconsultation-form/.test(institution) && /teleconsultation-action-form/.test(institution) && /teleconsultation-loop/.test(institution) && /county-teleconsultation-loop/.test(county) && /county-teleconsultation-status-filter/.test(county), detail: "institution create form, feedback form, institution loop, and county command entry present" },
     { id: "referral:releaseScript", passed: Boolean(pkg.scripts?.["referral:readiness"]), detail: pkg.scripts?.["referral:readiness"] || "missing" }
   ];
@@ -86,6 +91,7 @@ function buildReferralTeleconsultationReadinessReport(options = {}) {
       reportReturned: reportReturned.length,
       archivedReports: reportReturned.filter((item) => archivedReportIds.has(item.id)).length,
       notifications: taskMessages.length,
+      feedbackNotifications: notifiedFeedbackIds.size,
       collaborationOrders: teleconsultations.filter((item) => collaborationOrderIds.has(item.collaborationOrderId)).length,
       avgResponseHours,
       avgReportReturnHours
@@ -118,6 +124,7 @@ function renderMarkdown(report) {
     `- Returned reports: ${report.summary.reportReturned}`,
     `- Archived reports: ${report.summary.archivedReports}`,
     `- Referral notifications: ${report.summary.notifications}`,
+    `- Feedback notifications: ${report.summary.feedbackNotifications}`,
     `- Linked collaboration orders: ${report.summary.collaborationOrders}`,
     `- Avg response hours: ${report.summary.avgResponseHours ?? "-"}`,
     `- Avg report return hours: ${report.summary.avgReportReturnHours ?? "-"}`,

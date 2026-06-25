@@ -2829,6 +2829,40 @@
   ],
   "taskMessages": [
     {
+      "id": "msg-rtc-001-feedback-citizen",
+      "taskId": "referralTeleconsultations:rtc-001",
+      "collection": "referralTeleconsultations",
+      "sourceId": "rtc-001",
+      "residentId": "r1",
+      "targetRole": "citizen",
+      "channel": "in_app",
+      "title": "Teleconsultation feedback returned",
+      "body": "Receiving feedback from Dalian Central Hospital: Specialist slot reserved; review current prescription before video consultation.",
+      "status": "sent",
+      "notificationKey": "referralTeleconsultations:rtc-001:feedback:rtc-001-feedback-seed:citizen",
+      "receipts": [],
+      "createdAt": "2026-06-23T09:31:00.000Z",
+      "createdBy": "system",
+      "createdByName": "System"
+    },
+    {
+      "id": "msg-rtc-001-feedback-institution",
+      "taskId": "referralTeleconsultations:rtc-001",
+      "collection": "referralTeleconsultations",
+      "sourceId": "rtc-001",
+      "residentId": "r1",
+      "targetRole": "institution",
+      "channel": "in_app",
+      "title": "Teleconsultation feedback returned",
+      "body": "Receiving feedback from Dalian Central Hospital and waiting for the video consultation report.",
+      "status": "sent",
+      "notificationKey": "referralTeleconsultations:rtc-001:feedback:rtc-001-feedback-seed:institution",
+      "receipts": [],
+      "createdAt": "2026-06-23T09:31:00.000Z",
+      "createdBy": "system",
+      "createdByName": "System"
+    },
+    {
       "id": "msg-rtc-002-report-citizen",
       "taskId": "referralTeleconsultations:rtc-002",
       "collection": "referralTeleconsultations",
@@ -4117,6 +4151,25 @@
       "idempotencyKey": "externalId",
       "signature": "HMAC-SHA256",
       "retryPolicy": "人工复核后重放",
+      "status": "ready"
+    },
+    {
+      "id": "referral-feedback-callback-v1",
+      "domain": "Referral",
+      "version": "1.0.0",
+      "direction": "inbound",
+      "resource": "TeleconsultationFeedback",
+      "requiredFields": [
+        "externalId",
+        "teleconsultationId",
+        "residentId",
+        "receivingFeedback",
+        "feedbackAt",
+        "sourceSystem"
+      ],
+      "idempotencyKey": "externalId",
+      "signature": "HMAC-SHA256",
+      "retryPolicy": "idempotent replay with manual reconciliation",
       "status": "ready"
     },
     {
