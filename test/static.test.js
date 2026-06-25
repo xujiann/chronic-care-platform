@@ -270,10 +270,13 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(html, /regional-data-sharing\.js/);
   assert.match(html, /regional-sharing-loop/);
   assert.match(html, /regional-selected-package/);
+  assert.match(html, /regional-readiness-checklist/);
   assert.match(html, /regional-access-feedback/);
   assert.match(client, /\/api\/regional-data-sharing/);
   assert.match(client, /selectRegionalPackage/);
   assert.match(client, /renderRegionalLoop/);
+  assert.match(client, /renderRegionalReadinessChecklist/);
+  assert.match(client, /buildRegionalReadinessChecks/);
   assert.match(client, /renderAccessFeedback/);
   assert.match(client, /调阅留痕/);
   assert.match(server, /seedRegionalDataSharingScope/);

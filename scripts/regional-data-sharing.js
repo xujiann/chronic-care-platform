@@ -56,6 +56,7 @@ function buildRegionalDataSharingReport(options = {}) {
     { id: "regional:apiRoutes", passed: /\/api\/regional-data-sharing/.test(server) && /createRegionalSharingAccessReview/.test(server), detail: "GET and POST regional routes present" },
     { id: "regional:frontendEntry", passed: /regional-data-sharing\.js/.test(html) && /regional-access-form/.test(html) && /authFetch/.test(client), detail: "page and client workflow present" },
     { id: "regional:frontendWorkflow", passed: /regional-sharing-loop/.test(html) && /regional-selected-package/.test(html) && /regional-access-feedback/.test(html) && /selectRegionalPackage/.test(client) && /renderRegionalLoop/.test(client), detail: "loop, selection and access feedback present" },
+    { id: "regional:readinessChecklist", passed: /regional-readiness-checklist/.test(html) && /renderRegionalReadinessChecklist/.test(client) && /buildRegionalReadinessChecks/.test(client), detail: "selected package readiness checks present" },
     { id: "regional:releaseScript", passed: Boolean(pkg.scripts?.["regional-data-sharing:report"]), detail: pkg.scripts?.["regional-data-sharing:report"] || "missing" }
   ];
   return {
@@ -72,7 +73,8 @@ function buildRegionalDataSharingReport(options = {}) {
       ready: packages.filter((item) => item.status === "ready").length,
       pendingReview: packages.filter((item) => item.status === "pending_review").length,
       accessReviews: reviews.length,
-      contractRefs: [...new Set(contractRefs)].length
+      contractRefs: [...new Set(contractRefs)].length,
+      readinessChecks: packages.length * 5
     },
     packages: packages.map((item) => ({
       id: item.id,
@@ -98,6 +100,7 @@ function renderMarkdown(report) {
     `- 共享包：${report.summary.packages}`,
     `- 可共享包：${report.summary.ready}`,
     `- 调阅留痕：${report.summary.accessReviews}`,
+    `- 联调检查项：${report.summary.readinessChecks}`,
     "",
     "## 检查项",
     "",

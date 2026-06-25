@@ -927,6 +927,49 @@ dialog::backdrop {
   color: var(--ink);
 }
 
+.regional-readiness-checklist {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.regional-readiness-checklist article {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #f8fbfd;
+}
+
+.regional-readiness-checklist article span {
+  display: inline-flex;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: #fff3d8;
+  color: var(--amber);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.regional-readiness-checklist article.is-ready span {
+  background: #e6f7ef;
+  color: var(--green);
+}
+
+.regional-readiness-checklist strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.regional-readiness-checklist p {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 .regional-access-feedback {
   min-height: 20px;
   margin: 10px 0;

@@ -95,6 +95,7 @@ function renderRegionalSharing() {
   renderRegionalSnapshots(data.snapshots || {});
   renderRegionalPackages(packages);
   renderSelectedPackage(packages);
+  renderRegionalReadinessChecklist(packages);
   renderAccessFeedback();
   renderRegionalReviews(data.accessReviews || []);
   fillPackageOptions(packages);
@@ -200,6 +201,65 @@ function renderSelectedPackage(packages) {
     `<p><strong>共享集合</strong><span>${(packageItem.sharedCollections || []).map(labelCollection).join("、")}</span></p>`,
     `<p><strong>授权/质量</strong><span>${consentLabel(packageItem.consentStatus)} / ${qualityLabel(packageItem.qualityStatus)}</span></p>`
   ].join("");
+}
+
+function renderRegionalReadinessChecklist(packages) {
+  const packageItem = packages.find((item) => item.id === regionalState.selectedPackageId) || packages[0];
+  const panel = document.querySelector("#regional-readiness-checklist");
+  const summary = document.querySelector("#regional-readiness-summary");
+  if (!panel || !summary) return;
+  if (!packageItem) {
+    summary.textContent = "";
+    panel.innerHTML = `<div class="muted">暂无共享包可检查。</div>`;
+    return;
+  }
+  const checks = buildRegionalReadinessChecks(packageItem);
+  const passed = checks.filter((item) => item.passed).length;
+  summary.textContent = `${passed}/${checks.length} 项就绪`;
+  panel.innerHTML = checks.map((item) => `
+    <article class="${item.passed ? "is-ready" : "needs-review"}">
+      <span>${item.passed ? "已就绪" : "待处理"}</span>
+      <div>
+        <strong>${item.label}</strong>
+        <p>${item.detail}</p>
+      </div>
+    </article>
+  `).join("");
+}
+
+function buildRegionalReadinessChecks(packageItem) {
+  const contracts = packageItem.contracts || [];
+  const contractRefs = packageItem.contractRefs || [];
+  const recordRefs = packageItem.recordRefs || [];
+  const latestRecords = packageItem.latestRecords || [];
+  const evidenceCounts = packageItem.evidenceCounts || {};
+  return [
+    {
+      label: "接口契约",
+      passed: contractRefs.length > 0 && contractRefs.every((id) => contracts.some((item) => item.id === id)),
+      detail: contractRefs.length ? contractRefs.map((id) => contractLabels[id] || id).join("、") : "未绑定接口契约"
+    },
+    {
+      label: "居民授权",
+      passed: packageItem.consentStatus === "active",
+      detail: consentLabel(packageItem.consentStatus)
+    },
+    {
+      label: "数据质控",
+      passed: packageItem.qualityStatus === "passed",
+      detail: qualityLabel(packageItem.qualityStatus)
+    },
+    {
+      label: "记录引用",
+      passed: recordRefs.length > 0 && latestRecords.length > 0,
+      detail: `已引用 ${recordRefs.length} 条记录，摘要 ${latestRecords.length} 条`
+    },
+    {
+      label: "审计留痕",
+      passed: Boolean(packageItem.lastAccessReviewId || packageItem.lastSharedAt || evidenceCounts.dataAccessLogs),
+      detail: packageItem.lastAccessReviewId ? `最近留痕 ${packageItem.lastAccessReviewId}` : "调阅后自动写入数据访问日志"
+    }
+  ];
 }
 
 function renderRegionalReviews(reviews) {
