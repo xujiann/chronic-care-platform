@@ -16,7 +16,7 @@ function renderMarkdown(report) {
       : "Policy doc: docs/政策依据说明.md";
     return `| ${item.conversationTitle} | ${String(item.functionalBoundary || "").replace(/\|/g, "/")} | ${item.reusePoints.join("<br>")} | ${item.dataCollections.join("<br>")} | ${item.testEvidence.join("<br>")} | ${documentation} |`;
   });
-  const normalizedDetailRows = detailRows.map((row) => row.replace(/docs\/[^<|]+\.md/g, "docs/maternal-child-policy.md"));
+  const normalizedDetailRows = detailRows.map((row) => row.replace(/Policy doc: docs\/[^<|]+\.md/g, "Policy doc: docs/maternal-child-policy.md"));
   return [
     "# Priority application templates",
     "",
