@@ -1,4 +1,5 @@
 const { expect, test } = require("@playwright/test");
+const fs = require("node:fs");
 
 async function login(page, username, expectedPage) {
   await page.goto("/login.html");
@@ -119,6 +120,20 @@ test("commission health dashboard filters live source actions and drills into so
 
   const countyLinks = page.locator("#dashboard-actions a[href='./county.html']");
   await expect(countyLinks).toHaveCount(2);
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.locator("#dashboard-export-json").click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^health-dashboard-summary-.*\.json$/);
+  const exportPath = await download.path();
+  const exported = JSON.parse(fs.readFileSync(exportPath, "utf8"));
+  expect(exported.sourceMode).toBe("api");
+  expect(exported.filters.applicationId).toBe("county-consortium");
+  expect(exported.filters.priority).toBe("high");
+  expect(exported.filteredOpenActions).toHaveLength(2);
+  expect(exported.summary.totals.sourceOpenActions).toBe(170);
+  expect(exported.summary.totals.previewOpenActions).toBe(12);
+
   await countyLinks.first().click();
   await expect(page).toHaveURL(/county\.html$/);
 });

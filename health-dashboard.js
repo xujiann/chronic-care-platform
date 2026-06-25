@@ -7,6 +7,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const summary = await loadDashboardSummary();
   currentDashboardSummary = summary;
   bindDashboardFilters();
+  bindDashboardExport();
   renderDashboard(summary);
 });
 
@@ -198,6 +199,36 @@ function bindDashboardFilters() {
       if (currentDashboardSummary) renderDashboard(currentDashboardSummary);
     });
   });
+}
+
+function bindDashboardExport() {
+  const button = document.querySelector("#dashboard-export-json");
+  if (!button || button.dataset.bound === "true") return;
+  button.dataset.bound = "true";
+  button.addEventListener("click", () => {
+    if (!currentDashboardSummary) return;
+    exportDashboardSummary(currentDashboardSummary);
+  });
+}
+
+function exportDashboardSummary(summary) {
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    sourceMode: summary.sourceMode || "unknown",
+    sourceReason: summary.sourceReason || "",
+    filters: dashboardFilters(),
+    filteredOpenActions: filteredDashboardActions(summary),
+    summary
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const link = document.createElement("a");
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  link.href = URL.createObjectURL(blob);
+  link.download = `health-dashboard-summary-${stamp}.json`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(link.href);
 }
 
 function renderFilterOptions(summary) {
