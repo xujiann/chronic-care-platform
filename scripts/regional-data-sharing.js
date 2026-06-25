@@ -36,6 +36,7 @@ function buildRegionalDataSharingReport(options = {}) {
   const pkg = options.pkg ?? readJson("package.json");
   const server = options.server ?? readText("server.js");
   const html = options.html ?? readText("regional-data-sharing.html");
+  const about = options.about ?? readText("regional-data-sharing-about.html");
   const client = options.client ?? readText("regional-data-sharing.js");
   const scope = data.regionalDataSharingScope || {};
   const packages = Array.isArray(data.regionalSharingPackages) ? data.regionalSharingPackages : [];
@@ -57,6 +58,7 @@ function buildRegionalDataSharingReport(options = {}) {
     { id: "regional:frontendEntry", passed: /regional-data-sharing\.js/.test(html) && /regional-access-form/.test(html) && /authFetch/.test(client), detail: "page and client workflow present" },
     { id: "regional:frontendWorkflow", passed: /regional-sharing-loop/.test(html) && /regional-selected-package/.test(html) && /regional-access-feedback/.test(html) && /selectRegionalPackage/.test(client) && /renderRegionalLoop/.test(client), detail: "loop, selection and access feedback present" },
     { id: "regional:readinessChecklist", passed: /regional-readiness-checklist/.test(html) && /renderRegionalReadinessChecklist/.test(client) && /buildRegionalReadinessChecks/.test(client), detail: "selected package readiness checks present" },
+    { id: "regional:aboutPolicy", passed: /regional-data-sharing-about\.html/.test(html) && /data-regional-about-section="policy-basis"/.test(about) && /医疗卫生机构信息互通共享三年攻坚/.test(about) && /医疗卫生机构网络安全管理办法/.test(about), detail: "policy explanation page linked" },
     { id: "regional:releaseScript", passed: Boolean(pkg.scripts?.["regional-data-sharing:report"]), detail: pkg.scripts?.["regional-data-sharing:report"] || "missing" }
   ];
   return {

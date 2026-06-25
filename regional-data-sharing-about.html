@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>关于区域诊疗数据共享平台</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>关于区域共享</span>
+          <h1>区域诊疗数据共享平台政策说明与建设边界</h1>
+          <p>围绕居民主索引、电子健康档案、电子病历、检查检验结果互通共享、授权调阅和审计留痕，说明本应用承接的政策要求、已实现能力和现场联调边界。</p>
+        </div>
+        <nav>
+          <a href="./regional-data-sharing.html">返回区域共享</a>
+          <a href="./platform.html">全民健康平台</a>
+          <a href="./health-city.html">系统总览</a>
+          <a href="./about.html">平台关于</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" data-regional-about-section="policy-summary">
+        <article class="metric-card">
+          <span>建设主线</span>
+          <strong>互通共享</strong>
+          <small>以区域全民健康信息平台为承载，推动电子健康档案、电子病历和检查检验结果跨机构调阅。</small>
+        </article>
+        <article class="metric-card">
+          <span>业务抓手</span>
+          <strong>共享包</strong>
+          <small>把居民、档案、报告、互认记录、接口契约和审计日志组织成可调阅、可追踪的诊疗数据包。</small>
+        </article>
+        <article class="metric-card">
+          <span>合规底线</span>
+          <strong>授权留痕</strong>
+          <small>居民授权、机构职责、质控状态、调阅目的和访问日志共同构成调阅边界。</small>
+        </article>
+        <article class="metric-card">
+          <span>现场边界</span>
+          <strong>联调确认</strong>
+          <small>真实上线前需完成 HIS、EMR、LIS、PACS 报文签名、机构编码、主索引和审计归档确认。</small>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide" data-regional-about-section="policy-basis">
+          <div class="panel-title">
+            <h2>相关政策依据</h2>
+            <span>官方公开文件</span>
+          </div>
+          <div class="policy-grid">
+            <a class="policy-card" href="https://www.nhc.gov.cn/guihuaxxs/c100133/202211/fae867435fea479c828cb50047526a69.shtml" target="_blank" rel="noreferrer">
+              <strong>“十四五”全民健康信息化规划</strong>
+              <span>明确全民健康信息化建设、标准体系、健康医疗大数据资源、基层信息化和网络数据安全等任务；本应用对应其中的互通共享、主索引、档案共享和安全可控要求。</span>
+            </a>
+            <a class="policy-card" href="https://www.scio.gov.cn/xwfb/bwxwfb/gbwfbh/wsjkwyh/202311/t20231110_778497.html" target="_blank" rel="noreferrer">
+              <strong>医疗卫生机构信息互通共享三年攻坚</strong>
+              <span>强调电子健康卡、检查检验结果互通共享、电子健康档案授权查询、区域平台完善和网络数据安全；本应用以共享包调阅和审计闭环承接这些场景。</span>
+            </a>
+            <a class="policy-card" href="https://www.nhc.gov.cn/yzygj/c100068/202202/ef4a28ddc74447eea85f93fe05107200.shtml" target="_blank" rel="noreferrer">
+              <strong>医疗机构检查检验结果互认管理办法</strong>
+              <span>围绕组织管理、互认规则、质量控制、支持保障和监督管理建立互认规则；本应用把互认记录、质控状态和接诊调阅目的放在同一共享闭环内。</span>
+            </a>
+            <a class="policy-card" href="https://www.nhc.gov.cn/yzygj/c100068/202411/e26dde958ae74bf5b8f4fe97d83253c7.shtml" target="_blank" rel="noreferrer">
+              <strong>进一步推进检查检验结果互认的指导意见</strong>
+              <span>要求以区域信息平台建设为依托，健全监测反馈和激励保障；本应用提供待复核处置、互认确认和调阅留痕，支撑后续监管统计。</span>
+            </a>
+            <a class="policy-card" href="https://www.nhc.gov.cn/guihuaxxs/c100133/202208/8a23d01133214a779879094dd20cd383.shtml" target="_blank" rel="noreferrer">
+              <strong>医疗卫生机构网络安全管理办法</strong>
+              <span>要求医疗卫生机构落实网络和数据安全主体责任、分类分级、授权访问和全生命周期安全管理；本应用不绕过授权、权限裁剪和审计保全。</span>
+            </a>
+          </div>
+        </article>
+
+        <article class="panel" data-regional-about-section="implementation-map">
+          <div class="panel-title">
+            <h2>落地映射</h2>
+            <span>从政策到功能</span>
+          </div>
+          <div class="rules">
+            <div><strong>主索引</strong><span>以居民编号和机构编码组织共享包，避免跨机构调阅时失去居民身份链路。</span></div>
+            <div><strong>互认结果</strong><span>把 LIS、PACS 和县域互认记录纳入共享包，保留质控状态和复核意见。</span></div>
+            <div><strong>授权访问</strong><span>机构端只看本机构来源或目标范围内的共享包，管理端用于监管总览。</span></div>
+            <div><strong>审计留痕</strong><span>每次调阅登记目的、结论、说明、操作者、机构和时间，回写数据访问日志。</span></div>
+          </div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide" data-regional-about-section="build-boundary">
+          <div class="panel-title">
+            <h2>本应用做什么</h2>
+            <span>当前可运行边界</span>
+          </div>
+          <div class="priority-list">
+            <div class="priority-row">
+              <strong>01</strong>
+              <div>
+                <h3>共享包编目</h3>
+                <p>复用 residents、personalRecords、diagnosticReports、countyMutualRecognitionRecords、integrationContracts、dataAccessLogs 和 securityEvents，生成跨机构诊疗共享包。</p>
+              </div>
+              <span>已实现</span>
+            </div>
+            <div class="priority-row">
+              <strong>02</strong>
+              <div>
+                <h3>角色裁剪</h3>
+                <p>管理端查看区域监管视图，机构端只查看本机构来源或目标共享包，居民端授权作为边界说明保留。</p>
+              </div>
+              <span>已实现</span>
+            </div>
+            <div class="priority-row">
+              <strong>03</strong>
+              <div>
+                <h3>调阅审计</h3>
+                <p>通过共享包、调阅结论、诊疗目的和说明形成审计记录，并同步进入数据访问日志和安全事件。</p>
+              </div>
+              <span>已实现</span>
+            </div>
+            <div class="priority-row">
+              <strong>04</strong>
+              <div>
+                <h3>联调检查</h3>
+                <p>按接口契约、居民授权、数据质控、记录引用和审计留痕展示当前共享包现场联调状态。</p>
+              </div>
+              <span>已实现</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel" data-regional-about-section="not-in-scope">
+          <div class="panel-title">
+            <h2>不做事项</h2>
+            <span>避免边界漂移</span>
+          </div>
+          <div class="rules">
+            <div><strong>不替代院内系统</strong><span>HIS、EMR、LIS、PACS 仍是生产源系统，本应用只承接共享、调阅和审计。</span></div>
+            <div><strong>不处理费用清分</strong><span>医保结算、票据、商保快赔和资金清分不纳入区域诊疗共享闭环。</span></div>
+            <div><strong>不绕过授权</strong><span>没有居民授权、机构职责或现场签名验收时，不开放真实跨机构调阅。</span></div>
+            <div><strong>不把科研数据当临床来源</strong><span>脱敏科研数据集不作为接诊诊疗直接依据。</span></div>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel" data-regional-about-section="joint-test-boundary">
+        <div class="panel-title">
+          <h2>现场联调边界</h2>
+          <span>上线前需补齐的外部证据</span>
+        </div>
+        <div class="capability-grid">
+          <article class="capability-card">
+            <strong>身份与授权</strong>
+            <span>确认政务统一认证、医生身份源、机构目录、居民主索引和授权来源，形成真实 token 与机构范围映射。</span>
+          </article>
+          <article class="capability-card">
+            <strong>医疗接口</strong>
+            <span>归档 HIS、EMR、LIS、PACS 的字段映射、签名密钥、幂等键、样例报文、异常重放和接收医师确认截图。</span>
+          </article>
+          <article class="capability-card">
+            <strong>质量与互认</strong>
+            <span>确认检验质控、影像 DICOM 完整性、互认项目目录、未互认原因、复查必要性说明和人工复核流程。</span>
+          </article>
+          <article class="capability-card">
+            <strong>审计与安全</strong>
+            <span>配置审计导出路径或 SIEM，确认访问日志留存年限、脱敏展示、越权拒绝、安全事件和应急处置流程。</span>
+          </article>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

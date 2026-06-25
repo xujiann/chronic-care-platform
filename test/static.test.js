@@ -38,7 +38,7 @@ test("citizen pages do not expose cross-role module links or management collecti
 });
 
 test("application pages avoid placeholder navigation", () => {
-  const pages = ["about.html", "citizen.html", "mobile-preview.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html"];
+  const pages = ["about.html", "regional-data-sharing-about.html", "citizen.html", "mobile-preview.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html"];
   pages.forEach((file) => assert.doesNotMatch(read(file), /href=["']#["']/, `${file} 存在空链接占位`));
 });
 
@@ -261,13 +261,16 @@ test("deployment baseline documents scripts and environment template", () => {
 
 test("regional data sharing application has runnable entry, API and evidence script", () => {
   const html = read("regional-data-sharing.html");
+  const about = read("regional-data-sharing-about.html");
   const client = read("regional-data-sharing.js");
   const server = read("server.js");
   const script = read("scripts/regional-data-sharing.js");
+  const auth = read("auth.js");
   const data = JSON.parse(read("data/db.json"));
 
   assert.match(html, /区域诊疗数据共享平台/);
   assert.match(html, /regional-data-sharing\.js/);
+  assert.match(html, /regional-data-sharing-about\.html/);
   assert.match(html, /regional-sharing-loop/);
   assert.match(html, /regional-selected-package/);
   assert.match(html, /regional-readiness-checklist/);
@@ -283,6 +286,14 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(server, /createRegionalSharingAccessReview/);
   assert.match(server, /\/api\/regional-data-sharing\/access-reviews/);
   assert.match(script, /buildRegionalDataSharingReport/);
+  assert.match(script, /regional:aboutPolicy/);
+  assert.match(about, /data-regional-about-section="policy-basis"/);
+  assert.match(about, /“十四五”全民健康信息化规划/);
+  assert.match(about, /医疗卫生机构信息互通共享三年攻坚/);
+  assert.match(about, /医疗机构检查检验结果互认管理办法/);
+  assert.match(about, /医疗卫生机构网络安全管理办法/);
+  assert.match(auth, /"regional-data-sharing-about\.html": \["commission", "institution"\]/);
+  assert.match(auth, /\["regional-data-sharing-about\.html", "共享说明"\]/);
   assert.equal(data.regionalDataSharingScope.reusedCollections.includes("residents"), true);
   assert.equal(data.regionalDataSharingScope.exclusions.length >= 3, true);
   assert.equal(data.regionalSharingPackages.length >= 3, true);
