@@ -116,6 +116,13 @@ const DASHBOARD_APPLICATION = {
 };
 
 const APPLICATIONS = [...SOURCE_APPLICATIONS, DASHBOARD_APPLICATION];
+const DOCUMENTATION_RULE = {
+  aboutPage: "about.html",
+  requiredDocument: "docs/<module-name>.md",
+  flowDiagram: "Each template must include a flow diagram covering data source, business workflow, sharing/collaboration, citizen visibility, and management statistics or alerts.",
+  requiredSections: ["功能边界", "角色入口", "数据对象", "API 权限", "页面入口", "测试证据", "验收证据", "流程图"],
+  maternalChildReference: "docs/妇幼健康全模块说明.md"
+};
 
 const CLOSED_STATUS_PATTERN = /closed|resolved|approved|recognized|completed|passed|ready|signed|done|宸插畬鎴|宸查€氳繃|宸插彇鑽|宸插洖浼|宸蹭簰璁|宸叉牳楠|宸查棴鐜|已完成|已通过|已闭环/;
 const HIGH_RISK_PATTERN = /high|urgent|critical|overdue|dead_letter|楂|绱|閫炬湡|critical|高|逾期|危急/;
@@ -183,6 +190,7 @@ function summarizeApplication(data, app) {
     frontendEntry: app.entry,
     testEvidence: app.testEvidence,
     acceptanceEvidence: app.acceptanceEvidence,
+    documentationRule: DOCUMENTATION_RULE,
     boundary: app.aggregate
       ? "Aggregate dashboard only; the first seven source applications remain the system of record."
       : "Aggregated in the dashboard; detailed workflow remains in the source application."
@@ -191,13 +199,6 @@ function summarizeApplication(data, app) {
 
 function buildPriorityApplicationTemplates(options = {}) {
   const summary = buildHealthDashboardSummary(options);
-  const documentationRule = {
-    aboutPage: "about.html",
-    requiredDocument: "docs/<module-name>.md",
-    flowDiagram: "Each template must include a flow diagram covering data source, business workflow, sharing/collaboration, citizen visibility, and management statistics or alerts.",
-    requiredSections: ["功能边界", "角色入口", "数据对象", "API 权限", "页面入口", "测试证据", "验收证据", "流程图"],
-    maternalChildReference: "docs/妇幼健康全模块说明.md"
-  };
   const templates = summary.applications.map((item, index) => ({
     sequence: index + 1,
     id: item.id,
@@ -217,7 +218,7 @@ function buildPriorityApplicationTemplates(options = {}) {
     records: item.records,
     openActions: item.openActions,
     highRisks: item.highRisks,
-    documentationRule
+    documentationRule: item.documentationRule
   }));
   const checks = [
     { id: "templates:count", passed: templates.length === 8, detail: `${templates.length} templates` },
@@ -291,6 +292,7 @@ function buildHealthDashboardSummary(options = {}) {
   const checks = [
     { id: "dashboard:applications", passed: applications.length === 8 && sourceApplications.length === 7 && applications.every((item) => item.entry && item.collections.length), detail: `${applications.length} priority applications; ${sourceApplications.length} source applications` },
     { id: "dashboard:development-template", passed: applications.every((item) => item.functionalBoundary && item.reusePoints.length && item.dataCollections.length && item.apiRoutes.length && item.frontendEntry && item.testEvidence.length && item.acceptanceEvidence.length), detail: "all priority applications expose boundary, reuse, data, API, frontend, test, and acceptance fields" },
+    { id: "dashboard:documentation-rule", passed: applications.every((item) => item.documentationRule?.aboutPage && item.documentationRule?.requiredDocument && item.documentationRule?.flowDiagram), detail: "all priority applications expose About docs and flow diagram requirements" },
     { id: "dashboard:source-boundary", passed: sourceApplications.every((item) => /source application/.test(item.boundary)), detail: "source applications keep workflow ownership" },
     { id: "dashboard:aggregate-boundary", passed: /first seven source applications/.test(applications.find((item) => item.id === DASHBOARD_APPLICATION.id)?.boundary || ""), detail: "dashboard is aggregate-only" },
     { id: "dashboard:metrics", passed: applications.reduce((sum, item) => sum + item.records, 0) > 0, detail: `${applications.reduce((sum, item) => sum + item.records, 0)} source records` },
@@ -356,7 +358,12 @@ function buildHealthDashboardSummary(options = {}) {
 
 function renderMarkdown(report) {
   const appRows = report.applications.map((item) => `| ${item.id} | ${item.entry} | ${item.records} | ${item.openActions} | ${item.highRisks} | ${item.status} |`);
-  const templateRows = report.applications.map((item) => `| ${item.id} | ${String(item.functionalBoundary || "").replace(/\|/g, "/")} | ${item.reusePoints.join("<br>")} | ${item.dataCollections.join("<br>")} | ${item.apiRoutes.join("<br>")} | ${item.frontendEntry} | ${item.testEvidence.join("<br>")} | ${item.acceptanceEvidence.join("<br>")} |`);
+  const templateRows = report.applications.map((item) => {
+    const documentation = item.documentationRule
+      ? [`About: ${item.documentationRule.aboutPage}`, `Doc: ${item.documentationRule.requiredDocument}`, "Flow: required", `Reference: ${item.documentationRule.maternalChildReference}`].join("<br>")
+      : "";
+    return `| ${item.id} | ${String(item.functionalBoundary || "").replace(/\|/g, "/")} | ${item.reusePoints.join("<br>")} | ${item.dataCollections.join("<br>")} | ${item.apiRoutes.join("<br>")} | ${item.frontendEntry} | ${item.testEvidence.join("<br>")} | ${item.acceptanceEvidence.join("<br>")} | ${documentation} |`;
+  });
   const actionRows = report.openActions.map((item) => `| ${item.priority} | ${item.collection} | ${item.id} | ${String(item.title || "").replace(/\|/g, "/")} | ${item.status} | ${item.owner} |`);
   const checkRows = report.checks.map((item) => `| ${item.passed ? "PASS" : "FAIL"} | ${item.id} | ${String(item.detail || "").replace(/\|/g, "/")} |`);
   return [
@@ -389,8 +396,8 @@ function renderMarkdown(report) {
     "",
     "## Development template",
     "",
-    "| Application | Boundary | Reuse points | Data collections | API | Frontend entry | Tests | Acceptance evidence |",
-    "|---|---|---|---|---|---|---|---|",
+    "| Application | Boundary | Reuse points | Data collections | API | Frontend entry | Tests | Acceptance evidence | Documentation rule |",
+    "|---|---|---|---|---|---|---|---|---|",
     ...templateRows,
     "",
     "## Open action preview",
@@ -438,4 +445,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { APPLICATIONS, buildHealthDashboardSummary, buildPriorityApplicationTemplates, parseArgs, renderMarkdown, writeOutput };
+module.exports = { APPLICATIONS, DOCUMENTATION_RULE, buildHealthDashboardSummary, buildPriorityApplicationTemplates, parseArgs, renderMarkdown, writeOutput };
