@@ -116,6 +116,9 @@ test("about page explains runnable platform capabilities", async ({ page }) => {
   await page.goto("/referral-teleconsultation-about.html");
   await expect(page.locator("[data-referral-about-section='policy-basis']")).toBeVisible();
   await expect(page.locator("[data-referral-policy='graded-diagnosis']")).toBeVisible();
+  await expect(page.locator("[data-referral-about-section='joint-signoff']")).toBeVisible();
+  await expect(page.locator("[data-referral-signoff='referral-center']")).toContainText("feedback-callback");
+  await expect(page.locator("[data-referral-signoff='hospital-it']")).toContainText("report-callback");
   await expect(page.locator("[data-referral-about-section='developer']")).toContainText("Dr.Xu");
 
   await login(page, "health", "index.html");

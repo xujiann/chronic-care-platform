@@ -68,8 +68,16 @@ test("about page documents runnable platform capabilities", () => {
   assert.match(auth, /referral-teleconsultation-about\.html/);
   assert.match(referralAbout, /data-referral-about-section="policy-basis"/);
   assert.match(referralAbout, /data-referral-policy="graded-diagnosis"/);
+  assert.match(referralAbout, /data-referral-about-section="joint-signoff"/);
+  assert.match(referralAbout, /data-referral-signoff="referral-center"/);
+  assert.match(referralAbout, /data-referral-signoff="receiving-hospital"/);
+  assert.match(referralAbout, /data-referral-signoff="hospital-it"/);
+  assert.match(referralAbout, /data-referral-signoff="county-performance"/);
   assert.match(referralAbout, /Developer: Dr\.Xu/);
   assert.match(referralAbout, /referral-feedback-callback-v1/);
+  assert.match(referralAbout, /feedback-callback/);
+  assert.match(referralAbout, /schedule-callback/);
+  assert.match(referralAbout, /report-callback/);
   assert.match(referralAbout, /npm\.cmd run referral:readiness/);
   assert.doesNotMatch(referralAbout, /requireRole/);
   assert.match(auth, /pageName === "about\.html"/);

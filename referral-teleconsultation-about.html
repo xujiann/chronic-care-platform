@@ -97,6 +97,51 @@
         </div>
       </section>
 
+      <section class="panel" data-referral-about-section="joint-signoff">
+        <div class="panel-title">
+          <h2>联调签收矩阵</h2>
+          <span>把接口验收、业务口径和上线阻断项放在同一张现场清单里</span>
+        </div>
+        <div class="evidence-grid">
+          <article data-referral-signoff="referral-center">
+            <div><span class="badge info">转诊中心</span><span class="badge warn">号源待接入</span></div>
+            <h3>转诊单与接诊反馈</h3>
+            <p>核对转诊单号、分诊意见、接收状态、下转说明和失败补偿队列，确认 <code>feedback-callback</code> 幂等重放不重复通知。</p>
+            <footer>
+              <small>接口：<code>/api/referral-teleconsultations/:id/feedback-callback</code></small>
+              <small>证据：接诊反馈、审计链、机构/居民消息。</small>
+            </footer>
+          </article>
+          <article data-referral-signoff="receiving-hospital">
+            <div><span class="badge info">接诊医院</span><span class="badge">会诊排期</span></div>
+            <h3>预约排期与会诊资源</h3>
+            <p>核对科室、接诊医生、号源、床位或视频间，确认 <code>schedule-callback</code> 更新会诊窗口和响应时效。</p>
+            <footer>
+              <small>接口：<code>/api/referral-teleconsultations/:id/schedule-callback</code></small>
+              <small>证据：meetingWindow、receivingDoctor、performance.responseHours。</small>
+            </footer>
+          </article>
+          <article data-referral-signoff="hospital-it">
+            <div><span class="badge info">信息中心</span><span class="badge danger">安全必验</span></div>
+            <h3>报告回传与安全审计</h3>
+            <p>核对 HIS/EMR/PACS/LIS 报告编号、摘要、附件索引和 HMAC 签名，确认报告只归档一次并进入个人健康信息库。</p>
+            <footer>
+              <small>接口：<code>/api/referral-teleconsultations/:id/report-callback</code></small>
+              <small>证据：teleconsultation-report、dataAccessLogs、auditHash。</small>
+            </footer>
+          </article>
+          <article data-referral-signoff="county-performance">
+            <div><span class="badge info">医共体/医保</span><span class="badge">绩效口径</span></div>
+            <h3>绩效评价与连续服务</h3>
+            <p>核对响应时长、报告回传时长、满意度、下转随访和医保引导，确认指标进入医共体驾驶舱和发布报告。</p>
+            <footer>
+              <small>接口：<code>/api/referral-teleconsultations</code></small>
+              <small>证据：referral:readiness、countyAcceptanceLedger、taskMessages。</small>
+            </footer>
+          </article>
+        </div>
+      </section>
+
       <section class="panel" data-referral-about-section="closed-loop">
         <div class="panel-title">
           <h2>闭环流程</h2>
