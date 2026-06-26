@@ -163,13 +163,18 @@ test("health dashboard about page documents policies data boundary and site cuto
   const auth = read("auth.js");
 
   assert.match(html, /requireRole\(\["commission"\]\)/);
+  assert.match(html, /data-dashboard-about-section="template-functions"/);
   assert.match(html, /data-dashboard-about-section="policy-basis"/);
   assert.match(html, /data-dashboard-about-section="data-boundary"/);
   assert.match(html, /data-dashboard-about-section="api-evidence"/);
   assert.match(html, /data-dashboard-about-section="site-cutover"/);
+  assert.match(html, /data-dashboard-template-function="aggregate-entry"/);
+  assert.match(html, /data-dashboard-template-function="population-service-board"/);
+  assert.match(html, /data-dashboard-template-function="release-report"/);
   assert.match(html, /data-dashboard-policy="certificates"/);
   assert.match(html, /\/api\/health-dashboard\/summary/);
   assert.match(html, /healthDashboard:populationServiceBoard/);
+  assert.match(html, /health-dashboard:summary/);
   assert.match(html, /birthCertificates\.birthDateTime/);
   assert.match(html, /healthStatistics\.serviceReports/);
   assert.match(auth, /"health-dashboard-about\.html": \["commission"\]/);

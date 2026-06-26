@@ -172,6 +172,10 @@ test("about page explains runnable platform capabilities", async ({ page }) => {
   await expect(page.locator(".auth-bar a[href='./about.html']")).toHaveCount(1);
 
   await page.goto("/health-dashboard-about.html");
+  await expect(page.locator("[data-dashboard-about-section='template-functions']")).toBeVisible();
+  await expect(page.locator("[data-dashboard-template-function='aggregate-entry']")).toContainText("health-dashboard-applications.js");
+  await expect(page.locator("[data-dashboard-template-function='population-service-board']")).toContainText("日");
+  await expect(page.locator("[data-dashboard-template-function='release-report']")).toContainText("health-dashboard:summary");
   await expect(page.locator("[data-dashboard-about-section='policy-basis']")).toBeVisible();
   await expect(page.locator("[data-dashboard-policy='certificates']")).toContainText("出生");
   await expect(page.locator("[data-dashboard-about-section='data-boundary']")).toContainText("birthCertificates.birthDateTime");

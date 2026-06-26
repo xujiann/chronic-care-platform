@@ -47,6 +47,39 @@
         </article>
       </section>
 
+      <section class="panel" data-dashboard-about-section="template-functions">
+        <div class="panel-title">
+          <h2>本模板主要功能</h2>
+          <span>作为优先应用 8 的可复用驾驶舱模板，统一汇总但不替代源应用</span>
+        </div>
+        <div class="capability-grid">
+          <article class="capability-card" data-dashboard-template-function="aggregate-entry">
+            <strong>前七应用汇总入口</strong>
+            <span>复用 <code>health-dashboard-applications.js</code> 的应用清单，汇总卫健委监管、医疗机构、医保治理、居民门户、县域医共体、平台治理和运维工作台的指标、风险和待办。</span>
+          </article>
+          <article class="capability-card" data-dashboard-template-function="population-service-board">
+            <strong>出生死亡就诊入院看板</strong>
+            <span>基于出生、死亡、就诊、入院数据形成日、周、月、年视图，并用趋势提示标注证照、门急诊、入院压力和现场联调重点。</span>
+          </article>
+          <article class="capability-card" data-dashboard-template-function="risk-action-loop">
+            <strong>风险预警与任务闭环</strong>
+            <span>把源应用 open action、优先级和高风险状态归一化展示，管理端可快速定位来源应用，但处置、签收、复核仍回到业务页面完成。</span>
+          </article>
+          <article class="capability-card" data-dashboard-template-function="interface-evidence">
+            <strong>接口联调与验收证据</strong>
+            <span>复用 <code>platformInterfaces</code>、<code>platformEvidence</code>、<code>hospitalInteroperabilityFunctions</code> 和 release 报告，形成接口与验收证据入口。</span>
+          </article>
+          <article class="capability-card" data-dashboard-template-function="policy-boundary">
+            <strong>政策说明与数据边界</strong>
+            <span>说明全民健康信息平台、电子证照、分级诊疗、互联网医疗监管和数据安全要求如何映射到当前演示能力与现场接入边界。</span>
+          </article>
+          <article class="capability-card" data-dashboard-template-function="release-report">
+            <strong>主要功能报告与发布审计</strong>
+            <span><code>npm.cmd run health-dashboard:summary</code> 生成模块摘要和主要功能报告，<code>release:report</code> 和 <code>deploy:check</code> 继续作为发布门禁。</span>
+          </article>
+        </div>
+      </section>
+
       <section class="panel" data-dashboard-about-section="policy-basis">
         <div class="panel-title">
           <h2>相关政策说明</h2>
