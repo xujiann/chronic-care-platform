@@ -28,6 +28,8 @@ const ARTIFACTS = [
   ["service-acceptance", "process", "Service acceptance summary", "release/service-acceptance-summary.json", "release/service-acceptance-summary.md", "release:report", "/api/service-acceptance-summary"],
   ["health-dashboard", "dashboard", "Health dashboard and eight-application template summary", "release/health-dashboard-summary.json", "release/health-dashboard-summary.md", "health-dashboard:summary", "/api/health-dashboard/summary"],
   ["priority-application-templates", "dashboard", "Priority application template handoff", "release/priority-application-templates.json", "release/priority-application-templates.md", "priority-apps:templates", "/api/priority-applications/templates"],
+  ["maternal-child-readiness", "maternal-child", "Maternal-child main function and readiness report", "release/maternal-child-readiness-report.json", "release/maternal-child-readiness-report.md", "maternal-child:readiness", "maternal-child-about.html"],
+  ["policy-coverage", "policy", "Policy coverage report", "release/policy-coverage-report.json", "release/policy-coverage-report.md", "policy:coverage", "release/policy-coverage-report.md"],
   ["site-readiness", "site", "Site readiness pack", "release/site-readiness-pack.json", "release/site-readiness-pack.md", "site:pack", "/api/site-readiness-pack"],
   ["production-db", "data", "Production database readiness report", "release/production-db-readiness-report.json", "release/production-db-readiness-report.md", "production-db:readiness", "STORAGE_ENGINE=sqlite"],
   ["evaluation-evidence", "evaluation", "Interoperability evaluation evidence report", "release/evaluation-evidence-report.json", "release/evaluation-evidence-report.md", "evaluation:evidence", "release/evaluation-evidence-report.md"]

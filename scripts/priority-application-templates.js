@@ -10,6 +10,13 @@ const DEFAULT_MARKDOWN = path.join(ROOT, "release", "priority-application-templa
 function renderMarkdown(report) {
   const checkRows = report.checks.map((item) => `| ${item.passed ? "PASS" : "FAIL"} | ${item.id} | ${String(item.detail || "").replace(/\|/g, "/")} |`);
   const templateRows = report.templates.map((item) => `| ${item.sequence} | ${item.conversationTitle} | ${item.id} | ${item.frontendEntry} | ${item.apiRoutes.join("<br>")} | ${item.acceptanceEvidence.join("<br>")} |`);
+  const starterRows = report.templates.map((item) => `| ${item.conversationTitle} | ${item.id} | ${String(item.conversationStarter || "").replace(/\|/g, "/")} |`);
+  const gateRows = report.templates.map((item) => {
+    const readyWhen = item.acceptanceGate?.readyWhen || [];
+    const blockers = item.acceptanceGate?.blockers || [];
+    const checklist = item.implementationChecklist || [];
+    return `| ${item.conversationTitle} | ${checklist.join("<br>")} | ${readyWhen.join("<br>")} | ${blockers.join("<br>")} |`;
+  });
   const detailRows = report.templates.map((item) => {
     const documentation = item.documentationRule
       ? [`About: ${item.documentationRule.aboutPage}`, `Module doc: ${item.documentationRule.requiredDocument}`, "Policy doc: docs/政策依据说明.md", `Reference: ${item.documentationRule.maternalChildReference}`].join("<br>")
@@ -44,6 +51,18 @@ function renderMarkdown(report) {
     "| # | Conversation title | Application ID | Frontend entry | API routes | Acceptance evidence |",
     "|---:|---|---|---|---|---|",
     ...templateRows,
+    "",
+    "## Conversation starters",
+    "",
+    "| Conversation title | Application ID | Starter prompt |",
+    "|---|---|---|",
+    ...starterRows,
+    "",
+    "## Acceptance gates",
+    "",
+    "| Conversation title | Implementation checklist | Ready when | Current blockers |",
+    "|---|---|---|---|",
+    ...gateRows,
     "",
     "## Development details",
     "",

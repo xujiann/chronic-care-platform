@@ -92,10 +92,12 @@ test("policy basis document maps policies to runnable platform evidence", () => 
 test("about page documents doctor multi-practice policy boundaries", () => {
   const about = read("about.html");
   const doc = read("docs/医师多点执业政策说明.md");
+  const report = read("docs/医师多点执业主要功能报告.md");
   assert.match(about, /医生账户与多点执业政策说明/);
   assert.match(about, /国卫医发〔2014〕86号/);
   assert.match(about, /医联体帮扶/);
   assert.match(about, /data-about-flow="multi-practice"/);
+  assert.match(about, /医师多点执业主要功能报告\.md/);
   assert.match(read("institution.html"), /政策说明/);
   assert.match(doc, /国卫医发〔2014〕86号/);
   assert.match(doc, /适用边界/);
@@ -106,6 +108,12 @@ test("about page documents doctor multi-practice policy boundaries", () => {
   assert.match(doc, /\/api\/multi-practice-registry/);
   assert.match(doc, /flowchart LR/);
   assert.match(doc, /医生账户只能查看本人多点执业申请/);
+  assert.match(report, /医师多点执业主要功能报告/);
+  assert.match(report, /主要功能矩阵/);
+  assert.match(report, /三端功能边界/);
+  assert.match(report, /\/api\/multi-practice-registry/);
+  assert.match(report, /flowchart TD/);
+  assert.match(report, /test\/api\.test\.js/);
 });
 
 test("static snapshot keeps completed P2 governance collections", () => {
@@ -288,6 +296,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal(Boolean(pkg.scripts["release:report"]), true);
   assert.equal(Boolean(pkg.scripts["release:manifest"]), true);
   assert.equal(Boolean(pkg.scripts["priority-apps:templates"]), true);
+  assert.equal(Boolean(pkg.scripts["maternal-child:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["rollback:snapshot"]), true);
   assert.equal(Boolean(pkg.scripts["storage:inspect"]), true);
   assert.equal(Boolean(pkg.scripts["identity:contract"]), true);
@@ -394,6 +403,9 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/deploy-check.js"), /site:pack/);
   assert.match(read("scripts/deploy-check.js"), /release:manifest/);
   assert.match(read("scripts/deploy-check.js"), /priority-apps:templates/);
+  assert.match(read("scripts/deploy-check.js"), /maternal-child:readiness/);
+  assert.match(read("docs/妇幼健康主要功能报告.md"), /## 主要功能矩阵/);
+  assert.match(read("docs/妇幼健康主要功能报告.md"), /maternal-child-readiness-report\.md/);
   assert.match(read("scripts/deploy-check.js"), /production-db:readiness/);
   assert.match(read("scripts/deploy-check.js"), /evaluation:evidence/);
   assert.match(read("scripts/deploy-check.js"), /process\.platform === "win32" \? "npm\.cmd" : "npm"/);
@@ -418,6 +430,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".github/workflows/ci.yml"), /npm run evaluation:evidence/);
   assert.match(read(".github/workflows/ci.yml"), /npm run release:manifest/);
   assert.match(read(".github/workflows/ci.yml"), /npm run priority-apps:templates/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run maternal-child:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run release:report/);
   assert.match(read(".github/workflows/ci.yml"), /actions\/upload-artifact@v4/);
   assert.match(read(".github/workflows/ci.yml"), /release-readiness-report/);

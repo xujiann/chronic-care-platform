@@ -19,8 +19,15 @@ test("priority application template artifact renders every application handoff",
   assert.equal(report.templates.length, 8);
   assert.equal(report.templates.some((item) => item.id === "regional-data-sharing"), true);
   assert.equal(report.templates.some((item) => item.id === "health-dashboard" && item.aggregateApplication), true);
+  assert.equal(report.templates.every((item) => item.conversationStarter.includes(item.id) && item.conversationStarter.includes(item.frontendEntry)), true);
+  assert.equal(report.templates.every((item) => item.implementationChecklist.length >= 8), true);
+  assert.equal(report.templates.every((item) => item.acceptanceGate.readyWhen.length >= 4 && item.acceptanceGate.evidence.length), true);
   assert.match(markdown, /Priority application templates/);
   assert.match(markdown, /Conversation handoff/);
+  assert.match(markdown, /Conversation starters/);
+  assert.match(markdown, /Acceptance gates/);
+  assert.match(markdown, /Starter prompt/);
+  assert.match(markdown, /Current blockers/);
   assert.match(markdown, /Policy and documentation/);
   assert.match(markdown, /docs\/maternal-child-policy\.md/);
   assert.match(markdown, /docs\/<module-name>\.md/);
@@ -36,6 +43,9 @@ test("priority application template artifact renders every application handoff",
   const writtenJson = JSON.parse(fs.readFileSync(path.join(outputDir, "priority-application-templates.json"), "utf8"));
   const writtenMarkdown = fs.readFileSync(path.join(outputDir, "priority-application-templates.md"), "utf8");
   assert.equal(writtenJson.summary.applications, 8);
+  assert.match(writtenJson.templates[0].conversationStarter, /regional-data-sharing/);
+  assert.equal(writtenJson.templates.every((item) => item.acceptanceGate.readyWhen.length >= 4), true);
+  assert.match(writtenMarkdown, /Implementation checklist/);
   assert.match(writtenMarkdown, /docs\/maternal-child-policy\.md/);
 });
 

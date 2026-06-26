@@ -142,6 +142,10 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.evaluationEvidence.ok, true);
   assert.equal(report.checks.some((item) => item.name === "environment:matrix" && item.passed), true);
   assert.equal(report.environmentMatrix.ok, true);
+  assert.equal(report.checks.some((item) => item.name === "priorityApps:conversationStarters" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "priorityApps:implementationChecklists" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "priorityApps:acceptanceGates" && item.passed), true);
+  assert.equal(report.priorityApplicationTemplates.templates.every((item) => item.conversationStarter && item.implementationChecklist.length >= 8 && item.acceptanceGate.readyWhen.length >= 4), true);
   assert.equal(report.environmentMatrix.profiles.some((item) => item.id === "staging"), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-env-file"), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-institution-interfaces" && !item.passed), true);
@@ -322,7 +326,10 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(environmentMarkdown, /Environment matrix report/);
   assert.equal(priorityTemplatesJson.priorityApplicationTemplates.ok, true);
   assert.equal(priorityTemplatesJson.priorityApplicationTemplates.templates.length, 8);
+  assert.equal(priorityTemplatesJson.priorityApplicationTemplates.templates.every((item) => item.conversationStarter && item.acceptanceGate.evidence.length), true);
   assert.match(priorityTemplatesMarkdown, /Priority application templates/);
+  assert.match(priorityTemplatesMarkdown, /Conversation starters/);
+  assert.match(priorityTemplatesMarkdown, /Acceptance gates/);
   assert.match(priorityTemplatesMarkdown, /卫生健康综合驾驶舱/);
   assert.equal(manifestJson.releaseArtifactManifest.ok, true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "service-acceptance"), true);

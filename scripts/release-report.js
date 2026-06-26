@@ -15,6 +15,8 @@ const { buildInterfaceMappingReport, renderMarkdown: renderInterfaceMappingMarkd
 const { buildHospitalOperationsReadinessReport, renderMarkdown: renderHospitalOperationsReadinessMarkdown } = require("./hospital-operations-readiness");
 const { buildMonitoringReadinessReport, renderMarkdown: renderMonitoringReadinessMarkdown } = require("./monitoring-readiness");
 const { buildOperationsReadinessReport, renderMarkdown: renderOperationsReadinessMarkdown } = require("./operations-readiness");
+const { buildMaternalChildReadinessReport, renderMarkdown: renderMaternalChildReadinessMarkdown } = require("./maternal-child-readiness");
+const { buildPolicyCoverageReport, renderMarkdown: renderPolicyCoverageMarkdown } = require("./policy-coverage");
 const { buildProcessAuditReport, renderMarkdown: renderProcessAuditMarkdown } = require("./process-audit");
 const { buildProductionDbReadinessReport, renderMarkdown: renderProductionDbReadinessMarkdown } = require("./production-db-readiness");
 const { renderMarkdown: renderPriorityApplicationTemplatesMarkdown } = require("./priority-application-templates");
@@ -360,7 +362,26 @@ function priorityApplicationTemplateChecks(priorityApplicationTemplates) {
   return [
     check("priorityApps:templates", priorityApplicationTemplates.ok, priorityApplicationTemplates.ok ? "priority application templates passed" : "priority application templates failed", "error", "priority-apps"),
     check("priorityApps:count", priorityApplicationTemplates.summary?.applications === 8 && priorityApplicationTemplates.summary?.sourceApplications === 7, `${priorityApplicationTemplates.summary?.applications || 0} applications; ${priorityApplicationTemplates.summary?.sourceApplications || 0} source applications`, "error", "priority-apps"),
-    check("priorityApps:conversationTitles", priorityApplicationTemplates.templates?.every((item) => item.conversationTitle), "conversation titles present", "error", "priority-apps")
+    check("priorityApps:conversationTitles", priorityApplicationTemplates.templates?.every((item) => item.conversationTitle), "conversation titles present", "error", "priority-apps"),
+    check("priorityApps:conversationStarters", priorityApplicationTemplates.templates?.every((item) => item.conversationStarter && item.conversationStarter.includes(item.id)), "conversation starters present", "error", "priority-apps"),
+    check("priorityApps:implementationChecklists", priorityApplicationTemplates.templates?.every((item) => Array.isArray(item.implementationChecklist) && item.implementationChecklist.length >= 8), "implementation checklists present", "error", "priority-apps"),
+    check("priorityApps:acceptanceGates", priorityApplicationTemplates.templates?.every((item) => item.acceptanceGate?.readyWhen?.length >= 4 && item.acceptanceGate?.evidence?.length), "acceptance gates present", "error", "priority-apps")
+  ];
+}
+
+function maternalChildReadinessChecks(maternalChildReadiness) {
+  return [
+    check("maternalChild:readiness", maternalChildReadiness.ok, maternalChildReadiness.ok ? "maternal-child readiness checks passed" : "maternal-child readiness checks failed", "error", "maternal-child"),
+    check("maternalChild:policy", maternalChildReadiness.checks?.some((item) => item.id === "docs:policy" && item.passed), "policy documents and module policy summary present", "error", "maternal-child"),
+    check("maternalChild:roles", ["role:institution", "role:commission", "role:citizen"].every((id) => maternalChildReadiness.checks?.some((item) => item.id === id && item.passed)), "institution, commission, and citizen roles covered", "error", "maternal-child")
+  ];
+}
+
+function policyCoverageChecks(policyCoverage) {
+  return [
+    check("policyCoverage:report", policyCoverage.ok, policyCoverage.ok ? "policy coverage checks passed" : "policy coverage checks failed", "error", "policy"),
+    check("policyCoverage:documents", policyCoverage.summary?.documentsPassed === policyCoverage.summary?.documents, `${policyCoverage.summary?.documentsPassed || 0}/${policyCoverage.summary?.documents || 0} policy documents`, "error", "policy"),
+    check("policyCoverage:releaseGates", policyCoverage.checks?.filter((item) => /^policyCoverage:(releaseManifest|releaseReport|deployCheck|packageScript|ci)$/.test(item.id)).every((item) => item.passed), "policy coverage is wired into package, CI, deploy check, manifest, and release report", "error", "policy")
   ];
 }
 
@@ -558,6 +579,8 @@ function packageChecks(pkg) {
     "hospital-operations:readiness",
     "health-dashboard:summary",
     "priority-apps:templates",
+    "maternal-child:readiness",
+    "policy:coverage",
     "integration:readiness",
     "interface:mapping",
     "monitoring:readiness",
@@ -632,6 +655,8 @@ function buildReleaseReport(options = {}) {
   const environmentMatrix = buildEnvironmentMatrixReport({ data, pkg });
   const healthDashboard = buildHealthDashboardSummary({ data });
   const priorityApplicationTemplates = buildPriorityApplicationTemplates({ data });
+  const maternalChildReadiness = buildMaternalChildReadinessReport({ data, packageSource: JSON.stringify(pkg) });
+  const policyCoverage = buildPolicyCoverageReport();
   const siteReadinessPack = buildSiteReadinessPack({ data, pkg, envFile: options.envFile || ".env.example", env: options.env || process.env, identityContract, interfaceMapping, monitoringReadiness });
   const checks = [
     assertFile("README.md"),
@@ -665,6 +690,8 @@ function buildReleaseReport(options = {}) {
     ...environmentMatrixChecks(environmentMatrix),
     ...healthDashboardChecks(healthDashboard),
     ...priorityApplicationTemplateChecks(priorityApplicationTemplates),
+    ...maternalChildReadinessChecks(maternalChildReadiness),
+    ...policyCoverageChecks(policyCoverage),
     ...env.checks,
     ...commandChecks(options.runCommands)
   ];
@@ -706,7 +733,9 @@ function buildReleaseReport(options = {}) {
     evaluationEvidence,
     environmentMatrix,
     healthDashboard,
-    priorityApplicationTemplates
+    priorityApplicationTemplates,
+    maternalChildReadiness,
+    policyCoverage
   };
 }
 
@@ -924,6 +953,8 @@ function renderMarkdown(report) {
     "See `health-dashboard-summary.json` and `health-dashboard-summary.md` for the aggregate entry across the first seven applications, open actions, interface tracks, evidence, and site dependencies.",
     "`GET /api/priority-applications/templates` exposes the live eight-application handoff templates for independent conversation work.",
     "See `priority-application-templates.json` and `priority-application-templates.md` for the standalone release artifact version of that handoff contract.",
+    "See `maternal-child-readiness-report.json` and `maternal-child-readiness-report.md` for maternal-child policy, birth certificate workflow, role scope, API, privacy, and release evidence.",
+    "See `policy-coverage-report.json` and `policy-coverage-report.md` for About-page policy IDs, policy documents, template rules, CI, deploy check, release manifest, and operator documentation coverage.",
     "",
     "## Release artifact manifest",
     "",
@@ -1146,6 +1177,22 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       priorityApplicationTemplates: report.priorityApplicationTemplates
     }, null, 2), "utf8");
+    const maternalChildReadinessJson = path.join(path.dirname(output), "maternal-child-readiness-report.json");
+    fs.writeFileSync(maternalChildReadinessJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      maternalChildReadiness: report.maternalChildReadiness
+    }, null, 2), "utf8");
+    const policyCoverageJson = path.join(path.dirname(output), "policy-coverage-report.json");
+    fs.writeFileSync(policyCoverageJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      policyCoverage: report.policyCoverage
+    }, null, 2), "utf8");
     const releaseArtifactManifest = buildReleaseArtifactManifest({ releaseReport: report });
     const releaseArtifactManifestJson = path.join(path.dirname(output), "release-artifact-manifest.json");
     fs.writeFileSync(releaseArtifactManifestJson, JSON.stringify({
@@ -1209,6 +1256,10 @@ function writeOutput(report, flags) {
     fs.writeFileSync(healthDashboardMarkdown, renderHealthDashboardMarkdown(report.healthDashboard), "utf8");
     const priorityApplicationTemplatesMarkdown = path.join(path.dirname(markdown), "priority-application-templates.md");
     fs.writeFileSync(priorityApplicationTemplatesMarkdown, renderPriorityApplicationTemplatesMarkdown(report.priorityApplicationTemplates), "utf8");
+    const maternalChildReadinessMarkdown = path.join(path.dirname(markdown), "maternal-child-readiness-report.md");
+    fs.writeFileSync(maternalChildReadinessMarkdown, renderMaternalChildReadinessMarkdown(report.maternalChildReadiness), "utf8");
+    const policyCoverageMarkdown = path.join(path.dirname(markdown), "policy-coverage-report.md");
+    fs.writeFileSync(policyCoverageMarkdown, renderPolicyCoverageMarkdown(report.policyCoverage), "utf8");
     const releaseArtifactManifestMarkdown = path.join(path.dirname(markdown), "release-artifact-manifest.md");
     fs.writeFileSync(releaseArtifactManifestMarkdown, renderReleaseArtifactManifestMarkdown(buildReleaseArtifactManifest({ releaseReport: report })), "utf8");
   }

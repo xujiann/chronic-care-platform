@@ -197,34 +197,84 @@ function summarizeApplication(data, app) {
   };
 }
 
+function buildConversationStarter(template) {
+  return [
+    `Thread title: ${template.conversationTitle}`,
+    `Goal: implement and verify ${template.id} using the unified template.`,
+    `Start from ${template.frontendEntry}, reuse ${template.dataCollections.join(", ")}, and keep ${template.acceptanceEvidence.join(", ")} as release evidence.`,
+    "Required sections: functional boundary, reuse points, data collections, API, frontend entry, tests, acceptance evidence, About section, module document, workflow diagram."
+  ].join(" ");
+}
+
+function buildImplementationChecklist(template) {
+  const docRule = template.documentationRule || DOCUMENTATION_RULE;
+  return [
+    `Confirm boundary and owner: ${template.owner}.`,
+    `Reuse source collections: ${template.dataCollections.join(", ")}.`,
+    `Wire or verify API routes: ${template.apiRoutes.join(", ")}.`,
+    `Verify frontend entry: ${template.frontendEntry}.`,
+    `Run evidence tests: ${template.testEvidence.join(", ")}.`,
+    `Archive release evidence: ${template.acceptanceEvidence.join(", ")}.`,
+    `Keep About page and module docs current: ${docRule.aboutPage}, ${docRule.requiredDocument}.`,
+    "Include a workflow diagram covering data source, business workflow, sharing/collaboration, citizen visibility, and management statistics or alerts."
+  ];
+}
+
+function buildAcceptanceGate(template) {
+  return {
+    readyWhen: [
+      "Functional boundary is explicit and does not replace the owning source workflow.",
+      "All listed data collections and API routes have runnable tests or release evidence.",
+      "Frontend entry, About section, module document, workflow diagram, and acceptance artifacts are cross-linked.",
+      "Release report, release manifest, deploy check, and CI all reference the module evidence."
+    ],
+    blockers: [
+      template.openActions > 0 ? `${template.openActions} open source actions remain visible in dashboard evidence.` : "No open source actions recorded in dashboard evidence.",
+      template.highRisks > 0 ? `${template.highRisks} high-risk source records require owner review.` : "No high-risk source records recorded in dashboard evidence."
+    ],
+    evidence: template.acceptanceEvidence
+  };
+}
+
 function buildPriorityApplicationTemplates(options = {}) {
   const summary = buildHealthDashboardSummary(options);
-  const templates = summary.applications.map((item, index) => ({
-    sequence: index + 1,
-    id: item.id,
-    conversationTitle: item.conversationTitle,
-    name: item.name,
-    owner: item.owner,
-    functionalBoundary: item.functionalBoundary,
-    reusePoints: item.reusePoints,
-    dataCollections: item.dataCollections,
-    apiRoutes: item.apiRoutes,
-    frontendEntry: item.frontendEntry,
-    testEvidence: item.testEvidence,
-    acceptanceEvidence: item.acceptanceEvidence,
-    sourceApplication: item.id !== DASHBOARD_APPLICATION.id,
-    aggregateApplication: item.id === DASHBOARD_APPLICATION.id,
-    status: item.status,
-    records: item.records,
-    openActions: item.openActions,
-    highRisks: item.highRisks,
-    documentationRule: item.documentationRule
-  }));
+  const templates = summary.applications.map((item, index) => {
+    const template = {
+      sequence: index + 1,
+      id: item.id,
+      conversationTitle: item.conversationTitle,
+      name: item.name,
+      owner: item.owner,
+      functionalBoundary: item.functionalBoundary,
+      reusePoints: item.reusePoints,
+      dataCollections: item.dataCollections,
+      apiRoutes: item.apiRoutes,
+      frontendEntry: item.frontendEntry,
+      testEvidence: item.testEvidence,
+      acceptanceEvidence: item.acceptanceEvidence,
+      sourceApplication: item.id !== DASHBOARD_APPLICATION.id,
+      aggregateApplication: item.id === DASHBOARD_APPLICATION.id,
+      status: item.status,
+      records: item.records,
+      openActions: item.openActions,
+      highRisks: item.highRisks,
+      documentationRule: item.documentationRule
+    };
+    return {
+      ...template,
+      conversationStarter: buildConversationStarter(template),
+      implementationChecklist: buildImplementationChecklist(template),
+      acceptanceGate: buildAcceptanceGate(template)
+    };
+  });
   const checks = [
     { id: "templates:count", passed: templates.length === 8, detail: `${templates.length} templates` },
     { id: "templates:titles", passed: templates.every((item) => item.conversationTitle), detail: "all templates expose conversation titles" },
     { id: "templates:required-fields", passed: templates.every((item) => item.functionalBoundary && item.reusePoints.length && item.dataCollections.length && item.apiRoutes.length && item.frontendEntry && item.testEvidence.length && item.acceptanceEvidence.length), detail: "all template fields populated" },
     { id: "templates:documentation-rule", passed: templates.every((item) => item.documentationRule?.aboutPage && item.documentationRule?.requiredDocument && item.documentationRule?.flowDiagram), detail: "all templates require About docs and flow diagrams" },
+    { id: "templates:conversation-starter", passed: templates.every((item) => item.conversationStarter && item.conversationStarter.includes(item.id) && item.conversationStarter.includes(item.frontendEntry)), detail: "all templates expose copy-ready conversation starters" },
+    { id: "templates:implementation-checklist", passed: templates.every((item) => Array.isArray(item.implementationChecklist) && item.implementationChecklist.length >= 8), detail: "all templates expose implementation checklists" },
+    { id: "templates:acceptance-gate", passed: templates.every((item) => item.acceptanceGate?.readyWhen?.length >= 4 && item.acceptanceGate?.evidence?.length), detail: "all templates expose acceptance gates" },
     { id: "templates:source-boundary", passed: templates.filter((item) => item.sourceApplication).length === 7 && templates.filter((item) => item.aggregateApplication).length === 1, detail: "7 source applications and 1 aggregate dashboard" }
   ];
   return {

@@ -58,8 +58,14 @@ test("priority application templates expose the eight conversation handoff contr
   assert.equal(report.templates.some((item) => item.conversationTitle === "卫生健康综合驾驶舱" && item.aggregateApplication), true);
   assert.equal(report.templates.every((item) => item.functionalBoundary && item.reusePoints.length && item.dataCollections.length && item.apiRoutes.length && item.frontendEntry && item.testEvidence.length && item.acceptanceEvidence.length), true);
   assert.equal(report.templates.every((item) => item.documentationRule.aboutPage === "about.html" && item.documentationRule.flowDiagram), true);
+  assert.equal(report.templates.every((item) => item.conversationStarter && item.conversationStarter.includes(item.id)), true);
+  assert.equal(report.templates.every((item) => item.implementationChecklist.length >= 8), true);
+  assert.equal(report.templates.every((item) => item.acceptanceGate.readyWhen.length >= 4 && item.acceptanceGate.evidence.length), true);
   assert.equal(report.templates[0].documentationRule.maternalChildReference, "docs/妇幼健康全模块说明.md");
   assert.equal(report.checks.some((item) => item.id === "templates:documentation-rule" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "templates:conversation-starter" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "templates:implementation-checklist" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "templates:acceptance-gate" && item.passed), true);
   assert.equal(report.checks.every((item) => item.passed), true);
 });
 

@@ -173,6 +173,8 @@ npm.cmd run release:report
 npm.cmd run release:report:full
 npm.cmd run release:manifest
 npm.cmd run priority-apps:templates
+npm.cmd run maternal-child:readiness
+npm.cmd run policy:coverage
 ```
 
 `deploy:check` 会检查 README、部署文档、静态快照、P2 集合、P2 完成状态、P0 接口准备度、安全验收台账、环境脚本和关键 npm scripts；`deploy:check:full` 还会串行执行 `check`、`test`、`test:coverage`、`test:e2e` 和 `npm audit --omit=dev`。
@@ -285,7 +287,10 @@ hospital-operations:readiness generates release/hospital-operations-readiness-re
 - Every application in the summary carries the unified development template: functional boundary, reuse points, data collections, API routes, frontend entry, test evidence, and acceptance artifacts.
 - Unified template rule: every platform template must include an About feature section, a module document under `docs/`, and a workflow diagram covering data source, business workflow, sharing/collaboration, citizen visibility, and management statistics or alerts. `docs/妇幼健康全模块说明.md` is the reference implementation for this rule.
 - Maternal-child policy About page: `maternal-child-about.html` documents the birth certificate policy basis, seventh-version certificate transition, three-role functional boundary, data workflow diagram, and acceptance rule. `docs/maternal-child-policy.md` keeps the policy-to-system mapping for release review.
+- `npm.cmd run maternal-child:readiness` writes `release/maternal-child-readiness-report.json` and `release/maternal-child-readiness-report.md`, forming the maternal-child main function report and checking policy basis, About page, module/function documents, birth certificate data, API routes, role boundaries, privacy audit, and release evidence.
+- `npm.cmd run policy:coverage` writes `release/policy-coverage-report.json` and `release/policy-coverage-report.md`, checking About-page policy IDs, policy documents, template rules, CI, deploy-check, release manifest, and operator documentation coverage.
 - `npm.cmd run health-dashboard:summary` writes `release/health-dashboard-summary.json` and `release/health-dashboard-summary.md`.
 - `npm.cmd run priority-apps:templates` writes `release/priority-application-templates.json` and `release/priority-application-templates.md` for the eight independent application handoff templates.
+- Each priority application template now carries a copy-ready `conversationStarter`, an `implementationChecklist`, and an `acceptanceGate` so each independent conversation can start with the same release boundary and evidence requirements.
 - `release:manifest` indexes `health-dashboard-summary.md` as the release artifact for the eight-application template and aggregate dashboard evidence.
 - Boundary: the dashboard does not replace source workflows; source applications remain the system of record for business operations and acceptance.

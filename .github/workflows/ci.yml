@@ -67,14 +67,16 @@ jobs:
         run: npm run site:pack
       - name: Generate priority application templates
         run: npm run priority-apps:templates
+      - name: Generate maternal child readiness report
+        run: npm run maternal-child:readiness
+      - name: Generate policy coverage report
+        run: npm run policy:coverage
       - name: Generate production database readiness report
         run: npm run production-db:readiness
       - name: Generate interoperability evaluation evidence
         run: npm run evaluation:evidence
       - name: Generate referral teleconsultation readiness report
         run: npm run referral:readiness
-      - name: Generate priority application templates
-        run: npm run priority-apps:templates
       - name: Generate release artifact manifest
         run: npm run release:manifest
       - name: Generate release readiness report
