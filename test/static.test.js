@@ -341,6 +341,8 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("server.js"), /closeChronicFollowupMessages/);
   assert.match(read("data/db.json"), /"chronicFollowup": true/);
   assert.match(read("docs/chronic-followup-readiness.md"), /\/api\/messages/);
+  assert.match(read("scripts/chronic-followup-readiness.js"), /policy-alignment/);
+  assert.match(read("scripts/release-report.js"), /chronicFollowup:policyAlignment/);
   assert.match(read("institution.html"), /chronic-followup-workbench/);
   assert.match(read("institution.js"), /dispatchChronicFollowup/);
   assert.match(read("institution.js"), /followupMessages/);

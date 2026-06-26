@@ -44,3 +44,5 @@ Run `npm run chronic:followup-readiness` to generate:
 - `release/chronic-followup-readiness-report.md`
 
 `release:report`, `deploy:check`, CI, and regression tests include the same readiness domain.
+
+`release:report` also gates `chronicFollowup:policyAlignment`, requiring all seven policy evidence items to be covered before release.

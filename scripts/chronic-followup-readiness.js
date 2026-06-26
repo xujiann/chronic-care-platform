@@ -31,10 +31,54 @@ function count(items, predicate) {
   return (Array.isArray(items) ? items : []).filter(predicate).length;
 }
 
+function buildPolicyAlignment(data, feedback, followupMessages) {
+  return [
+    {
+      id: "policy-screening",
+      evidence: "chronicScreeningTasks",
+      count: count(data.chronicScreeningTasks, (item) => item.residentId && item.riskLevel && item.nextStep)
+    },
+    {
+      id: "policy-tiered-management",
+      evidence: "chronicManagementPlans",
+      count: count(data.chronicManagementPlans, (item) => item.residentId && item.grade && item.nextReview)
+    },
+    {
+      id: "policy-followup-guidance",
+      evidence: "followups",
+      count: count(data.followups, (item) => item.residentId && item.plannedAt && item.assignee)
+    },
+    {
+      id: "policy-medication-support",
+      evidence: "medicationPickups",
+      count: count(data.medicationPickups, (item) => item.residentId && item.nextPickup && item.pharmacyStatus)
+    },
+    {
+      id: "policy-family-doctor",
+      evidence: "residents.familyDoctor/chronicManagementPlans.owner",
+      count: count(data.residents, (item) => item.familyDoctor) + count(data.chronicManagementPlans, (item) => item.owner)
+    },
+    {
+      id: "policy-resident-feedback",
+      evidence: "personalRecords[category=chronic-feedback]",
+      count: feedback.length
+    },
+    {
+      id: "policy-feedback-dispatch",
+      evidence: "taskMessages[chronicFollowup=true]",
+      count: followupMessages.filter((item) => item.residentId && item.targetRole).length
+    }
+  ].map((item) => ({
+    ...item,
+    covered: item.count > 0
+  }));
+}
+
 function buildChronicFollowupReadinessReport(options = {}) {
   const data = options.data || readJson("data/db.json");
   const feedback = (data.personalRecords || []).filter((item) => item.category === "chronic-feedback" || item.meta?.followupFeedback);
   const followupMessages = (data.taskMessages || []).filter((item) => item.chronicFollowup);
+  const policyAlignment = buildPolicyAlignment(data, feedback, followupMessages);
   const screeningResidents = recordsByResident(data, "chronicScreeningTasks");
   const planResidents = recordsByResident(data, "chronicManagementPlans");
   const followupResidents = recordsByResident(data, "followups");
@@ -91,6 +135,12 @@ function buildChronicFollowupReadinessReport(options = {}) {
       evidence: "taskMessages[chronicFollowup=true]"
     },
     {
+      id: "policy-alignment",
+      name: "Policy-aligned chronic follow-up evidence",
+      passed: policyAlignment.length >= 7 && policyAlignment.every((item) => item.covered),
+      evidence: "policyAlignment[chronic-followup]"
+    },
+    {
       id: "status-policy",
       name: "Status normalization policy",
       passed: Boolean(policy.version && policy.statusGroups?.open && policy.statusGroups?.closed && policy.requiredEvidence?.followup),
@@ -115,10 +165,13 @@ function buildChronicFollowupReadinessReport(options = {}) {
       residents: residentCoverage.length,
       feedbackRecords: feedback.length,
       notificationMessages: followupMessages.length,
+      policyAligned: policyAlignment.filter((item) => item.covered).length,
+      policyItems: policyAlignment.length,
       highRiskScreenings: count(data.chronicScreeningTasks, (item) => /楂樺嵄|high/i.test(String(item.riskLevel || ""))),
       openFollowups: count(data.followups, (item) => item.status !== "宸插畬鎴?")
     },
     boundaries,
+    policyAlignment,
     residentCoverage,
     reusePoints: [
       "chronicScreeningTasks",
@@ -139,6 +192,7 @@ function buildChronicFollowupReadinessReport(options = {}) {
 
 function renderMarkdown(report) {
   const rows = report.boundaries.map((item) => `| ${item.id} | ${item.passed ? "PASS" : "FAIL"} | ${item.evidence} |`).join("\n");
+  const policyRows = (report.policyAlignment || []).map((item) => `| ${item.id} | ${item.covered ? "Y" : "N"} | ${item.count} | ${item.evidence} |`).join("\n");
   const residentRows = report.residentCoverage.map((item) => `| ${item.residentId} | ${item.screening ? "Y" : "N"} | ${item.plan ? "Y" : "N"} | ${item.followup ? "Y" : "N"} | ${item.medication ? "Y" : "N"} | ${item.feedback ? "Y" : "N"} |`).join("\n");
   return [
     "# Chronic follow-up readiness report",
@@ -152,6 +206,12 @@ function renderMarkdown(report) {
     "| Boundary | Status | Evidence |",
     "| --- | --- | --- |",
     rows,
+    "",
+    "## Policy alignment",
+    "",
+    "| Policy item | Covered | Count | Evidence |",
+    "| --- | --- | --- | --- |",
+    policyRows,
     "",
     "## Resident coverage",
     "",
