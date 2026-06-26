@@ -1737,6 +1737,9 @@ function seedDigitalCredentials() {
 
 function seedPolicyAlignment() {
   return [
+    { domain: "医联体转诊与远程会诊", requirement: "依据分级诊疗体系建设要求，以紧密型医联体为抓手，完善基层首诊、双向转诊、急慢分治、上下联动和转诊服务管理。", capability: "平台已形成转诊申请、居民授权、接诊反馈、预约排期、远程会诊、报告回传、个人健康信息库归档和绩效评价闭环。", status: "专项应用闭环" },
+    { domain: "县域医共体信息化协同", requirement: "依据紧密型县域医共体信息化功能要求，支撑远程会诊、双向转诊、检验检查结果互认、医保业务协同和医共体绩效管理。", capability: "县域端复用 countyCollaborationOrders、countyAcceptanceLedger、countyMutualRecognitionRecords 和 referralTeleconsultations 形成协同指挥视图。", status: "专项应用闭环" },
+    { domain: "远程医疗与互联网诊疗监管边界", requirement: "远程医疗侧重医疗机构之间远程会诊和诊断协作，互联网诊疗主要承接常见病、慢性病复诊、家庭医生签约和用药指导等服务。", capability: "平台按医疗机构、医生、居民授权、报告归档、接口签名、幂等回调和审计留痕划清远程会诊与居民端服务边界。", status: "联调待现场确认" },
     { domain: "普惠数字医疗", requirement: "建设互通共享的全民健康信息平台，推动医疗卫生机构数据共享互认和业务协同。", capability: "个人健康信息库聚合电子病历、检查检验、用药、授权和慢病管理数据。", status: "已启动" },
     { domain: "医疗全流程在线办理", requirement: "加快异地转诊、就医、住院、医保等医疗全流程在线办理。", capability: "医疗机构端承接转诊协同，医保中心承接结算经办审核，医保局保留基金监管视图，个人端承接固定取药和授权共享。", status: "原型完成" },
     { domain: "互联网医疗监管", requirement: "完善互联网医疗服务监管体系，推进互联网+监管和智慧监管。", capability: "卫健委端建设四端运行监测、机构绩效、风险预警和数据质量看板。", status: "已纳入" },
@@ -3889,6 +3892,10 @@ function sealAuditTrail(rows) {
   return items;
 }
 
+function resealAuditTrail(rows) {
+  return sealAuditTrail((Array.isArray(rows) ? rows : []).map(({ auditHash, previousAuditHash, ...item }) => item));
+}
+
 function verifyAuditTrail(rows) {
   const items = Array.isArray(rows) ? rows : [];
   const broken = [];
@@ -4614,7 +4621,7 @@ function buildMobileExperience(data, user) {
 
 function appendSecurityEvent(event) {
   const data = readDatabase();
-  data.securityEvents = [
+  data.securityEvents = resealAuditTrail([
     {
       id: randomUUID(),
       at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -4626,7 +4633,7 @@ function appendSecurityEvent(event) {
       detail: event.detail || ""
     },
     ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-  ].slice(0, 120);
+  ].slice(0, 120));
   writeDatabase(data);
 }
 

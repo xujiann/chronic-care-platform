@@ -251,6 +251,8 @@ npm.cmd run rollback:snapshot -- "data/backups/<备份目录>"
 
 ## Referral Teleconsultation Callback
 
+Open `referral-teleconsultation-about.html` during onsite review to align policy basis, workflow boundaries, callback contracts, and signoff responsibilities before testing real HIS/EMR/referral-center payloads.
+
 Use `POST /api/referral-teleconsultations/:id/feedback-callback` for receiving-hospital acceptance, triage note, or down-referral acceptance joint testing. Requests must include `idempotencyKey` and `x-integration-signature`; successful callbacks update `receivingFeedback`, feedback timestamp, performance evidence, audit/data-access logs, institution/resident `taskMessages`, and a matched `integrationGatewayEvents` record.
 
 Use `POST /api/referral-teleconsultations/:id/schedule-callback` for appointment-slot, bed-resource, or tele-video room callback joint testing. Requests must include `idempotencyKey` and `x-integration-signature`; successful callbacks update `meetingWindow`, target institution fields, receiving doctor, performance evidence, audit/data-access logs, institution/resident `taskMessages`, and a matched `integrationGatewayEvents` record.

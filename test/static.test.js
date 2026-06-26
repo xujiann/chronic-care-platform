@@ -38,15 +38,18 @@ test("citizen pages do not expose cross-role module links or management collecti
 });
 
 test("application pages avoid placeholder navigation", () => {
-  const pages = ["about.html", "citizen.html", "mobile-preview.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html"];
+  const pages = ["about.html", "referral-teleconsultation-about.html", "citizen.html", "mobile-preview.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html"];
   pages.forEach((file) => assert.doesNotMatch(read(file), /href=["']#["']/, `${file} 存在空链接占位`));
 });
 
 test("about page documents runnable platform capabilities", () => {
   const about = read("about.html");
+  const referralAbout = read("referral-teleconsultation-about.html");
   const auth = read("auth.js");
   assert.match(about, /data-about-section="runtime-capabilities"/);
   assert.match(about, /data-about-section="role-portals"/);
+  assert.match(about, /data-about-section="referral-policy"/);
+  assert.match(about, /data-about-capability="referral-teleconsultation"/);
   assert.match(about, /data-about-capability="service-acceptance"/);
   assert.match(about, /data-about-capability="site-template-readmes"/);
   assert.match(about, /data-about-capability="workflow-tasks"/);
@@ -59,7 +62,16 @@ test("about page documents runnable platform capabilities", () => {
   assert.match(read("index.html"), /href="\.\/about\.html"/);
   assert.match(read("platform.html"), /href="\.\/about\.html"/);
   assert.match(read("health-city.html"), /href="\.\/about\.html"/);
+  assert.match(read("institution.html"), /href="\.\/referral-teleconsultation-about\.html"/);
+  assert.match(read("county.html"), /href="\.\/referral-teleconsultation-about\.html"/);
   assert.match(auth, /\["about\.html", "关于"\]/);
+  assert.match(auth, /referral-teleconsultation-about\.html/);
+  assert.match(referralAbout, /data-referral-about-section="policy-basis"/);
+  assert.match(referralAbout, /data-referral-policy="graded-diagnosis"/);
+  assert.match(referralAbout, /Developer: Dr\.Xu/);
+  assert.match(referralAbout, /referral-feedback-callback-v1/);
+  assert.match(referralAbout, /npm\.cmd run referral:readiness/);
+  assert.doesNotMatch(referralAbout, /requireRole/);
   assert.match(auth, /pageName === "about\.html"/);
   assert.doesNotMatch(about, /requireRole/);
 });

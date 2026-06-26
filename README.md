@@ -256,6 +256,8 @@ GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下
 
 ## Referral Teleconsultation Callback
 
+The runnable policy and about page for this application is `referral-teleconsultation-about.html`; it maps graded diagnosis, county medical consortium informatization, telemedicine governance, and insurance-payment boundaries to the platform workflow.
+
 Receiving systems can use `POST /api/referral-teleconsultations/:id/feedback-callback` with `idempotencyKey` and `x-integration-signature`; accepted callbacks update `receivingFeedback`, status, performance evidence, institution/resident `taskMessages`, audit logs, and a matched integration gateway event.
 
 Scheduling systems can use `POST /api/referral-teleconsultations/:id/schedule-callback` with `idempotencyKey` and `x-integration-signature`; accepted callbacks update `meetingWindow`, receiving doctor, target institution fields, performance evidence, create institution/resident `taskMessages`, and write a matched integration gateway event.

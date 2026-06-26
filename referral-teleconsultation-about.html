@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>医联体转诊与远程会诊平台 · 关于</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>关于应用 2</span>
+          <h1>医联体转诊与远程会诊平台</h1>
+          <p>围绕基层首诊、双向转诊、远程会诊、接诊反馈、报告回传、协同工单和绩效评价，形成可运行、可审计、可联调的分级诊疗闭环。</p>
+        </div>
+        <nav>
+          <a href="./about.html">平台关于</a>
+          <a href="./institution.html">机构端</a>
+          <a href="./county.html">医共体端</a>
+          <a href="./health-city.html">系统总览</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" data-referral-about-section="summary">
+        <article class="metric-card">
+          <span>业务边界</span>
+          <strong>6 类</strong>
+          <small>转诊、会诊、反馈、回传、工单、绩效</small>
+        </article>
+        <article class="metric-card">
+          <span>回调接口</span>
+          <strong>3 个</strong>
+          <small>feedback / schedule / report callback</small>
+        </article>
+        <article class="metric-card">
+          <span>复用集合</span>
+          <strong>5 组</strong>
+          <small>referralSystem、careOrders、countyCollaborationOrders、personalRecords、taskMessages</small>
+        </article>
+        <article class="metric-card">
+          <span>验收门禁</span>
+          <strong>referral:readiness</strong>
+          <small>专项证据进入发布报告和接口映射</small>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide" data-referral-about-section="policy-basis">
+          <div class="panel-title">
+            <h2>政策依据与系统落点</h2>
+            <span>政策说明不替代正式文件，现场联调时以主管部门和医院确认口径为准</span>
+          </div>
+          <div class="capability-grid">
+            <article class="capability-card" data-referral-policy="graded-diagnosis">
+              <strong>分级诊疗体系建设</strong>
+              <span>以紧密型医联体为抓手，推进基层首诊、双向转诊、急慢分治、上下联动；平台落到转诊申请、接诊反馈、预约排期、报告回传和绩效指标。</span>
+            </article>
+            <article class="capability-card" data-referral-policy="county-consortium">
+              <strong>紧密型县域医共体信息化</strong>
+              <span>围绕远程会诊、双向转诊、检验检查结果互认、医共体绩效等协同功能；平台复用县域协同工单、互认台账和医共体驾驶舱。</span>
+            </article>
+            <article class="capability-card" data-referral-policy="telemedicine">
+              <strong>远程医疗与互联网诊疗边界</strong>
+              <span>远程会诊由医疗机构之间协作完成，互联网诊疗主要服务常见病、慢性病复诊和家庭医生签约；平台保留医生、机构、居民授权和审计留痕。</span>
+            </article>
+            <article class="capability-card" data-referral-policy="insurance-payment">
+              <strong>医保支付与连续服务</strong>
+              <span>转诊、长期处方和互联网复诊支付需按统筹地区政策执行；平台把医保引导、固定取药、报告回传和居民消息纳入闭环证据。</span>
+            </article>
+          </div>
+        </article>
+
+        <article class="panel" data-referral-about-section="developer">
+          <div class="panel-title">
+            <h2>开发与验收</h2>
+            <span>Developer: Dr.Xu</span>
+          </div>
+          <div class="rules">
+            <div><strong>专项脚本</strong><span><code>npm.cmd run referral:readiness</code></span></div>
+            <div><strong>发布证据</strong><span><code>release/referral-teleconsultation-readiness-report.md</code></span></div>
+            <div><strong>接口映射</strong><span><code>referral-feedback-callback-v1</code>、<code>referral-schedule-callback-v1</code>、<code>referral-report-callback-v1</code></span></div>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel" data-referral-about-section="policy-sources">
+        <div class="panel-title">
+          <h2>政策来源</h2>
+          <span>现场评审时建议与主管部门确认适用版本和地方实施细则</span>
+        </div>
+        <div class="rules">
+          <div><strong>分级诊疗</strong><span><a href="https://www.nhc.gov.cn/wjw/mtbd/202604/7f64a7d2f54c4f7197692ff18869b02a.shtml">国务院办公厅《关于加快建设分级诊疗体系的若干措施》</a></span></div>
+          <div><strong>县域医共体</strong><span><a href="https://www.nhc.gov.cn/mohwsbwstjxxzx/s8561/202001/6b0b3d419d044659b85e3561373d69c7/files/1740035888099_87946.pdf">国家卫生健康委《县域医共体信息化建设指南》</a></span></div>
+          <div><strong>远程医疗</strong><span><a href="https://www.nhc.gov.cn/yzygj/c100068/201809/d53877b9685d4e7ca991f77542402c1b.shtml">国卫医发〔2018〕25号及远程医疗服务管理规范</a></span></div>
+        </div>
+      </section>
+
+      <section class="panel" data-referral-about-section="closed-loop">
+        <div class="panel-title">
+          <h2>闭环流程</h2>
+          <span>从基层申请到报告归档和居民触达</span>
+        </div>
+        <div class="priority-list">
+          <div class="priority-row"><strong>01</strong><div><h3>申请与授权</h3><p>基层机构发起转诊或远程会诊，绑定居民授权、转诊单和医共体协同工单。</p></div><span>resident authorization</span></div>
+          <div class="priority-row"><strong>02</strong><div><h3>接诊反馈</h3><p>接诊机构通过签名回调确认接收、分诊意见或下转承接说明，写入审计和消息中心。</p></div><span>feedback callback</span></div>
+          <div class="priority-row"><strong>03</strong><div><h3>排期与会诊</h3><p>预约号源、床位或远程视频间回传后更新会诊窗口、接诊医生和响应时效。</p></div><span>schedule callback</span></div>
+          <div class="priority-row"><strong>04</strong><div><h3>报告回传</h3><p>HIS/EMR/PACS/LIS 报告回传后归档到个人健康信息库，并通知机构和居民。</p></div><span>report callback</span></div>
+        </div>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel" data-referral-about-section="onsite-boundary">
+          <div class="panel-title">
+            <h2>现场联调边界</h2>
+            <span>需要医院和转诊中心确认</span>
+          </div>
+          <div class="rules">
+            <div><strong>字段</strong><span>居民标识、转诊单号、接诊意见、预约号源、视频间、报告编号、报告摘要。</span></div>
+            <div><strong>安全</strong><span>HMAC 密钥、幂等键、重放策略、居民授权、审计保全和最小权限。</span></div>
+            <div><strong>绩效</strong><span>响应时长、报告回传时长、满意度、下转随访和医共体结算公式。</span></div>
+          </div>
+        </article>
+
+        <article class="panel" data-referral-about-section="entrypoints">
+          <div class="panel-title">
+            <h2>运行入口</h2>
+            <span>直接进入当前演示能力</span>
+          </div>
+          <div class="rules">
+            <div><strong>机构端</strong><span><a href="./institution.html">创建会诊、反馈和报告回传</a></span></div>
+            <div><strong>医共体端</strong><span><a href="./county.html">查看转诊会诊指挥和绩效</a></span></div>
+            <div><strong>全局关于</strong><span><a href="./about.html">查看平台整体能力说明</a></span></div>
+          </div>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>
