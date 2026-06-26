@@ -248,6 +248,16 @@
           <div><strong>角色入口</strong><span>医生账户和医疗机构在 <code>institution.html</code> 提交申请、补齐协议、执行第一执业地点同意/报备；卫健委在 <code>index.html</code> 监管视图查看公开台账和补正队列。</span></div>
           <div><strong>说明文档</strong><span><code>docs/医师多点执业政策说明.md</code> 记录政策依据、系统边界、数据对象、API、流程和验收规则。</span></div>
         </div>
+        <div class="platform-map" data-about-flow="multi-practice">
+          <article><strong>1. 医生账户建档</strong><p>关联医师执业证号、职称、专业、第一执业地点和定期考核记录。</p></article>
+          <article><strong>2. 申请登记</strong><p>填写拟执业机构、科室、范围、期限、排班、任务、责任、薪酬和保险。</p></article>
+          <article><strong>3. 政策核验</strong><p>核验资格条件、执业范围一致性、第一执业地点意见和协议完整性。</p></article>
+          <article><strong>4. 机构确认</strong><p>第一执业地点执行同意或知情报备，医联体帮扶按任务登记。</p></article>
+          <article><strong>5. 卫健备案</strong><p>监管端查看待审、退回、补正、已备案和公开状态。</p></article>
+          <article><strong>6. 公开台账</strong><p>按公开字段展示医师姓名、执业范围、机构、期限和监管状态。</p></article>
+          <article><strong>7. 风险补正</strong><p>对协议缺失、保险缺失、排班冲突、范围不一致等事项形成补正队列。</p></article>
+          <article><strong>8. 审计留痕</strong><p>申请、审核、拒绝、越权访问和状态变更写入安全事件和生命周期。</p></article>
+        </div>
       </section>
 
       <section class="portal-grid">
