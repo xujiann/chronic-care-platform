@@ -62,7 +62,38 @@ function chronicDispatchButton(collection, id, label, updates, note) {
 
 function chronicClosed(state, status) {
   const closed = state.chronicFollowupStatusPolicy?.statusGroups?.closed || [];
-  return closed.some((item) => String(status || "").includes(item) || String(item || "").includes(String(status || "")));
+  return closed.some((item) => String(status || "").includes(item) || String(item || "").includes(String(status || ""))) || /已完成|已取药|已评估|已复核|completed|picked|handled|closed|read/i.test(String(status || ""));
+}
+
+function chronicDaysUntil(dateText) {
+  if (!dateText) return 999;
+  const date = new Date(`${String(dateText).slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return 999;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((date.getTime() - today.getTime()) / 86400000);
+}
+
+function buildChronicFollowupAlertQueue(state) {
+  const normalize = (item) => {
+    const days = chronicDaysUntil(item.dueAt);
+    const riskText = `${item.status || ""} ${item.risk || ""}`;
+    const priority = String(riskText).includes("逾期") || days < 0 ? "critical" : /高危|预警|high|alert/i.test(riskText) || days <= 3 ? "high" : days <= 7 ? "medium" : "low";
+    return {
+      id: `${item.collection}:${item.sourceId}`,
+      ...item,
+      daysUntil: days,
+      dueBucket: String(riskText).includes("逾期") || days < 0 ? "overdue" : days === 0 ? "due-today" : days <= 7 ? "due-soon" : "scheduled",
+      priority
+    };
+  };
+  return [
+    ...(state.followups || []).filter((item) => !chronicClosed(state, item.status)).map((item) => normalize({ collection: "followups", sourceId: item.id, residentId: item.residentId, dueAt: item.plannedAt, status: item.status, risk: item.diseaseType })),
+    ...(state.medicationPickups || []).filter((item) => !chronicClosed(state, item.status || item.pharmacyStatus)).map((item) => normalize({ collection: "medicationPickups", sourceId: item.id, residentId: item.residentId, dueAt: item.nextPickup, status: item.status || item.pharmacyStatus, risk: item.medication })),
+    ...(state.chronicManagementPlans || []).filter((item) => !chronicClosed(state, item.status)).map((item) => normalize({ collection: "chronicManagementPlans", sourceId: item.id, residentId: item.residentId, dueAt: item.nextReview, status: item.status, risk: item.grade })),
+    ...(state.chronicScreeningTasks || []).filter((item) => !chronicClosed(state, item.status)).map((item) => normalize({ collection: "chronicScreeningTasks", sourceId: item.id, residentId: item.residentId, dueAt: item.due, status: item.status, risk: item.riskLevel })),
+    ...(state.taskMessages || []).filter((item) => item.chronicFollowup && item.targetRole === "institution" && !["read", "handled"].includes(String(item.status || "").toLowerCase())).map((item) => normalize({ collection: item.collection || "taskMessages", sourceId: item.sourceId || item.id, residentId: item.residentId, dueAt: String(item.createdAt || "").slice(0, 10), status: item.status || "sent", risk: "feedback" }))
+  ].sort((a, b) => ({ critical: 0, high: 1, medium: 2, low: 3 }[a.priority] ?? 9) - ({ critical: 0, high: 1, medium: 2, low: 3 }[b.priority] ?? 9) || a.daysUntil - b.daysUntil);
 }
 
 function buildChronicFollowupPolicyAlignment(state) {
@@ -91,7 +122,9 @@ function renderChronicFollowupWorkbench(state) {
   const followupMessages = (state.taskMessages || []).filter((item) => item.chronicFollowup && item.targetRole === "institution" && !["read", "handled"].includes(String(item.status || "").toLowerCase()));
   const policyAlignment = buildChronicFollowupPolicyAlignment(state);
   const policyCovered = policyAlignment.filter((item) => item.covered).length;
+  const alertQueue = buildChronicFollowupAlertQueue(state);
   summaryEl.textContent = `${openFollowups.length + openPlans.length + openScreenings.length + followupMessages.length} 项待处置`;
+  summaryEl.textContent += ` · ${alertQueue.length} 项风险提醒`;
   metricsEl.innerHTML = [
     ["筛查分级", openScreenings.length, "高风险发现与分级评估"],
     ["管理计划", openPlans.length, "复核、升级预警、下次随访"],
@@ -99,6 +132,7 @@ function renderChronicFollowupWorkbench(state) {
     ["用药依从", pendingMedication.length, "固定取药与长处方闭环"],
     ["随访消息", followupMessages.length, "居民反馈到机构处置提醒"],
     ["居民反馈", feedback.length, "居民端主动回填"],
+    ["提醒队列", alertQueue.length, "逾期、复诊、取药和反馈处置"],
     ["政策对照", `${policyCovered}/${policyAlignment.length}`, "国卫基层发〔2025〕15号"]
   ].map(([label, value, hint]) => `<article class="claim-card"><strong>${label}</strong><span>${value}<br>${hint}</span></article>`).join("");
 

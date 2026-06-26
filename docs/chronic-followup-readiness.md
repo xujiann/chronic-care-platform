@@ -4,6 +4,8 @@
 
 Priority application 6 covers chronic screening, tiered management, post-discharge follow-up, return visit reminders, medication adherence, family doctor collaboration, and resident feedback loops.
 
+This increment also adds a shared alert queue for overdue follow-ups, near-term management reviews, medication pickup reminders, screening tasks, and resident feedback disposition.
+
 ## Policy Basis
 
 - 《关于加强基层慢性病健康管理服务的指导意见》（国卫基层发〔2025〕15号）要求强化基层慢病健康管理服务，覆盖家庭医生签约、分类分级管理、随访健康指导、自我健康管理、用药保障、医保协同和质量控制。
@@ -36,6 +38,8 @@ The API keeps resident authorization checks, role-gated institution handling, da
 
 Resident feedback also creates `taskMessages` for institution follow-up, and institution dispositions create resident-facing messages through the existing `/api/messages` channel.
 
+`GET /api/chronic/followup-summary` includes `alertQueue`, `summary.alerts`, `summary.overdueAlerts`, and `summary.highPriorityAlerts` so institution and resident entry points can share the same follow-up risk queue.
+
 ## Release Evidence
 
 Run `npm run chronic:followup-readiness` to generate:
@@ -46,3 +50,5 @@ Run `npm run chronic:followup-readiness` to generate:
 `release:report`, `deploy:check`, CI, and regression tests include the same readiness domain.
 
 `release:report` also gates `chronicFollowup:policyAlignment`, requiring all seven policy evidence items to be covered before release.
+
+`release:report` gates `chronicFollowup:alertQueue`, requiring risk reminders and high-priority follow-up alerts to remain available for release.

@@ -31,6 +31,49 @@ function count(items, predicate) {
   return (Array.isArray(items) ? items : []).filter(predicate).length;
 }
 
+function demoBaseDate() {
+  const configured = String(process.env.DEMO_TODAY || "2026-06-22").trim();
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(configured) ? configured : "2026-06-22";
+  return new Date(`${normalized}T00:00:00.000Z`);
+}
+
+function daysUntil(dateText, baseDate = demoBaseDate()) {
+  if (!dateText) return 999;
+  const value = new Date(`${String(dateText).slice(0, 10)}T00:00:00.000Z`);
+  if (Number.isNaN(value.getTime())) return 999;
+  const base = new Date(baseDate);
+  base.setUTCHours(0, 0, 0, 0);
+  return Math.round((value.getTime() - base.getTime()) / 86400000);
+}
+
+function statusClosed(policy, status) {
+  return (policy.statusGroups?.closed || []).some((item) => String(status || "").includes(item) || String(item || "").includes(String(status || ""))) || /已完成|已取药|已评估|已复核|completed|picked|handled|closed|read/i.test(String(status || ""));
+}
+
+function buildAlertQueue(data, followupMessages, policy) {
+  const residents = new Map((data.residents || []).map((item) => [item.id, item]));
+  const normalize = (item) => {
+    const days = daysUntil(item.dueAt);
+    const riskText = `${item.status || ""} ${item.risk || ""}`;
+    const priority = String(riskText).includes("逾期") || days < 0 ? "critical" : /高危|预警|high|alert/i.test(riskText) || days <= 3 ? "high" : days <= 7 ? "medium" : "low";
+    return {
+      id: `${item.collection}:${item.sourceId}`,
+      ...item,
+      residentName: residents.get(item.residentId)?.name || "",
+      daysUntil: days,
+      dueBucket: String(riskText).includes("逾期") || days < 0 ? "overdue" : days === 0 ? "due-today" : days <= 7 ? "due-soon" : "scheduled",
+      priority
+    };
+  };
+  return [
+    ...(data.followups || []).filter((item) => !statusClosed(policy, item.status)).map((item) => normalize({ type: "followup", collection: "followups", sourceId: item.id, residentId: item.residentId, dueAt: item.plannedAt, status: item.status, risk: item.riskLevel || item.diseaseType })),
+    ...(data.medicationPickups || []).filter((item) => !statusClosed(policy, item.status || item.pharmacyStatus)).map((item) => normalize({ type: "medication", collection: "medicationPickups", sourceId: item.id, residentId: item.residentId, dueAt: item.nextPickup, status: item.status || item.pharmacyStatus, risk: item.medication })),
+    ...(data.chronicManagementPlans || []).filter((item) => !statusClosed(policy, item.status)).map((item) => normalize({ type: "management-plan", collection: "chronicManagementPlans", sourceId: item.id, residentId: item.residentId, dueAt: item.nextReview, status: item.status, risk: item.grade })),
+    ...(data.chronicScreeningTasks || []).filter((item) => !statusClosed(policy, item.status)).map((item) => normalize({ type: "screening", collection: "chronicScreeningTasks", sourceId: item.id, residentId: item.residentId, dueAt: item.due, status: item.status, risk: item.riskLevel })),
+    ...followupMessages.filter((item) => item.targetRole === "institution" && !["read", "handled"].includes(String(item.status || "").toLowerCase())).map((item) => normalize({ type: "resident-feedback", collection: item.collection || "taskMessages", sourceId: item.sourceId || item.id, residentId: item.residentId, dueAt: String(item.createdAt || "").slice(0, 10), status: item.status || "sent", risk: "feedback" }))
+  ].sort((a, b) => ({ critical: 0, high: 1, medium: 2, low: 3 }[a.priority] ?? 9) - ({ critical: 0, high: 1, medium: 2, low: 3 }[b.priority] ?? 9) || a.daysUntil - b.daysUntil);
+}
+
 function buildPolicyAlignment(data, feedback, followupMessages) {
   return [
     {
@@ -85,6 +128,7 @@ function buildChronicFollowupReadinessReport(options = {}) {
   const pickupResidents = recordsByResident(data, "medicationPickups");
   const feedbackResidents = new Map(feedback.map((item) => [item.residentId, true]));
   const policy = data.chronicFollowupStatusPolicy || {};
+  const alertQueue = buildAlertQueue(data, followupMessages, policy);
   const boundaries = [
     {
       id: "screening",
@@ -107,7 +151,7 @@ function buildChronicFollowupReadinessReport(options = {}) {
     {
       id: "return-visit-reminder",
       name: "Return visit reminders",
-      passed: count(data.followups, (item) => item.status !== "宸插畬鎴?" && item.plannedAt) >= 1,
+      passed: count(data.followups, (item) => !statusClosed(policy, item.status) && item.plannedAt) >= 1,
       evidence: "followups.plannedAt/status"
     },
     {
@@ -133,6 +177,12 @@ function buildChronicFollowupReadinessReport(options = {}) {
       name: "Feedback notification loop",
       passed: followupMessages.length >= 1 && followupMessages.every((item) => item.residentId && item.targetRole && item.status),
       evidence: "taskMessages[chronicFollowup=true]"
+    },
+    {
+      id: "risk-reminder-queue",
+      name: "Risk and reminder queue",
+      passed: alertQueue.length >= 1 && alertQueue.some((item) => ["critical", "high"].includes(item.priority)) && alertQueue.some((item) => item.dueBucket === "overdue"),
+      evidence: "alertQueue[followups/medicationPickups/chronicManagementPlans/chronicScreeningTasks]"
     },
     {
       id: "policy-alignment",
@@ -165,13 +215,17 @@ function buildChronicFollowupReadinessReport(options = {}) {
       residents: residentCoverage.length,
       feedbackRecords: feedback.length,
       notificationMessages: followupMessages.length,
+      alerts: alertQueue.length,
+      overdueAlerts: alertQueue.filter((item) => item.dueBucket === "overdue").length,
+      highPriorityAlerts: alertQueue.filter((item) => ["critical", "high"].includes(item.priority)).length,
       policyAligned: policyAlignment.filter((item) => item.covered).length,
       policyItems: policyAlignment.length,
-      highRiskScreenings: count(data.chronicScreeningTasks, (item) => /楂樺嵄|high/i.test(String(item.riskLevel || ""))),
-      openFollowups: count(data.followups, (item) => item.status !== "宸插畬鎴?")
+      highRiskScreenings: count(data.chronicScreeningTasks, (item) => /\u9ad8\u5371|high/i.test(String(item.riskLevel || ""))),
+      openFollowups: count(data.followups, (item) => !statusClosed(policy, item.status))
     },
     boundaries,
     policyAlignment,
+    alertQueue,
     residentCoverage,
     reusePoints: [
       "chronicScreeningTasks",
@@ -193,6 +247,7 @@ function buildChronicFollowupReadinessReport(options = {}) {
 function renderMarkdown(report) {
   const rows = report.boundaries.map((item) => `| ${item.id} | ${item.passed ? "PASS" : "FAIL"} | ${item.evidence} |`).join("\n");
   const policyRows = (report.policyAlignment || []).map((item) => `| ${item.id} | ${item.covered ? "Y" : "N"} | ${item.count} | ${item.evidence} |`).join("\n");
+  const alertRows = (report.alertQueue || []).slice(0, 12).map((item) => `| ${item.id} | ${item.residentId} | ${item.priority} | ${item.dueBucket} | ${item.dueAt || ""} |`).join("\n");
   const residentRows = report.residentCoverage.map((item) => `| ${item.residentId} | ${item.screening ? "Y" : "N"} | ${item.plan ? "Y" : "N"} | ${item.followup ? "Y" : "N"} | ${item.medication ? "Y" : "N"} | ${item.feedback ? "Y" : "N"} |`).join("\n");
   return [
     "# Chronic follow-up readiness report",
@@ -212,6 +267,12 @@ function renderMarkdown(report) {
     "| Policy item | Covered | Count | Evidence |",
     "| --- | --- | --- | --- |",
     policyRows,
+    "",
+    "## Alert queue",
+    "",
+    "| Alert | Resident | Priority | Due bucket | Due at |",
+    "| --- | --- | --- | --- | --- |",
+    alertRows,
     "",
     "## Resident coverage",
     "",

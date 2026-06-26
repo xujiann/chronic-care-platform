@@ -726,12 +726,16 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(chronicFollowupSummary.body.ok, true);
     assert.equal(chronicFollowupSummary.body.summary.feedbackRecords >= 1, true);
     assert.equal(chronicFollowupSummary.body.summary.policyAligned, chronicFollowupSummary.body.summary.policyItems);
+    assert.equal(chronicFollowupSummary.body.summary.alerts >= 1, true);
+    assert.equal(chronicFollowupSummary.body.summary.highPriorityAlerts >= 1, true);
+    assert.equal(chronicFollowupSummary.body.alertQueue.some((item) => item.residentId === "r1" && item.dueBucket === "overdue"), true);
     assert.equal(chronicFollowupSummary.body.policyAlignment.some((item) => item.id === "policy-feedback-dispatch" && item.covered), true);
     assert.equal(chronicFollowupSummary.body.residents.some((item) => item.residentId === "r1" && item.medicationAdherence.total >= 1), true);
 
     const citizenFollowupSummary = await api(baseUrl, "/api/chronic/followup-summary?residentId=r1", authorized(citizen.body.token));
     assert.equal(citizenFollowupSummary.response.status, 200);
     assert.equal(citizenFollowupSummary.body.residents.every((item) => ["r1"].includes(item.residentId)), true);
+    assert.equal(citizenFollowupSummary.body.alertQueue.every((item) => item.residentId === "r1"), true);
 
     const feedback = await api(baseUrl, "/api/chronic/followup-feedback", authorized(citizen.body.token, {
       method: "POST",

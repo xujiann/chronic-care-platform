@@ -4481,6 +4481,10 @@ function statusInPolicy(policy, group, status) {
   return (policy?.statusGroups?.[group] || []).some((item) => String(status || "").includes(item) || String(item || "").includes(String(status || "")));
 }
 
+function isClosedChronicStatus(policy, status) {
+  return statusInPolicy(policy, "closed", status) || /已完成|已取药|已评估|已复核|completed|picked|handled|closed|read/i.test(String(status || ""));
+}
+
 function buildChronicFollowupPolicyAlignment(data) {
   const feedback = (data.personalRecords || []).filter((item) => item.category === "chronic-feedback" || item.meta?.followupFeedback);
   return [
@@ -4564,6 +4568,118 @@ function medicationAdherenceForResident(data, residentId) {
   };
 }
 
+function daysUntil(dateText, baseDate = demoBaseDate()) {
+  if (!dateText) return 999;
+  const value = new Date(`${String(dateText).slice(0, 10)}T00:00:00.000Z`);
+  if (Number.isNaN(value.getTime())) return 999;
+  const base = new Date(baseDate);
+  base.setUTCHours(0, 0, 0, 0);
+  return Math.round((value.getTime() - base.getTime()) / 86400000);
+}
+
+function chronicDueBucket(days, status = "") {
+  if (String(status).includes("逾期") || days < 0) return "overdue";
+  if (days === 0) return "due-today";
+  if (days <= 7) return "due-soon";
+  return "scheduled";
+}
+
+function chronicAlertPriority({ days, status, risk = "" }) {
+  const text = `${status} ${risk}`;
+  if (String(text).includes("逾期") || days < 0) return "critical";
+  if (/高危|预警|high|alert/i.test(String(text)) || days <= 3) return "high";
+  if (days <= 7) return "medium";
+  return "low";
+}
+
+function buildChronicFollowupAlertQueue(data, residents, policy) {
+  const residentIds = new Set((residents || []).map((resident) => resident.id));
+  const residentMap = new Map((data.residents || []).map((resident) => [resident.id, resident]));
+  const priorityRank = { critical: 0, high: 1, medium: 2, low: 3 };
+  const normalize = (item) => {
+    const resident = residentMap.get(item.residentId) || {};
+    const days = daysUntil(item.dueAt);
+    const dueBucket = chronicDueBucket(days, item.status);
+    const priority = item.priority || chronicAlertPriority({ days, status: item.status, risk: item.risk });
+    return {
+      id: `${item.collection}:${item.sourceId}`,
+      ...item,
+      residentName: resident.name || item.residentName || "",
+      organization: resident.organization || item.organization || "",
+      familyDoctor: resident.familyDoctor || item.owner || "",
+      daysUntil: days,
+      dueBucket,
+      priority
+    };
+  };
+  const rows = [
+    ...(data.followups || []).filter((item) => residentIds.has(item.residentId) && !isClosedChronicStatus(policy, item.status)).map((item) => normalize({
+      type: "followup",
+      collection: "followups",
+      sourceId: item.id,
+      residentId: item.residentId,
+      title: `${item.diseaseType || "chronic"} follow-up`,
+      detail: item.advice || item.result || "",
+      status: item.status,
+      dueAt: item.plannedAt,
+      owner: item.assignee,
+      nextAction: item.advice || "complete post-discharge follow-up"
+    })),
+    ...(data.medicationPickups || []).filter((item) => residentIds.has(item.residentId) && !isClosedChronicStatus(policy, item.status || item.pharmacyStatus)).map((item) => normalize({
+      type: "medication",
+      collection: "medicationPickups",
+      sourceId: item.id,
+      residentId: item.residentId,
+      title: `${item.medication || "medication"} pickup`,
+      detail: item.insuranceReview || item.pharmacyStatus || "",
+      status: item.status || item.pharmacyStatus,
+      dueAt: item.nextPickup,
+      owner: item.pharmacy,
+      nextAction: "confirm medication pickup and adherence"
+    })),
+    ...(data.chronicManagementPlans || []).filter((item) => residentIds.has(item.residentId) && !isClosedChronicStatus(policy, item.status)).map((item) => normalize({
+      type: "management-plan",
+      collection: "chronicManagementPlans",
+      sourceId: item.id,
+      residentId: item.residentId,
+      title: `${item.diseaseType || "chronic"} management review`,
+      detail: item.intervention || item.plan || "",
+      status: item.status,
+      dueAt: item.nextReview,
+      owner: item.owner,
+      risk: item.grade,
+      nextAction: item.intervention || "review chronic management plan"
+    })),
+    ...(data.chronicScreeningTasks || []).filter((item) => residentIds.has(item.residentId) && !isClosedChronicStatus(policy, item.status)).map((item) => normalize({
+      type: "screening",
+      collection: "chronicScreeningTasks",
+      sourceId: item.id,
+      residentId: item.residentId,
+      title: `${item.taskName || "chronic"} screening`,
+      detail: item.nextStep || item.result || "",
+      status: item.status,
+      dueAt: item.due,
+      owner: item.institution,
+      risk: item.riskLevel,
+      nextAction: item.nextStep || "complete screening and risk stratification"
+    })),
+    ...(data.taskMessages || []).filter((item) => item.chronicFollowup && residentIds.has(item.residentId) && item.targetRole === "institution" && isOpenChronicFollowupMessage(item)).map((item) => normalize({
+      type: "resident-feedback",
+      collection: item.collection || "taskMessages",
+      sourceId: item.sourceId || item.id,
+      residentId: item.residentId,
+      title: item.title || "resident feedback",
+      detail: item.body || "",
+      status: item.status || "sent",
+      dueAt: String(item.createdAt || "").slice(0, 10),
+      owner: item.targetRole,
+      priority: "high",
+      nextAction: "review resident feedback and close disposition"
+    }))
+  ];
+  return rows.sort((a, b) => (priorityRank[a.priority] ?? 9) - (priorityRank[b.priority] ?? 9) || a.daysUntil - b.daysUntil || String(a.type).localeCompare(String(b.type)));
+}
+
 function buildChronicFollowupSummary(data, user, residentId = "") {
   const scoped = scopeStateForUser(data, user);
   const targetResidents = (scoped.residents || []).filter((resident) => !residentId || resident.id === residentId);
@@ -4571,6 +4687,7 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
   const policyAlignment = buildChronicFollowupPolicyAlignment(scoped);
   const feedbackRecords = (scoped.personalRecords || []).filter((item) => item.category === "chronic-feedback");
   const followupMessages = (scoped.taskMessages || []).filter((item) => item.chronicFollowup);
+  const alertQueue = buildChronicFollowupAlertQueue(scoped, targetResidents, policy);
   const residents = targetResidents.map((resident) => {
     const screenings = (scoped.chronicScreeningTasks || []).filter((item) => item.residentId === resident.id);
     const plans = (scoped.chronicManagementPlans || []).filter((item) => item.residentId === resident.id);
@@ -4579,10 +4696,10 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
     const adherence = medicationAdherenceForResident(scoped, resident.id);
     const latestFeedback = latestRecord(feedbackRecords, resident.id);
     const openItems = [
-      ...screenings.filter((item) => !statusInPolicy(policy, "closed", item.status)),
-      ...plans.filter((item) => !statusInPolicy(policy, "closed", item.status)),
-      ...followups.filter((item) => !statusInPolicy(policy, "closed", item.status)),
-      ...adherence.pickups.filter((item) => !statusInPolicy(policy, "closed", item.status || item.pharmacyStatus))
+      ...screenings.filter((item) => !isClosedChronicStatus(policy, item.status)),
+      ...plans.filter((item) => !isClosedChronicStatus(policy, item.status)),
+      ...followups.filter((item) => !isClosedChronicStatus(policy, item.status)),
+      ...adherence.pickups.filter((item) => !isClosedChronicStatus(policy, item.status || item.pharmacyStatus))
     ];
     const highPriority = [
       ...screenings,
@@ -4598,7 +4715,7 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
       screeningTasks: screenings,
       managementPlans: plans,
       followups,
-      returnVisitReminders: followups.filter((item) => !statusInPolicy(policy, "closed", item.status)).map((item) => ({
+      returnVisitReminders: followups.filter((item) => !isClosedChronicStatus(policy, item.status)).map((item) => ({
         id: item.id,
         plannedAt: item.plannedAt,
         assignee: item.assignee,
@@ -4619,6 +4736,7 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
         count: followupMessages.filter((item) => item.residentId === resident.id).length,
         unread: followupMessages.filter((item) => item.residentId === resident.id && isOpenChronicFollowupMessage(item)).length
       },
+      alerts: alertQueue.filter((item) => item.residentId === resident.id),
       archiveEvidence: {
         authorizations: records.filter((item) => item.category === "authorizations").length,
         emr: records.filter((item) => item.category === "emr").length,
@@ -4637,10 +4755,14 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
       medicationPending: residents.reduce((sum, item) => sum + item.medicationAdherence.pending, 0),
       feedbackRecords: residents.reduce((sum, item) => sum + item.residentFeedback.count, 0),
       notifications: residents.reduce((sum, item) => sum + item.notifications.count, 0),
+      alerts: alertQueue.length,
+      overdueAlerts: alertQueue.filter((item) => item.dueBucket === "overdue").length,
+      highPriorityAlerts: alertQueue.filter((item) => ["critical", "high"].includes(item.priority)).length,
       policyAligned: policyAlignment.filter((item) => item.covered).length,
       policyItems: policyAlignment.length
     },
     policyAlignment,
+    alertQueue,
     residents
   };
 }

@@ -277,6 +277,7 @@ function chronicFollowupChecks(chronicFollowup) {
     check("chronicFollowup:readiness", chronicFollowup.ok, chronicFollowup.ok ? "chronic follow-up readiness checks passed" : "chronic follow-up readiness checks failed", "error", "chronic-followup"),
     check("chronicFollowup:boundaries", chronicFollowup.summary?.passed === chronicFollowup.summary?.boundaries, `${chronicFollowup.summary?.passed || 0}/${chronicFollowup.summary?.boundaries || 0} boundaries`, "error", "chronic-followup"),
     check("chronicFollowup:policyAlignment", chronicFollowup.summary?.policyAligned === chronicFollowup.summary?.policyItems && chronicFollowup.summary?.policyItems >= 7, `${chronicFollowup.summary?.policyAligned || 0}/${chronicFollowup.summary?.policyItems || 0} policy items`, "error", "chronic-followup"),
+    check("chronicFollowup:alertQueue", chronicFollowup.summary?.alerts >= 1 && chronicFollowup.summary?.highPriorityAlerts >= 1, `${chronicFollowup.summary?.alerts || 0} alerts; high=${chronicFollowup.summary?.highPriorityAlerts || 0}`, "error", "chronic-followup"),
     check("chronicFollowup:feedback", chronicFollowup.summary?.feedbackRecords >= 1, `${chronicFollowup.summary?.feedbackRecords || 0} feedback records`, "error", "chronic-followup"),
     check("chronicFollowup:notifications", chronicFollowup.summary?.notificationMessages >= 1, `${chronicFollowup.summary?.notificationMessages || 0} notification messages`, "error", "chronic-followup")
   ];

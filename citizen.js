@@ -272,13 +272,52 @@ function bindLargeMode() {
   });
 }
 
+function chronicReminderDaysUntil(dateText) {
+  if (!dateText) return 999;
+  const date = new Date(`${String(dateText).slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return 999;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((date.getTime() - today.getTime()) / 86400000);
+}
+
+function chronicReminderStatus(dateText, status = "", risk = "") {
+  const days = chronicReminderDaysUntil(dateText);
+  const text = `${status} ${risk}`;
+  if (String(text).includes("逾期") || days < 0) return "已逾期";
+  if (days === 0) return "今日到期";
+  if (/高危|预警|high|alert/i.test(text) || days <= 7) return "重点提醒";
+  return "计划内";
+}
+
+function buildResidentChronicReminderQueue(residentId) {
+  return [
+    ...(state.followups || []).filter((item) => item.residentId === residentId && item.status !== "已完成").map((item) => ({
+      title: `${item.diseaseType}随访提醒`,
+      detail: `${item.plannedAt} · ${item.assignee} · ${item.advice || "按计划随访"}`,
+      status: chronicReminderStatus(item.plannedAt, item.status, item.diseaseType)
+    })),
+    ...(state.medicationPickups || []).filter((item) => item.residentId === residentId && !["已完成", "已取药"].includes(item.status)).map((item) => ({
+      title: `${item.medication}取药提醒`,
+      detail: `${item.nextPickup} · ${item.pharmacy} · ${item.insuranceReview || "待医保审核"}`,
+      status: chronicReminderStatus(item.nextPickup, item.status, item.medication)
+    })),
+    ...(state.chronicManagementPlans || []).filter((item) => item.residentId === residentId && !["已完成", "已复核"].includes(item.status)).map((item) => ({
+      title: `${item.diseaseType}管理复核`,
+      detail: `${item.nextReview} · ${item.owner} · ${item.intervention || item.plan || "按管理计划复核"}`,
+      status: chronicReminderStatus(item.nextReview, item.status, item.grade)
+    })),
+    ...(state.taskMessages || []).filter((item) => item.residentId === residentId && item.targetRole === "citizen" && item.chronicFollowup && !["read", "handled"].includes(String(item.status || "").toLowerCase())).map((item) => ({
+      title: item.title || "慢病随访处置",
+      detail: `${item.createdAt ? item.createdAt.slice(0, 10) : ""} · ${item.body || "请查看家庭医生处置意见"}`,
+      status: "机构回执"
+    }))
+  ].sort((a, b) => ({ "已逾期": 0, "今日到期": 1, "重点提醒": 2, "机构回执": 3, "计划内": 4 }[a.status] ?? 9) - ({ "已逾期": 0, "今日到期": 1, "重点提醒": 2, "机构回执": 3, "计划内": 4 }[b.status] ?? 9));
+}
+
 function renderReminderCenter(residentId) {
   const reminders = [
-    ...state.followups.filter((item) => item.residentId === residentId && item.status !== "已完成").map((item) => ({
-      title: `${item.diseaseType}随访`,
-      detail: `${item.plannedAt} · ${item.assignee} · ${item.advice || "按计划随访"}`,
-      status: item.status
-    })),
+    ...buildResidentChronicReminderQueue(residentId),
     ...(state.chronicScreeningTasks || []).filter((item) => item.residentId === residentId && !["已评估", "已推送干预"].includes(item.status)).map((item) => ({
       title: `${item.taskName}筛查`,
       detail: `${item.due} · ${item.institution} · ${item.nextStep}`,
@@ -288,16 +327,6 @@ function renderReminderCenter(residentId) {
       title: `${item.topic}宣教`,
       detail: `${item.pushAt} · ${item.channel} · ${item.feedback}`,
       status: item.status
-    })),
-    ...(state.medicationPickups || []).filter((item) => item.residentId === residentId && !["已完成", "已取药"].includes(item.status)).map((item) => ({
-      title: `${item.medication}固定取药`,
-      detail: `${item.nextPickup} · ${item.pharmacy} · ${item.insuranceReview || "待医保审核"}`,
-      status: item.status
-    })),
-    ...(state.taskMessages || []).filter((item) => item.residentId === residentId && item.targetRole === "citizen" && item.chronicFollowup && !["read", "handled"].includes(String(item.status || "").toLowerCase())).map((item) => ({
-      title: item.title || "慢病随访处置",
-      detail: `${item.createdAt ? item.createdAt.slice(0, 10) : ""} · ${item.body || "请查看家庭医生处置意见"}`,
-      status: item.status || "sent"
     })),
     ...(state.referralSystem?.referrals || []).filter((item) => item.residentId === residentId && !["已完成", "基层承接"].includes(item.status)).map((item) => ({
       title: `${item.type}转诊`,
@@ -317,7 +346,7 @@ function renderReminderCenter(residentId) {
   listEl.innerHTML = reminders.map((item) => `<article class="mini-card">
     <h3>${item.title}</h3>
     <p class="muted">${item.detail}</p>
-    <span class="status ${["已逾期", "已过期"].includes(item.status) ? "danger" : String(item.status).includes("待") ? "warn" : ""}">${item.status}</span>
+    <span class="status ${["已逾期", "已过期"].includes(item.status) ? "danger" : ["今日到期", "重点提醒"].includes(item.status) || String(item.status).includes("待") ? "warn" : ""}">${item.status}</span>
   </article>`).join("") || `<p class="muted">暂无待办提醒。</p>`;
 }
 

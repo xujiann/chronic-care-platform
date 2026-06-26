@@ -17,11 +17,14 @@ test("chronic follow-up readiness covers all priority application boundaries", (
   const report = buildChronicFollowupReadinessReport({ data });
 
   assert.equal(report.ok, true);
-  assert.equal(report.boundaries.length, 10);
+  assert.equal(report.boundaries.length, 11);
   assert.equal(report.boundaries.every((item) => item.passed), true);
   assert.equal(report.summary.feedbackRecords >= 1, true);
   assert.equal(report.summary.notificationMessages >= 1, true);
+  assert.equal(report.summary.alerts >= 1, true);
+  assert.equal(report.summary.highPriorityAlerts >= 1, true);
   assert.equal(report.summary.policyAligned, report.summary.policyItems);
+  assert.equal(report.alertQueue.some((item) => item.id === "followups:f1" && item.dueBucket === "overdue"), true);
   assert.equal(report.policyAlignment.some((item) => item.id === "policy-feedback-dispatch" && item.covered), true);
   assert.equal(report.reusePoints.includes("chronicScreeningTasks"), true);
   assert.equal(report.reusePoints.includes("citizen.html"), true);
@@ -56,6 +59,20 @@ test("chronic follow-up readiness fails without policy-aligned follow-up evidenc
   assert.equal(report.policyAlignment.find((item) => item.id === "policy-medication-support").covered, false);
 });
 
+test("chronic follow-up readiness fails without risk reminder queue evidence", () => {
+  const data = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "db.json"), "utf8"));
+  data.followups = data.followups.map((item) => ({ ...item, status: "已完成" }));
+  data.medicationPickups = data.medicationPickups.map((item) => ({ ...item, status: "已完成", pharmacyStatus: "已取药" }));
+  data.chronicManagementPlans = data.chronicManagementPlans.map((item) => ({ ...item, status: "已完成" }));
+  data.chronicScreeningTasks = data.chronicScreeningTasks.map((item) => ({ ...item, status: "已评估" }));
+  data.taskMessages = data.taskMessages.map((item) => ({ ...item, status: "handled" }));
+  const report = buildChronicFollowupReadinessReport({ data });
+
+  assert.equal(report.ok, false);
+  assert.equal(report.boundaries.find((item) => item.id === "risk-reminder-queue").passed, false);
+  assert.equal(report.summary.alerts, 0);
+});
+
 test("chronic follow-up readiness renders and writes release artifacts", (t) => {
   const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "chronic-followup-readiness-"));
   t.after(() => fs.rmSync(outputDir, { recursive: true, force: true }));
@@ -68,6 +85,7 @@ test("chronic follow-up readiness renders and writes release artifacts", (t) => 
 
   assert.match(markdown, /Chronic follow-up readiness report/);
   assert.match(markdown, /Policy alignment/);
+  assert.match(markdown, /Alert queue/);
   assert.equal(JSON.parse(fs.readFileSync(written.output, "utf8")).ok, true);
   assert.match(fs.readFileSync(written.markdown, "utf8"), /resident-feedback/);
   assert.match(fs.readFileSync(written.markdown, "utf8"), /policy-alignment/);
