@@ -448,8 +448,10 @@ function renderInstitutionDrugConsumableSupervision(report, state) {
   const rows = report?.rows?.length ? report.rows : fallbackRows;
   const openRows = rows.filter((item) => item.normalizedStatus !== "closed");
   const boundaries = report?.boundaries || [];
+  const policySources = report?.traceabilityPolicySources || [];
   countEl.textContent = `${openRows.length}/${rows.length} open`;
   boundaryEl.innerHTML = boundaries.map((item) => `<div><strong>${item.name}</strong><span>${item.source} · ${item.count}</span></div>`).join("") || `<div><strong>Institution remediation</strong><span>Drug, consumable, fixed-pickup and catalog evidence</span></div>`;
+  boundaryEl.insertAdjacentHTML("beforeend", renderInstitutionTraceabilityPolicySources(policySources));
   listEl.innerHTML = openRows.map((item) => {
     const resident = residentOf(state, item.residentId);
     const badge = item.riskLevel === "high" ? "danger" : item.normalizedStatus === "pending" ? "warn" : "info";
@@ -467,6 +469,24 @@ function renderInstitutionDrugConsumableSupervision(report, state) {
       <span class="badge ${badge}">${item.riskLevel || item.normalizedStatus || item.status}</span>
     </section>`;
   }).join("") || `<p class="muted">No open drug consumable remediation rows.</p>`;
+}
+
+function renderInstitutionTraceabilityPolicySources(policySources = []) {
+  if (!policySources.length) {
+    return `<div data-institution-traceability-policy-sources><strong>Traceability policy sources</strong><span>No official policy sources returned by /api/drug-consumable-supervision.</span></div>`;
+  }
+  return `
+    <div data-institution-traceability-policy-sources>
+      <strong>Traceability policy sources</strong>
+      <span>${policySources.length} official policy links; review <a href="./drug-consumable-about.html">drug consumable policy about</a> before uploading remediation evidence.</span>
+    </div>
+    ${policySources.slice(0, 5).map((item) => `
+      <div data-institution-traceability-policy-source="${item.id || ""}">
+        <strong>${item.documentNo || item.authority || "Policy source"}</strong>
+        <span><a href="${item.url || "./drug-consumable-about.html"}">${item.title || item.authority || "Official source"}</a></span>
+      </div>
+    `).join("")}
+  `;
 }
 
 function renderReferralCenter(state) {

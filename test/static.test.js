@@ -192,11 +192,15 @@ test("insurance portal exposes actionable drug consumable supervision workflow",
   const server = read("server.js");
   assert.match(html, /drug-consumable-panel/);
   assert.match(js, /renderDrugConsumableSupervision/);
+  assert.match(js, /renderTraceabilityPolicySources/);
+  assert.match(js, /data-drug-traceability-policy-sources/);
   assert.match(js, /postDrugConsumableAction/);
   assert.match(js, /data-drug-action/);
   assert.match(institutionHtml, /institution-drug-consumable-panel/);
   assert.match(institutionJs, /loadInstitutionDrugConsumableSupervision/);
   assert.match(institutionJs, /renderInstitutionDrugConsumableSupervision/);
+  assert.match(institutionJs, /renderInstitutionTraceabilityPolicySources/);
+  assert.match(institutionJs, /data-institution-traceability-policy-sources/);
   assert.match(institutionJs, /postInstitutionDrugConsumableRemediation/);
   assert.match(institutionJs, /data-institution-drug-action/);
   assert.match(institutionJs, /\/drug-consumable-supervision\/\$\{encodeURIComponent\(id\)\}\/remediation/);
@@ -357,6 +361,8 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(workbenchJs, /loadUnifiedTaskReport/);
   assert.match(workbenchJs, /loadDrugConsumableSupervision/);
   assert.match(workbenchJs, /renderDrugConsumableSupervision/);
+  assert.match(workbenchJs, /renderDrugTraceabilityPolicyRow/);
+  assert.match(workbenchJs, /data-drug-traceability-policy-sources/);
   assert.match(workbenchJs, /data-unified-task/);
   assert.match(workbenchJs, /renderReleaseEvidenceGates/);
   assert.match(workbenchJs, /data-quality:report/);

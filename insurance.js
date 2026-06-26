@@ -128,10 +128,12 @@ function renderMetrics(state) {
 function renderDrugConsumableSupervision(report) {
   const rows = report.rows || [];
   const boundaries = report.boundaries || [];
+  const policySources = report.traceabilityPolicySources || [];
   document.querySelector("#drug-consumable-count").textContent = `${rows.length} 条`;
-  document.querySelector("#drug-consumable-boundaries").innerHTML = boundaries.map((item) => `
+  const boundaryRows = boundaries.map((item) => `
     <div><strong>${item.name}</strong><span>${item.source} · ${item.count} 条</span></div>
   `).join("");
+  document.querySelector("#drug-consumable-boundaries").innerHTML = `${boundaryRows}${renderTraceabilityPolicySources(policySources)}`;
   document.querySelector("#drug-consumable-list").innerHTML = rows.map((item) => {
     const badge = item.riskLevel === "high" ? "danger" : item.normalizedStatus === "pending" ? "warn" : "info";
     const resident = residentOf(platformState, item.residentId);
@@ -150,6 +152,24 @@ function renderDrugConsumableSupervision(report) {
       <span class="badge ${badge}">${item.riskLevel || item.normalizedStatus}</span>
     </section>`;
   }).join("") || `<p class="muted">暂无药品耗材监管线索。</p>`;
+}
+
+function renderTraceabilityPolicySources(policySources = []) {
+  if (!policySources.length) {
+    return `<div data-drug-traceability-policy-sources><strong>Traceability policy sources</strong><span>No official policy sources returned by /api/drug-consumable-supervision.</span></div>`;
+  }
+  return `
+    <div data-drug-traceability-policy-sources>
+      <strong>Traceability policy sources</strong>
+      <span>${policySources.length} official policy links are available on <a href="./drug-consumable-about.html">drug consumable policy about</a>.</span>
+    </div>
+    ${policySources.slice(0, 5).map((item) => `
+      <div data-drug-traceability-policy-source="${item.id || ""}">
+        <strong>${item.documentNo || item.authority || "Policy source"}</strong>
+        <span><a href="${item.url || "./drug-consumable-about.html"}">${item.title || item.authority || "Official source"}</a></span>
+      </div>
+    `).join("")}
+  `;
 }
 
 function renderClaims(state) {

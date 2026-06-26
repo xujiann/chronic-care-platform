@@ -245,6 +245,7 @@ function renderDrugConsumableSupervision(report, state) {
   }));
   const rows = report?.rows?.length ? report.rows : fallbackRows;
   const boundaries = report?.boundaries || [];
+  const policySources = report?.traceabilityPolicySources || [];
   const summary = report?.summary || {
     total: rows.length,
     open: rows.filter((item) => item.normalizedStatus !== "closed").length,
@@ -253,6 +254,7 @@ function renderDrugConsumableSupervision(report, state) {
 
   countEl.textContent = `${summary.open ?? rows.length}/${summary.total ?? rows.length} open`;
   const boundaryRows = boundaries.length ? boundaries.map((item) => `<div><strong>${item.name}</strong><span>${item.source} · ${item.count}</span></div>`).join("") : "";
+  const policySourceRow = renderDrugTraceabilityPolicyRow(policySources);
   const supervisionRows = rows.slice(0, 6).map((item, index) => {
     const resident = residentOf(state, item.residentId);
     const badge = item.riskLevel === "high" ? "danger" : item.normalizedStatus === "pending" ? "warn" : "info";
@@ -280,8 +282,23 @@ function renderDrugConsumableSupervision(report, state) {
       <span class="badge ${summary.highRisk ? "danger" : "info"}">${summary.contractReady === false ? "contract pending" : "demo-ready"}</span>
     </article>
     ${boundaryRows ? `<article class="priority-row"><div class="priority-rank info">B</div><div class="rules">${boundaryRows}</div><span class="badge info">boundaries</span></article>` : ""}
+    ${policySourceRow}
     ${supervisionRows || `<article class="priority-row"><div class="priority-rank warn">0</div><div><h3>No drug consumable supervision rows</h3><p>Run the local API or seed data to review this app.</p></div><span class="badge warn">empty</span></article>`}
   `;
+}
+
+function renderDrugTraceabilityPolicyRow(policySources = []) {
+  const sourceLinks = policySources.slice(0, 3).map((item) => `<a href="${item.url || "./drug-consumable-about.html"}">${item.documentNo || item.authority || "source"}</a>`).join(" · ");
+  return `<article class="priority-row" data-drug-traceability-policy-sources>
+    <div class="priority-rank info">${policySources.length || "P"}</div>
+    <div>
+      <h3>Drug traceability policy sources</h3>
+      <p>${policySources.length ? `${policySources.length} official policy sources linked to supervision, remediation and insurance settlement evidence.` : "No official policy sources returned by the drug consumable API."}</p>
+      <small>${sourceLinks || "drugTraceabilityPolicySources"}</small>
+      <small><a href="./drug-consumable-about.html">drug-consumable-about.html</a></small>
+    </div>
+    <span class="badge info">policy</span>
+  </article>`;
 }
 
 function renderSystemReadiness(readiness) {
