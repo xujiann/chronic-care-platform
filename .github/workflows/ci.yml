@@ -79,6 +79,8 @@ jobs:
         run: npm run referral:readiness
       - name: Generate medical escort readiness report
         run: npm run escort:readiness
+      - name: Generate internet nursing readiness report
+        run: npm run internet-nursing:readiness
       - name: Generate release artifact manifest
         run: npm run release:manifest
       - name: Generate release readiness report

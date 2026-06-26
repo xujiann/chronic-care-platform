@@ -378,10 +378,10 @@ const SQLITE_MIGRATIONS = [
     }
   }
 ];
-const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals", "referralTeleconsultations", "escortServiceOrders", "deathCertificates", "birthCertificates", "multiPracticeApplications", "digitalCredentials", "emergencySignals", "drugConsumableSupervisions", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports"]);
+const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals", "referralTeleconsultations", "escortServiceOrders", "internetNursingOrders", "deathCertificates", "birthCertificates", "multiPracticeApplications", "digitalCredentials", "emergencySignals", "drugConsumableSupervisions", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports"]);
 const WORKFLOW_ROLE_COLLECTIONS = {
   commission: WORKFLOW_COLLECTIONS,
-  institution: new Set(["careOrders", "medicationPickups", "followups", "referrals", "referralTeleconsultations", "escortServiceOrders", "deathCertificates", "birthCertificates", "multiPracticeApplications", "drugConsumableSupervisions", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "emergencySignals"]),
+  institution: new Set(["careOrders", "medicationPickups", "followups", "referrals", "referralTeleconsultations", "escortServiceOrders", "internetNursingOrders", "deathCertificates", "birthCertificates", "multiPracticeApplications", "drugConsumableSupervisions", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "emergencySignals"]),
   insurance: new Set(["insuranceClaims", "medicationPickups", "digitalCredentials", "drugConsumableSupervisions"]),
   county: new Set(["referralTeleconsultations", "escortServiceOrders", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "emergencySignals"])
 };
@@ -1209,6 +1209,7 @@ function seedEscortServiceOrders() {
 
 function seedAuthUsers() {
   return [
+    { id: "u-nurse", username: "nurse", password: "123456", name: "Internet nursing demo nurse", role: "institution", roleName: "Nurse workstation", orgCode: "MR1", orgName: "Dalian Central Hospital", orgType: "medical_institution", orgLevel: "tertiary hospital", dataScope: "Internet nursing orders and service traces", home: "internet-nursing.html", nurseId: "inn-001", accountType: "nurse", status: "enabled" },
     { id: "u-city", username: "city", name: "市级管理员", role: "commission", roleName: "市级健康城市管理", orgCode: "ORG-CITY-DL", orgName: "大连市健康城市平台", orgType: "city", orgLevel: "市级", dataScope: "全市", home: "workbench.html", status: "启用" },
     { id: "u-district", username: "district", name: "区市县管理员", role: "commission", roleName: "区市县管理端", orgCode: "ORG-DIST-ZS", orgName: "中山区健康城市平台", orgType: "district", orgLevel: "区市县", dataScope: "中山区", home: "workbench.html", status: "启用" },
     { id: "u-health", username: "health", name: "大连市卫生健康委管理员", role: "commission", roleName: "大连市卫生健康委", orgCode: "ORG-HEALTH-DL", orgName: "大连市卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管", home: "index.html", status: "启用" },
@@ -4062,6 +4063,10 @@ function normalizeState(data) {
     escortServiceProviders: mergeByKey(seedEscortServiceProviders(), data.escortServiceProviders, "id"),
     escortWorkers: mergeByKey(seedEscortWorkers(), data.escortWorkers, "id"),
     escortServiceOrders: mergeByKey(seedEscortServiceOrders(), data.escortServiceOrders, "id"),
+    internetNursingPolicy: data.internetNursingPolicy && typeof data.internetNursingPolicy === "object" ? { ...seedInternetNursingPolicy(), ...data.internetNursingPolicy } : seedInternetNursingPolicy(),
+    internetNursingInstitutions: mergeByKey(seedInternetNursingInstitutions(), data.internetNursingInstitutions, "id"),
+    internetNursingNurses: mergeByKey(seedInternetNursingNurses(), data.internetNursingNurses, "id"),
+    internetNursingOrders: mergeByKey(seedInternetNursingOrders(), data.internetNursingOrders, "id"),
     taskMessages: Array.isArray(data.taskMessages) ? data.taskMessages : [],
     dataQualityIssues: Array.isArray(data.dataQualityIssues) ? data.dataQualityIssues : [],
     careOrders: Array.isArray(data.careOrders) ? data.careOrders : seedCareOrders(),
@@ -4181,6 +4186,10 @@ function completeSystemTargets(state) {
   state.escortServiceProviders = mergeByKey(seedEscortServiceProviders(), state.escortServiceProviders, "id");
   state.escortWorkers = mergeByKey(seedEscortWorkers(), state.escortWorkers, "id");
   state.escortServiceOrders = mergeByKey(seedEscortServiceOrders(), state.escortServiceOrders, "id");
+  state.internetNursingPolicy = state.internetNursingPolicy && typeof state.internetNursingPolicy === "object" ? { ...seedInternetNursingPolicy(), ...state.internetNursingPolicy } : seedInternetNursingPolicy();
+  state.internetNursingInstitutions = mergeByKey(seedInternetNursingInstitutions(), state.internetNursingInstitutions, "id");
+  state.internetNursingNurses = mergeByKey(seedInternetNursingNurses(), state.internetNursingNurses, "id");
+  state.internetNursingOrders = mergeByKey(seedInternetNursingOrders(), state.internetNursingOrders, "id");
   state.mobileExperienceSettings = state.mobileExperienceSettings && typeof state.mobileExperienceSettings === "object" ? { ...seedMobileExperienceSettings(), ...state.mobileExperienceSettings } : seedMobileExperienceSettings();
   state.accessibilityChecklist = mergeByKey(seedAccessibilityChecklist(), state.accessibilityChecklist, "id");
   state.securityAcceptanceLedger = mergeByKey(seedSecurityAcceptanceLedger(), state.securityAcceptanceLedger, "id");
@@ -5602,6 +5611,345 @@ function applyEscortServiceOrderAction(item, payload, user) {
   };
 }
 
+function seedInternetNursingPolicy() {
+  return {
+    id: "internet-nursing-liaoning-pilot",
+    source: "Liaoning Internet+ Nursing pilot implementation plan",
+    scope: ["online application", "offline service", "first-visit assessment", "informed consent", "nurse qualification", "location tracking", "full audit trail", "workload statistics"],
+    serviceObjects: ["elderly or disabled people", "rehabilitation patients", "terminal-stage patients", "maternal and infant people", "mobility-limited chronic disease patients"],
+    serviceCatalog: ["daily living ability assessment", "vital signs measurement", "blood glucose measurement", "wound care", "tube care", "postpartum care", "infant care", "PICC maintenance"],
+    requiredEvidence: ["identity authentication", "first diagnosis assessment", "signed informed consent", "nurse practice certificate", "service location trace", "nursing record", "quality callback"],
+    platformRequirements: ["grade-3 security protection", "privacy protection", "medical record storage", "traceable service behavior", "workload statistics"],
+    riskControls: ["emergency plan", "one-click alert", "liability insurance", "medical accident insurance", "service recorder"]
+  };
+}
+
+function seedInternetNursingInstitutions() {
+  return [
+    {
+      id: "inh-mr1",
+      institutionCode: "MR1",
+      name: "Dalian Central Hospital",
+      district: "Zhongshan",
+      licenseNo: "PDY-INH-MR1",
+      serviceModes: ["home bed", "patrol diagnosis", "community nursing"],
+      published: true,
+      serviceArea: ["Zhongshan", "Xigang", "Shahekou"],
+      serviceItems: ["wound care", "PICC maintenance", "blood glucose measurement", "postpartum care"],
+      dailyCapacity: 18,
+      qualityOwner: "Nursing department",
+      complaintHotline: "0411-12320",
+      emergencyPlan: "hospital-nursing-home-service-emergency-plan",
+      securityLevel: "grade-3-ready"
+    },
+    {
+      id: "inh-mr3",
+      institutionCode: "MR3",
+      name: "Qingniwaqiao Community Health Service Center",
+      district: "Zhongshan",
+      licenseNo: "PDY-INH-MR3",
+      serviceModes: ["community nursing", "patrol diagnosis"],
+      published: true,
+      serviceArea: ["Qingniwaqiao", "Renmin Road"],
+      serviceItems: ["daily living ability assessment", "vital signs measurement", "blood glucose measurement", "tube care"],
+      dailyCapacity: 10,
+      qualityOwner: "Community nursing office",
+      complaintHotline: "0411-12320",
+      emergencyPlan: "community-nursing-emergency-plan",
+      securityLevel: "grade-3-platform-access"
+    },
+    {
+      id: "inh-mr5",
+      institutionCode: "MR5",
+      name: "Ganjingzi District People's Hospital",
+      district: "Ganjingzi",
+      licenseNo: "PDY-INH-MR5",
+      serviceModes: ["home bed", "community nursing"],
+      published: false,
+      serviceArea: ["Ganjingzi"],
+      serviceItems: ["wound care", "postpartum care", "infant care"],
+      dailyCapacity: 8,
+      qualityOwner: "Pilot office",
+      complaintHotline: "0411-12320",
+      emergencyPlan: "district-nursing-emergency-plan",
+      securityLevel: "pending-review"
+    }
+  ];
+}
+
+function seedInternetNursingNurses() {
+  return [
+    {
+      id: "inn-001",
+      name: "Nurse Sun",
+      institutionId: "inh-mr1",
+      institutionCode: "MR1",
+      title: "senior nurse",
+      yearsClinical: 9,
+      registrationStatus: "verified",
+      badPracticeRecord: "none",
+      specialties: ["wound care", "PICC maintenance", "blood glucose measurement"],
+      trainingStatus: "passed",
+      insuranceStatus: "covered",
+      locationDevice: "enabled",
+      recorderStatus: "ready",
+      oneClickAlert: "enabled",
+      status: "available"
+    },
+    {
+      id: "inn-002",
+      name: "Nurse Zhao",
+      institutionId: "inh-mr3",
+      institutionCode: "MR3",
+      title: "nurse practitioner",
+      yearsClinical: 6,
+      registrationStatus: "verified",
+      badPracticeRecord: "none",
+      specialties: ["vital signs measurement", "daily living ability assessment", "tube care"],
+      trainingStatus: "passed",
+      insuranceStatus: "covered",
+      locationDevice: "enabled",
+      recorderStatus: "ready",
+      oneClickAlert: "enabled",
+      status: "available"
+    },
+    {
+      id: "inn-003",
+      name: "Nurse Liu",
+      institutionId: "inh-mr1",
+      institutionCode: "MR1",
+      title: "specialist nurse",
+      yearsClinical: 12,
+      registrationStatus: "verified",
+      badPracticeRecord: "none",
+      specialties: ["postpartum care", "infant care", "wound care"],
+      trainingStatus: "passed",
+      insuranceStatus: "covered",
+      locationDevice: "enabled",
+      recorderStatus: "ready",
+      oneClickAlert: "enabled",
+      status: "in-service"
+    }
+  ];
+}
+
+function seedInternetNursingOrders() {
+  return [
+    {
+      id: "ino-001",
+      residentId: "r1",
+      residentName: "Demo resident A",
+      institutionId: "inh-mr1",
+      institutionCode: "MR1",
+      institutionName: "Dalian Central Hospital",
+      nurseId: "inn-001",
+      nurseName: "Nurse Sun",
+      serviceItem: "wound care",
+      serviceObject: "mobility-limited chronic disease patient",
+      requestedAt: todayOffset(-1),
+      preferredAt: todayOffset(1),
+      address: "Zhongshan district demo address",
+      firstVisitAssessment: "passed",
+      informedConsent: "signed",
+      identityVerified: true,
+      riskLevel: "medium",
+      status: "dispatched",
+      locationTrace: "pending",
+      serviceRecordStatus: "pending",
+      qualityCallback: "pending",
+      feeEstimate: 168,
+      createdAt: todayOffset(-1),
+      auditTrail: [{ at: todayOffset(-1), action: "order-created", by: "citizen", note: "Resident submitted internet nursing appointment." }]
+    },
+    {
+      id: "ino-002",
+      residentId: "r2",
+      residentName: "Demo resident B",
+      institutionId: "inh-mr3",
+      institutionCode: "MR3",
+      institutionName: "Qingniwaqiao Community Health Service Center",
+      nurseId: "inn-002",
+      nurseName: "Nurse Zhao",
+      serviceItem: "blood glucose measurement",
+      serviceObject: "elderly or disabled people",
+      requestedAt: todayOffset(-2),
+      preferredAt: todayOffset(0),
+      address: "Qingniwaqiao demo home",
+      firstVisitAssessment: "passed",
+      informedConsent: "signed",
+      identityVerified: true,
+      riskLevel: "low",
+      status: "accepted",
+      locationTrace: "tracking",
+      serviceRecordStatus: "in-progress",
+      qualityCallback: "pending",
+      feeEstimate: 86,
+      createdAt: todayOffset(-2),
+      auditTrail: [{ at: todayOffset(-2), action: "nurse-accepted", by: "inn-002", note: "Nurse accepted order and location tracking started." }]
+    },
+    {
+      id: "ino-003",
+      residentId: "r3",
+      residentName: "Demo resident C",
+      institutionId: "inh-mr1",
+      institutionCode: "MR1",
+      institutionName: "Dalian Central Hospital",
+      nurseId: "",
+      nurseName: "",
+      serviceItem: "PICC maintenance",
+      serviceObject: "rehabilitation patient",
+      requestedAt: todayOffset(0),
+      preferredAt: todayOffset(2),
+      address: "Shahekou demo address",
+      firstVisitAssessment: "pending",
+      informedConsent: "pending",
+      identityVerified: true,
+      riskLevel: "high",
+      status: "requested",
+      locationTrace: "pending",
+      serviceRecordStatus: "pending",
+      qualityCallback: "pending",
+      feeEstimate: 260,
+      createdAt: todayOffset(0),
+      auditTrail: [{ at: todayOffset(0), action: "order-created", by: "citizen", note: "High-risk service requires hospital assessment before dispatch." }]
+    }
+  ];
+}
+
+function canAccessInternetNursingOrder(user, item, data) {
+  if (!canAccessResident(user, item.residentId, data)) return false;
+  if (["commission", "county", "citizen"].includes(user.role)) return true;
+  if (user.role !== "institution") return false;
+  return [item.institutionCode, institutionForNursingOrder(data, item)?.institutionCode].some((code) => code && code === user.orgCode) ||
+    [item.institutionName, institutionForNursingOrder(data, item)?.name].some((name) => name && name === user.orgName) ||
+    (user.nurseId && item.nurseId === user.nurseId);
+}
+
+function institutionForNursingOrder(data, item) {
+  return (data.internetNursingInstitutions || []).find((row) => row.id === item.institutionId);
+}
+
+function buildInternetNursingDashboard(data, user) {
+  const policy = data.internetNursingPolicy || seedInternetNursingPolicy();
+  const institutions = Array.isArray(data.internetNursingInstitutions) ? data.internetNursingInstitutions : [];
+  const nurses = Array.isArray(data.internetNursingNurses) ? data.internetNursingNurses : [];
+  const institutionRows = user.role === "institution"
+    ? institutions.filter((item) => item.institutionCode === user.orgCode || item.name === user.orgName)
+    : user.role === "citizen"
+      ? institutions.filter((item) => item.published)
+      : institutions;
+  const nurseRows = user.role === "institution"
+    ? nurses.filter((item) => item.institutionCode === user.orgCode || institutionRows.some((institution) => institution.id === item.institutionId))
+    : nurses;
+  const orders = (Array.isArray(data.internetNursingOrders) ? data.internetNursingOrders : [])
+    .filter((item) => canAccessInternetNursingOrder(user, item, data));
+  const nurseById = new Map(nurses.map((item) => [item.id, item]));
+  const institutionById = new Map(institutions.map((item) => [item.id, item]));
+  const openOrders = orders.filter((item) => !isClosedTaskStatus(item.status));
+  const riskQueue = orders.filter((item) => /high|urgent|overdue/i.test(`${item.riskLevel || ""} ${item.status || ""}`));
+  return {
+    ok: true,
+    policy,
+    summary: {
+      institutions: institutionRows.length,
+      publishedInstitutions: institutionRows.filter((item) => item.published).length,
+      nurses: nurseRows.length,
+      qualifiedNurses: nurseRows.filter(isQualifiedInternetNurse).length,
+      orders: orders.length,
+      openOrders: openOrders.length,
+      pendingAssessment: orders.filter((item) => item.firstVisitAssessment !== "passed").length,
+      consentPending: orders.filter((item) => item.informedConsent !== "signed").length,
+      highRisk: riskQueue.length,
+      trackingActive: orders.filter((item) => item.locationTrace === "tracking").length
+    },
+    institutions: institutionRows,
+    nurses: nurseRows,
+    orders: orders.map((item) => ({
+      ...item,
+      nurse: nurseById.get(item.nurseId) || null,
+      institution: institutionById.get(item.institutionId) || null
+    })),
+    riskQueue,
+    nurseQueue: openOrders.filter((item) => item.status === "dispatched" || item.status === "requested" || item.status === "accepted")
+  };
+}
+
+function isQualifiedInternetNurse(item) {
+  return Number(item.yearsClinical || 0) >= 5 &&
+    item.registrationStatus === "verified" &&
+    item.badPracticeRecord === "none" &&
+    item.trainingStatus === "passed" &&
+    item.insuranceStatus === "covered";
+}
+
+function normalizeInternetNursingOrder(payload, user, data) {
+  const residentId = String(payload.residentId || user.residentId || "").trim();
+  if (!residentId) throw new Error("residentId is required");
+  if (!canAccessResident(user, residentId, data)) throw new Error("resident scope denied");
+  const institutions = Array.isArray(data.internetNursingInstitutions) ? data.internetNursingInstitutions : seedInternetNursingInstitutions();
+  const institutionId = String(payload.institutionId || institutions.find((item) => item.published)?.id || institutions[0]?.id || "").trim();
+  const institution = institutions.find((item) => item.id === institutionId);
+  if (!institution) throw new Error("institution is required");
+  if (user.role === "citizen" && institution.published === false) throw new Error("institution is not published");
+  const resident = (data.residents || []).find((item) => item.id === residentId) || {};
+  const serviceItem = String(payload.serviceItem || "vital signs measurement").trim();
+  const now = new Date().toISOString();
+  return {
+    id: payload.id || `ino-${randomUUID()}`,
+    residentId,
+    residentName: resident.name || String(payload.residentName || "").trim(),
+    institutionId,
+    institutionCode: institution.institutionCode || "",
+    institutionName: institution.name || "",
+    nurseId: String(payload.nurseId || "").trim(),
+    nurseName: String(payload.nurseName || "").trim(),
+    serviceItem,
+    serviceObject: String(payload.serviceObject || "mobility-limited chronic disease patient").trim(),
+    requestedAt: now,
+    preferredAt: String(payload.preferredAt || payload.due || "").trim(),
+    address: String(payload.address || "").trim(),
+    firstVisitAssessment: String(payload.firstVisitAssessment || "pending").trim(),
+    informedConsent: String(payload.informedConsent || "pending").trim(),
+    identityVerified: payload.identityVerified !== false,
+    riskLevel: String(payload.riskLevel || "medium").trim(),
+    status: String(payload.status || "requested").trim(),
+    locationTrace: String(payload.locationTrace || "pending").trim(),
+    serviceRecordStatus: String(payload.serviceRecordStatus || "pending").trim(),
+    qualityCallback: String(payload.qualityCallback || "pending").trim(),
+    feeEstimate: Number(payload.feeEstimate || 0),
+    sourceChannel: String(payload.sourceChannel || user.role).trim(),
+    createdAt: now,
+    createdBy: user.username || user.role,
+    createdByName: user.name || "",
+    auditTrail: [{ at: now, action: "order-created", by: user.username || user.role, note: String(payload.note || "Internet nursing appointment created.").trim() }]
+  };
+}
+
+function applyInternetNursingOrderAction(item, payload, user, data) {
+  const now = new Date().toISOString();
+  const allowed = ["status", "nurseId", "firstVisitAssessment", "informedConsent", "riskLevel", "locationTrace", "serviceRecordStatus", "qualityCallback", "feeEstimate"];
+  const updates = Object.fromEntries(allowed
+    .filter((key) => Object.hasOwn(payload, key))
+    .map((key) => [key, key === "feeEstimate" ? Number(payload[key] || 0) : String(payload[key] || "").trim()]));
+  if (updates.nurseId) {
+    const nurse = (data.internetNursingNurses || []).find((row) => row.id === updates.nurseId);
+    if (nurse) updates.nurseName = nurse.name;
+    if (nurse && !isQualifiedInternetNurse(nurse)) throw new Error("nurse is not qualified for internet nursing service");
+  }
+  if (updates.status === "accepted" && !updates.locationTrace) updates.locationTrace = "tracking";
+  if (updates.status === "completed" && !updates.serviceRecordStatus) updates.serviceRecordStatus = "completed";
+  return {
+    ...item,
+    ...updates,
+    updatedAt: now,
+    updatedBy: user.username || user.role,
+    auditTrail: [
+      { at: now, action: String(payload.action || "internet-nursing-order-update").trim(), by: user.username || user.role, note: String(payload.note || updates.status || "").trim() },
+      ...(Array.isArray(item.auditTrail) ? item.auditTrail : [])
+    ].slice(0, 30)
+  };
+}
+
 function redactSensitiveResponse(value, user) {
   if (!user || user.role === "commission") return value;
   return redactSensitiveValue(value);
@@ -5754,9 +6102,12 @@ function scopeStateForUser(data, user) {
     }
     scoped.referralTeleconsultations = (data.referralTeleconsultations || []).filter((item) => canAccessReferralTeleconsultation(user, item, data));
     scoped.escortServiceOrders = (data.escortServiceOrders || []).filter((item) => canAccessEscortOrder(user, item, data));
+    scoped.internetNursingOrders = (data.internetNursingOrders || []).filter((item) => canAccessInternetNursingOrder(user, item, data));
     if (user.role === "institution") {
       scoped.escortServiceProviders = (data.escortServiceProviders || []).filter((item) => item.institutionCode === user.orgCode || item.name === user.orgName);
       scoped.escortWorkers = (data.escortWorkers || []).filter((worker) => scoped.escortServiceProviders.some((provider) => provider.id === worker.providerId));
+      scoped.internetNursingInstitutions = (data.internetNursingInstitutions || []).filter((item) => item.institutionCode === user.orgCode || item.name === user.orgName);
+      scoped.internetNursingNurses = (data.internetNursingNurses || []).filter((nurse) => scoped.internetNursingInstitutions.some((institution) => institution.id === nurse.institutionId) || nurse.institutionCode === user.orgCode);
     }
     if (scoped.mobileExperienceSettings) scoped.mobileExperienceSettings = { ...scoped.mobileExperienceSettings, userPreferences: undefined };
     return scoped;
@@ -5776,7 +6127,7 @@ function scopeStateForUser(data, user) {
     const preferenceKey = user.residentId || user.accountId || user.username;
     scoped.mobileExperienceSettings = { ...scoped.mobileExperienceSettings, userPreferences: { [preferenceKey]: preferences[preferenceKey] || {} } };
   }
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "referralTeleconsultations", "escortServiceOrders", "taskMessages"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "referralTeleconsultations", "escortServiceOrders", "internetNursingOrders", "taskMessages"].forEach((key) => {
     scoped[key] = (data[key] || []).filter(hasAllowedResident);
   });
   if (scoped.referralSystem) {
@@ -6331,6 +6682,7 @@ const TASK_SOURCES = [
   ["careOrders", "institution", "诊疗工单", "orderDate"],
   ["referralTeleconsultations", ["institution", "county"], "referral teleconsultation", "due"],
   ["escortServiceOrders", ["institution", "county"], "medical escort service", "due"],
+  ["internetNursingOrders", "institution", "internet nursing service", "preferredAt"],
   ["medicationPickups", "insurance", "固定取药", "nextPickup"],
   ["insuranceClaims", "insurance", "医保审核", "claimDate"],
   ["digitalCredentials", "insurance", "数字凭证", "lastUpdated"],
@@ -6357,7 +6709,8 @@ const SERVICE_DOMAIN_BY_COLLECTION = {
   countyMutualRecognitionRecords: "mutualRecognition",
   diagnosticReports: "diagnosticReports",
   referralTeleconsultations: "referralTeleconsultation",
-  escortServiceOrders: "escortService"
+  escortServiceOrders: "escortService",
+  internetNursingOrders: "internetNursing"
 };
 
 function taskPriorityLevel(item) {
@@ -6391,7 +6744,9 @@ function buildUnifiedTasks(data, user) {
         ? canAccessReferralTeleconsultation(user, item, data)
         : collection === "escortServiceOrders"
           ? canAccessEscortOrder(user, item, data)
-          : canAccessResident(user, item.residentId || item.maternalResidentId, data)
+          : collection === "internetNursingOrders"
+            ? canAccessInternetNursingOrder(user, item, data)
+            : canAccessResident(user, item.residentId || item.maternalResidentId, data)
     ).map((item) => {
       const task = {
         id: `${collection}:${item.id}`,
@@ -7923,6 +8278,109 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/internet-nursing/dashboard") {
+    const user = requireApiRole(req, res, ["commission", "institution", "county", "citizen"], "/api/internet-nursing/dashboard");
+    if (!user) return;
+    sendJson(res, 200, redactSensitiveResponse(buildInternetNursingDashboard(readDatabase(), user), user));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/internet-nursing/orders") {
+    const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/internet-nursing/orders");
+    if (!user) return;
+    const data = readDatabase();
+    try {
+      const order = normalizeInternetNursingOrder(await collectJson(req), user, data);
+      if (!canAccessInternetNursingOrder(user, order, data)) {
+        appendSecurityEvent({ actor: user.name, role: user.role, action: "create internet nursing order", target: order.residentId, result: "denied", detail: "scope denied" });
+        sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
+        return;
+      }
+      data.internetNursingOrders = [order, ...(Array.isArray(data.internetNursingOrders) ? data.internetNursingOrders : [])].slice(0, 500);
+      data.taskMessages = [
+        {
+          id: `msg-${randomUUID()}`,
+          taskId: `internetNursingOrders:${order.id}`,
+          collection: "internetNursingOrders",
+          sourceId: order.id,
+          residentId: order.residentId,
+          targetRole: "institution",
+          channel: "in_app",
+          title: "New internet nursing appointment",
+          body: `${order.institutionName || order.institutionId} needs first-visit assessment and nurse dispatch for ${order.serviceItem}.`,
+          status: "sent",
+          receipts: [],
+          createdAt: new Date().toISOString(),
+          createdBy: user.username || user.role,
+          createdByName: user.name
+        },
+        ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])
+      ].slice(0, 300);
+      appendDataAccessLog(data, user, order.residentId, "internetNursingOrders", "create internet nursing appointment", "allowed");
+      data.securityEvents = [
+        {
+          id: randomUUID(),
+          at: new Date().toLocaleString("zh-CN", { hour12: false }),
+          actor: user.name,
+          role: user.role,
+          action: "create internet nursing order",
+          target: order.id,
+          result: "allowed",
+          detail: order.status
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120);
+      writeDatabase(data);
+      sendJson(res, 201, order);
+    } catch (error) {
+      const denied = /scope denied|not published/i.test(error.message || "");
+      sendJson(res, denied ? 403 : 400, { error: denied ? "Forbidden" : "Bad Request", message: error.message });
+    }
+    return;
+  }
+
+  const internetNursingActionMatch = url.pathname.match(/^\/api\/internet-nursing\/orders\/([^/]+)\/actions$/);
+  if (req.method === "POST" && internetNursingActionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/internet-nursing/orders/:id/actions");
+    if (!user) return;
+    const data = readDatabase();
+    const rows = Array.isArray(data.internetNursingOrders) ? data.internetNursingOrders : [];
+    const index = rows.findIndex((item) => item.id === decodeURIComponent(internetNursingActionMatch[1]));
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "internet nursing order not found" });
+      return;
+    }
+    if (!canAccessInternetNursingOrder(user, rows[index], data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "update internet nursing order", target: rows[index].id, result: "denied", detail: "scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
+      return;
+    }
+    try {
+      const payload = await collectJson(req);
+      rows[index] = applyInternetNursingOrderAction(rows[index], payload, user, data);
+      data.internetNursingOrders = rows;
+      appendDataAccessLog(data, user, rows[index].residentId, "internetNursingOrders", payload.note || rows[index].status, "allowed");
+      data.securityEvents = [
+        {
+          id: randomUUID(),
+          at: new Date().toLocaleString("zh-CN", { hour12: false }),
+          actor: user.name,
+          role: user.role,
+          action: "update internet nursing order",
+          target: rows[index].id,
+          result: "allowed",
+          detail: rows[index].status
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120);
+      writeDatabase(data);
+      sendJson(res, 200, rows[index]);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+    }
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/tasks") {
     const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/tasks");
     if (!user) return;
@@ -8617,7 +9075,11 @@ async function handleApi(req, res) {
       sendJson(res, 403, { error: "Forbidden", message: "No access to this escort service task" });
       return;
     }
-    if (collection !== "escortServiceOrders" && !canAccessResident(user, rows[index].residentId || rows[index].maternalResidentId, data)) {
+    if (collection === "internetNursingOrders" && !canAccessInternetNursingOrder(user, rows[index], data)) {
+      sendJson(res, 403, { error: "Forbidden", message: "No access to this internet nursing task" });
+      return;
+    }
+    if (!["escortServiceOrders", "internetNursingOrders"].includes(collection) && !canAccessResident(user, rows[index].residentId || rows[index].maternalResidentId, data)) {
       sendJson(res, 403, { error: "Forbidden", message: "无权处理该居民任务" });
       return;
     }

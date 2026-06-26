@@ -2,6 +2,7 @@
   const SESSION_KEY = "health-city-auth-session";
   const API_BASE = isStaticPreview() ? "" : "/api";
   const demoUsers = [
+    { id: "u-nurse", username: "nurse", password: "123456", name: "Internet nursing demo nurse", role: "institution", roleName: "Nurse workstation", orgCode: "MR1", orgName: "Dalian Central Hospital", orgType: "medical_institution", orgLevel: "tertiary hospital", dataScope: "Internet nursing orders and service traces", home: "internet-nursing.html", nurseId: "inn-001", accountType: "nurse" },
     { id: "u-city", username: "city", password: "123456", name: "市级管理员", role: "commission", roleName: "市级健康城市管理", orgCode: "ORG-CITY-DL", orgName: "大连市健康城市平台", orgType: "city", orgLevel: "市级", dataScope: "全市", home: "workbench.html" },
     { id: "u-district", username: "district", password: "123456", name: "区市县管理员", role: "commission", roleName: "区市县管理端", orgCode: "ORG-DIST-ZS", orgName: "中山区健康城市平台", orgType: "district", orgLevel: "区市县", dataScope: "中山区", home: "workbench.html" },
     { id: "u-health", username: "health", password: "123456", name: "大连市卫生健康委管理员", role: "commission", roleName: "大连市卫生健康委", orgCode: "ORG-HEALTH-DL", orgName: "大连市卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管", home: "index.html" },
@@ -34,6 +35,7 @@
     "quality-safety.html": ["commission"],
     "operations.html": ["commission"],
     "escort.html": ["commission"],
+    "internet-nursing.html": ["commission", "institution", "citizen", "county"],
     "institution.html": ["institution"],
     "insurance.html": ["insurance"],
     "county.html": ["county"],
@@ -50,6 +52,11 @@
     citizen: [["health-city.html", "总览"], ["about.html", "关于"], ["citizen.html", "个人端"], ["mobile-preview.html", "手机预览"]],
     county: [["health-city.html", "总览"], ["about.html", "关于"], ["county.html", "医共体"]]
   };
+
+  roleLinks.commission.splice(5, 0, ["internet-nursing.html", "Internet Nursing"]);
+  roleLinks.institution.splice(2, 0, ["internet-nursing.html", "Internet Nursing"]);
+  roleLinks.citizen.splice(1, 0, ["internet-nursing.html", "Internet Nursing"]);
+  roleLinks.county.splice(1, 0, ["internet-nursing.html", "Internet Nursing"]);
 
   async function login(username, password) {
     if (API_BASE) {

@@ -647,3 +647,36 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   assert.match(citizenCss, /escort-order-card/);
   assert.match(read("server.js"), /provider is not published/);
 });
+
+test("internet nursing module exposes appointment, management and nurse workflows", () => {
+  const html = read("internet-nursing.html");
+  const js = read("internet-nursing.js");
+  const server = read("server.js");
+  assert.match(html, /nursing-appointment-form/);
+  assert.match(html, /nursing-orders/);
+  assert.match(html, /nursing-nurse-queue/);
+  assert.match(js, /fetchInternetNursingDashboard/);
+  assert.match(js, /\/internet-nursing\/orders/);
+  assert.match(js, /currentNursingUser/);
+  assert.match(js, /accountType !== "nurse"/);
+  assert.match(js, /accountType === "nurse"/);
+  assert.match(js, /select\.disabled = Boolean\(sessionNurseId\)/);
+  assert.match(js, /view only/);
+  assert.match(js, /hospital dispatch required/);
+  assert.match(server, /\/api\/internet-nursing\/dashboard/);
+  assert.match(server, /canAccessInternetNursingOrder/);
+  assert.match(read("auth.js"), /"internet-nursing\.html": \["commission", "institution", "citizen", "county"\]/);
+  assert.match(read("auth.js"), /username: "nurse"/);
+  assert.match(read("auth.js"), /password: "123456"/);
+  assert.match(read("server.js"), /username: "nurse"/);
+  assert.match(read("server.js"), /password: "123456"/);
+  assert.match(read("package.json"), /internet-nursing:readiness/);
+  assert.match(read("scripts/release-artifact-manifest.js"), /internet-nursing-readiness-report\.md/);
+  assert.match(read("scripts/release-report.js"), /buildInternetNursingReadinessReport/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run internet-nursing:readiness/);
+  assert.match(read("README.md"), /Internet Nursing Pilot/);
+  assert.match(read("DEPLOYMENT.md"), /internet-nursing:readiness/);
+  assert.match(read("docs/互联网护理服务模块说明.md"), /flowchart TD/);
+  assert.match(read("docs/互联网护理服务模块说明.md"), /nurse \/ 123456/);
+  assert.match(read("docs/互联网护理服务模块说明.md"), /\/api\/internet-nursing\/orders\/:id\/actions/);
+});

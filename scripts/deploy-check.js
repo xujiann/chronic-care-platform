@@ -60,12 +60,17 @@ function buildDeployCheckReport(options = {}) {
     "escortServiceProviders",
     "escortWorkers",
     "escortServiceOrders",
+    "internetNursingPolicy",
+    "internetNursingInstitutions",
+    "internetNursingNurses",
+    "internetNursingOrders",
     "healthDashboardSnapshots"
   ];
   const p0Interfaces = (Array.isArray(data.platformInterfaces) ? data.platformInterfaces : []).filter((item) => item.priority === "P0");
   const securityAcceptanceLedger = Array.isArray(data.securityAcceptanceLedger) ? data.securityAcceptanceLedger : [];
   const serverSource = fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
   const manifestSource = fs.readFileSync(path.join(ROOT, "scripts", "release-artifact-manifest.js"), "utf8");
+  const internetNursingDoc = fs.readFileSync(path.join(ROOT, "docs", "互联网护理服务模块说明.md"), "utf8");
   const externalDependencyRiskIds = [
     "identity-source",
     "institution-systems",
@@ -90,9 +95,13 @@ function buildDeployCheckReport(options = {}) {
     { name: "package:policyCoverage", ok: Boolean(pkg.scripts?.["policy:coverage"]), detail: pkg.scripts?.["policy:coverage"] || "missing" },
     { name: "package:maternalChildReadiness", ok: Boolean(pkg.scripts?.["maternal-child:readiness"]), detail: pkg.scripts?.["maternal-child:readiness"] || "missing" },
     { name: "package:escortReadiness", ok: Boolean(pkg.scripts?.["escort:readiness"]), detail: pkg.scripts?.["escort:readiness"] || "missing" },
+    { name: "package:internetNursingReadiness", ok: Boolean(pkg.scripts?.["internet-nursing:readiness"]), detail: pkg.scripts?.["internet-nursing:readiness"] || "missing" },
     { name: "snapshot:collections", ok: requiredCollections.every((key) => data[key]), detail: requiredCollections.filter((key) => !data[key]).join(",") || "all present" },
     { name: "snapshot:regionalDataSharing", ok: (data.regionalSharingPackages || []).length >= 3 && (data.regionalSharingAccessReviews || []).length >= 1 && serverSource.includes("/api/regional-data-sharing"), detail: `${data.regionalSharingPackages?.length || 0} packages, ${data.regionalSharingAccessReviews?.length || 0} access reviews` },
     { name: "snapshot:escortService", ok: (data.escortServiceProviders || []).length >= 3 && (data.escortWorkers || []).length >= 4 && (data.escortServiceOrders || []).length >= 3 && serverSource.includes("/api/escort-services/dashboard"), detail: `${data.escortServiceProviders?.length || 0} providers, ${data.escortWorkers?.length || 0} workers, ${data.escortServiceOrders?.length || 0} orders` },
+    { name: "snapshot:internetNursing", ok: (data.internetNursingInstitutions || []).length >= 2 && (data.internetNursingNurses || []).length >= 2 && (data.internetNursingOrders || []).length >= 3 && serverSource.includes("/api/internet-nursing/dashboard"), detail: `${data.internetNursingInstitutions?.length || 0} institutions, ${data.internetNursingNurses?.length || 0} nurses, ${data.internetNursingOrders?.length || 0} orders` },
+    { name: "snapshot:internetNursingAuth", ok: (data.authUsers || []).some((item) => item.username === "nurse" && item.password === "123456" && item.home === "internet-nursing.html" && item.nurseId === "inn-001") && serverSource.includes('username: "nurse"') && serverSource.includes('password: "123456"'), detail: "nurse workstation demo account is seeded" },
+    { name: "docs:internetNursing", ok: internetNursingDoc.includes("flowchart TD") && internetNursingDoc.includes("nurse / 123456") && internetNursingDoc.includes("/api/internet-nursing/orders/:id/actions"), detail: "internet nursing module handoff document is complete" },
     { name: "snapshot:interfaceReadiness", ok: p0Interfaces.length >= 4 && p0Interfaces.every((item) => item.id && item.owner && item.status && item.next), detail: `${p0Interfaces.length} P0 interface tracks` },
     { name: "snapshot:securityAcceptance", ok: securityAcceptanceLedger.length >= 4 && securityAcceptanceLedger.every((item) => item.id && item.category && item.owner && item.status && item.next), detail: `${securityAcceptanceLedger.length} security acceptance items` },
     { name: "snapshot:qualitySafety", ok: Array.isArray(data.qualitySafetyEvents) && data.qualitySafetyEvents.length >= 3 && Array.isArray(data.qualityRectificationOrders) && data.qualityRectificationOrders.length >= 1, detail: `${data.qualitySafetyEvents?.length || 0} events, ${data.qualityRectificationOrders?.length || 0} rectifications` },
@@ -107,6 +116,7 @@ function buildDeployCheckReport(options = {}) {
     { name: "manifest:policyCoverage", ok: manifestSource.includes("policy-coverage-report.md") && manifestSource.includes("policy:coverage"), detail: "policy coverage artifact is indexed" },
     { name: "manifest:maternalChildReadiness", ok: manifestSource.includes("maternal-child-readiness-report.md") && manifestSource.includes("maternal-child:readiness"), detail: "maternal-child readiness artifact is indexed" },
     { name: "manifest:escortServiceReadiness", ok: manifestSource.includes("escort-service-readiness-report.md") && manifestSource.includes("escort:readiness"), detail: "escort service readiness artifact is indexed" },
+    { name: "manifest:internetNursingReadiness", ok: manifestSource.includes("internet-nursing-readiness-report.md") && manifestSource.includes("internet-nursing:readiness"), detail: "internet nursing readiness artifact is indexed" },
     { name: "snapshot:storageMeta", ok: Boolean(data.storageMeta?.engine && data.storageMeta?.mode), detail: data.storageMeta ? `${data.storageMeta.engine}/${data.storageMeta.mode}` : "missing" }
   ];
 

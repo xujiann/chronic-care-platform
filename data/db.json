@@ -4129,6 +4129,309 @@
       ]
     }
   ],
+  "internetNursingPolicy": {
+    "id": "internet-nursing-liaoning-pilot",
+    "source": "Liaoning Internet+ Nursing pilot implementation plan",
+    "scope": [
+      "online application",
+      "offline service",
+      "first-visit assessment",
+      "informed consent",
+      "nurse qualification",
+      "location tracking",
+      "full audit trail",
+      "workload statistics"
+    ],
+    "serviceObjects": [
+      "elderly or disabled people",
+      "rehabilitation patients",
+      "terminal-stage patients",
+      "maternal and infant people",
+      "mobility-limited chronic disease patients"
+    ],
+    "serviceCatalog": [
+      "daily living ability assessment",
+      "vital signs measurement",
+      "blood glucose measurement",
+      "wound care",
+      "tube care",
+      "postpartum care",
+      "infant care",
+      "PICC maintenance"
+    ],
+    "requiredEvidence": [
+      "identity authentication",
+      "first diagnosis assessment",
+      "signed informed consent",
+      "nurse practice certificate",
+      "service location trace",
+      "nursing record",
+      "quality callback"
+    ],
+    "platformRequirements": [
+      "grade-3 security protection",
+      "privacy protection",
+      "medical record storage",
+      "traceable service behavior",
+      "workload statistics"
+    ],
+    "riskControls": [
+      "emergency plan",
+      "one-click alert",
+      "liability insurance",
+      "medical accident insurance",
+      "service recorder"
+    ]
+  },
+  "internetNursingInstitutions": [
+    {
+      "id": "inh-mr1",
+      "institutionCode": "MR1",
+      "name": "Dalian Central Hospital",
+      "district": "Zhongshan",
+      "licenseNo": "PDY-INH-MR1",
+      "serviceModes": [
+        "home bed",
+        "patrol diagnosis",
+        "community nursing"
+      ],
+      "published": true,
+      "serviceArea": [
+        "Zhongshan",
+        "Xigang",
+        "Shahekou"
+      ],
+      "serviceItems": [
+        "wound care",
+        "PICC maintenance",
+        "blood glucose measurement",
+        "postpartum care"
+      ],
+      "dailyCapacity": 18,
+      "qualityOwner": "Nursing department",
+      "complaintHotline": "0411-12320",
+      "emergencyPlan": "hospital-nursing-home-service-emergency-plan",
+      "securityLevel": "grade-3-ready"
+    },
+    {
+      "id": "inh-mr3",
+      "institutionCode": "MR3",
+      "name": "Qingniwaqiao Community Health Service Center",
+      "district": "Zhongshan",
+      "licenseNo": "PDY-INH-MR3",
+      "serviceModes": [
+        "community nursing",
+        "patrol diagnosis"
+      ],
+      "published": true,
+      "serviceArea": [
+        "Qingniwaqiao",
+        "Renmin Road"
+      ],
+      "serviceItems": [
+        "daily living ability assessment",
+        "vital signs measurement",
+        "blood glucose measurement",
+        "tube care"
+      ],
+      "dailyCapacity": 10,
+      "qualityOwner": "Community nursing office",
+      "complaintHotline": "0411-12320",
+      "emergencyPlan": "community-nursing-emergency-plan",
+      "securityLevel": "grade-3-platform-access"
+    },
+    {
+      "id": "inh-mr5",
+      "institutionCode": "MR5",
+      "name": "Ganjingzi District People's Hospital",
+      "district": "Ganjingzi",
+      "licenseNo": "PDY-INH-MR5",
+      "serviceModes": [
+        "home bed",
+        "community nursing"
+      ],
+      "published": false,
+      "serviceArea": [
+        "Ganjingzi"
+      ],
+      "serviceItems": [
+        "wound care",
+        "postpartum care",
+        "infant care"
+      ],
+      "dailyCapacity": 8,
+      "qualityOwner": "Pilot office",
+      "complaintHotline": "0411-12320",
+      "emergencyPlan": "district-nursing-emergency-plan",
+      "securityLevel": "pending-review"
+    }
+  ],
+  "internetNursingNurses": [
+    {
+      "id": "inn-001",
+      "name": "Nurse Sun",
+      "institutionId": "inh-mr1",
+      "institutionCode": "MR1",
+      "title": "senior nurse",
+      "yearsClinical": 9,
+      "registrationStatus": "verified",
+      "badPracticeRecord": "none",
+      "specialties": [
+        "wound care",
+        "PICC maintenance",
+        "blood glucose measurement"
+      ],
+      "trainingStatus": "passed",
+      "insuranceStatus": "covered",
+      "locationDevice": "enabled",
+      "recorderStatus": "ready",
+      "oneClickAlert": "enabled",
+      "status": "available"
+    },
+    {
+      "id": "inn-002",
+      "name": "Nurse Zhao",
+      "institutionId": "inh-mr3",
+      "institutionCode": "MR3",
+      "title": "nurse practitioner",
+      "yearsClinical": 6,
+      "registrationStatus": "verified",
+      "badPracticeRecord": "none",
+      "specialties": [
+        "vital signs measurement",
+        "daily living ability assessment",
+        "tube care"
+      ],
+      "trainingStatus": "passed",
+      "insuranceStatus": "covered",
+      "locationDevice": "enabled",
+      "recorderStatus": "ready",
+      "oneClickAlert": "enabled",
+      "status": "available"
+    },
+    {
+      "id": "inn-003",
+      "name": "Nurse Liu",
+      "institutionId": "inh-mr1",
+      "institutionCode": "MR1",
+      "title": "specialist nurse",
+      "yearsClinical": 12,
+      "registrationStatus": "verified",
+      "badPracticeRecord": "none",
+      "specialties": [
+        "postpartum care",
+        "infant care",
+        "wound care"
+      ],
+      "trainingStatus": "passed",
+      "insuranceStatus": "covered",
+      "locationDevice": "enabled",
+      "recorderStatus": "ready",
+      "oneClickAlert": "enabled",
+      "status": "in-service"
+    }
+  ],
+  "internetNursingOrders": [
+    {
+      "id": "ino-001",
+      "residentId": "r1",
+      "residentName": "Demo resident A",
+      "institutionId": "inh-mr1",
+      "institutionCode": "MR1",
+      "institutionName": "Dalian Central Hospital",
+      "nurseId": "inn-001",
+      "nurseName": "Nurse Sun",
+      "serviceItem": "wound care",
+      "serviceObject": "mobility-limited chronic disease patient",
+      "requestedAt": "2026-06-21",
+      "preferredAt": "2026-06-23",
+      "address": "Zhongshan district demo address",
+      "firstVisitAssessment": "passed",
+      "informedConsent": "signed",
+      "identityVerified": true,
+      "riskLevel": "medium",
+      "status": "dispatched",
+      "locationTrace": "pending",
+      "serviceRecordStatus": "pending",
+      "qualityCallback": "pending",
+      "feeEstimate": 168,
+      "createdAt": "2026-06-21",
+      "auditTrail": [
+        {
+          "at": "2026-06-21",
+          "action": "order-created",
+          "by": "citizen",
+          "note": "Resident submitted internet nursing appointment."
+        }
+      ]
+    },
+    {
+      "id": "ino-002",
+      "residentId": "r2",
+      "residentName": "Demo resident B",
+      "institutionId": "inh-mr3",
+      "institutionCode": "MR3",
+      "institutionName": "Qingniwaqiao Community Health Service Center",
+      "nurseId": "inn-002",
+      "nurseName": "Nurse Zhao",
+      "serviceItem": "blood glucose measurement",
+      "serviceObject": "elderly or disabled people",
+      "requestedAt": "2026-06-20",
+      "preferredAt": "2026-06-22",
+      "address": "Qingniwaqiao demo home",
+      "firstVisitAssessment": "passed",
+      "informedConsent": "signed",
+      "identityVerified": true,
+      "riskLevel": "low",
+      "status": "accepted",
+      "locationTrace": "tracking",
+      "serviceRecordStatus": "in-progress",
+      "qualityCallback": "pending",
+      "feeEstimate": 86,
+      "createdAt": "2026-06-20",
+      "auditTrail": [
+        {
+          "at": "2026-06-20",
+          "action": "nurse-accepted",
+          "by": "inn-002",
+          "note": "Nurse accepted order and location tracking started."
+        }
+      ]
+    },
+    {
+      "id": "ino-003",
+      "residentId": "r3",
+      "residentName": "Demo resident C",
+      "institutionId": "inh-mr1",
+      "institutionCode": "MR1",
+      "institutionName": "Dalian Central Hospital",
+      "nurseId": "",
+      "nurseName": "",
+      "serviceItem": "PICC maintenance",
+      "serviceObject": "rehabilitation patient",
+      "requestedAt": "2026-06-22",
+      "preferredAt": "2026-06-24",
+      "address": "Shahekou demo address",
+      "firstVisitAssessment": "pending",
+      "informedConsent": "pending",
+      "identityVerified": true,
+      "riskLevel": "high",
+      "status": "requested",
+      "locationTrace": "pending",
+      "serviceRecordStatus": "pending",
+      "qualityCallback": "pending",
+      "feeEstimate": 260,
+      "createdAt": "2026-06-22",
+      "auditTrail": [
+        {
+          "at": "2026-06-22",
+          "action": "order-created",
+          "by": "citizen",
+          "note": "High-risk service requires hospital assessment before dispatch."
+        }
+      ]
+    }
+  ],
   "taskMessages": [],
   "dataQualityIssues": [],
   "careOrders": [
@@ -4591,6 +4894,42 @@
     }
   ],
   "securityEvents": [
+    {
+      "id": "ed4c65c4-b77f-4c46-9df6-ccd5b9503dda",
+      "at": "2026/6/26 22:37:23",
+      "actor": "Internet nursing demo nurse",
+      "role": "institution",
+      "action": "登录",
+      "target": "internet-nursing.html",
+      "result": "允许",
+      "detail": "签名会话已签发，支持密钥轮换校验",
+      "previousAuditHash": "89aeb30bc975813ac912d06dcc09f2a9b18b502c96cab138a6c5a233a684ff0a",
+      "auditHash": "3c3218167987c217469818313747d8c15a8510b5ae2956172f55b1f326f05bce"
+    },
+    {
+      "id": "3c28044f-19a7-447a-ba93-ee7217a91b71",
+      "at": "2026/6/26 22:35:21",
+      "actor": "nurse",
+      "role": "unknown",
+      "action": "登录",
+      "target": "统一认证",
+      "result": "拒绝",
+      "detail": "账号或密码错误",
+      "previousAuditHash": "0b08d1dcaadf9684df964b96e97e6fbf381a4268c7d2ab53b19a7b4cbd33aabe",
+      "auditHash": "89aeb30bc975813ac912d06dcc09f2a9b18b502c96cab138a6c5a233a684ff0a"
+    },
+    {
+      "id": "331e5793-5fe0-42b0-8e53-7591c94d624f",
+      "at": "2026/6/26 22:29:23",
+      "actor": "演示居民A",
+      "role": "citizen",
+      "action": "登录",
+      "target": "citizen.html",
+      "result": "允许",
+      "detail": "签名会话已签发，支持密钥轮换校验",
+      "previousAuditHash": "0ba1e97b817b8fd1ead81e199ba8f8ff58815c131a9e349b32969bf2755c646f",
+      "auditHash": "0b08d1dcaadf9684df964b96e97e6fbf381a4268c7d2ab53b19a7b4cbd33aabe"
+    },
     {
       "id": "0e313e5f-671f-45f7-bee1-00311ddcadf6",
       "at": "2026/6/26 21:13:43",
@@ -5878,6 +6217,23 @@
     }
   ],
   "authUsers": [
+    {
+      "id": "u-nurse",
+      "username": "nurse",
+      "password": "123456",
+      "name": "Internet nursing demo nurse",
+      "role": "institution",
+      "roleName": "Nurse workstation",
+      "orgCode": "MR1",
+      "orgName": "Dalian Central Hospital",
+      "orgType": "medical_institution",
+      "orgLevel": "tertiary hospital",
+      "dataScope": "Internet nursing orders and service traces",
+      "home": "internet-nursing.html",
+      "nurseId": "inn-001",
+      "accountType": "nurse",
+      "status": "enabled"
+    },
     {
       "id": "u-city",
       "username": "city",
@@ -9112,7 +9468,7 @@
       "emergencySignals": 1,
       "seniorServices": 1,
       "dataAccessLogs": 3,
-      "securityEvents": 28,
+      "securityEvents": 31,
       "digitalCredentials": 1,
       "healthArchiveStandard": 1,
       "authOrganizations": 2,
@@ -9179,7 +9535,11 @@
       "escortServicePolicy": 1,
       "escortServiceProviders": 1,
       "escortWorkers": 1,
-      "escortServiceOrders": 1
+      "escortServiceOrders": 1,
+      "internetNursingPolicy": 1,
+      "internetNursingInstitutions": 1,
+      "internetNursingNurses": 1,
+      "internetNursingOrders": 1
     },
     "sqliteError": ""
   }

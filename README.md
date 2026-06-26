@@ -284,6 +284,17 @@ hospital-operations:readiness generates release/hospital-operations-readiness-re
 `citizen.html` includes a resident-side medical escort appointment form. Citizen users can create an order for themselves or household members through `POST /api/escort-services/orders`; the same scoped dashboard returns only their household orders and published service providers.
 
 `npm.cmd run escort:readiness` generates `release/escort-service-readiness-report.json` and `release/escort-service-readiness-report.md`, proving the policy-to-system mapping, registry, workforce, order evidence, API guard, commission frontend entry, and citizen appointment entry.
+## Internet Nursing Pilot
+
+`internet-nursing.html` is the runnable three-role entry for Internet+ Nursing. Citizens can submit nursing appointments, hospital users can complete first-visit assessment, informed consent, and nurse dispatch, and the nurse workstation can accept orders, start tracked home service, complete nursing records, and leave quality-callback evidence.
+
+Demo login: use `nurse` / `123456` to open the nurse workstation directly; it is scoped as an institution user with `nurseId=inn-001`.
+
+The module uses `GET /api/internet-nursing/dashboard`, `POST /api/internet-nursing/orders`, and `POST /api/internet-nursing/orders/:id/actions`. It tracks pilot institutions, qualified nurses, resident appointments, consent, service traces, nursing records, risk level, and task messages.
+
+The handoff document is `docs/互联网护理服务模块说明.md`; it covers role entries, data objects, API permissions, risk controls, workflow diagram, and acceptance evidence.
+
+`npm.cmd run internet-nursing:readiness` generates `release/internet-nursing-readiness-report.json` and `release/internet-nursing-readiness-report.md`, checking the Liaoning pilot policy boundary, institution registry, nurse qualification, order evidence, API guard, three-role frontend, and release script.
 ## Drug Consumable Supervision Evidence
 
 `drug-consumable:readiness` generates `release/drug-consumable-readiness-report.json` and `release/drug-consumable-readiness-report.md`, covering rational medication, prescription review, fixed pickup, high-value consumable clues, insurance settlement coordination, and remediation-loop evidence for the drug and consumable supervision app.

@@ -8,6 +8,7 @@ const { buildDataQualityReport, renderMarkdown: renderDataQualityMarkdown } = re
 const { buildDrugConsumableReadinessReport, renderMarkdown: renderDrugConsumableMarkdown } = require("./drug-consumable-readiness");
 const { buildEvaluationEvidenceReport, renderMarkdown: renderEvaluationEvidenceMarkdown } = require("./evaluation-evidence");
 const { buildEscortServiceReadinessReport, renderMarkdown: renderEscortServiceMarkdown } = require("./escort-service-readiness");
+const { buildInternetNursingReadinessReport, renderMarkdown: renderInternetNursingMarkdown } = require("./internet-nursing-readiness");
 const { buildEnvironmentMatrixReport, renderMarkdown: renderEnvironmentMatrixMarkdown } = require("./environment-matrix");
 const { buildHealthDashboardSummary, buildPriorityApplicationTemplates, renderMarkdown: renderHealthDashboardMarkdown } = require("./health-dashboard-summary");
 const { buildIdentityContract, renderMarkdown: renderIdentityContractMarkdown } = require("./identity-contract");
@@ -451,6 +452,14 @@ function escortServiceChecks(escortServiceReadiness) {
   ];
 }
 
+function internetNursingChecks(internetNursingReadiness) {
+  return [
+    check("internetNursing:readiness", internetNursingReadiness.ok, internetNursingReadiness.ok ? "internet nursing readiness checks passed" : "internet nursing readiness checks failed", "error", "internet-nursing"),
+    check("internetNursing:qualification", internetNursingReadiness.summary?.qualifiedNurses >= 2, `${internetNursingReadiness.summary?.qualifiedNurses || 0}/${internetNursingReadiness.summary?.nurses || 0} qualified nurses`, "error", "internet-nursing"),
+    check("internetNursing:riskTrace", internetNursingReadiness.checks?.some((item) => item.id === "nursing:riskTrace" && item.passed), "risk queue and location tracking evidence present", "error", "internet-nursing")
+  ];
+}
+
 function productionDbReadinessChecks(productionDbReadiness) {
   return [
     check("productionDb:readiness", productionDbReadiness.ok, productionDbReadiness.ok ? "production database readiness checks passed" : "production database readiness checks failed", "error", "production-db"),
@@ -586,6 +595,7 @@ function packageChecks(pkg) {
     "quality-safety:report",
     "environment:matrix",
     "hospital-operations:readiness",
+    "internet-nursing:readiness",
     "health-dashboard:summary",
     "priority-apps:templates",
     "maternal-child:readiness",
@@ -657,6 +667,7 @@ function buildReleaseReport(options = {}) {
   const monitoringReadiness = buildMonitoringReadinessReport({ data, pkg });
   const referralTeleconsultationReadiness = buildReferralTeleconsultationReadinessReport({ data, pkg });
   const escortServiceReadiness = buildEscortServiceReadinessReport({ data, pkg });
+  const internetNursingReadiness = buildInternetNursingReadinessReport({ data, pkg });
   const operationsReadiness = buildOperationsReadinessReport({ data, pkg });
   const processAudit = buildProcessAuditReport({ data });
   const serviceAcceptance = buildServiceAcceptanceSummary(data);
@@ -692,6 +703,7 @@ function buildReleaseReport(options = {}) {
     ...monitoringReadinessChecks(monitoringReadiness),
     ...referralTeleconsultationChecks(referralTeleconsultationReadiness),
     ...escortServiceChecks(escortServiceReadiness),
+    ...internetNursingChecks(internetNursingReadiness),
     ...operationsReadinessChecks(operationsReadiness),
     ...processAuditChecks(processAudit),
     ...serviceAcceptanceChecks(serviceAcceptance),
@@ -737,6 +749,7 @@ function buildReleaseReport(options = {}) {
     monitoringReadiness,
     referralTeleconsultationReadiness,
     escortServiceReadiness,
+    internetNursingReadiness,
     operationsReadiness,
     processAudit,
     serviceAcceptance,
@@ -948,6 +961,10 @@ function renderMarkdown(report) {
     "",
     "See `referral-teleconsultation-readiness-report.json` and `referral-teleconsultation-readiness-report.md` for referral, teleconsultation, receiving feedback, report return, collaboration order, resident authorization, and performance evidence.",
     "",
+    "## Internet nursing readiness report",
+    "",
+    "See `internet-nursing-readiness-report.json` and `internet-nursing-readiness-report.md` for resident appointment, hospital assessment and dispatch, nurse acceptance, location trace, service record, quality callback, and policy evidence.",
+    "",
     "## Production database readiness report",
     "",
     "See `production-db-readiness-report.json` and `production-db-readiness-report.md` for PostgreSQL cutover prerequisites, current SQLite/JSON model evidence, backup rehearsal documentation, and runtime adapter guardrails.",
@@ -1157,6 +1174,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       escortServiceReadiness: report.escortServiceReadiness
     }, null, 2), "utf8");
+    const internetNursingJson = path.join(path.dirname(output), "internet-nursing-readiness-report.json");
+    fs.writeFileSync(internetNursingJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      internetNursingReadiness: report.internetNursingReadiness
+    }, null, 2), "utf8");
     const productionDbJson = path.join(path.dirname(output), "production-db-readiness-report.json");
     fs.writeFileSync(productionDbJson, JSON.stringify({
       project: report.project,
@@ -1268,6 +1293,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(referralTeleconsultationMarkdown, renderReferralTeleconsultationReadinessMarkdown(report.referralTeleconsultationReadiness), "utf8");
     const escortServiceMarkdown = path.join(path.dirname(markdown), "escort-service-readiness-report.md");
     fs.writeFileSync(escortServiceMarkdown, renderEscortServiceMarkdown(report.escortServiceReadiness), "utf8");
+    const internetNursingMarkdown = path.join(path.dirname(markdown), "internet-nursing-readiness-report.md");
+    fs.writeFileSync(internetNursingMarkdown, renderInternetNursingMarkdown(report.internetNursingReadiness), "utf8");
     const productionDbMarkdown = path.join(path.dirname(markdown), "production-db-readiness-report.md");
     fs.writeFileSync(productionDbMarkdown, renderProductionDbReadinessMarkdown(report.productionDbReadiness), "utf8");
     const evaluationMarkdown = path.join(path.dirname(markdown), "evaluation-evidence-report.md");

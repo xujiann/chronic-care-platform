@@ -268,6 +268,10 @@ operations.html is the runnable management entry for hospital operation monitori
 
 Open `escort.html` after commission login to review the older adult medical escort service pilot dashboard. Open `citizen.html` with the citizen demo account to create a resident-side medical escort appointment for the current household. Run `npm.cmd run escort:readiness` before release; the generated `release/escort-service-readiness-report.md` and `release/escort-service-readiness-report.json` cover provider registry, trained escort workers, service order evidence, subsidy and time-bank coverage, contract and insurance risk controls, quality callbacks, API routes, commission frontend evidence, and citizen appointment evidence.
 
+Open `internet-nursing.html` after citizen, hospital, or commission login to review the Internet+ Nursing pilot. Run `npm.cmd run internet-nursing:readiness` before release; the generated `release/internet-nursing-readiness-report.md` and `release/internet-nursing-readiness-report.json` cover resident appointment, first-visit assessment, informed consent, qualified nurse dispatch, nurse acceptance, location tracking, service record, quality callback, and API route evidence.
+
+Use `docs/互联网护理服务模块说明.md` as the module handoff document for role entry, data object, API permission, workflow diagram, risk control, and browser acceptance checks.
+
 hospital-operations:readiness generates release/hospital-operations-readiness-report.json and release/hospital-operations-readiness-report.md. The report reuses healthStatistics, healthStatisticsIngestion, medicalResources, operations-readiness, /api/metrics, and platformProcessAudit evidence, and is included by release:report and deploy:check.
 ## Drug Consumable Supervision Evidence
 

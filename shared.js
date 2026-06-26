@@ -34,7 +34,7 @@ function normalizePlatformState(data) {
     resident.identityIndex = resident.personIndex;
   });
   const residentMap = new Map(residents.map((resident) => [resident.id, resident]));
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "multiPracticeApplications", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "referralTeleconsultations"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "multiPracticeApplications", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "referralTeleconsultations", "internetNursingOrders"].forEach((key) => {
     (Array.isArray(state[key]) ? state[key] : []).forEach((item) => {
       item.personIndex = item.personIndex || personIndexForResident(residentMap, item.residentId);
     });

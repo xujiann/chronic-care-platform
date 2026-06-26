@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Internet+ Nursing</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+    <script>window.HealthCityAuth.requireRole(["commission", "institution", "citizen", "county"])</script>
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>Internet+ Nursing</span>
+          <h1>Appointment, hospital dispatch, and nurse acceptance</h1>
+          <p>Liaoning pilot workflow: online request, first-visit assessment, consent, qualified nurse dispatch, tracked home service, and quality callback.</p>
+        </div>
+        <nav>
+          <a href="./citizen.html">Citizen</a>
+          <a href="./institution.html">Hospital</a>
+          <a href="./health-city.html">Overview</a>
+          <a href="./about.html">About</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" id="nursing-metrics"></section>
+
+      <section class="portal-grid">
+        <article class="panel">
+          <div class="panel-title">
+            <h2>Citizen Appointment</h2>
+            <span id="nursing-citizen-summary"></span>
+          </div>
+          <form id="nursing-appointment-form" class="filter-grid">
+            <label>Resident ID<input name="residentId" value="r1" /></label>
+            <label>Institution<select name="institutionId" id="nursing-institution-select"></select></label>
+            <label>Service
+              <select name="serviceItem">
+                <option value="vital signs measurement">vital signs measurement</option>
+                <option value="blood glucose measurement">blood glucose measurement</option>
+                <option value="wound care">wound care</option>
+                <option value="tube care">tube care</option>
+                <option value="postpartum care">postpartum care</option>
+                <option value="infant care">infant care</option>
+                <option value="PICC maintenance">PICC maintenance</option>
+              </select>
+            </label>
+            <label>People group
+              <select name="serviceObject">
+                <option value="elderly or disabled people">elderly or disabled people</option>
+                <option value="rehabilitation patient">rehabilitation patient</option>
+                <option value="terminal-stage patient">terminal-stage patient</option>
+                <option value="maternal and infant people">maternal and infant people</option>
+                <option value="mobility-limited chronic disease patient">mobility-limited chronic disease patient</option>
+              </select>
+            </label>
+            <label>Preferred date<input name="preferredAt" type="date" /></label>
+            <label>Risk
+              <select name="riskLevel">
+                <option value="medium">medium</option>
+                <option value="low">low</option>
+                <option value="high">high</option>
+              </select>
+            </label>
+            <label class="full">Address<input name="address" value="Zhongshan district demo address" /></label>
+            <label class="full">Need<input name="note" value="Home nursing appointment from resident portal" /></label>
+            <button class="inline-action" type="submit">Submit</button>
+          </form>
+        </article>
+
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>Hospital Management</h2>
+            <span>assessment / consent / dispatch</span>
+          </div>
+          <div id="nursing-orders" class="table-wrap"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>Nurse Workstation</h2>
+            <span id="nursing-nurse-summary"></span>
+          </div>
+          <div class="filter-grid">
+            <label>Nurse<select id="nursing-nurse-select"></select></label>
+          </div>
+          <div id="nursing-nurse-queue" class="table-wrap"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>Policy Controls</h2>
+            <span id="nursing-policy-summary"></span>
+          </div>
+          <div id="nursing-policy" class="rules"></div>
+        </article>
+      </section>
+    </main>
+
+    <script src="./shared.js"></script>
+    <script src="./internet-nursing.js"></script>
+  </body>
+</html>
