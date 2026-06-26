@@ -78,6 +78,7 @@ test("research sandbox about page documents policy and release boundaries", () =
   assert.match(page, /涉及人的生命科学和医学研究伦理审查办法/);
   assert.match(page, /国家健康医疗大数据标准、安全和服务管理办法/);
   assert.match(page, /\/api\/research\/sandbox/);
+  assert.match(page, /research:policy-controls/);
   assert.match(page, /research-sandbox-readiness-report\.md/);
   assert.match(read("README.md"), /research-sandbox-about\.html/);
   assert.doesNotMatch(page, /requireRole/);
@@ -88,6 +89,7 @@ test("static snapshot keeps completed P2 governance collections", () => {
   assert.equal(data.creditEvaluationRules.version, "credit-rules-2026.1");
   assert.equal(Array.isArray(data.researchDatasets), true);
   assert.equal(data.researchDatasets.some((item) => item.id === "rd-hypertension-001"), true);
+  assert.equal(data.researchDatasets.every((item) => item.governance?.dataUseAgreement && item.governance.minimumNecessary === true && item.governance.reidentificationProhibited === true && item.governance.retentionDays > 0), true);
   assert.equal(data.researchDatasets.every((item) => item.ethicsStatus && item.deidentificationStatus && item.sandbox && Array.isArray(item.sourceCollections)), true);
   assert.equal(data.dataAccessLogs.some((item) => /research/i.test(`${item.scope || ""} ${item.purpose || ""}`)), true);
   assert.equal(Array.isArray(data.diseaseRegistryModels), true);

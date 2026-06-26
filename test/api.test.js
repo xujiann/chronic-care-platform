@@ -847,22 +847,43 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(sandboxSummary.response.status, 200);
     assert.equal(sandboxSummary.body.reusableCollections.includes("personalRecords"), true);
     assert.equal(sandboxSummary.body.boundaries.includes("sandbox access"), true);
+    assert.equal(sandboxSummary.body.boundaries.includes("policy controls"), true);
     assert.equal(sandboxSummary.body.summary.activeDatasets >= 1, true);
+    assert.equal(sandboxSummary.body.summary.policyReady >= 2, true);
     assert.equal(Array.isArray(sandboxSummary.body.pendingApplications), true);
     assert.equal(Array.isArray(sandboxSummary.body.recentAudits), true);
     assert.equal(Array.isArray(sandboxSummary.body.recentOutcomes), true);
     const researchInstitution = await login(baseUrl, "hospital");
+    const invalidApplication = await api(baseUrl, "/api/research/datasets", authorized(researchInstitution.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        diseaseType: "copd",
+        name: "COPD missing governance",
+        purpose: "sandbox feasibility assessment",
+        sourceCollections: ["personalRecords", "diagnosticReports"]
+      })
+    }));
+    assert.equal(invalidApplication.response.status, 400);
+    assert.match(invalidApplication.body.message, /dataUseAgreement/);
     const application = await api(baseUrl, "/api/research/datasets", authorized(researchInstitution.body.token, {
       method: "POST",
       body: JSON.stringify({
         diseaseType: "copd",
         name: "COPD pulmonary rehabilitation cohort",
         purpose: "sandbox feasibility assessment",
-        sourceCollections: ["personalRecords", "diagnosticReports"]
+        sourceCollections: ["personalRecords", "diagnosticReports"],
+        governance: {
+          dataUseAgreement: "DUA-DEMO-COPD-2026",
+          minimumNecessary: true,
+          reidentificationProhibited: true,
+          exportReviewRequired: true,
+          retentionDays: 180
+        }
       })
     }));
     assert.equal(application.response.status, 201);
     assert.equal(application.body.authorizationStatus, "pending");
+    assert.equal(application.body.governance.dataUseAgreement, "DUA-DEMO-COPD-2026");
     assert.equal(application.body.sourceCollections.includes("diagnosticReports"), true);
     const blockedSandbox = await api(baseUrl, `/api/research/datasets/${application.body.id}/sandbox-access`, authorized(researchInstitution.body.token, {
       method: "POST",
@@ -882,6 +903,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     }));
     assert.equal(sandboxAccess.response.status, 200);
     assert.equal(sandboxAccess.body.deidentified, true);
+    assert.equal(sandboxAccess.body.governance.reidentificationProhibited, true);
     assert.equal(sandboxAccess.body.sourceCollections.includes("personalRecords"), true);
     const returnedOutcome = await api(baseUrl, `/api/research/datasets/${application.body.id}/outcomes`, authorized(researchInstitution.body.token, {
       method: "POST",

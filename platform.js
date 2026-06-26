@@ -511,7 +511,7 @@ function renderResearchGovernance(platform, sandboxSummary = null) {
   const datasets = Array.isArray(platform.researchDatasets) ? platform.researchDatasets : [];
   const models = Array.isArray(platform.diseaseRegistryModels) ? platform.diseaseRegistryModels : [];
   const summary = sandboxSummary?.summary || {};
-  const boundaries = Array.isArray(sandboxSummary?.boundaries) ? sandboxSummary.boundaries : ["research dataset", "disease registry", "ethics approval", "de-identification release", "sandbox access", "usage audit", "outcome return"];
+  const boundaries = Array.isArray(sandboxSummary?.boundaries) ? sandboxSummary.boundaries : ["research dataset", "disease registry", "ethics approval", "de-identification release", "policy controls", "sandbox access", "usage audit", "outcome return"];
   const reusableCollections = Array.isArray(sandboxSummary?.reusableCollections) ? sandboxSummary.reusableCollections : ["researchDatasets", "diseaseRegistryModels", "dataAccessLogs", "securityAcceptanceLedger", "personalRecords", "diagnosticReports"];
   const activeSandboxCount = Number.isFinite(summary.activeDatasets) ? summary.activeDatasets : datasets.filter((item) => item.authorizationStatus === "approved" && (item.sandbox?.status === "active" || item.status === "published")).length;
   const pendingApplications = Number.isFinite(summary.pendingApplications) ? summary.pendingApplications : datasets.filter((item) => item.authorizationStatus === "pending" || item.status === "requested").length;
@@ -527,6 +527,7 @@ function renderResearchGovernance(platform, sandboxSummary = null) {
       <td>${item.version}</td>
       <td>${item.ethicsApproval || "待登记"}</td>
       <td>${item.anonymization || "待登记"} / ${item.deidentificationStatus || "pending"}</td>
+      <td>${item.governance?.dataUseAgreement || "pending"} / ${item.governance?.retentionDays || 0}d</td>
       <td>${statusBadge(item.authorizationStatus || item.status)} ${statusBadge(item.sandbox?.status || "pending")}</td>
       <td>${item.records || 0}</td>
       <td>${(item.usageAudit || []).length} / ${(item.outcomes || []).length}</td>
@@ -574,6 +575,22 @@ function renderResearchGovernance(platform, sandboxSummary = null) {
         <input name="purpose" value="sandbox feasibility assessment" required />
       </label>
       <label>
+        数据使用协议
+        <input name="dataUseAgreement" value="DUA-DEMO-COPD-2026" required />
+      </label>
+      <label>
+        审计留存天数
+        <input name="retentionDays" type="number" min="1" max="3650" value="180" required />
+      </label>
+      <label class="checkbox-label">
+        <input name="minimumNecessary" type="checkbox" checked />
+        最小必要字段
+      </label>
+      <label class="checkbox-label">
+        <input name="reidentificationProhibited" type="checkbox" checked />
+        禁止再识别
+      </label>
+      <label>
         来源集合
         <select name="sourceProfile">
           <option value="clinical">personalRecords + diagnosticReports</option>
@@ -604,8 +621,8 @@ function renderResearchGovernance(platform, sandboxSummary = null) {
       </article>
     </div>
     <table>
-      <thead><tr><th>数据集</th><th>病种</th><th>版本</th><th>伦理审批</th><th>脱敏</th><th>授权/沙箱</th><th>记录数</th><th>审计/成果</th><th>Action</th></tr></thead>
-      <tbody>${datasetRows || `<tr><td colspan="9">暂无科研数据集。</td></tr>`}</tbody>
+      <thead><tr><th>数据集</th><th>病种</th><th>版本</th><th>伦理审批</th><th>脱敏</th><th>协议/留存</th><th>授权/沙箱</th><th>记录数</th><th>审计/成果</th><th>Action</th></tr></thead>
+      <tbody>${datasetRows || `<tr><td colspan="10">暂无科研数据集。</td></tr>`}</tbody>
     </table>
     <table>
       <thead><tr><th>模型</th><th>病种</th><th>版本</th><th>适用人群</th><th>触发阈值</th><th>复核状态</th><th>输出</th><th>复核人</th></tr></thead>
@@ -615,6 +632,7 @@ function renderResearchGovernance(platform, sandboxSummary = null) {
 }
 
 function researchBoundaryLabel(value) {
+  if (value === "policy controls") return "协议与最小必要";
   return {
     "research dataset": "科研数据集",
     "disease registry": "专病库",
@@ -905,10 +923,18 @@ async function submitResearchDatasetApplication(form) {
     diseaseType: String(data.diseaseType || "").trim(),
     name: String(data.name || "").trim(),
     purpose: String(data.purpose || "").trim(),
-    sourceCollections: sourceProfiles[data.sourceProfile] || sourceProfiles.clinical
+    sourceCollections: sourceProfiles[data.sourceProfile] || sourceProfiles.clinical,
+    governance: {
+      dataUseAgreement: String(data.dataUseAgreement || "").trim(),
+      minimumNecessary: data.minimumNecessary === "on",
+      reidentificationProhibited: data.reidentificationProhibited === "on",
+      exportReviewRequired: true,
+      retentionDays: Number(data.retentionDays || 180),
+      steward: "research-governance"
+    }
   };
-  if (!payload.diseaseType || !payload.name || !payload.purpose) {
-    setResearchStatus("请补齐病种、数据集名称和研究目的。", true);
+  if (!payload.diseaseType || !payload.name || !payload.purpose || !payload.governance.dataUseAgreement || !payload.governance.minimumNecessary || !payload.governance.reidentificationProhibited) {
+    setResearchStatus("请补齐病种、数据集名称、研究目的、数据使用协议、最小必要和禁止再识别声明。", true);
     return;
   }
   try {

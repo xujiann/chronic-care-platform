@@ -485,6 +485,19 @@ h1 { margin-top: 4px; font-size: 28px; }
   background: #fff;
 }
 
+.research-application-form .checkbox-label {
+  grid-template-columns: 18px 1fr;
+  align-items: center;
+  min-height: 34px;
+  color: var(--ink);
+}
+
+.research-application-form .checkbox-label input {
+  width: 16px;
+  min-height: 16px;
+  padding: 0;
+}
+
 .research-application-form .inline-action {
   width: 100%;
   white-space: nowrap;
