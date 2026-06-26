@@ -23,6 +23,7 @@ const ARTIFACTS = [
   ["research-sandbox", "research", "Research sandbox readiness report", "release/research-sandbox-readiness-report.json", "release/research-sandbox-readiness-report.md", "research:sandbox", "/api/research/sandbox"],
   ["monitoring-readiness", "operations", "Monitoring readiness report", "release/monitoring-readiness-report.json", "release/monitoring-readiness-report.md", "monitoring:readiness", "/api/metrics"],
   ["referral-teleconsultation", "referral", "Referral teleconsultation readiness report", "release/referral-teleconsultation-readiness-report.json", "release/referral-teleconsultation-readiness-report.md", "referral:readiness", "/api/referral-teleconsultations"],
+  ["escort-service", "elder-care", "Medical escort service readiness report", "release/escort-service-readiness-report.json", "release/escort-service-readiness-report.md", "escort:readiness", "/api/escort-services/dashboard"],
   ["operations-readiness", "operations", "Operations readiness report", "release/operations-readiness-report.json", "release/operations-readiness-report.md", "operations:readiness", "/api/system/readiness"],
   ["process-audit", "process", "Full process audit report", "release/process-audit-report.json", "release/process-audit-report.md", "process:audit", "/api/process-audit"],
   ["service-acceptance", "process", "Service acceptance summary", "release/service-acceptance-summary.json", "release/service-acceptance-summary.md", "release:report", "/api/service-acceptance-summary"],

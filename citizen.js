@@ -32,6 +32,37 @@ const fallbackState = {
   ],
   followups: [
     { id: "f1", residentId: "r1", diseaseType: "高血压", plannedAt: todayOffset(3), assignee: "刘医生", status: "待随访", result: "未记录", advice: "记录家庭血压" }
+  ],
+  escortServiceProviders: [
+    {
+      id: "esp-demo-community",
+      name: "社区助医陪诊服务站",
+      district: "中山区",
+      published: true,
+      trainedWorkers: 8,
+      pricing: { halfDayFee: 120 }
+    }
+  ],
+  escortServiceOrders: [
+    {
+      id: "eso-demo-citizen",
+      residentId: "r1",
+      providerId: "esp-demo-community",
+      providerName: "社区助医陪诊服务站",
+      hospital: "大连市中心医院",
+      department: "心内科",
+      appointmentAt: todayOffset(3),
+      due: todayOffset(3),
+      serviceItems: ["registration", "exam escort"],
+      status: "requested",
+      priority: "medium",
+      riskLevel: "medium",
+      subsidyType: "self-pay",
+      contractStatus: "pending",
+      insuranceStatus: "covered",
+      qualityReview: "pending",
+      feeEstimate: 120
+    }
   ]
 };
 
@@ -140,11 +171,13 @@ let activeVaultSection = "timeline";
 
 let state = fallbackState;
 let citizenExtra = loadCitizenExtra();
+let escortDashboard = null;
 let currentResidentId;
 let currentAccountId;
 
 document.addEventListener("DOMContentLoaded", async () => {
   state = await loadState();
+  escortDashboard = await fetchCitizenEscortDashboard();
   ensureAccounts();
   populateAccounts();
   bindLargeMode();
@@ -156,6 +189,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   bindDialogs();
   bindFollowupFeedback();
+  bindEscortAppointment();
   currentAccountId = state.accounts[0]?.id;
   const account = getCurrentAccount();
   renderAccount(account);
@@ -254,6 +288,7 @@ function renderCitizen(residentId) {
   renderReferrals(resident.id);
   renderBirthHealth(resident.id);
   renderMaternalChildContinuity(resident.id);
+  renderEscortAppointments(resident.id);
   renderPickups(resident.id);
   renderSeniorServices(resident.id);
   renderDigitalCredentials(resident.id);
@@ -863,6 +898,169 @@ function renderMaternalChildContinuity(residentId) {
     <p>${row.detail}</p>
     <span class="status ${row.urgent ? "warn" : ""}">${row.status}</span>
   </article>`).join("");
+}
+
+async function fetchCitizenEscortDashboard() {
+  if (API_BASE) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/escort-services/dashboard`);
+      if (response.ok) return await response.json();
+    } catch (error) {
+      // Static and offline previews use the scoped state already loaded.
+    }
+  }
+  return {
+    providers: (state.escortServiceProviders || []).filter((item) => item.published !== false),
+    orders: state.escortServiceOrders || [],
+    summary: {
+      providers: (state.escortServiceProviders || []).filter((item) => item.published !== false).length,
+      orders: (state.escortServiceOrders || []).length
+    }
+  };
+}
+
+function renderEscortAppointments(residentId) {
+  const form = document.querySelector("#escort-appointment-form");
+  const cards = document.querySelector("#escort-appointment-cards");
+  const summary = document.querySelector("#escort-appointment-summary");
+  if (!form || !cards || !summary) return;
+  const providers = getEscortProviders();
+  const orders = getEscortOrders(residentId);
+  const providerSelect = form.elements.providerId;
+  const selected = providerSelect.value;
+  providerSelect.innerHTML = providers
+    .map((item) => `<option value="${item.id}">${item.name} · ${item.district || "本市"} · ${item.pricing?.halfDayFee || item.feeEstimate || "待估价"} 元起</option>`)
+    .join("");
+  if (selected && providers.some((item) => item.id === selected)) providerSelect.value = selected;
+  if (!providerSelect.value && providers[0]) providerSelect.value = providers[0].id;
+  if (!form.elements.appointmentAt.value) form.elements.appointmentAt.value = todayOffset(1);
+  summary.textContent = `${providers.length} 家可预约服务主体 · ${orders.length} 单本人/家庭陪诊预约`;
+  cards.innerHTML = orders
+    .sort((a, b) => String(a.appointmentAt || a.due || "").localeCompare(String(b.appointmentAt || b.due || "")))
+    .map((item) => `<article class="mini-card escort-order-card">
+      <h3>${item.hospital || "待确认医院"} · ${item.department || "待确认科室"}</h3>
+      <p class="muted">${item.appointmentAt || item.due || "日期待确认"} · ${item.providerName || providerName(item.providerId)}</p>
+      <p>${formatEscortItems(item.serviceItems)} · ${formatSubsidy(item.subsidyType)} · 预估 ${item.feeEstimate || 0} 元</p>
+      <p>合同 ${formatEscortStatus(item.contractStatus)} · 保障 ${formatEscortStatus(item.insuranceStatus)} · 回访 ${formatEscortStatus(item.qualityReview)}</p>
+      <span class="status ${item.priority === "high" || item.riskLevel === "high" ? "danger" : String(item.status || "").includes("requested") ? "warn" : ""}">${formatEscortStatus(item.status)}</span>
+    </article>`)
+    .join("") || `<p class="muted">暂无陪诊预约。提交后将同步到助医陪诊监管端和服务主体待办。</p>`;
+}
+
+function bindEscortAppointment() {
+  const form = document.querySelector("#escort-appointment-form");
+  if (!form) return;
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = new FormData(form);
+    const provider = getEscortProviders().find((item) => item.id === data.get("providerId"));
+    const payload = {
+      residentId: currentResidentId,
+      providerId: data.get("providerId"),
+      hospital: data.get("hospital"),
+      department: data.get("department"),
+      appointmentAt: data.get("appointmentAt"),
+      due: data.get("appointmentAt"),
+      serviceItems: data.getAll("serviceItems").length ? data.getAll("serviceItems") : ["registration", "exam escort"],
+      subsidyType: data.get("subsidyType"),
+      priority: data.get("priority"),
+      riskLevel: data.get("priority") === "high" ? "high" : "medium",
+      familyContactStatus: data.get("familyContactStatus"),
+      sourceChannel: "citizen.html",
+      note: data.get("note")
+    };
+    const submit = form.querySelector("button[type='submit']");
+    submit.disabled = true;
+    try {
+      let saved;
+      if (API_BASE) {
+        const request = window.HealthCityAuth?.authFetch || fetch;
+        const response = await request(`${API_BASE}/escort-services/orders`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (!response.ok) throw new Error(`escort appointment failed: ${response.status}`);
+        saved = await response.json();
+      } else {
+        saved = {
+          ...payload,
+          id: `eso-local-${crypto.randomUUID()}`,
+          status: "requested",
+          providerName: provider?.name || "社区助医陪诊服务站",
+          feeEstimate: Number(provider?.pricing?.halfDayFee || 120),
+          contractStatus: "pending",
+          insuranceStatus: provider?.insurance || "covered",
+          qualityReview: "pending",
+          createdAt: new Date().toISOString(),
+          createdBy: "citizen"
+        };
+      }
+      if (!Array.isArray(state.escortServiceOrders)) state.escortServiceOrders = [];
+      state.escortServiceOrders.unshift(saved);
+      if (escortDashboard?.orders && escortDashboard.orders !== state.escortServiceOrders) escortDashboard.orders.unshift(saved);
+      form.reset();
+      form.elements.appointmentAt.value = todayOffset(1);
+      renderCitizen(currentResidentId);
+      showToast("陪诊预约已提交，服务主体将在监管端确认合同、保险和陪诊安排");
+    } catch (error) {
+      showToast(error.message || "陪诊预约提交失败，请检查登录状态和网络连接");
+    } finally {
+      submit.disabled = false;
+    }
+  });
+}
+
+function getEscortProviders() {
+  const providers = escortDashboard?.providers?.length ? escortDashboard.providers : state.escortServiceProviders || [];
+  return providers.filter((item) => item.published !== false);
+}
+
+function getEscortOrders(residentId) {
+  const orders = escortDashboard?.orders?.length ? escortDashboard.orders : state.escortServiceOrders || [];
+  return orders.filter((item) => item.residentId === residentId);
+}
+
+function providerName(providerId) {
+  return getEscortProviders().find((item) => item.id === providerId)?.name || "服务主体待确认";
+}
+
+function formatEscortItems(items) {
+  const labels = {
+    registration: "挂号取号",
+    "exam escort": "检查陪同",
+    "medication pickup": "取药结算",
+    "report explanation": "报告协助"
+  };
+  const values = Array.isArray(items) ? items : String(items || "").split(",").map((item) => item.trim()).filter(Boolean);
+  return values.map((item) => labels[item] || item).join("、") || "基础陪诊";
+}
+
+function formatSubsidy(value) {
+  return {
+    "self-pay": "自费",
+    "80plus-living-alone": "80 岁以上独居",
+    "low-income": "低收入补贴",
+    "time-bank": "时间银行"
+  }[value] || value || "保障待确认";
+}
+
+function formatEscortStatus(value) {
+  return {
+    requested: "待确认",
+    matched: "已匹配",
+    "contract-pending": "合同待签",
+    "in-service": "服务中",
+    completed: "已完成",
+    closed: "已关闭",
+    pending: "待确认",
+    covered: "已保障",
+    signed: "已签约",
+    high: "较急",
+    medium: "普通",
+    low: "不急"
+  }[value] || value || "待确认";
 }
 
 function renderPickups(residentId) {

@@ -387,6 +387,52 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     ].forEach((key) => assert.equal(body[key], undefined, `${key} 不应返回给居民端`));
   });
 
+  await t.test("allows citizen medical escort appointment within household scope", async () => {
+    const dashboard = await api(baseUrl, "/api/escort-services/dashboard", authorized(citizenToken));
+    assert.equal(dashboard.response.status, 200);
+    assert.equal(dashboard.body.ok, true);
+    assert.equal(dashboard.body.providers.every((item) => item.published !== false), true);
+
+    const providerId = dashboard.body.providers[0].id;
+    const created = await api(baseUrl, "/api/escort-services/orders", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        providerId,
+        hospital: "Dalian Central Hospital outpatient clinic demo",
+        department: "Cardiology",
+        appointmentAt: "2026-06-27",
+        serviceItems: ["registration", "exam escort"],
+        subsidyType: "80plus-living-alone",
+        priority: "high",
+        riskLevel: "high",
+        sourceChannel: "citizen.html",
+        note: "resident portal appointment regression"
+      })
+    }));
+    assert.equal(created.response.status, 201);
+    assert.equal(created.body.residentId, "r1");
+    assert.equal(created.body.createdBy, "citizen");
+    assert.equal(created.body.sourceChannel, "citizen.html");
+    assert.equal(created.body.serviceItems.includes("registration"), true);
+
+    const refreshed = await api(baseUrl, "/api/escort-services/dashboard", authorized(citizenToken));
+    assert.equal(refreshed.body.orders.some((item) => item.id === created.body.id && item.residentId === "r1"), true);
+    assert.equal(refreshed.body.orders.every((item) => ["r1", "r4"].includes(item.residentId)), true);
+
+    const denied = await api(baseUrl, "/api/escort-services/orders", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r2",
+        providerId,
+        hospital: "Dalian Central Hospital outpatient clinic demo",
+        department: "Endocrinology",
+        appointmentAt: "2026-06-27"
+      })
+    }));
+    assert.equal(denied.response.status, 403);
+  });
+
   await t.test("enforces personal record ownership and protects record identity", async () => {
     const ownRecords = await api(baseUrl, "/api/personal-records?residentId=r1", authorized(citizenToken));
     assert.equal(ownRecords.response.status, 200);

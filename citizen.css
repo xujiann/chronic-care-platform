@@ -306,6 +306,60 @@ select,
   margin-bottom: 16px;
 }
 
+.escort-appointment-panel {
+  margin-bottom: 16px;
+}
+
+.escort-appointment-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.9fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.escort-appointment-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: #f8fbfd;
+}
+
+.escort-appointment-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.escort-appointment-form label.full,
+.escort-appointment-form button {
+  grid-column: 1 / -1;
+}
+
+.escort-appointment-form input,
+.escort-appointment-form select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+
+.escort-appointment-form select[multiple] {
+  min-height: 92px;
+}
+
+.escort-order-card {
+  border-left: 4px solid var(--teal);
+}
+
 .lifecycle-grid {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -1067,6 +1121,8 @@ dialog::backdrop {
 
   .summary-grid,
   .citizen-trend-grid,
+  .escort-appointment-layout,
+  .escort-appointment-form,
   .lifecycle-grid,
   .two-column,
   .account-panel,

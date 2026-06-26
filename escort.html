@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>助医陪诊信息平台</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+    <script>window.HealthCityAuth.requireRole(["commission"])</script>
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>助医陪诊信息平台</span>
+          <h1>服务主体名录、陪诊师队伍、订单闭环和质量监管</h1>
+          <p>面向老年人就医陪同场景，串联养老服务机构、陪诊师、医疗机构导诊、补贴保障、合同保险、风险预案和服务质量监测。</p>
+        </div>
+        <nav>
+          <a href="./platform.html">平台驾驶舱</a>
+          <a href="./workbench.html">运营工作台</a>
+          <a href="./index.html">卫健委端</a>
+          <a href="./about.html">关于</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" id="escort-metrics"></section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>陪诊订单闭环</h2>
+            <span id="escort-boundary"></span>
+          </div>
+          <div id="escort-orders" class="table-wrap"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>新增陪诊申请</h2>
+            <span>生成订单、任务和审计记录</span>
+          </div>
+          <form id="escort-order-form" class="filter-grid">
+            <label>居民 ID<input name="residentId" value="r1" /></label>
+            <label>服务主体
+              <select name="providerId" id="escort-provider-select"></select>
+            </label>
+            <label>医院<input name="hospital" value="Dalian Central Hospital outpatient clinic demo" /></label>
+            <label>科室<input name="department" value="Cardiology" /></label>
+            <label>预约日期<input name="appointmentAt" type="date" /></label>
+            <label>补贴类型
+              <select name="subsidyType">
+                <option value="80plus-living-alone">80plus-living-alone</option>
+                <option value="low-income">low-income</option>
+                <option value="time-bank">time-bank</option>
+                <option value="self-pay">self-pay</option>
+              </select>
+            </label>
+            <label>优先级
+              <select name="priority">
+                <option value="high">high</option>
+                <option value="medium">medium</option>
+                <option value="normal">normal</option>
+              </select>
+            </label>
+            <label class="full">服务内容<input name="serviceItems" value="mobility assistance,registration,exam escort,family communication" /></label>
+            <button class="inline-action" type="submit">提交申请</button>
+          </form>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel">
+          <div class="panel-title">
+            <h2>服务主体名录</h2>
+            <span>机构能力、收费、保险和发布状态</span>
+          </div>
+          <div id="escort-providers" class="table-wrap"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>陪诊师队伍</h2>
+            <span>培训、考核、保险和技能</span>
+          </div>
+          <div id="escort-workers" class="table-wrap"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel">
+          <div class="panel-title">
+            <h2>风险队列</h2>
+            <span>高龄、合同、应急和质量回访</span>
+          </div>
+          <div id="escort-risks" class="rules"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>政策映射</h2>
+            <span>试点方案到系统能力</span>
+          </div>
+          <div id="escort-policy" class="rules"></div>
+        </article>
+      </section>
+    </main>
+
+    <script src="./shared.js"></script>
+    <script src="./escort.js"></script>
+  </body>
+</html>

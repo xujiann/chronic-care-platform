@@ -1278,10 +1278,10 @@
     {
       "id": "birth-cert-016c9f75-b5c1-43d6-bb20-361b3665c97d",
       "certificateNo": "TEST-BIRTH-1782178052805",
-      "certificateVersion": "待补充",
-      "issueType": "待补充",
-      "newbornName": "待补充",
-      "newbornGender": "demo-placeholder",
+      "certificateVersion": "???",
+      "issueType": "????",
+      "newbornName": "?????",
+      "newbornGender": "?",
       "birthDateTime": "2026-06-23 09:30",
       "gestationalWeeks": 40,
       "birthWeight": 2400,
@@ -1291,24 +1291,24 @@
       "residentId": "r1",
       "maternalResidentId": "r1",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
-      "motherName": "demo-placeholder",
+      "motherName": "??",
       "motherDocumentNo": "DEMO-ID-R1",
-      "fatherName": "demo-placeholder",
+      "fatherName": "??",
       "fatherDocumentNo": "",
       "issuingInstitutionId": "MR1",
-      "issuingInstitution": "待补充",
-      "issuingPhysician": "待补充",
+      "issuingInstitution": "???????",
+      "issuingPhysician": "????",
       "applicantName": "演示居民A",
       "applicantRelation": "母亲",
       "materials": [],
-      "status": "待补充",
+      "status": "???",
       "electronicLicenseStatus": "待生成",
       "publicSecuritySync": "未共享",
       "maternalChildSync": "待入册",
       "qualityCheck": "待复核",
       "issueDeadline": "出生后及时办理，签发登记留痕",
       "healthManagementStatus": "待新生儿访视",
-      "nextService": "待补充",
+      "nextService": "????????",
       "createdBy": "hospital",
       "createdByName": "医疗机构管理员",
       "createdAt": "2026-06-23T01:27:32.820Z",
@@ -3730,7 +3730,7 @@
       "department": "Cardiology",
       "applicantDoctor": "doc-liu",
       "receivingDoctor": "doc-wang",
-      "residentAuthorizationId": "auth-r1-referral-demo",
+      "residentAuthorizationId": "pr-auth-r1",
       "authorizationStatus": "authorized",
       "status": "scheduled",
       "priority": "high",
@@ -3747,7 +3747,7 @@
       "reportStatus": "pending-return",
       "reportReturnedAt": "",
       "reportSummary": "",
-      "collaborationOrderId": "cco-001",
+      "collaborationOrderId": "cco-004",
       "performance": {
         "responseHours": 4,
         "reportReturnHours": 0,
@@ -3780,7 +3780,7 @@
       "department": "Family doctor studio",
       "applicantDoctor": "doc-wang",
       "receivingDoctor": "doc-liu",
-      "residentAuthorizationId": "auth-r4-referral-demo",
+      "residentAuthorizationId": "pr-auth-r4",
       "authorizationStatus": "authorized",
       "status": "report-returned",
       "priority": "medium",
@@ -3796,7 +3796,7 @@
       "reportStatus": "returned",
       "reportReturnedAt": "2026-06-21",
       "reportSummary": "Continue eight-week long prescription follow-up and weekly blood pressure upload.",
-      "collaborationOrderId": "cco-001",
+      "collaborationOrderId": "cco-005",
       "performance": {
         "responseHours": 2,
         "reportReturnHours": 18,
@@ -3817,6 +3817,316 @@
         }
       ],
       "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
+    }
+  ],
+  "escortServicePolicy": {
+    "id": "escort-policy-shanghai-pilot-2025",
+    "name": "Older adult medical escort service pilot",
+    "source": "Shanghai older adult medical escort pilot plan, January 2025",
+    "scope": [
+      "service catalog",
+      "trained escort workers",
+      "provider registry",
+      "pricing and subsidy",
+      "risk control",
+      "quality monitoring"
+    ],
+    "pilotDistricts": [
+      "Pudong",
+      "Yangpu",
+      "Songjiang",
+      "Xuhui",
+      "Changning",
+      "Putuo",
+      "Jing'an",
+      "Hongkou",
+      "Huangpu"
+    ],
+    "serviceItems": [
+      "mobility assistance",
+      "registration",
+      "exam escort",
+      "payment and medication pickup",
+      "family communication",
+      "psychological comfort"
+    ],
+    "providerEntryRule": "Provider must have trained escort workers and regular professional service capacity before public registry publication.",
+    "trainingTargetPerDistrict": 100,
+    "statusCatalog": [
+      "requested",
+      "matched",
+      "contract-pending",
+      "in-service",
+      "completed",
+      "quality-review",
+      "closed",
+      "cancelled"
+    ],
+    "requiredEvidence": [
+      "service contract",
+      "worker training certificate",
+      "liability insurance",
+      "emergency plan",
+      "quality review",
+      "complaint disposition"
+    ],
+    "subsidyRules": [
+      {
+        "group": "low-income",
+        "coverage": "government subsidy or purchase-of-service guarantee"
+      },
+      {
+        "group": "80plus-living-alone",
+        "coverage": "low-price inclusive service package"
+      },
+      {
+        "group": "time-bank",
+        "coverage": "volunteer service hour exchange"
+      }
+    ],
+    "integrationTargets": [
+      "elder-care service platform",
+      "hospital outpatient guidance",
+      "non-emergency transfer",
+      "volunteer time bank"
+    ]
+  },
+  "escortServiceProviders": [
+    {
+      "id": "esp-pudong-carehub",
+      "name": "Pudong Elder Care Service Center",
+      "district": "Pudong",
+      "type": "elder-care-institution",
+      "institutionCode": "ORG-HOSPITAL",
+      "serviceCapacity": "regular",
+      "trainedWorkers": 128,
+      "published": true,
+      "pricing": {
+        "baseFee": 160,
+        "halfDayFee": 260,
+        "fullDayFee": 420,
+        "subsidyAccepted": true
+      },
+      "insurance": "liability-insurance-active",
+      "emergencyPlan": "hospital-fall-and-transfer-plan-v1",
+      "status": "published",
+      "qualityScore": 92,
+      "contact": "escort-demo-pudong"
+    },
+    {
+      "id": "esp-xuhui-daycare",
+      "name": "Xuhui Community Day-care Escort Team",
+      "district": "Xuhui",
+      "type": "community-day-care",
+      "institutionCode": "ORG-COMMUNITY",
+      "serviceCapacity": "regular",
+      "trainedWorkers": 104,
+      "published": true,
+      "pricing": {
+        "baseFee": 120,
+        "halfDayFee": 220,
+        "fullDayFee": 360,
+        "subsidyAccepted": true
+      },
+      "insurance": "liability-insurance-active",
+      "emergencyPlan": "community-emergency-contact-plan",
+      "status": "published",
+      "qualityScore": 88,
+      "contact": "escort-demo-xuhui"
+    },
+    {
+      "id": "esp-hongkou-volunteer",
+      "name": "Hongkou Time-bank Escort Service Station",
+      "district": "Hongkou",
+      "type": "time-bank-volunteer",
+      "institutionCode": "ORG-COUNTY",
+      "serviceCapacity": "pilot",
+      "trainedWorkers": 96,
+      "published": false,
+      "pricing": {
+        "baseFee": 0,
+        "halfDayFee": 80,
+        "fullDayFee": 160,
+        "subsidyAccepted": true
+      },
+      "insurance": "municipal-volunteer-insurance",
+      "emergencyPlan": "volunteer-supervision-plan",
+      "status": "training-gap",
+      "qualityScore": 81,
+      "contact": "escort-demo-hongkou"
+    }
+  ],
+  "escortWorkers": [
+    {
+      "id": "ew-pd-001",
+      "providerId": "esp-pudong-carehub",
+      "name": "Escort Worker A",
+      "district": "Pudong",
+      "trainingHours": 42,
+      "examStatus": "passed",
+      "skills": [
+        "mobility assistance",
+        "exam escort",
+        "family communication"
+      ],
+      "insuranceStatus": "covered",
+      "status": "available"
+    },
+    {
+      "id": "ew-pd-002",
+      "providerId": "esp-pudong-carehub",
+      "name": "Escort Worker B",
+      "district": "Pudong",
+      "trainingHours": 38,
+      "examStatus": "passed",
+      "skills": [
+        "registration",
+        "payment and medication pickup"
+      ],
+      "insuranceStatus": "covered",
+      "status": "assigned"
+    },
+    {
+      "id": "ew-xh-001",
+      "providerId": "esp-xuhui-daycare",
+      "name": "Escort Worker C",
+      "district": "Xuhui",
+      "trainingHours": 40,
+      "examStatus": "passed",
+      "skills": [
+        "mobility assistance",
+        "psychological comfort"
+      ],
+      "insuranceStatus": "covered",
+      "status": "available"
+    },
+    {
+      "id": "ew-hk-001",
+      "providerId": "esp-hongkou-volunteer",
+      "name": "Escort Volunteer D",
+      "district": "Hongkou",
+      "trainingHours": 28,
+      "examStatus": "pending",
+      "skills": [
+        "registration",
+        "family communication"
+      ],
+      "insuranceStatus": "covered",
+      "status": "training"
+    }
+  ],
+  "escortServiceOrders": [
+    {
+      "id": "eso-r1-20260622",
+      "residentId": "r1",
+      "providerId": "esp-pudong-carehub",
+      "workerId": "ew-pd-002",
+      "district": "Pudong",
+      "hospital": "Dalian Central Hospital outpatient clinic demo",
+      "department": "Cardiology",
+      "appointmentAt": "2026-06-23",
+      "due": "2026-06-23",
+      "serviceItems": [
+        "mobility assistance",
+        "registration",
+        "exam escort",
+        "payment and medication pickup"
+      ],
+      "status": "matched",
+      "priority": "high",
+      "riskLevel": "high",
+      "subsidyType": "80plus-living-alone",
+      "feeEstimate": 120,
+      "contractStatus": "signed",
+      "insuranceStatus": "covered",
+      "transportLink": "non-emergency-transfer-ready",
+      "familyContactStatus": "notified",
+      "qualityReview": "pending",
+      "complaintStatus": "none",
+      "satisfaction": "pending",
+      "sourceChannel": "community-worker",
+      "auditTrail": [
+        {
+          "at": "2026-06-22",
+          "action": "match-worker",
+          "by": "system",
+          "note": "High-risk older adult matched with trained worker."
+        }
+      ]
+    },
+    {
+      "id": "eso-r4-20260623",
+      "residentId": "r4",
+      "providerId": "esp-xuhui-daycare",
+      "workerId": "ew-xh-001",
+      "district": "Xuhui",
+      "hospital": "Community follow-up clinic demo",
+      "department": "Endocrinology",
+      "appointmentAt": "2026-06-24",
+      "due": "2026-06-24",
+      "serviceItems": [
+        "registration",
+        "exam escort",
+        "family communication",
+        "psychological comfort"
+      ],
+      "status": "contract-pending",
+      "priority": "medium",
+      "riskLevel": "medium",
+      "subsidyType": "low-income",
+      "feeEstimate": 80,
+      "contractStatus": "pending",
+      "insuranceStatus": "covered",
+      "transportLink": "family-arranged",
+      "familyContactStatus": "pending",
+      "qualityReview": "pending",
+      "complaintStatus": "none",
+      "satisfaction": "pending",
+      "sourceChannel": "family-proxy",
+      "auditTrail": [
+        {
+          "at": "2026-06-22",
+          "action": "request-created",
+          "by": "family-proxy",
+          "note": "Contract confirmation pending."
+        }
+      ]
+    },
+    {
+      "id": "eso-r2-20260621",
+      "residentId": "r2",
+      "providerId": "esp-hongkou-volunteer",
+      "workerId": "ew-hk-001",
+      "district": "Hongkou",
+      "hospital": "Specialist outpatient demo",
+      "department": "Ophthalmology",
+      "appointmentAt": "2026-06-21",
+      "due": "2026-06-22",
+      "serviceItems": [
+        "registration",
+        "family communication"
+      ],
+      "status": "quality-review",
+      "priority": "medium",
+      "riskLevel": "medium",
+      "subsidyType": "time-bank",
+      "feeEstimate": 0,
+      "contractStatus": "signed",
+      "insuranceStatus": "covered",
+      "transportLink": "not-required",
+      "familyContactStatus": "completed",
+      "qualityReview": "follow-up-call-required",
+      "complaintStatus": "none",
+      "satisfaction": "pending",
+      "sourceChannel": "time-bank",
+      "auditTrail": [
+        {
+          "at": "2026-06-21",
+          "action": "service-completed",
+          "by": "escort-worker",
+          "note": "Quality review callback required."
+        }
+      ]
     }
   ],
   "taskMessages": [],
@@ -4215,17 +4525,17 @@
   ],
   "dataAccessLogs": [
     {
-      "id": "dal-research-sandbox-demo",
-      "residentId": "r1",
-      "actor": "demo-placeholder",
+      "id": "dal-research-sandbox-escort-restore",
+      "at": "2026-06-26T12:30:39.543Z",
+      "actor": "system",
       "role": "commission",
-      "scope": "research sandbox",
-      "purpose": "research dataset access audit",
+      "residentId": "r1",
+      "scope": "researchSandbox",
+      "purpose": "research dataset sandbox readiness evidence",
       "result": "allowed",
-      "at": "2026-06-23T09:00:00.000Z",
       "previousAuditHash": "724e15a086a78f0f0c882d55a0182621f656be5da01bfc31dd1aa2acd65dc7e6",
-      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
-      "auditHash": "15b00b57c9f4eb3e366b4470b28119bf4c5e8312c953fe0d6929d4fa21688b57"
+      "auditHash": "d75c4f1abaa0fd585f8a2825b5fb7c0d1b96ac3d56610641f25971413dae8376",
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "al1",
@@ -4282,6 +4592,162 @@
   ],
   "securityEvents": [
     {
+      "id": "0e313e5f-671f-45f7-bee1-00311ddcadf6",
+      "at": "2026/6/26 21:13:43",
+      "actor": "演示居民A",
+      "role": "citizen",
+      "action": "登录",
+      "target": "citizen.html",
+      "result": "允许",
+      "detail": "签名会话已签发，支持密钥轮换校验",
+      "previousAuditHash": "09554363dce8c86968826301bdbb2ef80ffac69bd6ce6a5345d24a3fbc8169f6",
+      "auditHash": "0ba1e97b817b8fd1ead81e199ba8f8ff58815c131a9e349b32969bf2755c646f"
+    },
+    {
+      "id": "8e2995cb-c5a3-4c2b-b339-e39b33a586f0",
+      "at": "2026/6/26 20:58:08",
+      "actor": "anonymous",
+      "role": "anonymous",
+      "action": "访问接口",
+      "target": "/api/escort-services/dashboard",
+      "result": "拒绝",
+      "detail": "未登录或会话已过期",
+      "previousAuditHash": "878b640a809fa3cbdd7550855e0aa65e2b57cd7e84c3276877cf687f2c6daa36",
+      "auditHash": "09554363dce8c86968826301bdbb2ef80ffac69bd6ce6a5345d24a3fbc8169f6"
+    },
+    {
+      "id": "ca23e987-e025-468b-aab7-b78a37064ce1",
+      "at": "2026/6/26 20:38:47",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "签名会话已签发，支持密钥轮换校验",
+      "previousAuditHash": "923e3cd29f64898154997249468818f4c12e0d5d73bbfa6840577afed2940cf9",
+      "auditHash": "878b640a809fa3cbdd7550855e0aa65e2b57cd7e84c3276877cf687f2c6daa36"
+    },
+    {
+      "id": "460c6622-ad75-4437-a4bc-d229b33e3003",
+      "at": "2026/6/26 20:38:30",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "签名会话已签发，支持密钥轮换校验",
+      "previousAuditHash": "3856163810aad7291d0a7b05463c527f92fe8b2cdaab26055d701458edac7ac0",
+      "auditHash": "923e3cd29f64898154997249468818f4c12e0d5d73bbfa6840577afed2940cf9"
+    },
+    {
+      "id": "bde39bdc-4d06-44cc-9833-5006746492b4",
+      "at": "2026/6/26 20:35:41",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "签名会话已签发，支持密钥轮换校验",
+      "previousAuditHash": "eecf40f8332de65494850ab8c02e9220260cf19f528115c16d65adf6f5f3adb2",
+      "auditHash": "3856163810aad7291d0a7b05463c527f92fe8b2cdaab26055d701458edac7ac0"
+    },
+    {
+      "id": "2c31f5ab-7aa8-4f2f-95e2-0de360bf9b70",
+      "at": "2026/6/26 20:35:33",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "签名会话已签发，支持密钥轮换校验",
+      "previousAuditHash": "bc749dc5fdd5be85ae52b6484da7d6138bf9f337c68cff47131e11eab8c358bf",
+      "auditHash": "eecf40f8332de65494850ab8c02e9220260cf19f528115c16d65adf6f5f3adb2"
+    },
+    {
+      "id": "9a33bb5e-bc68-4688-afc6-f960044af90c",
+      "at": "2026/6/26 20:35:27",
+      "actor": "anonymous",
+      "role": "anonymous",
+      "action": "访问接口",
+      "target": "/api/escort-services/dashboard",
+      "result": "拒绝",
+      "detail": "未登录或会话已过期",
+      "previousAuditHash": "c20d7a230261c874d38e1819daadc8e7e8d7c43a210d83fac682a5cc4754458f",
+      "auditHash": "bc749dc5fdd5be85ae52b6484da7d6138bf9f337c68cff47131e11eab8c358bf"
+    },
+    {
+      "id": "61a8bd51-d2ab-4d2c-a1fe-b665ddd3f159",
+      "at": "2026/6/26 20:35:27",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "签名会话已签发，支持密钥轮换校验",
+      "previousAuditHash": "190125ec8c8d9cac5aa2a74644f7aa833553bd4776a7e86beeebc079f855a343",
+      "auditHash": "c20d7a230261c874d38e1819daadc8e7e8d7c43a210d83fac682a5cc4754458f"
+    },
+    {
+      "id": "ced0b9d5-3420-4ba3-aacc-00bc4d742d4d",
+      "at": "2026/6/26 20:35:03",
+      "actor": "anonymous",
+      "role": "anonymous",
+      "action": "访问接口",
+      "target": "/api/escort-services/dashboard",
+      "result": "拒绝",
+      "detail": "未登录或会话已过期",
+      "previousAuditHash": "2c132c5f39f6395c32e7589b236b8d000d7a3a4debd209cb4b29625310adcbe1",
+      "auditHash": "190125ec8c8d9cac5aa2a74644f7aa833553bd4776a7e86beeebc079f855a343"
+    },
+    {
+      "id": "082c6d2b-5efa-4a05-81bf-f336a48df33b",
+      "at": "2026/6/26 20:34:45",
+      "actor": "anonymous",
+      "role": "anonymous",
+      "action": "访问接口",
+      "target": "/api/escort-services/dashboard",
+      "result": "拒绝",
+      "detail": "未登录或会话已过期",
+      "previousAuditHash": "7d0c2a0b1cb2c886de5272e84fc85f6ff1bc3bf6b279449512f433c0de9e13bf",
+      "auditHash": "2c132c5f39f6395c32e7589b236b8d000d7a3a4debd209cb4b29625310adcbe1"
+    },
+    {
+      "id": "871d3b1b-259d-4de9-b89d-78bd41784de5",
+      "at": "2026/6/26 09:27:17",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "签名会话已签发，支持密钥轮换校验",
+      "previousAuditHash": "c52cfed696f6bbf3a735edf297f64476d544da9c635cb7afa6ebee34327550ff",
+      "auditHash": "7d0c2a0b1cb2c886de5272e84fc85f6ff1bc3bf6b279449512f433c0de9e13bf"
+    },
+    {
+      "id": "dc36f866-3762-4906-be23-c023c4913db3",
+      "at": "2026/6/26 09:20:08",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "签名会话已签发，支持密钥轮换校验",
+      "previousAuditHash": "5f4fbe8962f13277684eb3f39d79c164e34f9ccbf9462018d2fd95ac1e59d0a2",
+      "auditHash": "c52cfed696f6bbf3a735edf297f64476d544da9c635cb7afa6ebee34327550ff"
+    },
+    {
+      "id": "71d51161-c651-4510-8e93-00e0920c6a95",
+      "at": "2026/6/25 15:57:12",
+      "actor": "anonymous",
+      "role": "anonymous",
+      "action": "访问接口",
+      "target": "/api/priority-applications/templates",
+      "result": "拒绝",
+      "detail": "未登录或会话已过期",
+      "previousAuditHash": "03842798317f4f40280a626c2a3f62cd7205fef1da1c51334703a4772a5ca583",
+      "auditHash": "5f4fbe8962f13277684eb3f39d79c164e34f9ccbf9462018d2fd95ac1e59d0a2"
+    },
+    {
       "id": "f14270da-8a16-4664-99aa-765ff76a980e",
       "at": "2026/6/23 13:46:23",
       "actor": "大连市卫生健康委管理员",
@@ -4290,8 +4756,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "签名会话已签发，支持密钥轮换校验",
-      "previousAuditHash": "f2f254725ac851a465468d7d49dfe47a14419f60186a28fabd80f80ee39431a9",
-      "auditHash": "49c0332ef2f1697640f90e3393c7aae27e65b63be031394b398d4cbc3fd543ae"
+      "previousAuditHash": "b53d49610f2c40bc4ddb764e2e7f9aee3d10165aebf35dc2a5df0990135a8f3f",
+      "auditHash": "03842798317f4f40280a626c2a3f62cd7205fef1da1c51334703a4772a5ca583"
     },
     {
       "id": "bbd9385d-c40f-4ad1-a109-0c0c799c4f82",
@@ -4302,8 +4768,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "签名会话已签发，支持密钥轮换校验",
-      "previousAuditHash": "6cc38fa283476e3fa2982c5112f1951444f5cc549269b7a3f1f9dc23f01a55c0",
-      "auditHash": "f2f254725ac851a465468d7d49dfe47a14419f60186a28fabd80f80ee39431a9"
+      "previousAuditHash": "63018e3c0863c3f903ac7e30a402f01b5df01d9434781fad4715d6c0f88029bb",
+      "auditHash": "b53d49610f2c40bc4ddb764e2e7f9aee3d10165aebf35dc2a5df0990135a8f3f"
     },
     {
       "id": "9e19f609-cee8-4776-843d-fe70c5c8aa22",
@@ -4314,8 +4780,8 @@
       "target": "/api/birth-certificates",
       "result": "拒绝",
       "detail": "需要角色：institution、commission",
-      "previousAuditHash": "3f0c8df84d6ec574531dfe5a0c221c37b2a7224cc787d889b42a2d1e49bd35b5",
-      "auditHash": "6cc38fa283476e3fa2982c5112f1951444f5cc549269b7a3f1f9dc23f01a55c0"
+      "previousAuditHash": "cdcc850889c71080ccbb21c9a6866b9459db5f4a59cdcf19f4a7f9cc8700da33",
+      "auditHash": "63018e3c0863c3f903ac7e30a402f01b5df01d9434781fad4715d6c0f88029bb"
     },
     {
       "id": "df65e737-1a1f-43a5-a965-dd413a66e1d3",
@@ -4326,8 +4792,8 @@
       "target": "TEST-BIRTH-1782178128044",
       "result": "允许",
       "detail": "测试新生儿 · 首次签发 · 大连市中心医院",
-      "previousAuditHash": "92a54878553021a45105ca10b38dd308dba5a1633b6305cce89deb31dd2a9187",
-      "auditHash": "3f0c8df84d6ec574531dfe5a0c221c37b2a7224cc787d889b42a2d1e49bd35b5"
+      "previousAuditHash": "98247121bf7c43d915978af62c5163bd53fed0e8cc046997cf8daad2c73050b5",
+      "auditHash": "cdcc850889c71080ccbb21c9a6866b9459db5f4a59cdcf19f4a7f9cc8700da33"
     },
     {
       "id": "19dc0735-52b8-4747-b337-b0a731a48418",
@@ -4338,8 +4804,8 @@
       "target": "citizen.html",
       "result": "允许",
       "detail": "签名会话已签发，支持密钥轮换校验",
-      "previousAuditHash": "5515bc68cbff4112a5fa752597208ebc1cf390b304653372fb6f67037dbe363b",
-      "auditHash": "92a54878553021a45105ca10b38dd308dba5a1633b6305cce89deb31dd2a9187"
+      "previousAuditHash": "237af5f1c58fd483c78ec555c447f78a759bc992cad40055ad1ab2adeb903802",
+      "auditHash": "98247121bf7c43d915978af62c5163bd53fed0e8cc046997cf8daad2c73050b5"
     },
     {
       "id": "5e8c310a-43cb-4592-a46d-32729ee34e8d",
@@ -4350,8 +4816,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "签名会话已签发，支持密钥轮换校验",
-      "previousAuditHash": "8d3fbd0b89034b02df43d7eeacf1e4b8db6ca053c975b590a5a3e6c24a825fdc",
-      "auditHash": "5515bc68cbff4112a5fa752597208ebc1cf390b304653372fb6f67037dbe363b"
+      "previousAuditHash": "5be447676148ae52ff063d80549ab7fe2597ea9625c38cc0db8188b782517290",
+      "auditHash": "237af5f1c58fd483c78ec555c447f78a759bc992cad40055ad1ab2adeb903802"
     },
     {
       "id": "5d45a812-e1a5-4d6e-8691-bb993a97910d",
@@ -4362,8 +4828,8 @@
       "target": "institution.html",
       "result": "允许",
       "detail": "签名会话已签发，支持密钥轮换校验",
-      "previousAuditHash": "d59438286d06277bd83a948b305d01e45933350b5ba0c5305a0c45f75700521b",
-      "auditHash": "8d3fbd0b89034b02df43d7eeacf1e4b8db6ca053c975b590a5a3e6c24a825fdc"
+      "previousAuditHash": "270124ba35fd3671824e18eda57f9b82ea12b14ace7257cf3099e072b7ea8591",
+      "auditHash": "5be447676148ae52ff063d80549ab7fe2597ea9625c38cc0db8188b782517290"
     },
     {
       "id": "e92ba174-1685-4b59-a82f-258e817a0062",
@@ -4374,8 +4840,8 @@
       "target": "/api/birth-certificates",
       "result": "拒绝",
       "detail": "需要角色：institution、commission",
-      "previousAuditHash": "c670f2c5445c75a74c671bcdfdf7e64de391e9e976c3941d12b61193830551e3",
-      "auditHash": "d59438286d06277bd83a948b305d01e45933350b5ba0c5305a0c45f75700521b"
+      "previousAuditHash": "acaeb852c7ffa830932f732ff091be2a19086260f82e01abee716583506503c2",
+      "auditHash": "270124ba35fd3671824e18eda57f9b82ea12b14ace7257cf3099e072b7ea8591"
     },
     {
       "id": "91817ca2-2f0f-40c7-9317-3db18ccfdd28",
@@ -4385,9 +4851,9 @@
       "action": "登记出生医学证明",
       "target": "TEST-BIRTH-1782178052805",
       "result": "允许",
-      "detail": "待补充 · 待补充 · 待补充",
-      "previousAuditHash": "322e53f55759f02f7b9f1f51c1adb1cb09be60df2fc2b3b4fecb19d0d131af01",
-      "auditHash": "c670f2c5445c75a74c671bcdfdf7e64de391e9e976c3941d12b61193830551e3"
+      "detail": "????? · ???? · ???????",
+      "previousAuditHash": "8218ef855f97d1a0380c6d30cf43a312e939135cdb7f0ded63d8738d865baf43",
+      "auditHash": "acaeb852c7ffa830932f732ff091be2a19086260f82e01abee716583506503c2"
     },
     {
       "id": "c52d215f-645a-4a31-b4a2-b8e8a6baf4d7",
@@ -4398,8 +4864,8 @@
       "target": "citizen.html",
       "result": "允许",
       "detail": "签名会话已签发，支持密钥轮换校验",
-      "previousAuditHash": "32e66f815c0342f9cb70466c2ce4dc64ef96eb78bc1e77cfb80934de5c4e82a1",
-      "auditHash": "322e53f55759f02f7b9f1f51c1adb1cb09be60df2fc2b3b4fecb19d0d131af01"
+      "previousAuditHash": "23c8c8476a0809c1456d4f5cda152467def24e060bd16a4acc307f60988514a7",
+      "auditHash": "8218ef855f97d1a0380c6d30cf43a312e939135cdb7f0ded63d8738d865baf43"
     },
     {
       "id": "a6ede5e6-f511-43cc-a8f5-ad8380623280",
@@ -4410,8 +4876,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "签名会话已签发，支持密钥轮换校验",
-      "previousAuditHash": "3b571a72075cb9f249a2a3c425003334478ce12a6596cc0c536bf82b41d65f0f",
-      "auditHash": "32e66f815c0342f9cb70466c2ce4dc64ef96eb78bc1e77cfb80934de5c4e82a1"
+      "previousAuditHash": "753a9b8d8eaf826ff15524237a62f7f29b032e1debee4d5e936f0808a6837ca2",
+      "auditHash": "23c8c8476a0809c1456d4f5cda152467def24e060bd16a4acc307f60988514a7"
     },
     {
       "id": "f6c33bd0-d7ce-4040-b7c9-5d1620836447",
@@ -4422,8 +4888,8 @@
       "target": "institution.html",
       "result": "允许",
       "detail": "签名会话已签发，支持密钥轮换校验",
-      "previousAuditHash": "8ae5bf4478785a5440adbed6a79299e5b73c0b735183c778e86b27c60af2b0f8",
-      "auditHash": "3b571a72075cb9f249a2a3c425003334478ce12a6596cc0c536bf82b41d65f0f"
+      "previousAuditHash": "db98ff1db1cd3fb7fd3433c7e2513f42a35f9dcad923b35f18e842e0c69dfac3",
+      "auditHash": "753a9b8d8eaf826ff15524237a62f7f29b032e1debee4d5e936f0808a6837ca2"
     },
     {
       "id": "7d9e5f96-6450-4af8-822b-13fca06e9644",
@@ -4434,8 +4900,8 @@
       "target": "workbench.html",
       "result": "允许",
       "detail": "签名会话已签发，支持密钥轮换校验",
-      "previousAuditHash": "85d795b2bc4cf3d89f8c677083cbe462f0053816dbb8fd90e2bca725430149df",
-      "auditHash": "8ae5bf4478785a5440adbed6a79299e5b73c0b735183c778e86b27c60af2b0f8"
+      "previousAuditHash": "6f2d722ce19239f64ae795eb0386eeae7807a6bc37e49087fbdbc9fd1ddcb510",
+      "auditHash": "db98ff1db1cd3fb7fd3433c7e2513f42a35f9dcad923b35f18e842e0c69dfac3"
     },
     {
       "id": "d8f89ac0-936b-4403-9030-ce47b068f954",
@@ -4446,8 +4912,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "签名会话已签发，支持密钥轮换校验",
-      "previousAuditHash": "55c3abe78555b2672dc1b0f8267e067afab8d771715ac60247e04fced953bdaf",
-      "auditHash": "85d795b2bc4cf3d89f8c677083cbe462f0053816dbb8fd90e2bca725430149df"
+      "previousAuditHash": "f002aff318797606f7c92fc3141e4d3d98d7aa2946172bb46f98f487b5ea1755",
+      "auditHash": "6f2d722ce19239f64ae795eb0386eeae7807a6bc37e49087fbdbc9fd1ddcb510"
     },
     {
       "id": "0dad9245-4063-4b99-8ef6-167281e3f615",
@@ -4458,8 +4924,8 @@
       "target": "/api/state",
       "result": "允许",
       "detail": "全量保存平台数据",
-      "previousAuditHash": "29cff6acd6e98f23e25428893709316976c1539dcdd74799f6ae9f43d635ea69",
-      "auditHash": "55c3abe78555b2672dc1b0f8267e067afab8d771715ac60247e04fced953bdaf"
+      "previousAuditHash": "4612f8b4901581cfda7e5b6777339bf58a7a9b0f5cc50aff181e96042c72e198",
+      "auditHash": "f002aff318797606f7c92fc3141e4d3d98d7aa2946172bb46f98f487b5ea1755"
     },
     {
       "id": "048daa79-e7a2-43b6-93e3-6514215d47ff",
@@ -4470,8 +4936,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "defa9cfcf94449ba69aa0c5c6eba0345c36d6bc375fd1bab391573d25ec52e0e",
-      "auditHash": "29cff6acd6e98f23e25428893709316976c1539dcdd74799f6ae9f43d635ea69"
+      "previousAuditHash": "a85e55d17df184449e1bd43c286122a0f5f56dd4a3da0085e15666bb095fbfc8",
+      "auditHash": "4612f8b4901581cfda7e5b6777339bf58a7a9b0f5cc50aff181e96042c72e198"
     },
     {
       "id": "56be4c3b-e9ea-4f15-9940-516c428827dc",
@@ -4482,8 +4948,8 @@
       "target": "/api/state",
       "result": "允许",
       "detail": "全量保存平台数据",
-      "previousAuditHash": "b01eac6bd439be082ff40491531678fb27c8ad8d51a23a7f6dc3adc091780806",
-      "auditHash": "defa9cfcf94449ba69aa0c5c6eba0345c36d6bc375fd1bab391573d25ec52e0e"
+      "previousAuditHash": "f81c679bf1ddccca16627a460dc92c48f74299367b3458d2117191f550410068",
+      "auditHash": "a85e55d17df184449e1bd43c286122a0f5f56dd4a3da0085e15666bb095fbfc8"
     },
     {
       "id": "e62c1837-b9c3-4f2c-9ab3-e961b20640fe",
@@ -4494,8 +4960,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "85739444fb9eea03b86fe4bdddb9e22cfcfb2f28dd34c1aea17bd54329b0f18b",
-      "auditHash": "b01eac6bd439be082ff40491531678fb27c8ad8d51a23a7f6dc3adc091780806"
+      "previousAuditHash": "efc62de46d342e182f798edba22029307d41d035d8bed972670f9003814830ad",
+      "auditHash": "f81c679bf1ddccca16627a460dc92c48f74299367b3458d2117191f550410068"
     },
     {
       "id": "0207e69d-2b5a-4ecb-b01b-d68267c31f4b",
@@ -4506,8 +4972,8 @@
       "target": "/api/state",
       "result": "允许",
       "detail": "全量保存平台数据",
-      "previousAuditHash": "31612d15143f23384766756ba1e82221e7313d5c2d8002ee4f6d838980843225",
-      "auditHash": "85739444fb9eea03b86fe4bdddb9e22cfcfb2f28dd34c1aea17bd54329b0f18b"
+      "previousAuditHash": "8a2a834ea7ac0d6b1e93cfb21e349c78a33867be251e5cef01296158081c0409",
+      "auditHash": "efc62de46d342e182f798edba22029307d41d035d8bed972670f9003814830ad"
     },
     {
       "id": "520a7742-a7cb-4896-a12d-bfeae26f9496",
@@ -4518,8 +4984,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "836a499d352379ef34b9f272b288a09dedc8d849bde9e9aabd21b3d685209219",
-      "auditHash": "31612d15143f23384766756ba1e82221e7313d5c2d8002ee4f6d838980843225"
+      "previousAuditHash": "774fddd15da0fb9b21293045f8a21049c71b8872ca2440be069ea39eb4a3ea24",
+      "auditHash": "8a2a834ea7ac0d6b1e93cfb21e349c78a33867be251e5cef01296158081c0409"
     },
     {
       "id": "a61a76c7-7a7b-41de-a62a-7b297a0ccd9c",
@@ -4530,8 +4996,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "5aecebca82cd8bd755521fddd5e690f8636778c22eba4169f7ac1784d2275169",
-      "auditHash": "836a499d352379ef34b9f272b288a09dedc8d849bde9e9aabd21b3d685209219"
+      "previousAuditHash": "d273a5068aaf2d761035202b4342846ed08d1dee2acb20b293bc16881f8e7fe0",
+      "auditHash": "774fddd15da0fb9b21293045f8a21049c71b8872ca2440be069ea39eb4a3ea24"
     },
     {
       "id": "8cf5bd7d-1b76-47e9-8519-8818848d5c5a",
@@ -4542,8 +5008,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "c8eb17652d99d934d065f389eb2badc24c16d20013fa333d3dc36cf56f3ee8e6",
-      "auditHash": "5aecebca82cd8bd755521fddd5e690f8636778c22eba4169f7ac1784d2275169"
+      "previousAuditHash": "275fc864021e2684ca46748b08ba8d27a2283b63c7b52f9d64cf72282b39749f",
+      "auditHash": "d273a5068aaf2d761035202b4342846ed08d1dee2acb20b293bc16881f8e7fe0"
     },
     {
       "id": "08170a07-7113-46cf-a406-20d6ec5464ef",
@@ -4554,8 +5020,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "363a66bb83db48085194da3e7b04e25c197c6dc7bae0c7a310ed5709881fd198",
-      "auditHash": "c8eb17652d99d934d065f389eb2badc24c16d20013fa333d3dc36cf56f3ee8e6"
+      "previousAuditHash": "2652c7acf254de1a34cee2cc578e7dcb961d3c42172196af5c8b7fe524eab19c",
+      "auditHash": "275fc864021e2684ca46748b08ba8d27a2283b63c7b52f9d64cf72282b39749f"
     },
     {
       "id": "d6a633dd-d89a-4555-ab91-b0ff0c3447b1",
@@ -4566,8 +5032,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "02978a598c519c50e66e0a2ae8b798d53d057a2212775beb077d288ae09b8021",
-      "auditHash": "363a66bb83db48085194da3e7b04e25c197c6dc7bae0c7a310ed5709881fd198"
+      "previousAuditHash": "47b22ab9d0e669c4c256c922cf3ed386243b564c112b862af10dc3a3093add40",
+      "auditHash": "2652c7acf254de1a34cee2cc578e7dcb961d3c42172196af5c8b7fe524eab19c"
     },
     {
       "id": "d5ccab94-859d-45bb-9a75-b077d50382ac",
@@ -4578,8 +5044,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "890cfeac896e3ca774ee526debb33fa33200c82178746bc3fe3c38b4a9aa3b3e",
-      "auditHash": "02978a598c519c50e66e0a2ae8b798d53d057a2212775beb077d288ae09b8021"
+      "previousAuditHash": "5ca7426d00d5ba86b53f295acdc77bd35a92cb06a4a360b41db2d21f2599c022",
+      "auditHash": "47b22ab9d0e669c4c256c922cf3ed386243b564c112b862af10dc3a3093add40"
     },
     {
       "id": "e44c5c89-c05f-4610-af91-849a9c94de32",
@@ -4590,8 +5056,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "b8c027cdfaaa14d803ff8322b128dd08f047d5d715392a5489adc96a53af881a",
-      "auditHash": "890cfeac896e3ca774ee526debb33fa33200c82178746bc3fe3c38b4a9aa3b3e"
+      "previousAuditHash": "b60c5650f0b18e84c43f44fff2a6c7644b24ac81753fbfe598784efce6d6396c",
+      "auditHash": "5ca7426d00d5ba86b53f295acdc77bd35a92cb06a4a360b41db2d21f2599c022"
     },
     {
       "id": "5fa12f91-02f6-4d49-a0b0-050583727df1",
@@ -4602,8 +5068,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "56e6ce1ad38f403717bb5ad976de96269b66d484062e66aa7d2de86600a3fe68",
-      "auditHash": "b8c027cdfaaa14d803ff8322b128dd08f047d5d715392a5489adc96a53af881a"
+      "previousAuditHash": "999f8f7e3ea56ba90ff5c65a1a9b35389da6ab19d775cfb6b9673bd251f95d33",
+      "auditHash": "b60c5650f0b18e84c43f44fff2a6c7644b24ac81753fbfe598784efce6d6396c"
     },
     {
       "id": "f1c6f21c-4fb3-4a31-9b0b-8bf2ad5ff707",
@@ -4614,8 +5080,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "6e4b55dc40258a9b2d2e73f34cfdd1e99454cb356db88d8d87e096dc16870d07",
-      "auditHash": "56e6ce1ad38f403717bb5ad976de96269b66d484062e66aa7d2de86600a3fe68"
+      "previousAuditHash": "f00ae7f5272cd2a6d62d6c7eb4f32117e073b53f391c5a86609579830bab05c9",
+      "auditHash": "999f8f7e3ea56ba90ff5c65a1a9b35389da6ab19d775cfb6b9673bd251f95d33"
     },
     {
       "id": "8a00f6a6-434e-4258-a2a0-f8f37f4507ef",
@@ -4626,8 +5092,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "bf4fdaff3b824bfead87fab9f4f2b72562ba2fff2495df302cf7212b1fc57091",
-      "auditHash": "6e4b55dc40258a9b2d2e73f34cfdd1e99454cb356db88d8d87e096dc16870d07"
+      "previousAuditHash": "402976f46e10da98899cd701dabc2988457f7a0db8ee052410f5bed314709e38",
+      "auditHash": "f00ae7f5272cd2a6d62d6c7eb4f32117e073b53f391c5a86609579830bab05c9"
     },
     {
       "id": "5e4d5530-29c5-417d-b729-7d6a43004f93",
@@ -4638,8 +5104,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "d3a21cae58252b7b1362c392a8a3be1a71c16a7c4f90514f77077c4ea7567bcf",
-      "auditHash": "bf4fdaff3b824bfead87fab9f4f2b72562ba2fff2495df302cf7212b1fc57091"
+      "previousAuditHash": "3f9dca579d049bf22b617ee9c24869ad39fa4433710bf0c60d1eb76e1b868325",
+      "auditHash": "402976f46e10da98899cd701dabc2988457f7a0db8ee052410f5bed314709e38"
     },
     {
       "id": "56973aa9-3298-4d9b-a5f7-fafab32e3e14",
@@ -4650,8 +5116,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "9f148291b1c7650a386debf0da31797f3cc4ec0cfc0ec4260efd81651df2cd78",
-      "auditHash": "d3a21cae58252b7b1362c392a8a3be1a71c16a7c4f90514f77077c4ea7567bcf"
+      "previousAuditHash": "872c4874260ece46d92e70e1acdf42d6184f000fd6c69af18c8fa846dc5836ff",
+      "auditHash": "3f9dca579d049bf22b617ee9c24869ad39fa4433710bf0c60d1eb76e1b868325"
     },
     {
       "id": "466b08dd-9bfe-42cc-97e9-96e8b0410a5b",
@@ -4662,8 +5128,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "a0eb257aee8d4447d31e3860413c05837747d9bb1ba18b1b065b9ef7b1152fd1",
-      "auditHash": "9f148291b1c7650a386debf0da31797f3cc4ec0cfc0ec4260efd81651df2cd78"
+      "previousAuditHash": "57ab8f0adfb45b7902001c3f3bd645774ef338cbe6b1e979c5ba9c8abccd3850",
+      "auditHash": "872c4874260ece46d92e70e1acdf42d6184f000fd6c69af18c8fa846dc5836ff"
     },
     {
       "id": "77bd93c3-25dc-42be-8e7e-e4d3edce379c",
@@ -4674,8 +5140,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "436c47ac75b5ecd7f5e7ad29d387e21fd4d350c4e47c2b976b83166d5374bd73",
-      "auditHash": "a0eb257aee8d4447d31e3860413c05837747d9bb1ba18b1b065b9ef7b1152fd1"
+      "previousAuditHash": "704216fd8d10cbb584a8a5cb95f15206ff8db158f4052b4b1b374b5d79a707e1",
+      "auditHash": "57ab8f0adfb45b7902001c3f3bd645774ef338cbe6b1e979c5ba9c8abccd3850"
     },
     {
       "id": "45407426-1f96-4ca0-9da3-02ca1ed0fa69",
@@ -4686,8 +5152,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "7074d68bd773e8193727984d56154a2227666a749cc87026e5cee6163ee4faec",
-      "auditHash": "436c47ac75b5ecd7f5e7ad29d387e21fd4d350c4e47c2b976b83166d5374bd73"
+      "previousAuditHash": "c65cb9cebc208d3660da01a7dfe70b2357838b45f75ca37737186665fe2cc48b",
+      "auditHash": "704216fd8d10cbb584a8a5cb95f15206ff8db158f4052b4b1b374b5d79a707e1"
     },
     {
       "id": "c4aca3bc-2102-4b6b-86c6-6a02961d16f6",
@@ -4698,8 +5164,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "601f3d93491c54c8d38e6adc7e471d26db918ed55fd233d7bb19145f7d67e0cf",
-      "auditHash": "7074d68bd773e8193727984d56154a2227666a749cc87026e5cee6163ee4faec"
+      "previousAuditHash": "f8b5b6f5354f0cf15462cade09cb0cbda82da7c8e5ea4b2ae48a7ec2c9f3424a",
+      "auditHash": "c65cb9cebc208d3660da01a7dfe70b2357838b45f75ca37737186665fe2cc48b"
     },
     {
       "id": "aca9c043-946a-4cde-937c-7bf95cd8bfbf",
@@ -4710,8 +5176,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "e7d80b837bbe013c6adda630c1f727b0494a3e1a67d18a3c6d2dbc3c9783aa35",
-      "auditHash": "601f3d93491c54c8d38e6adc7e471d26db918ed55fd233d7bb19145f7d67e0cf"
+      "previousAuditHash": "f2c4850fc11126473ea6dcf80c3923c9c622e5b1039100cd0acc6af408eafd26",
+      "auditHash": "f8b5b6f5354f0cf15462cade09cb0cbda82da7c8e5ea4b2ae48a7ec2c9f3424a"
     },
     {
       "id": "d6c7a16a-1dfd-4972-8ea4-e057eb62164a",
@@ -4722,8 +5188,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "6cb21d2bd185762a9e9776a96a4e531fe9b416651cfcee369ddae3a002f3168d",
-      "auditHash": "e7d80b837bbe013c6adda630c1f727b0494a3e1a67d18a3c6d2dbc3c9783aa35"
+      "previousAuditHash": "b9c24f2baf976146fa0e240281bcdda5b2165847f1efd0e9943a351928fd762c",
+      "auditHash": "f2c4850fc11126473ea6dcf80c3923c9c622e5b1039100cd0acc6af408eafd26"
     },
     {
       "id": "c740f2da-e4b2-44e5-a795-8521e7228ed3",
@@ -4734,8 +5200,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "8a742890e5d84d7b7c661f8fb24ea4f051034487761c6e0d6f46d30527a42bce",
-      "auditHash": "6cb21d2bd185762a9e9776a96a4e531fe9b416651cfcee369ddae3a002f3168d"
+      "previousAuditHash": "982569b4ca66ca0bdccbad61b0b25cd09e89bee5f15a1e05793b39245926f361",
+      "auditHash": "b9c24f2baf976146fa0e240281bcdda5b2165847f1efd0e9943a351928fd762c"
     },
     {
       "id": "d8821b09-9da3-4dad-baab-8068b775069c",
@@ -4746,8 +5212,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "1ce4dfc429451e0d48495814686cb2546b701130c23da55a22159f0685cdd9df",
-      "auditHash": "8a742890e5d84d7b7c661f8fb24ea4f051034487761c6e0d6f46d30527a42bce"
+      "previousAuditHash": "f24c2d3bdbe7e123d7b99c2447705a1b5b3366bd95d285ae2c0f1454e05651b2",
+      "auditHash": "982569b4ca66ca0bdccbad61b0b25cd09e89bee5f15a1e05793b39245926f361"
     },
     {
       "id": "5052fa09-a19b-4d65-a364-2077b3d5a595",
@@ -4758,8 +5224,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "642ef070a6ff81ab68bffa2e3ec3bc85de8bff8a290f3bfa23fde73f6d273a83",
-      "auditHash": "1ce4dfc429451e0d48495814686cb2546b701130c23da55a22159f0685cdd9df"
+      "previousAuditHash": "c42e820053cbcf72e4b72979f2f73ca20d463d591e0cbbb06ddbb7add8aac6cf",
+      "auditHash": "f24c2d3bdbe7e123d7b99c2447705a1b5b3366bd95d285ae2c0f1454e05651b2"
     },
     {
       "id": "cf42de82-4c1a-40a2-8480-ae2f66f21fef",
@@ -4770,8 +5236,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "6ad35b3755ac34acfbd77869f7eb798d64b14b6daa56131da14bf7040f58ba97",
-      "auditHash": "642ef070a6ff81ab68bffa2e3ec3bc85de8bff8a290f3bfa23fde73f6d273a83"
+      "previousAuditHash": "d9c0ae0d111438d0bf7ec03bf6f2f86ce0a89327a4fcf49297677275bd55c26f",
+      "auditHash": "c42e820053cbcf72e4b72979f2f73ca20d463d591e0cbbb06ddbb7add8aac6cf"
     },
     {
       "id": "2bb5d27c-7013-4727-ac83-5e29b12fadde",
@@ -4782,8 +5248,8 @@
       "target": "/api/state",
       "result": "拒绝",
       "detail": "未登录或会话已过期",
-      "previousAuditHash": "fcca1dd88cf203c8875cc24a0c4949b78a1839116a85ba2d48dd03d4e6bdb7fc",
-      "auditHash": "6ad35b3755ac34acfbd77869f7eb798d64b14b6daa56131da14bf7040f58ba97"
+      "previousAuditHash": "e20a8d110ea025a366764fcf64eba04bfd49ef1d8c539abf2cd0271033b42926",
+      "auditHash": "d9c0ae0d111438d0bf7ec03bf6f2f86ce0a89327a4fcf49297677275bd55c26f"
     },
     {
       "id": "dd7251ad-f953-4a72-a729-bcaae0c7558a",
@@ -4794,8 +5260,8 @@
       "target": "workbench.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "d57038f75215a94b7ab2c6d56da2756e5e7bafe30be592996b4b4e9950b29f5b",
-      "auditHash": "fcca1dd88cf203c8875cc24a0c4949b78a1839116a85ba2d48dd03d4e6bdb7fc"
+      "previousAuditHash": "5020a3a683741eddf29323ebbe1aaafc12b24c290be750807999e3102a1a6ca5",
+      "auditHash": "e20a8d110ea025a366764fcf64eba04bfd49ef1d8c539abf2cd0271033b42926"
     },
     {
       "id": "1ba02545-1352-405d-b9db-67b6f95aa885",
@@ -4806,8 +5272,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "ef36050c6baeca35a6bc527f9d186d8ca6934015750157ccdac2676ee6aa44c1",
-      "auditHash": "d57038f75215a94b7ab2c6d56da2756e5e7bafe30be592996b4b4e9950b29f5b"
+      "previousAuditHash": "6bc0e5145cf0645112e4992aa273d6ba57fea625b01c6bc50ce78ceb09a9c5c0",
+      "auditHash": "5020a3a683741eddf29323ebbe1aaafc12b24c290be750807999e3102a1a6ca5"
     },
     {
       "id": "fee2c95b-aebe-4ba8-90b7-9701b762a783",
@@ -4818,8 +5284,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "33423cf257412717adbb347c457c4db2fcdfa29d819bd43eba36c9a7f7b5c422",
-      "auditHash": "ef36050c6baeca35a6bc527f9d186d8ca6934015750157ccdac2676ee6aa44c1"
+      "previousAuditHash": "e0bfdfe06e6c6dfd79b9236644e32ea2a5f5b66b142b669efe8875ccd234a4b8",
+      "auditHash": "6bc0e5145cf0645112e4992aa273d6ba57fea625b01c6bc50ce78ceb09a9c5c0"
     },
     {
       "id": "41a7be06-3f65-4abf-bcbb-a9f60ed9cee1",
@@ -4830,8 +5296,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "dddb11a3ea5792248fa4c9dfb4ecdaac55c1f1a463435177291039e49907bea2",
-      "auditHash": "33423cf257412717adbb347c457c4db2fcdfa29d819bd43eba36c9a7f7b5c422"
+      "previousAuditHash": "af600eea7265b8e65e641ac9207c886245c8de84b150f9314e45c9116b0f88ed",
+      "auditHash": "e0bfdfe06e6c6dfd79b9236644e32ea2a5f5b66b142b669efe8875ccd234a4b8"
     },
     {
       "id": "890cd595-61c3-4f9c-b6e3-b49a105b86c2",
@@ -4842,8 +5308,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "8d9f62e25c1913bacdaa2f16e3da604b7cc999eb128e47ada21915ea72086205",
-      "auditHash": "dddb11a3ea5792248fa4c9dfb4ecdaac55c1f1a463435177291039e49907bea2"
+      "previousAuditHash": "df0179c4d277566acdcf06ea1d48fb9077b88b9cf279c3d83b2f3dc959364435",
+      "auditHash": "af600eea7265b8e65e641ac9207c886245c8de84b150f9314e45c9116b0f88ed"
     },
     {
       "id": "78371aba-2921-472b-8ff2-1a6bf702c2b3",
@@ -4854,20 +5320,20 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "efb59036237ae05a1ca5d73c38780998293a12a29f319a916df3683e59bfe2ef",
-      "auditHash": "8d9f62e25c1913bacdaa2f16e3da604b7cc999eb128e47ada21915ea72086205"
+      "previousAuditHash": "083a85b18b3ed2e6d5dee86f08026ad78942e92ad1ad799a0df9974920211282",
+      "auditHash": "df0179c4d277566acdcf06ea1d48fb9077b88b9cf279c3d83b2f3dc959364435"
     },
     {
       "id": "9e798d89-8bcb-4ff3-ad08-dff7bf2d2c05",
       "at": "2026/6/19 20:38:35",
-      "actor": "演示字段A",
+      "actor": "[编码损坏，待核验]A",
       "role": "citizen",
       "action": "登录",
       "target": "citizen.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "080f0c9ebca3a347c65fd5ae9940a0d5e3fec7105d2283edc5cfff28aa87c9bd",
-      "auditHash": "efb59036237ae05a1ca5d73c38780998293a12a29f319a916df3683e59bfe2ef"
+      "previousAuditHash": "c440d692846181d4a90ec1d32f893519c32a6b2d0fcaf1c4b062e89c92d51b03",
+      "auditHash": "083a85b18b3ed2e6d5dee86f08026ad78942e92ad1ad799a0df9974920211282"
     },
     {
       "id": "332941e5-4685-4b80-91cf-fffab5bc49f0",
@@ -4878,44 +5344,44 @@
       "target": "/api/state",
       "result": "允许",
       "detail": "全量保存平台数据",
-      "previousAuditHash": "f11050772f5425f8ba8d17637365a7f62e6c602bda001a839c355d785d2e6c12",
-      "auditHash": "080f0c9ebca3a347c65fd5ae9940a0d5e3fec7105d2283edc5cfff28aa87c9bd"
+      "previousAuditHash": "0a173906e493a1cf7e60b83049072a6f249a71b31efbf05ddbdf7acd325785fb",
+      "auditHash": "c440d692846181d4a90ec1d32f893519c32a6b2d0fcaf1c4b062e89c92d51b03"
     },
     {
       "id": "8b7567e0-071b-4bd2-aa20-3f8c9a3f33ee",
       "at": "2026/6/19 20:38:35",
-      "actor": "演示字段",
+      "actor": "[编码损坏，待核验]",
       "role": "commission",
-      "action": "演示字段",
+      "action": "[编码损坏，待核验]",
       "target": "workbench.html",
-      "result": "演示字段",
-      "detail": "演示字段",
-      "previousAuditHash": "d3aae926045b94ba24ecdf3bfa93080397aca2851c62120dfabb98323a430661",
-      "auditHash": "f11050772f5425f8ba8d17637365a7f62e6c602bda001a839c355d785d2e6c12"
+      "result": "[编码损坏，待核验]",
+      "detail": "[编码损坏，待核验]",
+      "previousAuditHash": "8bbf4f3b98474a4bcdd6f7bdc9e29d7efcb63e37b8034311ef34035ca87cdfa7",
+      "auditHash": "0a173906e493a1cf7e60b83049072a6f249a71b31efbf05ddbdf7acd325785fb"
     },
     {
       "id": "0dd0de07-fbc0-451b-9b31-9c78a9afc022",
       "at": "2026/6/19 20:25:19",
-      "actor": "演示字段A",
+      "actor": "[编码损坏，待核验]A",
       "role": "citizen",
-      "action": "演示字段",
+      "action": "[编码损坏，待核验]",
       "target": "citizen.html",
-      "result": "演示字段",
-      "detail": "演示字段",
-      "previousAuditHash": "315ca0a9e96dbd0177a7f1a9d887346003cfd01c511e6bc4c4d698950430738f",
-      "auditHash": "d3aae926045b94ba24ecdf3bfa93080397aca2851c62120dfabb98323a430661"
+      "result": "[编码损坏，待核验]",
+      "detail": "[编码损坏，待核验]",
+      "previousAuditHash": "21d9af4ec33bbe57d6f3e034b894c7008a57620d6d84f3cce27a53bd0591837d",
+      "auditHash": "8bbf4f3b98474a4bcdd6f7bdc9e29d7efcb63e37b8034311ef34035ca87cdfa7"
     },
     {
       "id": "b6aab847-e7dd-45f0-8e05-6606c035f289",
       "at": "2026/6/19 20:25:19",
-      "actor": "演示字段",
+      "actor": "[编码损坏，待核验]",
       "role": "commission",
-      "action": "演示字段",
+      "action": "[编码损坏，待核验]",
       "target": "/api/reset",
-      "result": "演示字段",
-      "detail": "演示字段",
+      "result": "[编码损坏，待核验]",
+      "detail": "[编码损坏，待核验]",
       "previousAuditHash": "df17fcbdd806857a8822566f7d57876ca5ff6be57cf9b73dcbc6e20ee722b67e",
-      "auditHash": "315ca0a9e96dbd0177a7f1a9d887346003cfd01c511e6bc4c4d698950430738f"
+      "auditHash": "21d9af4ec33bbe57d6f3e034b894c7008a57620d6d84f3cce27a53bd0591837d"
     },
     {
       "id": "se1",
@@ -7182,7 +7648,7 @@
         "dataAccessLogs",
         "securityEvents"
       ],
-      "status": "演示底座闭环",
+      "status": "开发中",
       "next": "补齐共享文档、信息资源中心、运行监控、标签模型、数据资产目录和存量模块统一纳管。"
     },
     {
@@ -7266,7 +7732,7 @@
         "platformProcessAudit",
         "platformRoadmap"
       ],
-      "status": "测评证据已建档",
+      "status": "待深化",
       "next": "建立测评证据库，按共享文档、术语标准、主索引、互联互通交易逐项归档。"
     },
     {
@@ -7280,7 +7746,7 @@
         "securityEvents",
         "dataAccessLogs"
       ],
-      "status": "安全证据已建档",
+      "status": "开发中",
       "next": "把当前登录、角色、审计能力升级为等保和密评验收清单。"
     }
   ],
@@ -7348,7 +7814,7 @@
       "next": "政务统一认证、CA、短信、人脸核验",
       "priority": "P0",
       "owner": "市级平台",
-      "status": "演示对接完成"
+      "status": "开发中"
     },
     {
       "id": "if-person-index",
@@ -7357,16 +7823,16 @@
       "next": "人口库、电子健康码、标准健康档案主索引",
       "priority": "P0",
       "owner": "市级平台",
-      "status": "演示对接完成"
+      "status": "开发中"
     },
     {
       "id": "if-medical",
       "domain": "医疗机构业务系统",
-      "existing": "HIS/EMR/LIS/PACS interface contracts, personalRecords, diagnosticReports, institution workflows",
+      "existing": "个人健康信息库、机构端协同",
       "next": "HIS、EMR、LIS、PACS、心电、体检系统",
       "priority": "P0",
       "owner": "医疗机构",
-      "status": "演示对接完成"
+      "status": "待接口"
     },
     {
       "id": "if-referral",
@@ -7375,7 +7841,7 @@
       "next": "远程会诊、双向转诊、远程影像、心电、检验、教育",
       "priority": "P0",
       "owner": "医政医管",
-      "status": "演示对接完成"
+      "status": "开发中"
     },
     {
       "id": "if-insurance",
@@ -7420,7 +7886,7 @@
       "next": "国密传输、数据库加密、日志保全、密评和等保证据",
       "priority": "P0",
       "owner": "安全管理",
-      "status": "演示对接完成"
+      "status": "开发中"
     }
   ],
   "platformDeliveryBatches": [
@@ -7520,24 +7986,17 @@
         "交易样例",
         "整改记录"
       ],
-      "status": "已建档",
+      "status": "待补齐",
       "next": "按接口域逐项挂接截图、报文样例、测试记录和整改状态。",
       "records": [
         {
           "id": "evr-api-test",
-          "owner": "演示字段/演示字段",
-          "testRecord": "API 演示字段",
-          "status": "演示字段",
+          "owner": "[编码损坏，待核验]/[编码损坏，待核验]",
+          "testRecord": "API [编码损坏，待核验]",
+          "at": "2026-06-19 12:00:00",
           "link": "https://example.test/evidence",
-          "at": "2026-06-19 12:00:00"
-        },
-        {
-          "id": "ev-interoperability-system-readiness",
-          "owner": "demo-placeholder/demo-placeholder",
-          "testRecord": "demo-placeholder",
-          "status": "demo-placeholder",
-          "link": "/api/system/readiness",
-          "at": "2026-06-23T09:00:00.000Z"
+          "fileName": "[编码损坏，待核验]-[编码损坏，待核验].md",
+          "status": "[编码损坏，待核验]"
         }
       ]
     },
@@ -7553,34 +8012,9 @@
         "安全事件",
         "密评整改项"
       ],
-      "status": "已建档",
+      "status": "开发中",
       "next": "补齐国密传输、数据库加密、日志保全和国产化适配证明。",
-      "records": [
-        {
-          "id": "ev-security-record-api",
-          "owner": "demo-placeholder",
-          "testRecord": "API readiness evidence",
-          "status": "demo-placeholder",
-          "link": "/api/system/readiness",
-          "at": "2026-06-23T09:00:00.000Z"
-        },
-        {
-          "id": "ev-security-record-report",
-          "owner": "demo-placeholder",
-          "testRecord": "release report evidence",
-          "status": "demo-placeholder",
-          "link": "release/release-report.md",
-          "at": "2026-06-23T09:00:00.000Z"
-        },
-        {
-          "id": "ev-security-record-check",
-          "owner": "demo-placeholder",
-          "testRecord": "deploy check evidence",
-          "status": "demo-placeholder",
-          "link": "release/deploy-check-report.md",
-          "at": "2026-06-23T09:00:00.000Z"
-        }
-      ]
+      "records": []
     },
     {
       "id": "ev-interface",
@@ -7610,34 +8044,9 @@
         "试运行问题",
         "用户反馈"
       ],
-      "status": "演示验收建档",
+      "status": "待启动",
       "next": "按区县、机构、应用和批次沉淀上线确认与问题闭环。",
-      "records": [
-        {
-          "id": "ev-launch-record-api",
-          "owner": "demo-placeholder",
-          "testRecord": "API readiness evidence",
-          "status": "demo-placeholder",
-          "link": "/api/system/readiness",
-          "at": "2026-06-23T09:00:00.000Z"
-        },
-        {
-          "id": "ev-launch-record-report",
-          "owner": "demo-placeholder",
-          "testRecord": "release report evidence",
-          "status": "demo-placeholder",
-          "link": "release/release-report.md",
-          "at": "2026-06-23T09:00:00.000Z"
-        },
-        {
-          "id": "ev-launch-record-check",
-          "owner": "demo-placeholder",
-          "testRecord": "deploy check evidence",
-          "status": "demo-placeholder",
-          "link": "release/deploy-check-report.md",
-          "at": "2026-06-23T09:00:00.000Z"
-        }
-      ]
+      "records": []
     }
   ],
   "productionDeploymentPlan": [
@@ -7763,7 +8172,7 @@
       "reuseMode": "门户集成+数据回流",
       "batch": "第二批",
       "evidence": "字段映射/联调记录",
-      "status": "演示对接完成",
+      "status": "开发中",
       "next": "按机构登记接口环境、版本和联调责任人。"
     },
     {
@@ -8051,7 +8460,7 @@
       "control": "定级备案、差距测评、安全整改、复测",
       "evidence": "定级报告/备案证明/测评报告/整改记录",
       "owner": "安全管理岗",
-      "status": "已建档",
+      "status": "开发中",
       "next": "完成生产环境定级备案和测评机构进场计划。"
     },
     {
@@ -8061,7 +8470,7 @@
       "control": "国密传输、身份鉴别、存储加密、密钥管理",
       "evidence": "密码应用方案/检测记录/密评报告",
       "owner": "密码应用责任人",
-      "status": "已建档",
+      "status": "待测评",
       "next": "确定密码设备和电子签名边界，形成测评对象清单。"
     },
     {
@@ -8071,7 +8480,7 @@
       "control": "SM2/SM3/SM4、国密SSL、关键字段加密",
       "evidence": "改造清单/配置截图/兼容性测试",
       "owner": "平台技术组",
-      "status": "已建档",
+      "status": "方案设计",
       "next": "完成接口、数据库和证书链的国密改造排期。"
     },
     {
@@ -8081,7 +8490,7 @@
       "control": "国产CPU、操作系统、数据库、中间件和浏览器",
       "evidence": "适配矩阵/测试报告/问题闭环",
       "owner": "基础设施组",
-      "status": "已建档",
+      "status": "待测试",
       "next": "建立软硬件版本矩阵并执行功能、性能和容灾测试。"
     }
   ],
@@ -8368,76 +8777,22 @@
   ],
   "personalRecords": [
     {
-      "id": "auth-r4-referral-demo",
-      "residentId": "r4",
-      "category": "authorizations",
-      "type": "authorization",
-      "name": "Referral teleconsultation resident authorization",
-      "status": "active",
-      "recordDate": "2026-06-23",
-      "source": "citizen consent demo",
-      "result": "authorized referral and teleconsultation sharing",
-      "meta": {
-        "status": "active",
-        "scope": "referral-teleconsultation",
-        "authorizedTo": [
-          "MR1",
-          "MR3"
-        ]
-      }
-    },
-    {
-      "id": "pr-chronic-feedback-r1-demo",
-      "residentId": "r1",
-      "category": "chronic-feedback",
-      "type": "followup-feedback",
-      "name": "Resident chronic follow-up feedback",
-      "status": "submitted",
-      "recordDate": "2026-06-23",
-      "source": "citizen.html",
-      "result": "medication taken on schedule; home blood pressure uploaded",
-      "meta": {
-        "followupFeedback": true,
-        "medicationAdherence": "on-schedule",
-        "satisfaction": "good"
-      }
-    },
-    {
-      "id": "auth-r1-referral-demo",
-      "residentId": "r1",
-      "category": "authorizations",
-      "type": "authorization",
-      "name": "Referral teleconsultation resident authorization",
-      "status": "active",
-      "recordDate": "2026-06-23",
-      "source": "citizen consent demo",
-      "result": "authorized referral and teleconsultation sharing",
-      "meta": {
-        "status": "active",
-        "scope": "referral-teleconsultation",
-        "authorizedTo": [
-          "MR1",
-          "MR3"
-        ]
-      }
-    },
-    {
       "id": "1c4f1498-b1f1-4a9f-951a-cd5307202d50",
       "residentId": "r1",
       "category": "emr",
       "date": "2026-05-21",
-      "name": "演示字段 2 演示字段",
-      "result": "演示字段,演示字段",
-      "source": "演示字段 / 演示字段",
+      "name": "[编码损坏，待核验] 2 [编码损坏，待核验]",
+      "result": "[编码损坏，待核验],[编码损坏，待核验]",
+      "source": "[编码损坏，待核验] � [编码损坏，待核验]",
       "meta": {
-        "visitType": "演示字段",
+        "visitType": "[编码损坏，待核验]",
         "exams": [
-          "演示字段:演示字段",
-          "演示字段:演示字段"
+          "[编码损坏，待核验]:[编码损坏，待核验]",
+          "[编码损坏，待核验]:[编码损坏，待核验]"
         ],
         "medications": [
-          "演示字段",
-          "演示字段"
+          "[编码损坏，待核验]",
+          "[编码损坏，待核验]"
         ]
       },
       "createdBy": "system",
@@ -8449,16 +8804,16 @@
       "residentId": "r1",
       "category": "emr",
       "date": "2026-04-12",
-      "name": "演示字段",
-      "result": "演示字段,演示字段",
-      "source": "演示字段 / 演示字段",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验],[编码损坏，待核验]",
+      "source": "[编码损坏，待核验] � [编码损坏，待核验]",
       "meta": {
-        "visitType": "演示字段",
+        "visitType": "[编码损坏，待核验]",
         "exams": [
-          "演示字段:158/92 mmHg"
+          "[编码损坏，待核验]:158/92 mmHg"
         ],
         "medications": [
-          "演示字段"
+          "[编码损坏，待核验]"
         ]
       },
       "createdBy": "system",
@@ -8470,17 +8825,17 @@
       "residentId": "r2",
       "category": "emr",
       "date": "2026-05-18",
-      "name": "2 演示字段",
-      "result": "演示字段,演示字段",
-      "source": "演示字段 / 演示字段",
+      "name": "2 [编码损坏，待核验]",
+      "result": "[编码损坏，待核验],[编码损坏，待核验]",
+      "source": "[编码损坏，待核验] � [编码损坏，待核验]",
       "meta": {
-        "visitType": "演示字段",
+        "visitType": "[编码损坏，待核验]",
         "exams": [
-          "演示字段:7.8 mmol/L",
-          "演示字段:演示字段"
+          "[编码损坏，待核验]:7.8 mmol/L",
+          "[编码损坏，待核验]:[编码损坏，待核验]"
         ],
         "medications": [
-          "演示字段"
+          "[编码损坏，待核验]"
         ]
       },
       "createdBy": "system",
@@ -8492,16 +8847,16 @@
       "residentId": "r4",
       "category": "emr",
       "date": "2026-03-30",
-      "name": "演示字段",
-      "result": "演示字段,演示字段",
-      "source": "演示字段 / 演示字段",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验],[编码损坏，待核验]",
+      "source": "[编码损坏，待核验] � [编码损坏，待核验]",
       "meta": {
-        "visitType": "演示字段",
+        "visitType": "[编码损坏，待核验]",
         "exams": [
-          "演示字段:148/88 mmHg"
+          "[编码损坏，待核验]:148/88 mmHg"
         ],
         "medications": [
-          "演示字段"
+          "[编码损坏，待核验]"
         ]
       },
       "createdBy": "system",
@@ -8513,9 +8868,9 @@
       "residentId": "r1",
       "category": "labs",
       "date": "2026-05-21",
-      "name": "演示字段",
-      "result": "演示字段",
-      "source": "演示字段",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8526,9 +8881,9 @@
       "residentId": "r1",
       "category": "labs",
       "date": "2026-05-21",
-      "name": "演示字段",
-      "result": "演示字段",
-      "source": "演示字段",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8539,9 +8894,9 @@
       "residentId": "r2",
       "category": "labs",
       "date": "2026-05-18",
-      "name": "演示字段",
-      "result": "7.8 mmol/L,演示字段",
-      "source": "演示字段",
+      "name": "[编码损坏，待核验]",
+      "result": "7.8 mmol/L,[编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8552,9 +8907,9 @@
       "residentId": "r4",
       "category": "labs",
       "date": "2026-03-30",
-      "name": "演示字段",
+      "name": "[编码损坏，待核验]",
       "result": "148/88 mmHg",
-      "source": "演示字段",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8565,9 +8920,9 @@
       "residentId": "r1",
       "category": "medications",
       "date": "2026-05-21",
-      "name": "演示字段",
-      "result": "演示字段 1 演示字段",
-      "source": "演示字段",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验] 1 [编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8578,9 +8933,9 @@
       "residentId": "r1",
       "category": "medications",
       "date": "2026-05-21",
-      "name": "演示字段",
-      "result": "演示字段 1 演示字段",
-      "source": "演示字段",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验] 1 [编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8591,9 +8946,9 @@
       "residentId": "r2",
       "category": "medications",
       "date": "2026-05-18",
-      "name": "演示字段",
-      "result": "演示字段 2 演示字段",
-      "source": "演示字段",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验] 2 [编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8604,9 +8959,9 @@
       "residentId": "r1",
       "category": "allergies",
       "date": "2025-10-02",
-      "name": "演示字段",
-      "result": "演示字段",
-      "source": "演示字段",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8617,9 +8972,9 @@
       "residentId": "r2",
       "category": "allergies",
       "date": "2025-08-14",
-      "name": "演示字段",
-      "result": "演示字段",
-      "source": "演示字段",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8630,9 +8985,9 @@
       "residentId": "r1",
       "category": "vaccines",
       "date": "2025-11-01",
-      "name": "演示字段",
-      "result": "演示字段",
-      "source": "演示字段",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8643,9 +8998,9 @@
       "residentId": "r4",
       "category": "vaccines",
       "date": "2025-11-05",
-      "name": "演示字段",
-      "result": "演示字段",
-      "source": "演示字段",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8656,9 +9011,9 @@
       "residentId": "r1",
       "category": "admissions",
       "date": "2024-06-18",
-      "name": "演示字段",
-      "result": "演示字段,演示字段",
-      "source": "演示字段",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验],[编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8669,9 +9024,9 @@
       "residentId": "r3",
       "category": "admissions",
       "date": "2025-12-09",
-      "name": "演示字段",
-      "result": "演示字段,演示字段",
-      "source": "演示字段",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验],[编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8682,9 +9037,9 @@
       "residentId": "r1",
       "category": "authorizations",
       "date": "2026-01-01",
-      "name": "演示字段",
-      "result": "演示字段",
-      "source": "演示字段",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8695,9 +9050,9 @@
       "residentId": "r1",
       "category": "authorizations",
       "date": "2026-01-01",
-      "name": "演示字段",
-      "result": "演示字段",
-      "source": "演示字段",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8708,9 +9063,9 @@
       "residentId": "r2",
       "category": "authorizations",
       "date": "2026-01-01",
-      "name": "演示字段",
-      "result": "演示字段",
-      "source": "演示字段",
+      "name": "[编码损坏，待核验]",
+      "result": "[编码损坏，待核验]",
+      "source": "[编码损坏，待核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8718,13 +9073,114 @@
     }
   ],
   "storageMeta": {
-    "engine": "json",
-    "mode": "JSON 文件存储",
-    "sqliteFile": "",
+    "engine": "json-snapshot",
+    "mode": "GitHub Pages 静态预览 JSON 快照",
+    "sqliteFile": "data/health-city.sqlite",
     "jsonFile": "data/db.json",
-    "sqliteAvailable": false,
-    "schemaVersion": 0,
-    "collectionVersions": {},
+    "sqliteAvailable": true,
+    "schemaVersion": 7,
+    "collectionVersions": {
+      "accounts": 1,
+      "residents": 1,
+      "diseases": 1,
+      "followups": 1,
+      "medicalResources": 1,
+      "healthStatistics": 1,
+      "deathCertificates": 1,
+      "deathCertificateForms": 1,
+      "deathStatistics": 1,
+      "birthCertificates": 3,
+      "birthCertificateForms": 1,
+      "birthStatistics": 3,
+      "healthBulletin2024": 1,
+      "dalianHealthStatistics2025": 1,
+      "healthStatisticsIngestion": 1,
+      "doctorProfiles": 1,
+      "multiPracticePolicy": 1,
+      "multiPracticeApplications": 2,
+      "chronicScreeningTasks": 1,
+      "chronicEducationPushes": 1,
+      "chronicManagementPlans": 1,
+      "countyCollaborationOrders": 1,
+      "countyAiDiagnosisCases": 1,
+      "countyMutualRecognitionRecords": 1,
+      "careOrders": 1,
+      "medicationPickups": 1,
+      "institutionSupervisions": 1,
+      "insuranceClaims": 1,
+      "policyAlignment": 1,
+      "emergencySignals": 1,
+      "seniorServices": 1,
+      "dataAccessLogs": 3,
+      "securityEvents": 28,
+      "digitalCredentials": 1,
+      "healthArchiveStandard": 1,
+      "authOrganizations": 2,
+      "authUsers": 2,
+      "interfaceRequirements": 1,
+      "chronicProjectBlueprint": 1,
+      "countyProjectBlueprint": 1,
+      "countyConsortium": 1,
+      "referralSystem": 1,
+      "platformCapabilities": 1,
+      "platformIntegrations": 1,
+      "platformInterfaces": 1,
+      "platformDeliveryBatches": 1,
+      "platformEvidence": 1,
+      "applicationCatalog": 1,
+      "institutionCreditEvaluations": 1,
+      "securityAcceptanceLedger": 1,
+      "platformChangeLogs": 1,
+      "platformRoadmap": 2,
+      "platformAudit": 2,
+      "platformProcessAudit": 2,
+      "personalRecords": 1,
+      "chronicServiceRoles": 1,
+      "chronicCapabilityConditions": 1,
+      "chronicServicePathways": 1,
+      "chronicComorbidityPlans": 1,
+      "chronicTcmServices": 1,
+      "chronicSelfManagement": 1,
+      "chronicMedicationSupport": 1,
+      "chronicQualityMetrics": 1,
+      "mutualRecognitionRules": 1,
+      "diagnosticReports": 1,
+      "taskMessages": 1,
+      "dataQualityIssues": 1,
+      "integrationContracts": 1,
+      "integrationGatewayEvents": 1,
+      "productionDeploymentPlan": 1,
+      "creditEvaluationRules": 1,
+      "researchDatasets": 2,
+      "diseaseRegistryModels": 1,
+      "mobileExperienceSettings": 1,
+      "accessibilityChecklist": 1,
+      "chronicAcceptanceLedger": 1,
+      "countyAcceptanceLedger": 1,
+      "hospitalInteroperabilityFunctions": 1,
+      "hospitalOperationSnapshots": 1,
+      "resourceDispatchRequests": 1,
+      "statisticsReconciliationReviews": 1,
+      "operationAlertRules": 1,
+      "chronicFollowupStatusPolicy": 1,
+      "qualitySafetyEvents": 1,
+      "criticalValueAlerts": 1,
+      "clinicalPathwayCases": 1,
+      "medicalRecordQualityReviews": 1,
+      "mutualRecognitionQualityReviews": 1,
+      "qualityRectificationOrders": 1,
+      "regionalDataSharingScope": 1,
+      "regionalSharingPackages": 1,
+      "regionalSharingSnapshots": 1,
+      "regionalSharingAccessReviews": 1,
+      "referralTeleconsultations": 1,
+      "drugConsumableSupervisions": 1,
+      "healthDashboardSnapshots": 1,
+      "escortServicePolicy": 1,
+      "escortServiceProviders": 1,
+      "escortWorkers": 1,
+      "escortServiceOrders": 1
+    },
     "sqliteError": ""
   }
 }

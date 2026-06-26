@@ -633,3 +633,17 @@ test("citizen portal exposes P2 imaging and attachment archive categories", () =
   assert.match(read("docs/C端全流程审计与优化清单.md"), /PWA manifest/);
   assert.match(read("docs/C端全流程审计与优化清单.md"), /影像资料、附件资料/);
 });
+
+test("citizen portal exposes medical escort appointment workflow", () => {
+  const citizenHtml = read("citizen.html");
+  const citizenJs = read("citizen.js");
+  const citizenCss = read("citizen.css");
+  assert.match(citizenHtml, /escort-appointment-form/);
+  assert.match(citizenHtml, /助医陪诊预约/);
+  assert.match(citizenJs, /fetchCitizenEscortDashboard/);
+  assert.match(citizenJs, /bindEscortAppointment/);
+  assert.match(citizenJs, /\/escort-services\/orders/);
+  assert.match(citizenCss, /escort-appointment-layout/);
+  assert.match(citizenCss, /escort-order-card/);
+  assert.match(read("server.js"), /provider is not published/);
+});

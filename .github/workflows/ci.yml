@@ -77,6 +77,8 @@ jobs:
         run: npm run evaluation:evidence
       - name: Generate referral teleconsultation readiness report
         run: npm run referral:readiness
+      - name: Generate medical escort readiness report
+        run: npm run escort:readiness
       - name: Generate release artifact manifest
         run: npm run release:manifest
       - name: Generate release readiness report

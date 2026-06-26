@@ -70,6 +70,64 @@
         <div id="lifecycle-cards" class="lifecycle-grid"></div>
       </section>
 
+      <section class="panel escort-appointment-panel">
+        <div class="panel-title">
+          <h2>助医陪诊预约</h2>
+          <span id="escort-appointment-summary">本人和家庭成员可预约陪诊服务</span>
+        </div>
+        <div class="escort-appointment-layout">
+          <form id="escort-appointment-form" class="escort-appointment-form">
+            <label>服务主体
+              <select name="providerId" required></select>
+            </label>
+            <label>就诊医院
+              <input name="hospital" placeholder="例如：大连市中心医院" required />
+            </label>
+            <label>科室
+              <input name="department" placeholder="例如：心内科" required />
+            </label>
+            <label>预约日期
+              <input name="appointmentAt" type="date" required />
+            </label>
+            <label>服务内容
+              <select name="serviceItems" multiple size="3">
+                <option value="registration">挂号取号</option>
+                <option value="exam escort">检查陪同</option>
+                <option value="medication pickup">取药结算</option>
+                <option value="report explanation">报告协助</option>
+              </select>
+            </label>
+            <label>保障类型
+              <select name="subsidyType">
+                <option value="self-pay">自费预约</option>
+                <option value="80plus-living-alone">80 岁以上独居</option>
+                <option value="low-income">低保/低收入补贴</option>
+                <option value="time-bank">时间银行</option>
+              </select>
+            </label>
+            <label>紧急程度
+              <select name="priority">
+                <option value="medium">普通</option>
+                <option value="high">较急</option>
+                <option value="low">不急</option>
+              </select>
+            </label>
+            <label>联系人状态
+              <select name="familyContactStatus">
+                <option value="pending">待平台确认</option>
+                <option value="confirmed">家属已确认</option>
+                <option value="self">本人确认</option>
+              </select>
+            </label>
+            <label class="full">补充说明
+              <input name="note" placeholder="例如：行动不便，需要协助排队和检查路线" />
+            </label>
+            <button class="small-button primary" type="submit">提交陪诊预约</button>
+          </form>
+          <div id="escort-appointment-cards" class="cards"></div>
+        </div>
+      </section>
+
       <section class="panel vault-panel">
         <div class="panel-title">
           <h2>健康信息归集</h2>

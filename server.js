@@ -378,12 +378,12 @@ const SQLITE_MIGRATIONS = [
     }
   }
 ];
-const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals", "referralTeleconsultations", "deathCertificates", "birthCertificates", "multiPracticeApplications", "digitalCredentials", "emergencySignals", "drugConsumableSupervisions", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports"]);
+const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals", "referralTeleconsultations", "escortServiceOrders", "deathCertificates", "birthCertificates", "multiPracticeApplications", "digitalCredentials", "emergencySignals", "drugConsumableSupervisions", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports"]);
 const WORKFLOW_ROLE_COLLECTIONS = {
   commission: WORKFLOW_COLLECTIONS,
-  institution: new Set(["careOrders", "medicationPickups", "followups", "referrals", "referralTeleconsultations", "deathCertificates", "birthCertificates", "multiPracticeApplications", "drugConsumableSupervisions", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "emergencySignals"]),
+  institution: new Set(["careOrders", "medicationPickups", "followups", "referrals", "referralTeleconsultations", "escortServiceOrders", "deathCertificates", "birthCertificates", "multiPracticeApplications", "drugConsumableSupervisions", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "emergencySignals"]),
   insurance: new Set(["insuranceClaims", "medicationPickups", "digitalCredentials", "drugConsumableSupervisions"]),
-  county: new Set(["referralTeleconsultations", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "emergencySignals"])
+  county: new Set(["referralTeleconsultations", "escortServiceOrders", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "emergencySignals"])
 };
 const WORKFLOW_PROTECTED_FIELDS = new Set(["id", "residentId", "maternalResidentId", "personIndex", "credentialNo", "certificateNo", "documentNo", "motherDocumentNo", "fatherDocumentNo", "createdAt", "createdBy", "createdByName", "lastUpdated", "updatedAt", "updatedBy", "updatedByName"]);
 const PERSONAL_RECORD_PROTECTED_FIELDS = new Set(["id", "residentId", "personIndex", "createdAt", "createdBy", "createdByName", "updatedAt", "updatedBy", "updatedByName", "expectedVersion"]);
@@ -1037,6 +1037,172 @@ function seedReferralTeleconsultations() {
         { at: todayOffset(-3), actor: "doc-wang", action: "created", note: "Tertiary hospital initiated down-referral consultation." },
         { at: todayOffset(-1), actor: "doc-liu", action: "report-returned", note: "Primary institution confirmed follow-up report return." }
       ]
+    }
+  ];
+}
+
+function seedEscortServicePolicy() {
+  return {
+    id: "escort-policy-shanghai-pilot-2025",
+    name: "Older adult medical escort service pilot",
+    source: "Shanghai older adult medical escort pilot plan, January 2025",
+    scope: ["service catalog", "trained escort workers", "provider registry", "pricing and subsidy", "risk control", "quality monitoring"],
+    pilotDistricts: ["Pudong", "Yangpu", "Songjiang", "Xuhui", "Changning", "Putuo", "Jing'an", "Hongkou", "Huangpu"],
+    serviceItems: ["mobility assistance", "registration", "exam escort", "payment and medication pickup", "family communication", "psychological comfort"],
+    providerEntryRule: "Provider must have trained escort workers and regular professional service capacity before public registry publication.",
+    trainingTargetPerDistrict: 100,
+    statusCatalog: ["requested", "matched", "contract-pending", "in-service", "completed", "quality-review", "closed", "cancelled"],
+    requiredEvidence: ["service contract", "worker training certificate", "liability insurance", "emergency plan", "quality review", "complaint disposition"],
+    subsidyRules: [
+      { group: "low-income", coverage: "government subsidy or purchase-of-service guarantee" },
+      { group: "80plus-living-alone", coverage: "low-price inclusive service package" },
+      { group: "time-bank", coverage: "volunteer service hour exchange" }
+    ],
+    integrationTargets: ["elder-care service platform", "hospital outpatient guidance", "non-emergency transfer", "volunteer time bank"]
+  };
+}
+
+function seedEscortServiceProviders() {
+  return [
+    {
+      id: "esp-pudong-carehub",
+      name: "Pudong Elder Care Service Center",
+      district: "Pudong",
+      type: "elder-care-institution",
+      institutionCode: "ORG-HOSPITAL",
+      serviceCapacity: "regular",
+      trainedWorkers: 128,
+      published: true,
+      pricing: { baseFee: 160, halfDayFee: 260, fullDayFee: 420, subsidyAccepted: true },
+      insurance: "liability-insurance-active",
+      emergencyPlan: "hospital-fall-and-transfer-plan-v1",
+      status: "published",
+      qualityScore: 92,
+      contact: "escort-demo-pudong"
+    },
+    {
+      id: "esp-xuhui-daycare",
+      name: "Xuhui Community Day-care Escort Team",
+      district: "Xuhui",
+      type: "community-day-care",
+      institutionCode: "ORG-COMMUNITY",
+      serviceCapacity: "regular",
+      trainedWorkers: 104,
+      published: true,
+      pricing: { baseFee: 120, halfDayFee: 220, fullDayFee: 360, subsidyAccepted: true },
+      insurance: "liability-insurance-active",
+      emergencyPlan: "community-emergency-contact-plan",
+      status: "published",
+      qualityScore: 88,
+      contact: "escort-demo-xuhui"
+    },
+    {
+      id: "esp-hongkou-volunteer",
+      name: "Hongkou Time-bank Escort Service Station",
+      district: "Hongkou",
+      type: "time-bank-volunteer",
+      institutionCode: "ORG-COUNTY",
+      serviceCapacity: "pilot",
+      trainedWorkers: 96,
+      published: false,
+      pricing: { baseFee: 0, halfDayFee: 80, fullDayFee: 160, subsidyAccepted: true },
+      insurance: "municipal-volunteer-insurance",
+      emergencyPlan: "volunteer-supervision-plan",
+      status: "training-gap",
+      qualityScore: 81,
+      contact: "escort-demo-hongkou"
+    }
+  ];
+}
+
+function seedEscortWorkers() {
+  return [
+    { id: "ew-pd-001", providerId: "esp-pudong-carehub", name: "Escort Worker A", district: "Pudong", trainingHours: 42, examStatus: "passed", skills: ["mobility assistance", "exam escort", "family communication"], insuranceStatus: "covered", status: "available" },
+    { id: "ew-pd-002", providerId: "esp-pudong-carehub", name: "Escort Worker B", district: "Pudong", trainingHours: 38, examStatus: "passed", skills: ["registration", "payment and medication pickup"], insuranceStatus: "covered", status: "assigned" },
+    { id: "ew-xh-001", providerId: "esp-xuhui-daycare", name: "Escort Worker C", district: "Xuhui", trainingHours: 40, examStatus: "passed", skills: ["mobility assistance", "psychological comfort"], insuranceStatus: "covered", status: "available" },
+    { id: "ew-hk-001", providerId: "esp-hongkou-volunteer", name: "Escort Volunteer D", district: "Hongkou", trainingHours: 28, examStatus: "pending", skills: ["registration", "family communication"], insuranceStatus: "covered", status: "training" }
+  ];
+}
+
+function seedEscortServiceOrders() {
+  return [
+    {
+      id: "eso-r1-20260622",
+      residentId: "r1",
+      providerId: "esp-pudong-carehub",
+      workerId: "ew-pd-002",
+      district: "Pudong",
+      hospital: "Dalian Central Hospital outpatient clinic demo",
+      department: "Cardiology",
+      appointmentAt: todayOffset(1),
+      due: todayOffset(1),
+      serviceItems: ["mobility assistance", "registration", "exam escort", "payment and medication pickup"],
+      status: "matched",
+      priority: "high",
+      riskLevel: "high",
+      subsidyType: "80plus-living-alone",
+      feeEstimate: 120,
+      contractStatus: "signed",
+      insuranceStatus: "covered",
+      transportLink: "non-emergency-transfer-ready",
+      familyContactStatus: "notified",
+      qualityReview: "pending",
+      complaintStatus: "none",
+      satisfaction: "pending",
+      sourceChannel: "community-worker",
+      auditTrail: [{ at: todayOffset(0), action: "match-worker", by: "system", note: "High-risk older adult matched with trained worker." }]
+    },
+    {
+      id: "eso-r4-20260623",
+      residentId: "r4",
+      providerId: "esp-xuhui-daycare",
+      workerId: "ew-xh-001",
+      district: "Xuhui",
+      hospital: "Community follow-up clinic demo",
+      department: "Endocrinology",
+      appointmentAt: todayOffset(2),
+      due: todayOffset(2),
+      serviceItems: ["registration", "exam escort", "family communication", "psychological comfort"],
+      status: "contract-pending",
+      priority: "medium",
+      riskLevel: "medium",
+      subsidyType: "low-income",
+      feeEstimate: 80,
+      contractStatus: "pending",
+      insuranceStatus: "covered",
+      transportLink: "family-arranged",
+      familyContactStatus: "pending",
+      qualityReview: "pending",
+      complaintStatus: "none",
+      satisfaction: "pending",
+      sourceChannel: "family-proxy",
+      auditTrail: [{ at: todayOffset(0), action: "request-created", by: "family-proxy", note: "Contract confirmation pending." }]
+    },
+    {
+      id: "eso-r2-20260621",
+      residentId: "r2",
+      providerId: "esp-hongkou-volunteer",
+      workerId: "ew-hk-001",
+      district: "Hongkou",
+      hospital: "Specialist outpatient demo",
+      department: "Ophthalmology",
+      appointmentAt: todayOffset(-1),
+      due: todayOffset(0),
+      serviceItems: ["registration", "family communication"],
+      status: "quality-review",
+      priority: "medium",
+      riskLevel: "medium",
+      subsidyType: "time-bank",
+      feeEstimate: 0,
+      contractStatus: "signed",
+      insuranceStatus: "covered",
+      transportLink: "not-required",
+      familyContactStatus: "completed",
+      qualityReview: "follow-up-call-required",
+      complaintStatus: "none",
+      satisfaction: "pending",
+      sourceChannel: "time-bank",
+      auditTrail: [{ at: todayOffset(-1), action: "service-completed", by: "escort-worker", note: "Quality review callback required." }]
     }
   ];
 }
@@ -3892,6 +4058,10 @@ function normalizeState(data) {
     regionalSharingSnapshots: data.regionalSharingSnapshots && typeof data.regionalSharingSnapshots === "object" ? { ...seedRegionalSharingSnapshots(), ...data.regionalSharingSnapshots } : seedRegionalSharingSnapshots(),
     regionalSharingAccessReviews: Array.isArray(data.regionalSharingAccessReviews) ? data.regionalSharingAccessReviews : seedRegionalSharingAccessReviews(),
     referralTeleconsultations: mergeByKey(seedReferralTeleconsultations(), data.referralTeleconsultations, "id"),
+    escortServicePolicy: data.escortServicePolicy && typeof data.escortServicePolicy === "object" ? { ...seedEscortServicePolicy(), ...data.escortServicePolicy } : seedEscortServicePolicy(),
+    escortServiceProviders: mergeByKey(seedEscortServiceProviders(), data.escortServiceProviders, "id"),
+    escortWorkers: mergeByKey(seedEscortWorkers(), data.escortWorkers, "id"),
+    escortServiceOrders: mergeByKey(seedEscortServiceOrders(), data.escortServiceOrders, "id"),
     taskMessages: Array.isArray(data.taskMessages) ? data.taskMessages : [],
     dataQualityIssues: Array.isArray(data.dataQualityIssues) ? data.dataQualityIssues : [],
     careOrders: Array.isArray(data.careOrders) ? data.careOrders : seedCareOrders(),
@@ -4007,6 +4177,10 @@ function completeSystemTargets(state) {
   state.chronicSelfManagement = mergeByKey(seedChronicSelfManagement(), state.chronicSelfManagement, "id");
   state.chronicMedicationSupport = mergeByKey(seedChronicMedicationSupport(), state.chronicMedicationSupport, "id");
   state.chronicQualityMetrics = mergeByKey(seedChronicQualityMetrics(), state.chronicQualityMetrics, "id");
+  state.escortServicePolicy = state.escortServicePolicy && typeof state.escortServicePolicy === "object" ? { ...seedEscortServicePolicy(), ...state.escortServicePolicy } : seedEscortServicePolicy();
+  state.escortServiceProviders = mergeByKey(seedEscortServiceProviders(), state.escortServiceProviders, "id");
+  state.escortWorkers = mergeByKey(seedEscortWorkers(), state.escortWorkers, "id");
+  state.escortServiceOrders = mergeByKey(seedEscortServiceOrders(), state.escortServiceOrders, "id");
   state.mobileExperienceSettings = state.mobileExperienceSettings && typeof state.mobileExperienceSettings === "object" ? { ...seedMobileExperienceSettings(), ...state.mobileExperienceSettings } : seedMobileExperienceSettings();
   state.accessibilityChecklist = mergeByKey(seedAccessibilityChecklist(), state.accessibilityChecklist, "id");
   state.securityAcceptanceLedger = mergeByKey(seedSecurityAcceptanceLedger(), state.securityAcceptanceLedger, "id");
@@ -5300,6 +5474,134 @@ function canAccessReferralTeleconsultation(user, item, data) {
     Boolean(user.doctorId && [item.applicantDoctor, item.receivingDoctor].includes(user.doctorId));
 }
 
+function canAccessEscortOrder(user, item, data) {
+  if (!canAccessResident(user, item.residentId, data)) return false;
+  if (user.role === "commission" || user.role === "county" || user.role === "citizen") return true;
+  if (user.role !== "institution") return false;
+  const provider = (data.escortServiceProviders || []).find((row) => row.id === item.providerId);
+  return [provider?.institutionCode, item.institutionCode].some((code) => code && code === user.orgCode) ||
+    [provider?.name, item.providerName].some((name) => name && name === user.orgName);
+}
+
+function buildEscortServiceDashboard(data, user) {
+  const policy = data.escortServicePolicy || seedEscortServicePolicy();
+  const providers = Array.isArray(data.escortServiceProviders) ? data.escortServiceProviders : [];
+  const workers = Array.isArray(data.escortWorkers) ? data.escortWorkers : [];
+  const orders = (Array.isArray(data.escortServiceOrders) ? data.escortServiceOrders : [])
+    .filter((item) => canAccessEscortOrder(user, item, data));
+  const providerById = new Map(providers.map((item) => [item.id, item]));
+  const workerById = new Map(workers.map((item) => [item.id, item]));
+  const qualityReviewRequired = orders.filter((item) => item.qualityReview && item.qualityReview !== "closed" && item.qualityReview !== "passed");
+  const highRisk = orders.filter((item) => /high|urgent|overdue/i.test(`${item.priority || ""} ${item.riskLevel || ""} ${item.status || ""}`));
+  const providerRows = user.role === "institution"
+    ? providers.filter((item) => item.institutionCode === user.orgCode || item.name === user.orgName)
+    : user.role === "citizen"
+      ? providers.filter((item) => item.published !== false)
+      : providers;
+  return {
+    ok: true,
+    policy,
+    boundaries: policy.scope || [],
+    integrationTargets: policy.integrationTargets || [],
+    summary: {
+      providers: providerRows.length,
+      publishedProviders: providerRows.filter((item) => item.published).length,
+      trainedWorkers: providerRows.reduce((sum, provider) => sum + Number(provider.trainedWorkers || 0), 0),
+      orders: orders.length,
+      openOrders: orders.filter((item) => !isClosedTaskStatus(item.status)).length,
+      highRisk: highRisk.length,
+      subsidyOrders: orders.filter((item) => item.subsidyType && item.subsidyType !== "self-pay").length,
+      qualityReviewRequired: qualityReviewRequired.length
+    },
+    providers: providerRows,
+    workers: workers.filter((worker) => providerRows.some((provider) => provider.id === worker.providerId)),
+    orders: orders.map((item) => ({
+      ...item,
+      provider: providerById.get(item.providerId) || null,
+      worker: workerById.get(item.workerId) || null
+    })),
+    riskQueue: highRisk.map((item) => ({
+      id: item.id,
+      residentId: item.residentId,
+      status: item.status,
+      priority: item.priority,
+      riskLevel: item.riskLevel,
+      due: item.due,
+      nextAction: item.contractStatus !== "signed"
+        ? "Confirm service contract before escort starts."
+        : item.qualityReview !== "closed"
+          ? "Complete quality callback and risk review."
+          : "Keep monitoring until order closes."
+    })),
+    qualityQueue: qualityReviewRequired
+  };
+}
+
+function normalizeEscortServiceOrder(payload, user, data) {
+  const residentId = String(payload.residentId || user.residentId || "").trim();
+  if (!residentId) throw new Error("residentId is required");
+  if (!canAccessResident(user, residentId, data)) throw new Error("resident scope denied");
+  const providerId = String(payload.providerId || "esp-xuhui-daycare").trim();
+  const provider = (data.escortServiceProviders || []).find((item) => item.id === providerId) || seedEscortServiceProviders()[0];
+  if (user.role === "citizen" && provider.published === false) throw new Error("provider is not published");
+  const resident = (data.residents || []).find((item) => item.id === residentId) || {};
+  const serviceItems = Array.isArray(payload.serviceItems)
+    ? payload.serviceItems.map(String).filter(Boolean)
+    : String(payload.serviceItems || "registration,exam escort").split(",").map((item) => item.trim()).filter(Boolean);
+  const now = new Date().toISOString();
+  const note = String(payload.note || "").trim();
+  return {
+    id: payload.id || `eso-${randomUUID()}`,
+    residentId,
+    residentName: resident.name || String(payload.residentName || "").trim(),
+    providerId,
+    workerId: String(payload.workerId || "").trim(),
+    district: String(payload.district || provider.district || "").trim(),
+    hospital: String(payload.hospital || "").trim(),
+    department: String(payload.department || "").trim(),
+    appointmentAt: String(payload.appointmentAt || payload.due || "").trim(),
+    due: String(payload.due || payload.appointmentAt || "").trim(),
+    serviceItems: serviceItems.length ? serviceItems : ["registration", "exam escort"],
+    status: String(payload.status || "requested").trim(),
+    priority: String(payload.priority || "medium").trim(),
+    riskLevel: String(payload.riskLevel || "medium").trim(),
+    subsidyType: String(payload.subsidyType || "self-pay").trim(),
+    feeEstimate: Number(payload.feeEstimate || provider.pricing?.halfDayFee || 0),
+    contractStatus: String(payload.contractStatus || "pending").trim(),
+    insuranceStatus: String(payload.insuranceStatus || provider.insurance || "pending").trim(),
+    transportLink: String(payload.transportLink || "pending").trim(),
+    familyContactStatus: String(payload.familyContactStatus || "pending").trim(),
+    qualityReview: String(payload.qualityReview || "pending").trim(),
+    complaintStatus: String(payload.complaintStatus || "none").trim(),
+    satisfaction: String(payload.satisfaction || "pending").trim(),
+    sourceChannel: String(payload.sourceChannel || user.role).trim(),
+    createdAt: now,
+    createdBy: user.username || user.role,
+    createdByName: user.name || "",
+    providerName: provider.name,
+    institutionCode: provider.institutionCode || "",
+    auditTrail: [{ at: now, action: "request-created", by: user.username || user.role, note: note || "Escort service request created." }]
+  };
+}
+
+function applyEscortServiceOrderAction(item, payload, user) {
+  const now = new Date().toISOString();
+  const allowed = ["status", "workerId", "priority", "riskLevel", "contractStatus", "insuranceStatus", "transportLink", "familyContactStatus", "qualityReview", "complaintStatus", "satisfaction", "feeEstimate"];
+  const updates = Object.fromEntries(allowed
+    .filter((key) => Object.hasOwn(payload, key))
+    .map((key) => [key, key === "feeEstimate" ? Number(payload[key] || 0) : String(payload[key] || "").trim()]));
+  return {
+    ...item,
+    ...updates,
+    updatedAt: now,
+    updatedBy: user.username || user.role,
+    auditTrail: [
+      { at: now, action: String(payload.action || "escort-order-update").trim(), by: user.username || user.role, note: String(payload.note || updates.status || "").trim() },
+      ...(Array.isArray(item.auditTrail) ? item.auditTrail : [])
+    ].slice(0, 20)
+  };
+}
+
 function redactSensitiveResponse(value, user) {
   if (!user || user.role === "commission") return value;
   return redactSensitiveValue(value);
@@ -5451,6 +5753,11 @@ function scopeStateForUser(data, user) {
       scoped.multiPracticeApplications = (data.multiPracticeApplications || []).filter((item) => item.doctorId === user.doctorId);
     }
     scoped.referralTeleconsultations = (data.referralTeleconsultations || []).filter((item) => canAccessReferralTeleconsultation(user, item, data));
+    scoped.escortServiceOrders = (data.escortServiceOrders || []).filter((item) => canAccessEscortOrder(user, item, data));
+    if (user.role === "institution") {
+      scoped.escortServiceProviders = (data.escortServiceProviders || []).filter((item) => item.institutionCode === user.orgCode || item.name === user.orgName);
+      scoped.escortWorkers = (data.escortWorkers || []).filter((worker) => scoped.escortServiceProviders.some((provider) => provider.id === worker.providerId));
+    }
     if (scoped.mobileExperienceSettings) scoped.mobileExperienceSettings = { ...scoped.mobileExperienceSettings, userPreferences: undefined };
     return scoped;
   }
@@ -5469,7 +5776,7 @@ function scopeStateForUser(data, user) {
     const preferenceKey = user.residentId || user.accountId || user.username;
     scoped.mobileExperienceSettings = { ...scoped.mobileExperienceSettings, userPreferences: { [preferenceKey]: preferences[preferenceKey] || {} } };
   }
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "referralTeleconsultations", "taskMessages"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "referralTeleconsultations", "escortServiceOrders", "taskMessages"].forEach((key) => {
     scoped[key] = (data[key] || []).filter(hasAllowedResident);
   });
   if (scoped.referralSystem) {
@@ -6023,6 +6330,7 @@ const TASK_SOURCES = [
   ["chronicManagementPlans", "institution", "慢病管理", "nextReview"],
   ["careOrders", "institution", "诊疗工单", "orderDate"],
   ["referralTeleconsultations", ["institution", "county"], "referral teleconsultation", "due"],
+  ["escortServiceOrders", ["institution", "county"], "medical escort service", "due"],
   ["medicationPickups", "insurance", "固定取药", "nextPickup"],
   ["insuranceClaims", "insurance", "医保审核", "claimDate"],
   ["digitalCredentials", "insurance", "数字凭证", "lastUpdated"],
@@ -6048,7 +6356,8 @@ const SERVICE_DOMAIN_BY_COLLECTION = {
   countyAiDiagnosisCases: "aiDiagnosis",
   countyMutualRecognitionRecords: "mutualRecognition",
   diagnosticReports: "diagnosticReports",
-  referralTeleconsultations: "referralTeleconsultation"
+  referralTeleconsultations: "referralTeleconsultation",
+  escortServiceOrders: "escortService"
 };
 
 function taskPriorityLevel(item) {
@@ -6080,7 +6389,9 @@ function buildUnifiedTasks(data, user) {
     return (Array.isArray(rows) ? rows : []).filter((item) =>
       collection === "referralTeleconsultations"
         ? canAccessReferralTeleconsultation(user, item, data)
-        : canAccessResident(user, item.residentId || item.maternalResidentId, data)
+        : collection === "escortServiceOrders"
+          ? canAccessEscortOrder(user, item, data)
+          : canAccessResident(user, item.residentId || item.maternalResidentId, data)
     ).map((item) => {
       const task = {
         id: `${collection}:${item.id}`,
@@ -7513,6 +7824,105 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/escort-services/dashboard") {
+    const user = requireApiRole(req, res, ["commission", "institution", "county", "citizen"], "/api/escort-services/dashboard");
+    if (!user) return;
+    sendJson(res, 200, redactSensitiveResponse(buildEscortServiceDashboard(readDatabase(), user), user));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/escort-services/orders") {
+    const user = requireApiRole(req, res, ["commission", "institution", "county", "citizen"], "/api/escort-services/orders");
+    if (!user) return;
+    const data = readDatabase();
+    try {
+      const order = normalizeEscortServiceOrder(await collectJson(req), user, data);
+      if (!canAccessEscortOrder(user, order, data)) {
+        appendSecurityEvent({ actor: user.name, role: user.role, action: "create escort service order", target: order.residentId, result: "denied", detail: "scope denied" });
+        sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
+        return;
+      }
+      data.escortServiceOrders = [order, ...(Array.isArray(data.escortServiceOrders) ? data.escortServiceOrders : [])].slice(0, 500);
+      data.taskMessages = [
+        {
+          id: `msg-${randomUUID()}`,
+          taskId: `escortServiceOrders:${order.id}`,
+          collection: "escortServiceOrders",
+          sourceId: order.id,
+          residentId: order.residentId,
+          targetRole: "institution",
+          channel: "in_app",
+          title: "New medical escort service request",
+          body: `${order.providerName || order.providerId} needs escort service confirmation for ${order.hospital || "outpatient visit"}.`,
+          status: "sent",
+          receipts: [],
+          createdAt: new Date().toISOString(),
+          createdBy: user.username || user.role,
+          createdByName: user.name
+        },
+        ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])
+      ].slice(0, 300);
+      appendDataAccessLog(data, user, order.residentId, "escortServiceOrders", "create medical escort service order", "allowed");
+      data.securityEvents = [
+        {
+          id: randomUUID(),
+          at: new Date().toLocaleString("zh-CN", { hour12: false }),
+          actor: user.name,
+          role: user.role,
+          action: "create escort service order",
+          target: order.id,
+          result: "allowed",
+          detail: order.status
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120);
+      writeDatabase(data);
+      sendJson(res, 201, order);
+    } catch (error) {
+      const denied = /scope denied|not published/i.test(error.message || "");
+      sendJson(res, denied ? 403 : 400, { error: denied ? "Forbidden" : "Bad Request", message: error.message });
+    }
+    return;
+  }
+
+  const escortOrderActionMatch = url.pathname.match(/^\/api\/escort-services\/orders\/([^/]+)\/actions$/);
+  if (req.method === "POST" && escortOrderActionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/escort-services/orders/:id/actions");
+    if (!user) return;
+    const data = readDatabase();
+    const rows = Array.isArray(data.escortServiceOrders) ? data.escortServiceOrders : [];
+    const index = rows.findIndex((item) => item.id === decodeURIComponent(escortOrderActionMatch[1]));
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "escort service order not found" });
+      return;
+    }
+    if (!canAccessEscortOrder(user, rows[index], data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "update escort service order", target: rows[index].id, result: "denied", detail: "scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
+      return;
+    }
+    const payload = await collectJson(req);
+    rows[index] = applyEscortServiceOrderAction(rows[index], payload, user);
+    data.escortServiceOrders = rows;
+    appendDataAccessLog(data, user, rows[index].residentId, "escortServiceOrders", payload.note || rows[index].status, "allowed");
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "update escort service order",
+        target: rows[index].id,
+        result: "allowed",
+        detail: rows[index].status
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, rows[index]);
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/tasks") {
     const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/tasks");
     if (!user) return;
@@ -8203,7 +8613,11 @@ async function handleApi(req, res) {
       sendJson(res, 404, { error: "Not Found", message: "未找到任务" });
       return;
     }
-    if (!canAccessResident(user, rows[index].residentId || rows[index].maternalResidentId, data)) {
+    if (collection === "escortServiceOrders" && !canAccessEscortOrder(user, rows[index], data)) {
+      sendJson(res, 403, { error: "Forbidden", message: "No access to this escort service task" });
+      return;
+    }
+    if (collection !== "escortServiceOrders" && !canAccessResident(user, rows[index].residentId || rows[index].maternalResidentId, data)) {
       sendJson(res, 403, { error: "Forbidden", message: "无权处理该居民任务" });
       return;
     }
