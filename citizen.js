@@ -176,6 +176,29 @@ const citizenServiceTabs = [
   { key: "registration", label: "挂号", status: "待开发", detail: "号源、支付、退号待接入" }
 ];
 
+const residentFunctionAudit = [
+  { service: "health-record", name: "手机号验证码登录", status: "已实现", evidence: "登录页支持手机号和演示验证码进入居民端", mobile: "独立表单，按钮满足触控尺寸" },
+  { service: "health-record", name: "家庭成员切换", status: "已实现", evidence: "居民账户按成员裁剪档案和服务记录", mobile: "成员卡片可横向滚动选择" },
+  { service: "health-record", name: "健康指标与风险等级", status: "已实现", evidence: "展示血压、血糖、BMI、家庭医生和风险分层", mobile: "摘要卡片单列堆叠" },
+  { service: "health-record", name: "全生命周期健康管理", status: "已实现", evidence: "出生、儿童、成人慢病、老年服务和死亡证明线索归集", mobile: "阶段卡片单列显示" },
+  { service: "health-record", name: "健康档案归集", status: "已实现", evidence: "标准档案、检查检验、用药、过敏、疫苗、影像和附件统一索引", mobile: "档案标签横向滑动" },
+  { service: "health-record", name: "上传资料", status: "已实现", evidence: "居民可补充报告、图片或自测记录", mobile: "弹窗在窄屏占满可用宽度" },
+  { service: "health-record", name: "授权共享与撤销", status: "已实现", evidence: "可新增授权并记录授权对象、范围和来源", mobile: "表单字段单列录入" },
+  { service: "emr", name: "电子病历时间线", status: "已实现", evidence: "门诊、随访、检查和用药摘要按时间展示", mobile: "时间线与详情卡片单列显示" },
+  { service: "emr", name: "慢病管理", status: "已实现", evidence: "展示慢病登记、随访提醒和院后反馈", mobile: "表单控件触控高度优化" },
+  { service: "emr", name: "转诊和家庭医生服务", status: "已实现", evidence: "居民端可查看转诊指引和签约服务记录", mobile: "服务卡片单列呈现" },
+  { service: "emr", name: "出生健康与妇幼接续", status: "已实现", evidence: "居民授权范围内查看出生证明和妇幼连续服务", mobile: "信息卡片按宽度自适应" },
+  { service: "emr", name: "固定取药和电子凭证", status: "已实现", evidence: "固定取药、数字凭证和访问记录进入个人视角", mobile: "状态标签不挤压正文" },
+  { service: "nursing", name: "互联网护理预约", status: "已实现", evidence: "居民可进入护理服务页提交上门护理申请", mobile: "以独立护理页承载完整预约流程" },
+  { service: "nursing", name: "护理订单追踪", status: "已实现", evidence: "复用机构派单、护士接单、服务记录和质控回访", mobile: "订单状态卡片移动端可读" },
+  { service: "nursing", name: "长期照护评估", status: "待开发", evidence: "需接入长期护理险、民政和医保待遇核验", mobile: "已在护理标签中显式标记待开发" },
+  { service: "escort", name: "助医陪诊预约", status: "已实现", evidence: "可为本人或家庭成员提交陪诊预约", mobile: "预约表单在手机端单列输入" },
+  { service: "escort", name: "陪诊合同、保险和回访", status: "已实现", evidence: "订单同步服务主体、保障类型、保险和质控状态", mobile: "订单卡片跟随陪诊标签展示" },
+  { service: "registration", name: "医院号源查询", status: "待开发", evidence: "待接入 HIS/互联网医院号源池", mobile: "保留挂号标签和待开发说明" },
+  { service: "registration", name: "预约挂号确认", status: "待开发", evidence: "待补支付、医保电子凭证核验、短信通知和退号规则", mobile: "保留协同底座状态" },
+  { service: "registration", name: "就医协同底座", status: "已实现", evidence: "陪诊、转诊和电子病历归集可支撑挂号上线", mobile: "作为挂号标签内已实现底座展示" }
+];
+
 let activeServiceTab = serviceTabFromHash() || "health-record";
 let state = fallbackState;
 let citizenExtra = loadCitizenExtra();
@@ -238,6 +261,7 @@ function setServiceTab(key, options = {}) {
 
 function updateServicePanes() {
   renderServiceSummary();
+  renderResidentFunctionAudit();
   document.querySelectorAll("[data-service-tab]").forEach((button) => {
     const active = button.dataset.serviceTab === activeServiceTab;
     button.classList.toggle("active", active);
@@ -263,6 +287,37 @@ function renderServiceSummary() {
     <span class="feature-state ready">${ready} 项已实现</span>
     <span class="feature-state pending">${pending} 项待开发</span>
   </div>`;
+}
+
+function renderResidentFunctionAudit() {
+  const grid = document.querySelector("#resident-audit-grid");
+  const stats = document.querySelector("#resident-audit-stats");
+  const summary = document.querySelector("#resident-audit-summary");
+  if (!grid || !stats || !summary) return;
+  const ready = residentFunctionAudit.filter((item) => item.status === "已实现").length;
+  const pending = residentFunctionAudit.filter((item) => item.status === "待开发").length;
+  const activeService = citizenServiceTabs.find((item) => item.key === activeServiceTab) || citizenServiceTabs[0];
+  const activeItems = residentFunctionAudit.filter((item) => item.service === activeService.key);
+  summary.textContent = `${activeService.label}：${activeItems.filter((item) => item.status === "已实现").length} 项已实现，${activeItems.filter((item) => item.status === "待开发").length} 项待开发`;
+  stats.innerHTML = `
+    <span class="feature-state ready">居民端共 ${residentFunctionAudit.length} 项</span>
+    <span class="feature-state ready">${ready} 项已实现</span>
+    <span class="feature-state pending">${pending} 项待开发</span>
+    <span class="feature-state mobile">手机端触控审计已覆盖</span>`;
+  grid.innerHTML = residentFunctionAudit.map((item) => {
+    const service = citizenServiceTabs.find((tab) => tab.key === item.service) || citizenServiceTabs[0];
+    const stateClass = item.status === "待开发" ? "pending" : "ready";
+    const active = item.service === activeServiceTab ? "active" : "";
+    return `<article class="resident-audit-card ${stateClass} ${active}" data-audit-service="${item.service}">
+      <div>
+        <span>${service.label}</span>
+        <strong>${item.name}</strong>
+      </div>
+      <em class="feature-state ${stateClass}">${item.status}</em>
+      <p>${item.evidence}</p>
+      <small>${item.mobile}</small>
+    </article>`;
+  }).join("");
 }
 
 async function loadState() {

@@ -303,6 +303,15 @@ select,
   box-shadow: var(--shadow);
 }
 
+.service-tabs button:focus-visible,
+.vault-tabs button:focus-visible,
+.member-card:focus-visible,
+.small-button:focus-visible,
+.ghost-link:focus-visible {
+  outline: 3px solid rgba(39, 110, 241, 0.35);
+  outline-offset: 2px;
+}
+
 .service-tabs button.active {
   border-color: var(--blue);
   background: #eaf2ff;
@@ -408,6 +417,76 @@ select,
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.resident-audit-panel {
+  margin-bottom: 16px;
+}
+
+.resident-audit-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.feature-state.mobile {
+  background: #e6f7f5;
+  color: var(--teal);
+}
+
+.resident-audit-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.resident-audit-card {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  gap: 8px;
+  min-height: 178px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--green);
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fbfd;
+}
+
+.resident-audit-card.pending {
+  border-left-color: var(--amber);
+}
+
+.resident-audit-card.active {
+  border-color: var(--blue);
+  border-left-color: var(--blue);
+  background: #eef6ff;
+}
+
+.resident-audit-card span,
+.resident-audit-card strong,
+.resident-audit-card small {
+  display: block;
+}
+
+.resident-audit-card span,
+.resident-audit-card small {
+  color: var(--muted);
+}
+
+.resident-audit-card strong {
+  margin-top: 4px;
+  font-size: 16px;
+}
+
+.resident-audit-card p {
+  color: var(--ink);
+  line-height: 1.55;
+}
+
+.resident-audit-card small {
+  line-height: 1.45;
+  font-weight: 700;
 }
 
 .lifecycle-panel {
@@ -1250,6 +1329,11 @@ dialog::backdrop {
 }
 
 @media (max-width: 900px) {
+  .citizen-shell {
+    width: min(100% - 20px, 640px);
+    padding: 12px 0 28px;
+  }
+
   .citizen-header,
   .account-panel,
   .profile-band,
@@ -1261,8 +1345,57 @@ dialog::backdrop {
     align-items: stretch;
   }
 
+  .citizen-header,
+  .profile-band,
+  .panel,
+  .summary-card,
+  .account-panel {
+    padding: 14px;
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+
+  .header-actions select,
+  .header-actions .ghost-link,
+  .small-button,
+  .member-card,
+  .feedback-form input,
+  .feedback-form select,
+  .escort-appointment-form input,
+  .escort-appointment-form select,
+  .form-grid input,
+  .form-grid select,
+  .close-button {
+    min-height: 44px;
+  }
+
+  .header-actions select,
+  .header-actions .ghost-link {
+    width: 100%;
+  }
+
+  .panel-title {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .auth-bar nav {
     justify-content: flex-start;
+  }
+
+  .member-list {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scroll-snap-type: x proximity;
+  }
+
+  .member-card {
+    min-width: 138px;
+    scroll-snap-align: start;
   }
 
   .service-summary-stats {
@@ -1270,12 +1403,12 @@ dialog::backdrop {
   }
 
   .summary-grid,
-  .service-tabs,
   .citizen-trend-grid,
   .escort-appointment-layout,
   .escort-appointment-form,
   .service-status-grid,
   .lifecycle-grid,
+  .resident-audit-grid,
   .two-column,
   .account-panel,
   .completeness,
@@ -1287,6 +1420,57 @@ dialog::backdrop {
   .vault-item,
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .service-tabs {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(156px, 72vw);
+    grid-template-columns: none;
+    overflow-x: auto;
+    padding: 2px 2px 8px;
+    scroll-snap-type: x mandatory;
+  }
+
+  .service-tabs button {
+    min-height: 118px;
+    scroll-snap-align: start;
+  }
+
+  .resident-audit-card {
+    min-height: 0;
+  }
+
+  .vault-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    scroll-snap-type: x proximity;
+  }
+
+  .vault-tabs button {
+    flex: 0 0 auto;
+    min-height: 44px;
+    scroll-snap-align: start;
+  }
+
+  dialog {
+    width: min(100vw - 16px, 560px);
+    max-height: calc(100dvh - 20px);
+    overflow: auto;
+  }
+
+  .dialog-form {
+    padding: 14px;
+  }
+
+  .dialog-form header,
+  .dialog-form footer {
+    align-items: stretch;
+  }
+
+  .dialog-form footer {
+    flex-direction: column-reverse;
   }
 
   .visit {
