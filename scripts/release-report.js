@@ -307,11 +307,15 @@ function environmentMatrixChecks(environmentMatrix) {
 }
 
 function healthDashboardChecks(healthDashboard) {
+  const populationPeriods = healthDashboard.populationServiceBoard?.periods?.length || 0;
+  const populationInsights = healthDashboard.populationServiceBoard?.insights?.length || 0;
+  const functionalItems = healthDashboard.functionalReport?.functions?.length || 0;
   return [
     check("healthDashboard:summary", healthDashboard.ok, healthDashboard.ok ? "health dashboard summary checks passed" : "health dashboard summary failed", "error", "health-dashboard"),
     check("healthDashboard:applications", healthDashboard.applications?.length === 7, `${healthDashboard.applications?.length || 0} source applications`, "error", "health-dashboard"),
     check("healthDashboard:boundary", /source business applications|source applications/.test(healthDashboard.scope?.rule || ""), healthDashboard.scope?.rule || "missing", "error", "health-dashboard"),
-    check("healthDashboard:populationServiceBoard", healthDashboard.populationServiceBoard?.periods?.length === 4, `${healthDashboard.populationServiceBoard?.periods?.length || 0} population/service periods`, "error", "health-dashboard")
+    check("healthDashboard:populationServiceBoard", populationPeriods === 4 && populationInsights >= 4, `${populationPeriods} population/service periods, ${populationInsights} site insights`, "error", "health-dashboard"),
+    check("healthDashboard:functionalReport", functionalItems >= 6, `${functionalItems} module functions reported`, "error", "health-dashboard")
   ];
 }
 

@@ -81,6 +81,15 @@ function buildStaticDashboardSummary(state) {
       openActions: item.openActions,
       nextAction: item.highRisks > 0 ? "回到源应用复核高风险记录。" : "回到源应用闭环待办。"
     }));
+  const populationServiceBoard = buildStaticPopulationServiceBoard(state);
+  const functionalReport = buildDashboardFunctionalReport({
+    applications: enrichedApplications,
+    openActions,
+    populationServiceBoard,
+    interfaces,
+    evidence,
+    siteDependencies: dependencies
+  });
   return {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -101,7 +110,8 @@ function buildStaticDashboardSummary(state) {
     applications: enrichedApplications,
     risks,
     openActions,
-    populationServiceBoard: buildStaticPopulationServiceBoard(state),
+    populationServiceBoard,
+    functionalReport,
     interfaces: interfaces.map((item) => ({ id: item.id, domain: item.domain || item.name, priority: item.priority, owner: item.owner, status: item.status, nextAction: item.next })),
     evidence: evidence.map((item) => ({ id: item.id, name: item.name || item.category, owner: item.owner, status: item.status, records: Array.isArray(item.records) ? item.records.length : 0, nextAction: item.next })),
     siteDependencies: dependencies.map((item) => ({ id: item.id, track: item.track || item.name, owner: item.owner, status: item.status, nextAction: item.nextAction || item.next }))
@@ -150,7 +160,124 @@ function buildStaticPopulationServiceBoard(state) {
     eventAnchor: formatDashboardDate(eventAnchor),
     statisticsPeriod,
     sourceNote: "出生、死亡来自证书日期；就诊、入院来自月度接口快照并折算为日、周、月、年视图，现场日报接口接入后可替换为真实分时数据。",
+    insights: buildDashboardPopulationInsights(periods, { serviceReports: serviceReports.length, statisticsPeriod }),
     periods
+  };
+}
+
+function dashboardMetricValue(periods, periodId, metricId) {
+  return Number((periods.find((period) => period.id === periodId)?.metrics || []).find((metric) => metric.id === metricId)?.value || 0);
+}
+
+function buildDashboardPopulationInsights(periods, context = {}) {
+  const monthBirths = dashboardMetricValue(periods, "month", "births");
+  const monthDeaths = dashboardMetricValue(periods, "month", "deaths");
+  const monthVisits = dashboardMetricValue(periods, "month", "visits");
+  const monthAdmissions = dashboardMetricValue(periods, "month", "admissions");
+  const hasServiceReports = Number(context.serviceReports || 0) > 0;
+  return [
+    {
+      id: "certificate-coverage",
+      title: "证照登记覆盖",
+      value: `${monthBirths + monthDeaths}例`,
+      status: monthBirths + monthDeaths > 0 ? "ready" : "empty",
+      detail: "出生、死亡已按医学证明日期形成月内统计；现场需补齐撤销、补正和跨部门交换回执。"
+    },
+    {
+      id: "medical-service-signal",
+      title: "门急诊服务量",
+      value: `${monthVisits}人次`,
+      status: hasServiceReports ? "watch" : "empty",
+      detail: hasServiceReports ? "当前使用月度接口总量折算，日报接口接入前不用于小时级预警。" : "等待卫生统计或院内门急诊日报接口写入。"
+    },
+    {
+      id: "admission-pressure",
+      title: "入院承压观察",
+      value: `${monthAdmissions}人次`,
+      status: monthAdmissions >= 20000 ? "watch" : "ready",
+      detail: "入院量用于提示床位、转诊和医共体协同压力；生产需接入床位和出入院实时状态。"
+    },
+    {
+      id: "site-cutover",
+      title: "现场联调重点",
+      value: "4类接口",
+      status: "blocked",
+      detail: "证照链路、院内系统、统计直报和统一身份需现场签字后替换演示口径。"
+    }
+  ];
+}
+
+function buildDashboardFunctionalReport(context) {
+  const applications = context.applications || [];
+  const openActions = context.openActions || [];
+  const populationServiceBoard = context.populationServiceBoard || {};
+  const interfaces = context.interfaces || [];
+  const evidence = context.evidence || [];
+  const siteDependencies = context.siteDependencies || [];
+  const sourceRecords = applications.reduce((sum, item) => sum + Number(item.records || 0), 0);
+  const sourceOpenActions = applications.reduce((sum, item) => sum + Number(item.openActions || 0), 0);
+  const highRisks = applications.reduce((sum, item) => sum + Number(item.highRisks || 0), 0);
+  const evidenceRecords = evidence.reduce((sum, item) => sum + (Array.isArray(item.records) ? item.records.length : 0), 0);
+  const functions = [
+    {
+      id: "aggregate-entry",
+      name: "前七应用汇总入口",
+      status: applications.length === 7 ? "ready" : "watch",
+      evidence: `${applications.length} source applications, ${sourceRecords} source records`,
+      boundary: "只做跨应用总览与导航，不替代源应用业务办理。"
+    },
+    {
+      id: "population-service-board",
+      name: "出生死亡就诊入院看板",
+      status: populationServiceBoard.periods?.length === 4 ? "ready" : "watch",
+      evidence: `${populationServiceBoard.periods?.length || 0} periods, ${populationServiceBoard.insights?.length || 0} insights`,
+      boundary: "日报接口接入前，就诊和入院使用月度快照折算。"
+    },
+    {
+      id: "risk-action-loop",
+      name: "风险预警与任务闭环",
+      status: openActions.length > 0 ? "watch" : "ready",
+      evidence: `${openActions.length} preview open actions, ${sourceOpenActions} source open actions, ${highRisks} high risks`,
+      boundary: "处置回写仍在源业务端完成。"
+    },
+    {
+      id: "interface-evidence",
+      name: "接口联调与验收证据",
+      status: interfaces.length >= 4 && evidenceRecords >= 2 ? "ready" : "watch",
+      evidence: `${interfaces.length} interface tracks, ${evidenceRecords} evidence records`,
+      boundary: "复用平台接口和验收证据，不替代现场签字。"
+    },
+    {
+      id: "policy-about",
+      name: "政策说明与关于页",
+      status: "ready",
+      evidence: "health-dashboard-about.html",
+      boundary: "说明政策依据、数据口径和现场切换条件。"
+    },
+    {
+      id: "release-audit",
+      name: "发布审计与验收报告",
+      status: siteDependencies.length > 0 ? "watch" : "ready",
+      evidence: "health-dashboard:summary, release:report, deploy:check",
+      boundary: "生产切换仍依赖现场签字和正式环境配置。"
+    }
+  ];
+  return {
+    title: "卫生健康综合驾驶舱主要功能报告",
+    generatedFrom: "/api/health-dashboard/summary",
+    summary: {
+      functions: functions.length,
+      ready: functions.filter((item) => item.status === "ready").length,
+      watch: functions.filter((item) => item.status === "watch").length,
+      blocked: functions.filter((item) => item.status === "blocked").length
+    },
+    functions,
+    releaseEvidence: [
+      { id: "summary-api", name: "综合驾驶舱摘要接口", evidence: "/api/health-dashboard/summary" },
+      { id: "summary-script", name: "模块摘要与功能报告", evidence: "npm.cmd run health-dashboard:summary" },
+      { id: "release-gate", name: "发布聚合报告", evidence: "npm.cmd run release:report" },
+      { id: "deploy-gate", name: "部署门禁", evidence: "npm.cmd run deploy:check" }
+    ]
   };
 }
 
@@ -211,6 +338,7 @@ function renderDashboard(summary) {
   renderMetrics(summary);
   renderDataState(summary);
   renderPopulationServiceBoard(summary);
+  renderFunctionReport(summary.functionalReport || {});
   document.querySelector("#dashboard-scope").textContent = summary.scope?.rule || "";
   renderFilterOptions(summary);
   renderApplications(summary.applications || []);
@@ -252,6 +380,28 @@ function renderMetrics(summary) {
   ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><small>${hint}</small></article>`).join("");
 }
 
+function renderFunctionReport(report) {
+  const summary = document.querySelector("#dashboard-function-summary");
+  const list = document.querySelector("#dashboard-function-list");
+  const evidence = document.querySelector("#dashboard-function-evidence");
+  const rows = Array.isArray(report.functions) ? report.functions : [];
+  const evidenceRows = Array.isArray(report.releaseEvidence) ? report.releaseEvidence : [];
+  if (summary) {
+    summary.textContent = `${report.summary?.functions || rows.length} functions / ${report.summary?.ready || 0} ready / ${report.summary?.watch || 0} watch`;
+  }
+  if (list) {
+    list.innerHTML = rows.map((item) => `<article class="function-report-card ${item.status || "normal"}" data-function-report="${item.id}">
+      <span>${item.status || "ready"}</span>
+      <strong>${item.name || item.id}</strong>
+      <small>${item.evidence || ""}</small>
+      <p>${item.boundary || ""}</p>
+    </article>`).join("") || `<article class="function-report-card empty"><strong>等待功能报告</strong><p>摘要接口返回后生成本模块主要功能报告。</p></article>`;
+  }
+  if (evidence) {
+    evidence.innerHTML = evidenceRows.map((item) => `<span data-function-evidence="${item.id}">${item.name || item.id}: ${item.evidence || ""}</span>`).join("");
+  }
+}
+
 function bindPopulationBoardPeriod() {
   const controls = document.querySelector("#population-period-controls");
   if (!controls || controls.dataset.bound === "true") return;
@@ -270,6 +420,7 @@ function renderPopulationServiceBoard(summary) {
   const controls = document.querySelector("#population-period-controls");
   const cards = document.querySelector("#population-metric-cards");
   const chart = document.querySelector("#population-chart");
+  const insights = document.querySelector("#population-insights");
   const range = document.querySelector("#population-board-range");
   const source = document.querySelector("#population-board-source");
   if (!section || !controls || !cards || !chart) return;
@@ -280,6 +431,7 @@ function renderPopulationServiceBoard(summary) {
     controls.innerHTML = "";
     cards.innerHTML = `<article class="population-empty">暂无出生、死亡、就诊、入院数据</article>`;
     chart.innerHTML = "";
+    if (insights) insights.innerHTML = "";
     if (range) range.textContent = "等待数据";
     if (source) source.textContent = "等待前 7 个应用或现场接口写入统计快照。";
     return;
@@ -305,6 +457,14 @@ function renderPopulationServiceBoard(summary) {
       <strong>${formatDashboardNumber(value)}${metric.unit || ""}</strong>
     </div>`;
   }).join("");
+  if (insights) {
+    const insightRows = Array.isArray(board.insights) ? board.insights : [];
+    insights.innerHTML = insightRows.map((item) => `<article class="population-insight ${item.status || "normal"}" data-population-insight="${item.id}">
+      <span>${item.title || item.id}</span>
+      <strong>${item.value || ""}</strong>
+      <small>${item.detail || ""}</small>
+    </article>`).join("");
+  }
 }
 
 function formatDashboardNumber(value) {

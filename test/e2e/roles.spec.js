@@ -114,10 +114,14 @@ test("commission health dashboard filters live source actions and drills into so
   await expect(page.locator("#dashboard-policy-notes")).toBeVisible();
   await expect(page.locator("[data-dashboard-policy='certificates']")).toContainText("出生");
   await expect(page.locator("#dashboard-policy-notes a[href='./health-dashboard-about.html']")).toHaveCount(1);
+  await expect(page.locator("#dashboard-function-list [data-function-report]")).toHaveCount(6);
+  await expect(page.locator("#dashboard-function-list [data-function-report='aggregate-entry']")).toContainText("source applications");
   await expect(page.locator("#population-service-board")).toBeVisible();
   await expect(page.locator("#population-service-board")).toHaveAttribute("data-active-period", "day");
   await expect(page.locator("#population-metric-cards [data-population-metric]")).toHaveCount(4);
   await expect(page.locator("#population-chart .population-bar-row")).toHaveCount(4);
+  await expect(page.locator("#population-insights [data-population-insight]")).toHaveCount(4);
+  await expect(page.locator("#population-insights [data-population-insight='site-cutover']")).toContainText("4类接口");
   await expect(page.locator("#population-metric-cards [data-population-metric='deaths']")).toContainText("1");
   await page.locator("[data-population-period='month']").click();
   await expect(page.locator("#population-service-board")).toHaveAttribute("data-active-period", "month");

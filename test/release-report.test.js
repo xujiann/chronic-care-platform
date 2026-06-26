@@ -256,6 +256,8 @@ test("release report writes standalone production cutover and storage artifacts"
   const evaluationMarkdown = fs.readFileSync(path.join(outputDir, "evaluation-evidence-report.md"), "utf8");
   const environmentJson = JSON.parse(fs.readFileSync(path.join(outputDir, "environment-matrix-report.json"), "utf8"));
   const environmentMarkdown = fs.readFileSync(path.join(outputDir, "environment-matrix-report.md"), "utf8");
+  const healthDashboardJson = JSON.parse(fs.readFileSync(path.join(outputDir, "health-dashboard-summary.json"), "utf8"));
+  const healthDashboardMarkdown = fs.readFileSync(path.join(outputDir, "health-dashboard-summary.md"), "utf8");
   const manifestJson = JSON.parse(fs.readFileSync(path.join(outputDir, "release-artifact-manifest.json"), "utf8"));
   const manifestMarkdown = fs.readFileSync(path.join(outputDir, "release-artifact-manifest.md"), "utf8");
   assert.equal(cutoverJson.checklist.some((item) => item.id === "cutover-identity"), true);
@@ -295,6 +297,9 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(evaluationMarkdown, /Artifact coverage/);
   assert.equal(environmentJson.environmentMatrix.ok, true);
   assert.match(environmentMarkdown, /Environment matrix report/);
+  assert.equal(healthDashboardJson.healthDashboard.functionalReport.functions.length, 6);
+  assert.match(healthDashboardMarkdown, /Main function report/);
+  assert.match(healthDashboardMarkdown, /Release evidence/);
   assert.equal(manifestJson.releaseArtifactManifest.ok, true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "service-acceptance"), true);
   assert.match(manifestMarkdown, /Release artifact manifest/);

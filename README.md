@@ -255,5 +255,5 @@ GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下
 
 - `health-dashboard.html` is priority application 8: the aggregate entry for the first seven applications.
 - `GET /api/health-dashboard/summary` returns application metrics, risk counts, open actions, interface tracks, acceptance evidence, and site dependencies for commission users.
-- `npm.cmd run health-dashboard:summary` writes `release/health-dashboard-summary.json` and `release/health-dashboard-summary.md`.
+- `npm.cmd run health-dashboard:summary` writes `release/health-dashboard-summary.json` and `release/health-dashboard-summary.md`, including the module main function report.
 - Boundary: the dashboard does not replace source workflows; source applications remain the system of record for business operations and acceptance.

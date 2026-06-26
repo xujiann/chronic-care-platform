@@ -32,10 +32,17 @@ test("health dashboard summary aggregates the first seven applications without r
   assert.deepEqual(report.populationServiceBoard.periods.map((item) => item.id), ["day", "week", "month", "year"]);
   assert.equal(report.populationServiceBoard.periods.every((period) => period.metrics.length === 4), true);
   assert.equal(report.populationServiceBoard.periods.every((period) => ["births", "deaths", "visits", "admissions"].every((id) => period.metrics.some((metric) => metric.id === id))), true);
+  assert.equal(report.populationServiceBoard.insights.length, 4);
+  assert.equal(report.populationServiceBoard.insights.some((item) => item.id === "medical-service-signal" && item.status === "watch"), true);
+  assert.equal(report.populationServiceBoard.insights.some((item) => item.id === "site-cutover" && item.status === "blocked"), true);
   assert.equal(report.populationServiceBoard.periods.find((item) => item.id === "month").metrics.find((item) => item.id === "visits").value, 414780);
   assert.equal(report.populationServiceBoard.periods.find((item) => item.id === "month").metrics.find((item) => item.id === "admissions").value, 23786);
+  assert.equal(report.functionalReport.functions.length, 6);
+  assert.equal(report.functionalReport.functions.some((item) => item.id === "population-service-board" && item.status === "ready"), true);
+  assert.equal(report.functionalReport.releaseEvidence.some((item) => item.evidence === "npm.cmd run health-dashboard:summary"), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:source-boundary" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:population-service-board" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "dashboard:functional-report" && item.passed), true);
   assert.equal(report.openActions.every((item) => item.applicationId && item.application && item.entry), true);
   assert.equal(report.openActions.some((item) => item.entry === "county.html" || item.entry === "institution.html"), true);
 
@@ -48,6 +55,9 @@ test("health dashboard summary aggregates the first seven applications without r
   assert.match(markdown, /Preview open actions/);
   assert.match(markdown, /Application \| Entry \| Collection/);
   assert.match(markdown, /Population and service board/);
+  assert.match(markdown, /Population and service insights/);
+  assert.match(markdown, /Main function report/);
+  assert.match(markdown, /Release evidence/);
   assert.match(markdown, /414780/);
 });
 

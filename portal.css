@@ -551,6 +551,117 @@ h1 { margin-top: 4px; font-size: 28px; }
 .population-bar-fill.visit { background: var(--blue); }
 .population-bar-fill.admission { background: var(--amber); }
 
+.function-report-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.function-report-card {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--blue);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+
+.function-report-card.ready { border-left-color: var(--green); }
+.function-report-card.watch { border-left-color: var(--amber); }
+.function-report-card.blocked { border-left-color: var(--red); }
+.function-report-card.empty { border-left-color: var(--muted); }
+
+.function-report-card span {
+  display: inline-block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.function-report-card strong,
+.function-report-card small {
+  display: block;
+}
+
+.function-report-card strong {
+  margin-top: 6px;
+  font-size: 16px;
+}
+
+.function-report-card small,
+.function-report-card p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.function-report-card small {
+  margin-top: 6px;
+}
+
+.function-report-card p {
+  margin: 8px 0 0;
+}
+
+.function-report-evidence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.function-report-evidence span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 10px;
+  color: var(--muted);
+  background: #f8fbfd;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.population-insights {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.population-insight {
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--blue);
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fbfd;
+}
+
+.population-insight.ready { border-top-color: var(--green); }
+.population-insight.watch { border-top-color: var(--amber); }
+.population-insight.blocked { border-top-color: var(--red); }
+.population-insight.empty { border-top-color: var(--muted); }
+
+.population-insight span,
+.population-insight strong,
+.population-insight small {
+  display: block;
+}
+
+.population-insight span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.population-insight strong {
+  margin-top: 6px;
+  font-size: 20px;
+}
+
+.population-insight small {
+  margin-top: 8px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
 .population-source {
   margin-top: 10px;
   line-height: 1.55;
@@ -1112,7 +1223,9 @@ dialog::backdrop {
     justify-content: flex-start;
   }
   .metric-grid,
+  .function-report-grid,
   .population-metric-grid,
+  .population-insights,
   .portal-grid,
   .claim-grid,
   .capability-grid,

@@ -164,6 +164,52 @@ function periodRangeLabel(anchor, periodId) {
   return `${formatDate(start)} to ${formatDate(anchor)}`;
 }
 
+function boardMetricValue(periods, periodId, metricId) {
+  return Number((periods.find((period) => period.id === periodId)?.metrics || []).find((metric) => metric.id === metricId)?.value || 0);
+}
+
+function buildPopulationServiceInsights(periods, context = {}) {
+  const monthBirths = boardMetricValue(periods, "month", "births");
+  const monthDeaths = boardMetricValue(periods, "month", "deaths");
+  const monthVisits = boardMetricValue(periods, "month", "visits");
+  const monthAdmissions = boardMetricValue(periods, "month", "admissions");
+  const hasServiceReports = Number(context.serviceReports || 0) > 0;
+  return [
+    {
+      id: "certificate-coverage",
+      title: "证照登记覆盖",
+      value: `${monthBirths + monthDeaths}例`,
+      status: monthBirths + monthDeaths > 0 ? "ready" : "empty",
+      detail: "出生、死亡已按医学证明日期形成月内统计；现场需补齐撤销、补正和跨部门交换回执。",
+      source: "birthCertificates/deathCertificates"
+    },
+    {
+      id: "medical-service-signal",
+      title: "门急诊服务量",
+      value: `${monthVisits}人次`,
+      status: hasServiceReports ? "watch" : "empty",
+      detail: hasServiceReports ? "当前使用月度接口总量折算日、周、月、年，日报接口接入前不用于小时级预警。" : "等待卫生统计或院内门急诊日报接口写入。",
+      source: "healthStatistics.serviceReports"
+    },
+    {
+      id: "admission-pressure",
+      title: "入院承压观察",
+      value: `${monthAdmissions}人次`,
+      status: monthAdmissions >= 20000 ? "watch" : "ready",
+      detail: "入院量用于提示床位、转诊和医共体协同压力；生产需接入床位和出入院实时状态。",
+      source: "inpatientAdmissions"
+    },
+    {
+      id: "site-cutover",
+      title: "现场联调重点",
+      value: "4类接口",
+      status: "blocked",
+      detail: "证照链路、院内 HIS/EMR/LIS/PACS、统计直报和统一身份需现场签字后替换演示口径。",
+      source: "site dependencies"
+    }
+  ];
+}
+
 function buildPopulationServiceBoard(data) {
   const birthRows = rows(data, "birthCertificates");
   const deathRows = rows(data, "deathCertificates");
@@ -203,7 +249,87 @@ function buildPopulationServiceBoard(data) {
     eventAnchor: formatDate(eventAnchor),
     statisticsPeriod,
     sourceNote: "出生、死亡按证书日期统计；就诊、入院先使用月度接口总量折算日、周、月、年，现场日报接口接入后可替换为真实分时数据。",
+    insights: buildPopulationServiceInsights(periods, { serviceReports: serviceReports.length, statisticsPeriod }),
     periods
+  };
+}
+
+function buildFunctionalReport(context) {
+  const applications = context.applications || [];
+  const openActions = context.openActions || [];
+  const populationServiceBoard = context.populationServiceBoard || {};
+  const interfaces = context.interfaceRows || [];
+  const evidenceRecords = context.evidenceRecords || [];
+  const siteDependencies = context.siteDependencies || [];
+  const sourceRecords = applications.reduce((sum, item) => sum + Number(item.records || 0), 0);
+  const sourceOpenActions = applications.reduce((sum, item) => sum + Number(item.openActions || 0), 0);
+  const highRisks = applications.reduce((sum, item) => sum + Number(item.highRisks || 0), 0);
+  const functionRows = [
+    {
+      id: "aggregate-entry",
+      name: "前七应用汇总入口",
+      status: applications.length === 7 ? "ready" : "watch",
+      evidence: `${applications.length} source applications, ${sourceRecords} source records`,
+      boundary: "只做跨应用总览与导航，不替代源应用业务办理。"
+    },
+    {
+      id: "population-service-board",
+      name: "出生死亡就诊入院看板",
+      status: populationServiceBoard.periods?.length === 4 ? "ready" : "watch",
+      evidence: `${populationServiceBoard.periods?.length || 0} periods, ${populationServiceBoard.insights?.length || 0} insights`,
+      boundary: "出生、死亡按证书日期统计；就诊、入院在日报接口前使用月度快照折算。"
+    },
+    {
+      id: "risk-action-loop",
+      name: "风险预警与任务闭环",
+      status: openActions.length > 0 ? "watch" : "ready",
+      evidence: `${openActions.length} preview open actions, ${sourceOpenActions} source open actions, ${highRisks} high risks`,
+      boundary: "仅归一化展示 open action，处置回写仍在源业务端完成。"
+    },
+    {
+      id: "interface-evidence",
+      name: "接口联调与验收证据",
+      status: interfaces.length >= 4 && evidenceRecords.length >= 2 ? "ready" : "watch",
+      evidence: `${interfaces.length} interface tracks, ${evidenceRecords.length} evidence records`,
+      boundary: "复用 platformInterfaces、platformEvidence 与互联互通函数清单。"
+    },
+    {
+      id: "policy-about",
+      name: "政策说明与关于页",
+      status: "ready",
+      evidence: "health-dashboard-about.html, policy notes, data boundary copy",
+      boundary: "说明政策依据、数据口径和现场切换条件，不承诺未接入系统能力。"
+    },
+    {
+      id: "release-audit",
+      name: "发布审计与验收报告",
+      status: siteDependencies.length > 0 ? "watch" : "ready",
+      evidence: "health-dashboard:summary, release:report, deploy:check",
+      boundary: "发布报告呈现当前演示与联调状态，生产切换仍依赖现场签字。"
+    }
+  ];
+  return {
+    title: "卫生健康综合驾驶舱主要功能报告",
+    generatedFrom: "/api/health-dashboard/summary",
+    summary: {
+      functions: functionRows.length,
+      ready: functionRows.filter((item) => item.status === "ready").length,
+      watch: functionRows.filter((item) => item.status === "watch").length,
+      blocked: functionRows.filter((item) => item.status === "blocked").length
+    },
+    functions: functionRows,
+    releaseEvidence: [
+      { id: "summary-api", name: "综合驾驶舱摘要接口", evidence: "/api/health-dashboard/summary" },
+      { id: "summary-script", name: "模块摘要与功能报告", evidence: "npm.cmd run health-dashboard:summary" },
+      { id: "release-gate", name: "发布聚合报告", evidence: "npm.cmd run release:report" },
+      { id: "deploy-gate", name: "部署门禁", evidence: "npm.cmd run deploy:check" }
+    ],
+    onsiteBoundaries: [
+      "证照链路需补齐出生、死亡、电子证照、公安户籍、民政殡葬交换回执。",
+      "就诊和入院日报接口接入前，小时级预警不得使用月度折算值。",
+      "HIS/EMR/LIS/PACS、医保核心、统计直报、统一身份需以现场联调签字替换演示口径。",
+      "生产环境还需完成审计留存、监控告警、数据库适配、备份恢复和应急演练。"
+    ]
   };
 }
 
@@ -220,6 +346,7 @@ function buildHealthDashboardSummary(options = {}) {
   const evidenceRecords = rows(data, "platformEvidence").flatMap((item) => item.records || []);
   const siteDependencies = rows(data, "productionDeploymentPlan").filter((item) => isOpen(item) || /missing|待|寰|blocked/i.test(JSON.stringify(item)));
   const populationServiceBoard = buildPopulationServiceBoard(data);
+  const functionalReport = buildFunctionalReport({ applications, openActions, populationServiceBoard, interfaceRows, evidenceRecords, siteDependencies });
   const checks = [
     { id: "dashboard:applications", passed: applications.length === 7 && applications.every((item) => item.entry && item.collections.length), detail: `${applications.length} applications` },
     { id: "dashboard:source-boundary", passed: applications.every((item) => /source application/.test(item.boundary)), detail: "dashboard is aggregate-only" },
@@ -227,7 +354,8 @@ function buildHealthDashboardSummary(options = {}) {
     { id: "dashboard:actions", passed: previewOpenActions > 0 && sourceOpenActions >= previewOpenActions, detail: `${previewOpenActions} preview / ${sourceOpenActions} source open actions` },
     { id: "dashboard:interfaces", passed: interfaceRows.length >= 4, detail: `${interfaceRows.length} interface rows` },
     { id: "dashboard:evidence", passed: evidenceRecords.length >= 2, detail: `${evidenceRecords.length} evidence records` },
-    { id: "dashboard:population-service-board", passed: populationServiceBoard.periods.length === 4 && populationServiceBoard.periods.every((period) => period.metrics.length === 4), detail: "birth, death, visit, admission board for day/week/month/year" }
+    { id: "dashboard:population-service-board", passed: populationServiceBoard.periods.length === 4 && populationServiceBoard.periods.every((period) => period.metrics.length === 4) && populationServiceBoard.insights.length >= 4, detail: "birth, death, visit, admission board for day/week/month/year with site insights" },
+    { id: "dashboard:functional-report", passed: functionalReport.functions.length >= 6 && functionalReport.releaseEvidence.length >= 4, detail: `${functionalReport.functions.length} module functions with release evidence` }
   ];
   return {
     ok: checks.every((item) => item.passed),
@@ -260,6 +388,7 @@ function buildHealthDashboardSummary(options = {}) {
     })),
     openActions,
     populationServiceBoard,
+    functionalReport,
     interfaces: interfaceRows.map((item) => ({
       id: item.id || item.domain,
       domain: item.domain || item.name || item.id,
@@ -293,6 +422,10 @@ function renderMarkdown(report) {
   const checkRows = report.checks.map((item) => `| ${item.passed ? "PASS" : "FAIL"} | ${item.id} | ${String(item.detail || "").replace(/\|/g, "/")} |`);
   const boardPeriods = report.populationServiceBoard?.periods || [];
   const boardRows = boardPeriods.flatMap((period) => (period.metrics || []).map((metric) => `| ${period.label} | ${period.rangeLabel} | ${metric.label} | ${metric.value} ${metric.unit || ""} | ${metric.source || ""} |`));
+  const insightRows = (report.populationServiceBoard?.insights || []).map((item) => `| ${item.status || ""} | ${item.title || item.id} | ${item.value || ""} | ${String(item.detail || "").replace(/\|/g, "/")} |`);
+  const functionRows = (report.functionalReport?.functions || []).map((item) => `| ${item.status || ""} | ${item.name || item.id} | ${String(item.evidence || "").replace(/\|/g, "/")} | ${String(item.boundary || "").replace(/\|/g, "/")} |`);
+  const reportEvidenceRows = (report.functionalReport?.releaseEvidence || []).map((item) => `| ${item.name || item.id} | ${String(item.evidence || "").replace(/\|/g, "/")} |`);
+  const onsiteBoundaryRows = (report.functionalReport?.onsiteBoundaries || []).map((item) => `- ${item}`);
   return [
     "# Health dashboard summary",
     "",
@@ -329,6 +462,35 @@ function renderMarkdown(report) {
     "| Period | Range | Metric | Value | Source |",
     "|---|---|---|---:|---|",
     ...boardRows,
+    "",
+    "### Population and service insights",
+    "",
+    "| Status | Insight | Value | Detail |",
+    "|---|---|---:|---|",
+    ...insightRows,
+    "",
+    "## Main function report",
+    "",
+    report.functionalReport?.title || "Health dashboard main function report",
+    "",
+    `- Functions: ${report.functionalReport?.summary?.functions || 0}`,
+    `- Ready: ${report.functionalReport?.summary?.ready || 0}`,
+    `- Watch: ${report.functionalReport?.summary?.watch || 0}`,
+    `- Blocked: ${report.functionalReport?.summary?.blocked || 0}`,
+    "",
+    "| Status | Function | Evidence | Boundary |",
+    "|---|---|---|---|",
+    ...functionRows,
+    "",
+    "### Release evidence",
+    "",
+    "| Item | Evidence |",
+    "|---|---|",
+    ...reportEvidenceRows,
+    "",
+    "### Onsite boundaries",
+    "",
+    ...onsiteBoundaryRows,
     "",
     "## Open action preview",
     "",
@@ -375,4 +537,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { APPLICATIONS, buildHealthDashboardSummary, buildPopulationServiceBoard, parseArgs, renderMarkdown, writeOutput };
+module.exports = { APPLICATIONS, buildFunctionalReport, buildHealthDashboardSummary, buildPopulationServiceBoard, parseArgs, renderMarkdown, writeOutput };

@@ -162,8 +162,15 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(healthDashboard.body.openActions.every((item) => item.applicationId && item.application && item.entry), true);
     assert.deepEqual(healthDashboard.body.populationServiceBoard.periods.map((item) => item.id), ["day", "week", "month", "year"]);
     assert.equal(healthDashboard.body.populationServiceBoard.periods.find((item) => item.id === "month").metrics.some((item) => item.id === "visits" && item.value === 414780), true);
+    assert.equal(healthDashboard.body.populationServiceBoard.insights.length, 4);
+    assert.equal(healthDashboard.body.populationServiceBoard.insights.some((item) => item.id === "medical-service-signal" && item.status === "watch"), true);
+    assert.equal(healthDashboard.body.populationServiceBoard.insights.some((item) => item.id === "site-cutover" && item.value === "4类接口"), true);
+    assert.equal(healthDashboard.body.functionalReport.functions.length, 6);
+    assert.equal(healthDashboard.body.functionalReport.functions.some((item) => item.id === "aggregate-entry"), true);
+    assert.equal(healthDashboard.body.functionalReport.releaseEvidence.some((item) => item.evidence === "npm.cmd run health-dashboard:summary"), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:source-boundary" && item.passed), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:population-service-board" && item.passed), true);
+    assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:functional-report" && item.passed), true);
 
     const processAudit = await api(baseUrl, "/api/process-audit", authorized(accountLogin.body.token));
     assert.equal(processAudit.response.status, 200);
