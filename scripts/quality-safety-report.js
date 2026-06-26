@@ -169,6 +169,104 @@ function buildInstitutionRisks(issues, rectifications) {
     .slice(0, 10);
 }
 
+function buildActionPlan({ qualityEvents, rectifications, criticalRows, clinicalPathwayRows, mutualRecognitionRows, institutionRisks }) {
+  const rows = [];
+  function push(item) {
+    rows.push({
+      id: item.id,
+      priority: item.priority,
+      owner: item.owner || "Site quality office",
+      domain: item.domain || "quality_safety",
+      action: item.action,
+      reason: item.reason,
+      source: item.source,
+      dueAt: item.dueAt || "",
+      evidence: item.evidence || ""
+    });
+  }
+  criticalRows
+    .filter((item) => !item.disposed)
+    .forEach((item) => push({
+      id: `action-${item.id}`,
+      priority: "critical",
+      owner: item.institutionName || "Critical value owner",
+      domain: "critical_value",
+      action: "Complete acknowledgement, physician notification, disposition note, and linked event closure.",
+      reason: `${item.item || "critical item"} ${item.value || ""} meets ${item.threshold || "critical"} threshold.`,
+      source: item.id,
+      dueAt: item.reportedAt,
+      evidence: "acknowledgement, disposition, auditTrail"
+    }));
+  rectifications
+    .filter((item) => !item.closed)
+    .filter((item) => ["overdue", "due_soon"].includes(item.slaStatus) || !item.evidenceComplete || !item.feedbackComplete)
+    .forEach((item) => push({
+      id: `action-${item.id}`,
+      priority: item.slaStatus === "overdue" ? "high" : "medium",
+      owner: item.institutionName || item.owner,
+      domain: "rectification",
+      action: item.slaStatus === "overdue" ? "Escalate overdue rectification and require leadership sign-off." : "Confirm feedback and evidence before the SLA deadline.",
+      reason: `${item.slaStatus}; feedback=${item.feedbackComplete ? "complete" : "missing"}; evidence=${item.evidenceComplete ? "complete" : "pending"}.`,
+      source: item.id,
+      dueAt: item.dueAt,
+      evidence: "feedback, review, auditTrail"
+    }));
+  clinicalPathwayRows
+    .filter((item) => !item.reviewed)
+    .forEach((item) => push({
+      id: `action-${item.id}`,
+      priority: "medium",
+      owner: item.institutionName || "Clinical pathway office",
+      domain: "clinical_pathway",
+      action: "Review pathway variance, attach EMR evidence, and close or return the linked quality event.",
+      reason: item.varianceType || item.currentNode || "Open clinical pathway variance.",
+      source: item.id,
+      dueAt: item.dueAt,
+      evidence: "reviewTrail, EMR variance evidence, qualitySafetyEvents"
+    }));
+  mutualRecognitionRows
+    .filter((item) => !statusClosed(item.status || item.qcStatus))
+    .forEach((item) => push({
+      id: `action-${item.id}`,
+      priority: /manual|open|required/i.test(`${item.qcStatus || ""}${item.status || ""}`) ? "medium" : "watch",
+      owner: item.owner || item.institutionName || "Regional mutual recognition QC",
+      domain: "mutual_recognition_qc",
+      action: "Verify recognition quality-control evidence and document whether the result can be recognized.",
+      reason: item.issueType || item.qcStatus || item.nextAction || "Mutual recognition QC pending.",
+      source: item.id,
+      dueAt: item.dueAt,
+      evidence: "countyMutualRecognitionRecords, diagnosticReports"
+    }));
+  institutionRisks
+    .filter((item) => item.riskLevel === "high")
+    .forEach((item) => push({
+      id: `action-risk-${item.institutionName.replace(/\W+/g, "-").toLowerCase()}`,
+      priority: "high",
+      owner: item.institutionName,
+      domain: "institution_risk",
+      action: item.nextAction,
+      reason: `${item.score} risk points; ${(item.drivers || []).join(", ")}`,
+      source: "institutionRisks",
+      evidence: "issues, rectifications, SLA, escalation"
+    }));
+  if (!rows.length && qualityEvents.some((item) => !statusClosed(item.status))) {
+    push({
+      id: "action-routine-qc",
+      priority: "watch",
+      owner: "Site quality office",
+      domain: "routine_qc",
+      action: "Keep routine quality tracking active and review newly opened issues.",
+      reason: `${qualityEvents.filter((item) => !statusClosed(item.status)).length} non-closed issues remain visible.`,
+      source: "qualitySafetyEvents",
+      evidence: "dashboard refresh"
+    });
+  }
+  const priorityRank = { critical: 0, high: 1, medium: 2, watch: 3 };
+  return rows
+    .sort((a, b) => (priorityRank[a.priority] ?? 9) - (priorityRank[b.priority] ?? 9) || String(a.dueAt || "9999").localeCompare(String(b.dueAt || "9999")) || a.id.localeCompare(b.id))
+    .slice(0, 8);
+}
+
 function buildQualitySafetyReport(options = {}) {
   const data = options.data || readJson("data/db.json");
   const server = options.serverSource || read("server.js");
@@ -183,6 +281,8 @@ function buildQualitySafetyReport(options = {}) {
     status: item.status || "open",
     acknowledged: Boolean(item.acknowledgedAt),
     disposed: Boolean(item.disposedAt),
+    institutionName: item.targetInstitution || item.sourceInstitution,
+    reportedAt: item.reportedAt || "",
     action: item.action || item.disposition?.action || ""
   }));
   const clinicalPathwayRows = arrayOf(data, "clinicalPathwayCases").map((item) => ({
@@ -200,6 +300,7 @@ function buildQualitySafetyReport(options = {}) {
     reviewCount: Array.isArray(item.reviewTrail) ? item.reviewTrail.length : 0
   }));
   const rectifications = arrayOf(data, "qualityRectificationOrders");
+  const mutualRecognitionRows = arrayOf(data, "mutualRecognitionQualityReviews");
   const boundaryRows = [
     { id: "medical-quality", collection: "qualitySafetyEvents", modeled: qualityEvents.some((item) => item.domain === "medical_quality") },
     { id: "safety-events", collection: "qualitySafetyEvents", modeled: qualityEvents.some((item) => item.type === "safety_event") },
@@ -235,6 +336,7 @@ function buildQualitySafetyReport(options = {}) {
       institutionName: item.institutionName,
       owner: item.owner,
       status: item.status || "open",
+      dueAt: item.dueAt || "",
       slaStatus: sla.status,
       daysRemaining: sla.daysRemaining,
       feedbackComplete: sla.feedbackComplete,
@@ -252,6 +354,7 @@ function buildQualitySafetyReport(options = {}) {
     evidenceComplete: stateRows.filter((item) => item.evidenceComplete).length
   };
   const institutionRisks = buildInstitutionRisks(qualityEvents, stateRows);
+  const actionPlan = buildActionPlan({ qualityEvents, rectifications: stateRows, criticalRows, clinicalPathwayRows, mutualRecognitionRows, institutionRisks });
   const checks = [
     { id: "quality-safety:boundaries", passed: boundaryRows.every((item) => item.modeled), detail: `${boundaryRows.filter((item) => item.modeled).length}/${boundaryRows.length} boundaries modeled` },
     { id: "quality-safety:collections", passed: collectionRows.every((item) => item.present && item.rows > 0), detail: collectionRows.map((item) => `${item.collection}:${item.rows}`).join(";") },
@@ -263,7 +366,8 @@ function buildQualitySafetyReport(options = {}) {
     { id: "quality-safety:risk-ranking", passed: institutionRisks.length > 0 && institutionRisks[0].score > 0, detail: `${institutionRisks.length} ranked institutions` },
     { id: "quality-safety:critical-value-loop", passed: criticalRows.length > 0 && criticalRows.every((item) => item.threshold && item.action), detail: `${criticalRows.length} critical value alerts; ${criticalRows.filter((item) => item.disposed).length} disposed` },
     { id: "quality-safety:clinical-pathway-loop", passed: clinicalPathwayRows.length > 0 && clinicalPathwayRows.every((item) => item.eventId && item.dueAt) && server.includes("/api/quality-safety/clinical-pathways/:id/review"), detail: `${clinicalPathwayRows.length} pathway variances; ${clinicalPathwayRows.filter((item) => item.reviewed).length} reviewed` },
-    { id: "quality-safety:policy-basis", passed: policyRows.every((item) => item.present), detail: `${policyRows.filter((item) => item.present).length}/${policyRows.length} policy references linked` }
+    { id: "quality-safety:policy-basis", passed: policyRows.every((item) => item.present), detail: `${policyRows.filter((item) => item.present).length}/${policyRows.length} policy references linked` },
+    { id: "quality-safety:action-plan", passed: actionPlan.length > 0 && actionPlan.every((item) => item.priority && item.action && item.evidence), detail: `${actionPlan.length} prioritized action items` }
   ];
   return {
     ok: checks.every((item) => item.passed),
@@ -287,13 +391,16 @@ function buildQualitySafetyReport(options = {}) {
         reviewed: clinicalPathwayRows.filter((item) => item.reviewed).length,
         pending: clinicalPathwayRows.filter((item) => !item.reviewed).length
       },
-      policyReferences: policyRows.filter((item) => item.present).length
+      policyReferences: policyRows.filter((item) => item.present).length,
+      actionItems: actionPlan.length,
+      highActionItems: actionPlan.filter((item) => ["critical", "high"].includes(item.priority)).length
     },
     boundaries: boundaryRows,
     collections: collectionRows,
     reusedCollections: reusedRows,
     routes: routeRows,
     policyReferences: policyRows,
+    actionPlan,
     institutionRisks,
     criticalValues: criticalRows,
     clinicalPathways: clinicalPathwayRows,
@@ -315,6 +422,7 @@ function renderMarkdown(report) {
     `- Critical values: ${report.summary.criticalValues.total}, pending disposition ${report.summary.criticalValues.pending}`,
     `- Clinical pathways: ${report.summary.clinicalPathways.total}, pending review ${report.summary.clinicalPathways.pending}`,
     `- Policy references: ${report.summary.policyReferences}/${report.policyReferences.length}`,
+    `- Action plan: ${report.summary.actionItems} items, high priority ${report.summary.highActionItems}`,
     "",
     "## Checks",
     "",
@@ -339,6 +447,12 @@ function renderMarkdown(report) {
     "| Policy | Reference | Linked |",
     "|---|---|---|",
     ...report.policyReferences.map((item) => `| ${item.title} | ${item.url} | ${item.present ? "yes" : "no"} |`),
+    "",
+    "## Regulatory Action Plan",
+    "",
+    "| Priority | Owner | Domain | Action | Evidence |",
+    "|---|---|---|---|---|",
+    ...report.actionPlan.map((item) => `| ${item.priority} | ${item.owner} | ${item.domain} | ${String(item.action || "").replace(/\|/g, "/")} | ${String(item.evidence || "").replace(/\|/g, "/")} |`),
     "",
     "## Institution risk ranking",
     "",

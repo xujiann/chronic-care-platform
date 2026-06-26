@@ -5106,6 +5106,104 @@ function buildQualitySafetyClinicalPathways(data, user) {
   return qualitySafetyVisibleRows(rows, user);
 }
 
+function buildQualitySafetyActionPlan({ issues, rectifications, criticalValueAlerts, clinicalPathwayCases, mutualRecognitionQualityReviews, institutionRisks }) {
+  const rows = [];
+  function push(item) {
+    rows.push({
+      id: item.id,
+      priority: item.priority,
+      owner: item.owner || "Site quality office",
+      domain: item.domain || "quality_safety",
+      action: item.action,
+      reason: item.reason,
+      source: item.source,
+      dueAt: item.dueAt || "",
+      evidence: item.evidence || ""
+    });
+  }
+  criticalValueAlerts
+    .filter((item) => item.normalizedStatus !== "closed" || !item.dispositionComplete)
+    .forEach((item) => push({
+      id: `action-${item.id}`,
+      priority: "critical",
+      owner: item.institutionName || item.targetInstitution || item.sourceInstitution,
+      domain: "critical_value",
+      action: "Complete acknowledgement, physician notification, disposition note, and linked event closure.",
+      reason: `${item.item || "critical item"} ${item.value || ""} meets ${item.threshold || "critical"} threshold.`,
+      source: item.id,
+      dueAt: item.reportedAt,
+      evidence: "acknowledgement, disposition, auditTrail"
+    }));
+  rectifications
+    .filter((item) => item.normalizedStatus !== "closed")
+    .filter((item) => ["overdue", "due_soon"].includes(item.slaStatus) || !item.evidenceComplete || !item.feedbackComplete)
+    .forEach((item) => push({
+      id: `action-${item.id}`,
+      priority: item.slaStatus === "overdue" ? "high" : "medium",
+      owner: item.institutionName || item.owner,
+      domain: "rectification",
+      action: item.slaStatus === "overdue" ? "Escalate overdue rectification and require leadership sign-off." : "Confirm feedback and evidence before the SLA deadline.",
+      reason: `${item.slaStatus || "open"}; feedback=${item.feedbackComplete ? "complete" : "missing"}; evidence=${item.evidenceComplete ? "complete" : "pending"}.`,
+      source: item.id,
+      dueAt: item.dueAt,
+      evidence: "feedback, review, auditTrail"
+    }));
+  clinicalPathwayCases
+    .filter((item) => item.normalizedStatus !== "closed")
+    .forEach((item) => push({
+      id: `action-${item.id}`,
+      priority: "medium",
+      owner: item.institutionName || item.owner,
+      domain: "clinical_pathway",
+      action: "Review pathway variance, attach EMR evidence, and close or return the linked quality event.",
+      reason: item.varianceReason || item.currentNode || "Open clinical pathway variance.",
+      source: item.id,
+      dueAt: item.dueAt,
+      evidence: "reviewTrail, EMR variance evidence, qualitySafetyEvents"
+    }));
+  mutualRecognitionQualityReviews
+    .filter((item) => normalizeQualitySafetyStatus(item.status || item.qcStatus) !== "closed")
+    .forEach((item) => push({
+      id: `action-${item.id}`,
+      priority: /manual|open|required/i.test(`${item.qcStatus || ""}${item.status || ""}`) ? "medium" : "watch",
+      owner: item.owner || item.institutionName || "Regional mutual recognition QC",
+      domain: "mutual_recognition_qc",
+      action: "Verify recognition quality-control evidence and document whether the result can be recognized.",
+      reason: item.issueType || item.qcStatus || item.nextAction || "Mutual recognition QC pending.",
+      source: item.id,
+      dueAt: item.dueAt,
+      evidence: "countyMutualRecognitionRecords, diagnosticReports"
+    }));
+  institutionRisks
+    .filter((item) => item.riskLevel === "high")
+    .forEach((item) => push({
+      id: `action-risk-${item.institutionName.replace(/\W+/g, "-").toLowerCase()}`,
+      priority: "high",
+      owner: item.institutionName,
+      domain: "institution_risk",
+      action: item.nextAction,
+      reason: `${item.score} risk points; ${(item.drivers || []).join(", ")}`,
+      source: "institutionRisks",
+      evidence: "issues, rectifications, SLA, escalation"
+    }));
+  if (!rows.length && issues.some((item) => item.normalizedStatus !== "closed")) {
+    push({
+      id: "action-routine-qc",
+      priority: "watch",
+      owner: "Site quality office",
+      domain: "routine_qc",
+      action: "Keep routine quality tracking active and review newly opened issues.",
+      reason: `${issues.filter((item) => item.normalizedStatus !== "closed").length} non-closed issues remain visible.`,
+      source: "qualitySafetyEvents",
+      evidence: "dashboard refresh"
+    });
+  }
+  const priorityRank = { critical: 0, high: 1, medium: 2, watch: 3 };
+  return rows
+    .sort((a, b) => (priorityRank[a.priority] ?? 9) - (priorityRank[b.priority] ?? 9) || String(a.dueAt || "9999").localeCompare(String(b.dueAt || "9999")) || a.id.localeCompare(b.id))
+    .slice(0, 8);
+}
+
 function qualitySafetyVisibleRows(rows, user) {
   if (user.role === "commission") return rows;
   if (user.role === "county") {
@@ -5179,6 +5277,14 @@ function buildQualitySafetyDashboard(data, user) {
   const criticalValueAlerts = buildQualitySafetyCriticalAlerts(data, user);
   const clinicalPathwayCases = buildQualitySafetyClinicalPathways(data, user);
   const institutionRisks = buildQualitySafetyInstitutionRisks(issues, rectifications);
+  const mutualRecognitionQualityReviews = qualitySafetyVisibleRows((Array.isArray(data.mutualRecognitionQualityReviews) ? data.mutualRecognitionQualityReviews : []).map((item) => ({
+    ...item,
+    ownerRole: item.ownerRole || "county",
+    sourceCollection: "mutualRecognitionQualityReviews",
+    sourceId: item.id,
+    normalizedStatus: normalizeQualitySafetyStatus(item.status || item.qcStatus)
+  })), user);
+  const actionPlan = buildQualitySafetyActionPlan({ issues, rectifications, criticalValueAlerts, clinicalPathwayCases, mutualRecognitionQualityReviews, institutionRisks });
   const slaSummary = {
     overdue: rectifications.filter((item) => item.slaStatus === "overdue").length,
     dueSoon: rectifications.filter((item) => item.slaStatus === "due_soon").length,
@@ -5201,7 +5307,10 @@ function buildQualitySafetyDashboard(data, user) {
     clinicalPathwaysOpen: clinicalPathwayCases.filter((item) => item.normalizedStatus !== "closed").length,
     clinicalPathwaysReviewed: clinicalPathwayCases.filter((item) => item.reviewComplete).length,
     medicalRecordReviews: Array.isArray(data.medicalRecordQualityReviews) ? data.medicalRecordQualityReviews.length : 0,
-    mutualRecognitionReviews: Array.isArray(data.mutualRecognitionQualityReviews) ? data.mutualRecognitionQualityReviews.length : 0
+    mutualRecognitionReviews: mutualRecognitionQualityReviews.length,
+    actionItems: actionPlan.length,
+    criticalActionItems: actionPlan.filter((item) => item.priority === "critical").length,
+    highActionItems: actionPlan.filter((item) => item.priority === "high").length
   };
   const reusableCollections = [
     "diagnosticReports",
@@ -5227,13 +5336,14 @@ function buildQualitySafetyDashboard(data, user) {
     generatedAt: new Date().toISOString(),
     role: user.role,
     summary,
+    actionPlan,
     institutionRisks,
     issues,
     rectifications,
     criticalValueAlerts,
     clinicalPathwayCases,
     medicalRecordQualityReviews: Array.isArray(data.medicalRecordQualityReviews) ? data.medicalRecordQualityReviews : [],
-    mutualRecognitionQualityReviews: Array.isArray(data.mutualRecognitionQualityReviews) ? data.mutualRecognitionQualityReviews : [],
+    mutualRecognitionQualityReviews,
     reusedCollections: reusableCollections
   };
 }

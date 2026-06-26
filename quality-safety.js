@@ -41,6 +41,7 @@ function renderMetrics(summary) {
     ["Reviewing", summary.reviewing],
     ["Closed", summary.closed],
     ["Rectifications", summary.rectifications],
+    ["Action items", summary.actionItems || 0],
     ["Pathway open", summary.clinicalPathwaysOpen || 0],
     ["Due soon", summary.sla?.dueSoon || 0],
     ["Overdue", summary.sla?.overdue || 0]
@@ -75,6 +76,25 @@ function renderRisks(rows) {
             <td>${item.score}</td>
             <td>${text((item.drivers || []).join(", "))}<br /><small>${item.openIssues || 0} open, ${item.dueSoon || 0} due soon, ${item.overdue || 0} overdue</small></td>
             <td>${text(item.nextAction)}</td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  `);
+}
+
+function renderActionPlan(rows) {
+  setHtml("quality-safety-actions", `
+    <table>
+      <thead><tr><th>Priority</th><th>Owner</th><th>Action</th><th>Reason</th><th>Evidence</th></tr></thead>
+      <tbody>
+        ${rows.map((item) => `
+          <tr>
+            <td>${statusLabel(item.priority)}</td>
+            <td><strong>${text(item.owner)}</strong><br /><small>${text(item.domain)} / ${text(item.source)}</small></td>
+            <td>${text(item.action)}<br /><small>${item.dueAt ? `Due ${text(item.dueAt)}` : ""}</small></td>
+            <td>${text(item.reason)}</td>
+            <td>${text(item.evidence)}</td>
           </tr>
         `).join("")}
       </tbody>
@@ -172,6 +192,7 @@ function renderBoundaries(data) {
 function renderQualitySafety(data) {
   qualitySafetyState = data;
   renderMetrics(data.summary || {});
+  renderActionPlan(data.actionPlan || []);
   renderRisks(data.institutionRisks || []);
   renderReuse(data.reusedCollections || []);
   renderIssues(data.issues || []);
