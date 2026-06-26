@@ -168,7 +168,15 @@ const vaultSections = [
 ];
 
 let activeVaultSection = "timeline";
+const citizenServiceTabs = [
+  { key: "health-record", label: "健康档案", status: "已实现", detail: "健康指标、标准档案、授权共享" },
+  { key: "emr", label: "电子病历", status: "已实现", detail: "诊疗时间线、慢病和访问记录" },
+  { key: "nursing", label: "护理", status: "已实现", detail: "互联网护理预约与追踪" },
+  { key: "escort", label: "陪诊", status: "已实现", detail: "陪诊预约、合同、保障和回访" },
+  { key: "registration", label: "挂号", status: "待开发", detail: "号源、支付、退号待接入" }
+];
 
+let activeServiceTab = serviceTabFromHash() || "health-record";
 let state = fallbackState;
 let citizenExtra = loadCitizenExtra();
 let escortDashboard = null;
@@ -181,6 +189,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   ensureAccounts();
   populateAccounts();
   bindLargeMode();
+  bindServiceTabs();
+  window.addEventListener("hashchange", () => setServiceTab(serviceTabFromHash() || "health-record", { syncHash: false }));
   document.querySelector("#account-select").addEventListener("change", (event) => {
     currentAccountId = event.target.value;
     const account = getCurrentAccount();
@@ -195,6 +205,65 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderAccount(account);
   renderCitizen(account?.members[0]?.residentId || state.residents[0]?.id);
 });
+
+function bindServiceTabs() {
+  const target = document.querySelector("#service-tabs");
+  if (!target) return;
+  target.innerHTML = citizenServiceTabs.map((item) => `<button type="button" data-service-tab="${item.key}" aria-pressed="${item.key === activeServiceTab}">
+    <span>${item.label}</span>
+    <strong class="${item.status === "待开发" ? "pending" : "ready"}">${item.status}</strong>
+    <small>${item.detail}</small>
+  </button>`).join("");
+  target.querySelectorAll("[data-service-tab]").forEach((button) => {
+    button.addEventListener("click", () => {
+      setServiceTab(button.dataset.serviceTab);
+    });
+  });
+  updateServicePanes();
+}
+
+function serviceTabFromHash() {
+  const key = decodeURIComponent(String(location.hash || "").replace(/^#service-/, ""));
+  return citizenServiceTabs.some((item) => item.key === key) ? key : "";
+}
+
+function setServiceTab(key, options = {}) {
+  if (!citizenServiceTabs.some((item) => item.key === key)) return;
+  activeServiceTab = key;
+  if (options.syncHash !== false && location.hash !== `#service-${key}`) {
+    history.replaceState(null, "", `#service-${key}`);
+  }
+  updateServicePanes();
+}
+
+function updateServicePanes() {
+  renderServiceSummary();
+  document.querySelectorAll("[data-service-tab]").forEach((button) => {
+    const active = button.dataset.serviceTab === activeServiceTab;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  document.querySelectorAll("[data-service-pane]").forEach((pane) => {
+    pane.hidden = pane.dataset.servicePane !== activeServiceTab;
+  });
+}
+
+function renderServiceSummary() {
+  const target = document.querySelector("#service-summary");
+  if (!target) return;
+  const active = citizenServiceTabs.find((item) => item.key === activeServiceTab) || citizenServiceTabs[0];
+  const ready = citizenServiceTabs.filter((item) => item.status === "已实现").length;
+  const pending = citizenServiceTabs.length - ready;
+  target.innerHTML = `<div>
+    <span>当前服务</span>
+    <strong>${active.label}</strong>
+    <small>${active.detail}</small>
+  </div>
+  <div class="service-summary-stats">
+    <span class="feature-state ready">${ready} 项已实现</span>
+    <span class="feature-state pending">${pending} 项待开发</span>
+  </div>`;
+}
 
 async function loadState() {
   if (API_BASE) {

@@ -24,7 +24,11 @@
         <article class="panel login-panel">
           <div class="panel-title">
             <h2>登录</h2>
-            <span>演示密码均为 123456</span>
+            <span>密码 123456 · 居民验证码 888888</span>
+          </div>
+          <div class="login-method-tabs" role="tablist" aria-label="登录方式">
+            <button type="button" class="active" data-login-method="account" role="tab" aria-selected="true">账号密码</button>
+            <button type="button" data-login-method="phone" role="tab" aria-selected="false">手机号验证码</button>
           </div>
           <form id="login-form" class="login-form">
             <label>账号
@@ -36,6 +40,16 @@
             <button class="primary-action" type="submit">进入系统</button>
             <p class="login-error" id="login-error" role="alert"></p>
           </form>
+          <form id="phone-login-form" class="login-form" hidden>
+            <label>手机号
+              <input name="phone" id="login-phone" value="DEMO-MOBILE-R1" autocomplete="tel" required />
+            </label>
+            <label>验证码
+              <input name="code" inputmode="numeric" value="888888" maxlength="6" autocomplete="one-time-code" required />
+            </label>
+            <button class="primary-action" type="submit">居民手机号登录</button>
+            <p class="login-error" id="phone-login-error" role="alert"></p>
+          </form>
           <div class="demo-accounts" id="demo-accounts"></div>
         </article>
       </section>
@@ -45,15 +59,30 @@
     <script>
       const select = document.querySelector("#login-user");
       const accounts = window.HealthCityAuth.demoUsers;
+      const phoneForm = document.querySelector("#phone-login-form");
+      const accountForm = document.querySelector("#login-form");
       select.innerHTML = accounts.map((user) => `<option value="${user.username}">${user.roleName} · ${user.orgName || user.name} · ${user.username}</option>`).join("");
       document.querySelector("#demo-accounts").innerHTML = accounts.map((user) => `<button type="button" data-user="${user.username}">
         <strong>${user.roleName}</strong>
-        <span>${user.orgName || user.name}<br>${user.username} / 123456<br>${user.dataScope || ""}</span>
+        <span>${user.orgName || user.name}<br>${user.username} / 123456${user.phone ? `<br>${user.phone} / ${window.HealthCityAuth.demoSmsCode}` : ""}<br>${user.dataScope || ""}</span>
       </button>`).join("");
+      document.querySelectorAll("[data-login-method]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const isPhone = button.dataset.loginMethod === "phone";
+          document.querySelectorAll("[data-login-method]").forEach((item) => {
+            item.classList.toggle("active", item === button);
+            item.setAttribute("aria-selected", String(item === button));
+          });
+          accountForm.hidden = isPhone;
+          phoneForm.hidden = !isPhone;
+        });
+      });
       document.querySelectorAll("[data-user]").forEach((button) => {
         button.addEventListener("click", () => {
           select.value = button.dataset.user;
           document.querySelector("[name='password']").value = "123456";
+          const user = accounts.find((item) => item.username === button.dataset.user);
+          if (user?.phone) document.querySelector("#login-phone").value = user.phone;
         });
       });
       document.querySelector("#login-form").addEventListener("submit", async (event) => {
@@ -67,6 +96,21 @@
         submitButton.textContent = "进入系统";
         if (!result.ok) {
           document.querySelector("#login-error").textContent = result.message;
+          return;
+        }
+        window.HealthCityAuth.redirectAfterLogin(result.user.home);
+      });
+      phoneForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const submitButton = event.currentTarget.querySelector("button[type='submit']");
+        const data = Object.fromEntries(new FormData(event.currentTarget));
+        submitButton.disabled = true;
+        submitButton.textContent = "登录中";
+        const result = await window.HealthCityAuth.loginByPhone(data.phone, data.code);
+        submitButton.disabled = false;
+        submitButton.textContent = "居民手机号登录";
+        if (!result.ok) {
+          document.querySelector("#phone-login-error").textContent = result.message;
           return;
         }
         window.HealthCityAuth.redirectAfterLogin(result.user.home);

@@ -35,6 +35,14 @@ async function login(baseUrl, username, password = "123456") {
   });
 }
 
+async function phoneLogin(baseUrl, phone, code = "888888") {
+  return api(baseUrl, "/api/auth/phone-login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone, code })
+  });
+}
+
 function authorized(token, options = {}) {
   return {
     ...options,
@@ -117,6 +125,13 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(accountLogin.body.user.username, "health");
     assert.equal(accountLogin.body.user.password, undefined);
     assert.equal(accountLogin.body.user.passwordHash, undefined);
+
+    const residentPhoneLogin = await phoneLogin(baseUrl, "DEMO-MOBILE-R1");
+    assert.equal(residentPhoneLogin.response.status, 200);
+    assert.equal(residentPhoneLogin.body.user.role, "citizen");
+    assert.equal(residentPhoneLogin.body.user.home, "citizen.html");
+    assert.equal(residentPhoneLogin.body.user.residentId, "r1");
+    assert.equal(residentPhoneLogin.body.user.password, undefined);
 
     const missing = await api(baseUrl, "/api/not-found", authorized(accountLogin.body.token));
     assert.equal(missing.response.status, 404);
@@ -280,6 +295,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
   await t.test("rejects invalid credentials and unauthenticated state reads", async () => {
     const badLogin = await login(baseUrl, "health", "wrong-password");
     assert.equal(badLogin.response.status, 401);
+    const badPhoneLogin = await phoneLogin(baseUrl, "DEMO-MOBILE-R1", "000000");
+    assert.equal(badPhoneLogin.response.status, 401);
 
     const state = await api(baseUrl, "/api/state");
     assert.equal(state.response.status, 401);

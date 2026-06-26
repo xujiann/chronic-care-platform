@@ -605,13 +605,17 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   const serviceWorker = read("service-worker.js");
   assert.match(citizenHtml, /rel="manifest"/);
   assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260627/);
+  assert.match(citizenHtml, /auth\.js\?v=20260627/);
   assert.equal(manifest.start_url, "./citizen.html");
   assert.equal(manifest.display, "standalone");
   assert.equal(manifest.icons.some((item) => item.src === "./pwa-icon.svg"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
+  assert.match(serviceWorker, /chronic-care-citizen-v2/);
   assert.match(serviceWorker, /citizen\.html/);
   assert.match(serviceWorker, /mobile-preview\.html/);
   assert.match(serviceWorker, /data\/db\.json/);
+  assert.match(serviceWorker, /\?:html\|js\|css/);
   assert.match(read("package.json"), /node --check service-worker\.js/);
   assert.match(read("README.md"), /manifest\.webmanifest/);
   assert.match(read("README.md"), /service-worker\.js/);
@@ -648,6 +652,36 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   assert.match(read("server.js"), /provider is not published/);
 });
 
+test("citizen portal exposes resident service tabs and implementation states", () => {
+  const loginHtml = read("login.html");
+  const auth = read("auth.js");
+  const citizenHtml = read("citizen.html");
+  const citizenJs = read("citizen.js");
+  const citizenCss = read("citizen.css");
+  const server = read("server.js");
+  assert.match(loginHtml, /phone-login-form/);
+  assert.match(loginHtml, /手机号验证码/);
+  assert.match(auth, /loginByPhone/);
+  assert.match(auth, /demoSmsCode/);
+  assert.match(server, /\/api\/auth\/phone-login/);
+  assert.match(server, /findCitizenAuthUserByPhone/);
+  ["健康档案", "电子病历", "护理", "陪诊", "挂号"].forEach((label) => assert.match(citizenJs, new RegExp(label)));
+  assert.match(citizenHtml, /service-tabs/);
+  assert.match(citizenHtml, /service-summary/);
+  assert.match(citizenHtml, /data-service-pane="health-record"/);
+  assert.match(citizenHtml, /data-service-pane="registration"/);
+  assert.match(citizenHtml, /feature-state ready/);
+  assert.match(citizenHtml, /feature-state pending/);
+  assert.match(citizenJs, /citizenServiceTabs/);
+  assert.match(citizenJs, /serviceTabFromHash/);
+  assert.match(citizenJs, /setServiceTab/);
+  assert.match(citizenJs, /renderServiceSummary/);
+  assert.match(citizenJs, /hashchange/);
+  assert.match(citizenJs, /updateServicePanes/);
+  assert.match(citizenCss, /service-status-card/);
+  assert.match(citizenCss, /service-summary-stats/);
+});
+
 test("internet nursing module exposes appointment, management and nurse workflows", () => {
   const html = read("internet-nursing.html");
   const js = read("internet-nursing.js");
@@ -661,15 +695,23 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(js, /accountType !== "nurse"/);
   assert.match(js, /accountType === "nurse"/);
   assert.match(js, /select\.disabled = Boolean\(sessionNurseId\)/);
-  assert.match(js, /view only/);
-  assert.match(js, /hospital dispatch required/);
+  assert.match(js, /仅查看/);
+  assert.match(js, /需医院派单/);
+  assert.match(html, /互联网\+护理服务/);
+  assert.match(html, /个人端预约/);
+  assert.match(html, /医院端管理/);
+  assert.match(html, /护士端接单/);
   assert.match(server, /\/api\/internet-nursing\/dashboard/);
   assert.match(server, /canAccessInternetNursingOrder/);
   assert.match(read("auth.js"), /"internet-nursing\.html": \["commission", "institution", "citizen", "county"\]/);
   assert.match(read("auth.js"), /username: "nurse"/);
   assert.match(read("auth.js"), /password: "123456"/);
+  assert.match(read("auth.js"), /护士工作站/);
+  assert.match(read("auth.js"), /互联网护理/);
+  assert.match(read("auth.js"), /displayAuthText/);
   assert.match(read("server.js"), /username: "nurse"/);
   assert.match(read("server.js"), /password: "123456"/);
+  assert.match(read("server.js"), /护士工作站/);
   assert.match(read("package.json"), /internet-nursing:readiness/);
   assert.match(read("scripts/release-artifact-manifest.js"), /internet-nursing-readiness-report\.md/);
   assert.match(read("scripts/release-report.js"), /buildInternetNursingReadinessReport/);
@@ -679,4 +721,6 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(read("docs/互联网护理服务模块说明.md"), /flowchart TD/);
   assert.match(read("docs/互联网护理服务模块说明.md"), /nurse \/ 123456/);
   assert.match(read("docs/互联网护理服务模块说明.md"), /\/api\/internet-nursing\/orders\/:id\/actions/);
+  assert.doesNotMatch(html, /Citizen Appointment|Hospital Management|Nurse Workstation|Policy Controls|Submit/);
+  assert.doesNotMatch(js, /Accept<\/button>|Start<\/button>|Complete<\/button>|view only|hospital dispatch required/);
 });

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Internet+ Nursing</title>
+    <title>互联网+护理服务</title>
     <link rel="stylesheet" href="./portal.css" />
     <script src="./auth.js"></script>
     <script>window.HealthCityAuth.requireRole(["commission", "institution", "citizen", "county"])</script>
@@ -12,15 +12,15 @@
     <main class="portal-shell">
       <header class="portal-header">
         <div>
-          <span>Internet+ Nursing</span>
-          <h1>Appointment, hospital dispatch, and nurse acceptance</h1>
-          <p>Liaoning pilot workflow: online request, first-visit assessment, consent, qualified nurse dispatch, tracked home service, and quality callback.</p>
+          <span>互联网+护理服务</span>
+          <h1>预约申请、医院派单、护士接单闭环</h1>
+          <p>辽宁试点流程：线上申请、首诊评估、知情同意、合格护士派单、上门服务轨迹、护理记录和质量回访。</p>
         </div>
         <nav>
-          <a href="./citizen.html">Citizen</a>
-          <a href="./institution.html">Hospital</a>
-          <a href="./health-city.html">Overview</a>
-          <a href="./about.html">About</a>
+          <a href="./citizen.html">个人端</a>
+          <a href="./institution.html">医院端</a>
+          <a href="./health-city.html">总览</a>
+          <a href="./about.html">关于</a>
         </nav>
       </header>
 
@@ -29,50 +29,50 @@
       <section class="portal-grid">
         <article class="panel">
           <div class="panel-title">
-            <h2>Citizen Appointment</h2>
+            <h2>个人端预约</h2>
             <span id="nursing-citizen-summary"></span>
           </div>
           <form id="nursing-appointment-form" class="filter-grid">
-            <label>Resident ID<input name="residentId" value="r1" /></label>
-            <label>Institution<select name="institutionId" id="nursing-institution-select"></select></label>
-            <label>Service
+            <label>居民 ID<input name="residentId" value="r1" /></label>
+            <label>服务机构<select name="institutionId" id="nursing-institution-select"></select></label>
+            <label>服务项目
               <select name="serviceItem">
-                <option value="vital signs measurement">vital signs measurement</option>
-                <option value="blood glucose measurement">blood glucose measurement</option>
-                <option value="wound care">wound care</option>
-                <option value="tube care">tube care</option>
-                <option value="postpartum care">postpartum care</option>
-                <option value="infant care">infant care</option>
-                <option value="PICC maintenance">PICC maintenance</option>
+                <option value="vital signs measurement">生命体征测量</option>
+                <option value="blood glucose measurement">血糖测量</option>
+                <option value="wound care">伤口护理</option>
+                <option value="tube care">管路护理</option>
+                <option value="postpartum care">产后护理</option>
+                <option value="infant care">婴幼儿护理</option>
+                <option value="PICC maintenance">PICC 维护</option>
               </select>
             </label>
-            <label>People group
+            <label>服务对象
               <select name="serviceObject">
-                <option value="elderly or disabled people">elderly or disabled people</option>
-                <option value="rehabilitation patient">rehabilitation patient</option>
-                <option value="terminal-stage patient">terminal-stage patient</option>
-                <option value="maternal and infant people">maternal and infant people</option>
-                <option value="mobility-limited chronic disease patient">mobility-limited chronic disease patient</option>
+                <option value="elderly or disabled people">老年人或失能人群</option>
+                <option value="rehabilitation patient">康复期患者</option>
+                <option value="terminal-stage patient">终末期患者</option>
+                <option value="maternal and infant people">母婴人群</option>
+                <option value="mobility-limited chronic disease patient">行动不便慢病患者</option>
               </select>
             </label>
-            <label>Preferred date<input name="preferredAt" type="date" /></label>
-            <label>Risk
+            <label>预约日期<input name="preferredAt" type="date" /></label>
+            <label>风险等级
               <select name="riskLevel">
-                <option value="medium">medium</option>
-                <option value="low">low</option>
-                <option value="high">high</option>
+                <option value="medium">中风险</option>
+                <option value="low">低风险</option>
+                <option value="high">高风险</option>
               </select>
             </label>
-            <label class="full">Address<input name="address" value="Zhongshan district demo address" /></label>
-            <label class="full">Need<input name="note" value="Home nursing appointment from resident portal" /></label>
-            <button class="inline-action" type="submit">Submit</button>
+            <label class="full">服务地址<input name="address" value="中山区示例地址" /></label>
+            <label class="full">护理需求<input name="note" value="居民端提交上门护理预约" /></label>
+            <button class="inline-action" type="submit">提交预约</button>
           </form>
         </article>
 
         <article class="panel wide">
           <div class="panel-title">
-            <h2>Hospital Management</h2>
-            <span>assessment / consent / dispatch</span>
+            <h2>医院端管理</h2>
+            <span>评估 / 知情同意 / 派单</span>
           </div>
           <div id="nursing-orders" class="table-wrap"></div>
         </article>
@@ -81,18 +81,18 @@
       <section class="portal-grid">
         <article class="panel wide">
           <div class="panel-title">
-            <h2>Nurse Workstation</h2>
+            <h2>护士端接单</h2>
             <span id="nursing-nurse-summary"></span>
           </div>
           <div class="filter-grid">
-            <label>Nurse<select id="nursing-nurse-select"></select></label>
+            <label>护士<select id="nursing-nurse-select"></select></label>
           </div>
           <div id="nursing-nurse-queue" class="table-wrap"></div>
         </article>
 
         <article class="panel">
           <div class="panel-title">
-            <h2>Policy Controls</h2>
+            <h2>政策与风控</h2>
             <span id="nursing-policy-summary"></span>
           </div>
           <div id="nursing-policy" class="rules"></div>

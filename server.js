@@ -36,6 +36,7 @@ const runtimeMetrics = {
   lastRequestAt: ""
 };
 const sessions = new Map();
+const DEMO_SMS_CODE = process.env.DEMO_SMS_CODE || "888888";
 let sqliteModule = null;
 let sqliteError = null;
 const SQLITE_MIGRATIONS = [
@@ -1209,7 +1210,7 @@ function seedEscortServiceOrders() {
 
 function seedAuthUsers() {
   return [
-    { id: "u-nurse", username: "nurse", password: "123456", name: "Internet nursing demo nurse", role: "institution", roleName: "Nurse workstation", orgCode: "MR1", orgName: "Dalian Central Hospital", orgType: "medical_institution", orgLevel: "tertiary hospital", dataScope: "Internet nursing orders and service traces", home: "internet-nursing.html", nurseId: "inn-001", accountType: "nurse", status: "enabled" },
+    { id: "u-nurse", username: "nurse", password: "123456", name: "互联网护理演示护士", role: "institution", roleName: "护士工作站", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "互联网护理订单与服务轨迹", home: "internet-nursing.html", nurseId: "inn-001", accountType: "nurse", status: "启用" },
     { id: "u-city", username: "city", name: "市级管理员", role: "commission", roleName: "市级健康城市管理", orgCode: "ORG-CITY-DL", orgName: "大连市健康城市平台", orgType: "city", orgLevel: "市级", dataScope: "全市", home: "workbench.html", status: "启用" },
     { id: "u-district", username: "district", name: "区市县管理员", role: "commission", roleName: "区市县管理端", orgCode: "ORG-DIST-ZS", orgName: "中山区健康城市平台", orgType: "district", orgLevel: "区市县", dataScope: "中山区", home: "workbench.html", status: "启用" },
     { id: "u-health", username: "health", name: "大连市卫生健康委管理员", role: "commission", roleName: "大连市卫生健康委", orgCode: "ORG-HEALTH-DL", orgName: "大连市卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管", home: "index.html", status: "启用" },
@@ -5388,6 +5389,18 @@ function findAuthUser(username) {
   return data.authUsers.find((user) => user.username === username && user.status !== "停用");
 }
 
+function findCitizenAuthUserByPhone(phone) {
+  const data = readDatabase();
+  const normalizedPhone = normalizePhone(phone);
+  const account = (data.accounts || []).find((item) => normalizePhone(item.phone) === normalizedPhone);
+  if (!account) return null;
+  return (data.authUsers || []).find((user) => user.role === "citizen" && user.status !== "停用" && (user.accountId === account.id || account.members?.some((member) => member.residentId === user.residentId)));
+}
+
+function normalizePhone(phone) {
+  return String(phone || "").replace(/\s+/g, "").trim();
+}
+
 function createSession(user) {
   const sessionId = randomUUID();
   const now = Date.now();
@@ -8044,6 +8057,22 @@ async function handleApi(req, res) {
     }
     const session = createSession(user);
     appendSecurityEvent({ actor: user.name, role: user.role, action: "登录", target: user.home, result: "允许", detail: "签名会话已签发，支持密钥轮换校验" });
+    sendJson(res, 200, { ok: true, token: session.token, expiresAt: session.expiresAt, user: session.user });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/auth/phone-login") {
+    const credentials = await collectJson(req);
+    const phone = normalizePhone(credentials.phone);
+    const code = String(credentials.code || "").trim();
+    const user = findCitizenAuthUserByPhone(phone);
+    if (!user || code !== DEMO_SMS_CODE) {
+      appendSecurityEvent({ actor: phone || "unknown", role: "citizen", action: "手机号验证码登录", target: "统一认证", result: "拒绝", detail: "手机号或验证码错误" });
+      sendJson(res, 401, { ok: false, message: "手机号或验证码不正确" });
+      return;
+    }
+    const session = createSession({ ...user, phone });
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "手机号验证码登录", target: user.home, result: "允许", detail: "居民端验证码演示会话已签发" });
     sendJson(res, 200, { ok: true, token: session.token, expiresAt: session.expiresAt, user: session.user });
     return;
   }

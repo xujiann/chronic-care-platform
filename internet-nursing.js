@@ -61,19 +61,19 @@ function renderInternetNursingDashboard(dashboard) {
   renderNurseQueue(dashboard.orders || []);
   renderPolicyControls(dashboard.policy || {});
   const citizenSummary = document.querySelector("#nursing-citizen-summary");
-  if (citizenSummary) citizenSummary.textContent = `${dashboard.summary?.publishedInstitutions || 0} published institutions`;
+  if (citizenSummary) citizenSummary.textContent = `${dashboard.summary?.publishedInstitutions || 0} 家已发布机构`;
   const nurseSummary = document.querySelector("#nursing-nurse-summary");
-  if (nurseSummary) nurseSummary.textContent = `${dashboard.summary?.qualifiedNurses || 0}/${dashboard.summary?.nurses || 0} qualified`;
+  if (nurseSummary) nurseSummary.textContent = `${dashboard.summary?.qualifiedNurses || 0}/${dashboard.summary?.nurses || 0} 名护士合格`;
 }
 
 function renderNursingMetrics(summary) {
   const metrics = [
-    ["Pilot institutions", summary.institutions || 0, `${summary.publishedInstitutions || 0} published`],
-    ["Qualified nurses", summary.qualifiedNurses || 0, `${summary.nurses || 0} total`],
-    ["Orders", summary.orders || 0, `${summary.openOrders || 0} open`],
-    ["Assessment", summary.pendingAssessment || 0, "pending first visit"],
-    ["Consent", summary.consentPending || 0, "pending consent"],
-    ["Tracking", summary.trackingActive || 0, "active service traces"]
+    ["试点机构", summary.institutions || 0, `${summary.publishedInstitutions || 0} 家已发布`],
+    ["合格护士", summary.qualifiedNurses || 0, `共 ${summary.nurses || 0} 名`],
+    ["服务订单", summary.orders || 0, `${summary.openOrders || 0} 单待处理`],
+    ["首诊评估", summary.pendingAssessment || 0, "待评估"],
+    ["知情同意", summary.consentPending || 0, "待签署"],
+    ["服务轨迹", summary.trackingActive || 0, "进行中轨迹"]
   ];
   document.querySelector("#nursing-metrics").innerHTML = metrics.map(([label, value, hint]) => `
     <article class="metric-card">
@@ -89,7 +89,7 @@ function renderInstitutionSelect(institutions) {
   if (!select) return;
   select.innerHTML = institutions
     .filter((item) => item.published !== false)
-    .map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)} / ${escapeHtml(item.district || "")}</option>`)
+    .map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(displayText(item.name))} / ${escapeHtml(displayText(item.district || ""))}</option>`)
     .join("");
 }
 
@@ -97,7 +97,7 @@ function renderNurseSelect(nurses) {
   const select = document.querySelector("#nursing-nurse-select");
   if (!select) return;
   const sessionNurseId = currentNursingUser().nurseId;
-  select.innerHTML = nurses.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)} / ${escapeHtml(item.title || "")}</option>`).join("");
+  select.innerHTML = nurses.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(displayText(item.name))} / ${escapeHtml(displayText(item.title || ""))}</option>`).join("");
   if (sessionNurseId && nurses.some((item) => item.id === sessionNurseId)) select.value = sessionNurseId;
   select.disabled = Boolean(sessionNurseId);
 }
@@ -108,22 +108,22 @@ function renderHospitalOrders(items) {
   const canManage = ["commission", "institution"].includes(user.role) && user.accountType !== "nurse";
   target.innerHTML = `
     <table>
-      <thead><tr><th>Order</th><th>Resident</th><th>Service</th><th>Institution</th><th>Nurse</th><th>Evidence</th><th>Status</th><th>Actions</th></tr></thead>
+      <thead><tr><th>订单</th><th>居民</th><th>服务</th><th>机构</th><th>护士</th><th>证据</th><th>状态</th><th>操作</th></tr></thead>
       <tbody>${items.map((item) => `
         <tr>
           <td><strong>${escapeHtml(item.id)}</strong><br><small>${escapeHtml(item.preferredAt || "")}</small></td>
-          <td>${escapeHtml(item.residentName || item.residentId || "")}<br><small>${escapeHtml(item.serviceObject || "")}</small></td>
-          <td>${escapeHtml(item.serviceItem || "")}<br><small>${escapeHtml(item.address || "")}</small></td>
-          <td>${escapeHtml(item.institution?.name || item.institutionName || "")}<br><small>${escapeHtml(item.institutionCode || "")}</small></td>
-          <td>${escapeHtml(item.nurse?.name || item.nurseName || "pending")}<br><small>${escapeHtml(item.nurse?.registrationStatus || "")}</small></td>
+          <td>${escapeHtml(displayText(item.residentName || item.residentId || ""))}<br><small>${escapeHtml(displayText(item.serviceObject || ""))}</small></td>
+          <td>${escapeHtml(displayText(item.serviceItem || ""))}<br><small>${escapeHtml(displayText(item.address || ""))}</small></td>
+          <td>${escapeHtml(displayText(item.institution?.name || item.institutionName || ""))}<br><small>${escapeHtml(item.institutionCode || "")}</small></td>
+          <td>${escapeHtml(displayText(item.nurse?.name || item.nurseName || "pending"))}<br><small>${escapeHtml(displayText(item.nurse?.registrationStatus || ""))}</small></td>
           <td>${statusBadge(item.firstVisitAssessment)} ${statusBadge(item.informedConsent)} ${statusBadge(item.locationTrace)}</td>
-          <td>${statusBadge(item.status)} ${statusBadge(item.riskLevel)}<br><small>${escapeHtml(item.qualityCallback || "")}</small></td>
+          <td>${statusBadge(item.status)} ${statusBadge(item.riskLevel)}<br><small>${escapeHtml(displayText(item.qualityCallback || ""))}</small></td>
           <td>
             ${canManage ? `
-            <button class="inline-action" type="button" data-nursing-action="${escapeHtml(item.id)}" data-action-kind="assessment">Assess</button>
-            <button class="inline-action" type="button" data-nursing-action="${escapeHtml(item.id)}" data-action-kind="dispatch">Dispatch</button>
-            <button class="inline-action" type="button" data-nursing-action="${escapeHtml(item.id)}" data-action-kind="review">Review</button>
-            ` : `<span class="badge info">view only</span>`}
+            <button class="inline-action" type="button" data-nursing-action="${escapeHtml(item.id)}" data-action-kind="assessment">评估</button>
+            <button class="inline-action" type="button" data-nursing-action="${escapeHtml(item.id)}" data-action-kind="dispatch">派单</button>
+            <button class="inline-action" type="button" data-nursing-action="${escapeHtml(item.id)}" data-action-kind="review">回访</button>
+            ` : `<span class="badge info">仅查看</span>`}
           </td>
         </tr>
       `).join("")}</tbody>
@@ -141,20 +141,20 @@ function renderNurseQueue(items) {
   const queue = items.filter((item) => !nurseId || !item.nurseId || item.nurseId === nurseId || item.status === "dispatched");
   document.querySelector("#nursing-nurse-queue").innerHTML = `
     <table>
-      <thead><tr><th>Order</th><th>Visit</th><th>Resident</th><th>Evidence</th><th>Status</th><th>Actions</th></tr></thead>
+      <thead><tr><th>订单</th><th>上门时间</th><th>居民</th><th>证据</th><th>状态</th><th>操作</th></tr></thead>
       <tbody>${queue.map((item) => `
         <tr>
-          <td><strong>${escapeHtml(item.id)}</strong><br><small>${escapeHtml(item.serviceItem || "")}</small></td>
-          <td>${escapeHtml(item.preferredAt || "")}<br><small>${escapeHtml(item.address || "")}</small></td>
-          <td>${escapeHtml(item.residentName || item.residentId || "")}<br><small>${escapeHtml(item.serviceObject || "")}</small></td>
+          <td><strong>${escapeHtml(item.id)}</strong><br><small>${escapeHtml(displayText(item.serviceItem || ""))}</small></td>
+          <td>${escapeHtml(item.preferredAt || "")}<br><small>${escapeHtml(displayText(item.address || ""))}</small></td>
+          <td>${escapeHtml(displayText(item.residentName || item.residentId || ""))}<br><small>${escapeHtml(displayText(item.serviceObject || ""))}</small></td>
           <td>${statusBadge(item.locationTrace)} ${statusBadge(item.serviceRecordStatus)} ${statusBadge(item.qualityCallback)}</td>
           <td>${statusBadge(item.status)} ${statusBadge(item.riskLevel)}</td>
           <td>
             ${canAct ? `
-            <button class="inline-action" type="button" data-nurse-action="${escapeHtml(item.id)}" data-action-kind="accept">Accept</button>
-            <button class="inline-action" type="button" data-nurse-action="${escapeHtml(item.id)}" data-action-kind="start">Start</button>
-            <button class="inline-action" type="button" data-nurse-action="${escapeHtml(item.id)}" data-action-kind="complete">Complete</button>
-            ` : `<span class="badge info">hospital dispatch required</span>`}
+            <button class="inline-action" type="button" data-nurse-action="${escapeHtml(item.id)}" data-action-kind="accept">接单</button>
+            <button class="inline-action" type="button" data-nurse-action="${escapeHtml(item.id)}" data-action-kind="start">开始服务</button>
+            <button class="inline-action" type="button" data-nurse-action="${escapeHtml(item.id)}" data-action-kind="complete">完成记录</button>
+            ` : `<span class="badge info">需医院派单</span>`}
           </td>
         </tr>
       `).join("")}</tbody>
@@ -167,11 +167,11 @@ function renderNurseQueue(items) {
 
 function renderPolicyControls(policy) {
   const rows = [
-    ["Service objects", (policy.serviceObjects || []).join(", ")],
-    ["Catalog", (policy.serviceCatalog || []).join(", ")],
-    ["Evidence", (policy.requiredEvidence || []).join(", ")],
-    ["Risk controls", (policy.riskControls || []).join(", ")],
-    ["Platform", (policy.platformRequirements || []).join(", ")]
+    ["服务对象", (policy.serviceObjects || []).map(displayText).join("、")],
+    ["服务目录", (policy.serviceCatalog || []).map(displayText).join("、")],
+    ["证据要求", (policy.requiredEvidence || []).map(displayText).join("、")],
+    ["风险控制", (policy.riskControls || []).map(displayText).join("、")],
+    ["平台要求", (policy.platformRequirements || []).map(displayText).join("、")]
   ];
   document.querySelector("#nursing-policy").innerHTML = rows.map(([label, value]) => `
     <div>
@@ -180,7 +180,7 @@ function renderPolicyControls(policy) {
     </div>
   `).join("");
   const summary = document.querySelector("#nursing-policy-summary");
-  if (summary) summary.textContent = policy.source || "pilot policy";
+  if (summary) summary.textContent = displayText(policy.source || "pilot policy");
 }
 
 function currentNursingUser() {
@@ -215,16 +215,16 @@ function bindNursingAppointmentForm() {
 
 function hospitalActionPayload(kind) {
   const nurseId = document.querySelector("#nursing-nurse-select")?.value || "";
-  if (kind === "assessment") return { firstVisitAssessment: "passed", informedConsent: "signed", status: "assessed", action: "first-visit-assessment", note: "First-visit assessment and informed consent completed." };
-  if (kind === "dispatch") return { nurseId, status: "dispatched", action: "dispatch-qualified-nurse", note: "Hospital dispatched a qualified nurse." };
-  return { qualityCallback: "closed", status: "closed", action: "quality-review", note: "Quality callback closed." };
+  if (kind === "assessment") return { firstVisitAssessment: "passed", informedConsent: "signed", status: "assessed", action: "first-visit-assessment", note: "已完成首诊评估和知情同意。" };
+  if (kind === "dispatch") return { nurseId, status: "dispatched", action: "dispatch-qualified-nurse", note: "医院已派出合格护士。" };
+  return { qualityCallback: "closed", status: "closed", action: "quality-review", note: "质量回访已关闭。" };
 }
 
 function nurseActionPayload(kind) {
   const nurseId = document.querySelector("#nursing-nurse-select")?.value || "";
-  if (kind === "accept") return { nurseId, status: "accepted", locationTrace: "tracking", action: "nurse-accept", note: "Nurse accepted the order and location tracking started." };
-  if (kind === "start") return { nurseId, status: "in-service", locationTrace: "tracking", serviceRecordStatus: "in-progress", action: "service-start", note: "Home nursing service started." };
-  return { nurseId, status: "completed", serviceRecordStatus: "completed", qualityCallback: "pending", action: "service-complete", note: "Nursing record completed and callback pending." };
+  if (kind === "accept") return { nurseId, status: "accepted", locationTrace: "tracking", action: "nurse-accept", note: "护士已接单，位置轨迹已开启。" };
+  if (kind === "start") return { nurseId, status: "in-service", locationTrace: "tracking", serviceRecordStatus: "in-progress", action: "service-start", note: "上门护理服务已开始。" };
+  return { nurseId, status: "completed", serviceRecordStatus: "completed", qualityCallback: "pending", action: "service-complete", note: "护理记录已完成，等待质量回访。" };
 }
 
 async function updateNursingOrder(id, payload) {
@@ -244,7 +244,7 @@ async function updateNursingOrder(id, payload) {
 
 function defaultNursingPolicy() {
   return {
-    source: "Liaoning Internet+ Nursing pilot implementation plan",
+    source: "辽宁省互联网+护理服务试点实施方案",
     serviceObjects: ["elderly or disabled people", "rehabilitation patients", "terminal-stage patients", "maternal and infant people"],
     serviceCatalog: ["daily living ability assessment", "vital signs measurement", "blood glucose measurement", "wound care", "tube care", "postpartum care", "infant care", "PICC maintenance"],
     requiredEvidence: ["identity authentication", "first diagnosis assessment", "signed informed consent", "nurse practice certificate", "service location trace", "nursing record", "quality callback"],
@@ -255,22 +255,22 @@ function defaultNursingPolicy() {
 
 function defaultNursingInstitutions() {
   return [
-    { id: "inh-mr1", institutionCode: "MR1", name: "Dalian Central Hospital", district: "Zhongshan", published: true, serviceItems: ["wound care", "PICC maintenance", "blood glucose measurement"], dailyCapacity: 18 },
-    { id: "inh-mr3", institutionCode: "MR3", name: "Qingniwaqiao Community Health Service Center", district: "Zhongshan", published: true, serviceItems: ["vital signs measurement", "tube care"], dailyCapacity: 10 }
+    { id: "inh-mr1", institutionCode: "MR1", name: "大连市中心医院", district: "中山区", published: true, serviceItems: ["wound care", "PICC maintenance", "blood glucose measurement"], dailyCapacity: 18 },
+    { id: "inh-mr3", institutionCode: "MR3", name: "青泥洼桥社区卫生服务中心", district: "中山区", published: true, serviceItems: ["vital signs measurement", "tube care"], dailyCapacity: 10 }
   ];
 }
 
 function defaultNursingNurses() {
   return [
-    { id: "inn-001", name: "Nurse Sun", institutionId: "inh-mr1", institutionCode: "MR1", title: "senior nurse", yearsClinical: 9, registrationStatus: "verified", badPracticeRecord: "none", trainingStatus: "passed", insuranceStatus: "covered", status: "available" },
-    { id: "inn-002", name: "Nurse Zhao", institutionId: "inh-mr3", institutionCode: "MR3", title: "nurse practitioner", yearsClinical: 6, registrationStatus: "verified", badPracticeRecord: "none", trainingStatus: "passed", insuranceStatus: "covered", status: "available" }
+    { id: "inn-001", name: "孙护士", institutionId: "inh-mr1", institutionCode: "MR1", title: "主管护师", yearsClinical: 9, registrationStatus: "verified", badPracticeRecord: "none", trainingStatus: "passed", insuranceStatus: "covered", status: "available" },
+    { id: "inn-002", name: "赵护士", institutionId: "inh-mr3", institutionCode: "MR3", title: "专科护士", yearsClinical: 6, registrationStatus: "verified", badPracticeRecord: "none", trainingStatus: "passed", insuranceStatus: "covered", status: "available" }
   ];
 }
 
 function defaultNursingOrders() {
   return [
-    { id: "ino-001", residentId: "r1", residentName: "Demo resident A", institutionId: "inh-mr1", institutionCode: "MR1", institutionName: "Dalian Central Hospital", nurseId: "inn-001", nurseName: "Nurse Sun", serviceItem: "wound care", serviceObject: "mobility-limited chronic disease patient", preferredAt: new Date(Date.now() + 86400000).toISOString().slice(0, 10), address: "Zhongshan district demo address", firstVisitAssessment: "passed", informedConsent: "signed", riskLevel: "medium", status: "dispatched", locationTrace: "pending", serviceRecordStatus: "pending", qualityCallback: "pending" },
-    { id: "ino-002", residentId: "r2", residentName: "Demo resident B", institutionId: "inh-mr3", institutionCode: "MR3", institutionName: "Qingniwaqiao Community Health Service Center", nurseId: "inn-002", nurseName: "Nurse Zhao", serviceItem: "blood glucose measurement", serviceObject: "elderly or disabled people", preferredAt: new Date().toISOString().slice(0, 10), address: "Qingniwaqiao demo home", firstVisitAssessment: "passed", informedConsent: "signed", riskLevel: "low", status: "accepted", locationTrace: "tracking", serviceRecordStatus: "in-progress", qualityCallback: "pending" }
+    { id: "ino-001", residentId: "r1", residentName: "演示居民A", institutionId: "inh-mr1", institutionCode: "MR1", institutionName: "大连市中心医院", nurseId: "inn-001", nurseName: "孙护士", serviceItem: "wound care", serviceObject: "mobility-limited chronic disease patient", preferredAt: new Date(Date.now() + 86400000).toISOString().slice(0, 10), address: "中山区示例地址", firstVisitAssessment: "passed", informedConsent: "signed", riskLevel: "medium", status: "dispatched", locationTrace: "pending", serviceRecordStatus: "pending", qualityCallback: "pending" },
+    { id: "ino-002", residentId: "r2", residentName: "演示居民B", institutionId: "inh-mr3", institutionCode: "MR3", institutionName: "青泥洼桥社区卫生服务中心", nurseId: "inn-002", nurseName: "赵护士", serviceItem: "blood glucose measurement", serviceObject: "elderly or disabled people", preferredAt: new Date().toISOString().slice(0, 10), address: "青泥洼桥示例家庭地址", firstVisitAssessment: "passed", informedConsent: "signed", riskLevel: "low", status: "accepted", locationTrace: "tracking", serviceRecordStatus: "in-progress", qualityCallback: "pending" }
   ];
 }
 
@@ -283,7 +283,83 @@ function statusBadge(status) {
   const danger = ["high", "blocked", "overdue"].includes(text);
   const warn = ["medium", "pending", "requested", "assessed", "dispatched", "accepted", "in-service", "tracking"].includes(text);
   const type = danger ? "danger" : warn ? "warn" : "info";
-  return `<span class="badge ${type}">${escapeHtml(text)}</span>`;
+  return `<span class="badge ${type}">${escapeHtml(displayText(text))}</span>`;
+}
+
+function displayText(value) {
+  const text = String(value ?? "");
+  const labels = {
+    "Liaoning Internet+ Nursing pilot implementation plan": "辽宁省互联网+护理服务试点实施方案",
+    "pilot policy": "试点政策",
+    "Dalian Central Hospital": "大连市中心医院",
+    "Qingniwaqiao Community Health Service Center": "青泥洼桥社区卫生服务中心",
+    "Ganjingzi District People's Hospital": "甘井子区人民医院",
+    Zhongshan: "中山区",
+    Ganjingzi: "甘井子区",
+    "Nurse Sun": "孙护士",
+    "Nurse Zhao": "赵护士",
+    "Nurse Liu": "刘护士",
+    "Demo resident A": "演示居民A",
+    "Demo resident B": "演示居民B",
+    "Demo resident C": "演示居民C",
+    "Zhongshan district demo address": "中山区示例地址",
+    "Qingniwaqiao demo home": "青泥洼桥示例家庭地址",
+    "Shahekou demo address": "沙河口区示例地址",
+    "daily living ability assessment": "日常生活能力评估",
+    "vital signs measurement": "生命体征测量",
+    "blood glucose measurement": "血糖测量",
+    "wound care": "伤口护理",
+    "tube care": "管路护理",
+    "postpartum care": "产后护理",
+    "infant care": "婴幼儿护理",
+    "PICC maintenance": "PICC 维护",
+    "elderly or disabled people": "老年人或失能人群",
+    "rehabilitation patient": "康复期患者",
+    "rehabilitation patients": "康复期患者",
+    "terminal-stage patients": "终末期患者",
+    "maternal and infant people": "母婴人群",
+    "mobility-limited chronic disease patient": "行动不便慢病患者",
+    "mobility-limited chronic disease patients": "行动不便慢病患者",
+    "identity authentication": "身份认证",
+    "first diagnosis assessment": "首诊评估",
+    "signed informed consent": "已签署知情同意",
+    "nurse practice certificate": "护士执业证书",
+    "service location trace": "服务位置轨迹",
+    "nursing record": "护理记录",
+    "quality callback": "质量回访",
+    "grade-3 security protection": "等保三级防护",
+    "privacy protection": "隐私保护",
+    "medical record storage": "病历资料留存",
+    "traceable service behavior": "服务行为可追溯",
+    "workload statistics": "工作量统计",
+    "emergency plan": "应急预案",
+    "one-click alert": "一键报警",
+    "liability insurance": "责任保险",
+    "medical accident insurance": "医疗事故保险",
+    "service recorder": "服务记录仪",
+    "senior nurse": "主管护师",
+    "nurse practitioner": "专科护士",
+    "specialist nurse": "专科护士",
+    verified: "已核验",
+    none: "无",
+    passed: "已通过",
+    signed: "已签署",
+    pending: "待处理",
+    requested: "已申请",
+    assessed: "已评估",
+    dispatched: "已派单",
+    accepted: "已接单",
+    "in-service": "服务中",
+    completed: "已完成",
+    closed: "已关闭",
+    tracking: "轨迹开启",
+    "in-progress": "进行中",
+    high: "高风险",
+    medium: "中风险",
+    low: "低风险",
+    unknown: "未知"
+  };
+  return labels[text] || text;
 }
 
 function escapeHtml(value) {

@@ -280,6 +280,78 @@ select,
   margin-bottom: 16px;
 }
 
+.service-tabs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.service-tabs button {
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+  gap: 6px;
+  min-height: 104px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  box-shadow: var(--shadow);
+}
+
+.service-tabs button.active {
+  border-color: var(--blue);
+  background: #eaf2ff;
+}
+
+.service-tabs span,
+.service-tabs strong,
+.service-tabs small {
+  display: block;
+}
+
+.service-tabs span {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.service-tabs strong,
+.feature-state {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: #e8f6ef;
+  color: var(--green);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.service-tabs strong.pending,
+.feature-state.pending {
+  background: #fff3d8;
+  color: var(--amber);
+}
+
+.service-tabs small {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.feature-state {
+  display: inline-flex;
+  margin-right: 8px;
+}
+
+[data-service-pane][hidden] {
+  display: none !important;
+}
+
 .summary-card {
   padding: 16px;
 }
@@ -302,12 +374,85 @@ select,
   color: var(--muted);
 }
 
+.service-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.service-summary span,
+.service-summary strong,
+.service-summary small {
+  display: block;
+}
+
+.service-summary span,
+.service-summary small {
+  color: var(--muted);
+}
+
+.service-summary strong {
+  margin: 4px 0;
+  font-size: 20px;
+}
+
+.service-summary-stats {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .lifecycle-panel {
   margin-bottom: 16px;
 }
 
 .escort-appointment-panel {
   margin-bottom: 16px;
+}
+
+.service-overview-panel {
+  margin-bottom: 16px;
+}
+
+.service-status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.service-status-card {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: #f8fbfd;
+}
+
+.service-status-card.ready {
+  border-left: 4px solid var(--green);
+}
+
+.service-status-card.pending {
+  border-left: 4px solid var(--amber);
+}
+
+.service-status-card strong {
+  font-size: 16px;
+}
+
+.service-status-card p {
+  color: var(--muted);
+  line-height: 1.6;
 }
 
 .escort-appointment-layout {
@@ -1110,7 +1255,8 @@ dialog::backdrop {
   .profile-band,
   .header-actions,
   .auth-bar,
-  .panel-actions {
+  .panel-actions,
+  .service-summary {
     flex-direction: column;
     align-items: stretch;
   }
@@ -1119,10 +1265,16 @@ dialog::backdrop {
     justify-content: flex-start;
   }
 
+  .service-summary-stats {
+    justify-content: flex-start;
+  }
+
   .summary-grid,
+  .service-tabs,
   .citizen-trend-grid,
   .escort-appointment-layout,
   .escort-appointment-form,
+  .service-status-grid,
   .lifecycle-grid,
   .two-column,
   .account-panel,

@@ -7,7 +7,7 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <meta name="theme-color" content="#1d4ed8" />
     <link rel="stylesheet" href="./citizen.css" />
-    <script src="./auth.js"></script>
+    <script src="./auth.js?v=20260627"></script>
     <script>window.HealthCityAuth.requireRole(["citizen"])</script>
   </head>
   <body>
@@ -46,7 +46,11 @@
 
       <section class="summary-grid" id="summary-grid"></section>
 
-      <section class="panel citizen-trend-panel">
+      <section class="service-summary" id="service-summary" aria-live="polite"></section>
+
+      <nav class="service-tabs" id="service-tabs" aria-label="居民服务标签页"></nav>
+
+      <section class="panel citizen-trend-panel" data-service-pane="health-record">
         <div class="panel-title">
           <h2>健康指标趋势</h2>
           <span id="trend-source-summary">血压、血糖、BMI 连续观察</span>
@@ -54,7 +58,7 @@
         <div id="citizen-trend-grid" class="citizen-trend-grid"></div>
       </section>
 
-      <section class="panel">
+      <section class="panel" data-service-pane="health-record">
         <div class="panel-title">
           <h2>提醒中心</h2>
           <span id="reminder-count">0 项待办</span>
@@ -62,7 +66,7 @@
         <div id="reminder-cards" class="cards"></div>
       </section>
 
-      <section class="panel lifecycle-panel">
+      <section class="panel lifecycle-panel" data-service-pane="health-record">
         <div class="panel-title">
           <h2>全生命周期健康管理</h2>
           <span id="lifecycle-summary">从出生医学证明到死亡医学证明的连续健康服务</span>
@@ -70,10 +74,10 @@
         <div id="lifecycle-cards" class="lifecycle-grid"></div>
       </section>
 
-      <section class="panel escort-appointment-panel">
+      <section class="panel escort-appointment-panel" data-service-pane="escort">
         <div class="panel-title">
           <h2>助医陪诊预约</h2>
-          <span id="escort-appointment-summary">本人和家庭成员可预约陪诊服务</span>
+          <span><em class="feature-state ready">已实现</em><span id="escort-appointment-summary">本人和家庭成员可预约陪诊服务</span></span>
         </div>
         <div class="escort-appointment-layout">
           <form id="escort-appointment-form" class="escort-appointment-form">
@@ -128,10 +132,11 @@
         </div>
       </section>
 
-      <section class="panel vault-panel">
+      <section class="panel vault-panel" data-service-pane="health-record">
         <div class="panel-title">
           <h2>健康信息归集</h2>
           <div class="panel-actions">
+            <em class="feature-state ready">已实现</em>
             <span id="vault-updated">持续更新</span>
             <button class="small-button" id="upload-record">上传资料</button>
             <button class="small-button primary" id="grant-auth">新增授权</button>
@@ -150,11 +155,59 @@
         <div class="vault-content" id="vault-content"></div>
       </section>
 
-      <section class="two-column">
+      <section class="panel service-overview-panel" data-service-pane="nursing">
+        <div class="panel-title">
+          <h2>护理服务</h2>
+          <span><em class="feature-state ready">已实现</em> 互联网护理可预约，护士工作站可接单</span>
+        </div>
+        <div class="service-status-grid">
+          <article class="service-status-card ready">
+            <strong>互联网护理预约</strong>
+            <p>居民可进入护理服务页提交上门护理申请，机构端完成评估、派单、护士接单、定位轨迹和质控回访。</p>
+            <a class="small-button primary" href="./internet-nursing.html">进入护理服务</a>
+          </article>
+          <article class="service-status-card ready">
+            <strong>护理订单追踪</strong>
+            <p>已复用居民身份、家庭成员授权、机构调度和服务记录，支持与个人健康档案关联。</p>
+            <span class="status">已实现</span>
+          </article>
+          <article class="service-status-card pending">
+            <strong>长期照护评估</strong>
+            <p>失能评估、长期护理险待遇核验和照护计划仍需接入正式医保及民政接口。</p>
+            <span class="status warn">待开发</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel service-overview-panel" data-service-pane="registration">
+        <div class="panel-title">
+          <h2>挂号服务</h2>
+          <span><em class="feature-state pending">待开发</em> 需接入医院号源、支付和退号规则</span>
+        </div>
+        <div class="service-status-grid">
+          <article class="service-status-card pending">
+            <strong>医院号源查询</strong>
+            <p>待对接 HIS/互联网医院号源池，按医院、科室、医生、日期展示可预约号源。</p>
+            <span class="status warn">待开发</span>
+          </article>
+          <article class="service-status-card pending">
+            <strong>预约挂号确认</strong>
+            <p>待补支付、医保电子凭证核验、短信通知、取消预约和爽约规则。</p>
+            <span class="status warn">待开发</span>
+          </article>
+          <article class="service-status-card ready">
+            <strong>就医协同能力</strong>
+            <p>陪诊预约、转诊指引和电子病历归集已具备，可作为挂号上线后的协同底座。</p>
+            <span class="status">已实现底座</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="two-column" data-service-pane="emr">
         <article class="panel">
           <div class="panel-title">
             <h2>电子病历时间线</h2>
-            <span id="emr-count"></span>
+            <span><em class="feature-state ready">已实现</em><span id="emr-count"></span></span>
           </div>
           <div class="timeline" id="emr-timeline"></div>
         </article>
@@ -304,7 +357,7 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="./health-archive-standard.js"></script>
-    <script src="./citizen.js"></script>
+    <script src="./citizen.js?v=20260627"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));
