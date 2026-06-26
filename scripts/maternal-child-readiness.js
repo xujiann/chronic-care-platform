@@ -6,54 +6,6 @@ const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "maternal-child-readiness-report.json");
 const DEFAULT_MARKDOWN = path.join(ROOT, "release", "maternal-child-readiness-report.md");
 
-const LEGACY_FUNCTION_DOMAINS = [
-  {
-    id: "commission-statistics",
-    name: "出生人口统计与监管",
-    role: "commission",
-    entry: "index.html",
-    api: ["state.birthStatistics", "renderBirthStatistics", "renderMaternalChildCare"],
-    data: ["birthStatistics", "birthCertificates"],
-    evidence: ["birth-stat-sources", "maternal-child-services", "mch-risk-list"]
-  },
-  {
-    id: "institution-certificate",
-    name: "出生医学证明办理",
-    role: "institution",
-    entry: "institution.html",
-    api: ["/api/birth-certificates", "submitBirthCertificate"],
-    data: ["birthCertificates", "birthCertificateForms"],
-    evidence: ["birth-certificate-form", "birthCertificateNo", "actionButton"]
-  },
-  {
-    id: "citizen-lifecycle",
-    name: "居民出生至儿童保健连续服务",
-    role: "citizen",
-    entry: "citizen.html",
-    api: ["getBirthCertificatesForResident", "renderBirthHealth", "renderMaternalChildContinuity"],
-    data: ["birthCertificates", "personalRecords"],
-    evidence: ["birth-health-management", "maternal-child-continuity", "lifecycle-summary"]
-  },
-  {
-    id: "sharing-license",
-    name: "电子证照与公安共享",
-    role: "institution / commission",
-    entry: "institution.html, index.html",
-    api: ["/api/birth-certificates"],
-    data: ["birthCertificates", "securityEvents"],
-    evidence: ["electronicLicenseStatus", "publicSecuritySync", "maternalChildSync"]
-  },
-  {
-    id: "policy-release",
-    name: "政策说明与发布证据",
-    role: "release",
-    entry: "maternal-child-about.html",
-    api: ["maternal-child:readiness", "release:manifest"],
-    data: ["docs/maternal-child-policy.md", "docs/妇幼健康全模块说明.md", "docs/妇幼健康主要功能报告.md"],
-    evidence: ["data-maternal-about=\"policy-basis\"", "data-about-flow=\"maternal-child-policy\"", "flowchart TD"]
-  }
-];
-
 const FUNCTION_DOMAINS = [
   {
     id: "commission-statistics",
@@ -154,38 +106,23 @@ function defaultSources() {
   };
 }
 
-function defaultSourcesClean() {
-  const functionReport = exists("docs/妇幼健康主要功能报告.md") ? read("docs/妇幼健康主要功能报告.md") : "";
-  return {
-    about: read("maternal-child-about.html"),
-    moduleDoc: read("docs/妇幼健康全模块说明.md"),
-    policyDoc: read("docs/maternal-child-policy.md"),
-    functionReport: `${functionReport}\n## 涓昏鍔熻兘鐭╅樀\n## 涓夌鍔熻兘杈圭晫\n## 鍙戝竷璇佹嵁`,
-    institution: `${read("institution.html")}\n${read("institution.js")}`,
-    citizen: `${read("citizen.html")}\n${read("citizen.js")}`,
-    commission: `${read("index.html")}\n${read("app.js")}`,
-    server: read("server.js"),
-    packageSource: read("package.json")
-  };
-}
-
 function buildMaternalChildReadinessReport(options = {}) {
   const data = options.data || readJson("data/db.json");
-  const sources = options.sources || defaultSourcesClean();
+  const sources = options.sources || defaultSources();
   const birthCertificates = Array.isArray(data.birthCertificates) ? data.birthCertificates : [];
   const birthForms = Array.isArray(data.birthCertificateForms) ? data.birthCertificateForms : [];
   const birthStatistics = data.birthStatistics && typeof data.birthStatistics === "object" ? data.birthStatistics : {};
   const dataKeys = Object.keys(data);
   const checks = [
-    check("docs:policy", hasAll(sources.policyDoc, ["2009", "2023", "flowchart TD"]) && hasAll(sources.moduleDoc, ["birthCertificates", "birthStatistics", "flowchart TD"]), "policy and module docs include policy years, data objects, and flow diagrams", "docs"),
+    check("docs:policy", hasAll(sources.policyDoc, ["卫妇社发〔2009〕96 号", "国卫办妇幼发〔2023〕4 号", "flowchart TD"]) && hasAll(sources.moduleDoc, ["birthCertificates", "birthStatistics", "flowchart TD"]), "policy and module docs include policy numbers, data objects, and flow diagrams", "docs"),
     check("docs:function-report", hasAll(sources.functionReport, ["## 主要功能矩阵", "## 三端功能边界", "## 发布证据"]), "main function report is present and structured", "docs"),
-    check("about:page", hasAll(sources.about, ["data-maternal-about=\"policy-basis\"", "data-about-flow=\"maternal-child-policy\"", "maternal-child-policy.md"]), "dedicated About page covers policy, flow, and policy document link", "about"),
+    check("about:page", hasAll(sources.about, ['data-maternal-about="policy-basis"', 'data-about-flow="maternal-child-policy"', "maternal-child-policy.md"]), "dedicated About page covers policy, flow, and policy document link", "about"),
     check("data:objects", ["birthCertificates", "birthCertificateForms", "birthStatistics", "residents", "personalRecords"].every((key) => dataKeys.includes(key)), "required data objects are seeded", "data"),
     check("data:birth-certificates", birthCertificates.length >= 3 && birthCertificates.every((item) => item.id && item.certificateNo && item.maternalResidentId && item.newbornName), `${birthCertificates.length} certificate records`, "data"),
     check("data:workflow-states", birthCertificates.some((item) => item.status) && birthCertificates.some((item) => item.maternalChildSync) && birthCertificates.some((item) => item.publicSecuritySync), "certificate status, maternal-child sync, and public-security sync are modeled", "data"),
     check("data:forms-statistics", birthForms.length >= 3 && Boolean(birthStatistics.title && birthStatistics.metrics), `${birthForms.length} forms; statistics ${birthStatistics.title || "missing"}`, "data"),
     check("api:server", hasAll(sources.server, ["/api/birth-certificates", "statistics: data.birthStatistics", "canAccessResident", "appendSecurityEvent"]), "server exposes scoped birth certificate API and audit events", "api"),
-    check("functions:domains", FUNCTION_DOMAINS.length === 5 && FUNCTION_DOMAINS.every((item) => item.id && item.name && item.entry), `${FUNCTION_DOMAINS.length} function domains`, "function"),
+    check("functions:domains", FUNCTION_DOMAINS.length >= 5 && FUNCTION_DOMAINS.every((item) => item.acceptance && item.evidence.length), `${FUNCTION_DOMAINS.length} function domains`, "function"),
     check("role:commission", hasAll(sources.commission, ["renderBirthStatistics", "renderMaternalChildCare", "mch-risk-list"]), "commission portal renders statistics, maternal-child services, and risks", "role"),
     check("role:institution", hasAll(sources.institution, ["birth-certificate-form", "birthCertificateNo", "submitBirthCertificate", "actionButton"]), "institution portal registers and advances certificate workflow", "role"),
     check("role:citizen", hasAll(sources.citizen, ["renderBirthHealth", "renderMaternalChildContinuity", "getBirthCertificatesForResident", "lifecycle-summary"]), "citizen portal exposes birth and maternal-child continuity tasks", "role"),
@@ -204,14 +141,6 @@ function buildMaternalChildReadinessReport(options = {}) {
       statisticsTitle: birthStatistics.title || ""
     },
     functionDomains: FUNCTION_DOMAINS,
-    artifacts: {
-      about: "maternal-child-about.html",
-      moduleDoc: "docs/妇幼健康全模块说明.md",
-      policyDoc: "docs/maternal-child-policy.md",
-      functionReport: "docs/妇幼健康主要功能报告.md",
-      api: ["/api/birth-certificates", "statistics in /api/birth-certificates"],
-      data: ["birthCertificates", "birthCertificateForms", "birthStatistics", "residents", "personalRecords"]
-    },
     artifacts: {
       about: "maternal-child-about.html",
       moduleDoc: "docs/妇幼健康全模块说明.md",
