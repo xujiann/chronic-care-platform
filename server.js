@@ -4481,6 +4481,71 @@ function statusInPolicy(policy, group, status) {
   return (policy?.statusGroups?.[group] || []).some((item) => String(status || "").includes(item) || String(item || "").includes(String(status || "")));
 }
 
+function buildChronicFollowupPolicyAlignment(data) {
+  const feedback = (data.personalRecords || []).filter((item) => item.category === "chronic-feedback" || item.meta?.followupFeedback);
+  return [
+    {
+      id: "policy-screening",
+      policy: "咨询筛查与风险发现",
+      basis: "基层慢性病健康管理服务能力建设指引",
+      evidence: "chronicScreeningTasks",
+      count: (data.chronicScreeningTasks || []).filter((item) => item.residentId && item.riskLevel && item.nextStep).length,
+      nextAction: "接入基层自测设备、健康体检和公卫筛查结果。"
+    },
+    {
+      id: "policy-tiered-management",
+      policy: "分类分级管理",
+      basis: "国卫基层发〔2025〕15号",
+      evidence: "chronicManagementPlans",
+      count: (data.chronicManagementPlans || []).filter((item) => item.residentId && item.grade && item.nextReview).length,
+      nextAction: "对接家庭医生签约分层规则和专病质控阈值。"
+    },
+    {
+      id: "policy-followup-guidance",
+      policy: "院后随访与健康指导",
+      basis: "国卫基层发〔2025〕15号",
+      evidence: "followups",
+      count: (data.followups || []).filter((item) => item.residentId && item.plannedAt && item.assignee).length,
+      nextAction: "对接 HIS/EMR 出院小结和真实复诊预约状态。"
+    },
+    {
+      id: "policy-medication-support",
+      policy: "长期处方与用药保障",
+      basis: "国卫基层发〔2025〕15号",
+      evidence: "medicationPickups",
+      count: (data.medicationPickups || []).filter((item) => item.residentId && item.nextPickup && item.pharmacyStatus).length,
+      nextAction: "对接处方、药房库存、医保慢病待遇和配送状态。"
+    },
+    {
+      id: "policy-family-doctor",
+      policy: "家庭医生协同",
+      basis: "国卫基层发〔2025〕15号",
+      evidence: "residents.familyDoctor/chronicManagementPlans.owner",
+      count: (data.residents || []).filter((resident) => resident.familyDoctor).length + (data.chronicManagementPlans || []).filter((item) => item.owner).length,
+      nextAction: "绑定真实家庭医生团队、签约居民和服务包。"
+    },
+    {
+      id: "policy-resident-feedback",
+      policy: "居民自我管理与反馈",
+      basis: "基层慢性病健康管理服务能力建设指引",
+      evidence: "personalRecords[category=chronic-feedback]",
+      count: feedback.length,
+      nextAction: "补充居民端量表、满意度和自测指标上传。"
+    },
+    {
+      id: "policy-feedback-dispatch",
+      policy: "信息流转与处置闭环",
+      basis: "基层慢性病健康管理服务能力建设指引",
+      evidence: "taskMessages[chronicFollowup=true]",
+      count: (data.taskMessages || []).filter((item) => item.chronicFollowup && item.residentId && item.targetRole).length,
+      nextAction: "对接短信、公众号和机构站内待办的真实触达回执。"
+    }
+  ].map((item) => ({
+    ...item,
+    covered: item.count > 0
+  }));
+}
+
 function latestRecord(records, residentId, category) {
   return (records || [])
     .filter((item) => item.residentId === residentId && (!category || item.category === category))
@@ -4503,6 +4568,7 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
   const scoped = scopeStateForUser(data, user);
   const targetResidents = (scoped.residents || []).filter((resident) => !residentId || resident.id === residentId);
   const policy = data.chronicFollowupStatusPolicy || seedChronicFollowupStatusPolicy();
+  const policyAlignment = buildChronicFollowupPolicyAlignment(scoped);
   const feedbackRecords = (scoped.personalRecords || []).filter((item) => item.category === "chronic-feedback");
   const followupMessages = (scoped.taskMessages || []).filter((item) => item.chronicFollowup);
   const residents = targetResidents.map((resident) => {
@@ -4570,8 +4636,11 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
       openFollowups: residents.reduce((sum, item) => sum + item.returnVisitReminders.length, 0),
       medicationPending: residents.reduce((sum, item) => sum + item.medicationAdherence.pending, 0),
       feedbackRecords: residents.reduce((sum, item) => sum + item.residentFeedback.count, 0),
-      notifications: residents.reduce((sum, item) => sum + item.notifications.count, 0)
+      notifications: residents.reduce((sum, item) => sum + item.notifications.count, 0),
+      policyAligned: policyAlignment.filter((item) => item.covered).length,
+      policyItems: policyAlignment.length
     },
+    policyAlignment,
     residents
   };
 }

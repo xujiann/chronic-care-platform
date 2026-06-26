@@ -9,6 +9,7 @@ Priority application 6 covers chronic screening, tiered management, post-dischar
 - 《关于加强基层慢性病健康管理服务的指导意见》（国卫基层发〔2025〕15号）要求强化基层慢病健康管理服务，覆盖家庭医生签约、分类分级管理、随访健康指导、自我健康管理、用药保障、医保协同和质量控制。
 - 《基层慢性病健康管理服务能力建设指引》明确基层慢病健康管理中心可承担咨询筛查、诊断治疗、随访与健康指导、转诊、信息汇总流转和数智化支撑等能力。
 - This application maps those policy requirements into runnable local evidence: `chronicScreeningTasks` for screening, `chronicManagementPlans` for tiered management, `followups` for post-discharge follow-up and return visits, `medicationPickups` for adherence and medication support, `taskMessages` for feedback handling, and audit logs for traceability.
+- `GET /api/chronic/followup-summary` now returns a `policyAlignment` matrix so the institution workbench can show policy coverage alongside operational workload.
 
 ## Reuse Points
 

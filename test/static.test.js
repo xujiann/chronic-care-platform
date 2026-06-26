@@ -345,6 +345,8 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("institution.js"), /dispatchChronicFollowup/);
   assert.match(read("institution.js"), /followupMessages/);
   assert.match(read("institution.js"), /随访消息/);
+  assert.match(read("institution.js"), /buildChronicFollowupPolicyAlignment/);
+  assert.match(read("institution.js"), /政策对照/);
   assert.match(read("citizen.html"), /followup-feedback-form/);
   assert.match(read("citizen.js"), /bindFollowupFeedback/);
   assert.match(read("citizen.js"), /state\.taskMessages/);
