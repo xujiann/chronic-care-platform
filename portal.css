@@ -451,6 +451,73 @@ h1 { margin-top: 4px; font-size: 28px; }
   opacity: 0.55;
 }
 
+.nursing-mobile-workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.nursing-mobile-panel {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.nursing-mobile-card-list {
+  display: grid;
+  gap: 10px;
+}
+
+.nursing-mobile-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fbfd;
+}
+
+.nursing-mobile-card header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.nursing-mobile-card strong,
+.nursing-mobile-card span,
+.nursing-mobile-card small {
+  display: block;
+}
+
+.nursing-mobile-card span,
+.nursing-mobile-card p,
+.nursing-mobile-card small {
+  color: var(--muted);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.nursing-mobile-evidence,
+.nursing-mobile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.nursing-mobile-actions .inline-action,
+.nursing-mobile-submit {
+  min-height: 44px;
+  justify-content: center;
+}
+
+.nursing-mobile-submit {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
 dialog {
   width: min(760px, calc(100vw - 28px));
   border: 0;
@@ -1032,6 +1099,7 @@ dialog::backdrop {
   }
   .metric-grid,
   .portal-grid,
+  .nursing-mobile-workbench,
   .claim-grid,
   .capability-grid,
   .model-grid,
@@ -1057,5 +1125,34 @@ dialog::backdrop {
 
   .capability-side small {
     text-align: left;
+  }
+}
+
+@media (max-width: 720px) {
+  .portal-shell {
+    width: min(100% - 20px, 480px);
+    padding-top: 14px;
+  }
+
+  .portal-header,
+  .panel,
+  .metric-card {
+    box-shadow: none;
+  }
+
+  .nursing-mobile-workbench {
+    gap: 10px;
+  }
+
+  .nursing-mobile-card header {
+    grid-template-columns: 1fr;
+  }
+
+  .nursing-mobile-actions .inline-action {
+    flex: 1 1 120px;
+  }
+
+  .nursing-desktop-table {
+    display: none;
   }
 }

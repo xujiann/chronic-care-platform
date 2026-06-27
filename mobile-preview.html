@@ -13,7 +13,7 @@
       <section class="preview-copy">
         <span>居民端手机预览</span>
         <h1>居民端手机导航预览</h1>
-        <p>右侧为 390px 宽手机视口，可检查居民端首页、底部服务导航、健康档案、电子病历、护理、陪诊和挂号待开发状态。</p>
+        <p>右侧为 390px 宽手机视口，可检查居民端首页、底部服务导航、健康档案、电子病历、互联网护理、陪诊和挂号状态。</p>
         <div class="preview-actions">
           <a href="./health-city.html">系统总览</a>
           <a href="./citizen.html">打开居民端</a>
@@ -65,6 +65,10 @@
       const setPreviewService = (service) => {
         activePreviewService = service;
         serviceButtons.forEach((button) => button.classList.toggle("active", button.dataset.previewService === service));
+        if (service === "nursing") {
+          frame.src = "./internet-nursing.html?preview=mobile-nursing";
+          return;
+        }
         frame.src = `./citizen.html?preview=mobile-nav&page=${service}#service-${service}`;
       };
       frame.addEventListener("load", () => {

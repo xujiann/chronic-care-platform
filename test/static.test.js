@@ -614,7 +614,9 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /http:\/\/localhost:5174\/mobile-preview\.html/);
   assert.match(mobilePreviewHtml, /DEMO-MOBILE-R1 \/ 888888/);
   assert.match(mobilePreviewHtml, /citizen\.html\?preview=mobile-nav&page=health-record/);
+  assert.match(mobilePreviewHtml, /internet-nursing\.html\?preview=mobile-nursing/);
   assert.match(mobilePreviewHtml, /page=\$\{service\}/);
+  assert.match(mobilePreviewHtml, /data-preview-service="nursing"/);
   assert.match(mobilePreviewHtml, /data-preview-service="registration"/);
   assert.match(mobilePreviewHtml, /preview-refresh/);
   assert.match(mobilePreviewHtml, /postMessage/);
@@ -739,14 +741,25 @@ test("citizen portal exposes resident service tabs and implementation states", (
 test("internet nursing module exposes appointment, management and nurse workflows", () => {
   const html = read("internet-nursing.html");
   const js = read("internet-nursing.js");
+  const css = read("portal.css");
+  const mobilePreviewHtml = read("mobile-preview.html");
   const server = read("server.js");
   assert.match(html, /nursing-appointment-form/);
   assert.match(html, /nursing-orders/);
   assert.match(html, /nursing-nurse-queue/);
   assert.match(html, /nursing-risk-guidance/);
+  assert.match(html, /nursing-mobile-workbench/);
+  assert.match(html, /data-mobile-surface="citizen-appointment"/);
+  assert.match(html, /data-mobile-surface="nurse-response"/);
+  assert.match(html, /nursing-mobile-appointment/);
+  assert.match(html, /nursing-nurse-mobile/);
   assert.match(js, /fetchInternetNursingDashboard/);
   assert.match(js, /renderRiskGuidance/);
   assert.match(js, /nextNursingAction/);
+  assert.match(js, /renderMobileAppointmentStatus/);
+  assert.match(js, /renderMobileNurseCards/);
+  assert.match(js, /bindNurseActionButtons/);
+  assert.match(js, /sourceChannel = "internet-nursing-mobile"/);
   assert.match(js, /nurseActionButtons/);
   assert.match(js, /showNursingMessage/);
   assert.match(js, /\/internet-nursing\/orders/);
@@ -760,6 +773,12 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(html, /个人端预约/);
   assert.match(html, /医院端管理/);
   assert.match(html, /护士端接单/);
+  assert.match(html, /手机端预约/);
+  assert.match(html, /手机端接单/);
+  assert.match(css, /nursing-mobile-workbench/);
+  assert.match(css, /nursing-mobile-card/);
+  assert.match(css, /nursing-desktop-table/);
+  assert.match(mobilePreviewHtml, /internet-nursing\.html\?preview=mobile-nursing/);
   assert.match(server, /\/api\/internet-nursing\/dashboard/);
   assert.match(server, /canAccessInternetNursingOrder/);
   assert.match(server, /assertInternetNursingActionAllowed/);

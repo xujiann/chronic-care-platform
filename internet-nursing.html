@@ -37,8 +37,26 @@
         </article>
       </section>
 
+      <section class="nursing-mobile-workbench" aria-label="互联网护理手机端工作区">
+        <article class="panel nursing-mobile-panel" data-mobile-surface="citizen-appointment">
+          <div class="panel-title">
+            <h2>手机端预约</h2>
+            <span>居民提交</span>
+          </div>
+          <div id="nursing-mobile-appointment" class="nursing-mobile-card-list"></div>
+          <a class="primary-button nursing-mobile-submit" href="#nursing-appointment-form">填写预约</a>
+        </article>
+        <article class="panel nursing-mobile-panel" data-mobile-surface="nurse-response">
+          <div class="panel-title">
+            <h2>手机端接单</h2>
+            <span>护士响应</span>
+          </div>
+          <div id="nursing-nurse-mobile" class="nursing-mobile-card-list"></div>
+        </article>
+      </section>
+
       <section class="portal-grid">
-        <article class="panel">
+        <article class="panel nursing-mobile-appointment">
           <div class="panel-title">
             <h2>个人端预约</h2>
             <span id="nursing-citizen-summary"></span>
@@ -85,7 +103,7 @@
             <h2>医院端管理</h2>
             <span>评估 / 知情同意 / 派单</span>
           </div>
-          <div id="nursing-orders" class="table-wrap"></div>
+          <div id="nursing-orders" class="table-wrap nursing-desktop-table"></div>
         </article>
       </section>
 
@@ -98,7 +116,7 @@
           <div class="filter-grid">
             <label>护士<select id="nursing-nurse-select"></select></label>
           </div>
-          <div id="nursing-nurse-queue" class="table-wrap"></div>
+          <div id="nursing-nurse-queue" class="table-wrap nursing-desktop-table"></div>
         </article>
 
         <article class="panel">

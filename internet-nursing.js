@@ -3,7 +3,10 @@ let nursingDashboard = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
   bindNursingAppointmentForm();
-  document.querySelector("#nursing-nurse-select")?.addEventListener("change", () => renderNurseQueue(nursingDashboard?.orders || []));
+  document.querySelector("#nursing-nurse-select")?.addEventListener("change", () => {
+    renderNurseQueue(nursingDashboard?.orders || []);
+    renderMobileNurseCards(nursingDashboard?.orders || []);
+  });
   await loadInternetNursingDashboard();
 });
 
@@ -58,6 +61,8 @@ function renderInternetNursingDashboard(dashboard) {
   renderRiskGuidance(dashboard.orders || [], dashboard.riskQueue || []);
   renderInstitutionSelect(dashboard.institutions || []);
   renderNurseSelect(dashboard.nurses || []);
+  renderMobileAppointmentStatus(dashboard.orders || []);
+  renderMobileNurseCards(dashboard.orders || []);
   renderHospitalOrders(dashboard.orders || []);
   renderNurseQueue(dashboard.orders || []);
   renderPolicyControls(dashboard.policy || {});
@@ -199,9 +204,99 @@ function renderNurseQueue(items) {
       `).join("")}</tbody>
     </table>
   `;
-  document.querySelectorAll("[data-nurse-action]").forEach((button) => {
+  bindNurseActionButtons(document.querySelector("#nursing-nurse-queue"));
+}
+
+function renderMobileAppointmentStatus(items) {
+  const target = document.querySelector("#nursing-mobile-appointment");
+  if (!target) return;
+  const residentId = currentNursingUser().residentId || document.querySelector("#nursing-appointment-form [name='residentId']")?.value || "";
+  const residentItems = items
+    .filter((item) => !residentId || item.residentId === residentId)
+    .sort((a, b) => String(b.preferredAt || "").localeCompare(String(a.preferredAt || "")))
+    .slice(0, 3);
+  target.innerHTML = residentItems.length ? residentItems.map((item) => `
+    <article class="nursing-mobile-card">
+      <header>
+        <div>
+          <strong>${escapeHtml(displayText(item.serviceItem || ""))}</strong>
+          <span>${escapeHtml(item.preferredAt || "")} · ${escapeHtml(displayText(item.institution?.name || item.institutionName || ""))}</span>
+        </div>
+        ${statusBadge(item.status)}
+      </header>
+      <p>${escapeHtml(displayText(item.address || ""))}</p>
+      <div class="nursing-mobile-evidence">
+        ${statusBadge(item.firstVisitAssessment)}
+        ${statusBadge(item.informedConsent)}
+        ${statusBadge(item.riskLevel)}
+      </div>
+      <small>${escapeHtml(nextNursingAction(item, item.riskLevel === "high") || "等待服务闭环更新。")}</small>
+    </article>
+  `).join("") : `
+    <article class="nursing-mobile-card empty">
+      <header>
+        <div>
+          <strong>暂无预约记录</strong>
+          <span>手机端提交后将同步到医院端评估派单。</span>
+        </div>
+      </header>
+    </article>
+  `;
+}
+
+function renderMobileNurseCards(items) {
+  const target = document.querySelector("#nursing-nurse-mobile");
+  if (!target) return;
+  const nurseId = document.querySelector("#nursing-nurse-select")?.value || "";
+  const user = currentNursingUser();
+  const canAct = user.accountType === "nurse" || ["commission", "institution"].includes(user.role);
+  const queue = items
+    .filter((item) => !nurseId || !item.nurseId || item.nurseId === nurseId)
+    .sort((a, b) => nursingMobileSortWeight(b) - nursingMobileSortWeight(a))
+    .slice(0, 6);
+  target.innerHTML = queue.length ? queue.map((item) => `
+    <article class="nursing-mobile-card" data-mobile-order="${escapeHtml(item.id)}">
+      <header>
+        <div>
+          <strong>${escapeHtml(displayText(item.residentName || item.residentId || ""))}</strong>
+          <span>${escapeHtml(displayText(item.serviceItem || ""))} · ${escapeHtml(item.preferredAt || "")}</span>
+        </div>
+        ${statusBadge(item.status)}
+      </header>
+      <p>${escapeHtml(displayText(item.address || ""))}</p>
+      <div class="nursing-mobile-evidence">
+        ${statusBadge(item.locationTrace)}
+        ${statusBadge(item.serviceRecordStatus)}
+        ${statusBadge(item.riskLevel)}
+      </div>
+      <div class="nursing-mobile-actions">
+        ${nurseActionButtons(item, canAct)}
+      </div>
+    </article>
+  `).join("") : `
+    <article class="nursing-mobile-card empty">
+      <header>
+        <div>
+          <strong>暂无接单任务</strong>
+          <span>医院派单后将在手机端出现。</span>
+        </div>
+      </header>
+    </article>
+  `;
+  bindNurseActionButtons(target);
+}
+
+function bindNurseActionButtons(root = document) {
+  root?.querySelectorAll("[data-nurse-action]").forEach((button) => {
     button.addEventListener("click", () => updateNursingOrder(button.dataset.nurseAction, nurseActionPayload(button.dataset.actionKind)));
   });
+}
+
+function nursingMobileSortWeight(item) {
+  const actionable = !item.nurseId || ["dispatched", "accepted", "in-service"].includes(item.status) ? 100 : 0;
+  const risk = item.riskLevel === "high" ? 30 : item.riskLevel === "medium" ? 15 : 0;
+  const stage = item.status === "dispatched" ? 30 : item.status === "accepted" ? 20 : item.status === "in-service" ? 10 : 0;
+  return actionable + risk + stage;
 }
 
 function nurseActionButtons(item, canAct) {
@@ -245,7 +340,7 @@ function bindNursingAppointmentForm() {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const values = Object.fromEntries(new FormData(form).entries());
-    values.sourceChannel = "internet-nursing.html";
+    values.sourceChannel = "internet-nursing-mobile";
     try {
       if (NURSING_API_BASE) {
         const request = window.HealthCityAuth?.authFetch || fetch;
