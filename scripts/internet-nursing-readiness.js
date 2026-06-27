@@ -59,6 +59,7 @@ function buildInternetNursingReadinessReport(options = {}) {
   const frontend = options.frontend ?? readText("internet-nursing.html") + readText("internet-nursing.js");
   const mobilePreview = options.mobilePreview ?? readText("mobile-preview.html");
   const moduleDoc = options.moduleDoc ?? readText("docs/互联网护理服务模块说明.md");
+  const launchPlan = options.launchPlan ?? readText("docs/互联网护理上线与下一步开发计划.md");
   const policy = data.internetNursingPolicy || fallbackPolicy();
   const institutions = Array.isArray(data.internetNursingInstitutions) && data.internetNursingInstitutions.length ? data.internetNursingInstitutions : fallbackInstitutions();
   const nurses = Array.isArray(data.internetNursingNurses) && data.internetNursingNurses.length ? data.internetNursingNurses : fallbackNurses();
@@ -75,9 +76,11 @@ function buildInternetNursingReadinessReport(options = {}) {
     { id: "nursing:api", passed: /\/api\/internet-nursing\/dashboard/.test(server) && /\/api\/internet-nursing\/orders/.test(server) && /canAccessInternetNursingOrder/.test(server), detail: "dashboard, order creation, action, and role guard present" },
     { id: "nursing:frontend", passed: /nursing-appointment-form/.test(frontend) && /nursing-nurse-queue/.test(frontend) && /nursing-risk-guidance/.test(frontend) && /fetchInternetNursingDashboard/.test(frontend), detail: "citizen, hospital, nurse, and risk guidance work areas present" },
     { id: "nursing:mobileWorkflow", passed: /nursing-mobile-workbench/.test(frontend) && /nursing-mobile-appointment/.test(frontend) && /nursing-nurse-mobile/.test(frontend) && /renderMobileAppointmentStatus/.test(frontend) && /renderMobileNurseCards/.test(frontend) && /internet-nursing-mobile/.test(frontend) && /internet-nursing\.html\?preview=mobile-nursing/.test(mobilePreview), detail: "citizen appointment and nurse response are available in the mobile surface" },
+    { id: "nursing:launchControls", passed: /validateInternetNursingAppointment/.test(server) && /normalizeInternetNursingServiceObject/.test(server) && /buildInternetNursingActionMessage/.test(server) && /互联网护理新预约/.test(server) && /renderServiceItemSelect/.test(frontend) && /nursing-service-select/.test(frontend), detail: "catalog validation, citizen anti-tamper controls, and task messages present" },
     { id: "nursing:operationSafety", passed: /assertInternetNursingActionAllowed/.test(server) && /nurse can only operate assigned orders/.test(server) && /nurseActionButtons/.test(frontend) && /showNursingMessage/.test(frontend), detail: "nurse action guard, state-specific buttons, and operator feedback present" },
     { id: "nursing:authNavigation", passed: /"internet-nursing\.html": \["commission", "institution", "citizen", "county"\]/.test(auth) && /username: "nurse"/.test(auth) && /password: "123456"/.test(auth) && /nurseId: "inn-001"/.test(auth) && /仅查看/.test(frontend) && /需医院派单/.test(frontend), detail: "route access, nurse demo account, and role-scoped actions present" },
     { id: "nursing:moduleDoc", passed: /互联网护理服务模块说明/.test(moduleDoc) && /flowchart TD/.test(moduleDoc) && /nurse \/ 123456/.test(moduleDoc) && /\/api\/internet-nursing\/orders\/:id\/actions/.test(moduleDoc), detail: "module document, workflow diagram, role entry, and API permissions present" },
+    { id: "nursing:nextPlan", passed: /上线标准/.test(launchPlan) && /下一步开发计划/.test(launchPlan) && /阶段一：上线联调/.test(launchPlan) && /阶段三：监管扩展/.test(launchPlan), detail: "launch standard and staged roadmap documented" },
     { id: "nursing:releaseScript", passed: Boolean(pkg.scripts?.["internet-nursing:readiness"]), detail: pkg.scripts?.["internet-nursing:readiness"] || "missing" }
   ];
   return {

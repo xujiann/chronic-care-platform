@@ -5903,6 +5903,7 @@ function normalizeInternetNursingOrder(payload, user, data) {
   const residentId = String(payload.residentId || user.residentId || "").trim();
   if (!residentId) throw new Error("residentId is required");
   if (!canAccessResident(user, residentId, data)) throw new Error("resident scope denied");
+  const policy = data.internetNursingPolicy || seedInternetNursingPolicy();
   const institutions = Array.isArray(data.internetNursingInstitutions) ? data.internetNursingInstitutions : seedInternetNursingInstitutions();
   const institutionId = String(payload.institutionId || institutions.find((item) => item.published)?.id || institutions[0]?.id || "").trim();
   const institution = institutions.find((item) => item.id === institutionId);
@@ -5910,7 +5911,10 @@ function normalizeInternetNursingOrder(payload, user, data) {
   if (user.role === "citizen" && institution.published === false) throw new Error("institution is not published");
   const resident = (data.residents || []).find((item) => item.id === residentId) || {};
   const serviceItem = String(payload.serviceItem || "vital signs measurement").trim();
+  const serviceObject = normalizeInternetNursingServiceObject(payload.serviceObject || "mobility-limited chronic disease patient");
+  validateInternetNursingAppointment({ ...payload, residentId, institution, policy, serviceItem, serviceObject }, user);
   const now = new Date().toISOString();
+  const citizenCreated = user.role === "citizen";
   return {
     id: payload.id || `ino-${randomUUID()}`,
     residentId,
@@ -5918,33 +5922,63 @@ function normalizeInternetNursingOrder(payload, user, data) {
     institutionId,
     institutionCode: institution.institutionCode || "",
     institutionName: institution.name || "",
-    nurseId: String(payload.nurseId || "").trim(),
-    nurseName: String(payload.nurseName || "").trim(),
+    nurseId: citizenCreated ? "" : String(payload.nurseId || "").trim(),
+    nurseName: citizenCreated ? "" : String(payload.nurseName || "").trim(),
     serviceItem,
-    serviceObject: String(payload.serviceObject || "mobility-limited chronic disease patient").trim(),
+    serviceObject,
     requestedAt: now,
     preferredAt: String(payload.preferredAt || payload.due || "").trim(),
     address: String(payload.address || "").trim(),
-    firstVisitAssessment: String(payload.firstVisitAssessment || "pending").trim(),
-    informedConsent: String(payload.informedConsent || "pending").trim(),
+    firstVisitAssessment: citizenCreated ? "pending" : String(payload.firstVisitAssessment || "pending").trim(),
+    informedConsent: citizenCreated ? "pending" : String(payload.informedConsent || "pending").trim(),
     identityVerified: payload.identityVerified !== false,
     riskLevel: String(payload.riskLevel || "medium").trim(),
-    status: String(payload.status || "requested").trim(),
-    locationTrace: String(payload.locationTrace || "pending").trim(),
-    serviceRecordStatus: String(payload.serviceRecordStatus || "pending").trim(),
-    qualityCallback: String(payload.qualityCallback || "pending").trim(),
-    feeEstimate: Number(payload.feeEstimate || 0),
+    status: citizenCreated ? "requested" : String(payload.status || "requested").trim(),
+    locationTrace: citizenCreated ? "pending" : String(payload.locationTrace || "pending").trim(),
+    serviceRecordStatus: citizenCreated ? "pending" : String(payload.serviceRecordStatus || "pending").trim(),
+    qualityCallback: citizenCreated ? "pending" : String(payload.qualityCallback || "pending").trim(),
+    feeEstimate: citizenCreated ? 0 : Number(payload.feeEstimate || 0),
     sourceChannel: String(payload.sourceChannel || user.role).trim(),
     createdAt: now,
     createdBy: user.username || user.role,
     createdByName: user.name || "",
-    auditTrail: [{ at: now, action: "order-created", by: user.username || user.role, note: String(payload.note || "Internet nursing appointment created.").trim() }]
+    auditTrail: [{ at: now, action: "order-created", by: user.username || user.role, note: String(payload.note || "互联网护理预约已创建。").trim() }]
   };
+}
+
+function normalizeInternetNursingServiceObject(value) {
+  const text = String(value || "").trim();
+  const aliases = {
+    "rehabilitation patient": "rehabilitation patients",
+    "terminal-stage patient": "terminal-stage patients",
+    "mobility-limited chronic disease patient": "mobility-limited chronic disease patients"
+  };
+  return aliases[text] || text;
+}
+
+function validateInternetNursingAppointment(payload, user) {
+  const serviceCatalog = new Set(payload.policy.serviceCatalog || []);
+  const serviceObjects = new Set([
+    ...(payload.policy.serviceObjects || []),
+    "rehabilitation patient",
+    "terminal-stage patient",
+    "mobility-limited chronic disease patient"
+  ]);
+  const institutionServices = new Set(payload.institution.serviceItems || []);
+  if (!serviceCatalog.has(payload.serviceItem)) throw new Error("service item is outside internet nursing catalog");
+  if (institutionServices.size && !institutionServices.has(payload.serviceItem)) throw new Error("institution does not publish this nursing service");
+  if (!serviceObjects.has(payload.serviceObject)) throw new Error("service object is outside pilot scope");
+  if (!["low", "medium", "high"].includes(String(payload.riskLevel || "medium").trim())) throw new Error("risk level is invalid");
+  const preferredAt = String(payload.preferredAt || payload.due || "").trim();
+  if (!preferredAt || Number.isNaN(Date.parse(preferredAt))) throw new Error("preferredAt is required");
+  if (!String(payload.address || "").trim()) throw new Error("service address is required");
+  if (user.role === "citizen") return;
+  if (payload.nurseId && !["requested", "assessed", "dispatched"].includes(String(payload.status || "requested").trim())) throw new Error("nurse dispatch must start from an open order");
 }
 
 function applyInternetNursingOrderAction(item, payload, user, data) {
   const now = new Date().toISOString();
-  assertInternetNursingActionAllowed(item, payload, user);
+  assertInternetNursingActionAllowed(item, payload, user, data);
   const allowed = ["status", "nurseId", "firstVisitAssessment", "informedConsent", "riskLevel", "locationTrace", "serviceRecordStatus", "qualityCallback", "feeEstimate"];
   const updates = Object.fromEntries(allowed
     .filter((key) => Object.hasOwn(payload, key))
@@ -5969,15 +6003,77 @@ function applyInternetNursingOrderAction(item, payload, user, data) {
 }
 
 function assertInternetNursingActionAllowed(item, payload, user) {
-  if (user.accountType !== "nurse") return;
   const action = String(payload.action || "").trim();
+  if (user.accountType !== "nurse") {
+    if (action === "dispatch-qualified-nurse") {
+      if (item.firstVisitAssessment !== "passed" || item.informedConsent !== "signed") throw new Error("first-visit assessment and informed consent are required before dispatch");
+      if (!String(payload.nurseId || "").trim()) throw new Error("qualified nurse is required before dispatch");
+    }
+    if (action === "quality-review") {
+      const serviceCompleted = item.status === "completed" || payload.status === "closed";
+      const recordCompleted = item.serviceRecordStatus === "completed" || payload.serviceRecordStatus === "completed";
+      if (!serviceCompleted || !recordCompleted) throw new Error("quality review requires completed service record");
+    }
+    return;
+  }
   const payloadNurseId = String(payload.nurseId || user.nurseId || "").trim();
   if (!user.nurseId) throw new Error("nurse account is not bound to a qualified nurse");
   if (payloadNurseId !== user.nurseId) throw new Error("nurse can only operate own workstation orders");
   if (item.nurseId && item.nurseId !== user.nurseId) throw new Error("nurse can only operate assigned orders");
   if (!["nurse-accept", "service-start", "service-complete"].includes(action)) throw new Error("nurse action is not allowed");
+  if (action === "nurse-accept" && (item.firstVisitAssessment !== "passed" || item.informedConsent !== "signed")) throw new Error("first-visit assessment and informed consent are required before nurse acceptance");
   if (action === "service-start" && item.status !== "accepted") throw new Error("order must be accepted before service starts");
   if (action === "service-complete" && item.status !== "in-service") throw new Error("order must be in service before completion");
+}
+
+function buildInternetNursingActionMessage(order, payload, user) {
+  const now = new Date().toISOString();
+  const action = String(payload.action || "").trim();
+  const templates = {
+    "dispatch-qualified-nurse": {
+      targetRole: "institution",
+      title: "互联网护理已派单",
+      body: `${order.nurseName || order.nurseId || "护士"} 已收到 ${order.residentName || order.residentId} 的上门护理任务。`
+    },
+    "nurse-accept": {
+      targetRole: "institution",
+      title: "护士已接单",
+      body: `${order.nurseName || order.nurseId || "护士"} 已接单，服务位置轨迹已开启。`
+    },
+    "service-start": {
+      targetRole: "institution",
+      title: "上门护理已开始",
+      body: `${order.residentName || order.residentId} 的互联网护理服务已开始。`
+    },
+    "service-complete": {
+      targetRole: "citizen",
+      title: "护理记录已完成",
+      body: `${order.serviceItem || "互联网护理"} 已完成护理记录，等待机构质控回访。`
+    },
+    "quality-review": {
+      targetRole: "citizen",
+      title: "互联网护理质控回访已关闭",
+      body: `${order.serviceItem || "互联网护理"} 已完成质量回访。`
+    }
+  };
+  const template = templates[action];
+  if (!template) return null;
+  return {
+    id: `msg-${randomUUID()}`,
+    taskId: `internetNursingOrders:${order.id}`,
+    collection: "internetNursingOrders",
+    sourceId: order.id,
+    residentId: order.residentId,
+    targetRole: template.targetRole,
+    channel: "in_app",
+    title: template.title,
+    body: template.body,
+    status: "sent",
+    receipts: [],
+    createdAt: now,
+    createdBy: user.username || user.role,
+    createdByName: user.name
+  };
 }
 
 function redactSensitiveResponse(value, user) {
@@ -8352,8 +8448,8 @@ async function handleApi(req, res) {
           residentId: order.residentId,
           targetRole: "institution",
           channel: "in_app",
-          title: "New internet nursing appointment",
-          body: `${order.institutionName || order.institutionId} needs first-visit assessment and nurse dispatch for ${order.serviceItem}.`,
+          title: "互联网护理新预约",
+          body: `${order.institutionName || order.institutionId} 需完成首诊评估、知情同意和护士派单：${order.serviceItem}。`,
           status: "sent",
           receipts: [],
           createdAt: new Date().toISOString(),
@@ -8405,6 +8501,10 @@ async function handleApi(req, res) {
       const payload = await collectJson(req);
       rows[index] = applyInternetNursingOrderAction(rows[index], payload, user, data);
       data.internetNursingOrders = rows;
+      const taskMessage = buildInternetNursingActionMessage(rows[index], payload, user);
+      if (taskMessage) {
+        data.taskMessages = [taskMessage, ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
+      }
       appendDataAccessLog(data, user, rows[index].residentId, "internetNursingOrders", payload.note || rows[index].status, "allowed");
       data.securityEvents = [
         {

@@ -21,9 +21,11 @@ test("internet nursing readiness validates three-role workflow and policy eviden
   assert.equal(report.checks.some((item) => item.id === "nursing:api" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "nursing:frontend" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "nursing:mobileWorkflow" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "nursing:launchControls" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "nursing:operationSafety" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "nursing:authNavigation" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "nursing:moduleDoc" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "nursing:nextPlan" && item.passed), true);
   assert.match(renderMarkdown(report), /Internet nursing readiness report/);
   assert.match(renderMarkdown(report), /docs\/互联网护理服务模块说明\.md/);
 });

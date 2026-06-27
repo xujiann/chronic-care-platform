@@ -450,6 +450,51 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(denied.response.status, 403);
   });
 
+  await t.test("guards mobile internet nursing appointments for launch", async () => {
+    const dashboard = await api(baseUrl, "/api/internet-nursing/dashboard", authorized(citizenToken));
+    assert.equal(dashboard.response.status, 200);
+    const institution = dashboard.body.institutions.find((item) => item.id === "inh-mr1");
+    assert.ok(institution);
+
+    const created = await api(baseUrl, "/api/internet-nursing/orders", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        institutionId: institution.id,
+        serviceItem: "wound care",
+        serviceObject: "mobility-limited chronic disease patient",
+        preferredAt: "2026-06-27",
+        address: "中山区手机端预约测试地址",
+        riskLevel: "high",
+        status: "completed",
+        nurseId: "inn-001",
+        firstVisitAssessment: "passed",
+        informedConsent: "signed",
+        sourceChannel: "internet-nursing-mobile"
+      })
+    }));
+    assert.equal(created.response.status, 201);
+    assert.equal(created.body.sourceChannel, "internet-nursing-mobile");
+    assert.equal(created.body.status, "requested");
+    assert.equal(created.body.nurseId, "");
+    assert.equal(created.body.firstVisitAssessment, "pending");
+    assert.equal(created.body.informedConsent, "pending");
+
+    const unsupportedService = await api(baseUrl, "/api/internet-nursing/orders", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        institutionId: institution.id,
+        serviceItem: "vital signs measurement",
+        serviceObject: "elderly or disabled people",
+        preferredAt: "2026-06-28",
+        address: "中山区手机端预约测试地址"
+      })
+    }));
+    assert.equal(unsupportedService.response.status, 400);
+    assert.match(unsupportedService.body.message, /does not publish/);
+  });
+
   await t.test("scopes internet nursing nurse actions to own workstation orders", async () => {
     const nurseLogin = await login(baseUrl, "nurse");
     assert.equal(nurseLogin.response.status, 200);

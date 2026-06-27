@@ -7,6 +7,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderNurseQueue(nursingDashboard?.orders || []);
     renderMobileNurseCards(nursingDashboard?.orders || []);
   });
+  document.querySelector("#nursing-institution-select")?.addEventListener("change", () => renderServiceItemSelect(nursingDashboard?.institutions || []));
   await loadInternetNursingDashboard();
 });
 
@@ -60,6 +61,7 @@ function renderInternetNursingDashboard(dashboard) {
   renderNursingMetrics(dashboard.summary || {});
   renderRiskGuidance(dashboard.orders || [], dashboard.riskQueue || []);
   renderInstitutionSelect(dashboard.institutions || []);
+  renderServiceItemSelect(dashboard.institutions || []);
   renderNurseSelect(dashboard.nurses || []);
   renderMobileAppointmentStatus(dashboard.orders || []);
   renderMobileNurseCards(dashboard.orders || []);
@@ -139,6 +141,25 @@ function renderInstitutionSelect(institutions) {
     .filter((item) => item.published !== false)
     .map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(displayText(item.name))} / ${escapeHtml(displayText(item.district || ""))}</option>`)
     .join("");
+}
+
+function renderServiceItemSelect(institutions) {
+  const select = document.querySelector("#nursing-service-select");
+  const institutionId = document.querySelector("#nursing-institution-select")?.value || "";
+  if (!select) return;
+  const current = select.value;
+  const institution = institutions.find((item) => item.id === institutionId) || institutions.find((item) => item.published !== false) || {};
+  const items = Array.isArray(institution.serviceItems) && institution.serviceItems.length ? institution.serviceItems : [
+    "vital signs measurement",
+    "blood glucose measurement",
+    "wound care",
+    "tube care",
+    "postpartum care",
+    "infant care",
+    "PICC maintenance"
+  ];
+  select.innerHTML = items.map((item) => `<option value="${escapeHtml(item)}">${escapeHtml(displayText(item))}</option>`).join("");
+  if (items.includes(current)) select.value = current;
 }
 
 function renderNurseSelect(nurses) {

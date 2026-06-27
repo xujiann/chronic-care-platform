@@ -755,6 +755,7 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(html, /nursing-orders/);
   assert.match(html, /nursing-nurse-queue/);
   assert.match(html, /nursing-risk-guidance/);
+  assert.match(html, /nursing-service-select/);
   assert.match(html, /nursing-mobile-workbench/);
   assert.match(html, /data-mobile-surface="citizen-appointment"/);
   assert.match(html, /data-mobile-surface="nurse-response"/);
@@ -765,6 +766,7 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(js, /nextNursingAction/);
   assert.match(js, /renderMobileAppointmentStatus/);
   assert.match(js, /renderMobileNurseCards/);
+  assert.match(js, /renderServiceItemSelect/);
   assert.match(js, /bindNurseActionButtons/);
   assert.match(js, /sourceChannel = "internet-nursing-mobile"/);
   assert.match(js, /nurseActionButtons/);
@@ -788,6 +790,9 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(mobilePreviewHtml, /internet-nursing\.html\?preview=mobile-nursing/);
   assert.match(server, /\/api\/internet-nursing\/dashboard/);
   assert.match(server, /canAccessInternetNursingOrder/);
+  assert.match(server, /validateInternetNursingAppointment/);
+  assert.match(server, /buildInternetNursingActionMessage/);
+  assert.match(server, /互联网护理新预约/);
   assert.match(server, /assertInternetNursingActionAllowed/);
   assert.match(server, /nurse can only operate assigned orders/);
   assert.match(read("auth.js"), /"internet-nursing\.html": \["commission", "institution", "citizen", "county"\]/);
@@ -808,6 +813,9 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(read("docs/互联网护理服务模块说明.md"), /flowchart TD/);
   assert.match(read("docs/互联网护理服务模块说明.md"), /nurse \/ 123456/);
   assert.match(read("docs/互联网护理服务模块说明.md"), /\/api\/internet-nursing\/orders\/:id\/actions/);
+  assert.match(read("docs/互联网护理服务模块说明.md"), /互联网护理上线与下一步开发计划/);
+  assert.match(read("docs/互联网护理上线与下一步开发计划.md"), /上线标准/);
+  assert.match(read("docs/互联网护理上线与下一步开发计划.md"), /下一步开发计划/);
   assert.doesNotMatch(html, /Citizen Appointment|Hospital Management|Nurse Workstation|Policy Controls|Submit/);
   assert.doesNotMatch(js, /Accept<\/button>|Start<\/button>|Complete<\/button>|view only|hospital dispatch required/);
 });
