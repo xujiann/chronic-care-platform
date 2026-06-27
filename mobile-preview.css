@@ -71,6 +71,13 @@ body {
   color: #fff;
 }
 
+.preview-steps {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 14px;
+}
+
+.preview-steps div,
 .hint {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -78,13 +85,19 @@ body {
   background: #fff;
 }
 
+.preview-steps strong,
 .hint strong {
   display: block;
   margin-bottom: 6px;
 }
 
+.preview-steps p,
 .hint p {
   margin: 0 0 10px;
+}
+
+.preview-steps div:last-child p {
+  margin-bottom: 0;
 }
 
 code {
@@ -137,6 +150,10 @@ iframe {
 @media (max-width: 520px) {
   .preview-shell {
     padding: 14px;
+  }
+
+  .preview-copy h1 {
+    font-size: 28px;
   }
 
   .phone-frame {

@@ -12,22 +12,38 @@
     <main class="preview-shell">
       <section class="preview-copy">
         <span>居民端手机预览</span>
-        <h1>健康档案与电子病历</h1>
-        <p>右侧为 390px 宽手机视口，可用于检查居民端在手机上的首页、健康档案、电子病历时间线、慢病管理和随访提醒。</p>
+        <h1>居民端手机导航预览</h1>
+        <p>右侧为 390px 宽手机视口，可检查居民端首页、底部服务导航、健康档案、电子病历、护理、陪诊和挂号待开发状态。</p>
         <div class="preview-actions">
           <a href="./health-city.html">系统总览</a>
           <a href="./citizen.html">打开居民端</a>
         </div>
+        <div class="preview-steps" aria-label="预览检查项">
+          <div>
+            <strong>1. 本机预览</strong>
+            <p>启动服务后打开本页，右侧手机框会直接加载居民端。</p>
+            <code>http://localhost:5174/mobile-preview.html</code>
+          </div>
+          <div>
+            <strong>2. 真机预览</strong>
+            <p>电脑和手机在同一 Wi-Fi 下，用电脑局域网 IP 加端口访问。</p>
+            <code>http://电脑IP:5174/mobile-preview.html</code>
+          </div>
+          <div>
+            <strong>3. 操作重点</strong>
+            <p>滑到底部后点击“健康档案、电子病历、护理、陪诊、挂号”，确认底部导航固定、状态同步、页面无横向溢出。</p>
+          </div>
+        </div>
         <div class="hint">
-          <strong>真机访问</strong>
-          <p>电脑和手机在同一 Wi-Fi 下时，可用电脑局域网 IP 加端口访问。</p>
-          <code>http://电脑IP:5173/citizen.html</code>
+          <strong>演示登录</strong>
+          <p>如果被重定向到登录页，可用账号密码或手机号验证码进入居民端。</p>
+          <code>citizen / 123456 或 DEMO-MOBILE-R1 / 888888</code>
         </div>
       </section>
 
       <section class="phone-frame" aria-label="居民端手机预览">
         <div class="phone-speaker"></div>
-        <iframe src="./citizen.html" title="居民端"></iframe>
+        <iframe src="./citizen.html?preview=mobile-nav" title="居民端"></iframe>
       </section>
     </main>
   </body>

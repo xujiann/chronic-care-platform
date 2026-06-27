@@ -69,7 +69,7 @@ http://localhost:5173/login.html
 | `mobile-preview.html` | 居民端手机预览 |
 | `county.html` | 县域医共体平台、16255 模型、协同工单、互认、基层 AI |
 
-居民端已提供 PWA 基础壳：`manifest.webmanifest`、`service-worker.js` 和 `pwa-icon.svg` 支持浏览器安装入口、静态资源缓存和弱网/离线回退到居民端健康档案页面；个人健康信息库已细分电子病历、检查检验、用药处方、影像资料和附件资料，正式上线时仍需结合生产域名、HTTPS、PACS/文档存储授权和现场移动端策略复核。
+居民端已提供 PWA 基础壳：`manifest.webmanifest`、`service-worker.js` 和 `pwa-icon.svg` 支持浏览器安装入口、静态资源缓存和弱网/离线回退到居民端健康档案页面；`mobile-preview.html` 提供 390px 手机框、本机/真机访问地址、演示登录方式和底部服务导航检查项，便于发布前预览居民端手机操作；个人健康信息库已细分电子病历、检查检验、用药处方、影像资料和附件资料，正式上线时仍需结合生产域名、HTTPS、PACS/文档存储授权和现场移动端策略复核。
 
 ## 数据与存储
 
