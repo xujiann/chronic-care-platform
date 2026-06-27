@@ -1,4 +1,4 @@
-const CACHE_NAME = "chronic-care-citizen-v6";
+const CACHE_NAME = "chronic-care-citizen-v7";
 const APP_SHELL = [
   "./",
   "./citizen.html",

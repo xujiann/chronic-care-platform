@@ -621,11 +621,14 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewCss, /preview-steps/);
   assert.match(mobilePreviewCss, /preview-service-switch/);
   assert.match(mobilePreviewCss, /position: sticky/);
+  assert.match(mobilePreviewCss, /grid-template-columns: minmax\(280px, 420px\) minmax\(390px, 430px\)/);
+  assert.match(mobilePreviewCss, /max-width: 820px/);
+  assert.match(mobilePreviewCss, /height: min\(760px, calc\(100vh - 132px\)\)/);
   assert.equal(manifest.start_url, "./citizen.html");
   assert.equal(manifest.display, "standalone");
   assert.equal(manifest.icons.some((item) => item.src === "./pwa-icon.svg"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v6/);
+  assert.match(serviceWorker, /chronic-care-citizen-v7/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627preview/);
   assert.match(serviceWorker, /citizen\.html/);
   assert.match(serviceWorker, /mobile-preview\.html/);
