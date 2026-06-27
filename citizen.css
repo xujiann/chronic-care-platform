@@ -304,6 +304,7 @@ select,
 }
 
 .service-tabs button:focus-visible,
+.mobile-service-nav button:focus-visible,
 .vault-tabs button:focus-visible,
 .member-card:focus-visible,
 .small-button:focus-visible,
@@ -417,6 +418,10 @@ select,
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.mobile-service-nav {
+  display: none;
 }
 
 .resident-audit-panel {
@@ -1331,7 +1336,7 @@ dialog::backdrop {
 @media (max-width: 900px) {
   .citizen-shell {
     width: min(100% - 20px, 640px);
-    padding: 12px 0 28px;
+    padding: 12px 0 calc(104px + env(safe-area-inset-bottom, 0px));
   }
 
   .citizen-header,
@@ -1437,8 +1442,78 @@ dialog::backdrop {
     scroll-snap-align: start;
   }
 
+  .mobile-service-nav {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: max(10px, env(safe-area-inset-bottom, 0px));
+    z-index: 18;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 6px;
+    border: 1px solid rgba(216, 226, 231, 0.96);
+    border-radius: 18px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 18px 46px rgba(15, 23, 42, 0.2);
+    backdrop-filter: blur(12px);
+  }
+
+  .mobile-service-nav button {
+    display: grid;
+    gap: 3px;
+    place-items: center;
+    min-width: 0;
+    min-height: 58px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    padding: 6px 4px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font: inherit;
+  }
+
+  .mobile-service-nav button.active {
+    border-color: #bfdbfe;
+    background: #eaf2ff;
+    color: var(--blue);
+  }
+
+  .mobile-service-nav span,
+  .mobile-service-nav small {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-service-nav span {
+    font-size: 13px;
+    font-weight: 900;
+  }
+
+  .mobile-service-nav small {
+    border-radius: 999px;
+    padding: 2px 5px;
+    background: #e8f6ef;
+    color: var(--green);
+    font-size: 10px;
+    font-weight: 900;
+  }
+
+  .mobile-service-nav small.pending {
+    background: #fff3d8;
+    color: var(--amber);
+  }
+
   .resident-audit-card {
     min-height: 0;
+  }
+
+  .resident-audit-card:not(.active) {
+    display: none;
   }
 
   .vault-tabs {

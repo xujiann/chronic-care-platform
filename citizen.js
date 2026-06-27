@@ -231,18 +231,34 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 function bindServiceTabs() {
   const target = document.querySelector("#service-tabs");
+  if (target) {
+    target.innerHTML = citizenServiceTabs.map((item) => `<button type="button" data-service-tab="${item.key}" aria-pressed="${item.key === activeServiceTab}">
+      <span>${item.label}</span>
+      <strong class="${item.status === "待开发" ? "pending" : "ready"}">${item.status}</strong>
+      <small>${item.detail}</small>
+    </button>`).join("");
+    target.querySelectorAll("[data-service-tab]").forEach((button) => {
+      button.addEventListener("click", () => {
+        setServiceTab(button.dataset.serviceTab);
+      });
+    });
+  }
+  renderMobileServiceNav();
+  updateServicePanes();
+}
+
+function renderMobileServiceNav() {
+  const target = document.querySelector("#mobile-service-nav");
   if (!target) return;
-  target.innerHTML = citizenServiceTabs.map((item) => `<button type="button" data-service-tab="${item.key}" aria-pressed="${item.key === activeServiceTab}">
+  target.innerHTML = citizenServiceTabs.map((item) => `<button type="button" data-mobile-service-tab="${item.key}" aria-label="${item.label}，${item.status}" aria-pressed="${item.key === activeServiceTab}">
     <span>${item.label}</span>
-    <strong class="${item.status === "待开发" ? "pending" : "ready"}">${item.status}</strong>
-    <small>${item.detail}</small>
+    <small class="${item.status === "待开发" ? "pending" : "ready"}">${item.status === "待开发" ? "待开" : "已开"}</small>
   </button>`).join("");
-  target.querySelectorAll("[data-service-tab]").forEach((button) => {
+  target.querySelectorAll("[data-mobile-service-tab]").forEach((button) => {
     button.addEventListener("click", () => {
-      setServiceTab(button.dataset.serviceTab);
+      setServiceTab(button.dataset.mobileServiceTab, { scrollToPane: true });
     });
   });
-  updateServicePanes();
 }
 
 function serviceTabFromHash() {
@@ -257,6 +273,12 @@ function setServiceTab(key, options = {}) {
     history.replaceState(null, "", `#service-${key}`);
   }
   updateServicePanes();
+  if (options.scrollToPane) {
+    requestAnimationFrame(() => {
+      const pane = document.querySelector(`[data-service-pane="${key}"]`) || document.querySelector("#service-summary");
+      pane?.scrollIntoView({ block: "start", behavior: "smooth" });
+    });
+  }
 }
 
 function updateServicePanes() {
@@ -264,6 +286,11 @@ function updateServicePanes() {
   renderResidentFunctionAudit();
   document.querySelectorAll("[data-service-tab]").forEach((button) => {
     const active = button.dataset.serviceTab === activeServiceTab;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  document.querySelectorAll("[data-mobile-service-tab]").forEach((button) => {
+    const active = button.dataset.mobileServiceTab === activeServiceTab;
     button.classList.toggle("active", active);
     button.setAttribute("aria-pressed", String(active));
   });

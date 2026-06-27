@@ -605,13 +605,14 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   const serviceWorker = read("service-worker.js");
   assert.match(citizenHtml, /rel="manifest"/);
   assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260627/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260627nav/);
   assert.match(citizenHtml, /auth\.js\?v=20260627/);
   assert.equal(manifest.start_url, "./citizen.html");
   assert.equal(manifest.display, "standalone");
   assert.equal(manifest.icons.some((item) => item.src === "./pwa-icon.svg"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v2/);
+  assert.match(serviceWorker, /chronic-care-citizen-v3/);
+  assert.match(serviceWorker, /citizen\.js\?v=20260627nav/);
   assert.match(serviceWorker, /citizen\.html/);
   assert.match(serviceWorker, /mobile-preview\.html/);
   assert.match(serviceWorker, /data\/db\.json/);
@@ -667,6 +668,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(server, /findCitizenAuthUserByPhone/);
   ["健康档案", "电子病历", "护理", "陪诊", "挂号"].forEach((label) => assert.match(citizenJs, new RegExp(label)));
   assert.match(citizenHtml, /service-tabs/);
+  assert.match(citizenHtml, /mobile-service-nav/);
   assert.match(citizenHtml, /service-summary/);
   assert.match(citizenHtml, /resident-function-audit/);
   assert.match(citizenHtml, /data-service-pane="health-record"/);
@@ -674,6 +676,9 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenHtml, /feature-state ready/);
   assert.match(citizenHtml, /feature-state pending/);
   assert.match(citizenJs, /citizenServiceTabs/);
+  assert.match(citizenJs, /renderMobileServiceNav/);
+  assert.match(citizenJs, /data-mobile-service-tab/);
+  assert.match(citizenJs, /scrollToPane/);
   assert.match(citizenJs, /residentFunctionAudit/);
   assert.match(citizenJs, /renderResidentFunctionAudit/);
   assert.match(citizenJs, /手机号验证码登录/);
@@ -685,6 +690,10 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /hashchange/);
   assert.match(citizenJs, /updateServicePanes/);
   assert.match(citizenCss, /resident-audit-grid/);
+  assert.match(citizenCss, /mobile-service-nav/);
+  assert.match(citizenCss, /position: fixed/);
+  assert.match(citizenCss, /safe-area-inset-bottom/);
+  assert.match(citizenCss, /resident-audit-card:not\(\.active\)/);
   assert.match(citizenCss, /grid-auto-columns: minmax\(156px, 72vw\)/);
   assert.match(citizenCss, /scroll-snap-type: x mandatory/);
   assert.match(citizenCss, /min-height: 44px/);
