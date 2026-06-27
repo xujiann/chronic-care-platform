@@ -460,6 +460,105 @@ select,
   outline-offset: 2px;
 }
 
+.client-channel-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.client-channel-switch {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 260px;
+}
+
+.client-channel-switch button {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.client-channel-switch button[aria-pressed="true"] {
+  border-color: var(--blue);
+  background: #eaf2ff;
+}
+
+.client-channel-switch span,
+.client-channel-switch small,
+.client-channel-detail span,
+.client-channel-detail strong,
+.client-channel-detail small {
+  display: block;
+}
+
+.client-channel-switch span {
+  font-weight: 900;
+}
+
+.client-channel-switch small,
+.client-channel-detail span,
+.client-channel-detail small {
+  color: var(--muted);
+}
+
+.client-channel-detail {
+  display: grid;
+  gap: 12px;
+}
+
+.client-channel-detail article,
+.client-channel-grid section {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fbfd;
+}
+
+.client-channel-detail article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.8fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.client-channel-detail strong {
+  margin: 4px 0;
+  font-size: 20px;
+}
+
+.client-channel-detail code {
+  border-radius: 8px;
+  padding: 10px;
+  background: #102033;
+  color: #e8f3ff;
+  overflow-x: auto;
+}
+
+.client-channel-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.client-channel-grid h3 {
+  margin-bottom: 8px;
+}
+
+.client-channel-grid p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
 .mobile-service-nav {
   display: none;
 }
@@ -1390,7 +1489,8 @@ dialog::backdrop {
   .header-actions,
   .auth-bar,
   .panel-actions,
-  .service-summary {
+  .service-summary,
+  .client-channel-detail article {
     flex-direction: column;
     align-items: stretch;
   }
@@ -1399,7 +1499,8 @@ dialog::backdrop {
   .profile-band,
   .panel,
   .summary-card,
-  .account-panel {
+  .account-panel,
+  .client-channel-panel {
     padding: 14px;
   }
 
@@ -1458,6 +1559,16 @@ dialog::backdrop {
 
   .service-page-action {
     width: 100%;
+  }
+
+  .client-channel-switch,
+  .client-channel-detail article,
+  .client-channel-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .client-channel-switch {
+    min-width: 0;
   }
 
   .summary-grid,

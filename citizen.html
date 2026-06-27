@@ -48,6 +48,17 @@
 
       <section class="service-summary" id="service-summary" aria-live="polite"></section>
 
+      <section class="client-channel-panel" id="client-channel-panel" aria-labelledby="client-channel-title">
+        <div class="panel-title">
+          <div>
+            <h2 id="client-channel-title">运行形态</h2>
+            <span>小程序和 APP 双端上线配置</span>
+          </div>
+          <div class="client-channel-switch" id="client-channel-switch" aria-label="选择居民端运行形态"></div>
+        </div>
+        <div class="client-channel-detail" id="client-channel-detail"></div>
+      </section>
+
       <nav class="service-tabs" id="service-tabs" aria-label="居民服务标签页"></nav>
 
       <div class="service-page-content-anchor" id="service-page-content" aria-hidden="true"></div>
@@ -370,7 +381,7 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="./health-archive-standard.js"></script>
-    <script src="./citizen.js?v=20260627actions"></script>
+    <script src="./citizen.js?v=20260627channels"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));

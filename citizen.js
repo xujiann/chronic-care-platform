@@ -1,6 +1,7 @@
 const STORAGE_KEY = "chronic-care-platform-state";
 const CITIZEN_EXTRA_KEY = "chronic-care-citizen-extra";
 const LARGE_MODE_KEY = "chronic-care-large-mode";
+const CLIENT_CHANNEL_KEY = "chronic-care-client-channel";
 const API_BASE = location.protocol === "file:" ? "" : "/api";
 
 const fallbackState = {
@@ -176,6 +177,29 @@ const citizenServiceTabs = [
   { key: "registration", label: "挂号", status: "待开发", detail: "号源、支付、退号待接入", title: "挂号服务二级页面", actionLabel: "查看挂号说明" }
 ];
 
+const citizenClientChannels = [
+  {
+    key: "mini-program",
+    label: "小程序",
+    status: "可上线配置",
+    entry: "citizen.html?client=mini-program&page=health-record",
+    audience: "微信/支付宝服务入口、扫码、机构公众号菜单",
+    capabilities: ["手机号授权登录", "轻量健康档案", "服务预约", "订阅消息提醒"],
+    readiness: ["HTTPS 域名备案", "小程序隐私协议", "类目与医疗服务资质", "消息模板审核"],
+    nextAction: "提交小程序审核包"
+  },
+  {
+    key: "app",
+    label: "APP",
+    status: "可上线配置",
+    entry: "citizen.html?client=app&page=health-record",
+    audience: "Android / iOS 应用壳、桌面图标、离线缓存",
+    capabilities: ["PWA 安装入口", "离线健康档案壳", "大字模式", "系统推送预留"],
+    readiness: ["应用签名与包名", "应用市场隐私合规", "推送证书", "崩溃监控与版本升级"],
+    nextAction: "打包 APP 上架材料"
+  }
+];
+
 const residentFunctionAudit = [
   { service: "health-record", name: "手机号验证码登录", status: "已实现", evidence: "登录页支持手机号和演示验证码进入居民端", mobile: "独立表单，按钮满足触控尺寸" },
   { service: "health-record", name: "家庭成员切换", status: "已实现", evidence: "居民账户按成员裁剪档案和服务记录", mobile: "成员卡片可横向滚动选择" },
@@ -200,6 +224,7 @@ const residentFunctionAudit = [
 ];
 
 let activeServiceTab = serviceTabFromRoute() || "health-record";
+let activeClientChannel = clientChannelFromRoute() || localStorage.getItem(CLIENT_CHANNEL_KEY) || "mini-program";
 let state = fallbackState;
 let citizenExtra = loadCitizenExtra();
 let escortDashboard = null;
@@ -213,6 +238,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   populateAccounts();
   bindLargeMode();
   bindServiceTabs();
+  renderClientChannels();
   window.addEventListener("popstate", () => setServiceTab(serviceTabFromRoute() || "health-record", { syncUrl: false }));
   window.addEventListener("hashchange", () => setServiceTab(serviceTabFromRoute() || "health-record", { syncUrl: false }));
   window.addEventListener("message", (event) => {
@@ -269,6 +295,65 @@ function renderMobileServiceNav() {
   });
 }
 
+function renderClientChannels() {
+  const switcher = document.querySelector("#client-channel-switch");
+  const detail = document.querySelector("#client-channel-detail");
+  if (!switcher || !detail) return;
+  const active = getActiveClientChannel();
+  document.body.dataset.clientChannel = active.key;
+  switcher.innerHTML = citizenClientChannels.map((item) => `<button type="button" data-client-channel="${item.key}" aria-pressed="${item.key === active.key}">
+    <span>${item.label}</span>
+    <small>${item.status}</small>
+  </button>`).join("");
+  switcher.querySelectorAll("[data-client-channel]").forEach((button) => {
+    button.addEventListener("click", () => setClientChannel(button.dataset.clientChannel));
+  });
+  detail.innerHTML = `<article>
+    <div>
+      <span>当前运行形态</span>
+      <strong>${active.label}</strong>
+      <small>${active.audience}</small>
+    </div>
+    <code>${active.entry}</code>
+  </article>
+  <div class="client-channel-grid">
+    <section>
+      <h3>上线能力</h3>
+      ${active.capabilities.map((item) => `<p>${item}</p>`).join("")}
+    </section>
+    <section>
+      <h3>发布条件</h3>
+      ${active.readiness.map((item) => `<p>${item}</p>`).join("")}
+    </section>
+    <section>
+      <h3>下一步</h3>
+      <p>${active.nextAction}</p>
+    </section>
+  </div>`;
+}
+
+function setClientChannel(key) {
+  if (!citizenClientChannels.some((item) => item.key === key)) return;
+  activeClientChannel = key;
+  localStorage.setItem(CLIENT_CHANNEL_KEY, key);
+  const params = new URLSearchParams(location.search);
+  params.set("client", key);
+  params.set("page", activeServiceTab);
+  params.delete("service");
+  history.replaceState({ citizenChannel: key, citizenPage: activeServiceTab }, "", `${location.pathname}?${params.toString()}#service-${activeServiceTab}`);
+  renderClientChannels();
+  updateServicePanes();
+}
+
+function getActiveClientChannel() {
+  return citizenClientChannels.find((item) => item.key === activeClientChannel) || citizenClientChannels[0];
+}
+
+function clientChannelFromRoute() {
+  const key = new URLSearchParams(location.search).get("client");
+  return citizenClientChannels.some((item) => item.key === key) ? key : "";
+}
+
 function serviceTabFromRoute() {
   const params = new URLSearchParams(location.search);
   const key = params.get("page") || params.get("service") || serviceTabFromHash();
@@ -283,6 +368,7 @@ function serviceTabFromHash() {
 function setServiceTab(key, options = {}) {
   if (!citizenServiceTabs.some((item) => item.key === key)) return;
   activeServiceTab = key;
+  activeClientChannel = clientChannelFromRoute() || activeClientChannel;
   if (options.syncUrl !== false) {
     const nextUrl = citizenPageHref(key);
     if (`${location.pathname}${location.search}${location.hash}` !== nextUrl) {
@@ -304,6 +390,7 @@ function getServicePageTarget(key) {
 
 function citizenPageHref(key) {
   const params = new URLSearchParams(location.search);
+  params.set("client", activeClientChannel);
   params.set("page", key);
   params.delete("service");
   const query = params.toString();
@@ -313,6 +400,7 @@ function citizenPageHref(key) {
 function updateServicePanes() {
   renderServiceSummary();
   renderResidentFunctionAudit();
+  renderClientChannels();
   document.querySelectorAll("[data-service-tab]").forEach((link) => {
     const active = link.dataset.serviceTab === activeServiceTab;
     link.classList.toggle("active", active);
@@ -336,11 +424,12 @@ function renderServiceSummary() {
   const target = document.querySelector("#service-summary");
   if (!target) return;
   const active = citizenServiceTabs.find((item) => item.key === activeServiceTab) || citizenServiceTabs[0];
+  const channel = getActiveClientChannel();
   const ready = citizenServiceTabs.filter((item) => item.status === "已实现").length;
   const pending = citizenServiceTabs.length - ready;
   const internalAction = !active.actionHref;
   target.innerHTML = `<div class="service-summary-copy">
-    <span>当前二级页面</span>
+    <span>当前二级页面 · ${channel.label}</span>
     <strong>${active.label}</strong>
     <small>${active.title} · ${active.detail}</small>
   </div>

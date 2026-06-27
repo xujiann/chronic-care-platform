@@ -128,12 +128,21 @@ code {
   box-shadow: 0 10px 28px rgba(31, 42, 55, 0.1);
 }
 
+.preview-client-switch,
 .preview-service-switch {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
 }
 
+.preview-client-switch {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.preview-service-switch {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.preview-client-switch button,
 .preview-service-switch button,
 .preview-refresh {
   min-height: 42px;
@@ -147,6 +156,7 @@ code {
   font-weight: 800;
 }
 
+.preview-client-switch button,
 .preview-service-switch button {
   min-width: 0;
   overflow: hidden;
@@ -155,6 +165,7 @@ code {
   font-size: 13px;
 }
 
+.preview-client-switch button.active,
 .preview-service-switch button.active,
 .preview-refresh {
   border-color: var(--blue);
