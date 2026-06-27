@@ -287,7 +287,7 @@ select,
   margin-bottom: 16px;
 }
 
-.service-tabs button {
+.service-tabs a {
   display: grid;
   grid-template-rows: auto auto 1fr;
   gap: 6px;
@@ -298,13 +298,14 @@ select,
   background: #fff;
   color: var(--ink);
   text-align: left;
+  text-decoration: none;
   cursor: pointer;
   font: inherit;
   box-shadow: var(--shadow);
 }
 
-.service-tabs button:focus-visible,
-.mobile-service-nav button:focus-visible,
+.service-tabs a:focus-visible,
+.mobile-service-nav a:focus-visible,
 .vault-tabs button:focus-visible,
 .member-card:focus-visible,
 .small-button:focus-visible,
@@ -313,14 +314,15 @@ select,
   outline-offset: 2px;
 }
 
-.service-tabs button.active {
+.service-tabs a.active {
   border-color: var(--blue);
   background: #eaf2ff;
 }
 
 .service-tabs span,
 .service-tabs strong,
-.service-tabs small {
+.service-tabs small,
+.service-tabs em {
   display: block;
 }
 
@@ -351,6 +353,14 @@ select,
 .service-tabs small {
   color: var(--muted);
   line-height: 1.45;
+}
+
+.service-tabs em {
+  align-self: end;
+  color: var(--blue);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 800;
 }
 
 .feature-state {
@@ -1437,7 +1447,7 @@ dialog::backdrop {
     scroll-snap-type: x mandatory;
   }
 
-  .service-tabs button {
+  .service-tabs a {
     min-height: 118px;
     scroll-snap-align: start;
   }
@@ -1459,7 +1469,7 @@ dialog::backdrop {
     backdrop-filter: blur(12px);
   }
 
-  .mobile-service-nav button {
+  .mobile-service-nav a {
     display: grid;
     gap: 3px;
     place-items: center;
@@ -1472,9 +1482,10 @@ dialog::backdrop {
     color: var(--muted);
     cursor: pointer;
     font: inherit;
+    text-decoration: none;
   }
 
-  .mobile-service-nav button.active {
+  .mobile-service-nav a.active {
     border-color: #bfdbfe;
     background: #eaf2ff;
     color: var(--blue);

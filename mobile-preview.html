@@ -54,7 +54,7 @@
         </div>
         <section class="phone-frame">
           <div class="phone-speaker"></div>
-          <iframe id="citizen-preview-frame" src="./citizen.html?preview=mobile-nav#service-health-record" title="居民端"></iframe>
+          <iframe id="citizen-preview-frame" src="./citizen.html?preview=mobile-nav&page=health-record#service-health-record" title="居民端"></iframe>
         </section>
       </section>
     </main>
@@ -65,7 +65,7 @@
       const setPreviewService = (service) => {
         activePreviewService = service;
         serviceButtons.forEach((button) => button.classList.toggle("active", button.dataset.previewService === service));
-        frame.src = `./citizen.html?preview=mobile-nav&service=${service}#service-${service}`;
+        frame.src = `./citizen.html?preview=mobile-nav&page=${service}#service-${service}`;
       };
       frame.addEventListener("load", () => {
         frame.contentWindow?.postMessage({ type: "set-service-tab", service: activePreviewService }, location.origin);

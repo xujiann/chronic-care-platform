@@ -169,11 +169,11 @@ const vaultSections = [
 
 let activeVaultSection = "timeline";
 const citizenServiceTabs = [
-  { key: "health-record", label: "健康档案", status: "已实现", detail: "健康指标、标准档案、授权共享" },
-  { key: "emr", label: "电子病历", status: "已实现", detail: "诊疗时间线、慢病和访问记录" },
-  { key: "nursing", label: "护理", status: "已实现", detail: "互联网护理预约与追踪" },
-  { key: "escort", label: "陪诊", status: "已实现", detail: "陪诊预约、合同、保障和回访" },
-  { key: "registration", label: "挂号", status: "待开发", detail: "号源、支付、退号待接入" }
+  { key: "health-record", label: "健康档案", status: "已实现", detail: "健康指标、标准档案、授权共享", title: "健康档案二级页面" },
+  { key: "emr", label: "电子病历", status: "已实现", detail: "诊疗时间线、慢病和访问记录", title: "电子病历二级页面" },
+  { key: "nursing", label: "护理", status: "已实现", detail: "互联网护理预约与追踪", title: "护理服务二级页面" },
+  { key: "escort", label: "陪诊", status: "已实现", detail: "陪诊预约、合同、保障和回访", title: "陪诊服务二级页面" },
+  { key: "registration", label: "挂号", status: "待开发", detail: "号源、支付、退号待接入", title: "挂号服务二级页面" }
 ];
 
 const residentFunctionAudit = [
@@ -199,7 +199,7 @@ const residentFunctionAudit = [
   { service: "registration", name: "就医协同底座", status: "已实现", evidence: "陪诊、转诊和电子病历归集可支撑挂号上线", mobile: "作为挂号标签内已实现底座展示" }
 ];
 
-let activeServiceTab = serviceTabFromHash() || "health-record";
+let activeServiceTab = serviceTabFromRoute() || "health-record";
 let state = fallbackState;
 let citizenExtra = loadCitizenExtra();
 let escortDashboard = null;
@@ -213,10 +213,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   populateAccounts();
   bindLargeMode();
   bindServiceTabs();
-  window.addEventListener("hashchange", () => setServiceTab(serviceTabFromHash() || "health-record", { syncHash: false }));
+  window.addEventListener("popstate", () => setServiceTab(serviceTabFromRoute() || "health-record", { syncUrl: false }));
+  window.addEventListener("hashchange", () => setServiceTab(serviceTabFromRoute() || "health-record", { syncUrl: false }));
   window.addEventListener("message", (event) => {
     if (event.origin !== location.origin || event.data?.type !== "set-service-tab") return;
-    setServiceTab(event.data.service, { scrollToPane: true });
+    setServiceTab(event.data.service, { pushState: true, scrollToPane: true });
   });
   document.querySelector("#account-select").addEventListener("change", (event) => {
     currentAccountId = event.target.value;
@@ -236,14 +237,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 function bindServiceTabs() {
   const target = document.querySelector("#service-tabs");
   if (target) {
-    target.innerHTML = citizenServiceTabs.map((item) => `<button type="button" data-service-tab="${item.key}" aria-pressed="${item.key === activeServiceTab}">
+    target.innerHTML = citizenServiceTabs.map((item) => `<a href="${citizenPageHref(item.key)}" data-service-tab="${item.key}" aria-current="${item.key === activeServiceTab ? "page" : "false"}">
       <span>${item.label}</span>
       <strong class="${item.status === "待开发" ? "pending" : "ready"}">${item.status}</strong>
       <small>${item.detail}</small>
-    </button>`).join("");
-    target.querySelectorAll("[data-service-tab]").forEach((button) => {
-      button.addEventListener("click", () => {
-        setServiceTab(button.dataset.serviceTab);
+      <em>二级页面</em>
+    </a>`).join("");
+    target.querySelectorAll("[data-service-tab]").forEach((link) => {
+      link.addEventListener("click", (event) => {
+        event.preventDefault();
+        setServiceTab(link.dataset.serviceTab, { pushState: true, scrollToPane: true });
       });
     });
   }
@@ -254,15 +257,22 @@ function bindServiceTabs() {
 function renderMobileServiceNav() {
   const target = document.querySelector("#mobile-service-nav");
   if (!target) return;
-  target.innerHTML = citizenServiceTabs.map((item) => `<button type="button" data-mobile-service-tab="${item.key}" aria-label="${item.label}，${item.status}" aria-pressed="${item.key === activeServiceTab}">
+  target.innerHTML = citizenServiceTabs.map((item) => `<a href="${citizenPageHref(item.key)}" data-mobile-service-tab="${item.key}" aria-label="${item.label}，${item.status}" aria-current="${item.key === activeServiceTab ? "page" : "false"}">
     <span>${item.label}</span>
     <small class="${item.status === "待开发" ? "pending" : "ready"}">${item.status === "待开发" ? "待开" : "已开"}</small>
-  </button>`).join("");
-  target.querySelectorAll("[data-mobile-service-tab]").forEach((button) => {
-    button.addEventListener("click", () => {
-      setServiceTab(button.dataset.mobileServiceTab, { scrollToPane: true });
+  </a>`).join("");
+  target.querySelectorAll("[data-mobile-service-tab]").forEach((link) => {
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      setServiceTab(link.dataset.mobileServiceTab, { pushState: true, scrollToPane: true });
     });
   });
+}
+
+function serviceTabFromRoute() {
+  const params = new URLSearchParams(location.search);
+  const key = params.get("page") || params.get("service") || serviceTabFromHash();
+  return citizenServiceTabs.some((item) => item.key === key) ? key : "";
 }
 
 function serviceTabFromHash() {
@@ -273,8 +283,12 @@ function serviceTabFromHash() {
 function setServiceTab(key, options = {}) {
   if (!citizenServiceTabs.some((item) => item.key === key)) return;
   activeServiceTab = key;
-  if (options.syncHash !== false && location.hash !== `#service-${key}`) {
-    history.replaceState(null, "", `#service-${key}`);
+  if (options.syncUrl !== false) {
+    const nextUrl = citizenPageHref(key);
+    if (`${location.pathname}${location.search}${location.hash}` !== nextUrl) {
+      const historyMethod = options.pushState ? "pushState" : "replaceState";
+      history[historyMethod]({ citizenPage: key }, "", nextUrl);
+    }
   }
   updateServicePanes();
   if (options.scrollToPane) {
@@ -285,22 +299,34 @@ function setServiceTab(key, options = {}) {
   }
 }
 
+function citizenPageHref(key) {
+  const params = new URLSearchParams(location.search);
+  params.set("page", key);
+  params.delete("service");
+  const query = params.toString();
+  return `${location.pathname}${query ? `?${query}` : ""}#service-${key}`;
+}
+
 function updateServicePanes() {
   renderServiceSummary();
   renderResidentFunctionAudit();
-  document.querySelectorAll("[data-service-tab]").forEach((button) => {
-    const active = button.dataset.serviceTab === activeServiceTab;
-    button.classList.toggle("active", active);
-    button.setAttribute("aria-pressed", String(active));
+  document.querySelectorAll("[data-service-tab]").forEach((link) => {
+    const active = link.dataset.serviceTab === activeServiceTab;
+    link.classList.toggle("active", active);
+    link.setAttribute("aria-current", active ? "page" : "false");
+    link.setAttribute("href", citizenPageHref(link.dataset.serviceTab));
   });
-  document.querySelectorAll("[data-mobile-service-tab]").forEach((button) => {
-    const active = button.dataset.mobileServiceTab === activeServiceTab;
-    button.classList.toggle("active", active);
-    button.setAttribute("aria-pressed", String(active));
+  document.querySelectorAll("[data-mobile-service-tab]").forEach((link) => {
+    const active = link.dataset.mobileServiceTab === activeServiceTab;
+    link.classList.toggle("active", active);
+    link.setAttribute("aria-current", active ? "page" : "false");
+    link.setAttribute("href", citizenPageHref(link.dataset.mobileServiceTab));
   });
   document.querySelectorAll("[data-service-pane]").forEach((pane) => {
     pane.hidden = pane.dataset.servicePane !== activeServiceTab;
   });
+  const active = citizenServiceTabs.find((item) => item.key === activeServiceTab) || citizenServiceTabs[0];
+  document.title = `${active.label} · 居民端`;
 }
 
 function renderServiceSummary() {
@@ -310,9 +336,9 @@ function renderServiceSummary() {
   const ready = citizenServiceTabs.filter((item) => item.status === "已实现").length;
   const pending = citizenServiceTabs.length - ready;
   target.innerHTML = `<div>
-    <span>当前服务</span>
+    <span>当前二级页面</span>
     <strong>${active.label}</strong>
-    <small>${active.detail}</small>
+    <small>${active.title} · ${active.detail}</small>
   </div>
   <div class="service-summary-stats">
     <span class="feature-state ready">${ready} 项已实现</span>
