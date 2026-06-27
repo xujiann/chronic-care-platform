@@ -169,11 +169,11 @@ const vaultSections = [
 
 let activeVaultSection = "timeline";
 const citizenServiceTabs = [
-  { key: "health-record", label: "健康档案", status: "已实现", detail: "健康指标、标准档案、授权共享", title: "健康档案二级页面" },
-  { key: "emr", label: "电子病历", status: "已实现", detail: "诊疗时间线、慢病和访问记录", title: "电子病历二级页面" },
-  { key: "nursing", label: "护理", status: "已实现", detail: "互联网护理预约与追踪", title: "护理服务二级页面" },
-  { key: "escort", label: "陪诊", status: "已实现", detail: "陪诊预约、合同、保障和回访", title: "陪诊服务二级页面" },
-  { key: "registration", label: "挂号", status: "待开发", detail: "号源、支付、退号待接入", title: "挂号服务二级页面" }
+  { key: "health-record", label: "健康档案", status: "已实现", detail: "健康指标、标准档案、授权共享", title: "健康档案二级页面", actionLabel: "查看健康档案" },
+  { key: "emr", label: "电子病历", status: "已实现", detail: "诊疗时间线、慢病和访问记录", title: "电子病历二级页面", actionLabel: "查看电子病历" },
+  { key: "nursing", label: "护理", status: "已实现", detail: "互联网护理预约与追踪", title: "护理服务二级页面", actionLabel: "进入护理服务", actionHref: "./internet-nursing.html" },
+  { key: "escort", label: "陪诊", status: "已实现", detail: "陪诊预约、合同、保障和回访", title: "陪诊服务二级页面", actionLabel: "提交陪诊预约" },
+  { key: "registration", label: "挂号", status: "待开发", detail: "号源、支付、退号待接入", title: "挂号服务二级页面", actionLabel: "查看挂号说明" }
 ];
 
 const residentFunctionAudit = [
@@ -338,15 +338,23 @@ function renderServiceSummary() {
   const active = citizenServiceTabs.find((item) => item.key === activeServiceTab) || citizenServiceTabs[0];
   const ready = citizenServiceTabs.filter((item) => item.status === "已实现").length;
   const pending = citizenServiceTabs.length - ready;
-  target.innerHTML = `<div>
+  const internalAction = !active.actionHref;
+  target.innerHTML = `<div class="service-summary-copy">
     <span>当前二级页面</span>
     <strong>${active.label}</strong>
     <small>${active.title} · ${active.detail}</small>
   </div>
-  <div class="service-summary-stats">
-    <span class="feature-state ready">${ready} 项已实现</span>
-    <span class="feature-state pending">${pending} 项待开发</span>
+  <div class="service-summary-actions">
+    <div class="service-summary-stats">
+      <span class="feature-state ready">${ready} 项已实现</span>
+      <span class="feature-state pending">${pending} 项待开发</span>
+    </div>
+    <a class="service-page-action" href="${internalAction ? citizenPageHref(active.key) : active.actionHref}" ${internalAction ? `data-service-action="${active.key}"` : ""}>${active.actionLabel}</a>
   </div>`;
+  target.querySelector("[data-service-action]")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    getServicePageTarget(event.currentTarget.dataset.serviceAction)?.scrollIntoView({ block: "start", behavior: "smooth" });
+  });
 }
 
 function renderResidentFunctionAudit() {

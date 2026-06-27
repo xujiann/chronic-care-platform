@@ -608,7 +608,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   const serviceWorker = read("service-worker.js");
   assert.match(citizenHtml, /rel="manifest"/);
   assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260627pages2/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260627actions/);
   assert.match(citizenHtml, /auth\.js\?v=20260627/);
   assert.match(mobilePreviewHtml, /preview=mobile-nav/);
   assert.match(mobilePreviewHtml, /http:\/\/localhost:5174\/mobile-preview\.html/);
@@ -631,10 +631,11 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.display, "standalone");
   assert.equal(manifest.icons.some((item) => item.src === "./pwa-icon.svg"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v9/);
+  assert.match(serviceWorker, /chronic-care-citizen-v10/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627preview/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages2/);
+  assert.match(serviceWorker, /citizen\.js\?v=20260627actions/);
   assert.match(serviceWorker, /citizen\.html/);
   assert.match(serviceWorker, /mobile-preview\.html/);
   assert.match(serviceWorker, /mobile-preview\.css/);
@@ -710,6 +711,10 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /pushState/);
   assert.match(citizenJs, /aria-current/);
   assert.match(citizenJs, /title:/);
+  assert.match(citizenJs, /actionLabel/);
+  assert.match(citizenJs, /service-page-action/);
+  assert.match(citizenJs, /data-service-action/);
+  assert.match(citizenJs, /internet-nursing\.html/);
   assert.match(citizenJs, /getServicePageTarget/);
   assert.match(citizenJs, /scrollToPane/);
   assert.match(citizenJs, /residentFunctionAudit/);
@@ -728,6 +733,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /\.service-tabs a/);
   assert.match(citizenCss, /\.mobile-service-nav a/);
   assert.match(citizenCss, /service-page-content-anchor/);
+  assert.match(citizenCss, /service-summary-actions/);
+  assert.match(citizenCss, /service-page-action/);
   assert.match(citizenCss, /position: fixed/);
   assert.match(citizenCss, /safe-area-inset-bottom/);
   assert.match(citizenCss, /resident-audit-card:not\(\.active\)/);

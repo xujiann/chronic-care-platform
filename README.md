@@ -69,7 +69,7 @@ http://localhost:5173/login.html
 | `mobile-preview.html` | 居民端手机预览 |
 | `county.html` | 县域医共体平台、16255 模型、协同工单、互认、基层 AI |
 
-居民端已提供 PWA 基础壳：`manifest.webmanifest`、`service-worker.js` 和 `pwa-icon.svg` 支持浏览器安装入口、静态资源缓存和弱网/离线回退到居民端健康档案页面；`citizen.html?page=health-record|emr|nursing|escort|registration` 将健康档案、电子病历、护理、陪诊和挂号拆为可分享、可回退的二级页面，桌面服务导航与手机底部导航均按 URL 跳转并优先落到对应业务内容，功能审计沉到页面后方作为状态证明；`mobile-preview.html` 提供 390px 手机框、本机/真机访问地址、演示登录方式、服务切换控制和底部服务导航检查项，并适配侧边浏览器等中等宽度窗口，便于发布前预览居民端手机操作；个人健康信息库已细分电子病历、检查检验、用药处方、影像资料和附件资料，正式上线时仍需结合生产域名、HTTPS、PACS/文档存储授权和现场移动端策略复核。
+居民端已提供 PWA 基础壳：`manifest.webmanifest`、`service-worker.js` 和 `pwa-icon.svg` 支持浏览器安装入口、静态资源缓存和弱网/离线回退到居民端健康档案页面；`citizen.html?page=health-record|emr|nursing|escort|registration` 将健康档案、电子病历、护理、陪诊和挂号拆为可分享、可回退的二级页面，桌面服务导航与手机底部导航均按 URL 跳转并优先落到对应业务内容，摘要卡提供当前页面主操作入口，功能审计沉到页面后方作为状态证明；`mobile-preview.html` 提供 390px 手机框、本机/真机访问地址、演示登录方式、服务切换控制和底部服务导航检查项，并适配侧边浏览器等中等宽度窗口，便于发布前预览居民端手机操作；个人健康信息库已细分电子病历、检查检验、用药处方、影像资料和附件资料，正式上线时仍需结合生产域名、HTTPS、PACS/文档存储授权和现场移动端策略复核。
 
 ## 数据与存储
 
