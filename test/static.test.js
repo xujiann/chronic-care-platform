@@ -601,25 +601,32 @@ test("citizen portal exposes P1 record details trends and source labels", () => 
 
 test("citizen portal exposes PWA install and offline shell assets", () => {
   const citizenHtml = read("citizen.html");
+  const citizenJs = read("citizen.js");
   const mobilePreviewHtml = read("mobile-preview.html");
   const mobilePreviewCss = read("mobile-preview.css");
   const manifest = JSON.parse(read("manifest.webmanifest"));
   const serviceWorker = read("service-worker.js");
   assert.match(citizenHtml, /rel="manifest"/);
   assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260627nav/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260627preview/);
   assert.match(citizenHtml, /auth\.js\?v=20260627/);
   assert.match(mobilePreviewHtml, /preview=mobile-nav/);
   assert.match(mobilePreviewHtml, /http:\/\/localhost:5174\/mobile-preview\.html/);
   assert.match(mobilePreviewHtml, /DEMO-MOBILE-R1 \/ 888888/);
   assert.match(mobilePreviewHtml, /citizen\.html\?preview=mobile-nav/);
+  assert.match(mobilePreviewHtml, /data-preview-service="registration"/);
+  assert.match(mobilePreviewHtml, /preview-refresh/);
+  assert.match(mobilePreviewHtml, /postMessage/);
+  assert.match(citizenJs, /set-service-tab/);
   assert.match(mobilePreviewCss, /preview-steps/);
+  assert.match(mobilePreviewCss, /preview-service-switch/);
+  assert.match(mobilePreviewCss, /position: sticky/);
   assert.equal(manifest.start_url, "./citizen.html");
   assert.equal(manifest.display, "standalone");
   assert.equal(manifest.icons.some((item) => item.src === "./pwa-icon.svg"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v4/);
-  assert.match(serviceWorker, /citizen\.js\?v=20260627nav/);
+  assert.match(serviceWorker, /chronic-care-citizen-v6/);
+  assert.match(serviceWorker, /citizen\.js\?v=20260627preview/);
   assert.match(serviceWorker, /citizen\.html/);
   assert.match(serviceWorker, /mobile-preview\.html/);
   assert.match(serviceWorker, /mobile-preview\.css/);

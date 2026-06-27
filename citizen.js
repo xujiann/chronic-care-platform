@@ -214,6 +214,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindLargeMode();
   bindServiceTabs();
   window.addEventListener("hashchange", () => setServiceTab(serviceTabFromHash() || "health-record", { syncHash: false }));
+  window.addEventListener("message", (event) => {
+    if (event.origin !== location.origin || event.data?.type !== "set-service-tab") return;
+    setServiceTab(event.data.service, { scrollToPane: true });
+  });
   document.querySelector("#account-select").addEventListener("change", (event) => {
     currentAccountId = event.target.value;
     const account = getCurrentAccount();

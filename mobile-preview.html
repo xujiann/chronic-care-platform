@@ -41,10 +41,41 @@
         </div>
       </section>
 
-      <section class="phone-frame" aria-label="居民端手机预览">
-        <div class="phone-speaker"></div>
-        <iframe src="./citizen.html?preview=mobile-nav" title="居民端"></iframe>
+      <section class="preview-device" aria-label="居民端手机预览">
+        <div class="preview-toolbar">
+          <div class="preview-service-switch" aria-label="切换手机框服务">
+            <button type="button" class="active" data-preview-service="health-record">健康档案</button>
+            <button type="button" data-preview-service="emr">电子病历</button>
+            <button type="button" data-preview-service="nursing">护理</button>
+            <button type="button" data-preview-service="escort">陪诊</button>
+            <button type="button" data-preview-service="registration">挂号</button>
+          </div>
+          <button type="button" class="preview-refresh" id="preview-refresh">重载手机框</button>
+        </div>
+        <section class="phone-frame">
+          <div class="phone-speaker"></div>
+          <iframe id="citizen-preview-frame" src="./citizen.html?preview=mobile-nav#service-health-record" title="居民端"></iframe>
+        </section>
       </section>
     </main>
+    <script>
+      const frame = document.querySelector("#citizen-preview-frame");
+      const serviceButtons = document.querySelectorAll("[data-preview-service]");
+      let activePreviewService = "health-record";
+      const setPreviewService = (service) => {
+        activePreviewService = service;
+        serviceButtons.forEach((button) => button.classList.toggle("active", button.dataset.previewService === service));
+        frame.src = `./citizen.html?preview=mobile-nav&service=${service}#service-${service}`;
+      };
+      frame.addEventListener("load", () => {
+        frame.contentWindow?.postMessage({ type: "set-service-tab", service: activePreviewService }, location.origin);
+      });
+      serviceButtons.forEach((button) => {
+        button.addEventListener("click", () => setPreviewService(button.dataset.previewService));
+      });
+      document.querySelector("#preview-refresh").addEventListener("click", () => {
+        frame.src = frame.src;
+      });
+    </script>
   </body>
 </html>
