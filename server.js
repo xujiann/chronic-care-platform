@@ -5833,8 +5833,12 @@ function canAccessInternetNursingOrder(user, item, data) {
   if (!canAccessResident(user, item.residentId, data)) return false;
   if (["commission", "county", "citizen"].includes(user.role)) return true;
   if (user.role !== "institution") return false;
-  return [item.institutionCode, institutionForNursingOrder(data, item)?.institutionCode].some((code) => code && code === user.orgCode) ||
-    [item.institutionName, institutionForNursingOrder(data, item)?.name].some((name) => name && name === user.orgName) ||
+  const sameInstitution = [item.institutionCode, institutionForNursingOrder(data, item)?.institutionCode].some((code) => code && code === user.orgCode) ||
+    [item.institutionName, institutionForNursingOrder(data, item)?.name].some((name) => name && name === user.orgName);
+  if (user.accountType === "nurse") {
+    return Boolean(user.nurseId) && (item.nurseId === user.nurseId || (!item.nurseId && sameInstitution));
+  }
+  return sameInstitution ||
     (user.nurseId && item.nurseId === user.nurseId);
 }
 
@@ -5940,6 +5944,7 @@ function normalizeInternetNursingOrder(payload, user, data) {
 
 function applyInternetNursingOrderAction(item, payload, user, data) {
   const now = new Date().toISOString();
+  assertInternetNursingActionAllowed(item, payload, user);
   const allowed = ["status", "nurseId", "firstVisitAssessment", "informedConsent", "riskLevel", "locationTrace", "serviceRecordStatus", "qualityCallback", "feeEstimate"];
   const updates = Object.fromEntries(allowed
     .filter((key) => Object.hasOwn(payload, key))
@@ -5961,6 +5966,18 @@ function applyInternetNursingOrderAction(item, payload, user, data) {
       ...(Array.isArray(item.auditTrail) ? item.auditTrail : [])
     ].slice(0, 30)
   };
+}
+
+function assertInternetNursingActionAllowed(item, payload, user) {
+  if (user.accountType !== "nurse") return;
+  const action = String(payload.action || "").trim();
+  const payloadNurseId = String(payload.nurseId || user.nurseId || "").trim();
+  if (!user.nurseId) throw new Error("nurse account is not bound to a qualified nurse");
+  if (payloadNurseId !== user.nurseId) throw new Error("nurse can only operate own workstation orders");
+  if (item.nurseId && item.nurseId !== user.nurseId) throw new Error("nurse can only operate assigned orders");
+  if (!["nurse-accept", "service-start", "service-complete"].includes(action)) throw new Error("nurse action is not allowed");
+  if (action === "service-start" && item.status !== "accepted") throw new Error("order must be accepted before service starts");
+  if (action === "service-complete" && item.status !== "in-service") throw new Error("order must be in service before completion");
 }
 
 function redactSensitiveResponse(value, user) {

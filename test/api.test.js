@@ -450,6 +450,65 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(denied.response.status, 403);
   });
 
+  await t.test("scopes internet nursing nurse actions to own workstation orders", async () => {
+    const nurseLogin = await login(baseUrl, "nurse");
+    assert.equal(nurseLogin.response.status, 200);
+    assert.equal(nurseLogin.body.user.accountType, "nurse");
+    const nurseToken = nurseLogin.body.token;
+
+    const dashboard = await api(baseUrl, "/api/internet-nursing/dashboard", authorized(nurseToken));
+    assert.equal(dashboard.response.status, 200);
+    assert.equal(dashboard.body.ok, true);
+    assert.equal(dashboard.body.orders.every((item) => item.nurseId !== "inn-002"), true);
+    assert.equal(dashboard.body.nurseQueue.some((item) => item.id === "ino-001"), true);
+
+    const otherNurseOrder = await api(baseUrl, "/api/internet-nursing/orders/ino-002/actions", authorized(nurseToken, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "nurse-accept",
+        status: "accepted",
+        nurseId: "inn-001"
+      })
+    }));
+    assert.equal(otherNurseOrder.response.status, 403);
+
+    const spoofedNurse = await api(baseUrl, "/api/internet-nursing/orders/ino-001/actions", authorized(nurseToken, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "nurse-accept",
+        status: "accepted",
+        nurseId: "inn-002"
+      })
+    }));
+    assert.equal(spoofedNurse.response.status, 400);
+    assert.match(spoofedNurse.body.message, /own workstation orders/);
+
+    const prematureComplete = await api(baseUrl, "/api/internet-nursing/orders/ino-001/actions", authorized(nurseToken, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "service-complete",
+        status: "completed",
+        nurseId: "inn-001",
+        serviceRecordStatus: "completed"
+      })
+    }));
+    assert.equal(prematureComplete.response.status, 400);
+    assert.match(prematureComplete.body.message, /in service before completion/);
+
+    const accepted = await api(baseUrl, "/api/internet-nursing/orders/ino-001/actions", authorized(nurseToken, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "nurse-accept",
+        status: "accepted",
+        nurseId: "inn-001"
+      })
+    }));
+    assert.equal(accepted.response.status, 200);
+    assert.equal(accepted.body.status, "accepted");
+    assert.equal(accepted.body.nurseId, "inn-001");
+    assert.equal(accepted.body.auditTrail.some((item) => item.action === "nurse-accept"), true);
+  });
+
   await t.test("enforces personal record ownership and protects record identity", async () => {
     const ownRecords = await api(baseUrl, "/api/personal-records?residentId=r1", authorized(citizenToken));
     assert.equal(ownRecords.response.status, 200);

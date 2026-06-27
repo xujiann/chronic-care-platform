@@ -743,7 +743,12 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(html, /nursing-appointment-form/);
   assert.match(html, /nursing-orders/);
   assert.match(html, /nursing-nurse-queue/);
+  assert.match(html, /nursing-risk-guidance/);
   assert.match(js, /fetchInternetNursingDashboard/);
+  assert.match(js, /renderRiskGuidance/);
+  assert.match(js, /nextNursingAction/);
+  assert.match(js, /nurseActionButtons/);
+  assert.match(js, /showNursingMessage/);
   assert.match(js, /\/internet-nursing\/orders/);
   assert.match(js, /currentNursingUser/);
   assert.match(js, /accountType !== "nurse"/);
@@ -757,6 +762,8 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(html, /护士端接单/);
   assert.match(server, /\/api\/internet-nursing\/dashboard/);
   assert.match(server, /canAccessInternetNursingOrder/);
+  assert.match(server, /assertInternetNursingActionAllowed/);
+  assert.match(server, /nurse can only operate assigned orders/);
   assert.match(read("auth.js"), /"internet-nursing\.html": \["commission", "institution", "citizen", "county"\]/);
   assert.match(read("auth.js"), /username: "nurse"/);
   assert.match(read("auth.js"), /password: "123456"/);

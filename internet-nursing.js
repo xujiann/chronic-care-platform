@@ -55,6 +55,7 @@ function buildStaticInternetNursingDashboard(state) {
 
 function renderInternetNursingDashboard(dashboard) {
   renderNursingMetrics(dashboard.summary || {});
+  renderRiskGuidance(dashboard.orders || [], dashboard.riskQueue || []);
   renderInstitutionSelect(dashboard.institutions || []);
   renderNurseSelect(dashboard.nurses || []);
   renderHospitalOrders(dashboard.orders || []);
@@ -82,6 +83,48 @@ function renderNursingMetrics(summary) {
       <small>${escapeHtml(hint)}</small>
     </article>
   `).join("");
+}
+
+function renderRiskGuidance(items, riskQueue) {
+  const target = document.querySelector("#nursing-risk-guidance");
+  if (!target) return;
+  const highRiskIds = new Set((riskQueue || []).map((item) => item.id));
+  const guidance = (items || [])
+    .map((item) => ({ item, nextAction: nextNursingAction(item, highRiskIds.has(item.id)) }))
+    .filter((row) => row.nextAction)
+    .sort((a, b) => nursingPriorityWeight(b.item, b.nextAction) - nursingPriorityWeight(a.item, a.nextAction))
+    .slice(0, 5);
+  const summary = document.querySelector("#nursing-risk-summary");
+  if (summary) summary.textContent = guidance.length ? `${guidance.length} 项待处置` : "暂无待处置风险";
+  target.innerHTML = guidance.length ? guidance.map(({ item, nextAction }) => `
+    <div>
+      <strong>${escapeHtml(displayText(item.residentName || item.residentId || ""))} · ${escapeHtml(displayText(item.serviceItem || ""))}</strong>
+      <span>${escapeHtml(nextAction)}</span>
+    </div>
+  `).join("") : `
+    <div>
+      <strong>暂无高风险待办</strong>
+      <span>当前订单评估、知情同意、服务轨迹和质量回访未发现需要优先处置的异常。</span>
+    </div>
+  `;
+}
+
+function nextNursingAction(item, isHighRisk) {
+  if (item.firstVisitAssessment !== "passed") return `${isHighRisk ? "高风险订单，" : ""}先完成首诊评估，确认是否适合上门护理。`;
+  if (item.informedConsent !== "signed") return "补齐知情同意后再安排护士上门。";
+  if (!item.nurseId) return "选择合格护士并完成医院派单。";
+  if (item.status === "dispatched") return "护士待接单，接单后应开启服务位置轨迹。";
+  if (item.status === "accepted" && item.locationTrace !== "tracking") return "已接单但未开启轨迹，请核验定位设备。";
+  if (item.serviceRecordStatus !== "completed" && ["in-service", "accepted"].includes(item.status)) return "服务进行中，需及时补全护理记录。";
+  if (item.status === "completed" && item.qualityCallback !== "closed") return "护理记录已完成，等待机构质控回访。";
+  if (isHighRisk) return "高风险订单已进入处置链路，持续关注回访和服务记录。";
+  return "";
+}
+
+function nursingPriorityWeight(item, nextAction) {
+  const risk = item.riskLevel === "high" ? 100 : item.riskLevel === "medium" ? 50 : 10;
+  const stage = item.firstVisitAssessment !== "passed" ? 40 : item.informedConsent !== "signed" ? 35 : !item.nurseId ? 30 : nextAction.includes("轨迹") ? 25 : 15;
+  return risk + stage;
 }
 
 function renderInstitutionSelect(institutions) {
@@ -138,7 +181,7 @@ function renderNurseQueue(items) {
   const nurseId = document.querySelector("#nursing-nurse-select")?.value || "";
   const user = currentNursingUser();
   const canAct = user.accountType === "nurse" || ["commission", "institution"].includes(user.role);
-  const queue = items.filter((item) => !nurseId || !item.nurseId || item.nurseId === nurseId || item.status === "dispatched");
+  const queue = items.filter((item) => !nurseId || !item.nurseId || item.nurseId === nurseId);
   document.querySelector("#nursing-nurse-queue").innerHTML = `
     <table>
       <thead><tr><th>订单</th><th>上门时间</th><th>居民</th><th>证据</th><th>状态</th><th>操作</th></tr></thead>
@@ -150,11 +193,7 @@ function renderNurseQueue(items) {
           <td>${statusBadge(item.locationTrace)} ${statusBadge(item.serviceRecordStatus)} ${statusBadge(item.qualityCallback)}</td>
           <td>${statusBadge(item.status)} ${statusBadge(item.riskLevel)}</td>
           <td>
-            ${canAct ? `
-            <button class="inline-action" type="button" data-nurse-action="${escapeHtml(item.id)}" data-action-kind="accept">接单</button>
-            <button class="inline-action" type="button" data-nurse-action="${escapeHtml(item.id)}" data-action-kind="start">开始服务</button>
-            <button class="inline-action" type="button" data-nurse-action="${escapeHtml(item.id)}" data-action-kind="complete">完成记录</button>
-            ` : `<span class="badge info">需医院派单</span>`}
+            ${nurseActionButtons(item, canAct)}
           </td>
         </tr>
       `).join("")}</tbody>
@@ -163,6 +202,17 @@ function renderNurseQueue(items) {
   document.querySelectorAll("[data-nurse-action]").forEach((button) => {
     button.addEventListener("click", () => updateNursingOrder(button.dataset.nurseAction, nurseActionPayload(button.dataset.actionKind)));
   });
+}
+
+function nurseActionButtons(item, canAct) {
+  if (!canAct) return `<span class="badge info">需医院派单</span>`;
+  const actions = [];
+  if (!item.nurseId || ["requested", "dispatched"].includes(item.status)) actions.push(["accept", "接单"]);
+  if (item.status === "accepted") actions.push(["start", "开始服务"]);
+  if (item.status === "in-service") actions.push(["complete", "完成记录"]);
+  return actions.length
+    ? actions.map(([kind, label]) => `<button class="inline-action" type="button" data-nurse-action="${escapeHtml(item.id)}" data-action-kind="${kind}">${label}</button>`).join("")
+    : `<span class="badge info">暂无可操作</span>`;
 }
 
 function renderPolicyControls(policy) {
@@ -196,20 +246,25 @@ function bindNursingAppointmentForm() {
     event.preventDefault();
     const values = Object.fromEntries(new FormData(form).entries());
     values.sourceChannel = "internet-nursing.html";
-    if (NURSING_API_BASE) {
-      const request = window.HealthCityAuth?.authFetch || fetch;
-      const response = await request(`${NURSING_API_BASE}/internet-nursing/orders`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values)
-      });
-      if (!response.ok) throw new Error(`internet nursing appointment failed: ${response.status}`);
-    } else {
-      nursingDashboard.orders.unshift({ ...values, id: `ino-local-${crypto.randomUUID()}`, status: "requested", firstVisitAssessment: "pending", informedConsent: "pending", locationTrace: "pending", serviceRecordStatus: "pending", qualityCallback: "pending" });
+    try {
+      if (NURSING_API_BASE) {
+        const request = window.HealthCityAuth?.authFetch || fetch;
+        const response = await request(`${NURSING_API_BASE}/internet-nursing/orders`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(values)
+        });
+        if (!response.ok) throw new Error(`互联网护理预约提交失败：${response.status}`);
+      } else {
+        nursingDashboard.orders.unshift({ ...values, id: `ino-local-${crypto.randomUUID()}`, status: "requested", firstVisitAssessment: "pending", informedConsent: "pending", locationTrace: "pending", serviceRecordStatus: "pending", qualityCallback: "pending" });
+      }
+      form.reset();
+      if (dateInput) dateInput.value = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+      showNursingMessage("预约已提交，医院端将进行首诊评估。");
+      await loadInternetNursingDashboard();
+    } catch (error) {
+      showNursingMessage(error.message || "预约提交失败，请稍后重试。", "danger");
     }
-    form.reset();
-    if (dateInput) dateInput.value = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-    await loadInternetNursingDashboard();
   });
 }
 
@@ -228,18 +283,35 @@ function nurseActionPayload(kind) {
 }
 
 async function updateNursingOrder(id, payload) {
-  if (NURSING_API_BASE) {
-    const request = window.HealthCityAuth?.authFetch || fetch;
-    await request(`${NURSING_API_BASE}/internet-nursing/orders/${encodeURIComponent(id)}/actions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-  } else {
-    const item = nursingDashboard.orders.find((row) => row.id === id);
-    if (item) Object.assign(item, payload);
+  try {
+    if (NURSING_API_BASE) {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${NURSING_API_BASE}/internet-nursing/orders/${encodeURIComponent(id)}/actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({}));
+        throw new Error(detail.message || `订单更新失败：${response.status}`);
+      }
+    } else {
+      const item = nursingDashboard.orders.find((row) => row.id === id);
+      if (item) Object.assign(item, payload);
+    }
+    showNursingMessage("订单状态已更新。");
+    await loadInternetNursingDashboard();
+  } catch (error) {
+    showNursingMessage(error.message || "订单更新失败，请稍后重试。", "danger");
   }
-  await loadInternetNursingDashboard();
+}
+
+function showNursingMessage(message, type = "info") {
+  const target = document.querySelector("#nursing-operation-message");
+  if (!target) return;
+  target.hidden = false;
+  target.textContent = message;
+  target.dataset.status = type;
 }
 
 function defaultNursingPolicy() {
