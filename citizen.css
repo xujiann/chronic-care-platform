@@ -434,8 +434,13 @@ select,
   display: none;
 }
 
+.service-page-content-anchor {
+  height: 1px;
+  scroll-margin-top: 14px;
+}
+
 .resident-audit-panel {
-  margin-bottom: 16px;
+  margin: 16px 0;
 }
 
 .resident-audit-stats {

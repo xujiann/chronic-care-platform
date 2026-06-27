@@ -293,10 +293,13 @@ function setServiceTab(key, options = {}) {
   updateServicePanes();
   if (options.scrollToPane) {
     requestAnimationFrame(() => {
-      const pane = document.querySelector(`[data-service-pane="${key}"]`) || document.querySelector("#service-summary");
-      pane?.scrollIntoView({ block: "start", behavior: "smooth" });
+      getServicePageTarget(key)?.scrollIntoView({ block: "start", behavior: "smooth" });
     });
   }
+}
+
+function getServicePageTarget(key) {
+  return document.querySelector(`[data-service-pane="${key}"]`) || document.querySelector("#service-page-content") || document.querySelector("#service-summary");
 }
 
 function citizenPageHref(key) {

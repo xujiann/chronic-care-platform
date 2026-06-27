@@ -608,7 +608,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   const serviceWorker = read("service-worker.js");
   assert.match(citizenHtml, /rel="manifest"/);
   assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260627pages/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260627pages2/);
   assert.match(citizenHtml, /auth\.js\?v=20260627/);
   assert.match(mobilePreviewHtml, /preview=mobile-nav/);
   assert.match(mobilePreviewHtml, /http:\/\/localhost:5174\/mobile-preview\.html/);
@@ -629,9 +629,10 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.display, "standalone");
   assert.equal(manifest.icons.some((item) => item.src === "./pwa-icon.svg"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v8/);
+  assert.match(serviceWorker, /chronic-care-citizen-v9/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627preview/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages/);
+  assert.match(serviceWorker, /citizen\.js\?v=20260627pages2/);
   assert.match(serviceWorker, /citizen\.html/);
   assert.match(serviceWorker, /mobile-preview\.html/);
   assert.match(serviceWorker, /mobile-preview\.css/);
@@ -690,11 +691,14 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenHtml, /service-tabs/);
   assert.match(citizenHtml, /mobile-service-nav/);
   assert.match(citizenHtml, /service-summary/);
+  assert.match(citizenHtml, /service-page-content/);
   assert.match(citizenHtml, /resident-function-audit/);
   assert.match(citizenHtml, /data-service-pane="health-record"/);
   assert.match(citizenHtml, /data-service-pane="registration"/);
   assert.match(citizenHtml, /feature-state ready/);
   assert.match(citizenHtml, /feature-state pending/);
+  assert.ok(citizenHtml.indexOf("service-page-content") < citizenHtml.indexOf('data-service-pane="health-record"'));
+  assert.ok(citizenHtml.indexOf("resident-function-audit") > citizenHtml.indexOf('data-service-pane="emr"'));
   assert.match(citizenJs, /citizenServiceTabs/);
   assert.match(citizenJs, /renderMobileServiceNav/);
   assert.match(citizenJs, /data-mobile-service-tab/);
@@ -704,6 +708,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /pushState/);
   assert.match(citizenJs, /aria-current/);
   assert.match(citizenJs, /title:/);
+  assert.match(citizenJs, /getServicePageTarget/);
   assert.match(citizenJs, /scrollToPane/);
   assert.match(citizenJs, /residentFunctionAudit/);
   assert.match(citizenJs, /renderResidentFunctionAudit/);
@@ -720,6 +725,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /mobile-service-nav/);
   assert.match(citizenCss, /\.service-tabs a/);
   assert.match(citizenCss, /\.mobile-service-nav a/);
+  assert.match(citizenCss, /service-page-content-anchor/);
   assert.match(citizenCss, /position: fixed/);
   assert.match(citizenCss, /safe-area-inset-bottom/);
   assert.match(citizenCss, /resident-audit-card:not\(\.active\)/);

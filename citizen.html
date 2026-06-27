@@ -50,14 +50,7 @@
 
       <nav class="service-tabs" id="service-tabs" aria-label="居民服务标签页"></nav>
 
-      <section class="panel resident-audit-panel" id="resident-function-audit" aria-labelledby="resident-function-audit-title">
-        <div class="panel-title">
-          <h2 id="resident-function-audit-title">居民端功能审计</h2>
-          <span id="resident-audit-summary">按标签页区分已实现和待开发功能</span>
-        </div>
-        <div class="resident-audit-stats" id="resident-audit-stats"></div>
-        <div class="resident-audit-grid" id="resident-audit-grid"></div>
-      </section>
+      <div class="service-page-content-anchor" id="service-page-content" aria-hidden="true"></div>
 
       <section class="panel citizen-trend-panel" data-service-pane="health-record">
         <div class="panel-title">
@@ -312,6 +305,15 @@
           </article>
         </aside>
       </section>
+
+      <section class="panel resident-audit-panel" id="resident-function-audit" aria-labelledby="resident-function-audit-title">
+        <div class="panel-title">
+          <h2 id="resident-function-audit-title">居民端功能审计</h2>
+          <span id="resident-audit-summary">按标签页区分已实现和待开发功能</span>
+        </div>
+        <div class="resident-audit-stats" id="resident-audit-stats"></div>
+        <div class="resident-audit-grid" id="resident-audit-grid"></div>
+      </section>
     </main>
 
     <nav class="mobile-service-nav" id="mobile-service-nav" aria-label="手机服务导航"></nav>
@@ -368,7 +370,7 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="./health-archive-standard.js"></script>
-    <script src="./citizen.js?v=20260627pages"></script>
+    <script src="./citizen.js?v=20260627pages2"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));
