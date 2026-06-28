@@ -238,12 +238,14 @@ let activeClientChannel = clientChannelFromRoute() || localStorage.getItem(CLIEN
 let state = fallbackState;
 let citizenExtra = loadCitizenExtra();
 let escortDashboard = null;
+let citizenMessages = [];
 let currentResidentId;
 let currentAccountId;
 
 document.addEventListener("DOMContentLoaded", async () => {
   state = await loadState();
   escortDashboard = await fetchCitizenEscortDashboard();
+  citizenMessages = await fetchCitizenMessages();
   ensureAccounts();
   populateAccounts();
   bindLargeMode();
@@ -264,6 +266,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindDialogs();
   bindFollowupFeedback();
   bindEscortAppointment();
+  bindResidentTaskActions();
+  bindCitizenMessageReceipts();
   currentAccountId = state.accounts[0]?.id;
   const account = getCurrentAccount();
   renderAccount(account);
@@ -546,6 +550,19 @@ async function loadState() {
   return saved ? JSON.parse(saved) : fallbackState;
 }
 
+async function fetchCitizenMessages() {
+  if (API_BASE) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/messages`);
+      if (response.ok) return (await response.json()).messages || [];
+    } catch (error) {
+      // Static and offline previews use the scoped state already loaded.
+    }
+  }
+  return Array.isArray(state.taskMessages) ? state.taskMessages : [];
+}
+
 function ensureAccounts() {
   if (Array.isArray(state.accounts) && state.accounts.length) return;
   state.accounts = [
@@ -608,6 +625,7 @@ function renderCitizen(residentId) {
   renderSummary(resident, diseases, followups, records);
   renderHealthTrends(resident);
   renderReminderCenter(resident.id);
+  renderCitizenNotifications(resident.id);
   renderLifeCycle(resident, diseases, followups, records);
   renderVault(resident, diseases, followups, records);
   renderEmr(records, resident, diseases, followups);
@@ -655,12 +673,17 @@ function renderReminderCenter(residentId) {
       <small>${item.due || "时间待确认"}</small>
       <span class="status ${serviceTaskStatusClass(item.status, item.due)}">${item.status}</span>
     </div>
+    <div class="service-task-buttons">
+      ${renderServiceTaskButtons(item)}
+    </div>
   </article>`).join("") || `<p class="muted">暂无服务待办，居民端会在预约、随访或授权到期时自动汇总。</p>`;
 }
 
 function buildResidentServiceTasks(residentId) {
   return [
     ...(state.followups || []).filter((item) => item.residentId === residentId && item.status !== "已完成").map((item) => ({
+      taskId: `followups:${item.id}`,
+      collection: "followups",
       service: "慢病随访",
       title: `${item.diseaseType}随访`,
       detail: `${item.plannedAt} · ${item.assignee} · ${item.advice || "按计划随访"}`,
@@ -670,6 +693,8 @@ function buildResidentServiceTasks(residentId) {
       action: "填写反馈"
     })),
     ...(state.chronicScreeningTasks || []).filter((item) => item.residentId === residentId && !["已评估", "已推送干预"].includes(item.status)).map((item) => ({
+      taskId: `chronicScreeningTasks:${item.id}`,
+      collection: "chronicScreeningTasks",
       service: "慢病筛查",
       title: `${item.taskName}筛查`,
       detail: `${item.due} · ${item.institution} · ${item.nextStep}`,
@@ -679,6 +704,8 @@ function buildResidentServiceTasks(residentId) {
       action: "查看档案"
     })),
     ...(state.chronicEducationPushes || []).filter((item) => item.residentId === residentId && !["已确认", "已阅读"].includes(item.status)).map((item) => ({
+      taskId: `chronicEducationPushes:${item.id}`,
+      collection: "chronicEducationPushes",
       service: "健康宣教",
       title: `${item.topic}宣教`,
       detail: `${item.pushAt} · ${item.channel} · ${item.feedback}`,
@@ -688,6 +715,8 @@ function buildResidentServiceTasks(residentId) {
       action: "查看内容"
     })),
     ...(state.medicationPickups || []).filter((item) => item.residentId === residentId && !["已完成", "已取药"].includes(item.status)).map((item) => ({
+      taskId: `medicationPickups:${item.id}`,
+      collection: "medicationPickups",
       service: "固定取药",
       title: `${item.medication}固定取药`,
       detail: `${item.nextPickup} · ${item.pharmacy} · ${item.insuranceReview || "待医保审核"}`,
@@ -697,6 +726,8 @@ function buildResidentServiceTasks(residentId) {
       action: "查看用药"
     })),
     ...(state.referralSystem?.referrals || []).filter((item) => item.residentId === residentId && !["已完成", "基层承接"].includes(item.status)).map((item) => ({
+      taskId: `referrals:${item.id}`,
+      collection: "referrals",
       service: "转诊号源",
       title: `${item.type}转诊`,
       detail: `${item.from} -> ${item.to} · ${item.reservedResource}`,
@@ -706,6 +737,8 @@ function buildResidentServiceTasks(residentId) {
       action: "查看挂号"
     })),
     ...getEscortOrders(residentId).filter((item) => !["closed", "completed"].includes(item.status)).map((item) => ({
+      taskId: `escortServiceOrders:${item.id}`,
+      collection: "escortServiceOrders",
       service: "助医陪诊",
       title: `${item.hospital || "陪诊预约"} · ${item.department || "科室待确认"}`,
       detail: `${item.providerName || providerName(item.providerId)} · ${formatEscortItems(item.serviceItems)} · 合同 ${formatEscortStatus(item.contractStatus)}`,
@@ -716,6 +749,8 @@ function buildResidentServiceTasks(residentId) {
       priority: item.priority === "high" || item.riskLevel === "high" ? "high" : "normal"
     })),
     ...(state.internetNursingOrders || []).filter((item) => item.residentId === residentId && !["completed", "closed"].includes(item.status)).map((item) => ({
+      taskId: `internetNursingOrders:${item.id}`,
+      collection: "internetNursingOrders",
       service: "互联网护理",
       title: `${formatNursingServiceItem(item.serviceItem)}上门护理`,
       detail: `${item.institutionName || "机构待确认"} · ${item.nurseName || "护士待派单"} · ${formatNursingStage(item)}`,
@@ -726,6 +761,8 @@ function buildResidentServiceTasks(residentId) {
       priority: item.riskLevel === "high" ? "high" : "normal"
     })),
     ...getPersonalRecords(residentId, "authorizations").filter((item) => !isRevoked(item) && item.date <= todayOffset(30)).map((item) => ({
+      taskId: `digitalCredentials:${item.id}`,
+      collection: "digitalCredentials",
       service: "授权管理",
       title: `${item.name}授权`,
       detail: `${item.result} · 有效期至 ${item.date}`,
@@ -736,6 +773,180 @@ function buildResidentServiceTasks(residentId) {
       priority: item.date < todayOffset(0) ? "high" : "normal"
     }))
   ].sort((a, b) => String(a.due || "9999-12-31").localeCompare(String(b.due || "9999-12-31")));
+}
+
+function renderServiceTaskButtons(item) {
+  const buttons = [
+    ["resident-confirm", "确认"],
+    ["cancel-request", "取消"]
+  ];
+  if (item.collection === "followups") buttons.push(["followup-feedback", "反馈"]);
+  if (["escortServiceOrders", "internetNursingOrders"].includes(item.collection)) buttons.push(["quality-feedback", "评价"]);
+  return buttons.map(([action, label]) => `<button type="button" data-task-id="${item.taskId}" data-task-collection="${item.collection}" data-resident-task-action="${action}">${label}</button>`).join("");
+}
+
+function bindResidentTaskActions() {
+  const target = document.querySelector("#reminder-cards");
+  if (!target) return;
+  target.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-resident-task-action]");
+    if (!button) return;
+    const action = button.dataset.residentTaskAction;
+    const comment = action === "resident-confirm" ? "居民端确认服务安排" : window.prompt("请填写处理说明", defaultResidentTaskComment(action)) || defaultResidentTaskComment(action);
+    button.disabled = true;
+    try {
+      await submitResidentTaskAction(button.dataset.taskId, button.dataset.taskCollection, {
+        action,
+        comment,
+        satisfaction: action === "quality-feedback" ? "满意" : "",
+        complaintStatus: action === "quality-feedback" ? "none" : ""
+      });
+      showToast("服务待办已更新");
+      renderCitizen(currentResidentId);
+    } catch (error) {
+      showToast(error.message || "服务待办更新失败");
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
+function defaultResidentTaskComment(action) {
+  return {
+    "cancel-request": "居民端申请取消，请服务团队确认",
+    "followup-feedback": "居民已补充随访反馈，请家庭医生查看",
+    "quality-feedback": "居民已完成服务评价"
+  }[action] || "居民端确认服务安排";
+}
+
+async function submitResidentTaskAction(taskId, collection, payload) {
+  if (API_BASE) {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${API_BASE}/tasks/${encodeURIComponent(taskId)}/actions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error(`服务待办更新失败：${response.status}`);
+    const updated = await response.json();
+    replaceResidentTaskItem(collection, updated);
+    citizenMessages = await fetchCitizenMessages();
+    return updated;
+  }
+  const updated = applyLocalResidentTaskAction(taskId, collection, payload);
+  citizenMessages.unshift(buildLocalCitizenMessage(updated, collection, payload));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  return updated;
+}
+
+function applyLocalResidentTaskAction(taskId, collection, payload) {
+  const itemId = String(taskId || "").split(":")[1];
+  const rows = findResidentTaskRows(collection);
+  const index = rows.findIndex((item) => item.id === itemId);
+  if (index < 0) throw new Error("未找到服务待办");
+  const now = new Date().toISOString();
+  rows[index] = {
+    ...rows[index],
+    taskAction: payload.action,
+    taskComment: payload.comment,
+    handledAt: now,
+    residentActionAt: now,
+    residentFeedback: payload.comment || rows[index].residentFeedback,
+    satisfaction: payload.satisfaction || rows[index].satisfaction
+  };
+  if (payload.action === "cancel-request") rows[index].status = "cancel-requested";
+  if (payload.action === "resident-confirm" && collection === "escortServiceOrders") rows[index].familyContactStatus = "confirmed";
+  if (payload.action === "quality-feedback" && collection === "escortServiceOrders") rows[index].qualityReview = "citizen-feedback";
+  if (payload.action === "quality-feedback" && collection === "internetNursingOrders") rows[index].qualityCallback = "citizen-feedback";
+  return rows[index];
+}
+
+function replaceResidentTaskItem(collection, updated) {
+  const rows = findResidentTaskRows(collection);
+  const index = rows.findIndex((item) => item.id === updated.id);
+  if (index >= 0) rows[index] = updated;
+}
+
+function findResidentTaskRows(collection) {
+  if (collection === "referrals") return state.referralSystem?.referrals || [];
+  if (collection === "digitalCredentials") return state.personalRecords || [];
+  if (!Array.isArray(state[collection])) state[collection] = [];
+  return state[collection];
+}
+
+function buildLocalCitizenMessage(item, collection, payload) {
+  return {
+    id: `msg-local-${crypto.randomUUID()}`,
+    taskId: `${collection}:${item.id}`,
+    collection,
+    sourceId: item.id,
+    residentId: item.residentId || currentResidentId,
+    targetRole: "institution",
+    channel: "in_app",
+    title: `居民端服务动作：${defaultResidentTaskComment(payload.action)}`,
+    body: payload.comment || "居民端已处理服务待办",
+    status: "sent",
+    receipts: [],
+    createdAt: new Date().toISOString(),
+    createdBy: "citizen"
+  };
+}
+
+function renderCitizenNotifications(residentId) {
+  const summary = document.querySelector("#citizen-notification-summary");
+  const cards = document.querySelector("#citizen-notification-cards");
+  if (!summary || !cards) return;
+  const messages = citizenMessages
+    .filter((item) => !item.residentId || item.residentId === residentId)
+    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
+    .slice(0, 6);
+  summary.textContent = `${messages.length} 条消息`;
+  cards.innerHTML = messages.map((item) => `<article class="mini-card citizen-notification-card">
+    <div class="service-task-head">
+      <span>${item.channel || "in_app"}</span>
+      <button type="button" data-message-receipt="${item.id}" ${item.status === "read" ? "disabled" : ""}>${item.status === "read" ? "已读" : "标记已读"}</button>
+    </div>
+    <h3>${item.title || "服务通知"}</h3>
+    <p class="muted">${item.body || "暂无消息内容"}</p>
+    <small>${item.createdAt || "时间待确认"}</small>
+  </article>`).join("") || `<p class="muted">暂无居民通知。预约变更、护士接单、陪诊师匹配和授权到期会在这里展示。</p>`;
+}
+
+function bindCitizenMessageReceipts() {
+  const target = document.querySelector("#citizen-notification-cards");
+  if (!target) return;
+  target.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-message-receipt]");
+    if (!button || button.disabled) return;
+    button.disabled = true;
+    try {
+      await submitMessageReceipt(button.dataset.messageReceipt);
+      renderCitizen(currentResidentId);
+      showToast("通知已标记为已读");
+    } catch (error) {
+      showToast(error.message || "通知回执失败");
+      button.disabled = false;
+    }
+  });
+}
+
+async function submitMessageReceipt(messageId) {
+  if (API_BASE) {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${API_BASE}/messages/${encodeURIComponent(messageId)}/receipt`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "read" })
+    });
+    if (!response.ok) throw new Error(`通知回执失败：${response.status}`);
+    const updated = await response.json();
+    const index = citizenMessages.findIndex((item) => item.id === updated.id);
+    if (index >= 0) citizenMessages[index] = updated;
+    return updated;
+  }
+  const message = citizenMessages.find((item) => item.id === messageId);
+  if (message) message.status = "read";
+  return message;
 }
 
 function serviceTaskStatusClass(status, due) {

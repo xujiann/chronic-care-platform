@@ -480,6 +480,32 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(refreshed.body.orders.some((item) => item.id === created.body.id && item.residentId === "r1"), true);
     assert.equal(refreshed.body.orders.every((item) => ["r1", "r4"].includes(item.residentId)), true);
 
+    const confirmed = await api(baseUrl, `/api/tasks/${encodeURIComponent(`escortServiceOrders:${created.body.id}`)}/actions`, authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "resident-confirm", comment: "居民确认陪诊安排" })
+    }));
+    assert.equal(confirmed.response.status, 200);
+    assert.equal(confirmed.body.familyContactStatus, "confirmed");
+    assert.equal(confirmed.body.taskAction, "resident-confirm");
+
+    const reviewed = await api(baseUrl, `/api/tasks/${encodeURIComponent(`escortServiceOrders:${created.body.id}`)}/actions`, authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "quality-feedback", comment: "陪诊服务满意", satisfaction: "满意", complaintStatus: "none" })
+    }));
+    assert.equal(reviewed.response.status, 200);
+    assert.equal(reviewed.body.qualityReview, "citizen-feedback");
+    assert.equal(reviewed.body.satisfaction, "满意");
+
+    const messages = await api(baseUrl, "/api/messages", authorized(citizenToken));
+    assert.equal(messages.response.status, 200);
+    assert.equal(messages.body.messages.some((item) => item.sourceId === created.body.id && /居民服务|助医陪诊/.test(item.title)), true);
+
+    const otherOrderAction = await api(baseUrl, `/api/tasks/${encodeURIComponent("escortServiceOrders:eso-r2-20260621")}/actions`, authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "resident-confirm", comment: "越权确认" })
+    }));
+    assert.equal(otherOrderAction.response.status, 403);
+
     const denied = await api(baseUrl, "/api/escort-services/orders", authorized(citizenToken, {
       method: "POST",
       body: JSON.stringify({
@@ -525,6 +551,21 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(created.body.consentAttachment.status, "pending");
     assert.equal(Array.isArray(created.body.locationTracePoints), true);
     assert.equal(created.body.locationTracePoints.length, 0);
+
+    const residentConfirmation = await api(baseUrl, `/api/tasks/${encodeURIComponent(`internetNursingOrders:${created.body.id}`)}/actions`, authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "resident-confirm", comment: "居民确认护理预约" })
+    }));
+    assert.equal(residentConfirmation.response.status, 200);
+    assert.equal(residentConfirmation.body.residentServiceConfirmation, "confirmed");
+
+    const nursingQuality = await api(baseUrl, `/api/tasks/${encodeURIComponent(`internetNursingOrders:${created.body.id}`)}/actions`, authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "quality-feedback", comment: "护理服务已评价", satisfaction: "满意" })
+    }));
+    assert.equal(nursingQuality.response.status, 200);
+    assert.equal(nursingQuality.body.qualityCallback, "citizen-feedback");
+    assert.equal(nursingQuality.body.satisfaction, "满意");
 
     const unsupportedService = await api(baseUrl, "/api/internet-nursing/orders", authorized(citizenToken, {
       method: "POST",

@@ -85,6 +85,14 @@
         <div id="reminder-cards" class="cards"></div>
       </section>
 
+      <section class="panel citizen-notification-panel" data-service-pane="health-record">
+        <div class="panel-title">
+          <h2>居民通知</h2>
+          <span id="citizen-notification-summary">0 条消息</span>
+        </div>
+        <div id="citizen-notification-cards" class="cards"></div>
+      </section>
+
       <section class="panel lifecycle-panel" data-service-pane="health-record">
         <div class="panel-title">
           <h2>全生命周期健康管理</h2>
@@ -387,7 +395,7 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="./health-archive-standard.js"></script>
-    <script src="./citizen.js?v=20260628launch"></script>
+    <script src="./citizen.js?v=20260628tasks"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));

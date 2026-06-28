@@ -384,7 +384,8 @@ const WORKFLOW_ROLE_COLLECTIONS = {
   commission: WORKFLOW_COLLECTIONS,
   institution: new Set(["careOrders", "medicationPickups", "followups", "referrals", "referralTeleconsultations", "escortServiceOrders", "internetNursingOrders", "deathCertificates", "birthCertificates", "multiPracticeApplications", "drugConsumableSupervisions", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "emergencySignals"]),
   insurance: new Set(["insuranceClaims", "medicationPickups", "digitalCredentials", "drugConsumableSupervisions"]),
-  county: new Set(["referralTeleconsultations", "escortServiceOrders", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "emergencySignals"])
+  county: new Set(["referralTeleconsultations", "escortServiceOrders", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "emergencySignals"]),
+  citizen: new Set(["followups", "referrals", "medicationPickups", "digitalCredentials", "chronicScreeningTasks", "chronicEducationPushes", "escortServiceOrders", "internetNursingOrders"])
 };
 const WORKFLOW_PROTECTED_FIELDS = new Set(["id", "residentId", "maternalResidentId", "personIndex", "credentialNo", "certificateNo", "documentNo", "motherDocumentNo", "fatherDocumentNo", "createdAt", "createdBy", "createdByName", "lastUpdated", "updatedAt", "updatedBy", "updatedByName"]);
 const PERSONAL_RECORD_PROTECTED_FIELDS = new Set(["id", "residentId", "personIndex", "createdAt", "createdBy", "createdByName", "updatedAt", "updatedBy", "updatedByName", "expectedVersion"]);
@@ -7222,6 +7223,94 @@ function createTaskMessage({ task, payload, user }) {
   };
 }
 
+function applyCitizenTaskAction(item, payload, collection, user) {
+  const now = new Date().toISOString();
+  const action = String(payload.action || "resident-confirm").trim();
+  const allowedActions = new Set(["resident-confirm", "cancel-request", "followup-feedback", "quality-feedback"]);
+  if (!allowedActions.has(action)) throw new Error("居民端不支持该任务动作");
+  const comment = String(payload.comment || payload.note || "").trim();
+  const updates = {
+    taskAction: action,
+    taskComment: comment,
+    handledAt: now,
+    handledBy: user.username || user.role,
+    handledByName: user.name,
+    residentActionAt: now,
+    residentActionBy: user.name || user.username || "居民"
+  };
+  if (action === "resident-confirm") {
+    updates.residentConfirmation = "confirmed";
+    if (collection === "escortServiceOrders") updates.familyContactStatus = "confirmed";
+    if (collection === "internetNursingOrders") updates.residentServiceConfirmation = "confirmed";
+  }
+  if (action === "cancel-request") {
+    updates.status = "cancel-requested";
+    updates.cancellationReason = comment || "居民端申请取消";
+  }
+  if (action === "followup-feedback") {
+    updates.status = collection === "followups" ? "居民已反馈" : item.status;
+    updates.residentFeedback = comment || "居民已提交反馈";
+    updates.satisfaction = String(payload.satisfaction || item.satisfaction || "需要协助").trim();
+  }
+  if (action === "quality-feedback") {
+    updates.residentFeedback = comment || "居民已提交服务评价";
+    updates.satisfaction = String(payload.satisfaction || "满意").trim();
+    if (collection === "escortServiceOrders") {
+      updates.qualityReview = "citizen-feedback";
+      updates.complaintStatus = String(payload.complaintStatus || "none").trim();
+    }
+    if (collection === "internetNursingOrders") {
+      updates.qualityCallback = "citizen-feedback";
+      updates.complaintStatus = String(payload.complaintStatus || "none").trim();
+    }
+  }
+  return {
+    ...item,
+    ...updates,
+    auditTrail: [
+      { at: now, action, by: user.username || user.role, note: comment || updates.status || updates.satisfaction || "resident task action" },
+      ...(Array.isArray(item.auditTrail) ? item.auditTrail : [])
+    ].slice(0, 30)
+  };
+}
+
+function buildCitizenTaskActionMessage(item, collection, payload, user) {
+  const now = new Date().toISOString();
+  const action = String(payload.action || "resident-confirm").trim();
+  const actionLabels = {
+    "resident-confirm": "居民已确认",
+    "cancel-request": "居民申请取消",
+    "followup-feedback": "居民已反馈",
+    "quality-feedback": "居民服务评价"
+  };
+  const serviceLabels = {
+    followups: "慢病随访",
+    referrals: "转诊号源",
+    medicationPickups: "固定取药",
+    digitalCredentials: "电子凭证",
+    chronicScreeningTasks: "慢病筛查",
+    chronicEducationPushes: "健康宣教",
+    escortServiceOrders: "助医陪诊",
+    internetNursingOrders: "互联网护理"
+  };
+  return {
+    id: `msg-${randomUUID()}`,
+    taskId: `${collection}:${item.id}`,
+    collection,
+    sourceId: item.id,
+    residentId: item.residentId || item.maternalResidentId || "",
+    targetRole: "institution",
+    channel: "in_app",
+    title: `${serviceLabels[collection] || "居民服务"}：${actionLabels[action] || "居民动作"}`,
+    body: `${user.name || user.username || "居民"} 已在居民端提交：${String(payload.comment || payload.note || actionLabels[action] || "").trim() || "请处理服务待办"}`,
+    status: "sent",
+    receipts: [],
+    createdAt: now,
+    createdBy: user.username || user.role,
+    createdByName: user.name
+  };
+}
+
 function normalizeReferralTeleconsultation(payload, user, data) {
   const residentId = String(payload.residentId || "").trim();
   if (!residentId) throw new Error("residentId is required");
@@ -9494,7 +9583,7 @@ async function handleApi(req, res) {
 
   const taskActionMatch = url.pathname.match(/^\/api\/tasks\/([^/]+)\/actions$/);
   if (req.method === "POST" && taskActionMatch) {
-    const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/tasks/:id/actions");
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county", "citizen"], "/api/tasks/:id/actions");
     if (!user) return;
     const taskId = decodeURIComponent(taskActionMatch[1]);
     const [collection, id] = taskId.split(":");
@@ -9530,15 +9619,25 @@ async function handleApi(req, res) {
       return;
     }
     const payload = await collectJson(req);
-    rows[index] = {
-      ...rows[index],
-      status: String(payload.status || rows[index].status || "processing").trim(),
-      taskAction: String(payload.action || "update").trim(),
-      taskComment: String(payload.comment || "").trim(),
-      handledAt: new Date().toISOString(),
-      handledBy: user.username || user.role,
-      handledByName: user.name
-    };
+    try {
+      rows[index] = user.role === "citizen"
+        ? applyCitizenTaskAction(rows[index], payload, collection, user)
+        : {
+            ...rows[index],
+            status: String(payload.status || rows[index].status || "processing").trim(),
+            taskAction: String(payload.action || "update").trim(),
+            taskComment: String(payload.comment || "").trim(),
+            handledAt: new Date().toISOString(),
+            handledBy: user.username || user.role,
+            handledByName: user.name
+          };
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    if (user.role === "citizen") {
+      data.taskMessages = [buildCitizenTaskActionMessage(rows[index], collection, payload, user), ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
+    }
     data.securityEvents = [
       {
         id: randomUUID(),

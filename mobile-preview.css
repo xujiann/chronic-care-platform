@@ -78,7 +78,8 @@ body {
 }
 
 .preview-steps div,
-.hint {
+.hint,
+.preview-checklist {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 14px;
@@ -86,7 +87,8 @@ body {
 }
 
 .preview-steps strong,
-.hint strong {
+.hint strong,
+.preview-checklist span {
   display: block;
   margin-bottom: 6px;
 }
@@ -98,6 +100,24 @@ body {
 
 .preview-steps div:last-child p {
   margin-bottom: 0;
+}
+
+.preview-checklist {
+  margin: 0 0 12px;
+}
+
+.preview-checklist span {
+  color: var(--teal);
+  font-weight: 800;
+}
+
+.preview-checklist ul {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  line-height: 1.6;
 }
 
 code {

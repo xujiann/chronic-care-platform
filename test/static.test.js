@@ -634,7 +634,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   const serviceWorker = read("service-worker.js");
   assert.match(citizenHtml, /rel="manifest"/);
   assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260628launch/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260628tasks/);
   assert.match(citizenHtml, /mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-title/);
@@ -655,11 +655,15 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /data-preview-service="nursing"/);
   assert.match(mobilePreviewHtml, /data-preview-service="registration"/);
   assert.match(mobilePreviewHtml, /preview-refresh/);
+  assert.match(mobilePreviewHtml, /待办与通知验收/);
+  assert.match(mobilePreviewHtml, /服务待办中心可聚合护理、陪诊、转诊号源和慢病随访/);
+  assert.match(mobilePreviewHtml, /满意度与投诉反馈能进入服务质控闭环/);
   assert.match(mobilePreviewHtml, /postMessage/);
   assert.match(citizenJs, /set-service-tab/);
   assert.match(mobilePreviewCss, /preview-steps/);
   assert.match(mobilePreviewCss, /preview-client-switch/);
   assert.match(mobilePreviewCss, /preview-service-switch/);
+  assert.match(mobilePreviewCss, /preview-checklist/);
   assert.match(mobilePreviewCss, /position: sticky/);
   assert.match(mobilePreviewCss, /grid-template-columns: minmax\(280px, 420px\) minmax\(390px, 430px\)/);
   assert.match(mobilePreviewCss, /max-width: 820px/);
@@ -675,13 +679,14 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.shortcuts.some((item) => item.url === "./citizen.html?client=app&page=escort#service-escort"), true);
   assert.equal(manifest.shortcuts.some((item) => item.url === "./mobile-preview.html?client=app"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v13/);
+  assert.match(serviceWorker, /chronic-care-citizen-v14/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627preview/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages2/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627actions/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627channels/);
   assert.match(serviceWorker, /citizen\.js\?v=20260628launch/);
+  assert.match(serviceWorker, /citizen\.js\?v=20260628tasks/);
   assert.match(serviceWorker, /citizen\.html/);
   assert.match(serviceWorker, /mobile-preview\.html/);
   assert.match(serviceWorker, /mobile-preview\.css/);
@@ -729,14 +734,24 @@ test("citizen portal aggregates cross-service resident tasks", () => {
   const citizenCss = read("citizen.css");
   assert.match(citizenHtml, /service-task-panel/);
   assert.match(citizenHtml, /服务待办中心/);
+  assert.match(citizenHtml, /citizen-notification-panel/);
+  assert.match(citizenHtml, /居民通知/);
   assert.match(citizenJs, /buildResidentServiceTasks/);
+  assert.match(citizenJs, /bindResidentTaskActions/);
+  assert.match(citizenJs, /submitResidentTaskAction/);
+  assert.match(citizenJs, /renderCitizenNotifications/);
+  assert.match(citizenJs, /submitMessageReceipt/);
   assert.match(citizenJs, /serviceTaskStatusClass/);
   assert.match(citizenJs, /internetNursingOrders/);
   assert.match(citizenJs, /助医陪诊/);
   assert.match(citizenJs, /转诊号源/);
   assert.match(citizenJs, /citizenPageHref\(item\.page\)/);
+  assert.match(read("server.js"), /applyCitizenTaskAction/);
+  assert.match(read("server.js"), /buildCitizenTaskActionMessage/);
   assert.match(citizenCss, /service-task-card/);
   assert.match(citizenCss, /service-task-action/);
+  assert.match(citizenCss, /service-task-buttons/);
+  assert.match(citizenCss, /citizen-notification-card/);
 });
 
 test("citizen portal exposes resident service tabs and implementation states", () => {

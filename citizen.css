@@ -1470,6 +1470,51 @@ select,
   outline: 0;
 }
 
+.service-task-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(68px, 1fr));
+  gap: 6px;
+}
+
+.service-task-buttons button,
+.citizen-notification-card button {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.service-task-buttons button:hover,
+.service-task-buttons button:focus-visible,
+.citizen-notification-card button:hover,
+.citizen-notification-card button:focus-visible {
+  border-color: #93c5fd;
+  outline: 0;
+}
+
+.service-task-buttons button:disabled,
+.citizen-notification-card button:disabled {
+  cursor: default;
+  color: #94a3b8;
+  background: #f8fafc;
+}
+
+.citizen-notification-card {
+  display: grid;
+  gap: 8px;
+}
+
+.citizen-notification-card small {
+  color: #64748b;
+  font-size: 12px;
+}
+
 .status {
   display: inline-flex;
   border-radius: 999px;
