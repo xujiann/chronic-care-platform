@@ -1422,6 +1422,54 @@ select,
   margin-bottom: 6px;
 }
 
+.service-task-panel .cards {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.service-task-card {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.service-task-card.urgent {
+  border-color: rgba(194, 65, 12, 0.32);
+  background: #fff7ed;
+}
+
+.service-task-head,
+.service-task-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.service-task-head span,
+.service-task-meta small {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.service-task-action {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 5px 8px;
+  color: #1d4ed8;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.service-task-action:hover,
+.service-task-action:focus-visible {
+  border-color: #93c5fd;
+  outline: 0;
+}
+
 .status {
   display: inline-flex;
   border-radius: 999px;

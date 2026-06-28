@@ -639,47 +639,136 @@ function bindLargeMode() {
 }
 
 function renderReminderCenter(residentId) {
-  const reminders = [
-    ...state.followups.filter((item) => item.residentId === residentId && item.status !== "已完成").map((item) => ({
-      title: `${item.diseaseType}随访`,
-      detail: `${item.plannedAt} · ${item.assignee} · ${item.advice || "按计划随访"}`,
-      status: item.status
-    })),
-    ...(state.chronicScreeningTasks || []).filter((item) => item.residentId === residentId && !["已评估", "已推送干预"].includes(item.status)).map((item) => ({
-      title: `${item.taskName}筛查`,
-      detail: `${item.due} · ${item.institution} · ${item.nextStep}`,
-      status: item.status
-    })),
-    ...(state.chronicEducationPushes || []).filter((item) => item.residentId === residentId && !["已确认", "已阅读"].includes(item.status)).map((item) => ({
-      title: `${item.topic}宣教`,
-      detail: `${item.pushAt} · ${item.channel} · ${item.feedback}`,
-      status: item.status
-    })),
-    ...(state.medicationPickups || []).filter((item) => item.residentId === residentId && !["已完成", "已取药"].includes(item.status)).map((item) => ({
-      title: `${item.medication}固定取药`,
-      detail: `${item.nextPickup} · ${item.pharmacy} · ${item.insuranceReview || "待医保审核"}`,
-      status: item.status
-    })),
-    ...(state.referralSystem?.referrals || []).filter((item) => item.residentId === residentId && !["已完成", "基层承接"].includes(item.status)).map((item) => ({
-      title: `${item.type}转诊`,
-      detail: `${item.from} -> ${item.to} · ${item.reservedResource}`,
-      status: item.status
-    })),
-    ...getPersonalRecords(residentId, "authorizations").filter((item) => !isRevoked(item) && item.date <= todayOffset(30)).map((item) => ({
-      title: `${item.name}授权`,
-      detail: `${item.result} · 有效期至 ${item.date}`,
-      status: item.date < todayOffset(0) ? "已过期" : "即将到期"
-    }))
-  ];
+  const reminders = buildResidentServiceTasks(residentId);
   const countEl = document.querySelector("#reminder-count");
   const listEl = document.querySelector("#reminder-cards");
   if (!countEl || !listEl) return;
   countEl.textContent = `${reminders.length} 项待办`;
-  listEl.innerHTML = reminders.map((item) => `<article class="mini-card">
+  listEl.innerHTML = reminders.map((item) => `<article class="mini-card service-task-card ${item.priority === "high" ? "urgent" : ""}">
+    <div class="service-task-head">
+      <span>${item.service}</span>
+      <a class="service-task-action" href="${citizenPageHref(item.page)}">${item.action}</a>
+    </div>
     <h3>${item.title}</h3>
     <p class="muted">${item.detail}</p>
-    <span class="status ${["已逾期", "已过期"].includes(item.status) ? "danger" : String(item.status).includes("待") ? "warn" : ""}">${item.status}</span>
-  </article>`).join("") || `<p class="muted">暂无待办提醒。</p>`;
+    <div class="service-task-meta">
+      <small>${item.due || "时间待确认"}</small>
+      <span class="status ${serviceTaskStatusClass(item.status, item.due)}">${item.status}</span>
+    </div>
+  </article>`).join("") || `<p class="muted">暂无服务待办，居民端会在预约、随访或授权到期时自动汇总。</p>`;
+}
+
+function buildResidentServiceTasks(residentId) {
+  return [
+    ...(state.followups || []).filter((item) => item.residentId === residentId && item.status !== "已完成").map((item) => ({
+      service: "慢病随访",
+      title: `${item.diseaseType}随访`,
+      detail: `${item.plannedAt} · ${item.assignee} · ${item.advice || "按计划随访"}`,
+      status: item.status,
+      due: item.plannedAt,
+      page: "emr",
+      action: "填写反馈"
+    })),
+    ...(state.chronicScreeningTasks || []).filter((item) => item.residentId === residentId && !["已评估", "已推送干预"].includes(item.status)).map((item) => ({
+      service: "慢病筛查",
+      title: `${item.taskName}筛查`,
+      detail: `${item.due} · ${item.institution} · ${item.nextStep}`,
+      status: item.status,
+      due: item.due,
+      page: "health-record",
+      action: "查看档案"
+    })),
+    ...(state.chronicEducationPushes || []).filter((item) => item.residentId === residentId && !["已确认", "已阅读"].includes(item.status)).map((item) => ({
+      service: "健康宣教",
+      title: `${item.topic}宣教`,
+      detail: `${item.pushAt} · ${item.channel} · ${item.feedback}`,
+      status: item.status,
+      due: item.pushAt,
+      page: "health-record",
+      action: "查看内容"
+    })),
+    ...(state.medicationPickups || []).filter((item) => item.residentId === residentId && !["已完成", "已取药"].includes(item.status)).map((item) => ({
+      service: "固定取药",
+      title: `${item.medication}固定取药`,
+      detail: `${item.nextPickup} · ${item.pharmacy} · ${item.insuranceReview || "待医保审核"}`,
+      status: item.status,
+      due: item.nextPickup,
+      page: "health-record",
+      action: "查看用药"
+    })),
+    ...(state.referralSystem?.referrals || []).filter((item) => item.residentId === residentId && !["已完成", "基层承接"].includes(item.status)).map((item) => ({
+      service: "转诊号源",
+      title: `${item.type}转诊`,
+      detail: `${item.from} -> ${item.to} · ${item.reservedResource}`,
+      status: item.status,
+      due: item.date,
+      page: "registration",
+      action: "查看挂号"
+    })),
+    ...getEscortOrders(residentId).filter((item) => !["closed", "completed"].includes(item.status)).map((item) => ({
+      service: "助医陪诊",
+      title: `${item.hospital || "陪诊预约"} · ${item.department || "科室待确认"}`,
+      detail: `${item.providerName || providerName(item.providerId)} · ${formatEscortItems(item.serviceItems)} · 合同 ${formatEscortStatus(item.contractStatus)}`,
+      status: formatEscortStatus(item.status),
+      due: item.appointmentAt || item.due,
+      page: "escort",
+      action: "查看陪诊",
+      priority: item.priority === "high" || item.riskLevel === "high" ? "high" : "normal"
+    })),
+    ...(state.internetNursingOrders || []).filter((item) => item.residentId === residentId && !["completed", "closed"].includes(item.status)).map((item) => ({
+      service: "互联网护理",
+      title: `${formatNursingServiceItem(item.serviceItem)}上门护理`,
+      detail: `${item.institutionName || "机构待确认"} · ${item.nurseName || "护士待派单"} · ${formatNursingStage(item)}`,
+      status: formatNursingStatus(item.status),
+      due: item.preferredAt || item.requestedAt,
+      page: "nursing",
+      action: "查看护理",
+      priority: item.riskLevel === "high" ? "high" : "normal"
+    })),
+    ...getPersonalRecords(residentId, "authorizations").filter((item) => !isRevoked(item) && item.date <= todayOffset(30)).map((item) => ({
+      service: "授权管理",
+      title: `${item.name}授权`,
+      detail: `${item.result} · 有效期至 ${item.date}`,
+      status: item.date < todayOffset(0) ? "已过期" : "即将到期",
+      due: item.date,
+      page: "health-record",
+      action: "管理授权",
+      priority: item.date < todayOffset(0) ? "high" : "normal"
+    }))
+  ].sort((a, b) => String(a.due || "9999-12-31").localeCompare(String(b.due || "9999-12-31")));
+}
+
+function serviceTaskStatusClass(status, due) {
+  if (["已逾期", "已过期"].includes(status) || (due && due < todayOffset(0))) return "danger";
+  return String(status).includes("待") || String(status).includes("pending") || String(status).includes("requested") ? "warn" : "";
+}
+
+function formatNursingServiceItem(value) {
+  const labels = {
+    "wound care": "伤口护理",
+    "blood glucose measurement": "血糖监测",
+    "PICC maintenance": "PICC 维护"
+  };
+  return labels[value] || value || "护理";
+}
+
+function formatNursingStatus(value) {
+  const labels = {
+    requested: "待评估",
+    dispatched: "已派单",
+    accepted: "护士已接单",
+    "in-service": "服务中",
+    completed: "已完成"
+  };
+  return labels[value] || value || "待确认";
+}
+
+function formatNursingStage(item) {
+  if (item.serviceRecordStatus && item.serviceRecordStatus !== "pending") return `服务记录 ${formatNursingStatus(item.serviceRecordStatus)}`;
+  if (item.locationTrace && item.locationTrace !== "pending") return "位置轨迹已开启";
+  if (item.informedConsent === "pending") return "待签署知情同意";
+  if (item.firstVisitAssessment === "pending") return "待首诊评估";
+  return "等待上门服务";
 }
 
 function renderVault(resident, diseases, followups, records) {

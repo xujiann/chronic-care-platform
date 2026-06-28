@@ -723,6 +723,22 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   assert.match(read("server.js"), /provider is not published/);
 });
 
+test("citizen portal aggregates cross-service resident tasks", () => {
+  const citizenHtml = read("citizen.html");
+  const citizenJs = read("citizen.js");
+  const citizenCss = read("citizen.css");
+  assert.match(citizenHtml, /service-task-panel/);
+  assert.match(citizenHtml, /服务待办中心/);
+  assert.match(citizenJs, /buildResidentServiceTasks/);
+  assert.match(citizenJs, /serviceTaskStatusClass/);
+  assert.match(citizenJs, /internetNursingOrders/);
+  assert.match(citizenJs, /助医陪诊/);
+  assert.match(citizenJs, /转诊号源/);
+  assert.match(citizenJs, /citizenPageHref\(item\.page\)/);
+  assert.match(citizenCss, /service-task-card/);
+  assert.match(citizenCss, /service-task-action/);
+});
+
 test("citizen portal exposes resident service tabs and implementation states", () => {
   const loginHtml = read("login.html");
   const auth = read("auth.js");
