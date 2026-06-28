@@ -66,8 +66,9 @@
       const frame = document.querySelector("#citizen-preview-frame");
       const serviceButtons = document.querySelectorAll("[data-preview-service]");
       const clientButtons = document.querySelectorAll("[data-preview-client]");
+      const previewParams = new URLSearchParams(location.search);
       let activePreviewService = "health-record";
-      let activePreviewClient = "mini-program";
+      let activePreviewClient = ["mini-program", "app"].includes(previewParams.get("client")) ? previewParams.get("client") : "mini-program";
       const citizenPreviewSrc = (service) => `./citizen.html?preview=mobile-nav&client=${activePreviewClient}&page=${service}#service-${service}`;
       const setPreviewService = (service) => {
         activePreviewService = service;
@@ -78,9 +79,14 @@
         }
         frame.src = citizenPreviewSrc(service);
       };
-      const setPreviewClient = (client) => {
+      const setPreviewClient = (client, options = {}) => {
         activePreviewClient = client;
         clientButtons.forEach((button) => button.classList.toggle("active", button.dataset.previewClient === client));
+        if (options.syncUrl !== false) {
+          const params = new URLSearchParams(location.search);
+          params.set("client", client);
+          history.replaceState({ previewClient: client }, "", `${location.pathname}?${params.toString()}`);
+        }
         setPreviewService(activePreviewService);
       };
       frame.addEventListener("load", () => {
@@ -95,6 +101,7 @@
       document.querySelector("#preview-refresh").addEventListener("click", () => {
         frame.src = frame.src;
       });
+      setPreviewClient(activePreviewClient, { syncUrl: false });
     </script>
   </body>
 </html>
