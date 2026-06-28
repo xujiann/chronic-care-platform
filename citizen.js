@@ -167,7 +167,11 @@ async function loadState() {
     try {
       const request = window.HealthCityAuth?.authFetch || fetch;
       const response = await request(`${API_BASE}/state`);
-      if (response.ok) return await response.json();
+      if (response.ok) {
+        const data = await response.json();
+        data.chronicFollowupSummary = await loadChronicFollowupSummary();
+        return data;
+      }
     } catch (error) {
       // Fall back to browser data below.
     }
@@ -180,6 +184,18 @@ async function loadState() {
   }
   const saved = localStorage.getItem(STORAGE_KEY);
   return saved ? JSON.parse(saved) : fallbackState;
+}
+
+async function loadChronicFollowupSummary() {
+  if (!API_BASE) return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${API_BASE}/chronic/followup-summary`);
+    if (response.ok) return await response.json();
+  } catch (error) {
+    // Fall back to local state-derived queue below.
+  }
+  return null;
 }
 
 function ensureAccounts() {
@@ -291,6 +307,14 @@ function chronicReminderStatus(dateText, status = "", risk = "") {
 }
 
 function buildResidentChronicReminderQueue(residentId) {
+  const apiAlerts = (state.chronicFollowupSummary?.alertQueue || []).filter((item) => item.residentId === residentId);
+  if (apiAlerts.length) {
+    return apiAlerts.map((item) => ({
+      title: item.title || `${item.type || "chronic"}提醒`,
+      detail: `${item.dueAt || ""} · ${item.owner || item.familyDoctor || ""} · ${item.nextAction || item.detail || ""}`,
+      status: item.dueBucket === "overdue" ? "已逾期" : item.dueBucket === "due-today" ? "今日到期" : ["critical", "high"].includes(item.priority) ? "重点提醒" : "计划内"
+    }));
+  }
   return [
     ...(state.followups || []).filter((item) => item.residentId === residentId && item.status !== "已完成").map((item) => ({
       title: `${item.diseaseType}随访提醒`,
@@ -770,6 +794,7 @@ function bindFollowupFeedback() {
         followup.feedbackSummary = saved.result;
         followup.medicationTaken = payload.medicationTaken;
       }
+      if (API_BASE) state.chronicFollowupSummary = await loadChronicFollowupSummary();
       form.reset();
       renderCitizen(currentResidentId);
       showToast("院后随访反馈已提交，家庭医生可在机构端处置");

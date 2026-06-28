@@ -351,9 +351,13 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("institution.js"), /随访消息/);
   assert.match(read("institution.js"), /buildChronicFollowupPolicyAlignment/);
   assert.match(read("institution.js"), /buildChronicFollowupAlertQueue/);
+  assert.match(read("institution.js"), /loadChronicFollowupSummary/);
+  assert.match(read("institution.js"), /\/chronic\/followup-summary/);
   assert.match(read("institution.js"), /政策对照/);
   assert.match(read("citizen.html"), /followup-feedback-form/);
   assert.match(read("citizen.js"), /buildResidentChronicReminderQueue/);
+  assert.match(read("citizen.js"), /loadChronicFollowupSummary/);
+  assert.match(read("citizen.js"), /chronicFollowupSummary\?\.alertQueue/);
   assert.match(read("citizen.js"), /bindFollowupFeedback/);
   assert.match(read("citizen.js"), /state\.taskMessages/);
 });

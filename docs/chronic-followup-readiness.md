@@ -40,6 +40,8 @@ Resident feedback also creates `taskMessages` for institution follow-up, and ins
 
 `GET /api/chronic/followup-summary` includes `alertQueue`, `summary.alerts`, `summary.overdueAlerts`, and `summary.highPriorityAlerts` so institution and resident entry points can share the same follow-up risk queue.
 
+Institution and resident pages now prefer that API queue when the backend is available, while retaining a local fallback for static preview.
+
 ## Release Evidence
 
 Run `npm run chronic:followup-readiness` to generate:

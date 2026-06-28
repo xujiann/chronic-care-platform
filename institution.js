@@ -4,9 +4,22 @@ let platformState = fallbackState;
 
 document.addEventListener("DOMContentLoaded", async () => {
   platformState = await loadPlatformState(fallbackState);
+  platformState.chronicFollowupSummary = await loadChronicFollowupSummary();
   bindInstitutionActions();
   renderAll(platformState);
 });
+
+async function loadChronicFollowupSummary() {
+  if (!institutionApiBase) return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/chronic/followup-summary`);
+    if (response.ok) return await response.json();
+  } catch (error) {
+    // Fall back to local state-derived queue below.
+  }
+  return null;
+}
 
 function renderAll(state) {
   renderChronicFollowupWorkbench(state);
@@ -122,7 +135,8 @@ function renderChronicFollowupWorkbench(state) {
   const followupMessages = (state.taskMessages || []).filter((item) => item.chronicFollowup && item.targetRole === "institution" && !["read", "handled"].includes(String(item.status || "").toLowerCase()));
   const policyAlignment = buildChronicFollowupPolicyAlignment(state);
   const policyCovered = policyAlignment.filter((item) => item.covered).length;
-  const alertQueue = buildChronicFollowupAlertQueue(state);
+  const alertQueue = state.chronicFollowupSummary?.alertQueue || buildChronicFollowupAlertQueue(state);
+  const alertSummary = state.chronicFollowupSummary?.summary || {};
   summaryEl.textContent = `${openFollowups.length + openPlans.length + openScreenings.length + followupMessages.length} 项待处置`;
   summaryEl.textContent += ` · ${alertQueue.length} 项风险提醒`;
   metricsEl.innerHTML = [
@@ -132,7 +146,7 @@ function renderChronicFollowupWorkbench(state) {
     ["用药依从", pendingMedication.length, "固定取药与长处方闭环"],
     ["随访消息", followupMessages.length, "居民反馈到机构处置提醒"],
     ["居民反馈", feedback.length, "居民端主动回填"],
-    ["提醒队列", alertQueue.length, "逾期、复诊、取药和反馈处置"],
+    ["提醒队列", alertQueue.length, `${alertSummary.highPriorityAlerts || alertQueue.filter((item) => ["critical", "high"].includes(item.priority)).length} 项高优先级`],
     ["政策对照", `${policyCovered}/${policyAlignment.length}`, "国卫基层发〔2025〕15号"]
   ].map(([label, value, hint]) => `<article class="claim-card"><strong>${label}</strong><span>${value}<br>${hint}</span></article>`).join("");
 
@@ -180,6 +194,7 @@ async function dispatchChronicFollowup(collection, id, updates, note) {
     const rows = platformState[collection] || [];
     const index = rows.findIndex((item) => item.id === id);
     if (index >= 0) rows[index] = saved;
+    platformState.chronicFollowupSummary = await loadChronicFollowupSummary();
     return { ok: true, saved };
   } catch (error) {
     alert(error.message || "慢病随访处置失败，请检查登录状态和网络连接");
