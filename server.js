@@ -6213,7 +6213,7 @@ function normalizeMultiPracticeApplication(payload, user, data) {
     lastUpdated: new Date().toISOString()
   };
   application.compliance = qualificationCompliance(profile, application);
-  return application;
+  return withMultiPracticeReviewState(application);
 }
 
 function scopeStateForUser(data, user) {
@@ -6672,35 +6672,45 @@ function multiPracticeRiskFlags(application) {
   ].filter(Boolean);
 }
 
+function withMultiPracticeReviewState(application) {
+  const reviewed = {
+    ...application,
+    documentChecks: syncMultiPracticeDocumentChecks(application)
+  };
+  return {
+    ...reviewed,
+    riskFlags: multiPracticeRiskFlags(reviewed)
+  };
+}
+
 function buildMultiPracticeRegistry(data, user) {
   const applications = (data.multiPracticeApplications || [])
     .filter((item) => canAccessMultiPracticeApplication(user, item))
     .map((item) => {
-      const documentChecks = syncMultiPracticeDocumentChecks(item);
-      const riskFlags = multiPracticeRiskFlags(item);
+      const reviewed = withMultiPracticeReviewState(item);
       return {
-        id: item.id,
-        doctorId: item.doctorId,
-        doctorName: item.doctorName,
-        title: item.title,
-        specialty: item.specialty,
-        practiceScope: item.practiceScope,
-        primaryInstitution: item.primaryInstitution,
-        targetInstitution: item.targetInstitution,
-        targetDepartment: item.targetDepartment,
-        period: item.period,
-        schedule: item.schedule,
-        registrationMode: item.registrationMode || "备案管理",
-        primaryConsent: item.primaryConsent,
-        status: item.status || "待处理",
-        publicVisible: item.publicVisible !== false,
-        compliance: item.compliance || {},
-        documentChecks,
-        risk: riskFlags.length > 0,
-        riskFlags,
-        disclosureItems: item.disclosureItems || [],
-        lifecycle: Array.isArray(item.lifecycle) ? item.lifecycle.slice(0, 5) : [],
-        lastUpdated: item.lastUpdated
+        id: reviewed.id,
+        doctorId: reviewed.doctorId,
+        doctorName: reviewed.doctorName,
+        title: reviewed.title,
+        specialty: reviewed.specialty,
+        practiceScope: reviewed.practiceScope,
+        primaryInstitution: reviewed.primaryInstitution,
+        targetInstitution: reviewed.targetInstitution,
+        targetDepartment: reviewed.targetDepartment,
+        period: reviewed.period,
+        schedule: reviewed.schedule,
+        registrationMode: reviewed.registrationMode || "备案管理",
+        primaryConsent: reviewed.primaryConsent,
+        status: reviewed.status || "待处理",
+        publicVisible: reviewed.publicVisible !== false,
+        compliance: reviewed.compliance || {},
+        documentChecks: reviewed.documentChecks,
+        risk: reviewed.riskFlags.length > 0,
+        riskFlags: reviewed.riskFlags,
+        disclosureItems: reviewed.disclosureItems || [],
+        lifecycle: Array.isArray(reviewed.lifecycle) ? reviewed.lifecycle.slice(0, 5) : [],
+        lastUpdated: reviewed.lastUpdated
       };
     });
   const publicLedger = applications.filter((item) => item.publicVisible).map((item) => ({
@@ -9622,9 +9632,14 @@ async function handleApi(req, res) {
       sendJson(res, 404, { error: "Not Found", message: "当前账户未绑定医生档案" });
       return;
     }
+    const doctorApplications = (data.multiPracticeApplications || [])
+      .filter((item) => item.doctorId === doctor.id)
+      .map(withMultiPracticeReviewState);
+    const doctorRegistry = buildMultiPracticeRegistry(data, user);
     sendJson(res, 200, {
       doctor,
-      multiPracticeApplications: (data.multiPracticeApplications || []).filter((item) => item.doctorId === doctor.id),
+      multiPracticeApplications: doctorApplications,
+      multiPracticeSummary: doctorRegistry.summary,
       policy: data.multiPracticePolicy
     });
     return;
@@ -9634,7 +9649,9 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["institution", "commission"], "/api/multi-practice-applications");
     if (!user) return;
     const data = readDatabase();
-    const applications = (data.multiPracticeApplications || []).filter((item) => canAccessMultiPracticeApplication(user, item));
+    const applications = (data.multiPracticeApplications || [])
+      .filter((item) => canAccessMultiPracticeApplication(user, item))
+      .map(withMultiPracticeReviewState);
     sendJson(res, 200, { applications, policy: data.multiPracticePolicy });
     return;
   }
@@ -9711,10 +9728,7 @@ async function handleApi(req, res) {
       updatedByName: user.name,
       lastUpdated: new Date().toISOString()
     };
-    data.multiPracticeApplications[index] = {
-      ...nextApplication,
-      documentChecks: syncMultiPracticeDocumentChecks(nextApplication)
-    };
+    data.multiPracticeApplications[index] = withMultiPracticeReviewState(nextApplication);
     if (Object.hasOwn(patch, "expectedVersion")) {
       data.storageMeta = {
         ...(data.storageMeta || {}),

@@ -99,6 +99,9 @@ test("about page documents doctor multi-practice policy boundaries", () => {
   assert.match(about, /data-about-flow="multi-practice"/);
   assert.match(about, /医师多点执业主要功能报告\.md/);
   assert.match(read("institution.html"), /政策说明/);
+  assert.match(read("institution.js"), /责任保险/);
+  assert.match(read("institution.js"), /补正提示/);
+  assert.match(read("institution.js"), /riskFlags/);
   assert.match(doc, /国卫医发〔2014〕86号/);
   assert.match(doc, /适用边界/);
   assert.match(doc, /政策到系统字段映射/);
@@ -111,6 +114,8 @@ test("about page documents doctor multi-practice policy boundaries", () => {
   assert.match(report, /医师多点执业主要功能报告/);
   assert.match(report, /主要功能矩阵/);
   assert.match(report, /三端功能边界/);
+  assert.match(report, /multiPracticeSummary/);
+  assert.match(report, /riskFlags/);
   assert.match(report, /\/api\/multi-practice-registry/);
   assert.match(report, /flowchart TD/);
   assert.match(report, /test\/api\.test\.js/);

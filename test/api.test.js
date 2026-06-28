@@ -366,10 +366,24 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(registry.body.reviewQueue.every((item) => item.risk || String(item.status || "").includes("待")), true);
 
     const doctorLogin = await login(baseUrl, "doctor");
+    const doctorMe = await api(baseUrl, "/api/doctors/me", authorized(doctorLogin.body.token));
+    assert.equal(doctorMe.response.status, 200);
+    assert.equal(doctorMe.body.doctor.id, doctorLogin.body.user.doctorId);
+    assert.equal(doctorMe.body.multiPracticeSummary.total, doctorMe.body.multiPracticeApplications.length);
+    assert.equal(doctorMe.body.multiPracticeApplications.every((item) => Array.isArray(item.riskFlags) && item.documentChecks), true);
+
     const doctorRegistry = await api(baseUrl, "/api/multi-practice-registry", authorized(doctorLogin.body.token));
     assert.equal(doctorRegistry.response.status, 200);
     assert.equal(doctorRegistry.body.applications.length >= 1, true);
     assert.equal(doctorRegistry.body.applications.every((item) => item.doctorId === doctorLogin.body.user.doctorId), true);
+    const patchedPractice = await api(baseUrl, `/api/multi-practice-applications/${doctorRegistry.body.applications[0].id}`, authorized(doctorLogin.body.token, {
+      method: "PATCH",
+      body: JSON.stringify({ scheduleConflict: true, note: "测试排班冲突补正" })
+    }));
+    assert.equal(patchedPractice.response.status, 200);
+    assert.equal(patchedPractice.body.documentChecks.scheduleConflict, true);
+    assert.equal(patchedPractice.body.riskFlags.includes("schedule-conflict"), true);
+    assert.equal(patchedPractice.body.lifecycle[0].note, "测试排班冲突补正");
 
     const insuranceLogin = await login(baseUrl, "insurance");
     const deniedRegistry = await api(baseUrl, "/api/multi-practice-registry", authorized(insuranceLogin.body.token));

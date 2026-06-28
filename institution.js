@@ -303,8 +303,11 @@ function renderMultiPracticeApplications(state) {
   countEl.textContent = `${applications.length} 条`;
   listEl.innerHTML = applications.map((item) => {
     const checks = item.compliance || {};
+    const documents = item.documentChecks || {};
+    const riskFlags = Array.isArray(item.riskFlags) ? item.riskFlags : [];
     const passed = Object.entries(checks).filter(([key, value]) => key !== "publicHospitalLeaderRestricted" && value).length;
-    const blocked = checks.publicHospitalLeaderRestricted || Object.entries(checks).some(([key, value]) => key !== "publicHospitalLeaderRestricted" && !value);
+    const documentBlocked = Object.values(documents).some((value) => value === false) || documents.scheduleConflict === true;
+    const blocked = checks.publicHospitalLeaderRestricted || Object.entries(checks).some(([key, value]) => key !== "publicHospitalLeaderRestricted" && !value) || documentBlocked || riskFlags.length > 0;
     const badge = item.status?.includes("待") ? "warn" : item.status?.includes("退回") || blocked ? "danger" : "info";
     return `<section class="item multi-practice-item">
       <div>
@@ -319,6 +322,14 @@ function renderMultiPracticeApplications(state) {
           <span class="badge ${checks.scopeMatched ? "info" : "warn"}">范围${checks.scopeMatched ? "一致" : "待核"}</span>
           <span class="badge ${checks.agreementCompleted ? "info" : "warn"}">协议${checks.agreementCompleted ? "完整" : "待补"}</span>
         </div>
+        <div class="standard-tags">
+          <span class="badge ${documents.firstPracticeConsent ? "info" : "warn"}">第一执业地点${documents.firstPracticeConsent ? "已确认" : "待确认"}</span>
+          <span class="badge ${documents.cooperationAgreement ? "info" : "warn"}">劳务协议${documents.cooperationAgreement ? "完整" : "待补"}</span>
+          <span class="badge ${documents.liabilityInsurance ? "info" : "warn"}">责任保险${documents.liabilityInsurance ? "已核" : "待补"}</span>
+          <span class="badge ${documents.scheduleConflict ? "danger" : "info"}">排班${documents.scheduleConflict ? "冲突" : "正常"}</span>
+          <span class="badge ${documents.publicDisclosure ? "info" : "warn"}">公开${documents.publicDisclosure ? "已纳入" : "未公开"}</span>
+        </div>
+        ${riskFlags.length ? `<p class="muted">补正提示：${riskFlags.join("、")}</p>` : ""}
         <p>第一执业地点：${item.primaryConsent || "待确认"} · ${item.registrationMode || "注册管理"} · 信息公开：${item.publicVisible ? "公开" : "不公开"} · 校验 ${passed}/6</p>
         <div class="action-row">
           ${item.primaryConsent !== "已同意" ? actionButton("multiPracticeApplications", item.id, "同意/报备", { primaryConsent: "已同意", status: "待卫健审核" }, "第一执业地点同意多点执业") : ""}
