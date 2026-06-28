@@ -298,14 +298,27 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const badPhoneLogin = await phoneLogin(baseUrl, "DEMO-MOBILE-R1", "000000");
     assert.equal(badPhoneLogin.response.status, 401);
 
-    const state = await api(baseUrl, "/api/state");
-    assert.equal(state.response.status, 401);
-
     const hashedLogin = await login(baseUrl, "hashed_commission", "hashed-pass");
     assert.equal(hashedLogin.response.status, 200);
     assert.equal(hashedLogin.body.user.passwordHash, undefined);
+
+    const baselineSecurityAudit = await api(baseUrl, "/api/audit/export?trail=securityEvents", authorized(hashedLogin.body.token));
+    assert.equal(baselineSecurityAudit.response.status, 200);
+    const anonymousStateDenialsBefore = baselineSecurityAudit.body.securityEvents.filter((item) => item.actor === "anonymous" && item.target === "/api/state" && item.detail === "未登录或会话已过期").length;
+    const authDenialsBefore = baselineSecurityAudit.body.securityEvents.filter((item) => item.target === "统一认证" && item.result === "拒绝").length;
+
+    const state = await api(baseUrl, "/api/state");
+    assert.equal(state.response.status, 401);
+
     const badHashedLogin = await login(baseUrl, "hashed_commission", "123456");
     assert.equal(badHashedLogin.response.status, 401);
+
+    const securityAudit = await api(baseUrl, "/api/audit/export?trail=securityEvents", authorized(hashedLogin.body.token));
+    assert.equal(securityAudit.response.status, 200);
+    const anonymousStateDenialsAfter = securityAudit.body.securityEvents.filter((item) => item.actor === "anonymous" && item.target === "/api/state" && item.detail === "未登录或会话已过期").length;
+    const authDenialsAfter = securityAudit.body.securityEvents.filter((item) => item.target === "统一认证" && item.result === "拒绝").length;
+    assert.equal(anonymousStateDenialsAfter, anonymousStateDenialsBefore);
+    assert.equal(authDenialsAfter > authDenialsBefore, true);
 
     const tamperedToken = `${hashedLogin.body.token.slice(0, -1)}x`;
     const tamperedState = await api(baseUrl, "/api/state", authorized(tamperedToken));

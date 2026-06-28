@@ -5482,7 +5482,7 @@ function requireApiRole(req, res, roles, target) {
   const allowed = Array.isArray(roles) ? roles : [roles];
   const session = currentSession(req);
   if (!session) {
-    appendSecurityEvent({ actor: "anonymous", role: "anonymous", action: "访问接口", target, result: "拒绝", detail: "未登录或会话已过期" });
+    appendSecurityEvent({ actor: "anonymous", role: "anonymous", action: "访问接口", target, result: "拒绝", detail: "未登录或会话已过期", transient: true });
     sendJson(res, 401, { error: "Unauthorized", message: "请先登录后再访问该接口" });
     return null;
   }
@@ -6532,6 +6532,7 @@ function dispatchChronicFollowupAction(data, user, payload) {
 }
 
 function appendSecurityEvent(event) {
+  if (isTransientAnonymousSecurityEvent(event)) return;
   const data = readDatabase();
   data.securityEvents = [
     {
@@ -6548,6 +6549,15 @@ function appendSecurityEvent(event) {
   ].slice(0, 120);
   data.securityEvents = sealAuditTrail(data.securityEvents, { recompute: true });
   writeDatabase(data);
+}
+
+function isTransientAnonymousSecurityEvent(event) {
+  return process.env.NODE_ENV !== "production" &&
+    event?.transient === true &&
+    event.actor === "anonymous" &&
+    event.role === "anonymous" &&
+    event.result === "拒绝" &&
+    event.detail === "未登录或会话已过期";
 }
 
 function appendDataAccessLog(data, user, residentId, scope, purpose, result = "允许") {
