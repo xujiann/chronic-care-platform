@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const fs = require("node:fs");
 const path = require("node:path");
+const { buildAuditRetentionReport } = require("./audit-retention");
 const { buildIdentityContract } = require("./identity-contract");
 const { buildInterfaceMappingReport } = require("./interface-mapping");
 const { buildMonitoringReadinessReport } = require("./monitoring-readiness");
@@ -80,6 +81,7 @@ function buildSiteReadinessPack(options = {}) {
   const identity = options.identityContract || buildIdentityContract({ data });
   const interfaceMapping = options.interfaceMapping || buildInterfaceMappingReport({ data, pkg });
   const monitoring = options.monitoringReadiness || buildMonitoringReadinessReport({ data, pkg });
+  const auditRetention = options.auditRetention || buildAuditRetentionReport({ data, env });
 
   const identityTemplates = toRows(identity.requiredClaims, (claim) => ({
     id: `identity-${claim.claim || claim.name}`,
@@ -122,6 +124,25 @@ function buildSiteReadinessPack(options = {}) {
       template: "slo-threshold",
       signal: target.name || target.id,
       requiredEvidence: ["threshold definition", "dashboard panel", "alert history", "escalation receiver"]
+    })),
+    ...Object.entries(auditRetention.trails || {}).map(([trail, trailReport]) => ({
+      id: `monitoring-audit-chain-${trail}`,
+      domain: "audit-monitoring",
+      owner: "security-admin",
+      template: "audit-chain-watch",
+      signal: `审计链路:${trail}`,
+      auditRows: trailReport.count || 0,
+      brokenLinks: (trailReport.broken || []).length,
+      requiredEvidence: ["audit-retention-report.md", "hash chain verification", "broken link triage", "retention owner signoff"]
+    })),
+    ...toRows(auditRetention.retentionTargets, (target) => ({
+      id: `monitoring-audit-retention-${target.id}`,
+      domain: "audit-monitoring",
+      owner: "security-admin",
+      template: "audit-retention-target",
+      signal: target.env,
+      configured: Boolean(target.configured),
+      requiredEvidence: ["retention target configuration", "export permission proof", "SIEM or archive handoff", "cutover signoff"]
     }))
   ];
 
@@ -149,7 +170,7 @@ function buildSiteReadinessPack(options = {}) {
       name: "Monitoring and on-call pack",
       owner: "platform-ops",
       rows: monitoringTemplates.length,
-      requiredArtifacts: ["监控目标", "SLO 阈值", "告警规则", "值班升级表", "演练记录"],
+      requiredArtifacts: ["监控目标", "SLO 阈值", "告警规则", "值班升级表", "审计链路校验", "审计保全目标", "演练记录"],
       status: monitoringTemplates.length >= 4 ? "template-ready" : "needs-template-work"
     },
     {
@@ -273,10 +294,10 @@ function renderTemplateReadmes(report) {
       title: "Monitoring and on-call template",
       pack: packById["monitoring-operations-pack"],
       rows: templates.monitoring || [],
-      capability: "Converts runtime health, metrics, SLO, alert, dead-letter, and escalation signals into an operations readiness checklist.",
-      input: "Health route screenshot, metrics scrape target, dashboard panel, alert rule, duty roster, escalation receiver, and drill record.",
-      output: "Route watch list, SLO threshold table, alert ownership, on-call escalation evidence, and cutover monitoring signoff material.",
-      apiEvidence: "/api/health, /api/metrics, /api/system/readiness, /api/site-readiness-pack"
+      capability: "Converts runtime health, metrics, SLO, alert, dead-letter, escalation, audit hash-chain, and audit-retention signals into an audit monitoring readiness checklist.",
+      input: "Health route screenshot, metrics scrape target, dashboard panel, alert rule, duty roster, escalation receiver, audit chain verification, retention target proof, and drill record.",
+      output: "Route watch list, SLO threshold table, alert ownership, audit-chain watch list, retention target evidence, on-call escalation evidence, and cutover monitoring signoff material.",
+      apiEvidence: "/api/health, /api/metrics, /api/audit/verify, /api/system/readiness, /api/site-readiness-pack, release/audit-retention-report.md"
     },
     {
       file: "production-signoff/README.md",
