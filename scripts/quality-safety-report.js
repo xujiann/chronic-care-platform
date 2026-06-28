@@ -12,7 +12,8 @@ const REQUIRED_COLLECTIONS = [
   "clinicalPathwayCases",
   "medicalRecordQualityReviews",
   "mutualRecognitionQualityReviews",
-  "qualityRectificationOrders"
+  "qualityRectificationOrders",
+  "qualitySafetySiteSignoffs"
 ];
 
 const REUSED_COLLECTIONS = [
@@ -32,7 +33,8 @@ const REQUIRED_ROUTES = [
   "/api/quality-safety/rectifications/:id/escalate",
   "/api/quality-safety/critical-values/:id/acknowledge",
   "/api/quality-safety/critical-values/:id/dispose",
-  "/api/quality-safety/clinical-pathways/:id/review"
+  "/api/quality-safety/clinical-pathways/:id/review",
+  "/api/quality-safety/site-signoffs/:id/review"
 ];
 
 const REQUIRED_POLICY_REFERENCES = [
@@ -57,7 +59,7 @@ function arrayOf(data, key) {
 }
 
 function statusClosed(status) {
-  return /closed|approved|resolved|completed|review_passed/i.test(String(status || ""));
+  return /closed|accepted|approved|resolved|completed|review_passed/i.test(String(status || ""));
 }
 
 function slaState(item, now = new Date()) {
@@ -362,6 +364,20 @@ function buildQualitySafetyReport(options = {}) {
   }));
   const rectifications = arrayOf(data, "qualityRectificationOrders");
   const mutualRecognitionRows = arrayOf(data, "mutualRecognitionQualityReviews");
+  const siteSignoffRows = arrayOf(data, "qualitySafetySiteSignoffs").map((item) => ({
+    id: item.id,
+    domain: item.domain,
+    item: item.item,
+    ownerRole: item.ownerRole,
+    owner: item.owner,
+    status: item.status || "pending_site_confirmation",
+    dueAt: item.dueAt || "",
+    requiredEvidence: Array.isArray(item.requiredEvidence) ? item.requiredEvidence : [],
+    evidenceCount: Array.isArray(item.evidence) ? item.evidence.length : 0,
+    auditCount: Array.isArray(item.auditTrail) ? item.auditTrail.length : 0,
+    sourceCollections: Array.isArray(item.sourceCollections) ? item.sourceCollections : [],
+    latestNote: item.latestNote || ""
+  }));
   const boundaryRows = [
     { id: "medical-quality", collection: "qualitySafetyEvents", modeled: qualityEvents.some((item) => item.domain === "medical_quality") },
     { id: "safety-events", collection: "qualitySafetyEvents", modeled: qualityEvents.some((item) => item.type === "safety_event") },
@@ -369,7 +385,8 @@ function buildQualitySafetyReport(options = {}) {
     { id: "clinical-pathways", collection: "clinicalPathwayCases", modeled: arrayOf(data, "clinicalPathwayCases").length > 0 },
     { id: "medical-record-qc", collection: "medicalRecordQualityReviews", modeled: arrayOf(data, "medicalRecordQualityReviews").length > 0 },
     { id: "mutual-recognition-qc", collection: "mutualRecognitionQualityReviews", modeled: arrayOf(data, "mutualRecognitionQualityReviews").length > 0 },
-    { id: "rectification-loop", collection: "qualityRectificationOrders", modeled: rectifications.some((item) => item.status && Array.isArray(item.auditTrail)) }
+    { id: "rectification-loop", collection: "qualityRectificationOrders", modeled: rectifications.some((item) => item.status && Array.isArray(item.auditTrail)) },
+    { id: "site-signoff-tracker", collection: "qualitySafetySiteSignoffs", modeled: siteSignoffRows.length >= 6 && siteSignoffRows.every((item) => item.auditCount > 0) }
   ];
   const collectionRows = REQUIRED_COLLECTIONS.map((collection) => ({
     collection,
@@ -430,6 +447,7 @@ function buildQualitySafetyReport(options = {}) {
     { id: "quality-safety:clinical-pathway-loop", passed: clinicalPathwayRows.length > 0 && clinicalPathwayRows.every((item) => item.eventId && item.dueAt) && server.includes("/api/quality-safety/clinical-pathways/:id/review"), detail: `${clinicalPathwayRows.length} pathway variances; ${clinicalPathwayRows.filter((item) => item.reviewed).length} reviewed` },
     { id: "quality-safety:policy-basis", passed: policyRows.every((item) => item.present), detail: `${policyRows.filter((item) => item.present).length}/${policyRows.length} policy references linked` },
     { id: "quality-safety:action-plan", passed: actionPlan.length > 0 && actionPlan.every((item) => item.priority && item.action && item.evidence), detail: `${actionPlan.length} prioritized action items` },
+    { id: "quality-safety:site-signoff-tracker", passed: siteSignoffRows.length >= 6 && siteSignoffRows.every((item) => item.requiredEvidence.length > 0 && item.auditCount > 0), detail: `${siteSignoffRows.length} site sign-off items; ${siteSignoffRows.filter((item) => statusClosed(item.status)).length} accepted` },
     { id: "quality-safety:go-live-readiness", passed: goLiveReadiness.usable, detail: `${goLiveReadiness.stage}; score=${goLiveReadiness.score}; blockers=${goLiveReadiness.blockers.length}` }
   ];
   return {
@@ -455,6 +473,12 @@ function buildQualitySafetyReport(options = {}) {
         pending: clinicalPathwayRows.filter((item) => !item.reviewed).length
       },
       policyReferences: policyRows.filter((item) => item.present).length,
+      siteSignoffs: {
+        total: siteSignoffRows.length,
+        ready: siteSignoffRows.filter((item) => item.status === "ready_for_joint_test").length,
+        accepted: siteSignoffRows.filter((item) => statusClosed(item.status)).length,
+        pending: siteSignoffRows.filter((item) => !statusClosed(item.status)).length
+      },
       actionItems: actionPlan.length,
       highActionItems: actionPlan.filter((item) => ["critical", "high"].includes(item.priority)).length,
       readinessStage: goLiveReadiness.stage,
@@ -471,6 +495,7 @@ function buildQualitySafetyReport(options = {}) {
     criticalValues: criticalRows,
     clinicalPathways: clinicalPathwayRows,
     rectifications: stateRows,
+    siteSignoffs: siteSignoffRows,
     checks
   };
 }
@@ -488,6 +513,7 @@ function renderMarkdown(report) {
     `- Critical values: ${report.summary.criticalValues.total}, pending disposition ${report.summary.criticalValues.pending}`,
     `- Clinical pathways: ${report.summary.clinicalPathways.total}, pending review ${report.summary.clinicalPathways.pending}`,
     `- Policy references: ${report.summary.policyReferences}/${report.policyReferences.length}`,
+    `- Site sign-offs: ${report.summary.siteSignoffs.total}, ready ${report.summary.siteSignoffs.ready}, accepted ${report.summary.siteSignoffs.accepted}`,
     `- Action plan: ${report.summary.actionItems} items, high priority ${report.summary.highActionItems}`,
     `- Go-live readiness: ${report.goLiveReadiness.stage}, score ${report.goLiveReadiness.score}, usable ${report.goLiveReadiness.usable ? "yes" : "no"}`,
     "",
@@ -529,6 +555,12 @@ function renderMarkdown(report) {
     "| Production sign-off item |",
     "|---|",
     ...report.goLiveReadiness.productionSignoffPending.map((item) => `| ${item} |`),
+    "",
+    "## Site Joint-testing Sign-offs",
+    "",
+    "| Item | Owner | Status | Required evidence | Sources |",
+    "|---|---|---|---|---|",
+    ...report.siteSignoffs.map((item) => `| ${item.item} | ${item.owner} | ${item.status} | ${item.requiredEvidence.join(", ")} | ${item.sourceCollections.join(", ")} |`),
     "",
     "## Regulatory Action Plan",
     "",

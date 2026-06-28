@@ -54,10 +54,13 @@ test("quality safety report covers boundaries, reuse and routes", () => {
   assert.equal(report.checks.some((item) => item.id === "quality-safety:policy-basis" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "quality-safety:action-plan" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "quality-safety:risk-ranking" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "quality-safety:site-signoff-tracker" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "quality-safety:go-live-readiness" && item.passed), true);
   assert.equal(report.goLiveReadiness.usable, true);
   assert.equal(report.goLiveReadiness.stage, "controlled_pilot_ready");
   assert.equal(report.summary.readinessScore, 100);
+  assert.equal(report.summary.siteSignoffs.total >= 6, true);
+  assert.equal(report.siteSignoffs.some((item) => item.id === "qss-audit-retention" && item.requiredEvidence.length > 0), true);
   assert.equal(report.institutionRisks.length > 0, true);
   assert.equal(report.institutionRisks[0].score > 0, true);
   assert.equal(report.criticalValues.length > 0, true);
@@ -73,6 +76,7 @@ test("quality safety report covers boundaries, reuse and routes", () => {
   assert.match(renderMarkdown(report), /Regulatory Action Plan/);
   assert.match(renderMarkdown(report), /Go-live Readiness/);
   assert.match(renderMarkdown(report), /controlled_pilot_ready/);
+  assert.match(renderMarkdown(report), /Site Joint-testing Sign-offs/);
   assert.match(renderMarkdown(report), /Institution risk ranking/);
   assert.match(renderMarkdown(report), /Rectification SLA/);
 });
@@ -106,6 +110,8 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
   assert.equal(dashboard.body.goLiveReadiness.usable, true);
   assert.equal(dashboard.body.goLiveReadiness.stage, "controlled_pilot_ready");
   assert.equal(dashboard.body.summary.readinessScore, 100);
+  assert.equal(dashboard.body.summary.siteSignoffs >= 6, true);
+  assert.equal(dashboard.body.siteSignoffs.some((item) => item.id === "qss-live-feeds"), true);
   assert.equal(dashboard.body.actionPlan.some((item) => item.priority === "critical"), true);
   assert.equal(dashboard.body.institutionRisks.length > 0, true);
   assert.equal(dashboard.body.institutionRisks[0].score > 0, true);
@@ -190,10 +196,23 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
   assert.equal(pathwayReview.response.status, 200);
   assert.equal(pathwayReview.body.status, "review_passed");
   assert.equal(pathwayReview.body.reviewComplete, true);
+  const signoffReview = await api(baseUrl, "/api/quality-safety/site-signoffs/qss-live-feeds/review", authorized(token, {
+    method: "POST",
+    body: JSON.stringify({ decision: "ready_for_joint_test", note: "Joint-test payload sample archived.", evidence: ["his-emr-lis-pacs-sample"] })
+  }));
+  assert.equal(signoffReview.response.status, 200);
+  assert.equal(signoffReview.body.status, "ready_for_joint_test");
+  assert.equal(signoffReview.body.evidenceCount >= 1, true);
+  const forbiddenSignoffReview = await api(baseUrl, "/api/quality-safety/site-signoffs/qss-live-feeds/review", authorized(institutionLogin.body.token, {
+    method: "POST",
+    body: JSON.stringify({ decision: "accepted", note: "Should be forbidden." })
+  }));
+  assert.equal(forbiddenSignoffReview.response.status, 403);
 
   const audit = await api(baseUrl, "/api/audit/export?trail=securityEvents", authorized(token));
   assert.equal(audit.response.status, 200);
   assert.equal(JSON.stringify(audit.body).includes("quality-safety review"), true);
   assert.equal(JSON.stringify(audit.body).includes("quality-safety critical value disposition"), true);
   assert.equal(JSON.stringify(audit.body).includes("quality-safety clinical pathway review"), true);
+  assert.equal(JSON.stringify(audit.body).includes("quality-safety site signoff review"), true);
 });

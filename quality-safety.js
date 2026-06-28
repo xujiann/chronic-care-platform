@@ -42,6 +42,7 @@ function renderMetrics(summary) {
     ["Closed", summary.closed],
     ["Rectifications", summary.rectifications],
     ["Action items", summary.actionItems || 0],
+    ["Site sign-offs", summary.siteSignoffs || 0],
     ["Pathway open", summary.clinicalPathwaysOpen || 0],
     ["Due soon", summary.sla?.dueSoon || 0],
     ["Overdue", summary.sla?.overdue || 0]
@@ -149,6 +150,26 @@ function renderIssues(rows) {
   `);
 }
 
+function renderSiteSignoffs(rows) {
+  const canReview = qualitySafetyState?.role === "commission";
+  setHtml("quality-safety-signoffs", `
+    <table>
+      <thead><tr><th>Item</th><th>Owner</th><th>Status</th><th>Evidence</th><th>Action</th></tr></thead>
+      <tbody>
+        ${rows.map((item) => `
+          <tr>
+            <td><strong>${text(item.item)}</strong><br /><small>${text(item.domain)} / ${text((item.sourceCollections || []).join(", "))}</small></td>
+            <td>${text(item.owner)}<br /><small>${statusLabel(item.ownerRole)}</small></td>
+            <td>${statusLabel(item.status)}<br /><small>Due ${text(item.dueAt)}</small></td>
+            <td>${text(item.requiredEvidenceText)}<br /><small>${item.evidenceCount || 0} uploaded, ${item.auditCount || 0} audit rows</small></td>
+            <td>${canReview ? `<button class="inline-action" type="button" data-signoff-review="${item.id}">Record joint-test</button>` : statusLabel("view")}</td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  `);
+}
+
 function renderRectifications(rows) {
   const role = qualitySafetyState?.role || "";
   const canReview = role === "commission";
@@ -223,6 +244,7 @@ function renderQualitySafety(data) {
   renderActionPlan(data.actionPlan || []);
   renderRisks(data.institutionRisks || []);
   renderReuse(data.reusedCollections || []);
+  renderSiteSignoffs(data.siteSignoffs || []);
   renderIssues(data.issues || []);
   renderRectifications(data.rectifications || []);
   renderCritical(data.criticalValueAlerts || []);
@@ -316,6 +338,18 @@ async function reviewClinicalPathway(caseId) {
   await loadQualitySafety();
 }
 
+async function reviewSiteSignoff(signoffId) {
+  await qualityApi(`/quality-safety/site-signoffs/${encodeURIComponent(signoffId)}/review`, {
+    method: "POST",
+    body: JSON.stringify({
+      decision: "ready_for_joint_test",
+      note: "Joint-test evidence recorded from the quality-safety portal.",
+      evidence: ["site-joint-test-note"]
+    })
+  });
+  await loadQualitySafety();
+}
+
 document.addEventListener("click", (event) => {
   const dispatch = event.target.closest("[data-dispatch]");
   const feedback = event.target.closest("[data-feedback]");
@@ -324,6 +358,7 @@ document.addEventListener("click", (event) => {
   const criticalAck = event.target.closest("[data-critical-ack]");
   const criticalDispose = event.target.closest("[data-critical-dispose]");
   const pathwayReview = event.target.closest("[data-pathway-review]");
+  const signoffReview = event.target.closest("[data-signoff-review]");
   if (dispatch) dispatchIssue(dispatch.dataset.dispatch).catch((error) => alert(error.message));
   if (feedback) submitFeedback(feedback.dataset.feedback).catch((error) => alert(error.message));
   if (review) reviewOrder(review.dataset.review).catch((error) => alert(error.message));
@@ -331,6 +366,7 @@ document.addEventListener("click", (event) => {
   if (criticalAck) acknowledgeCritical(criticalAck.dataset.criticalAck).catch((error) => alert(error.message));
   if (criticalDispose) disposeCritical(criticalDispose.dataset.criticalDispose).catch((error) => alert(error.message));
   if (pathwayReview) reviewClinicalPathway(pathwayReview.dataset.pathwayReview).catch((error) => alert(error.message));
+  if (signoffReview) reviewSiteSignoff(signoffReview.dataset.signoffReview).catch((error) => alert(error.message));
 });
 
 loadQualitySafety();

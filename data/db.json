@@ -7102,5 +7102,169 @@
         }
       ]
     }
+  ],
+  "qualitySafetySiteSignoffs": [
+    {
+      "id": "qss-live-feeds",
+      "domain": "live_interfaces",
+      "item": "Live HIS/EMR/LIS/PACS feed binding",
+      "ownerRole": "commission",
+      "owner": "Institution integration group",
+      "requiredEvidence": [
+        "signed joint-test record",
+        "sample inbound payload",
+        "field mapping confirmation"
+      ],
+      "sourceCollections": [
+        "hospitalInteroperabilityFunctions",
+        "integrationContracts"
+      ],
+      "status": "pending_site_confirmation",
+      "dueAt": "2026-07-05",
+      "latestNote": "Confirm live feed scope and payload signatures before production cutover.",
+      "auditTrail": [
+        {
+          "at": "2026-06-28T10:00:00.000Z",
+          "by": "health",
+          "action": "seed-site-signoff",
+          "note": "Initial site sign-off tracker."
+        }
+      ]
+    },
+    {
+      "id": "qss-critical-routing",
+      "domain": "critical_value",
+      "item": "Production critical-value routing and timeout escalation",
+      "ownerRole": "institution",
+      "owner": "Dalian Central Hospital",
+      "requiredEvidence": [
+        "routing rule screenshot",
+        "acknowledgement receipt",
+        "timeout escalation recipient list"
+      ],
+      "sourceCollections": [
+        "criticalValueAlerts",
+        "diagnosticReports"
+      ],
+      "status": "ready_for_joint_test",
+      "dueAt": "2026-07-03",
+      "latestNote": "Pilot route is ready; production notification receipt still needs site confirmation.",
+      "auditTrail": [
+        {
+          "at": "2026-06-28T10:05:00.000Z",
+          "by": "health",
+          "action": "seed-site-signoff",
+          "note": "Critical value route prepared for joint test."
+        }
+      ]
+    },
+    {
+      "id": "qss-pathway-dictionary",
+      "domain": "clinical_pathway",
+      "item": "Local clinical pathway dictionaries and EMR variance evidence",
+      "ownerRole": "institution",
+      "owner": "Dalian Central Hospital",
+      "requiredEvidence": [
+        "local pathway dictionary",
+        "variance rule mapping",
+        "EMR screenshot sample"
+      ],
+      "sourceCollections": [
+        "clinicalPathwayCases",
+        "qualitySafetyEvents"
+      ],
+      "status": "pending_site_confirmation",
+      "dueAt": "2026-07-08",
+      "latestNote": "Attach local pathway dictionary version and variance examples.",
+      "auditTrail": [
+        {
+          "at": "2026-06-28T10:10:00.000Z",
+          "by": "health",
+          "action": "seed-site-signoff",
+          "note": "Pathway dictionary sign-off item created."
+        }
+      ]
+    },
+    {
+      "id": "qss-mutual-recognition-rules",
+      "domain": "mutual_recognition_qc",
+      "item": "Regional mutual-recognition lists and negative-list rules",
+      "ownerRole": "county",
+      "owner": "Regional mutual recognition QC",
+      "requiredEvidence": [
+        "recognition catalog",
+        "negative-list rule",
+        "manual review exception sample"
+      ],
+      "sourceCollections": [
+        "countyMutualRecognitionRecords",
+        "mutualRecognitionQualityReviews"
+      ],
+      "status": "pending_site_confirmation",
+      "dueAt": "2026-07-06",
+      "latestNote": "County consortium must confirm catalog and exception handling.",
+      "auditTrail": [
+        {
+          "at": "2026-06-28T10:15:00.000Z",
+          "by": "health",
+          "action": "seed-site-signoff",
+          "note": "Mutual-recognition sign-off item created."
+        }
+      ]
+    },
+    {
+      "id": "qss-department-attachments",
+      "domain": "rectification",
+      "item": "Department rectification sign-off attachments",
+      "ownerRole": "institution",
+      "owner": "Qingniwaqiao Community Health Service Center",
+      "requiredEvidence": [
+        "department head signature",
+        "corrected EMR evidence",
+        "commission review note"
+      ],
+      "sourceCollections": [
+        "qualityRectificationOrders",
+        "medicalRecordQualityReviews"
+      ],
+      "status": "ready_for_joint_test",
+      "dueAt": "2026-07-04",
+      "latestNote": "Demo attachment placeholder exists; production requires signed department evidence.",
+      "auditTrail": [
+        {
+          "at": "2026-06-28T10:20:00.000Z",
+          "by": "health",
+          "action": "seed-site-signoff",
+          "note": "Rectification attachment sign-off prepared."
+        }
+      ]
+    },
+    {
+      "id": "qss-audit-retention",
+      "domain": "audit_retention",
+      "item": "Production audit retention target",
+      "ownerRole": "commission",
+      "owner": "Security administration",
+      "requiredEvidence": [
+        "AUDIT_EXPORT_PATH or SIEM_ENDPOINT",
+        "retention period approval",
+        "audit export permission"
+      ],
+      "sourceCollections": [
+        "securityEvents",
+        "dataAccessLogs"
+      ],
+      "status": "pending_site_confirmation",
+      "dueAt": "2026-07-10",
+      "latestNote": "Production retention target remains a cutover warning until environment evidence is configured.",
+      "auditTrail": [
+        {
+          "at": "2026-06-28T10:25:00.000Z",
+          "by": "health",
+          "action": "seed-site-signoff",
+          "note": "Audit retention sign-off item created."
+        }
+      ]
+    }
   ]
 }

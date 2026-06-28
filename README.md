@@ -257,11 +257,12 @@ GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下
 - Runnable portal: `quality-safety.html`
 - About and policy page: `quality-safety-about.html`
 - Role access: commission dispatches and reviews; institution/county users can open the same portal for scoped dashboard and rectification feedback.
-- API evidence: `/api/quality-safety/dashboard`, `/api/quality-safety/issues/:id/dispatch`, `/api/quality-safety/rectifications/:id/feedback`, `/api/quality-safety/rectifications/:id/review`, `/api/quality-safety/critical-values/:id/acknowledge`, `/api/quality-safety/critical-values/:id/dispose`, `/api/quality-safety/clinical-pathways/:id/review`
-- Seed collections: `qualitySafetyEvents`, `criticalValueAlerts`, `clinicalPathwayCases`, `medicalRecordQualityReviews`, `mutualRecognitionQualityReviews`, `qualityRectificationOrders`
+- API evidence: `/api/quality-safety/dashboard`, `/api/quality-safety/issues/:id/dispatch`, `/api/quality-safety/rectifications/:id/feedback`, `/api/quality-safety/rectifications/:id/review`, `/api/quality-safety/critical-values/:id/acknowledge`, `/api/quality-safety/critical-values/:id/dispose`, `/api/quality-safety/clinical-pathways/:id/review`, `/api/quality-safety/site-signoffs/:id/review`
+- Seed collections: `qualitySafetyEvents`, `criticalValueAlerts`, `clinicalPathwayCases`, `medicalRecordQualityReviews`, `mutualRecognitionQualityReviews`, `qualityRectificationOrders`, `qualitySafetySiteSignoffs`
 - Reused collections: `diagnosticReports`, `countyMutualRecognitionRecords`, `dataQualityIssues`, `institutionCreditEvaluations`, `securityEvents`, `hospitalInteroperabilityFunctions`
 - Release artifact: `quality-safety-report.md` / `quality-safety-report.json` from `npm.cmd run quality-safety:report`
 - Go-live readiness: the dashboard, module report, and release report compute `controlled_pilot_ready` status with a score, evidence checks, blockers, and production sign-off items.
+- Site sign-off tracker: production cutover items for live feeds, critical-value routing, pathway dictionaries, mutual-recognition rules, department attachments, and audit retention are tracked with owner, status, required evidence, and audit trail.
 - SLA evidence: rectification orders include due-date status, evidence completeness, and commission escalation records.
 - Risk ranking: the portal and release report derive institution priority from severity, open issues, SLA pressure, missing feedback, and escalations.
 - Regulatory action plan: the dashboard and release report turn risk, SLA, critical-value, pathway, and mutual-recognition signals into prioritized next actions with owner and evidence fields.

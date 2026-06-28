@@ -544,6 +544,7 @@ function seedState() {
     medicalRecordQualityReviews: seedMedicalRecordQualityReviews(),
     mutualRecognitionQualityReviews: seedMutualRecognitionQualityReviews(),
     qualityRectificationOrders: seedQualityRectificationOrders(),
+    qualitySafetySiteSignoffs: seedQualitySafetySiteSignoffs(),
     careOrders: seedCareOrders(),
     medicationPickups: seedMedicationPickups(),
     institutionSupervisions: seedInstitutionSupervisions(),
@@ -1177,6 +1178,89 @@ function seedQualityRectificationOrders() {
       feedback: [{ at: "2026-06-22T16:00:00.000Z", by: "community", byName: "Community doctor", content: "Corrected assessment fields have been uploaded for review.", attachments: ["emr-correction-screenshot"] }],
       review: [],
       auditTrail: [{ at: "2026-06-20T15:00:00.000Z", by: "health", action: "dispatch", note: "Seed rectification order." }]
+    }
+  ];
+}
+
+function seedQualitySafetySiteSignoffs() {
+  return [
+    {
+      id: "qss-live-feeds",
+      domain: "live_interfaces",
+      item: "Live HIS/EMR/LIS/PACS feed binding",
+      ownerRole: "commission",
+      owner: "Institution integration group",
+      requiredEvidence: ["signed joint-test record", "sample inbound payload", "field mapping confirmation"],
+      sourceCollections: ["hospitalInteroperabilityFunctions", "integrationContracts"],
+      status: "pending_site_confirmation",
+      dueAt: "2026-07-05",
+      latestNote: "Confirm live feed scope and payload signatures before production cutover.",
+      auditTrail: [{ at: "2026-06-28T10:00:00.000Z", by: "health", action: "seed-site-signoff", note: "Initial site sign-off tracker." }]
+    },
+    {
+      id: "qss-critical-routing",
+      domain: "critical_value",
+      item: "Production critical-value routing and timeout escalation",
+      ownerRole: "institution",
+      owner: "Dalian Central Hospital",
+      requiredEvidence: ["routing rule screenshot", "acknowledgement receipt", "timeout escalation recipient list"],
+      sourceCollections: ["criticalValueAlerts", "diagnosticReports"],
+      status: "ready_for_joint_test",
+      dueAt: "2026-07-03",
+      latestNote: "Pilot route is ready; production notification receipt still needs site confirmation.",
+      auditTrail: [{ at: "2026-06-28T10:05:00.000Z", by: "health", action: "seed-site-signoff", note: "Critical value route prepared for joint test." }]
+    },
+    {
+      id: "qss-pathway-dictionary",
+      domain: "clinical_pathway",
+      item: "Local clinical pathway dictionaries and EMR variance evidence",
+      ownerRole: "institution",
+      owner: "Dalian Central Hospital",
+      requiredEvidence: ["local pathway dictionary", "variance rule mapping", "EMR screenshot sample"],
+      sourceCollections: ["clinicalPathwayCases", "qualitySafetyEvents"],
+      status: "pending_site_confirmation",
+      dueAt: "2026-07-08",
+      latestNote: "Attach local pathway dictionary version and variance examples.",
+      auditTrail: [{ at: "2026-06-28T10:10:00.000Z", by: "health", action: "seed-site-signoff", note: "Pathway dictionary sign-off item created." }]
+    },
+    {
+      id: "qss-mutual-recognition-rules",
+      domain: "mutual_recognition_qc",
+      item: "Regional mutual-recognition lists and negative-list rules",
+      ownerRole: "county",
+      owner: "Regional mutual recognition QC",
+      requiredEvidence: ["recognition catalog", "negative-list rule", "manual review exception sample"],
+      sourceCollections: ["countyMutualRecognitionRecords", "mutualRecognitionQualityReviews"],
+      status: "pending_site_confirmation",
+      dueAt: "2026-07-06",
+      latestNote: "County consortium must confirm catalog and exception handling.",
+      auditTrail: [{ at: "2026-06-28T10:15:00.000Z", by: "health", action: "seed-site-signoff", note: "Mutual-recognition sign-off item created." }]
+    },
+    {
+      id: "qss-department-attachments",
+      domain: "rectification",
+      item: "Department rectification sign-off attachments",
+      ownerRole: "institution",
+      owner: "Qingniwaqiao Community Health Service Center",
+      requiredEvidence: ["department head signature", "corrected EMR evidence", "commission review note"],
+      sourceCollections: ["qualityRectificationOrders", "medicalRecordQualityReviews"],
+      status: "ready_for_joint_test",
+      dueAt: "2026-07-04",
+      latestNote: "Demo attachment placeholder exists; production requires signed department evidence.",
+      auditTrail: [{ at: "2026-06-28T10:20:00.000Z", by: "health", action: "seed-site-signoff", note: "Rectification attachment sign-off prepared." }]
+    },
+    {
+      id: "qss-audit-retention",
+      domain: "audit_retention",
+      item: "Production audit retention target",
+      ownerRole: "commission",
+      owner: "Security administration",
+      requiredEvidence: ["AUDIT_EXPORT_PATH or SIEM_ENDPOINT", "retention period approval", "audit export permission"],
+      sourceCollections: ["securityEvents", "dataAccessLogs"],
+      status: "pending_site_confirmation",
+      dueAt: "2026-07-10",
+      latestNote: "Production retention target remains a cutover warning until environment evidence is configured.",
+      auditTrail: [{ at: "2026-06-28T10:25:00.000Z", by: "health", action: "seed-site-signoff", note: "Audit retention sign-off item created." }]
     }
   ];
 }
@@ -3445,6 +3529,7 @@ function normalizeState(data) {
     medicalRecordQualityReviews: mergeByKey(seedMedicalRecordQualityReviews(), data.medicalRecordQualityReviews, "id"),
     mutualRecognitionQualityReviews: mergeByKey(seedMutualRecognitionQualityReviews(), data.mutualRecognitionQualityReviews, "id"),
     qualityRectificationOrders: mergeByKey(seedQualityRectificationOrders(), data.qualityRectificationOrders, "id"),
+    qualitySafetySiteSignoffs: mergeByKey(seedQualitySafetySiteSignoffs(), data.qualitySafetySiteSignoffs, "id"),
     mutualRecognitionRules: mergeByKey(seedMutualRecognitionRules(), data.mutualRecognitionRules, "id"),
     diagnosticReports: mergeByKey(seedDiagnosticReports(), data.diagnosticReports, "id"),
     taskMessages: Array.isArray(data.taskMessages) ? data.taskMessages : [],
@@ -4509,6 +4594,7 @@ function scopeStateForUser(data, user) {
   delete scoped.medicalRecordQualityReviews;
   delete scoped.mutualRecognitionQualityReviews;
   delete scoped.qualityRectificationOrders;
+  delete scoped.qualitySafetySiteSignoffs;
   if (user.role !== "county") delete scoped.countyAcceptanceLedger;
   if (user.role !== "institution") delete scoped.chronicAcceptanceLedger;
 
@@ -4959,7 +5045,7 @@ function buildDataQualityScorecard(data) {
 
 function normalizeQualitySafetyStatus(status) {
   const text = String(status || "open").trim().toLowerCase();
-  if (/closed|resolved|approved|review_passed|completed|recognized|disposed/.test(text)) return "closed";
+  if (/closed|resolved|approved|accepted|review_passed|completed|recognized|disposed/.test(text)) return "closed";
   if (/feedback|submitted|review/.test(text)) return "reviewing";
   if (/dispatch|in_progress|pending_disposition|acknowledg|variance_open|escalat/.test(text)) return "in_progress";
   if (/reject|returned|overdue/.test(text)) return "returned";
@@ -5215,6 +5301,21 @@ function qualitySafetyVisibleRows(rows, user) {
   return [];
 }
 
+function buildQualitySafetySiteSignoffs(data, user) {
+  const rows = (Array.isArray(data.qualitySafetySiteSignoffs) ? data.qualitySafetySiteSignoffs : []).map((item) => ({
+    ...item,
+    ownerRole: item.ownerRole || "commission",
+    normalizedStatus: normalizeQualitySafetyStatus(item.status),
+    evidenceCount: Array.isArray(item.evidence) ? item.evidence.length : 0,
+    auditCount: Array.isArray(item.auditTrail) ? item.auditTrail.length : 0,
+    evidenceReady: Array.isArray(item.evidence) && item.evidence.length > 0,
+    requiredEvidenceText: Array.isArray(item.requiredEvidence) ? item.requiredEvidence.join(", ") : String(item.requiredEvidence || ""),
+    sourceCollection: "qualitySafetySiteSignoffs",
+    sourceId: item.id
+  }));
+  return qualitySafetyVisibleRows(rows, user);
+}
+
 function buildQualitySafetyGoLiveReadiness({ summary, actionPlan, institutionRisks, rectifications, criticalValueAlerts, clinicalPathwayCases, mutualRecognitionQualityReviews, reusedCollections, role }) {
   const checks = [
     {
@@ -5337,6 +5438,7 @@ function buildQualitySafetyDashboard(data, user) {
     .map((item) => ({ ...item, normalizedStatus: normalizeQualitySafetyStatus(item.status), ...qualitySafetySlaState(item) }));
   const criticalValueAlerts = buildQualitySafetyCriticalAlerts(data, user);
   const clinicalPathwayCases = buildQualitySafetyClinicalPathways(data, user);
+  const siteSignoffs = buildQualitySafetySiteSignoffs(data, user);
   const institutionRisks = buildQualitySafetyInstitutionRisks(issues, rectifications);
   const mutualRecognitionQualityReviews = qualitySafetyVisibleRows((Array.isArray(data.mutualRecognitionQualityReviews) ? data.mutualRecognitionQualityReviews : []).map((item) => ({
     ...item,
@@ -5373,6 +5475,10 @@ function buildQualitySafetyDashboard(data, user) {
     criticalActionItems: actionPlan.filter((item) => item.priority === "critical").length,
     highActionItems: actionPlan.filter((item) => item.priority === "high").length
   };
+  summary.siteSignoffs = siteSignoffs.length;
+  summary.siteSignoffsAccepted = siteSignoffs.filter((item) => item.normalizedStatus === "closed").length;
+  summary.siteSignoffsReady = siteSignoffs.filter((item) => item.status === "ready_for_joint_test").length;
+  summary.siteSignoffsPending = siteSignoffs.filter((item) => !["accepted", "closed"].includes(String(item.status || ""))).length;
   const reusableCollections = [
     "diagnosticReports",
     "countyMutualRecognitionRecords",
@@ -5417,6 +5523,7 @@ function buildQualitySafetyDashboard(data, user) {
     rectifications,
     criticalValueAlerts,
     clinicalPathwayCases,
+    siteSignoffs,
     medicalRecordQualityReviews: Array.isArray(data.medicalRecordQualityReviews) ? data.medicalRecordQualityReviews : [],
     mutualRecognitionQualityReviews,
     reusedCollections: reusableCollections,
@@ -6532,6 +6639,50 @@ async function handleApi(req, res) {
     appendQualitySafetyAudit(data, user, "quality-safety clinical pathway review", id, `${decision}: ${review.comment}`);
     writeDatabase(data);
     sendJson(res, 200, { ...cases[index], normalizedStatus: normalizeQualitySafetyStatus(cases[index].status), reviewComplete: normalizeQualitySafetyStatus(cases[index].status) === "closed" });
+    return;
+  }
+
+  const qualitySiteSignoffMatch = url.pathname.match(/^\/api\/quality-safety\/site-signoffs\/([^/]+)\/review$/);
+  if (req.method === "POST" && qualitySiteSignoffMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/quality-safety/site-signoffs/:id/review");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(qualitySiteSignoffMatch[1]);
+    const signoffs = Array.isArray(data.qualitySafetySiteSignoffs) ? data.qualitySafetySiteSignoffs : [];
+    const index = signoffs.findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Quality-safety site sign-off item not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const decision = String(payload.decision || payload.status || "ready_for_joint_test").trim();
+    if (!["ready_for_joint_test", "accepted", "returned", "pending_site_confirmation"].includes(decision)) {
+      sendJson(res, 400, { error: "Bad Request", message: "decision must be ready_for_joint_test, accepted, returned, or pending_site_confirmation" });
+      return;
+    }
+    const now = new Date().toISOString();
+    const review = {
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      decision,
+      note: String(payload.note || payload.comment || "").trim(),
+      evidence: Array.isArray(payload.evidence) ? payload.evidence.map((item) => String(item).trim()).filter(Boolean) : []
+    };
+    signoffs[index] = {
+      ...signoffs[index],
+      status: decision,
+      latestNote: review.note || signoffs[index].latestNote,
+      reviewedAt: now,
+      reviewedBy: user.username || user.role,
+      evidence: [...review.evidence, ...(signoffs[index].evidence || [])].slice(0, 50),
+      reviewTrail: [review, ...(signoffs[index].reviewTrail || [])].slice(0, 50),
+      auditTrail: [{ at: now, by: user.username || user.role, action: "site-signoff-review", note: `${decision}: ${review.note}` }, ...(signoffs[index].auditTrail || [])].slice(0, 50)
+    };
+    data.qualitySafetySiteSignoffs = signoffs;
+    appendQualitySafetyAudit(data, user, "quality-safety site signoff review", id, `${decision}: ${review.note}`);
+    writeDatabase(data);
+    sendJson(res, 200, { ...signoffs[index], normalizedStatus: normalizeQualitySafetyStatus(signoffs[index].status), evidenceCount: (signoffs[index].evidence || []).length });
     return;
   }
 
