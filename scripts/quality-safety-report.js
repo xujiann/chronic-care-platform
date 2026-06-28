@@ -267,6 +267,67 @@ function buildActionPlan({ qualityEvents, rectifications, criticalRows, clinical
     .slice(0, 8);
 }
 
+function buildGoLiveReadiness({ boundaryRows, collectionRows, reusedRows, routeRows, policyRows, stateRows, criticalRows, clinicalPathwayRows, mutualRecognitionRows, actionPlan, institutionRisks }) {
+  const checks = [
+    {
+      id: "boundary-coverage",
+      passed: boundaryRows.every((item) => item.modeled),
+      evidence: `${boundaryRows.filter((item) => item.modeled).length}/${boundaryRows.length} supervision boundaries modeled`
+    },
+    {
+      id: "seed-and-reuse",
+      passed: collectionRows.every((item) => item.present && item.rows > 0) && reusedRows.every((item) => item.present),
+      evidence: `${collectionRows.length} seed collections and ${reusedRows.length} reused platform collections`
+    },
+    {
+      id: "api-operations",
+      passed: routeRows.every((item) => item.present),
+      evidence: `${routeRows.filter((item) => item.present).length}/${routeRows.length} quality-safety routes implemented`
+    },
+    {
+      id: "closed-loop-evidence",
+      passed: stateRows.some((item) => item.feedbackCount > 0 && item.auditCount > 0 && item.evidenceComplete),
+      evidence: `${stateRows.filter((item) => item.evidenceComplete).length}/${stateRows.length} rectifications include evidence`
+    },
+    {
+      id: "critical-and-pathway-loop",
+      passed: criticalRows.length > 0 && criticalRows.every((item) => item.threshold && item.action) && clinicalPathwayRows.length > 0 && clinicalPathwayRows.every((item) => item.eventId && item.dueAt),
+      evidence: `${criticalRows.length} critical alerts and ${clinicalPathwayRows.length} pathway variances`
+    },
+    {
+      id: "policy-and-role-boundary",
+      passed: policyRows.every((item) => item.present),
+      evidence: `${policyRows.filter((item) => item.present).length}/${policyRows.length} policy references linked`
+    },
+    {
+      id: "risk-action-plan",
+      passed: actionPlan.length > 0 && institutionRisks.length > 0 && mutualRecognitionRows.length > 0,
+      evidence: `${actionPlan.length} action items, ${institutionRisks.length} ranked institutions, ${mutualRecognitionRows.length} mutual-recognition QC rows`
+    }
+  ];
+  const passed = checks.filter((item) => item.passed).length;
+  const score = Math.round((passed / checks.length) * 100);
+  const blockers = checks.filter((item) => !item.passed).map((item) => item.id);
+  return {
+    stage: blockers.length ? "release_candidate" : "controlled_pilot_ready",
+    usable: blockers.length === 0,
+    score,
+    blockers,
+    checks,
+    productionSignoffPending: [
+      "live HIS/EMR/LIS/PACS feed binding",
+      "production critical-value routing and timeout escalation",
+      "local clinical pathway dictionaries and EMR variance evidence",
+      "regional mutual-recognition lists and negative-list rules",
+      "department rectification sign-off attachments",
+      "production audit retention target"
+    ],
+    nextAction: blockers.length
+      ? `Resolve ${blockers.join(", ")} before pilot go-live.`
+      : "Ready for controlled pilot release; complete site joint-testing sign-offs before production cutover."
+  };
+}
+
 function buildQualitySafetyReport(options = {}) {
   const data = options.data || readJson("data/db.json");
   const server = options.serverSource || read("server.js");
@@ -355,6 +416,7 @@ function buildQualitySafetyReport(options = {}) {
   };
   const institutionRisks = buildInstitutionRisks(qualityEvents, stateRows);
   const actionPlan = buildActionPlan({ qualityEvents, rectifications: stateRows, criticalRows, clinicalPathwayRows, mutualRecognitionRows, institutionRisks });
+  const goLiveReadiness = buildGoLiveReadiness({ boundaryRows, collectionRows, reusedRows, routeRows, policyRows, stateRows, criticalRows, clinicalPathwayRows, mutualRecognitionRows, actionPlan, institutionRisks });
   const checks = [
     { id: "quality-safety:boundaries", passed: boundaryRows.every((item) => item.modeled), detail: `${boundaryRows.filter((item) => item.modeled).length}/${boundaryRows.length} boundaries modeled` },
     { id: "quality-safety:collections", passed: collectionRows.every((item) => item.present && item.rows > 0), detail: collectionRows.map((item) => `${item.collection}:${item.rows}`).join(";") },
@@ -367,7 +429,8 @@ function buildQualitySafetyReport(options = {}) {
     { id: "quality-safety:critical-value-loop", passed: criticalRows.length > 0 && criticalRows.every((item) => item.threshold && item.action), detail: `${criticalRows.length} critical value alerts; ${criticalRows.filter((item) => item.disposed).length} disposed` },
     { id: "quality-safety:clinical-pathway-loop", passed: clinicalPathwayRows.length > 0 && clinicalPathwayRows.every((item) => item.eventId && item.dueAt) && server.includes("/api/quality-safety/clinical-pathways/:id/review"), detail: `${clinicalPathwayRows.length} pathway variances; ${clinicalPathwayRows.filter((item) => item.reviewed).length} reviewed` },
     { id: "quality-safety:policy-basis", passed: policyRows.every((item) => item.present), detail: `${policyRows.filter((item) => item.present).length}/${policyRows.length} policy references linked` },
-    { id: "quality-safety:action-plan", passed: actionPlan.length > 0 && actionPlan.every((item) => item.priority && item.action && item.evidence), detail: `${actionPlan.length} prioritized action items` }
+    { id: "quality-safety:action-plan", passed: actionPlan.length > 0 && actionPlan.every((item) => item.priority && item.action && item.evidence), detail: `${actionPlan.length} prioritized action items` },
+    { id: "quality-safety:go-live-readiness", passed: goLiveReadiness.usable, detail: `${goLiveReadiness.stage}; score=${goLiveReadiness.score}; blockers=${goLiveReadiness.blockers.length}` }
   ];
   return {
     ok: checks.every((item) => item.passed),
@@ -393,7 +456,9 @@ function buildQualitySafetyReport(options = {}) {
       },
       policyReferences: policyRows.filter((item) => item.present).length,
       actionItems: actionPlan.length,
-      highActionItems: actionPlan.filter((item) => ["critical", "high"].includes(item.priority)).length
+      highActionItems: actionPlan.filter((item) => ["critical", "high"].includes(item.priority)).length,
+      readinessStage: goLiveReadiness.stage,
+      readinessScore: goLiveReadiness.score
     },
     boundaries: boundaryRows,
     collections: collectionRows,
@@ -401,6 +466,7 @@ function buildQualitySafetyReport(options = {}) {
     routes: routeRows,
     policyReferences: policyRows,
     actionPlan,
+    goLiveReadiness,
     institutionRisks,
     criticalValues: criticalRows,
     clinicalPathways: clinicalPathwayRows,
@@ -423,6 +489,7 @@ function renderMarkdown(report) {
     `- Clinical pathways: ${report.summary.clinicalPathways.total}, pending review ${report.summary.clinicalPathways.pending}`,
     `- Policy references: ${report.summary.policyReferences}/${report.policyReferences.length}`,
     `- Action plan: ${report.summary.actionItems} items, high priority ${report.summary.highActionItems}`,
+    `- Go-live readiness: ${report.goLiveReadiness.stage}, score ${report.goLiveReadiness.score}, usable ${report.goLiveReadiness.usable ? "yes" : "no"}`,
     "",
     "## Checks",
     "",
@@ -447,6 +514,21 @@ function renderMarkdown(report) {
     "| Policy | Reference | Linked |",
     "|---|---|---|",
     ...report.policyReferences.map((item) => `| ${item.title} | ${item.url} | ${item.present ? "yes" : "no"} |`),
+    "",
+    "## Go-live Readiness",
+    "",
+    `- Stage: ${report.goLiveReadiness.stage}`,
+    `- Score: ${report.goLiveReadiness.score}`,
+    `- Usable for controlled pilot: ${report.goLiveReadiness.usable ? "yes" : "no"}`,
+    `- Next action: ${report.goLiveReadiness.nextAction}`,
+    "",
+    "| Check | Result | Evidence |",
+    "|---|---|---|",
+    ...report.goLiveReadiness.checks.map((item) => `| ${item.id} | ${item.passed ? "PASS" : "FAIL"} | ${String(item.evidence || "").replace(/\|/g, "/")} |`),
+    "",
+    "| Production sign-off item |",
+    "|---|",
+    ...report.goLiveReadiness.productionSignoffPending.map((item) => `| ${item} |`),
     "",
     "## Regulatory Action Plan",
     "",

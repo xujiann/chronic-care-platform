@@ -249,7 +249,9 @@ npm.cmd run rollback:snapshot -- "data/backups/<备份目录>"
 
 ## Medical quality and safety supervision release boundary
 
-Run `npm.cmd run quality-safety:report` before release. The generated `release/quality-safety-report.md` and `release/quality-safety-report.json` prove the demo boundary for medical quality, safety events, critical value acknowledgement and disposition, clinical pathway variance review, medical record QC, mutual-recognition QC, dispatch, feedback, review, permission trimming, policy-basis references, prioritized action-plan evidence, and audit evidence.
+Run `npm.cmd run quality-safety:report` before release. The generated `release/quality-safety-report.md` and `release/quality-safety-report.json` prove the demo boundary for medical quality, safety events, critical value acknowledgement and disposition, clinical pathway variance review, medical record QC, mutual-recognition QC, dispatch, feedback, review, permission trimming, policy-basis references, prioritized action-plan evidence, go-live readiness, and audit evidence.
+
+Go-live readiness boundary: the module is considered usable for a controlled pilot only when boundary coverage, seed/reuse data, API operations, closed-loop evidence, critical-value/pathway loops, policy references, role boundaries, risk ranking, and action-plan evidence all pass. Full production cutover still requires site sign-off for live interfaces, routing, local dictionaries, negative lists, department attachments, and production audit retention.
 
 Site joint testing still requires live HIS/EMR/LIS/PACS feeds, production critical-value acknowledgement routing, medical-record sampling signatures, clinical pathway rule dictionaries and EMR variance evidence, mutual-recognition QC rules, and department rectification sign-off attachments.
 

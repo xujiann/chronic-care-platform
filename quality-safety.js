@@ -102,6 +102,33 @@ function renderActionPlan(rows) {
   `);
 }
 
+function renderGoLiveReadiness(readiness = {}) {
+  const checks = readiness.checks || [];
+  const signoffs = readiness.productionSignoffPending || [];
+  setHtml("quality-safety-readiness", `
+    <div class="rule-card">
+      <strong>${readiness.usable ? "Controlled pilot ready" : "Release candidate"}</strong>
+      <span>${text(readiness.score)} / 100</span>
+      <p>${text(readiness.nextAction)}</p>
+    </div>
+    <div class="rule-card">
+      <strong>${statusLabel(readiness.stage)}</strong>
+      <span>${readiness.blockers?.length ? `${readiness.blockers.length} blockers` : "no module blockers"}</span>
+      <p>${readiness.blockers?.length ? readiness.blockers.map(statusLabel).join(", ") : "Dashboard, closed loop, reuse, risk and action-plan checks are ready for pilot use."}</p>
+    </div>
+    <div class="rule-card">
+      <strong>Readiness checks</strong>
+      <span>${checks.filter((item) => item.passed).length}/${checks.length}</span>
+      <p>${checks.map((item) => `${item.passed ? "PASS" : "FAIL"} ${item.id}`).join("; ")}</p>
+    </div>
+    <div class="rule-card">
+      <strong>Production sign-off</strong>
+      <span>${signoffs.length} site items</span>
+      <p>${signoffs.join("; ")}</p>
+    </div>
+  `);
+}
+
 function renderIssues(rows) {
   const canDispatch = qualitySafetyState?.role === "commission";
   setHtml("quality-safety-issues", `
@@ -192,6 +219,7 @@ function renderBoundaries(data) {
 function renderQualitySafety(data) {
   qualitySafetyState = data;
   renderMetrics(data.summary || {});
+  renderGoLiveReadiness(data.goLiveReadiness || {});
   renderActionPlan(data.actionPlan || []);
   renderRisks(data.institutionRisks || []);
   renderReuse(data.reusedCollections || []);

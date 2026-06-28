@@ -54,6 +54,10 @@ test("quality safety report covers boundaries, reuse and routes", () => {
   assert.equal(report.checks.some((item) => item.id === "quality-safety:policy-basis" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "quality-safety:action-plan" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "quality-safety:risk-ranking" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "quality-safety:go-live-readiness" && item.passed), true);
+  assert.equal(report.goLiveReadiness.usable, true);
+  assert.equal(report.goLiveReadiness.stage, "controlled_pilot_ready");
+  assert.equal(report.summary.readinessScore, 100);
   assert.equal(report.institutionRisks.length > 0, true);
   assert.equal(report.institutionRisks[0].score > 0, true);
   assert.equal(report.criticalValues.length > 0, true);
@@ -67,6 +71,8 @@ test("quality safety report covers boundaries, reuse and routes", () => {
   assert.match(renderMarkdown(report), /Clinical Pathway Loop/);
   assert.match(renderMarkdown(report), /Policy Basis/);
   assert.match(renderMarkdown(report), /Regulatory Action Plan/);
+  assert.match(renderMarkdown(report), /Go-live Readiness/);
+  assert.match(renderMarkdown(report), /controlled_pilot_ready/);
   assert.match(renderMarkdown(report), /Institution risk ranking/);
   assert.match(renderMarkdown(report), /Rectification SLA/);
 });
@@ -97,6 +103,9 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
   assert.equal(dashboard.body.summary.criticalValuesPending >= 1, true);
   assert.equal(dashboard.body.summary.clinicalPathwaysOpen >= 1, true);
   assert.equal(dashboard.body.summary.actionItems >= 1, true);
+  assert.equal(dashboard.body.goLiveReadiness.usable, true);
+  assert.equal(dashboard.body.goLiveReadiness.stage, "controlled_pilot_ready");
+  assert.equal(dashboard.body.summary.readinessScore, 100);
   assert.equal(dashboard.body.actionPlan.some((item) => item.priority === "critical"), true);
   assert.equal(dashboard.body.institutionRisks.length > 0, true);
   assert.equal(dashboard.body.institutionRisks[0].score > 0, true);

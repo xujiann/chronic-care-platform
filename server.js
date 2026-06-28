@@ -5215,6 +5215,67 @@ function qualitySafetyVisibleRows(rows, user) {
   return [];
 }
 
+function buildQualitySafetyGoLiveReadiness({ summary, actionPlan, institutionRisks, rectifications, criticalValueAlerts, clinicalPathwayCases, mutualRecognitionQualityReviews, reusedCollections, role }) {
+  const checks = [
+    {
+      id: "dashboard-scope",
+      passed: summary.issues > 0 && summary.rectifications > 0,
+      evidence: `${summary.issues} issues and ${summary.rectifications} rectifications visible for ${role}`
+    },
+    {
+      id: "dispatch-review-loop",
+      passed: rectifications.some((item) => item.feedbackComplete && item.evidenceComplete),
+      evidence: `${rectifications.filter((item) => item.evidenceComplete).length} rectifications include feedback and audit evidence`
+    },
+    {
+      id: "critical-value-loop",
+      passed: criticalValueAlerts.length > 0 && criticalValueAlerts.every((item) => item.acknowledgementComplete || item.dispositionComplete || item.normalizedStatus !== "closed"),
+      evidence: `${summary.criticalValuesDisposed}/${summary.criticalValues} critical values disposed`
+    },
+    {
+      id: "pathway-qc-loop",
+      passed: clinicalPathwayCases.length > 0 && clinicalPathwayCases.every((item) => item.eventId && item.dueAt),
+      evidence: `${summary.clinicalPathwaysReviewed}/${summary.clinicalPathways} pathway variances reviewed`
+    },
+    {
+      id: "mutual-recognition-qc",
+      passed: mutualRecognitionQualityReviews.length > 0,
+      evidence: `${mutualRecognitionQualityReviews.length} mutual-recognition QC rows`
+    },
+    {
+      id: "risk-action-plan",
+      passed: institutionRisks.length > 0 && actionPlan.length > 0,
+      evidence: `${institutionRisks.length} ranked institutions and ${actionPlan.length} action items`
+    },
+    {
+      id: "reuse-map",
+      passed: reusedCollections.every((item) => item.present),
+      evidence: reusedCollections.map((item) => `${item.collection}:${item.rows}`).join(";")
+    }
+  ];
+  const passed = checks.filter((item) => item.passed).length;
+  const score = Math.round((passed / checks.length) * 100);
+  const blockers = checks.filter((item) => !item.passed).map((item) => item.id);
+  return {
+    stage: blockers.length ? "release_candidate" : "controlled_pilot_ready",
+    usable: blockers.length === 0,
+    score,
+    blockers,
+    checks,
+    productionSignoffPending: [
+      "live HIS/EMR/LIS/PACS feed binding",
+      "production critical-value routing and timeout escalation",
+      "local clinical pathway dictionaries and EMR variance evidence",
+      "regional mutual-recognition lists and negative-list rules",
+      "department rectification sign-off attachments",
+      "production audit retention target"
+    ],
+    nextAction: blockers.length
+      ? `Resolve ${blockers.join(", ")} before pilot go-live.`
+      : "Ready for controlled pilot release; complete site joint-testing sign-offs before production cutover."
+  };
+}
+
 function buildQualitySafetyIssues(data) {
   const eventRows = (Array.isArray(data.qualitySafetyEvents) ? data.qualitySafetyEvents : []).map((item) => ({
     ...item,
@@ -5322,6 +5383,7 @@ function buildQualitySafetyDashboard(data, user) {
   ].map((collection) => ({
     collection,
     rows: Array.isArray(data[collection]) ? data[collection].length : 0,
+    present: Array.isArray(data[collection]),
     reusedFor: {
       diagnosticReports: "critical value and report quality signals",
       countyMutualRecognitionRecords: "mutual recognition QC",
@@ -5331,6 +5393,19 @@ function buildQualitySafetyDashboard(data, user) {
       hospitalInteroperabilityFunctions: "HIS/EMR/LIS/PACS management boundary"
     }[collection]
   }));
+  const goLiveReadiness = buildQualitySafetyGoLiveReadiness({
+    summary,
+    actionPlan,
+    institutionRisks,
+    rectifications,
+    criticalValueAlerts,
+    clinicalPathwayCases,
+    mutualRecognitionQualityReviews,
+    reusedCollections: reusableCollections,
+    role: user.role
+  });
+  summary.readinessScore = goLiveReadiness.score;
+  summary.readinessStage = goLiveReadiness.stage;
   return {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -5344,7 +5419,8 @@ function buildQualitySafetyDashboard(data, user) {
     clinicalPathwayCases,
     medicalRecordQualityReviews: Array.isArray(data.medicalRecordQualityReviews) ? data.medicalRecordQualityReviews : [],
     mutualRecognitionQualityReviews,
-    reusedCollections: reusableCollections
+    reusedCollections: reusableCollections,
+    goLiveReadiness
   };
 }
 
