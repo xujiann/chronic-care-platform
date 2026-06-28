@@ -25,6 +25,7 @@ const ARTIFACTS = [
   ["referral-teleconsultation", "referral", "Referral teleconsultation readiness report", "release/referral-teleconsultation-readiness-report.json", "release/referral-teleconsultation-readiness-report.md", "referral:readiness", "/api/referral-teleconsultations"],
   ["escort-service", "elder-care", "Medical escort service readiness report", "release/escort-service-readiness-report.json", "release/escort-service-readiness-report.md", "escort:readiness", "/api/escort-services/dashboard"],
   ["internet-nursing", "nursing", "Internet nursing readiness report", "release/internet-nursing-readiness-report.json", "release/internet-nursing-readiness-report.md", "internet-nursing:readiness", "/api/internet-nursing/dashboard"],
+  ["multi-practice", "doctor-governance", "Doctor multi-practice readiness report", "release/multi-practice-readiness-report.json", "release/multi-practice-readiness-report.md", "multi-practice:readiness", "/api/multi-practice-registry"],
   ["operations-readiness", "operations", "Operations readiness report", "release/operations-readiness-report.json", "release/operations-readiness-report.md", "operations:readiness", "/api/system/readiness"],
   ["process-audit", "process", "Full process audit report", "release/process-audit-report.json", "release/process-audit-report.md", "process:audit", "/api/process-audit"],
   ["service-acceptance", "process", "Service acceptance summary", "release/service-acceptance-summary.json", "release/service-acceptance-summary.md", "release:report", "/api/service-acceptance-summary"],

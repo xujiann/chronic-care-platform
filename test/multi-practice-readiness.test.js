@@ -1,0 +1,37 @@
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const test = require("node:test");
+
+const {
+  buildMultiPracticeReadinessReport,
+  renderMarkdown,
+  writeReport
+} = require("../scripts/multi-practice-readiness");
+
+test("multi-practice readiness validates doctor accounts, review state, APIs and release evidence", () => {
+  const report = buildMultiPracticeReadinessReport();
+  assert.equal(report.ok, true);
+  assert.equal(report.summary.doctors >= 2, true);
+  assert.equal(report.summary.applications >= 2, true);
+  assert.equal(report.requiredDocumentChecks.includes("liabilityInsurance"), true);
+  assert.equal(report.checks.some((item) => item.id === "multiPractice:doctorApi" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "multiPractice:registryApi" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "multiPractice:institutionUi" && item.passed), true);
+  assert.match(renderMarkdown(report), /Doctor multi-practice readiness report/);
+});
+
+test("multi-practice readiness writes release artifacts", (t) => {
+  const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "multi-practice-readiness-"));
+  t.after(() => fs.rmSync(outputDir, { recursive: true, force: true }));
+  const report = buildMultiPracticeReadinessReport();
+  const output = path.join(outputDir, "multi-practice-readiness-report.json");
+  const markdown = path.join(outputDir, "multi-practice-readiness-report.md");
+  writeReport(report, output, markdown);
+  const json = JSON.parse(fs.readFileSync(output, "utf8"));
+  const md = fs.readFileSync(markdown, "utf8");
+  assert.equal(json.ok, true);
+  assert.equal(json.multiPracticeReadiness.ok, true);
+  assert.match(md, /Required Document Checks/);
+});
