@@ -5,6 +5,7 @@ const test = require("node:test");
 
 const {
   FUNCTION_DOMAINS,
+  HANDOFF_ACTIONS,
   buildMaternalChildReadinessReport,
   parseArgs,
   renderMarkdown,
@@ -35,15 +36,21 @@ test("maternal child main function report validates policy, roles, API and relea
   assert.equal(report.ok, true);
   assert.equal(report.checks.every((item) => item.passed), true);
   assert.equal(report.functionDomains.length, FUNCTION_DOMAINS.length);
+  assert.equal(report.handoffActions.length, HANDOFF_ACTIONS.length);
   assert.deepEqual(functionIds, ["commission-statistics", "institution-certificate", "citizen-lifecycle", "sharing-license", "policy-release"]);
   assert.equal(report.artifacts.about, "maternal-child-about.html");
   assert.equal(report.artifacts.policyDoc, "docs/maternal-child-policy.md");
   assert.equal(report.artifacts.functionReport, "docs/妇幼健康主要功能报告.md");
   assert.equal(report.artifacts.api.includes("/api/birth-certificates"), true);
   assert.equal(report.checks.some((item) => item.id === "docs:function-report"), true);
+  assert.equal(report.checks.some((item) => item.id === "data:certificate-policy-fields"), true);
+  assert.equal(report.checks.some((item) => item.id === "handoff:actions"), true);
+  assert.equal(report.checks.some((item) => item.id === "role:isolation"), true);
   assert.equal(report.checks.some((item) => item.id === "role:citizen"), true);
   assert.match(markdown, /Maternal-child main function report/);
   assert.match(markdown, /Main Functions/);
+  assert.match(markdown, /Handoff Actions/);
+  assert.match(markdown, /certificate-policy/);
   assert.match(markdown, /maternal-child-about\.html/);
   assert.match(markdown, /docs\/maternal-child-policy\.md/);
   assert.match(markdown, /\/api\/birth-certificates/);
@@ -71,5 +78,6 @@ test("maternal child readiness CLI parser and writer keep artifact paths", (t) =
   const writtenMarkdown = fs.readFileSync(path.join(outputDir, "report.md"), "utf8");
   assert.equal(writtenJson.ok, true);
   assert.deepEqual(writtenJson.functionDomains.map((item) => item.id), ["commission-statistics", "institution-certificate", "citizen-lifecycle", "sharing-license", "policy-release"]);
+  assert.deepEqual(writtenJson.handoffActions.map((item) => item.id), ["role-scope", "certificate-policy", "lifecycle-continuity", "release-evidence"]);
   assert.match(writtenMarkdown, /Maternal-child main function report/);
 });

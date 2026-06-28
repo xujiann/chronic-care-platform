@@ -1261,7 +1261,11 @@
       "issuingPhysician": "测试医师",
       "applicantName": "演示居民A",
       "applicantRelation": "母亲",
-      "materials": [],
+      "materials": [
+        "母亲身份证",
+        "首次签发登记表",
+        "分娩信息核验"
+      ],
       "status": "待签发",
       "electronicLicenseStatus": "待生成",
       "publicSecuritySync": "未共享",
@@ -1300,7 +1304,11 @@
       "issuingPhysician": "测试医师",
       "applicantName": "演示居民A",
       "applicantRelation": "母亲",
-      "materials": [],
+      "materials": [
+        "母亲身份证",
+        "首次签发登记表",
+        "分娩信息核验"
+      ],
       "status": "待签发",
       "electronicLicenseStatus": "待生成",
       "publicSecuritySync": "未共享",
