@@ -6,6 +6,8 @@ Priority application 6 covers chronic screening, tiered management, post-dischar
 
 This increment also adds a shared alert queue for overdue follow-ups, near-term management reviews, medication pickup reminders, screening tasks, and resident feedback disposition.
 
+Resident experience now includes self-monitoring upload, medication check-in, satisfaction feedback, family proxy handling, senior reminders, and health point evidence.
+
 ## Policy Basis
 
 - 《关于加强基层慢性病健康管理服务的指导意见》（国卫基层发〔2025〕15号）要求强化基层慢病健康管理服务，覆盖家庭医生签约、分类分级管理、随访健康指导、自我健康管理、用药保障、医保协同和质量控制。
@@ -32,6 +34,7 @@ This increment also adds a shared alert queue for overdue follow-ups, near-term 
 
 - `GET /api/chronic/followup-summary`
 - `POST /api/chronic/followup-feedback`
+- `POST /api/chronic/resident-checkins`
 - `POST /api/chronic/followup-dispatch`
 
 The API keeps resident authorization checks, role-gated institution handling, data access logs, and security event audit trails in the existing server model.
@@ -41,6 +44,8 @@ Resident feedback also creates `taskMessages` for institution follow-up, and ins
 `GET /api/chronic/followup-summary` includes `alertQueue`, `summary.alerts`, `summary.overdueAlerts`, and `summary.highPriorityAlerts` so institution and resident entry points can share the same follow-up risk queue.
 
 Institution and resident pages now prefer that API queue when the backend is available, while retaining a local fallback for static preview.
+
+`POST /api/chronic/resident-checkins` writes resident self-management check-ins to `personalRecords`, `chronicSelfManagement`, medication adherence state, optional senior service evidence, and institution `taskMessages` when review is needed.
 
 ## Release Evidence
 
@@ -54,3 +59,5 @@ Run `npm run chronic:followup-readiness` to generate:
 `release:report` also gates `chronicFollowup:policyAlignment`, requiring all seven policy evidence items to be covered before release.
 
 `release:report` gates `chronicFollowup:alertQueue`, requiring risk reminders and high-priority follow-up alerts to remain available for release.
+
+`release:report` gates `chronicFollowup:residentExperience`, requiring self-monitoring, satisfaction, family proxy, and senior reminder evidence to remain in the release package.

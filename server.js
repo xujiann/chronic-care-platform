@@ -4686,6 +4686,7 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
   const policy = data.chronicFollowupStatusPolicy || seedChronicFollowupStatusPolicy();
   const policyAlignment = buildChronicFollowupPolicyAlignment(scoped);
   const feedbackRecords = (scoped.personalRecords || []).filter((item) => item.category === "chronic-feedback");
+  const residentExperienceRecords = (scoped.personalRecords || []).filter((item) => item.category === "chronic-self-checkin" || item.meta?.residentExperience);
   const followupMessages = (scoped.taskMessages || []).filter((item) => item.chronicFollowup);
   const alertQueue = buildChronicFollowupAlertQueue(scoped, targetResidents, policy);
   const residents = targetResidents.map((resident) => {
@@ -4732,6 +4733,11 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
         latest: latestFeedback || null,
         count: feedbackRecords.filter((item) => item.residentId === resident.id).length
       },
+      residentExperience: {
+        checkins: residentExperienceRecords.filter((item) => item.residentId === resident.id).length,
+        healthPoints: residentExperienceRecords.filter((item) => item.residentId === resident.id).reduce((sum, item) => sum + Number(item.meta?.healthPoints || 0), 0),
+        seniorReminder: (scoped.seniorServices || []).some((item) => item.residentId === resident.id)
+      },
       notifications: {
         count: followupMessages.filter((item) => item.residentId === resident.id).length,
         unread: followupMessages.filter((item) => item.residentId === resident.id && isOpenChronicFollowupMessage(item)).length
@@ -4754,6 +4760,9 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
       openFollowups: residents.reduce((sum, item) => sum + item.returnVisitReminders.length, 0),
       medicationPending: residents.reduce((sum, item) => sum + item.medicationAdherence.pending, 0),
       feedbackRecords: residents.reduce((sum, item) => sum + item.residentFeedback.count, 0),
+      residentExperienceRecords: residents.reduce((sum, item) => sum + item.residentExperience.checkins, 0),
+      healthPoints: residents.reduce((sum, item) => sum + item.residentExperience.healthPoints, 0),
+      seniorReminderResidents: residents.filter((item) => item.residentExperience.seniorReminder).length,
       notifications: residents.reduce((sum, item) => sum + item.notifications.count, 0),
       alerts: alertQueue.length,
       overdueAlerts: alertQueue.filter((item) => item.dueBucket === "overdue").length,
@@ -4893,6 +4902,181 @@ function upsertChronicFeedback(data, user, payload) {
   appendDataAccessLog(data, user, feedback.residentId, "chronic follow-up feedback", feedback.result || feedback.name);
   writeDatabase(normalizeState(data));
   return { status: 201, body: { ...feedback, messageId: message.id } };
+}
+
+function parseBooleanValue(value) {
+  if (value === undefined || value === null || value === "") return null;
+  return value === true || String(value).toLowerCase() === "true" || String(value) === "1" || String(value).includes("是") || String(value).includes("已");
+}
+
+function residentExperienceNeedsReview(payload) {
+  const text = [
+    payload.measurementValue,
+    payload.symptoms,
+    payload.satisfaction,
+    payload.note
+  ].map((item) => String(item || "")).join(" ");
+  return /偏高|偏低|异常|头晕|胸闷|疼|痛|不满意|需要|协助|high|low|dizzy|pain|help/i.test(text);
+}
+
+function residentExperiencePoints(payload) {
+  let points = 10;
+  if (String(payload.measurementValue || "").trim()) points += 5;
+  if (parseBooleanValue(payload.medicationTaken) === true) points += 5;
+  if (String(payload.satisfaction || "").trim()) points += 2;
+  if (String(payload.proxyName || "").trim()) points += 3;
+  if (parseBooleanValue(payload.seniorReminder) === true) points += 2;
+  return Math.min(points, 30);
+}
+
+function upsertResidentExperienceCheckin(data, user, payload) {
+  const residentId = String(payload.residentId || user.residentId || "").trim();
+  if (!residentId) return { status: 400, body: { error: "Bad Request", message: "residentId is required" } };
+  if (!canAccessResident(user, residentId, data)) {
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "submit chronic resident check-in", target: residentId, result: "denied", detail: "resident scope denied" });
+    return { status: 403, body: { error: "Forbidden", message: "resident scope denied" } };
+  }
+
+  const now = new Date().toISOString();
+  const residentMap = new Map((data.residents || []).map((resident) => [resident.id, resident]));
+  const personIndex = personIndexForResident(residentMap, residentId);
+  const medicationTaken = parseBooleanValue(payload.medicationTaken);
+  const healthPoints = residentExperiencePoints(payload);
+  const needsReview = residentExperienceNeedsReview(payload);
+  const measurementType = String(payload.measurementType || "home self-monitoring").trim();
+  const measurementValue = String(payload.measurementValue || "").trim();
+  const proxyName = String(payload.proxyName || "").trim();
+  const proxyRelation = String(payload.proxyRelation || "").trim();
+  const satisfaction = String(payload.satisfaction || "").trim();
+  const seniorReminder = parseBooleanValue(payload.seniorReminder) === true;
+  const resultParts = [
+    measurementValue ? `${measurementType}: ${measurementValue}` : "",
+    medicationTaken === null ? "" : medicationTaken ? "medication taken" : "medication missed",
+    satisfaction ? `satisfaction: ${satisfaction}` : "",
+    proxyName ? `family proxy: ${proxyName}` : "",
+    seniorReminder ? "senior reminder enabled" : ""
+  ].filter(Boolean);
+
+  const record = {
+    id: randomUUID(),
+    residentId,
+    category: "chronic-self-checkin",
+    date: String(payload.date || now.slice(0, 10)),
+    name: String(payload.name || "chronic resident self-management check-in").trim(),
+    result: resultParts.join("; ") || "resident check-in submitted",
+    source: String(payload.source || (proxyName ? "family proxy" : "resident portal")).trim(),
+    meta: {
+      residentExperience: true,
+      measurementType,
+      measurementValue,
+      medicationPickupId: String(payload.medicationPickupId || "").trim(),
+      medicationTaken,
+      symptoms: String(payload.symptoms || "").trim(),
+      satisfaction,
+      proxyName,
+      proxyRelation,
+      seniorReminder,
+      note: String(payload.note || "").trim(),
+      healthPoints,
+      needsReview,
+      submittedBy: user.username || user.role,
+      submittedByName: user.name,
+      submittedAt: now
+    },
+    personIndex,
+    createdBy: user.username || user.role,
+    createdByName: user.name,
+    createdAt: now
+  };
+
+  const selfManagement = {
+    id: `csm-${randomUUID()}`,
+    residentId,
+    device: measurementType,
+    latestValue: measurementValue || satisfaction || "resident check-in",
+    uploadSource: proxyName ? "family proxy upload" : "resident portal",
+    group: String(payload.group || "chronic self-management").trim(),
+    incentive: `${healthPoints} health points`,
+    status: needsReview ? "needs family doctor review" : "resident checked in",
+    nextAction: needsReview ? "review resident self-monitoring and follow up" : "continue self-management plan",
+    personIndex,
+    recordId: record.id,
+    updatedAt: now
+  };
+
+  let medicationPickup = null;
+  const medicationPickupId = record.meta.medicationPickupId;
+  if (medicationPickupId) {
+    medicationPickup = (data.medicationPickups || []).find((item) => item.id === medicationPickupId && item.residentId === residentId);
+    if (medicationPickup) {
+      medicationPickup.adherenceCheckinAt = now;
+      medicationPickup.medicationTaken = medicationTaken;
+      medicationPickup.adherenceStatus = medicationTaken === false ? "needs adherence review" : "resident confirmed";
+      medicationPickup.lastUpdated = now;
+    }
+  }
+
+  let seniorService = null;
+  if (proxyName || seniorReminder) {
+    seniorService = {
+      id: `ss-checkin-${randomUUID()}`,
+      residentId,
+      service: seniorReminder ? "senior chronic reminder" : "family proxy chronic check-in",
+      channel: "citizen portal",
+      status: "recorded",
+      contact: proxyName || user.name,
+      nextAction: seniorReminder ? "send large-font medication and follow-up reminders" : "confirm family proxy support during next follow-up",
+      recordId: record.id,
+      createdAt: now
+    };
+    data.seniorServices = [seniorService, ...(Array.isArray(data.seniorServices) ? data.seniorServices : [])].slice(0, 200);
+  }
+
+  data.personalRecords = [record, ...(Array.isArray(data.personalRecords) ? data.personalRecords : [])].slice(0, 500);
+  data.chronicSelfManagement = [selfManagement, ...(Array.isArray(data.chronicSelfManagement) ? data.chronicSelfManagement : [])].slice(0, 300);
+
+  let message = null;
+  if (needsReview || medicationTaken === false || proxyName || seniorReminder) {
+    message = appendChronicFollowupMessage(data, {
+      residentId,
+      taskId: `chronicSelfManagement:${selfManagement.id}`,
+      collection: "chronicSelfManagement",
+      sourceId: selfManagement.id,
+      targetRole: "institution",
+      title: "Resident chronic self-management check-in",
+      body: record.result,
+      user
+    });
+  }
+
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "submit chronic resident check-in",
+      target: residentId,
+      result: "allowed",
+      detail: `${record.name}; points=${healthPoints}`
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+  appendDataAccessLog(data, user, residentId, "chronic resident check-in", record.result);
+  writeDatabase(normalizeState(data));
+
+  return {
+    status: 201,
+    body: {
+      record,
+      selfManagement,
+      medicationPickup,
+      seniorService,
+      healthPoints,
+      seniorReminder,
+      messageId: message?.id || null
+    }
+  };
 }
 
 function dispatchChronicFollowupAction(data, user, payload) {
@@ -6183,6 +6367,14 @@ async function handleApi(req, res) {
       sendJson(res, 400, { error: "Bad Request", message: error.message });
       return;
     }
+    sendJson(res, result.status, redactSensitiveResponse(result.body, user));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/chronic/resident-checkins") {
+    const user = requireApiRole(req, res, ["citizen", "institution", "commission"], "/api/chronic/resident-checkins");
+    if (!user) return;
+    const result = upsertResidentExperienceCheckin(readDatabase(), user, await collectJson(req));
     sendJson(res, result.status, redactSensitiveResponse(result.body, user));
     return;
   }

@@ -156,6 +156,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   bindDialogs();
   bindFollowupFeedback();
+  bindResidentExperienceCheckin();
   currentAccountId = state.accounts[0]?.id;
   const account = getCurrentAccount();
   renderAccount(account);
@@ -266,6 +267,7 @@ function renderCitizen(residentId) {
   renderDiseases(diseases, risk);
   renderFollowups(followups);
   renderFollowupFeedback(resident.id, followups);
+  renderResidentExperienceCheckin(resident.id);
   renderChronicServices(resident.id);
   renderReferrals(resident.id);
   renderBirthHealth(resident.id);
@@ -800,6 +802,102 @@ function bindFollowupFeedback() {
       showToast("院后随访反馈已提交，家庭医生可在机构端处置");
     } catch (error) {
       showToast(error.message || "反馈提交失败，请检查登录状态和网络连接");
+    } finally {
+      submit.disabled = false;
+    }
+  });
+}
+
+function renderResidentExperienceCheckin(residentId) {
+  const form = document.querySelector("#resident-checkin-form");
+  const status = document.querySelector("#resident-checkin-status");
+  if (!form || !status) return;
+  const pickups = (state.medicationPickups || []).filter((item) => item.residentId === residentId);
+  const select = form.querySelector("select[name='medicationPickupId']");
+  select.innerHTML = [
+    `<option value="">不关联取药</option>`,
+    ...pickups.map((item) => `<option value="${item.id}">${item.medication} · ${item.nextPickup} · ${item.status}</option>`)
+  ].join("");
+  const records = (state.personalRecords || []).filter((item) => item.residentId === residentId && (item.category === "chronic-self-checkin" || item.meta?.residentExperience));
+  const points = records.reduce((sum, item) => sum + Number(item.meta?.healthPoints || 0), 0);
+  status.textContent = records.length ? `${records.length} 次打卡 · ${points} 健康积分` : "待打卡";
+}
+
+function bindResidentExperienceCheckin() {
+  const form = document.querySelector("#resident-checkin-form");
+  if (!form) return;
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(form));
+    const payload = {
+      residentId: currentResidentId,
+      medicationPickupId: data.medicationPickupId || "",
+      measurementType: data.measurementType || "居民端自测",
+      measurementValue: data.measurementValue || "",
+      medicationTaken: data.medicationTaken === "true",
+      satisfaction: data.satisfaction || "",
+      proxyName: data.proxyName || "",
+      seniorReminder: form.querySelector("input[name='seniorReminder']")?.checked || false,
+      note: data.note || ""
+    };
+    const submit = form.querySelector("button[type='submit']");
+    submit.disabled = true;
+    try {
+      let saved;
+      if (API_BASE) {
+        const request = window.HealthCityAuth?.authFetch || fetch;
+        const response = await request(`${API_BASE}/chronic/resident-checkins`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (!response.ok) throw new Error(`check-in failed: ${response.status}`);
+        saved = await response.json();
+      } else {
+        const healthPoints = 10 + (payload.measurementValue ? 5 : 0) + (payload.medicationTaken ? 5 : 0) + (payload.proxyName ? 3 : 0) + (payload.seniorReminder ? 2 : 0);
+        saved = {
+          record: {
+            ...payload,
+            id: crypto.randomUUID(),
+            category: "chronic-self-checkin",
+            date: todayOffset(0),
+            name: "慢病居民自我管理打卡",
+            result: `${payload.measurementType}: ${payload.measurementValue || "已打卡"}`,
+            source: payload.proxyName ? "家属代办" : "居民端",
+            meta: { residentExperience: true, healthPoints, ...payload },
+            createdAt: new Date().toISOString()
+          },
+          selfManagement: {
+            id: crypto.randomUUID(),
+            residentId: payload.residentId,
+            device: payload.measurementType,
+            latestValue: payload.measurementValue,
+            uploadSource: payload.proxyName ? "家属代办上传" : "居民端自测",
+            incentive: `${healthPoints} 健康积分`,
+            status: payload.medicationTaken ? "居民已打卡" : "需医生复核",
+            nextAction: payload.note || "继续自我管理"
+          },
+          healthPoints
+        };
+      }
+      if (!Array.isArray(state.personalRecords)) state.personalRecords = [];
+      state.personalRecords.unshift(saved.record);
+      if (!Array.isArray(state.chronicSelfManagement)) state.chronicSelfManagement = [];
+      state.chronicSelfManagement.unshift(saved.selfManagement);
+      if (saved.medicationPickup) {
+        const index = (state.medicationPickups || []).findIndex((item) => item.id === saved.medicationPickup.id);
+        if (index >= 0) state.medicationPickups[index] = saved.medicationPickup;
+      }
+      if (saved.seniorService) {
+        if (!Array.isArray(state.seniorServices)) state.seniorServices = [];
+        state.seniorServices.unshift(saved.seniorService);
+      }
+      if (API_BASE) state.chronicFollowupSummary = await loadChronicFollowupSummary();
+      form.reset();
+      renderCitizen(currentResidentId);
+      showToast(`自我管理打卡已提交，获得 ${saved.healthPoints || 0} 健康积分`);
+    } catch (error) {
+      showToast(error.message || "自我管理打卡提交失败，请检查登录状态和网络连接");
     } finally {
       submit.disabled = false;
     }

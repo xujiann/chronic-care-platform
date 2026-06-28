@@ -811,6 +811,19 @@ dialog::backdrop {
   margin: 0;
 }
 
+.feedback-form .checkbox-line {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.feedback-form .checkbox-line input {
+  width: auto;
+  min-height: auto;
+  margin: 0;
+}
+
 .report-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

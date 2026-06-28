@@ -120,6 +120,7 @@ function buildPolicyAlignment(data, feedback, followupMessages) {
 function buildChronicFollowupReadinessReport(options = {}) {
   const data = options.data || readJson("data/db.json");
   const feedback = (data.personalRecords || []).filter((item) => item.category === "chronic-feedback" || item.meta?.followupFeedback);
+  const experienceRecords = (data.personalRecords || []).filter((item) => item.category === "chronic-self-checkin" || item.meta?.residentExperience);
   const followupMessages = (data.taskMessages || []).filter((item) => item.chronicFollowup);
   const policyAlignment = buildPolicyAlignment(data, feedback, followupMessages);
   const screeningResidents = recordsByResident(data, "chronicScreeningTasks");
@@ -129,6 +130,13 @@ function buildChronicFollowupReadinessReport(options = {}) {
   const feedbackResidents = new Map(feedback.map((item) => [item.residentId, true]));
   const policy = data.chronicFollowupStatusPolicy || {};
   const alertQueue = buildAlertQueue(data, followupMessages, policy);
+  const residentExperience = {
+    selfMonitoring: count(data.chronicSelfManagement, (item) => item.residentId && item.latestValue && item.uploadSource),
+    medicationSupport: count(data.medicationPickups, (item) => item.residentId && (item.medicationTaken !== undefined || item.applyMode || item.deliveryMode || item.adherenceStatus)),
+    satisfaction: feedback.filter((item) => item.meta?.satisfaction || item.meta?.nextRequest).length + experienceRecords.filter((item) => item.meta?.satisfaction).length,
+    familyProxy: count(data.seniorServices, (item) => item.residentId && /家属|proxy|代办/i.test(`${item.service || ""}${item.contact || ""}${item.nextAction || ""}`)) + count(data.medicationPickups, (item) => /家属|proxy|代办/i.test(`${item.applyMode || ""}${item.deliveryMode || ""}`)),
+    seniorReminder: count(data.seniorServices, (item) => item.residentId && item.nextAction)
+  };
   const boundaries = [
     {
       id: "screening",
@@ -185,6 +193,12 @@ function buildChronicFollowupReadinessReport(options = {}) {
       evidence: "alertQueue[followups/medicationPickups/chronicManagementPlans/chronicScreeningTasks]"
     },
     {
+      id: "resident-experience",
+      name: "Resident self-management experience",
+      passed: residentExperience.selfMonitoring >= 1 && residentExperience.medicationSupport >= 1 && residentExperience.satisfaction >= 1 && residentExperience.familyProxy >= 1 && residentExperience.seniorReminder >= 1,
+      evidence: "chronicSelfManagement/personalRecords/seniorServices/medicationPickups"
+    },
+    {
       id: "policy-alignment",
       name: "Policy-aligned chronic follow-up evidence",
       passed: policyAlignment.length >= 7 && policyAlignment.every((item) => item.covered),
@@ -218,6 +232,10 @@ function buildChronicFollowupReadinessReport(options = {}) {
       alerts: alertQueue.length,
       overdueAlerts: alertQueue.filter((item) => item.dueBucket === "overdue").length,
       highPriorityAlerts: alertQueue.filter((item) => ["critical", "high"].includes(item.priority)).length,
+      residentExperienceItems: Object.values(residentExperience).reduce((sum, value) => sum + value, 0),
+      selfMonitoringRecords: residentExperience.selfMonitoring,
+      satisfactionRecords: residentExperience.satisfaction,
+      familyProxyRecords: residentExperience.familyProxy,
       policyAligned: policyAlignment.filter((item) => item.covered).length,
       policyItems: policyAlignment.length,
       highRiskScreenings: count(data.chronicScreeningTasks, (item) => /\u9ad8\u5371|high/i.test(String(item.riskLevel || ""))),
@@ -226,6 +244,7 @@ function buildChronicFollowupReadinessReport(options = {}) {
     boundaries,
     policyAlignment,
     alertQueue,
+    residentExperience,
     residentCoverage,
     reusePoints: [
       "chronicScreeningTasks",
@@ -239,6 +258,7 @@ function buildChronicFollowupReadinessReport(options = {}) {
     apiSurface: [
       "GET /api/chronic/followup-summary",
       "POST /api/chronic/followup-feedback",
+      "POST /api/chronic/resident-checkins",
       "POST /api/chronic/followup-dispatch"
     ]
   };

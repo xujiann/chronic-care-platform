@@ -17,13 +17,17 @@ test("chronic follow-up readiness covers all priority application boundaries", (
   const report = buildChronicFollowupReadinessReport({ data });
 
   assert.equal(report.ok, true);
-  assert.equal(report.boundaries.length, 11);
+  assert.equal(report.boundaries.length, 12);
   assert.equal(report.boundaries.every((item) => item.passed), true);
   assert.equal(report.summary.feedbackRecords >= 1, true);
   assert.equal(report.summary.notificationMessages >= 1, true);
   assert.equal(report.summary.alerts >= 1, true);
   assert.equal(report.summary.highPriorityAlerts >= 1, true);
+  assert.equal(report.summary.selfMonitoringRecords >= 1, true);
+  assert.equal(report.summary.familyProxyRecords >= 1, true);
+  assert.equal(report.summary.satisfactionRecords >= 1, true);
   assert.equal(report.summary.policyAligned, report.summary.policyItems);
+  assert.equal(report.boundaries.some((item) => item.id === "resident-experience" && item.passed), true);
   assert.equal(report.alertQueue.some((item) => item.id === "followups:f1" && item.dueBucket === "overdue"), true);
   assert.equal(report.policyAlignment.some((item) => item.id === "policy-feedback-dispatch" && item.covered), true);
   assert.equal(report.reusePoints.includes("chronicScreeningTasks"), true);
@@ -71,6 +75,19 @@ test("chronic follow-up readiness fails without risk reminder queue evidence", (
   assert.equal(report.ok, false);
   assert.equal(report.boundaries.find((item) => item.id === "risk-reminder-queue").passed, false);
   assert.equal(report.summary.alerts, 0);
+});
+
+test("chronic follow-up readiness fails without resident experience evidence", () => {
+  const data = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "db.json"), "utf8"));
+  data.chronicSelfManagement = [];
+  data.seniorServices = [];
+  data.medicationPickups = data.medicationPickups.map((item) => ({ ...item, applyMode: "", deliveryMode: "" }));
+  data.personalRecords = data.personalRecords.filter((item) => item.category !== "chronic-self-checkin" && item.category !== "chronic-feedback");
+  const report = buildChronicFollowupReadinessReport({ data });
+
+  assert.equal(report.ok, false);
+  assert.equal(report.boundaries.find((item) => item.id === "resident-experience").passed, false);
+  assert.equal(report.summary.selfMonitoringRecords, 0);
 });
 
 test("chronic follow-up readiness renders and writes release artifacts", (t) => {

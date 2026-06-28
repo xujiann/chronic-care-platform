@@ -143,6 +143,48 @@
 
           <article class="panel">
             <div class="panel-title">
+              <h2>自我管理打卡</h2>
+              <span id="resident-checkin-status"></span>
+            </div>
+            <form id="resident-checkin-form" class="feedback-form">
+              <label>自测类型
+                <input name="measurementType" placeholder="例如：家庭血压、空腹血糖、步数" />
+              </label>
+              <label>自测结果
+                <input name="measurementValue" placeholder="例如：158/92 mmHg、7.8 mmol/L" />
+              </label>
+              <label>关联取药
+                <select name="medicationPickupId"></select>
+              </label>
+              <label>服药打卡
+                <select name="medicationTaken">
+                  <option value="true">已按医嘱服药</option>
+                  <option value="false">漏服或需要协助</option>
+                </select>
+              </label>
+              <label>满意度
+                <select name="satisfaction">
+                  <option value="满意">满意</option>
+                  <option value="需要协助">需要协助</option>
+                  <option value="不满意">不满意</option>
+                </select>
+              </label>
+              <label>家属代办
+                <input name="proxyName" placeholder="家属姓名，可为空" />
+              </label>
+              <label class="checkbox-line">
+                <input name="seniorReminder" type="checkbox" value="true" />
+                开启适老提醒
+              </label>
+              <label>备注
+                <input name="note" placeholder="例如：希望电话复核、提醒家属取药" />
+              </label>
+              <button class="small-button primary" type="submit">提交打卡</button>
+            </form>
+          </article>
+
+          <article class="panel">
+            <div class="panel-title">
               <h2>慢病筛查与宣教</h2>
             </div>
             <div id="chronic-service-cards" class="cards"></div>

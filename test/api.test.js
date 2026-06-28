@@ -737,6 +737,39 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(citizenFollowupSummary.body.residents.every((item) => ["r1"].includes(item.residentId)), true);
     assert.equal(citizenFollowupSummary.body.alertQueue.every((item) => item.residentId === "r1"), true);
 
+    const residentCheckin = await api(baseUrl, "/api/chronic/resident-checkins", authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        medicationPickupId: "mp1",
+        measurementType: "home blood pressure",
+        measurementValue: "158/92 mmHg high",
+        medicationTaken: true,
+        satisfaction: "needs phone review",
+        proxyName: "family member A",
+        proxyRelation: "daughter",
+        seniorReminder: true,
+        note: "please remind family before next pickup"
+      })
+    }));
+    assert.equal(residentCheckin.response.status, 201);
+    assert.equal(residentCheckin.body.record.category, "chronic-self-checkin");
+    assert.equal(residentCheckin.body.selfManagement.residentId, "r1");
+    assert.equal(residentCheckin.body.healthPoints >= 20, true);
+    assert.equal(typeof residentCheckin.body.messageId, "string");
+    assert.equal(residentCheckin.body.medicationPickup.id, "mp1");
+
+    const checkinSummary = await api(baseUrl, "/api/chronic/followup-summary?residentId=r1", authorized(citizen.body.token));
+    assert.equal(checkinSummary.body.summary.residentExperienceRecords >= 1, true);
+    assert.equal(checkinSummary.body.summary.healthPoints >= residentCheckin.body.healthPoints, true);
+    assert.equal(checkinSummary.body.residents[0].residentExperience.seniorReminder, true);
+
+    const residentCheckinDenied = await api(baseUrl, "/api/chronic/resident-checkins", authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({ residentId: "r2", measurementType: "blood glucose", measurementValue: "7.1" })
+    }));
+    assert.equal(residentCheckinDenied.response.status, 403);
+
     const feedback = await api(baseUrl, "/api/chronic/followup-feedback", authorized(citizen.body.token, {
       method: "POST",
       body: JSON.stringify({
