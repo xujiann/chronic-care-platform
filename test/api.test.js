@@ -594,6 +594,20 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(teleconsultations.body.summary.highRisk >= 1, true);
     assert.equal(teleconsultations.body.escalations.some((item) => item.teleconsultationId === "rtc-001" && item.severity === "high"), true);
     assert.equal(teleconsultations.body.escalations.some((item) => item.reasons.some((reason) => reason.includes("pending report"))), true);
+    const referralEscalationRun = await api(baseUrl, "/api/referral-teleconsultations/escalations/run", authorized(county.body.token, {
+      method: "POST",
+      body: JSON.stringify({ teleconsultationId: "rtc-001" })
+    }));
+    assert.equal(referralEscalationRun.response.status, 201);
+    assert.equal(referralEscalationRun.body.summary.created, 1);
+    assert.equal(referralEscalationRun.body.messages[0].targetRole, "institution");
+    assert.match(referralEscalationRun.body.messages[0].escalationKey, /referralTeleconsultations:rtc-001:sla:high/);
+    const referralEscalationReplay = await api(baseUrl, "/api/referral-teleconsultations/escalations/run", authorized(county.body.token, {
+      method: "POST",
+      body: JSON.stringify({ teleconsultationId: "rtc-001" })
+    }));
+    assert.equal(referralEscalationReplay.response.status, 201);
+    assert.equal(referralEscalationReplay.body.summary.created, 0);
     const teleconsultationAction = await api(baseUrl, "/api/referral-teleconsultations/rtc-001/actions", authorized(county.body.token, {
       method: "POST",
       body: JSON.stringify({ status: "feedback-returned", feedback: "County office confirmed receiving feedback.", note: "county follow-up" })
@@ -602,6 +616,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(teleconsultationAction.body.status, "feedback-returned");
 
     const institution = await login(baseUrl, "doctor");
+    const slaInstitutionMessages = await api(baseUrl, "/api/messages", authorized(institution.body.token));
+    assert.equal(slaInstitutionMessages.body.messages.some((item) => item.escalationKey === "referralTeleconsultations:rtc-001:sla:high"), true);
     const institutionState = await api(baseUrl, "/api/state", authorized(institution.body.token));
     const authorization = institutionState.body.personalRecords.find((item) => item.category === "authorizations" && item.residentId === "r1" && item.status !== "revoked");
     const createdTeleconsultation = await api(baseUrl, "/api/referral-teleconsultations", authorized(institution.body.token, {

@@ -5246,6 +5246,28 @@ function buildReferralTeleconsultationEscalations(rows, options = {}) {
     });
 }
 
+function createReferralTeleconsultationEscalationMessage(item, escalation, user) {
+  const now = new Date().toISOString();
+  return {
+    id: `msg-${randomUUID()}`,
+    taskId: `referralTeleconsultations:${item.id}`,
+    collection: "referralTeleconsultations",
+    sourceId: item.id,
+    residentId: item.residentId || "",
+    targetRole: "institution",
+    channel: "in_app",
+    title: "Referral teleconsultation SLA reminder",
+    body: `${item.targetInstitution || "Receiving institution"} needs follow-up: ${escalation.reasons.join("; ")}.`,
+    status: "sent",
+    notificationKey: `referralTeleconsultations:${item.id}:sla:${escalation.severity}`,
+    escalationKey: `referralTeleconsultations:${item.id}:sla:${escalation.severity}`,
+    receipts: [],
+    createdAt: now,
+    createdBy: user.username || user.role,
+    createdByName: user.name
+  };
+}
+
 function buildDataQualityIssues(data) {
   const issues = [];
   const indexes = new Map();
@@ -6042,6 +6064,43 @@ async function handleApi(req, res) {
         highRisk: escalations.filter((item) => item.severity === "high").length
       }
     });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/referral-teleconsultations/escalations/run") {
+    const user = requireApiRole(req, res, ["county", "commission"], "/api/referral-teleconsultations/escalations/run");
+    if (!user) return;
+    const data = readDatabase();
+    const payload = await collectJson(req);
+    const rows = (Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [])
+      .filter((item) => canAccessReferralTeleconsultation(user, item, data))
+      .filter((item) => !payload.teleconsultationId || item.id === String(payload.teleconsultationId));
+    const rowMap = new Map(rows.map((item) => [item.id, item]));
+    const escalations = buildReferralTeleconsultationEscalations(rows);
+    const existingKeys = new Set((Array.isArray(data.taskMessages) ? data.taskMessages : [])
+      .map((message) => message.escalationKey || message.notificationKey)
+      .filter(Boolean));
+    const messages = escalations
+      .map((escalation) => createReferralTeleconsultationEscalationMessage(rowMap.get(escalation.teleconsultationId), escalation, user))
+      .filter((message) => !existingKeys.has(message.escalationKey));
+    data.taskMessages = [...messages, ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
+    if (messages.length) {
+      data.securityEvents = resealAuditTrail([
+        {
+          id: randomUUID(),
+          at: new Date().toLocaleString("zh-CN", { hour12: false }),
+          actor: user.name,
+          role: user.role,
+          action: "run referral teleconsultation SLA escalation",
+          target: payload.teleconsultationId || "all",
+          result: "allowed",
+          detail: `${messages.length}/${escalations.length} reminders created`
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120));
+    }
+    writeDatabase(data);
+    sendJson(res, 201, { messages, escalations, summary: { created: messages.length, escalations: escalations.length } });
     return;
   }
 

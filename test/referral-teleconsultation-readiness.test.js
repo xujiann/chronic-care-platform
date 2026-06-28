@@ -34,6 +34,7 @@ test("referral teleconsultation readiness validates closed-loop evidence", () =>
   assert.equal(report.checks.some((item) => item.id === "referral:feedbackCallback" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:performance" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:slaEscalation" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "referral:slaReminder" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:frontend" && item.passed), true);
   assert.match(renderMarkdown(report), /Referral teleconsultation readiness report/);
 });

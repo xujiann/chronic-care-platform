@@ -277,7 +277,12 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("county.js"), /averagePerformance/);
   assert.match(read("county.js"), /SLA risks/);
   assert.match(read("county.js"), /buildReferralTeleconsultationEscalations/);
+  assert.match(read("county.js"), /data-referral-escalation/);
+  assert.match(read("county.js"), /runReferralEscalation/);
+  assert.match(read("county.js"), /hasReferralEscalationReminder/);
   assert.match(read("server.js"), /buildReferralTeleconsultationEscalations/);
+  assert.match(read("server.js"), /referral-teleconsultations\/escalations\/run/);
+  assert.match(read("server.js"), /createReferralTeleconsultationEscalationMessage/);
   assert.match(read("server.js"), /highRisk/);
   assert.match(read("server.js"), /schedule-callback/);
   assert.match(read("server.js"), /feedback-callback/);

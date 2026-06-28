@@ -234,6 +234,7 @@ function renderCountyTeleconsultationLoop(state) {
       const responseHours = Number(item.performance?.responseHours);
       const reportReturnHours = Number(item.performance?.reportReturnHours);
       const escalation = escalationMap.get(item.id);
+      const reminderSent = escalation && hasReferralEscalationReminder(state, item.id, escalation.severity);
       return `<tr>
         <td>${resident?.name || item.residentId || "Unknown"}</td>
         <td>${item.sourceInstitution || "-"} -> ${item.targetInstitution || "-"}<br><small>${item.department || item.type || ""}</small></td>
@@ -243,6 +244,7 @@ function renderCountyTeleconsultationLoop(state) {
         <td>${escalation ? `<span class="badge ${escalation.severity === "high" ? "danger" : "warn"}">${escalation.severity}</span><br><small>${escalation.reasons.join("；")}</small>` : `<span class="badge info">normal</span>`}</td>
         <td>${item.reportStatus || "pending"}</td>
         <td>
+          ${escalation ? countyEscalationButton(item.id, reminderSent ? "Reminder sent" : "Send SLA reminder", reminderSent) : ""}
           ${countyActionButton("referralTeleconsultations", item.id, "County follow-up", { status: "feedback-returned", receivingFeedback: "County consortium office followed up receiving feedback." })}
           ${countyActionButton("referralTeleconsultations", item.id, "Report returned", { status: "report-returned", reportStatus: "returned", reportSummary: "County office confirmed report return evidence." })}
         </td>
@@ -307,6 +309,14 @@ function bindCountyActions() {
   document.querySelector("#county-teleconsultation-status-filter")?.addEventListener("change", () => renderCountyTeleconsultationLoop(platformState));
   document.querySelector("#county-teleconsultation-priority-filter")?.addEventListener("change", () => renderCountyTeleconsultationLoop(platformState));
   document.addEventListener("click", async (event) => {
+    const reminderButton = event.target.closest("[data-referral-escalation]");
+    if (reminderButton && platformState) {
+      reminderButton.disabled = true;
+      const result = await runReferralEscalation(platformState, reminderButton.dataset.id);
+      reminderButton.textContent = result.ok ? `Reminder ${result.created}` : "Retry reminder";
+      renderCountyTeleconsultationLoop(platformState);
+      return;
+    }
     const button = event.target.closest("[data-county-action]");
     if (!button || !platformState) return;
     const updates = JSON.parse(button.dataset.updates || "{}");
@@ -317,8 +327,62 @@ function bindCountyActions() {
   });
 }
 
+async function runReferralEscalation(state, teleconsultationId) {
+  if (API_BASE) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/referral-teleconsultations/escalations/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teleconsultationId })
+      });
+      if (response.ok) {
+        const payload = await response.json();
+        state.taskMessages = [...(payload.messages || []), ...(state.taskMessages || [])].slice(0, 300);
+        return { ok: true, created: payload.summary?.created ?? 0 };
+      }
+    } catch (error) {
+      // Static preview falls back to a local in-app reminder below.
+    }
+  }
+  const item = (state.referralTeleconsultations || []).find((row) => row.id === teleconsultationId);
+  if (!item) return { ok: false, created: 0 };
+  const key = `referralTeleconsultations:${item.id}:sla:local`;
+  const existing = (state.taskMessages || []).some((message) => message.escalationKey === key);
+  if (!existing) {
+    state.taskMessages = [{
+      id: `msg-${Date.now()}`,
+      taskId: `referralTeleconsultations:${item.id}`,
+      collection: "referralTeleconsultations",
+      sourceId: item.id,
+      residentId: item.residentId || "",
+      targetRole: "institution",
+      channel: "in_app",
+      title: "Referral teleconsultation SLA reminder",
+      body: `${item.targetInstitution || "Receiving institution"} needs report callback follow-up.`,
+      status: "sent",
+      escalationKey: key,
+      createdAt: new Date().toISOString(),
+      createdBy: "county-preview"
+    }, ...(state.taskMessages || [])].slice(0, 300);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+  return { ok: true, created: existing ? 0 : 1 };
+}
+
+function hasReferralEscalationReminder(state, id, severity) {
+  return (state.taskMessages || []).some((message) =>
+    message.escalationKey === `referralTeleconsultations:${id}:sla:${severity}` ||
+    message.escalationKey === `referralTeleconsultations:${id}:sla:local`
+  );
+}
+
 function countyActionButton(collection, id, label, updates) {
   return `<button class="inline-action" type="button" data-county-action data-collection="${collection}" data-id="${id}" data-updates='${JSON.stringify(updates)}' data-note="${label}">${label}</button>`;
+}
+
+function countyEscalationButton(id, label, disabled = false) {
+  return `<button class="inline-action" type="button" data-referral-escalation data-id="${id}" ${disabled ? "disabled" : ""}>${label}</button>`;
 }
 
 function residentOf(state, id) {
