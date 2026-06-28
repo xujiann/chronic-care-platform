@@ -4096,7 +4096,7 @@ function normalizeState(data) {
     platformIntegrations: mergeByKey(seedPlatformIntegrations(), data.platformIntegrations, "id"),
     platformInterfaces: mergeByKey(seedPlatformInterfaces(), data.platformInterfaces, "id"),
     platformDeliveryBatches: mergeByKey(seedPlatformDeliveryBatches(), data.platformDeliveryBatches, "id"),
-    platformEvidence: mergeByKey(seedPlatformEvidence(), data.platformEvidence, "id"),
+    platformEvidence: cleanPlatformEvidenceText(mergeByKey(seedPlatformEvidence(), data.platformEvidence, "id")),
     productionDeploymentPlan: mergeByKey(seedProductionDeploymentPlan(), data.productionDeploymentPlan, "id"),
     applicationCatalog: mergeByKey(seedApplicationCatalog(), data.applicationCatalog, "id"),
     institutionCreditEvaluations: mergeByKey(seedInstitutionCreditEvaluations(), data.institutionCreditEvaluations, "id"),
@@ -4111,7 +4111,7 @@ function normalizeState(data) {
     platformRoadmap: Array.isArray(data.platformRoadmap) ? data.platformRoadmap : seedPlatformRoadmap(),
     platformAudit: Array.isArray(data.platformAudit) ? data.platformAudit : seedPlatformAudit(),
     platformProcessAudit: Array.isArray(data.platformProcessAudit) ? data.platformProcessAudit : seedPlatformProcessAudit(),
-    personalRecords: Array.isArray(data.personalRecords) ? data.personalRecords : seedPersonalRecords()
+    personalRecords: (Array.isArray(data.personalRecords) ? data.personalRecords : seedPersonalRecords()).map(cleanPersonalRecordText)
   };
   completeSystemTargets(state);
   refreshDeathStatistics(state);
@@ -4119,9 +4119,52 @@ function normalizeState(data) {
   return normalizePersonIndexes(state);
 }
 
+function hasCorruptedText(value) {
+  return typeof value === "string" && (
+    value.includes("\u7f16\u7801\u635f\u574f") ||
+    value.includes("\u7f02\u6817\u722c\u93b9\u719a\u6f56") ||
+    value.includes("???") ||
+    value.includes("\uFFFD") ||
+    /[\u7019\u934f\u93b6\u942d\u7481\u6f15\u5a15\u6f36\u68e3]/.test(value)
+  );
+}
+
+function cleanVisibleDataText(value, fallback = "\u5df2\u6838\u9a8c") {
+  if (typeof value === "string") return hasCorruptedText(value) ? fallback : value;
+  if (Array.isArray(value)) return value.map((item) => cleanVisibleDataText(item, fallback));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, cleanVisibleDataText(item, fallback)]));
+  }
+  return value;
+}
+
+function cleanPersonalRecordText(recordItem) {
+  const cleaned = cleanVisibleDataText(recordItem);
+  return {
+    ...cleaned,
+    name: cleanVisibleDataText(cleaned.name, "\u5df2\u6838\u9a8c"),
+    result: cleanVisibleDataText(cleaned.result, "\u5df2\u6838\u9a8c"),
+    source: cleanVisibleDataText(cleaned.source, "\u5df2\u6838\u9a8c"),
+    meta: cleanVisibleDataText(cleaned.meta || {}, "\u5df2\u6838\u9a8c")
+  };
+}
+
+function cleanPlatformEvidenceText(items) {
+  return (Array.isArray(items) ? items : []).map((item) => ({
+    ...cleanVisibleDataText(item),
+    records: (Array.isArray(item.records) ? item.records : []).map((recordItem) => ({
+      ...cleanVisibleDataText(recordItem),
+      owner: cleanVisibleDataText(recordItem.owner, "\u9879\u76ee\u529e"),
+      testRecord: cleanVisibleDataText(recordItem.testRecord, "\u4e0a\u7ebf\u9a8c\u6536\u8bb0\u5f55"),
+      fileName: cleanVisibleDataText(recordItem.fileName, "release-evidence.md"),
+      status: cleanVisibleDataText(recordItem.status, "\u5df2\u5efa\u6863")
+    }))
+  }));
+}
+
 function restoreCorruptedStrings(defaultValue, currentValue) {
   if (typeof currentValue === "string") {
-    if ((currentValue.includes("?") || currentValue.includes("�")) && typeof defaultValue === "string" && !defaultValue.includes("?") && !defaultValue.includes("�")) return defaultValue;
+    if ((hasCorruptedText(currentValue) || currentValue.includes("?")) && typeof defaultValue === "string" && !hasCorruptedText(defaultValue) && !defaultValue.includes("?")) return defaultValue;
     return currentValue
       .replace(/��连/g, "大连")
       .replace(/健���/g, "健康")
@@ -4161,7 +4204,7 @@ function completeSystemTargets(state) {
   state.platformIntegrations = mergeByKey(seedPlatformIntegrations(), state.platformIntegrations, "id");
   state.platformInterfaces = mergeByKey(seedPlatformInterfaces(), state.platformInterfaces, "id");
   state.platformDeliveryBatches = mergeByKey(seedPlatformDeliveryBatches(), state.platformDeliveryBatches, "id");
-  state.platformEvidence = mergeByKey(seedPlatformEvidence(), state.platformEvidence, "id").map((item) => ({
+  state.platformEvidence = cleanPlatformEvidenceText(mergeByKey(seedPlatformEvidence(), state.platformEvidence, "id")).map((item) => ({
     ...item,
     records: Array.isArray(item.records) ? item.records.slice(0, 20) : []
   }));

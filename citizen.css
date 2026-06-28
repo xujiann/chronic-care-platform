@@ -537,6 +537,7 @@ select,
 }
 
 .client-channel-detail code {
+  display: block;
   border-radius: 8px;
   padding: 10px;
   background: #102033;
@@ -544,9 +545,40 @@ select,
   overflow-x: auto;
 }
 
+.client-channel-entry {
+  display: grid;
+  gap: 10px;
+}
+
+.client-channel-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.client-channel-action {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: #fff;
+  color: var(--blue);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 900;
+  text-align: center;
+  text-decoration: none;
+}
+
+.client-channel-action.primary {
+  border-color: var(--blue);
+  background: var(--blue);
+  color: #fff;
+}
+
 .client-channel-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -557,6 +589,28 @@ select,
 .client-channel-grid p {
   color: var(--muted);
   line-height: 1.55;
+}
+
+.client-launch-checklist p {
+  display: grid;
+  gap: 4px;
+  color: var(--ink);
+}
+
+.client-launch-checklist strong,
+.client-launch-checklist span,
+.client-launch-checklist small {
+  display: block;
+}
+
+.client-launch-checklist span {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: #eaf7ef;
+  color: #17663a;
+  font-size: 12px;
+  font-weight: 900;
 }
 
 .mobile-service-nav {

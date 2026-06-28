@@ -123,7 +123,7 @@ function nextNursingAction(item, isHighRisk) {
   if (item.status === "dispatched") return "护士待接单，接单后应开启服务位置轨迹。";
   if (item.status === "accepted" && item.locationTrace !== "tracking") return "已接单但未开启轨迹，请核验定位设备。";
   if (item.serviceRecordStatus !== "completed" && ["in-service", "accepted"].includes(item.status)) return "服务进行中，需及时补全护理记录。";
-  if (item.status === "completed" && item.qualityCallback !== "closed") return "护理记录已完成，等待机构质控回访。";
+  if (item.status === "completed" && item.qualityCallback !== "closed") return "护理记录已完成，等待机构质量回访。";
   if (isHighRisk) return "高风险订单已进入处置链路，持续关注回访和服务记录。";
   return "";
 }
@@ -482,8 +482,8 @@ function displayText(value) {
     "Dalian Central Hospital": "大连市中心医院",
     "Qingniwaqiao Community Health Service Center": "青泥洼桥社区卫生服务中心",
     "Ganjingzi District People's Hospital": "甘井子区人民医院",
-    Zhongshan: "中山区",
-    Ganjingzi: "甘井子区",
+    "Zhongshan": "中山区",
+    "Ganjingzi": "甘井子区",
     "Nurse Sun": "孙护士",
     "Nurse Zhao": "赵护士",
     "Nurse Liu": "刘护士",
@@ -528,24 +528,24 @@ function displayText(value) {
     "senior nurse": "主管护师",
     "nurse practitioner": "专科护士",
     "specialist nurse": "专科护士",
-    verified: "已核验",
-    none: "无",
-    passed: "已通过",
-    signed: "已签署",
-    pending: "待处理",
-    requested: "已申请",
-    assessed: "已评估",
-    dispatched: "已派单",
-    accepted: "已接单",
+    "verified": "已核验",
+    "none": "无",
+    "passed": "已通过",
+    "signed": "已签署",
+    "pending": "待处理",
+    "requested": "已申请",
+    "assessed": "已评估",
+    "dispatched": "已派单",
+    "accepted": "已接单",
     "in-service": "服务中",
-    completed: "已完成",
-    closed: "已关闭",
-    tracking: "轨迹开启",
+    "completed": "已完成",
+    "closed": "已关闭",
+    "tracking": "轨迹开启",
     "in-progress": "进行中",
-    high: "高风险",
-    medium: "中风险",
-    low: "低风险",
-    unknown: "未知"
+    "high": "高风险",
+    "medium": "中风险",
+    "low": "低风险",
+    "unknown": "未知"
   };
   return labels[text] || text;
 }

@@ -608,7 +608,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   const serviceWorker = read("service-worker.js");
   assert.match(citizenHtml, /rel="manifest"/);
   assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260627channels/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260628launch/);
   assert.match(citizenHtml, /auth\.js\?v=20260627/);
   assert.match(mobilePreviewHtml, /preview=mobile-nav/);
   assert.match(mobilePreviewHtml, /http:\/\/localhost:5174\/mobile-preview\.html/);
@@ -635,12 +635,13 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.display, "standalone");
   assert.equal(manifest.icons.some((item) => item.src === "./pwa-icon.svg"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v11/);
+  assert.match(serviceWorker, /chronic-care-citizen-v12/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627preview/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages2/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627actions/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627channels/);
+  assert.match(serviceWorker, /citizen\.js\?v=20260628launch/);
   assert.match(serviceWorker, /citizen\.html/);
   assert.match(serviceWorker, /mobile-preview\.html/);
   assert.match(serviceWorker, /mobile-preview\.css/);
@@ -716,6 +717,11 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /renderClientChannels/);
   assert.match(citizenJs, /setClientChannel/);
   assert.match(citizenJs, /clientChannelFromRoute/);
+  assert.match(citizenJs, /clientChannelEntry/);
+  assert.match(citizenJs, /copyClientEntry/);
+  assert.match(citizenJs, /data-copy-client-entry/);
+  assert.match(citizenJs, /launchChecklist/);
+  assert.match(citizenJs, /client-launch-checklist/);
   assert.match(citizenJs, /data-client-channel/);
   assert.match(citizenJs, /mini-program/);
   assert.match(citizenJs, /app/);
@@ -756,6 +762,9 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /client-channel-panel/);
   assert.match(citizenCss, /client-channel-switch/);
   assert.match(citizenCss, /client-channel-grid/);
+  assert.match(citizenCss, /client-channel-actions/);
+  assert.match(citizenCss, /client-channel-action/);
+  assert.match(citizenCss, /client-launch-checklist/);
   assert.match(citizenCss, /position: fixed/);
   assert.match(citizenCss, /safe-area-inset-bottom/);
   assert.match(citizenCss, /resident-audit-card:not\(\.active\)/);

@@ -186,7 +186,12 @@ const citizenClientChannels = [
     audience: "微信/支付宝服务入口、扫码、机构公众号菜单",
     capabilities: ["手机号授权登录", "轻量健康档案", "服务预约", "订阅消息提醒"],
     readiness: ["HTTPS 域名备案", "小程序隐私协议", "类目与医疗服务资质", "消息模板审核"],
-    nextAction: "提交小程序审核包"
+    nextAction: "提交小程序审核包",
+    launchChecklist: [
+      { label: "实名登录", state: "已就绪", note: "手机号验证码进入居民端" },
+      { label: "服务入口", state: "已就绪", note: "按二级页面生成可分享链接" },
+      { label: "订阅提醒", state: "上线前确认", note: "需绑定平台消息模板" }
+    ]
   },
   {
     key: "app",
@@ -196,7 +201,12 @@ const citizenClientChannels = [
     audience: "Android / iOS 应用壳、桌面图标、离线缓存",
     capabilities: ["PWA 安装入口", "离线健康档案壳", "大字模式", "系统推送预留"],
     readiness: ["应用签名与包名", "应用市场隐私合规", "推送证书", "崩溃监控与版本升级"],
-    nextAction: "打包 APP 上架材料"
+    nextAction: "打包 APP 上架材料",
+    launchChecklist: [
+      { label: "安装入口", state: "已就绪", note: "PWA 壳支持浏览器安装" },
+      { label: "离线访问", state: "已就绪", note: "Service Worker 缓存居民端壳" },
+      { label: "应用上架", state: "上线前确认", note: "需补齐签名、隐私和推送证书" }
+    ]
   }
 ];
 
@@ -300,6 +310,7 @@ function renderClientChannels() {
   const detail = document.querySelector("#client-channel-detail");
   if (!switcher || !detail) return;
   const active = getActiveClientChannel();
+  const currentEntry = clientChannelEntry(active.key, activeServiceTab);
   document.body.dataset.clientChannel = active.key;
   switcher.innerHTML = citizenClientChannels.map((item) => `<button type="button" data-client-channel="${item.key}" aria-pressed="${item.key === active.key}">
     <span>${item.label}</span>
@@ -314,7 +325,13 @@ function renderClientChannels() {
       <strong>${active.label}</strong>
       <small>${active.audience}</small>
     </div>
-    <code>${active.entry}</code>
+    <div class="client-channel-entry">
+      <code>${currentEntry}</code>
+      <div class="client-channel-actions">
+        <a class="client-channel-action primary" href="./${currentEntry}">打开入口</a>
+        <button type="button" class="client-channel-action" data-copy-client-entry="${currentEntry}">复制入口</button>
+      </div>
+    </div>
   </article>
   <div class="client-channel-grid">
     <section>
@@ -329,7 +346,12 @@ function renderClientChannels() {
       <h3>下一步</h3>
       <p>${active.nextAction}</p>
     </section>
+    <section class="client-launch-checklist">
+      <h3>发布检查</h3>
+      ${active.launchChecklist.map((item) => `<p><strong>${item.label}</strong><span>${item.state}</span><small>${item.note}</small></p>`).join("")}
+    </section>
   </div>`;
+  detail.querySelector("[data-copy-client-entry]")?.addEventListener("click", (event) => copyClientEntry(event.currentTarget.dataset.copyClientEntry));
 }
 
 function setClientChannel(key) {
@@ -352,6 +374,33 @@ function getActiveClientChannel() {
 function clientChannelFromRoute() {
   const key = new URLSearchParams(location.search).get("client");
   return citizenClientChannels.some((item) => item.key === key) ? key : "";
+}
+
+function clientChannelEntry(channelKey, serviceKey) {
+  const params = new URLSearchParams();
+  params.set("client", channelKey);
+  params.set("page", serviceKey);
+  return `citizen.html?${params.toString()}#service-${serviceKey}`;
+}
+
+async function copyClientEntry(entry) {
+  const url = new URL(entry, location.href).href;
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable");
+    await navigator.clipboard.writeText(url);
+    showToast("入口链接已复制");
+  } catch (error) {
+    const helper = document.createElement("textarea");
+    helper.value = url;
+    helper.setAttribute("readonly", "");
+    helper.style.position = "fixed";
+    helper.style.opacity = "0";
+    document.body.appendChild(helper);
+    helper.select();
+    document.execCommand("copy");
+    helper.remove();
+    showToast("入口链接已复制");
+  }
 }
 
 function serviceTabFromRoute() {
