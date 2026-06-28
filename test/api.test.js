@@ -211,6 +211,79 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(operationsDashboard.body.summary.openDispatchRequests >= 2, true);
     assert.equal(operationsDashboard.body.snapshots.some((item) => item.normalizedStatus === "critical"), true);
     assert.equal(operationsDashboard.body.reusedCollections.includes("healthStatisticsIngestion"), true);
+    assert.equal(operationsDashboard.body.performanceMonitoring.manuals.secondary.total, 28);
+    assert.equal(operationsDashboard.body.performanceMonitoring.manuals.tertiary.total, 56);
+    assert.equal(operationsDashboard.body.commandChains.some((item) => item.stage === "直报阻断"), true);
+    assert.equal(operationsDashboard.body.commandChains.some((item) => item.steps.some((step) => step.name === "资源调度")), true);
+    assert.equal(operationsDashboard.body.commandChains.some((item) => item.sla && item.sla.status), true);
+    assert.equal(operationsDashboard.body.interfaceMapping.summary.total >= 5, true);
+    assert.equal(operationsDashboard.body.playbooks.some((item) => item.actions.length >= 4 && item.slaHours), true);
+    assert.equal(operationsDashboard.body.handover.summary.items >= 1, true);
+    assert.equal(operationsDashboard.body.handover.items.some((item) => item.checkpoints.length >= 4 && item.evidence.includes("/api/operations/handover")), true);
+    assert.equal(operationsDashboard.body.handoverOwnerMatrix.summary.owners >= 1, true);
+    assert.equal(operationsDashboard.body.handoverOwnerMatrix.matrix.some((item) => item.evidence.includes("/api/operations/handover/owners")), true);
+
+    const performanceMonitoring = await api(baseUrl, "/api/operations/performance-monitoring", authorized(accountLogin.body.token));
+    assert.equal(performanceMonitoring.response.status, 200);
+    assert.equal(performanceMonitoring.body.ok, true);
+    assert.equal(performanceMonitoring.body.manuals.secondary.national, 21);
+    assert.equal(performanceMonitoring.body.manuals.tertiary.national, 26);
+    assert.equal(performanceMonitoring.body.manuals.secondary.readinessMatrix.some((item) => item.status === "ready"), true);
+    assert.equal(performanceMonitoring.body.manuals.secondary.readinessMatrix.some((item) => item.status === "pending"), true);
+    assert.equal(performanceMonitoring.body.manuals.tertiary.readinessMatrix.some((item) => item.owner && item.nextAction), true);
+    assert.equal(performanceMonitoring.body.manuals.secondary.indicatorDetails.some((item) => item.exceptionTemplate && item.sourceFields.length > 0), true);
+    assert.equal(performanceMonitoring.body.manuals.tertiary.indicatorDetails.some((item) => item.numerator && item.denominator), true);
+    assert.equal(performanceMonitoring.body.actions.some((item) => item.id === "performance-runtime-pressure"), true);
+
+    const commandChains = await api(baseUrl, "/api/operations/command-chains", authorized(accountLogin.body.token));
+    assert.equal(commandChains.response.status, 200);
+    assert.equal(commandChains.body.ok, true);
+    assert.equal(commandChains.body.summary.institutions >= 3, true);
+    assert.equal(commandChains.body.commandChains.some((item) => item.owner === "统计直报专班"), true);
+    assert.equal(commandChains.body.commandChains.every((item) => item.sla && item.sla.dueAt && item.sla.escalation), true);
+
+    const playbooks = await api(baseUrl, "/api/operations/playbooks", authorized(accountLogin.body.token));
+    assert.equal(playbooks.response.status, 200);
+    assert.equal(playbooks.body.ok, true);
+    assert.equal(playbooks.body.summary.playbooks >= 5, true);
+    assert.equal(playbooks.body.playbooks.some((item) => item.ruleId === "reporting-variance-high" && item.evidence.includes("/api/operations/reconciliation/:id/review")), true);
+    assert.equal(playbooks.body.playbooks.every((item) => item.owner && item.trigger && item.actions.length), true);
+
+    const handover = await api(baseUrl, "/api/operations/handover", authorized(accountLogin.body.token));
+    assert.equal(handover.response.status, 200);
+    assert.equal(handover.body.ok, true);
+    assert.equal(handover.body.summary.items >= 1, true);
+    assert.equal(handover.body.items.some((item) => item.riskSignals.length && item.nextActions.length), true);
+    assert.equal(handover.body.items.every((item) => item.owner && item.dueStatus && item.checkpoints.length >= 4), true);
+
+    const handoverOwners = await api(baseUrl, "/api/operations/handover/owners", authorized(accountLogin.body.token));
+    assert.equal(handoverOwners.response.status, 200);
+    assert.equal(handoverOwners.body.ok, true);
+    assert.equal(handoverOwners.body.summary.owners >= 1, true);
+    assert.equal(handoverOwners.body.matrix.every((item) => item.owner && item.itemCount >= 1 && item.institutions.length), true);
+
+    const handoverSignoff = await api(baseUrl, "/api/operations/handover/signoff", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        shift: "API 回归交接班",
+        itemIds: handover.body.items.slice(0, 2).map((item) => item.id),
+        note: "API regression handover signoff",
+        nextShiftFocus: "继续跟进严重预警和直报复核"
+      })
+    }));
+    assert.equal(handoverSignoff.response.status, 201);
+    assert.equal(handoverSignoff.body.itemCount >= 1, true);
+    assert.equal(handoverSignoff.body.auditTrail.some((item) => item.action === "handover-signoff"), true);
+
+    const handoverAfterSignoff = await api(baseUrl, "/api/operations/handover", authorized(accountLogin.body.token));
+    assert.equal(handoverAfterSignoff.body.recentSignoffs.some((item) => item.id === handoverSignoff.body.id), true);
+
+    const interfaceMapping = await api(baseUrl, "/api/operations/interface-mapping", authorized(accountLogin.body.token));
+    assert.equal(interfaceMapping.response.status, 200);
+    assert.equal(interfaceMapping.body.ok, true);
+    assert.equal(interfaceMapping.body.summary.total >= 5, true);
+    assert.equal(interfaceMapping.body.mappings.some((item) => item.status === "待联调"), true);
+    assert.equal(interfaceMapping.body.mappings.every((item) => item.fieldCoverage.every((field) => field.mapped)), true);
 
     const dispatchAction = await api(baseUrl, "/api/operations/dispatch", authorized(accountLogin.body.token, {
       method: "POST",
@@ -230,6 +303,14 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(dispatchAction.body.id, "dispatch-api-test");
     assert.equal(dispatchAction.body.auditTrail.some((item) => item.action === "upsert"), true);
 
+    const dispatchStatus = await api(baseUrl, "/api/operations/dispatch/dispatch-api-test/status", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ status: "closed", note: "API regression closed" })
+    }));
+    assert.equal(dispatchStatus.response.status, 200);
+    assert.equal(dispatchStatus.body.status, "closed");
+    assert.equal(dispatchStatus.body.auditTrail.some((item) => item.action === "status-change"), true);
+
     const reconReview = await api(baseUrl, "/api/operations/reconciliation/recon-mr1-20260622-am/review", authorized(accountLogin.body.token, {
       method: "POST",
       body: JSON.stringify({ status: "approved", reviewNote: "API regression approved" })
@@ -237,6 +318,15 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(reconReview.response.status, 200);
     assert.equal(reconReview.body.status, "approved");
     assert.equal(reconReview.body.reviewedBy, "health");
+    assert.equal(reconReview.body.auditTrail.some((item) => item.action === "review-status-change"), true);
+
+    const reconCorrection = await api(baseUrl, "/api/operations/reconciliation/recon-mr3-20260622-am/review", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ status: "correcting", reviewNote: "API regression correction requested" })
+    }));
+    assert.equal(reconCorrection.response.status, 200);
+    assert.equal(reconCorrection.body.status, "correcting");
+    assert.equal(reconCorrection.body.auditTrail.some((item) => item.action === "review-status-change"), true);
 
     const identityPreview = await api(baseUrl, "/api/auth/identity/preview", authorized(accountLogin.body.token, {
       method: "POST",

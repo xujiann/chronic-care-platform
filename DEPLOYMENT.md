@@ -250,6 +250,10 @@ npm.cmd run rollback:snapshot -- "data/backups/<备份目录>"
 
 ## Hospital Operations Dispatch
 
-operations.html is the runnable management entry for hospital operation monitoring and resource dispatch. It uses GET /api/operations/dashboard, POST /api/operations/dispatch, and POST /api/operations/reconciliation/:id/review to cover bed, staff, equipment, outpatient, emergency, inpatient, dispatch, alert, and statistics direct-report reconciliation boundaries.
+operations.html is the runnable management entry for hospital operation monitoring and resource dispatch. It uses GET /api/operations/dashboard, GET /api/operations/handover, GET /api/operations/handover/owners, POST /api/operations/handover/signoff, POST /api/operations/dispatch, and POST /api/operations/reconciliation/:id/review to cover bed, staff, equipment, outpatient, emergency, inpatient, dispatch, alert, shift handover owner assignment, shift handover signoff, and statistics direct-report reconciliation boundaries.
+
+operations-about.html is the policy and scope page for the hospital operations platform. It summarizes the 2025 secondary and tertiary public hospital performance monitoring manuals, hospital operation monitoring boundaries, direct-report reconciliation requirements, data source ownership, and on-site joint-test handoff points.
 
 hospital-operations:readiness generates release/hospital-operations-readiness-report.json and release/hospital-operations-readiness-report.md. The report reuses healthStatistics, healthStatisticsIngestion, medicalResources, operations-readiness, /api/metrics, and platformProcessAudit evidence, and is included by release:report and deploy:check.
+
+hospital-operations:release generates release/hospital-operations-release-report.json and release/hospital-operations-release-report.md. The release report verifies the completed directions: field mapping for site integration, SLA command chains, alert playbooks, shift handover, shift handover owner matrix, shift handover signoff and audit trace, multi-status reconciliation review, performance-indicator details, and dispatch lifecycle evidence. release:report and the CI release artifact upload include this report.

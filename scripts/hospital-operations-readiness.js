@@ -19,7 +19,15 @@ const REQUIRED_COLLECTIONS = [
 
 const REQUIRED_ROUTES = [
   "/api/operations/dashboard",
+  "/api/operations/performance-monitoring",
+  "/api/operations/command-chains",
+  "/api/operations/playbooks",
+  "/api/operations/handover",
+  "/api/operations/handover/owners",
+  "/api/operations/handover/signoff",
+  "/api/operations/interface-mapping",
   "/api/operations/dispatch",
+  "/api/operations/dispatch/:id/status",
   "/api/operations/reconciliation/:id/review"
 ];
 
@@ -40,6 +48,12 @@ function ratio(numerator, denominator) {
   return bottom > 0 ? Number(numerator || 0) / bottom : 0;
 }
 
+function routePresent(route, serverSource) {
+  if (route === "/api/operations/reconciliation/:id/review") return serverSource.includes("/api/operations/reconciliation/");
+  if (route === "/api/operations/dispatch/:id/status") return serverSource.includes("/api/operations/dispatch/:id/status") || (serverSource.includes("/api/operations/dispatch/") && serverSource.includes("/status"));
+  return serverSource.includes(route);
+}
+
 function buildHospitalOperationsReadinessReport(options = {}) {
   const data = options.data ?? readJson("data/db.json");
   const pkg = options.pkg ?? readJson("package.json");
@@ -58,9 +72,16 @@ function buildHospitalOperationsReadinessReport(options = {}) {
     { id: "hospitalOps:dispatch", passed: dispatchRequests.length >= 2 && dispatchRequests.every((item) => item.id && item.resourceType && item.quantity && item.status && Array.isArray(item.auditTrail)), detail: `${dispatchRequests.length} dispatch requests` },
     { id: "hospitalOps:reconciliation", passed: reconciliationReviews.length >= 2 && reconciliationReviews.every((item) => item.id && item.sourceBatch && item.status && Array.isArray(item.evidence)), detail: `${reconciliationReviews.length} reconciliation reviews` },
     { id: "hospitalOps:alertRules", passed: alertRules.length >= 5 && alertRules.every((item) => item.id && item.domain && item.threshold && item.dispatchBoundary), detail: `${alertRules.length} alert rules` },
-    { id: "hospitalOps:apiRoutes", passed: REQUIRED_ROUTES.every((route) => route.includes(":id") ? serverSource.includes("/api/operations/reconciliation/") : serverSource.includes(route)), detail: REQUIRED_ROUTES.join(", ") },
+    { id: "hospitalOps:apiRoutes", passed: REQUIRED_ROUTES.every((route) => routePresent(route, serverSource)), detail: REQUIRED_ROUTES.join(", ") },
     { id: "hospitalOps:permissions", passed: /requireApiRole\(req, res, \["commission"\], "\/api\/operations\/dashboard"\)/.test(serverSource) && /operations-dispatch/.test(serverSource) && /statistics-reconciliation-review/.test(serverSource), detail: "commission-only API and audit events" },
     { id: "hospitalOps:frontend", passed: /operations-snapshots/.test(operationsHtml) && /dispatch-form/.test(operationsHtml) && /fetchOperationsDashboard/.test(operationsJs), detail: "operations page renders live monitor, dispatch, and reconciliation controls" },
+    { id: "hospitalOps:interfaceMapping", passed: /buildOperationsInterfaceMappingEvidence/.test(serverSource) && /operations-interface-mapping/.test(operationsHtml) && /renderInterfaceMapping/.test(operationsJs), detail: "site joint-test field mapping API and panel" },
+    { id: "hospitalOps:sla", passed: /buildCommandSla/.test(serverSource) && /command-chain-sla/.test(operationsJs), detail: "command-chain SLA status and escalation evidence" },
+    { id: "hospitalOps:playbooks", passed: /buildOperationsPlaybooks/.test(serverSource) && /operation-playbooks/.test(operationsHtml) && /renderOperationsPlaybooks/.test(operationsJs), detail: "alert playbook API evidence and panel" },
+    { id: "hospitalOps:handover", passed: /buildOperationsHandover/.test(serverSource) && /\/api\/operations\/handover/.test(serverSource) && /operation-handover/.test(operationsHtml) && /renderOperationsHandover/.test(operationsJs), detail: "shift handover list API and panel" },
+    { id: "hospitalOps:handoverOwners", passed: /buildOperationsHandoverOwnerMatrix/.test(serverSource) && /\/api\/operations\/handover\/owners/.test(serverSource) && /operation-handover-owner-matrix/.test(operationsHtml) && /renderHandoverOwnerMatrix/.test(operationsJs), detail: "shift handover owner matrix API and panel" },
+    { id: "hospitalOps:handoverSignoff", passed: /\/api\/operations\/handover\/signoff/.test(serverSource) && /normalizeHandoverSignoff/.test(serverSource) && /operation-handover-signoffs/.test(operationsHtml) && /signoffOperationsHandover/.test(operationsJs), detail: "shift handover signoff API, audit trace, and panel" },
+    { id: "hospitalOps:performanceDetail", passed: /indicatorDetails/.test(serverSource) && /performance-indicator-detail/.test(operationsHtml) && /renderPerformanceIndicatorDetail/.test(operationsJs), detail: "performance manual indicator details and exception template" },
     { id: "hospitalOps:releaseScript", passed: Boolean(pkg.scripts?.["hospital-operations:readiness"]), detail: "package script registered" }
   ];
   return {

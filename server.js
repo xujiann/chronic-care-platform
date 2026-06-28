@@ -513,6 +513,7 @@ function seedState() {
     resourceDispatchRequests: seedResourceDispatchRequests(),
     statisticsReconciliationReviews: seedStatisticsReconciliationReviews(),
     operationAlertRules: seedOperationAlertRules(),
+    operationHandoverSignoffs: [],
     healthStatistics: seedHealthStatistics(),
     deathCertificates: seedDeathCertificates(),
     deathCertificateForms: seedDeathCertificateForms(),
@@ -3191,6 +3192,512 @@ function normalizeOperationStatus(snapshot, rules = []) {
   return "normal";
 }
 
+const PERFORMANCE_MONITORING_MANUALS = {
+  secondary: {
+    title: "二级公立医院绩效监测操作手册（2025版）",
+    total: 28,
+    quantitative: 28,
+    qualitative: 0,
+    national: 21,
+    domains: { "医疗质量": 13, "运营效率": 9, "持续发展": 4, "满意度评价": 2 },
+    sources: { "病案首页": 7, "医院填报": 5, "财务年报表": 9, "国家或省级平台": 5, "满意度调查平台": 2 }
+  },
+  tertiary: {
+    title: "三级公立医院绩效监测操作手册（2025版）",
+    total: 56,
+    quantitative: 51,
+    qualitative: 5,
+    national: 26,
+    domains: { "功能定位": 7, "医疗质量": 19, "运营效率": 18, "持续发展": 9, "满意度评价": 3 },
+    sources: { "病案首页": 10, "医院填报": 20, "财务年报表": 16, "国家或省级平台": 7, "满意度调查平台": 3 }
+  }
+};
+
+const OPERATIONS_INTERFACE_MAPPINGS = [
+  {
+    id: "ops-his-beds",
+    sourceSystem: "HIS/住院管理",
+    source: "病案首页",
+    targetCollection: "hospitalOperationSnapshots",
+    targetField: "beds",
+    fields: ["开放床位", "占用床位", "重症床位", "急诊留观"],
+    owner: "医务部、病案室、信息中心",
+    updateCycle: "日内15分钟",
+    status: "已接入",
+    nextAction: "现场核对床位开放、占用和重症床位口径，确认与直报床位口径差异说明。"
+  },
+  {
+    id: "ops-hr-staff",
+    sourceSystem: "人力资源/排班系统",
+    source: "医院填报",
+    targetCollection: "hospitalOperationSnapshots",
+    targetField: "staff",
+    fields: ["在岗医生", "在岗护士", "急诊医生", "人员缺口"],
+    owner: "人事科、护理部、医务部",
+    updateCycle: "日内排班变更",
+    status: "待联调",
+    nextAction: "补齐排班接口、请假调班规则、临时支援人员归属和责任科室。"
+  },
+  {
+    id: "ops-equipment-ed",
+    sourceSystem: "设备管理/急诊系统",
+    source: "医院填报",
+    targetCollection: "hospitalOperationSnapshots",
+    targetField: "equipment,outpatient",
+    fields: ["CT可用台数", "呼吸机可用数", "救护车可用数", "急诊人次", "候诊超30分钟"],
+    owner: "设备科、急诊科、门诊部",
+    updateCycle: "日内30分钟",
+    status: "已接入",
+    nextAction: "确认设备停机、急诊分诊和候诊统计的自动采集时间戳。"
+  },
+  {
+    id: "ops-stat-direct",
+    sourceSystem: "卫生健康统计直报",
+    source: "财务年报表",
+    targetCollection: "statisticsReconciliationReviews",
+    targetField: "varianceRate,fields,platformValue,directReportValue",
+    fields: ["直报批次", "差异字段", "平台采集值", "直报暂存值", "复核状态"],
+    owner: "统计办公室、规划发展与信息化处",
+    updateCycle: "日报/周报/月报",
+    status: "已接入",
+    nextAction: "把退回、阻断、补正中、通过状态与直报系统回执编码建立映射。"
+  },
+  {
+    id: "ops-satisfaction",
+    sourceSystem: "满意度调查平台",
+    source: "满意度调查平台",
+    targetCollection: "performanceMonitoring",
+    targetField: "readinessMatrix",
+    fields: ["门诊满意度", "住院满意度", "医务人员满意度", "调查周期", "有效样本量"],
+    owner: "行风办、门诊部、护理部",
+    updateCycle: "月度",
+    status: "待联调",
+    nextAction: "现场确认国家满意度平台数据权限、导出周期、样本量字段和异常说明模板。"
+  }
+];
+
+function performanceLinkedSources(data) {
+  const linked = new Set();
+  if ((data.hospitalOperationSnapshots || []).length) {
+    linked.add("病案首页");
+    linked.add("医院填报");
+  }
+  if ((data.statisticsReconciliationReviews || []).length || data.healthStatistics) linked.add("财务年报表");
+  if (data.healthStatisticsIngestion) linked.add("国家或省级平台");
+  return linked;
+}
+
+function performanceSourceOwner(source) {
+  if (source === "病案首页") return "病案室与医务部";
+  if (source === "医院填报") return "医务部、药学部、运营管理部门";
+  if (source === "财务年报表") return "财务科";
+  if (source === "满意度调查平台") return "行风办、门诊部、护理部";
+  if (source === "国家或省级平台") return "信息中心与业务主管科室";
+  return "责任科室待确认";
+}
+
+function performanceReadinessMatrix(manual, linkedSources) {
+  return Object.entries(manual.sources).map(([source, count]) => {
+    const linked = linkedSources.has(source);
+    return {
+      source,
+      indicators: count,
+      linked,
+      status: linked ? "ready" : "pending",
+      owner: performanceSourceOwner(source),
+      nextAction: linked
+        ? "纳入运行监测、绩效复核和异常说明闭环。"
+        : "现场补齐接口字段、统计口径、责任科室、上报周期和历史基线。"
+    };
+  });
+}
+
+function performanceManualIndicators(manual) {
+  if (Array.isArray(manual.indicators)) return manual.indicators;
+  const domains = Object.keys(manual.domains || {});
+  const sources = Object.keys(manual.sources || {});
+  const total = Number(manual.total || 0);
+  const national = Number(manual.national || 0);
+  return Array.from({ length: total }, (_, index) => [
+    index + 1,
+    `${String(manual.title || "公立医院绩效监测").replace(/操作手册.*/, "").trim()}指标${index + 1}`,
+    domains[index % Math.max(domains.length, 1)] || "运行监测",
+    sources[index % Math.max(sources.length, 1)] || "医院填报",
+    index % 2 === 0 ? "持续监测" : "逐步改善",
+    index < national
+  ]);
+}
+
+function performanceIndicatorDetail(item) {
+  const [, name, domain, source, direction, national] = item;
+  return {
+    name,
+    domain,
+    source,
+    direction,
+    national,
+    numerator: `${name}分子按${source}采集，现场联调时确认字段编码、去重规则和时间范围。`,
+    denominator: `${name}分母按同周期机构运行或财务统计口径确认，保留异常说明。`,
+    sourceFields: OPERATIONS_INTERFACE_MAPPINGS
+      .filter((mapping) => mapping.source === source || mapping.targetCollection === "performanceMonitoring")
+      .flatMap((mapping) => mapping.fields)
+      .slice(0, 6),
+    trendPlaceholder: "月度趋势待接入正式历史数据后自动计算，演示环境保留基线占位。",
+    exceptionTemplate: `${name}出现异常时，由${performanceSourceOwner(source)}说明数据来源、业务原因、整改动作和预计闭环时间。`
+  };
+}
+
+function buildPerformanceMonitoringEvidence(data, operationsDashboard = null) {
+  const linkedSources = performanceLinkedSources(data);
+  const manuals = Object.fromEntries(Object.entries(PERFORMANCE_MONITORING_MANUALS).map(([key, manual]) => {
+    const linked = Object.entries(manual.sources).filter(([source]) => linkedSources.has(source)).reduce((sum, [, count]) => sum + count, 0);
+    const pendingSources = Object.keys(manual.sources).filter((source) => !linkedSources.has(source));
+    return [key, {
+      ...manual,
+      coverage: {
+        linked,
+        pending: manual.total - linked,
+        linkedSources: Object.keys(manual.sources).filter((source) => linkedSources.has(source)),
+        pendingSources
+      },
+      readinessMatrix: performanceReadinessMatrix(manual, linkedSources),
+      indicatorDetails: performanceManualIndicators(manual).map(performanceIndicatorDetail)
+    }];
+  }));
+  const snapshots = operationsDashboard?.snapshots || [];
+  const maxPressure = snapshots.reduce((max, item) => Math.max(max, Number(item.resourcePressure || 0)), 0);
+  const actions = [
+    {
+      id: "performance-runtime-pressure",
+      title: "运行压力纳入绩效异常说明",
+      status: maxPressure >= 80 ? "warning" : "ready",
+      detail: `当前最高资源压力 ${maxPressure}，用于支撑床位、门急诊、人员负荷和绩效指标异常说明。`
+    },
+    ...[...new Set(Object.values(manuals).flatMap((manual) => manual.coverage.pendingSources))].map((source) => ({
+      id: `performance-source-${source}`,
+      title: `补接${source}`,
+      status: "pending",
+      detail: `${source}尚未形成完整运行联动，需现场确认字段、口径、责任科室和上报周期。`
+    }))
+  ];
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    source: "国家二级/三级公立医院绩效监测操作手册（2025版）",
+    manuals,
+    linkedSources: [...linkedSources],
+    actions
+  };
+}
+
+function buildOperationsInterfaceMappingEvidence(data) {
+  const collections = new Set(Object.keys(data || {}));
+  const mappings = OPERATIONS_INTERFACE_MAPPINGS.map((mapping) => ({
+    ...mapping,
+    collectionReady: mapping.targetCollection === "performanceMonitoring" || collections.has(mapping.targetCollection),
+    fieldCoverage: mapping.fields.map((field) => ({
+      field,
+      mapped: true,
+      reviewPoint: `${field}需在现场联调中确认字段编码、单位、时间范围和责任科室。`
+    }))
+  }));
+  return {
+    ok: mappings.every((item) => item.collectionReady && item.fieldCoverage.every((field) => field.mapped)),
+    generatedAt: new Date().toISOString(),
+    mappings,
+    summary: {
+      systems: new Set(mappings.map((item) => item.sourceSystem)).size,
+      total: mappings.length,
+      ready: mappings.filter((item) => item.status === "已接入").length,
+      pending: mappings.filter((item) => item.status !== "已接入").length
+    }
+  };
+}
+
+function operationInstitutionMatched(left = {}, right = {}) {
+  const leftId = String(left.institutionId || left.sourceInstitutionId || "").toLowerCase();
+  const rightId = String(right.institutionId || right.sourceInstitutionId || "").toLowerCase();
+  if (leftId && rightId && leftId === rightId) return true;
+  const leftName = String(left.institution || left.sourceInstitution || "").trim().toLowerCase();
+  const rightName = String(right.institution || right.sourceInstitution || "").trim().toLowerCase();
+  return Boolean(leftName && rightName && leftName === rightName);
+}
+
+function operationCommandStage(snapshot, dispatches, reconciliations) {
+  const blockedReconciliation = reconciliations.find((item) => item.status === "blocked");
+  if (blockedReconciliation) {
+    return {
+      stage: "直报阻断",
+      severity: "critical",
+      owner: "统计直报专班",
+      dueHours: 2,
+      nextAction: "先关闭统计直报差异复核，再恢复上报提交。"
+    };
+  }
+  const openDispatch = dispatches.find((item) => ["pending", "assigned", "in-progress"].includes(item.status));
+  if (openDispatch) {
+    return {
+      stage: openDispatch.status === "pending" ? "待分派调度" : "调度执行中",
+      severity: openDispatch.priority === "high" ? "critical" : "warning",
+      owner: "运行调度席",
+      dueHours: openDispatch.priority === "high" ? 4 : 8,
+      nextAction: "跟踪目标机构确认、资源到位和工单关闭留痕。"
+    };
+  }
+  const pendingReconciliation = reconciliations.find((item) => !["approved", "closed"].includes(item.status));
+  if (pendingReconciliation) {
+    return {
+      stage: "直报复核",
+      severity: "warning",
+      owner: "统计质控岗",
+      dueHours: 12,
+      nextAction: "核对平台采集值、直报暂存值和字段口径后提交复核结论。"
+    };
+  }
+  if ((snapshot.activeAlerts || []).length) {
+    return {
+      stage: "预警复盘",
+      severity: snapshot.normalizedStatus === "critical" ? "critical" : "warning",
+      owner: "运行监测岗",
+      dueHours: snapshot.normalizedStatus === "critical" ? 4 : 24,
+      nextAction: "确认预警是否需要生成调度单或纳入绩效异常说明。"
+    };
+  }
+  return {
+    stage: "常态监测",
+    severity: "normal",
+    owner: "运行监测岗",
+    dueHours: 24,
+    nextAction: "维持日内监测，关注床位、门急诊、人员和直报趋势。"
+  };
+}
+
+function addHours(value, hours) {
+  const base = new Date(value || Date.now());
+  if (Number.isNaN(base.getTime())) return "";
+  base.setHours(base.getHours() + Number(hours || 0));
+  return base.toISOString();
+}
+
+function buildCommandSla(snapshot, dispatches, reconciliations, stage) {
+  const openDispatch = dispatches.find((item) => ["pending", "assigned", "in-progress"].includes(item.status));
+  const pendingReconciliation = reconciliations.find((item) => !["approved", "closed"].includes(item.status));
+  const dueAt = openDispatch?.requiredBy || addHours(snapshot.snapshotAt, stage.dueHours);
+  const dueTime = new Date(dueAt);
+  const now = new Date();
+  const closed = !openDispatch && !pendingReconciliation && !(snapshot.activeAlerts || []).length;
+  const overdue = !closed && !Number.isNaN(dueTime.getTime()) && dueTime.getTime() < now.getTime();
+  const remainingMinutes = Number.isNaN(dueTime.getTime()) ? null : Math.round((dueTime.getTime() - now.getTime()) / 60000);
+  return {
+    dueAt,
+    status: closed ? "已闭环" : overdue ? "已超时" : "进行中",
+    overdue,
+    remainingMinutes,
+    owner: stage.owner,
+    escalation: overdue ? `${stage.owner}需补充超时原因、资源到位情况和下一步闭环时间。` : "按处置链继续跟踪。"
+  };
+}
+
+function buildOperationsCommandChains({ snapshots, dispatchRequests, reconciliationReviews }) {
+  return snapshots.map((snapshot) => {
+    const dispatches = dispatchRequests.filter((item) => operationInstitutionMatched(snapshot, item));
+    const reconciliations = reconciliationReviews.filter((item) => operationInstitutionMatched(snapshot, item));
+    const stage = operationCommandStage(snapshot, dispatches, reconciliations);
+    const openDispatches = dispatches.filter((item) => ["pending", "assigned", "in-progress"].includes(item.status));
+    const pendingReconciliations = reconciliations.filter((item) => !["approved", "closed"].includes(item.status));
+    return {
+      id: `chain-${snapshot.id}`,
+      institutionId: snapshot.institutionId,
+      institution: snapshot.institution,
+      status: snapshot.normalizedStatus,
+      resourcePressure: snapshot.resourcePressure,
+      alertCount: (snapshot.activeAlerts || []).length,
+      openDispatchCount: openDispatches.length,
+      pendingReconciliationCount: pendingReconciliations.length,
+      stage: stage.stage,
+      severity: stage.severity,
+      owner: stage.owner,
+      dueHours: stage.dueHours,
+      sla: buildCommandSla(snapshot, dispatches, reconciliations, stage),
+      nextAction: stage.nextAction,
+      evidence: [
+        ...(snapshot.activeAlerts || []).map((item) => item.id),
+        ...openDispatches.map((item) => item.id),
+        ...pendingReconciliations.map((item) => item.id)
+      ],
+      steps: [
+        { name: "运行监测", status: (snapshot.activeAlerts || []).length ? "触发预警" : "正常", count: (snapshot.activeAlerts || []).length },
+        { name: "资源调度", status: openDispatches.length ? "进行中" : "无待办", count: openDispatches.length },
+        { name: "直报复核", status: pendingReconciliations.length ? "待关闭" : "已闭环", count: pendingReconciliations.length },
+        { name: "绩效说明", status: snapshot.resourcePressure >= 80 || pendingReconciliations.length ? "需说明" : "常规归档", count: snapshot.resourcePressure >= 80 || pendingReconciliations.length ? 1 : 0 }
+      ]
+    };
+  }).sort((a, b) => statusSeverity(b.severity) - statusSeverity(a.severity) || Number(b.resourcePressure || 0) - Number(a.resourcePressure || 0));
+}
+
+function playbookOwnerForDomain(domain) {
+  return {
+    beds: "医务部/运行调度席",
+    staff: "人事科/护理部/医务部",
+    outpatient: "门诊部/急诊科/设备科",
+    equipment: "设备科/急诊科",
+    statistics: "统计直报专班"
+  }[domain] || "运行监测岗";
+}
+
+function playbookActionsForDomain(domain) {
+  return {
+    beds: ["确认开放床位和占用口径", "启动院内备用床位", "评估跨院转运或下转", "同步绩效异常说明"],
+    staff: ["核对排班和请假变更", "启用备用班次或跨科支援", "记录人员缺口原因", "追踪到岗确认"],
+    outpatient: ["调整门急诊分诊队列", "释放检查检验优先时段", "同步候诊超时说明", "必要时启动区域分流"],
+    equipment: ["核对设备停机和可用台数", "协调共享设备或外院检查", "记录维修预计恢复时间", "更新调度工单"],
+    statistics: ["冻结直报提交", "核对平台采集值和直报暂存值", "形成退回/补正/阻断结论", "归档复核证据"]
+  }[domain] || ["确认告警来源", "指定责任科室", "记录处置过程", "关闭复盘证据"];
+}
+
+function buildOperationsPlaybooks({ snapshots, alertRules, commandChains, interfaceMapping }) {
+  const chainsByInstitution = new Map((commandChains || []).map((item) => [item.institutionId, item]));
+  return (alertRules || []).map((rule) => {
+    const relatedSnapshots = (snapshots || []).filter((snapshot) => (snapshot.activeAlerts || []).some((alert) => alert.id === rule.id));
+    const chainOwners = [...new Set(relatedSnapshots.map((snapshot) => chainsByInstitution.get(snapshot.institutionId)?.owner).filter(Boolean))];
+    const fields = (interfaceMapping?.mappings || [])
+      .filter((mapping) => mapping.targetField?.includes(rule.domain) || mapping.source === rule.source || mapping.targetCollection === "statisticsReconciliationReviews" && rule.domain === "statistics")
+      .flatMap((mapping) => mapping.fields || [])
+      .slice(0, 8);
+    const severity = relatedSnapshots.some((snapshot) => snapshot.normalizedStatus === "critical") || rule.severity === "critical" ? "critical" : relatedSnapshots.length ? "warning" : "normal";
+    const slaHours = rule.severity === "critical" ? 4 : rule.domain === "statistics" ? 12 : 24;
+    return {
+      id: `playbook-${rule.id}`,
+      ruleId: rule.id,
+      domain: rule.domain,
+      severity,
+      owner: chainOwners[0] || playbookOwnerForDomain(rule.domain),
+      trigger: rule.threshold,
+      dispatchBoundary: rule.dispatchBoundary,
+      activeInstitutions: relatedSnapshots.length,
+      activeInstitutionNames: relatedSnapshots.map((snapshot) => snapshot.institution),
+      slaHours,
+      requiredFields: fields,
+      actions: playbookActionsForDomain(rule.domain),
+      evidence: [
+        "/api/operations/dashboard",
+        "/api/operations/command-chains",
+        "/api/operations/interface-mapping",
+        rule.domain === "statistics" ? "/api/operations/reconciliation/:id/review" : "/api/operations/dispatch"
+      ]
+    };
+  }).sort((a, b) => statusSeverity(b.severity) - statusSeverity(a.severity) || b.activeInstitutions - a.activeInstitutions);
+}
+
+function buildOperationsHandover({ snapshots, dispatchRequests, reconciliationReviews, commandChains, playbooks, handoverSignoffs }) {
+  const openStatuses = new Set(["pending", "assigned", "in-progress"]);
+  const items = (commandChains || [])
+    .filter((chain) => chain.severity !== "normal" || chain.openDispatchCount || chain.pendingReconciliationCount || chain.sla?.overdue)
+    .map((chain) => {
+      const snapshot = (snapshots || []).find((item) => item.institutionId === chain.institutionId || item.institution === chain.institution) || {};
+      const dispatches = (dispatchRequests || []).filter((item) => operationInstitutionMatched(snapshot, item) && openStatuses.has(item.status));
+      const reconciliations = (reconciliationReviews || []).filter((item) => operationInstitutionMatched(snapshot, item) && !["approved", "closed"].includes(item.status));
+      const matchedPlaybooks = (playbooks || []).filter((item) => (item.activeInstitutionNames || []).includes(chain.institution));
+      const remainingMinutes = Number(chain.sla?.remainingMinutes);
+      const dueSoon = !chain.sla?.overdue && Number.isFinite(remainingMinutes) && remainingMinutes <= 240;
+      const riskSignals = [
+        chain.alertCount ? `活动预警 ${chain.alertCount} 项` : "",
+        dispatches.length ? `开放调度 ${dispatches.length} 单` : "",
+        reconciliations.length ? `待复核 ${reconciliations.length} 项` : "",
+        matchedPlaybooks.length ? `命中预案 ${matchedPlaybooks.length} 条` : "",
+        chain.sla?.overdue ? "SLA 已超时" : dueSoon ? "SLA 临期" : ""
+      ].filter(Boolean);
+      return {
+        id: `handover-${chain.institutionId || chain.institution}`,
+        institutionId: chain.institutionId,
+        institution: chain.institution,
+        severity: chain.sla?.overdue ? "critical" : dueSoon && chain.severity === "normal" ? "warning" : chain.severity,
+        stage: chain.stage,
+        owner: chain.owner,
+        dueAt: chain.sla?.dueAt || "",
+        dueStatus: chain.sla?.status || "",
+        remainingMinutes: Number.isFinite(remainingMinutes) ? remainingMinutes : null,
+        riskSignals,
+        checkpoints: [
+          "确认最新床位、人员、设备、门急诊和住院运行快照",
+          "核对调度单责任人、到位时间和审计留痕",
+          "复核统计直报差异结论与退回/阻断状态",
+          "记录绩效异常说明和下一班跟进边界"
+        ],
+        nextActions: [
+          chain.nextAction,
+          ...matchedPlaybooks.flatMap((item) => item.actions || []).slice(0, 3)
+        ].filter(Boolean).slice(0, 4),
+        evidence: [
+          "/api/operations/dashboard",
+          "/api/operations/command-chains",
+          "/api/operations/playbooks",
+          "/api/operations/handover"
+        ]
+      };
+    })
+    .sort((a, b) => statusSeverity(b.severity) - statusSeverity(a.severity) || Number(a.remainingMinutes ?? 99999) - Number(b.remainingMinutes ?? 99999));
+  const recentSignoffs = [...(Array.isArray(handoverSignoffs) ? handoverSignoffs : [])]
+    .sort((a, b) => new Date(b.signedAt || 0) - new Date(a.signedAt || 0))
+    .slice(0, 8);
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    summary: {
+      items: items.length,
+      critical: items.filter((item) => item.severity === "critical").length,
+      dueSoon: items.filter((item) => item.remainingMinutes !== null && item.remainingMinutes <= 240 && item.remainingMinutes >= 0).length,
+      overdue: items.filter((item) => item.riskSignals.includes("SLA 已超时")).length,
+      owners: new Set(items.map((item) => item.owner).filter(Boolean)).size,
+      signoffs: recentSignoffs.length
+    },
+    shiftNote: "交班清单用于院级运行调度值班、统计直报复核和绩效异常说明的同屏交接。",
+    items,
+    recentSignoffs
+  };
+}
+
+function buildOperationsHandoverOwnerMatrix(handover) {
+  const items = Array.isArray(handover?.items) ? handover.items : [];
+  const owners = new Map();
+  items.forEach((item) => {
+    const owner = item.owner || "运行监测岗";
+    const current = owners.get(owner) || {
+      id: `handover-owner-${owners.size + 1}`,
+      owner,
+      itemCount: 0,
+      criticalCount: 0,
+      dueSoonCount: 0,
+      overdueCount: 0,
+      institutions: [],
+      stages: [],
+      nextActions: [],
+      evidence: ["/api/operations/handover", "/api/operations/handover/owners"]
+    };
+    current.itemCount += 1;
+    current.criticalCount += item.severity === "critical" ? 1 : 0;
+    current.dueSoonCount += item.remainingMinutes !== null && item.remainingMinutes <= 240 && item.remainingMinutes >= 0 ? 1 : 0;
+    current.overdueCount += (item.riskSignals || []).includes("SLA 已超时") ? 1 : 0;
+    current.institutions = [...new Set([...current.institutions, item.institution].filter(Boolean))];
+    current.stages = [...new Set([...current.stages, item.stage].filter(Boolean))];
+    current.nextActions = [...new Set([...current.nextActions, ...(item.nextActions || [])].filter(Boolean))].slice(0, 5);
+    owners.set(owner, current);
+  });
+  const matrix = [...owners.values()].sort((a, b) => b.criticalCount - a.criticalCount || b.dueSoonCount - a.dueSoonCount || b.itemCount - a.itemCount);
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    summary: {
+      owners: matrix.length,
+      items: matrix.reduce((sum, item) => sum + item.itemCount, 0),
+      critical: matrix.reduce((sum, item) => sum + item.criticalCount, 0),
+      dueSoon: matrix.reduce((sum, item) => sum + item.dueSoonCount, 0),
+      overdue: matrix.reduce((sum, item) => sum + item.overdueCount, 0)
+    },
+    matrix
+  };
+}
+
 function buildHospitalOperationsDashboard(data) {
   const rules = Array.isArray(data.operationAlertRules) ? data.operationAlertRules : [];
   const snapshots = (Array.isArray(data.hospitalOperationSnapshots) ? data.hospitalOperationSnapshots : []).map((snapshot) => {
@@ -3209,6 +3716,7 @@ function buildHospitalOperationsDashboard(data) {
   }).sort((a, b) => statusSeverity(b.normalizedStatus) - statusSeverity(a.normalizedStatus) || b.bedOccupancyRate - a.bedOccupancyRate);
   const dispatchRequests = Array.isArray(data.resourceDispatchRequests) ? data.resourceDispatchRequests : [];
   const reconciliationReviews = Array.isArray(data.statisticsReconciliationReviews) ? data.statisticsReconciliationReviews : [];
+  const handoverSignoffs = Array.isArray(data.operationHandoverSignoffs) ? data.operationHandoverSignoffs : [];
   const openStatuses = new Set(["pending", "assigned", "in-progress"]);
   const summary = {
     institutions: snapshots.length,
@@ -3223,7 +3731,11 @@ function buildHospitalOperationsDashboard(data) {
     emergencyVisitsToday: snapshots.reduce((sum, item) => sum + Number(item.outpatient?.emergencyVisits || 0), 0)
   };
   summary.bedOccupancyRate = ratio(summary.occupiedBeds, summary.totalOpenBeds);
-  return {
+  const commandChains = buildOperationsCommandChains({ snapshots, dispatchRequests, reconciliationReviews });
+  const interfaceMapping = buildOperationsInterfaceMappingEvidence(data);
+  const playbooks = buildOperationsPlaybooks({ snapshots, alertRules: rules, commandChains, interfaceMapping });
+  const handover = buildOperationsHandover({ snapshots, dispatchRequests, reconciliationReviews, commandChains, playbooks, handoverSignoffs });
+  const dashboard = {
     ok: true,
     generatedAt: new Date().toISOString(),
     boundaries: [
@@ -3237,8 +3749,15 @@ function buildHospitalOperationsDashboard(data) {
     snapshots,
     dispatchRequests,
     reconciliationReviews,
-    alertRules: rules
+    alertRules: rules,
+    commandChains,
+    interfaceMapping,
+    playbooks,
+    handover,
+    handoverOwnerMatrix: buildOperationsHandoverOwnerMatrix(handover)
   };
+  dashboard.performanceMonitoring = buildPerformanceMonitoringEvidence(data, dashboard);
+  return dashboard;
 }
 
 function normalizeDispatchAction(payload, user) {
@@ -3263,6 +3782,50 @@ function normalizeDispatchAction(payload, user) {
     auditTrail: [
       ...(Array.isArray(payload.auditTrail) ? payload.auditTrail : []),
       { at: now, actor: user.username || user.role, action: "upsert", note: payload.note || status }
+    ]
+  };
+}
+
+function normalizeHandoverSignoff(payload, user, handover) {
+  const now = new Date().toISOString();
+  const handoverItems = Array.isArray(handover?.items) ? handover.items : [];
+  const requestedIds = new Set(Array.isArray(payload.itemIds) ? payload.itemIds.map(String) : []);
+  const signedItems = requestedIds.size ? handoverItems.filter((item) => requestedIds.has(String(item.id))) : handoverItems;
+  return {
+    id: payload.id || `handover-signoff-${randomUUID()}`,
+    signedAt: now,
+    shift: String(payload.shift || new Date().toLocaleDateString("zh-CN", { hour12: false })).trim(),
+    signer: user.name || user.username || user.role,
+    signerRole: user.role,
+    itemIds: signedItems.map((item) => item.id),
+    itemCount: signedItems.length,
+    criticalCount: signedItems.filter((item) => item.severity === "critical").length,
+    dueSoonCount: signedItems.filter((item) => item.remainingMinutes !== null && item.remainingMinutes <= 240 && item.remainingMinutes >= 0).length,
+    owners: [...new Set(signedItems.map((item) => item.owner).filter(Boolean))],
+    note: String(payload.note || "已确认本班运行交接清单。").trim(),
+    nextShiftFocus: String(payload.nextShiftFocus || signedItems.slice(0, 3).map((item) => `${item.institution}:${item.stage}`).join("；") || "保持常态监测。").trim(),
+    evidence: ["/api/operations/handover", "/api/process-audit", "/api/audit/verify"],
+    auditTrail: [
+      { at: now, actor: user.username || user.role, action: "handover-signoff", note: String(payload.note || "交接签收").trim() }
+    ]
+  };
+}
+
+function applyDispatchStatusUpdate(item, payload, user) {
+  const now = new Date().toISOString();
+  const status = String(payload.status || item.status || "pending").trim();
+  const note = String(payload.note || payload.reviewNote || `状态更新为${status}`).trim();
+  return {
+    ...item,
+    status,
+    updatedAt: now,
+    updatedBy: user.username || user.role,
+    assignedAt: status === "assigned" && !item.assignedAt ? now : item.assignedAt,
+    closedAt: ["closed", "cancelled"].includes(status) ? now : item.closedAt,
+    closureNote: status === "closed" ? note : item.closureNote,
+    auditTrail: [
+      ...(Array.isArray(item.auditTrail) ? item.auditTrail : []),
+      { at: now, actor: user.username || user.role, action: "status-change", note }
     ]
   };
 }
@@ -3535,6 +4098,7 @@ function normalizeState(data) {
     resourceDispatchRequests: mergeByKey(seedResourceDispatchRequests(), data.resourceDispatchRequests, "id"),
     statisticsReconciliationReviews: mergeByKey(seedStatisticsReconciliationReviews(), data.statisticsReconciliationReviews, "id"),
     operationAlertRules: mergeByKey(seedOperationAlertRules(), data.operationAlertRules, "id"),
+    operationHandoverSignoffs: Array.isArray(data.operationHandoverSignoffs) ? data.operationHandoverSignoffs : [],
     healthStatistics: data.healthStatistics && typeof data.healthStatistics === "object" ? data.healthStatistics : seedHealthStatistics(),
     deathCertificates: mergeByKey(seedDeathCertificates(), data.deathCertificates, "id"),
     deathCertificateForms: mergeByKey(seedDeathCertificateForms(), data.deathCertificateForms, "id"),
@@ -5609,6 +6173,110 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/operations/performance-monitoring") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/performance-monitoring");
+    if (!user) return;
+    const data = readDatabase();
+    sendJson(res, 200, buildPerformanceMonitoringEvidence(data, buildHospitalOperationsDashboard(data)));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/command-chains") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/command-chains");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, {
+      ok: true,
+      generatedAt: dashboard.generatedAt,
+      summary: {
+        institutions: dashboard.summary.institutions,
+        critical: dashboard.commandChains.filter((item) => item.severity === "critical").length,
+        warning: dashboard.commandChains.filter((item) => item.severity === "warning").length,
+        normal: dashboard.commandChains.filter((item) => item.severity === "normal").length
+      },
+      commandChains: dashboard.commandChains
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/playbooks") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/playbooks");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, {
+      ok: true,
+      generatedAt: dashboard.generatedAt,
+      summary: {
+        playbooks: dashboard.playbooks.length,
+        active: dashboard.playbooks.filter((item) => item.activeInstitutions > 0).length,
+        critical: dashboard.playbooks.filter((item) => item.severity === "critical").length
+      },
+      playbooks: dashboard.playbooks
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/handover") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/handover");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.handover);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/handover/owners") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/handover/owners");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.handoverOwnerMatrix);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/operations/handover/signoff") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/handover/signoff");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const dashboard = buildHospitalOperationsDashboard(data);
+    const signoff = normalizeHandoverSignoff(payload, user, dashboard.handover);
+    data.operationHandoverSignoffs = [signoff, ...(Array.isArray(data.operationHandoverSignoffs) ? data.operationHandoverSignoffs : [])].slice(0, 120);
+    data.platformProcessAudit = [
+      {
+        process: "医院运行交接签收",
+        owner: signoff.signer,
+        status: "已签收",
+        risk: signoff.criticalCount ? "存在严重或超时交接事项" : "常规交接",
+        auditPoint: "核查交接事项、责任组、SLA、下一班关注点和签收人是否留痕。",
+        evidence: `operationHandoverSignoffs/${signoff.id}`,
+        nextAction: signoff.nextShiftFocus
+      },
+      ...(Array.isArray(data.platformProcessAudit) ? data.platformProcessAudit : [])
+    ].slice(0, 80);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "operations-handover-signoff",
+        target: signoff.id,
+        result: "allowed",
+        detail: `${signoff.shift}:${signoff.itemCount}:${signoff.criticalCount}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 201, signoff);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/interface-mapping") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/interface-mapping");
+    if (!user) return;
+    sendJson(res, 200, buildOperationsInterfaceMappingEvidence(readDatabase()));
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/operations/dispatch") {
     const user = requireApiRole(req, res, ["commission"], "/api/operations/dispatch");
     if (!user) return;
@@ -5639,6 +6307,37 @@ async function handleApi(req, res) {
     return;
   }
 
+  const dispatchStatusMatch = url.pathname.match(/^\/api\/operations\/dispatch\/([^/]+)\/status$/);
+  if (req.method === "POST" && dispatchStatusMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/dispatch/:id/status");
+    if (!user) return;
+    const id = decodeURIComponent(dispatchStatusMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const index = (data.resourceDispatchRequests || []).findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "dispatch request not found" });
+      return;
+    }
+    data.resourceDispatchRequests[index] = applyDispatchStatusUpdate(data.resourceDispatchRequests[index], payload, user);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "operations-dispatch-status",
+        target: id,
+        result: "allowed",
+        detail: data.resourceDispatchRequests[index].status
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, data.resourceDispatchRequests[index]);
+    return;
+  }
+
   const reconciliationReviewMatch = url.pathname.match(/^\/api\/operations\/reconciliation\/([^/]+)\/review$/);
   if (req.method === "POST" && reconciliationReviewMatch) {
     const user = requireApiRole(req, res, ["commission"], "/api/operations/reconciliation/:id/review");
@@ -5656,7 +6355,16 @@ async function handleApi(req, res) {
       status: String(payload.status || "approved").trim(),
       reviewedBy: user.username || user.role,
       reviewedAt: new Date().toISOString(),
-      reviewNote: String(payload.reviewNote || payload.note || data.statisticsReconciliationReviews[index].reviewNote || "").trim()
+      reviewNote: String(payload.reviewNote || payload.note || data.statisticsReconciliationReviews[index].reviewNote || "").trim(),
+      auditTrail: [
+        ...(Array.isArray(data.statisticsReconciliationReviews[index].auditTrail) ? data.statisticsReconciliationReviews[index].auditTrail : []),
+        {
+          at: new Date().toISOString(),
+          actor: user.username || user.role,
+          action: "review-status-change",
+          note: String(payload.reviewNote || payload.note || payload.status || "reviewed").trim()
+        }
+      ]
     };
     data.securityEvents = [
       {

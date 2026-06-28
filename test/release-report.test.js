@@ -111,6 +111,10 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.integrationReadiness.ok, true);
   assert.equal(report.checks.some((item) => item.name === "interfaceMapping:report" && item.passed), true);
   assert.equal(report.interfaceMapping.ok, true);
+  assert.equal(report.checks.some((item) => item.name === "hospitalOps:readiness" && item.passed), true);
+  assert.equal(report.hospitalOperationsReadiness.ok, true);
+  assert.equal(report.checks.some((item) => item.name === "hospitalOpsRelease:ready" && item.passed), true);
+  assert.equal(report.hospitalOperationsRelease.ok, true);
   assert.equal(report.checks.some((item) => item.name === "monitoring:readiness" && item.passed), true);
   assert.equal(report.monitoringReadiness.ok, true);
   assert.equal(report.checks.some((item) => item.name === "operations:readiness" && item.passed), true);
@@ -152,6 +156,8 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(markdown, /Monitoring readiness report/);
   assert.match(markdown, /Operations readiness report/);
   assert.match(markdown, /Full process audit report/);
+  assert.match(markdown, /Hospital operations readiness report/);
+  assert.match(markdown, /Hospital operations release report/);
   assert.match(markdown, /Service acceptance summary/);
   assert.match(markdown, /service:chronicDomains/);
   assert.match(markdown, /Service open action preview/);
@@ -240,6 +246,10 @@ test("release report writes standalone production cutover and storage artifacts"
   const monitoringMarkdown = fs.readFileSync(path.join(outputDir, "monitoring-readiness-report.md"), "utf8");
   const operationsJson = JSON.parse(fs.readFileSync(path.join(outputDir, "operations-readiness-report.json"), "utf8"));
   const operationsMarkdown = fs.readFileSync(path.join(outputDir, "operations-readiness-report.md"), "utf8");
+  const hospitalOperationsJson = JSON.parse(fs.readFileSync(path.join(outputDir, "hospital-operations-readiness-report.json"), "utf8"));
+  const hospitalOperationsMarkdown = fs.readFileSync(path.join(outputDir, "hospital-operations-readiness-report.md"), "utf8");
+  const hospitalOperationsReleaseJson = JSON.parse(fs.readFileSync(path.join(outputDir, "hospital-operations-release-report.json"), "utf8"));
+  const hospitalOperationsReleaseMarkdown = fs.readFileSync(path.join(outputDir, "hospital-operations-release-report.md"), "utf8");
   const processAuditJson = JSON.parse(fs.readFileSync(path.join(outputDir, "process-audit-report.json"), "utf8"));
   const processAuditMarkdown = fs.readFileSync(path.join(outputDir, "process-audit-report.md"), "utf8");
   const serviceAcceptanceJson = JSON.parse(fs.readFileSync(path.join(outputDir, "service-acceptance-summary.json"), "utf8"));
@@ -277,6 +287,10 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(monitoringMarkdown, /SLO targets/);
   assert.equal(operationsJson.operationsReadiness.ok, true);
   assert.match(operationsMarkdown, /External dependency risks/);
+  assert.equal(hospitalOperationsJson.hospitalOperationsReadiness.ok, true);
+  assert.match(hospitalOperationsMarkdown, /hospitalOps:frontend/);
+  assert.equal(hospitalOperationsReleaseJson.hospitalOperationsRelease.ok, true);
+  assert.match(hospitalOperationsReleaseMarkdown, /发布范围/);
   assert.equal(processAuditJson.processAudit.ok, true);
   assert.match(processAuditMarkdown, /Full process audit report/);
   assert.equal(serviceAcceptanceJson.serviceAcceptance.ok, true);

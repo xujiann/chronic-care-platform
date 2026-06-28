@@ -19,11 +19,150 @@
         <nav>
           <a href="./platform.html">平台驾驶舱</a>
           <a href="./workbench.html">运营工作台</a>
+          <a href="./operations-about.html">政策说明</a>
           <a href="./index.html">卫健委端</a>
         </nav>
       </header>
 
+      <section class="panel operations-policy-panel" aria-label="政策依据与监测边界">
+        <div class="panel-title">
+          <h2>政策依据与监测边界</h2>
+          <span>对齐国家二级、三级公立医院绩效监测操作手册（2025版）和医院运行调度现场管理口径</span>
+        </div>
+        <div class="policy-note-grid">
+          <article>
+            <strong>绩效监测口径</strong>
+            <span>按二级公立医院 28 项、三级公立医院 56 项指标建立指标域、数据来源、责任科室、填报周期和异常说明，运行页只承载监测、预警、复核和取证，不替代国家平台正式上报。</span>
+          </article>
+          <article>
+            <strong>运行调度边界</strong>
+            <span>覆盖床位、人员、设备、门急诊、住院运行、直报对账和资源调度；跨院调拨、急诊分流、重症资源协调均保留指挥链 SLA 和审计轨迹。</span>
+          </article>
+          <article>
+            <strong>现场联调要求</strong>
+            <span>HIS、病案首页、人力资源、排班、设备、急诊、统计直报和满意度平台需逐字段核对来源、更新频率、责任科室和差异处理规则。</span>
+          </article>
+        </div>
+      </section>
+
       <section class="metric-grid" id="operations-metrics"></section>
+
+      <section class="panel performance-manual-panel" aria-label="公立医院绩效监测口径">
+        <div class="panel-title">
+          <h2>公立医院绩效监测口径</h2>
+          <span>依据二级、三级公立医院绩效监测操作手册（2025版）</span>
+        </div>
+        <div class="filter-grid">
+          <label>医院等级
+            <select id="performance-tier-filter">
+              <option value="secondary">二级公立医院</option>
+              <option value="tertiary">三级公立医院</option>
+            </select>
+          </label>
+          <label>指标域
+            <select id="performance-domain-filter">
+              <option value="all">全部指标域</option>
+              <option value="功能定位">功能定位</option>
+              <option value="医疗质量">医疗质量</option>
+              <option value="运营效率">运营效率</option>
+              <option value="持续发展">持续发展</option>
+              <option value="满意度评价">满意度评价</option>
+            </select>
+          </label>
+          <label>数据来源
+            <select id="performance-source-filter">
+              <option value="all">全部来源</option>
+              <option value="病案首页">病案首页</option>
+              <option value="医院填报">医院填报</option>
+              <option value="财务年报表">财务年报表</option>
+              <option value="满意度调查平台">满意度调查平台</option>
+              <option value="国家或省级平台">国家或省级平台</option>
+            </select>
+          </label>
+          <button id="performance-filter-reset" class="inline-action" type="button">重置口径</button>
+        </div>
+        <div id="performance-summary" class="performance-summary-grid"></div>
+        <div class="portal-grid compact-monitor-grid">
+          <div id="performance-domains" class="performance-domain-list"></div>
+          <div id="performance-indicators" class="performance-indicator-list"></div>
+        </div>
+        <div id="performance-actions" class="performance-action-grid"></div>
+        <div id="performance-readiness" class="performance-readiness-grid"></div>
+        <div id="performance-indicator-detail" class="performance-detail-panel"></div>
+      </section>
+
+      <section class="panel operations-monitor-controls" aria-label="运行监测筛选">
+        <div class="panel-title">
+          <h2>运行监测筛选</h2>
+          <span>按机构状态、预警域和资源压力定位异常</span>
+        </div>
+        <div class="filter-grid">
+          <label>状态
+            <select id="operation-status-filter">
+              <option value="all">全部状态</option>
+              <option value="critical">严重预警</option>
+              <option value="warning">一般预警</option>
+              <option value="normal">正常</option>
+            </select>
+          </label>
+          <label>预警域
+            <select id="operation-domain-filter">
+              <option value="all">全部预警域</option>
+              <option value="beds">床位</option>
+              <option value="staff">人员</option>
+              <option value="outpatient">门急诊</option>
+              <option value="statistics">统计直报</option>
+            </select>
+          </label>
+          <label>机构搜索
+            <input id="operation-search" type="search" placeholder="输入机构名称" />
+          </label>
+          <label>排序
+            <select id="operation-sort">
+              <option value="pressure">资源压力优先</option>
+              <option value="bed">床位占用优先</option>
+              <option value="emergency">急诊量优先</option>
+              <option value="variance">直报差异优先</option>
+            </select>
+          </label>
+          <button id="operation-filter-reset" class="inline-action" type="button">重置筛选</button>
+        </div>
+      </section>
+
+      <section class="panel interface-mapping-panel" aria-label="现场联调字段映射">
+        <div class="panel-title">
+          <h2>现场联调字段映射</h2>
+          <span>按来源系统核对字段、责任科室、更新周期和联调状态</span>
+        </div>
+        <div id="operations-interface-mapping" class="interface-mapping-grid"></div>
+      </section>
+
+      <section class="panel command-chain-panel" aria-label="运行处置链">
+        <div class="panel-title">
+          <h2>运行处置链</h2>
+          <span>按机构串联预警、调度、直报复核和绩效说明</span>
+        </div>
+        <div id="operation-command-chains" class="command-chain-grid"></div>
+      </section>
+
+      <section class="panel operation-playbook-panel" aria-label="预警处置预案">
+        <div class="panel-title">
+          <h2>预警处置预案</h2>
+          <span>按床位、人员、门急诊、设备和统计直报场景沉淀责任链、SLA、字段证据和处置动作</span>
+        </div>
+        <div id="operation-playbooks" class="operation-playbook-grid"></div>
+      </section>
+
+      <section class="panel operation-handover-panel" aria-label="运行交接清单">
+        <div class="panel-title">
+          <h2>运行交接清单</h2>
+          <span>汇总开放调度、活动预警、直报复核和SLA临期风险，支持值班交接</span>
+        </div>
+        <div id="operation-handover-summary" class="operation-handover-summary"></div>
+        <div id="operation-handover-owner-matrix" class="operation-handover-owner-matrix"></div>
+        <div id="operation-handover-signoffs" class="operation-handover-signoffs"></div>
+        <div id="operation-handover" class="operation-handover-grid"></div>
+      </section>
 
       <section class="portal-grid">
         <article class="panel wide">
@@ -32,6 +171,24 @@
             <span id="operations-boundary"></span>
           </div>
           <div id="operations-snapshots" class="table-wrap"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>单机构详情</h2>
+            <span id="operation-selected-hint">点击监测表行查看</span>
+          </div>
+          <div id="operation-detail" class="operation-detail"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>预警处置队列</h2>
+            <span>自动汇总床位、人员、门急诊和直报差异</span>
+          </div>
+          <div id="operation-alert-queue" class="operation-alert-queue"></div>
         </article>
 
         <article class="panel">
@@ -58,25 +215,25 @@
             <span>写入审计留痕</span>
           </div>
           <form id="dispatch-form" class="filter-grid">
-            <label>来源机构<input name="sourceInstitution" value="Qingniwaqiao Community Health Service Center" /></label>
-            <label>目标机构<input name="targetInstitution" value="Dalian Central Hospital" /></label>
-            <label>资源类型<input name="resourceType" value="step-down-bed" /></label>
+            <label>来源机构<input name="sourceInstitution" value="青泥洼桥社区卫生服务中心" /></label>
+            <label>目标机构<input name="targetInstitution" value="大连市中心医院" /></label>
+            <label>资源类型<input name="resourceType" value="过渡病床" /></label>
             <label>数量<input name="quantity" type="number" min="1" value="6" /></label>
             <label>优先级
               <select name="priority">
-                <option value="high">high</option>
-                <option value="medium">medium</option>
-                <option value="low">low</option>
+                <option value="high">高</option>
+                <option value="medium">中</option>
+                <option value="low">低</option>
               </select>
             </label>
             <label>状态
               <select name="status">
-                <option value="pending">pending</option>
-                <option value="assigned">assigned</option>
-                <option value="closed">closed</option>
+                <option value="pending">待处理</option>
+                <option value="assigned">已分派</option>
+                <option value="closed">已关闭</option>
               </select>
             </label>
-            <label class="full">原因<textarea name="reason" rows="3">Bed occupancy alert triggered manual dispatch review.</textarea></label>
+            <label class="full">原因<textarea name="reason" rows="3">床位占用预警触发人工调度复核。</textarea></label>
             <button class="inline-action" type="submit">提交调度</button>
           </form>
         </article>
@@ -85,7 +242,7 @@
       <section class="panel">
         <div class="panel-title">
           <h2>统计直报对账复核</h2>
-          <span>关联 healthStatistics、healthStatisticsIngestion 与运行快照</span>
+          <span>关联卫生健康统计数据、统计直报采集数据与运行快照</span>
         </div>
         <div id="reconciliation-reviews" class="table-wrap"></div>
       </section>
