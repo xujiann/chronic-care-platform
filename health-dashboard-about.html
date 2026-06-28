@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="./portal.css" />
     <script src="./auth.js"></script>
     <script>window.HealthCityAuth.requireRole(["commission"])</script>
+    <script src="./health-dashboard-about.js" defer></script>
   </head>
   <body>
     <main class="portal-shell">
@@ -45,6 +46,16 @@
           <strong>API</strong>
           <small>/api/health-dashboard/summary</small>
         </article>
+      </section>
+
+      <section class="panel" data-dashboard-about-section="runtime-report" id="dashboard-about-runtime">
+        <div class="panel-title">
+          <h2>当前模块运行状态</h2>
+          <span id="dashboard-about-runtime-state">正在读取综合驾驶舱摘要接口</span>
+        </div>
+        <div class="function-report-grid" id="dashboard-about-function-report"></div>
+        <div class="function-report-evidence" id="dashboard-about-release-evidence"></div>
+        <div class="rules" id="dashboard-about-onsite-boundaries"></div>
       </section>
 
       <section class="panel" data-dashboard-about-section="template-functions">
@@ -181,6 +192,47 @@
           <article class="capability-card" data-dashboard-site="operation">
             <strong>生产运维与安全验收</strong>
             <span>补齐生产数据库、对象存储、日志留存、监控告警、备份恢复、等保密评、信创适配和上线签字证据。</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" data-dashboard-about-section="next-plan">
+        <div class="panel-title">
+          <h2>下一步开发计划</h2>
+          <span>围绕真实接口、数据质量、预警闭环和现场验收继续迭代</span>
+        </div>
+        <div class="priority-list">
+          <article class="priority-row" data-dashboard-next-plan="daily-interface">
+            <strong>01</strong>
+            <div>
+              <h3>接入日报与实时服务量接口</h3>
+              <p>把当前就诊、入院月度折算替换为门急诊、出入院、床位和转诊日报接口，并保留日、周、月、年口径一致性校验。</p>
+            </div>
+            <span>数据接口</span>
+          </article>
+          <article class="priority-row" data-dashboard-next-plan="certificate-exchange">
+            <strong>02</strong>
+            <div>
+              <h3>完善证照交换链路</h3>
+              <p>补齐出生、死亡、电子证照、公安户籍、民政殡葬和疾控死因监测的撤销、补正、回执和跨部门对账状态。</p>
+            </div>
+            <span>证照协同</span>
+          </article>
+          <article class="priority-row" data-dashboard-next-plan="risk-drilldown">
+            <strong>03</strong>
+            <div>
+              <h3>增强风险下钻与任务闭环</h3>
+              <p>从汇总卡片下钻到源应用记录，展示责任人、时限、处置轨迹、复核状态和跨部门阻塞原因。</p>
+            </div>
+            <span>闭环治理</span>
+          </article>
+          <article class="priority-row" data-dashboard-next-plan="site-evidence">
+            <strong>04</strong>
+            <div>
+              <h3>沉淀现场验收证据包</h3>
+              <p>把接口联调截图、报文样例、签字单、问题整改、复测结论和上线批次材料绑定到发布报告与关于页。</p>
+            </div>
+            <span>验收发布</span>
           </article>
         </div>
       </section>

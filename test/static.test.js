@@ -160,14 +160,19 @@ test("health dashboard exposes the aggregate application entry and API contract"
 
 test("health dashboard about page documents policies data boundary and site cutover", () => {
   const html = read("health-dashboard-about.html");
+  const js = read("health-dashboard-about.js");
   const auth = read("auth.js");
 
   assert.match(html, /requireRole\(\["commission"\]\)/);
+  assert.match(html, /health-dashboard-about\.js/);
+  assert.match(html, /data-dashboard-about-section="runtime-report"/);
+  assert.match(html, /dashboard-about-function-report/);
   assert.match(html, /data-dashboard-about-section="template-functions"/);
   assert.match(html, /data-dashboard-about-section="policy-basis"/);
   assert.match(html, /data-dashboard-about-section="data-boundary"/);
   assert.match(html, /data-dashboard-about-section="api-evidence"/);
   assert.match(html, /data-dashboard-about-section="site-cutover"/);
+  assert.match(html, /data-dashboard-about-section="next-plan"/);
   assert.match(html, /data-dashboard-template-function="aggregate-entry"/);
   assert.match(html, /data-dashboard-template-function="population-service-board"/);
   assert.match(html, /data-dashboard-template-function="release-report"/);
@@ -175,8 +180,16 @@ test("health dashboard about page documents policies data boundary and site cuto
   assert.match(html, /\/api\/health-dashboard\/summary/);
   assert.match(html, /healthDashboard:populationServiceBoard/);
   assert.match(html, /health-dashboard:summary/);
+  assert.match(html, /data-dashboard-next-plan="daily-interface"/);
+  assert.match(html, /data-dashboard-next-plan="site-evidence"/);
   assert.match(html, /birthCertificates\.birthDateTime/);
   assert.match(html, /healthStatistics\.serviceReports/);
+  assert.match(js, /\/api\/health-dashboard\/summary/);
+  assert.match(js, /dashboard-about-runtime-state/);
+  assert.match(js, /aboutRuntimeFunction/);
+  assert.match(js, /aboutRuntimeEvidence/);
+  assert.match(js, /staticAboutRuntimeReport/);
+  assert.match(read("package.json"), /health-dashboard-about\.js/);
   assert.match(auth, /"health-dashboard-about\.html": \["commission"\]/);
 });
 

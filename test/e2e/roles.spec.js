@@ -172,6 +172,11 @@ test("about page explains runnable platform capabilities", async ({ page }) => {
   await expect(page.locator(".auth-bar a[href='./about.html']")).toHaveCount(1);
 
   await page.goto("/health-dashboard-about.html");
+  await expect(page.locator("[data-dashboard-about-section='runtime-report']")).toBeVisible();
+  await expect(page.locator("#dashboard-about-runtime-state")).toHaveAttribute("data-source-mode", "api");
+  await expect(page.locator("#dashboard-about-function-report [data-about-runtime-function]")).toHaveCount(6);
+  await expect(page.locator("#dashboard-about-function-report [data-about-runtime-function='aggregate-entry']")).toContainText("196 source records");
+  await expect(page.locator("#dashboard-about-release-evidence [data-about-runtime-evidence='summary-script']")).toContainText("health-dashboard:summary");
   await expect(page.locator("[data-dashboard-about-section='template-functions']")).toBeVisible();
   await expect(page.locator("[data-dashboard-template-function='aggregate-entry']")).toContainText("health-dashboard-applications.js");
   await expect(page.locator("[data-dashboard-template-function='population-service-board']")).toContainText("日");
@@ -181,6 +186,9 @@ test("about page explains runnable platform capabilities", async ({ page }) => {
   await expect(page.locator("[data-dashboard-about-section='data-boundary']")).toContainText("birthCertificates.birthDateTime");
   await expect(page.locator("[data-dashboard-about-section='api-evidence']")).toContainText("/api/health-dashboard/summary");
   await expect(page.locator("[data-dashboard-about-section='site-cutover']")).toBeVisible();
+  await expect(page.locator("[data-dashboard-about-section='next-plan']")).toBeVisible();
+  await expect(page.locator("[data-dashboard-next-plan='daily-interface']")).toContainText("日报");
+  await expect(page.locator("[data-dashboard-next-plan='site-evidence']")).toContainText("验收");
 });
 
 test("citizen stays in the household experience and cannot open commission pages", async ({ page }) => {
