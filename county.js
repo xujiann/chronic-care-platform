@@ -217,25 +217,30 @@ function renderCountyTeleconsultationLoop(state) {
     const reportReturned = rows.filter((item) => item.reportStatus === "returned" || item.status === "report-returned").length;
     const avgResponse = averagePerformance(rows, "responseHours");
     const avgReportReturn = averagePerformance(rows, "reportReturnHours");
+    const escalations = buildReferralTeleconsultationEscalations(rows);
     performanceEl.innerHTML = [
       ["Returned reports", `${reportReturned}/${rows.length || 0}`, rows.length ? `${Math.round((reportReturned / rows.length) * 100)}% return rate` : "No filtered records"],
       ["Avg response", Number.isFinite(avgResponse) ? `${avgResponse.toFixed(1)}h` : "-", "Receiving feedback timeliness"],
       ["Avg report return", Number.isFinite(avgReportReturn) ? `${avgReportReturn.toFixed(1)}h` : "-", "Report callback timeliness"],
+      ["SLA risks", `${escalations.length}`, `${escalations.filter((item) => item.severity === "high").length} high risk follow-up items`],
       ["High priority", rows.filter((item) => item.priority === "high").length, "County follow-up queue"]
     ].map(([label, value, hint]) => `<article class="claim-card"><strong>${label}</strong><span>${value}<br>${hint}</span></article>`).join("");
   }
+  const escalationMap = new Map(buildReferralTeleconsultationEscalations(rows).map((item) => [item.teleconsultationId, item]));
   tableEl.innerHTML = `<table>
-    <thead><tr><th>Resident</th><th>Pathway</th><th>Question</th><th>Status</th><th>Performance</th><th>Report</th><th>Action</th></tr></thead>
+    <thead><tr><th>Resident</th><th>Pathway</th><th>Question</th><th>Status</th><th>Performance</th><th>SLA</th><th>Report</th><th>Action</th></tr></thead>
     <tbody>${rows.map((item) => {
       const resident = residentOf(state, item.residentId);
       const responseHours = Number(item.performance?.responseHours);
       const reportReturnHours = Number(item.performance?.reportReturnHours);
+      const escalation = escalationMap.get(item.id);
       return `<tr>
         <td>${resident?.name || item.residentId || "Unknown"}</td>
         <td>${item.sourceInstitution || "-"} -> ${item.targetInstitution || "-"}<br><small>${item.department || item.type || ""}</small></td>
         <td>${item.clinicalQuestion || item.receivingFeedback || item.reportSummary || "-"}</td>
         <td><span class="badge ${item.priority === "high" ? "danger" : "info"}">${item.status}</span></td>
         <td>Response ${Number.isFinite(responseHours) ? `${responseHours}h` : "-"}<br><small>Report ${Number.isFinite(reportReturnHours) ? `${reportReturnHours}h` : "-"}</small></td>
+        <td>${escalation ? `<span class="badge ${escalation.severity === "high" ? "danger" : "warn"}">${escalation.severity}</span><br><small>${escalation.reasons.join("；")}</small>` : `<span class="badge info">normal</span>`}</td>
         <td>${item.reportStatus || "pending"}</td>
         <td>
           ${countyActionButton("referralTeleconsultations", item.id, "County follow-up", { status: "feedback-returned", receivingFeedback: "County consortium office followed up receiving feedback." })}
@@ -254,6 +259,42 @@ function filterCountyTeleconsultations(rows) {
     const priorityMatched = priority === "all" || item.priority === priority;
     return statusMatched && priorityMatched;
   });
+}
+
+function parseReferralDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function buildReferralTeleconsultationEscalations(rows) {
+  const now = new Date();
+  return (Array.isArray(rows) ? rows : [])
+    .filter((item) => item.reportStatus !== "returned" && item.status !== "closed")
+    .map((item) => {
+      const dueDate = parseReferralDate(item.due);
+      const requestedAt = parseReferralDate(item.requestedAt || item.createdAt);
+      const daysOverdue = dueDate ? Math.floor((now.getTime() - dueDate.getTime()) / 86400000) : 0;
+      const ageDays = requestedAt ? Math.floor((now.getTime() - requestedAt.getTime()) / 86400000) : 0;
+      const responseHours = Number(item.performance?.responseHours);
+      const reportReturnHours = Number(item.performance?.reportReturnHours);
+      const reasons = [];
+      if (daysOverdue > 0) reasons.push(`逾期 ${daysOverdue} 天`);
+      if (item.priority === "high") reasons.push("高优先级报告未回传");
+      if (Number.isFinite(responseHours) && responseHours > 4) reasons.push(`响应 ${responseHours}h`);
+      if (Number.isFinite(reportReturnHours) && reportReturnHours > 24) reasons.push(`报告 ${reportReturnHours}h`);
+      if (!item.meetingWindow) reasons.push("缺少会诊窗口");
+      if (!reasons.length && ageDays >= 2) reasons.push(`开放 ${ageDays} 天`);
+      if (!reasons.length) return null;
+      return {
+        teleconsultationId: item.id,
+        severity: item.priority === "high" || daysOverdue > 0 ? "high" : "medium",
+        reasons,
+        daysOverdue: Math.max(0, daysOverdue)
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.daysOverdue - a.daysOverdue);
 }
 
 function averagePerformance(rows, field) {

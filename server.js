@@ -5190,6 +5190,62 @@ function buildReferralTeleconsultationPersonalRecord(data, item, callback, user)
   };
 }
 
+function parseReferralDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function daysBetween(start, end) {
+  if (!start || !end) return null;
+  return Math.floor((end.getTime() - start.getTime()) / 86400000);
+}
+
+function buildReferralTeleconsultationEscalations(rows, options = {}) {
+  const now = parseReferralDate(options.asOf) || new Date();
+  return (Array.isArray(rows) ? rows : [])
+    .filter((item) => !isClosedTaskStatus(item.status) && item.reportStatus !== "returned")
+    .map((item) => {
+      const dueDate = parseReferralDate(item.due);
+      const requestedAt = parseReferralDate(item.requestedAt || item.createdAt);
+      const daysOverdue = dueDate ? daysBetween(dueDate, now) : null;
+      const ageDays = requestedAt ? daysBetween(requestedAt, now) : null;
+      const responseHours = Number(item.performance?.responseHours);
+      const reportReturnHours = Number(item.performance?.reportReturnHours);
+      const reasons = [];
+      if (Number.isFinite(daysOverdue) && daysOverdue > 0) reasons.push(`due overdue ${daysOverdue}d`);
+      if (item.priority === "high" && item.reportStatus !== "returned") reasons.push("high priority pending report");
+      if (Number.isFinite(responseHours) && responseHours > 4) reasons.push(`response ${responseHours}h`);
+      if (Number.isFinite(reportReturnHours) && reportReturnHours > 24) reasons.push(`report return ${reportReturnHours}h`);
+      if (!item.meetingWindow) reasons.push("meeting window missing");
+      if (!reasons.length && Number.isFinite(ageDays) && ageDays >= 2) reasons.push(`open ${ageDays}d`);
+      if (!reasons.length) return null;
+      const severity = item.priority === "high" || (Number.isFinite(daysOverdue) && daysOverdue >= 1) ? "high" : "medium";
+      return {
+        id: `rtc-escalation-${item.id}`,
+        teleconsultationId: item.id,
+        residentId: item.residentId,
+        priority: item.priority || "normal",
+        severity,
+        status: item.status,
+        reportStatus: item.reportStatus || "pending-return",
+        due: item.due || "",
+        daysOverdue: Number.isFinite(daysOverdue) ? daysOverdue : 0,
+        reasons,
+        ownerRole: "county",
+        nextAction: item.reportStatus === "returned"
+          ? "archive report return evidence"
+          : "confirm receiving hospital report callback or manual reconciliation",
+        evidence: "referral teleconsultation SLA queue"
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => {
+      const severityRank = { high: 2, medium: 1 };
+      return (severityRank[b.severity] || 0) - (severityRank[a.severity] || 0) || b.daysOverdue - a.daysOverdue;
+    });
+}
+
 function buildDataQualityIssues(data) {
   const issues = [];
   const indexes = new Map();
@@ -5974,12 +6030,16 @@ async function handleApi(req, res) {
     const data = readDatabase();
     const rows = (Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [])
       .filter((item) => canAccessReferralTeleconsultation(user, item, data));
+    const escalations = buildReferralTeleconsultationEscalations(rows);
     sendJson(res, 200, {
       teleconsultations: rows,
+      escalations,
       summary: {
         total: rows.length,
         pending: rows.filter((item) => !isClosedTaskStatus(item.status) && item.reportStatus !== "returned").length,
-        reportReturned: rows.filter((item) => item.reportStatus === "returned" || item.status === "report-returned").length
+        reportReturned: rows.filter((item) => item.reportStatus === "returned" || item.status === "report-returned").length,
+        escalations: escalations.length,
+        highRisk: escalations.filter((item) => item.severity === "high").length
       }
     });
     return;

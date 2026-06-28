@@ -30,6 +30,41 @@ function averagePerformance(rows, field) {
   return Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1));
 }
 
+function parseReferralDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function buildReferralTeleconsultationEscalations(rows, options = {}) {
+  const now = parseReferralDate(options.asOf) || new Date();
+  return (Array.isArray(rows) ? rows : [])
+    .filter((item) => item.status !== "closed" && item.reportStatus !== "returned")
+    .map((item) => {
+      const dueDate = parseReferralDate(item.due);
+      const requestedAt = parseReferralDate(item.requestedAt || item.createdAt);
+      const daysOverdue = dueDate ? Math.floor((now.getTime() - dueDate.getTime()) / 86400000) : 0;
+      const ageDays = requestedAt ? Math.floor((now.getTime() - requestedAt.getTime()) / 86400000) : 0;
+      const responseHours = Number(item.performance?.responseHours);
+      const reportReturnHours = Number(item.performance?.reportReturnHours);
+      const reasons = [];
+      if (daysOverdue > 0) reasons.push(`due overdue ${daysOverdue}d`);
+      if (item.priority === "high") reasons.push("high priority pending report");
+      if (Number.isFinite(responseHours) && responseHours > 4) reasons.push(`response ${responseHours}h`);
+      if (Number.isFinite(reportReturnHours) && reportReturnHours > 24) reasons.push(`report return ${reportReturnHours}h`);
+      if (!item.meetingWindow) reasons.push("meeting window missing");
+      if (!reasons.length && ageDays >= 2) reasons.push(`open ${ageDays}d`);
+      if (!reasons.length) return null;
+      return {
+        teleconsultationId: item.id,
+        severity: item.priority === "high" || daysOverdue > 0 ? "high" : "medium",
+        daysOverdue: Math.max(0, daysOverdue),
+        reasons
+      };
+    })
+    .filter(Boolean);
+}
+
 function buildReferralTeleconsultationReadinessReport(options = {}) {
   const data = options.data ?? readJson("data/db.json");
   const pkg = options.pkg ?? readJson("package.json");
@@ -58,6 +93,7 @@ function buildReferralTeleconsultationReadinessReport(options = {}) {
     .map((item) => item.sourceId));
   const avgResponseHours = averagePerformance(teleconsultations, "responseHours");
   const avgReportReturnHours = averagePerformance(teleconsultations, "reportReturnHours");
+  const escalations = buildReferralTeleconsultationEscalations(teleconsultations, options);
   const boundaryEvidence = {
     referral: teleconsultations.every((item) => item.referralId),
     teleconsultation: teleconsultations.every((item) => item.meetingWindow || item.type),
@@ -77,6 +113,7 @@ function buildReferralTeleconsultationReadinessReport(options = {}) {
     { id: "referral:notifications", passed: reportReturned.length >= 1 && reportReturned.every((item) => notifiedReportIds.has(item.id)) && /appendReferralTeleconsultationNotifications/.test(server), detail: `${reportReturned.filter((item) => notifiedReportIds.has(item.id)).length}/${reportReturned.length} returned reports notified` },
     { id: "referral:feedbackCallback", passed: contractIds.has("referral-feedback-callback-v1") && /feedback-callback/.test(server) && teleconsultations.some((item) => item.receivingFeedback && notifiedFeedbackIds.has(item.id)), detail: `${notifiedFeedbackIds.size} feedback notifications with signed callback contract` },
     { id: "referral:performance", passed: avgResponseHours !== null && avgReportReturnHours !== null && /county-teleconsultation-performance/.test(county), detail: `avg response ${avgResponseHours}h, avg report return ${avgReportReturnHours}h` },
+    { id: "referral:slaEscalation", passed: /buildReferralTeleconsultationEscalations/.test(server) && /SLA risks/.test(county), detail: `${escalations.length} SLA escalation items surfaced` },
     { id: "referral:api", passed: /\/api\/referral-teleconsultations/.test(server) && /feedback-callback/.test(server) && /schedule-callback/.test(server) && /report-callback/.test(server) && /verifyIntegrationSignature/.test(server) && /canAccessReferralTeleconsultation/.test(server) && /appendDataAccessLog/.test(server), detail: "specialized API, signed feedback/schedule/report callbacks, role guard, and audit log present" },
     { id: "referral:frontend", passed: /teleconsultation-form/.test(institution) && /teleconsultation-action-form/.test(institution) && /teleconsultation-loop/.test(institution) && /county-teleconsultation-loop/.test(county) && /county-teleconsultation-status-filter/.test(county), detail: "institution create form, feedback form, institution loop, and county command entry present" },
     { id: "referral:releaseScript", passed: Boolean(pkg.scripts?.["referral:readiness"]), detail: pkg.scripts?.["referral:readiness"] || "missing" }
@@ -92,10 +129,13 @@ function buildReferralTeleconsultationReadinessReport(options = {}) {
       archivedReports: reportReturned.filter((item) => archivedReportIds.has(item.id)).length,
       notifications: taskMessages.length,
       feedbackNotifications: notifiedFeedbackIds.size,
+      slaEscalations: escalations.length,
+      highRiskEscalations: escalations.filter((item) => item.severity === "high").length,
       collaborationOrders: teleconsultations.filter((item) => collaborationOrderIds.has(item.collaborationOrderId)).length,
       avgResponseHours,
       avgReportReturnHours
     },
+    escalations,
     teleconsultations: teleconsultations.map((item) => ({
       id: item.id,
       referralId: item.referralId,
@@ -125,6 +165,8 @@ function renderMarkdown(report) {
     `- Archived reports: ${report.summary.archivedReports}`,
     `- Referral notifications: ${report.summary.notifications}`,
     `- Feedback notifications: ${report.summary.feedbackNotifications}`,
+    `- SLA escalations: ${report.summary.slaEscalations}`,
+    `- High risk escalations: ${report.summary.highRiskEscalations}`,
     `- Linked collaboration orders: ${report.summary.collaborationOrders}`,
     `- Avg response hours: ${report.summary.avgResponseHours ?? "-"}`,
     `- Avg report return hours: ${report.summary.avgReportReturnHours ?? "-"}`,

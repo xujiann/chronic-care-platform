@@ -590,6 +590,10 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(teleconsultations.response.status, 200);
     assert.equal(teleconsultations.body.summary.total >= 2, true);
     assert.equal(teleconsultations.body.summary.reportReturned >= 1, true);
+    assert.equal(teleconsultations.body.summary.escalations >= 1, true);
+    assert.equal(teleconsultations.body.summary.highRisk >= 1, true);
+    assert.equal(teleconsultations.body.escalations.some((item) => item.teleconsultationId === "rtc-001" && item.severity === "high"), true);
+    assert.equal(teleconsultations.body.escalations.some((item) => item.reasons.some((reason) => reason.includes("pending report"))), true);
     const teleconsultationAction = await api(baseUrl, "/api/referral-teleconsultations/rtc-001/actions", authorized(county.body.token, {
       method: "POST",
       body: JSON.stringify({ status: "feedback-returned", feedback: "County office confirmed receiving feedback.", note: "county follow-up" })
