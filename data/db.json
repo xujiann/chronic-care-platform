@@ -2456,7 +2456,10 @@
       "incentive": "连续上传7天可兑换健康积分",
       "status": "需医生复核",
       "nextAction": "家庭医生电话随访并判断是否上转",
-      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
+      "deviceId": "bp-device-demo-001",
+      "deviceExternalId": "device-bp-r1-20260622",
+      "integrationStatus": "device gateway accepted"
     },
     {
       "id": "csm-002",
@@ -2878,6 +2881,26 @@
   ],
   "taskMessages": [
     {
+      "id": "msg-reminder-outreach-r1-demo",
+      "taskId": "seniorServices:ss-outreach-r1-demo",
+      "collection": "seniorServices",
+      "sourceId": "ss-outreach-r1-demo",
+      "residentId": "r1",
+      "targetRole": "citizen",
+      "channel": "sms",
+      "title": "Chronic reminder outreach scheduled",
+      "body": "Medication pickup and follow-up reminder scheduled for resident and family proxy.",
+      "status": "sent",
+      "chronicFollowup": true,
+      "meta": {
+        "reminderOutreach": true,
+        "serviceId": "ss-outreach-r1-demo"
+      },
+      "receipts": [],
+      "createdAt": "2026-06-22T09:30:00.000Z",
+      "createdBy": "seed"
+    },
+    {
       "id": "msg-chronic-followup-001",
       "taskId": "followups:f1",
       "collection": "followups",
@@ -2952,7 +2975,11 @@
       "pharmacyStatus": "待取药",
       "deliveryMode": "社区药房自取",
       "lastUpdated": "2026-06-15",
-      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
+      "callbackExternalId": "pharmacy-mp1-20260622",
+      "pickupConfirmedAt": "2026-06-22T09:30:00.000Z",
+      "inventoryStatus": "dispensed",
+      "adherenceStatus": "pharmacy callback confirmed"
     },
     {
       "id": "mp2",
@@ -3165,6 +3192,19 @@
     }
   ],
   "seniorServices": [
+    {
+      "id": "ss-outreach-r1-demo",
+      "residentId": "r1",
+      "service": "chronic reminder outreach",
+      "channel": "sms",
+      "status": "scheduled",
+      "contact": "resident and family proxy",
+      "nextAction": "send medication pickup and follow-up reminder, collect receipt before next visit",
+      "scheduledAt": "2026-06-22T09:30:00.000Z",
+      "outreachEvidence": true,
+      "createdAt": "2026-06-22T09:30:00.000Z",
+      "createdBy": "seed"
+    },
     {
       "id": "ss1",
       "residentId": "r4",
@@ -6506,6 +6546,26 @@
     }
   ],
   "personalRecords": [
+    {
+      "id": "pr-family-doctor-r1-demo",
+      "residentId": "r1",
+      "category": "chronic-family-doctor-note",
+      "date": "2026-06-22",
+      "name": "family doctor chronic follow-up closure",
+      "result": "Family doctor reviewed high blood pressure self-monitoring and updated the 7-day home monitoring plan.",
+      "source": "family doctor service pack",
+      "meta": {
+        "familyDoctorClosure": true,
+        "taskId": "chronicSelfManagement:csm-001",
+        "servicePack": "hypertension follow-up pack",
+        "nextAction": "continue home monitoring for 7 days",
+        "handledAt": "2026-06-22T09:30:00.000Z",
+        "handledBy": "family-doctor-demo"
+      },
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
+      "createdAt": "2026-06-22T09:30:00.000Z",
+      "createdBy": "seed"
+    },
     {
       "id": "pr-chronic-feedback-001",
       "residentId": "r1",

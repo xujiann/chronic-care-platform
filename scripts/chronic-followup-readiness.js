@@ -137,6 +137,12 @@ function buildChronicFollowupReadinessReport(options = {}) {
     familyProxy: count(data.seniorServices, (item) => item.residentId && /家属|proxy|代办/i.test(`${item.service || ""}${item.contact || ""}${item.nextAction || ""}`)) + count(data.medicationPickups, (item) => /家属|proxy|代办/i.test(`${item.applyMode || ""}${item.deliveryMode || ""}`)),
     seniorReminder: count(data.seniorServices, (item) => item.residentId && item.nextAction)
   };
+  const fieldIntegration = {
+    deviceMeasurements: experienceRecords.filter((item) => item.meta?.deviceExternalId || item.meta?.deviceId || /device gateway|remote device/i.test(`${item.source || ""}${item.meta?.measurementType || ""}`)).length + count(data.chronicSelfManagement, (item) => item.deviceExternalId || item.deviceId || /device gateway|remote/i.test(`${item.uploadSource || ""}${item.integrationStatus || ""}`)),
+    pharmacyCallbacks: count(data.medicationPickups, (item) => item.callbackExternalId || item.pickupConfirmedAt || /callback|pharmacy callback/i.test(`${item.adherenceStatus || ""}${item.integrationStatus || ""}`)),
+    familyDoctorClosures: count(data.personalRecords, (item) => item.category === "chronic-family-doctor-note" || item.meta?.familyDoctorClosure) + count(data.taskMessages, (item) => item.chronicFollowup && item.targetRole === "institution" && ["handled", "read"].includes(String(item.status || "").toLowerCase())),
+    reminderOutreach: count(data.seniorServices, (item) => item.outreachEvidence || /outreach|sms|phone|call/i.test(`${item.service || ""}${item.channel || ""}${item.nextAction || ""}`)) + count(data.taskMessages, (item) => item.chronicFollowup && item.meta?.reminderOutreach)
+  };
   const boundaries = [
     {
       id: "screening",
@@ -199,6 +205,12 @@ function buildChronicFollowupReadinessReport(options = {}) {
       evidence: "chronicSelfManagement/personalRecords/seniorServices/medicationPickups"
     },
     {
+      id: "field-integration-closure",
+      name: "Field integration and outreach closure",
+      passed: fieldIntegration.deviceMeasurements >= 1 && fieldIntegration.pharmacyCallbacks >= 1 && fieldIntegration.familyDoctorClosures >= 1 && fieldIntegration.reminderOutreach >= 1,
+      evidence: "device measurements/pharmacy callbacks/family doctor actions/reminder outreach"
+    },
+    {
       id: "policy-alignment",
       name: "Policy-aligned chronic follow-up evidence",
       passed: policyAlignment.length >= 7 && policyAlignment.every((item) => item.covered),
@@ -236,6 +248,11 @@ function buildChronicFollowupReadinessReport(options = {}) {
       selfMonitoringRecords: residentExperience.selfMonitoring,
       satisfactionRecords: residentExperience.satisfaction,
       familyProxyRecords: residentExperience.familyProxy,
+      fieldIntegrationItems: Object.values(fieldIntegration).reduce((sum, value) => sum + value, 0),
+      deviceMeasurementRecords: fieldIntegration.deviceMeasurements,
+      pharmacyCallbackRecords: fieldIntegration.pharmacyCallbacks,
+      familyDoctorClosureRecords: fieldIntegration.familyDoctorClosures,
+      reminderOutreachRecords: fieldIntegration.reminderOutreach,
       policyAligned: policyAlignment.filter((item) => item.covered).length,
       policyItems: policyAlignment.length,
       highRiskScreenings: count(data.chronicScreeningTasks, (item) => /\u9ad8\u5371|high/i.test(String(item.riskLevel || ""))),
@@ -245,6 +262,7 @@ function buildChronicFollowupReadinessReport(options = {}) {
     policyAlignment,
     alertQueue,
     residentExperience,
+    fieldIntegration,
     residentCoverage,
     reusePoints: [
       "chronicScreeningTasks",
@@ -259,6 +277,10 @@ function buildChronicFollowupReadinessReport(options = {}) {
       "GET /api/chronic/followup-summary",
       "POST /api/chronic/followup-feedback",
       "POST /api/chronic/resident-checkins",
+      "POST /api/chronic/device-measurements",
+      "POST /api/chronic/pharmacy-callbacks",
+      "POST /api/chronic/family-doctor-actions",
+      "POST /api/chronic/reminder-outreach",
       "POST /api/chronic/followup-dispatch"
     ]
   };

@@ -4805,7 +4805,7 @@ function normalizeChronicFeedback(payload, user) {
   };
 }
 
-function appendChronicFollowupMessage(data, { residentId, taskId, collection, sourceId, targetRole, title, body, user }) {
+function appendChronicFollowupMessage(data, { residentId, taskId, collection, sourceId, targetRole, title, body, user, channel, status, meta }) {
   const now = new Date().toISOString();
   const message = {
     id: `msg-${randomUUID()}`,
@@ -4814,11 +4814,12 @@ function appendChronicFollowupMessage(data, { residentId, taskId, collection, so
     sourceId: sourceId || "",
     residentId,
     targetRole,
-    channel: "in_app",
+    channel: channel || "in_app",
     title,
     body,
-    status: "sent",
+    status: status || "sent",
     chronicFollowup: true,
+    meta: meta || {},
     receipts: [],
     createdAt: now,
     createdBy: user?.username || user?.role || "system",
@@ -4949,6 +4950,7 @@ function upsertResidentExperienceCheckin(data, user, payload) {
   const proxyRelation = String(payload.proxyRelation || "").trim();
   const satisfaction = String(payload.satisfaction || "").trim();
   const seniorReminder = parseBooleanValue(payload.seniorReminder) === true;
+  const recordSource = String(payload.source || (proxyName ? "family proxy" : "resident portal")).trim();
   const resultParts = [
     measurementValue ? `${measurementType}: ${measurementValue}` : "",
     medicationTaken === null ? "" : medicationTaken ? "medication taken" : "medication missed",
@@ -4964,7 +4966,7 @@ function upsertResidentExperienceCheckin(data, user, payload) {
     date: String(payload.date || now.slice(0, 10)),
     name: String(payload.name || "chronic resident self-management check-in").trim(),
     result: resultParts.join("; ") || "resident check-in submitted",
-    source: String(payload.source || (proxyName ? "family proxy" : "resident portal")).trim(),
+    source: recordSource,
     meta: {
       residentExperience: true,
       measurementType,
@@ -4976,6 +4978,8 @@ function upsertResidentExperienceCheckin(data, user, payload) {
       proxyName,
       proxyRelation,
       seniorReminder,
+      deviceId: String(payload.deviceId || "").trim(),
+      deviceExternalId: String(payload.externalId || payload.deviceEventId || "").trim(),
       note: String(payload.note || "").trim(),
       healthPoints,
       needsReview,
@@ -4994,7 +4998,7 @@ function upsertResidentExperienceCheckin(data, user, payload) {
     residentId,
     device: measurementType,
     latestValue: measurementValue || satisfaction || "resident check-in",
-    uploadSource: proxyName ? "family proxy upload" : "resident portal",
+    uploadSource: proxyName ? "family proxy upload" : recordSource,
     group: String(payload.group || "chronic self-management").trim(),
     incentive: `${healthPoints} health points`,
     status: needsReview ? "needs family doctor review" : "resident checked in",
@@ -5077,6 +5081,215 @@ function upsertResidentExperienceCheckin(data, user, payload) {
       messageId: message?.id || null
     }
   };
+}
+
+function ingestChronicDeviceMeasurement(data, user, payload) {
+  const residentId = String(payload.residentId || user.residentId || "").trim();
+  if (!residentId) return { status: 400, body: { error: "Bad Request", message: "residentId is required" } };
+  if (!canAccessResident(user, residentId, data)) {
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "ingest chronic device measurement", target: residentId, result: "denied", detail: "resident scope denied" });
+    return { status: 403, body: { error: "Forbidden", message: "resident scope denied" } };
+  }
+  const externalId = String(payload.externalId || payload.deviceEventId || "").trim();
+  if (externalId) {
+    const existing = (data.personalRecords || []).find((record) => record.category === "chronic-self-checkin" && record.meta?.deviceExternalId === externalId);
+    if (existing) return { status: 200, body: { record: existing, idempotent: true } };
+  }
+  return upsertResidentExperienceCheckin(data, user, {
+    ...payload,
+    residentId,
+    source: String(payload.source || "device gateway").trim(),
+    measurementType: String(payload.measurementType || payload.deviceType || "remote device measurement").trim(),
+    measurementValue: String(payload.measurementValue || payload.value || "").trim(),
+    note: String(payload.note || "external device measurement received").trim(),
+    deviceId: String(payload.deviceId || "").trim(),
+    externalId
+  });
+}
+
+function recordChronicPharmacyCallback(data, user, payload) {
+  const pickupId = String(payload.medicationPickupId || payload.id || "").trim();
+  if (!pickupId) return { status: 400, body: { error: "Bad Request", message: "medicationPickupId is required" } };
+  const pickup = (data.medicationPickups || []).find((item) => item.id === pickupId);
+  if (!pickup) return { status: 404, body: { error: "Not Found", message: "medication pickup not found" } };
+  if (!canAccessResident(user, pickup.residentId, data)) {
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "record pharmacy callback", target: pickupId, result: "denied", detail: "resident scope denied" });
+    return { status: 403, body: { error: "Forbidden", message: "resident scope denied" } };
+  }
+  const now = new Date().toISOString();
+  pickup.pharmacyStatus = String(payload.pharmacyStatus || payload.status || "picked_up").trim();
+  pickup.status = String(payload.status || pickup.status || pickup.pharmacyStatus).trim();
+  pickup.pickupConfirmedAt = String(payload.pickupConfirmedAt || now).trim();
+  pickup.callbackExternalId = String(payload.externalId || payload.callbackId || "").trim();
+  pickup.inventoryStatus = String(payload.inventoryStatus || pickup.inventoryStatus || "confirmed").trim();
+  pickup.adherenceStatus = String(payload.adherenceStatus || "pharmacy callback confirmed").trim();
+  pickup.lastUpdated = now;
+  if (payload.deliveryMode) pickup.deliveryMode = String(payload.deliveryMode).trim();
+  if (payload.medicationTaken !== undefined) pickup.medicationTaken = parseBooleanValue(payload.medicationTaken);
+
+  const message = appendChronicFollowupMessage(data, {
+    residentId: pickup.residentId,
+    taskId: `medicationPickups:${pickup.id}`,
+    collection: "medicationPickups",
+    sourceId: pickup.id,
+    targetRole: "citizen",
+    title: "Medication pickup status updated",
+    body: String(payload.note || pickup.pharmacyStatus || "pharmacy callback received").trim(),
+    user,
+    meta: { pharmacyCallback: true, externalId: pickup.callbackExternalId }
+  });
+  closeChronicFollowupMessages(data, { residentId: pickup.residentId, taskId: `medicationPickups:${pickup.id}`, targetRole: "institution", user });
+  appendDataAccessLog(data, user, pickup.residentId, "chronic pharmacy callback", pickup.pharmacyStatus);
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "record pharmacy callback",
+      target: `medicationPickups/${pickup.id}`,
+      result: "allowed",
+      detail: pickup.pharmacyStatus
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+  writeDatabase(normalizeState(data));
+  return { status: 200, body: { medicationPickup: pickup, messageId: message.id } };
+}
+
+function closeFamilyDoctorChronicAction(data, user, payload) {
+  const residentId = String(payload.residentId || "").trim();
+  if (!residentId) return { status: 400, body: { error: "Bad Request", message: "residentId is required" } };
+  if (!canAccessResident(user, residentId, data)) {
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "close family doctor chronic action", target: residentId, result: "denied", detail: "resident scope denied" });
+    return { status: 403, body: { error: "Forbidden", message: "resident scope denied" } };
+  }
+  const now = new Date().toISOString();
+  const taskId = String(payload.taskId || "").trim();
+  const messageId = String(payload.messageId || "").trim();
+  let closedMessages = 0;
+  data.taskMessages = (Array.isArray(data.taskMessages) ? data.taskMessages : []).map((message) => {
+    const match = (messageId && message.id === messageId) || (taskId && message.taskId === taskId && message.residentId === residentId && message.targetRole === "institution");
+    if (!match || !isOpenChronicFollowupMessage(message)) return message;
+    closedMessages += 1;
+    return {
+      ...message,
+      status: "handled",
+      handledAt: now,
+      handledBy: user.username || user.role,
+      handledByName: user.name,
+      receipts: [
+        { at: now, by: user.username || user.role, byName: user.name, status: "handled" },
+        ...(Array.isArray(message.receipts) ? message.receipts : [])
+      ].slice(0, 20)
+    };
+  });
+
+  const residentMap = new Map((data.residents || []).map((resident) => [resident.id, resident]));
+  const note = {
+    id: randomUUID(),
+    residentId,
+    category: "chronic-family-doctor-note",
+    date: String(payload.date || now.slice(0, 10)),
+    name: String(payload.action || "family doctor chronic follow-up").trim(),
+    result: String(payload.result || payload.note || "family doctor action closed").trim(),
+    source: String(payload.source || "family doctor service pack").trim(),
+    meta: {
+      familyDoctorClosure: true,
+      taskId,
+      messageId,
+      nextAction: String(payload.nextAction || "").trim(),
+      servicePack: String(payload.servicePack || "").trim(),
+      handledAt: now,
+      handledBy: user.username || user.role,
+      handledByName: user.name
+    },
+    personIndex: personIndexForResident(residentMap, residentId),
+    createdBy: user.username || user.role,
+    createdByName: user.name,
+    createdAt: now
+  };
+  data.personalRecords = [note, ...(Array.isArray(data.personalRecords) ? data.personalRecords : [])].slice(0, 500);
+  const citizenMessage = appendChronicFollowupMessage(data, {
+    residentId,
+    taskId: taskId || `familyDoctor:${note.id}`,
+    collection: "personalRecords",
+    sourceId: note.id,
+    targetRole: "citizen",
+    title: "Family doctor follow-up completed",
+    body: note.result,
+    user,
+    meta: { familyDoctorClosure: true }
+  });
+  appendDataAccessLog(data, user, residentId, "family doctor chronic action", note.result);
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "close family doctor chronic action",
+      target: residentId,
+      result: "allowed",
+      detail: note.result
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+  writeDatabase(normalizeState(data));
+  return { status: 200, body: { note, closedMessages, messageId: citizenMessage.id } };
+}
+
+function scheduleChronicReminderOutreach(data, user, payload) {
+  const residentId = String(payload.residentId || "").trim();
+  if (!residentId) return { status: 400, body: { error: "Bad Request", message: "residentId is required" } };
+  if (!canAccessResident(user, residentId, data)) {
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "schedule chronic reminder outreach", target: residentId, result: "denied", detail: "resident scope denied" });
+    return { status: 403, body: { error: "Forbidden", message: "resident scope denied" } };
+  }
+  const now = new Date().toISOString();
+  const channel = String(payload.channel || "sms").trim();
+  const service = {
+    id: `ss-outreach-${randomUUID()}`,
+    residentId,
+    service: String(payload.reminderType || "chronic reminder outreach").trim(),
+    channel,
+    status: String(payload.status || "scheduled").trim(),
+    contact: String(payload.contact || payload.proxyName || user.name || "").trim(),
+    nextAction: String(payload.nextAction || payload.reason || "send chronic reminder and collect receipt").trim(),
+    scheduledAt: String(payload.scheduledAt || now).trim(),
+    outreachEvidence: true,
+    createdAt: now,
+    createdBy: user.username || user.role
+  };
+  data.seniorServices = [service, ...(Array.isArray(data.seniorServices) ? data.seniorServices : [])].slice(0, 200);
+  const message = appendChronicFollowupMessage(data, {
+    residentId,
+    taskId: `seniorServices:${service.id}`,
+    collection: "seniorServices",
+    sourceId: service.id,
+    targetRole: "citizen",
+    title: "Chronic reminder outreach scheduled",
+    body: service.nextAction,
+    user,
+    channel,
+    meta: { reminderOutreach: true, serviceId: service.id }
+  });
+  appendDataAccessLog(data, user, residentId, "chronic reminder outreach", `${service.channel}:${service.nextAction}`);
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "schedule chronic reminder outreach",
+      target: residentId,
+      result: "allowed",
+      detail: `${service.channel}:${service.status}`
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+  writeDatabase(normalizeState(data));
+  return { status: 201, body: { seniorService: service, messageId: message.id } };
 }
 
 function dispatchChronicFollowupAction(data, user, payload) {
@@ -6375,6 +6588,38 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["citizen", "institution", "commission"], "/api/chronic/resident-checkins");
     if (!user) return;
     const result = upsertResidentExperienceCheckin(readDatabase(), user, await collectJson(req));
+    sendJson(res, result.status, redactSensitiveResponse(result.body, user));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/chronic/device-measurements") {
+    const user = requireApiRole(req, res, ["citizen", "institution", "commission"], "/api/chronic/device-measurements");
+    if (!user) return;
+    const result = ingestChronicDeviceMeasurement(readDatabase(), user, await collectJson(req));
+    sendJson(res, result.status, redactSensitiveResponse(result.body, user));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/chronic/pharmacy-callbacks") {
+    const user = requireApiRole(req, res, ["institution", "insurance", "commission"], "/api/chronic/pharmacy-callbacks");
+    if (!user) return;
+    const result = recordChronicPharmacyCallback(readDatabase(), user, await collectJson(req));
+    sendJson(res, result.status, redactSensitiveResponse(result.body, user));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/chronic/family-doctor-actions") {
+    const user = requireApiRole(req, res, ["institution", "commission"], "/api/chronic/family-doctor-actions");
+    if (!user) return;
+    const result = closeFamilyDoctorChronicAction(readDatabase(), user, await collectJson(req));
+    sendJson(res, result.status, redactSensitiveResponse(result.body, user));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/chronic/reminder-outreach") {
+    const user = requireApiRole(req, res, ["institution", "commission"], "/api/chronic/reminder-outreach");
+    if (!user) return;
+    const result = scheduleChronicReminderOutreach(readDatabase(), user, await collectJson(req));
     sendJson(res, result.status, redactSensitiveResponse(result.body, user));
     return;
   }

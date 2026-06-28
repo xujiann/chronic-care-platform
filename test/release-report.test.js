@@ -109,11 +109,13 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "chronicFollowup:policyAlignment" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "chronicFollowup:alertQueue" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "chronicFollowup:residentExperience" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "chronicFollowup:fieldIntegration" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "chronicFollowup:notifications" && item.passed), true);
   assert.equal(report.chronicFollowup.ok, true);
   assert.equal(report.chronicFollowup.summary.notificationMessages >= 1, true);
   assert.equal(report.chronicFollowup.summary.alerts >= 1, true);
   assert.equal(report.chronicFollowup.summary.residentExperienceItems >= 1, true);
+  assert.equal(report.chronicFollowup.summary.fieldIntegrationItems >= 1, true);
   assert.equal(report.chronicFollowup.summary.policyAligned, report.chronicFollowup.summary.policyItems);
   assert.equal(report.chronicFollowup.apiSurface.includes("POST /api/chronic/followup-feedback"), true);
   assert.equal(report.checks.some((item) => item.name === "dataQuality:report" && item.passed), true);
@@ -284,6 +286,7 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.equal(chronicFollowupJson.chronicFollowup.summary.notificationMessages >= 1, true);
   assert.equal(chronicFollowupJson.chronicFollowup.summary.highPriorityAlerts >= 1, true);
   assert.equal(chronicFollowupJson.chronicFollowup.summary.residentExperienceItems >= 1, true);
+  assert.equal(chronicFollowupJson.chronicFollowup.summary.fieldIntegrationItems >= 1, true);
   assert.equal(chronicFollowupJson.chronicFollowup.summary.policyAligned, chronicFollowupJson.chronicFollowup.summary.policyItems);
   assert.match(chronicFollowupMarkdown, /resident-feedback/);
   assert.match(chronicFollowupMarkdown, /policy-alignment/);

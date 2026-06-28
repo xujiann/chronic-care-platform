@@ -45,6 +45,14 @@ function renderAll(state) {
 function bindInstitutionActions() {
   document.addEventListener("click", async (event) => {
       const button = event.target.closest("[data-workflow-action]");
+      const integrationButton = event.target.closest("[data-chronic-integration]");
+      if (integrationButton) {
+        integrationButton.disabled = true;
+        const result = await runChronicIntegrationDemo(integrationButton.dataset.chronicIntegration);
+        integrationButton.disabled = false;
+        if (result.ok) renderAll(platformState);
+        return;
+      }
       if (!button) return;
     if (button.dataset.chronicDispatch) {
       button.disabled = true;
@@ -199,6 +207,75 @@ async function dispatchChronicFollowup(collection, id, updates, note) {
   } catch (error) {
     alert(error.message || "慢病随访处置失败，请检查登录状态和网络连接");
     return { ok: false };
+  }
+}
+
+function chronicIntegrationPayload(type) {
+  const resident = (platformState.residents || []).find((item) => item.id === "r1") || (platformState.residents || [])[0] || {};
+  const pickup = (platformState.medicationPickups || []).find((item) => item.residentId === resident.id) || (platformState.medicationPickups || [])[0] || {};
+  const message = (platformState.taskMessages || []).find((item) => item.chronicFollowup && item.targetRole === "institution" && item.residentId === resident.id) || {};
+  const residentId = resident.id || pickup.residentId || "r1";
+  const today = new Date().toISOString().slice(0, 10);
+  if (type === "device") {
+    return { path: "/chronic/device-measurements", body: { residentId, externalId: `demo-device-${residentId}-${today}`, deviceId: "bp-device-demo", deviceType: "blood pressure monitor", measurementType: "remote blood pressure", measurementValue: "151/91 mmHg high", medicationTaken: true, note: "device gateway demo upload" } };
+  }
+  if (type === "pharmacy") {
+    return { path: "/chronic/pharmacy-callbacks", body: { medicationPickupId: pickup.id || "mp1", externalId: `demo-pharmacy-${pickup.id || "mp1"}-${today}`, status: "picked_up", pharmacyStatus: "picked_up", medicationTaken: true, inventoryStatus: "dispensed", note: "pharmacy callback demo confirmed" } };
+  }
+  if (type === "familyDoctor") {
+    return { path: "/chronic/family-doctor-actions", body: { residentId, messageId: message.id || "", taskId: message.taskId || "", action: "family doctor phone review", result: "family doctor reviewed resident self-monitoring and updated plan", nextAction: "continue home monitoring for 7 days", servicePack: "hypertension follow-up pack" } };
+  }
+  return { path: "/chronic/reminder-outreach", body: { residentId, channel: "sms", reminderType: "chronic medication and follow-up reminder", reason: "send pickup and follow-up reminder to resident/family", status: "scheduled" } };
+}
+
+async function runChronicIntegrationDemo(type) {
+  const status = document.querySelector("#chronic-integration-status");
+  const demo = chronicIntegrationPayload(type);
+  try {
+    if (institutionApiBase) {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${institutionApiBase}${demo.path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(demo.body)
+      });
+      if (!response.ok) throw new Error(`integration demo failed: ${response.status}`);
+      const saved = await response.json();
+      applyChronicIntegrationResult(type, saved);
+      platformState.chronicFollowupSummary = await loadChronicFollowupSummary();
+    } else {
+      applyChronicIntegrationResult(type, { ...demo.body, local: true });
+    }
+    if (status) status.textContent = `${type} integration evidence recorded`;
+    return { ok: true };
+  } catch (error) {
+    if (status) status.textContent = error.message || "integration demo failed";
+    return { ok: false };
+  }
+}
+
+function applyChronicIntegrationResult(type, saved) {
+  if (type === "device" && saved.record) {
+    platformState.personalRecords = [saved.record, ...(platformState.personalRecords || [])];
+    if (saved.selfManagement) platformState.chronicSelfManagement = [saved.selfManagement, ...(platformState.chronicSelfManagement || [])];
+  } else if (type === "device" && saved.local) {
+    const record = { id: `local-device-${Date.now()}`, residentId: saved.residentId, category: "chronic-self-checkin", date: new Date().toISOString().slice(0, 10), name: "device gateway demo", result: `${saved.measurementType}: ${saved.measurementValue}`, source: "device gateway", meta: { residentExperience: true, deviceExternalId: saved.externalId, deviceId: saved.deviceId, measurementType: saved.measurementType } };
+    platformState.personalRecords = [record, ...(platformState.personalRecords || [])];
+    platformState.chronicSelfManagement = [{ id: `local-csm-${Date.now()}`, residentId: saved.residentId, device: saved.deviceType, latestValue: saved.measurementValue, uploadSource: "device gateway", integrationStatus: "local preview" }, ...(platformState.chronicSelfManagement || [])];
+  } else if (type === "pharmacy" && saved.medicationPickup) {
+    const index = (platformState.medicationPickups || []).findIndex((item) => item.id === saved.medicationPickup.id);
+    if (index >= 0) platformState.medicationPickups[index] = saved.medicationPickup;
+  } else if (type === "pharmacy" && saved.local) {
+    const index = (platformState.medicationPickups || []).findIndex((item) => item.id === saved.medicationPickupId);
+    if (index >= 0) platformState.medicationPickups[index] = { ...platformState.medicationPickups[index], status: saved.status, pharmacyStatus: saved.pharmacyStatus, callbackExternalId: saved.externalId, pickupConfirmedAt: new Date().toISOString() };
+  } else if (type === "familyDoctor" && saved.note) {
+    platformState.personalRecords = [saved.note, ...(platformState.personalRecords || [])];
+  } else if (type === "familyDoctor" && saved.local) {
+    platformState.personalRecords = [{ id: `local-family-doctor-${Date.now()}`, residentId: saved.residentId, category: "chronic-family-doctor-note", date: new Date().toISOString().slice(0, 10), name: saved.action, result: saved.result, source: "family doctor service pack", meta: { familyDoctorClosure: true } }, ...(platformState.personalRecords || [])];
+  } else if (type === "outreach" && saved.seniorService) {
+    platformState.seniorServices = [saved.seniorService, ...(platformState.seniorServices || [])];
+  } else if (type === "outreach" && saved.local) {
+    platformState.seniorServices = [{ id: `local-outreach-${Date.now()}`, residentId: saved.residentId, service: saved.reminderType, channel: saved.channel, status: saved.status, nextAction: saved.reason, outreachEvidence: true }, ...(platformState.seniorServices || [])];
   }
 }
 
