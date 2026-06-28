@@ -1682,6 +1682,18 @@ function seedDoctorProfiles() {
       department: "家庭医生工作室",
       licenseNo: "DEMO-DOC-210202-001",
       registrationValidUntil: "2029-12-31",
+      electronicRegistration: {
+        registryId: "ER-DL-210202-0001",
+        sourceSystem: "医师电子化注册系统",
+        syncedAt: "2026-06-15T09:10:00+08:00",
+        verificationStatus: "已核验",
+        licenseNo: "DEMO-DOC-210202-001",
+        category: "临床",
+        practiceScope: "全科医学专业",
+        primaryInstitutionId: "MR3",
+        validUntil: "2029-12-31",
+        signatureNo: "DL-ER-SIGN-20260615-001"
+      },
       yearsInSpecialty: 12,
       healthStatus: "适宜执业",
       assessmentRecords: ["2024 合格", "2025 合格"],
@@ -1703,6 +1715,18 @@ function seedDoctorProfiles() {
       department: "心内科",
       licenseNo: "DEMO-DOC-210200-002",
       registrationValidUntil: "2030-06-30",
+      electronicRegistration: {
+        registryId: "ER-DL-210200-0002",
+        sourceSystem: "医师电子化注册系统",
+        syncedAt: "2026-06-15T09:25:00+08:00",
+        verificationStatus: "已核验",
+        licenseNo: "DEMO-DOC-210200-002",
+        category: "临床",
+        practiceScope: "内科专业",
+        primaryInstitutionId: "MR1",
+        validUntil: "2030-06-30",
+        signatureNo: "DL-ER-SIGN-20260615-002"
+      },
       yearsInSpecialty: 18,
       healthStatus: "适宜执业",
       assessmentRecords: ["2024 合格", "2025 合格"],
@@ -1752,6 +1776,15 @@ function seedMultiPracticeApplications() {
       compensation: "按实际工作时间、工作量和绩效协商结算",
       insurance: "已购买医师个人医疗执业保险",
       documentChecks: { firstPracticeConsent: true, cooperationAgreement: true, liabilityInsurance: true, scheduleConflict: false, publicDisclosure: true },
+      primaryPracticeConfirmation: {
+        status: "已电子确认",
+        mode: "第一执业地点电子签章",
+        confirmedBy: "张主任",
+        confirmedByOrg: "青泥洼桥社区卫生服务中心",
+        confirmedAt: "2026-06-17T11:20:00+08:00",
+        signatureNo: "DL-MP-CONSENT-20260617-001",
+        opinion: "同意在医联体内开展慢病联合门诊"
+      },
       lifecycle: [
         { at: "2026-06-17 09:00", actor: "刘医生", action: "提交申请", note: "补齐执业期限、责任保险和工作任务" },
         { at: "2026-06-17 11:20", actor: "青泥洼桥社区卫生服务中心", action: "第一执业地点同意", note: "同意在医联体内开展慢病联合门诊" }
@@ -1793,6 +1826,15 @@ function seedMultiPracticeApplications() {
       compensation: "医联体帮扶任务，按院内绩效规则登记工作量",
       insurance: "机构医疗责任保险+个人执业保险",
       documentChecks: { firstPracticeConsent: true, cooperationAgreement: true, liabilityInsurance: true, scheduleConflict: false, publicDisclosure: true },
+      primaryPracticeConfirmation: {
+        status: "医联体帮扶免办",
+        mode: "医联体帮扶备案",
+        confirmedBy: "医务部",
+        confirmedByOrg: "大连市中心医院",
+        confirmedAt: "2026-06-16T15:00:00+08:00",
+        signatureNo: "DL-MP-AID-20260616-001",
+        opinion: "按医联体帮扶任务管理"
+      },
       lifecycle: [
         { at: "2026-06-16 10:30", actor: "王医生", action: "医联体帮扶登记", note: "纳入基层高危慢病帮扶排班" },
         { at: "2026-06-16 15:00", actor: "大连市中心医院", action: "备案通过", note: "按医联体帮扶任务管理" }
@@ -6142,7 +6184,32 @@ function maskSensitiveValue(value) {
   return suffix ? `已脱敏-${suffix}` : "已脱敏";
 }
 
+function verifyDoctorElectronicRegistration(profile = {}) {
+  const registry = profile.electronicRegistration && typeof profile.electronicRegistration === "object" ? profile.electronicRegistration : {};
+  const validUntil = registry.validUntil || profile.registrationValidUntil || "";
+  const inForce = validUntil ? new Date(`${validUntil}T23:59:59+08:00`) >= new Date() : false;
+  const licenseMatched = Boolean(profile.licenseNo && registry.licenseNo === profile.licenseNo);
+  const categoryMatched = !registry.category || registry.category === profile.category;
+  const scopeMatched = !registry.practiceScope || registry.practiceScope === profile.practiceScope;
+  const primaryInstitutionMatched = !registry.primaryInstitutionId || registry.primaryInstitutionId === profile.primaryInstitutionId;
+  const verified = registry.verificationStatus === "已核验" && licenseMatched && categoryMatched && scopeMatched && primaryInstitutionMatched && inForce;
+  return {
+    registryId: registry.registryId || "",
+    sourceSystem: registry.sourceSystem || "医师电子化注册系统",
+    syncedAt: registry.syncedAt || "",
+    verificationStatus: verified ? "已核验" : "待复核",
+    licenseMatched,
+    categoryMatched,
+    scopeMatched,
+    primaryInstitutionMatched,
+    inForce,
+    validUntil,
+    signatureNo: registry.signatureNo || ""
+  };
+}
+
 function qualificationCompliance(profile, payload) {
+  const electronicRegistration = verifyDoctorElectronicRegistration(profile);
   const titleQualified = /(主任|副主任|主治|中级)/.test(profile?.title || payload.title || "");
   const fiveYears = Number(profile?.yearsInSpecialty || payload.yearsInSpecialty || 0) >= 5;
   const assessmentQualified = (profile?.assessmentRecords || []).slice(-2).every((item) => String(item).includes("合格"));
@@ -6155,6 +6222,8 @@ function qualificationCompliance(profile, payload) {
     titleQualified,
     fiveYears,
     assessmentQualified,
+    electronicRegistrationVerified: electronicRegistration.verificationStatus === "已核验",
+    registrationInForce: electronicRegistration.inForce,
     categoryMatched,
     scopeMatched,
     agreementCompleted,
@@ -6170,6 +6239,7 @@ function normalizeMultiPracticeApplication(payload, user, data) {
   if (!profile) throw new Error("未找到医生档案");
   const targetInstitution = String(payload.targetInstitution || "").trim();
   if (!targetInstitution) throw new Error("targetInstitution 不能为空");
+  const electronicRegistrationVerification = verifyDoctorElectronicRegistration(profile);
   const application = {
     id: payload.id || `mp-${randomUUID()}`,
     doctorId,
@@ -6189,6 +6259,7 @@ function normalizeMultiPracticeApplication(payload, user, data) {
     responsibility: String(payload.responsibility || "").trim(),
     compensation: String(payload.compensation || "").trim(),
     insurance: String(payload.insurance || "").trim(),
+    electronicRegistrationVerification,
     documentChecks: {
       firstPracticeConsent: ["已同意", "知情报备", "医联体内帮扶免办多点执业手续"].some((text) => String(payload.primaryConsent || "").includes(text)),
       cooperationAgreement: Boolean(String(payload.responsibility || "").trim() && String(payload.compensation || "").trim()),
@@ -6207,6 +6278,7 @@ function normalizeMultiPracticeApplication(payload, user, data) {
     disclosureItems: ["医师姓名", "执业类别", "执业范围", "第一执业地点", "拟执业机构", "执业期限", "监管状态"],
     riskFlags: [],
     primaryConsent: String(payload.primaryConsent || "待确认").trim(),
+    primaryPracticeConfirmation: buildPrimaryPracticeConfirmation(payload, user, profile, {}),
     registrationMode: String(payload.registrationMode || "注册管理").trim(),
     status: String(payload.status || "待第一执业地点确认").trim(),
     publicVisible: payload.publicVisible !== false,
@@ -6214,6 +6286,36 @@ function normalizeMultiPracticeApplication(payload, user, data) {
   };
   application.compliance = qualificationCompliance(profile, application);
   return withMultiPracticeReviewState(application);
+}
+
+function primaryPracticeConfirmed(application = {}) {
+  const confirmation = application.primaryPracticeConfirmation && typeof application.primaryPracticeConfirmation === "object" ? application.primaryPracticeConfirmation : {};
+  return ["已电子确认", "知情报备已签收", "医联体帮扶免办"].includes(confirmation.status) ||
+    ["已同意", "知情报备", "医联体内帮扶免办多点执业手续"].some((text) => String(application.primaryConsent || "").includes(text));
+}
+
+function buildPrimaryPracticeConfirmation(payload = {}, user = {}, profile = {}, previous = {}) {
+  const existing = previous.primaryPracticeConfirmation && typeof previous.primaryPracticeConfirmation === "object" ? previous.primaryPracticeConfirmation : {};
+  const primaryConsent = String(payload.primaryConsent || previous.primaryConsent || "").trim();
+  if (payload.primaryPracticeConfirmation && typeof payload.primaryPracticeConfirmation === "object") {
+    return {
+      ...existing,
+      ...payload.primaryPracticeConfirmation,
+      status: payload.primaryPracticeConfirmation.status || existing.status || "已电子确认"
+    };
+  }
+  if (!["已同意", "知情报备", "医联体内帮扶免办多点执业手续"].some((text) => primaryConsent.includes(text))) return existing;
+  const isAid = primaryConsent.includes("医联体");
+  return {
+    ...existing,
+    status: isAid ? "医联体帮扶免办" : primaryConsent.includes("知情报备") ? "知情报备已签收" : "已电子确认",
+    mode: isAid ? "医联体帮扶备案" : "第一执业地点电子签章",
+    confirmedBy: user.name || existing.confirmedBy || profile.name || "第一执业地点经办人",
+    confirmedByOrg: user.orgName || existing.confirmedByOrg || profile.primaryInstitution || previous.primaryInstitution || "",
+    confirmedAt: existing.confirmedAt || new Date().toISOString(),
+    signatureNo: existing.signatureNo || `DL-MP-CONSENT-${Date.now()}`,
+    opinion: String(payload.note || payload.reviewOpinion || existing.opinion || primaryConsent || "第一执业地点已确认").trim()
+  };
 }
 
 function scopeStateForUser(data, user) {
@@ -6638,7 +6740,7 @@ function syncMultiPracticeDocumentChecks(application) {
   const previous = application.documentChecks && typeof application.documentChecks === "object" ? application.documentChecks : {};
   return {
     ...previous,
-    firstPracticeConsent: ["已同意", "知情报备", "医联体内帮扶免办多点执业手续"].some((text) => String(application.primaryConsent || "").includes(text)),
+    firstPracticeConsent: primaryPracticeConfirmed(application),
     cooperationAgreement: Boolean(String(application.responsibility || "").trim() && String(application.compensation || "").trim()),
     liabilityInsurance: Boolean(String(application.insurance || "").trim()),
     scheduleConflict: Boolean(application.scheduleConflict),
@@ -6668,6 +6770,8 @@ function multiPracticeRiskFlags(application) {
   const documents = syncMultiPracticeDocumentChecks(application);
   return [
     compliance.publicHospitalLeaderRestricted ? "public-hospital-leader-restricted" : "",
+    compliance.electronicRegistrationVerified === false ? "electronic-registration-unverified" : "",
+    compliance.registrationInForce === false ? "registration-expired" : "",
     compliance.titleQualified === false ? "title-not-qualified" : "",
     compliance.fiveYears === false ? "years-not-qualified" : "",
     compliance.assessmentQualified === false ? "assessment-not-qualified" : "",
@@ -6682,9 +6786,13 @@ function multiPracticeRiskFlags(application) {
   ].filter(Boolean);
 }
 
-function withMultiPracticeReviewState(application) {
+function withMultiPracticeReviewState(application, profile = null) {
+  const electronicRegistrationVerification = application.electronicRegistrationVerification || (profile ? verifyDoctorElectronicRegistration(profile) : undefined);
+  const compliance = profile ? qualificationCompliance(profile, application) : (application.compliance || {});
   const reviewed = {
     ...application,
+    ...(electronicRegistrationVerification ? { electronicRegistrationVerification } : {}),
+    compliance,
     documentChecks: syncMultiPracticeDocumentChecks(application)
   };
   return {
@@ -6697,7 +6805,8 @@ function buildMultiPracticeRegistry(data, user) {
   const applications = (data.multiPracticeApplications || [])
     .filter((item) => canAccessMultiPracticeApplication(user, item))
     .map((item) => {
-      const reviewed = withMultiPracticeReviewState(item);
+      const profile = (data.doctorProfiles || []).find((doctor) => doctor.id === item.doctorId);
+      const reviewed = withMultiPracticeReviewState(item, profile);
       return {
         id: reviewed.id,
         doctorId: reviewed.doctorId,
@@ -6705,6 +6814,7 @@ function buildMultiPracticeRegistry(data, user) {
         title: reviewed.title,
         specialty: reviewed.specialty,
         practiceScope: reviewed.practiceScope,
+        electronicRegistrationVerification: reviewed.electronicRegistrationVerification,
         primaryInstitution: reviewed.primaryInstitution,
         targetInstitution: reviewed.targetInstitution,
         targetDepartment: reviewed.targetDepartment,
@@ -6712,6 +6822,7 @@ function buildMultiPracticeRegistry(data, user) {
         schedule: reviewed.schedule,
         registrationMode: reviewed.registrationMode || "备案管理",
         primaryConsent: reviewed.primaryConsent,
+        primaryPracticeConfirmation: reviewed.primaryPracticeConfirmation,
         status: reviewed.status || "待处理",
         publicVisible: reviewed.publicVisible !== false,
         compliance: reviewed.compliance || {},
@@ -9642,12 +9753,16 @@ async function handleApi(req, res) {
       sendJson(res, 404, { error: "Not Found", message: "当前账户未绑定医生档案" });
       return;
     }
+    const reviewedDoctor = {
+      ...doctor,
+      electronicRegistrationVerification: verifyDoctorElectronicRegistration(doctor)
+    };
     const doctorApplications = (data.multiPracticeApplications || [])
       .filter((item) => item.doctorId === doctor.id)
-      .map(withMultiPracticeReviewState);
+      .map((item) => withMultiPracticeReviewState(item, doctor));
     const doctorRegistry = buildMultiPracticeRegistry(data, user);
     sendJson(res, 200, {
-      doctor,
+      doctor: reviewedDoctor,
       multiPracticeApplications: doctorApplications,
       multiPracticeSummary: doctorRegistry.summary,
       policy: data.multiPracticePolicy
@@ -9661,7 +9776,7 @@ async function handleApi(req, res) {
     const data = readDatabase();
     const applications = (data.multiPracticeApplications || [])
       .filter((item) => canAccessMultiPracticeApplication(user, item))
-      .map(withMultiPracticeReviewState);
+      .map((item) => withMultiPracticeReviewState(item, (data.doctorProfiles || []).find((doctor) => doctor.id === item.doctorId)));
     sendJson(res, 200, { applications, policy: data.multiPracticePolicy });
     return;
   }
@@ -9721,6 +9836,8 @@ async function handleApi(req, res) {
     }
     const safePatch = cleanMultiPracticePatch(patch);
     const previousApplication = data.multiPracticeApplications[index];
+    const profile = (data.doctorProfiles || []).find((doctor) => doctor.id === previousApplication.doctorId);
+    if (safePatch.primaryConsent) safePatch.primaryPracticeConfirmation = buildPrimaryPracticeConfirmation({ ...safePatch, note: patch.note }, user, profile || {}, previousApplication);
     const nextLifecycle = [
       {
         at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -9738,7 +9855,7 @@ async function handleApi(req, res) {
       updatedByName: user.name,
       lastUpdated: new Date().toISOString()
     };
-    data.multiPracticeApplications[index] = withMultiPracticeReviewState(nextApplication);
+    data.multiPracticeApplications[index] = withMultiPracticeReviewState(nextApplication, profile);
     if (Object.hasOwn(patch, "expectedVersion")) {
       data.storageMeta = {
         ...(data.storageMeta || {}),
@@ -10309,6 +10426,22 @@ async function handleApi(req, res) {
       Object.assign(item, applyReferralTeleconsultationAction(item, payload, user));
     } else {
       Object.assign(item, cleanWorkflowUpdates(payload.updates));
+    }
+    if (collection === "multiPracticeApplications") {
+      const profile = (data.doctorProfiles || []).find((doctor) => doctor.id === item.doctorId);
+      if (payload.updates?.primaryConsent) {
+        item.primaryPracticeConfirmation = buildPrimaryPracticeConfirmation({ ...(payload.updates || {}), note: payload.note }, user, profile || {}, item);
+      }
+      item.lifecycle = [
+        {
+          at: new Date().toLocaleString("zh-CN", { hour12: false }),
+          actor: user.name,
+          action: payload.status ? `状态更新为 ${payload.status}` : String(payload.note || "更新多点执业申请"),
+          note: String(payload.note || "").trim()
+        },
+        ...(Array.isArray(item.lifecycle) ? item.lifecycle : [])
+      ].slice(0, 20);
+      Object.assign(item, withMultiPracticeReviewState(item, profile));
     }
     if (payload.status) item.status = String(payload.status);
     item.lastUpdated = new Date().toISOString();

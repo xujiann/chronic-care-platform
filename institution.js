@@ -268,15 +268,20 @@ function renderDoctorAccounts(state) {
   const listEl = document.querySelector("#doctor-accounts");
   if (!countEl || !listEl) return;
   countEl.textContent = `${doctors.length} 个账户`;
-  listEl.innerHTML = doctors.map((doctor) => `<section class="item">
+  listEl.innerHTML = doctors.map((doctor) => {
+    const registry = doctor.electronicRegistrationVerification || doctor.electronicRegistration || {};
+    const registryOk = registry.verificationStatus === "已核验" || registry.verificationStatus === "verified";
+    return `<section class="item">
     <div>
       <h3>${doctor.name} · ${doctor.title} · ${doctor.specialty}</h3>
       <p>${doctor.primaryInstitution} · ${doctor.department} · ${doctor.practiceScope}</p>
       <p>执业证号：${doctor.licenseNo} · 注册有效期至 ${doctor.registrationValidUntil} · 考核 ${doctor.assessmentRecords?.slice(-2).join("、") || "待补齐"}</p>
+      <p>电子化注册：${registry.sourceSystem || "医师电子化注册系统"} · ${registry.registryId || "待同步"} · ${registry.verificationStatus || "待核验"} · 签章 ${registry.signatureNo || "待签章"}</p>
       <p>关联功能：${(doctor.functions || []).join("、")}</p>
     </div>
-    <span class="badge ${doctor.accountStatus === "启用" ? "info" : "warn"}">${doctor.accountStatus || "待启用"}</span>
-  </section>`).join("") || `<p class="muted">暂无医生账户档案。</p>`;
+    <span class="badge ${doctor.accountStatus === "启用" && registryOk ? "info" : "warn"}">${registryOk ? doctor.accountStatus || "启用" : "注册待核验"}</span>
+  </section>`;
+  }).join("") || `<p class="muted">暂无医生账户档案。</p>`;
 }
 
 function renderMultiPracticePolicy(state) {
@@ -305,7 +310,10 @@ function renderMultiPracticeApplications(state) {
     const checks = item.compliance || {};
     const documents = item.documentChecks || {};
     const riskFlags = Array.isArray(item.riskFlags) ? item.riskFlags : [];
+    const electronic = item.electronicRegistrationVerification || {};
+    const confirmation = item.primaryPracticeConfirmation || {};
     const passed = Object.entries(checks).filter(([key, value]) => key !== "publicHospitalLeaderRestricted" && value).length;
+    const total = Object.entries(checks).filter(([key]) => key !== "publicHospitalLeaderRestricted").length || 6;
     const documentBlocked = Object.values(documents).some((value) => value === false) || documents.scheduleConflict === true;
     const blocked = checks.publicHospitalLeaderRestricted || Object.entries(checks).some(([key, value]) => key !== "publicHospitalLeaderRestricted" && !value) || documentBlocked || riskFlags.length > 0;
     const badge = item.status?.includes("待") ? "warn" : item.status?.includes("退回") || blocked ? "danger" : "info";
@@ -319,6 +327,8 @@ function renderMultiPracticeApplications(state) {
           <span class="badge ${checks.titleQualified ? "info" : "warn"}">职称${checks.titleQualified ? "符合" : "待核"}</span>
           <span class="badge ${checks.fiveYears ? "info" : "warn"}">年限${checks.fiveYears ? "符合" : "待核"}</span>
           <span class="badge ${checks.assessmentQualified ? "info" : "warn"}">考核${checks.assessmentQualified ? "合格" : "待核"}</span>
+          <span class="badge ${checks.electronicRegistrationVerified ? "info" : "warn"}">电子注册${checks.electronicRegistrationVerified ? "已核" : "待核"}</span>
+          <span class="badge ${checks.registrationInForce ? "info" : "warn"}">注册有效${checks.registrationInForce ? "期内" : "待复核"}</span>
           <span class="badge ${checks.scopeMatched ? "info" : "warn"}">范围${checks.scopeMatched ? "一致" : "待核"}</span>
           <span class="badge ${checks.agreementCompleted ? "info" : "warn"}">协议${checks.agreementCompleted ? "完整" : "待补"}</span>
         </div>
@@ -330,7 +340,9 @@ function renderMultiPracticeApplications(state) {
           <span class="badge ${documents.publicDisclosure ? "info" : "warn"}">公开${documents.publicDisclosure ? "已纳入" : "未公开"}</span>
         </div>
         ${riskFlags.length ? `<p class="muted">补正提示：${riskFlags.join("、")}</p>` : ""}
-        <p>第一执业地点：${item.primaryConsent || "待确认"} · ${item.registrationMode || "注册管理"} · 信息公开：${item.publicVisible ? "公开" : "不公开"} · 校验 ${passed}/6</p>
+        <p>电子化注册：${electronic.registryId || "待同步"} · ${electronic.verificationStatus || "待核验"} · 有效期 ${electronic.validUntil || "待同步"}</p>
+        <p>第一执业地点电子确认：${confirmation.status || item.primaryConsent || "待确认"} · ${confirmation.confirmedByOrg || item.primaryInstitution || "第一执业地点"} · 签章 ${confirmation.signatureNo || "待签章"}</p>
+        <p>第一执业地点：${item.primaryConsent || "待确认"} · ${item.registrationMode || "注册管理"} · 信息公开：${item.publicVisible ? "公开" : "不公开"} · 校验 ${passed}/${total}</p>
         <div class="action-row">
           ${item.primaryConsent !== "已同意" ? actionButton("multiPracticeApplications", item.id, "同意/报备", { primaryConsent: "已同意", status: "待卫健审核" }, "第一执业地点同意多点执业") : ""}
           ${item.status !== "已备案" ? actionButton("multiPracticeApplications", item.id, "备案通过", { status: "已备案", publicVisible: true }, "多点执业备案通过并公开") : ""}

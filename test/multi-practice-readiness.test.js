@@ -14,8 +14,12 @@ test("multi-practice readiness validates doctor accounts, review state, APIs and
   const report = buildMultiPracticeReadinessReport();
   assert.equal(report.ok, true);
   assert.equal(report.summary.doctors >= 2, true);
+  assert.equal(report.summary.verifiedRegistrations >= 2, true);
   assert.equal(report.summary.applications >= 2, true);
+  assert.equal(report.summary.signedConfirmations >= 2, true);
   assert.equal(report.requiredDocumentChecks.includes("liabilityInsurance"), true);
+  assert.equal(report.checks.some((item) => item.id === "multiPractice:electronicRegistration" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "multiPractice:firstPracticeConfirmation" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "multiPractice:doctorApi" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "multiPractice:registryApi" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "multiPractice:institutionUi" && item.passed), true);
@@ -33,5 +37,6 @@ test("multi-practice readiness writes release artifacts", (t) => {
   const md = fs.readFileSync(markdown, "utf8");
   assert.equal(json.ok, true);
   assert.equal(json.multiPracticeReadiness.ok, true);
-  assert.match(md, /Required Document Checks/);
+  assert.match(md, /Verified registrations/);
+  assert.match(md, /Signed first-practice confirmations/);
 });

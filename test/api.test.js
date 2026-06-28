@@ -382,6 +382,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const doctorMe = await api(baseUrl, "/api/doctors/me", authorized(doctorLogin.body.token));
     assert.equal(doctorMe.response.status, 200);
     assert.equal(doctorMe.body.doctor.id, doctorLogin.body.user.doctorId);
+    assert.equal(doctorMe.body.doctor.electronicRegistrationVerification.verificationStatus, "已核验");
+    assert.equal(doctorMe.body.doctor.electronicRegistrationVerification.licenseMatched, true);
     assert.equal(doctorMe.body.multiPracticeSummary.total, doctorMe.body.multiPracticeApplications.length);
     assert.equal(doctorMe.body.multiPracticeApplications.every((item) => Array.isArray(item.riskFlags) && item.documentChecks), true);
 
@@ -397,6 +399,20 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(patchedPractice.body.documentChecks.scheduleConflict, true);
     assert.equal(patchedPractice.body.riskFlags.includes("schedule-conflict"), true);
     assert.equal(patchedPractice.body.lifecycle[0].note, "测试排班冲突补正");
+    const confirmedPractice = await api(baseUrl, "/api/workflow-actions", authorized(doctorLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        collection: "multiPracticeApplications",
+        id: doctorRegistry.body.applications[0].id,
+        status: "待卫健审核",
+        updates: { primaryConsent: "已同意" },
+        note: "第一执业地点电子签章确认"
+      })
+    }));
+    assert.equal(confirmedPractice.response.status, 200);
+    assert.equal(confirmedPractice.body.primaryPracticeConfirmation.status, "已电子确认");
+    assert.match(confirmedPractice.body.primaryPracticeConfirmation.signatureNo, /DL-MP-CONSENT/);
+    assert.equal(confirmedPractice.body.documentChecks.firstPracticeConsent, true);
 
     const insuranceLogin = await login(baseUrl, "insurance");
     const deniedRegistry = await api(baseUrl, "/api/multi-practice-registry", authorized(insuranceLogin.body.token));

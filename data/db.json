@@ -2110,6 +2110,18 @@
       "department": "家庭医生工作室",
       "licenseNo": "DEMO-DOC-210202-001",
       "registrationValidUntil": "2029-12-31",
+      "electronicRegistration": {
+        "registryId": "ER-DL-210202-0001",
+        "sourceSystem": "医师电子化注册系统",
+        "syncedAt": "2026-06-15T09:10:00+08:00",
+        "verificationStatus": "已核验",
+        "licenseNo": "DEMO-DOC-210202-001",
+        "category": "临床",
+        "practiceScope": "全科医学专业",
+        "primaryInstitutionId": "MR3",
+        "validUntil": "2029-12-31",
+        "signatureNo": "DL-ER-SIGN-20260615-001"
+      },
       "yearsInSpecialty": 12,
       "healthStatus": "适宜执业",
       "assessmentRecords": [
@@ -2141,6 +2153,18 @@
       "department": "心内科",
       "licenseNo": "DEMO-DOC-210200-002",
       "registrationValidUntil": "2030-06-30",
+      "electronicRegistration": {
+        "registryId": "ER-DL-210200-0002",
+        "sourceSystem": "医师电子化注册系统",
+        "syncedAt": "2026-06-15T09:25:00+08:00",
+        "verificationStatus": "已核验",
+        "licenseNo": "DEMO-DOC-210200-002",
+        "category": "临床",
+        "practiceScope": "内科专业",
+        "primaryInstitutionId": "MR1",
+        "validUntil": "2030-06-30",
+        "signatureNo": "DL-ER-SIGN-20260615-002"
+      },
       "yearsInSpecialty": 18,
       "healthStatus": "适宜执业",
       "assessmentRecords": [
@@ -2217,6 +2241,28 @@
         "scheduleConflict": false,
         "publicDisclosure": true
       },
+      "electronicRegistrationVerification": {
+        "registryId": "ER-DL-210202-0001",
+        "sourceSystem": "医师电子化注册系统",
+        "syncedAt": "2026-06-15T09:10:00+08:00",
+        "verificationStatus": "已核验",
+        "licenseMatched": true,
+        "categoryMatched": true,
+        "scopeMatched": true,
+        "primaryInstitutionMatched": true,
+        "inForce": true,
+        "validUntil": "2029-12-31",
+        "signatureNo": "DL-ER-SIGN-20260615-001"
+      },
+      "primaryPracticeConfirmation": {
+        "status": "已电子确认",
+        "mode": "第一执业地点电子签章",
+        "confirmedBy": "张主任",
+        "confirmedByOrg": "青泥洼桥社区卫生服务中心",
+        "confirmedAt": "2026-06-17T11:20:00+08:00",
+        "signatureNo": "DL-MP-CONSENT-20260617-001",
+        "opinion": "同意在医联体内开展慢病联合门诊"
+      },
       "lifecycle": [
         {
           "at": "2026-06-17 09:00",
@@ -2248,6 +2294,8 @@
         "titleQualified": true,
         "fiveYears": true,
         "assessmentQualified": true,
+        "electronicRegistrationVerified": true,
+        "registrationInForce": true,
         "categoryMatched": true,
         "scopeMatched": true,
         "agreementCompleted": true,
@@ -2282,6 +2330,28 @@
         "scheduleConflict": false,
         "publicDisclosure": true
       },
+      "electronicRegistrationVerification": {
+        "registryId": "ER-DL-210200-0002",
+        "sourceSystem": "医师电子化注册系统",
+        "syncedAt": "2026-06-15T09:25:00+08:00",
+        "verificationStatus": "已核验",
+        "licenseMatched": true,
+        "categoryMatched": true,
+        "scopeMatched": true,
+        "primaryInstitutionMatched": true,
+        "inForce": true,
+        "validUntil": "2030-06-30",
+        "signatureNo": "DL-ER-SIGN-20260615-002"
+      },
+      "primaryPracticeConfirmation": {
+        "status": "医联体帮扶免办",
+        "mode": "医联体帮扶备案",
+        "confirmedBy": "医务部",
+        "confirmedByOrg": "大连市中心医院",
+        "confirmedAt": "2026-06-16T15:00:00+08:00",
+        "signatureNo": "DL-MP-AID-20260616-001",
+        "opinion": "按医联体帮扶任务管理"
+      },
       "lifecycle": [
         {
           "at": "2026-06-16 10:30",
@@ -2313,6 +2383,8 @@
         "titleQualified": true,
         "fiveYears": true,
         "assessmentQualified": true,
+        "electronicRegistrationVerified": true,
+        "registrationInForce": true,
         "categoryMatched": true,
         "scopeMatched": true,
         "agreementCompleted": true,

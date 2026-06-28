@@ -39,12 +39,14 @@ function buildMultiPracticeReadinessReport(options = {}) {
   const policy = data.multiPracticePolicy && typeof data.multiPracticePolicy === "object" ? data.multiPracticePolicy : {};
   const checks = [
     { id: "multiPractice:doctorAccounts", passed: doctors.length >= 2 && doctors.every((item) => item.id && item.licenseNo && item.primaryInstitution && item.practiceScope), detail: `${doctors.length} doctor profiles` },
+    { id: "multiPractice:electronicRegistration", passed: doctors.every((item) => item.electronicRegistration?.registryId && item.electronicRegistration?.verificationStatus === "已核验" && item.electronicRegistration?.signatureNo), detail: "doctor profiles carry verified electronic registration source records" },
     { id: "multiPractice:applications", passed: applications.length >= 2 && applications.every((item) => item.doctorId && item.targetInstitution && item.status && item.lifecycle), detail: `${applications.length} applications` },
     { id: "multiPractice:documentChecks", passed: applications.every((item) => REQUIRED_DOCUMENT_CHECKS.every((field) => Object.hasOwn(item.documentChecks || {}, field))), detail: REQUIRED_DOCUMENT_CHECKS.join(", ") },
+    { id: "multiPractice:firstPracticeConfirmation", passed: applications.every((item) => item.primaryPracticeConfirmation?.status && item.primaryPracticeConfirmation?.signatureNo && item.documentChecks?.firstPracticeConsent === true), detail: "first-practice electronic confirmations are signed and reflected in document checks" },
     { id: "multiPractice:riskFlags", passed: hasAll(server, ["withMultiPracticeReviewState", "multiPracticeRiskFlags", "schedule-conflict"]) && applications.every((item) => Array.isArray(item.riskFlags)), detail: "risk flags normalized across API responses" },
-    { id: "multiPractice:doctorApi", passed: hasAll(server, ["/api/doctors/me", "multiPracticeSummary", "withMultiPracticeReviewState"]), detail: "doctor account API returns own summary and reviewed applications" },
+    { id: "multiPractice:doctorApi", passed: hasAll(server, ["/api/doctors/me", "multiPracticeSummary", "verifyDoctorElectronicRegistration", "withMultiPracticeReviewState"]), detail: "doctor account API returns own summary, registration verification, and reviewed applications" },
     { id: "multiPractice:registryApi", passed: hasAll(server, ["/api/multi-practice-registry", "publicLedger", "reviewQueue", "canAccessMultiPracticeApplication"]), detail: "registry API covers public ledger, review queue, and role guard" },
-    { id: "multiPractice:institutionUi", passed: hasAll(institution, ["multi-practice-form", "renderDoctorAccounts", "责任保险", "补正提示", "riskFlags"]), detail: "doctor/institution view exposes application and material-check workflow" },
+    { id: "multiPractice:institutionUi", passed: hasAll(institution, ["multi-practice-form", "renderDoctorAccounts", "电子化注册", "第一执业地点电子确认", "责任保险", "补正提示", "riskFlags"]), detail: "doctor/institution view exposes application, registration, confirmation, and material-check workflow" },
     { id: "multiPractice:commissionUi", passed: hasAll(commission, ["renderMultiPracticeGovernance", "multi-practice-governance-summary", "风险补正"]), detail: "commission view exposes supervision summary and risk queue" },
     { id: "multiPractice:policy", passed: hasAll(policyDoc, ["国卫医发〔2014〕86号", "documentChecks.liabilityInsurance", "flowchart LR"]) && hasAll(functionReport, ["multiPracticeSummary", "riskFlags", "flowchart TD"]), detail: "policy and main function reports are linked" },
     { id: "multiPractice:releaseScript", passed: Boolean(pkg.scripts?.["multi-practice:readiness"]), detail: pkg.scripts?.["multi-practice:readiness"] || "missing" }
@@ -55,7 +57,9 @@ function buildMultiPracticeReadinessReport(options = {}) {
     policySource: policy.source || "",
     summary: {
       doctors: doctors.length,
+      verifiedRegistrations: doctors.filter((item) => item.electronicRegistration?.verificationStatus === "已核验").length,
       applications: applications.length,
+      signedConfirmations: applications.filter((item) => item.primaryPracticeConfirmation?.signatureNo).length,
       filed: applications.filter((item) => String(item.status || "").includes("备案")).length,
       publicVisible: applications.filter((item) => item.publicVisible !== false).length,
       reviewQueue: applications.filter((item) => String(item.status || "").includes("待") || (item.riskFlags || []).length > 0).length,
@@ -77,7 +81,9 @@ function renderMarkdown(report) {
     "## Summary",
     "",
     `- Doctor profiles: ${report.summary.doctors}`,
+    `- Verified registrations: ${report.summary.verifiedRegistrations}`,
     `- Applications: ${report.summary.applications}`,
+    `- Signed first-practice confirmations: ${report.summary.signedConfirmations}`,
     `- Filed applications: ${report.summary.filed}`,
     `- Public ledger rows: ${report.summary.publicVisible}`,
     `- Review queue rows: ${report.summary.reviewQueue}`,
