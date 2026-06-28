@@ -836,6 +836,9 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(js, /nextNursingAction/);
   assert.match(js, /renderMobileAppointmentStatus/);
   assert.match(js, /renderMobileNurseCards/);
+  assert.match(js, /consentAttachmentText/);
+  assert.match(js, /locationTraceSummary/);
+  assert.match(js, /locationTracePoints/);
   assert.match(js, /renderServiceItemSelect/);
   assert.match(js, /bindNurseActionButtons/);
   assert.match(js, /sourceChannel = "internet-nursing-mobile"/);
@@ -862,6 +865,9 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(server, /canAccessInternetNursingOrder/);
   assert.match(server, /validateInternetNursingAppointment/);
   assert.match(server, /buildInternetNursingActionMessage/);
+  assert.match(server, /buildInternetNursingConsentAttachment/);
+  assert.match(server, /appendInternetNursingTracePoint/);
+  assert.match(server, /hasSignedInternetNursingConsent/);
   assert.match(server, /互联网护理新预约/);
   assert.match(server, /assertInternetNursingActionAllowed/);
   assert.match(server, /nurse can only operate assigned orders/);

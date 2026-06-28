@@ -4458,10 +4458,21 @@
       "address": "Zhongshan district demo address",
       "firstVisitAssessment": "passed",
       "informedConsent": "signed",
+      "consentAttachment": {
+        "id": "consent-ino-001",
+        "type": "electronic-informed-consent",
+        "status": "signed",
+        "version": "internet-nursing-consent-v1",
+        "signerName": "Demo resident A",
+        "signedAt": "2026-06-21T08:00:00.000Z",
+        "attachmentName": "internet-nursing-informed-consent-ino-001.pdf",
+        "hash": "sha256:seed-consent-ino-001"
+      },
       "identityVerified": true,
       "riskLevel": "medium",
       "status": "dispatched",
       "locationTrace": "pending",
+      "locationTracePoints": [],
       "serviceRecordStatus": "pending",
       "qualityCallback": "pending",
       "feeEstimate": 168,
@@ -4491,10 +4502,38 @@
       "address": "Qingniwaqiao demo home",
       "firstVisitAssessment": "passed",
       "informedConsent": "signed",
+      "consentAttachment": {
+        "id": "consent-ino-002",
+        "type": "electronic-informed-consent",
+        "status": "signed",
+        "version": "internet-nursing-consent-v1",
+        "signerName": "Demo resident B",
+        "signedAt": "2026-06-20T08:00:00.000Z",
+        "attachmentName": "internet-nursing-informed-consent-ino-002.pdf",
+        "hash": "sha256:seed-consent-ino-002"
+      },
       "identityVerified": true,
       "riskLevel": "low",
       "status": "accepted",
       "locationTrace": "tracking",
+      "locationTracePoints": [
+        {
+          "at": "2026-06-21T09:00:00.000Z",
+          "stage": "nurse-accept",
+          "lat": 38.914,
+          "lng": 121.614,
+          "source": "nurse-mobile",
+          "verified": true
+        },
+        {
+          "at": "2026-06-22T09:30:00.000Z",
+          "stage": "service-start",
+          "lat": 38.915,
+          "lng": 121.616,
+          "source": "nurse-mobile",
+          "verified": true
+        }
+      ],
       "serviceRecordStatus": "in-progress",
       "qualityCallback": "pending",
       "feeEstimate": 86,
@@ -4524,10 +4563,16 @@
       "address": "Shahekou demo address",
       "firstVisitAssessment": "pending",
       "informedConsent": "pending",
+      "consentAttachment": {
+        "status": "pending",
+        "required": true,
+        "version": "internet-nursing-consent-v1"
+      },
       "identityVerified": true,
       "riskLevel": "high",
       "status": "requested",
       "locationTrace": "pending",
+      "locationTracePoints": [],
       "serviceRecordStatus": "pending",
       "qualityCallback": "pending",
       "feeEstimate": 260,

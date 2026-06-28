@@ -30,7 +30,7 @@ async function fetchInternetNursingDashboard() {
 function buildStaticInternetNursingDashboard(state) {
   const institutions = state.internetNursingInstitutions?.length ? state.internetNursingInstitutions : defaultNursingInstitutions();
   const nurses = state.internetNursingNurses?.length ? state.internetNursingNurses : defaultNursingNurses();
-  const orders = state.internetNursingOrders?.length ? state.internetNursingOrders : defaultNursingOrders();
+  const orders = (state.internetNursingOrders?.length ? state.internetNursingOrders : defaultNursingOrders()).map(enrichStaticNursingOrder);
   const institutionById = new Map(institutions.map((item) => [item.id, item]));
   const nurseById = new Map(nurses.map((item) => [item.id, item]));
   const policy = state.internetNursingPolicy || defaultNursingPolicy();
@@ -54,6 +54,17 @@ function buildStaticInternetNursingDashboard(state) {
     orders: orders.map((item) => ({ ...item, institution: institutionById.get(item.institutionId), nurse: nurseById.get(item.nurseId) })),
     nurseQueue: orders,
     riskQueue: orders.filter((item) => item.riskLevel === "high")
+  };
+}
+
+function enrichStaticNursingOrder(item) {
+  const signedConsent = item.informedConsent === "signed";
+  return {
+    ...item,
+    consentAttachment: item.consentAttachment || (signedConsent
+      ? { status: "signed", version: "internet-nursing-consent-v1", signerName: item.residentName || "居民电子签名", signedAt: item.createdAt || new Date().toISOString(), attachmentName: `internet-nursing-informed-consent-${item.id}.pdf` }
+      : { status: "pending", required: true, version: "internet-nursing-consent-v1" }),
+    locationTracePoints: Array.isArray(item.locationTracePoints) ? item.locationTracePoints : []
   };
 }
 
@@ -134,6 +145,23 @@ function nursingPriorityWeight(item, nextAction) {
   return risk + stage;
 }
 
+function consentAttachmentText(item) {
+  const attachment = item?.consentAttachment || {};
+  if (attachment.status !== "signed") return "知情同意附件待签署";
+  const signer = displayText(attachment.signerName || "居民电子签名");
+  const version = attachment.version || "internet-nursing-consent-v1";
+  const signedAt = attachment.signedAt ? String(attachment.signedAt).slice(0, 16).replace("T", " ") : "待核验";
+  return `电子签名 ${signer} / ${version} / ${signedAt}`;
+}
+
+function locationTraceSummary(item) {
+  const points = Array.isArray(item?.locationTracePoints) ? item.locationTracePoints : [];
+  if (!points.length) return "轨迹点待采集";
+  const latest = points[points.length - 1] || {};
+  const stage = displayText(latest.stage || "location-check");
+  return `轨迹点 ${points.length} 个 / 最近 ${stage}`;
+}
+
 function renderInstitutionSelect(institutions) {
   const select = document.querySelector("#nursing-institution-select");
   if (!select) return;
@@ -185,7 +213,7 @@ function renderHospitalOrders(items) {
           <td>${escapeHtml(displayText(item.serviceItem || ""))}<br><small>${escapeHtml(displayText(item.address || ""))}</small></td>
           <td>${escapeHtml(displayText(item.institution?.name || item.institutionName || ""))}<br><small>${escapeHtml(item.institutionCode || "")}</small></td>
           <td>${escapeHtml(displayText(item.nurse?.name || item.nurseName || "pending"))}<br><small>${escapeHtml(displayText(item.nurse?.registrationStatus || ""))}</small></td>
-          <td>${statusBadge(item.firstVisitAssessment)} ${statusBadge(item.informedConsent)} ${statusBadge(item.locationTrace)}</td>
+          <td>${statusBadge(item.firstVisitAssessment)} ${statusBadge(item.informedConsent)} ${statusBadge(item.locationTrace)}<br><small>${escapeHtml(consentAttachmentText(item))}</small><br><small>${escapeHtml(locationTraceSummary(item))}</small></td>
           <td>${statusBadge(item.status)} ${statusBadge(item.riskLevel)}<br><small>${escapeHtml(displayText(item.qualityCallback || ""))}</small></td>
           <td>
             ${canManage ? `
@@ -216,7 +244,7 @@ function renderNurseQueue(items) {
           <td><strong>${escapeHtml(item.id)}</strong><br><small>${escapeHtml(displayText(item.serviceItem || ""))}</small></td>
           <td>${escapeHtml(item.preferredAt || "")}<br><small>${escapeHtml(displayText(item.address || ""))}</small></td>
           <td>${escapeHtml(displayText(item.residentName || item.residentId || ""))}<br><small>${escapeHtml(displayText(item.serviceObject || ""))}</small></td>
-          <td>${statusBadge(item.locationTrace)} ${statusBadge(item.serviceRecordStatus)} ${statusBadge(item.qualityCallback)}</td>
+          <td>${statusBadge(item.locationTrace)} ${statusBadge(item.serviceRecordStatus)} ${statusBadge(item.qualityCallback)}<br><small>${escapeHtml(locationTraceSummary(item))}</small></td>
           <td>${statusBadge(item.status)} ${statusBadge(item.riskLevel)}</td>
           <td>
             ${nurseActionButtons(item, canAct)}
@@ -251,6 +279,7 @@ function renderMobileAppointmentStatus(items) {
         ${statusBadge(item.informedConsent)}
         ${statusBadge(item.riskLevel)}
       </div>
+      <small>${escapeHtml(consentAttachmentText(item))}</small>
       <small>${escapeHtml(nextNursingAction(item, item.riskLevel === "high") || "等待服务闭环更新。")}</small>
     </article>
   `).join("") : `
@@ -290,6 +319,7 @@ function renderMobileNurseCards(items) {
         ${statusBadge(item.serviceRecordStatus)}
         ${statusBadge(item.riskLevel)}
       </div>
+      <small>${escapeHtml(locationTraceSummary(item))}</small>
       <div class="nursing-mobile-actions">
         ${nurseActionButtons(item, canAct)}
       </div>
@@ -372,7 +402,7 @@ function bindNursingAppointmentForm() {
         });
         if (!response.ok) throw new Error(`互联网护理预约提交失败：${response.status}`);
       } else {
-        nursingDashboard.orders.unshift({ ...values, id: `ino-local-${crypto.randomUUID()}`, status: "requested", firstVisitAssessment: "pending", informedConsent: "pending", locationTrace: "pending", serviceRecordStatus: "pending", qualityCallback: "pending" });
+        nursingDashboard.orders.unshift({ ...values, id: `ino-local-${crypto.randomUUID()}`, status: "requested", firstVisitAssessment: "pending", informedConsent: "pending", consentAttachment: { status: "pending", required: true, version: "internet-nursing-consent-v1" }, locationTrace: "pending", locationTracePoints: [], serviceRecordStatus: "pending", qualityCallback: "pending" });
       }
       form.reset();
       if (dateInput) dateInput.value = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
@@ -386,16 +416,25 @@ function bindNursingAppointmentForm() {
 
 function hospitalActionPayload(kind) {
   const nurseId = document.querySelector("#nursing-nurse-select")?.value || "";
-  if (kind === "assessment") return { firstVisitAssessment: "passed", informedConsent: "signed", status: "assessed", action: "first-visit-assessment", note: "已完成首诊评估和知情同意。" };
+  if (kind === "assessment") {
+    return {
+      firstVisitAssessment: "passed",
+      informedConsent: "signed",
+      consentAttachment: { status: "signed", type: "electronic-informed-consent", version: "internet-nursing-consent-v1", signerName: "居民电子签名", attachmentName: "internet-nursing-informed-consent.pdf" },
+      status: "assessed",
+      action: "first-visit-assessment",
+      note: "已完成首诊评估和知情同意。"
+    };
+  }
   if (kind === "dispatch") return { nurseId, status: "dispatched", action: "dispatch-qualified-nurse", note: "医院已派出合格护士。" };
   return { qualityCallback: "closed", status: "closed", action: "quality-review", note: "质量回访已关闭。" };
 }
 
 function nurseActionPayload(kind) {
   const nurseId = document.querySelector("#nursing-nurse-select")?.value || "";
-  if (kind === "accept") return { nurseId, status: "accepted", locationTrace: "tracking", action: "nurse-accept", note: "护士已接单，位置轨迹已开启。" };
-  if (kind === "start") return { nurseId, status: "in-service", locationTrace: "tracking", serviceRecordStatus: "in-progress", action: "service-start", note: "上门护理服务已开始。" };
-  return { nurseId, status: "completed", serviceRecordStatus: "completed", qualityCallback: "pending", action: "service-complete", note: "护理记录已完成，等待质量回访。" };
+  if (kind === "accept") return { nurseId, status: "accepted", locationTrace: "tracking", tracePoint: { stage: "nurse-accept", lat: 38.914, lng: 121.614, source: "nurse-mobile" }, action: "nurse-accept", note: "护士已接单，位置轨迹已开启。" };
+  if (kind === "start") return { nurseId, status: "in-service", locationTrace: "tracking", serviceRecordStatus: "in-progress", tracePoint: { stage: "service-start", lat: 38.915, lng: 121.616, source: "nurse-mobile" }, action: "service-start", note: "上门护理服务已开始。" };
+  return { nurseId, status: "completed", serviceRecordStatus: "completed", qualityCallback: "pending", tracePoint: { stage: "service-complete", lat: 38.916, lng: 121.617, source: "nurse-mobile" }, action: "service-complete", note: "护理记录已完成，等待质量回访。" };
 }
 
 async function updateNursingOrder(id, payload) {
@@ -413,13 +452,30 @@ async function updateNursingOrder(id, payload) {
       }
     } else {
       const item = nursingDashboard.orders.find((row) => row.id === id);
-      if (item) Object.assign(item, payload);
+      if (item) Object.assign(item, applyStaticNursingOrderAction(item, payload));
     }
     showNursingMessage("订单状态已更新。");
     await loadInternetNursingDashboard();
   } catch (error) {
     showNursingMessage(error.message || "订单更新失败，请稍后重试。", "danger");
   }
+}
+
+function applyStaticNursingOrderAction(item, payload) {
+  const updates = { ...payload };
+  if (payload.informedConsent === "signed" || payload.action === "first-visit-assessment") {
+    updates.consentAttachment = {
+      ...(item.consentAttachment || {}),
+      ...(payload.consentAttachment || {}),
+      status: "signed",
+      signedAt: payload.consentAttachment?.signedAt || new Date().toISOString()
+    };
+  }
+  if (payload.tracePoint) {
+    updates.locationTracePoints = [...(Array.isArray(item.locationTracePoints) ? item.locationTracePoints : []), payload.tracePoint].slice(-30);
+  }
+  delete updates.tracePoint;
+  return updates;
 }
 
 function showNursingMessage(message, type = "info") {

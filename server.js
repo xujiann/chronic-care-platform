@@ -5849,10 +5849,21 @@ function seedInternetNursingOrders() {
       address: "Zhongshan district demo address",
       firstVisitAssessment: "passed",
       informedConsent: "signed",
+      consentAttachment: {
+        id: "consent-ino-001",
+        type: "electronic-informed-consent",
+        status: "signed",
+        version: "internet-nursing-consent-v1",
+        signerName: "Demo resident A",
+        signedAt: todayOffset(-1),
+        attachmentName: "internet-nursing-informed-consent-ino-001.pdf",
+        hash: "sha256:seed-consent-ino-001"
+      },
       identityVerified: true,
       riskLevel: "medium",
       status: "dispatched",
       locationTrace: "pending",
+      locationTracePoints: [],
       serviceRecordStatus: "pending",
       qualityCallback: "pending",
       feeEstimate: 168,
@@ -5875,10 +5886,24 @@ function seedInternetNursingOrders() {
       address: "Qingniwaqiao demo home",
       firstVisitAssessment: "passed",
       informedConsent: "signed",
+      consentAttachment: {
+        id: "consent-ino-002",
+        type: "electronic-informed-consent",
+        status: "signed",
+        version: "internet-nursing-consent-v1",
+        signerName: "Demo resident B",
+        signedAt: todayOffset(-2),
+        attachmentName: "internet-nursing-informed-consent-ino-002.pdf",
+        hash: "sha256:seed-consent-ino-002"
+      },
       identityVerified: true,
       riskLevel: "low",
       status: "accepted",
       locationTrace: "tracking",
+      locationTracePoints: [
+        { at: todayOffset(-1), stage: "nurse-accept", lat: 38.914, lng: 121.614, source: "nurse-mobile", verified: true },
+        { at: todayOffset(0), stage: "service-start", lat: 38.915, lng: 121.616, source: "nurse-mobile", verified: true }
+      ],
       serviceRecordStatus: "in-progress",
       qualityCallback: "pending",
       feeEstimate: 86,
@@ -5901,10 +5926,12 @@ function seedInternetNursingOrders() {
       address: "Shahekou demo address",
       firstVisitAssessment: "pending",
       informedConsent: "pending",
+      consentAttachment: { status: "pending", required: true, version: "internet-nursing-consent-v1" },
       identityVerified: true,
       riskLevel: "high",
       status: "requested",
       locationTrace: "pending",
+      locationTracePoints: [],
       serviceRecordStatus: "pending",
       qualityCallback: "pending",
       feeEstimate: 260,
@@ -5984,6 +6011,85 @@ function isQualifiedInternetNurse(item) {
     item.insuranceStatus === "covered";
 }
 
+function hasSignedInternetNursingConsent(item) {
+  const attachment = item?.consentAttachment || {};
+  return item?.informedConsent === "signed" &&
+    attachment.status === "signed" &&
+    Boolean(attachment.signedAt) &&
+    Boolean(attachment.signerName) &&
+    Boolean(attachment.version);
+}
+
+function buildInternetNursingConsentAttachment(payload, user, now, existing = {}) {
+  const requested = payload.consentAttachment && typeof payload.consentAttachment === "object" ? payload.consentAttachment : {};
+  const shouldSign = payload.informedConsent === "signed" || payload.action === "first-visit-assessment" || requested.status === "signed";
+  if (!shouldSign) {
+    return {
+      status: requested.status || existing.status || "pending",
+      required: requested.required ?? existing.required ?? true,
+      version: requested.version || existing.version || "internet-nursing-consent-v1"
+    };
+  }
+  const version = requested.version || payload.consentVersion || existing.version || "internet-nursing-consent-v1";
+  const signerName = requested.signerName || payload.consentSignerName || payload.residentName || user.name || user.username || "resident electronic signature";
+  const signedAt = requested.signedAt || payload.consentSignedAt || existing.signedAt || now;
+  const attachmentName = requested.attachmentName || payload.consentAttachmentName || existing.attachmentName || "internet-nursing-informed-consent.pdf";
+  const hash = requested.hash || payload.consentHash || existing.hash || `sha256:${createHash("sha256").update(`${signerName}|${signedAt}|${version}|${attachmentName}`).digest("hex")}`;
+  return {
+    id: requested.id || existing.id || `consent-${randomUUID()}`,
+    type: requested.type || existing.type || "electronic-informed-consent",
+    status: "signed",
+    version,
+    signerName,
+    signedAt,
+    attachmentName,
+    hash
+  };
+}
+
+function normalizeInternetNursingTracePoint(point, fallbackStage, now) {
+  if (!point || typeof point !== "object") return null;
+  const lat = Number(point.lat ?? point.latitude);
+  const lng = Number(point.lng ?? point.longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return {
+    at: String(point.at || point.time || now).trim(),
+    stage: String(point.stage || fallbackStage || "location-check").trim(),
+    lat,
+    lng,
+    source: String(point.source || "nurse-mobile").trim(),
+    verified: point.verified !== false
+  };
+}
+
+function normalizeInternetNursingTracePoints(value) {
+  if (!Array.isArray(value)) return [];
+  const now = new Date().toISOString();
+  return value
+    .map((point) => normalizeInternetNursingTracePoint(point, point?.stage, now))
+    .filter(Boolean)
+    .slice(-30);
+}
+
+function defaultInternetNursingTracePoint(stage, now) {
+  const offsets = {
+    "nurse-accept": [38.914, 121.614],
+    "service-start": [38.915, 121.616],
+    "service-complete": [38.916, 121.617]
+  };
+  const [lat, lng] = offsets[stage] || offsets["service-start"];
+  return { at: now, stage, lat, lng, source: "nurse-mobile", verified: true };
+}
+
+function appendInternetNursingTracePoint(existing, payload, user, stage, now) {
+  const points = normalizeInternetNursingTracePoints(existing);
+  const requested = normalizeInternetNursingTracePoint(payload.tracePoint || payload.locationPoint, stage, now);
+  const point = requested || defaultInternetNursingTracePoint(stage, now);
+  point.source = point.source || (user.accountType === "nurse" ? "nurse-mobile" : "institution-workbench");
+  const duplicate = points.some((item) => item.stage === point.stage && item.at === point.at);
+  return (duplicate ? points : [...points, point]).slice(-30);
+}
+
 function normalizeInternetNursingOrder(payload, user, data) {
   const residentId = String(payload.residentId || user.residentId || "").trim();
   if (!residentId) throw new Error("residentId is required");
@@ -6016,10 +6122,14 @@ function normalizeInternetNursingOrder(payload, user, data) {
     address: String(payload.address || "").trim(),
     firstVisitAssessment: citizenCreated ? "pending" : String(payload.firstVisitAssessment || "pending").trim(),
     informedConsent: citizenCreated ? "pending" : String(payload.informedConsent || "pending").trim(),
+    consentAttachment: citizenCreated
+      ? buildInternetNursingConsentAttachment({}, user, now)
+      : buildInternetNursingConsentAttachment(payload, user, now),
     identityVerified: payload.identityVerified !== false,
     riskLevel: String(payload.riskLevel || "medium").trim(),
     status: citizenCreated ? "requested" : String(payload.status || "requested").trim(),
     locationTrace: citizenCreated ? "pending" : String(payload.locationTrace || "pending").trim(),
+    locationTracePoints: normalizeInternetNursingTracePoints(payload.locationTracePoints),
     serviceRecordStatus: citizenCreated ? "pending" : String(payload.serviceRecordStatus || "pending").trim(),
     qualityCallback: citizenCreated ? "pending" : String(payload.qualityCallback || "pending").trim(),
     feeEstimate: citizenCreated ? 0 : Number(payload.feeEstimate || 0),
@@ -6075,6 +6185,22 @@ function applyInternetNursingOrderAction(item, payload, user, data) {
   }
   if (updates.status === "accepted" && !updates.locationTrace) updates.locationTrace = "tracking";
   if (updates.status === "completed" && !updates.serviceRecordStatus) updates.serviceRecordStatus = "completed";
+  if (updates.informedConsent === "signed" || payload.action === "first-visit-assessment") {
+    updates.consentAttachment = buildInternetNursingConsentAttachment({ ...payload, informedConsent: "signed" }, user, now, item.consentAttachment);
+  } else if (!item.consentAttachment) {
+    updates.consentAttachment = buildInternetNursingConsentAttachment({}, user, now);
+  }
+  const traceStage = {
+    "nurse-accept": "nurse-accept",
+    "service-start": "service-start",
+    "service-complete": "service-complete"
+  }[String(payload.action || "").trim()];
+  if (traceStage) {
+    updates.locationTracePoints = appendInternetNursingTracePoint(item.locationTracePoints, payload, user, traceStage, now);
+    if (!updates.locationTrace) updates.locationTrace = "tracking";
+  } else if (!item.locationTracePoints) {
+    updates.locationTracePoints = [];
+  }
   return {
     ...item,
     ...updates,
@@ -6091,7 +6217,7 @@ function assertInternetNursingActionAllowed(item, payload, user) {
   const action = String(payload.action || "").trim();
   if (user.accountType !== "nurse") {
     if (action === "dispatch-qualified-nurse") {
-      if (item.firstVisitAssessment !== "passed" || item.informedConsent !== "signed") throw new Error("first-visit assessment and informed consent are required before dispatch");
+      if (item.firstVisitAssessment !== "passed" || !hasSignedInternetNursingConsent(item)) throw new Error("first-visit assessment and signed consent attachment are required before dispatch");
       if (!String(payload.nurseId || "").trim()) throw new Error("qualified nurse is required before dispatch");
     }
     if (action === "quality-review") {
@@ -6106,7 +6232,7 @@ function assertInternetNursingActionAllowed(item, payload, user) {
   if (payloadNurseId !== user.nurseId) throw new Error("nurse can only operate own workstation orders");
   if (item.nurseId && item.nurseId !== user.nurseId) throw new Error("nurse can only operate assigned orders");
   if (!["nurse-accept", "service-start", "service-complete"].includes(action)) throw new Error("nurse action is not allowed");
-  if (action === "nurse-accept" && (item.firstVisitAssessment !== "passed" || item.informedConsent !== "signed")) throw new Error("first-visit assessment and informed consent are required before nurse acceptance");
+  if (action === "nurse-accept" && (item.firstVisitAssessment !== "passed" || !hasSignedInternetNursingConsent(item))) throw new Error("first-visit assessment and signed consent attachment are required before nurse acceptance");
   if (action === "service-start" && item.status !== "accepted") throw new Error("order must be accepted before service starts");
   if (action === "service-complete" && item.status !== "in-service") throw new Error("order must be in service before completion");
 }

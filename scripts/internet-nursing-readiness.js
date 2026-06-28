@@ -7,7 +7,7 @@ const DEFAULT_OUTPUT = path.join(ROOT, "release", "internet-nursing-readiness-re
 const DEFAULT_MARKDOWN = path.join(ROOT, "release", "internet-nursing-readiness-report.md");
 
 const REQUIRED_POLICY_FIELDS = ["online application", "offline service", "first-visit assessment", "informed consent", "nurse qualification", "location tracking", "full audit trail", "workload statistics"];
-const REQUIRED_ORDER_FIELDS = ["firstVisitAssessment", "informedConsent", "identityVerified", "locationTrace", "serviceRecordStatus", "qualityCallback", "auditTrail"];
+const REQUIRED_ORDER_FIELDS = ["firstVisitAssessment", "informedConsent", "consentAttachment", "identityVerified", "locationTrace", "locationTracePoints", "serviceRecordStatus", "qualityCallback", "auditTrail"];
 
 function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(ROOT, relativePath), "utf8"));
@@ -37,9 +37,9 @@ function fallbackNurses() {
 
 function fallbackOrders() {
   return [
-    { id: "ino-001", institutionId: "inh-mr1", nurseId: "inn-001", firstVisitAssessment: "passed", informedConsent: "signed", identityVerified: true, locationTrace: "pending", serviceRecordStatus: "pending", qualityCallback: "pending", riskLevel: "medium", status: "dispatched", auditTrail: [{}] },
-    { id: "ino-002", institutionId: "inh-mr3", nurseId: "inn-002", firstVisitAssessment: "passed", informedConsent: "signed", identityVerified: true, locationTrace: "tracking", serviceRecordStatus: "in-progress", qualityCallback: "pending", riskLevel: "low", status: "accepted", auditTrail: [{}] },
-    { id: "ino-003", institutionId: "inh-mr1", nurseId: "", firstVisitAssessment: "pending", informedConsent: "pending", identityVerified: true, locationTrace: "pending", serviceRecordStatus: "pending", qualityCallback: "pending", riskLevel: "high", status: "requested", auditTrail: [{}] }
+    { id: "ino-001", institutionId: "inh-mr1", nurseId: "inn-001", firstVisitAssessment: "passed", informedConsent: "signed", consentAttachment: { status: "signed", signedAt: "2026-06-26T08:00:00.000Z", signerName: "Demo resident A", version: "internet-nursing-consent-v1" }, identityVerified: true, locationTrace: "pending", locationTracePoints: [], serviceRecordStatus: "pending", qualityCallback: "pending", riskLevel: "medium", status: "dispatched", auditTrail: [{}] },
+    { id: "ino-002", institutionId: "inh-mr3", nurseId: "inn-002", firstVisitAssessment: "passed", informedConsent: "signed", consentAttachment: { status: "signed", signedAt: "2026-06-26T08:00:00.000Z", signerName: "Demo resident B", version: "internet-nursing-consent-v1" }, identityVerified: true, locationTrace: "tracking", locationTracePoints: [{ stage: "service-start", lat: 38.915, lng: 121.616, at: "2026-06-26T09:00:00.000Z" }, { stage: "service-complete", lat: 38.916, lng: 121.617, at: "2026-06-26T10:00:00.000Z" }], serviceRecordStatus: "in-progress", qualityCallback: "pending", riskLevel: "low", status: "accepted", auditTrail: [{}] },
+    { id: "ino-003", institutionId: "inh-mr1", nurseId: "", firstVisitAssessment: "pending", informedConsent: "pending", consentAttachment: { status: "pending", required: true, version: "internet-nursing-consent-v1" }, identityVerified: true, locationTrace: "pending", locationTracePoints: [], serviceRecordStatus: "pending", qualityCallback: "pending", riskLevel: "high", status: "requested", auditTrail: [{}] }
   ];
 }
 
@@ -53,6 +53,23 @@ function nurseQualified(item) {
 
 function hasCorruptedVisibleText(text) {
   return /\?{3,}|\uFFFD|[\u7019\u934f\u93b6\u942d\u7481\u6f15\u5a15\u6f36\u68e3]/.test(String(text || ""));
+}
+
+function hasSignedConsentAttachment(item) {
+  const attachment = item.consentAttachment || {};
+  return item.informedConsent === "signed" &&
+    attachment.status === "signed" &&
+    Boolean(attachment.signedAt) &&
+    Boolean(attachment.signerName) &&
+    Boolean(attachment.version);
+}
+
+function hasServiceTracePoints(item) {
+  return Array.isArray(item.locationTracePoints) &&
+    item.locationTracePoints.length >= 2 &&
+    item.locationTracePoints.some((point) => point.stage === "service-start") &&
+    item.locationTracePoints.some((point) => point.stage === "service-complete" || point.stage === "nurse-accept") &&
+    item.locationTracePoints.every((point) => Number.isFinite(Number(point.lat)) && Number.isFinite(Number(point.lng)));
 }
 
 function buildInternetNursingReadinessReport(options = {}) {
@@ -77,6 +94,7 @@ function buildInternetNursingReadinessReport(options = {}) {
     { id: "nursing:orders", passed: orders.length >= 3 && orders.every((item) => institutionIds.has(item.institutionId) && (!item.nurseId || nurseIds.has(item.nurseId))), detail: `${orders.length} orders` },
     { id: "nursing:orderEvidence", passed: orders.every((item) => REQUIRED_ORDER_FIELDS.every((field) => Object.hasOwn(item, field))), detail: REQUIRED_ORDER_FIELDS.join(", ") },
     { id: "nursing:riskTrace", passed: orders.some((item) => item.riskLevel === "high") && orders.some((item) => item.locationTrace === "tracking"), detail: "risk queue and location tracking present" },
+    { id: "nursing:phaseOneEvidence", passed: orders.some(hasSignedConsentAttachment) && orders.some(hasServiceTracePoints) && /buildInternetNursingConsentAttachment/.test(server) && /appendInternetNursingTracePoint/.test(server) && /consentAttachmentText/.test(frontend) && /locationTraceSummary/.test(frontend) && /电子签名附件|鐢靛瓙绛惧悕闄勪欢/.test(launchPlan) && /轨迹点|杞ㄨ抗鐐?/.test(moduleDoc + launchPlan), detail: "electronic consent attachment and service trace point list are implemented" },
     { id: "nursing:api", passed: /\/api\/internet-nursing\/dashboard/.test(server) && /\/api\/internet-nursing\/orders/.test(server) && /canAccessInternetNursingOrder/.test(server), detail: "dashboard, order creation, action, and role guard present" },
     { id: "nursing:frontend", passed: /nursing-appointment-form/.test(frontend) && /nursing-nurse-queue/.test(frontend) && /nursing-risk-guidance/.test(frontend) && /fetchInternetNursingDashboard/.test(frontend), detail: "citizen, hospital, nurse, and risk guidance work areas present" },
     { id: "nursing:visibleText", passed: !hasCorruptedVisibleText(frontend) && /\u8ba2\u5355/.test(frontend) && /\u63a5\u5355/.test(frontend) && /\u9884\u7ea6\u5df2\u63d0\u4ea4/.test(frontend), detail: "visible Chinese labels and operation feedback are clean" },

@@ -522,6 +522,9 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(created.body.nurseId, "");
     assert.equal(created.body.firstVisitAssessment, "pending");
     assert.equal(created.body.informedConsent, "pending");
+    assert.equal(created.body.consentAttachment.status, "pending");
+    assert.equal(Array.isArray(created.body.locationTracePoints), true);
+    assert.equal(created.body.locationTracePoints.length, 0);
 
     const unsupportedService = await api(baseUrl, "/api/internet-nursing/orders", authorized(citizenToken, {
       method: "POST",
@@ -594,7 +597,37 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(accepted.response.status, 200);
     assert.equal(accepted.body.status, "accepted");
     assert.equal(accepted.body.nurseId, "inn-001");
+    assert.equal(accepted.body.locationTrace, "tracking");
+    assert.equal(accepted.body.locationTracePoints.some((item) => item.stage === "nurse-accept"), true);
     assert.equal(accepted.body.auditTrail.some((item) => item.action === "nurse-accept"), true);
+
+    const started = await api(baseUrl, "/api/internet-nursing/orders/ino-001/actions", authorized(nurseToken, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "service-start",
+        status: "in-service",
+        nurseId: "inn-001",
+        serviceRecordStatus: "in-progress",
+        tracePoint: { stage: "service-start", lat: 38.915, lng: 121.616, source: "nurse-mobile" }
+      })
+    }));
+    assert.equal(started.response.status, 200);
+    assert.equal(started.body.status, "in-service");
+    assert.equal(started.body.locationTracePoints.some((item) => item.stage === "service-start" && item.verified === true), true);
+
+    const completed = await api(baseUrl, "/api/internet-nursing/orders/ino-001/actions", authorized(nurseToken, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "service-complete",
+        status: "completed",
+        nurseId: "inn-001",
+        serviceRecordStatus: "completed",
+        tracePoint: { stage: "service-complete", lat: 38.916, lng: 121.617, source: "nurse-mobile" }
+      })
+    }));
+    assert.equal(completed.response.status, 200);
+    assert.equal(completed.body.serviceRecordStatus, "completed");
+    assert.equal(completed.body.locationTracePoints.some((item) => item.stage === "service-complete"), true);
   });
 
   await t.test("enforces personal record ownership and protects record identity", async () => {
