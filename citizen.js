@@ -930,10 +930,14 @@ function renderLifeCycle(resident, diseases, followups, records) {
   const labs = getPersonalRecords(resident.id, "labs");
   const vaccines = getPersonalRecords(resident.id, "vaccines");
   const medications = getPersonalRecords(resident.id, "medications");
+  const admissions = getPersonalRecords(resident.id, "admissions");
+  const authorizations = getPersonalRecords(resident.id, "authorizations");
   const senior = (state.seniorServices || []).filter((item) => item.residentId === resident.id);
   const age = ageOf(resident.birthDate);
   const latestRecord = [records[0], labs[0], medications[0]].filter(Boolean).sort(sortByDateDesc)[0];
   const pendingFollowups = followups.filter((item) => item.status !== "已完成");
+  const activeStatuses = new Set(["已归集", "有记录", "持续更新", "管理中", "已纳入", "已授权", "已归档"]);
+  const urgentActions = [];
   const stages = [
     {
       title: "出生与建档",
@@ -941,31 +945,50 @@ function renderLifeCycle(resident, diseases, followups, records) {
       detail: birthCertificates[0]
         ? `${birthCertificates[0].newbornName || resident.name} · ${birthCertificates[0].certificateNo} · ${birthCertificates[0].healthManagementStatus || "新生儿管理"}`
         : "出生医学证明、母婴三证和新生儿访视信息待接入。",
-      action: birthCertificates[0]?.nextService || "补齐出生证、出生筛查和接种起始记录"
+      action: birthCertificates[0]?.nextService || "补齐出生证、出生筛查和接种起始记录",
+      urgent: !birthCertificates.length || /待|复测|确认|专案/.test(birthCertificates[0]?.nextService || "")
     },
     {
-      title: "儿童青少年",
+      title: "儿童保健",
       status: vaccines.length ? "有记录" : age < 18 ? "待跟进" : "历史阶段",
-      detail: vaccines[0] ? `${vaccines.length} 条免疫接种记录，最近：${vaccines[0].name}` : "儿童体检、免疫规划、发育评估和学校健康记录可持续归集。",
-      action: age < 18 ? "关注体检、接种、发育和视力口腔管理" : "保留历史儿童保健和接种档案"
+      detail: vaccines[0] ? `${vaccines.length} 条免疫接种记录，最近：${vaccines[0].name}` : "儿童体检、免疫规划、发育评估和体弱儿童管理可持续归集。",
+      action: age < 7 ? "下发月龄体检、接种和发育评估提醒" : "保留历史儿童保健和接种档案",
+      urgent: age < 7 && !vaccines.length
+    },
+    {
+      title: "青少年健康",
+      status: age >= 7 && age < 18 ? "管理中" : vaccines.length ? "有记录" : "历史阶段",
+      detail: "学校健康、视力口腔、心理筛查、运动处方和传染病防控记录按授权汇入。",
+      action: age >= 7 && age < 18 ? "下发视力、口腔、心理和疫苗补种计划" : "沉淀青少年阶段风险与干预记录",
+      urgent: age >= 7 && age < 18
     },
     {
       title: "成人健康",
       status: latestRecord ? "持续更新" : "待补齐",
       detail: latestRecord ? `${latestRecord.date} · ${latestRecord.name} · ${latestRecord.source}` : "体检、门诊病历、检查检验和用药处方待补齐。",
-      action: "保持年度体检、授权共享和异常指标随访"
+      action: "保持年度体检、授权共享和异常指标随访",
+      urgent: !latestRecord
     },
     {
       title: "慢病与康复",
       status: diseases.length ? "管理中" : "未登记慢病",
       detail: diseases.length ? diseases.map((item) => `${item.type}/${item.status}`).join("、") : "暂无慢病登记，继续风险筛查和健康教育。",
-      action: pendingFollowups.length ? `${pendingFollowups.length} 项随访待处理` : "按需开展慢病筛查、复诊和康复管理"
+      action: pendingFollowups.length ? `${pendingFollowups.length} 项随访待处理` : "按需开展慢病筛查、复诊和康复管理",
+      urgent: Boolean(pendingFollowups.length)
     },
     {
       title: "老年与照护",
       status: age >= 60 || senior.length ? "已纳入" : "预备阶段",
       detail: senior.length ? senior.map((item) => `${item.serviceName || item.type || "适老服务"} · ${item.status || "服务中"}`).join("、") : "适老服务、家庭代办、长期处方、失能评估和照护资源可接续。",
-      action: age >= 60 ? "完善老年健康评估、用药安全和照护计划" : "提前建立家庭联系人和授权代办"
+      action: age >= 60 ? "完善老年健康评估、用药安全和照护计划" : "提前建立家庭联系人和授权代办",
+      urgent: age >= 60 && !senior.length
+    },
+    {
+      title: "临终关怀与授权",
+      status: authorizations.length || admissions.length ? "已授权" : "预备阶段",
+      detail: authorizations[0] ? `${authorizations.length} 条授权记录，最近：${authorizations[0].name}` : "急危重症、住院、临终关怀、家属代办和预立医疗照护计划可接续。",
+      action: admissions.length ? "联动住院记录、家庭联系人和转归随访" : "完善紧急联系人、授权代办和照护意愿",
+      urgent: age >= 60 && !authorizations.length
     },
     {
       title: "死亡与身后事项",
@@ -973,15 +996,19 @@ function renderLifeCycle(resident, diseases, followups, records) {
       detail: deathCertificates[0]
         ? `${deathCertificates[0].certificateNo} · ${deathCertificates[0].deathDateTime} · ${deathCertificates[0].qualityCheck || "待质控"}`
         : "死亡医学证明、公安民政共享和家属事项尚未触发。",
-      action: deathCertificates[0] ? `${deathCertificates[0].publicSecuritySync || "公安待共享"} · ${deathCertificates[0].civilAffairsSync || "民政待共享"}` : "保留预立授权、紧急联系人和身后事务指引"
+      action: deathCertificates[0] ? `${deathCertificates[0].publicSecuritySync || "公安待共享"} · ${deathCertificates[0].civilAffairsSync || "民政待共享"}` : "保留预立授权、紧急联系人和身后事务指引",
+      urgent: deathCertificates.some((item) => item.publicSecuritySync !== "已共享" || item.civilAffairsSync !== "已共享")
     }
   ];
-  document.querySelector("#lifecycle-summary").textContent = `${resident.name} · ${age} 岁 · ${stages.filter((item) => ["已归集", "有记录", "持续更新", "管理中", "已纳入", "已归档"].includes(item.status)).length}/6 个阶段已有数据`;
+  stages.forEach((stage) => {
+    if (stage.urgent) urgentActions.push(`${stage.title}：${stage.action}`);
+  });
+  document.querySelector("#lifecycle-summary").textContent = `${resident.name} · ${age} 岁 · ${stages.filter((item) => activeStatuses.has(item.status)).length}/${stages.length} 个阶段已有数据 · ${urgentActions.length} 项需下发`;
   container.innerHTML = stages.map((stage, index) => `<article class="lifecycle-card">
     <span>${String(index + 1).padStart(2, "0")}</span>
     <strong>${stage.title}</strong>
     <p>${stage.detail}</p>
-    <small>${stage.status} · ${stage.action}</small>
+    <small class="${stage.urgent ? "warn" : ""}">${stage.status} · ${stage.action}</small>
   </article>`).join("");
 }
 

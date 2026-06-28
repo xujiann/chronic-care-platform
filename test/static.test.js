@@ -610,6 +610,21 @@ test("citizen portal exposes P1 record details trends and source labels", () => 
   assert.match(citizenCss, /record-detail/);
 });
 
+test("citizen portal exposes eight-stage lifecycle health management", () => {
+  const citizenHtml = read("citizen.html");
+  const citizenJs = read("citizen.js");
+  const citizenCss = read("citizen.css");
+  assert.match(citizenHtml, /lifecycle-summary/);
+  ["出生与建档", "儿童保健", "青少年健康", "成人健康", "慢病与康复", "老年与照护", "临终关怀与授权", "死亡与身后事项"].forEach((label) => {
+    assert.match(citizenJs, new RegExp(label));
+  });
+  assert.match(citizenJs, /项需下发/);
+  assert.match(citizenJs, /deathCertificates/);
+  assert.match(citizenJs, /authorizations/);
+  assert.match(citizenCss, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(citizenCss, /lifecycle-card small\.warn/);
+});
+
 test("citizen portal exposes PWA install and offline shell assets", () => {
   const citizenHtml = read("citizen.html");
   const citizenJs = read("citizen.js");

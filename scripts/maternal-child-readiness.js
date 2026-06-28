@@ -34,8 +34,8 @@ const FUNCTION_DOMAINS = [
     entry: "citizen.html",
     api: ["getBirthCertificatesForResident", "renderBirthHealth", "renderMaternalChildContinuity"],
     data: ["birthCertificates", "personalRecords"],
-    evidence: ["birth-health-management", "maternal-child-continuity", "lifecycle-summary"],
-    acceptance: "居民可查看家庭成员出生证明、妇幼入册、新生儿访视、筛查、接种、低体重儿专案和儿童保健接续。"
+    evidence: ["birth-health-management", "maternal-child-continuity", "lifecycle-summary", "临终关怀与授权"],
+    acceptance: "居民可查看家庭成员出生证明、妇幼入册、新生儿访视、筛查、接种、低体重儿专案、儿童保健、青少年健康、成人慢病、老年照护、临终授权和死亡证明接续。"
   },
   {
     id: "sharing-license",
@@ -78,8 +78,8 @@ const HANDOFF_ACTIONS = [
     id: "lifecycle-continuity",
     name: "居民全生命周期接续",
     owner: "个人用户端",
-    evidence: ["birthCertificates", "personalRecords", "lifecycle-summary"],
-    acceptance: "出生证明自动接续到新生儿访视、筛查、接种、儿童保健和个人健康档案。"
+    evidence: ["birthCertificates", "personalRecords", "deathCertificates", "lifecycle-summary"],
+    acceptance: "出生证明自动接续到新生儿访视、筛查、接种、儿童保健、青少年健康、成人慢病、老年照护、临终授权、死亡证明和个人健康档案。"
   },
   {
     id: "release-evidence",
@@ -177,6 +177,7 @@ function buildMaternalChildReadinessReport(options = {}) {
     check("role:commission", hasAll(sources.commission, ["renderBirthStatistics", "renderMaternalChildCare", "mch-risk-list"]), "commission portal renders statistics, maternal-child services, and risks", "role"),
     check("role:institution", hasAll(sources.institution, ["birth-certificate-form", "birthCertificateNo", "submitBirthCertificate", "actionButton"]), "institution portal registers and advances certificate workflow", "role"),
     check("role:citizen", hasAll(sources.citizen, ["renderBirthHealth", "renderMaternalChildContinuity", "getBirthCertificatesForResident", "lifecycle-summary"]), "citizen portal exposes birth and maternal-child continuity tasks", "role"),
+    check("role:citizen-lifecycle-8", hasAll(sources.citizen, ["儿童保健", "青少年健康", "成人健康", "慢病与康复", "老年与照护", "临终关怀与授权", "死亡与身后事项", "项需下发"]) && sources.citizen.includes("stages.length"), "citizen lifecycle timeline covers eight life stages and dispatch summary", "role"),
     check("role:isolation", hasAll(sources.policyDoc, ["不展示卫健监管", "机构办理"]) && sources.server.includes("canAccessResident") && !sources.citizen.includes("birth-certificate-form"), "citizen role excludes institution certificate form while server keeps resident-scoped access", "role"),
     check("release:script", hasAll(sources.packageSource, ["maternal-child:readiness", "scripts/maternal-child-readiness.js"]), "release script is available in package scripts", "release")
   ];

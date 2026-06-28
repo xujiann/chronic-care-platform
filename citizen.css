@@ -789,7 +789,7 @@ select,
 
 .lifecycle-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -827,6 +827,10 @@ select,
 .lifecycle-card small {
   color: var(--ink);
   font-weight: 700;
+}
+
+.lifecycle-card small.warn {
+  color: #a65d00;
 }
 
 .two-column {

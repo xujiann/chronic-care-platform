@@ -45,12 +45,14 @@ test("maternal child main function report validates policy, roles, API and relea
   assert.equal(report.checks.some((item) => item.id === "docs:function-report"), true);
   assert.equal(report.checks.some((item) => item.id === "data:certificate-policy-fields"), true);
   assert.equal(report.checks.some((item) => item.id === "handoff:actions"), true);
+  assert.equal(report.checks.some((item) => item.id === "role:citizen-lifecycle-8"), true);
   assert.equal(report.checks.some((item) => item.id === "role:isolation"), true);
   assert.equal(report.checks.some((item) => item.id === "role:citizen"), true);
   assert.match(markdown, /Maternal-child main function report/);
   assert.match(markdown, /Main Functions/);
   assert.match(markdown, /Handoff Actions/);
   assert.match(markdown, /certificate-policy/);
+  assert.match(markdown, /临终关怀与授权/);
   assert.match(markdown, /maternal-child-about\.html/);
   assert.match(markdown, /docs\/maternal-child-policy\.md/);
   assert.match(markdown, /\/api\/birth-certificates/);
