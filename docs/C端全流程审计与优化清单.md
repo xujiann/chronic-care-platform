@@ -23,6 +23,7 @@
 | 居民端功能审计 | 已实现 | `citizen.html` 首页展示全功能审计面板，按健康档案、电子病历、护理、陪诊、挂号区分已实现和待开发 |
 | 二级页面导航 | 已实现 | `citizen.html?page=health-record|emr|nursing|escort|registration` 支持按主功能进入二级页面，桌面服务导航、手机底部导航和预览页控制均同步 URL，并优先落到对应业务内容，摘要卡提供当前页面主操作 |
 | 模块接口映射 | 已实现 | `citizen.html` 展示居民端与健康档案、电子病历、护理、陪诊、挂号、消息与待办的接口、数据集合、当前状态和生产边界，`docs/citizen-module-interface-map.md` 提供联调说明 |
+| 授权与病历可信来源 | 已实现 | `citizen.html` 展示实名/家庭关系、授权共享、电子病历来源、访问日志和消息回执的当前证据与生产化边界，`docs/citizen-authorization-emr-governance.md` 提供治理说明 |
 | 小程序与 APP 运行形态 | 已实现 | `citizen.html?client=mini-program|app&page=...` 支持按渠道预览居民端，页面展示入口、上线能力、发布条件、当前二级页入口、复制入口、发布检查清单和下一步动作 |
 | APP/PWA 手机安装配置 | 已实现 | `manifest.webmanifest` 提供 APP 形态 `id`、展示降级策略和健康档案/电子病历/陪诊快捷入口，`citizen.html` 提供 Android/iOS 添加到桌面的 meta |
 | 多系统真实接入 | 未完成 | 需要对接 EMR、LIS、PACS、医保、公卫等系统 |

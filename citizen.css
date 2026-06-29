@@ -460,7 +460,8 @@ select,
   outline-offset: 2px;
 }
 
-.module-interface-panel {
+.module-interface-panel,
+.data-governance-panel {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 16px;
@@ -469,13 +470,15 @@ select,
   box-shadow: var(--shadow);
 }
 
-.module-interface-grid {
+.module-interface-grid,
+.data-governance-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
-.module-interface-card {
+.module-interface-card,
+.data-governance-card {
   display: grid;
   gap: 8px;
   border: 1px solid var(--line);
@@ -484,24 +487,29 @@ select,
   background: #f8fbfd;
 }
 
-.module-interface-card > div {
+.module-interface-card > div,
+.data-governance-card > div {
   display: flex;
   gap: 8px;
   align-items: center;
   justify-content: space-between;
 }
 
-.module-interface-card strong {
+.module-interface-card strong,
+.data-governance-card strong {
   font-size: 16px;
 }
 
 .module-interface-card p,
-.module-interface-card small {
+.module-interface-card small,
+.data-governance-card p,
+.data-governance-card small {
   color: var(--muted);
   line-height: 1.55;
 }
 
-.module-interface-card b {
+.module-interface-card b,
+.data-governance-card b {
   display: block;
   color: var(--ink);
 }
@@ -1776,6 +1784,7 @@ dialog::backdrop {
   .summary-card,
   .account-panel,
   .module-interface-panel,
+  .data-governance-panel,
   .client-channel-panel {
     padding: 14px;
   }
@@ -1841,6 +1850,7 @@ dialog::backdrop {
 
   .client-channel-switch,
   .module-interface-grid,
+  .data-governance-grid,
   .client-channel-detail article,
   .client-channel-grid {
     grid-template-columns: 1fr;

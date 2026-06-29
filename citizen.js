@@ -192,6 +192,14 @@ const citizenModuleInterfaces = [
   { module: "消息与待办", status: "已实现", api: "/api/messages, /api/tasks/:id/actions", collections: "taskMessages, service tasks, dataAccessLogs", boundary: "生产需接入真实短信、订阅消息、站内信送达回执和审计保全" }
 ];
 
+const citizenGovernanceChecks = [
+  { key: "identity", title: "实名与家庭关系", interface: "/api/auth/phone-login", ready: "演示可用", production: "接入真实短信、实名核验和监护人关系校验后生产上线" },
+  { key: "authorization", title: "授权共享与撤销", interface: "/api/personal-records", ready: "已实现", production: "撤销后需要后端强制拦截、访问复核和审计保全联动" },
+  { key: "emr", title: "电子病历来源", interface: "EMR/LIS/PACS -> /api/personal-records", ready: "演示归集", production: "接入院内 EMR、LIS、PACS、对象存储和原文调阅授权" },
+  { key: "access", title: "访问日志复核", interface: "dataAccessLogs, /api/messages", ready: "已展示", production: "接入统一审计链、SIEM 或审计导出路径" },
+  { key: "notification", title: "消息触达回执", interface: "/api/messages, /api/tasks/:id/actions", ready: "已实现", production: "接入短信、订阅消息、APP 推送和送达回执" }
+];
+
 const citizenClientChannels = [
   {
     key: "mini-program",
@@ -266,6 +274,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindLargeMode();
   bindServiceTabs();
   renderModuleInterfaces();
+  renderDataGovernance();
   renderClientChannels();
   window.addEventListener("popstate", () => setServiceTab(serviceTabFromRoute() || "health-record", { syncUrl: false }));
   window.addEventListener("hashchange", () => setServiceTab(serviceTabFromRoute() || "health-record", { syncUrl: false }));
@@ -337,6 +346,32 @@ function renderModuleInterfaces() {
     <p><b>接口</b>${item.api}</p>
     <p><b>数据</b>${item.collections}</p>
     <small>${item.boundary}</small>
+  </article>`).join("");
+}
+
+function renderDataGovernance(residentId = currentResidentId) {
+  const target = document.querySelector("#data-governance-grid");
+  if (!target) return;
+  const authorizations = residentId ? getPersonalRecords(residentId, "authorizations") : [];
+  const activeAuthorizations = authorizations.filter((item) => !isRevoked(item));
+  const emrSources = residentId ? new Set(getPersonalRecords(residentId, "emr").map((item) => classifyDataSource(item).label)) : new Set();
+  const accessLogs = residentId ? (state.dataAccessLogs || []).filter((item) => item.residentId === residentId) : [];
+  const residentMessages = residentId ? citizenMessages.filter((item) => !item.residentId || item.residentId === residentId) : [];
+  const metrics = {
+    identity: currentAccountId ? "居民账号已绑定" : "待登录",
+    authorization: `${activeAuthorizations.length}/${authorizations.length || 0} 条有效授权`,
+    emr: `${emrSources.size || 0} 类来源`,
+    access: `${accessLogs.length} 条访问记录`,
+    notification: `${residentMessages.length} 条消息`
+  };
+  target.innerHTML = citizenGovernanceChecks.map((item) => `<article class="data-governance-card">
+    <div>
+      <strong>${item.title}</strong>
+      <span class="status ${item.ready.includes("演示") ? "warn" : ""}">${item.ready}</span>
+    </div>
+    <p><b>当前证据</b>${metrics[item.key] || "待生成"}</p>
+    <p><b>接口</b>${item.interface}</p>
+    <small>${item.production}</small>
   </article>`).join("");
 }
 
@@ -673,6 +708,7 @@ function renderCitizen(residentId) {
   renderSeniorServices(resident.id);
   renderDigitalCredentials(resident.id);
   renderAccessLogs(resident.id);
+  renderDataGovernance(resident.id);
 }
 
 function bindLargeMode() {

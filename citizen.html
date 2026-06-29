@@ -64,6 +64,16 @@
         <div class="module-interface-grid" id="module-interface-grid"></div>
       </section>
 
+      <section class="data-governance-panel" id="data-governance-panel" aria-labelledby="data-governance-title">
+        <div class="panel-title">
+          <div>
+            <h2 id="data-governance-title">授权与病历可信来源</h2>
+            <span>居民端上线前的身份、授权、病历来源和访问复核边界</span>
+          </div>
+        </div>
+        <div class="data-governance-grid" id="data-governance-grid"></div>
+      </section>
+
       <section class="client-channel-panel" id="client-channel-panel" aria-labelledby="client-channel-title">
         <div class="panel-title">
           <div>
@@ -417,7 +427,7 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="./health-archive-standard.js"></script>
-    <script src="./citizen.js?v=20260629registration"></script>
+    <script src="./citizen.js?v=20260629governance"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));

@@ -634,7 +634,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   const serviceWorker = read("service-worker.js");
   assert.match(citizenHtml, /rel="manifest"/);
   assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260629registration/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260629governance/);
   assert.match(citizenHtml, /mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-title/);
@@ -679,7 +679,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.shortcuts.some((item) => item.url === "./citizen.html?client=app&page=escort#service-escort"), true);
   assert.equal(manifest.shortcuts.some((item) => item.url === "./mobile-preview.html?client=app"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v15/);
+  assert.match(serviceWorker, /chronic-care-citizen-v16/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627preview/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages2/);
@@ -688,6 +688,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(serviceWorker, /citizen\.js\?v=20260628launch/);
   assert.match(serviceWorker, /citizen\.js\?v=20260628tasks/);
   assert.match(serviceWorker, /citizen\.js\?v=20260629registration/);
+  assert.match(serviceWorker, /citizen\.js\?v=20260629governance/);
   assert.match(serviceWorker, /citizen\.html/);
   assert.match(serviceWorker, /mobile-preview\.html/);
   assert.match(serviceWorker, /mobile-preview\.css/);
@@ -780,6 +781,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenHtml, /service-summary/);
   assert.match(citizenHtml, /module-interface-panel/);
   assert.match(citizenHtml, /module-interface-grid/);
+  assert.match(citizenHtml, /data-governance-panel/);
+  assert.match(citizenHtml, /data-governance-grid/);
   assert.match(citizenHtml, /client-channel-panel/);
   assert.match(citizenHtml, /client-channel-switch/);
   assert.match(citizenHtml, /client-channel-detail/);
@@ -797,6 +800,10 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /citizenServiceTabs/);
   assert.match(citizenJs, /citizenModuleInterfaces/);
   assert.match(citizenJs, /renderModuleInterfaces/);
+  assert.match(citizenJs, /citizenGovernanceChecks/);
+  assert.match(citizenJs, /renderDataGovernance/);
+  assert.match(citizenJs, /EMR\/LIS\/PACS -> \/api\/personal-records/);
+  assert.match(citizenJs, /dataAccessLogs, \/api\/messages/);
   assert.match(citizenJs, /\/api\/personal-records/);
   assert.match(citizenJs, /\/api\/internet-nursing\/dashboard/);
   assert.match(citizenJs, /\/api\/escort-services\/orders/);
@@ -856,6 +863,9 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /module-interface-panel/);
   assert.match(citizenCss, /module-interface-grid/);
   assert.match(citizenCss, /module-interface-card/);
+  assert.match(citizenCss, /data-governance-panel/);
+  assert.match(citizenCss, /data-governance-grid/);
+  assert.match(citizenCss, /data-governance-card/);
   assert.match(citizenCss, /client-channel-panel/);
   assert.match(citizenCss, /client-channel-switch/);
   assert.match(citizenCss, /client-channel-grid/);
@@ -878,6 +888,11 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenInterfaceDoc, /\/api\/internet-nursing\/dashboard/);
   assert.match(citizenInterfaceDoc, /\/api\/escort-services\/orders/);
   assert.match(citizenInterfaceDoc, /\/api\/tasks\/:id\/actions/);
+  const citizenGovernanceDoc = read("docs/citizen-authorization-emr-governance.md");
+  assert.match(citizenGovernanceDoc, /C端授权与病历可信来源治理/);
+  assert.match(citizenGovernanceDoc, /\/api\/auth\/phone-login/);
+  assert.match(citizenGovernanceDoc, /EMR\/LIS\/PACS -> \/api\/personal-records/);
+  assert.match(citizenGovernanceDoc, /dataAccessLogs/);
 });
 
 test("internet nursing module exposes appointment, management and nurse workflows", () => {
