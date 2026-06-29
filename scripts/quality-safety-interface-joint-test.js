@@ -152,8 +152,11 @@ function hasAuthHeader(headers) {
 
 function endpointMatches(template, actual) {
   if (!actual) return true;
-  const pattern = `^${String(template).replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\\:id/g, "[^/]+")}$`;
-  return new RegExp(pattern).test(String(actual));
+  const pattern = String(template)
+    .split("/")
+    .map((part) => part.startsWith(":") ? "[^/]+" : part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("/");
+  return new RegExp(`^${pattern}$`).test(String(actual));
 }
 
 function fieldValue(message, field) {

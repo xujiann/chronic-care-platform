@@ -102,9 +102,13 @@
     }
   }
 
+  function getToken() {
+    return getUser()?.token || "";
+  }
+
   function authHeaders(extra = {}) {
-    const user = getUser();
-    return user?.token ? { ...extra, Authorization: `Bearer ${user.token}` } : extra;
+    const token = getToken();
+    return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
   }
 
   function authFetch(url, options = {}) {
@@ -233,6 +237,7 @@
     login,
     logout,
     getUser,
+    getToken,
     authHeaders,
     authFetch,
     requireRole,

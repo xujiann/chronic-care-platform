@@ -417,6 +417,7 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(read("platform.html"), /quality-safety\.html/);
   assert.match(read("workbench.html"), /quality-safety\.html/);
   assert.match(read("auth.js"), /quality-safety\.html/);
+  assert.match(read("auth.js"), /getToken/);
 });
 
 test("system structure documentation reflects completed local governance loops", () => {

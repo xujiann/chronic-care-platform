@@ -8,6 +8,7 @@ const test = require("node:test");
 const {
   buildQualitySafetyInterfaceJointTestPack,
   renderMarkdown,
+  signInterfaceRequest,
   validateQualitySafetyInterfaceMessage,
   writeOutput
 } = require("../scripts/quality-safety-interface-joint-test");
@@ -56,6 +57,27 @@ test("quality safety joint-test pack validates samples signatures and negative c
     message: sample.message
   });
   assert.equal(accepted.ok, true);
+
+  const disposition = pack.sampleRequests.find((item) => item.interfaceId === "qs-critical-value-disposition-v1");
+  const concretePath = "/api/quality-safety/critical-values/cva-001/dispose";
+  const concreteHeaders = {
+    ...disposition.headers,
+    "X-Signature": signInterfaceRequest({
+      method: disposition.method,
+      path: concretePath,
+      timestamp: disposition.headers["X-Timestamp"],
+      idempotencyKey: disposition.headers["X-Idempotency-Key"],
+      body: disposition.message
+    })
+  };
+  const concreteAccepted = validateQualitySafetyInterfaceMessage({
+    interfaceId: disposition.interfaceId,
+    method: disposition.method,
+    path: concretePath,
+    headers: concreteHeaders,
+    message: disposition.message
+  });
+  assert.equal(concreteAccepted.ok, true);
 
   const invalid = validateQualitySafetyInterfaceMessage({
     interfaceId: sample.interfaceId,
