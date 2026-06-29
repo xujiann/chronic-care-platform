@@ -24,30 +24,52 @@ function fallbackPolicy() {
       enabled: true,
       channels: ["in_app", "sms", "hospital_message"],
       events: ["appointment-submitted", "dispatch-qualified-nurse", "nurse-accept", "service-start", "service-complete", "quality-review"]
+    },
+    pricingRules: {
+      items: {
+        "blood glucose measurement": { basePrice: 86, insuranceEligible: true },
+        "wound care": { basePrice: 168, insuranceEligible: true },
+        "PICC maintenance": { basePrice: 260, insuranceEligible: true }
+      }
+    },
+    regulatoryContract: {
+      version: "internet-nursing-regulatory-contract-v1",
+      endpoints: ["/api/internet-nursing/dashboard", "/api/internet-nursing/orders", "/api/internet-nursing/orders/:id/actions"],
+      targetSystems: ["nursing management system", "EMR", "medical insurance settlement", "health supervision platform"]
     }
   };
 }
 
 function fallbackInstitutions() {
   return [
-    { id: "inh-mr1", published: true, securityLevel: "grade-3-ready", emergencyPlan: "plan", serviceItems: ["wound care"] },
-    { id: "inh-mr3", published: true, securityLevel: "grade-3-platform-access", emergencyPlan: "plan", serviceItems: ["blood glucose measurement"] }
+    { id: "inh-mr1", published: true, securityLevel: "grade-3-ready", emergencyPlan: "plan", serviceItems: ["wound care"], admissionReview: { status: "approved" }, catalogChangeRequests: [{ status: "approved" }], monthlyCapacity: { completedVisits: 126 } },
+    { id: "inh-mr3", published: true, securityLevel: "grade-3-platform-access", emergencyPlan: "plan", serviceItems: ["blood glucose measurement"], admissionReview: { status: "approved" }, catalogChangeRequests: [{ status: "approved" }], monthlyCapacity: { completedVisits: 71 } },
+    { id: "inh-mr5", published: false, securityLevel: "pending-review", emergencyPlan: "plan", serviceItems: ["infant care"], admissionReview: { status: "pending" }, catalogChangeRequests: [{ status: "pending" }], monthlyCapacity: { completedVisits: 0 } }
   ];
 }
 
 function fallbackNurses() {
   return [
-    { id: "inn-001", yearsClinical: 9, registrationStatus: "verified", badPracticeRecord: "none", trainingStatus: "passed", insuranceStatus: "covered", locationDevice: "enabled", oneClickAlert: "enabled" },
-    { id: "inn-002", yearsClinical: 6, registrationStatus: "verified", badPracticeRecord: "none", trainingStatus: "passed", insuranceStatus: "covered", locationDevice: "enabled", oneClickAlert: "enabled" }
+    { id: "inn-001", institutionId: "inh-mr1", yearsClinical: 9, registrationStatus: "verified", badPracticeRecord: "none", trainingStatus: "passed", insuranceStatus: "covered", locationDevice: "enabled", oneClickAlert: "enabled", specialties: ["wound care"], dailyCapacity: 6, assignedToday: 2, qualificationExpiresAt: "2026-12-31" },
+    { id: "inn-002", institutionId: "inh-mr3", yearsClinical: 6, registrationStatus: "verified", badPracticeRecord: "none", trainingStatus: "passed", insuranceStatus: "covered", locationDevice: "enabled", oneClickAlert: "enabled", specialties: ["blood glucose measurement"], dailyCapacity: 5, assignedToday: 1, qualificationExpiresAt: "2026-09-30" },
+    { id: "inn-003", institutionId: "inh-mr1", yearsClinical: 12, registrationStatus: "verified", badPracticeRecord: "none", trainingStatus: "passed", insuranceStatus: "covered", locationDevice: "enabled", oneClickAlert: "enabled", specialties: ["PICC maintenance"], dailyCapacity: 4, assignedToday: 3, qualificationExpiresAt: "2026-07-20" }
   ];
 }
 
 function fallbackOrders() {
   return [
-    { id: "ino-001", institutionId: "inh-mr1", nurseId: "inn-001", firstVisitAssessment: "passed", informedConsent: "signed", consentAttachment: { status: "signed", signedAt: "2026-06-26T08:00:00.000Z", signerName: "Demo resident A", version: "internet-nursing-consent-v1" }, identityVerified: true, locationTrace: "pending", locationTracePoints: [], serviceRecordStatus: "pending", qualityCallback: "pending", riskLevel: "medium", status: "dispatched", auditTrail: [{}] },
-    { id: "ino-002", institutionId: "inh-mr3", nurseId: "inn-002", firstVisitAssessment: "passed", informedConsent: "signed", consentAttachment: { status: "signed", signedAt: "2026-06-26T08:00:00.000Z", signerName: "Demo resident B", version: "internet-nursing-consent-v1" }, identityVerified: true, locationTrace: "tracking", locationTracePoints: [{ stage: "service-start", lat: 38.915, lng: 121.616, at: "2026-06-26T09:00:00.000Z" }, { stage: "service-complete", lat: 38.916, lng: 121.617, at: "2026-06-26T10:00:00.000Z" }], serviceRecordStatus: "in-progress", qualityCallback: "pending", riskLevel: "low", status: "accepted", auditTrail: [{}] },
-    { id: "ino-003", institutionId: "inh-mr1", nurseId: "", firstVisitAssessment: "pending", informedConsent: "pending", consentAttachment: { status: "pending", required: true, version: "internet-nursing-consent-v1" }, identityVerified: true, locationTrace: "pending", locationTracePoints: [], serviceRecordStatus: "pending", qualityCallback: "pending", riskLevel: "high", status: "requested", auditTrail: [{}] }
+    { id: "ino-001", institutionId: "inh-mr1", nurseId: "inn-001", firstVisitAssessment: "passed", informedConsent: "signed", consentAttachment: { status: "signed", signedAt: "2026-06-26T08:00:00.000Z", signerName: "Demo resident A", version: "internet-nursing-consent-v1" }, identityVerified: true, locationTrace: "pending", locationTracePoints: [], serviceRecordStatus: "pending", qualityCallback: "pending", riskLevel: "medium", status: "dispatched", settlement: { paymentStatus: "pending" }, satisfaction: { status: "pending" }, complaintStatus: "none", qualityInspection: { status: "pending" }, adverseEvent: { status: "none" }, auditTrail: [{}] },
+    { id: "ino-002", institutionId: "inh-mr3", nurseId: "inn-002", firstVisitAssessment: "passed", informedConsent: "signed", consentAttachment: { status: "signed", signedAt: "2026-06-26T08:00:00.000Z", signerName: "Demo resident B", version: "internet-nursing-consent-v1" }, identityVerified: true, locationTrace: "tracking", locationTracePoints: [{ stage: "service-start", lat: 38.915, lng: 121.616, at: "2026-06-26T09:00:00.000Z" }, { stage: "service-complete", lat: 38.916, lng: 121.617, at: "2026-06-26T10:00:00.000Z" }], serviceRecordStatus: "completed", qualityCallback: "closed", riskLevel: "low", status: "closed", settlement: { paymentStatus: "prechecked" }, satisfaction: { status: "submitted", score: 5 }, complaintStatus: "none", qualityInspection: { status: "closed" }, adverseEvent: { status: "none" }, auditTrail: [{}] },
+    { id: "ino-003", institutionId: "inh-mr1", nurseId: "", serviceItem: "PICC maintenance", firstVisitAssessment: "pending", informedConsent: "pending", consentAttachment: { status: "pending", required: true, version: "internet-nursing-consent-v1" }, identityVerified: true, locationTrace: "pending", locationTracePoints: [], serviceRecordStatus: "pending", qualityCallback: "pending", riskLevel: "high", status: "requested", settlement: { paymentStatus: "pending" }, satisfaction: { status: "pending" }, complaintStatus: "none", qualityInspection: { status: "required" }, adverseEvent: { status: "none" }, auditTrail: [{}] }
   ];
+}
+
+function mergeById(fallbackRows, currentRows) {
+  const rows = new Map((Array.isArray(fallbackRows) ? fallbackRows : []).map((item) => [item.id, item]));
+  (Array.isArray(currentRows) ? currentRows : []).forEach((item) => {
+    if (item?.id) rows.set(item.id, { ...(rows.get(item.id) || {}), ...item });
+  });
+  return [...rows.values()];
 }
 
 function nurseQualified(item) {
@@ -91,6 +113,40 @@ function hasNotificationGateway(policy) {
     events.has("service-complete");
 }
 
+function hasDispatchRecommendationEvidence(orders, nurses) {
+  return orders.some((order) => !order.nurseId && nurses.some((nurse) =>
+    nurse.institutionId === order.institutionId &&
+    Array.isArray(nurse.specialties) &&
+    nurse.specialties.includes(order.serviceItem) &&
+    Number(nurse.dailyCapacity || 0) > Number(nurse.assignedToday || 0)
+  ));
+}
+
+function hasOperationalManagementEvidence(policy, orders, nurses, frontend, server, launchPlan) {
+  return Boolean(policy.pricingRules?.items) &&
+    orders.every((item) => item.settlement && item.satisfaction && item.qualityInspection && item.adverseEvent) &&
+    nurses.every((item) => Number.isFinite(Number(item.dailyCapacity)) && Number.isFinite(Number(item.assignedToday))) &&
+    hasDispatchRecommendationEvidence(orders, nurses) &&
+    /buildInternetNursingDispatchRecommendations/.test(server) &&
+    /renderDispatchRecommendations/.test(frontend) &&
+    /renderFinanceQuality/.test(frontend) &&
+    /阶段二：运营管理/.test(launchPlan) &&
+    /已完成/.test(launchPlan);
+}
+
+function hasRegulatoryExpansionEvidence(policy, institutions, nurses, frontend, server, launchPlan) {
+  return Boolean(policy.regulatoryContract?.version) &&
+    institutions.some((item) => item.admissionReview?.status === "pending") &&
+    institutions.some((item) => Array.isArray(item.catalogChangeRequests) && item.catalogChangeRequests.some((request) => request.status === "pending")) &&
+    nurses.some((item) => item.qualificationExpiresAt) &&
+    /buildInternetNursingRegulatoryMonthlyReport/.test(server) &&
+    /buildInternetNursingRegulatoryAlerts/.test(server) &&
+    /renderRegulatoryReport/.test(frontend) &&
+    /renderRegulatoryContract/.test(frontend) &&
+    /阶段三：监管扩展/.test(launchPlan) &&
+    /接口契约/.test(launchPlan);
+}
+
 function buildInternetNursingReadinessReport(options = {}) {
   const data = options.data ?? readJson("data/db.json");
   const pkg = options.pkg ?? readJson("package.json");
@@ -100,10 +156,13 @@ function buildInternetNursingReadinessReport(options = {}) {
   const mobilePreview = options.mobilePreview ?? readText("mobile-preview.html");
   const moduleDoc = options.moduleDoc ?? readText("docs/互联网护理服务模块说明.md");
   const launchPlan = options.launchPlan ?? readText("docs/互联网护理上线与下一步开发计划.md");
-  const policy = data.internetNursingPolicy || fallbackPolicy();
-  const institutions = Array.isArray(data.internetNursingInstitutions) && data.internetNursingInstitutions.length ? data.internetNursingInstitutions : fallbackInstitutions();
-  const nurses = Array.isArray(data.internetNursingNurses) && data.internetNursingNurses.length ? data.internetNursingNurses : fallbackNurses();
-  const orders = Array.isArray(data.internetNursingOrders) && data.internetNursingOrders.length ? data.internetNursingOrders : fallbackOrders();
+  const policy = { ...fallbackPolicy(), ...(data.internetNursingPolicy || {}) };
+  policy.notificationGateway = { ...fallbackPolicy().notificationGateway, ...(data.internetNursingPolicy?.notificationGateway || {}) };
+  policy.pricingRules = { ...fallbackPolicy().pricingRules, ...(data.internetNursingPolicy?.pricingRules || {}) };
+  policy.regulatoryContract = { ...fallbackPolicy().regulatoryContract, ...(data.internetNursingPolicy?.regulatoryContract || {}) };
+  const institutions = mergeById(fallbackInstitutions(), data.internetNursingInstitutions);
+  const nurses = mergeById(fallbackNurses(), data.internetNursingNurses);
+  const orders = mergeById(fallbackOrders(), data.internetNursingOrders);
   const institutionIds = new Set(institutions.map((item) => item.id));
   const nurseIds = new Set(nurses.map((item) => item.id));
   const checks = [
@@ -115,6 +174,8 @@ function buildInternetNursingReadinessReport(options = {}) {
     { id: "nursing:riskTrace", passed: orders.some((item) => item.riskLevel === "high") && orders.some((item) => item.locationTrace === "tracking"), detail: "risk queue and location tracking present" },
     { id: "nursing:phaseOneEvidence", passed: orders.some(hasSignedConsentAttachment) && orders.some(hasServiceTracePoints) && /buildInternetNursingConsentAttachment/.test(server) && /appendInternetNursingTracePoint/.test(server) && /consentAttachmentText/.test(frontend) && /locationTraceSummary/.test(frontend) && /电子签名附件|鐢靛瓙绛惧悕闄勪欢/.test(launchPlan) && /轨迹点|杞ㄨ抗鐐?/.test(moduleDoc + launchPlan), detail: "electronic consent attachment and service trace point list are implemented" },
     { id: "nursing:notificationGateway", passed: hasNotificationGateway(policy) && /buildInternetNursingNotificationDeliveries/.test(server) && /appendInternetNursingNotifications/.test(server) && /notificationSummary/.test(frontend) && /消息网关|娑堟伅缃戝叧/.test(moduleDoc + launchPlan), detail: "in-app, SMS, and hospital message gateway delivery evidence is implemented" },
+    { id: "nursing:phaseTwoOperations", passed: hasOperationalManagementEvidence(policy, orders, nurses, frontend, server, launchPlan), detail: "dispatch recommendation, scheduling capacity, settlement estimate, satisfaction, complaint, quality inspection, and adverse-event evidence are implemented" },
+    { id: "nursing:phaseThreeRegulation", passed: hasRegulatoryExpansionEvidence(policy, institutions, nurses, frontend, server, launchPlan), detail: "admission review, catalog approval, nurse qualification reminders, monthly report, quality score, and regulatory API contract are implemented" },
     { id: "nursing:api", passed: /\/api\/internet-nursing\/dashboard/.test(server) && /\/api\/internet-nursing\/orders/.test(server) && /canAccessInternetNursingOrder/.test(server), detail: "dashboard, order creation, action, and role guard present" },
     { id: "nursing:frontend", passed: /nursing-appointment-form/.test(frontend) && /nursing-nurse-queue/.test(frontend) && /nursing-risk-guidance/.test(frontend) && /fetchInternetNursingDashboard/.test(frontend), detail: "citizen, hospital, nurse, and risk guidance work areas present" },
     { id: "nursing:visibleText", passed: !hasCorruptedVisibleText(frontend) && /\u8ba2\u5355/.test(frontend) && /\u63a5\u5355/.test(frontend) && /\u9884\u7ea6\u5df2\u63d0\u4ea4/.test(frontend), detail: "visible Chinese labels and operation feedback are clean" },

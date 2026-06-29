@@ -637,7 +637,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   const serviceWorker = read("service-worker.js");
   assert.match(citizenHtml, /rel="manifest"/);
   assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260629governance/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260629multinav/);
   assert.match(citizenHtml, /mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-title/);
@@ -682,7 +682,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.shortcuts.some((item) => item.url === "./citizen.html?client=app&page=escort#service-escort"), true);
   assert.equal(manifest.shortcuts.some((item) => item.url === "./mobile-preview.html?client=app"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v16/);
+  assert.match(serviceWorker, /chronic-care-citizen-v17/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627preview/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages2/);
@@ -691,7 +691,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(serviceWorker, /citizen\.js\?v=20260628launch/);
   assert.match(serviceWorker, /citizen\.js\?v=20260628tasks/);
   assert.match(serviceWorker, /citizen\.js\?v=20260629registration/);
-  assert.match(serviceWorker, /citizen\.js\?v=20260629governance/);
+  assert.match(serviceWorker, /citizen\.js\?v=20260629multinav/);
   assert.match(serviceWorker, /citizen\.html/);
   assert.match(serviceWorker, /mobile-preview\.html/);
   assert.match(serviceWorker, /mobile-preview\.css/);
@@ -785,6 +785,11 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenHtml, /service-tabs/);
   assert.match(citizenHtml, /mobile-service-nav/);
   assert.match(citizenHtml, /service-summary/);
+  assert.match(citizenHtml, /service-health-record/);
+  assert.match(citizenHtml, /service-emr/);
+  assert.match(citizenHtml, /service-nursing/);
+  assert.match(citizenHtml, /service-escort/);
+  assert.match(citizenHtml, /service-registration/);
   assert.match(citizenHtml, /module-interface-panel/);
   assert.match(citizenHtml, /module-interface-grid/);
   assert.match(citizenHtml, /data-governance-panel/);
@@ -856,6 +861,9 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /serviceTabFromHash/);
   assert.match(citizenJs, /setServiceTab/);
   assert.match(citizenJs, /renderServiceSummary/);
+  assert.match(citizenJs, /service-subnav/);
+  assert.match(citizenJs, /featureNavId/);
+  assert.match(citizenJs, /data-service-feature/);
   assert.match(citizenJs, /hashchange/);
   assert.match(citizenJs, /popstate/);
   assert.match(citizenJs, /updateServicePanes/);
@@ -863,6 +871,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /mobile-service-nav/);
   assert.match(citizenCss, /\.service-tabs a/);
   assert.match(citizenCss, /\.mobile-service-nav a/);
+  assert.match(citizenCss, /\.service-subnav/);
+  assert.match(citizenCss, /grid-auto-columns: minmax\(138px, 64vw\)/);
   assert.match(citizenCss, /service-page-content-anchor/);
   assert.match(citizenCss, /service-summary-actions/);
   assert.match(citizenCss, /service-page-action/);
@@ -917,6 +927,10 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(html, /data-mobile-surface="nurse-response"/);
   assert.match(html, /nursing-mobile-appointment/);
   assert.match(html, /nursing-nurse-mobile/);
+  assert.match(html, /nursing-dispatch-recommendations/);
+  assert.match(html, /nursing-finance-quality/);
+  assert.match(html, /nursing-regulatory-report/);
+  assert.match(html, /nursing-regulatory-contract/);
   assert.match(js, /fetchInternetNursingDashboard/);
   assert.match(js, /renderRiskGuidance/);
   assert.match(js, /nextNursingAction/);
@@ -925,6 +939,10 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(js, /consentAttachmentText/);
   assert.match(js, /locationTraceSummary/);
   assert.match(js, /notificationSummary/);
+  assert.match(js, /renderDispatchRecommendations/);
+  assert.match(js, /renderFinanceQuality/);
+  assert.match(js, /renderRegulatoryReport/);
+  assert.match(js, /renderRegulatoryContract/);
   assert.match(js, /staticNotificationDeliveries/);
   assert.match(js, /locationTracePoints/);
   assert.match(js, /renderServiceItemSelect/);
@@ -955,6 +973,10 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(server, /buildInternetNursingActionMessage/);
   assert.match(server, /buildInternetNursingConsentAttachment/);
   assert.match(server, /appendInternetNursingTracePoint/);
+  assert.match(server, /buildInternetNursingDispatchRecommendations/);
+  assert.match(server, /buildInternetNursingRegulatoryMonthlyReport/);
+  assert.match(server, /buildInternetNursingRegulatoryAlerts/);
+  assert.match(server, /regulatoryContract/);
   assert.match(server, /hasSignedInternetNursingConsent/);
   assert.match(server, /buildInternetNursingNotificationDeliveries/);
   assert.match(server, /appendInternetNursingNotifications/);
@@ -983,6 +1005,9 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(read("docs/互联网护理服务模块说明.md"), /互联网护理上线与下一步开发计划/);
   assert.match(read("docs/互联网护理上线与下一步开发计划.md"), /上线标准/);
   assert.match(read("docs/互联网护理上线与下一步开发计划.md"), /下一步开发计划/);
+  assert.match(read("docs/互联网护理上线与下一步开发计划.md"), /阶段二：运营管理（已完成）/);
+  assert.match(read("docs/互联网护理上线与下一步开发计划.md"), /阶段三：监管扩展（已完成）/);
+  assert.match(read("docs/互联网护理上线与下一步开发计划.md"), /internet-nursing-regulatory-contract-v1/);
   assert.doesNotMatch(html, /Citizen Appointment|Hospital Management|Nurse Workstation|Policy Controls|Submit/);
   assert.doesNotMatch(js, /Accept<\/button>|Start<\/button>|Complete<\/button>|view only|hospital dispatch required/);
 });

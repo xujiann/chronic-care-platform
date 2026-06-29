@@ -5817,6 +5817,26 @@ function seedInternetNursingPolicy() {
       channels: ["in_app", "sms", "hospital_message"],
       events: ["appointment-submitted", "dispatch-qualified-nurse", "nurse-accept", "service-start", "service-complete", "quality-review"],
       readiness: "gateway-contract-ready"
+    },
+    pricingRules: {
+      currency: "CNY",
+      settlementModes: ["self-pay estimate", "medical insurance pre-check"],
+      items: {
+        "daily living ability assessment": { basePrice: 68, insuranceEligible: false },
+        "vital signs measurement": { basePrice: 58, insuranceEligible: false },
+        "blood glucose measurement": { basePrice: 86, insuranceEligible: true },
+        "wound care": { basePrice: 168, insuranceEligible: true },
+        "tube care": { basePrice: 198, insuranceEligible: true },
+        "postpartum care": { basePrice: 220, insuranceEligible: false },
+        "infant care": { basePrice: 180, insuranceEligible: false },
+        "PICC maintenance": { basePrice: 260, insuranceEligible: true }
+      }
+    },
+    regulatoryContract: {
+      version: "internet-nursing-regulatory-contract-v1",
+      endpoints: ["/api/internet-nursing/dashboard", "/api/internet-nursing/orders", "/api/internet-nursing/orders/:id/actions"],
+      exchangeObjects: ["internetNursingInstitutions", "internetNursingNurses", "internetNursingOrders", "taskMessages"],
+      targetSystems: ["nursing management system", "EMR", "medical insurance settlement", "health supervision platform"]
     }
   };
 }
@@ -5837,7 +5857,10 @@ function seedInternetNursingInstitutions() {
       qualityOwner: "Nursing department",
       complaintHotline: "0411-12320",
       emergencyPlan: "hospital-nursing-home-service-emergency-plan",
-      securityLevel: "grade-3-ready"
+      securityLevel: "grade-3-ready",
+      admissionReview: { status: "approved", reviewedAt: todayOffset(-40), reviewer: "health commission" },
+      catalogChangeRequests: [{ id: "cat-inh-mr1-001", item: "PICC maintenance", status: "approved", submittedAt: todayOffset(-20) }],
+      monthlyCapacity: { month: "2026-06", plannedVisits: 180, completedVisits: 126, complaints: 1, adverseEvents: 0 }
     },
     {
       id: "inh-mr3",
@@ -5853,7 +5876,10 @@ function seedInternetNursingInstitutions() {
       qualityOwner: "Community nursing office",
       complaintHotline: "0411-12320",
       emergencyPlan: "community-nursing-emergency-plan",
-      securityLevel: "grade-3-platform-access"
+      securityLevel: "grade-3-platform-access",
+      admissionReview: { status: "approved", reviewedAt: todayOffset(-32), reviewer: "district health bureau" },
+      catalogChangeRequests: [{ id: "cat-inh-mr3-001", item: "tube care", status: "approved", submittedAt: todayOffset(-18) }],
+      monthlyCapacity: { month: "2026-06", plannedVisits: 96, completedVisits: 71, complaints: 0, adverseEvents: 0 }
     },
     {
       id: "inh-mr5",
@@ -5869,7 +5895,10 @@ function seedInternetNursingInstitutions() {
       qualityOwner: "Pilot office",
       complaintHotline: "0411-12320",
       emergencyPlan: "district-nursing-emergency-plan",
-      securityLevel: "pending-review"
+      securityLevel: "pending-review",
+      admissionReview: { status: "pending", submittedAt: todayOffset(-5), reviewer: "health commission" },
+      catalogChangeRequests: [{ id: "cat-inh-mr5-001", item: "infant care", status: "pending", submittedAt: todayOffset(-4) }],
+      monthlyCapacity: { month: "2026-06", plannedVisits: 48, completedVisits: 0, complaints: 0, adverseEvents: 0 }
     }
   ];
 }
@@ -5891,7 +5920,11 @@ function seedInternetNursingNurses() {
       locationDevice: "enabled",
       recorderStatus: "ready",
       oneClickAlert: "enabled",
-      status: "available"
+      status: "available",
+      serviceArea: ["Zhongshan", "Xigang"],
+      dailyCapacity: 6,
+      assignedToday: 2,
+      qualificationExpiresAt: "2026-12-31"
     },
     {
       id: "inn-002",
@@ -5908,7 +5941,11 @@ function seedInternetNursingNurses() {
       locationDevice: "enabled",
       recorderStatus: "ready",
       oneClickAlert: "enabled",
-      status: "available"
+      status: "available",
+      serviceArea: ["Qingniwaqiao", "Renmin Road"],
+      dailyCapacity: 5,
+      assignedToday: 1,
+      qualificationExpiresAt: "2026-09-30"
     },
     {
       id: "inn-003",
@@ -5925,7 +5962,11 @@ function seedInternetNursingNurses() {
       locationDevice: "enabled",
       recorderStatus: "ready",
       oneClickAlert: "enabled",
-      status: "in-service"
+      status: "in-service",
+      serviceArea: ["Zhongshan", "Shahekou"],
+      dailyCapacity: 4,
+      assignedToday: 3,
+      qualificationExpiresAt: "2026-07-20"
     }
   ];
 }
@@ -5966,6 +6007,11 @@ function seedInternetNursingOrders() {
       serviceRecordStatus: "pending",
       qualityCallback: "pending",
       feeEstimate: 168,
+      settlement: { mode: "medical insurance pre-check", estimatedSelfPay: 58, insuranceEstimate: 110, paymentStatus: "pending" },
+      satisfaction: { score: 0, status: "pending" },
+      complaintStatus: "none",
+      qualityInspection: { status: "pending", inspector: "Nursing department", sampleType: "routine" },
+      adverseEvent: { status: "none", level: "" },
       createdAt: todayOffset(-1),
       auditTrail: [{ at: todayOffset(-1), action: "order-created", by: "citizen", note: "Resident submitted internet nursing appointment." }]
     },
@@ -6006,6 +6052,11 @@ function seedInternetNursingOrders() {
       serviceRecordStatus: "in-progress",
       qualityCallback: "pending",
       feeEstimate: 86,
+      settlement: { mode: "medical insurance pre-check", estimatedSelfPay: 36, insuranceEstimate: 50, paymentStatus: "prechecked" },
+      satisfaction: { score: 0, status: "pending" },
+      complaintStatus: "none",
+      qualityInspection: { status: "sampled", inspector: "Community nursing office", sampleType: "risk-followup" },
+      adverseEvent: { status: "none", level: "" },
       createdAt: todayOffset(-2),
       auditTrail: [{ at: todayOffset(-2), action: "nurse-accepted", by: "inn-002", note: "Nurse accepted order and location tracking started." }]
     },
@@ -6034,6 +6085,11 @@ function seedInternetNursingOrders() {
       serviceRecordStatus: "pending",
       qualityCallback: "pending",
       feeEstimate: 260,
+      settlement: { mode: "medical insurance pre-check", estimatedSelfPay: 120, insuranceEstimate: 140, paymentStatus: "pending" },
+      satisfaction: { score: 0, status: "pending" },
+      complaintStatus: "none",
+      qualityInspection: { status: "required", inspector: "Nursing department", sampleType: "high-risk" },
+      adverseEvent: { status: "none", level: "" },
       createdAt: todayOffset(0),
       auditTrail: [{ at: todayOffset(0), action: "order-created", by: "citizen", note: "High-risk service requires hospital assessment before dispatch." }]
     }
@@ -6057,6 +6113,101 @@ function institutionForNursingOrder(data, item) {
   return (data.internetNursingInstitutions || []).find((row) => row.id === item.institutionId);
 }
 
+function buildInternetNursingDispatchRecommendations(orders, nurses) {
+  return orders
+    .filter((order) => !order.nurseId && ["requested", "assessed", "dispatched"].includes(order.status))
+    .map((order) => {
+      const candidates = nurses
+        .filter((nurse) => isQualifiedInternetNurse(nurse))
+        .filter((nurse) => !order.institutionId || nurse.institutionId === order.institutionId || nurse.institutionCode === order.institutionCode)
+        .filter((nurse) => !Array.isArray(nurse.specialties) || nurse.specialties.includes(order.serviceItem))
+        .map((nurse) => {
+          const remainingCapacity = Number(nurse.dailyCapacity || 0) - Number(nurse.assignedToday || 0);
+          const riskBonus = order.riskLevel === "high" && Number(nurse.yearsClinical || 0) >= 8 ? 2 : 0;
+          return {
+            nurseId: nurse.id,
+            nurseName: nurse.name,
+            title: nurse.title,
+            remainingCapacity,
+            matchedSpecialty: order.serviceItem,
+            score: Math.max(0, remainingCapacity) + riskBonus + Math.min(3, Number(nurse.yearsClinical || 0) / 5),
+            reason: "按护士资质、服务项目、服务区域、日容量和风险等级推荐"
+          };
+        })
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 3);
+      return { orderId: order.id, residentId: order.residentId, serviceItem: order.serviceItem, riskLevel: order.riskLevel, candidates };
+    });
+}
+
+function buildInternetNursingRegulatoryMonthlyReport(orders, institutions) {
+  const callbackClosed = orders.filter((item) => item.qualityCallback === "closed");
+  const complaints = orders.filter((item) => item.complaintStatus && item.complaintStatus !== "none");
+  const traceComplete = orders.filter((item) => Array.isArray(item.locationTracePoints) && item.locationTracePoints.length >= 2);
+  const adverseEvents = orders.filter((item) => item.adverseEvent && item.adverseEvent.status && item.adverseEvent.status !== "none");
+  return {
+    month: "2026-06",
+    serviceVolume: orders.length,
+    completedServices: orders.filter((item) => ["completed", "closed"].includes(item.status)).length,
+    highRiskHandled: orders.filter((item) => item.riskLevel === "high" && item.firstVisitAssessment === "passed").length,
+    callbackClosureRate: orders.length ? callbackClosed.length / orders.length : 0,
+    complaintRate: orders.length ? complaints.length / orders.length : 0,
+    traceCompletenessRate: orders.length ? traceComplete.length / orders.length : 0,
+    adverseEvents: adverseEvents.length,
+    serviceVolumeByInstitution: institutions.map((institution) => {
+      const rows = orders.filter((item) => item.institutionId === institution.id);
+      const institutionComplaints = rows.filter((item) => item.complaintStatus && item.complaintStatus !== "none").length;
+      const institutionAdverse = rows.filter((item) => item.adverseEvent && item.adverseEvent.status && item.adverseEvent.status !== "none").length;
+      const callbackRate = rows.length ? rows.filter((item) => item.qualityCallback === "closed").length / rows.length : 0;
+      return {
+        institutionId: institution.id,
+        institutionName: institution.name,
+        orders: rows.length,
+        completed: rows.filter((item) => ["completed", "closed"].includes(item.status)).length,
+        complaints: institutionComplaints,
+        adverseEvents: institutionAdverse,
+        callbackRate,
+        qualityScore: Math.max(0, Math.round(100 - institutionComplaints * 12 - institutionAdverse * 18 + callbackRate * 8))
+      };
+    })
+  };
+}
+
+function buildInternetNursingRegulatoryAlerts(institutions, nurses) {
+  return [
+    ...institutions.flatMap((institution) => {
+      const alerts = [];
+      if (institution.admissionReview?.status !== "approved") alerts.push({ type: "institution-admission", targetId: institution.id, level: "warning", detail: "试点机构准入待审核" });
+      (institution.catalogChangeRequests || []).filter((item) => item.status !== "approved").forEach((item) => {
+        alerts.push({ type: "catalog-change", targetId: institution.id, level: "warning", detail: `${item.item} 服务目录变更待审批` });
+      });
+      return alerts;
+    }),
+    ...nurses
+      .filter((nurse) => {
+        const expiresAt = Date.parse(nurse.qualificationExpiresAt || "");
+        return Number.isFinite(expiresAt) && expiresAt - Date.now() <= 1000 * 60 * 60 * 24 * 45;
+      })
+      .map((nurse) => ({ type: "nurse-qualification-expiry", targetId: nurse.id, level: "warning", detail: `${nurse.name} 资质即将到期` }))
+  ];
+}
+
+function enrichInternetNursingFinancials(order, policy) {
+  const rule = policy.pricingRules?.items?.[order.serviceItem] || {};
+  const basePrice = Number(order.feeEstimate || rule.basePrice || 0);
+  const insuranceEstimate = order.settlement?.insuranceEstimate ?? (rule.insuranceEligible ? Math.round(basePrice * 0.55) : 0);
+  return {
+    ...order,
+    feeEstimate: basePrice,
+    settlement: {
+      mode: order.settlement?.mode || (rule.insuranceEligible ? "medical insurance pre-check" : "self-pay estimate"),
+      estimatedSelfPay: order.settlement?.estimatedSelfPay ?? Math.max(0, basePrice - insuranceEstimate),
+      insuranceEstimate,
+      paymentStatus: order.settlement?.paymentStatus || "pending"
+    }
+  };
+}
+
 function buildInternetNursingDashboard(data, user) {
   const policy = data.internetNursingPolicy || seedInternetNursingPolicy();
   const institutions = Array.isArray(data.internetNursingInstitutions) ? data.internetNursingInstitutions : [];
@@ -6070,7 +6221,8 @@ function buildInternetNursingDashboard(data, user) {
     ? nurses.filter((item) => item.institutionCode === user.orgCode || institutionRows.some((institution) => institution.id === item.institutionId))
     : nurses;
   const orders = (Array.isArray(data.internetNursingOrders) ? data.internetNursingOrders : [])
-    .filter((item) => canAccessInternetNursingOrder(user, item, data));
+    .filter((item) => canAccessInternetNursingOrder(user, item, data))
+    .map((item) => enrichInternetNursingFinancials(item, policy));
   const nurseById = new Map(nurses.map((item) => [item.id, item]));
   const institutionById = new Map(institutions.map((item) => [item.id, item]));
   const openOrders = orders.filter((item) => !isClosedTaskStatus(item.status));
@@ -6090,7 +6242,10 @@ function buildInternetNursingDashboard(data, user) {
       highRisk: riskQueue.length,
       trackingActive: orders.filter((item) => item.locationTrace === "tracking").length,
       notificationQueued: orders.flatMap((item) => item.notificationDeliveries || []).filter((item) => item.status === "queued").length,
-      notificationSent: orders.flatMap((item) => item.notificationDeliveries || []).filter((item) => item.status === "sent").length
+      notificationSent: orders.flatMap((item) => item.notificationDeliveries || []).filter((item) => item.status === "sent").length,
+      complaints: orders.filter((item) => item.complaintStatus && item.complaintStatus !== "none").length,
+      qualitySamples: orders.filter((item) => item.qualityInspection?.status && item.qualityInspection.status !== "pending").length,
+      adverseEvents: orders.filter((item) => item.adverseEvent?.status && item.adverseEvent.status !== "none").length
     },
     institutions: institutionRows,
     nurses: nurseRows,
@@ -6100,7 +6255,11 @@ function buildInternetNursingDashboard(data, user) {
       institution: institutionById.get(item.institutionId) || null
     })),
     riskQueue,
-    nurseQueue: openOrders.filter((item) => item.status === "dispatched" || item.status === "requested" || item.status === "accepted")
+    nurseQueue: openOrders.filter((item) => item.status === "dispatched" || item.status === "requested" || item.status === "accepted"),
+    dispatchRecommendations: buildInternetNursingDispatchRecommendations(openOrders, nurseRows),
+    regulatoryMonthlyReport: buildInternetNursingRegulatoryMonthlyReport(orders, institutionRows),
+    regulatoryAlerts: buildInternetNursingRegulatoryAlerts(institutionRows, nurseRows),
+    regulatoryContract: policy.regulatoryContract || seedInternetNursingPolicy().regulatoryContract
   };
 }
 
@@ -6273,6 +6432,11 @@ function normalizeInternetNursingOrder(payload, user, data) {
     serviceRecordStatus: citizenCreated ? "pending" : String(payload.serviceRecordStatus || "pending").trim(),
     qualityCallback: citizenCreated ? "pending" : String(payload.qualityCallback || "pending").trim(),
     feeEstimate: citizenCreated ? 0 : Number(payload.feeEstimate || 0),
+    settlement: payload.settlement && typeof payload.settlement === "object" ? payload.settlement : { mode: "self-pay estimate", estimatedSelfPay: 0, insuranceEstimate: 0, paymentStatus: "pending" },
+    satisfaction: payload.satisfaction && typeof payload.satisfaction === "object" ? payload.satisfaction : { score: 0, status: "pending" },
+    complaintStatus: String(payload.complaintStatus || "none").trim(),
+    qualityInspection: payload.qualityInspection && typeof payload.qualityInspection === "object" ? payload.qualityInspection : { status: "pending" },
+    adverseEvent: payload.adverseEvent && typeof payload.adverseEvent === "object" ? payload.adverseEvent : { status: "none", level: "" },
     sourceChannel: String(payload.sourceChannel || user.role).trim(),
     createdAt: now,
     createdBy: user.username || user.role,
@@ -6318,10 +6482,44 @@ function validateInternetNursingAppointment(payload, user) {
 function applyInternetNursingOrderAction(item, payload, user, data) {
   const now = new Date().toISOString();
   assertInternetNursingActionAllowed(item, payload, user, data);
-  const allowed = ["status", "nurseId", "firstVisitAssessment", "informedConsent", "riskLevel", "locationTrace", "serviceRecordStatus", "qualityCallback", "feeEstimate"];
+  const allowed = ["status", "nurseId", "firstVisitAssessment", "informedConsent", "riskLevel", "locationTrace", "serviceRecordStatus", "qualityCallback", "feeEstimate", "complaintStatus"];
   const updates = Object.fromEntries(allowed
     .filter((key) => Object.hasOwn(payload, key))
     .map((key) => [key, key === "feeEstimate" ? Number(payload[key] || 0) : String(payload[key] || "").trim()]));
+  if (payload.settlement && typeof payload.settlement === "object") {
+    updates.settlement = {
+      ...(item.settlement || {}),
+      mode: String(payload.settlement.mode || item.settlement?.mode || "self-pay estimate").trim(),
+      estimatedSelfPay: Number(payload.settlement.estimatedSelfPay ?? item.settlement?.estimatedSelfPay ?? 0),
+      insuranceEstimate: Number(payload.settlement.insuranceEstimate ?? item.settlement?.insuranceEstimate ?? 0),
+      paymentStatus: String(payload.settlement.paymentStatus || item.settlement?.paymentStatus || "pending").trim()
+    };
+  }
+  if (payload.satisfaction && typeof payload.satisfaction === "object") {
+    updates.satisfaction = {
+      ...(item.satisfaction || {}),
+      score: Number(payload.satisfaction.score ?? item.satisfaction?.score ?? 0),
+      status: String(payload.satisfaction.status || item.satisfaction?.status || "pending").trim(),
+      submittedAt: payload.satisfaction.submittedAt || item.satisfaction?.submittedAt || now
+    };
+  }
+  if (payload.qualityInspection && typeof payload.qualityInspection === "object") {
+    updates.qualityInspection = {
+      ...(item.qualityInspection || {}),
+      status: String(payload.qualityInspection.status || item.qualityInspection?.status || "sampled").trim(),
+      inspector: String(payload.qualityInspection.inspector || item.qualityInspection?.inspector || user.name || user.username || "quality office").trim(),
+      sampleType: String(payload.qualityInspection.sampleType || item.qualityInspection?.sampleType || "routine").trim(),
+      checkedAt: payload.qualityInspection.checkedAt || item.qualityInspection?.checkedAt || now
+    };
+  }
+  if (payload.adverseEvent && typeof payload.adverseEvent === "object") {
+    updates.adverseEvent = {
+      ...(item.adverseEvent || {}),
+      status: String(payload.adverseEvent.status || item.adverseEvent?.status || "none").trim(),
+      level: String(payload.adverseEvent.level || item.adverseEvent?.level || "").trim(),
+      reportedAt: payload.adverseEvent.reportedAt || item.adverseEvent?.reportedAt || (payload.adverseEvent.status && payload.adverseEvent.status !== "none" ? now : "")
+    };
+  }
   if (updates.nurseId) {
     const nurse = (data.internetNursingNurses || []).find((row) => row.id === updates.nurseId);
     if (nurse) updates.nurseName = nurse.name;
@@ -6346,6 +6544,12 @@ function applyInternetNursingOrderAction(item, payload, user, data) {
     updates.locationTracePoints = [];
   }
   const notificationEvent = String(payload.action || updates.status || "internet-nursing-order-update").trim();
+  if (payload.action === "quality-review" && !updates.satisfaction) {
+    updates.satisfaction = { ...(item.satisfaction || {}), score: Number(payload.satisfactionScore || 5), status: "submitted", submittedAt: now };
+  }
+  if (payload.action === "quality-review" && !updates.qualityInspection) {
+    updates.qualityInspection = { ...(item.qualityInspection || {}), status: "closed", inspector: user.name || user.username || "quality office", sampleType: item.riskLevel === "high" ? "high-risk" : "routine", checkedAt: now };
+  }
   updates.notificationDeliveries = appendInternetNursingNotifications({ ...item, ...updates }, notificationEvent, user, data, now);
   return {
     ...item,

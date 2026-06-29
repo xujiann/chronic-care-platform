@@ -84,6 +84,72 @@ function staticNotificationDeliveries(item) {
   ];
 }
 
+function buildStaticDispatchRecommendations(orders, nurses) {
+  return orders
+    .filter((order) => !order.nurseId && ["requested", "assessed", "dispatched"].includes(order.status))
+    .map((order) => ({
+      orderId: order.id,
+      residentId: order.residentId,
+      serviceItem: order.serviceItem,
+      riskLevel: order.riskLevel,
+      candidates: nurses
+        .filter(isQualifiedNurse)
+        .filter((nurse) => !order.institutionId || nurse.institutionId === order.institutionId || nurse.institutionCode === order.institutionCode)
+        .filter((nurse) => !Array.isArray(nurse.specialties) || nurse.specialties.includes(order.serviceItem))
+        .map((nurse) => ({
+          nurseId: nurse.id,
+          nurseName: nurse.name,
+          remainingCapacity: Number(nurse.dailyCapacity || 0) - Number(nurse.assignedToday || 0),
+          score: Math.max(0, Number(nurse.dailyCapacity || 0) - Number(nurse.assignedToday || 0)) + (order.riskLevel === "high" ? 2 : 0),
+          reason: "按护士资质、服务项目、服务区域、日容量和风险等级推荐"
+        }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 3)
+    }));
+}
+
+function buildStaticRegulatoryMonthlyReport(orders, institutions) {
+  return {
+    month: "2026-06",
+    serviceVolume: orders.length,
+    completedServices: orders.filter((item) => ["completed", "closed"].includes(item.status)).length,
+    highRiskHandled: orders.filter((item) => item.riskLevel === "high" && item.firstVisitAssessment === "passed").length,
+    callbackClosureRate: orders.length ? orders.filter((item) => item.qualityCallback === "closed").length / orders.length : 0,
+    complaintRate: orders.length ? orders.filter((item) => item.complaintStatus && item.complaintStatus !== "none").length / orders.length : 0,
+    traceCompletenessRate: orders.length ? orders.filter((item) => Array.isArray(item.locationTracePoints) && item.locationTracePoints.length >= 2).length / orders.length : 0,
+    adverseEvents: orders.filter((item) => item.adverseEvent?.status && item.adverseEvent.status !== "none").length,
+    serviceVolumeByInstitution: institutions.map((institution) => {
+      const rows = orders.filter((item) => item.institutionId === institution.id);
+      const complaints = rows.filter((item) => item.complaintStatus && item.complaintStatus !== "none").length;
+      const adverseEvents = rows.filter((item) => item.adverseEvent?.status && item.adverseEvent.status !== "none").length;
+      const callbackRate = rows.length ? rows.filter((item) => item.qualityCallback === "closed").length / rows.length : 0;
+      return {
+        institutionId: institution.id,
+        institutionName: institution.name,
+        orders: rows.length,
+        completed: rows.filter((item) => ["completed", "closed"].includes(item.status)).length,
+        complaints,
+        adverseEvents,
+        callbackRate,
+        qualityScore: Math.max(0, Math.round(100 - complaints * 12 - adverseEvents * 18 + callbackRate * 8))
+      };
+    })
+  };
+}
+
+function buildStaticRegulatoryAlerts(institutions, nurses) {
+  return [
+    ...institutions.flatMap((institution) => {
+      const alerts = [];
+      if (institution.admissionReview?.status !== "approved") alerts.push({ type: "institution-admission", targetId: institution.id, detail: "试点机构准入待审核" });
+      (institution.catalogChangeRequests || []).filter((item) => item.status !== "approved").forEach((item) => alerts.push({ type: "catalog-change", targetId: institution.id, detail: `${item.item} 服务目录变更待审批` }));
+      return alerts;
+    }),
+    ...nurses.filter((nurse) => Date.parse(nurse.qualificationExpiresAt || "") - Date.now() <= 1000 * 60 * 60 * 24 * 45)
+      .map((nurse) => ({ type: "nurse-qualification-expiry", targetId: nurse.id, detail: `${displayText(nurse.name)} 资质即将到期` }))
+  ];
+}
+
 function renderInternetNursingDashboard(dashboard) {
   renderNursingMetrics(dashboard.summary || {});
   renderRiskGuidance(dashboard.orders || [], dashboard.riskQueue || []);
@@ -95,6 +161,10 @@ function renderInternetNursingDashboard(dashboard) {
   renderHospitalOrders(dashboard.orders || []);
   renderNurseQueue(dashboard.orders || []);
   renderPolicyControls(dashboard.policy || {});
+  renderDispatchRecommendations(dashboard.dispatchRecommendations || []);
+  renderFinanceQuality(dashboard.orders || []);
+  renderRegulatoryReport(dashboard.regulatoryMonthlyReport || {});
+  renderRegulatoryContract(dashboard.regulatoryContract || {}, dashboard.regulatoryAlerts || []);
   const citizenSummary = document.querySelector("#nursing-citizen-summary");
   if (citizenSummary) citizenSummary.textContent = `${dashboard.summary?.publishedInstitutions || 0} 家已发布机构`;
   const nurseSummary = document.querySelector("#nursing-nurse-summary");
@@ -186,6 +256,83 @@ function notificationSummary(item) {
   const sent = deliveries.filter((row) => row.status === "sent").length;
   const channels = [...new Set(deliveries.map((row) => displayText(row.channel || "")).filter(Boolean))].join("、");
   return `消息 ${sent} 已发 / ${queued} 待发${channels ? ` / ${channels}` : ""}`;
+}
+
+function settlementSummary(item) {
+  const settlement = item?.settlement || {};
+  return `${displayText(settlement.mode || "self-pay estimate")} / 自费 ${Number(settlement.estimatedSelfPay || 0)} / 医保预估 ${Number(settlement.insuranceEstimate || 0)} / ${displayText(settlement.paymentStatus || "pending")}`;
+}
+
+function qualitySummary(item) {
+  const satisfaction = item?.satisfaction || {};
+  const inspection = item?.qualityInspection || {};
+  const adverse = item?.adverseEvent || {};
+  return `满意度 ${satisfaction.score || 0} / 抽查 ${displayText(inspection.status || "pending")} / 投诉 ${displayText(item.complaintStatus || "none")} / 不良事件 ${displayText(adverse.status || "none")}`;
+}
+
+function renderDispatchRecommendations(items) {
+  const target = document.querySelector("#nursing-dispatch-recommendations");
+  if (!target) return;
+  target.innerHTML = items.length ? items.map((item) => {
+    const first = item.candidates?.[0];
+    return `<div>
+      <strong>${escapeHtml(item.orderId)} · ${escapeHtml(displayText(item.serviceItem))}</strong>
+      <span>${first ? `${escapeHtml(displayText(first.nurseName))}，剩余容量 ${escapeHtml(first.remainingCapacity)}，评分 ${escapeHtml(Math.round(first.score * 10) / 10)}` : "暂无合格护士候选"}</span>
+      <small>${escapeHtml(first?.reason || "按护士资质、服务项目、服务区域、日容量和风险等级推荐")}</small>
+    </div>`;
+  }).join("") : `<div><strong>暂无待推荐订单</strong><span>当前订单均已派单或已进入服务闭环。</span></div>`;
+}
+
+function renderFinanceQuality(items) {
+  const target = document.querySelector("#nursing-finance-quality");
+  if (!target) return;
+  const rows = items.slice(0, 5);
+  target.innerHTML = rows.length ? rows.map((item) => `<div>
+    <strong>${escapeHtml(item.id)} · ${escapeHtml(displayText(item.residentName || item.residentId || ""))}</strong>
+    <span>${escapeHtml(settlementSummary(item))}</span>
+    <small>${escapeHtml(qualitySummary(item))}</small>
+  </div>`).join("") : `<div><strong>暂无费用质量记录</strong><span>完成订单后将展示结算预估、投诉、满意度和质控抽查。</span></div>`;
+}
+
+function renderRegulatoryReport(report) {
+  const target = document.querySelector("#nursing-regulatory-report");
+  if (!target) return;
+  const rows = report.serviceVolumeByInstitution || [];
+  target.innerHTML = `
+    <table>
+      <thead><tr><th>机构</th><th>服务量</th><th>完成</th><th>投诉</th><th>不良事件</th><th>回访率</th><th>质量评分</th></tr></thead>
+      <tbody>${rows.map((item) => `<tr>
+        <td>${escapeHtml(displayText(item.institutionName || item.institutionId))}</td>
+        <td>${escapeHtml(item.orders || 0)}</td>
+        <td>${escapeHtml(item.completed || 0)}</td>
+        <td>${escapeHtml(item.complaints || 0)}</td>
+        <td>${escapeHtml(item.adverseEvents || 0)}</td>
+        <td>${escapeHtml(Math.round(Number(item.callbackRate || 0) * 100))}%</td>
+        <td>${escapeHtml(item.qualityScore || 0)}</td>
+      </tr>`).join("")}</tbody>
+    </table>
+    <p class="muted">月报 ${escapeHtml(report.month || "2026-06")}：服务量 ${escapeHtml(report.serviceVolume || 0)}，风险处置 ${escapeHtml(report.highRiskHandled || 0)}，轨迹完整率 ${escapeHtml(Math.round(Number(report.traceCompletenessRate || 0) * 100))}%。</p>
+  `;
+}
+
+function renderRegulatoryContract(contract, alerts) {
+  const target = document.querySelector("#nursing-regulatory-contract");
+  if (!target) return;
+  target.innerHTML = `
+    <div>
+      <strong>接口契约</strong>
+      <span>${escapeHtml(contract.version || "internet-nursing-regulatory-contract-v1")}</span>
+      <small>${escapeHtml((contract.endpoints || []).join("、"))}</small>
+    </div>
+    <div>
+      <strong>对接对象</strong>
+      <span>${escapeHtml((contract.targetSystems || []).map(displayText).join("、"))}</span>
+    </div>
+    ${(alerts || []).length ? alerts.map((item) => `<div>
+      <strong>${escapeHtml(displayText(item.type))}</strong>
+      <span>${escapeHtml(item.detail || "")}</span>
+    </div>`).join("") : `<div><strong>暂无监管提醒</strong><span>准入、目录变更和护士资质均无待办。</span></div>`}
+  `;
 }
 
 function renderInstitutionSelect(institutions) {
@@ -525,28 +672,45 @@ function defaultNursingPolicy() {
     serviceCatalog: ["daily living ability assessment", "vital signs measurement", "blood glucose measurement", "wound care", "tube care", "postpartum care", "infant care", "PICC maintenance"],
     requiredEvidence: ["identity authentication", "first diagnosis assessment", "signed informed consent", "nurse practice certificate", "service location trace", "nursing record", "quality callback"],
     riskControls: ["emergency plan", "one-click alert", "liability insurance", "medical accident insurance", "service recorder"],
-    platformRequirements: ["grade-3 security protection", "privacy protection", "medical record storage", "traceable service behavior", "workload statistics"]
+    platformRequirements: ["grade-3 security protection", "privacy protection", "medical record storage", "traceable service behavior", "workload statistics"],
+    pricingRules: {
+      items: {
+        "blood glucose measurement": { basePrice: 86, insuranceEligible: true },
+        "wound care": { basePrice: 168, insuranceEligible: true },
+        "PICC maintenance": { basePrice: 260, insuranceEligible: true }
+      }
+    },
+    regulatoryContract: defaultRegulatoryContract()
+  };
+}
+
+function defaultRegulatoryContract() {
+  return {
+    version: "internet-nursing-regulatory-contract-v1",
+    endpoints: ["/api/internet-nursing/dashboard", "/api/internet-nursing/orders", "/api/internet-nursing/orders/:id/actions"],
+    exchangeObjects: ["internetNursingInstitutions", "internetNursingNurses", "internetNursingOrders", "taskMessages"],
+    targetSystems: ["nursing management system", "EMR", "medical insurance settlement", "health supervision platform"]
   };
 }
 
 function defaultNursingInstitutions() {
   return [
-    { id: "inh-mr1", institutionCode: "MR1", name: "大连市中心医院", district: "中山区", published: true, serviceItems: ["wound care", "PICC maintenance", "blood glucose measurement"], dailyCapacity: 18 },
-    { id: "inh-mr3", institutionCode: "MR3", name: "青泥洼桥社区卫生服务中心", district: "中山区", published: true, serviceItems: ["vital signs measurement", "tube care"], dailyCapacity: 10 }
+    { id: "inh-mr1", institutionCode: "MR1", name: "大连市中心医院", district: "中山区", published: true, serviceItems: ["wound care", "PICC maintenance", "blood glucose measurement"], dailyCapacity: 18, admissionReview: { status: "approved" }, catalogChangeRequests: [] },
+    { id: "inh-mr3", institutionCode: "MR3", name: "青泥洼桥社区卫生服务中心", district: "中山区", published: true, serviceItems: ["vital signs measurement", "tube care"], dailyCapacity: 10, admissionReview: { status: "approved" }, catalogChangeRequests: [] }
   ];
 }
 
 function defaultNursingNurses() {
   return [
-    { id: "inn-001", name: "孙护士", institutionId: "inh-mr1", institutionCode: "MR1", title: "主管护师", yearsClinical: 9, registrationStatus: "verified", badPracticeRecord: "none", trainingStatus: "passed", insuranceStatus: "covered", status: "available" },
-    { id: "inn-002", name: "赵护士", institutionId: "inh-mr3", institutionCode: "MR3", title: "专科护士", yearsClinical: 6, registrationStatus: "verified", badPracticeRecord: "none", trainingStatus: "passed", insuranceStatus: "covered", status: "available" }
+    { id: "inn-001", name: "孙护士", institutionId: "inh-mr1", institutionCode: "MR1", title: "主管护师", yearsClinical: 9, registrationStatus: "verified", badPracticeRecord: "none", trainingStatus: "passed", insuranceStatus: "covered", specialties: ["wound care", "PICC maintenance", "blood glucose measurement"], dailyCapacity: 6, assignedToday: 2, qualificationExpiresAt: "2026-12-31", status: "available" },
+    { id: "inn-002", name: "赵护士", institutionId: "inh-mr3", institutionCode: "MR3", title: "专科护士", yearsClinical: 6, registrationStatus: "verified", badPracticeRecord: "none", trainingStatus: "passed", insuranceStatus: "covered", specialties: ["vital signs measurement", "tube care"], dailyCapacity: 5, assignedToday: 1, qualificationExpiresAt: "2026-09-30", status: "available" }
   ];
 }
 
 function defaultNursingOrders() {
   return [
-    { id: "ino-001", residentId: "r1", residentName: "演示居民A", institutionId: "inh-mr1", institutionCode: "MR1", institutionName: "大连市中心医院", nurseId: "inn-001", nurseName: "孙护士", serviceItem: "wound care", serviceObject: "mobility-limited chronic disease patient", preferredAt: new Date(Date.now() + 86400000).toISOString().slice(0, 10), address: "中山区示例地址", firstVisitAssessment: "passed", informedConsent: "signed", riskLevel: "medium", status: "dispatched", locationTrace: "pending", serviceRecordStatus: "pending", qualityCallback: "pending" },
-    { id: "ino-002", residentId: "r2", residentName: "演示居民B", institutionId: "inh-mr3", institutionCode: "MR3", institutionName: "青泥洼桥社区卫生服务中心", nurseId: "inn-002", nurseName: "赵护士", serviceItem: "blood glucose measurement", serviceObject: "elderly or disabled people", preferredAt: new Date().toISOString().slice(0, 10), address: "青泥洼桥示例家庭地址", firstVisitAssessment: "passed", informedConsent: "signed", riskLevel: "low", status: "accepted", locationTrace: "tracking", serviceRecordStatus: "in-progress", qualityCallback: "pending" }
+    { id: "ino-001", residentId: "r1", residentName: "演示居民A", institutionId: "inh-mr1", institutionCode: "MR1", institutionName: "大连市中心医院", nurseId: "inn-001", nurseName: "孙护士", serviceItem: "wound care", serviceObject: "mobility-limited chronic disease patient", preferredAt: new Date(Date.now() + 86400000).toISOString().slice(0, 10), address: "中山区示例地址", firstVisitAssessment: "passed", informedConsent: "signed", riskLevel: "medium", status: "dispatched", locationTrace: "pending", serviceRecordStatus: "pending", qualityCallback: "pending", feeEstimate: 168, settlement: { mode: "medical insurance pre-check", estimatedSelfPay: 58, insuranceEstimate: 110, paymentStatus: "pending" }, satisfaction: { score: 0, status: "pending" }, complaintStatus: "none", qualityInspection: { status: "pending" }, adverseEvent: { status: "none" } },
+    { id: "ino-002", residentId: "r2", residentName: "演示居民B", institutionId: "inh-mr3", institutionCode: "MR3", institutionName: "青泥洼桥社区卫生服务中心", nurseId: "inn-002", nurseName: "赵护士", serviceItem: "blood glucose measurement", serviceObject: "elderly or disabled people", preferredAt: new Date().toISOString().slice(0, 10), address: "青泥洼桥示例家庭地址", firstVisitAssessment: "passed", informedConsent: "signed", riskLevel: "low", status: "accepted", locationTrace: "tracking", serviceRecordStatus: "in-progress", qualityCallback: "pending", feeEstimate: 86, settlement: { mode: "medical insurance pre-check", estimatedSelfPay: 36, insuranceEstimate: 50, paymentStatus: "prechecked" }, satisfaction: { score: 0, status: "pending" }, complaintStatus: "none", qualityInspection: { status: "sampled" }, adverseEvent: { status: "none" } }
   ];
 }
 
@@ -603,6 +767,19 @@ function displayText(value) {
     "service location trace": "服务位置轨迹",
     "nursing record": "护理记录",
     "quality callback": "质量回访",
+    "self-pay estimate": "自费预估",
+    "medical insurance pre-check": "医保预核",
+    "prechecked": "已预核",
+    "submitted": "已提交",
+    "sampled": "已抽查",
+    "required": "需抽查",
+    "institution-admission": "机构准入",
+    "catalog-change": "目录变更",
+    "nurse-qualification-expiry": "护士资质到期",
+    "nursing management system": "院内护理管理系统",
+    "EMR": "电子病历",
+    "medical insurance settlement": "医保结算",
+    "health supervision platform": "监管平台",
     "grade-3 security protection": "等保三级防护",
     "privacy protection": "隐私保护",
     "medical record storage": "病历资料留存",
