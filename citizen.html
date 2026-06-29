@@ -54,6 +54,16 @@
 
       <section class="service-summary" id="service-summary" aria-live="polite"></section>
 
+      <section class="module-interface-panel" id="module-interface-panel" aria-labelledby="module-interface-title">
+        <div class="panel-title">
+          <div>
+            <h2 id="module-interface-title">模块接口</h2>
+            <span>居民端与健康档案、病历、护理、陪诊、挂号和消息中心的接口关系</span>
+          </div>
+        </div>
+        <div class="module-interface-grid" id="module-interface-grid"></div>
+      </section>
+
       <section class="client-channel-panel" id="client-channel-panel" aria-labelledby="client-channel-title">
         <div class="panel-title">
           <div>
@@ -209,24 +219,36 @@
       <section class="panel service-overview-panel" data-service-pane="registration">
         <div class="panel-title">
           <h2>挂号服务</h2>
-          <span><em class="feature-state pending">待开发</em> 需接入医院号源、支付和退号规则</span>
+          <span><em class="feature-state ready">已实现</em> 演示号源、预约确认、取消规则，生产仍需接入 HIS/支付/医保</span>
         </div>
-        <div class="service-status-grid">
-          <article class="service-status-card pending">
-            <strong>医院号源查询</strong>
-            <p>待对接 HIS/互联网医院号源池，按医院、科室、医生、日期展示可预约号源。</p>
-            <span class="status warn">待开发</span>
+        <div class="registration-workflow">
+          <form id="registration-form" class="registration-form">
+            <label>选择号源
+              <select name="scheduleId" required></select>
+            </label>
+            <label>就诊方式
+              <select name="visitType">
+                <option value="onsite">到院就诊</option>
+                <option value="internet">互联网复诊</option>
+              </select>
+            </label>
+            <label>就诊诉求
+              <input name="reason" placeholder="例如：复诊调药、检查结果咨询" />
+            </label>
+            <button class="small-button primary" type="submit">确认预约</button>
+          </form>
+          <article class="registration-rule-card">
+            <strong>上线边界</strong>
+            <p>当前为居民端可操作闭环：号源展示、预约确认、待支付/待医保核验、取消规则和消息状态。生产需替换为医院 HIS/互联网医院号源池、支付平台和医保电子凭证。</p>
           </article>
-          <article class="service-status-card pending">
-            <strong>预约挂号确认</strong>
-            <p>待补支付、医保电子凭证核验、短信通知、取消预约和爽约规则。</p>
-            <span class="status warn">待开发</span>
-          </article>
-          <article class="service-status-card ready">
-            <strong>就医协同能力</strong>
-            <p>陪诊预约、转诊指引和电子病历归集已具备，可作为挂号上线后的协同底座。</p>
-            <span class="status">已实现底座</span>
-          </article>
+        </div>
+        <div class="registration-section">
+          <h3>可预约号源</h3>
+          <div class="cards registration-schedules" id="registration-schedule-cards"></div>
+        </div>
+        <div class="registration-section">
+          <h3>我的挂号</h3>
+          <div class="cards registration-orders" id="registration-order-cards"></div>
         </div>
       </section>
 
@@ -395,7 +417,7 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="./health-archive-standard.js"></script>
-    <script src="./citizen.js?v=20260628tasks"></script>
+    <script src="./citizen.js?v=20260629registration"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));

@@ -460,6 +460,52 @@ select,
   outline-offset: 2px;
 }
 
+.module-interface-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.module-interface-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.module-interface-card {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fbfd;
+}
+
+.module-interface-card > div {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.module-interface-card strong {
+  font-size: 16px;
+}
+
+.module-interface-card p,
+.module-interface-card small {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.module-interface-card b {
+  display: block;
+  color: var(--ink);
+}
+
 .client-channel-panel {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -785,6 +831,84 @@ select,
 
 .escort-order-card {
   border-left: 4px solid var(--teal);
+}
+
+.registration-workflow {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.9fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+  margin-bottom: 16px;
+}
+
+.registration-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: #f8fbfd;
+}
+
+.registration-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.registration-form label:first-child,
+.registration-form button {
+  grid-column: 1 / -1;
+}
+
+.registration-form input,
+.registration-form select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+
+.registration-rule-card,
+.registration-schedule-card,
+.registration-order-card {
+  border-left: 4px solid var(--blue);
+}
+
+.registration-rule-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--amber);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fff8e8;
+}
+
+.registration-rule-card p,
+.registration-section h3 {
+  margin: 0;
+}
+
+.registration-section {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.registration-order-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .lifecycle-grid {
@@ -1651,6 +1775,7 @@ dialog::backdrop {
   .panel,
   .summary-card,
   .account-panel,
+  .module-interface-panel,
   .client-channel-panel {
     padding: 14px;
   }
@@ -1667,6 +1792,8 @@ dialog::backdrop {
   .feedback-form select,
   .escort-appointment-form input,
   .escort-appointment-form select,
+  .registration-form input,
+  .registration-form select,
   .form-grid input,
   .form-grid select,
   .close-button {
@@ -1713,6 +1840,7 @@ dialog::backdrop {
   }
 
   .client-channel-switch,
+  .module-interface-grid,
   .client-channel-detail article,
   .client-channel-grid {
     grid-template-columns: 1fr;
@@ -1726,6 +1854,8 @@ dialog::backdrop {
   .citizen-trend-grid,
   .escort-appointment-layout,
   .escort-appointment-form,
+  .registration-workflow,
+  .registration-form,
   .service-status-grid,
   .lifecycle-grid,
   .resident-audit-grid,

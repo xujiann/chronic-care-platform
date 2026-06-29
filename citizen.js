@@ -174,7 +174,22 @@ const citizenServiceTabs = [
   { key: "emr", label: "电子病历", status: "已实现", detail: "诊疗时间线、慢病和访问记录", title: "电子病历二级页面", actionLabel: "查看电子病历" },
   { key: "nursing", label: "护理", status: "已实现", detail: "互联网护理预约与追踪", title: "护理服务二级页面", actionLabel: "进入护理服务", actionHref: "./internet-nursing.html" },
   { key: "escort", label: "陪诊", status: "已实现", detail: "陪诊预约、合同、保障和回访", title: "陪诊服务二级页面", actionLabel: "提交陪诊预约" },
-  { key: "registration", label: "挂号", status: "待开发", detail: "号源、支付、退号待接入", title: "挂号服务二级页面", actionLabel: "查看挂号说明" }
+  { key: "registration", label: "挂号", status: "已实现", detail: "演示号源、预约确认、取消规则，HIS/支付待接入", title: "挂号服务二级页面", actionLabel: "提交挂号预约" }
+];
+
+const registrationSchedules = [
+  { id: "reg-sch-cardio-am", hospital: "大连市中心医院", department: "心内科", doctor: "王医生", date: todayOffset(2), period: "上午", remaining: 6, fee: 18, cancelBeforeHours: 24, source: "演示号源池", tags: ["高血压复诊", "支持陪诊"] },
+  { id: "reg-sch-endocrine-pm", hospital: "大连医科大学附属医院", department: "内分泌科", doctor: "赵医生", date: todayOffset(3), period: "下午", remaining: 4, fee: 22, cancelBeforeHours: 12, source: "演示号源池", tags: ["糖尿病复诊", "检查解读"] },
+  { id: "reg-sch-community-am", hospital: "青泥洼桥社区卫生服务中心", department: "全科门诊", doctor: "刘医生", date: todayOffset(1), period: "上午", remaining: 12, fee: 8, cancelBeforeHours: 4, source: "基层预约池", tags: ["家庭医生", "慢病随访"] }
+];
+
+const citizenModuleInterfaces = [
+  { module: "健康档案", status: "已实现", api: "/api/state, /api/personal-records", collections: "residents, accounts, diseases, followups, personalRecords", boundary: "生产需接入主索引、基层公卫和居民实名关系核验" },
+  { module: "电子病历", status: "已实现", api: "/api/personal-records", collections: "personalRecords.emr, labs, medications, imaging, attachments", boundary: "生产需接入 EMR/LIS/PACS 和文档存储授权" },
+  { module: "护理", status: "已实现", api: "/api/internet-nursing/dashboard, /api/internet-nursing/orders", collections: "internetNursingOrders, internetNursingNurses, taskMessages", boundary: "生产需补齐护士资质、电子签名、定位轨迹和质控监管接入" },
+  { module: "陪诊", status: "已实现", api: "/api/escort-services/dashboard, /api/escort-services/orders, /api/messages", collections: "escortServiceOrders, escortServiceProviders, escortWorkers, taskMessages", boundary: "生产需对接医院接诊回执、保险保障和陪诊服务主体监管" },
+  { module: "挂号", status: "演示闭环", api: "citizen local registration state -> HIS/互联网医院号源待接入", collections: "citizenExtra.registrations, registrationSchedules", boundary: "生产需接入号源池、支付、退号、医保电子凭证和短信通知" },
+  { module: "消息与待办", status: "已实现", api: "/api/messages, /api/tasks/:id/actions", collections: "taskMessages, service tasks, dataAccessLogs", boundary: "生产需接入真实短信、订阅消息、站内信送达回执和审计保全" }
 ];
 
 const citizenClientChannels = [
@@ -228,8 +243,8 @@ const residentFunctionAudit = [
   { service: "nursing", name: "长期照护评估", status: "待开发", evidence: "需接入长期护理险、民政和医保待遇核验", mobile: "已在护理标签中显式标记待开发" },
   { service: "escort", name: "助医陪诊预约", status: "已实现", evidence: "可为本人或家庭成员提交陪诊预约", mobile: "预约表单在手机端单列输入" },
   { service: "escort", name: "陪诊合同、保险和回访", status: "已实现", evidence: "订单同步服务主体、保障类型、保险和质控状态", mobile: "订单卡片跟随陪诊标签展示" },
-  { service: "registration", name: "医院号源查询", status: "待开发", evidence: "待接入 HIS/互联网医院号源池", mobile: "保留挂号标签和待开发说明" },
-  { service: "registration", name: "预约挂号确认", status: "待开发", evidence: "待补支付、医保电子凭证核验、短信通知和退号规则", mobile: "保留协同底座状态" },
+  { service: "registration", name: "医院号源查询", status: "已实现", evidence: "居民端展示演示号源池，按医院、科室、医生、日期、余号和费用呈现", mobile: "号源卡片单列显示，适合手机端选择" },
+  { service: "registration", name: "预约挂号确认", status: "已实现", evidence: "可提交挂号预约，生成待支付/待医保核验状态并展示取消规则", mobile: "表单单列录入，订单卡可直接取消" },
   { service: "registration", name: "就医协同底座", status: "已实现", evidence: "陪诊、转诊和电子病历归集可支撑挂号上线", mobile: "作为挂号标签内已实现底座展示" }
 ];
 
@@ -250,6 +265,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   populateAccounts();
   bindLargeMode();
   bindServiceTabs();
+  renderModuleInterfaces();
   renderClientChannels();
   window.addEventListener("popstate", () => setServiceTab(serviceTabFromRoute() || "health-record", { syncUrl: false }));
   window.addEventListener("hashchange", () => setServiceTab(serviceTabFromRoute() || "health-record", { syncUrl: false }));
@@ -266,6 +282,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindDialogs();
   bindFollowupFeedback();
   bindEscortAppointment();
+  bindRegistrationAppointment();
   bindResidentTaskActions();
   bindCitizenMessageReceipts();
   currentAccountId = state.accounts[0]?.id;
@@ -307,6 +324,20 @@ function renderMobileServiceNav() {
       setServiceTab(link.dataset.mobileServiceTab, { pushState: true, scrollToPane: true });
     });
   });
+}
+
+function renderModuleInterfaces() {
+  const target = document.querySelector("#module-interface-grid");
+  if (!target) return;
+  target.innerHTML = citizenModuleInterfaces.map((item) => `<article class="module-interface-card">
+    <div>
+      <strong>${item.module}</strong>
+      <span class="status ${item.status.includes("演示") ? "warn" : ""}">${item.status}</span>
+    </div>
+    <p><b>接口</b>${item.api}</p>
+    <p><b>数据</b>${item.collections}</p>
+    <small>${item.boundary}</small>
+  </article>`).join("");
 }
 
 function renderClientChannels() {
@@ -637,6 +668,7 @@ function renderCitizen(residentId) {
   renderBirthHealth(resident.id);
   renderMaternalChildContinuity(resident.id);
   renderEscortAppointments(resident.id);
+  renderRegistration(resident.id);
   renderPickups(resident.id);
   renderSeniorServices(resident.id);
   renderDigitalCredentials(resident.id);
@@ -1718,6 +1750,110 @@ function formatEscortStatus(value) {
     medium: "普通",
     low: "不急"
   }[value] || value || "待确认";
+}
+
+function renderRegistration(residentId) {
+  const form = document.querySelector("#registration-form");
+  const scheduleCards = document.querySelector("#registration-schedule-cards");
+  const orderCards = document.querySelector("#registration-order-cards");
+  if (!form || !scheduleCards || !orderCards) return;
+  const selected = form.elements.scheduleId.value;
+  form.elements.scheduleId.innerHTML = registrationSchedules.map((item) => `<option value="${item.id}">${item.hospital} · ${item.department} · ${item.date} ${item.period} · ${item.remaining} 个号</option>`).join("");
+  if (selected && registrationSchedules.some((item) => item.id === selected)) form.elements.scheduleId.value = selected;
+  const orders = getRegistrationOrders(residentId);
+  scheduleCards.innerHTML = registrationSchedules.map((item) => `<article class="mini-card registration-schedule-card">
+    <h3>${item.hospital} · ${item.department}</h3>
+    <p class="muted">${item.date} ${item.period} · ${item.doctor} · ${item.source}</p>
+    <p>余号 ${item.remaining} 个 · 挂号费 ${item.fee} 元 · ${item.cancelBeforeHours} 小时前可取消</p>
+    <div class="visit-tags">${item.tags.map((tag) => `<span class="tag">${tag}</span>`).join("")}</div>
+  </article>`).join("");
+  orderCards.innerHTML = orders
+    .sort((a, b) => String(a.appointmentDate || "").localeCompare(String(b.appointmentDate || "")))
+    .map((item) => `<article class="mini-card registration-order-card">
+      <h3>${item.hospital} · ${item.department}</h3>
+      <p class="muted">${item.appointmentDate} ${item.period} · ${item.doctor} · ${item.visitType === "internet" ? "互联网复诊" : "到院就诊"}</p>
+      <p>${item.reason || "居民端预约"} · 挂号费 ${item.fee} 元</p>
+      <p>支付 ${formatRegistrationStatus(item.paymentStatus)} · 医保 ${formatRegistrationStatus(item.insuranceStatus)} · 通知 ${formatRegistrationStatus(item.notificationStatus)}</p>
+      <div class="registration-order-actions">
+        <span class="status ${item.status === "cancelled" ? "danger" : item.paymentStatus === "pending" ? "warn" : ""}">${formatRegistrationStatus(item.status)}</span>
+        ${canCancelRegistration(item) ? `<button type="button" class="small-button" data-registration-cancel="${item.id}">取消预约</button>` : ""}
+      </div>
+    </article>`)
+    .join("") || `<p class="muted">暂无挂号预约。提交后会生成待支付、待医保核验和短信通知状态。</p>`;
+  orderCards.querySelectorAll("[data-registration-cancel]").forEach((button) => {
+    button.addEventListener("click", () => cancelRegistrationOrder(residentId, button.dataset.registrationCancel));
+  });
+}
+
+function bindRegistrationAppointment() {
+  const form = document.querySelector("#registration-form");
+  if (!form) return;
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(form));
+    const schedule = registrationSchedules.find((item) => item.id === data.scheduleId) || registrationSchedules[0];
+    const order = {
+      id: `reg-local-${crypto.randomUUID()}`,
+      residentId: currentResidentId,
+      scheduleId: schedule.id,
+      hospital: schedule.hospital,
+      department: schedule.department,
+      doctor: schedule.doctor,
+      appointmentDate: schedule.date,
+      period: schedule.period,
+      visitType: data.visitType,
+      reason: data.reason,
+      fee: schedule.fee,
+      cancelBeforeHours: schedule.cancelBeforeHours,
+      status: "confirmed",
+      paymentStatus: "pending",
+      insuranceStatus: "pending",
+      notificationStatus: "queued",
+      source: "citizen-registration-demo",
+      createdAt: new Date().toISOString()
+    };
+    if (!citizenExtra[currentResidentId]) citizenExtra[currentResidentId] = {};
+    if (!Array.isArray(citizenExtra[currentResidentId].registrations)) citizenExtra[currentResidentId].registrations = [];
+    citizenExtra[currentResidentId].registrations.unshift(order);
+    localStorage.setItem(CITIZEN_EXTRA_KEY, JSON.stringify(citizenExtra));
+    form.reset();
+    renderCitizen(currentResidentId);
+    showToast("挂号预约已确认，待支付和医保电子凭证核验");
+  });
+}
+
+function getRegistrationOrders(residentId) {
+  return Array.isArray(citizenExtra[residentId]?.registrations) ? citizenExtra[residentId].registrations : [];
+}
+
+function canCancelRegistration(order) {
+  return !["cancelled", "completed"].includes(order.status);
+}
+
+function cancelRegistrationOrder(residentId, orderId) {
+  const order = getRegistrationOrders(residentId).find((item) => item.id === orderId);
+  if (!order) return;
+  order.status = "cancelled";
+  order.paymentStatus = order.paymentStatus === "paid" ? "refund-pending" : "closed";
+  order.notificationStatus = "queued";
+  order.cancelledAt = new Date().toISOString();
+  localStorage.setItem(CITIZEN_EXTRA_KEY, JSON.stringify(citizenExtra));
+  renderCitizen(residentId);
+  showToast("挂号预约已取消，通知状态已更新");
+}
+
+function formatRegistrationStatus(value) {
+  return {
+    confirmed: "已确认",
+    cancelled: "已取消",
+    completed: "已完成",
+    pending: "待处理",
+    paid: "已支付",
+    closed: "已关闭",
+    "refund-pending": "待退费",
+    queued: "待通知",
+    sent: "已通知"
+  }[value] || value || "待处理";
 }
 
 function renderPickups(residentId) {
