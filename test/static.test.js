@@ -719,6 +719,8 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   const citizenHtml = read("citizen.html");
   const citizenJs = read("citizen.js");
   const citizenCss = read("citizen.css");
+  const escortHtml = read("escort.html");
+  const escortJs = read("escort.js");
   assert.match(citizenHtml, /escort-appointment-form/);
   assert.match(citizenHtml, /助医陪诊预约/);
   assert.match(citizenJs, /fetchCitizenEscortDashboard/);
@@ -726,6 +728,10 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   assert.match(citizenJs, /\/escort-services\/orders/);
   assert.match(citizenCss, /escort-appointment-layout/);
   assert.match(citizenCss, /escort-order-card/);
+  assert.match(escortHtml, /requireRole\(\["commission", "institution"\]\)/);
+  assert.match(escortJs, /data-escort-hospital/);
+  assert.match(escortJs, /hospital-handoff/);
+  assert.match(escortJs, /updateEscortHospitalHandoff/);
   assert.match(read("server.js"), /provider is not published/);
 });
 

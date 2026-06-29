@@ -111,8 +111,18 @@ function renderEscortOrders(items) {
       `).join("")}</tbody>
     </table>
   `;
+  document.querySelectorAll('[data-escort-action][data-status="closed"]').forEach((button) => {
+    const id = escapeHtml(button.dataset.escortAction || "");
+    button.insertAdjacentHTML("beforebegin", `
+      <button class="inline-action" type="button" data-escort-hospital="${id}" data-decision="confirm">医院确认</button>
+      <button class="inline-action" type="button" data-escort-hospital="${id}" data-decision="return">退回</button>
+    `);
+  });
   document.querySelectorAll("[data-escort-action]").forEach((button) => {
     button.addEventListener("click", () => updateEscortOrder(button.dataset.escortAction, button.dataset.status));
+  });
+  document.querySelectorAll("[data-escort-hospital]").forEach((button) => {
+    button.addEventListener("click", () => updateEscortHospitalHandoff(button.dataset.escortHospital, button.dataset.decision));
   });
 }
 
@@ -211,6 +221,24 @@ async function updateEscortOrder(id, status) {
       qualityReview: status === "closed" ? "closed" : "follow-up-call-required",
       action: `set-${status}`,
       note: `Escort order moved to ${status}.`
+    })
+  });
+  await loadEscortDashboard();
+}
+
+async function updateEscortHospitalHandoff(id, decision) {
+  if (!ESCORT_API_BASE) return;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  const confirmed = decision !== "return";
+  await request(`${ESCORT_API_BASE}/escort-services/orders/${encodeURIComponent(id)}/hospital-handoff`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      decision,
+      hospitalCheckInStatus: confirmed ? "confirmed" : "pending",
+      hospitalCheckInNo: confirmed ? `HIS-${id}` : "",
+      hospitalNotice: confirmed ? "Hospital outpatient desk confirmed the escort handoff." : "Hospital returned the handoff for supplementary appointment evidence.",
+      note: confirmed ? "Confirmed from escort console." : "Returned from escort console."
     })
   });
   await loadEscortDashboard();
