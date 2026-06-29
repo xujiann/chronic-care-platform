@@ -7,6 +7,7 @@ const { buildSiteReadinessPack, renderTemplateReadmes } = require("./scripts/sit
 const { buildReleaseReport, buildServiceAcceptanceSummary } = require("./scripts/release-report");
 const { buildReleaseArtifactManifest } = require("./scripts/release-artifact-manifest");
 const { buildQualitySafetyInterfaceStandard } = require("./scripts/quality-safety-interface-standard");
+const { buildQualitySafetyInterfaceJointTestPack, validateQualitySafetyInterfaceMessage } = require("./scripts/quality-safety-interface-joint-test");
 
 const PORT = Number(process.env.PORT || 5173);
 const ROOT = __dirname;
@@ -6354,6 +6355,35 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/quality-safety/interface-standard");
     if (!user) return;
     sendJson(res, 200, buildQualitySafetyInterfaceStandard({ data: readDatabase() }));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/quality-safety/interface-joint-test-pack") {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/quality-safety/interface-joint-test-pack");
+    if (!user) return;
+    sendJson(res, 200, buildQualitySafetyInterfaceJointTestPack({ data: readDatabase(), secret: integrationGatewaySecret() }));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/quality-safety/interface-messages/validate") {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/quality-safety/interface-messages/validate");
+    if (!user) return;
+    const data = readDatabase();
+    const payload = await collectJson(req);
+    const standard = buildQualitySafetyInterfaceStandard({ data }).standard;
+    const result = validateQualitySafetyInterfaceMessage({
+      standard,
+      interfaceId: payload.interfaceId,
+      method: payload.method || "POST",
+      path: payload.path,
+      headers: payload.headers || {},
+      message: payload.message || payload.payload || {},
+      previousIdempotencyKeys: Array.isArray(payload.previousIdempotencyKeys) ? payload.previousIdempotencyKeys : [],
+      secret: integrationGatewaySecret()
+    });
+    appendQualitySafetyAudit(data, user, "quality-safety interface message validation", result.interfaceId || String(payload.interfaceId || ""), `${result.status}: ${result.errors.map((item) => item.code).join(",") || "accepted"}`);
+    writeDatabase(data);
+    sendJson(res, 200, result);
     return;
   }
 

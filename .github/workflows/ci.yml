@@ -49,6 +49,8 @@ jobs:
         run: npm run quality-safety:report
       - name: Generate medical quality institution interface standard
         run: npm run quality-safety:interface-standard
+      - name: Generate medical quality institution joint-test pack
+        run: npm run quality-safety:joint-test
       - name: Generate integration readiness report
         run: npm run integration:readiness
       - name: Generate interface mapping report

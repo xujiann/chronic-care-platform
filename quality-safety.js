@@ -1,6 +1,8 @@
 const QUALITY_API_BASE = location.protocol === "file:" ? "" : "/api";
 
 let qualitySafetyState = null;
+let qualitySafetyInterfacePack = null;
+let qualitySafetyValidationResult = null;
 
 function qualityToken() {
   return window.HealthCityAuth?.getToken?.() || "";
@@ -170,6 +172,45 @@ function renderSiteSignoffs(rows) {
   `);
 }
 
+function renderInterfaceJointTestPack(pack, validationResult = null) {
+  if (!pack) return;
+  const sampleRows = pack.sampleRequests || [];
+  const resultText = validationResult ? `${validationResult.status}: ${validationResult.errors?.map((item) => item.code).join(", ") || "accepted"}` : "No manual validation yet";
+  setHtml("quality-safety-interface-pack", `
+    <div class="rules">
+      <div class="rule-card">
+        <strong>${pack.ok ? "Joint-test pack ready" : "Joint-test pack needs review"}</strong>
+        <span>${pack.summary.sampleAccepted}/${pack.summary.sampleRequests} samples accepted</span>
+        <p>${(pack.checks || []).map((item) => `${item.passed ? "PASS" : "FAIL"} ${item.id}`).join("; ")}</p>
+      </div>
+      <div class="rule-card">
+        <strong>${pack.securityFixture.algorithm}</strong>
+        <span>${pack.securityFixture.demoSecretName}</span>
+        <p>${pack.securityFixture.signatureBase}</p>
+      </div>
+      <div class="rule-card">
+        <strong>Last validation</strong>
+        <span>${validationResult?.ok ? "accepted" : validationResult ? "rejected" : "pending"}</span>
+        <p>${resultText}</p>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>Interface</th><th>Path</th><th>Idempotency</th><th>Body hash</th><th>Action</th></tr></thead>
+      <tbody>
+        ${sampleRows.map((item) => `
+          <tr>
+            <td><strong>${item.interfaceId}</strong><br /><small>${text(item.message?.eventType)}</small></td>
+            <td>${text(item.method)} ${text(item.path)}</td>
+            <td>${text(item.headers?.["X-Idempotency-Key"])}</td>
+            <td>${text(item.bodySha256).slice(0, 16)}...</td>
+            <td><button class="inline-action" type="button" data-interface-validate="${item.interfaceId}">Validate sample</button></td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
+  `);
+}
+
 function renderRectifications(rows) {
   const role = qualitySafetyState?.role || "";
   const canReview = role === "commission";
@@ -258,6 +299,15 @@ async function loadQualitySafety() {
     renderQualitySafety(await qualityApi("/quality-safety/dashboard"));
   } catch (error) {
     setHtml("quality-safety-issues", `<p>${error.message}</p>`);
+  }
+}
+
+async function loadQualitySafetyInterfacePack() {
+  try {
+    qualitySafetyInterfacePack = await qualityApi("/quality-safety/interface-joint-test-pack");
+    renderInterfaceJointTestPack(qualitySafetyInterfacePack, qualitySafetyValidationResult);
+  } catch (error) {
+    setHtml("quality-safety-interface-pack", `<p>${error.message}</p>`);
   }
 }
 
@@ -350,6 +400,22 @@ async function reviewSiteSignoff(signoffId) {
   await loadQualitySafety();
 }
 
+async function validateInterfaceSample(interfaceId) {
+  const request = (qualitySafetyInterfacePack?.sampleRequests || []).find((item) => item.interfaceId === interfaceId);
+  if (!request) throw new Error("Interface sample is not loaded");
+  qualitySafetyValidationResult = await qualityApi("/quality-safety/interface-messages/validate", {
+    method: "POST",
+    body: JSON.stringify({
+      interfaceId: request.interfaceId,
+      method: request.method,
+      path: request.path,
+      headers: request.headers,
+      message: request.message
+    })
+  });
+  await loadQualitySafetyInterfacePack();
+}
+
 document.addEventListener("click", (event) => {
   const dispatch = event.target.closest("[data-dispatch]");
   const feedback = event.target.closest("[data-feedback]");
@@ -359,6 +425,7 @@ document.addEventListener("click", (event) => {
   const criticalDispose = event.target.closest("[data-critical-dispose]");
   const pathwayReview = event.target.closest("[data-pathway-review]");
   const signoffReview = event.target.closest("[data-signoff-review]");
+  const interfaceValidate = event.target.closest("[data-interface-validate]");
   if (dispatch) dispatchIssue(dispatch.dataset.dispatch).catch((error) => alert(error.message));
   if (feedback) submitFeedback(feedback.dataset.feedback).catch((error) => alert(error.message));
   if (review) reviewOrder(review.dataset.review).catch((error) => alert(error.message));
@@ -367,6 +434,8 @@ document.addEventListener("click", (event) => {
   if (criticalDispose) disposeCritical(criticalDispose.dataset.criticalDispose).catch((error) => alert(error.message));
   if (pathwayReview) reviewClinicalPathway(pathwayReview.dataset.pathwayReview).catch((error) => alert(error.message));
   if (signoffReview) reviewSiteSignoff(signoffReview.dataset.signoffReview).catch((error) => alert(error.message));
+  if (interfaceValidate) validateInterfaceSample(interfaceValidate.dataset.interfaceValidate).catch((error) => alert(error.message));
 });
 
 loadQualitySafety();
+loadQualitySafetyInterfacePack();

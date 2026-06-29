@@ -137,11 +137,14 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "qualitySafety:siteSignoffTracker" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "qualitySafety:goLiveReadiness" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "qualitySafetyInterface:standard" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "qualitySafetyInterfaceJointTest:pack" && item.passed), true);
   assert.equal(report.qualitySafety.goLiveReadiness.usable, true);
   assert.equal(report.qualitySafety.goLiveReadiness.stage, "controlled_pilot_ready");
   assert.equal(report.qualitySafety.siteSignoffs.length >= 6, true);
   assert.equal(report.qualitySafetyInterfaceStandard.ok, true);
   assert.equal(report.qualitySafetyInterfaceStandard.summary.interfaces >= 6, true);
+  assert.equal(report.qualitySafetyInterfaceJointTest.ok, true);
+  assert.equal(report.qualitySafetyInterfaceJointTest.summary.sampleAccepted, report.qualitySafetyInterfaceJointTest.summary.sampleRequests);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-env-file"), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-institution-interfaces" && !item.passed), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-insurance-certificate" && !item.passed), true);
@@ -170,6 +173,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(markdown, /Environment matrix report/);
   assert.match(markdown, /Release artifact manifest/);
   assert.match(markdown, /Quality-safety institution interface standard/);
+  assert.match(markdown, /Quality-safety institution joint-test pack/);
   assert.match(markdown, /cutover-identity/);
   assert.match(markdown, /snapshot:acceptanceEvidence/);
   assert.match(markdown, /snapshot:securityAcceptance/);
@@ -243,6 +247,8 @@ test("release report writes standalone production cutover and storage artifacts"
   const dataQualityMarkdown = fs.readFileSync(path.join(outputDir, "data-quality-report.md"), "utf8");
   const qualitySafetyInterfaceJson = JSON.parse(fs.readFileSync(path.join(outputDir, "quality-safety-interface-standard.json"), "utf8"));
   const qualitySafetyInterfaceMarkdown = fs.readFileSync(path.join(outputDir, "quality-safety-interface-standard.md"), "utf8");
+  const qualitySafetyJointTestJson = JSON.parse(fs.readFileSync(path.join(outputDir, "quality-safety-interface-joint-test-pack.json"), "utf8"));
+  const qualitySafetyJointTestMarkdown = fs.readFileSync(path.join(outputDir, "quality-safety-interface-joint-test-pack.md"), "utf8");
   const integrationJson = JSON.parse(fs.readFileSync(path.join(outputDir, "integration-readiness-report.json"), "utf8"));
   const integrationMarkdown = fs.readFileSync(path.join(outputDir, "integration-readiness-report.md"), "utf8");
   const interfaceMappingJson = JSON.parse(fs.readFileSync(path.join(outputDir, "interface-mapping-report.json"), "utf8"));
@@ -282,6 +288,8 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(dataQualityMarkdown, /Resident-linked collections/);
   assert.equal(qualitySafetyInterfaceJson.qualitySafetyInterfaceStandard.ok, true);
   assert.match(qualitySafetyInterfaceMarkdown, /Interface List/);
+  assert.equal(qualitySafetyJointTestJson.qualitySafetyInterfaceJointTest.ok, true);
+  assert.match(qualitySafetyJointTestMarkdown, /Validation Cases/);
   assert.equal(integrationJson.integrationReadiness.ok, true);
   assert.match(integrationMarkdown, /P0 coverage/);
   assert.equal(interfaceMappingJson.interfaceMapping.ok, true);

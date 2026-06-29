@@ -13,6 +13,7 @@ const { buildMonitoringReadinessReport, renderMarkdown: renderMonitoringReadines
 const { buildOperationsReadinessReport, renderMarkdown: renderOperationsReadinessMarkdown } = require("./operations-readiness");
 const { buildProcessAuditReport, renderMarkdown: renderProcessAuditMarkdown } = require("./process-audit");
 const { buildProductionDbReadinessReport, renderMarkdown: renderProductionDbReadinessMarkdown } = require("./production-db-readiness");
+const { buildQualitySafetyInterfaceJointTestPack, renderMarkdown: renderQualitySafetyInterfaceJointTestMarkdown } = require("./quality-safety-interface-joint-test");
 const { buildQualitySafetyInterfaceStandard, renderMarkdown: renderQualitySafetyInterfaceStandardMarkdown } = require("./quality-safety-interface-standard");
 const { buildQualitySafetyReport, renderMarkdown: renderQualitySafetyMarkdown } = require("./quality-safety-report");
 const { buildReleaseArtifactManifest, renderMarkdown: renderReleaseArtifactManifestMarkdown } = require("./release-artifact-manifest");
@@ -333,6 +334,14 @@ function qualitySafetyInterfaceStandardChecks(standard) {
   ];
 }
 
+function qualitySafetyInterfaceJointTestChecks(pack) {
+  return [
+    check("qualitySafetyInterfaceJointTest:pack", pack.ok, pack.ok ? "quality-safety joint-test pack checks passed" : "quality-safety joint-test pack checks failed", "error", "quality-safety"),
+    check("qualitySafetyInterfaceJointTest:samples", pack.summary?.sampleAccepted === pack.summary?.sampleRequests, `${pack.summary?.sampleAccepted || 0}/${pack.summary?.sampleRequests || 0} sample messages accepted`, "error", "quality-safety"),
+    check("qualitySafetyInterfaceJointTest:negativeCases", pack.negativeCases?.every((item) => !item.result.ok), `${pack.negativeCases?.length || 0} rejection cases`, "error", "quality-safety")
+  ];
+}
+
 function operationsReadinessChecks(operationsReadiness) {
   return [
     check("operations:readiness", operationsReadiness.ok, operationsReadiness.ok ? "operations readiness checks passed" : "operations readiness checks failed", "error", "operations"),
@@ -483,6 +492,7 @@ function packageChecks(pkg) {
     "data-quality:report",
     "quality-safety:report",
     "quality-safety:interface-standard",
+    "quality-safety:joint-test",
     "environment:matrix",
     "integration:readiness",
     "interface:mapping",
@@ -540,6 +550,7 @@ function buildReleaseReport(options = {}) {
   const dataQuality = buildDataQualityReport({ data });
   const qualitySafety = buildQualitySafetyReport({ data });
   const qualitySafetyInterfaceStandard = buildQualitySafetyInterfaceStandard({ data });
+  const qualitySafetyInterfaceJointTest = buildQualitySafetyInterfaceJointTestPack({ data, standardReport: qualitySafetyInterfaceStandard });
   const integrationReadiness = buildIntegrationReadinessReport({ data });
   const interfaceMapping = buildInterfaceMappingReport({ data, pkg });
   const monitoringReadiness = buildMonitoringReadinessReport({ data, pkg });
@@ -565,6 +576,7 @@ function buildReleaseReport(options = {}) {
     ...dataQualityChecks(dataQuality),
     ...qualitySafetyChecks(qualitySafety),
     ...qualitySafetyInterfaceStandardChecks(qualitySafetyInterfaceStandard),
+    ...qualitySafetyInterfaceJointTestChecks(qualitySafetyInterfaceJointTest),
     ...integrationReadinessChecks(integrationReadiness),
     ...interfaceMappingChecks(interfaceMapping),
     ...monitoringReadinessChecks(monitoringReadiness),
@@ -600,6 +612,7 @@ function buildReleaseReport(options = {}) {
     dataQuality,
     qualitySafety,
     qualitySafetyInterfaceStandard,
+    qualitySafetyInterfaceJointTest,
     integrationReadiness,
     interfaceMapping,
     monitoringReadiness,
@@ -779,6 +792,10 @@ function renderMarkdown(report) {
     "",
     "See `quality-safety-interface-standard.json` and `quality-safety-interface-standard.md` for hospital-facing document control, transport, security, message envelope, field dictionaries, sample payloads, status codes, and joint-test acceptance checklist.",
     "",
+    "## Quality-safety institution joint-test pack",
+    "",
+    "See `quality-safety-interface-joint-test-pack.json` and `quality-safety-interface-joint-test-pack.md` for sample requests, HMAC-SHA256 signature fixtures, field dictionaries, idempotency replay checks, and negative validation cases.",
+    "",
     "## Operations readiness report",
     "",
     "See `operations-readiness-report.json` and `operations-readiness-report.md` for operation routes, production deployment tracks, external dependency risks, and release operation scripts.",
@@ -892,6 +909,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       qualitySafetyInterfaceStandard: report.qualitySafetyInterfaceStandard
     }, null, 2), "utf8");
+    const qualitySafetyJointTestJson = path.join(path.dirname(output), "quality-safety-interface-joint-test-pack.json");
+    fs.writeFileSync(qualitySafetyJointTestJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      qualitySafetyInterfaceJointTest: report.qualitySafetyInterfaceJointTest
+    }, null, 2), "utf8");
     const integrationJson = path.join(path.dirname(output), "integration-readiness-report.json");
     fs.writeFileSync(integrationJson, JSON.stringify({
       project: report.project,
@@ -1000,6 +1025,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(qualitySafetyMarkdown, renderQualitySafetyMarkdown(report.qualitySafety), "utf8");
     const qualitySafetyInterfaceMarkdown = path.join(path.dirname(markdown), "quality-safety-interface-standard.md");
     fs.writeFileSync(qualitySafetyInterfaceMarkdown, renderQualitySafetyInterfaceStandardMarkdown(report.qualitySafetyInterfaceStandard), "utf8");
+    const qualitySafetyJointTestMarkdown = path.join(path.dirname(markdown), "quality-safety-interface-joint-test-pack.md");
+    fs.writeFileSync(qualitySafetyJointTestMarkdown, renderQualitySafetyInterfaceJointTestMarkdown(report.qualitySafetyInterfaceJointTest), "utf8");
     const integrationMarkdown = path.join(path.dirname(markdown), "integration-readiness-report.md");
     fs.writeFileSync(integrationMarkdown, renderIntegrationReadinessMarkdown(report.integrationReadiness), "utf8");
     const interfaceMappingMarkdown = path.join(path.dirname(markdown), "interface-mapping-report.md");
