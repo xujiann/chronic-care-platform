@@ -101,6 +101,7 @@ test("about page documents doctor multi-practice policy boundaries", () => {
   assert.match(read("institution.html"), /政策说明/);
   assert.match(read("institution.js"), /电子化注册/);
   assert.match(read("institution.js"), /第一执业地点电子确认/);
+  assert.match(read("institution.js"), /taskMessages/);
   assert.match(read("institution.js"), /责任保险/);
   assert.match(read("institution.js"), /补正提示/);
   assert.match(read("institution.js"), /riskFlags/);
@@ -122,6 +123,8 @@ test("about page documents doctor multi-practice policy boundaries", () => {
   assert.match(report, /riskFlags/);
   assert.match(report, /doctorProfiles\.electronicRegistration/);
   assert.match(report, /primaryPracticeConfirmation/);
+  assert.match(read("scripts/multi-practice-readiness.js"), /doctorHospitalLoop/);
+  assert.match(read("scripts/multi-practice-readiness.js"), /buildMultiPracticeTaskMessage/);
   assert.match(report, /\/api\/multi-practice-registry/);
   assert.match(report, /flowchart TD/);
   assert.match(report, /test\/api\.test\.js/);

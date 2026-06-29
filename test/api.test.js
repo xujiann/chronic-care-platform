@@ -387,6 +387,41 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(doctorMe.body.multiPracticeSummary.total, doctorMe.body.multiPracticeApplications.length);
     assert.equal(doctorMe.body.multiPracticeApplications.every((item) => Array.isArray(item.riskFlags) && item.documentChecks), true);
 
+    const createdPractice = await api(baseUrl, "/api/multi-practice-applications", authorized(doctorLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        targetInstitutionId: "MR1",
+        targetInstitution: "大连市中心医院",
+        targetDepartment: "心内科联合门诊",
+        practiceScope: "全科医学专业",
+        period: "2026-08-01 至 2027-07-31",
+        schedule: "每周一上午",
+        tasks: "慢病联合门诊和用药方案复核",
+        responsibility: "由当事医疗机构和医师按协议依法承担医疗责任",
+        compensation: "按工作量协商结算",
+        insurance: "已购买医师个人医疗执业保险"
+      })
+    }));
+    assert.equal(createdPractice.response.status, 201);
+    const hospitalLogin = await login(baseUrl, "hospital");
+    const hospitalMessages = await api(baseUrl, "/api/messages", authorized(hospitalLogin.body.token));
+    assert.equal(hospitalMessages.response.status, 200);
+    assert.equal(hospitalMessages.body.messages.some((item) => item.sourceId === createdPractice.body.id && /待医院端处理/.test(item.title)), true);
+    const hospitalConfirmed = await api(baseUrl, "/api/workflow-actions", authorized(hospitalLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        collection: "multiPracticeApplications",
+        id: createdPractice.body.id,
+        status: "待卫健审核",
+        updates: { primaryConsent: "已同意", hospitalReviewOpinion: "医院端材料核验通过" },
+        note: "医院端确认接收多点执业申请"
+      })
+    }));
+    assert.equal(hospitalConfirmed.response.status, 200);
+    assert.equal(hospitalConfirmed.body.primaryPracticeConfirmation.status, "已电子确认");
+    const doctorLoop = await api(baseUrl, "/api/doctors/me", authorized(doctorLogin.body.token));
+    assert.equal(doctorLoop.body.multiPracticeMessages.some((item) => item.sourceId === createdPractice.body.id && item.targetRole === "doctor" && /医院端已处理/.test(item.title)), true);
+
     const doctorRegistry = await api(baseUrl, "/api/multi-practice-registry", authorized(doctorLogin.body.token));
     assert.equal(doctorRegistry.response.status, 200);
     assert.equal(doctorRegistry.body.applications.length >= 1, true);

@@ -1,4 +1,4 @@
-const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], referralTeleconsultations: [], medicationPickups: [], chronicScreeningTasks: [], chronicManagementPlans: [], chronicFollowupStatusPolicy: {}, deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthStatistics: {}, doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {} };
+const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], referralTeleconsultations: [], medicationPickups: [], chronicScreeningTasks: [], chronicManagementPlans: [], chronicFollowupStatusPolicy: {}, deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthStatistics: {}, doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {}, taskMessages: [] };
 const institutionApiBase = location.protocol === "file:" || location.hostname.endsWith("github.io") ? "" : "/api";
 let platformState = fallbackState;
 
@@ -302,6 +302,7 @@ function renderMultiPracticePolicy(state) {
 
 function renderMultiPracticeApplications(state) {
   const applications = state.multiPracticeApplications || [];
+  const messages = state.taskMessages || [];
   const countEl = document.querySelector("#multi-practice-count");
   const listEl = document.querySelector("#multi-practice-applications");
   if (!countEl || !listEl) return;
@@ -312,6 +313,9 @@ function renderMultiPracticeApplications(state) {
     const riskFlags = Array.isArray(item.riskFlags) ? item.riskFlags : [];
     const electronic = item.electronicRegistrationVerification || {};
     const confirmation = item.primaryPracticeConfirmation || {};
+    const applicationMessages = messages
+      .filter((message) => message.collection === "multiPracticeApplications" && message.sourceId === item.id)
+      .slice(0, 3);
     const passed = Object.entries(checks).filter(([key, value]) => key !== "publicHospitalLeaderRestricted" && value).length;
     const total = Object.entries(checks).filter(([key]) => key !== "publicHospitalLeaderRestricted").length || 6;
     const documentBlocked = Object.values(documents).some((value) => value === false) || documents.scheduleConflict === true;
@@ -342,6 +346,7 @@ function renderMultiPracticeApplications(state) {
         ${riskFlags.length ? `<p class="muted">补正提示：${riskFlags.join("、")}</p>` : ""}
         <p>电子化注册：${electronic.registryId || "待同步"} · ${electronic.verificationStatus || "待核验"} · 有效期 ${electronic.validUntil || "待同步"}</p>
         <p>第一执业地点电子确认：${confirmation.status || item.primaryConsent || "待确认"} · ${confirmation.confirmedByOrg || item.primaryInstitution || "第一执业地点"} · 签章 ${confirmation.signatureNo || "待签章"}</p>
+        ${applicationMessages.length ? `<div class="list compact">${applicationMessages.map((message) => `<p><strong>${message.title}</strong>：${message.body || "待处理"} · ${String(message.createdAt || "").slice(0, 16)}</p>`).join("")}</div>` : ""}
         <p>第一执业地点：${item.primaryConsent || "待确认"} · ${item.registrationMode || "注册管理"} · 信息公开：${item.publicVisible ? "公开" : "不公开"} · 校验 ${passed}/${total}</p>
         <div class="action-row">
           ${item.primaryConsent !== "已同意" ? actionButton("multiPracticeApplications", item.id, "同意/报备", { primaryConsent: "已同意", status: "待卫健审核" }, "第一执业地点同意多点执业") : ""}

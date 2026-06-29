@@ -5582,6 +5582,12 @@ function canAccessMultiPracticeApplication(user, item) {
     [item.primaryInstitution, item.targetInstitution].includes(user.orgName);
 }
 
+function canAccessMultiPracticeMessage(user, message, data) {
+  if (message.collection !== "multiPracticeApplications") return false;
+  const application = (data.multiPracticeApplications || []).find((item) => item.id === message.sourceId);
+  return application ? canAccessMultiPracticeApplication(user, application) : false;
+}
+
 function hasResidentAuthorization(data, residentId, authorizationId) {
   const records = Array.isArray(data.personalRecords) ? data.personalRecords : [];
   return records.some((record) =>
@@ -5779,7 +5785,14 @@ function seedInternetNursingPolicy() {
     serviceCatalog: ["daily living ability assessment", "vital signs measurement", "blood glucose measurement", "wound care", "tube care", "postpartum care", "infant care", "PICC maintenance"],
     requiredEvidence: ["identity authentication", "first diagnosis assessment", "signed informed consent", "nurse practice certificate", "service location trace", "nursing record", "quality callback"],
     platformRequirements: ["grade-3 security protection", "privacy protection", "medical record storage", "traceable service behavior", "workload statistics"],
-    riskControls: ["emergency plan", "one-click alert", "liability insurance", "medical accident insurance", "service recorder"]
+    riskControls: ["emergency plan", "one-click alert", "liability insurance", "medical accident insurance", "service recorder"],
+    notificationGateway: {
+      mode: "simulation",
+      enabled: true,
+      channels: ["in_app", "sms", "hospital_message"],
+      events: ["appointment-submitted", "dispatch-qualified-nurse", "nurse-accept", "service-start", "service-complete", "quality-review"],
+      readiness: "gateway-contract-ready"
+    }
   };
 }
 
@@ -6050,7 +6063,9 @@ function buildInternetNursingDashboard(data, user) {
       pendingAssessment: orders.filter((item) => item.firstVisitAssessment !== "passed").length,
       consentPending: orders.filter((item) => item.informedConsent !== "signed").length,
       highRisk: riskQueue.length,
-      trackingActive: orders.filter((item) => item.locationTrace === "tracking").length
+      trackingActive: orders.filter((item) => item.locationTrace === "tracking").length,
+      notificationQueued: orders.flatMap((item) => item.notificationDeliveries || []).filter((item) => item.status === "queued").length,
+      notificationSent: orders.flatMap((item) => item.notificationDeliveries || []).filter((item) => item.status === "sent").length
     },
     institutions: institutionRows,
     nurses: nurseRows,
@@ -6151,6 +6166,45 @@ function appendInternetNursingTracePoint(existing, payload, user, stage, now) {
   return (duplicate ? points : [...points, point]).slice(-30);
 }
 
+function internetNursingNotificationTargets(event) {
+  const targetByEvent = {
+    "appointment-submitted": ["institution"],
+    "dispatch-qualified-nurse": ["nurse", "citizen"],
+    "nurse-accept": ["institution", "citizen"],
+    "service-start": ["institution", "citizen"],
+    "service-complete": ["institution", "citizen"],
+    "quality-review": ["citizen"]
+  };
+  return targetByEvent[event] || ["institution"];
+}
+
+function buildInternetNursingNotificationDeliveries(order, event, user, policy, now) {
+  const gateway = policy?.notificationGateway || seedInternetNursingPolicy().notificationGateway;
+  const channels = gateway.enabled ? gateway.channels || ["in_app"] : ["in_app"];
+  return channels.flatMap((channel) => internetNursingNotificationTargets(event).map((targetRole) => ({
+    id: `notify-${randomUUID()}`,
+    event,
+    channel,
+    targetRole,
+    status: channel === "in_app" ? "sent" : "queued",
+    gatewayMode: gateway.mode || "simulation",
+    taskId: `internetNursingOrders:${order.id}`,
+    sourceId: order.id,
+    residentId: order.residentId,
+    queuedAt: now,
+    sentAt: channel === "in_app" ? now : "",
+    createdBy: user.username || user.role
+  })));
+}
+
+function appendInternetNursingNotifications(order, event, user, data, now) {
+  const policy = data.internetNursingPolicy || seedInternetNursingPolicy();
+  return [
+    ...buildInternetNursingNotificationDeliveries(order, event, user, policy, now),
+    ...(Array.isArray(order.notificationDeliveries) ? order.notificationDeliveries : [])
+  ].slice(0, 50);
+}
+
 function normalizeInternetNursingOrder(payload, user, data) {
   const residentId = String(payload.residentId || user.residentId || "").trim();
   if (!residentId) throw new Error("residentId is required");
@@ -6167,7 +6221,7 @@ function normalizeInternetNursingOrder(payload, user, data) {
   validateInternetNursingAppointment({ ...payload, residentId, institution, policy, serviceItem, serviceObject }, user);
   const now = new Date().toISOString();
   const citizenCreated = user.role === "citizen";
-  return {
+  const order = {
     id: payload.id || `ino-${randomUUID()}`,
     residentId,
     residentName: resident.name || String(payload.residentName || "").trim(),
@@ -6199,6 +6253,10 @@ function normalizeInternetNursingOrder(payload, user, data) {
     createdBy: user.username || user.role,
     createdByName: user.name || "",
     auditTrail: [{ at: now, action: "order-created", by: user.username || user.role, note: String(payload.note || "互联网护理预约已创建。").trim() }]
+  };
+  return {
+    ...order,
+    notificationDeliveries: appendInternetNursingNotifications(order, "appointment-submitted", user, data, now)
   };
 }
 
@@ -6262,6 +6320,8 @@ function applyInternetNursingOrderAction(item, payload, user, data) {
   } else if (!item.locationTracePoints) {
     updates.locationTracePoints = [];
   }
+  const notificationEvent = String(payload.action || updates.status || "internet-nursing-order-update").trim();
+  updates.notificationDeliveries = appendInternetNursingNotifications({ ...item, ...updates }, notificationEvent, user, data, now);
   return {
     ...item,
     ...updates,
@@ -6338,6 +6398,8 @@ function buildInternetNursingActionMessage(order, payload, user) {
     residentId: order.residentId,
     targetRole: template.targetRole,
     channel: "in_app",
+    notificationEvent: action,
+    deliveryChannels: ["in_app", "sms", "hospital_message"],
     title: template.title,
     body: template.body,
     status: "sent",
@@ -6567,6 +6629,7 @@ function scopeStateForUser(data, user) {
       scoped.internetNursingInstitutions = (data.internetNursingInstitutions || []).filter((item) => item.institutionCode === user.orgCode || item.name === user.orgName);
       scoped.internetNursingNurses = (data.internetNursingNurses || []).filter((nurse) => scoped.internetNursingInstitutions.some((institution) => institution.id === nurse.institutionId) || nurse.institutionCode === user.orgCode);
     }
+    scoped.taskMessages = (data.taskMessages || []).filter((message) => canAccessTaskMessage(user, message, data));
     if (scoped.mobileExperienceSettings) scoped.mobileExperienceSettings = { ...scoped.mobileExperienceSettings, userPreferences: undefined };
     return scoped;
   }
@@ -7258,9 +7321,42 @@ function buildUnifiedTasks(data, user) {
 
 function canAccessTaskMessage(user, message, data) {
   if (user.role === "commission") return true;
+  if (message.collection === "multiPracticeApplications") return canAccessMultiPracticeMessage(user, message, data);
   if (message.targetRole === user.role) return true;
   if (message.residentId && canAccessResident(user, message.residentId, data)) return true;
   return message.createdBy === user.username;
+}
+
+function buildMultiPracticeTaskMessage(application, payload = {}, user = {}) {
+  const now = new Date().toISOString();
+  const target = String(payload.target || "hospital").trim();
+  const returned = /退回|补正|returned|correction/i.test(`${application.status || ""} ${payload.status || ""} ${payload.action || ""}`);
+  const targetRole = target === "doctor" ? "doctor" : "institution";
+  const title = target === "doctor"
+    ? returned ? "多点执业申请退回补正" : "多点执业医院端已处理"
+    : "多点执业申请待医院端处理";
+  const body = target === "doctor"
+    ? `${application.targetInstitution || "拟执业机构"} 已处理 ${application.doctorName || "医生"} 的多点执业申请：${application.status || "已更新"}。${payload.note || application.reviewOpinion || ""}`.trim()
+    : `${application.doctorName || "医生"} 申请到 ${application.targetInstitution || "拟执业机构"} 开展多点执业，请医院端完成材料核验、第一执业地点确认和备案意见。`;
+  return {
+    id: `msg-${randomUUID()}`,
+    taskId: `multiPracticeApplications:${application.id}`,
+    collection: "multiPracticeApplications",
+    sourceId: application.id,
+    residentId: "",
+    targetRole,
+    targetDoctorId: target === "doctor" ? application.doctorId : "",
+    targetOrgCode: target === "doctor" ? application.primaryInstitutionId : application.targetInstitutionId || application.primaryInstitutionId || "",
+    targetOrgName: target === "doctor" ? application.primaryInstitution : application.targetInstitution || application.primaryInstitution || "",
+    channel: "in_app",
+    title,
+    body,
+    status: "sent",
+    receipts: [],
+    createdAt: now,
+    createdBy: user.username || user.role || "system",
+    createdByName: user.name || "system"
+  };
 }
 
 function createTaskMessage({ task, payload, user }) {
@@ -8954,6 +9050,8 @@ async function handleApi(req, res) {
           residentId: order.residentId,
           targetRole: "institution",
           channel: "in_app",
+          notificationEvent: "appointment-submitted",
+          deliveryChannels: ["in_app", "sms", "hospital_message"],
           title: "互联网护理新预约",
           body: `${order.institutionName || order.institutionId} 需完成首诊评估、知情同意和护士派单：${order.serviceItem}。`,
           status: "sent",
@@ -10103,10 +10201,13 @@ async function handleApi(req, res) {
       .filter((item) => item.doctorId === doctor.id)
       .map((item) => withMultiPracticeReviewState(item, doctor));
     const doctorRegistry = buildMultiPracticeRegistry(data, user);
+    const multiPracticeMessages = (Array.isArray(data.taskMessages) ? data.taskMessages : [])
+      .filter((message) => message.collection === "multiPracticeApplications" && canAccessTaskMessage(user, message, data));
     sendJson(res, 200, {
       doctor: reviewedDoctor,
       multiPracticeApplications: doctorApplications,
       multiPracticeSummary: doctorRegistry.summary,
+      multiPracticeMessages,
       policy: data.multiPracticePolicy
     });
     return;
@@ -10142,6 +10243,10 @@ async function handleApi(req, res) {
       return;
     }
     data.multiPracticeApplications = [application, ...(Array.isArray(data.multiPracticeApplications) ? data.multiPracticeApplications : [])].slice(0, 200);
+    data.taskMessages = [
+      buildMultiPracticeTaskMessage(application, { target: "hospital" }, user),
+      ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])
+    ].slice(0, 300);
     data.securityEvents = [
       {
         id: randomUUID(),
@@ -10198,6 +10303,10 @@ async function handleApi(req, res) {
       lastUpdated: new Date().toISOString()
     };
     data.multiPracticeApplications[index] = withMultiPracticeReviewState(nextApplication, profile);
+    data.taskMessages = [
+      buildMultiPracticeTaskMessage(data.multiPracticeApplications[index], { target: "doctor", note: patch.note || safePatch.reviewOpinion || safePatch.correctionRequired || "" }, user),
+      ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])
+    ].slice(0, 300);
     if (Object.hasOwn(patch, "expectedVersion")) {
       data.storageMeta = {
         ...(data.storageMeta || {}),
@@ -10771,6 +10880,7 @@ async function handleApi(req, res) {
     }
     if (collection === "multiPracticeApplications") {
       const profile = (data.doctorProfiles || []).find((doctor) => doctor.id === item.doctorId);
+      if (payload.status) item.status = String(payload.status);
       if (payload.updates?.primaryConsent) {
         item.primaryPracticeConfirmation = buildPrimaryPracticeConfirmation({ ...(payload.updates || {}), note: payload.note }, user, profile || {}, item);
       }
@@ -10784,6 +10894,10 @@ async function handleApi(req, res) {
         ...(Array.isArray(item.lifecycle) ? item.lifecycle : [])
       ].slice(0, 20);
       Object.assign(item, withMultiPracticeReviewState(item, profile));
+      data.taskMessages = [
+        buildMultiPracticeTaskMessage(item, { target: "doctor", note: payload.note || "" }, user),
+        ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])
+      ].slice(0, 300);
     }
     if (payload.status) item.status = String(payload.status);
     item.lastUpdated = new Date().toISOString();
