@@ -475,6 +475,34 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(created.body.createdBy, "citizen");
     assert.equal(created.body.sourceChannel, "citizen.html");
     assert.equal(created.body.serviceItems.includes("registration"), true);
+    assert.equal(created.body.hospitalCode, "MR1");
+
+    const hospitalLogin = await login(baseUrl, "hospital");
+    assert.equal(hospitalLogin.response.status, 200);
+    const hospitalToken = hospitalLogin.body.token;
+    const handoff = await api(baseUrl, `/api/escort-services/orders/${created.body.id}/hospital-handoff`, authorized(hospitalToken, {
+      method: "POST",
+      body: JSON.stringify({
+        decision: "confirm",
+        hospitalCode: "MR1",
+        hospitalCheckInStatus: "confirmed",
+        hospitalCheckInNo: "OP-MR1-20260627-008",
+        hospitalDepartmentContact: "Cardiology outpatient guidance desk",
+        appointmentAt: "2026-06-27T09:30:00+08:00",
+        hospitalNotice: "Arrive 20 minutes early and bring ID card.",
+        note: "hospital outpatient handoff regression"
+      })
+    }));
+    assert.equal(handoff.response.status, 200);
+    assert.equal(handoff.body.status, "hospital-confirmed");
+    assert.equal(handoff.body.hospitalInterfaceStatus, "confirmed");
+    assert.equal(handoff.body.hospitalCheckInNo, "OP-MR1-20260627-008");
+    assert.equal(handoff.body.auditTrail[0].action, "hospital-confirmed");
+
+    const hospitalDashboard = await api(baseUrl, "/api/escort-services/dashboard", authorized(hospitalToken));
+    assert.equal(hospitalDashboard.response.status, 200);
+    assert.equal(hospitalDashboard.body.orders.some((item) => item.id === created.body.id && item.hospitalInterfaceStatus === "confirmed"), true);
+    assert.equal(hospitalDashboard.body.summary.hospitalConfirmed >= 1, true);
 
     const refreshed = await api(baseUrl, "/api/escort-services/dashboard", authorized(citizenToken));
     assert.equal(refreshed.body.orders.some((item) => item.id === created.body.id && item.residentId === "r1"), true);
@@ -498,6 +526,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
 
     const messages = await api(baseUrl, "/api/messages", authorized(citizenToken));
     assert.equal(messages.response.status, 200);
+    assert.equal(messages.body.messages.some((item) => item.sourceId === created.body.id && /hospital handoff/i.test(item.title)), true);
     assert.equal(messages.body.messages.some((item) => item.sourceId === created.body.id && /居民服务|助医陪诊/.test(item.title)), true);
 
     const otherOrderAction = await api(baseUrl, `/api/tasks/${encodeURIComponent("escortServiceOrders:eso-r2-20260621")}/actions`, authorized(citizenToken, {

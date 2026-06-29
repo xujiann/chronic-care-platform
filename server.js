@@ -1053,7 +1053,7 @@ function seedEscortServicePolicy() {
     serviceItems: ["mobility assistance", "registration", "exam escort", "payment and medication pickup", "family communication", "psychological comfort"],
     providerEntryRule: "Provider must have trained escort workers and regular professional service capacity before public registry publication.",
     trainingTargetPerDistrict: 100,
-    statusCatalog: ["requested", "matched", "contract-pending", "in-service", "completed", "quality-review", "closed", "cancelled"],
+    statusCatalog: ["requested", "matched", "hospital-confirmed", "hospital-returned", "contract-pending", "in-service", "completed", "quality-review", "closed", "cancelled"],
     requiredEvidence: ["service contract", "worker training certificate", "liability insurance", "emergency plan", "quality review", "complaint disposition"],
     subsidyRules: [
       { group: "low-income", coverage: "government subsidy or purchase-of-service guarantee" },
@@ -1135,6 +1135,7 @@ function seedEscortServiceOrders() {
       workerId: "ew-pd-002",
       district: "Pudong",
       hospital: "Dalian Central Hospital outpatient clinic demo",
+      hospitalCode: "MR1",
       department: "Cardiology",
       appointmentAt: todayOffset(1),
       due: todayOffset(1),
@@ -1151,6 +1152,12 @@ function seedEscortServiceOrders() {
       qualityReview: "pending",
       complaintStatus: "none",
       satisfaction: "pending",
+      hospitalInterfaceStatus: "confirmed",
+      hospitalCheckInStatus: "confirmed",
+      hospitalCheckInNo: "OP-MR1-20260622-001",
+      hospitalDepartmentContact: "Cardiology outpatient guidance desk",
+      hospitalConfirmedAt: todayOffset(0),
+      hospitalNotice: "Arrive at first-floor outpatient service desk 20 minutes before the appointment.",
       sourceChannel: "community-worker",
       auditTrail: [{ at: todayOffset(0), action: "match-worker", by: "system", note: "High-risk older adult matched with trained worker." }]
     },
@@ -1161,6 +1168,7 @@ function seedEscortServiceOrders() {
       workerId: "ew-xh-001",
       district: "Xuhui",
       hospital: "Community follow-up clinic demo",
+      hospitalCode: "MR3",
       department: "Endocrinology",
       appointmentAt: todayOffset(2),
       due: todayOffset(2),
@@ -1177,6 +1185,12 @@ function seedEscortServiceOrders() {
       qualityReview: "pending",
       complaintStatus: "none",
       satisfaction: "pending",
+      hospitalInterfaceStatus: "pending",
+      hospitalCheckInStatus: "pending",
+      hospitalCheckInNo: "",
+      hospitalDepartmentContact: "",
+      hospitalConfirmedAt: "",
+      hospitalNotice: "",
       sourceChannel: "family-proxy",
       auditTrail: [{ at: todayOffset(0), action: "request-created", by: "family-proxy", note: "Contract confirmation pending." }]
     },
@@ -1187,6 +1201,7 @@ function seedEscortServiceOrders() {
       workerId: "ew-hk-001",
       district: "Hongkou",
       hospital: "Specialist outpatient demo",
+      hospitalCode: "",
       department: "Ophthalmology",
       appointmentAt: todayOffset(-1),
       due: todayOffset(0),
@@ -1203,6 +1218,12 @@ function seedEscortServiceOrders() {
       qualityReview: "follow-up-call-required",
       complaintStatus: "none",
       satisfaction: "pending",
+      hospitalInterfaceStatus: "returned",
+      hospitalCheckInStatus: "completed",
+      hospitalCheckInNo: "TB-HK-20260621-002",
+      hospitalDepartmentContact: "Outpatient volunteer desk",
+      hospitalConfirmedAt: todayOffset(-1),
+      hospitalNotice: "Quality callback required after volunteer escort completion.",
       sourceChannel: "time-bank",
       auditTrail: [{ at: todayOffset(-1), action: "service-completed", by: "escort-worker", note: "Quality review callback required." }]
     }
@@ -5587,8 +5608,8 @@ function canAccessEscortOrder(user, item, data) {
   if (user.role === "commission" || user.role === "county" || user.role === "citizen") return true;
   if (user.role !== "institution") return false;
   const provider = (data.escortServiceProviders || []).find((row) => row.id === item.providerId);
-  return [provider?.institutionCode, item.institutionCode].some((code) => code && code === user.orgCode) ||
-    [provider?.name, item.providerName].some((name) => name && name === user.orgName);
+  return [provider?.institutionCode, item.institutionCode, item.hospitalCode].some((code) => code && code === user.orgCode) ||
+    [provider?.name, item.providerName, item.hospital].some((name) => name && name === user.orgName);
 }
 
 function buildEscortServiceDashboard(data, user) {
@@ -5619,7 +5640,9 @@ function buildEscortServiceDashboard(data, user) {
       openOrders: orders.filter((item) => !isClosedTaskStatus(item.status)).length,
       highRisk: highRisk.length,
       subsidyOrders: orders.filter((item) => item.subsidyType && item.subsidyType !== "self-pay").length,
-      qualityReviewRequired: qualityReviewRequired.length
+      qualityReviewRequired: qualityReviewRequired.length,
+      hospitalConfirmed: orders.filter((item) => item.hospitalInterfaceStatus === "confirmed").length,
+      hospitalReturned: orders.filter((item) => item.hospitalInterfaceStatus === "returned").length
     },
     providers: providerRows,
     workers: workers.filter((worker) => providerRows.some((provider) => provider.id === worker.providerId)),
@@ -5658,6 +5681,8 @@ function normalizeEscortServiceOrder(payload, user, data) {
     : String(payload.serviceItems || "registration,exam escort").split(",").map((item) => item.trim()).filter(Boolean);
   const now = new Date().toISOString();
   const note = String(payload.note || "").trim();
+  const hospital = String(payload.hospital || "").trim();
+  const hospitalCode = String(payload.hospitalCode || (/(Dalian Central|central hospital|MR1)/i.test(hospital) ? "MR1" : "")).trim();
   return {
     id: payload.id || `eso-${randomUUID()}`,
     residentId,
@@ -5665,7 +5690,8 @@ function normalizeEscortServiceOrder(payload, user, data) {
     providerId,
     workerId: String(payload.workerId || "").trim(),
     district: String(payload.district || provider.district || "").trim(),
-    hospital: String(payload.hospital || "").trim(),
+    hospital,
+    hospitalCode,
     department: String(payload.department || "").trim(),
     appointmentAt: String(payload.appointmentAt || payload.due || "").trim(),
     due: String(payload.due || payload.appointmentAt || "").trim(),
@@ -5682,6 +5708,12 @@ function normalizeEscortServiceOrder(payload, user, data) {
     qualityReview: String(payload.qualityReview || "pending").trim(),
     complaintStatus: String(payload.complaintStatus || "none").trim(),
     satisfaction: String(payload.satisfaction || "pending").trim(),
+    hospitalInterfaceStatus: String(payload.hospitalInterfaceStatus || "pending").trim(),
+    hospitalCheckInStatus: String(payload.hospitalCheckInStatus || "pending").trim(),
+    hospitalCheckInNo: String(payload.hospitalCheckInNo || "").trim(),
+    hospitalDepartmentContact: String(payload.hospitalDepartmentContact || "").trim(),
+    hospitalConfirmedAt: String(payload.hospitalConfirmedAt || "").trim(),
+    hospitalNotice: String(payload.hospitalNotice || "").trim(),
     sourceChannel: String(payload.sourceChannel || user.role).trim(),
     createdAt: now,
     createdBy: user.username || user.role,
@@ -5689,6 +5721,34 @@ function normalizeEscortServiceOrder(payload, user, data) {
     providerName: provider.name,
     institutionCode: provider.institutionCode || "",
     auditTrail: [{ at: now, action: "request-created", by: user.username || user.role, note: note || "Escort service request created." }]
+  };
+}
+
+function applyEscortHospitalHandoff(item, payload, user) {
+  const now = new Date().toISOString();
+  const decision = String(payload.decision || payload.action || "confirm").trim();
+  const returned = decision === "return" || decision === "reject";
+  const updates = {
+    hospitalCode: String(payload.hospitalCode || item.hospitalCode || user.orgCode || "").trim(),
+    hospitalInterfaceStatus: returned ? "returned" : "confirmed",
+    hospitalCheckInStatus: String(payload.hospitalCheckInStatus || (returned ? "pending" : "confirmed")).trim(),
+    hospitalCheckInNo: String(payload.hospitalCheckInNo || item.hospitalCheckInNo || "").trim(),
+    hospitalDepartmentContact: String(payload.hospitalDepartmentContact || item.hospitalDepartmentContact || "").trim(),
+    hospitalConfirmedAt: String(payload.hospitalConfirmedAt || now).trim(),
+    hospitalNotice: String(payload.hospitalNotice || payload.note || item.hospitalNotice || "").trim(),
+    appointmentAt: String(payload.appointmentAt || item.appointmentAt || "").trim(),
+    due: String(payload.due || payload.appointmentAt || item.due || "").trim(),
+    status: String(payload.status || (returned ? "hospital-returned" : "hospital-confirmed")).trim()
+  };
+  return {
+    ...item,
+    ...updates,
+    updatedAt: now,
+    updatedBy: user.username || user.role,
+    auditTrail: [
+      { at: now, action: `hospital-${returned ? "returned" : "confirmed"}`, by: user.username || user.role, note: String(payload.note || updates.hospitalNotice || updates.status).trim() },
+      ...(Array.isArray(item.auditTrail) ? item.auditTrail : [])
+    ].slice(0, 20)
   };
 }
 
@@ -8768,6 +8828,63 @@ async function handleApi(req, res) {
       const denied = /scope denied|not published/i.test(error.message || "");
       sendJson(res, denied ? 403 : 400, { error: denied ? "Forbidden" : "Bad Request", message: error.message });
     }
+    return;
+  }
+
+  const escortHospitalHandoffMatch = url.pathname.match(/^\/api\/escort-services\/orders\/([^/]+)\/hospital-handoff$/);
+  if (req.method === "POST" && escortHospitalHandoffMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/escort-services/orders/:id/hospital-handoff");
+    if (!user) return;
+    const data = readDatabase();
+    const rows = Array.isArray(data.escortServiceOrders) ? data.escortServiceOrders : [];
+    const index = rows.findIndex((item) => item.id === decodeURIComponent(escortHospitalHandoffMatch[1]));
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "escort service order not found" });
+      return;
+    }
+    if (!canAccessEscortOrder(user, rows[index], data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "hospital handoff escort service order", target: rows[index].id, result: "denied", detail: "scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
+      return;
+    }
+    const payload = await collectJson(req);
+    rows[index] = applyEscortHospitalHandoff(rows[index], payload, user);
+    data.escortServiceOrders = rows;
+    data.taskMessages = [
+      {
+        id: `msg-${randomUUID()}`,
+        taskId: `escortServiceOrders:${rows[index].id}`,
+        collection: "escortServiceOrders",
+        sourceId: rows[index].id,
+        residentId: rows[index].residentId,
+        targetRole: "citizen",
+        channel: "in_app",
+        title: "Medical escort hospital handoff updated",
+        body: `${rows[index].hospital || "Hospital"} ${rows[index].department || ""} reported ${rows[index].hospitalInterfaceStatus}; ${rows[index].hospitalNotice || rows[index].hospitalCheckInNo || "please follow the escort arrangement."}`.trim(),
+        status: "sent",
+        receipts: [],
+        createdAt: new Date().toISOString(),
+        createdBy: user.username || user.role,
+        createdByName: user.name
+      },
+      ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])
+    ].slice(0, 300);
+    appendDataAccessLog(data, user, rows[index].residentId, "escortServiceOrders", payload.note || rows[index].hospitalInterfaceStatus || rows[index].status, "allowed");
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "hospital handoff escort service order",
+        target: rows[index].id,
+        result: "allowed",
+        detail: rows[index].hospitalInterfaceStatus
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, rows[index]);
     return;
   }
 

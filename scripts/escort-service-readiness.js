@@ -8,6 +8,7 @@ const DEFAULT_MARKDOWN = path.join(ROOT, "release", "escort-service-readiness-re
 
 const REQUIRED_POLICY_FIELDS = ["service catalog", "trained escort workers", "provider registry", "pricing and subsidy", "risk control", "quality monitoring"];
 const REQUIRED_ORDER_FIELDS = ["contractStatus", "insuranceStatus", "qualityReview", "subsidyType", "riskLevel", "auditTrail"];
+const REQUIRED_HOSPITAL_FIELDS = ["hospitalCode", "hospitalInterfaceStatus", "hospitalCheckInStatus", "hospitalCheckInNo", "hospitalDepartmentContact", "hospitalNotice"];
 
 function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(ROOT, relativePath), "utf8"));
@@ -23,6 +24,7 @@ function buildEscortServiceReadinessReport(options = {}) {
   const server = options.server ?? readText("server.js");
   const frontend = options.frontend ?? readText("escort.html") + readText("escort.js");
   const citizenFrontend = options.citizenFrontend ?? readText("citizen.html") + readText("citizen.js");
+  const hospitalInterfaceDoc = options.hospitalInterfaceDoc ?? readText("docs/escort-hospital-interface.md");
   const policy = data.escortServicePolicy || {};
   const providers = Array.isArray(data.escortServiceProviders) ? data.escortServiceProviders : [];
   const workers = Array.isArray(data.escortWorkers) ? data.escortWorkers : [];
@@ -38,6 +40,8 @@ function buildEscortServiceReadinessReport(options = {}) {
     { id: "escort:subsidy", passed: orders.some((item) => ["low-income", "80plus-living-alone", "time-bank"].includes(item.subsidyType)), detail: orders.map((item) => item.subsidyType).join(", ") },
     { id: "escort:riskQuality", passed: orders.some((item) => item.riskLevel === "high") && orders.some((item) => item.qualityReview && item.qualityReview !== "closed"), detail: "risk queue and quality callback present" },
     { id: "escort:api", passed: /\/api\/escort-services\/dashboard/.test(server) && /\/api\/escort-services\/orders/.test(server) && /canAccessEscortOrder/.test(server), detail: "dashboard, order creation, action, and role guard present" },
+    { id: "escort:hospitalInterface", passed: /hospital-handoff/.test(server) && /applyEscortHospitalHandoff/.test(server) && REQUIRED_HOSPITAL_FIELDS.every((field) => server.includes(field)) && (orders.some((item) => item.hospitalInterfaceStatus === "confirmed") || server.includes('hospitalInterfaceStatus: "confirmed"')), detail: REQUIRED_HOSPITAL_FIELDS.join(", ") },
+    { id: "escort:hospitalInterfaceDoc", passed: /POST \/api\/escort-services\/orders\/:id\/hospital-handoff/.test(hospitalInterfaceDoc) && /flowchart TD/.test(hospitalInterfaceDoc) && /hospitalCode/.test(hospitalInterfaceDoc), detail: "hospital handoff contract and workflow documented" },
     { id: "escort:frontend", passed: /escort-order-form/.test(frontend) && /fetchEscortDashboard/.test(frontend) && /data-escort-action/.test(frontend), detail: "runnable escort portal present" },
     { id: "escort:citizenAppointment", passed: /escort-appointment-form/.test(citizenFrontend) && /bindEscortAppointment/.test(citizenFrontend) && /\/escort-services\/orders/.test(citizenFrontend), detail: "citizen portal can create medical escort appointments" },
     { id: "escort:releaseScript", passed: Boolean(pkg.scripts?.["escort:readiness"]), detail: pkg.scripts?.["escort:readiness"] || "missing" }
@@ -54,7 +58,8 @@ function buildEscortServiceReadinessReport(options = {}) {
       trainedWorkers: workers.filter((item) => item.examStatus === "passed").length,
       orders: orders.length,
       subsidyOrders: orders.filter((item) => item.subsidyType && item.subsidyType !== "self-pay").length,
-      highRiskOrders: orders.filter((item) => item.riskLevel === "high" || item.priority === "high").length
+      highRiskOrders: orders.filter((item) => item.riskLevel === "high" || item.priority === "high").length,
+      hospitalConfirmedOrders: orders.filter((item) => item.hospitalInterfaceStatus === "confirmed").length
     },
     checks
   };
@@ -74,6 +79,7 @@ function renderMarkdown(report) {
     `- Orders: ${report.summary.orders}`,
     `- Subsidy orders: ${report.summary.subsidyOrders}`,
     `- High-risk orders: ${report.summary.highRiskOrders}`,
+    `- Hospital-confirmed orders: ${report.summary.hospitalConfirmedOrders}`,
     "",
     "## Checks",
     "",

@@ -41,7 +41,9 @@ function buildStaticEscortDashboard(state) {
       openOrders: orders.filter((item) => !["completed", "closed", "cancelled"].includes(item.status)).length,
       highRisk: orders.filter((item) => item.priority === "high" || item.riskLevel === "high").length,
       subsidyOrders: orders.filter((item) => item.subsidyType && item.subsidyType !== "self-pay").length,
-      qualityReviewRequired: orders.filter((item) => item.qualityReview && !["closed", "passed"].includes(item.qualityReview)).length
+      qualityReviewRequired: orders.filter((item) => item.qualityReview && !["closed", "passed"].includes(item.qualityReview)).length,
+      hospitalConfirmed: orders.filter((item) => item.hospitalInterfaceStatus === "confirmed").length,
+      hospitalReturned: orders.filter((item) => item.hospitalInterfaceStatus === "returned").length
     },
     providers,
     workers,
@@ -97,7 +99,7 @@ function renderEscortOrders(items) {
           <td>${escapeHtml(item.residentId || "")}<br><small>${escapeHtml(item.familyContactStatus || "")}</small></td>
           <td>${escapeHtml(item.provider?.name || item.providerName || item.providerId || "")}<br><small>${escapeHtml(item.district || "")}</small></td>
           <td>${escapeHtml(item.worker?.name || item.workerId || "pending")}<br><small>${escapeHtml((item.serviceItems || []).join(", "))}</small></td>
-          <td>${escapeHtml(item.hospital || "")}<br><small>${escapeHtml(item.department || "")} / ${escapeHtml(item.appointmentAt || item.due || "")}</small></td>
+          <td>${escapeHtml(item.hospital || "")}<br><small>${escapeHtml(item.department || "")} / ${escapeHtml(item.appointmentAt || item.due || "")}</small><br><small>${statusBadge(item.hospitalInterfaceStatus || "pending")} ${escapeHtml(item.hospitalCheckInNo || item.hospitalNotice || "")}</small></td>
           <td>${statusBadge(item.subsidyType)} ${statusBadge(item.contractStatus)} ${statusBadge(item.insuranceStatus)}</td>
           <td>${statusBadge(item.status)} ${statusBadge(item.priority)}<br><small>${escapeHtml(item.qualityReview || "")}</small></td>
           <td>
@@ -216,7 +218,7 @@ async function updateEscortOrder(id, status) {
 
 function statusBadge(status) {
   const text = String(status ?? "unknown");
-  const danger = ["high", "blocked", "training-gap", "overdue"].includes(text);
+  const danger = ["high", "blocked", "training-gap", "overdue", "returned", "hospital-returned"].includes(text);
   const warn = ["medium", "pending", "contract-pending", "requested", "quality-review", "follow-up-call-required", "training"].includes(text);
   const type = danger ? "danger" : warn ? "warn" : "info";
   return `<span class="badge ${type}">${escapeHtml(text)}</span>`;
