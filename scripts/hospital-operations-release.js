@@ -39,6 +39,7 @@ function buildHospitalOperationsReleaseReport(options = {}) {
     check("release:reconciliationStatuses", /returned/.test(sharedJs) && /correcting/.test(sharedJs) && /reconciliationActionButtons/.test(operationsJs) && /review-status-change/.test(serverSource), "direct-report review statuses and audit trail are present"),
     check("release:performanceDetail", /performance-indicator-detail/.test(operationsHtml) && /renderPerformanceIndicatorDetail/.test(operationsJs) && /indicatorDetails/.test(serverSource), "performance indicator detail view is present"),
     check("release:dispatchLifecycle", /\/api\/operations\/dispatch\/:id\/status/.test(serverSource) && /dispatchStatusButtons/.test(operationsJs) && /status-change/.test(serverSource), "dispatch lifecycle actions are present"),
+    check("release:hospitalIntegrationIngest", /\/api\/operations\/integration\/snapshots/.test(serverSource) && /\/api\/operations\/integration\/dispatch-feedback/.test(serverSource) && /\/api\/operations\/integration\/reconciliation/.test(serverSource) && /医院运行接口验签/.test(serverSource), "signed hospital system ingest APIs are present"),
     check("release:packageScript", Boolean(pkg.scripts?.["hospital-operations:release"]), "package script registered")
   ];
   return {

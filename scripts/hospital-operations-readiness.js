@@ -26,6 +26,9 @@ const REQUIRED_ROUTES = [
   "/api/operations/handover/owners",
   "/api/operations/handover/signoff",
   "/api/operations/interface-mapping",
+  "/api/operations/integration/snapshots",
+  "/api/operations/integration/dispatch-feedback",
+  "/api/operations/integration/reconciliation",
   "/api/operations/dispatch",
   "/api/operations/dispatch/:id/status",
   "/api/operations/reconciliation/:id/review"
@@ -76,6 +79,7 @@ function buildHospitalOperationsReadinessReport(options = {}) {
     { id: "hospitalOps:permissions", passed: /requireApiRole\(req, res, \["commission"\], "\/api\/operations\/dashboard"\)/.test(serverSource) && /operations-dispatch/.test(serverSource) && /statistics-reconciliation-review/.test(serverSource), detail: "commission-only API and audit events" },
     { id: "hospitalOps:frontend", passed: /operations-snapshots/.test(operationsHtml) && /dispatch-form/.test(operationsHtml) && /fetchOperationsDashboard/.test(operationsJs), detail: "operations page renders live monitor, dispatch, and reconciliation controls" },
     { id: "hospitalOps:interfaceMapping", passed: /buildOperationsInterfaceMappingEvidence/.test(serverSource) && /operations-interface-mapping/.test(operationsHtml) && /renderInterfaceMapping/.test(operationsJs), detail: "site joint-test field mapping API and panel" },
+    { id: "hospitalOps:integrationIngest", passed: /normalizeOperationSnapshot/.test(serverSource) && /\/api\/operations\/integration\/snapshots/.test(serverSource) && /\/api\/operations\/integration\/dispatch-feedback/.test(serverSource) && /\/api\/operations\/integration\/reconciliation/.test(serverSource) && /verifyIntegrationSignature/.test(serverSource), detail: "signed hospital system ingest APIs for snapshots, dispatch feedback, and reconciliation batches" },
     { id: "hospitalOps:sla", passed: /buildCommandSla/.test(serverSource) && /command-chain-sla/.test(operationsJs), detail: "command-chain SLA status and escalation evidence" },
     { id: "hospitalOps:playbooks", passed: /buildOperationsPlaybooks/.test(serverSource) && /operation-playbooks/.test(operationsHtml) && /renderOperationsPlaybooks/.test(operationsJs), detail: "alert playbook API evidence and panel" },
     { id: "hospitalOps:handover", passed: /buildOperationsHandover/.test(serverSource) && /\/api\/operations\/handover/.test(serverSource) && /operation-handover/.test(operationsHtml) && /renderOperationsHandover/.test(operationsJs), detail: "shift handover list API and panel" },

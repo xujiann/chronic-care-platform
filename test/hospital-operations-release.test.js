@@ -20,6 +20,7 @@ test("hospital operations release validates all completed directions", () => {
   assert.equal(report.checks.some((item) => item.id === "release:reconciliationStatuses" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "release:performanceDetail" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "release:dispatchLifecycle" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "release:hospitalIntegrationIngest" && item.passed), true);
 });
 
 test("hospital operations release detects missing package script", () => {
@@ -49,6 +50,7 @@ test("hospital operations release renders and writes artifacts", (t) => {
   const writtenJson = JSON.parse(fs.readFileSync(path.join(outputDir, "hospital-operations-release-report.json"), "utf8"));
   const writtenMarkdown = fs.readFileSync(path.join(outputDir, "hospital-operations-release-report.md"), "utf8");
   assert.equal(writtenJson.ok, true);
+  assert.match(writtenMarkdown, /release:hospitalIntegrationIngest/);
   assert.match(writtenMarkdown, /release:performanceDetail/);
 });
 

@@ -285,6 +285,43 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(interfaceMapping.body.mappings.some((item) => item.status === "待联调"), true);
     assert.equal(interfaceMapping.body.mappings.every((item) => item.fieldCoverage.every((field) => field.mapped)), true);
 
+    const hospitalLogin = await login(baseUrl, "hospital");
+    const snapshotPayload = {
+      idempotencyKey: "ops-snapshot-mr1-live-001",
+      snapshots: [
+        {
+          id: "ops-mr1-live-api",
+          institutionId: "MR1",
+          institution: "Dalian Central Hospital",
+          district: "city",
+          snapshotAt: "2026-06-23T09:00:00+08:00",
+          sourceSystem: "HIS/ED/HR",
+          beds: { total: 1460, open: 1400, occupied: 1372, icuTotal: 72, icuOccupied: 70, emergencyObservation: 42 },
+          staff: { doctorsOnDuty: 190, nursesOnDuty: 418, emergencyDoctors: 29, shortage: 2 },
+          equipment: { ctTotal: 8, ctAvailable: 6, ventilatorsTotal: 96, ventilatorsAvailable: 12, ambulancesAvailable: 5 },
+          outpatient: { visitsToday: 5120, emergencyVisits: 650, feverClinicVisits: 95, waitingOver30Min: 88 },
+          inpatient: { admissionsToday: 214, dischargesToday: 188, surgeryScheduled: 90, averageLengthOfStay: 7.6 },
+          reporting: { directReportBatch: "stat-20260623-am", source: "healthStatisticsIngestion", reconciled: false, varianceRate: 0.052 },
+          dispatchSuggestion: "API regression snapshot should trigger critical operation monitoring."
+        }
+      ]
+    };
+    const unsignedSnapshot = await api(baseUrl, "/api/operations/integration/snapshots", authorized(hospitalLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify(snapshotPayload)
+    }));
+    assert.equal(unsignedSnapshot.response.status, 401);
+
+    const signedSnapshot = await api(baseUrl, "/api/operations/integration/snapshots", authorized(hospitalLogin.body.token, {
+      method: "POST",
+      headers: { "x-integration-signature": integrationSignature(snapshotPayload) },
+      body: JSON.stringify(snapshotPayload)
+    }));
+    assert.equal(signedSnapshot.response.status, 202);
+    assert.equal(signedSnapshot.body.accepted, 1);
+    assert.equal(signedSnapshot.body.ids.includes("ops-mr1-live-api"), true);
+    assert.equal(signedSnapshot.body.critical, 1);
+
     const dispatchAction = await api(baseUrl, "/api/operations/dispatch", authorized(accountLogin.body.token, {
       method: "POST",
       body: JSON.stringify({
@@ -311,6 +348,42 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(dispatchStatus.body.status, "closed");
     assert.equal(dispatchStatus.body.auditTrail.some((item) => item.action === "status-change"), true);
 
+    const integrationDispatch = await api(baseUrl, "/api/operations/dispatch", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        id: "dispatch-integration-feedback-test",
+        category: "bed",
+        priority: "high",
+        status: "assigned",
+        sourceInstitutionId: "MR3",
+        sourceInstitution: "Qingniwaqiao Community Health Service Center",
+        targetInstitutionId: "MR1",
+        targetInstitution: "Dalian Central Hospital",
+        resourceType: "step-down-bed",
+        quantity: 6,
+        reason: "API regression dispatch feedback"
+      })
+    }));
+    assert.equal(integrationDispatch.response.status, 201);
+
+    const feedbackPayload = {
+      dispatchId: "dispatch-integration-feedback-test",
+      status: "in-progress",
+      note: "Hospital accepted resource dispatch.",
+      sourceSystem: "hospital-dispatch-system",
+      receiptNo: "RECEIPT-MR1-001",
+      handledBy: "MR1 operations desk"
+    };
+    const dispatchFeedback = await api(baseUrl, "/api/operations/integration/dispatch-feedback", authorized(hospitalLogin.body.token, {
+      method: "POST",
+      headers: { "x-integration-signature": integrationSignature(feedbackPayload) },
+      body: JSON.stringify(feedbackPayload)
+    }));
+    assert.equal(dispatchFeedback.response.status, 200);
+    assert.equal(dispatchFeedback.body.status, "in-progress");
+    assert.equal(dispatchFeedback.body.externalReceipt.receiptNo, "RECEIPT-MR1-001");
+    assert.equal(dispatchFeedback.body.auditTrail.some((item) => item.action === "status-change"), true);
+
     const reconReview = await api(baseUrl, "/api/operations/reconciliation/recon-mr1-20260622-am/review", authorized(accountLogin.body.token, {
       method: "POST",
       body: JSON.stringify({ status: "approved", reviewNote: "API regression approved" })
@@ -327,6 +400,38 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(reconCorrection.response.status, 200);
     assert.equal(reconCorrection.body.status, "correcting");
     assert.equal(reconCorrection.body.auditTrail.some((item) => item.action === "review-status-change"), true);
+
+    const reconciliationPayload = {
+      idempotencyKey: "ops-recon-mr1-live-001",
+      reconciliations: [
+        {
+          id: "recon-mr1-live-api",
+          institutionId: "MR1",
+          institution: "Dalian Central Hospital",
+          period: "2026-06-23 AM",
+          sourceBatch: "stat-20260623-am",
+          status: "blocked",
+          varianceRate: 0.052,
+          fields: ["beds.occupied", "outpatient.visitsToday"],
+          platformValue: 5120,
+          directReportValue: 4860,
+          reviewNote: "Hospital direct-report staging value requires confirmation."
+        }
+      ]
+    };
+    const reconciliationIngest = await api(baseUrl, "/api/operations/integration/reconciliation", authorized(hospitalLogin.body.token, {
+      method: "POST",
+      headers: { "x-integration-signature": integrationSignature(reconciliationPayload) },
+      body: JSON.stringify(reconciliationPayload)
+    }));
+    assert.equal(reconciliationIngest.response.status, 202);
+    assert.equal(reconciliationIngest.body.accepted, 1);
+    assert.equal(reconciliationIngest.body.blocked, 1);
+
+    const operationsAfterIntegration = await api(baseUrl, "/api/operations/dashboard", authorized(accountLogin.body.token));
+    assert.equal(operationsAfterIntegration.body.snapshots.some((item) => item.id === "ops-mr1-live-api" && item.normalizedStatus === "critical"), true);
+    assert.equal(operationsAfterIntegration.body.dispatchRequests.some((item) => item.id === "dispatch-integration-feedback-test" && item.status === "in-progress"), true);
+    assert.equal(operationsAfterIntegration.body.reconciliationReviews.some((item) => item.id === "recon-mr1-live-api" && item.status === "blocked"), true);
 
     const identityPreview = await api(baseUrl, "/api/auth/identity/preview", authorized(accountLogin.body.token, {
       method: "POST",

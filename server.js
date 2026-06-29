@@ -3786,6 +3786,157 @@ function normalizeDispatchAction(payload, user) {
   };
 }
 
+function numberField(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function objectField(value) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function integrationPayloadAllowedForInstitution(payload, user) {
+  if (user.role !== "institution") return true;
+  const institutionId = String(payload.institutionId || payload.sourceInstitutionId || payload.targetInstitutionId || "").trim();
+  return !institutionId || institutionId === user.orgCode;
+}
+
+function assertSignedOperationsPayload(req, res, payload, user, target) {
+  if (!verifyIntegrationSignature(payload, req.headers["x-integration-signature"])) {
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "医院运行接口验签", target, result: "拒绝", detail: "签名不匹配" });
+    sendJson(res, 401, { error: "Unauthorized", message: "医院运行接口签名校验失败" });
+    return false;
+  }
+  return true;
+}
+
+function deriveOperationAlerts(snapshot) {
+  const alerts = new Set(Array.isArray(snapshot.alerts) ? snapshot.alerts.map(String).filter(Boolean) : []);
+  const bedRatio = ratio(snapshot.beds?.occupied, snapshot.beds?.open);
+  const variance = Number(snapshot.reporting?.varianceRate || 0);
+  if (bedRatio >= 0.95) alerts.add("bed-occupancy-critical");
+  else if (bedRatio >= 0.9) alerts.add("bed-occupancy-high");
+  if (Number(snapshot.staff?.shortage || 0) > 0) alerts.add("staff-shortage");
+  if (Number(snapshot.outpatient?.waitingOver30Min || 0) >= 50) alerts.add("ed-waiting-high");
+  if (variance >= 0.05) alerts.add("reporting-variance-high");
+  return [...alerts];
+}
+
+function normalizeOperationSnapshot(payload, user, rules = []) {
+  const now = new Date().toISOString();
+  const beds = objectField(payload.beds);
+  const staff = objectField(payload.staff);
+  const equipment = objectField(payload.equipment);
+  const outpatient = objectField(payload.outpatient);
+  const inpatient = objectField(payload.inpatient);
+  const reporting = objectField(payload.reporting);
+  const institutionId = String(payload.institutionId || user.orgCode || "").trim();
+  const snapshotAt = String(payload.snapshotAt || now).trim();
+  const normalized = {
+    id: String(payload.id || `ops-${institutionId || "unknown"}-${snapshotAt.replace(/[^0-9A-Za-z]/g, "").slice(0, 14)}`).trim(),
+    institutionId,
+    institution: String(payload.institution || user.orgName || institutionId).trim(),
+    district: String(payload.district || payload.region || "").trim(),
+    snapshotAt,
+    beds: {
+      total: numberField(beds.total),
+      open: numberField(beds.open),
+      occupied: numberField(beds.occupied),
+      icuTotal: numberField(beds.icuTotal),
+      icuOccupied: numberField(beds.icuOccupied),
+      emergencyObservation: numberField(beds.emergencyObservation)
+    },
+    staff: {
+      doctorsOnDuty: numberField(staff.doctorsOnDuty),
+      nursesOnDuty: numberField(staff.nursesOnDuty),
+      emergencyDoctors: numberField(staff.emergencyDoctors),
+      shortage: numberField(staff.shortage)
+    },
+    equipment: {
+      ctTotal: numberField(equipment.ctTotal),
+      ctAvailable: numberField(equipment.ctAvailable),
+      ventilatorsTotal: numberField(equipment.ventilatorsTotal),
+      ventilatorsAvailable: numberField(equipment.ventilatorsAvailable),
+      ambulancesAvailable: numberField(equipment.ambulancesAvailable)
+    },
+    outpatient: {
+      visitsToday: numberField(outpatient.visitsToday),
+      emergencyVisits: numberField(outpatient.emergencyVisits),
+      feverClinicVisits: numberField(outpatient.feverClinicVisits),
+      waitingOver30Min: numberField(outpatient.waitingOver30Min)
+    },
+    inpatient: {
+      admissionsToday: numberField(inpatient.admissionsToday),
+      dischargesToday: numberField(inpatient.dischargesToday),
+      surgeryScheduled: numberField(inpatient.surgeryScheduled),
+      averageLengthOfStay: numberField(inpatient.averageLengthOfStay)
+    },
+    reporting: {
+      directReportBatch: String(reporting.directReportBatch || payload.sourceBatch || "").trim(),
+      source: String(reporting.source || payload.sourceSystem || "hospital-operations-integration").trim(),
+      reconciled: Boolean(reporting.reconciled),
+      varianceRate: numberField(reporting.varianceRate)
+    },
+    dispatchSuggestion: String(payload.dispatchSuggestion || "").trim(),
+    sourceSystem: String(payload.sourceSystem || "hospital-operations-integration").trim(),
+    receivedAt: now,
+    receivedBy: user.username || user.role,
+    auditTrail: [
+      ...(Array.isArray(payload.auditTrail) ? payload.auditTrail : []),
+      { at: now, actor: user.username || user.role, action: "integration-snapshot-upsert", note: String(payload.idempotencyKey || payload.messageId || "snapshot").trim() }
+    ]
+  };
+  normalized.alerts = deriveOperationAlerts({ ...normalized, alerts: payload.alerts });
+  normalized.normalizedStatus = normalizeOperationStatus(normalized, rules);
+  return normalized;
+}
+
+function normalizeReconciliationBatchItem(payload, user) {
+  const now = new Date().toISOString();
+  const institutionId = String(payload.institutionId || user.orgCode || "").trim();
+  const sourceBatch = String(payload.sourceBatch || payload.batch || "").trim();
+  const fields = Array.isArray(payload.fields) ? payload.fields.map(String).filter(Boolean) : [];
+  return {
+    id: String(payload.id || `recon-${institutionId || "unknown"}-${sourceBatch || Date.now()}`).trim(),
+    institutionId,
+    institution: String(payload.institution || user.orgName || institutionId).trim(),
+    period: String(payload.period || "").trim(),
+    sourceBatch,
+    status: String(payload.status || "pending-review").trim(),
+    varianceRate: numberField(payload.varianceRate),
+    fields,
+    platformValue: numberField(payload.platformValue),
+    directReportValue: numberField(payload.directReportValue),
+    owner: String(payload.owner || "statistics-office").trim(),
+    reviewedBy: String(payload.reviewedBy || "").trim(),
+    reviewedAt: payload.reviewedAt || "",
+    reviewNote: String(payload.reviewNote || payload.note || "").trim(),
+    evidence: Array.isArray(payload.evidence) ? payload.evidence.map(String).filter(Boolean) : ["hospitalOperationSnapshots", "healthStatisticsIngestion"],
+    receivedAt: now,
+    receivedBy: user.username || user.role,
+    auditTrail: [
+      ...(Array.isArray(payload.auditTrail) ? payload.auditTrail : []),
+      { at: now, actor: user.username || user.role, action: "integration-reconciliation-upsert", note: sourceBatch || "reconciliation" }
+    ]
+  };
+}
+
+function appendOperationsIntegrationAudit(data, user, action, target, detail) {
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action,
+      target,
+      result: "allowed",
+      detail
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+}
+
 function normalizeHandoverSignoff(payload, user, handover) {
   const now = new Date().toISOString();
   const handoverItems = Array.isArray(handover?.items) ? handover.items : [];
@@ -6274,6 +6425,106 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/operations/interface-mapping");
     if (!user) return;
     sendJson(res, 200, buildOperationsInterfaceMappingEvidence(readDatabase()));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/operations/integration/snapshots") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/operations/integration/snapshots");
+    if (!user) return;
+    const payload = await collectJson(req);
+    if (!assertSignedOperationsPayload(req, res, payload, user, "operations-snapshots")) return;
+    const rows = Array.isArray(payload.snapshots) ? payload.snapshots : [payload.snapshot || payload];
+    if (!rows.length || rows.some((item) => !item || typeof item !== "object" || !item.institutionId || !item.snapshotAt)) {
+      sendJson(res, 400, { error: "Bad Request", message: "运行快照必须包含 institutionId 和 snapshotAt" });
+      return;
+    }
+    if (!rows.every((item) => integrationPayloadAllowedForInstitution(item, user))) {
+      sendJson(res, 403, { error: "Forbidden", message: "医疗机构只能上报本机构运行快照" });
+      return;
+    }
+    const data = readDatabase();
+    const rules = Array.isArray(data.operationAlertRules) ? data.operationAlertRules : [];
+    const snapshots = rows.map((item) => normalizeOperationSnapshot(item, user, rules));
+    const current = Array.isArray(data.hospitalOperationSnapshots) ? data.hospitalOperationSnapshots : [];
+    const byId = new Map(current.map((item) => [item.id, item]));
+    snapshots.forEach((item) => byId.set(item.id, { ...(byId.get(item.id) || {}), ...item }));
+    data.hospitalOperationSnapshots = [...snapshots.map((item) => byId.get(item.id)), ...current.filter((item) => !snapshots.some((snapshot) => snapshot.id === item.id))].slice(0, 300);
+    appendOperationsIntegrationAudit(data, user, "operations-snapshot-ingest", `${snapshots.length} snapshots`, `critical=${snapshots.filter((item) => item.normalizedStatus === "critical").length}`);
+    writeDatabase(data);
+    sendJson(res, 202, {
+      ok: true,
+      accepted: snapshots.length,
+      ids: snapshots.map((item) => item.id),
+      critical: snapshots.filter((item) => item.normalizedStatus === "critical").length,
+      warning: snapshots.filter((item) => item.normalizedStatus === "warning").length
+    });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/operations/integration/dispatch-feedback") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/operations/integration/dispatch-feedback");
+    if (!user) return;
+    const payload = await collectJson(req);
+    if (!assertSignedOperationsPayload(req, res, payload, user, "operations-dispatch-feedback")) return;
+    const dispatchId = String(payload.dispatchId || payload.id || "").trim();
+    if (!dispatchId) {
+      sendJson(res, 400, { error: "Bad Request", message: "调度回执必须包含 dispatchId" });
+      return;
+    }
+    const data = readDatabase();
+    const index = (data.resourceDispatchRequests || []).findIndex((item) => item.id === dispatchId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "dispatch request not found" });
+      return;
+    }
+    const dispatch = data.resourceDispatchRequests[index];
+    if (user.role === "institution" && ![dispatch.sourceInstitutionId, dispatch.targetInstitutionId].filter(Boolean).includes(user.orgCode)) {
+      sendJson(res, 403, { error: "Forbidden", message: "医疗机构只能反馈本机构相关调度单" });
+      return;
+    }
+    data.resourceDispatchRequests[index] = {
+      ...applyDispatchStatusUpdate(dispatch, payload, user),
+      externalReceipt: {
+        sourceSystem: String(payload.sourceSystem || "hospital-dispatch-feedback").trim(),
+        receiptNo: String(payload.receiptNo || payload.idempotencyKey || "").trim(),
+        handledBy: String(payload.handledBy || user.name || user.username).trim(),
+        handledAt: String(payload.handledAt || new Date().toISOString()).trim()
+      }
+    };
+    appendOperationsIntegrationAudit(data, user, "operations-dispatch-feedback", dispatchId, data.resourceDispatchRequests[index].status);
+    writeDatabase(data);
+    sendJson(res, 200, data.resourceDispatchRequests[index]);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/operations/integration/reconciliation") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/operations/integration/reconciliation");
+    if (!user) return;
+    const payload = await collectJson(req);
+    if (!assertSignedOperationsPayload(req, res, payload, user, "operations-reconciliation")) return;
+    const rows = Array.isArray(payload.reconciliations) ? payload.reconciliations : [payload.reconciliation || payload];
+    if (!rows.length || rows.some((item) => !item || typeof item !== "object" || !item.institutionId || !item.sourceBatch)) {
+      sendJson(res, 400, { error: "Bad Request", message: "统计对账批次必须包含 institutionId 和 sourceBatch" });
+      return;
+    }
+    if (!rows.every((item) => integrationPayloadAllowedForInstitution(item, user))) {
+      sendJson(res, 403, { error: "Forbidden", message: "医疗机构只能上报本机构统计对账数据" });
+      return;
+    }
+    const data = readDatabase();
+    const reviews = rows.map((item) => normalizeReconciliationBatchItem(item, user));
+    const current = Array.isArray(data.statisticsReconciliationReviews) ? data.statisticsReconciliationReviews : [];
+    const byId = new Map(current.map((item) => [item.id, item]));
+    reviews.forEach((item) => byId.set(item.id, { ...(byId.get(item.id) || {}), ...item }));
+    data.statisticsReconciliationReviews = [...reviews.map((item) => byId.get(item.id)), ...current.filter((item) => !reviews.some((review) => review.id === item.id))].slice(0, 200);
+    appendOperationsIntegrationAudit(data, user, "operations-reconciliation-ingest", `${reviews.length} reviews`, `blocked=${reviews.filter((item) => item.status === "blocked").length}`);
+    writeDatabase(data);
+    sendJson(res, 202, {
+      ok: true,
+      accepted: reviews.length,
+      ids: reviews.map((item) => item.id),
+      blocked: reviews.filter((item) => item.status === "blocked").length
+    });
     return;
   }
 

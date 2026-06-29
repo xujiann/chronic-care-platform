@@ -778,7 +778,7 @@ function renderMarkdown(report) {
     "",
     "## Hospital operations release report",
     "",
-    "See `hospital-operations-release-report.json` and `hospital-operations-release-report.md` for interface mapping, SLA command chains, alert playbooks, shift handover, shift handover owner matrix, shift handover signoff audit trace, multi-status reconciliation review, performance indicator detail, dispatch lifecycle, and release script evidence.",
+    "See `hospital-operations-release-report.json` and `hospital-operations-release-report.md` for interface mapping, signed hospital system ingest APIs, SLA command chains, alert playbooks, shift handover, shift handover owner matrix, shift handover signoff audit trace, multi-status reconciliation review, performance indicator detail, dispatch lifecycle, and release script evidence.",
     "",
     "## Full process audit report",
     "",

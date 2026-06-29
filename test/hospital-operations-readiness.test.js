@@ -18,6 +18,7 @@ test("hospital operations readiness validates monitor dispatch and reconciliatio
   assert.equal(report.checks.some((item) => item.id === "hospitalOps:handoverOwners" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "hospitalOps:handoverSignoff" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "hospitalOps:performanceDetail" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "hospitalOps:integrationIngest" && item.passed), true);
   assert.equal(report.summary.highPressure >= 1, true);
   assert.equal(report.reusedCollections.includes("healthStatisticsIngestion"), true);
 });
