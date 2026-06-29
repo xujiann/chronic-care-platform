@@ -143,6 +143,8 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(js, /renderRiskDrilldowns/);
   assert.match(js, /buildStaticSiteEvidencePackage/);
   assert.match(js, /renderSiteEvidencePackage/);
+  assert.match(js, /buildDashboardDepartmentFunctionMatrix/);
+  assert.match(js, /buildDashboardCityCountyFunctionMatrix/);
   assert.match(js, /buildDashboardPopulationInsights/);
   assert.match(js, /renderFunctionReport/);
   assert.match(js, /renderPopulationServiceBoard/);
@@ -161,6 +163,7 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(read("portal.css"), /certificate-exchange-card/);
   assert.match(read("portal.css"), /drilldown-card/);
   assert.match(read("portal.css"), /site-evidence-card/);
+  assert.match(read("portal.css"), /function-matrix-card/);
   assert.match(js, /源待办/);
   assert.match(js, /预览待办/);
   assert.match(js, /源应用/);
@@ -182,6 +185,14 @@ test("health dashboard about page documents policies data boundary and site cuto
   assert.match(html, /health-dashboard-about\.js/);
   assert.match(html, /data-dashboard-about-section="runtime-report"/);
   assert.match(html, /dashboard-about-function-report/);
+  assert.match(html, /data-dashboard-about-section="department-functions"/);
+  assert.match(html, /dashboard-about-department-matrix/);
+  assert.match(html, /规划信息处\/信息中心/);
+  assert.match(html, /医政医管处/);
+  assert.match(html, /data-dashboard-about-section="city-county-functions"/);
+  assert.match(html, /dashboard-about-city-county-matrix/);
+  assert.match(html, /市卫生健康委/);
+  assert.match(html, /区县卫生健康局/);
   assert.match(html, /data-dashboard-about-section="template-functions"/);
   assert.match(html, /data-dashboard-about-section="policy-basis"/);
   assert.match(html, /data-dashboard-about-section="data-boundary"/);
@@ -204,6 +215,8 @@ test("health dashboard about page documents policies data boundary and site cuto
   assert.match(js, /\/api\/health-dashboard\/summary/);
   assert.match(js, /dashboard-about-runtime-state/);
   assert.match(js, /aboutRuntimeFunction/);
+  assert.match(js, /renderAboutMatrix/);
+  assert.match(js, /aboutFunctionMatrix/);
   assert.match(js, /aboutRuntimeEvidence/);
   assert.match(js, /staticAboutRuntimeReport/);
   assert.match(read("package.json"), /health-dashboard-about\.js/);

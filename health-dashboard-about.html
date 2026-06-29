@@ -58,6 +58,68 @@
         <div class="rules" id="dashboard-about-onsite-boundaries"></div>
       </section>
 
+      <section class="panel" data-dashboard-about-section="department-functions">
+        <div class="panel-title">
+          <h2>按内部机构设置的已实现功能</h2>
+          <span>结合卫生健康行政部门常见处室职责，列出当前系统能力和下一步接口计划</span>
+        </div>
+        <div class="function-matrix-grid" id="dashboard-about-department-matrix">
+          <article class="function-matrix-card ready" data-about-function-matrix="planning-information-static">
+            <span>内部机构 · ready</span>
+            <strong>规划信息处/信息中心</strong>
+            <ul>
+              <li>前七应用汇总入口</li>
+              <li>日周月年服务量看板</li>
+              <li>接口联调与发布证据</li>
+            </ul>
+            <p>接入真实统计日报、机构目录、运行监控和生产数据库。</p>
+            <small>health-dashboard:summary</small>
+          </article>
+          <article class="function-matrix-card watch" data-about-function-matrix="medical-administration-static">
+            <span>内部机构 · watch</span>
+            <strong>医政医管处</strong>
+            <ul>
+              <li>就诊入院看板</li>
+              <li>转诊与高风险任务下钻</li>
+              <li>源应用导航</li>
+            </ul>
+            <p>联调 HIS、EMR、LIS、PACS、床位和远程会诊接口。</p>
+            <small>riskDrilldowns</small>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" data-dashboard-about-section="city-county-functions">
+        <div class="panel-title">
+          <h2>按市、县两级机构的已实现功能</h2>
+          <span>区分市级统筹、专业中心、区县卫健局、医共体和基层机构的当前能力边界</span>
+        </div>
+        <div class="function-matrix-grid" id="dashboard-about-city-county-matrix">
+          <article class="function-matrix-card ready" data-about-function-matrix="city-health-commission-static">
+            <span>市级 · ready</span>
+            <strong>市卫生健康委</strong>
+            <ul>
+              <li>综合管理入口</li>
+              <li>指标风险任务证据汇总</li>
+              <li>管理端审计留痕</li>
+            </ul>
+            <p>接入真实统一身份、统计直报和跨部门证照回执。</p>
+            <small>/api/health-dashboard/summary</small>
+          </article>
+          <article class="function-matrix-card watch" data-about-function-matrix="county-health-bureau-static">
+            <span>县级 · watch</span>
+            <strong>区县卫生健康局</strong>
+            <ul>
+              <li>基层、医共体和慢病任务汇总</li>
+              <li>源应用办理入口</li>
+              <li>现场问题证据挂接</li>
+            </ul>
+            <p>增加区县筛选、辖区机构看板和任务闭环率。</p>
+            <small>county.html/openActions</small>
+          </article>
+        </div>
+      </section>
+
       <section class="panel" data-dashboard-about-section="template-functions">
         <div class="panel-title">
           <h2>本模板主要功能</h2>

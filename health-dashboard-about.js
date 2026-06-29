@@ -24,6 +24,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 function renderAboutRuntime(report, sourceMode) {
   renderAboutFunctionCards(report.functions || [], sourceMode);
+  renderAboutMatrix("#dashboard-about-department-matrix", report.departmentFunctionMatrix || [], "department");
+  renderAboutMatrix("#dashboard-about-city-county-matrix", report.cityCountyFunctionMatrix || [], "agency");
   renderAboutReleaseEvidence(report.releaseEvidence || []);
   renderAboutOnsiteBoundaries(report.onsiteBoundaries || []);
 }
@@ -58,6 +60,42 @@ function aboutCard(item) {
   const boundary = document.createElement("p");
   boundary.textContent = item.boundary || "";
   card.append(status, title, evidence, boundary);
+  return card;
+}
+
+function renderAboutMatrix(selector, items, type) {
+  const target = document.querySelector(selector);
+  if (!target) return;
+  target.innerHTML = "";
+  if (!items.length) {
+    const empty = document.createElement("article");
+    empty.className = "function-matrix-card empty";
+    empty.textContent = "等待摘要接口返回机构功能矩阵。";
+    target.appendChild(empty);
+    return;
+  }
+  items.forEach((item) => target.appendChild(aboutMatrixCard(item, type)));
+}
+
+function aboutMatrixCard(item, type) {
+  const card = document.createElement("article");
+  card.className = `function-matrix-card ${item.status || "normal"}`;
+  card.dataset.aboutFunctionMatrix = item.id || type || "matrix";
+  const meta = document.createElement("span");
+  meta.textContent = type === "agency" ? `${item.level || ""} · ${item.status || "ready"}` : `${item.level || "内部机构"} · ${item.status || "ready"}`;
+  const title = document.createElement("strong");
+  title.textContent = item.name || item.agency || item.id || "机构功能";
+  const list = document.createElement("ul");
+  (item.implemented || []).forEach((text) => {
+    const li = document.createElement("li");
+    li.textContent = text;
+    list.appendChild(li);
+  });
+  const next = document.createElement("p");
+  next.textContent = item.nextPlan || "";
+  const evidence = document.createElement("small");
+  evidence.textContent = item.evidence || "";
+  card.append(meta, title, list, next, evidence);
   return card;
 }
 
@@ -103,11 +141,51 @@ function staticAboutRuntimeReport() {
         name: "出生死亡就诊入院看板",
         status: "ready",
         evidence: "day/week/month/year",
-        boundary: "日报接口接入前，就诊和入院使用月度快照折算。"
+        boundary: "就诊、入院已按日报快照汇总日周月年，小时级预警和生产切换仍需实时明细。"
       }
     ],
     releaseEvidence: [
       { id: "summary-script", name: "模块摘要与功能报告", evidence: "npm.cmd run health-dashboard:summary" }
+    ],
+    departmentFunctionMatrix: [
+      {
+        id: "planning-information",
+        name: "规划信息处/信息中心",
+        level: "内部机构",
+        status: "ready",
+        implemented: ["前七应用汇总入口", "日周月年服务量看板", "接口联调与发布证据"],
+        nextPlan: "接入真实统计日报、机构目录、运行监控和生产数据库。",
+        evidence: "health-dashboard:summary"
+      },
+      {
+        id: "medical-administration",
+        name: "医政医管处",
+        level: "内部机构",
+        status: "watch",
+        implemented: ["就诊入院看板", "转诊与高风险任务下钻", "源应用导航"],
+        nextPlan: "联调 HIS、EMR、LIS、PACS、床位和远程会诊接口。",
+        evidence: "riskDrilldowns"
+      }
+    ],
+    cityCountyFunctionMatrix: [
+      {
+        id: "city-health-commission",
+        level: "市级",
+        agency: "市卫生健康委",
+        status: "ready",
+        implemented: ["综合管理入口", "指标风险任务证据汇总", "管理端审计留痕"],
+        nextPlan: "接入真实统一身份、统计直报和跨部门证照回执。",
+        evidence: "/api/health-dashboard/summary"
+      },
+      {
+        id: "county-health-bureau",
+        level: "县级",
+        agency: "区县卫生健康局",
+        status: "watch",
+        implemented: ["基层、医共体和慢病任务汇总", "源应用办理入口", "现场问题证据挂接"],
+        nextPlan: "增加区县筛选、辖区机构看板和任务闭环率。",
+        evidence: "county.html/openActions"
+      }
     ],
     onsiteBoundaries: [
       "现场真实接口、统一身份、生产数据库、审计留存和运维监控接入前，本页只展示模板能力边界。"

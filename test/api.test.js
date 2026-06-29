@@ -167,6 +167,11 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(healthDashboard.body.populationServiceBoard.insights.some((item) => item.id === "site-cutover" && item.value === "5类接口"), true);
     assert.equal(healthDashboard.body.functionalReport.functions.length, 9);
     assert.equal(healthDashboard.body.functionalReport.functions.some((item) => item.id === "aggregate-entry"), true);
+    assert.equal(healthDashboard.body.functionalReport.departmentFunctionMatrix.length >= 6, true);
+    assert.equal(healthDashboard.body.functionalReport.departmentFunctionMatrix.some((item) => item.id === "medical-administration" && item.nextPlan), true);
+    assert.equal(healthDashboard.body.functionalReport.cityCountyFunctionMatrix.length >= 5, true);
+    assert.equal(healthDashboard.body.functionalReport.cityCountyFunctionMatrix.some((item) => item.level === "市级"), true);
+    assert.equal(healthDashboard.body.functionalReport.cityCountyFunctionMatrix.some((item) => item.level === "县级"), true);
     assert.equal(healthDashboard.body.functionalReport.releaseEvidence.some((item) => item.evidence === "npm.cmd run health-dashboard:summary"), true);
     assert.equal(healthDashboard.body.populationServiceBoard.serviceMode, "daily-interface");
     assert.equal(healthDashboard.body.certificateExchange.items.length, 5);
@@ -178,6 +183,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:risk-drilldown" && item.passed), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:site-evidence-package" && item.passed), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:functional-report" && item.passed), true);
+    assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:department-function-matrix" && item.passed), true);
+    assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:city-county-function-matrix" && item.passed), true);
 
     const processAudit = await api(baseUrl, "/api/process-audit", authorized(accountLogin.body.token));
     assert.equal(processAudit.response.status, 200);

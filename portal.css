@@ -602,6 +602,63 @@ h1 { margin-top: 4px; font-size: 28px; }
   margin: 8px 0 0;
 }
 
+.function-matrix-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.function-matrix-card {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--blue);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+
+.function-matrix-card.ready { border-left-color: var(--green); }
+.function-matrix-card.watch { border-left-color: var(--amber); }
+.function-matrix-card.blocked { border-left-color: var(--red); }
+.function-matrix-card.empty { border-left-color: var(--muted); }
+
+.function-matrix-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.function-matrix-card strong,
+.function-matrix-card small {
+  display: block;
+}
+
+.function-matrix-card strong {
+  margin-top: 6px;
+  font-size: 16px;
+}
+
+.function-matrix-card ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: #24364a;
+  line-height: 1.55;
+}
+
+.function-matrix-card p,
+.function-matrix-card small {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.function-matrix-card p {
+  margin: 10px 0 0;
+}
+
+.function-matrix-card small {
+  margin-top: 8px;
+}
+
 .function-report-evidence {
   display: flex;
   flex-wrap: wrap;

@@ -321,6 +321,150 @@ function buildStaticSiteEvidencePackage(state, context = {}) {
   };
 }
 
+function buildDashboardDepartmentFunctionMatrix(context = {}) {
+  const applications = context.applications || [];
+  const openActions = context.openActions || [];
+  const populationServiceBoard = context.populationServiceBoard || {};
+  const certificateExchange = context.certificateExchange || { summary: {} };
+  const riskDrilldowns = context.riskDrilldowns || { summary: {} };
+  const siteEvidencePackage = context.siteEvidencePackage || { summary: {} };
+  const interfaces = context.interfaces || [];
+  const evidence = context.evidence || [];
+  const siteDependencies = context.siteDependencies || [];
+  const sourceRecords = applications.reduce((sum, item) => sum + Number(item.records || 0), 0);
+  const evidenceRecords = evidence.reduce((sum, item) => sum + (Array.isArray(item.records) ? item.records.length : 0), 0);
+  return [
+    {
+      id: "planning-information",
+      name: "规划信息处/信息中心",
+      level: "内部机构",
+      implemented: [`${applications.length}个源应用汇总入口`, `日/周/月/年服务量看板（${populationServiceBoard.serviceMode || "snapshot"}）`, `${interfaces.length}条接口联调轨道`, `${siteEvidencePackage.summary?.artifacts || 0}项现场证据包`],
+      nextPlan: "接入市级平台运行监控、真实卫生统计日报、机构目录和生产数据库适配，形成按区县和机构钻取的运行视图。",
+      evidence: "healthDashboardSummary.populationServiceBoard/platformInterfaces/siteEvidencePackage",
+      status: populationServiceBoard.serviceMode === "daily-interface" ? "ready" : "watch"
+    },
+    {
+      id: "medical-administration",
+      name: "医政医管处",
+      level: "内部机构",
+      implemented: ["就诊、入院、出院、床位日报汇总", "转诊、远程会诊、医技互认和高风险 open action 归集", `${riskDrilldowns.summary?.items || 0}条风险下钻处置轨迹`],
+      nextPlan: "联调 HIS、EMR、LIS、PACS、床位、远程会诊和检查检验互认接口，补齐处置回写和复核签字。",
+      evidence: "healthStatistics.dailyServiceReports/openActions/riskDrilldowns",
+      status: riskDrilldowns.summary?.items ? "ready" : "watch"
+    },
+    {
+      id: "primary-public-health",
+      name: "基层卫生处/公共卫生处",
+      level: "内部机构",
+      implemented: ["县域医共体、基层慢病、家庭医生和公共卫生任务汇总", "基层风险、逾期随访、上转复核和服务协同待办", `${openActions.length}条预览待办与源应用导航`],
+      nextPlan: "按区县、乡镇卫生院、社区卫生服务中心和村卫生室接入真实任务回写，形成基层闭环率和超期率看板。",
+      evidence: "county.html/index.html/openActions",
+      status: openActions.length ? "watch" : "ready"
+    },
+    {
+      id: "maternal-child",
+      name: "妇幼健康处",
+      level: "内部机构",
+      implemented: ["出生医学证明指标纳入四周期统计", "出生证照交换、撤销、补正、回执和跨部门对账状态", `${certificateExchange.summary?.receipts || 0}条交换回执`],
+      nextPlan: "联调出生医学证明签发系统、省电子证照平台和公安户籍回执，补齐撤销、补正和纸电一致性证据。",
+      evidence: "birthCertificates/certificateExchange",
+      status: certificateExchange.summary?.receipts >= 3 ? "ready" : "watch"
+    },
+    {
+      id: "disease-control",
+      name: "疾控处/应急办",
+      level: "内部机构",
+      implemented: ["死亡医学证明、死因监测和公共卫生风险汇总", "死亡证照、疾控死因监测和法定传染病关联链路", "高风险预警纳入管理端任务闭环"],
+      nextPlan: "联调疾控死因监测、传染病报告、突发公共卫生事件和应急处置接口，补齐编码修订和补报回执。",
+      evidence: "deathCertificates/certificateExchange/openActions",
+      status: certificateExchange.summary?.blocked > 0 ? "watch" : "ready"
+    },
+    {
+      id: "supervision-policy",
+      name: "综合监督处/政策法规处",
+      level: "内部机构",
+      implemented: ["政策说明、数据边界、管理端权限和审计链说明", `${evidenceRecords}条平台验收证据`, `${sourceRecords}条源应用记录纳入汇总审计`],
+      nextPlan: "补齐行政监管事项清单、执法监督接口、数据授权规则和个人信息保护影响评估证据。",
+      evidence: "health-dashboard-about.html/platformEvidence/securityEvents",
+      status: evidenceRecords >= 2 ? "ready" : "watch"
+    },
+    {
+      id: "project-security",
+      name: "项目办/安全管理岗",
+      level: "内部机构",
+      implemented: ["发布报告、部署门禁、现场证据包和验收材料索引", "接口报文、验收记录、现场签字和复测结论归集", `${siteDependencies.length}项生产现场依赖`],
+      nextPlan: "完成生产统一身份、审计留存、监控告警、备份恢复、等保密评、信创适配和上线签字闭环。",
+      evidence: "release-report/deploy-check/siteEvidencePackage",
+      status: siteEvidencePackage.summary?.ready >= 3 ? "ready" : "watch"
+    }
+  ];
+}
+
+function buildDashboardCityCountyFunctionMatrix(context = {}) {
+  const applications = context.applications || [];
+  const openActions = context.openActions || [];
+  const certificateExchange = context.certificateExchange || { summary: {} };
+  const riskDrilldowns = context.riskDrilldowns || { summary: {} };
+  const siteEvidencePackage = context.siteEvidencePackage || { summary: {} };
+  const interfaces = context.interfaces || [];
+  return [
+    {
+      id: "city-health-commission",
+      level: "市级",
+      agency: "市卫生健康委",
+      implemented: ["跨前七应用总览、指标、风险、任务和验收证据汇总", "出生、死亡、就诊、入院四指标日/周/月/年看板", "管理端权限和摘要接口审计留痕"],
+      nextPlan: "建设市级专题驾驶视图，接入真实机构目录、统计直报、统一认证和跨部门证照交换回执。",
+      evidence: "/api/health-dashboard/summary",
+      status: applications.length === 7 ? "ready" : "watch"
+    },
+    {
+      id: "city-platform-center",
+      level: "市级",
+      agency: "市级全民健康信息平台/大数据中心",
+      implemented: [`${interfaces.length}条接口联调轨道`, "平台证据、发布报告、部署门禁和静态快照", `${siteEvidencePackage.summary?.artifacts || 0}项现场证据包`],
+      nextPlan: "联调生产数据库、消息总线、统一身份、日志留存、监控告警和灾备演练。",
+      evidence: "platformInterfaces/release-report/deploy-check",
+      status: interfaces.length >= 5 ? "ready" : "watch"
+    },
+    {
+      id: "city-specialized-centers",
+      level: "市级",
+      agency: "疾控中心/妇幼保健机构/急救与统计中心",
+      implemented: ["出生、死亡、证照、疾控死因监测和统计日报汇总", `${certificateExchange.summary?.tracks || 0}条证照/统计交换链路`, "风险预警与现场依赖统一展示"],
+      nextPlan: "接入妇幼、疾控、急救、统计直报和电子证照正式接口，形成专业条线可追溯对账。",
+      evidence: "certificateExchange/populationServiceBoard",
+      status: certificateExchange.summary?.tracks >= 5 ? "ready" : "watch"
+    },
+    {
+      id: "county-health-bureau",
+      level: "县级",
+      agency: "区县卫生健康局",
+      implemented: ["按源应用汇总基层、医共体、慢病、转诊和公共卫生任务", `${openActions.length}条跨应用预览待办`, "可从管理系统回到源应用办理页面"],
+      nextPlan: "增加区县筛选、辖区机构看板、任务闭环率、超期率和现场问题整改台账。",
+      evidence: "county.html/index.html/openActions",
+      status: openActions.length ? "watch" : "ready"
+    },
+    {
+      id: "county-consortium",
+      level: "县级",
+      agency: "县域医共体牵头医院",
+      implemented: ["转诊、远程会诊、检查检验互认和高危慢病上转风险汇总", `${riskDrilldowns.summary?.items || 0}条下钻轨迹关联责任人和时限`, "入院与床位压力作为管理提示"],
+      nextPlan: "联调牵头医院 HIS/EMR/LIS/PACS、床位、会诊和绩效接口，补齐医共体内闭环回写。",
+      evidence: "county.html/riskDrilldowns/healthStatistics.dailyServiceReports",
+      status: riskDrilldowns.summary?.items ? "ready" : "watch"
+    },
+    {
+      id: "primary-institutions",
+      level: "县级",
+      agency: "乡镇卫生院/社区卫生服务中心/村卫生室",
+      implemented: ["基层随访、家庭医生、慢病管理、取药和公共卫生待办汇总", "源应用边界清晰，办理仍回基层业务端完成", "现场验收证据可挂接到发布报告"],
+      nextPlan: "接入移动随访、家庭医生签约、公卫系统和基层药品供应接口，形成网底服务质控与提醒。",
+      evidence: "index.html/citizen.html/siteEvidencePackage",
+      status: "watch"
+    }
+  ];
+}
+
 function buildDashboardFunctionalReport(context) {
   const applications = context.applications || [];
   const openActions = context.openActions || [];
@@ -331,6 +475,8 @@ function buildDashboardFunctionalReport(context) {
   const certificateExchange = context.certificateExchange || { summary: {}, items: [] };
   const riskDrilldowns = context.riskDrilldowns || { summary: {}, items: [] };
   const siteEvidencePackage = context.siteEvidencePackage || { summary: {}, items: [] };
+  const departmentFunctionMatrix = buildDashboardDepartmentFunctionMatrix(context);
+  const cityCountyFunctionMatrix = buildDashboardCityCountyFunctionMatrix(context);
   const sourceRecords = applications.reduce((sum, item) => sum + Number(item.records || 0), 0);
   const sourceOpenActions = applications.reduce((sum, item) => sum + Number(item.openActions || 0), 0);
   const highRisks = applications.reduce((sum, item) => sum + Number(item.highRisks || 0), 0);
@@ -348,7 +494,7 @@ function buildDashboardFunctionalReport(context) {
       name: "出生死亡就诊入院看板",
       status: populationServiceBoard.periods?.length === 4 ? "ready" : "watch",
       evidence: `${populationServiceBoard.periods?.length || 0} periods, ${populationServiceBoard.insights?.length || 0} insights`,
-      boundary: "日报接口接入前，就诊和入院使用月度快照折算。"
+      boundary: "就诊、入院已按日报快照汇总日周月年，小时级预警和生产切换仍需实时明细。"
     },
     {
       id: "certificate-exchange-chain",
@@ -410,6 +556,8 @@ function buildDashboardFunctionalReport(context) {
       blocked: functions.filter((item) => item.status === "blocked").length
     },
     functions,
+    departmentFunctionMatrix,
+    cityCountyFunctionMatrix,
     releaseEvidence: [
       { id: "summary-api", name: "综合管理服务系统摘要接口", evidence: "/api/health-dashboard/summary" },
       { id: "summary-script", name: "模块摘要与功能报告", evidence: "npm.cmd run health-dashboard:summary" },

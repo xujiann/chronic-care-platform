@@ -46,6 +46,11 @@ test("health dashboard summary aggregates the first seven applications without r
   assert.equal(report.siteEvidencePackage.summary.ready, 3);
   assert.equal(report.functionalReport.functions.length, 9);
   assert.equal(report.functionalReport.functions.some((item) => item.id === "population-service-board" && item.status === "ready"), true);
+  assert.equal(report.functionalReport.departmentFunctionMatrix.length >= 6, true);
+  assert.equal(report.functionalReport.departmentFunctionMatrix.some((item) => item.id === "planning-information" && item.nextPlan), true);
+  assert.equal(report.functionalReport.cityCountyFunctionMatrix.length >= 5, true);
+  assert.equal(report.functionalReport.cityCountyFunctionMatrix.some((item) => item.level === "市级"), true);
+  assert.equal(report.functionalReport.cityCountyFunctionMatrix.some((item) => item.level === "县级"), true);
   assert.equal(report.functionalReport.releaseEvidence.some((item) => item.evidence === "npm.cmd run health-dashboard:summary"), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:source-boundary" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:population-service-board" && item.passed), true);
@@ -53,6 +58,8 @@ test("health dashboard summary aggregates the first seven applications without r
   assert.equal(report.checks.some((item) => item.id === "dashboard:risk-drilldown" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:site-evidence-package" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:functional-report" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "dashboard:department-function-matrix" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "dashboard:city-county-function-matrix" && item.passed), true);
   assert.equal(report.openActions.every((item) => item.applicationId && item.application && item.entry), true);
   assert.equal(report.openActions.some((item) => item.entry === "county.html" || item.entry === "institution.html"), true);
 
@@ -67,6 +74,10 @@ test("health dashboard summary aggregates the first seven applications without r
   assert.match(markdown, /Population and service board/);
   assert.match(markdown, /Population and service insights/);
   assert.match(markdown, /Main function report/);
+  assert.match(markdown, /Internal department function matrix/);
+  assert.match(markdown, /City and county agency function matrix/);
+  assert.match(markdown, /规划信息处/);
+  assert.match(markdown, /区县卫生健康局/);
   assert.match(markdown, /Risk drilldowns/);
   assert.match(markdown, /Site evidence package/);
   assert.match(markdown, /Release evidence/);
