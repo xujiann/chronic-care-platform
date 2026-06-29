@@ -3698,6 +3698,199 @@ function buildOperationsHandoverOwnerMatrix(handover) {
   };
 }
 
+function buildOperationsSiteJointTests({ interfaceMapping }) {
+  const mappings = Array.isArray(interfaceMapping?.mappings) ? interfaceMapping.mappings : [];
+  const rows = mappings.map((mapping) => {
+    const completed = mapping.status === "已接入" && mapping.collectionReady;
+    return {
+      id: `joint-${mapping.id}`,
+      sourceSystem: mapping.sourceSystem,
+      targetCollection: mapping.targetCollection,
+      targetField: mapping.targetField,
+      owner: mapping.owner,
+      updateCycle: mapping.updateCycle,
+      status: completed ? "已完成" : "待联调",
+      samplePacket: `${mapping.sourceSystem}样例报文`,
+      replayResult: completed ? "快照上报、调度回执或统计对账回放通过" : "等待现场样例报文和接收端确认截图",
+      validationPoints: ["字段编码", "单位口径", "时间戳", "机构编码", "回执编码"],
+      attachments: completed ? ["字段映射表", "验签日志", "回放记录"] : ["待补充样例报文", "待补充失败重试记录"],
+      exitCriteria: completed ? "已具备演示联调证据，生产仍需现场签字。" : mapping.nextAction,
+      evidence: ["/api/operations/interface-mapping", "/api/operations/integration/snapshots"]
+    };
+  });
+  return {
+    ok: rows.length > 0 && rows.every((item) => item.owner && item.validationPoints.length),
+    generatedAt: new Date().toISOString(),
+    summary: {
+      systems: new Set(rows.map((item) => item.sourceSystem)).size,
+      total: rows.length,
+      completed: rows.filter((item) => item.status === "已完成").length,
+      pending: rows.filter((item) => item.status !== "已完成").length
+    },
+    rows
+  };
+}
+
+function productionCheckName(id, fallback) {
+  return {
+    "node-env": "生产运行模式",
+    "storage-engine": "生产存储引擎",
+    "session-secrets": "会话密钥质量",
+    "gateway-secret": "接口网关密钥质量",
+    "database-url": "正式数据库连接",
+    "identity-adapter": "政务统一身份",
+    "audit-retention": "审计保全目标",
+    "site-interface-signoff": "现场接口联调签字",
+    "insurance-certificate-signoff": "医保证照交换签字",
+    "monitoring-signoff": "监控值守签字",
+    "dr-rehearsal-signoff": "灾备演练签字"
+  }[id] || fallback || id;
+}
+
+function buildOperationsProductionHardening(data) {
+  const environment = buildProductionEnvironmentStatus();
+  const checks = [
+    ...environment.checks.map((item) => ({
+      id: item.id,
+      name: productionCheckName(item.id, item.name),
+      passed: item.passed,
+      detail: item.detail,
+      nextAction: item.passed ? "保持归档并纳入割接清单。" : "补齐真实生产参数、签字材料或现场演练证据。"
+    })),
+    {
+      id: "operations-audit-trace",
+      name: "运行调度审计留痕",
+      passed: Array.isArray(data.platformProcessAudit) && Array.isArray(data.securityEvents),
+      detail: "platformProcessAudit/securityEvents",
+      nextAction: "生产需接入日志保全或 SIEM。"
+    }
+  ];
+  return {
+    ok: checks.every((item) => item.passed),
+    generatedAt: new Date().toISOString(),
+    status: checks.every((item) => item.passed) ? "生产可割接" : "待生产签字",
+    summary: {
+      total: checks.length,
+      passed: checks.filter((item) => item.passed).length,
+      blocked: checks.filter((item) => !item.passed).length
+    },
+    tracks: [
+      { id: "secret-rotation", name: "生产密钥轮换", owner: "平台运维/安全管理岗", evidence: "SESSION_SECRETS, INTEGRATION_GATEWAY_SECRET", status: checks.find((item) => item.id === "gateway-secret")?.passed ? "已具备" : "待配置" },
+      { id: "audit-retention", name: "审计保全", owner: "安全管理岗", evidence: "AUDIT_EXPORT_PATH 或 SIEM_ENDPOINT", status: checks.find((item) => item.id === "audit-retention")?.passed ? "已具备" : "待配置" },
+      { id: "monitoring-oncall", name: "监控告警与值守", owner: "平台运维", evidence: "CUTOVER_MONITORING_SIGNOFF", status: checks.find((item) => item.id === "monitoring-signoff")?.passed ? "已签字" : "待签字" },
+      { id: "dr-rehearsal", name: "灾备演练", owner: "基础设施组", evidence: "CUTOVER_DR_REHEARSAL_SIGNOFF", status: checks.find((item) => item.id === "dr-rehearsal-signoff")?.passed ? "已签字" : "待签字" }
+    ],
+    checks
+  };
+}
+
+function buildOperationsIntelligence({ snapshots, dispatchRequests, reconciliationReviews }) {
+  const lowerPressureTargets = [...snapshots].sort((a, b) => Number(a.bedOccupancyRate || 0) - Number(b.bedOccupancyRate || 0));
+  const recommendations = snapshots.map((snapshot) => {
+    const openDispatches = dispatchRequests.filter((item) => operationInstitutionMatched(snapshot, item) && ["pending", "assigned", "in-progress"].includes(item.status));
+    const pendingRecon = reconciliationReviews.filter((item) => operationInstitutionMatched(snapshot, item) && !["approved", "closed"].includes(item.status));
+    const target = lowerPressureTargets.find((item) => item.institutionId !== snapshot.institutionId && Number(item.bedOccupancyRate || 0) <= 0.9);
+    const riskScore = Math.min(100, Math.round(Number(snapshot.resourcePressure || 0) + Number(snapshot.outpatient?.waitingOver30Min || 0) * 0.2 + pendingRecon.length * 8));
+    const bedGapTomorrow = Math.max(0, Math.round(Number(snapshot.beds?.occupied || 0) * 1.03 - Number(snapshot.beds?.open || 0)));
+    const staffGapTonight = Math.max(Number(snapshot.staff?.shortage || 0), Math.ceil(Number(snapshot.outpatient?.waitingOver30Min || 0) / 45));
+    return {
+      id: `intel-${snapshot.institutionId}`,
+      institutionId: snapshot.institutionId,
+      institution: snapshot.institution,
+      riskLevel: riskScore >= 85 ? "高" : riskScore >= 65 ? "中" : "低",
+      riskScore,
+      prediction: {
+        bedGapTomorrow,
+        staffGapTonight,
+        emergencyCongestion: Number(snapshot.outpatient?.waitingOver30Min || 0) >= 50 ? "可能拥堵" : "可控",
+        reportingRisk: Number(snapshot.reporting?.varianceRate || 0) >= 0.05 ? "直报阻断风险" : "常规复核"
+      },
+      recommendation: target
+        ? `建议优先向${target.institution}协调${bedGapTomorrow || 6}张过渡床位或检查时段。`
+        : "建议先启动院内备用资源和分诊分流。",
+      reviewQueue: [
+        ...openDispatches.map((item) => `调度单：${item.resourceType} ${item.quantity}`),
+        ...pendingRecon.map((item) => `直报复核：${item.sourceBatch}`)
+      ].slice(0, 4),
+      confidence: riskScore >= 85 ? "高" : "中",
+      evidence: ["/api/operations/dashboard", "/api/operations/dispatch"]
+    };
+  }).sort((a, b) => b.riskScore - a.riskScore);
+  return {
+    ok: recommendations.length > 0,
+    generatedAt: new Date().toISOString(),
+    summary: {
+      recommendations: recommendations.length,
+      highRisk: recommendations.filter((item) => item.riskLevel === "高").length,
+      reviewItems: recommendations.reduce((sum, item) => sum + item.reviewQueue.length, 0)
+    },
+    recommendations
+  };
+}
+
+function buildOperationsGovernanceReport({ snapshots, dispatchRequests, reconciliationReviews, performanceMonitoring, handover }) {
+  const openDispatches = dispatchRequests.filter((item) => ["pending", "assigned", "in-progress"].includes(item.status));
+  const closedDispatches = dispatchRequests.filter((item) => ["closed", "cancelled"].includes(item.status));
+  const pendingRecon = reconciliationReviews.filter((item) => !["approved", "closed"].includes(item.status));
+  const exceptionSources = [...new Set(Object.values(performanceMonitoring?.manuals || {}).flatMap((manual) => manual.coverage?.pendingSources || []))];
+  const sections = [
+    {
+      id: "monthly-operations",
+      title: "月度运行态势",
+      owner: "规划发展与信息化处",
+      metric: `${snapshots.length}家机构，${snapshots.filter((item) => item.normalizedStatus === "critical").length}家严重预警`,
+      conclusion: "用于委端月度运行治理报告首屏。"
+    },
+    {
+      id: "dispatch-review",
+      title: "调度复盘",
+      owner: "医政医管处/运行调度席",
+      metric: `${openDispatches.length}个开放工单，${closedDispatches.length}个已闭环工单`,
+      conclusion: "按资源类型和目标机构复盘响应时效。"
+    },
+    {
+      id: "reconciliation-diff",
+      title: "统计直报差异",
+      owner: "统计办公室",
+      metric: `${pendingRecon.length}项待复核，最高差异${Math.round(Math.max(...reconciliationReviews.map((item) => Number(item.varianceRate || 0)), 0) * 1000) / 10}%`,
+      conclusion: "形成直报差异清单和退回/补正/阻断归档。"
+    },
+    {
+      id: "performance-exception",
+      title: "绩效异常说明",
+      owner: "医务部/运营管理部门",
+      metric: exceptionSources.length ? `待补接：${exceptionSources.join("、")}` : "绩效来源已纳入运行联动",
+      conclusion: "将运行压力、直报差异和手册指标异常说明合并归档。"
+    },
+    {
+      id: "handover-quality",
+      title: "交接班质量",
+      owner: "运行监测岗",
+      metric: `${handover?.summary?.items || 0}项交接事项，${handover?.summary?.signoffs || 0}次签收`,
+      conclusion: "跟踪交接事项、责任组和下一班关注点。"
+    }
+  ];
+  return {
+    ok: sections.every((item) => item.owner && item.metric),
+    generatedAt: new Date().toISOString(),
+    period: "2026-06",
+    summary: {
+      sections: sections.length,
+      openDispatches: openDispatches.length,
+      pendingReconciliation: pendingRecon.length,
+      performanceExceptions: exceptionSources.length
+    },
+    exportName: "医院运行治理月报-2026-06",
+    sections,
+    nextActions: [
+      "导出委端月度运行治理报告",
+      "归档直报差异清单和调度复盘清单",
+      "将绩效异常说明与现场联调记录合并复核"
+    ],
+    evidence: ["/api/operations/dashboard", "/api/operations/governance-report", "hospital-operations-module-report.md"]
+  };
+}
+
 function buildHospitalOperationsDashboard(data) {
   const rules = Array.isArray(data.operationAlertRules) ? data.operationAlertRules : [];
   const snapshots = (Array.isArray(data.hospitalOperationSnapshots) ? data.hospitalOperationSnapshots : []).map((snapshot) => {
@@ -3735,6 +3928,9 @@ function buildHospitalOperationsDashboard(data) {
   const interfaceMapping = buildOperationsInterfaceMappingEvidence(data);
   const playbooks = buildOperationsPlaybooks({ snapshots, alertRules: rules, commandChains, interfaceMapping });
   const handover = buildOperationsHandover({ snapshots, dispatchRequests, reconciliationReviews, commandChains, playbooks, handoverSignoffs });
+  const siteJointTests = buildOperationsSiteJointTests({ interfaceMapping });
+  const productionHardening = buildOperationsProductionHardening(data);
+  const intelligence = buildOperationsIntelligence({ snapshots, dispatchRequests, reconciliationReviews });
   const dashboard = {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -3752,11 +3948,21 @@ function buildHospitalOperationsDashboard(data) {
     alertRules: rules,
     commandChains,
     interfaceMapping,
+    siteJointTests,
+    productionHardening,
+    intelligence,
     playbooks,
     handover,
     handoverOwnerMatrix: buildOperationsHandoverOwnerMatrix(handover)
   };
   dashboard.performanceMonitoring = buildPerformanceMonitoringEvidence(data, dashboard);
+  dashboard.governanceReport = buildOperationsGovernanceReport({
+    snapshots,
+    dispatchRequests,
+    reconciliationReviews,
+    performanceMonitoring: dashboard.performanceMonitoring,
+    handover
+  });
   return dashboard;
 }
 
@@ -6425,6 +6631,38 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/operations/interface-mapping");
     if (!user) return;
     sendJson(res, 200, buildOperationsInterfaceMappingEvidence(readDatabase()));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/site-joint-tests") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/site-joint-tests");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.siteJointTests);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/production-hardening") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/production-hardening");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.productionHardening);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/intelligence") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/intelligence");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.intelligence);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/governance-report") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/governance-report");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.governanceReport);
     return;
   }
 

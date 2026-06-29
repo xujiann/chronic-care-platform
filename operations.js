@@ -135,6 +135,14 @@ function zh(value) {
   return window.HealthCityLocale?.text ? window.HealthCityLocale.text(value) : String(value || "");
 }
 
+function zhInline(value) {
+  const text = zh(value);
+  const terms = window.HealthCityLocale?.terms || {};
+  return Object.entries(terms)
+    .sort(([left], [right]) => right.length - left.length)
+    .reduce((output, [source, target]) => output.split(source).join(target), text);
+}
+
 function zhList(values, separator = "、") {
   return window.HealthCityLocale?.list ? window.HealthCityLocale.list(values, separator) : (Array.isArray(values) ? values : []).join(separator);
 }
@@ -147,7 +155,11 @@ const OPERATIONS_EVIDENCE_LABELS = {
   "/api/operations/reconciliation/:id/review": "统计复核接口",
   "/api/operations/playbooks": "预警处置预案接口",
   "/api/operations/handover": "交接班清单接口",
-  "/api/operations/handover/owners": "交接责任矩阵接口"
+  "/api/operations/handover/owners": "交接责任矩阵接口",
+  "/api/operations/site-joint-tests": "现场联调闭环接口",
+  "/api/operations/production-hardening": "生产加固清单接口",
+  "/api/operations/intelligence": "智能调度建议接口",
+  "/api/operations/governance-report": "治理报表接口"
 };
 
 function htmlAttribute(value) {
@@ -204,6 +216,11 @@ function buildStaticOperationsDashboard(state) {
   const interfaceMapping = buildStaticInterfaceMapping();
   const playbooks = buildStaticOperationsPlaybooks(snapshots, alertRules, commandChains, interfaceMapping);
   const handover = buildStaticOperationsHandover(snapshots, dispatchRequests, reconciliationReviews, commandChains, playbooks, state.operationHandoverSignoffs || []);
+  const siteJointTests = buildStaticSiteJointTests(interfaceMapping);
+  const productionHardening = buildStaticProductionHardening(state);
+  const intelligence = buildStaticOperationsIntelligence(snapshots, dispatchRequests, reconciliationReviews);
+  const performanceMonitoring = buildStaticPerformanceMonitoringEvidence(state, snapshots);
+  const governanceReport = buildStaticGovernanceReport(snapshots, dispatchRequests, reconciliationReviews, performanceMonitoring, handover);
   return {
     ok: true,
     boundaries: ["hospital-operation-monitoring", "resource-dispatch", "statistics-reconciliation"],
@@ -227,9 +244,14 @@ function buildStaticOperationsDashboard(state) {
     alertRules,
     commandChains,
     interfaceMapping,
+    siteJointTests,
+    productionHardening,
+    intelligence,
     playbooks,
     handover,
-    handoverOwnerMatrix: buildStaticHandoverOwnerMatrix(handover)
+    handoverOwnerMatrix: buildStaticHandoverOwnerMatrix(handover),
+    performanceMonitoring,
+    governanceReport
   };
 }
 
@@ -261,6 +283,131 @@ function buildStaticInterfaceMapping() {
       pending: mappings.filter((item) => item.status !== "已接入").length
     },
     mappings
+  };
+}
+
+function buildStaticSiteJointTests(interfaceMapping) {
+  const rows = (interfaceMapping.mappings || []).map((mapping) => {
+    const completed = mapping.status === "已接入";
+    return {
+      id: `joint-${mapping.id}`,
+      sourceSystem: mapping.sourceSystem,
+      targetCollection: mapping.targetCollection,
+      targetField: mapping.targetField,
+      owner: mapping.owner,
+      updateCycle: mapping.updateCycle,
+      status: completed ? "已完成" : "待联调",
+      samplePacket: `${mapping.sourceSystem}样例报文`,
+      replayResult: completed ? "快照上报、调度回执或统计对账回放通过" : "等待现场样例报文和接收端确认截图",
+      validationPoints: ["字段编码", "单位口径", "时间戳", "机构编码", "回执编码"],
+      attachments: completed ? ["字段映射表", "验签日志", "回放记录"] : ["待补充样例报文", "待补充失败重试记录"],
+      exitCriteria: completed ? "已具备演示联调证据，生产仍需现场签字。" : mapping.nextAction,
+      evidence: ["/api/operations/interface-mapping", "/api/operations/site-joint-tests"]
+    };
+  });
+  return {
+    ok: rows.length > 0,
+    summary: {
+      systems: new Set(rows.map((item) => item.sourceSystem)).size,
+      total: rows.length,
+      completed: rows.filter((item) => item.status === "已完成").length,
+      pending: rows.filter((item) => item.status !== "已完成").length
+    },
+    rows
+  };
+}
+
+function buildStaticProductionHardening(state) {
+  const hasAudit = Array.isArray(state.platformProcessAudit);
+  const checks = [
+    { id: "session-secrets", name: "会话密钥质量", passed: false, detail: "静态预览不读取生产密钥", nextAction: "上线前配置非占位 SESSION_SECRETS。" },
+    { id: "gateway-secret", name: "接口网关密钥质量", passed: false, detail: "静态预览不读取生产密钥", nextAction: "上线前配置 INTEGRATION_GATEWAY_SECRET 并确认轮换方案。" },
+    { id: "audit-retention", name: "审计保全目标", passed: hasAudit, detail: hasAudit ? "已具备本地审计台账" : "缺少审计台账", nextAction: "生产需配置 AUDIT_EXPORT_PATH 或 SIEM_ENDPOINT。" },
+    { id: "monitoring-signoff", name: "监控值守签字", passed: false, detail: "待现场签字", nextAction: "绑定 /api/health、/api/metrics 和值守升级链。" },
+    { id: "dr-rehearsal-signoff", name: "灾备演练签字", passed: false, detail: "待现场演练", nextAction: "完成备份、恢复、RTO/RPO 和回退演练。" }
+  ];
+  return {
+    ok: checks.every((item) => item.passed),
+    status: checks.every((item) => item.passed) ? "生产可割接" : "待生产签字",
+    summary: {
+      total: checks.length,
+      passed: checks.filter((item) => item.passed).length,
+      blocked: checks.filter((item) => !item.passed).length
+    },
+    tracks: [
+      { id: "secret-rotation", name: "生产密钥轮换", owner: "平台运维/安全管理岗", evidence: "SESSION_SECRETS, INTEGRATION_GATEWAY_SECRET", status: "待配置" },
+      { id: "audit-retention", name: "审计保全", owner: "安全管理岗", evidence: "AUDIT_EXPORT_PATH 或 SIEM_ENDPOINT", status: hasAudit ? "演示已建档" : "待配置" },
+      { id: "monitoring-oncall", name: "监控告警与值守", owner: "平台运维", evidence: "CUTOVER_MONITORING_SIGNOFF", status: "待签字" },
+      { id: "dr-rehearsal", name: "灾备演练", owner: "基础设施组", evidence: "CUTOVER_DR_REHEARSAL_SIGNOFF", status: "待签字" }
+    ],
+    checks
+  };
+}
+
+function buildStaticOperationsIntelligence(snapshots, dispatchRequests, reconciliationReviews) {
+  const targets = [...snapshots].sort((a, b) => Number(a.bedOccupancyRate || 0) - Number(b.bedOccupancyRate || 0));
+  const recommendations = snapshots.map((snapshot) => {
+    const pendingRecon = reconciliationReviews.filter((item) => operationEntityMatched(snapshot, item) && !["approved", "closed"].includes(item.status));
+    const openDispatches = dispatchRequests.filter((item) => operationEntityMatched(snapshot, item) && ["pending", "assigned", "in-progress"].includes(item.status));
+    const target = targets.find((item) => item.institutionId !== snapshot.institutionId && Number(item.bedOccupancyRate || 0) <= 0.9);
+    const riskScore = Math.min(100, Math.round(Number(snapshot.resourcePressure || 0) + Number(snapshot.outpatient?.waitingOver30Min || 0) * 0.2 + pendingRecon.length * 8));
+    return {
+      id: `intel-${snapshot.institutionId}`,
+      institutionId: snapshot.institutionId,
+      institution: snapshot.institution,
+      riskLevel: riskScore >= 85 ? "高" : riskScore >= 65 ? "中" : "低",
+      riskScore,
+      prediction: {
+        bedGapTomorrow: Math.max(0, Math.round(Number(snapshot.beds?.occupied || 0) * 1.03 - Number(snapshot.beds?.open || 0))),
+        staffGapTonight: Math.max(Number(snapshot.staff?.shortage || 0), Math.ceil(Number(snapshot.outpatient?.waitingOver30Min || 0) / 45)),
+        emergencyCongestion: Number(snapshot.outpatient?.waitingOver30Min || 0) >= 50 ? "可能拥堵" : "可控",
+        reportingRisk: Number(snapshot.reporting?.varianceRate || 0) >= 0.05 ? "直报阻断风险" : "常规复核"
+      },
+      recommendation: target ? `建议优先向${zh(target.institution)}协调过渡床位或检查时段。` : "建议先启动院内备用资源和分诊分流。",
+      reviewQueue: [
+        ...openDispatches.map((item) => `调度单：${zh(item.resourceType)} ${item.quantity}`),
+        ...pendingRecon.map((item) => `直报复核：${item.sourceBatch}`)
+      ].slice(0, 4),
+      confidence: riskScore >= 85 ? "高" : "中",
+      evidence: ["/api/operations/dashboard", "/api/operations/intelligence"]
+    };
+  }).sort((a, b) => b.riskScore - a.riskScore);
+  return {
+    ok: recommendations.length > 0,
+    summary: {
+      recommendations: recommendations.length,
+      highRisk: recommendations.filter((item) => item.riskLevel === "高").length,
+      reviewItems: recommendations.reduce((sum, item) => sum + item.reviewQueue.length, 0)
+    },
+    recommendations
+  };
+}
+
+function buildStaticGovernanceReport(snapshots, dispatchRequests, reconciliationReviews, performanceMonitoring, handover) {
+  const openDispatches = dispatchRequests.filter((item) => ["pending", "assigned", "in-progress"].includes(item.status));
+  const pendingRecon = reconciliationReviews.filter((item) => !["approved", "closed"].includes(item.status));
+  const exceptionSources = [...new Set(Object.values(performanceMonitoring?.manuals || {}).flatMap((manual) => manual.coverage?.pendingSources || []))];
+  const maxVariance = Math.round(Math.max(...reconciliationReviews.map((item) => Number(item.varianceRate || 0)), 0) * 1000) / 10;
+  const sections = [
+    { id: "monthly-operations", title: "月度运行态势", owner: "规划发展与信息化处", metric: `${snapshots.length}家机构，${snapshots.filter((item) => item.normalizedStatus === "critical").length}家严重预警`, conclusion: "用于委端月度运行治理报告首屏。" },
+    { id: "dispatch-review", title: "调度复盘", owner: "医政医管处/运行调度席", metric: `${openDispatches.length}个开放工单`, conclusion: "按资源类型和目标机构复盘响应时效。" },
+    { id: "reconciliation-diff", title: "统计直报差异", owner: "统计办公室", metric: `${pendingRecon.length}项待复核，最高差异${maxVariance}%`, conclusion: "形成直报差异清单和退回/补正/阻断归档。" },
+    { id: "performance-exception", title: "绩效异常说明", owner: "医务部/运营管理部门", metric: exceptionSources.length ? `待补接：${exceptionSources.join("、")}` : "绩效来源已纳入运行联动", conclusion: "将运行压力、直报差异和手册指标异常说明合并归档。" },
+    { id: "handover-quality", title: "交接班质量", owner: "运行监测岗", metric: `${handover?.summary?.items || 0}项交接事项，${handover?.summary?.signoffs || 0}次签收`, conclusion: "跟踪交接事项、责任组和下一班关注点。" }
+  ];
+  return {
+    ok: true,
+    period: "2026-06",
+    exportName: "医院运行治理月报-2026-06",
+    summary: {
+      sections: sections.length,
+      openDispatches: openDispatches.length,
+      pendingReconciliation: pendingRecon.length,
+      performanceExceptions: exceptionSources.length
+    },
+    sections,
+    nextActions: ["导出委端月度运行治理报告", "归档直报差异清单和调度复盘清单", "将绩效异常说明与现场联调记录合并复核"],
+    evidence: ["/api/operations/dashboard", "/api/operations/governance-report"]
   };
 }
 
@@ -514,6 +661,10 @@ function renderOperationsDashboard() {
   renderOperationsMetrics(dashboard.summary || {}, filteredSnapshots);
   renderPerformanceManual(dashboard, filteredSnapshots);
   renderInterfaceMapping(dashboard.interfaceMapping || buildStaticInterfaceMapping());
+  renderSiteJointTests(dashboard.siteJointTests || buildStaticSiteJointTests(dashboard.interfaceMapping || buildStaticInterfaceMapping()));
+  renderProductionHardening(dashboard.productionHardening || buildStaticProductionHardening({}));
+  renderOperationsIntelligence(dashboard.intelligence || buildStaticOperationsIntelligence(filteredSnapshots, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || []));
+  renderGovernanceReport(dashboard.governanceReport || buildStaticGovernanceReport(filteredSnapshots, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || [], dashboard.performanceMonitoring || {}, dashboard.handover || {}));
   renderCommandChains(dashboard.commandChains || [], filteredSnapshots);
   renderOperationsPlaybooks(dashboard.playbooks || [], filteredSnapshots);
   renderHandoverOwnerMatrix(dashboard.handoverOwnerMatrix || buildStaticHandoverOwnerMatrix(dashboard.handover || {}), filteredSnapshots);
@@ -798,6 +949,114 @@ function renderInterfaceMapping(evidence) {
         <small>责任：${item.owner} / 周期：${item.updateCycle}</small>
         <p>${item.nextAction}</p>
         <div class="interface-field-list">${(item.fields || []).map((field) => `<span>${field}</span>`).join("")}</div>
+      </article>
+    `).join("")}
+  `;
+}
+
+function renderSiteJointTests(siteJointTests) {
+  const target = document.querySelector("#operations-site-joint-tests");
+  if (!target) return;
+  const rows = Array.isArray(siteJointTests.rows) ? siteJointTests.rows : [];
+  target.innerHTML = `
+    <article class="interface-mapping-summary">
+      <strong>联调闭环</strong>
+      <span>${siteJointTests.summary?.completed || 0}/${siteJointTests.summary?.total || 0} 项完成，${siteJointTests.summary?.pending || 0} 项待联调</span>
+    </article>
+    ${rows.map((item) => `
+      <article class="interface-mapping-card ${item.status === "已完成" ? "ready" : "pending"}">
+        <div>
+          <strong>${zhInline(item.sourceSystem)}</strong>
+          <span>${zhInline(item.samplePacket)} / ${zhInline(item.replayResult)}</span>
+        </div>
+        <span class="badge ${item.status === "已完成" ? "success" : "warn"}">${item.status}</span>
+        <small>责任：${zhInline(item.owner)} / 周期：${zhInline(item.updateCycle)}</small>
+        <p>${zhInline(item.exitCriteria)}</p>
+        <div class="interface-field-list">
+          ${(item.validationPoints || []).map((point) => `<span>${zhInline(point)}</span>`).join("")}
+          ${(item.attachments || []).map((attachment) => `<span>${zhInline(attachment)}</span>`).join("")}
+        </div>
+      </article>
+    `).join("")}
+  `;
+}
+
+function renderProductionHardening(productionHardening) {
+  const target = document.querySelector("#operation-production-hardening");
+  if (!target) return;
+  const checks = Array.isArray(productionHardening.checks) ? productionHardening.checks : [];
+  const tracks = Array.isArray(productionHardening.tracks) ? productionHardening.tracks : [];
+  target.innerHTML = `
+    <article class="performance-readiness-card ${productionHardening.ok ? "ready" : "pending"}">
+      <strong>${productionHardening.status || "待生产签字"}</strong>
+      <span>${productionHardening.summary?.passed || 0}/${productionHardening.summary?.total || 0} 项通过，${productionHardening.summary?.blocked || 0} 项阻断</span>
+      <small>生产割接仍以真实环境变量、现场签字和演练记录为准。</small>
+    </article>
+    ${tracks.map((item) => `
+      <article class="performance-readiness-card ${/已|具备/.test(item.status) ? "ready" : "pending"}">
+        <strong>${item.name}</strong>
+        <span>${item.owner}</span>
+        <small>${item.status} / ${item.evidence}</small>
+      </article>
+    `).join("")}
+    ${checks.filter((item) => !item.passed).slice(0, 6).map((item) => `
+      <article class="performance-readiness-card pending">
+        <strong>${item.name}</strong>
+        <span>${item.detail}</span>
+        <small>${item.nextAction}</small>
+      </article>
+    `).join("")}
+  `;
+}
+
+function renderOperationsIntelligence(intelligence) {
+  const target = document.querySelector("#operation-intelligence");
+  if (!target) return;
+  const rows = Array.isArray(intelligence.recommendations) ? intelligence.recommendations : [];
+  target.innerHTML = rows.map((item) => `
+    <article class="operation-playbook-card ${item.riskLevel === "高" ? "critical" : item.riskLevel === "中" ? "warning" : "normal"}">
+      <div class="operation-playbook-head">
+        <div>
+          <strong>${zh(item.institution)}</strong>
+          <span>风险 ${item.riskScore} / 置信度 ${item.confidence}</span>
+        </div>
+        <span class="badge ${item.riskLevel === "高" ? "danger" : item.riskLevel === "中" ? "warn" : "info"}">${item.riskLevel}风险</span>
+      </div>
+      <div class="operation-playbook-meta">
+        <span>床位缺口：${item.prediction?.bedGapTomorrow || 0}</span>
+        <span>人员缺口：${item.prediction?.staffGapTonight || 0}</span>
+        <span>${item.prediction?.emergencyCongestion || "可控"}</span>
+        <span>${item.prediction?.reportingRisk || "常规复核"}</span>
+      </div>
+      <p>${zhInline(item.recommendation)}</p>
+      <div class="operation-playbook-actions">
+        ${(item.reviewQueue || ["人工复核后采纳"]).map((row) => `<span>${zhInline(row)}</span>`).join("")}
+      </div>
+      <footer><small>证据：${evidenceList(item.evidence)}</small></footer>
+    </article>
+  `).join("") || "<p class=\"muted\">暂无智能调度建议。</p>";
+}
+
+function renderGovernanceReport(report) {
+  const target = document.querySelector("#operation-governance-report");
+  if (!target) return;
+  const sections = Array.isArray(report.sections) ? report.sections : [];
+  target.innerHTML = `
+    <article class="performance-action-head">
+      <strong>${report.exportName || "医院运行治理月报"}</strong>
+      <span>${report.period || "本期"} / ${report.summary?.sections || sections.length} 个治理章节 / ${report.summary?.pendingReconciliation || 0} 项直报待复核</span>
+    </article>
+    ${sections.map((item) => `
+      <article class="performance-action-card info">
+        <strong>${item.title}</strong>
+        <span>${zhInline(item.metric)}</span>
+        <small>${zhInline(item.owner)}：${zhInline(item.conclusion)}</small>
+      </article>
+    `).join("")}
+    ${(report.nextActions || []).map((item) => `
+      <article class="performance-action-card">
+        <strong>下一步归档</strong>
+        <span>${item}</span>
       </article>
     `).join("")}
   `;

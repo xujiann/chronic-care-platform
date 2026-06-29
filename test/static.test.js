@@ -353,6 +353,10 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsHtml, /performance-readiness/);
   assert.match(operationsHtml, /performance-indicator-detail/);
   assert.match(operationsHtml, /operations-interface-mapping/);
+  assert.match(operationsHtml, /operations-site-joint-tests/);
+  assert.match(operationsHtml, /operation-production-hardening/);
+  assert.match(operationsHtml, /operation-intelligence/);
+  assert.match(operationsHtml, /operation-governance-report/);
   assert.match(operationsHtml, /operation-command-chains/);
   assert.match(operationsHtml, /operation-playbooks/);
   assert.match(operationsHtml, /operation-handover/);
@@ -384,6 +388,10 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsJs, /renderPerformanceReadiness/);
   assert.match(operationsJs, /renderPerformanceIndicatorDetail/);
   assert.match(operationsJs, /renderInterfaceMapping/);
+  assert.match(operationsJs, /renderSiteJointTests/);
+  assert.match(operationsJs, /renderProductionHardening/);
+  assert.match(operationsJs, /renderOperationsIntelligence/);
+  assert.match(operationsJs, /renderGovernanceReport/);
   assert.match(operationsJs, /renderCommandChains/);
   assert.match(operationsJs, /renderOperationsPlaybooks/);
   assert.match(operationsJs, /renderOperationsHandover/);
@@ -413,6 +421,10 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsJs, /dispatchStatusButtons/);
   assert.match(operationsJs, /reconciliationActionButtons/);
   assert.match(operationsJs, /\/operations\/dashboard/);
+  assert.match(operationsJs, /\/api\/operations\/site-joint-tests/);
+  assert.match(operationsJs, /\/api\/operations\/production-hardening/);
+  assert.match(operationsJs, /\/api\/operations\/intelligence/);
+  assert.match(operationsJs, /\/api\/operations\/governance-report/);
   assert.match(operationsJs, /\/operations\/dispatch/);
   assert.match(operationsJs, /\/operations\/dispatch\/.*\/status/);
   assert.match(operationsJs, /\/operations\/reconciliation/);
@@ -455,6 +467,10 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("server.js"), /\/api\/operations\/handover\/owners/);
   assert.match(read("server.js"), /\/api\/operations\/handover\/signoff/);
   assert.match(read("server.js"), /\/api\/operations\/interface-mapping/);
+  assert.match(read("server.js"), /\/api\/operations\/site-joint-tests/);
+  assert.match(read("server.js"), /\/api\/operations\/production-hardening/);
+  assert.match(read("server.js"), /\/api\/operations\/intelligence/);
+  assert.match(read("server.js"), /\/api\/operations\/governance-report/);
   assert.match(read("server.js"), /\/api\/operations\/dispatch\/:id\/status/);
   assert.match(read("server.js"), /buildPerformanceMonitoringEvidence/);
   assert.match(read("server.js"), /buildOperationsInterfaceMappingEvidence/);

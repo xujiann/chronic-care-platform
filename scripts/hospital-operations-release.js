@@ -40,6 +40,10 @@ function buildHospitalOperationsReleaseReport(options = {}) {
     check("release:performanceDetail", /performance-indicator-detail/.test(operationsHtml) && /renderPerformanceIndicatorDetail/.test(operationsJs) && /indicatorDetails/.test(serverSource), "performance indicator detail view is present"),
     check("release:dispatchLifecycle", /\/api\/operations\/dispatch\/:id\/status/.test(serverSource) && /dispatchStatusButtons/.test(operationsJs) && /status-change/.test(serverSource), "dispatch lifecycle actions are present"),
     check("release:hospitalIntegrationIngest", /\/api\/operations\/integration\/snapshots/.test(serverSource) && /\/api\/operations\/integration\/dispatch-feedback/.test(serverSource) && /\/api\/operations\/integration\/reconciliation/.test(serverSource) && /医院运行接口验签/.test(serverSource), "signed hospital system ingest APIs are present"),
+    check("release:siteJointTests", /\/api\/operations\/site-joint-tests/.test(serverSource) && /buildOperationsSiteJointTests/.test(serverSource) && /operations-site-joint-tests/.test(operationsHtml) && /renderSiteJointTests/.test(operationsJs), "site joint-test closeout is present"),
+    check("release:productionHardening", /\/api\/operations\/production-hardening/.test(serverSource) && /buildOperationsProductionHardening/.test(serverSource) && /operation-production-hardening/.test(operationsHtml) && /renderProductionHardening/.test(operationsJs), "production hardening checklist is present"),
+    check("release:intelligence", /\/api\/operations\/intelligence/.test(serverSource) && /buildOperationsIntelligence/.test(serverSource) && /operation-intelligence/.test(operationsHtml) && /renderOperationsIntelligence/.test(operationsJs), "intelligent dispatch recommendations are present"),
+    check("release:governanceReport", /\/api\/operations\/governance-report/.test(serverSource) && /buildOperationsGovernanceReport/.test(serverSource) && /operation-governance-report/.test(operationsHtml) && /renderGovernanceReport/.test(operationsJs), "governance report panel is present"),
     check("release:packageScript", Boolean(pkg.scripts?.["hospital-operations:release"]), "package script registered")
   ];
   return {
@@ -63,6 +67,10 @@ function buildHospitalOperationsReleaseReport(options = {}) {
       "交接签收与审计留痕",
       "统计直报多状态复核",
       "绩效指标详情与异常说明模板",
+      "现场联调闭环",
+      "生产加固清单",
+      "智能调度建议",
+      "治理报表",
       "发布证据脚本与闸口集成"
     ],
     checks

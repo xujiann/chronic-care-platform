@@ -95,7 +95,8 @@
           <article><strong>4. 资源调度</strong><span>管理端提交调度请求，记录来源机构、目标机构、资源类型、数量、要求完成时间和操作轨迹。</span></article>
           <article><strong>5. 对账复核</strong><span>直报差异进入复核队列，支持通过、退回、补正中、阻断，审计记录写入平台过程审计。</span></article>
           <article><strong>6. 值班交接</strong><span>汇总开放调度、活动预警、直报复核、命中预案和SLA临期风险，形成下一班跟进清单、责任组矩阵，并支持交接签收与审计留痕。</span></article>
-          <article><strong>7. 发布归档</strong><span>运行 `hospital-operations:readiness`、`hospital-operations:release` 和 `release:report` 生成发布证据。</span></article>
+          <article><strong>7. 联调与加固</strong><span>现场联调闭环、生产加固清单、智能调度建议和治理报表已进入运行平台，真实报文与签字材料按现场归档。</span></article>
+          <article><strong>8. 发布归档</strong><span>运行 `hospital-operations:readiness`、`hospital-operations:release`、`hospital-operations:module-report` 和 `release:report` 生成发布证据。</span></article>
         </div>
       </section>
 
@@ -114,6 +115,10 @@
             <code>GET /api/operations/handover/owners</code>
             <code>POST /api/operations/handover/signoff</code>
             <code>GET /api/operations/interface-mapping</code>
+            <code>GET /api/operations/site-joint-tests</code>
+            <code>GET /api/operations/production-hardening</code>
+            <code>GET /api/operations/intelligence</code>
+            <code>GET /api/operations/governance-report</code>
             <code>POST /api/operations/dispatch</code>
             <code>POST /api/operations/dispatch/:id/status</code>
             <code>POST /api/operations/reconciliation/:id/review</code>

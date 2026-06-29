@@ -222,6 +222,10 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(operationsDashboard.body.handover.items.some((item) => item.checkpoints.length >= 4 && item.evidence.includes("/api/operations/handover")), true);
     assert.equal(operationsDashboard.body.handoverOwnerMatrix.summary.owners >= 1, true);
     assert.equal(operationsDashboard.body.handoverOwnerMatrix.matrix.some((item) => item.evidence.includes("/api/operations/handover/owners")), true);
+    assert.equal(operationsDashboard.body.siteJointTests.summary.total >= 5, true);
+    assert.equal(operationsDashboard.body.productionHardening.summary.total >= 5, true);
+    assert.equal(operationsDashboard.body.intelligence.recommendations.some((item) => item.recommendation && item.prediction), true);
+    assert.equal(operationsDashboard.body.governanceReport.sections.some((item) => item.id === "reconciliation-diff"), true);
 
     const performanceMonitoring = await api(baseUrl, "/api/operations/performance-monitoring", authorized(accountLogin.body.token));
     assert.equal(performanceMonitoring.response.status, 200);
@@ -284,6 +288,22 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(interfaceMapping.body.summary.total >= 5, true);
     assert.equal(interfaceMapping.body.mappings.some((item) => item.status === "待联调"), true);
     assert.equal(interfaceMapping.body.mappings.every((item) => item.fieldCoverage.every((field) => field.mapped)), true);
+
+    const siteJointTests = await api(baseUrl, "/api/operations/site-joint-tests", authorized(accountLogin.body.token));
+    assert.equal(siteJointTests.response.status, 200);
+    assert.equal(siteJointTests.body.rows.some((item) => item.validationPoints.includes("字段编码")), true);
+
+    const productionHardening = await api(baseUrl, "/api/operations/production-hardening", authorized(accountLogin.body.token));
+    assert.equal(productionHardening.response.status, 200);
+    assert.equal(productionHardening.body.tracks.some((item) => item.id === "dr-rehearsal"), true);
+
+    const intelligence = await api(baseUrl, "/api/operations/intelligence", authorized(accountLogin.body.token));
+    assert.equal(intelligence.response.status, 200);
+    assert.equal(intelligence.body.recommendations.some((item) => item.prediction.reportingRisk), true);
+
+    const governanceReport = await api(baseUrl, "/api/operations/governance-report", authorized(accountLogin.body.token));
+    assert.equal(governanceReport.response.status, 200);
+    assert.equal(governanceReport.body.nextActions.some((item) => /月度运行治理报告/.test(item)), true);
 
     const hospitalLogin = await login(baseUrl, "hospital");
     const snapshotPayload = {

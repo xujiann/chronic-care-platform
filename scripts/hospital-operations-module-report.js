@@ -82,6 +82,34 @@ function buildCapabilities(data, serverSource, readiness, release) {
       detail: "将预警、SLA、责任人、处置动作、交接班签收和审计留痕串成可追踪闭环。"
     },
     {
+      id: "site-joint-test",
+      name: "现场联调闭环",
+      status: release.checks.some((item) => item.id === "release:siteJointTests" && item.passed) ? "ready" : "needs-attention",
+      evidence: ["/api/operations/site-joint-tests", "/api/operations/interface-mapping"],
+      detail: "把样例报文、验签日志、回放记录、失败重试和接收端确认整理为可复核闭环。"
+    },
+    {
+      id: "production-hardening",
+      name: "生产加固清单",
+      status: release.checks.some((item) => item.id === "release:productionHardening" && item.passed) ? "ready" : "needs-attention",
+      evidence: ["/api/operations/production-hardening", "release:report:full"],
+      detail: "汇总生产密钥、审计保全、监控告警、灾备演练和现场签字状态，明确割接阻断项。"
+    },
+    {
+      id: "ops-intelligence",
+      name: "智能调度建议",
+      status: release.checks.some((item) => item.id === "release:intelligence" && item.passed) ? "ready" : "needs-attention",
+      evidence: ["/api/operations/intelligence", "/api/operations/dispatch"],
+      detail: "按机构生成床位缺口、人员缺口、急诊拥堵、直报风险和跨院资源建议，进入人工复核队列。"
+    },
+    {
+      id: "governance-reporting",
+      name: "治理报表",
+      status: release.checks.some((item) => item.id === "release:governanceReport" && item.passed) ? "ready" : "needs-attention",
+      evidence: ["/api/operations/governance-report", "hospital-operations-module-report.md"],
+      detail: "形成月度运行报告、直报差异清单、调度复盘和绩效异常说明的导出骨架。"
+    },
+    {
       id: "release-evidence",
       name: "发布与审计证据",
       status: readiness.ok && release.ok ? "ready" : "needs-attention",
@@ -102,32 +130,32 @@ function buildNextPlan() {
       phase: "P0 现场联调",
       owner: "医疗机构/接口联调组",
       scope: "HIS、住院管理、HR排班、设备系统、急诊分诊、卫生统计直报",
-      deliverable: "真实报文样例、字段映射差异表、签名验签日志、失败重试记录、接收端确认截图。",
-      exitCriteria: "每个接入系统至少完成一轮快照上报、调度回执和统计对账回放。"
+      deliverable: "已上线 /api/operations/site-joint-tests 和现场联调闭环面板；真实报文和接收端截图为现场归档项。",
+      exitCriteria: "代码侧已完成闭环结构；生产前每个接入系统仍需完成一轮真实快照上报、调度回执和统计对账回放。"
     },
     {
       id: "production-hardening",
       phase: "P0 生产加固",
       owner: "平台运维/安全管理岗",
       scope: "生产密钥、审计保全、监控告警、灾备演练、回退方案",
-      deliverable: "INTEGRATION_GATEWAY_SECRET 轮换方案、AUDIT_EXPORT_PATH 或 SIEM_ENDPOINT、CUTOVER_MONITORING_SIGNOFF、CUTOVER_DR_REHEARSAL_SIGNOFF。",
-      exitCriteria: "release:report:full 无 error，生产割接项完成签字归档。"
+      deliverable: "已上线 /api/operations/production-hardening 和生产加固清单面板；真实密钥、保全路径和演练签字为现场归档项。",
+      exitCriteria: "代码侧已完成阻断清单；生产前需 release:report:full 无 error 且割接项完成签字归档。"
     },
     {
       id: "ops-intelligence",
       phase: "P1 智能调度",
       owner: "医政医管处/运行调度席",
       scope: "床位预测、人员缺口预测、急诊拥堵预测、跨院资源推荐",
-      deliverable: "预测模型版本、人工复核队列、调度建议采纳率和闭环时效指标。",
-      exitCriteria: "形成按机构、科室、资源类型分层的调度建议和复盘看板。"
+      deliverable: "已上线 /api/operations/intelligence 和智能调度建议面板；模型版本和采纳率可在现场数据接入后继续强化。",
+      exitCriteria: "已形成按机构分层的调度建议和人工复核队列。"
     },
     {
       id: "governance-reporting",
       phase: "P1 治理报表",
       owner: "规划发展与信息化处/统计办公室",
       scope: "绩效监测、统计直报、资源利用、预警处置、交接班质量",
-      deliverable: "月度运行报告、直报差异清单、调度复盘清单、绩效异常说明归档。",
-      exitCriteria: "可按月导出面向委端和医院端的运行治理报告。"
+      deliverable: "已上线 /api/operations/governance-report 和治理报表面板，覆盖月报、差异、调度复盘和绩效异常说明。",
+      exitCriteria: "已具备按月导出委端治理报告的数据骨架；医院端正式导出需现场角色和模板确认。"
     }
   ];
 }

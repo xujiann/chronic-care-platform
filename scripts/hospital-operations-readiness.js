@@ -26,6 +26,10 @@ const REQUIRED_ROUTES = [
   "/api/operations/handover/owners",
   "/api/operations/handover/signoff",
   "/api/operations/interface-mapping",
+  "/api/operations/site-joint-tests",
+  "/api/operations/production-hardening",
+  "/api/operations/intelligence",
+  "/api/operations/governance-report",
   "/api/operations/integration/snapshots",
   "/api/operations/integration/dispatch-feedback",
   "/api/operations/integration/reconciliation",
@@ -86,6 +90,10 @@ function buildHospitalOperationsReadinessReport(options = {}) {
     { id: "hospitalOps:handoverOwners", passed: /buildOperationsHandoverOwnerMatrix/.test(serverSource) && /\/api\/operations\/handover\/owners/.test(serverSource) && /operation-handover-owner-matrix/.test(operationsHtml) && /renderHandoverOwnerMatrix/.test(operationsJs), detail: "shift handover owner matrix API and panel" },
     { id: "hospitalOps:handoverSignoff", passed: /\/api\/operations\/handover\/signoff/.test(serverSource) && /normalizeHandoverSignoff/.test(serverSource) && /operation-handover-signoffs/.test(operationsHtml) && /signoffOperationsHandover/.test(operationsJs), detail: "shift handover signoff API, audit trace, and panel" },
     { id: "hospitalOps:performanceDetail", passed: /indicatorDetails/.test(serverSource) && /performance-indicator-detail/.test(operationsHtml) && /renderPerformanceIndicatorDetail/.test(operationsJs), detail: "performance manual indicator details and exception template" },
+    { id: "hospitalOps:siteJointTests", passed: /buildOperationsSiteJointTests/.test(serverSource) && /\/api\/operations\/site-joint-tests/.test(serverSource) && /operations-site-joint-tests/.test(operationsHtml) && /renderSiteJointTests/.test(operationsJs), detail: "site joint-test closeout API and panel" },
+    { id: "hospitalOps:productionHardening", passed: /buildOperationsProductionHardening/.test(serverSource) && /\/api\/operations\/production-hardening/.test(serverSource) && /operation-production-hardening/.test(operationsHtml) && /renderProductionHardening/.test(operationsJs), detail: "production hardening checklist API and panel" },
+    { id: "hospitalOps:intelligence", passed: /buildOperationsIntelligence/.test(serverSource) && /\/api\/operations\/intelligence/.test(serverSource) && /operation-intelligence/.test(operationsHtml) && /renderOperationsIntelligence/.test(operationsJs), detail: "intelligent dispatch recommendations API and panel" },
+    { id: "hospitalOps:governanceReport", passed: /buildOperationsGovernanceReport/.test(serverSource) && /\/api\/operations\/governance-report/.test(serverSource) && /operation-governance-report/.test(operationsHtml) && /renderGovernanceReport/.test(operationsJs), detail: "monthly governance report API and panel" },
     { id: "hospitalOps:releaseScript", passed: Boolean(pkg.scripts?.["hospital-operations:readiness"]), detail: "package script registered" }
   ];
   return {
