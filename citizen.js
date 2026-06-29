@@ -484,6 +484,11 @@ function serviceTabFromHash() {
   return citizenServiceTabs.some((item) => item.key === key) ? key : "";
 }
 
+function featureNavId(item) {
+  const index = residentFunctionAudit.filter((row) => row.service === item.service).indexOf(item);
+  return `service-feature-${item.service}-${index + 1}`;
+}
+
 function setServiceTab(key, options = {}) {
   if (!citizenServiceTabs.some((item) => item.key === key)) return;
   activeServiceTab = key;
@@ -547,6 +552,7 @@ function renderServiceSummary() {
   const ready = citizenServiceTabs.filter((item) => item.status === "已实现").length;
   const pending = citizenServiceTabs.length - ready;
   const internalAction = !active.actionHref;
+  const activeItems = residentFunctionAudit.filter((item) => item.service === active.key);
   target.innerHTML = `<div class="service-summary-copy">
     <span>当前二级页面 · ${channel.label}</span>
     <strong>${active.label}</strong>
@@ -558,10 +564,25 @@ function renderServiceSummary() {
       <span class="feature-state pending">${pending} 项待开发</span>
     </div>
     <a class="service-page-action" href="${internalAction ? citizenPageHref(active.key) : active.actionHref}" ${internalAction ? `data-service-action="${active.key}"` : ""}>${active.actionLabel}</a>
-  </div>`;
+  </div>
+  <nav class="service-subnav" aria-label="${active.label}功能导航">
+    ${activeItems.map((item) => {
+      const stateClass = item.status === "待开发" ? "pending" : "ready";
+      return `<a href="#${featureNavId(item)}" data-service-feature="${featureNavId(item)}">
+        <span>${item.name}</span>
+        <small class="${stateClass}">${item.status}</small>
+      </a>`;
+    }).join("")}
+  </nav>`;
   target.querySelector("[data-service-action]")?.addEventListener("click", (event) => {
     event.preventDefault();
     getServicePageTarget(event.currentTarget.dataset.serviceAction)?.scrollIntoView({ block: "start", behavior: "smooth" });
+  });
+  target.querySelectorAll("[data-service-feature]").forEach((link) => {
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      document.querySelector(`#${event.currentTarget.dataset.serviceFeature}`)?.scrollIntoView({ block: "start", behavior: "smooth" });
+    });
   });
 }
 
@@ -584,7 +605,7 @@ function renderResidentFunctionAudit() {
     const service = citizenServiceTabs.find((tab) => tab.key === item.service) || citizenServiceTabs[0];
     const stateClass = item.status === "待开发" ? "pending" : "ready";
     const active = item.service === activeServiceTab ? "active" : "";
-    return `<article class="resident-audit-card ${stateClass} ${active}" data-audit-service="${item.service}">
+    return `<article class="resident-audit-card ${stateClass} ${active}" id="${featureNavId(item)}" data-audit-service="${item.service}">
       <div>
         <span>${service.label}</span>
         <strong>${item.name}</strong>

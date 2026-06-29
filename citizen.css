@@ -395,8 +395,8 @@ select,
 }
 
 .service-summary {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 14px;
   border: 1px solid var(--line);
@@ -405,6 +405,68 @@ select,
   margin-bottom: 12px;
   background: #fff;
   box-shadow: var(--shadow);
+}
+
+.service-subnav {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(148px, 1fr);
+  gap: 8px;
+  overflow-x: auto;
+  padding-top: 12px;
+  scroll-snap-type: x proximity;
+}
+
+.service-subnav a {
+  min-height: 44px;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: #f8fbfd;
+  color: var(--ink);
+  text-decoration: none;
+  scroll-snap-align: start;
+}
+
+.service-subnav a:focus-visible {
+  outline: 3px solid rgba(39, 110, 241, 0.35);
+  outline-offset: 2px;
+}
+
+.service-subnav span,
+.service-subnav small {
+  display: block;
+  min-width: 0;
+}
+
+.service-subnav span {
+  font-size: 13px;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.service-subnav small {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.service-subnav small.ready {
+  background: #eaf7ef;
+  color: #17663a;
+}
+
+.service-subnav small.pending {
+  background: #fff4d8;
+  color: #8a5a00;
 }
 
 .service-summary-copy {
@@ -1840,12 +1902,21 @@ dialog::backdrop {
     justify-content: flex-start;
   }
 
+  .service-summary {
+    grid-template-columns: 1fr;
+  }
+
   .service-summary-actions {
     justify-items: stretch;
   }
 
   .service-page-action {
     width: 100%;
+  }
+
+  .service-subnav {
+    grid-auto-columns: minmax(138px, 64vw);
+    padding-bottom: 2px;
   }
 
   .client-channel-switch,

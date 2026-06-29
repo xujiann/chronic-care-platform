@@ -89,7 +89,7 @@
 
       <div class="service-page-content-anchor" id="service-page-content" aria-hidden="true"></div>
 
-      <section class="panel citizen-trend-panel" data-service-pane="health-record">
+      <section class="panel citizen-trend-panel" id="service-health-record" data-service-pane="health-record">
         <div class="panel-title">
           <h2>健康指标趋势</h2>
           <span id="trend-source-summary">血压、血糖、BMI 连续观察</span>
@@ -121,7 +121,7 @@
         <div id="lifecycle-cards" class="lifecycle-grid"></div>
       </section>
 
-      <section class="panel escort-appointment-panel" data-service-pane="escort">
+      <section class="panel escort-appointment-panel" id="service-escort" data-service-pane="escort">
         <div class="panel-title">
           <h2>助医陪诊预约</h2>
           <span><em class="feature-state ready">已实现</em><span id="escort-appointment-summary">本人和家庭成员可预约陪诊服务</span></span>
@@ -202,7 +202,7 @@
         <div class="vault-content" id="vault-content"></div>
       </section>
 
-      <section class="panel service-overview-panel" data-service-pane="nursing">
+      <section class="panel service-overview-panel" id="service-nursing" data-service-pane="nursing">
         <div class="panel-title">
           <h2>护理服务</h2>
           <span><em class="feature-state ready">已实现</em> 互联网护理可预约，护士工作站可接单</span>
@@ -226,7 +226,7 @@
         </div>
       </section>
 
-      <section class="panel service-overview-panel" data-service-pane="registration">
+      <section class="panel service-overview-panel" id="service-registration" data-service-pane="registration">
         <div class="panel-title">
           <h2>挂号服务</h2>
           <span><em class="feature-state ready">已实现</em> 演示号源、预约确认、取消规则，生产仍需接入 HIS/支付/医保</span>
@@ -262,7 +262,7 @@
         </div>
       </section>
 
-      <section class="two-column" data-service-pane="emr">
+      <section class="two-column" id="service-emr" data-service-pane="emr">
         <article class="panel">
           <div class="panel-title">
             <h2>电子病历时间线</h2>
@@ -427,7 +427,7 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="./health-archive-standard.js"></script>
-    <script src="./citizen.js?v=20260629governance"></script>
+    <script src="./citizen.js?v=20260629multinav"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));
