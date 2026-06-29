@@ -130,6 +130,14 @@ function buildProductionCutoverChecklist(env, checks = []) {
       nextAction: "Archive signed HIS/EMR/LIS/PACS and referral joint-test records from the target site before production cutover."
     },
     {
+      id: "cutover-chronic-launch-core",
+      phase: "integration",
+      owner: "chronic-followup",
+      passed: ready("chronicFollowup:launchCore") && envFlagEnabled(env, "CUTOVER_CHRONIC_LAUNCH_CORE_SIGNOFF"),
+      evidence: `${detail("chronicFollowup:launchCore")}; ${signoff("CUTOVER_CHRONIC_LAUNCH_CORE_SIGNOFF")}`,
+      nextAction: "Attach signed chronic launch core closure evidence for institution systems, identity scope, message receipts, quality model review, pharmacy insurance closure, and site pack signoff."
+    },
+    {
       id: "cutover-insurance-certificate",
       phase: "integration",
       owner: "cross-agency-integration",

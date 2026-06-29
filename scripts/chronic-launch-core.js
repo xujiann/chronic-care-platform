@@ -13,6 +13,7 @@ const CORE_ITEMS = [
     collection: "chronicExternalIntegrations",
     owner: "institution-integration",
     requiredFields: ["system", "contractId", "endpoint", "signature", "idempotencyKey", "samplePayload", "receiptStatus"],
+    closureFields: ["completionStatus", "latestReceiptId", "jointTestStatus"],
     evidence: ["docs/chronic-institution-interfaces.md", "/api/chronic/institution-interfaces"]
   },
   {
@@ -21,6 +22,7 @@ const CORE_ITEMS = [
     collection: "chronicIdentityScopes",
     owner: "identity-integration",
     requiredFields: ["claim", "source", "mappedField", "role", "organizationScope", "sampleValue"],
+    closureFields: ["completionStatus", "sampleTokenValidated", "scopeReviewStatus"],
     evidence: ["identity-contract", "canAccessResident", "scopeStateForUser"]
   },
   {
@@ -29,6 +31,7 @@ const CORE_ITEMS = [
     collection: "chronicMessageChannels",
     owner: "message-platform",
     requiredFields: ["channel", "provider", "receiptField", "retryPolicy", "escalationAfter", "fallback"],
+    closureFields: ["completionStatus", "latestReceiptStatus", "escalationTested"],
     evidence: ["/api/chronic/reminder-outreach", "taskMessages.receipts"]
   },
   {
@@ -37,6 +40,7 @@ const CORE_ITEMS = [
     collection: "chronicModelGovernance",
     owner: "chronic-quality-office",
     requiredFields: ["modelId", "diseaseType", "version", "threshold", "reviewOwner", "manualReview", "sampleRule"],
+    closureFields: ["completionStatus", "lastReviewStatus", "qualitySampleStatus"],
     evidence: ["diseaseRegistryModels", "chronicQualityMetrics"]
   },
   {
@@ -45,6 +49,7 @@ const CORE_ITEMS = [
     collection: "chronicPharmacyInsuranceLinks",
     owner: "pharmacy-insurance",
     requiredFields: ["medicationPickupId", "insuranceClaimId", "longPrescription", "catalogVersion", "settlementStatus", "callbackStatus"],
+    closureFields: ["completionStatus", "settlementReceiptStatus", "closureStatus"],
     evidence: ["medicationPickups", "insuranceClaims", "/api/chronic/pharmacy-callbacks"]
   }
 ];
@@ -87,6 +92,27 @@ function buildCollectionEvidence(data, item) {
     requiredFields: item.requiredFields,
     missingFields: item.requiredFields.filter((field) => !rows.some((row) => hasValue(row[field]))),
     samples: rows.slice(0, 3)
+  };
+}
+
+function buildClosureEvidence(data, item) {
+  const rows = Array.isArray(data[item.collection]) ? data[item.collection] : [];
+  const fields = item.closureFields || [];
+  return {
+    fields,
+    readyRows: rows.filter((row) => rowReady(row, fields)).length,
+    rows: rows.length,
+    missingFields: fields.filter((field) => !rows.some((row) => hasValue(row[field])))
+  };
+}
+
+function buildSiteSignoffs(data) {
+  const signoffs = Array.isArray(data.chronicLaunchCoreSignoffs) ? data.chronicLaunchCoreSignoffs : [];
+  return {
+    rows: signoffs,
+    total: signoffs.length,
+    signed: signoffs.filter((item) => /^signed|approved|completed$/i.test(String(item.signoffStatus || ""))).length,
+    owners: [...new Set(signoffs.map((item) => item.owner).filter(Boolean))]
   };
 }
 
@@ -141,20 +167,27 @@ function buildChronicLaunchCoreReport(options = {}) {
 
   const items = CORE_ITEMS.map((item) => {
     const collectionEvidence = buildCollectionEvidence(data, item);
+    const closureEvidence = buildClosureEvidence(data, item);
     const crossEvidence = buildCrossEvidence(data, server, docs, item);
     const collectionReady = collectionEvidence.rows > 0 && collectionEvidence.readyRows === collectionEvidence.rows;
+    const closureReady = closureEvidence.rows > 0 && closureEvidence.readyRows === closureEvidence.rows;
     const evidenceReady = crossEvidence.length > 0 && crossEvidence.every(Boolean);
     return {
       ...item,
       collectionEvidence,
+      closureEvidence,
       evidenceReady,
-      ready: collectionReady && evidenceReady
+      closureReady,
+      ready: collectionReady && evidenceReady && closureReady
     };
   });
+  const siteSignoffs = buildSiteSignoffs(data);
 
   const checks = [
     { id: "launch-core:items", passed: items.length === 5 && items.every((item) => item.ready), detail: `${items.filter((item) => item.ready).length}/${items.length} core items ready` },
     { id: "launch-core:dataCollections", passed: items.every((item) => item.collectionEvidence.rows > 0), detail: items.map((item) => `${item.collection}:${item.collectionEvidence.rows}`).join(";") },
+    { id: "launch-core:actionClosure", passed: items.every((item) => item.closureReady), detail: items.map((item) => `${item.id}:${item.closureEvidence.readyRows}/${item.closureEvidence.rows}`).join(";") },
+    { id: "launch-core:siteSignoffs", passed: siteSignoffs.total >= 6 && siteSignoffs.signed === siteSignoffs.total, detail: `${siteSignoffs.signed}/${siteSignoffs.total} signoffs signed` },
     { id: "launch-core:routes", passed: server.includes("/api/chronic/launch-core"), detail: "/api/chronic/launch-core" },
     { id: "launch-core:script", passed: Boolean(pkg.scripts?.["chronic:launch-core"]), detail: "chronic:launch-core" },
     { id: "launch-core:docs", passed: docs.includes("chronic-launch-core") && docs.includes("HIS/EMR/LIS/PACS"), detail: "docs/chronic-launch-core.md" }
@@ -166,17 +199,25 @@ function buildChronicLaunchCoreReport(options = {}) {
     summary: {
       items: items.length,
       readyItems: items.filter((item) => item.ready).length,
-      evidenceRows: items.reduce((sum, item) => sum + item.collectionEvidence.rows, 0)
+      evidenceRows: items.reduce((sum, item) => sum + item.collectionEvidence.rows, 0),
+      closureRows: items.reduce((sum, item) => sum + item.closureEvidence.readyRows, 0),
+      signoffs: siteSignoffs.total,
+      signedSignoffs: siteSignoffs.signed
     },
     items,
+    siteSignoffs,
     checks,
-    apiSurface: ["GET /api/chronic/launch-core"]
+    apiSurface: [
+      "GET /api/chronic/launch-core",
+      "POST /api/chronic/launch-core/actions"
+    ]
   };
 }
 
 function renderMarkdown(report) {
   const checkRows = report.checks.map((item) => `| ${item.passed ? "PASS" : "FAIL"} | ${item.id} | ${String(item.detail || "").replace(/\|/g, "/")} |`);
-  const itemRows = report.items.map((item) => `| ${item.ready ? "PASS" : "FAIL"} | ${item.id} | ${item.title} | ${item.collection} | ${item.collectionEvidence.readyRows}/${item.collectionEvidence.rows} | ${item.owner} |`);
+  const itemRows = report.items.map((item) => `| ${item.ready ? "PASS" : "FAIL"} | ${item.id} | ${item.title} | ${item.collection} | ${item.collectionEvidence.readyRows}/${item.collectionEvidence.rows} | ${item.closureEvidence.readyRows}/${item.closureEvidence.rows} | ${item.owner} |`);
+  const signoffRows = (report.siteSignoffs?.rows || []).map((item) => `| ${item.signoffStatus} | ${item.itemId} | ${item.owner} | ${item.artifact} | ${item.evidence} |`);
   return [
     "# Chronic launch core readiness",
     "",
@@ -193,9 +234,15 @@ function renderMarkdown(report) {
     "",
     "## Core Items",
     "",
-    "| Result | Item | Title | Collection | Ready rows | Owner |",
-    "|---|---|---|---|---|---|",
+    "| Result | Item | Title | Collection | Ready rows | Closure rows | Owner |",
+    "|---|---|---|---|---|---|---|",
     ...itemRows,
+    "",
+    "## Site Signoffs",
+    "",
+    "| Status | Item | Owner | Artifact | Evidence |",
+    "|---|---|---|---|---|",
+    ...signoffRows,
     "",
     "## API Surface",
     "",

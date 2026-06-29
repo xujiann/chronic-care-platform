@@ -39,6 +39,7 @@ function buildSignoffTemplates(env) {
     ["cutover-audit-retention", "audit", "security-admin", "audit retention signoff", "AUDIT_EXPORT_PATH or SIEM endpoint and retention permission confirmed"],
     ["cutover-storage-adapter", "storage", "data-platform", "production database and backup signoff", "database adapter, backup, rollback, and migration rehearsal confirmed"],
     ["cutover-institution-interfaces", "integration", "institution-integration", "HIS/EMR/LIS/PACS joint-test signoff", envSigned(env, "CUTOVER_SITE_INTERFACE_SIGNOFF") ? "signed" : "requires CUTOVER_SITE_INTERFACE_SIGNOFF"],
+    ["cutover-chronic-launch-core", "integration", "chronic-followup", "chronic launch core action closure signoff", envSigned(env, "CUTOVER_CHRONIC_LAUNCH_CORE_SIGNOFF") ? "signed" : "requires CUTOVER_CHRONIC_LAUNCH_CORE_SIGNOFF"],
     ["cutover-insurance-certificate", "integration", "cross-agency-integration", "insurance/certificate/statistics exchange signoff", envSigned(env, "CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF") ? "signed" : "requires CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF"],
     ["cutover-monitoring", "operations", "platform-ops", "monitoring and on-call signoff", envSigned(env, "CUTOVER_MONITORING_SIGNOFF") ? "signed" : "requires CUTOVER_MONITORING_SIGNOFF"],
     ["cutover-dr-rehearsal", "resilience", "data-platform", "disaster recovery rehearsal signoff", envSigned(env, "CUTOVER_DR_REHEARSAL_SIGNOFF") ? "signed" : "requires CUTOVER_DR_REHEARSAL_SIGNOFF"]

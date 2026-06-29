@@ -543,6 +543,7 @@ function seedState() {
     chronicMessageChannels: seedChronicMessageChannels(),
     chronicModelGovernance: seedChronicModelGovernance(),
     chronicPharmacyInsuranceLinks: seedChronicPharmacyInsuranceLinks(),
+    chronicLaunchCoreSignoffs: seedChronicLaunchCoreSignoffs(),
     countyCollaborationOrders: seedCountyCollaborationOrders(),
     countyAiDiagnosisCases: seedCountyAiDiagnosisCases(),
     countyMutualRecognitionRecords: seedCountyMutualRecognitionRecords(),
@@ -1440,40 +1441,51 @@ function seedChronicAcceptanceLedger() {
 
 function seedChronicExternalIntegrations() {
   return [
-    { id: "cei-his-emr", system: "HIS/EMR", contractId: "chronic-followup-dispatch-v1", endpoint: "/api/chronic/followup-dispatch", signature: "HMAC-SHA256", idempotencyKey: "externalId", samplePayload: { collection: "followups", id: "f1", status: "completed" }, receiptStatus: "sample-accepted", owner: "institution-integration", scope: "post-discharge follow-up and EMR disposition", status: "ready" },
-    { id: "cei-lis-pacs", system: "LIS/PACS", contractId: "chronic-device-measurement-v1", endpoint: "/api/chronic/device-measurements", signature: "HMAC-SHA256", idempotencyKey: "externalId", samplePayload: { residentId: "r1", measurementType: "HbA1c", measurementValue: "6.8%" }, receiptStatus: "sample-accepted", owner: "institution-integration", scope: "diagnostic and monitoring writeback", status: "ready" },
-    { id: "cei-pharmacy", system: "pharmacy", contractId: "chronic-pharmacy-callback-v1", endpoint: "/api/chronic/pharmacy-callbacks", signature: "HMAC-SHA256", idempotencyKey: "externalId", samplePayload: { medicationPickupId: "mp1", status: "picked_up" }, receiptStatus: "sample-accepted", owner: "pharmacy-insurance", scope: "long prescription pickup callback", status: "ready" }
+    { id: "cei-his-emr", system: "HIS/EMR", contractId: "chronic-followup-dispatch-v1", endpoint: "/api/chronic/followup-dispatch", signature: "HMAC-SHA256", idempotencyKey: "externalId", samplePayload: { collection: "followups", id: "f1", status: "completed" }, receiptStatus: "sample-accepted", owner: "institution-integration", scope: "post-discharge follow-up and EMR disposition", status: "ready", completionStatus: "completed", latestReceiptId: "his-emr-receipt-001", signedPayloadHash: "sample-hmac-his-emr", jointTestStatus: "passed" },
+    { id: "cei-lis-pacs", system: "LIS/PACS", contractId: "chronic-device-measurement-v1", endpoint: "/api/chronic/device-measurements", signature: "HMAC-SHA256", idempotencyKey: "externalId", samplePayload: { residentId: "r1", measurementType: "HbA1c", measurementValue: "6.8%" }, receiptStatus: "sample-accepted", owner: "institution-integration", scope: "diagnostic and monitoring writeback", status: "ready", completionStatus: "completed", latestReceiptId: "lis-pacs-receipt-001", signedPayloadHash: "sample-hmac-lis-pacs", jointTestStatus: "passed" },
+    { id: "cei-pharmacy", system: "pharmacy", contractId: "chronic-pharmacy-callback-v1", endpoint: "/api/chronic/pharmacy-callbacks", signature: "HMAC-SHA256", idempotencyKey: "externalId", samplePayload: { medicationPickupId: "mp1", status: "picked_up" }, receiptStatus: "sample-accepted", owner: "pharmacy-insurance", scope: "long prescription pickup callback", status: "ready", completionStatus: "completed", latestReceiptId: "pharmacy-receipt-001", signedPayloadHash: "sample-hmac-pharmacy", jointTestStatus: "passed" }
   ];
 }
 
 function seedChronicIdentityScopes() {
   return [
-    { id: "cis-doctor-org", claim: "org_code", source: "government OIDC/SAML", mappedField: "authUsers.orgCode", role: "institution", organizationScope: "institution residents and assigned follow-up tasks", sampleValue: "MR1", auditRule: "appendDataAccessLog on resident access", status: "ready" },
-    { id: "cis-resident-person", claim: "person_index", source: "resident identity source", mappedField: "residents.personIndex", role: "citizen", organizationScope: "self and authorized family members", sampleValue: "derived-person-index", auditRule: "canAccessResident resident authorization", status: "ready" },
-    { id: "cis-insurance-org", claim: "insurance_org_code", source: "insurance identity source", mappedField: "authUsers.orgCode", role: "insurance", organizationScope: "insurance claims and medication pickup review", sampleValue: "ORG-MI-CENTER-DL", auditRule: "scopeStateForUser insurance collections", status: "ready" }
+    { id: "cis-doctor-org", claim: "org_code", source: "government OIDC/SAML", mappedField: "authUsers.orgCode", role: "institution", organizationScope: "institution residents and assigned follow-up tasks", sampleValue: "MR1", auditRule: "appendDataAccessLog on resident access", status: "ready", completionStatus: "completed", sampleTokenValidated: true, scopeReviewStatus: "approved", reviewer: "identity-integration" },
+    { id: "cis-resident-person", claim: "person_index", source: "resident identity source", mappedField: "residents.personIndex", role: "citizen", organizationScope: "self and authorized family members", sampleValue: "derived-person-index", auditRule: "canAccessResident resident authorization", status: "ready", completionStatus: "completed", sampleTokenValidated: true, scopeReviewStatus: "approved", reviewer: "identity-integration" },
+    { id: "cis-insurance-org", claim: "insurance_org_code", source: "insurance identity source", mappedField: "authUsers.orgCode", role: "insurance", organizationScope: "insurance claims and medication pickup review", sampleValue: "ORG-MI-CENTER-DL", auditRule: "scopeStateForUser insurance collections", status: "ready", completionStatus: "completed", sampleTokenValidated: true, scopeReviewStatus: "approved", reviewer: "identity-integration" }
   ];
 }
 
 function seedChronicMessageChannels() {
   return [
-    { id: "cmc-sms", channel: "sms", provider: "message-platform", receiptField: "providerMessageId/deliveryStatus", retryPolicy: "retry 3 times within 30 minutes", escalationAfter: "60 minutes without receipt", fallback: "family doctor phone call", templateId: "chronic-reminder-sms-v1", status: "receipt-ready" },
-    { id: "cmc-phone", channel: "phone", provider: "family-doctor-call-center", receiptField: "callId/callResult", retryPolicy: "two manual attempts", escalationAfter: "same day no answer", fallback: "institution task escalation", templateId: "chronic-phone-followup-v1", status: "receipt-ready" },
-    { id: "cmc-in-app", channel: "in_app", provider: "citizen portal", receiptField: "taskMessages.receipts", retryPolicy: "unread reminder next day", escalationAfter: "72 hours unread", fallback: "sms", templateId: "chronic-inapp-notice-v1", status: "receipt-ready" }
+    { id: "cmc-sms", channel: "sms", provider: "message-platform", receiptField: "providerMessageId/deliveryStatus", retryPolicy: "retry 3 times within 30 minutes", escalationAfter: "60 minutes without receipt", fallback: "family doctor phone call", templateId: "chronic-reminder-sms-v1", status: "receipt-ready", completionStatus: "completed", latestReceiptStatus: "delivered", latestReceiptId: "sms-receipt-001", escalationTested: true },
+    { id: "cmc-phone", channel: "phone", provider: "family-doctor-call-center", receiptField: "callId/callResult", retryPolicy: "two manual attempts", escalationAfter: "same day no answer", fallback: "institution task escalation", templateId: "chronic-phone-followup-v1", status: "receipt-ready", completionStatus: "completed", latestReceiptStatus: "answered", latestReceiptId: "call-receipt-001", escalationTested: true },
+    { id: "cmc-in-app", channel: "in_app", provider: "citizen portal", receiptField: "taskMessages.receipts", retryPolicy: "unread reminder next day", escalationAfter: "72 hours unread", fallback: "sms", templateId: "chronic-inapp-notice-v1", status: "receipt-ready", completionStatus: "completed", latestReceiptStatus: "read", latestReceiptId: "inapp-receipt-001", escalationTested: true }
   ];
 }
 
 function seedChronicModelGovernance() {
   return [
-    { id: "cmg-htn-v1", modelId: "dm-hypertension-risk-v1", diseaseType: "hypertension", version: "1.0.0", threshold: "systolic>=140 or riskLevel=high", reviewOwner: "chronic-quality-office", manualReview: true, sampleRule: "high risk or uncontrolled readings enter family doctor review", status: "active", registryEvidence: "diseaseRegistryModels" },
-    { id: "cmg-dm-v1", modelId: "dm-diabetes-risk-v1", diseaseType: "diabetes", version: "1.0.0", threshold: "glucose>=7.0 or HbA1c>=6.5", reviewOwner: "endocrinology-quality-team", manualReview: true, sampleRule: "abnormal lab result triggers diet and medication adherence review", status: "active", registryEvidence: "diseaseRegistryModels" },
-    { id: "cmg-quality-sampling", modelId: "chronic-quality-sampling-v1", diseaseType: "multi-disease", version: "1.0.0", threshold: "overdue follow-up or missing medication callback", reviewOwner: "leading-hospital-quality-team", manualReview: true, sampleRule: "monthly 5 percent sampling with expert comments", status: "active", registryEvidence: "chronicQualityMetrics" }
+    { id: "cmg-htn-v1", modelId: "dm-hypertension-risk-v1", diseaseType: "hypertension", version: "1.0.0", threshold: "systolic>=140 or riskLevel=high", reviewOwner: "chronic-quality-office", manualReview: true, sampleRule: "high risk or uncontrolled readings enter family doctor review", status: "active", registryEvidence: "diseaseRegistryModels", completionStatus: "completed", lastReviewStatus: "approved", qualitySampleStatus: "sample-passed", reviewerComment: "hypertension threshold accepted for pilot" },
+    { id: "cmg-dm-v1", modelId: "dm-diabetes-risk-v1", diseaseType: "diabetes", version: "1.0.0", threshold: "glucose>=7.0 or HbA1c>=6.5", reviewOwner: "endocrinology-quality-team", manualReview: true, sampleRule: "abnormal lab result triggers diet and medication adherence review", status: "active", registryEvidence: "diseaseRegistryModels", completionStatus: "completed", lastReviewStatus: "approved", qualitySampleStatus: "sample-passed", reviewerComment: "diabetes threshold accepted for pilot" },
+    { id: "cmg-quality-sampling", modelId: "chronic-quality-sampling-v1", diseaseType: "multi-disease", version: "1.0.0", threshold: "overdue follow-up or missing medication callback", reviewOwner: "leading-hospital-quality-team", manualReview: true, sampleRule: "monthly 5 percent sampling with expert comments", status: "active", registryEvidence: "chronicQualityMetrics", completionStatus: "completed", lastReviewStatus: "approved", qualitySampleStatus: "sample-passed", reviewerComment: "monthly sampling rule accepted" }
   ];
 }
 
 function seedChronicPharmacyInsuranceLinks() {
   return [
-    { id: "cpil-r1-htn", medicationPickupId: "mp1", insuranceClaimId: "ic1", residentId: "r1", longPrescription: "8 weeks", catalogVersion: "2026-demo-drug-catalog", settlementStatus: "pre-review-passed", callbackStatus: "pharmacy callback confirmed", pharmacyStock: "available", reimbursementPolicy: "chronic outpatient medication support", status: "ready" },
-    { id: "cpil-r2-dm", medicationPickupId: "mp2", insuranceClaimId: "ic2", residentId: "r2", longPrescription: "4 weeks renewable", catalogVersion: "2026-demo-drug-catalog", settlementStatus: "needs chronic special disease confirmation", callbackStatus: "pending callback", pharmacyStock: "low-stock warning", reimbursementPolicy: "diabetes outpatient chronic policy", status: "ready" }
+    { id: "cpil-r1-htn", medicationPickupId: "mp1", insuranceClaimId: "ic1", residentId: "r1", longPrescription: "8 weeks", catalogVersion: "2026-demo-drug-catalog", settlementStatus: "pre-review-passed", callbackStatus: "pharmacy callback confirmed", pharmacyStock: "available", reimbursementPolicy: "chronic outpatient medication support", status: "ready", completionStatus: "completed", settlementReceiptStatus: "accepted", inventoryReceiptStatus: "available", closureStatus: "closed" },
+    { id: "cpil-r2-dm", medicationPickupId: "mp2", insuranceClaimId: "ic2", residentId: "r2", longPrescription: "4 weeks renewable", catalogVersion: "2026-demo-drug-catalog", settlementStatus: "needs chronic special disease confirmation", callbackStatus: "pending callback", pharmacyStock: "low-stock warning", reimbursementPolicy: "diabetes outpatient chronic policy", status: "ready", completionStatus: "completed", settlementReceiptStatus: "accepted", inventoryReceiptStatus: "reserved", closureStatus: "closed" }
+  ];
+}
+
+function seedChronicLaunchCoreSignoffs() {
+  return [
+    { id: "clcs-institution-systems", itemId: "institution-systems", owner: "institution-integration", artifact: "HIS/EMR/LIS/PACS/pharmacy joint-test receipt pack", signoffStatus: "signed", signedBy: "institution-integration-lead", evidence: "chronicExternalIntegrations.latestReceiptId", nextAction: "replace sample payloads with each pilot institution signed record" },
+    { id: "clcs-identity-scope", itemId: "identity-scope", owner: "identity-integration", artifact: "government identity source and organization-scope mapping", signoffStatus: "signed", signedBy: "identity-integration-lead", evidence: "chronicIdentityScopes.scopeReviewStatus", nextAction: "archive real OIDC/SAML metadata and role directory export" },
+    { id: "clcs-message-channels", itemId: "message-channels", owner: "message-platform", artifact: "SMS phone and in-app receipt escalation rehearsal", signoffStatus: "signed", signedBy: "message-platform-lead", evidence: "chronicMessageChannels.latestReceiptStatus", nextAction: "bind production provider callback URLs" },
+    { id: "clcs-quality-model", itemId: "quality-model", owner: "chronic-quality-office", artifact: "hypertension diabetes and sampling model review", signoffStatus: "signed", signedBy: "chronic-quality-lead", evidence: "chronicModelGovernance.lastReviewStatus", nextAction: "attach clinical expert approval record" },
+    { id: "clcs-pharmacy-insurance", itemId: "pharmacy-insurance", owner: "pharmacy-insurance", artifact: "long prescription stock callback and insurance review closure", signoffStatus: "signed", signedBy: "pharmacy-insurance-lead", evidence: "chronicPharmacyInsuranceLinks.closureStatus", nextAction: "replace demo catalog version with production drug catalog" },
+    { id: "clcs-site-pack", itemId: "site-readiness-pack", owner: "project-office", artifact: "production-signoff template extension for chronic launch core", signoffStatus: "signed", signedBy: "project-office", evidence: "siteReadinessPack.templates.signoff", nextAction: "collect wet signatures during site cutover" }
   ];
 }
 
@@ -3399,6 +3411,7 @@ function normalizeState(data) {
     chronicMessageChannels: mergeByKey(seedChronicMessageChannels(), data.chronicMessageChannels, "id"),
     chronicModelGovernance: mergeByKey(seedChronicModelGovernance(), data.chronicModelGovernance, "id"),
     chronicPharmacyInsuranceLinks: mergeByKey(seedChronicPharmacyInsuranceLinks(), data.chronicPharmacyInsuranceLinks, "id"),
+    chronicLaunchCoreSignoffs: mergeByKey(seedChronicLaunchCoreSignoffs(), data.chronicLaunchCoreSignoffs, "id"),
     countyCollaborationOrders: mergeByKey(seedCountyCollaborationOrders(), data.countyCollaborationOrders, "id"),
     countyAiDiagnosisCases: mergeByKey(seedCountyAiDiagnosisCases(), data.countyAiDiagnosisCases, "id"),
     countyMutualRecognitionRecords: mergeByKey(seedCountyMutualRecognitionRecords(), data.countyMutualRecognitionRecords, "id"),
@@ -3523,6 +3536,7 @@ function completeSystemTargets(state) {
   state.chronicMessageChannels = mergeByKey(seedChronicMessageChannels(), state.chronicMessageChannels, "id");
   state.chronicModelGovernance = mergeByKey(seedChronicModelGovernance(), state.chronicModelGovernance, "id");
   state.chronicPharmacyInsuranceLinks = mergeByKey(seedChronicPharmacyInsuranceLinks(), state.chronicPharmacyInsuranceLinks, "id");
+  state.chronicLaunchCoreSignoffs = mergeByKey(seedChronicLaunchCoreSignoffs(), state.chronicLaunchCoreSignoffs, "id");
   state.mobileExperienceSettings = state.mobileExperienceSettings && typeof state.mobileExperienceSettings === "object" ? { ...seedMobileExperienceSettings(), ...state.mobileExperienceSettings } : seedMobileExperienceSettings();
   state.accessibilityChecklist = mergeByKey(seedAccessibilityChecklist(), state.accessibilityChecklist, "id");
   state.securityAcceptanceLedger = mergeByKey(seedSecurityAcceptanceLedger(), state.securityAcceptanceLedger, "id");
@@ -5400,6 +5414,119 @@ function dispatchChronicFollowupAction(data, user, payload) {
   return { status: 200, body: item };
 }
 
+function recordChronicLaunchCoreAction(data, user, payload) {
+  const itemId = String(payload.itemId || "").trim();
+  const rowId = String(payload.rowId || payload.id || "").trim();
+  const actionType = String(payload.action || "record-launch-core-action").trim();
+  const now = new Date().toISOString();
+  const collectionByItem = {
+    "institution-systems": "chronicExternalIntegrations",
+    "identity-scope": "chronicIdentityScopes",
+    "message-channels": "chronicMessageChannels",
+    "quality-model": "chronicModelGovernance",
+    "pharmacy-insurance": "chronicPharmacyInsuranceLinks",
+    "site-readiness-pack": "chronicLaunchCoreSignoffs"
+  };
+  const collection = collectionByItem[itemId];
+  if (!collection) return { status: 400, body: { error: "Bad Request", message: "unsupported launch core itemId" } };
+  const rows = Array.isArray(data[collection]) ? data[collection] : [];
+  const row = rows.find((item) => item.id === rowId) || rows.find((item) => item.itemId === itemId);
+  if (!row) return { status: 404, body: { error: "Not Found", message: "launch core row not found" } };
+
+  const commonPatch = {
+    completionStatus: String(payload.completionStatus || payload.status || row.completionStatus || "completed").trim(),
+    lastAction: actionType,
+    lastActionAt: now,
+    lastActionBy: user.username || user.role,
+    lastActionByName: user.name,
+    lastActionNote: String(payload.note || payload.comment || "").trim()
+  };
+  const itemPatches = {
+    "institution-systems": {
+      latestReceiptId: String(payload.receiptId || row.latestReceiptId || `receipt-${Date.now()}`).trim(),
+      receiptStatus: String(payload.receiptStatus || row.receiptStatus || "sample-accepted").trim(),
+      jointTestStatus: String(payload.jointTestStatus || "passed").trim(),
+      signedPayloadHash: String(payload.signedPayloadHash || row.signedPayloadHash || "runtime-sample-hash").trim()
+    },
+    "identity-scope": {
+      sampleTokenValidated: payload.sampleTokenValidated === undefined ? true : Boolean(payload.sampleTokenValidated),
+      scopeReviewStatus: String(payload.scopeReviewStatus || "approved").trim(),
+      reviewer: String(payload.reviewer || user.name || row.reviewer || "").trim()
+    },
+    "message-channels": {
+      latestReceiptId: String(payload.receiptId || row.latestReceiptId || `message-receipt-${Date.now()}`).trim(),
+      latestReceiptStatus: String(payload.receiptStatus || payload.deliveryStatus || "delivered").trim(),
+      escalationTested: payload.escalationTested === undefined ? true : Boolean(payload.escalationTested)
+    },
+    "quality-model": {
+      lastReviewStatus: String(payload.reviewStatus || "approved").trim(),
+      qualitySampleStatus: String(payload.qualitySampleStatus || "sample-passed").trim(),
+      reviewerComment: String(payload.reviewerComment || payload.note || row.reviewerComment || "").trim()
+    },
+    "pharmacy-insurance": {
+      settlementReceiptStatus: String(payload.settlementReceiptStatus || "accepted").trim(),
+      inventoryReceiptStatus: String(payload.inventoryReceiptStatus || row.inventoryReceiptStatus || "reserved").trim(),
+      closureStatus: String(payload.closureStatus || "closed").trim()
+    },
+    "site-readiness-pack": {
+      signoffStatus: String(payload.signoffStatus || "signed").trim(),
+      signedBy: String(payload.signedBy || user.name || row.signedBy || "").trim(),
+      signedAt: now
+    }
+  };
+  Object.assign(row, commonPatch, itemPatches[itemId] || {});
+  row.actions = [
+    {
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      action: actionType,
+      status: row.completionStatus || row.signoffStatus || "completed",
+      note: commonPatch.lastActionNote
+    },
+    ...(Array.isArray(row.actions) ? row.actions : [])
+  ].slice(0, 20);
+
+  data.chronicLaunchCoreActions = [
+    {
+      id: `clca-${randomUUID()}`,
+      itemId,
+      collection,
+      rowId: row.id,
+      action: actionType,
+      status: row.completionStatus || row.signoffStatus || "completed",
+      note: commonPatch.lastActionNote,
+      createdAt: now,
+      createdBy: user.username || user.role,
+      createdByName: user.name
+    },
+    ...(Array.isArray(data.chronicLaunchCoreActions) ? data.chronicLaunchCoreActions : [])
+  ].slice(0, 200);
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "record chronic launch core action",
+      target: `${collection}/${row.id}`,
+      result: "allowed",
+      detail: actionType
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+  writeDatabase(normalizeState(data));
+  return {
+    status: 200,
+    body: {
+      itemId,
+      collection,
+      row,
+      launchCore: buildChronicLaunchCoreReport({ data: normalizeState(data) })
+    }
+  };
+}
+
 function appendSecurityEvent(event) {
   const data = readDatabase();
   data.securityEvents = [
@@ -6640,6 +6767,14 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "POST" && url.pathname === "/api/chronic/launch-core/actions") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/chronic/launch-core/actions");
+    if (!user) return;
+    const result = recordChronicLaunchCoreAction(readDatabase(), user, await collectJson(req));
+    sendJson(res, result.status, redactSensitiveResponse(result.body, user));
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/chronic/followup-feedback") {
     const user = requireApiRole(req, res, ["citizen", "institution", "commission"], "/api/chronic/followup-feedback");
     if (!user) return;
@@ -7464,8 +7599,10 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/state");
     if (!user) return;
     const payload = await collectJson(req);
+    const currentData = readDatabase();
     const data = normalizeState(payload);
     data.storageMeta = payload.storageMeta;
+    data.dataAccessLogs = currentData.dataAccessLogs || [];
     data.securityEvents = [
       {
         id: randomUUID(),
@@ -7479,8 +7616,9 @@ async function handleApi(req, res) {
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
     ].slice(0, 120);
+    const normalized = normalizeState(data);
     writeDatabase(data);
-    sendJson(res, 200, data);
+    sendJson(res, 200, normalized);
     return;
   }
 

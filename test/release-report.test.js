@@ -69,6 +69,7 @@ test("release report validates demo and production environment profiles", () => 
   assert.equal(production.cutoverChecklist.some((item) => item.id === "cutover-identity" && item.passed), true);
   assert.equal(production.cutoverChecklist.some((item) => item.id === "cutover-audit-retention" && item.passed), true);
   assert.equal(production.cutoverChecklist.some((item) => item.id === "cutover-institution-interfaces" && !item.passed), true);
+  assert.equal(production.cutoverChecklist.some((item) => item.id === "cutover-chronic-launch-core" && !item.passed), true);
   assert.equal(production.cutoverChecklist.some((item) => item.id === "cutover-monitoring" && /missing site signoff/.test(item.evidence)), true);
 
   const missingEnvFile = validateProductionConfig({
@@ -120,6 +121,8 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.chronicFollowup.summary.fieldIntegrationItems >= 1, true);
   assert.equal(report.chronicInstitutionInterfaces.summary.readyContracts, report.chronicInstitutionInterfaces.summary.contracts);
   assert.equal(report.chronicLaunchCore.summary.readyItems, 5);
+  assert.equal(report.chronicLaunchCore.summary.closureRows >= 14, true);
+  assert.equal(report.chronicLaunchCore.summary.signedSignoffs, 6);
   assert.equal(report.chronicFollowup.summary.policyAligned, report.chronicFollowup.summary.policyItems);
   assert.equal(report.chronicFollowup.apiSurface.includes("POST /api/chronic/followup-feedback"), true);
   assert.equal(report.checks.some((item) => item.name === "dataQuality:report" && item.passed), true);
@@ -153,6 +156,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.environmentMatrix.profiles.some((item) => item.id === "staging"), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-env-file"), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-institution-interfaces" && !item.passed), true);
+  assert.equal(report.productionCutover.some((item) => item.id === "cutover-chronic-launch-core" && !item.passed), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-insurance-certificate" && !item.passed), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-monitoring" && !item.passed), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-dr-rehearsal" && !item.passed), true);
@@ -190,6 +194,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(cutoverMarkdown, /Production cutover checklist/);
   assert.match(cutoverMarkdown, /cutover-audit-retention/);
   assert.match(cutoverMarkdown, /cutover-institution-interfaces/);
+  assert.match(cutoverMarkdown, /cutover-chronic-launch-core/);
   assert.match(cutoverMarkdown, /missing site signoff/);
 
   const signedReport = buildReleaseReport({
@@ -200,12 +205,14 @@ test("release report summarizes repository readiness and renders markdown", () =
       SESSION_SECRETS: "replace-with-long-random-secret",
       INTEGRATION_GATEWAY_SECRET: "replace-with-integration-secret",
       CUTOVER_SITE_INTERFACE_SIGNOFF: "signed",
+      CUTOVER_CHRONIC_LAUNCH_CORE_SIGNOFF: "signed",
       CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF: "signed",
       CUTOVER_MONITORING_SIGNOFF: "signed",
       CUTOVER_DR_REHEARSAL_SIGNOFF: "signed"
     }
   });
   assert.equal(signedReport.productionCutover.some((item) => item.id === "cutover-institution-interfaces" && item.passed), true);
+  assert.equal(signedReport.productionCutover.some((item) => item.id === "cutover-chronic-launch-core" && item.passed), true);
   assert.equal(signedReport.productionCutover.some((item) => item.id === "cutover-monitoring" && item.passed), true);
 
   const storageMarkdown = renderStorageModelMarkdown(report);
@@ -300,7 +307,9 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.equal(chronicInstitutionInterfacesJson.chronicInstitutionInterfaces.ok, true);
   assert.match(chronicInstitutionInterfacesMarkdown, /chronic-device-measurement-v1/);
   assert.equal(chronicLaunchCoreJson.chronicLaunchCore.ok, true);
+  assert.equal(chronicLaunchCoreJson.chronicLaunchCore.summary.signedSignoffs, 6);
   assert.match(chronicLaunchCoreMarkdown, /institution-systems/);
+  assert.match(chronicLaunchCoreMarkdown, /Site Signoffs/);
   assert.match(chronicFollowupMarkdown, /resident-feedback/);
   assert.match(chronicFollowupMarkdown, /policy-alignment/);
   assert.match(chronicFollowupMarkdown, /Alert queue/);

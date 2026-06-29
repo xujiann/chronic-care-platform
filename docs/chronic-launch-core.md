@@ -18,10 +18,24 @@ This document defines the first five production-facing work packages for the chr
   - Roles: `commission`, `institution`.
   - Returns the five launch core items, required field completeness, cross-evidence status and release checks.
   - The response is read-only and uses the current database snapshot.
+- `POST /api/chronic/launch-core/actions`
+  - Roles: `commission`, `institution`.
+  - Records a closure action for one launch-core row and writes an audit event.
+  - Supported `itemId` values: `institution-systems`, `identity-scope`, `message-channels`, `quality-model`, `pharmacy-insurance`, `site-readiness-pack`.
+  - The response returns the updated row and a refreshed launch-core report.
 
 ## Release Gate
 
 The `chronicFollowup:launchCore` release check passes only when all five core items are ready. It intentionally sits after the existing follow-up readiness and institution interface checks, so the module cannot be marked release-ready if only demo pages are present without field-level launch evidence.
+
+The release evidence also includes `launch-core:actionClosure` and `launch-core:siteSignoffs`. These checks prove that the six pre-launch tasks have closure rows and signed site evidence:
+
+- Institution system receipt and joint-test closure.
+- Identity and organization scope review.
+- Message receipt and escalation rehearsal.
+- Quality model version and manual review closure.
+- Pharmacy, prescription and insurance callback closure.
+- Site readiness pack signoff.
 
 ## Site Joint-Test Boundary
 

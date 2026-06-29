@@ -59,7 +59,15 @@ function renderAll(state) {
 function bindInstitutionActions() {
   document.addEventListener("click", async (event) => {
       const button = event.target.closest("[data-workflow-action]");
+      const launchCoreButton = event.target.closest("[data-launch-core-action]");
       const integrationButton = event.target.closest("[data-chronic-integration]");
+      if (launchCoreButton) {
+        launchCoreButton.disabled = true;
+        const result = await recordLaunchCoreAction(launchCoreButton.dataset.itemId, launchCoreButton.dataset.rowId);
+        launchCoreButton.disabled = false;
+        if (result.ok) renderAll(platformState);
+        return;
+      }
       if (integrationButton) {
         integrationButton.disabled = true;
         const result = await runChronicIntegrationDemo(integrationButton.dataset.chronicIntegration);
@@ -93,6 +101,12 @@ function actionButton(collection, id, label, updates, note) {
 
 function chronicDispatchButton(collection, id, label, updates, note) {
   return `<button class="inline-action" type="button" data-workflow-action data-chronic-dispatch="true" data-collection="${collection}" data-id="${id}" data-updates='${JSON.stringify(updates)}' data-note="${note || label}">${label}</button>`;
+}
+
+function launchCoreActionButton(item) {
+  const row = (item.closureEvidence?.rowsDetail || [])[0] || {};
+  const rowId = row.id || row.itemId || item.id;
+  return `<button class="inline-action" type="button" data-launch-core-action data-item-id="${item.id}" data-row-id="${rowId}">Record closure</button>`;
 }
 
 function chronicClosed(state, status) {
@@ -173,7 +187,7 @@ function fallbackChronicLaunchCore(state) {
   };
 }
 
-function renderChronicLaunchCore(state) {
+function renderChronicLaunchCoreLegacy(state) {
   const summaryEl = document.querySelector("#chronic-launch-core-summary");
   const gridEl = document.querySelector("#chronic-launch-core");
   if (!summaryEl || !gridEl) return;
@@ -186,6 +200,68 @@ function renderChronicLaunchCore(state) {
       <span>${item.ready ? "PASS" : "PENDING"}<br>${item.collection} · ${rows.readyRows || 0}/${rows.rows || 0}<br>${item.owner}</span>
     </article>`;
   }).join("");
+}
+
+function renderChronicLaunchCore(state) {
+  const summaryEl = document.querySelector("#chronic-launch-core-summary");
+  const gridEl = document.querySelector("#chronic-launch-core");
+  if (!summaryEl || !gridEl) return;
+  const report = state.chronicLaunchCore || fallbackChronicLaunchCore(state);
+  const signoffs = report.summary.signoffs || 0;
+  const signedSignoffs = report.summary.signedSignoffs || 0;
+  summaryEl.textContent = `${report.summary.readyItems}/${report.summary.items} ready - ${report.summary.closureRows || 0} closure rows - ${signedSignoffs}/${signoffs} signoffs`;
+  gridEl.innerHTML = (report.items || []).map((item) => {
+    const rows = item.collectionEvidence || {};
+    const closure = item.closureEvidence || {};
+    return `<article class="claim-card">
+      <strong>${item.title}</strong>
+      <span>${item.ready ? "PASS" : "PENDING"}<br>${item.collection} - ${rows.readyRows || 0}/${rows.rows || 0}<br>closure - ${closure.readyRows || 0}/${closure.rows || 0}<br>${item.owner}</span>
+      <div class="action-row">${launchCoreActionButton(item)}</div>
+    </article>`;
+  }).join("");
+}
+
+async function recordLaunchCoreAction(itemId, rowId) {
+  const payload = {
+    itemId,
+    rowId,
+    action: "site closure confirmation",
+    completionStatus: "closed",
+    receiptStatus: "accepted",
+    reviewStatus: "approved",
+    signoffStatus: "signed",
+    note: "institution launch core closure recorded from portal"
+  };
+  if (!institutionApiBase) {
+    const report = platformState.chronicLaunchCore || fallbackChronicLaunchCore(platformState);
+    const item = (report.items || []).find((entry) => entry.id === itemId);
+    if (item) {
+      item.ready = true;
+      item.closureReady = true;
+      item.closureEvidence = {
+        ...(item.closureEvidence || {}),
+        rows: Math.max(item.closureEvidence?.rows || 0, 1),
+        readyRows: Math.max(item.closureEvidence?.readyRows || 0, 1)
+      };
+    }
+    platformState.chronicLaunchCore = report;
+    return { ok: true };
+  }
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/chronic/launch-core/actions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error(`launch core action failed: ${response.status}`);
+    const saved = await response.json();
+    platformState.chronicLaunchCore = saved.launchCore || await loadChronicLaunchCore();
+    return { ok: true, saved };
+  } catch (error) {
+    alert(error.message || "launch core action failed");
+    return { ok: false };
+  }
 }
 
 function renderChronicFollowupWorkbench(state) {

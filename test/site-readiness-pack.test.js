@@ -20,6 +20,7 @@ test("site readiness pack creates implementation templates", () => {
   assert.equal(report.templates.identity.some((item) => item.id.includes("undefined")), false);
   assert.equal(report.templates.monitoring.some((item) => item.id.includes("undefined")), false);
   assert.equal(report.templates.signoff.some((item) => item.id === "signoff-cutover-institution-interfaces"), true);
+  assert.equal(report.templates.signoff.some((item) => item.id === "signoff-cutover-chronic-launch-core"), true);
   assert.equal(report.checks.every((item) => item.passed), true);
 });
 

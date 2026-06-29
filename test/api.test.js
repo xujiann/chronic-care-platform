@@ -743,8 +743,38 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(chronicLaunchCore.response.status, 200);
     assert.equal(chronicLaunchCore.body.ok, true);
     assert.equal(chronicLaunchCore.body.summary.readyItems, 5);
+    assert.equal(chronicLaunchCore.body.summary.signedSignoffs, chronicLaunchCore.body.summary.signoffs);
+    assert.equal(chronicLaunchCore.body.checks.some((item) => item.id === "launch-core:actionClosure" && item.passed), true);
     assert.equal(chronicLaunchCore.body.items.some((item) => item.id === "institution-systems" && item.ready), true);
     assert.equal(chronicLaunchCore.body.items.some((item) => item.id === "pharmacy-insurance" && item.collectionEvidence.rows >= 2), true);
+
+    const launchCoreAction = await api(baseUrl, "/api/chronic/launch-core/actions", authorized(institution.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        itemId: "message-channels",
+        rowId: "cmc-sms",
+        action: "provider receipt rehearsal",
+        receiptStatus: "delivered",
+        note: "sms provider receipt accepted in API regression"
+      })
+    }));
+    assert.equal(launchCoreAction.response.status, 200);
+    assert.equal(launchCoreAction.body.row.latestReceiptStatus, "delivered");
+    assert.equal(launchCoreAction.body.launchCore.ok, true);
+
+    const launchCoreSignoff = await api(baseUrl, "/api/chronic/launch-core/actions", authorized(institution.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        itemId: "site-readiness-pack",
+        rowId: "clcs-site-pack",
+        action: "site signoff confirmation",
+        signoffStatus: "signed",
+        note: "site pack signoff retained"
+      })
+    }));
+    assert.equal(launchCoreSignoff.response.status, 200);
+    assert.equal(launchCoreSignoff.body.row.signoffStatus, "signed");
+    assert.equal(launchCoreSignoff.body.launchCore.summary.signedSignoffs, launchCoreSignoff.body.launchCore.summary.signoffs);
 
     const citizenFollowupSummary = await api(baseUrl, "/api/chronic/followup-summary?residentId=r1", authorized(citizen.body.token));
     assert.equal(citizenFollowupSummary.response.status, 200);

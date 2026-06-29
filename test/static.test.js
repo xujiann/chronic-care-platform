@@ -180,6 +180,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".env.example"), /SESSION_SECRETS=/);
   assert.match(read(".env.example"), /INTEGRATION_GATEWAY_SECRET=/);
   assert.match(read(".env.example"), /CUTOVER_SITE_INTERFACE_SIGNOFF/);
+  assert.match(read(".env.example"), /CUTOVER_CHRONIC_LAUNCH_CORE_SIGNOFF/);
   assert.match(read(".env.example"), /CUTOVER_DR_REHEARSAL_SIGNOFF/);
   assert.match(read(".env.example"), /OIDC_ISSUER_URL=/);
   assert.match(read(".env.example"), /AUDIT_EXPORT_PATH=/);
@@ -341,6 +342,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("server.js"), /\/api\/release-artifact-manifest/);
   assert.match(read("server.js"), /\/api\/chronic\/institution-interfaces/);
   assert.match(read("server.js"), /\/api\/chronic\/launch-core/);
+  assert.match(read("server.js"), /\/api\/chronic\/launch-core\/actions/);
   assert.match(read("server.js"), /\/api\/chronic\/followup-summary/);
   assert.match(read("server.js"), /\/api\/chronic\/followup-feedback/);
   assert.match(read("server.js"), /\/api\/chronic\/resident-checkins/);
@@ -355,9 +357,14 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("server.js"), /recordChronicPharmacyCallback/);
   assert.match(read("server.js"), /closeFamilyDoctorChronicAction/);
   assert.match(read("server.js"), /buildChronicFollowupAlertQueue/);
+  assert.match(read("server.js"), /recordChronicLaunchCoreAction/);
   assert.match(read("data/db.json"), /"chronicFollowup": true/);
+  assert.match(read("data/db.json"), /"chronicLaunchCoreSignoffs"/);
   assert.match(read("docs/chronic-followup-readiness.md"), /\/api\/messages/);
   assert.match(read("scripts/chronic-followup-readiness.js"), /policy-alignment/);
+  assert.match(read("scripts/chronic-launch-core.js"), /launch-core:actionClosure/);
+  assert.match(read("scripts/chronic-launch-core.js"), /launch-core:siteSignoffs/);
+  assert.match(read("scripts/site-readiness-pack.js"), /cutover-chronic-launch-core/);
   assert.match(read("scripts/release-report.js"), /chronicFollowup:policyAlignment/);
   assert.match(read("scripts/release-report.js"), /chronicFollowup:alertQueue/);
   assert.match(read("scripts/release-report.js"), /chronicFollowup:residentExperience/);
@@ -381,6 +388,8 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("institution.js"), /loadChronicFollowupSummary/);
   assert.match(read("institution.js"), /\/chronic\/followup-summary/);
   assert.match(read("institution.js"), /\/chronic\/launch-core/);
+  assert.match(read("institution.js"), /recordLaunchCoreAction/);
+  assert.match(read("institution.js"), /\/chronic\/launch-core\/actions/);
   assert.match(read("institution.js"), /renderChronicLaunchCore/);
   assert.match(read("institution.js"), /政策对照/);
   assert.match(read("citizen.html"), /followup-feedback-form/);
