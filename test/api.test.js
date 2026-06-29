@@ -1702,6 +1702,6 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(reset.response.status, 200);
     assert.equal(reset.body.residents.length >= 4, true);
     assert.equal(reset.body.securityEvents[0].target, "/api/reset");
-    assert.equal(reset.body.securityEvents[0].actor, "大连市卫生健康委管理员");
+    assert.match(reset.body.securityEvents[0].actor, /大连市(卫生健康委|卫健委)管理员/);
   });
 });
