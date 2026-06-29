@@ -357,7 +357,7 @@ function buildDashboardDepartmentFunctionMatrix(context = {}) {
       name: "基层卫生处/公共卫生处",
       level: "内部机构",
       implemented: ["县域医共体、基层慢病、家庭医生和公共卫生任务汇总", "基层风险、逾期随访、上转复核和服务协同待办", `${openActions.length}条预览待办与源应用导航`],
-      nextPlan: "按区县、乡镇卫生院、社区卫生服务中心和村卫生室接入真实任务回写，形成基层闭环率和超期率看板。",
+      nextPlan: "按区县维度接入基层源业务回写结果，形成监管用闭环率和超期率看板；基层机构具体办理仍在源业务系统完成。",
       evidence: "county.html/index.html/openActions",
       status: openActions.length ? "watch" : "ready"
     },
@@ -412,54 +412,36 @@ function buildDashboardCityCountyFunctionMatrix(context = {}) {
       id: "city-health-commission",
       level: "市级",
       agency: "市卫生健康委",
-      implemented: ["跨前七应用总览、指标、风险、任务和验收证据汇总", "出生、死亡、就诊、入院四指标日/周/月/年看板", "管理端权限和摘要接口审计留痕"],
-      nextPlan: "建设市级专题驾驶视图，接入真实机构目录、统计直报、统一认证和跨部门证照交换回执。",
+      implemented: ["跨前七应用总览、指标、风险、任务和验收证据汇总", "出生、死亡、就诊、入院四指标日/周/月/年看板", "按医政、基层、公卫、妇幼、疾控、监督和规划信息职能关联源模块"],
+      nextPlan: "建设市级行政监管专题视图；医疗机构、平台中心、专业中心和基层机构仅作为数据来源或协同对象，不在本系统承接办理职责。",
       evidence: "/api/health-dashboard/summary",
       status: applications.length === 7 ? "ready" : "watch"
     },
     {
-      id: "city-platform-center",
+      id: "city-admin-coordination",
       level: "市级",
-      agency: "市级全民健康信息平台/大数据中心",
-      implemented: [`${interfaces.length}条接口联调轨道`, "平台证据、发布报告、部署门禁和静态快照", `${siteEvidencePackage.summary?.artifacts || 0}项现场证据包`],
-      nextPlan: "联调生产数据库、消息总线、统一身份、日志留存、监控告警和灾备演练。",
-      evidence: "platformInterfaces/release-report/deploy-check",
-      status: interfaces.length >= 5 ? "ready" : "watch"
-    },
-    {
-      id: "city-specialized-centers",
-      level: "市级",
-      agency: "疾控中心/妇幼保健机构/急救与统计中心",
-      implemented: ["出生、死亡、证照、疾控死因监测和统计日报汇总", `${certificateExchange.summary?.tracks || 0}条证照/统计交换链路`, "风险预警与现场依赖统一展示"],
-      nextPlan: "接入妇幼、疾控、急救、统计直报和电子证照正式接口，形成专业条线可追溯对账。",
-      evidence: "certificateExchange/populationServiceBoard",
-      status: certificateExchange.summary?.tracks >= 5 ? "ready" : "watch"
+      agency: "市级卫生健康行政部门业务处室",
+      implemented: [`规划信息处关联${interfaces.length}条接口联调轨道和${siteEvidencePackage.summary?.artifacts || 0}项现场证据包`, `妇幼、疾控、统计职能汇总${certificateExchange.summary?.tracks || 0}条证照/统计交换链路`, `医政医管、基层公卫职能监管${riskDrilldowns.summary?.items || 0}条风险下钻和${openActions.length}条跨应用待办`],
+      nextPlan: "补齐处室职责清单、事项权限、督办规则和审计字段；源业务办理继续回到对应业务系统。",
+      evidence: "platformInterfaces/certificateExchange/riskDrilldowns/openActions",
+      status: interfaces.length >= 5 && certificateExchange.summary?.tracks >= 5 ? "ready" : "watch"
     },
     {
       id: "county-health-bureau",
       level: "县级",
       agency: "区县卫生健康局",
-      implemented: ["按源应用汇总基层、医共体、慢病、转诊和公共卫生任务", `${openActions.length}条跨应用预览待办`, "可从管理系统回到源应用办理页面"],
-      nextPlan: "增加区县筛选、辖区机构看板、任务闭环率、超期率和现场问题整改台账。",
+      implemented: ["按行政辖区汇总基层、医共体、慢病、转诊和公共卫生监管信号", `${openActions.length}条跨应用预览待办`, "可从管理系统回到源应用查看、督办和留痕，具体办理不在本系统完成"],
+      nextPlan: "增加区县筛选、辖区机构监管看板、任务闭环率、超期率和现场问题整改台账。",
       evidence: "county.html/index.html/openActions",
       status: openActions.length ? "watch" : "ready"
     },
     {
-      id: "county-consortium",
+      id: "county-admin-coordination",
       level: "县级",
-      agency: "县域医共体牵头医院",
-      implemented: ["转诊、远程会诊、检查检验互认和高危慢病上转风险汇总", `${riskDrilldowns.summary?.items || 0}条下钻轨迹关联责任人和时限`, "入院与床位压力作为管理提示"],
-      nextPlan: "联调牵头医院 HIS/EMR/LIS/PACS、床位、会诊和绩效接口，补齐医共体内闭环回写。",
-      evidence: "county.html/riskDrilldowns/healthStatistics.dailyServiceReports",
-      status: riskDrilldowns.summary?.items ? "ready" : "watch"
-    },
-    {
-      id: "primary-institutions",
-      level: "县级",
-      agency: "乡镇卫生院/社区卫生服务中心/村卫生室",
-      implemented: ["基层随访、家庭医生、慢病管理、取药和公共卫生待办汇总", "源应用边界清晰，办理仍回基层业务端完成", "现场验收证据可挂接到发布报告"],
-      nextPlan: "接入移动随访、家庭医生签约、公卫系统和基层药品供应接口，形成网底服务质控与提醒。",
-      evidence: "index.html/citizen.html/siteEvidencePackage",
+      agency: "区县卫生健康行政部门业务科室",
+      implemented: ["基层卫生、医政医管、公卫和妇幼职能按源模块分工关联", "医共体牵头医院、乡镇卫生院和社区卫生服务中心仅作为辖区服务数据来源", "入院、床位、随访和证照信号用于监管提示，不下放医疗机构办理任务"],
+      nextPlan: "建立区县业务科室与源模块的权限映射，现场联调只验收数据归集、督办和审计，不替代机构端业务闭环。",
+      evidence: "county.html/riskDrilldowns/healthStatistics.dailyServiceReports/siteEvidencePackage",
       status: "watch"
     }
   ];

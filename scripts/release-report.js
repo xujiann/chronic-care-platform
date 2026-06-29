@@ -325,7 +325,7 @@ function healthDashboardChecks(healthDashboard) {
     check("healthDashboard:siteEvidencePackage", evidenceArtifacts >= 4, `${evidenceArtifacts} evidence artifacts`, "error", "health-dashboard"),
     check("healthDashboard:functionalReport", functionalItems >= 9, `${functionalItems} module functions reported`, "error", "health-dashboard"),
     check("healthDashboard:departmentFunctionMatrix", departmentRows >= 6, `${departmentRows} internal department rows`, "error", "health-dashboard"),
-    check("healthDashboard:cityCountyFunctionMatrix", cityCountyRows >= 5, `${cityCountyRows} city/county agency rows`, "error", "health-dashboard")
+    check("healthDashboard:cityCountyFunctionMatrix", cityCountyRows >= 4, `${cityCountyRows} city/county health-administration rows`, "error", "health-dashboard")
   ];
 }
 

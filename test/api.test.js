@@ -65,6 +65,9 @@ function integrationSignature(payload) {
 test("API authentication, scoping and governance regression suite", async (t) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "health-platform-test-"));
   const fixture = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "db.json"), "utf8"));
+  delete fixture.healthStatistics.dailyServiceReports;
+  delete fixture.healthStatistics.certificateExchangeLinks;
+  delete fixture.healthStatistics.siteEvidencePackage;
   fixture.accounts[0].name = "Needs normalization?";
   fixture.authUsers.push({
     id: "u-hashed-test",
@@ -169,9 +172,13 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(healthDashboard.body.functionalReport.functions.some((item) => item.id === "aggregate-entry"), true);
     assert.equal(healthDashboard.body.functionalReport.departmentFunctionMatrix.length >= 6, true);
     assert.equal(healthDashboard.body.functionalReport.departmentFunctionMatrix.some((item) => item.id === "medical-administration" && item.nextPlan), true);
-    assert.equal(healthDashboard.body.functionalReport.cityCountyFunctionMatrix.length >= 5, true);
+    assert.equal(healthDashboard.body.functionalReport.cityCountyFunctionMatrix.length >= 4, true);
     assert.equal(healthDashboard.body.functionalReport.cityCountyFunctionMatrix.some((item) => item.level === "市级"), true);
     assert.equal(healthDashboard.body.functionalReport.cityCountyFunctionMatrix.some((item) => item.level === "县级"), true);
+    assert.equal(healthDashboard.body.functionalReport.cityCountyFunctionMatrix.every((item) => /卫生健康|行政部门|卫健/.test(item.agency)), true);
+    assert.equal(healthDashboard.body.functionalReport.cityCountyFunctionMatrix.some((item) => item.id === "city-admin-coordination"), true);
+    assert.equal(healthDashboard.body.functionalReport.cityCountyFunctionMatrix.some((item) => item.id === "county-admin-coordination"), true);
+    assert.equal(healthDashboard.body.functionalReport.cityCountyFunctionMatrix.some((item) => item.agency === "县域医共体牵头医院" || /乡镇卫生院|社区卫生服务中心|村卫生室|大数据中心|专业中心/.test(item.agency)), false);
     assert.equal(healthDashboard.body.functionalReport.releaseEvidence.some((item) => item.evidence === "npm.cmd run health-dashboard:summary"), true);
     assert.equal(healthDashboard.body.populationServiceBoard.serviceMode, "daily-interface");
     assert.equal(healthDashboard.body.certificateExchange.items.length, 5);

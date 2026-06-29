@@ -3443,9 +3443,11 @@ function restoreCorruptedStrings(defaultValue, currentValue) {
     });
   }
   if (currentValue && typeof currentValue === "object") {
-    return Object.fromEntries(Object.entries(currentValue).map(([key, value]) => [
+    const defaults = defaultValue && typeof defaultValue === "object" && !Array.isArray(defaultValue) ? defaultValue : {};
+    const keys = new Set([...Object.keys(currentValue), ...Object.keys(defaults)]);
+    return Object.fromEntries([...keys].map((key) => [
       key,
-      restoreCorruptedStrings(defaultValue && typeof defaultValue === "object" ? defaultValue[key] : undefined, value)
+      restoreCorruptedStrings(defaults[key], Object.prototype.hasOwnProperty.call(currentValue, key) ? currentValue[key] : defaults[key])
     ]));
   }
   return currentValue;

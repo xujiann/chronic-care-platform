@@ -173,8 +173,8 @@ function staticAboutRuntimeReport() {
         level: "市级",
         agency: "市卫生健康委",
         status: "ready",
-        implemented: ["综合管理入口", "指标风险任务证据汇总", "管理端审计留痕"],
-        nextPlan: "接入真实统一身份、统计直报和跨部门证照回执。",
+        implemented: ["综合管理入口", "指标风险任务证据汇总", "按行政职能关联源模块"],
+        nextPlan: "接入真实统一身份、统计直报和跨部门证照回执；医疗机构和专业中心仅作为数据来源或协同对象。",
         evidence: "/api/health-dashboard/summary"
       },
       {
@@ -182,8 +182,8 @@ function staticAboutRuntimeReport() {
         level: "县级",
         agency: "区县卫生健康局",
         status: "watch",
-        implemented: ["基层、医共体和慢病任务汇总", "源应用办理入口", "现场问题证据挂接"],
-        nextPlan: "增加区县筛选、辖区机构看板和任务闭环率。",
+        implemented: ["辖区监管信号汇总", "源应用查看督办入口", "现场问题证据挂接"],
+        nextPlan: "增加区县筛选、辖区机构监管看板和任务闭环率；具体业务办理仍回源业务系统。",
         evidence: "county.html/openActions"
       }
     ],

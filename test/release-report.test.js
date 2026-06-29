@@ -299,7 +299,8 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(environmentMarkdown, /Environment matrix report/);
   assert.equal(healthDashboardJson.healthDashboard.functionalReport.functions.length, 9);
   assert.equal(healthDashboardJson.healthDashboard.functionalReport.departmentFunctionMatrix.length >= 6, true);
-  assert.equal(healthDashboardJson.healthDashboard.functionalReport.cityCountyFunctionMatrix.length >= 5, true);
+  assert.equal(healthDashboardJson.healthDashboard.functionalReport.cityCountyFunctionMatrix.length >= 4, true);
+  assert.equal(healthDashboardJson.healthDashboard.functionalReport.cityCountyFunctionMatrix.every((item) => /卫生健康|行政部门|卫健/.test(item.agency)), true);
   assert.equal(healthDashboardJson.healthDashboard.riskDrilldowns.items.length >= 4, true);
   assert.equal(healthDashboardJson.healthDashboard.siteEvidencePackage.items.length, 4);
   assert.match(healthDashboardMarkdown, /Main function report/);

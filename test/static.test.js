@@ -193,6 +193,8 @@ test("health dashboard about page documents policies data boundary and site cuto
   assert.match(html, /dashboard-about-city-county-matrix/);
   assert.match(html, /市卫生健康委/);
   assert.match(html, /区县卫生健康局/);
+  assert.match(html, /非本机关单位不在本系统承接办理职责/);
+  assert.doesNotMatch(html, /源应用办理入口/);
   assert.match(html, /data-dashboard-about-section="template-functions"/);
   assert.match(html, /data-dashboard-about-section="policy-basis"/);
   assert.match(html, /data-dashboard-about-section="data-boundary"/);

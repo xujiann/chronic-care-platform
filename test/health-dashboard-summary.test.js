@@ -48,9 +48,13 @@ test("health dashboard summary aggregates the first seven applications without r
   assert.equal(report.functionalReport.functions.some((item) => item.id === "population-service-board" && item.status === "ready"), true);
   assert.equal(report.functionalReport.departmentFunctionMatrix.length >= 6, true);
   assert.equal(report.functionalReport.departmentFunctionMatrix.some((item) => item.id === "planning-information" && item.nextPlan), true);
-  assert.equal(report.functionalReport.cityCountyFunctionMatrix.length >= 5, true);
+  assert.equal(report.functionalReport.cityCountyFunctionMatrix.length >= 4, true);
   assert.equal(report.functionalReport.cityCountyFunctionMatrix.some((item) => item.level === "市级"), true);
   assert.equal(report.functionalReport.cityCountyFunctionMatrix.some((item) => item.level === "县级"), true);
+  assert.equal(report.functionalReport.cityCountyFunctionMatrix.every((item) => /卫生健康|行政部门|卫健/.test(item.agency)), true);
+  assert.equal(report.functionalReport.cityCountyFunctionMatrix.some((item) => item.id === "city-admin-coordination"), true);
+  assert.equal(report.functionalReport.cityCountyFunctionMatrix.some((item) => item.id === "county-admin-coordination"), true);
+  assert.equal(report.functionalReport.cityCountyFunctionMatrix.some((item) => item.agency === "县域医共体牵头医院" || /乡镇卫生院|社区卫生服务中心|村卫生室|大数据中心|专业中心/.test(item.agency)), false);
   assert.equal(report.functionalReport.releaseEvidence.some((item) => item.evidence === "npm.cmd run health-dashboard:summary"), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:source-boundary" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:population-service-board" && item.passed), true);
@@ -78,6 +82,8 @@ test("health dashboard summary aggregates the first seven applications without r
   assert.match(markdown, /City and county agency function matrix/);
   assert.match(markdown, /规划信息处/);
   assert.match(markdown, /区县卫生健康局/);
+  assert.match(markdown, /市级卫生健康行政部门业务处室/);
+  assert.doesNotMatch(markdown, /\| .*县域医共体牵头医院 \|/);
   assert.match(markdown, /Risk drilldowns/);
   assert.match(markdown, /Site evidence package/);
   assert.match(markdown, /Release evidence/);
