@@ -137,6 +137,15 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(missing.response.status, 404);
     assert.equal(typeof missing.body.error, "string");
 
+    const deniedId = await api(baseUrl, "/api/id", { method: "POST" });
+    assert.equal(deniedId.response.status, 401);
+    assert.equal(typeof deniedId.body.error, "string");
+
+    const generatedId = await api(baseUrl, "/api/id", authorized(accountLogin.body.token, { method: "POST" }));
+    assert.equal(generatedId.response.status, 200);
+    assert.equal(typeof generatedId.body.id, "string");
+    assert.equal(generatedId.body.id.length > 20, true);
+
     const metrics = await api(baseUrl, "/api/metrics", authorized(accountLogin.body.token));
     assert.equal(metrics.response.status, 200);
     assert.equal(metrics.body.service.name, "chronic-care-platform");
@@ -1683,5 +1692,16 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(logout.response.status, 200);
     const me = await api(baseUrl, "/api/auth/me", authorized(session.body.token));
     assert.equal(me.response.status, 401);
+  });
+
+  await t.test("guards and executes commission data reset", async () => {
+    const denied = await api(baseUrl, "/api/reset", authorized(citizenToken, { method: "POST" }));
+    assert.equal(denied.response.status, 403);
+
+    const reset = await api(baseUrl, "/api/reset", authorized(commissionToken, { method: "POST" }));
+    assert.equal(reset.response.status, 200);
+    assert.equal(reset.body.residents.length >= 4, true);
+    assert.equal(reset.body.securityEvents[0].target, "/api/reset");
+    assert.equal(reset.body.securityEvents[0].actor, "大连市卫健委管理员");
   });
 });

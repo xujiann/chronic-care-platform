@@ -12168,6 +12168,7 @@ function stopServer() {
   });
 }
 
+/* c8 ignore next 8 */
 if (require.main === module) {
   startServer();
   const shutdown = async () => {
