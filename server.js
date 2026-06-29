@@ -6680,6 +6680,57 @@ async function handleApi(req, res) {
     return;
   }
 
+  const qualitySiteSignoffEvidenceMatch = url.pathname.match(/^\/api\/quality-safety\/site-signoffs\/([^/]+)\/evidence$/);
+  if (req.method === "POST" && qualitySiteSignoffEvidenceMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/quality-safety/site-signoffs/:id/evidence");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(qualitySiteSignoffEvidenceMatch[1]);
+    const signoffs = Array.isArray(data.qualitySafetySiteSignoffs) ? data.qualitySafetySiteSignoffs : [];
+    const index = signoffs.findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Quality-safety site sign-off item not found" });
+      return;
+    }
+    const ownerRole = String(signoffs[index].ownerRole || "commission");
+    if (user.role !== "commission" && ownerRole !== user.role) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "访问接口", target: "/api/quality-safety/site-signoffs/:id/evidence", result: "拒绝", detail: `site sign-off ${id} belongs to ${ownerRole}` });
+      sendJson(res, 403, { error: "Forbidden", message: "Site sign-off evidence can only be submitted by the owner role or commission" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const evidence = Array.isArray(payload.evidence) ? payload.evidence.map((item) => String(item).trim()).filter(Boolean) : [];
+    const note = String(payload.note || payload.comment || "").trim();
+    if (evidence.length === 0 && !note) {
+      sendJson(res, 400, { error: "Bad Request", message: "evidence or note is required" });
+      return;
+    }
+    const now = new Date().toISOString();
+    const submission = {
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      ownerRole,
+      note,
+      evidence
+    };
+    signoffs[index] = {
+      ...signoffs[index],
+      status: "evidence_submitted",
+      latestNote: note || signoffs[index].latestNote,
+      submittedAt: now,
+      submittedBy: user.username || user.role,
+      evidence: [...evidence, ...(signoffs[index].evidence || [])].slice(0, 50),
+      submissionTrail: [submission, ...(signoffs[index].submissionTrail || [])].slice(0, 50),
+      auditTrail: [{ at: now, by: user.username || user.role, action: "site-signoff-evidence", note: note || evidence.join(", ") }, ...(signoffs[index].auditTrail || [])].slice(0, 50)
+    };
+    data.qualitySafetySiteSignoffs = signoffs;
+    appendQualitySafetyAudit(data, user, "quality-safety site signoff evidence", id, note || evidence.join(", "));
+    writeDatabase(data);
+    sendJson(res, 200, { ...signoffs[index], normalizedStatus: normalizeQualitySafetyStatus(signoffs[index].status), evidenceCount: (signoffs[index].evidence || []).length });
+    return;
+  }
+
   const qualitySiteSignoffMatch = url.pathname.match(/^\/api\/quality-safety\/site-signoffs\/([^/]+)\/review$/);
   if (req.method === "POST" && qualitySiteSignoffMatch) {
     const user = requireApiRole(req, res, ["commission"], "/api/quality-safety/site-signoffs/:id/review");

@@ -137,6 +137,15 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
   assert.equal(institutionDashboard.response.status, 200);
   assert.equal(institutionDashboard.body.role, "institution");
   assert.equal(Array.isArray(institutionDashboard.body.institutionRisks), true);
+  assert.equal(institutionDashboard.body.siteSignoffs.some((item) => item.id === "qss-critical-routing"), true);
+  const siteEvidence = await api(baseUrl, "/api/quality-safety/site-signoffs/qss-critical-routing/evidence", authorized(institutionLogin.body.token, {
+    method: "POST",
+    body: JSON.stringify({ note: "Critical routing screenshot and receipt uploaded.", evidence: ["critical-routing-screenshot", "ack-receipt"] })
+  }));
+  assert.equal(siteEvidence.response.status, 200);
+  assert.equal(siteEvidence.body.status, "evidence_submitted");
+  assert.equal(siteEvidence.body.evidenceCount >= 2, true);
+  assert.equal(Array.isArray(siteEvidence.body.submissionTrail), true);
   const acknowledgement = await api(baseUrl, `/api/quality-safety/critical-values/${encodeURIComponent(critical.id)}/acknowledge`, authorized(institutionLogin.body.token, {
     method: "POST",
     body: JSON.stringify({ note: "Duty physician confirmed receipt." })
@@ -166,6 +175,18 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
   const countyDashboard = await api(baseUrl, "/api/quality-safety/dashboard", authorized(countyLogin.body.token));
   assert.equal(countyDashboard.response.status, 200);
   assert.equal(countyDashboard.body.role, "county");
+  assert.equal(countyDashboard.body.siteSignoffs.some((item) => item.id === "qss-mutual-recognition-rules"), true);
+  const countyEvidence = await api(baseUrl, "/api/quality-safety/site-signoffs/qss-mutual-recognition-rules/evidence", authorized(countyLogin.body.token, {
+    method: "POST",
+    body: JSON.stringify({ note: "Recognition catalog and exception sample uploaded.", evidence: ["recognition-catalog", "exception-sample"] })
+  }));
+  assert.equal(countyEvidence.response.status, 200);
+  assert.equal(countyEvidence.body.status, "evidence_submitted");
+  const forbiddenSiteEvidence = await api(baseUrl, "/api/quality-safety/site-signoffs/qss-live-feeds/evidence", authorized(countyLogin.body.token, {
+    method: "POST",
+    body: JSON.stringify({ note: "Should be forbidden.", evidence: ["wrong-owner"] })
+  }));
+  assert.equal(forbiddenSiteEvidence.response.status, 403);
 
   const escalation = await api(baseUrl, `/api/quality-safety/rectifications/${encodeURIComponent(dispatch.body.id)}/escalate`, authorized(token, {
     method: "POST",
@@ -203,6 +224,13 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
   assert.equal(signoffReview.response.status, 200);
   assert.equal(signoffReview.body.status, "ready_for_joint_test");
   assert.equal(signoffReview.body.evidenceCount >= 1, true);
+  const signoffAccepted = await api(baseUrl, "/api/quality-safety/site-signoffs/qss-critical-routing/review", authorized(token, {
+    method: "POST",
+    body: JSON.stringify({ decision: "accepted", note: "Institution evidence accepted for controlled pilot.", evidence: ["commission-acceptance-note"] })
+  }));
+  assert.equal(signoffAccepted.response.status, 200);
+  assert.equal(signoffAccepted.body.status, "accepted");
+  assert.equal(signoffAccepted.body.normalizedStatus, "closed");
   const forbiddenSignoffReview = await api(baseUrl, "/api/quality-safety/site-signoffs/qss-live-feeds/review", authorized(institutionLogin.body.token, {
     method: "POST",
     body: JSON.stringify({ decision: "accepted", note: "Should be forbidden." })
@@ -214,5 +242,6 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
   assert.equal(JSON.stringify(audit.body).includes("quality-safety review"), true);
   assert.equal(JSON.stringify(audit.body).includes("quality-safety critical value disposition"), true);
   assert.equal(JSON.stringify(audit.body).includes("quality-safety clinical pathway review"), true);
+  assert.equal(JSON.stringify(audit.body).includes("quality-safety site signoff evidence"), true);
   assert.equal(JSON.stringify(audit.body).includes("quality-safety site signoff review"), true);
 });

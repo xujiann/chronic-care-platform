@@ -34,6 +34,7 @@ const REQUIRED_ROUTES = [
   "/api/quality-safety/critical-values/:id/acknowledge",
   "/api/quality-safety/critical-values/:id/dispose",
   "/api/quality-safety/clinical-pathways/:id/review",
+  "/api/quality-safety/site-signoffs/:id/evidence",
   "/api/quality-safety/site-signoffs/:id/review"
 ];
 
@@ -374,6 +375,7 @@ function buildQualitySafetyReport(options = {}) {
     dueAt: item.dueAt || "",
     requiredEvidence: Array.isArray(item.requiredEvidence) ? item.requiredEvidence : [],
     evidenceCount: Array.isArray(item.evidence) ? item.evidence.length : 0,
+    submissionCount: Array.isArray(item.submissionTrail) ? item.submissionTrail.length : 0,
     auditCount: Array.isArray(item.auditTrail) ? item.auditTrail.length : 0,
     sourceCollections: Array.isArray(item.sourceCollections) ? item.sourceCollections : [],
     latestNote: item.latestNote || ""
@@ -386,7 +388,8 @@ function buildQualitySafetyReport(options = {}) {
     { id: "medical-record-qc", collection: "medicalRecordQualityReviews", modeled: arrayOf(data, "medicalRecordQualityReviews").length > 0 },
     { id: "mutual-recognition-qc", collection: "mutualRecognitionQualityReviews", modeled: arrayOf(data, "mutualRecognitionQualityReviews").length > 0 },
     { id: "rectification-loop", collection: "qualityRectificationOrders", modeled: rectifications.some((item) => item.status && Array.isArray(item.auditTrail)) },
-    { id: "site-signoff-tracker", collection: "qualitySafetySiteSignoffs", modeled: siteSignoffRows.length >= 6 && siteSignoffRows.every((item) => item.auditCount > 0) }
+    { id: "site-signoff-tracker", collection: "qualitySafetySiteSignoffs", modeled: siteSignoffRows.length >= 6 && siteSignoffRows.every((item) => item.auditCount > 0) },
+    { id: "site-evidence-submission", collection: "qualitySafetySiteSignoffs", modeled: server.includes("/api/quality-safety/site-signoffs/:id/evidence") }
   ];
   const collectionRows = REQUIRED_COLLECTIONS.map((collection) => ({
     collection,
@@ -448,6 +451,7 @@ function buildQualitySafetyReport(options = {}) {
     { id: "quality-safety:policy-basis", passed: policyRows.every((item) => item.present), detail: `${policyRows.filter((item) => item.present).length}/${policyRows.length} policy references linked` },
     { id: "quality-safety:action-plan", passed: actionPlan.length > 0 && actionPlan.every((item) => item.priority && item.action && item.evidence), detail: `${actionPlan.length} prioritized action items` },
     { id: "quality-safety:site-signoff-tracker", passed: siteSignoffRows.length >= 6 && siteSignoffRows.every((item) => item.requiredEvidence.length > 0 && item.auditCount > 0), detail: `${siteSignoffRows.length} site sign-off items; ${siteSignoffRows.filter((item) => statusClosed(item.status)).length} accepted` },
+    { id: "quality-safety:site-evidence-submission", passed: routeRows.some((item) => item.route === "/api/quality-safety/site-signoffs/:id/evidence" && item.present), detail: "site owner evidence submission route implemented" },
     { id: "quality-safety:go-live-readiness", passed: goLiveReadiness.usable, detail: `${goLiveReadiness.stage}; score=${goLiveReadiness.score}; blockers=${goLiveReadiness.blockers.length}` }
   ];
   return {

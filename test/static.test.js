@@ -375,6 +375,7 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(js, /renderSiteSignoffs/);
   assert.match(js, /renderInterfaceJointTestPack/);
   assert.match(js, /validateInterfaceSample/);
+  assert.match(js, /submitSiteSignoffEvidence/);
   assert.match(js, /dispatchIssue/);
   assert.match(js, /submitFeedback/);
   assert.match(js, /reviewOrder/);
@@ -398,6 +399,7 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(server, /\/api\/quality-safety\/critical-values\/:id\/acknowledge/);
   assert.match(server, /\/api\/quality-safety\/critical-values\/:id\/dispose/);
   assert.match(server, /\/api\/quality-safety\/clinical-pathways\/:id\/review/);
+  assert.match(server, /\/api\/quality-safety\/site-signoffs\/:id\/evidence/);
   assert.match(server, /\/api\/quality-safety\/site-signoffs\/:id\/review/);
   assert.match(server, /qualitySafetySlaState/);
   assert.match(server, /buildQualitySafetyActionPlan/);
@@ -408,6 +410,7 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:policy-basis/);
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:action-plan/);
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:site-signoff-tracker/);
+  assert.match(read("scripts/quality-safety-report.js"), /quality-safety:site-evidence-submission/);
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:go-live-readiness/);
   assert.match(read("scripts/release-report.js"), /qualitySafety:report/);
   assert.match(read("scripts/release-report.js"), /qualitySafetyInterface:standard/);

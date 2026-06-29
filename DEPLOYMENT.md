@@ -259,7 +259,7 @@ Go-live readiness boundary: the module is considered usable for a controlled pil
 
 Site joint testing still requires live HIS/EMR/LIS/PACS feeds, production critical-value acknowledgement routing, medical-record sampling signatures, clinical pathway rule dictionaries and EMR variance evidence, mutual-recognition QC rules, and department rectification sign-off attachments.
 
-Site sign-off tracker boundary: `qualitySafetySiteSignoffs` records owner, status, required evidence, source collections, review trail, and audit trail for the production cutover items above. Commission users can record joint-test status through `/api/quality-safety/site-signoffs/:id/review`; this tracks evidence readiness but does not replace signed hospital or agency acceptance documents.
+Site sign-off tracker boundary: `qualitySafetySiteSignoffs` records owner, status, required evidence, source collections, submission trail, review trail, and audit trail for the production cutover items above. Site owner roles submit evidence through `/api/quality-safety/site-signoffs/:id/evidence`, and commission users record joint-test status through `/api/quality-safety/site-signoffs/:id/review`; this tracks evidence readiness but does not replace signed hospital or agency acceptance documents.
 
 Policy page boundary: `quality-safety-about.html` summarizes the official policy basis used by the demo. Site acceptance must confirm local implementation rules, regional mutual-recognition lists, clinical pathway dictionaries, negative lists, and hospital-specific quality-control scoring forms before production use.
 

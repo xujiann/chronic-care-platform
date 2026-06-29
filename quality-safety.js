@@ -153,7 +153,9 @@ function renderIssues(rows) {
 }
 
 function renderSiteSignoffs(rows) {
+  const role = qualitySafetyState?.role || "";
   const canReview = qualitySafetyState?.role === "commission";
+  const canSubmit = (item) => role === "commission" || item.ownerRole === role;
   setHtml("quality-safety-signoffs", `
     <table>
       <thead><tr><th>Item</th><th>Owner</th><th>Status</th><th>Evidence</th><th>Action</th></tr></thead>
@@ -164,7 +166,11 @@ function renderSiteSignoffs(rows) {
             <td>${text(item.owner)}<br /><small>${statusLabel(item.ownerRole)}</small></td>
             <td>${statusLabel(item.status)}<br /><small>Due ${text(item.dueAt)}</small></td>
             <td>${text(item.requiredEvidenceText)}<br /><small>${item.evidenceCount || 0} uploaded, ${item.auditCount || 0} audit rows</small></td>
-            <td>${canReview ? `<button class="inline-action" type="button" data-signoff-review="${item.id}">Record joint-test</button>` : statusLabel("view")}</td>
+            <td>
+              ${canSubmit(item) ? `<button class="inline-action" type="button" data-signoff-evidence="${item.id}">Submit evidence</button>` : ""}
+              ${canReview ? `<button class="inline-action" type="button" data-signoff-review="${item.id}">Record joint-test</button>` : ""}
+              ${!canSubmit(item) && !canReview ? statusLabel("view") : ""}
+            </td>
           </tr>
         `).join("")}
       </tbody>
@@ -400,6 +406,17 @@ async function reviewSiteSignoff(signoffId) {
   await loadQualitySafety();
 }
 
+async function submitSiteSignoffEvidence(signoffId) {
+  await qualityApi(`/quality-safety/site-signoffs/${encodeURIComponent(signoffId)}/evidence`, {
+    method: "POST",
+    body: JSON.stringify({
+      note: "Site joint-test evidence submitted from the quality-safety portal.",
+      evidence: ["site-joint-test-evidence"]
+    })
+  });
+  await loadQualitySafety();
+}
+
 async function validateInterfaceSample(interfaceId) {
   const request = (qualitySafetyInterfacePack?.sampleRequests || []).find((item) => item.interfaceId === interfaceId);
   if (!request) throw new Error("Interface sample is not loaded");
@@ -425,6 +442,7 @@ document.addEventListener("click", (event) => {
   const criticalDispose = event.target.closest("[data-critical-dispose]");
   const pathwayReview = event.target.closest("[data-pathway-review]");
   const signoffReview = event.target.closest("[data-signoff-review]");
+  const signoffEvidence = event.target.closest("[data-signoff-evidence]");
   const interfaceValidate = event.target.closest("[data-interface-validate]");
   if (dispatch) dispatchIssue(dispatch.dataset.dispatch).catch((error) => alert(error.message));
   if (feedback) submitFeedback(feedback.dataset.feedback).catch((error) => alert(error.message));
@@ -433,6 +451,7 @@ document.addEventListener("click", (event) => {
   if (criticalAck) acknowledgeCritical(criticalAck.dataset.criticalAck).catch((error) => alert(error.message));
   if (criticalDispose) disposeCritical(criticalDispose.dataset.criticalDispose).catch((error) => alert(error.message));
   if (pathwayReview) reviewClinicalPathway(pathwayReview.dataset.pathwayReview).catch((error) => alert(error.message));
+  if (signoffEvidence) submitSiteSignoffEvidence(signoffEvidence.dataset.signoffEvidence).catch((error) => alert(error.message));
   if (signoffReview) reviewSiteSignoff(signoffReview.dataset.signoffReview).catch((error) => alert(error.message));
   if (interfaceValidate) validateInterfaceSample(interfaceValidate.dataset.interfaceValidate).catch((error) => alert(error.message));
 });
