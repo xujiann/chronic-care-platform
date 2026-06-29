@@ -57,6 +57,8 @@ jobs:
         run: npm run hospital-operations:readiness
       - name: Generate hospital operations release report
         run: npm run hospital-operations:release
+      - name: Generate hospital operations module report
+        run: npm run hospital-operations:module-report
       - name: Generate site readiness pack
         run: npm run site:pack
       - name: Generate production database readiness report

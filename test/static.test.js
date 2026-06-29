@@ -164,6 +164,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal(Boolean(pkg.scripts["environment:matrix"]), true);
   assert.equal(Boolean(pkg.scripts["hospital-operations:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["hospital-operations:release"]), true);
+  assert.equal(Boolean(pkg.scripts["hospital-operations:module-report"]), true);
   assert.equal(Boolean(pkg.scripts["integration:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["interface:mapping"]), true);
   assert.equal(Boolean(pkg.scripts["monitoring:readiness"]), true);
@@ -197,6 +198,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /operations-readiness-report\.md/);
   assert.match(read("README.md"), /hospital-operations-readiness-report\.md/);
   assert.match(read("README.md"), /hospital-operations-release-report\.md/);
+  assert.match(read("README.md"), /hospital-operations-module-report\.md/);
   assert.match(read("README.md"), /operations-about\.html/);
   assert.match(read("README.md"), /process-audit-report\.md/);
   assert.match(read("README.md"), /service-acceptance-summary\.md/);
@@ -218,6 +220,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("DEPLOYMENT.md"), /operations-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /hospital-operations-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /hospital-operations-release-report\.md/);
+  assert.match(read("DEPLOYMENT.md"), /hospital-operations-module-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /operations-about\.html/);
   assert.match(read("DEPLOYMENT.md"), /process-audit-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /site-readiness-pack\.md/);
@@ -241,6 +244,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/deploy-check.js"), /operations:readiness/);
   assert.match(read("scripts/deploy-check.js"), /hospital-operations:readiness/);
   assert.match(read("scripts/deploy-check.js"), /hospital-operations:release/);
+  assert.match(read("scripts/deploy-check.js"), /hospital-operations:module-report/);
   assert.match(read("scripts/deploy-check.js"), /process:audit/);
   assert.match(read("scripts/deploy-check.js"), /site:pack/);
   assert.match(read("scripts/deploy-check.js"), /release:manifest/);
@@ -258,6 +262,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".github/workflows/ci.yml"), /npm run operations:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run hospital-operations:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run hospital-operations:release/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run hospital-operations:module-report/);
   assert.match(read(".github/workflows/ci.yml"), /npm run site:pack/);
   assert.match(read(".github/workflows/ci.yml"), /npm run production-db:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run evaluation:evidence/);

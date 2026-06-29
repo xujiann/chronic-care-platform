@@ -20,6 +20,7 @@ test("release artifact manifest indexes reports templates commands and evidence"
   assert.equal(report.artifacts.some((item) => item.id === "release-report" && item.command === "release:report"), true);
   assert.equal(report.artifacts.some((item) => item.id === "release-artifact-manifest" && item.command === "release:manifest"), true);
   assert.equal(report.artifacts.some((item) => item.id === "hospital-operations-release" && item.command === "hospital-operations:release"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "hospital-operations-module-report" && item.command === "hospital-operations:module-report"), true);
   assert.equal(report.artifacts.some((item) => item.id === "site-readiness" && item.evidence === "/api/site-readiness-pack"), true);
   assert.equal(report.artifacts.some((item) => item.id === "service-acceptance" && item.markdown === "release/service-acceptance-summary.md" && item.evidence === "/api/service-acceptance-summary"), true);
   assert.equal(report.templateReadmes.some((item) => item.file === "release/templates/interface-joint-test/README.md"), true);
