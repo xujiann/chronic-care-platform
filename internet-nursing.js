@@ -383,7 +383,7 @@ function renderHospitalOrders(items) {
         <tr>
           <td><strong>${escapeHtml(item.id)}</strong><br><small>${escapeHtml(item.preferredAt || "")}</small></td>
           <td>${escapeHtml(displayText(item.residentName || item.residentId || ""))}<br><small>${escapeHtml(displayText(item.serviceObject || ""))}</small></td>
-          <td>${escapeHtml(displayText(item.serviceItem || ""))}<br><small>${escapeHtml(displayText(item.address || ""))}</small></td>
+          <td>${escapeHtml(displayText(item.serviceItem || ""))}<br><small>${escapeHtml(nursingAddressText(item.address))}</small></td>
           <td>${escapeHtml(displayText(item.institution?.name || item.institutionName || ""))}<br><small>${escapeHtml(item.institutionCode || "")}</small></td>
           <td>${escapeHtml(displayText(item.nurse?.name || item.nurseName || "pending"))}<br><small>${escapeHtml(displayText(item.nurse?.registrationStatus || ""))}</small></td>
           <td>${statusBadge(item.firstVisitAssessment)} ${statusBadge(item.informedConsent)} ${statusBadge(item.locationTrace)}<br><small>${escapeHtml(consentAttachmentText(item))}</small><br><small>${escapeHtml(locationTraceSummary(item))}</small><br><small>${escapeHtml(notificationSummary(item))}</small></td>
@@ -415,9 +415,9 @@ function renderNurseQueue(items) {
       <tbody>${queue.map((item) => `
         <tr>
           <td><strong>${escapeHtml(item.id)}</strong><br><small>${escapeHtml(displayText(item.serviceItem || ""))}</small></td>
-          <td>${escapeHtml(item.preferredAt || "")}<br><small>${escapeHtml(displayText(item.address || ""))}</small></td>
+          <td>${escapeHtml(item.preferredAt || "")}<br><small>${escapeHtml(nursingAddressText(item.address))}</small></td>
           <td>${escapeHtml(displayText(item.residentName || item.residentId || ""))}<br><small>${escapeHtml(displayText(item.serviceObject || ""))}</small></td>
-          <td>${statusBadge(item.locationTrace)} ${statusBadge(item.serviceRecordStatus)} ${statusBadge(item.qualityCallback)}<br><small>${escapeHtml(locationTraceSummary(item))}</small><br><small>${escapeHtml(notificationSummary(item))}</small></td>
+          <td>${nursingEvidenceBadge("首诊", item.firstVisitAssessment, "首诊待评估")} ${nursingEvidenceBadge("同意书", item.informedConsent, "同意书待签署")} ${nursingEvidenceBadge("轨迹", item.locationTrace, "轨迹待采集")} ${nursingEvidenceBadge("护理记录", item.serviceRecordStatus, "护理记录待填写")}<br><small>${escapeHtml(locationTraceSummary(item))}</small><br><small>${escapeHtml(notificationSummary(item))}</small></td>
           <td>${statusBadge(item.status)} ${statusBadge(item.riskLevel)}</td>
           <td>
             ${nurseActionButtons(item, canAct)}
@@ -446,7 +446,7 @@ function renderMobileAppointmentStatus(items) {
         </div>
         ${statusBadge(item.status)}
       </header>
-      <p>${escapeHtml(displayText(item.address || ""))}</p>
+      <p>${escapeHtml(nursingAddressText(item.address))}</p>
       <div class="nursing-mobile-evidence">
         ${statusBadge(item.firstVisitAssessment)}
         ${statusBadge(item.informedConsent)}
@@ -486,10 +486,12 @@ function renderMobileNurseCards(items) {
         </div>
         ${statusBadge(item.status)}
       </header>
-      <p>${escapeHtml(displayText(item.address || ""))}</p>
+      <p>${escapeHtml(nursingAddressText(item.address))}</p>
       <div class="nursing-mobile-evidence">
-        ${statusBadge(item.locationTrace)}
-        ${statusBadge(item.serviceRecordStatus)}
+        ${nursingEvidenceBadge("首诊", item.firstVisitAssessment, "首诊待评估")}
+        ${nursingEvidenceBadge("同意书", item.informedConsent, "同意书待签署")}
+        ${nursingEvidenceBadge("轨迹", item.locationTrace, "轨迹待采集")}
+        ${nursingEvidenceBadge("护理记录", item.serviceRecordStatus, "护理记录待填写")}
         ${statusBadge(item.riskLevel)}
       </div>
       <small>${escapeHtml(locationTraceSummary(item))}</small>
@@ -513,6 +515,7 @@ function renderMobileNurseCards(items) {
 
 function bindNurseActionButtons(root = document) {
   root?.querySelectorAll("[data-nurse-action]").forEach((button) => {
+    if (button.disabled) return;
     button.addEventListener("click", () => updateNursingOrder(button.dataset.nurseAction, nurseActionPayload(button.dataset.actionKind)));
   });
 }
@@ -527,12 +530,49 @@ function nursingMobileSortWeight(item) {
 function nurseActionButtons(item, canAct) {
   if (!canAct) return `<span class="badge info">需医院派单</span>`;
   const actions = [];
-  if (!item.nurseId || ["requested", "dispatched"].includes(item.status)) actions.push(["accept", "接单"]);
+  if (!item.nurseId || ["requested", "dispatched"].includes(item.status)) {
+    const blockReason = nurseAcceptBlockReason(item);
+    if (blockReason) {
+      actions.push(`<button class="inline-action" type="button" disabled aria-disabled="true" title="${escapeHtml(blockReason)}">${escapeHtml(blockReason)}</button>`);
+    } else {
+      actions.push(`<button class="inline-action" type="button" data-nurse-action="${escapeHtml(item.id)}" data-action-kind="accept">接单</button>`);
+    }
+  }
   if (item.status === "accepted") actions.push(["start", "开始服务"]);
   if (item.status === "in-service") actions.push(["complete", "完成记录"]);
   return actions.length
-    ? actions.map(([kind, label]) => `<button class="inline-action" type="button" data-nurse-action="${escapeHtml(item.id)}" data-action-kind="${kind}">${label}</button>`).join("")
+    ? actions.map((action) => Array.isArray(action) ? `<button class="inline-action" type="button" data-nurse-action="${escapeHtml(item.id)}" data-action-kind="${escapeHtml(action[0])}">${escapeHtml(action[1])}</button>` : action).join("")
     : `<span class="badge info">暂无可操作</span>`;
+}
+
+function hasSignedNursingConsent(item) {
+  const attachment = item?.consentAttachment || {};
+  return item?.informedConsent === "signed" &&
+    attachment.status === "signed" &&
+    Boolean(attachment.signedAt) &&
+    Boolean(attachment.signerName) &&
+    Boolean(attachment.version);
+}
+
+function nurseAcceptBlockReason(item) {
+  if (item.firstVisitAssessment !== "passed") return "需先完成首诊评估";
+  if (!hasSignedNursingConsent(item)) return "需先签署知情同意";
+  return "";
+}
+
+function nursingEvidenceBadge(label, status, pendingLabel) {
+  const text = String(status ?? "pending");
+  const danger = ["high", "blocked", "overdue"].includes(text);
+  const warn = ["medium", "pending", "requested", "assessed", "dispatched", "accepted", "in-service", "tracking"].includes(text);
+  const type = danger ? "danger" : warn ? "warn" : "info";
+  const content = text === "pending" ? pendingLabel : `${label}${displayText(text)}`;
+  return `<span class="badge ${type}">${escapeHtml(content)}</span>`;
+}
+
+function nursingAddressText(value) {
+  const text = displayText(value || "");
+  if (/已脱敏[-\s]*[A-Za-z]*$/i.test(text) || /redacted/i.test(text)) return "地址已脱敏";
+  return text;
 }
 
 function renderPolicyControls(policy) {

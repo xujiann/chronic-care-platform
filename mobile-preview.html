@@ -22,12 +22,12 @@
           <div>
             <strong>1. 本机预览</strong>
             <p>启动服务后打开本页，右侧手机框会直接加载居民端。</p>
-            <code>http://localhost:5174/mobile-preview.html</code>
+            <code id="preview-local-url">./mobile-preview.html</code>
           </div>
           <div>
             <strong>2. 真机预览</strong>
             <p>电脑和手机在同一 Wi-Fi 下，用电脑局域网 IP 加端口访问。</p>
-            <code>http://电脑IP:5174/mobile-preview.html</code>
+            <code id="preview-lan-url">http://YOUR-LAN-IP/mobile-preview.html</code>
           </div>
           <div>
             <strong>3. 操作重点</strong>
@@ -80,12 +80,29 @@
       const serviceButtons = document.querySelectorAll("[data-preview-service]");
       const clientButtons = document.querySelectorAll("[data-preview-client]");
       const previewParams = new URLSearchParams(location.search);
-      let activePreviewService = "health-record";
+      const previewLocalUrl = document.querySelector("#preview-local-url");
+      const previewLanUrl = document.querySelector("#preview-lan-url");
+      const previewServices = [...serviceButtons].map((button) => button.dataset.previewService);
+      let activePreviewService = previewServices.includes(previewParams.get("service")) ? previewParams.get("service") : "health-record";
       let activePreviewClient = ["mini-program", "app"].includes(previewParams.get("client")) ? previewParams.get("client") : "mini-program";
+      const renderPreviewUrls = () => {
+        const previewPort = location.port ? `:${location.port}` : "";
+        const previewPath = `${location.pathname}${location.search}`;
+        previewLocalUrl.textContent = `${location.origin}${previewPath}`;
+        previewLanUrl.textContent = `${location.protocol}//YOUR-LAN-IP${previewPort}${previewPath}`;
+      };
+      const syncPreviewUrl = () => {
+        const params = new URLSearchParams(location.search);
+        params.set("client", activePreviewClient);
+        params.set("service", activePreviewService);
+        history.replaceState({ previewClient: activePreviewClient, previewService: activePreviewService }, "", `${location.pathname}?${params.toString()}`);
+        renderPreviewUrls();
+      };
       const citizenPreviewSrc = (service) => `./citizen.html?preview=mobile-nav&client=${activePreviewClient}&page=${service}#service-${service}`;
-      const setPreviewService = (service) => {
+      const setPreviewService = (service, options = {}) => {
         activePreviewService = service;
         serviceButtons.forEach((button) => button.classList.toggle("active", button.dataset.previewService === service));
+        if (options.syncUrl !== false) syncPreviewUrl();
         if (service === "nursing") {
           frame.src = `./internet-nursing.html?preview=mobile-nursing&client=${activePreviewClient}`;
           return;
@@ -96,11 +113,9 @@
         activePreviewClient = client;
         clientButtons.forEach((button) => button.classList.toggle("active", button.dataset.previewClient === client));
         if (options.syncUrl !== false) {
-          const params = new URLSearchParams(location.search);
-          params.set("client", client);
-          history.replaceState({ previewClient: client }, "", `${location.pathname}?${params.toString()}`);
+          syncPreviewUrl();
         }
-        setPreviewService(activePreviewService);
+        setPreviewService(activePreviewService, { syncUrl: false });
       };
       frame.addEventListener("load", () => {
         frame.contentWindow?.postMessage({ type: "set-service-tab", service: activePreviewService }, location.origin);
@@ -114,6 +129,7 @@
       document.querySelector("#preview-refresh").addEventListener("click", () => {
         frame.src = frame.src;
       });
+      renderPreviewUrls();
       setPreviewClient(activePreviewClient, { syncUrl: false });
     </script>
   </body>

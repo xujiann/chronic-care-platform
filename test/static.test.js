@@ -644,7 +644,10 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(citizenHtml, /apple-touch-icon/);
   assert.match(citizenHtml, /auth\.js\?v=20260627/);
   assert.match(mobilePreviewHtml, /preview=mobile-nav/);
-  assert.match(mobilePreviewHtml, /http:\/\/localhost:5174\/mobile-preview\.html/);
+  assert.match(mobilePreviewHtml, /preview-local-url/);
+  assert.match(mobilePreviewHtml, /preview-lan-url/);
+  assert.match(mobilePreviewHtml, /renderPreviewUrls/);
+  assert.match(mobilePreviewHtml, /YOUR-LAN-IP/);
   assert.match(mobilePreviewHtml, /DEMO-MOBILE-R1 \/ 888888/);
   assert.match(mobilePreviewHtml, /citizen\.html\?preview=mobile-nav&client=mini-program&page=health-record/);
   assert.match(mobilePreviewHtml, /data-preview-client="mini-program"/);
@@ -682,7 +685,8 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.shortcuts.some((item) => item.url === "./citizen.html?client=app&page=escort#service-escort"), true);
   assert.equal(manifest.shortcuts.some((item) => item.url === "./mobile-preview.html?client=app"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v17/);
+  assert.match(serviceWorker, /chronic-care-citizen-v18/);
+  assert.match(serviceWorker, /internet-nursing\.js\?v=20260629nursefix/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627preview/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages2/);
@@ -927,6 +931,7 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(html, /data-mobile-surface="nurse-response"/);
   assert.match(html, /nursing-mobile-appointment/);
   assert.match(html, /nursing-nurse-mobile/);
+  assert.match(html, /internet-nursing\.js\?v=20260629nursefix/);
   assert.match(html, /nursing-dispatch-recommendations/);
   assert.match(html, /nursing-finance-quality/);
   assert.match(html, /nursing-regulatory-report/);
@@ -949,6 +954,10 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(js, /bindNurseActionButtons/);
   assert.match(js, /sourceChannel = "internet-nursing-mobile"/);
   assert.match(js, /nurseActionButtons/);
+  assert.match(js, /nurseAcceptBlockReason/);
+  assert.match(js, /hasSignedNursingConsent/);
+  assert.match(js, /需先完成首诊评估/);
+  assert.match(js, /需先签署知情同意/);
   assert.match(js, /showNursingMessage/);
   assert.match(js, /\/internet-nursing\/orders/);
   assert.match(js, /currentNursingUser/);
