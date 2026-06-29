@@ -97,7 +97,7 @@
         </div>
         <p id="dashboard-data-boundary">综合管理服务系统面向各级卫生健康行政部门，仅汇总前 7 个应用的指标、风险、任务和证据；业务办理仍回到源应用完成。</p>
         <div class="action-row">
-          <button class="inline-action" id="dashboard-export-json" type="button">导出验收 JSON</button>
+          <button class="inline-action" id="dashboard-export-json" type="button">导出验收数据</button>
         </div>
       </section>
 
@@ -117,9 +117,9 @@
             优先级
             <select id="dashboard-priority-filter">
               <option value="">全部优先级</option>
-              <option value="high">high</option>
-              <option value="medium">medium</option>
-              <option value="normal">normal</option>
+              <option value="high">高</option>
+              <option value="medium">中</option>
+              <option value="normal">一般</option>
             </select>
           </label>
         </div>
@@ -147,7 +147,7 @@
         <article class="panel wide">
           <div class="panel-title">
             <h2>任务闭环</h2>
-            <span>仅展示跨应用 open action，办理入口保留在源业务端</span>
+            <span>仅展示跨应用待办，办理入口保留在源业务端</span>
           </div>
           <div id="dashboard-actions" class="priority-list"></div>
         </article>
@@ -183,7 +183,7 @@
         <article class="panel">
           <div class="panel-title">
             <h2>接口联调</h2>
-            <span>复用 platformInterfaces 和联调证据</span>
+            <span>复用平台接口清单和联调证据</span>
           </div>
           <div id="dashboard-interfaces" class="rules"></div>
         </article>
@@ -191,7 +191,7 @@
         <article class="panel">
           <div class="panel-title">
             <h2>验收证据</h2>
-            <span>复用 platformEvidence 与 release artifacts</span>
+            <span>复用平台验收证据与发布材料</span>
           </div>
           <div id="dashboard-evidence" class="rules"></div>
         </article>

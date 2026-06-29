@@ -43,8 +43,8 @@
         </article>
         <article class="metric-card">
           <span>验收证据</span>
-          <strong>API</strong>
-          <small>/api/health-dashboard/summary</small>
+          <strong>接口</strong>
+          <small>综合管理服务系统摘要接口</small>
         </article>
       </section>
 
@@ -65,7 +65,7 @@
         </div>
         <div class="function-matrix-grid" id="dashboard-about-department-matrix">
           <article class="function-matrix-card ready" data-about-function-matrix="planning-information-static">
-            <span>内部机构 · ready</span>
+            <span>内部机构 · 已就绪</span>
             <strong>规划信息处/信息中心</strong>
             <ul>
               <li>前七应用汇总入口</li>
@@ -76,7 +76,7 @@
             <small>health-dashboard:summary</small>
           </article>
           <article class="function-matrix-card watch" data-about-function-matrix="medical-administration-static">
-            <span>内部机构 · watch</span>
+            <span>内部机构 · 需关注</span>
             <strong>医政医管处</strong>
             <ul>
               <li>就诊入院看板</li>
@@ -96,7 +96,7 @@
         </div>
         <div class="function-matrix-grid" id="dashboard-about-city-county-matrix">
           <article class="function-matrix-card ready" data-about-function-matrix="city-health-commission-static">
-            <span>市级 · ready</span>
+            <span>市级 · 已就绪</span>
             <strong>市卫生健康委</strong>
             <ul>
               <li>综合管理入口</li>
@@ -107,7 +107,7 @@
             <small>/api/health-dashboard/summary</small>
           </article>
           <article class="function-matrix-card watch" data-about-function-matrix="county-health-bureau-static">
-            <span>县级 · watch</span>
+            <span>县级 · 需关注</span>
             <strong>区县卫生健康局</strong>
             <ul>
               <li>辖区监管信号汇总</li>
@@ -128,7 +128,7 @@
         <div class="capability-grid">
           <article class="capability-card" data-dashboard-template-function="aggregate-entry">
             <strong>前七应用汇总入口</strong>
-            <span>复用 <code>health-dashboard-applications.js</code> 的应用清单，汇总卫健委监管、医疗机构、医保治理、居民门户、县域医共体、平台治理和运维工作台的指标、风险和待办。</span>
+            <span>复用综合管理服务系统应用清单，汇总卫健委监管、医疗机构、医保治理、居民门户、县域医共体、平台治理和运维工作台的指标、风险和待办。</span>
           </article>
           <article class="capability-card" data-dashboard-template-function="population-service-board">
             <strong>出生死亡就诊入院看板</strong>
@@ -136,11 +136,11 @@
           </article>
           <article class="capability-card" data-dashboard-template-function="risk-action-loop">
             <strong>风险预警与任务闭环</strong>
-            <span>把源应用 open action、优先级和高风险状态归一化展示，管理端可快速定位来源应用，但处置、签收、复核仍回到业务页面完成。</span>
+            <span>把源应用待办、优先级和高风险状态归一化展示，管理端可快速定位来源应用，但处置、签收、复核仍回到业务页面完成。</span>
           </article>
           <article class="capability-card" data-dashboard-template-function="interface-evidence">
             <strong>接口联调与验收证据</strong>
-            <span>复用 <code>platformInterfaces</code>、<code>platformEvidence</code>、<code>hospitalInteroperabilityFunctions</code> 和 release 报告，形成接口与验收证据入口。</span>
+            <span>复用平台接口清单、平台验收证据、医院互联互通能力清单和发布报告，形成接口与验收证据入口。</span>
           </article>
           <article class="capability-card" data-dashboard-template-function="policy-boundary">
             <strong>政策说明与数据边界</strong>
@@ -148,7 +148,7 @@
           </article>
           <article class="capability-card" data-dashboard-template-function="release-report">
             <strong>主要功能报告与发布审计</strong>
-            <span><code>npm.cmd run health-dashboard:summary</code> 生成模块摘要和主要功能报告，<code>release:report</code> 和 <code>deploy:check</code> 继续作为发布门禁。</span>
+            <span>模块摘要脚本生成系统摘要和主要功能报告，发布聚合报告和部署门禁继续作为上线审计依据。</span>
           </article>
         </div>
       </section>
@@ -165,7 +165,7 @@
           </article>
           <article class="capability-card" data-dashboard-policy="online-workflow">
             <strong>医疗全流程在线办理</strong>
-            <span>转诊、就医、住院、医保、取药和授权共享等流程通过源应用办理；系统只负责跨域汇总、预警和 open action 闭环。</span>
+            <span>转诊、就医、住院、医保、取药和授权共享等流程通过源应用办理；系统只负责跨域汇总、预警和待办闭环。</span>
           </article>
           <article class="capability-card" data-dashboard-policy="smart-supervision">
             <strong>互联网医疗监管与智慧监管</strong>
@@ -197,7 +197,7 @@
               <strong>01</strong>
               <div>
                 <h3>出生与死亡</h3>
-                <p>当前从 <code>birthCertificates.birthDateTime</code> 和 <code>deathCertificates.deathDateTime</code> 统计。现场需确认医学证明签发、登记、撤销、补正和跨部门交换的最终口径。</p>
+                <p>当前从出生医学证明日期和死亡医学证明日期统计。现场需确认医学证明签发、登记、撤销、补正和跨部门交换的最终口径。</p>
               </div>
               <span>证照链路</span>
             </div>
@@ -205,7 +205,7 @@
               <strong>02</strong>
               <div>
                 <h3>就诊与入院</h3>
-                <p>当前从 <code>healthStatistics.dailyServiceReports</code> 日报门急诊和入院接口快照汇总日、周、月、年。现场生产切换后应替换为机构级实时明细。</p>
+                <p>当前从卫生统计日报中的门急诊和入院接口快照汇总日、周、月、年。现场生产切换后应替换为机构级实时明细。</p>
               </div>
               <span>卫生统计</span>
             </div>
@@ -213,7 +213,7 @@
               <strong>03</strong>
               <div>
                 <h3>风险、任务和验收证据</h3>
-                <p>系统只汇总源应用 open action、风险等级、接口轨道、平台证据和现场依赖；处置、签收、办理、复核仍回到对应源应用。</p>
+                <p>系统只汇总源应用待办、风险等级、接口轨道、平台证据和现场依赖；处置、签收、办理、复核仍回到对应源应用。</p>
               </div>
               <span>汇总入口</span>
             </div>
@@ -226,8 +226,8 @@
             <span>发布与审计可复用</span>
           </div>
           <div class="rules">
-            <div><strong>摘要接口</strong><span><code>/api/health-dashboard/summary</code> 返回应用、风险、任务、接口、证据、现场依赖和人口服务看板。</span></div>
-            <div><strong>发布报告</strong><span><code>release-report</code> 已检查 <code>healthDashboard:populationServiceBoard</code>，确保四周期四指标存在。</span></div>
+            <div><strong>摘要接口</strong><span>综合管理服务系统摘要接口返回应用、风险、任务、接口、证据、现场依赖和人口服务看板。</span></div>
+            <div><strong>发布报告</strong><span>发布报告已检查人口服务看板，确保日、周、月、年四周期和出生、死亡、就诊、入院四指标存在。</span></div>
             <div><strong>静态兜底</strong><span>API 不可用时，系统从本地快照构建相同看板，保留演示数据和空状态边界。</span></div>
           </div>
         </article>

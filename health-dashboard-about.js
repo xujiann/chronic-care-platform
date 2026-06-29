@@ -10,17 +10,39 @@ document.addEventListener("DOMContentLoaded", async () => {
     renderAboutRuntime(summary.functionalReport || {}, "api");
     if (state) {
       const report = summary.functionalReport || {};
-      state.textContent = `api / ${report.summary?.functions || 0} functions / ${report.summary?.ready || 0} ready / ${report.summary?.watch || 0} watch`;
+      state.textContent = `接口实时汇总 / ${report.summary?.functions || 0} 项功能 / ${report.summary?.ready || 0} 已就绪 / ${report.summary?.watch || 0} 需关注`;
       state.dataset.sourceMode = "api";
     }
   } catch (error) {
     renderAboutRuntime(staticAboutRuntimeReport(), "static");
     if (state) {
-      state.textContent = "static / 摘要接口不可用，显示模板说明边界";
+      state.textContent = "静态快照 / 摘要接口不可用，显示模板说明边界";
       state.dataset.sourceMode = "static";
     }
   }
 });
+
+function aboutStatusLabel(status) {
+  const key = String(status || "").toLowerCase();
+  return {
+    ready: "已就绪",
+    watch: "需关注",
+    blocked: "受阻",
+    empty: "暂无数据",
+    normal: "正常"
+  }[key] || status || "未标注";
+}
+
+function aboutEvidenceLabel(text) {
+  return String(text || "")
+    .replace(/\/api\/health-dashboard\/summary/g, "综合管理服务系统摘要接口")
+    .replace(/health-dashboard-applications\.js/g, "应用清单")
+    .replace(/health-dashboard:summary/g, "综合管理服务系统摘要脚本")
+    .replace(/riskDrilldowns/g, "风险下钻记录")
+    .replace(/openActions/g, "待办清单")
+    .replace(/day\/week\/month\/year/g, "日、周、月、年")
+    .replace(/npm\.cmd run /g, "运行脚本：");
+}
 
 function renderAboutRuntime(report, sourceMode) {
   renderAboutFunctionCards(report.functions || [], sourceMode);
@@ -52,11 +74,11 @@ function aboutCard(item) {
   card.className = `function-report-card ${item.status || "normal"}`;
   card.dataset.aboutRuntimeFunction = item.id || "runtime-function";
   const status = document.createElement("span");
-  status.textContent = item.status || "ready";
+  status.textContent = aboutStatusLabel(item.status || "ready");
   const title = document.createElement("strong");
   title.textContent = item.name || item.id || "模块功能";
   const evidence = document.createElement("small");
-  evidence.textContent = item.evidence || "";
+  evidence.textContent = aboutEvidenceLabel(item.evidence || "");
   const boundary = document.createElement("p");
   boundary.textContent = item.boundary || "";
   card.append(status, title, evidence, boundary);
@@ -82,7 +104,7 @@ function aboutMatrixCard(item, type) {
   card.className = `function-matrix-card ${item.status || "normal"}`;
   card.dataset.aboutFunctionMatrix = item.id || type || "matrix";
   const meta = document.createElement("span");
-  meta.textContent = type === "agency" ? `${item.level || ""} · ${item.status || "ready"}` : `${item.level || "内部机构"} · ${item.status || "ready"}`;
+  meta.textContent = type === "agency" ? `${item.level || ""} · ${aboutStatusLabel(item.status || "ready")}` : `${item.level || "内部机构"} · ${aboutStatusLabel(item.status || "ready")}`;
   const title = document.createElement("strong");
   title.textContent = item.name || item.agency || item.id || "机构功能";
   const list = document.createElement("ul");
@@ -94,7 +116,7 @@ function aboutMatrixCard(item, type) {
   const next = document.createElement("p");
   next.textContent = item.nextPlan || "";
   const evidence = document.createElement("small");
-  evidence.textContent = item.evidence || "";
+  evidence.textContent = aboutEvidenceLabel(item.evidence || "");
   card.append(meta, title, list, next, evidence);
   return card;
 }
@@ -106,7 +128,7 @@ function renderAboutReleaseEvidence(items) {
   items.forEach((item) => {
     const chip = document.createElement("span");
     chip.dataset.aboutRuntimeEvidence = item.id || "evidence";
-    chip.textContent = `${item.name || item.id}: ${item.evidence || ""}`;
+    chip.textContent = `${item.name || item.id}：${aboutEvidenceLabel(item.evidence || "")}`;
     target.appendChild(chip);
   });
 }

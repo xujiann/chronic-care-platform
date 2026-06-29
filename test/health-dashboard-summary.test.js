@@ -21,7 +21,7 @@ test("health dashboard summary aggregates the first seven applications without r
   assert.equal(APPLICATIONS, healthDashboardApplications);
   assert.equal(report.applications.length, 7);
   assert.equal(report.applications.every((item) => item.entry.endsWith(".html")), true);
-  assert.equal(report.applications.every((item) => /source application/.test(item.boundary)), true);
+  assert.equal(report.applications.every((item) => /源应用|源业务/.test(item.boundary)), true);
   assert.equal(report.totals.sourceRecords > 0, true);
   assert.equal(report.totals.interfaceTracks >= 4, true);
   assert.equal(report.totals.evidenceRecords >= 2, true);
@@ -68,27 +68,27 @@ test("health dashboard summary aggregates the first seven applications without r
   assert.equal(report.openActions.some((item) => item.entry === "county.html" || item.entry === "institution.html"), true);
 
   const markdown = renderMarkdown(report);
-  assert.match(markdown, /Health dashboard summary/);
-  assert.match(markdown, /commission-supervision/);
-  assert.match(markdown, /operations-workbench/);
-  assert.match(markdown, /Open action preview/);
-  assert.match(markdown, /Source open actions/);
-  assert.match(markdown, /Preview open actions/);
-  assert.match(markdown, /Application \| Entry \| Collection/);
-  assert.match(markdown, /Population and service board/);
-  assert.match(markdown, /Population and service insights/);
-  assert.match(markdown, /Main function report/);
-  assert.match(markdown, /Internal department function matrix/);
-  assert.match(markdown, /City and county agency function matrix/);
+  assert.match(markdown, /卫生健康综合管理服务系统摘要/);
+  assert.match(markdown, /卫健委综合监管/);
+  assert.match(markdown, /运维验收工作台/);
+  assert.match(markdown, /待办预览/);
+  assert.match(markdown, /源应用待办/);
+  assert.match(markdown, /预览待办/);
+  assert.match(markdown, /应用 \| 数据集/);
+  assert.match(markdown, /人口与服务看板/);
+  assert.match(markdown, /人口与服务洞察/);
+  assert.match(markdown, /主要功能报告/);
+  assert.match(markdown, /内部机构功能矩阵/);
+  assert.match(markdown, /市县两级机构功能矩阵/);
   assert.match(markdown, /规划信息处/);
   assert.match(markdown, /区县卫生健康局/);
   assert.match(markdown, /市级卫生健康行政部门业务处室/);
   assert.doesNotMatch(markdown, /\| .*县域医共体牵头医院 \|/);
-  assert.match(markdown, /Risk drilldowns/);
-  assert.match(markdown, /Site evidence package/);
-  assert.match(markdown, /Release evidence/);
+  assert.match(markdown, /风险下钻/);
+  assert.match(markdown, /现场验收证据包/);
+  assert.match(markdown, /发布证据/);
   assert.match(markdown, /92800/);
-  assert.match(markdown, /Certificate exchange chain/);
+  assert.match(markdown, /证照交换链路/);
 });
 
 test("health dashboard summary supports empty source application boundaries", () => {

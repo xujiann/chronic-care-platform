@@ -318,7 +318,7 @@ function healthDashboardChecks(healthDashboard) {
   return [
     check("healthDashboard:summary", healthDashboard.ok, healthDashboard.ok ? "health dashboard summary checks passed" : "health dashboard summary failed", "error", "health-dashboard"),
     check("healthDashboard:applications", healthDashboard.applications?.length === 7, `${healthDashboard.applications?.length || 0} source applications`, "error", "health-dashboard"),
-    check("healthDashboard:boundary", /source business applications|source applications/.test(healthDashboard.scope?.rule || ""), healthDashboard.scope?.rule || "missing", "error", "health-dashboard"),
+    check("healthDashboard:boundary", /源应用|源业务|source business applications|source applications/.test(healthDashboard.scope?.rule || ""), healthDashboard.scope?.rule || "missing", "error", "health-dashboard"),
     check("healthDashboard:populationServiceBoard", populationPeriods === 4 && populationInsights >= 4 && healthDashboard.populationServiceBoard?.serviceMode === "daily-interface", `${populationPeriods} population/service periods, ${populationInsights} site insights, ${healthDashboard.populationServiceBoard?.serviceMode || "unknown"}`, "error", "health-dashboard"),
     check("healthDashboard:certificateExchange", certificateTracks >= 5, `${certificateTracks} certificate exchange tracks`, "error", "health-dashboard"),
     check("healthDashboard:riskDrilldown", drilldowns >= 4, `${drilldowns} risk drilldowns`, "error", "health-dashboard"),

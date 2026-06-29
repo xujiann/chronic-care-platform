@@ -303,12 +303,12 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.equal(healthDashboardJson.healthDashboard.functionalReport.cityCountyFunctionMatrix.every((item) => /卫生健康|行政部门|卫健/.test(item.agency)), true);
   assert.equal(healthDashboardJson.healthDashboard.riskDrilldowns.items.length >= 4, true);
   assert.equal(healthDashboardJson.healthDashboard.siteEvidencePackage.items.length, 4);
-  assert.match(healthDashboardMarkdown, /Main function report/);
-  assert.match(healthDashboardMarkdown, /Internal department function matrix/);
-  assert.match(healthDashboardMarkdown, /City and county agency function matrix/);
-  assert.match(healthDashboardMarkdown, /Risk drilldowns/);
-  assert.match(healthDashboardMarkdown, /Site evidence package/);
-  assert.match(healthDashboardMarkdown, /Release evidence/);
+  assert.match(healthDashboardMarkdown, /主要功能报告/);
+  assert.match(healthDashboardMarkdown, /内部机构功能矩阵/);
+  assert.match(healthDashboardMarkdown, /市县两级机构功能矩阵/);
+  assert.match(healthDashboardMarkdown, /风险下钻/);
+  assert.match(healthDashboardMarkdown, /现场验收证据包/);
+  assert.match(healthDashboardMarkdown, /发布证据/);
   assert.equal(manifestJson.releaseArtifactManifest.ok, true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "service-acceptance"), true);
   assert.match(manifestMarkdown, /Release artifact manifest/);

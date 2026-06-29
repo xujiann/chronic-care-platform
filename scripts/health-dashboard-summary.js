@@ -70,7 +70,7 @@ function summarizeApplication(data, app) {
     highRisks: highRiskRows.length,
     evidenceRecords: relatedEvidence.length,
     status: allRows.length ? "modeled" : "empty-ready",
-    boundary: "Aggregated in the dashboard; detailed workflow remains in the source application."
+    boundary: "综合管理服务系统仅做汇总展示；具体业务流程仍在源应用办理。"
   };
 }
 
@@ -179,12 +179,12 @@ function sumDailyServiceWindow(reports, anchor, periodId, metricId) {
 }
 
 function periodRangeLabel(anchor, periodId) {
-  if (!anchor) return "No dated records";
+  if (!anchor) return "暂无日期记录";
   const start = new Date(anchor);
   if (periodId === "week") start.setDate(start.getDate() - 6);
   if (periodId === "month") start.setDate(1);
   if (periodId === "year") start.setMonth(0, 1);
-  return `${formatDate(start)} to ${formatDate(anchor)}`;
+  return `${formatDate(start)} 至 ${formatDate(anchor)}`;
 }
 
 function boardMetricValue(periods, periodId, metricId) {
@@ -364,10 +364,10 @@ function buildSiteEvidencePackage(data, context = {}) {
   const interfaceRows = context.interfaceRows || [];
   const siteDependencies = context.siteDependencies || [];
   const fallback = [
-    { id: "summary-json", type: "发布摘要", evidence: "release/health-dashboard-summary.json", owner: "规划信息处", status: "ready", nextAction: "随 release:report 归档。" },
-    { id: "interface-messages", type: "接口报文", evidence: `${interfaceRows.length} platformInterfaces`, owner: "接口联调组", status: interfaceRows.length >= 4 ? "ready" : "watch", nextAction: "生产联调时替换为真实请求、响应和签名样例。" },
-    { id: "acceptance-records", type: "验收记录", evidence: `${evidenceRecords.length} platformEvidence records`, owner: "项目办", status: evidenceRecords.length >= 2 ? "ready" : "watch", nextAction: "补充现场截图、签字单和复测结论。" },
-    { id: "site-signoff", type: "现场签字", evidence: `${siteDependencies.length} site dependencies`, owner: "各级卫生健康行政部门", status: siteDependencies.length > 0 ? "watch" : "ready", nextAction: "上线前完成身份、证照、统计、院内系统和灾备签字。" }
+    { id: "summary-json", type: "发布摘要", evidence: "综合管理服务系统摘要文件", owner: "规划信息处", status: "ready", nextAction: "随发布聚合报告归档。" },
+    { id: "interface-messages", type: "接口报文", evidence: `${interfaceRows.length} 条平台接口清单`, owner: "接口联调组", status: interfaceRows.length >= 4 ? "ready" : "watch", nextAction: "生产联调时替换为真实请求、响应和签名样例。" },
+    { id: "acceptance-records", type: "验收记录", evidence: `${evidenceRecords.length} 条平台验收证据`, owner: "项目办", status: evidenceRecords.length >= 2 ? "ready" : "watch", nextAction: "补充现场截图、签字单和复测结论。" },
+    { id: "site-signoff", type: "现场签字", evidence: `${siteDependencies.length} 项现场依赖`, owner: "各级卫生健康行政部门", status: siteDependencies.length > 0 ? "watch" : "ready", nextAction: "上线前完成身份、证照、统计、院内系统和灾备签字。" }
   ];
   const items = configured.length ? configured : fallback;
   return {
@@ -415,7 +415,7 @@ function buildDepartmentFunctionMatrix(context = {}) {
       level: "内部机构",
       implemented: [
         "就诊、入院、出院、床位日报汇总",
-        "转诊、远程会诊、医技互认和高风险 open action 归集",
+        "转诊、远程会诊、医技互认和高风险待办归集",
         `${riskDrilldowns.summary?.items || 0}条风险下钻处置轨迹`
       ],
       nextPlan: "联调 HIS、EMR、LIS、PACS、床位、远程会诊和检查检验互认接口，补齐处置回写和复核签字。",
@@ -574,7 +574,7 @@ function buildFunctionalReport(context) {
       id: "aggregate-entry",
       name: "前七应用汇总入口",
       status: applications.length === 7 ? "ready" : "watch",
-      evidence: `${applications.length} source applications, ${sourceRecords} source records`,
+      evidence: `${applications.length} 个源应用，${sourceRecords} 条源记录`,
       boundary: "只做跨应用总览与导航，不替代源应用业务办理。"
     },
     {
@@ -595,42 +595,42 @@ function buildFunctionalReport(context) {
       id: "risk-action-loop",
       name: "风险预警与任务闭环",
       status: openActions.length > 0 ? "watch" : "ready",
-      evidence: `${openActions.length} preview open actions, ${sourceOpenActions} source open actions, ${highRisks} high risks`,
-      boundary: "仅归一化展示 open action，处置回写仍在源业务端完成。"
+      evidence: `${openActions.length} 条预览待办，${sourceOpenActions} 条源应用待办，${highRisks} 条高风险`,
+      boundary: "仅归一化展示待办，处置回写仍在源业务端完成。"
     },
     {
       id: "risk-drilldown-loop",
       name: "风险下钻与处置轨迹",
       status: riskDrilldowns.items?.length ? "ready" : "watch",
-      evidence: `${riskDrilldowns.summary?.items || 0} drilldowns, ${riskDrilldowns.summary?.withTrace || 0} with trace`,
+      evidence: `${riskDrilldowns.summary?.items || 0} 条下钻记录，${riskDrilldowns.summary?.withTrace || 0} 条已有轨迹`,
       boundary: "下钻展示源应用链接、责任人、时限、状态和阻塞原因；不在本系统直接修改源业务记录。"
     },
     {
       id: "interface-evidence",
       name: "接口联调与验收证据",
       status: interfaces.length >= 4 && evidenceRecords.length >= 2 ? "ready" : "watch",
-      evidence: `${interfaces.length} interface tracks, ${evidenceRecords.length} evidence records`,
-      boundary: "复用 platformInterfaces、platformEvidence 与互联互通函数清单。"
+      evidence: `${interfaces.length} 条接口轨道，${evidenceRecords.length} 条验收证据`,
+      boundary: "复用平台接口清单、平台验收证据与互联互通函数清单。"
     },
     {
       id: "policy-about",
       name: "政策说明与关于页",
       status: "ready",
-      evidence: "health-dashboard-about.html, policy notes, data boundary copy",
+      evidence: "系统说明页面、政策说明、数据边界说明",
       boundary: "说明政策依据、数据口径和现场切换条件，不承诺未接入系统能力。"
     },
     {
       id: "release-audit",
       name: "发布审计与验收报告",
       status: siteDependencies.length > 0 ? "watch" : "ready",
-      evidence: "health-dashboard:summary, release:report, deploy:check",
+      evidence: "综合管理服务系统摘要、发布聚合报告、部署门禁",
       boundary: "发布报告呈现当前演示与联调状态，生产切换仍依赖现场签字。"
     },
     {
       id: "site-evidence-package",
       name: "现场验收证据包",
       status: siteEvidencePackage.items?.length >= 4 ? "ready" : "watch",
-      evidence: `${siteEvidencePackage.summary?.artifacts || 0} artifacts, ${siteEvidencePackage.summary?.ready || 0} ready`,
+      evidence: `${siteEvidencePackage.summary?.artifacts || 0} 项材料，${siteEvidencePackage.summary?.ready || 0} 项已就绪`,
       boundary: "绑定接口报文、截图、签字单、整改、复测和上线批次材料；生产证据需现场替换演示样例。"
     }
   ];
@@ -682,9 +682,9 @@ function buildHealthDashboardSummary(options = {}) {
   const cityCountyFunctionMatrix = functionalReport.cityCountyFunctionMatrix || [];
   const checks = [
     { id: "dashboard:applications", passed: applications.length === 7 && applications.every((item) => item.entry && item.collections.length), detail: `${applications.length} applications` },
-    { id: "dashboard:source-boundary", passed: applications.every((item) => /source application/.test(item.boundary)), detail: "dashboard is aggregate-only" },
+    { id: "dashboard:source-boundary", passed: applications.every((item) => /源应用|源业务/.test(item.boundary)), detail: "综合管理服务系统仅做汇总展示" },
     { id: "dashboard:metrics", passed: applications.reduce((sum, item) => sum + item.records, 0) > 0, detail: `${applications.reduce((sum, item) => sum + item.records, 0)} source records` },
-    { id: "dashboard:actions", passed: previewOpenActions > 0 && sourceOpenActions >= previewOpenActions, detail: `${previewOpenActions} preview / ${sourceOpenActions} source open actions` },
+    { id: "dashboard:actions", passed: previewOpenActions > 0 && sourceOpenActions >= previewOpenActions, detail: `${previewOpenActions} 条预览待办 / ${sourceOpenActions} 条源应用待办` },
     { id: "dashboard:interfaces", passed: interfaceRows.length >= 4, detail: `${interfaceRows.length} interface rows` },
     { id: "dashboard:evidence", passed: evidenceRecords.length >= 2, detail: `${evidenceRecords.length} evidence records` },
     { id: "dashboard:population-service-board", passed: populationServiceBoard.periods.length === 4 && populationServiceBoard.periods.every((period) => period.metrics.length === 4) && populationServiceBoard.insights.length >= 4 && populationServiceBoard.serviceMode === "daily-interface", detail: `birth, death, visit, admission board for day/week/month/year with ${populationServiceBoard.serviceMode}` },
@@ -707,7 +707,7 @@ function buildHealthDashboardSummary(options = {}) {
     generatedAt: new Date().toISOString(),
     scope: {
       role: "health-administration-management-service-system",
-      rule: "For health administration departments at all levels: do not replace source business applications; expose metrics, risk, actions, interfaces, acceptance evidence, and site dependencies."
+      rule: "面向各级卫生健康行政部门：不替代源业务应用，仅汇总指标、风险、任务、接口、验收证据和现场依赖。"
     },
     totals: {
       applications: applications.length,
@@ -729,7 +729,7 @@ function buildHealthDashboardSummary(options = {}) {
       application: item.name,
       highRisks: item.highRisks,
       openActions: item.openActions,
-      nextAction: item.highRisks ? "Review high-risk source records in the owning application." : "Close source workflow actions in the owning application."
+      nextAction: item.highRisks ? "回到源应用复核高风险记录。" : "回到源应用闭环待办。"
     })),
     openActions,
     populationServiceBoard,
@@ -764,124 +764,238 @@ function buildHealthDashboardSummary(options = {}) {
   };
 }
 
+function dashboardReportStatusLabel(status) {
+  const key = String(status || "").toLowerCase();
+  const labels = {
+    ready: "已就绪",
+    watch: "需关注",
+    blocked: "受阻",
+    empty: "暂无数据",
+    "empty-ready": "待接入",
+    modeled: "已建模",
+    normal: "正常",
+    open: "待办",
+    pending: "待处理",
+    linked: "已关联",
+    received: "已回执",
+    partial: "部分回执",
+    missing: "缺少回执",
+    matched: "已对账",
+    "variance-review": "差异复核",
+    "owner-pending": "待明确责任人",
+    "due-pending": "待明确时限",
+    "daily-interface": "日报接口",
+    "monthly-snapshot": "月度快照"
+  };
+  return labels[key] || status || "未标注";
+}
+
+function dashboardReportPriorityLabel(priority) {
+  const key = String(priority || "").toLowerCase();
+  return { high: "高", medium: "中", normal: "一般", low: "低" }[key] || priority || "一般";
+}
+
+function dashboardReportOwnerLabel(owner) {
+  return dashboardReportStatusLabel(owner || "owner-pending");
+}
+
+function dashboardReportCollectionLabel(collection) {
+  const labels = {
+    followups: "随访任务",
+    careOrders: "照护服务工单",
+    medicationPickups: "取药预约",
+    insuranceClaims: "医保审核",
+    emergencySignals: "风险预警",
+    countyCollaborationOrders: "县域协同工单",
+    countyMutualRecognitionRecords: "检查检验互认",
+    countyAiDiagnosisCases: "人工智能辅助诊断",
+    chronicScreeningTasks: "慢病筛查任务",
+    chronicEducationPushes: "健康教育推送",
+    birthCertificates: "出生医学证明",
+    deathCertificates: "死亡医学证明",
+    platformInterfaces: "平台接口清单",
+    platformEvidence: "平台验收证据"
+  };
+  return labels[collection] || dashboardReportEvidenceLabel(collection);
+}
+
+function dashboardReportCheckLabel(checkId) {
+  const labels = {
+    "dashboard:source-boundary": "源应用边界",
+    "dashboard:summary": "综合管理服务系统摘要",
+    "dashboard:applications": "前七应用汇总",
+    "dashboard:metrics": "指标汇总",
+    "dashboard:actions": "跨应用待办",
+    "dashboard:interfaces": "接口轨道",
+    "dashboard:evidence": "验收证据",
+    "dashboard:population-service-board": "人口服务看板",
+    "dashboard:certificate-exchange": "证照交换链路",
+    "dashboard:risk-drilldown": "风险下钻",
+    "dashboard:risk-drilldowns": "风险下钻",
+    "dashboard:site-evidence-package": "现场验收证据包",
+    "dashboard:functional-report": "主要功能报告",
+    "dashboard:department-function-matrix": "内部机构功能矩阵",
+    "dashboard:department-functions": "内部机构功能矩阵",
+    "dashboard:city-county-function-matrix": "市县两级机构功能矩阵",
+    "dashboard:city-county-functions": "市县两级机构功能矩阵"
+  };
+  return labels[checkId] || checkId;
+}
+
+function dashboardReportEvidenceLabel(text) {
+  return String(text || "")
+    .replace(/\/api\/health-dashboard\/summary/g, "综合管理服务系统摘要接口")
+    .replace(/health-dashboard-about\.html/g, "系统说明页面")
+    .replace(/health-dashboard-applications\.js/g, "应用清单")
+    .replace(/health-dashboard:summary/g, "综合管理服务系统摘要脚本")
+    .replace(/healthDashboardSummary/g, "综合管理服务系统摘要")
+    .replace(/healthDashboard:populationServiceBoard/g, "人口服务看板检查")
+    .replace(/release:report/g, "发布聚合报告")
+    .replace(/deploy:check/g, "部署门禁")
+    .replace(/source applications?/g, "源应用")
+    .replace(/source records?/g, "源记录")
+    .replace(/source open actions?/g, "源应用待办")
+    .replace(/preview open actions?/g, "预览待办")
+    .replace(/openActions/g, "待办")
+    .replace(/open actions?/g, "待办")
+    .replace(/high risks?/g, "高风险")
+    .replace(/riskDrilldowns/g, "风险下钻")
+    .replace(/certificateExchange/g, "证照交换")
+    .replace(/siteEvidencePackage/g, "现场证据包")
+    .replace(/dailyServiceReports/g, "日报服务量")
+    .replace(/interface tracks?/g, "接口轨道")
+    .replace(/evidence records?/g, "验收证据")
+    .replace(/platformInterfaces/g, "平台接口清单")
+    .replace(/platformEvidence/g, "平台验收证据")
+    .replace(/site dependencies/g, "现场依赖")
+    .replace(/artifacts/g, "材料")
+    .replace(/records/g, "记录")
+    .replace(/module functions/g, "模块功能")
+    .replace(/functions/g, "项功能")
+    .replace(/ready/g, "已就绪")
+    .replace(/watch/g, "需关注")
+    .replace(/blocked/g, "受阻")
+    .replace(/pending/g, "待处理");
+}
+
 function renderMarkdown(report) {
-  const appRows = report.applications.map((item) => `| ${item.id} | ${item.entry} | ${item.records} | ${item.openActions} | ${item.highRisks} | ${item.status} |`);
-  const actionRows = report.openActions.map((item) => `| ${item.priority} | ${item.application || ""} | ${item.entry || ""} | ${item.collection} | ${item.id} | ${String(item.title || "").replace(/\|/g, "/")} | ${item.status} | ${item.owner} |`);
-  const checkRows = report.checks.map((item) => `| ${item.passed ? "PASS" : "FAIL"} | ${item.id} | ${String(item.detail || "").replace(/\|/g, "/")} |`);
+  const appRows = report.applications.map((item) => `| ${item.name || item.id} | 进入应用 | ${item.records} | ${item.openActions} | ${item.highRisks} | ${dashboardReportStatusLabel(item.status)} |`);
+  const actionRows = report.openActions.map((item) => `| ${dashboardReportPriorityLabel(item.priority)} | ${item.application || ""} | ${dashboardReportCollectionLabel(item.collection)} | ${item.id} | ${String(item.title || "").replace(/\|/g, "/")} | ${dashboardReportStatusLabel(item.status)} | ${dashboardReportOwnerLabel(item.owner)} |`);
+  const checkRows = report.checks.map((item) => `| ${item.passed ? "通过" : "未通过"} | ${dashboardReportCheckLabel(item.id)} | ${dashboardReportEvidenceLabel(item.detail || "")} |`);
   const boardPeriods = report.populationServiceBoard?.periods || [];
   const boardRows = boardPeriods.flatMap((period) => (period.metrics || []).map((metric) => `| ${period.label} | ${period.rangeLabel} | ${metric.label} | ${metric.value} ${metric.unit || ""} | ${metric.source || ""} |`));
-  const insightRows = (report.populationServiceBoard?.insights || []).map((item) => `| ${item.status || ""} | ${item.title || item.id} | ${item.value || ""} | ${String(item.detail || "").replace(/\|/g, "/")} |`);
-  const certificateRows = (report.certificateExchange?.items || []).map((item) => `| ${item.status || ""} | ${item.domain || item.id} | ${item.target || ""} | ${item.receiptStatus || ""} | ${item.reconciliationStatus || ""} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`);
-  const drilldownRows = (report.riskDrilldowns?.items || []).map((item) => `| ${item.priority || ""} | ${item.application || ""} | ${item.collection || ""} | ${item.owner || ""} | ${item.status || ""} | ${String(item.blocker || "").replace(/\|/g, "/")} |`);
-  const siteEvidenceRows = (report.siteEvidencePackage?.items || []).map((item) => `| ${item.status || ""} | ${item.type || item.id} | ${String(item.evidence || "").replace(/\|/g, "/")} | ${item.owner || ""} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`);
-  const functionRows = (report.functionalReport?.functions || []).map((item) => `| ${item.status || ""} | ${item.name || item.id} | ${String(item.evidence || "").replace(/\|/g, "/")} | ${String(item.boundary || "").replace(/\|/g, "/")} |`);
-  const departmentRows = (report.functionalReport?.departmentFunctionMatrix || []).map((item) => `| ${item.status || ""} | ${item.name || item.id} | ${(item.implemented || []).map((text) => String(text).replace(/\|/g, "/")).join("<br>")} | ${String(item.nextPlan || "").replace(/\|/g, "/")} |`);
-  const cityCountyRows = (report.functionalReport?.cityCountyFunctionMatrix || []).map((item) => `| ${item.status || ""} | ${item.level || ""} | ${item.agency || item.id} | ${(item.implemented || []).map((text) => String(text).replace(/\|/g, "/")).join("<br>")} | ${String(item.nextPlan || "").replace(/\|/g, "/")} |`);
-  const reportEvidenceRows = (report.functionalReport?.releaseEvidence || []).map((item) => `| ${item.name || item.id} | ${String(item.evidence || "").replace(/\|/g, "/")} |`);
+  const insightRows = (report.populationServiceBoard?.insights || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.title || item.id} | ${item.value || ""} | ${String(item.detail || "").replace(/\|/g, "/")} |`);
+  const certificateRows = (report.certificateExchange?.items || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.domain || item.id} | ${item.target || ""} | ${dashboardReportStatusLabel(item.receiptStatus)} | ${dashboardReportStatusLabel(item.reconciliationStatus)} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`);
+  const drilldownRows = (report.riskDrilldowns?.items || []).map((item) => `| ${dashboardReportPriorityLabel(item.priority)} | ${item.application || ""} | ${dashboardReportCollectionLabel(item.collection)} | ${dashboardReportOwnerLabel(item.owner)} | ${dashboardReportStatusLabel(item.status)} | ${String(item.blocker || "").replace(/\|/g, "/")} |`);
+  const siteEvidenceRows = (report.siteEvidencePackage?.items || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.type || item.id} | ${dashboardReportEvidenceLabel(item.evidence || "").replace(/\|/g, "/")} | ${dashboardReportOwnerLabel(item.owner)} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`);
+  const functionRows = (report.functionalReport?.functions || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.name || item.id} | ${dashboardReportEvidenceLabel(item.evidence || "").replace(/\|/g, "/")} | ${String(item.boundary || "").replace(/\|/g, "/")} |`);
+  const departmentRows = (report.functionalReport?.departmentFunctionMatrix || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.name || item.id} | ${(item.implemented || []).map((text) => String(text).replace(/\|/g, "/")).join("<br>")} | ${String(item.nextPlan || "").replace(/\|/g, "/")} |`);
+  const cityCountyRows = (report.functionalReport?.cityCountyFunctionMatrix || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.level || ""} | ${item.agency || item.id} | ${(item.implemented || []).map((text) => String(text).replace(/\|/g, "/")).join("<br>")} | ${String(item.nextPlan || "").replace(/\|/g, "/")} |`);
+  const reportEvidenceRows = (report.functionalReport?.releaseEvidence || []).map((item) => `| ${item.name || item.id} | ${dashboardReportEvidenceLabel(item.evidence || "").replace(/\|/g, "/")} |`);
   const onsiteBoundaryRows = (report.functionalReport?.onsiteBoundaries || []).map((item) => `- ${item}`);
   return [
-    "# Health dashboard summary",
+    "# 卫生健康综合管理服务系统摘要",
     "",
-    `- Generated at: ${report.generatedAt}`,
-    `- Result: ${report.ok ? "PASS" : "FAIL"}`,
-    `- Applications: ${report.totals.applications}`,
-    `- Source records: ${report.totals.sourceRecords}`,
-    `- Source open actions: ${report.totals.sourceOpenActions ?? report.totals.openActions}`,
-    `- Preview open actions: ${report.totals.previewOpenActions ?? report.totals.openActions}`,
-    `- High risks: ${report.totals.highRisks}`,
-    `- Interface tracks: ${report.totals.interfaceTracks}`,
-    `- Evidence records: ${report.totals.evidenceRecords}`,
+    `- 生成时间：${report.generatedAt}`,
+    `- 检查结果：${report.ok ? "通过" : "未通过"}`,
+    `- 应用入口：${report.totals.applications}`,
+    `- 源记录：${report.totals.sourceRecords}`,
+    `- 源应用待办：${report.totals.sourceOpenActions ?? report.totals.openActions}`,
+    `- 预览待办：${report.totals.previewOpenActions ?? report.totals.openActions}`,
+    `- 高风险：${report.totals.highRisks}`,
+    `- 接口轨道：${report.totals.interfaceTracks}`,
+    `- 验收证据：${report.totals.evidenceRecords}`,
     "",
-    "## Boundary",
+    "## 功能边界",
     "",
     report.scope.rule,
     "",
-    "## Checks",
+    "## 发布检查",
     "",
-    "| Result | Check | Detail |",
+    "| 结果 | 检查项 | 明细 |",
     "|---|---|---|",
     ...checkRows,
     "",
-    "## Applications",
+    "## 应用汇总",
     "",
-    "| Application | Entry | Records | Open actions | High risks | Status |",
+    "| 应用 | 入口 | 源记录 | 待办 | 高风险 | 状态 |",
     "|---|---|---:|---:|---:|---|",
     ...appRows,
     "",
-    "## Population and service board",
+    "## 人口与服务看板",
     "",
-    report.populationServiceBoard?.sourceNote || "No board source note.",
+    report.populationServiceBoard?.sourceNote || "暂无看板来源说明。",
     "",
-    "| Period | Range | Metric | Value | Source |",
+    "| 周期 | 范围 | 指标 | 数值 | 来源 |",
     "|---|---|---|---:|---|",
     ...boardRows,
     "",
-    "### Population and service insights",
+    "### 人口与服务洞察",
     "",
-    "| Status | Insight | Value | Detail |",
+    "| 状态 | 洞察 | 数值 | 明细 |",
     "|---|---|---:|---|",
     ...insightRows,
     "",
-    "## Certificate exchange chain",
+    "## 证照交换链路",
     "",
-    `- Status: ${report.certificateExchange?.status || "empty"}`,
-    `- Source: ${report.certificateExchange?.source || "healthStatistics.certificateExchangeLinks"}`,
+    `- 状态：${dashboardReportStatusLabel(report.certificateExchange?.status || "empty")}`,
+    `- 来源：${dashboardReportEvidenceLabel(report.certificateExchange?.source || "healthStatistics.certificateExchangeLinks")}`,
     "",
-    "| Status | Domain | Target | Receipt | Reconciliation | Next action |",
+    "| 状态 | 领域 | 目标 | 回执 | 对账 | 下一步 |",
     "|---|---|---|---|---|---|",
     ...certificateRows,
     "",
-    "## Risk drilldowns",
+    "## 风险下钻",
     "",
-    "| Priority | Application | Collection | Owner | Status | Blocker |",
+    "| 优先级 | 应用 | 数据集 | 责任人 | 状态 | 阻塞点 |",
     "|---|---|---|---|---|---|",
     ...drilldownRows,
     "",
-    "## Site evidence package",
+    "## 现场验收证据包",
     "",
-    "| Status | Type | Evidence | Owner | Next action |",
+    "| 状态 | 类型 | 证据 | 责任人 | 下一步 |",
     "|---|---|---|---|---|",
     ...siteEvidenceRows,
     "",
-    "## Main function report",
+    "## 主要功能报告",
     "",
-    report.functionalReport?.title || "Health dashboard main function report",
+    report.functionalReport?.title || "综合管理服务系统主要功能报告",
     "",
-    `- Functions: ${report.functionalReport?.summary?.functions || 0}`,
-    `- Ready: ${report.functionalReport?.summary?.ready || 0}`,
-    `- Watch: ${report.functionalReport?.summary?.watch || 0}`,
-    `- Blocked: ${report.functionalReport?.summary?.blocked || 0}`,
+    `- 功能数：${report.functionalReport?.summary?.functions || 0}`,
+    `- 已就绪：${report.functionalReport?.summary?.ready || 0}`,
+    `- 需关注：${report.functionalReport?.summary?.watch || 0}`,
+    `- 受阻：${report.functionalReport?.summary?.blocked || 0}`,
     "",
-    "| Status | Function | Evidence | Boundary |",
+    "| 状态 | 功能 | 证据 | 边界 |",
     "|---|---|---|---|",
     ...functionRows,
     "",
-    "### Internal department function matrix",
+    "### 内部机构功能矩阵",
     "",
-    "| Status | Department | Implemented functions | Next plan |",
+    "| 状态 | 机构 | 已实现功能 | 下一步 |",
     "|---|---|---|---|",
     ...departmentRows,
     "",
-    "### City and county agency function matrix",
+    "### 市县两级机构功能矩阵",
     "",
-    "| Status | Level | Agency | Implemented functions | Next plan |",
+    "| 状态 | 层级 | 机构 | 已实现功能 | 下一步 |",
     "|---|---|---|---|---|",
     ...cityCountyRows,
     "",
-    "### Release evidence",
+    "### 发布证据",
     "",
-    "| Item | Evidence |",
+    "| 项目 | 证据 |",
     "|---|---|",
     ...reportEvidenceRows,
     "",
-    "### Onsite boundaries",
+    "### 现场联调边界",
     "",
     ...onsiteBoundaryRows,
     "",
-    "## Open action preview",
+    "## 待办预览",
     "",
-    "| Priority | Application | Entry | Collection | ID | Title | Status | Owner |",
-    "|---|---|---|---|---|---|---|---|",
+    "| 优先级 | 应用 | 数据集 | 编号 | 标题 | 状态 | 责任人 |",
+    "|---|---|---|---|---|---|---|",
     ...actionRows,
     ""
   ].join("\n");

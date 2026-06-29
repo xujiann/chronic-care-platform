@@ -52,7 +52,7 @@ function buildStaticDashboardSummary(state) {
       highRisks: 0,
       evidenceRecords: 0,
       status: records ? "modeled" : "empty-ready",
-      boundary: "Aggregated in the dashboard; detailed workflow remains in the source application."
+      boundary: "综合管理服务系统仅做汇总展示；具体业务流程仍在源应用办理。"
     };
   });
   const evidence = Array.isArray(state.platformEvidence) ? state.platformEvidence : [];
@@ -302,10 +302,10 @@ function buildStaticSiteEvidencePackage(state, context = {}) {
   const siteDependencies = context.siteDependencies || [];
   const evidenceRecords = evidence.reduce((sum, item) => sum + (Array.isArray(item.records) ? item.records.length : 0), 0);
   const fallback = [
-    { id: "summary-json", type: "发布摘要", evidence: "release/health-dashboard-summary.json", owner: "规划信息处", status: "ready", nextAction: "随 release:report 归档。" },
-    { id: "interface-messages", type: "接口报文", evidence: `${interfaces.length} platformInterfaces`, owner: "接口联调组", status: interfaces.length >= 4 ? "ready" : "watch", nextAction: "生产联调时替换为真实请求、响应和签名样例。" },
-    { id: "acceptance-records", type: "验收记录", evidence: `${evidenceRecords} platformEvidence records`, owner: "项目办", status: evidenceRecords >= 2 ? "ready" : "watch", nextAction: "补充现场截图、签字单和复测结论。" },
-    { id: "site-signoff", type: "现场签字", evidence: `${siteDependencies.length} site dependencies`, owner: "各级卫生健康行政部门", status: siteDependencies.length > 0 ? "watch" : "ready", nextAction: "上线前完成身份、证照、统计、院内系统和灾备签字。" }
+    { id: "summary-json", type: "发布摘要", evidence: "综合管理服务系统摘要文件", owner: "规划信息处", status: "ready", nextAction: "随发布聚合报告归档。" },
+    { id: "interface-messages", type: "接口报文", evidence: `${interfaces.length} 条平台接口清单`, owner: "接口联调组", status: interfaces.length >= 4 ? "ready" : "watch", nextAction: "生产联调时替换为真实请求、响应和签名样例。" },
+    { id: "acceptance-records", type: "验收记录", evidence: `${evidenceRecords} 条平台验收证据`, owner: "项目办", status: evidenceRecords >= 2 ? "ready" : "watch", nextAction: "补充现场截图、签字单和复测结论。" },
+    { id: "site-signoff", type: "现场签字", evidence: `${siteDependencies.length} 项现场依赖`, owner: "各级卫生健康行政部门", status: siteDependencies.length > 0 ? "watch" : "ready", nextAction: "上线前完成身份、证照、统计、院内系统和灾备签字。" }
   ];
   const items = configured.length ? configured : fallback;
   return {
@@ -347,7 +347,7 @@ function buildDashboardDepartmentFunctionMatrix(context = {}) {
       id: "medical-administration",
       name: "医政医管处",
       level: "内部机构",
-      implemented: ["就诊、入院、出院、床位日报汇总", "转诊、远程会诊、医技互认和高风险 open action 归集", `${riskDrilldowns.summary?.items || 0}条风险下钻处置轨迹`],
+      implemented: ["就诊、入院、出院、床位日报汇总", "转诊、远程会诊、医技互认和高风险待办归集", `${riskDrilldowns.summary?.items || 0}条风险下钻处置轨迹`],
       nextPlan: "联调 HIS、EMR、LIS、PACS、床位、远程会诊和检查检验互认接口，补齐处置回写和复核签字。",
       evidence: "healthStatistics.dailyServiceReports/openActions/riskDrilldowns",
       status: riskDrilldowns.summary?.items ? "ready" : "watch"
@@ -468,7 +468,7 @@ function buildDashboardFunctionalReport(context) {
       id: "aggregate-entry",
       name: "前七应用汇总入口",
       status: applications.length === 7 ? "ready" : "watch",
-      evidence: `${applications.length} source applications, ${sourceRecords} source records`,
+      evidence: `${applications.length} 个源应用，${sourceRecords} 条源记录`,
       boundary: "只做跨应用总览与导航，不替代源应用业务办理。"
     },
     {
@@ -489,42 +489,42 @@ function buildDashboardFunctionalReport(context) {
       id: "risk-action-loop",
       name: "风险预警与任务闭环",
       status: openActions.length > 0 ? "watch" : "ready",
-      evidence: `${openActions.length} preview open actions, ${sourceOpenActions} source open actions, ${highRisks} high risks`,
+      evidence: `${openActions.length} 条预览待办，${sourceOpenActions} 条源应用待办，${highRisks} 条高风险`,
       boundary: "处置回写仍在源业务端完成。"
     },
     {
       id: "risk-drilldown-loop",
       name: "风险下钻与处置轨迹",
       status: riskDrilldowns.items?.length ? "ready" : "watch",
-      evidence: `${riskDrilldowns.summary?.items || 0} drilldowns, ${riskDrilldowns.summary?.withTrace || 0} with trace`,
+      evidence: `${riskDrilldowns.summary?.items || 0} 条下钻记录，${riskDrilldowns.summary?.withTrace || 0} 条已有轨迹`,
       boundary: "展示源应用链接、责任人、时限、状态和阻塞原因；不直接修改源业务记录。"
     },
     {
       id: "interface-evidence",
       name: "接口联调与验收证据",
       status: interfaces.length >= 4 && evidenceRecords >= 2 ? "ready" : "watch",
-      evidence: `${interfaces.length} interface tracks, ${evidenceRecords} evidence records`,
+      evidence: `${interfaces.length} 条接口轨道，${evidenceRecords} 条验收证据`,
       boundary: "复用平台接口和验收证据，不替代现场签字。"
     },
     {
       id: "policy-about",
       name: "政策说明与关于页",
       status: "ready",
-      evidence: "health-dashboard-about.html",
+      evidence: "系统说明页面",
       boundary: "说明政策依据、数据口径和现场切换条件。"
     },
     {
       id: "release-audit",
       name: "发布审计与验收报告",
       status: siteDependencies.length > 0 ? "watch" : "ready",
-      evidence: "health-dashboard:summary, release:report, deploy:check",
+      evidence: "综合管理服务系统摘要、发布聚合报告、部署门禁",
       boundary: "生产切换仍依赖现场签字和正式环境配置。"
     },
     {
       id: "site-evidence-package",
       name: "现场验收证据包",
       status: siteEvidencePackage.items?.length >= 4 ? "ready" : "watch",
-      evidence: `${siteEvidencePackage.summary?.artifacts || 0} artifacts, ${siteEvidencePackage.summary?.ready || 0} ready`,
+      evidence: `${siteEvidencePackage.summary?.artifacts || 0} 项材料，${siteEvidencePackage.summary?.ready || 0} 项已就绪`,
       boundary: "绑定接口报文、截图、签字单、整改、复测和上线批次材料。"
     }
   ];
@@ -599,7 +599,7 @@ function dashboardPeriodRange(anchor, periodId) {
   if (periodId === "week") start.setDate(start.getDate() - 6);
   if (periodId === "month") start.setDate(1);
   if (periodId === "year") start.setMonth(0, 1);
-  return `${formatDashboardDate(start)} to ${formatDashboardDate(anchor)}`;
+  return `${formatDashboardDate(start)} 至 ${formatDashboardDate(anchor)}`;
 }
 
 function renderDashboard(summary) {
@@ -621,6 +621,170 @@ function renderDashboard(summary) {
   renderFilterSummary(summary);
 }
 
+function dashboardStatusLabel(status) {
+  const key = String(status || "").toLowerCase();
+  const labels = {
+    ready: "已就绪",
+    watch: "需关注",
+    blocked: "受阻",
+    empty: "暂无数据",
+    "empty-ready": "待接入",
+    modeled: "已建模",
+    normal: "正常",
+    open: "待办",
+    pending: "待处理",
+    linked: "已关联",
+    received: "已回执",
+    partial: "部分回执",
+    missing: "缺少回执",
+    matched: "已对账",
+    "variance-review": "差异复核",
+    "owner-pending": "待明确责任人",
+    "due-pending": "待明确时限",
+    "daily-interface": "日报接口",
+    "monthly-snapshot": "月度快照",
+    planned: "计划中"
+  };
+  return labels[key] || status || "未标注";
+}
+
+function dashboardPriorityLabel(priority) {
+  const key = String(priority || "").toLowerCase();
+  return { high: "高", medium: "中", normal: "一般", low: "低" }[key] || priority || "一般";
+}
+
+function dashboardInterfacePriorityLabel(priority) {
+  return { P0: "一级", P1: "二级", P2: "三级" }[priority] || priority || "二级";
+}
+
+function dashboardSourceModeLabel(mode) {
+  const key = String(mode || "").toLowerCase();
+  return { api: "接口实时汇总", static: "静态快照", unknown: "来源未知" }[key] || mode || "来源未知";
+}
+
+function dashboardCollectionLabel(collection) {
+  const labels = {
+    followups: "随访任务",
+    careOrders: "照护服务工单",
+    medicationPickups: "取药预约",
+    insuranceClaims: "医保审核",
+    emergencySignals: "风险预警",
+    countyCollaborationOrders: "县域协同工单",
+    countyMutualRecognitionRecords: "检查检验互认",
+    countyAiDiagnosisCases: "人工智能辅助诊断",
+    chronicScreeningTasks: "慢病筛查任务",
+    chronicEducationPushes: "健康教育推送",
+    birthCertificates: "出生医学证明",
+    deathCertificates: "死亡医学证明",
+    platformInterfaces: "平台接口清单",
+    platformEvidence: "平台验收证据",
+    healthStatistics: "卫生统计",
+    "healthStatistics.dailyServiceReports": "卫生统计日报",
+    "healthStatistics.serviceReports": "卫生统计月报",
+    "healthStatistics.siteEvidencePackage": "卫生统计现场证据包",
+    "healthStatistics.certificateExchangeLinks": "卫生统计证照交换链路",
+    productionDeploymentPlan: "生产部署计划",
+    "release-governance": "发布治理",
+    "platform-ops": "平台运维",
+    "data-platform": "数据平台",
+    "identity-integration": "身份集成",
+    "security-admin": "安全管理员",
+    database: "数据库",
+    identity: "身份集成",
+    security: "安全审计"
+  };
+  return labels[collection] || dashboardTechnicalLabel(collection);
+}
+
+function dashboardDateLabel(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("zh-CN", { hour12: false });
+}
+
+function dashboardTechnicalLabel(text) {
+  return String(text || "")
+    .replace(/\/api\/health-dashboard\/summary/g, "综合管理服务系统摘要接口")
+    .replace(/release\/health-dashboard-summary\.json/g, "综合管理服务系统摘要文件")
+    .replace(/health-dashboard-about\.html/g, "系统说明页面")
+    .replace(/health-dashboard-applications\.js/g, "应用清单")
+    .replace(/healthDashboardSummary/g, "综合管理服务系统摘要")
+    .replace(/health-dashboard:summary/g, "综合管理服务系统摘要脚本")
+    .replace(/release:report/g, "发布聚合报告")
+    .replace(/release-report/g, "发布聚合报告")
+    .replace(/deploy:check/g, "部署门禁")
+    .replace(/npm\.cmd run /g, "运行脚本：")
+    .replace(/env:check:production/g, "生产环境检查")
+    .replace(/Run /g, "运行")
+    .replace(/site-specific \.env/g, "现场环境配置")
+    .replace(/site-specific env/g, "现场环境配置")
+    .replace(/before production cutover\.?/g, "后再生产切换")
+    .replace(/Implement PostgreSQL adapter behind the existing storage API and rehearse migration with masked data\.?/g, "在现有存储接口后接入正式数据库适配器，并使用脱敏数据演练迁移。")
+    .replace(/Map external identity claims to authUsers, authOrganizations, orgCode and role home pages\.?/g, "把外部身份字段映射到用户、机构、机构编码和角色首页。")
+    .replace(/Export hash-chain audit trails to production log retention infrastructure and attach assessment evidence\.?/g, "把哈希链审计日志导出到生产日志留存设施，并补充评估证据。")
+    .replace(/with /g, "包含")
+    .replace(/production cutover\.?/g, "生产切换")
+    .replace(/PostgreSQL/g, "正式数据库")
+    .replace(/API/g, "接口")
+    .replace(/source applications?/g, "源应用")
+    .replace(/source records?/g, "源记录")
+    .replace(/source open actions?/g, "源应用待办")
+    .replace(/preview open actions?/g, "预览待办")
+    .replace(/openActions/g, "待办")
+    .replace(/open actions?/g, "待办")
+    .replace(/high risks?/g, "高风险")
+    .replace(/riskDrilldowns/g, "风险下钻")
+    .replace(/certificateExchange/g, "证照交换")
+    .replace(/siteEvidencePackage/g, "现场证据包")
+    .replace(/dailyServiceReports/g, "日报服务量")
+    .replace(/birthCertificates/g, "出生医学证明")
+    .replace(/deathCertificates/g, "死亡医学证明")
+    .replace(/deathStatistics/g, "死亡统计")
+    .replace(/healthStatistics/g, "卫生统计")
+    .replace(/hospitalInteroperabilityFunctions/g, "医院互联互通能力清单")
+    .replace(/productionDeploymentPlan/g, "生产部署计划")
+    .replace(/signoff/g, "签字确认")
+    .replace(/drilldowns?/g, "下钻记录")
+    .replace(/with trace/g, "已有轨迹")
+    .replace(/periods/g, "周期")
+    .replace(/insights/g, "洞察")
+    .replace(/tracks/g, "链路")
+    .replace(/receipts/g, "回执")
+    .replace(/reconciled/g, "已对账")
+    .replace(/interface tracks?/g, "接口轨道")
+    .replace(/evidence records?/g, "验收证据")
+    .replace(/platformInterfaces/g, "平台接口清单")
+    .replace(/platformEvidence/g, "平台验收证据")
+    .replace(/site dependencies/g, "现场依赖")
+    .replace(/data-platform/g, "数据平台")
+    .replace(/platform-ops/g, "平台运维")
+    .replace(/identity-integration/g, "身份集成")
+    .replace(/security-admin/g, "安全管理员")
+    .replace(/database/g, "数据库")
+    .replace(/identity/g, "身份集成")
+    .replace(/security/g, "安全审计")
+    .replace(/adapter/g, "适配器")
+    .replace(/migration/g, "迁移")
+    .replace(/masked data/g, "脱敏数据")
+    .replace(/external/g, "外部")
+    .replace(/claims/g, "身份字段")
+    .replace(/authUsers/g, "用户")
+    .replace(/authOrganizations/g, "机构")
+    .replace(/orgCode/g, "机构编码")
+    .replace(/role home pages/g, "角色首页")
+    .replace(/hash-chain audit trails/g, "哈希链审计日志")
+    .replace(/log retention infrastructure/g, "日志留存设施")
+    .replace(/assessment evidence/g, "评估证据")
+    .replace(/artifacts/g, "材料")
+    .replace(/records/g, "记录")
+    .replace(/functions/g, "项功能")
+    .replace(/ready/g, "已就绪")
+    .replace(/watch/g, "需关注")
+    .replace(/blocked/g, "受阻")
+    .replace(/pending/g, "待处理");
+}
+
 function renderCertificateExchange(exchange) {
   const board = document.querySelector("#certificate-exchange-board");
   const summary = document.querySelector("#certificate-exchange-summary");
@@ -631,11 +795,11 @@ function renderCertificateExchange(exchange) {
   board.dataset.exchangeStatus = exchange.status || "empty";
   summary.textContent = `${counts.tracks || items.length} 条链路 / ${counts.receipts || 0} 回执 / ${counts.correctable || 0} 支持补正 / ${counts.reconciled || 0} 已对账`;
   cards.innerHTML = items.map((item) => `<article class="certificate-exchange-card ${item.status || "watch"}" data-certificate-exchange="${item.id}">
-    <span>${item.status || "watch"} / ${item.receiptStatus || "missing"}</span>
+    <span>${dashboardStatusLabel(item.status || "watch")} / ${dashboardStatusLabel(item.receiptStatus || "missing")}</span>
     <strong>${item.domain || item.id}</strong>
-    <small>${item.source || ""} -> ${item.target || ""}</small>
-    <p>${item.reconciliationStatus || "pending"} / ${item.owner || "owner-pending"}</p>
-    <p>${item.nextAction || ""}</p>
+    <small>${dashboardTechnicalLabel(item.source || "")} 至 ${dashboardTechnicalLabel(item.target || "")}</small>
+    <p>${dashboardStatusLabel(item.reconciliationStatus || "pending")} / ${dashboardStatusLabel(item.owner || "owner-pending")}</p>
+    <p>${dashboardTechnicalLabel(item.nextAction || "")}</p>
   </article>`).join("") || `<article class="certificate-exchange-card empty"><strong>等待证照交换链路</strong><p>现场补齐出生、死亡、电子证照、公安、民政、疾控和统计直报回执后显示。</p></article>`;
 }
 
@@ -649,13 +813,13 @@ function renderRiskDrilldowns(drilldowns) {
   section.dataset.drilldownStatus = drilldowns.status || "empty";
   summary.textContent = `${counts.items || items.length} 条下钻 / ${counts.high || 0} 高风险 / ${counts.withTrace || 0} 有轨迹`;
   list.innerHTML = items.map((item) => `<article class="drilldown-card ${item.priority || "normal"}" data-risk-drilldown="${item.sourceActionId || item.id}">
-    <span>${item.priority || "normal"} / ${item.status || "open"}</span>
-    <strong>${item.title || item.id}</strong>
-    <small>${item.application || ""} / ${item.collection || ""}</small>
-    <p>${item.owner || "owner-pending"} / ${item.dueAt || "due-pending"}</p>
+    <span>${dashboardPriorityLabel(item.priority || "normal")} / ${dashboardStatusLabel(item.status || "open")}</span>
+    <strong>${dashboardCollectionLabel(item.title || item.id)}</strong>
+    <small>${item.application || ""} / ${dashboardCollectionLabel(item.collection || "")}</small>
+    <p>${dashboardStatusLabel(item.owner || "owner-pending")} / ${dashboardStatusLabel(item.dueAt || "due-pending")}</p>
     <p>${item.blocker || ""}</p>
     ${item.entry ? `<a href="./${item.entry}">源应用</a>` : ""}
-  </article>`).join("") || `<article class="drilldown-card empty"><strong>等待风险下钻</strong><p>源应用产生 open action 后显示责任人、时限、轨迹和阻塞原因。</p></article>`;
+  </article>`).join("") || `<article class="drilldown-card empty"><strong>等待风险下钻</strong><p>源应用产生待办后显示责任人、时限、轨迹和阻塞原因。</p></article>`;
 }
 
 function renderSiteEvidencePackage(packageData) {
@@ -666,13 +830,13 @@ function renderSiteEvidencePackage(packageData) {
   const items = Array.isArray(packageData.items) ? packageData.items : [];
   const counts = packageData.summary || {};
   section.dataset.evidenceStatus = packageData.status || "empty";
-  summary.textContent = `${counts.artifacts || items.length} 项材料 / ${counts.ready || 0} ready / ${counts.watch || 0} watch`;
+  summary.textContent = `${counts.artifacts || items.length} 项材料 / ${counts.ready || 0} 已就绪 / ${counts.watch || 0} 需关注`;
   list.innerHTML = items.map((item) => `<article class="site-evidence-card ${item.status || "watch"}" data-site-evidence="${item.id}">
-    <span>${item.status || "watch"}</span>
+    <span>${dashboardStatusLabel(item.status || "watch")}</span>
     <strong>${item.type || item.id}</strong>
-    <small>${item.evidence || ""}</small>
-    <p>${item.owner || "owner-pending"}</p>
-    <p>${item.nextAction || ""}</p>
+    <small>${dashboardTechnicalLabel(item.evidence || "")}</small>
+    <p>${dashboardStatusLabel(item.owner || "owner-pending")}</p>
+    <p>${dashboardTechnicalLabel(item.nextAction || "")}</p>
   </article>`).join("") || `<article class="site-evidence-card empty"><strong>等待现场验收证据</strong><p>接口报文、截图、签字单、整改和复测结论归档后显示。</p></article>`;
 }
 
@@ -683,8 +847,8 @@ function renderDataState(summary) {
     state.dataset.sourceMode = summary.sourceMode || "unknown";
     state.dataset.sourceReason = summary.sourceReason || "";
     state.textContent = summary.sourceMode === "api"
-      ? `${summary.sourceLabel || "管理端动态汇总"} / ${summary.generatedAt || ""}`
-      : `${summary.sourceLabel || "静态快照兜底"} / ${summary.sourceReason || "本地数据"}`;
+      ? `${summary.sourceLabel || "管理端动态汇总"} / ${dashboardDateLabel(summary.generatedAt)}`
+      : `${dashboardSourceModeLabel(summary.sourceMode)} / ${summary.sourceReason || "本地数据"}`;
   }
   if (boundary) {
     boundary.textContent = summary.scope?.rule || "综合管理服务系统只汇总源应用，不替代源业务办理。";
@@ -695,14 +859,14 @@ function renderMetrics(summary) {
   const totals = summary.totals || {};
   document.querySelector("#dashboard-metrics").innerHTML = [
     ["应用入口", totals.applications || 0, "前 7 个应用汇总"],
-    ["源记录", totals.sourceRecords || 0, "来自 data/db.json 与业务 API"],
+    ["源记录", totals.sourceRecords || 0, "来自演示数据快照与业务接口"],
     ["源待办", totals.sourceOpenActions ?? totals.openActions ?? 0, "源应用全部待闭环"],
     ["预览待办", totals.previewOpenActions ?? totals.openActions ?? 0, "驾驶舱优先展示"],
     ["高风险", totals.highRisks || 0, "状态/优先级归一化"],
-    ["接口轨道", totals.interfaceTracks || 0, "platformInterfaces"],
-    ["验收证据", totals.evidenceRecords || 0, "platformEvidence records"],
+    ["接口轨道", totals.interfaceTracks || 0, "平台接口清单"],
+    ["验收证据", totals.evidenceRecords || 0, "平台验收证据"],
     ["现场依赖", totals.siteDependencies || 0, "生产切换签字项"],
-    ["就绪状态", summary.ok ? "OK" : "Check", summary.generatedAt || ""]
+    ["就绪状态", summary.ok ? "通过" : "待核验", dashboardDateLabel(summary.generatedAt)]
   ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><small>${hint}</small></article>`).join("");
 }
 
@@ -713,18 +877,18 @@ function renderFunctionReport(report) {
   const rows = Array.isArray(report.functions) ? report.functions : [];
   const evidenceRows = Array.isArray(report.releaseEvidence) ? report.releaseEvidence : [];
   if (summary) {
-    summary.textContent = `${report.summary?.functions || rows.length} functions / ${report.summary?.ready || 0} ready / ${report.summary?.watch || 0} watch`;
+    summary.textContent = `${report.summary?.functions || rows.length} 项功能 / ${report.summary?.ready || 0} 已就绪 / ${report.summary?.watch || 0} 需关注`;
   }
   if (list) {
     list.innerHTML = rows.map((item) => `<article class="function-report-card ${item.status || "normal"}" data-function-report="${item.id}">
-      <span>${item.status || "ready"}</span>
+      <span>${dashboardStatusLabel(item.status || "ready")}</span>
       <strong>${item.name || item.id}</strong>
-      <small>${item.evidence || ""}</small>
+      <small>${dashboardTechnicalLabel(item.evidence || "")}</small>
       <p>${item.boundary || ""}</p>
     </article>`).join("") || `<article class="function-report-card empty"><strong>等待功能报告</strong><p>摘要接口返回后生成本模块主要功能报告。</p></article>`;
   }
   if (evidence) {
-    evidence.innerHTML = evidenceRows.map((item) => `<span data-function-evidence="${item.id}">${item.name || item.id}: ${item.evidence || ""}</span>`).join("");
+    evidence.innerHTML = evidenceRows.map((item) => `<span data-function-evidence="${item.id}">${item.name || item.id}：${dashboardTechnicalLabel(item.evidence || "")}</span>`).join("");
   }
 }
 
@@ -799,14 +963,14 @@ function formatDashboardNumber(value) {
 
 function renderApplications(applications) {
   document.querySelector("#dashboard-applications").innerHTML = `<table>
-    <thead><tr><th>应用</th><th>入口</th><th>源记录</th><th>Open actions</th><th>高风险</th><th>状态</th></tr></thead>
+    <thead><tr><th>应用</th><th>入口</th><th>源记录</th><th>待办</th><th>高风险</th><th>状态</th></tr></thead>
     <tbody>${applications.map((item) => `<tr>
       <td>${item.name}</td>
-      <td><a href="./${item.entry}">${item.entry}</a></td>
+      <td><a href="./${item.entry}">进入应用</a></td>
       <td>${item.records}</td>
       <td>${item.openActions}</td>
       <td>${item.highRisks}</td>
-      <td><span class="badge ${item.status === "modeled" ? "info" : "warn"}">${item.status}</span></td>
+      <td><span class="badge ${item.status === "modeled" ? "info" : "warn"}">${dashboardStatusLabel(item.status)}</span></td>
     </tr>`).join("")}</tbody>
   </table>`;
 }
@@ -814,8 +978,8 @@ function renderApplications(applications) {
 function renderRisks(risks) {
   document.querySelector("#dashboard-risks").innerHTML = risks.map((item) => `<div>
     <strong>${item.application}</strong>
-    <span>${item.highRisks} high / ${item.openActions} open</span>
-    <small>${item.nextAction}</small>
+    <span>${item.highRisks} 高风险 / ${item.openActions} 待办</span>
+    <small>${dashboardTechnicalLabel(item.nextAction)}</small>
   </div>`).join("") || `<div><strong>暂无高风险汇总</strong><span>等待源应用产生风险或现场联调数据。</span></div>`;
 }
 
@@ -823,15 +987,15 @@ function renderActions(actions) {
   document.querySelector("#dashboard-actions").innerHTML = actions.map((item, index) => `<article class="priority-row">
     <div class="priority-rank ${item.priority === "high" ? "danger" : item.priority === "medium" ? "warn" : "info"}">${index + 1}</div>
     <div>
-      <h3>${item.title}</h3>
-      <p>${item.application || item.collection} / ${item.collection} / ${item.status}</p>
+      <h3>${dashboardCollectionLabel(item.title || item.id)}</h3>
+      <p>${item.application || dashboardCollectionLabel(item.collection)} / ${dashboardCollectionLabel(item.collection)} / ${dashboardStatusLabel(item.status)}</p>
     </div>
     <div class="capability-side">
-      <span class="badge ${item.priority === "high" ? "danger" : item.priority === "medium" ? "warn" : "info"}">${item.priority}</span>
+      <span class="badge ${item.priority === "high" ? "danger" : item.priority === "medium" ? "warn" : "info"}">${dashboardPriorityLabel(item.priority)}</span>
       ${item.entry ? `<a href="./${item.entry}">源应用</a>` : ""}
-      <small>${item.owner || "owner-pending"}</small>
+      <small>${dashboardStatusLabel(item.owner || "owner-pending")}</small>
     </div>
-  </article>`).join("") || `<article class="priority-row"><div class="priority-rank info">0</div><div><h3>暂无跨应用待办</h3><p>源应用 open action 完成后这里会归零。</p></div></article>`;
+  </article>`).join("") || `<article class="priority-row"><div class="priority-rank info">0</div><div><h3>暂无跨应用待办</h3><p>源应用待办完成后这里会归零。</p></div></article>`;
 }
 
 function bindDashboardFilters() {
@@ -904,31 +1068,31 @@ function renderFilterSummary(summary) {
   const count = filteredDashboardActions(summary).length;
   document.querySelector("#dashboard-filter-summary").textContent = [
     app?.name || "全部应用",
-    filters.priority || "全部优先级",
-    `${count} open actions`
+    filters.priority ? dashboardPriorityLabel(filters.priority) : "全部优先级",
+    `${count} 条待办`
   ].join(" / ");
 }
 
 function renderDependencies(items) {
   document.querySelector("#dashboard-dependencies").innerHTML = items.map((item) => `<div>
-    <strong>${item.track || item.id}</strong>
-    <span>${item.status || "pending"} / ${item.owner || "owner-pending"}</span>
-    <small>${item.nextAction || ""}</small>
+    <strong>${dashboardCollectionLabel(item.track || item.id)}</strong>
+    <span>${dashboardStatusLabel(item.status || "pending")} / ${dashboardCollectionLabel(item.owner || "owner-pending")}</span>
+    <small>${dashboardTechnicalLabel(item.nextAction || "")}</small>
   </div>`).join("") || `<div><strong>暂无现场依赖</strong><span>生产签字项尚未进入快照。</span></div>`;
 }
 
 function renderInterfaces(items) {
   document.querySelector("#dashboard-interfaces").innerHTML = items.slice(0, 8).map((item) => `<div>
     <strong>${item.domain || item.id}</strong>
-    <span>${item.priority || "P2"} / ${item.status || "pending"}</span>
+    <span>${dashboardInterfacePriorityLabel(item.priority)} / ${dashboardStatusLabel(item.status || "pending")}</span>
     <small>${item.nextAction || ""}</small>
-  </div>`).join("") || `<div><strong>暂无接口轨道</strong><span>等待 platformInterfaces 数据。</span></div>`;
+  </div>`).join("") || `<div><strong>暂无接口轨道</strong><span>等待平台接口清单数据。</span></div>`;
 }
 
 function renderEvidence(items) {
   document.querySelector("#dashboard-evidence").innerHTML = items.slice(0, 8).map((item) => `<div>
     <strong>${item.name || item.id}</strong>
-    <span>${item.status || "pending"} / ${item.records || 0} records</span>
+    <span>${dashboardStatusLabel(item.status || "pending")} / ${item.records || 0} 条记录</span>
     <small>${item.owner || ""}</small>
   </div>`).join("") || `<div><strong>暂无验收证据</strong><span>等待平台证据归档。</span></div>`;
 }
