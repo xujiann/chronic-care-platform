@@ -6,6 +6,7 @@ const { buildProcessAuditReport } = require("./scripts/process-audit");
 const { buildSiteReadinessPack, renderTemplateReadmes } = require("./scripts/site-readiness-pack");
 const { buildReleaseReport, buildServiceAcceptanceSummary } = require("./scripts/release-report");
 const { buildReleaseArtifactManifest } = require("./scripts/release-artifact-manifest");
+const { buildChronicInstitutionInterfaceReport } = require("./scripts/chronic-institution-interfaces");
 
 const PORT = Number(process.env.PORT || 5173);
 const ROOT = __dirname;
@@ -6567,6 +6568,13 @@ async function handleApi(req, res) {
       return;
     }
     sendJson(res, 200, redactSensitiveResponse(buildChronicFollowupSummary(data, user, residentId), user));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/chronic/institution-interfaces") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/chronic/institution-interfaces");
+    if (!user) return;
+    sendJson(res, 200, buildChronicInstitutionInterfaceReport({ data: readDatabase() }));
     return;
   }
 

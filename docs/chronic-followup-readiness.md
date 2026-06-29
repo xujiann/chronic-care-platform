@@ -10,6 +10,8 @@ Resident experience now includes self-monitoring upload, medication check-in, sa
 
 Field integration now covers device measurement ingestion, pharmacy pickup callbacks, family doctor closure actions, and senior reminder outreach evidence.
 
+Institution interface details are maintained in `docs/chronic-institution-interfaces.md` and checked by `npm run chronic:institution-interfaces`.
+
 ## Policy Basis
 
 - 《关于加强基层慢性病健康管理服务的指导意见》（国卫基层发〔2025〕15号）要求强化基层慢病健康管理服务，覆盖家庭医生签约、分类分级管理、随访健康指导、自我健康管理、用药保障、医保协同和质量控制。
@@ -71,3 +73,5 @@ Run `npm run chronic:followup-readiness` to generate:
 `release:report` gates `chronicFollowup:residentExperience`, requiring self-monitoring, satisfaction, family proxy, and senior reminder evidence to remain in the release package.
 
 `release:report` gates `chronicFollowup:fieldIntegration`, requiring device measurement, pharmacy callback, family doctor closure, and reminder outreach evidence before publication.
+
+`release:report` gates `chronicFollowup:institutionInterfaces`, requiring the institution interface specification, runtime routes, API tests, and launch evidence to stay aligned.

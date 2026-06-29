@@ -4,6 +4,7 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { buildAuditRetentionReport, renderMarkdown: renderAuditRetentionMarkdown } = require("./audit-retention");
 const { buildChronicFollowupReadinessReport, renderMarkdown: renderChronicFollowupMarkdown } = require("./chronic-followup-readiness");
+const { buildChronicInstitutionInterfaceReport, renderMarkdown: renderChronicInstitutionInterfaceMarkdown } = require("./chronic-institution-interfaces");
 const { buildDataQualityReport, renderMarkdown: renderDataQualityMarkdown } = require("./data-quality-report");
 const { buildEvaluationEvidenceReport, renderMarkdown: renderEvaluationEvidenceMarkdown } = require("./evaluation-evidence");
 const { buildEnvironmentMatrixReport, renderMarkdown: renderEnvironmentMatrixMarkdown } = require("./environment-matrix");
@@ -272,7 +273,7 @@ function auditRetentionChecks(auditRetention) {
   ];
 }
 
-function chronicFollowupChecks(chronicFollowup) {
+function chronicFollowupChecks(chronicFollowup, chronicInstitutionInterfaces) {
   return [
     check("chronicFollowup:readiness", chronicFollowup.ok, chronicFollowup.ok ? "chronic follow-up readiness checks passed" : "chronic follow-up readiness checks failed", "error", "chronic-followup"),
     check("chronicFollowup:boundaries", chronicFollowup.summary?.passed === chronicFollowup.summary?.boundaries, `${chronicFollowup.summary?.passed || 0}/${chronicFollowup.summary?.boundaries || 0} boundaries`, "error", "chronic-followup"),
@@ -280,6 +281,7 @@ function chronicFollowupChecks(chronicFollowup) {
     check("chronicFollowup:alertQueue", chronicFollowup.summary?.alerts >= 1 && chronicFollowup.summary?.highPriorityAlerts >= 1, `${chronicFollowup.summary?.alerts || 0} alerts; high=${chronicFollowup.summary?.highPriorityAlerts || 0}`, "error", "chronic-followup"),
     check("chronicFollowup:residentExperience", chronicFollowup.summary?.selfMonitoringRecords >= 1 && chronicFollowup.summary?.satisfactionRecords >= 1 && chronicFollowup.summary?.familyProxyRecords >= 1, `${chronicFollowup.summary?.residentExperienceItems || 0} resident experience evidence items`, "error", "chronic-followup"),
     check("chronicFollowup:fieldIntegration", chronicFollowup.summary?.deviceMeasurementRecords >= 1 && chronicFollowup.summary?.pharmacyCallbackRecords >= 1 && chronicFollowup.summary?.familyDoctorClosureRecords >= 1 && chronicFollowup.summary?.reminderOutreachRecords >= 1, `${chronicFollowup.summary?.fieldIntegrationItems || 0} field integration evidence items`, "error", "chronic-followup"),
+    check("chronicFollowup:institutionInterfaces", chronicInstitutionInterfaces?.ok && chronicInstitutionInterfaces.summary?.readyContracts === chronicInstitutionInterfaces.summary?.contracts, `${chronicInstitutionInterfaces?.summary?.readyContracts || 0}/${chronicInstitutionInterfaces?.summary?.contracts || 0} institution contracts`, "error", "chronic-followup"),
     check("chronicFollowup:feedback", chronicFollowup.summary?.feedbackRecords >= 1, `${chronicFollowup.summary?.feedbackRecords || 0} feedback records`, "error", "chronic-followup"),
     check("chronicFollowup:notifications", chronicFollowup.summary?.notificationMessages >= 1, `${chronicFollowup.summary?.notificationMessages || 0} notification messages`, "error", "chronic-followup")
   ];
@@ -528,6 +530,7 @@ function buildReleaseReport(options = {}) {
   const identityContract = buildIdentityContract({ data });
   const auditRetention = buildAuditRetentionReport({ data, env: options.env || process.env });
   const chronicFollowup = buildChronicFollowupReadinessReport({ data });
+  const chronicInstitutionInterfaces = buildChronicInstitutionInterfaceReport({ data, pkg });
   const dataQuality = buildDataQualityReport({ data });
   const integrationReadiness = buildIntegrationReadinessReport({ data });
   const interfaceMapping = buildInterfaceMappingReport({ data, pkg });
@@ -551,7 +554,7 @@ function buildReleaseReport(options = {}) {
     ...storageModelChecks(storageModel),
     ...identityContractChecks(identityContract),
     ...auditRetentionChecks(auditRetention),
-    ...chronicFollowupChecks(chronicFollowup),
+    ...chronicFollowupChecks(chronicFollowup, chronicInstitutionInterfaces),
     ...dataQualityChecks(dataQuality),
     ...integrationReadinessChecks(integrationReadiness),
     ...interfaceMappingChecks(interfaceMapping),
@@ -586,6 +589,7 @@ function buildReleaseReport(options = {}) {
     identityContract,
     auditRetention,
     chronicFollowup,
+    chronicInstitutionInterfaces,
     dataQuality,
     integrationReadiness,
     interfaceMapping,
@@ -859,6 +863,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       chronicFollowup: report.chronicFollowup
     }, null, 2), "utf8");
+    const chronicInstitutionInterfacesJson = path.join(path.dirname(output), "chronic-institution-interfaces.json");
+    fs.writeFileSync(chronicInstitutionInterfacesJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      chronicInstitutionInterfaces: report.chronicInstitutionInterfaces
+    }, null, 2), "utf8");
     const dataQualityJson = path.join(path.dirname(output), "data-quality-report.json");
     fs.writeFileSync(dataQualityJson, JSON.stringify({
       project: report.project,
@@ -971,6 +983,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(auditMarkdown, renderAuditRetentionMarkdown(report.auditRetention), "utf8");
     const chronicFollowupMarkdown = path.join(path.dirname(markdown), "chronic-followup-readiness-report.md");
     fs.writeFileSync(chronicFollowupMarkdown, renderChronicFollowupMarkdown(report.chronicFollowup), "utf8");
+    const chronicInstitutionInterfacesMarkdown = path.join(path.dirname(markdown), "chronic-institution-interfaces.md");
+    fs.writeFileSync(chronicInstitutionInterfacesMarkdown, renderChronicInstitutionInterfaceMarkdown(report.chronicInstitutionInterfaces), "utf8");
     const dataQualityMarkdown = path.join(path.dirname(markdown), "data-quality-report.md");
     fs.writeFileSync(dataQualityMarkdown, renderDataQualityMarkdown(report.dataQuality), "utf8");
     const integrationMarkdown = path.join(path.dirname(markdown), "integration-readiness-report.md");

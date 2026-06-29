@@ -733,6 +733,12 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(chronicFollowupSummary.body.policyAlignment.some((item) => item.id === "policy-feedback-dispatch" && item.covered), true);
     assert.equal(chronicFollowupSummary.body.residents.some((item) => item.residentId === "r1" && item.medicationAdherence.total >= 1), true);
 
+    const chronicInstitutionInterfaces = await api(baseUrl, "/api/chronic/institution-interfaces", authorized(commissionToken));
+    assert.equal(chronicInstitutionInterfaces.response.status, 200);
+    assert.equal(chronicInstitutionInterfaces.body.ok, true);
+    assert.equal(chronicInstitutionInterfaces.body.summary.readyContracts, 8);
+    assert.equal(chronicInstitutionInterfaces.body.contracts.some((item) => item.path === "/api/chronic/pharmacy-callbacks" && item.ready), true);
+
     const citizenFollowupSummary = await api(baseUrl, "/api/chronic/followup-summary?residentId=r1", authorized(citizen.body.token));
     assert.equal(citizenFollowupSummary.response.status, 200);
     assert.equal(citizenFollowupSummary.body.residents.every((item) => ["r1"].includes(item.residentId)), true);
