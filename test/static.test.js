@@ -663,7 +663,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /URLSearchParams\(location\.search\)/);
   assert.match(mobilePreviewHtml, /previewParams\.get\("client"\)/);
   assert.match(mobilePreviewHtml, /setPreviewClient\(activePreviewClient, \{ syncUrl: false \}\)/);
-  assert.match(mobilePreviewHtml, /internet-nursing\.html\?preview=mobile-nursing/);
+  assert.doesNotMatch(mobilePreviewHtml, /internet-nursing\.html\?preview=mobile-nursing/);
   assert.match(mobilePreviewHtml, /client=\$\{activePreviewClient\}/);
   assert.match(mobilePreviewHtml, /page=\$\{service\}/);
   assert.match(mobilePreviewHtml, /data-preview-service="nursing"/);

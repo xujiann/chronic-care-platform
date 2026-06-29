@@ -103,10 +103,6 @@
         activePreviewService = service;
         serviceButtons.forEach((button) => button.classList.toggle("active", button.dataset.previewService === service));
         if (options.syncUrl !== false) syncPreviewUrl();
-        if (service === "nursing") {
-          frame.src = `./internet-nursing.html?preview=mobile-nursing&client=${activePreviewClient}`;
-          return;
-        }
         frame.src = citizenPreviewSrc(service);
       };
       const setPreviewClient = (client, options = {}) => {
