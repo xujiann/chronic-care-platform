@@ -212,7 +212,7 @@ function renderCountyTeleconsultationLoop(state) {
   const performanceEl = document.querySelector("#county-teleconsultation-performance");
   if (!countEl || !tableEl) return;
   const allRows = state.referralTeleconsultations || [];
-  countEl.textContent = `${rows.length}/${allRows.length} items`;
+  countEl.textContent = `${rows.length}/${allRows.length} 项`;
   if (performanceEl) {
     const reportReturned = rows.filter((item) => item.reportStatus === "returned" || item.status === "report-returned").length;
     const avgResponse = averagePerformance(rows, "responseHours");
@@ -251,6 +251,68 @@ function renderCountyTeleconsultationLoop(state) {
       </tr>`;
     }).join("")}</tbody>
   </table>`;
+}
+
+function renderCountyTeleconsultationLoop(state) {
+  const rows = filterCountyTeleconsultations(state.referralTeleconsultations || []);
+  const countEl = document.querySelector("#county-teleconsultation-count");
+  const tableEl = document.querySelector("#county-teleconsultation-loop");
+  const performanceEl = document.querySelector("#county-teleconsultation-performance");
+  if (!countEl || !tableEl) return;
+  const allRows = state.referralTeleconsultations || [];
+  countEl.textContent = `${rows.length}/${allRows.length} items`;
+  if (performanceEl) {
+    const reportReturned = rows.filter((item) => item.reportStatus === "returned" || item.status === "report-returned").length;
+    const avgResponse = averagePerformance(rows, "responseHours");
+    const avgReportReturn = averagePerformance(rows, "reportReturnHours");
+    const escalations = buildReferralTeleconsultationEscalations(rows);
+    performanceEl.innerHTML = [
+      ["报告回传", `${reportReturned}/${rows.length || 0}`, rows.length ? `${Math.round((reportReturned / rows.length) * 100)}% 回传率` : "暂无筛选记录"],
+      ["平均响应", Number.isFinite(avgResponse) ? `${avgResponse.toFixed(1)}h` : "-", "接诊反馈时效"],
+      ["平均回传", Number.isFinite(avgReportReturn) ? `${avgReportReturn.toFixed(1)}h` : "-", "报告回调时效"],
+      ["SLA risks", `${escalations.length}`, `${escalations.filter((item) => item.severity === "high").length} 个高风险待跟进`],
+      ["已确认", allRows.filter((item) => item.slaDisposition?.status && item.slaDisposition.status !== "pending-ack").length, "机构或医共体 SLA 处置记录"],
+      ["高优先级", rows.filter((item) => item.priority === "high").length, "医共体跟进队列"]
+    ].map(([label, value, hint]) => `<article class="claim-card"><strong>${label}</strong><span>${value}<br>${hint}</span></article>`).join("");
+  }
+  const escalationMap = new Map(buildReferralTeleconsultationEscalations(rows).map((item) => [item.teleconsultationId, item]));
+  tableEl.innerHTML = `<table>
+    <thead><tr><th>居民</th><th>路径</th><th>临床问题</th><th>状态</th><th>绩效</th><th>SLA</th><th>督办</th><th>报告</th><th>操作</th></tr></thead>
+    <tbody>${rows.map((item) => {
+      const resident = residentOf(state, item.residentId);
+      const responseHours = Number(item.performance?.responseHours);
+      const reportReturnHours = Number(item.performance?.reportReturnHours);
+      const escalation = escalationMap.get(item.id);
+      const reminderSent = escalation && hasReferralEscalationReminder(state, item.id, escalation.severity);
+      return `<tr>
+        <td>${resident?.name || item.residentId || "未知居民"}</td>
+        <td>${item.sourceInstitution || "-"} -> ${item.targetInstitution || "-"}<br><small>${item.department || item.type || ""}</small></td>
+        <td>${item.clinicalQuestion || item.receivingFeedback || item.reportSummary || "-"}</td>
+        <td><span class="badge ${item.priority === "high" ? "danger" : "info"}">${countyTeleconsultationStatusLabel(item.status)}</span></td>
+        <td>响应 ${Number.isFinite(responseHours) ? `${responseHours}h` : "-"}<br><small>报告 ${Number.isFinite(reportReturnHours) ? `${reportReturnHours}h` : "-"} · ${item.performance?.insurancePaymentPath || "支付路径待确认"}</small></td>
+        <td>${escalation ? `<span class="badge ${escalation.severity === "high" ? "danger" : "warn"}">${escalation.severity}</span><br><small>${escalation.reasons.join("; ")}</small>` : `<span class="badge info">正常</span>`}</td>
+        <td>${item.countySupervision?.status || item.slaDisposition?.status || "待处置"}<br><small>${item.slaDisposition?.action || item.countySupervision?.reason || "-"}</small></td>
+        <td>${item.reportStatus || "待回传"}</td>
+        <td>
+          ${escalation ? countyEscalationButton(item.id, reminderSent ? "已提醒" : "发送 SLA 提醒", reminderSent) : ""}
+          ${item.slaDisposition?.status !== "closed" ? countySlaAckButton(item.id, item.slaDisposition?.status === "acknowledged" ? "关闭督办" : "确认督办") : ""}
+          ${countyActionButton("referralTeleconsultations", item.id, "医共体跟进", { status: "feedback-returned", receivingFeedback: "医共体办公室已跟进接诊反馈。" })}
+          ${countyActionButton("referralTeleconsultations", item.id, "确认回传", { status: "report-returned", reportStatus: "returned", reportSummary: "医共体办公室确认报告回传证据。" })}
+        </td>
+      </tr>`;
+    }).join("")}</tbody>
+  </table>`;
+}
+
+function countyTeleconsultationStatusLabel(status) {
+  return {
+    requested: "已申请",
+    accepted: "已接诊",
+    scheduled: "已排期",
+    "feedback-returned": "已反馈",
+    "report-returned": "报告已回传",
+    closed: "已闭环"
+  }[status] || status || "待处理";
 }
 
 function filterCountyTeleconsultations(rows) {
@@ -317,6 +379,13 @@ function bindCountyActions() {
       renderCountyTeleconsultationLoop(platformState);
       return;
     }
+    const ackButton = event.target.closest("[data-county-sla-ack]");
+    if (ackButton && platformState) {
+      ackButton.disabled = true;
+      await acknowledgeCountySla(platformState, ackButton.dataset.id, ackButton.dataset.mode || "acknowledged");
+      renderCountyTeleconsultationLoop(platformState);
+      return;
+    }
     const button = event.target.closest("[data-county-action]");
     if (!button || !platformState) return;
     const updates = JSON.parse(button.dataset.updates || "{}");
@@ -377,12 +446,55 @@ function hasReferralEscalationReminder(state, id, severity) {
   );
 }
 
+async function acknowledgeCountySla(state, id, mode) {
+  const status = mode === "closed" ? "closed" : "acknowledged";
+  const action = status === "closed"
+    ? "County office closed SLA supervision after report evidence review."
+    : "County office acknowledged SLA supervision and assigned institution follow-up.";
+  if (API_BASE) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/referral-teleconsultations/${encodeURIComponent(id)}/escalations/ack`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, action })
+      });
+      if (response.ok) {
+        const payload = await response.json();
+        state.referralTeleconsultations = (state.referralTeleconsultations || []).map((item) => item.id === id ? payload.teleconsultation : item);
+        state.taskMessages = [
+          ...(payload.messages || []),
+          ...(state.taskMessages || []).filter((message) => !(message.collection === "referralTeleconsultations" && message.sourceId === id))
+        ].slice(0, 300);
+        return { ok: true };
+      }
+    } catch (error) {
+      // Static preview falls back to local acknowledgement below.
+    }
+  }
+  const now = new Date().toISOString();
+  state.referralTeleconsultations = (state.referralTeleconsultations || []).map((item) => item.id === id
+    ? {
+        ...item,
+        slaDisposition: { status, action, owner: "county-preview", updatedAt: now },
+        countySupervision: { ...(item.countySupervision || {}), status: status === "closed" ? "已闭环" : "已确认", action, updatedAt: now }
+      }
+    : item);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  return { ok: true };
+}
+
 function countyActionButton(collection, id, label, updates) {
   return `<button class="inline-action" type="button" data-county-action data-collection="${collection}" data-id="${id}" data-updates='${JSON.stringify(updates)}' data-note="${label}">${label}</button>`;
 }
 
 function countyEscalationButton(id, label, disabled = false) {
   return `<button class="inline-action" type="button" data-referral-escalation data-id="${id}" ${disabled ? "disabled" : ""}>${label}</button>`;
+}
+
+function countySlaAckButton(id, label) {
+  const mode = label.includes("Close") ? "closed" : "acknowledged";
+  return `<button class="inline-action" type="button" data-county-sla-ack data-id="${id}" data-mode="${mode}">${label}</button>`;
 }
 
 function residentOf(state, id) {

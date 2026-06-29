@@ -32,6 +32,14 @@ function renderAll(state) {
 
 function bindInstitutionActions() {
   document.addEventListener("click", async (event) => {
+    const ackButton = event.target.closest("[data-teleconsultation-ack]");
+    if (ackButton) {
+      ackButton.disabled = true;
+      const result = await acknowledgeTeleconsultationSla(platformState, ackButton.dataset.id);
+      ackButton.disabled = false;
+      if (result.ok) renderAll(platformState);
+      return;
+    }
     const button = event.target.closest("[data-workflow-action]");
     if (!button) return;
     const updates = JSON.parse(button.dataset.updates || "{}");
@@ -517,42 +525,102 @@ function renderTeleconsultationLoop(state) {
   const countEl = document.querySelector("#teleconsultation-count");
   const listEl = document.querySelector("#teleconsultation-loop");
   if (!countEl || !listEl) return;
-  countEl.textContent = `${rows.length} items`;
+  countEl.textContent = `${rows.length} 项`;
   listEl.innerHTML = rows.map((item) => {
     const resident = residentOf(state, item.residentId);
     const badge = item.priority === "high" ? "danger" : item.reportStatus === "returned" ? "info" : "warn";
-    return `<section class="item">
+    return `<section class="item teleconsultation-card">
       <div>
-        <h3>${resident?.name || "Unknown resident"} · ${item.department || item.diseaseType || "Teleconsultation"}</h3>
+        <h3>${resident?.name || "未知居民"} · ${item.department || item.diseaseType || "远程会诊"}</h3>
         <p>${item.sourceInstitution || "-"} -> ${item.targetInstitution || "-"} · ${item.meetingWindow || item.due || "-"}</p>
-        <p>${item.clinicalQuestion || item.receivingFeedback || item.reportSummary || "Pending clinical note"}</p>
-        <p>Authorization: ${item.authorizationStatus || "pending"} · Report: ${item.reportStatus || "pending"}</p>
+        <p>${item.clinicalQuestion || item.receivingFeedback || item.reportSummary || "待补充临床问题"}</p>
+        <div class="status-ribbon">
+          <span>授权：${item.authorizationStatus || "待确认"}</span>
+          <span>报告：${item.reportStatus || "待回传"}</span>
+          <span>SLA：${item.slaDisposition?.status || "pending-ack"}</span>
+          <span>支付：${item.performance?.insurancePaymentPath || "待确认"}</span>
+        </div>
+        <p>${item.slaDisposition?.action || item.countySupervision?.reason || "暂无医共体督办提醒"}</p>
         <form class="filter-grid teleconsultation-action-form" data-id="${item.id}">
-          <label>Status
+          <label>状态
             <select name="status">
-              ${["accepted", "feedback-returned", "report-returned", "closed"].map((status) => `<option value="${status}" ${item.status === status ? "selected" : ""}>${status}</option>`).join("")}
+              ${["accepted", "feedback-returned", "report-returned", "closed"].map((status) => `<option value="${status}" ${item.status === status ? "selected" : ""}>${teleconsultationStatusLabel(status)}</option>`).join("")}
             </select>
           </label>
-          <label>Receiving feedback
-            <input name="receivingFeedback" value="${item.receivingFeedback || ""}" placeholder="Receiving institution feedback" />
+          <label>接诊反馈
+            <input name="receivingFeedback" value="${item.receivingFeedback || ""}" placeholder="填写接诊机构反馈" />
           </label>
-          <label>Report summary
-            <input name="reportSummary" value="${item.reportSummary || ""}" placeholder="Returned report summary" />
+          <label>报告摘要
+            <input name="reportSummary" value="${item.reportSummary || ""}" placeholder="填写回传报告摘要" />
           </label>
-          <label>Audit note
-            <input name="note" value="Institution closed-loop update" />
+          <label>审计备注
+            <input name="note" value="机构端闭环更新" />
           </label>
-          <button class="inline-action" type="submit">Save feedback</button>
+          <button class="inline-action" type="submit">保存反馈</button>
         </form>
         <div class="action-row">
-          ${item.status === "requested" ? actionButton("referralTeleconsultations", item.id, "Accept", { status: "accepted", receivingFeedback: "Receiving institution accepted the teleconsultation." }, "Accept referral teleconsultation") : ""}
-          ${item.reportStatus !== "returned" ? actionButton("referralTeleconsultations", item.id, "Return report", { status: "report-returned", reportStatus: "returned", reportSummary: "Consultation report returned to the originating institution." }, "Return teleconsultation report") : ""}
-          ${item.status !== "closed" ? actionButton("referralTeleconsultations", item.id, "Close", { status: "closed" }, "Close referral teleconsultation loop") : ""}
+          ${item.reportStatus !== "returned" && item.slaDisposition?.status !== "acknowledged" ? teleconsultationAckButton(item.id) : ""}
+          ${item.status === "requested" ? actionButton("referralTeleconsultations", item.id, "接收会诊", { status: "accepted", receivingFeedback: "接诊机构已接收远程会诊。" }, "接收转诊会诊") : ""}
+          ${item.reportStatus !== "returned" ? actionButton("referralTeleconsultations", item.id, "回传报告", { status: "report-returned", reportStatus: "returned", reportSummary: "会诊报告已回传至申请机构。" }, "回传会诊报告") : ""}
+          ${item.status !== "closed" ? actionButton("referralTeleconsultations", item.id, "闭环", { status: "closed" }, "关闭转诊会诊闭环") : ""}
         </div>
       </div>
-      <span class="badge ${badge}">${item.status}</span>
+      <span class="badge ${badge}">${teleconsultationStatusLabel(item.status)}</span>
     </section>`;
-  }).join("") || `<p class="muted">No referral teleconsultation tasks.</p>`;
+  }).join("") || `<p class="muted">暂无转诊会诊任务。</p>`;
+}
+
+async function acknowledgeTeleconsultationSla(state, id) {
+  const action = "Institution acknowledged SLA reminder and started report callback reconciliation.";
+  if (institutionApiBase) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${institutionApiBase}/referral-teleconsultations/${encodeURIComponent(id)}/escalations/ack`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "acknowledged", action })
+      });
+      if (response.ok) {
+        const payload = await response.json();
+        state.referralTeleconsultations = (state.referralTeleconsultations || []).map((item) => item.id === id ? payload.teleconsultation : item);
+        state.taskMessages = [
+          ...(payload.messages || []),
+          ...(state.taskMessages || []).filter((message) => !(message.collection === "referralTeleconsultations" && message.sourceId === id))
+        ].slice(0, 300);
+        return { ok: true };
+      }
+    } catch (error) {
+      // Static preview falls back to local acknowledgement below.
+    }
+  }
+  const now = new Date().toISOString();
+  state.referralTeleconsultations = (state.referralTeleconsultations || []).map((item) => item.id === id
+    ? {
+        ...item,
+        slaDisposition: { status: "acknowledged", action, owner: "institution-preview", updatedAt: now },
+        countySupervision: { ...(item.countySupervision || {}), status: "已确认", action, updatedAt: now }
+      }
+    : item);
+  state.taskMessages = (state.taskMessages || []).map((message) => message.collection === "referralTeleconsultations" && message.sourceId === id && message.escalationKey
+    ? { ...message, status: "acknowledged", receipts: [{ at: now, by: "institution-preview", action }, ...(message.receipts || [])] }
+    : message);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  return { ok: true };
+}
+
+function teleconsultationAckButton(id) {
+  return `<button class="inline-action" type="button" data-teleconsultation-ack data-id="${id}">确认 SLA</button>`;
+}
+
+function teleconsultationStatusLabel(status) {
+  return {
+    requested: "已申请",
+    accepted: "已接诊",
+    scheduled: "已排期",
+    "feedback-returned": "已反馈",
+    "report-returned": "报告已回传",
+    closed: "已闭环"
+  }[status] || status || "待处理";
 }
 
 function renderReservedResources(state) {

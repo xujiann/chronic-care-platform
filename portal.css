@@ -313,6 +313,36 @@ h1 { margin-top: 4px; font-size: 28px; }
   color: var(--muted);
 }
 
+.workbench-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.workbench-strip div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fbfd;
+}
+
+.workbench-strip strong,
+.workbench-strip span {
+  display: block;
+}
+
+.workbench-strip span {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.compact-form {
+  margin-bottom: 14px;
+}
+
 .list {
   display: grid;
   gap: 10px;
@@ -337,6 +367,28 @@ h1 { margin-top: 4px; font-size: 28px; }
 .item p {
   color: var(--muted);
   line-height: 1.55;
+}
+
+.teleconsultation-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.status-ribbon {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.status-ribbon span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: #fff;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .standard-item {
@@ -988,6 +1040,7 @@ dialog::backdrop {
   .capability-row,
   .priority-row,
   .workflow-grid,
+  .workbench-strip,
   .evidence-grid,
   .filter-grid,
   .report-grid,

@@ -23,6 +23,10 @@ test("referral teleconsultation readiness validates closed-loop evidence", () =>
   assert.equal(report.summary.feedbackNotifications >= 1, true);
   assert.equal(report.summary.slaEscalations >= 1, true);
   assert.equal(report.summary.highRiskEscalations >= 1, true);
+  assert.equal(report.summary.slaMessages >= 1, true);
+  assert.equal(report.summary.acknowledgedEscalations >= 1, true);
+  assert.equal(report.summary.countySupervisionRows >= 2, true);
+  assert.equal(report.summary.insurancePerformanceRows >= 2, true);
   assert.equal(report.escalations.some((item) => item.teleconsultationId === "rtc-001" && item.severity === "high"), true);
   assert.equal(Number.isFinite(report.summary.avgResponseHours), true);
   assert.equal(Number.isFinite(report.summary.avgReportReturnHours), true);
@@ -35,6 +39,10 @@ test("referral teleconsultation readiness validates closed-loop evidence", () =>
   assert.equal(report.checks.some((item) => item.id === "referral:performance" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:slaEscalation" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:slaReminder" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "referral:slaAcknowledgement" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "referral:countySupervision" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "referral:jointTestPack" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "referral:insurancePerformancePolicy" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:frontend" && item.passed), true);
   assert.match(renderMarkdown(report), /Referral teleconsultation readiness report/);
 });
@@ -56,5 +64,8 @@ test("referral teleconsultation readiness writes release artifacts", (t) => {
   assert.match(md, /Feedback notifications/);
   assert.match(md, /SLA escalations/);
   assert.match(md, /High risk escalations/);
+  assert.match(md, /Acknowledged escalations/);
+  assert.match(md, /County supervision rows/);
+  assert.match(md, /Insurance performance rows/);
   assert.match(md, /Avg response hours/);
 });

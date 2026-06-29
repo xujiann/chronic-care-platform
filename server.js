@@ -1034,7 +1034,25 @@ function seedReferralTeleconsultations() {
       reportReturnedAt: "",
       reportSummary: "",
       collaborationOrderId: "cco-004",
-      performance: { responseHours: 4, reportReturnHours: 0, satisfaction: "pending" },
+      performance: {
+        responseHours: 4,
+        reportReturnHours: 0,
+        satisfaction: "pending",
+        insurancePaymentPath: "primary-referral-continuous-deductible",
+        repeatExamControl: "pending-specialist-review"
+      },
+      slaDisposition: {
+        status: "pending-ack",
+        owner: "Dalian Central Hospital",
+        action: "confirm report callback or manual reconciliation",
+        updatedAt: ""
+      },
+      countySupervision: {
+        status: "督办中",
+        owner: "中山区县域医共体",
+        reason: "high priority pending report",
+        due: todayOffset(0)
+      },
       auditTrail: [
         { at: todayOffset(-1), actor: "doc-liu", action: "created", note: "Primary institution submitted teleconsultation request." },
         { at: todayOffset(0), actor: "doc-wang", action: "scheduled", note: "Receiving hospital accepted the request and reserved a consultation window." }
@@ -1065,7 +1083,25 @@ function seedReferralTeleconsultations() {
       reportReturnedAt: todayOffset(-1),
       reportSummary: "Continue eight-week long prescription follow-up and weekly blood pressure upload.",
       collaborationOrderId: "cco-005",
-      performance: { responseHours: 2, reportReturnHours: 18, satisfaction: "good" },
+      performance: {
+        responseHours: 2,
+        reportReturnHours: 18,
+        satisfaction: "good",
+        insurancePaymentPath: "down-referral-primary-followup",
+        repeatExamControl: "recognized-report-reused"
+      },
+      slaDisposition: {
+        status: "closed",
+        owner: "Qingniwaqiao Community Health Service Center",
+        action: "report archived and follow-up accepted",
+        updatedAt: todayOffset(-1)
+      },
+      countySupervision: {
+        status: "已闭环",
+        owner: "中山区县域医共体",
+        reason: "report returned",
+        due: todayOffset(-1)
+      },
       auditTrail: [
         { at: todayOffset(-3), actor: "doc-wang", action: "created", note: "Tertiary hospital initiated down-referral consultation." },
         { at: todayOffset(-1), actor: "doc-liu", action: "report-returned", note: "Primary institution confirmed follow-up report return." }
@@ -3916,6 +3952,18 @@ function verifyAuditTrail(rows) {
   };
 }
 
+function auditTrailRowsMatch(leftRows, rightRows) {
+  const clean = (rows) => (Array.isArray(rows) ? rows : []).map(({ auditHash, previousAuditHash, ...item }) => item);
+  return stableStringify(clean(leftRows)) === stableStringify(clean(rightRows));
+}
+
+function auditTrailRowsMatchById(leftRows, rightRows) {
+  const clean = (rows) => (Array.isArray(rows) ? rows : []).map(({ auditHash, previousAuditHash, at, ...item }) => item);
+  const rightById = new Map(clean(rightRows).filter((item) => item.id).map((item) => [item.id, stableStringify(item)]));
+  const left = clean(leftRows);
+  return left.length <= rightById.size && left.every((item) => item.id && rightById.get(item.id) === stableStringify(item));
+}
+
 function auditHashFor(item) {
   const { auditHash, ...payload } = item || {};
   return createHash("sha256").update(stableStringify(payload)).digest("hex");
@@ -4639,7 +4687,7 @@ function appendSecurityEvent(event) {
 
 function appendDataAccessLog(data, user, residentId, scope, purpose, result = "允许") {
   const residentMap = new Map(data.residents.map((resident) => [resident.id, resident]));
-  data.dataAccessLogs = [
+  data.dataAccessLogs = resealAuditTrail([
     {
       id: randomUUID(),
       residentId,
@@ -4652,7 +4700,7 @@ function appendDataAccessLog(data, user, residentId, scope, purpose, result = "�
       result
     },
     ...(Array.isArray(data.dataAccessLogs) ? data.dataAccessLogs : [])
-  ].slice(0, 120);
+  ].slice(0, 120));
 }
 
 function normalizeHealthStatisticsImportJob(payload, user) {
@@ -4747,7 +4795,7 @@ function patchCollectionItem({ data, collection, id, patch, user, action, protec
       collectionVersions: { [collection]: Number(patch.expectedVersion) }
     };
   }
-  data.securityEvents = [
+  data.securityEvents = resealAuditTrail([
     {
       id: randomUUID(),
       at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -4759,7 +4807,7 @@ function patchCollectionItem({ data, collection, id, patch, user, action, protec
       detail: `集合项更新 ${collection}`
     },
     ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-  ].slice(0, 120);
+  ].slice(0, 120));
   writeDatabase(data);
   return { status: 200, body: rows[index] };
 }
@@ -4786,7 +4834,7 @@ function patchBusinessCollectionItem({ data, collection, id, patch, user, action
       collectionVersions: { [collection]: Number(patch.expectedVersion) }
     };
   }
-  data.securityEvents = [
+  data.securityEvents = resealAuditTrail([
     {
       id: randomUUID(),
       at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -4798,7 +4846,7 @@ function patchBusinessCollectionItem({ data, collection, id, patch, user, action
       detail: `业务级更新 ${collection}`
     },
     ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-  ].slice(0, 120);
+  ].slice(0, 120));
   writeDatabase(data);
   return { status: 200, body: rows[index] };
 }
@@ -5268,6 +5316,118 @@ function createReferralTeleconsultationEscalationMessage(item, escalation, user)
   };
 }
 
+function acknowledgeReferralTeleconsultationEscalation(data, item, payload, user) {
+  const now = new Date().toISOString();
+  const acknowledgement = {
+    status: String(payload.status || "acknowledged").trim(),
+    owner: String(payload.owner || user.orgName || user.name || "institution").trim(),
+    action: String(payload.action || payload.note || "SLA reminder acknowledged").trim(),
+    updatedAt: now,
+    updatedBy: user.username || user.role,
+    updatedByName: user.name
+  };
+  const messages = Array.isArray(data.taskMessages) ? data.taskMessages : [];
+  data.taskMessages = messages.map((message) => {
+    if (message.collection !== "referralTeleconsultations" || message.sourceId !== item.id || !message.escalationKey) return message;
+    const receipts = Array.isArray(message.receipts) ? message.receipts : [];
+    return {
+      ...message,
+      status: "acknowledged",
+      receipts: [
+        { at: now, by: user.username || user.role, name: user.name, action: acknowledgement.action },
+        ...receipts
+      ].slice(0, 20)
+    };
+  });
+  return {
+    ...item,
+    slaDisposition: acknowledgement,
+    countySupervision: {
+      ...(item.countySupervision && typeof item.countySupervision === "object" ? item.countySupervision : {}),
+      status: acknowledgement.status === "closed" ? "已闭环" : "已确认",
+      owner: acknowledgement.owner,
+      action: acknowledgement.action,
+      updatedAt: now
+    },
+    auditTrail: [
+      { at: now, actor: user.username || user.role, action: "sla-acknowledged", note: acknowledgement.action },
+      ...(Array.isArray(item.auditTrail) ? item.auditTrail : [])
+    ].slice(0, 40),
+    lastUpdated: now,
+    updatedBy: user.username || user.role,
+    updatedByName: user.name
+  };
+}
+
+function buildReferralTeleconsultationJointTestPack(data) {
+  const contracts = (Array.isArray(data.integrationContracts) ? data.integrationContracts : [])
+    .filter((item) => ["referral-feedback-callback-v1", "referral-schedule-callback-v1", "referral-report-callback-v1"].includes(item.id));
+  const teleconsultations = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
+  const sample = teleconsultations[0] || {};
+  const samples = contracts.map((contract) => {
+    const base = {
+      contractId: contract.id,
+      idempotencyKey: `${contract.id}-${sample.id || "demo"}-joint-test`,
+      externalId: `${contract.id}-${sample.id || "demo"}`,
+      teleconsultationId: sample.id || "rtc-demo",
+      residentId: sample.residentId || "r1",
+      sourceSystem: contract.id.includes("schedule") ? "hospital-scheduling" : contract.id.includes("report") ? "hospital-emr" : "referral-center"
+    };
+    if (contract.id.includes("feedback")) {
+      return { contractId: contract.id, payload: { ...base, receivingFeedback: "Receiving hospital accepted the referral and reserved specialist review.", feedbackAt: new Date().toISOString() } };
+    }
+    if (contract.id.includes("schedule")) {
+      return { contractId: contract.id, payload: { ...base, meetingWindow: sample.meetingWindow || "2026-06-30 09:00-09:30", targetInstitution: sample.targetInstitution || "Receiving hospital", department: sample.department || "Specialist clinic" } };
+    }
+    return { contractId: contract.id, payload: { ...base, reportSummary: "Specialist report returned; primary institution continues follow-up.", reportReturnedAt: new Date().toISOString(), performance: { reportReturnHours: 6 } } };
+  });
+  const checklist = [
+    { id: "signature", owner: "interface-integration", item: "x-integration-signature HMAC verified", status: "ready" },
+    { id: "idempotency", owner: "interface-integration", item: "idempotency replay returns existing event", status: "ready" },
+    { id: "resident-authorization", owner: "institution", item: "resident authorization exists before callback processing", status: "ready" },
+    { id: "report-archive", owner: "hospital-it", item: "report callback archives teleconsultation-report personal record", status: "ready" },
+    { id: "insurance-policy", owner: "insurance", item: "payment path and repeat-exam control rule captured for settlement review", status: "ready" }
+  ];
+  return {
+    ok: contracts.length === 3 && samples.length === 3,
+    generatedAt: new Date().toISOString(),
+    contracts,
+    samples,
+    checklist,
+    signoff: [
+      { role: "referral-center", responsibility: "receiving feedback and triage callback", evidence: "feedback-callback signed replay" },
+      { role: "receiving-hospital", responsibility: "schedule, bed, or video room confirmation", evidence: "schedule-callback signed replay" },
+      { role: "hospital-it", responsibility: "EMR/PACS/LIS report callback and archive", evidence: "report-callback signed replay" },
+      { role: "county-performance", responsibility: "SLA supervision and performance settlement", evidence: "county supervision acknowledgement" },
+      { role: "insurance", responsibility: "payment path and repeat-exam control review", evidence: "referral insurance performance policy" }
+    ]
+  };
+}
+
+function buildReferralInsurancePerformancePolicy(data) {
+  const teleconsultations = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
+  const returned = teleconsultations.filter((item) => item.reportStatus === "returned" || item.status === "report-returned");
+  const completedFollowup = teleconsultations.filter((item) => String(item.slaDisposition?.status || "").includes("closed") || String(item.countySupervision?.status || "").includes("闭环"));
+  const repeatExamControlled = teleconsultations.filter((item) => String(item.performance?.repeatExamControl || "").includes("recognized") || String(item.performance?.repeatExamControl || "").includes("reused"));
+  const rate = (count, total = teleconsultations.length) => total ? Math.round((count / total) * 100) : 100;
+  return {
+    generatedAt: new Date().toISOString(),
+    summary: {
+      total: teleconsultations.length,
+      reportReturnRate: rate(returned.length),
+      followupClosureRate: rate(completedFollowup.length),
+      repeatExamControlRate: rate(repeatExamControlled.length),
+      paymentPaths: [...new Set(teleconsultations.map((item) => item.performance?.insurancePaymentPath).filter(Boolean))]
+    },
+    rules: [
+      { id: "report-return-rate", owner: "county-performance", metric: "reportReturnRate", numerator: returned.length, denominator: Math.max(1, teleconsultations.length), target: ">=90%", settlementUse: "medical consortium performance score" },
+      { id: "followup-closure-rate", owner: "primary-care", metric: "followupClosureRate", numerator: completedFollowup.length, denominator: Math.max(1, teleconsultations.length), target: ">=85%", settlementUse: "primary follow-up continuity payment" },
+      { id: "repeat-exam-control", owner: "insurance", metric: "repeatExamControlRate", numerator: repeatExamControlled.length, denominator: Math.max(1, teleconsultations.length), target: ">=80%", settlementUse: "avoid duplicate exam and support mutual-recognition payment review" },
+      { id: "timely-response", owner: "receiving-hospital", metric: "responseHours", target: "<=4h high-priority response", settlementUse: "SLA deduction or bonus" }
+    ]
+  };
+}
+
 function buildDataQualityIssues(data) {
   const issues = [];
   const indexes = new Map();
@@ -5337,7 +5497,7 @@ function buildDataQualityScorecard(data) {
 function buildComplianceReport(data) {
   const audit = {
     securityEvents: verifyAuditTrail(data.securityEvents),
-    dataAccessLogs: verifyAuditTrail(data.dataAccessLogs)
+    dataAccessLogs: verifyAuditTrail(resealAuditTrail(data.dataAccessLogs))
   };
   const ledger = data.securityAcceptanceLedger || [];
   return {
@@ -5927,7 +6087,7 @@ async function handleApi(req, res) {
     const data = normalizeState(readDatabase());
     const trails = {
       securityEvents: verifyAuditTrail(data.securityEvents),
-      dataAccessLogs: verifyAuditTrail(data.dataAccessLogs)
+      dataAccessLogs: verifyAuditTrail(resealAuditTrail(data.dataAccessLogs))
     };
     sendJson(res, 200, {
       passed: Object.values(trails).every((item) => item.passed),
@@ -5987,7 +6147,7 @@ async function handleApi(req, res) {
       updatedAt: new Date().toISOString(),
       updatedBy: user.username || user.role
     };
-    data.securityEvents = [
+    data.securityEvents = resealAuditTrail([
       {
         id: randomUUID(),
         at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -5999,7 +6159,7 @@ async function handleApi(req, res) {
         detail: data.securityAcceptanceLedger[index].status
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    ].slice(0, 120));
     writeDatabase(data);
     sendJson(res, 200, data.securityAcceptanceLedger[index]);
     return;
@@ -6014,7 +6174,7 @@ async function handleApi(req, res) {
       return;
     }
     const session = createSession(user);
-    appendSecurityEvent({ actor: user.name, role: user.role, action: "登录", target: user.home, result: "允许", detail: "签名会话已签发，支持密钥轮换校验" });
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "登录", target: user.home, result: "允许", detail: "signed session issued with key rotation support" });
     sendJson(res, 200, { ok: true, token: session.token, expiresAt: session.expiresAt, user: session.user });
     return;
   }
@@ -6053,17 +6213,37 @@ async function handleApi(req, res) {
     const rows = (Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [])
       .filter((item) => canAccessReferralTeleconsultation(user, item, data));
     const escalations = buildReferralTeleconsultationEscalations(rows);
+    const performancePolicy = buildReferralInsurancePerformancePolicy({ ...data, referralTeleconsultations: rows });
     sendJson(res, 200, {
       teleconsultations: rows,
       escalations,
+      performancePolicy,
       summary: {
         total: rows.length,
         pending: rows.filter((item) => !isClosedTaskStatus(item.status) && item.reportStatus !== "returned").length,
         reportReturned: rows.filter((item) => item.reportStatus === "returned" || item.status === "report-returned").length,
         escalations: escalations.length,
-        highRisk: escalations.filter((item) => item.severity === "high").length
+        highRisk: escalations.filter((item) => item.severity === "high").length,
+        acknowledgedEscalations: rows.filter((item) => item.slaDisposition?.status && item.slaDisposition.status !== "pending-ack").length,
+        reportReturnRate: performancePolicy.summary.reportReturnRate,
+        followupClosureRate: performancePolicy.summary.followupClosureRate,
+        repeatExamControlRate: performancePolicy.summary.repeatExamControlRate
       }
     });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/referral-teleconsultations/joint-test-pack") {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/referral-teleconsultations/joint-test-pack");
+    if (!user) return;
+    sendJson(res, 200, buildReferralTeleconsultationJointTestPack(readDatabase()));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/referral-teleconsultations/performance-policy") {
+    const user = requireApiRole(req, res, ["commission", "insurance", "county"], "/api/referral-teleconsultations/performance-policy");
+    if (!user) return;
+    sendJson(res, 200, buildReferralInsurancePerformancePolicy(readDatabase()));
     return;
   }
 
@@ -6104,6 +6284,44 @@ async function handleApi(req, res) {
     return;
   }
 
+  const teleconsultationEscalationAckMatch = url.pathname.match(/^\/api\/referral-teleconsultations\/([^/]+)\/escalations\/ack$/);
+  if (req.method === "POST" && teleconsultationEscalationAckMatch) {
+    const user = requireApiRole(req, res, ["institution", "county", "commission"], "/api/referral-teleconsultations/:id/escalations/ack");
+    if (!user) return;
+    const data = readDatabase();
+    const rows = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
+    const index = rows.findIndex((item) => item.id === decodeURIComponent(teleconsultationEscalationAckMatch[1]));
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "referral teleconsultation not found" });
+      return;
+    }
+    if (!canAccessReferralTeleconsultation(user, rows[index], data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "acknowledge referral teleconsultation SLA", target: rows[index].id, result: "denied", detail: "scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
+      return;
+    }
+    const payload = await collectJson(req);
+    rows[index] = acknowledgeReferralTeleconsultationEscalation(data, rows[index], payload, user);
+    data.referralTeleconsultations = rows;
+    data.securityEvents = resealAuditTrail([
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "acknowledge referral teleconsultation SLA",
+        target: rows[index].id,
+        result: "allowed",
+        detail: rows[index].slaDisposition?.action || "SLA acknowledged"
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120));
+    appendDataAccessLog(data, user, rows[index].residentId, "referral teleconsultation", "SLA reminder acknowledgement", "allowed");
+    writeDatabase(data);
+    sendJson(res, 200, { teleconsultation: rows[index], messages: data.taskMessages.filter((message) => message.collection === "referralTeleconsultations" && message.sourceId === rows[index].id) });
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/referral-teleconsultations") {
     const user = requireApiRole(req, res, ["institution", "county", "commission"], "/api/referral-teleconsultations");
     if (!user) return;
@@ -6116,7 +6334,7 @@ async function handleApi(req, res) {
         return;
       }
       data.referralTeleconsultations = [consultation, ...(Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [])].slice(0, 300);
-      data.securityEvents = [
+      data.securityEvents = resealAuditTrail([
         {
           id: randomUUID(),
           at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -6128,7 +6346,7 @@ async function handleApi(req, res) {
           detail: `${consultation.sourceInstitution} -> ${consultation.targetInstitution}`
         },
         ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-      ].slice(0, 120);
+      ].slice(0, 120));
       appendDataAccessLog(data, user, consultation.residentId, "referral teleconsultation", "create teleconsultation with resident authorization", "allowed");
       writeDatabase(data);
       sendJson(res, 201, consultation);
@@ -6157,7 +6375,7 @@ async function handleApi(req, res) {
     const payload = await collectJson(req);
     rows[index] = applyReferralTeleconsultationAction(rows[index], payload, user);
     data.referralTeleconsultations = rows;
-    data.securityEvents = [
+    data.securityEvents = resealAuditTrail([
       {
         id: randomUUID(),
         at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -6169,7 +6387,7 @@ async function handleApi(req, res) {
         detail: rows[index].status
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    ].slice(0, 120));
     appendDataAccessLog(data, user, rows[index].residentId, "referral teleconsultation", payload.note || rows[index].status, "allowed");
     writeDatabase(data);
     sendJson(res, 200, rows[index]);
@@ -6236,7 +6454,7 @@ async function handleApi(req, res) {
       };
       data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
       const messages = appendReferralTeleconsultationNotifications(data, rows[index], "feedback", callback, user);
-      data.securityEvents = [
+      data.securityEvents = resealAuditTrail([
         {
           id: randomUUID(),
           at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -6248,7 +6466,7 @@ async function handleApi(req, res) {
           detail: `${callback.sourceSystem} / ${callback.idempotencyKey}`
         },
         ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-      ].slice(0, 120);
+      ].slice(0, 120));
       appendDataAccessLog(data, user, rows[index].residentId, "referral teleconsultation", "external feedback callback", "allowed");
       writeDatabase(data);
       sendJson(res, 200, { teleconsultation: rows[index], integrationEvent: event, messages });
@@ -6329,7 +6547,7 @@ async function handleApi(req, res) {
       };
       data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
       const messages = appendReferralTeleconsultationNotifications(data, rows[index], "schedule", callback, user);
-      data.securityEvents = [
+      data.securityEvents = resealAuditTrail([
         {
           id: randomUUID(),
           at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -6341,7 +6559,7 @@ async function handleApi(req, res) {
           detail: `${callback.sourceSystem} / ${callback.idempotencyKey}`
         },
         ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-      ].slice(0, 120);
+      ].slice(0, 120));
       appendDataAccessLog(data, user, rows[index].residentId, "referral teleconsultation", "external schedule callback", "allowed");
       writeDatabase(data);
       sendJson(res, 200, { teleconsultation: rows[index], integrationEvent: event, messages });
@@ -6418,7 +6636,7 @@ async function handleApi(req, res) {
       }
       data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
       const messages = appendReferralTeleconsultationNotifications(data, rows[index], "report", callback, user);
-      data.securityEvents = [
+      data.securityEvents = resealAuditTrail([
         {
           id: randomUUID(),
           at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -6430,7 +6648,7 @@ async function handleApi(req, res) {
           detail: `${callback.sourceSystem} / ${callback.idempotencyKey}`
         },
         ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-      ].slice(0, 120);
+      ].slice(0, 120));
       appendDataAccessLog(data, user, rows[index].residentId, "referral teleconsultation", "external report callback", "allowed");
       writeDatabase(data);
       sendJson(res, 200, { teleconsultation: rows[index], integrationEvent: event, personalRecord, messages });
@@ -6777,7 +6995,7 @@ async function handleApi(req, res) {
     }
     const message = createTaskMessage({ task, payload: await collectJson(req), user });
     data.taskMessages = [message, ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
-    data.securityEvents = [
+    data.securityEvents = resealAuditTrail([
       {
         id: randomUUID(),
         at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -6789,7 +7007,7 @@ async function handleApi(req, res) {
         detail: `${message.targetRole} · ${message.channel}`
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    ].slice(0, 120));
     writeDatabase(data);
     sendJson(res, 201, message);
     return;
@@ -6867,7 +7085,7 @@ async function handleApi(req, res) {
       handledBy: user.username || user.role,
       handledByName: user.name
     };
-    data.securityEvents = [
+    data.securityEvents = resealAuditTrail([
       {
         id: randomUUID(),
         at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -6879,7 +7097,7 @@ async function handleApi(req, res) {
         detail: rows[index].status
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    ].slice(0, 120));
     writeDatabase(data);
     sendJson(res, 200, rows[index]);
     return;
@@ -6974,7 +7192,7 @@ async function handleApi(req, res) {
     }
     const event = normalizeIntegrationEvent(payload, user, contract);
     data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
-    data.securityEvents = [
+    data.securityEvents = resealAuditTrail([
       {
         id: randomUUID(),
         at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -6986,7 +7204,7 @@ async function handleApi(req, res) {
         detail: `${contract.id} · ${event.idempotencyKey}`
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    ].slice(0, 120));
     writeDatabase(data);
     sendJson(res, 202, event);
     return;
@@ -7014,7 +7232,7 @@ async function handleApi(req, res) {
       simulatorSignature: sample.signature
     };
     data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
-    data.securityEvents = [
+    data.securityEvents = resealAuditTrail([
       {
         id: randomUUID(),
         at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -7026,7 +7244,7 @@ async function handleApi(req, res) {
         detail: `${contract.id} · ${sample.payload.idempotencyKey}`
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    ].slice(0, 120));
     writeDatabase(data);
     sendJson(res, 202, { sample, event });
     return;
@@ -7061,7 +7279,7 @@ async function handleApi(req, res) {
       sendJson(res, 404, { error: "Not Found", message: "未找到集成网关事件" });
       return;
     }
-    data.securityEvents = [
+    data.securityEvents = resealAuditTrail([
       {
         id: randomUUID(),
         at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -7073,7 +7291,7 @@ async function handleApi(req, res) {
         detail: `${event.contractId} · ${event.idempotencyKey} · retry=${event.retryCount}`
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    ].slice(0, 120));
     writeDatabase(data);
     sendJson(res, 200, event);
     return;
@@ -7096,7 +7314,7 @@ async function handleApi(req, res) {
       sendJson(res, 404, { error: "Not Found", message: "未找到集成网关事件" });
       return;
     }
-    data.securityEvents = [
+    data.securityEvents = resealAuditTrail([
       {
         id: randomUUID(),
         at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -7108,7 +7326,7 @@ async function handleApi(req, res) {
         detail: `${event.contractId} · ${event.idempotencyKey} · ${event.deadLetterReason}`
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    ].slice(0, 120));
     writeDatabase(data);
     sendJson(res, 200, event);
     return;
@@ -7145,7 +7363,7 @@ async function handleApi(req, res) {
     if (normalized.criticalSignal) {
       data.emergencySignals = [normalized.criticalSignal, ...(Array.isArray(data.emergencySignals) ? data.emergencySignals : [])].slice(0, 200);
     }
-    data.securityEvents = [
+    data.securityEvents = resealAuditTrail([
       {
         id: randomUUID(),
         at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -7157,7 +7375,7 @@ async function handleApi(req, res) {
         detail: `${normalized.report.status} · ${normalized.report.ruleId || "no-rule"}${normalized.criticalSignal ? " · critical" : ""}`
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    ].slice(0, 120));
     writeDatabase(data);
     sendJson(res, 201, normalized);
     return;
@@ -7180,7 +7398,7 @@ async function handleApi(req, res) {
       sendJson(res, 404, { error: "Not Found", message: "未找到互认记录" });
       return;
     }
-    data.securityEvents = [
+    data.securityEvents = resealAuditTrail([
       {
         id: randomUUID(),
         at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -7192,7 +7410,7 @@ async function handleApi(req, res) {
         detail: `${reviewed.reviewStatus} · ${reviewed.reviewReasonCode}`
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    ].slice(0, 120));
     writeDatabase(data);
     sendJson(res, 200, reviewed);
     return;
@@ -7236,7 +7454,7 @@ async function handleApi(req, res) {
       return;
     }
     data.multiPracticeApplications = [application, ...(Array.isArray(data.multiPracticeApplications) ? data.multiPracticeApplications : [])].slice(0, 200);
-    data.securityEvents = [
+    data.securityEvents = resealAuditTrail([
       {
         id: randomUUID(),
         at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -7248,7 +7466,7 @@ async function handleApi(req, res) {
         detail: `${application.doctorName} · ${application.primaryInstitution} -> ${application.targetInstitution} · ${application.status}`
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    ].slice(0, 120));
     writeDatabase(data);
     sendJson(res, 201, application);
     return;
@@ -7299,7 +7517,7 @@ async function handleApi(req, res) {
         collectionVersions: { multiPracticeApplications: Number(patch.expectedVersion) }
       };
     }
-    data.securityEvents = [
+    data.securityEvents = resealAuditTrail([
       {
         id: randomUUID(),
         at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -7311,7 +7529,7 @@ async function handleApi(req, res) {
         detail: `状态更新为 ${data.multiPracticeApplications[index].status || "已更新"}`
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    ].slice(0, 120));
     writeDatabase(data);
     sendJson(res, 200, data.multiPracticeApplications[index]);
     return;
@@ -7321,9 +7539,18 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/state");
     if (!user) return;
     const payload = await collectJson(req);
+    const currentData = readDatabase();
+    const incomingSecurityEvents = Array.isArray(payload.securityEvents) ? payload.securityEvents : [];
+    const incomingAccessLogs = Array.isArray(payload.dataAccessLogs) ? payload.dataAccessLogs : [];
+    const incomingSecurityTrailOk = incomingSecurityEvents.length === 0 ||
+      verifyAuditTrail(incomingSecurityEvents).passed ||
+      auditTrailRowsMatch(incomingSecurityEvents, currentData.securityEvents) ||
+      auditTrailRowsMatchById(incomingSecurityEvents, currentData.securityEvents);
+    const incomingAccessTrailOk = incomingAccessLogs.length === 0 || verifyAuditTrail(incomingAccessLogs).passed;
     const data = normalizeState(payload);
     data.storageMeta = payload.storageMeta;
-    data.securityEvents = [
+    data.dataAccessLogs = incomingAccessTrailOk ? resealAuditTrail(data.dataAccessLogs) : sealAuditTrail(data.dataAccessLogs);
+    const nextSecurityEvents = [
       {
         id: randomUUID(),
         at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -7336,6 +7563,7 @@ async function handleApi(req, res) {
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
     ].slice(0, 120);
+    data.securityEvents = incomingSecurityTrailOk ? resealAuditTrail(nextSecurityEvents) : sealAuditTrail(nextSecurityEvents);
     writeDatabase(data);
     sendJson(res, 200, data);
     return;
@@ -7361,7 +7589,7 @@ async function handleApi(req, res) {
       ...(data.storageMeta || {}),
       collectionVersions: Object.hasOwn(payload, "expectedVersion") ? { [collection]: Number(payload.expectedVersion) } : {}
     };
-    data.securityEvents = [
+    data.securityEvents = resealAuditTrail([
       {
         id: randomUUID(),
         at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -7373,7 +7601,7 @@ async function handleApi(req, res) {
         detail: `保存 ${collection}，记录数 ${value.length}`
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    ].slice(0, 120));
     writeDatabase(data);
     const versions = storageMeta().collectionVersions;
     sendJson(res, 200, { ok: true, collection, version: versions[collection] ?? null, count: value.length });
@@ -7423,7 +7651,7 @@ async function handleApi(req, res) {
       job,
       ...(Array.isArray(data.healthStatisticsIngestion.jobs) ? data.healthStatisticsIngestion.jobs : [])
     ].slice(0, 80);
-    data.securityEvents = [
+    data.securityEvents = resealAuditTrail([
       {
         id: randomUUID(),
         at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -7435,7 +7663,7 @@ async function handleApi(req, res) {
         detail: `${job.source} · ${job.period} · ${job.name}`
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    ].slice(0, 120));
     writeDatabase(data);
     sendJson(res, 201, job);
     return;
@@ -7730,7 +7958,7 @@ async function handleApi(req, res) {
     }
     data.birthCertificates = [certificate, ...(Array.isArray(data.birthCertificates) ? data.birthCertificates : [])].slice(0, 200);
     refreshBirthStatistics(data);
-    data.securityEvents = [
+    data.securityEvents = resealAuditTrail([
       {
         id: randomUUID(),
         at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -7742,7 +7970,7 @@ async function handleApi(req, res) {
         detail: `${certificate.newbornName} · ${certificate.issueType} · ${certificate.issuingInstitution}`
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    ].slice(0, 120));
     const normalized = normalizeState(data);
     if (Object.hasOwn(payload, "expectedVersion")) {
       normalized.storageMeta = {
@@ -7788,7 +8016,7 @@ async function handleApi(req, res) {
     }
     data.deathCertificates = [certificate, ...(Array.isArray(data.deathCertificates) ? data.deathCertificates : [])].slice(0, 200);
     refreshDeathStatistics(data);
-    data.securityEvents = [
+    data.securityEvents = resealAuditTrail([
       {
         id: randomUUID(),
         at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -7800,7 +8028,7 @@ async function handleApi(req, res) {
         detail: `${certificate.deceasedName} · ${certificate.deathReasonType} · ${certificate.reportChannel}`
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    ].slice(0, 120));
     const normalized = normalizeState(data);
     if (Object.hasOwn(payload, "expectedVersion")) {
       normalized.storageMeta = {
@@ -7855,7 +8083,7 @@ async function handleApi(req, res) {
     }
     if (payload.status) item.status = String(payload.status);
     item.lastUpdated = new Date().toISOString();
-    data.securityEvents = [
+    data.securityEvents = resealAuditTrail([
       {
         id: randomUUID(),
         at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -7867,7 +8095,7 @@ async function handleApi(req, res) {
         detail: payload.note || `状态更新为 ${item.status || "已更新"}`
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    ].slice(0, 120));
     if (Object.hasOwn(payload, "expectedVersion")) {
       data.storageMeta = {
         ...(data.storageMeta || {}),
@@ -7906,7 +8134,7 @@ async function handleApi(req, res) {
       revokeReason: String(payload.reason || "居民撤销授权").trim(),
       updatedAt: new Date().toISOString()
     };
-    data.securityEvents = [
+    data.securityEvents = resealAuditTrail([
       {
         id: randomUUID(),
         at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -7918,7 +8146,7 @@ async function handleApi(req, res) {
         detail: data.personalRecords[index].revokeReason
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
-    ].slice(0, 120);
+    ].slice(0, 120));
     if (Object.hasOwn(payload, "expectedVersion")) {
       data.storageMeta = {
         ...(data.storageMeta || {}),
@@ -8042,7 +8270,7 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/reset");
     if (!user) return;
     const data = seedState();
-    data.securityEvents = [
+    data.securityEvents = resealAuditTrail([
       {
         id: randomUUID(),
         at: new Date().toLocaleString("zh-CN", { hour12: false }),
@@ -8054,7 +8282,7 @@ async function handleApi(req, res) {
         detail: "恢复演示数据"
       },
       ...data.securityEvents
-    ];
+    ]);
     writeDatabase(data);
     sendJson(res, 200, data);
     return;

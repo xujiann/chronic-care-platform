@@ -2863,6 +2863,24 @@
       "createdByName": "System"
     },
     {
+      "id": "msg-rtc-001-sla-institution",
+      "taskId": "referralTeleconsultations:rtc-001:sla:high",
+      "collection": "referralTeleconsultations",
+      "sourceId": "rtc-001",
+      "residentId": "r1",
+      "targetRole": "institution",
+      "channel": "in_app",
+      "title": "Teleconsultation SLA reminder",
+      "body": "Dalian Central Hospital teleconsultation report is overdue; confirm report callback or manual reconciliation.",
+      "status": "sent",
+      "priority": "high",
+      "escalationKey": "referralTeleconsultations:rtc-001:sla:high",
+      "receipts": [],
+      "createdAt": "2026-06-24T08:00:00.000Z",
+      "createdBy": "system",
+      "createdByName": "System"
+    },
+    {
       "id": "msg-rtc-002-report-citizen",
       "taskId": "referralTeleconsultations:rtc-002",
       "collection": "referralTeleconsultations",
@@ -7130,7 +7148,9 @@
       "performance": {
         "responseHours": 4,
         "reportReturnHours": 0,
-        "satisfaction": "pending"
+        "satisfaction": "pending",
+        "insurancePaymentPath": "primary-referral-continuous-deductible",
+        "repeatExamControl": "pending-specialist-review"
       },
       "auditTrail": [
         {
@@ -7145,7 +7165,19 @@
           "action": "scheduled",
           "note": "Receiving hospital accepted and reserved consultation window."
         }
-      ]
+      ],
+      "slaDisposition": {
+        "status": "pending-ack",
+        "owner": "Dalian Central Hospital",
+        "action": "confirm report callback or manual reconciliation",
+        "updatedAt": ""
+      },
+      "countySupervision": {
+        "status": "督办中",
+        "owner": "中山区县域医共体",
+        "reason": "high priority pending report",
+        "due": "2026-06-23"
+      }
     },
     {
       "id": "rtc-002",
@@ -7180,7 +7212,9 @@
       "performance": {
         "responseHours": 3,
         "reportReturnHours": 25,
-        "satisfaction": "good"
+        "satisfaction": "good",
+        "insurancePaymentPath": "down-referral-primary-followup",
+        "repeatExamControl": "recognized-report-reused"
       },
       "auditTrail": [
         {
@@ -7195,7 +7229,19 @@
           "action": "report-returned",
           "note": "Specialist report returned to primary institution."
         }
-      ]
+      ],
+      "slaDisposition": {
+        "status": "closed",
+        "owner": "Xinghaiwan Community Health Service Center",
+        "action": "report archived and follow-up accepted",
+        "updatedAt": "2026-06-22T11:30:00.000Z"
+      },
+      "countySupervision": {
+        "status": "已闭环",
+        "owner": "中山区县域医共体",
+        "reason": "report returned",
+        "due": "2026-06-22"
+      }
     }
   ]
 }

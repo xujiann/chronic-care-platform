@@ -1,4 +1,4 @@
-const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [] };
+const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], referralTeleconsultations: [], referralSystem: null };
 let platformState = fallbackState;
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -13,6 +13,7 @@ function renderAll(state) {
   renderClaims(state);
   renderSupervisions(state);
   renderReferralPayments(state);
+  renderReferralPerformancePolicy(state);
   renderPickupAudits(state);
   renderCredentialChecks(state);
   renderInsuranceAudit(state);
@@ -122,6 +123,28 @@ function renderReferralPayments(state) {
       <span class="badge ${badge}">${item.status}</span>
     </section>`;
   }).join("") || `<p class="muted">暂无分级诊疗支付政策配置。</p>`;
+}
+
+function renderReferralPerformancePolicy(state) {
+  const rows = state.referralTeleconsultations || [];
+  const el = document.querySelector("#referral-performance-policy");
+  const countEl = document.querySelector("#referral-performance-policy-count");
+  if (!el || !countEl) return;
+  const returned = rows.filter((item) => item.reportStatus === "returned" || item.status === "report-returned");
+  const closed = rows.filter((item) => String(item.slaDisposition?.status || "").includes("closed") || String(item.countySupervision?.status || "").includes("闭环"));
+  const repeatControlled = rows.filter((item) => String(item.performance?.repeatExamControl || "").includes("recognized") || String(item.performance?.repeatExamControl || "").includes("reused"));
+  const rate = (count) => rows.length ? Math.round((count / rows.length) * 100) : 100;
+  const paymentPaths = [...new Set(rows.map((item) => item.performance?.insurancePaymentPath).filter(Boolean))];
+  countEl.textContent = `${rows.length} 项`;
+  el.innerHTML = [
+    ["报告回传率", `${rate(returned.length)}%`, `${returned.length}/${rows.length || 0} 用于医共体绩效`],
+    ["随访闭环率", `${rate(closed.length)}%`, `${closed.length}/${rows.length || 0} 支撑基层连续服务支付`],
+    ["重复检查控制", `${rate(repeatControlled.length)}%`, `${repeatControlled.length}/${rows.length || 0} 支撑互认和控费审核`],
+    ["支付路径", paymentPaths.length, paymentPaths.join("；") || "待现场医保口径确认"]
+  ].map(([label, value, hint]) => `<article class="claim-card">
+    <strong>${label}</strong>
+    <span>${value}<br>${hint}</span>
+  </article>`).join("");
 }
 
 function renderPickupAudits(state) {

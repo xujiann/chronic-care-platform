@@ -145,42 +145,48 @@
 
       <section class="panel">
         <div class="panel-title">
-          <h2>Referral teleconsultation loop</h2>
+          <h2>转诊会诊闭环工作台</h2>
           <span id="teleconsultation-count"></span>
         </div>
-        <form id="teleconsultation-form" class="filter-grid">
-          <label>Authorized resident
+        <div class="workbench-strip" data-referral-layout="institution-flow">
+          <div><strong>01 申请授权</strong><span>居民授权、转诊单和临床问题</span></div>
+          <div><strong>02 接诊反馈</strong><span>接收、分诊、排期和资源确认</span></div>
+          <div><strong>03 报告回传</strong><span>会诊意见归档到健康档案</span></div>
+          <div><strong>04 SLA 处置</strong><span>逾期提醒、督办和绩效留痕</span></div>
+        </div>
+        <form id="teleconsultation-form" class="filter-grid compact-form">
+          <label>授权居民
             <select name="residentAuthorizationId" required></select>
           </label>
-          <label>Linked referral
+          <label>关联转诊单
             <select name="referralId"></select>
           </label>
-          <label>Target institution
-            <input name="targetInstitution" placeholder="Dalian Central Hospital" required />
+          <label>接诊机构
+            <input name="targetInstitution" placeholder="大连市中心医院" required />
           </label>
-          <label>Target institution code
+          <label>机构代码
             <input name="targetInstitutionCode" placeholder="MR1" />
           </label>
-          <label>Department
-            <input name="department" placeholder="Cardiology" required />
+          <label>接诊科室
+            <input name="department" placeholder="心内科" required />
           </label>
-          <label>Priority
+          <label>优先级
             <select name="priority">
-              <option value="normal">normal</option>
-              <option value="medium">medium</option>
-              <option value="high">high</option>
+              <option value="normal">普通</option>
+              <option value="medium">中等</option>
+              <option value="high">高优先级</option>
             </select>
           </label>
-          <label>Due date
+          <label>要求完成日期
             <input name="due" type="date" />
           </label>
-          <label>Meeting window
+          <label>会诊窗口
             <input name="meetingWindow" placeholder="2026-06-23 15:00-15:30" />
           </label>
-          <label class="full">Clinical question
-            <input name="clinicalQuestion" placeholder="Describe the referral or consultation question" required />
+          <label class="full">临床问题
+            <input name="clinicalQuestion" placeholder="填写转诊或远程会诊需要解决的问题" required />
           </label>
-          <button class="inline-action" type="submit">Create teleconsultation</button>
+          <button class="inline-action" type="submit">创建会诊单</button>
         </form>
         <div id="teleconsultation-loop" class="list"></div>
       </section>

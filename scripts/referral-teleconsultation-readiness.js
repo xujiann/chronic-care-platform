@@ -13,7 +13,10 @@ const REQUIRED_BOUNDARIES = [
   "receiving feedback",
   "report return",
   "collaboration order",
-  "performance"
+  "performance",
+  "SLA disposition",
+  "joint test pack",
+  "insurance payment policy"
 ];
 
 function readJson(relativePath) {
@@ -94,13 +97,20 @@ function buildReferralTeleconsultationReadinessReport(options = {}) {
   const avgResponseHours = averagePerformance(teleconsultations, "responseHours");
   const avgReportReturnHours = averagePerformance(teleconsultations, "reportReturnHours");
   const escalations = buildReferralTeleconsultationEscalations(teleconsultations, options);
+  const acknowledgedEscalations = teleconsultations.filter((item) => item.slaDisposition?.status && item.slaDisposition.status !== "pending-ack");
+  const countySupervised = teleconsultations.filter((item) => item.countySupervision?.status);
+  const insurancePerformanceRows = teleconsultations.filter((item) => item.performance?.insurancePaymentPath && item.performance?.repeatExamControl);
+  const slaMessages = taskMessages.filter((item) => item.escalationKey);
   const boundaryEvidence = {
     referral: teleconsultations.every((item) => item.referralId),
     teleconsultation: teleconsultations.every((item) => item.meetingWindow || item.type),
     "receiving feedback": teleconsultations.every((item) => Object.hasOwn(item, "receivingFeedback")),
     "report return": teleconsultations.every((item) => Object.hasOwn(item, "reportStatus") && Object.hasOwn(item, "reportSummary")),
     "collaboration order": teleconsultations.every((item) => item.collaborationOrderId),
-    performance: teleconsultations.every((item) => item.performance && typeof item.performance === "object")
+    performance: teleconsultations.every((item) => item.performance && typeof item.performance === "object"),
+    "SLA disposition": teleconsultations.every((item) => item.slaDisposition && item.countySupervision),
+    "joint test pack": /buildReferralTeleconsultationJointTestPack/.test(server),
+    "insurance payment policy": teleconsultations.every((item) => item.performance?.insurancePaymentPath)
   };
   const checks = [
     { id: "referral:boundary", passed: REQUIRED_BOUNDARIES.every((item) => boundaryEvidence[item]), detail: REQUIRED_BOUNDARIES.join(", ") },
@@ -115,6 +125,10 @@ function buildReferralTeleconsultationReadinessReport(options = {}) {
     { id: "referral:performance", passed: avgResponseHours !== null && avgReportReturnHours !== null && /county-teleconsultation-performance/.test(county), detail: `avg response ${avgResponseHours}h, avg report return ${avgReportReturnHours}h` },
     { id: "referral:slaEscalation", passed: /buildReferralTeleconsultationEscalations/.test(server) && /SLA risks/.test(county), detail: `${escalations.length} SLA escalation items surfaced` },
     { id: "referral:slaReminder", passed: /referral-teleconsultations\/escalations\/run/.test(server) && /data-referral-escalation/.test(county) && /escalationKey/.test(server), detail: "SLA reminders create idempotent taskMessages for institutions" },
+    { id: "referral:slaAcknowledgement", passed: /escalations\/ack/.test(server) && /data-teleconsultation-ack/.test(institution) && /data-county-sla-ack/.test(county) && slaMessages.length >= 1, detail: `${acknowledgedEscalations.length} acknowledged, ${slaMessages.length} SLA messages` },
+    { id: "referral:countySupervision", passed: countySupervised.length === teleconsultations.length && /Supervision/.test(county), detail: `${countySupervised.length}/${teleconsultations.length} county supervision rows` },
+    { id: "referral:jointTestPack", passed: /joint-test-pack/.test(server) && /buildReferralTeleconsultationJointTestPack/.test(server), detail: "runtime joint-test pack exposes callback samples, checklist, and signoff roles" },
+    { id: "referral:insurancePerformancePolicy", passed: insurancePerformanceRows.length === teleconsultations.length && /performance-policy/.test(server) && /referral-performance-policy/.test(readText("insurance.html") + readText("insurance.js")), detail: `${insurancePerformanceRows.length}/${teleconsultations.length} payment policy rows` },
     { id: "referral:api", passed: /\/api\/referral-teleconsultations/.test(server) && /feedback-callback/.test(server) && /schedule-callback/.test(server) && /report-callback/.test(server) && /verifyIntegrationSignature/.test(server) && /canAccessReferralTeleconsultation/.test(server) && /appendDataAccessLog/.test(server), detail: "specialized API, signed feedback/schedule/report callbacks, role guard, and audit log present" },
     { id: "referral:frontend", passed: /teleconsultation-form/.test(institution) && /teleconsultation-action-form/.test(institution) && /teleconsultation-loop/.test(institution) && /county-teleconsultation-loop/.test(county) && /county-teleconsultation-status-filter/.test(county), detail: "institution create form, feedback form, institution loop, and county command entry present" },
     { id: "referral:releaseScript", passed: Boolean(pkg.scripts?.["referral:readiness"]), detail: pkg.scripts?.["referral:readiness"] || "missing" }
@@ -132,6 +146,10 @@ function buildReferralTeleconsultationReadinessReport(options = {}) {
       feedbackNotifications: notifiedFeedbackIds.size,
       slaEscalations: escalations.length,
       highRiskEscalations: escalations.filter((item) => item.severity === "high").length,
+      slaMessages: slaMessages.length,
+      acknowledgedEscalations: acknowledgedEscalations.length,
+      countySupervisionRows: countySupervised.length,
+      insurancePerformanceRows: insurancePerformanceRows.length,
       collaborationOrders: teleconsultations.filter((item) => collaborationOrderIds.has(item.collaborationOrderId)).length,
       avgResponseHours,
       avgReportReturnHours
@@ -147,6 +165,8 @@ function buildReferralTeleconsultationReadinessReport(options = {}) {
       targetInstitution: item.targetInstitution,
       collaborationOrderId: item.collaborationOrderId,
       performance: item.performance,
+      slaDisposition: item.slaDisposition,
+      countySupervision: item.countySupervision,
       auditEvents: Array.isArray(item.auditTrail) ? item.auditTrail.length : 0
     })),
     checks
@@ -168,6 +188,10 @@ function renderMarkdown(report) {
     `- Feedback notifications: ${report.summary.feedbackNotifications}`,
     `- SLA escalations: ${report.summary.slaEscalations}`,
     `- High risk escalations: ${report.summary.highRiskEscalations}`,
+    `- SLA messages: ${report.summary.slaMessages}`,
+    `- Acknowledged escalations: ${report.summary.acknowledgedEscalations}`,
+    `- County supervision rows: ${report.summary.countySupervisionRows}`,
+    `- Insurance performance rows: ${report.summary.insurancePerformanceRows}`,
     `- Linked collaboration orders: ${report.summary.collaborationOrders}`,
     `- Avg response hours: ${report.summary.avgResponseHours ?? "-"}`,
     `- Avg report return hours: ${report.summary.avgReportReturnHours ?? "-"}`,

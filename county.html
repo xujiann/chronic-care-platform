@@ -100,27 +100,33 @@
 
       <section class="panel">
         <div class="panel-title">
-          <h2>Referral and teleconsultation command</h2>
+          <h2>转诊会诊指挥台</h2>
           <span id="county-teleconsultation-count"></span>
         </div>
-        <div class="filter-grid">
-          <label>Status
+        <div class="workbench-strip" data-referral-layout="county-command">
+          <div><strong>接诊反馈</strong><span>接收状态、分诊意见和下转承接</span></div>
+          <div><strong>报告回传</strong><span>报告状态、归档和居民触达</span></div>
+          <div><strong>SLA 督办</strong><span>逾期、提醒和闭环确认</span></div>
+          <div><strong>绩效评价</strong><span>响应时长、重复检查控制和支付口径</span></div>
+        </div>
+        <div class="filter-grid compact-form">
+          <label>状态
             <select id="county-teleconsultation-status-filter">
-              <option value="all">All statuses</option>
-              <option value="requested">requested</option>
-              <option value="accepted">accepted</option>
-              <option value="scheduled">scheduled</option>
-              <option value="feedback-returned">feedback-returned</option>
-              <option value="report-returned">report-returned</option>
-              <option value="closed">closed</option>
+              <option value="all">全部状态</option>
+              <option value="requested">已申请</option>
+              <option value="accepted">已接诊</option>
+              <option value="scheduled">已排期</option>
+              <option value="feedback-returned">已反馈</option>
+              <option value="report-returned">报告已回传</option>
+              <option value="closed">已闭环</option>
             </select>
           </label>
-          <label>Priority
+          <label>优先级
             <select id="county-teleconsultation-priority-filter">
-              <option value="all">All priorities</option>
-              <option value="high">high</option>
-              <option value="medium">medium</option>
-              <option value="normal">normal</option>
+              <option value="all">全部优先级</option>
+              <option value="high">高优先级</option>
+              <option value="medium">中等</option>
+              <option value="normal">普通</option>
             </select>
           </label>
         </div>
