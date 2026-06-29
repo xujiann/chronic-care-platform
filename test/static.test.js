@@ -1026,7 +1026,7 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(css, /nursing-mobile-workbench/);
   assert.match(css, /nursing-mobile-card/);
   assert.match(css, /nursing-desktop-table/);
-  assert.match(mobilePreviewHtml, /internet-nursing\.html\?preview=mobile-nursing/);
+  assert.doesNotMatch(mobilePreviewHtml, /internet-nursing\.html\?preview=mobile-nursing/);
   assert.match(server, /\/api\/internet-nursing\/dashboard/);
   assert.match(server, /canAccessInternetNursingOrder/);
   assert.match(server, /validateInternetNursingAppointment/);
