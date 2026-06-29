@@ -2141,16 +2141,6 @@ function formatRegistrationStatus(value) {
   }[value] || value || "待处理";
 }
 
-function formatCaregiver(value) {
-  return { family: "家庭照护人", community: "社区照护站", institution: "养老/护理机构" }[value] || "家庭照护人";
-}
-
-function formatLongTermCareEligibility(insurance, civilAffairs) {
-  const insuranceText = { eligible: "长护险演示条件符合", review: "长护险需人工复核", missing: "长护险材料待补充" }[insurance] || "长护险待核验";
-  const civilText = { none: "暂无民政补贴", subsidy: "疑似可享民政补贴", "home-visit": "需民政上门复评" }[civilAffairs] || "民政服务待核验";
-  return `${insuranceText}，${civilText}`;
-}
-
 function renderPickups(residentId) {
   const pickups = (state.medicationPickups || []).filter((item) => item.residentId === residentId).sort(sortByDateDesc);
   document.querySelector("#pickup-cards").innerHTML = pickups
