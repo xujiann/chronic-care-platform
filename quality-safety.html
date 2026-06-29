@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Medical Quality and Safety Supervision</title>
+    <title>医疗质量与安全监管平台</title>
     <link rel="stylesheet" href="./portal.css" />
     <script src="./auth.js"></script>
     <script>window.HealthCityAuth.requireRole(["commission", "institution", "county"])</script>
@@ -12,29 +12,29 @@
     <main class="portal-shell">
       <header class="portal-header">
         <div>
-          <span>Priority application 3</span>
-          <h1>Medical quality and safety supervision</h1>
-          <p>Quality dashboard, issue dispatch, rectification feedback, and commission review for critical values, clinical pathways, record QC, mutual recognition QC, and safety events.</p>
+          <span>优先应用 3</span>
+          <h1>医疗质量与安全监管平台</h1>
+          <p>面向危急值、临床路径、病历质控、检查检验互认质控和安全事件，提供质控看板、问题派发、整改反馈与监管复核。</p>
         </div>
         <nav>
-          <a href="./quality-safety-about.html">About</a>
-          <a href="./workbench.html">Workbench</a>
-          <a href="./platform.html">Platform</a>
-          <a href="./index.html">Commission</a>
-          <a href="./institution.html">Institution</a>
-          <a href="./county.html">County</a>
+          <a href="./quality-safety-about.html">关于</a>
+          <a href="./workbench.html">工作台</a>
+          <a href="./platform.html">平台总览</a>
+          <a href="./index.html">卫健管理</a>
+          <a href="./institution.html">医疗机构</a>
+          <a href="./county.html">县域医共体</a>
         </nav>
       </header>
 
       <section class="panel">
         <div class="panel-title">
-          <h2>Policy basis</h2>
-          <span>Quality management, core safety systems, mutual recognition, and pathway governance</span>
+          <h2>政策依据</h2>
+          <span>医疗质量管理、核心安全制度、检查检验互认和临床路径治理</span>
         </div>
         <div class="rules">
-          <div><strong>Regulatory scope</strong><span>Aligned to medical quality management duties for health authorities and medical institutions.</span></div>
-          <div><strong>Closed-loop focus</strong><span>Critical values, record traceability, pathway variance, mutual recognition QC, and rectification evidence are tracked as auditable workflows.</span></div>
-          <div><strong>Detailed explanation</strong><span><a href="./quality-safety-about.html">Open the policy and about page</a></span></div>
+          <div><strong>监管范围</strong><span>对应卫生健康行政部门和医疗机构的医疗质量管理职责。</span></div>
+          <div><strong>闭环重点</strong><span>危急值、病历可追溯、路径偏离、互认质控和整改证据均按可审计流程跟踪。</span></div>
+          <div><strong>详细说明</strong><span><a href="./quality-safety-about.html">查看政策和关于页</a></span></div>
         </div>
       </section>
 
@@ -42,40 +42,40 @@
 
       <section class="panel">
         <div class="panel-title">
-          <h2>Go-live readiness</h2>
-          <span>Controlled pilot status and production sign-off boundary</span>
+          <h2>上线就绪</h2>
+          <span>受控试点状态和生产签收边界</span>
         </div>
         <div id="quality-safety-readiness" class="rules"></div>
       </section>
 
       <section class="panel">
         <div class="panel-title">
-          <h2>Site joint-testing sign-offs</h2>
-          <span>Production cutover evidence tracker</span>
+          <h2>现场联调签收</h2>
+          <span>生产切换证据跟踪</span>
         </div>
         <div id="quality-safety-signoffs" class="table-wrap"></div>
       </section>
 
       <section class="panel">
         <div class="panel-title">
-          <h2>Institution interface joint test</h2>
-          <span>Sample payload validator, HMAC fixture, idempotency and field dictionary checks</span>
+          <h2>机构接口联调</h2>
+          <span>样例报文校验、HMAC 签名、幂等键和字段字典检查</span>
         </div>
         <div id="quality-safety-interface-pack" class="table-wrap"></div>
       </section>
 
       <section class="panel">
         <div class="panel-title">
-          <h2>Regulatory action plan</h2>
-          <span>Prioritized next actions from risk, SLA, critical value, pathway, and mutual recognition signals</span>
+          <h2>监管行动计划</h2>
+          <span>按风险、SLA、危急值、路径和互认信号生成优先处置事项</span>
         </div>
         <div id="quality-safety-actions" class="table-wrap"></div>
       </section>
 
       <section class="panel">
         <div class="panel-title">
-          <h2>Regulatory priority</h2>
-          <span>Institution risk ranking</span>
+          <h2>监管优先级</h2>
+          <span>医疗机构风险排序</span>
         </div>
         <div id="quality-safety-risks" class="table-wrap"></div>
       </section>
@@ -83,7 +83,7 @@
       <section class="portal-grid">
         <article class="panel wide">
           <div class="panel-title">
-            <h2>Issue queue</h2>
+            <h2>问题队列</h2>
             <span id="quality-safety-updated"></span>
           </div>
           <div id="quality-safety-issues" class="table-wrap"></div>
@@ -91,8 +91,8 @@
 
         <article class="panel">
           <div class="panel-title">
-            <h2>Reuse map</h2>
-            <span>Existing platform collections</span>
+            <h2>复用关系</h2>
+            <span>既有平台数据集合</span>
           </div>
           <div id="quality-safety-reuse" class="rules"></div>
         </article>
@@ -101,16 +101,16 @@
       <section class="portal-grid">
         <article class="panel wide">
           <div class="panel-title">
-            <h2>Rectification loop</h2>
-            <span>Dispatch, feedback, and review</span>
+            <h2>整改闭环</h2>
+            <span>派发、反馈和复核</span>
           </div>
           <div id="quality-safety-rectifications" class="table-wrap"></div>
         </article>
 
         <article class="panel">
           <div class="panel-title">
-            <h2>Critical values</h2>
-            <span>LIS/PACS/HIS closed loop</span>
+            <h2>危急值</h2>
+            <span>LIS/PACS/HIS 闭环</span>
           </div>
           <div id="quality-safety-critical" class="rules"></div>
         </article>
@@ -118,8 +118,8 @@
 
       <section class="panel">
         <div class="panel-title">
-          <h2>Boundary evidence</h2>
-          <span>Pathway, medical record, and mutual recognition QC</span>
+          <h2>边界证据</h2>
+          <span>临床路径、病历质控和互认质控</span>
         </div>
         <div id="quality-safety-boundaries" class="table-wrap"></div>
       </section>

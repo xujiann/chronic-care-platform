@@ -362,6 +362,8 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(html, /quality-safety-issues/);
   assert.match(html, /quality-safety-rectifications/);
   assert.match(html, /quality-safety-about\.html/);
+  assert.match(html, /医疗质量与安全监管平台/);
+  assert.doesNotMatch(html, /Medical quality|Policy basis|Go-live readiness|Issue queue|Rectification loop/);
   assert.match(about, /data-quality-safety-about="policy-basis"/);
   assert.match(about, /data-quality-safety-about="joint-testing"/);
   assert.match(about, /data-policy-ref="medical-quality-management"/);
@@ -376,6 +378,10 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(js, /renderInterfaceJointTestPack/);
   assert.match(js, /validateInterfaceSample/);
   assert.match(js, /submitSiteSignoffEvidence/);
+  assert.match(js, /提交证据/);
+  assert.match(js, /zhText\(item\.id\)/);
+  assert.match(js, /zhText\(pack\.securityFixture\.signatureBase\)/);
+  assert.doesNotMatch(js, />Submit evidence<|>Dispatch<|>Feedback<|>Review<|>Escalate<|Last validation|No manual validation yet/);
   assert.match(js, /dispatchIssue/);
   assert.match(js, /submitFeedback/);
   assert.match(js, /reviewOrder/);
