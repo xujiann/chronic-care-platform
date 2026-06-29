@@ -253,7 +253,7 @@ GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下
 - [GitHub 拆分部署方案](./docs/GitHub拆分部署方案.md)
 ## Health Dashboard Aggregate Entry
 
-- `health-dashboard.html` is priority application 8: the aggregate entry for the first seven applications.
-- `GET /api/health-dashboard/summary` returns application metrics, risk counts, open actions, interface tracks, acceptance evidence, and site dependencies for commission users.
+- `health-dashboard.html` is priority application 8: 卫生健康综合管理服务系统, an aggregate entry for health administration departments across the first seven applications.
+- `GET /api/health-dashboard/summary` returns application metrics, daily service volume, certificate exchange tracks, risk counts, open actions, interface tracks, acceptance evidence, and site dependencies for commission users.
 - `npm.cmd run health-dashboard:summary` writes `release/health-dashboard-summary.json` and `release/health-dashboard-summary.md`, including the module main function report.
 - Boundary: the dashboard does not replace source workflows; source applications remain the system of record for business operations and acceptance.

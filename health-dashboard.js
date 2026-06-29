@@ -82,10 +82,16 @@ function buildStaticDashboardSummary(state) {
       nextAction: item.highRisks > 0 ? "回到源应用复核高风险记录。" : "回到源应用闭环待办。"
     }));
   const populationServiceBoard = buildStaticPopulationServiceBoard(state);
+  const certificateExchange = buildStaticCertificateExchange(state);
+  const riskDrilldowns = buildStaticRiskDrilldowns(openActions);
+  const siteEvidencePackage = buildStaticSiteEvidencePackage(state, { interfaces, evidence, siteDependencies: dependencies });
   const functionalReport = buildDashboardFunctionalReport({
     applications: enrichedApplications,
     openActions,
     populationServiceBoard,
+    certificateExchange,
+    riskDrilldowns,
+    siteEvidencePackage,
     interfaces,
     evidence,
     siteDependencies: dependencies
@@ -111,6 +117,9 @@ function buildStaticDashboardSummary(state) {
     risks,
     openActions,
     populationServiceBoard,
+    certificateExchange,
+    riskDrilldowns,
+    siteEvidencePackage,
     functionalReport,
     interfaces: interfaces.map((item) => ({ id: item.id, domain: item.domain || item.name, priority: item.priority, owner: item.owner, status: item.status, nextAction: item.next })),
     evidence: evidence.map((item) => ({ id: item.id, name: item.name || item.category, owner: item.owner, status: item.status, records: Array.isArray(item.records) ? item.records.length : 0, nextAction: item.next })),
@@ -127,10 +136,12 @@ function buildStaticPopulationServiceBoard(state) {
   const deathRows = Array.isArray(state.deathCertificates) ? state.deathCertificates : [];
   const healthStatistics = state.healthStatistics && typeof state.healthStatistics === "object" ? state.healthStatistics : {};
   const serviceReports = Array.isArray(healthStatistics.serviceReports) ? healthStatistics.serviceReports : [];
+  const dailyServiceReports = Array.isArray(healthStatistics.dailyServiceReports) ? healthStatistics.dailyServiceReports : [];
   const statisticsPeriod = healthStatistics.period || "";
   const eventAnchor = latestDashboardDate(
     birthRows.map((item) => item.birthDateTime),
-    deathRows.map((item) => item.deathDateTime)
+    deathRows.map((item) => item.deathDateTime),
+    dailyServiceReports.map((item) => item.reportDate || item.date || item.serviceDate)
   ) || parseDashboardDate(`${statisticsPeriod || ""}-01`) || new Date();
   const monthDays = dashboardDaysInMonth(statisticsPeriod, eventAnchor);
   const serviceTotals = serviceReports.reduce((totals, item) => {
@@ -139,6 +150,10 @@ function buildStaticPopulationServiceBoard(state) {
     totals.admissions += Number(interfaceData.inpatientAdmissions || 0);
     return totals;
   }, { visits: 0, admissions: 0 });
+  const hasDailyServiceReports = dailyServiceReports.length > 0;
+  const serviceMetric = (period, metricId) => hasDailyServiceReports
+    ? sumDashboardDailyServiceWindow(dailyServiceReports, eventAnchor, period.id, metricId)
+    : Math.round(serviceTotals[metricId] * period.serviceFactor);
   const periods = [
     { id: "day", label: "日", serviceFactor: 1 / monthDays },
     { id: "week", label: "周", serviceFactor: 7 / monthDays },
@@ -151,18 +166,43 @@ function buildStaticPopulationServiceBoard(state) {
     metrics: [
       { id: "births", label: "出生", value: countDashboardWindow(birthRows, "birthDateTime", eventAnchor, period.id), unit: "例", tone: "birth", sourceLabel: "出生医学证明日期", source: "birthCertificates.birthDateTime" },
       { id: "deaths", label: "死亡", value: countDashboardWindow(deathRows, "deathDateTime", eventAnchor, period.id), unit: "例", tone: "death", sourceLabel: "死亡医学证明日期", source: "deathCertificates.deathDateTime" },
-      { id: "visits", label: "就诊", value: Math.round(serviceTotals.visits * period.serviceFactor), unit: "人次", tone: "visit", sourceLabel: "月度门急诊接口折算", source: "healthStatistics.serviceReports 门急诊" },
-      { id: "admissions", label: "入院", value: Math.round(serviceTotals.admissions * period.serviceFactor), unit: "人次", tone: "admission", sourceLabel: "月度入院接口折算", source: "healthStatistics.serviceReports 入院" }
+      { id: "visits", label: "就诊", value: serviceMetric(period, "visits"), unit: "人次", tone: "visit", sourceLabel: hasDailyServiceReports ? "日报门急诊接口" : "月度门急诊接口折算", source: hasDailyServiceReports ? "healthStatistics.dailyServiceReports 门急诊" : "healthStatistics.serviceReports 门急诊" },
+      { id: "admissions", label: "入院", value: serviceMetric(period, "admissions"), unit: "人次", tone: "admission", sourceLabel: hasDailyServiceReports ? "日报入院接口" : "月度入院接口折算", source: hasDailyServiceReports ? "healthStatistics.dailyServiceReports 入院" : "healthStatistics.serviceReports 入院" }
     ]
   }));
   return {
     defaultPeriod: "day",
     eventAnchor: formatDashboardDate(eventAnchor),
     statisticsPeriod,
-    sourceNote: "出生、死亡来自证书日期；就诊、入院来自月度接口快照并折算为日、周、月、年视图，现场日报接口接入后可替换为真实分时数据。",
-    insights: buildDashboardPopulationInsights(periods, { serviceReports: serviceReports.length, statisticsPeriod }),
+    serviceMode: hasDailyServiceReports ? "daily-interface" : "monthly-snapshot",
+    dailyServiceReports: dailyServiceReports.length,
+    sourceNote: hasDailyServiceReports ? "出生、死亡来自证书日期；就诊、入院来自卫生统计日报接口，日、周、月、年均按日报快照汇总。" : "出生、死亡来自证书日期；就诊、入院来自月度接口快照并折算为日、周、月、年视图。",
+    insights: buildDashboardPopulationInsights(periods, { serviceReports: serviceReports.length, dailyServiceReports: dailyServiceReports.length, statisticsPeriod }),
     periods
   };
+}
+
+function dashboardServiceReportDate(item) {
+  return parseDashboardDate(item.reportDate || item.date || item.serviceDate || item.createdAt);
+}
+
+function sumDashboardDailyServiceWindow(reports, anchor, periodId, metricId) {
+  if (!anchor) return 0;
+  const start = new Date(anchor);
+  const end = new Date(anchor);
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+  if (periodId === "week") start.setDate(start.getDate() - 6);
+  if (periodId === "month") start.setDate(1);
+  if (periodId === "year") start.setMonth(0, 1);
+  return reports.reduce((sum, item) => {
+    const date = dashboardServiceReportDate(item);
+    if (!date || date < start || date > end) return sum;
+    const interfaceData = item.interfaceData || {};
+    if (metricId === "visits") return sum + Number(interfaceData.outpatientVisits || 0) + Number(interfaceData.emergencyVisits || 0);
+    if (metricId === "admissions") return sum + Number(interfaceData.inpatientAdmissions || 0);
+    return sum;
+  }, 0);
 }
 
 function dashboardMetricValue(periods, periodId, metricId) {
@@ -174,37 +214,111 @@ function buildDashboardPopulationInsights(periods, context = {}) {
   const monthDeaths = dashboardMetricValue(periods, "month", "deaths");
   const monthVisits = dashboardMetricValue(periods, "month", "visits");
   const monthAdmissions = dashboardMetricValue(periods, "month", "admissions");
-  const hasServiceReports = Number(context.serviceReports || 0) > 0;
+  const hasDailyServiceReports = Number(context.dailyServiceReports || 0) > 0;
+  const hasServiceReports = hasDailyServiceReports || Number(context.serviceReports || 0) > 0;
   return [
-    {
-      id: "certificate-coverage",
-      title: "证照登记覆盖",
-      value: `${monthBirths + monthDeaths}例`,
-      status: monthBirths + monthDeaths > 0 ? "ready" : "empty",
-      detail: "出生、死亡已按医学证明日期形成月内统计；现场需补齐撤销、补正和跨部门交换回执。"
-    },
-    {
-      id: "medical-service-signal",
-      title: "门急诊服务量",
-      value: `${monthVisits}人次`,
-      status: hasServiceReports ? "watch" : "empty",
-      detail: hasServiceReports ? "当前使用月度接口总量折算，日报接口接入前不用于小时级预警。" : "等待卫生统计或院内门急诊日报接口写入。"
-    },
-    {
-      id: "admission-pressure",
-      title: "入院承压观察",
-      value: `${monthAdmissions}人次`,
-      status: monthAdmissions >= 20000 ? "watch" : "ready",
-      detail: "入院量用于提示床位、转诊和医共体协同压力；生产需接入床位和出入院实时状态。"
-    },
-    {
-      id: "site-cutover",
-      title: "现场联调重点",
-      value: "4类接口",
-      status: "blocked",
-      detail: "证照链路、院内系统、统计直报和统一身份需现场签字后替换演示口径。"
-    }
+    { id: "certificate-coverage", title: "证照登记覆盖", value: `${monthBirths + monthDeaths}例`, status: monthBirths + monthDeaths > 0 ? "ready" : "empty", detail: "出生、死亡已按医学证明日期形成月内统计；现场需补齐撤销、补正和跨部门交换回执。" },
+    { id: "medical-service-signal", title: "门急诊服务量", value: `${monthVisits}人次`, status: hasDailyServiceReports ? "ready" : hasServiceReports ? "watch" : "empty", detail: hasDailyServiceReports ? "已接入日报服务量快照，日、周、月、年视图使用真实日报汇总。" : "当前使用月度接口总量折算，日报接口接入前不用于小时级预警。" },
+    { id: "admission-pressure", title: "入院承压观察", value: `${monthAdmissions}人次`, status: hasDailyServiceReports && monthAdmissions >= 5000 ? "watch" : monthAdmissions >= 20000 ? "watch" : "ready", detail: "入院量用于提示床位、转诊和医共体协同压力；生产需接入床位和出入院实时状态。" },
+    { id: "site-cutover", title: "现场联调重点", value: "5类接口", status: "blocked", detail: "证照链路、院内系统、统计直报、统一身份和公安/民政/疾控回执需现场签字后替换演示路径。" }
   ];
+}
+
+function buildStaticCertificateExchange(state) {
+  const healthStatistics = state.healthStatistics && typeof state.healthStatistics === "object" ? state.healthStatistics : {};
+  const items = Array.isArray(healthStatistics.certificateExchangeLinks) ? healthStatistics.certificateExchangeLinks : [];
+  const normalized = items.map((item) => ({
+    id: item.id,
+    domain: item.domain || item.name || item.id,
+    source: item.source || "",
+    target: item.target || "",
+    owner: item.owner || "owner-pending",
+    status: item.status || "watch",
+    receiptStatus: item.receiptStatus || "missing",
+    receiptNo: item.receiptNo || "",
+    revokeSupported: Boolean(item.revokeSupported),
+    correctionSupported: Boolean(item.correctionSupported),
+    reconciliationStatus: item.reconciliationStatus || "pending",
+    lastReceiptAt: item.lastReceiptAt || "",
+    nextAction: item.nextAction || ""
+  }));
+  const ready = normalized.filter((item) => item.status === "ready").length;
+  const blocked = normalized.filter((item) => item.status === "blocked" || item.receiptStatus === "missing").length;
+  return {
+    status: blocked > 0 ? "blocked" : ready === normalized.length && normalized.length > 0 ? "ready" : "watch",
+    source: "healthStatistics.certificateExchangeLinks",
+    summary: {
+      tracks: normalized.length,
+      ready,
+      watch: normalized.filter((item) => item.status === "watch").length,
+      blocked,
+      receipts: normalized.filter((item) => item.receiptStatus === "received").length,
+      reversible: normalized.filter((item) => item.revokeSupported).length,
+      correctable: normalized.filter((item) => item.correctionSupported).length,
+      reconciled: normalized.filter((item) => item.reconciliationStatus === "matched").length
+    },
+    items: normalized
+  };
+}
+
+function buildStaticRiskDrilldowns(openActions) {
+  const items = (openActions || []).slice(0, 8).map((item, index) => ({
+    id: `risk-drilldown-${item.id || index + 1}`,
+    sourceActionId: item.id,
+    applicationId: item.applicationId,
+    application: item.application,
+    entry: item.entry,
+    collection: item.collection,
+    title: item.title,
+    owner: item.owner,
+    dueAt: item.dueAt || "",
+    status: item.status || "open",
+    priority: item.priority || "normal",
+    blocker: item.priority === "high" ? "责任处室复核、跨部门接口回执或现场签字待确认。" : "等待源应用办理节点回写。",
+    trace: [
+      { step: "源应用记录", status: "linked", detail: `${item.collection || "source"} / ${item.id || ""}` },
+      { step: "责任人与时限", status: item.owner ? "ready" : "watch", detail: `${item.owner || "owner-pending"} / ${item.dueAt || "due-pending"}` },
+      { step: "处置复核", status: item.priority === "high" ? "watch" : "ready", detail: item.status || "open" }
+    ]
+  }));
+  return {
+    status: items.length ? "ready" : "empty",
+    source: "openActions",
+    summary: {
+      items: items.length,
+      high: items.filter((item) => item.priority === "high").length,
+      withOwner: items.filter((item) => item.owner && item.owner !== "owner-pending").length,
+      withTrace: items.filter((item) => item.trace.length >= 3).length
+    },
+    items
+  };
+}
+
+function buildStaticSiteEvidencePackage(state, context = {}) {
+  const healthStatistics = state.healthStatistics && typeof state.healthStatistics === "object" ? state.healthStatistics : {};
+  const configured = Array.isArray(healthStatistics.siteEvidencePackage) ? healthStatistics.siteEvidencePackage : [];
+  const interfaces = context.interfaces || [];
+  const evidence = context.evidence || [];
+  const siteDependencies = context.siteDependencies || [];
+  const evidenceRecords = evidence.reduce((sum, item) => sum + (Array.isArray(item.records) ? item.records.length : 0), 0);
+  const fallback = [
+    { id: "summary-json", type: "发布摘要", evidence: "release/health-dashboard-summary.json", owner: "规划信息处", status: "ready", nextAction: "随 release:report 归档。" },
+    { id: "interface-messages", type: "接口报文", evidence: `${interfaces.length} platformInterfaces`, owner: "接口联调组", status: interfaces.length >= 4 ? "ready" : "watch", nextAction: "生产联调时替换为真实请求、响应和签名样例。" },
+    { id: "acceptance-records", type: "验收记录", evidence: `${evidenceRecords} platformEvidence records`, owner: "项目办", status: evidenceRecords >= 2 ? "ready" : "watch", nextAction: "补充现场截图、签字单和复测结论。" },
+    { id: "site-signoff", type: "现场签字", evidence: `${siteDependencies.length} site dependencies`, owner: "各级卫生健康行政部门", status: siteDependencies.length > 0 ? "watch" : "ready", nextAction: "上线前完成身份、证照、统计、院内系统和灾备签字。" }
+  ];
+  const items = configured.length ? configured : fallback;
+  return {
+    status: items.every((item) => item.status === "ready") ? "ready" : "watch",
+    source: configured.length ? "healthStatistics.siteEvidencePackage" : "platformEvidence/platformInterfaces/productionDeploymentPlan",
+    summary: {
+      artifacts: items.length,
+      ready: items.filter((item) => item.status === "ready").length,
+      watch: items.filter((item) => item.status === "watch").length,
+      signed: items.filter((item) => /签字|signed|signoff/i.test(`${item.status} ${item.evidence}`)).length
+    },
+    items
+  };
 }
 
 function buildDashboardFunctionalReport(context) {
@@ -214,6 +328,9 @@ function buildDashboardFunctionalReport(context) {
   const interfaces = context.interfaces || [];
   const evidence = context.evidence || [];
   const siteDependencies = context.siteDependencies || [];
+  const certificateExchange = context.certificateExchange || { summary: {}, items: [] };
+  const riskDrilldowns = context.riskDrilldowns || { summary: {}, items: [] };
+  const siteEvidencePackage = context.siteEvidencePackage || { summary: {}, items: [] };
   const sourceRecords = applications.reduce((sum, item) => sum + Number(item.records || 0), 0);
   const sourceOpenActions = applications.reduce((sum, item) => sum + Number(item.openActions || 0), 0);
   const highRisks = applications.reduce((sum, item) => sum + Number(item.highRisks || 0), 0);
@@ -234,11 +351,25 @@ function buildDashboardFunctionalReport(context) {
       boundary: "日报接口接入前，就诊和入院使用月度快照折算。"
     },
     {
+      id: "certificate-exchange-chain",
+      name: "证照交换链路",
+      status: certificateExchange.status === "ready" ? "ready" : "watch",
+      evidence: `${certificateExchange.summary?.tracks || 0} tracks, ${certificateExchange.summary?.receipts || 0} receipts, ${certificateExchange.summary?.reconciled || 0} reconciled`,
+      boundary: "汇总出生、死亡、电子证照、公安、民政、疾控和统计直报回执，不替代各部门源系统办件。"
+    },
+    {
       id: "risk-action-loop",
       name: "风险预警与任务闭环",
       status: openActions.length > 0 ? "watch" : "ready",
       evidence: `${openActions.length} preview open actions, ${sourceOpenActions} source open actions, ${highRisks} high risks`,
       boundary: "处置回写仍在源业务端完成。"
+    },
+    {
+      id: "risk-drilldown-loop",
+      name: "风险下钻与处置轨迹",
+      status: riskDrilldowns.items?.length ? "ready" : "watch",
+      evidence: `${riskDrilldowns.summary?.items || 0} drilldowns, ${riskDrilldowns.summary?.withTrace || 0} with trace`,
+      boundary: "展示源应用链接、责任人、时限、状态和阻塞原因；不直接修改源业务记录。"
     },
     {
       id: "interface-evidence",
@@ -260,10 +391,17 @@ function buildDashboardFunctionalReport(context) {
       status: siteDependencies.length > 0 ? "watch" : "ready",
       evidence: "health-dashboard:summary, release:report, deploy:check",
       boundary: "生产切换仍依赖现场签字和正式环境配置。"
+    },
+    {
+      id: "site-evidence-package",
+      name: "现场验收证据包",
+      status: siteEvidencePackage.items?.length >= 4 ? "ready" : "watch",
+      evidence: `${siteEvidencePackage.summary?.artifacts || 0} artifacts, ${siteEvidencePackage.summary?.ready || 0} ready`,
+      boundary: "绑定接口报文、截图、签字单、整改、复测和上线批次材料。"
     }
   ];
   return {
-    title: "卫生健康综合驾驶舱主要功能报告",
+    title: "卫生健康综合管理服务系统主要功能报告",
     generatedFrom: "/api/health-dashboard/summary",
     summary: {
       functions: functions.length,
@@ -273,7 +411,7 @@ function buildDashboardFunctionalReport(context) {
     },
     functions,
     releaseEvidence: [
-      { id: "summary-api", name: "综合驾驶舱摘要接口", evidence: "/api/health-dashboard/summary" },
+      { id: "summary-api", name: "综合管理服务系统摘要接口", evidence: "/api/health-dashboard/summary" },
       { id: "summary-script", name: "模块摘要与功能报告", evidence: "npm.cmd run health-dashboard:summary" },
       { id: "release-gate", name: "发布聚合报告", evidence: "npm.cmd run release:report" },
       { id: "deploy-gate", name: "部署门禁", evidence: "npm.cmd run deploy:check" }
@@ -338,6 +476,9 @@ function renderDashboard(summary) {
   renderMetrics(summary);
   renderDataState(summary);
   renderPopulationServiceBoard(summary);
+  renderCertificateExchange(summary.certificateExchange || {});
+  renderRiskDrilldowns(summary.riskDrilldowns || {});
+  renderSiteEvidencePackage(summary.siteEvidencePackage || {});
   renderFunctionReport(summary.functionalReport || {});
   document.querySelector("#dashboard-scope").textContent = summary.scope?.rule || "";
   renderFilterOptions(summary);
@@ -348,6 +489,61 @@ function renderDashboard(summary) {
   renderInterfaces(summary.interfaces || []);
   renderEvidence(summary.evidence || []);
   renderFilterSummary(summary);
+}
+
+function renderCertificateExchange(exchange) {
+  const board = document.querySelector("#certificate-exchange-board");
+  const summary = document.querySelector("#certificate-exchange-summary");
+  const cards = document.querySelector("#certificate-exchange-cards");
+  if (!board || !summary || !cards) return;
+  const items = Array.isArray(exchange.items) ? exchange.items : [];
+  const counts = exchange.summary || {};
+  board.dataset.exchangeStatus = exchange.status || "empty";
+  summary.textContent = `${counts.tracks || items.length} 条链路 / ${counts.receipts || 0} 回执 / ${counts.correctable || 0} 支持补正 / ${counts.reconciled || 0} 已对账`;
+  cards.innerHTML = items.map((item) => `<article class="certificate-exchange-card ${item.status || "watch"}" data-certificate-exchange="${item.id}">
+    <span>${item.status || "watch"} / ${item.receiptStatus || "missing"}</span>
+    <strong>${item.domain || item.id}</strong>
+    <small>${item.source || ""} -> ${item.target || ""}</small>
+    <p>${item.reconciliationStatus || "pending"} / ${item.owner || "owner-pending"}</p>
+    <p>${item.nextAction || ""}</p>
+  </article>`).join("") || `<article class="certificate-exchange-card empty"><strong>等待证照交换链路</strong><p>现场补齐出生、死亡、电子证照、公安、民政、疾控和统计直报回执后显示。</p></article>`;
+}
+
+function renderRiskDrilldowns(drilldowns) {
+  const section = document.querySelector("#risk-drilldown-board");
+  const summary = document.querySelector("#risk-drilldown-summary");
+  const list = document.querySelector("#risk-drilldown-list");
+  if (!section || !summary || !list) return;
+  const items = Array.isArray(drilldowns.items) ? drilldowns.items : [];
+  const counts = drilldowns.summary || {};
+  section.dataset.drilldownStatus = drilldowns.status || "empty";
+  summary.textContent = `${counts.items || items.length} 条下钻 / ${counts.high || 0} 高风险 / ${counts.withTrace || 0} 有轨迹`;
+  list.innerHTML = items.map((item) => `<article class="drilldown-card ${item.priority || "normal"}" data-risk-drilldown="${item.sourceActionId || item.id}">
+    <span>${item.priority || "normal"} / ${item.status || "open"}</span>
+    <strong>${item.title || item.id}</strong>
+    <small>${item.application || ""} / ${item.collection || ""}</small>
+    <p>${item.owner || "owner-pending"} / ${item.dueAt || "due-pending"}</p>
+    <p>${item.blocker || ""}</p>
+    ${item.entry ? `<a href="./${item.entry}">源应用</a>` : ""}
+  </article>`).join("") || `<article class="drilldown-card empty"><strong>等待风险下钻</strong><p>源应用产生 open action 后显示责任人、时限、轨迹和阻塞原因。</p></article>`;
+}
+
+function renderSiteEvidencePackage(packageData) {
+  const section = document.querySelector("#site-evidence-package");
+  const summary = document.querySelector("#site-evidence-summary");
+  const list = document.querySelector("#site-evidence-list");
+  if (!section || !summary || !list) return;
+  const items = Array.isArray(packageData.items) ? packageData.items : [];
+  const counts = packageData.summary || {};
+  section.dataset.evidenceStatus = packageData.status || "empty";
+  summary.textContent = `${counts.artifacts || items.length} 项材料 / ${counts.ready || 0} ready / ${counts.watch || 0} watch`;
+  list.innerHTML = items.map((item) => `<article class="site-evidence-card ${item.status || "watch"}" data-site-evidence="${item.id}">
+    <span>${item.status || "watch"}</span>
+    <strong>${item.type || item.id}</strong>
+    <small>${item.evidence || ""}</small>
+    <p>${item.owner || "owner-pending"}</p>
+    <p>${item.nextAction || ""}</p>
+  </article>`).join("") || `<article class="site-evidence-card empty"><strong>等待现场验收证据</strong><p>接口报文、截图、签字单、整改和复测结论归档后显示。</p></article>`;
 }
 
 function renderDataState(summary) {
@@ -361,7 +557,7 @@ function renderDataState(summary) {
       : `${summary.sourceLabel || "静态快照兜底"} / ${summary.sourceReason || "本地数据"}`;
   }
   if (boundary) {
-    boundary.textContent = summary.scope?.rule || "综合驾驶舱只汇总源应用，不替代源业务办理。";
+    boundary.textContent = summary.scope?.rule || "综合管理服务系统只汇总源应用，不替代源业务办理。";
   }
 }
 

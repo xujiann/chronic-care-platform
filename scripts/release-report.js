@@ -310,12 +310,18 @@ function healthDashboardChecks(healthDashboard) {
   const populationPeriods = healthDashboard.populationServiceBoard?.periods?.length || 0;
   const populationInsights = healthDashboard.populationServiceBoard?.insights?.length || 0;
   const functionalItems = healthDashboard.functionalReport?.functions?.length || 0;
+  const certificateTracks = healthDashboard.certificateExchange?.items?.length || 0;
+  const drilldowns = healthDashboard.riskDrilldowns?.items?.length || 0;
+  const evidenceArtifacts = healthDashboard.siteEvidencePackage?.items?.length || 0;
   return [
     check("healthDashboard:summary", healthDashboard.ok, healthDashboard.ok ? "health dashboard summary checks passed" : "health dashboard summary failed", "error", "health-dashboard"),
     check("healthDashboard:applications", healthDashboard.applications?.length === 7, `${healthDashboard.applications?.length || 0} source applications`, "error", "health-dashboard"),
     check("healthDashboard:boundary", /source business applications|source applications/.test(healthDashboard.scope?.rule || ""), healthDashboard.scope?.rule || "missing", "error", "health-dashboard"),
-    check("healthDashboard:populationServiceBoard", populationPeriods === 4 && populationInsights >= 4, `${populationPeriods} population/service periods, ${populationInsights} site insights`, "error", "health-dashboard"),
-    check("healthDashboard:functionalReport", functionalItems >= 6, `${functionalItems} module functions reported`, "error", "health-dashboard")
+    check("healthDashboard:populationServiceBoard", populationPeriods === 4 && populationInsights >= 4 && healthDashboard.populationServiceBoard?.serviceMode === "daily-interface", `${populationPeriods} population/service periods, ${populationInsights} site insights, ${healthDashboard.populationServiceBoard?.serviceMode || "unknown"}`, "error", "health-dashboard"),
+    check("healthDashboard:certificateExchange", certificateTracks >= 5, `${certificateTracks} certificate exchange tracks`, "error", "health-dashboard"),
+    check("healthDashboard:riskDrilldown", drilldowns >= 4, `${drilldowns} risk drilldowns`, "error", "health-dashboard"),
+    check("healthDashboard:siteEvidencePackage", evidenceArtifacts >= 4, `${evidenceArtifacts} evidence artifacts`, "error", "health-dashboard"),
+    check("healthDashboard:functionalReport", functionalItems >= 9, `${functionalItems} module functions reported`, "error", "health-dashboard")
   ];
 }
 

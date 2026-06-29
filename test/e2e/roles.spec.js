@@ -108,25 +108,28 @@ test("commission health dashboard filters live source actions and drills into so
 
   await expect(page.locator("#dashboard-api-state")).toHaveAttribute("data-source-mode", "api");
   await expect(page.locator("#dashboard-metrics .metric-card")).toHaveCount(9);
-  await expect(page.locator("#dashboard-metrics")).toContainText("170");
+  await expect(page.locator("#dashboard-metrics")).toContainText("181");
   await expect(page.locator("#dashboard-metrics")).toContainText("12");
   await expect(page.locator("#dashboard-applications tbody tr")).toHaveCount(7);
   await expect(page.locator("#dashboard-policy-notes")).toBeVisible();
   await expect(page.locator("[data-dashboard-policy='certificates']")).toContainText("出生");
   await expect(page.locator("#dashboard-policy-notes a[href='./health-dashboard-about.html']")).toHaveCount(1);
-  await expect(page.locator("#dashboard-function-list [data-function-report]")).toHaveCount(6);
+  await expect(page.locator("#dashboard-function-list [data-function-report]")).toHaveCount(9);
   await expect(page.locator("#dashboard-function-list [data-function-report='aggregate-entry']")).toContainText("source applications");
   await expect(page.locator("#population-service-board")).toBeVisible();
   await expect(page.locator("#population-service-board")).toHaveAttribute("data-active-period", "day");
   await expect(page.locator("#population-metric-cards [data-population-metric]")).toHaveCount(4);
   await expect(page.locator("#population-chart .population-bar-row")).toHaveCount(4);
   await expect(page.locator("#population-insights [data-population-insight]")).toHaveCount(4);
-  await expect(page.locator("#population-insights [data-population-insight='site-cutover']")).toContainText("4类接口");
+  await expect(page.locator("#population-insights [data-population-insight='site-cutover']")).toContainText("5类接口");
   await expect(page.locator("#population-metric-cards [data-population-metric='deaths']")).toContainText("1");
   await page.locator("[data-population-period='month']").click();
   await expect(page.locator("#population-service-board")).toHaveAttribute("data-active-period", "month");
   await expect(page.locator("#population-metric-cards [data-population-metric='births']")).toContainText("3");
-  await expect(page.locator("#population-metric-cards [data-population-metric='visits']")).toContainText("414,780");
+  await expect(page.locator("#certificate-exchange-cards [data-certificate-exchange='exchange-birth-license']")).toContainText("出生医学证明");
+  await expect(page.locator("#risk-drilldown-list [data-risk-drilldown]")).toHaveCount(8);
+  await expect(page.locator("#site-evidence-list [data-site-evidence]")).toHaveCount(4);
+  await expect(page.locator("#population-metric-cards [data-population-metric='visits']")).toContainText("92,800");
   await page.locator("[data-population-period='year']").click();
   await expect(page.locator("#population-service-board")).toHaveAttribute("data-active-period", "year");
 
@@ -149,7 +152,7 @@ test("commission health dashboard filters live source actions and drills into so
   expect(exported.filters.applicationId).toBe("county-consortium");
   expect(exported.filters.priority).toBe("high");
   expect(exported.filteredOpenActions).toHaveLength(2);
-  expect(exported.summary.totals.sourceOpenActions).toBe(170);
+  expect(exported.summary.totals.sourceOpenActions).toBe(181);
   expect(exported.summary.totals.previewOpenActions).toBe(12);
 
   await countyLinks.first().click();
@@ -174,8 +177,8 @@ test("about page explains runnable platform capabilities", async ({ page }) => {
   await page.goto("/health-dashboard-about.html");
   await expect(page.locator("[data-dashboard-about-section='runtime-report']")).toBeVisible();
   await expect(page.locator("#dashboard-about-runtime-state")).toHaveAttribute("data-source-mode", "api");
-  await expect(page.locator("#dashboard-about-function-report [data-about-runtime-function]")).toHaveCount(6);
-  await expect(page.locator("#dashboard-about-function-report [data-about-runtime-function='aggregate-entry']")).toContainText("196 source records");
+  await expect(page.locator("#dashboard-about-function-report [data-about-runtime-function]")).toHaveCount(9);
+  await expect(page.locator("#dashboard-about-function-report [data-about-runtime-function='aggregate-entry']")).toContainText("212 source records");
   await expect(page.locator("#dashboard-about-release-evidence [data-about-runtime-evidence='summary-script']")).toContainText("health-dashboard:summary");
   await expect(page.locator("[data-dashboard-about-section='template-functions']")).toBeVisible();
   await expect(page.locator("[data-dashboard-template-function='aggregate-entry']")).toContainText("health-dashboard-applications.js");
@@ -187,8 +190,8 @@ test("about page explains runnable platform capabilities", async ({ page }) => {
   await expect(page.locator("[data-dashboard-about-section='api-evidence']")).toContainText("/api/health-dashboard/summary");
   await expect(page.locator("[data-dashboard-about-section='site-cutover']")).toBeVisible();
   await expect(page.locator("[data-dashboard-about-section='next-plan']")).toBeVisible();
-  await expect(page.locator("[data-dashboard-next-plan='daily-interface']")).toContainText("日报");
-  await expect(page.locator("[data-dashboard-next-plan='site-evidence']")).toContainText("验收");
+  await expect(page.locator("[data-dashboard-next-plan='daily-interface-done']")).toContainText("日报");
+  await expect(page.locator("[data-dashboard-next-plan='site-evidence-done']")).toContainText("验收");
 });
 
 test("citizen stays in the household experience and cannot open commission pages", async ({ page }) => {

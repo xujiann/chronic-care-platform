@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>驾驶舱说明 · 卫生健康综合驾驶舱</title>
+    <title>系统说明 · 卫生健康综合管理服务系统</title>
     <link rel="stylesheet" href="./portal.css" />
     <script src="./auth.js"></script>
     <script>window.HealthCityAuth.requireRole(["commission"])</script>
@@ -13,12 +13,12 @@
     <main class="portal-shell">
       <header class="portal-header">
         <div>
-          <span>优先应用 8 · 关于驾驶舱</span>
-          <h1>卫生健康综合驾驶舱说明</h1>
-          <p>本页说明综合驾驶舱的政策依据、数据口径、接口边界和验收证据。驾驶舱作为前 7 个应用的汇总入口，不替代卫健委端、医疗机构端、医保端、居民端、医共体端、平台治理和运维工作台的源业务办理。</p>
+          <span>优先应用 8 · 关于系统</span>
+          <h1>卫生健康综合管理服务系统说明</h1>
+          <p>本页说明综合管理服务系统的政策依据、数据口径、接口边界和验收证据。本系统面向各级卫生健康行政部门，作为前 7 个应用的汇总管理入口，不替代卫健委端、医疗机构端、医保端、居民端、医共体端、平台治理和运维工作台的源业务办理。</p>
         </div>
         <nav>
-          <a href="./health-dashboard.html">综合驾驶舱</a>
+          <a href="./health-dashboard.html">综合管理服务系统</a>
           <a href="./platform.html">平台建设</a>
           <a href="./workbench.html">运营工作台</a>
           <a href="./about.html">平台关于</a>
@@ -51,7 +51,7 @@
       <section class="panel" data-dashboard-about-section="runtime-report" id="dashboard-about-runtime">
         <div class="panel-title">
           <h2>当前模块运行状态</h2>
-          <span id="dashboard-about-runtime-state">正在读取综合驾驶舱摘要接口</span>
+          <span id="dashboard-about-runtime-state">正在读取综合管理服务系统摘要接口</span>
         </div>
         <div class="function-report-grid" id="dashboard-about-function-report"></div>
         <div class="function-report-evidence" id="dashboard-about-release-evidence"></div>
@@ -61,7 +61,7 @@
       <section class="panel" data-dashboard-about-section="template-functions">
         <div class="panel-title">
           <h2>本模板主要功能</h2>
-          <span>作为优先应用 8 的可复用驾驶舱模板，统一汇总但不替代源应用</span>
+          <span>作为优先应用 8 的可复用综合管理服务系统模板，统一汇总但不替代源应用</span>
         </div>
         <div class="capability-grid">
           <article class="capability-card" data-dashboard-template-function="aggregate-entry">
@@ -99,15 +99,15 @@
         <div class="capability-grid">
           <article class="capability-card" data-dashboard-policy="platform-sharing">
             <strong>全民健康信息平台互通共享</strong>
-            <span>围绕互通共享的全民健康信息平台建设要求，驾驶舱汇聚源应用指标、接口、证据和现场依赖，形成管理端统一观察入口。</span>
+            <span>围绕互通共享的全民健康信息平台建设要求，系统汇聚源应用指标、接口、证据和现场依赖，形成管理端统一观察入口。</span>
           </article>
           <article class="capability-card" data-dashboard-policy="online-workflow">
             <strong>医疗全流程在线办理</strong>
-            <span>转诊、就医、住院、医保、取药和授权共享等流程通过源应用办理；驾驶舱只负责跨域汇总、预警和 open action 闭环。</span>
+            <span>转诊、就医、住院、医保、取药和授权共享等流程通过源应用办理；系统只负责跨域汇总、预警和 open action 闭环。</span>
           </article>
           <article class="capability-card" data-dashboard-policy="smart-supervision">
             <strong>互联网医疗监管与智慧监管</strong>
-            <span>风险预警、任务闭环、接口联调和验收证据在驾驶舱集中呈现，支持卫健委对医疗服务、公共卫生和平台运行进行智慧化监管。</span>
+            <span>风险预警、任务闭环、接口联调和验收证据在系统集中呈现，支持卫健委对医疗服务、公共卫生和平台运行进行智慧化监管。</span>
           </article>
           <article class="capability-card" data-dashboard-policy="certificates">
             <strong>出生死亡证明与电子证照</strong>
@@ -115,11 +115,11 @@
           </article>
           <article class="capability-card" data-dashboard-policy="hierarchical-care">
             <strong>分级诊疗和县域医共体协同</strong>
-            <span>就诊、入院、转诊、床位和远程诊断数据需与 HIS、EMR、LIS、PACS、心电和医共体协同系统联调，驾驶舱保留汇总视图。</span>
+            <span>就诊、入院、转诊、床位和远程诊断数据需与 HIS、EMR、LIS、PACS、心电和医共体协同系统联调，系统保留汇总视图。</span>
           </article>
           <article class="capability-card" data-dashboard-policy="security-audit">
             <strong>数据安全、授权和审计合规</strong>
-            <span>驾驶舱仅允许管理端访问，接口读取写入审计链；生产上线需完成统一身份、日志留存、脱敏授权、密评等保和灾备演练证据。</span>
+            <span>系统仅允许管理端访问，接口读取写入审计链；生产上线需完成统一身份、日志留存、脱敏授权、密评等保和灾备演练证据。</span>
           </article>
         </div>
       </section>
@@ -143,7 +143,7 @@
               <strong>02</strong>
               <div>
                 <h3>就诊与入院</h3>
-                <p>当前从 <code>healthStatistics.serviceReports</code> 月度门急诊和入院接口总量折算日、周、月、年。现场日报接口接入后应替换为真实分时统计。</p>
+                <p>当前从 <code>healthStatistics.dailyServiceReports</code> 日报门急诊和入院接口快照汇总日、周、月、年。现场生产切换后应替换为机构级实时明细。</p>
               </div>
               <span>卫生统计</span>
             </div>
@@ -151,7 +151,7 @@
               <strong>03</strong>
               <div>
                 <h3>风险、任务和验收证据</h3>
-                <p>驾驶舱只汇总源应用 open action、风险等级、接口轨道、平台证据和现场依赖；处置、签收、办理、复核仍回到对应源应用。</p>
+                <p>系统只汇总源应用 open action、风险等级、接口轨道、平台证据和现场依赖；处置、签收、办理、复核仍回到对应源应用。</p>
               </div>
               <span>汇总入口</span>
             </div>
@@ -166,7 +166,7 @@
           <div class="rules">
             <div><strong>摘要接口</strong><span><code>/api/health-dashboard/summary</code> 返回应用、风险、任务、接口、证据、现场依赖和人口服务看板。</span></div>
             <div><strong>发布报告</strong><span><code>release-report</code> 已检查 <code>healthDashboard:populationServiceBoard</code>，确保四周期四指标存在。</span></div>
-            <div><strong>静态兜底</strong><span>API 不可用时，驾驶舱从本地快照构建相同看板，保留演示数据和空状态边界。</span></div>
+            <div><strong>静态兜底</strong><span>API 不可用时，系统从本地快照构建相同看板，保留演示数据和空状态边界。</span></div>
           </div>
         </article>
       </section>
@@ -199,38 +199,38 @@
       <section class="panel" data-dashboard-about-section="next-plan">
         <div class="panel-title">
           <h2>下一步开发计划</h2>
-          <span>围绕真实接口、数据质量、预警闭环和现场验收继续迭代</span>
+          <span>四项计划已形成可运行模块，生产切换时替换为现场真实接口与签字证据</span>
         </div>
         <div class="priority-list">
-          <article class="priority-row" data-dashboard-next-plan="daily-interface">
+          <article class="priority-row" data-dashboard-next-plan="daily-interface-done">
             <strong>01</strong>
             <div>
               <h3>接入日报与实时服务量接口</h3>
-              <p>把当前就诊、入院月度折算替换为门急诊、出入院、床位和转诊日报接口，并保留日、周、月、年口径一致性校验。</p>
+              <p>已接入门急诊、入院、出院和床位日报快照，日、周、月、年口径由日报汇总生成；生产切换时接入机构级实时接口。</p>
             </div>
             <span>数据接口</span>
           </article>
-          <article class="priority-row" data-dashboard-next-plan="certificate-exchange">
+          <article class="priority-row" data-dashboard-next-plan="certificate-exchange-done">
             <strong>02</strong>
             <div>
               <h3>完善证照交换链路</h3>
-              <p>补齐出生、死亡、电子证照、公安户籍、民政殡葬和疾控死因监测的撤销、补正、回执和跨部门对账状态。</p>
+              <p>已补齐出生、死亡、电子证照、公安户籍、民政殡葬、疾控死因监测和统计直报的撤销、补正、回执与对账状态。</p>
             </div>
             <span>证照协同</span>
           </article>
-          <article class="priority-row" data-dashboard-next-plan="risk-drilldown">
+          <article class="priority-row" data-dashboard-next-plan="risk-drilldown-done">
             <strong>03</strong>
             <div>
               <h3>增强风险下钻与任务闭环</h3>
-              <p>从汇总卡片下钻到源应用记录，展示责任人、时限、处置轨迹、复核状态和跨部门阻塞原因。</p>
+              <p>已新增风险下钻模块，从汇总待办关联源应用入口，展示责任人、时限、处置轨迹、复核状态和阻塞原因。</p>
             </div>
             <span>闭环治理</span>
           </article>
-          <article class="priority-row" data-dashboard-next-plan="site-evidence">
+          <article class="priority-row" data-dashboard-next-plan="site-evidence-done">
             <strong>04</strong>
             <div>
               <h3>沉淀现场验收证据包</h3>
-              <p>把接口联调截图、报文样例、签字单、问题整改、复测结论和上线批次材料绑定到发布报告与关于页。</p>
+              <p>已新增现场验收证据包，绑定接口报文、发布摘要、验收记录、签字单、整改复测和上线批次材料。</p>
             </div>
             <span>验收发布</span>
           </article>

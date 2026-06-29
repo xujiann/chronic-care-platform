@@ -297,8 +297,12 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(evaluationMarkdown, /Artifact coverage/);
   assert.equal(environmentJson.environmentMatrix.ok, true);
   assert.match(environmentMarkdown, /Environment matrix report/);
-  assert.equal(healthDashboardJson.healthDashboard.functionalReport.functions.length, 6);
+  assert.equal(healthDashboardJson.healthDashboard.functionalReport.functions.length, 9);
+  assert.equal(healthDashboardJson.healthDashboard.riskDrilldowns.items.length >= 4, true);
+  assert.equal(healthDashboardJson.healthDashboard.siteEvidencePackage.items.length, 4);
   assert.match(healthDashboardMarkdown, /Main function report/);
+  assert.match(healthDashboardMarkdown, /Risk drilldowns/);
+  assert.match(healthDashboardMarkdown, /Site evidence package/);
   assert.match(healthDashboardMarkdown, /Release evidence/);
   assert.equal(manifestJson.releaseArtifactManifest.ok, true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "service-acceptance"), true);

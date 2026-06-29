@@ -1665,6 +1665,28 @@ function seedHealthStatistics() {
       { institutionId: "mr4", institution: "星海湾社区卫生服务中心", interfaceData: { outpatientVisits: 14200, emergencyVisits: 360, inpatientAdmissions: 86, discharges: 84, bedDays: 1260 }, directReport: { outpatientVisits: 14120, emergencyVisits: 360, inpatientAdmissions: 84, discharges: 84, bedDays: 1260 }, status: "待复核" },
       { institutionId: "mr5", institution: "甘井子区人民医院", interfaceData: { outpatientVisits: 64200, emergencyVisits: 7200, inpatientAdmissions: 4260, discharges: 4200, bedDays: 128800 }, directReport: { outpatientVisits: 64240, emergencyVisits: 7180, inpatientAdmissions: 4260, discharges: 4196, bedDays: 128600 }, status: "待复核" }
     ],
+    dailyServiceReports: [
+      { id: "daily-service-20260610", reportDate: "2026-06-10", source: "卫生健康统计日报接口", scope: "全市医疗机构日报汇总", interfaceData: { outpatientVisits: 12000, emergencyVisits: 900, inpatientAdmissions: 720, discharges: 698, occupiedBeds: 8030 }, receiptNo: "DSR-20260610-001", status: "received", reconciled: true },
+      { id: "daily-service-20260611", reportDate: "2026-06-11", source: "卫生健康统计日报接口", scope: "全市医疗机构日报汇总", interfaceData: { outpatientVisits: 12240, emergencyVisits: 920, inpatientAdmissions: 735, discharges: 706, occupiedBeds: 8058 }, receiptNo: "DSR-20260611-001", status: "received", reconciled: true },
+      { id: "daily-service-20260612", reportDate: "2026-06-12", source: "卫生健康统计日报接口", scope: "全市医疗机构日报汇总", interfaceData: { outpatientVisits: 12580, emergencyVisits: 980, inpatientAdmissions: 760, discharges: 742, occupiedBeds: 8094 }, receiptNo: "DSR-20260612-001", status: "received", reconciled: true },
+      { id: "daily-service-20260613", reportDate: "2026-06-13", source: "卫生健康统计日报接口", scope: "全市医疗机构日报汇总", interfaceData: { outpatientVisits: 11880, emergencyVisits: 860, inpatientAdmissions: 710, discharges: 724, occupiedBeds: 8079 }, receiptNo: "DSR-20260613-001", status: "received", reconciled: true },
+      { id: "daily-service-20260614", reportDate: "2026-06-14", source: "卫生健康统计日报接口", scope: "全市医疗机构日报汇总", interfaceData: { outpatientVisits: 11650, emergencyVisits: 840, inpatientAdmissions: 705, discharges: 700, occupiedBeds: 8065 }, receiptNo: "DSR-20260614-001", status: "received", reconciled: true },
+      { id: "daily-service-20260615", reportDate: "2026-06-15", source: "卫生健康统计日报接口", scope: "全市医疗机构日报汇总", interfaceData: { outpatientVisits: 13100, emergencyVisits: 1010, inpatientAdmissions: 790, discharges: 755, occupiedBeds: 8128 }, receiptNo: "DSR-20260615-001", status: "received", reconciled: true },
+      { id: "daily-service-20260616", reportDate: "2026-06-16", source: "卫生健康统计日报接口", scope: "全市医疗机构日报汇总", interfaceData: { outpatientVisits: 12880, emergencyVisits: 960, inpatientAdmissions: 792, discharges: 768, occupiedBeds: 8150 }, receiptNo: "DSR-20260616-001", status: "received", reconciled: true }
+    ],
+    certificateExchangeLinks: [
+      { id: "exchange-birth-license", domain: "出生医学证明", source: "birthCertificates", target: "电子证照平台/公安户籍登记", owner: "妇幼健康处", status: "ready", receiptStatus: "received", receiptNo: "BIRTH-REC-20260616-001", revokeSupported: true, correctionSupported: true, reconciliationStatus: "matched", lastReceiptAt: "2026-06-16T11:20:00.000Z", nextAction: "现场替换为省电子证照与公安户籍正式回执。" },
+      { id: "exchange-death-license", domain: "死亡医学证明", source: "deathCertificates", target: "电子证照平台/人口死亡信息登记系统", owner: "医政医管处", status: "watch", receiptStatus: "partial", receiptNo: "DEATH-REC-20260616-001", revokeSupported: true, correctionSupported: true, reconciliationStatus: "pending", lastReceiptAt: "2026-06-16T09:40:00.000Z", nextAction: "补齐纸质证明回执与电子证照撤销校验样例。" },
+      { id: "exchange-cdc-cause", domain: "疾控死因监测", source: "deathStatistics", target: "疾控死因监测/法定传染病关联", owner: "疾控处", status: "watch", receiptStatus: "received", receiptNo: "CDC-CAUSE-20260616-001", revokeSupported: false, correctionSupported: true, reconciliationStatus: "variance-review", lastReceiptAt: "2026-06-16T12:10:00.000Z", nextAction: "联调死因编码修订、补报和死亡原因链质控回执。" },
+      { id: "exchange-civil-affairs", domain: "民政殡葬协同", source: "deathCertificates", target: "民政殡葬服务共享", owner: "基层卫生处/民政协同", status: "blocked", receiptStatus: "missing", receiptNo: "", revokeSupported: false, correctionSupported: false, reconciliationStatus: "missing", lastReceiptAt: "", nextAction: "现场确认民政殡葬服务接口、回执字段和数据共享协议。" },
+      { id: "exchange-statistics-direct", domain: "卫生统计直报对账", source: "healthStatistics.dailyServiceReports", target: "卫生健康统计直报系统", owner: "规划信息处", status: "ready", receiptStatus: "received", receiptNo: "STAT-DAILY-20260616-001", revokeSupported: true, correctionSupported: true, reconciliationStatus: "matched", lastReceiptAt: "2026-06-16T18:00:00.000Z", nextAction: "生产切换时接入机构级日报明细与月报差异清单。" }
+    ],
+    siteEvidencePackage: [
+      { id: "summary-json", type: "发布摘要", evidence: "release/health-dashboard-summary.json", owner: "规划信息处", status: "ready", nextAction: "随 release:report 归档。" },
+      { id: "interface-messages", type: "接口报文", evidence: "platformInterfaces + hospitalInteroperabilityFunctions", owner: "接口联调组", status: "ready", nextAction: "生产联调时替换为真实请求、响应和签名样例。" },
+      { id: "acceptance-records", type: "验收记录", evidence: "platformEvidence records", owner: "项目办", status: "ready", nextAction: "补充现场截图、签字单和复测结论。" },
+      { id: "site-signoff", type: "现场签字", evidence: "productionDeploymentPlan signoff", owner: "各级卫生健康行政部门", status: "watch", nextAction: "上线前完成身份、证照、统计、院内系统和灾备签字。" }
+    ],
     qualityRules: [
       { rule: "资源口径一致", detail: "床位、执业医生、注册护士以机构接口与统计直报系统双源比对，差异超过 1% 标记复核。", status: "已配置" },
       { rule: "诊疗量完整", detail: "门急诊、入院、出院、实际占用总床日按月汇总，缺报或异常波动进入质量清单。", status: "已配置" },

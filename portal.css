@@ -1261,3 +1261,134 @@ dialog::backdrop {
     text-align: left;
   }
 }
+
+
+.certificate-exchange-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.certificate-exchange-card {
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--blue);
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fbfd;
+}
+
+.certificate-exchange-card.ready { border-top-color: var(--green); }
+.certificate-exchange-card.watch { border-top-color: var(--amber); }
+.certificate-exchange-card.blocked { border-top-color: var(--red); }
+.certificate-exchange-card.empty { border-top-color: var(--muted); }
+
+.certificate-exchange-card span,
+.certificate-exchange-card strong,
+.certificate-exchange-card small {
+  display: block;
+}
+
+.certificate-exchange-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.certificate-exchange-card strong {
+  margin-top: 6px;
+  font-size: 16px;
+}
+
+.certificate-exchange-card small,
+.certificate-exchange-card p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.certificate-exchange-card p {
+  margin: 8px 0 0;
+}
+
+.drilldown-grid,
+.site-evidence-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.drilldown-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.drilldown-card,
+.site-evidence-card {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--blue);
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fbfd;
+}
+
+.drilldown-card.high,
+.site-evidence-card.blocked { border-left-color: var(--red); }
+.drilldown-card.medium,
+.site-evidence-card.watch { border-left-color: var(--amber); }
+.drilldown-card.normal,
+.site-evidence-card.ready { border-left-color: var(--green); }
+.drilldown-card.empty,
+.site-evidence-card.empty { border-left-color: var(--muted); }
+
+.drilldown-card span,
+.drilldown-card strong,
+.drilldown-card small,
+.site-evidence-card span,
+.site-evidence-card strong,
+.site-evidence-card small {
+  display: block;
+}
+
+.drilldown-card span,
+.site-evidence-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.drilldown-card strong,
+.site-evidence-card strong {
+  margin-top: 6px;
+  font-size: 15px;
+}
+
+.drilldown-card small,
+.drilldown-card p,
+.site-evidence-card small,
+.site-evidence-card p {
+  color: var(--muted);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.drilldown-card p,
+.site-evidence-card p {
+  margin: 8px 0 0;
+}
+
+.drilldown-card a {
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+@media (max-width: 1100px) {
+  .certificate-exchange-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .drilldown-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .certificate-exchange-grid { grid-template-columns: 1fr; }
+  .drilldown-grid { grid-template-columns: 1fr; }
+}

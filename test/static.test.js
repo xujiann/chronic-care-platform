@@ -103,7 +103,7 @@ test("health dashboard exposes the aggregate application entry and API contract"
   const release = read("scripts/release-report.js");
   const deploy = read("scripts/deploy-check.js");
 
-  assert.match(html, /卫生健康综合驾驶舱/);
+  assert.match(html, /卫生健康综合管理服务系统/);
   assert.match(html, /dashboard-applications/);
   assert.match(html, /dashboard-actions/);
   assert.match(html, /dashboard-api-state/);
@@ -117,6 +117,12 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(html, /population-chart/);
   assert.match(html, /population-insights/);
   assert.match(html, /dashboard-export-json/);
+  assert.match(html, /certificate-exchange-board/);
+  assert.match(html, /certificate-exchange-cards/);
+  assert.match(html, /risk-drilldown-board/);
+  assert.match(html, /risk-drilldown-list/);
+  assert.match(html, /site-evidence-package/);
+  assert.match(html, /site-evidence-list/);
   assert.match(html, /dashboard-interfaces/);
   assert.match(html, /dashboard-evidence/);
   assert.match(html, /dashboard-dependencies/);
@@ -131,6 +137,12 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(js, /collectStaticOpenActions/);
   assert.match(js, /buildStaticPopulationServiceBoard/);
   assert.match(js, /buildDashboardFunctionalReport/);
+  assert.match(js, /buildStaticCertificateExchange/);
+  assert.match(js, /renderCertificateExchange/);
+  assert.match(js, /buildStaticRiskDrilldowns/);
+  assert.match(js, /renderRiskDrilldowns/);
+  assert.match(js, /buildStaticSiteEvidencePackage/);
+  assert.match(js, /renderSiteEvidencePackage/);
   assert.match(js, /buildDashboardPopulationInsights/);
   assert.match(js, /renderFunctionReport/);
   assert.match(js, /renderPopulationServiceBoard/);
@@ -146,11 +158,14 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(read("portal.css"), /population-bar-fill/);
   assert.match(read("portal.css"), /population-insight/);
   assert.match(read("portal.css"), /function-report-card/);
+  assert.match(read("portal.css"), /certificate-exchange-card/);
+  assert.match(read("portal.css"), /drilldown-card/);
+  assert.match(read("portal.css"), /site-evidence-card/);
   assert.match(js, /源待办/);
   assert.match(js, /预览待办/);
   assert.match(js, /源应用/);
-  assert.match(read("auth.js"), /"health-dashboard\.html", "综合驾驶舱"/);
-  assert.match(read("auth.js"), /"health-dashboard-about\.html", "驾驶舱说明"/);
+  assert.match(read("auth.js"), /"health-dashboard\.html", "卫生健康综合管理服务系统"/);
+  assert.match(read("auth.js"), /"health-dashboard-about\.html", "系统说明"/);
   assert.match(server, /\/api\/health-dashboard\/summary/);
   assert.match(server, /buildHealthDashboardSummary/);
   assert.match(read("package.json"), /health-dashboard-applications\.js/);
@@ -180,10 +195,12 @@ test("health dashboard about page documents policies data boundary and site cuto
   assert.match(html, /\/api\/health-dashboard\/summary/);
   assert.match(html, /healthDashboard:populationServiceBoard/);
   assert.match(html, /health-dashboard:summary/);
-  assert.match(html, /data-dashboard-next-plan="daily-interface"/);
-  assert.match(html, /data-dashboard-next-plan="site-evidence"/);
+  assert.match(html, /data-dashboard-next-plan="daily-interface-done"/);
+  assert.match(html, /data-dashboard-next-plan="certificate-exchange-done"/);
+  assert.match(html, /data-dashboard-next-plan="risk-drilldown-done"/);
+  assert.match(html, /data-dashboard-next-plan="site-evidence-done"/);
   assert.match(html, /birthCertificates\.birthDateTime/);
-  assert.match(html, /healthStatistics\.serviceReports/);
+  assert.match(html, /healthStatistics\.dailyServiceReports/);
   assert.match(js, /\/api\/health-dashboard\/summary/);
   assert.match(js, /dashboard-about-runtime-state/);
   assert.match(js, /aboutRuntimeFunction/);

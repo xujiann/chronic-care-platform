@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>卫生健康综合驾驶舱</title>
+    <title>卫生健康综合管理服务系统</title>
     <link rel="stylesheet" href="./portal.css" />
     <script src="./auth.js"></script>
     <script>window.HealthCityAuth.requireRole(["commission"])</script>
@@ -13,13 +13,13 @@
       <header class="portal-header">
         <div>
           <span>优先应用 8</span>
-          <h1>卫生健康综合驾驶舱</h1>
-          <p>面向前 7 个应用的汇总入口，集中展示指标、风险、任务、接口、验收证据和现场依赖；业务办理仍回到各源应用完成。</p>
+          <h1>卫生健康综合管理服务系统</h1>
+          <p>面向各级卫生健康行政部门使用，作为前 7 个应用的汇总管理入口，集中展示指标、风险、任务、接口、验收证据和现场依赖；业务办理仍回到各源应用完成。</p>
         </div>
         <nav>
           <a href="./platform.html">平台建设</a>
           <a href="./workbench.html">运营工作台</a>
-          <a href="./health-dashboard-about.html">驾驶舱说明</a>
+          <a href="./health-dashboard-about.html">系统说明</a>
           <a href="./index.html">卫健委端</a>
           <a href="./county.html">医共体</a>
           <a href="./health-city.html">总览</a>
@@ -40,7 +40,7 @@
           </article>
           <article class="capability-card" data-dashboard-policy="online-service">
             <strong>医疗全流程在线办理</strong>
-            <span>就诊、入院、转诊、医保、取药、授权共享等流程仍由源应用承办，驾驶舱只做跨域看板和闭环追踪，避免替代业务系统。</span>
+            <span>就诊、入院、转诊、医保、取药、授权共享等流程仍由源应用承办，综合管理服务系统只做跨域看板和闭环追踪，避免替代业务系统。</span>
           </article>
           <article class="capability-card" data-dashboard-policy="certificates">
             <strong>电子证照与出生死亡管理</strong>
@@ -48,7 +48,7 @@
           </article>
           <article class="capability-card" data-dashboard-policy="security">
             <strong>数据安全与审计合规</strong>
-            <span>驾驶舱接口限管理端访问，摘要读取进入审计链；生产发布还需落实统一身份、日志留存、密评等保、备份恢复和现场签字证据。</span>
+            <span>综合管理服务系统接口限管理端访问，摘要读取进入审计链；生产发布还需落实统一身份、日志留存、密评等保、备份恢复和现场签字证据。</span>
           </article>
         </div>
         <div class="action-row">
@@ -82,12 +82,20 @@
         <p class="muted population-source" id="population-board-source">正在汇总出生、死亡、就诊、入院数据。</p>
       </section>
 
+      <section class="panel certificate-exchange-board" id="certificate-exchange-board">
+        <div class="panel-title">
+          <h2>证照交换链路</h2>
+          <span id="certificate-exchange-summary">正在汇总出生、死亡、电子证照、公安、民政、疾控和统计直报回执</span>
+        </div>
+        <div class="certificate-exchange-grid" id="certificate-exchange-cards"></div>
+      </section>
+
       <section class="panel">
         <div class="panel-title">
           <h2>数据状态</h2>
           <span id="dashboard-api-state">正在加载</span>
         </div>
-        <p id="dashboard-data-boundary">综合驾驶舱只汇总前 7 个应用的指标、风险、任务和证据；业务办理仍回到源应用完成。</p>
+        <p id="dashboard-data-boundary">综合管理服务系统面向各级卫生健康行政部门，仅汇总前 7 个应用的指标、风险、任务和证据；业务办理仍回到源应用完成。</p>
         <div class="action-row">
           <button class="inline-action" id="dashboard-export-json" type="button">导出验收 JSON</button>
         </div>
@@ -150,6 +158,24 @@
             <span>上线前需现场签字或联调确认</span>
           </div>
           <div id="dashboard-dependencies" class="rules"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide" id="risk-drilldown-board">
+          <div class="panel-title">
+            <h2>风险下钻与处置轨迹</h2>
+            <span id="risk-drilldown-summary">正在汇总责任人、时限、处置轨迹和阻塞原因</span>
+          </div>
+          <div class="drilldown-grid" id="risk-drilldown-list"></div>
+        </article>
+
+        <article class="panel" id="site-evidence-package">
+          <div class="panel-title">
+            <h2>现场验收证据包</h2>
+            <span id="site-evidence-summary">正在绑定接口报文、截图、签字单和复测结论</span>
+          </div>
+          <div class="site-evidence-grid" id="site-evidence-list"></div>
         </article>
       </section>
 
