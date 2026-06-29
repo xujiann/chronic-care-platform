@@ -139,6 +139,35 @@ function zhList(values, separator = "、") {
   return window.HealthCityLocale?.list ? window.HealthCityLocale.list(values, separator) : (Array.isArray(values) ? values : []).join(separator);
 }
 
+const OPERATIONS_EVIDENCE_LABELS = {
+  "/api/operations/dashboard": "运行监测总览接口",
+  "/api/operations/command-chains": "处置指挥链接口",
+  "/api/operations/interface-mapping": "现场联调字段映射",
+  "/api/operations/dispatch": "资源调度接口",
+  "/api/operations/reconciliation/:id/review": "统计复核接口",
+  "/api/operations/playbooks": "预警处置预案接口",
+  "/api/operations/handover": "交接班清单接口",
+  "/api/operations/handover/owners": "交接责任矩阵接口"
+};
+
+function htmlAttribute(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function evidenceLabel(value) {
+  return OPERATIONS_EVIDENCE_LABELS[value] || zh(value);
+}
+
+function evidenceList(values) {
+  const items = Array.isArray(values) ? values : [];
+  if (!items.length) return "待归档";
+  return items.map((item) => `<span title="${htmlAttribute(item)}">${evidenceLabel(item)}</span>`).join(" / ");
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   bindPerformanceControls();
   bindMonitorControls();
@@ -593,7 +622,7 @@ function renderOperationsPlaybooks(playbooks, filteredSnapshots) {
         ${(item.requiredFields || []).length ? item.requiredFields.map((field) => `<span>${field}</span>`).join("") : "<span>现场确认字段</span>"}
       </div>
       <footer>
-        <small>证据：${zhList(item.evidence || [], " / ")}</small>
+        <small>证据：${evidenceList(item.evidence)}</small>
         ${(item.activeInstitutionNames || []).length ? `<button class="inline-action compact" type="button" data-playbook-institution="${item.activeInstitutionNames[0]}">查看触发机构</button>` : ""}
       </footer>
     </article>
@@ -662,7 +691,7 @@ function renderOperationsHandover(handover, filteredSnapshots) {
         ${(item.checkpoints || []).slice(0, 4).map((checkpoint) => `<span>${checkpoint}</span>`).join("")}
       </div>
       <footer>
-        <small>证据：${zhList(item.evidence || [], " / ")}</small>
+        <small>证据：${evidenceList(item.evidence)}</small>
         <button class="inline-action compact" type="button" data-handover-institution="${item.institutionId}">查看机构</button>
       </footer>
     </article>
@@ -700,7 +729,7 @@ function renderHandoverOwnerMatrix(ownerMatrix, filteredSnapshots) {
         ${(item.stages || []).slice(0, 3).map((stage) => `<span>${stage}</span>`).join("")}
       </div>
       <p>${(item.nextActions || [])[0] || "保持常态监测。"}</p>
-      <small>证据：${zhList(item.evidence || [], " / ")}</small>
+      <small>证据：${evidenceList(item.evidence)}</small>
     </article>
   `).join("") : "<p class=\"muted\">当前筛选条件下暂无责任组交接事项。</p>";
 }

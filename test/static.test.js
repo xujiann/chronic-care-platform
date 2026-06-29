@@ -439,6 +439,10 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsJs, /HealthCityLocale/);
   assert.match(operationsJs, /zhList\(dashboard\.boundaries/);
   assert.match(operationsJs, /statusBadge\(item\.normalizedStatus\)/);
+  assert.match(operationsJs, /OPERATIONS_EVIDENCE_LABELS/);
+  assert.match(operationsJs, /运行监测总览接口/);
+  assert.match(operationsJs, /evidenceList\(item\.evidence\)/);
+  assert.doesNotMatch(operationsJs, /证据：\$\{zhList\(item\.evidence/);
   assert.doesNotMatch(operationsHtml, />high</);
   assert.doesNotMatch(operationsHtml, />pending</);
   assert.doesNotMatch(operationsHtml, /Qingniwaqiao Community Health Service Center/);
