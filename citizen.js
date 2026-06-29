@@ -186,7 +186,7 @@ const registrationSchedules = [
 const citizenModuleInterfaces = [
   { module: "健康档案", status: "已实现", api: "/api/state, /api/personal-records", collections: "residents, accounts, diseases, followups, personalRecords", boundary: "生产需接入主索引、基层公卫和居民实名关系核验" },
   { module: "电子病历", status: "已实现", api: "/api/personal-records", collections: "personalRecords.emr, labs, medications, imaging, attachments", boundary: "生产需接入 EMR/LIS/PACS 和文档存储授权" },
-  { module: "护理", status: "已实现", api: "/api/internet-nursing/dashboard, /api/internet-nursing/orders", collections: "internetNursingOrders, internetNursingNurses, taskMessages", boundary: "生产需补齐护士资质、电子签名、定位轨迹和质控监管接入" },
+  { module: "护理", status: "已实现", api: "/api/internet-nursing/dashboard, /api/internet-nursing/orders", collections: "internetNursingOrders, internetNursingNurses, taskMessages, citizenExtra.longTermCareAssessments", boundary: "生产需补齐护士资质、电子签名、定位轨迹、长期护理险和质控监管接入" },
   { module: "陪诊", status: "已实现", api: "/api/escort-services/dashboard, /api/escort-services/orders, /api/messages", collections: "escortServiceOrders, escortServiceProviders, escortWorkers, taskMessages", boundary: "生产需对接医院接诊回执、保险保障和陪诊服务主体监管" },
   { module: "挂号", status: "已实现", api: "/api/registrations/dashboard, /api/registrations/orders, /api/registrations/orders/:id/cancel", collections: "registrationSchedules, registrationOrders, taskMessages", boundary: "已具备 HIS/互联网医院号源、支付、退号、医保电子凭证和短信通知契约，生产需替换真实网关" },
   { module: "消息与待办", status: "已实现", api: "/api/messages, /api/tasks/:id/actions", collections: "taskMessages, service tasks, dataAccessLogs", boundary: "生产需接入真实短信、订阅消息、站内信送达回执和审计保全" }
