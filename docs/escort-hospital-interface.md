@@ -32,6 +32,11 @@
   "hospitalCode": "MR1",
   "hospitalCheckInStatus": "confirmed",
   "hospitalCheckInNo": "OP-MR1-20260627-008",
+  "hisVisitId": "HIS-MR1-20260627-0008",
+  "appointmentSource": "hospital-outpatient-guidance",
+  "departmentCode": "CARD",
+  "doctorCode": "DOC-CARD-01",
+  "outpatientQueueNo": "C08",
   "hospitalDepartmentContact": "Cardiology outpatient guidance desk",
   "appointmentAt": "2026-06-27T09:30:00+08:00",
   "hospitalNotice": "Arrive 20 minutes early and bring ID card.",
@@ -50,6 +55,11 @@
   "hospitalInterfaceStatus": "confirmed",
   "hospitalCheckInStatus": "confirmed",
   "hospitalCheckInNo": "OP-MR1-20260627-008",
+  "hisVisitId": "HIS-MR1-20260627-0008",
+  "appointmentSource": "hospital-outpatient-guidance",
+  "departmentCode": "CARD",
+  "doctorCode": "DOC-CARD-01",
+  "outpatientQueueNo": "C08",
   "hospitalDepartmentContact": "Cardiology outpatient guidance desk",
   "hospitalConfirmedAt": "2026-06-29T10:00:00.000Z",
   "hospitalNotice": "Arrive 20 minutes early and bring ID card."
@@ -123,3 +133,16 @@ flowchart TD
 - 确认 `auditTrail`、`dataAccessLogs`、`securityEvents` 均留痕。
 - 确认居民端 `/api/messages` 能收到医院回执通知。
 - 执行 `npm.cmd run escort:readiness` 和 `npm.cmd run deploy:check` 作为上线前验收。
+## 9. HIS / appointment source fields
+
+These fields are optional in early pilots but should be included by production hospital gateways:
+
+| Field | Source system | Purpose |
+| --- | --- | --- |
+| `hisVisitId` | HIS/registration | Stable visit or registration primary key for reconciliation. |
+| `appointmentSource` | HIS, outpatient guidance, resident mobile, escort console | Identifies where the appointment confirmation came from. |
+| `departmentCode` | Hospital department dictionary | Maps the displayed department to a production dictionary code. |
+| `doctorCode` | HIS clinic or doctor dictionary | Optional doctor or clinic code for appointment matching. |
+| `outpatientQueueNo` | Outpatient calling/queue system | Queue number shown to the resident and escort worker. |
+
+Joint testing must prove the resident card, escort console, task message, audit trail, and data access log all carry the same `hisVisitId` or the agreed site-specific equivalent.

@@ -730,6 +730,9 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   assert.match(citizenJs, /fetchCitizenEscortDashboard/);
   assert.match(citizenJs, /bindEscortAppointment/);
   assert.match(citizenJs, /\/escort-services\/orders/);
+  assert.match(citizenJs, /formatEscortHospitalHandoff/);
+  assert.match(citizenJs, /hisVisitId/);
+  assert.match(citizenJs, /outpatientQueueNo/);
   assert.match(citizenCss, /escort-appointment-layout/);
   assert.match(citizenCss, /escort-order-card/);
   assert.match(escortHtml, /requireRole\(\["commission", "institution"\]\)/);
@@ -921,6 +924,8 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(js, /renderMobileNurseCards/);
   assert.match(js, /consentAttachmentText/);
   assert.match(js, /locationTraceSummary/);
+  assert.match(js, /notificationSummary/);
+  assert.match(js, /staticNotificationDeliveries/);
   assert.match(js, /locationTracePoints/);
   assert.match(js, /renderServiceItemSelect/);
   assert.match(js, /bindNurseActionButtons/);
@@ -951,6 +956,9 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(server, /buildInternetNursingConsentAttachment/);
   assert.match(server, /appendInternetNursingTracePoint/);
   assert.match(server, /hasSignedInternetNursingConsent/);
+  assert.match(server, /buildInternetNursingNotificationDeliveries/);
+  assert.match(server, /appendInternetNursingNotifications/);
+  assert.match(server, /notificationGateway/);
   assert.match(server, /互联网护理新预约/);
   assert.match(server, /assertInternetNursingActionAllowed/);
   assert.match(server, /nurse can only operate assigned orders/);

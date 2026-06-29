@@ -1668,6 +1668,7 @@ function renderEscortAppointments(residentId) {
       <p class="muted">${item.appointmentAt || item.due || "日期待确认"} · ${item.providerName || providerName(item.providerId)}</p>
       <p>${formatEscortItems(item.serviceItems)} · ${formatSubsidy(item.subsidyType)} · 预估 ${item.feeEstimate || 0} 元</p>
       <p>合同 ${formatEscortStatus(item.contractStatus)} · 保障 ${formatEscortStatus(item.insuranceStatus)} · 回访 ${formatEscortStatus(item.qualityReview)}</p>
+      <p>${formatEscortHospitalHandoff(item)}</p>
       <span class="status ${item.priority === "high" || item.riskLevel === "high" ? "danger" : String(item.status || "").includes("requested") ? "warn" : ""}">${formatEscortStatus(item.status)}</span>
     </article>`)
     .join("") || `<p class="muted">暂无陪诊预约。提交后将同步到助医陪诊监管端和服务主体待办。</p>`;
@@ -1786,6 +1787,14 @@ function formatEscortStatus(value) {
     medium: "普通",
     low: "不急"
   }[value] || value || "待确认";
+}
+
+function formatEscortHospitalHandoff(item) {
+  const status = formatEscortStatus(item.hospitalInterfaceStatus || "pending");
+  const queue = item.outpatientQueueNo || item.hospitalCheckInNo || "待医院确认";
+  const source = item.hisVisitId || item.appointmentSource || "HIS/预约回执待同步";
+  const contact = item.hospitalDepartmentContact || item.hospitalNotice || "";
+  return `医院回执 ${status} · ${queue} · ${source}${contact ? ` · ${contact}` : ""}`;
 }
 
 function renderRegistration(residentId) {

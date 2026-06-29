@@ -47,7 +47,9 @@ function buildStaticInternetNursingDashboard(state) {
       pendingAssessment: orders.filter((item) => item.firstVisitAssessment !== "passed").length,
       consentPending: orders.filter((item) => item.informedConsent !== "signed").length,
       highRisk: orders.filter((item) => item.riskLevel === "high").length,
-      trackingActive: orders.filter((item) => item.locationTrace === "tracking").length
+      trackingActive: orders.filter((item) => item.locationTrace === "tracking").length,
+      notificationQueued: orders.flatMap((item) => item.notificationDeliveries || []).filter((item) => item.status === "queued").length,
+      notificationSent: orders.flatMap((item) => item.notificationDeliveries || []).filter((item) => item.status === "sent").length
     },
     institutions,
     nurses,
@@ -64,8 +66,22 @@ function enrichStaticNursingOrder(item) {
     consentAttachment: item.consentAttachment || (signedConsent
       ? { status: "signed", version: "internet-nursing-consent-v1", signerName: item.residentName || "居民电子签名", signedAt: item.createdAt || new Date().toISOString(), attachmentName: `internet-nursing-informed-consent-${item.id}.pdf` }
       : { status: "pending", required: true, version: "internet-nursing-consent-v1" }),
-    locationTracePoints: Array.isArray(item.locationTracePoints) ? item.locationTracePoints : []
+    locationTracePoints: Array.isArray(item.locationTracePoints) ? item.locationTracePoints : [],
+    notificationDeliveries: Array.isArray(item.notificationDeliveries) ? item.notificationDeliveries : staticNotificationDeliveries(item)
   };
+}
+
+function staticNotificationDeliveries(item) {
+  const status = String(item.status || "requested");
+  const serviceStarted = ["in-service", "completed", "closed"].includes(status);
+  const serviceFinished = ["completed", "closed"].includes(status);
+  return [
+    { event: "appointment-submitted", channel: "in_app", status: "sent" },
+    { event: "dispatch-qualified-nurse", channel: "hospital_message", status: item.nurseId ? "sent" : "queued" },
+    { event: "nurse-accept", channel: "sms", status: ["accepted", "in-service", "completed", "closed"].includes(status) ? "sent" : "queued" },
+    { event: "service-start", channel: "sms", status: serviceStarted ? "sent" : "queued" },
+    { event: "service-complete", channel: "in_app", status: serviceFinished ? "sent" : "queued" }
+  ];
 }
 
 function renderInternetNursingDashboard(dashboard) {
@@ -92,7 +108,8 @@ function renderNursingMetrics(summary) {
     ["服务订单", summary.orders || 0, `${summary.openOrders || 0} 单待处理`],
     ["首诊评估", summary.pendingAssessment || 0, "待评估"],
     ["知情同意", summary.consentPending || 0, "待签署"],
-    ["服务轨迹", summary.trackingActive || 0, "进行中轨迹"]
+    ["服务轨迹", summary.trackingActive || 0, "进行中轨迹"],
+    ["消息触达", summary.notificationQueued || 0, `${summary.notificationSent || 0} 条已发送`]
   ];
   document.querySelector("#nursing-metrics").innerHTML = metrics.map(([label, value, hint]) => `
     <article class="metric-card">
@@ -162,6 +179,15 @@ function locationTraceSummary(item) {
   return `轨迹点 ${points.length} 个 / 最近 ${stage}`;
 }
 
+function notificationSummary(item) {
+  const deliveries = Array.isArray(item?.notificationDeliveries) ? item.notificationDeliveries : [];
+  if (!deliveries.length) return "消息网关待触达";
+  const queued = deliveries.filter((row) => row.status === "queued").length;
+  const sent = deliveries.filter((row) => row.status === "sent").length;
+  const channels = [...new Set(deliveries.map((row) => displayText(row.channel || "")).filter(Boolean))].join("、");
+  return `消息 ${sent} 已发 / ${queued} 待发${channels ? ` / ${channels}` : ""}`;
+}
+
 function renderInstitutionSelect(institutions) {
   const select = document.querySelector("#nursing-institution-select");
   if (!select) return;
@@ -213,7 +239,7 @@ function renderHospitalOrders(items) {
           <td>${escapeHtml(displayText(item.serviceItem || ""))}<br><small>${escapeHtml(displayText(item.address || ""))}</small></td>
           <td>${escapeHtml(displayText(item.institution?.name || item.institutionName || ""))}<br><small>${escapeHtml(item.institutionCode || "")}</small></td>
           <td>${escapeHtml(displayText(item.nurse?.name || item.nurseName || "pending"))}<br><small>${escapeHtml(displayText(item.nurse?.registrationStatus || ""))}</small></td>
-          <td>${statusBadge(item.firstVisitAssessment)} ${statusBadge(item.informedConsent)} ${statusBadge(item.locationTrace)}<br><small>${escapeHtml(consentAttachmentText(item))}</small><br><small>${escapeHtml(locationTraceSummary(item))}</small></td>
+          <td>${statusBadge(item.firstVisitAssessment)} ${statusBadge(item.informedConsent)} ${statusBadge(item.locationTrace)}<br><small>${escapeHtml(consentAttachmentText(item))}</small><br><small>${escapeHtml(locationTraceSummary(item))}</small><br><small>${escapeHtml(notificationSummary(item))}</small></td>
           <td>${statusBadge(item.status)} ${statusBadge(item.riskLevel)}<br><small>${escapeHtml(displayText(item.qualityCallback || ""))}</small></td>
           <td>
             ${canManage ? `
@@ -244,7 +270,7 @@ function renderNurseQueue(items) {
           <td><strong>${escapeHtml(item.id)}</strong><br><small>${escapeHtml(displayText(item.serviceItem || ""))}</small></td>
           <td>${escapeHtml(item.preferredAt || "")}<br><small>${escapeHtml(displayText(item.address || ""))}</small></td>
           <td>${escapeHtml(displayText(item.residentName || item.residentId || ""))}<br><small>${escapeHtml(displayText(item.serviceObject || ""))}</small></td>
-          <td>${statusBadge(item.locationTrace)} ${statusBadge(item.serviceRecordStatus)} ${statusBadge(item.qualityCallback)}<br><small>${escapeHtml(locationTraceSummary(item))}</small></td>
+          <td>${statusBadge(item.locationTrace)} ${statusBadge(item.serviceRecordStatus)} ${statusBadge(item.qualityCallback)}<br><small>${escapeHtml(locationTraceSummary(item))}</small><br><small>${escapeHtml(notificationSummary(item))}</small></td>
           <td>${statusBadge(item.status)} ${statusBadge(item.riskLevel)}</td>
           <td>
             ${nurseActionButtons(item, canAct)}
@@ -320,6 +346,7 @@ function renderMobileNurseCards(items) {
         ${statusBadge(item.riskLevel)}
       </div>
       <small>${escapeHtml(locationTraceSummary(item))}</small>
+      <small>${escapeHtml(notificationSummary(item))}</small>
       <div class="nursing-mobile-actions">
         ${nurseActionButtons(item, canAct)}
       </div>
@@ -402,7 +429,9 @@ function bindNursingAppointmentForm() {
         });
         if (!response.ok) throw new Error(`互联网护理预约提交失败：${response.status}`);
       } else {
-        nursingDashboard.orders.unshift({ ...values, id: `ino-local-${crypto.randomUUID()}`, status: "requested", firstVisitAssessment: "pending", informedConsent: "pending", consentAttachment: { status: "pending", required: true, version: "internet-nursing-consent-v1" }, locationTrace: "pending", locationTracePoints: [], serviceRecordStatus: "pending", qualityCallback: "pending" });
+        const localOrder = { ...values, id: `ino-local-${crypto.randomUUID()}`, status: "requested", firstVisitAssessment: "pending", informedConsent: "pending", consentAttachment: { status: "pending", required: true, version: "internet-nursing-consent-v1" }, locationTrace: "pending", locationTracePoints: [], serviceRecordStatus: "pending", qualityCallback: "pending" };
+        localOrder.notificationDeliveries = staticNotificationDeliveries(localOrder);
+        nursingDashboard.orders.unshift(localOrder);
       }
       form.reset();
       if (dateInput) dateInput.value = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
@@ -473,6 +502,9 @@ function applyStaticNursingOrderAction(item, payload) {
   }
   if (payload.tracePoint) {
     updates.locationTracePoints = [...(Array.isArray(item.locationTracePoints) ? item.locationTracePoints : []), payload.tracePoint].slice(-30);
+  }
+  if (payload.action) {
+    updates.notificationDeliveries = [...staticNotificationDeliveries({ ...item, ...updates }), ...(Array.isArray(item.notificationDeliveries) ? item.notificationDeliveries : [])].slice(0, 50);
   }
   delete updates.tracePoint;
   return updates;

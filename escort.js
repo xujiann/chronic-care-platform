@@ -99,7 +99,7 @@ function renderEscortOrders(items) {
           <td>${escapeHtml(item.residentId || "")}<br><small>${escapeHtml(item.familyContactStatus || "")}</small></td>
           <td>${escapeHtml(item.provider?.name || item.providerName || item.providerId || "")}<br><small>${escapeHtml(item.district || "")}</small></td>
           <td>${escapeHtml(item.worker?.name || item.workerId || "pending")}<br><small>${escapeHtml((item.serviceItems || []).join(", "))}</small></td>
-          <td>${escapeHtml(item.hospital || "")}<br><small>${escapeHtml(item.department || "")} / ${escapeHtml(item.appointmentAt || item.due || "")}</small><br><small>${statusBadge(item.hospitalInterfaceStatus || "pending")} ${escapeHtml(item.hospitalCheckInNo || item.hospitalNotice || "")}</small></td>
+          <td>${escapeHtml(item.hospital || "")}<br><small>${escapeHtml(item.department || "")} / ${escapeHtml(item.appointmentAt || item.due || "")}</small><br><small>${statusBadge(item.hospitalInterfaceStatus || "pending")} ${escapeHtml(item.hospitalCheckInNo || item.outpatientQueueNo || item.hospitalNotice || "")}</small><br><small>${escapeHtml(item.hisVisitId || item.appointmentSource || "")} ${escapeHtml(item.departmentCode || "")} ${escapeHtml(item.doctorCode || "")}</small></td>
           <td>${statusBadge(item.subsidyType)} ${statusBadge(item.contractStatus)} ${statusBadge(item.insuranceStatus)}</td>
           <td>${statusBadge(item.status)} ${statusBadge(item.priority)}<br><small>${escapeHtml(item.qualityReview || "")}</small></td>
           <td>
@@ -237,6 +237,11 @@ async function updateEscortHospitalHandoff(id, decision) {
       decision,
       hospitalCheckInStatus: confirmed ? "confirmed" : "pending",
       hospitalCheckInNo: confirmed ? `HIS-${id}` : "",
+      hisVisitId: confirmed ? `HIS-VISIT-${id}` : "",
+      appointmentSource: "escort-console",
+      departmentCode: "OUTP",
+      doctorCode: "",
+      outpatientQueueNo: confirmed ? `Q-${id.slice(-4)}` : "",
       hospitalNotice: confirmed ? "Hospital outpatient desk confirmed the escort handoff." : "Hospital returned the handoff for supplementary appointment evidence.",
       note: confirmed ? "Confirmed from escort console." : "Returned from escort console."
     })

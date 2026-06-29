@@ -18,7 +18,14 @@ function readText(relativePath) {
 }
 
 function fallbackPolicy() {
-  return { scope: REQUIRED_POLICY_FIELDS };
+  return {
+    scope: REQUIRED_POLICY_FIELDS,
+    notificationGateway: {
+      enabled: true,
+      channels: ["in_app", "sms", "hospital_message"],
+      events: ["appointment-submitted", "dispatch-qualified-nurse", "nurse-accept", "service-start", "service-complete", "quality-review"]
+    }
+  };
 }
 
 function fallbackInstitutions() {
@@ -72,6 +79,18 @@ function hasServiceTracePoints(item) {
     item.locationTracePoints.every((point) => Number.isFinite(Number(point.lat)) && Number.isFinite(Number(point.lng)));
 }
 
+function hasNotificationGateway(policy) {
+  const gateway = policy.notificationGateway || fallbackPolicy().notificationGateway;
+  const channels = new Set(gateway.channels || []);
+  const events = new Set(gateway.events || []);
+  return gateway.enabled === true &&
+    channels.has("in_app") &&
+    channels.has("sms") &&
+    channels.has("hospital_message") &&
+    events.has("appointment-submitted") &&
+    events.has("service-complete");
+}
+
 function buildInternetNursingReadinessReport(options = {}) {
   const data = options.data ?? readJson("data/db.json");
   const pkg = options.pkg ?? readJson("package.json");
@@ -95,6 +114,7 @@ function buildInternetNursingReadinessReport(options = {}) {
     { id: "nursing:orderEvidence", passed: orders.every((item) => REQUIRED_ORDER_FIELDS.every((field) => Object.hasOwn(item, field))), detail: REQUIRED_ORDER_FIELDS.join(", ") },
     { id: "nursing:riskTrace", passed: orders.some((item) => item.riskLevel === "high") && orders.some((item) => item.locationTrace === "tracking"), detail: "risk queue and location tracking present" },
     { id: "nursing:phaseOneEvidence", passed: orders.some(hasSignedConsentAttachment) && orders.some(hasServiceTracePoints) && /buildInternetNursingConsentAttachment/.test(server) && /appendInternetNursingTracePoint/.test(server) && /consentAttachmentText/.test(frontend) && /locationTraceSummary/.test(frontend) && /电子签名附件|鐢靛瓙绛惧悕闄勪欢/.test(launchPlan) && /轨迹点|杞ㄨ抗鐐?/.test(moduleDoc + launchPlan), detail: "electronic consent attachment and service trace point list are implemented" },
+    { id: "nursing:notificationGateway", passed: hasNotificationGateway(policy) && /buildInternetNursingNotificationDeliveries/.test(server) && /appendInternetNursingNotifications/.test(server) && /notificationSummary/.test(frontend) && /消息网关|娑堟伅缃戝叧/.test(moduleDoc + launchPlan), detail: "in-app, SMS, and hospital message gateway delivery evidence is implemented" },
     { id: "nursing:api", passed: /\/api\/internet-nursing\/dashboard/.test(server) && /\/api\/internet-nursing\/orders/.test(server) && /canAccessInternetNursingOrder/.test(server), detail: "dashboard, order creation, action, and role guard present" },
     { id: "nursing:frontend", passed: /nursing-appointment-form/.test(frontend) && /nursing-nurse-queue/.test(frontend) && /nursing-risk-guidance/.test(frontend) && /fetchInternetNursingDashboard/.test(frontend), detail: "citizen, hospital, nurse, and risk guidance work areas present" },
     { id: "nursing:visibleText", passed: !hasCorruptedVisibleText(frontend) && /\u8ba2\u5355/.test(frontend) && /\u63a5\u5355/.test(frontend) && /\u9884\u7ea6\u5df2\u63d0\u4ea4/.test(frontend), detail: "visible Chinese labels and operation feedback are clean" },
