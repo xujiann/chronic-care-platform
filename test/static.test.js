@@ -165,6 +165,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal(Boolean(pkg.scripts["audit:retention"]), true);
   assert.equal(Boolean(pkg.scripts["data-quality:report"]), true);
   assert.equal(Boolean(pkg.scripts["quality-safety:report"]), true);
+  assert.equal(Boolean(pkg.scripts["quality-safety:interface-standard"]), true);
   assert.equal(Boolean(pkg.scripts["environment:matrix"]), true);
   assert.equal(Boolean(pkg.scripts["integration:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["interface:mapping"]), true);
@@ -193,6 +194,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /audit-retention-report\.md/);
   assert.match(read("README.md"), /data-quality-report\.md/);
   assert.match(read("README.md"), /quality-safety-report\.md/);
+  assert.match(read("README.md"), /quality-safety-interface-standard\.md/);
   assert.match(read("README.md"), /environment-matrix-report\.md/);
   assert.match(read("README.md"), /integration-readiness-report\.md/);
   assert.match(read("README.md"), /interface-mapping-report\.md/);
@@ -212,6 +214,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("DEPLOYMENT.md"), /audit-retention-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /data-quality-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /quality-safety-report\.md/);
+  assert.match(read("DEPLOYMENT.md"), /quality-safety-interface-standard\.md/);
   assert.match(read("DEPLOYMENT.md"), /environment-matrix-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /integration-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /interface-mapping-report\.md/);
@@ -233,6 +236,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/deploy-check.js"), /audit:retention/);
   assert.match(read("scripts/deploy-check.js"), /data-quality:report/);
   assert.match(read("scripts/deploy-check.js"), /quality-safety:report/);
+  assert.match(read("scripts/deploy-check.js"), /quality-safety:interface-standard/);
   assert.match(read("scripts/deploy-check.js"), /environment:matrix/);
   assert.match(read("scripts/deploy-check.js"), /integration:readiness/);
   assert.match(read("scripts/deploy-check.js"), /interface:mapping/);
@@ -250,6 +254,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".github/workflows/ci.yml"), /npm run audit:retention/);
   assert.match(read(".github/workflows/ci.yml"), /npm run data-quality:report/);
   assert.match(read(".github/workflows/ci.yml"), /npm run quality-safety:report/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run quality-safety:interface-standard/);
   assert.match(read(".github/workflows/ci.yml"), /npm run integration:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run interface:mapping/);
   assert.match(read(".github/workflows/ci.yml"), /npm run monitoring:readiness/);
@@ -375,6 +380,7 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(js, /canFeedback/);
   assert.match(js, /canEscalate/);
   assert.match(server, /\/api\/quality-safety\/dashboard/);
+  assert.match(server, /\/api\/quality-safety\/interface-standard/);
   assert.match(server, /\/api\/quality-safety\/issues\/:id\/dispatch/);
   assert.match(server, /\/api\/quality-safety\/rectifications\/:id\/feedback/);
   assert.match(server, /\/api\/quality-safety\/rectifications\/:id\/review/);
@@ -394,6 +400,7 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:site-signoff-tracker/);
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:go-live-readiness/);
   assert.match(read("scripts/release-report.js"), /qualitySafety:report/);
+  assert.match(read("scripts/release-report.js"), /qualitySafetyInterface:standard/);
   assert.match(read("scripts/release-report.js"), /qualitySafety:siteSignoffTracker/);
   assert.match(read("scripts/release-report.js"), /qualitySafety:goLiveReadiness/);
   assert.match(read("platform.html"), /quality-safety\.html/);

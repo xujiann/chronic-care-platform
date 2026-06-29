@@ -6,6 +6,7 @@ const { buildProcessAuditReport } = require("./scripts/process-audit");
 const { buildSiteReadinessPack, renderTemplateReadmes } = require("./scripts/site-readiness-pack");
 const { buildReleaseReport, buildServiceAcceptanceSummary } = require("./scripts/release-report");
 const { buildReleaseArtifactManifest } = require("./scripts/release-artifact-manifest");
+const { buildQualitySafetyInterfaceStandard } = require("./scripts/quality-safety-interface-standard");
 
 const PORT = Number(process.env.PORT || 5173);
 const ROOT = __dirname;
@@ -6346,6 +6347,13 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/quality-safety/dashboard");
     if (!user) return;
     sendJson(res, 200, buildQualitySafetyDashboard(readDatabase(), user));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/quality-safety/interface-standard") {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/quality-safety/interface-standard");
+    if (!user) return;
+    sendJson(res, 200, buildQualitySafetyInterfaceStandard({ data: readDatabase() }));
     return;
   }
 

@@ -13,6 +13,7 @@ const { buildMonitoringReadinessReport, renderMarkdown: renderMonitoringReadines
 const { buildOperationsReadinessReport, renderMarkdown: renderOperationsReadinessMarkdown } = require("./operations-readiness");
 const { buildProcessAuditReport, renderMarkdown: renderProcessAuditMarkdown } = require("./process-audit");
 const { buildProductionDbReadinessReport, renderMarkdown: renderProductionDbReadinessMarkdown } = require("./production-db-readiness");
+const { buildQualitySafetyInterfaceStandard, renderMarkdown: renderQualitySafetyInterfaceStandardMarkdown } = require("./quality-safety-interface-standard");
 const { buildQualitySafetyReport, renderMarkdown: renderQualitySafetyMarkdown } = require("./quality-safety-report");
 const { buildReleaseArtifactManifest, renderMarkdown: renderReleaseArtifactManifestMarkdown } = require("./release-artifact-manifest");
 const { buildSiteReadinessPack, renderMarkdown: renderSiteReadinessMarkdown, writeTemplateReadmes } = require("./site-readiness-pack");
@@ -324,6 +325,14 @@ function qualitySafetyChecks(qualitySafety) {
   ];
 }
 
+function qualitySafetyInterfaceStandardChecks(standard) {
+  return [
+    check("qualitySafetyInterface:standard", standard.ok, standard.ok ? "quality-safety institution interface standard checks passed" : "quality-safety institution interface standard checks failed", "error", "quality-safety"),
+    check("qualitySafetyInterface:interfaces", standard.summary?.interfaces >= 6, `${standard.summary?.interfaces || 0} interface documents`, "error", "quality-safety"),
+    check("qualitySafetyInterface:acceptanceChecklist", standard.summary?.acceptanceRows >= 6, `${standard.summary?.acceptanceRows || 0} acceptance rows`, "error", "quality-safety")
+  ];
+}
+
 function operationsReadinessChecks(operationsReadiness) {
   return [
     check("operations:readiness", operationsReadiness.ok, operationsReadiness.ok ? "operations readiness checks passed" : "operations readiness checks failed", "error", "operations"),
@@ -473,6 +482,7 @@ function packageChecks(pkg) {
     "audit:retention",
     "data-quality:report",
     "quality-safety:report",
+    "quality-safety:interface-standard",
     "environment:matrix",
     "integration:readiness",
     "interface:mapping",
@@ -529,6 +539,7 @@ function buildReleaseReport(options = {}) {
   const auditRetention = buildAuditRetentionReport({ data, env: options.env || process.env });
   const dataQuality = buildDataQualityReport({ data });
   const qualitySafety = buildQualitySafetyReport({ data });
+  const qualitySafetyInterfaceStandard = buildQualitySafetyInterfaceStandard({ data });
   const integrationReadiness = buildIntegrationReadinessReport({ data });
   const interfaceMapping = buildInterfaceMappingReport({ data, pkg });
   const monitoringReadiness = buildMonitoringReadinessReport({ data, pkg });
@@ -553,6 +564,7 @@ function buildReleaseReport(options = {}) {
     ...auditRetentionChecks(auditRetention),
     ...dataQualityChecks(dataQuality),
     ...qualitySafetyChecks(qualitySafety),
+    ...qualitySafetyInterfaceStandardChecks(qualitySafetyInterfaceStandard),
     ...integrationReadinessChecks(integrationReadiness),
     ...interfaceMappingChecks(interfaceMapping),
     ...monitoringReadinessChecks(monitoringReadiness),
@@ -587,6 +599,7 @@ function buildReleaseReport(options = {}) {
     auditRetention,
     dataQuality,
     qualitySafety,
+    qualitySafetyInterfaceStandard,
     integrationReadiness,
     interfaceMapping,
     monitoringReadiness,
@@ -762,6 +775,10 @@ function renderMarkdown(report) {
     "",
     "See `quality-safety-report.json` and `quality-safety-report.md` for medical quality, safety event, critical value, clinical pathway, medical record QC, mutual recognition QC, dispatch, feedback, and review evidence.",
     "",
+    "## Quality-safety institution interface standard",
+    "",
+    "See `quality-safety-interface-standard.json` and `quality-safety-interface-standard.md` for hospital-facing document control, transport, security, message envelope, field dictionaries, sample payloads, status codes, and joint-test acceptance checklist.",
+    "",
     "## Operations readiness report",
     "",
     "See `operations-readiness-report.json` and `operations-readiness-report.md` for operation routes, production deployment tracks, external dependency risks, and release operation scripts.",
@@ -866,6 +883,14 @@ function writeOutput(report, flags) {
       profile: report.profile,
       generatedAt: report.generatedAt,
       qualitySafety: report.qualitySafety
+    }, null, 2), "utf8");
+    const qualitySafetyInterfaceJson = path.join(path.dirname(output), "quality-safety-interface-standard.json");
+    fs.writeFileSync(qualitySafetyInterfaceJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      qualitySafetyInterfaceStandard: report.qualitySafetyInterfaceStandard
     }, null, 2), "utf8");
     const integrationJson = path.join(path.dirname(output), "integration-readiness-report.json");
     fs.writeFileSync(integrationJson, JSON.stringify({
@@ -973,6 +998,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(dataQualityMarkdown, renderDataQualityMarkdown(report.dataQuality), "utf8");
     const qualitySafetyMarkdown = path.join(path.dirname(markdown), "quality-safety-report.md");
     fs.writeFileSync(qualitySafetyMarkdown, renderQualitySafetyMarkdown(report.qualitySafety), "utf8");
+    const qualitySafetyInterfaceMarkdown = path.join(path.dirname(markdown), "quality-safety-interface-standard.md");
+    fs.writeFileSync(qualitySafetyInterfaceMarkdown, renderQualitySafetyInterfaceStandardMarkdown(report.qualitySafetyInterfaceStandard), "utf8");
     const integrationMarkdown = path.join(path.dirname(markdown), "integration-readiness-report.md");
     fs.writeFileSync(integrationMarkdown, renderIntegrationReadinessMarkdown(report.integrationReadiness), "utf8");
     const interfaceMappingMarkdown = path.join(path.dirname(markdown), "interface-mapping-report.md");
