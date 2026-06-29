@@ -5,6 +5,7 @@ const { spawnSync } = require("node:child_process");
 const { buildAuditRetentionReport, renderMarkdown: renderAuditRetentionMarkdown } = require("./audit-retention");
 const { buildChronicFollowupReadinessReport, renderMarkdown: renderChronicFollowupMarkdown } = require("./chronic-followup-readiness");
 const { buildChronicInstitutionInterfaceReport, renderMarkdown: renderChronicInstitutionInterfaceMarkdown } = require("./chronic-institution-interfaces");
+const { buildChronicLaunchCoreReport, renderMarkdown: renderChronicLaunchCoreMarkdown } = require("./chronic-launch-core");
 const { buildDataQualityReport, renderMarkdown: renderDataQualityMarkdown } = require("./data-quality-report");
 const { buildEvaluationEvidenceReport, renderMarkdown: renderEvaluationEvidenceMarkdown } = require("./evaluation-evidence");
 const { buildEnvironmentMatrixReport, renderMarkdown: renderEnvironmentMatrixMarkdown } = require("./environment-matrix");
@@ -273,7 +274,7 @@ function auditRetentionChecks(auditRetention) {
   ];
 }
 
-function chronicFollowupChecks(chronicFollowup, chronicInstitutionInterfaces) {
+function chronicFollowupChecks(chronicFollowup, chronicInstitutionInterfaces, chronicLaunchCore) {
   return [
     check("chronicFollowup:readiness", chronicFollowup.ok, chronicFollowup.ok ? "chronic follow-up readiness checks passed" : "chronic follow-up readiness checks failed", "error", "chronic-followup"),
     check("chronicFollowup:boundaries", chronicFollowup.summary?.passed === chronicFollowup.summary?.boundaries, `${chronicFollowup.summary?.passed || 0}/${chronicFollowup.summary?.boundaries || 0} boundaries`, "error", "chronic-followup"),
@@ -282,6 +283,7 @@ function chronicFollowupChecks(chronicFollowup, chronicInstitutionInterfaces) {
     check("chronicFollowup:residentExperience", chronicFollowup.summary?.selfMonitoringRecords >= 1 && chronicFollowup.summary?.satisfactionRecords >= 1 && chronicFollowup.summary?.familyProxyRecords >= 1, `${chronicFollowup.summary?.residentExperienceItems || 0} resident experience evidence items`, "error", "chronic-followup"),
     check("chronicFollowup:fieldIntegration", chronicFollowup.summary?.deviceMeasurementRecords >= 1 && chronicFollowup.summary?.pharmacyCallbackRecords >= 1 && chronicFollowup.summary?.familyDoctorClosureRecords >= 1 && chronicFollowup.summary?.reminderOutreachRecords >= 1, `${chronicFollowup.summary?.fieldIntegrationItems || 0} field integration evidence items`, "error", "chronic-followup"),
     check("chronicFollowup:institutionInterfaces", chronicInstitutionInterfaces?.ok && chronicInstitutionInterfaces.summary?.readyContracts === chronicInstitutionInterfaces.summary?.contracts, `${chronicInstitutionInterfaces?.summary?.readyContracts || 0}/${chronicInstitutionInterfaces?.summary?.contracts || 0} institution contracts`, "error", "chronic-followup"),
+    check("chronicFollowup:launchCore", chronicLaunchCore?.ok && chronicLaunchCore.summary?.readyItems === chronicLaunchCore.summary?.items, `${chronicLaunchCore?.summary?.readyItems || 0}/${chronicLaunchCore?.summary?.items || 0} launch core items`, "error", "chronic-followup"),
     check("chronicFollowup:feedback", chronicFollowup.summary?.feedbackRecords >= 1, `${chronicFollowup.summary?.feedbackRecords || 0} feedback records`, "error", "chronic-followup"),
     check("chronicFollowup:notifications", chronicFollowup.summary?.notificationMessages >= 1, `${chronicFollowup.summary?.notificationMessages || 0} notification messages`, "error", "chronic-followup")
   ];
@@ -531,6 +533,7 @@ function buildReleaseReport(options = {}) {
   const auditRetention = buildAuditRetentionReport({ data, env: options.env || process.env });
   const chronicFollowup = buildChronicFollowupReadinessReport({ data });
   const chronicInstitutionInterfaces = buildChronicInstitutionInterfaceReport({ data, pkg });
+  const chronicLaunchCore = buildChronicLaunchCoreReport({ data, pkg });
   const dataQuality = buildDataQualityReport({ data });
   const integrationReadiness = buildIntegrationReadinessReport({ data });
   const interfaceMapping = buildInterfaceMappingReport({ data, pkg });
@@ -554,7 +557,7 @@ function buildReleaseReport(options = {}) {
     ...storageModelChecks(storageModel),
     ...identityContractChecks(identityContract),
     ...auditRetentionChecks(auditRetention),
-    ...chronicFollowupChecks(chronicFollowup, chronicInstitutionInterfaces),
+    ...chronicFollowupChecks(chronicFollowup, chronicInstitutionInterfaces, chronicLaunchCore),
     ...dataQualityChecks(dataQuality),
     ...integrationReadinessChecks(integrationReadiness),
     ...interfaceMappingChecks(interfaceMapping),
@@ -590,6 +593,7 @@ function buildReleaseReport(options = {}) {
     auditRetention,
     chronicFollowup,
     chronicInstitutionInterfaces,
+    chronicLaunchCore,
     dataQuality,
     integrationReadiness,
     interfaceMapping,
@@ -754,6 +758,10 @@ function renderMarkdown(report) {
     "",
     "See `chronic-followup-readiness-report.json` and `chronic-followup-readiness-report.md` for screening, tiered management, post-discharge follow-up, return visit reminders, medication adherence, family doctor collaboration, and resident feedback evidence.",
     "",
+    "## Chronic launch core readiness",
+    "",
+    "See `chronic-launch-core.json` and `chronic-launch-core.md` for institution systems, identity scope, message receipts, quality model governance, and pharmacy-insurance closure evidence.",
+    "",
     "## Integration readiness report",
     "",
     "See `integration-readiness-report.json` and `integration-readiness-report.md` for P0 interface coverage, external contract readiness, idempotency, signature, and retry policy evidence.",
@@ -871,6 +879,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       chronicInstitutionInterfaces: report.chronicInstitutionInterfaces
     }, null, 2), "utf8");
+    const chronicLaunchCoreJson = path.join(path.dirname(output), "chronic-launch-core.json");
+    fs.writeFileSync(chronicLaunchCoreJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      chronicLaunchCore: report.chronicLaunchCore
+    }, null, 2), "utf8");
     const dataQualityJson = path.join(path.dirname(output), "data-quality-report.json");
     fs.writeFileSync(dataQualityJson, JSON.stringify({
       project: report.project,
@@ -985,6 +1001,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(chronicFollowupMarkdown, renderChronicFollowupMarkdown(report.chronicFollowup), "utf8");
     const chronicInstitutionInterfacesMarkdown = path.join(path.dirname(markdown), "chronic-institution-interfaces.md");
     fs.writeFileSync(chronicInstitutionInterfacesMarkdown, renderChronicInstitutionInterfaceMarkdown(report.chronicInstitutionInterfaces), "utf8");
+    const chronicLaunchCoreMarkdown = path.join(path.dirname(markdown), "chronic-launch-core.md");
+    fs.writeFileSync(chronicLaunchCoreMarkdown, renderChronicLaunchCoreMarkdown(report.chronicLaunchCore), "utf8");
     const dataQualityMarkdown = path.join(path.dirname(markdown), "data-quality-report.md");
     fs.writeFileSync(dataQualityMarkdown, renderDataQualityMarkdown(report.dataQuality), "utf8");
     const integrationMarkdown = path.join(path.dirname(markdown), "integration-readiness-report.md");

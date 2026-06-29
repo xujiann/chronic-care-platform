@@ -5,6 +5,7 @@ let platformState = fallbackState;
 document.addEventListener("DOMContentLoaded", async () => {
   platformState = await loadPlatformState(fallbackState);
   platformState.chronicFollowupSummary = await loadChronicFollowupSummary();
+  platformState.chronicLaunchCore = await loadChronicLaunchCore();
   bindInstitutionActions();
   renderAll(platformState);
 });
@@ -21,7 +22,20 @@ async function loadChronicFollowupSummary() {
   return null;
 }
 
+async function loadChronicLaunchCore() {
+  if (!institutionApiBase) return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/chronic/launch-core`);
+    if (response.ok) return await response.json();
+  } catch (error) {
+    // Static preview can render from local state.
+  }
+  return null;
+}
+
 function renderAll(state) {
+  renderChronicLaunchCore(state);
   renderChronicFollowupWorkbench(state);
   populateBirthCertificateForm(state);
   populateMultiPracticeForm(state);
@@ -128,6 +142,50 @@ function buildChronicFollowupPolicyAlignment(state) {
     ["居民自我管理与反馈", feedback.length],
     ["信息流转与处置闭环", (state.taskMessages || []).filter((item) => item.chronicFollowup && item.residentId && item.targetRole).length]
   ].map(([policy, count]) => ({ policy, count, covered: count > 0 }));
+}
+
+function fallbackChronicLaunchCore(state) {
+  const items = [
+    ["institution-systems", "机构系统联调", "chronicExternalIntegrations", "institution-integration"],
+    ["identity-scope", "身份与机构范围", "chronicIdentityScopes", "identity-integration"],
+    ["message-channels", "消息回执升级", "chronicMessageChannels", "message-platform"],
+    ["quality-model", "质控模型版本", "chronicModelGovernance", "chronic-quality-office"],
+    ["pharmacy-insurance", "药房医保闭环", "chronicPharmacyInsuranceLinks", "pharmacy-insurance"]
+  ].map(([id, title, collection, owner]) => {
+    const rows = state[collection] || [];
+    return {
+      id,
+      title,
+      owner,
+      collection,
+      ready: rows.length > 0,
+      collectionEvidence: { rows: rows.length, readyRows: rows.length }
+    };
+  });
+  return {
+    ok: items.every((item) => item.ready),
+    summary: {
+      items: items.length,
+      readyItems: items.filter((item) => item.ready).length,
+      evidenceRows: items.reduce((sum, item) => sum + item.collectionEvidence.rows, 0)
+    },
+    items
+  };
+}
+
+function renderChronicLaunchCore(state) {
+  const summaryEl = document.querySelector("#chronic-launch-core-summary");
+  const gridEl = document.querySelector("#chronic-launch-core");
+  if (!summaryEl || !gridEl) return;
+  const report = state.chronicLaunchCore || fallbackChronicLaunchCore(state);
+  summaryEl.textContent = `${report.summary.readyItems}/${report.summary.items} 项就绪 · ${report.summary.evidenceRows} 条证据`;
+  gridEl.innerHTML = (report.items || []).map((item) => {
+    const rows = item.collectionEvidence || {};
+    return `<article class="claim-card">
+      <strong>${item.title}</strong>
+      <span>${item.ready ? "PASS" : "PENDING"}<br>${item.collection} · ${rows.readyRows || 0}/${rows.rows || 0}<br>${item.owner}</span>
+    </article>`;
+  }).join("");
 }
 
 function renderChronicFollowupWorkbench(state) {

@@ -15,6 +15,7 @@ const ARTIFACTS = [
   ["audit-retention", "security", "Audit retention report", "release/audit-retention-report.json", "release/audit-retention-report.md", "audit:retention", "/api/audit/verify"],
   ["chronic-followup", "process", "Chronic follow-up readiness report", "release/chronic-followup-readiness-report.json", "release/chronic-followup-readiness-report.md", "chronic:followup-readiness", "/api/chronic/followup-summary"],
   ["chronic-institution-interfaces", "integration", "Chronic institution interface specification", "release/chronic-institution-interfaces.json", "release/chronic-institution-interfaces.md", "chronic:institution-interfaces", "/api/chronic/institution-interfaces"],
+  ["chronic-launch-core", "integration", "Chronic launch core readiness", "release/chronic-launch-core.json", "release/chronic-launch-core.md", "chronic:launch-core", "/api/chronic/launch-core"],
   ["data-quality", "data", "Data quality report", "release/data-quality-report.json", "release/data-quality-report.md", "data-quality:report", "/api/data-quality/scorecard"],
   ["environment-matrix", "environment", "Environment matrix report", "release/environment-matrix-report.json", "release/environment-matrix-report.md", "environment:matrix", "env:check:production"],
   ["integration-readiness", "integration", "Integration readiness report", "release/integration-readiness-report.json", "release/integration-readiness-report.md", "integration:readiness", "/api/integration/contracts"],
