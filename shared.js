@@ -142,6 +142,10 @@ async function updateWorkflowAction(state, collection, id, updates, note) {
     collection,
     id,
     status: updates.status,
+    action: updates.action,
+    lifecycleAction: updates.lifecycleAction,
+    correctionRequired: updates.correctionRequired,
+    publicVisible: updates.publicVisible,
     updates,
     note
   };

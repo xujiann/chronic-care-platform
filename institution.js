@@ -313,6 +313,8 @@ function renderMultiPracticeApplications(state) {
     const riskFlags = Array.isArray(item.riskFlags) ? item.riskFlags : [];
     const electronic = item.electronicRegistrationVerification || {};
     const confirmation = item.primaryPracticeConfirmation || {};
+    const conflictEvidence = Array.isArray(item.scheduleConflictEvidence) ? item.scheduleConflictEvidence : [];
+    const externalSync = item.externalSync || {};
     const applicationMessages = messages
       .filter((message) => message.collection === "multiPracticeApplications" && message.sourceId === item.id)
       .slice(0, 3);
@@ -344,13 +346,19 @@ function renderMultiPracticeApplications(state) {
           <span class="badge ${documents.publicDisclosure ? "info" : "warn"}">公开${documents.publicDisclosure ? "已纳入" : "未公开"}</span>
         </div>
         ${riskFlags.length ? `<p class="muted">补正提示：${riskFlags.join("、")}</p>` : ""}
+        ${conflictEvidence.length ? `<p class="muted">排班冲突：${conflictEvidence.map((row) => `${row.targetInstitution || "其他机构"} ${row.schedule || ""}`).join("；")}</p>` : ""}
         <p>电子化注册：${electronic.registryId || "待同步"} · ${electronic.verificationStatus || "待核验"} · 有效期 ${electronic.validUntil || "待同步"}</p>
         <p>第一执业地点电子确认：${confirmation.status || item.primaryConsent || "待确认"} · ${confirmation.confirmedByOrg || item.primaryInstitution || "第一执业地点"} · 签章 ${confirmation.signatureNo || "待签章"}</p>
+        <p>外部同步：电子注册 ${externalSync.electronicRegistration?.status || "待同步"} · 电子签章 ${externalSync.eSignature?.status || "待签"} · HIS/HR ${externalSync.hisHr?.status || "待映射"}</p>
         ${applicationMessages.length ? `<div class="list compact">${applicationMessages.map((message) => `<p><strong>${message.title}</strong>：${message.body || "待处理"} · ${String(message.createdAt || "").slice(0, 16)}</p>`).join("")}</div>` : ""}
         <p>第一执业地点：${item.primaryConsent || "待确认"} · ${item.registrationMode || "注册管理"} · 信息公开：${item.publicVisible ? "公开" : "不公开"} · 校验 ${passed}/${total}</p>
         <div class="action-row">
           ${item.primaryConsent !== "已同意" ? actionButton("multiPracticeApplications", item.id, "同意/报备", { primaryConsent: "已同意", status: "待卫健审核" }, "第一执业地点同意多点执业") : ""}
           ${item.status !== "已备案" ? actionButton("multiPracticeApplications", item.id, "备案通过", { status: "已备案", publicVisible: true }, "多点执业备案通过并公开") : ""}
+          ${!String(item.status || "").includes("退回") ? actionButton("multiPracticeApplications", item.id, "退回补正", { action: "return-correction", correctionRequired: "请补齐协议、责任保险或第一执业地点意见" }, "医院端退回补正") : ""}
+          ${!String(item.status || "").includes("暂停") ? actionButton("multiPracticeApplications", item.id, "暂停执业", { action: "suspend" }, "排班冲突或监管要求暂停执业") : ""}
+          ${!String(item.status || "").includes("撤回") ? actionButton("multiPracticeApplications", item.id, "撤回申请", { action: "withdraw" }, "医生或机构撤回多点执业申请") : ""}
+          ${!String(item.status || "").includes("终止") ? actionButton("multiPracticeApplications", item.id, "终止备案", { action: "terminate" }, "终止多点执业备案并退出公开") : ""}
         </div>
       </div>
       <span class="badge ${badge}">${item.status || "待处理"}</span>

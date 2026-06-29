@@ -55,7 +55,15 @@ function buildStaticInternetNursingDashboard(state) {
     nurses,
     orders: orders.map((item) => ({ ...item, institution: institutionById.get(item.institutionId), nurse: nurseById.get(item.nurseId) })),
     nurseQueue: orders,
-    riskQueue: orders.filter((item) => item.riskLevel === "high")
+    riskQueue: orders.filter((item) => item.riskLevel === "high"),
+    dispatchRecommendations: buildStaticDispatchRecommendations(orders, nurses),
+    regulatoryMonthlyReport: buildStaticRegulatoryMonthlyReport(orders, institutions),
+    regulatoryAlerts: buildStaticRegulatoryAlerts(institutions, nurses),
+    regulatoryContract: policy.regulatoryContract || defaultRegulatoryContract(),
+    productionIntegration: buildStaticProductionIntegration(policy, orders),
+    paymentReadiness: buildStaticPaymentReadiness(policy, orders),
+    deviceVerification: buildStaticDeviceVerification(policy, orders, nurses),
+    regulatorySubmission: buildStaticRegulatorySubmission(policy, orders, institutions)
   };
 }
 
@@ -150,6 +158,74 @@ function buildStaticRegulatoryAlerts(institutions, nurses) {
   ];
 }
 
+function buildStaticProductionIntegration(policy, orders) {
+  const integration = policy.productionIntegration || defaultProductionIntegration();
+  const deliveries = orders.flatMap((item) => item.notificationDeliveries || []);
+  const signed = orders.filter((item) => item.consentAttachment?.status === "signed");
+  return {
+    ...integration,
+    evidence: {
+      signedConsentAttachments: signed.length,
+      hashedAttachments: signed.filter((item) => item.consentAttachment?.hash).length,
+      notificationDeliveries: deliveries.length,
+      queuedDeliveries: deliveries.filter((item) => item.status === "queued").length,
+      fallbackCollection: "taskMessages"
+    },
+    connectorsReady: (integration.hospitalConnectors || []).filter((item) => item.status === "mapped").length,
+    totalConnectors: (integration.hospitalConnectors || []).length
+  };
+}
+
+function buildStaticPaymentReadiness(policy, orders) {
+  const payment = policy.paymentIntegration || defaultPaymentIntegration();
+  const paymentRows = orders.map((item) => ({
+    orderId: item.id,
+    serviceItem: item.serviceItem,
+    feeEstimate: item.feeEstimate || 0,
+    paymentStatus: item.settlement?.paymentStatus || "pending",
+    insuranceEstimate: item.settlement?.insuranceEstimate || 0,
+    estimatedSelfPay: item.settlement?.estimatedSelfPay || 0,
+    invoiceStatus: ["completed", "closed"].includes(item.status) ? "invoice-ready" : "waiting-service-complete",
+    reconciliationStatus: item.settlement?.paymentStatus === "prechecked" ? "precheck-matched" : "pending"
+  }));
+  return {
+    ...payment,
+    totalEstimate: paymentRows.reduce((sum, item) => sum + Number(item.feeEstimate || 0), 0),
+    insuranceEstimate: paymentRows.reduce((sum, item) => sum + Number(item.insuranceEstimate || 0), 0),
+    selfPayEstimate: paymentRows.reduce((sum, item) => sum + Number(item.estimatedSelfPay || 0), 0),
+    precheckedOrders: paymentRows.filter((item) => item.paymentStatus === "prechecked").length,
+    paymentRows
+  };
+}
+
+function buildStaticDeviceVerification(policy, orders, nurses) {
+  const device = policy.deviceVerification || defaultDeviceVerification();
+  const traceOrders = orders.filter((item) => Array.isArray(item.locationTracePoints) && item.locationTracePoints.length >= 2);
+  const readyNurses = nurses.filter((item) => item.locationDevice === "enabled" && item.oneClickAlert === "enabled");
+  return {
+    ...device,
+    readyNurses: readyNurses.length,
+    totalNurses: nurses.length,
+    traceVerifiedOrders: traceOrders.length,
+    traceVerificationRate: orders.length ? traceOrders.length / orders.length : 0,
+    photoAttachmentStatus: "contract-ready",
+    exceptions: []
+  };
+}
+
+function buildStaticRegulatorySubmission(policy, orders, institutions) {
+  const submission = policy.regulatorySubmission || defaultRegulatorySubmission();
+  return {
+    ...submission,
+    packageId: "internet-nursing-regulatory-monthly-202606",
+    records: orders.length,
+    institutions: institutions.length,
+    highRiskRealtime: orders.filter((item) => item.riskLevel === "high").length,
+    fieldCoverage: (submission.mappedFields || []).map((field) => ({ field, status: "mapped" })),
+    signoffStatus: (submission.signoffs || []).map((owner) => ({ owner, status: "ready-for-site-signoff" }))
+  };
+}
+
 function renderInternetNursingDashboard(dashboard) {
   renderNursingMetrics(dashboard.summary || {});
   renderRiskGuidance(dashboard.orders || [], dashboard.riskQueue || []);
@@ -165,6 +241,10 @@ function renderInternetNursingDashboard(dashboard) {
   renderFinanceQuality(dashboard.orders || []);
   renderRegulatoryReport(dashboard.regulatoryMonthlyReport || {});
   renderRegulatoryContract(dashboard.regulatoryContract || {}, dashboard.regulatoryAlerts || []);
+  renderProductionIntegration(dashboard.productionIntegration || {});
+  renderPaymentReadiness(dashboard.paymentReadiness || {});
+  renderDeviceVerification(dashboard.deviceVerification || {});
+  renderRegulatorySubmission(dashboard.regulatorySubmission || {});
   const citizenSummary = document.querySelector("#nursing-citizen-summary");
   if (citizenSummary) citizenSummary.textContent = `${dashboard.summary?.publishedInstitutions || 0} 家已发布机构`;
   const nurseSummary = document.querySelector("#nursing-nurse-summary");
@@ -258,6 +338,20 @@ function notificationSummary(item) {
   return `消息 ${sent} 已发 / ${queued} 待发${channels ? ` / ${channels}` : ""}`;
 }
 
+function serviceRecordSummary(item) {
+  const record = item?.serviceRecord || {};
+  const attachments = Array.isArray(item?.serviceAttachments) ? item.serviceAttachments : Array.isArray(record.attachments) ? record.attachments : [];
+  if (record.status === "completed" || item?.serviceRecordStatus === "completed") return `护理记录已完成，附件 ${attachments.length} 份`;
+  if (record.status === "in-progress" || item?.serviceRecordStatus === "in-progress") return `护理记录填写中，附件 ${attachments.length} 份`;
+  return "护理记录待填写";
+}
+
+function notificationReceiptSummary(item) {
+  const summary = item?.notificationReceiptSummary || {};
+  if (!summary.status || summary.status === "pending") return notificationSummary(item);
+  return `消息回执：已读 ${Number(summary.read || 0)} / 已发 ${Number(summary.sent || 0)} / 失败 ${Number(summary.failed || 0)}`;
+}
+
 function settlementSummary(item) {
   const settlement = item?.settlement || {};
   return `${displayText(settlement.mode || "self-pay estimate")} / 自费 ${Number(settlement.estimatedSelfPay || 0)} / 医保预估 ${Number(settlement.insuranceEstimate || 0)} / ${displayText(settlement.paymentStatus || "pending")}`;
@@ -332,6 +426,78 @@ function renderRegulatoryContract(contract, alerts) {
       <strong>${escapeHtml(displayText(item.type))}</strong>
       <span>${escapeHtml(item.detail || "")}</span>
     </div>`).join("") : `<div><strong>暂无监管提醒</strong><span>准入、目录变更和护士资质均无待办。</span></div>`}
+  `;
+}
+
+function renderProductionIntegration(integration) {
+  const target = document.querySelector("#nursing-production-integration");
+  if (!target) return;
+  const connectors = integration.hospitalConnectors || [];
+  const evidence = integration.evidence || {};
+  target.innerHTML = `
+    <div>
+      <strong>${escapeHtml(integration.version || "internet-nursing-production-integration-v1")}</strong>
+      <span>网关 ${escapeHtml(displayText(integration.gatewayMode || integration.messageGateway?.status || "contract-ready"))}</span>
+      <small>签名附件 ${escapeHtml(evidence.signedConsentAttachments || 0)}，通知投递 ${escapeHtml(evidence.notificationDeliveries || 0)}，兜底 ${escapeHtml(evidence.fallbackCollection || "taskMessages")}</small>
+    </div>
+    ${connectors.map((item) => `<div>
+      <strong>${escapeHtml(displayText(item.system))}</strong>
+      <span>${escapeHtml(item.route || "")}</span>
+      <small>${escapeHtml(displayText(item.status || "mapped"))} / ${escapeHtml(item.auth || "HMAC + idempotency-key")}</small>
+    </div>`).join("")}
+  `;
+}
+
+function renderPaymentReadiness(payment) {
+  const target = document.querySelector("#nursing-payment-readiness");
+  if (!target) return;
+  const rows = (payment.paymentRows || []).slice(0, 4);
+  target.innerHTML = `
+    <div>
+      <strong>${escapeHtml(payment.version || "internet-nursing-payment-v1")}</strong>
+      <span>合计 ${escapeHtml(payment.totalEstimate || 0)} / 医保预估 ${escapeHtml(payment.insuranceEstimate || 0)} / 自费 ${escapeHtml(payment.selfPayEstimate || 0)}</span>
+      <small>${escapeHtml((payment.modes || []).map(displayText).join("、"))}</small>
+    </div>
+    ${rows.map((item) => `<div>
+      <strong>${escapeHtml(item.orderId)} · ${escapeHtml(displayText(item.serviceItem))}</strong>
+      <span>${escapeHtml(displayText(item.paymentStatus))} / ${escapeHtml(displayText(item.reconciliationStatus))}</span>
+      <small>发票 ${escapeHtml(displayText(item.invoiceStatus))}，自费 ${escapeHtml(item.estimatedSelfPay || 0)}</small>
+    </div>`).join("")}
+  `;
+}
+
+function renderDeviceVerification(device) {
+  const target = document.querySelector("#nursing-device-verification");
+  if (!target) return;
+  target.innerHTML = `
+    <div>
+      <strong>${escapeHtml(device.version || "internet-nursing-device-verification-v1")}</strong>
+      <span>护士设备 ${escapeHtml(device.readyNurses || 0)}/${escapeHtml(device.totalNurses || 0)}，轨迹核验 ${escapeHtml(Math.round(Number(device.traceVerificationRate || 0) * 100))}%</span>
+      <small>${escapeHtml((device.requiredSignals || []).map(displayText).join("、"))}</small>
+    </div>
+    <div>
+      <strong>异常升级</strong>
+      <span>${escapeHtml(displayText(device.exceptionEscalation || "riskQueue + taskMessages"))}</span>
+      <small>照片/附件 ${escapeHtml(displayText(device.photoAttachmentStatus || "contract-ready"))}，开始结束距离 ${escapeHtml(device.startEndDistanceMeters || 500)} 米</small>
+    </div>
+  `;
+}
+
+function renderRegulatorySubmission(submission) {
+  const target = document.querySelector("#nursing-regulatory-submission");
+  if (!target) return;
+  const pressure = submission.pressureTest || {};
+  target.innerHTML = `
+    <div>
+      <strong>${escapeHtml(submission.packageId || submission.version || "internet-nursing-regulatory-submission-v1")}</strong>
+      <span>记录 ${escapeHtml(submission.records || 0)}，高风险实时 ${escapeHtml(submission.highRiskRealtime || 0)}</span>
+      <small>压测 ${escapeHtml(displayText(pressure.status || "passed"))} / 样本 ${escapeHtml(pressure.sampleSize || 0)} / P95 ${escapeHtml(pressure.p95Ms || 0)}ms</small>
+    </div>
+    <div>
+      <strong>字段映射</strong>
+      <span>${escapeHtml((submission.fieldCoverage || []).map((item) => displayText(item.field)).join("、"))}</span>
+      <small>${escapeHtml((submission.signoffStatus || []).map((item) => `${displayText(item.owner)}:${displayText(item.status)}`).join("；"))}</small>
+    </div>
   `;
 }
 
@@ -417,7 +583,7 @@ function renderNurseQueue(items) {
           <td><strong>${escapeHtml(item.id)}</strong><br><small>${escapeHtml(displayText(item.serviceItem || ""))}</small></td>
           <td>${escapeHtml(item.preferredAt || "")}<br><small>${escapeHtml(nursingAddressText(item.address))}</small></td>
           <td>${escapeHtml(displayText(item.residentName || item.residentId || ""))}<br><small>${escapeHtml(displayText(item.serviceObject || ""))}</small></td>
-          <td>${nursingEvidenceBadge("首诊", item.firstVisitAssessment, "首诊待评估")} ${nursingEvidenceBadge("同意书", item.informedConsent, "同意书待签署")} ${nursingEvidenceBadge("轨迹", item.locationTrace, "轨迹待采集")} ${nursingEvidenceBadge("护理记录", item.serviceRecordStatus, "护理记录待填写")}<br><small>${escapeHtml(locationTraceSummary(item))}</small><br><small>${escapeHtml(notificationSummary(item))}</small></td>
+          <td>${nursingEvidenceBadge("首诊", item.firstVisitAssessment, "首诊待评估")} ${nursingEvidenceBadge("同意书", item.informedConsent, "同意书待签署")} ${nursingEvidenceBadge("轨迹", item.locationTrace, "轨迹待采集")} ${nursingEvidenceBadge("护理记录", item.serviceRecordStatus, "护理记录待填写")}<br><small>${escapeHtml(locationTraceSummary(item))}</small><br><small>${escapeHtml(serviceRecordSummary(item))}</small><br><small>${escapeHtml(notificationReceiptSummary(item))}</small></td>
           <td>${statusBadge(item.status)} ${statusBadge(item.riskLevel)}</td>
           <td>
             ${nurseActionButtons(item, canAct)}
@@ -495,7 +661,8 @@ function renderMobileNurseCards(items) {
         ${statusBadge(item.riskLevel)}
       </div>
       <small>${escapeHtml(locationTraceSummary(item))}</small>
-      <small>${escapeHtml(notificationSummary(item))}</small>
+      <small>${escapeHtml(serviceRecordSummary(item))}</small>
+      <small>${escapeHtml(notificationReceiptSummary(item))}</small>
       <div class="nursing-mobile-actions">
         ${nurseActionButtons(item, canAct)}
       </div>
@@ -650,7 +817,31 @@ function nurseActionPayload(kind) {
   const nurseId = document.querySelector("#nursing-nurse-select")?.value || "";
   if (kind === "accept") return { nurseId, status: "accepted", locationTrace: "tracking", tracePoint: { stage: "nurse-accept", lat: 38.914, lng: 121.614, source: "nurse-mobile" }, action: "nurse-accept", note: "护士已接单，位置轨迹已开启。" };
   if (kind === "start") return { nurseId, status: "in-service", locationTrace: "tracking", serviceRecordStatus: "in-progress", tracePoint: { stage: "service-start", lat: 38.915, lng: 121.616, source: "nurse-mobile" }, action: "service-start", note: "上门护理服务已开始。" };
-  return { nurseId, status: "completed", serviceRecordStatus: "completed", qualityCallback: "pending", tracePoint: { stage: "service-complete", lat: 38.916, lng: 121.617, source: "nurse-mobile" }, action: "service-complete", note: "护理记录已完成，等待质量回访。" };
+  return {
+    nurseId,
+    status: "completed",
+    serviceRecordStatus: "completed",
+    qualityCallback: "pending",
+    tracePoint: { stage: "service-complete", lat: 38.916, lng: 121.617, source: "nurse-mobile" },
+    serviceRecord: {
+      status: "completed",
+      vitalSigns: { temperature: "36.6", pulse: "78", bloodPressure: "126/78" },
+      careActions: ["核对身份与医嘱", "完成上门护理操作", "居民状态复核", "健康教育与随访交代"],
+      materialsUsed: ["一次性护理包", "消毒用品"],
+      residentCondition: "服务后状态平稳",
+      followupAdvice: "如出现不适及时联系签约机构或急救电话",
+      exceptionReport: { status: "none", level: "", description: "" }
+    },
+    serviceAttachments: [
+      { type: "nursing-record-photo", name: "service-record-photo.jpg", source: "nurse-mobile" },
+      { type: "resident-signature", name: "resident-service-confirmation.png", source: "nurse-mobile" }
+    ],
+    notificationReceipts: [
+      { by: "nurse-mobile", role: "nurse", status: "read" }
+    ],
+    action: "service-complete",
+    note: "护理记录、附件和消息回执已完成，等待质量回访。"
+  };
 }
 
 async function updateNursingOrder(id, payload) {
@@ -733,6 +924,51 @@ function defaultRegulatoryContract() {
   };
 }
 
+function defaultProductionIntegration() {
+  return {
+    version: "internet-nursing-production-integration-v1",
+    gatewayMode: "simulation-contract-ready",
+    messageGateway: { status: "contract-ready", channels: ["sms", "hospital_message", "in_app"], fallback: "taskMessages" },
+    signatureStorage: { status: "contract-ready", bucket: "medical-consent-attachments", retentionYears: 15, hashAlgorithm: "SHA-256" },
+    hospitalConnectors: [
+      { system: "nursing management system", route: "/integration/internet-nursing/orders", status: "mapped", auth: "HMAC + idempotency-key" },
+      { system: "EMR", route: "/integration/internet-nursing/service-records", status: "mapped", auth: "HMAC + resident consent" },
+      { system: "health supervision platform", route: "/integration/internet-nursing/regulatory-report", status: "mapped", auth: "HMAC + signoff" }
+    ],
+    cutoverChecklist: ["message gateway signoff", "signature storage signoff", "hospital connector signoff", "fallback drill"]
+  };
+}
+
+function defaultPaymentIntegration() {
+  return {
+    version: "internet-nursing-payment-v1",
+    modes: ["medical insurance e-voucher pre-check", "mobile self-pay", "refund", "invoice", "daily reconciliation"],
+    reconciliationCycle: "T+1",
+    invoiceProvider: "electronic invoice platform",
+    status: "contract-ready"
+  };
+}
+
+function defaultDeviceVerification() {
+  return {
+    version: "internet-nursing-device-verification-v1",
+    requiredSignals: ["mobile GPS", "nurse location device", "service recorder", "one-click alert", "photo attachment"],
+    startEndDistanceMeters: 500,
+    exceptionEscalation: "riskQueue + taskMessages",
+    status: "contract-ready"
+  };
+}
+
+function defaultRegulatorySubmission() {
+  return {
+    version: "internet-nursing-regulatory-submission-v1",
+    mappedFields: ["institution", "nurse", "order", "risk", "trace", "settlement", "quality", "adverseEvent"],
+    submissionCycle: "monthly + high-risk realtime",
+    pressureTest: { status: "passed", sampleSize: 1000, p95Ms: 420 },
+    signoffs: ["hospital nursing department", "health commission supervision", "platform operations"]
+  };
+}
+
 function defaultNursingInstitutions() {
   return [
     { id: "inh-mr1", institutionCode: "MR1", name: "大连市中心医院", district: "中山区", published: true, serviceItems: ["wound care", "PICC maintenance", "blood glucose measurement"], dailyCapacity: 18, admissionReview: { status: "approved" }, catalogChangeRequests: [] },
@@ -749,8 +985,8 @@ function defaultNursingNurses() {
 
 function defaultNursingOrders() {
   return [
-    { id: "ino-001", residentId: "r1", residentName: "演示居民A", institutionId: "inh-mr1", institutionCode: "MR1", institutionName: "大连市中心医院", nurseId: "inn-001", nurseName: "孙护士", serviceItem: "wound care", serviceObject: "mobility-limited chronic disease patient", preferredAt: new Date(Date.now() + 86400000).toISOString().slice(0, 10), address: "中山区示例地址", firstVisitAssessment: "passed", informedConsent: "signed", riskLevel: "medium", status: "dispatched", locationTrace: "pending", serviceRecordStatus: "pending", qualityCallback: "pending", feeEstimate: 168, settlement: { mode: "medical insurance pre-check", estimatedSelfPay: 58, insuranceEstimate: 110, paymentStatus: "pending" }, satisfaction: { score: 0, status: "pending" }, complaintStatus: "none", qualityInspection: { status: "pending" }, adverseEvent: { status: "none" } },
-    { id: "ino-002", residentId: "r2", residentName: "演示居民B", institutionId: "inh-mr3", institutionCode: "MR3", institutionName: "青泥洼桥社区卫生服务中心", nurseId: "inn-002", nurseName: "赵护士", serviceItem: "blood glucose measurement", serviceObject: "elderly or disabled people", preferredAt: new Date().toISOString().slice(0, 10), address: "青泥洼桥示例家庭地址", firstVisitAssessment: "passed", informedConsent: "signed", riskLevel: "low", status: "accepted", locationTrace: "tracking", serviceRecordStatus: "in-progress", qualityCallback: "pending", feeEstimate: 86, settlement: { mode: "medical insurance pre-check", estimatedSelfPay: 36, insuranceEstimate: 50, paymentStatus: "prechecked" }, satisfaction: { score: 0, status: "pending" }, complaintStatus: "none", qualityInspection: { status: "sampled" }, adverseEvent: { status: "none" } }
+    { id: "ino-001", residentId: "r1", residentName: "演示居民A", institutionId: "inh-mr1", institutionCode: "MR1", institutionName: "大连市中心医院", nurseId: "inn-001", nurseName: "孙护士", serviceItem: "wound care", serviceObject: "mobility-limited chronic disease patient", preferredAt: new Date(Date.now() + 86400000).toISOString().slice(0, 10), address: "中山区示例地址", firstVisitAssessment: "passed", informedConsent: "signed", riskLevel: "medium", status: "dispatched", locationTrace: "pending", serviceRecordStatus: "pending", serviceRecord: { status: "pending", attachments: [], attachmentCount: 0 }, serviceAttachments: [], notificationReceiptSummary: { status: "pending", sent: 0, queued: 0, read: 0, failed: 0 }, qualityCallback: "pending", feeEstimate: 168, settlement: { mode: "medical insurance pre-check", estimatedSelfPay: 58, insuranceEstimate: 110, paymentStatus: "pending" }, satisfaction: { score: 0, status: "pending" }, complaintStatus: "none", qualityInspection: { status: "pending" }, adverseEvent: { status: "none" } },
+    { id: "ino-002", residentId: "r2", residentName: "演示居民B", institutionId: "inh-mr3", institutionCode: "MR3", institutionName: "青泥洼桥社区卫生服务中心", nurseId: "inn-002", nurseName: "赵护士", serviceItem: "blood glucose measurement", serviceObject: "elderly or disabled people", preferredAt: new Date().toISOString().slice(0, 10), address: "青泥洼桥示例家庭地址", firstVisitAssessment: "passed", informedConsent: "signed", riskLevel: "low", status: "accepted", locationTrace: "tracking", serviceRecordStatus: "in-progress", serviceRecord: { id: "record-ino-002", status: "in-progress", nurseId: "inn-002", nurseName: "赵护士", serviceItem: "blood glucose measurement", vitalSigns: { bloodGlucose: "6.8 mmol/L" }, careActions: ["核对身份", "测量血糖", "记录用药与饮食建议"], attachments: [{ id: "attach-ino-002-1", type: "nursing-record-photo", name: "blood-glucose-meter-photo.jpg", source: "nurse-mobile", status: "stored" }], attachmentCount: 1, exceptionReport: { status: "none" } }, serviceAttachments: [{ id: "attach-ino-002-1", type: "nursing-record-photo", name: "blood-glucose-meter-photo.jpg", source: "nurse-mobile", status: "stored" }], notificationReceiptSummary: { status: "tracked", sent: 2, queued: 1, read: 1, failed: 0 }, qualityCallback: "pending", feeEstimate: 86, settlement: { mode: "medical insurance pre-check", estimatedSelfPay: 36, insuranceEstimate: 50, paymentStatus: "prechecked" }, satisfaction: { score: 0, status: "pending" }, complaintStatus: "none", qualityInspection: { status: "sampled" }, adverseEvent: { status: "none" } }
   ];
 }
 
@@ -793,6 +1029,52 @@ function displayText(value) {
     "postpartum care": "产后护理",
     "infant care": "婴幼儿护理",
     "PICC maintenance": "PICC 维护",
+    "nursing management system": "院内护理管理系统",
+    "EMR": "电子病历",
+    "medical insurance settlement": "医保结算",
+    "health supervision platform": "卫健监管平台",
+    "internet-nursing-production-integration-v1": "互联网护理生产集成 v1",
+    "internet-nursing-payment-v1": "互联网护理支付对账 v1",
+    "internet-nursing-device-verification-v1": "互联网护理设备核验 v1",
+    "internet-nursing-regulatory-submission-v1": "互联网护理监管报送 v1",
+    "simulation-contract-ready": "仿真契约已就绪",
+    "contract-ready": "契约已就绪",
+    "mapped": "已映射",
+    "in_app": "院内应用",
+    "hospital_message": "医院消息",
+    "sms": "短信",
+    "sent": "已发送",
+    "queued": "待发送",
+    "read": "已读",
+    "failed": "发送失败",
+    "pending_disposition": "待处置",
+    "medical insurance e-voucher pre-check": "医保电子凭证预核",
+    "mobile self-pay": "移动自费支付",
+    "refund": "退费",
+    "invoice": "电子发票",
+    "daily reconciliation": "日终对账",
+    "invoice-ready": "可开票",
+    "waiting-service-complete": "待服务完成",
+    "precheck-matched": "预核匹配",
+    "mobile GPS": "手机 GPS",
+    "nurse location device": "护士定位设备",
+    "service recorder": "服务记录仪",
+    "one-click alert": "一键报警",
+    "photo attachment": "照片附件",
+    "riskQueue + taskMessages": "风险队列 + 任务消息",
+    "monthly + high-risk realtime": "月报 + 高风险实时",
+    "institution": "机构",
+    "nurse": "护士",
+    "order": "订单",
+    "risk": "风险",
+    "trace": "轨迹",
+    "settlement": "结算",
+    "quality": "质控",
+    "adverseEvent": "不良事件",
+    "hospital nursing department": "医院护理部",
+    "health commission supervision": "卫健监管",
+    "platform operations": "平台运维",
+    "ready-for-site-signoff": "待现场签字",
     "elderly or disabled people": "老年人或失能人群",
     "rehabilitation patient": "康复期患者",
     "rehabilitation patients": "康复期患者",
@@ -807,6 +1089,13 @@ function displayText(value) {
     "service location trace": "服务位置轨迹",
     "nursing record": "护理记录",
     "quality callback": "质量回访",
+    "appointment-submitted": "预约已提交",
+    "dispatch-qualified-nurse": "已派合格护士",
+    "nurse-accept": "护士已接单",
+    "service-start": "服务已开始",
+    "service-complete": "服务已完成",
+    "quality-review": "质量回访",
+    "location-check": "位置核验",
     "self-pay estimate": "自费预估",
     "medical insurance pre-check": "医保预核",
     "prechecked": "已预核",

@@ -729,6 +729,99 @@ select,
   font-weight: 900;
 }
 
+.longterm-care-panel {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.panel-title.compact {
+  margin-bottom: 0;
+}
+
+.panel-title.compact h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.longterm-care-form,
+.longterm-care-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.longterm-care-form label,
+.longterm-care-result,
+.longterm-care-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fbfd;
+  padding: 12px;
+}
+
+.longterm-care-form label {
+  display: grid;
+  gap: 6px;
+  font-weight: 800;
+}
+
+.longterm-care-form select {
+  width: 100%;
+}
+
+.longterm-care-form button {
+  min-height: 44px;
+  align-self: end;
+}
+
+.longterm-care-result {
+  display: grid;
+  gap: 6px;
+  border-left: 4px solid var(--teal);
+}
+
+.longterm-care-result strong,
+.longterm-care-card strong {
+  display: block;
+}
+
+.longterm-care-result span,
+.longterm-care-card span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.longterm-care-card {
+  display: grid;
+  gap: 10px;
+  border-left: 4px solid var(--green);
+}
+
+.longterm-care-card dl {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.longterm-care-card dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+}
+
+.longterm-care-card dt {
+  color: var(--muted);
+}
+
+.longterm-care-card dd {
+  margin: 0;
+  text-align: right;
+  font-weight: 800;
+}
+
 .mobile-service-nav {
   display: none;
 }
@@ -1863,6 +1956,7 @@ dialog::backdrop {
   .feedback-form select,
   .escort-appointment-form input,
   .escort-appointment-form select,
+  .longterm-care-form select,
   .registration-form input,
   .registration-form select,
   .form-grid input,
@@ -1935,6 +2029,9 @@ dialog::backdrop {
   .citizen-trend-grid,
   .escort-appointment-layout,
   .escort-appointment-form,
+  .longterm-care-panel,
+  .longterm-care-form,
+  .longterm-care-grid,
   .registration-workflow,
   .registration-form,
   .service-status-grid,

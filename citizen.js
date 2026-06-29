@@ -188,7 +188,7 @@ const citizenModuleInterfaces = [
   { module: "电子病历", status: "已实现", api: "/api/personal-records", collections: "personalRecords.emr, labs, medications, imaging, attachments", boundary: "生产需接入 EMR/LIS/PACS 和文档存储授权" },
   { module: "护理", status: "已实现", api: "/api/internet-nursing/dashboard, /api/internet-nursing/orders", collections: "internetNursingOrders, internetNursingNurses, taskMessages", boundary: "生产需补齐护士资质、电子签名、定位轨迹和质控监管接入" },
   { module: "陪诊", status: "已实现", api: "/api/escort-services/dashboard, /api/escort-services/orders, /api/messages", collections: "escortServiceOrders, escortServiceProviders, escortWorkers, taskMessages", boundary: "生产需对接医院接诊回执、保险保障和陪诊服务主体监管" },
-  { module: "挂号", status: "演示闭环", api: "citizen local registration state -> HIS/互联网医院号源待接入", collections: "citizenExtra.registrations, registrationSchedules", boundary: "生产需接入号源池、支付、退号、医保电子凭证和短信通知" },
+  { module: "挂号", status: "已实现", api: "/api/registrations/dashboard, /api/registrations/orders, /api/registrations/orders/:id/cancel", collections: "registrationSchedules, registrationOrders, taskMessages", boundary: "已具备 HIS/互联网医院号源、支付、退号、医保电子凭证和短信通知契约，生产需替换真实网关" },
   { module: "消息与待办", status: "已实现", api: "/api/messages, /api/tasks/:id/actions", collections: "taskMessages, service tasks, dataAccessLogs", boundary: "生产需接入真实短信、订阅消息、站内信送达回执和审计保全" }
 ];
 
@@ -248,7 +248,7 @@ const residentFunctionAudit = [
   { service: "emr", name: "固定取药和电子凭证", status: "已实现", evidence: "固定取药、数字凭证和访问记录进入个人视角", mobile: "状态标签不挤压正文" },
   { service: "nursing", name: "互联网护理预约", status: "已实现", evidence: "居民可进入护理服务页提交上门护理申请", mobile: "以独立护理页承载完整预约流程" },
   { service: "nursing", name: "护理订单追踪", status: "已实现", evidence: "复用机构派单、护士接单、服务记录和质控回访", mobile: "订单状态卡片移动端可读" },
-  { service: "nursing", name: "长期照护评估", status: "待开发", evidence: "需接入长期护理险、民政和医保待遇核验", mobile: "已在护理标签中显式标记待开发" },
+  { service: "nursing", name: "长期照护评估", status: "已实现", evidence: "居民端可录入失能风险、照护人、长护险和民政预核验并生成照护建议", mobile: "护理标签内表单单列触控，评估结果即时更新" },
   { service: "escort", name: "助医陪诊预约", status: "已实现", evidence: "可为本人或家庭成员提交陪诊预约", mobile: "预约表单在手机端单列输入" },
   { service: "escort", name: "陪诊合同、保险和回访", status: "已实现", evidence: "订单同步服务主体、保障类型、保险和质控状态", mobile: "订单卡片跟随陪诊标签展示" },
   { service: "registration", name: "医院号源查询", status: "已实现", evidence: "居民端展示演示号源池，按医院、科室、医生、日期、余号和费用呈现", mobile: "号源卡片单列显示，适合手机端选择" },
@@ -261,6 +261,7 @@ let activeClientChannel = clientChannelFromRoute() || localStorage.getItem(CLIEN
 let state = fallbackState;
 let citizenExtra = loadCitizenExtra();
 let escortDashboard = null;
+let registrationDashboard = null;
 let citizenMessages = [];
 let currentResidentId;
 let currentAccountId;
@@ -268,6 +269,7 @@ let currentAccountId;
 document.addEventListener("DOMContentLoaded", async () => {
   state = await loadState();
   escortDashboard = await fetchCitizenEscortDashboard();
+  registrationDashboard = await fetchCitizenRegistrationDashboard();
   citizenMessages = await fetchCitizenMessages();
   ensureAccounts();
   populateAccounts();
@@ -292,6 +294,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindFollowupFeedback();
   bindEscortAppointment();
   bindRegistrationAppointment();
+  bindLongTermCareAssessment();
   bindResidentTaskActions();
   bindCitizenMessageReceipts();
   currentAccountId = state.accounts[0]?.id;
@@ -561,7 +564,7 @@ function renderServiceSummary() {
   <div class="service-summary-actions">
     <div class="service-summary-stats">
       <span class="feature-state ready">${ready} 项已实现</span>
-      <span class="feature-state pending">${pending} 项待开发</span>
+      <span class="feature-state ${pending ? "pending" : "ready"}">${pending ? `${pending} 项待开发` : "全部已实现"}</span>
     </div>
     <a class="service-page-action" href="${internalAction ? citizenPageHref(active.key) : active.actionHref}" ${internalAction ? `data-service-action="${active.key}"` : ""}>${active.actionLabel}</a>
   </div>
@@ -595,11 +598,13 @@ function renderResidentFunctionAudit() {
   const pending = residentFunctionAudit.filter((item) => item.status === "待开发").length;
   const activeService = citizenServiceTabs.find((item) => item.key === activeServiceTab) || citizenServiceTabs[0];
   const activeItems = residentFunctionAudit.filter((item) => item.service === activeService.key);
-  summary.textContent = `${activeService.label}：${activeItems.filter((item) => item.status === "已实现").length} 项已实现，${activeItems.filter((item) => item.status === "待开发").length} 项待开发`;
+  const activeReady = activeItems.filter((item) => item.status === "已实现").length;
+  const activePending = activeItems.filter((item) => item.status === "待开发").length;
+  summary.textContent = activePending ? `${activeService.label}：${activeReady} 项已实现，${activePending} 项待开发` : `${activeService.label}：${activeReady} 项全部已实现`;
   stats.innerHTML = `
     <span class="feature-state ready">居民端共 ${residentFunctionAudit.length} 项</span>
     <span class="feature-state ready">${ready} 项已实现</span>
-    <span class="feature-state pending">${pending} 项待开发</span>
+    <span class="feature-state ${pending ? "pending" : "ready"}">${pending ? `${pending} 项待开发` : "全部已实现"}</span>
     <span class="feature-state mobile">手机端触控审计已覆盖</span>`;
   grid.innerHTML = residentFunctionAudit.map((item) => {
     const service = citizenServiceTabs.find((tab) => tab.key === item.service) || citizenServiceTabs[0];
@@ -648,6 +653,25 @@ async function fetchCitizenMessages() {
     }
   }
   return Array.isArray(state.taskMessages) ? state.taskMessages : [];
+}
+
+async function fetchCitizenRegistrationDashboard() {
+  if (API_BASE) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/registrations/dashboard`);
+      if (response.ok) return await response.json();
+    } catch (error) {
+      // Static and offline previews use local registration schedules.
+    }
+  }
+  return {
+    ok: true,
+    schedules: Array.isArray(state.registrationSchedules) && state.registrationSchedules.length ? state.registrationSchedules : registrationSchedules,
+    orders: Array.isArray(state.registrationOrders) ? state.registrationOrders : [],
+    summary: {},
+    integration: { status: "static-preview" }
+  };
 }
 
 function ensureAccounts() {
@@ -725,6 +749,7 @@ function renderCitizen(residentId) {
   renderMaternalChildContinuity(resident.id);
   renderEscortAppointments(resident.id);
   renderRegistration(resident.id);
+  renderLongTermCareAssessment(resident.id);
   renderPickups(resident.id);
   renderSeniorServices(resident.id);
   renderDigitalCredentials(resident.id);
@@ -1822,34 +1847,131 @@ function formatEscortHospitalHandoff(item) {
   return `医院回执 ${status} · ${queue} · ${source}${contact ? ` · ${contact}` : ""}`;
 }
 
+function bindLongTermCareAssessment() {
+  const form = document.querySelector("#longterm-care-form");
+  if (!form) return;
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!currentResidentId) return;
+    const values = Object.fromEntries(new FormData(form).entries());
+    const assessment = buildLongTermCareAssessment(values, currentResidentId);
+    if (!citizenExtra[currentResidentId]) citizenExtra[currentResidentId] = {};
+    if (!Array.isArray(citizenExtra[currentResidentId].longTermCareAssessments)) citizenExtra[currentResidentId].longTermCareAssessments = [];
+    citizenExtra[currentResidentId].longTermCareAssessments.unshift(assessment);
+    localStorage.setItem(CITIZEN_EXTRA_KEY, JSON.stringify(citizenExtra));
+    form.reset();
+    renderLongTermCareAssessment(currentResidentId);
+    renderResidentFunctionAudit();
+    showToast("长期照护评估已生成，照护建议已进入居民端");
+  });
+}
+
+function buildLongTermCareAssessment(values, residentId) {
+  const score = ["mobility", "selfCare", "cognition"].reduce((sum, key) => sum + Number(values[key] || 0), 0) * 20;
+  const highNeed = score >= 80 || values.insurance === "eligible" || values.civilAffairs === "home-visit";
+  return {
+    id: `ltc-${Date.now()}`,
+    residentId,
+    service: "长期照护评估",
+    channel: "居民端自评",
+    status: highNeed ? "待上门复评" : "已生成建议",
+    contact: formatCaregiver(values.caregiver),
+    nextAction: highNeed ? "推送社区照护站上门复评并同步长护险预核验" : "纳入家庭医生随访时复核",
+    careLevel: score >= 80 ? "重度失能风险" : score >= 40 ? "中度照护风险" : "轻度照护风险",
+    eligibility: formatLongTermCareEligibility(values.insurance, values.civilAffairs),
+    assessmentScore: score,
+    carePlan: highNeed ? "建议每周 2 次上门照护、用药复核、跌倒风险评估和家属照护指导" : "建议开启适老提醒、家庭监测和月度随访复核",
+    provider: values.caregiver === "institution" ? "养老/护理机构" : values.caregiver === "community" ? "社区照护站" : "家庭医生团队",
+    reviewCycle: highNeed ? "7 天内复评" : "90 天复评",
+    createdAt: new Date().toISOString()
+  };
+}
+
+function renderLongTermCareAssessment(residentId) {
+  const target = document.querySelector("#longterm-care-cards");
+  const result = document.querySelector("#longterm-care-result");
+  const summary = document.querySelector("#longterm-care-summary");
+  if (!target || !result || !summary) return;
+  const seeded = (state.seniorServices || []).filter((item) => item.residentId === residentId);
+  const generated = Array.isArray(citizenExtra[residentId]?.longTermCareAssessments) ? citizenExtra[residentId].longTermCareAssessments : [];
+  const assessments = [...generated, ...seeded].filter((item) => item.careLevel || item.assessmentScore || item.carePlan);
+  const latest = assessments[0];
+  summary.textContent = assessments.length ? `${assessments.length} 条照护评估，最近：${latest.careLevel || latest.service}` : "暂无照护评估，提交表单后生成建议";
+  result.innerHTML = latest ? `
+    <strong>${latest.careLevel || "照护风险待评估"}</strong>
+    <span>${latest.eligibility || "待遇预核验待补充"} · ${latest.reviewCycle || "随访时复核"}</span>
+    <p>${latest.carePlan || latest.nextAction || "请补充评估信息。"}</p>
+  ` : `<p class="muted">可按行动能力、自理能力、认知状态、照护人和待遇预核验生成长期照护建议。</p>`;
+  target.innerHTML = assessments.map((item) => `<article class="longterm-care-card">
+    <div>
+      <strong>${item.service || "长期照护评估"}</strong>
+      <span>${item.status || "已生成建议"}</span>
+    </div>
+    <p>${item.carePlan || item.nextAction || "照护计划待补充。"}</p>
+    <dl>
+      <div><dt>等级</dt><dd>${item.careLevel || "待评估"}</dd></div>
+      <div><dt>预核验</dt><dd>${item.eligibility || "待核验"}</dd></div>
+      <div><dt>服务团队</dt><dd>${item.provider || item.contact || "家庭医生团队"}</dd></div>
+      <div><dt>复评</dt><dd>${item.reviewCycle || "随访时复核"}</dd></div>
+    </dl>
+  </article>`).join("") || `<p class="muted">暂无长期照护评估记录。</p>`;
+}
+
+function formatCaregiver(value) {
+  return { family: "家庭照护人", community: "社区照护站", institution: "养老/护理机构" }[value] || "家庭照护人";
+}
+
+function formatLongTermCareEligibility(insurance, civilAffairs) {
+  const insuranceText = { eligible: "长护险演示条件符合", review: "长护险需人工复核", missing: "长护险材料待补充" }[insurance] || "长护险待核验";
+  const civilText = { none: "暂无民政补贴", subsidy: "疑似可享民政补贴", "home-visit": "需民政上门复评" }[civilAffairs] || "民政服务待核验";
+  return `${insuranceText}；${civilText}`;
+}
+
+function activeRegistrationSchedules() {
+  const schedules = registrationDashboard?.schedules;
+  if (Array.isArray(schedules) && schedules.length) return schedules;
+  if (Array.isArray(state.registrationSchedules) && state.registrationSchedules.length) return state.registrationSchedules;
+  return registrationSchedules;
+}
+
+function activeRegistrationOrders(residentId) {
+  const apiOrders = registrationDashboard?.orders;
+  const scopedApiOrders = Array.isArray(apiOrders) ? apiOrders.filter((item) => item.residentId === residentId) : [];
+  return [...scopedApiOrders, ...getLocalRegistrationOrders(residentId)]
+    .filter((item, index, rows) => rows.findIndex((row) => row.id === item.id) === index);
+}
+
 function renderRegistration(residentId) {
   const form = document.querySelector("#registration-form");
   const scheduleCards = document.querySelector("#registration-schedule-cards");
   const orderCards = document.querySelector("#registration-order-cards");
   if (!form || !scheduleCards || !orderCards) return;
+  const schedules = activeRegistrationSchedules();
   const selected = form.elements.scheduleId.value;
-  form.elements.scheduleId.innerHTML = registrationSchedules.map((item) => `<option value="${item.id}">${item.hospital} · ${item.department} · ${item.date} ${item.period} · ${item.remaining} 个号</option>`).join("");
-  if (selected && registrationSchedules.some((item) => item.id === selected)) form.elements.scheduleId.value = selected;
-  const orders = getRegistrationOrders(residentId);
-  scheduleCards.innerHTML = registrationSchedules.map((item) => `<article class="mini-card registration-schedule-card">
+  form.elements.scheduleId.innerHTML = schedules.map((item) => `<option value="${item.id}">${item.hospital} · ${item.department} · ${item.date} ${item.period} · ${item.remaining} 个号</option>`).join("");
+  if (selected && schedules.some((item) => item.id === selected)) form.elements.scheduleId.value = selected;
+  scheduleCards.innerHTML = schedules.map((item) => `<article class="mini-card registration-schedule-card">
     <h3>${item.hospital} · ${item.department}</h3>
-    <p class="muted">${item.date} ${item.period} · ${item.doctor} · ${item.source}</p>
-    <p>余号 ${item.remaining} 个 · 挂号费 ${item.fee} 元 · ${item.cancelBeforeHours} 小时前可取消</p>
-    <div class="visit-tags">${item.tags.map((tag) => `<span class="tag">${tag}</span>`).join("")}</div>
+    <p class="muted">${item.date} ${item.period} · ${item.doctor} · ${item.source || item.sourceSystem || "HIS号源池"}</p>
+    <p>HIS号源 ${item.hisScheduleId || item.id} · 余号 ${item.remaining} 个 · 挂号费 ${item.fee} 元</p>
+    <p>支付 ${item.paymentRequired === false ? "免预付" : "待支付"} · 医保 ${item.insuranceSupported === false ? "不支持" : "电子凭证预核验"} · ${item.cancelBeforeHours} 小时前可取消</p>
+    <div class="visit-tags">${(item.tags || []).map((tag) => `<span class="tag">${tag}</span>`).join("")}</div>
   </article>`).join("");
+  const orders = activeRegistrationOrders(residentId);
   orderCards.innerHTML = orders
     .sort((a, b) => String(a.appointmentDate || "").localeCompare(String(b.appointmentDate || "")))
     .map((item) => `<article class="mini-card registration-order-card">
       <h3>${item.hospital} · ${item.department}</h3>
       <p class="muted">${item.appointmentDate} ${item.period} · ${item.doctor} · ${item.visitType === "internet" ? "互联网复诊" : "到院就诊"}</p>
-      <p>${item.reason || "居民端预约"} · 挂号费 ${item.fee} 元</p>
-      <p>支付 ${formatRegistrationStatus(item.paymentStatus)} · 医保 ${formatRegistrationStatus(item.insuranceStatus)} · 通知 ${formatRegistrationStatus(item.notificationStatus)}</p>
+      <p>${item.reason || "居民端预约"} · 挂号费 ${item.fee} 元 · 队列 ${item.queueNo || item.registrationNo || "待回执"}</p>
+      <p>HIS ${item.hisVisitId || item.hisScheduleId || "待同步"} · 支付 ${formatRegistrationStatus(item.paymentStatus)} · 退费 ${formatRegistrationStatus(item.refundStatus)}</p>
+      <p>医保 ${formatRegistrationStatus(item.insuranceStatus)} ${item.insurancePrecheckNo ? `· ${item.insurancePrecheckNo}` : ""} · 短信 ${formatRegistrationDeliveryStatus(item)}</p>
       <div class="registration-order-actions">
         <span class="status ${item.status === "cancelled" ? "danger" : item.paymentStatus === "pending" ? "warn" : ""}">${formatRegistrationStatus(item.status)}</span>
         ${canCancelRegistration(item) ? `<button type="button" class="small-button" data-registration-cancel="${item.id}">取消预约</button>` : ""}
       </div>
     </article>`)
-    .join("") || `<p class="muted">暂无挂号预约。提交后会生成待支付、待医保核验和短信通知状态。</p>`;
+    .join("") || `<p class="muted">暂无挂号预约。提交后将生成 HIS 回执、支付、医保电子凭证和短信通知状态。</p>`;
   orderCards.querySelectorAll("[data-registration-cancel]").forEach((button) => {
     button.addEventListener("click", () => cancelRegistrationOrder(residentId, button.dataset.registrationCancel));
   });
@@ -1858,58 +1980,145 @@ function renderRegistration(residentId) {
 function bindRegistrationAppointment() {
   const form = document.querySelector("#registration-form");
   if (!form) return;
-  form.addEventListener("submit", (event) => {
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
+    const submit = form.querySelector("button[type='submit']");
     const data = Object.fromEntries(new FormData(form));
-    const schedule = registrationSchedules.find((item) => item.id === data.scheduleId) || registrationSchedules[0];
-    const order = {
-      id: `reg-local-${crypto.randomUUID()}`,
-      residentId: currentResidentId,
-      scheduleId: schedule.id,
-      hospital: schedule.hospital,
-      department: schedule.department,
-      doctor: schedule.doctor,
-      appointmentDate: schedule.date,
-      period: schedule.period,
-      visitType: data.visitType,
-      reason: data.reason,
-      fee: schedule.fee,
-      cancelBeforeHours: schedule.cancelBeforeHours,
-      status: "confirmed",
-      paymentStatus: "pending",
-      insuranceStatus: "pending",
-      notificationStatus: "queued",
-      source: "citizen-registration-demo",
-      createdAt: new Date().toISOString()
-    };
-    if (!citizenExtra[currentResidentId]) citizenExtra[currentResidentId] = {};
-    if (!Array.isArray(citizenExtra[currentResidentId].registrations)) citizenExtra[currentResidentId].registrations = [];
-    citizenExtra[currentResidentId].registrations.unshift(order);
-    localStorage.setItem(CITIZEN_EXTRA_KEY, JSON.stringify(citizenExtra));
-    form.reset();
-    renderCitizen(currentResidentId);
-    showToast("挂号预约已确认，待支付和医保电子凭证核验");
+    submit.disabled = true;
+    try {
+      let order;
+      if (API_BASE) {
+        const request = window.HealthCityAuth?.authFetch || fetch;
+        const response = await request(`${API_BASE}/registrations/orders`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...data, residentId: currentResidentId })
+        });
+        if (!response.ok) throw new Error(`挂号预约失败：${response.status}`);
+        order = await response.json();
+        registrationDashboard = await fetchCitizenRegistrationDashboard();
+        citizenMessages = await fetchCitizenMessages();
+      } else {
+        order = createLocalRegistrationOrder(currentResidentId, data);
+      }
+      if (!API_BASE) persistLocalRegistrationOrder(currentResidentId, order);
+      form.reset();
+      renderCitizen(currentResidentId);
+      showToast("挂号预约已确认，HIS、支付、医保和短信状态已更新");
+    } catch (error) {
+      const order = createLocalRegistrationOrder(currentResidentId, data);
+      persistLocalRegistrationOrder(currentResidentId, order);
+      form.reset();
+      renderCitizen(currentResidentId);
+      showToast(error.message || "已切换到本地挂号演示");
+    } finally {
+      submit.disabled = false;
+    }
   });
 }
 
-function getRegistrationOrders(residentId) {
+function createLocalRegistrationOrder(residentId, data) {
+  const schedules = activeRegistrationSchedules();
+  const schedule = schedules.find((item) => item.id === data.scheduleId) || schedules[0] || {};
+  const id = `reg-local-${crypto.randomUUID()}`;
+  return {
+    id,
+    residentId,
+    scheduleId: schedule.id,
+    hisScheduleId: schedule.hisScheduleId || schedule.id,
+    hisVisitId: `HIS-LOCAL-${id.slice(-8)}`,
+    registrationNo: `REG-LOCAL-${id.slice(-6)}`,
+    queueNo: `L${Math.floor(10 + Math.random() * 80)}`,
+    hospital: schedule.hospital,
+    hospitalCode: schedule.hospitalCode || "",
+    department: schedule.department,
+    departmentCode: schedule.departmentCode || "",
+    doctor: schedule.doctor,
+    doctorCode: schedule.doctorCode || "",
+    appointmentDate: schedule.date,
+    period: schedule.period,
+    visitType: data.visitType,
+    reason: data.reason,
+    fee: Number(schedule.fee || 0),
+    cancelBeforeHours: Number(schedule.cancelBeforeHours || 0),
+    status: "confirmed",
+    paymentStatus: schedule.paymentRequired === false ? "waived" : "pending",
+    paymentTradeNo: schedule.paymentRequired === false ? "" : `PAY-LOCAL-${id.slice(-8)}`,
+    refundStatus: "none",
+    insuranceStatus: schedule.insuranceSupported === false ? "not-supported" : "prechecked",
+    insuranceCredentialNo: "MI-DEMO-CITIZEN",
+    insurancePrecheckNo: schedule.insuranceSupported === false ? "" : `MI-PRE-LOCAL-${id.slice(-8)}`,
+    notificationStatus: "queued",
+    notificationDeliveries: [
+      { event: "registration-submitted", channel: "in_app", status: "sent" },
+      { event: "registration-submitted", channel: "sms", status: "queued" }
+    ],
+    source: schedule.sourceSystem || schedule.source || "citizen-registration-static",
+    createdAt: new Date().toISOString()
+  };
+}
+
+function persistLocalRegistrationOrder(residentId, order) {
+  if (!citizenExtra[residentId]) citizenExtra[residentId] = {};
+  if (!Array.isArray(citizenExtra[residentId].registrations)) citizenExtra[residentId].registrations = [];
+  citizenExtra[residentId].registrations = [order, ...citizenExtra[residentId].registrations.filter((item) => item.id !== order.id)];
+  localStorage.setItem(CITIZEN_EXTRA_KEY, JSON.stringify(citizenExtra));
+}
+
+function getLocalRegistrationOrders(residentId) {
   return Array.isArray(citizenExtra[residentId]?.registrations) ? citizenExtra[residentId].registrations : [];
 }
 
-function canCancelRegistration(order) {
-  return !["cancelled", "completed"].includes(order.status);
+function getRegistrationOrders(residentId) {
+  return activeRegistrationOrders(residentId);
 }
 
-function cancelRegistrationOrder(residentId, orderId) {
-  const order = getRegistrationOrders(residentId).find((item) => item.id === orderId);
+function canCancelRegistration(order) {
+  return !["cancelled", "completed", "closed"].includes(order.status);
+}
+
+async function cancelRegistrationOrder(residentId, orderId) {
+  const apiOrder = (registrationDashboard?.orders || []).find((item) => item.id === orderId);
+  if (apiOrder && API_BASE) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/registrations/orders/${encodeURIComponent(orderId)}/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: "resident cancellation from citizen portal" })
+      });
+      if (!response.ok) throw new Error(`取消挂号失败：${response.status}`);
+      registrationDashboard = await fetchCitizenRegistrationDashboard();
+      citizenMessages = await fetchCitizenMessages();
+      renderCitizen(residentId);
+      showToast("挂号预约已取消，退号、支付和短信状态已同步");
+      return;
+    } catch (error) {
+      showToast(error.message || "取消挂号失败，请稍后重试");
+      return;
+    }
+  }
+  const order = getLocalRegistrationOrders(residentId).find((item) => item.id === orderId);
   if (!order) return;
   order.status = "cancelled";
   order.paymentStatus = order.paymentStatus === "paid" ? "refund-pending" : "closed";
+  order.refundStatus = order.paymentStatus === "refund-pending" ? "refund-pending" : "not-required";
   order.notificationStatus = "queued";
+  order.notificationDeliveries = [
+    { event: "registration-cancelled", channel: "in_app", status: "sent" },
+    { event: "registration-cancelled", channel: "sms", status: "queued" },
+    ...(order.notificationDeliveries || [])
+  ];
   order.cancelledAt = new Date().toISOString();
   localStorage.setItem(CITIZEN_EXTRA_KEY, JSON.stringify(citizenExtra));
   renderCitizen(residentId);
   showToast("挂号预约已取消，通知状态已更新");
+}
+
+function formatRegistrationDeliveryStatus(item) {
+  const deliveries = Array.isArray(item.notificationDeliveries) ? item.notificationDeliveries : [];
+  const sms = deliveries.find((delivery) => delivery.channel === "sms");
+  return formatRegistrationStatus(sms?.status || item.notificationStatus);
 }
 
 function formatRegistrationStatus(value) {
@@ -1919,11 +2128,93 @@ function formatRegistrationStatus(value) {
     completed: "已完成",
     pending: "待处理",
     paid: "已支付",
+    waived: "免预付",
     closed: "已关闭",
-    "refund-pending": "待退费",
+    "refund-pending": "待退款",
+    "not-required": "无需退款",
+    "not-supported": "不支持",
+    prechecked: "已预核验",
     queued: "待通知",
-    sent: "已通知"
+    sent: "已通知",
+    none: "无",
+    available: "可预约"
   }[value] || value || "待处理";
+}
+
+function bindLongTermCareAssessment() {
+  const form = document.querySelector("#longterm-care-form");
+  if (!form) return;
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!currentResidentId) return;
+    const values = Object.fromEntries(new FormData(form).entries());
+    const score = ["mobility", "selfCare", "cognition"].reduce((sum, key) => sum + Number(values[key] || 0), 0) * 20;
+    const highNeed = score >= 80 || values.insurance === "eligible" || values.civilAffairs === "home-visit";
+    const assessment = {
+      id: `ltc-${Date.now()}`,
+      residentId: currentResidentId,
+      service: "长期照护评估",
+      channel: "居民端自评",
+      status: highNeed ? "待上门复评" : "已生成建议",
+      contact: formatCaregiver(values.caregiver),
+      nextAction: highNeed ? "推送社区照护站上门复评并同步长护险预核验" : "纳入家庭医生随访时复核",
+      careLevel: score >= 80 ? "重度失能风险" : score >= 40 ? "中度照护风险" : "轻度照护风险",
+      eligibility: formatLongTermCareEligibility(values.insurance, values.civilAffairs),
+      assessmentScore: score,
+      carePlan: highNeed ? "建议每周 2 次上门照护、用药复核、跌倒风险评估和家属照护指导" : "建议开启适老提醒、家庭监测和月度随访复核",
+      provider: values.caregiver === "institution" ? "养老/护理机构" : values.caregiver === "community" ? "社区照护站" : "家庭医生团队",
+      reviewCycle: highNeed ? "7 天内复评" : "90 天复评",
+      createdAt: new Date().toISOString()
+    };
+    if (!citizenExtra[currentResidentId]) citizenExtra[currentResidentId] = {};
+    if (!Array.isArray(citizenExtra[currentResidentId].longTermCareAssessments)) citizenExtra[currentResidentId].longTermCareAssessments = [];
+    citizenExtra[currentResidentId].longTermCareAssessments.unshift(assessment);
+    localStorage.setItem(CITIZEN_EXTRA_KEY, JSON.stringify(citizenExtra));
+    form.reset();
+    renderLongTermCareAssessment(currentResidentId);
+    renderResidentFunctionAudit();
+    showToast("长期照护评估已生成，照护建议已进入居民端");
+  });
+}
+
+function renderLongTermCareAssessment(residentId) {
+  const target = document.querySelector("#longterm-care-cards");
+  const result = document.querySelector("#longterm-care-result");
+  const summary = document.querySelector("#longterm-care-summary");
+  if (!target || !result || !summary) return;
+  const seeded = (state.seniorServices || []).filter((item) => item.residentId === residentId);
+  const generated = Array.isArray(citizenExtra[residentId]?.longTermCareAssessments) ? citizenExtra[residentId].longTermCareAssessments : [];
+  const assessments = [...generated, ...seeded].filter((item) => item.careLevel || item.assessmentScore || item.carePlan);
+  const latest = assessments[0];
+  summary.textContent = assessments.length ? `${assessments.length} 条照护评估，最近：${latest.careLevel || latest.service}` : "暂无照护评估，提交表单后生成建议";
+  result.innerHTML = latest ? `
+    <strong>${latest.careLevel || "照护风险待评估"}</strong>
+    <span>${latest.eligibility || "待遇预核验待补充"} · ${latest.reviewCycle || "随访时复核"}</span>
+    <p>${latest.carePlan || latest.nextAction || "请补充评估信息。"}</p>
+  ` : `<p class="muted">可按行动能力、自理能力、认知状态、照护人和待遇预核验生成长期照护建议。</p>`;
+  target.innerHTML = assessments.map((item) => `<article class="longterm-care-card">
+    <div>
+      <strong>${item.service || "长期照护评估"}</strong>
+      <span>${item.status || "已生成建议"}</span>
+    </div>
+    <p>${item.carePlan || item.nextAction || "照护计划待补充。"}</p>
+    <dl>
+      <div><dt>等级</dt><dd>${item.careLevel || "待评估"}</dd></div>
+      <div><dt>预核验</dt><dd>${item.eligibility || "待核验"}</dd></div>
+      <div><dt>服务团队</dt><dd>${item.provider || item.contact || "家庭医生团队"}</dd></div>
+      <div><dt>复评</dt><dd>${item.reviewCycle || "随访时复核"}</dd></div>
+    </dl>
+  </article>`).join("") || `<p class="muted">暂无长期照护评估记录。</p>`;
+}
+
+function formatCaregiver(value) {
+  return { family: "家庭照护人", community: "社区照护站", institution: "养老/护理机构" }[value] || "家庭照护人";
+}
+
+function formatLongTermCareEligibility(insurance, civilAffairs) {
+  const insuranceText = { eligible: "长护险演示条件符合", review: "长护险需人工复核", missing: "长护险材料待补充" }[insurance] || "长护险待核验";
+  const civilText = { none: "暂无民政补贴", subsidy: "疑似可享民政补贴", "home-visit": "需民政上门复评" }[civilAffairs] || "民政服务待核验";
+  return `${insuranceText}，${civilText}`;
 }
 
 function renderPickups(residentId) {

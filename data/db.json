@@ -139,6 +139,12 @@
       "source": "家庭医生随访",
       "status": "稳定管理",
       "note": "按季度复查",
+      "careLevel": "中度失能",
+      "eligibility": "长护险待遇已核验",
+      "assessmentScore": 72,
+      "carePlan": "每周 2 次上门协助取药、血压复测和用药提醒",
+      "provider": "青泥洼桥社区照护团队",
+      "reviewCycle": "30 天复评",
       "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     }
   ],
@@ -152,6 +158,12 @@
       "status": "已逾期",
       "result": "未记录",
       "advice": "补充电话随访",
+      "careLevel": "轻度风险",
+      "eligibility": "暂不触发长护险待遇",
+      "assessmentScore": 38,
+      "carePlan": "手机大字模式、家庭血压上传和家庭医生月度复核",
+      "provider": "刘医生家庭医生团队",
+      "reviewCycle": "90 天复评",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
@@ -163,6 +175,12 @@
       "status": "待随访",
       "result": "未记录",
       "advice": "复测空腹血糖",
+      "careLevel": "自理",
+      "eligibility": "医保电子凭证待核验",
+      "assessmentScore": 18,
+      "carePlan": "社区帮办绑定凭证，糖尿病随访时同步复核照护风险",
+      "provider": "星海湾社区服务站",
+      "reviewCycle": "随访时复核",
       "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
@@ -1416,14 +1434,14 @@
     ],
     "metrics": {
       "total": 5,
-      "firstIssued": 3,
+      "firstIssued": 4,
       "reissued": 1,
       "signed": 1,
       "reported": 3,
       "electronicLicenses": 1,
       "publicSecuritySynced": 1,
       "maternalChildSynced": 2,
-      "pending": 3,
+      "pending": 4,
       "lowBirthWeight": 2,
       "qualityPass": 1
     },
@@ -1431,7 +1449,7 @@
       {
         "region": "市级",
         "births": 4,
-        "firstIssueRate": "75%",
+        "firstIssueRate": "100%",
         "publicSecuritySyncRate": "25%",
         "lowBirthWeight": 2
       },
@@ -2241,19 +2259,6 @@
         "scheduleConflict": false,
         "publicDisclosure": true
       },
-      "electronicRegistrationVerification": {
-        "registryId": "ER-DL-210202-0001",
-        "sourceSystem": "医师电子化注册系统",
-        "syncedAt": "2026-06-15T09:10:00+08:00",
-        "verificationStatus": "已核验",
-        "licenseMatched": true,
-        "categoryMatched": true,
-        "scopeMatched": true,
-        "primaryInstitutionMatched": true,
-        "inForce": true,
-        "validUntil": "2029-12-31",
-        "signatureNo": "DL-ER-SIGN-20260615-001"
-      },
       "primaryPracticeConfirmation": {
         "status": "已电子确认",
         "mode": "第一执业地点电子签章",
@@ -2302,7 +2307,20 @@
         "publicHospitalLeaderRestricted": false
       },
       "publicVisible": true,
-      "lastUpdated": "2026-06-17T09:00:00.000Z"
+      "lastUpdated": "2026-06-17T09:00:00.000Z",
+      "electronicRegistrationVerification": {
+        "registryId": "ER-DL-210202-0001",
+        "sourceSystem": "医师电子化注册系统",
+        "syncedAt": "2026-06-15T09:10:00+08:00",
+        "verificationStatus": "已核验",
+        "licenseMatched": true,
+        "categoryMatched": true,
+        "scopeMatched": true,
+        "primaryInstitutionMatched": true,
+        "inForce": true,
+        "validUntil": "2029-12-31",
+        "signatureNo": "DL-ER-SIGN-20260615-001"
+      }
     },
     {
       "id": "mp-002",
@@ -2329,19 +2347,6 @@
         "liabilityInsurance": true,
         "scheduleConflict": false,
         "publicDisclosure": true
-      },
-      "electronicRegistrationVerification": {
-        "registryId": "ER-DL-210200-0002",
-        "sourceSystem": "医师电子化注册系统",
-        "syncedAt": "2026-06-15T09:25:00+08:00",
-        "verificationStatus": "已核验",
-        "licenseMatched": true,
-        "categoryMatched": true,
-        "scopeMatched": true,
-        "primaryInstitutionMatched": true,
-        "inForce": true,
-        "validUntil": "2030-06-30",
-        "signatureNo": "DL-ER-SIGN-20260615-002"
       },
       "primaryPracticeConfirmation": {
         "status": "医联体帮扶免办",
@@ -2391,7 +2396,20 @@
         "publicHospitalLeaderRestricted": false
       },
       "publicVisible": true,
-      "lastUpdated": "2026-06-16T10:30:00.000Z"
+      "lastUpdated": "2026-06-16T10:30:00.000Z",
+      "electronicRegistrationVerification": {
+        "registryId": "ER-DL-210200-0002",
+        "sourceSystem": "医师电子化注册系统",
+        "syncedAt": "2026-06-15T09:25:00+08:00",
+        "verificationStatus": "已核验",
+        "licenseMatched": true,
+        "categoryMatched": true,
+        "scopeMatched": true,
+        "primaryInstitutionMatched": true,
+        "inForce": true,
+        "validUntil": "2030-06-30",
+        "signatureNo": "DL-ER-SIGN-20260615-002"
+      }
     }
   ],
   "chronicScreeningTasks": [
@@ -4133,6 +4151,7 @@
       "workerId": "ew-pd-002",
       "district": "Pudong",
       "hospital": "Dalian Central Hospital outpatient clinic demo",
+      "hospitalCode": "MR1",
       "department": "Cardiology",
       "appointmentAt": "2026-06-23",
       "due": "2026-06-23",
@@ -4154,7 +4173,6 @@
       "qualityReview": "pending",
       "complaintStatus": "none",
       "satisfaction": "pending",
-      "hospitalCode": "MR1",
       "hospitalInterfaceStatus": "confirmed",
       "hospitalCheckInStatus": "confirmed",
       "hospitalCheckInNo": "OP-MR1-20260622-001",
@@ -4183,6 +4201,7 @@
       "workerId": "ew-xh-001",
       "district": "Xuhui",
       "hospital": "Community follow-up clinic demo",
+      "hospitalCode": "MR3",
       "department": "Endocrinology",
       "appointmentAt": "2026-06-24",
       "due": "2026-06-24",
@@ -4204,7 +4223,6 @@
       "qualityReview": "pending",
       "complaintStatus": "none",
       "satisfaction": "pending",
-      "hospitalCode": "MR3",
       "hospitalInterfaceStatus": "pending",
       "hospitalCheckInStatus": "pending",
       "hospitalCheckInNo": "",
@@ -4233,6 +4251,7 @@
       "workerId": "ew-hk-001",
       "district": "Hongkou",
       "hospital": "Specialist outpatient demo",
+      "hospitalCode": "",
       "department": "Ophthalmology",
       "appointmentAt": "2026-06-21",
       "due": "2026-06-22",
@@ -4252,7 +4271,6 @@
       "qualityReview": "follow-up-call-required",
       "complaintStatus": "none",
       "satisfaction": "pending",
-      "hospitalCode": "",
       "hospitalInterfaceStatus": "returned",
       "hospitalCheckInStatus": "completed",
       "hospitalCheckInNo": "TB-HK-20260621-002",
@@ -4271,6 +4289,156 @@
           "action": "service-completed",
           "by": "escort-worker",
           "note": "Quality review callback required."
+        }
+      ]
+    }
+  ],
+  "registrationSchedules": [
+    {
+      "id": "reg-sch-cardio-am",
+      "hisScheduleId": "HIS-SCH-MR1-CARD-20260631-AM",
+      "hospitalCode": "MR1",
+      "hospital": "Dalian Central Hospital outpatient clinic demo",
+      "departmentCode": "CARD",
+      "department": "Cardiology",
+      "doctorCode": "DOC-CARD-01",
+      "doctor": "Doctor Wang",
+      "date": "2026-06-24",
+      "period": "AM",
+      "source": "HIS outpatient source pool",
+      "sourceSystem": "hospital-HIS",
+      "sourceType": "hospital-his",
+      "remaining": 6,
+      "total": 30,
+      "fee": 18,
+      "paymentRequired": true,
+      "insuranceSupported": true,
+      "medicalInsuranceItemCode": "MI-OP-CARD-REG",
+      "cancelBeforeHours": 24,
+      "tags": [
+        "hypertension follow-up",
+        "escort supported"
+      ],
+      "status": "available",
+      "lockMinutes": 10,
+      "hospitalDepartmentContact": "Cardiology outpatient guidance desk"
+    },
+    {
+      "id": "reg-sch-endocrine-pm",
+      "hisScheduleId": "IH-SCH-MR2-ENDO-20260701-PM",
+      "hospitalCode": "MR2",
+      "hospital": "Dalian Medical University Affiliated Hospital demo",
+      "departmentCode": "ENDO",
+      "department": "Endocrinology",
+      "doctorCode": "DOC-ENDO-02",
+      "doctor": "Doctor Zhao",
+      "date": "2026-06-25",
+      "period": "PM",
+      "source": "Internet hospital source pool",
+      "sourceSystem": "internet-hospital",
+      "sourceType": "internet-hospital",
+      "remaining": 4,
+      "total": 20,
+      "fee": 22,
+      "paymentRequired": true,
+      "insuranceSupported": true,
+      "medicalInsuranceItemCode": "MI-OP-ENDO-REG",
+      "cancelBeforeHours": 12,
+      "tags": [
+        "diabetes follow-up",
+        "online revisit"
+      ],
+      "status": "available",
+      "lockMinutes": 10,
+      "hospitalDepartmentContact": "Internet hospital revisit desk"
+    },
+    {
+      "id": "reg-sch-community-am",
+      "hisScheduleId": "HIS-SCH-MR3-GP-20260630-AM",
+      "hospitalCode": "MR3",
+      "hospital": "Qingniwaqiao Community Health Service Center demo",
+      "departmentCode": "GP",
+      "department": "General Practice",
+      "doctorCode": "DOC-GP-01",
+      "doctor": "Doctor Liu",
+      "date": "2026-06-23",
+      "period": "AM",
+      "source": "Primary care appointment source pool",
+      "sourceSystem": "primary-care-HIS",
+      "sourceType": "primary-care",
+      "remaining": 12,
+      "total": 36,
+      "fee": 8,
+      "paymentRequired": false,
+      "insuranceSupported": true,
+      "medicalInsuranceItemCode": "MI-PC-GP-REG",
+      "cancelBeforeHours": 4,
+      "tags": [
+        "family doctor",
+        "chronic follow-up"
+      ],
+      "status": "available",
+      "lockMinutes": 10,
+      "hospitalDepartmentContact": "Community outpatient desk"
+    }
+  ],
+  "registrationOrders": [
+    {
+      "id": "reg-r1-20260630-cardio",
+      "residentId": "r1",
+      "scheduleId": "reg-sch-cardio-am",
+      "hisScheduleId": "HIS-SCH-MR1-CARD-20260631-AM",
+      "hisVisitId": "HIS-MR1-REG-20260630-0008",
+      "registrationNo": "REG-MR1-C08",
+      "queueNo": "C08",
+      "hospitalCode": "MR1",
+      "hospital": "Dalian Central Hospital outpatient clinic demo",
+      "departmentCode": "CARD",
+      "department": "Cardiology",
+      "doctorCode": "DOC-CARD-01",
+      "doctor": "Doctor Wang",
+      "appointmentDate": "2026-06-24",
+      "period": "AM",
+      "visitType": "onsite",
+      "reason": "Hypertension follow-up and medication adjustment",
+      "fee": 18,
+      "cancelBeforeHours": 24,
+      "status": "confirmed",
+      "scheduleLockStatus": "confirmed",
+      "paymentStatus": "pending",
+      "paymentTradeNo": "PAY-DEMO-REG-R1-0008",
+      "refundStatus": "none",
+      "insuranceStatus": "prechecked",
+      "insuranceCredentialNo": "MI-DEMO-MOBILE-R1",
+      "insurancePrecheckNo": "MI-PRE-REG-R1-0008",
+      "insuranceCoverage": 0,
+      "notificationStatus": "sent",
+      "notificationDeliveries": [
+        {
+          "event": "registration-submitted",
+          "channel": "in_app",
+          "status": "sent",
+          "sentAt": "2026-06-22",
+          "receiptAt": "2026-06-22"
+        },
+        {
+          "event": "registration-submitted",
+          "channel": "sms",
+          "status": "queued",
+          "sentAt": "",
+          "receiptAt": ""
+        }
+      ],
+      "source": "hospital-HIS",
+      "sourceChannel": "citizen",
+      "createdAt": "2026-06-22",
+      "updatedAt": "2026-06-22",
+      "auditTrail": [
+        {
+          "at": "2026-06-22",
+          "action": "seed-confirmed",
+          "by": "system",
+          "note": "Seeded registration order with HIS and insurance precheck evidence."
         }
       ]
     }
@@ -4327,7 +4495,181 @@
       "liability insurance",
       "medical accident insurance",
       "service recorder"
-    ]
+    ],
+    "notificationGateway": {
+      "mode": "simulation",
+      "enabled": true,
+      "channels": [
+        "in_app",
+        "sms",
+        "hospital_message"
+      ],
+      "events": [
+        "appointment-submitted",
+        "dispatch-qualified-nurse",
+        "nurse-accept",
+        "service-start",
+        "service-complete",
+        "quality-review"
+      ],
+      "readiness": "gateway-contract-ready"
+    },
+    "pricingRules": {
+      "currency": "CNY",
+      "settlementModes": [
+        "self-pay estimate",
+        "medical insurance pre-check"
+      ],
+      "items": {
+        "daily living ability assessment": {
+          "basePrice": 68,
+          "insuranceEligible": false
+        },
+        "vital signs measurement": {
+          "basePrice": 58,
+          "insuranceEligible": false
+        },
+        "blood glucose measurement": {
+          "basePrice": 86,
+          "insuranceEligible": true
+        },
+        "wound care": {
+          "basePrice": 168,
+          "insuranceEligible": true
+        },
+        "tube care": {
+          "basePrice": 198,
+          "insuranceEligible": true
+        },
+        "postpartum care": {
+          "basePrice": 220,
+          "insuranceEligible": false
+        },
+        "infant care": {
+          "basePrice": 180,
+          "insuranceEligible": false
+        },
+        "PICC maintenance": {
+          "basePrice": 260,
+          "insuranceEligible": true
+        }
+      }
+    },
+    "regulatoryContract": {
+      "version": "internet-nursing-regulatory-contract-v1",
+      "endpoints": [
+        "/api/internet-nursing/dashboard",
+        "/api/internet-nursing/orders",
+        "/api/internet-nursing/orders/:id/actions"
+      ],
+      "exchangeObjects": [
+        "internetNursingInstitutions",
+        "internetNursingNurses",
+        "internetNursingOrders",
+        "taskMessages"
+      ],
+      "targetSystems": [
+        "nursing management system",
+        "EMR",
+        "medical insurance settlement",
+        "health supervision platform"
+      ]
+    },
+    "productionIntegration": {
+      "version": "internet-nursing-production-integration-v1",
+      "gatewayMode": "simulation-contract-ready",
+      "messageGateway": {
+        "status": "contract-ready",
+        "channels": [
+          "sms",
+          "hospital_message",
+          "in_app"
+        ],
+        "fallback": "taskMessages"
+      },
+      "signatureStorage": {
+        "status": "contract-ready",
+        "bucket": "medical-consent-attachments",
+        "retentionYears": 15,
+        "hashAlgorithm": "SHA-256"
+      },
+      "hospitalConnectors": [
+        {
+          "system": "nursing management system",
+          "route": "/integration/internet-nursing/orders",
+          "status": "mapped",
+          "auth": "HMAC + idempotency-key"
+        },
+        {
+          "system": "EMR",
+          "route": "/integration/internet-nursing/service-records",
+          "status": "mapped",
+          "auth": "HMAC + resident consent"
+        },
+        {
+          "system": "health supervision platform",
+          "route": "/integration/internet-nursing/regulatory-report",
+          "status": "mapped",
+          "auth": "HMAC + signoff"
+        }
+      ],
+      "cutoverChecklist": [
+        "message gateway signoff",
+        "signature storage signoff",
+        "hospital connector signoff",
+        "fallback drill"
+      ]
+    },
+    "paymentIntegration": {
+      "version": "internet-nursing-payment-v1",
+      "modes": [
+        "medical insurance e-voucher pre-check",
+        "mobile self-pay",
+        "refund",
+        "invoice",
+        "daily reconciliation"
+      ],
+      "reconciliationCycle": "T+1",
+      "invoiceProvider": "electronic invoice platform",
+      "status": "contract-ready"
+    },
+    "deviceVerification": {
+      "version": "internet-nursing-device-verification-v1",
+      "requiredSignals": [
+        "mobile GPS",
+        "nurse location device",
+        "service recorder",
+        "one-click alert",
+        "photo attachment"
+      ],
+      "startEndDistanceMeters": 500,
+      "exceptionEscalation": "riskQueue + taskMessages",
+      "status": "contract-ready"
+    },
+    "regulatorySubmission": {
+      "version": "internet-nursing-regulatory-submission-v1",
+      "mappedFields": [
+        "institution",
+        "nurse",
+        "order",
+        "risk",
+        "trace",
+        "settlement",
+        "quality",
+        "adverseEvent"
+      ],
+      "submissionCycle": "monthly + high-risk realtime",
+      "pressureTest": {
+        "status": "passed",
+        "sampleSize": 1000,
+        "p95Ms": 420
+      },
+      "signoffs": [
+        "hospital nursing department",
+        "health commission supervision",
+        "platform operations"
+      ]
+    }
   },
   "internetNursingInstitutions": [
     {
@@ -4357,7 +4699,27 @@
       "qualityOwner": "Nursing department",
       "complaintHotline": "0411-12320",
       "emergencyPlan": "hospital-nursing-home-service-emergency-plan",
-      "securityLevel": "grade-3-ready"
+      "securityLevel": "grade-3-ready",
+      "admissionReview": {
+        "status": "approved",
+        "reviewedAt": "2026-05-13",
+        "reviewer": "health commission"
+      },
+      "catalogChangeRequests": [
+        {
+          "id": "cat-inh-mr1-001",
+          "item": "PICC maintenance",
+          "status": "approved",
+          "submittedAt": "2026-06-02"
+        }
+      ],
+      "monthlyCapacity": {
+        "month": "2026-06",
+        "plannedVisits": 180,
+        "completedVisits": 126,
+        "complaints": 1,
+        "adverseEvents": 0
+      }
     },
     {
       "id": "inh-mr3",
@@ -4384,7 +4746,27 @@
       "qualityOwner": "Community nursing office",
       "complaintHotline": "0411-12320",
       "emergencyPlan": "community-nursing-emergency-plan",
-      "securityLevel": "grade-3-platform-access"
+      "securityLevel": "grade-3-platform-access",
+      "admissionReview": {
+        "status": "approved",
+        "reviewedAt": "2026-05-21",
+        "reviewer": "district health bureau"
+      },
+      "catalogChangeRequests": [
+        {
+          "id": "cat-inh-mr3-001",
+          "item": "tube care",
+          "status": "approved",
+          "submittedAt": "2026-06-04"
+        }
+      ],
+      "monthlyCapacity": {
+        "month": "2026-06",
+        "plannedVisits": 96,
+        "completedVisits": 71,
+        "complaints": 0,
+        "adverseEvents": 0
+      }
     },
     {
       "id": "inh-mr5",
@@ -4409,7 +4791,27 @@
       "qualityOwner": "Pilot office",
       "complaintHotline": "0411-12320",
       "emergencyPlan": "district-nursing-emergency-plan",
-      "securityLevel": "pending-review"
+      "securityLevel": "pending-review",
+      "admissionReview": {
+        "status": "pending",
+        "submittedAt": "2026-06-17",
+        "reviewer": "health commission"
+      },
+      "catalogChangeRequests": [
+        {
+          "id": "cat-inh-mr5-001",
+          "item": "infant care",
+          "status": "pending",
+          "submittedAt": "2026-06-18"
+        }
+      ],
+      "monthlyCapacity": {
+        "month": "2026-06",
+        "plannedVisits": 48,
+        "completedVisits": 0,
+        "complaints": 0,
+        "adverseEvents": 0
+      }
     }
   ],
   "internetNursingNurses": [
@@ -4432,7 +4834,14 @@
       "locationDevice": "enabled",
       "recorderStatus": "ready",
       "oneClickAlert": "enabled",
-      "status": "available"
+      "status": "available",
+      "serviceArea": [
+        "Zhongshan",
+        "Xigang"
+      ],
+      "dailyCapacity": 6,
+      "assignedToday": 2,
+      "qualificationExpiresAt": "2026-12-31"
     },
     {
       "id": "inn-002",
@@ -4453,7 +4862,14 @@
       "locationDevice": "enabled",
       "recorderStatus": "ready",
       "oneClickAlert": "enabled",
-      "status": "available"
+      "status": "available",
+      "serviceArea": [
+        "Qingniwaqiao",
+        "Renmin Road"
+      ],
+      "dailyCapacity": 5,
+      "assignedToday": 1,
+      "qualificationExpiresAt": "2026-09-30"
     },
     {
       "id": "inn-003",
@@ -4474,7 +4890,14 @@
       "locationDevice": "enabled",
       "recorderStatus": "ready",
       "oneClickAlert": "enabled",
-      "status": "in-service"
+      "status": "in-service",
+      "serviceArea": [
+        "Zhongshan",
+        "Shahekou"
+      ],
+      "dailyCapacity": 4,
+      "assignedToday": 3,
+      "qualificationExpiresAt": "2026-07-20"
     }
   ],
   "internetNursingOrders": [
@@ -4510,8 +4933,43 @@
       "locationTrace": "pending",
       "locationTracePoints": [],
       "serviceRecordStatus": "pending",
+      "serviceRecord": {
+        "status": "pending",
+        "attachments": [],
+        "attachmentCount": 0
+      },
+      "serviceAttachments": [],
+      "notificationReceiptSummary": {
+        "status": "pending",
+        "channels": [],
+        "sent": 0,
+        "queued": 0,
+        "read": 0,
+        "failed": 0,
+        "receipts": []
+      },
       "qualityCallback": "pending",
       "feeEstimate": 168,
+      "settlement": {
+        "mode": "medical insurance pre-check",
+        "estimatedSelfPay": 58,
+        "insuranceEstimate": 110,
+        "paymentStatus": "pending"
+      },
+      "satisfaction": {
+        "score": 0,
+        "status": "pending"
+      },
+      "complaintStatus": "none",
+      "qualityInspection": {
+        "status": "pending",
+        "inspector": "Nursing department",
+        "sampleType": "routine"
+      },
+      "adverseEvent": {
+        "status": "none",
+        "level": ""
+      },
       "createdAt": "2026-06-21",
       "auditTrail": [
         {
@@ -4568,11 +5026,118 @@
           "lng": 121.616,
           "source": "nurse-mobile",
           "verified": true
+        },
+        {
+          "at": "2026-06-22T10:10:00.000Z",
+          "stage": "service-complete",
+          "lat": 38.916,
+          "lng": 121.617,
+          "source": "nurse-mobile",
+          "verified": true
         }
       ],
-      "serviceRecordStatus": "in-progress",
-      "qualityCallback": "pending",
+      "serviceRecordStatus": "completed",
+      "serviceRecord": {
+        "id": "record-ino-002",
+        "status": "completed",
+        "nurseId": "inn-002",
+        "nurseName": "Nurse Zhao",
+        "startedAt": "2026-06-22",
+        "completedAt": "2026-06-22T10:12:00.000Z",
+        "serviceItem": "blood glucose measurement",
+        "vitalSigns": {
+          "bloodGlucose": "6.8 mmol/L"
+        },
+        "careActions": [
+          "核对身份",
+          "测量血糖",
+          "记录用药与饮食建议"
+        ],
+        "materialsUsed": [
+          "一次性采血针",
+          "血糖试纸"
+        ],
+        "residentCondition": "服务后状态平稳",
+        "followupAdvice": "按医嘱复测血糖并上传结果",
+        "attachments": [
+          {
+            "id": "attach-ino-002-1",
+            "type": "nursing-record-photo",
+            "name": "blood-glucose-meter-photo.jpg",
+            "source": "nurse-mobile",
+            "capturedAt": "2026-06-22",
+            "hash": "sha256:seed-nursing-attach-ino-002",
+            "status": "stored"
+          }
+        ],
+        "attachmentCount": 2,
+        "exceptionReport": {
+          "status": "none",
+          "level": ""
+        }
+      },
+      "serviceAttachments": [
+        {
+          "id": "attach-ino-002-1",
+          "type": "nursing-record-photo",
+          "name": "blood-glucose-meter-photo.jpg",
+          "source": "nurse-mobile",
+          "capturedAt": "2026-06-22",
+          "hash": "sha256:seed-nursing-attach-ino-002",
+          "status": "stored"
+        },
+        {
+          "id": "attach-ino-002-signature",
+          "type": "resident-signature",
+          "name": "resident-confirmation.png",
+          "source": "nurse-mobile",
+          "capturedAt": "2026-06-22",
+          "hash": "sha256:seed-service-ino-002-signature",
+          "status": "stored"
+        }
+      ],
+      "notificationReceiptSummary": {
+        "status": "tracked",
+        "channels": [
+          "in_app",
+          "sms",
+          "hospital_message"
+        ],
+        "sent": 3,
+        "queued": 0,
+        "read": 1,
+        "failed": 0,
+        "receipts": [
+          {
+            "by": "Demo resident B",
+            "role": "citizen",
+            "status": "read",
+            "at": "2026-06-22"
+          }
+        ]
+      },
+      "qualityCallback": "closed",
       "feeEstimate": 86,
+      "settlement": {
+        "mode": "medical insurance pre-check",
+        "estimatedSelfPay": 36,
+        "insuranceEstimate": 50,
+        "paymentStatus": "prechecked"
+      },
+      "satisfaction": {
+        "score": 0,
+        "status": "pending"
+      },
+      "complaintStatus": "none",
+      "qualityInspection": {
+        "status": "sampled",
+        "inspector": "Community nursing office",
+        "sampleType": "risk-followup"
+      },
+      "adverseEvent": {
+        "status": "none",
+        "level": ""
+      },
       "createdAt": "2026-06-20",
       "auditTrail": [
         {
@@ -4610,8 +5175,43 @@
       "locationTrace": "pending",
       "locationTracePoints": [],
       "serviceRecordStatus": "pending",
+      "serviceRecord": {
+        "status": "pending",
+        "attachments": [],
+        "attachmentCount": 0
+      },
+      "serviceAttachments": [],
+      "notificationReceiptSummary": {
+        "status": "pending",
+        "channels": [],
+        "sent": 0,
+        "queued": 0,
+        "read": 0,
+        "failed": 0,
+        "receipts": []
+      },
       "qualityCallback": "pending",
       "feeEstimate": 260,
+      "settlement": {
+        "mode": "medical insurance pre-check",
+        "estimatedSelfPay": 120,
+        "insuranceEstimate": 140,
+        "paymentStatus": "pending"
+      },
+      "satisfaction": {
+        "score": 0,
+        "status": "pending"
+      },
+      "complaintStatus": "none",
+      "qualityInspection": {
+        "status": "required",
+        "inspector": "Nursing department",
+        "sampleType": "high-risk"
+      },
+      "adverseEvent": {
+        "status": "none",
+        "level": ""
+      },
       "createdAt": "2026-06-22",
       "auditTrail": [
         {
@@ -4994,6 +5594,12 @@
       "status": "已开通",
       "contact": "演示居民A",
       "nextAction": "每月 15 日提醒家属确认取药",
+      "careLevel": "中度失能",
+      "eligibility": "长护险待遇已核验",
+      "assessmentScore": 72,
+      "carePlan": "每周 2 次上门协助取药、血压复测和用药提醒",
+      "provider": "青泥洼桥社区照护团队",
+      "reviewCycle": "30 天复评",
       "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     },
     {
@@ -5004,6 +5610,12 @@
       "status": "待开通",
       "contact": "本人",
       "nextAction": "下次登录提示开启适老显示",
+      "careLevel": "轻度风险",
+      "eligibility": "暂不触发长护险待遇",
+      "assessmentScore": 38,
+      "carePlan": "手机大字模式、家庭血压上传和家庭医生月度复核",
+      "provider": "刘医生家庭医生团队",
+      "reviewCycle": "90 天复评",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
@@ -5014,6 +5626,12 @@
       "status": "已预约",
       "contact": "本人",
       "nextAction": "社区工作人员协助绑定医保电子凭证",
+      "careLevel": "自理",
+      "eligibility": "医保电子凭证待核验",
+      "assessmentScore": 18,
+      "carePlan": "社区帮办绑定凭证，糖尿病随访时同步复核照护风险",
+      "provider": "星海湾社区服务站",
+      "reviewCycle": "随访时复核",
       "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     }
   ],
@@ -9740,118 +10358,13 @@
     }
   ],
   "storageMeta": {
-    "engine": "json-snapshot",
-    "mode": "GitHub Pages 静态预览 JSON 快照",
-    "sqliteFile": "data/health-city.sqlite",
+    "engine": "json",
+    "mode": "JSON 文件存储",
+    "sqliteFile": "",
     "jsonFile": "data/db.json",
-    "sqliteAvailable": true,
-    "schemaVersion": 7,
-    "collectionVersions": {
-      "accounts": 1,
-      "residents": 1,
-      "diseases": 1,
-      "followups": 1,
-      "medicalResources": 1,
-      "healthStatistics": 1,
-      "deathCertificates": 1,
-      "deathCertificateForms": 1,
-      "deathStatistics": 1,
-      "birthCertificates": 3,
-      "birthCertificateForms": 1,
-      "birthStatistics": 3,
-      "healthBulletin2024": 1,
-      "dalianHealthStatistics2025": 1,
-      "healthStatisticsIngestion": 1,
-      "doctorProfiles": 1,
-      "multiPracticePolicy": 1,
-      "multiPracticeApplications": 2,
-      "chronicScreeningTasks": 1,
-      "chronicEducationPushes": 1,
-      "chronicManagementPlans": 1,
-      "countyCollaborationOrders": 1,
-      "countyAiDiagnosisCases": 1,
-      "countyMutualRecognitionRecords": 1,
-      "careOrders": 1,
-      "medicationPickups": 1,
-      "institutionSupervisions": 1,
-      "insuranceClaims": 1,
-      "policyAlignment": 1,
-      "emergencySignals": 1,
-      "seniorServices": 1,
-      "dataAccessLogs": 3,
-      "securityEvents": 31,
-      "digitalCredentials": 1,
-      "healthArchiveStandard": 1,
-      "authOrganizations": 2,
-      "authUsers": 2,
-      "interfaceRequirements": 1,
-      "chronicProjectBlueprint": 1,
-      "countyProjectBlueprint": 1,
-      "countyConsortium": 1,
-      "referralSystem": 1,
-      "platformCapabilities": 1,
-      "platformIntegrations": 1,
-      "platformInterfaces": 1,
-      "platformDeliveryBatches": 1,
-      "platformEvidence": 1,
-      "applicationCatalog": 1,
-      "institutionCreditEvaluations": 1,
-      "securityAcceptanceLedger": 1,
-      "platformChangeLogs": 1,
-      "platformRoadmap": 2,
-      "platformAudit": 2,
-      "platformProcessAudit": 2,
-      "personalRecords": 1,
-      "chronicServiceRoles": 1,
-      "chronicCapabilityConditions": 1,
-      "chronicServicePathways": 1,
-      "chronicComorbidityPlans": 1,
-      "chronicTcmServices": 1,
-      "chronicSelfManagement": 1,
-      "chronicMedicationSupport": 1,
-      "chronicQualityMetrics": 1,
-      "mutualRecognitionRules": 1,
-      "diagnosticReports": 1,
-      "taskMessages": 1,
-      "dataQualityIssues": 1,
-      "integrationContracts": 1,
-      "integrationGatewayEvents": 1,
-      "productionDeploymentPlan": 1,
-      "creditEvaluationRules": 1,
-      "researchDatasets": 2,
-      "diseaseRegistryModels": 1,
-      "mobileExperienceSettings": 1,
-      "accessibilityChecklist": 1,
-      "chronicAcceptanceLedger": 1,
-      "countyAcceptanceLedger": 1,
-      "hospitalInteroperabilityFunctions": 1,
-      "hospitalOperationSnapshots": 1,
-      "resourceDispatchRequests": 1,
-      "statisticsReconciliationReviews": 1,
-      "operationAlertRules": 1,
-      "chronicFollowupStatusPolicy": 1,
-      "qualitySafetyEvents": 1,
-      "criticalValueAlerts": 1,
-      "clinicalPathwayCases": 1,
-      "medicalRecordQualityReviews": 1,
-      "mutualRecognitionQualityReviews": 1,
-      "qualityRectificationOrders": 1,
-      "regionalDataSharingScope": 1,
-      "regionalSharingPackages": 1,
-      "regionalSharingSnapshots": 1,
-      "regionalSharingAccessReviews": 1,
-      "referralTeleconsultations": 1,
-      "drugConsumableSupervisions": 1,
-      "healthDashboardSnapshots": 1,
-      "escortServicePolicy": 1,
-      "escortServiceProviders": 1,
-      "escortWorkers": 1,
-      "escortServiceOrders": 3,
-      "internetNursingPolicy": 1,
-      "internetNursingInstitutions": 1,
-      "internetNursingNurses": 1,
-      "internetNursingOrders": 1
-    },
+    "sqliteAvailable": false,
+    "schemaVersion": 0,
+    "collectionVersions": {},
     "sqliteError": ""
   }
 }

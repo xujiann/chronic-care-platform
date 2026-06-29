@@ -1126,6 +1126,134 @@ function seedEscortWorkers() {
   ];
 }
 
+function seedRegistrationSchedules() {
+  return [
+    {
+      id: "reg-sch-cardio-am",
+      hisScheduleId: "HIS-SCH-MR1-CARD-20260631-AM",
+      hospitalCode: "MR1",
+      hospital: "Dalian Central Hospital outpatient clinic demo",
+      departmentCode: "CARD",
+      department: "Cardiology",
+      doctorCode: "DOC-CARD-01",
+      doctor: "Doctor Wang",
+      date: todayOffset(2),
+      period: "AM",
+      source: "HIS outpatient source pool",
+      sourceSystem: "hospital-HIS",
+      sourceType: "hospital-his",
+      remaining: 6,
+      total: 30,
+      fee: 18,
+      paymentRequired: true,
+      insuranceSupported: true,
+      medicalInsuranceItemCode: "MI-OP-CARD-REG",
+      cancelBeforeHours: 24,
+      tags: ["hypertension follow-up", "escort supported"],
+      status: "available",
+      lockMinutes: 10,
+      hospitalDepartmentContact: "Cardiology outpatient guidance desk"
+    },
+    {
+      id: "reg-sch-endocrine-pm",
+      hisScheduleId: "IH-SCH-MR2-ENDO-20260701-PM",
+      hospitalCode: "MR2",
+      hospital: "Dalian Medical University Affiliated Hospital demo",
+      departmentCode: "ENDO",
+      department: "Endocrinology",
+      doctorCode: "DOC-ENDO-02",
+      doctor: "Doctor Zhao",
+      date: todayOffset(3),
+      period: "PM",
+      source: "Internet hospital source pool",
+      sourceSystem: "internet-hospital",
+      sourceType: "internet-hospital",
+      remaining: 4,
+      total: 20,
+      fee: 22,
+      paymentRequired: true,
+      insuranceSupported: true,
+      medicalInsuranceItemCode: "MI-OP-ENDO-REG",
+      cancelBeforeHours: 12,
+      tags: ["diabetes follow-up", "online revisit"],
+      status: "available",
+      lockMinutes: 10,
+      hospitalDepartmentContact: "Internet hospital revisit desk"
+    },
+    {
+      id: "reg-sch-community-am",
+      hisScheduleId: "HIS-SCH-MR3-GP-20260630-AM",
+      hospitalCode: "MR3",
+      hospital: "Qingniwaqiao Community Health Service Center demo",
+      departmentCode: "GP",
+      department: "General Practice",
+      doctorCode: "DOC-GP-01",
+      doctor: "Doctor Liu",
+      date: todayOffset(1),
+      period: "AM",
+      source: "Primary care appointment source pool",
+      sourceSystem: "primary-care-HIS",
+      sourceType: "primary-care",
+      remaining: 12,
+      total: 36,
+      fee: 8,
+      paymentRequired: false,
+      insuranceSupported: true,
+      medicalInsuranceItemCode: "MI-PC-GP-REG",
+      cancelBeforeHours: 4,
+      tags: ["family doctor", "chronic follow-up"],
+      status: "available",
+      lockMinutes: 10,
+      hospitalDepartmentContact: "Community outpatient desk"
+    }
+  ];
+}
+
+function seedRegistrationOrders() {
+  return [
+    {
+      id: "reg-r1-20260630-cardio",
+      residentId: "r1",
+      scheduleId: "reg-sch-cardio-am",
+      hisScheduleId: "HIS-SCH-MR1-CARD-20260631-AM",
+      hisVisitId: "HIS-MR1-REG-20260630-0008",
+      registrationNo: "REG-MR1-C08",
+      queueNo: "C08",
+      hospitalCode: "MR1",
+      hospital: "Dalian Central Hospital outpatient clinic demo",
+      departmentCode: "CARD",
+      department: "Cardiology",
+      doctorCode: "DOC-CARD-01",
+      doctor: "Doctor Wang",
+      appointmentDate: todayOffset(2),
+      period: "AM",
+      visitType: "onsite",
+      reason: "Hypertension follow-up and medication adjustment",
+      fee: 18,
+      cancelBeforeHours: 24,
+      status: "confirmed",
+      scheduleLockStatus: "confirmed",
+      paymentStatus: "pending",
+      paymentTradeNo: "PAY-DEMO-REG-R1-0008",
+      refundStatus: "none",
+      insuranceStatus: "prechecked",
+      insuranceCredentialNo: "MI-DEMO-MOBILE-R1",
+      insurancePrecheckNo: "MI-PRE-REG-R1-0008",
+      insuranceCoverage: 0,
+      notificationStatus: "sent",
+      notificationDeliveries: [
+        { event: "registration-submitted", channel: "in_app", status: "sent", sentAt: todayOffset(0), receiptAt: todayOffset(0) },
+        { event: "registration-submitted", channel: "sms", status: "queued", sentAt: "", receiptAt: "" }
+      ],
+      source: "hospital-HIS",
+      sourceChannel: "citizen",
+      createdAt: todayOffset(0),
+      updatedAt: todayOffset(0),
+      auditTrail: [{ at: todayOffset(0), action: "seed-confirmed", by: "system", note: "Seeded registration order with HIS and insurance precheck evidence." }]
+    }
+  ];
+}
+
 function seedEscortServiceOrders() {
   return [
     {
@@ -2191,9 +2319,9 @@ function seedEmergencySignals() {
 
 function seedSeniorServices() {
   return [
-    { id: "ss1", residentId: "r4", service: "家属代办取药", channel: "个人端", status: "已开通", contact: "演示居民A", nextAction: "每月 15 日提醒家属确认取药" },
-    { id: "ss2", residentId: "r1", service: "大字模式提醒", channel: "手机端", status: "待开通", contact: "本人", nextAction: "下次登录提示开启适老显示" },
-    { id: "ss3", residentId: "r2", service: "线下帮办预约", channel: "社区服务站", status: "已预约", contact: "本人", nextAction: "社区工作人员协助绑定医保电子凭证" }
+    { id: "ss1", residentId: "r4", service: "家属代办取药", channel: "个人端", status: "已开通", contact: "演示居民A", nextAction: "每月 15 日提醒家属确认取药", careLevel: "中度失能", eligibility: "长护险待遇已核验", assessmentScore: 72, carePlan: "每周 2 次上门协助取药、血压复测和用药提醒", provider: "青泥洼桥社区照护团队", reviewCycle: "30 天复评" },
+    { id: "ss2", residentId: "r1", service: "大字模式提醒", channel: "手机端", status: "已开通", contact: "本人", nextAction: "下次登录提示开启适老显示", careLevel: "轻度风险", eligibility: "暂不触发长护险待遇", assessmentScore: 38, carePlan: "手机大字模式、家庭血压上传和家庭医生月度复核", provider: "刘医生家庭医生团队", reviewCycle: "90 天复评" },
+    { id: "ss3", residentId: "r2", service: "线下帮办预约", channel: "社区服务站", status: "已预约", contact: "本人", nextAction: "社区工作人员协助绑定医保电子凭证", careLevel: "自理", eligibility: "医保电子凭证待核验", assessmentScore: 18, carePlan: "社区帮办绑定凭证，糖尿病随访时同步复核照护风险", provider: "星海湾社区服务站", reviewCycle: "随访时复核" }
   ];
 }
 
@@ -4143,6 +4271,8 @@ function normalizeState(data) {
     escortServiceProviders: mergeByKey(seedEscortServiceProviders(), data.escortServiceProviders, "id"),
     escortWorkers: mergeByKey(seedEscortWorkers(), data.escortWorkers, "id"),
     escortServiceOrders: mergeByKey(seedEscortServiceOrders(), data.escortServiceOrders, "id"),
+    registrationSchedules: mergeByKey(seedRegistrationSchedules(), data.registrationSchedules, "id"),
+    registrationOrders: mergeByKey(seedRegistrationOrders(), data.registrationOrders, "id"),
     internetNursingPolicy: data.internetNursingPolicy && typeof data.internetNursingPolicy === "object" ? { ...seedInternetNursingPolicy(), ...data.internetNursingPolicy } : seedInternetNursingPolicy(),
     internetNursingInstitutions: mergeByKey(seedInternetNursingInstitutions(), data.internetNursingInstitutions, "id"),
     internetNursingNurses: mergeByKey(seedInternetNursingNurses(), data.internetNursingNurses, "id"),
@@ -4309,6 +4439,8 @@ function completeSystemTargets(state) {
   state.escortServiceProviders = mergeByKey(seedEscortServiceProviders(), state.escortServiceProviders, "id");
   state.escortWorkers = mergeByKey(seedEscortWorkers(), state.escortWorkers, "id");
   state.escortServiceOrders = mergeByKey(seedEscortServiceOrders(), state.escortServiceOrders, "id");
+  state.registrationSchedules = mergeByKey(seedRegistrationSchedules(), state.registrationSchedules, "id");
+  state.registrationOrders = mergeByKey(seedRegistrationOrders(), state.registrationOrders, "id");
   state.internetNursingPolicy = state.internetNursingPolicy && typeof state.internetNursingPolicy === "object" ? { ...seedInternetNursingPolicy(), ...state.internetNursingPolicy } : seedInternetNursingPolicy();
   state.internetNursingInstitutions = mergeByKey(seedInternetNursingInstitutions(), state.internetNursingInstitutions, "id");
   state.internetNursingNurses = mergeByKey(seedInternetNursingNurses(), state.internetNursingNurses, "id");
@@ -5633,6 +5765,171 @@ function canAccessEscortOrder(user, item, data) {
     [provider?.name, item.providerName, item.hospital].some((name) => name && name === user.orgName);
 }
 
+function canAccessRegistrationOrder(user, item, data) {
+  if (!canAccessResident(user, item.residentId, data)) return false;
+  if (user.role === "commission" || user.role === "county" || user.role === "citizen" || user.role === "insurance") return true;
+  if (user.role !== "institution") return false;
+  return [item.hospitalCode, item.institutionCode].some((code) => code && code === user.orgCode) ||
+    [item.hospital, item.institutionName].some((name) => name && name === user.orgName);
+}
+
+function canAccessRegistrationSchedule(user, item) {
+  if (user.role === "institution") {
+    return !item.hospitalCode || item.hospitalCode === user.orgCode || item.hospital === user.orgName;
+  }
+  return true;
+}
+
+function buildRegistrationDashboard(data, user) {
+  const schedules = (Array.isArray(data.registrationSchedules) ? data.registrationSchedules : seedRegistrationSchedules())
+    .filter((item) => canAccessRegistrationSchedule(user, item));
+  const scheduleById = new Map(schedules.map((item) => [item.id, item]));
+  const orders = (Array.isArray(data.registrationOrders) ? data.registrationOrders : [])
+    .filter((item) => canAccessRegistrationOrder(user, item, data));
+  return {
+    ok: true,
+    summary: {
+      schedules: schedules.length,
+      availableSchedules: schedules.filter((item) => item.status !== "closed" && Number(item.remaining || 0) > 0).length,
+      orders: orders.length,
+      openOrders: orders.filter((item) => !["cancelled", "completed", "closed"].includes(item.status)).length,
+      hisConfirmed: orders.filter((item) => item.hisVisitId || item.registrationNo).length,
+      paymentPending: orders.filter((item) => item.paymentStatus === "pending").length,
+      insurancePrechecked: orders.filter((item) => item.insuranceStatus === "prechecked").length,
+      smsQueued: orders.filter((item) => (item.notificationDeliveries || []).some((delivery) => delivery.channel === "sms" && delivery.status === "queued")).length
+    },
+    schedules,
+    orders: orders.map((item) => ({ ...item, schedule: scheduleById.get(item.scheduleId) || null })),
+    integration: {
+      endpoints: ["/api/registrations/dashboard", "/api/registrations/orders", "/api/registrations/orders/:id/cancel"],
+      exchangeObjects: ["registrationSchedules", "registrationOrders", "taskMessages", "dataAccessLogs"],
+      targetSystems: ["hospital HIS", "internet hospital", "payment gateway", "medical insurance e-voucher", "sms gateway"],
+      status: "contract-ready"
+    }
+  };
+}
+
+function normalizeRegistrationOrder(payload, user, data) {
+  const residentId = String(payload.residentId || user.residentId || "").trim();
+  if (!residentId) throw new Error("residentId is required");
+  if (!canAccessResident(user, residentId, data)) throw new Error("resident scope denied");
+  const schedules = Array.isArray(data.registrationSchedules) ? data.registrationSchedules : seedRegistrationSchedules();
+  const schedule = schedules.find((item) => item.id === payload.scheduleId);
+  if (!schedule) throw new Error("schedule not found");
+  if (!canAccessRegistrationSchedule(user, schedule)) throw new Error("schedule scope denied");
+  if (schedule.status === "closed" || Number(schedule.remaining || 0) <= 0) throw new Error("schedule is unavailable");
+  const resident = (data.residents || []).find((item) => item.id === residentId) || {};
+  const now = new Date().toISOString();
+  const id = payload.id || `reg-${randomUUID()}`;
+  const registrationNo = payload.registrationNo || `REG-${schedule.hospitalCode || "HIS"}-${String(Math.floor(1000 + Math.random() * 9000))}`;
+  const paymentRequired = payload.paymentRequired ?? schedule.paymentRequired;
+  const insuranceSupported = payload.insuranceSupported ?? schedule.insuranceSupported;
+  return {
+    id,
+    residentId,
+    residentName: resident.name || String(payload.residentName || "").trim(),
+    scheduleId: schedule.id,
+    hisScheduleId: schedule.hisScheduleId || "",
+    hisVisitId: payload.hisVisitId || `HIS-${schedule.hospitalCode || "REG"}-${id.slice(-8)}`,
+    registrationNo,
+    queueNo: payload.queueNo || registrationNo.split("-").slice(-1)[0],
+    hospitalCode: schedule.hospitalCode || "",
+    hospital: schedule.hospital || "",
+    departmentCode: schedule.departmentCode || "",
+    department: schedule.department || "",
+    doctorCode: schedule.doctorCode || "",
+    doctor: schedule.doctor || "",
+    appointmentDate: schedule.date || String(payload.appointmentDate || "").trim(),
+    period: schedule.period || String(payload.period || "").trim(),
+    visitType: String(payload.visitType || "onsite").trim(),
+    reason: String(payload.reason || "").trim(),
+    fee: Number(schedule.fee || payload.fee || 0),
+    cancelBeforeHours: Number(schedule.cancelBeforeHours || 0),
+    status: "confirmed",
+    scheduleLockStatus: "confirmed",
+    lockExpireAt: new Date(Date.now() + Number(schedule.lockMinutes || 10) * 60_000).toISOString(),
+    paymentStatus: paymentRequired ? "pending" : "waived",
+    paymentTradeNo: paymentRequired ? `PAY-REG-${id.slice(-8).toUpperCase()}` : "",
+    refundStatus: "none",
+    insuranceStatus: insuranceSupported ? "prechecked" : "not-supported",
+    insuranceCredentialNo: String(payload.insuranceCredentialNo || resident.phone || user.username || "").trim(),
+    insurancePrecheckNo: insuranceSupported ? `MI-PRE-${id.slice(-8).toUpperCase()}` : "",
+    insuranceCoverage: Number(payload.insuranceCoverage || 0),
+    notificationStatus: "queued",
+    notificationDeliveries: buildRegistrationNotificationDeliveries(id, residentId, "registration-submitted", user, now),
+    source: schedule.sourceSystem || schedule.source || "hospital-HIS",
+    sourceChannel: String(payload.sourceChannel || user.role || "citizen").trim(),
+    hospitalDepartmentContact: schedule.hospitalDepartmentContact || "",
+    createdAt: now,
+    createdBy: user.username || user.role,
+    createdByName: user.name || "",
+    auditTrail: [{ at: now, action: "registration-created", by: user.username || user.role, note: "HIS schedule locked with payment, insurance and notification evidence." }]
+  };
+}
+
+function buildRegistrationNotificationDeliveries(orderId, residentId, event, user, now) {
+  return ["in_app", "sms"].map((channel) => ({
+    event,
+    channel,
+    status: channel === "in_app" ? "sent" : "queued",
+    taskId: `registrationOrders:${orderId}`,
+    sourceId: orderId,
+    residentId,
+    queuedAt: now,
+    sentAt: channel === "in_app" ? now : "",
+    receiptAt: channel === "in_app" ? now : "",
+    createdBy: user.username || user.role || "system"
+  }));
+}
+
+function buildRegistrationTaskMessage(order, event, user) {
+  const cancelled = event === "registration-cancelled";
+  return {
+    id: `msg-${randomUUID()}`,
+    taskId: `registrationOrders:${order.id}`,
+    collection: "registrationOrders",
+    sourceId: order.id,
+    residentId: order.residentId,
+    targetRole: cancelled ? "citizen" : "institution",
+    channel: "in_app",
+    notificationEvent: event,
+    deliveryChannels: ["in_app", "sms"],
+    title: cancelled ? "Registration appointment cancelled" : "New registration appointment",
+    body: cancelled
+      ? `${order.hospital || "Hospital"} ${order.department || ""} appointment has been cancelled; refund status ${order.refundStatus || order.paymentStatus}.`
+      : `${order.hospital || "Hospital"} ${order.department || ""} needs HIS confirmation for ${order.appointmentDate || "appointment"}.`,
+    status: "sent",
+    receipts: [],
+    createdAt: new Date().toISOString(),
+    createdBy: user.username || user.role || "system",
+    createdByName: user.name || "system"
+  };
+}
+
+function applyRegistrationCancel(order, payload, user) {
+  const now = new Date().toISOString();
+  return {
+    ...order,
+    status: "cancelled",
+    scheduleLockStatus: "released",
+    paymentStatus: order.paymentStatus === "paid" ? "refund-pending" : ["pending", "waived"].includes(order.paymentStatus) ? "closed" : order.paymentStatus,
+    refundStatus: order.paymentStatus === "paid" ? "refund-pending" : "not-required",
+    notificationStatus: "queued",
+    notificationDeliveries: [
+      ...buildRegistrationNotificationDeliveries(order.id, order.residentId, "registration-cancelled", user, now),
+      ...(Array.isArray(order.notificationDeliveries) ? order.notificationDeliveries : [])
+    ].slice(0, 30),
+    cancelledAt: now,
+    cancelledBy: user.username || user.role,
+    cancelReason: String(payload.reason || payload.note || "resident request").trim(),
+    updatedAt: now,
+    auditTrail: [
+      { at: now, action: "registration-cancelled", by: user.username || user.role, note: String(payload.reason || payload.note || "cancelled").trim() },
+      ...(Array.isArray(order.auditTrail) ? order.auditTrail : [])
+    ].slice(0, 20)
+  };
+}
+
 function buildEscortServiceDashboard(data, user) {
   const policy = data.escortServicePolicy || seedEscortServicePolicy();
   const providers = Array.isArray(data.escortServiceProviders) ? data.escortServiceProviders : [];
@@ -5837,6 +6134,39 @@ function seedInternetNursingPolicy() {
       endpoints: ["/api/internet-nursing/dashboard", "/api/internet-nursing/orders", "/api/internet-nursing/orders/:id/actions"],
       exchangeObjects: ["internetNursingInstitutions", "internetNursingNurses", "internetNursingOrders", "taskMessages"],
       targetSystems: ["nursing management system", "EMR", "medical insurance settlement", "health supervision platform"]
+    },
+    productionIntegration: {
+      version: "internet-nursing-production-integration-v1",
+      gatewayMode: "simulation-contract-ready",
+      messageGateway: { status: "contract-ready", channels: ["sms", "hospital_message", "in_app"], fallback: "taskMessages" },
+      signatureStorage: { status: "contract-ready", bucket: "medical-consent-attachments", retentionYears: 15, hashAlgorithm: "SHA-256" },
+      hospitalConnectors: [
+        { system: "nursing management system", route: "/integration/internet-nursing/orders", status: "mapped", auth: "HMAC + idempotency-key" },
+        { system: "EMR", route: "/integration/internet-nursing/service-records", status: "mapped", auth: "HMAC + resident consent" },
+        { system: "health supervision platform", route: "/integration/internet-nursing/regulatory-report", status: "mapped", auth: "HMAC + signoff" }
+      ],
+      cutoverChecklist: ["message gateway signoff", "signature storage signoff", "hospital connector signoff", "fallback drill"]
+    },
+    paymentIntegration: {
+      version: "internet-nursing-payment-v1",
+      modes: ["medical insurance e-voucher pre-check", "mobile self-pay", "refund", "invoice", "daily reconciliation"],
+      reconciliationCycle: "T+1",
+      invoiceProvider: "electronic invoice platform",
+      status: "contract-ready"
+    },
+    deviceVerification: {
+      version: "internet-nursing-device-verification-v1",
+      requiredSignals: ["mobile GPS", "nurse location device", "service recorder", "one-click alert", "photo attachment"],
+      startEndDistanceMeters: 500,
+      exceptionEscalation: "riskQueue + taskMessages",
+      status: "contract-ready"
+    },
+    regulatorySubmission: {
+      version: "internet-nursing-regulatory-submission-v1",
+      mappedFields: ["institution", "nurse", "order", "risk", "trace", "settlement", "quality", "adverseEvent"],
+      submissionCycle: "monthly + high-risk realtime",
+      pressureTest: { status: "passed", sampleSize: 1000, p95Ms: 420 },
+      signoffs: ["hospital nursing department", "health commission supervision", "platform operations"]
     }
   };
 }
@@ -6005,6 +6335,9 @@ function seedInternetNursingOrders() {
       locationTrace: "pending",
       locationTracePoints: [],
       serviceRecordStatus: "pending",
+      serviceRecord: { status: "pending", attachments: [], attachmentCount: 0 },
+      serviceAttachments: [],
+      notificationReceiptSummary: { status: "pending", channels: [], sent: 0, queued: 0, read: 0, failed: 0, receipts: [] },
       qualityCallback: "pending",
       feeEstimate: 168,
       settlement: { mode: "medical insurance pre-check", estimatedSelfPay: 58, insuranceEstimate: 110, paymentStatus: "pending" },
@@ -6050,6 +6383,24 @@ function seedInternetNursingOrders() {
         { at: todayOffset(0), stage: "service-start", lat: 38.915, lng: 121.616, source: "nurse-mobile", verified: true }
       ],
       serviceRecordStatus: "in-progress",
+      serviceRecord: {
+        id: "record-ino-002",
+        status: "in-progress",
+        nurseId: "inn-002",
+        nurseName: "Nurse Zhao",
+        startedAt: todayOffset(0),
+        serviceItem: "blood glucose measurement",
+        vitalSigns: { bloodGlucose: "6.8 mmol/L" },
+        careActions: ["核对身份", "测量血糖", "记录用药与饮食建议"],
+        materialsUsed: ["一次性采血针", "血糖试纸"],
+        residentCondition: "服务中状态平稳",
+        followupAdvice: "按医嘱复测血糖并上传结果",
+        attachments: [{ id: "attach-ino-002-1", type: "nursing-record-photo", name: "blood-glucose-meter-photo.jpg", source: "nurse-mobile", capturedAt: todayOffset(0), hash: "sha256:seed-nursing-attach-ino-002", status: "stored" }],
+        attachmentCount: 1,
+        exceptionReport: { status: "none", level: "" }
+      },
+      serviceAttachments: [{ id: "attach-ino-002-1", type: "nursing-record-photo", name: "blood-glucose-meter-photo.jpg", source: "nurse-mobile", capturedAt: todayOffset(0), hash: "sha256:seed-nursing-attach-ino-002", status: "stored" }],
+      notificationReceiptSummary: { status: "tracked", channels: ["in_app", "sms", "hospital_message"], sent: 2, queued: 1, read: 1, failed: 0, receipts: [{ by: "Demo resident B", role: "citizen", status: "read", at: todayOffset(0) }] },
       qualityCallback: "pending",
       feeEstimate: 86,
       settlement: { mode: "medical insurance pre-check", estimatedSelfPay: 36, insuranceEstimate: 50, paymentStatus: "prechecked" },
@@ -6083,6 +6434,9 @@ function seedInternetNursingOrders() {
       locationTrace: "pending",
       locationTracePoints: [],
       serviceRecordStatus: "pending",
+      serviceRecord: { status: "pending", attachments: [], attachmentCount: 0 },
+      serviceAttachments: [],
+      notificationReceiptSummary: { status: "pending", channels: [], sent: 0, queued: 0, read: 0, failed: 0, receipts: [] },
       qualityCallback: "pending",
       feeEstimate: 260,
       settlement: { mode: "medical insurance pre-check", estimatedSelfPay: 120, insuranceEstimate: 140, paymentStatus: "pending" },
@@ -6192,6 +6546,79 @@ function buildInternetNursingRegulatoryAlerts(institutions, nurses) {
   ];
 }
 
+function buildInternetNursingProductionIntegration(policy, orders) {
+  const integration = policy.productionIntegration || seedInternetNursingPolicy().productionIntegration;
+  const signedAttachments = orders.filter((item) => item.consentAttachment?.status === "signed");
+  const notificationRows = orders.flatMap((item) => item.notificationDeliveries || []);
+  return {
+    ...integration,
+    evidence: {
+      signedConsentAttachments: signedAttachments.length,
+      hashedAttachments: signedAttachments.filter((item) => item.consentAttachment?.hash).length,
+      notificationDeliveries: notificationRows.length,
+      queuedDeliveries: notificationRows.filter((item) => item.status === "queued").length,
+      fallbackCollection: "taskMessages"
+    },
+    connectorsReady: (integration.hospitalConnectors || []).filter((item) => item.status === "mapped").length,
+    totalConnectors: (integration.hospitalConnectors || []).length
+  };
+}
+
+function buildInternetNursingPaymentReadiness(policy, orders) {
+  const payment = policy.paymentIntegration || seedInternetNursingPolicy().paymentIntegration;
+  const paymentRows = orders.map((item) => ({
+    orderId: item.id,
+    residentId: item.residentId,
+    serviceItem: item.serviceItem,
+    feeEstimate: item.feeEstimate || 0,
+    mode: item.settlement?.mode || "self-pay estimate",
+    paymentStatus: item.settlement?.paymentStatus || "pending",
+    insuranceEstimate: item.settlement?.insuranceEstimate || 0,
+    estimatedSelfPay: item.settlement?.estimatedSelfPay || 0,
+    invoiceStatus: ["completed", "closed"].includes(item.status) ? "invoice-ready" : "waiting-service-complete",
+    reconciliationStatus: item.settlement?.paymentStatus === "prechecked" ? "precheck-matched" : "pending"
+  }));
+  return {
+    ...payment,
+    totalEstimate: paymentRows.reduce((sum, item) => sum + Number(item.feeEstimate || 0), 0),
+    insuranceEstimate: paymentRows.reduce((sum, item) => sum + Number(item.insuranceEstimate || 0), 0),
+    selfPayEstimate: paymentRows.reduce((sum, item) => sum + Number(item.estimatedSelfPay || 0), 0),
+    precheckedOrders: paymentRows.filter((item) => item.paymentStatus === "prechecked").length,
+    paymentRows
+  };
+}
+
+function buildInternetNursingDeviceVerification(policy, orders, nurses) {
+  const device = policy.deviceVerification || seedInternetNursingPolicy().deviceVerification;
+  const traceOrders = orders.filter((item) => Array.isArray(item.locationTracePoints) && item.locationTracePoints.length >= 2);
+  const deviceReadyNurses = nurses.filter((item) => item.locationDevice === "enabled" && item.recorderStatus === "ready" && item.oneClickAlert === "enabled");
+  return {
+    ...device,
+    readyNurses: deviceReadyNurses.length,
+    totalNurses: nurses.length,
+    traceVerifiedOrders: traceOrders.length,
+    traceVerificationRate: orders.length ? traceOrders.length / orders.length : 0,
+    photoAttachmentStatus: orders.some((item) => item.serviceAttachment?.photoStatus === "uploaded") ? "sample-uploaded" : "contract-ready",
+    exceptions: orders
+      .filter((item) => item.locationTrace === "tracking" && !Array.isArray(item.locationTracePoints))
+      .map((item) => ({ orderId: item.id, issue: "tracking without trace points" }))
+  };
+}
+
+function buildInternetNursingRegulatorySubmission(policy, orders, institutions) {
+  const submission = policy.regulatorySubmission || seedInternetNursingPolicy().regulatorySubmission;
+  const highRiskRealtime = orders.filter((item) => item.riskLevel === "high").length;
+  return {
+    ...submission,
+    packageId: `internet-nursing-regulatory-${submission.submissionCycle || "monthly"}-202606`,
+    records: orders.length,
+    institutions: institutions.length,
+    highRiskRealtime,
+    fieldCoverage: (submission.mappedFields || []).map((field) => ({ field, status: "mapped" })),
+    signoffStatus: (submission.signoffs || []).map((owner) => ({ owner, status: "ready-for-site-signoff" }))
+  };
+}
+
 function enrichInternetNursingFinancials(order, policy) {
   const rule = policy.pricingRules?.items?.[order.serviceItem] || {};
   const basePrice = Number(order.feeEstimate || rule.basePrice || 0);
@@ -6259,7 +6686,11 @@ function buildInternetNursingDashboard(data, user) {
     dispatchRecommendations: buildInternetNursingDispatchRecommendations(openOrders, nurseRows),
     regulatoryMonthlyReport: buildInternetNursingRegulatoryMonthlyReport(orders, institutionRows),
     regulatoryAlerts: buildInternetNursingRegulatoryAlerts(institutionRows, nurseRows),
-    regulatoryContract: policy.regulatoryContract || seedInternetNursingPolicy().regulatoryContract
+    regulatoryContract: policy.regulatoryContract || seedInternetNursingPolicy().regulatoryContract,
+    productionIntegration: buildInternetNursingProductionIntegration(policy, orders),
+    paymentReadiness: buildInternetNursingPaymentReadiness(policy, orders),
+    deviceVerification: buildInternetNursingDeviceVerification(policy, orders, nurseRows),
+    regulatorySubmission: buildInternetNursingRegulatorySubmission(policy, orders, institutionRows)
   };
 }
 
@@ -6331,6 +6762,98 @@ function normalizeInternetNursingTracePoints(value) {
     .slice(-30);
 }
 
+function normalizeInternetNursingAttachments(value, existing = [], now = new Date().toISOString()) {
+  const rows = Array.isArray(value) ? value : [];
+  const normalized = rows.map((item) => {
+    if (typeof item === "string") {
+      const name = item.trim();
+      return name ? { id: `attach-${randomUUID()}`, type: "nursing-record", name, capturedAt: now, source: "nurse-mobile", status: "stored" } : null;
+    }
+    if (!item || typeof item !== "object") return null;
+    const name = String(item.name || item.fileName || item.attachmentName || "").trim();
+    if (!name) return null;
+    return {
+      id: String(item.id || `attach-${randomUUID()}`).trim(),
+      type: String(item.type || item.attachmentType || "nursing-record").trim(),
+      name,
+      source: String(item.source || "nurse-mobile").trim(),
+      capturedAt: String(item.capturedAt || item.createdAt || now).trim(),
+      hash: String(item.hash || `sha256:${createHash("sha256").update(`${name}|${now}`).digest("hex")}`).trim(),
+      status: String(item.status || "stored").trim()
+    };
+  }).filter(Boolean);
+  return [...normalized, ...(Array.isArray(existing) ? existing : [])].slice(0, 20);
+}
+
+function normalizeInternetNursingExceptionReport(value, user, now, existing = {}) {
+  const report = value && typeof value === "object" ? value : {};
+  const status = String(report.status || existing.status || "none").trim();
+  return {
+    ...(existing || {}),
+    status,
+    level: String(report.level || existing.level || "").trim(),
+    description: String(report.description || existing.description || "").trim(),
+    handledBy: String(report.handledBy || existing.handledBy || user.name || user.username || "").trim(),
+    handledAt: report.handledAt || existing.handledAt || (status !== "none" ? now : ""),
+    escalationRequired: Boolean(report.escalationRequired ?? existing.escalationRequired ?? false)
+  };
+}
+
+function buildInternetNursingServiceRecord(item, payload, user, now) {
+  const requested = payload.serviceRecord && typeof payload.serviceRecord === "object" ? payload.serviceRecord : {};
+  const existing = item.serviceRecord && typeof item.serviceRecord === "object" ? item.serviceRecord : {};
+  const completed = payload.action === "service-complete" || payload.serviceRecordStatus === "completed" || payload.status === "completed";
+  const attachments = normalizeInternetNursingAttachments(payload.serviceAttachments || requested.attachments, item.serviceAttachments, now);
+  return {
+    ...(existing || {}),
+    id: requested.id || existing.id || `record-${item.id || randomUUID()}`,
+    status: completed ? "completed" : String(payload.serviceRecordStatus || existing.status || "in-progress").trim(),
+    nurseId: String(payload.nurseId || user.nurseId || existing.nurseId || item.nurseId || "").trim(),
+    nurseName: String(user.name || existing.nurseName || item.nurseName || "").trim(),
+    startedAt: requested.startedAt || existing.startedAt || (payload.action === "service-start" ? now : ""),
+    completedAt: requested.completedAt || existing.completedAt || (completed ? now : ""),
+    serviceItem: String(requested.serviceItem || item.serviceItem || "").trim(),
+    vitalSigns: requested.vitalSigns && typeof requested.vitalSigns === "object" ? requested.vitalSigns : existing.vitalSigns || {},
+    careActions: Array.isArray(requested.careActions) && requested.careActions.length ? requested.careActions.map((row) => String(row).trim()).filter(Boolean) : existing.careActions || (completed ? ["完成上门护理操作", "居民状态复核", "健康教育与随访交代"] : []),
+    materialsUsed: Array.isArray(requested.materialsUsed) ? requested.materialsUsed.map((row) => String(row).trim()).filter(Boolean) : existing.materialsUsed || [],
+    residentCondition: String(requested.residentCondition || existing.residentCondition || (completed ? "服务后状态平稳" : "")).trim(),
+    followupAdvice: String(requested.followupAdvice || existing.followupAdvice || (completed ? "如出现不适及时联系签约机构或急救电话" : "")).trim(),
+    attachments,
+    attachmentCount: attachments.length,
+    exceptionReport: normalizeInternetNursingExceptionReport(requested.exceptionReport || payload.exceptionReport || payload.adverseEvent, user, now, existing.exceptionReport || item.adverseEvent || {})
+  };
+}
+
+function buildInternetNursingNotificationReceiptSummary(deliveries, payload, now, existing = {}) {
+  const rows = Array.isArray(deliveries) ? deliveries : [];
+  const requested = Array.isArray(payload.notificationReceipts) ? payload.notificationReceipts : [];
+  const counts = rows.reduce((acc, item) => {
+    const status = String(item.receiptStatus || item.status || "queued").trim();
+    acc[status] = (acc[status] || 0) + 1;
+    return acc;
+  }, {});
+  requested.forEach((item) => {
+    const status = String(item.status || "read").trim();
+    counts[status] = (counts[status] || 0) + 1;
+  });
+  return {
+    ...(existing || {}),
+    status: rows.some((item) => ["failed", "bounced"].includes(item.receiptStatus || item.status)) ? "attention-required" : "tracked",
+    channels: [...new Set(rows.map((item) => item.channel).filter(Boolean))],
+    sent: counts.sent || 0,
+    queued: counts.queued || 0,
+    read: counts.read || 0,
+    failed: counts.failed || counts.bounced || 0,
+    receipts: requested.map((item) => ({
+      by: String(item.by || item.reader || "").trim(),
+      role: String(item.role || "").trim(),
+      status: String(item.status || "read").trim(),
+      at: String(item.at || now).trim()
+    })).filter((item) => item.by || item.status).slice(0, 20),
+    updatedAt: now
+  };
+}
+
 function defaultInternetNursingTracePoint(stage, now) {
   const offsets = {
     "nurse-accept": [38.914, 121.614],
@@ -6371,12 +6894,14 @@ function buildInternetNursingNotificationDeliveries(order, event, user, policy, 
     channel,
     targetRole,
     status: channel === "in_app" ? "sent" : "queued",
+    receiptStatus: channel === "in_app" ? "read" : "pending",
     gatewayMode: gateway.mode || "simulation",
     taskId: `internetNursingOrders:${order.id}`,
     sourceId: order.id,
     residentId: order.residentId,
     queuedAt: now,
     sentAt: channel === "in_app" ? now : "",
+    receiptAt: channel === "in_app" ? now : "",
     createdBy: user.username || user.role
   })));
 }
@@ -6430,6 +6955,9 @@ function normalizeInternetNursingOrder(payload, user, data) {
     locationTrace: citizenCreated ? "pending" : String(payload.locationTrace || "pending").trim(),
     locationTracePoints: normalizeInternetNursingTracePoints(payload.locationTracePoints),
     serviceRecordStatus: citizenCreated ? "pending" : String(payload.serviceRecordStatus || "pending").trim(),
+    serviceRecord: payload.serviceRecord && typeof payload.serviceRecord === "object" ? buildInternetNursingServiceRecord({ ...payload, id: payload.id || `ino-${randomUUID()}` }, payload, user, now) : { status: "pending", attachments: [], attachmentCount: 0 },
+    serviceAttachments: normalizeInternetNursingAttachments(payload.serviceAttachments, [], now),
+    notificationReceiptSummary: { status: "pending", channels: [], sent: 0, queued: 0, read: 0, failed: 0, receipts: [] },
     qualityCallback: citizenCreated ? "pending" : String(payload.qualityCallback || "pending").trim(),
     feeEstimate: citizenCreated ? 0 : Number(payload.feeEstimate || 0),
     settlement: payload.settlement && typeof payload.settlement === "object" ? payload.settlement : { mode: "self-pay estimate", estimatedSelfPay: 0, insuranceEstimate: 0, paymentStatus: "pending" },
@@ -6517,8 +7045,24 @@ function applyInternetNursingOrderAction(item, payload, user, data) {
       ...(item.adverseEvent || {}),
       status: String(payload.adverseEvent.status || item.adverseEvent?.status || "none").trim(),
       level: String(payload.adverseEvent.level || item.adverseEvent?.level || "").trim(),
+      description: String(payload.adverseEvent.description || item.adverseEvent?.description || "").trim(),
       reportedAt: payload.adverseEvent.reportedAt || item.adverseEvent?.reportedAt || (payload.adverseEvent.status && payload.adverseEvent.status !== "none" ? now : "")
     };
+  }
+  if (payload.serviceRecord || payload.serviceAttachments || payload.exceptionReport || payload.action === "service-start" || payload.action === "service-complete") {
+    const serviceRecord = buildInternetNursingServiceRecord(item, payload, user, now);
+    updates.serviceRecord = serviceRecord;
+    updates.serviceAttachments = serviceRecord.attachments || normalizeInternetNursingAttachments(payload.serviceAttachments, item.serviceAttachments, now);
+    if (!updates.serviceRecordStatus) updates.serviceRecordStatus = serviceRecord.status || item.serviceRecordStatus || "in-progress";
+    if (serviceRecord.exceptionReport && serviceRecord.exceptionReport.status !== "none") {
+      updates.adverseEvent = {
+        ...(updates.adverseEvent || item.adverseEvent || {}),
+        status: serviceRecord.exceptionReport.status,
+        level: serviceRecord.exceptionReport.level,
+        description: serviceRecord.exceptionReport.description,
+        reportedAt: serviceRecord.exceptionReport.handledAt || now
+      };
+    }
   }
   if (updates.nurseId) {
     const nurse = (data.internetNursingNurses || []).find((row) => row.id === updates.nurseId);
@@ -6551,6 +7095,7 @@ function applyInternetNursingOrderAction(item, payload, user, data) {
     updates.qualityInspection = { ...(item.qualityInspection || {}), status: "closed", inspector: user.name || user.username || "quality office", sampleType: item.riskLevel === "high" ? "high-risk" : "routine", checkedAt: now };
   }
   updates.notificationDeliveries = appendInternetNursingNotifications({ ...item, ...updates }, notificationEvent, user, data, now);
+  updates.notificationReceiptSummary = buildInternetNursingNotificationReceiptSummary(updates.notificationDeliveries, payload, now, item.notificationReceiptSummary);
   return {
     ...item,
     ...updates,
@@ -6763,7 +7308,7 @@ function normalizeMultiPracticeApplication(payload, user, data) {
     lastUpdated: new Date().toISOString()
   };
   application.compliance = qualificationCompliance(profile, application);
-  return withMultiPracticeReviewState(application);
+  return refreshMultiPracticeReviewState(application, profile, data.multiPracticeApplications || [], "create", user);
 }
 
 function primaryPracticeConfirmed(application = {}) {
@@ -6851,6 +7396,7 @@ function scopeStateForUser(data, user) {
     }
     scoped.referralTeleconsultations = (data.referralTeleconsultations || []).filter((item) => canAccessReferralTeleconsultation(user, item, data));
     scoped.escortServiceOrders = (data.escortServiceOrders || []).filter((item) => canAccessEscortOrder(user, item, data));
+    scoped.registrationOrders = (data.registrationOrders || []).filter((item) => canAccessRegistrationOrder(user, item, data));
     scoped.internetNursingOrders = (data.internetNursingOrders || []).filter((item) => canAccessInternetNursingOrder(user, item, data));
     if (user.role === "institution") {
       scoped.escortServiceProviders = (data.escortServiceProviders || []).filter((item) => item.institutionCode === user.orgCode || item.name === user.orgName);
@@ -6877,7 +7423,7 @@ function scopeStateForUser(data, user) {
     const preferenceKey = user.residentId || user.accountId || user.username;
     scoped.mobileExperienceSettings = { ...scoped.mobileExperienceSettings, userPreferences: { [preferenceKey]: preferences[preferenceKey] || {} } };
   }
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "referralTeleconsultations", "escortServiceOrders", "internetNursingOrders", "taskMessages"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "referralTeleconsultations", "escortServiceOrders", "registrationOrders", "internetNursingOrders", "taskMessages"].forEach((key) => {
     scoped[key] = (data[key] || []).filter(hasAllowedResident);
   });
   if (scoped.referralSystem) {
@@ -7215,6 +7761,102 @@ function cleanMultiPracticePatch(patch) {
   }, {});
 }
 
+function normalizeMultiPracticeScheduleText(value) {
+  return String(value || "")
+    .replace(/\s+/g, "")
+    .replace(/[，,；;]/g, "|")
+    .trim()
+    .toLowerCase();
+}
+
+function isActiveMultiPracticeStatus(status) {
+  const text = String(status || "");
+  return !["已撤回", "已终止", "备案终止", "终止", "withdrawn", "terminated"].some((item) => text.includes(item));
+}
+
+function detectMultiPracticeScheduleConflicts(application = {}, applications = []) {
+  const schedule = normalizeMultiPracticeScheduleText(application.schedule);
+  if (!application.doctorId || !schedule) return [];
+  return (applications || [])
+    .filter((item) =>
+      item &&
+      item.id !== application.id &&
+      item.doctorId === application.doctorId &&
+      isActiveMultiPracticeStatus(item.status) &&
+      normalizeMultiPracticeScheduleText(item.schedule) === schedule
+    )
+    .map((item) => ({
+      id: item.id,
+      targetInstitution: item.targetInstitution || "",
+      targetDepartment: item.targetDepartment || "",
+      schedule: item.schedule || "",
+      status: item.status || ""
+    }))
+    .slice(0, 10);
+}
+
+function buildMultiPracticeExternalSync(application = {}, profile = {}, action = "sync", user = {}) {
+  const electronic = application.electronicRegistrationVerification || verifyDoctorElectronicRegistration(profile);
+  const confirmation = application.primaryPracticeConfirmation && typeof application.primaryPracticeConfirmation === "object"
+    ? application.primaryPracticeConfirmation
+    : {};
+  return {
+    action,
+    syncedAt: new Date().toISOString(),
+    electronicRegistration: {
+      status: electronic.verificationStatus || "pending",
+      registryId: electronic.registryId || profile.electronicRegistration?.registryId || "",
+      licenseNo: profile.licenseNo || "",
+      signatureNo: electronic.signatureNo || profile.electronicRegistration?.signatureNo || ""
+    },
+    eSignature: {
+      status: confirmation.signatureNo ? "signed" : "pending",
+      signatureNo: confirmation.signatureNo || "",
+      signerOrg: confirmation.confirmedByOrg || application.primaryInstitution || profile.primaryInstitution || ""
+    },
+    hisHr: {
+      status: profile.primaryInstitutionId || application.primaryInstitutionId ? "mapped" : "pending",
+      employeeId: profile.hrEmployeeId || profile.id || application.doctorId || "",
+      primaryInstitutionId: application.primaryInstitutionId || profile.primaryInstitutionId || "",
+      operator: user.username || user.name || "system"
+    }
+  };
+}
+
+function resolveMultiPracticeLifecyclePatch(payload = {}) {
+  const action = String(payload.action || payload.lifecycleAction || "").trim();
+  const statusByAction = {
+    "return-correction": "退回补正",
+    "suspend": "暂停执业",
+    "withdraw": "已撤回",
+    "terminate": "已终止",
+    "approve-filing": "已备案",
+    "file": "已备案",
+    "confirm": "待卫健审核"
+  };
+  const status = payload.status || statusByAction[action] || "";
+  const publicVisible = ["withdraw", "terminate"].includes(action) ? false : payload.publicVisible;
+  return {
+    action,
+    status,
+    ...(publicVisible !== undefined ? { publicVisible } : {}),
+    correctionRequired: action === "return-correction"
+      ? String(payload.correctionRequired || payload.note || "请补齐多点执业协议、责任保险或第一执业地点意见").trim()
+      : payload.correctionRequired
+  };
+}
+
+function refreshMultiPracticeReviewState(application, profile, applications = [], action = "sync", user = {}) {
+  const scheduleConflictEvidence = detectMultiPracticeScheduleConflicts(application, applications);
+  const reviewed = {
+    ...application,
+    scheduleConflictEvidence,
+    scheduleConflict: Boolean(application.scheduleConflict) || scheduleConflictEvidence.length > 0
+  };
+  reviewed.externalSync = buildMultiPracticeExternalSync(reviewed, profile || {}, action, user);
+  return withMultiPracticeReviewState(reviewed, profile);
+}
+
 function syncMultiPracticeDocumentChecks(application) {
   const previous = application.documentChecks && typeof application.documentChecks === "object" ? application.documentChecks : {};
   return {
@@ -7222,7 +7864,7 @@ function syncMultiPracticeDocumentChecks(application) {
     firstPracticeConsent: primaryPracticeConfirmed(application),
     cooperationAgreement: Boolean(String(application.responsibility || "").trim() && String(application.compensation || "").trim()),
     liabilityInsurance: Boolean(String(application.insurance || "").trim()),
-    scheduleConflict: Boolean(application.scheduleConflict),
+    scheduleConflict: Boolean(application.scheduleConflict) || (Array.isArray(application.scheduleConflictEvidence) && application.scheduleConflictEvidence.length > 0),
     publicDisclosure: application.publicVisible !== false
   };
 }
@@ -7285,7 +7927,13 @@ function buildMultiPracticeRegistry(data, user) {
     .filter((item) => canAccessMultiPracticeApplication(user, item))
     .map((item) => {
       const profile = (data.doctorProfiles || []).find((doctor) => doctor.id === item.doctorId);
-      const reviewed = withMultiPracticeReviewState(item, profile);
+      const reviewed = refreshMultiPracticeReviewState(
+        item,
+        profile,
+        (data.multiPracticeApplications || []).filter((application) => application.id !== item.id),
+        "registry",
+        user
+      );
       return {
         id: reviewed.id,
         doctorId: reviewed.doctorId,
@@ -7306,6 +7954,8 @@ function buildMultiPracticeRegistry(data, user) {
         publicVisible: reviewed.publicVisible !== false,
         compliance: reviewed.compliance || {},
         documentChecks: reviewed.documentChecks,
+        scheduleConflictEvidence: Array.isArray(reviewed.scheduleConflictEvidence) ? reviewed.scheduleConflictEvidence : [],
+        externalSync: reviewed.externalSync || buildMultiPracticeExternalSync(reviewed, profile || {}, "registry", user),
         risk: reviewed.riskFlags.length > 0,
         riskFlags: reviewed.riskFlags,
         disclosureItems: reviewed.disclosureItems || [],
@@ -9251,6 +9901,97 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/registrations/dashboard") {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county", "citizen"], "/api/registrations/dashboard");
+    if (!user) return;
+    sendJson(res, 200, redactSensitiveResponse(buildRegistrationDashboard(readDatabase(), user), user));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/registrations/orders") {
+    const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/registrations/orders");
+    if (!user) return;
+    const data = readDatabase();
+    try {
+      const order = normalizeRegistrationOrder(await collectJson(req), user, data);
+      if (!canAccessRegistrationOrder(user, order, data)) {
+        appendSecurityEvent({ actor: user.name, role: user.role, action: "create registration order", target: order.residentId, result: "denied", detail: "scope denied" });
+        sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
+        return;
+      }
+      data.registrationOrders = [order, ...(Array.isArray(data.registrationOrders) ? data.registrationOrders : [])].slice(0, 500);
+      data.registrationSchedules = (Array.isArray(data.registrationSchedules) ? data.registrationSchedules : seedRegistrationSchedules()).map((schedule) =>
+        schedule.id === order.scheduleId ? { ...schedule, remaining: Math.max(0, Number(schedule.remaining || 0) - 1) } : schedule
+      );
+      data.taskMessages = [buildRegistrationTaskMessage(order, "registration-submitted", user), ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
+      appendDataAccessLog(data, user, order.residentId, "registrationOrders", "create HIS registration appointment", "allowed");
+      data.securityEvents = [
+        {
+          id: randomUUID(),
+          at: new Date().toLocaleString("zh-CN", { hour12: false }),
+          actor: user.name,
+          role: user.role,
+          action: "create registration order",
+          target: order.id,
+          result: "allowed",
+          detail: order.status
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120);
+      writeDatabase(data);
+      sendJson(res, 201, order);
+    } catch (error) {
+      const denied = /scope denied|unavailable/i.test(error.message || "");
+      sendJson(res, denied ? 403 : 400, { error: denied ? "Forbidden" : "Bad Request", message: error.message });
+    }
+    return;
+  }
+
+  const registrationCancelMatch = url.pathname.match(/^\/api\/registrations\/orders\/([^/]+)\/cancel$/);
+  if (req.method === "POST" && registrationCancelMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/registrations/orders/:id/cancel");
+    if (!user) return;
+    const data = readDatabase();
+    const rows = Array.isArray(data.registrationOrders) ? data.registrationOrders : [];
+    const index = rows.findIndex((item) => item.id === decodeURIComponent(registrationCancelMatch[1]));
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "registration order not found" });
+      return;
+    }
+    if (!canAccessRegistrationOrder(user, rows[index], data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "cancel registration order", target: rows[index].id, result: "denied", detail: "scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const wasOpen = rows[index].status !== "cancelled";
+    rows[index] = applyRegistrationCancel(rows[index], payload, user);
+    data.registrationOrders = rows;
+    if (wasOpen) {
+      data.registrationSchedules = (Array.isArray(data.registrationSchedules) ? data.registrationSchedules : seedRegistrationSchedules()).map((schedule) =>
+        schedule.id === rows[index].scheduleId ? { ...schedule, remaining: Number(schedule.remaining || 0) + 1 } : schedule
+      );
+    }
+    data.taskMessages = [buildRegistrationTaskMessage(rows[index], "registration-cancelled", user), ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
+    appendDataAccessLog(data, user, rows[index].residentId, "registrationOrders", payload.reason || "cancel registration appointment", "allowed");
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "cancel registration order",
+        target: rows[index].id,
+        result: "allowed",
+        detail: rows[index].status
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, rows[index]);
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/internet-nursing/dashboard") {
     const user = requireApiRole(req, res, ["commission", "institution", "county", "citizen"], "/api/internet-nursing/dashboard");
     if (!user) return;
@@ -10428,7 +11169,13 @@ async function handleApi(req, res) {
     };
     const doctorApplications = (data.multiPracticeApplications || [])
       .filter((item) => item.doctorId === doctor.id)
-      .map((item) => withMultiPracticeReviewState(item, doctor));
+      .map((item) => refreshMultiPracticeReviewState(
+        item,
+        doctor,
+        (data.multiPracticeApplications || []).filter((application) => application.id !== item.id),
+        "doctor-view",
+        user
+      ));
     const doctorRegistry = buildMultiPracticeRegistry(data, user);
     const multiPracticeMessages = (Array.isArray(data.taskMessages) ? data.taskMessages : [])
       .filter((message) => message.collection === "multiPracticeApplications" && canAccessTaskMessage(user, message, data));
@@ -10448,8 +11195,41 @@ async function handleApi(req, res) {
     const data = readDatabase();
     const applications = (data.multiPracticeApplications || [])
       .filter((item) => canAccessMultiPracticeApplication(user, item))
-      .map((item) => withMultiPracticeReviewState(item, (data.doctorProfiles || []).find((doctor) => doctor.id === item.doctorId)));
+      .map((item) => refreshMultiPracticeReviewState(
+        item,
+        (data.doctorProfiles || []).find((doctor) => doctor.id === item.doctorId),
+        (data.multiPracticeApplications || []).filter((application) => application.id !== item.id),
+        "application-list",
+        user
+      ));
     sendJson(res, 200, { applications, policy: data.multiPracticePolicy });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public/multi-practice-ledger") {
+    const data = readDatabase();
+    const registry = buildMultiPracticeRegistry(data, { role: "commission", name: "public" });
+    const query = String(url.searchParams.get("q") || "").trim().toLowerCase();
+    const doctorName = String(url.searchParams.get("doctorName") || "").trim().toLowerCase();
+    const institution = String(url.searchParams.get("institution") || "").trim().toLowerCase();
+    const status = String(url.searchParams.get("status") || "").trim().toLowerCase();
+    const publicLedger = registry.publicLedger.filter((item) => {
+      const haystack = [item.doctorName, item.primaryInstitution, item.targetInstitution, item.targetDepartment, item.practiceScope, item.status].join(" ").toLowerCase();
+      return (!query || haystack.includes(query)) &&
+        (!doctorName || String(item.doctorName || "").toLowerCase().includes(doctorName)) &&
+        (!institution || [item.primaryInstitution, item.targetInstitution].some((value) => String(value || "").toLowerCase().includes(institution))) &&
+        (!status || String(item.status || "").toLowerCase().includes(status));
+    });
+    sendJson(res, 200, {
+      ok: true,
+      generatedAt: registry.generatedAt,
+      total: publicLedger.length,
+      summary: {
+        publicVisible: publicLedger.length,
+        filed: publicLedger.filter((item) => String(item.status || "").includes("备案")).length
+      },
+      publicLedger
+    });
     return;
   }
 
@@ -10513,12 +11293,16 @@ async function handleApi(req, res) {
     const safePatch = cleanMultiPracticePatch(patch);
     const previousApplication = data.multiPracticeApplications[index];
     const profile = (data.doctorProfiles || []).find((doctor) => doctor.id === previousApplication.doctorId);
+    const lifecyclePatch = resolveMultiPracticeLifecyclePatch(patch);
+    if (lifecyclePatch.status) safePatch.status = lifecyclePatch.status;
+    if (lifecyclePatch.publicVisible !== undefined) safePatch.publicVisible = lifecyclePatch.publicVisible;
+    if (lifecyclePatch.correctionRequired) safePatch.correctionRequired = lifecyclePatch.correctionRequired;
     if (safePatch.primaryConsent) safePatch.primaryPracticeConfirmation = buildPrimaryPracticeConfirmation({ ...safePatch, note: patch.note }, user, profile || {}, previousApplication);
     const nextLifecycle = [
       {
         at: new Date().toLocaleString("zh-CN", { hour12: false }),
         actor: user.name,
-        action: safePatch.status ? `状态更新为 ${safePatch.status}` : "更新申请材料",
+        action: lifecyclePatch.action || (safePatch.status ? `状态更新为 ${safePatch.status}` : "更新申请材料"),
         note: String(patch.note || safePatch.reviewOpinion || safePatch.correctionRequired || "").trim()
       },
       ...(Array.isArray(previousApplication.lifecycle) ? previousApplication.lifecycle : [])
@@ -10531,7 +11315,8 @@ async function handleApi(req, res) {
       updatedByName: user.name,
       lastUpdated: new Date().toISOString()
     };
-    data.multiPracticeApplications[index] = withMultiPracticeReviewState(nextApplication, profile);
+    const peerApplications = data.multiPracticeApplications.filter((item) => item.id !== id);
+    data.multiPracticeApplications[index] = refreshMultiPracticeReviewState(nextApplication, profile, peerApplications, lifecyclePatch.action || "patch", user);
     data.taskMessages = [
       buildMultiPracticeTaskMessage(data.multiPracticeApplications[index], { target: "doctor", note: patch.note || safePatch.reviewOpinion || safePatch.correctionRequired || "" }, user),
       ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])
@@ -11109,7 +11894,10 @@ async function handleApi(req, res) {
     }
     if (collection === "multiPracticeApplications") {
       const profile = (data.doctorProfiles || []).find((doctor) => doctor.id === item.doctorId);
-      if (payload.status) item.status = String(payload.status);
+      const lifecyclePatch = resolveMultiPracticeLifecyclePatch(payload);
+      if (lifecyclePatch.status) item.status = String(lifecyclePatch.status);
+      if (lifecyclePatch.publicVisible !== undefined) item.publicVisible = lifecyclePatch.publicVisible;
+      if (lifecyclePatch.correctionRequired) item.correctionRequired = lifecyclePatch.correctionRequired;
       if (payload.updates?.primaryConsent) {
         item.primaryPracticeConfirmation = buildPrimaryPracticeConfirmation({ ...(payload.updates || {}), note: payload.note }, user, profile || {}, item);
       }
@@ -11117,18 +11905,19 @@ async function handleApi(req, res) {
         {
           at: new Date().toLocaleString("zh-CN", { hour12: false }),
           actor: user.name,
-          action: payload.status ? `状态更新为 ${payload.status}` : String(payload.note || "更新多点执业申请"),
+          action: lifecyclePatch.action || (lifecyclePatch.status ? `状态更新为 ${lifecyclePatch.status}` : String(payload.note || "更新多点执业申请")),
           note: String(payload.note || "").trim()
         },
         ...(Array.isArray(item.lifecycle) ? item.lifecycle : [])
       ].slice(0, 20);
-      Object.assign(item, withMultiPracticeReviewState(item, profile));
+      const peerApplications = (data.multiPracticeApplications || []).filter((application) => application.id !== item.id);
+      Object.assign(item, refreshMultiPracticeReviewState(item, profile, peerApplications, lifecyclePatch.action || "workflow-action", user));
       data.taskMessages = [
         buildMultiPracticeTaskMessage(item, { target: "doctor", note: payload.note || "" }, user),
         ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])
       ].slice(0, 300);
     }
-    if (payload.status) item.status = String(payload.status);
+    if (payload.status && collection !== "multiPracticeApplications") item.status = String(payload.status);
     item.lastUpdated = new Date().toISOString();
     data.securityEvents = [
       {

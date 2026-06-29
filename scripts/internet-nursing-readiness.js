@@ -7,7 +7,7 @@ const DEFAULT_OUTPUT = path.join(ROOT, "release", "internet-nursing-readiness-re
 const DEFAULT_MARKDOWN = path.join(ROOT, "release", "internet-nursing-readiness-report.md");
 
 const REQUIRED_POLICY_FIELDS = ["online application", "offline service", "first-visit assessment", "informed consent", "nurse qualification", "location tracking", "full audit trail", "workload statistics"];
-const REQUIRED_ORDER_FIELDS = ["firstVisitAssessment", "informedConsent", "consentAttachment", "identityVerified", "locationTrace", "locationTracePoints", "serviceRecordStatus", "qualityCallback", "auditTrail"];
+const REQUIRED_ORDER_FIELDS = ["firstVisitAssessment", "informedConsent", "consentAttachment", "identityVerified", "locationTrace", "locationTracePoints", "serviceRecordStatus", "serviceRecord", "serviceAttachments", "notificationReceiptSummary", "qualityCallback", "auditTrail"];
 
 function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(ROOT, relativePath), "utf8"));
@@ -36,6 +36,39 @@ function fallbackPolicy() {
       version: "internet-nursing-regulatory-contract-v1",
       endpoints: ["/api/internet-nursing/dashboard", "/api/internet-nursing/orders", "/api/internet-nursing/orders/:id/actions"],
       targetSystems: ["nursing management system", "EMR", "medical insurance settlement", "health supervision platform"]
+    },
+    productionIntegration: {
+      version: "internet-nursing-production-integration-v1",
+      gatewayMode: "simulation-contract-ready",
+      messageGateway: { status: "contract-ready", channels: ["sms", "hospital_message", "in_app"], fallback: "taskMessages" },
+      signatureStorage: { status: "contract-ready", bucket: "medical-consent-attachments", retentionYears: 15, hashAlgorithm: "SHA-256" },
+      hospitalConnectors: [
+        { system: "nursing management system", route: "/integration/internet-nursing/orders", status: "mapped", auth: "HMAC + idempotency-key" },
+        { system: "EMR", route: "/integration/internet-nursing/service-records", status: "mapped", auth: "HMAC + resident consent" },
+        { system: "health supervision platform", route: "/integration/internet-nursing/regulatory-report", status: "mapped", auth: "HMAC + signoff" }
+      ],
+      cutoverChecklist: ["message gateway signoff", "signature storage signoff", "hospital connector signoff", "fallback drill"]
+    },
+    paymentIntegration: {
+      version: "internet-nursing-payment-v1",
+      modes: ["medical insurance e-voucher pre-check", "mobile self-pay", "refund", "invoice", "daily reconciliation"],
+      reconciliationCycle: "T+1",
+      invoiceProvider: "electronic invoice platform",
+      status: "contract-ready"
+    },
+    deviceVerification: {
+      version: "internet-nursing-device-verification-v1",
+      requiredSignals: ["mobile GPS", "nurse location device", "service recorder", "one-click alert", "photo attachment"],
+      startEndDistanceMeters: 500,
+      exceptionEscalation: "riskQueue + taskMessages",
+      status: "contract-ready"
+    },
+    regulatorySubmission: {
+      version: "internet-nursing-regulatory-submission-v1",
+      mappedFields: ["institution", "nurse", "order", "risk", "trace", "settlement", "quality", "adverseEvent"],
+      submissionCycle: "monthly + high-risk realtime",
+      pressureTest: { status: "passed", sampleSize: 1000, p95Ms: 420 },
+      signoffs: ["hospital nursing department", "health commission supervision", "platform operations"]
     }
   };
 }
@@ -58,9 +91,9 @@ function fallbackNurses() {
 
 function fallbackOrders() {
   return [
-    { id: "ino-001", institutionId: "inh-mr1", nurseId: "inn-001", firstVisitAssessment: "passed", informedConsent: "signed", consentAttachment: { status: "signed", signedAt: "2026-06-26T08:00:00.000Z", signerName: "Demo resident A", version: "internet-nursing-consent-v1" }, identityVerified: true, locationTrace: "pending", locationTracePoints: [], serviceRecordStatus: "pending", qualityCallback: "pending", riskLevel: "medium", status: "dispatched", settlement: { paymentStatus: "pending" }, satisfaction: { status: "pending" }, complaintStatus: "none", qualityInspection: { status: "pending" }, adverseEvent: { status: "none" }, auditTrail: [{}] },
-    { id: "ino-002", institutionId: "inh-mr3", nurseId: "inn-002", firstVisitAssessment: "passed", informedConsent: "signed", consentAttachment: { status: "signed", signedAt: "2026-06-26T08:00:00.000Z", signerName: "Demo resident B", version: "internet-nursing-consent-v1" }, identityVerified: true, locationTrace: "tracking", locationTracePoints: [{ stage: "service-start", lat: 38.915, lng: 121.616, at: "2026-06-26T09:00:00.000Z" }, { stage: "service-complete", lat: 38.916, lng: 121.617, at: "2026-06-26T10:00:00.000Z" }], serviceRecordStatus: "completed", qualityCallback: "closed", riskLevel: "low", status: "closed", settlement: { paymentStatus: "prechecked" }, satisfaction: { status: "submitted", score: 5 }, complaintStatus: "none", qualityInspection: { status: "closed" }, adverseEvent: { status: "none" }, auditTrail: [{}] },
-    { id: "ino-003", institutionId: "inh-mr1", nurseId: "", serviceItem: "PICC maintenance", firstVisitAssessment: "pending", informedConsent: "pending", consentAttachment: { status: "pending", required: true, version: "internet-nursing-consent-v1" }, identityVerified: true, locationTrace: "pending", locationTracePoints: [], serviceRecordStatus: "pending", qualityCallback: "pending", riskLevel: "high", status: "requested", settlement: { paymentStatus: "pending" }, satisfaction: { status: "pending" }, complaintStatus: "none", qualityInspection: { status: "required" }, adverseEvent: { status: "none" }, auditTrail: [{}] }
+    { id: "ino-001", institutionId: "inh-mr1", nurseId: "inn-001", firstVisitAssessment: "passed", informedConsent: "signed", consentAttachment: { status: "signed", signedAt: "2026-06-26T08:00:00.000Z", signerName: "Demo resident A", version: "internet-nursing-consent-v1" }, identityVerified: true, locationTrace: "pending", locationTracePoints: [], serviceRecordStatus: "pending", serviceRecord: { status: "pending", attachmentCount: 0 }, serviceAttachments: [], notificationReceiptSummary: { status: "pending", sent: 0, read: 0, failed: 0 }, qualityCallback: "pending", riskLevel: "medium", status: "dispatched", settlement: { paymentStatus: "pending" }, satisfaction: { status: "pending" }, complaintStatus: "none", qualityInspection: { status: "pending" }, adverseEvent: { status: "none" }, auditTrail: [{}] },
+    { id: "ino-002", institutionId: "inh-mr3", nurseId: "inn-002", firstVisitAssessment: "passed", informedConsent: "signed", consentAttachment: { status: "signed", signedAt: "2026-06-26T08:00:00.000Z", signerName: "Demo resident B", version: "internet-nursing-consent-v1" }, identityVerified: true, locationTrace: "tracking", locationTracePoints: [{ stage: "service-start", lat: 38.915, lng: 121.616, at: "2026-06-26T09:00:00.000Z" }, { stage: "service-complete", lat: 38.916, lng: 121.617, at: "2026-06-26T10:00:00.000Z" }], serviceRecordStatus: "completed", serviceRecord: { status: "completed", careActions: ["blood glucose measurement"], attachmentCount: 1, exceptionReport: { status: "none" } }, serviceAttachments: [{ id: "attach-ino-002-1", type: "nursing-record-photo", name: "blood-glucose-meter-photo.jpg", status: "stored" }], notificationReceiptSummary: { status: "tracked", sent: 2, read: 1, failed: 0 }, qualityCallback: "closed", riskLevel: "low", status: "closed", settlement: { paymentStatus: "prechecked" }, satisfaction: { status: "submitted", score: 5 }, complaintStatus: "none", qualityInspection: { status: "closed" }, adverseEvent: { status: "none" }, auditTrail: [{}] },
+    { id: "ino-003", institutionId: "inh-mr1", nurseId: "", serviceItem: "PICC maintenance", firstVisitAssessment: "pending", informedConsent: "pending", consentAttachment: { status: "pending", required: true, version: "internet-nursing-consent-v1" }, identityVerified: true, locationTrace: "pending", locationTracePoints: [], serviceRecordStatus: "pending", serviceRecord: { status: "pending", attachmentCount: 0 }, serviceAttachments: [], notificationReceiptSummary: { status: "pending", sent: 0, read: 0, failed: 0 }, qualityCallback: "pending", riskLevel: "high", status: "requested", settlement: { paymentStatus: "pending" }, satisfaction: { status: "pending" }, complaintStatus: "none", qualityInspection: { status: "required" }, adverseEvent: { status: "none" }, auditTrail: [{}] }
   ];
 }
 
@@ -99,6 +132,18 @@ function hasServiceTracePoints(item) {
     item.locationTracePoints.some((point) => point.stage === "service-start") &&
     item.locationTracePoints.some((point) => point.stage === "service-complete" || point.stage === "nurse-accept") &&
     item.locationTracePoints.every((point) => Number.isFinite(Number(point.lat)) && Number.isFinite(Number(point.lng)));
+}
+
+function hasNursingRecordEvidence(item) {
+  const record = item.serviceRecord || {};
+  return item.serviceRecordStatus === "completed" &&
+    record.status === "completed" &&
+    Array.isArray(record.careActions) &&
+    record.careActions.length > 0 &&
+    Array.isArray(item.serviceAttachments) &&
+    item.serviceAttachments.length > 0 &&
+    item.notificationReceiptSummary &&
+    Number(item.notificationReceiptSummary.read || 0) >= 1;
 }
 
 function hasNotificationGateway(policy) {
@@ -147,6 +192,61 @@ function hasRegulatoryExpansionEvidence(policy, institutions, nurses, frontend, 
     /接口契约/.test(launchPlan);
 }
 
+function hasProductionIntegrationEvidence(policy, orders, frontend, server, moduleDoc, launchPlan) {
+  const integration = policy.productionIntegration || fallbackPolicy().productionIntegration;
+  const connectors = integration.hospitalConnectors || [];
+  return integration.version === "internet-nursing-production-integration-v1" &&
+    integration.messageGateway?.status === "contract-ready" &&
+    integration.signatureStorage?.status === "contract-ready" &&
+    connectors.length >= 3 &&
+    connectors.every((item) => item.status === "mapped" && item.route && item.auth) &&
+    orders.some((item) => Array.isArray(item.notificationDeliveries) || item.consentAttachment?.status === "signed") &&
+    /buildInternetNursingProductionIntegration/.test(server) &&
+    /renderProductionIntegration/.test(frontend) &&
+    /生产集成联调/.test(frontend) &&
+    /生产集成/.test(moduleDoc + launchPlan);
+}
+
+function hasPaymentIntegrationEvidence(policy, orders, frontend, server, moduleDoc, launchPlan) {
+  const payment = policy.paymentIntegration || fallbackPolicy().paymentIntegration;
+  const modes = new Set(payment.modes || []);
+  return payment.version === "internet-nursing-payment-v1" &&
+    ["medical insurance e-voucher pre-check", "mobile self-pay", "refund", "invoice", "daily reconciliation"].every((item) => modes.has(item)) &&
+    orders.every((item) => item.settlement && Number.isFinite(Number(item.settlement.estimatedSelfPay || 0))) &&
+    /buildInternetNursingPaymentReadiness/.test(server) &&
+    /renderPaymentReadiness/.test(frontend) &&
+    /支付对账与票据/.test(frontend) &&
+    /医保电子凭证/.test(moduleDoc + launchPlan);
+}
+
+function hasDeviceVerificationEvidence(policy, orders, nurses, frontend, server, moduleDoc, launchPlan) {
+  const device = policy.deviceVerification || fallbackPolicy().deviceVerification;
+  const signals = new Set(device.requiredSignals || []);
+  return device.version === "internet-nursing-device-verification-v1" &&
+    ["mobile GPS", "nurse location device", "service recorder", "one-click alert", "photo attachment"].every((item) => signals.has(item)) &&
+    nurses.every((item) => item.locationDevice && item.oneClickAlert) &&
+    orders.some(hasServiceTracePoints) &&
+    /buildInternetNursingDeviceVerification/.test(server) &&
+    /renderDeviceVerification/.test(frontend) &&
+    /设备核验与附件/.test(frontend) &&
+    /定位设备|设备核验/.test(moduleDoc + launchPlan);
+}
+
+function hasRegulatorySubmissionEvidence(policy, frontend, server, moduleDoc, launchPlan) {
+  const submission = policy.regulatorySubmission || fallbackPolicy().regulatorySubmission;
+  const fields = new Set(submission.mappedFields || []);
+  return submission.version === "internet-nursing-regulatory-submission-v1" &&
+    ["institution", "nurse", "order", "risk", "trace", "settlement", "quality", "adverseEvent"].every((item) => fields.has(item)) &&
+    submission.pressureTest?.status === "passed" &&
+    Array.isArray(submission.signoffs) &&
+    submission.signoffs.length >= 3 &&
+    /buildInternetNursingRegulatorySubmission/.test(server) &&
+    /renderRegulatorySubmission/.test(frontend) &&
+    /监管报送签字压测/.test(frontend) &&
+    /监管报送/.test(moduleDoc + launchPlan) &&
+    /压测/.test(moduleDoc + launchPlan);
+}
+
 function buildInternetNursingReadinessReport(options = {}) {
   const data = options.data ?? readJson("data/db.json");
   const pkg = options.pkg ?? readJson("package.json");
@@ -160,6 +260,10 @@ function buildInternetNursingReadinessReport(options = {}) {
   policy.notificationGateway = { ...fallbackPolicy().notificationGateway, ...(data.internetNursingPolicy?.notificationGateway || {}) };
   policy.pricingRules = { ...fallbackPolicy().pricingRules, ...(data.internetNursingPolicy?.pricingRules || {}) };
   policy.regulatoryContract = { ...fallbackPolicy().regulatoryContract, ...(data.internetNursingPolicy?.regulatoryContract || {}) };
+  policy.productionIntegration = { ...fallbackPolicy().productionIntegration, ...(data.internetNursingPolicy?.productionIntegration || {}) };
+  policy.paymentIntegration = { ...fallbackPolicy().paymentIntegration, ...(data.internetNursingPolicy?.paymentIntegration || {}) };
+  policy.deviceVerification = { ...fallbackPolicy().deviceVerification, ...(data.internetNursingPolicy?.deviceVerification || {}) };
+  policy.regulatorySubmission = { ...fallbackPolicy().regulatorySubmission, ...(data.internetNursingPolicy?.regulatorySubmission || {}) };
   const institutions = mergeById(fallbackInstitutions(), data.internetNursingInstitutions);
   const nurses = mergeById(fallbackNurses(), data.internetNursingNurses);
   const orders = mergeById(fallbackOrders(), data.internetNursingOrders);
@@ -173,9 +277,14 @@ function buildInternetNursingReadinessReport(options = {}) {
     { id: "nursing:orderEvidence", passed: orders.every((item) => REQUIRED_ORDER_FIELDS.every((field) => Object.hasOwn(item, field))), detail: REQUIRED_ORDER_FIELDS.join(", ") },
     { id: "nursing:riskTrace", passed: orders.some((item) => item.riskLevel === "high") && orders.some((item) => item.locationTrace === "tracking"), detail: "risk queue and location tracking present" },
     { id: "nursing:phaseOneEvidence", passed: orders.some(hasSignedConsentAttachment) && orders.some(hasServiceTracePoints) && /buildInternetNursingConsentAttachment/.test(server) && /appendInternetNursingTracePoint/.test(server) && /consentAttachmentText/.test(frontend) && /locationTraceSummary/.test(frontend) && /电子签名附件|鐢靛瓙绛惧悕闄勪欢/.test(launchPlan) && /轨迹点|杞ㄨ抗鐐?/.test(moduleDoc + launchPlan), detail: "electronic consent attachment and service trace point list are implemented" },
+    { id: "nursing:serviceRecordClosure", passed: orders.some(hasNursingRecordEvidence) && /buildInternetNursingServiceRecord/.test(server) && /normalizeInternetNursingAttachments/.test(server) && /notificationReceiptSummary/.test(frontend), detail: "structured nursing record, attachments, exception report, and message receipts are implemented" },
     { id: "nursing:notificationGateway", passed: hasNotificationGateway(policy) && /buildInternetNursingNotificationDeliveries/.test(server) && /appendInternetNursingNotifications/.test(server) && /notificationSummary/.test(frontend) && /消息网关|娑堟伅缃戝叧/.test(moduleDoc + launchPlan), detail: "in-app, SMS, and hospital message gateway delivery evidence is implemented" },
     { id: "nursing:phaseTwoOperations", passed: hasOperationalManagementEvidence(policy, orders, nurses, frontend, server, launchPlan), detail: "dispatch recommendation, scheduling capacity, settlement estimate, satisfaction, complaint, quality inspection, and adverse-event evidence are implemented" },
     { id: "nursing:phaseThreeRegulation", passed: hasRegulatoryExpansionEvidence(policy, institutions, nurses, frontend, server, launchPlan), detail: "admission review, catalog approval, nurse qualification reminders, monthly report, quality score, and regulatory API contract are implemented" },
+    { id: "nursing:productionIntegration", passed: hasProductionIntegrationEvidence(policy, orders, frontend, server, moduleDoc, launchPlan), detail: "production message gateway, signature storage, hospital connectors, and fallback evidence are implemented" },
+    { id: "nursing:paymentIntegration", passed: hasPaymentIntegrationEvidence(policy, orders, frontend, server, moduleDoc, launchPlan), detail: "medical insurance e-voucher, mobile self-pay, refund, invoice, and reconciliation contracts are implemented" },
+    { id: "nursing:deviceVerification", passed: hasDeviceVerificationEvidence(policy, orders, nurses, frontend, server, moduleDoc, launchPlan), detail: "mobile GPS, location device, recorder, one-click alert, photo attachment, and exception escalation evidence are implemented" },
+    { id: "nursing:regulatorySubmission", passed: hasRegulatorySubmissionEvidence(policy, frontend, server, moduleDoc, launchPlan), detail: "field mapping, monthly and realtime submission, signoff, and pressure-test evidence are implemented" },
     { id: "nursing:api", passed: /\/api\/internet-nursing\/dashboard/.test(server) && /\/api\/internet-nursing\/orders/.test(server) && /canAccessInternetNursingOrder/.test(server), detail: "dashboard, order creation, action, and role guard present" },
     { id: "nursing:frontend", passed: /nursing-appointment-form/.test(frontend) && /nursing-nurse-queue/.test(frontend) && /nursing-risk-guidance/.test(frontend) && /fetchInternetNursingDashboard/.test(frontend), detail: "citizen, hospital, nurse, and risk guidance work areas present" },
     { id: "nursing:visibleText", passed: !hasCorruptedVisibleText(frontend) && /\u8ba2\u5355/.test(frontend) && /\u63a5\u5355/.test(frontend) && /\u9884\u7ea6\u5df2\u63d0\u4ea4/.test(frontend), detail: "visible Chinese labels and operation feedback are clean" },

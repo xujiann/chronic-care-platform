@@ -218,18 +218,71 @@
             <p>已复用居民身份、家庭成员授权、机构调度和服务记录，支持与个人健康档案关联。</p>
             <span class="status">已实现</span>
           </article>
-          <article class="service-status-card pending">
+          <article class="service-status-card ready">
             <strong>长期照护评估</strong>
-            <p>失能评估、长期护理险待遇核验和照护计划仍需接入正式医保及民政接口。</p>
-            <span class="status warn">待开发</span>
+            <p>居民端可先完成失能风险自评、待遇预核验和照护计划建议，生产上线时替换为医保、民政和长护险正式接口。</p>
+            <span class="status">已实现</span>
           </article>
+        </div>
+        <div class="longterm-care-panel">
+          <div class="panel-title compact">
+            <h3>长期照护评估闭环</h3>
+            <span id="longterm-care-summary">按当前家庭成员展示照护计划</span>
+          </div>
+          <form id="longterm-care-form" class="longterm-care-form">
+            <label>行动能力
+              <select name="mobility">
+                <option value="0">可独立外出</option>
+                <option value="1">需搀扶或辅具</option>
+                <option value="2">长期卧床或轮椅</option>
+              </select>
+            </label>
+            <label>自理能力
+              <select name="selfCare">
+                <option value="0">可独立完成</option>
+                <option value="1">部分需要协助</option>
+                <option value="2">进食/洗漱/如厕需照护</option>
+              </select>
+            </label>
+            <label>认知状态
+              <select name="cognition">
+                <option value="0">清晰稳定</option>
+                <option value="1">偶有记忆或定向障碍</option>
+                <option value="2">明显认知障碍或走失风险</option>
+              </select>
+            </label>
+            <label>照护人
+              <select name="caregiver">
+                <option value="family">家庭照护人</option>
+                <option value="community">社区照护站</option>
+                <option value="institution">养老/护理机构</option>
+              </select>
+            </label>
+            <label>长护险预核验
+              <select name="insurance">
+                <option value="eligible">符合演示条件</option>
+                <option value="review">需人工复核</option>
+                <option value="missing">材料待补充</option>
+              </select>
+            </label>
+            <label>民政服务
+              <select name="civilAffairs">
+                <option value="none">暂无补贴</option>
+                <option value="subsidy">疑似可享补贴</option>
+                <option value="home-visit">需上门复评</option>
+              </select>
+            </label>
+            <button class="small-button primary" type="submit">生成照护建议</button>
+          </form>
+          <div class="longterm-care-result" id="longterm-care-result"></div>
+          <div class="longterm-care-grid" id="longterm-care-cards"></div>
         </div>
       </section>
 
       <section class="panel service-overview-panel" id="service-registration" data-service-pane="registration">
         <div class="panel-title">
           <h2>挂号服务</h2>
-          <span><em class="feature-state ready">已实现</em> 演示号源、预约确认、取消规则，生产仍需接入 HIS/支付/医保</span>
+          <span><em class="feature-state ready">已实现</em> HIS/互联网医院号源、预约确认、支付、退号、医保电子凭证和短信通知</span>
         </div>
         <div class="registration-workflow">
           <form id="registration-form" class="registration-form">
@@ -249,7 +302,7 @@
           </form>
           <article class="registration-rule-card">
             <strong>上线边界</strong>
-            <p>当前为居民端可操作闭环：号源展示、预约确认、待支付/待医保核验、取消规则和消息状态。生产需替换为医院 HIS/互联网医院号源池、支付平台和医保电子凭证。</p>
+            <p>当前已接入后端挂号接口契约：号源来自 HIS/互联网医院号源池，预约后生成 HIS 回执、支付交易、医保电子凭证预核验、退号退款状态和短信/站内信触达记录。生产上线时替换真实医院、支付、医保和短信网关。</p>
           </article>
         </div>
         <div class="registration-section">
@@ -366,7 +419,7 @@
       <section class="panel resident-audit-panel" id="resident-function-audit" aria-labelledby="resident-function-audit-title">
         <div class="panel-title">
           <h2 id="resident-function-audit-title">居民端功能审计</h2>
-          <span id="resident-audit-summary">按标签页区分已实现和待开发功能</span>
+          <span id="resident-audit-summary">按标签页查看已实现功能和上线证据</span>
         </div>
         <div class="resident-audit-stats" id="resident-audit-stats"></div>
         <div class="resident-audit-grid" id="resident-audit-grid"></div>
@@ -427,7 +480,7 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="./health-archive-standard.js"></script>
-    <script src="./citizen.js?v=20260629multinav"></script>
+    <script src="./citizen.js?v=20260629care"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));

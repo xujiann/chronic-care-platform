@@ -18,12 +18,19 @@ test("multi-practice readiness validates doctor accounts, review state, APIs and
   assert.equal(report.summary.applications >= 2, true);
   assert.equal(report.summary.signedConfirmations >= 2, true);
   assert.equal(report.summary.messageLoopReady, true);
+  assert.equal(report.summary.scheduleConflictReady, true);
+  assert.equal(report.summary.publicLedgerReady, true);
+  assert.equal(report.summary.externalSyncReady, true);
   assert.equal(report.requiredDocumentChecks.includes("liabilityInsurance"), true);
   assert.equal(report.checks.some((item) => item.id === "multiPractice:electronicRegistration" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "multiPractice:firstPracticeConfirmation" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "multiPractice:doctorHospitalLoop" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "multiPractice:doctorApi" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "multiPractice:registryApi" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "multiPractice:scheduleConflict" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "multiPractice:lifecycleActions" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "multiPractice:publicQuery" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "multiPractice:externalSync" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "multiPractice:institutionUi" && item.passed), true);
   assert.match(renderMarkdown(report), /Doctor multi-practice readiness report/);
 });
@@ -42,4 +49,7 @@ test("multi-practice readiness writes release artifacts", (t) => {
   assert.match(md, /Verified registrations/);
   assert.match(md, /Signed first-practice confirmations/);
   assert.match(md, /Doctor-hospital message loop/);
+  assert.match(md, /Schedule conflict detection/);
+  assert.match(md, /Public ledger query/);
+  assert.match(md, /External sync evidence/);
 });
