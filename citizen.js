@@ -1774,6 +1774,10 @@ function formatSubsidy(value) {
 
 function formatEscortStatus(value) {
   return {
+    confirmed: "已确认",
+    returned: "已退回",
+    "hospital-confirmed": "医院已确认",
+    "hospital-returned": "医院退回补充",
     requested: "待确认",
     matched: "已匹配",
     "contract-pending": "合同待签",
