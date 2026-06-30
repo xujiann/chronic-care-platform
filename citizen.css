@@ -1255,6 +1255,30 @@ select,
   font-weight: 800;
 }
 
+.lifecycle-action-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.lifecycle-action-buttons button {
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f6fbfa;
+  color: var(--teal-dark);
+  font-weight: 800;
+}
+
+.lifecycle-action-buttons button:last-child {
+  background: #ffffff;
+  color: var(--ink);
+}
+
+.lifecycle-action-buttons button:disabled {
+  opacity: 0.55;
+}
+
 .two-column {
   display: grid;
   grid-template-columns: 1.35fr 0.9fr;

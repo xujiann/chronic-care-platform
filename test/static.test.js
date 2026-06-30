@@ -274,6 +274,18 @@ test("chronic follow-up launch core is wired through docs api and portals", () =
   assert.equal(Boolean(packageJson.scripts["chronic:launch-core"]), true);
 });
 
+test("institution chronic follow-up workbench exposes escalation closure", () => {
+  const institutionHtml = read("institution.html");
+  const institutionJs = read("institution.js");
+  const serverJs = read("server.js");
+  assert.match(institutionHtml, /chronic-followup-workbench/);
+  assert.match(institutionJs, /chronicEscalationButton/);
+  assert.match(institutionJs, /data-chronic-escalation/);
+  assert.match(institutionJs, /\/chronic\/followup-escalations/);
+  assert.match(serverJs, /\/api\/chronic\/followup-escalations/);
+  assert.match(serverJs, /idempotent: Boolean\(existingMessage\)/);
+});
+
 test("static snapshot keeps acceptance evidence clean and actionable", () => {
   const raw = read("data/db.json");
   const data = JSON.parse(raw);
@@ -625,9 +637,12 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(read("auth.js"), /quality-safety\.html/);
   assert.match(read("server.js"), /\/api\/chronic\/followup-summary/);
   assert.match(read("server.js"), /\/api\/chronic\/followup-feedback/);
+  assert.match(read("server.js"), /\/api\/chronic\/followup-escalations/);
   assert.match(read("server.js"), /\/api\/chronic\/followup-dispatch/);
   assert.match(read("institution.html"), /chronic-followup-workbench/);
   assert.match(read("institution.js"), /dispatchChronicFollowup/);
+  assert.match(read("institution.js"), /escalateChronicFollowup/);
+  assert.match(read("institution.js"), /data-chronic-escalation/);
   assert.match(read("citizen.html"), /followup-feedback-form/);
   assert.match(read("citizen.js"), /bindFollowupFeedback/);
 });
@@ -672,6 +687,9 @@ test("citizen portal exposes eight-stage lifecycle health management", () => {
   assert.match(citizenJs, /authorizations/);
   assert.match(read("server.js"), /\/api\/citizen\/lifecycle-actions/);
   assert.match(read("server.js"), /buildCitizenLifecycleActions/);
+  assert.match(read("server.js"), /buildCitizenLifecycleTaskRows/);
+  assert.match(read("server.js"), /buildLifecycleActionClosureMessage/);
+  assert.match(read("server.js"), /citizenLifecycleActions/);
   assert.match(citizenCss, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
   assert.match(citizenCss, /lifecycle-action-grid/);
   assert.match(citizenCss, /lifecycle-card small\.warn/);
@@ -686,7 +704,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   const serviceWorker = read("service-worker.js");
   assert.match(citizenHtml, /rel="manifest"/);
   assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260630sync/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260630escortlink/);
   assert.match(citizenHtml, /mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-title/);
@@ -748,7 +766,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.shortcuts.some((item) => item.url === "./citizen.html?client=app&page=escort#service-escort"), true);
   assert.equal(manifest.shortcuts.some((item) => item.url === "./mobile-preview.html?client=app"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v24/);
+  assert.match(serviceWorker, /chronic-care-citizen-v25/);
   assert.match(serviceWorker, /internet-nursing\.js\?v=20260629prod/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627preview/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages/);
@@ -763,7 +781,9 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(serviceWorker, /citizen\.js\?v=20260630layout/);
   assert.match(serviceWorker, /citizen\.js\?v=20260630visible/);
   assert.match(serviceWorker, /citizen\.js\?v=20260630touch/);
-  assert.match(serviceWorker, /citizen\.js\?v=20260630sync/);
+  assert.match(serviceWorker, /citizen\.js\?v=20260630escortlink/);
+  assert.match(serviceWorker, /citizen\.css\?v=20260630lifecycle/);
+  assert.match(serviceWorker, /citizen\.js\?v=20260630lifecycle/);
   assert.match(serviceWorker, /citizen\.html/);
   assert.match(serviceWorker, /mobile-preview\.html/);
   assert.match(serviceWorker, /mobile-preview\.css/);
@@ -799,9 +819,13 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   const escortJs = read("escort.js");
   assert.match(citizenHtml, /escort-appointment-form/);
   assert.match(citizenHtml, /助医陪诊预约/);
+  assert.match(citizenHtml, /name="registrationOrderId"/);
+  assert.match(citizenHtml, /关联挂号/);
   assert.match(citizenJs, /fetchCitizenEscortDashboard/);
   assert.match(citizenJs, /bindEscortAppointment/);
   assert.match(citizenJs, /\/escort-services\/orders/);
+  assert.match(citizenJs, /getEscortRegistrationOptions/);
+  assert.match(citizenJs, /applyLinkedRegistrationToEscortForm/);
   assert.match(citizenJs, /formatEscortHospitalHandoff/);
   assert.match(citizenJs, /hisVisitId/);
   assert.match(citizenJs, /outpatientQueueNo/);
@@ -1017,7 +1041,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /longterm-care-form/);
   assert.match(citizenCss, /registration-form/);
   assert.match(citizenHtml, /registration-summary/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260630sync/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260630escortlink/);
   assert.match(citizenJs, /registration-summary/);
   assert.match(citizenJs, /hisOrders/);
   assert.match(citizenJs, /insuranceReady/);
@@ -1109,6 +1133,8 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(js, /renderRegulatorySubmission/);
   assert.match(js, /buildStaticSiteCutoverPack/);
   assert.match(js, /renderSiteCutoverPack/);
+  assert.match(js, /productionBlockers/);
+  assert.match(js, /production-blocked/);
   assert.match(js, /nursing-cutover-regulatory-pressure-test/);
   assert.match(js, /staticNotificationDeliveries/);
   assert.match(js, /locationTracePoints/);
@@ -1165,6 +1191,8 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(server, /buildInternetNursingRegulatorySubmission/);
   assert.match(server, /buildInternetNursingCutoverPack/);
   assert.match(server, /siteCutoverPack/);
+  assert.match(server, /productionBlockers/);
+  assert.match(server, /buildProductionEnvironmentStatus/);
   assert.match(server, /regulatoryContract/);
   assert.match(server, /hasSignedInternetNursingConsent/);
   assert.match(server, /buildInternetNursingNotificationDeliveries/);

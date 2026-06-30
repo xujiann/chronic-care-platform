@@ -99,6 +99,18 @@ Runtime audit endpoint: `GET /api/chronic/institution-interfaces`.
 - Writes: `seniorServices`, `taskMessages`, `securityEvents`, `dataAccessLogs`
 - Launch check: SMS, phone, or in-app reminder evidence is visible in readiness reports.
 
+### chronic-followup-escalation-v1
+
+- Endpoint: `POST /api/chronic/followup-escalations`
+- Owner: medical institution
+- Roles: `institution`, `commission`
+- Direction: inbound priority escalation
+- Required body fields: `collection` and `id`, or `alertId`
+- Optional fields: `reason`, `escalationOwner`, `escalationLevel`, `status`
+- Supported collections: `chronicScreeningTasks`, `chronicManagementPlans`, `followups`, `medicationPickups`
+- Writes: business collection, `taskMessages`, `securityEvents`, `dataAccessLogs`
+- Launch check: overdue and high-priority alerts can be escalated to an institution work queue with audit evidence.
+
 ### chronic-followup-dispatch-v1
 
 - Endpoint: `POST /api/chronic/followup-dispatch`

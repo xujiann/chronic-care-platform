@@ -17,10 +17,11 @@ test("chronic institution interface report covers pre-launch contracts", () => {
   const report = buildChronicInstitutionInterfaceReport({ data });
 
   assert.equal(report.ok, true);
-  assert.equal(report.summary.contracts, 8);
-  assert.equal(report.summary.readyContracts, 8);
+  assert.equal(report.summary.contracts, 9);
+  assert.equal(report.summary.readyContracts, 9);
   assert.equal(report.contracts.every((item) => item.routeReady && item.docReady && item.testReady), true);
   assert.equal(report.contracts.some((item) => item.id === "chronic-device-measurement-v1" && item.requiredFields.includes("externalId?")), true);
+  assert.equal(report.contracts.some((item) => item.id === "chronic-followup-escalation-v1" && item.path === "/api/chronic/followup-escalations"), true);
   assert.equal(report.launchEvidence.authorization, true);
   assert.equal(report.launchEvidence.seedEvidence, true);
 });
@@ -47,5 +48,5 @@ test("chronic institution interface report renders and writes release artifacts"
   assert.match(markdown, /Chronic institution interface readiness/);
   assert.match(markdown, /chronic-pharmacy-callback-v1/);
   assert.equal(JSON.parse(fs.readFileSync(written.output, "utf8")).ok, true);
-  assert.match(fs.readFileSync(written.markdown, "utf8"), /chronic-reminder-outreach-v1/);
+  assert.match(fs.readFileSync(written.markdown, "utf8"), /chronic-followup-escalation-v1/);
 });

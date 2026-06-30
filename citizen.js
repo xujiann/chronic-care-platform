@@ -322,6 +322,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindRegistrationAppointment();
   bindLongTermCareAssessment();
   bindResidentTaskActions();
+  bindLifecycleActionButtons();
   bindCitizenMessageReceipts();
   currentAccountId = state.accounts[0]?.id;
   const account = getCurrentAccount();
@@ -1487,7 +1488,101 @@ function renderLifecycleActions(residentId) {
     </div>
     <p>${item.action || "请按家庭医生或经办机构提示完成。"}${item.due ? ` · ${item.due}` : ""}</p>
     <small>${priorityLabel[item.priority] || "需办理"} · ${item.ownerRole === "citizen" ? "居民端" : item.ownerRole}</small>
+    <div class="lifecycle-action-buttons">
+      <button type="button" data-lifecycle-action="${item.id}" data-lifecycle-action-type="resident-remind">提醒医生</button>
+      <button type="button" data-lifecycle-action="${item.id}" data-lifecycle-action-type="acknowledge">我已知晓</button>
+    </div>
   </article>`).join("");
+}
+
+function bindLifecycleActionButtons() {
+  const target = document.querySelector("#lifecycle-action-cards");
+  if (!target) return;
+  target.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-lifecycle-action]");
+    if (!button) return;
+    const actionId = button.dataset.lifecycleAction;
+    const actionType = button.dataset.lifecycleActionType || "resident-remind";
+    const lifecycleAction = (state.citizenLifecycleActions || []).find((item) => item.id === actionId);
+    const defaultComment = actionType === "acknowledge"
+      ? "居民已知晓该生命周期健康管理事项"
+      : lifecycleAction?.action || "请家庭医生协助处理生命周期健康管理待办";
+    const comment = actionType === "acknowledge"
+      ? defaultComment
+      : window.prompt("请补充提醒内容", defaultComment) || defaultComment;
+    button.disabled = true;
+    try {
+      await submitLifecycleAction(actionId, { action: actionType, comment });
+      showToast(actionType === "acknowledge" ? "已记录知晓回执" : "已发送医生提醒");
+      renderCitizen(currentResidentId);
+    } catch (error) {
+      showToast(error.message || "生命周期待办提交失败");
+    } finally {
+      button.disabled = false;
+    }
+  });
+}
+
+async function submitLifecycleAction(actionId, payload) {
+  if (API_BASE) {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${API_BASE}/citizen/lifecycle-actions/${encodeURIComponent(actionId)}/actions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error(`生命周期待办提交失败：${response.status}`);
+    const result = await response.json();
+    state.citizenLifecycleActions = [
+      ...(state.citizenLifecycleActions || []).filter((item) => item.residentId !== currentResidentId),
+      ...(Array.isArray(result.actions) ? result.actions : [])
+    ];
+    citizenMessages = await fetchCitizenMessages();
+    return result;
+  }
+  const action = applyLocalLifecycleAction(actionId, payload);
+  citizenMessages.unshift(buildLocalLifecycleMessage(action, payload));
+  state.taskMessages = citizenMessages;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  return { ok: true, action };
+}
+
+function applyLocalLifecycleAction(actionId, payload) {
+  const actions = state.citizenLifecycleActions || [];
+  const action = actions.find((item) => item.id === actionId);
+  if (!action) throw new Error("未找到生命周期待办");
+  if (payload.action === "acknowledge" && action.sourceId) {
+    const rows = findResidentTaskRows(action.sourceCollection);
+    const index = rows.findIndex((item) => item.id === action.sourceId);
+    if (index >= 0) {
+      rows[index] = {
+        ...rows[index],
+        lifecycleResidentAction: "acknowledge",
+        lifecycleResidentActionAt: new Date().toISOString(),
+        lifecycleResidentComment: payload.comment || ""
+      };
+    }
+    state.citizenLifecycleActions = actions.filter((item) => item.id !== actionId);
+  }
+  return action;
+}
+
+function buildLocalLifecycleMessage(action, payload) {
+  return {
+    id: `msg-local-${crypto.randomUUID()}`,
+    taskId: `citizenLifecycleActions:${action.id}`,
+    collection: "citizenLifecycleActions",
+    sourceId: action.sourceId || action.id,
+    residentId: action.residentId || currentResidentId,
+    targetRole: "institution",
+    channel: "in_app",
+    title: payload.action === "acknowledge" ? "生命周期待办：居民已知晓" : "生命周期待办：居民提醒医生",
+    body: payload.comment || action.action || "居民端已处理生命周期待办",
+    status: "sent",
+    receipts: [],
+    createdAt: new Date().toISOString(),
+    createdBy: "citizen"
+  };
 }
 
 function getBirthCertificatesForResident(residentId) {
@@ -1818,11 +1913,21 @@ function renderEscortAppointments(residentId) {
   const providers = getEscortProviders();
   const orders = getEscortOrders(residentId);
   const providerSelect = form.elements.providerId;
+  const registrationSelect = form.elements.registrationOrderId;
   const selected = providerSelect.value;
   providerSelect.innerHTML = providers
     .map((item) => `<option value="${item.id}">${formatEscortProviderName(item)} · ${formatEscortDistrict(item.district)} · ${item.pricing?.halfDayFee || item.feeEstimate || "待估价"} 元起</option>`)
     .join("");
   if (selected && providers.some((item) => item.id === selected)) providerSelect.value = selected;
+  if (registrationSelect) {
+    const selectedRegistration = registrationSelect.value;
+    const registrationOptions = getEscortRegistrationOptions(residentId);
+    registrationSelect.innerHTML = [
+      `<option value="">不关联挂号</option>`,
+      ...registrationOptions.map((item) => `<option value="${item.id}">${formatEscortHospital(item.hospital)} · ${formatEscortDepartment(item.department)} · ${item.appointmentDate || item.appointmentAt || "日期待确认"} · ${item.queueNo || item.registrationNo || "待回执"}</option>`)
+    ].join("");
+    if (selectedRegistration && registrationOptions.some((item) => item.id === selectedRegistration)) registrationSelect.value = selectedRegistration;
+  }
   if (!providerSelect.value && providers[0]) providerSelect.value = providers[0].id;
   if (!form.elements.appointmentAt.value) form.elements.appointmentAt.value = todayOffset(1);
   summary.textContent = `${providers.length} 家可预约服务主体 · ${orders.length} 单本人/家庭陪诊预约`;
@@ -1842,22 +1947,35 @@ function renderEscortAppointments(residentId) {
 function bindEscortAppointment() {
   const form = document.querySelector("#escort-appointment-form");
   if (!form) return;
+  form.elements.registrationOrderId?.addEventListener("change", () => {
+    applyLinkedRegistrationToEscortForm(form, form.elements.registrationOrderId.value);
+  });
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const data = new FormData(form);
     const provider = getEscortProviders().find((item) => item.id === data.get("providerId"));
+    const linkedRegistration = findEscortRegistrationOrder(currentResidentId, data.get("registrationOrderId"));
     const payload = {
       residentId: currentResidentId,
       providerId: data.get("providerId"),
-      hospital: data.get("hospital"),
-      department: data.get("department"),
-      appointmentAt: data.get("appointmentAt"),
-      due: data.get("appointmentAt"),
+      registrationOrderId: data.get("registrationOrderId"),
+      hospital: data.get("hospital") || linkedRegistration?.hospital || "",
+      hospitalCode: linkedRegistration?.hospitalCode || "",
+      department: data.get("department") || linkedRegistration?.department || "",
+      departmentCode: linkedRegistration?.departmentCode || "",
+      doctorCode: linkedRegistration?.doctorCode || "",
+      appointmentAt: data.get("appointmentAt") || linkedRegistration?.appointmentDate || "",
+      due: data.get("appointmentAt") || linkedRegistration?.appointmentDate || "",
       serviceItems: data.getAll("serviceItems").length ? data.getAll("serviceItems") : ["registration", "exam escort"],
       subsidyType: data.get("subsidyType"),
       priority: data.get("priority"),
       riskLevel: data.get("priority") === "high" ? "high" : "medium",
       familyContactStatus: data.get("familyContactStatus"),
+      hisVisitId: linkedRegistration?.hisVisitId || "",
+      hospitalCheckInNo: linkedRegistration?.registrationNo || "",
+      outpatientQueueNo: linkedRegistration?.queueNo || "",
+      appointmentSource: linkedRegistration ? "registration-order" : "citizen.html",
+      hospitalDepartmentContact: linkedRegistration?.hospitalDepartmentContact || "",
       sourceChannel: "citizen.html",
       note: data.get("note")
     };
@@ -1911,6 +2029,23 @@ function getEscortProviders() {
 function getEscortOrders(residentId) {
   const orders = escortDashboard?.orders?.length ? escortDashboard.orders : state.escortServiceOrders || [];
   return orders.filter((item) => item.residentId === residentId);
+}
+
+function getEscortRegistrationOptions(residentId) {
+  return activeRegistrationOrders(residentId).filter((item) => !["cancelled", "closed"].includes(item.status));
+}
+
+function findEscortRegistrationOrder(residentId, orderId) {
+  if (!orderId) return null;
+  return getEscortRegistrationOptions(residentId).find((item) => item.id === orderId) || null;
+}
+
+function applyLinkedRegistrationToEscortForm(form, orderId) {
+  const order = findEscortRegistrationOrder(currentResidentId, orderId);
+  if (!order) return;
+  form.elements.hospital.value = formatEscortHospital(order.hospital);
+  form.elements.department.value = formatEscortDepartment(order.department);
+  form.elements.appointmentAt.value = order.appointmentDate || order.appointmentAt || form.elements.appointmentAt.value;
 }
 
 function providerName(providerId) {

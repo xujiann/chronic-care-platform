@@ -43,6 +43,7 @@ Institution interface details are maintained in `docs/chronic-institution-interf
 - `POST /api/chronic/pharmacy-callbacks`
 - `POST /api/chronic/family-doctor-actions`
 - `POST /api/chronic/reminder-outreach`
+- `POST /api/chronic/followup-escalations`
 - `POST /api/chronic/followup-dispatch`
 
 The API keeps resident authorization checks, role-gated institution handling, data access logs, and security event audit trails in the existing server model.
@@ -56,6 +57,8 @@ Institution and resident pages now prefer that API queue when the backend is ava
 `POST /api/chronic/resident-checkins` writes resident self-management check-ins to `personalRecords`, `chronicSelfManagement`, medication adherence state, optional senior service evidence, and institution `taskMessages` when review is needed.
 
 The field integration APIs reuse the same resident authorization, institution scope, message, and audit model: device uploads land as resident self-management evidence, pharmacy callbacks update `medicationPickups`, family doctor actions close institution messages and write personal records, and reminder outreach records SMS/phone/in-app evidence in `seniorServices` plus task messages.
+
+`POST /api/chronic/followup-escalations` lets institutions and the commission escalate overdue or high-priority screening, management plan, follow-up, and medication adherence items. It reuses the same resident scope checks, writes an institution task message, stamps the source business item with escalation owner/reason/status, and records data access plus security audit evidence.
 
 ## Release Evidence
 

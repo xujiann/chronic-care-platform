@@ -281,6 +281,7 @@ function buildChronicFollowupReadinessReport(options = {}) {
       "POST /api/chronic/pharmacy-callbacks",
       "POST /api/chronic/family-doctor-actions",
       "POST /api/chronic/reminder-outreach",
+      "POST /api/chronic/followup-escalations",
       "POST /api/chronic/followup-dispatch"
     ]
   };

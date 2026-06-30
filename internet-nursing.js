@@ -269,11 +269,19 @@ function buildStaticSiteCutoverPack(policy) {
       blockingUntil: "完成监管月报、高风险实时上报、字段映射和压测记录签字"
     }
   ];
+  const productionBlockers = [
+    { id: "production-audit-retention", source: "audit-retention", name: "audit retention target", detail: "missing", requiredAction: "configure AUDIT_EXPORT_PATH or SIEM_ENDPOINT and archive retention permission" },
+    { id: "production-site-interface-signoff", source: "site-interface-signoff", name: "site interface joint-test signoff", detail: "missing", requiredAction: "set CUTOVER_SITE_INTERFACE_SIGNOFF after signed site interface joint test" },
+    { id: "production-monitoring-signoff", source: "monitoring-signoff", name: "monitoring and on-call signoff", detail: "missing", requiredAction: "set CUTOVER_MONITORING_SIGNOFF after monitoring and on-call acceptance" },
+    { id: "production-dr-rehearsal-signoff", source: "dr-rehearsal-signoff", name: "disaster recovery rehearsal signoff", detail: "missing", requiredAction: "set CUTOVER_DR_REHEARSAL_SIGNOFF after disaster recovery rehearsal" }
+  ];
   return {
     status: tracks.every((item) => item.status === "ready-for-site-signoff") ? "ready-for-site-signoff" : "blocked",
+    productionReadiness: "production-blocked",
     template: "release/templates/production-signoff/README.md",
     auditRetentionEvidence: "release/audit-retention-report.md",
     productionCutoverEvidence: "release/production-cutover-checklist.md",
+    productionBlockers,
     tracks
   };
 }
@@ -558,6 +566,7 @@ function renderSiteCutoverPack(pack) {
   const target = document.querySelector("#nursing-site-cutover-pack");
   if (!target) return;
   const tracks = Array.isArray(pack.tracks) ? pack.tracks : [];
+  const blockers = Array.isArray(pack.productionBlockers) ? pack.productionBlockers : [];
   target.innerHTML = `
     <div>
       <strong>${escapeHtml(displayText(pack.status || "ready-for-site-signoff"))}</strong>
@@ -565,10 +574,20 @@ function renderSiteCutoverPack(pack) {
       <small>${escapeHtml(pack.template || "release/templates/production-signoff/README.md")}</small>
     </div>
     <div>
+      <strong>${escapeHtml(displayText(pack.productionReadiness || "production-blocked"))}</strong>
+      <span>${escapeHtml(blockers.length)} 项生产阻断</span>
+      <small>模块轨道就绪不等于正式生产可发，需完成环境配置和现场签字</small>
+    </div>
+    <div>
       <strong>发布证据</strong>
       <span>${escapeHtml(pack.auditRetentionEvidence || "release/audit-retention-report.md")}</span>
       <small>${escapeHtml(pack.productionCutoverEvidence || "release/production-cutover-checklist.md")}</small>
     </div>
+    ${blockers.map((item) => `<div>
+      <strong>${escapeHtml(displayText(item.source || item.id))}</strong>
+      <span>${escapeHtml(displayText(item.name || ""))} / ${escapeHtml(displayText(item.detail || ""))}</span>
+      <small>${escapeHtml(item.requiredAction || "")}</small>
+    </div>`).join("")}
     ${tracks.map((item) => `<div>
       <strong>${escapeHtml(displayText(item.id))}</strong>
       <span>${escapeHtml(item.owner || "")} / ${escapeHtml(displayText(item.status || ""))}</span>
@@ -1152,6 +1171,18 @@ function displayText(value) {
     "health commission supervision": "卫健监管",
     "platform operations": "平台运维",
     "ready-for-site-signoff": "待现场签字",
+    "production-ready": "生产可发",
+    "production-blocked": "生产阻断",
+    "audit-retention": "审计留存",
+    "site-interface-signoff": "接口联调签字",
+    "insurance-certificate-signoff": "医保与证照签字",
+    "monitoring-signoff": "监控值守签字",
+    "dr-rehearsal-signoff": "灾备演练签字",
+    "node-env": "生产运行模式",
+    "storage-engine": "生产存储引擎",
+    "session-secrets": "会话密钥",
+    "gateway-secret": "接口网关密钥",
+    "identity-adapter": "身份认证适配",
     "nursing-cutover-message-signature": "消息与签名存储签字",
     "nursing-cutover-hospital-connectors": "院内接口联调签字",
     "nursing-cutover-payment-reconciliation": "支付对账验收签字",

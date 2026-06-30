@@ -382,10 +382,10 @@ const SQLITE_MIGRATIONS = [
     }
   }
 ];
-const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals", "referralTeleconsultations", "escortServiceOrders", "internetNursingOrders", "deathCertificates", "birthCertificates", "multiPracticeApplications", "digitalCredentials", "emergencySignals", "drugConsumableSupervisions", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports"]);
+const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals", "referralTeleconsultations", "escortServiceOrders", "internetNursingOrders", "deathCertificates", "birthCertificates", "citizenLifecycleActions", "multiPracticeApplications", "digitalCredentials", "emergencySignals", "drugConsumableSupervisions", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports"]);
 const WORKFLOW_ROLE_COLLECTIONS = {
   commission: WORKFLOW_COLLECTIONS,
-  institution: new Set(["careOrders", "medicationPickups", "followups", "referrals", "referralTeleconsultations", "escortServiceOrders", "internetNursingOrders", "deathCertificates", "birthCertificates", "multiPracticeApplications", "drugConsumableSupervisions", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "emergencySignals"]),
+  institution: new Set(["careOrders", "medicationPickups", "followups", "referrals", "referralTeleconsultations", "escortServiceOrders", "internetNursingOrders", "deathCertificates", "birthCertificates", "citizenLifecycleActions", "multiPracticeApplications", "drugConsumableSupervisions", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "emergencySignals"]),
   insurance: new Set(["insuranceClaims", "medicationPickups", "digitalCredentials", "drugConsumableSupervisions"]),
   county: new Set(["referralTeleconsultations", "escortServiceOrders", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "emergencySignals"]),
   citizen: new Set(["followups", "referrals", "medicationPickups", "digitalCredentials", "chronicScreeningTasks", "chronicEducationPushes", "escortServiceOrders", "internetNursingOrders"])
@@ -6157,25 +6157,33 @@ function normalizeEscortServiceOrder(payload, user, data) {
   const provider = (data.escortServiceProviders || []).find((item) => item.id === providerId) || seedEscortServiceProviders()[0];
   if (user.role === "citizen" && provider.published === false) throw new Error("provider is not published");
   const resident = (data.residents || []).find((item) => item.id === residentId) || {};
+  const registrationOrderId = String(payload.registrationOrderId || "").trim();
+  const registrationOrder = registrationOrderId
+    ? (Array.isArray(data.registrationOrders) ? data.registrationOrders : []).find((item) => item.id === registrationOrderId)
+    : null;
+  if (registrationOrderId && !registrationOrder) throw new Error("registration order not found");
+  if (registrationOrder && !canAccessRegistrationOrder(user, registrationOrder, data)) throw new Error("registration scope denied");
   const serviceItems = Array.isArray(payload.serviceItems)
     ? payload.serviceItems.map(String).filter(Boolean)
     : String(payload.serviceItems || "registration,exam escort").split(",").map((item) => item.trim()).filter(Boolean);
   const now = new Date().toISOString();
   const note = String(payload.note || "").trim();
-  const hospital = String(payload.hospital || "").trim();
-  const hospitalCode = String(payload.hospitalCode || (/(Dalian Central|central hospital|MR1)/i.test(hospital) ? "MR1" : "")).trim();
+  const hospital = String(payload.hospital || registrationOrder?.hospital || "").trim();
+  const hospitalCode = String(payload.hospitalCode || registrationOrder?.hospitalCode || (/(Dalian Central|central hospital|MR1)/i.test(hospital) ? "MR1" : "")).trim();
+  const appointmentAt = String(payload.appointmentAt || payload.due || registrationOrder?.appointmentDate || "").trim();
   return {
     id: payload.id || `eso-${randomUUID()}`,
     residentId,
     residentName: resident.name || String(payload.residentName || "").trim(),
+    registrationOrderId,
     providerId,
     workerId: String(payload.workerId || "").trim(),
     district: String(payload.district || provider.district || "").trim(),
     hospital,
     hospitalCode,
-    department: String(payload.department || "").trim(),
-    appointmentAt: String(payload.appointmentAt || payload.due || "").trim(),
-    due: String(payload.due || payload.appointmentAt || "").trim(),
+    department: String(payload.department || registrationOrder?.department || "").trim(),
+    appointmentAt,
+    due: String(payload.due || payload.appointmentAt || registrationOrder?.appointmentDate || "").trim(),
     serviceItems: serviceItems.length ? serviceItems : ["registration", "exam escort"],
     status: String(payload.status || "requested").trim(),
     priority: String(payload.priority || "medium").trim(),
@@ -6191,13 +6199,13 @@ function normalizeEscortServiceOrder(payload, user, data) {
     satisfaction: String(payload.satisfaction || "pending").trim(),
     hospitalInterfaceStatus: String(payload.hospitalInterfaceStatus || "pending").trim(),
     hospitalCheckInStatus: String(payload.hospitalCheckInStatus || "pending").trim(),
-    hospitalCheckInNo: String(payload.hospitalCheckInNo || "").trim(),
-    hisVisitId: String(payload.hisVisitId || "").trim(),
-    appointmentSource: String(payload.appointmentSource || user.role).trim(),
-    departmentCode: String(payload.departmentCode || "").trim(),
-    doctorCode: String(payload.doctorCode || "").trim(),
-    outpatientQueueNo: String(payload.outpatientQueueNo || "").trim(),
-    hospitalDepartmentContact: String(payload.hospitalDepartmentContact || "").trim(),
+    hospitalCheckInNo: String(payload.hospitalCheckInNo || registrationOrder?.registrationNo || "").trim(),
+    hisVisitId: String(payload.hisVisitId || registrationOrder?.hisVisitId || "").trim(),
+    appointmentSource: String(payload.appointmentSource || (registrationOrder ? "registration-order" : user.role)).trim(),
+    departmentCode: String(payload.departmentCode || registrationOrder?.departmentCode || "").trim(),
+    doctorCode: String(payload.doctorCode || registrationOrder?.doctorCode || "").trim(),
+    outpatientQueueNo: String(payload.outpatientQueueNo || registrationOrder?.queueNo || "").trim(),
+    hospitalDepartmentContact: String(payload.hospitalDepartmentContact || registrationOrder?.hospitalDepartmentContact || "").trim(),
     hospitalConfirmedAt: String(payload.hospitalConfirmedAt || "").trim(),
     hospitalNotice: String(payload.hospitalNotice || "").trim(),
     sourceChannel: String(payload.sourceChannel || user.role).trim(),
@@ -6770,6 +6778,7 @@ function buildInternetNursingDeviceVerification(policy, orders, nurses) {
 
 function buildInternetNursingRegulatorySubmission(policy, orders, institutions) {
   const submission = policy.regulatorySubmission || seedInternetNursingPolicy().regulatorySubmission;
+  const productionEnvironment = buildProductionEnvironmentStatus();
   const highRiskRealtime = orders.filter((item) => item.riskLevel === "high").length;
   return {
     ...submission,
@@ -6787,6 +6796,7 @@ function buildInternetNursingCutoverPack(policy) {
   const payment = policy.paymentIntegration || seedInternetNursingPolicy().paymentIntegration;
   const device = policy.deviceVerification || seedInternetNursingPolicy().deviceVerification;
   const submission = policy.regulatorySubmission || seedInternetNursingPolicy().regulatorySubmission;
+  const productionEnvironment = buildProductionEnvironmentStatus();
   const tracks = [
     {
       id: "nursing-cutover-message-signature",
@@ -6824,11 +6834,33 @@ function buildInternetNursingCutoverPack(policy) {
       blockingUntil: "完成监管月报、高风险实时上报、字段映射和压测记录签字"
     }
   ];
+  const productionBlockers = productionEnvironment.checks
+    .filter((item) => !item.passed)
+    .map((item) => ({
+      id: `production-${item.id}`,
+      source: item.id,
+      name: item.name,
+      detail: item.detail,
+      requiredAction: {
+        "audit-retention": "configure AUDIT_EXPORT_PATH or SIEM_ENDPOINT and archive retention permission",
+        "site-interface-signoff": "set CUTOVER_SITE_INTERFACE_SIGNOFF after signed site interface joint test",
+        "insurance-certificate-signoff": "set CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF after insurance and certificate exchange acceptance",
+        "monitoring-signoff": "set CUTOVER_MONITORING_SIGNOFF after monitoring and on-call acceptance",
+        "dr-rehearsal-signoff": "set CUTOVER_DR_REHEARSAL_SIGNOFF after disaster recovery rehearsal",
+        "node-env": "run with NODE_ENV=production during formal cutover",
+        "storage-engine": "switch from JSON demo storage to production storage adapter",
+        "session-secrets": "configure non-placeholder SESSION_SECRETS",
+        "gateway-secret": "configure non-placeholder INTEGRATION_GATEWAY_SECRET",
+        "identity-adapter": "configure OIDC issuer, client id, and client secret"
+      }[item.id] || "complete production environment configuration"
+    }));
   return {
     status: tracks.every((item) => item.status === "ready-for-site-signoff") ? "ready-for-site-signoff" : "blocked",
+    productionReadiness: productionEnvironment.passed ? "production-ready" : "production-blocked",
     template: "release/templates/production-signoff/README.md",
     auditRetentionEvidence: "release/audit-retention-report.md",
     productionCutoverEvidence: "release/production-cutover-checklist.md",
+    productionBlockers,
     tracks
   };
 }
@@ -7742,6 +7774,7 @@ function buildCitizenLifecycleActions(data, user, residentId = "") {
       });
     }
     birthCertificates.forEach((certificate) => {
+      if (certificate.lifecycleResidentAction === "acknowledge") return;
       if (isLifecycleActionOpen(certificate.status, certificate.maternalChildSync, certificate.publicSecuritySync, certificate.healthManagementStatus, certificate.nextService)) {
         pushAction(resident, {
           stage: "birth",
@@ -7767,6 +7800,7 @@ function buildCitizenLifecycleActions(data, user, residentId = "") {
       });
     }
     followups.filter((item) => isLifecycleActionOpen(item.status, item.result, item.nextAction)).forEach((followup) => {
+      if (followup.lifecycleResidentAction === "acknowledge") return;
       pushAction(resident, {
         stage: "chronic",
         title: followup.nextAction || "慢病随访待处理",
@@ -7779,6 +7813,7 @@ function buildCitizenLifecycleActions(data, user, residentId = "") {
       });
     });
     medicationPickups.filter((item) => isLifecycleActionOpen(item.status, item.pharmacyStatus, item.nextAction)).forEach((pickup) => {
+      if (pickup.lifecycleResidentAction === "acknowledge") return;
       pushAction(resident, {
         stage: "adult",
         title: pickup.nextAction || pickup.drugName || "固定取药待确认",
@@ -7790,7 +7825,9 @@ function buildCitizenLifecycleActions(data, user, residentId = "") {
         action: "确认取药、医保结算和用药依从性。"
       });
     });
-    if ((age >= 60 || seniorServices.length) && !seniorServices.some((item) => /已完成|completed|closed/i.test(String(item.status || "")))) {
+    if ((age >= 60 || seniorServices.length) &&
+      seniorServices[0]?.lifecycleResidentAction !== "acknowledge" &&
+      !seniorServices.some((item) => /已完成|completed|closed/i.test(String(item.status || "")))) {
       pushAction(resident, {
         stage: "senior",
         title: "完善老年健康评估与照护计划",
@@ -7812,6 +7849,7 @@ function buildCitizenLifecycleActions(data, user, residentId = "") {
       });
     }
     deathCertificates.forEach((certificate) => {
+      if (certificate.lifecycleResidentAction === "acknowledge") return;
       if (isLifecycleActionOpen(certificate.status, certificate.qualityCheck, certificate.publicSecuritySync, certificate.civilAffairsSync)) {
         pushAction(resident, {
           stage: "death",
@@ -7843,6 +7881,11 @@ function buildCitizenLifecycleActions(data, user, residentId = "") {
   };
 }
 
+function lifecycleActionSourceId(action) {
+  const raw = [action.residentId, action.stage, action.sourceCollection, action.sourceId || action.title || action.action].filter(Boolean).join("|");
+  return `cla-${createHash("sha256").update(raw).digest("hex").slice(0, 16)}`;
+}
+
 function statusInPolicy(policy, group, status) {
   return (policy?.statusGroups?.[group] || []).some((item) => String(status || "").includes(item) || String(item || "").includes(String(status || "")));
 }
@@ -7865,11 +7908,44 @@ function medicationAdherenceForResident(data, residentId) {
   };
 }
 
+const CHRONIC_FOLLOWUP_ACTION_COLLECTIONS = new Set(["chronicScreeningTasks", "chronicManagementPlans", "followups", "medicationPickups"]);
+
+function parseChronicFollowupReference(reference) {
+  const [collection, ...idParts] = String(reference || "").split(":");
+  return { collection, id: idParts.join(":") };
+}
+
+function findChronicFollowupActionItem(data, collection, id) {
+  if (!CHRONIC_FOLLOWUP_ACTION_COLLECTIONS.has(collection)) return null;
+  return (Array.isArray(data[collection]) ? data[collection] : []).find((item) => item.id === id) || null;
+}
+
+function chronicFollowupEscalationRecommendation(alert) {
+  if (alert.dueBucket === "overdue") return "escalate to family doctor team and contact resident today";
+  if (["critical", "high"].includes(alert.priority)) return "assign high-priority family doctor review";
+  return "keep reminder in routine follow-up queue";
+}
+
+function enrichChronicAlertQueue(data, alertQueue) {
+  return (alertQueue || []).map((alert) => {
+    const { collection, id } = parseChronicFollowupReference(alert.id);
+    const item = findChronicFollowupActionItem(data, collection, id) || {};
+    return {
+      ...alert,
+      escalationStatus: item.escalationStatus || "",
+      escalationOwner: item.escalationOwner || item.assignee || item.owner || item.pharmacy || "",
+      recommendedAction: chronicFollowupEscalationRecommendation(alert)
+    };
+  });
+}
+
 function buildChronicFollowupSummary(data, user, residentId = "") {
   const scoped = scopeStateForUser(data, user);
   const targetResidents = (scoped.residents || []).filter((resident) => !residentId || resident.id === residentId);
   const policy = data.chronicFollowupStatusPolicy || seedChronicFollowupStatusPolicy();
   const readiness = buildChronicFollowupReadinessReport({ data: scoped });
+  const alertQueue = enrichChronicAlertQueue(scoped, readiness.alertQueue || []);
+  const escalationMessages = (scoped.taskMessages || []).filter((message) => message.chronicFollowup && message.meta?.escalation && isOpenChronicFollowupMessage(message));
   const feedbackRecords = (scoped.personalRecords || []).filter((item) => item.category === "chronic-feedback");
   const residents = targetResidents.map((resident) => {
     const screenings = (scoped.chronicScreeningTasks || []).filter((item) => item.residentId === resident.id);
@@ -7935,11 +8011,13 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
       alerts: readiness.summary?.alerts || 0,
       overdueAlerts: readiness.summary?.overdueAlerts || 0,
       highPriorityAlerts: readiness.summary?.highPriorityAlerts || 0,
+      escalationAlerts: alertQueue.filter((item) => item.dueBucket === "overdue" || ["critical", "high"].includes(item.priority)).length,
+      openEscalations: escalationMessages.length,
       policyAligned: readiness.summary?.policyAligned || 0,
       policyItems: readiness.summary?.policyItems || 0
     },
     policyAlignment: readiness.policyAlignment || [],
-    alertQueue: readiness.alertQueue || [],
+    alertQueue,
     residents
   };
 }
@@ -8574,10 +8652,84 @@ function recordChronicLaunchCoreAction(data, user, payload) {
   };
 }
 
+function escalateChronicFollowupAction(data, user, payload) {
+  const parsed = parseChronicFollowupReference(payload.alertId || `${payload.collection || ""}:${payload.id || ""}`);
+  const collection = String(payload.collection || parsed.collection || "").trim();
+  const id = String(payload.id || parsed.id || "").trim();
+  if (!CHRONIC_FOLLOWUP_ACTION_COLLECTIONS.has(collection)) return { status: 400, body: { error: "Bad Request", message: "unsupported chronic follow-up collection" } };
+  if (!id) return { status: 400, body: { error: "Bad Request", message: "id is required" } };
+  const item = findChronicFollowupActionItem(data, collection, id);
+  if (!item) return { status: 404, body: { error: "Not Found", message: "business item not found" } };
+  if (!canAccessResident(user, item.residentId, data)) {
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "escalate chronic follow-up", target: `${collection}/${id}`, result: "denied", detail: "resident scope denied" });
+    return { status: 403, body: { error: "Forbidden", message: "resident scope denied" } };
+  }
+
+  const now = new Date().toISOString();
+  const taskId = `${collection}:${item.id}:escalation`;
+  const reason = String(payload.reason || payload.note || "chronic follow-up escalation").trim();
+  const existingMessage = (data.taskMessages || []).find((message) =>
+    message.chronicFollowup &&
+    message.taskId === taskId &&
+    message.targetRole === "institution" &&
+    message.meta?.escalation &&
+    isOpenChronicFollowupMessage(message)
+  );
+
+  Object.assign(item, {
+    escalationStatus: String(payload.escalationStatus || "escalated").trim(),
+    escalationLevel: String(payload.escalationLevel || "priority").trim(),
+    escalationOwner: String(payload.escalationOwner || item.assignee || item.owner || item.pharmacy || "family doctor team").trim(),
+    escalationReason: reason,
+    escalatedAt: now,
+    escalatedBy: user.username || user.role,
+    escalatedByName: user.name,
+    lastUpdated: now
+  });
+  if (payload.status) item.status = String(payload.status).trim();
+
+  const message = existingMessage || appendChronicFollowupMessage(data, {
+    residentId: item.residentId,
+    taskId,
+    collection,
+    sourceId: item.id,
+    targetRole: "institution",
+    title: "Chronic follow-up escalation",
+    body: reason,
+    user,
+    meta: { escalation: true, escalationLevel: item.escalationLevel, sourceAlertId: `${collection}:${item.id}` }
+  });
+
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "escalate chronic follow-up",
+      target: `${collection}/${item.id}`,
+      result: "allowed",
+      detail: reason
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+  appendDataAccessLog(data, user, item.residentId, "chronic follow-up escalation", reason);
+  const normalized = normalizeState(data);
+  writeDatabase(normalized);
+  return {
+    status: existingMessage ? 200 : 201,
+    body: {
+      item,
+      message,
+      idempotent: Boolean(existingMessage),
+      summary: buildChronicFollowupSummary(normalized, user, item.residentId).summary
+    }
+  };
+}
+
 function dispatchChronicFollowupAction(data, user, payload) {
   const collection = String(payload.collection || "").trim();
-  const allowed = new Set(["chronicScreeningTasks", "chronicManagementPlans", "followups", "medicationPickups"]);
-  if (!allowed.has(collection)) return { status: 400, body: { error: "Bad Request", message: "unsupported chronic follow-up collection" } };
+  if (!CHRONIC_FOLLOWUP_ACTION_COLLECTIONS.has(collection)) return { status: 400, body: { error: "Bad Request", message: "unsupported chronic follow-up collection" } };
   const rows = Array.isArray(data[collection]) ? data[collection] : [];
   const item = rows.find((row) => row.id === payload.id);
   if (!item) return { status: 404, body: { error: "Not Found", message: "business item not found" } };
@@ -9107,7 +9259,8 @@ const SERVICE_DOMAIN_BY_COLLECTION = {
   diagnosticReports: "diagnosticReports",
   referralTeleconsultations: "referralTeleconsultation",
   escortServiceOrders: "escortService",
-  internetNursingOrders: "internetNursing"
+  internetNursingOrders: "internetNursing",
+  citizenLifecycleActions: "citizenLifecycle"
 };
 
 function taskPriorityLevel(item) {
@@ -9131,8 +9284,40 @@ function isOverdueTask(task, now = new Date()) {
   return Number.isFinite(dueTime) && dueTime < now.getTime();
 }
 
+function buildCitizenLifecycleTaskRows(data, user) {
+  if (!["commission", "institution"].includes(user.role)) return [];
+  const closedKeys = new Set((Array.isArray(data.taskMessages) ? data.taskMessages : [])
+    .filter((message) => message.collection === "citizenLifecycleActions" && message.meta?.lifecycleActionClosed)
+    .map((message) => message.sourceId));
+  return buildCitizenLifecycleActions(data, user).actions
+    .map((action) => {
+      const sourceId = lifecycleActionSourceId(action);
+      return {
+        id: `citizenLifecycleActions:${sourceId}`,
+        collection: "citizenLifecycleActions",
+        sourceId,
+        category: "生命周期健康管理",
+        role: user.role === "commission" ? "institution" : user.role,
+        residentId: action.residentId,
+        title: action.title,
+        status: action.status || "待办理",
+        priority: action.priority || "medium",
+        priorityLevel: action.priority === "high" ? "high" : action.priority === "low" ? "normal" : "medium",
+        serviceDomain: SERVICE_DOMAIN_BY_COLLECTION.citizenLifecycleActions,
+        dueAt: action.due || "",
+        owner: action.organization || action.ownerRole || "居民端",
+        source: "citizenLifecycleActions",
+        sourceCollection: action.sourceCollection,
+        sourceActionId: action.id,
+        action
+      };
+    })
+    .filter((task) => !closedKeys.has(task.sourceId))
+    .map((task) => ({ ...task, overdue: isOverdueTask(task), escalationLevel: isOverdueTask(task) ? "level-1" : "" }));
+}
+
 function buildUnifiedTasks(data, user) {
-  return TASK_SOURCES.flatMap(([collection, role, category, dueField]) => {
+  const sourceTasks = TASK_SOURCES.flatMap(([collection, role, category, dueField]) => {
     const roles = Array.isArray(role) ? role : [role];
     if (user.role !== "commission" && !roles.includes(user.role)) return [];
     const rows = collection === "referrals" ? data.referralSystem?.referrals : data[collection];
@@ -9163,7 +9348,9 @@ function buildUnifiedTasks(data, user) {
       };
       return { ...task, overdue: isOverdueTask(task), escalationLevel: isOverdueTask(task) ? "level-1" : "" };
     });
-  }).sort((left, right) => String(left.dueAt || "").localeCompare(String(right.dueAt || "")));
+  });
+  return [...sourceTasks, ...buildCitizenLifecycleTaskRows(data, user)]
+    .sort((left, right) => String(left.dueAt || "").localeCompare(String(right.dueAt || "")));
 }
 
 function canAccessTaskMessage(user, message, data) {
@@ -9312,6 +9499,101 @@ function buildCitizenTaskActionMessage(item, collection, payload, user) {
     createdBy: user.username || user.role,
     createdByName: user.name
   };
+}
+
+function buildLifecycleActionClosureMessage(task, payload, user) {
+  const now = new Date().toISOString();
+  const actionLabel = String(payload.action || "lifecycle-action-handle").trim();
+  const status = String(payload.status || "handled").trim();
+  const comment = String(payload.comment || payload.note || "").trim();
+  return {
+    id: `msg-${randomUUID()}`,
+    taskId: task.id,
+    collection: "citizenLifecycleActions",
+    sourceId: task.sourceId,
+    residentId: task.residentId || "",
+    targetRole: String(payload.targetRole || "citizen").trim(),
+    channel: String(payload.channel || "in_app").trim(),
+    title: `生命周期健康管理：${task.title}`,
+    body: comment || `${user.name || user.username || "经办人员"} 已处理该生命周期健康管理事项：${status}`,
+    status: "sent",
+    receipts: [],
+    meta: {
+      lifecycleActionClosed: true,
+      lifecycleActionStatus: status,
+      lifecycleAction: actionLabel,
+      sourceCollection: task.sourceCollection || "",
+      sourceActionId: task.sourceActionId || ""
+    },
+    createdAt: now,
+    createdBy: user.username || user.role,
+    createdByName: user.name
+  };
+}
+
+function buildCitizenLifecycleActionMessage(lifecycleAction, payload, user) {
+  const now = new Date().toISOString();
+  const action = String(payload.action || "resident-remind").trim();
+  const actionLabels = {
+    "resident-remind": "居民提醒医生",
+    acknowledge: "居民已知晓"
+  };
+  return {
+    id: `msg-${randomUUID()}`,
+    taskId: `citizenLifecycleActions:${lifecycleAction.id}`,
+    collection: "citizenLifecycleActions",
+    sourceId: lifecycleAction.sourceId || lifecycleAction.id,
+    residentId: lifecycleAction.residentId || "",
+    targetRole: "institution",
+    channel: "in_app",
+    title: `生命周期待办：${actionLabels[action] || "居民操作"}`,
+    body: `${user.name || user.username || "居民"} 已在居民端处理「${lifecycleAction.title || "生命周期健康管理事项"}」：${String(payload.comment || lifecycleAction.action || actionLabels[action] || "").trim()}`,
+    status: "sent",
+    receipts: [],
+    createdAt: now,
+    createdBy: user.username || user.role,
+    createdByName: user.name
+  };
+}
+
+function applyCitizenLifecycleAction(data, lifecycleAction, payload, user) {
+  const action = String(payload.action || "resident-remind").trim();
+  const allowedActions = new Set(["resident-remind", "acknowledge"]);
+  if (!allowedActions.has(action)) throw new Error("居民端不支持该生命周期操作");
+  const now = new Date().toISOString();
+  const collection = lifecycleAction.sourceCollection;
+  const rows = collection ? findWorkflowCollection(data, collection) : null;
+  const index = rows && lifecycleAction.sourceId ? rows.findIndex((item) => item.id === lifecycleAction.sourceId) : -1;
+  const receipt = {
+    action,
+    comment: String(payload.comment || lifecycleAction.action || "").trim(),
+    at: now,
+    by: user.username || user.role,
+    byName: user.name || user.username || "居民"
+  };
+  if (index >= 0) {
+    rows[index] = {
+      ...rows[index],
+      lifecycleResidentAction: action,
+      lifecycleResidentActionAt: now,
+      lifecycleResidentComment: receipt.comment,
+      lifecycleActionReceipts: [
+        receipt,
+        ...(Array.isArray(rows[index].lifecycleActionReceipts) ? rows[index].lifecycleActionReceipts : [])
+      ].slice(0, 20),
+      auditTrail: [
+        { at: now, action: `lifecycle-${action}`, by: user.username || user.role, note: receipt.comment || lifecycleAction.title },
+        ...(Array.isArray(rows[index].auditTrail) ? rows[index].auditTrail : [])
+      ].slice(0, 30)
+    };
+    if (collection === "referrals") {
+      data.referralSystem = data.referralSystem || seedReferralSystem();
+      data.referralSystem.referrals = rows;
+    } else {
+      data[workflowStateCollectionKey(collection)] = rows;
+    }
+  }
+  return { sourceUpdated: index >= 0, receipt };
 }
 
 function normalizeReferralTeleconsultation(payload, user, data) {
@@ -10623,6 +10905,52 @@ async function handleApi(req, res) {
     return;
   }
 
+  const citizenLifecycleActionMatch = url.pathname.match(/^\/api\/citizen\/lifecycle-actions\/([^/]+)\/actions$/);
+  if (req.method === "POST" && citizenLifecycleActionMatch) {
+    const user = requireApiRole(req, res, ["citizen"], "/api/citizen/lifecycle-actions/:id/actions");
+    if (!user) return;
+    const data = readDatabase();
+    const actionId = decodeURIComponent(citizenLifecycleActionMatch[1]);
+    const lifecycleAction = buildCitizenLifecycleActions(data, user).actions.find((item) => item.id === actionId);
+    if (!lifecycleAction) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到可处理的生命周期待办" });
+      return;
+    }
+    if (!canAccessResident(user, lifecycleAction.residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "handle citizen lifecycle action", target: actionId, result: "denied", detail: "resident scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "resident scope denied" });
+      return;
+    }
+    const payload = await collectJson(req);
+    let receipt;
+    try {
+      receipt = applyCitizenLifecycleAction(data, lifecycleAction, payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    const message = buildCitizenLifecycleActionMessage(lifecycleAction, payload, user);
+    data.taskMessages = [message, ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "handle citizen lifecycle action",
+        target: actionId,
+        result: "allowed",
+        detail: `${String(payload.action || "resident-remind")} · ${lifecycleAction.sourceCollection || "generated"}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    appendDataAccessLog(data, user, lifecycleAction.residentId, "citizenLifecycleActions", String(payload.action || "resident-remind"), "allowed");
+    writeDatabase(data);
+    const refreshed = buildCitizenLifecycleActions(readDatabase(), user, lifecycleAction.residentId);
+    sendJson(res, 200, { ok: true, action: lifecycleAction, message, sourceUpdated: receipt.sourceUpdated, receipt: receipt.receipt, actions: refreshed.actions });
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/regional-data-sharing") {
     const user = requireApiRole(req, res, ["commission", "institution"], "/api/regional-data-sharing");
     if (!user) return;
@@ -11424,6 +11752,14 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "POST" && url.pathname === "/api/chronic/followup-escalations") {
+    const user = requireApiRole(req, res, ["institution", "commission"], "/api/chronic/followup-escalations");
+    if (!user) return;
+    const result = escalateChronicFollowupAction(readDatabase(), user, await collectJson(req));
+    sendJson(res, result.status, redactSensitiveResponse(result.body, user));
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/chronic/followup-dispatch") {
     const user = requireApiRole(req, res, ["institution", "commission"], "/api/chronic/followup-dispatch");
     if (!user) return;
@@ -11825,6 +12161,45 @@ async function handleApi(req, res) {
       return;
     }
     const data = readDatabase();
+    if (collection === "citizenLifecycleActions") {
+      const task = buildUnifiedTasks(data, user).find((item) => item.id === taskId);
+      if (!task) {
+        sendJson(res, 404, { error: "Not Found", message: "未找到生命周期健康管理任务" });
+        return;
+      }
+      if (!canAccessResident(user, task.residentId, data)) {
+        sendJson(res, 403, { error: "Forbidden", message: "无权处理该居民生命周期任务" });
+        return;
+      }
+      const payload = await collectJson(req);
+      const message = buildLifecycleActionClosureMessage(task, payload, user);
+      data.taskMessages = [message, ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
+      data.securityEvents = [
+        {
+          id: randomUUID(),
+          at: new Date().toLocaleString("zh-CN", { hour12: false }),
+          actor: user.name,
+          role: user.role,
+          action: "handle citizen lifecycle task",
+          target: taskId,
+          result: "allowed",
+          detail: `${payload.status || "handled"} · ${task.sourceCollection || "derived"}`
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120);
+      writeDatabase(data);
+      sendJson(res, 200, {
+        ...task,
+        status: String(payload.status || "handled").trim(),
+        taskAction: String(payload.action || "lifecycle-action-handle").trim(),
+        taskComment: String(payload.comment || payload.note || "").trim(),
+        handledAt: message.createdAt,
+        handledBy: user.username || user.role,
+        handledByName: user.name,
+        message
+      });
+      return;
+    }
     const rows = findWorkflowCollection(data, collection);
     if (!rows) {
       sendJson(res, 400, { error: "Bad Request", message: "不支持的任务集合" });

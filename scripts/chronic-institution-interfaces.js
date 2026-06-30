@@ -86,6 +86,17 @@ const CONTRACTS = [
     evidence: ["sms/phone/in-app evidence", "senior service", "receipt-ready task message"]
   },
   {
+    id: "chronic-followup-escalation-v1",
+    method: "POST",
+    path: "/api/chronic/followup-escalations",
+    owner: "medical-institution",
+    direction: "inbound",
+    roles: ["institution", "commission"],
+    requiredFields: ["collection|alertId", "id?", "reason?", "escalationOwner?"],
+    targetCollections: ["followups", "chronicManagementPlans", "chronicScreeningTasks", "medicationPickups", "taskMessages", "securityEvents", "dataAccessLogs"],
+    evidence: ["business item escalation stamp", "institution message", "audit trail"]
+  },
+  {
     id: "chronic-followup-dispatch-v1",
     method: "POST",
     path: "/api/chronic/followup-dispatch",
@@ -153,7 +164,7 @@ function buildChronicInstitutionInterfaceReport(options = {}) {
     )
   };
   const checks = [
-    { id: "institution-interfaces:contracts", passed: contracts.length === 8 && contracts.every((item) => item.ready), detail: `${contracts.filter((item) => item.ready).length}/${contracts.length} contracts ready` },
+    { id: "institution-interfaces:contracts", passed: contracts.length === CONTRACTS.length && contracts.every((item) => item.ready), detail: `${contracts.filter((item) => item.ready).length}/${contracts.length} contracts ready` },
     { id: "institution-interfaces:docs", passed: contracts.every((item) => item.docReady), detail: DOC_PATH },
     { id: "institution-interfaces:routes", passed: contracts.every((item) => item.routeReady), detail: contracts.map((item) => `${item.path}:${item.routeReady ? "yes" : "missing"}`).join(";") },
     { id: "institution-interfaces:tests", passed: contracts.every((item) => item.testReady), detail: "api/static coverage" },

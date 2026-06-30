@@ -12,7 +12,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="format-detection" content="telephone=no" />
     <link rel="apple-touch-icon" href="./pwa-icon.svg" />
-    <link rel="stylesheet" href="./citizen.css" />
+    <link rel="stylesheet" href="./citizen.css?v=20260630lifecycle" />
     <script src="./auth.js?v=20260627"></script>
     <script>window.HealthCityAuth.requireRole(["citizen"])</script>
   </head>
@@ -132,6 +132,11 @@
           <form id="escort-appointment-form" class="escort-appointment-form">
             <label>服务主体
               <select name="providerId" required></select>
+            </label>
+            <label>关联挂号
+              <select name="registrationOrderId">
+                <option value="">不关联挂号</option>
+              </select>
             </label>
             <label>就诊医院
               <input name="hospital" placeholder="例如：大连市中心医院" required />
@@ -507,7 +512,7 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="./health-archive-standard.js"></script>
-    <script src="./citizen.js?v=20260630sync"></script>
+    <script src="./citizen.js?v=20260630escortlink"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));

@@ -91,6 +91,13 @@ function bindInstitutionActions() {
       if (result.ok) renderAll(platformState);
       return;
     }
+    if (button.dataset.chronicEscalation) {
+      button.disabled = true;
+      const result = await escalateChronicFollowup(button.dataset.collection, button.dataset.id, button.dataset.reason || "chronic follow-up escalation");
+      button.disabled = false;
+      if (result.ok) renderAll(platformState);
+      return;
+    }
     const updates = JSON.parse(button.dataset.updates || "{}");
     button.disabled = true;
     const result = await updateWorkflowAction(platformState, button.dataset.collection, button.dataset.id, updates, button.dataset.note || "机构端更新业务状态");
@@ -124,6 +131,10 @@ function actionButton(collection, id, label, updates, note) {
 
 function chronicDispatchButton(collection, id, label, updates, note) {
   return `<button class="inline-action" type="button" data-workflow-action data-chronic-dispatch="true" data-collection="${collection}" data-id="${id}" data-updates='${JSON.stringify(updates)}' data-note="${note || label}">${label}</button>`;
+}
+
+function chronicEscalationButton(collection, id, reason) {
+  return `<button class="inline-action" type="button" data-workflow-action data-chronic-escalation="true" data-collection="${collection}" data-id="${id}" data-reason="${reason || "priority chronic follow-up escalation"}">升级处置</button>`;
 }
 
 function fallbackChronicLaunchCore(state) {
@@ -295,6 +306,7 @@ function renderChronicFollowupWorkbench(state) {
         <div class="action-row">
           ${chronicDispatchButton(item.collection, item.id, item.primary, item.updates, `慢病随访处置：${item.primary}`)}
           ${item.collection === "chronicManagementPlans" ? chronicDispatchButton(item.collection, item.id, "升级预警", { status: "预警中", intervention: "已升级家庭医生重点管理" }, "慢病管理计划升级预警") : ""}
+          ${["critical", "high"].includes(item.itemPriority) ? chronicEscalationButton(item.collection, item.id, `priority ${item.itemPriority} chronic follow-up escalation`) : ""}
         </div>
       </div>
       <span class="badge ${String(item.status || "").includes("逾期") || String(item.status || "").includes("预警") ? "danger" : "warn"}">${item.status || "待处理"}</span>
@@ -323,6 +335,35 @@ async function dispatchChronicFollowup(collection, id, updates, note) {
     return { ok: true, saved };
   } catch (error) {
     alert(error.message || "慢病随访处置失败，请检查登录状态和网络连接");
+    return { ok: false };
+  }
+}
+
+async function escalateChronicFollowup(collection, id, reason) {
+  if (!institutionApiBase) {
+    Object.assign((platformState[collection] || []).find((item) => item.id === id) || {}, {
+      escalationStatus: "escalated",
+      escalationReason: reason,
+      escalatedAt: new Date().toISOString()
+    });
+    return { ok: true };
+  }
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/chronic/followup-escalations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ collection, id, reason })
+    });
+    if (!response.ok) throw new Error(`escalation failed: ${response.status}`);
+    const saved = await response.json();
+    const rows = platformState[collection] || [];
+    const index = rows.findIndex((item) => item.id === id);
+    if (index >= 0 && saved.item) rows[index] = saved.item;
+    await refreshChronicRuntimeState();
+    return { ok: true, saved };
+  } catch (error) {
+    alert(error.message || "慢病随访升级失败，请检查登录状态和网络连接");
     return { ok: false };
   }
 }
