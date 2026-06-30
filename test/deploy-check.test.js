@@ -18,6 +18,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "snapshot:securityAcceptance",
     "snapshot:externalDependencyRisks",
     "snapshot:drugTraceabilityPolicySources",
+    "snapshot:drugTraceabilityEvidenceRequirements",
     "snapshot:p2-complete",
     "snapshot:accessibility",
     "snapshot:storageMeta"

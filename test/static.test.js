@@ -106,6 +106,9 @@ test("static snapshot keeps completed P2 governance collections", () => {
   assert.equal(data.drugTraceabilityPolicySources.some((item) => item.id === "nhsa-2025-7" && item.documentNo === "医保发〔2025〕7号"), true);
   assert.equal(data.drugTraceabilityPolicySources.some((item) => item.id === "nmpa-2022-label" && item.documentNo === "NMPAB/T 1011-2022"), true);
   assert.equal(data.drugTraceabilityPolicySources.every((item) => /^https:\/\/(www\.)?(nhsa|nmpa)\.gov\.cn\//.test(item.url)), true);
+  assert.equal(Array.isArray(data.drugTraceabilityEvidenceRequirements), true);
+  assert.equal(data.drugTraceabilityEvidenceRequirements.some((item) => item.id === "trace-code-mapping" && item.policySourceIds.includes("nmpa-2019-32")), true);
+  assert.equal(data.drugTraceabilityEvidenceRequirements.every((item) => Array.isArray(item.evidenceFields) && item.evidenceFields.length > 0), true);
   assert.equal(data.mobileExperienceSettings.weakNetworkMode, "cache-last-state");
   assert.equal(Array.isArray(data.accessibilityChecklist), true);
   assert.equal(data.accessibilityChecklist.some((item) => item.id === "a11y-large-font"), true);

@@ -252,4 +252,6 @@ Before site joint testing for the drug and consumable supervision app, run `npm.
 
 Before publishing any platform template, page, remediation record, joint-test file, or generated artifact that cites a policy, standard, attachment, or source file, keep the related runnable page and `about.html#policy-source-rules` aligned with the policy basis, official source link, applicability boundary, and verification evidence. The drug traceability-code source list is seeded as `drugTraceabilityPolicySources` and is validated by `drug-consumable:readiness`, `site:pack`, `deploy:check`, and `release:report`.
 
+For drug traceability-code field joint testing, keep `drugTraceabilityEvidenceRequirements` aligned with site scanner fields,医保编码/商品码/追溯码映射, no-code exception handling, high-value consumable catalog versions, and remediation audit attachments. `drug-consumable:readiness`, `deploy:check`, and `release:report` now fail if these evidence requirements are missing or disconnected from official policy sources.
+
 Use `drug-consumable-about.html` during site walkthroughs as the policy explanation page for drug traceability-code collection, rational medication review, fixed pickup, high-value consumable clues, insurance settlement coordination, remediation evidence, role boundaries, and remaining field integration work.

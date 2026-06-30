@@ -42,6 +42,7 @@ function buildDeployCheckReport(options = {}) {
     "diseaseRegistryModels",
     "drugConsumableSupervisions",
     "drugTraceabilityPolicySources",
+    "drugTraceabilityEvidenceRequirements",
     "mobileExperienceSettings",
     "accessibilityChecklist",
     "securityAcceptanceLedger"
@@ -49,6 +50,7 @@ function buildDeployCheckReport(options = {}) {
   const p0Interfaces = (Array.isArray(data.platformInterfaces) ? data.platformInterfaces : []).filter((item) => item.priority === "P0");
   const securityAcceptanceLedger = Array.isArray(data.securityAcceptanceLedger) ? data.securityAcceptanceLedger : [];
   const traceabilityPolicySources = Array.isArray(data.drugTraceabilityPolicySources) ? data.drugTraceabilityPolicySources : [];
+  const traceabilityEvidenceRequirements = Array.isArray(data.drugTraceabilityEvidenceRequirements) ? data.drugTraceabilityEvidenceRequirements : [];
   const serverSource = fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
   const externalDependencyRiskIds = [
     "identity-source",
@@ -71,6 +73,7 @@ function buildDeployCheckReport(options = {}) {
     { name: "snapshot:securityAcceptance", ok: securityAcceptanceLedger.length >= 4 && securityAcceptanceLedger.every((item) => item.id && item.category && item.owner && item.status && item.next), detail: `${securityAcceptanceLedger.length} security acceptance items` },
     { name: "snapshot:externalDependencyRisks", ok: externalDependencyRiskIds.every((id) => serverSource.includes(id)), detail: `${externalDependencyRiskIds.length} external dependency risks` },
     { name: "snapshot:drugTraceabilityPolicySources", ok: traceabilityPolicySources.length >= 5 && traceabilityPolicySources.every((item) => /^https:\/\/(www\.)?(nhsa|nmpa)\.gov\.cn\//.test(item.url || "")), detail: `${traceabilityPolicySources.length} official traceability policy sources` },
+    { name: "snapshot:drugTraceabilityEvidenceRequirements", ok: traceabilityEvidenceRequirements.length >= 5 && traceabilityEvidenceRequirements.every((item) => item.id && Array.isArray(item.policySourceIds) && item.policySourceIds.every((id) => traceabilityPolicySources.some((source) => source.id === id)) && Array.isArray(item.evidenceFields) && item.evidenceFields.length > 0), detail: `${traceabilityEvidenceRequirements.length} traceability evidence requirements` },
     { name: "snapshot:p2-complete", ok: (data.platformRoadmap || []).filter((item) => item.priority === "P2").every((item) => item.status === "已完成"), detail: (data.platformRoadmap || []).filter((item) => item.priority === "P2").map((item) => `${item.title}:${item.status}`).join(";") },
     { name: "snapshot:accessibility", ok: Array.isArray(data.accessibilityChecklist) && data.accessibilityChecklist.length >= 5, detail: `${data.accessibilityChecklist?.length || 0} checklist items` },
     { name: "snapshot:storageMeta", ok: Boolean(data.storageMeta?.engine && data.storageMeta?.mode), detail: data.storageMeta ? `${data.storageMeta.engine}/${data.storageMeta.mode}` : "missing" }

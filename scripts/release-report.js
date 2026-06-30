@@ -213,6 +213,7 @@ function snapshotChecks(data) {
     "researchDatasets",
     "diseaseRegistryModels",
     "drugTraceabilityPolicySources",
+    "drugTraceabilityEvidenceRequirements",
     "accessibilityChecklist",
     "securityAcceptanceLedger"
   ];
@@ -223,6 +224,7 @@ function snapshotChecks(data) {
   const securityAcceptanceLedger = Array.isArray(data.securityAcceptanceLedger) ? data.securityAcceptanceLedger : [];
   const productionDeploymentPlan = Array.isArray(data.productionDeploymentPlan) ? data.productionDeploymentPlan : [];
   const traceabilityPolicySources = Array.isArray(data.drugTraceabilityPolicySources) ? data.drugTraceabilityPolicySources : [];
+  const traceabilityEvidenceRequirements = Array.isArray(data.drugTraceabilityEvidenceRequirements) ? data.drugTraceabilityEvidenceRequirements : [];
   const p0Interfaces = (Array.isArray(data.platformInterfaces) ? data.platformInterfaces : []).filter((item) => item.priority === "P0");
   const serverSource = fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
   const externalDependencyRiskIds = [
@@ -243,6 +245,7 @@ function snapshotChecks(data) {
     check("snapshot:interfaceReadiness", p0Interfaces.length >= 4 && p0Interfaces.every((item) => item.id && item.owner && item.status && item.next), `${p0Interfaces.length} P0 interface tracks`, "error", "snapshot"),
     check("snapshot:externalDependencyRisks", externalDependencyRiskIds.every((id) => serverSource.includes(id)), `${externalDependencyRiskIds.length} external dependency risks`, "error", "snapshot"),
     check("snapshot:drugTraceabilityPolicySources", traceabilityPolicySources.length >= 5 && traceabilityPolicySources.every((item) => /^https:\/\/(www\.)?(nhsa|nmpa)\.gov\.cn\//.test(item.url || "")), `${traceabilityPolicySources.length} official traceability policy sources`, "error", "snapshot"),
+    check("snapshot:drugTraceabilityEvidenceRequirements", traceabilityEvidenceRequirements.length >= 5 && traceabilityEvidenceRequirements.every((item) => item.id && Array.isArray(item.policySourceIds) && item.policySourceIds.every((id) => traceabilityPolicySources.some((source) => source.id === id)) && Array.isArray(item.evidenceFields) && item.evidenceFields.length > 0), `${traceabilityEvidenceRequirements.length} traceability evidence requirements`, "error", "snapshot"),
     check("snapshot:noCorruptedPlaceholders", !/编码损坏|缂栫爜鎹熷潖|\?\?\?/.test(raw), "no known corrupted placeholders", "error", "snapshot"),
     check("snapshot:accessibility", Array.isArray(data.accessibilityChecklist) && data.accessibilityChecklist.length >= 5, `${data.accessibilityChecklist?.length || 0} checklist items`, "error", "snapshot")
   ];
@@ -320,7 +323,8 @@ function drugConsumableChecks(drugConsumable) {
     check("drugConsumable:readiness", drugConsumable.ok, drugConsumable.ok ? "drug consumable supervision checks passed" : "drug consumable supervision checks failed", "error", "drug-consumable"),
     check("drugConsumable:boundaries", drugConsumable.requiredBoundaries?.every((boundary) => drugConsumable.checks?.find((item) => item.id === "drug-consumable:boundaries")?.detail?.includes(`${boundary}:present`)), `${drugConsumable.requiredBoundaries?.length || 0} boundaries`, "error", "drug-consumable"),
     check("drugConsumable:links", drugConsumable.linkedRows?.every((item) => item.pickupLinked && item.claimLinked && item.auditTrailPresent), `${drugConsumable.linkedRows?.length || 0} linked supervision rows`, "error", "drug-consumable"),
-    check("drugConsumable:traceabilityPolicy", drugConsumable.summary?.traceabilityPolicySources >= 5 && drugConsumable.checks?.some((item) => item.id === "drug-consumable:traceability-policy" && item.passed), `${drugConsumable.summary?.traceabilityPolicySources || 0} official traceability policy sources`, "error", "drug-consumable")
+    check("drugConsumable:traceabilityPolicy", drugConsumable.summary?.traceabilityPolicySources >= 5 && drugConsumable.checks?.some((item) => item.id === "drug-consumable:traceability-policy" && item.passed), `${drugConsumable.summary?.traceabilityPolicySources || 0} official traceability policy sources`, "error", "drug-consumable"),
+    check("drugConsumable:traceabilityEvidence", drugConsumable.summary?.traceabilityEvidenceRequirements >= 5 && drugConsumable.summary?.traceabilityEvidenceReady >= 5 && drugConsumable.checks?.some((item) => item.id === "drug-consumable:traceability-evidence" && item.passed), `${drugConsumable.summary?.traceabilityEvidenceReady || 0}/${drugConsumable.summary?.traceabilityEvidenceRequirements || 0} traceability evidence requirements ready`, "error", "drug-consumable")
   ];
 }
 

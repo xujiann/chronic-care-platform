@@ -99,6 +99,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "snapshot:interfaceReadiness" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "snapshot:externalDependencyRisks" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "snapshot:drugTraceabilityPolicySources" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "snapshot:drugTraceabilityEvidenceRequirements" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "storage:jsonSnapshot.present" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "storage:jsonSnapshot.collections" && item.passed), true);
   assert.equal(report.storageModel.jsonSnapshot.present, true);
@@ -111,6 +112,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.dataQuality.ok, true);
   assert.equal(report.checks.some((item) => item.name === "drugConsumable:readiness" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "drugConsumable:traceabilityPolicy" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "drugConsumable:traceabilityEvidence" && item.passed), true);
   assert.equal(report.drugConsumable.ok, true);
   assert.equal(report.checks.some((item) => item.name === "integration:readiness" && item.passed), true);
   assert.equal(report.integrationReadiness.ok, true);
@@ -174,6 +176,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(markdown, /snapshot:interfaceReadiness/);
   assert.match(markdown, /snapshot:externalDependencyRisks/);
   assert.match(markdown, /snapshot:drugTraceabilityPolicySources/);
+  assert.match(markdown, /snapshot:drugTraceabilityEvidenceRequirements/);
 
   const cutoverMarkdown = renderCutoverMarkdown(report);
   assert.match(cutoverMarkdown, /Production cutover checklist/);
@@ -281,6 +284,7 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.equal(drugConsumableJson.drugConsumable.ok, true);
   assert.match(drugConsumableMarkdown, /Drug consumable readiness report/);
   assert.match(drugConsumableMarkdown, /Traceability policy sources/);
+  assert.match(drugConsumableMarkdown, /Traceability evidence requirements/);
   assert.equal(integrationJson.integrationReadiness.ok, true);
   assert.match(integrationMarkdown, /P0 coverage/);
   assert.equal(interfaceMappingJson.interfaceMapping.ok, true);

@@ -257,4 +257,6 @@ GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下
 
 `drugTraceabilityPolicySources` anchors the official drug traceability-code policy sources used by this app and by the generated site templates. Platform rule: when any page, template, remediation record, joint-test file, or generated artifact references a policy, standard, attachment, or source file, the related runnable page and `about.html#policy-source-rules` must expose the policy basis, source link, applicability boundary, and verification evidence.
 
+`drugTraceabilityEvidenceRequirements` is the static evidence-field source for traceability scan capture, insurance-code mapping, no-code/manual exceptions, high-value consumable catalog cross-checks, and remediation audit trails. The drug consumable API returns the same requirements as `traceabilityEvidenceRequirements` and derives `traceabilityEvidenceChecklist` from live supervision rows, so site templates and runtime review screens use one evidence vocabulary.
+
 `drug-consumable-about.html` is the runnable about page for this app. It links policy sources to rational medication, prescription review, fixed pickup, high-value consumable clues, insurance settlement coordination, remediation loops, role boundaries, and field joint-test evidence.
