@@ -312,7 +312,7 @@ The handoff document is `docs/互联网护理服务模块说明.md`; it covers r
 - `npm.cmd run policy:coverage` writes `release/policy-coverage-report.json` and `release/policy-coverage-report.md`, checking About-page policy IDs, policy documents, template rules, CI, deploy-check, release manifest, and operator documentation coverage.
 - `npm.cmd run health-dashboard:summary` writes `release/health-dashboard-summary.json` and `release/health-dashboard-summary.md`.
 - `npm.cmd run priority-apps:templates` writes `release/priority-application-templates.json` and `release/priority-application-templates.md` for the eight independent application handoff templates.
-- Each priority application template now carries a copy-ready `conversationStarter`, an `implementationChecklist`, and an `acceptanceGate` so each independent conversation can start with the same release boundary and evidence requirements.
+- Each priority application template now carries a copy-ready `conversationStarter`, an `implementationChecklist` with the Codex loop execution step, and an `acceptanceGate` so each independent conversation can start with the same release boundary and evidence requirements.
 - Development loop: plan first, make one small change, run the matching test or build, observe and fix failures, update docs and acceptance notes, then repeat until the module passes release gates.
 - `release:manifest` indexes `health-dashboard-summary.md` as the release artifact for the eight-application template and aggregate dashboard evidence.
 - Boundary: the dashboard does not replace source workflows; source applications remain the system of record for business operations and acceptance.
