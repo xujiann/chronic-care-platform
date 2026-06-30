@@ -137,6 +137,8 @@ test("about page documents doctor multi-practice policy boundaries", () => {
   assert.match(doc, /医师电子化注册核验/);
   assert.match(doc, /第一执业地点电子确认/);
   assert.match(doc, /\/api\/multi-practice-registry/);
+  assert.match(doc, /\| \u533b\u751f\u8d26\u6237 \|[^\n]+\| `doctor\.html` \|/);
+  assert.doesNotMatch(doc, /\| \u533b\u751f\u8d26\u6237 \|[^\n]+\| `institution\.html` \|/);
   assert.match(doc, /flowchart LR/);
   assert.match(doc, /医生账户只能查看本人多点执业申请/);
   assert.match(report, /医师多点执业主要功能报告/);

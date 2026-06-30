@@ -61,6 +61,7 @@ test("priority application templates expose the eight conversation handoff contr
   assert.equal(report.templates.every((item) => /small change/.test(item.documentationRule.codexLoop) && /test or build/.test(item.documentationRule.codexLoop)), true);
   assert.equal(report.templates.every((item) => item.conversationStarter && item.conversationStarter.includes(item.id)), true);
   assert.equal(report.templates.every((item) => item.implementationChecklist.length >= 8), true);
+  assert.equal(report.templates.every((item) => item.implementationChecklist.some((step) => /Follow Codex loop/.test(step) && /small change/.test(step))), true);
   assert.equal(report.templates.every((item) => item.acceptanceGate.readyWhen.length >= 4 && item.acceptanceGate.evidence.length), true);
   assert.equal(report.templates[0].documentationRule.maternalChildReference, "docs/妇幼健康全模块说明.md");
   assert.equal(report.checks.some((item) => item.id === "templates:documentation-rule" && item.passed), true);

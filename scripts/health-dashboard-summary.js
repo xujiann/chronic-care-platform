@@ -215,6 +215,7 @@ function buildImplementationChecklist(template) {
     `Wire or verify API routes: ${template.apiRoutes.join(", ")}.`,
     `Verify frontend entry: ${template.frontendEntry}.`,
     `Run evidence tests: ${template.testEvidence.join(", ")}.`,
+    `Follow Codex loop: ${docRule.codexLoop}`,
     `Archive release evidence: ${template.acceptanceEvidence.join(", ")}.`,
     `Keep About page and module docs current: ${docRule.aboutPage}, ${docRule.requiredDocument}.`,
     "Include a workflow diagram covering data source, business workflow, sharing/collaboration, citizen visibility, and management statistics or alerts."
