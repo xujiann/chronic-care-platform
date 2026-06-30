@@ -32,6 +32,7 @@ http://localhost:5173/login.html
 - `workbench.html`
 - `index.html`
 - `institution.html`
+- `doctor.html`
 - `insurance.html`
 - `citizen.html`
 - `mobile-preview.html`
