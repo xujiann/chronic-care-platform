@@ -5432,7 +5432,10 @@ function buildQualitySafetyDepartmentTaskView({ user, summary, actionPlan, issue
       title: item.action,
       owner: item.owner,
       dueAt: item.dueAt || "",
-      source: item.source || item.id
+      source: item.source || item.id,
+      context: item.reason || item.evidence || "",
+      targetSection: "quality-safety-actions",
+      actionLabel: "查看行动计划"
     })),
     ...roleSignoffs.map((item) => ({
       id: item.id,
@@ -5441,7 +5444,10 @@ function buildQualitySafetyDepartmentTaskView({ user, summary, actionPlan, issue
       title: item.item,
       owner: item.owner,
       dueAt: item.dueAt || "",
-      source: item.sourceCollection || "qualitySafetySiteSignoffs"
+      source: item.sourceCollection || "qualitySafetySiteSignoffs",
+      context: item.requiredEvidenceText || item.latestNote || "",
+      targetSection: "quality-safety-signoffs",
+      actionLabel: role === "commission" ? "记录联调" : "提交证据"
     }))
   ];
   const priorityRank = { critical: 0, high: 1, medium: 2, watch: 3 };

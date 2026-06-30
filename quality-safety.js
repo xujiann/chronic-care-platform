@@ -420,6 +420,28 @@ function renderDepartmentView(data) {
   `);
 }
 
+function renderDepartmentTaskQueue(data) {
+  const rows = data.departmentTaskView?.queue || [];
+  setHtml("quality-safety-department-queue", `
+    <table>
+      <thead><tr><th>优先级</th><th>任务</th><th>责任方与来源</th><th>下一步</th></tr></thead>
+      <tbody>
+        ${rows.length ? rows.map((item) => `
+          <tr>
+            <td>${statusLabel(item.priority)}<br /><small>${statusLabel(item.kind)}</small></td>
+            <td><strong>${zhText(item.title)}</strong><br /><small>${zhText(item.context || "")}</small></td>
+            <td>${zhText(item.owner)}<br /><small>${zhText(item.source || item.id)}</small></td>
+            <td>
+              ${item.dueAt ? `截止 ${text(item.dueAt)}<br />` : ""}
+              <button class="inline-action" type="button" data-scroll-target="${text(item.targetSection || "quality-safety-actions")}">${zhText(item.actionLabel || "定位")}</button>
+            </td>
+          </tr>
+        `).join("") : emptyRow(4, "当前部门暂无待办任务")}
+      </tbody>
+    </table>
+  `);
+}
+
 function renderMetrics(summary) {
   const metrics = [
     ["问题总数", summary.issues],
@@ -693,6 +715,7 @@ function renderQualitySafety(data) {
     siteSignoffs: filteredSignoffs
   });
   renderDepartmentView(data);
+  renderDepartmentTaskQueue(data);
   renderGoLiveReadiness(data.goLiveReadiness || {});
   renderActionPlan(data.actionPlan || []);
   renderRisks(data.institutionRisks || []);
@@ -865,6 +888,7 @@ function resetQualitySafetyFilters() {
 document.addEventListener("click", (event) => {
   const reset = event.target.closest("#quality-safety-reset");
   const refresh = event.target.closest("#quality-safety-refresh");
+  const scrollTarget = event.target.closest("[data-scroll-target]");
   const dispatch = event.target.closest("[data-dispatch]");
   const feedback = event.target.closest("[data-feedback]");
   const review = event.target.closest("[data-review]");
@@ -875,6 +899,10 @@ document.addEventListener("click", (event) => {
   const signoffReview = event.target.closest("[data-signoff-review]");
   const signoffEvidence = event.target.closest("[data-signoff-evidence]");
   const interfaceValidate = event.target.closest("[data-interface-validate]");
+  if (scrollTarget) {
+    const target = document.getElementById(scrollTarget.dataset.scrollTarget || "");
+    if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
   if (reset) resetQualitySafetyFilters();
   if (refresh) {
     Promise.all([loadQualitySafety(), loadQualitySafetyInterfacePack()]).catch((error) => alert(error.message));
