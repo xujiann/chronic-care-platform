@@ -484,6 +484,18 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(hospitalConfirmed.body.externalSync.eSignature.status, "signed");
     const doctorLoop = await api(baseUrl, "/api/doctors/me", authorized(doctorLogin.body.token));
     assert.equal(doctorLoop.body.multiPracticeMessages.some((item) => item.sourceId === createdPractice.body.id && item.targetRole === "doctor" && /医院端已处理/.test(item.title)), true);
+    const otherDoctorLogin = await login(baseUrl, "doctor_wang");
+    const forbiddenDoctorPractice = await api(baseUrl, "/api/workflow-actions", authorized(otherDoctorLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        collection: "multiPracticeApplications",
+        id: createdPractice.body.id,
+        status: "已备案",
+        note: "医生不能处理他人多点执业申请"
+      })
+    }));
+    assert.equal(forbiddenDoctorPractice.response.status, 403);
+
     const returnedPractice = await api(baseUrl, "/api/workflow-actions", authorized(hospitalLogin.body.token, {
       method: "POST",
       body: JSON.stringify({
@@ -1077,7 +1089,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
 
     const patched = await api(baseUrl, `/api/personal-records/${created.body.id}`, authorized(citizenToken, {
       method: "PATCH",
-      body: JSON.stringify({ id: "tampered", residentId: "r2", result: "已复核", meta: { sourceTrust: "居民确认" } })
+      body: JSON.stringify({ id: "tampered", residentId: "r2", result: "已复核", expectedVersion: 20260703, meta: { sourceTrust: "居民确认" } })
     }));
     assert.equal(patched.response.status, 200);
     assert.equal(patched.body.id, created.body.id);
@@ -1246,6 +1258,14 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       body: JSON.stringify({ collection: "insuranceClaims", id: "ic1", status: "已通过" })
     }));
     assert.equal(workflowWrite.response.status, 403);
+
+    const hospital = await login(baseUrl, "hospital");
+    const outOfScopeTeleconsultationWrite = await api(baseUrl, "/api/workflow-actions", authorized(hospital.body.token, {
+      method: "POST",
+      body: JSON.stringify({ collection: "referralTeleconsultations", id: "rtc-002", status: "已接收" })
+    }));
+    assert.equal(outOfScopeTeleconsultationWrite.response.status, 403);
+
     const referralTeleconsultations = await api(baseUrl, "/api/referral-teleconsultations", authorized(citizenToken));
     assert.equal(referralTeleconsultations.response.status, 403);
   });
@@ -1959,12 +1979,19 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     }));
     assert.equal(insuranceChronicWrite.response.status, 403);
 
+    const missingWorkflowRecord = await api(baseUrl, "/api/workflow-actions", authorized(institution.body.token, {
+      method: "POST",
+      body: JSON.stringify({ collection: "careOrders", id: "missing-care-order", status: "missing" })
+    }));
+    assert.equal(missingWorkflowRecord.response.status, 404);
+
     const allowed = await api(baseUrl, "/api/workflow-actions", authorized(institution.body.token, {
       method: "POST",
       body: JSON.stringify({
         collection: "careOrders",
         id: "co1",
         status: "已接诊",
+        expectedVersion: 20260704,
         updates: { id: "tampered", residentId: "r3", institutionReview: "已接诊" }
       })
     }));
@@ -1997,6 +2024,18 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       })
     }));
     assert.equal(medicationSupportAllowed.response.status, 200);
+    const referralWorkflowAction = await api(baseUrl, "/api/workflow-actions", authorized(county.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        collection: "referralTeleconsultations",
+        id: "rtc-001",
+        status: "feedback-returned",
+        feedback: "Unified workflow feedback",
+        note: "workflow action regression"
+      })
+    }));
+    assert.equal(referralWorkflowAction.response.status, 200);
+    assert.equal(referralWorkflowAction.body.status, "feedback-returned");
     assert.equal(medicationSupportAllowed.body.stockStatus, "已完成库存复核");
   });
 

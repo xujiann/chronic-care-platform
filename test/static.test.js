@@ -228,6 +228,8 @@ test("about page documents maternal child module and unified template flow rule"
   assert.match(doc, /flowchart TD/);
   assert.match(doc, /出生医学证明/);
   assert.match(doc, /统一模板规则/);
+  assert.match(doc, /Codex loop/);
+  assert.match(doc, /先写计划/);
   assert.match(templates, /documentationRule/);
   assert.match(templates, /flowDiagram/);
 });
