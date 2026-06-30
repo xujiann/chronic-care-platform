@@ -791,7 +791,12 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(commission.response.status, 200);
     assert.equal(commission.body.scope.name, "区域诊疗数据共享平台");
     assert.equal(commission.body.summary.totalPackages >= 3, true);
+    assert.equal(commission.body.summary.referralHandoffReady >= 1, true);
     assert.equal(commission.body.packages.some((item) => item.id === "rsp-r3-imaging"), true);
+    const commissionHandoff = commission.body.packages.find((item) => item.id === "rsp-r1-hypertension").referralHandoff;
+    assert.equal(commissionHandoff.total, 6);
+    assert.equal(commissionHandoff.evidence.some((item) => item.id === "access-audit" && item.ready), true);
+    assert.equal(commissionHandoff.runtimeBoundaries.some((item) => item.includes("不把区域共享包当作转诊单主表")), true);
     assert.equal(commission.body.scope.exclusions.some((item) => item.includes("HIS")), true);
 
     const hospital = await login(baseUrl, "hospital");
@@ -800,6 +805,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(institutionView.body.packages.some((item) => item.id === "rsp-r1-hypertension"), true);
     assert.equal(institutionView.body.packages.some((item) => item.id === "rsp-r2-diabetes"), true);
     assert.equal(institutionView.body.packages.some((item) => item.id === "rsp-r3-imaging"), false);
+    assert.equal(institutionView.body.packages.every((item) => item.referralHandoff?.total === 6), true);
     assert.equal(institutionView.body.packages.every((item) => !String(item.resident?.idCard || "").startsWith("DEMO-ID-")), true);
 
     const accessReview = await api(baseUrl, "/api/regional-data-sharing/access-reviews", authorized(hospital.body.token, {
@@ -817,6 +823,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
 
     const refreshed = await api(baseUrl, "/api/regional-data-sharing", authorized(hospital.body.token));
     assert.equal(refreshed.body.accessReviews.some((item) => item.id === accessReview.body.review.id), true);
+    const refreshedDiabetes = refreshed.body.packages.find((item) => item.id === "rsp-r2-diabetes");
+    assert.equal(refreshedDiabetes.referralHandoff.evidence.some((item) => item.id === "access-audit" && item.ready), true);
     const commissionState = await api(baseUrl, "/api/state", authorized(commissionToken));
     assert.equal(commissionState.body.dataAccessLogs.some((item) => item.scope === "regionalDataSharing" && item.residentId === "r2"), true);
 

@@ -240,7 +240,7 @@ function renderRegionalReferralHandoff(packages, reviews) {
     boundary.innerHTML = "";
     return;
   }
-  const handoff = buildRegionalReferralHandoff(packageItem, reviews);
+  const handoff = packageItem.referralHandoff || buildRegionalReferralHandoff(packageItem, reviews);
   const readyCount = handoff.evidence.filter((item) => item.ready).length;
   summary.textContent = `${readyCount}/${handoff.evidence.length} 项证据可交接`;
   panel.innerHTML = [

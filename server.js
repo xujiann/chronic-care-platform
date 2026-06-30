@@ -4216,9 +4216,75 @@ function canAccessRegionalSharingPackage(user, item) {
     (item.targetInstitutions || []).includes(user.orgName);
 }
 
+function buildRegionalReferralHandoffEvidence(packageItem, reviews = []) {
+  const collections = new Set(packageItem.sharedCollections || []);
+  const evidenceCounts = packageItem.evidenceCounts || {};
+  const targetCount = (packageItem.targetOrgCodes || packageItem.targetInstitutions || []).length;
+  const relatedReviews = reviews.filter((item) => item.packageId === packageItem.id);
+  const evidence = [
+    {
+      id: "clinical-records",
+      label: "诊疗资料",
+      ready: collections.has("personalRecords") && collections.has("diagnosticReports") && evidenceCounts.personalRecords > 0 && evidenceCounts.diagnosticReports > 0,
+      detail: `档案 ${evidenceCounts.personalRecords || 0} 条，报告 ${evidenceCounts.diagnosticReports || 0} 条`
+    },
+    {
+      id: "mutual-recognition",
+      label: "互认依据",
+      ready: collections.has("countyMutualRecognitionRecords") && evidenceCounts.mutualRecognitionRecords > 0,
+      detail: `互认记录 ${evidenceCounts.mutualRecognitionRecords || 0} 条，可支撑检查检验结果复用`
+    },
+    {
+      id: "integration-contracts",
+      label: "接口契约",
+      ready: (packageItem.contractRefs || []).length > 0 && (packageItem.contracts || []).every((item) => item.status === "ready"),
+      detail: (packageItem.contracts || []).map((item) => item.domain || item.id).join("、") || "未绑定契约"
+    },
+    {
+      id: "consent-quality",
+      label: "授权与质控",
+      ready: packageItem.consentStatus === "active" && packageItem.qualityStatus === "passed",
+      detail: `${packageItem.consentStatus || "unknown"} / ${packageItem.qualityStatus || "unknown"}`
+    },
+    {
+      id: "access-audit",
+      label: "调阅审计",
+      ready: relatedReviews.length > 0 || Boolean(packageItem.lastAccessReviewId || packageItem.lastSharedAt),
+      detail: relatedReviews.length ? `本包已有 ${relatedReviews.length} 条调阅留痕` : "转诊接诊前需登记调阅目的"
+    },
+    {
+      id: "recipient-scope",
+      label: "接收范围",
+      ready: targetCount > 0,
+      detail: `目标机构 ${targetCount} 个；仅允许来源或目标机构在授权范围内调阅`
+    }
+  ];
+  const readyCount = evidence.filter((item) => item.ready).length;
+  return {
+    ready: readyCount === evidence.length,
+    readyCount,
+    total: evidence.length,
+    evidence,
+    mergeItems: [
+      "共享 residents、personalRecords、diagnosticReports、countyMutualRecognitionRecords、integrationContracts、dataAccessLogs 作为接诊前证据。",
+      "现场验收报告合并呈现：区域共享证明资料可调阅，转诊会诊证明业务可流转。",
+      "转诊回传报告进入诊断报告或健康档案后，可再次被共享包编目。"
+    ],
+    runtimeBoundaries: [
+      "不把区域共享包当作转诊单主表。",
+      "不在区域共享入口改写号源、床位、接诊反馈或服务时限状态。",
+      "不绕过居民授权、机构范围和调阅审计。"
+    ],
+    note: "交接只证明资料可调阅、可追溯、可用于接诊判断；转诊单、号源床位、服务时限督办和绩效结算仍由转诊会诊模块负责。"
+  };
+}
+
 function buildRegionalDataSharingView(data, user) {
   const packages = normalizeRegionalSharingPackages(data.regionalSharingPackages || seedRegionalSharingPackages())
     .filter((item) => canAccessRegionalSharingPackage(user, item));
+  const reviews = (data.regionalSharingAccessReviews || []).filter((review) =>
+    packages.some((item) => item.id === review.packageId)
+  );
   const residentsById = new Map((data.residents || []).map((item) => [item.id, item]));
   const contractsById = new Map((data.integrationContracts || []).map((item) => [item.id, item]));
   const diagnosticReports = data.diagnosticReports || [];
@@ -4229,7 +4295,7 @@ function buildRegionalDataSharingView(data, user) {
     const relatedPersonalRecords = personalRecords.filter((record) => record.residentId === item.residentId && (item.recordRefs.includes(record.id) || item.sharedCollections.includes("personalRecords")));
     const relatedRecognition = recognitionRecords.filter((record) => record.residentId === item.residentId || item.recordRefs.includes(record.id));
     const contracts = item.contractRefs.map((id) => contractsById.get(id)).filter(Boolean);
-    return {
+    const packageView = {
       ...item,
       resident: residentsById.get(item.residentId) || null,
       contracts: contracts.map((contract) => ({
@@ -4250,10 +4316,11 @@ function buildRegionalDataSharingView(data, user) {
         ...relatedRecognition.slice(0, 3).map((record) => ({ type: "countyMutualRecognitionRecords", id: record.id, name: record.item, status: record.status, at: record.at }))
       ].sort((left, right) => String(right.at || "").localeCompare(String(left.at || ""))).slice(0, 5)
     };
+    return {
+      ...packageView,
+      referralHandoff: buildRegionalReferralHandoffEvidence(packageView, reviews)
+    };
   });
-  const reviews = (data.regionalSharingAccessReviews || []).filter((review) =>
-    packages.some((item) => item.id === review.packageId)
-  );
   return {
     scope: data.regionalDataSharingScope || seedRegionalDataSharingScope(),
     snapshots: data.regionalSharingSnapshots || seedRegionalSharingSnapshots(),
@@ -4262,6 +4329,7 @@ function buildRegionalDataSharingView(data, user) {
       ready: enrichedPackages.filter((item) => item.status === "ready").length,
       pendingReview: enrichedPackages.filter((item) => item.status === "pending_review").length,
       blocked: enrichedPackages.filter((item) => item.status === "blocked").length,
+      referralHandoffReady: enrichedPackages.filter((item) => item.referralHandoff?.ready).length,
       accessReviews: reviews.length,
       institutions: new Set(enrichedPackages.flatMap((item) => [item.sourceInstitution, ...(item.targetInstitutions || [])]).filter(Boolean)).size,
       contracts: new Set(enrichedPackages.flatMap((item) => item.contractRefs || [])).size
