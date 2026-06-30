@@ -540,6 +540,26 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       "institutionCreditEvaluations",
       "securityAcceptanceLedger"
     ].forEach((key) => assert.equal(body[key], undefined, `${key} 不应返回给居民端`));
+    assert.ok(Array.isArray(body.citizenLifecycleActions));
+    assert.equal(body.citizenLifecycleActions.length > 0, true);
+    assert.equal(body.citizenLifecycleActions.every((item) => ["r1", "r4"].includes(item.residentId)), true);
+  });
+
+  await t.test("returns citizen lifecycle actions inside account scope", async () => {
+    const lifecycle = await api(baseUrl, "/api/citizen/lifecycle-actions", authorized(citizenToken));
+    assert.equal(lifecycle.response.status, 200);
+    assert.equal(lifecycle.body.ok, true);
+    assert.equal(lifecycle.body.actions.length > 0, true);
+    assert.equal(lifecycle.body.actions.every((item) => ["r1", "r4"].includes(item.residentId)), true);
+    assert.equal(lifecycle.body.actions.some((item) => ["birthCertificates", "followups", "medicationPickups"].includes(item.sourceCollection)), true);
+    assert.equal(lifecycle.body.actions.some((item) => ["authUsers", "platformAudit"].includes(item.sourceCollection)), false);
+
+    const scoped = await api(baseUrl, "/api/citizen/lifecycle-actions?residentId=r1", authorized(citizenToken));
+    assert.equal(scoped.response.status, 200);
+    assert.equal(scoped.body.actions.every((item) => item.residentId === "r1"), true);
+
+    const forbidden = await api(baseUrl, "/api/citizen/lifecycle-actions?residentId=r2", authorized(citizenToken));
+    assert.equal(forbidden.response.status, 403);
   });
 
   await t.test("allows citizen medical escort appointment within household scope", async () => {
@@ -711,6 +731,9 @@ test("API authentication, scoping and governance regression suite", async (t) =>
   await t.test("guards mobile internet nursing appointments for launch", async () => {
     const dashboard = await api(baseUrl, "/api/internet-nursing/dashboard", authorized(citizenToken));
     assert.equal(dashboard.response.status, 200);
+    assert.equal(dashboard.body.siteCutoverPack.status, "ready-for-site-signoff");
+    assert.equal(dashboard.body.siteCutoverPack.tracks.length, 5);
+    assert.equal(dashboard.body.siteCutoverPack.tracks.some((item) => item.id === "nursing-cutover-payment-reconciliation"), true);
     const institution = dashboard.body.institutions.find((item) => item.id === "inh-mr1");
     assert.ok(institution);
 

@@ -661,13 +661,19 @@ test("citizen portal exposes eight-stage lifecycle health management", () => {
   const citizenJs = read("citizen.js");
   const citizenCss = read("citizen.css");
   assert.match(citizenHtml, /lifecycle-summary/);
+  assert.match(citizenHtml, /lifecycle-action-cards/);
   ["出生与建档", "儿童保健", "青少年健康", "成人健康", "慢病与康复", "老年与照护", "临终关怀与授权", "死亡与身后事项"].forEach((label) => {
     assert.match(citizenJs, new RegExp(label));
   });
   assert.match(citizenJs, /项需下发/);
+  assert.match(citizenJs, /renderLifecycleActions/);
+  assert.match(citizenJs, /citizenLifecycleActions/);
   assert.match(citizenJs, /deathCertificates/);
   assert.match(citizenJs, /authorizations/);
+  assert.match(read("server.js"), /\/api\/citizen\/lifecycle-actions/);
+  assert.match(read("server.js"), /buildCitizenLifecycleActions/);
   assert.match(citizenCss, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(citizenCss, /lifecycle-action-grid/);
   assert.match(citizenCss, /lifecycle-card small\.warn/);
 });
 
@@ -680,7 +686,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   const serviceWorker = read("service-worker.js");
   assert.match(citizenHtml, /rel="manifest"/);
   assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260630touch/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260630sync/);
   assert.match(citizenHtml, /mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-title/);
@@ -692,6 +698,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /preview-status/);
   assert.match(mobilePreviewHtml, /renderPreviewUrls/);
   assert.match(mobilePreviewHtml, /renderPreviewStatus/);
+  assert.match(mobilePreviewHtml, /syncPreviewServiceControls/);
   assert.match(mobilePreviewHtml, /previewServiceLabels/);
   assert.match(mobilePreviewHtml, /390px 手机视口/);
   assert.match(mobilePreviewHtml, /YOUR-LAN-IP/);
@@ -713,6 +720,11 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /满意度与投诉反馈能进入服务质控闭环/);
   assert.match(mobilePreviewHtml, /postMessage/);
   assert.match(citizenJs, /set-service-tab/);
+  assert.match(citizenJs, /citizen-service-changed/);
+  assert.match(citizenJs, /notifyPreviewServiceChange/);
+  assert.match(mobilePreviewHtml, /citizen-service-changed/);
+  assert.match(mobilePreviewHtml, /reload: false/);
+  assert.match(mobilePreviewHtml, /event\.source !== frame\.contentWindow/);
   assert.match(mobilePreviewCss, /preview-steps/);
   assert.match(mobilePreviewCss, /preview-client-switch/);
   assert.match(mobilePreviewCss, /preview-service-switch/);
@@ -736,7 +748,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.shortcuts.some((item) => item.url === "./citizen.html?client=app&page=escort#service-escort"), true);
   assert.equal(manifest.shortcuts.some((item) => item.url === "./mobile-preview.html?client=app"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v23/);
+  assert.match(serviceWorker, /chronic-care-citizen-v24/);
   assert.match(serviceWorker, /internet-nursing\.js\?v=20260629prod/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627preview/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages/);
@@ -751,6 +763,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(serviceWorker, /citizen\.js\?v=20260630layout/);
   assert.match(serviceWorker, /citizen\.js\?v=20260630visible/);
   assert.match(serviceWorker, /citizen\.js\?v=20260630touch/);
+  assert.match(serviceWorker, /citizen\.js\?v=20260630sync/);
   assert.match(serviceWorker, /citizen\.html/);
   assert.match(serviceWorker, /mobile-preview\.html/);
   assert.match(serviceWorker, /mobile-preview\.css/);
@@ -1004,7 +1017,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /longterm-care-form/);
   assert.match(citizenCss, /registration-form/);
   assert.match(citizenHtml, /registration-summary/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260630touch/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260630sync/);
   assert.match(citizenJs, /registration-summary/);
   assert.match(citizenJs, /hisOrders/);
   assert.match(citizenJs, /insuranceReady/);
@@ -1025,6 +1038,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
   const citizenInterfaceDoc = read("docs/citizen-module-interface-map.md");
   assert.match(citizenInterfaceDoc, /C端居民端模块接口说明/);
   assert.match(citizenInterfaceDoc, /\/api\/internet-nursing\/dashboard/);
+  assert.match(citizenInterfaceDoc, /\/api\/citizen\/lifecycle-actions/);
+  assert.match(citizenInterfaceDoc, /birthCertificates/);
   assert.match(citizenInterfaceDoc, /\/api\/escort-services\/orders/);
   assert.match(citizenInterfaceDoc, /\/api\/tasks\/:id\/actions/);
   const citizenGovernanceDoc = read("docs/citizen-authorization-emr-governance.md");
@@ -1070,6 +1085,8 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(html, /nursing-payment-readiness/);
   assert.match(html, /nursing-device-verification/);
   assert.match(html, /nursing-regulatory-submission/);
+  assert.match(html, /nursing-site-cutover-pack/);
+  assert.match(html, /现场割接证据包/);
   assert.match(js, /fetchInternetNursingDashboard/);
   assert.match(js, /renderRiskGuidance/);
   assert.match(js, /nextNursingAction/);
@@ -1090,6 +1107,9 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(js, /renderPaymentReadiness/);
   assert.match(js, /renderDeviceVerification/);
   assert.match(js, /renderRegulatorySubmission/);
+  assert.match(js, /buildStaticSiteCutoverPack/);
+  assert.match(js, /renderSiteCutoverPack/);
+  assert.match(js, /nursing-cutover-regulatory-pressure-test/);
   assert.match(js, /staticNotificationDeliveries/);
   assert.match(js, /locationTracePoints/);
   assert.match(js, /renderServiceItemSelect/);
@@ -1143,6 +1163,8 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(server, /buildInternetNursingPaymentReadiness/);
   assert.match(server, /buildInternetNursingDeviceVerification/);
   assert.match(server, /buildInternetNursingRegulatorySubmission/);
+  assert.match(server, /buildInternetNursingCutoverPack/);
+  assert.match(server, /siteCutoverPack/);
   assert.match(server, /regulatoryContract/);
   assert.match(server, /hasSignedInternetNursingConsent/);
   assert.match(server, /buildInternetNursingNotificationDeliveries/);

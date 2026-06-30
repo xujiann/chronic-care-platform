@@ -1202,6 +1202,59 @@ select,
   color: #a65d00;
 }
 
+.lifecycle-action-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.lifecycle-action-card {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 8px;
+  min-height: 132px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--teal);
+  border-radius: 8px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.lifecycle-action-card.high {
+  border-left-color: #b42318;
+}
+
+.lifecycle-action-card.medium {
+  border-left-color: #a65d00;
+}
+
+.lifecycle-action-card.low,
+.lifecycle-action-card.stable {
+  border-left-color: #2f7d32;
+}
+
+.lifecycle-action-card strong,
+.lifecycle-action-card span,
+.lifecycle-action-card small {
+  display: block;
+}
+
+.lifecycle-action-card strong {
+  font-size: 14px;
+}
+
+.lifecycle-action-card span,
+.lifecycle-action-card p {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.lifecycle-action-card small {
+  color: var(--ink);
+  font-weight: 800;
+}
+
 .two-column {
   display: grid;
   grid-template-columns: 1.35fr 0.9fr;
@@ -2164,6 +2217,7 @@ dialog::backdrop {
   .registration-form,
   .service-status-grid,
   .lifecycle-grid,
+  .lifecycle-action-grid,
   .resident-audit-grid,
   .two-column,
   .account-panel,

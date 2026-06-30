@@ -101,6 +101,9 @@
       const renderPreviewStatus = () => {
         previewStatus.textContent = `${previewClientLabels[activePreviewClient]} · ${previewServiceLabels[activePreviewService]} · 390px 手机视口`;
       };
+      const syncPreviewServiceControls = () => {
+        serviceButtons.forEach((button) => button.classList.toggle("active", button.dataset.previewService === activePreviewService));
+      };
       const renderPreviewUrls = () => {
         const previewPort = location.port ? `:${location.port}` : "";
         const previewPath = `${location.pathname}${location.search}`;
@@ -118,10 +121,10 @@
       const citizenPreviewSrc = (service) => `./citizen.html?preview=mobile-nav&client=${activePreviewClient}&page=${service}#service-${service}`;
       const setPreviewService = (service, options = {}) => {
         activePreviewService = service;
-        serviceButtons.forEach((button) => button.classList.toggle("active", button.dataset.previewService === service));
+        syncPreviewServiceControls();
         if (options.syncUrl !== false) syncPreviewUrl();
         if (options.syncUrl === false) renderPreviewStatus();
-        frame.src = citizenPreviewSrc(service);
+        if (options.reload !== false) frame.src = citizenPreviewSrc(service);
       };
       const setPreviewClient = (client, options = {}) => {
         activePreviewClient = client;
@@ -134,6 +137,11 @@
       };
       frame.addEventListener("load", () => {
         frame.contentWindow?.postMessage({ type: "set-service-tab", service: activePreviewService }, location.origin);
+      });
+      window.addEventListener("message", (event) => {
+        if (event.origin !== location.origin || event.source !== frame.contentWindow || event.data?.type !== "citizen-service-changed") return;
+        if (!previewServices.includes(event.data.service)) return;
+        setPreviewService(event.data.service, { reload: false });
       });
       serviceButtons.forEach((button) => {
         button.addEventListener("click", () => setPreviewService(button.dataset.previewService));

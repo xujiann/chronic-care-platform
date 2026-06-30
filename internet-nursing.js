@@ -63,7 +63,8 @@ function buildStaticInternetNursingDashboard(state) {
     productionIntegration: buildStaticProductionIntegration(policy, orders),
     paymentReadiness: buildStaticPaymentReadiness(policy, orders),
     deviceVerification: buildStaticDeviceVerification(policy, orders, nurses),
-    regulatorySubmission: buildStaticRegulatorySubmission(policy, orders, institutions)
+    regulatorySubmission: buildStaticRegulatorySubmission(policy, orders, institutions),
+    siteCutoverPack: buildStaticSiteCutoverPack(policy)
   };
 }
 
@@ -226,6 +227,57 @@ function buildStaticRegulatorySubmission(policy, orders, institutions) {
   };
 }
 
+function buildStaticSiteCutoverPack(policy) {
+  const production = policy.productionIntegration || defaultProductionIntegration();
+  const payment = policy.paymentIntegration || defaultPaymentIntegration();
+  const device = policy.deviceVerification || defaultDeviceVerification();
+  const submission = policy.regulatorySubmission || defaultRegulatorySubmission();
+  const tracks = [
+    {
+      id: "nursing-cutover-message-signature",
+      owner: "医院护理信息化与平台运维",
+      status: production.messageGateway?.status === "contract-ready" && production.signatureStorage?.status === "contract-ready" ? "ready-for-site-signoff" : "blocked",
+      evidence: ["短信/院内消息/站内兜底", "电子签名附件存储", production.version],
+      blockingUntil: "完成消息网关、站内兜底和电子签名附件存储现场签字"
+    },
+    {
+      id: "nursing-cutover-hospital-connectors",
+      owner: "医疗机构接口联调组",
+      status: (production.hospitalConnectors || []).length >= 3 && (production.hospitalConnectors || []).every((item) => item.status === "mapped") ? "ready-for-site-signoff" : "blocked",
+      evidence: (production.hospitalConnectors || []).map((item) => `${displayText(item.system)}:${item.route}`),
+      blockingUntil: "完成院内护理管理系统、电子病历和监管平台联调签字"
+    },
+    {
+      id: "nursing-cutover-payment-reconciliation",
+      owner: "医保经办、财务与平台支付组",
+      status: payment.status === "contract-ready" && (payment.modes || []).includes("daily reconciliation") ? "ready-for-site-signoff" : "blocked",
+      evidence: payment.modes || [],
+      blockingUntil: "完成医保电子凭证、自费支付、退费、发票和 T+1 对账验收"
+    },
+    {
+      id: "nursing-cutover-device-drill",
+      owner: "护理运营与设备管理组",
+      status: device.status === "contract-ready" && (device.requiredSignals || []).includes("one-click alert") ? "ready-for-site-signoff" : "blocked",
+      evidence: device.requiredSignals || [],
+      blockingUntil: "完成 GPS、定位设备、记录仪、一键报警和照片附件现场实测"
+    },
+    {
+      id: "nursing-cutover-regulatory-pressure-test",
+      owner: "卫健监管与平台运维",
+      status: submission.pressureTest?.status === "passed" && (submission.signoffs || []).length >= 3 ? "ready-for-site-signoff" : "blocked",
+      evidence: [`${submission.submissionCycle}`, `P95 ${submission.pressureTest?.p95Ms || 0}ms`, ...(submission.signoffs || [])],
+      blockingUntil: "完成监管月报、高风险实时上报、字段映射和压测记录签字"
+    }
+  ];
+  return {
+    status: tracks.every((item) => item.status === "ready-for-site-signoff") ? "ready-for-site-signoff" : "blocked",
+    template: "release/templates/production-signoff/README.md",
+    auditRetentionEvidence: "release/audit-retention-report.md",
+    productionCutoverEvidence: "release/production-cutover-checklist.md",
+    tracks
+  };
+}
+
 function renderInternetNursingDashboard(dashboard) {
   renderNursingMetrics(dashboard.summary || {});
   renderRiskGuidance(dashboard.orders || [], dashboard.riskQueue || []);
@@ -245,6 +297,7 @@ function renderInternetNursingDashboard(dashboard) {
   renderPaymentReadiness(dashboard.paymentReadiness || {});
   renderDeviceVerification(dashboard.deviceVerification || {});
   renderRegulatorySubmission(dashboard.regulatorySubmission || {});
+  renderSiteCutoverPack(dashboard.siteCutoverPack || {});
   const citizenSummary = document.querySelector("#nursing-citizen-summary");
   if (citizenSummary) citizenSummary.textContent = `${dashboard.summary?.publishedInstitutions || 0} 家已发布机构`;
   const nurseSummary = document.querySelector("#nursing-nurse-summary");
@@ -498,6 +551,30 @@ function renderRegulatorySubmission(submission) {
       <span>${escapeHtml((submission.fieldCoverage || []).map((item) => displayText(item.field)).join("、"))}</span>
       <small>${escapeHtml((submission.signoffStatus || []).map((item) => `${displayText(item.owner)}:${displayText(item.status)}`).join("；"))}</small>
     </div>
+  `;
+}
+
+function renderSiteCutoverPack(pack) {
+  const target = document.querySelector("#nursing-site-cutover-pack");
+  if (!target) return;
+  const tracks = Array.isArray(pack.tracks) ? pack.tracks : [];
+  target.innerHTML = `
+    <div>
+      <strong>${escapeHtml(displayText(pack.status || "ready-for-site-signoff"))}</strong>
+      <span>${escapeHtml(tracks.filter((item) => item.status === "ready-for-site-signoff").length)} / ${escapeHtml(tracks.length)} 条签字轨道就绪</span>
+      <small>${escapeHtml(pack.template || "release/templates/production-signoff/README.md")}</small>
+    </div>
+    <div>
+      <strong>发布证据</strong>
+      <span>${escapeHtml(pack.auditRetentionEvidence || "release/audit-retention-report.md")}</span>
+      <small>${escapeHtml(pack.productionCutoverEvidence || "release/production-cutover-checklist.md")}</small>
+    </div>
+    ${tracks.map((item) => `<div>
+      <strong>${escapeHtml(displayText(item.id))}</strong>
+      <span>${escapeHtml(item.owner || "")} / ${escapeHtml(displayText(item.status || ""))}</span>
+      <small>${escapeHtml((item.evidence || []).map(displayText).join("、"))}</small>
+      <small>${escapeHtml(item.blockingUntil || "")}</small>
+    </div>`).join("")}
   `;
 }
 
@@ -1075,6 +1152,11 @@ function displayText(value) {
     "health commission supervision": "卫健监管",
     "platform operations": "平台运维",
     "ready-for-site-signoff": "待现场签字",
+    "nursing-cutover-message-signature": "消息与签名存储签字",
+    "nursing-cutover-hospital-connectors": "院内接口联调签字",
+    "nursing-cutover-payment-reconciliation": "支付对账验收签字",
+    "nursing-cutover-device-drill": "设备现场实测签字",
+    "nursing-cutover-regulatory-pressure-test": "监管报送压测签字",
     "elderly or disabled people": "老年人或失能人群",
     "rehabilitation patient": "康复期患者",
     "rehabilitation patients": "康复期患者",

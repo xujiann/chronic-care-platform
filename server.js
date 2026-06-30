@@ -6782,6 +6782,57 @@ function buildInternetNursingRegulatorySubmission(policy, orders, institutions) 
   };
 }
 
+function buildInternetNursingCutoverPack(policy) {
+  const production = policy.productionIntegration || seedInternetNursingPolicy().productionIntegration;
+  const payment = policy.paymentIntegration || seedInternetNursingPolicy().paymentIntegration;
+  const device = policy.deviceVerification || seedInternetNursingPolicy().deviceVerification;
+  const submission = policy.regulatorySubmission || seedInternetNursingPolicy().regulatorySubmission;
+  const tracks = [
+    {
+      id: "nursing-cutover-message-signature",
+      owner: "医院护理信息化与平台运维",
+      status: production.messageGateway?.status === "contract-ready" && production.signatureStorage?.status === "contract-ready" ? "ready-for-site-signoff" : "blocked",
+      evidence: ["短信/院内消息/站内兜底", "电子签名附件存储", production.version],
+      blockingUntil: "完成消息网关、站内兜底和电子签名附件存储现场签字"
+    },
+    {
+      id: "nursing-cutover-hospital-connectors",
+      owner: "医疗机构接口联调组",
+      status: (production.hospitalConnectors || []).length >= 3 && (production.hospitalConnectors || []).every((item) => item.status === "mapped") ? "ready-for-site-signoff" : "blocked",
+      evidence: (production.hospitalConnectors || []).map((item) => `${item.system}:${item.route}`),
+      blockingUntil: "完成院内护理管理系统、电子病历和监管平台联调签字"
+    },
+    {
+      id: "nursing-cutover-payment-reconciliation",
+      owner: "医保经办、财务与平台支付组",
+      status: payment.status === "contract-ready" && (payment.modes || []).includes("daily reconciliation") ? "ready-for-site-signoff" : "blocked",
+      evidence: payment.modes || [],
+      blockingUntil: "完成医保电子凭证、自费支付、退费、发票和 T+1 对账验收"
+    },
+    {
+      id: "nursing-cutover-device-drill",
+      owner: "护理运营与设备管理组",
+      status: device.status === "contract-ready" && (device.requiredSignals || []).includes("one-click alert") ? "ready-for-site-signoff" : "blocked",
+      evidence: device.requiredSignals || [],
+      blockingUntil: "完成 GPS、定位设备、记录仪、一键报警和照片附件现场实测"
+    },
+    {
+      id: "nursing-cutover-regulatory-pressure-test",
+      owner: "卫健监管与平台运维",
+      status: submission.pressureTest?.status === "passed" && (submission.signoffs || []).length >= 3 ? "ready-for-site-signoff" : "blocked",
+      evidence: [`${submission.submissionCycle}`, `P95 ${submission.pressureTest?.p95Ms || 0}ms`, ...(submission.signoffs || [])],
+      blockingUntil: "完成监管月报、高风险实时上报、字段映射和压测记录签字"
+    }
+  ];
+  return {
+    status: tracks.every((item) => item.status === "ready-for-site-signoff") ? "ready-for-site-signoff" : "blocked",
+    template: "release/templates/production-signoff/README.md",
+    auditRetentionEvidence: "release/audit-retention-report.md",
+    productionCutoverEvidence: "release/production-cutover-checklist.md",
+    tracks
+  };
+}
+
 function enrichInternetNursingFinancials(order, policy) {
   const rule = policy.pricingRules?.items?.[order.serviceItem] || {};
   const basePrice = Number(order.feeEstimate || rule.basePrice || 0);
@@ -6853,7 +6904,8 @@ function buildInternetNursingDashboard(data, user) {
     productionIntegration: buildInternetNursingProductionIntegration(policy, orders),
     paymentReadiness: buildInternetNursingPaymentReadiness(policy, orders),
     deviceVerification: buildInternetNursingDeviceVerification(policy, orders, nurseRows),
-    regulatorySubmission: buildInternetNursingRegulatorySubmission(policy, orders, institutionRows)
+    regulatorySubmission: buildInternetNursingRegulatorySubmission(policy, orders, institutionRows),
+    siteCutoverPack: buildInternetNursingCutoverPack(policy)
   };
 }
 
@@ -7593,6 +7645,7 @@ function scopeStateForUser(data, user) {
     scoped.referralSystem.referrals = (data.referralSystem?.referrals || []).filter(hasAllowedResident);
     scoped.referralSystem.familyDoctorServices = (data.referralSystem?.familyDoctorServices || []).filter(hasAllowedResident);
   }
+  scoped.citizenLifecycleActions = buildCitizenLifecycleActions(scoped, user).actions;
   return scoped;
 }
 
@@ -7624,6 +7677,169 @@ function buildMobileExperience(data, user) {
     preferences: preferences[preferenceKey] || {},
     seniorServices: services.filter((item) => allowedIds.has(item?.residentId)),
     accessibilityChecklist: data.accessibilityChecklist || seedAccessibilityChecklist()
+  };
+}
+
+function lifecycleAgeOf(birthDate) {
+  if (!birthDate) return 0;
+  const birth = new Date(`${birthDate}T00:00:00+08:00`);
+  if (Number.isNaN(birth.getTime())) return 0;
+  const now = new Date();
+  let age = now.getFullYear() - birth.getFullYear();
+  const monthDelta = now.getMonth() - birth.getMonth();
+  if (monthDelta < 0 || (monthDelta === 0 && now.getDate() < birth.getDate())) age -= 1;
+  return Math.max(0, age);
+}
+
+function isLifecycleActionOpen(...values) {
+  const text = values.filter(Boolean).join(" ");
+  return /待|未|复测|确认|补|异常|风险|逾期|pending|open|due|risk/i.test(text) && !/已完成|已共享|已入册|已归档|closed|completed/i.test(text);
+}
+
+function lifecyclePriority(...values) {
+  const text = values.filter(Boolean).join(" ");
+  if (/异常|风险|逾期|高危|专案|复测|risk|overdue/i.test(text)) return "high";
+  if (/待|未|确认|补|pending|due/i.test(text)) return "medium";
+  return "low";
+}
+
+function buildCitizenLifecycleActions(data, user, residentId = "") {
+  const residents = (data.residents || [])
+    .filter((resident) => (!residentId || resident.id === residentId) && canAccessResident(user, resident.id, data));
+  const actions = [];
+  const pushAction = (resident, action) => {
+    actions.push({
+      id: `${resident.id}:${action.stage}:${action.sourceId || actions.length}`,
+      residentId: resident.id,
+      residentName: resident.name,
+      organization: resident.organization,
+      ownerRole: action.ownerRole || "citizen",
+      visibleTo: ["citizen"],
+      ...action
+    });
+  };
+  residents.forEach((resident) => {
+    const age = lifecycleAgeOf(resident.birthDate);
+    const birthCertificates = (data.birthCertificates || [])
+      .filter((item) => item.residentId === resident.id || item.maternalResidentId === resident.id)
+      .sort((a, b) => String(b.birthDateTime || b.lastUpdated || "").localeCompare(String(a.birthDateTime || a.lastUpdated || "")));
+    const deathCertificates = (data.deathCertificates || [])
+      .filter((item) => item.residentId === resident.id)
+      .sort((a, b) => String(b.deathDateTime || b.lastUpdated || "").localeCompare(String(a.deathDateTime || a.lastUpdated || "")));
+    const followups = (data.followups || []).filter((item) => item.residentId === resident.id);
+    const personalRecords = (data.personalRecords || []).filter((item) => item.residentId === resident.id);
+    const medicationPickups = (data.medicationPickups || []).filter((item) => item.residentId === resident.id);
+    const seniorServices = (data.seniorServices || []).filter((item) => item.residentId === resident.id);
+    const authorizations = personalRecords.filter((item) => item.category === "authorizations");
+    if (!birthCertificates.length && age <= 6) {
+      pushAction(resident, {
+        stage: "birth",
+        title: "补齐出生医学证明与新生儿建档",
+        status: "待归集",
+        priority: "medium",
+        sourceCollection: "birthCertificates",
+        action: "请联系分娩机构或妇幼保健机构补齐出生证明、筛查和接种起始记录。"
+      });
+    }
+    birthCertificates.forEach((certificate) => {
+      if (isLifecycleActionOpen(certificate.status, certificate.maternalChildSync, certificate.publicSecuritySync, certificate.healthManagementStatus, certificate.nextService)) {
+        pushAction(resident, {
+          stage: "birth",
+          title: certificate.nextService || "出生医学证明与妇幼健康接续",
+          status: [certificate.status, certificate.maternalChildSync, certificate.publicSecuritySync].filter(Boolean).join(" / ") || "待办理",
+          priority: lifecyclePriority(certificate.status, certificate.healthManagementStatus, certificate.nextService),
+          sourceCollection: "birthCertificates",
+          sourceId: certificate.id,
+          due: certificate.issueDeadline || "出生后及时办理",
+          action: "按出生证明、公安共享、妇幼入册和新生儿访视顺序完成闭环。"
+        });
+      }
+    });
+    const childRecords = personalRecords.filter((item) => ["vaccines", "child-health", "screening"].includes(item.category));
+    if (age < 18 && !childRecords.length) {
+      pushAction(resident, {
+        stage: age < 7 ? "child" : "adolescent",
+        title: age < 7 ? "下发儿童保健与接种提醒" : "下发青少年健康筛查提醒",
+        status: "待下发",
+        priority: "medium",
+        sourceCollection: "personalRecords",
+        action: age < 7 ? "完善儿童体检、预防接种、发育评估和体弱儿童管理。" : "完善视力、口腔、心理、运动和传染病防控记录。"
+      });
+    }
+    followups.filter((item) => isLifecycleActionOpen(item.status, item.result, item.nextAction)).forEach((followup) => {
+      pushAction(resident, {
+        stage: "chronic",
+        title: followup.nextAction || "慢病随访待处理",
+        status: followup.status || "待随访",
+        priority: lifecyclePriority(followup.status, followup.result, followup.nextAction),
+        sourceCollection: "followups",
+        sourceId: followup.id,
+        due: followup.date || followup.nextDate || "",
+        action: "居民端可提交自测反馈，家庭医生端继续闭环随访。"
+      });
+    });
+    medicationPickups.filter((item) => isLifecycleActionOpen(item.status, item.pharmacyStatus, item.nextAction)).forEach((pickup) => {
+      pushAction(resident, {
+        stage: "adult",
+        title: pickup.nextAction || pickup.drugName || "固定取药待确认",
+        status: pickup.status || pickup.pharmacyStatus || "待确认",
+        priority: lifecyclePriority(pickup.status, pickup.pharmacyStatus, pickup.nextAction),
+        sourceCollection: "medicationPickups",
+        sourceId: pickup.id,
+        due: pickup.pickupDate || pickup.nextDate || "",
+        action: "确认取药、医保结算和用药依从性。"
+      });
+    });
+    if ((age >= 60 || seniorServices.length) && !seniorServices.some((item) => /已完成|completed|closed/i.test(String(item.status || "")))) {
+      pushAction(resident, {
+        stage: "senior",
+        title: "完善老年健康评估与照护计划",
+        status: seniorServices.length ? "服务中" : "待纳入",
+        priority: age >= 80 ? "high" : "medium",
+        sourceCollection: "seniorServices",
+        sourceId: seniorServices[0]?.id,
+        action: "补齐适老服务、用药安全、长期照护评估和家庭代办授权。"
+      });
+    }
+    if (!authorizations.length && age >= 60) {
+      pushAction(resident, {
+        stage: "authorization",
+        title: "建立紧急联系人与授权代办",
+        status: "待授权",
+        priority: "medium",
+        sourceCollection: "personalRecords",
+        action: "完善紧急联系人、家庭成员授权、预立医疗照护和身后事务指引。"
+      });
+    }
+    deathCertificates.forEach((certificate) => {
+      if (isLifecycleActionOpen(certificate.status, certificate.qualityCheck, certificate.publicSecuritySync, certificate.civilAffairsSync)) {
+        pushAction(resident, {
+          stage: "death",
+          title: "死亡医学证明共享与归档",
+          status: [certificate.status, certificate.publicSecuritySync, certificate.civilAffairsSync].filter(Boolean).join(" / ") || "待归档",
+          priority: lifecyclePriority(certificate.status, certificate.qualityCheck, certificate.publicSecuritySync, certificate.civilAffairsSync),
+          sourceCollection: "deathCertificates",
+          sourceId: certificate.id,
+          due: certificate.deathDateTime || "",
+          action: "完成质控、公安共享、民政共享和家属事项提示。"
+        });
+      }
+    });
+  });
+  const priorityRank = { high: 0, medium: 1, low: 2 };
+  actions.sort((a, b) => (priorityRank[a.priority] ?? 3) - (priorityRank[b.priority] ?? 3) || String(a.residentName || "").localeCompare(String(b.residentName || "")));
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    role: user.role,
+    residentId,
+    summary: {
+      residents: residents.length,
+      actions: actions.length,
+      high: actions.filter((item) => item.priority === "high").length,
+      medium: actions.filter((item) => item.priority === "medium").length
+    },
+    actions
   };
 }
 
@@ -10390,6 +10606,20 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission", "institution", "insurance", "citizen", "county"], "/api/state");
     if (!user) return;
     sendJson(res, 200, redactSensitiveResponse(scopeStateForUser(readDatabase(), user), user));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/citizen/lifecycle-actions") {
+    const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/citizen/lifecycle-actions");
+    if (!user) return;
+    const data = readDatabase();
+    const residentId = url.searchParams.get("residentId") || "";
+    if (residentId && !canAccessResident(user, residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "read citizen lifecycle actions", target: residentId, result: "denied", detail: "resident scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "resident scope denied" });
+      return;
+    }
+    sendJson(res, 200, redactSensitiveResponse(buildCitizenLifecycleActions(data, user, residentId), user));
     return;
   }
 

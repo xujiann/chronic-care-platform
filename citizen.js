@@ -307,7 +307,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   window.addEventListener("hashchange", () => setServiceTab(serviceTabFromRoute() || "health-record", { syncUrl: false }));
   window.addEventListener("message", (event) => {
     if (event.origin !== location.origin || event.data?.type !== "set-service-tab") return;
-    setServiceTab(event.data.service, { pushState: true, scrollToPane: true });
+    setServiceTab(event.data.service, { pushState: true, scrollToPane: true, notifyPreview: false });
   });
   document.querySelector("#account-select").addEventListener("change", (event) => {
     currentAccountId = event.target.value;
@@ -538,6 +538,14 @@ function setServiceTab(key, options = {}) {
       getServicePageTarget(next)?.scrollIntoView({ block: "start", behavior: "smooth" });
     });
   }
+  if (options.notifyPreview !== false) {
+    notifyPreviewServiceChange(next);
+  }
+}
+
+function notifyPreviewServiceChange(service) {
+  if (window.parent === window) return;
+  window.parent.postMessage({ type: "citizen-service-changed", service }, location.origin);
 }
 
 function getServicePageTarget(key) {
@@ -1453,6 +1461,32 @@ function renderLifeCycle(resident, diseases, followups, records) {
     <strong>${stage.title}</strong>
     <p>${stage.detail}</p>
     <small class="${stage.urgent ? "warn" : ""}">${stage.status} · ${stage.action}</small>
+  </article>`).join("");
+  renderLifecycleActions(resident.id);
+}
+
+function renderLifecycleActions(residentId) {
+  const container = document.querySelector("#lifecycle-action-cards");
+  if (!container) return;
+  const actions = (state.citizenLifecycleActions || [])
+    .filter((item) => item.residentId === residentId)
+    .slice(0, 6);
+  if (!actions.length) {
+    container.innerHTML = `<article class="lifecycle-action-card stable">
+      <strong>暂无待办事项</strong>
+      <span>当前账号可见范围内，出生、儿童、成人、老年和身后事项未触发新的健康管理待办。</span>
+      <small>继续按家庭医生提醒和年度体检更新健康档案</small>
+    </article>`;
+    return;
+  }
+  const priorityLabel = { high: "高优先级", medium: "需办理", low: "可完善" };
+  container.innerHTML = actions.map((item) => `<article class="lifecycle-action-card ${item.priority || "medium"}">
+    <div>
+      <strong>${item.title || "生命周期健康管理事项"}</strong>
+      <span>${item.status || "待办理"} · ${item.sourceCollection || "healthRecords"}</span>
+    </div>
+    <p>${item.action || "请按家庭医生或经办机构提示完成。"}${item.due ? ` · ${item.due}` : ""}</p>
+    <small>${priorityLabel[item.priority] || "需办理"} · ${item.ownerRole === "citizen" ? "居民端" : item.ownerRole}</small>
   </article>`).join("");
 }
 

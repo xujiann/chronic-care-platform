@@ -120,6 +120,7 @@
           <span id="lifecycle-summary">从出生医学证明到死亡医学证明的连续健康服务</span>
         </div>
         <div id="lifecycle-cards" class="lifecycle-grid"></div>
+        <div id="lifecycle-action-cards" class="lifecycle-action-grid" aria-live="polite"></div>
       </section>
 
       <section class="panel escort-appointment-panel" id="service-escort" data-service-pane="escort">
@@ -506,7 +507,7 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="./health-archive-standard.js"></script>
-    <script src="./citizen.js?v=20260630touch"></script>
+    <script src="./citizen.js?v=20260630sync"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));

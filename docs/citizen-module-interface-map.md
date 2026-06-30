@@ -10,6 +10,7 @@
 | --- | --- | --- | --- | --- |
 | 健康档案 | `/api/state`, `/api/personal-records` | `residents`, `accounts`, `diseases`, `followups`, `personalRecords` | 已实现 | 接入主索引、基层公卫、居民实名关系核验 |
 | 电子病历 | `/api/personal-records` | `personalRecords.emr`, `labs`, `medications`, `imaging`, `attachments` | 已实现 | 接入 EMR/LIS/PACS、影像和文档存储授权 |
+| 全生命周期待办 | `/api/citizen/lifecycle-actions`, `/api/state` | `birthCertificates`, `deathCertificates`, `followups`, `medicationPickups`, `seniorServices`, `personalRecords.authorizations` | 已实现 | 接入真实妇幼、公卫、慢病、老年照护和身后事项经办系统，按居民授权范围裁剪 |
 | 护理 | `/api/internet-nursing/dashboard`, `/api/internet-nursing/orders` | `internetNursingOrders`, `internetNursingNurses`, `taskMessages`, `citizenExtra.longTermCareAssessments` | 已实现 | 补齐护士资质、电子签名、定位轨迹、质控监管、长期护理险和民政补贴正式接口 |
 | 陪诊 | `/api/escort-services/dashboard`, `/api/escort-services/orders`, `/api/messages` | `escortServiceOrders`, `escortServiceProviders`, `escortWorkers`, `taskMessages` | 已实现 | 对接医院接诊回执、保险保障和服务主体监管 |
 | 挂号 | `/api/registrations/dashboard`, `/api/registrations/orders`, `/api/registrations/orders/:id/cancel` | `registrationSchedules`, `registrationOrders`, `taskMessages`, `dataAccessLogs` | 接口闭环 | 替换为医院 HIS/互联网医院号源池、支付平台、医保电子凭证和短信网关 |
