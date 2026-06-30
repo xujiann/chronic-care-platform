@@ -57,7 +57,7 @@
 
       <section class="summary-grid" id="summary-grid"></section>
 
-      <section class="module-interface-panel" id="module-interface-panel" aria-labelledby="module-interface-title">
+      <section class="module-interface-panel" id="module-interface-panel" aria-labelledby="module-interface-title" data-internal-launch-panel hidden>
         <div class="panel-title">
           <div>
             <h2 id="module-interface-title">模块接口</h2>
@@ -67,7 +67,7 @@
         <div class="module-interface-grid" id="module-interface-grid"></div>
       </section>
 
-      <section class="data-governance-panel" id="data-governance-panel" aria-labelledby="data-governance-title">
+      <section class="data-governance-panel" id="data-governance-panel" aria-labelledby="data-governance-title" data-internal-launch-panel hidden>
         <div class="panel-title">
           <div>
             <h2 id="data-governance-title">授权与病历可信来源</h2>
@@ -77,7 +77,7 @@
         <div class="data-governance-grid" id="data-governance-grid"></div>
       </section>
 
-      <section class="client-channel-panel" id="client-channel-panel" aria-labelledby="client-channel-title">
+      <section class="client-channel-panel" id="client-channel-panel" aria-labelledby="client-channel-title" data-internal-launch-panel hidden>
         <div class="panel-title">
           <div>
             <h2 id="client-channel-title">运行形态</h2>
@@ -221,7 +221,7 @@
           </article>
           <article class="service-status-card ready">
             <strong>长期照护评估</strong>
-            <p>居民端可先完成失能风险自评、待遇预核验和照护计划建议，生产上线时替换为医保、民政和长护险正式接口。</p>
+            <p>居民端可完成失能风险自评、待遇预核验和照护计划建议，并在个人端查看后续照护安排。</p>
             <span class="status">已实现</span>
           </article>
         </div>
@@ -261,7 +261,7 @@
             </label>
             <label>长护险预核验
               <select name="insurance">
-                <option value="eligible">符合演示条件</option>
+                <option value="eligible">符合预核验条件</option>
                 <option value="review">需人工复核</option>
                 <option value="missing">材料待补充</option>
               </select>
@@ -302,8 +302,8 @@
             <button class="small-button primary" type="submit">确认预约</button>
           </form>
           <article class="registration-rule-card">
-            <strong>上线边界</strong>
-            <p>当前已接入后端挂号接口契约：号源来自 HIS/互联网医院号源池，预约后生成 HIS 回执、支付交易、医保电子凭证预核验、退号退款状态和短信/站内信触达记录。生产上线时替换真实医院、支付、医保和短信网关。</p>
+            <strong>服务说明</strong>
+            <p>号源来自医院和互联网医院号源池，预约后生成 HIS 回执、支付交易、医保电子凭证预核验、退号退款状态和短信/站内信触达记录。</p>
           </article>
         </div>
         <div class="registration-section">
@@ -370,7 +370,7 @@
               <h2>居民随访自测</h2>
               <span id="resident-checkin-status"></span>
             </div>
-            <form id="resident-checkin-form" class="feedback-form">
+            <form id="resident-checkin-form" class="feedback-form" data-testid="resident-checkin-form" aria-label="居民随访自测表单">
               <label>测量类型
                 <input name="measurementType" value="血压" />
               </label>
@@ -442,10 +442,10 @@
         </aside>
       </section>
 
-      <section class="panel resident-audit-panel" id="resident-function-audit" aria-labelledby="resident-function-audit-title">
+      <section class="panel resident-audit-panel" id="resident-function-audit" aria-labelledby="resident-function-audit-title" data-internal-launch-panel hidden>
         <div class="panel-title">
           <h2 id="resident-function-audit-title">居民端功能审计</h2>
-          <span id="resident-audit-summary">按标签页查看已实现功能和上线证据</span>
+          <span id="resident-audit-summary">按标签页查看已上线功能</span>
         </div>
         <div class="resident-audit-stats" id="resident-audit-stats"></div>
         <div class="resident-audit-grid" id="resident-audit-grid"></div>

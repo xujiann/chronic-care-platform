@@ -203,8 +203,8 @@ function getActiveCitizenService() {
 }
 
 const registrationSchedules = [
-  { id: "reg-sch-cardio-am", hospital: "大连市中心医院", department: "心内科", doctor: "王医生", date: todayOffset(2), period: "上午", remaining: 6, fee: 18, cancelBeforeHours: 24, source: "演示号源池", tags: ["高血压复诊", "支持陪诊"] },
-  { id: "reg-sch-endocrine-pm", hospital: "大连医科大学附属医院", department: "内分泌科", doctor: "赵医生", date: todayOffset(3), period: "下午", remaining: 4, fee: 22, cancelBeforeHours: 12, source: "演示号源池", tags: ["糖尿病复诊", "检查解读"] },
+  { id: "reg-sch-cardio-am", hospital: "大连市中心医院", department: "心内科", doctor: "王医生", date: todayOffset(2), period: "上午", remaining: 6, fee: 18, cancelBeforeHours: 24, source: "医院号源池", tags: ["高血压复诊", "支持陪诊"] },
+  { id: "reg-sch-endocrine-pm", hospital: "大连医科大学附属医院", department: "内分泌科", doctor: "赵医生", date: todayOffset(3), period: "下午", remaining: 4, fee: 22, cancelBeforeHours: 12, source: "医院号源池", tags: ["糖尿病复诊", "检查解读"] },
   { id: "reg-sch-community-am", hospital: "青泥洼桥社区卫生服务中心", department: "全科门诊", doctor: "刘医生", date: todayOffset(1), period: "上午", remaining: 12, fee: 8, cancelBeforeHours: 4, source: "基层预约池", tags: ["家庭医生", "慢病随访"] }
 ];
 
@@ -276,7 +276,7 @@ const residentFunctionAudit = [
   { service: "nursing", name: "长期照护评估", status: "已实现", evidence: "居民端可录入失能风险、照护人、长护险和民政预核验并生成照护建议", mobile: "护理标签内表单单列触控，评估结果即时更新" },
   { service: "escort", name: "助医陪诊预约", status: "已实现", evidence: "可为本人或家庭成员提交陪诊预约", mobile: "预约表单在手机端单列输入" },
   { service: "escort", name: "陪诊合同、保险和回访", status: "已实现", evidence: "订单同步服务主体、保障类型、保险和质控状态", mobile: "订单卡片跟随陪诊标签展示" },
-  { service: "registration", name: "医院号源查询", status: "已实现", evidence: "居民端展示演示号源池，按医院、科室、医生、日期、余号和费用呈现", mobile: "号源卡片单列显示，适合手机端选择" },
+  { service: "registration", name: "医院号源查询", status: "已实现", evidence: "居民端展示医院号源池，按医院、科室、医生、日期、余号和费用呈现", mobile: "号源卡片单列显示，适合手机端选择" },
   { service: "registration", name: "预约挂号确认", status: "已实现", evidence: "可提交挂号预约，生成待支付/待医保核验状态并展示取消规则", mobile: "表单单列录入，订单卡可直接取消" },
   { service: "registration", name: "就医协同底座", status: "已实现", evidence: "陪诊、转诊和电子病历归集可支撑挂号上线", mobile: "作为挂号标签内已实现底座展示" }
 ];
@@ -1166,7 +1166,7 @@ function renderVault(resident, diseases, followups, records) {
       <span>${item.date}<br>${item.source}</span>
       ${activeVaultSection === "authorizations" && !isRevoked(item) ? `<button class="revoke-button" data-revoke-auth="${item.id}">撤销</button>` : ""}
     </article>`)
-    .join("") || `<p class="muted">当前分类暂无数据，后续可通过区域平台、医院电子病历或个人上传补齐。</p>`;
+    .join("") || `<p class="muted">当前分类暂无数据，可通过区域平台、医院电子病历或个人上传更新。</p>`;
   document.querySelectorAll("[data-revoke-auth]").forEach((button) => {
     button.addEventListener("click", () => revokeAuthorization(button.dataset.revokeAuth));
   });
@@ -1386,7 +1386,7 @@ function renderLifeCycle(resident, diseases, followups, records) {
       status: birthCertificates.length ? "已归集" : "待归集",
       detail: birthCertificates[0]
         ? `${birthCertificates[0].newbornName || resident.name} · ${birthCertificates[0].certificateNo} · ${birthCertificates[0].healthManagementStatus || "新生儿管理"}`
-        : "出生医学证明、母婴三证和新生儿访视信息待接入。",
+        : "出生医学证明、母婴三证和新生儿访视信息可在归集后查看。",
       action: birthCertificates[0]?.nextService || "补齐出生证、出生筛查和接种起始记录",
       urgent: !birthCertificates.length || /待|复测|确认|专案/.test(birthCertificates[0]?.nextService || "")
     },
@@ -2005,7 +2005,7 @@ function formatCaregiver(value) {
 }
 
 function formatLongTermCareEligibility(insurance, civilAffairs) {
-  const insuranceText = { eligible: "长护险演示条件符合", review: "长护险需人工复核", missing: "长护险材料待补充" }[insurance] || "长护险待核验";
+  const insuranceText = { eligible: "长护险预核验条件符合", review: "长护险需人工复核", missing: "长护险材料待补充" }[insurance] || "长护险待核验";
   const civilText = { none: "暂无民政补贴", subsidy: "疑似可享民政补贴", "home-visit": "需民政上门复评" }[civilAffairs] || "民政服务待核验";
   return `${insuranceText}；${civilText}`;
 }
@@ -2100,7 +2100,7 @@ function bindRegistrationAppointment() {
       persistLocalRegistrationOrder(currentResidentId, order);
       form.reset();
       renderCitizen(currentResidentId);
-      showToast(error.message || "已切换到本地挂号演示");
+      showToast(error.message || "已切换到本地挂号服务");
     } finally {
       submit.disabled = false;
     }

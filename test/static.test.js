@@ -840,10 +840,13 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenHtml, /client-channel-detail/);
   assert.match(citizenHtml, /registration-form/);
   assert.match(citizenHtml, /longterm-care-form/);
+  assert.match(citizenHtml, /module-interface-panel"[^>]*data-internal-launch-panel hidden/);
   assert.match(citizenHtml, /longterm-care-result/);
   assert.match(citizenHtml, /registration-schedule-cards/);
+  assert.match(citizenHtml, /data-governance-panel"[^>]*data-internal-launch-panel hidden/);
   assert.match(citizenHtml, /registration-order-cards/);
   assert.match(citizenHtml, /service-page-content/);
+  assert.match(citizenHtml, /client-channel-panel"[^>]*data-internal-launch-panel hidden/);
   assert.match(citizenHtml, /resident-function-audit/);
   assert.match(citizenHtml, /longterm-care-cards/);
   assert.match(citizenHtml, /长期照护评估闭环/);
@@ -853,6 +856,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.ok(citizenHtml.indexOf("service-command-panel") < citizenHtml.indexOf("summary-grid"));
   assert.ok(citizenHtml.indexOf("service-page-content") < citizenHtml.indexOf('data-service-pane="health-record"'));
   assert.ok(citizenHtml.indexOf("resident-function-audit") > citizenHtml.indexOf('data-service-pane="emr"'));
+  assert.match(citizenHtml, /resident-function-audit"[^>]*data-internal-launch-panel hidden/);
   assert.match(citizenJs, /citizenServiceTabs/);
   assert.match(citizenJs, /citizenModuleInterfaces/);
   assert.match(citizenJs, /renderModuleInterfaces/);
@@ -989,6 +993,10 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /scroll-snap-type: x mandatory/);
   assert.match(citizenCss, /min-height: 44px/);
   assert.match(citizenCss, /service-status-card/);
+  assert.match(citizenHtml, /\u670d\u52a1\u8bf4\u660e/u);
+  assert.doesNotMatch(citizenHtml, /\u4e0a\u7ebf\u8fb9\u754c|\u751f\u4ea7\u4e0a\u7ebf\u65f6\u66ff\u6362|\u5f85\u63a5\u5165/u);
+  assert.match(citizenJs, /\u533b\u9662\u53f7\u6e90\u6c60/u);
+  assert.doesNotMatch(citizenJs, /\u6f14\u793a\u53f7\u6e90\u6c60|\u672c\u5730\u6302\u53f7\u6f14\u793a|\u957f\u62a4\u9669\u6f14\u793a\u6761\u4ef6\u7b26\u5408/u);
   assert.match(citizenCss, /service-summary-stats/);
   const citizenInterfaceDoc = read("docs/citizen-module-interface-map.md");
   assert.match(citizenInterfaceDoc, /C端居民端模块接口说明/);
