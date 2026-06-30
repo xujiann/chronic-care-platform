@@ -113,6 +113,7 @@ test("about page documents doctor multi-practice policy boundaries", () => {
   assert.match(about, /医生账户与多点执业政策说明/);
   assert.match(about, /国卫医发〔2014〕86号/);
   assert.match(about, /医联体帮扶/);
+  assert.match(about, /doctor\.html[\s\S]*本人档案、提交申请和接收医院端消息/);
   assert.match(about, /data-about-flow="multi-practice"/);
   assert.match(about, /医师多点执业主要功能报告\.md/);
   assert.match(read("institution.html"), /政策说明/);
