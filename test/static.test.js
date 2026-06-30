@@ -88,6 +88,8 @@ test("policy basis document maps policies to runnable platform evidence", () => 
   assert.match(doc, /flowchart TD/);
   assert.match(doc, /\/api\/chronic\/risk-stratification/);
   assert.match(doc, /\/api\/multi-practice-registry/);
+  assert.match(doc, /`doctor\.html` \u533b\u5e08\u7533\u8bf7\u5165\u53e3/);
+  assert.match(doc, /`institution\.html` \u673a\u6784\u5ba1\u6838\u5165\u53e3/);
   assert.match(doc, /npm\.cmd run priority-apps:templates/);
 });
 
