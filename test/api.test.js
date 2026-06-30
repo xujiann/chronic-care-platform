@@ -118,6 +118,15 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(typeof healthBody.storage.mode, "string");
     assert.equal(typeof healthBody.storage.jsonFile, "string");
 
+    const doctorPage = await fetch(`${baseUrl}/doctor.html`);
+    assert.equal(doctorPage.status, 200);
+    assert.match(doctorPage.headers.get("content-type") || "", /^text\/html/);
+    assert.match(await doctorPage.text(), /doctor-multi-practice-form/);
+
+    const missingStaticPage = await fetch(`${baseUrl}/missing-static-page.html`);
+    assert.equal(missingStaticPage.status, 404);
+    assert.equal(await missingStaticPage.text(), "Not found");
+
     const accountLogin = await login(baseUrl, "health");
     assert.equal(typeof accountLogin.body.token, "string");
     assert.equal(accountLogin.body.token.split(".").length, 4);
@@ -1060,7 +1069,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
 
     const created = await api(baseUrl, "/api/personal-records", authorized(citizenToken, {
       method: "POST",
-      body: JSON.stringify({ id: "client-controlled-id", residentId: "r1", category: "self-upload", name: "居民自测记录", result: "正常" })
+      body: JSON.stringify({ id: "client-controlled-id", residentId: "r1", category: "self-upload", name: "居民自测记录", result: "正常", expectedVersion: 20260701 })
     }));
     assert.equal(created.response.status, 201);
     assert.notEqual(created.body.id, "client-controlled-id");
@@ -1076,6 +1085,28 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(patched.body.result, "已复核");
     assert.equal(patched.body.meta.sourceTrust, "居民确认");
 
+    const missingPatch = await api(baseUrl, "/api/personal-records/not-found-record", authorized(citizenToken, {
+      method: "PATCH",
+      body: JSON.stringify({ result: "not found regression" })
+    }));
+    assert.equal(missingPatch.response.status, 404);
+
+    const commissionR2Records = await api(baseUrl, "/api/personal-records?residentId=r2", authorized(commissionToken));
+    assert.equal(commissionR2Records.response.status, 200);
+    assert.equal(commissionR2Records.body.length > 0, true);
+    const forbiddenPatch = await api(baseUrl, `/api/personal-records/${commissionR2Records.body[0].id}`, authorized(citizenToken, {
+      method: "PATCH",
+      body: JSON.stringify({ result: "forbidden regression" })
+    }));
+    assert.equal(forbiddenPatch.response.status, 403);
+
+    const versionedCreate = await api(baseUrl, "/api/personal-records", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ residentId: "r1", category: "self-upload", name: "versioned record", result: "ok", expectedVersion: 43 })
+    }));
+    assert.equal(versionedCreate.response.status, 201);
+    assert.equal(versionedCreate.body.residentId, "r1");
+
     const forbiddenCreate = await api(baseUrl, "/api/personal-records", authorized(citizenToken, {
       method: "POST",
       body: JSON.stringify({ residentId: "r2", category: "self-upload", name: "越权记录" })
@@ -1089,9 +1120,24 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.ok(authorizations.body.length > 0);
     const authorizationId = authorizations.body[0].id;
 
+    const missingRevoke = await api(baseUrl, "/api/authorizations/missing-authorization/revoke", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ reason: "missing authorization regression" })
+    }));
+    assert.equal(missingRevoke.response.status, 404);
+
+    const otherAuthorizations = await api(baseUrl, "/api/personal-records?residentId=r2&category=authorizations", authorized(commissionToken));
+    assert.equal(otherAuthorizations.response.status, 200);
+    assert.equal(otherAuthorizations.body.length > 0, true);
+    const forbiddenRevoke = await api(baseUrl, `/api/authorizations/${otherAuthorizations.body[0].id}/revoke`, authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ reason: "forbidden authorization regression" })
+    }));
+    assert.equal(forbiddenRevoke.response.status, 403);
+
     const revoked = await api(baseUrl, `/api/authorizations/${authorizationId}/revoke`, authorized(citizenToken, {
       method: "POST",
-      body: JSON.stringify({ reason: "居民主动撤销测试授权" })
+      body: JSON.stringify({ reason: "居民主动撤销测试授权", expectedVersion: 20260702 })
     }));
     assert.equal(revoked.response.status, 200);
     assert.equal(revoked.body.status, "已撤销");
@@ -1128,6 +1174,18 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       item.result === "denied" &&
       /resident authorization is required/.test(item.detail)
     ), true);
+
+    const versionedAuthorization = await api(baseUrl, "/api/personal-records", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ residentId: "r1", category: "authorizations", name: "versioned authorization", result: "active" })
+    }));
+    assert.equal(versionedAuthorization.response.status, 201);
+    const versionedRevoked = await api(baseUrl, `/api/authorizations/${versionedAuthorization.body.id}/revoke`, authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ reason: "versioned revoke", expectedVersion: 44 })
+    }));
+    assert.equal(versionedRevoked.response.status, 200);
+    assert.equal(versionedRevoked.body.revokeReason, "versioned revoke");
 
     const forbiddenReview = await api(baseUrl, "/api/access-reviews?residentId=r2", authorized(citizenToken));
     assert.equal(forbiddenReview.response.status, 403);

@@ -1,6 +1,6 @@
 const doctorApiBase = location.protocol === "file:" || location.hostname.endsWith("github.io") ? "" : "/api";
 const doctorFallbackState = { doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {}, taskMessages: [] };
-let doctorRuntime = { doctor: null, applications: [], messages: [], policy: {}, ledger: [] };
+let doctorRuntime = { doctor: null, applications: [], messages: [], policy: {}, ledger: [], summary: {} };
 
 document.addEventListener("DOMContentLoaded", async () => {
   doctorRuntime = await loadDoctorRuntime();
@@ -43,7 +43,10 @@ async function loadDoctorRuntime() {
     applications,
     messages,
     policy: state.multiPracticePolicy || {},
-    summary: { total: applications.length, pending: applications.filter((item) => String(item.status || "").includes("待")).length },
+    summary: {
+      total: applications.length,
+      pending: applications.filter((item) => /待|补正|pending/i.test(String(item.status || ""))).length
+    },
     ledger: (state.multiPracticeApplications || []).filter((item) => item.publicVisible !== false)
   };
 }
@@ -112,7 +115,7 @@ function renderDoctorMetrics() {
     ["本人申请", applications.length, "多点执业申请和备案记录"],
     ["待处理", pending, "医院端或医生端仍需处理"],
     ["医院消息", messages.length, "医院端确认、退回和备案通知"],
-    ["电子注册", registry.verificationStatus || "待核验", registry.registryId || "医生电子化注册系统"]
+    ["电子注册", registry.verificationStatus || "待核验", registry.registryId || "医师电子化注册系统"]
   ].map(([label, value, hint]) => `<article class="metric-card"><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span><small>${escapeHtml(hint)}</small></article>`).join("");
   const status = document.querySelector("#doctor-profile-status");
   if (status) status.textContent = `${publicRows} 条公开备案相关记录`;
@@ -123,6 +126,7 @@ function renderDoctorProfile() {
   const registry = doctor.electronicRegistrationVerification || doctor.electronicRegistration || {};
   const target = document.querySelector("#doctor-profile");
   if (!target) return;
+  const verified = ["已核验", "verified"].includes(String(registry.verificationStatus || ""));
   target.innerHTML = `<section class="item">
     <div>
       <h3>${escapeHtml(doctor.name || "医生账户")} · ${escapeHtml(doctor.title || "职称待同步")} · ${escapeHtml(doctor.specialty || "专业待同步")}</h3>
@@ -130,7 +134,7 @@ function renderDoctorProfile() {
       <p>执业证号：${escapeHtml(doctor.licenseNo || "待同步")} · 执业范围：${escapeHtml(doctor.practiceScope || "待同步")} · 有效期至 ${escapeHtml(doctor.registrationValidUntil || registry.validUntil || "待同步")}</p>
       <p>电子化注册：${escapeHtml(registry.registryId || "待同步")} · ${escapeHtml(registry.verificationStatus || "待核验")} · 签章 ${escapeHtml(registry.signatureNo || "待签章")}</p>
     </div>
-    <span class="badge ${registry.verificationStatus === "已核验" || registry.verificationStatus === "verified" ? "info" : "warn"}">${escapeHtml(doctor.accountStatus || "启用")}</span>
+    <span class="badge ${verified ? "info" : "warn"}">${escapeHtml(doctor.accountStatus || "启用")}</span>
   </section>`;
 }
 
@@ -194,8 +198,8 @@ function renderDoctorPublicLedger() {
 
 function doctorStatusClass(status) {
   const text = String(status || "");
-  if (/退回|暂停|冲突|补正/.test(text)) return "danger";
-  if (/待|审核|处理中/.test(text)) return "warn";
+  if (/退回|暂停|冲突|补正|风险|danger/i.test(text)) return "danger";
+  if (/待|审核|处理中|pending|review/i.test(text)) return "warn";
   return "info";
 }
 

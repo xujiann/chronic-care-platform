@@ -12,9 +12,9 @@
     <main class="portal-shell">
       <header class="portal-header">
         <div>
-          <span>医生端</span>
-          <h1>医生账户与多点执业工作台</h1>
-          <p>查看本人电子化注册、第一执业地点确认、多点执业申请、医院端处理消息和公开备案状态。</p>
+          <span>医生账户</span>
+          <h1>多点执业工作台</h1>
+          <p>查看本人电子化注册、第一执业地点确认、多点执业申请、医院回执消息和公开备案状态。</p>
         </div>
         <nav>
           <a href="./institution.html">医疗机构端</a>
@@ -28,7 +28,7 @@
       <section class="portal-grid">
         <article class="panel">
           <div class="panel-title">
-            <h2>本人执业档案</h2>
+            <h2>执业档案</h2>
             <span id="doctor-profile-status"></span>
           </div>
           <div id="doctor-profile" class="list compact"></div>
@@ -53,10 +53,10 @@
             <input name="targetInstitution" placeholder="例如：大连市中心医院" required />
           </label>
           <label>拟执业科室
-            <input name="targetDepartment" placeholder="例如：心内科慢病联合门诊" />
+            <input name="targetDepartment" placeholder="例如：心内科门诊" />
           </label>
           <label>执业范围
-            <input name="practiceScope" placeholder="与电子化注册执业范围一致" />
+            <input name="practiceScope" placeholder="与本人执业注册范围一致" />
           </label>
           <label>执业期限
             <input name="period" placeholder="2026-07-01 至 2027-06-30" required />
@@ -65,16 +65,16 @@
             <input name="schedule" placeholder="每周三下午" required />
           </label>
           <label class="full">工作任务
-            <input name="tasks" placeholder="会诊、联合门诊、基层帮扶、慢病管理等" required />
+            <input name="tasks" placeholder="门诊、会诊、基层帮扶或专病管理" required />
           </label>
           <label class="full">医疗责任约定
-            <input name="responsibility" value="由当事医疗机构和医师按协议依法承担医疗责任" required />
+            <input name="responsibility" value="拟执业医疗机构与医师签署协议并明确医疗责任" required />
           </label>
           <label>薪酬约定
-            <input name="compensation" value="按工作量和绩效协商结算" required />
+            <input name="compensation" value="按劳务协议和绩效规则结算" required />
           </label>
           <label>责任保险
-            <input name="insurance" value="已购买医师个人医疗执业保险" required />
+            <input name="insurance" value="已覆盖医师多点执业医疗责任" required />
           </label>
           <label>第一执业地点意见
             <select name="primaryConsent">
@@ -88,14 +88,14 @@
             <select name="registrationMode">
               <option>备案管理</option>
               <option>注册管理</option>
-              <option>医联体帮扶</option>
+              <option>医联体帮扶登记</option>
             </select>
           </label>
           <label class="checkbox-line">
             <input name="publicVisible" type="checkbox" checked />
             纳入公开备案台账
           </label>
-          <button class="inline-action" type="submit">提交本人申请</button>
+          <button class="inline-action" type="submit">提交申请</button>
         </form>
       </section>
 
@@ -117,6 +117,6 @@
     </main>
 
     <script src="./shared.js"></script>
-    <script src="./doctor.js?v=20260630"></script>
+    <script src="./doctor.js?v=20260701"></script>
   </body>
 </html>
