@@ -263,6 +263,8 @@ Use `POST /api/referral-teleconsultations/:id/report-callback` for HIS/EMR repor
 
 Use `GET /api/referral-teleconsultations/joint-test-pack` before field testing to export the callback sample payloads, checklist, and signoff matrix for referral center, receiving hospital, hospital IT, county performance, and insurance review.
 
+Use `GET /api/referral-teleconsultations/signoff-summary` during field testing to review demo-ready evidence and site-pending signoff rows for referral center, receiving hospital, hospital IT, county performance, and insurance review before archiving real signatures.
+
 Use `POST /api/referral-teleconsultations/:id/escalations/ack` after an SLA reminder is sent. Institution and county users can acknowledge or close the supervision item; the platform updates `slaDisposition`, county supervision status, reminder receipts, and audit logs.
 
 Use `GET /api/referral-teleconsultations/performance-policy` to confirm insurance-payment and medical-consortium performance rules. The report includes report-return rate, follow-up closure, repeat-exam control, and configured payment paths before site settlement formulas are finalized.

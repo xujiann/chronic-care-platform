@@ -1,4 +1,4 @@
-const fallbackState = { countyConsortium: null, countyProjectBlueprint: null, countyCollaborationOrders: [], countyAiDiagnosisCases: [], countyMutualRecognitionRecords: [], referralTeleconsultations: [], residents: [], medicalResources: [], personalRecords: [] };
+const fallbackState = { countyConsortium: null, countyProjectBlueprint: null, countyCollaborationOrders: [], countyAiDiagnosisCases: [], countyMutualRecognitionRecords: [], referralTeleconsultations: [], residents: [], medicalResources: [], personalRecords: [], taskMessages: [], integrationContracts: [] };
 let platformState = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -228,6 +228,7 @@ function renderCountyTeleconsultationLoop(state) {
     ].map(([label, value, hint]) => `<article class="claim-card"><strong>${label}</strong><span>${value}<br>${hint}</span></article>`).join("");
   }
   renderCountyTeleconsultationRiskBoard(state, rows, escalations);
+  renderCountyTeleconsultationSignoff(state, rows);
   const escalationMap = new Map(escalations.map((item) => [item.teleconsultationId, item]));
   tableEl.innerHTML = `<table>
     <thead><tr><th>居民</th><th>路径</th><th>临床问题</th><th>状态</th><th>绩效</th><th>SLA</th><th>督办</th><th>报告</th><th>操作</th></tr></thead>
@@ -255,6 +256,85 @@ function renderCountyTeleconsultationLoop(state) {
       </tr>`;
     }).join("")}</tbody>
   </table>`;
+}
+
+function renderCountyTeleconsultationSignoff(state, rows) {
+  const el = document.querySelector("#county-teleconsultation-signoff");
+  if (!el) return;
+  const signoffRows = buildCountyTeleconsultationSignoffRows(state, rows);
+  el.innerHTML = signoffRows.map((item) => `<article data-referral-signoff-status="${item.role}">
+    <div><span class="badge ${item.localEvidence ? "info" : "warn"}">${item.institutionType}</span><span class="badge warn">现场待签</span></div>
+    <h3>${item.title}</h3>
+    <p>${item.responsibility}</p>
+    <footer>
+      <small>${item.localEvidence ? "本地证据已就绪" : "本地证据待补齐"}：${item.evidence}</small>
+      <small>${item.nextAction}</small>
+    </footer>
+  </article>`).join("");
+}
+
+function buildCountyTeleconsultationSignoffRows(state, rows) {
+  const messages = (state.taskMessages || []).filter((item) => item.collection === "referralTeleconsultations");
+  const contractIds = new Set((state.integrationContracts || []).map((item) => item.id));
+  const archivedReportIds = new Set((state.personalRecords || [])
+    .filter((item) => item.category === "teleconsultation-report" && item.teleconsultationId)
+    .map((item) => item.teleconsultationId));
+  const reportReturned = rows.filter((item) => item.reportStatus === "returned" || item.status === "report-returned");
+  const hasSlaDispositionEvidence = rows.some((item) => {
+    const status = String(item.slaDisposition?.status || item.countySupervision?.status || "").toLowerCase();
+    return status && status !== "pending-ack" && (status.includes("acknowledged") || status.includes("closed") || status.includes("已确认") || status.includes("已闭环"));
+  });
+  const signoffRows = [
+    {
+      role: "referral-center",
+      institutionType: "转诊中心",
+      title: "转诊单与反馈",
+      responsibility: "转诊单接收、分诊意见和接诊反馈回调。",
+      localEvidence: contractIds.has("referral-feedback-callback-v1") && messages.some((item) => item.notificationKey?.includes(":feedback:")) && rows.some((item) => item.receivingFeedback),
+      evidence: "feedback-callback、receivingFeedback、反馈消息",
+      blocker: "真实转诊单号和失败补偿队列"
+    },
+    {
+      role: "receiving-hospital",
+      institutionType: "接诊医院",
+      title: "排期与会诊资源",
+      responsibility: "会诊排期、号源/床位/视频间和接诊医生确认。",
+      localEvidence: contractIds.has("referral-schedule-callback-v1") && rows.some((item) => item.meetingWindow && item.receivingDoctor),
+      evidence: "schedule-callback、meetingWindow、receivingDoctor",
+      blocker: "真实号源、床位和视频系统"
+    },
+    {
+      role: "hospital-it",
+      institutionType: "信息中心",
+      title: "报告回传归档",
+      responsibility: "HIS/EMR/PACS/LIS 报告回传、签名校验和归档。",
+      localEvidence: contractIds.has("referral-report-callback-v1") && reportReturned.length > 0 && reportReturned.every((item) => archivedReportIds.has(item.id)),
+      evidence: "report-callback、teleconsultation-report 归档",
+      blocker: "真实报告编号、附件地址和签名密钥"
+    },
+    {
+      role: "county-performance",
+      institutionType: "医共体办公室",
+      title: "督办与绩效",
+      responsibility: "SLA 督办、协同工单跟踪、绩效归集和闭环确认。",
+      localEvidence: rows.every((item) => item.countySupervision?.status && item.slaDisposition?.status) && (messages.some((item) => item.escalationKey) || hasSlaDispositionEvidence),
+      evidence: "countySupervision、slaDisposition、SLA 消息",
+      blocker: "值班人、升级渠道和签收截图"
+    },
+    {
+      role: "insurance",
+      institutionType: "医保/绩效",
+      title: "支付与互认口径",
+      responsibility: "支付路径、报告互认控费、重复检查控制和结算口径确认。",
+      localEvidence: rows.every((item) => item.performance?.insurancePaymentPath && item.performance?.repeatExamControl),
+      evidence: "insurancePaymentPath、repeatExamControl、绩效策略",
+      blocker: "统筹区支付细则和结算公式"
+    }
+  ];
+  return signoffRows.map((item) => ({
+    ...item,
+    nextAction: item.localEvidence ? `现场签收：${item.blocker}` : `补齐证据：${item.evidence}`
+  }));
 }
 
 function renderCountyTeleconsultationRiskBoard(state, rows, escalations) {

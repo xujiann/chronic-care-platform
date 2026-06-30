@@ -650,6 +650,13 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(jointTestPack.body.contracts.length, 3);
     assert.equal(jointTestPack.body.samples.some((item) => item.contractId === "referral-report-callback-v1"), true);
     assert.equal(jointTestPack.body.signoff.some((item) => item.role === "insurance"), true);
+    assert.equal(jointTestPack.body.signoffSummary.some((item) => item.role === "county-performance" && item.localEvidence), true);
+    const signoffSummary = await api(baseUrl, "/api/referral-teleconsultations/signoff-summary", authorized(county.body.token));
+    assert.equal(signoffSummary.response.status, 200);
+    assert.equal(signoffSummary.body.ok, true);
+    assert.equal(signoffSummary.body.summary.demoReady, signoffSummary.body.summary.roles);
+    assert.equal(signoffSummary.body.signoff.some((item) => item.role === "hospital-it" && item.status === "demo-ready"), true);
+    assert.equal(signoffSummary.body.signoff.every((item) => item.siteSignoffRequired), true);
     const referralInsuranceUser = await login(baseUrl, "insurance");
     const performancePolicy = await api(baseUrl, "/api/referral-teleconsultations/performance-policy", authorized(referralInsuranceUser.body.token));
     assert.equal(performancePolicy.response.status, 200);

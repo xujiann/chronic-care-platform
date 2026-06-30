@@ -80,6 +80,7 @@ test("about page documents runnable platform capabilities", () => {
   assert.match(referralAbout, /feedback-callback/);
   assert.match(referralAbout, /schedule-callback/);
   assert.match(referralAbout, /report-callback/);
+  assert.match(referralAbout, /signoff-summary/);
   assert.match(referralAbout, /npm\.cmd run referral:readiness/);
   assert.doesNotMatch(referralAbout, /requireRole/);
   assert.match(auth, /pageName === "about\.html"/);
@@ -355,11 +356,14 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("county.html"), /county-teleconsultation-priority-filter/);
   assert.match(read("county.html"), /county-teleconsultation-performance/);
   assert.match(read("county.html"), /county-teleconsultation-risk-board/);
+  assert.match(read("county.html"), /county-teleconsultation-signoff/);
   assert.match(read("county.js"), /averagePerformance/);
   assert.match(read("county.js"), /SLA risks/);
   assert.equal((read("county.js").match(/function renderCountyTeleconsultationLoop/g) || []).length, 1);
   assert.match(read("county.js"), /buildReferralTeleconsultationEscalations/);
   assert.match(read("county.js"), /renderCountyTeleconsultationRiskBoard/);
+  assert.match(read("county.js"), /buildCountyTeleconsultationSignoffRows/);
+  assert.match(read("county.js"), /data-referral-signoff-status/);
   assert.match(read("county.js"), /data-referral-escalation/);
   assert.match(read("county.js"), /data-county-sla-ack/);
   assert.match(read("county.js"), /label\.includes\("关闭"\)/);
@@ -369,6 +373,11 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("server.js"), /buildReferralTeleconsultationEscalations/);
   assert.match(read("server.js"), /referral-teleconsultations\/escalations\/run/);
   assert.match(read("server.js"), /referral-teleconsultations\/joint-test-pack/);
+  assert.match(read("server.js"), /referral-teleconsultations\/signoff-summary/);
+  assert.match(read("server.js"), /buildReferralTeleconsultationSignoffSummary/);
+  assert.match(read("server.js"), /mergeByKeyWithDefaultFields\(seedReferralTeleconsultations\(\), data\.referralTeleconsultations, "id"\)/);
+  assert.match(read("server.js"), /function mergeByKeyWithDefaultFields/);
+  assert.match(read("server.js"), /function mergeDefaultFields/);
   assert.match(read("server.js"), /referral-teleconsultations\/performance-policy/);
   assert.match(read("server.js"), /escalations\/ack/);
   assert.match(read("server.js"), /createReferralTeleconsultationEscalationMessage/);
@@ -379,10 +388,12 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /referral-teleconsultations\/:id\/report-callback/);
   assert.match(read("README.md"), /referral-feedback-callback-v1/);
   assert.match(read("README.md"), /referral-schedule-callback-v1/);
+  assert.match(read("README.md"), /referral-teleconsultations\/signoff-summary/);
   assert.match(read("README.md"), /taskMessages/);
   assert.match(read("DEPLOYMENT.md"), /x-integration-signature/);
   assert.match(read("DEPLOYMENT.md"), /feedback-callback/);
   assert.match(read("DEPLOYMENT.md"), /referral-report-callback-v1/);
+  assert.match(read("DEPLOYMENT.md"), /referral-teleconsultations\/signoff-summary/);
   assert.match(read("DEPLOYMENT.md"), /institution\/resident `taskMessages`/);
   assert.match(read("county.html"), /county-teleconsultation-loop/);
   assert.match(read("insurance.html"), /referral-performance-policy/);

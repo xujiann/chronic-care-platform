@@ -4006,7 +4006,7 @@ function normalizeState(data) {
     regionalSharingPackages: normalizeRegionalSharingPackages(mergeByKey(seedRegionalSharingPackages(), data.regionalSharingPackages, "id")),
     regionalSharingSnapshots: data.regionalSharingSnapshots && typeof data.regionalSharingSnapshots === "object" ? { ...seedRegionalSharingSnapshots(), ...data.regionalSharingSnapshots } : seedRegionalSharingSnapshots(),
     regionalSharingAccessReviews: Array.isArray(data.regionalSharingAccessReviews) ? data.regionalSharingAccessReviews : seedRegionalSharingAccessReviews(),
-    referralTeleconsultations: mergeByKey(seedReferralTeleconsultations(), data.referralTeleconsultations, "id"),
+    referralTeleconsultations: mergeByKeyWithDefaultFields(seedReferralTeleconsultations(), data.referralTeleconsultations, "id"),
     taskMessages: Array.isArray(data.taskMessages) ? data.taskMessages : [],
     dataQualityIssues: Array.isArray(data.dataQualityIssues) ? data.dataQualityIssues : [],
     careOrders: Array.isArray(data.careOrders) ? data.careOrders : seedCareOrders(),
@@ -4557,6 +4557,35 @@ function mergeByKey(defaultRows, currentRows, key) {
     merged.set(item[key], { ...(merged.get(item[key]) || {}), ...item });
   });
   return [...merged.values()];
+}
+
+function mergeByKeyWithDefaultFields(defaultRows, currentRows, key) {
+  const merged = new Map();
+  (Array.isArray(defaultRows) ? defaultRows : []).forEach((item) => merged.set(item[key], item));
+  (Array.isArray(currentRows) ? currentRows : []).forEach((item) => {
+    if (!item?.[key]) return;
+    merged.set(item[key], mergeDefaultFields(merged.get(item[key]) || {}, item));
+  });
+  return [...merged.values()];
+}
+
+function mergeDefaultFields(defaultValue, currentValue) {
+  if (currentValue === undefined) return defaultValue;
+  if (Array.isArray(defaultValue)) return Array.isArray(currentValue) ? currentValue : defaultValue;
+  if (
+    defaultValue &&
+    currentValue &&
+    typeof defaultValue === "object" &&
+    typeof currentValue === "object" &&
+    !Array.isArray(currentValue)
+  ) {
+    const merged = { ...defaultValue, ...currentValue };
+    Object.entries(defaultValue).forEach(([field, value]) => {
+      merged[field] = mergeDefaultFields(value, currentValue[field]);
+    });
+    return merged;
+  }
+  return currentValue;
 }
 
 function sealAuditTrail(rows, options = {}) {
@@ -6563,19 +6592,100 @@ function buildReferralTeleconsultationJointTestPack(data) {
     { id: "report-archive", owner: "hospital-it", item: "report callback archives teleconsultation-report personal record", status: "ready" },
     { id: "insurance-policy", owner: "insurance", item: "payment path and repeat-exam control rule captured for settlement review", status: "ready" }
   ];
+  const signoff = [
+    { role: "referral-center", responsibility: "receiving feedback and triage callback", evidence: "feedback-callback signed replay" },
+    { role: "receiving-hospital", responsibility: "schedule, bed, or video room confirmation", evidence: "schedule-callback signed replay" },
+    { role: "hospital-it", responsibility: "EMR/PACS/LIS report callback and archive", evidence: "report-callback signed replay" },
+    { role: "county-performance", responsibility: "SLA supervision and performance settlement", evidence: "county supervision acknowledgement" },
+    { role: "insurance", responsibility: "payment path and repeat-exam control review", evidence: "referral insurance performance policy" }
+  ];
   return {
     ok: contracts.length === 3 && samples.length === 3,
     generatedAt: new Date().toISOString(),
     contracts,
     samples,
     checklist,
-    signoff: [
-      { role: "referral-center", responsibility: "receiving feedback and triage callback", evidence: "feedback-callback signed replay" },
-      { role: "receiving-hospital", responsibility: "schedule, bed, or video room confirmation", evidence: "schedule-callback signed replay" },
-      { role: "hospital-it", responsibility: "EMR/PACS/LIS report callback and archive", evidence: "report-callback signed replay" },
-      { role: "county-performance", responsibility: "SLA supervision and performance settlement", evidence: "county supervision acknowledgement" },
-      { role: "insurance", responsibility: "payment path and repeat-exam control review", evidence: "referral insurance performance policy" }
-    ]
+    signoff,
+    signoffSummary: buildReferralTeleconsultationSignoffSummary(data, { includeRowsOnly: true })
+  };
+}
+
+function buildReferralTeleconsultationSignoffSummary(data, options = {}) {
+  const teleconsultations = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
+  const taskMessages = (Array.isArray(data.taskMessages) ? data.taskMessages : [])
+    .filter((item) => item.collection === "referralTeleconsultations");
+  const contractIds = new Set((Array.isArray(data.integrationContracts) ? data.integrationContracts : []).map((item) => item.id));
+  const archivedReportIds = new Set((Array.isArray(data.personalRecords) ? data.personalRecords : [])
+    .filter((item) => item.category === "teleconsultation-report" && item.teleconsultationId)
+    .map((item) => item.teleconsultationId));
+  const reportReturned = teleconsultations.filter((item) => item.reportStatus === "returned" || item.status === "report-returned");
+  const hasFeedbackNotification = taskMessages.some((item) => item.notificationKey && item.notificationKey.includes(":feedback:"));
+  const hasReportNotification = taskMessages.some((item) => item.notificationKey && item.notificationKey.includes(":report:"));
+  const hasSlaMessage = taskMessages.some((item) => item.escalationKey);
+  const hasSlaDispositionEvidence = teleconsultations.some((item) => {
+    const status = String(item.slaDisposition?.status || item.countySupervision?.status || "").toLowerCase();
+    return status && status !== "pending-ack" && (status.includes("acknowledged") || status.includes("closed") || status.includes("已确认") || status.includes("已闭环"));
+  });
+  const evidenceRows = [
+    {
+      role: "referral-center",
+      institutionType: "转诊中心",
+      responsibility: "转诊单接收、分诊意见和接诊反馈回调",
+      localEvidence: contractIds.has("referral-feedback-callback-v1") && hasFeedbackNotification && teleconsultations.some((item) => item.receivingFeedback),
+      evidence: "feedback-callback contract, receivingFeedback, taskMessages feedback notification",
+      blocker: "真实转诊单号、失败补偿队列和接诊意见字典待现场确认"
+    },
+    {
+      role: "receiving-hospital",
+      institutionType: "接诊医院",
+      responsibility: "会诊排期、床位/号源/视频间确认和接诊医生确认",
+      localEvidence: contractIds.has("referral-schedule-callback-v1") && teleconsultations.some((item) => item.meetingWindow && item.receivingDoctor),
+      evidence: "schedule-callback contract, meetingWindow, receivingDoctor",
+      blocker: "真实号源、床位、视频系统会议室和接诊医生排班待接入"
+    },
+    {
+      role: "hospital-it",
+      institutionType: "医院信息中心",
+      responsibility: "HIS/EMR/PACS/LIS 报告回传、签名校验和归档",
+      localEvidence: contractIds.has("referral-report-callback-v1") && reportReturned.length > 0 && reportReturned.every((item) => archivedReportIds.has(item.id)) && hasReportNotification,
+      evidence: "report-callback contract, teleconsultation-report archive, report taskMessages",
+      blocker: "真实报告编号、附件地址、签名密钥和重放策略待现场联调"
+    },
+    {
+      role: "county-performance",
+      institutionType: "医共体办公室",
+      responsibility: "SLA 督办、协同工单跟踪、绩效归集和闭环确认",
+      localEvidence: teleconsultations.every((item) => item.countySupervision?.status && item.slaDisposition?.status) && (hasSlaMessage || hasSlaDispositionEvidence),
+      evidence: "countySupervision, slaDisposition, SLA taskMessages or acknowledged disposition",
+      blocker: "值班人、升级渠道、现场签收截图和绩效责任单位待归档"
+    },
+    {
+      role: "insurance",
+      institutionType: "医保/绩效部门",
+      responsibility: "支付路径、报告互认控费、重复检查控制和结算口径确认",
+      localEvidence: teleconsultations.every((item) => item.performance?.insurancePaymentPath && item.performance?.repeatExamControl),
+      evidence: "performance.insurancePaymentPath, performance.repeatExamControl, performance-policy endpoint",
+      blocker: "统筹区支付细则、医共体结算公式和医保核心回执待确认"
+    }
+  ].map((row) => ({
+    ...row,
+    status: row.localEvidence ? "demo-ready" : "needs-evidence",
+    siteSignoffRequired: true,
+    nextAction: row.localEvidence ? `现场签收：${row.blocker}` : `补齐本地证据：${row.evidence}`
+  }));
+  const summary = {
+    roles: evidenceRows.length,
+    demoReady: evidenceRows.filter((item) => item.localEvidence).length,
+    needsEvidence: evidenceRows.filter((item) => !item.localEvidence).length,
+    sitePending: evidenceRows.length,
+    allDemoReady: evidenceRows.every((item) => item.localEvidence)
+  };
+  if (options.includeRowsOnly) return evidenceRows;
+  return {
+    ok: summary.allDemoReady,
+    generatedAt: new Date().toISOString(),
+    summary,
+    signoff: evidenceRows
   };
 }
 
@@ -7815,6 +7925,13 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/referral-teleconsultations/joint-test-pack");
     if (!user) return;
     sendJson(res, 200, buildReferralTeleconsultationJointTestPack(readDatabase()));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/referral-teleconsultations/signoff-summary") {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/referral-teleconsultations/signoff-summary");
+    if (!user) return;
+    sendJson(res, 200, buildReferralTeleconsultationSignoffSummary(readDatabase()));
     return;
   }
 
