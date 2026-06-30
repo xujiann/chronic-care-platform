@@ -1,8 +1,25 @@
-const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], referralTeleconsultations: [], referralSystem: null };
+const fallbackState = {
+  residents: [],
+  diseases: [],
+  followups: [],
+  personalRecords: [],
+  medicalResources: [],
+  careOrders: [],
+  medicationPickups: [],
+  insuranceClaims: [],
+  institutionSupervisions: [],
+  digitalCredentials: [],
+  dataAccessLogs: [],
+  referralTeleconsultations: [],
+  referralSystem: { insuranceGuidance: [], referrals: [] }
+};
+
 let platformState = fallbackState;
+let drugConsumableState = { boundaries: [], rows: [], summary: {} };
 
 document.addEventListener("DOMContentLoaded", async () => {
   platformState = await loadPlatformState(fallbackState);
+  drugConsumableState = await loadDrugConsumableSupervision();
   bindInsuranceActions();
   renderAll(platformState);
 });
@@ -10,6 +27,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 function renderAll(state) {
   renderInsuranceOrgScope();
   renderMetrics(state);
+  renderDrugConsumableSupervision(drugConsumableState);
   renderClaims(state);
   renderSupervisions(state);
   renderReferralPayments(state);
@@ -19,15 +37,54 @@ function renderAll(state) {
   renderInsuranceAudit(state);
 }
 
+async function loadDrugConsumableSupervision() {
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${API_BASE}/drug-consumable-supervision`);
+    if (!response.ok) return { boundaries: [], rows: [], summary: {} };
+    return response.json();
+  } catch {
+    return { boundaries: [], rows: [], summary: {} };
+  }
+}
+
+async function postDrugConsumableAction(id, action, body) {
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  const response = await request(`${API_BASE}/drug-consumable-supervision/${encodeURIComponent(id)}/${action}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  if (!response.ok) return false;
+  drugConsumableState = await loadDrugConsumableSupervision();
+  platformState = await loadPlatformState(fallbackState);
+  renderAll(platformState);
+  return true;
+}
+
 function bindInsuranceActions() {
   document.addEventListener("click", async (event) => {
+    const drugButton = event.target.closest("[data-drug-action]");
+    if (drugButton) {
+      drugButton.disabled = true;
+      const action = drugButton.dataset.drugAction;
+      const id = drugButton.dataset.id;
+      const payload = JSON.parse(drugButton.dataset.payload || "{}");
+      await postDrugConsumableAction(id, action, payload);
+      drugButton.disabled = false;
+      return;
+    }
+
     const button = event.target.closest("[data-workflow-action]");
     if (!button) return;
     const updates = JSON.parse(button.dataset.updates || "{}");
     button.disabled = true;
-    const result = await updateWorkflowAction(platformState, button.dataset.collection, button.dataset.id, updates, button.dataset.note || "医保经办/监管更新业务状态");
+    const result = await updateWorkflowAction(platformState, button.dataset.collection, button.dataset.id, updates, button.dataset.note || "insurance workflow update");
     button.disabled = false;
-    if (result.ok) renderAll(platformState);
+    if (result.ok) {
+      drugConsumableState = await loadDrugConsumableSupervision();
+      renderAll(platformState);
+    }
   });
 }
 
@@ -35,8 +92,8 @@ function renderInsuranceOrgScope() {
   const user = window.HealthCityAuth?.getUser?.();
   const typeMap = {
     insurance_bureau: ["医保行政监管", "政策、待遇、基金监管、跨区县监督"],
-    insurance_center: ["医保经办服务", "结算审核、凭证核验、固定取药审核、经办留痕"],
-    district_insurance_bureau: ["区市县医保监管", "本区机构监管、慢病待遇协同、基层医保服务监督"]
+    insurance_center: ["医保经办服务", "结算审核、凭证核验、固定取药审核和经办留痕"],
+    district_insurance_bureau: ["区县医保监管", "本区机构监管、慢病待遇协同、基层医保服务监督"]
   };
   const [label, scope] = typeMap[user?.orgType] || ["医保协同", user?.dataScope || "医保审核与基金监管"];
   document.querySelector("#insurance-org-type").textContent = label;
@@ -51,37 +108,70 @@ function actionButton(collection, id, label, updates, note) {
   return `<button class="inline-action" type="button" data-workflow-action data-collection="${collection}" data-id="${id}" data-updates='${JSON.stringify(updates)}' data-note="${note || label}">${label}</button>`;
 }
 
+function drugActionButton(id, action, label, payload) {
+  return `<button class="inline-action" type="button" data-drug-action="${action}" data-id="${id}" data-payload='${JSON.stringify(payload)}'>${label}</button>`;
+}
+
 function residentOf(state, id) {
-  return state.residents.find((item) => item.id === id);
+  return (state.residents || []).find((item) => item.id === id);
 }
 
 function renderMetrics(state) {
-  const total = state.insuranceClaims.reduce((sum, item) => sum + Number(item.totalAmount || 0), 0);
-  const pay = state.insuranceClaims.reduce((sum, item) => sum + Number(item.insurancePay || 0), 0);
-  const pending = state.insuranceClaims.filter((item) => item.status !== "已通过").length;
-  const chronic = new Set(state.insuranceClaims.map((item) => item.diseaseType)).size;
+  const claims = state.insuranceClaims || [];
+  const total = claims.reduce((sum, item) => sum + Number(item.totalAmount || 0), 0);
+  const pay = claims.reduce((sum, item) => sum + Number(item.insurancePay || 0), 0);
+  const pending = claims.filter((item) => item.status !== "已通过" && item.status !== "宸查€氳繃").length;
+  const openDrugRows = drugConsumableState.summary?.openRows || drugConsumableState.rows?.filter((item) => item.normalizedStatus !== "closed").length || 0;
   document.querySelector("#insurance-metrics").innerHTML = [
-    ["审核单据", state.insuranceClaims.length, "慢病相关结算"],
+    ["审核单据", claims.length, "慢病相关结算"],
     ["总费用", money(total), "本期申报金额"],
     ["医保支付", money(pay), "基金预计支出"],
-    ["待审核", pending, `${chronic} 类慢病病种`]
+    ["药耗线索", openDrugRows, "合理用药与耗材闭环"]
   ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${value}</strong><small>${hint}</small></article>`).join("");
 }
 
+function renderDrugConsumableSupervision(report) {
+  const rows = report.rows || [];
+  const boundaries = report.boundaries || [];
+  document.querySelector("#drug-consumable-count").textContent = `${rows.length} 条`;
+  document.querySelector("#drug-consumable-boundaries").innerHTML = boundaries.map((item) => `
+    <div><strong>${item.name}</strong><span>${item.source} · ${item.count} 条</span></div>
+  `).join("");
+  document.querySelector("#drug-consumable-list").innerHTML = rows.map((item) => {
+    const badge = item.riskLevel === "high" ? "danger" : item.normalizedStatus === "pending" ? "warn" : "info";
+    const resident = residentOf(platformState, item.residentId);
+    return `<section class="item">
+      <div>
+        <h3>${resident?.name || item.residentId || "未知居民"} · ${item.category}</h3>
+        <p>${item.institution || "机构待补"} · ${item.boundary} · ${item.issue}</p>
+        <p>审方：${item.reviewStatus || "pending"} · 医保：${item.insuranceStatus || "pending"} · 整改：${item.remediationStatus || "open"} · 审计 ${item.auditCount || 0} 条</p>
+        <p>${item.nextAction || "等待下一步处理"}</p>
+        <div class="action-row">
+          ${drugActionButton(item.id, "review", "审核通过", { reviewStatus: "review-passed", insuranceStatus: "coordinating", status: "in-review", nextAction: "Continue settlement coordination and archive prescription review evidence." })}
+          ${drugActionButton(item.id, "insurance-sync", "医保同步", { insuranceStatus: "synced", status: "insurance-synced", settlementBatch: "demo-drug-consumable", nextAction: "Archive settlement coordination evidence." })}
+          ${drugActionButton(item.id, "remediation", "提交整改", { remediationStatus: "submitted", status: "remediation-submitted", evidence: "demo-remediation-evidence", nextAction: "Regulator reviews remediation evidence." })}
+        </div>
+      </div>
+      <span class="badge ${badge}">${item.riskLevel || item.normalizedStatus}</span>
+    </section>`;
+  }).join("") || `<p class="muted">暂无药品耗材监管线索。</p>`;
+}
+
 function renderClaims(state) {
-  document.querySelector("#claim-count").textContent = `${state.insuranceClaims.length} 条`;
-  document.querySelector("#claim-list").innerHTML = state.insuranceClaims.map((claim) => {
+  const claims = state.insuranceClaims || [];
+  document.querySelector("#claim-count").textContent = `${claims.length} 条`;
+  document.querySelector("#claim-list").innerHTML = claims.map((claim) => {
     const resident = residentOf(state, claim.residentId);
-    const risk = claim.status === "待审核" ? "warn" : claim.status === "智能初审" ? "info" : "";
-    const records = state.personalRecords.filter((item) => item.residentId === claim.residentId && ["emr", "medications", "labs"].includes(item.category)).length;
+    const risk = claim.status === "待审核" || claim.status === "寰呭鏍?" ? "warn" : claim.status === "智能初审" || claim.status === "鏅鸿兘鍒濆" ? "info" : "";
+    const records = (state.personalRecords || []).filter((item) => item.residentId === claim.residentId && ["emr", "medications", "labs"].includes(item.category)).length;
     return `<section class="item">
       <div>
         <h3>${resident?.name || "未知居民"} · ${claim.claimType}</h3>
-        <p>${claim.institution} · ${claim.diseaseType} · ${claim.date}</p>
+        <p>${claim.institution} · ${claim.diseaseType} · ${claim.date || claim.claimDate || ""}</p>
         <p>总费用 ${money(claim.totalAmount)}，医保支付 ${money(claim.insurancePay)}，自付 ${money(claim.selfPay)}</p>
-        <p>关联健康资料 ${records} 条 · ${claim.risk}</p>
+        <p>关联健康资料 ${records} 条 · ${claim.risk || "无异常"}</p>
         <div class="action-row">
-          ${claim.status !== "已通过" ? actionButton("insuranceClaims", claim.id, "审核通过", { status: "已通过", reviewResult: "合规通过" }, "医保结算审核通过") : ""}
+          ${claim.status !== "已通过" && claim.status !== "宸查€氳繃" ? actionButton("insuranceClaims", claim.id, "审核通过", { status: "已通过", reviewResult: "合规通过" }, "医保结算审核通过") : ""}
           ${claim.status !== "退回补正" ? actionButton("insuranceClaims", claim.id, "退回补正", { status: "退回补正", reviewResult: "需补充病历或处方依据" }, "医保结算退回补正") : ""}
         </div>
       </div>
@@ -94,12 +184,12 @@ function renderSupervisions(state) {
   const items = state.institutionSupervisions || [];
   document.querySelector("#supervision-count").textContent = `${items.length} 项`;
   document.querySelector("#supervision-list").innerHTML = items.map((item) => {
-    const badge = item.level === "关注" ? "warn" : item.level === "提示" ? "info" : "";
+    const badge = item.level === "关注" || item.level === "鍏虫敞" ? "warn" : item.level === "提示" || item.level === "鎻愮ず" ? "info" : "";
     const resource = (state.medicalResources || []).find((row) => row.institution === item.institution);
     return `<section class="item">
       <div>
         <h3>${item.institution} · ${item.issue}</h3>
-        <p>${resource ? `${resource.type} · ${resource.region} · 医生 ${resource.doctors} · 床位 ${resource.beds}` : "机构资源待补充"}</p>
+        <p>${resource ? `${resource.type} · ${resource.region} · 医生 ${resource.doctors} · 床位 ${resource.beds}` : "机构资源待补入"}</p>
         <p>${item.action} · ${item.status}</p>
       </div>
       <span class="badge ${badge}">${item.level}</span>
@@ -112,8 +202,8 @@ function renderReferralPayments(state) {
   const referrals = state.referralSystem?.referrals || [];
   document.querySelector("#referral-payment-count").textContent = `${rules.length} 项`;
   document.querySelector("#referral-payment-list").innerHTML = rules.map((item) => {
-    const related = referrals.filter((referral) => referral.insurancePolicy?.includes(item.item.slice(0, 4))).length;
-    const badge = item.status.includes("待") ? "warn" : "info";
+    const related = referrals.filter((referral) => referral.insurancePolicy?.includes(String(item.item || "").slice(0, 4))).length;
+    const badge = String(item.status || "").includes("待") ? "warn" : "info";
     return `<section class="item">
       <div>
         <h3>${item.item}</h3>
@@ -152,44 +242,44 @@ function renderPickupAudits(state) {
   document.querySelector("#pickup-audit-count").textContent = `${pickups.length} 项`;
   document.querySelector("#pickup-audit-list").innerHTML = pickups.map((item) => {
     const resident = residentOf(state, item.residentId);
-    const badge = item.insuranceReview === "已通过" ? "info" : "warn";
+    const passed = item.insuranceReview === "已通过" || item.insuranceReview === "宸查€氳繃";
     return `<section class="item">
       <div>
         <h3>${resident?.name || "未知居民"} · ${item.medication}</h3>
         <p>${item.coverage} · ${item.dosage} · ${item.nextPickup}</p>
         <p>机构确认：${item.institutionReview || "待确认"} · 药房状态：${item.pharmacyStatus || item.status}</p>
         <div class="action-row">
-          ${item.insuranceReview !== "已通过" ? actionButton("medicationPickups", item.id, "医保通过", { insuranceReview: "已通过", status: "待取药" }, "医保通过固定取药审核") : ""}
+          ${!passed ? actionButton("medicationPickups", item.id, "医保通过", { insuranceReview: "已通过", status: "待取药" }, "医保通过固定取药审核") : ""}
           ${item.insuranceReview !== "退回补正" ? actionButton("medicationPickups", item.id, "退回补正", { insuranceReview: "退回补正", status: "待补正" }, "固定取药医保退回补正") : ""}
         </div>
       </div>
-      <span class="badge ${badge}">${item.insuranceReview || "待审核"}</span>
+      <span class="badge ${passed ? "info" : "warn"}">${item.insuranceReview || "待审核"}</span>
     </section>`;
   }).join("") || `<p class="muted">暂无固定取药审核事项。</p>`;
 }
 
 function renderCredentialChecks(state) {
-  const items = (state.digitalCredentials || []).filter((item) => item.type.includes("医保"));
+  const items = (state.digitalCredentials || []).filter((item) => String(item.type || "").includes("医保") || String(item.type || "").includes("鍖讳繚"));
   document.querySelector("#credential-check-count").textContent = `${items.length} 项`;
   document.querySelector("#credential-check-list").innerHTML = items.map((item) => {
     const resident = residentOf(state, item.residentId);
-    const badge = item.status === "待核验" ? "warn" : "info";
+    const pending = item.status === "待核验" || item.status === "寰呮牳楠?";
     return `<section class="item">
       <div>
         <h3>${resident?.name || "未知居民"} · ${item.type}</h3>
         <p>${item.provider} · ${item.lastVerified}</p>
         <p>${item.usage} · ${item.personIndex || "待索引"}</p>
         <div class="action-row">
-          ${item.status === "待核验" ? actionButton("digitalCredentials", item.id, "核验通过", { status: "已核验", lastVerified: new Date().toISOString().slice(0, 10) }, "医保凭证核验通过") : ""}
+          ${pending ? actionButton("digitalCredentials", item.id, "核验通过", { status: "已核验", lastVerified: new Date().toISOString().slice(0, 10) }, "医保凭证核验通过") : ""}
         </div>
       </div>
-      <span class="badge ${badge}">${item.status}</span>
+      <span class="badge ${pending ? "warn" : "info"}">${item.status}</span>
     </section>`;
   }).join("") || `<p class="muted">暂无医保电子凭证核验事项。</p>`;
 }
 
 function renderInsuranceAudit(state) {
-  const logs = (state.dataAccessLogs || []).filter((item) => item.role === "医保监管");
+  const logs = (state.dataAccessLogs || []).filter((item) => item.role === "医保监管" || item.role === "鍖讳繚鐩戠");
   document.querySelector("#insurance-audit-count").textContent = `${logs.length} 条`;
   document.querySelector("#insurance-audit").innerHTML = logs.map((log) => {
     const resident = residentOf(state, log.residentId);

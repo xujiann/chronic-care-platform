@@ -171,6 +171,8 @@ npm.cmd run release:report:full
 
 `interface:mapping` 会生成 `release/interface-mapping-report.json` 和 `release/interface-mapping-report.md`，逐项检查外部契约必填字段、幂等字段、目标集合、目标字段、签名和重试策略是否有平台落点；现场 HIS/EMR/LIS/PACS/医保/证照/统计联调前，应把该报告与真实字段对照表、样例报文和整改记录一起归档。
 
+`research:sandbox` generates `release/research-sandbox-readiness-report.json` and `release/research-sandbox-readiness-report.md`, covering research dataset applications, disease registry models, ethics approval, de-identification release, sandbox access, usage audit, and outcome return evidence.
+
 `data-quality:report` 会生成 `release/data-quality-report.json` 和 `release/data-quality-report.md`，检查居民主索引完整度、跨集合居民引用、personIndex 一致性、来源可追溯和整改闭环，作为 P1 数据质量治理和主索引现场规则确认前的证据包。
 
 `environment:matrix` 会生成 `release/environment-matrix-report.json` 和 `release/environment-matrix-report.md`，把 demo、staging、production 三层环境的必填变量、阻断变量、责任人、门禁脚本和上线验收规则固化为可检查矩阵；`release:report` 会同步写出这些文件，作为环境分层、密钥注入、现场签字和生产切换审查的前置材料。
@@ -266,3 +268,25 @@ Use `POST /api/referral-teleconsultations/:id/escalations/ack` after an SLA remi
 Use `GET /api/referral-teleconsultations/performance-policy` to confirm insurance-payment and medical-consortium performance rules. The report includes report-return rate, follow-up closure, repeat-exam control, and configured payment paths before site settlement formulas are finalized.
 
 Before onsite testing, compare `referral-feedback-callback-v1`, `referral-schedule-callback-v1`, and `referral-report-callback-v1` in `release/interface-mapping-report.md` with the real HIS/EMR scheduling, receiving feedback, and report payloads.
+
+## Medical quality and safety supervision release boundary
+
+Run `npm.cmd run quality-safety:report` before release. The generated `release/quality-safety-report.md` and `release/quality-safety-report.json` prove the demo boundary for medical quality, safety events, critical values, clinical pathways, medical record QC, mutual-recognition QC, dispatch, feedback, review, permission trimming, and audit evidence.
+
+Site joint testing still requires live HIS/EMR/LIS/PACS feeds, production critical-value acknowledgement routing, medical-record sampling signatures, clinical pathway rule dictionaries, mutual-recognition QC rules, and department rectification sign-off attachments.
+
+## Hospital Operations Dispatch
+
+operations.html is the runnable management entry for hospital operation monitoring and resource dispatch. It uses GET /api/operations/dashboard, POST /api/operations/dispatch, and POST /api/operations/reconciliation/:id/review to cover bed, staff, equipment, outpatient, emergency, inpatient, dispatch, alert, and statistics direct-report reconciliation boundaries.
+
+hospital-operations:readiness generates release/hospital-operations-readiness-report.json and release/hospital-operations-readiness-report.md. The report reuses healthStatistics, healthStatisticsIngestion, medicalResources, operations-readiness, /api/metrics, and platformProcessAudit evidence, and is included by release:report and deploy:check.
+## Drug Consumable Supervision Evidence
+
+Before site joint testing for the drug and consumable supervision app, run `npm.cmd run drug-consumable:readiness` and archive `release/drug-consumable-readiness-report.json` plus `release/drug-consumable-readiness-report.md`. The report is the pre-field evidence bundle for rational medication, prescription review, fixed pickup, high-value consumable clues, insurance settlement coordination, and remediation-loop signoff.
+## Health Dashboard Deployment Evidence
+
+- Open `health-dashboard.html` after commission login to review the aggregate health dashboard.
+- Run `npm.cmd run health-dashboard:summary` to generate `release/health-dashboard-summary.json` and `release/health-dashboard-summary.md`.
+- Archive the generated development-template section as the handoff checklist for each of the eight application conversations: boundary, reuse, data, API, frontend entry, tests, and acceptance evidence.
+- `release:manifest` must include `health-dashboard-summary.md` so the eight-application template is part of the formal release package.
+- The dashboard remains blocked on real site joint-test inputs for identity, HIS/EMR/LIS/PACS, insurance, certificates, statistics, monitoring, and disaster recovery signoff.
