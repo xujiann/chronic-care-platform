@@ -193,6 +193,8 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /integration-readiness-report\.md/);
   assert.match(read("README.md"), /interface-mapping-report\.md/);
   assert.match(read("scripts/release-report.js"), /regional-data-sharing-report\.md/);
+  assert.match(read("scripts/release-report.js"), /regional-referral-overlap-report\.md/);
+  assert.match(read("README.md"), /regional-referral-overlap-report\.md/);
   assert.match(read("README.md"), /monitoring-readiness-report\.md/);
   assert.match(read("README.md"), /operations-readiness-report\.md/);
   assert.match(read("README.md"), /process-audit-report\.md/);
@@ -211,6 +213,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("DEPLOYMENT.md"), /environment-matrix-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /integration-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /interface-mapping-report\.md/);
+  assert.match(read("DEPLOYMENT.md"), /regional-referral-overlap-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /monitoring-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /operations-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /process-audit-report\.md/);
@@ -232,6 +235,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/deploy-check.js"), /integration:readiness/);
   assert.match(read("scripts/deploy-check.js"), /interface:mapping/);
   assert.match(read("scripts/deploy-check.js"), /regional-data-sharing:report/);
+  assert.match(read("scripts/deploy-check.js"), /regional-referral:overlap/);
   assert.match(read("package.json"), /regional-referral:overlap/);
   assert.match(read("scripts/deploy-check.js"), /monitoring:readiness/);
   assert.match(read("scripts/deploy-check.js"), /operations:readiness/);
@@ -249,6 +253,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".github/workflows/ci.yml"), /npm run integration:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run interface:mapping/);
   assert.match(read(".github/workflows/ci.yml"), /npm run regional-data-sharing:report/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run regional-referral:overlap/);
   assert.match(read(".github/workflows/ci.yml"), /npm run monitoring:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run operations:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run site:pack/);

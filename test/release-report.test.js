@@ -113,6 +113,8 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.interfaceMapping.ok, true);
   assert.equal(report.checks.some((item) => item.name === "regionalDataSharing:report" && item.passed), true);
   assert.equal(report.regionalDataSharing.ok, true);
+  assert.equal(report.checks.some((item) => item.name === "regionalReferralOverlap:report" && item.passed), true);
+  assert.equal(report.regionalReferralOverlap.runtimeMergeAllowed, false);
   assert.equal(report.checks.some((item) => item.name === "monitoring:readiness" && item.passed), true);
   assert.equal(report.monitoringReadiness.ok, true);
   assert.equal(report.checks.some((item) => item.name === "operations:readiness" && item.passed), true);
@@ -150,6 +152,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(markdown, /Audit retention report/);
   assert.match(markdown, /Integration readiness report/);
   assert.match(markdown, /Interface mapping report/);
+  assert.match(markdown, /Regional data sharing and referral overlap report/);
   assert.match(markdown, /Data quality and master index report/);
   assert.match(markdown, /Monitoring readiness report/);
   assert.match(markdown, /Operations readiness report/);
@@ -238,6 +241,8 @@ test("release report writes standalone production cutover and storage artifacts"
   const integrationMarkdown = fs.readFileSync(path.join(outputDir, "integration-readiness-report.md"), "utf8");
   const interfaceMappingJson = JSON.parse(fs.readFileSync(path.join(outputDir, "interface-mapping-report.json"), "utf8"));
   const interfaceMappingMarkdown = fs.readFileSync(path.join(outputDir, "interface-mapping-report.md"), "utf8");
+  const regionalReferralOverlapJson = JSON.parse(fs.readFileSync(path.join(outputDir, "regional-referral-overlap-report.json"), "utf8"));
+  const regionalReferralOverlapMarkdown = fs.readFileSync(path.join(outputDir, "regional-referral-overlap-report.md"), "utf8");
   const monitoringJson = JSON.parse(fs.readFileSync(path.join(outputDir, "monitoring-readiness-report.json"), "utf8"));
   const monitoringMarkdown = fs.readFileSync(path.join(outputDir, "monitoring-readiness-report.md"), "utf8");
   const operationsJson = JSON.parse(fs.readFileSync(path.join(outputDir, "operations-readiness-report.json"), "utf8"));
@@ -275,6 +280,9 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(integrationMarkdown, /P0 coverage/);
   assert.equal(interfaceMappingJson.interfaceMapping.ok, true);
   assert.match(interfaceMappingMarkdown, /Contract field mappings/);
+  assert.equal(regionalReferralOverlapJson.regionalReferralOverlap.ok, true);
+  assert.equal(regionalReferralOverlapJson.regionalReferralOverlap.runtimeMergeAllowed, false);
+  assert.match(regionalReferralOverlapMarkdown, /区域诊疗数据共享与医联体转诊重合度检查报告/);
   assert.equal(monitoringJson.monitoringReadiness.ok, true);
   assert.match(monitoringMarkdown, /SLO targets/);
   assert.equal(operationsJson.operationsReadiness.ok, true);
@@ -299,7 +307,9 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(environmentMarkdown, /Environment matrix report/);
   assert.equal(manifestJson.releaseArtifactManifest.ok, true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "service-acceptance"), true);
+  assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "regional-referral-overlap"), true);
   assert.match(manifestMarkdown, /Release artifact manifest/);
+  assert.match(manifestMarkdown, /regional-referral-overlap-report\.md/);
   assert.match(manifestMarkdown, /service-acceptance-summary\.md/);
   assert.match(manifestMarkdown, /release\/templates\/identity-source-mapping\/README\.md/);
 });

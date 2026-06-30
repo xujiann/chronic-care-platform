@@ -14,6 +14,7 @@ const { buildOperationsReadinessReport, renderMarkdown: renderOperationsReadines
 const { buildProcessAuditReport, renderMarkdown: renderProcessAuditMarkdown } = require("./process-audit");
 const { buildProductionDbReadinessReport, renderMarkdown: renderProductionDbReadinessMarkdown } = require("./production-db-readiness");
 const { buildRegionalDataSharingReport, renderMarkdown: renderRegionalDataSharingMarkdown } = require("./regional-data-sharing");
+const { buildRegionalReferralOverlapReport, renderMarkdown: renderRegionalReferralOverlapMarkdown } = require("./regional-referral-overlap");
 const { buildReleaseArtifactManifest, renderMarkdown: renderReleaseArtifactManifestMarkdown } = require("./release-artifact-manifest");
 const { buildSiteReadinessPack, renderMarkdown: renderSiteReadinessMarkdown, writeTemplateReadmes } = require("./site-readiness-pack");
 const { inspectStorageModel } = require("./storage-admin");
@@ -300,6 +301,14 @@ function regionalDataSharingChecks(regionalDataSharing) {
   ];
 }
 
+function regionalReferralOverlapChecks(regionalReferralOverlap) {
+  return [
+    check("regionalReferralOverlap:report", regionalReferralOverlap.ok, regionalReferralOverlap.ok ? "regional referral overlap checks passed" : "regional referral overlap checks failed", "error", "regional-data-sharing"),
+    check("regionalReferralOverlap:mergeDecision", regionalReferralOverlap.mergeAllowed && regionalReferralOverlap.runtimeMergeAllowed === false, regionalReferralOverlap.decision || "missing decision", "error", "regional-data-sharing"),
+    check("regionalReferralOverlap:sharedEvidence", regionalReferralOverlap.summary?.sharedCollections >= 6, `${regionalReferralOverlap.summary?.sharedCollections || 0} shared collections`, "error", "regional-data-sharing")
+  ];
+}
+
 function evaluationEvidenceChecks(evaluationEvidence) {
   return [
     check("evaluation:evidence", evaluationEvidence.ok, evaluationEvidence.ok ? "evaluation evidence checks passed" : "evaluation evidence checks failed", "error", "evaluation"),
@@ -482,6 +491,7 @@ function packageChecks(pkg) {
     "production-db:readiness",
     "evaluation:evidence",
     "regional-data-sharing:report",
+    "regional-referral:overlap",
     "storage:backup",
     "storage:inspect",
     "storage:assess",
@@ -516,6 +526,7 @@ function commandChecks(runCommands) {
     run(npm, ["run", "test:coverage"]),
     run(npm, ["run", "test:e2e"]),
     run(npm, ["run", "deploy:check"]),
+    run(npm, ["run", "regional-referral:overlap"]),
     run(npm, ["audit", "--omit=dev"])
   ].map((item) => check(`command:${item.command}`, item.passed, item.passed ? "passed" : item.stderr || item.stdout, "error", "commands"));
 }
@@ -531,6 +542,7 @@ function buildReleaseReport(options = {}) {
   const integrationReadiness = buildIntegrationReadinessReport({ data });
   const interfaceMapping = buildInterfaceMappingReport({ data, pkg });
   const regionalDataSharing = buildRegionalDataSharingReport({ data, pkg });
+  const regionalReferralOverlap = buildRegionalReferralOverlapReport({ data });
   const monitoringReadiness = buildMonitoringReadinessReport({ data, pkg });
   const operationsReadiness = buildOperationsReadinessReport({ data, pkg });
   const processAudit = buildProcessAuditReport({ data });
@@ -555,6 +567,7 @@ function buildReleaseReport(options = {}) {
     ...integrationReadinessChecks(integrationReadiness),
     ...interfaceMappingChecks(interfaceMapping),
     ...regionalDataSharingChecks(regionalDataSharing),
+    ...regionalReferralOverlapChecks(regionalReferralOverlap),
     ...monitoringReadinessChecks(monitoringReadiness),
     ...operationsReadinessChecks(operationsReadiness),
     ...processAuditChecks(processAudit),
@@ -589,6 +602,7 @@ function buildReleaseReport(options = {}) {
     integrationReadiness,
     interfaceMapping,
     regionalDataSharing,
+    regionalReferralOverlap,
     monitoringReadiness,
     operationsReadiness,
     processAudit,
@@ -754,6 +768,10 @@ function renderMarkdown(report) {
     "",
     "See `interface-mapping-report.json` and `interface-mapping-report.md` for contract-to-platform collection mappings, required field coverage, idempotency field mapping, signature, and retry evidence.",
     "",
+    "## Regional data sharing and referral overlap report",
+    "",
+    "See `regional-referral-overlap-report.json` and `regional-referral-overlap-report.md` for the merge decision, shared evidence collections, non-merge runtime boundaries, and onsite handoff recommendations.",
+    "",
     "## Data quality and master index report",
     "",
     "See `data-quality-report.json` and `data-quality-report.md` for resident master index completeness, resident reference checks, source traceability, and rectification issue evidence.",
@@ -879,6 +897,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       regionalDataSharing: report.regionalDataSharing
     }, null, 2), "utf8");
+    const regionalReferralOverlapJson = path.join(path.dirname(output), "regional-referral-overlap-report.json");
+    fs.writeFileSync(regionalReferralOverlapJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      regionalReferralOverlap: report.regionalReferralOverlap
+    }, null, 2), "utf8");
     const operationsJson = path.join(path.dirname(output), "operations-readiness-report.json");
     fs.writeFileSync(operationsJson, JSON.stringify({
       project: report.project,
@@ -973,6 +999,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(interfaceMappingMarkdown, renderInterfaceMappingMarkdown(report.interfaceMapping), "utf8");
     const regionalDataSharingMarkdown = path.join(path.dirname(markdown), "regional-data-sharing-report.md");
     fs.writeFileSync(regionalDataSharingMarkdown, renderRegionalDataSharingMarkdown(report.regionalDataSharing), "utf8");
+    const regionalReferralOverlapMarkdown = path.join(path.dirname(markdown), "regional-referral-overlap-report.md");
+    fs.writeFileSync(regionalReferralOverlapMarkdown, renderRegionalReferralOverlapMarkdown(report.regionalReferralOverlap), "utf8");
     const operationsMarkdown = path.join(path.dirname(markdown), "operations-readiness-report.md");
     fs.writeFileSync(operationsMarkdown, renderOperationsReadinessMarkdown(report.operationsReadiness), "utf8");
     const processAuditMarkdown = path.join(path.dirname(markdown), "process-audit-report.md");

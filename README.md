@@ -170,7 +170,10 @@ npm.cmd run env:check
 npm.cmd run release:report
 npm.cmd run release:report:full
 npm.cmd run release:manifest
+npm.cmd run regional-referral:overlap
 ```
+
+`regional-referral:overlap` 会生成 `release/regional-referral-overlap-report.json` 和 `release/regional-referral-overlap-report.md`，用于检查区域诊疗数据共享平台与医联体转诊/远程会诊功能的重合度。当前结论是“部分合并”：合并交接证据、报告和现场验收边界；不合并运行时主模型和 API。
 
 `deploy:check` 会检查 README、部署文档、静态快照、P2 集合、P2 完成状态、P0 接口准备度、安全验收台账、环境脚本和关键 npm scripts；`deploy:check:full` 还会串行执行 `check`、`test`、`test:coverage`、`test:e2e` 和 `npm audit --omit=dev`。
 

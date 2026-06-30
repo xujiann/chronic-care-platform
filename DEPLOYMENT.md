@@ -138,7 +138,10 @@ npm.cmd run deploy:check
 npm.cmd run env:check
 npm.cmd run release:report
 npm.cmd run release:manifest
+npm.cmd run regional-referral:overlap
 ```
+
+`regional-referral:overlap` 会生成 `release/regional-referral-overlap-report.json` 和 `release/regional-referral-overlap-report.md`，把区域诊疗数据共享平台与医联体转诊/远程会诊的共享集合、共享居民、重合能力、可合并项和不可合并运行时边界整理为现场报告。该报告建议合并交接证据、发布报告和现场验收边界，但保留区域共享与转诊会诊两套运行时主模型和 API。
 
 本地服务启动后可访问：
 
