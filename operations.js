@@ -160,6 +160,7 @@ const OPERATIONS_EVIDENCE_LABELS = {
   "/api/operations/site-joint-patrol": "现场联调巡检接口",
   "/api/operations/production-hardening": "生产加固清单接口",
   "/api/operations/cutover-command": "生产割接签收接口",
+  "/api/operations/post-cutover-observation": "上线后观察接口",
   "/api/operations/intelligence": "智能调度建议接口",
   "/api/operations/resource-pool": "跨院资源池接口",
   "/api/operations/mobile-duty": "移动值守接口",
@@ -231,6 +232,7 @@ function buildStaticOperationsDashboard(state) {
   const resourcePool = buildStaticResourcePool(snapshots, medicalResources, dispatchRequests);
   const mobileDuty = buildStaticMobileDuty(snapshots, dispatchRequests, reconciliationReviews, handover, state.taskMessages || []);
   const cutoverCommand = buildStaticCutoverCommand(productionHardening, siteJointPatrol, mobileDuty, state.platformProcessAudit || [], state.securityEvents || []);
+  const postCutoverObservation = buildStaticPostCutoverObservation(snapshots, dispatchRequests, reconciliationReviews, siteJointPatrol, cutoverCommand, mobileDuty, state.platformProcessAudit || [], state.securityEvents || []);
   const governanceReport = buildStaticGovernanceReport(snapshots, dispatchRequests, reconciliationReviews, performanceMonitoring, handover);
   const governanceExportPackage = buildStaticGovernanceExportPackage(
     snapshots,
@@ -287,6 +289,7 @@ function buildStaticOperationsDashboard(state) {
     resourcePool,
     mobileDuty,
     cutoverCommand,
+    postCutoverObservation,
     governanceReport,
     governanceExportPackage,
     nextDevelopmentResearch
@@ -475,6 +478,58 @@ function buildStaticCutoverCommand(productionHardening, siteJointPatrol, mobileD
     rollbackPolicy: "任一高优先级割接项未签收时，维持演示环境，暂不进入生产切换。",
     items,
     evidence: ["/api/operations/cutover-command", "/api/operations/cutover-command/actions", "platformProcessAudit", "securityEvents"]
+  };
+}
+
+function staticPostCutoverItem(id, title, owner, priority, metric, detail, nextAction, evidence, processAudit) {
+  const auditHit = processAudit.find((item) =>
+    String(item.process || "").includes("上线后观察") &&
+    (String(item.evidence || "").includes(id) || String(item.auditPoint || "").includes(title))
+  );
+  return {
+    id,
+    title,
+    owner,
+    priority,
+    status: auditHit ? "已观察" : priority === "高" ? "异常待处置" : priority === "中" ? "观察中" : "稳定",
+    metric,
+    detail,
+    nextAction: auditHit ? "保持观察记录归档，并进入下一观察窗口。" : nextAction,
+    evidence
+  };
+}
+
+function buildStaticPostCutoverObservation(snapshots, dispatchRequests, reconciliationReviews, siteJointPatrol, cutoverCommand, mobileDuty, processAudit = [], securityEvents = []) {
+  const openDispatches = dispatchRequests.filter((item) => ["pending", "assigned", "in-progress"].includes(item.status));
+  const pendingRecon = reconciliationReviews.filter((item) => !["approved", "closed"].includes(item.status));
+  const critical = snapshots.filter((item) => item.normalizedStatus === "critical");
+  const warning = snapshots.filter((item) => item.normalizedStatus === "warning");
+  const cutoverBlocking = Number(cutoverCommand?.summary?.blocking || 0);
+  const cutoverPending = Number(cutoverCommand?.summary?.pending || 0);
+  const patrolPending = Number(siteJointPatrol?.summary?.pending || 0);
+  const reminders = Number(mobileDuty?.summary?.reminders || 0);
+  const items = [
+    staticPostCutoverItem("observation-runtime-health", "运行健康与接口可用性", "平台运维", cutoverBlocking ? "高" : warning.length ? "中" : "常规", `${critical.length}家严重，${warning.length}家预警`, "联合健康检查、指标接口与运行快照观察上线后基础可用性。", "持续观察健康检查、接口耗时、错误率和关键告警。", ["/api/health", "/api/metrics", "/api/operations/post-cutover-observation"], processAudit),
+    staticPostCutoverItem("observation-resource-pressure", "床位人员设备压力", "运行调度席", critical.length ? "高" : warning.length ? "中" : "常规", `${critical.length + warning.length}家机构需关注`, "观察床位、ICU、人员缺口、设备占用和门急诊积压。", "高压机构需进入调度席人工复核，并准备跨院资源支援。", ["/api/operations/dashboard", "/api/operations/resource-pool"], processAudit),
+    staticPostCutoverItem("observation-dispatch-backlog", "资源调度积压", "医政医管处", openDispatches.length >= 3 ? "高" : openDispatches.length ? "中" : "常规", `${openDispatches.length}张未关闭调度单`, "观察调度单创建、分派、执行、关闭是否形成闭环。", "未关闭调度单需明确责任医院、资源类型和预计关闭时间。", ["/api/operations/dispatch", "/api/operations/resource-pool"], processAudit),
+    staticPostCutoverItem("observation-reconciliation", "统计直报复核", "统计办公室", pendingRecon.length >= 2 ? "高" : pendingRecon.length ? "中" : "常规", `${pendingRecon.length}批次待复核`, "观察统计直报、绩效指标异常说明和补正回执是否稳定。", "待复核批次需完成退回、补正、通过或关闭状态处理。", ["/api/operations/reconciliation/:id/review", "/api/operations/governance-report"], processAudit),
+    staticPostCutoverItem("observation-site-joint-patrol", "现场联调巡检归档", "接口联调组", patrolPending >= 3 ? "高" : patrolPending ? "中" : "常规", `${patrolPending}项巡检待归档`, "观察真实样例报文、验签日志、回放记录、失败重试和接收端确认是否归档。", "待归档项需补齐现场截图、回放日志和接收端签字。", ["/api/operations/site-joint-patrol", "/api/operations/site-joint-patrol/actions"], processAudit),
+    staticPostCutoverItem("observation-cutover-signoff", "割接签收与回退准备", "值班长", cutoverBlocking ? "高" : cutoverPending ? "中" : "常规", `${cutoverPending}项割接签收待完成`, "观察割接签收、回退策略、观察窗口和生产阻断项是否关闭。", "任一高优先级阻断项未签收时保持回退准备。", ["/api/operations/cutover-command", "/api/operations/cutover-command/actions"], processAudit),
+    staticPostCutoverItem("observation-mobile-duty", "移动值守提醒", "运行监测岗", reminders ? "常规" : "中", `${reminders}条值守提醒`, "观察移动端提醒、弱网补传和消息回执是否形成留痕。", "尚无提醒时需向值班长发送一次上线后观察提醒。", ["/api/operations/mobile-duty", "/api/operations/mobile-duty/actions", "/api/messages"], processAudit)
+  ];
+  return {
+    ok: items.length > 0 && items.every((item) => item.status === "已观察" || item.priority !== "高"),
+    watchWindow: "T+0 2小时、T+0 8小时、T+1 24小时",
+    summary: {
+      total: items.length,
+      abnormal: items.filter((item) => item.priority === "高").length,
+      watching: items.filter((item) => item.status === "观察中" || item.status === "异常待处置").length,
+      observed: items.filter((item) => item.status === "已观察").length,
+      auditEvents: processAudit.filter((item) => String(item.process || "").includes("上线后观察")).length,
+      securityEvents: securityEvents.filter((item) => String(item.action || "").includes("post-cutover")).length
+    },
+    items,
+    evidence: ["/api/operations/post-cutover-observation", "/api/operations/post-cutover-observation/actions", "platformProcessAudit", "securityEvents"]
   };
 }
 
@@ -1136,6 +1191,7 @@ function renderOperationsDashboard() {
   renderSiteJointPatrol(dashboard.siteJointPatrol || buildStaticSiteJointPatrol(dashboard.siteJointTests || {}, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || []));
   renderProductionHardening(dashboard.productionHardening || buildStaticProductionHardening({}));
   renderCutoverCommand(dashboard.cutoverCommand || buildStaticCutoverCommand(dashboard.productionHardening || {}, dashboard.siteJointPatrol || {}, dashboard.mobileDuty || {}, [], []));
+  renderPostCutoverObservation(dashboard.postCutoverObservation || buildStaticPostCutoverObservation(filteredSnapshots, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || [], dashboard.siteJointPatrol || {}, dashboard.cutoverCommand || {}, dashboard.mobileDuty || {}, [], []));
   renderOperationsIntelligence(dashboard.intelligence || buildStaticOperationsIntelligence(filteredSnapshots, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || []));
   renderResourcePool(dashboard.resourcePool || buildStaticResourcePool(filteredSnapshots, dashboard.medicalResources || [], dashboard.dispatchRequests || []));
   renderMobileDuty(dashboard.mobileDuty || buildStaticMobileDuty(filteredSnapshots, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || [], dashboard.handover || {}, []));
@@ -1727,6 +1783,74 @@ async function signoffCutoverCommand(itemId) {
     };
   }
   renderCutoverCommand(operationsDashboard.cutoverCommand || {});
+}
+
+function renderPostCutoverObservation(postCutoverObservation) {
+  const target = document.querySelector("#operation-post-cutover-observation");
+  if (!target) return;
+  const items = Array.isArray(postCutoverObservation.items) ? postCutoverObservation.items : [];
+  target.innerHTML = `
+    <article class="operation-observation-summary ${postCutoverObservation.ok ? "ready" : "watching"}">
+      <strong>上线后观察台</strong>
+      <span>${postCutoverObservation.summary?.observed || 0}/${postCutoverObservation.summary?.total || 0} 项已观察，${postCutoverObservation.summary?.abnormal || 0} 项异常</span>
+      <small>观察窗口：${zhInline(postCutoverObservation.watchWindow)}；证据：${evidenceList(postCutoverObservation.evidence)}</small>
+    </article>
+    ${items.map((item) => `
+      <article class="operation-observation-card ${item.priority === "高" ? "critical" : item.priority === "中" ? "warning" : "ready"}">
+        <div class="operation-playbook-head">
+          <div>
+            <strong>${zhInline(item.title)}</strong>
+            <span>${zhInline(item.owner)} / ${zhInline(item.status)} / ${zhInline(item.metric)}</span>
+          </div>
+          <span class="badge ${item.priority === "高" ? "danger" : item.priority === "中" ? "warn" : "info"}">${zhInline(item.priority)}</span>
+        </div>
+        <p>${zhInline(item.detail)}</p>
+        <div class="operation-observation-actions">
+          <span>${zhInline(item.nextAction)}</span>
+        </div>
+        <footer>
+          <small>证据：${evidenceList(item.evidence)}</small>
+          <button class="inline-action compact" type="button" data-post-cutover-observation="${htmlAttribute(item.id)}">记录观察</button>
+        </footer>
+      </article>
+    `).join("")}
+  `;
+  target.querySelectorAll("[data-post-cutover-observation]").forEach((button) => {
+    button.addEventListener("click", () => submitPostCutoverObservation(button.dataset.postCutoverObservation));
+  });
+}
+
+async function submitPostCutoverObservation(itemId) {
+  const item = (operationsDashboard?.postCutoverObservation?.items || []).find((row) => row.id === itemId);
+  if (!item) return;
+  const payload = {
+    itemId,
+    status: "已观察",
+    note: item.nextAction
+  };
+  try {
+    const response = await request(`${OPERATIONS_API_BASE}/operations/post-cutover-observation/actions`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error("post cutover observation failed");
+    const result = await response.json();
+    operationsDashboard.postCutoverObservation = result.postCutoverObservation || operationsDashboard.postCutoverObservation;
+  } catch (error) {
+    operationsDashboard.postCutoverObservation = {
+      ...(operationsDashboard.postCutoverObservation || {}),
+      items: (operationsDashboard.postCutoverObservation?.items || []).map((row) => row.id === itemId ? { ...row, status: "已观察", priority: "常规" } : row)
+    };
+    const rows = operationsDashboard.postCutoverObservation.items || [];
+    operationsDashboard.postCutoverObservation.summary = {
+      ...(operationsDashboard.postCutoverObservation.summary || {}),
+      observed: rows.filter((row) => row.status === "已观察").length,
+      abnormal: rows.filter((row) => row.priority === "高").length,
+      watching: rows.filter((row) => row.status === "观察中" || row.status === "异常待处置").length,
+      total: rows.length
+    };
+  }
+  renderPostCutoverObservation(operationsDashboard.postCutoverObservation || {});
 }
 
 function renderOperationsIntelligence(intelligence) {

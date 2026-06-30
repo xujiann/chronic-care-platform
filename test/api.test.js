@@ -239,6 +239,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(operationsDashboard.body.productionHardening.summary.total >= 5, true);
     assert.equal(operationsDashboard.body.cutoverCommand.summary.total >= 5, true);
     assert.equal(operationsDashboard.body.cutoverCommand.items.some((item) => item.evidence.includes("/api/operations/cutover-command")), true);
+    assert.equal(operationsDashboard.body.postCutoverObservation.summary.total >= 7, true);
+    assert.equal(operationsDashboard.body.postCutoverObservation.items.some((item) => item.evidence.includes("/api/operations/post-cutover-observation")), true);
     assert.equal(operationsDashboard.body.intelligence.recommendations.some((item) => item.recommendation && item.prediction), true);
     assert.equal(operationsDashboard.body.resourcePool.rows.some((item) => item.resourceSlots.length >= 5), true);
     assert.equal(operationsDashboard.body.resourcePool.recommendations.length >= 1, true);
@@ -353,6 +355,23 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(cutoverSignoff.response.status, 201);
     assert.equal(cutoverSignoff.body.audit.process, "医院运行生产割接签收");
     assert.equal(cutoverSignoff.body.cutoverCommand.items.some((item) => item.id === cutoverCommand.body.items[0].id), true);
+
+    const postCutoverObservation = await api(baseUrl, "/api/operations/post-cutover-observation", authorized(accountLogin.body.token));
+    assert.equal(postCutoverObservation.response.status, 200);
+    assert.equal(postCutoverObservation.body.summary.total >= 7, true);
+    assert.equal(postCutoverObservation.body.watchWindow.includes("T+1"), true);
+
+    const postCutoverAction = await api(baseUrl, "/api/operations/post-cutover-observation/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        itemId: postCutoverObservation.body.items[0].id,
+        status: "已观察",
+        note: "API regression post cutover observation"
+      })
+    }));
+    assert.equal(postCutoverAction.response.status, 201);
+    assert.equal(postCutoverAction.body.audit.process, "医院运行上线后观察");
+    assert.equal(postCutoverAction.body.postCutoverObservation.items.some((item) => item.id === postCutoverObservation.body.items[0].id), true);
 
     const intelligence = await api(baseUrl, "/api/operations/intelligence", authorized(accountLogin.body.token));
     assert.equal(intelligence.response.status, 200);

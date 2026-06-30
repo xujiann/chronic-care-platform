@@ -4211,6 +4211,141 @@ function buildOperationsCutoverCommand({ productionHardening, siteJointPatrol, m
   };
 }
 
+function postCutoverItem(id, title, owner, priority, metric, detail, nextAction, evidence, auditRows) {
+  const auditHit = auditRows.find((item) =>
+    String(item.process || "").includes("上线后观察") &&
+    (String(item.evidence || "").includes(id) || String(item.auditPoint || "").includes(title))
+  );
+  return {
+    id,
+    title,
+    owner,
+    priority,
+    status: auditHit ? "已观察" : priority === "高" ? "异常待处置" : priority === "中" ? "观察中" : "稳定",
+    metric,
+    detail,
+    nextAction: auditHit ? "保持观察记录归档，并进入下一观察窗口。" : nextAction,
+    observedAt: auditHit?.evidence || "",
+    evidence
+  };
+}
+
+function buildOperationsPostCutoverObservation({
+  snapshots,
+  dispatchRequests,
+  reconciliationReviews,
+  siteJointPatrol,
+  cutoverCommand,
+  mobileDuty,
+  processAudit,
+  securityEvents
+}) {
+  const auditRows = Array.isArray(processAudit) ? processAudit : [];
+  const eventRows = Array.isArray(securityEvents) ? securityEvents : [];
+  const openDispatches = (Array.isArray(dispatchRequests) ? dispatchRequests : []).filter((item) => ["pending", "assigned", "in-progress"].includes(item.status));
+  const pendingRecon = (Array.isArray(reconciliationReviews) ? reconciliationReviews : []).filter((item) => !["approved", "closed"].includes(item.status));
+  const criticalInstitutions = (Array.isArray(snapshots) ? snapshots : []).filter((item) => item.normalizedStatus === "critical");
+  const warningInstitutions = (Array.isArray(snapshots) ? snapshots : []).filter((item) => item.normalizedStatus === "warning");
+  const cutoverBlocking = Number(cutoverCommand?.summary?.blocking || 0);
+  const cutoverPending = Number(cutoverCommand?.summary?.pending || 0);
+  const patrolPending = Number(siteJointPatrol?.summary?.pending || 0);
+  const reminders = Number(mobileDuty?.summary?.reminders || 0);
+  const items = [
+    postCutoverItem(
+      "observation-runtime-health",
+      "运行健康与接口可用性",
+      "平台运维",
+      cutoverBlocking > 0 ? "高" : warningInstitutions.length ? "中" : "常规",
+      `${criticalInstitutions.length}家严重，${warningInstitutions.length}家预警`,
+      "联合 /api/health、/api/metrics 与运行快照观察上线后基础可用性。",
+      "持续观察健康检查、接口耗时、错误率和关键告警。",
+      ["/api/health", "/api/metrics", "/api/operations/dashboard", "/api/operations/post-cutover-observation"],
+      auditRows
+    ),
+    postCutoverItem(
+      "observation-resource-pressure",
+      "床位人员设备压力",
+      "运行调度席",
+      criticalInstitutions.length ? "高" : warningInstitutions.length ? "中" : "常规",
+      `${criticalInstitutions.length + warningInstitutions.length}家机构需关注`,
+      "上线后继续观察床位、ICU、人员缺口、设备占用和门急诊积压。",
+      "高压机构需进入调度席人工复核，并准备跨院资源支援。",
+      ["/api/operations/dashboard", "/api/operations/resource-pool"],
+      auditRows
+    ),
+    postCutoverItem(
+      "observation-dispatch-backlog",
+      "资源调度积压",
+      "医政医管处",
+      openDispatches.length >= 3 ? "高" : openDispatches.length ? "中" : "常规",
+      `${openDispatches.length}张未关闭调度单`,
+      "观察上线后调度单创建、分派、执行、关闭是否形成闭环。",
+      "未关闭调度单需明确责任医院、资源类型和预计关闭时间。",
+      ["/api/operations/dispatch", "/api/operations/resource-pool"],
+      auditRows
+    ),
+    postCutoverItem(
+      "observation-reconciliation",
+      "统计直报复核",
+      "统计办公室",
+      pendingRecon.length >= 2 ? "高" : pendingRecon.length ? "中" : "常规",
+      `${pendingRecon.length}批次待复核`,
+      "观察统计直报、绩效指标异常说明和补正回执是否稳定。",
+      "待复核批次需完成退回、补正、通过或关闭状态处理。",
+      ["/api/operations/reconciliation/:id/review", "/api/operations/governance-report"],
+      auditRows
+    ),
+    postCutoverItem(
+      "observation-site-joint-patrol",
+      "现场联调巡检归档",
+      "接口联调组",
+      patrolPending >= 3 ? "高" : patrolPending ? "中" : "常规",
+      `${patrolPending}项巡检待归档`,
+      "观察真实样例报文、验签日志、回放记录、失败重试和接收端确认是否归档。",
+      "待归档项需补齐现场截图、回放日志和接收端签字。",
+      ["/api/operations/site-joint-patrol", "/api/operations/site-joint-patrol/actions"],
+      auditRows
+    ),
+    postCutoverItem(
+      "observation-cutover-signoff",
+      "割接签收与回退准备",
+      "值班长",
+      cutoverBlocking > 0 ? "高" : cutoverPending ? "中" : "常规",
+      `${cutoverPending}项割接签收待完成`,
+      "观察割接签收、回退策略、观察窗口和生产阻断项是否关闭。",
+      "任一高优先级阻断项未签收时保持回退准备。",
+      ["/api/operations/cutover-command", "/api/operations/cutover-command/actions"],
+      auditRows
+    ),
+    postCutoverItem(
+      "observation-mobile-duty",
+      "移动值守提醒",
+      "运行监测岗",
+      reminders ? "常规" : "中",
+      `${reminders}条值守提醒`,
+      "观察移动端提醒、弱网补传和消息回执是否形成留痕。",
+      "尚无提醒时需向值班长发送一次上线后观察提醒。",
+      ["/api/operations/mobile-duty", "/api/operations/mobile-duty/actions", "/api/messages"],
+      auditRows
+    )
+  ];
+  return {
+    ok: items.length > 0 && items.every((item) => item.status === "已观察" || item.priority !== "高"),
+    generatedAt: new Date().toISOString(),
+    watchWindow: "T+0 2小时、T+0 8小时、T+1 24小时",
+    summary: {
+      total: items.length,
+      abnormal: items.filter((item) => item.priority === "高").length,
+      watching: items.filter((item) => item.status === "观察中" || item.status === "异常待处置").length,
+      observed: items.filter((item) => item.status === "已观察").length,
+      auditEvents: auditRows.filter((item) => String(item.process || "").includes("上线后观察")).length,
+      securityEvents: eventRows.filter((item) => String(item.action || "").includes("post-cutover")).length
+    },
+    items,
+    evidence: ["/api/operations/post-cutover-observation", "/api/operations/post-cutover-observation/actions", "platformProcessAudit", "securityEvents"]
+  };
+}
+
 function buildOperationsIntelligence({ snapshots, dispatchRequests, reconciliationReviews }) {
   const lowerPressureTargets = [...snapshots].sort((a, b) => Number(a.bedOccupancyRate || 0) - Number(b.bedOccupancyRate || 0));
   const recommendations = snapshots.map((snapshot) => {
@@ -4814,6 +4949,16 @@ function buildHospitalOperationsDashboard(data) {
   dashboard.cutoverCommand = buildOperationsCutoverCommand({
     productionHardening,
     siteJointPatrol,
+    mobileDuty: dashboard.mobileDuty,
+    processAudit: data.platformProcessAudit,
+    securityEvents: data.securityEvents
+  });
+  dashboard.postCutoverObservation = buildOperationsPostCutoverObservation({
+    snapshots,
+    dispatchRequests,
+    reconciliationReviews,
+    siteJointPatrol,
+    cutoverCommand: dashboard.cutoverCommand,
     mobileDuty: dashboard.mobileDuty,
     processAudit: data.platformProcessAudit,
     securityEvents: data.securityEvents
@@ -8679,6 +8824,56 @@ async function handleApi(req, res) {
     writeDatabase(data);
     const refreshed = buildHospitalOperationsDashboard(data);
     sendJson(res, 201, { audit, cutoverCommand: refreshed.cutoverCommand });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/post-cutover-observation") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/post-cutover-observation");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.postCutoverObservation);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/operations/post-cutover-observation/actions") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/post-cutover-observation/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const dashboard = buildHospitalOperationsDashboard(data);
+    const items = Array.isArray(dashboard.postCutoverObservation?.items) ? dashboard.postCutoverObservation.items : [];
+    const item = items.find((row) => row.id === payload.itemId) || items[0];
+    if (!item) {
+      sendJson(res, 400, { error: "Bad Request", message: "上线后观察项不存在" });
+      return;
+    }
+    const now = new Date().toISOString();
+    const audit = {
+      process: "医院运行上线后观察",
+      owner: item.owner || user.name,
+      status: String(payload.status || "已观察").trim(),
+      risk: item.priority === "高" ? "上线后异常待处置" : "上线后常规观察",
+      auditPoint: `${item.title}：${item.metric || ""}`,
+      evidence: `${item.id}/${now}`,
+      nextAction: String(payload.note || item.nextAction || "保持观察记录归档，并进入下一观察窗口。").trim()
+    };
+    data.platformProcessAudit = [audit, ...(Array.isArray(data.platformProcessAudit) ? data.platformProcessAudit : [])].slice(0, 80);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "operations-post-cutover-observation",
+        target: item.id,
+        result: "allowed",
+        detail: `${item.title}:${audit.status}:${item.priority}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    const refreshed = buildHospitalOperationsDashboard(data);
+    sendJson(res, 201, { audit, postCutoverObservation: refreshed.postCutoverObservation });
     return;
   }
 

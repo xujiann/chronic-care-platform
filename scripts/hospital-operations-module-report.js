@@ -110,6 +110,13 @@ function buildCapabilities(data, serverSource, readiness, release) {
       detail: "按生产加固检查项生成割接签收任务，跟踪阻断项、观察窗口、回退策略和审计留痕。"
     },
     {
+      id: "post-cutover-observation",
+      name: "上线后观察台",
+      status: release.checks.some((item) => item.id === "release:postCutoverObservation" && item.passed) ? "ready" : "needs-attention",
+      evidence: ["/api/operations/post-cutover-observation", "/api/operations/post-cutover-observation/actions", "platformProcessAudit"],
+      detail: "按 T+0/T+1 观察窗口跟踪运行健康、资源压力、调度积压、直报复核、巡检归档、割接签收和移动值守提醒。"
+    },
+    {
       id: "ops-intelligence",
       name: "智能调度建议",
       status: release.checks.some((item) => item.id === "release:intelligence" && item.passed) ? "ready" : "needs-attention",
@@ -180,8 +187,8 @@ function buildNextPlan() {
       phase: "P0 生产加固",
       owner: "平台运维/安全管理岗",
       scope: "生产密钥、审计保全、监控告警、灾备演练、回退方案",
-      deliverable: "已上线 /api/operations/production-hardening、/api/operations/cutover-command 和生产割接签收台；真实密钥、保全路径、演练签字、观察窗口和回退策略为现场归档项。",
-      exitCriteria: "代码侧已完成阻断清单和签收审计；生产前需 release:report:full 无 error 且割接项完成真实签字归档。"
+      deliverable: "已上线 /api/operations/production-hardening、/api/operations/cutover-command、/api/operations/post-cutover-observation、生产割接签收台和上线后观察台；真实密钥、保全路径、演练签字、观察窗口和回退策略为现场归档项。",
+      exitCriteria: "代码侧已完成阻断清单、签收审计和 T+1 观察闭环；生产前需 release:report:full 无 error 且割接项完成真实签字归档。"
     },
     {
       id: "ops-intelligence",

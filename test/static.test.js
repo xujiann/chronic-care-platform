@@ -460,6 +460,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsHtml, /operations-site-joint-patrol/);
   assert.match(operationsHtml, /operation-production-hardening/);
   assert.match(operationsHtml, /operation-cutover-command/);
+  assert.match(operationsHtml, /operation-post-cutover-observation/);
   assert.match(operationsHtml, /operation-intelligence/);
   assert.match(operationsHtml, /operation-resource-pool/);
   assert.match(operationsHtml, /operation-mobile-duty/);
@@ -507,6 +508,9 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsJs, /renderCutoverCommand/);
   assert.match(operationsJs, /buildStaticCutoverCommand/);
   assert.match(operationsJs, /signoffCutoverCommand/);
+  assert.match(operationsJs, /renderPostCutoverObservation/);
+  assert.match(operationsJs, /buildStaticPostCutoverObservation/);
+  assert.match(operationsJs, /submitPostCutoverObservation/);
   assert.match(operationsJs, /renderOperationsIntelligence/);
   assert.match(operationsJs, /renderResourcePool/);
   assert.match(operationsJs, /buildStaticResourcePool/);
@@ -552,6 +556,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsJs, /\/api\/operations\/site-joint-patrol/);
   assert.match(operationsJs, /\/api\/operations\/production-hardening/);
   assert.match(operationsJs, /\/api\/operations\/cutover-command/);
+  assert.match(operationsJs, /\/api\/operations\/post-cutover-observation/);
   assert.match(operationsJs, /\/api\/operations\/intelligence/);
   assert.match(operationsJs, /\/api\/operations\/resource-pool/);
   assert.match(operationsJs, /\/api\/operations\/mobile-duty/);
@@ -571,6 +576,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("portal.css"), /interface-mapping-card/);
   assert.match(read("portal.css"), /site-joint-patrol-card/);
   assert.match(read("portal.css"), /operation-cutover-card/);
+  assert.match(read("portal.css"), /operation-observation-card/);
   assert.match(read("portal.css"), /command-chain-sla/);
   assert.match(read("portal.css"), /operation-playbook-card/);
   assert.match(read("portal.css"), /operation-resource-pool-card/);
@@ -610,6 +616,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("server.js"), /\/api\/operations\/site-joint-patrol/);
   assert.match(read("server.js"), /\/api\/operations\/production-hardening/);
   assert.match(read("server.js"), /\/api\/operations\/cutover-command/);
+  assert.match(read("server.js"), /\/api\/operations\/post-cutover-observation/);
   assert.match(read("server.js"), /\/api\/operations\/intelligence/);
   assert.match(read("server.js"), /\/api\/operations\/resource-pool/);
   assert.match(read("server.js"), /\/api\/operations\/mobile-duty/);
@@ -622,6 +629,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("server.js"), /buildOperationsInterfaceMappingEvidence/);
   assert.match(read("server.js"), /buildOperationsSiteJointPatrol/);
   assert.match(read("server.js"), /buildOperationsCutoverCommand/);
+  assert.match(read("server.js"), /buildOperationsPostCutoverObservation/);
   assert.match(read("server.js"), /buildCommandSla/);
   assert.match(read("server.js"), /buildOperationsPlaybooks/);
   assert.match(read("server.js"), /buildOperationsHandover/);

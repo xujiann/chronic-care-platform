@@ -1159,6 +1159,73 @@ dialog::backdrop {
   padding: 5px 8px;
 }
 
+.operation-observation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.operation-observation-summary,
+.operation-observation-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 12px;
+}
+
+.operation-observation-summary.ready,
+.operation-observation-card.ready {
+  background: #f4fbf9;
+  border-color: #b8d8d1;
+}
+
+.operation-observation-summary.watching,
+.operation-observation-card.warning {
+  background: #fff9ea;
+  border-color: #edcf8f;
+}
+
+.operation-observation-card.critical {
+  background: #fff4f2;
+  border-color: #e7a19a;
+}
+
+.operation-observation-summary strong,
+.operation-observation-card strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.operation-observation-summary span,
+.operation-observation-summary small,
+.operation-observation-card p,
+.operation-observation-card footer {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.operation-observation-card {
+  display: grid;
+  gap: 8px;
+}
+
+.operation-observation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.operation-observation-actions span {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fbfd;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 5px 8px;
+}
+
 .command-chain-panel {
   margin-bottom: 16px;
 }
