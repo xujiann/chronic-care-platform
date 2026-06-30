@@ -273,6 +273,8 @@ The field contracts are tracked as `referral-feedback-callback-v1`, `referral-sc
 
 `GET /api/referral-teleconsultations/joint-test-ledger` returns the joint-test reconciliation ledger across callback replay events, local demo evidence, onsite signoff status, SLA supervision, and insurance payment-policy rows.
 
+`POST /api/referral-teleconsultations/joint-test-ledger/tasks` lets county or commission users create idempotent `taskMessages` from unresolved ledger rows, so callback replay, onsite signoff, SLA supervision, and insurance-policy follow-up can be assigned before final acceptance.
+
 `GET /api/referral-teleconsultations/signoff-summary` returns the demo-ready/site-pending signoff summary for referral center, receiving hospital, hospital IT, county performance, and insurance review, so onsite teams can see which local evidence is ready before attaching real signed records.
 
 `POST /api/referral-teleconsultations/signoff-summary/:role/evidence` archives an onsite signoff record for an approved role. Commission/county users can archive any role, institution users can archive referral-center/receiving-hospital/hospital-it evidence, and insurance users can archive insurance evidence; every write records signer, organization, note, audit log, and security event.

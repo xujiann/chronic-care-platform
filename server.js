@@ -6714,6 +6714,66 @@ function buildReferralTeleconsultationJointTestLedger(data) {
   };
 }
 
+function createReferralTeleconsultationJointTestTasks(data, user) {
+  const ledger = buildReferralTeleconsultationJointTestLedger(data);
+  const existing = Array.isArray(data.taskMessages) ? data.taskMessages : [];
+  const existingKeys = new Set(existing.map((message) => message.jointTestKey || message.notificationKey).filter(Boolean));
+  const now = new Date().toISOString();
+  const messages = ledger.rows
+    .filter((row) => !["matched", "signed"].includes(row.status))
+    .map((row) => {
+      const key = `referralTeleconsultations:joint-test:${row.role}`;
+      if (existingKeys.has(key)) return null;
+      const targetRole = row.role === "insurance" ? "insurance" : row.role === "county-performance" ? "county" : "institution";
+      return {
+        id: `msg-${randomUUID()}`,
+        taskId: `referralTeleconsultations:joint-test:${row.role}`,
+        collection: "referralTeleconsultations",
+        sourceId: row.role,
+        residentId: "",
+        targetRole,
+        channel: "in_app",
+        title: `Referral teleconsultation joint-test follow-up: ${row.role}`,
+        body: `${row.title}: ${row.nextAction}`,
+        status: "sent",
+        notificationKey: key,
+        jointTestKey: key,
+        receipts: [],
+        createdAt: now,
+        createdBy: user.username || user.role,
+        createdByName: user.name
+      };
+    })
+    .filter(Boolean);
+  data.taskMessages = [...messages, ...existing].slice(0, 300);
+  if (messages.length) {
+    data.securityEvents = resealAuditTrail([
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "create referral teleconsultation joint-test tasks",
+        target: "referral-teleconsultation",
+        result: "allowed",
+        detail: `${messages.length} joint-test tasks created`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ]);
+  }
+  writeDatabase(data);
+  return {
+    ok: true,
+    messages,
+    summary: {
+      created: messages.length,
+      pendingRows: ledger.rows.filter((row) => !["matched", "signed"].includes(row.status)).length,
+      totalRows: ledger.rows.length
+    },
+    ledger
+  };
+}
+
 function buildReferralTeleconsultationSignoffSummary(data, options = {}) {
   const teleconsultations = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
   const signoffRecords = Array.isArray(data.referralTeleconsultationSignoffs) ? data.referralTeleconsultationSignoffs : [];
@@ -8104,6 +8164,13 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/referral-teleconsultations/joint-test-ledger");
     if (!user) return;
     sendJson(res, 200, buildReferralTeleconsultationJointTestLedger(readDatabase()));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/referral-teleconsultations/joint-test-ledger/tasks") {
+    const user = requireApiRole(req, res, ["commission", "county"], "/api/referral-teleconsultations/joint-test-ledger/tasks");
+    if (!user) return;
+    sendJson(res, 201, createReferralTeleconsultationJointTestTasks(readDatabase(), user));
     return;
   }
 

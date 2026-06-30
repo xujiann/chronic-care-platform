@@ -17,6 +17,7 @@ const REQUIRED_BOUNDARIES = [
   "SLA disposition",
   "joint test pack",
   "joint test ledger",
+  "joint test task dispatch",
   "insurance payment policy",
   "onsite signoff summary",
   "onsite signoff archive"
@@ -209,6 +210,7 @@ function buildReferralTeleconsultationReadinessReport(options = {}) {
     "SLA disposition": teleconsultations.every((item) => item.slaDisposition && item.countySupervision),
     "joint test pack": /buildReferralTeleconsultationJointTestPack/.test(server),
     "joint test ledger": /buildReferralTeleconsultationJointTestLedger/.test(server) && /county-teleconsultation-joint-ledger/.test(county),
+    "joint test task dispatch": /joint-test-ledger\/tasks/.test(server) && /createReferralJointLedgerTasks/.test(county),
     "insurance payment policy": teleconsultations.every((item) => item.performance?.insurancePaymentPath),
     "onsite signoff summary": signoffSummary.summary.roles >= 5 && signoffSummary.summary.demoReady >= 5,
     "onsite signoff archive": /upsertReferralTeleconsultationSignoff/.test(server) && /data-referral-signoff-submit/.test(county)
@@ -230,6 +232,7 @@ function buildReferralTeleconsultationReadinessReport(options = {}) {
     { id: "referral:countySupervision", passed: countySupervised.length === teleconsultations.length && /Supervision/.test(county), detail: `${countySupervised.length}/${teleconsultations.length} county supervision rows` },
     { id: "referral:jointTestPack", passed: /joint-test-pack/.test(server) && /buildReferralTeleconsultationJointTestPack/.test(server), detail: "runtime joint-test pack exposes callback samples, checklist, and signoff roles" },
     { id: "referral:jointTestLedger", passed: /joint-test-ledger/.test(server) && /buildReferralTeleconsultationJointTestLedger/.test(server) && /renderCountyTeleconsultationJointLedger/.test(county), detail: `${jointLedger.summary.localReady}/${jointLedger.summary.rows} local-ready rows; ${jointLedger.summary.callbackMatchedContracts}/${jointLedger.summary.callbackContracts} callbacks replayed` },
+    { id: "referral:jointTestTaskDispatch", passed: /joint-test-ledger\/tasks/.test(server) && /createReferralTeleconsultationJointTestTasks/.test(server) && /data-referral-joint-ledger-tasks/.test(county), detail: "county command board can create idempotent joint-test taskMessages from the ledger" },
     { id: "referral:signoffSummary", passed: /signoff-summary/.test(server) && /county-teleconsultation-signoff/.test(county) && signoffSummary.summary.allDemoReady, detail: `${signoffSummary.summary.demoReady}/${signoffSummary.summary.roles} demo-ready roles; ${signoffSummary.summary.sitePending} site signoffs pending` },
     { id: "referral:signoffArchive", passed: /upsertReferralTeleconsultationSignoff/.test(server) && /signoff-summary\/:role\/evidence/.test(server) && /archiveReferralSignoff/.test(county) && /data-referral-signoff-submit/.test(county), detail: `${signoffSummary.summary.siteSigned}/${signoffSummary.summary.roles} onsite signoffs archived; ${signoffSummary.summary.sitePending} pending` },
     { id: "referral:insurancePerformancePolicy", passed: insurancePerformanceRows.length === teleconsultations.length && /performance-policy/.test(server) && /referral-performance-policy/.test(readText("insurance.html") + readText("insurance.js")), detail: `${insurancePerformanceRows.length}/${teleconsultations.length} payment policy rows` },

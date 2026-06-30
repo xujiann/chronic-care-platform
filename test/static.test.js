@@ -364,6 +364,8 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("county.js"), /renderCountyTeleconsultationRiskBoard/);
   assert.match(read("county.js"), /renderCountyTeleconsultationJointLedger/);
   assert.match(read("county.js"), /data-referral-joint-ledger/);
+  assert.match(read("county.js"), /data-referral-joint-ledger-tasks/);
+  assert.match(read("county.js"), /createReferralJointLedgerTasks/);
   assert.match(read("county.js"), /buildCountyTeleconsultationSignoffRows/);
   assert.match(read("county.js"), /data-referral-signoff-status/);
   assert.match(read("county.js"), /data-referral-signoff-submit/);
@@ -378,7 +380,9 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("server.js"), /referral-teleconsultations\/escalations\/run/);
   assert.match(read("server.js"), /referral-teleconsultations\/joint-test-pack/);
   assert.match(read("server.js"), /referral-teleconsultations\/joint-test-ledger/);
+  assert.match(read("server.js"), /joint-test-ledger\/tasks/);
   assert.match(read("server.js"), /buildReferralTeleconsultationJointTestLedger/);
+  assert.match(read("server.js"), /createReferralTeleconsultationJointTestTasks/);
   assert.match(read("server.js"), /referral-teleconsultations\/signoff-summary/);
   assert.match(read("server.js"), /signoff-summary\/:role\/evidence/);
   assert.match(read("server.js"), /upsertReferralTeleconsultationSignoff/);

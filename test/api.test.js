@@ -656,6 +656,19 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(jointTestLedger.body.summary.rows, 5);
     assert.equal(jointTestLedger.body.summary.callbackContracts, 3);
     assert.equal(jointTestLedger.body.rows.some((item) => item.contractId === "referral-report-callback-v1" && item.status === "local-evidence-ready"), true);
+    const jointTaskDispatch = await api(baseUrl, "/api/referral-teleconsultations/joint-test-ledger/tasks", authorized(county.body.token, {
+      method: "POST",
+      body: JSON.stringify({})
+    }));
+    assert.equal(jointTaskDispatch.response.status, 201);
+    assert.equal(jointTaskDispatch.body.summary.created, 5);
+    assert.equal(jointTaskDispatch.body.messages.some((item) => item.jointTestKey === "referralTeleconsultations:joint-test:hospital-it"), true);
+    const jointTaskReplay = await api(baseUrl, "/api/referral-teleconsultations/joint-test-ledger/tasks", authorized(county.body.token, {
+      method: "POST",
+      body: JSON.stringify({})
+    }));
+    assert.equal(jointTaskReplay.response.status, 201);
+    assert.equal(jointTaskReplay.body.summary.created, 0);
     const signoffSummary = await api(baseUrl, "/api/referral-teleconsultations/signoff-summary", authorized(county.body.token));
     assert.equal(signoffSummary.response.status, 200);
     assert.equal(signoffSummary.body.ok, true);
