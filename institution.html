@@ -30,48 +30,48 @@
           <span id="chronic-followup-summary"></span>
         </div>
         <div class="panel-title">
-          <h2>Chronic Launch Core</h2>
+          <h2>慢病上线核心联调</h2>
           <span id="chronic-launch-core-summary"></span>
         </div>
         <div id="chronic-launch-core" class="claim-grid"></div>
         <div id="chronic-followup-metrics" class="claim-grid"></div>
         <div class="chronic-workbench-controls" data-chronic-workbench-controls>
-          <label>Priority
+          <label>优先级
             <select id="chronic-priority-filter">
-              <option value="all">All priorities</option>
-              <option value="critical">Critical</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
+              <option value="all">全部优先级</option>
+              <option value="critical">紧急</option>
+              <option value="high">高</option>
+              <option value="medium">中</option>
+              <option value="low">低</option>
             </select>
           </label>
-          <label>Type
+          <label>任务类型
             <select id="chronic-type-filter">
-              <option value="all">All task types</option>
-              <option value="chronicScreeningTasks">Screening</option>
-              <option value="chronicManagementPlans">Management plan</option>
-              <option value="followups">Follow-up</option>
-              <option value="medicationPickups">Medication</option>
+              <option value="all">全部任务类型</option>
+              <option value="chronicScreeningTasks">筛查分级</option>
+              <option value="chronicManagementPlans">管理计划</option>
+              <option value="followups">随访任务</option>
+              <option value="medicationPickups">用药取药</option>
             </select>
           </label>
-          <label>Search
-            <input id="chronic-search" type="search" placeholder="Resident, task, status" />
+          <label>搜索
+            <input id="chronic-search" type="search" placeholder="居民、任务、状态" />
           </label>
-          <label>Sort
+          <label>排序
             <select id="chronic-sort">
-              <option value="priority">Priority then due date</option>
-              <option value="due">Due date</option>
-              <option value="resident">Resident</option>
+              <option value="priority">优先级与到期时间</option>
+              <option value="due">到期时间</option>
+              <option value="resident">居民姓名</option>
             </select>
           </label>
-          <button class="inline-action" id="chronic-clear-filters" type="button">Clear</button>
+          <button class="inline-action" id="chronic-clear-filters" type="button">清空</button>
         </div>
         <div class="integration-actions" id="chronic-integration-actions">
-          <button class="inline-action" type="button" data-chronic-integration="device">Device upload</button>
-          <button class="inline-action" type="button" data-chronic-integration="pharmacy">Pharmacy callback</button>
-          <button class="inline-action" type="button" data-chronic-integration="familyDoctor">Family doctor closure</button>
-          <button class="inline-action" type="button" data-chronic-integration="outreach">Reminder outreach</button>
-          <span id="chronic-integration-status" class="muted">Field integration ready</span>
+          <button class="inline-action" type="button" data-chronic-integration="device">设备上传</button>
+          <button class="inline-action" type="button" data-chronic-integration="pharmacy">药房回传</button>
+          <button class="inline-action" type="button" data-chronic-integration="familyDoctor">家庭医生闭环</button>
+          <button class="inline-action" type="button" data-chronic-integration="outreach">提醒触达</button>
+          <span id="chronic-integration-status" class="muted">现场联调已就绪</span>
         </div>
         <div id="chronic-followup-workbench" class="list"></div>
       </section>

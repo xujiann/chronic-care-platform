@@ -241,6 +241,8 @@ test("maternal child about page documents policy basis and release evidence", ()
 
 test("chronic follow-up launch core is wired through docs api and portals", () => {
   const packageJson = JSON.parse(read("package.json"));
+  const institutionHtml = read("institution.html");
+  const institutionJs = read("institution.js");
   assert.match(read("docs/chronic-followup-readiness.md"), /chronic-institution-interfaces\.md/);
   assert.match(read("docs/chronic-launch-core.md"), /HIS\/EMR\/LIS\/PACS/);
   assert.match(read("docs/chronic-launch-core.md"), /\/api\/chronic\/launch-core/);
@@ -252,9 +254,15 @@ test("chronic follow-up launch core is wired through docs api and portals", () =
   assert.match(read("server.js"), /\/api\/chronic\/pharmacy-callbacks/);
   assert.match(read("server.js"), /\/api\/chronic\/family-doctor-actions/);
   assert.match(read("server.js"), /\/api\/chronic\/reminder-outreach/);
-  assert.match(read("institution.html"), /chronic-launch-core/);
-  assert.match(read("institution.js"), /\/chronic\/device-measurements/);
-  assert.match(read("institution.js"), /\/chronic\/launch-core\/actions/);
+  assert.match(institutionHtml, /chronic-launch-core/);
+  assert.match(institutionHtml, /慢病上线核心联调/);
+  assert.match(institutionHtml, /设备上传/);
+  assert.match(institutionHtml, /现场联调已就绪/);
+  assert.doesNotMatch(institutionHtml, /Chronic Launch Core|Device upload|Pharmacy callback|Family doctor closure|Reminder outreach|Field integration ready|Resident, task, status/);
+  assert.match(institutionJs, /\/chronic\/device-measurements/);
+  assert.match(institutionJs, /\/chronic\/launch-core\/actions/);
+  assert.match(institutionJs, /接收会诊/);
+  assert.match(institutionJs, /回传会诊报告/);
   assert.match(read("citizen.html"), /resident-checkin-form/);
   assert.match(read("citizen.js"), /\/chronic\/resident-checkins/);
   assert.match(read("data/db.json"), /"chronicExternalIntegrations"/);
@@ -832,22 +840,23 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenHtml, /service-escort/);
   assert.match(citizenHtml, /service-registration/);
   assert.match(citizenHtml, /module-interface-panel/);
+  assert.match(citizenHtml, /module-interface-panel"[^>]*data-internal-launch-panel hidden/);
   assert.match(citizenHtml, /module-interface-grid/);
   assert.match(citizenHtml, /data-governance-panel/);
+  assert.match(citizenHtml, /data-governance-panel"[^>]*data-internal-launch-panel hidden/);
   assert.match(citizenHtml, /data-governance-grid/);
   assert.match(citizenHtml, /client-channel-panel/);
+  assert.match(citizenHtml, /client-channel-panel"[^>]*data-internal-launch-panel hidden/);
   assert.match(citizenHtml, /client-channel-switch/);
   assert.match(citizenHtml, /client-channel-detail/);
   assert.match(citizenHtml, /registration-form/);
   assert.match(citizenHtml, /longterm-care-form/);
-  assert.match(citizenHtml, /module-interface-panel"[^>]*data-internal-launch-panel hidden/);
   assert.match(citizenHtml, /longterm-care-result/);
   assert.match(citizenHtml, /registration-schedule-cards/);
-  assert.match(citizenHtml, /data-governance-panel"[^>]*data-internal-launch-panel hidden/);
   assert.match(citizenHtml, /registration-order-cards/);
   assert.match(citizenHtml, /service-page-content/);
-  assert.match(citizenHtml, /client-channel-panel"[^>]*data-internal-launch-panel hidden/);
   assert.match(citizenHtml, /resident-function-audit/);
+  assert.match(citizenHtml, /resident-function-audit"[^>]*data-internal-launch-panel hidden/);
   assert.match(citizenHtml, /longterm-care-cards/);
   assert.match(citizenHtml, /长期照护评估闭环/);
   assert.match(citizenHtml, /data-service-pane="health-record"/);
@@ -856,7 +865,6 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.ok(citizenHtml.indexOf("service-command-panel") < citizenHtml.indexOf("summary-grid"));
   assert.ok(citizenHtml.indexOf("service-page-content") < citizenHtml.indexOf('data-service-pane="health-record"'));
   assert.ok(citizenHtml.indexOf("resident-function-audit") > citizenHtml.indexOf('data-service-pane="emr"'));
-  assert.match(citizenHtml, /resident-function-audit"[^>]*data-internal-launch-panel hidden/);
   assert.match(citizenJs, /citizenServiceTabs/);
   assert.match(citizenJs, /citizenModuleInterfaces/);
   assert.match(citizenJs, /renderModuleInterfaces/);
@@ -985,6 +993,10 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /hisOrders/);
   assert.match(citizenJs, /insuranceReady/);
   assert.match(citizenJs, /个可约号源/);
+  assert.match(citizenHtml, /\u670d\u52a1\u8bf4\u660e/u);
+  assert.doesNotMatch(citizenHtml, /\u4e0a\u7ebf\u8fb9\u754c|\u751f\u4ea7\u4e0a\u7ebf\u65f6\u66ff\u6362|\u5f85\u63a5\u5165/u);
+  assert.match(citizenJs, /\u533b\u9662\u53f7\u6e90\u6c60/u);
+  assert.doesNotMatch(citizenJs, /\u6f14\u793a\u53f7\u6e90\u6c60|\u672c\u5730\u6302\u53f7\u6f14\u793a|\u957f\u62a4\u9669\u6f14\u793a\u6761\u4ef6\u7b26\u5408/u);
   assert.match(citizenCss, /registration-order-card/);
   assert.match(citizenCss, /position: fixed/);
   assert.match(citizenCss, /safe-area-inset-bottom/);
@@ -993,10 +1005,6 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /scroll-snap-type: x mandatory/);
   assert.match(citizenCss, /min-height: 44px/);
   assert.match(citizenCss, /service-status-card/);
-  assert.match(citizenHtml, /\u670d\u52a1\u8bf4\u660e/u);
-  assert.doesNotMatch(citizenHtml, /\u4e0a\u7ebf\u8fb9\u754c|\u751f\u4ea7\u4e0a\u7ebf\u65f6\u66ff\u6362|\u5f85\u63a5\u5165/u);
-  assert.match(citizenJs, /\u533b\u9662\u53f7\u6e90\u6c60/u);
-  assert.doesNotMatch(citizenJs, /\u6f14\u793a\u53f7\u6e90\u6c60|\u672c\u5730\u6302\u53f7\u6f14\u793a|\u957f\u62a4\u9669\u6f14\u793a\u6761\u4ef6\u7b26\u5408/u);
   assert.match(citizenCss, /service-summary-stats/);
   const citizenInterfaceDoc = read("docs/citizen-module-interface-map.md");
   assert.match(citizenInterfaceDoc, /C端居民端模块接口说明/);
