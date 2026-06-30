@@ -17,6 +17,11 @@ function readText(relativePath) {
   return fs.readFileSync(path.join(ROOT, relativePath), "utf8");
 }
 
+function readOptionalText(relativePath) {
+  const target = path.join(ROOT, relativePath);
+  return fs.existsSync(target) ? fs.readFileSync(target, "utf8") : "";
+}
+
 function fallbackPolicy() {
   return {
     scope: REQUIRED_POLICY_FIELDS,
@@ -247,6 +252,67 @@ function hasRegulatorySubmissionEvidence(policy, frontend, server, moduleDoc, la
     /压测/.test(moduleDoc + launchPlan);
 }
 
+function buildInternetNursingCutoverPack(policy) {
+  const production = policy.productionIntegration || fallbackPolicy().productionIntegration;
+  const payment = policy.paymentIntegration || fallbackPolicy().paymentIntegration;
+  const device = policy.deviceVerification || fallbackPolicy().deviceVerification;
+  const submission = policy.regulatorySubmission || fallbackPolicy().regulatorySubmission;
+  const tracks = [
+    {
+      id: "nursing-cutover-message-signature",
+      owner: "hospital-nursing-it",
+      evidence: ["message gateway signoff", "signature storage signoff", production.version],
+      ready: production.messageGateway?.status === "contract-ready" && production.signatureStorage?.status === "contract-ready",
+      blockingUntil: "signed SMS, hospital message, in-app fallback, and electronic signature storage acceptance"
+    },
+    {
+      id: "nursing-cutover-hospital-connectors",
+      owner: "institution-integration",
+      evidence: (production.hospitalConnectors || []).map((item) => `${item.system}:${item.route}`),
+      ready: (production.hospitalConnectors || []).length >= 3 && (production.hospitalConnectors || []).every((item) => item.status === "mapped" && item.auth),
+      blockingUntil: "signed nursing management, EMR, and supervision connector joint-test records"
+    },
+    {
+      id: "nursing-cutover-payment-reconciliation",
+      owner: "finance-insurance",
+      evidence: payment.modes || [],
+      ready: payment.status === "contract-ready" && (payment.modes || []).includes("daily reconciliation"),
+      blockingUntil: "signed insurance e-voucher, self-pay, refund, invoice, and T+1 reconciliation acceptance"
+    },
+    {
+      id: "nursing-cutover-device-drill",
+      owner: "nursing-operations",
+      evidence: device.requiredSignals || [],
+      ready: device.status === "contract-ready" && (device.requiredSignals || []).includes("one-click alert"),
+      blockingUntil: "signed GPS, location device, service recorder, alert, and photo attachment field drill"
+    },
+    {
+      id: "nursing-cutover-regulatory-pressure-test",
+      owner: "health-commission-supervision",
+      evidence: [`${submission.submissionCycle}`, `p95=${submission.pressureTest?.p95Ms || "n/a"}ms`, ...(submission.signoffs || [])],
+      ready: submission.pressureTest?.status === "passed" && (submission.signoffs || []).length >= 3,
+      blockingUntil: "signed monthly and high-risk realtime submission pressure-test record"
+    }
+  ];
+  return {
+    status: tracks.every((item) => item.ready) ? "ready-for-site-signoff" : "blocked",
+    template: "release/templates/production-signoff/README.md",
+    auditRetentionEvidence: "release/audit-retention-report.md",
+    productionCutoverEvidence: "release/production-cutover-checklist.md",
+    tracks
+  };
+}
+
+function hasCutoverPackEvidence(cutoverPack, moduleDoc, launchPlan) {
+  return cutoverPack.status === "ready-for-site-signoff" &&
+    cutoverPack.tracks.length >= 5 &&
+    cutoverPack.tracks.every((item) => item.ready && item.owner && item.blockingUntil && item.evidence.length > 0) &&
+    /release\/templates\/production-signoff\/README\.md/.test(cutoverPack.template) &&
+    /release\/audit-retention-report\.md/.test(cutoverPack.auditRetentionEvidence) &&
+    /release\/production-cutover-checklist\.md/.test(cutoverPack.productionCutoverEvidence) &&
+    /nursing-cutover/.test(moduleDoc + launchPlan);
+}
+
 function buildInternetNursingReadinessReport(options = {}) {
   const data = options.data ?? readJson("data/db.json");
   const pkg = options.pkg ?? readJson("package.json");
@@ -254,6 +320,7 @@ function buildInternetNursingReadinessReport(options = {}) {
   const auth = options.auth ?? readText("auth.js");
   const frontend = options.frontend ?? readText("internet-nursing.html") + readText("internet-nursing.js");
   const mobilePreview = options.mobilePreview ?? readText("mobile-preview.html");
+  const cutoverDoc = options.cutoverDoc ?? readOptionalText("docs/互联网护理现场割接证据包.md");
   const moduleDoc = options.moduleDoc ?? readText("docs/互联网护理服务模块说明.md");
   const launchPlan = options.launchPlan ?? readText("docs/互联网护理上线与下一步开发计划.md");
   const policy = { ...fallbackPolicy(), ...(data.internetNursingPolicy || {}) };
@@ -267,6 +334,7 @@ function buildInternetNursingReadinessReport(options = {}) {
   const institutions = mergeById(fallbackInstitutions(), data.internetNursingInstitutions);
   const nurses = mergeById(fallbackNurses(), data.internetNursingNurses);
   const orders = mergeById(fallbackOrders(), data.internetNursingOrders);
+  const cutoverPack = buildInternetNursingCutoverPack(policy);
   const institutionIds = new Set(institutions.map((item) => item.id));
   const nurseIds = new Set(nurses.map((item) => item.id));
   const checks = [
@@ -285,6 +353,7 @@ function buildInternetNursingReadinessReport(options = {}) {
     { id: "nursing:paymentIntegration", passed: hasPaymentIntegrationEvidence(policy, orders, frontend, server, moduleDoc, launchPlan), detail: "medical insurance e-voucher, mobile self-pay, refund, invoice, and reconciliation contracts are implemented" },
     { id: "nursing:deviceVerification", passed: hasDeviceVerificationEvidence(policy, orders, nurses, frontend, server, moduleDoc, launchPlan), detail: "mobile GPS, location device, recorder, one-click alert, photo attachment, and exception escalation evidence are implemented" },
     { id: "nursing:regulatorySubmission", passed: hasRegulatorySubmissionEvidence(policy, frontend, server, moduleDoc, launchPlan), detail: "field mapping, monthly and realtime submission, signoff, and pressure-test evidence are implemented" },
+    { id: "nursing:siteCutoverPack", passed: hasCutoverPackEvidence(cutoverPack, `${moduleDoc}\n${cutoverDoc}`, launchPlan), detail: "site cutover signoff pack maps message, signature, connector, payment, device, regulatory, and audit-retention evidence" },
     { id: "nursing:api", passed: /\/api\/internet-nursing\/dashboard/.test(server) && /\/api\/internet-nursing\/orders/.test(server) && /canAccessInternetNursingOrder/.test(server), detail: "dashboard, order creation, action, and role guard present" },
     { id: "nursing:frontend", passed: /nursing-appointment-form/.test(frontend) && /nursing-nurse-queue/.test(frontend) && /nursing-risk-guidance/.test(frontend) && /fetchInternetNursingDashboard/.test(frontend), detail: "citizen, hospital, nurse, and risk guidance work areas present" },
     { id: "nursing:visibleText", passed: !hasCorruptedVisibleText(frontend) && /\u8ba2\u5355/.test(frontend) && /\u63a5\u5355/.test(frontend) && /\u9884\u7ea6\u5df2\u63d0\u4ea4/.test(frontend), detail: "visible Chinese labels and operation feedback are clean" },
@@ -308,8 +377,11 @@ function buildInternetNursingReadinessReport(options = {}) {
       qualifiedNurses: nurses.filter(nurseQualified).length,
       orders: orders.length,
       highRiskOrders: orders.filter((item) => item.riskLevel === "high").length,
-      trackingOrders: orders.filter((item) => item.locationTrace === "tracking").length
+      trackingOrders: orders.filter((item) => item.locationTrace === "tracking").length,
+      cutoverTracks: cutoverPack.tracks.length,
+      cutoverReadyTracks: cutoverPack.tracks.filter((item) => item.ready).length
     },
+    cutoverPack,
     checks
   };
 }
@@ -328,7 +400,19 @@ function renderMarkdown(report) {
     `- Orders: ${report.summary.orders}`,
     `- High-risk orders: ${report.summary.highRiskOrders}`,
     `- Tracking orders: ${report.summary.trackingOrders}`,
+    `- Cutover tracks: ${report.summary.cutoverReadyTracks}/${report.summary.cutoverTracks}`,
     `- Module document: docs/互联网护理服务模块说明.md`,
+    "",
+    "## Site Cutover Pack",
+    "",
+    `- Status: ${report.cutoverPack.status}`,
+    `- Template: ${report.cutoverPack.template}`,
+    `- Audit retention evidence: ${report.cutoverPack.auditRetentionEvidence}`,
+    `- Production cutover evidence: ${report.cutoverPack.productionCutoverEvidence}`,
+    "",
+    "| Track | Owner | Ready | Blocking until |",
+    "| --- | --- | --- | --- |",
+    ...report.cutoverPack.tracks.map((item) => `| ${item.id} | ${item.owner} | ${item.ready ? "yes" : "no"} | ${item.blockingUntil.replace(/\|/g, "/")} |`),
     "",
     "## Checks",
     "",
@@ -355,6 +439,7 @@ if (require.main === module) main();
 
 module.exports = {
   buildInternetNursingReadinessReport,
+  buildInternetNursingCutoverPack,
   renderMarkdown,
   writeReport
 };

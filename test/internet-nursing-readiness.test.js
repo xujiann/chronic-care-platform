@@ -34,9 +34,16 @@ test("internet nursing readiness validates three-role workflow and policy eviden
   assert.equal(report.checks.some((item) => item.id === "nursing:paymentIntegration" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "nursing:deviceVerification" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "nursing:regulatorySubmission" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "nursing:siteCutoverPack" && item.passed), true);
+  assert.equal(report.summary.cutoverTracks, 5);
+  assert.equal(report.summary.cutoverReadyTracks, 5);
+  assert.equal(report.cutoverPack.status, "ready-for-site-signoff");
+  assert.equal(report.cutoverPack.tracks.every((item) => item.id.startsWith("nursing-cutover-") && item.ready), true);
   assert.equal(report.checks.some((item) => item.id === "nursing:developedFeatures" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "nursing:nextPlan" && item.passed), true);
   assert.match(renderMarkdown(report), /Internet nursing readiness report/);
+  assert.match(renderMarkdown(report), /Site Cutover Pack/);
+  assert.match(renderMarkdown(report), /nursing-cutover-payment-reconciliation/);
   assert.match(renderMarkdown(report), /docs\/互联网护理服务模块说明\.md/);
 });
 
@@ -51,5 +58,7 @@ test("internet nursing readiness writes release artifacts", (t) => {
   const md = fs.readFileSync(markdown, "utf8");
   assert.equal(json.ok, true);
   assert.equal(json.internetNursingReadiness.ok, true);
+  assert.equal(json.internetNursingReadiness.cutoverPack.tracks.length, 5);
   assert.match(md, /Qualified nurses/);
+  assert.match(md, /Site Cutover Pack/);
 });
