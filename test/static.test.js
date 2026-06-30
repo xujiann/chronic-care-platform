@@ -29,6 +29,13 @@ test("role pages keep explicit page guards", () => {
   });
 });
 
+test("server-backed pages reject stale local demo sessions without bearer tokens", () => {
+  const auth = read("auth.js");
+  assert.match(auth, /API_BASE && !user\.token/);
+  assert.match(auth, /localStorage\.removeItem\(SESSION_KEY\)/);
+  assert.match(auth, /redirect=\$\{encodeURIComponent\(currentPage\(\)\)\}&expired=1/);
+});
+
 test("citizen pages do not expose cross-role module links or management collections", () => {
   const citizenHtml = `${read("citizen.html")}\n${read("mobile-preview.html")}`;
   ["institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html", "quality-safety.html", "quality-safety-about.html"].forEach((target) => {
@@ -413,6 +420,8 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(js, /submitSiteSignoffEvidence/);
   assert.match(js, /submitCoreSystemEvidence/);
   assert.match(js, /data-core-system-evidence/);
+  assert.match(js, /response\.status === 401/);
+  assert.match(js, /HealthCityAuth\?\.logout/);
   assert.match(js, /提交证据/);
   assert.match(js, /zhText\(item\.id\)/);
   assert.match(js, /zhText\(pack\.securityFixture\.signatureBase\)/);

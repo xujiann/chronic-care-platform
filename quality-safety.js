@@ -235,6 +235,10 @@ async function qualityApi(pathname, options = {}) {
     }
   });
   const body = await response.json();
+  if (response.status === 401) {
+    window.HealthCityAuth?.logout?.();
+    throw new Error("登录已过期，请重新登录");
+  }
   if (!response.ok) throw new Error(body.message || body.error || "请求失败");
   return body;
 }

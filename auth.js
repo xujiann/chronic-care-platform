@@ -137,6 +137,11 @@
       window.location.replace(`./login.html?redirect=${encodeURIComponent(currentPage())}`);
       return false;
     }
+    if (API_BASE && !user.token) {
+      localStorage.removeItem(SESSION_KEY);
+      window.location.replace(`./login.html?redirect=${encodeURIComponent(currentPage())}&expired=1`);
+      return false;
+    }
     if (user.expiresAt && new Date(user.expiresAt).getTime() < Date.now()) {
       localStorage.removeItem(SESSION_KEY);
       window.location.replace(`./login.html?redirect=${encodeURIComponent(currentPage())}&expired=1`);
