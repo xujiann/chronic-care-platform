@@ -1,4 +1,4 @@
-const CACHE_NAME = "chronic-care-citizen-v20";
+const CACHE_NAME = "chronic-care-citizen-v21";
 const APP_SHELL = [
   "./",
   "./citizen.html",
@@ -16,6 +16,7 @@ const APP_SHELL = [
   "./citizen.js?v=20260629registration",
   "./citizen.js?v=20260629multinav",
   "./citizen.js?v=20260629care",
+  "./citizen.js?v=20260630layout",
   "./auth.js",
   "./auth.js?v=20260627",
   "./health-archive-standard.js",

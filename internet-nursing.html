@@ -27,7 +27,30 @@
       <section class="metric-grid" id="nursing-metrics"></section>
       <div id="nursing-operation-message" class="auth-bar" role="status" aria-live="polite" hidden></div>
 
-      <section class="portal-grid">
+      <nav class="nursing-role-nav" aria-label="互联网护理角色工作台">
+        <a href="#nursing-mobile-workbench">
+          <strong>手机端</strong>
+          <span>预约与接单</span>
+        </a>
+        <a href="#nursing-appointment-panel">
+          <strong>个人端</strong>
+          <span>居民预约</span>
+        </a>
+        <a href="#nursing-hospital-management">
+          <strong>医院端</strong>
+          <span>评估派单</span>
+        </a>
+        <a href="#nursing-nurse-response">
+          <strong>护士端</strong>
+          <span>响应闭环</span>
+        </a>
+        <a href="#nursing-regulatory-section">
+          <strong>监管端</strong>
+          <span>月报报送</span>
+        </a>
+      </nav>
+
+      <section class="portal-grid" id="nursing-risk-section">
         <article class="panel wide">
           <div class="panel-title">
             <h2>风险处置提示</h2>
@@ -37,7 +60,7 @@
         </article>
       </section>
 
-      <section class="nursing-mobile-workbench" aria-label="互联网护理手机端工作区">
+      <section class="nursing-mobile-workbench" id="nursing-mobile-workbench" aria-label="互联网护理手机端工作区">
         <article class="panel nursing-mobile-panel" data-mobile-surface="citizen-appointment">
           <div class="panel-title">
             <h2>手机端预约</h2>
@@ -56,7 +79,7 @@
       </section>
 
       <section class="portal-grid">
-        <article class="panel nursing-mobile-appointment">
+        <article class="panel nursing-mobile-appointment" id="nursing-appointment-panel">
           <div class="panel-title">
             <h2>个人端预约</h2>
             <span id="nursing-citizen-summary"></span>
@@ -98,7 +121,7 @@
           </form>
         </article>
 
-        <article class="panel wide">
+        <article class="panel wide" id="nursing-hospital-management">
           <div class="panel-title">
             <h2>医院端管理</h2>
             <span>评估 / 知情同意 / 派单</span>
@@ -125,7 +148,7 @@
         </article>
       </section>
 
-      <section class="portal-grid">
+      <section class="portal-grid" id="nursing-nurse-response">
         <article class="panel wide">
           <div class="panel-title">
             <h2>护士端接单</h2>
@@ -146,7 +169,7 @@
         </article>
       </section>
 
-      <section class="portal-grid">
+      <section class="portal-grid" id="nursing-regulatory-section">
         <article class="panel wide">
           <div class="panel-title">
             <h2>监管月报</h2>

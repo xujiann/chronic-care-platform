@@ -50,9 +50,12 @@
         <div id="profile-risk" class="risk-pill">风险等级</div>
       </section>
 
-      <section class="summary-grid" id="summary-grid"></section>
+      <section class="service-command-panel" aria-label="居民服务工作台">
+        <nav class="service-tabs" id="service-tabs" aria-label="居民服务标签页"></nav>
+        <section class="service-summary" id="service-summary" aria-live="polite"></section>
+      </section>
 
-      <section class="service-summary" id="service-summary" aria-live="polite"></section>
+      <section class="summary-grid" id="summary-grid"></section>
 
       <section class="module-interface-panel" id="module-interface-panel" aria-labelledby="module-interface-title">
         <div class="panel-title">
@@ -84,8 +87,6 @@
         </div>
         <div class="client-channel-detail" id="client-channel-detail"></div>
       </section>
-
-      <nav class="service-tabs" id="service-tabs" aria-label="居民服务标签页"></nav>
 
       <div class="service-page-content-anchor" id="service-page-content" aria-hidden="true"></div>
 
@@ -282,7 +283,7 @@
       <section class="panel service-overview-panel" id="service-registration" data-service-pane="registration">
         <div class="panel-title">
           <h2>挂号服务</h2>
-          <span><em class="feature-state ready">已实现</em> HIS/互联网医院号源、预约确认、支付、退号、医保电子凭证和短信通知</span>
+          <span><em class="feature-state ready">已实现</em><span id="registration-summary">HIS/互联网医院号源、预约确认、支付、退号、医保电子凭证和短信通知</span></span>
         </div>
         <div class="registration-workflow">
           <form id="registration-form" class="registration-form">
@@ -480,7 +481,7 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="./health-archive-standard.js"></script>
-    <script src="./citizen.js?v=20260629care"></script>
+    <script src="./citizen.js?v=20260630layout"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));

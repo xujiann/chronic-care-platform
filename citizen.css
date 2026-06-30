@@ -24,6 +24,18 @@ body {
   font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
 }
 
+body::selection {
+  background: rgba(39, 110, 241, 0.18);
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
 body.large-mode {
   font-size: 18px;
 }
@@ -135,6 +147,10 @@ body.large-mode h3 {
   align-items: flex-start;
   padding: 22px;
   margin-bottom: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  backdrop-filter: blur(14px);
 }
 
 .eyebrow {
@@ -169,6 +185,9 @@ h1 {
   display: flex;
   gap: 10px;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 52%;
 }
 
 select,
@@ -220,6 +239,7 @@ select,
   cursor: pointer;
   text-align: left;
   font: inherit;
+  min-height: 58px;
 }
 
 .member-card.active {
@@ -275,33 +295,52 @@ select,
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 14px;
   margin-bottom: 16px;
 }
 
-.service-tabs {
+.service-command-panel {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
   margin-bottom: 16px;
+}
+
+.service-command-panel .service-summary {
+  margin-bottom: 0;
+}
+
+.service-tabs {
+  position: sticky;
+  top: 8px;
+  z-index: 14;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  border: 1px solid rgba(216, 226, 231, 0.86);
+  border-radius: 10px;
+  padding: 8px;
+  margin-bottom: 0;
+  background: rgba(246, 248, 252, 0.94);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(10px);
 }
 
 .service-tabs a {
   display: grid;
   grid-template-rows: auto auto 1fr;
   gap: 6px;
-  min-height: 104px;
+  min-height: 88px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 12px;
+  padding: 10px 12px;
   background: #fff;
   color: var(--ink);
   text-align: left;
   text-decoration: none;
   cursor: pointer;
   font: inherit;
-  box-shadow: var(--shadow);
+  min-width: 0;
 }
 
 .service-tabs a:focus-visible,
@@ -317,6 +356,7 @@ select,
 .service-tabs a.active {
   border-color: var(--blue);
   background: #eaf2ff;
+  box-shadow: inset 0 0 0 1px rgba(29, 78, 216, 0.16);
 }
 
 .service-tabs span,
@@ -353,6 +393,7 @@ select,
 .service-tabs small {
   color: var(--muted);
   line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .service-tabs em {
@@ -374,6 +415,7 @@ select,
 
 .summary-card {
   padding: 16px;
+  min-width: 0;
 }
 
 .summary-card span {
@@ -392,12 +434,13 @@ select,
   display: block;
   margin-top: 8px;
   color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
 .service-summary {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, max-content);
+  align-items: start;
   gap: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -405,6 +448,7 @@ select,
   margin-bottom: 12px;
   background: #fff;
   box-shadow: var(--shadow);
+  min-width: 0;
 }
 
 .service-subnav {
@@ -482,6 +526,7 @@ select,
 .service-summary span,
 .service-summary small {
   color: var(--muted);
+  overflow-wrap: anywhere;
 }
 
 .service-summary strong {
@@ -500,6 +545,7 @@ select,
   display: grid;
   gap: 10px;
   justify-items: end;
+  min-width: 220px;
 }
 
 .service-page-action {
@@ -530,12 +576,13 @@ select,
   margin-bottom: 16px;
   background: #fff;
   box-shadow: var(--shadow);
+  min-width: 0;
 }
 
 .module-interface-grid,
 .data-governance-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 10px;
 }
 
@@ -747,8 +794,14 @@ select,
 .longterm-care-form,
 .longterm-care-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 10px;
+}
+
+.longterm-care-form,
+.escort-appointment-form,
+.registration-form {
+  align-content: start;
 }
 
 .longterm-care-form label,
@@ -758,6 +811,7 @@ select,
   border-radius: 8px;
   background: #f8fbfd;
   padding: 12px;
+  min-width: 0;
 }
 
 .longterm-care-form label {
@@ -790,6 +844,7 @@ select,
 .longterm-care-card span {
   color: var(--muted);
   font-size: 13px;
+  overflow-wrap: anywhere;
 }
 
 .longterm-care-card {
@@ -955,12 +1010,13 @@ select,
 
 .escort-appointment-form {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 14px;
   background: #f8fbfd;
+  min-width: 0;
 }
 
 .escort-appointment-form label {
@@ -988,12 +1044,24 @@ select,
   font: inherit;
 }
 
+.escort-appointment-form input:focus,
+.escort-appointment-form select:focus,
+.longterm-care-form select:focus,
+.registration-form input:focus,
+.registration-form select:focus {
+  border-color: var(--blue);
+  outline: 3px solid rgba(39, 110, 241, 0.14);
+  outline-offset: 1px;
+}
+
 .escort-appointment-form select[multiple] {
   min-height: 92px;
 }
 
 .escort-order-card {
   border-left: 4px solid var(--teal);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .registration-workflow {
@@ -1006,12 +1074,13 @@ select,
 
 .registration-form {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 14px;
   background: #f8fbfd;
+  min-width: 0;
 }
 
 .registration-form label {
@@ -1043,6 +1112,15 @@ select,
 .registration-schedule-card,
 .registration-order-card {
   border-left: 4px solid var(--blue);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.registration-schedule-card,
+.registration-order-card {
+  display: grid;
+  gap: 8px;
+  align-content: start;
 }
 
 .registration-rule-card {
@@ -1072,6 +1150,10 @@ select,
   gap: 8px;
   align-items: center;
   justify-content: space-between;
+}
+
+.registration-order-actions .small-button {
+  white-space: nowrap;
 }
 
 .lifecycle-grid {
@@ -1523,6 +1605,16 @@ select,
 
 .panel-title span {
   color: var(--muted);
+  line-height: 1.55;
+}
+
+.panel-title > span {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  text-align: right;
 }
 
 .panel-actions {
@@ -1917,8 +2009,15 @@ dialog::backdrop {
 
 @media (max-width: 900px) {
   .citizen-shell {
+    display: flex;
+    flex-direction: column;
     width: min(100% - 20px, 640px);
     padding: 12px 0 calc(104px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .citizen-header {
+    position: static;
+    backdrop-filter: none;
   }
 
   .citizen-header,
@@ -1946,6 +2045,8 @@ dialog::backdrop {
 
   .header-actions {
     width: 100%;
+    max-width: none;
+    justify-content: stretch;
   }
 
   .header-actions select,
@@ -1975,6 +2076,11 @@ dialog::backdrop {
     align-items: stretch;
   }
 
+  .panel-title > span {
+    justify-content: flex-start;
+    text-align: left;
+  }
+
   .auth-bar nav {
     justify-content: flex-start;
   }
@@ -1998,10 +2104,20 @@ dialog::backdrop {
 
   .service-summary {
     grid-template-columns: 1fr;
+    position: sticky;
+    top: 0;
+    z-index: 16;
+    margin-inline: -2px;
+  }
+
+  .service-command-panel {
+    gap: 8px;
+    order: 4;
   }
 
   .service-summary-actions {
     justify-items: stretch;
+    min-width: 0;
   }
 
   .service-page-action {
@@ -2011,6 +2127,18 @@ dialog::backdrop {
   .service-subnav {
     grid-auto-columns: minmax(138px, 64vw);
     padding-bottom: 2px;
+  }
+
+  .module-interface-panel,
+  .data-governance-panel,
+  .client-channel-panel,
+  .resident-audit-panel {
+    order: 30;
+  }
+
+  [data-service-pane],
+  .service-page-content-anchor {
+    scroll-margin-top: 128px;
   }
 
   .client-channel-switch,
@@ -2052,8 +2180,9 @@ dialog::backdrop {
 
   .service-tabs {
     display: grid;
+    position: static;
     grid-auto-flow: column;
-    grid-auto-columns: minmax(156px, 72vw);
+    grid-auto-columns: minmax(168px, 74vw);
     grid-template-columns: none;
     overflow-x: auto;
     padding: 2px 2px 8px;
@@ -2061,8 +2190,16 @@ dialog::backdrop {
   }
 
   .service-tabs a {
-    min-height: 118px;
+    min-height: 112px;
     scroll-snap-align: start;
+  }
+
+  .registration-order-actions {
+    align-items: stretch;
+  }
+
+  .registration-order-actions .small-button {
+    width: 100%;
   }
 
   .mobile-service-nav {

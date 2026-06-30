@@ -1945,6 +1945,7 @@ function renderRegistration(residentId) {
   const form = document.querySelector("#registration-form");
   const scheduleCards = document.querySelector("#registration-schedule-cards");
   const orderCards = document.querySelector("#registration-order-cards");
+  const summary = document.querySelector("#registration-summary");
   if (!form || !scheduleCards || !orderCards) return;
   const schedules = activeRegistrationSchedules();
   const selected = form.elements.scheduleId.value;
@@ -1958,6 +1959,12 @@ function renderRegistration(residentId) {
     <div class="visit-tags">${(item.tags || []).map((tag) => `<span class="tag">${tag}</span>`).join("")}</div>
   </article>`).join("");
   const orders = activeRegistrationOrders(residentId);
+  if (summary) {
+    const openOrders = orders.filter((item) => canCancelRegistration(item)).length;
+    const hisOrders = orders.filter((item) => item.hisVisitId || item.registrationNo).length;
+    const insuranceReady = orders.filter((item) => item.insuranceStatus === "prechecked").length;
+    summary.textContent = `${schedules.length} 个可约号源 · ${orders.length} 个我的挂号 · HIS ${hisOrders} 个回执 · 医保 ${insuranceReady} 个预核验 · ${openOrders} 个可操作`;
+  }
   orderCards.innerHTML = orders
     .sort((a, b) => String(a.appointmentDate || "").localeCompare(String(b.appointmentDate || "")))
     .map((item) => `<article class="mini-card registration-order-card">
