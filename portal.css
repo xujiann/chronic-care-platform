@@ -758,6 +758,76 @@ h1 { margin-top: 4px; font-size: 28px; }
   margin-top: 10px;
 }
 
+.department-board {
+  margin-bottom: 16px;
+}
+
+.department-switch {
+  margin-bottom: 12px;
+}
+
+.department-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.department-card {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--blue);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fff;
+}
+
+.department-card.ready { border-left-color: var(--green); }
+.department-card.watch { border-left-color: var(--amber); }
+.department-card.blocked { border-left-color: var(--red); }
+.department-card.empty { border-left-color: var(--muted); }
+
+.department-card span,
+.department-card strong,
+.department-card small {
+  display: block;
+}
+
+.department-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.department-card strong {
+  margin-top: 6px;
+  font-size: 17px;
+}
+
+.department-card ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: #24364a;
+  line-height: 1.55;
+}
+
+.department-card p,
+.department-card small {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.department-card p {
+  margin: 10px 0 0;
+}
+
+.department-card small {
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+
+.department-boundary {
+  margin-top: 10px;
+}
+
 .function-report-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1493,6 +1563,7 @@ dialog::backdrop {
   .population-source-grid,
   .population-insights,
   .jurisdiction-grid,
+  .department-grid,
   .portal-grid,
   .claim-grid,
   .capability-grid,

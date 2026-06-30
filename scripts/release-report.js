@@ -324,7 +324,7 @@ function healthDashboardChecks(healthDashboard) {
     check("healthDashboard:certificateExchange", certificateTracks >= 5, `${certificateTracks} certificate exchange tracks`, "error", "health-dashboard"),
     check("healthDashboard:riskDrilldown", drilldowns >= 4, `${drilldowns} risk drilldowns`, "error", "health-dashboard"),
     check("healthDashboard:siteEvidencePackage", evidenceArtifacts >= 4, `${evidenceArtifacts} evidence artifacts`, "error", "health-dashboard"),
-    check("healthDashboard:functionalReport", functionalItems >= 10, `${functionalItems} module functions reported`, "error", "health-dashboard"),
+    check("healthDashboard:functionalReport", functionalItems >= 11, `${functionalItems} module functions reported`, "error", "health-dashboard"),
     check("healthDashboard:departmentFunctionMatrix", departmentRows >= 6, `${departmentRows} internal department rows`, "error", "health-dashboard"),
     check("healthDashboard:cityCountyFunctionMatrix", cityCountyRows >= 4, `${cityCountyRows} city/county health-administration rows`, "error", "health-dashboard")
   ];

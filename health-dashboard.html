@@ -31,6 +31,7 @@
       <nav class="dashboard-section-nav" aria-label="综合管理服务系统页面导航">
         <a href="#population-service-board">人口服务</a>
         <a href="#dashboard-jurisdiction-board">市县视角</a>
+        <a href="#dashboard-department-board">内设机构</a>
         <a href="#dashboard-function-report">功能报告</a>
         <a href="#dashboard-actions-panel">任务闭环</a>
         <a href="#risk-drilldown-board">风险下钻</a>
@@ -128,6 +129,20 @@
         </div>
         <div class="jurisdiction-grid" id="jurisdiction-matrix"></div>
         <p class="muted jurisdiction-boundary" id="jurisdiction-boundary">本系统面向卫生健康行政部门使用，医疗机构、平台中心、专业中心和基层机构仅作为数据来源或协同对象。</p>
+      </section>
+
+      <section class="panel department-board" id="dashboard-department-board" data-active-status="all">
+        <div class="panel-title">
+          <h2>内设机构职能台账</h2>
+          <span id="department-board-summary">正在汇总委机关内设机构与源模块关联</span>
+        </div>
+        <div class="period-switch department-switch" id="department-status-controls" aria-label="内设机构状态筛选">
+          <button type="button" data-department-status="all" class="active">全部</button>
+          <button type="button" data-department-status="ready">已就绪</button>
+          <button type="button" data-department-status="watch">需关注</button>
+        </div>
+        <div class="department-grid" id="department-function-matrix"></div>
+        <p class="muted department-boundary" id="department-boundary">台账仅用于行政管理、督办、联调和验收，不把医疗机构、医保经办、专业中心或基层服务职责带入本机关办理范围。</p>
       </section>
 
       <section class="panel population-board" id="population-service-board" data-active-period="day">

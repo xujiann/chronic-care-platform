@@ -639,6 +639,13 @@ function buildFunctionalReport(context) {
       boundary: "仅面向卫生健康行政部门监管、督办、审计和联调；非本机关单位不承接本系统办理职责。"
     },
     {
+      id: "department-workbench",
+      name: "内设机构职能台账",
+      status: departmentFunctionMatrix.length >= 6 ? "ready" : "watch",
+      evidence: `${departmentFunctionMatrix.length} 条委机关内设机构职能矩阵`,
+      boundary: "按规划信息、医政、基层公卫、妇幼、疾控、监督和项目安全职责关联源模块，不带入非本机关办理任务。"
+    },
+    {
       id: "certificate-exchange-chain",
       name: "证照交换链路",
       status: certificateExchange.status === "ready" ? "ready" : "watch",

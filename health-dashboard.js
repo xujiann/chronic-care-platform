@@ -4,6 +4,7 @@ const DASHBOARD_SUMMARY_PATH = DASHBOARD_SUMMARY_ROUTE.replace(/^\/api/, "");
 let currentDashboardSummary = null;
 let currentPopulationPeriod = "day";
 let currentJurisdictionLevel = "all";
+let currentDepartmentStatus = "all";
 
 document.addEventListener("DOMContentLoaded", async () => {
   const summary = await loadDashboardSummary();
@@ -12,6 +13,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindDashboardExport();
   bindPopulationBoardPeriod();
   bindJurisdictionLevel();
+  bindDepartmentStatus();
   renderDashboard(summary);
 });
 
@@ -535,6 +537,13 @@ function buildDashboardFunctionalReport(context) {
       boundary: "仅面向卫生健康行政部门监管、督办、审计和联调；非本机关单位不承接本系统办理职责。"
     },
     {
+      id: "department-workbench",
+      name: "内设机构职能台账",
+      status: departmentFunctionMatrix.length >= 6 ? "ready" : "watch",
+      evidence: `${departmentFunctionMatrix.length} 条委机关内设机构职能矩阵`,
+      boundary: "按规划信息、医政、基层公卫、妇幼、疾控、监督和项目安全职责关联源模块，不带入非本机关办理任务。"
+    },
+    {
       id: "certificate-exchange-chain",
       name: "证照交换链路",
       status: certificateExchange.status === "ready" ? "ready" : "watch",
@@ -667,6 +676,7 @@ function renderDashboard(summary) {
   renderSiteEvidencePackage(summary.siteEvidencePackage || {});
   renderFunctionReport(summary.functionalReport || {});
   renderJurisdictionWorkbench(summary.functionalReport || {});
+  renderDepartmentWorkbench(summary.functionalReport || {});
   document.querySelector("#dashboard-scope").textContent = summary.scope?.rule || "";
   renderFilterOptions(summary);
   renderApplications(summary.applications || []);
@@ -988,6 +998,48 @@ function renderJurisdictionWorkbench(report) {
   </article>`).join("") || `<article class="jurisdiction-card empty"><strong>等待行政层级矩阵</strong><p>摘要接口返回市、县两级卫生健康行政部门职责后显示。</p></article>`;
   if (boundary) {
     boundary.textContent = "本工作台仅呈现卫生健康行政部门监管、督办、审计和联调视角；医疗机构、专业中心、平台中心和基层服务机构不在本系统承接非本机关办理职责。";
+  }
+}
+
+function bindDepartmentStatus() {
+  const controls = document.querySelector("#department-status-controls");
+  if (!controls || controls.dataset.bound === "true") return;
+  controls.dataset.bound = "true";
+  controls.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-department-status]");
+    if (!button) return;
+    currentDepartmentStatus = button.dataset.departmentStatus || "all";
+    if (currentDashboardSummary) renderDepartmentWorkbench(currentDashboardSummary.functionalReport || {});
+  });
+}
+
+function renderDepartmentWorkbench(report) {
+  const board = document.querySelector("#dashboard-department-board");
+  const controls = document.querySelector("#department-status-controls");
+  const summary = document.querySelector("#department-board-summary");
+  const matrix = document.querySelector("#department-function-matrix");
+  const boundary = document.querySelector("#department-boundary");
+  if (!board || !controls || !matrix) return;
+  const rows = Array.isArray(report.departmentFunctionMatrix) ? report.departmentFunctionMatrix : [];
+  const statuses = ["all", ...Array.from(new Set(rows.map((item) => item.status).filter(Boolean)))];
+  if (!statuses.includes(currentDepartmentStatus)) currentDepartmentStatus = "all";
+  const filteredRows = currentDepartmentStatus === "all" ? rows : rows.filter((item) => item.status === currentDepartmentStatus);
+  board.dataset.activeStatus = currentDepartmentStatus;
+  controls.innerHTML = statuses.map((status) => `<button type="button" data-department-status="${status}" class="${status === currentDepartmentStatus ? "active" : ""}">${status === "all" ? "全部" : dashboardStatusLabel(status)}</button>`).join("");
+  if (summary) {
+    const readyRows = rows.filter((item) => item.status === "ready").length;
+    const watchRows = rows.filter((item) => item.status === "watch").length;
+    summary.textContent = `${currentDepartmentStatus === "all" ? "全部状态" : dashboardStatusLabel(currentDepartmentStatus)} / 已就绪 ${readyRows} 项 / 需关注 ${watchRows} 项 / 当前 ${filteredRows.length} 项`;
+  }
+  matrix.innerHTML = filteredRows.map((item) => `<article class="department-card ${item.status || "watch"}" data-department-row="${item.id}" data-department-status="${item.status || ""}">
+    <span>${item.name || item.id} / ${dashboardStatusLabel(item.status || "watch")}</span>
+    <strong>${item.level || "内部机构"}</strong>
+    <ul>${(item.implemented || []).map((text) => `<li>${dashboardTechnicalLabel(text)}</li>`).join("")}</ul>
+    <p>${item.nextPlan || ""}</p>
+    <small>${dashboardTechnicalLabel(item.evidence || "")}</small>
+  </article>`).join("") || `<article class="department-card empty"><strong>等待内设机构职能台账</strong><p>摘要接口返回委机关内设机构职责后显示。</p></article>`;
+  if (boundary) {
+    boundary.textContent = "本台账只呈现卫生健康行政部门内部处室的监管、督办、审计和联调事项；源业务办理仍由对应业务系统或责任单位完成。";
   }
 }
 
