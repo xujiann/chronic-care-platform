@@ -144,7 +144,7 @@ npm.cmd run regional-referral:overlap
 `regional-referral:overlap` 会生成 `release/regional-referral-overlap-report.json` 和 `release/regional-referral-overlap-report.md`，把区域诊疗数据共享平台与医联体转诊/远程会诊的共享集合、共享居民、重合能力、可合并项和不可合并运行时边界整理为现场报告。该报告建议合并交接证据、发布报告和现场验收边界，但保留区域共享与转诊会诊两套运行时主模型和 API。
 
 区域诊疗数据共享平台还提供 `GET /api/regional-data-sharing/handoff-report` 和页面“生成交接清单”按钮，用于按卫健委/机构端权限生成区域共享-转诊会诊交接清单。现场联调时只校验证据调阅、互认依据、接口契约、授权质控、审计留痕和接收范围；转诊单主表、号源床位、接诊反馈、服务时限督办和绩效结算仍由医联体转诊会诊模块联调。
-`release:report` 会将该运行时清单 API 与页面入口作为错误级发布门禁，避免只保留离线报告而丢失现场可操作能力。
+`deploy:check` 和 `release:report` 会将该运行时清单 API 与页面入口作为发布门禁，避免只保留离线报告而丢失现场可操作能力。
 
 本地服务启动后可访问：
 
