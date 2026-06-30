@@ -178,6 +178,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(healthDashboard.body.jurisdictionScope.districts.length >= 2, true);
     assert.equal(healthDashboard.body.jurisdictionScope.summary.institutions >= 3, true);
     assert.equal(healthDashboard.body.jurisdictionScope.districts.some((item) => item.district === "中山区"), true);
+    assert.equal(healthDashboard.body.jurisdictionScope.districtOptions.some((item) => /医保/.test(item)), false);
+    assert.equal(healthDashboard.body.jurisdictionScope.districts.some((item) => item.id !== "all" && (item.institutionsList.length || item.serviceReportList.length || item.actionList.length)), true);
     assert.equal(healthDashboard.body.functionalReport.departmentFunctionMatrix.length >= 6, true);
     assert.equal(healthDashboard.body.functionalReport.departmentFunctionMatrix.some((item) => item.id === "medical-administration" && item.nextPlan), true);
     assert.equal(healthDashboard.body.functionalReport.cityCountyFunctionMatrix.length >= 4, true);
@@ -199,6 +201,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:site-evidence-package" && item.passed), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:functional-report" && item.passed), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:jurisdiction-scope" && item.passed), true);
+    assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:jurisdiction-detail" && item.passed), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:department-function-matrix" && item.passed), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:city-county-function-matrix" && item.passed), true);
 

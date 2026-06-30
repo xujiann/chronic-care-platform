@@ -302,6 +302,7 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.equal(healthDashboardJson.healthDashboard.functionalReport.functions.some((item) => item.id === "jurisdiction-scope-drilldown"), true);
   assert.equal(healthDashboardJson.healthDashboard.functionalReport.functions.some((item) => item.id === "department-workbench"), true);
   assert.equal(healthDashboardJson.healthDashboard.jurisdictionScope.districts.length >= 2, true);
+  assert.equal(healthDashboardJson.healthDashboard.jurisdictionScope.districts.some((item) => item.id !== "all" && (item.institutionsList.length || item.serviceReportList.length || item.actionList.length)), true);
   assert.equal(healthDashboardJson.healthDashboard.populationServiceBoard.sourceDetails.length, 4);
   assert.equal(healthDashboardJson.healthDashboard.functionalReport.departmentFunctionMatrix.length >= 6, true);
   assert.equal(healthDashboardJson.healthDashboard.functionalReport.cityCountyFunctionMatrix.length >= 4, true);

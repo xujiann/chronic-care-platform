@@ -7,6 +7,7 @@ let currentJurisdictionLevel = "all";
 let currentDepartmentStatus = "all";
 let currentJurisdictionDistrict = "";
 let currentJurisdictionType = "";
+let currentJurisdictionDetail = "";
 
 document.addEventListener("DOMContentLoaded", async () => {
   const summary = await loadDashboardSummary();
@@ -471,6 +472,32 @@ function buildDashboardJurisdictionRow(district, context = {}) {
     serviceReports: scopedReports.length,
     visits: serviceTotals.visits,
     admissions: serviceTotals.admissions,
+    institutionsList: scopedResources.map((item) => ({
+      id: item.id || item.institutionId || item.name,
+      name: item.name || item.institution || item.id || "未命名机构",
+      type: item.type || item.orgLevel || "未标注",
+      region: item.region || district,
+      beds: Number(item.beds || 0),
+      doctors: Number(item.doctors || 0)
+    })),
+    serviceReportList: scopedReports.map((item) => ({
+      id: item.id || item.reportId || item.reportDate,
+      reportDate: item.reportDate || item.date || item.period || "",
+      institution: item.institution || item.institutionName || item.orgName || item.region || district,
+      visits: Number(item.interfaceData?.outpatientVisits || 0) + Number(item.interfaceData?.emergencyVisits || 0),
+      admissions: Number(item.interfaceData?.inpatientAdmissions || 0),
+      status: item.status || item.reviewStatus || "待复核"
+    })),
+    actionList: scopedActions.slice(0, 6).map((item) => ({
+      id: item.id,
+      title: item.title || item.collection || "源应用待办",
+      application: item.application || item.applicationId || "源应用",
+      owner: item.owner || "待明确",
+      status: item.status || "open",
+      priority: item.priority || "normal",
+      dueAt: item.dueAt || "",
+      entry: item.entry || ""
+    })),
     nextAction: all ? "市级视角继续补齐各区县机构目录、日报接口和闭环率对账。" : "县级视角继续补齐辖区机构目录、源应用回写和问题整改台账。"
   };
 }
@@ -1091,9 +1118,28 @@ function bindJurisdictionScopeFilters() {
     control.addEventListener("change", () => {
       currentJurisdictionDistrict = document.querySelector("#jurisdiction-district-filter")?.value || "";
       currentJurisdictionType = document.querySelector("#jurisdiction-type-filter")?.value || "";
+      currentJurisdictionDetail = "";
       if (currentDashboardSummary) renderJurisdictionScope(currentDashboardSummary.jurisdictionScope || {});
     });
   });
+  const grid = document.querySelector("#jurisdiction-scope-grid");
+  if (grid && grid.dataset.bound !== "true") {
+    grid.dataset.bound = "true";
+    grid.addEventListener("click", (event) => {
+      const card = event.target.closest("[data-jurisdiction-scope]");
+      if (!card) return;
+      currentJurisdictionDetail = card.dataset.jurisdictionScope || "";
+      if (currentDashboardSummary) renderJurisdictionScope(currentDashboardSummary.jurisdictionScope || {});
+    });
+    grid.addEventListener("keydown", (event) => {
+      if (!["Enter", " "].includes(event.key)) return;
+      const card = event.target.closest("[data-jurisdiction-scope]");
+      if (!card) return;
+      event.preventDefault();
+      currentJurisdictionDetail = card.dataset.jurisdictionScope || "";
+      if (currentDashboardSummary) renderJurisdictionScope(currentDashboardSummary.jurisdictionScope || {});
+    });
+  }
 }
 
 function renderJurisdictionWorkbench(report) {
@@ -1131,6 +1177,7 @@ function renderJurisdictionScope(scope) {
   const typeFilter = document.querySelector("#jurisdiction-type-filter");
   const summary = document.querySelector("#jurisdiction-scope-summary");
   const grid = document.querySelector("#jurisdiction-scope-grid");
+  const detail = document.querySelector("#jurisdiction-detail-panel");
   if (!districtFilter || !typeFilter || !grid) return;
   const districts = Array.isArray(scope.districts) ? scope.districts : [];
   const districtOptions = Array.isArray(scope.districtOptions) ? scope.districtOptions : [];
@@ -1160,7 +1207,10 @@ function renderJurisdictionScope(scope) {
   if (summary) {
     summary.textContent = `${selectedDistrict || "全部辖区"} / ${selectedType || "全部机构类型"} / ${totals.institutions} 个机构 / ${totals.openActions} 条待办 / ${totals.highRisks} 条高风险`;
   }
-  grid.innerHTML = visibleRows.map((item) => `<article class="jurisdiction-scope-card ${item.status || "watch"}" data-jurisdiction-scope="${item.id}">
+  if (!currentJurisdictionDetail || !visibleRows.some((item) => item.id === currentJurisdictionDetail)) {
+    currentJurisdictionDetail = visibleRows.find((item) => item.id !== "all")?.id || visibleRows[0]?.id || "";
+  }
+  grid.innerHTML = visibleRows.map((item) => `<article class="jurisdiction-scope-card ${item.status || "watch"} ${item.id === currentJurisdictionDetail ? "active" : ""}" data-jurisdiction-scope="${item.id}" role="button" tabindex="0" aria-pressed="${item.id === currentJurisdictionDetail ? "true" : "false"}">
     <span>${dashboardStatusLabel(item.status || "watch")} / ${item.district}</span>
     <strong>${item.institutions || 0} 个机构 · ${item.openActions || 0} 条待办</strong>
     <small>${(item.institutionTypes || []).map((type) => `${type.type}${type.count}`).join(" / ") || "等待机构目录"}</small>
@@ -1168,6 +1218,40 @@ function renderJurisdictionScope(scope) {
     <p>就诊 ${formatDashboardNumber(item.visits || 0)} 人次 / 入院 ${formatDashboardNumber(item.admissions || 0)} 人次 / 高风险 ${formatDashboardNumber(item.highRisks || 0)} 条</p>
     <small>${item.nextAction || ""}</small>
   </article>`).join("") || `<article class="jurisdiction-scope-card empty"><strong>等待辖区数据</strong><p>接入机构目录、日报和源应用待办后显示。</p></article>`;
+  if (detail) renderJurisdictionDetail(detail, visibleRows.find((item) => item.id === currentJurisdictionDetail), selectedType);
+}
+
+function renderJurisdictionDetail(container, row, selectedType) {
+  if (!row) {
+    container.innerHTML = `<article class="jurisdiction-detail-card empty"><strong>等待区县详情</strong><p>选择辖区卡片后显示监管明细。</p></article>`;
+    return;
+  }
+  const institutions = selectedType ? (row.institutionsList || []).filter((item) => item.type === selectedType) : (row.institutionsList || []);
+  const serviceReports = row.serviceReportList || [];
+  const actions = row.actionList || [];
+  const institutionRows = institutions.slice(0, 5).map((item) => `<li><strong>${item.name}</strong><span>${item.type} / 床位 ${formatDashboardNumber(item.beds)} / 医师 ${formatDashboardNumber(item.doctors)}</span></li>`).join("");
+  const serviceRows = serviceReports.slice(0, 4).map((item) => `<li><strong>${item.reportDate || "未标注日期"}</strong><span>${item.institution} / 就诊 ${formatDashboardNumber(item.visits)} / 入院 ${formatDashboardNumber(item.admissions)} / ${dashboardStatusLabel(item.status)}</span></li>`).join("");
+  const actionRows = actions.slice(0, 5).map((item) => `<li><strong>${item.title}</strong><span>${item.application} / ${dashboardStatusLabel(item.priority)} / ${item.owner} / ${item.status}</span></li>`).join("");
+  container.innerHTML = `<article class="jurisdiction-detail-card ${row.status || "watch"}">
+    <div>
+      <span>${row.district}监管详情</span>
+      <strong>${selectedType || "全部机构类型"} / ${formatDashboardNumber(institutions.length)} 个机构 / ${formatDashboardNumber(row.openActions || 0)} 条待办</strong>
+      <p>仅展示卫生健康行政监管、接口联调和验收证据视角；具体业务办理继续回到对应源应用或属地系统。</p>
+    </div>
+    <div class="jurisdiction-detail-metrics">
+      <span>床位 <strong>${formatDashboardNumber(row.beds || 0)}</strong></span>
+      <span>医师 <strong>${formatDashboardNumber(row.doctors || 0)}</strong></span>
+      <span>就诊 <strong>${formatDashboardNumber(row.visits || 0)}</strong></span>
+      <span>入院 <strong>${formatDashboardNumber(row.admissions || 0)}</strong></span>
+      <span>高风险 <strong>${formatDashboardNumber(row.highRisks || 0)}</strong></span>
+    </div>
+    <div class="jurisdiction-detail-columns">
+      <section><h4>机构目录</h4><ul>${institutionRows || "<li><span>等待机构目录接入</span></li>"}</ul></section>
+      <section><h4>日报服务量</h4><ul>${serviceRows || "<li><span>等待日报接口接入</span></li>"}</ul></section>
+      <section><h4>源应用待办</h4><ul>${actionRows || "<li><span>暂无源应用待办</span></li>"}</ul></section>
+    </div>
+    <small>${row.nextAction || ""}</small>
+  </article>`;
 }
 
 function bindDepartmentStatus() {

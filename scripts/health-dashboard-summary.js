@@ -480,6 +480,32 @@ function buildJurisdictionRow(district, context = {}) {
     serviceReports: scopedReports.length,
     visits: serviceTotals.visits,
     admissions: serviceTotals.admissions,
+    institutionsList: scopedResources.map((item) => ({
+      id: item.id || item.institutionId || item.name,
+      name: item.name || item.institution || item.id || "未命名机构",
+      type: item.type || item.orgLevel || "未标注",
+      region: item.region || district,
+      beds: Number(item.beds || 0),
+      doctors: Number(item.doctors || 0)
+    })),
+    serviceReportList: scopedReports.map((item) => ({
+      id: item.id || item.reportId || item.reportDate,
+      reportDate: item.reportDate || item.date || item.period || "",
+      institution: item.institution || item.institutionName || item.orgName || item.region || district,
+      visits: Number(item.interfaceData?.outpatientVisits || 0) + Number(item.interfaceData?.emergencyVisits || 0),
+      admissions: Number(item.interfaceData?.inpatientAdmissions || 0),
+      status: item.status || item.reviewStatus || "待复核"
+    })),
+    actionList: scopedActions.slice(0, 6).map((item) => ({
+      id: item.id,
+      title: item.title || item.collection || "源应用待办",
+      application: item.application || item.applicationId || "源应用",
+      owner: item.owner || "待明确",
+      status: item.status || "open",
+      priority: item.priority || "normal",
+      dueAt: item.dueAt || "",
+      entry: item.entry || ""
+    })),
     nextAction: all ? "市级视角继续补齐各区县机构目录、日报接口和闭环率对账。" : "县级视角继续补齐辖区机构目录、源应用回写和问题整改台账。"
   };
 }
@@ -861,6 +887,7 @@ function buildHealthDashboardSummary(options = {}) {
     { id: "dashboard:site-evidence-package", passed: siteEvidencePackage.items.length >= 4 && siteEvidencePackage.summary.ready >= 3, detail: `${siteEvidencePackage.items.length} evidence package artifacts` },
     { id: "dashboard:functional-report", passed: functionalReport.functions.length >= 12 && functionalReport.releaseEvidence.length >= 4, detail: `${functionalReport.functions.length} module functions with release evidence` },
     { id: "dashboard:jurisdiction-scope", passed: jurisdictionScope.districts.length >= 2 && jurisdictionScope.summary.institutions >= 3 && jurisdictionScope.institutionTypeOptions.length >= 2, detail: `${jurisdictionScope.summary.districts} districts, ${jurisdictionScope.summary.institutions} institutions, ${jurisdictionScope.summary.openActions} open actions` },
+    { id: "dashboard:jurisdiction-detail", passed: jurisdictionScope.districts.some((item) => item.id !== "all" && (item.institutionsList?.length || item.serviceReportList?.length || item.actionList?.length)), detail: "district drilldown includes institution, service, or action detail" },
     { id: "dashboard:department-function-matrix", passed: departmentFunctionMatrix.length >= 6 && departmentFunctionMatrix.every((item) => item.implemented?.length && item.nextPlan), detail: `${departmentFunctionMatrix.length} internal department function rows` },
     {
       id: "dashboard:city-county-function-matrix",
@@ -1005,6 +1032,7 @@ function dashboardReportCheckLabel(checkId) {
     "dashboard:site-evidence-package": "现场验收证据包",
     "dashboard:functional-report": "主要功能报告",
     "dashboard:jurisdiction-scope": "辖区监管钻取",
+    "dashboard:jurisdiction-detail": "区县监管详情",
     "dashboard:department-function-matrix": "内部机构功能矩阵",
     "dashboard:department-functions": "内部机构功能矩阵",
     "dashboard:city-county-function-matrix": "市县两级机构功能矩阵",
@@ -1064,6 +1092,7 @@ function renderMarkdown(report) {
   const departmentRows = (report.functionalReport?.departmentFunctionMatrix || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.name || item.id} | ${(item.implemented || []).map((text) => String(text).replace(/\|/g, "/")).join("<br>")} | ${String(item.nextPlan || "").replace(/\|/g, "/")} |`);
   const cityCountyRows = (report.functionalReport?.cityCountyFunctionMatrix || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.level || ""} | ${item.agency || item.id} | ${(item.implemented || []).map((text) => String(text).replace(/\|/g, "/")).join("<br>")} | ${String(item.nextPlan || "").replace(/\|/g, "/")} |`);
   const jurisdictionRows = (report.jurisdictionScope?.districts || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.district || item.id} | ${item.institutions || 0} | ${item.beds || 0} | ${item.doctors || 0} | ${item.openActions || 0} | ${item.highRisks || 0} | ${item.serviceReports || 0} |`);
+  const jurisdictionDetailRows = (report.jurisdictionScope?.districts || []).filter((item) => item.id !== "all").map((item) => `| ${item.district || item.id} | ${(item.institutionsList || []).slice(0, 4).map((row) => `${row.name || row.id}(${row.type || "未标注"})`).join("<br>") || "等待机构目录"} | ${(item.serviceReportList || []).slice(0, 3).map((row) => `${row.reportDate || "未标注"} 就诊${row.visits || 0}/入院${row.admissions || 0}`).join("<br>") || "等待日报"} | ${(item.actionList || []).slice(0, 3).map((row) => `${row.application || "源应用"}:${String(row.title || row.id || "").replace(/\|/g, "/")}`).join("<br>") || "暂无待办"} |`);
   const reportEvidenceRows = (report.functionalReport?.releaseEvidence || []).map((item) => `| ${item.name || item.id} | ${dashboardReportEvidenceLabel(item.evidence || "").replace(/\|/g, "/")} |`);
   const onsiteBoundaryRows = (report.functionalReport?.onsiteBoundaries || []).map((item) => `- ${item}`);
   return [
@@ -1166,6 +1195,12 @@ function renderMarkdown(report) {
     "| 状态 | 辖区 | 机构 | 床位 | 医师 | 待办 | 高风险 | 日报 |",
     "|---|---|---:|---:|---:|---:|---:|---:|",
     ...jurisdictionRows,
+    "",
+    "### 区县监管详情",
+    "",
+    "| 辖区 | 机构目录 | 日报服务量 | 源应用待办 |",
+    "|---|---|---|---|",
+    ...jurisdictionDetailRows,
     "",
     "### 发布证据",
     "",

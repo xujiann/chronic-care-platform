@@ -730,12 +730,22 @@ h1 { margin-top: 4px; font-size: 28px; }
   border-radius: 8px;
   padding: 12px;
   background: #fff;
+  cursor: pointer;
 }
 
 .jurisdiction-scope-card.ready { border-left-color: var(--green); }
 .jurisdiction-scope-card.watch { border-left-color: var(--amber); }
 .jurisdiction-scope-card.blocked { border-left-color: var(--red); }
 .jurisdiction-scope-card.empty { border-left-color: var(--muted); }
+.jurisdiction-scope-card.active {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.jurisdiction-scope-card:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.26);
+  outline-offset: 2px;
+}
 
 .jurisdiction-scope-card span,
 .jurisdiction-scope-card strong,
@@ -767,6 +777,100 @@ h1 { margin-top: 4px; font-size: 28px; }
 .jurisdiction-scope-card small {
   margin-top: 8px;
   overflow-wrap: anywhere;
+}
+
+.jurisdiction-detail-panel {
+  margin-top: 12px;
+}
+
+.jurisdiction-detail-card {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--blue);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fff;
+}
+
+.jurisdiction-detail-card.ready { border-left-color: var(--green); }
+.jurisdiction-detail-card.watch { border-left-color: var(--amber); }
+.jurisdiction-detail-card.blocked { border-left-color: var(--red); }
+.jurisdiction-detail-card.empty { border-left-color: var(--muted); }
+
+.jurisdiction-detail-card > div:first-child span,
+.jurisdiction-detail-card > div:first-child strong {
+  display: block;
+}
+
+.jurisdiction-detail-card > div:first-child span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.jurisdiction-detail-card > div:first-child strong {
+  margin-top: 6px;
+  font-size: 18px;
+}
+
+.jurisdiction-detail-card p,
+.jurisdiction-detail-card small,
+.jurisdiction-detail-card li span {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.jurisdiction-detail-metrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.jurisdiction-detail-metrics span {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  background: #f8fafc;
+}
+
+.jurisdiction-detail-metrics strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--text);
+  font-size: 18px;
+}
+
+.jurisdiction-detail-columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.jurisdiction-detail-columns h4 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.jurisdiction-detail-columns ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.jurisdiction-detail-columns li {
+  border-top: 1px solid var(--line);
+  padding: 8px 0;
+}
+
+.jurisdiction-detail-columns li:first-child {
+  border-top: 0;
+}
+
+.jurisdiction-detail-columns li strong,
+.jurisdiction-detail-columns li span {
+  display: block;
 }
 
 .jurisdiction-card {
@@ -1631,6 +1735,8 @@ dialog::backdrop {
   .population-insights,
   .jurisdiction-grid,
   .jurisdiction-scope-grid,
+  .jurisdiction-detail-metrics,
+  .jurisdiction-detail-columns,
   .department-grid,
   .portal-grid,
   .claim-grid,
