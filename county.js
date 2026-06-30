@@ -212,70 +212,23 @@ function renderCountyTeleconsultationLoop(state) {
   const performanceEl = document.querySelector("#county-teleconsultation-performance");
   if (!countEl || !tableEl) return;
   const allRows = state.referralTeleconsultations || [];
+  const escalations = buildReferralTeleconsultationEscalations(rows);
   countEl.textContent = `${rows.length}/${allRows.length} 项`;
   if (performanceEl) {
     const reportReturned = rows.filter((item) => item.reportStatus === "returned" || item.status === "report-returned").length;
     const avgResponse = averagePerformance(rows, "responseHours");
     const avgReportReturn = averagePerformance(rows, "reportReturnHours");
-    const escalations = buildReferralTeleconsultationEscalations(rows);
-    performanceEl.innerHTML = [
-      ["Returned reports", `${reportReturned}/${rows.length || 0}`, rows.length ? `${Math.round((reportReturned / rows.length) * 100)}% return rate` : "No filtered records"],
-      ["Avg response", Number.isFinite(avgResponse) ? `${avgResponse.toFixed(1)}h` : "-", "Receiving feedback timeliness"],
-      ["Avg report return", Number.isFinite(avgReportReturn) ? `${avgReportReturn.toFixed(1)}h` : "-", "Report callback timeliness"],
-      ["SLA risks", `${escalations.length}`, `${escalations.filter((item) => item.severity === "high").length} high risk follow-up items`],
-      ["High priority", rows.filter((item) => item.priority === "high").length, "County follow-up queue"]
-    ].map(([label, value, hint]) => `<article class="claim-card"><strong>${label}</strong><span>${value}<br>${hint}</span></article>`).join("");
-  }
-  const escalationMap = new Map(buildReferralTeleconsultationEscalations(rows).map((item) => [item.teleconsultationId, item]));
-  tableEl.innerHTML = `<table>
-    <thead><tr><th>Resident</th><th>Pathway</th><th>Question</th><th>Status</th><th>Performance</th><th>SLA</th><th>Report</th><th>Action</th></tr></thead>
-    <tbody>${rows.map((item) => {
-      const resident = residentOf(state, item.residentId);
-      const responseHours = Number(item.performance?.responseHours);
-      const reportReturnHours = Number(item.performance?.reportReturnHours);
-      const escalation = escalationMap.get(item.id);
-      const reminderSent = escalation && hasReferralEscalationReminder(state, item.id, escalation.severity);
-      return `<tr>
-        <td>${resident?.name || item.residentId || "Unknown"}</td>
-        <td>${item.sourceInstitution || "-"} -> ${item.targetInstitution || "-"}<br><small>${item.department || item.type || ""}</small></td>
-        <td>${item.clinicalQuestion || item.receivingFeedback || item.reportSummary || "-"}</td>
-        <td><span class="badge ${item.priority === "high" ? "danger" : "info"}">${item.status}</span></td>
-        <td>Response ${Number.isFinite(responseHours) ? `${responseHours}h` : "-"}<br><small>Report ${Number.isFinite(reportReturnHours) ? `${reportReturnHours}h` : "-"}</small></td>
-        <td>${escalation ? `<span class="badge ${escalation.severity === "high" ? "danger" : "warn"}">${escalation.severity}</span><br><small>${escalation.reasons.join("；")}</small>` : `<span class="badge info">normal</span>`}</td>
-        <td>${item.reportStatus || "pending"}</td>
-        <td>
-          ${escalation ? countyEscalationButton(item.id, reminderSent ? "Reminder sent" : "Send SLA reminder", reminderSent) : ""}
-          ${countyActionButton("referralTeleconsultations", item.id, "County follow-up", { status: "feedback-returned", receivingFeedback: "County consortium office followed up receiving feedback." })}
-          ${countyActionButton("referralTeleconsultations", item.id, "Report returned", { status: "report-returned", reportStatus: "returned", reportSummary: "County office confirmed report return evidence." })}
-        </td>
-      </tr>`;
-    }).join("")}</tbody>
-  </table>`;
-}
-
-function renderCountyTeleconsultationLoop(state) {
-  const rows = filterCountyTeleconsultations(state.referralTeleconsultations || []);
-  const countEl = document.querySelector("#county-teleconsultation-count");
-  const tableEl = document.querySelector("#county-teleconsultation-loop");
-  const performanceEl = document.querySelector("#county-teleconsultation-performance");
-  if (!countEl || !tableEl) return;
-  const allRows = state.referralTeleconsultations || [];
-  countEl.textContent = `${rows.length}/${allRows.length} items`;
-  if (performanceEl) {
-    const reportReturned = rows.filter((item) => item.reportStatus === "returned" || item.status === "report-returned").length;
-    const avgResponse = averagePerformance(rows, "responseHours");
-    const avgReportReturn = averagePerformance(rows, "reportReturnHours");
-    const escalations = buildReferralTeleconsultationEscalations(rows);
     performanceEl.innerHTML = [
       ["报告回传", `${reportReturned}/${rows.length || 0}`, rows.length ? `${Math.round((reportReturned / rows.length) * 100)}% 回传率` : "暂无筛选记录"],
       ["平均响应", Number.isFinite(avgResponse) ? `${avgResponse.toFixed(1)}h` : "-", "接诊反馈时效"],
       ["平均回传", Number.isFinite(avgReportReturn) ? `${avgReportReturn.toFixed(1)}h` : "-", "报告回调时效"],
-      ["SLA risks", `${escalations.length}`, `${escalations.filter((item) => item.severity === "high").length} 个高风险待跟进`],
+      ["SLA 风险", `${escalations.length}`, `SLA risks：${escalations.filter((item) => item.severity === "high").length} 个高风险待跟进`],
       ["已确认", allRows.filter((item) => item.slaDisposition?.status && item.slaDisposition.status !== "pending-ack").length, "机构或医共体 SLA 处置记录"],
       ["高优先级", rows.filter((item) => item.priority === "high").length, "医共体跟进队列"]
     ].map(([label, value, hint]) => `<article class="claim-card"><strong>${label}</strong><span>${value}<br>${hint}</span></article>`).join("");
   }
-  const escalationMap = new Map(buildReferralTeleconsultationEscalations(rows).map((item) => [item.teleconsultationId, item]));
+  renderCountyTeleconsultationRiskBoard(state, rows, escalations);
+  const escalationMap = new Map(escalations.map((item) => [item.teleconsultationId, item]));
   tableEl.innerHTML = `<table>
     <thead><tr><th>居民</th><th>路径</th><th>临床问题</th><th>状态</th><th>绩效</th><th>SLA</th><th>督办</th><th>报告</th><th>操作</th></tr></thead>
     <tbody>${rows.map((item) => {
@@ -286,7 +239,7 @@ function renderCountyTeleconsultationLoop(state) {
       const reminderSent = escalation && hasReferralEscalationReminder(state, item.id, escalation.severity);
       return `<tr>
         <td>${resident?.name || item.residentId || "未知居民"}</td>
-        <td>${item.sourceInstitution || "-"} -> ${item.targetInstitution || "-"}<br><small>${item.department || item.type || ""}</small></td>
+        <td>${item.sourceInstitution || "-"} → ${item.targetInstitution || "-"}<br><small>${item.department || item.type || ""}</small></td>
         <td>${item.clinicalQuestion || item.receivingFeedback || item.reportSummary || "-"}</td>
         <td><span class="badge ${item.priority === "high" ? "danger" : "info"}">${countyTeleconsultationStatusLabel(item.status)}</span></td>
         <td>响应 ${Number.isFinite(responseHours) ? `${responseHours}h` : "-"}<br><small>报告 ${Number.isFinite(reportReturnHours) ? `${reportReturnHours}h` : "-"} · ${item.performance?.insurancePaymentPath || "支付路径待确认"}</small></td>
@@ -302,6 +255,48 @@ function renderCountyTeleconsultationLoop(state) {
       </tr>`;
     }).join("")}</tbody>
   </table>`;
+}
+
+function renderCountyTeleconsultationRiskBoard(state, rows, escalations) {
+  const board = document.querySelector("#county-teleconsultation-risk-board");
+  if (!board) return;
+  const reportPending = rows.filter((item) => item.reportStatus !== "returned");
+  const messageRows = rows.filter((item) => (state.taskMessages || []).some((message) => message.collection === "referralTeleconsultations" && message.sourceId === item.id));
+  const noEscalation = !escalations.length && rows.length;
+  const topEscalations = escalations.slice(0, 2);
+  board.innerHTML = [
+    {
+      badge: "医共体督办",
+      title: "SLA 风险队列",
+      body: topEscalations.length
+        ? topEscalations.map((item) => `${item.teleconsultationId}：${item.reasons.join("；")}`).join("；")
+        : (noEscalation ? "当前筛选范围未发现逾期或高优先级风险。" : "暂无筛选记录。"),
+      footer: `${escalations.filter((item) => item.severity === "high").length} 个高风险 · ${escalations.length} 个待跟进`
+    },
+    {
+      badge: "报告回传",
+      title: "未回传闭环",
+      body: reportPending.map((item) => item.targetInstitution || item.id).slice(0, 3).join("、") || "当前筛选范围报告已完成回传。",
+      footer: `${reportPending.length}/${rows.length || 0} 项需报告证据`
+    },
+    {
+      badge: "消息触达",
+      title: "机构/居民通知",
+      body: messageRows.map((item) => item.id).slice(0, 3).join("、") || "待生成提醒或居民触达消息。",
+      footer: `${messageRows.length} 项已有 taskMessages 留痕`
+    },
+    {
+      badge: "绩效支付",
+      title: "互认与结算口径",
+      body: [...new Set(rows.map((item) => item.performance?.repeatExamControl).filter(Boolean))].join("；") || "待医保和医共体确认重复检查控制口径。",
+      footer: "用于县域绩效与医保审核"
+    }
+  ].map((item) => `<article data-referral-risk-board>
+    <div><span class="badge info">${item.badge}</span></div>
+    <h3>${item.title}</h3>
+    <p>${item.body}</p>
+    <footer><small>${item.footer}</small></footer>
+  </article>`).join("");
 }
 
 function countyTeleconsultationStatusLabel(status) {
@@ -493,7 +488,7 @@ function countyEscalationButton(id, label, disabled = false) {
 }
 
 function countySlaAckButton(id, label) {
-  const mode = label.includes("Close") ? "closed" : "acknowledged";
+  const mode = label.includes("Close") || label.includes("关闭") ? "closed" : "acknowledged";
   return `<button class="inline-action" type="button" data-county-sla-ack data-id="${id}" data-mode="${mode}">${label}</button>`;
 }
 

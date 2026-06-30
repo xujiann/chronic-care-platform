@@ -294,6 +294,7 @@ h1 { margin-top: 4px; font-size: 28px; }
 
 .panel {
   padding: 18px;
+  min-width: 0;
 }
 
 .panel-title {
@@ -583,7 +584,7 @@ dialog::backdrop {
 
 .claim-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 10px;
 }
 
@@ -754,7 +755,7 @@ dialog::backdrop {
 
 .evidence-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 10px;
 }
 
@@ -789,6 +790,38 @@ dialog::backdrop {
   gap: 6px;
   border-top: 1px solid rgba(216, 226, 231, 0.72);
   padding-top: 10px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-wrap table {
+  width: 100%;
+  min-width: 860px;
+  border-collapse: collapse;
+}
+
+.table-wrap th,
+.table-wrap td {
+  padding: 12px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.table-wrap th {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.table-wrap td {
+  line-height: 1.5;
+}
+
+.table-wrap small {
+  color: var(--muted);
 }
 
 .evidence-records {

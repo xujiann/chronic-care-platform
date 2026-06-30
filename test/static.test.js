@@ -171,6 +171,7 @@ test("chronic disease policy module exposes 2025 service capacity workflow", () 
 
 test("deployment baseline documents scripts and environment template", () => {
   const pkg = JSON.parse(read("package.json"));
+  const referralAbout = read("referral-teleconsultation-about.html");
   assert.equal(Boolean(pkg.scripts["deploy:check"]), true);
   assert.equal(Boolean(pkg.scripts["env:check"]), true);
   assert.equal(Boolean(pkg.scripts["release:report"]), true);
@@ -278,11 +279,15 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("county.html"), /county-teleconsultation-status-filter/);
   assert.match(read("county.html"), /county-teleconsultation-priority-filter/);
   assert.match(read("county.html"), /county-teleconsultation-performance/);
+  assert.match(read("county.html"), /county-teleconsultation-risk-board/);
   assert.match(read("county.js"), /averagePerformance/);
   assert.match(read("county.js"), /SLA risks/);
+  assert.equal((read("county.js").match(/function renderCountyTeleconsultationLoop/g) || []).length, 1);
   assert.match(read("county.js"), /buildReferralTeleconsultationEscalations/);
+  assert.match(read("county.js"), /renderCountyTeleconsultationRiskBoard/);
   assert.match(read("county.js"), /data-referral-escalation/);
   assert.match(read("county.js"), /data-county-sla-ack/);
+  assert.match(read("county.js"), /label\.includes\("关闭"\)/);
   assert.match(read("county.js"), /督办/);
   assert.match(read("county.js"), /runReferralEscalation/);
   assert.match(read("county.js"), /hasReferralEscalationReminder/);
@@ -308,6 +313,10 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("insurance.html"), /referral-performance-policy/);
   assert.match(read("insurance.html"), /data-referral-layout="insurance-policy"/);
   assert.match(read("insurance.js"), /renderReferralPerformancePolicy/);
+  assert.match(referralAbout, /data-referral-about-section="participant-progress"/);
+  assert.match(referralAbout, /data-referral-role-progress="county-office"/);
+  assert.match(read("portal.css"), /grid-template-columns: repeat\(auto-fit, minmax\(220px, 1fr\)\)/);
+  assert.match(read("portal.css"), /\.table-wrap table/);
   assert.match(read(".github/workflows/ci.yml"), /npm run operations:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run site:pack/);
   assert.match(read(".github/workflows/ci.yml"), /npm run production-db:readiness/);
