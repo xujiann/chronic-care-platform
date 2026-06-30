@@ -4045,6 +4045,53 @@ function buildOperationsSiteJointTests({ interfaceMapping }) {
   };
 }
 
+function buildOperationsSiteJointPatrol({ siteJointTests, snapshots, dispatchRequests, reconciliationReviews, processAudit }) {
+  const rows = Array.isArray(siteJointTests?.rows) ? siteJointTests.rows : [];
+  const auditRows = Array.isArray(processAudit) ? processAudit : [];
+  const patrolRows = rows.map((row) => {
+    const completed = row.status === "已完成";
+    const hasRecentAudit = auditRows.some((item) => String(item.evidence || "").includes(row.id) || String(item.process || "").includes(row.sourceSystem));
+    const openDispatches = (Array.isArray(dispatchRequests) ? dispatchRequests : []).filter((item) => String(item.sourceInstitution || item.targetInstitution || "").includes(row.sourceSystem));
+    const relatedRecon = (Array.isArray(reconciliationReviews) ? reconciliationReviews : []).filter((item) => (item.evidence || []).includes(row.targetCollection) || String(item.reviewNote || "").includes(row.targetCollection));
+    const sampleStatus = completed ? "已通过" : "待补传";
+    const signatureStatus = completed || hasRecentAudit ? "已验签" : "待验签";
+    const replayStatus = completed ? "已回放" : openDispatches.length || relatedRecon.length ? "需复测" : "待回放";
+    const retryStatus = replayStatus === "需复测" ? "需重试" : "无失败";
+    const receiverStatus = completed ? "已确认" : "待确认";
+    return {
+      id: `patrol-${row.id}`,
+      sourceSystem: row.sourceSystem,
+      targetCollection: row.targetCollection,
+      owner: row.owner,
+      priority: !completed && (openDispatches.length || relatedRecon.length) ? "高" : completed ? "常规" : "中",
+      status: completed && hasRecentAudit ? "已归档" : completed ? "待签收" : "待巡检",
+      checkpoints: [
+        { id: "sample-packet", name: "样例报文", status: sampleStatus, evidence: row.samplePacket },
+        { id: "signature-log", name: "验签日志", status: signatureStatus, evidence: "operationIntegrationAudit" },
+        { id: "replay-record", name: "回放记录", status: replayStatus, evidence: row.replayResult },
+        { id: "retry-queue", name: "失败重试", status: retryStatus, evidence: `${openDispatches.length + relatedRecon.length}项需关注` },
+        { id: "receiver-confirmation", name: "接收确认", status: receiverStatus, evidence: row.exitCriteria }
+      ],
+      nextAction: completed ? "补齐接收端签收截图并归档。" : "补传样例报文、执行验签回放并记录失败重试结果。",
+      evidence: ["/api/operations/site-joint-tests", "/api/operations/site-joint-patrol", "/api/operations/integration/snapshots"]
+    };
+  });
+  return {
+    ok: patrolRows.length > 0,
+    generatedAt: new Date().toISOString(),
+    summary: {
+      systems: new Set(patrolRows.map((item) => item.sourceSystem)).size,
+      rows: patrolRows.length,
+      highPriority: patrolRows.filter((item) => item.priority === "高").length,
+      pending: patrolRows.filter((item) => item.status !== "已归档").length,
+      checkpoints: patrolRows.reduce((sum, item) => sum + item.checkpoints.length, 0)
+    },
+    rows: patrolRows,
+    dailyChecklist: ["样例报文", "验签日志", "回放记录", "失败重试", "接收端确认"],
+    evidence: ["/api/operations/site-joint-patrol", "platformProcessAudit", "operationIntegrationAudit"]
+  };
+}
+
 function productionCheckName(id, fallback) {
   return {
     "node-env": "生产运行模式",
@@ -4419,11 +4466,11 @@ function buildOperationsNextDevelopmentResearch({
       name: "多源真实报文联调驾驶舱",
       owner: "接口联调组/信息中心",
       problem: `当前已沉淀${totalJointTests}类现场联调项，仍需把样例报文、回放日志和失败重试转成日常可追踪闭环。`,
-      deliverable: "按HIS、EMR、LIS、PACS、HRP、120急救和统计直报来源展示报文状态、字段映射、回执编码和责任科室签收。",
+      deliverable: "已上线现场联调巡检台，按HIS、EMR、LIS、PACS、HRP、120急救和统计直报来源展示报文状态、字段映射、验签日志、回放记录、失败重试和接收端确认。",
       prerequisites: ["接入真实样例报文", "统一机构编码", "补齐失败重试回执", "现场联调签字归档"],
       dataSources: ["operationIntegrationAudit", "healthStatisticsIngestion", "hospitalOperationSnapshots"],
       acceptance: completedJointTests >= totalJointTests && totalJointTests > 0 ? "联调项已具备演示闭环，下一步进入真实报文日常巡检。" : "至少完成全部来源的样例报文、验签日志、回放记录和失败重试截图。",
-      evidence: ["/api/operations/site-joint-tests", "/api/operations/interface-mapping"]
+      evidence: ["/api/operations/site-joint-tests", "/api/operations/site-joint-patrol", "/api/operations/interface-mapping"]
     },
     {
       id: "production-cutover-ops",
@@ -4660,6 +4707,7 @@ function buildHospitalOperationsDashboard(data) {
   const playbooks = buildOperationsPlaybooks({ snapshots, alertRules: rules, commandChains, interfaceMapping });
   const handover = buildOperationsHandover({ snapshots, dispatchRequests, reconciliationReviews, commandChains, playbooks, handoverSignoffs });
   const siteJointTests = buildOperationsSiteJointTests({ interfaceMapping });
+  const siteJointPatrol = buildOperationsSiteJointPatrol({ siteJointTests, snapshots, dispatchRequests, reconciliationReviews, processAudit: data.platformProcessAudit });
   const productionHardening = buildOperationsProductionHardening(data);
   const intelligence = buildOperationsIntelligence({ snapshots, dispatchRequests, reconciliationReviews });
   const dashboard = {
@@ -4681,6 +4729,7 @@ function buildHospitalOperationsDashboard(data) {
     commandChains,
     interfaceMapping,
     siteJointTests,
+    siteJointPatrol,
     productionHardening,
     intelligence,
     playbooks,
@@ -8450,6 +8499,55 @@ async function handleApi(req, res) {
     if (!user) return;
     const dashboard = buildHospitalOperationsDashboard(readDatabase());
     sendJson(res, 200, dashboard.siteJointTests);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/site-joint-patrol") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/site-joint-patrol");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.siteJointPatrol);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/operations/site-joint-patrol/actions") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/site-joint-patrol/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const dashboard = buildHospitalOperationsDashboard(data);
+    const rows = Array.isArray(dashboard.siteJointPatrol?.rows) ? dashboard.siteJointPatrol.rows : [];
+    const patrol = rows.find((item) => item.id === payload.patrolId) || rows[0];
+    if (!patrol) {
+      sendJson(res, 400, { error: "Bad Request", message: "现场联调巡检项不存在" });
+      return;
+    }
+    const now = new Date().toISOString();
+    const audit = {
+      process: "医院运行现场联调巡检",
+      owner: patrol.owner || user.name,
+      status: String(payload.status || "已巡检").trim(),
+      risk: patrol.priority === "高" ? "高优先级联调风险" : "常规联调巡检",
+      auditPoint: "核查样例报文、验签日志、回放记录、失败重试和接收端确认。",
+      evidence: `${patrol.id}/${now}`,
+      nextAction: String(payload.note || patrol.nextAction || "").trim()
+    };
+    data.platformProcessAudit = [audit, ...(Array.isArray(data.platformProcessAudit) ? data.platformProcessAudit : [])].slice(0, 80);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "operations-site-joint-patrol",
+        target: patrol.id,
+        result: "allowed",
+        detail: `${patrol.sourceSystem}:${audit.status}:${patrol.priority}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 201, { audit, siteJointPatrol: buildOperationsSiteJointPatrol({ siteJointTests: dashboard.siteJointTests, snapshots: dashboard.snapshots, dispatchRequests: dashboard.dispatchRequests, reconciliationReviews: dashboard.reconciliationReviews, processAudit: data.platformProcessAudit }) });
     return;
   }
 

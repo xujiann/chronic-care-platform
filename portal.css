@@ -1028,6 +1028,70 @@ dialog::backdrop {
   font-size: 12px;
 }
 
+.site-joint-patrol-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.site-joint-patrol-summary,
+.site-joint-patrol-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+
+.site-joint-patrol-summary strong,
+.site-joint-patrol-card strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.site-joint-patrol-summary span,
+.site-joint-patrol-summary small,
+.site-joint-patrol-card p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.site-joint-patrol-card {
+  display: grid;
+  gap: 8px;
+}
+
+.site-joint-patrol-card.critical {
+  background: #fff4f2;
+  border-color: #e7a19a;
+}
+
+.site-joint-patrol-card.warning {
+  background: #fff9ea;
+  border-color: #edcf8f;
+}
+
+.site-joint-patrol-card.normal {
+  background: #f4fbf9;
+  border-color: #b8d8d1;
+}
+
+.site-joint-patrol-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.site-joint-patrol-checks span {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 5px 8px;
+  background: #f8fbfd;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .command-chain-panel {
   margin-bottom: 16px;
 }

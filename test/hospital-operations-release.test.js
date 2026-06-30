@@ -22,6 +22,7 @@ test("hospital operations release validates all completed directions", () => {
   assert.equal(report.checks.some((item) => item.id === "release:dispatchLifecycle" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "release:hospitalIntegrationIngest" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "release:siteJointTests" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "release:siteJointPatrol" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "release:productionHardening" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "release:intelligence" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "release:resourcePool" && item.passed), true);
@@ -65,6 +66,7 @@ test("hospital operations release renders and writes artifacts", (t) => {
   assert.equal(writtenJson.ok, true);
   assert.match(writtenMarkdown, /release:hospitalIntegrationIngest/);
   assert.match(writtenMarkdown, /release:performanceDetail/);
+  assert.match(writtenMarkdown, /release:siteJointPatrol/);
   assert.match(writtenMarkdown, /release:resourcePool/);
   assert.match(writtenMarkdown, /release:mobileDuty/);
   assert.match(writtenMarkdown, /release:governanceReport/);

@@ -89,6 +89,13 @@ function buildCapabilities(data, serverSource, readiness, release) {
       detail: "把样例报文、验签日志、回放记录、失败重试和接收端确认整理为可复核闭环。"
     },
     {
+      id: "site-joint-patrol",
+      name: "现场联调巡检台",
+      status: release.checks.some((item) => item.id === "release:siteJointPatrol" && item.passed) ? "ready" : "needs-attention",
+      evidence: ["/api/operations/site-joint-patrol", "/api/operations/site-joint-patrol/actions", "platformProcessAudit"],
+      detail: "按来源系统每日核查样例报文、验签日志、回放记录、失败重试和接收端确认，并把巡检结果写入审计留痕。"
+    },
+    {
       id: "production-hardening",
       name: "生产加固清单",
       status: release.checks.some((item) => item.id === "release:productionHardening" && item.passed) ? "ready" : "needs-attention",
@@ -158,8 +165,8 @@ function buildNextPlan() {
       phase: "P0 现场联调",
       owner: "医疗机构/接口联调组",
       scope: "HIS、住院管理、HR排班、设备系统、急诊分诊、卫生统计直报",
-      deliverable: "已上线 /api/operations/site-joint-tests 和现场联调闭环面板；真实报文和接收端截图为现场归档项。",
-      exitCriteria: "代码侧已完成闭环结构；生产前每个接入系统仍需完成一轮真实快照上报、调度回执和统计对账回放。"
+      deliverable: "已上线 /api/operations/site-joint-tests、/api/operations/site-joint-patrol 和现场联调巡检台；真实报文、验签日志、回放记录、失败重试和接收端截图为现场归档项。",
+      exitCriteria: "代码侧已完成闭环与每日巡检结构；生产前每个接入系统仍需完成一轮真实快照上报、调度回执、统计对账回放和接收端签收。"
     },
     {
       id: "production-hardening",

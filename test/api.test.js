@@ -234,6 +234,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(operationsDashboard.body.handoverOwnerMatrix.summary.owners >= 1, true);
     assert.equal(operationsDashboard.body.handoverOwnerMatrix.matrix.some((item) => item.evidence.includes("/api/operations/handover/owners")), true);
     assert.equal(operationsDashboard.body.siteJointTests.summary.total >= 5, true);
+    assert.equal(operationsDashboard.body.siteJointPatrol.summary.rows >= 5, true);
+    assert.equal(operationsDashboard.body.siteJointPatrol.rows.some((item) => item.checkpoints.length >= 5 && item.evidence.includes("/api/operations/site-joint-patrol")), true);
     assert.equal(operationsDashboard.body.productionHardening.summary.total >= 5, true);
     assert.equal(operationsDashboard.body.intelligence.recommendations.some((item) => item.recommendation && item.prediction), true);
     assert.equal(operationsDashboard.body.resourcePool.rows.some((item) => item.resourceSlots.length >= 5), true);
@@ -310,6 +312,24 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const siteJointTests = await api(baseUrl, "/api/operations/site-joint-tests", authorized(accountLogin.body.token));
     assert.equal(siteJointTests.response.status, 200);
     assert.equal(siteJointTests.body.rows.some((item) => item.validationPoints.includes("字段编码")), true);
+
+    const siteJointPatrol = await api(baseUrl, "/api/operations/site-joint-patrol", authorized(accountLogin.body.token));
+    assert.equal(siteJointPatrol.response.status, 200);
+    assert.equal(siteJointPatrol.body.summary.rows >= 5, true);
+    assert.equal(siteJointPatrol.body.dailyChecklist.includes("失败重试"), true);
+    assert.equal(siteJointPatrol.body.rows.some((item) => item.checkpoints.some((checkpoint) => checkpoint.id === "receiver-confirmation")), true);
+
+    const siteJointPatrolAction = await api(baseUrl, "/api/operations/site-joint-patrol/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        patrolId: siteJointPatrol.body.rows[0].id,
+        status: "已巡检",
+        note: "API regression site joint patrol"
+      })
+    }));
+    assert.equal(siteJointPatrolAction.response.status, 201);
+    assert.equal(siteJointPatrolAction.body.audit.process, "医院运行现场联调巡检");
+    assert.equal(siteJointPatrolAction.body.siteJointPatrol.rows.some((item) => item.id === siteJointPatrol.body.rows[0].id), true);
 
     const productionHardening = await api(baseUrl, "/api/operations/production-hardening", authorized(accountLogin.body.token));
     assert.equal(productionHardening.response.status, 200);

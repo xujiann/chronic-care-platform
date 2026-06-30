@@ -157,6 +157,7 @@ const OPERATIONS_EVIDENCE_LABELS = {
   "/api/operations/handover": "交接班清单接口",
   "/api/operations/handover/owners": "交接责任矩阵接口",
   "/api/operations/site-joint-tests": "现场联调闭环接口",
+  "/api/operations/site-joint-patrol": "现场联调巡检接口",
   "/api/operations/production-hardening": "生产加固清单接口",
   "/api/operations/intelligence": "智能调度建议接口",
   "/api/operations/resource-pool": "跨院资源池接口",
@@ -222,6 +223,7 @@ function buildStaticOperationsDashboard(state) {
   const playbooks = buildStaticOperationsPlaybooks(snapshots, alertRules, commandChains, interfaceMapping);
   const handover = buildStaticOperationsHandover(snapshots, dispatchRequests, reconciliationReviews, commandChains, playbooks, state.operationHandoverSignoffs || []);
   const siteJointTests = buildStaticSiteJointTests(interfaceMapping);
+  const siteJointPatrol = buildStaticSiteJointPatrol(siteJointTests, dispatchRequests, reconciliationReviews);
   const productionHardening = buildStaticProductionHardening(state);
   const intelligence = buildStaticOperationsIntelligence(snapshots, dispatchRequests, reconciliationReviews);
   const performanceMonitoring = buildStaticPerformanceMonitoringEvidence(state, snapshots);
@@ -273,6 +275,7 @@ function buildStaticOperationsDashboard(state) {
     commandChains,
     interfaceMapping,
     siteJointTests,
+    siteJointPatrol,
     productionHardening,
     intelligence,
     playbooks,
@@ -346,6 +349,45 @@ function buildStaticSiteJointTests(interfaceMapping) {
       pending: rows.filter((item) => item.status !== "已完成").length
     },
     rows
+  };
+}
+
+function buildStaticSiteJointPatrol(siteJointTests, dispatchRequests = [], reconciliationReviews = []) {
+  const rows = (Array.isArray(siteJointTests?.rows) ? siteJointTests.rows : []).map((row) => {
+    const completed = row.status === "已完成";
+    const openDispatches = dispatchRequests.filter((item) => String(item.sourceInstitution || item.targetInstitution || "").includes(row.sourceSystem));
+    const relatedRecon = reconciliationReviews.filter((item) => (item.evidence || []).includes(row.targetCollection) || String(item.reviewNote || "").includes(row.targetCollection));
+    const replayStatus = completed ? "已回放" : openDispatches.length || relatedRecon.length ? "需复测" : "待回放";
+    return {
+      id: `patrol-${row.id}`,
+      sourceSystem: row.sourceSystem,
+      targetCollection: row.targetCollection,
+      owner: row.owner,
+      priority: !completed && (openDispatches.length || relatedRecon.length) ? "高" : completed ? "常规" : "中",
+      status: completed ? "待签收" : "待巡检",
+      checkpoints: [
+        { id: "sample-packet", name: "样例报文", status: completed ? "已通过" : "待补传", evidence: row.samplePacket },
+        { id: "signature-log", name: "验签日志", status: completed ? "已验签" : "待验签", evidence: "operationIntegrationAudit" },
+        { id: "replay-record", name: "回放记录", status: replayStatus, evidence: row.replayResult },
+        { id: "retry-queue", name: "失败重试", status: replayStatus === "需复测" ? "需重试" : "无失败", evidence: `${openDispatches.length + relatedRecon.length}项需关注` },
+        { id: "receiver-confirmation", name: "接收确认", status: completed ? "已确认" : "待确认", evidence: row.exitCriteria }
+      ],
+      nextAction: completed ? "补齐接收端签收截图并归档。" : "补传样例报文、执行验签回放并记录失败重试结果。",
+      evidence: ["/api/operations/site-joint-tests", "/api/operations/site-joint-patrol", "/api/operations/integration/snapshots"]
+    };
+  });
+  return {
+    ok: rows.length > 0,
+    summary: {
+      systems: new Set(rows.map((item) => item.sourceSystem)).size,
+      rows: rows.length,
+      highPriority: rows.filter((item) => item.priority === "高").length,
+      pending: rows.filter((item) => item.status !== "已归档").length,
+      checkpoints: rows.reduce((sum, item) => sum + item.checkpoints.length, 0)
+    },
+    rows,
+    dailyChecklist: ["样例报文", "验签日志", "回放记录", "失败重试", "接收端确认"],
+    evidence: ["/api/operations/site-joint-patrol", "platformProcessAudit", "operationIntegrationAudit"]
   };
 }
 
@@ -679,11 +721,11 @@ function buildStaticNextDevelopmentResearch(
       name: "多源真实报文联调驾驶舱",
       owner: "接口联调组/信息中心",
       problem: `当前已沉淀${totalJointTests}类现场联调项，仍需把样例报文、回放日志和失败重试转成日常可追踪闭环。`,
-      deliverable: "按HIS、EMR、LIS、PACS、HRP、120急救和统计直报来源展示报文状态、字段映射、回执编码和责任科室签收。",
+      deliverable: "已上线现场联调巡检台，按HIS、EMR、LIS、PACS、HRP、120急救和统计直报来源展示报文状态、字段映射、验签日志、回放记录、失败重试和接收端确认。",
       prerequisites: ["接入真实样例报文", "统一机构编码", "补齐失败重试回执", "现场联调签字归档"],
       dataSources: ["operationIntegrationAudit", "healthStatisticsIngestion", "hospitalOperationSnapshots"],
       acceptance: completedJointTests >= totalJointTests && totalJointTests > 0 ? "联调项已具备演示闭环，下一步进入真实报文日常巡检。" : "至少完成全部来源的样例报文、验签日志、回放记录和失败重试截图。",
-      evidence: ["/api/operations/site-joint-tests", "/api/operations/interface-mapping"]
+      evidence: ["/api/operations/site-joint-tests", "/api/operations/site-joint-patrol", "/api/operations/interface-mapping"]
     },
     {
       id: "production-cutover-ops",
@@ -1031,6 +1073,7 @@ function renderOperationsDashboard() {
   renderPerformanceManual(dashboard, filteredSnapshots);
   renderInterfaceMapping(dashboard.interfaceMapping || buildStaticInterfaceMapping());
   renderSiteJointTests(dashboard.siteJointTests || buildStaticSiteJointTests(dashboard.interfaceMapping || buildStaticInterfaceMapping()));
+  renderSiteJointPatrol(dashboard.siteJointPatrol || buildStaticSiteJointPatrol(dashboard.siteJointTests || {}, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || []));
   renderProductionHardening(dashboard.productionHardening || buildStaticProductionHardening({}));
   renderOperationsIntelligence(dashboard.intelligence || buildStaticOperationsIntelligence(filteredSnapshots, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || []));
   renderResourcePool(dashboard.resourcePool || buildStaticResourcePool(filteredSnapshots, dashboard.medicalResources || [], dashboard.dispatchRequests || []));
@@ -1470,6 +1513,63 @@ function renderSiteJointTests(siteJointTests) {
       </article>
     `).join("")}
   `;
+}
+
+function renderSiteJointPatrol(siteJointPatrol) {
+  const target = document.querySelector("#operations-site-joint-patrol");
+  if (!target) return;
+  const rows = Array.isArray(siteJointPatrol.rows) ? siteJointPatrol.rows : [];
+  target.innerHTML = `
+    <article class="site-joint-patrol-summary">
+      <strong>现场联调巡检</strong>
+      <span>${siteJointPatrol.summary?.rows || 0} 项来源 / ${siteJointPatrol.summary?.pending || 0} 项待归档 / ${siteJointPatrol.summary?.highPriority || 0} 项高优先级</span>
+      <small>每日检查：${zhList(siteJointPatrol.dailyChecklist || [])}</small>
+    </article>
+    ${rows.map((item) => `
+      <article class="site-joint-patrol-card ${item.priority === "高" ? "critical" : item.priority === "中" ? "warning" : "normal"}">
+        <div class="operation-playbook-head">
+          <div>
+            <strong>${zhInline(item.sourceSystem)}</strong>
+            <span>${zhInline(item.targetCollection)} / ${zhInline(item.owner)} / ${zhInline(item.status)}</span>
+          </div>
+          <span class="badge ${item.priority === "高" ? "danger" : item.priority === "中" ? "warn" : "info"}">${zhInline(item.priority)}</span>
+        </div>
+        <div class="site-joint-patrol-checks">
+          ${(item.checkpoints || []).map((checkpoint) => `<span title="${htmlAttribute(checkpoint.evidence)}">${zhInline(checkpoint.name)}：${zhInline(checkpoint.status)}</span>`).join("")}
+        </div>
+        <p>${zhInline(item.nextAction)}</p>
+        <button class="inline-action compact" type="button" data-site-patrol="${htmlAttribute(item.id)}">提交巡检</button>
+      </article>
+    `).join("")}
+  `;
+  target.querySelectorAll("[data-site-patrol]").forEach((button) => {
+    button.addEventListener("click", () => submitSiteJointPatrol(button.dataset.sitePatrol));
+  });
+}
+
+async function submitSiteJointPatrol(patrolId) {
+  const row = (operationsDashboard?.siteJointPatrol?.rows || []).find((item) => item.id === patrolId);
+  if (!row) return;
+  const payload = {
+    patrolId,
+    status: "已巡检",
+    note: row.nextAction
+  };
+  try {
+    const response = await request(`${OPERATIONS_API_BASE}/operations/site-joint-patrol/actions`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error("site joint patrol failed");
+    const result = await response.json();
+    operationsDashboard.siteJointPatrol = result.siteJointPatrol || operationsDashboard.siteJointPatrol;
+  } catch (error) {
+    operationsDashboard.siteJointPatrol = {
+      ...(operationsDashboard.siteJointPatrol || {}),
+      rows: (operationsDashboard.siteJointPatrol?.rows || []).map((item) => item.id === patrolId ? { ...item, status: "已巡检" } : item)
+    };
+  }
+  renderSiteJointPatrol(operationsDashboard.siteJointPatrol || {});
 }
 
 function renderProductionHardening(productionHardening) {
