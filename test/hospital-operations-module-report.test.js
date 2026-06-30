@@ -17,8 +17,11 @@ test("hospital operations module report audits capabilities and next plan", () =
   assert.equal(report.capabilities.some((item) => item.id === "production-hardening" && item.status === "ready"), true);
   assert.equal(report.capabilities.some((item) => item.id === "ops-intelligence" && item.status === "ready"), true);
   assert.equal(report.capabilities.some((item) => item.id === "governance-reporting" && item.status === "ready"), true);
+  assert.equal(report.capabilities.some((item) => item.id === "next-development-research" && item.status === "ready"), true);
   assert.equal(report.capabilities.some((item) => item.evidence.includes("/api/operations/dashboard")), true);
   assert.equal(report.nextPlan.some((item) => item.id === "production-hardening" && item.exitCriteria.includes("release:report:full")), true);
+  assert.equal(report.nextPlan.some((item) => item.id === "cross-hospital-resource-market"), true);
+  assert.equal(report.nextPlan.some((item) => item.id === "mobile-command"), true);
   assert.equal(report.checks.every((item) => item.passed), true);
 });
 
@@ -32,6 +35,7 @@ test("hospital operations module report renders and writes release artifacts", (
   assert.match(markdown, /医院系统签名接入/);
   assert.match(markdown, /智能调度建议/);
   assert.match(markdown, /治理报表/);
+  assert.match(markdown, /下一步功能研究/);
 
   writeOutput(report, {
     output: path.join("tmp", "hospital-operations-module-report-test", "hospital-operations-module-report.json"),
@@ -42,6 +46,7 @@ test("hospital operations module report renders and writes release artifacts", (
   const writtenMarkdown = fs.readFileSync(path.join(outputDir, "hospital-operations-module-report.md"), "utf8");
   assert.equal(writtenJson.ok, true);
   assert.match(writtenMarkdown, /P0 现场联调/);
+  assert.match(writtenMarkdown, /P2 移动值守/);
 });
 
 test("hospital operations module report CLI parser keeps output flags", () => {

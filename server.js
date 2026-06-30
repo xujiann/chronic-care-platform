@@ -3891,6 +3891,136 @@ function buildOperationsGovernanceReport({ snapshots, dispatchRequests, reconcil
   };
 }
 
+function buildOperationsNextDevelopmentResearch({
+  snapshots,
+  dispatchRequests,
+  reconciliationReviews,
+  performanceMonitoring,
+  siteJointTests,
+  productionHardening,
+  intelligence,
+  governanceReport,
+  handover
+}) {
+  const openDispatches = dispatchRequests.filter((item) => ["pending", "assigned", "in-progress"].includes(item.status));
+  const pendingRecon = reconciliationReviews.filter((item) => !["approved", "closed"].includes(item.status));
+  const highPressure = snapshots.filter((item) => item.normalizedStatus === "critical" || item.resourcePressure >= 85);
+  const completedJointTests = Number(siteJointTests?.summary?.completed || 0);
+  const totalJointTests = Number(siteJointTests?.summary?.total || 0);
+  const blockedHardening = Number(productionHardening?.summary?.blocked || 0);
+  const intelligenceRows = Array.isArray(intelligence?.recommendations) ? intelligence.recommendations : [];
+  const governanceSections = Number(governanceReport?.summary?.sections || 0);
+  const handoverItems = Number(handover?.summary?.items || 0);
+  const tracks = [
+    {
+      id: "field-integration-command-center",
+      priority: "P0",
+      phase: "现场联调深化",
+      name: "多源真实报文联调驾驶舱",
+      owner: "接口联调组/信息中心",
+      problem: `当前已沉淀${totalJointTests}类现场联调项，仍需把样例报文、回放日志和失败重试转成日常可追踪闭环。`,
+      deliverable: "按HIS、EMR、LIS、PACS、HRP、120急救和统计直报来源展示报文状态、字段映射、回执编码和责任科室签收。",
+      prerequisites: ["接入真实样例报文", "统一机构编码", "补齐失败重试回执", "现场联调签字归档"],
+      dataSources: ["operationIntegrationAudit", "healthStatisticsIngestion", "hospitalOperationSnapshots"],
+      acceptance: completedJointTests >= totalJointTests && totalJointTests > 0 ? "联调项已具备演示闭环，下一步进入真实报文日常巡检。" : "至少完成全部来源的样例报文、验签日志、回放记录和失败重试截图。",
+      evidence: ["/api/operations/site-joint-tests", "/api/operations/interface-mapping"]
+    },
+    {
+      id: "production-cutover-ops",
+      priority: "P0",
+      phase: "生产割接运营",
+      name: "割接值守与回退演练台",
+      owner: "平台运维/安全管理岗",
+      problem: `生产加固仍有${blockedHardening}项需要现场签字或环境变量确认。`,
+      deliverable: "形成割接窗口、值守人、监控阈值、回退路径、审计保全和灾备演练的一屏确认台。",
+      prerequisites: ["SESSION_SECRETS生产配置", "INTEGRATION_GATEWAY_SECRET轮换", "监控值守签字", "灾备演练记录"],
+      dataSources: ["platformProcessAudit", "securityEvents", "/api/health", "/api/metrics"],
+      acceptance: "生产前 release 报告无阻断项，割接、监控、审计、回退均完成签字归档。",
+      evidence: ["/api/operations/production-hardening", "/api/system/readiness"]
+    },
+    {
+      id: "predictive-capacity-model",
+      priority: "P1",
+      phase: "智能调度增强",
+      name: "床位/人员/设备预测模型与采纳率闭环",
+      owner: "医务运行调度岗/数据分析岗",
+      problem: `当前有${intelligenceRows.length}条智能调度建议，仍需记录人工采纳、驳回原因和次日实际压力。`,
+      deliverable: "把预测缺口、调度建议、人工决策、实际床位压力和工单关闭结果串成模型评估面板。",
+      prerequisites: ["调度工单状态闭环", "采纳/驳回原因字典", "次日运行快照", "模型版本号"],
+      dataSources: ["resourceDispatchRequests", "hospitalOperationSnapshots", "medicalResources"],
+      acceptance: "展示建议采纳率、调度后压力变化、误报漏报案例和模型版本回溯。",
+      evidence: ["/api/operations/intelligence", "/api/operations/dispatch"]
+    },
+    {
+      id: "cross-hospital-resource-market",
+      priority: "P1",
+      phase: "跨院资源协同",
+      name: "跨院资源池与调拨协议",
+      owner: "医政医管处/医联体办公室",
+      problem: `当前开放调度工单${openDispatches.length}条，需要把院内请求升级为跨院资源池和协议化调拨。`,
+      deliverable: "按床位、ICU、检查设备、值班人员和转运能力形成可申请、可审批、可追踪的跨院资源池。",
+      prerequisites: ["资源口径统一", "调拨审批规则", "目标医院确认机制", "转运责任边界"],
+      dataSources: ["medicalResources", "resourceDispatchRequests", "hospitalOperationSnapshots"],
+      acceptance: "跨院调拨工单可完成申请、受理、执行、关闭、复盘和审计追踪。",
+      evidence: ["/api/operations/dashboard", "/api/operations/dispatch"]
+    },
+    {
+      id: "governance-export-center",
+      priority: "P1",
+      phase: "治理报表导出",
+      name: "委端月报、绩效异常和直报差异导出中心",
+      owner: "统计办公室/规划发展与信息化处",
+      problem: `治理报表已有${governanceSections}个章节，待复核直报差异${pendingRecon.length}项，需要可下载、可留痕的报表包。`,
+      deliverable: "导出月度运行治理报告、绩效异常说明、直报差异清单、调度复盘和附件目录。",
+      prerequisites: ["报表模板定稿", "异常说明字段", "附件编号规则", "复核签收流程"],
+      dataSources: ["healthStatistics", "statisticsReconciliationReviews", "platformProcessAudit"],
+      acceptance: "导出的报告包可追溯生成时间、数据版本、复核人、差异状态和附件证据。",
+      evidence: ["/api/operations/governance-report", "/api/operations/reconciliation/:id/review"]
+    },
+    {
+      id: "mobile-command",
+      priority: "P2",
+      phase: "移动值守",
+      name: "移动端值守与消息闭环",
+      owner: "运行监测岗/值班长",
+      problem: `交接事项${handoverItems}项，高压机构${highPressure.length}家，夜间值守需要更轻量的确认和提醒入口。`,
+      deliverable: "移动端查看预警、工单、交接事项和待复核直报差异，并支持签收、备注和消息提醒。",
+      prerequisites: ["移动端角色权限", "消息模板", "签收审计字段", "弱网重试策略"],
+      dataSources: ["operationHandoverSignoffs", "taskMessages", "securityEvents"],
+      acceptance: "移动值守可完成预警确认、交接签收、调度备注和审计留痕。",
+      evidence: ["/api/operations/handover", "/api/process-audit"]
+    }
+  ];
+  const nextSprint = [
+    "把现场联调闭环升级为真实报文巡检和失败重试看板。",
+    "把生产加固清单接入割接值守、回退演练和监控签字。",
+    "为智能调度建议增加采纳率、驳回原因和次日压力校验。",
+    "沉淀委端月报导出模板和直报差异附件包。"
+  ];
+  return {
+    ok: tracks.length >= 5,
+    generatedAt: new Date().toISOString(),
+    horizon: "2026-Q3 至 2026-Q4",
+    summary: {
+      tracks: tracks.length,
+      p0: tracks.filter((item) => item.priority === "P0").length,
+      p1: tracks.filter((item) => item.priority === "P1").length,
+      p2: tracks.filter((item) => item.priority === "P2").length,
+      readyForFieldResearch: completedJointTests,
+      blockedForCutover: blockedHardening,
+      pendingReconciliation: pendingRecon.length
+    },
+    tracks,
+    risks: [
+      "真实报文、生产密钥、移动端消息和跨院调拨均需现场制度与安全边界共同确认。",
+      "预测模型上线前必须保留人工复核、采纳原因、驳回原因和审计留痕。",
+      "委端导出件应锁定数据版本，避免月报、直报和绩效说明口径漂移。"
+    ],
+    nextSprint,
+    evidence: ["/api/operations/dashboard", "/api/operations/next-development-research", "hospital-operations-module-report.md"]
+  };
+}
+
 function buildHospitalOperationsDashboard(data) {
   const rules = Array.isArray(data.operationAlertRules) ? data.operationAlertRules : [];
   const snapshots = (Array.isArray(data.hospitalOperationSnapshots) ? data.hospitalOperationSnapshots : []).map((snapshot) => {
@@ -3961,6 +4091,17 @@ function buildHospitalOperationsDashboard(data) {
     dispatchRequests,
     reconciliationReviews,
     performanceMonitoring: dashboard.performanceMonitoring,
+    handover
+  });
+  dashboard.nextDevelopmentResearch = buildOperationsNextDevelopmentResearch({
+    snapshots,
+    dispatchRequests,
+    reconciliationReviews,
+    performanceMonitoring: dashboard.performanceMonitoring,
+    siteJointTests,
+    productionHardening,
+    intelligence,
+    governanceReport: dashboard.governanceReport,
     handover
   });
   return dashboard;
@@ -6663,6 +6804,14 @@ async function handleApi(req, res) {
     if (!user) return;
     const dashboard = buildHospitalOperationsDashboard(readDatabase());
     sendJson(res, 200, dashboard.governanceReport);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/next-development-research") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/next-development-research");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.nextDevelopmentResearch);
     return;
   }
 

@@ -110,6 +110,13 @@ function buildCapabilities(data, serverSource, readiness, release) {
       detail: "形成月度运行报告、直报差异清单、调度复盘和绩效异常说明的导出骨架。"
     },
     {
+      id: "next-development-research",
+      name: "下一步功能研究",
+      status: release.checks.some((item) => item.id === "release:nextDevelopmentResearch" && item.passed) ? "ready" : "needs-attention",
+      evidence: ["/api/operations/next-development-research", "operations.html", "hospital-operations-module-report.md"],
+      detail: "沉淀现场联调、生产割接、智能调度、跨院资源、治理导出和移动值守六个可开发方向，并给出前置条件、数据来源、验收口径和风险边界。"
+    },
+    {
       id: "release-evidence",
       name: "发布与审计证据",
       status: readiness.ok && release.ok ? "ready" : "needs-attention",
@@ -156,6 +163,22 @@ function buildNextPlan() {
       scope: "绩效监测、统计直报、资源利用、预警处置、交接班质量",
       deliverable: "已上线 /api/operations/governance-report 和治理报表面板，覆盖月报、差异、调度复盘和绩效异常说明。",
       exitCriteria: "已具备按月导出委端治理报告的数据骨架；医院端正式导出需现场角色和模板确认。"
+    },
+    {
+      id: "cross-hospital-resource-market",
+      phase: "P1 跨院资源协同",
+      owner: "医政医管处/医联体办公室",
+      scope: "床位、ICU、检查设备、值班人员和转运能力的跨院资源池",
+      deliverable: "下一步基于 /api/operations/next-development-research 拆分资源池、调拨协议、审批规则和审计回放。",
+      exitCriteria: "跨院调拨工单可完成申请、受理、执行、关闭、复盘和审计追踪。"
+    },
+    {
+      id: "mobile-command",
+      phase: "P2 移动值守",
+      owner: "运行监测岗/值班长",
+      scope: "预警确认、交接签收、调度备注、直报复核提醒和消息闭环",
+      deliverable: "下一步复用交接签收和 taskMessages 通知链，形成移动值守入口和弱网重试策略。",
+      exitCriteria: "移动端可完成签收、备注、提醒确认和审计留痕。"
     }
   ];
 }

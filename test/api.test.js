@@ -226,6 +226,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(operationsDashboard.body.productionHardening.summary.total >= 5, true);
     assert.equal(operationsDashboard.body.intelligence.recommendations.some((item) => item.recommendation && item.prediction), true);
     assert.equal(operationsDashboard.body.governanceReport.sections.some((item) => item.id === "reconciliation-diff"), true);
+    assert.equal(operationsDashboard.body.nextDevelopmentResearch.tracks.length >= 5, true);
+    assert.equal(operationsDashboard.body.nextDevelopmentResearch.summary.p0 >= 1, true);
 
     const performanceMonitoring = await api(baseUrl, "/api/operations/performance-monitoring", authorized(accountLogin.body.token));
     assert.equal(performanceMonitoring.response.status, 200);
@@ -304,6 +306,12 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const governanceReport = await api(baseUrl, "/api/operations/governance-report", authorized(accountLogin.body.token));
     assert.equal(governanceReport.response.status, 200);
     assert.equal(governanceReport.body.nextActions.some((item) => /月度运行治理报告/.test(item)), true);
+
+    const nextDevelopmentResearch = await api(baseUrl, "/api/operations/next-development-research", authorized(accountLogin.body.token));
+    assert.equal(nextDevelopmentResearch.response.status, 200);
+    assert.equal(nextDevelopmentResearch.body.tracks.some((item) => item.id === "field-integration-command-center"), true);
+    assert.equal(nextDevelopmentResearch.body.tracks.some((item) => item.id === "mobile-command"), true);
+    assert.equal(nextDevelopmentResearch.body.nextSprint.length >= 4, true);
 
     const hospitalLogin = await login(baseUrl, "hospital");
     const snapshotPayload = {

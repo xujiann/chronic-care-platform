@@ -1093,6 +1093,116 @@ dialog::backdrop {
   color: var(--teal);
 }
 
+.operations-next-development-panel {
+  grid-column: 1 / -1;
+}
+
+.operation-next-development-grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.operation-next-development-summary,
+.operation-next-development-card,
+.operation-next-development-risks article {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+
+.operation-next-development-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.operation-next-development-summary strong,
+.operation-next-development-card strong,
+.operation-next-development-risks strong {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.operation-next-development-summary span,
+.operation-next-development-summary small,
+.operation-next-development-card p,
+.operation-next-development-card small,
+.operation-next-development-risks span {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.operation-next-development-summary small {
+  grid-column: 1 / -1;
+}
+
+.operation-next-development-metrics,
+.operation-next-development-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.operation-next-development-metrics span,
+.operation-next-development-tags span {
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: #f8fbfd;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.operation-next-development-track-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 10px;
+}
+
+.operation-next-development-card {
+  display: grid;
+  gap: 9px;
+}
+
+.operation-next-development-card.urgent {
+  border-color: #e7a19a;
+  background: #fff4f2;
+}
+
+.operation-next-development-card.important {
+  border-color: #edcf8f;
+  background: #fff9ea;
+}
+
+.operation-next-development-card.later {
+  border-color: #b8d8d1;
+  background: #f4fbf9;
+}
+
+.operation-next-development-card footer {
+  display: grid;
+  gap: 5px;
+}
+
+.operation-next-development-tags.subtle span {
+  background: #eef8f6;
+  color: var(--teal);
+}
+
+.operation-next-development-risks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.operation-next-development-risks article {
+  display: grid;
+  gap: 7px;
+}
+
 .operation-handover-summary {
   display: flex;
   flex-wrap: wrap;

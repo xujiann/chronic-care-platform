@@ -25,6 +25,7 @@ test("hospital operations release validates all completed directions", () => {
   assert.equal(report.checks.some((item) => item.id === "release:productionHardening" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "release:intelligence" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "release:governanceReport" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "release:nextDevelopmentResearch" && item.passed), true);
 });
 
 test("hospital operations release detects missing package script", () => {
@@ -47,6 +48,7 @@ test("hospital operations release renders and writes artifacts", (t) => {
   assert.match(markdown, /预警处置预案/);
   assert.match(markdown, /智能调度建议/);
   assert.match(markdown, /治理报表/);
+  assert.match(markdown, /下一步功能研究/);
 
   writeOutput(report, {
     output: path.join("tmp", "hospital-operations-release-test", "hospital-operations-release-report.json"),
@@ -59,6 +61,7 @@ test("hospital operations release renders and writes artifacts", (t) => {
   assert.match(writtenMarkdown, /release:hospitalIntegrationIngest/);
   assert.match(writtenMarkdown, /release:performanceDetail/);
   assert.match(writtenMarkdown, /release:governanceReport/);
+  assert.match(writtenMarkdown, /release:nextDevelopmentResearch/);
 });
 
 test("hospital operations release CLI parser keeps output flags", () => {

@@ -159,7 +159,8 @@ const OPERATIONS_EVIDENCE_LABELS = {
   "/api/operations/site-joint-tests": "现场联调闭环接口",
   "/api/operations/production-hardening": "生产加固清单接口",
   "/api/operations/intelligence": "智能调度建议接口",
-  "/api/operations/governance-report": "治理报表接口"
+  "/api/operations/governance-report": "治理报表接口",
+  "/api/operations/next-development-research": "下一步功能研究接口"
 };
 
 function htmlAttribute(value) {
@@ -221,6 +222,17 @@ function buildStaticOperationsDashboard(state) {
   const intelligence = buildStaticOperationsIntelligence(snapshots, dispatchRequests, reconciliationReviews);
   const performanceMonitoring = buildStaticPerformanceMonitoringEvidence(state, snapshots);
   const governanceReport = buildStaticGovernanceReport(snapshots, dispatchRequests, reconciliationReviews, performanceMonitoring, handover);
+  const nextDevelopmentResearch = buildStaticNextDevelopmentResearch(
+    snapshots,
+    dispatchRequests,
+    reconciliationReviews,
+    performanceMonitoring,
+    siteJointTests,
+    productionHardening,
+    intelligence,
+    governanceReport,
+    handover
+  );
   return {
     ok: true,
     boundaries: ["hospital-operation-monitoring", "resource-dispatch", "statistics-reconciliation"],
@@ -251,7 +263,8 @@ function buildStaticOperationsDashboard(state) {
     handover,
     handoverOwnerMatrix: buildStaticHandoverOwnerMatrix(handover),
     performanceMonitoring,
-    governanceReport
+    governanceReport,
+    nextDevelopmentResearch
   };
 }
 
@@ -408,6 +421,134 @@ function buildStaticGovernanceReport(snapshots, dispatchRequests, reconciliation
     sections,
     nextActions: ["导出委端月度运行治理报告", "归档直报差异清单和调度复盘清单", "将绩效异常说明与现场联调记录合并复核"],
     evidence: ["/api/operations/dashboard", "/api/operations/governance-report"]
+  };
+}
+
+function buildStaticNextDevelopmentResearch(
+  snapshots,
+  dispatchRequests,
+  reconciliationReviews,
+  performanceMonitoring,
+  siteJointTests,
+  productionHardening,
+  intelligence,
+  governanceReport,
+  handover
+) {
+  const openDispatches = dispatchRequests.filter((item) => ["pending", "assigned", "in-progress"].includes(item.status));
+  const pendingRecon = reconciliationReviews.filter((item) => !["approved", "closed"].includes(item.status));
+  const highPressure = snapshots.filter((item) => item.normalizedStatus === "critical" || Number(item.resourcePressure || 0) >= 85);
+  const completedJointTests = Number(siteJointTests?.summary?.completed || 0);
+  const totalJointTests = Number(siteJointTests?.summary?.total || 0);
+  const blockedHardening = Number(productionHardening?.summary?.blocked || 0);
+  const intelligenceRows = Array.isArray(intelligence?.recommendations) ? intelligence.recommendations : [];
+  const governanceSections = Number(governanceReport?.summary?.sections || 0);
+  const handoverItems = Number(handover?.summary?.items || 0);
+  const tracks = [
+    {
+      id: "field-integration-command-center",
+      priority: "P0",
+      phase: "现场联调深化",
+      name: "多源真实报文联调驾驶舱",
+      owner: "接口联调组/信息中心",
+      problem: `当前已沉淀${totalJointTests}类现场联调项，仍需把样例报文、回放日志和失败重试转成日常可追踪闭环。`,
+      deliverable: "按HIS、EMR、LIS、PACS、HRP、120急救和统计直报来源展示报文状态、字段映射、回执编码和责任科室签收。",
+      prerequisites: ["接入真实样例报文", "统一机构编码", "补齐失败重试回执", "现场联调签字归档"],
+      dataSources: ["operationIntegrationAudit", "healthStatisticsIngestion", "hospitalOperationSnapshots"],
+      acceptance: completedJointTests >= totalJointTests && totalJointTests > 0 ? "联调项已具备演示闭环，下一步进入真实报文日常巡检。" : "至少完成全部来源的样例报文、验签日志、回放记录和失败重试截图。",
+      evidence: ["/api/operations/site-joint-tests", "/api/operations/interface-mapping"]
+    },
+    {
+      id: "production-cutover-ops",
+      priority: "P0",
+      phase: "生产割接运营",
+      name: "割接值守与回退演练台",
+      owner: "平台运维/安全管理岗",
+      problem: `生产加固仍有${blockedHardening}项需要现场签字或环境变量确认。`,
+      deliverable: "形成割接窗口、值守人、监控阈值、回退路径、审计保全和灾备演练的一屏确认台。",
+      prerequisites: ["生产密钥轮换", "监控值守签字", "灾备演练记录", "回退责任人确认"],
+      dataSources: ["platformProcessAudit", "securityEvents", "/api/health", "/api/metrics"],
+      acceptance: "生产前发布报告无阻断项，割接、监控、审计、回退均完成签字归档。",
+      evidence: ["/api/operations/production-hardening", "/api/system/readiness"]
+    },
+    {
+      id: "predictive-capacity-model",
+      priority: "P1",
+      phase: "智能调度增强",
+      name: "床位/人员/设备预测模型与采纳率闭环",
+      owner: "医务运行调度岗/数据分析岗",
+      problem: `当前有${intelligenceRows.length}条智能调度建议，仍需记录人工采纳、驳回原因和次日实际压力。`,
+      deliverable: "把预测缺口、调度建议、人工决策、实际床位压力和工单关闭结果串成模型评估面板。",
+      prerequisites: ["调度工单状态闭环", "采纳/驳回原因字典", "次日运行快照", "模型版本号"],
+      dataSources: ["resourceDispatchRequests", "hospitalOperationSnapshots", "medicalResources"],
+      acceptance: "展示建议采纳率、调度后压力变化、误报漏报案例和模型版本回溯。",
+      evidence: ["/api/operations/intelligence", "/api/operations/dispatch"]
+    },
+    {
+      id: "cross-hospital-resource-market",
+      priority: "P1",
+      phase: "跨院资源协同",
+      name: "跨院资源池与调拨协议",
+      owner: "医政医管处/医联体办公室",
+      problem: `当前开放调度工单${openDispatches.length}条，需要把院内请求升级为跨院资源池和协议化调拨。`,
+      deliverable: "按床位、ICU、检查设备、值班人员和转运能力形成可申请、可审批、可追踪的跨院资源池。",
+      prerequisites: ["资源口径统一", "调拨审批规则", "目标医院确认机制", "转运责任边界"],
+      dataSources: ["medicalResources", "resourceDispatchRequests", "hospitalOperationSnapshots"],
+      acceptance: "跨院调拨工单可完成申请、受理、执行、关闭、复盘和审计追踪。",
+      evidence: ["/api/operations/dashboard", "/api/operations/dispatch"]
+    },
+    {
+      id: "governance-export-center",
+      priority: "P1",
+      phase: "治理报表导出",
+      name: "委端月报、绩效异常和直报差异导出中心",
+      owner: "统计办公室/规划发展与信息化处",
+      problem: `治理报表已有${governanceSections}个章节，待复核直报差异${pendingRecon.length}项，需要可下载、可留痕的报表包。`,
+      deliverable: "导出月度运行治理报告、绩效异常说明、直报差异清单、调度复盘和附件目录。",
+      prerequisites: ["报表模板定稿", "异常说明字段", "附件编号规则", "复核签收流程"],
+      dataSources: ["healthStatistics", "statisticsReconciliationReviews", "platformProcessAudit"],
+      acceptance: "导出的报告包可追溯生成时间、数据版本、复核人、差异状态和附件证据。",
+      evidence: ["/api/operations/governance-report", "/api/operations/reconciliation/:id/review"]
+    },
+    {
+      id: "mobile-command",
+      priority: "P2",
+      phase: "移动值守",
+      name: "移动端值守与消息闭环",
+      owner: "运行监测岗/值班长",
+      problem: `交接事项${handoverItems}项，高压机构${highPressure.length}家，夜间值守需要更轻量的确认和提醒入口。`,
+      deliverable: "移动端查看预警、工单、交接事项和待复核直报差异，并支持签收、备注和消息提醒。",
+      prerequisites: ["移动端角色权限", "消息模板", "签收审计字段", "弱网重试策略"],
+      dataSources: ["operationHandoverSignoffs", "taskMessages", "securityEvents"],
+      acceptance: "移动值守可完成预警确认、交接签收、调度备注和审计留痕。",
+      evidence: ["/api/operations/handover", "/api/process-audit"]
+    }
+  ];
+  return {
+    ok: true,
+    horizon: "2026-Q3 至 2026-Q4",
+    summary: {
+      tracks: tracks.length,
+      p0: tracks.filter((item) => item.priority === "P0").length,
+      p1: tracks.filter((item) => item.priority === "P1").length,
+      p2: tracks.filter((item) => item.priority === "P2").length,
+      readyForFieldResearch: completedJointTests,
+      blockedForCutover: blockedHardening,
+      pendingReconciliation: pendingRecon.length
+    },
+    tracks,
+    risks: [
+      "真实报文、生产密钥、移动端消息和跨院调拨均需现场制度与安全边界共同确认。",
+      "预测模型上线前必须保留人工复核、采纳原因、驳回原因和审计留痕。",
+      "委端导出件应锁定数据版本，避免月报、直报和绩效说明口径漂移。"
+    ],
+    nextSprint: [
+      "把现场联调闭环升级为真实报文巡检和失败重试看板。",
+      "把生产加固清单接入割接值守、回退演练和监控签字。",
+      "为智能调度建议增加采纳率、驳回原因和次日压力校验。",
+      "沉淀委端月报导出模板和直报差异附件包。"
+    ],
+    evidence: ["/api/operations/dashboard", "/api/operations/next-development-research", "hospital-operations-module-report.md"]
   };
 }
 
@@ -666,6 +807,17 @@ function renderOperationsDashboard() {
   renderProductionHardening(dashboard.productionHardening || buildStaticProductionHardening({}));
   renderOperationsIntelligence(dashboard.intelligence || buildStaticOperationsIntelligence(filteredSnapshots, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || []));
   renderGovernanceReport(dashboard.governanceReport || buildStaticGovernanceReport(filteredSnapshots, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || [], dashboard.performanceMonitoring || {}, dashboard.handover || {}));
+  renderNextDevelopmentResearch(dashboard.nextDevelopmentResearch || buildStaticNextDevelopmentResearch(
+    filteredSnapshots,
+    dashboard.dispatchRequests || [],
+    dashboard.reconciliationReviews || [],
+    dashboard.performanceMonitoring || {},
+    dashboard.siteJointTests || {},
+    dashboard.productionHardening || {},
+    dashboard.intelligence || {},
+    dashboard.governanceReport || {},
+    dashboard.handover || {}
+  ));
   renderCommandChains(dashboard.commandChains || [], filteredSnapshots);
   renderOperationsPlaybooks(dashboard.playbooks || [], filteredSnapshots);
   renderHandoverOwnerMatrix(dashboard.handoverOwnerMatrix || buildStaticHandoverOwnerMatrix(dashboard.handover || {}), filteredSnapshots);
@@ -1172,6 +1324,63 @@ function renderGovernanceReport(report) {
         <span>${item}</span>
       </article>
     `).join("")}
+  `;
+}
+
+function renderNextDevelopmentResearch(research) {
+  const target = document.querySelector("#operation-next-development");
+  if (!target) return;
+  const tracks = Array.isArray(research.tracks) ? research.tracks : [];
+  const risks = Array.isArray(research.risks) ? research.risks : [];
+  const nextSprint = Array.isArray(research.nextSprint) ? research.nextSprint : [];
+  target.innerHTML = `
+    <article class="operation-next-development-summary">
+      <div>
+        <strong>研究周期 ${research.horizon || "待定"}</strong>
+        <span>${research.summary?.tracks || tracks.length} 个方向 / P0 ${research.summary?.p0 || 0} 项 / P1 ${research.summary?.p1 || 0} 项 / P2 ${research.summary?.p2 || 0} 项</span>
+      </div>
+      <div class="operation-next-development-metrics">
+        <span>联调闭环 ${research.summary?.readyForFieldResearch || 0}</span>
+        <span>割接阻断 ${research.summary?.blockedForCutover || 0}</span>
+        <span>直报待复核 ${research.summary?.pendingReconciliation || 0}</span>
+      </div>
+      <small>证据：${evidenceList(research.evidence)}</small>
+    </article>
+    <div class="operation-next-development-track-list">
+      ${tracks.map((item) => `
+        <article class="operation-next-development-card ${item.priority === "P0" ? "urgent" : item.priority === "P1" ? "important" : "later"}">
+          <div class="operation-playbook-head">
+            <div>
+              <strong>${zhInline(item.name)}</strong>
+              <span>${zhInline(item.phase)} / ${zhInline(item.owner)}</span>
+            </div>
+            <span class="badge ${item.priority === "P0" ? "danger" : item.priority === "P1" ? "warn" : "info"}">${item.priority}</span>
+          </div>
+          <p>${zhInline(item.problem)}</p>
+          <p>${zhInline(item.deliverable)}</p>
+          <div class="operation-next-development-tags">
+            ${(item.prerequisites || []).map((row) => `<span>${zhInline(row)}</span>`).join("")}
+          </div>
+          <div class="operation-next-development-tags subtle">
+            ${(item.dataSources || []).map((row) => `<span>${zhInline(row)}</span>`).join("")}
+          </div>
+          <footer>
+            <small>${zhInline(item.acceptance)}</small>
+            <small>证据：${evidenceList(item.evidence)}</small>
+          </footer>
+        </article>
+      `).join("")}
+    </div>
+    <div class="operation-next-development-risks">
+      <article>
+        <strong>研发风险边界</strong>
+        ${(risks.length ? risks : ["待现场确认风险边界。"]).map((item) => `<span>${zhInline(item)}</span>`).join("")}
+      </article>
+      <article>
+        <strong>下一迭代建议</strong>
+        ${(nextSprint.length ? nextSprint : ["待补充下一迭代任务。"]).map((item) => `<span>${zhInline(item)}</span>`).join("")}
+      </article>
+    </div>
   `;
 }
 
