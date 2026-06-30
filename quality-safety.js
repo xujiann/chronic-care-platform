@@ -316,6 +316,102 @@ function renderOperationsBrief(data, filtered = {}) {
   `);
 }
 
+function qualityDepartmentProfile(role) {
+  const profiles = {
+    commission: {
+      name: "卫健监管部门",
+      scope: "全域/辖区医疗质量、安全事件、整改闭环和现场签收监管",
+      focus: "优先处理高风险机构、逾期整改、危急行动事项和现场签收阻断项",
+      actions: ["派发问题", "复核整改", "升级逾期", "复核路径", "联调签收"]
+    },
+    institution: {
+      name: "医疗机构",
+      scope: "本机构医疗质量事件、危急值、整改反馈和现场证据",
+      focus: "优先完成危急值确认处置、整改反馈、病历补证和生产证据补交",
+      actions: ["提交整改反馈", "确认危急值", "处置危急值", "提交现场证据"]
+    },
+    county: {
+      name: "县域医共体",
+      scope: "医共体成员机构、互认质控、区域协同事项和现场签收材料",
+      focus: "优先补齐互认清单、负面清单、例外复核证据和医共体签收材料",
+      actions: ["查看互认质控", "提交医共体证据", "补充签收材料", "协同成员机构"]
+    }
+  };
+  return profiles[role] || profiles.commission;
+}
+
+function departmentTaskMetrics(data, role) {
+  const rectifications = data.rectifications || [];
+  const criticalValueAlerts = data.criticalValueAlerts || [];
+  const siteSignoffs = data.siteSignoffs || [];
+  const mutualReviews = data.mutualRecognitionQualityReviews || [];
+  const issues = data.issues || [];
+  const closedSignoffStatuses = new Set(["accepted", "closed", "ready_for_joint_test", "已通过", "已关闭", "具备联调条件"]);
+  const openSignoffs = siteSignoffs.filter((item) => {
+    const rawStatus = String(item.normalizedStatus || item.status || "");
+    return !closedSignoffStatuses.has(rawStatus) && !closedSignoffStatuses.has(statusLabel(item.status));
+  });
+  const roleSignoffs = openSignoffs.filter((item) => !item.ownerRole || item.ownerRole === role);
+  const openIssues = issues.filter((item) => statusLabel(item.normalizedStatus || item.status) !== "已关闭").length;
+  if (role === "institution") {
+    return [
+      ["待处置危急值", criticalValueAlerts.filter((item) => !item.acknowledgementComplete || !item.dispositionComplete).length],
+      ["待反馈整改", rectifications.filter((item) => !item.feedbackComplete && statusLabel(item.normalizedStatus || item.status) !== "已关闭").length],
+      ["本机构签收", roleSignoffs.length],
+      ["可见问题", openIssues]
+    ];
+  }
+  if (role === "county") {
+    return [
+      ["互认待复核", mutualReviews.filter((item) => statusLabel(item.normalizedStatus || item.status) !== "已关闭").length],
+      ["医共体签收", roleSignoffs.length],
+      ["区域整改", rectifications.filter((item) => statusLabel(item.normalizedStatus || item.status) !== "已关闭").length],
+      ["可见问题", openIssues]
+    ];
+  }
+  return [
+    ["逾期整改", rectifications.filter((item) => statusLabel(item.slaStatus) === "已逾期").length],
+    ["高危行动", data.summary?.criticalActionItems || 0],
+    ["待复核整改", rectifications.filter((item) => statusLabel(item.normalizedStatus || item.status) === "复核中").length],
+    ["待签收项", openSignoffs.length]
+  ];
+}
+
+function renderDepartmentView(data) {
+  const user = window.HealthCityAuth?.getUser?.() || {};
+  const role = data.role || user.role || "commission";
+  const profile = qualityDepartmentProfile(role);
+  const tasks = departmentTaskMetrics(data, role);
+  const roleText = user.roleName || profile.name;
+  const orgText = user.orgName || profile.name;
+  const scopeText = user.dataScope || profile.scope;
+  setHtml("quality-safety-department-view", `
+    <article class="primary">
+      <span>当前登录部门</span>
+      <strong>${zhText(roleText)}</strong>
+      <small>${zhText(orgText)} · ${zhText(scopeText)}</small>
+    </article>
+    <article>
+      <span>数据范围</span>
+      <strong>${zhText(profile.name)}</strong>
+      <small>${zhText(profile.scope)}</small>
+    </article>
+    <article>
+      <span>可执行动作</span>
+      <div class="quality-action-list">
+        ${profile.actions.map((action) => `<span>${zhText(action)}</span>`).join("")}
+      </div>
+    </article>
+    <article>
+      <span>重点待办</span>
+      <small>${zhText(profile.focus)}</small>
+      <div class="quality-task-list">
+        ${tasks.map(([label, value]) => `<p><b>${zhText(label)}</b><strong>${value}</strong></p>`).join("")}
+      </div>
+    </article>
+  `);
+}
+
 function renderMetrics(summary) {
   const metrics = [
     ["问题总数", summary.issues],
@@ -588,6 +684,7 @@ function renderQualitySafety(data) {
     rectifications: filteredRectifications,
     siteSignoffs: filteredSignoffs
   });
+  renderDepartmentView(data);
   renderGoLiveReadiness(data.goLiveReadiness || {});
   renderActionPlan(data.actionPlan || []);
   renderRisks(data.institutionRisks || []);

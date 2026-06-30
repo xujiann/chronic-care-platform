@@ -1105,6 +1105,80 @@ tbody tr:hover {
   font-size: 24px;
 }
 
+.quality-department-view {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.2fr) repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.quality-department-view article {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fbfd;
+}
+
+.quality-department-view article.primary {
+  border-color: #cfe5df;
+  background: #f0fbf7;
+}
+
+.quality-department-view span,
+.quality-department-view small {
+  display: block;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.quality-department-view strong {
+  display: block;
+  margin: 5px 0;
+  font-size: 22px;
+}
+
+.quality-action-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.quality-action-list span {
+  border-radius: 8px;
+  padding: 5px 7px;
+  background: #fff;
+  color: var(--teal);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.quality-task-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.quality-task-list p {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+}
+
+.quality-task-list b {
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.quality-task-list strong {
+  margin: 0;
+  font-size: 18px;
+}
+
 .quality-safety-page .rules {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
@@ -1144,6 +1218,7 @@ tbody tr:hover {
   .portal-grid,
   .quality-filter-grid,
   .quality-brief,
+  .quality-department-view,
   .claim-grid,
   .capability-grid,
   .model-grid,
