@@ -733,6 +733,20 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(messages.body.messages.some((item) => item.sourceId === created.body.id && /hospital handoff/i.test(item.title)), true);
     assert.equal(messages.body.messages.some((item) => item.sourceId === created.body.id && /居民服务|助医陪诊/.test(item.title)), true);
 
+    const missingRegistration = await api(baseUrl, "/api/escort-services/orders", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        providerId,
+        registrationOrderId: "reg-missing-for-escort",
+        serviceItems: ["registration", "exam escort"],
+        subsidyType: "self-pay",
+        priority: "medium"
+      })
+    }));
+    assert.equal(missingRegistration.response.status, 400);
+    assert.equal(missingRegistration.body.message, "registration order not found");
+
     const otherOrderAction = await api(baseUrl, `/api/tasks/${encodeURIComponent("escortServiceOrders:eso-r2-20260621")}/actions`, authorized(citizenToken, {
       method: "POST",
       body: JSON.stringify({ action: "resident-confirm", comment: "越权确认" })
