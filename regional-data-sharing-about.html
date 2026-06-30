@@ -146,6 +146,31 @@
         </article>
       </section>
 
+      <section class="panel" data-regional-about-section="merge-boundary">
+        <div class="panel-title">
+          <h2>与医联体转诊功能的关系</h2>
+          <span>部分合并，不合并运行时主模型</span>
+        </div>
+        <div class="capability-grid">
+          <article class="capability-card">
+            <strong>重合点</strong>
+            <span>两者都依赖居民主索引、个人健康档案、诊断报告、检查检验互认、接口契约和审计日志；转诊接诊前需要先能安全调阅区域共享包。</span>
+          </article>
+          <article class="capability-card">
+            <strong>区域共享保留</strong>
+            <span>负责共享包编目、居民授权、质量状态、权限裁剪、调阅目的登记和访问审计，不承担号源床位、会诊排期和 SLA 督办。</span>
+          </article>
+          <article class="capability-card">
+            <strong>转诊会诊保留</strong>
+            <span>负责转诊申请、接诊反馈、远程会诊、报告回传、下转随访、医共体绩效和医保支付路径，不替代区域数据共享总账。</span>
+          </article>
+          <article class="capability-card">
+            <strong>合并方式</strong>
+            <span>合并交接证据、发布报告和现场验收边界；后续深度集成时新增 referralId、teleconsultationId、regionalPackageId 显式关联字段。</span>
+          </article>
+        </div>
+      </section>
+
       <section class="panel" data-regional-about-section="joint-test-boundary">
         <div class="panel-title">
           <h2>现场联调边界</h2>

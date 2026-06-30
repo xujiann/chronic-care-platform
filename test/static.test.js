@@ -164,6 +164,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal(Boolean(pkg.scripts["integration:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["interface:mapping"]), true);
   assert.equal(Boolean(pkg.scripts["regional-data-sharing:report"]), true);
+  assert.equal(Boolean(pkg.scripts["regional-referral:overlap"]), true);
   assert.equal(Boolean(pkg.scripts["monitoring:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["operations:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["process:audit"]), true);
@@ -231,6 +232,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/deploy-check.js"), /integration:readiness/);
   assert.match(read("scripts/deploy-check.js"), /interface:mapping/);
   assert.match(read("scripts/deploy-check.js"), /regional-data-sharing:report/);
+  assert.match(read("package.json"), /regional-referral:overlap/);
   assert.match(read("scripts/deploy-check.js"), /monitoring:readiness/);
   assert.match(read("scripts/deploy-check.js"), /operations:readiness/);
   assert.match(read("scripts/deploy-check.js"), /process:audit/);
@@ -288,6 +290,10 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(script, /buildRegionalDataSharingReport/);
   assert.match(script, /regional:aboutPolicy/);
   assert.match(about, /data-regional-about-section="policy-basis"/);
+  assert.match(about, /data-regional-about-section="merge-boundary"/);
+  assert.match(about, /与医联体转诊功能的关系/);
+  assert.match(read("scripts/regional-referral-overlap.js"), /buildRegionalReferralOverlapReport/);
+  assert.match(read("scripts/regional-referral-overlap.js"), /runtimeMergeAllowed/);
   assert.match(about, /“十四五”全民健康信息化规划/);
   assert.match(about, /医疗卫生机构信息互通共享三年攻坚/);
   assert.match(about, /医疗机构检查检验结果互认管理办法/);
