@@ -117,6 +117,19 @@ test("about page explains runnable platform capabilities", async ({ page }) => {
   await expect(page.locator(".auth-bar a[href='./about.html']")).toHaveCount(1);
 });
 
+test("regional sharing page renders referral handoff boundary", async ({ page }) => {
+  await login(page, "health", "index.html");
+  await page.goto("/regional-data-sharing.html");
+
+  await expect(page.getByRole("heading", { name: "转诊会诊交接" })).toBeVisible();
+  await expect(page.locator("#regional-referral-handoff-summary")).toContainText(/项证据可交接/);
+  await expect(page.locator("#regional-referral-handoff .handoff-grid article")).toHaveCount(6);
+  await expect(page.locator("#regional-referral-handoff")).toContainText("调阅审计");
+  await expect(page.locator("#regional-referral-boundary")).toContainText("可以合并");
+  await expect(page.locator("#regional-referral-boundary")).toContainText("不合并运行时");
+  await expect(page.locator("#regional-referral-boundary")).toContainText("不把区域共享包当作转诊单主表");
+});
+
 test("citizen stays in the household experience and cannot open commission pages", async ({ page }) => {
   await login(page, "citizen", "citizen.html");
   await expect(page.getByRole("heading", { name: "个人健康信息库" })).toBeVisible();

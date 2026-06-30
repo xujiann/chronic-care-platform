@@ -281,12 +281,18 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(html, /regional-sharing-loop/);
   assert.match(html, /regional-selected-package/);
   assert.match(html, /regional-readiness-checklist/);
+  assert.match(html, /data-regional-section="referral-handoff"/);
+  assert.match(html, /regional-referral-handoff/);
+  assert.match(html, /regional-referral-boundary/);
   assert.match(html, /regional-access-feedback/);
   assert.match(client, /\/api\/regional-data-sharing/);
   assert.match(client, /selectRegionalPackage/);
   assert.match(client, /renderRegionalLoop/);
   assert.match(client, /renderRegionalReadinessChecklist/);
   assert.match(client, /buildRegionalReadinessChecks/);
+  assert.match(client, /renderRegionalReferralHandoff/);
+  assert.match(client, /buildRegionalReferralHandoff/);
+  assert.match(client, /不合并运行时/);
   assert.match(client, /renderAccessFeedback/);
   assert.match(client, /调阅留痕/);
   assert.match(server, /seedRegionalDataSharingScope/);
@@ -299,6 +305,7 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(about, /与医联体转诊功能的关系/);
   assert.match(read("scripts/regional-referral-overlap.js"), /buildRegionalReferralOverlapReport/);
   assert.match(read("scripts/regional-referral-overlap.js"), /runtimeMergeAllowed/);
+  assert.match(script, /regional:referralHandoff/);
   assert.match(about, /“十四五”全民健康信息化规划/);
   assert.match(about, /医疗卫生机构信息互通共享三年攻坚/);
   assert.match(about, /医疗机构检查检验结果互认管理办法/);

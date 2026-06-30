@@ -1001,6 +1001,91 @@ dialog::backdrop {
   line-height: 1.5;
 }
 
+.regional-handoff {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.handoff-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fbfd;
+}
+
+.handoff-head strong,
+.handoff-head p {
+  display: block;
+}
+
+.handoff-head p,
+.handoff-note {
+  margin-top: 4px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.handoff-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.handoff-grid article {
+  min-height: 116px;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #fff;
+}
+
+.handoff-grid article span {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: #fff3d8;
+  color: var(--amber);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.handoff-grid article.is-ready span {
+  background: #e6f7ef;
+  color: var(--green);
+}
+
+.handoff-grid article p {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.regional-boundary {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.regional-boundary h3 {
+  font-size: 15px;
+}
+
+.regional-boundary p {
+  display: grid;
+  gap: 4px;
+  border-top: 1px solid rgba(216, 226, 231, 0.72);
+  padding-top: 8px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
 .regional-access-feedback {
   min-height: 20px;
   margin: 10px 0;
@@ -1148,6 +1233,7 @@ dialog::backdrop {
   .filter-grid,
   .report-grid,
   .regional-loop,
+  .handoff-grid,
   .login-flow,
   .demo-accounts,
   .item {
