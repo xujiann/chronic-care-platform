@@ -901,6 +901,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(supervision.body.traceabilityEvidenceRequirements.some((item) => item.id === "trace-code-mapping"), true);
     assert.equal(supervision.body.traceabilityEvidenceChecklist.some((item) => item.id === "trace-scan-capture" && item.ready), true);
     assert.equal(supervision.body.traceabilityEvidenceChecklist.every((item) => Array.isArray(item.evidenceFields) && item.evidenceFields.length > 0), true);
+    assert.equal(supervision.body.rows.every((item) => item.traceabilityEvidenceCoverage && item.traceabilityEvidenceCoverage.required > 0), true);
 
     const traceabilityEvidence = await api(baseUrl, "/api/drug-consumable-supervision/dcs-rational-r1/traceability-evidence", authorized(insurance.body.token, {
       method: "POST",
@@ -921,6 +922,10 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(traceabilityEvidence.body.traceabilityEvidenceSubmissions[0].requirementId, "trace-code-mapping");
     assert.equal(traceabilityEvidence.body.traceabilityEvidenceSubmissions[0].missingFields.length, 0);
     assert.equal(traceabilityEvidence.body.auditTrail[0].action, "drug-consumable-traceability-evidence");
+    const afterTraceabilityEvidence = await api(baseUrl, "/api/drug-consumable-supervision", authorized(insurance.body.token));
+    const evidenceRow = afterTraceabilityEvidence.body.rows.find((item) => item.id === "dcs-rational-r1");
+    assert.equal(evidenceRow.traceabilityEvidenceCoverage.complete >= 1, true);
+    assert.equal(evidenceRow.traceabilityEvidenceCoverage.requirementStatus.some((item) => item.requirementId === "trace-code-mapping" && item.status === "complete"), true);
 
     const review = await api(baseUrl, "/api/drug-consumable-supervision/dcs-rational-r1/review", authorized(insurance.body.token, {
       method: "POST",

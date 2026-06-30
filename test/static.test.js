@@ -200,6 +200,7 @@ test("insurance portal exposes actionable drug consumable supervision workflow",
   assert.match(js, /data-drug-traceability-policy-sources/);
   assert.match(js, /data-drug-traceability-evidence-checklist/);
   assert.match(js, /traceability-evidence/);
+  assert.match(js, /traceabilityEvidenceCoverage/);
   assert.match(js, /postDrugConsumableAction/);
   assert.match(js, /data-drug-action/);
   assert.match(institutionHtml, /institution-drug-consumable-panel/);
@@ -211,6 +212,7 @@ test("insurance portal exposes actionable drug consumable supervision workflow",
   assert.match(institutionJs, /data-institution-traceability-evidence-checklist/);
   assert.match(institutionJs, /postInstitutionDrugConsumableAction/);
   assert.match(institutionJs, /traceability-evidence/);
+  assert.match(institutionJs, /traceabilityEvidenceCoverage/);
   assert.match(institutionJs, /postInstitutionDrugConsumableRemediation/);
   assert.match(institutionJs, /data-institution-drug-action/);
   assert.match(institutionJs, /\/drug-consumable-supervision\/\$\{encodeURIComponent\(id\)\}\/\$\{action\}/);
@@ -219,7 +221,10 @@ test("insurance portal exposes actionable drug consumable supervision workflow",
   assert.match(server, /traceabilityPolicySources/);
   assert.match(server, /buildDrugTraceabilityEvidenceChecklist/);
   assert.match(server, /buildDrugTraceabilityEvidenceSubmission/);
+  assert.match(server, /buildDrugTraceabilityEvidenceCoverage/);
   assert.match(server, /traceabilityEvidenceChecklist/);
+  assert.match(server, /traceabilityEvidenceCoverage/);
+  assert.match(server, /traceabilityCoverageCompleteRows/);
   assert.match(server, /drug-consumable-traceability-evidence/);
   assert.match(server, /drug-consumable-review/);
   assert.match(server, /drug-consumable-remediation/);
@@ -401,6 +406,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(workbenchJs, /\/api\/release-artifact-manifest/);
   assert.match(workbenchJs, /\/api\/tasks/);
   assert.match(workbenchJs, /\/api\/drug-consumable-supervision/);
+  assert.match(workbenchJs, /traceabilityEvidenceCoverage/);
   assert.match(workbenchJs, /\/api\/chronic\/acceptance-ledger/);
   assert.match(workbenchJs, /\/api\/county\/acceptance-ledger/);
   assert.match(read("server.js"), /\/api\/process-audit/);

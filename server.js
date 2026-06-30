@@ -5178,6 +5178,41 @@ function buildDrugTraceabilityEvidenceSubmission(data, item, payload, user) {
   };
 }
 
+function drugTraceabilityRequirementApplies(requirement, row) {
+  const boundaries = requirement.boundaries || [];
+  return boundaries.includes(row.boundary) ||
+    (boundaries.includes("insurance-settlement") && row.relatedClaimId) ||
+    (requirement.id === "trace-remediation-audit" && row.remediationStatus);
+}
+
+function buildDrugTraceabilityEvidenceCoverage(row, requirements = seedDrugTraceabilityEvidenceRequirements()) {
+  const applicable = requirements.filter((requirement) => drugTraceabilityRequirementApplies(requirement, row));
+  const submissions = Array.isArray(row.traceabilityEvidenceSubmissions) ? row.traceabilityEvidenceSubmissions : [];
+  const requirementStatus = applicable.map((requirement) => {
+    const submission = submissions.find((item) => item.requirementId === requirement.id);
+    const status = submission?.completeness === "complete" ? "complete" : submission ? "partial" : "missing";
+    return {
+      requirementId: requirement.id,
+      title: requirement.title,
+      status,
+      missingFields: submission?.missingFields || requirement.evidenceFields || [],
+      submittedAt: submission?.submittedAt || "",
+      evidenceSource: submission?.evidenceSource || ""
+    };
+  });
+  const complete = requirementStatus.filter((item) => item.status === "complete").length;
+  const partial = requirementStatus.filter((item) => item.status === "partial").length;
+  const missing = requirementStatus.filter((item) => item.status === "missing").length;
+  return {
+    required: applicable.length,
+    complete,
+    partial,
+    missing,
+    status: missing === 0 && partial === 0 && applicable.length > 0 ? "complete" : complete || partial ? "partial" : "pending",
+    requirementStatus
+  };
+}
+
 function buildDrugConsumableSupervision(data) {
   const supervisions = Array.isArray(data.drugConsumableSupervisions) ? data.drugConsumableSupervisions : seedDrugConsumableSupervisions();
   const traceabilityPolicySources = Array.isArray(data.drugTraceabilityPolicySources) ? data.drugTraceabilityPolicySources : seedDrugTraceabilityPolicySources();
@@ -5196,10 +5231,12 @@ function buildDrugConsumableSupervision(data) {
       pickup,
       claim,
       institutionIssue,
+      traceabilityEvidenceCoverage: buildDrugTraceabilityEvidenceCoverage(item, traceabilityEvidenceRequirements),
       auditCount: Array.isArray(item.auditTrail) ? item.auditTrail.length : 0
     };
   });
   const openRows = rows.filter((item) => item.normalizedStatus !== "closed");
+  const completeCoverageRows = rows.filter((item) => item.traceabilityEvidenceCoverage?.status === "complete");
   const traceabilityEvidenceChecklist = buildDrugTraceabilityEvidenceChecklist(rows, traceabilityPolicySources, traceabilityEvidenceRequirements);
   const insuranceContract = contracts.find((item) => item.id === "insurance-settlement-v1");
   return {
@@ -5223,6 +5260,7 @@ function buildDrugConsumableSupervision(data) {
       traceabilityEvidenceRequirements: traceabilityEvidenceRequirements.length,
       traceabilityEvidenceItems: traceabilityEvidenceChecklist.length,
       traceabilityEvidenceReady: traceabilityEvidenceChecklist.filter((item) => item.ready).length,
+      traceabilityCoverageCompleteRows: completeCoverageRows.length,
       contractReady: Boolean(insuranceContract?.status === "ready" && insuranceContract.signature && insuranceContract.retryPolicy)
     },
     rows,

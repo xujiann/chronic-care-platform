@@ -466,7 +466,7 @@ function renderInstitutionDrugConsumableSupervision(report, state) {
         <h3>${resident?.name || item.residentId || "Unknown resident"} · ${item.category || item.boundary}</h3>
         <p>${item.institution || "institution pending"} · ${item.issue || item.nextAction || "Drug consumable supervision item"}</p>
         <p>Review ${item.reviewStatus || "pending"} · Insurance ${item.insuranceStatus || "pending"} · Remediation ${item.remediationStatus || "open"} · Audit ${item.auditCount || 0}</p>
-        <p>Trace evidence ${item.traceabilityEvidenceStatus || "pending"} · submissions ${(item.traceabilityEvidenceSubmissions || []).length}</p>
+        <p>Trace evidence ${item.traceabilityEvidenceStatus || "pending"} · submissions ${(item.traceabilityEvidenceSubmissions || []).length} · coverage ${item.traceabilityEvidenceCoverage?.complete || 0}/${item.traceabilityEvidenceCoverage?.required || 0}</p>
         <p>${item.nextAction || "Upload institution remediation evidence and wait for regulator review."}</p>
         <div class="action-row">
           ${institutionDrugActionButton(item.id, "Submit remediation", { remediationStatus: "submitted", status: "remediation-submitted", evidence: "institution-remediation-evidence", nextAction: "Regulator reviews institution remediation evidence." })}

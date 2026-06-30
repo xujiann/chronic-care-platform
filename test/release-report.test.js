@@ -114,6 +114,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "drugConsumable:traceabilityPolicy" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "drugConsumable:traceabilityEvidence" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "drugConsumable:traceabilitySubmission" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "drugConsumable:traceabilityCoverage" && item.passed), true);
   assert.equal(report.drugConsumable.ok, true);
   assert.equal(report.checks.some((item) => item.name === "integration:readiness" && item.passed), true);
   assert.equal(report.integrationReadiness.ok, true);
