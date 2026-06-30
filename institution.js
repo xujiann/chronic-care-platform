@@ -4,11 +4,25 @@ let platformState = fallbackState;
 
 document.addEventListener("DOMContentLoaded", async () => {
   platformState = await loadPlatformState(fallbackState);
+  platformState.chronicLaunchCore = await loadChronicLaunchCore();
   bindInstitutionActions();
   renderAll(platformState);
 });
 
+async function loadChronicLaunchCore() {
+  if (!institutionApiBase) return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/chronic/launch-core`);
+    if (response.ok) return await response.json();
+  } catch (error) {
+    // Static preview falls back to local snapshot evidence.
+  }
+  return null;
+}
+
 function renderAll(state) {
+  renderChronicLaunchCore(state);
   renderChronicFollowupWorkbench(state);
   populateBirthCertificateForm(state);
   populateMultiPracticeForm(state);
@@ -33,6 +47,22 @@ function renderAll(state) {
 function bindInstitutionActions() {
   document.addEventListener("click", async (event) => {
       const button = event.target.closest("[data-workflow-action]");
+      const launchCoreButton = event.target.closest("[data-launch-core-action]");
+      const integrationButton = event.target.closest("[data-chronic-integration]");
+      if (launchCoreButton) {
+        launchCoreButton.disabled = true;
+        const result = await recordLaunchCoreAction(launchCoreButton.dataset.itemId, launchCoreButton.dataset.rowId);
+        launchCoreButton.disabled = false;
+        if (result.ok) renderAll(platformState);
+        return;
+      }
+      if (integrationButton) {
+        integrationButton.disabled = true;
+        const result = await runChronicIntegrationDemo(integrationButton.dataset.chronicIntegration);
+        integrationButton.disabled = false;
+        if (result.ok) renderAll(platformState);
+        return;
+      }
       if (!button) return;
     if (button.dataset.chronicDispatch) {
       button.disabled = true;
@@ -51,6 +81,21 @@ function bindInstitutionActions() {
   document.querySelector("#birth-status-filter")?.addEventListener("change", () => renderBirthCertificates(platformState));
   document.querySelector("#birth-risk-filter")?.addEventListener("change", () => renderBirthCertificates(platformState));
   document.querySelector("#multi-practice-form")?.addEventListener("submit", submitMultiPracticeApplication);
+  document.querySelector("#chronic-priority-filter")?.addEventListener("change", () => renderChronicFollowupWorkbench(platformState));
+  document.querySelector("#chronic-type-filter")?.addEventListener("change", () => renderChronicFollowupWorkbench(platformState));
+  document.querySelector("#chronic-sort")?.addEventListener("change", () => renderChronicFollowupWorkbench(platformState));
+  document.querySelector("#chronic-search")?.addEventListener("input", () => renderChronicFollowupWorkbench(platformState));
+  document.querySelector("#chronic-clear-filters")?.addEventListener("click", () => {
+    const priority = document.querySelector("#chronic-priority-filter");
+    const type = document.querySelector("#chronic-type-filter");
+    const sort = document.querySelector("#chronic-sort");
+    const search = document.querySelector("#chronic-search");
+    if (priority) priority.value = "all";
+    if (type) type.value = "all";
+    if (sort) sort.value = "priority";
+    if (search) search.value = "";
+    renderChronicFollowupWorkbench(platformState);
+  });
 }
 
 function actionButton(collection, id, label, updates, note) {
@@ -61,9 +106,132 @@ function chronicDispatchButton(collection, id, label, updates, note) {
   return `<button class="inline-action" type="button" data-workflow-action data-chronic-dispatch="true" data-collection="${collection}" data-id="${id}" data-updates='${JSON.stringify(updates)}' data-note="${note || label}">${label}</button>`;
 }
 
+function fallbackChronicLaunchCore(state) {
+  const items = [
+    ["institution-systems", "Institution systems", "chronicExternalIntegrations", "institution-integration"],
+    ["identity-scope", "Identity scope", "chronicIdentityScopes", "identity-integration"],
+    ["message-channels", "Message channels", "chronicMessageChannels", "message-platform"],
+    ["quality-model", "Quality model", "chronicModelGovernance", "chronic-quality-office"],
+    ["pharmacy-insurance", "Pharmacy insurance", "chronicPharmacyInsuranceLinks", "pharmacy-insurance"]
+  ].map(([id, title, collection, owner]) => {
+    const rows = state[collection] || [];
+    return {
+      id,
+      title,
+      owner,
+      collection,
+      ready: rows.length > 0,
+      collectionEvidence: { rows: rows.length, readyRows: rows.length },
+      closureEvidence: { rows: rows.length, readyRows: rows.length, rowsDetail: rows.slice(0, 2) }
+    };
+  });
+  return {
+    ok: items.every((item) => item.ready),
+    summary: {
+      items: items.length,
+      readyItems: items.filter((item) => item.ready).length,
+      closureRows: items.reduce((sum, item) => sum + (item.closureEvidence?.rows || 0), 0),
+      signoffs: (state.chronicLaunchCoreSignoffs || []).length,
+      signedSignoffs: (state.chronicLaunchCoreSignoffs || []).filter((item) => String(item.signoffStatus || "").toLowerCase() === "signed").length
+    },
+    items
+  };
+}
+
+function launchCoreActionButton(item) {
+  const row = (item.closureEvidence?.rowsDetail || [])[0] || {};
+  const rowId = row.id || row.itemId || item.id;
+  return `<button class="inline-action" type="button" data-launch-core-action data-item-id="${item.id}" data-row-id="${rowId}">Record closure</button>`;
+}
+
+function renderChronicLaunchCore(state) {
+  const summaryEl = document.querySelector("#chronic-launch-core-summary");
+  const gridEl = document.querySelector("#chronic-launch-core");
+  if (!summaryEl || !gridEl) return;
+  const report = state.chronicLaunchCore || fallbackChronicLaunchCore(state);
+  const signoffs = report.summary?.signoffs || 0;
+  const signedSignoffs = report.summary?.signedSignoffs || 0;
+  summaryEl.textContent = `${report.summary?.readyItems || 0}/${report.summary?.items || 0} ready - ${report.summary?.closureRows || 0} closure rows - ${signedSignoffs}/${signoffs} signoffs`;
+  gridEl.innerHTML = (report.items || []).map((item) => {
+    const rows = item.collectionEvidence || {};
+    const closure = item.closureEvidence || {};
+    return `<article class="claim-card">
+      <strong>${item.title}</strong>
+      <span>${item.ready ? "PASS" : "PENDING"}<br>${item.collection} - ${rows.readyRows || 0}/${rows.rows || 0}<br>closure - ${closure.readyRows || 0}/${closure.rows || 0}<br>${item.owner}</span>
+      <div class="action-row">${launchCoreActionButton(item)}</div>
+    </article>`;
+  }).join("");
+}
+
+async function recordLaunchCoreAction(itemId, rowId) {
+  if (!institutionApiBase) {
+    platformState.chronicLaunchCore = fallbackChronicLaunchCore(platformState);
+    return { ok: true };
+  }
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/chronic/launch-core/actions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        itemId,
+        rowId,
+        action: "site closure confirmation",
+        completionStatus: "closed",
+        receiptStatus: "accepted",
+        reviewStatus: "approved",
+        signoffStatus: "signed",
+        note: "institution launch core closure recorded from portal"
+      })
+    });
+    if (!response.ok) throw new Error(`launch core action failed: ${response.status}`);
+    const saved = await response.json();
+    platformState.chronicLaunchCore = saved.launchCore || await loadChronicLaunchCore();
+    return { ok: true };
+  } catch (error) {
+    alert(error.message || "launch core action failed");
+    return { ok: false };
+  }
+}
+
 function chronicClosed(state, status) {
   const closed = state.chronicFollowupStatusPolicy?.statusGroups?.closed || [];
   return closed.some((item) => String(status || "").includes(item) || String(item || "").includes(String(status || "")));
+}
+
+function chronicPriority(item) {
+  const status = `${item.status || ""} ${item.riskLevel || ""} ${item.grade || ""}`.toLowerCase();
+  const due = item.due ? new Date(`${String(item.due).slice(0, 10)}T00:00:00`) : null;
+  const days = due && !Number.isNaN(due.getTime()) ? Math.round((due.getTime() - new Date().setHours(0, 0, 0, 0)) / 86400000) : 999;
+  if (/overdue|alert|high|critical/.test(status) || String(item.status || "").includes("閫炬湡") || days < 0) return "critical";
+  if (days <= 3 || /warning/.test(status) || String(item.status || "").includes("棰勮")) return "high";
+  if (days <= 7) return "medium";
+  return "low";
+}
+
+function filterChronicWorkbenchRows(rows, state) {
+  const priority = document.querySelector("#chronic-priority-filter")?.value || "all";
+  const type = document.querySelector("#chronic-type-filter")?.value || "all";
+  const search = String(document.querySelector("#chronic-search")?.value || "").trim().toLowerCase();
+  const sort = document.querySelector("#chronic-sort")?.value || "priority";
+  const rank = { critical: 0, high: 1, medium: 2, low: 3 };
+  return rows.map((item) => {
+    const resident = residentOf(state, item.residentId);
+    const itemPriority = chronicPriority(item);
+    return {
+      ...item,
+      itemPriority,
+      searchText: [resident?.name, item.title, item.collection, item.status, item.due, item.assignee, item.owner, item.pharmacy, item.nextStep, item.intervention, item.advice, item.result].filter(Boolean).join(" ").toLowerCase()
+    };
+  }).filter((item) =>
+    (priority === "all" || item.itemPriority === priority) &&
+    (type === "all" || item.collection === type) &&
+    (!search || item.searchText.includes(search))
+  ).sort((a, b) => {
+    if (sort === "resident") return String(residentOf(state, a.residentId)?.name || "").localeCompare(String(residentOf(state, b.residentId)?.name || ""));
+    if (sort === "due") return String(a.due || "").localeCompare(String(b.due || ""));
+    return (rank[a.itemPriority] ?? 9) - (rank[b.itemPriority] ?? 9) || String(a.due || "").localeCompare(String(b.due || ""));
+  });
 }
 
 function renderChronicFollowupWorkbench(state) {
@@ -85,12 +253,12 @@ function renderChronicFollowupWorkbench(state) {
     ["居民反馈", feedback.length, "居民端主动回填"]
   ].map(([label, value, hint]) => `<article class="claim-card"><strong>${label}</strong><span>${value}<br>${hint}</span></article>`).join("");
 
-  const rows = [
+  const rows = filterChronicWorkbenchRows([
     ...openScreenings.map((item) => ({ ...item, collection: "chronicScreeningTasks", title: item.taskName, due: item.due, primary: "完成评估", updates: { status: "已评估", result: "已生成风险分级和干预建议" } })),
     ...openPlans.map((item) => ({ ...item, collection: "chronicManagementPlans", title: `${item.diseaseType}管理计划`, due: item.nextReview, primary: "复核完成", updates: { status: "已复核", intervention: "已完成阶段复核并更新管理方案" } })),
     ...openFollowups.map((item) => ({ ...item, collection: "followups", title: `${item.diseaseType}随访`, due: item.plannedAt, primary: "完成随访", updates: { status: "已完成", result: "已完成院后随访并同步居民反馈" } })),
     ...pendingMedication.map((item) => ({ ...item, collection: "medicationPickups", title: item.medication, due: item.nextPickup, primary: "确认依从", updates: { status: "已完成", pharmacyStatus: "已取药" } }))
-  ].slice(0, 12);
+  ], state).slice(0, 12);
   listEl.innerHTML = rows.map((item) => {
     const resident = residentOf(state, item.residentId);
     const latestFeedback = feedback.find((record) => record.residentId === item.residentId);
@@ -130,6 +298,53 @@ async function dispatchChronicFollowup(collection, id, updates, note) {
     return { ok: true, saved };
   } catch (error) {
     alert(error.message || "慢病随访处置失败，请检查登录状态和网络连接");
+    return { ok: false };
+  }
+}
+
+function chronicIntegrationPayload(type) {
+  const resident = (platformState.residents || []).find((item) => item.id === "r1") || (platformState.residents || [])[0] || {};
+  const pickup = (platformState.medicationPickups || []).find((item) => item.residentId === resident.id) || (platformState.medicationPickups || [])[0] || {};
+  const message = (platformState.taskMessages || []).find((item) => item.chronicFollowup && item.targetRole === "institution" && item.residentId === resident.id) || {};
+  const residentId = resident.id || pickup.residentId || "r1";
+  const today = new Date().toISOString().slice(0, 10);
+  if (type === "device") {
+    return { path: "/chronic/device-measurements", body: { residentId, externalId: `demo-device-${residentId}-${today}`, deviceId: "bp-device-demo", deviceType: "blood pressure monitor", measurementType: "remote blood pressure", measurementValue: "151/91 mmHg high", medicationTaken: true, note: "device gateway demo upload" } };
+  }
+  if (type === "pharmacy") {
+    return { path: "/chronic/pharmacy-callbacks", body: { medicationPickupId: pickup.id || "mp1", externalId: `demo-pharmacy-${pickup.id || "mp1"}-${today}`, status: "picked_up", pharmacyStatus: "picked_up", medicationTaken: true, inventoryStatus: "dispensed", note: "pharmacy callback demo confirmed" } };
+  }
+  if (type === "familyDoctor") {
+    return { path: "/chronic/family-doctor-actions", body: { residentId, messageId: message.id || "", taskId: message.taskId || "", action: "family doctor phone review", result: "family doctor reviewed resident self-monitoring and updated plan", nextAction: "continue home monitoring for 7 days", servicePack: "hypertension follow-up pack" } };
+  }
+  return { path: "/chronic/reminder-outreach", body: { residentId, channel: "sms", reminderType: "chronic medication and follow-up reminder", reason: "send pickup and follow-up reminder to resident/family", status: "scheduled" } };
+}
+
+async function runChronicIntegrationDemo(type) {
+  const status = document.querySelector("#chronic-integration-status");
+  const demo = chronicIntegrationPayload(type);
+  try {
+    if (institutionApiBase) {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${institutionApiBase}${demo.path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(demo.body)
+      });
+      if (!response.ok) throw new Error(`integration demo failed: ${response.status}`);
+      await response.json();
+    }
+    if (type === "device") {
+      platformState.personalRecords = [{ id: `local-device-${Date.now()}`, residentId: demo.body.residentId, category: "chronic-self-checkin", result: demo.body.measurementValue, source: "device gateway" }, ...(platformState.personalRecords || [])];
+    }
+    if (type === "pharmacy") {
+      const pickup = (platformState.medicationPickups || []).find((item) => item.id === demo.body.medicationPickupId);
+      if (pickup) Object.assign(pickup, { status: demo.body.status, pharmacyStatus: demo.body.pharmacyStatus, callbackExternalId: demo.body.externalId });
+    }
+    if (status) status.textContent = `${type} integration evidence recorded`;
+    return { ok: true };
+  } catch (error) {
+    if (status) status.textContent = error.message || "integration demo failed";
     return { ok: false };
   }
 }

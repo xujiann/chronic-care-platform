@@ -367,6 +367,31 @@
 
           <article class="panel">
             <div class="panel-title">
+              <h2>Resident Self Check-in</h2>
+              <span id="resident-checkin-status"></span>
+            </div>
+            <form id="resident-checkin-form" class="feedback-form">
+              <label>Measurement type
+                <input name="measurementType" value="blood pressure" />
+              </label>
+              <label>Measurement value
+                <input name="measurementValue" placeholder="e.g. 128/78 or 151/91 high" />
+              </label>
+              <label>Medication taken
+                <select name="medicationTaken">
+                  <option value="true">Yes</option>
+                  <option value="false">No</option>
+                </select>
+              </label>
+              <label>Symptoms
+                <input name="symptoms" placeholder="e.g. dizzy, pain, none" />
+              </label>
+              <button class="small-button primary" type="submit">Submit check-in</button>
+            </form>
+          </article>
+
+          <article class="panel">
+            <div class="panel-title">
               <h2>慢病筛查与宣教</h2>
             </div>
             <div id="chronic-service-cards" class="cards"></div>
@@ -481,7 +506,7 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="./health-archive-standard.js"></script>
-    <script src="./citizen.js?v=20260630layout"></script>
+    <script src="./citizen.js?v=20260630visible"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));

@@ -29,7 +29,50 @@
           <h2>慢病管理与院后随访闭环</h2>
           <span id="chronic-followup-summary"></span>
         </div>
+        <div class="panel-title">
+          <h2>Chronic Launch Core</h2>
+          <span id="chronic-launch-core-summary"></span>
+        </div>
+        <div id="chronic-launch-core" class="claim-grid"></div>
         <div id="chronic-followup-metrics" class="claim-grid"></div>
+        <div class="chronic-workbench-controls" data-chronic-workbench-controls>
+          <label>Priority
+            <select id="chronic-priority-filter">
+              <option value="all">All priorities</option>
+              <option value="critical">Critical</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </label>
+          <label>Type
+            <select id="chronic-type-filter">
+              <option value="all">All task types</option>
+              <option value="chronicScreeningTasks">Screening</option>
+              <option value="chronicManagementPlans">Management plan</option>
+              <option value="followups">Follow-up</option>
+              <option value="medicationPickups">Medication</option>
+            </select>
+          </label>
+          <label>Search
+            <input id="chronic-search" type="search" placeholder="Resident, task, status" />
+          </label>
+          <label>Sort
+            <select id="chronic-sort">
+              <option value="priority">Priority then due date</option>
+              <option value="due">Due date</option>
+              <option value="resident">Resident</option>
+            </select>
+          </label>
+          <button class="inline-action" id="chronic-clear-filters" type="button">Clear</button>
+        </div>
+        <div class="integration-actions" id="chronic-integration-actions">
+          <button class="inline-action" type="button" data-chronic-integration="device">Device upload</button>
+          <button class="inline-action" type="button" data-chronic-integration="pharmacy">Pharmacy callback</button>
+          <button class="inline-action" type="button" data-chronic-integration="familyDoctor">Family doctor closure</button>
+          <button class="inline-action" type="button" data-chronic-integration="outreach">Reminder outreach</button>
+          <span id="chronic-integration-status" class="muted">Field integration ready</span>
+        </div>
         <div id="chronic-followup-workbench" class="list"></div>
       </section>
 

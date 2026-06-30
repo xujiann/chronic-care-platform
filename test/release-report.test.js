@@ -108,6 +108,10 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "chronicFollowup:readiness" && item.passed), true);
   assert.equal(report.chronicFollowup.ok, true);
   assert.equal(report.chronicFollowup.apiSurface.includes("POST /api/chronic/followup-feedback"), true);
+  assert.equal(report.checks.some((item) => item.name === "chronicFollowup:institutionInterfaces" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "chronicFollowup:launchCore" && item.passed), true);
+  assert.equal(report.chronicInstitutionInterfaces.summary.readyContracts, report.chronicInstitutionInterfaces.summary.contracts);
+  assert.equal(report.chronicLaunchCore.summary.readyItems, 5);
   assert.equal(report.checks.some((item) => item.name === "dataQuality:report" && item.passed), true);
   assert.equal(report.dataQuality.ok, true);
   assert.equal(report.checks.some((item) => item.name === "drugConsumable:readiness" && item.passed), true);
@@ -149,6 +153,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.environmentMatrix.profiles.some((item) => item.id === "staging"), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-env-file"), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-institution-interfaces" && !item.passed), true);
+  assert.equal(report.productionCutover.some((item) => item.id === "cutover-chronic-launch-core" && !item.passed), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-insurance-certificate" && !item.passed), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-monitoring" && !item.passed), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-dr-rehearsal" && !item.passed), true);
@@ -187,6 +192,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(cutoverMarkdown, /Production cutover checklist/);
   assert.match(cutoverMarkdown, /cutover-audit-retention/);
   assert.match(cutoverMarkdown, /cutover-institution-interfaces/);
+  assert.match(cutoverMarkdown, /cutover-chronic-launch-core/);
   assert.match(cutoverMarkdown, /missing site signoff/);
 
   const signedReport = buildReleaseReport({
@@ -197,12 +203,14 @@ test("release report summarizes repository readiness and renders markdown", () =
       SESSION_SECRETS: "replace-with-long-random-secret",
       INTEGRATION_GATEWAY_SECRET: "replace-with-integration-secret",
       CUTOVER_SITE_INTERFACE_SIGNOFF: "signed",
+      CUTOVER_CHRONIC_LAUNCH_CORE_SIGNOFF: "signed",
       CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF: "signed",
       CUTOVER_MONITORING_SIGNOFF: "signed",
       CUTOVER_DR_REHEARSAL_SIGNOFF: "signed"
     }
   });
   assert.equal(signedReport.productionCutover.some((item) => item.id === "cutover-institution-interfaces" && item.passed), true);
+  assert.equal(signedReport.productionCutover.some((item) => item.id === "cutover-chronic-launch-core" && item.passed), true);
   assert.equal(signedReport.productionCutover.some((item) => item.id === "cutover-monitoring" && item.passed), true);
 
   const storageMarkdown = renderStorageModelMarkdown(report);
@@ -247,6 +255,10 @@ test("release report writes standalone production cutover and storage artifacts"
   const auditMarkdown = fs.readFileSync(path.join(outputDir, "audit-retention-report.md"), "utf8");
   const chronicFollowupJson = JSON.parse(fs.readFileSync(path.join(outputDir, "chronic-followup-readiness-report.json"), "utf8"));
   const chronicFollowupMarkdown = fs.readFileSync(path.join(outputDir, "chronic-followup-readiness-report.md"), "utf8");
+  const chronicInstitutionInterfacesJson = JSON.parse(fs.readFileSync(path.join(outputDir, "chronic-institution-interfaces.json"), "utf8"));
+  const chronicInstitutionInterfacesMarkdown = fs.readFileSync(path.join(outputDir, "chronic-institution-interfaces.md"), "utf8");
+  const chronicLaunchCoreJson = JSON.parse(fs.readFileSync(path.join(outputDir, "chronic-launch-core.json"), "utf8"));
+  const chronicLaunchCoreMarkdown = fs.readFileSync(path.join(outputDir, "chronic-launch-core.md"), "utf8");
   const dataQualityJson = JSON.parse(fs.readFileSync(path.join(outputDir, "data-quality-report.json"), "utf8"));
   const dataQualityMarkdown = fs.readFileSync(path.join(outputDir, "data-quality-report.md"), "utf8");
   const drugConsumableJson = JSON.parse(fs.readFileSync(path.join(outputDir, "drug-consumable-readiness-report.json"), "utf8"));
@@ -292,6 +304,11 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(auditMarkdown, /Audit chains/);
   assert.equal(chronicFollowupJson.chronicFollowup.ok, true);
   assert.match(chronicFollowupMarkdown, /resident-feedback/);
+  assert.equal(chronicInstitutionInterfacesJson.chronicInstitutionInterfaces.ok, true);
+  assert.match(chronicInstitutionInterfacesMarkdown, /chronic-device-measurement-v1/);
+  assert.equal(chronicLaunchCoreJson.chronicLaunchCore.ok, true);
+  assert.equal(chronicLaunchCoreJson.chronicLaunchCore.summary.signedSignoffs, 6);
+  assert.match(chronicLaunchCoreMarkdown, /Site Signoffs/);
   assert.equal(dataQualityJson.dataQuality.ok, true);
   assert.match(dataQualityMarkdown, /Resident-linked collections/);
   assert.equal(drugConsumableJson.drugConsumable.ok, true);

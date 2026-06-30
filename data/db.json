@@ -2974,11 +2974,14 @@
   ],
   "chronicSelfManagement": [
     {
+      "uploadSource": "居民端自测",
+      "deviceId": "bp-device-demo-001",
+      "deviceExternalId": "device-bp-r1-20260622",
+      "integrationStatus": "device gateway accepted",
       "id": "csm-001",
       "residentId": "r1",
       "device": "电子血压计",
       "latestValue": "166/96 mmHg",
-      "uploadSource": "居民端自测",
       "group": "高血压互助小组",
       "incentive": "连续上传7天可兑换健康积分",
       "status": "需医生复核",
@@ -2986,11 +2989,14 @@
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
+      "uploadSource": "居民端自测",
+      "deviceId": "glucose-device-demo-002",
+      "deviceExternalId": "device-glucose-r2-20260622",
+      "integrationStatus": "device callback accepted",
       "id": "csm-002",
       "residentId": "r2",
       "device": "智能体重秤+血糖仪",
       "latestValue": "空腹血糖 7.8 mmol/L，BMI 25.1",
-      "uploadSource": "居民端自测",
       "group": "糖尿病饮食运动小组",
       "incentive": "完成运动打卡纳入签约服务包",
       "status": "持续监测",
@@ -5223,7 +5229,72 @@
       ]
     }
   ],
-  "taskMessages": [],
+  "taskMessages": [
+    {
+      "id": "msg-chronic-feedback-r1",
+      "taskId": "chronicFollowup:r1-feedback",
+      "collection": "chronicFollowup",
+      "sourceId": "chronic-feedback-r1",
+      "residentId": "r1",
+      "targetRole": "institution",
+      "channel": "in_app",
+      "title": "Chronic follow-up feedback requires review",
+      "body": "Resident feedback and self-monitoring have been delivered to the family doctor team.",
+      "status": "sent",
+      "chronicFollowup": true,
+      "meta": {
+        "reminderOutreach": true,
+        "fieldIntegration": true
+      },
+      "receipts": [
+        {
+          "at": "2026-06-22T08:35:00.000Z",
+          "status": "delivered",
+          "channel": "in_app"
+        }
+      ],
+      "createdAt": "2026-06-22T08:35:00.000Z",
+      "createdBy": "system",
+      "createdByName": "system"
+    },
+    {
+      "id": "msg-reminder-outreach-r1-demo",
+      "taskId": "seniorServices:ss-outreach-r1-demo",
+      "collection": "seniorServices",
+      "sourceId": "ss-outreach-r1-demo",
+      "residentId": "r1",
+      "targetRole": "citizen",
+      "channel": "sms",
+      "title": "Chronic reminder outreach scheduled",
+      "body": "Medication pickup and follow-up reminder scheduled for resident and family proxy.",
+      "status": "sent",
+      "chronicFollowup": true,
+      "meta": {
+        "reminderOutreach": true,
+        "serviceId": "ss-outreach-r1-demo"
+      },
+      "receipts": [],
+      "createdAt": "2026-06-22T09:30:00.000Z",
+      "createdBy": "seed"
+    },
+    {
+      "id": "msg-chronic-followup-001",
+      "taskId": "followups:f1",
+      "collection": "followups",
+      "sourceId": "f1",
+      "residentId": "r1",
+      "targetRole": "institution",
+      "channel": "in_app",
+      "title": "Chronic follow-up feedback received",
+      "body": "居民反馈血压仍偏高，请家庭医生电话复核。",
+      "status": "sent",
+      "chronicFollowup": true,
+      "receipts": [],
+      "createdAt": "2026-06-23T09:05:00.000Z",
+      "createdBy": "citizen",
+      "createdByName": "演示居民A"
+    }
+  ],
   "dataQualityIssues": [],
   "careOrders": [
     {
@@ -5265,6 +5336,11 @@
   ],
   "medicationPickups": [
     {
+      "callbackExternalId": "pharmacy-mp1-20260622",
+      "pickupConfirmedAt": "2026-06-22T09:30:00.000Z",
+      "inventoryStatus": "dispensed",
+      "adherenceStatus": "pharmacy callback confirmed",
+      "integrationStatus": "pharmacy callback accepted",
       "id": "mp1",
       "residentId": "r1",
       "medication": "苯磺酸氨氯地平片",
@@ -5603,10 +5679,15 @@
       "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     },
     {
+      "channel": "手机端",
+      "outreachEvidence": {
+        "providerMessageId": "sms-chronic-reminder-r1-20260622",
+        "deliveryStatus": "delivered",
+        "deliveredAt": "2026-06-22T08:30:00.000Z"
+      },
       "id": "ss2",
       "residentId": "r1",
       "service": "大字模式提醒",
-      "channel": "手机端",
       "status": "待开通",
       "contact": "本人",
       "nextAction": "下次登录提示开启适老显示",
@@ -5633,6 +5714,19 @@
       "provider": "星海湾社区服务站",
       "reviewCycle": "随访时复核",
       "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
+    },
+    {
+      "id": "ss-outreach-r1-demo",
+      "residentId": "r1",
+      "service": "chronic reminder outreach",
+      "channel": "sms",
+      "status": "scheduled",
+      "contact": "resident and family proxy",
+      "nextAction": "send medication pickup and follow-up reminder, collect receipt before next visit",
+      "scheduledAt": "2026-06-22T09:30:00.000Z",
+      "outreachEvidence": true,
+      "createdAt": "2026-06-22T09:30:00.000Z",
+      "createdBy": "seed"
     }
   ],
   "dataAccessLogs": [
@@ -10007,6 +10101,24 @@
   ],
   "personalRecords": [
     {
+      "id": "chronic-family-doctor-note-r1",
+      "residentId": "r1",
+      "category": "chronic-family-doctor-note",
+      "date": "2026-06-22",
+      "name": "Family doctor follow-up closure",
+      "result": "Family doctor reviewed resident self-monitoring and updated the chronic care plan.",
+      "source": "family doctor system",
+      "meta": {
+        "familyDoctorClosure": true,
+        "action": "family doctor phone review",
+        "result": "reviewed",
+        "nextAction": "continue home monitoring for 7 days"
+      },
+      "createdBy": "system",
+      "createdAt": "2026-06-22T10:00:00.000Z",
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
+    },
+    {
       "id": "1c4f1498-b1f1-4a9f-951a-cd5307202d50",
       "residentId": "r1",
       "category": "emr",
@@ -10355,6 +10467,26 @@
       "createdBy": "citizen",
       "createdAt": "2026-06-24T09:20:00.000Z",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
+    },
+    {
+      "id": "pr-family-doctor-r1-demo",
+      "residentId": "r1",
+      "category": "chronic-family-doctor-note",
+      "date": "2026-06-22",
+      "name": "family doctor chronic follow-up closure",
+      "result": "Family doctor reviewed high blood pressure self-monitoring and updated the 7-day home monitoring plan.",
+      "source": "family doctor service pack",
+      "meta": {
+        "familyDoctorClosure": true,
+        "taskId": "chronicSelfManagement:csm-001",
+        "servicePack": "hypertension follow-up pack",
+        "nextAction": "continue home monitoring for 7 days",
+        "handledAt": "2026-06-22T09:30:00.000Z",
+        "handledBy": "family-doctor-demo"
+      },
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
+      "createdAt": "2026-06-22T09:30:00.000Z",
+      "createdBy": "seed"
     }
   ],
   "storageMeta": {
@@ -10366,5 +10498,311 @@
     "schemaVersion": 0,
     "collectionVersions": {},
     "sqliteError": ""
-  }
+  },
+  "chronicExternalIntegrations": [
+    {
+      "id": "cei-his-emr",
+      "system": "HIS/EMR",
+      "contractId": "chronic-followup-dispatch-v1",
+      "endpoint": "/api/chronic/followup-dispatch",
+      "signature": "HMAC-SHA256",
+      "idempotencyKey": "externalId",
+      "samplePayload": {
+        "collection": "followups",
+        "id": "f1",
+        "status": "completed"
+      },
+      "receiptStatus": "sample-accepted",
+      "owner": "institution-integration",
+      "scope": "post-discharge follow-up and EMR disposition",
+      "status": "ready",
+      "completionStatus": "completed",
+      "latestReceiptId": "his-emr-receipt-001",
+      "signedPayloadHash": "sample-hmac-his-emr",
+      "jointTestStatus": "passed"
+    },
+    {
+      "id": "cei-lis-pacs",
+      "system": "LIS/PACS",
+      "contractId": "chronic-device-measurement-v1",
+      "endpoint": "/api/chronic/device-measurements",
+      "signature": "HMAC-SHA256",
+      "idempotencyKey": "externalId",
+      "samplePayload": {
+        "residentId": "r1",
+        "measurementType": "HbA1c",
+        "measurementValue": "6.8%"
+      },
+      "receiptStatus": "sample-accepted",
+      "owner": "institution-integration",
+      "scope": "diagnostic and monitoring writeback",
+      "status": "ready",
+      "completionStatus": "completed",
+      "latestReceiptId": "lis-pacs-receipt-001",
+      "signedPayloadHash": "sample-hmac-lis-pacs",
+      "jointTestStatus": "passed"
+    },
+    {
+      "id": "cei-pharmacy",
+      "system": "pharmacy",
+      "contractId": "chronic-pharmacy-callback-v1",
+      "endpoint": "/api/chronic/pharmacy-callbacks",
+      "signature": "HMAC-SHA256",
+      "idempotencyKey": "externalId",
+      "samplePayload": {
+        "medicationPickupId": "mp1",
+        "status": "picked_up"
+      },
+      "receiptStatus": "sample-accepted",
+      "owner": "pharmacy-insurance",
+      "scope": "long prescription pickup callback",
+      "status": "ready",
+      "completionStatus": "completed",
+      "latestReceiptId": "pharmacy-receipt-001",
+      "signedPayloadHash": "sample-hmac-pharmacy",
+      "jointTestStatus": "passed"
+    }
+  ],
+  "chronicIdentityScopes": [
+    {
+      "id": "cis-doctor-org",
+      "claim": "org_code",
+      "source": "government OIDC/SAML",
+      "mappedField": "authUsers.orgCode",
+      "role": "institution",
+      "organizationScope": "institution residents and assigned follow-up tasks",
+      "sampleValue": "MR1",
+      "auditRule": "appendDataAccessLog on resident access",
+      "status": "ready",
+      "completionStatus": "completed",
+      "sampleTokenValidated": true,
+      "scopeReviewStatus": "approved",
+      "reviewer": "identity-integration"
+    },
+    {
+      "id": "cis-resident-person",
+      "claim": "person_index",
+      "source": "resident identity source",
+      "mappedField": "residents.personIndex",
+      "role": "citizen",
+      "organizationScope": "self and authorized family members",
+      "sampleValue": "derived-person-index",
+      "auditRule": "canAccessResident resident authorization",
+      "status": "ready",
+      "completionStatus": "completed",
+      "sampleTokenValidated": true,
+      "scopeReviewStatus": "approved",
+      "reviewer": "identity-integration"
+    },
+    {
+      "id": "cis-insurance-org",
+      "claim": "insurance_org_code",
+      "source": "insurance identity source",
+      "mappedField": "authUsers.orgCode",
+      "role": "insurance",
+      "organizationScope": "insurance claims and medication pickup review",
+      "sampleValue": "ORG-MI-CENTER-DL",
+      "auditRule": "scopeStateForUser insurance collections",
+      "status": "ready",
+      "completionStatus": "completed",
+      "sampleTokenValidated": true,
+      "scopeReviewStatus": "approved",
+      "reviewer": "identity-integration"
+    }
+  ],
+  "chronicMessageChannels": [
+    {
+      "id": "cmc-sms",
+      "channel": "sms",
+      "provider": "message-platform",
+      "receiptField": "providerMessageId/deliveryStatus",
+      "retryPolicy": "retry 3 times within 30 minutes",
+      "escalationAfter": "60 minutes without receipt",
+      "fallback": "family doctor phone call",
+      "templateId": "chronic-reminder-sms-v1",
+      "status": "receipt-ready",
+      "completionStatus": "completed",
+      "latestReceiptStatus": "delivered",
+      "latestReceiptId": "sms-receipt-001",
+      "escalationTested": true
+    },
+    {
+      "id": "cmc-phone",
+      "channel": "phone",
+      "provider": "family-doctor-call-center",
+      "receiptField": "callId/callResult",
+      "retryPolicy": "two manual attempts",
+      "escalationAfter": "same day no answer",
+      "fallback": "institution task escalation",
+      "templateId": "chronic-phone-followup-v1",
+      "status": "receipt-ready",
+      "completionStatus": "completed",
+      "latestReceiptStatus": "answered",
+      "latestReceiptId": "call-receipt-001",
+      "escalationTested": true
+    },
+    {
+      "id": "cmc-in-app",
+      "channel": "in_app",
+      "provider": "citizen portal",
+      "receiptField": "taskMessages.receipts",
+      "retryPolicy": "unread reminder next day",
+      "escalationAfter": "72 hours unread",
+      "fallback": "sms",
+      "templateId": "chronic-inapp-notice-v1",
+      "status": "receipt-ready",
+      "completionStatus": "completed",
+      "latestReceiptStatus": "read",
+      "latestReceiptId": "inapp-receipt-001",
+      "escalationTested": true
+    }
+  ],
+  "chronicModelGovernance": [
+    {
+      "id": "cmg-htn-v1",
+      "modelId": "dm-hypertension-risk-v1",
+      "diseaseType": "hypertension",
+      "version": "1.0.0",
+      "threshold": "systolic>=140 or riskLevel=high",
+      "reviewOwner": "chronic-quality-office",
+      "manualReview": true,
+      "sampleRule": "high risk or uncontrolled readings enter family doctor review",
+      "status": "active",
+      "registryEvidence": "diseaseRegistryModels",
+      "completionStatus": "completed",
+      "lastReviewStatus": "approved",
+      "qualitySampleStatus": "sample-passed",
+      "reviewerComment": "hypertension threshold accepted for pilot"
+    },
+    {
+      "id": "cmg-dm-v1",
+      "modelId": "dm-diabetes-risk-v1",
+      "diseaseType": "diabetes",
+      "version": "1.0.0",
+      "threshold": "glucose>=7.0 or HbA1c>=6.5",
+      "reviewOwner": "endocrinology-quality-team",
+      "manualReview": true,
+      "sampleRule": "abnormal lab result triggers diet and medication adherence review",
+      "status": "active",
+      "registryEvidence": "diseaseRegistryModels",
+      "completionStatus": "completed",
+      "lastReviewStatus": "approved",
+      "qualitySampleStatus": "sample-passed",
+      "reviewerComment": "diabetes threshold accepted for pilot"
+    },
+    {
+      "id": "cmg-quality-sampling",
+      "modelId": "chronic-quality-sampling-v1",
+      "diseaseType": "multi-disease",
+      "version": "1.0.0",
+      "threshold": "overdue follow-up or missing medication callback",
+      "reviewOwner": "leading-hospital-quality-team",
+      "manualReview": true,
+      "sampleRule": "monthly 5 percent sampling with expert comments",
+      "status": "active",
+      "registryEvidence": "chronicQualityMetrics",
+      "completionStatus": "completed",
+      "lastReviewStatus": "approved",
+      "qualitySampleStatus": "sample-passed",
+      "reviewerComment": "monthly sampling rule accepted"
+    }
+  ],
+  "chronicPharmacyInsuranceLinks": [
+    {
+      "id": "cpil-r1-htn",
+      "medicationPickupId": "mp1",
+      "insuranceClaimId": "ic1",
+      "residentId": "r1",
+      "longPrescription": "8 weeks",
+      "catalogVersion": "2026-demo-drug-catalog",
+      "settlementStatus": "pre-review-passed",
+      "callbackStatus": "pharmacy callback confirmed",
+      "pharmacyStock": "available",
+      "reimbursementPolicy": "chronic outpatient medication support",
+      "status": "ready",
+      "completionStatus": "completed",
+      "settlementReceiptStatus": "accepted",
+      "inventoryReceiptStatus": "available",
+      "closureStatus": "closed"
+    },
+    {
+      "id": "cpil-r2-dm",
+      "medicationPickupId": "mp2",
+      "insuranceClaimId": "ic2",
+      "residentId": "r2",
+      "longPrescription": "4 weeks renewable",
+      "catalogVersion": "2026-demo-drug-catalog",
+      "settlementStatus": "needs chronic special disease confirmation",
+      "callbackStatus": "pending callback",
+      "pharmacyStock": "low-stock warning",
+      "reimbursementPolicy": "diabetes outpatient chronic policy",
+      "status": "ready",
+      "completionStatus": "completed",
+      "settlementReceiptStatus": "accepted",
+      "inventoryReceiptStatus": "reserved",
+      "closureStatus": "closed"
+    }
+  ],
+  "chronicLaunchCoreSignoffs": [
+    {
+      "id": "clcs-institution-systems",
+      "itemId": "institution-systems",
+      "owner": "institution-integration",
+      "artifact": "HIS/EMR/LIS/PACS/pharmacy joint-test receipt pack",
+      "signoffStatus": "signed",
+      "signedBy": "institution-integration-lead",
+      "evidence": "chronicExternalIntegrations.latestReceiptId",
+      "nextAction": "replace sample payloads with each pilot institution signed record"
+    },
+    {
+      "id": "clcs-identity-scope",
+      "itemId": "identity-scope",
+      "owner": "identity-integration",
+      "artifact": "government identity source and organization-scope mapping",
+      "signoffStatus": "signed",
+      "signedBy": "identity-integration-lead",
+      "evidence": "chronicIdentityScopes.scopeReviewStatus",
+      "nextAction": "archive real OIDC/SAML metadata and role directory export"
+    },
+    {
+      "id": "clcs-message-channels",
+      "itemId": "message-channels",
+      "owner": "message-platform",
+      "artifact": "SMS phone and in-app receipt escalation rehearsal",
+      "signoffStatus": "signed",
+      "signedBy": "message-platform-lead",
+      "evidence": "chronicMessageChannels.latestReceiptStatus",
+      "nextAction": "bind production provider callback URLs"
+    },
+    {
+      "id": "clcs-quality-model",
+      "itemId": "quality-model",
+      "owner": "chronic-quality-office",
+      "artifact": "hypertension diabetes and sampling model review",
+      "signoffStatus": "signed",
+      "signedBy": "chronic-quality-lead",
+      "evidence": "chronicModelGovernance.lastReviewStatus",
+      "nextAction": "attach clinical expert approval record"
+    },
+    {
+      "id": "clcs-pharmacy-insurance",
+      "itemId": "pharmacy-insurance",
+      "owner": "pharmacy-insurance",
+      "artifact": "long prescription stock callback and insurance review closure",
+      "signoffStatus": "signed",
+      "signedBy": "pharmacy-insurance-lead",
+      "evidence": "chronicPharmacyInsuranceLinks.closureStatus",
+      "nextAction": "replace demo catalog version with production drug catalog"
+    },
+    {
+      "id": "clcs-site-pack",
+      "itemId": "site-readiness-pack",
+      "owner": "project-office",
+      "artifact": "production-signoff template extension for chronic launch core",
+      "signoffStatus": "signed",
+      "signedBy": "project-office",
+      "evidence": "siteReadinessPack.templates.signoff",
+      "nextAction": "collect wet signatures during site cutover"
+    }
+  ]
 }

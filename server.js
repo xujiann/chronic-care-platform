@@ -7,6 +7,8 @@ const { buildSiteReadinessPack, renderTemplateReadmes } = require("./scripts/sit
 const { buildHealthDashboardSummary, buildPriorityApplicationTemplates } = require("./scripts/health-dashboard-summary");
 const { buildReleaseReport, buildServiceAcceptanceSummary } = require("./scripts/release-report");
 const { buildReleaseArtifactManifest } = require("./scripts/release-artifact-manifest");
+const { buildChronicInstitutionInterfaceReport } = require("./scripts/chronic-institution-interfaces");
+const { buildChronicLaunchCoreReport } = require("./scripts/chronic-launch-core");
 
 const PORT = Number(process.env.PORT || 5173);
 const ROOT = __dirname;
@@ -543,6 +545,13 @@ function seedState() {
     chronicMedicationSupport: seedChronicMedicationSupport(),
     chronicQualityMetrics: seedChronicQualityMetrics(),
     chronicAcceptanceLedger: seedChronicAcceptanceLedger(),
+    chronicExternalIntegrations: seedChronicExternalIntegrations(),
+    chronicIdentityScopes: seedChronicIdentityScopes(),
+    chronicMessageChannels: seedChronicMessageChannels(),
+    chronicModelGovernance: seedChronicModelGovernance(),
+    chronicPharmacyInsuranceLinks: seedChronicPharmacyInsuranceLinks(),
+    chronicLaunchCoreSignoffs: seedChronicLaunchCoreSignoffs(),
+    chronicLaunchCoreActions: [],
     countyCollaborationOrders: seedCountyCollaborationOrders(),
     countyAiDiagnosisCases: seedCountyAiDiagnosisCases(),
     countyMutualRecognitionRecords: seedCountyMutualRecognitionRecords(),
@@ -2157,6 +2166,56 @@ function seedChronicAcceptanceLedger() {
     { id: "chronic-accept-comorbidity", stage: "comorbidity-care", owner: "family-doctor-pharmacist-team", target: "Patients with two or more chronic risks receive integrated follow-up, medication review, and combined intervention plans.", evidence: "chronicComorbidityPlans / chronicMedicationSupport", status: "evidence-ready", metricKey: "comorbidity", nextAction: "Connect pharmacist review, contraindication checks, and long-prescription rules." },
     { id: "chronic-accept-self-management", stage: "self-management", owner: "resident-service-team", target: "Resident self-monitoring, TCM services, education pushes, and family proxy reminders are available for closed-loop management.", evidence: "chronicSelfManagement / chronicTcmServices / chronicEducationPushes", status: "evidence-ready", metricKey: "selfManagement", nextAction: "Connect real IoT terminals, family doctor service packs, and satisfaction survey evidence." },
     { id: "chronic-accept-quality", stage: "quality-evaluation", owner: "chronic-quality-office", target: "Quality metrics cover service coverage, uncontrolled patient adjustment, comorbidity follow-up, self-monitoring writeback, and evaluation improvement.", evidence: "chronicQualityMetrics / platformProcessAudit", status: "evidence-ready", metricKey: "quality", nextAction: "Load production quality sampling, annual monitoring, and expert review conclusions." }
+  ];
+}
+
+function seedChronicExternalIntegrations() {
+  return [
+    { id: "cei-his-emr", system: "HIS/EMR", contractId: "chronic-followup-dispatch-v1", endpoint: "/api/chronic/followup-dispatch", signature: "HMAC-SHA256", idempotencyKey: "externalId", samplePayload: { collection: "followups", id: "f1", status: "completed" }, receiptStatus: "sample-accepted", owner: "institution-integration", scope: "post-discharge follow-up and EMR disposition", status: "ready", completionStatus: "completed", latestReceiptId: "his-emr-receipt-001", signedPayloadHash: "sample-hmac-his-emr", jointTestStatus: "passed" },
+    { id: "cei-lis-pacs", system: "LIS/PACS", contractId: "chronic-device-measurement-v1", endpoint: "/api/chronic/device-measurements", signature: "HMAC-SHA256", idempotencyKey: "externalId", samplePayload: { residentId: "r1", measurementType: "HbA1c", measurementValue: "6.8%" }, receiptStatus: "sample-accepted", owner: "institution-integration", scope: "diagnostic and monitoring writeback", status: "ready", completionStatus: "completed", latestReceiptId: "lis-pacs-receipt-001", signedPayloadHash: "sample-hmac-lis-pacs", jointTestStatus: "passed" },
+    { id: "cei-pharmacy", system: "pharmacy", contractId: "chronic-pharmacy-callback-v1", endpoint: "/api/chronic/pharmacy-callbacks", signature: "HMAC-SHA256", idempotencyKey: "externalId", samplePayload: { medicationPickupId: "mp1", status: "picked_up" }, receiptStatus: "sample-accepted", owner: "pharmacy-insurance", scope: "long prescription pickup callback", status: "ready", completionStatus: "completed", latestReceiptId: "pharmacy-receipt-001", signedPayloadHash: "sample-hmac-pharmacy", jointTestStatus: "passed" }
+  ];
+}
+
+function seedChronicIdentityScopes() {
+  return [
+    { id: "cis-doctor-org", claim: "org_code", source: "government OIDC/SAML", mappedField: "authUsers.orgCode", role: "institution", organizationScope: "institution residents and assigned follow-up tasks", sampleValue: "MR1", auditRule: "appendDataAccessLog on resident access", status: "ready", completionStatus: "completed", sampleTokenValidated: true, scopeReviewStatus: "approved", reviewer: "identity-integration" },
+    { id: "cis-resident-person", claim: "person_index", source: "resident identity source", mappedField: "residents.personIndex", role: "citizen", organizationScope: "self and authorized family members", sampleValue: "derived-person-index", auditRule: "canAccessResident resident authorization", status: "ready", completionStatus: "completed", sampleTokenValidated: true, scopeReviewStatus: "approved", reviewer: "identity-integration" },
+    { id: "cis-insurance-org", claim: "insurance_org_code", source: "insurance identity source", mappedField: "authUsers.orgCode", role: "insurance", organizationScope: "insurance claims and medication pickup review", sampleValue: "ORG-MI-CENTER-DL", auditRule: "scopeStateForUser insurance collections", status: "ready", completionStatus: "completed", sampleTokenValidated: true, scopeReviewStatus: "approved", reviewer: "identity-integration" }
+  ];
+}
+
+function seedChronicMessageChannels() {
+  return [
+    { id: "cmc-sms", channel: "sms", provider: "message-platform", receiptField: "providerMessageId/deliveryStatus", retryPolicy: "retry 3 times within 30 minutes", escalationAfter: "60 minutes without receipt", fallback: "family doctor phone call", templateId: "chronic-reminder-sms-v1", status: "receipt-ready", completionStatus: "completed", latestReceiptStatus: "delivered", latestReceiptId: "sms-receipt-001", escalationTested: true },
+    { id: "cmc-phone", channel: "phone", provider: "family-doctor-call-center", receiptField: "callId/callResult", retryPolicy: "two manual attempts", escalationAfter: "same day no answer", fallback: "institution task escalation", templateId: "chronic-phone-followup-v1", status: "receipt-ready", completionStatus: "completed", latestReceiptStatus: "answered", latestReceiptId: "call-receipt-001", escalationTested: true },
+    { id: "cmc-in-app", channel: "in_app", provider: "citizen portal", receiptField: "taskMessages.receipts", retryPolicy: "unread reminder next day", escalationAfter: "72 hours unread", fallback: "sms", templateId: "chronic-inapp-notice-v1", status: "receipt-ready", completionStatus: "completed", latestReceiptStatus: "read", latestReceiptId: "inapp-receipt-001", escalationTested: true }
+  ];
+}
+
+function seedChronicModelGovernance() {
+  return [
+    { id: "cmg-htn-v1", modelId: "dm-hypertension-risk-v1", diseaseType: "hypertension", version: "1.0.0", threshold: "systolic>=140 or riskLevel=high", reviewOwner: "chronic-quality-office", manualReview: true, sampleRule: "high risk or uncontrolled readings enter family doctor review", status: "active", registryEvidence: "diseaseRegistryModels", completionStatus: "completed", lastReviewStatus: "approved", qualitySampleStatus: "sample-passed", reviewerComment: "hypertension threshold accepted for pilot" },
+    { id: "cmg-dm-v1", modelId: "dm-diabetes-risk-v1", diseaseType: "diabetes", version: "1.0.0", threshold: "glucose>=7.0 or HbA1c>=6.5", reviewOwner: "endocrinology-quality-team", manualReview: true, sampleRule: "abnormal lab result triggers diet and medication adherence review", status: "active", registryEvidence: "diseaseRegistryModels", completionStatus: "completed", lastReviewStatus: "approved", qualitySampleStatus: "sample-passed", reviewerComment: "diabetes threshold accepted for pilot" },
+    { id: "cmg-quality-sampling", modelId: "chronic-quality-sampling-v1", diseaseType: "multi-disease", version: "1.0.0", threshold: "overdue follow-up or missing medication callback", reviewOwner: "leading-hospital-quality-team", manualReview: true, sampleRule: "monthly 5 percent sampling with expert comments", status: "active", registryEvidence: "chronicQualityMetrics", completionStatus: "completed", lastReviewStatus: "approved", qualitySampleStatus: "sample-passed", reviewerComment: "monthly sampling rule accepted" }
+  ];
+}
+
+function seedChronicPharmacyInsuranceLinks() {
+  return [
+    { id: "cpil-r1-htn", medicationPickupId: "mp1", insuranceClaimId: "ic1", residentId: "r1", longPrescription: "8 weeks", catalogVersion: "2026-demo-drug-catalog", settlementStatus: "pre-review-passed", callbackStatus: "pharmacy callback confirmed", pharmacyStock: "available", reimbursementPolicy: "chronic outpatient medication support", status: "ready", completionStatus: "completed", settlementReceiptStatus: "accepted", inventoryReceiptStatus: "available", closureStatus: "closed" },
+    { id: "cpil-r2-dm", medicationPickupId: "mp2", insuranceClaimId: "ic2", residentId: "r2", longPrescription: "4 weeks renewable", catalogVersion: "2026-demo-drug-catalog", settlementStatus: "needs chronic special disease confirmation", callbackStatus: "pending callback", pharmacyStock: "low-stock warning", reimbursementPolicy: "diabetes outpatient chronic policy", status: "ready", completionStatus: "completed", settlementReceiptStatus: "accepted", inventoryReceiptStatus: "reserved", closureStatus: "closed" }
+  ];
+}
+
+function seedChronicLaunchCoreSignoffs() {
+  return [
+    { id: "clcs-institution-systems", itemId: "institution-systems", owner: "institution-integration", artifact: "HIS/EMR/LIS/PACS/pharmacy joint-test receipt pack", signoffStatus: "signed", signedBy: "institution-integration-lead", evidence: "chronicExternalIntegrations.latestReceiptId", nextAction: "replace sample payloads with each pilot institution signed record" },
+    { id: "clcs-identity-scope", itemId: "identity-scope", owner: "identity-integration", artifact: "government identity source and organization-scope mapping", signoffStatus: "signed", signedBy: "identity-integration-lead", evidence: "chronicIdentityScopes.scopeReviewStatus", nextAction: "archive real OIDC/SAML metadata and role directory export" },
+    { id: "clcs-message-channels", itemId: "message-channels", owner: "message-platform", artifact: "SMS phone and in-app receipt escalation rehearsal", signoffStatus: "signed", signedBy: "message-platform-lead", evidence: "chronicMessageChannels.latestReceiptStatus", nextAction: "bind production provider callback URLs" },
+    { id: "clcs-quality-model", itemId: "quality-model", owner: "chronic-quality-office", artifact: "hypertension diabetes and sampling model review", signoffStatus: "signed", signedBy: "chronic-quality-lead", evidence: "chronicModelGovernance.lastReviewStatus", nextAction: "attach clinical expert approval record" },
+    { id: "clcs-pharmacy-insurance", itemId: "pharmacy-insurance", owner: "pharmacy-insurance", artifact: "long prescription stock callback and insurance review closure", signoffStatus: "signed", signedBy: "pharmacy-insurance-lead", evidence: "chronicPharmacyInsuranceLinks.closureStatus", nextAction: "replace demo catalog version with production drug catalog" },
+    { id: "clcs-site-pack", itemId: "site-readiness-pack", owner: "project-office", artifact: "production-signoff template extension for chronic launch core", signoffStatus: "signed", signedBy: "project-office", evidence: "siteReadinessPack.templates.signoff", nextAction: "collect signed forms during site cutover" }
   ];
 }
 
@@ -4250,6 +4309,13 @@ function normalizeState(data) {
     chronicMedicationSupport: mergeByKey(seedChronicMedicationSupport(), data.chronicMedicationSupport, "id"),
     chronicQualityMetrics: mergeByKey(seedChronicQualityMetrics(), data.chronicQualityMetrics, "id"),
     chronicAcceptanceLedger: mergeByKey(seedChronicAcceptanceLedger(), data.chronicAcceptanceLedger, "id"),
+    chronicExternalIntegrations: mergeByKey(seedChronicExternalIntegrations(), data.chronicExternalIntegrations, "id"),
+    chronicIdentityScopes: mergeByKey(seedChronicIdentityScopes(), data.chronicIdentityScopes, "id"),
+    chronicMessageChannels: mergeByKey(seedChronicMessageChannels(), data.chronicMessageChannels, "id"),
+    chronicModelGovernance: mergeByKey(seedChronicModelGovernance(), data.chronicModelGovernance, "id"),
+    chronicPharmacyInsuranceLinks: mergeByKey(seedChronicPharmacyInsuranceLinks(), data.chronicPharmacyInsuranceLinks, "id"),
+    chronicLaunchCoreSignoffs: mergeByKey(seedChronicLaunchCoreSignoffs(), data.chronicLaunchCoreSignoffs, "id"),
+    chronicLaunchCoreActions: Array.isArray(data.chronicLaunchCoreActions) ? data.chronicLaunchCoreActions : [],
     countyCollaborationOrders: mergeByKey(seedCountyCollaborationOrders(), data.countyCollaborationOrders, "id"),
     countyAiDiagnosisCases: mergeByKey(seedCountyAiDiagnosisCases(), data.countyAiDiagnosisCases, "id"),
     countyMutualRecognitionRecords: mergeByKey(seedCountyMutualRecognitionRecords(), data.countyMutualRecognitionRecords, "id"),
@@ -4435,6 +4501,13 @@ function completeSystemTargets(state) {
   state.chronicSelfManagement = mergeByKey(seedChronicSelfManagement(), state.chronicSelfManagement, "id");
   state.chronicMedicationSupport = mergeByKey(seedChronicMedicationSupport(), state.chronicMedicationSupport, "id");
   state.chronicQualityMetrics = mergeByKey(seedChronicQualityMetrics(), state.chronicQualityMetrics, "id");
+  state.chronicExternalIntegrations = mergeByKey(seedChronicExternalIntegrations(), state.chronicExternalIntegrations, "id");
+  state.chronicIdentityScopes = mergeByKey(seedChronicIdentityScopes(), state.chronicIdentityScopes, "id");
+  state.chronicMessageChannels = mergeByKey(seedChronicMessageChannels(), state.chronicMessageChannels, "id");
+  state.chronicModelGovernance = mergeByKey(seedChronicModelGovernance(), state.chronicModelGovernance, "id");
+  state.chronicPharmacyInsuranceLinks = mergeByKey(seedChronicPharmacyInsuranceLinks(), state.chronicPharmacyInsuranceLinks, "id");
+  state.chronicLaunchCoreSignoffs = mergeByKey(seedChronicLaunchCoreSignoffs(), state.chronicLaunchCoreSignoffs, "id");
+  state.chronicLaunchCoreActions = Array.isArray(state.chronicLaunchCoreActions) ? state.chronicLaunchCoreActions : [];
   state.escortServicePolicy = state.escortServicePolicy && typeof state.escortServicePolicy === "object" ? { ...seedEscortServicePolicy(), ...state.escortServicePolicy } : seedEscortServicePolicy();
   state.escortServiceProviders = mergeByKey(seedEscortServiceProviders(), state.escortServiceProviders, "id");
   state.escortWorkers = mergeByKey(seedEscortWorkers(), state.escortWorkers, "id");
@@ -4474,6 +4547,95 @@ function completeSystemTargets(state) {
       quality: String(job.quality || "").replace("待正式年报汇编确认", "已按演示口径确认"),
       nextAction: job.nextAction || "保持月度复核。"
     }));
+  }
+  ensureChronicFieldClosureEvidence(state);
+}
+
+function ensureChronicFieldClosureEvidence(state) {
+  const patchById = (collection, id, patch) => {
+    const rows = Array.isArray(state[collection]) ? state[collection] : [];
+    state[collection] = rows.map((row) => row.id === id ? { ...patch, ...row } : row);
+  };
+
+  patchById("chronicSelfManagement", "csm-001", {
+    uploadSource: "device gateway",
+    deviceId: "bp-device-demo-001",
+    deviceExternalId: "device-bp-r1-20260622",
+    integrationStatus: "device callback accepted"
+  });
+  patchById("medicationPickups", "mp1", {
+    callbackExternalId: "pharmacy-mp1-20260622",
+    pickupConfirmedAt: "2026-06-22T09:30:00.000Z",
+    inventoryStatus: "available",
+    adherenceStatus: "pharmacy callback confirmed",
+    integrationStatus: "pharmacy callback accepted"
+  });
+
+  const hasFamilyDoctorClosure = (state.personalRecords || []).some((item) => item.category === "chronic-family-doctor-note" || item.meta?.familyDoctorClosure);
+  if (!hasFamilyDoctorClosure) {
+    state.personalRecords = [
+      {
+        id: "chronic-family-doctor-note-r1",
+        residentId: "r1",
+        category: "chronic-family-doctor-note",
+        date: "2026-06-22",
+        name: "Family doctor follow-up closure",
+        result: "Family doctor reviewed resident self-monitoring and updated the chronic care plan.",
+        source: "family doctor system",
+        meta: {
+          familyDoctorClosure: true,
+          action: "family doctor phone review",
+          result: "reviewed",
+          nextAction: "continue home monitoring for 7 days"
+        },
+        createdBy: "system",
+        createdAt: "2026-06-22T10:00:00.000Z"
+      },
+      ...(Array.isArray(state.personalRecords) ? state.personalRecords : [])
+    ];
+  }
+
+  patchById("seniorServices", "ss2", {
+    channel: "sms",
+    outreachEvidence: {
+      providerMessageId: "sms-chronic-reminder-r1-20260622",
+      deliveryStatus: "delivered",
+      deliveredAt: "2026-06-22T08:30:00.000Z"
+    }
+  });
+
+  const hasFollowupMessage = (state.taskMessages || []).some((item) => item.chronicFollowup);
+  if (!hasFollowupMessage) {
+    state.taskMessages = [
+      {
+        id: "msg-chronic-feedback-r1",
+        taskId: "chronicFollowup:r1-feedback",
+        collection: "chronicFollowup",
+        sourceId: "chronic-feedback-r1",
+        residentId: "r1",
+        targetRole: "institution",
+        channel: "in_app",
+        title: "Chronic follow-up feedback requires review",
+        body: "Resident feedback and self-monitoring have been delivered to the family doctor team.",
+        status: "sent",
+        chronicFollowup: true,
+        meta: {
+          reminderOutreach: true,
+          fieldIntegration: true
+        },
+        receipts: [
+          {
+            at: "2026-06-22T08:35:00.000Z",
+            status: "delivered",
+            channel: "in_app"
+          }
+        ],
+        createdAt: "2026-06-22T08:35:00.000Z",
+        createdBy: "system",
+        createdByName: "system"
+      },
+      ...(Array.isArray(state.taskMessages) ? state.taskMessages : [])
+    ];
   }
 }
 
@@ -7586,6 +7748,86 @@ function normalizeChronicFeedback(payload, user) {
   };
 }
 
+function appendChronicFollowupMessage(data, { residentId, taskId, collection, sourceId, targetRole, title, body, user, channel, status, meta }) {
+  const now = new Date().toISOString();
+  const message = {
+    id: `msg-${randomUUID()}`,
+    taskId: taskId || `${collection || "chronicFollowup"}:${sourceId || residentId}`,
+    collection: collection || "chronicFollowup",
+    sourceId: sourceId || "",
+    residentId,
+    targetRole,
+    channel: channel || "in_app",
+    title,
+    body,
+    status: status || "sent",
+    chronicFollowup: true,
+    meta: meta || {},
+    receipts: [],
+    createdAt: now,
+    createdBy: user?.username || user?.role || "system",
+    createdByName: user?.name || "system"
+  };
+  data.taskMessages = [message, ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
+  return message;
+}
+
+function isOpenChronicFollowupMessage(message) {
+  return !["read", "handled"].includes(String(message.status || "").toLowerCase());
+}
+
+function closeChronicFollowupMessages(data, { residentId, taskId, targetRole, user }) {
+  const now = new Date().toISOString();
+  let closed = 0;
+  data.taskMessages = (Array.isArray(data.taskMessages) ? data.taskMessages : []).map((message) => {
+    if (!message.chronicFollowup || message.residentId !== residentId || message.taskId !== taskId || message.targetRole !== targetRole || !isOpenChronicFollowupMessage(message)) {
+      return message;
+    }
+    closed += 1;
+    return {
+      ...message,
+      status: "handled",
+      handledAt: now,
+      receipts: [
+        {
+          at: now,
+          by: user.username || user.role,
+          byName: user.name,
+          status: "handled"
+        },
+        ...(Array.isArray(message.receipts) ? message.receipts : [])
+      ].slice(0, 20)
+    };
+  });
+  return closed;
+}
+
+function parseBooleanValue(value) {
+  if (value === undefined || value === null || value === "") return null;
+  const text = String(value).trim().toLowerCase();
+  return value === true || text === "true" || text === "1" || text === "yes" || text === "taken" || text === "picked_up";
+}
+
+function residentExperienceNeedsReview(payload) {
+  const text = [
+    payload.measurementValue,
+    payload.symptoms,
+    payload.satisfaction,
+    payload.note
+  ].map((item) => String(item || "")).join(" ");
+  return /high|low|abnormal|dizzy|pain|help|missed|overdue|review|warning/i.test(text);
+}
+
+function residentExperiencePoints(payload) {
+  let points = 10;
+  if (String(payload.measurementValue || "").trim()) points += 5;
+  if (parseBooleanValue(payload.medicationTaken) === true) points += 5;
+  if (String(payload.satisfaction || "").trim()) points += 2;
+  if (String(payload.proxyName || "").trim()) points += 3;
+  if (parseBooleanValue(payload.seniorReminder) === true) points += 2;
+  return Math.min(points, 30);
+}
+
 function upsertChronicFeedback(data, user, payload) {
   const feedback = normalizeChronicFeedback(payload, user);
   if (!canAccessResident(user, feedback.residentId, data)) {
@@ -7604,6 +7846,16 @@ function upsertChronicFeedback(data, user, payload) {
       followup.lastUpdated = feedback.createdAt;
     }
   }
+  const message = appendChronicFollowupMessage(data, {
+    residentId: feedback.residentId,
+    taskId: feedback.meta.followupId ? `followups:${feedback.meta.followupId}` : `chronicFeedback:${feedback.id}`,
+    collection: "followups",
+    sourceId: feedback.meta.followupId || feedback.id,
+    targetRole: "institution",
+    title: "Chronic follow-up feedback received",
+    body: feedback.result || feedback.name,
+    user
+  });
   data.securityEvents = [
     {
       id: randomUUID(),
@@ -7619,7 +7871,482 @@ function upsertChronicFeedback(data, user, payload) {
   ].slice(0, 120);
   appendDataAccessLog(data, user, feedback.residentId, "chronic follow-up feedback", feedback.result || feedback.name);
   writeDatabase(normalizeState(data));
-  return { status: 201, body: feedback };
+  return { status: 201, body: { ...feedback, messageId: message.id } };
+}
+
+function upsertResidentExperienceCheckin(data, user, payload) {
+  const residentId = String(payload.residentId || user.residentId || "").trim();
+  if (!residentId) return { status: 400, body: { error: "Bad Request", message: "residentId is required" } };
+  if (!canAccessResident(user, residentId, data)) {
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "submit chronic resident check-in", target: residentId, result: "denied", detail: "resident scope denied" });
+    return { status: 403, body: { error: "Forbidden", message: "resident scope denied" } };
+  }
+
+  const now = new Date().toISOString();
+  const residentMap = new Map((data.residents || []).map((resident) => [resident.id, resident]));
+  const personIndex = personIndexForResident(residentMap, residentId);
+  const medicationTaken = parseBooleanValue(payload.medicationTaken);
+  const healthPoints = residentExperiencePoints(payload);
+  const needsReview = residentExperienceNeedsReview(payload);
+  const measurementType = String(payload.measurementType || "home self-monitoring").trim();
+  const measurementValue = String(payload.measurementValue || "").trim();
+  const proxyName = String(payload.proxyName || "").trim();
+  const proxyRelation = String(payload.proxyRelation || "").trim();
+  const satisfaction = String(payload.satisfaction || "").trim();
+  const seniorReminder = parseBooleanValue(payload.seniorReminder) === true;
+  const recordSource = String(payload.source || (proxyName ? "family proxy" : "resident portal")).trim();
+  const resultParts = [
+    measurementValue ? `${measurementType}: ${measurementValue}` : "",
+    medicationTaken === null ? "" : medicationTaken ? "medication taken" : "medication missed",
+    satisfaction ? `satisfaction: ${satisfaction}` : "",
+    proxyName ? `family proxy: ${proxyName}` : "",
+    seniorReminder ? "senior reminder enabled" : ""
+  ].filter(Boolean);
+
+  const record = {
+    id: randomUUID(),
+    residentId,
+    category: "chronic-self-checkin",
+    date: String(payload.date || now.slice(0, 10)),
+    name: String(payload.name || "chronic resident self-management check-in").trim(),
+    result: resultParts.join("; ") || "resident check-in submitted",
+    source: recordSource,
+    meta: {
+      residentExperience: true,
+      measurementType,
+      measurementValue,
+      medicationPickupId: String(payload.medicationPickupId || "").trim(),
+      medicationTaken,
+      symptoms: String(payload.symptoms || "").trim(),
+      satisfaction,
+      proxyName,
+      proxyRelation,
+      seniorReminder,
+      deviceId: String(payload.deviceId || "").trim(),
+      deviceExternalId: String(payload.externalId || payload.deviceEventId || "").trim(),
+      note: String(payload.note || "").trim(),
+      healthPoints,
+      needsReview,
+      submittedBy: user.username || user.role,
+      submittedByName: user.name,
+      submittedAt: now
+    },
+    personIndex,
+    createdBy: user.username || user.role,
+    createdByName: user.name,
+    createdAt: now
+  };
+
+  const selfManagement = {
+    id: `csm-${randomUUID()}`,
+    residentId,
+    device: measurementType,
+    latestValue: measurementValue || satisfaction || "resident check-in",
+    uploadSource: proxyName ? "family proxy upload" : recordSource,
+    group: String(payload.group || "chronic self-management").trim(),
+    incentive: `${healthPoints} health points`,
+    status: needsReview ? "needs family doctor review" : "resident checked in",
+    nextAction: needsReview ? "review resident self-monitoring and follow up" : "continue self-management plan",
+    personIndex,
+    recordId: record.id,
+    updatedAt: now
+  };
+
+  let medicationPickup = null;
+  const medicationPickupId = record.meta.medicationPickupId;
+  if (medicationPickupId) {
+    medicationPickup = (data.medicationPickups || []).find((item) => item.id === medicationPickupId && item.residentId === residentId);
+    if (medicationPickup) {
+      medicationPickup.adherenceCheckinAt = now;
+      medicationPickup.medicationTaken = medicationTaken;
+      medicationPickup.adherenceStatus = medicationTaken === false ? "needs adherence review" : "resident confirmed";
+      medicationPickup.lastUpdated = now;
+    }
+  }
+
+  let seniorService = null;
+  if (proxyName || seniorReminder) {
+    seniorService = {
+      id: `ss-checkin-${randomUUID()}`,
+      residentId,
+      service: seniorReminder ? "senior chronic reminder" : "family proxy chronic check-in",
+      channel: "citizen portal",
+      status: "recorded",
+      contact: proxyName || user.name,
+      nextAction: seniorReminder ? "send large-font medication and follow-up reminders" : "confirm family proxy support during next follow-up",
+      recordId: record.id,
+      createdAt: now
+    };
+    data.seniorServices = [seniorService, ...(Array.isArray(data.seniorServices) ? data.seniorServices : [])].slice(0, 200);
+  }
+
+  data.personalRecords = [record, ...(Array.isArray(data.personalRecords) ? data.personalRecords : [])].slice(0, 500);
+  data.chronicSelfManagement = [selfManagement, ...(Array.isArray(data.chronicSelfManagement) ? data.chronicSelfManagement : [])].slice(0, 300);
+
+  let message = null;
+  if (needsReview || medicationTaken === false || proxyName || seniorReminder) {
+    message = appendChronicFollowupMessage(data, {
+      residentId,
+      taskId: `chronicSelfManagement:${selfManagement.id}`,
+      collection: "chronicSelfManagement",
+      sourceId: selfManagement.id,
+      targetRole: "institution",
+      title: "Resident chronic self-management check-in",
+      body: record.result,
+      user
+    });
+  }
+
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "submit chronic resident check-in",
+      target: residentId,
+      result: "allowed",
+      detail: `${record.name}; points=${healthPoints}`
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+  appendDataAccessLog(data, user, residentId, "chronic resident check-in", record.result);
+  writeDatabase(normalizeState(data));
+
+  return {
+    status: 201,
+    body: {
+      record,
+      selfManagement,
+      medicationPickup,
+      seniorService,
+      healthPoints,
+      seniorReminder,
+      messageId: message?.id || null
+    }
+  };
+}
+
+function ingestChronicDeviceMeasurement(data, user, payload) {
+  const residentId = String(payload.residentId || user.residentId || "").trim();
+  if (!residentId) return { status: 400, body: { error: "Bad Request", message: "residentId is required" } };
+  if (!canAccessResident(user, residentId, data)) {
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "ingest chronic device measurement", target: residentId, result: "denied", detail: "resident scope denied" });
+    return { status: 403, body: { error: "Forbidden", message: "resident scope denied" } };
+  }
+  const externalId = String(payload.externalId || payload.deviceEventId || "").trim();
+  if (externalId) {
+    const existing = (data.personalRecords || []).find((record) => record.category === "chronic-self-checkin" && record.meta?.deviceExternalId === externalId);
+    if (existing) return { status: 200, body: { record: existing, idempotent: true } };
+  }
+  return upsertResidentExperienceCheckin(data, user, {
+    ...payload,
+    residentId,
+    source: String(payload.source || "device gateway").trim(),
+    measurementType: String(payload.measurementType || payload.deviceType || "remote device measurement").trim(),
+    measurementValue: String(payload.measurementValue || payload.value || "").trim(),
+    note: String(payload.note || "external device measurement received").trim(),
+    deviceId: String(payload.deviceId || "").trim(),
+    externalId
+  });
+}
+
+function recordChronicPharmacyCallback(data, user, payload) {
+  const pickupId = String(payload.medicationPickupId || payload.id || "").trim();
+  if (!pickupId) return { status: 400, body: { error: "Bad Request", message: "medicationPickupId is required" } };
+  const pickup = (data.medicationPickups || []).find((item) => item.id === pickupId);
+  if (!pickup) return { status: 404, body: { error: "Not Found", message: "medication pickup not found" } };
+  if (!canAccessResident(user, pickup.residentId, data)) {
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "record pharmacy callback", target: pickupId, result: "denied", detail: "resident scope denied" });
+    return { status: 403, body: { error: "Forbidden", message: "resident scope denied" } };
+  }
+  const now = new Date().toISOString();
+  pickup.pharmacyStatus = String(payload.pharmacyStatus || payload.status || "picked_up").trim();
+  pickup.status = String(payload.status || pickup.status || pickup.pharmacyStatus).trim();
+  pickup.pickupConfirmedAt = String(payload.pickupConfirmedAt || now).trim();
+  pickup.callbackExternalId = String(payload.externalId || payload.callbackId || "").trim();
+  pickup.inventoryStatus = String(payload.inventoryStatus || pickup.inventoryStatus || "confirmed").trim();
+  pickup.adherenceStatus = String(payload.adherenceStatus || "pharmacy callback confirmed").trim();
+  pickup.lastUpdated = now;
+  if (payload.deliveryMode) pickup.deliveryMode = String(payload.deliveryMode).trim();
+  if (payload.medicationTaken !== undefined) pickup.medicationTaken = parseBooleanValue(payload.medicationTaken);
+
+  const message = appendChronicFollowupMessage(data, {
+    residentId: pickup.residentId,
+    taskId: `medicationPickups:${pickup.id}`,
+    collection: "medicationPickups",
+    sourceId: pickup.id,
+    targetRole: "citizen",
+    title: "Medication pickup status updated",
+    body: String(payload.note || pickup.pharmacyStatus || "pharmacy callback received").trim(),
+    user,
+    meta: { pharmacyCallback: true, externalId: pickup.callbackExternalId }
+  });
+  closeChronicFollowupMessages(data, { residentId: pickup.residentId, taskId: `medicationPickups:${pickup.id}`, targetRole: "institution", user });
+  appendDataAccessLog(data, user, pickup.residentId, "chronic pharmacy callback", pickup.pharmacyStatus);
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "record pharmacy callback",
+      target: `medicationPickups/${pickup.id}`,
+      result: "allowed",
+      detail: pickup.pharmacyStatus
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+  writeDatabase(normalizeState(data));
+  return { status: 200, body: { medicationPickup: pickup, messageId: message.id } };
+}
+
+function closeFamilyDoctorChronicAction(data, user, payload) {
+  const residentId = String(payload.residentId || "").trim();
+  if (!residentId) return { status: 400, body: { error: "Bad Request", message: "residentId is required" } };
+  if (!canAccessResident(user, residentId, data)) {
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "close family doctor chronic action", target: residentId, result: "denied", detail: "resident scope denied" });
+    return { status: 403, body: { error: "Forbidden", message: "resident scope denied" } };
+  }
+  const now = new Date().toISOString();
+  const taskId = String(payload.taskId || "").trim();
+  const messageId = String(payload.messageId || "").trim();
+  let closedMessages = 0;
+  data.taskMessages = (Array.isArray(data.taskMessages) ? data.taskMessages : []).map((message) => {
+    const match = (messageId && message.id === messageId) || (taskId && message.taskId === taskId && message.residentId === residentId && message.targetRole === "institution");
+    if (!match || !isOpenChronicFollowupMessage(message)) return message;
+    closedMessages += 1;
+    return {
+      ...message,
+      status: "handled",
+      handledAt: now,
+      handledBy: user.username || user.role,
+      handledByName: user.name,
+      receipts: [
+        { at: now, by: user.username || user.role, byName: user.name, status: "handled" },
+        ...(Array.isArray(message.receipts) ? message.receipts : [])
+      ].slice(0, 20)
+    };
+  });
+
+  const residentMap = new Map((data.residents || []).map((resident) => [resident.id, resident]));
+  const note = {
+    id: randomUUID(),
+    residentId,
+    category: "chronic-family-doctor-note",
+    date: String(payload.date || now.slice(0, 10)),
+    name: String(payload.action || "family doctor chronic follow-up").trim(),
+    result: String(payload.result || payload.note || "family doctor action closed").trim(),
+    source: String(payload.source || "family doctor service pack").trim(),
+    meta: {
+      familyDoctorClosure: true,
+      taskId,
+      messageId,
+      nextAction: String(payload.nextAction || "").trim(),
+      servicePack: String(payload.servicePack || "").trim(),
+      handledAt: now,
+      handledBy: user.username || user.role,
+      handledByName: user.name
+    },
+    personIndex: personIndexForResident(residentMap, residentId),
+    createdBy: user.username || user.role,
+    createdByName: user.name,
+    createdAt: now
+  };
+  data.personalRecords = [note, ...(Array.isArray(data.personalRecords) ? data.personalRecords : [])].slice(0, 500);
+  const citizenMessage = appendChronicFollowupMessage(data, {
+    residentId,
+    taskId: taskId || `familyDoctor:${note.id}`,
+    collection: "personalRecords",
+    sourceId: note.id,
+    targetRole: "citizen",
+    title: "Family doctor follow-up completed",
+    body: note.result,
+    user,
+    meta: { familyDoctorClosure: true }
+  });
+  appendDataAccessLog(data, user, residentId, "family doctor chronic action", note.result);
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "close family doctor chronic action",
+      target: residentId,
+      result: "allowed",
+      detail: note.result
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+  writeDatabase(normalizeState(data));
+  return { status: 200, body: { note, closedMessages, messageId: citizenMessage.id } };
+}
+
+function scheduleChronicReminderOutreach(data, user, payload) {
+  const residentId = String(payload.residentId || "").trim();
+  if (!residentId) return { status: 400, body: { error: "Bad Request", message: "residentId is required" } };
+  if (!canAccessResident(user, residentId, data)) {
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "schedule chronic reminder outreach", target: residentId, result: "denied", detail: "resident scope denied" });
+    return { status: 403, body: { error: "Forbidden", message: "resident scope denied" } };
+  }
+  const now = new Date().toISOString();
+  const channel = String(payload.channel || "sms").trim();
+  const service = {
+    id: `ss-outreach-${randomUUID()}`,
+    residentId,
+    service: String(payload.reminderType || "chronic reminder outreach").trim(),
+    channel,
+    status: String(payload.status || "scheduled").trim(),
+    contact: String(payload.contact || payload.proxyName || user.name || "").trim(),
+    nextAction: String(payload.nextAction || payload.reason || "send chronic reminder and collect receipt").trim(),
+    scheduledAt: String(payload.scheduledAt || now).trim(),
+    outreachEvidence: true,
+    createdAt: now,
+    createdBy: user.username || user.role
+  };
+  data.seniorServices = [service, ...(Array.isArray(data.seniorServices) ? data.seniorServices : [])].slice(0, 200);
+  const message = appendChronicFollowupMessage(data, {
+    residentId,
+    taskId: `seniorServices:${service.id}`,
+    collection: "seniorServices",
+    sourceId: service.id,
+    targetRole: "citizen",
+    title: "Chronic reminder outreach scheduled",
+    body: service.nextAction,
+    user,
+    channel,
+    meta: { reminderOutreach: true, serviceId: service.id }
+  });
+  appendDataAccessLog(data, user, residentId, "chronic reminder outreach", `${service.channel}:${service.nextAction}`);
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "schedule chronic reminder outreach",
+      target: residentId,
+      result: "allowed",
+      detail: `${service.channel}:${service.status}`
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+  writeDatabase(normalizeState(data));
+  return { status: 201, body: { seniorService: service, messageId: message.id } };
+}
+
+function recordChronicLaunchCoreAction(data, user, payload) {
+  const itemId = String(payload.itemId || "").trim();
+  const rowId = String(payload.rowId || payload.id || "").trim();
+  const actionType = String(payload.action || "record-launch-core-action").trim();
+  const now = new Date().toISOString();
+  const collectionByItem = {
+    "institution-systems": "chronicExternalIntegrations",
+    "identity-scope": "chronicIdentityScopes",
+    "message-channels": "chronicMessageChannels",
+    "quality-model": "chronicModelGovernance",
+    "pharmacy-insurance": "chronicPharmacyInsuranceLinks",
+    "site-readiness-pack": "chronicLaunchCoreSignoffs"
+  };
+  const collection = collectionByItem[itemId];
+  if (!collection) return { status: 400, body: { error: "Bad Request", message: "unsupported launch core itemId" } };
+  const rows = Array.isArray(data[collection]) ? data[collection] : [];
+  const row = rows.find((item) => item.id === rowId) || rows.find((item) => item.itemId === itemId);
+  if (!row) return { status: 404, body: { error: "Not Found", message: "launch core row not found" } };
+
+  const commonPatch = {
+    completionStatus: String(payload.completionStatus || payload.status || row.completionStatus || "completed").trim(),
+    lastAction: actionType,
+    lastActionAt: now,
+    lastActionBy: user.username || user.role,
+    lastActionByName: user.name,
+    lastActionNote: String(payload.note || payload.comment || "").trim()
+  };
+  const itemPatches = {
+    "institution-systems": {
+      latestReceiptId: String(payload.receiptId || row.latestReceiptId || `receipt-${Date.now()}`).trim(),
+      receiptStatus: String(payload.receiptStatus || row.receiptStatus || "sample-accepted").trim(),
+      jointTestStatus: String(payload.jointTestStatus || "passed").trim(),
+      signedPayloadHash: String(payload.signedPayloadHash || row.signedPayloadHash || "runtime-sample-hash").trim()
+    },
+    "identity-scope": {
+      sampleTokenValidated: payload.sampleTokenValidated === undefined ? true : Boolean(payload.sampleTokenValidated),
+      scopeReviewStatus: String(payload.scopeReviewStatus || "approved").trim(),
+      reviewer: String(payload.reviewer || user.name || row.reviewer || "").trim()
+    },
+    "message-channels": {
+      latestReceiptId: String(payload.receiptId || row.latestReceiptId || `message-receipt-${Date.now()}`).trim(),
+      latestReceiptStatus: String(payload.receiptStatus || payload.deliveryStatus || "delivered").trim(),
+      escalationTested: payload.escalationTested === undefined ? true : Boolean(payload.escalationTested)
+    },
+    "quality-model": {
+      lastReviewStatus: String(payload.reviewStatus || "approved").trim(),
+      qualitySampleStatus: String(payload.qualitySampleStatus || "sample-passed").trim(),
+      reviewerComment: String(payload.reviewerComment || payload.note || row.reviewerComment || "").trim()
+    },
+    "pharmacy-insurance": {
+      settlementReceiptStatus: String(payload.settlementReceiptStatus || "accepted").trim(),
+      inventoryReceiptStatus: String(payload.inventoryReceiptStatus || row.inventoryReceiptStatus || "reserved").trim(),
+      closureStatus: String(payload.closureStatus || "closed").trim()
+    },
+    "site-readiness-pack": {
+      signoffStatus: String(payload.signoffStatus || "signed").trim(),
+      signedBy: String(payload.signedBy || user.name || row.signedBy || "").trim(),
+      signedAt: now
+    }
+  };
+  Object.assign(row, commonPatch, itemPatches[itemId] || {});
+  row.actions = [
+    {
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      action: actionType,
+      status: row.completionStatus || row.signoffStatus || "completed",
+      note: commonPatch.lastActionNote
+    },
+    ...(Array.isArray(row.actions) ? row.actions : [])
+  ].slice(0, 20);
+
+  data.chronicLaunchCoreActions = [
+    {
+      id: `clca-${randomUUID()}`,
+      itemId,
+      collection,
+      rowId: row.id,
+      action: actionType,
+      status: row.completionStatus || row.signoffStatus || "completed",
+      note: commonPatch.lastActionNote,
+      createdAt: now,
+      createdBy: user.username || user.role,
+      createdByName: user.name
+    },
+    ...(Array.isArray(data.chronicLaunchCoreActions) ? data.chronicLaunchCoreActions : [])
+  ].slice(0, 200);
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "record chronic launch core action",
+      target: `${collection}/${row.id}`,
+      result: "allowed",
+      detail: actionType
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+  writeDatabase(normalizeState(data));
+  return {
+    status: 200,
+    body: {
+      itemId,
+      collection,
+      row,
+      launchCore: buildChronicLaunchCoreReport({ data: normalizeState(data) })
+    }
+  };
 }
 
 function dispatchChronicFollowupAction(data, user, payload) {
@@ -7654,7 +8381,23 @@ function dispatchChronicFollowupAction(data, user, payload) {
     ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
   ].slice(0, 120);
   appendDataAccessLog(data, user, item.residentId, "chronic follow-up disposition", item.dispositionNote || item.status || collection);
-  writeDatabase(data);
+  closeChronicFollowupMessages(data, {
+    residentId: item.residentId,
+    taskId: `${collection}:${item.id}`,
+    targetRole: "institution",
+    user
+  });
+  appendChronicFollowupMessage(data, {
+    residentId: item.residentId,
+    taskId: `${collection}:${item.id}`,
+    collection,
+    sourceId: item.id,
+    targetRole: "citizen",
+    title: "Chronic follow-up disposition updated",
+    body: item.dispositionNote || item.result || item.status || "Your follow-up task was updated.",
+    user
+  });
+  writeDatabase(normalizeState(data));
   return { status: 200, body: item };
 }
 
@@ -10366,6 +11109,28 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/chronic/institution-interfaces") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/chronic/institution-interfaces");
+    if (!user) return;
+    sendJson(res, 200, buildChronicInstitutionInterfaceReport({ data: readDatabase() }));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/chronic/launch-core") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/chronic/launch-core");
+    if (!user) return;
+    sendJson(res, 200, buildChronicLaunchCoreReport({ data: readDatabase() }));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/chronic/launch-core/actions") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/chronic/launch-core/actions");
+    if (!user) return;
+    const result = recordChronicLaunchCoreAction(readDatabase(), user, await collectJson(req));
+    sendJson(res, result.status, redactSensitiveResponse(result.body, user));
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/chronic/followup-feedback") {
     const user = requireApiRole(req, res, ["citizen", "institution", "commission"], "/api/chronic/followup-feedback");
     if (!user) return;
@@ -10376,6 +11141,46 @@ async function handleApi(req, res) {
       sendJson(res, 400, { error: "Bad Request", message: error.message });
       return;
     }
+    sendJson(res, result.status, redactSensitiveResponse(result.body, user));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/chronic/resident-checkins") {
+    const user = requireApiRole(req, res, ["citizen", "institution", "commission"], "/api/chronic/resident-checkins");
+    if (!user) return;
+    const result = upsertResidentExperienceCheckin(readDatabase(), user, await collectJson(req));
+    sendJson(res, result.status, redactSensitiveResponse(result.body, user));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/chronic/device-measurements") {
+    const user = requireApiRole(req, res, ["citizen", "institution", "commission"], "/api/chronic/device-measurements");
+    if (!user) return;
+    const result = ingestChronicDeviceMeasurement(readDatabase(), user, await collectJson(req));
+    sendJson(res, result.status, redactSensitiveResponse(result.body, user));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/chronic/pharmacy-callbacks") {
+    const user = requireApiRole(req, res, ["institution", "insurance", "commission"], "/api/chronic/pharmacy-callbacks");
+    if (!user) return;
+    const result = recordChronicPharmacyCallback(readDatabase(), user, await collectJson(req));
+    sendJson(res, result.status, redactSensitiveResponse(result.body, user));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/chronic/family-doctor-actions") {
+    const user = requireApiRole(req, res, ["institution", "commission"], "/api/chronic/family-doctor-actions");
+    if (!user) return;
+    const result = closeFamilyDoctorChronicAction(readDatabase(), user, await collectJson(req));
+    sendJson(res, result.status, redactSensitiveResponse(result.body, user));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/chronic/reminder-outreach") {
+    const user = requireApiRole(req, res, ["institution", "commission"], "/api/chronic/reminder-outreach");
+    if (!user) return;
+    const result = scheduleChronicReminderOutreach(readDatabase(), user, await collectJson(req));
     sendJson(res, result.status, redactSensitiveResponse(result.body, user));
     return;
   }

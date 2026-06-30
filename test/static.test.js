@@ -239,6 +239,31 @@ test("maternal child about page documents policy basis and release evidence", ()
   assert.match(workflow, /priority-apps:templates/);
 });
 
+test("chronic follow-up launch core is wired through docs api and portals", () => {
+  const packageJson = JSON.parse(read("package.json"));
+  assert.match(read("docs/chronic-followup-readiness.md"), /chronic-institution-interfaces\.md/);
+  assert.match(read("docs/chronic-launch-core.md"), /HIS\/EMR\/LIS\/PACS/);
+  assert.match(read("docs/chronic-launch-core.md"), /\/api\/chronic\/launch-core/);
+  assert.match(read("docs/chronic-institution-interfaces.md"), /chronic-device-measurement-v1/);
+  assert.match(read("server.js"), /\/api\/chronic\/institution-interfaces/);
+  assert.match(read("server.js"), /\/api\/chronic\/launch-core\/actions/);
+  assert.match(read("server.js"), /\/api\/chronic\/resident-checkins/);
+  assert.match(read("server.js"), /\/api\/chronic\/device-measurements/);
+  assert.match(read("server.js"), /\/api\/chronic\/pharmacy-callbacks/);
+  assert.match(read("server.js"), /\/api\/chronic\/family-doctor-actions/);
+  assert.match(read("server.js"), /\/api\/chronic\/reminder-outreach/);
+  assert.match(read("institution.html"), /chronic-launch-core/);
+  assert.match(read("institution.js"), /\/chronic\/device-measurements/);
+  assert.match(read("institution.js"), /\/chronic\/launch-core\/actions/);
+  assert.match(read("citizen.html"), /resident-checkin-form/);
+  assert.match(read("citizen.js"), /\/chronic\/resident-checkins/);
+  assert.match(read("data/db.json"), /"chronicExternalIntegrations"/);
+  assert.match(read("data/db.json"), /"chronicLaunchCoreSignoffs"/);
+  assert.match(read(".env.example"), /CUTOVER_CHRONIC_LAUNCH_CORE_SIGNOFF/);
+  assert.equal(Boolean(packageJson.scripts["chronic:institution-interfaces"]), true);
+  assert.equal(Boolean(packageJson.scripts["chronic:launch-core"]), true);
+});
+
 test("static snapshot keeps acceptance evidence clean and actionable", () => {
   const raw = read("data/db.json");
   const data = JSON.parse(raw);
@@ -645,7 +670,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   const serviceWorker = read("service-worker.js");
   assert.match(citizenHtml, /rel="manifest"/);
   assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260630layout/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260630visible/);
   assert.match(citizenHtml, /mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-title/);
@@ -693,7 +718,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.shortcuts.some((item) => item.url === "./citizen.html?client=app&page=escort#service-escort"), true);
   assert.equal(manifest.shortcuts.some((item) => item.url === "./mobile-preview.html?client=app"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v21/);
+  assert.match(serviceWorker, /chronic-care-citizen-v22/);
   assert.match(serviceWorker, /internet-nursing\.js\?v=20260629prod/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627preview/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages/);
@@ -706,6 +731,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(serviceWorker, /citizen\.js\?v=20260629multinav/);
   assert.match(serviceWorker, /citizen\.js\?v=20260629care/);
   assert.match(serviceWorker, /citizen\.js\?v=20260630layout/);
+  assert.match(serviceWorker, /citizen\.js\?v=20260630visible/);
   assert.match(serviceWorker, /citizen\.html/);
   assert.match(serviceWorker, /mobile-preview\.html/);
   assert.match(serviceWorker, /mobile-preview\.css/);
@@ -888,6 +914,10 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /scrollToPane/);
   assert.match(citizenJs, /residentFunctionAudit/);
   assert.match(citizenJs, /renderResidentFunctionAudit/);
+  assert.match(citizenJs, /CITIZEN_HIDDEN_STATUS_PATTERN/);
+  assert.match(citizenJs, /isCitizenLaunchVisible/);
+  assert.match(citizenJs, /getLaunchedCitizenServiceTabs/);
+  assert.match(citizenJs, /getLaunchedResidentFunctionAudit/);
   assert.doesNotMatch(citizenJs, /status: "待开发"/);
   assert.match(citizenJs, /手机号验证码登录/);
   assert.match(citizenJs, /长期照护评估/);
@@ -896,7 +926,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /longTermCareAssessments/);
   assert.match(citizenJs, /formatLongTermCareEligibility/);
   assert.match(citizenJs, /待上门复评/);
-  assert.match(citizenJs, /全部已实现/);
+  assert.match(citizenJs, /仅显示上线功能/);
+  assert.match(citizenJs, /仅展示上线能力/);
   assert.match(citizenJs, /医院号源查询/);
   assert.match(citizenJs, /serviceTabFromHash/);
   assert.match(citizenJs, /setServiceTab/);
@@ -945,7 +976,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /longterm-care-form/);
   assert.match(citizenCss, /registration-form/);
   assert.match(citizenHtml, /registration-summary/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260630layout/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260630visible/);
   assert.match(citizenJs, /registration-summary/);
   assert.match(citizenJs, /hisOrders/);
   assert.match(citizenJs, /insuranceReady/);

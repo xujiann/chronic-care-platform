@@ -174,8 +174,33 @@ const citizenServiceTabs = [
   { key: "emr", label: "电子病历", status: "已实现", detail: "诊疗时间线、慢病和访问记录", title: "电子病历二级页面", actionLabel: "查看电子病历" },
   { key: "nursing", label: "护理", status: "已实现", detail: "互联网护理预约与追踪", title: "护理服务二级页面", actionLabel: "进入护理服务", actionHref: "./internet-nursing.html" },
   { key: "escort", label: "陪诊", status: "已实现", detail: "陪诊预约、合同、保障和回访", title: "陪诊服务二级页面", actionLabel: "提交陪诊预约" },
-  { key: "registration", label: "挂号", status: "已实现", detail: "演示号源、预约确认、取消规则，HIS/支付待接入", title: "挂号服务二级页面", actionLabel: "提交挂号预约" }
+  { key: "registration", label: "挂号", status: "已实现", detail: "号源查询、预约确认、支付医保和取消规则", title: "挂号服务二级页面", actionLabel: "提交挂号预约" }
 ];
+
+const CITIZEN_HIDDEN_STATUS_PATTERN = /待开发|待上线|未上线|规划中|pending|todo|backlog/i;
+
+function isCitizenLaunchVisible(item) {
+  return !CITIZEN_HIDDEN_STATUS_PATTERN.test(String(item?.status || ""));
+}
+
+function getLaunchedCitizenServiceTabs() {
+  const launched = citizenServiceTabs.filter(isCitizenLaunchVisible);
+  return launched.length ? launched : citizenServiceTabs;
+}
+
+function getLaunchedResidentFunctionAudit(serviceKey = "") {
+  const launchedServices = new Set(getLaunchedCitizenServiceTabs().map((item) => item.key));
+  return residentFunctionAudit.filter((item) => {
+    if (!launchedServices.has(item.service)) return false;
+    if (!isCitizenLaunchVisible(item)) return false;
+    return serviceKey ? item.service === serviceKey : true;
+  });
+}
+
+function getActiveCitizenService() {
+  const launched = getLaunchedCitizenServiceTabs();
+  return launched.find((item) => item.key === activeServiceTab) || launched[0] || citizenServiceTabs[0];
+}
 
 const registrationSchedules = [
   { id: "reg-sch-cardio-am", hospital: "大连市中心医院", department: "心内科", doctor: "王医生", date: todayOffset(2), period: "上午", remaining: 6, fee: 18, cancelBeforeHours: 24, source: "演示号源池", tags: ["高血压复诊", "支持陪诊"] },
@@ -292,6 +317,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
   bindDialogs();
   bindFollowupFeedback();
+  bindResidentCheckin();
   bindEscortAppointment();
   bindRegistrationAppointment();
   bindLongTermCareAssessment();
@@ -305,10 +331,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 function bindServiceTabs() {
   const target = document.querySelector("#service-tabs");
+  const launchedTabs = getLaunchedCitizenServiceTabs();
   if (target) {
-    target.innerHTML = citizenServiceTabs.map((item) => `<a href="${citizenPageHref(item.key)}" data-service-tab="${item.key}" aria-current="${item.key === activeServiceTab ? "page" : "false"}">
+    target.innerHTML = launchedTabs.map((item) => `<a href="${citizenPageHref(item.key)}" data-service-tab="${item.key}" aria-current="${item.key === activeServiceTab ? "page" : "false"}">
       <span>${item.label}</span>
-      <strong class="${item.status === "待开发" ? "pending" : "ready"}">${item.status}</strong>
+      <strong class="ready">${item.status}</strong>
       <small>${item.detail}</small>
       <em>二级页面</em>
     </a>`).join("");
@@ -326,9 +353,9 @@ function bindServiceTabs() {
 function renderMobileServiceNav() {
   const target = document.querySelector("#mobile-service-nav");
   if (!target) return;
-  target.innerHTML = citizenServiceTabs.map((item) => `<a href="${citizenPageHref(item.key)}" data-mobile-service-tab="${item.key}" aria-label="${item.label}，${item.status}" aria-current="${item.key === activeServiceTab ? "page" : "false"}">
+  target.innerHTML = getLaunchedCitizenServiceTabs().map((item) => `<a href="${citizenPageHref(item.key)}" data-mobile-service-tab="${item.key}" aria-label="${item.label}，${item.status}" aria-current="${item.key === activeServiceTab ? "page" : "false"}">
     <span>${item.label}</span>
-    <small class="${item.status === "待开发" ? "pending" : "ready"}">${item.status === "待开发" ? "待开" : "已开"}</small>
+    <small class="ready">已开</small>
   </a>`).join("");
   target.querySelectorAll("[data-mobile-service-tab]").forEach((link) => {
     link.addEventListener("click", (event) => {
@@ -479,12 +506,12 @@ async function copyClientEntry(entry) {
 function serviceTabFromRoute() {
   const params = new URLSearchParams(location.search);
   const key = params.get("page") || params.get("service") || serviceTabFromHash();
-  return citizenServiceTabs.some((item) => item.key === key) ? key : "";
+  return getLaunchedCitizenServiceTabs().some((item) => item.key === key) ? key : "";
 }
 
 function serviceTabFromHash() {
   const key = decodeURIComponent(String(location.hash || "").replace(/^#service-/, ""));
-  return citizenServiceTabs.some((item) => item.key === key) ? key : "";
+  return getLaunchedCitizenServiceTabs().some((item) => item.key === key) ? key : "";
 }
 
 function featureNavId(item) {
@@ -493,20 +520,22 @@ function featureNavId(item) {
 }
 
 function setServiceTab(key, options = {}) {
-  if (!citizenServiceTabs.some((item) => item.key === key)) return;
-  activeServiceTab = key;
+  const launchedTabs = getLaunchedCitizenServiceTabs();
+  const next = launchedTabs.some((item) => item.key === key) ? key : launchedTabs[0]?.key;
+  if (!next) return;
+  activeServiceTab = next;
   activeClientChannel = clientChannelFromRoute() || activeClientChannel;
   if (options.syncUrl !== false) {
-    const nextUrl = citizenPageHref(key);
+    const nextUrl = citizenPageHref(next);
     if (`${location.pathname}${location.search}${location.hash}` !== nextUrl) {
       const historyMethod = options.pushState ? "pushState" : "replaceState";
-      history[historyMethod]({ citizenPage: key }, "", nextUrl);
+      history[historyMethod]({ citizenPage: next }, "", nextUrl);
     }
   }
   updateServicePanes();
   if (options.scrollToPane) {
     requestAnimationFrame(() => {
-      getServicePageTarget(key)?.scrollIntoView({ block: "start", behavior: "smooth" });
+      getServicePageTarget(next)?.scrollIntoView({ block: "start", behavior: "smooth" });
     });
   }
 }
@@ -525,6 +554,10 @@ function citizenPageHref(key) {
 }
 
 function updateServicePanes() {
+  const launchedTabs = getLaunchedCitizenServiceTabs();
+  if (!launchedTabs.some((item) => item.key === activeServiceTab) && launchedTabs[0]) {
+    activeServiceTab = launchedTabs[0].key;
+  }
   renderServiceSummary();
   renderResidentFunctionAudit();
   renderClientChannels();
@@ -541,21 +574,21 @@ function updateServicePanes() {
     link.setAttribute("href", citizenPageHref(link.dataset.mobileServiceTab));
   });
   document.querySelectorAll("[data-service-pane]").forEach((pane) => {
-    pane.hidden = pane.dataset.servicePane !== activeServiceTab;
+    const launched = launchedTabs.some((item) => item.key === pane.dataset.servicePane);
+    pane.hidden = !launched || pane.dataset.servicePane !== activeServiceTab;
   });
-  const active = citizenServiceTabs.find((item) => item.key === activeServiceTab) || citizenServiceTabs[0];
+  const active = getActiveCitizenService();
   document.title = `${active.label} · 居民端`;
 }
 
 function renderServiceSummary() {
   const target = document.querySelector("#service-summary");
   if (!target) return;
-  const active = citizenServiceTabs.find((item) => item.key === activeServiceTab) || citizenServiceTabs[0];
+  const launchedTabs = getLaunchedCitizenServiceTabs();
+  const active = getActiveCitizenService();
   const channel = getActiveClientChannel();
-  const ready = citizenServiceTabs.filter((item) => item.status === "已实现").length;
-  const pending = citizenServiceTabs.length - ready;
   const internalAction = !active.actionHref;
-  const activeItems = residentFunctionAudit.filter((item) => item.service === active.key);
+  const activeItems = getLaunchedResidentFunctionAudit(active.key);
   target.innerHTML = `<div class="service-summary-copy">
     <span>当前二级页面 · ${channel.label}</span>
     <strong>${active.label}</strong>
@@ -563,17 +596,16 @@ function renderServiceSummary() {
   </div>
   <div class="service-summary-actions">
     <div class="service-summary-stats">
-      <span class="feature-state ready">${ready} 项已实现</span>
-      <span class="feature-state ${pending ? "pending" : "ready"}">${pending ? `${pending} 项待开发` : "全部已实现"}</span>
+      <span class="feature-state ready">${launchedTabs.length} 项已上线</span>
+      <span class="feature-state ready">仅显示上线功能</span>
     </div>
     <a class="service-page-action" href="${internalAction ? citizenPageHref(active.key) : active.actionHref}" ${internalAction ? `data-service-action="${active.key}"` : ""}>${active.actionLabel}</a>
   </div>
   <nav class="service-subnav" aria-label="${active.label}功能导航">
     ${activeItems.map((item) => {
-      const stateClass = item.status === "待开发" ? "pending" : "ready";
       return `<a href="#${featureNavId(item)}" data-service-feature="${featureNavId(item)}">
         <span>${item.name}</span>
-        <small class="${stateClass}">${item.status}</small>
+        <small class="ready">${item.status}</small>
       </a>`;
     }).join("")}
   </nav>`;
@@ -594,28 +626,23 @@ function renderResidentFunctionAudit() {
   const stats = document.querySelector("#resident-audit-stats");
   const summary = document.querySelector("#resident-audit-summary");
   if (!grid || !stats || !summary) return;
-  const ready = residentFunctionAudit.filter((item) => item.status === "已实现").length;
-  const pending = residentFunctionAudit.filter((item) => item.status === "待开发").length;
-  const activeService = citizenServiceTabs.find((item) => item.key === activeServiceTab) || citizenServiceTabs[0];
-  const activeItems = residentFunctionAudit.filter((item) => item.service === activeService.key);
-  const activeReady = activeItems.filter((item) => item.status === "已实现").length;
-  const activePending = activeItems.filter((item) => item.status === "待开发").length;
-  summary.textContent = activePending ? `${activeService.label}：${activeReady} 项已实现，${activePending} 项待开发` : `${activeService.label}：${activeReady} 项全部已实现`;
+  const visibleItems = getLaunchedResidentFunctionAudit();
+  const activeService = getActiveCitizenService();
+  const activeItems = getLaunchedResidentFunctionAudit(activeService.key);
+  summary.textContent = `${activeService.label}：${activeItems.length} 项已上线功能`;
   stats.innerHTML = `
-    <span class="feature-state ready">居民端共 ${residentFunctionAudit.length} 项</span>
-    <span class="feature-state ready">${ready} 项已实现</span>
-    <span class="feature-state ${pending ? "pending" : "ready"}">${pending ? `${pending} 项待开发` : "全部已实现"}</span>
+    <span class="feature-state ready">居民端显示 ${visibleItems.length} 项上线功能</span>
+    <span class="feature-state ready">仅展示上线能力</span>
     <span class="feature-state mobile">手机端触控审计已覆盖</span>`;
-  grid.innerHTML = residentFunctionAudit.map((item) => {
-    const service = citizenServiceTabs.find((tab) => tab.key === item.service) || citizenServiceTabs[0];
-    const stateClass = item.status === "待开发" ? "pending" : "ready";
+  grid.innerHTML = visibleItems.map((item) => {
+    const service = getLaunchedCitizenServiceTabs().find((tab) => tab.key === item.service) || getActiveCitizenService();
     const active = item.service === activeServiceTab ? "active" : "";
-    return `<article class="resident-audit-card ${stateClass} ${active}" id="${featureNavId(item)}" data-audit-service="${item.service}">
+    return `<article class="resident-audit-card ready ${active}" id="${featureNavId(item)}" data-audit-service="${item.service}">
       <div>
         <span>${service.label}</span>
         <strong>${item.name}</strong>
       </div>
-      <em class="feature-state ${stateClass}">${item.status}</em>
+      <em class="feature-state ready">${item.status}</em>
       <p>${item.evidence}</p>
       <small>${item.mobile}</small>
     </article>`;
@@ -743,6 +770,7 @@ function renderCitizen(residentId) {
   renderDiseases(diseases, risk);
   renderFollowups(followups);
   renderFollowupFeedback(resident.id, followups);
+  renderResidentCheckin(resident.id);
   renderChronicServices(resident.id);
   renderReferrals(resident.id);
   renderBirthHealth(resident.id);
@@ -1548,6 +1576,61 @@ function bindFollowupFeedback() {
       showToast("院后随访反馈已提交，家庭医生可在机构端处置");
     } catch (error) {
       showToast(error.message || "反馈提交失败，请检查登录状态和网络连接");
+    } finally {
+      submit.disabled = false;
+    }
+  });
+}
+
+function renderResidentCheckin(residentId) {
+  const status = document.querySelector("#resident-checkin-status");
+  if (!status) return;
+  const records = (state.personalRecords || []).filter((item) => item.residentId === residentId && (item.category === "chronic-self-checkin" || item.meta?.residentExperience));
+  status.textContent = records.length ? `${records.length} check-ins recorded` : "Ready";
+}
+
+function bindResidentCheckin() {
+  const form = document.querySelector("#resident-checkin-form");
+  if (!form) return;
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(form));
+    const payload = {
+      residentId: currentResidentId,
+      measurementType: data.measurementType || "home self-monitoring",
+      measurementValue: data.measurementValue || "",
+      medicationTaken: data.medicationTaken === "true",
+      symptoms: data.symptoms || "",
+      source: "resident portal"
+    };
+    const submit = form.querySelector("button[type='submit']");
+    submit.disabled = true;
+    try {
+      let saved;
+      if (API_BASE) {
+        const request = window.HealthCityAuth?.authFetch || fetch;
+        const response = await request(`${API_BASE}/chronic/resident-checkins`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (!response.ok) throw new Error(`check-in failed: ${response.status}`);
+        saved = await response.json();
+      } else {
+        saved = {
+          record: { id: crypto.randomUUID(), residentId: currentResidentId, category: "chronic-self-checkin", date: todayOffset(0), name: "resident self-management check-in", result: `${payload.measurementType}: ${payload.measurementValue}`, source: payload.source, meta: { residentExperience: true, medicationTaken: payload.medicationTaken, symptoms: payload.symptoms }, createdAt: new Date().toISOString() },
+          selfManagement: { id: `csm-${crypto.randomUUID()}`, residentId: currentResidentId, device: payload.measurementType, latestValue: payload.measurementValue, uploadSource: payload.source, status: "resident checked in", nextAction: "continue self-management plan" }
+        };
+      }
+      if (!Array.isArray(state.personalRecords)) state.personalRecords = [];
+      if (!Array.isArray(state.chronicSelfManagement)) state.chronicSelfManagement = [];
+      if (saved.record) state.personalRecords.unshift(saved.record);
+      if (saved.selfManagement) state.chronicSelfManagement.unshift(saved.selfManagement);
+      form.reset();
+      renderCitizen(currentResidentId);
+      showToast("Resident self-management check-in submitted.");
+    } catch (error) {
+      showToast(error.message || "Check-in failed.");
     } finally {
       submit.disabled = false;
     }
