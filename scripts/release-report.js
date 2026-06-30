@@ -314,6 +314,7 @@ function healthDashboardChecks(healthDashboard) {
   const certificateTracks = healthDashboard.certificateExchange?.items?.length || 0;
   const drilldowns = healthDashboard.riskDrilldowns?.items?.length || 0;
   const evidenceArtifacts = healthDashboard.siteEvidencePackage?.items?.length || 0;
+  const jurisdictionRows = healthDashboard.jurisdictionScope?.districts?.length || 0;
   const departmentRows = healthDashboard.functionalReport?.departmentFunctionMatrix?.length || 0;
   const cityCountyRows = healthDashboard.functionalReport?.cityCountyFunctionMatrix?.length || 0;
   return [
@@ -324,7 +325,8 @@ function healthDashboardChecks(healthDashboard) {
     check("healthDashboard:certificateExchange", certificateTracks >= 5, `${certificateTracks} certificate exchange tracks`, "error", "health-dashboard"),
     check("healthDashboard:riskDrilldown", drilldowns >= 4, `${drilldowns} risk drilldowns`, "error", "health-dashboard"),
     check("healthDashboard:siteEvidencePackage", evidenceArtifacts >= 4, `${evidenceArtifacts} evidence artifacts`, "error", "health-dashboard"),
-    check("healthDashboard:functionalReport", functionalItems >= 11, `${functionalItems} module functions reported`, "error", "health-dashboard"),
+    check("healthDashboard:functionalReport", functionalItems >= 12, `${functionalItems} module functions reported`, "error", "health-dashboard"),
+    check("healthDashboard:jurisdictionScope", jurisdictionRows >= 2 && (healthDashboard.jurisdictionScope?.summary?.institutions || 0) >= 3, `${jurisdictionRows} jurisdiction rows`, "error", "health-dashboard"),
     check("healthDashboard:departmentFunctionMatrix", departmentRows >= 6, `${departmentRows} internal department rows`, "error", "health-dashboard"),
     check("healthDashboard:cityCountyFunctionMatrix", cityCountyRows >= 4, `${cityCountyRows} city/county health-administration rows`, "error", "health-dashboard")
   ];

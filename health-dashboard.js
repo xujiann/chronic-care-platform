@@ -5,6 +5,8 @@ let currentDashboardSummary = null;
 let currentPopulationPeriod = "day";
 let currentJurisdictionLevel = "all";
 let currentDepartmentStatus = "all";
+let currentJurisdictionDistrict = "";
+let currentJurisdictionType = "";
 
 document.addEventListener("DOMContentLoaded", async () => {
   const summary = await loadDashboardSummary();
@@ -13,6 +15,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindDashboardExport();
   bindPopulationBoardPeriod();
   bindJurisdictionLevel();
+  bindJurisdictionScopeFilters();
   bindDepartmentStatus();
   renderDashboard(summary);
 });
@@ -89,6 +92,7 @@ function buildStaticDashboardSummary(state) {
   const certificateExchange = buildStaticCertificateExchange(state);
   const riskDrilldowns = buildStaticRiskDrilldowns(openActions);
   const siteEvidencePackage = buildStaticSiteEvidencePackage(state, { interfaces, evidence, siteDependencies: dependencies });
+  const jurisdictionScope = buildDashboardJurisdictionScope(state, { openActions, applications: enrichedApplications });
   const functionalReport = buildDashboardFunctionalReport({
     applications: enrichedApplications,
     openActions,
@@ -96,6 +100,7 @@ function buildStaticDashboardSummary(state) {
     certificateExchange,
     riskDrilldowns,
     siteEvidencePackage,
+    jurisdictionScope,
     interfaces,
     evidence,
     siteDependencies: dependencies
@@ -124,6 +129,7 @@ function buildStaticDashboardSummary(state) {
     certificateExchange,
     riskDrilldowns,
     siteEvidencePackage,
+    jurisdictionScope,
     functionalReport,
     interfaces: interfaces.map((item) => ({ id: item.id, domain: item.domain || item.name, priority: item.priority, owner: item.owner, status: item.status, nextAction: item.next })),
     evidence: evidence.map((item) => ({ id: item.id, name: item.name || item.category, owner: item.owner, status: item.status, records: Array.isArray(item.records) ? item.records.length : 0, nextAction: item.next })),
@@ -372,6 +378,103 @@ function buildStaticSiteEvidencePackage(state, context = {}) {
   };
 }
 
+function buildDashboardJurisdictionScope(state, context = {}) {
+  const organizations = Array.isArray(state.authOrganizations) ? state.authOrganizations : [];
+  const resources = Array.isArray(state.medicalResources) ? state.medicalResources : [];
+  const jurisdictionOrganizations = organizations.filter(isDashboardHealthJurisdictionOrganization);
+  const healthStatistics = state.healthStatistics && typeof state.healthStatistics === "object" ? state.healthStatistics : {};
+  const dailyReports = Array.isArray(healthStatistics.dailyServiceReports) ? healthStatistics.dailyServiceReports : [];
+  const openActions = context.openActions || [];
+  const resourceDistricts = resources.map((item) => normalizeDashboardDistrictRegion(item.region)).filter(Boolean);
+  const organizationDistricts = jurisdictionOrganizations
+    .filter((item) => item.orgType === "district" || item.orgLevel === "区市县")
+    .map((item) => normalizeDashboardDistrictRegion(dashboardDistrictName(item.name)))
+    .filter(Boolean);
+  const baseDistricts = new Set([...organizationDistricts, ...resourceDistricts]);
+  const actionDistricts = openActions
+    .map((item) => normalizeDashboardDistrictRegion(item.region))
+    .filter((region) => region && (baseDistricts.has(region) || /(?:区|县|市)$/.test(region)));
+  const districtNames = Array.from(new Set([
+    ...organizationDistricts,
+    ...resourceDistricts,
+    ...actionDistricts
+  ].filter(Boolean))).sort((left, right) => left.localeCompare(right, "zh-CN"));
+  const allResourceTypes = Array.from(new Set(resources.map((item) => item.type || item.orgLevel).filter(Boolean))).sort((left, right) => left.localeCompare(right, "zh-CN"));
+  const districts = [
+    buildDashboardJurisdictionRow("全市", { organizations: jurisdictionOrganizations, resources, dailyReports, openActions, all: true }),
+    ...districtNames.map((district) => buildDashboardJurisdictionRow(district, { organizations: jurisdictionOrganizations, resources, dailyReports, openActions }))
+  ];
+  const totals = districts[0] || {};
+  return {
+    defaultDistrict: "",
+    districtOptions: districtNames,
+    institutionTypeOptions: allResourceTypes,
+    summary: {
+      districts: districtNames.length,
+      institutions: totals.institutions || 0,
+      beds: totals.beds || 0,
+      doctors: totals.doctors || 0,
+      openActions: totals.openActions || 0,
+      highRisks: totals.highRisks || 0,
+      serviceReports: totals.serviceReports || 0
+    },
+    districts
+  };
+}
+
+function dashboardDistrictName(name) {
+  return String(name || "").replace(/健康城市平台|卫生健康局|县域医共体/g, "").trim();
+}
+
+function isDashboardHealthJurisdictionOrganization(item = {}) {
+  return ["city", "district", "health_admin"].includes(item.orgType);
+}
+
+function normalizeDashboardDistrictRegion(value) {
+  const region = String(value || "").trim();
+  if (!region || region === "市级" || /医保/.test(region)) return "";
+  return region.replace(/健康城市平台|卫生健康局|县域医共体/g, "").trim();
+}
+
+function buildDashboardJurisdictionRow(district, context = {}) {
+  const all = Boolean(context.all);
+  const organizations = context.organizations || [];
+  const resources = context.resources || [];
+  const dailyReports = context.dailyReports || [];
+  const openActions = context.openActions || [];
+  const scopedResources = all ? resources : resources.filter((item) => item.region === district);
+  const scopedOrganizations = all ? organizations : organizations.filter((item) => dashboardDistrictName(item.name) === district || (item.parentCode === "ORG-DIST-ZS" && district === "中山区"));
+  const scopedReports = all ? dailyReports : dailyReports.filter((item) => item.region === district);
+  const scopedActions = all ? openActions : openActions.filter((item) => item.region === district || JSON.stringify(item).includes(district));
+  const serviceTotals = scopedReports.reduce((totals, item) => {
+    const data = item.interfaceData || {};
+    totals.visits += Number(data.outpatientVisits || 0) + Number(data.emergencyVisits || 0);
+    totals.admissions += Number(data.inpatientAdmissions || 0);
+    return totals;
+  }, { visits: 0, admissions: 0 });
+  const typeCounts = scopedResources.reduce((counts, item) => {
+    const type = item.type || "未标注";
+    counts[type] = (counts[type] || 0) + 1;
+    return counts;
+  }, {});
+  return {
+    id: all ? "all" : `district-${district}`,
+    district,
+    status: scopedActions.some((item) => item.priority === "high") ? "watch" : "ready",
+    organizations: scopedOrganizations.length,
+    institutions: scopedResources.length,
+    institutionTypes: Object.entries(typeCounts).map(([type, count]) => ({ type, count })),
+    beds: scopedResources.reduce((sum, item) => sum + Number(item.beds || 0), 0),
+    doctors: scopedResources.reduce((sum, item) => sum + Number(item.doctors || 0), 0),
+    openActions: scopedActions.length,
+    highRisks: scopedActions.filter((item) => item.priority === "high").length,
+    serviceReports: scopedReports.length,
+    visits: serviceTotals.visits,
+    admissions: serviceTotals.admissions,
+    nextAction: all ? "市级视角继续补齐各区县机构目录、日报接口和闭环率对账。" : "县级视角继续补齐辖区机构目录、源应用回写和问题整改台账。"
+  };
+}
+
 function buildDashboardDepartmentFunctionMatrix(context = {}) {
   const applications = context.applications || [];
   const openActions = context.openActions || [];
@@ -508,6 +611,7 @@ function buildDashboardFunctionalReport(context) {
   const certificateExchange = context.certificateExchange || { summary: {}, items: [] };
   const riskDrilldowns = context.riskDrilldowns || { summary: {}, items: [] };
   const siteEvidencePackage = context.siteEvidencePackage || { summary: {}, items: [] };
+  const jurisdictionScope = context.jurisdictionScope || { summary: {}, districts: [] };
   const departmentFunctionMatrix = buildDashboardDepartmentFunctionMatrix(context);
   const cityCountyFunctionMatrix = buildDashboardCityCountyFunctionMatrix(context);
   const sourceRecords = applications.reduce((sum, item) => sum + Number(item.records || 0), 0);
@@ -535,6 +639,13 @@ function buildDashboardFunctionalReport(context) {
       status: cityCountyFunctionMatrix.length >= 4 ? "ready" : "watch",
       evidence: `${cityCountyFunctionMatrix.length} 条市县机构功能矩阵`,
       boundary: "仅面向卫生健康行政部门监管、督办、审计和联调；非本机关单位不承接本系统办理职责。"
+    },
+    {
+      id: "jurisdiction-scope-drilldown",
+      name: "辖区机构监管钻取",
+      status: jurisdictionScope.districts?.length ? "ready" : "watch",
+      evidence: `${jurisdictionScope.summary?.districts || 0} 个辖区，${jurisdictionScope.summary?.institutions || 0} 个机构，${jurisdictionScope.summary?.openActions || 0} 条待办`,
+      boundary: "仅按辖区汇总机构目录、日报服务量和源应用待办，不替代区县或机构端办理。"
     },
     {
       id: "department-workbench",
@@ -676,6 +787,7 @@ function renderDashboard(summary) {
   renderSiteEvidencePackage(summary.siteEvidencePackage || {});
   renderFunctionReport(summary.functionalReport || {});
   renderJurisdictionWorkbench(summary.functionalReport || {});
+  renderJurisdictionScope(summary.jurisdictionScope || {});
   renderDepartmentWorkbench(summary.functionalReport || {});
   document.querySelector("#dashboard-scope").textContent = summary.scope?.rule || "";
   renderFilterOptions(summary);
@@ -971,6 +1083,19 @@ function bindJurisdictionLevel() {
   });
 }
 
+function bindJurisdictionScopeFilters() {
+  ["#jurisdiction-district-filter", "#jurisdiction-type-filter"].forEach((selector) => {
+    const control = document.querySelector(selector);
+    if (!control || control.dataset.bound === "true") return;
+    control.dataset.bound = "true";
+    control.addEventListener("change", () => {
+      currentJurisdictionDistrict = document.querySelector("#jurisdiction-district-filter")?.value || "";
+      currentJurisdictionType = document.querySelector("#jurisdiction-type-filter")?.value || "";
+      if (currentDashboardSummary) renderJurisdictionScope(currentDashboardSummary.jurisdictionScope || {});
+    });
+  });
+}
+
 function renderJurisdictionWorkbench(report) {
   const board = document.querySelector("#dashboard-jurisdiction-board");
   const controls = document.querySelector("#jurisdiction-level-controls");
@@ -999,6 +1124,50 @@ function renderJurisdictionWorkbench(report) {
   if (boundary) {
     boundary.textContent = "本工作台仅呈现卫生健康行政部门监管、督办、审计和联调视角；医疗机构、专业中心、平台中心和基层服务机构不在本系统承接非本机关办理职责。";
   }
+}
+
+function renderJurisdictionScope(scope) {
+  const districtFilter = document.querySelector("#jurisdiction-district-filter");
+  const typeFilter = document.querySelector("#jurisdiction-type-filter");
+  const summary = document.querySelector("#jurisdiction-scope-summary");
+  const grid = document.querySelector("#jurisdiction-scope-grid");
+  if (!districtFilter || !typeFilter || !grid) return;
+  const districts = Array.isArray(scope.districts) ? scope.districts : [];
+  const districtOptions = Array.isArray(scope.districtOptions) ? scope.districtOptions : [];
+  const typeOptions = Array.isArray(scope.institutionTypeOptions) ? scope.institutionTypeOptions : [];
+  if (!districtFilter.dataset.ready) {
+    districtFilter.innerHTML = [`<option value="">全部辖区</option>`, ...districtOptions.map((item) => `<option value="${item}">${item}</option>`)].join("");
+    districtFilter.dataset.ready = "1";
+  }
+  if (!typeFilter.dataset.ready) {
+    typeFilter.innerHTML = [`<option value="">全部机构类型</option>`, ...typeOptions.map((item) => `<option value="${item}">${item}</option>`)].join("");
+    typeFilter.dataset.ready = "1";
+  }
+  const selectedDistrict = currentJurisdictionDistrict || districtFilter.value || "";
+  const selectedType = currentJurisdictionType || typeFilter.value || "";
+  const selectedRows = districts.filter((item) =>
+    (!selectedDistrict ? item.id === "all" || item.district !== "全市" : item.district === selectedDistrict) &&
+    (!selectedType || (item.institutionTypes || []).some((type) => type.type === selectedType))
+  );
+  const rows = selectedDistrict ? selectedRows : selectedRows.filter((item) => item.id !== "all");
+  const visibleRows = rows.length ? rows : districts.filter((item) => item.id === "all");
+  const totals = visibleRows.reduce((sum, item) => ({
+    districts: sum.districts + (item.id === "all" ? 0 : 1),
+    institutions: sum.institutions + Number(item.institutions || 0),
+    openActions: sum.openActions + Number(item.openActions || 0),
+    highRisks: sum.highRisks + Number(item.highRisks || 0)
+  }), { districts: 0, institutions: 0, openActions: 0, highRisks: 0 });
+  if (summary) {
+    summary.textContent = `${selectedDistrict || "全部辖区"} / ${selectedType || "全部机构类型"} / ${totals.institutions} 个机构 / ${totals.openActions} 条待办 / ${totals.highRisks} 条高风险`;
+  }
+  grid.innerHTML = visibleRows.map((item) => `<article class="jurisdiction-scope-card ${item.status || "watch"}" data-jurisdiction-scope="${item.id}">
+    <span>${dashboardStatusLabel(item.status || "watch")} / ${item.district}</span>
+    <strong>${item.institutions || 0} 个机构 · ${item.openActions || 0} 条待办</strong>
+    <small>${(item.institutionTypes || []).map((type) => `${type.type}${type.count}`).join(" / ") || "等待机构目录"}</small>
+    <p>床位 ${formatDashboardNumber(item.beds || 0)} / 医师 ${formatDashboardNumber(item.doctors || 0)} / 日报 ${formatDashboardNumber(item.serviceReports || 0)} 条</p>
+    <p>就诊 ${formatDashboardNumber(item.visits || 0)} 人次 / 入院 ${formatDashboardNumber(item.admissions || 0)} 人次 / 高风险 ${formatDashboardNumber(item.highRisks || 0)} 条</p>
+    <small>${item.nextAction || ""}</small>
+  </article>`).join("") || `<article class="jurisdiction-scope-card empty"><strong>等待辖区数据</strong><p>接入机构目录、日报和源应用待办后显示。</p></article>`;
 }
 
 function bindDepartmentStatus() {
@@ -1297,6 +1466,7 @@ function collectStaticOpenActions(state, applications) {
         title: item.title || item.taskName || item.orderType || item.item || item.claimType || item.medication || collection,
         owner: item.owner || item.assignee || item.institution || item.center || "owner-pending",
         status: item.status || "open",
+        region: item.region || item.district || item.area || "",
         priority: dashboardPriority(item)
       }));
     }).slice(0, 12);

@@ -103,6 +103,7 @@ function collectOpenActions(data, limit = 12) {
       owner: item.owner || item.assignee || item.institution || item.center || item.sourceInstitution || item.targetInstitution || "owner-pending",
       status: statusOf(item) || "open",
       priority: riskLevel(item),
+      region: item.region || item.district || item.area || "",
       dueAt: item.dueAt || item.due || item.nextReview || item.plannedAt || item.requestedAt || item.lastUpdated || ""
     };
   })).sort((left, right) =>
@@ -430,6 +431,103 @@ function buildSiteEvidencePackage(data, context = {}) {
   };
 }
 
+function districtName(name) {
+  return String(name || "").replace(/健康城市平台|卫生健康局|县域医共体/g, "").trim();
+}
+
+function isHealthJurisdictionOrganization(item = {}) {
+  return ["city", "district", "health_admin"].includes(item.orgType);
+}
+
+function normalizeDistrictRegion(value) {
+  const region = String(value || "").trim();
+  if (!region || region === "市级" || /医保/.test(region)) return "";
+  return districtName(region);
+}
+
+function buildJurisdictionRow(district, context = {}) {
+  const all = Boolean(context.all);
+  const organizations = context.organizations || [];
+  const resources = context.resources || [];
+  const dailyReports = context.dailyReports || [];
+  const openActions = context.openActions || [];
+  const scopedResources = all ? resources : resources.filter((item) => item.region === district);
+  const scopedOrganizations = all ? organizations : organizations.filter((item) => districtName(item.name) === district || (item.parentCode === "ORG-DIST-ZS" && district === "中山区"));
+  const scopedReports = all ? dailyReports : dailyReports.filter((item) => item.region === district);
+  const scopedActions = all ? openActions : openActions.filter((item) => item.region === district || JSON.stringify(item).includes(district));
+  const serviceTotals = scopedReports.reduce((totals, item) => {
+    const interfaceData = item.interfaceData || {};
+    totals.visits += Number(interfaceData.outpatientVisits || 0) + Number(interfaceData.emergencyVisits || 0);
+    totals.admissions += Number(interfaceData.inpatientAdmissions || 0);
+    return totals;
+  }, { visits: 0, admissions: 0 });
+  const typeCounts = scopedResources.reduce((counts, item) => {
+    const type = item.type || "未标注";
+    counts[type] = (counts[type] || 0) + 1;
+    return counts;
+  }, {});
+  return {
+    id: all ? "all" : `district-${district}`,
+    district,
+    status: scopedActions.some((item) => item.priority === "high") ? "watch" : "ready",
+    organizations: scopedOrganizations.length,
+    institutions: scopedResources.length,
+    institutionTypes: Object.entries(typeCounts).map(([type, count]) => ({ type, count })),
+    beds: scopedResources.reduce((sum, item) => sum + Number(item.beds || 0), 0),
+    doctors: scopedResources.reduce((sum, item) => sum + Number(item.doctors || 0), 0),
+    openActions: scopedActions.length,
+    highRisks: scopedActions.filter((item) => item.priority === "high").length,
+    serviceReports: scopedReports.length,
+    visits: serviceTotals.visits,
+    admissions: serviceTotals.admissions,
+    nextAction: all ? "市级视角继续补齐各区县机构目录、日报接口和闭环率对账。" : "县级视角继续补齐辖区机构目录、源应用回写和问题整改台账。"
+  };
+}
+
+function buildJurisdictionScope(data, context = {}) {
+  const organizations = rows(data, "authOrganizations");
+  const resources = rows(data, "medicalResources");
+  const jurisdictionOrganizations = organizations.filter(isHealthJurisdictionOrganization);
+  const healthStatistics = data.healthStatistics && typeof data.healthStatistics === "object" ? data.healthStatistics : {};
+  const dailyReports = Array.isArray(healthStatistics.dailyServiceReports) ? healthStatistics.dailyServiceReports : [];
+  const openActions = context.openActions || [];
+  const resourceDistricts = resources.map((item) => normalizeDistrictRegion(item.region)).filter(Boolean);
+  const organizationDistricts = jurisdictionOrganizations
+    .filter((item) => item.orgType === "district" || item.orgLevel === "区市县")
+    .map((item) => normalizeDistrictRegion(item.name))
+    .filter(Boolean);
+  const baseDistricts = new Set([...organizationDistricts, ...resourceDistricts]);
+  const actionDistricts = openActions
+    .map((item) => normalizeDistrictRegion(item.region))
+    .filter((region) => region && (baseDistricts.has(region) || /(?:区|县|市)$/.test(region)));
+  const districtOptions = Array.from(new Set([
+    ...organizationDistricts,
+    ...resourceDistricts,
+    ...actionDistricts
+  ].filter(Boolean))).sort((left, right) => left.localeCompare(right, "zh-CN"));
+  const institutionTypeOptions = Array.from(new Set(resources.map((item) => item.type || item.orgLevel).filter(Boolean))).sort((left, right) => left.localeCompare(right, "zh-CN"));
+  const districts = [
+    buildJurisdictionRow("全市", { organizations: jurisdictionOrganizations, resources, dailyReports, openActions, all: true }),
+    ...districtOptions.map((district) => buildJurisdictionRow(district, { organizations: jurisdictionOrganizations, resources, dailyReports, openActions }))
+  ];
+  const totals = districts[0] || {};
+  return {
+    defaultDistrict: "",
+    districtOptions,
+    institutionTypeOptions,
+    summary: {
+      districts: districtOptions.length,
+      institutions: totals.institutions || 0,
+      beds: totals.beds || 0,
+      doctors: totals.doctors || 0,
+      openActions: totals.openActions || 0,
+      highRisks: totals.highRisks || 0,
+      serviceReports: totals.serviceReports || 0
+    },
+    districts
+  };
+}
+
 function buildDepartmentFunctionMatrix(context = {}) {
   const applications = context.applications || [];
   const openActions = context.openActions || [];
@@ -611,6 +709,7 @@ function buildFunctionalReport(context) {
   const certificateExchange = context.certificateExchange || { summary: {}, items: [] };
   const riskDrilldowns = context.riskDrilldowns || { summary: {}, items: [] };
   const siteEvidencePackage = context.siteEvidencePackage || { summary: {}, items: [] };
+  const jurisdictionScope = context.jurisdictionScope || { summary: {}, districts: [] };
   const departmentFunctionMatrix = buildDepartmentFunctionMatrix(context);
   const cityCountyFunctionMatrix = buildCityCountyFunctionMatrix(context);
   const sourceRecords = applications.reduce((sum, item) => sum + Number(item.records || 0), 0);
@@ -637,6 +736,13 @@ function buildFunctionalReport(context) {
       status: cityCountyFunctionMatrix.length >= 4 ? "ready" : "watch",
       evidence: `${cityCountyFunctionMatrix.length} 条市县机构功能矩阵`,
       boundary: "仅面向卫生健康行政部门监管、督办、审计和联调；非本机关单位不承接本系统办理职责。"
+    },
+    {
+      id: "jurisdiction-scope-drilldown",
+      name: "辖区机构监管钻取",
+      status: jurisdictionScope.districts?.length ? "ready" : "watch",
+      evidence: `${jurisdictionScope.summary?.districts || 0} 个辖区，${jurisdictionScope.summary?.institutions || 0} 个机构，${jurisdictionScope.summary?.openActions || 0} 条待办`,
+      boundary: "仅按辖区汇总机构目录、日报服务量和源应用待办，不替代区县或机构端办理。"
     },
     {
       id: "department-workbench",
@@ -738,7 +844,8 @@ function buildHealthDashboardSummary(options = {}) {
   const certificateExchange = buildCertificateExchangeChain(data);
   const riskDrilldowns = buildRiskDrilldowns(openActions);
   const siteEvidencePackage = buildSiteEvidencePackage(data, { interfaceRows, evidenceRecords, siteDependencies });
-  const functionalReport = buildFunctionalReport({ applications, openActions, populationServiceBoard, certificateExchange, riskDrilldowns, siteEvidencePackage, interfaceRows, evidenceRecords, siteDependencies });
+  const jurisdictionScope = buildJurisdictionScope(data, { openActions, applications });
+  const functionalReport = buildFunctionalReport({ applications, openActions, populationServiceBoard, certificateExchange, riskDrilldowns, siteEvidencePackage, jurisdictionScope, interfaceRows, evidenceRecords, siteDependencies });
   const departmentFunctionMatrix = functionalReport.departmentFunctionMatrix || [];
   const cityCountyFunctionMatrix = functionalReport.cityCountyFunctionMatrix || [];
   const checks = [
@@ -752,7 +859,8 @@ function buildHealthDashboardSummary(options = {}) {
     { id: "dashboard:certificate-exchange", passed: certificateExchange.items.length >= 5 && certificateExchange.summary.receipts >= 3 && certificateExchange.summary.correctable >= 4, detail: `${certificateExchange.items.length} certificate exchange tracks, ${certificateExchange.summary.receipts} receipts` },
     { id: "dashboard:risk-drilldown", passed: riskDrilldowns.items.length >= 4 && riskDrilldowns.summary.withTrace === riskDrilldowns.items.length, detail: `${riskDrilldowns.items.length} risk drilldowns with trace` },
     { id: "dashboard:site-evidence-package", passed: siteEvidencePackage.items.length >= 4 && siteEvidencePackage.summary.ready >= 3, detail: `${siteEvidencePackage.items.length} evidence package artifacts` },
-    { id: "dashboard:functional-report", passed: functionalReport.functions.length >= 9 && functionalReport.releaseEvidence.length >= 4, detail: `${functionalReport.functions.length} module functions with release evidence` },
+    { id: "dashboard:functional-report", passed: functionalReport.functions.length >= 12 && functionalReport.releaseEvidence.length >= 4, detail: `${functionalReport.functions.length} module functions with release evidence` },
+    { id: "dashboard:jurisdiction-scope", passed: jurisdictionScope.districts.length >= 2 && jurisdictionScope.summary.institutions >= 3 && jurisdictionScope.institutionTypeOptions.length >= 2, detail: `${jurisdictionScope.summary.districts} districts, ${jurisdictionScope.summary.institutions} institutions, ${jurisdictionScope.summary.openActions} open actions` },
     { id: "dashboard:department-function-matrix", passed: departmentFunctionMatrix.length >= 6 && departmentFunctionMatrix.every((item) => item.implemented?.length && item.nextPlan), detail: `${departmentFunctionMatrix.length} internal department function rows` },
     {
       id: "dashboard:city-county-function-matrix",
@@ -797,6 +905,7 @@ function buildHealthDashboardSummary(options = {}) {
     certificateExchange,
     riskDrilldowns,
     siteEvidencePackage,
+    jurisdictionScope,
     functionalReport,
     interfaces: interfaceRows.map((item) => ({
       id: item.id || item.domain,
@@ -895,6 +1004,7 @@ function dashboardReportCheckLabel(checkId) {
     "dashboard:risk-drilldowns": "风险下钻",
     "dashboard:site-evidence-package": "现场验收证据包",
     "dashboard:functional-report": "主要功能报告",
+    "dashboard:jurisdiction-scope": "辖区监管钻取",
     "dashboard:department-function-matrix": "内部机构功能矩阵",
     "dashboard:department-functions": "内部机构功能矩阵",
     "dashboard:city-county-function-matrix": "市县两级机构功能矩阵",
@@ -953,6 +1063,7 @@ function renderMarkdown(report) {
   const functionRows = (report.functionalReport?.functions || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.name || item.id} | ${dashboardReportEvidenceLabel(item.evidence || "").replace(/\|/g, "/")} | ${String(item.boundary || "").replace(/\|/g, "/")} |`);
   const departmentRows = (report.functionalReport?.departmentFunctionMatrix || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.name || item.id} | ${(item.implemented || []).map((text) => String(text).replace(/\|/g, "/")).join("<br>")} | ${String(item.nextPlan || "").replace(/\|/g, "/")} |`);
   const cityCountyRows = (report.functionalReport?.cityCountyFunctionMatrix || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.level || ""} | ${item.agency || item.id} | ${(item.implemented || []).map((text) => String(text).replace(/\|/g, "/")).join("<br>")} | ${String(item.nextPlan || "").replace(/\|/g, "/")} |`);
+  const jurisdictionRows = (report.jurisdictionScope?.districts || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.district || item.id} | ${item.institutions || 0} | ${item.beds || 0} | ${item.doctors || 0} | ${item.openActions || 0} | ${item.highRisks || 0} | ${item.serviceReports || 0} |`);
   const reportEvidenceRows = (report.functionalReport?.releaseEvidence || []).map((item) => `| ${item.name || item.id} | ${dashboardReportEvidenceLabel(item.evidence || "").replace(/\|/g, "/")} |`);
   const onsiteBoundaryRows = (report.functionalReport?.onsiteBoundaries || []).map((item) => `- ${item}`);
   return [
@@ -1049,6 +1160,12 @@ function renderMarkdown(report) {
     "| 状态 | 层级 | 机构 | 已实现功能 | 下一步 |",
     "|---|---|---|---|---|",
     ...cityCountyRows,
+    "",
+    "### 辖区监管钻取",
+    "",
+    "| 状态 | 辖区 | 机构 | 床位 | 医师 | 待办 | 高风险 | 日报 |",
+    "|---|---|---:|---:|---:|---:|---:|---:|",
+    ...jurisdictionRows,
     "",
     "### 发布证据",
     "",

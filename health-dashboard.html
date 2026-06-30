@@ -128,6 +128,27 @@
           <button type="button" data-jurisdiction-level="县级">县级</button>
         </div>
         <div class="jurisdiction-grid" id="jurisdiction-matrix"></div>
+        <div class="jurisdiction-scope-panel">
+          <div class="panel-title compact">
+            <h3>辖区监管钻取</h3>
+            <span id="jurisdiction-scope-summary">正在汇总辖区机构、待办和服务量</span>
+          </div>
+          <div class="filter-grid jurisdiction-filter-grid">
+            <label>
+              辖区
+              <select id="jurisdiction-district-filter">
+                <option value="">全部辖区</option>
+              </select>
+            </label>
+            <label>
+              机构类型
+              <select id="jurisdiction-type-filter">
+                <option value="">全部机构类型</option>
+              </select>
+            </label>
+          </div>
+          <div class="jurisdiction-scope-grid" id="jurisdiction-scope-grid"></div>
+        </div>
         <p class="muted jurisdiction-boundary" id="jurisdiction-boundary">本系统面向卫生健康行政部门使用，医疗机构、平台中心、专业中心和基层机构仅作为数据来源或协同对象。</p>
       </section>
 

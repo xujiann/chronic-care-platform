@@ -170,10 +170,14 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(healthDashboard.body.populationServiceBoard.insights.some((item) => item.id === "site-cutover" && item.value === "5类接口"), true);
     assert.equal(healthDashboard.body.populationServiceBoard.sourceDetails.length, 4);
     assert.equal(healthDashboard.body.populationServiceBoard.sourceDetails.some((item) => item.id === "admissions" && item.field.includes("dailyServiceReports") && item.status === "ready"), true);
-    assert.equal(healthDashboard.body.functionalReport.functions.length, 11);
+    assert.equal(healthDashboard.body.functionalReport.functions.length, 12);
     assert.equal(healthDashboard.body.functionalReport.functions.some((item) => item.id === "aggregate-entry"), true);
     assert.equal(healthDashboard.body.functionalReport.functions.some((item) => item.id === "jurisdiction-workbench"), true);
+    assert.equal(healthDashboard.body.functionalReport.functions.some((item) => item.id === "jurisdiction-scope-drilldown"), true);
     assert.equal(healthDashboard.body.functionalReport.functions.some((item) => item.id === "department-workbench"), true);
+    assert.equal(healthDashboard.body.jurisdictionScope.districts.length >= 2, true);
+    assert.equal(healthDashboard.body.jurisdictionScope.summary.institutions >= 3, true);
+    assert.equal(healthDashboard.body.jurisdictionScope.districts.some((item) => item.district === "中山区"), true);
     assert.equal(healthDashboard.body.functionalReport.departmentFunctionMatrix.length >= 6, true);
     assert.equal(healthDashboard.body.functionalReport.departmentFunctionMatrix.some((item) => item.id === "medical-administration" && item.nextPlan), true);
     assert.equal(healthDashboard.body.functionalReport.cityCountyFunctionMatrix.length >= 4, true);
@@ -194,6 +198,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:risk-drilldown" && item.passed), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:site-evidence-package" && item.passed), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:functional-report" && item.passed), true);
+    assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:jurisdiction-scope" && item.passed), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:department-function-matrix" && item.passed), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:city-county-function-matrix" && item.passed), true);
 

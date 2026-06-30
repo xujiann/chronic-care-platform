@@ -297,9 +297,11 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(evaluationMarkdown, /Artifact coverage/);
   assert.equal(environmentJson.environmentMatrix.ok, true);
   assert.match(environmentMarkdown, /Environment matrix report/);
-  assert.equal(healthDashboardJson.healthDashboard.functionalReport.functions.length, 11);
+  assert.equal(healthDashboardJson.healthDashboard.functionalReport.functions.length, 12);
   assert.equal(healthDashboardJson.healthDashboard.functionalReport.functions.some((item) => item.id === "jurisdiction-workbench"), true);
+  assert.equal(healthDashboardJson.healthDashboard.functionalReport.functions.some((item) => item.id === "jurisdiction-scope-drilldown"), true);
   assert.equal(healthDashboardJson.healthDashboard.functionalReport.functions.some((item) => item.id === "department-workbench"), true);
+  assert.equal(healthDashboardJson.healthDashboard.jurisdictionScope.districts.length >= 2, true);
   assert.equal(healthDashboardJson.healthDashboard.populationServiceBoard.sourceDetails.length, 4);
   assert.equal(healthDashboardJson.healthDashboard.functionalReport.departmentFunctionMatrix.length >= 6, true);
   assert.equal(healthDashboardJson.healthDashboard.functionalReport.cityCountyFunctionMatrix.length >= 4, true);
