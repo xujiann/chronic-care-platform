@@ -4250,7 +4250,11 @@ function buildRegionalReferralHandoffEvidence(packageItem, reviews = []) {
       id: "access-audit",
       label: "调阅审计",
       ready: relatedReviews.length > 0 || Boolean(packageItem.lastAccessReviewId || packageItem.lastSharedAt),
-      detail: relatedReviews.length ? `本包已有 ${relatedReviews.length} 条调阅留痕` : "转诊接诊前需登记调阅目的"
+      detail: relatedReviews.length
+        ? `本包已有 ${relatedReviews.length} 条调阅留痕`
+        : packageItem.lastAccessReviewId || packageItem.lastSharedAt
+          ? `已有共享或留痕记录 ${packageItem.lastAccessReviewId || packageItem.lastSharedAt}`
+          : "转诊接诊前需登记调阅目的"
     },
     {
       id: "recipient-scope",

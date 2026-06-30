@@ -302,6 +302,9 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(server, /createRegionalSharingAccessReview/);
   assert.match(server, /\/api\/regional-data-sharing\/access-reviews/);
   assert.match(script, /buildRegionalDataSharingReport/);
+  assert.match(script, /buildRegionalReportHandoff/);
+  assert.match(script, /referralHandoffReady/);
+  assert.match(script, /转诊会诊交接证据/);
   assert.match(script, /regional:aboutPolicy/);
   assert.match(about, /data-regional-about-section="policy-basis"/);
   assert.match(about, /data-regional-about-section="merge-boundary"/);

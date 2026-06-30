@@ -297,7 +297,8 @@ function regionalDataSharingChecks(regionalDataSharing) {
   return [
     check("regionalDataSharing:report", regionalDataSharing.ok, regionalDataSharing.ok ? "regional data sharing checks passed" : "regional data sharing checks failed", "error", "regional-data-sharing"),
     check("regionalDataSharing:packages", regionalDataSharing.summary?.packages >= 3, `${regionalDataSharing.summary?.packages || 0} packages`, "error", "regional-data-sharing"),
-    check("regionalDataSharing:accessReviews", regionalDataSharing.summary?.accessReviews >= 1, `${regionalDataSharing.summary?.accessReviews || 0} access reviews`, "error", "regional-data-sharing")
+    check("regionalDataSharing:accessReviews", regionalDataSharing.summary?.accessReviews >= 1, `${regionalDataSharing.summary?.accessReviews || 0} access reviews`, "error", "regional-data-sharing"),
+    check("regionalDataSharing:handoffEvidence", regionalDataSharing.summary?.referralHandoffReady >= 1 && regionalDataSharing.summary?.referralHandoffChecks >= 18, `${regionalDataSharing.summary?.referralHandoffReady || 0} handoff-ready packages`, "error", "regional-data-sharing")
   ];
 }
 
