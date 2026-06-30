@@ -5465,6 +5465,48 @@ function buildQualitySafetyDepartmentTaskView({ user, summary, actionPlan, issue
   };
 }
 
+function buildQualitySafetyCoreSystemMatrix(data) {
+  const rows = [
+    ["first-visit-responsibility", "首诊负责制度", "明确诊疗责任主体、连续服务和诊疗记录可追溯", ["qualitySafetyEvents", "medicalRecordQualityReviews"], "首诊责任和转诊告知记录抽查"],
+    ["three-level-rounds", "三级查房制度", "明确各级医师决策权限、查房周期和术前术后查房要求", ["medicalRecordQualityReviews"], "病历质控抽样和查房记录缺陷反馈"],
+    ["consultation", "会诊制度", "统一会诊单、急会诊时限、会诊意见处置和病程记录", ["clinicalPathwayCases", "hospitalInteroperabilityFunctions"], "会诊记录和路径偏离证据联动"],
+    ["graded-nursing", "分级护理制度", "护理级别动态调整、明确标识和护理记录质控", ["medicalRecordQualityReviews"], "护理记录缺陷纳入病历质控反馈"],
+    ["duty-handover", "值班和交接班制度", "值班职责、通讯畅通、急危重床旁交班和专册签字", ["criticalValueAlerts", "qualitySafetySiteSignoffs"], "危急值路由、超时升级和现场签收"],
+    ["difficult-case-discussion", "疑难病例讨论制度", "疑难病例范围、科室组织、专册记录和病历写入", ["clinicalPathwayCases", "medicalRecordQualityReviews"], "路径偏离与疑难讨论证据抽查"],
+    ["critical-rescue", "急危重患者抢救制度", "绿色通道、抢救资源、6小时内抢救记录和签字审核", ["criticalValueAlerts", "qualitySafetyEvents"], "危急值处置和关联事件关闭"],
+    ["preoperative-discussion", "术前讨论制度", "手术指征、风险预案、多学科讨论和病历记录", ["clinicalPathwayCases", "medicalRecordQualityReviews"], "术前讨论证据纳入病历质控"],
+    ["death-case-discussion", "死亡病例讨论制度", "死亡病例1周内讨论、专册记录和持续改进", ["medicalRecordQualityReviews", "qualitySafetyEvents"], "死亡病例专项抽查待接入"],
+    ["checking-system", "查对制度", "患者身份、诊疗行为、设备药品和标本查对", ["diagnosticReports", "criticalValueAlerts"], "检查检验报告、危急值复核和双人核对"],
+    ["surgical-safety-check", "手术安全核查制度", "麻醉前、手术前、离室前多方核查并纳入病历", ["medicalRecordQualityReviews"], "手术安全核查表抽样质控"],
+    ["surgery-grade-management", "手术分级管理制度", "手术分级目录、医师授权档案和动态评估", ["hospitalInteroperabilityFunctions", "medicalRecordQualityReviews"], "手术权限和病案证据现场签收"],
+    ["new-technology-access", "新技术和新项目准入制度", "技术清单、审批流程、伦理审核、风险预案和动态评估", ["qualitySafetyEvents", "institutionCreditEvaluations"], "新技术准入风险和机构信用整改联动"],
+    ["critical-value-reporting", "危急值报告制度", "危急值清单、复核报告、接收确认和全流程登记追溯", ["criticalValueAlerts", "diagnosticReports"], "危急值提醒、确认、处置和审计轨迹"],
+    ["medical-record-management", "病历管理制度", "病历书写、质控、保存、修改和安全等级保护", ["medicalRecordQualityReviews", "qualityRectificationOrders"], "病历质控评分、整改反馈和复核证据"],
+    ["antimicrobial-grade-management", "抗菌药物分级管理制度", "药物分级目录、处方权限、会诊专家库和用药评价", ["qualitySafetyEvents", "dataQualityIssues"], "药事系统接口和处方权限待现场接入"],
+    ["clinical-blood-audit", "临床用血审核制度", "用血申请、配血、输血观察、不良反应和全程记录", ["qualitySafetyEvents", "medicalRecordQualityReviews"], "输血系统接口和合理用血评估待现场接入"],
+    ["information-security", "信息安全管理制度", "诊疗信息全流程安全、授权、风险评估、自查和事故追溯", ["securityEvents", "dataAccessLogs"], "安全事件、访问审计和追溯机制"]
+  ];
+  const siteSignoffs = Array.isArray(data.qualitySafetySiteSignoffs) ? data.qualitySafetySiteSignoffs : [];
+  return rows.map(([id, name, requirement, evidenceCollections, platformControl]) => {
+    const evidenceRows = evidenceCollections.reduce((total, collection) => total + (Array.isArray(data[collection]) ? data[collection].length : 0), 0);
+    const signoffMatched = siteSignoffs.some((item) => {
+      const sources = Array.isArray(item.sourceCollections) ? item.sourceCollections : [];
+      return evidenceCollections.some((collection) => sources.includes(collection)) || String(item.item || "").includes(name.slice(0, 2));
+    });
+    return {
+      id,
+      name,
+      requirement,
+      platformControl,
+      evidenceCollections,
+      evidenceRows,
+      sourcePolicy: "国卫医发〔2018〕8号《医疗质量安全核心制度要点》",
+      status: signoffMatched ? "已纳入现场联调" : evidenceRows > 0 ? "已纳入监管看板" : "需扩展接口",
+      nextAction: signoffMatched ? "完成现场签收并固化生产证据" : evidenceRows > 0 ? "补充现场模板和抽查规则" : "对接业务系统并建立质控样例"
+    };
+  });
+}
+
 function buildQualitySafetyIssues(data) {
   const eventRows = (Array.isArray(data.qualitySafetyEvents) ? data.qualitySafetyEvents : []).map((item) => ({
     ...item,
@@ -5610,12 +5652,17 @@ function buildQualitySafetyDashboard(data, user) {
     siteSignoffs,
     mutualRecognitionQualityReviews
   });
+  const coreSystemMatrix = buildQualitySafetyCoreSystemMatrix(data);
+  summary.coreSystems = coreSystemMatrix.length;
+  summary.coreSystemsLinked = coreSystemMatrix.filter((item) => item.evidenceRows > 0).length;
+  summary.coreSystemsInJointTest = coreSystemMatrix.filter((item) => item.status === "已纳入现场联调").length;
   return {
     ok: true,
     generatedAt: new Date().toISOString(),
     role: user.role,
     summary,
     departmentTaskView,
+    coreSystemMatrix,
     actionPlan,
     institutionRisks,
     issues,

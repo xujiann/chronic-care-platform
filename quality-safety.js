@@ -452,6 +452,7 @@ function renderMetrics(summary) {
     ["整改工单", summary.rectifications],
     ["行动事项", summary.actionItems || 0],
     ["现场签收", summary.siteSignoffs || 0],
+    ["核心制度", `${summary.coreSystemsLinked || 0}/${summary.coreSystems || 0}`],
     ["路径待复核", summary.clinicalPathwaysOpen || 0],
     ["即将到期", summary.sla?.dueSoon || 0],
     ["已逾期", summary.sla?.overdue || 0]
@@ -462,6 +463,24 @@ function renderMetrics(summary) {
       <strong>${value}</strong>
     </article>
   `).join(""));
+}
+
+function renderCoreSystemMatrix(rows) {
+  setHtml("quality-safety-core-systems", `
+    <table>
+      <thead><tr><th>核心制度</th><th>平台落实要求</th><th>证据源</th><th>状态与下一步</th></tr></thead>
+      <tbody>
+        ${rows.length ? rows.map((item) => `
+          <tr>
+            <td><strong>${zhText(item.name)}</strong><br /><small>${zhText(item.sourcePolicy)}</small></td>
+            <td>${zhText(item.requirement)}<br /><small>${zhText(item.platformControl)}</small></td>
+            <td>${(item.evidenceCollections || []).map(zh).join("、")}<br /><small>${item.evidenceRows || 0} 条证据记录</small></td>
+            <td>${zhText(item.status)}<br /><small>${zhText(item.nextAction)}</small></td>
+          </tr>
+        `).join("") : emptyRow(4, "暂无核心制度矩阵")}
+      </tbody>
+    </table>
+  `);
 }
 
 function renderReuse(rows) {
@@ -716,6 +735,7 @@ function renderQualitySafety(data) {
   });
   renderDepartmentView(data);
   renderDepartmentTaskQueue(data);
+  renderCoreSystemMatrix(data.coreSystemMatrix || []);
   renderGoLiveReadiness(data.goLiveReadiness || {});
   renderActionPlan(data.actionPlan || []);
   renderRisks(data.institutionRisks || []);

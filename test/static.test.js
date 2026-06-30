@@ -356,6 +356,8 @@ test("quality safety supervision app exposes runnable portal, API and release ev
     assert.match(read("scripts/quality-safety-report.js"), new RegExp(key));
   });
   assert.match(html, /quality-safety-metrics/);
+  assert.match(html, /quality-safety-core-systems/);
+  assert.match(html, /data-quality-safety-core-systems-panel/);
   assert.match(html, /quality-safety-risks/);
   assert.match(html, /quality-safety-actions/);
   assert.match(html, /quality-safety-readiness/);
@@ -376,8 +378,12 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(html, /医疗质量与安全监管平台/);
   assert.doesNotMatch(html, /Medical quality|Policy basis|Go-live readiness|Issue queue|Rectification loop/);
   assert.match(about, /data-quality-safety-about="policy-basis"/);
+  assert.match(about, /data-quality-safety-about="core-systems-matrix"/);
   assert.match(about, /data-quality-safety-about="joint-testing"/);
   assert.match(about, /data-quality-safety-about="login-departments"/);
+  assert.match(about, /18项核心制度建设要求/);
+  assert.match(about, /首诊负责、三级查房、会诊、分级护理、值班和交接班/);
+  assert.match(about, /c24f4ba21d02422f81afc59efdd380a8/);
   assert.match(about, /卫健监管部门/);
   assert.match(about, /医疗机构/);
   assert.match(about, /县域医共体/);
@@ -386,6 +392,7 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(about, /data-policy-ref="mutual-recognition"/);
   assert.match(about, /data-policy-ref="clinical-pathway"/);
   assert.match(js, /loadQualitySafety/);
+  assert.match(js, /renderCoreSystemMatrix/);
   assert.match(js, /renderRisks/);
   assert.match(js, /renderActionPlan/);
   assert.match(js, /renderGoLiveReadiness/);
@@ -434,6 +441,9 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(login, /scope\.roles\.includes\(user\.role\)/);
   assert.match(server, /\/api\/quality-safety\/dashboard/);
   assert.match(server, /buildQualitySafetyDepartmentTaskView/);
+  assert.match(server, /buildQualitySafetyCoreSystemMatrix/);
+  assert.match(server, /首诊负责制度/);
+  assert.match(server, /信息安全管理制度/);
   assert.match(server, /\/api\/quality-safety\/interface-standard/);
   assert.match(server, /\/api\/quality-safety\/interface-joint-test-pack/);
   assert.match(server, /\/api\/quality-safety\/interface-messages\/validate/);

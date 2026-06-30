@@ -111,6 +111,11 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
   assert.equal(dashboard.body.goLiveReadiness.stage, "controlled_pilot_ready");
   assert.equal(dashboard.body.summary.readinessScore, 100);
   assert.equal(dashboard.body.summary.siteSignoffs >= 6, true);
+  assert.equal(dashboard.body.summary.coreSystems, 18);
+  assert.equal(dashboard.body.summary.coreSystemsLinked >= 18, true);
+  assert.equal(dashboard.body.coreSystemMatrix.length, 18);
+  assert.equal(dashboard.body.coreSystemMatrix.some((item) => item.name === "危急值报告制度" && item.evidenceCollections.includes("criticalValueAlerts")), true);
+  assert.equal(dashboard.body.coreSystemMatrix.some((item) => item.name === "信息安全管理制度" && item.evidenceCollections.includes("securityEvents")), true);
   assert.equal(dashboard.body.departmentTaskView.role, "commission");
   assert.equal(dashboard.body.departmentTaskView.profile.permissions.includes("review_rectification"), true);
   assert.equal(dashboard.body.departmentTaskView.metrics.some((item) => item.label === "逾期整改"), true);

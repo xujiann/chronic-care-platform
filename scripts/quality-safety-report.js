@@ -40,7 +40,7 @@ const REQUIRED_ROUTES = [
 
 const REQUIRED_POLICY_REFERENCES = [
   { id: "medical-quality-management", title: "医疗质量管理办法", url: "https://www.nhc.gov.cn/fzs/c100048/201808/6f3f7915d59943e09768b7469679b857.shtml" },
-  { id: "core-safety-systems", title: "医疗质量安全核心制度要点", url: "https://www.nhc.gov.cn/yzygj/c100068/201804/42ab2552298047679cd6ec733f233862.shtml" },
+  { id: "core-safety-systems", title: "医疗质量安全核心制度要点", url: "https://www.nhc.gov.cn/wjw/c100175/201804/c24f4ba21d02422f81afc59efdd380a8.shtml" },
   { id: "quality-action-2023-2025", title: "全面提升医疗质量行动", url: "https://www.nhc.gov.cn/yzygj/c100068/202305/68bcfaf610d94c638f64c53aff5de994.shtml" },
   { id: "mutual-recognition", title: "检查检验结果互认管理办法", url: "https://www.nhc.gov.cn/yzygj/c100068/202202/ef4a28ddc74447eea85f93fe05107200.shtml" },
   { id: "quality-goals-2025", title: "2025年国家医疗质量安全改进目标", url: "https://www.nhc.gov.cn/yzygj/c100067/202503/e9a3bd9bfaa24b28973d86c9d329b8c2.shtml" },
