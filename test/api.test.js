@@ -799,6 +799,14 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(commissionHandoff.runtimeBoundaries.some((item) => item.includes("不把区域共享包当作转诊单主表")), true);
     assert.equal(commission.body.scope.exclusions.some((item) => item.includes("HIS")), true);
 
+    const commissionReport = await api(baseUrl, "/api/regional-data-sharing/handoff-report", authorized(commissionToken));
+    assert.equal(commissionReport.response.status, 200);
+    assert.equal(commissionReport.body.summary.packages, commission.body.summary.totalPackages);
+    assert.equal(commissionReport.body.summary.evidenceTotal, commission.body.summary.totalPackages * 6);
+    assert.equal(commissionReport.body.markdown.includes("区域共享-转诊会诊交接清单"), true);
+    assert.equal(commissionReport.body.packages.some((item) => item.id === "rsp-r3-imaging"), true);
+    assert.equal(commissionReport.body.scope.runtimeBoundary.includes("不生成或改写转诊单"), true);
+
     const hospital = await login(baseUrl, "hospital");
     const institutionView = await api(baseUrl, "/api/regional-data-sharing", authorized(hospital.body.token));
     assert.equal(institutionView.response.status, 200);
@@ -807,6 +815,13 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(institutionView.body.packages.some((item) => item.id === "rsp-r3-imaging"), false);
     assert.equal(institutionView.body.packages.every((item) => item.referralHandoff?.total === 6), true);
     assert.equal(institutionView.body.packages.every((item) => !String(item.resident?.idCard || "").startsWith("DEMO-ID-")), true);
+
+    const institutionReport = await api(baseUrl, "/api/regional-data-sharing/handoff-report", authorized(hospital.body.token));
+    assert.equal(institutionReport.response.status, 200);
+    assert.equal(institutionReport.body.packages.some((item) => item.id === "rsp-r1-hypertension"), true);
+    assert.equal(institutionReport.body.packages.some((item) => item.id === "rsp-r3-imaging"), false);
+    assert.equal(institutionReport.body.packages.every((item) => item.total === 6), true);
+    assert.equal(institutionReport.body.scope.packageScope, "本机构来源或接收共享包");
 
     const accessReview = await api(baseUrl, "/api/regional-data-sharing/access-reviews", authorized(hospital.body.token, {
       method: "POST",
@@ -838,6 +853,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const insurance = await login(baseUrl, "insurance");
     const insuranceView = await api(baseUrl, "/api/regional-data-sharing", authorized(insurance.body.token));
     assert.equal(insuranceView.response.status, 403);
+    const insuranceReport = await api(baseUrl, "/api/regional-data-sharing/handoff-report", authorized(insurance.body.token));
+    assert.equal(insuranceReport.response.status, 403);
   });
 
   await t.test("enforces workflow collection ownership and protects structural fields", async () => {

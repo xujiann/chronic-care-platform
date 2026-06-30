@@ -1007,6 +1007,71 @@ dialog::backdrop {
   margin-top: 12px;
 }
 
+.handoff-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.regional-handoff-report {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.handoff-report-head,
+.handoff-report-list article > div,
+.handoff-report-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.handoff-report-head,
+.handoff-report-list article,
+.handoff-report-boundary {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #fff;
+}
+
+.handoff-report-head span,
+.handoff-report-list p,
+.handoff-report-list small,
+.handoff-report-boundary {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.handoff-report-summary {
+  justify-content: flex-start;
+}
+
+.handoff-report-summary span {
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: #eef8f6;
+  color: var(--teal);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.handoff-report-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.handoff-report-list article {
+  display: grid;
+  gap: 6px;
+}
+
 .handoff-head {
   display: flex;
   justify-content: space-between;
@@ -1234,6 +1299,7 @@ dialog::backdrop {
   .report-grid,
   .regional-loop,
   .handoff-grid,
+  .handoff-report-list,
   .login-flow,
   .demo-accounts,
   .item {

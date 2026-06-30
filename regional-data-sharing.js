@@ -1,5 +1,7 @@
 const regionalState = {
   data: null,
+  handoffReport: null,
+  handoffReportMessage: "",
   selectedPackageId: "",
   feedback: "",
   lastReviewId: "",
@@ -63,6 +65,7 @@ document.addEventListener("DOMContentLoaded", () => {
     renderRegionalSharing();
   });
   document.querySelector("#regional-access-form")?.addEventListener("submit", submitRegionalAccessReview);
+  document.querySelector("#regional-handoff-report-action")?.addEventListener("click", generateRegionalHandoffReport);
   document.querySelector("#regional-sharing-packages")?.addEventListener("click", (event) => {
     const button = event.target.closest("[data-package-id]");
     if (!button) return;
@@ -97,6 +100,7 @@ function renderRegionalSharing() {
   renderSelectedPackage(packages);
   renderRegionalReadinessChecklist(packages);
   renderRegionalReferralHandoff(packages, data.accessReviews || []);
+  renderRegionalHandoffReport();
   renderAccessFeedback();
   renderRegionalReviews(data.accessReviews || []);
   fillPackageOptions(packages);
@@ -264,6 +268,65 @@ function renderRegionalReferralHandoff(packages, reviews) {
     sectionList("可以合并", handoff.mergeItems),
     sectionList("不合并运行时", handoff.runtimeBoundaries)
   ].join("");
+}
+
+function renderRegionalHandoffReport() {
+  const panel = document.querySelector("#regional-handoff-report");
+  const summary = document.querySelector("#regional-handoff-report-summary");
+  if (!panel || !summary) return;
+  const report = regionalState.handoffReport;
+  if (!report) {
+    summary.textContent = regionalState.handoffReportMessage || "按当前角色权限生成现场核验清单";
+    panel.innerHTML = "";
+    return;
+  }
+  const packages = report.packages || [];
+  summary.textContent = `已生成 ${packages.length} 个共享包清单，${report.summary?.handoffReady || 0} 个可交接`;
+  panel.innerHTML = [
+    `<div class="handoff-report-head">
+      <strong>区域共享-转诊会诊交接清单</strong>
+      <span>${report.actor?.organization || report.actor?.role || "当前账号"} · ${formatDateTime(report.generatedAt)}</span>
+    </div>`,
+    `<div class="handoff-report-summary">
+      <span>证据进度 ${report.summary?.evidenceReady || 0}/${report.summary?.evidenceTotal || 0}</span>
+      <span>调阅留痕 ${report.summary?.accessReviews || 0} 条</span>
+      <span>${report.scope?.packageScope || "当前权限范围"}</span>
+    </div>`,
+    `<div class="handoff-report-list">${packages.map((item) => `
+      <article>
+        <div>
+          <strong>${item.title}</strong>
+          <span class="badge ${item.handoffReady ? "success" : "warn"}">${item.readyCount}/${item.total}</span>
+        </div>
+        <p>${item.residentName || item.residentId} · ${item.sourceInstitution || "来源机构未配置"} → ${(item.targetInstitutions || []).join("、") || "接收机构未配置"}</p>
+        <small>${item.pendingEvidence?.length ? `待补：${item.pendingEvidence.join("、")}` : "交接证据已齐备"}</small>
+      </article>
+    `).join("")}</div>`,
+    `<p class="handoff-report-boundary">${report.scope?.runtimeBoundary || ""}</p>`
+  ].join("");
+}
+
+async function generateRegionalHandoffReport() {
+  const button = document.querySelector("#regional-handoff-report-action");
+  if (button) {
+    button.disabled = true;
+    button.textContent = "生成中";
+  }
+  const response = await regionalAuthFetch("/api/regional-data-sharing/handoff-report");
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    regionalState.handoffReport = null;
+    regionalState.handoffReportMessage = body.message || "交接清单生成失败";
+    renderRegionalHandoffReport();
+  } else {
+    regionalState.handoffReport = await response.json();
+    regionalState.handoffReportMessage = "";
+    renderRegionalHandoffReport();
+  }
+  if (button) {
+    button.disabled = false;
+    button.textContent = "生成交接清单";
+  }
 }
 
 function buildRegionalReferralHandoff(packageItem, reviews) {
@@ -499,6 +562,13 @@ function qualityLabel(status) {
 
 function decisionLabel(decision) {
   return decisionLabels[decision] || decision || "待确认";
+}
+
+function formatDateTime(value) {
+  if (!value) return "时间未记录";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("zh-CN", { hour12: false });
 }
 
 function labelCollection(key) {

@@ -128,6 +128,11 @@ test("regional sharing page renders referral handoff boundary", async ({ page })
   await expect(page.locator("#regional-referral-boundary")).toContainText("可以合并");
   await expect(page.locator("#regional-referral-boundary")).toContainText("不合并运行时");
   await expect(page.locator("#regional-referral-boundary")).toContainText("不把区域共享包当作转诊单主表");
+
+  await page.getByRole("button", { name: "生成交接清单" }).click();
+  await expect(page.locator("#regional-handoff-report")).toContainText("区域共享-转诊会诊交接清单");
+  await expect(page.locator("#regional-handoff-report")).toContainText("证据进度");
+  await expect(page.locator("#regional-handoff-report .handoff-report-list article")).toHaveCount(3);
 });
 
 test("citizen stays in the household experience and cannot open commission pages", async ({ page }) => {

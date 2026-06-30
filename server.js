@@ -4343,6 +4343,78 @@ function buildRegionalDataSharingView(data, user) {
   };
 }
 
+function buildRegionalHandoffReport(data, user) {
+  const view = buildRegionalDataSharingView(data, user);
+  const packages = (view.packages || []).map((item) => {
+    const handoff = item.referralHandoff || { ready: false, readyCount: 0, total: 0, evidence: [] };
+    const evidence = handoff.evidence || [];
+    return {
+      id: item.id,
+      title: item.title,
+      residentId: item.residentId,
+      residentName: item.resident?.name || item.residentId,
+      sourceInstitution: item.sourceInstitution || item.sourceOrgCode,
+      targetInstitutions: item.targetInstitutions || item.targetOrgCodes || [],
+      status: item.status,
+      handoffReady: Boolean(handoff.ready),
+      readyCount: handoff.readyCount || evidence.filter((entry) => entry.ready).length,
+      total: handoff.total || evidence.length,
+      readyEvidence: evidence.filter((entry) => entry.ready).map((entry) => entry.label),
+      pendingEvidence: evidence.filter((entry) => !entry.ready).map((entry) => entry.label),
+      note: handoff.note
+    };
+  });
+  const report = {
+    generatedAt: new Date().toISOString(),
+    actor: {
+      role: user.role,
+      organization: user.orgName || "",
+      name: user.name || ""
+    },
+    scope: {
+      name: view.scope?.name || "区域诊疗数据共享平台",
+      packageScope: user.role === "commission" ? "全域共享包" : "本机构来源或接收共享包",
+      runtimeBoundary: "只生成调阅交接证据清单，不生成或改写转诊单、号源、床位、接诊反馈和绩效结算。"
+    },
+    summary: {
+      packages: packages.length,
+      handoffReady: packages.filter((item) => item.handoffReady).length,
+      evidenceTotal: packages.reduce((sum, item) => sum + item.total, 0),
+      evidenceReady: packages.reduce((sum, item) => sum + item.readyCount, 0),
+      accessReviews: view.summary?.accessReviews || 0
+    },
+    packages
+  };
+  return {
+    ...report,
+    markdown: renderRegionalHandoffMarkdown(report)
+  };
+}
+
+function renderRegionalHandoffMarkdown(report) {
+  const rows = (report.packages || []).map((item) => [
+    item.id,
+    item.residentName,
+    item.sourceInstitution,
+    (item.targetInstitutions || []).join("、") || "未配置",
+    `${item.readyCount}/${item.total}`,
+    item.pendingEvidence.length ? item.pendingEvidence.join("、") : "无"
+  ]);
+  return [
+    "# 区域共享-转诊会诊交接清单",
+    "",
+    `- 生成时间：${report.generatedAt}`,
+    `- 生成角色：${report.actor.organization || report.actor.role}`,
+    `- 权限范围：${report.scope.packageScope}`,
+    `- 交接就绪：${report.summary.handoffReady}/${report.summary.packages}`,
+    `- 运行边界：${report.scope.runtimeBoundary}`,
+    "",
+    "| 共享包 | 居民 | 来源机构 | 接收机构 | 证据进度 | 待补证据 |",
+    "| --- | --- | --- | --- | --- | --- |",
+    ...rows.map((row) => `| ${row.join(" | ")} |`)
+  ].join("\n");
+}
+
 function createRegionalSharingAccessReview(data, payload, user) {
   const packages = normalizeRegionalSharingPackages(data.regionalSharingPackages || seedRegionalSharingPackages());
   const packageId = String(payload.packageId || "").trim();
@@ -5929,6 +6001,22 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission", "institution"], "/api/regional-data-sharing");
     if (!user) return;
     sendJson(res, 200, redactSensitiveResponse(buildRegionalDataSharingView(readDatabase(), user), user));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/regional-data-sharing/handoff-report") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/regional-data-sharing/handoff-report");
+    if (!user) return;
+    const report = buildRegionalHandoffReport(readDatabase(), user);
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "生成区域共享交接清单",
+      target: "/api/regional-data-sharing/handoff-report",
+      result: "允许",
+      detail: `${report.summary.packages} 个共享包，${report.summary.handoffReady} 个可交接`
+    });
+    sendJson(res, 200, redactSensitiveResponse(report, user));
     return;
   }
 

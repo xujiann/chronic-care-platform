@@ -19,6 +19,7 @@ test("release artifact manifest indexes reports templates commands and evidence"
   assert.equal(report.templateReadmes.length, 4);
   assert.equal(report.artifacts.some((item) => item.id === "release-report" && item.command === "release:report"), true);
   assert.equal(report.artifacts.some((item) => item.id === "release-artifact-manifest" && item.command === "release:manifest"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "regional-data-sharing" && item.command === "regional-data-sharing:report" && item.evidence === "/api/regional-data-sharing/handoff-report"), true);
   assert.equal(report.artifacts.some((item) => item.id === "regional-referral-overlap" && item.command === "regional-referral:overlap"), true);
   assert.equal(report.artifacts.some((item) => item.id === "site-readiness" && item.evidence === "/api/site-readiness-pack"), true);
   assert.equal(report.artifacts.some((item) => item.id === "service-acceptance" && item.markdown === "release/service-acceptance-summary.md" && item.evidence === "/api/service-acceptance-summary"), true);
@@ -35,6 +36,7 @@ test("release artifact manifest renders and writes artifacts", (t) => {
   assert.match(markdown, /Release artifact manifest/);
   assert.match(markdown, /Template READMEs/);
   assert.match(markdown, /release-artifact-manifest\.md/);
+  assert.match(markdown, /regional-data-sharing-report\.md/);
   assert.match(markdown, /regional-referral-overlap-report\.md/);
 
   writeOutput(report, {
