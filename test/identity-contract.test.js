@@ -19,7 +19,7 @@ test("identity contract validates required claims, roles and sample mappings", (
   assert.equal(contract.roleCoverage.citizen.users >= 1, true);
   assert.equal(contract.roleCoverage.county.users >= 1, true);
   assert.equal(contract.sampleMappings.every((item) => item.passed), true);
-  assert.equal(contract.sampleMappings.find((item) => item.id === "identity-institution").mappedHome, "institution.html");
+  assert.equal(contract.sampleMappings.find((item) => item.id === "identity-institution").mappedHome, "doctor.html");
 });
 
 test("identity contract renders and writes release artifacts", (t) => {

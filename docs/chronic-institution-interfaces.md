@@ -118,10 +118,10 @@ Runtime audit endpoint: `GET /api/chronic/institution-interfaces`.
 - Roles: `institution`, `commission`
 - Direction: inbound business disposition
 - Required body fields: `collection`, `id`
-- Optional fields: `updates`, `status`, `note`
+- Optional fields: `updates`, `status`, `note`, `resolveEscalation`
 - Supported collections: `chronicScreeningTasks`, `chronicManagementPlans`, `followups`, `medicationPickups`
 - Writes: business collection, `taskMessages`, `securityEvents`, `dataAccessLogs`
-- Launch check: institution messages are closed and residents receive a disposition update.
+- Launch check: institution messages and matching escalation messages are closed, escalation status is marked `resolved`, and residents receive a disposition update.
 
 ## Sample Payloads
 

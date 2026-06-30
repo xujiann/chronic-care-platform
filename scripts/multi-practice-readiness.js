@@ -31,6 +31,7 @@ function buildMultiPracticeReadinessReport(options = {}) {
   const pkg = options.pkg ?? readJson("package.json");
   const server = options.server ?? readText("server.js");
   const institution = options.institution ?? `${readText("institution.html")}\n${readText("institution.js")}`;
+  const doctorPortal = options.doctorPortal ?? `${readText("doctor.html")}\n${readText("doctor.js")}`;
   const commission = options.commission ?? `${readText("index.html")}\n${readText("app.js")}`;
   const policyDoc = options.policyDoc ?? readText("docs/医师多点执业政策说明.md");
   const functionReport = options.functionReport ?? readText("docs/医师多点执业主要功能报告.md");
@@ -45,6 +46,7 @@ function buildMultiPracticeReadinessReport(options = {}) {
     { id: "multiPractice:firstPracticeConfirmation", passed: applications.every((item) => item.primaryPracticeConfirmation?.status && item.primaryPracticeConfirmation?.signatureNo && item.documentChecks?.firstPracticeConsent === true), detail: "first-practice electronic confirmations are signed and reflected in document checks" },
     { id: "multiPractice:riskFlags", passed: hasAll(server, ["withMultiPracticeReviewState", "multiPracticeRiskFlags", "schedule-conflict"]) && applications.every((item) => Array.isArray(item.riskFlags)), detail: "risk flags normalized across API responses" },
     { id: "multiPractice:doctorApi", passed: hasAll(server, ["/api/doctors/me", "multiPracticeSummary", "verifyDoctorElectronicRegistration", "withMultiPracticeReviewState"]), detail: "doctor account API returns own summary, registration verification, and reviewed applications" },
+    { id: "multiPractice:doctorPortal", passed: hasAll(doctorPortal, ["doctor-multi-practice-form", "doctor-public-ledger", "/doctors/me", "/multi-practice-applications", "/public/multi-practice-ledger"]), detail: "dedicated doctor portal exposes own profile, application submission, hospital messages, and public ledger" },
     { id: "multiPractice:doctorHospitalLoop", passed: hasAll(server, ["buildMultiPracticeTaskMessage", "multiPracticeMessages", "待医院端处理", "医院端已处理"]) && hasAll(institution, ["taskMessages", "multiPracticeApplications"]), detail: "doctor submissions and hospital confirmations are linked through scoped task messages" },
     { id: "multiPractice:registryApi", passed: hasAll(server, ["/api/multi-practice-registry", "publicLedger", "reviewQueue", "canAccessMultiPracticeApplication"]), detail: "registry API covers public ledger, review queue, and role guard" },
     { id: "multiPractice:scheduleConflict", passed: hasAll(server, ["detectMultiPracticeScheduleConflicts", "scheduleConflictEvidence", "normalizeMultiPracticeScheduleText"]) && hasAll(institution, ["排班冲突", "scheduleConflictEvidence"]), detail: "same-doctor schedule conflicts are detected and displayed" },

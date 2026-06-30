@@ -13,6 +13,7 @@ test("role pages keep explicit page guards", () => {
   const guards = {
     "citizen.html": "citizen",
     "mobile-preview.html": "citizen",
+    "doctor.html": "institution",
     "institution.html": "institution",
     "insurance.html": "insurance",
     "county.html": "county",
@@ -40,7 +41,7 @@ test("citizen pages do not expose cross-role module links or management collecti
 });
 
 test("application pages avoid placeholder navigation", () => {
-  const pages = ["about.html", "citizen.html", "mobile-preview.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html", "quality-safety.html", "health-dashboard.html"];
+  const pages = ["about.html", "citizen.html", "mobile-preview.html", "doctor.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html", "quality-safety.html", "health-dashboard.html"];
   pages.forEach((file) => assert.doesNotMatch(read(file), /href=["']#["']/, `${file} 存在空链接占位`));
 });
 
@@ -66,6 +67,7 @@ test("about page documents runnable platform capabilities", () => {
   assert.match(about, /npm run deploy:check/);
   assert.match(read("index.html"), /href="\.\/about\.html"/);
   assert.match(read("institution.html"), /href="\.\/about\.html"/);
+  assert.match(read("doctor.html"), /href="\.\/about\.html"/);
   assert.match(read("insurance.html"), /href="\.\/about\.html"/);
   assert.match(read("county.html"), /href="\.\/about\.html"/);
   assert.match(read("citizen.html"), /href="\.\/about\.html"/);
@@ -93,6 +95,13 @@ test("about page documents doctor multi-practice policy boundaries", () => {
   const about = read("about.html");
   const doc = read("docs/医师多点执业政策说明.md");
   const report = read("docs/医师多点执业主要功能报告.md");
+  assert.match(read("doctor.html"), /doctor-multi-practice-form/);
+  assert.match(read("doctor.html"), /doctor-public-ledger/);
+  assert.match(read("doctor.js"), /\/doctors\/me/);
+  assert.match(read("doctor.js"), /\/multi-practice-applications/);
+  assert.match(read("doctor.js"), /\/public\/multi-practice-ledger/);
+  assert.match(read("auth.js"), /"doctor\.html": \["institution"\]/);
+  assert.match(read("auth.js"), /home: "doctor\.html", doctorId: "doc-liu"/);
   assert.match(about, /医生账户与多点执业政策说明/);
   assert.match(about, /国卫医发〔2014〕86号/);
   assert.match(about, /医联体帮扶/);

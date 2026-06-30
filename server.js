@@ -1393,8 +1393,8 @@ function seedAuthUsers() {
     { id: "u-hospital", username: "hospital", name: "医疗机构管理员", role: "institution", roleName: "医疗机构端", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构", home: "institution.html", status: "启用" },
     { id: "u-community", username: "community", name: "基层机构管理员", role: "institution", roleName: "基层医疗机构端", orgCode: "MR3", orgName: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", dataScope: "本机构与签约居民", home: "institution.html", status: "启用" },
     { id: "u1", username: "whjw", name: "大连市卫生健康委管理员", role: "commission", roleName: "大连市卫生健康委", orgCode: "ORG-HEALTH-DL", orgName: "大连市卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管", home: "index.html", status: "启用" },
-    { id: "u2", username: "doctor", name: "刘医生", role: "institution", roleName: "医生账户", orgCode: "MR3", orgName: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", dataScope: "签约居民、随访、长期处方、多点执业申请", home: "institution.html", doctorId: "doc-liu", accountType: "doctor", status: "启用" },
-    { id: "u-doctor-wang", username: "doctor_wang", name: "王医生", role: "institution", roleName: "医生账户", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构诊疗、转诊接诊、多点执业备案", home: "institution.html", doctorId: "doc-wang", accountType: "doctor", status: "启用" },
+    { id: "u2", username: "doctor", name: "刘医生", role: "institution", roleName: "医生账户", orgCode: "MR3", orgName: "青泥洼桥社区卫生服务中心", orgType: "medical_institution", orgLevel: "基层医疗机构", dataScope: "签约居民、随访、长期处方、多点执业申请", home: "doctor.html", doctorId: "doc-liu", accountType: "doctor", status: "启用" },
+    { id: "u-doctor-wang", username: "doctor_wang", name: "王医生", role: "institution", roleName: "医生账户", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构诊疗、转诊接诊、多点执业备案", home: "doctor.html", doctorId: "doc-wang", accountType: "doctor", status: "启用" },
     { id: "u3", username: "insurance", name: "大连市医保中心审核员", role: "insurance", roleName: "大连市医保中心经办端", orgCode: "ORG-MI-CENTER-DL", orgName: "大连市医保中心", orgType: "insurance_center", orgLevel: "市级", dataScope: "医保结算经办、凭证核验、固定取药审核和经办留痕", home: "insurance.html", status: "启用" },
     { id: "u-mi-district", username: "district_mi", name: "区市县医保局管理员", role: "insurance", roleName: "区市县医保局管理端", orgCode: "ORG-MI-DIST-ZS", orgName: "中山区医保局", orgType: "district_insurance_bureau", orgLevel: "区市县", dataScope: "本区医保基金监管、机构监管和慢病待遇协同", home: "insurance.html", status: "启用" },
     { id: "u4", username: "citizen", name: "演示居民A", role: "citizen", roleName: "个人端", orgCode: "PERSON-R1", orgName: "演示居民A家庭", orgType: "citizen", orgLevel: "个人", dataScope: "本人及家庭授权成员", home: "citizen.html", residentId: "r1", accountId: "a1", status: "启用" },
@@ -5032,6 +5032,9 @@ function normalizePersonIndexes(state) {
       member.personIndex = member.personIndex || personIndexForResident(residentMap, member.residentId);
     });
   });
+  (Array.isArray(state.authUsers) ? state.authUsers : []).forEach((user) => {
+    if (user.accountType === "doctor" || user.doctorId) user.home = "doctor.html";
+  });
   return state;
 }
 
@@ -5696,7 +5699,9 @@ function roleFromExternalClaims(claims, organization) {
   return "commission";
 }
 
-function homeForRole(role, organization) {
+function homeForRole(role, organization, roles = []) {
+  const rawRoles = [roles].flat().filter(Boolean).map((item) => String(item).toLowerCase());
+  if (role === "institution" && rawRoles.some((item) => /doctor|physician|医生/.test(item))) return "doctor.html";
   if (organization?.portal) return organization.portal;
   return {
     commission: "index.html",
@@ -5740,7 +5745,7 @@ function mapExternalIdentityClaims(claims, data) {
       orgType: organization?.orgType || String(claims.orgType || "").trim(),
       orgLevel: organization?.orgLevel || String(claims.orgLevel || "").trim(),
       dataScope: organization?.dataScope || String(claims.dataScope || "external identity scope pending").trim(),
-      home: homeForRole(role, organization),
+      home: homeForRole(role, organization, claims.roles || claims.role || claims.authorities),
       status: "待绑定"
     }),
     organization: organization || null
@@ -5904,9 +5909,22 @@ function hasResidentAuthorization(data, residentId, authorizationId) {
     record.category === "authorizations" &&
     record.residentId === residentId &&
     (!authorizationId || record.id === authorizationId) &&
-    record.status !== "revoked" &&
-    record.meta?.status !== "revoked"
+    !["revoked", "已撤销"].includes(record.status) &&
+    record.meta?.status !== "revoked" &&
+    isActiveAuthorizationRecord(record)
   );
+}
+
+function isActiveAuthorizationRecord(record = {}) {
+  if (record.revokedAt || record.meta?.revokedAt) return false;
+  const text = [
+    record.status,
+    record.result,
+    record.meta?.status,
+    record.revokedAt,
+    record.revokeReason
+  ].filter(Boolean).join(" ");
+  return !/revoked|withdrawn|cancelled|revoke|撤销/i.test(text);
 }
 
 function canAccessReferralTeleconsultation(user, item, data) {
@@ -8743,7 +8761,16 @@ function dispatchChronicFollowupAction(data, user, payload) {
   item.dispositionNote = String(payload.note || item.dispositionNote || "").trim();
   item.dispositionBy = user.username || user.role;
   item.dispositionByName = user.name;
-  item.lastUpdated = new Date().toISOString();
+  const now = new Date().toISOString();
+  item.lastUpdated = now;
+  const shouldResolveEscalation = payload.resolveEscalation !== false && item.escalationStatus === "escalated";
+  if (shouldResolveEscalation) {
+    item.escalationStatus = "resolved";
+    item.escalationResolvedAt = now;
+    item.escalationResolvedBy = user.username || user.role;
+    item.escalationResolvedByName = user.name;
+    item.escalationResolution = item.dispositionNote || item.result || item.status || item.disposition;
+  }
   data.securityEvents = [
     {
       id: randomUUID(),
@@ -8758,12 +8785,20 @@ function dispatchChronicFollowupAction(data, user, payload) {
     ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
   ].slice(0, 120);
   appendDataAccessLog(data, user, item.residentId, "chronic follow-up disposition", item.dispositionNote || item.status || collection);
-  closeChronicFollowupMessages(data, {
+  const closedMessages = closeChronicFollowupMessages(data, {
     residentId: item.residentId,
     taskId: `${collection}:${item.id}`,
     targetRole: "institution",
     user
   });
+  const closedEscalationMessages = shouldResolveEscalation
+    ? closeChronicFollowupMessages(data, {
+        residentId: item.residentId,
+        taskId: `${collection}:${item.id}:escalation`,
+        targetRole: "institution",
+        user
+      })
+    : 0;
   appendChronicFollowupMessage(data, {
     residentId: item.residentId,
     taskId: `${collection}:${item.id}`,
@@ -8775,7 +8810,7 @@ function dispatchChronicFollowupAction(data, user, payload) {
     user
   });
   writeDatabase(normalizeState(data));
-  return { status: 200, body: item };
+  return { status: 200, body: { ...item, closedMessages, closedEscalationMessages } };
 }
 
 function appendSecurityEvent(event) {
@@ -10987,8 +11022,9 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["institution", "county", "commission"], "/api/referral-teleconsultations");
     if (!user) return;
     const data = readDatabase();
+    const payload = await collectJson(req);
     try {
-      const consultation = normalizeReferralTeleconsultation(await collectJson(req), user, data);
+      const consultation = normalizeReferralTeleconsultation(payload, user, data);
       if (!canAccessReferralTeleconsultation(user, consultation, data)) {
         appendSecurityEvent({ actor: user.name, role: user.role, action: "create referral teleconsultation", target: consultation.residentId, result: "denied", detail: "organization scope denied" });
         sendJson(res, 403, { error: "Forbidden", message: "organization scope denied" });
@@ -11012,6 +11048,16 @@ async function handleApi(req, res) {
       writeDatabase(data);
       sendJson(res, 201, consultation);
     } catch (error) {
+      if (/resident authorization/i.test(error.message || "")) {
+        appendSecurityEvent({
+          actor: user.name,
+          role: user.role,
+          action: "create referral teleconsultation",
+          target: String(payload.residentId || payload.residentAuthorizationId || ""),
+          result: "denied",
+          detail: error.message
+        });
+      }
       sendJson(res, 400, { error: "Bad Request", message: error.message });
     }
     return;

@@ -7246,7 +7246,7 @@
       "orgType": "medical_institution",
       "orgLevel": "基层医疗机构",
       "dataScope": "签约居民、随访、长期处方、多点执业申请",
-      "home": "institution.html",
+      "home": "doctor.html",
       "doctorId": "doc-liu",
       "accountType": "doctor",
       "status": "启用"
@@ -7262,7 +7262,7 @@
       "orgType": "medical_institution",
       "orgLevel": "三级医院",
       "dataScope": "本机构诊疗、转诊接诊、多点执业备案",
-      "home": "institution.html",
+      "home": "doctor.html",
       "doctorId": "doc-wang",
       "accountType": "doctor",
       "status": "启用"

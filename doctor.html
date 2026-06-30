@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>医生端 · 多点执业工作台</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+    <script>window.HealthCityAuth.requireRole(["institution"])</script>
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>医生端</span>
+          <h1>医生账户与多点执业工作台</h1>
+          <p>查看本人电子化注册、第一执业地点确认、多点执业申请、医院端处理消息和公开备案状态。</p>
+        </div>
+        <nav>
+          <a href="./institution.html">医疗机构端</a>
+          <a href="./health-city.html">系统总览</a>
+          <a href="./about.html">关于</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" id="doctor-metrics"></section>
+
+      <section class="portal-grid">
+        <article class="panel">
+          <div class="panel-title">
+            <h2>本人执业档案</h2>
+            <span id="doctor-profile-status"></span>
+          </div>
+          <div id="doctor-profile" class="list compact"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>政策校验</h2>
+            <span>国卫医发〔2014〕86号</span>
+          </div>
+          <div id="doctor-policy" class="rules"></div>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>提交多点执业申请</h2>
+          <span id="doctor-submit-status"></span>
+        </div>
+        <form id="doctor-multi-practice-form" class="filter-grid">
+          <label>拟执业机构
+            <input name="targetInstitution" placeholder="例如：大连市中心医院" required />
+          </label>
+          <label>拟执业科室
+            <input name="targetDepartment" placeholder="例如：心内科慢病联合门诊" />
+          </label>
+          <label>执业范围
+            <input name="practiceScope" placeholder="与电子化注册执业范围一致" />
+          </label>
+          <label>执业期限
+            <input name="period" placeholder="2026-07-01 至 2027-06-30" required />
+          </label>
+          <label>时间安排
+            <input name="schedule" placeholder="每周三下午" required />
+          </label>
+          <label class="full">工作任务
+            <input name="tasks" placeholder="会诊、联合门诊、基层帮扶、慢病管理等" required />
+          </label>
+          <label class="full">医疗责任约定
+            <input name="responsibility" value="由当事医疗机构和医师按协议依法承担医疗责任" required />
+          </label>
+          <label>薪酬约定
+            <input name="compensation" value="按工作量和绩效协商结算" required />
+          </label>
+          <label>责任保险
+            <input name="insurance" value="已购买医师个人医疗执业保险" required />
+          </label>
+          <label>第一执业地点意见
+            <select name="primaryConsent">
+              <option>待确认</option>
+              <option>已同意</option>
+              <option>知情报备</option>
+              <option>医联体内帮扶免办多点执业手续</option>
+            </select>
+          </label>
+          <label>登记方式
+            <select name="registrationMode">
+              <option>备案管理</option>
+              <option>注册管理</option>
+              <option>医联体帮扶</option>
+            </select>
+          </label>
+          <label class="checkbox-line">
+            <input name="publicVisible" type="checkbox" checked />
+            纳入公开备案台账
+          </label>
+          <button class="inline-action" type="submit">提交本人申请</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>本人申请与医院消息</h2>
+          <span id="doctor-application-count"></span>
+        </div>
+        <div id="doctor-applications" class="list"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>公开备案查询</h2>
+          <span id="doctor-ledger-count"></span>
+        </div>
+        <div id="doctor-public-ledger" class="table-wrap"></div>
+      </section>
+    </main>
+
+    <script src="./shared.js"></script>
+    <script src="./doctor.js?v=20260630"></script>
+  </body>
+</html>

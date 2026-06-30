@@ -298,7 +298,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(identityPreview.response.status, 200);
     assert.equal(identityPreview.body.mapping.user.role, "institution");
     assert.equal(identityPreview.body.mapping.user.orgCode, "MR1");
-    assert.equal(identityPreview.body.mapping.user.home, "institution.html");
+    assert.equal(identityPreview.body.mapping.user.home, "doctor.html");
   });
 
   await t.test("rejects invalid credentials and unauthenticated state reads", async () => {
@@ -388,6 +388,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(registry.body.reviewQueue.every((item) => item.risk || String(item.status || "").includes("待")), true);
 
     const doctorLogin = await login(baseUrl, "doctor");
+    assert.equal(doctorLogin.body.user.home, "doctor.html");
     const doctorMe = await api(baseUrl, "/api/doctors/me", authorized(doctorLogin.body.token));
     assert.equal(doctorMe.response.status, 200);
     assert.equal(doctorMe.body.doctor.id, doctorLogin.body.user.doctorId);
@@ -1085,6 +1086,32 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(review.body.accessLogs.some((item) => item.scope === "授权撤销"), true);
     assert.match(review.body.accessLogs[0].personIndex, /^已脱敏-/);
 
+    const institution = await login(baseUrl, "hospital");
+    const blockedTeleconsultation = await api(baseUrl, "/api/referral-teleconsultations", authorized(institution.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        residentAuthorizationId: authorizationId,
+        type: "teleconsultation",
+        diseaseType: "hypertension",
+        targetInstitution: "County teleconsultation center",
+        targetInstitutionCode: "ORG-COUNTY-CENTER",
+        department: "Cardiology",
+        clinicalQuestion: "Should medication be adjusted after abnormal home blood pressure?"
+      })
+    }));
+    assert.equal(blockedTeleconsultation.response.status, 400);
+    assert.equal(blockedTeleconsultation.body.message, "resident authorization is required before referral teleconsultation");
+
+    const securityAudit = await api(baseUrl, "/api/audit/export?trail=securityEvents", authorized(commissionToken));
+    assert.equal(securityAudit.response.status, 200);
+    assert.equal(securityAudit.body.securityEvents.some((item) =>
+      item.action === "create referral teleconsultation" &&
+      item.target === "r1" &&
+      item.result === "denied" &&
+      /resident authorization is required/.test(item.detail)
+    ), true);
+
     const forbiddenReview = await api(baseUrl, "/api/access-reviews?residentId=r2", authorized(citizenToken));
     assert.equal(forbiddenReview.response.status, 403);
   });
@@ -1645,6 +1672,29 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(dispatched.response.status, 200);
     assert.equal(dispatched.body.status, "已完成");
     assert.equal(dispatched.body.disposition, "handled");
+    assert.equal(dispatched.body.escalationStatus, "resolved");
+    assert.equal(dispatched.body.closedEscalationMessages, 1);
+
+    const manualEscalation = await api(baseUrl, "/api/chronic/followup-escalations", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({ collection: "followups", id: "f3", reason: "site team keeps manual review open" })
+    }));
+    assert.equal(manualEscalation.response.status, 201);
+    assert.equal(manualEscalation.body.item.escalationStatus, "escalated");
+
+    const manualDispatch = await api(baseUrl, "/api/chronic/followup-dispatch", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({
+        collection: "followups",
+        id: "f3",
+        status: "复核中",
+        note: "site team recorded progress but keeps escalation open",
+        resolveEscalation: false
+      })
+    }));
+    assert.equal(manualDispatch.response.status, 200);
+    assert.equal(manualDispatch.body.escalationStatus, "escalated");
+    assert.equal(manualDispatch.body.closedEscalationMessages, 0);
 
     const dispatchDenied = await api(baseUrl, "/api/chronic/followup-dispatch", authorized(citizen.body.token, {
       method: "POST",

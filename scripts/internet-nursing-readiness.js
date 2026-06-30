@@ -252,11 +252,61 @@ function hasRegulatorySubmissionEvidence(policy, frontend, server, moduleDoc, la
     /压测/.test(moduleDoc + launchPlan);
 }
 
-function buildInternetNursingCutoverPack(policy) {
+function secretReady(value, minLength = 32) {
+  const text = String(value || "");
+  return text.length >= minLength && !/replace-with|change-me|changeme|demo-|demo_|example|placeholder/i.test(text);
+}
+
+function cutoverSignoffReady(name, env = process.env) {
+  return /^(1|true|yes|ready|signed|approved)$/i.test(String(env[name] || "").trim());
+}
+
+function productionBlockerAction(id) {
+  return {
+    "node-env": "set NODE_ENV=production before final cutover",
+    "storage-engine": "switch STORAGE_ENGINE away from json for production runtime",
+    "session-secrets": "configure strong SESSION_SECRETS with at least one 32-character secret",
+    "gateway-secret": "configure INTEGRATION_GATEWAY_SECRET with a strong production secret",
+    "database-url": "configure DATABASE_URL when STORAGE_ENGINE is postgres",
+    "identity-adapter": "configure OIDC_ISSUER_URL, OIDC_CLIENT_ID, and OIDC_CLIENT_SECRET",
+    "audit-retention": "configure AUDIT_EXPORT_PATH or SIEM_ENDPOINT and archive retention permission",
+    "site-interface-signoff": "set CUTOVER_SITE_INTERFACE_SIGNOFF after signed site interface joint test",
+    "insurance-certificate-signoff": "set CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF after insurance and certificate exchange acceptance",
+    "monitoring-signoff": "set CUTOVER_MONITORING_SIGNOFF after monitoring and on-call acceptance",
+    "dr-rehearsal-signoff": "set CUTOVER_DR_REHEARSAL_SIGNOFF after disaster recovery rehearsal"
+  }[id] || "complete production evidence and rerun release gates";
+}
+
+function buildProductionEnvironmentStatus(env = process.env) {
+  const storageEngine = String(env.STORAGE_ENGINE || "auto").toLowerCase();
+  const sessionSecrets = String(env.SESSION_SECRETS || env.SESSION_SECRET || "").split(",").map((item) => item.trim()).filter(Boolean);
+  const checks = [
+    { id: "node-env", name: "NODE_ENV=production", passed: env.NODE_ENV === "production", detail: env.NODE_ENV || "missing" },
+    { id: "storage-engine", name: "production storage engine", passed: storageEngine !== "json", detail: storageEngine },
+    { id: "session-secrets", name: "session secret quality", passed: sessionSecrets.length > 0 && sessionSecrets.every((item) => secretReady(item)), detail: `${sessionSecrets.length} configured` },
+    { id: "gateway-secret", name: "integration gateway secret quality", passed: secretReady(env.INTEGRATION_GATEWAY_SECRET), detail: env.INTEGRATION_GATEWAY_SECRET ? "configured" : "missing" },
+    { id: "database-url", name: "database url for postgres", passed: !["postgres", "postgresql"].includes(storageEngine) || Boolean(env.DATABASE_URL), detail: env.DATABASE_URL ? "configured" : "not required" },
+    { id: "identity-adapter", name: "government identity adapter", passed: Boolean(env.OIDC_ISSUER_URL && env.OIDC_CLIENT_ID && env.OIDC_CLIENT_SECRET), detail: env.OIDC_ISSUER_URL ? "issuer configured" : "OIDC missing" },
+    { id: "audit-retention", name: "audit retention target", passed: Boolean(env.AUDIT_EXPORT_PATH || env.SIEM_ENDPOINT), detail: env.AUDIT_EXPORT_PATH || env.SIEM_ENDPOINT ? "configured" : "missing" },
+    { id: "site-interface-signoff", name: "site interface joint-test signoff", passed: cutoverSignoffReady("CUTOVER_SITE_INTERFACE_SIGNOFF", env), detail: env.CUTOVER_SITE_INTERFACE_SIGNOFF || "missing" },
+    { id: "insurance-certificate-signoff", name: "insurance and certificate exchange signoff", passed: cutoverSignoffReady("CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF", env), detail: env.CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF || "missing" },
+    { id: "monitoring-signoff", name: "monitoring and on-call signoff", passed: cutoverSignoffReady("CUTOVER_MONITORING_SIGNOFF", env), detail: env.CUTOVER_MONITORING_SIGNOFF || "missing" },
+    { id: "dr-rehearsal-signoff", name: "disaster recovery rehearsal signoff", passed: cutoverSignoffReady("CUTOVER_DR_REHEARSAL_SIGNOFF", env), detail: env.CUTOVER_DR_REHEARSAL_SIGNOFF || "missing" }
+  ];
+  return {
+    profile: env.NODE_ENV || "development",
+    storageEngine,
+    passed: checks.every((item) => item.passed),
+    checks
+  };
+}
+
+function buildInternetNursingCutoverPack(policy, env = process.env) {
   const production = policy.productionIntegration || fallbackPolicy().productionIntegration;
   const payment = policy.paymentIntegration || fallbackPolicy().paymentIntegration;
   const device = policy.deviceVerification || fallbackPolicy().deviceVerification;
   const submission = policy.regulatorySubmission || fallbackPolicy().regulatorySubmission;
+  const productionEnvironment = buildProductionEnvironmentStatus(env);
   const tracks = [
     {
       id: "nursing-cutover-message-signature",
@@ -294,8 +344,20 @@ function buildInternetNursingCutoverPack(policy) {
       blockingUntil: "signed monthly and high-risk realtime submission pressure-test record"
     }
   ];
+  const productionBlockers = productionEnvironment.checks
+    .filter((item) => !item.passed)
+    .map((item) => ({
+      id: `production-${item.id}`,
+      source: item.id,
+      name: item.name,
+      detail: item.detail,
+      requiredAction: productionBlockerAction(item.id)
+    }));
   return {
     status: tracks.every((item) => item.ready) ? "ready-for-site-signoff" : "blocked",
+    productionReadiness: productionEnvironment.passed ? "production-ready" : "production-blocked",
+    productionProfile: productionEnvironment.profile,
+    productionBlockers,
     template: "release/templates/production-signoff/README.md",
     auditRetentionEvidence: "release/audit-retention-report.md",
     productionCutoverEvidence: "release/production-cutover-checklist.md",
@@ -307,6 +369,9 @@ function hasCutoverPackEvidence(cutoverPack, moduleDoc, launchPlan) {
   return cutoverPack.status === "ready-for-site-signoff" &&
     cutoverPack.tracks.length >= 5 &&
     cutoverPack.tracks.every((item) => item.ready && item.owner && item.blockingUntil && item.evidence.length > 0) &&
+    /production-(ready|blocked)/.test(cutoverPack.productionReadiness || "") &&
+    Array.isArray(cutoverPack.productionBlockers) &&
+    cutoverPack.productionBlockers.every((item) => item.source && item.name && item.requiredAction) &&
     /release\/templates\/production-signoff\/README\.md/.test(cutoverPack.template) &&
     /release\/audit-retention-report\.md/.test(cutoverPack.auditRetentionEvidence) &&
     /release\/production-cutover-checklist\.md/.test(cutoverPack.productionCutoverEvidence) &&
@@ -334,7 +399,7 @@ function buildInternetNursingReadinessReport(options = {}) {
   const institutions = mergeById(fallbackInstitutions(), data.internetNursingInstitutions);
   const nurses = mergeById(fallbackNurses(), data.internetNursingNurses);
   const orders = mergeById(fallbackOrders(), data.internetNursingOrders);
-  const cutoverPack = buildInternetNursingCutoverPack(policy);
+  const cutoverPack = buildInternetNursingCutoverPack(policy, options.env || process.env);
   const institutionIds = new Set(institutions.map((item) => item.id));
   const nurseIds = new Set(nurses.map((item) => item.id));
   const checks = [
@@ -379,7 +444,8 @@ function buildInternetNursingReadinessReport(options = {}) {
       highRiskOrders: orders.filter((item) => item.riskLevel === "high").length,
       trackingOrders: orders.filter((item) => item.locationTrace === "tracking").length,
       cutoverTracks: cutoverPack.tracks.length,
-      cutoverReadyTracks: cutoverPack.tracks.filter((item) => item.ready).length
+      cutoverReadyTracks: cutoverPack.tracks.filter((item) => item.ready).length,
+      productionBlockers: cutoverPack.productionBlockers.length
     },
     cutoverPack,
     checks
@@ -401,11 +467,15 @@ function renderMarkdown(report) {
     `- High-risk orders: ${report.summary.highRiskOrders}`,
     `- Tracking orders: ${report.summary.trackingOrders}`,
     `- Cutover tracks: ${report.summary.cutoverReadyTracks}/${report.summary.cutoverTracks}`,
+    `- Production readiness: ${report.cutoverPack.productionReadiness}`,
+    `- Production blockers: ${report.summary.productionBlockers}`,
     `- Module document: docs/互联网护理服务模块说明.md`,
     "",
     "## Site Cutover Pack",
     "",
     `- Status: ${report.cutoverPack.status}`,
+    `- Production readiness: ${report.cutoverPack.productionReadiness}`,
+    `- Production profile: ${report.cutoverPack.productionProfile}`,
     `- Template: ${report.cutoverPack.template}`,
     `- Audit retention evidence: ${report.cutoverPack.auditRetentionEvidence}`,
     `- Production cutover evidence: ${report.cutoverPack.productionCutoverEvidence}`,
@@ -413,6 +483,14 @@ function renderMarkdown(report) {
     "| Track | Owner | Ready | Blocking until |",
     "| --- | --- | --- | --- |",
     ...report.cutoverPack.tracks.map((item) => `| ${item.id} | ${item.owner} | ${item.ready ? "yes" : "no"} | ${item.blockingUntil.replace(/\|/g, "/")} |`),
+    "",
+    "## Production Blockers",
+    "",
+    "| Source | Name | Detail | Required action |",
+    "| --- | --- | --- | --- |",
+    ...(report.cutoverPack.productionBlockers.length > 0
+      ? report.cutoverPack.productionBlockers.map((item) => `| ${item.source} | ${item.name} | ${String(item.detail || "").replace(/\|/g, "/")} | ${item.requiredAction.replace(/\|/g, "/")} |`)
+      : ["| none | production ready | configured | continue release signoff |"]),
     "",
     "## Checks",
     "",
@@ -440,6 +518,7 @@ if (require.main === module) main();
 module.exports = {
   buildInternetNursingReadinessReport,
   buildInternetNursingCutoverPack,
+  buildProductionEnvironmentStatus,
   renderMarkdown,
   writeReport
 };

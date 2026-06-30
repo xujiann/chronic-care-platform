@@ -103,9 +103,9 @@ const CONTRACTS = [
     owner: "medical-institution",
     direction: "inbound",
     roles: ["institution", "commission"],
-    requiredFields: ["collection", "id", "updates?", "status?", "note?"],
+    requiredFields: ["collection", "id", "updates?", "status?", "note?", "resolveEscalation?"],
     targetCollections: ["followups", "chronicManagementPlans", "chronicScreeningTasks", "medicationPickups", "taskMessages"],
-    evidence: ["business disposition", "message closure", "citizen notification"]
+    evidence: ["business disposition", "message closure", "escalation closure", "citizen notification"]
   }
 ];
 
