@@ -110,6 +110,13 @@ function buildCapabilities(data, serverSource, readiness, release) {
       detail: "形成月度运行报告、直报差异清单、调度复盘和绩效异常说明的导出骨架。"
     },
     {
+      id: "governance-export-package",
+      name: "治理导出包",
+      status: release.checks.some((item) => item.id === "release:governanceExportPackage" && item.passed) ? "ready" : "needs-attention",
+      evidence: ["/api/operations/governance-export-package", "operations.html", "hospital-operations-module-report.md"],
+      detail: "生成月度运行治理报告、统计直报差异清单、资源调度复盘清单、绩效异常说明模板和附件目录，并支持前端下载归档。"
+    },
+    {
       id: "next-development-research",
       name: "下一步功能研究",
       status: release.checks.some((item) => item.id === "release:nextDevelopmentResearch" && item.passed) ? "ready" : "needs-attention",
@@ -161,8 +168,8 @@ function buildNextPlan() {
       phase: "P1 治理报表",
       owner: "规划发展与信息化处/统计办公室",
       scope: "绩效监测、统计直报、资源利用、预警处置、交接班质量",
-      deliverable: "已上线 /api/operations/governance-report 和治理报表面板，覆盖月报、差异、调度复盘和绩效异常说明。",
-      exitCriteria: "已具备按月导出委端治理报告的数据骨架；医院端正式导出需现场角色和模板确认。"
+      deliverable: "已上线 /api/operations/governance-report、/api/operations/governance-export-package 和治理导出包下载入口，覆盖月报、差异、调度复盘、绩效异常说明和附件目录。",
+      exitCriteria: "已具备按月导出委端治理报告包的数据骨架；医院端正式版仍需现场角色、模板和签收流程确认。"
     },
     {
       id: "cross-hospital-resource-market",

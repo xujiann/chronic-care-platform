@@ -30,6 +30,7 @@ const REQUIRED_ROUTES = [
   "/api/operations/production-hardening",
   "/api/operations/intelligence",
   "/api/operations/governance-report",
+  "/api/operations/governance-export-package",
   "/api/operations/next-development-research",
   "/api/operations/integration/snapshots",
   "/api/operations/integration/dispatch-feedback",
@@ -95,6 +96,7 @@ function buildHospitalOperationsReadinessReport(options = {}) {
     { id: "hospitalOps:productionHardening", passed: /buildOperationsProductionHardening/.test(serverSource) && /\/api\/operations\/production-hardening/.test(serverSource) && /operation-production-hardening/.test(operationsHtml) && /renderProductionHardening/.test(operationsJs), detail: "production hardening checklist API and panel" },
     { id: "hospitalOps:intelligence", passed: /buildOperationsIntelligence/.test(serverSource) && /\/api\/operations\/intelligence/.test(serverSource) && /operation-intelligence/.test(operationsHtml) && /renderOperationsIntelligence/.test(operationsJs), detail: "intelligent dispatch recommendations API and panel" },
     { id: "hospitalOps:governanceReport", passed: /buildOperationsGovernanceReport/.test(serverSource) && /\/api\/operations\/governance-report/.test(serverSource) && /operation-governance-report/.test(operationsHtml) && /renderGovernanceReport/.test(operationsJs), detail: "monthly governance report API and panel" },
+    { id: "hospitalOps:governanceExportPackage", passed: /buildOperationsGovernanceExportPackage/.test(serverSource) && /\/api\/operations\/governance-export-package/.test(serverSource) && /downloadGovernanceExportPackage/.test(operationsJs) && /performance-action-card export/.test(operationsJs), detail: "governance export package API and download action" },
     { id: "hospitalOps:nextDevelopmentResearch", passed: /buildOperationsNextDevelopmentResearch/.test(serverSource) && /\/api\/operations\/next-development-research/.test(serverSource) && /operation-next-development/.test(operationsHtml) && /renderNextDevelopmentResearch/.test(operationsJs), detail: "next development research API and panel" },
     { id: "hospitalOps:releaseScript", passed: Boolean(pkg.scripts?.["hospital-operations:readiness"]), detail: "package script registered" }
   ];

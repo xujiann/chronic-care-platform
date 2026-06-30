@@ -44,6 +44,7 @@ function buildHospitalOperationsReleaseReport(options = {}) {
     check("release:productionHardening", /\/api\/operations\/production-hardening/.test(serverSource) && /buildOperationsProductionHardening/.test(serverSource) && /operation-production-hardening/.test(operationsHtml) && /renderProductionHardening/.test(operationsJs), "production hardening checklist is present"),
     check("release:intelligence", /\/api\/operations\/intelligence/.test(serverSource) && /buildOperationsIntelligence/.test(serverSource) && /operation-intelligence/.test(operationsHtml) && /renderOperationsIntelligence/.test(operationsJs), "intelligent dispatch recommendations are present"),
     check("release:governanceReport", /\/api\/operations\/governance-report/.test(serverSource) && /buildOperationsGovernanceReport/.test(serverSource) && /operation-governance-report/.test(operationsHtml) && /renderGovernanceReport/.test(operationsJs), "governance report panel is present"),
+    check("release:governanceExportPackage", /\/api\/operations\/governance-export-package/.test(serverSource) && /buildOperationsGovernanceExportPackage/.test(serverSource) && /downloadGovernanceExportPackage/.test(operationsJs) && /performance-action-card export/.test(operationsJs), "governance export package is present"),
     check("release:nextDevelopmentResearch", /\/api\/operations\/next-development-research/.test(serverSource) && /buildOperationsNextDevelopmentResearch/.test(serverSource) && /operation-next-development/.test(operationsHtml) && /renderNextDevelopmentResearch/.test(operationsJs), "next development research panel is present"),
     check("release:packageScript", Boolean(pkg.scripts?.["hospital-operations:release"]), "package script registered")
   ];
@@ -72,6 +73,7 @@ function buildHospitalOperationsReleaseReport(options = {}) {
       "生产加固清单",
       "智能调度建议",
       "治理报表",
+      "治理导出包",
       "下一步功能研究",
       "发布证据脚本与闸口集成"
     ],

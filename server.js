@@ -3891,6 +3891,107 @@ function buildOperationsGovernanceReport({ snapshots, dispatchRequests, reconcil
   };
 }
 
+function buildOperationsGovernanceExportPackage({
+  snapshots,
+  dispatchRequests,
+  reconciliationReviews,
+  performanceMonitoring,
+  governanceReport,
+  intelligence,
+  handover
+}) {
+  const pendingRecon = reconciliationReviews.filter((item) => !["approved", "closed"].includes(item.status));
+  const openDispatches = dispatchRequests.filter((item) => ["pending", "assigned", "in-progress"].includes(item.status));
+  const exceptionSources = [...new Set(Object.values(performanceMonitoring?.manuals || {}).flatMap((manual) => manual.coverage?.pendingSources || []))];
+  const files = [
+    {
+      id: "monthly-governance-report",
+      name: "月度运行治理报告.md",
+      type: "markdown",
+      owner: "规划发展与信息化处",
+      rows: Array.isArray(governanceReport?.sections) ? governanceReport.sections.length : 0,
+      description: "汇总运行态势、调度复盘、直报差异、绩效异常和交接班质量。"
+    },
+    {
+      id: "reconciliation-diff-list",
+      name: "统计直报差异清单.csv",
+      type: "csv",
+      owner: "统计办公室",
+      rows: pendingRecon.length,
+      description: "列出待复核、退回、补正中和阻断的直报差异批次。"
+    },
+    {
+      id: "dispatch-review-list",
+      name: "资源调度复盘清单.csv",
+      type: "csv",
+      owner: "运行调度席",
+      rows: dispatchRequests.length,
+      description: "沉淀资源类型、数量、目标机构、状态、要求到位时间和审计轨迹。"
+    },
+    {
+      id: "performance-exception-note",
+      name: "绩效异常说明模板.md",
+      type: "markdown",
+      owner: "医务部/运营管理部门",
+      rows: exceptionSources.length,
+      description: "按绩效监测手册口径补充异常说明、数据来源和责任科室。"
+    },
+    {
+      id: "attachment-index",
+      name: "附件目录.json",
+      type: "json",
+      owner: "运行监测岗",
+      rows: 5,
+      description: "关联现场联调记录、交接签收、智能调度建议、审计记录和发布报告。"
+    }
+  ];
+  const lines = [
+    `# ${governanceReport?.exportName || "医院运行治理月报"}`,
+    "",
+    `- 生成时间：${new Date().toISOString()}`,
+    `- 机构数：${snapshots.length}`,
+    `- 开放调度工单：${openDispatches.length}`,
+    `- 待复核直报差异：${pendingRecon.length}`,
+    `- 智能调度建议：${Array.isArray(intelligence?.recommendations) ? intelligence.recommendations.length : 0}`,
+    `- 交接事项：${handover?.summary?.items || 0}`,
+    "",
+    "## 治理章节",
+    "",
+    ...(Array.isArray(governanceReport?.sections) ? governanceReport.sections : []).map((item) => `- ${item.title}：${item.metric}；${item.conclusion}`),
+    "",
+    "## 导出文件",
+    "",
+    ...files.map((item) => `- ${item.name}：${item.description}`),
+    "",
+    "## 复核要求",
+    "",
+    "- 导出前确认数据版本、复核人、附件编号和统计直报差异状态。",
+    "- 导出后将文件包编号写入审计记录，并与现场联调证据、发布报告一并归档。"
+  ];
+  const markdown = lines.join("\n");
+  return {
+    ok: files.every((item) => item.owner && item.name),
+    generatedAt: new Date().toISOString(),
+    packageName: `${governanceReport?.exportName || "医院运行治理月报"}-导出包`,
+    version: createHash("sha256").update(markdown).digest("hex").slice(0, 12),
+    summary: {
+      files: files.length,
+      sections: Array.isArray(governanceReport?.sections) ? governanceReport.sections.length : 0,
+      pendingReconciliation: pendingRecon.length,
+      dispatchReviews: dispatchRequests.length,
+      performanceExceptions: exceptionSources.length
+    },
+    files,
+    markdown,
+    checklist: [
+      "确认月报模板、直报差异清单和附件编号规则。",
+      "由统计办公室复核差异状态，由运行调度席复核工单闭环。",
+      "导出包编号写入平台过程审计，现场正式版需完成签收归档。"
+    ],
+    evidence: ["/api/operations/governance-report", "/api/operations/governance-export-package", "/api/process-audit"]
+  };
+}
+
 function buildOperationsNextDevelopmentResearch({
   snapshots,
   dispatchRequests,
@@ -4091,6 +4192,15 @@ function buildHospitalOperationsDashboard(data) {
     dispatchRequests,
     reconciliationReviews,
     performanceMonitoring: dashboard.performanceMonitoring,
+    handover
+  });
+  dashboard.governanceExportPackage = buildOperationsGovernanceExportPackage({
+    snapshots,
+    dispatchRequests,
+    reconciliationReviews,
+    performanceMonitoring: dashboard.performanceMonitoring,
+    governanceReport: dashboard.governanceReport,
+    intelligence,
     handover
   });
   dashboard.nextDevelopmentResearch = buildOperationsNextDevelopmentResearch({
@@ -6804,6 +6914,14 @@ async function handleApi(req, res) {
     if (!user) return;
     const dashboard = buildHospitalOperationsDashboard(readDatabase());
     sendJson(res, 200, dashboard.governanceReport);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/governance-export-package") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/governance-export-package");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.governanceExportPackage);
     return;
   }
 

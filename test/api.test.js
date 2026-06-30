@@ -226,6 +226,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(operationsDashboard.body.productionHardening.summary.total >= 5, true);
     assert.equal(operationsDashboard.body.intelligence.recommendations.some((item) => item.recommendation && item.prediction), true);
     assert.equal(operationsDashboard.body.governanceReport.sections.some((item) => item.id === "reconciliation-diff"), true);
+    assert.equal(operationsDashboard.body.governanceExportPackage.files.some((item) => item.id === "reconciliation-diff-list"), true);
     assert.equal(operationsDashboard.body.nextDevelopmentResearch.tracks.length >= 5, true);
     assert.equal(operationsDashboard.body.nextDevelopmentResearch.summary.p0 >= 1, true);
 
@@ -306,6 +307,12 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const governanceReport = await api(baseUrl, "/api/operations/governance-report", authorized(accountLogin.body.token));
     assert.equal(governanceReport.response.status, 200);
     assert.equal(governanceReport.body.nextActions.some((item) => /月度运行治理报告/.test(item)), true);
+
+    const governanceExportPackage = await api(baseUrl, "/api/operations/governance-export-package", authorized(accountLogin.body.token));
+    assert.equal(governanceExportPackage.response.status, 200);
+    assert.equal(governanceExportPackage.body.files.some((item) => item.id === "monthly-governance-report"), true);
+    assert.equal(governanceExportPackage.body.files.some((item) => item.id === "attachment-index"), true);
+    assert.match(governanceExportPackage.body.markdown, /导出文件/);
 
     const nextDevelopmentResearch = await api(baseUrl, "/api/operations/next-development-research", authorized(accountLogin.body.token));
     assert.equal(nextDevelopmentResearch.response.status, 200);

@@ -838,6 +838,11 @@ dialog::backdrop {
   border-color: #c7d9fb;
 }
 
+.performance-action-card.export {
+  background: #f4fbf9;
+  border-color: #b8d8d1;
+}
+
 .performance-readiness-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

@@ -399,6 +399,8 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsJs, /renderProductionHardening/);
   assert.match(operationsJs, /renderOperationsIntelligence/);
   assert.match(operationsJs, /renderGovernanceReport/);
+  assert.match(operationsJs, /buildStaticGovernanceExportPackage/);
+  assert.match(operationsJs, /downloadGovernanceExportPackage/);
   assert.match(operationsJs, /renderNextDevelopmentResearch/);
   assert.match(operationsJs, /buildStaticNextDevelopmentResearch/);
   assert.match(operationsJs, /renderCommandChains/);
@@ -434,6 +436,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsJs, /\/api\/operations\/production-hardening/);
   assert.match(operationsJs, /\/api\/operations\/intelligence/);
   assert.match(operationsJs, /\/api\/operations\/governance-report/);
+  assert.match(operationsJs, /\/api\/operations\/governance-export-package/);
   assert.match(operationsJs, /\/api\/operations\/next-development-research/);
   assert.match(operationsJs, /\/operations\/dispatch/);
   assert.match(operationsJs, /\/operations\/dispatch\/.*\/status/);
@@ -442,6 +445,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("portal.css"), /performance-manual-panel/);
   assert.match(read("portal.css"), /performance-indicator-card/);
   assert.match(read("portal.css"), /performance-action-card/);
+  assert.match(read("portal.css"), /performance-action-card\.export/);
   assert.match(read("portal.css"), /performance-readiness-card/);
   assert.match(read("portal.css"), /performance-detail-card/);
   assert.match(read("portal.css"), /interface-mapping-card/);
@@ -482,6 +486,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("server.js"), /\/api\/operations\/production-hardening/);
   assert.match(read("server.js"), /\/api\/operations\/intelligence/);
   assert.match(read("server.js"), /\/api\/operations\/governance-report/);
+  assert.match(read("server.js"), /\/api\/operations\/governance-export-package/);
   assert.match(read("server.js"), /\/api\/operations\/next-development-research/);
   assert.match(read("server.js"), /\/api\/operations\/dispatch\/:id\/status/);
   assert.match(read("server.js"), /buildPerformanceMonitoringEvidence/);
