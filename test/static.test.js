@@ -376,6 +376,10 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("data/db.json"), /"chronicExternalIntegrations"/);
   assert.match(read("data/db.json"), /"chronicPharmacyInsuranceLinks"/);
   assert.match(read("institution.html"), /chronic-followup-workbench/);
+  assert.match(read("institution.html"), /chronic-workbench-controls/);
+  assert.match(read("institution.html"), /chronic-priority-filter/);
+  assert.match(read("institution.html"), /chronic-type-filter/);
+  assert.match(read("institution.html"), /chronic-search/);
   assert.match(read("institution.html"), /chronic-launch-core/);
   assert.match(read("institution.html"), /chronic-integration-actions/);
   assert.match(read("institution.js"), /dispatchChronicFollowup/);
@@ -385,12 +389,17 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("institution.js"), /随访消息/);
   assert.match(read("institution.js"), /buildChronicFollowupPolicyAlignment/);
   assert.match(read("institution.js"), /buildChronicFollowupAlertQueue/);
+  assert.match(read("institution.js"), /filterChronicWorkbenchRows/);
+  assert.match(read("institution.js"), /chronicWorkbenchFilters/);
+  assert.match(read("institution.js"), /chronic-workbench-row/);
   assert.match(read("institution.js"), /loadChronicFollowupSummary/);
   assert.match(read("institution.js"), /\/chronic\/followup-summary/);
   assert.match(read("institution.js"), /\/chronic\/launch-core/);
   assert.match(read("institution.js"), /recordLaunchCoreAction/);
   assert.match(read("institution.js"), /\/chronic\/launch-core\/actions/);
   assert.match(read("institution.js"), /renderChronicLaunchCore/);
+  assert.match(read("portal.css"), /chronic-workbench-controls/);
+  assert.match(read("portal.css"), /chronic-row-meta/);
   assert.match(read("institution.js"), /政策对照/);
   assert.match(read("citizen.html"), /followup-feedback-form/);
   assert.match(read("citizen.html"), /resident-checkin-form/);
