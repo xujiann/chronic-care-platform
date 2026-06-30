@@ -1820,7 +1820,7 @@ function renderEscortAppointments(residentId) {
   const providerSelect = form.elements.providerId;
   const selected = providerSelect.value;
   providerSelect.innerHTML = providers
-    .map((item) => `<option value="${item.id}">${item.name} · ${item.district || "本市"} · ${item.pricing?.halfDayFee || item.feeEstimate || "待估价"} 元起</option>`)
+    .map((item) => `<option value="${item.id}">${formatEscortProviderName(item)} · ${formatEscortDistrict(item.district)} · ${item.pricing?.halfDayFee || item.feeEstimate || "待估价"} 元起</option>`)
     .join("");
   if (selected && providers.some((item) => item.id === selected)) providerSelect.value = selected;
   if (!providerSelect.value && providers[0]) providerSelect.value = providers[0].id;
@@ -1829,8 +1829,8 @@ function renderEscortAppointments(residentId) {
   cards.innerHTML = orders
     .sort((a, b) => String(a.appointmentAt || a.due || "").localeCompare(String(b.appointmentAt || b.due || "")))
     .map((item) => `<article class="mini-card escort-order-card">
-      <h3>${item.hospital || "待确认医院"} · ${item.department || "待确认科室"}</h3>
-      <p class="muted">${item.appointmentAt || item.due || "日期待确认"} · ${item.providerName || providerName(item.providerId)}</p>
+      <h3>${formatEscortHospital(item.hospital)} · ${formatEscortDepartment(item.department)}</h3>
+      <p class="muted">${item.appointmentAt || item.due || "日期待确认"} · ${item.providerName ? formatEscortProviderName(item) : providerName(item.providerId)}</p>
       <p>${formatEscortItems(item.serviceItems)} · ${formatSubsidy(item.subsidyType)} · 预估 ${item.feeEstimate || 0} 元</p>
       <p>合同 ${formatEscortStatus(item.contractStatus)} · 保障 ${formatEscortStatus(item.insuranceStatus)} · 回访 ${formatEscortStatus(item.qualityReview)}</p>
       <p>${formatEscortHospitalHandoff(item)}</p>
@@ -1914,15 +1914,59 @@ function getEscortOrders(residentId) {
 }
 
 function providerName(providerId) {
-  return getEscortProviders().find((item) => item.id === providerId)?.name || "服务主体待确认";
+  const provider = getEscortProviders().find((item) => item.id === providerId);
+  return provider ? formatEscortProviderName(provider) : "服务主体待确认";
+}
+
+function formatEscortProviderName(item) {
+  const value = typeof item === "string" ? item : item?.providerName || item?.name || "";
+  return {
+    "Pudong Elder Care Service Center": "浦东助医陪诊服务中心",
+    "Xuhui Community Day-care Escort Team": "徐汇社区日间照护陪诊队",
+    "Hongkou Time-bank Escort Service Station": "虹口时间银行陪诊服务站"
+  }[value] || value || "服务主体待确认";
+}
+
+function formatEscortDistrict(value) {
+  return {
+    Pudong: "浦东新区",
+    Xuhui: "徐汇区",
+    Hongkou: "虹口区",
+    Yangpu: "杨浦区",
+    Songjiang: "松江区",
+    Changning: "长宁区",
+    Putuo: "普陀区",
+    "Jing'an": "静安区",
+    Huangpu: "黄浦区"
+  }[value] || value || "本市";
+}
+
+function formatEscortHospital(value) {
+  return {
+    "Dalian Central Hospital outpatient clinic demo": "大连市中心医院门诊",
+    "Community follow-up clinic demo": "社区随访门诊",
+    "Specialist outpatient demo": "专科门诊"
+  }[value] || value || "待确认医院";
+}
+
+function formatEscortDepartment(value) {
+  return {
+    Cardiology: "心内科",
+    Endocrinology: "内分泌科",
+    Ophthalmology: "眼科"
+  }[value] || value || "待确认科室";
 }
 
 function formatEscortItems(items) {
   const labels = {
+    "mobility assistance": "行动协助",
     registration: "挂号取号",
     "exam escort": "检查陪同",
     "medication pickup": "取药结算",
-    "report explanation": "报告协助"
+    "payment and medication pickup": "缴费取药",
+    "report explanation": "报告协助",
+    "family communication": "家属沟通",
+    "psychological comfort": "心理慰藉"
   };
   const values = Array.isArray(items) ? items : String(items || "").split(",").map((item) => item.trim()).filter(Boolean);
   return values.map((item) => labels[item] || item).join("、") || "基础陪诊";
@@ -1962,8 +2006,17 @@ function formatEscortHospitalHandoff(item) {
   const status = formatEscortStatus(item.hospitalInterfaceStatus || "pending");
   const queue = item.outpatientQueueNo || item.hospitalCheckInNo || "待医院确认";
   const source = item.hisVisitId || item.appointmentSource || "HIS/预约回执待同步";
-  const contact = item.hospitalDepartmentContact || item.hospitalNotice || "";
+  const contact = formatEscortContact(item.hospitalDepartmentContact || item.hospitalNotice || "");
   return `医院回执 ${status} · ${queue} · ${source}${contact ? ` · ${contact}` : ""}`;
+}
+
+function formatEscortContact(value) {
+  return {
+    "Cardiology outpatient guidance desk": "心内科门诊导诊台",
+    "Outpatient volunteer desk": "门诊志愿服务台",
+    "Arrive at first-floor outpatient service desk 20 minutes before the appointment.": "请提前 20 分钟到一楼门诊服务台报到",
+    "Quality callback required after volunteer escort completion.": "服务完成后需进行质控回访"
+  }[value] || value;
 }
 
 function bindLongTermCareAssessment() {
