@@ -678,7 +678,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   const serviceWorker = read("service-worker.js");
   assert.match(citizenHtml, /rel="manifest"/);
   assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260630visible/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260630touch/);
   assert.match(citizenHtml, /mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-title/);
@@ -687,7 +687,11 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /preview=mobile-nav/);
   assert.match(mobilePreviewHtml, /preview-local-url/);
   assert.match(mobilePreviewHtml, /preview-lan-url/);
+  assert.match(mobilePreviewHtml, /preview-status/);
   assert.match(mobilePreviewHtml, /renderPreviewUrls/);
+  assert.match(mobilePreviewHtml, /renderPreviewStatus/);
+  assert.match(mobilePreviewHtml, /previewServiceLabels/);
+  assert.match(mobilePreviewHtml, /390px 手机视口/);
   assert.match(mobilePreviewHtml, /YOUR-LAN-IP/);
   assert.match(mobilePreviewHtml, /DEMO-MOBILE-R1 \/ 888888/);
   assert.match(mobilePreviewHtml, /citizen\.html\?preview=mobile-nav&client=mini-program&page=health-record/);
@@ -710,8 +714,12 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewCss, /preview-steps/);
   assert.match(mobilePreviewCss, /preview-client-switch/);
   assert.match(mobilePreviewCss, /preview-service-switch/);
+  assert.match(mobilePreviewCss, /preview-status/);
   assert.match(mobilePreviewCss, /preview-checklist/);
   assert.match(mobilePreviewCss, /position: sticky/);
+  assert.match(mobilePreviewCss, /grid-auto-columns: minmax\(74px, 1fr\)/);
+  assert.match(mobilePreviewCss, /scroll-snap-type: x proximity/);
+  assert.match(mobilePreviewCss, /height: min\(760px, calc\(100dvh - 28px\)\)/);
   assert.match(mobilePreviewCss, /grid-template-columns: minmax\(280px, 420px\) minmax\(390px, 430px\)/);
   assert.match(mobilePreviewCss, /max-width: 820px/);
   assert.match(mobilePreviewCss, /height: min\(760px, calc\(100vh - 132px\)\)/);
@@ -726,7 +734,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.shortcuts.some((item) => item.url === "./citizen.html?client=app&page=escort#service-escort"), true);
   assert.equal(manifest.shortcuts.some((item) => item.url === "./mobile-preview.html?client=app"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v22/);
+  assert.match(serviceWorker, /chronic-care-citizen-v23/);
   assert.match(serviceWorker, /internet-nursing\.js\?v=20260629prod/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627preview/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages/);
@@ -740,6 +748,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(serviceWorker, /citizen\.js\?v=20260629care/);
   assert.match(serviceWorker, /citizen\.js\?v=20260630layout/);
   assert.match(serviceWorker, /citizen\.js\?v=20260630visible/);
+  assert.match(serviceWorker, /citizen\.js\?v=20260630touch/);
   assert.match(serviceWorker, /citizen\.html/);
   assert.match(serviceWorker, /mobile-preview\.html/);
   assert.match(serviceWorker, /mobile-preview\.css/);
@@ -912,6 +921,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /APP/);
   assert.match(citizenJs, /renderMobileServiceNav/);
   assert.match(citizenJs, /data-mobile-service-tab/);
+  assert.match(citizenJs, /badge\.textContent = active \? "当前" : "已开"/);
+  assert.match(citizenJs, /\$\{item\.key === activeServiceTab \? "当前" : "已开"\}/);
   assert.match(citizenJs, /citizenPageHref/);
   assert.match(citizenJs, /serviceTabFromRoute/);
   assert.match(citizenJs, /params\.set\("page", key\)/);
@@ -954,6 +965,9 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /longterm-care-grid/);
   assert.match(citizenCss, /longterm-care-result/);
   assert.match(citizenCss, /mobile-service-nav/);
+  assert.match(citizenCss, /touch-action: manipulation/);
+  assert.match(citizenCss, /user-select: none/);
+  assert.match(citizenCss, /mobile-service-nav a\.active small/);
   assert.match(citizenCss, /service-command-panel/);
   assert.match(citizenCss, /\.service-tabs a/);
   assert.match(citizenCss, /\.mobile-service-nav a/);
@@ -988,7 +1002,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /longterm-care-form/);
   assert.match(citizenCss, /registration-form/);
   assert.match(citizenHtml, /registration-summary/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260630visible/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260630touch/);
   assert.match(citizenJs, /registration-summary/);
   assert.match(citizenJs, /hisOrders/);
   assert.match(citizenJs, /insuranceReady/);

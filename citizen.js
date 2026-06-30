@@ -355,7 +355,7 @@ function renderMobileServiceNav() {
   if (!target) return;
   target.innerHTML = getLaunchedCitizenServiceTabs().map((item) => `<a href="${citizenPageHref(item.key)}" data-mobile-service-tab="${item.key}" aria-label="${item.label}，${item.status}" aria-current="${item.key === activeServiceTab ? "page" : "false"}">
     <span>${item.label}</span>
-    <small class="ready">已开</small>
+    <small class="ready">${item.key === activeServiceTab ? "当前" : "已开"}</small>
   </a>`).join("");
   target.querySelectorAll("[data-mobile-service-tab]").forEach((link) => {
     link.addEventListener("click", (event) => {
@@ -572,6 +572,8 @@ function updateServicePanes() {
     link.classList.toggle("active", active);
     link.setAttribute("aria-current", active ? "page" : "false");
     link.setAttribute("href", citizenPageHref(link.dataset.mobileServiceTab));
+    const badge = link.querySelector("small");
+    if (badge) badge.textContent = active ? "当前" : "已开";
   });
   document.querySelectorAll("[data-service-pane]").forEach((pane) => {
     const launched = launchedTabs.some((item) => item.key === pane.dataset.servicePane);
