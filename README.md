@@ -261,4 +261,6 @@ GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下
 
 `POST /api/drug-consumable-supervision/:id/traceability-evidence` accepts role-scoped traceability evidence submissions from institution, insurance, or commission users, validates them against `drugTraceabilityEvidenceRequirements`, stores missing/completed fields on the supervision row, and writes the `drug-consumable-traceability-evidence` audit action.
 
+Each supervision row also returns `traceabilityEvidenceCoverage` with required, complete, partial, missing, and status fields. Insurance, institution, and commission workbench pages display that coverage so joint-test teams can see which traceability-code evidence remains incomplete before signoff.
+
 `drug-consumable-about.html` is the runnable about page for this app. It links policy sources to rational medication, prescription review, fixed pickup, high-value consumable clues, insurance settlement coordination, remediation loops, role boundaries, and field joint-test evidence.

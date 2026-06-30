@@ -143,7 +143,7 @@ function renderDrugConsumableSupervision(report) {
         <h3>${resident?.name || item.residentId || "未知居民"} · ${item.category}</h3>
         <p>${item.institution || "机构待补"} · ${item.boundary} · ${item.issue}</p>
         <p>审方：${item.reviewStatus || "pending"} · 医保：${item.insuranceStatus || "pending"} · 整改：${item.remediationStatus || "open"} · 审计 ${item.auditCount || 0} 条</p>
-        <p>Trace evidence ${item.traceabilityEvidenceStatus || "pending"} · submissions ${(item.traceabilityEvidenceSubmissions || []).length} · coverage ${item.traceabilityEvidenceCoverage?.complete || 0}/${item.traceabilityEvidenceCoverage?.required || 0}</p>
+        <p>Trace evidence ${item.traceabilityEvidenceStatus || "pending"} · submissions ${(item.traceabilityEvidenceSubmissions || []).length} · coverage ${item.traceabilityEvidenceCoverage?.complete || 0}/${item.traceabilityEvidenceCoverage?.required || 0} · status ${item.traceabilityEvidenceCoverage?.status || "pending"} · missing ${item.traceabilityEvidenceCoverage?.missing || 0} · partial ${item.traceabilityEvidenceCoverage?.partial || 0}</p>
         <p>${item.nextAction || "等待下一步处理"}</p>
         <div class="action-row">
           ${drugActionButton(item.id, "review", "审核通过", { reviewStatus: "review-passed", insuranceStatus: "coordinating", status: "in-review", nextAction: "Continue settlement coordination and archive prescription review evidence." })}

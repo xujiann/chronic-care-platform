@@ -201,6 +201,7 @@ test("insurance portal exposes actionable drug consumable supervision workflow",
   assert.match(js, /data-drug-traceability-evidence-checklist/);
   assert.match(js, /traceability-evidence/);
   assert.match(js, /traceabilityEvidenceCoverage/);
+  assert.match(js, /missing \$/);
   assert.match(js, /postDrugConsumableAction/);
   assert.match(js, /data-drug-action/);
   assert.match(institutionHtml, /institution-drug-consumable-panel/);
@@ -213,6 +214,7 @@ test("insurance portal exposes actionable drug consumable supervision workflow",
   assert.match(institutionJs, /postInstitutionDrugConsumableAction/);
   assert.match(institutionJs, /traceability-evidence/);
   assert.match(institutionJs, /traceabilityEvidenceCoverage/);
+  assert.match(institutionJs, /partial \$/);
   assert.match(institutionJs, /postInstitutionDrugConsumableRemediation/);
   assert.match(institutionJs, /data-institution-drug-action/);
   assert.match(institutionJs, /\/drug-consumable-supervision\/\$\{encodeURIComponent\(id\)\}\/\$\{action\}/);
@@ -407,6 +409,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(workbenchJs, /\/api\/tasks/);
   assert.match(workbenchJs, /\/api\/drug-consumable-supervision/);
   assert.match(workbenchJs, /traceabilityEvidenceCoverage/);
+  assert.match(workbenchJs, /status \$/);
   assert.match(workbenchJs, /\/api\/chronic\/acceptance-ledger/);
   assert.match(workbenchJs, /\/api\/county\/acceptance-ledger/);
   assert.match(read("server.js"), /\/api\/process-audit/);

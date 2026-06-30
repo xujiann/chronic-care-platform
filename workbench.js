@@ -265,7 +265,7 @@ function renderDrugConsumableSupervision(report, state) {
       <div>
         <h3>${resident?.name || item.residentId || "Unknown resident"} · ${item.category || item.boundary}</h3>
         <p>${item.institution || "institution pending"} · ${item.issue || item.nextAction || "Drug consumable supervision item"}</p>
-        <small>Trace evidence ${item.traceabilityEvidenceStatus || "pending"} · submissions ${(item.traceabilityEvidenceSubmissions || []).length} · coverage ${item.traceabilityEvidenceCoverage?.complete || 0}/${item.traceabilityEvidenceCoverage?.required || 0}</small>
+        <small>Trace evidence ${item.traceabilityEvidenceStatus || "pending"} · submissions ${(item.traceabilityEvidenceSubmissions || []).length} · coverage ${item.traceabilityEvidenceCoverage?.complete || 0}/${item.traceabilityEvidenceCoverage?.required || 0} · status ${item.traceabilityEvidenceCoverage?.status || "pending"} · missing ${item.traceabilityEvidenceCoverage?.missing || 0} · partial ${item.traceabilityEvidenceCoverage?.partial || 0}</small>
         <small>${item.boundary || ""}</small>
         <small>${item.nextAction || ""}</small>
       </div>
