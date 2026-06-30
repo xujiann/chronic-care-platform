@@ -19,7 +19,7 @@ function renderMarkdown(report) {
   });
   const detailRows = report.templates.map((item) => {
     const documentation = item.documentationRule
-      ? [`About: ${item.documentationRule.aboutPage}`, `Module doc: ${item.documentationRule.requiredDocument}`, "Policy doc: docs/政策依据说明.md", `Reference: ${item.documentationRule.maternalChildReference}`].join("<br>")
+      ? [`About: ${item.documentationRule.aboutPage}`, `Module doc: ${item.documentationRule.requiredDocument}`, "Policy doc: docs/政策依据说明.md", `Codex loop: ${item.documentationRule.codexLoop}`, `Reference: ${item.documentationRule.maternalChildReference}`].join("<br>")
       : "Policy doc: docs/政策依据说明.md";
     return `| ${item.conversationTitle} | ${String(item.functionalBoundary || "").replace(/\|/g, "/")} | ${item.reusePoints.join("<br>")} | ${item.dataCollections.join("<br>")} | ${item.testEvidence.join("<br>")} | ${documentation} |`;
   });

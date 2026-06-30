@@ -32,6 +32,7 @@ test("priority application template artifact renders every application handoff",
   assert.match(markdown, /docs\/maternal-child-policy\.md/);
   assert.match(markdown, /docs\/<module-name>\.md/);
   assert.match(markdown, /docs\/妇幼健康全模块说明\.md/);
+  assert.match(markdown, /Codex loop/);
   assert.match(markdown, /regional-data-sharing/);
   assert.match(markdown, /health-dashboard/);
 

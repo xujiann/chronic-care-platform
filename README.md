@@ -47,7 +47,7 @@ http://localhost:5173/login.html
 | `health` / `whjw` | `index.html` | 大连市卫生健康委 |
 | `hospital` | `institution.html` | 三级医疗机构 |
 | `community` | `institution.html` | 基层医疗机构 |
-| `doctor` / `doctor_wang` | `institution.html` | 医生账户 |
+| `doctor` / `doctor_wang` | `doctor.html` | 医生账户 |
 | `mi` | `insurance.html` | 大连市医保局管理端 |
 | `insurance` | `insurance.html` | 大连市医保中心经办端 |
 | `district_mi` | `insurance.html` | 区市县医保局管理端 |

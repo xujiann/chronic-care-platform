@@ -58,6 +58,7 @@ test("priority application templates expose the eight conversation handoff contr
   assert.equal(report.templates.some((item) => item.conversationTitle === "卫生健康综合驾驶舱" && item.aggregateApplication), true);
   assert.equal(report.templates.every((item) => item.functionalBoundary && item.reusePoints.length && item.dataCollections.length && item.apiRoutes.length && item.frontendEntry && item.testEvidence.length && item.acceptanceEvidence.length), true);
   assert.equal(report.templates.every((item) => item.documentationRule.aboutPage === "about.html" && item.documentationRule.flowDiagram), true);
+  assert.equal(report.templates.every((item) => /small change/.test(item.documentationRule.codexLoop) && /test or build/.test(item.documentationRule.codexLoop)), true);
   assert.equal(report.templates.every((item) => item.conversationStarter && item.conversationStarter.includes(item.id)), true);
   assert.equal(report.templates.every((item) => item.implementationChecklist.length >= 8), true);
   assert.equal(report.templates.every((item) => item.acceptanceGate.readyWhen.length >= 4 && item.acceptanceGate.evidence.length), true);

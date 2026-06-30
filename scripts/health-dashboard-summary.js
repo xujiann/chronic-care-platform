@@ -121,6 +121,7 @@ const DOCUMENTATION_RULE = {
   requiredDocument: "docs/<module-name>.md",
   flowDiagram: "Each template must include a flow diagram covering data source, business workflow, sharing/collaboration, citizen visibility, and management statistics or alerts.",
   requiredSections: ["功能边界", "角色入口", "数据对象", "API 权限", "页面入口", "测试证据", "验收证据", "流程图"],
+  codexLoop: "Plan first, make one small change, run the matching test or build, observe and fix failures, update docs and acceptance notes, then repeat until accepted.",
   maternalChildReference: "docs/妇幼健康全模块说明.md"
 };
 
