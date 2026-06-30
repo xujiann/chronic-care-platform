@@ -657,6 +657,22 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(signoffSummary.body.summary.demoReady, signoffSummary.body.summary.roles);
     assert.equal(signoffSummary.body.signoff.some((item) => item.role === "hospital-it" && item.status === "demo-ready"), true);
     assert.equal(signoffSummary.body.signoff.every((item) => item.siteSignoffRequired), true);
+    const signoffEvidence = await api(baseUrl, "/api/referral-teleconsultations/signoff-summary/county-performance/evidence", authorized(county.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        signerName: "现场负责人",
+        signerOrg: "中山区县域医共体",
+        evidenceNote: "现场联调签收截图已归档",
+        attachmentName: "county-performance-signoff.png"
+      })
+    }));
+    assert.equal(signoffEvidence.response.status, 201);
+    assert.equal(signoffEvidence.body.signoff.role, "county-performance");
+    assert.equal(signoffEvidence.body.summary.siteSigned, 1);
+    const signoffAfterArchive = await api(baseUrl, "/api/referral-teleconsultations/signoff-summary", authorized(county.body.token));
+    assert.equal(signoffAfterArchive.response.status, 200);
+    assert.equal(signoffAfterArchive.body.summary.sitePending, signoffAfterArchive.body.summary.roles - 1);
+    assert.equal(signoffAfterArchive.body.signoff.some((item) => item.role === "county-performance" && item.siteStatus === "signed"), true);
     const referralInsuranceUser = await login(baseUrl, "insurance");
     const performancePolicy = await api(baseUrl, "/api/referral-teleconsultations/performance-policy", authorized(referralInsuranceUser.body.token));
     assert.equal(performancePolicy.response.status, 200);

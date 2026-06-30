@@ -19,6 +19,7 @@ const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const DEMO_PASSWORD = "123456";
 const PASSWORD_HASH_ITERATIONS = 120_000;
 const STORAGE_SCHEMA_VERSION = 7;
+const REFERRAL_SIGNOFF_ROLES = new Set(["referral-center", "receiving-hospital", "hospital-it", "county-performance", "insurance"]);
 const PROJECT_VERSION = (() => {
   try {
     return JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version || "0.0.0";
@@ -4007,6 +4008,7 @@ function normalizeState(data) {
     regionalSharingSnapshots: data.regionalSharingSnapshots && typeof data.regionalSharingSnapshots === "object" ? { ...seedRegionalSharingSnapshots(), ...data.regionalSharingSnapshots } : seedRegionalSharingSnapshots(),
     regionalSharingAccessReviews: Array.isArray(data.regionalSharingAccessReviews) ? data.regionalSharingAccessReviews : seedRegionalSharingAccessReviews(),
     referralTeleconsultations: mergeByKeyWithDefaultFields(seedReferralTeleconsultations(), data.referralTeleconsultations, "id"),
+    referralTeleconsultationSignoffs: Array.isArray(data.referralTeleconsultationSignoffs) ? data.referralTeleconsultationSignoffs : [],
     taskMessages: Array.isArray(data.taskMessages) ? data.taskMessages : [],
     dataQualityIssues: Array.isArray(data.dataQualityIssues) ? data.dataQualityIssues : [],
     careOrders: Array.isArray(data.careOrders) ? data.careOrders : seedCareOrders(),
@@ -6612,6 +6614,10 @@ function buildReferralTeleconsultationJointTestPack(data) {
 
 function buildReferralTeleconsultationSignoffSummary(data, options = {}) {
   const teleconsultations = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
+  const signoffRecords = Array.isArray(data.referralTeleconsultationSignoffs) ? data.referralTeleconsultationSignoffs : [];
+  const signoffByRole = new Map(signoffRecords
+    .filter((item) => REFERRAL_SIGNOFF_ROLES.has(item.role) && item.status === "signed")
+    .map((item) => [item.role, item]));
   const taskMessages = (Array.isArray(data.taskMessages) ? data.taskMessages : [])
     .filter((item) => item.collection === "referralTeleconsultations");
   const contractIds = new Set((Array.isArray(data.integrationContracts) ? data.integrationContracts : []).map((item) => item.id));
@@ -6626,7 +6632,7 @@ function buildReferralTeleconsultationSignoffSummary(data, options = {}) {
     const status = String(item.slaDisposition?.status || item.countySupervision?.status || "").toLowerCase();
     return status && status !== "pending-ack" && (status.includes("acknowledged") || status.includes("closed") || status.includes("已确认") || status.includes("已闭环"));
   });
-  const evidenceRows = [
+  let evidenceRows = [
     {
       role: "referral-center",
       institutionType: "转诊中心",
@@ -6673,12 +6679,24 @@ function buildReferralTeleconsultationSignoffSummary(data, options = {}) {
     siteSignoffRequired: true,
     nextAction: row.localEvidence ? `现场签收：${row.blocker}` : `补齐本地证据：${row.evidence}`
   }));
+  evidenceRows = evidenceRows.map((row) => {
+    const onsiteEvidence = signoffByRole.get(row.role) || null;
+    return {
+      ...row,
+      onsiteEvidence,
+      siteStatus: onsiteEvidence ? "signed" : "pending-site-signoff",
+      nextAction: onsiteEvidence ? "Onsite signoff archived; keep original signed material in the project evidence pack." : row.nextAction
+    };
+  });
+  const signed = evidenceRows.filter((item) => item.onsiteEvidence).length;
   const summary = {
     roles: evidenceRows.length,
     demoReady: evidenceRows.filter((item) => item.localEvidence).length,
     needsEvidence: evidenceRows.filter((item) => !item.localEvidence).length,
-    sitePending: evidenceRows.length,
-    allDemoReady: evidenceRows.every((item) => item.localEvidence)
+    siteSigned: signed,
+    sitePending: evidenceRows.length - signed,
+    allDemoReady: evidenceRows.every((item) => item.localEvidence),
+    allSiteSigned: signed === evidenceRows.length
   };
   if (options.includeRowsOnly) return evidenceRows;
   return {
@@ -6687,6 +6705,58 @@ function buildReferralTeleconsultationSignoffSummary(data, options = {}) {
     summary,
     signoff: evidenceRows
   };
+}
+
+function canSubmitReferralSignoff(user, role) {
+  if (!REFERRAL_SIGNOFF_ROLES.has(role)) return false;
+  if (["commission", "county"].includes(user.role)) return true;
+  if (user.role === "insurance") return role === "insurance";
+  if (user.role === "institution") return ["referral-center", "receiving-hospital", "hospital-it"].includes(role);
+  return false;
+}
+
+function upsertReferralTeleconsultationSignoff(data, role, payload, user) {
+  const signerName = String(payload.signerName || user.name || "").trim();
+  const signerOrg = String(payload.signerOrg || user.orgName || "").trim();
+  const evidenceNote = String(payload.evidenceNote || payload.note || "").trim();
+  if (!REFERRAL_SIGNOFF_ROLES.has(role)) {
+    return { status: 404, body: { error: "Not Found", message: "referral signoff role not found" } };
+  }
+  if (!canSubmitReferralSignoff(user, role)) {
+    return { status: 403, body: { error: "Forbidden", message: "role cannot submit this signoff evidence" } };
+  }
+  if (!signerName || !signerOrg || !evidenceNote) {
+    return { status: 400, body: { error: "Bad Request", message: "signerName, signerOrg and evidenceNote are required" } };
+  }
+  const now = new Date().toISOString();
+  const current = Array.isArray(data.referralTeleconsultationSignoffs) ? data.referralTeleconsultationSignoffs : [];
+  const previous = current.find((item) => item.role === role && item.status === "signed");
+  const record = {
+    id: previous?.id || `rtcs-${role}-${createHash("sha1").update(`${role}:${signerOrg}`).digest("hex").slice(0, 8)}`,
+    role,
+    status: "signed",
+    signerName,
+    signerOrg,
+    signedAt: String(payload.signedAt || now).trim(),
+    evidenceNote,
+    attachmentName: String(payload.attachmentName || "").trim(),
+    evidenceType: String(payload.evidenceType || "onsite-signoff").trim(),
+    submittedBy: user.username || user.role,
+    submittedByName: user.name,
+    submittedAt: now,
+    auditTrail: [
+      { at: now, actor: user.username || user.role, action: previous ? "updated" : "created", note: evidenceNote },
+      ...(Array.isArray(previous?.auditTrail) ? previous.auditTrail : [])
+    ].slice(0, 20)
+  };
+  data.referralTeleconsultationSignoffs = [
+    record,
+    ...current.filter((item) => !(item.role === role && item.status === "signed"))
+  ].slice(0, 50);
+  appendDataAccessLog(data, user, "", "referral teleconsultation onsite signoff", `${role}: ${evidenceNote}`, "allowed");
+  writeDatabase(data);
+  appendSecurityEvent({ actor: user.name, role: user.role, action: "archive referral teleconsultation signoff", target: role, result: "allowed", detail: evidenceNote });
+  return { status: previous ? 200 : 201, body: { ok: true, signoff: record, summary: buildReferralTeleconsultationSignoffSummary(data).summary } };
 }
 
 function buildReferralInsurancePerformancePolicy(data) {
@@ -7932,6 +8002,16 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/referral-teleconsultations/signoff-summary");
     if (!user) return;
     sendJson(res, 200, buildReferralTeleconsultationSignoffSummary(readDatabase()));
+    return;
+  }
+
+  const referralSignoffEvidenceMatch = url.pathname.match(/^\/api\/referral-teleconsultations\/signoff-summary\/([^/]+)\/evidence$/);
+  if (req.method === "POST" && referralSignoffEvidenceMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/referral-teleconsultations/signoff-summary/:role/evidence");
+    if (!user) return;
+    const data = readDatabase();
+    const result = upsertReferralTeleconsultationSignoff(data, decodeURIComponent(referralSignoffEvidenceMatch[1]), await collectJson(req), user);
+    sendJson(res, result.status, result.body);
     return;
   }
 

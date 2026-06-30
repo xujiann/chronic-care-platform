@@ -26,6 +26,7 @@ test("referral teleconsultation readiness validates closed-loop evidence", () =>
   assert.equal(report.summary.slaMessages >= 1, true);
   assert.equal(report.summary.acknowledgedEscalations >= 1, true);
   assert.equal(report.summary.signoffDemoReady, report.summary.signoffRoles);
+  assert.equal(report.summary.signoffSiteSigned >= 0, true);
   assert.equal(report.summary.signoffSitePending >= 5, true);
   assert.equal(report.summary.countySupervisionRows >= 2, true);
   assert.equal(report.summary.insurancePerformanceRows >= 2, true);
@@ -45,6 +46,7 @@ test("referral teleconsultation readiness validates closed-loop evidence", () =>
   assert.equal(report.checks.some((item) => item.id === "referral:countySupervision" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:jointTestPack" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:signoffSummary" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "referral:signoffArchive" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:insurancePerformancePolicy" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:frontend" && item.passed), true);
   assert.match(renderMarkdown(report), /Referral teleconsultation readiness report/);
@@ -69,6 +71,7 @@ test("referral teleconsultation readiness writes release artifacts", (t) => {
   assert.match(md, /High risk escalations/);
   assert.match(md, /Acknowledged escalations/);
   assert.match(md, /Signoff demo-ready roles/);
+  assert.match(md, /Site signoffs archived/);
   assert.match(md, /Site signoffs pending/);
   assert.match(md, /County supervision rows/);
   assert.match(md, /Insurance performance rows/);

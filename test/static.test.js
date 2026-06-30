@@ -364,6 +364,8 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("county.js"), /renderCountyTeleconsultationRiskBoard/);
   assert.match(read("county.js"), /buildCountyTeleconsultationSignoffRows/);
   assert.match(read("county.js"), /data-referral-signoff-status/);
+  assert.match(read("county.js"), /data-referral-signoff-submit/);
+  assert.match(read("county.js"), /archiveReferralSignoff/);
   assert.match(read("county.js"), /data-referral-escalation/);
   assert.match(read("county.js"), /data-county-sla-ack/);
   assert.match(read("county.js"), /label\.includes\("关闭"\)/);
@@ -374,6 +376,9 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("server.js"), /referral-teleconsultations\/escalations\/run/);
   assert.match(read("server.js"), /referral-teleconsultations\/joint-test-pack/);
   assert.match(read("server.js"), /referral-teleconsultations\/signoff-summary/);
+  assert.match(read("server.js"), /signoff-summary\/:role\/evidence/);
+  assert.match(read("server.js"), /upsertReferralTeleconsultationSignoff/);
+  assert.match(read("server.js"), /canSubmitReferralSignoff/);
   assert.match(read("server.js"), /buildReferralTeleconsultationSignoffSummary/);
   assert.match(read("server.js"), /mergeByKeyWithDefaultFields\(seedReferralTeleconsultations\(\), data\.referralTeleconsultations, "id"\)/);
   assert.match(read("server.js"), /function mergeByKeyWithDefaultFields/);

@@ -17,7 +17,8 @@ const REQUIRED_BOUNDARIES = [
   "SLA disposition",
   "joint test pack",
   "insurance payment policy",
-  "onsite signoff summary"
+  "onsite signoff summary",
+  "onsite signoff archive"
 ];
 
 function readJson(relativePath) {
@@ -71,6 +72,10 @@ function buildReferralTeleconsultationEscalations(rows, options = {}) {
 
 function buildReferralTeleconsultationSignoffSummary(data) {
   const teleconsultations = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
+  const signoffRecords = Array.isArray(data.referralTeleconsultationSignoffs) ? data.referralTeleconsultationSignoffs : [];
+  const signoffByRole = new Map(signoffRecords
+    .filter((item) => item.status === "signed")
+    .map((item) => [item.role, item]));
   const taskMessages = (Array.isArray(data.taskMessages) ? data.taskMessages : [])
     .filter((item) => item.collection === "referralTeleconsultations");
   const contractIds = new Set((Array.isArray(data.integrationContracts) ? data.integrationContracts : []).map((item) => item.id));
@@ -103,15 +108,25 @@ function buildReferralTeleconsultationSignoffSummary(data) {
       role: "insurance",
       localEvidence: teleconsultations.every((item) => item.performance?.insurancePaymentPath && item.performance?.repeatExamControl)
     }
-  ];
+  ].map((row) => {
+    const onsiteEvidence = signoffByRole.get(row.role) || null;
+    return {
+      ...row,
+      onsiteEvidence,
+      siteStatus: onsiteEvidence ? "signed" : "pending-site-signoff"
+    };
+  });
+  const siteSigned = rows.filter((item) => item.onsiteEvidence).length;
   return {
     roles: rows,
     summary: {
       roles: rows.length,
       demoReady: rows.filter((item) => item.localEvidence).length,
       needsEvidence: rows.filter((item) => !item.localEvidence).length,
-      sitePending: rows.length,
-      allDemoReady: rows.every((item) => item.localEvidence)
+      siteSigned,
+      sitePending: rows.length - siteSigned,
+      allDemoReady: rows.every((item) => item.localEvidence),
+      allSiteSigned: siteSigned === rows.length
     }
   };
 }
@@ -160,7 +175,8 @@ function buildReferralTeleconsultationReadinessReport(options = {}) {
     "SLA disposition": teleconsultations.every((item) => item.slaDisposition && item.countySupervision),
     "joint test pack": /buildReferralTeleconsultationJointTestPack/.test(server),
     "insurance payment policy": teleconsultations.every((item) => item.performance?.insurancePaymentPath),
-    "onsite signoff summary": signoffSummary.summary.roles >= 5 && signoffSummary.summary.demoReady >= 5
+    "onsite signoff summary": signoffSummary.summary.roles >= 5 && signoffSummary.summary.demoReady >= 5,
+    "onsite signoff archive": /upsertReferralTeleconsultationSignoff/.test(server) && /data-referral-signoff-submit/.test(county)
   };
   const checks = [
     { id: "referral:boundary", passed: REQUIRED_BOUNDARIES.every((item) => boundaryEvidence[item]), detail: REQUIRED_BOUNDARIES.join(", ") },
@@ -179,6 +195,7 @@ function buildReferralTeleconsultationReadinessReport(options = {}) {
     { id: "referral:countySupervision", passed: countySupervised.length === teleconsultations.length && /Supervision/.test(county), detail: `${countySupervised.length}/${teleconsultations.length} county supervision rows` },
     { id: "referral:jointTestPack", passed: /joint-test-pack/.test(server) && /buildReferralTeleconsultationJointTestPack/.test(server), detail: "runtime joint-test pack exposes callback samples, checklist, and signoff roles" },
     { id: "referral:signoffSummary", passed: /signoff-summary/.test(server) && /county-teleconsultation-signoff/.test(county) && signoffSummary.summary.allDemoReady, detail: `${signoffSummary.summary.demoReady}/${signoffSummary.summary.roles} demo-ready roles; ${signoffSummary.summary.sitePending} site signoffs pending` },
+    { id: "referral:signoffArchive", passed: /upsertReferralTeleconsultationSignoff/.test(server) && /signoff-summary\/:role\/evidence/.test(server) && /archiveReferralSignoff/.test(county) && /data-referral-signoff-submit/.test(county), detail: `${signoffSummary.summary.siteSigned}/${signoffSummary.summary.roles} onsite signoffs archived; ${signoffSummary.summary.sitePending} pending` },
     { id: "referral:insurancePerformancePolicy", passed: insurancePerformanceRows.length === teleconsultations.length && /performance-policy/.test(server) && /referral-performance-policy/.test(readText("insurance.html") + readText("insurance.js")), detail: `${insurancePerformanceRows.length}/${teleconsultations.length} payment policy rows` },
     { id: "referral:api", passed: /\/api\/referral-teleconsultations/.test(server) && /feedback-callback/.test(server) && /schedule-callback/.test(server) && /report-callback/.test(server) && /verifyIntegrationSignature/.test(server) && /canAccessReferralTeleconsultation/.test(server) && /appendDataAccessLog/.test(server), detail: "specialized API, signed feedback/schedule/report callbacks, role guard, and audit log present" },
     { id: "referral:frontend", passed: /teleconsultation-form/.test(institution) && /teleconsultation-action-form/.test(institution) && /teleconsultation-loop/.test(institution) && /county-teleconsultation-loop/.test(county) && /county-teleconsultation-status-filter/.test(county), detail: "institution create form, feedback form, institution loop, and county command entry present" },
@@ -201,6 +218,7 @@ function buildReferralTeleconsultationReadinessReport(options = {}) {
       acknowledgedEscalations: acknowledgedEscalations.length,
       signoffRoles: signoffSummary.summary.roles,
       signoffDemoReady: signoffSummary.summary.demoReady,
+      signoffSiteSigned: signoffSummary.summary.siteSigned,
       signoffSitePending: signoffSummary.summary.sitePending,
       countySupervisionRows: countySupervised.length,
       insurancePerformanceRows: insurancePerformanceRows.length,
@@ -246,6 +264,7 @@ function renderMarkdown(report) {
     `- SLA messages: ${report.summary.slaMessages}`,
     `- Acknowledged escalations: ${report.summary.acknowledgedEscalations}`,
     `- Signoff demo-ready roles: ${report.summary.signoffDemoReady}/${report.summary.signoffRoles}`,
+    `- Site signoffs archived: ${report.summary.signoffSiteSigned}/${report.summary.signoffRoles}`,
     `- Site signoffs pending: ${report.summary.signoffSitePending}`,
     `- County supervision rows: ${report.summary.countySupervisionRows}`,
     `- Insurance performance rows: ${report.summary.insurancePerformanceRows}`,

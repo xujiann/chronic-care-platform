@@ -1,4 +1,4 @@
-const fallbackState = { countyConsortium: null, countyProjectBlueprint: null, countyCollaborationOrders: [], countyAiDiagnosisCases: [], countyMutualRecognitionRecords: [], referralTeleconsultations: [], residents: [], medicalResources: [], personalRecords: [], taskMessages: [], integrationContracts: [] };
+const fallbackState = { countyConsortium: null, countyProjectBlueprint: null, countyCollaborationOrders: [], countyAiDiagnosisCases: [], countyMutualRecognitionRecords: [], referralTeleconsultations: [], referralTeleconsultationSignoffs: [], residents: [], medicalResources: [], personalRecords: [], taskMessages: [], integrationContracts: [] };
 let platformState = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -269,12 +269,17 @@ function renderCountyTeleconsultationSignoff(state, rows) {
     <footer>
       <small>${item.localEvidence ? "本地证据已就绪" : "本地证据待补齐"}：${item.evidence}</small>
       <small>${item.nextAction}</small>
+      ${item.onsiteEvidence ? `<small>Signed by ${item.onsiteEvidence.signerName} · ${item.onsiteEvidence.signerOrg}</small>` : ""}
+      <button class="inline-action" type="button" data-referral-signoff-submit data-role="${item.role}" ${item.onsiteEvidence ? "disabled" : ""}>Archive signoff</button>
     </footer>
   </article>`).join("");
 }
 
 function buildCountyTeleconsultationSignoffRows(state, rows) {
   const messages = (state.taskMessages || []).filter((item) => item.collection === "referralTeleconsultations");
+  const signoffByRole = new Map((state.referralTeleconsultationSignoffs || [])
+    .filter((item) => item.status === "signed")
+    .map((item) => [item.role, item]));
   const contractIds = new Set((state.integrationContracts || []).map((item) => item.id));
   const archivedReportIds = new Set((state.personalRecords || [])
     .filter((item) => item.category === "teleconsultation-report" && item.teleconsultationId)
@@ -333,6 +338,7 @@ function buildCountyTeleconsultationSignoffRows(state, rows) {
   ];
   return signoffRows.map((item) => ({
     ...item,
+    onsiteEvidence: signoffByRole.get(item.role) || null,
     nextAction: item.localEvidence ? `现场签收：${item.blocker}` : `补齐证据：${item.evidence}`
   }));
 }
@@ -461,6 +467,13 @@ function bindCountyActions() {
       renderCountyTeleconsultationLoop(platformState);
       return;
     }
+    const signoffButton = event.target.closest("[data-referral-signoff-submit]");
+    if (signoffButton && platformState) {
+      signoffButton.disabled = true;
+      await archiveReferralSignoff(platformState, signoffButton.dataset.role);
+      renderCountyTeleconsultationLoop(platformState);
+      return;
+    }
     const button = event.target.closest("[data-county-action]");
     if (!button || !platformState) return;
     const updates = JSON.parse(button.dataset.updates || "{}");
@@ -555,6 +568,56 @@ async function acknowledgeCountySla(state, id, mode) {
         countySupervision: { ...(item.countySupervision || {}), status: status === "closed" ? "已闭环" : "已确认", action, updatedAt: now }
       }
     : item);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  return { ok: true };
+}
+
+async function archiveReferralSignoff(state, role) {
+  const payload = {
+    signerName: "现场联调负责人",
+    signerOrg: "中山区县域医共体",
+    evidenceNote: `${role} onsite signoff archived from county command board`,
+    attachmentName: `${role}-signoff-screenshot.png`,
+    evidenceType: "onsite-signoff"
+  };
+  if (API_BASE) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/referral-teleconsultations/signoff-summary/${encodeURIComponent(role)}/evidence`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (response.ok) {
+        const result = await response.json();
+        state.referralTeleconsultationSignoffs = [
+          result.signoff,
+          ...(state.referralTeleconsultationSignoffs || []).filter((item) => !(item.role === role && item.status === "signed"))
+        ].slice(0, 50);
+        return { ok: true };
+      }
+    } catch (error) {
+      // Static preview falls back to local signoff below.
+    }
+  }
+  const now = new Date().toISOString();
+  const signoff = {
+    id: `local-signoff-${role}`,
+    role,
+    status: "signed",
+    signerName: payload.signerName,
+    signerOrg: payload.signerOrg,
+    evidenceNote: payload.evidenceNote,
+    attachmentName: payload.attachmentName,
+    evidenceType: payload.evidenceType,
+    signedAt: now,
+    submittedAt: now,
+    submittedBy: "county-preview"
+  };
+  state.referralTeleconsultationSignoffs = [
+    signoff,
+    ...(state.referralTeleconsultationSignoffs || []).filter((item) => !(item.role === role && item.status === "signed"))
+  ].slice(0, 50);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   return { ok: true };
 }
