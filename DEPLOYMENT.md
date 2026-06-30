@@ -254,4 +254,6 @@ Before publishing any platform template, page, remediation record, joint-test fi
 
 For drug traceability-code field joint testing, keep `drugTraceabilityEvidenceRequirements` aligned with site scanner fields,医保编码/商品码/追溯码映射, no-code exception handling, high-value consumable catalog versions, and remediation audit attachments. `drug-consumable:readiness`, `deploy:check`, and `release:report` now fail if these evidence requirements are missing or disconnected from official policy sources.
 
+During scanner, pharmacy, and insurance settlement joint testing, submit sample evidence through `POST /api/drug-consumable-supervision/:id/traceability-evidence` or the insurance/institution portal buttons. Archive the returned `traceabilityEvidenceSubmissions`, completed/missing fields, and audit action with the site signoff package.
+
 Use `drug-consumable-about.html` during site walkthroughs as the policy explanation page for drug traceability-code collection, rational medication review, fixed pickup, high-value consumable clues, insurance settlement coordination, remediation evidence, role boundaries, and remaining field integration work.

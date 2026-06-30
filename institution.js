@@ -37,7 +37,7 @@ function bindInstitutionActions() {
     if (drugButton) {
       drugButton.disabled = true;
       const payload = JSON.parse(drugButton.dataset.payload || "{}");
-      await postInstitutionDrugConsumableRemediation(drugButton.dataset.id, payload);
+      await postInstitutionDrugConsumableAction(drugButton.dataset.id, drugButton.dataset.institutionDrugAction || "remediation", payload);
       drugButton.disabled = false;
       return;
     }
@@ -83,10 +83,10 @@ async function loadInstitutionDrugConsumableSupervision(state = platformState) {
   }
 }
 
-async function postInstitutionDrugConsumableRemediation(id, body) {
+async function postInstitutionDrugConsumableAction(id, action, body) {
   if (!institutionApiBase) return false;
   const request = window.HealthCityAuth?.authFetch || fetch;
-  const response = await request(`${institutionApiBase}/drug-consumable-supervision/${encodeURIComponent(id)}/remediation`, {
+  const response = await request(`${institutionApiBase}/drug-consumable-supervision/${encodeURIComponent(id)}/${action}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
@@ -98,12 +98,16 @@ async function postInstitutionDrugConsumableRemediation(id, body) {
   return true;
 }
 
+async function postInstitutionDrugConsumableRemediation(id, body) {
+  return postInstitutionDrugConsumableAction(id, "remediation", body);
+}
+
 function actionButton(collection, id, label, updates, note) {
   return `<button class="inline-action" type="button" data-workflow-action data-collection="${collection}" data-id="${id}" data-updates='${JSON.stringify(updates)}' data-note="${note || label}">${label}</button>`;
 }
 
-function institutionDrugActionButton(id, label, payload) {
-  return `<button class="inline-action" type="button" data-institution-drug-action data-id="${id}" data-payload='${JSON.stringify(payload)}'>${label}</button>`;
+function institutionDrugActionButton(id, label, payload, action = "remediation") {
+  return `<button class="inline-action" type="button" data-institution-drug-action="${action}" data-id="${id}" data-payload='${JSON.stringify(payload)}'>${label}</button>`;
 }
 
 function residentOf(state, id) {
@@ -462,9 +466,11 @@ function renderInstitutionDrugConsumableSupervision(report, state) {
         <h3>${resident?.name || item.residentId || "Unknown resident"} · ${item.category || item.boundary}</h3>
         <p>${item.institution || "institution pending"} · ${item.issue || item.nextAction || "Drug consumable supervision item"}</p>
         <p>Review ${item.reviewStatus || "pending"} · Insurance ${item.insuranceStatus || "pending"} · Remediation ${item.remediationStatus || "open"} · Audit ${item.auditCount || 0}</p>
+        <p>Trace evidence ${item.traceabilityEvidenceStatus || "pending"} · submissions ${(item.traceabilityEvidenceSubmissions || []).length}</p>
         <p>${item.nextAction || "Upload institution remediation evidence and wait for regulator review."}</p>
         <div class="action-row">
           ${institutionDrugActionButton(item.id, "Submit remediation", { remediationStatus: "submitted", status: "remediation-submitted", evidence: "institution-remediation-evidence", nextAction: "Regulator reviews institution remediation evidence." })}
+          ${institutionDrugActionButton(item.id, "Trace scan uploaded", { requirementId: "trace-scan-capture", evidenceSource: "institution-scanner-joint-test", fields: { traceCode: "TRACE-DEMO-001", scanTime: "2026-06-30T09:00:00.000Z", packageLevel: "unit", operator: "institution-demo", sourceSystem: "pharmacy-scanner" }, nextAction: "Insurance center verifies scan capture and settlement mapping." }, "traceability-evidence")}
           ${institutionDrugActionButton(item.id, "Catalog version uploaded", { remediationStatus: "catalog-version-uploaded", status: "remediation-evidence-uploaded", evidence: "institution-uploaded-catalog-version", nextAction: "Insurance center cross-checks settlement and catalog version." })}
         </div>
       </div>

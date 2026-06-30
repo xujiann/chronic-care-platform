@@ -143,10 +143,12 @@ function renderDrugConsumableSupervision(report) {
         <h3>${resident?.name || item.residentId || "未知居民"} · ${item.category}</h3>
         <p>${item.institution || "机构待补"} · ${item.boundary} · ${item.issue}</p>
         <p>审方：${item.reviewStatus || "pending"} · 医保：${item.insuranceStatus || "pending"} · 整改：${item.remediationStatus || "open"} · 审计 ${item.auditCount || 0} 条</p>
+        <p>Trace evidence ${item.traceabilityEvidenceStatus || "pending"} · submissions ${(item.traceabilityEvidenceSubmissions || []).length}</p>
         <p>${item.nextAction || "等待下一步处理"}</p>
         <div class="action-row">
           ${drugActionButton(item.id, "review", "审核通过", { reviewStatus: "review-passed", insuranceStatus: "coordinating", status: "in-review", nextAction: "Continue settlement coordination and archive prescription review evidence." })}
           ${drugActionButton(item.id, "insurance-sync", "医保同步", { insuranceStatus: "synced", status: "insurance-synced", settlementBatch: "demo-drug-consumable", nextAction: "Archive settlement coordination evidence." })}
+          ${drugActionButton(item.id, "traceability-evidence", "Trace evidence", { requirementId: "trace-code-mapping", evidenceSource: "insurance-settlement-joint-test", fields: { medicalInsuranceCode: "MI-DEMO-001", commodityCode: "COM-DEMO-001", traceCode: "TRACE-DEMO-001", packageCascade: "box-pack-unit", mappingVersion: "demo-2026.1" }, nextAction: "Institution and insurance center review traceability-code mapping evidence." })}
           ${drugActionButton(item.id, "remediation", "提交整改", { remediationStatus: "submitted", status: "remediation-submitted", evidence: "demo-remediation-evidence", nextAction: "Regulator reviews remediation evidence." })}
         </div>
       </div>

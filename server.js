@@ -5147,6 +5147,37 @@ function buildDrugTraceabilityEvidenceChecklist(rows, policySources, requirement
   });
 }
 
+function buildDrugTraceabilityEvidenceSubmission(data, item, payload, user) {
+  const requirements = Array.isArray(data.drugTraceabilityEvidenceRequirements) ? data.drugTraceabilityEvidenceRequirements : seedDrugTraceabilityEvidenceRequirements();
+  const policySources = Array.isArray(data.drugTraceabilityPolicySources) ? data.drugTraceabilityPolicySources : seedDrugTraceabilityPolicySources();
+  const requirement = requirements.find((row) => row.id === payload.requirementId) ||
+    requirements.find((row) => (row.boundaries || []).includes(item.boundary)) ||
+    requirements[0];
+  const fields = payload.fields && typeof payload.fields === "object" ? payload.fields : {};
+  const expectedFields = Array.isArray(requirement?.evidenceFields) ? requirement.evidenceFields : [];
+  const completedFields = expectedFields.filter((field) => fields[field] !== undefined && fields[field] !== null && String(fields[field]).trim() !== "");
+  const missingFields = expectedFields.filter((field) => !completedFields.includes(field));
+  const policySourceIds = (requirement?.policySourceIds || []).filter((id) => policySources.some((source) => source.id === id));
+  const completeness = missingFields.length === 0 && expectedFields.length > 0 ? "complete" : "partial";
+  return {
+    id: `dte-${randomUUID()}`,
+    requirementId: requirement?.id || String(payload.requirementId || "traceability-evidence"),
+    title: requirement?.title || "Traceability evidence",
+    submittedAt: new Date().toISOString(),
+    submittedBy: user.username || user.role,
+    submittedByName: user.name,
+    submittedByRole: user.role,
+    evidenceSource: String(payload.evidenceSource || payload.source || "manual-entry"),
+    fields,
+    expectedFields,
+    completedFields,
+    missingFields,
+    policySourceIds,
+    completeness,
+    note: String(payload.note || payload.nextAction || "").trim()
+  };
+}
+
 function buildDrugConsumableSupervision(data) {
   const supervisions = Array.isArray(data.drugConsumableSupervisions) ? data.drugConsumableSupervisions : seedDrugConsumableSupervisions();
   const traceabilityPolicySources = Array.isArray(data.drugTraceabilityPolicySources) ? data.drugTraceabilityPolicySources : seedDrugTraceabilityPolicySources();
@@ -5714,6 +5745,30 @@ async function handleApi(req, res) {
       status: String(payload.status || "insurance-synced"),
       nextAction: String(payload.nextAction || payload.note || "Archive settlement coordination evidence.")
     }, user, "drug-consumable-insurance-sync");
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname.startsWith("/api/drug-consumable-supervision/") && url.pathname.endsWith("/traceability-evidence")) {
+    const user = requireApiRole(req, res, ["commission", "insurance", "institution"], "/api/drug-consumable-supervision/:id/traceability-evidence");
+    if (!user) return;
+    const id = decodeURIComponent(url.pathname.replace("/api/drug-consumable-supervision/", "").replace("/traceability-evidence", ""));
+    const data = readDatabase();
+    const item = (Array.isArray(data.drugConsumableSupervisions) ? data.drugConsumableSupervisions : []).find((row) => row.id === id);
+    if (!item) {
+      sendJson(res, 404, { error: "Not Found", message: "drug consumable supervision not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const submission = buildDrugTraceabilityEvidenceSubmission(data, item, payload, user);
+    const submissions = [submission, ...(Array.isArray(item.traceabilityEvidenceSubmissions) ? item.traceabilityEvidenceSubmissions : [])].slice(0, 10);
+    const result = updateDrugConsumableSupervision(data, id, {
+      traceabilityEvidenceSubmissions: submissions,
+      traceabilityEvidenceStatus: submission.completeness,
+      status: submission.completeness === "complete" ? String(payload.status || "traceability-evidence-complete") : String(payload.status || "traceability-evidence-partial"),
+      remediationStatus: submission.completeness === "complete" ? String(payload.remediationStatus || "evidence-complete") : String(payload.remediationStatus || "evidence-partial"),
+      nextAction: String(payload.nextAction || (submission.completeness === "complete" ? "Review submitted traceability evidence and archive field joint-test proof." : `Complete missing traceability fields: ${submission.missingFields.join(", ")}`))
+    }, user, "drug-consumable-traceability-evidence");
     sendJson(res, result.status, result.body);
     return;
   }

@@ -20,12 +20,14 @@ test("drug consumable readiness covers required supervision boundaries", () => {
   assert.equal(report.summary.traceabilityPolicySources >= 5, true);
   assert.equal(report.summary.traceabilityEvidenceRequirements >= 5, true);
   assert.equal(report.summary.traceabilityEvidenceReady >= 5, true);
+  assert.equal(report.summary.traceabilitySubmissionReady, true);
   assert.equal(report.summary.workflowReuseReady, true);
   assert.equal(report.summary.institutionRemediationReady, true);
   assert.equal(report.linkedRows.every((item) => item.auditTrailPresent), true);
   assert.equal(report.checks.some((item) => item.id === "drug-consumable:workflow-reuse" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "drug-consumable:traceability-policy" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "drug-consumable:traceability-evidence" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "drug-consumable:traceability-submission" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "drug-consumable:frontend" && item.passed), true);
   assert.equal(report.traceabilityEvidenceChecklist.some((item) => item.id === "trace-consumable-catalog" && item.ready), true);
   assert.equal(report.traceabilityEvidenceChecklist.every((item) => item.rowCount > 0), true);

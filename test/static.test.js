@@ -199,6 +199,7 @@ test("insurance portal exposes actionable drug consumable supervision workflow",
   assert.match(js, /renderTraceabilityEvidenceChecklist/);
   assert.match(js, /data-drug-traceability-policy-sources/);
   assert.match(js, /data-drug-traceability-evidence-checklist/);
+  assert.match(js, /traceability-evidence/);
   assert.match(js, /postDrugConsumableAction/);
   assert.match(js, /data-drug-action/);
   assert.match(institutionHtml, /institution-drug-consumable-panel/);
@@ -208,14 +209,18 @@ test("insurance portal exposes actionable drug consumable supervision workflow",
   assert.match(institutionJs, /renderInstitutionTraceabilityEvidenceChecklist/);
   assert.match(institutionJs, /data-institution-traceability-policy-sources/);
   assert.match(institutionJs, /data-institution-traceability-evidence-checklist/);
+  assert.match(institutionJs, /postInstitutionDrugConsumableAction/);
+  assert.match(institutionJs, /traceability-evidence/);
   assert.match(institutionJs, /postInstitutionDrugConsumableRemediation/);
   assert.match(institutionJs, /data-institution-drug-action/);
-  assert.match(institutionJs, /\/drug-consumable-supervision\/\$\{encodeURIComponent\(id\)\}\/remediation/);
+  assert.match(institutionJs, /\/drug-consumable-supervision\/\$\{encodeURIComponent\(id\)\}\/\$\{action\}/);
   assert.match(server, /buildDrugConsumableSupervision/);
   assert.match(server, /\/api\/drug-consumable-supervision/);
   assert.match(server, /traceabilityPolicySources/);
   assert.match(server, /buildDrugTraceabilityEvidenceChecklist/);
+  assert.match(server, /buildDrugTraceabilityEvidenceSubmission/);
   assert.match(server, /traceabilityEvidenceChecklist/);
+  assert.match(server, /drug-consumable-traceability-evidence/);
   assert.match(server, /drug-consumable-review/);
   assert.match(server, /drug-consumable-remediation/);
   assert.match(server, /drug-consumable-insurance-sync/);
