@@ -6,8 +6,14 @@
     <title>居民端 · 健康档案与电子病历</title>
     <link rel="manifest" href="./manifest.webmanifest" />
     <meta name="theme-color" content="#1d4ed8" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="慢病居民端" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="apple-touch-icon" href="./pwa-icon.svg" />
     <link rel="stylesheet" href="./citizen.css" />
-    <script src="./auth.js"></script>
+    <script src="./auth.js?v=20260627"></script>
     <script>window.HealthCityAuth.requireRole(["citizen"])</script>
   </head>
   <body>
@@ -22,6 +28,7 @@
           <select id="account-select" aria-label="选择个人账户"></select>
           <button class="ghost-link" id="large-mode" type="button" aria-pressed="false">大字模式</button>
           <a class="ghost-link" href="./health-city.html">系统总览</a>
+          <a class="ghost-link" href="./about.html">关于</a>
           <a class="ghost-link" href="./mobile-preview.html">手机预览</a>
         </div>
       </header>
@@ -43,9 +50,47 @@
         <div id="profile-risk" class="risk-pill">风险等级</div>
       </section>
 
+      <section class="service-command-panel" aria-label="居民服务工作台">
+        <nav class="service-tabs" id="service-tabs" aria-label="居民服务标签页"></nav>
+        <section class="service-summary" id="service-summary" aria-live="polite"></section>
+      </section>
+
       <section class="summary-grid" id="summary-grid"></section>
 
-      <section class="panel citizen-trend-panel">
+      <section class="module-interface-panel" id="module-interface-panel" aria-labelledby="module-interface-title">
+        <div class="panel-title">
+          <div>
+            <h2 id="module-interface-title">模块接口</h2>
+            <span>居民端与健康档案、病历、护理、陪诊、挂号和消息中心的接口关系</span>
+          </div>
+        </div>
+        <div class="module-interface-grid" id="module-interface-grid"></div>
+      </section>
+
+      <section class="data-governance-panel" id="data-governance-panel" aria-labelledby="data-governance-title">
+        <div class="panel-title">
+          <div>
+            <h2 id="data-governance-title">授权与病历可信来源</h2>
+            <span>居民端上线前的身份、授权、病历来源和访问复核边界</span>
+          </div>
+        </div>
+        <div class="data-governance-grid" id="data-governance-grid"></div>
+      </section>
+
+      <section class="client-channel-panel" id="client-channel-panel" aria-labelledby="client-channel-title">
+        <div class="panel-title">
+          <div>
+            <h2 id="client-channel-title">运行形态</h2>
+            <span>小程序和 APP 双端上线配置</span>
+          </div>
+          <div class="client-channel-switch" id="client-channel-switch" aria-label="选择居民端运行形态"></div>
+        </div>
+        <div class="client-channel-detail" id="client-channel-detail"></div>
+      </section>
+
+      <div class="service-page-content-anchor" id="service-page-content" aria-hidden="true"></div>
+
+      <section class="panel citizen-trend-panel" id="service-health-record" data-service-pane="health-record">
         <div class="panel-title">
           <h2>健康指标趋势</h2>
           <span id="trend-source-summary">血压、血糖、BMI 连续观察</span>
@@ -53,15 +98,23 @@
         <div id="citizen-trend-grid" class="citizen-trend-grid"></div>
       </section>
 
-      <section class="panel">
+      <section class="panel service-task-panel" data-service-pane="health-record">
         <div class="panel-title">
-          <h2>提醒中心</h2>
+          <h2>服务待办中心</h2>
           <span id="reminder-count">0 项待办</span>
         </div>
         <div id="reminder-cards" class="cards"></div>
       </section>
 
-      <section class="panel lifecycle-panel">
+      <section class="panel citizen-notification-panel" data-service-pane="health-record">
+        <div class="panel-title">
+          <h2>居民通知</h2>
+          <span id="citizen-notification-summary">0 条消息</span>
+        </div>
+        <div id="citizen-notification-cards" class="cards"></div>
+      </section>
+
+      <section class="panel lifecycle-panel" data-service-pane="health-record">
         <div class="panel-title">
           <h2>全生命周期健康管理</h2>
           <span id="lifecycle-summary">从出生医学证明到死亡医学证明的连续健康服务</span>
@@ -69,10 +122,69 @@
         <div id="lifecycle-cards" class="lifecycle-grid"></div>
       </section>
 
-      <section class="panel vault-panel">
+      <section class="panel escort-appointment-panel" id="service-escort" data-service-pane="escort">
+        <div class="panel-title">
+          <h2>助医陪诊预约</h2>
+          <span><em class="feature-state ready">已实现</em><span id="escort-appointment-summary">本人和家庭成员可预约陪诊服务</span></span>
+        </div>
+        <div class="escort-appointment-layout">
+          <form id="escort-appointment-form" class="escort-appointment-form">
+            <label>服务主体
+              <select name="providerId" required></select>
+            </label>
+            <label>就诊医院
+              <input name="hospital" placeholder="例如：大连市中心医院" required />
+            </label>
+            <label>科室
+              <input name="department" placeholder="例如：心内科" required />
+            </label>
+            <label>预约日期
+              <input name="appointmentAt" type="date" required />
+            </label>
+            <label>服务内容
+              <select name="serviceItems" multiple size="3">
+                <option value="registration">挂号取号</option>
+                <option value="exam escort">检查陪同</option>
+                <option value="medication pickup">取药结算</option>
+                <option value="report explanation">报告协助</option>
+              </select>
+            </label>
+            <label>保障类型
+              <select name="subsidyType">
+                <option value="self-pay">自费预约</option>
+                <option value="80plus-living-alone">80 岁以上独居</option>
+                <option value="low-income">低保/低收入补贴</option>
+                <option value="time-bank">时间银行</option>
+              </select>
+            </label>
+            <label>紧急程度
+              <select name="priority">
+                <option value="medium">普通</option>
+                <option value="high">较急</option>
+                <option value="low">不急</option>
+              </select>
+            </label>
+            <label>联系人状态
+              <select name="familyContactStatus">
+                <option value="pending">待平台确认</option>
+                <option value="confirmed">家属已确认</option>
+                <option value="self">本人确认</option>
+              </select>
+            </label>
+            <label class="full">补充说明
+              <input name="note" placeholder="例如：行动不便，需要协助排队和检查路线" />
+            </label>
+            <button class="small-button primary" type="submit">提交陪诊预约</button>
+          </form>
+          <div id="escort-appointment-cards" class="cards"></div>
+        </div>
+      </section>
+
+      <section class="panel vault-panel" data-service-pane="health-record">
         <div class="panel-title">
           <h2>健康信息归集</h2>
           <div class="panel-actions">
+            <em class="feature-state ready">已实现</em>
             <span id="vault-updated">持续更新</span>
             <button class="small-button" id="upload-record">上传资料</button>
             <button class="small-button primary" id="grant-auth">新增授权</button>
@@ -91,11 +203,124 @@
         <div class="vault-content" id="vault-content"></div>
       </section>
 
-      <section class="two-column">
+      <section class="panel service-overview-panel" id="service-nursing" data-service-pane="nursing">
+        <div class="panel-title">
+          <h2>护理服务</h2>
+          <span><em class="feature-state ready">已实现</em> 互联网护理可预约，护士工作站可接单</span>
+        </div>
+        <div class="service-status-grid">
+          <article class="service-status-card ready">
+            <strong>互联网护理预约</strong>
+            <p>居民可进入护理服务页提交上门护理申请，机构端完成评估、派单、护士接单、定位轨迹和质控回访。</p>
+            <a class="small-button primary" href="./internet-nursing.html">进入护理服务</a>
+          </article>
+          <article class="service-status-card ready">
+            <strong>护理订单追踪</strong>
+            <p>已复用居民身份、家庭成员授权、机构调度和服务记录，支持与个人健康档案关联。</p>
+            <span class="status">已实现</span>
+          </article>
+          <article class="service-status-card ready">
+            <strong>长期照护评估</strong>
+            <p>居民端可先完成失能风险自评、待遇预核验和照护计划建议，生产上线时替换为医保、民政和长护险正式接口。</p>
+            <span class="status">已实现</span>
+          </article>
+        </div>
+        <div class="longterm-care-panel">
+          <div class="panel-title compact">
+            <h3>长期照护评估闭环</h3>
+            <span id="longterm-care-summary">按当前家庭成员展示照护计划</span>
+          </div>
+          <form id="longterm-care-form" class="longterm-care-form">
+            <label>行动能力
+              <select name="mobility">
+                <option value="0">可独立外出</option>
+                <option value="1">需搀扶或辅具</option>
+                <option value="2">长期卧床或轮椅</option>
+              </select>
+            </label>
+            <label>自理能力
+              <select name="selfCare">
+                <option value="0">可独立完成</option>
+                <option value="1">部分需要协助</option>
+                <option value="2">进食/洗漱/如厕需照护</option>
+              </select>
+            </label>
+            <label>认知状态
+              <select name="cognition">
+                <option value="0">清晰稳定</option>
+                <option value="1">偶有记忆或定向障碍</option>
+                <option value="2">明显认知障碍或走失风险</option>
+              </select>
+            </label>
+            <label>照护人
+              <select name="caregiver">
+                <option value="family">家庭照护人</option>
+                <option value="community">社区照护站</option>
+                <option value="institution">养老/护理机构</option>
+              </select>
+            </label>
+            <label>长护险预核验
+              <select name="insurance">
+                <option value="eligible">符合演示条件</option>
+                <option value="review">需人工复核</option>
+                <option value="missing">材料待补充</option>
+              </select>
+            </label>
+            <label>民政服务
+              <select name="civilAffairs">
+                <option value="none">暂无补贴</option>
+                <option value="subsidy">疑似可享补贴</option>
+                <option value="home-visit">需上门复评</option>
+              </select>
+            </label>
+            <button class="small-button primary" type="submit">生成照护建议</button>
+          </form>
+          <div class="longterm-care-result" id="longterm-care-result"></div>
+          <div class="longterm-care-grid" id="longterm-care-cards"></div>
+        </div>
+      </section>
+
+      <section class="panel service-overview-panel" id="service-registration" data-service-pane="registration">
+        <div class="panel-title">
+          <h2>挂号服务</h2>
+          <span><em class="feature-state ready">已实现</em><span id="registration-summary">HIS/互联网医院号源、预约确认、支付、退号、医保电子凭证和短信通知</span></span>
+        </div>
+        <div class="registration-workflow">
+          <form id="registration-form" class="registration-form">
+            <label>选择号源
+              <select name="scheduleId" required></select>
+            </label>
+            <label>就诊方式
+              <select name="visitType">
+                <option value="onsite">到院就诊</option>
+                <option value="internet">互联网复诊</option>
+              </select>
+            </label>
+            <label>就诊诉求
+              <input name="reason" placeholder="例如：复诊调药、检查结果咨询" />
+            </label>
+            <button class="small-button primary" type="submit">确认预约</button>
+          </form>
+          <article class="registration-rule-card">
+            <strong>上线边界</strong>
+            <p>当前已接入后端挂号接口契约：号源来自 HIS/互联网医院号源池，预约后生成 HIS 回执、支付交易、医保电子凭证预核验、退号退款状态和短信/站内信触达记录。生产上线时替换真实医院、支付、医保和短信网关。</p>
+          </article>
+        </div>
+        <div class="registration-section">
+          <h3>可预约号源</h3>
+          <div class="cards registration-schedules" id="registration-schedule-cards"></div>
+        </div>
+        <div class="registration-section">
+          <h3>我的挂号</h3>
+          <div class="cards registration-orders" id="registration-order-cards"></div>
+        </div>
+      </section>
+
+      <section class="two-column" id="service-emr" data-service-pane="emr">
         <article class="panel">
           <div class="panel-title">
             <h2>电子病历时间线</h2>
-            <span id="emr-count"></span>
+            <span><em class="feature-state ready">已实现</em><span id="emr-count"></span></span>
           </div>
           <div class="timeline" id="emr-timeline"></div>
         </article>
@@ -159,6 +384,7 @@
               <h2>出生人口健康管理</h2>
             </div>
             <div id="birth-health-cards" class="cards"></div>
+            <div id="mch-continuity-cards" class="cards"></div>
           </article>
 
           <article class="panel">
@@ -190,7 +416,18 @@
           </article>
         </aside>
       </section>
+
+      <section class="panel resident-audit-panel" id="resident-function-audit" aria-labelledby="resident-function-audit-title">
+        <div class="panel-title">
+          <h2 id="resident-function-audit-title">居民端功能审计</h2>
+          <span id="resident-audit-summary">按标签页查看已实现功能和上线证据</span>
+        </div>
+        <div class="resident-audit-stats" id="resident-audit-stats"></div>
+        <div class="resident-audit-grid" id="resident-audit-grid"></div>
+      </section>
     </main>
+
+    <nav class="mobile-service-nav" id="mobile-service-nav" aria-label="手机服务导航"></nav>
 
     <dialog id="upload-dialog">
       <form method="dialog" class="dialog-form" id="upload-form">
@@ -244,7 +481,7 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="./health-archive-standard.js"></script>
-    <script src="./citizen.js"></script>
+    <script src="./citizen.js?v=20260630layout"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));

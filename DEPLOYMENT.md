@@ -138,6 +138,9 @@ npm.cmd run deploy:check
 npm.cmd run env:check
 npm.cmd run release:report
 npm.cmd run release:manifest
+npm.cmd run priority-apps:templates
+npm.cmd run maternal-child:readiness
+npm.cmd run policy:coverage
 ```
 
 本地服务启动后可访问：
@@ -261,6 +264,14 @@ Site joint testing still requires live HIS/EMR/LIS/PACS feeds, production critic
 
 operations.html is the runnable management entry for hospital operation monitoring and resource dispatch. It uses GET /api/operations/dashboard, POST /api/operations/dispatch, and POST /api/operations/reconciliation/:id/review to cover bed, staff, equipment, outpatient, emergency, inpatient, dispatch, alert, and statistics direct-report reconciliation boundaries.
 
+## Medical Escort Service Platform
+
+Open `escort.html` after commission login to review the older adult medical escort service pilot dashboard. Open `citizen.html` with the citizen demo account to create a resident-side medical escort appointment for the current household. Run `npm.cmd run escort:readiness` before release; the generated `release/escort-service-readiness-report.md` and `release/escort-service-readiness-report.json` cover provider registry, trained escort workers, service order evidence, subsidy and time-bank coverage, contract and insurance risk controls, quality callbacks, API routes, commission frontend evidence, and citizen appointment evidence.
+
+Open `internet-nursing.html` after citizen, hospital, or commission login to review the Internet+ Nursing pilot. Run `npm.cmd run internet-nursing:readiness` before release; the generated `release/internet-nursing-readiness-report.md` and `release/internet-nursing-readiness-report.json` cover resident appointment, first-visit assessment, informed consent, qualified nurse dispatch, nurse acceptance, location tracking, service record, quality callback, and API route evidence.
+
+Use `docs/互联网护理服务模块说明.md` as the module handoff document for role entry, data object, API permission, workflow diagram, risk control, and browser acceptance checks.
+
 hospital-operations:readiness generates release/hospital-operations-readiness-report.json and release/hospital-operations-readiness-report.md. The report reuses healthStatistics, healthStatisticsIngestion, medicalResources, operations-readiness, /api/metrics, and platformProcessAudit evidence, and is included by release:report and deploy:check.
 ## Drug Consumable Supervision Evidence
 
@@ -269,6 +280,14 @@ Before site joint testing for the drug and consumable supervision app, run `npm.
 
 - Open `health-dashboard.html` after commission login to review the aggregate health dashboard.
 - Run `npm.cmd run health-dashboard:summary` to generate `release/health-dashboard-summary.json` and `release/health-dashboard-summary.md`.
+- Run `npm.cmd run priority-apps:templates` to generate `release/priority-application-templates.json` and `release/priority-application-templates.md`.
+- Run `npm.cmd run maternal-child:readiness` to generate the maternal-child main function report: `release/maternal-child-readiness-report.json` and `release/maternal-child-readiness-report.md`.
+- Run `npm.cmd run policy:coverage` to generate `release/policy-coverage-report.json` and `release/policy-coverage-report.md`.
+- Use `GET /api/priority-applications/templates` as the live handoff API for the eight independent application conversations.
 - Archive the generated development-template section as the handoff checklist for each of the eight application conversations: boundary, reuse, data, API, frontend entry, tests, and acceptance evidence.
+- Use the generated `conversationStarter`, `implementationChecklist`, and `acceptanceGate` fields as the required kickoff, build checklist, and release gate for every independent application conversation.
+- Enforce the unified template rule for every platform module: About feature description, `docs/` module document, workflow diagram, API/data/test/acceptance evidence. Use `docs/妇幼健康全模块说明.md` as the reference module package.
+- Maternal-child policy release evidence must include `maternal-child-about.html`, `docs/maternal-child-policy.md`, and the policy-to-system mapping for birth certificate signing, seventh-version certificate transition, blank certificate distribution, invalid certificate handling, permanent archiving, privacy, public-security sharing, and maternal-child enrollment.
 - `release:manifest` must include `health-dashboard-summary.md` so the eight-application template is part of the formal release package.
+- `release:manifest` must also include `priority-application-templates.md` so the standalone handoff contract is archived with the release package.
 - The dashboard remains blocked on real site joint-test inputs for identity, HIS/EMR/LIS/PACS, insurance, certificates, statistics, monitoring, and disaster recovery signoff.

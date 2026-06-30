@@ -35,6 +35,14 @@ async function login(baseUrl, username, password = "123456") {
   });
 }
 
+async function phoneLogin(baseUrl, phone, code = "888888") {
+  return api(baseUrl, "/api/auth/phone-login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ phone, code })
+  });
+}
+
 function authorized(token, options = {}) {
   return {
     ...options,
@@ -118,9 +126,25 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(accountLogin.body.user.password, undefined);
     assert.equal(accountLogin.body.user.passwordHash, undefined);
 
+    const residentPhoneLogin = await phoneLogin(baseUrl, "DEMO-MOBILE-R1");
+    assert.equal(residentPhoneLogin.response.status, 200);
+    assert.equal(residentPhoneLogin.body.user.role, "citizen");
+    assert.equal(residentPhoneLogin.body.user.home, "citizen.html");
+    assert.equal(residentPhoneLogin.body.user.residentId, "r1");
+    assert.equal(residentPhoneLogin.body.user.password, undefined);
+
     const missing = await api(baseUrl, "/api/not-found", authorized(accountLogin.body.token));
     assert.equal(missing.response.status, 404);
     assert.equal(typeof missing.body.error, "string");
+
+    const deniedId = await api(baseUrl, "/api/id", { method: "POST" });
+    assert.equal(deniedId.response.status, 401);
+    assert.equal(typeof deniedId.body.error, "string");
+
+    const generatedId = await api(baseUrl, "/api/id", authorized(accountLogin.body.token, { method: "POST" }));
+    assert.equal(generatedId.response.status, 200);
+    assert.equal(typeof generatedId.body.id, "string");
+    assert.equal(generatedId.body.id.length > 20, true);
 
     const metrics = await api(baseUrl, "/api/metrics", authorized(accountLogin.body.token));
     assert.equal(metrics.response.status, 200);
@@ -163,6 +187,16 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(healthDashboard.body.applications.every((item) => item.functionalBoundary && item.apiRoutes?.length && item.frontendEntry && item.testEvidence?.length && item.acceptanceEvidence?.length), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:development-template" && item.passed), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:source-boundary" && item.passed), true);
+
+    const priorityTemplates = await api(baseUrl, "/api/priority-applications/templates", authorized(accountLogin.body.token));
+    assert.equal(priorityTemplates.response.status, 200);
+    assert.equal(priorityTemplates.body.ok, true);
+    assert.equal(priorityTemplates.body.scope.role, "priority-application-development-templates");
+    assert.equal(priorityTemplates.body.summary.applications, 8);
+    assert.equal(priorityTemplates.body.summary.sourceApplications, 7);
+    assert.equal(priorityTemplates.body.templates.some((item) => item.conversationTitle === "医联体转诊与远程会诊平台" && item.apiRoutes.length >= 3), true);
+    assert.equal(priorityTemplates.body.templates.some((item) => item.conversationTitle === "卫生健康综合驾驶舱" && item.aggregateApplication), true);
+    assert.equal(priorityTemplates.body.checks.every((item) => item.passed), true);
 
     const processAudit = await api(baseUrl, "/api/process-audit", authorized(accountLogin.body.token));
     assert.equal(processAudit.response.status, 200);
@@ -270,15 +304,30 @@ test("API authentication, scoping and governance regression suite", async (t) =>
   await t.test("rejects invalid credentials and unauthenticated state reads", async () => {
     const badLogin = await login(baseUrl, "health", "wrong-password");
     assert.equal(badLogin.response.status, 401);
-
-    const state = await api(baseUrl, "/api/state");
-    assert.equal(state.response.status, 401);
+    const badPhoneLogin = await phoneLogin(baseUrl, "DEMO-MOBILE-R1", "000000");
+    assert.equal(badPhoneLogin.response.status, 401);
 
     const hashedLogin = await login(baseUrl, "hashed_commission", "hashed-pass");
     assert.equal(hashedLogin.response.status, 200);
     assert.equal(hashedLogin.body.user.passwordHash, undefined);
+
+    const baselineSecurityAudit = await api(baseUrl, "/api/audit/export?trail=securityEvents", authorized(hashedLogin.body.token));
+    assert.equal(baselineSecurityAudit.response.status, 200);
+    const anonymousStateDenialsBefore = baselineSecurityAudit.body.securityEvents.filter((item) => item.actor === "anonymous" && item.target === "/api/state" && item.detail === "未登录或会话已过期").length;
+    const authDenialsBefore = baselineSecurityAudit.body.securityEvents.filter((item) => item.target === "统一认证" && item.result === "拒绝").length;
+
+    const state = await api(baseUrl, "/api/state");
+    assert.equal(state.response.status, 401);
+
     const badHashedLogin = await login(baseUrl, "hashed_commission", "123456");
     assert.equal(badHashedLogin.response.status, 401);
+
+    const securityAudit = await api(baseUrl, "/api/audit/export?trail=securityEvents", authorized(hashedLogin.body.token));
+    assert.equal(securityAudit.response.status, 200);
+    const anonymousStateDenialsAfter = securityAudit.body.securityEvents.filter((item) => item.actor === "anonymous" && item.target === "/api/state" && item.detail === "未登录或会话已过期").length;
+    const authDenialsAfter = securityAudit.body.securityEvents.filter((item) => item.target === "统一认证" && item.result === "拒绝").length;
+    assert.equal(anonymousStateDenialsAfter, anonymousStateDenialsBefore);
+    assert.equal(authDenialsAfter > authDenialsBefore, true);
 
     const tamperedToken = `${hashedLogin.body.token.slice(0, -1)}x`;
     const tamperedState = await api(baseUrl, "/api/state", authorized(tamperedToken));
@@ -328,6 +377,143 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     });
   });
 
+  await t.test("exposes scoped multi-practice registry for supervision and public ledger", async () => {
+    const registry = await api(baseUrl, "/api/multi-practice-registry", authorized(commissionToken));
+    assert.equal(registry.response.status, 200);
+    assert.equal(registry.body.ok, true);
+    assert.equal(registry.body.summary.total >= 2, true);
+    assert.equal(registry.body.summary.publicVisible, registry.body.publicLedger.length);
+    assert.equal(registry.body.publicLedger.every((item) => item.doctorName && item.primaryInstitution && item.targetInstitution), true);
+    assert.equal(registry.body.applications.every((item) => Array.isArray(item.riskFlags) && item.documentChecks), true);
+    assert.equal(registry.body.reviewQueue.every((item) => item.risk || String(item.status || "").includes("待")), true);
+
+    const doctorLogin = await login(baseUrl, "doctor");
+    const doctorMe = await api(baseUrl, "/api/doctors/me", authorized(doctorLogin.body.token));
+    assert.equal(doctorMe.response.status, 200);
+    assert.equal(doctorMe.body.doctor.id, doctorLogin.body.user.doctorId);
+    assert.equal(doctorMe.body.doctor.electronicRegistrationVerification.verificationStatus, "已核验");
+    assert.equal(doctorMe.body.doctor.electronicRegistrationVerification.licenseMatched, true);
+    assert.equal(doctorMe.body.multiPracticeSummary.total, doctorMe.body.multiPracticeApplications.length);
+    assert.equal(doctorMe.body.multiPracticeApplications.every((item) => Array.isArray(item.riskFlags) && item.documentChecks), true);
+
+    const createdPractice = await api(baseUrl, "/api/multi-practice-applications", authorized(doctorLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        targetInstitutionId: "MR1",
+        targetInstitution: "大连市中心医院",
+        targetDepartment: "心内科联合门诊",
+        practiceScope: "全科医学专业",
+        period: "2026-08-01 至 2027-07-31",
+        schedule: "每周一上午",
+        tasks: "慢病联合门诊和用药方案复核",
+        responsibility: "由当事医疗机构和医师按协议依法承担医疗责任",
+        compensation: "按工作量协商结算",
+        insurance: "已购买医师个人医疗执业保险"
+      })
+    }));
+    assert.equal(createdPractice.response.status, 201);
+    assert.equal(createdPractice.body.externalSync.electronicRegistration.status, "已核验");
+    assert.equal(createdPractice.body.externalSync.hisHr.status, "mapped");
+    const publicLedger = await api(baseUrl, "/api/public/multi-practice-ledger?q=中心医院");
+    assert.equal(publicLedger.response.status, 200);
+    assert.equal(publicLedger.body.ok, true);
+    assert.equal(Array.isArray(publicLedger.body.publicLedger), true);
+    assert.equal(publicLedger.body.publicLedger.every((item) => item.doctorName && item.targetInstitution && !item.licenseNo), true);
+    const conflictPractice = await api(baseUrl, "/api/multi-practice-applications", authorized(doctorLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        targetInstitutionId: "MR1",
+        targetInstitution: "大连市中心医院",
+        targetDepartment: "慢病联合门诊",
+        practiceScope: "全科医学专业",
+        period: "2026-09-01 至 2027-08-31",
+        schedule: "每周一上午",
+        tasks: "慢病联合门诊和用药方案复核",
+        responsibility: "由当事医疗机构和医师按协议依法承担医疗责任",
+        compensation: "按工作量协商结算",
+        insurance: "已购买医师个人医疗执业保险"
+      })
+    }));
+    assert.equal(conflictPractice.response.status, 201);
+    assert.equal(conflictPractice.body.documentChecks.scheduleConflict, true);
+    assert.equal(conflictPractice.body.riskFlags.includes("schedule-conflict"), true);
+    assert.equal(conflictPractice.body.scheduleConflictEvidence.some((item) => item.id === createdPractice.body.id), true);
+    const hospitalLogin = await login(baseUrl, "hospital");
+    const hospitalMessages = await api(baseUrl, "/api/messages", authorized(hospitalLogin.body.token));
+    assert.equal(hospitalMessages.response.status, 200);
+    assert.equal(hospitalMessages.body.messages.some((item) => item.sourceId === createdPractice.body.id && /待医院端处理/.test(item.title)), true);
+    const hospitalConfirmed = await api(baseUrl, "/api/workflow-actions", authorized(hospitalLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        collection: "multiPracticeApplications",
+        id: createdPractice.body.id,
+        status: "待卫健审核",
+        updates: { primaryConsent: "已同意", hospitalReviewOpinion: "医院端材料核验通过" },
+        note: "医院端确认接收多点执业申请"
+      })
+    }));
+    assert.equal(hospitalConfirmed.response.status, 200);
+    assert.equal(hospitalConfirmed.body.primaryPracticeConfirmation.status, "已电子确认");
+    assert.equal(hospitalConfirmed.body.externalSync.eSignature.status, "signed");
+    const doctorLoop = await api(baseUrl, "/api/doctors/me", authorized(doctorLogin.body.token));
+    assert.equal(doctorLoop.body.multiPracticeMessages.some((item) => item.sourceId === createdPractice.body.id && item.targetRole === "doctor" && /医院端已处理/.test(item.title)), true);
+    const returnedPractice = await api(baseUrl, "/api/workflow-actions", authorized(hospitalLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        collection: "multiPracticeApplications",
+        id: conflictPractice.body.id,
+        action: "return-correction",
+        note: "请补齐排班避让说明和责任保险凭证"
+      })
+    }));
+    assert.equal(returnedPractice.response.status, 200);
+    assert.equal(returnedPractice.body.status, "退回补正");
+    assert.equal(returnedPractice.body.correctionRequired.includes("排班"), true);
+    const terminatedPractice = await api(baseUrl, "/api/workflow-actions", authorized(hospitalLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        collection: "multiPracticeApplications",
+        id: conflictPractice.body.id,
+        action: "terminate",
+        note: "测试终止备案"
+      })
+    }));
+    assert.equal(terminatedPractice.response.status, 200);
+    assert.equal(terminatedPractice.body.status, "已终止");
+    assert.equal(terminatedPractice.body.publicVisible, false);
+
+    const doctorRegistry = await api(baseUrl, "/api/multi-practice-registry", authorized(doctorLogin.body.token));
+    assert.equal(doctorRegistry.response.status, 200);
+    assert.equal(doctorRegistry.body.applications.length >= 1, true);
+    assert.equal(doctorRegistry.body.applications.every((item) => item.doctorId === doctorLogin.body.user.doctorId), true);
+    const patchedPractice = await api(baseUrl, `/api/multi-practice-applications/${doctorRegistry.body.applications[0].id}`, authorized(doctorLogin.body.token, {
+      method: "PATCH",
+      body: JSON.stringify({ scheduleConflict: true, note: "测试排班冲突补正" })
+    }));
+    assert.equal(patchedPractice.response.status, 200);
+    assert.equal(patchedPractice.body.documentChecks.scheduleConflict, true);
+    assert.equal(patchedPractice.body.riskFlags.includes("schedule-conflict"), true);
+    assert.equal(patchedPractice.body.lifecycle[0].note, "测试排班冲突补正");
+    const confirmedPractice = await api(baseUrl, "/api/workflow-actions", authorized(doctorLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        collection: "multiPracticeApplications",
+        id: doctorRegistry.body.applications[0].id,
+        status: "待卫健审核",
+        updates: { primaryConsent: "已同意" },
+        note: "第一执业地点电子签章确认"
+      })
+    }));
+    assert.equal(confirmedPractice.response.status, 200);
+    assert.equal(confirmedPractice.body.primaryPracticeConfirmation.status, "已电子确认");
+    assert.match(confirmedPractice.body.primaryPracticeConfirmation.signatureNo, /DL-MP-CONSENT/);
+    assert.equal(confirmedPractice.body.documentChecks.firstPracticeConsent, true);
+
+    const insuranceLogin = await login(baseUrl, "insurance");
+    const deniedRegistry = await api(baseUrl, "/api/multi-practice-registry", authorized(insuranceLogin.body.token));
+    assert.equal(deniedRegistry.response.status, 403);
+  });
+
   const citizenLogin = await login(baseUrl, "citizen");
   assert.equal(citizenLogin.response.status, 200);
   const citizenToken = citizenLogin.body.token;
@@ -354,6 +540,349 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       "institutionCreditEvaluations",
       "securityAcceptanceLedger"
     ].forEach((key) => assert.equal(body[key], undefined, `${key} 不应返回给居民端`));
+  });
+
+  await t.test("allows citizen medical escort appointment within household scope", async () => {
+    const dashboard = await api(baseUrl, "/api/escort-services/dashboard", authorized(citizenToken));
+    assert.equal(dashboard.response.status, 200);
+    assert.equal(dashboard.body.ok, true);
+    assert.equal(dashboard.body.providers.every((item) => item.published !== false), true);
+
+    const providerId = dashboard.body.providers[0].id;
+    const created = await api(baseUrl, "/api/escort-services/orders", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        providerId,
+        hospital: "Dalian Central Hospital outpatient clinic demo",
+        department: "Cardiology",
+        appointmentAt: "2026-06-27",
+        serviceItems: ["registration", "exam escort"],
+        subsidyType: "80plus-living-alone",
+        priority: "high",
+        riskLevel: "high",
+        sourceChannel: "citizen.html",
+        note: "resident portal appointment regression"
+      })
+    }));
+    assert.equal(created.response.status, 201);
+    assert.equal(created.body.residentId, "r1");
+    assert.equal(created.body.createdBy, "citizen");
+    assert.equal(created.body.sourceChannel, "citizen.html");
+    assert.equal(created.body.serviceItems.includes("registration"), true);
+    assert.equal(created.body.hospitalCode, "MR1");
+
+    const hospitalLogin = await login(baseUrl, "hospital");
+    assert.equal(hospitalLogin.response.status, 200);
+    const hospitalToken = hospitalLogin.body.token;
+    const handoff = await api(baseUrl, `/api/escort-services/orders/${created.body.id}/hospital-handoff`, authorized(hospitalToken, {
+      method: "POST",
+      body: JSON.stringify({
+        decision: "confirm",
+        hospitalCode: "MR1",
+        hospitalCheckInStatus: "confirmed",
+        hospitalCheckInNo: "OP-MR1-20260627-008",
+        hisVisitId: "HIS-MR1-20260627-0008",
+        appointmentSource: "hospital-outpatient-guidance",
+        departmentCode: "CARD",
+        doctorCode: "DOC-CARD-01",
+        outpatientQueueNo: "C08",
+        hospitalDepartmentContact: "Cardiology outpatient guidance desk",
+        appointmentAt: "2026-06-27T09:30:00+08:00",
+        hospitalNotice: "Arrive 20 minutes early and bring ID card.",
+        note: "hospital outpatient handoff regression"
+      })
+    }));
+    assert.equal(handoff.response.status, 200);
+    assert.equal(handoff.body.status, "hospital-confirmed");
+    assert.equal(handoff.body.hospitalInterfaceStatus, "confirmed");
+    assert.equal(handoff.body.hospitalCheckInNo, "OP-MR1-20260627-008");
+    assert.equal(handoff.body.hisVisitId, "HIS-MR1-20260627-0008");
+    assert.equal(handoff.body.outpatientQueueNo, "C08");
+    assert.equal(handoff.body.departmentCode, "CARD");
+    assert.equal(handoff.body.auditTrail[0].action, "hospital-confirmed");
+
+    const hospitalDashboard = await api(baseUrl, "/api/escort-services/dashboard", authorized(hospitalToken));
+    assert.equal(hospitalDashboard.response.status, 200);
+    assert.equal(hospitalDashboard.body.orders.some((item) => item.id === created.body.id && item.hospitalInterfaceStatus === "confirmed"), true);
+    assert.equal(hospitalDashboard.body.summary.hospitalConfirmed >= 1, true);
+
+    const refreshed = await api(baseUrl, "/api/escort-services/dashboard", authorized(citizenToken));
+    assert.equal(refreshed.body.orders.some((item) => item.id === created.body.id && item.residentId === "r1"), true);
+    assert.equal(refreshed.body.orders.every((item) => ["r1", "r4"].includes(item.residentId)), true);
+
+    const confirmed = await api(baseUrl, `/api/tasks/${encodeURIComponent(`escortServiceOrders:${created.body.id}`)}/actions`, authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "resident-confirm", comment: "居民确认陪诊安排" })
+    }));
+    assert.equal(confirmed.response.status, 200);
+    assert.equal(confirmed.body.familyContactStatus, "confirmed");
+    assert.equal(confirmed.body.taskAction, "resident-confirm");
+
+    const reviewed = await api(baseUrl, `/api/tasks/${encodeURIComponent(`escortServiceOrders:${created.body.id}`)}/actions`, authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "quality-feedback", comment: "陪诊服务满意", satisfaction: "满意", complaintStatus: "none" })
+    }));
+    assert.equal(reviewed.response.status, 200);
+    assert.equal(reviewed.body.qualityReview, "citizen-feedback");
+    assert.equal(reviewed.body.satisfaction, "满意");
+
+    const messages = await api(baseUrl, "/api/messages", authorized(citizenToken));
+    assert.equal(messages.response.status, 200);
+    assert.equal(messages.body.messages.some((item) => item.sourceId === created.body.id && /hospital handoff/i.test(item.title)), true);
+    assert.equal(messages.body.messages.some((item) => item.sourceId === created.body.id && /居民服务|助医陪诊/.test(item.title)), true);
+
+    const otherOrderAction = await api(baseUrl, `/api/tasks/${encodeURIComponent("escortServiceOrders:eso-r2-20260621")}/actions`, authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "resident-confirm", comment: "越权确认" })
+    }));
+    assert.equal(otherOrderAction.response.status, 403);
+
+    const denied = await api(baseUrl, "/api/escort-services/orders", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r2",
+        providerId,
+        hospital: "Dalian Central Hospital outpatient clinic demo",
+        department: "Endocrinology",
+        appointmentAt: "2026-06-27"
+      })
+    }));
+    assert.equal(denied.response.status, 403);
+  });
+
+  await t.test("supports citizen registration HIS payment insurance and SMS workflow", async () => {
+    const dashboard = await api(baseUrl, "/api/registrations/dashboard", authorized(citizenToken));
+    assert.equal(dashboard.response.status, 200);
+    assert.equal(dashboard.body.ok, true);
+    assert.equal(dashboard.body.integration.endpoints.includes("/api/registrations/orders"), true);
+    assert.equal(dashboard.body.schedules.some((item) => item.hisScheduleId && item.sourceSystem), true);
+    assert.equal(dashboard.body.orders.every((item) => ["r1", "r4"].includes(item.residentId)), true);
+
+    const schedule = dashboard.body.schedules.find((item) => item.remaining > 0 && item.insuranceSupported);
+    assert.ok(schedule);
+    const created = await api(baseUrl, "/api/registrations/orders", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        scheduleId: schedule.id,
+        visitType: schedule.sourceType === "internet-hospital" ? "internet" : "onsite",
+        reason: "registration API regression"
+      })
+    }));
+    assert.equal(created.response.status, 201);
+    assert.equal(created.body.residentId, "r1");
+    assert.equal(created.body.scheduleId, schedule.id);
+    assert.equal(created.body.hisScheduleId, schedule.hisScheduleId);
+    assert.match(created.body.hisVisitId, /^HIS-/);
+    assert.match(created.body.paymentTradeNo || "PAY-REG-WAIVED", /^PAY-REG-|^$/);
+    assert.equal(["pending", "waived"].includes(created.body.paymentStatus), true);
+    assert.equal(created.body.insuranceStatus, "prechecked");
+    assert.match(created.body.insurancePrecheckNo, /^MI-PRE-/);
+    assert.equal(created.body.notificationDeliveries.some((item) => item.channel === "sms" && item.status === "queued"), true);
+
+    const refreshed = await api(baseUrl, "/api/registrations/dashboard", authorized(citizenToken));
+    assert.equal(refreshed.response.status, 200);
+    assert.equal(refreshed.body.orders.some((item) => item.id === created.body.id), true);
+    assert.equal(refreshed.body.summary.hisConfirmed >= 1, true);
+    assert.equal(refreshed.body.summary.insurancePrechecked >= 1, true);
+
+    const registrationMessages = await api(baseUrl, "/api/messages", authorized(citizenToken));
+    assert.equal(registrationMessages.response.status, 200);
+    assert.equal(registrationMessages.body.messages.some((item) => item.collection === "registrationOrders" && item.sourceId === created.body.id), true);
+
+    const cancelled = await api(baseUrl, `/api/registrations/orders/${created.body.id}/cancel`, authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ reason: "API regression cancellation" })
+    }));
+    assert.equal(cancelled.response.status, 200);
+    assert.equal(cancelled.body.status, "cancelled");
+    assert.equal(cancelled.body.scheduleLockStatus, "released");
+    assert.equal(["closed", "refund-pending"].includes(cancelled.body.paymentStatus), true);
+    assert.equal(cancelled.body.notificationDeliveries.some((item) => item.event === "registration-cancelled" && item.channel === "sms"), true);
+
+    const denied = await api(baseUrl, "/api/registrations/orders", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ residentId: "r2", scheduleId: schedule.id, reason: "scope violation" })
+    }));
+    assert.equal(denied.response.status, 403);
+  });
+
+  await t.test("guards mobile internet nursing appointments for launch", async () => {
+    const dashboard = await api(baseUrl, "/api/internet-nursing/dashboard", authorized(citizenToken));
+    assert.equal(dashboard.response.status, 200);
+    const institution = dashboard.body.institutions.find((item) => item.id === "inh-mr1");
+    assert.ok(institution);
+
+    const created = await api(baseUrl, "/api/internet-nursing/orders", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        institutionId: institution.id,
+        serviceItem: "wound care",
+        serviceObject: "mobility-limited chronic disease patient",
+        preferredAt: "2026-06-27",
+        address: "中山区手机端预约测试地址",
+        riskLevel: "high",
+        status: "completed",
+        nurseId: "inn-001",
+        firstVisitAssessment: "passed",
+        informedConsent: "signed",
+        sourceChannel: "internet-nursing-mobile"
+      })
+    }));
+    assert.equal(created.response.status, 201);
+    assert.equal(created.body.sourceChannel, "internet-nursing-mobile");
+    assert.equal(created.body.status, "requested");
+    assert.equal(created.body.nurseId, "");
+    assert.equal(created.body.firstVisitAssessment, "pending");
+    assert.equal(created.body.informedConsent, "pending");
+    assert.equal(created.body.consentAttachment.status, "pending");
+    assert.equal(Array.isArray(created.body.locationTracePoints), true);
+    assert.equal(created.body.locationTracePoints.length, 0);
+    assert.equal(created.body.notificationDeliveries.some((item) => item.event === "appointment-submitted" && item.channel === "sms" && item.status === "queued"), true);
+    assert.equal(created.body.notificationDeliveries.some((item) => item.event === "appointment-submitted" && item.channel === "hospital_message"), true);
+
+    const residentConfirmation = await api(baseUrl, `/api/tasks/${encodeURIComponent(`internetNursingOrders:${created.body.id}`)}/actions`, authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "resident-confirm", comment: "居民确认护理预约" })
+    }));
+    assert.equal(residentConfirmation.response.status, 200);
+    assert.equal(residentConfirmation.body.residentServiceConfirmation, "confirmed");
+
+    const nursingQuality = await api(baseUrl, `/api/tasks/${encodeURIComponent(`internetNursingOrders:${created.body.id}`)}/actions`, authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "quality-feedback", comment: "护理服务已评价", satisfaction: "满意" })
+    }));
+    assert.equal(nursingQuality.response.status, 200);
+    assert.equal(nursingQuality.body.qualityCallback, "citizen-feedback");
+    assert.equal(nursingQuality.body.satisfaction, "满意");
+
+    const unsupportedService = await api(baseUrl, "/api/internet-nursing/orders", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        institutionId: institution.id,
+        serviceItem: "vital signs measurement",
+        serviceObject: "elderly or disabled people",
+        preferredAt: "2026-06-28",
+        address: "中山区手机端预约测试地址"
+      })
+    }));
+    assert.equal(unsupportedService.response.status, 400);
+    assert.match(unsupportedService.body.message, /does not publish/);
+  });
+
+  await t.test("scopes internet nursing nurse actions to own workstation orders", async () => {
+    const nurseLogin = await login(baseUrl, "nurse");
+    assert.equal(nurseLogin.response.status, 200);
+    assert.equal(nurseLogin.body.user.accountType, "nurse");
+    const nurseToken = nurseLogin.body.token;
+
+    const dashboard = await api(baseUrl, "/api/internet-nursing/dashboard", authorized(nurseToken));
+    assert.equal(dashboard.response.status, 200);
+    assert.equal(dashboard.body.ok, true);
+    assert.equal(dashboard.body.orders.every((item) => item.nurseId !== "inn-002"), true);
+    assert.equal(dashboard.body.nurseQueue.some((item) => item.id === "ino-001"), true);
+
+    const otherNurseOrder = await api(baseUrl, "/api/internet-nursing/orders/ino-002/actions", authorized(nurseToken, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "nurse-accept",
+        status: "accepted",
+        nurseId: "inn-001"
+      })
+    }));
+    assert.equal(otherNurseOrder.response.status, 403);
+
+    const spoofedNurse = await api(baseUrl, "/api/internet-nursing/orders/ino-001/actions", authorized(nurseToken, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "nurse-accept",
+        status: "accepted",
+        nurseId: "inn-002"
+      })
+    }));
+    assert.equal(spoofedNurse.response.status, 400);
+    assert.match(spoofedNurse.body.message, /own workstation orders/);
+
+    const prematureComplete = await api(baseUrl, "/api/internet-nursing/orders/ino-001/actions", authorized(nurseToken, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "service-complete",
+        status: "completed",
+        nurseId: "inn-001",
+        serviceRecordStatus: "completed"
+      })
+    }));
+    assert.equal(prematureComplete.response.status, 400);
+    assert.match(prematureComplete.body.message, /in service before completion/);
+
+    const accepted = await api(baseUrl, "/api/internet-nursing/orders/ino-001/actions", authorized(nurseToken, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "nurse-accept",
+        status: "accepted",
+        nurseId: "inn-001"
+      })
+    }));
+    assert.equal(accepted.response.status, 200);
+    assert.equal(accepted.body.status, "accepted");
+    assert.equal(accepted.body.nurseId, "inn-001");
+    assert.equal(accepted.body.locationTrace, "tracking");
+    assert.equal(accepted.body.locationTracePoints.some((item) => item.stage === "nurse-accept"), true);
+    assert.equal(accepted.body.notificationDeliveries.some((item) => item.event === "nurse-accept" && item.channel === "sms"), true);
+    assert.equal(accepted.body.auditTrail.some((item) => item.action === "nurse-accept"), true);
+
+    const started = await api(baseUrl, "/api/internet-nursing/orders/ino-001/actions", authorized(nurseToken, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "service-start",
+        status: "in-service",
+        nurseId: "inn-001",
+        serviceRecordStatus: "in-progress",
+        tracePoint: { stage: "service-start", lat: 38.915, lng: 121.616, source: "nurse-mobile" }
+      })
+    }));
+    assert.equal(started.response.status, 200);
+    assert.equal(started.body.status, "in-service");
+    assert.equal(started.body.locationTracePoints.some((item) => item.stage === "service-start" && item.verified === true), true);
+    assert.equal(started.body.notificationDeliveries.some((item) => item.event === "service-start" && item.channel === "hospital_message"), true);
+
+    const completed = await api(baseUrl, "/api/internet-nursing/orders/ino-001/actions", authorized(nurseToken, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "service-complete",
+        status: "completed",
+        nurseId: "inn-001",
+        serviceRecordStatus: "completed",
+        tracePoint: { stage: "service-complete", lat: 38.916, lng: 121.617, source: "nurse-mobile" },
+        serviceRecord: {
+          status: "completed",
+          vitalSigns: { temperature: "36.6", pulse: "78", bloodPressure: "126/78" },
+          careActions: ["核对身份与医嘱", "完成伤口护理", "居民状态复核"],
+          materialsUsed: ["一次性护理包", "消毒用品"],
+          residentCondition: "服务后状态平稳",
+          followupAdvice: "如出现红肿渗液及时联系机构",
+          exceptionReport: { status: "none", level: "", description: "" }
+        },
+        serviceAttachments: [
+          { type: "nursing-record-photo", name: "wound-care-photo.jpg", source: "nurse-mobile" },
+          { type: "resident-signature", name: "resident-confirmation.png", source: "nurse-mobile" }
+        ],
+        notificationReceipts: [{ by: "nurse", role: "institution", status: "read" }]
+      })
+    }));
+    assert.equal(completed.response.status, 200);
+    assert.equal(completed.body.serviceRecordStatus, "completed");
+    assert.equal(completed.body.serviceRecord.status, "completed");
+    assert.equal(completed.body.serviceRecord.careActions.includes("完成伤口护理"), true);
+    assert.equal(completed.body.serviceRecord.attachmentCount, 2);
+    assert.equal(completed.body.serviceAttachments.length, 2);
+    assert.equal(completed.body.adverseEvent.status, "none");
+    assert.equal(completed.body.notificationReceiptSummary.read >= 1, true);
+    assert.equal(completed.body.locationTracePoints.some((item) => item.stage === "service-complete"), true);
+    assert.equal(completed.body.notificationDeliveries.some((item) => item.event === "service-complete" && item.channel === "sms"), true);
   });
 
   await t.test("enforces personal record ownership and protects record identity", async () => {
@@ -1163,5 +1692,16 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(logout.response.status, 200);
     const me = await api(baseUrl, "/api/auth/me", authorized(session.body.token));
     assert.equal(me.response.status, 401);
+  });
+
+  await t.test("guards and executes commission data reset", async () => {
+    const denied = await api(baseUrl, "/api/reset", authorized(citizenToken, { method: "POST" }));
+    assert.equal(denied.response.status, 403);
+
+    const reset = await api(baseUrl, "/api/reset", authorized(commissionToken, { method: "POST" }));
+    assert.equal(reset.response.status, 200);
+    assert.equal(reset.body.residents.length >= 4, true);
+    assert.equal(reset.body.securityEvents[0].target, "/api/reset");
+    assert.match(reset.body.securityEvents[0].actor, /大连市(卫生健康委|卫健委)管理员/);
   });
 });

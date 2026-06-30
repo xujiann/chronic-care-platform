@@ -12,23 +12,121 @@
     <main class="preview-shell">
       <section class="preview-copy">
         <span>居民端手机预览</span>
-        <h1>健康档案与电子病历</h1>
-        <p>右侧为 390px 宽手机视口，可用于检查居民端在手机上的首页、健康档案、电子病历时间线、慢病管理和随访提醒。</p>
+        <h1>居民端手机导航预览</h1>
+        <p>右侧为 390px 宽手机视口，可检查居民端首页、底部服务导航、健康档案、电子病历、互联网护理、陪诊和挂号状态。</p>
         <div class="preview-actions">
           <a href="./health-city.html">系统总览</a>
           <a href="./citizen.html">打开居民端</a>
         </div>
+        <div class="preview-steps" aria-label="预览检查项">
+          <div>
+            <strong>1. 本机预览</strong>
+            <p>启动服务后打开本页，右侧手机框会直接加载居民端。</p>
+            <code id="preview-local-url">./mobile-preview.html</code>
+          </div>
+          <div>
+            <strong>2. 真机预览</strong>
+            <p>电脑和手机在同一 Wi-Fi 下，用电脑局域网 IP 加端口访问。</p>
+            <code id="preview-lan-url">http://YOUR-LAN-IP/mobile-preview.html</code>
+          </div>
+          <div>
+            <strong>3. 操作重点</strong>
+            <p>滑到底部后点击“健康档案、电子病历、护理、陪诊、挂号”，确认底部导航固定、状态同步、页面无横向溢出。</p>
+          </div>
+          <div>
+            <strong>4. 待办与通知验收</strong>
+            <p>在健康档案页检查服务待办中心，验证确认、取消、反馈、评价按钮和居民通知已读回执。</p>
+          </div>
+        </div>
+        <div class="preview-checklist" aria-label="居民端上线验收项">
+          <span>上线验收</span>
+          <ul>
+            <li>服务待办中心可聚合护理、陪诊、转诊号源和慢病随访。</li>
+            <li>手机框内按钮可单手点击，卡片文本不遮挡。</li>
+            <li>居民通知展示预约变更、护士接单、陪诊师匹配和授权到期。</li>
+            <li>满意度与投诉反馈能进入服务质控闭环。</li>
+          </ul>
+        </div>
         <div class="hint">
-          <strong>真机访问</strong>
-          <p>电脑和手机在同一 Wi-Fi 下时，可用电脑局域网 IP 加端口访问。</p>
-          <code>http://电脑IP:5173/citizen.html</code>
+          <strong>演示登录</strong>
+          <p>如果被重定向到登录页，可用账号密码或手机号验证码进入居民端。</p>
+          <code>citizen / 123456 或 DEMO-MOBILE-R1 / 888888</code>
         </div>
       </section>
 
-      <section class="phone-frame" aria-label="居民端手机预览">
-        <div class="phone-speaker"></div>
-        <iframe src="./citizen.html" title="居民端"></iframe>
+      <section class="preview-device" aria-label="居民端手机预览">
+        <div class="preview-toolbar">
+          <div class="preview-client-switch" aria-label="切换运行形态">
+            <button type="button" class="active" data-preview-client="mini-program">小程序</button>
+            <button type="button" data-preview-client="app">APP</button>
+          </div>
+          <div class="preview-service-switch" aria-label="切换手机框服务">
+            <button type="button" class="active" data-preview-service="health-record">健康档案</button>
+            <button type="button" data-preview-service="emr">电子病历</button>
+            <button type="button" data-preview-service="nursing">护理</button>
+            <button type="button" data-preview-service="escort">陪诊</button>
+            <button type="button" data-preview-service="registration">挂号</button>
+          </div>
+          <button type="button" class="preview-refresh" id="preview-refresh">重载手机框</button>
+        </div>
+        <section class="phone-frame">
+          <div class="phone-speaker"></div>
+          <iframe id="citizen-preview-frame" src="./citizen.html?preview=mobile-nav&client=mini-program&page=health-record#service-health-record" title="居民端"></iframe>
+        </section>
       </section>
     </main>
+    <script>
+      const frame = document.querySelector("#citizen-preview-frame");
+      const serviceButtons = document.querySelectorAll("[data-preview-service]");
+      const clientButtons = document.querySelectorAll("[data-preview-client]");
+      const previewParams = new URLSearchParams(location.search);
+      const previewLocalUrl = document.querySelector("#preview-local-url");
+      const previewLanUrl = document.querySelector("#preview-lan-url");
+      const previewServices = [...serviceButtons].map((button) => button.dataset.previewService);
+      let activePreviewService = previewServices.includes(previewParams.get("service")) ? previewParams.get("service") : "health-record";
+      let activePreviewClient = ["mini-program", "app"].includes(previewParams.get("client")) ? previewParams.get("client") : "mini-program";
+      const renderPreviewUrls = () => {
+        const previewPort = location.port ? `:${location.port}` : "";
+        const previewPath = `${location.pathname}${location.search}`;
+        previewLocalUrl.textContent = `${location.origin}${previewPath}`;
+        previewLanUrl.textContent = `${location.protocol}//YOUR-LAN-IP${previewPort}${previewPath}`;
+      };
+      const syncPreviewUrl = () => {
+        const params = new URLSearchParams(location.search);
+        params.set("client", activePreviewClient);
+        params.set("service", activePreviewService);
+        history.replaceState({ previewClient: activePreviewClient, previewService: activePreviewService }, "", `${location.pathname}?${params.toString()}`);
+        renderPreviewUrls();
+      };
+      const citizenPreviewSrc = (service) => `./citizen.html?preview=mobile-nav&client=${activePreviewClient}&page=${service}#service-${service}`;
+      const setPreviewService = (service, options = {}) => {
+        activePreviewService = service;
+        serviceButtons.forEach((button) => button.classList.toggle("active", button.dataset.previewService === service));
+        if (options.syncUrl !== false) syncPreviewUrl();
+        frame.src = citizenPreviewSrc(service);
+      };
+      const setPreviewClient = (client, options = {}) => {
+        activePreviewClient = client;
+        clientButtons.forEach((button) => button.classList.toggle("active", button.dataset.previewClient === client));
+        if (options.syncUrl !== false) {
+          syncPreviewUrl();
+        }
+        setPreviewService(activePreviewService, { syncUrl: false });
+      };
+      frame.addEventListener("load", () => {
+        frame.contentWindow?.postMessage({ type: "set-service-tab", service: activePreviewService }, location.origin);
+      });
+      serviceButtons.forEach((button) => {
+        button.addEventListener("click", () => setPreviewService(button.dataset.previewService));
+      });
+      clientButtons.forEach((button) => {
+        button.addEventListener("click", () => setPreviewClient(button.dataset.previewClient));
+      });
+      document.querySelector("#preview-refresh").addEventListener("click", () => {
+        frame.src = frame.src;
+      });
+      renderPreviewUrls();
+      setPreviewClient(activePreviewClient, { syncUrl: false });
+    </script>
   </body>
 </html>

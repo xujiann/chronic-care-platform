@@ -7,16 +7,21 @@ const { buildChronicFollowupReadinessReport, renderMarkdown: renderChronicFollow
 const { buildDataQualityReport, renderMarkdown: renderDataQualityMarkdown } = require("./data-quality-report");
 const { buildDrugConsumableReadinessReport, renderMarkdown: renderDrugConsumableMarkdown } = require("./drug-consumable-readiness");
 const { buildEvaluationEvidenceReport, renderMarkdown: renderEvaluationEvidenceMarkdown } = require("./evaluation-evidence");
+const { buildEscortServiceReadinessReport, renderMarkdown: renderEscortServiceMarkdown } = require("./escort-service-readiness");
+const { buildInternetNursingReadinessReport, renderMarkdown: renderInternetNursingMarkdown } = require("./internet-nursing-readiness");
 const { buildEnvironmentMatrixReport, renderMarkdown: renderEnvironmentMatrixMarkdown } = require("./environment-matrix");
-const { buildHealthDashboardSummary, renderMarkdown: renderHealthDashboardMarkdown } = require("./health-dashboard-summary");
+const { buildHealthDashboardSummary, buildPriorityApplicationTemplates, renderMarkdown: renderHealthDashboardMarkdown } = require("./health-dashboard-summary");
 const { buildIdentityContract, renderMarkdown: renderIdentityContractMarkdown } = require("./identity-contract");
 const { buildIntegrationReadinessReport, renderMarkdown: renderIntegrationReadinessMarkdown } = require("./integration-readiness");
 const { buildInterfaceMappingReport, renderMarkdown: renderInterfaceMappingMarkdown } = require("./interface-mapping");
 const { buildHospitalOperationsReadinessReport, renderMarkdown: renderHospitalOperationsReadinessMarkdown } = require("./hospital-operations-readiness");
 const { buildMonitoringReadinessReport, renderMarkdown: renderMonitoringReadinessMarkdown } = require("./monitoring-readiness");
 const { buildOperationsReadinessReport, renderMarkdown: renderOperationsReadinessMarkdown } = require("./operations-readiness");
+const { buildMaternalChildReadinessReport, renderMarkdown: renderMaternalChildReadinessMarkdown } = require("./maternal-child-readiness");
+const { buildPolicyCoverageReport, renderMarkdown: renderPolicyCoverageMarkdown } = require("./policy-coverage");
 const { buildProcessAuditReport, renderMarkdown: renderProcessAuditMarkdown } = require("./process-audit");
 const { buildProductionDbReadinessReport, renderMarkdown: renderProductionDbReadinessMarkdown } = require("./production-db-readiness");
+const { renderMarkdown: renderPriorityApplicationTemplatesMarkdown } = require("./priority-application-templates");
 const { buildRegionalDataSharingReport, renderMarkdown: renderRegionalDataSharingMarkdown } = require("./regional-data-sharing");
 const { buildQualitySafetyReport, renderMarkdown: renderQualitySafetyMarkdown } = require("./quality-safety-report");
 const { buildReleaseArtifactManifest, renderMarkdown: renderReleaseArtifactManifestMarkdown } = require("./release-artifact-manifest");
@@ -355,6 +360,33 @@ function healthDashboardChecks(healthDashboard) {
   ];
 }
 
+function priorityApplicationTemplateChecks(priorityApplicationTemplates) {
+  return [
+    check("priorityApps:templates", priorityApplicationTemplates.ok, priorityApplicationTemplates.ok ? "priority application templates passed" : "priority application templates failed", "error", "priority-apps"),
+    check("priorityApps:count", priorityApplicationTemplates.summary?.applications === 8 && priorityApplicationTemplates.summary?.sourceApplications === 7, `${priorityApplicationTemplates.summary?.applications || 0} applications; ${priorityApplicationTemplates.summary?.sourceApplications || 0} source applications`, "error", "priority-apps"),
+    check("priorityApps:conversationTitles", priorityApplicationTemplates.templates?.every((item) => item.conversationTitle), "conversation titles present", "error", "priority-apps"),
+    check("priorityApps:conversationStarters", priorityApplicationTemplates.templates?.every((item) => item.conversationStarter && item.conversationStarter.includes(item.id)), "conversation starters present", "error", "priority-apps"),
+    check("priorityApps:implementationChecklists", priorityApplicationTemplates.templates?.every((item) => Array.isArray(item.implementationChecklist) && item.implementationChecklist.length >= 8), "implementation checklists present", "error", "priority-apps"),
+    check("priorityApps:acceptanceGates", priorityApplicationTemplates.templates?.every((item) => item.acceptanceGate?.readyWhen?.length >= 4 && item.acceptanceGate?.evidence?.length), "acceptance gates present", "error", "priority-apps")
+  ];
+}
+
+function maternalChildReadinessChecks(maternalChildReadiness) {
+  return [
+    check("maternalChild:readiness", maternalChildReadiness.ok, maternalChildReadiness.ok ? "maternal-child readiness checks passed" : "maternal-child readiness checks failed", "error", "maternal-child"),
+    check("maternalChild:policy", maternalChildReadiness.checks?.some((item) => item.id === "docs:policy" && item.passed), "policy documents and module policy summary present", "error", "maternal-child"),
+    check("maternalChild:roles", ["role:institution", "role:commission", "role:citizen"].every((id) => maternalChildReadiness.checks?.some((item) => item.id === id && item.passed)), "institution, commission, and citizen roles covered", "error", "maternal-child")
+  ];
+}
+
+function policyCoverageChecks(policyCoverage) {
+  return [
+    check("policyCoverage:report", policyCoverage.ok, policyCoverage.ok ? "policy coverage checks passed" : "policy coverage checks failed", "error", "policy"),
+    check("policyCoverage:documents", policyCoverage.summary?.documentsPassed === policyCoverage.summary?.documents, `${policyCoverage.summary?.documentsPassed || 0}/${policyCoverage.summary?.documents || 0} policy documents`, "error", "policy"),
+    check("policyCoverage:releaseGates", policyCoverage.checks?.filter((item) => /^policyCoverage:(releaseManifest|releaseReport|deployCheck|packageScript|ci)$/.test(item.id)).every((item) => item.passed), "policy coverage is wired into package, CI, deploy check, manifest, and release report", "error", "policy")
+  ];
+}
+
 function dataQualityChecks(dataQuality) {
   return [
     check("dataQuality:report", dataQuality.ok, dataQuality.ok ? "data quality checks passed" : "data quality checks failed", "error", "data-quality"),
@@ -409,6 +441,22 @@ function referralTeleconsultationChecks(referralTeleconsultationReadiness) {
     check("referralTeleconsultation:readiness", referralTeleconsultationReadiness.ok, referralTeleconsultationReadiness.ok ? "referral teleconsultation readiness checks passed" : "referral teleconsultation readiness checks failed", "error", "referral"),
     check("referralTeleconsultation:authorization", referralTeleconsultationReadiness.checks?.some((item) => item.id === "referral:residentAuthorization" && item.passed), "resident authorization evidence present", "error", "referral"),
     check("referralTeleconsultation:frontend", referralTeleconsultationReadiness.checks?.some((item) => item.id === "referral:frontend" && item.passed), "institution and county runnable entries present", "error", "referral")
+  ];
+}
+
+function escortServiceChecks(escortServiceReadiness) {
+  return [
+    check("escortService:readiness", escortServiceReadiness.ok, escortServiceReadiness.ok ? "escort service readiness checks passed" : "escort service readiness checks failed", "error", "escort"),
+    check("escortService:registry", escortServiceReadiness.summary?.providers >= 3 && escortServiceReadiness.summary?.trainedWorkers >= 3, `${escortServiceReadiness.summary?.providers || 0} providers / ${escortServiceReadiness.summary?.trainedWorkers || 0} trained workers`, "error", "escort"),
+    check("escortService:riskQuality", escortServiceReadiness.checks?.some((item) => item.id === "escort:riskQuality" && item.passed), "risk queue and quality callback evidence present", "error", "escort")
+  ];
+}
+
+function internetNursingChecks(internetNursingReadiness) {
+  return [
+    check("internetNursing:readiness", internetNursingReadiness.ok, internetNursingReadiness.ok ? "internet nursing readiness checks passed" : "internet nursing readiness checks failed", "error", "internet-nursing"),
+    check("internetNursing:qualification", internetNursingReadiness.summary?.qualifiedNurses >= 2, `${internetNursingReadiness.summary?.qualifiedNurses || 0}/${internetNursingReadiness.summary?.nurses || 0} qualified nurses`, "error", "internet-nursing"),
+    check("internetNursing:riskTrace", internetNursingReadiness.checks?.some((item) => item.id === "nursing:riskTrace" && item.passed), "risk queue and location tracking evidence present", "error", "internet-nursing")
   ];
 }
 
@@ -547,7 +595,11 @@ function packageChecks(pkg) {
     "quality-safety:report",
     "environment:matrix",
     "hospital-operations:readiness",
+    "internet-nursing:readiness",
     "health-dashboard:summary",
+    "priority-apps:templates",
+    "maternal-child:readiness",
+    "policy:coverage",
     "integration:readiness",
     "interface:mapping",
     "monitoring:readiness",
@@ -614,6 +666,8 @@ function buildReleaseReport(options = {}) {
   const researchSandbox = buildResearchSandboxReadiness(data);
   const monitoringReadiness = buildMonitoringReadinessReport({ data, pkg });
   const referralTeleconsultationReadiness = buildReferralTeleconsultationReadinessReport({ data, pkg });
+  const escortServiceReadiness = buildEscortServiceReadinessReport({ data, pkg });
+  const internetNursingReadiness = buildInternetNursingReadinessReport({ data, pkg });
   const operationsReadiness = buildOperationsReadinessReport({ data, pkg });
   const processAudit = buildProcessAuditReport({ data });
   const serviceAcceptance = buildServiceAcceptanceSummary(data);
@@ -621,6 +675,9 @@ function buildReleaseReport(options = {}) {
   const evaluationEvidence = buildEvaluationEvidenceReport({ data });
   const environmentMatrix = buildEnvironmentMatrixReport({ data, pkg });
   const healthDashboard = buildHealthDashboardSummary({ data });
+  const priorityApplicationTemplates = buildPriorityApplicationTemplates({ data });
+  const maternalChildReadiness = buildMaternalChildReadinessReport({ data, packageSource: JSON.stringify(pkg) });
+  const policyCoverage = buildPolicyCoverageReport();
   const siteReadinessPack = buildSiteReadinessPack({ data, pkg, envFile: options.envFile || ".env.example", env: options.env || process.env, identityContract, interfaceMapping, monitoringReadiness });
   const checks = [
     assertFile("README.md"),
@@ -645,6 +702,8 @@ function buildReleaseReport(options = {}) {
     ...researchSandboxChecks(researchSandbox),
     ...monitoringReadinessChecks(monitoringReadiness),
     ...referralTeleconsultationChecks(referralTeleconsultationReadiness),
+    ...escortServiceChecks(escortServiceReadiness),
+    ...internetNursingChecks(internetNursingReadiness),
     ...operationsReadinessChecks(operationsReadiness),
     ...processAuditChecks(processAudit),
     ...serviceAcceptanceChecks(serviceAcceptance),
@@ -653,6 +712,9 @@ function buildReleaseReport(options = {}) {
     ...evaluationEvidenceChecks(evaluationEvidence),
     ...environmentMatrixChecks(environmentMatrix),
     ...healthDashboardChecks(healthDashboard),
+    ...priorityApplicationTemplateChecks(priorityApplicationTemplates),
+    ...maternalChildReadinessChecks(maternalChildReadiness),
+    ...policyCoverageChecks(policyCoverage),
     ...env.checks,
     ...commandChecks(options.runCommands)
   ];
@@ -686,6 +748,8 @@ function buildReleaseReport(options = {}) {
     researchSandbox,
     monitoringReadiness,
     referralTeleconsultationReadiness,
+    escortServiceReadiness,
+    internetNursingReadiness,
     operationsReadiness,
     processAudit,
     serviceAcceptance,
@@ -693,7 +757,10 @@ function buildReleaseReport(options = {}) {
     productionDbReadiness,
     evaluationEvidence,
     environmentMatrix,
-    healthDashboard
+    healthDashboard,
+    priorityApplicationTemplates,
+    maternalChildReadiness,
+    policyCoverage
   };
 }
 
@@ -894,6 +961,10 @@ function renderMarkdown(report) {
     "",
     "See `referral-teleconsultation-readiness-report.json` and `referral-teleconsultation-readiness-report.md` for referral, teleconsultation, receiving feedback, report return, collaboration order, resident authorization, and performance evidence.",
     "",
+    "## Internet nursing readiness report",
+    "",
+    "See `internet-nursing-readiness-report.json` and `internet-nursing-readiness-report.md` for resident appointment, hospital assessment and dispatch, nurse acceptance, location trace, service record, quality callback, and policy evidence.",
+    "",
     "## Production database readiness report",
     "",
     "See `production-db-readiness-report.json` and `production-db-readiness-report.md` for PostgreSQL cutover prerequisites, current SQLite/JSON model evidence, backup rehearsal documentation, and runtime adapter guardrails.",
@@ -909,6 +980,10 @@ function renderMarkdown(report) {
     "## Health dashboard summary",
     "",
     "See `health-dashboard-summary.json` and `health-dashboard-summary.md` for the aggregate entry across the first seven applications, open actions, interface tracks, evidence, and site dependencies.",
+    "`GET /api/priority-applications/templates` exposes the live eight-application handoff templates for independent conversation work.",
+    "See `priority-application-templates.json` and `priority-application-templates.md` for the standalone release artifact version of that handoff contract.",
+    "See `maternal-child-readiness-report.json` and `maternal-child-readiness-report.md` for maternal-child policy, birth certificate workflow, role scope, API, privacy, and release evidence.",
+    "See `policy-coverage-report.json` and `policy-coverage-report.md` for About-page policy IDs, policy documents, template rules, CI, deploy check, release manifest, and operator documentation coverage.",
     "",
     "## Release artifact manifest",
     "",
@@ -1091,6 +1166,22 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       referralTeleconsultationReadiness: report.referralTeleconsultationReadiness
     }, null, 2), "utf8");
+    const escortServiceJson = path.join(path.dirname(output), "escort-service-readiness-report.json");
+    fs.writeFileSync(escortServiceJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      escortServiceReadiness: report.escortServiceReadiness
+    }, null, 2), "utf8");
+    const internetNursingJson = path.join(path.dirname(output), "internet-nursing-readiness-report.json");
+    fs.writeFileSync(internetNursingJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      internetNursingReadiness: report.internetNursingReadiness
+    }, null, 2), "utf8");
     const productionDbJson = path.join(path.dirname(output), "production-db-readiness-report.json");
     fs.writeFileSync(productionDbJson, JSON.stringify({
       project: report.project,
@@ -1122,6 +1213,30 @@ function writeOutput(report, flags) {
       profile: report.profile,
       generatedAt: report.generatedAt,
       healthDashboard: report.healthDashboard
+    }, null, 2), "utf8");
+    const priorityApplicationTemplatesJson = path.join(path.dirname(output), "priority-application-templates.json");
+    fs.writeFileSync(priorityApplicationTemplatesJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      priorityApplicationTemplates: report.priorityApplicationTemplates
+    }, null, 2), "utf8");
+    const maternalChildReadinessJson = path.join(path.dirname(output), "maternal-child-readiness-report.json");
+    fs.writeFileSync(maternalChildReadinessJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      maternalChildReadiness: report.maternalChildReadiness
+    }, null, 2), "utf8");
+    const policyCoverageJson = path.join(path.dirname(output), "policy-coverage-report.json");
+    fs.writeFileSync(policyCoverageJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      policyCoverage: report.policyCoverage
     }, null, 2), "utf8");
     const releaseArtifactManifest = buildReleaseArtifactManifest({ releaseReport: report });
     const releaseArtifactManifestJson = path.join(path.dirname(output), "release-artifact-manifest.json");
@@ -1176,6 +1291,10 @@ function writeOutput(report, flags) {
     fs.writeFileSync(monitoringMarkdown, renderMonitoringReadinessMarkdown(report.monitoringReadiness), "utf8");
     const referralTeleconsultationMarkdown = path.join(path.dirname(markdown), "referral-teleconsultation-readiness-report.md");
     fs.writeFileSync(referralTeleconsultationMarkdown, renderReferralTeleconsultationReadinessMarkdown(report.referralTeleconsultationReadiness), "utf8");
+    const escortServiceMarkdown = path.join(path.dirname(markdown), "escort-service-readiness-report.md");
+    fs.writeFileSync(escortServiceMarkdown, renderEscortServiceMarkdown(report.escortServiceReadiness), "utf8");
+    const internetNursingMarkdown = path.join(path.dirname(markdown), "internet-nursing-readiness-report.md");
+    fs.writeFileSync(internetNursingMarkdown, renderInternetNursingMarkdown(report.internetNursingReadiness), "utf8");
     const productionDbMarkdown = path.join(path.dirname(markdown), "production-db-readiness-report.md");
     fs.writeFileSync(productionDbMarkdown, renderProductionDbReadinessMarkdown(report.productionDbReadiness), "utf8");
     const evaluationMarkdown = path.join(path.dirname(markdown), "evaluation-evidence-report.md");
@@ -1184,6 +1303,12 @@ function writeOutput(report, flags) {
     fs.writeFileSync(environmentMarkdown, renderEnvironmentMatrixMarkdown(report.environmentMatrix), "utf8");
     const healthDashboardMarkdown = path.join(path.dirname(markdown), "health-dashboard-summary.md");
     fs.writeFileSync(healthDashboardMarkdown, renderHealthDashboardMarkdown(report.healthDashboard), "utf8");
+    const priorityApplicationTemplatesMarkdown = path.join(path.dirname(markdown), "priority-application-templates.md");
+    fs.writeFileSync(priorityApplicationTemplatesMarkdown, renderPriorityApplicationTemplatesMarkdown(report.priorityApplicationTemplates), "utf8");
+    const maternalChildReadinessMarkdown = path.join(path.dirname(markdown), "maternal-child-readiness-report.md");
+    fs.writeFileSync(maternalChildReadinessMarkdown, renderMaternalChildReadinessMarkdown(report.maternalChildReadiness), "utf8");
+    const policyCoverageMarkdown = path.join(path.dirname(markdown), "policy-coverage-report.md");
+    fs.writeFileSync(policyCoverageMarkdown, renderPolicyCoverageMarkdown(report.policyCoverage), "utf8");
     const releaseArtifactManifestMarkdown = path.join(path.dirname(markdown), "release-artifact-manifest.md");
     fs.writeFileSync(releaseArtifactManifestMarkdown, renderReleaseArtifactManifestMarkdown(buildReleaseArtifactManifest({ releaseReport: report })), "utf8");
   }

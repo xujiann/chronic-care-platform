@@ -949,6 +949,7 @@ function renderAnalytics() {
   renderStatisticsAnalytics();
   renderDalianHealthStatistics2025();
   renderBirthHealthManagement();
+  renderMaternalChildCare();
   renderHealthStatisticsIngestion();
   renderHealthBulletin2024();
 }
@@ -1474,6 +1475,75 @@ function renderBirthHealthManagement() {
     <span>${item.target}</span>
     <span class="badge info">${item.status}</span>
   </article>`).join("");
+}
+
+function renderMaternalChildCare() {
+  const summary = document.querySelector("#mch-summary");
+  const cards = document.querySelector("#mch-cards");
+  const table = document.querySelector("#mch-service-table");
+  const risks = document.querySelector("#mch-risk-list");
+  if (!summary || !cards || !table || !risks) return;
+
+  const certificates = state.birthCertificates || [];
+  const birth = getBirthStatistics();
+  const healthTasks = birth.healthManagement || [];
+  const motherIds = new Set(certificates.map((item) => item.maternalResidentId).filter(Boolean));
+  const signed = certificates.filter((item) => ["已签发", "已上报"].includes(item.status)).length;
+  const pendingVisit = certificates.filter((item) => /待|复测|确认/.test(`${item.healthManagementStatus || ""}${item.nextService || ""}`)).length;
+  const pendingScreening = certificates.filter((item) => /筛查|黄疸|出生缺陷|听力|遗传/.test(item.nextService || "")).length;
+  const lowWeight = certificates.filter((item) => Number(item.birthWeight || 0) > 0 && Number(item.birthWeight || 0) < 2500).length;
+  const pendingSync = certificates.filter((item) => item.maternalChildSync !== "已入册" || item.publicSecuritySync !== "已共享").length;
+  const qualityPending = certificates.filter((item) => ["待质控", "待复核", "待补正"].includes(item.qualityCheck)).length;
+
+  summary.textContent = `${formatPeriod(birth.period)} · 孕产妇、出生证明、新生儿访视、筛查和儿童保健连续管理`;
+  cards.innerHTML = [
+    ["孕产妇个案", motherIds.size, "按母亲居民主索引汇聚"],
+    ["出生证明", certificates.length, "分娩信息和法定证明"],
+    ["签发/上报", signed, "证照与妇幼入册前置"],
+    ["待访视", pendingVisit, "新生儿/产后访视待闭环"],
+    ["筛查待确认", pendingScreening, "出生缺陷和黄疸等结果归集"],
+    ["低体重儿", lowWeight, "专案随访和喂养指导"],
+    ["共享待办", pendingSync, "公安户籍和妇幼系统"],
+    ["质控待办", qualityPending, "材料、编号和签章复核"]
+  ].map(([label, value, hint]) => `<article class="metric-card"><span>${label}</span><strong>${formatNumber(value)}</strong><em>${hint}</em></article>`).join("");
+
+  const stages = [
+    ["孕产妇建册", motherIds.size, "孕产妇保健服务与高危管理", pendingSync ? "关注入册" : "已衔接"],
+    ["产前筛查诊断", pendingScreening, "出生缺陷筛查、听力和遗传代谢病结果归集", pendingScreening ? "待确认" : "持续监测"],
+    ["住院分娩登记", certificates.length, "分娩机构、出生时间、体重身长和父母身份核验", "已建模"],
+    ["出生医学证明", signed, "首次签发、换发补发、电子证照和公安共享", pendingSync ? "待共享" : "已闭环"],
+    ["产后/新生儿访视", pendingVisit, "出生后 7 天内或出院后一周内访视", pendingVisit ? "待随访" : "已安排"],
+    ["儿童保健接续", healthTasks.length, "预防接种、体弱儿童管理和儿童体检", "居民端可见"]
+  ];
+  table.innerHTML = `<table>
+    <thead><tr><th>服务环节</th><th>数量</th><th>管理口径</th><th>状态</th></tr></thead>
+    <tbody>${stages.map(([stage, count, scope, status]) => `<tr>
+      <td>${stage}</td>
+      <td>${formatNumber(count)}</td>
+      <td>${scope}</td>
+      <td><span class="badge ${/待|关注/.test(status) ? "warn" : "info"}">${status}</span></td>
+    </tr>`).join("")}</tbody>
+  </table>`;
+
+  const riskItems = certificates
+    .map((item) => {
+      const signals = [
+        Number(item.birthWeight || 0) > 0 && Number(item.birthWeight || 0) < 2500 ? "低体重儿" : "",
+        item.maternalChildSync !== "已入册" ? "妇幼待入册" : "",
+        item.publicSecuritySync !== "已共享" ? "公安待共享" : "",
+        ["待质控", "待复核", "待补正"].includes(item.qualityCheck) ? `质控${item.qualityCheck}` : "",
+        /筛查|黄疸|出生缺陷/.test(item.nextService || "") ? "筛查结果待确认" : ""
+      ].filter(Boolean);
+      return { ...item, signals };
+    })
+    .filter((item) => item.signals.length)
+    .slice(0, 6);
+  risks.innerHTML = riskItems.map((item) => `<article>
+    <strong>${item.newbornName || "未命名新生儿"} · ${item.motherName || "母亲待核验"}</strong>
+    <span>${item.birthDateTime || "出生时间待确认"} · ${item.birthWeight || "-"}g · ${item.issuingInstitution || "机构待确认"}</span>
+    <span>${item.signals.join("、")}</span>
+    <span class="badge warn">${item.nextService || "妇幼健康随访待安排"}</span>
+  </article>`).join("") || `<article><strong>暂无高优先级妇幼风险</strong><span>出生证、访视、筛查和共享状态均未触发风险规则。</span><span class="badge info">持续监测</span></article>`;
 }
 
 function renderStatisticsAnalytics() {

@@ -8,7 +8,7 @@ const DEFAULT_MARKDOWN = path.join(ROOT, "release", "identity-contract.md");
 
 const ROLE_PORTALS = {
   commission: ["index.html", "workbench.html"],
-  institution: ["institution.html"],
+  institution: ["institution.html", "internet-nursing.html"],
   insurance: ["insurance.html"],
   citizen: ["citizen.html"],
   county: ["county.html"]

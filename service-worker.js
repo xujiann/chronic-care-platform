@@ -1,12 +1,29 @@
-const CACHE_NAME = "chronic-care-citizen-v1";
+const CACHE_NAME = "chronic-care-citizen-v21";
 const APP_SHELL = [
   "./",
   "./citizen.html",
   "./citizen.css",
   "./citizen.js",
+  "./citizen.js?v=20260627",
+  "./citizen.js?v=20260627nav",
+  "./citizen.js?v=20260627preview",
+  "./citizen.js?v=20260627pages",
+  "./citizen.js?v=20260627pages2",
+  "./citizen.js?v=20260627actions",
+  "./citizen.js?v=20260627channels",
+  "./citizen.js?v=20260628launch",
+  "./citizen.js?v=20260628tasks",
+  "./citizen.js?v=20260629registration",
+  "./citizen.js?v=20260629multinav",
+  "./citizen.js?v=20260629care",
+  "./citizen.js?v=20260630layout",
   "./auth.js",
+  "./auth.js?v=20260627",
   "./health-archive-standard.js",
   "./mobile-preview.html",
+  "./mobile-preview.css",
+  "./internet-nursing.html",
+  "./internet-nursing.js?v=20260629prod",
   "./manifest.webmanifest",
   "./pwa-icon.svg",
   "./data/db.json"
@@ -35,6 +52,19 @@ self.addEventListener("fetch", (event) => {
   if (event.request.mode === "navigate") {
     event.respondWith(
       fetch(event.request).catch(() => caches.match("./citizen.html"))
+    );
+    return;
+  }
+
+  if (/\.(?:html|js|css)$/.test(requestUrl.pathname)) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          return response;
+        })
+        .catch(() => caches.match(event.request))
     );
     return;
   }
