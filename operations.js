@@ -159,6 +159,7 @@ const OPERATIONS_EVIDENCE_LABELS = {
   "/api/operations/site-joint-tests": "现场联调闭环接口",
   "/api/operations/site-joint-patrol": "现场联调巡检接口",
   "/api/operations/production-hardening": "生产加固清单接口",
+  "/api/operations/cutover-command": "生产割接签收接口",
   "/api/operations/intelligence": "智能调度建议接口",
   "/api/operations/resource-pool": "跨院资源池接口",
   "/api/operations/mobile-duty": "移动值守接口",
@@ -229,6 +230,7 @@ function buildStaticOperationsDashboard(state) {
   const performanceMonitoring = buildStaticPerformanceMonitoringEvidence(state, snapshots);
   const resourcePool = buildStaticResourcePool(snapshots, medicalResources, dispatchRequests);
   const mobileDuty = buildStaticMobileDuty(snapshots, dispatchRequests, reconciliationReviews, handover, state.taskMessages || []);
+  const cutoverCommand = buildStaticCutoverCommand(productionHardening, siteJointPatrol, mobileDuty, state.platformProcessAudit || [], state.securityEvents || []);
   const governanceReport = buildStaticGovernanceReport(snapshots, dispatchRequests, reconciliationReviews, performanceMonitoring, handover);
   const governanceExportPackage = buildStaticGovernanceExportPackage(
     snapshots,
@@ -284,6 +286,7 @@ function buildStaticOperationsDashboard(state) {
     performanceMonitoring,
     resourcePool,
     mobileDuty,
+    cutoverCommand,
     governanceReport,
     governanceExportPackage,
     nextDevelopmentResearch
@@ -415,6 +418,63 @@ function buildStaticProductionHardening(state) {
       { id: "dr-rehearsal", name: "灾备演练", owner: "基础设施组", evidence: "CUTOVER_DR_REHEARSAL_SIGNOFF", status: "待签字" }
     ],
     checks
+  };
+}
+
+function staticCutoverOwner(id) {
+  return {
+    "session-secrets": "平台运维/安全管理员",
+    "gateway-secret": "接口网关负责人",
+    "audit-retention": "安全管理员",
+    "monitoring-signoff": "监控值守长",
+    "dr-rehearsal-signoff": "基础设施组",
+    "operations-audit-trace": "运行监测岗"
+  }[id] || "运行监测岗";
+}
+
+function buildStaticCutoverCommand(productionHardening, siteJointPatrol, mobileDuty, processAudit = [], securityEvents = []) {
+  const checks = Array.isArray(productionHardening?.checks) ? productionHardening.checks : [];
+  const patrolPending = Number(siteJointPatrol?.summary?.pending || 0);
+  const dutyReminders = Number(mobileDuty?.summary?.reminders || 0);
+  const items = checks.map((check, index) => {
+    const auditHit = processAudit.find((item) =>
+      String(item.process || "").includes("生产割接") &&
+      (String(item.evidence || "").includes(check.id) || String(item.auditPoint || "").includes(check.name))
+    );
+    const signed = Boolean(check.passed || auditHit);
+    const blocking = !signed && ["session-secrets", "gateway-secret", "audit-retention", "monitoring-signoff", "dr-rehearsal-signoff"].includes(check.id);
+    return {
+      id: `cutover-${check.id}`,
+      checkId: check.id,
+      name: check.name,
+      owner: staticCutoverOwner(check.id),
+      phase: index <= 2 ? "T-1生产准备" : index <= 4 ? "T-0割接确认" : "上线后观察",
+      status: signed ? "已签收" : blocking ? "阻断待签收" : "待复核",
+      priority: blocking ? "高" : signed ? "常规" : "中",
+      detail: check.detail,
+      nextAction: signed ? "保持证据归档，并纳入上线后观察。" : check.nextAction,
+      blockers: [
+        !check.passed ? check.name : "",
+        patrolPending > 0 && check.id === "site-interface-signoff" ? `${patrolPending}项现场巡检待归档` : "",
+        dutyReminders === 0 && check.id === "monitoring-signoff" ? "尚未形成移动值守提醒证据" : ""
+      ].filter(Boolean),
+      evidence: ["/api/operations/production-hardening", "/api/operations/cutover-command", "platformProcessAudit"]
+    };
+  });
+  return {
+    ok: items.length > 0 && items.every((item) => item.status === "已签收"),
+    summary: {
+      total: items.length,
+      signed: items.filter((item) => item.status === "已签收").length,
+      blocking: items.filter((item) => item.status === "阻断待签收").length,
+      pending: items.filter((item) => item.status !== "已签收").length,
+      auditEvents: processAudit.filter((item) => String(item.process || "").includes("生产割接")).length,
+      securityEvents: securityEvents.filter((item) => String(item.action || "").includes("cutover")).length
+    },
+    watchWindow: "T-1 18:00 至 T+1 08:00",
+    rollbackPolicy: "任一高优先级割接项未签收时，维持演示环境，暂不进入生产切换。",
+    items,
+    evidence: ["/api/operations/cutover-command", "/api/operations/cutover-command/actions", "platformProcessAudit", "securityEvents"]
   };
 }
 
@@ -1075,6 +1135,7 @@ function renderOperationsDashboard() {
   renderSiteJointTests(dashboard.siteJointTests || buildStaticSiteJointTests(dashboard.interfaceMapping || buildStaticInterfaceMapping()));
   renderSiteJointPatrol(dashboard.siteJointPatrol || buildStaticSiteJointPatrol(dashboard.siteJointTests || {}, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || []));
   renderProductionHardening(dashboard.productionHardening || buildStaticProductionHardening({}));
+  renderCutoverCommand(dashboard.cutoverCommand || buildStaticCutoverCommand(dashboard.productionHardening || {}, dashboard.siteJointPatrol || {}, dashboard.mobileDuty || {}, [], []));
   renderOperationsIntelligence(dashboard.intelligence || buildStaticOperationsIntelligence(filteredSnapshots, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || []));
   renderResourcePool(dashboard.resourcePool || buildStaticResourcePool(filteredSnapshots, dashboard.medicalResources || [], dashboard.dispatchRequests || []));
   renderMobileDuty(dashboard.mobileDuty || buildStaticMobileDuty(filteredSnapshots, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || [], dashboard.handover || {}, []));
@@ -1598,6 +1659,74 @@ function renderProductionHardening(productionHardening) {
       </article>
     `).join("")}
   `;
+}
+
+function renderCutoverCommand(cutoverCommand) {
+  const target = document.querySelector("#operation-cutover-command");
+  if (!target) return;
+  const items = Array.isArray(cutoverCommand.items) ? cutoverCommand.items : [];
+  target.innerHTML = `
+    <article class="operation-cutover-summary ${cutoverCommand.ok ? "ready" : "blocked"}">
+      <strong>生产割接签收台</strong>
+      <span>${cutoverCommand.summary?.signed || 0}/${cutoverCommand.summary?.total || 0} 项已签收，${cutoverCommand.summary?.blocking || 0} 项阻断</span>
+      <small>观察窗口：${zhInline(cutoverCommand.watchWindow)}；回退策略：${zhInline(cutoverCommand.rollbackPolicy)}</small>
+    </article>
+    ${items.map((item) => `
+      <article class="operation-cutover-card ${item.priority === "高" ? "critical" : item.status === "已签收" ? "ready" : "warning"}">
+        <div class="operation-playbook-head">
+          <div>
+            <strong>${zhInline(item.name)}</strong>
+            <span>${zhInline(item.phase)} / ${zhInline(item.owner)} / ${zhInline(item.status)}</span>
+          </div>
+          <span class="badge ${item.priority === "高" ? "danger" : item.status === "已签收" ? "info" : "warn"}">${zhInline(item.priority)}</span>
+        </div>
+        <p>${zhInline(item.detail)}</p>
+        <div class="operation-cutover-blockers">
+          ${(item.blockers?.length ? item.blockers : ["无新增阻断"]).map((row) => `<span>${zhInline(row)}</span>`).join("")}
+        </div>
+        <footer>
+          <small>证据：${evidenceList(item.evidence)}</small>
+          <button class="inline-action compact" type="button" data-cutover-signoff="${htmlAttribute(item.id)}">提交签收</button>
+        </footer>
+      </article>
+    `).join("")}
+  `;
+  target.querySelectorAll("[data-cutover-signoff]").forEach((button) => {
+    button.addEventListener("click", () => signoffCutoverCommand(button.dataset.cutoverSignoff));
+  });
+}
+
+async function signoffCutoverCommand(itemId) {
+  const item = (operationsDashboard?.cutoverCommand?.items || []).find((row) => row.id === itemId);
+  if (!item) return;
+  const payload = {
+    itemId,
+    status: "已签收",
+    note: item.nextAction
+  };
+  try {
+    const response = await request(`${OPERATIONS_API_BASE}/operations/cutover-command/actions`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error("cutover signoff failed");
+    const result = await response.json();
+    operationsDashboard.cutoverCommand = result.cutoverCommand || operationsDashboard.cutoverCommand;
+  } catch (error) {
+    operationsDashboard.cutoverCommand = {
+      ...(operationsDashboard.cutoverCommand || {}),
+      items: (operationsDashboard.cutoverCommand?.items || []).map((row) => row.id === itemId ? { ...row, status: "已签收", priority: "常规", blockers: [] } : row)
+    };
+    const rows = operationsDashboard.cutoverCommand.items || [];
+    operationsDashboard.cutoverCommand.summary = {
+      ...(operationsDashboard.cutoverCommand.summary || {}),
+      signed: rows.filter((row) => row.status === "已签收").length,
+      blocking: rows.filter((row) => row.status === "阻断待签收").length,
+      pending: rows.filter((row) => row.status !== "已签收").length,
+      total: rows.length
+    };
+  }
+  renderCutoverCommand(operationsDashboard.cutoverCommand || {});
 }
 
 function renderOperationsIntelligence(intelligence) {

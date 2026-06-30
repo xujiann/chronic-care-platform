@@ -4145,6 +4145,72 @@ function buildOperationsProductionHardening(data) {
   };
 }
 
+function cutoverOwner(id) {
+  return {
+    "session-secrets": "平台运维/安全管理员",
+    "gateway-secret": "接口网关负责人",
+    "database-url": "数据平台负责人",
+    "storage-engine": "数据平台负责人",
+    "identity-adapter": "统一身份负责人",
+    "audit-retention": "安全管理员",
+    "site-interface-signoff": "接口联调组",
+    "insurance-certificate-signoff": "跨部门交换负责人",
+    "monitoring-signoff": "监控值守长",
+    "dr-rehearsal-signoff": "基础设施组",
+    "operations-audit-trace": "运行监测岗"
+  }[id] || "运行监测岗";
+}
+
+function buildOperationsCutoverCommand({ productionHardening, siteJointPatrol, mobileDuty, processAudit, securityEvents }) {
+  const checks = Array.isArray(productionHardening?.checks) ? productionHardening.checks : [];
+  const auditRows = Array.isArray(processAudit) ? processAudit : [];
+  const eventRows = Array.isArray(securityEvents) ? securityEvents : [];
+  const patrolPending = Number(siteJointPatrol?.summary?.pending || 0);
+  const dutyReminders = Number(mobileDuty?.summary?.reminders || 0);
+  const items = checks.map((check, index) => {
+    const auditHit = auditRows.find((item) =>
+      String(item.process || "").includes("生产割接") &&
+      (String(item.evidence || "").includes(check.id) || String(item.auditPoint || "").includes(check.name))
+    );
+    const signed = Boolean(check.passed || auditHit);
+    const isBlocking = !signed && ["session-secrets", "gateway-secret", "audit-retention", "monitoring-signoff", "dr-rehearsal-signoff"].includes(check.id);
+    return {
+      id: `cutover-${check.id}`,
+      checkId: check.id,
+      name: check.name,
+      owner: cutoverOwner(check.id),
+      phase: index <= 3 ? "T-1生产准备" : index <= 7 ? "T-0割接确认" : "上线后观察",
+      status: signed ? "已签收" : isBlocking ? "阻断待签收" : "待复核",
+      priority: isBlocking ? "高" : signed ? "常规" : "中",
+      detail: check.detail,
+      nextAction: signed ? "保持证据归档，并纳入上线后观察。" : check.nextAction,
+      blockers: [
+        !check.passed ? check.name : "",
+        patrolPending > 0 && check.id === "site-interface-signoff" ? `${patrolPending}项现场巡检待归档` : "",
+        dutyReminders === 0 && check.id === "monitoring-signoff" ? "尚未形成移动值守提醒证据" : ""
+      ].filter(Boolean),
+      evidence: ["/api/operations/production-hardening", "/api/operations/cutover-command", "platformProcessAudit"],
+      signedAt: auditHit?.evidence || ""
+    };
+  });
+  return {
+    ok: items.length > 0 && items.every((item) => item.status === "已签收"),
+    generatedAt: new Date().toISOString(),
+    summary: {
+      total: items.length,
+      signed: items.filter((item) => item.status === "已签收").length,
+      blocking: items.filter((item) => item.status === "阻断待签收").length,
+      pending: items.filter((item) => item.status !== "已签收").length,
+      auditEvents: auditRows.filter((item) => String(item.process || "").includes("生产割接")).length,
+      securityEvents: eventRows.filter((item) => String(item.action || "").includes("cutover")).length
+    },
+    watchWindow: "T-1 18:00 至 T+1 08:00",
+    rollbackPolicy: "任一高优先级割接项未签收时，维持演示环境，暂不进入生产切换。",
+    items,
+    evidence: ["/api/operations/cutover-command", "/api/operations/cutover-command/actions", "platformProcessAudit", "securityEvents"]
+  };
+}
+
 function buildOperationsIntelligence({ snapshots, dispatchRequests, reconciliationReviews }) {
   const lowerPressureTargets = [...snapshots].sort((a, b) => Number(a.bedOccupancyRate || 0) - Number(b.bedOccupancyRate || 0));
   const recommendations = snapshots.map((snapshot) => {
@@ -4744,6 +4810,13 @@ function buildHospitalOperationsDashboard(data) {
     reconciliationReviews,
     handover,
     taskMessages: data.taskMessages
+  });
+  dashboard.cutoverCommand = buildOperationsCutoverCommand({
+    productionHardening,
+    siteJointPatrol,
+    mobileDuty: dashboard.mobileDuty,
+    processAudit: data.platformProcessAudit,
+    securityEvents: data.securityEvents
   });
   dashboard.governanceReport = buildOperationsGovernanceReport({
     snapshots,
@@ -8556,6 +8629,56 @@ async function handleApi(req, res) {
     if (!user) return;
     const dashboard = buildHospitalOperationsDashboard(readDatabase());
     sendJson(res, 200, dashboard.productionHardening);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/cutover-command") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/cutover-command");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.cutoverCommand);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/operations/cutover-command/actions") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/cutover-command/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const dashboard = buildHospitalOperationsDashboard(data);
+    const items = Array.isArray(dashboard.cutoverCommand?.items) ? dashboard.cutoverCommand.items : [];
+    const item = items.find((row) => row.id === payload.itemId) || items[0];
+    if (!item) {
+      sendJson(res, 400, { error: "Bad Request", message: "生产割接签收项不存在" });
+      return;
+    }
+    const now = new Date().toISOString();
+    const audit = {
+      process: "医院运行生产割接签收",
+      owner: item.owner || user.name,
+      status: String(payload.status || "已签收").trim(),
+      risk: item.priority === "高" ? "高优先级割接阻断项" : "常规割接复核",
+      auditPoint: `${item.name}：${item.detail || ""}`,
+      evidence: `${item.checkId}/${now}`,
+      nextAction: String(payload.note || item.nextAction || "保持证据归档，并进入上线后观察。").trim()
+    };
+    data.platformProcessAudit = [audit, ...(Array.isArray(data.platformProcessAudit) ? data.platformProcessAudit : [])].slice(0, 80);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "operations-cutover-signoff",
+        target: item.id,
+        result: "allowed",
+        detail: `${item.checkId}:${audit.status}:${item.priority}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    const refreshed = buildHospitalOperationsDashboard(data);
+    sendJson(res, 201, { audit, cutoverCommand: refreshed.cutoverCommand });
     return;
   }
 

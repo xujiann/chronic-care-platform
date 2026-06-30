@@ -103,6 +103,13 @@ function buildCapabilities(data, serverSource, readiness, release) {
       detail: "汇总生产密钥、审计保全、监控告警、灾备演练和现场签字状态，明确割接阻断项。"
     },
     {
+      id: "cutover-command",
+      name: "生产割接签收台",
+      status: release.checks.some((item) => item.id === "release:cutoverCommand" && item.passed) ? "ready" : "needs-attention",
+      evidence: ["/api/operations/cutover-command", "/api/operations/cutover-command/actions", "platformProcessAudit"],
+      detail: "按生产加固检查项生成割接签收任务，跟踪阻断项、观察窗口、回退策略和审计留痕。"
+    },
+    {
       id: "ops-intelligence",
       name: "智能调度建议",
       status: release.checks.some((item) => item.id === "release:intelligence" && item.passed) ? "ready" : "needs-attention",
@@ -173,8 +180,8 @@ function buildNextPlan() {
       phase: "P0 生产加固",
       owner: "平台运维/安全管理岗",
       scope: "生产密钥、审计保全、监控告警、灾备演练、回退方案",
-      deliverable: "已上线 /api/operations/production-hardening 和生产加固清单面板；真实密钥、保全路径和演练签字为现场归档项。",
-      exitCriteria: "代码侧已完成阻断清单；生产前需 release:report:full 无 error 且割接项完成签字归档。"
+      deliverable: "已上线 /api/operations/production-hardening、/api/operations/cutover-command 和生产割接签收台；真实密钥、保全路径、演练签字、观察窗口和回退策略为现场归档项。",
+      exitCriteria: "代码侧已完成阻断清单和签收审计；生产前需 release:report:full 无 error 且割接项完成真实签字归档。"
     },
     {
       id: "ops-intelligence",
