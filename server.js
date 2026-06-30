@@ -9,6 +9,7 @@ const { buildReleaseReport, buildServiceAcceptanceSummary } = require("./scripts
 const { buildReleaseArtifactManifest } = require("./scripts/release-artifact-manifest");
 const { buildChronicInstitutionInterfaceReport } = require("./scripts/chronic-institution-interfaces");
 const { buildChronicLaunchCoreReport } = require("./scripts/chronic-launch-core");
+const { buildChronicFollowupReadinessReport } = require("./scripts/chronic-followup-readiness");
 
 const PORT = Number(process.env.PORT || 5173);
 const ROOT = __dirname;
@@ -7652,6 +7653,7 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
   const scoped = scopeStateForUser(data, user);
   const targetResidents = (scoped.residents || []).filter((resident) => !residentId || resident.id === residentId);
   const policy = data.chronicFollowupStatusPolicy || seedChronicFollowupStatusPolicy();
+  const readiness = buildChronicFollowupReadinessReport({ data: scoped });
   const feedbackRecords = (scoped.personalRecords || []).filter((item) => item.category === "chronic-feedback");
   const residents = targetResidents.map((resident) => {
     const screenings = (scoped.chronicScreeningTasks || []).filter((item) => item.residentId === resident.id);
@@ -7713,8 +7715,15 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
       highPriority: residents.filter((item) => item.riskLevel === "high").length,
       openFollowups: residents.reduce((sum, item) => sum + item.returnVisitReminders.length, 0),
       medicationPending: residents.reduce((sum, item) => sum + item.medicationAdherence.pending, 0),
-      feedbackRecords: residents.reduce((sum, item) => sum + item.residentFeedback.count, 0)
+      feedbackRecords: residents.reduce((sum, item) => sum + item.residentFeedback.count, 0),
+      alerts: readiness.summary?.alerts || 0,
+      overdueAlerts: readiness.summary?.overdueAlerts || 0,
+      highPriorityAlerts: readiness.summary?.highPriorityAlerts || 0,
+      policyAligned: readiness.summary?.policyAligned || 0,
+      policyItems: readiness.summary?.policyItems || 0
     },
+    policyAlignment: readiness.policyAlignment || [],
+    alertQueue: readiness.alertQueue || [],
     residents
   };
 }

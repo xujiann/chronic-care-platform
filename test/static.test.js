@@ -259,6 +259,8 @@ test("chronic follow-up launch core is wired through docs api and portals", () =
   assert.match(institutionHtml, /设备上传/);
   assert.match(institutionHtml, /现场联调已就绪/);
   assert.doesNotMatch(institutionHtml, /Chronic Launch Core|Device upload|Pharmacy callback|Family doctor closure|Reminder outreach|Field integration ready|Resident, task, status/);
+  assert.match(institutionJs, /loadChronicFollowupSummary/);
+  assert.match(institutionJs, /refreshChronicRuntimeState/);
   assert.match(institutionJs, /\/chronic\/device-measurements/);
   assert.match(institutionJs, /\/chronic\/launch-core\/actions/);
   assert.match(institutionJs, /接收会诊/);

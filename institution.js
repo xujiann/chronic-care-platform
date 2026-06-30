@@ -4,10 +4,24 @@ let platformState = fallbackState;
 
 document.addEventListener("DOMContentLoaded", async () => {
   platformState = await loadPlatformState(fallbackState);
-  platformState.chronicLaunchCore = await loadChronicLaunchCore();
+  const [followupSummary, launchCore] = await Promise.all([loadChronicFollowupSummary(), loadChronicLaunchCore()]);
+  platformState.chronicFollowupSummary = followupSummary;
+  platformState.chronicLaunchCore = launchCore;
   bindInstitutionActions();
   renderAll(platformState);
 });
+
+async function loadChronicFollowupSummary() {
+  if (!institutionApiBase) return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/chronic/followup-summary`);
+    if (response.ok) return await response.json();
+  } catch (error) {
+    // Static preview falls back to local snapshot evidence.
+  }
+  return null;
+}
 
 async function loadChronicLaunchCore() {
   if (!institutionApiBase) return null;
@@ -19,6 +33,12 @@ async function loadChronicLaunchCore() {
     // Static preview falls back to local snapshot evidence.
   }
   return null;
+}
+
+async function refreshChronicRuntimeState() {
+  const [followupSummary, launchCore] = await Promise.all([loadChronicFollowupSummary(), loadChronicLaunchCore()]);
+  if (followupSummary) platformState.chronicFollowupSummary = followupSummary;
+  if (launchCore) platformState.chronicLaunchCore = launchCore;
 }
 
 function renderAll(state) {
@@ -245,6 +265,10 @@ function renderChronicFollowupWorkbench(state) {
   const openScreenings = (state.chronicScreeningTasks || []).filter((item) => !chronicClosed(state, item.status));
   const pendingMedication = (state.medicationPickups || []).filter((item) => !chronicClosed(state, item.status || item.pharmacyStatus));
   summaryEl.textContent = `${openFollowups.length + openPlans.length + openScreenings.length} 项待处置`;
+  const apiSummary = state.chronicFollowupSummary?.summary || {};
+  if (apiSummary.alerts !== undefined) {
+    summaryEl.textContent = `${openFollowups.length + openPlans.length + openScreenings.length} 项待处置 · ${apiSummary.highPriorityAlerts || 0} 项高优先级 · ${apiSummary.policyAligned || 0}/${apiSummary.policyItems || 0} 政策覆盖`;
+  }
   metricsEl.innerHTML = [
     ["筛查分级", openScreenings.length, "高风险发现与分级评估"],
     ["管理计划", openPlans.length, "复核、升级预警、下次随访"],
@@ -295,6 +319,7 @@ async function dispatchChronicFollowup(collection, id, updates, note) {
     const rows = platformState[collection] || [];
     const index = rows.findIndex((item) => item.id === id);
     if (index >= 0) rows[index] = saved;
+    await refreshChronicRuntimeState();
     return { ok: true, saved };
   } catch (error) {
     alert(error.message || "慢病随访处置失败，请检查登录状态和网络连接");
@@ -333,6 +358,7 @@ async function runChronicIntegrationDemo(type) {
       });
       if (!response.ok) throw new Error(`integration demo failed: ${response.status}`);
       await response.json();
+      await refreshChronicRuntimeState();
     }
     if (type === "device") {
       platformState.personalRecords = [{ id: `local-device-${Date.now()}`, residentId: demo.body.residentId, category: "chronic-self-checkin", result: demo.body.measurementValue, source: "device gateway" }, ...(platformState.personalRecords || [])];
