@@ -111,6 +111,10 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
   assert.equal(dashboard.body.goLiveReadiness.stage, "controlled_pilot_ready");
   assert.equal(dashboard.body.summary.readinessScore, 100);
   assert.equal(dashboard.body.summary.siteSignoffs >= 6, true);
+  assert.equal(dashboard.body.departmentTaskView.role, "commission");
+  assert.equal(dashboard.body.departmentTaskView.profile.permissions.includes("review_rectification"), true);
+  assert.equal(dashboard.body.departmentTaskView.metrics.some((item) => item.label === "逾期整改"), true);
+  assert.equal(dashboard.body.departmentTaskView.queue.some((item) => item.kind === "action_plan"), true);
   assert.equal(dashboard.body.siteSignoffs.some((item) => item.id === "qss-live-feeds"), true);
   assert.equal(dashboard.body.actionPlan.some((item) => item.priority === "critical"), true);
   assert.equal(dashboard.body.institutionRisks.length > 0, true);
@@ -136,6 +140,9 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
   const institutionDashboard = await api(baseUrl, "/api/quality-safety/dashboard", authorized(institutionLogin.body.token));
   assert.equal(institutionDashboard.response.status, 200);
   assert.equal(institutionDashboard.body.role, "institution");
+  assert.equal(institutionDashboard.body.departmentTaskView.role, "institution");
+  assert.equal(institutionDashboard.body.departmentTaskView.profile.permissions.includes("submit_feedback"), true);
+  assert.equal(institutionDashboard.body.departmentTaskView.metrics.some((item) => item.label === "待处置危急值"), true);
   assert.equal(Array.isArray(institutionDashboard.body.institutionRisks), true);
   assert.equal(institutionDashboard.body.siteSignoffs.some((item) => item.id === "qss-critical-routing"), true);
   const siteEvidence = await api(baseUrl, "/api/quality-safety/site-signoffs/qss-critical-routing/evidence", authorized(institutionLogin.body.token, {
@@ -175,6 +182,9 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
   const countyDashboard = await api(baseUrl, "/api/quality-safety/dashboard", authorized(countyLogin.body.token));
   assert.equal(countyDashboard.response.status, 200);
   assert.equal(countyDashboard.body.role, "county");
+  assert.equal(countyDashboard.body.departmentTaskView.role, "county");
+  assert.equal(countyDashboard.body.departmentTaskView.profile.permissions.includes("submit_consortium_evidence"), true);
+  assert.equal(countyDashboard.body.departmentTaskView.metrics.some((item) => item.label === "互认待复核"), true);
   assert.equal(countyDashboard.body.siteSignoffs.some((item) => item.id === "qss-mutual-recognition-rules"), true);
   const countyEvidence = await api(baseUrl, "/api/quality-safety/site-signoffs/qss-mutual-recognition-rules/evidence", authorized(countyLogin.body.token, {
     method: "POST",

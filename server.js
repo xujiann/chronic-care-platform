@@ -5379,6 +5379,86 @@ function buildQualitySafetyGoLiveReadiness({ summary, actionPlan, institutionRis
   };
 }
 
+function buildQualitySafetyDepartmentTaskView({ user, summary, actionPlan, issues, rectifications, criticalValueAlerts, siteSignoffs, mutualRecognitionQualityReviews }) {
+  const profileByRole = {
+    commission: {
+      name: "卫健监管部门",
+      scope: "全域/辖区医疗质量、安全事件、整改闭环和现场签收监管",
+      focus: "优先处理高风险机构、逾期整改、危急行动事项和现场签收阻断项",
+      actions: ["派发问题", "复核整改", "升级逾期", "复核路径", "联调签收"],
+      permissions: ["dispatch_issue", "review_rectification", "escalate_overdue", "review_pathway", "review_site_signoff"]
+    },
+    institution: {
+      name: "医疗机构",
+      scope: "本机构医疗质量事件、危急值、整改反馈和现场证据",
+      focus: "优先完成危急值确认处置、整改反馈、病历补证和生产证据补交",
+      actions: ["提交整改反馈", "确认危急值", "处置危急值", "提交现场证据"],
+      permissions: ["submit_feedback", "acknowledge_critical_value", "dispose_critical_value", "submit_site_evidence"]
+    },
+    county: {
+      name: "县域医共体",
+      scope: "医共体成员机构、互认质控、区域协同事项和现场签收材料",
+      focus: "优先补齐互认清单、负面清单、例外复核证据和医共体签收材料",
+      actions: ["查看互认质控", "提交医共体证据", "补充签收材料", "协同成员机构"],
+      permissions: ["view_mutual_recognition_qc", "submit_consortium_evidence", "coordinate_member_institutions"]
+    }
+  };
+  const role = user.role || "commission";
+  const profile = profileByRole[role] || profileByRole.commission;
+  const openIssueCount = issues.filter((item) => normalizeQualitySafetyStatus(item.status || item.normalizedStatus) !== "closed").length;
+  const openSignoffs = siteSignoffs.filter((item) => !["accepted", "closed", "ready_for_joint_test"].includes(String(item.status || item.normalizedStatus || "")));
+  const roleSignoffs = openSignoffs.filter((item) => !item.ownerRole || item.ownerRole === role);
+  const metricRows = role === "institution" ? [
+    { label: "待处置危急值", value: criticalValueAlerts.filter((item) => !item.acknowledgementComplete || !item.dispositionComplete).length },
+    { label: "待反馈整改", value: rectifications.filter((item) => !item.feedbackComplete && item.normalizedStatus !== "closed").length },
+    { label: "本机构签收", value: roleSignoffs.length },
+    { label: "可见问题", value: openIssueCount }
+  ] : role === "county" ? [
+    { label: "互认待复核", value: mutualRecognitionQualityReviews.filter((item) => normalizeQualitySafetyStatus(item.status || item.qcStatus) !== "closed").length },
+    { label: "医共体签收", value: roleSignoffs.length },
+    { label: "区域整改", value: rectifications.filter((item) => item.normalizedStatus !== "closed").length },
+    { label: "可见问题", value: openIssueCount }
+  ] : [
+    { label: "逾期整改", value: summary.sla?.overdue || 0 },
+    { label: "高危行动", value: summary.criticalActionItems || 0 },
+    { label: "待复核整改", value: rectifications.filter((item) => item.normalizedStatus === "reviewing").length },
+    { label: "待签收项", value: openSignoffs.length }
+  ];
+  const queue = [
+    ...actionPlan.map((item) => ({
+      id: item.id,
+      kind: "action_plan",
+      priority: item.priority,
+      title: item.action,
+      owner: item.owner,
+      dueAt: item.dueAt || "",
+      source: item.source || item.id
+    })),
+    ...roleSignoffs.map((item) => ({
+      id: item.id,
+      kind: "site_signoff",
+      priority: item.status === "pending_site_confirmation" ? "high" : "medium",
+      title: item.item,
+      owner: item.owner,
+      dueAt: item.dueAt || "",
+      source: item.sourceCollection || "qualitySafetySiteSignoffs"
+    }))
+  ];
+  const priorityRank = { critical: 0, high: 1, medium: 2, watch: 3 };
+  return {
+    role,
+    roleName: user.roleName || profile.name,
+    orgCode: user.orgCode || "",
+    orgName: user.orgName || "",
+    dataScope: user.dataScope || profile.scope,
+    profile,
+    metrics: metricRows,
+    queue: queue
+      .sort((a, b) => (priorityRank[a.priority] ?? 9) - (priorityRank[b.priority] ?? 9) || String(a.dueAt || "9999").localeCompare(String(b.dueAt || "9999")) || a.id.localeCompare(b.id))
+      .slice(0, 6)
+  };
+}
+
 function buildQualitySafetyIssues(data) {
   const eventRows = (Array.isArray(data.qualitySafetyEvents) ? data.qualitySafetyEvents : []).map((item) => ({
     ...item,
@@ -5514,11 +5594,22 @@ function buildQualitySafetyDashboard(data, user) {
   });
   summary.readinessScore = goLiveReadiness.score;
   summary.readinessStage = goLiveReadiness.stage;
+  const departmentTaskView = buildQualitySafetyDepartmentTaskView({
+    user,
+    summary,
+    actionPlan,
+    issues,
+    rectifications,
+    criticalValueAlerts,
+    siteSignoffs,
+    mutualRecognitionQualityReviews
+  });
   return {
     ok: true,
     generatedAt: new Date().toISOString(),
     role: user.role,
     summary,
+    departmentTaskView,
     actionPlan,
     institutionRisks,
     issues,

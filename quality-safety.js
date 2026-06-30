@@ -379,12 +379,15 @@ function departmentTaskMetrics(data, role) {
 
 function renderDepartmentView(data) {
   const user = window.HealthCityAuth?.getUser?.() || {};
-  const role = data.role || user.role || "commission";
-  const profile = qualityDepartmentProfile(role);
-  const tasks = departmentTaskMetrics(data, role);
-  const roleText = user.roleName || profile.name;
-  const orgText = user.orgName || profile.name;
-  const scopeText = user.dataScope || profile.scope;
+  const view = data.departmentTaskView || {};
+  const role = view.role || data.role || user.role || "commission";
+  const profile = view.profile || qualityDepartmentProfile(role);
+  const tasks = Array.isArray(view.metrics) && view.metrics.length ? view.metrics.map((item) => [item.label, item.value]) : departmentTaskMetrics(data, role);
+  const actions = profile.actions || (profile.permissions || []).map((item) => statusLabel(item));
+  const roleText = view.roleName || user.roleName || profile.name;
+  const orgText = view.orgName || user.orgName || profile.name;
+  const scopeText = view.dataScope || user.dataScope || profile.scope;
+  const queue = Array.isArray(view.queue) ? view.queue : [];
   setHtml("quality-safety-department-view", `
     <article class="primary">
       <span>当前登录部门</span>
@@ -399,7 +402,7 @@ function renderDepartmentView(data) {
     <article>
       <span>可执行动作</span>
       <div class="quality-action-list">
-        ${profile.actions.map((action) => `<span>${zhText(action)}</span>`).join("")}
+        ${actions.map((action) => `<span>${zhText(action)}</span>`).join("")}
       </div>
     </article>
     <article>
@@ -408,6 +411,11 @@ function renderDepartmentView(data) {
       <div class="quality-task-list">
         ${tasks.map(([label, value]) => `<p><b>${zhText(label)}</b><strong>${value}</strong></p>`).join("")}
       </div>
+      ${queue.length ? `
+        <div class="quality-queue-list">
+          ${queue.slice(0, 3).map((item) => `<p><b>${zhText(item.priority)}</b>${zhText(item.title)}</p>`).join("")}
+        </div>
+      ` : ""}
     </article>
   `);
 }

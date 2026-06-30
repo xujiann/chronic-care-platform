@@ -392,6 +392,8 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(js, /renderOperationsBrief/);
   assert.match(js, /renderDepartmentView/);
   assert.match(js, /qualityDepartmentProfile/);
+  assert.match(js, /departmentTaskView/);
+  assert.match(js, /quality-queue-list/);
   assert.match(js, /window\.HealthCityAuth\?\.getUser/);
   assert.match(js, /filterQualityRows/);
   assert.match(js, /applyQualitySafetyFilters/);
@@ -417,6 +419,7 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(portalCss, /quality-brief/);
   assert.match(portalCss, /quality-department-view/);
   assert.match(portalCss, /quality-action-list/);
+  assert.match(portalCss, /quality-queue-list/);
   assert.match(portalCss, /\.table-wrap/);
   assert.match(portalCss, /position: sticky/);
   assert.match(portalCss, /login-scope-note/);
@@ -425,6 +428,7 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(login, /医疗质量与安全监管平台准入部门/);
   assert.match(login, /scope\.roles\.includes\(user\.role\)/);
   assert.match(server, /\/api\/quality-safety\/dashboard/);
+  assert.match(server, /buildQualitySafetyDepartmentTaskView/);
   assert.match(server, /\/api\/quality-safety\/interface-standard/);
   assert.match(server, /\/api\/quality-safety\/interface-joint-test-pack/);
   assert.match(server, /\/api\/quality-safety\/interface-messages\/validate/);

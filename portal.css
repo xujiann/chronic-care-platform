@@ -1179,6 +1179,28 @@ tbody tr:hover {
   font-size: 18px;
 }
 
+.quality-queue-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.quality-queue-list p {
+  margin: 0;
+  border-radius: 8px;
+  background: #fff;
+  padding: 7px 8px;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.quality-queue-list b {
+  display: inline-block;
+  margin-right: 6px;
+  color: var(--teal);
+}
+
 .quality-safety-page .rules {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
