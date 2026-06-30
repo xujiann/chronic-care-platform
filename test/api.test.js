@@ -892,9 +892,13 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(supervision.response.status, 200);
     assert.equal(supervision.body.summary.total >= 3, true);
     assert.equal(supervision.body.summary.traceabilityPolicySources >= 5, true);
+    assert.equal(supervision.body.summary.traceabilityEvidenceItems >= 5, true);
+    assert.equal(supervision.body.summary.traceabilityEvidenceReady >= 5, true);
     assert.equal(supervision.body.boundaries.some((item) => item.id === "rational-medication"), true);
     assert.equal(supervision.body.insuranceCoordination.contractId, "insurance-settlement-v1");
     assert.equal(supervision.body.traceabilityPolicySources.some((item) => item.id === "nhsa-2025-7"), true);
+    assert.equal(supervision.body.traceabilityEvidenceChecklist.some((item) => item.id === "trace-scan-capture" && item.ready), true);
+    assert.equal(supervision.body.traceabilityEvidenceChecklist.every((item) => Array.isArray(item.evidenceFields) && item.evidenceFields.length > 0), true);
 
     const review = await api(baseUrl, "/api/drug-consumable-supervision/dcs-rational-r1/review", authorized(insurance.body.token, {
       method: "POST",

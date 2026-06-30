@@ -5081,6 +5081,68 @@ function drugConsumableStatus(value) {
   return text || "tracking";
 }
 
+const DRUG_TRACEABILITY_EVIDENCE_REQUIREMENTS = [
+  {
+    id: "trace-scan-capture",
+    title: "Traceability scan capture",
+    boundaries: ["rational-medication", "fixed-pharmacy", "insurance-settlement"],
+    owner: "institution-and-insurance",
+    policySourceIds: ["nhsa-2025-7", "nmpa-2022-label"],
+    evidenceFields: ["traceCode", "scanTime", "packageLevel", "operator", "sourceSystem"]
+  },
+  {
+    id: "trace-code-mapping",
+    title: "Insurance code and traceability-code mapping",
+    boundaries: ["insurance-settlement"],
+    owner: "insurance-integration",
+    policySourceIds: ["nhsa-2024-collection", "nmpa-2019-32"],
+    evidenceFields: ["medicalInsuranceCode", "commodityCode", "traceCode", "packageCascade", "mappingVersion"]
+  },
+  {
+    id: "trace-manual-exception",
+    title: "No-code or failed-scan manual verification",
+    boundaries: ["rational-medication", "fixed-pharmacy", "consumable-clue"],
+    owner: "institution-remediation",
+    policySourceIds: ["nhsa-2024-collection", "nmpa-2022-label"],
+    evidenceFields: ["noCodeReason", "manualVerification", "photoEvidence", "reviewer", "rectificationDeadline"]
+  },
+  {
+    id: "trace-consumable-catalog",
+    title: "High-value consumable catalog and settlement cross-check",
+    boundaries: ["consumable-clue", "insurance-settlement"],
+    owner: "institution-and-insurance",
+    policySourceIds: ["nhsa-2025-7", "nhsa-2024-collection"],
+    evidenceFields: ["catalogVersion", "batchNo", "useRecord", "chargeItem", "claimId"]
+  },
+  {
+    id: "trace-remediation-audit",
+    title: "Remediation audit trail and department coordination",
+    boundaries: ["rational-medication", "fixed-pharmacy", "consumable-clue", "insurance-settlement"],
+    owner: "commission-insurance-institution",
+    policySourceIds: ["nhsa-2025-7", "nmpa-2018-guidance"],
+    evidenceFields: ["auditTrail", "securityEvent", "remediationEvidence", "reviewDecision", "nextAction"]
+  }
+];
+
+function buildDrugTraceabilityEvidenceChecklist(rows, policySources) {
+  const sourceIds = new Set((policySources || []).map((item) => item.id));
+  return DRUG_TRACEABILITY_EVIDENCE_REQUIREMENTS.map((requirement) => {
+    const linkedRows = rows.filter((row) =>
+      requirement.boundaries.includes(row.boundary) ||
+      (requirement.boundaries.includes("insurance-settlement") && row.relatedClaimId) ||
+      (requirement.id === "trace-remediation-audit" && row.remediationStatus)
+    );
+    const policySourceIds = requirement.policySourceIds.filter((id) => sourceIds.has(id));
+    return {
+      ...requirement,
+      policySourceIds,
+      rowIds: linkedRows.map((row) => row.id),
+      rowCount: linkedRows.length,
+      ready: policySourceIds.length === requirement.policySourceIds.length && linkedRows.length > 0
+    };
+  });
+}
+
 function buildDrugConsumableSupervision(data) {
   const supervisions = Array.isArray(data.drugConsumableSupervisions) ? data.drugConsumableSupervisions : seedDrugConsumableSupervisions();
   const traceabilityPolicySources = Array.isArray(data.drugTraceabilityPolicySources) ? data.drugTraceabilityPolicySources : seedDrugTraceabilityPolicySources();
@@ -5102,6 +5164,7 @@ function buildDrugConsumableSupervision(data) {
     };
   });
   const openRows = rows.filter((item) => item.normalizedStatus !== "closed");
+  const traceabilityEvidenceChecklist = buildDrugTraceabilityEvidenceChecklist(rows, traceabilityPolicySources);
   const insuranceContract = contracts.find((item) => item.id === "insurance-settlement-v1");
   return {
     generatedAt: new Date().toISOString(),
@@ -5121,10 +5184,13 @@ function buildDrugConsumableSupervision(data) {
       fixedPickup: pickups.length,
       claims: claims.length,
       traceabilityPolicySources: traceabilityPolicySources.length,
+      traceabilityEvidenceItems: traceabilityEvidenceChecklist.length,
+      traceabilityEvidenceReady: traceabilityEvidenceChecklist.filter((item) => item.ready).length,
       contractReady: Boolean(insuranceContract?.status === "ready" && insuranceContract.signature && insuranceContract.retryPolicy)
     },
     rows,
     traceabilityPolicySources,
+    traceabilityEvidenceChecklist,
     insuranceCoordination: {
       contractId: insuranceContract?.id || "",
       status: insuranceContract?.status || "missing",

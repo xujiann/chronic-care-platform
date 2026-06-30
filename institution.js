@@ -449,9 +449,11 @@ function renderInstitutionDrugConsumableSupervision(report, state) {
   const openRows = rows.filter((item) => item.normalizedStatus !== "closed");
   const boundaries = report?.boundaries || [];
   const policySources = report?.traceabilityPolicySources || [];
+  const evidenceChecklist = report?.traceabilityEvidenceChecklist || [];
   countEl.textContent = `${openRows.length}/${rows.length} open`;
   boundaryEl.innerHTML = boundaries.map((item) => `<div><strong>${item.name}</strong><span>${item.source} · ${item.count}</span></div>`).join("") || `<div><strong>Institution remediation</strong><span>Drug, consumable, fixed-pickup and catalog evidence</span></div>`;
   boundaryEl.insertAdjacentHTML("beforeend", renderInstitutionTraceabilityPolicySources(policySources));
+  boundaryEl.insertAdjacentHTML("beforeend", renderInstitutionTraceabilityEvidenceChecklist(evidenceChecklist));
   listEl.innerHTML = openRows.map((item) => {
     const resident = residentOf(state, item.residentId);
     const badge = item.riskLevel === "high" ? "danger" : item.normalizedStatus === "pending" ? "warn" : "info";
@@ -484,6 +486,24 @@ function renderInstitutionTraceabilityPolicySources(policySources = []) {
       <div data-institution-traceability-policy-source="${item.id || ""}">
         <strong>${item.documentNo || item.authority || "Policy source"}</strong>
         <span><a href="${item.url || "./drug-consumable-about.html"}">${item.title || item.authority || "Official source"}</a></span>
+      </div>
+    `).join("")}
+  `;
+}
+
+function renderInstitutionTraceabilityEvidenceChecklist(evidenceChecklist = []) {
+  if (!evidenceChecklist.length) {
+    return `<div data-institution-traceability-evidence-checklist><strong>Traceability evidence checklist</strong><span>No evidence checklist returned by /api/drug-consumable-supervision.</span></div>`;
+  }
+  return `
+    <div data-institution-traceability-evidence-checklist>
+      <strong>Traceability evidence checklist</strong>
+      <span>${evidenceChecklist.filter((item) => item.ready).length}/${evidenceChecklist.length} ready evidence groups; use these fields when submitting remediation.</span>
+    </div>
+    ${evidenceChecklist.filter((item) => item.owner !== "insurance-integration").slice(0, 5).map((item) => `
+      <div data-institution-traceability-evidence="${item.id || ""}">
+        <strong>${item.title || item.id}</strong>
+        <span>${(item.evidenceFields || []).join(", ")} · policies ${(item.policySourceIds || []).join(", ")} · rows ${item.rowCount || 0}</span>
       </div>
     `).join("")}
   `;

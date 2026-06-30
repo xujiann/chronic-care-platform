@@ -129,11 +129,12 @@ function renderDrugConsumableSupervision(report) {
   const rows = report.rows || [];
   const boundaries = report.boundaries || [];
   const policySources = report.traceabilityPolicySources || [];
+  const evidenceChecklist = report.traceabilityEvidenceChecklist || [];
   document.querySelector("#drug-consumable-count").textContent = `${rows.length} 条`;
   const boundaryRows = boundaries.map((item) => `
     <div><strong>${item.name}</strong><span>${item.source} · ${item.count} 条</span></div>
   `).join("");
-  document.querySelector("#drug-consumable-boundaries").innerHTML = `${boundaryRows}${renderTraceabilityPolicySources(policySources)}`;
+  document.querySelector("#drug-consumable-boundaries").innerHTML = `${boundaryRows}${renderTraceabilityPolicySources(policySources)}${renderTraceabilityEvidenceChecklist(evidenceChecklist)}`;
   document.querySelector("#drug-consumable-list").innerHTML = rows.map((item) => {
     const badge = item.riskLevel === "high" ? "danger" : item.normalizedStatus === "pending" ? "warn" : "info";
     const resident = residentOf(platformState, item.residentId);
@@ -167,6 +168,24 @@ function renderTraceabilityPolicySources(policySources = []) {
       <div data-drug-traceability-policy-source="${item.id || ""}">
         <strong>${item.documentNo || item.authority || "Policy source"}</strong>
         <span><a href="${item.url || "./drug-consumable-about.html"}">${item.title || item.authority || "Official source"}</a></span>
+      </div>
+    `).join("")}
+  `;
+}
+
+function renderTraceabilityEvidenceChecklist(evidenceChecklist = []) {
+  if (!evidenceChecklist.length) {
+    return `<div data-drug-traceability-evidence-checklist><strong>Traceability evidence checklist</strong><span>No evidence checklist returned by /api/drug-consumable-supervision.</span></div>`;
+  }
+  return `
+    <div data-drug-traceability-evidence-checklist>
+      <strong>Traceability evidence checklist</strong>
+      <span>${evidenceChecklist.filter((item) => item.ready).length}/${evidenceChecklist.length} ready evidence groups for settlement, remediation and audit review.</span>
+    </div>
+    ${evidenceChecklist.slice(0, 5).map((item) => `
+      <div data-drug-traceability-evidence="${item.id || ""}">
+        <strong>${item.title || item.id}</strong>
+        <span>${(item.evidenceFields || []).join(", ")} · policies ${(item.policySourceIds || []).join(", ")} · rows ${item.rowCount || 0} · owner ${item.owner || "pending"}</span>
       </div>
     `).join("")}
   `;

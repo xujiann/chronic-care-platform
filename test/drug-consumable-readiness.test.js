@@ -23,6 +23,7 @@ test("drug consumable readiness covers required supervision boundaries", () => {
   assert.equal(report.linkedRows.every((item) => item.auditTrailPresent), true);
   assert.equal(report.checks.some((item) => item.id === "drug-consumable:workflow-reuse" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "drug-consumable:traceability-policy" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "drug-consumable:traceability-evidence" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "drug-consumable:frontend" && item.passed), true);
   assert.equal(report.policySources.some((item) => item.documentNo === "医保发〔2025〕7号"), true);
   assert.equal(report.policySources.some((item) => item.documentNo === "NMPAB/T 1011-2022"), true);
