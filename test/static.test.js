@@ -511,6 +511,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsJs, /renderPostCutoverObservation/);
   assert.match(operationsJs, /buildStaticPostCutoverObservation/);
   assert.match(operationsJs, /submitPostCutoverObservation/);
+  assert.match(operationsJs, /operation-observation-windows/);
   assert.match(operationsJs, /renderOperationsIntelligence/);
   assert.match(operationsJs, /renderResourcePool/);
   assert.match(operationsJs, /buildStaticResourcePool/);
@@ -577,6 +578,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("portal.css"), /site-joint-patrol-card/);
   assert.match(read("portal.css"), /operation-cutover-card/);
   assert.match(read("portal.css"), /operation-observation-card/);
+  assert.match(read("portal.css"), /operation-observation-windows/);
   assert.match(read("portal.css"), /command-chain-sla/);
   assert.match(read("portal.css"), /operation-playbook-card/);
   assert.match(read("portal.css"), /operation-resource-pool-card/);

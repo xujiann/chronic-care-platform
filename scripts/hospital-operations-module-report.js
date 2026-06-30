@@ -114,7 +114,7 @@ function buildCapabilities(data, serverSource, readiness, release) {
       name: "上线后观察台",
       status: release.checks.some((item) => item.id === "release:postCutoverObservation" && item.passed) ? "ready" : "needs-attention",
       evidence: ["/api/operations/post-cutover-observation", "/api/operations/post-cutover-observation/actions", "platformProcessAudit"],
-      detail: "按 T+0/T+1 观察窗口跟踪运行健康、资源压力、调度积压、直报复核、巡检归档、割接签收和移动值守提醒。"
+      detail: "按 T+0 2小时、T+0 8小时、T+1 24小时观察窗口跟踪运行健康、资源压力、调度积压、直报复核、巡检归档、割接签收和移动值守提醒。"
     },
     {
       id: "ops-intelligence",

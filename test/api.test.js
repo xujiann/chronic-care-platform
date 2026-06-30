@@ -241,6 +241,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(operationsDashboard.body.cutoverCommand.items.some((item) => item.evidence.includes("/api/operations/cutover-command")), true);
     assert.equal(operationsDashboard.body.postCutoverObservation.summary.total >= 7, true);
     assert.equal(operationsDashboard.body.postCutoverObservation.items.some((item) => item.evidence.includes("/api/operations/post-cutover-observation")), true);
+    assert.equal(operationsDashboard.body.postCutoverObservation.windows.length, 3);
     assert.equal(operationsDashboard.body.intelligence.recommendations.some((item) => item.recommendation && item.prediction), true);
     assert.equal(operationsDashboard.body.resourcePool.rows.some((item) => item.resourceSlots.length >= 5), true);
     assert.equal(operationsDashboard.body.resourcePool.recommendations.length >= 1, true);
@@ -360,6 +361,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(postCutoverObservation.response.status, 200);
     assert.equal(postCutoverObservation.body.summary.total >= 7, true);
     assert.equal(postCutoverObservation.body.watchWindow.includes("T+1"), true);
+    assert.equal(postCutoverObservation.body.windows.some((item) => item.id === "t1-24h" && item.owner), true);
 
     const postCutoverAction = await api(baseUrl, "/api/operations/post-cutover-observation/actions", authorized(accountLogin.body.token, {
       method: "POST",

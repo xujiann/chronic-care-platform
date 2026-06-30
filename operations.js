@@ -520,6 +520,11 @@ function buildStaticPostCutoverObservation(snapshots, dispatchRequests, reconcil
   return {
     ok: items.length > 0 && items.every((item) => item.status === "已观察" || item.priority !== "高"),
     watchWindow: "T+0 2小时、T+0 8小时、T+1 24小时",
+    windows: [
+      { id: "t0-2h", name: "T+0 2小时", focus: "接口可用性、错误率、关键告警", owner: "平台运维" },
+      { id: "t0-8h", name: "T+0 8小时", focus: "床位压力、调度积压、直报复核", owner: "运行调度席" },
+      { id: "t1-24h", name: "T+1 24小时", focus: "巡检归档、回退准备、治理报告", owner: "值班长" }
+    ],
     summary: {
       total: items.length,
       abnormal: items.filter((item) => item.priority === "高").length,
@@ -1794,6 +1799,9 @@ function renderPostCutoverObservation(postCutoverObservation) {
       <strong>上线后观察台</strong>
       <span>${postCutoverObservation.summary?.observed || 0}/${postCutoverObservation.summary?.total || 0} 项已观察，${postCutoverObservation.summary?.abnormal || 0} 项异常</span>
       <small>观察窗口：${zhInline(postCutoverObservation.watchWindow)}；证据：${evidenceList(postCutoverObservation.evidence)}</small>
+      <div class="operation-observation-windows">
+        ${(postCutoverObservation.windows || []).map((windowItem) => `<span title="${htmlAttribute(windowItem.focus)}">${zhInline(windowItem.name)} / ${zhInline(windowItem.owner)}</span>`).join("")}
+      </div>
     </article>
     ${items.map((item) => `
       <article class="operation-observation-card ${item.priority === "高" ? "critical" : item.priority === "中" ? "warning" : "ready"}">
