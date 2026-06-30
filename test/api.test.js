@@ -225,6 +225,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(operationsDashboard.body.siteJointTests.summary.total >= 5, true);
     assert.equal(operationsDashboard.body.productionHardening.summary.total >= 5, true);
     assert.equal(operationsDashboard.body.intelligence.recommendations.some((item) => item.recommendation && item.prediction), true);
+    assert.equal(operationsDashboard.body.resourcePool.rows.some((item) => item.resourceSlots.length >= 5), true);
+    assert.equal(operationsDashboard.body.resourcePool.recommendations.length >= 1, true);
     assert.equal(operationsDashboard.body.governanceReport.sections.some((item) => item.id === "reconciliation-diff"), true);
     assert.equal(operationsDashboard.body.governanceExportPackage.files.some((item) => item.id === "reconciliation-diff-list"), true);
     assert.equal(operationsDashboard.body.nextDevelopmentResearch.tracks.length >= 5, true);
@@ -303,6 +305,12 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const intelligence = await api(baseUrl, "/api/operations/intelligence", authorized(accountLogin.body.token));
     assert.equal(intelligence.response.status, 200);
     assert.equal(intelligence.body.recommendations.some((item) => item.prediction.reportingRisk), true);
+
+    const resourcePool = await api(baseUrl, "/api/operations/resource-pool", authorized(accountLogin.body.token));
+    assert.equal(resourcePool.response.status, 200);
+    assert.equal(resourcePool.body.summary.institutions >= 3, true);
+    assert.equal(resourcePool.body.rows.some((item) => item.protocol && item.evidence.includes("/api/operations/resource-pool")), true);
+    assert.equal(resourcePool.body.recommendations.some((item) => item.evidence.includes("/api/operations/dispatch")), true);
 
     const governanceReport = await api(baseUrl, "/api/operations/governance-report", authorized(accountLogin.body.token));
     assert.equal(governanceReport.response.status, 200);

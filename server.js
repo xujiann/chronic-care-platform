@@ -3992,6 +3992,91 @@ function buildOperationsGovernanceExportPackage({
   };
 }
 
+function operationEntityMatched(left = {}, right = {}) {
+  const leftId = String(left.institutionId || left.sourceInstitutionId || left.targetInstitutionId || "").toLowerCase();
+  const rightId = String(right.institutionId || right.sourceInstitutionId || right.targetInstitutionId || "").toLowerCase();
+  if (leftId && rightId && leftId === rightId) return true;
+  const leftName = String(left.institution || left.sourceInstitution || left.targetInstitution || "").trim().toLowerCase();
+  const rightName = String(right.institution || right.sourceInstitution || right.targetInstitution || "").trim().toLowerCase();
+  return Boolean(leftName && rightName && leftName === rightName);
+}
+
+function buildOperationsResourcePool({ snapshots, medicalResources, dispatchRequests }) {
+  const byInstitutionId = new Map(snapshots.map((item) => [String(item.institutionId || "").toLowerCase(), item]));
+  const openStatuses = new Set(["pending", "assigned", "in-progress"]);
+  const openDispatches = dispatchRequests.filter((item) => openStatuses.has(item.status));
+  const rows = medicalResources.map((resource) => {
+    const snapshot = byInstitutionId.get(String(resource.id || resource.institutionId || "").toLowerCase()) || {};
+    const availableBeds = snapshot.beds ? Math.max(0, Number(snapshot.beds.open || 0) - Number(snapshot.beds.occupied || 0)) : Math.max(0, Math.round(Number(resource.beds || 0) * 0.08));
+    const availableIcuBeds = snapshot.beds ? Math.max(0, Number(snapshot.beds.icuTotal || 0) - Number(snapshot.beds.icuOccupied || 0)) : Math.max(0, Math.round(Number(resource.beds || 0) * 0.01));
+    const availableVentilators = Number(snapshot.equipment?.ventilatorsAvailable ?? Math.max(0, Math.round(Number(resource.devices || 0) * 0.25)));
+    const availableAmbulances = Number(snapshot.equipment?.ambulancesAvailable ?? Math.max(1, Math.round(Number(resource.devices || 0) * 0.08)));
+    const reserveDoctors = Math.max(0, Math.round(Number(resource.doctors || 0) * 0.03) - Number(snapshot.staff?.shortage || 0));
+    const pressure = Number(snapshot.resourcePressure || 0);
+    const status = snapshot.normalizedStatus === "critical" || pressure >= 85
+      ? "需保障本院"
+      : availableBeds >= 20 || availableVentilators >= 8 || reserveDoctors >= 3
+        ? "可调拨"
+        : "有限支援";
+    return {
+      id: `pool-${String(resource.id || resource.institution || "").toLowerCase()}`,
+      institutionId: String(resource.id || resource.institutionId || "").toUpperCase(),
+      institution: snapshot.institution || resource.institution,
+      region: resource.region || snapshot.district || "待确认",
+      institutionType: resource.type || "医疗机构",
+      status,
+      pressure,
+      activeDispatches: openDispatches.filter((item) => operationEntityMatched(snapshot, item) || String(item.targetInstitutionId || "").toLowerCase() === String(resource.id || "").toLowerCase()).length,
+      resourceSlots: [
+        { type: "普通床位", available: availableBeds, unit: "张", boundary: "优先用于急诊留观、下转过渡和择期手术错峰。" },
+        { type: "ICU床位", available: availableIcuBeds, unit: "张", boundary: "需医政医管处确认重症收治边界和转运风险。" },
+        { type: "呼吸机", available: availableVentilators, unit: "台", boundary: "调拨前确认设备编号、消毒状态和随设备耗材。" },
+        { type: "救护车", available: availableAmbulances, unit: "辆", boundary: "用于跨院转运或急诊分流，需同步调度指令。" },
+        { type: "值班医生", available: reserveDoctors, unit: "人", boundary: "只作为短时支援能力，需目标科室确认执业和排班边界。" }
+      ],
+      protocol: {
+        approval: status === "可调拨" ? "运行调度席初审，医政医管处确认" : "先保障本院运行，再评估支援",
+        responseSla: status === "可调拨" ? "2小时确认，4小时到位" : "4小时内复核可支援边界",
+        audit: "形成申请、审批、执行、关闭、复盘和审计留痕。"
+      },
+      evidence: ["/api/operations/resource-pool", "/api/operations/dashboard", "medicalResources"]
+    };
+  }).sort((a, b) => (a.status === "可调拨" ? -1 : 1) - (b.status === "可调拨" ? -1 : 1) || b.resourceSlots[0].available - a.resourceSlots[0].available);
+  const highPressure = snapshots.filter((item) => item.normalizedStatus === "critical" || Number(item.resourcePressure || 0) >= 85);
+  const donors = rows.filter((item) => item.status === "可调拨");
+  const recommendations = highPressure.map((source, index) => {
+    const target = donors.find((item) => String(item.institutionId).toLowerCase() !== String(source.institutionId || "").toLowerCase()) || donors[index % Math.max(1, donors.length)];
+    return {
+      id: `resource-match-${source.institutionId || index}`,
+      sourceInstitutionId: source.institutionId,
+      sourceInstitution: source.institution,
+      targetInstitutionId: target?.institutionId || "",
+      targetInstitution: target?.institution || "待人工指定",
+      resourceType: Number(source.beds?.icuOccupied || 0) / Math.max(1, Number(source.beds?.icuTotal || 0)) >= 0.9 ? "ICU床位/呼吸机" : "过渡床位/急诊分流",
+      priority: source.normalizedStatus === "critical" ? "高" : "中",
+      reason: `资源压力 ${source.resourcePressure || 0}，开放调度工单 ${openDispatches.filter((item) => operationEntityMatched(source, item)).length} 条。`,
+      suggestedAction: target ? `建议向${target.institution}申请${target.resourceSlots[0].available}张以内过渡床位或设备支援。` : "建议先由运行调度席人工指定支援机构。",
+      evidence: ["/api/operations/resource-pool", "/api/operations/dispatch"]
+    };
+  });
+  return {
+    ok: rows.length > 0,
+    generatedAt: new Date().toISOString(),
+    summary: {
+      institutions: rows.length,
+      transferableInstitutions: rows.filter((item) => item.status === "可调拨").length,
+      transferableBeds: rows.reduce((sum, item) => sum + Number(item.resourceSlots.find((slot) => slot.type === "普通床位")?.available || 0), 0),
+      icuBeds: rows.reduce((sum, item) => sum + Number(item.resourceSlots.find((slot) => slot.type === "ICU床位")?.available || 0), 0),
+      ventilators: rows.reduce((sum, item) => sum + Number(item.resourceSlots.find((slot) => slot.type === "呼吸机")?.available || 0), 0),
+      openDispatches: openDispatches.length,
+      recommendations: recommendations.length
+    },
+    rows,
+    recommendations,
+    evidence: ["/api/operations/resource-pool", "medicalResources", "resourceDispatchRequests"]
+  };
+}
+
 function buildOperationsNextDevelopmentResearch({
   snapshots,
   dispatchRequests,
@@ -4141,6 +4226,7 @@ function buildHospitalOperationsDashboard(data) {
   const dispatchRequests = Array.isArray(data.resourceDispatchRequests) ? data.resourceDispatchRequests : [];
   const reconciliationReviews = Array.isArray(data.statisticsReconciliationReviews) ? data.statisticsReconciliationReviews : [];
   const handoverSignoffs = Array.isArray(data.operationHandoverSignoffs) ? data.operationHandoverSignoffs : [];
+  const medicalResources = Array.isArray(data.medicalResources) ? data.medicalResources : [];
   const openStatuses = new Set(["pending", "assigned", "in-progress"]);
   const summary = {
     institutions: snapshots.length,
@@ -4176,6 +4262,7 @@ function buildHospitalOperationsDashboard(data) {
     snapshots,
     dispatchRequests,
     reconciliationReviews,
+    medicalResources,
     alertRules: rules,
     commandChains,
     interfaceMapping,
@@ -4187,6 +4274,7 @@ function buildHospitalOperationsDashboard(data) {
     handoverOwnerMatrix: buildOperationsHandoverOwnerMatrix(handover)
   };
   dashboard.performanceMonitoring = buildPerformanceMonitoringEvidence(data, dashboard);
+  dashboard.resourcePool = buildOperationsResourcePool({ snapshots, medicalResources, dispatchRequests });
   dashboard.governanceReport = buildOperationsGovernanceReport({
     snapshots,
     dispatchRequests,
@@ -6906,6 +6994,14 @@ async function handleApi(req, res) {
     if (!user) return;
     const dashboard = buildHospitalOperationsDashboard(readDatabase());
     sendJson(res, 200, dashboard.intelligence);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/resource-pool") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/resource-pool");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.resourcePool);
     return;
   }
 

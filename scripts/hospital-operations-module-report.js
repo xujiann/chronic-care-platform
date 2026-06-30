@@ -103,6 +103,13 @@ function buildCapabilities(data, serverSource, readiness, release) {
       detail: "按机构生成床位缺口、人员缺口、急诊拥堵、直报风险和跨院资源建议，进入人工复核队列。"
     },
     {
+      id: "cross-hospital-resource-pool",
+      name: "跨院资源池",
+      status: release.checks.some((item) => item.id === "release:resourcePool" && item.passed) ? "ready" : "needs-attention",
+      evidence: ["/api/operations/resource-pool", "medicalResources", "resourceDispatchRequests"],
+      detail: "基于医疗资源目录、运行快照和调度工单生成跨院床位、ICU、呼吸机、救护车和值班医生可支援能力，并提供调拨建议。"
+    },
+    {
       id: "governance-reporting",
       name: "治理报表",
       status: release.checks.some((item) => item.id === "release:governanceReport" && item.passed) ? "ready" : "needs-attention",
@@ -176,8 +183,8 @@ function buildNextPlan() {
       phase: "P1 跨院资源协同",
       owner: "医政医管处/医联体办公室",
       scope: "床位、ICU、检查设备、值班人员和转运能力的跨院资源池",
-      deliverable: "下一步基于 /api/operations/next-development-research 拆分资源池、调拨协议、审批规则和审计回放。",
-      exitCriteria: "跨院调拨工单可完成申请、受理、执行、关闭、复盘和审计追踪。"
+      deliverable: "已上线 /api/operations/resource-pool 和跨院资源池面板，生成可支援资源、审批边界、SLA 和调拨建议。",
+      exitCriteria: "代码侧已形成资源池和调拨草稿；生产前需现场确认跨院协议、审批人、转运责任和正式签收流程。"
     },
     {
       id: "mobile-command",

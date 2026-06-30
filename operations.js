@@ -159,6 +159,7 @@ const OPERATIONS_EVIDENCE_LABELS = {
   "/api/operations/site-joint-tests": "现场联调闭环接口",
   "/api/operations/production-hardening": "生产加固清单接口",
   "/api/operations/intelligence": "智能调度建议接口",
+  "/api/operations/resource-pool": "跨院资源池接口",
   "/api/operations/governance-report": "治理报表接口",
   "/api/operations/governance-export-package": "治理导出包接口",
   "/api/operations/next-development-research": "下一步功能研究接口"
@@ -211,6 +212,7 @@ function buildStaticOperationsDashboard(state) {
   const snapshots = (Array.isArray(state.hospitalOperationSnapshots) ? state.hospitalOperationSnapshots : []).map((snapshot) => enrichSnapshot(snapshot, alertRules));
   const dispatchRequests = Array.isArray(state.resourceDispatchRequests) ? state.resourceDispatchRequests : [];
   const reconciliationReviews = Array.isArray(state.statisticsReconciliationReviews) ? state.statisticsReconciliationReviews : [];
+  const medicalResources = Array.isArray(state.medicalResources) ? state.medicalResources : [];
   const openStatuses = new Set(["pending", "assigned", "in-progress"]);
   const occupiedBeds = snapshots.reduce((sum, item) => sum + Number(item.beds?.occupied || 0), 0);
   const totalOpenBeds = snapshots.reduce((sum, item) => sum + Number(item.beds?.open || 0), 0);
@@ -222,6 +224,7 @@ function buildStaticOperationsDashboard(state) {
   const productionHardening = buildStaticProductionHardening(state);
   const intelligence = buildStaticOperationsIntelligence(snapshots, dispatchRequests, reconciliationReviews);
   const performanceMonitoring = buildStaticPerformanceMonitoringEvidence(state, snapshots);
+  const resourcePool = buildStaticResourcePool(snapshots, medicalResources, dispatchRequests);
   const governanceReport = buildStaticGovernanceReport(snapshots, dispatchRequests, reconciliationReviews, performanceMonitoring, handover);
   const governanceExportPackage = buildStaticGovernanceExportPackage(
     snapshots,
@@ -263,6 +266,7 @@ function buildStaticOperationsDashboard(state) {
     snapshots,
     dispatchRequests,
     reconciliationReviews,
+    medicalResources,
     alertRules,
     commandChains,
     interfaceMapping,
@@ -273,6 +277,7 @@ function buildStaticOperationsDashboard(state) {
     handover,
     handoverOwnerMatrix: buildStaticHandoverOwnerMatrix(handover),
     performanceMonitoring,
+    resourcePool,
     governanceReport,
     governanceExportPackage,
     nextDevelopmentResearch
@@ -492,6 +497,77 @@ function buildStaticGovernanceExportPackage(
     markdown,
     checklist: ["确认月报模板、直报差异清单和附件编号规则。", "由统计办公室复核差异状态，由运行调度席复核工单闭环。", "导出包编号写入平台过程审计，现场正式版需完成签收归档。"],
     evidence: ["/api/operations/governance-report", "/api/operations/governance-export-package", "/api/process-audit"]
+  };
+}
+
+function buildStaticResourcePool(snapshots, medicalResources, dispatchRequests) {
+  const byInstitutionId = new Map(snapshots.map((item) => [String(item.institutionId || "").toLowerCase(), item]));
+  const openStatuses = new Set(["pending", "assigned", "in-progress"]);
+  const openDispatches = dispatchRequests.filter((item) => openStatuses.has(item.status));
+  const rows = medicalResources.map((resource) => {
+    const snapshot = byInstitutionId.get(String(resource.id || resource.institutionId || "").toLowerCase()) || {};
+    const availableBeds = snapshot.beds ? Math.max(0, Number(snapshot.beds.open || 0) - Number(snapshot.beds.occupied || 0)) : Math.max(0, Math.round(Number(resource.beds || 0) * 0.08));
+    const availableIcuBeds = snapshot.beds ? Math.max(0, Number(snapshot.beds.icuTotal || 0) - Number(snapshot.beds.icuOccupied || 0)) : Math.max(0, Math.round(Number(resource.beds || 0) * 0.01));
+    const availableVentilators = Number(snapshot.equipment?.ventilatorsAvailable ?? Math.max(0, Math.round(Number(resource.devices || 0) * 0.25)));
+    const availableAmbulances = Number(snapshot.equipment?.ambulancesAvailable ?? Math.max(1, Math.round(Number(resource.devices || 0) * 0.08)));
+    const reserveDoctors = Math.max(0, Math.round(Number(resource.doctors || 0) * 0.03) - Number(snapshot.staff?.shortage || 0));
+    const pressure = Number(snapshot.resourcePressure || 0);
+    const status = snapshot.normalizedStatus === "critical" || pressure >= 85 ? "需保障本院" : availableBeds >= 20 || availableVentilators >= 8 || reserveDoctors >= 3 ? "可调拨" : "有限支援";
+    return {
+      id: `pool-${String(resource.id || resource.institution || "").toLowerCase()}`,
+      institutionId: String(resource.id || resource.institutionId || "").toUpperCase(),
+      institution: snapshot.institution || resource.institution,
+      region: resource.region || snapshot.district || "待确认",
+      institutionType: resource.type || "医疗机构",
+      status,
+      pressure,
+      activeDispatches: openDispatches.filter((item) => operationEntityMatched(snapshot, item) || String(item.targetInstitutionId || "").toLowerCase() === String(resource.id || "").toLowerCase()).length,
+      resourceSlots: [
+        { type: "普通床位", available: availableBeds, unit: "张", boundary: "优先用于急诊留观、下转过渡和择期手术错峰。" },
+        { type: "ICU床位", available: availableIcuBeds, unit: "张", boundary: "需医政医管处确认重症收治边界和转运风险。" },
+        { type: "呼吸机", available: availableVentilators, unit: "台", boundary: "调拨前确认设备编号、消毒状态和随设备耗材。" },
+        { type: "救护车", available: availableAmbulances, unit: "辆", boundary: "用于跨院转运或急诊分流，需同步调度指令。" },
+        { type: "值班医生", available: reserveDoctors, unit: "人", boundary: "只作为短时支援能力，需目标科室确认执业和排班边界。" }
+      ],
+      protocol: {
+        approval: status === "可调拨" ? "运行调度席初审，医政医管处确认" : "先保障本院运行，再评估支援",
+        responseSla: status === "可调拨" ? "2小时确认，4小时到位" : "4小时内复核可支援边界",
+        audit: "形成申请、审批、执行、关闭、复盘和审计留痕。"
+      },
+      evidence: ["/api/operations/resource-pool", "/api/operations/dashboard", "medicalResources"]
+    };
+  }).sort((a, b) => (a.status === "可调拨" ? -1 : 1) - (b.status === "可调拨" ? -1 : 1) || b.resourceSlots[0].available - a.resourceSlots[0].available);
+  const highPressure = snapshots.filter((item) => item.normalizedStatus === "critical" || Number(item.resourcePressure || 0) >= 85);
+  const donors = rows.filter((item) => item.status === "可调拨");
+  const recommendations = highPressure.map((source, index) => {
+    const target = donors.find((item) => String(item.institutionId).toLowerCase() !== String(source.institutionId || "").toLowerCase()) || donors[index % Math.max(1, donors.length)];
+    return {
+      id: `resource-match-${source.institutionId || index}`,
+      sourceInstitutionId: source.institutionId,
+      sourceInstitution: source.institution,
+      targetInstitutionId: target?.institutionId || "",
+      targetInstitution: target?.institution || "待人工指定",
+      resourceType: Number(source.beds?.icuOccupied || 0) / Math.max(1, Number(source.beds?.icuTotal || 0)) >= 0.9 ? "ICU床位/呼吸机" : "过渡床位/急诊分流",
+      priority: source.normalizedStatus === "critical" ? "高" : "中",
+      reason: `资源压力 ${source.resourcePressure || 0}，开放调度工单 ${openDispatches.filter((item) => operationEntityMatched(source, item)).length} 条。`,
+      suggestedAction: target ? `建议向${zh(target.institution)}申请${target.resourceSlots[0].available}张以内过渡床位或设备支援。` : "建议先由运行调度席人工指定支援机构。",
+      evidence: ["/api/operations/resource-pool", "/api/operations/dispatch"]
+    };
+  });
+  return {
+    ok: rows.length > 0,
+    summary: {
+      institutions: rows.length,
+      transferableInstitutions: rows.filter((item) => item.status === "可调拨").length,
+      transferableBeds: rows.reduce((sum, item) => sum + Number(item.resourceSlots.find((slot) => slot.type === "普通床位")?.available || 0), 0),
+      icuBeds: rows.reduce((sum, item) => sum + Number(item.resourceSlots.find((slot) => slot.type === "ICU床位")?.available || 0), 0),
+      ventilators: rows.reduce((sum, item) => sum + Number(item.resourceSlots.find((slot) => slot.type === "呼吸机")?.available || 0), 0),
+      openDispatches: openDispatches.length,
+      recommendations: recommendations.length
+    },
+    rows,
+    recommendations,
+    evidence: ["/api/operations/resource-pool", "medicalResources", "resourceDispatchRequests"]
   };
 }
 
@@ -877,6 +953,7 @@ function renderOperationsDashboard() {
   renderSiteJointTests(dashboard.siteJointTests || buildStaticSiteJointTests(dashboard.interfaceMapping || buildStaticInterfaceMapping()));
   renderProductionHardening(dashboard.productionHardening || buildStaticProductionHardening({}));
   renderOperationsIntelligence(dashboard.intelligence || buildStaticOperationsIntelligence(filteredSnapshots, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || []));
+  renderResourcePool(dashboard.resourcePool || buildStaticResourcePool(filteredSnapshots, dashboard.medicalResources || [], dashboard.dispatchRequests || []));
   renderGovernanceReport(
     dashboard.governanceReport || buildStaticGovernanceReport(filteredSnapshots, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || [], dashboard.performanceMonitoring || {}, dashboard.handover || {}),
     dashboard.governanceExportPackage
@@ -1374,6 +1451,66 @@ function renderOperationsIntelligence(intelligence) {
   target.querySelectorAll("[data-intelligence-institution]").forEach((button) => {
     button.addEventListener("click", () => selectSnapshotById(button.dataset.intelligenceInstitution, "#operation-detail"));
   });
+}
+
+function renderResourcePool(resourcePool) {
+  const target = document.querySelector("#operation-resource-pool");
+  if (!target) return;
+  const rows = Array.isArray(resourcePool.rows) ? resourcePool.rows : [];
+  const recommendations = Array.isArray(resourcePool.recommendations) ? resourcePool.recommendations : [];
+  target.innerHTML = `
+    <article class="operation-resource-pool-summary">
+      <strong>跨院资源池</strong>
+      <span>${resourcePool.summary?.institutions || rows.length} 家机构 / 可调拨 ${resourcePool.summary?.transferableInstitutions || 0} 家 / 普通床位 ${resourcePool.summary?.transferableBeds || 0} 张 / ICU ${resourcePool.summary?.icuBeds || 0} 张 / 呼吸机 ${resourcePool.summary?.ventilators || 0} 台</span>
+      <small>证据：${evidenceList(resourcePool.evidence)}</small>
+    </article>
+    <div class="operation-resource-pool-recommendations">
+      ${(recommendations.length ? recommendations : [{ sourceInstitution: "暂无高压机构", targetInstitution: "待运行监测触发", resourceType: "常规储备", priority: "低", reason: "当前未形成跨院调拨建议。", suggestedAction: "持续监测床位、ICU、设备和调度工单。" }]).map((item) => `
+        <article class="operation-resource-pool-recommendation ${item.priority === "高" ? "critical" : "warning"}">
+          <strong>${zhInline(item.sourceInstitution)} → ${zhInline(item.targetInstitution)}</strong>
+          <span>${zhInline(item.resourceType)} / 优先级 ${zhInline(item.priority)}</span>
+          <p>${zhInline(item.reason)}</p>
+          <small>${zhInline(item.suggestedAction)}</small>
+          ${item.targetInstitution && item.sourceInstitution ? `<button class="inline-action compact" type="button" data-resource-dispatch="${htmlAttribute(item.id)}">生成调度草稿</button>` : ""}
+        </article>
+      `).join("")}
+    </div>
+    <div class="operation-resource-pool-list">
+      ${rows.map((item) => `
+        <article class="operation-resource-pool-card ${item.status === "可调拨" ? "ready" : item.status === "需保障本院" ? "critical" : "limited"}">
+          <div class="operation-playbook-head">
+            <div>
+              <strong>${zhInline(item.institution)}</strong>
+              <span>${zhInline(item.region)} / ${zhInline(item.institutionType)} / 压力 ${item.pressure || 0}</span>
+            </div>
+            <span class="badge ${item.status === "可调拨" ? "info" : item.status === "需保障本院" ? "danger" : "warn"}">${zhInline(item.status)}</span>
+          </div>
+          <div class="operation-resource-pool-slots">
+            ${(item.resourceSlots || []).map((slot) => `<span title="${htmlAttribute(slot.boundary)}">${zhInline(slot.type)} ${slot.available || 0}${zhInline(slot.unit)}</span>`).join("")}
+          </div>
+          <p>${zhInline(item.protocol?.approval || "")} / ${zhInline(item.protocol?.responseSla || "")}</p>
+          <small>${zhInline(item.protocol?.audit || "")}</small>
+        </article>
+      `).join("")}
+    </div>
+  `;
+  target.querySelectorAll("[data-resource-dispatch]").forEach((button) => {
+    button.addEventListener("click", () => applyResourceDispatchDraft(recommendations.find((item) => item.id === button.dataset.resourceDispatch)));
+  });
+}
+
+function applyResourceDispatchDraft(recommendation) {
+  if (!recommendation) return;
+  const form = document.querySelector("#dispatch-form");
+  if (!form) return;
+  form.elements.sourceInstitution.value = recommendation.sourceInstitution || "";
+  form.elements.targetInstitution.value = recommendation.targetInstitution || "";
+  form.elements.resourceType.value = recommendation.resourceType || "跨院资源支援";
+  form.elements.quantity.value = recommendation.priority === "高" ? 6 : 3;
+  form.elements.priority.value = recommendation.priority === "高" ? "high" : "medium";
+  form.elements.status.value = "pending";
+  form.elements.reason.value = `${recommendation.reason || ""}\n${recommendation.suggestedAction || ""}`.trim();
+  document.querySelector("#dispatch-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function renderGovernanceReport(report, exportPackage) {
