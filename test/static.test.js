@@ -346,6 +346,7 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   const about = read("quality-safety-about.html");
   const js = read("quality-safety.js");
   const server = read("server.js");
+  const portalCss = read("portal.css");
   ["qualitySafetyEvents", "criticalValueAlerts", "clinicalPathwayCases", "medicalRecordQualityReviews", "mutualRecognitionQualityReviews", "qualityRectificationOrders", "qualitySafetySiteSignoffs"].forEach((key) => {
     assert.equal(Array.isArray(data[key]), true, `${key} should be seeded`);
     assert.equal(data[key].length > 0, true, `${key} should not be empty`);
@@ -361,6 +362,11 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(html, /quality-safety-interface-pack/);
   assert.match(html, /quality-safety-issues/);
   assert.match(html, /quality-safety-rectifications/);
+  assert.match(html, /quality-safety-toolbar/);
+  assert.match(html, /quality-safety-status-filter/);
+  assert.match(html, /quality-safety-domain-filter/);
+  assert.match(html, /quality-safety-search/);
+  assert.match(html, /quality-safety-brief/);
   assert.match(html, /quality-safety-about\.html/);
   assert.match(html, /医疗质量与安全监管平台/);
   assert.doesNotMatch(html, /Medical quality|Policy basis|Go-live readiness|Issue queue|Rectification loop/);
@@ -376,6 +382,9 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(js, /renderGoLiveReadiness/);
   assert.match(js, /renderSiteSignoffs/);
   assert.match(js, /renderInterfaceJointTestPack/);
+  assert.match(js, /renderOperationsBrief/);
+  assert.match(js, /filterQualityRows/);
+  assert.match(js, /applyQualitySafetyFilters/);
   assert.match(js, /validateInterfaceSample/);
   assert.match(js, /submitSiteSignoffEvidence/);
   assert.match(js, /提交证据/);
@@ -394,6 +403,10 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(js, /canReview/);
   assert.match(js, /canFeedback/);
   assert.match(js, /canEscalate/);
+  assert.match(portalCss, /quality-filter-grid/);
+  assert.match(portalCss, /quality-brief/);
+  assert.match(portalCss, /\.table-wrap/);
+  assert.match(portalCss, /position: sticky/);
   assert.match(server, /\/api\/quality-safety\/dashboard/);
   assert.match(server, /\/api\/quality-safety\/interface-standard/);
   assert.match(server, /\/api\/quality-safety\/interface-joint-test-pack/);

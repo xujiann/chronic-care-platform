@@ -8,7 +8,7 @@
     <script src="./auth.js"></script>
     <script>window.HealthCityAuth.requireRole(["commission", "institution", "county"])</script>
   </head>
-  <body>
+  <body class="quality-safety-page">
     <main class="portal-shell">
       <header class="portal-header">
         <div>
@@ -36,6 +36,52 @@
           <div><strong>闭环重点</strong><span>危急值、病历可追溯、路径偏离、互认质控和整改证据均按可审计流程跟踪。</span></div>
           <div><strong>详细说明</strong><span><a href="./quality-safety-about.html">查看政策和关于页</a></span></div>
         </div>
+      </section>
+
+      <section class="panel quality-safety-toolbar" aria-label="质量安全监管工具条">
+        <div class="panel-title">
+          <h2>监管工作台</h2>
+          <span>筛选问题、整改、签收事项并聚焦今日重点</span>
+        </div>
+        <div class="quality-filter-grid">
+          <label>
+            状态
+            <select id="quality-safety-status-filter">
+              <option value="">全部状态</option>
+              <option value="待处理">待处理</option>
+              <option value="处理中">处理中</option>
+              <option value="复核中">复核中</option>
+              <option value="已逾期">已逾期</option>
+              <option value="待现场确认">待现场确认</option>
+              <option value="具备联调条件">具备联调条件</option>
+              <option value="已关闭">已关闭</option>
+            </select>
+          </label>
+          <label>
+            领域
+            <select id="quality-safety-domain-filter">
+              <option value="">全部领域</option>
+              <option value="医疗质量">医疗质量</option>
+              <option value="安全事件">安全事件</option>
+              <option value="危急值">危急值</option>
+              <option value="临床路径">临床路径</option>
+              <option value="病历质控">病历质控</option>
+              <option value="互认质控">互认质控</option>
+              <option value="整改闭环">整改闭环</option>
+              <option value="数据质量">数据质量</option>
+              <option value="机构信用">机构信用</option>
+            </select>
+          </label>
+          <label class="wide">
+            关键词
+            <input id="quality-safety-search" type="search" placeholder="搜索机构、问题、工单或证据" />
+          </label>
+          <div class="quality-toolbar-actions">
+            <button class="ghost-button" type="button" id="quality-safety-reset">重置</button>
+            <button class="primary-button" type="button" id="quality-safety-refresh">刷新</button>
+          </div>
+        </div>
+        <div id="quality-safety-brief" class="quality-brief" aria-live="polite"></div>
       </section>
 
       <section class="metric-grid" id="quality-safety-metrics"></section>

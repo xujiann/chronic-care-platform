@@ -3,6 +3,11 @@ const QUALITY_API_BASE = location.protocol === "file:" ? "" : "/api";
 let qualitySafetyState = null;
 let qualitySafetyInterfacePack = null;
 let qualitySafetyValidationResult = null;
+let qualitySafetyFilters = {
+  status: "",
+  domain: "",
+  search: ""
+};
 
 const QUALITY_TEXT = {
   integrationContracts: "接口契约",
@@ -252,6 +257,65 @@ function statusLabel(value) {
   return zh(raw) || raw.replace(/_/g, " ");
 }
 
+function normalizeFilterText(value) {
+  if (value === undefined || value === null || value === "") return "";
+  return zh(String(value)).toLowerCase();
+}
+
+function emptyRow(colspan, message = "当前筛选条件下暂无记录") {
+  return `<tr><td colspan="${colspan}" class="empty-cell">${message}</td></tr>`;
+}
+
+function filterQualityRows(rows, accessors = {}) {
+  const statusNeedle = normalizeFilterText(qualitySafetyFilters.status);
+  const domainNeedle = normalizeFilterText(qualitySafetyFilters.domain);
+  const searchNeedle = normalizeFilterText(qualitySafetyFilters.search);
+  if (!statusNeedle && !domainNeedle && !searchNeedle) return rows;
+  return rows.filter((item) => {
+    const domainText = normalizeFilterText((accessors.domain?.(item) || [item.domain]).join(" "));
+    const statusText = normalizeFilterText((accessors.status?.(item) || [item.normalizedStatus || item.status, item.slaStatus]).join(" "));
+    const searchText = normalizeFilterText((accessors.search?.(item) || Object.values(item)).join(" "));
+    return (!domainNeedle || domainText.includes(domainNeedle)) &&
+      (!statusNeedle || statusText.includes(statusNeedle)) &&
+      (!searchNeedle || searchText.includes(searchNeedle));
+  });
+}
+
+function renderOperationsBrief(data, filtered = {}) {
+  const overdueRectifications = (data.rectifications || []).filter((item) => statusLabel(item.slaStatus) === "已逾期").length;
+  const openCritical = (data.criticalValueAlerts || []).filter((item) => !item.acknowledgementComplete || !item.dispositionComplete).length;
+  const pendingSignoffs = (data.siteSignoffs || []).filter((item) => statusLabel(item.status) !== "具备联调条件").length;
+  const highRisk = (data.institutionRisks || []).filter((item) => statusLabel(item.riskLevel) === "高").length;
+  const activeFilters = [qualitySafetyFilters.status, qualitySafetyFilters.domain, qualitySafetyFilters.search].filter(Boolean).length;
+  setHtml("quality-safety-brief", `
+    <article>
+      <span>逾期整改</span>
+      <strong>${overdueRectifications}</strong>
+      <small>需监管升级或复核</small>
+    </article>
+    <article>
+      <span>待处置危急值</span>
+      <strong>${openCritical}</strong>
+      <small>确认、通知、处置闭环</small>
+    </article>
+    <article>
+      <span>待现场签收</span>
+      <strong>${pendingSignoffs}</strong>
+      <small>生产切换前补证</small>
+    </article>
+    <article>
+      <span>高风险机构</span>
+      <strong>${highRisk}</strong>
+      <small>优先纳入监管计划</small>
+    </article>
+    <article>
+      <span>当前筛选命中</span>
+      <strong>${(filtered.issues || []).length + (filtered.rectifications || []).length + (filtered.siteSignoffs || []).length}</strong>
+      <small>${activeFilters ? `${activeFilters} 个条件生效` : "未启用筛选"}</small>
+    </article>
+  `);
+}
+
 function renderMetrics(summary) {
   const metrics = [
     ["问题总数", summary.issues],
@@ -355,7 +419,7 @@ function renderIssues(rows) {
     <table>
       <thead><tr><th>领域</th><th>问题</th><th>状态</th><th>责任方</th><th>操作</th></tr></thead>
       <tbody>
-        ${rows.map((item) => `
+        ${rows.length ? rows.map((item) => `
           <tr>
             <td>${statusLabel(item.domain)}</td>
             <td><strong>${zhText(item.title)}</strong><br /><small>${zhText(item.sourceCollection)} ${text(item.sourceId)}</small></td>
@@ -363,7 +427,7 @@ function renderIssues(rows) {
             <td>${zhText(item.owner || item.institutionName)}</td>
             <td>${canDispatch ? `<button class="inline-action" type="button" data-dispatch="${item.id}">派发</button>` : statusLabel(item.ownerRole || "view")}</td>
           </tr>
-        `).join("")}
+        `).join("") : emptyRow(5)}
       </tbody>
     </table>
   `);
@@ -377,7 +441,7 @@ function renderSiteSignoffs(rows) {
     <table>
       <thead><tr><th>事项</th><th>责任方</th><th>状态</th><th>证据</th><th>操作</th></tr></thead>
       <tbody>
-        ${rows.map((item) => `
+        ${rows.length ? rows.map((item) => `
           <tr>
             <td><strong>${zhText(item.item)}</strong><br /><small>${statusLabel(item.domain)} / ${(item.sourceCollections || []).map(zh).join("、")}</small></td>
             <td>${zhText(item.owner)}<br /><small>${statusLabel(item.ownerRole)}</small></td>
@@ -389,7 +453,7 @@ function renderSiteSignoffs(rows) {
               ${!canSubmit(item) && !canReview ? statusLabel("view") : ""}
             </td>
           </tr>
-        `).join("")}
+        `).join("") : emptyRow(5)}
       </tbody>
     </table>
   `);
@@ -443,7 +507,7 @@ function renderRectifications(rows) {
     <table>
       <thead><tr><th>工单</th><th>整改要求</th><th>状态</th><th>SLA</th><th>证据</th><th>操作</th></tr></thead>
       <tbody>
-        ${rows.map((item) => `
+        ${rows.length ? rows.map((item) => `
           <tr>
             <td><strong>${item.id}</strong><br /><small>${zhText(item.institutionName)}</small></td>
             <td>${zhText(item.requirement)}</td>
@@ -456,7 +520,7 @@ function renderRectifications(rows) {
               ${canEscalate && item.normalizedStatus !== "closed" ? `<button class="inline-action" type="button" data-escalate="${item.id}">升级</button>` : ""}
             </td>
           </tr>
-        `).join("")}
+        `).join("") : emptyRow(6)}
       </tbody>
     </table>
   `);
@@ -503,14 +567,34 @@ function renderBoundaries(data) {
 
 function renderQualitySafety(data) {
   qualitySafetyState = data;
+  const filteredIssues = filterQualityRows(data.issues || [], {
+    domain: (item) => [item.domain],
+    status: (item) => [item.normalizedStatus || item.status],
+    search: (item) => [item.title, item.owner, item.institutionName, item.sourceCollection, item.sourceId]
+  });
+  const filteredSignoffs = filterQualityRows(data.siteSignoffs || [], {
+    domain: (item) => [item.domain, ...(item.sourceCollections || [])],
+    status: (item) => [item.status, item.ownerRole],
+    search: (item) => [item.item, item.owner, item.requiredEvidenceText, ...(item.sourceCollections || [])]
+  });
+  const filteredRectifications = filterQualityRows(data.rectifications || [], {
+    domain: (item) => [item.domain, "整改闭环"],
+    status: (item) => [item.normalizedStatus || item.status, item.slaStatus],
+    search: (item) => [item.id, item.institutionName, item.requirement, item.slaStatus]
+  });
   renderMetrics(data.summary || {});
+  renderOperationsBrief(data, {
+    issues: filteredIssues,
+    rectifications: filteredRectifications,
+    siteSignoffs: filteredSignoffs
+  });
   renderGoLiveReadiness(data.goLiveReadiness || {});
   renderActionPlan(data.actionPlan || []);
   renderRisks(data.institutionRisks || []);
   renderReuse(data.reusedCollections || []);
-  renderSiteSignoffs(data.siteSignoffs || []);
-  renderIssues(data.issues || []);
-  renderRectifications(data.rectifications || []);
+  renderSiteSignoffs(filteredSignoffs);
+  renderIssues(filteredIssues);
+  renderRectifications(filteredRectifications);
   renderCritical(data.criticalValueAlerts || []);
   renderBoundaries(data);
   const updated = document.getElementById("quality-safety-updated");
@@ -650,7 +734,32 @@ async function validateInterfaceSample(interfaceId) {
   await loadQualitySafetyInterfacePack();
 }
 
+function readQualitySafetyFilters() {
+  qualitySafetyFilters = {
+    status: document.getElementById("quality-safety-status-filter")?.value || "",
+    domain: document.getElementById("quality-safety-domain-filter")?.value || "",
+    search: document.getElementById("quality-safety-search")?.value.trim() || ""
+  };
+}
+
+function applyQualitySafetyFilters() {
+  readQualitySafetyFilters();
+  if (qualitySafetyState) renderQualitySafety(qualitySafetyState);
+}
+
+function resetQualitySafetyFilters() {
+  const status = document.getElementById("quality-safety-status-filter");
+  const domain = document.getElementById("quality-safety-domain-filter");
+  const search = document.getElementById("quality-safety-search");
+  if (status) status.value = "";
+  if (domain) domain.value = "";
+  if (search) search.value = "";
+  applyQualitySafetyFilters();
+}
+
 document.addEventListener("click", (event) => {
+  const reset = event.target.closest("#quality-safety-reset");
+  const refresh = event.target.closest("#quality-safety-refresh");
   const dispatch = event.target.closest("[data-dispatch]");
   const feedback = event.target.closest("[data-feedback]");
   const review = event.target.closest("[data-review]");
@@ -661,6 +770,10 @@ document.addEventListener("click", (event) => {
   const signoffReview = event.target.closest("[data-signoff-review]");
   const signoffEvidence = event.target.closest("[data-signoff-evidence]");
   const interfaceValidate = event.target.closest("[data-interface-validate]");
+  if (reset) resetQualitySafetyFilters();
+  if (refresh) {
+    Promise.all([loadQualitySafety(), loadQualitySafetyInterfacePack()]).catch((error) => alert(error.message));
+  }
   if (dispatch) dispatchIssue(dispatch.dataset.dispatch).catch((error) => alert(error.message));
   if (feedback) submitFeedback(feedback.dataset.feedback).catch((error) => alert(error.message));
   if (review) reviewOrder(review.dataset.review).catch((error) => alert(error.message));
@@ -671,6 +784,14 @@ document.addEventListener("click", (event) => {
   if (signoffEvidence) submitSiteSignoffEvidence(signoffEvidence.dataset.signoffEvidence).catch((error) => alert(error.message));
   if (signoffReview) reviewSiteSignoff(signoffReview.dataset.signoffReview).catch((error) => alert(error.message));
   if (interfaceValidate) validateInterfaceSample(interfaceValidate.dataset.interfaceValidate).catch((error) => alert(error.message));
+});
+
+document.addEventListener("input", (event) => {
+  if (event.target.closest("#quality-safety-search")) applyQualitySafetyFilters();
+});
+
+document.addEventListener("change", (event) => {
+  if (event.target.closest("#quality-safety-status-filter, #quality-safety-domain-filter")) applyQualitySafetyFilters();
 });
 
 loadQualitySafety();
