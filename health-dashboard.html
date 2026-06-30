@@ -30,6 +30,7 @@
 
       <nav class="dashboard-section-nav" aria-label="综合管理服务系统页面导航">
         <a href="#population-service-board">人口服务</a>
+        <a href="#dashboard-jurisdiction-board">市县视角</a>
         <a href="#dashboard-function-report">功能报告</a>
         <a href="#dashboard-actions-panel">任务闭环</a>
         <a href="#risk-drilldown-board">风险下钻</a>
@@ -115,6 +116,20 @@
         <div class="function-report-evidence" id="dashboard-function-evidence"></div>
       </section>
 
+      <section class="panel jurisdiction-board" id="dashboard-jurisdiction-board" data-active-level="all">
+        <div class="panel-title">
+          <h2>行政层级工作台</h2>
+          <span id="jurisdiction-board-summary">正在汇总市、县两级卫生健康行政部门功能</span>
+        </div>
+        <div class="period-switch jurisdiction-switch" id="jurisdiction-level-controls" aria-label="行政层级视图切换">
+          <button type="button" data-jurisdiction-level="all" class="active">全部</button>
+          <button type="button" data-jurisdiction-level="市级">市级</button>
+          <button type="button" data-jurisdiction-level="县级">县级</button>
+        </div>
+        <div class="jurisdiction-grid" id="jurisdiction-matrix"></div>
+        <p class="muted jurisdiction-boundary" id="jurisdiction-boundary">本系统面向卫生健康行政部门使用，医疗机构、平台中心、专业中心和基层机构仅作为数据来源或协同对象。</p>
+      </section>
+
       <section class="panel population-board" id="population-service-board" data-active-period="day">
         <div class="panel-title">
           <h2>出生死亡与医疗服务看板</h2>
@@ -128,6 +143,7 @@
         </div>
         <div class="population-metric-grid" id="population-metric-cards"></div>
         <div class="population-chart" id="population-chart" aria-label="出生、死亡、就诊、入院统计图"></div>
+        <div class="population-source-grid" id="population-source-details" aria-label="人口与医疗服务接口字段"></div>
         <div class="population-insights" id="population-insights" aria-label="趋势与现场联调提示"></div>
         <p class="muted population-source" id="population-board-source">正在汇总出生、死亡、就诊、入院数据。</p>
       </section>

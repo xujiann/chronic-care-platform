@@ -234,6 +234,52 @@ function buildPopulationServiceInsights(periods, context = {}) {
   ];
 }
 
+function buildPopulationSourceDetails(context = {}) {
+  const birthRows = context.birthRows || [];
+  const deathRows = context.deathRows || [];
+  const serviceReports = context.serviceReports || [];
+  const dailyServiceReports = context.dailyServiceReports || [];
+  const hasDailyServiceReports = Boolean(context.hasDailyServiceReports);
+  return [
+    {
+      id: "births",
+      label: "出生",
+      field: "birthCertificates.birthDateTime",
+      source: "出生医学证明日期",
+      mode: "证书日期直取",
+      status: birthRows.length ? "ready" : "empty",
+      records: birthRows.length
+    },
+    {
+      id: "deaths",
+      label: "死亡",
+      field: "deathCertificates.deathDateTime",
+      source: "死亡医学证明日期",
+      mode: "证书日期直取",
+      status: deathRows.length ? "ready" : "empty",
+      records: deathRows.length
+    },
+    {
+      id: "visits",
+      label: "就诊",
+      field: hasDailyServiceReports ? "healthStatistics.dailyServiceReports.interfaceData.outpatientVisits + emergencyVisits" : "healthStatistics.serviceReports.interfaceData.outpatientVisits + emergencyVisits",
+      source: hasDailyServiceReports ? "卫生统计日报接口" : "卫生统计月报快照",
+      mode: hasDailyServiceReports ? "日报汇总" : "月度折算",
+      status: hasDailyServiceReports ? "ready" : serviceReports.length ? "watch" : "empty",
+      records: hasDailyServiceReports ? dailyServiceReports.length : serviceReports.length
+    },
+    {
+      id: "admissions",
+      label: "入院",
+      field: hasDailyServiceReports ? "healthStatistics.dailyServiceReports.interfaceData.inpatientAdmissions" : "healthStatistics.serviceReports.interfaceData.inpatientAdmissions",
+      source: hasDailyServiceReports ? "卫生统计日报接口" : "卫生统计月报快照",
+      mode: hasDailyServiceReports ? "日报汇总" : "月度折算",
+      status: hasDailyServiceReports ? "ready" : serviceReports.length ? "watch" : "empty",
+      records: hasDailyServiceReports ? dailyServiceReports.length : serviceReports.length
+    }
+  ];
+}
+
 function buildPopulationServiceBoard(data) {
   const birthRows = rows(data, "birthCertificates");
   const deathRows = rows(data, "deathCertificates");
@@ -280,6 +326,7 @@ function buildPopulationServiceBoard(data) {
     statisticsPeriod,
     serviceMode: hasDailyServiceReports ? "daily-interface" : "monthly-snapshot",
     dailyServiceReports: dailyServiceReports.length,
+    sourceDetails: buildPopulationSourceDetails({ birthRows, deathRows, serviceReports, dailyServiceReports, hasDailyServiceReports }),
     sourceNote: hasDailyServiceReports ? "出生、死亡按医学证明日期统计；就诊、入院来自卫生统计日报接口，日、周、月、年均按日报快照汇总，月度直报保留为对账基线。" : "出生、死亡按证书日期统计；就诊、入院先使用月度接口总量折算日、周、月、年，现场日报接口接入后可替换为真实分时数据。",
     insights: buildPopulationServiceInsights(periods, { serviceReports: serviceReports.length, dailyServiceReports: dailyServiceReports.length, statisticsPeriod }),
     periods
@@ -581,8 +628,15 @@ function buildFunctionalReport(context) {
       id: "population-service-board",
       name: "出生死亡就诊入院看板",
       status: populationServiceBoard.periods?.length === 4 ? "ready" : "watch",
-      evidence: `${populationServiceBoard.periods?.length || 0} periods, ${populationServiceBoard.insights?.length || 0} insights`,
+      evidence: `${populationServiceBoard.periods?.length || 0} periods, ${populationServiceBoard.insights?.length || 0} insights, ${populationServiceBoard.sourceDetails?.length || 0} source fields`,
       boundary: "出生、死亡按证书日期统计；就诊、入院已按日报快照汇总日周月年，小时级预警和生产切换仍需实时明细。"
+    },
+    {
+      id: "jurisdiction-workbench",
+      name: "市县两级行政工作台",
+      status: cityCountyFunctionMatrix.length >= 4 ? "ready" : "watch",
+      evidence: `${cityCountyFunctionMatrix.length} 条市县机构功能矩阵`,
+      boundary: "仅面向卫生健康行政部门监管、督办、审计和联调；非本机关单位不承接本系统办理职责。"
     },
     {
       id: "certificate-exchange-chain",
@@ -687,7 +741,7 @@ function buildHealthDashboardSummary(options = {}) {
     { id: "dashboard:actions", passed: previewOpenActions > 0 && sourceOpenActions >= previewOpenActions, detail: `${previewOpenActions} 条预览待办 / ${sourceOpenActions} 条源应用待办` },
     { id: "dashboard:interfaces", passed: interfaceRows.length >= 4, detail: `${interfaceRows.length} interface rows` },
     { id: "dashboard:evidence", passed: evidenceRecords.length >= 2, detail: `${evidenceRecords.length} evidence records` },
-    { id: "dashboard:population-service-board", passed: populationServiceBoard.periods.length === 4 && populationServiceBoard.periods.every((period) => period.metrics.length === 4) && populationServiceBoard.insights.length >= 4 && populationServiceBoard.serviceMode === "daily-interface", detail: `birth, death, visit, admission board for day/week/month/year with ${populationServiceBoard.serviceMode}` },
+    { id: "dashboard:population-service-board", passed: populationServiceBoard.periods.length === 4 && populationServiceBoard.periods.every((period) => period.metrics.length === 4) && populationServiceBoard.insights.length >= 4 && populationServiceBoard.sourceDetails?.length === 4 && populationServiceBoard.serviceMode === "daily-interface", detail: `birth, death, visit, admission board for day/week/month/year with ${populationServiceBoard.serviceMode}` },
     { id: "dashboard:certificate-exchange", passed: certificateExchange.items.length >= 5 && certificateExchange.summary.receipts >= 3 && certificateExchange.summary.correctable >= 4, detail: `${certificateExchange.items.length} certificate exchange tracks, ${certificateExchange.summary.receipts} receipts` },
     { id: "dashboard:risk-drilldown", passed: riskDrilldowns.items.length >= 4 && riskDrilldowns.summary.withTrace === riskDrilldowns.items.length, detail: `${riskDrilldowns.items.length} risk drilldowns with trace` },
     { id: "dashboard:site-evidence-package", passed: siteEvidencePackage.items.length >= 4 && siteEvidencePackage.summary.ready >= 3, detail: `${siteEvidencePackage.items.length} evidence package artifacts` },
@@ -884,6 +938,7 @@ function renderMarkdown(report) {
   const checkRows = report.checks.map((item) => `| ${item.passed ? "通过" : "未通过"} | ${dashboardReportCheckLabel(item.id)} | ${dashboardReportEvidenceLabel(item.detail || "")} |`);
   const boardPeriods = report.populationServiceBoard?.periods || [];
   const boardRows = boardPeriods.flatMap((period) => (period.metrics || []).map((metric) => `| ${period.label} | ${period.rangeLabel} | ${metric.label} | ${metric.value} ${metric.unit || ""} | ${metric.source || ""} |`));
+  const boardSourceRows = (report.populationServiceBoard?.sourceDetails || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.label || item.id} | ${item.mode || ""} | ${item.field || ""} | ${item.records || 0} |`);
   const insightRows = (report.populationServiceBoard?.insights || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.title || item.id} | ${item.value || ""} | ${String(item.detail || "").replace(/\|/g, "/")} |`);
   const certificateRows = (report.certificateExchange?.items || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.domain || item.id} | ${item.target || ""} | ${dashboardReportStatusLabel(item.receiptStatus)} | ${dashboardReportStatusLabel(item.reconciliationStatus)} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`);
   const drilldownRows = (report.riskDrilldowns?.items || []).map((item) => `| ${dashboardReportPriorityLabel(item.priority)} | ${item.application || ""} | ${dashboardReportCollectionLabel(item.collection)} | ${dashboardReportOwnerLabel(item.owner)} | ${dashboardReportStatusLabel(item.status)} | ${String(item.blocker || "").replace(/\|/g, "/")} |`);
@@ -929,6 +984,12 @@ function renderMarkdown(report) {
     "| 周期 | 范围 | 指标 | 数值 | 来源 |",
     "|---|---|---|---:|---|",
     ...boardRows,
+    "",
+    "### 人口与服务接口字段",
+    "",
+    "| 状态 | 指标 | 口径 | 字段 | 记录数 |",
+    "|---|---|---|---|---:|",
+    ...boardSourceRows,
     "",
     "### 人口与服务洞察",
     "",

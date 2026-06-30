@@ -113,10 +113,14 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(html, /dashboard-policy-notes/);
   assert.match(html, /data-dashboard-policy="certificates"/);
   assert.match(html, /health-dashboard-about\.html/);
+  assert.match(html, /dashboard-jurisdiction-board/);
+  assert.match(html, /jurisdiction-level-controls/);
+  assert.match(html, /jurisdiction-matrix/);
   assert.match(html, /population-service-board/);
   assert.match(html, /population-period-controls/);
   assert.match(html, /population-metric-cards/);
   assert.match(html, /population-chart/);
+  assert.match(html, /population-source-details/);
   assert.match(html, /population-insights/);
   assert.match(html, /dashboard-export-json/);
   assert.match(html, /certificate-exchange-board/);
@@ -139,6 +143,7 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(js, /filteredDashboardActions/);
   assert.match(js, /collectStaticOpenActions/);
   assert.match(js, /buildStaticPopulationServiceBoard/);
+  assert.match(js, /buildDashboardPopulationSourceDetails/);
   assert.match(js, /buildDashboardFunctionalReport/);
   assert.match(js, /buildStaticCertificateExchange/);
   assert.match(js, /renderCertificateExchange/);
@@ -149,6 +154,8 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(js, /buildDashboardDepartmentFunctionMatrix/);
   assert.match(js, /buildDashboardCityCountyFunctionMatrix/);
   assert.match(js, /buildDashboardPopulationInsights/);
+  assert.match(js, /renderJurisdictionWorkbench/);
+  assert.match(js, /bindJurisdictionLevel/);
   assert.match(js, /renderFunctionReport/);
   assert.match(js, /renderPopulationServiceBoard/);
   assert.match(js, /bindPopulationBoardPeriod/);
@@ -161,8 +168,10 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(js, /sourceMode/);
   assert.match(js, /dataset\.sourceMode/);
   assert.match(read("portal.css"), /population-metric-card/);
+  assert.match(read("portal.css"), /population-source-card/);
   assert.match(read("portal.css"), /dashboard-command-center/);
   assert.match(read("portal.css"), /dashboard-section-nav/);
+  assert.match(read("portal.css"), /jurisdiction-card/);
   assert.match(read("portal.css"), /population-bar-fill/);
   assert.match(read("portal.css"), /population-insight/);
   assert.match(read("portal.css"), /function-report-card/);

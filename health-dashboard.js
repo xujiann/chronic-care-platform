@@ -3,6 +3,7 @@ const DASHBOARD_SUMMARY_ROUTE = "/api/health-dashboard/summary";
 const DASHBOARD_SUMMARY_PATH = DASHBOARD_SUMMARY_ROUTE.replace(/^\/api/, "");
 let currentDashboardSummary = null;
 let currentPopulationPeriod = "day";
+let currentJurisdictionLevel = "all";
 
 document.addEventListener("DOMContentLoaded", async () => {
   const summary = await loadDashboardSummary();
@@ -10,6 +11,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindDashboardFilters();
   bindDashboardExport();
   bindPopulationBoardPeriod();
+  bindJurisdictionLevel();
   renderDashboard(summary);
 });
 
@@ -176,10 +178,57 @@ function buildStaticPopulationServiceBoard(state) {
     statisticsPeriod,
     serviceMode: hasDailyServiceReports ? "daily-interface" : "monthly-snapshot",
     dailyServiceReports: dailyServiceReports.length,
+    sourceDetails: buildDashboardPopulationSourceDetails({ birthRows, deathRows, serviceReports, dailyServiceReports, hasDailyServiceReports }),
     sourceNote: hasDailyServiceReports ? "出生、死亡来自证书日期；就诊、入院来自卫生统计日报接口，日、周、月、年均按日报快照汇总。" : "出生、死亡来自证书日期；就诊、入院来自月度接口快照并折算为日、周、月、年视图。",
     insights: buildDashboardPopulationInsights(periods, { serviceReports: serviceReports.length, dailyServiceReports: dailyServiceReports.length, statisticsPeriod }),
     periods
   };
+}
+
+function buildDashboardPopulationSourceDetails(context = {}) {
+  const birthRows = context.birthRows || [];
+  const deathRows = context.deathRows || [];
+  const serviceReports = context.serviceReports || [];
+  const dailyServiceReports = context.dailyServiceReports || [];
+  const hasDailyServiceReports = Boolean(context.hasDailyServiceReports);
+  return [
+    {
+      id: "births",
+      label: "出生",
+      field: "birthCertificates.birthDateTime",
+      source: "出生医学证明日期",
+      mode: "证书日期直取",
+      status: birthRows.length ? "ready" : "empty",
+      records: birthRows.length
+    },
+    {
+      id: "deaths",
+      label: "死亡",
+      field: "deathCertificates.deathDateTime",
+      source: "死亡医学证明日期",
+      mode: "证书日期直取",
+      status: deathRows.length ? "ready" : "empty",
+      records: deathRows.length
+    },
+    {
+      id: "visits",
+      label: "就诊",
+      field: hasDailyServiceReports ? "healthStatistics.dailyServiceReports.interfaceData.outpatientVisits + emergencyVisits" : "healthStatistics.serviceReports.interfaceData.outpatientVisits + emergencyVisits",
+      source: hasDailyServiceReports ? "卫生统计日报接口" : "卫生统计月报快照",
+      mode: hasDailyServiceReports ? "日报汇总" : "月度折算",
+      status: hasDailyServiceReports ? "ready" : serviceReports.length ? "watch" : "empty",
+      records: hasDailyServiceReports ? dailyServiceReports.length : serviceReports.length
+    },
+    {
+      id: "admissions",
+      label: "入院",
+      field: hasDailyServiceReports ? "healthStatistics.dailyServiceReports.interfaceData.inpatientAdmissions" : "healthStatistics.serviceReports.interfaceData.inpatientAdmissions",
+      source: hasDailyServiceReports ? "卫生统计日报接口" : "卫生统计月报快照",
+      mode: hasDailyServiceReports ? "日报汇总" : "月度折算",
+      status: hasDailyServiceReports ? "ready" : serviceReports.length ? "watch" : "empty",
+      records: hasDailyServiceReports ? dailyServiceReports.length : serviceReports.length
+    }
+  ];
 }
 
 function dashboardServiceReportDate(item) {
@@ -475,8 +524,15 @@ function buildDashboardFunctionalReport(context) {
       id: "population-service-board",
       name: "出生死亡就诊入院看板",
       status: populationServiceBoard.periods?.length === 4 ? "ready" : "watch",
-      evidence: `${populationServiceBoard.periods?.length || 0} periods, ${populationServiceBoard.insights?.length || 0} insights`,
+      evidence: `${populationServiceBoard.periods?.length || 0} periods, ${populationServiceBoard.insights?.length || 0} insights, ${populationServiceBoard.sourceDetails?.length || 0} source fields`,
       boundary: "就诊、入院已按日报快照汇总日周月年，小时级预警和生产切换仍需实时明细。"
+    },
+    {
+      id: "jurisdiction-workbench",
+      name: "市县两级行政工作台",
+      status: cityCountyFunctionMatrix.length >= 4 ? "ready" : "watch",
+      evidence: `${cityCountyFunctionMatrix.length} 条市县机构功能矩阵`,
+      boundary: "仅面向卫生健康行政部门监管、督办、审计和联调；非本机关单位不承接本系统办理职责。"
     },
     {
       id: "certificate-exchange-chain",
@@ -610,6 +666,7 @@ function renderDashboard(summary) {
   renderRiskDrilldowns(summary.riskDrilldowns || {});
   renderSiteEvidencePackage(summary.siteEvidencePackage || {});
   renderFunctionReport(summary.functionalReport || {});
+  renderJurisdictionWorkbench(summary.functionalReport || {});
   document.querySelector("#dashboard-scope").textContent = summary.scope?.rule || "";
   renderFilterOptions(summary);
   renderApplications(summary.applications || []);
@@ -892,6 +949,48 @@ function renderFunctionReport(report) {
   }
 }
 
+function bindJurisdictionLevel() {
+  const controls = document.querySelector("#jurisdiction-level-controls");
+  if (!controls || controls.dataset.bound === "true") return;
+  controls.dataset.bound = "true";
+  controls.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-jurisdiction-level]");
+    if (!button) return;
+    currentJurisdictionLevel = button.dataset.jurisdictionLevel || "all";
+    if (currentDashboardSummary) renderJurisdictionWorkbench(currentDashboardSummary.functionalReport || {});
+  });
+}
+
+function renderJurisdictionWorkbench(report) {
+  const board = document.querySelector("#dashboard-jurisdiction-board");
+  const controls = document.querySelector("#jurisdiction-level-controls");
+  const summary = document.querySelector("#jurisdiction-board-summary");
+  const matrix = document.querySelector("#jurisdiction-matrix");
+  const boundary = document.querySelector("#jurisdiction-boundary");
+  if (!board || !controls || !matrix) return;
+  const rows = Array.isArray(report.cityCountyFunctionMatrix) ? report.cityCountyFunctionMatrix : [];
+  const levels = ["all", ...Array.from(new Set(rows.map((item) => item.level).filter(Boolean)))];
+  if (!levels.includes(currentJurisdictionLevel)) currentJurisdictionLevel = "all";
+  const filteredRows = currentJurisdictionLevel === "all" ? rows : rows.filter((item) => item.level === currentJurisdictionLevel);
+  board.dataset.activeLevel = currentJurisdictionLevel;
+  controls.innerHTML = levels.map((level) => `<button type="button" data-jurisdiction-level="${level}" class="${level === currentJurisdictionLevel ? "active" : ""}">${level === "all" ? "全部" : level}</button>`).join("");
+  if (summary) {
+    const cityRows = rows.filter((item) => item.level === "市级").length;
+    const countyRows = rows.filter((item) => item.level === "县级").length;
+    summary.textContent = `${currentJurisdictionLevel === "all" ? "全部层级" : currentJurisdictionLevel} / 市级 ${cityRows} 项 / 县级 ${countyRows} 项 / 当前 ${filteredRows.length} 项`;
+  }
+  matrix.innerHTML = filteredRows.map((item) => `<article class="jurisdiction-card ${item.status || "watch"}" data-jurisdiction-row="${item.id}" data-jurisdiction-level="${item.level || ""}">
+    <span>${item.level || "未标注"} / ${dashboardStatusLabel(item.status || "watch")}</span>
+    <strong>${item.agency || item.id}</strong>
+    <ul>${(item.implemented || []).map((text) => `<li>${dashboardTechnicalLabel(text)}</li>`).join("")}</ul>
+    <p>${item.nextPlan || ""}</p>
+    <small>${dashboardTechnicalLabel(item.evidence || "")}</small>
+  </article>`).join("") || `<article class="jurisdiction-card empty"><strong>等待行政层级矩阵</strong><p>摘要接口返回市、县两级卫生健康行政部门职责后显示。</p></article>`;
+  if (boundary) {
+    boundary.textContent = "本工作台仅呈现卫生健康行政部门监管、督办、审计和联调视角；医疗机构、专业中心、平台中心和基层服务机构不在本系统承接非本机关办理职责。";
+  }
+}
+
 function bindPopulationBoardPeriod() {
   const controls = document.querySelector("#population-period-controls");
   if (!controls || controls.dataset.bound === "true") return;
@@ -910,6 +1009,7 @@ function renderPopulationServiceBoard(summary) {
   const controls = document.querySelector("#population-period-controls");
   const cards = document.querySelector("#population-metric-cards");
   const chart = document.querySelector("#population-chart");
+  const sourceDetails = document.querySelector("#population-source-details");
   const insights = document.querySelector("#population-insights");
   const range = document.querySelector("#population-board-range");
   const source = document.querySelector("#population-board-source");
@@ -921,6 +1021,7 @@ function renderPopulationServiceBoard(summary) {
     controls.innerHTML = "";
     cards.innerHTML = `<article class="population-empty">暂无出生、死亡、就诊、入院数据</article>`;
     chart.innerHTML = "";
+    if (sourceDetails) sourceDetails.innerHTML = "";
     if (insights) insights.innerHTML = "";
     if (range) range.textContent = "等待数据";
     if (source) source.textContent = "等待前 7 个应用或现场接口写入统计快照。";
@@ -947,6 +1048,23 @@ function renderPopulationServiceBoard(summary) {
       <strong>${formatDashboardNumber(value)}${metric.unit || ""}</strong>
     </div>`;
   }).join("");
+  if (sourceDetails) {
+    const details = Array.isArray(board.sourceDetails) ? board.sourceDetails : metrics.map((metric) => ({
+      id: metric.id,
+      label: metric.label,
+      field: metric.source || "",
+      source: metric.sourceLabel || "",
+      mode: "接口字段",
+      status: "watch",
+      records: 0
+    }));
+    sourceDetails.innerHTML = details.map((item) => `<article class="population-source-card ${item.status || "watch"}" data-population-source="${item.id}">
+      <span>${dashboardStatusLabel(item.status || "watch")} / ${item.mode || ""}</span>
+      <strong>${item.label || item.id}</strong>
+      <small>${dashboardTechnicalLabel(item.field || "")}</small>
+      <p>${item.source || ""} / ${formatDashboardNumber(item.records || 0)} 条记录</p>
+    </article>`).join("");
+  }
   if (insights) {
     const insightRows = Array.isArray(board.insights) ? board.insights : [];
     insights.innerHTML = insightRows.map((item) => `<article class="population-insight ${item.status || "normal"}" data-population-insight="${item.id}">

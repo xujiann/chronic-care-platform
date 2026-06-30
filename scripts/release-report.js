@@ -309,6 +309,7 @@ function environmentMatrixChecks(environmentMatrix) {
 function healthDashboardChecks(healthDashboard) {
   const populationPeriods = healthDashboard.populationServiceBoard?.periods?.length || 0;
   const populationInsights = healthDashboard.populationServiceBoard?.insights?.length || 0;
+  const populationSourceFields = healthDashboard.populationServiceBoard?.sourceDetails?.length || 0;
   const functionalItems = healthDashboard.functionalReport?.functions?.length || 0;
   const certificateTracks = healthDashboard.certificateExchange?.items?.length || 0;
   const drilldowns = healthDashboard.riskDrilldowns?.items?.length || 0;
@@ -319,11 +320,11 @@ function healthDashboardChecks(healthDashboard) {
     check("healthDashboard:summary", healthDashboard.ok, healthDashboard.ok ? "health dashboard summary checks passed" : "health dashboard summary failed", "error", "health-dashboard"),
     check("healthDashboard:applications", healthDashboard.applications?.length === 7, `${healthDashboard.applications?.length || 0} source applications`, "error", "health-dashboard"),
     check("healthDashboard:boundary", /源应用|源业务|source business applications|source applications/.test(healthDashboard.scope?.rule || ""), healthDashboard.scope?.rule || "missing", "error", "health-dashboard"),
-    check("healthDashboard:populationServiceBoard", populationPeriods === 4 && populationInsights >= 4 && healthDashboard.populationServiceBoard?.serviceMode === "daily-interface", `${populationPeriods} population/service periods, ${populationInsights} site insights, ${healthDashboard.populationServiceBoard?.serviceMode || "unknown"}`, "error", "health-dashboard"),
+    check("healthDashboard:populationServiceBoard", populationPeriods === 4 && populationInsights >= 4 && populationSourceFields === 4 && healthDashboard.populationServiceBoard?.serviceMode === "daily-interface", `${populationPeriods} population/service periods, ${populationInsights} site insights, ${populationSourceFields} source fields, ${healthDashboard.populationServiceBoard?.serviceMode || "unknown"}`, "error", "health-dashboard"),
     check("healthDashboard:certificateExchange", certificateTracks >= 5, `${certificateTracks} certificate exchange tracks`, "error", "health-dashboard"),
     check("healthDashboard:riskDrilldown", drilldowns >= 4, `${drilldowns} risk drilldowns`, "error", "health-dashboard"),
     check("healthDashboard:siteEvidencePackage", evidenceArtifacts >= 4, `${evidenceArtifacts} evidence artifacts`, "error", "health-dashboard"),
-    check("healthDashboard:functionalReport", functionalItems >= 9, `${functionalItems} module functions reported`, "error", "health-dashboard"),
+    check("healthDashboard:functionalReport", functionalItems >= 10, `${functionalItems} module functions reported`, "error", "health-dashboard"),
     check("healthDashboard:departmentFunctionMatrix", departmentRows >= 6, `${departmentRows} internal department rows`, "error", "health-dashboard"),
     check("healthDashboard:cityCountyFunctionMatrix", cityCountyRows >= 4, `${cityCountyRows} city/county health-administration rows`, "error", "health-dashboard")
   ];

@@ -637,6 +637,127 @@ h1 { margin-top: 4px; font-size: 28px; }
 .population-bar-fill.visit { background: var(--blue); }
 .population-bar-fill.admission { background: var(--amber); }
 
+.population-source-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.population-source-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+
+.population-source-card.ready { border-left: 4px solid var(--green); }
+.population-source-card.watch { border-left: 4px solid var(--amber); }
+.population-source-card.empty { border-left: 4px solid var(--muted); }
+
+.population-source-card span,
+.population-source-card strong,
+.population-source-card small,
+.population-source-card p {
+  display: block;
+}
+
+.population-source-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.population-source-card strong {
+  margin-top: 6px;
+  font-size: 16px;
+}
+
+.population-source-card small,
+.population-source-card p {
+  color: var(--muted);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.population-source-card small {
+  margin-top: 6px;
+}
+
+.population-source-card p {
+  margin: 8px 0 0;
+}
+
+.jurisdiction-board {
+  margin-bottom: 16px;
+}
+
+.jurisdiction-switch {
+  margin-bottom: 12px;
+}
+
+.jurisdiction-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.jurisdiction-card {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--blue);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fff;
+}
+
+.jurisdiction-card.ready { border-left-color: var(--green); }
+.jurisdiction-card.watch { border-left-color: var(--amber); }
+.jurisdiction-card.blocked { border-left-color: var(--red); }
+.jurisdiction-card.empty { border-left-color: var(--muted); }
+
+.jurisdiction-card span,
+.jurisdiction-card strong,
+.jurisdiction-card small {
+  display: block;
+}
+
+.jurisdiction-card span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.jurisdiction-card strong {
+  margin-top: 6px;
+  font-size: 17px;
+}
+
+.jurisdiction-card ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  color: #24364a;
+  line-height: 1.55;
+}
+
+.jurisdiction-card p,
+.jurisdiction-card small {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.jurisdiction-card p {
+  margin: 10px 0 0;
+}
+
+.jurisdiction-card small {
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+
+.jurisdiction-boundary {
+  margin-top: 10px;
+}
+
 .function-report-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1369,7 +1490,9 @@ dialog::backdrop {
   .dashboard-control-grid,
   .function-report-grid,
   .population-metric-grid,
+  .population-source-grid,
   .population-insights,
+  .jurisdiction-grid,
   .portal-grid,
   .claim-grid,
   .capability-grid,
