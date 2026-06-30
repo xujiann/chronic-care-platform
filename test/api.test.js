@@ -747,6 +747,31 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(missingRegistration.response.status, 400);
     assert.equal(missingRegistration.body.message, "registration order not found");
 
+    const communitySchedule = registrationDashboard.body.schedules.find((item) => item.hospitalCode === "MR3" && item.remaining > 0);
+    assert.ok(communitySchedule);
+    const communityRegistration = await api(baseUrl, "/api/registrations/orders", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        scheduleId: communitySchedule.id,
+        visitType: "onsite",
+        reason: "escort registration scope regression"
+      })
+    }));
+    assert.equal(communityRegistration.response.status, 201);
+    const registrationScopeDenied = await api(baseUrl, "/api/escort-services/orders", authorized(hospitalToken, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        providerId,
+        registrationOrderId: communityRegistration.body.id,
+        serviceItems: ["registration", "exam escort"],
+        priority: "medium"
+      })
+    }));
+    assert.equal(registrationScopeDenied.response.status, 403);
+    assert.equal(registrationScopeDenied.body.message, "registration scope denied");
+
     const otherOrderAction = await api(baseUrl, `/api/tasks/${encodeURIComponent("escortServiceOrders:eso-r2-20260621")}/actions`, authorized(citizenToken, {
       method: "POST",
       body: JSON.stringify({ action: "resident-confirm", comment: "越权确认" })
