@@ -27,8 +27,11 @@
 
   const routeAccess = {
     "index.html": ["commission"],
+    "health-dashboard.html": ["commission"],
     "workbench.html": ["commission"],
     "platform.html": ["commission"],
+    "regional-data-sharing.html": ["commission", "institution"],
+    "quality-safety.html": ["commission"],
     "operations.html": ["commission"],
     "operations-about.html": ["commission"],
     "institution.html": ["institution"],
@@ -41,8 +44,8 @@
   };
 
   const roleLinks = {
-    commission: [["platform.html", "全民健康平台"], ["health-city.html", "总览"], ["about.html", "关于"], ["operations.html", "运行监测"], ["operations-about.html", "运行说明"], ["workbench.html", "工作台"], ["index.html", "卫健管理"]],
-    institution: [["health-city.html", "总览"], ["about.html", "关于"], ["institution.html", "医疗机构"]],
+    commission: [["platform.html", "全民健康平台"], ["regional-data-sharing.html", "区域共享"], ["quality-safety.html", "质量安全"], ["operations.html", "运行监测"], ["operations-about.html", "运行说明"], ["health-city.html", "总览"], ["about.html", "关于"], ["workbench.html", "工作台"], ["index.html", "卫健管理"]],
+    institution: [["health-city.html", "总览"], ["regional-data-sharing.html", "区域共享"], ["about.html", "关于"], ["institution.html", "医疗机构"]],
     insurance: [["health-city.html", "总览"], ["about.html", "关于"], ["insurance.html", "医保"]],
     citizen: [["health-city.html", "总览"], ["about.html", "关于"], ["citizen.html", "个人端"], ["mobile-preview.html", "手机预览"]],
     county: [["health-city.html", "总览"], ["about.html", "关于"], ["county.html", "医共体"]]

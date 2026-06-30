@@ -4,6 +4,7 @@ const path = require("path");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
 const { buildProcessAuditReport } = require("./scripts/process-audit");
 const { buildSiteReadinessPack, renderTemplateReadmes } = require("./scripts/site-readiness-pack");
+const { buildHealthDashboardSummary } = require("./scripts/health-dashboard-summary");
 const { buildReleaseReport, buildServiceAcceptanceSummary } = require("./scripts/release-report");
 const { buildReleaseArtifactManifest } = require("./scripts/release-artifact-manifest");
 
@@ -377,12 +378,12 @@ const SQLITE_MIGRATIONS = [
     }
   }
 ];
-const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals", "deathCertificates", "birthCertificates", "multiPracticeApplications", "digitalCredentials", "emergencySignals", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports"]);
+const WORKFLOW_COLLECTIONS = new Set(["careOrders", "medicationPickups", "insuranceClaims", "followups", "referrals", "referralTeleconsultations", "deathCertificates", "birthCertificates", "multiPracticeApplications", "digitalCredentials", "emergencySignals", "drugConsumableSupervisions", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports"]);
 const WORKFLOW_ROLE_COLLECTIONS = {
   commission: WORKFLOW_COLLECTIONS,
-  institution: new Set(["careOrders", "medicationPickups", "followups", "referrals", "deathCertificates", "birthCertificates", "multiPracticeApplications", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "emergencySignals"]),
-  insurance: new Set(["insuranceClaims", "medicationPickups", "digitalCredentials"]),
-  county: new Set(["countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "emergencySignals"])
+  institution: new Set(["careOrders", "medicationPickups", "followups", "referrals", "referralTeleconsultations", "deathCertificates", "birthCertificates", "multiPracticeApplications", "drugConsumableSupervisions", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "chronicMedicationSupport", "chronicQualityMetrics", "emergencySignals"]),
+  insurance: new Set(["insuranceClaims", "medicationPickups", "digitalCredentials", "drugConsumableSupervisions"]),
+  county: new Set(["referralTeleconsultations", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "emergencySignals"])
 };
 const WORKFLOW_PROTECTED_FIELDS = new Set(["id", "residentId", "maternalResidentId", "personIndex", "credentialNo", "certificateNo", "documentNo", "motherDocumentNo", "fatherDocumentNo", "createdAt", "createdBy", "createdByName", "lastUpdated", "updatedAt", "updatedBy", "updatedByName"]);
 const PERSONAL_RECORD_PROTECTED_FIELDS = new Set(["id", "residentId", "personIndex", "createdAt", "createdBy", "createdByName", "updatedAt", "updatedBy", "updatedByName", "expectedVersion"]);
@@ -400,7 +401,8 @@ const COLLECTION_WRITE_KEYS = new Set([
   "birthCertificates",
   "chronicScreeningTasks",
   "chronicEducationPushes",
-  "chronicManagementPlans"
+  "chronicManagementPlans",
+  "chronicFollowupStatusPolicy"
 ]);
 
 const mimeTypes = {
@@ -530,6 +532,7 @@ function seedState() {
     chronicScreeningTasks: seedChronicScreeningTasks(),
     chronicEducationPushes: seedChronicEducationPushes(),
     chronicManagementPlans: seedChronicManagementPlans(),
+    chronicFollowupStatusPolicy: seedChronicFollowupStatusPolicy(),
     chronicServiceRoles: seedChronicServiceRoles(),
     chronicCapabilityConditions: seedChronicCapabilityConditions(),
     chronicServicePathways: seedChronicServicePathways(),
@@ -543,6 +546,12 @@ function seedState() {
     countyAiDiagnosisCases: seedCountyAiDiagnosisCases(),
     countyMutualRecognitionRecords: seedCountyMutualRecognitionRecords(),
     countyAcceptanceLedger: seedCountyAcceptanceLedger(),
+    qualitySafetyEvents: seedQualitySafetyEvents(),
+    criticalValueAlerts: seedCriticalValueAlerts(),
+    clinicalPathwayCases: seedClinicalPathwayCases(),
+    medicalRecordQualityReviews: seedMedicalRecordQualityReviews(),
+    mutualRecognitionQualityReviews: seedMutualRecognitionQualityReviews(),
+    qualityRectificationOrders: seedQualityRectificationOrders(),
     careOrders: seedCareOrders(),
     medicationPickups: seedMedicationPickups(),
     institutionSupervisions: seedInstitutionSupervisions(),
@@ -577,6 +586,7 @@ function seedState() {
     accessibilityChecklist: seedAccessibilityChecklist(),
     securityAcceptanceLedger: seedSecurityAcceptanceLedger(),
     platformChangeLogs: seedPlatformChangeLogs(),
+    healthDashboardSnapshots: seedHealthDashboardSnapshots(),
     platformRoadmap: seedPlatformRoadmap(),
     platformAudit: seedPlatformAudit(),
     platformProcessAudit: seedPlatformProcessAudit(),
@@ -588,6 +598,32 @@ function seedState() {
 function seedPlatformChangeLogs() {
   return [
     { id: "pcl-001", at: "2026-06-18 15:10", actor: "市级管理员", role: "commission", collection: "platformCapabilities", itemId: "cap-data-platform", itemName: "城市级医疗健康大数据平台", action: "初始化建设台账", before: "无", after: "开发中", note: "按申报材料建立建设域、整合项、接口域和开发批次数据。" }
+  ];
+}
+
+function seedHealthDashboardSnapshots() {
+  return [
+    {
+      id: "health-dashboard-demo-20260623",
+      generatedAt: "2026-06-23T09:00:00.000Z",
+      sourceApplications: [
+        "index.html",
+        "institution.html",
+        "insurance.html",
+        "citizen.html",
+        "county.html",
+        "platform.html",
+        "workbench.html"
+      ],
+      status: "demo-compatible",
+      boundary: "Aggregate metrics, risks, actions, interfaces, evidence, and site dependencies only; source applications remain the system of record.",
+      staticFields: ["applicationId", "entry", "records", "openActions", "highRisks", "evidenceRecords", "status"],
+      normalization: {
+        openActionStatus: "Any source workflow status not matching a closed or accepted state remains open.",
+        riskLevel: "Source priority, level, status, dead-letter, and overdue signals normalize to high, medium, or normal.",
+        emptyState: "If a previous application thread has not produced data yet, the dashboard shows empty-ready with the source boundary."
+      }
+    }
   ];
 }
 
@@ -752,8 +788,8 @@ function seedCreditEvaluationRules() {
 
 function seedResearchDatasets() {
   return [
-    { id: "rd-hypertension-001", diseaseType: "hypertension", name: "Hypertension chronic management cohort", version: "1.0.0", ethicsApproval: "IRB-DEMO-HTN-2026", anonymization: "k-anonymity-demo", authorizationStatus: "approved", records: 2, status: "published", usageAudit: [], outcomes: [] },
-    { id: "rd-diabetes-001", diseaseType: "diabetes", name: "Diabetes follow-up and HbA1c cohort", version: "1.0.0", ethicsApproval: "IRB-DEMO-DM-2026", anonymization: "k-anonymity-demo", authorizationStatus: "approved", records: 1, status: "published", usageAudit: [], outcomes: [] }
+    { id: "rd-hypertension-001", diseaseType: "hypertension", name: "Hypertension chronic management cohort", version: "1.0.0", ethicsApproval: "IRB-DEMO-HTN-2026", ethicsStatus: "approved", anonymization: "k-anonymity-demo", deidentificationStatus: "released", authorizationStatus: "approved", records: 2, sourceCollections: ["personalRecords", "diagnosticReports", "chronicManagementPlans"], sandbox: { status: "active", environment: "demo-safe-sandbox", lastAccessAt: "" }, accessRequests: [], usageAudit: [], outcomes: [], status: "published" },
+    { id: "rd-diabetes-001", diseaseType: "diabetes", name: "Diabetes follow-up and HbA1c cohort", version: "1.0.0", ethicsApproval: "IRB-DEMO-DM-2026", ethicsStatus: "approved", anonymization: "k-anonymity-demo", deidentificationStatus: "released", authorizationStatus: "approved", records: 1, sourceCollections: ["personalRecords", "diagnosticReports", "followups"], sandbox: { status: "active", environment: "demo-safe-sandbox", lastAccessAt: "" }, accessRequests: [], usageAudit: [], outcomes: [], status: "published" }
   ];
 }
 
@@ -937,6 +973,73 @@ function seedReferralSystem() {
       { title: "长期处方与固定取药", audience: "慢病患者", message: "符合条件的慢病患者基层单次可开具不超过 12 周长期处方，并与固定取药闭环联动。", channel: "个人端、医保中心经办端" }
     ]
   };
+}
+
+function seedReferralTeleconsultations() {
+  return [
+    {
+      id: "rtc-001",
+      referralId: "rf1",
+      residentId: "r1",
+      type: "teleconsultation",
+      diseaseType: "hypertension",
+      sourceInstitution: "Qingniwaqiao Community Health Service Center",
+      targetInstitution: "Dalian Central Hospital",
+      department: "Cardiology",
+      applicantDoctor: "doc-liu",
+      receivingDoctor: "doc-wang",
+      residentAuthorizationId: "pr-auth-r1",
+      authorizationStatus: "authorized",
+      status: "scheduled",
+      priority: "high",
+      requestedAt: todayOffset(-1),
+      due: todayOffset(0),
+      meetingWindow: "2026-06-23 15:00-15:30",
+      clinicalQuestion: "Blood pressure remains uncontrolled after primary care adjustment; request medication plan review.",
+      materials: ["EMR summary", "blood pressure log", "current prescription"],
+      receivingFeedback: "Specialist slot reserved; review current prescription before video consultation.",
+      reportStatus: "pending-return",
+      reportReturnedAt: "",
+      reportSummary: "",
+      collaborationOrderId: "cco-004",
+      performance: { responseHours: 4, reportReturnHours: 0, satisfaction: "pending" },
+      auditTrail: [
+        { at: todayOffset(-1), actor: "doc-liu", action: "created", note: "Primary institution submitted teleconsultation request." },
+        { at: todayOffset(0), actor: "doc-wang", action: "scheduled", note: "Receiving hospital accepted the request and reserved a consultation window." }
+      ]
+    },
+    {
+      id: "rtc-002",
+      referralId: "rf3",
+      residentId: "r4",
+      type: "down-referral-feedback",
+      diseaseType: "hypertension rehabilitation",
+      sourceInstitution: "Dalian Central Hospital",
+      targetInstitution: "Qingniwaqiao Community Health Service Center",
+      department: "Family doctor studio",
+      applicantDoctor: "doc-wang",
+      receivingDoctor: "doc-liu",
+      residentAuthorizationId: "pr-auth-r4",
+      authorizationStatus: "authorized",
+      status: "report-returned",
+      priority: "medium",
+      requestedAt: todayOffset(-3),
+      due: todayOffset(-1),
+      meetingWindow: "2026-06-21 10:00-10:20",
+      clinicalQuestion: "Confirm home follow-up plan after specialist discharge and down-referral.",
+      materials: ["discharge summary", "medication plan"],
+      receivingFeedback: "Primary institution received the down-referral task and follow-up plan.",
+      reportStatus: "returned",
+      reportReturnedAt: todayOffset(-1),
+      reportSummary: "Continue eight-week long prescription follow-up and weekly blood pressure upload.",
+      collaborationOrderId: "cco-005",
+      performance: { responseHours: 2, reportReturnHours: 18, satisfaction: "good" },
+      auditTrail: [
+        { at: todayOffset(-3), actor: "doc-wang", action: "created", note: "Tertiary hospital initiated down-referral consultation." },
+        { at: todayOffset(-1), actor: "doc-liu", action: "report-returned", note: "Primary institution confirmed follow-up report return." }
+      ]
+    }
+  ];
 }
 
 function seedAuthUsers() {
@@ -1205,6 +1308,118 @@ function seedHospitalInteroperabilityFunctions() {
   ];
 }
 
+function seedQualitySafetyEvents() {
+  return [
+    {
+      id: "qse-med-001",
+      domain: "medical_quality",
+      type: "safety_event",
+      severity: "high",
+      institutionId: "ORG-HOSPITAL-001",
+      institutionName: "Dalian Central Hospital",
+      department: "Endocrinology",
+      residentId: "r2",
+      sourceCollection: "diagnosticReports",
+      sourceId: "dr-001",
+      title: "Critical glucose value acknowledgement overdue",
+      description: "LIS report reached critical threshold and needs closed-loop acknowledgement.",
+      reportedAt: "2026-06-22T09:12:00.000Z",
+      dueAt: "2026-06-23T09:12:00.000Z",
+      status: "dispatched",
+      ownerRole: "institution",
+      owner: "Medical quality office",
+      staticSnapshot: { reportItem: "glucose", trigger: "critical-value", sourceSystem: "LIS" },
+      auditTrail: [{ at: "2026-06-22T09:20:00.000Z", by: "health", action: "seed-dispatch", note: "Initial quality-safety seed event." }]
+    },
+    {
+      id: "qse-path-001",
+      domain: "clinical_pathway",
+      type: "pathway_variance",
+      severity: "medium",
+      institutionId: "ORG-HOSPITAL-001",
+      institutionName: "Dalian Central Hospital",
+      department: "Cardiology",
+      residentId: "r1",
+      sourceCollection: "personalRecords",
+      sourceId: "pr-001",
+      title: "Hypertension pathway follow-up evidence missing",
+      description: "Clinical pathway milestone lacks follow-up assessment and medication education evidence.",
+      reportedAt: "2026-06-21T10:00:00.000Z",
+      dueAt: "2026-06-28T10:00:00.000Z",
+      status: "open",
+      ownerRole: "institution",
+      owner: "Clinical pathway office",
+      staticSnapshot: { pathway: "hypertension-standard-pathway", variance: "missing-followup-evidence" },
+      auditTrail: [{ at: "2026-06-21T10:00:00.000Z", by: "health", action: "seed-open", note: "Pathway variance captured from EMR summary." }]
+    },
+    {
+      id: "qse-record-001",
+      domain: "medical_record_qc",
+      type: "record_defect",
+      severity: "medium",
+      institutionId: "ORG-COMMUNITY-001",
+      institutionName: "Qingniwaqiao Community Health Service Center",
+      department: "General practice",
+      residentId: "r4",
+      sourceCollection: "dataQualityIssues",
+      sourceId: "dq-credit-credit-community",
+      title: "Medical record quality sampling requires rectification",
+      description: "Sampling found incomplete chronic disease assessment fields and missing physician sign-off.",
+      reportedAt: "2026-06-20T14:30:00.000Z",
+      dueAt: "2026-06-27T14:30:00.000Z",
+      status: "feedback_submitted",
+      ownerRole: "institution",
+      owner: "Community quality manager",
+      staticSnapshot: { sampleRate: "5%", defectLevel: "B", sourceSystem: "EMR" },
+      auditTrail: [{ at: "2026-06-20T14:30:00.000Z", by: "health", action: "seed-review", note: "Medical record QC sampling event." }]
+    }
+  ];
+}
+
+function seedCriticalValueAlerts() {
+  return [
+    { id: "cva-001", eventId: "qse-med-001", reportId: "dr-001", residentId: "r2", item: "glucose", value: "26.1 mmol/L", threshold: ">25 mmol/L", level: "high", sourceInstitution: "Dalian Central Hospital", targetInstitution: "Dalian Central Hospital", reportedAt: "2026-06-22T09:12:00.000Z", acknowledgedAt: "", disposedAt: "", status: "pending_disposition", action: "Notify responsible physician and complete disposition note." }
+  ];
+}
+
+function seedClinicalPathwayCases() {
+  return [
+    { id: "cpc-001", eventId: "qse-path-001", residentId: "r1", pathwayCode: "HTN-2026", pathwayName: "Hypertension standard pathway", institutionName: "Dalian Central Hospital", currentNode: "follow-up-after-medication", varianceType: "missing_evidence", varianceReason: "Follow-up result not written back to EMR.", status: "variance_open", owner: "Clinical pathway office", dueAt: "2026-06-28T10:00:00.000Z" }
+  ];
+}
+
+function seedMedicalRecordQualityReviews() {
+  return [
+    { id: "mrq-001", eventId: "qse-record-001", institutionName: "Qingniwaqiao Community Health Service Center", sampleNo: "MRQ-2026-06-001", sampleScope: "Chronic disease outpatient records", defectCount: 3, score: 86, grade: "B", reviewer: "City medical record QC group", reviewedAt: "2026-06-20T14:30:00.000Z", status: "feedback_submitted", nextAction: "Upload corrected EMR screenshots and physician sign-off." }
+  ];
+}
+
+function seedMutualRecognitionQualityReviews() {
+  return [
+    { id: "mrqr-001", recognitionRecordId: "cmr-001", reportId: "dr-001", institutionName: "Dalian Central Hospital", item: "glucose", qcStatus: "manual_review_required", issueType: "critical_value_followup", status: "open", owner: "Regional mutual recognition QC", dueAt: "2026-06-24T18:00:00.000Z", nextAction: "Verify critical value acknowledgement before recognition." }
+  ];
+}
+
+function seedQualityRectificationOrders() {
+  return [
+    {
+      id: "qro-001",
+      issueId: "qse-record-001",
+      sourceType: "medical_record_qc",
+      institutionName: "Qingniwaqiao Community Health Service Center",
+      ownerRole: "institution",
+      owner: "Community quality manager",
+      requirement: "Complete missing assessment fields and physician sign-off.",
+      status: "feedback_submitted",
+      dispatchedAt: "2026-06-20T15:00:00.000Z",
+      dueAt: "2026-06-27T15:00:00.000Z",
+      feedback: [{ at: "2026-06-22T16:00:00.000Z", by: "community", byName: "Community doctor", content: "Corrected assessment fields have been uploaded for review.", attachments: ["emr-correction-screenshot"] }],
+      review: [],
+      auditTrail: [{ at: "2026-06-20T15:00:00.000Z", by: "health", action: "dispatch", note: "Seed rectification order." }]
+    }
+  ];
+}
+
 function seedChronicProjectBlueprint() {
   return {
     source: "大连市慢病管理平台建设项目-提级论证申报材料（20260615）",
@@ -1457,6 +1672,34 @@ function seedChronicManagementPlans() {
     { id: "cmp-002", residentId: "r2", diseaseType: "糖尿病", grade: "中危", owner: "赵医生", plan: "每月血糖复测、季度糖化血红蛋白、饮食运动干预", indicators: ["空腹血糖", "糖化血红蛋白", "体重"], status: "待复核", nextReview: todayOffset(10), intervention: "补充并发症筛查结果" },
     { id: "cmp-003", residentId: "r4", diseaseType: "高血压/脑卒中高危", grade: "高危", owner: "刘医生", plan: "纳入重点人群，每周提醒、家属协同、必要时转诊", indicators: ["血压", "心电", "卒中风险评分"], status: "预警中", nextReview: todayOffset(3), intervention: "推送卒中宣教并预约专科会诊" }
   ];
+}
+
+function seedChronicFollowupStatusPolicy() {
+  return {
+    version: "chronic-followup-2026.1",
+    boundaries: [
+      "screening-risk-stratification",
+      "tiered-management-plan",
+      "post-discharge-followup",
+      "return-visit-reminder",
+      "medication-adherence",
+      "family-doctor-collaboration",
+      "resident-feedback-loop"
+    ],
+    statusGroups: {
+      open: ["寰呯瓫鏌?", "妫€鏌ョ敵璇?", "寰呭共棰?", "寰呭鏍?", "鎵ц涓?", "棰勮涓?", "宸查€炬湡", "寰呴殢璁?", "寰呭彇鑽?", "寰呯‘璁?"],
+      active: ["鎵ц涓?", "棰勮涓?", "寰呴殢璁?", "寰呭共棰?", "寰呭尰淇濆鏍?"],
+      closed: ["宸茶瘎浼?", "宸叉帹閫佸共棰?", "宸插鏍?", "宸插畬鎴?", "宸插彇鑽?", "宸茬‘璁?", "宸查槄璇?"],
+      escalated: ["宸查€炬湡", "棰勮涓?", "楂樺嵄"]
+    },
+    requiredEvidence: {
+      screening: ["residentId", "riskLevel", "nextStep"],
+      managementPlan: ["residentId", "grade", "nextReview", "intervention"],
+      followup: ["residentId", "plannedAt", "assignee", "status"],
+      medication: ["residentId", "nextPickup", "institutionReview", "insuranceReview", "pharmacyStatus"],
+      feedback: ["residentId", "category", "source", "meta.followupFeedback"]
+    }
+  };
 }
 
 function seedChronicServiceRoles() {
@@ -2412,6 +2655,77 @@ function seedInstitutionSupervisions() {
     { id: "is1", institution: "大连市中心医院", level: "提示", issue: "长期处方占比较高", action: "抽查慢病处方合理性", status: "待复核" },
     { id: "is2", institution: "大连医科大学附属医院", level: "正常", issue: "结算与病历匹配", action: "持续监测", status: "通过" },
     { id: "is3", institution: "青泥洼桥社区卫生服务中心", level: "关注", issue: "基层随访服务包需补充记录", action: "补齐家庭医生随访记录", status: "整改中" }
+  ];
+}
+
+function seedDrugConsumableSupervisions() {
+  return [
+    {
+      id: "dcs-rational-r1",
+      residentId: "r1",
+      category: "rational-use",
+      boundary: "rational-medication",
+      institution: "Dalian Central Hospital",
+      sourceCollection: "insuranceClaims",
+      sourceId: "ic1",
+      relatedPickupId: "mp1",
+      relatedClaimId: "ic1",
+      issue: "Long-term prescription and settlement claim need prescription-review evidence.",
+      riskLevel: "warning",
+      reviewStatus: "pending-review",
+      insuranceStatus: "pending-audit",
+      remediationStatus: "open",
+      status: "open",
+      ownerRole: "insurance",
+      nextAction: "Attach prescription-review note and medication-use basis before settlement approval.",
+      auditTrail: [{ at: "2026-06-20T09:00:00.000Z", actor: "system", role: "commission", action: "seed", result: "created" }],
+      lastUpdated: "2026-06-20T09:00:00.000Z",
+      personIndex: "DEMO-ID-R1#DEMO-MOBILE-R1"
+    },
+    {
+      id: "dcs-fixed-pickup-r2",
+      residentId: "r2",
+      category: "fixed-pickup",
+      boundary: "fixed-pharmacy",
+      institution: "Xinghaiwan Community Health Service Center",
+      sourceCollection: "medicationPickups",
+      sourceId: "mp3",
+      relatedPickupId: "mp3",
+      relatedClaimId: "ic2",
+      issue: "Fixed pickup request waits for insurance review and pharmacy confirmation.",
+      riskLevel: "attention",
+      reviewStatus: "institution-confirmed",
+      insuranceStatus: "pending-audit",
+      remediationStatus: "tracking",
+      status: "in-progress",
+      ownerRole: "insurance",
+      nextAction: "Insurance center confirms benefit scope and pickup cycle.",
+      auditTrail: [{ at: "2026-06-20T09:05:00.000Z", actor: "system", role: "commission", action: "seed", result: "created" }],
+      lastUpdated: "2026-06-20T09:05:00.000Z",
+      personIndex: "DEMO-ID-R2#DEMO-MOBILE-R2"
+    },
+    {
+      id: "dcs-consumable-mr1",
+      residentId: "r4",
+      category: "high-value-consumable",
+      boundary: "consumable-clue",
+      institution: "Dalian Central Hospital",
+      sourceCollection: "institutionSupervisions",
+      sourceId: "is1",
+      relatedPickupId: "mp4",
+      relatedClaimId: "ic3",
+      issue: "High-value consumable clue needs institution explanation and insurance settlement cross-check.",
+      riskLevel: "high",
+      reviewStatus: "clue-registered",
+      insuranceStatus: "coordinating",
+      remediationStatus: "open",
+      status: "open",
+      ownerRole: "commission",
+      nextAction: "Health commission asks institution to upload consumable catalog version and rectification evidence.",
+      auditTrail: [{ at: "2026-06-20T09:10:00.000Z", actor: "system", role: "commission", action: "seed", result: "created" }],
+      lastUpdated: "2026-06-20T09:10:00.000Z",
+      personIndex: "DEMO-ID-R4#DEMO-MOBILE-R4"
+    }
   ];
 }
 
@@ -4811,6 +5125,7 @@ function normalizeState(data) {
     chronicScreeningTasks: mergeByKey(seedChronicScreeningTasks(), data.chronicScreeningTasks, "id"),
     chronicEducationPushes: mergeByKey(seedChronicEducationPushes(), data.chronicEducationPushes, "id"),
     chronicManagementPlans: mergeByKey(seedChronicManagementPlans(), data.chronicManagementPlans, "id"),
+    chronicFollowupStatusPolicy: data.chronicFollowupStatusPolicy && typeof data.chronicFollowupStatusPolicy === "object" ? { ...seedChronicFollowupStatusPolicy(), ...data.chronicFollowupStatusPolicy } : seedChronicFollowupStatusPolicy(),
     chronicServiceRoles: mergeByKey(seedChronicServiceRoles(), data.chronicServiceRoles, "id"),
     chronicCapabilityConditions: mergeByKey(seedChronicCapabilityConditions(), data.chronicCapabilityConditions, "id"),
     chronicServicePathways: mergeByKey(seedChronicServicePathways(), data.chronicServicePathways, "id"),
@@ -4824,13 +5139,25 @@ function normalizeState(data) {
     countyAiDiagnosisCases: mergeByKey(seedCountyAiDiagnosisCases(), data.countyAiDiagnosisCases, "id"),
     countyMutualRecognitionRecords: mergeByKey(seedCountyMutualRecognitionRecords(), data.countyMutualRecognitionRecords, "id"),
     countyAcceptanceLedger: mergeByKey(seedCountyAcceptanceLedger(), data.countyAcceptanceLedger, "id"),
+    qualitySafetyEvents: mergeByKey(seedQualitySafetyEvents(), data.qualitySafetyEvents, "id"),
+    criticalValueAlerts: mergeByKey(seedCriticalValueAlerts(), data.criticalValueAlerts, "id"),
+    clinicalPathwayCases: mergeByKey(seedClinicalPathwayCases(), data.clinicalPathwayCases, "id"),
+    medicalRecordQualityReviews: mergeByKey(seedMedicalRecordQualityReviews(), data.medicalRecordQualityReviews, "id"),
+    mutualRecognitionQualityReviews: mergeByKey(seedMutualRecognitionQualityReviews(), data.mutualRecognitionQualityReviews, "id"),
+    qualityRectificationOrders: mergeByKey(seedQualityRectificationOrders(), data.qualityRectificationOrders, "id"),
     mutualRecognitionRules: mergeByKey(seedMutualRecognitionRules(), data.mutualRecognitionRules, "id"),
     diagnosticReports: mergeByKey(seedDiagnosticReports(), data.diagnosticReports, "id"),
+    regionalDataSharingScope: data.regionalDataSharingScope && typeof data.regionalDataSharingScope === "object" ? { ...seedRegionalDataSharingScope(), ...data.regionalDataSharingScope } : seedRegionalDataSharingScope(),
+    regionalSharingPackages: normalizeRegionalSharingPackages(mergeByKey(seedRegionalSharingPackages(), data.regionalSharingPackages, "id")),
+    regionalSharingSnapshots: data.regionalSharingSnapshots && typeof data.regionalSharingSnapshots === "object" ? { ...seedRegionalSharingSnapshots(), ...data.regionalSharingSnapshots } : seedRegionalSharingSnapshots(),
+    regionalSharingAccessReviews: Array.isArray(data.regionalSharingAccessReviews) ? data.regionalSharingAccessReviews : seedRegionalSharingAccessReviews(),
+    referralTeleconsultations: mergeByKey(seedReferralTeleconsultations(), data.referralTeleconsultations, "id"),
     taskMessages: Array.isArray(data.taskMessages) ? data.taskMessages : [],
     dataQualityIssues: Array.isArray(data.dataQualityIssues) ? data.dataQualityIssues : [],
     careOrders: Array.isArray(data.careOrders) ? data.careOrders : seedCareOrders(),
     medicationPickups: Array.isArray(data.medicationPickups) ? data.medicationPickups : seedMedicationPickups(),
     institutionSupervisions: Array.isArray(data.institutionSupervisions) ? data.institutionSupervisions : seedInstitutionSupervisions(),
+    drugConsumableSupervisions: mergeByKey(seedDrugConsumableSupervisions(), data.drugConsumableSupervisions, "id"),
     insuranceClaims: Array.isArray(data.insuranceClaims) ? data.insuranceClaims : seedInsuranceClaims(),
     policyAlignment: Array.isArray(data.policyAlignment) ? data.policyAlignment : seedPolicyAlignment(),
     emergencySignals: Array.isArray(data.emergencySignals) ? data.emergencySignals : seedEmergencySignals(),
@@ -4864,6 +5191,7 @@ function normalizeState(data) {
     accessibilityChecklist: mergeByKey(seedAccessibilityChecklist(), data.accessibilityChecklist, "id"),
     securityAcceptanceLedger: mergeByKey(seedSecurityAcceptanceLedger(), data.securityAcceptanceLedger, "id"),
     platformChangeLogs: Array.isArray(data.platformChangeLogs) ? data.platformChangeLogs : seedPlatformChangeLogs(),
+    healthDashboardSnapshots: mergeByKey(seedHealthDashboardSnapshots(), data.healthDashboardSnapshots, "id"),
     platformRoadmap: Array.isArray(data.platformRoadmap) ? data.platformRoadmap : seedPlatformRoadmap(),
     platformAudit: Array.isArray(data.platformAudit) ? data.platformAudit : seedPlatformAudit(),
     platformProcessAudit: Array.isArray(data.platformProcessAudit) ? data.platformProcessAudit : seedPlatformProcessAudit(),
@@ -4988,6 +5316,146 @@ function normalizePersonalRecord(data) {
     meta: data.meta && typeof data.meta === "object" ? data.meta : {},
     createdBy: data.createdBy || "resident",
     createdAt: data.createdAt || new Date().toISOString()
+  };
+}
+
+function normalizeResearchDatasetApplication(payload, user, data) {
+  const diseaseType = String(payload.diseaseType || "").trim();
+  const name = String(payload.name || "").trim();
+  if (!diseaseType || !name) throw new Error("diseaseType and name are required");
+  const requestedSources = Array.isArray(payload.sourceCollections) && payload.sourceCollections.length
+    ? payload.sourceCollections.map((item) => String(item).trim()).filter(Boolean)
+    : ["personalRecords", "diagnosticReports"];
+  const allowedSources = new Set(["personalRecords", "diagnosticReports", "diseases", "followups", "chronicScreeningTasks", "chronicManagementPlans", "diseaseRegistryModels"]);
+  const sourceCollections = requestedSources.filter((item) => allowedSources.has(item));
+  if (!sourceCollections.length) throw new Error("sourceCollections must use approved research sources");
+  const records = estimateResearchDatasetRecords(data, sourceCollections, diseaseType);
+  const now = new Date().toISOString();
+  return {
+    id: payload.id || `rd-${diseaseType.replace(/[^a-z0-9-]/gi, "-").toLowerCase()}-${Date.now()}`,
+    diseaseType,
+    name,
+    version: String(payload.version || "0.1.0").trim(),
+    ethicsApproval: String(payload.ethicsApproval || "").trim(),
+    ethicsStatus: "pending",
+    anonymization: String(payload.anonymization || "pending-policy").trim(),
+    deidentificationStatus: "pending",
+    authorizationStatus: "pending",
+    records,
+    sourceCollections,
+    sandbox: { status: "pending", environment: String(payload.environment || "demo-safe-sandbox").trim(), lastAccessAt: "" },
+    accessRequests: [{
+      at: now,
+      by: user.username || user.role,
+      role: user.role,
+      purpose: String(payload.purpose || "research dataset application").trim(),
+      status: "submitted"
+    }],
+    usageAudit: [],
+    outcomes: [],
+    status: "requested",
+    createdAt: now,
+    createdBy: user.username || user.role,
+    updatedAt: now,
+    updatedBy: user.username || user.role
+  };
+}
+
+function estimateResearchDatasetRecords(data, sourceCollections, diseaseType) {
+  const disease = diseaseType.toLowerCase();
+  const residentIds = new Set();
+  sourceCollections.forEach((collection) => {
+    const rows = Array.isArray(data[collection]) ? data[collection] : [];
+    rows.forEach((item) => {
+      const haystack = JSON.stringify(item || {}).toLowerCase();
+      if (!disease || haystack.includes(disease)) {
+        if (item.residentId) residentIds.add(item.residentId);
+        else if (item.id) residentIds.add(`${collection}:${item.id}`);
+      }
+    });
+  });
+  return residentIds.size || sourceCollections.reduce((sum, collection) => sum + (Array.isArray(data[collection]) ? data[collection].length : 0), 0);
+}
+
+function normalizeResearchApproval(dataset, payload, user) {
+  const approved = String(payload.decision || payload.status || "approved").trim() === "approved";
+  const now = new Date().toISOString();
+  return {
+    ...dataset,
+    version: String(payload.version || dataset.version || "1.0.0").trim(),
+    ethicsApproval: String(payload.ethicsApproval || dataset.ethicsApproval || "").trim(),
+    ethicsStatus: approved ? "approved" : "rejected",
+    anonymization: String(payload.anonymization || dataset.anonymization || "k-anonymity-demo").trim(),
+    deidentificationStatus: approved ? String(payload.deidentificationStatus || "released").trim() : "blocked",
+    authorizationStatus: approved ? "approved" : "rejected",
+    status: approved ? String(payload.publishStatus || "published").trim() : "rejected",
+    sandbox: {
+      ...(dataset.sandbox || {}),
+      status: approved ? "active" : "blocked",
+      environment: String(payload.environment || dataset.sandbox?.environment || "demo-safe-sandbox").trim()
+    },
+    approval: {
+      at: now,
+      by: user.username || user.role,
+      decision: approved ? "approved" : "rejected",
+      note: String(payload.note || "").trim()
+    },
+    updatedAt: now,
+    updatedBy: user.username || user.role
+  };
+}
+
+function requireDatasetSandboxAccess(dataset) {
+  const approved = dataset.authorizationStatus === "approved" && (dataset.ethicsStatus === "approved" || (!dataset.ethicsStatus && dataset.ethicsApproval));
+  const deidentified = ["released", "approved", "completed"].includes(String(dataset.deidentificationStatus || "").trim()) || (!dataset.deidentificationStatus && Boolean(dataset.anonymization));
+  const active = ["published", "active"].includes(String(dataset.status || "").trim()) && (!dataset.sandbox || dataset.sandbox.status === "active");
+  return approved && deidentified && active;
+}
+
+function appendResearchAudit(data, user, dataset, action, detail, result = "allowed") {
+  const now = new Date().toISOString();
+  dataset.usageAudit = [
+    { at: now, by: user.username || user.role, role: user.role, action, purpose: detail, result },
+    ...(Array.isArray(dataset.usageAudit) ? dataset.usageAudit : [])
+  ].slice(0, 50);
+  appendDataAccessLog(data, user, "", "research-sandbox", `${dataset.id}:${action}:${detail}`, result);
+  dataset.updatedAt = now;
+  dataset.updatedBy = user.username || user.role;
+}
+
+function buildResearchSandboxSummary(data) {
+  const datasets = Array.isArray(data.researchDatasets) ? data.researchDatasets : [];
+  const models = Array.isArray(data.diseaseRegistryModels) ? data.diseaseRegistryModels : [];
+  const auditLogs = (Array.isArray(data.dataAccessLogs) ? data.dataAccessLogs : []).filter((item) => String(item.scope || "").includes("research"));
+  const activeDatasets = datasets.filter(requireDatasetSandboxAccess);
+  return {
+    ok: datasets.length >= 2 && activeDatasets.length >= 1 && auditLogs.length >= 1,
+    boundaries: ["research dataset", "disease registry", "ethics approval", "de-identification release", "sandbox access", "usage audit", "outcome return"],
+    summary: {
+      datasets: datasets.length,
+      activeDatasets: activeDatasets.length,
+      pendingApplications: datasets.filter((item) => item.status === "requested" || item.authorizationStatus === "pending").length,
+      diseaseModels: models.length,
+      usageAudits: datasets.reduce((sum, item) => sum + (Array.isArray(item.usageAudit) ? item.usageAudit.length : 0), 0),
+      outcomes: datasets.reduce((sum, item) => sum + (Array.isArray(item.outcomes) ? item.outcomes.length : 0), 0),
+      auditLogs: auditLogs.length
+    },
+    datasets: datasets.map((item) => ({
+      id: item.id,
+      diseaseType: item.diseaseType,
+      name: item.name,
+      status: item.status,
+      ethicsStatus: item.ethicsStatus || (item.ethicsApproval ? "approved" : "pending"),
+      deidentificationStatus: item.deidentificationStatus || "pending",
+      authorizationStatus: item.authorizationStatus,
+      sandboxStatus: item.sandbox?.status || "pending",
+      sourceCollections: item.sourceCollections || [],
+      records: item.records || 0,
+      usageAuditCount: Array.isArray(item.usageAudit) ? item.usageAudit.length : 0,
+      outcomeCount: Array.isArray(item.outcomes) ? item.outcomes.length : 0
+    })),
+    models: models.map((item) => ({ id: item.id, diseaseType: item.diseaseType, version: item.version, reviewStatus: item.reviewStatus })),
+    reusableCollections: ["researchDatasets", "diseaseRegistryModels", "dataAccessLogs", "securityAcceptanceLedger", "personalRecords", "diagnosticReports"]
   };
 }
 
@@ -5207,7 +5675,7 @@ function normalizePersonIndexes(state) {
     resident.identityIndex = resident.personIndex;
   });
   const residentMap = new Map(residents.map((resident) => [resident.id, resident]));
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "taskMessages"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "referralTeleconsultations", "taskMessages"].forEach((key) => {
     (Array.isArray(state[key]) ? state[key] : []).forEach((item) => {
       item.personIndex = item.personIndex || personIndexForResident(residentMap, item.residentId);
     });
@@ -5236,7 +5704,7 @@ function mergeByKey(defaultRows, currentRows, key) {
   return [...merged.values()];
 }
 
-function sealAuditTrail(rows) {
+function sealAuditTrail(rows, options = {}) {
   const items = (Array.isArray(rows) ? rows : []).map((item) => ({ ...item }));
   const shouldReseal = items.some((item) => !item.auditHash || !Object.hasOwn(item, "previousAuditHash"));
   let previousHash = "";
@@ -5250,6 +5718,8 @@ function sealAuditTrail(rows) {
       if (!item.previousAuditHash) item.previousAuditHash = previousHash;
       if (!item.auditHash) item.auditHash = auditHashFor(item);
     }
+    if (options.recompute || !item.previousAuditHash) item.previousAuditHash = previousHash;
+    if (options.recompute || !item.auditHash) item.auditHash = auditHashFor(item);
     previousHash = item.auditHash;
   }
   return items;
@@ -5538,6 +6008,300 @@ function reviewMutualRecognitionRecord(data, id, payload, user) {
   return updated;
 }
 
+function seedRegionalDataSharingScope() {
+  return {
+    id: "regional-data-sharing",
+    name: "区域诊疗数据共享平台",
+    boundary: [
+      "居民主索引下的诊疗摘要、检查检验报告、互认记录和授权调阅",
+      "管理端按区域、机构、接口和质量状态监管共享闭环",
+      "机构端按本机构来源或目标居民共享包完成调阅、确认和留痕"
+    ],
+    roles: [
+      { role: "commission", name: "管理端", permissions: ["共享网络总览", "质量与合规监管", "跨机构审计追踪", "现场联调证据归档"] },
+      { role: "institution", name: "机构端", permissions: ["本机构共享包调阅", "报告回传确认", "互认结果确认", "问题闭环登记"] },
+      { role: "citizen", name: "居民端", permissions: ["通过既有个人健康档案和授权记录查看结果"], via: "citizen.html / personalRecords" }
+    ],
+    coreLoop: [
+      "机构接口或人工回传形成 diagnosticReports / personalRecords",
+      "区域规则生成 countyMutualRecognitionRecords 和共享包",
+      "目标机构调阅共享包并登记 regionalSharingAccessReviews",
+      "管理端用质量、授权、互认、审计和接口证据验收闭环"
+    ],
+    exclusions: [
+      "不替代院内 HIS/EMR/LIS/PACS 原系统",
+      "不直接承载医保结算、电子票据或费用清分",
+      "不绕过居民授权、机构职责边界和现场接口签名验收",
+      "不把科研脱敏数据集作为临床诊疗直接来源"
+    ],
+    reusedCollections: [
+      "residents",
+      "personalRecords",
+      "diagnosticReports",
+      "countyMutualRecognitionRecords",
+      "integrationContracts",
+      "hospitalInteroperabilityFunctions",
+      "platformEvidence",
+      "dataAccessLogs",
+      "securityEvents"
+    ],
+    statusNorms: {
+      ready: "可共享",
+      pending_review: "待复核",
+      blocked: "暂缓共享",
+      archived: "已归档"
+    }
+  };
+}
+
+function seedRegionalSharingPackages() {
+  return [
+    {
+      id: "rsp-r1-hypertension",
+      residentId: "r1",
+      personIndex: "DEMO-ID-R1#DEMO-MOBILE-R1",
+      sourceInstitution: "青泥洼桥社区卫生服务中心",
+      sourceOrgCode: "MR3",
+      targetInstitutions: ["大连市中心医院", "中山区县域医共体"],
+      targetOrgCodes: ["MR1", "ORG-CONSORTIUM-ZS"],
+      category: "chronic-followup",
+      title: "高血压复查共享包",
+      sharedCollections: ["personalRecords", "followups", "diagnosticReports"],
+      recordRefs: ["pr-001", "dr-seed-001"],
+      contractRefs: ["his-patient-v1", "emr-summary-v1", "lis-report-v1"],
+      consentStatus: "active",
+      qualityStatus: "passed",
+      status: "ready",
+      lastSharedAt: "2026-06-22T09:20:00.000Z",
+      owner: "基层机构管理员",
+      nextAction: "上级医院调阅后回写接诊意见。"
+    },
+    {
+      id: "rsp-r2-diabetes",
+      residentId: "r2",
+      personIndex: "DEMO-ID-R2#DEMO-MOBILE-R2",
+      sourceInstitution: "大连市中心医院",
+      sourceOrgCode: "MR1",
+      targetInstitutions: ["星海湾社区卫生服务中心", "中山区县域医共体"],
+      targetOrgCodes: ["MR4", "ORG-CONSORTIUM-ZS"],
+      category: "diagnostic-report",
+      title: "糖尿病检验报告互认共享包",
+      sharedCollections: ["diagnosticReports", "countyMutualRecognitionRecords", "personalRecords"],
+      recordRefs: ["dr-seed-002", "cmr-seed-002"],
+      contractRefs: ["lis-report-v1", "pacs-report-v1"],
+      consentStatus: "active",
+      qualityStatus: "passed",
+      status: "ready",
+      lastSharedAt: "2026-06-22T10:15:00.000Z",
+      owner: "医疗机构管理员",
+      nextAction: "基层机构确认互认并减少重复检验。"
+    },
+    {
+      id: "rsp-r3-imaging",
+      residentId: "r3",
+      personIndex: "DEMO-ID-R3#DEMO-MOBILE-R3",
+      sourceInstitution: "甘井子区人民医院",
+      sourceOrgCode: "MR5",
+      targetInstitutions: ["大连医科大学附属医院"],
+      targetOrgCodes: ["MR2"],
+      category: "imaging",
+      title: "影像报告复核共享包",
+      sharedCollections: ["diagnosticReports", "integrationGatewayEvents"],
+      recordRefs: ["dr-seed-003"],
+      contractRefs: ["pacs-report-v1"],
+      consentStatus: "pending",
+      qualityStatus: "manual_review",
+      status: "pending_review",
+      lastSharedAt: "",
+      owner: "区域诊断中心",
+      nextAction: "补齐居民授权和影像质控结论后开放调阅。"
+    }
+  ];
+}
+
+function seedRegionalSharingSnapshots() {
+  return {
+    generatedAt: "2026-06-22T10:30:00.000Z",
+    fields: {
+      packageId: "共享包主键",
+      residentId: "居民主索引关联",
+      sourceOrgCode: "来源机构代码",
+      targetOrgCodes: "目标机构代码列表",
+      status: "ready | pending_review | blocked | archived",
+      consentStatus: "active | pending | revoked",
+      qualityStatus: "passed | manual_review | failed",
+      contractRefs: "integrationContracts.id 列表",
+      recordRefs: "personalRecords / diagnosticReports / countyMutualRecognitionRecords 引用"
+    },
+    statusNorms: seedRegionalDataSharingScope().statusNorms,
+    staticEvidence: [
+      "residents.personIndex",
+      "personalRecords.reportId",
+      "diagnosticReports.recognitionRecordId",
+      "integrationContracts.requiredFields",
+      "interface-mapping-report.md"
+    ]
+  };
+}
+
+function seedRegionalSharingAccessReviews() {
+  return [
+    {
+      id: "rsar-seed-001",
+      packageId: "rsp-r1-hypertension",
+      residentId: "r1",
+      actor: "医疗机构管理员",
+      role: "institution",
+      organization: "大连市中心医院",
+      purpose: "上转接诊前调阅慢病随访和检验摘要",
+      decision: "approved",
+      status: "completed",
+      at: "2026-06-22T10:40:00.000Z",
+      note: "调阅范围限定为本次接诊所需共享包。"
+    }
+  ];
+}
+
+function normalizeRegionalSharingStatus(packageItem) {
+  const status = String(packageItem.status || "").trim();
+  const consent = String(packageItem.consentStatus || "").trim();
+  const quality = String(packageItem.qualityStatus || "").trim();
+  if (consent === "revoked" || quality === "failed") return "blocked";
+  if (status === "archived") return "archived";
+  if (consent !== "active" || quality === "manual_review") return "pending_review";
+  return status || "ready";
+}
+
+function normalizeRegionalSharingPackages(packages) {
+  return (Array.isArray(packages) ? packages : []).map((item) => ({
+    ...item,
+    targetInstitutions: Array.isArray(item.targetInstitutions) ? item.targetInstitutions : [],
+    targetOrgCodes: Array.isArray(item.targetOrgCodes) ? item.targetOrgCodes : [],
+    sharedCollections: Array.isArray(item.sharedCollections) ? item.sharedCollections : [],
+    recordRefs: Array.isArray(item.recordRefs) ? item.recordRefs : [],
+    contractRefs: Array.isArray(item.contractRefs) ? item.contractRefs : [],
+    status: normalizeRegionalSharingStatus(item)
+  }));
+}
+
+function canAccessRegionalSharingPackage(user, item) {
+  if (user.role === "commission") return true;
+  if (user.role !== "institution") return false;
+  return item.sourceOrgCode === user.orgCode ||
+    item.sourceInstitution === user.orgName ||
+    (item.targetOrgCodes || []).includes(user.orgCode) ||
+    (item.targetInstitutions || []).includes(user.orgName);
+}
+
+function buildRegionalDataSharingView(data, user) {
+  const packages = normalizeRegionalSharingPackages(data.regionalSharingPackages || seedRegionalSharingPackages())
+    .filter((item) => canAccessRegionalSharingPackage(user, item));
+  const residentsById = new Map((data.residents || []).map((item) => [item.id, item]));
+  const contractsById = new Map((data.integrationContracts || []).map((item) => [item.id, item]));
+  const diagnosticReports = data.diagnosticReports || [];
+  const personalRecords = data.personalRecords || [];
+  const recognitionRecords = data.countyMutualRecognitionRecords || [];
+  const enrichedPackages = packages.map((item) => {
+    const relatedReports = diagnosticReports.filter((report) => report.residentId === item.residentId || item.recordRefs.includes(report.id));
+    const relatedPersonalRecords = personalRecords.filter((record) => record.residentId === item.residentId && (item.recordRefs.includes(record.id) || item.sharedCollections.includes("personalRecords")));
+    const relatedRecognition = recognitionRecords.filter((record) => record.residentId === item.residentId || item.recordRefs.includes(record.id));
+    const contracts = item.contractRefs.map((id) => contractsById.get(id)).filter(Boolean);
+    return {
+      ...item,
+      resident: residentsById.get(item.residentId) || null,
+      contracts: contracts.map((contract) => ({
+        id: contract.id,
+        domain: contract.domain,
+        resource: contract.resource,
+        status: contract.status
+      })),
+      evidenceCounts: {
+        diagnosticReports: relatedReports.length,
+        personalRecords: relatedPersonalRecords.length,
+        mutualRecognitionRecords: relatedRecognition.length,
+        contracts: contracts.length
+      },
+      latestRecords: [
+        ...relatedReports.slice(0, 3).map((record) => ({ type: "diagnosticReports", id: record.id, name: record.item, status: record.status, at: record.reportedAt })),
+        ...relatedPersonalRecords.slice(0, 3).map((record) => ({ type: "personalRecords", id: record.id, name: record.name, status: record.status || record.category, at: record.recordDate || record.date })),
+        ...relatedRecognition.slice(0, 3).map((record) => ({ type: "countyMutualRecognitionRecords", id: record.id, name: record.item, status: record.status, at: record.at }))
+      ].sort((left, right) => String(right.at || "").localeCompare(String(left.at || ""))).slice(0, 5)
+    };
+  });
+  const reviews = (data.regionalSharingAccessReviews || []).filter((review) =>
+    packages.some((item) => item.id === review.packageId)
+  );
+  return {
+    scope: data.regionalDataSharingScope || seedRegionalDataSharingScope(),
+    snapshots: data.regionalSharingSnapshots || seedRegionalSharingSnapshots(),
+    summary: {
+      totalPackages: enrichedPackages.length,
+      ready: enrichedPackages.filter((item) => item.status === "ready").length,
+      pendingReview: enrichedPackages.filter((item) => item.status === "pending_review").length,
+      blocked: enrichedPackages.filter((item) => item.status === "blocked").length,
+      accessReviews: reviews.length,
+      institutions: new Set(enrichedPackages.flatMap((item) => [item.sourceInstitution, ...(item.targetInstitutions || [])]).filter(Boolean)).size,
+      contracts: new Set(enrichedPackages.flatMap((item) => item.contractRefs || [])).size
+    },
+    packages: enrichedPackages,
+    accessReviews: reviews.slice(0, 50)
+  };
+}
+
+function createRegionalSharingAccessReview(data, payload, user) {
+  const packages = normalizeRegionalSharingPackages(data.regionalSharingPackages || seedRegionalSharingPackages());
+  const packageId = String(payload.packageId || "").trim();
+  const index = packages.findIndex((item) => item.id === packageId);
+  if (index < 0) return { status: 404, body: { error: "Not Found", message: "regional sharing package not found" } };
+  if (!canAccessRegionalSharingPackage(user, packages[index])) {
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "regional sharing access review", target: packageId, result: "denied", detail: "organization scope denied" });
+    return { status: 403, body: { error: "Forbidden", message: "organization scope denied" } };
+  }
+  if (!canAccessResident(user, packages[index].residentId, data)) {
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "regional sharing access review", target: packages[index].residentId, result: "denied", detail: "resident scope denied" });
+    return { status: 403, body: { error: "Forbidden", message: "resident scope denied" } };
+  }
+  const now = new Date().toISOString();
+  const decision = String(payload.decision || "approved").trim();
+  const review = {
+    id: `rsar-${randomUUID()}`,
+    packageId,
+    residentId: packages[index].residentId,
+    actor: user.name,
+    role: user.role,
+    organization: user.orgName || "",
+    purpose: String(payload.purpose || "regional diagnosis data sharing").trim(),
+    decision,
+    status: decision === "approved" ? "completed" : "denied",
+    at: now,
+    note: String(payload.note || "").trim()
+  };
+  packages[index] = {
+    ...packages[index],
+    status: decision === "approved" ? normalizeRegionalSharingStatus({ ...packages[index], status: "ready" }) : packages[index].status,
+    lastSharedAt: decision === "approved" ? now : packages[index].lastSharedAt,
+    lastAccessReviewId: review.id
+  };
+  data.regionalSharingPackages = packages;
+  data.regionalSharingAccessReviews = [review, ...(Array.isArray(data.regionalSharingAccessReviews) ? data.regionalSharingAccessReviews : [])].slice(0, 200);
+  appendDataAccessLog(data, user, packages[index].residentId, "regionalDataSharing", review.purpose, decision === "approved" ? "允许" : "拒绝");
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "regional sharing access review",
+      target: packageId,
+      result: decision === "approved" ? "allowed" : "denied",
+      detail: review.purpose
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+  writeDatabase(data);
+  return { status: 201, body: { review, package: packages[index] } };
+}
+
 function personIndexFromParts(idCard, phone) {
   return `${String(idCard || "").trim()}#${String(phone || "").trim()}`;
 }
@@ -5775,6 +6539,27 @@ function canAccessMultiPracticeApplication(user, item) {
     [item.primaryInstitution, item.targetInstitution].includes(user.orgName);
 }
 
+function hasResidentAuthorization(data, residentId, authorizationId) {
+  const records = Array.isArray(data.personalRecords) ? data.personalRecords : [];
+  return records.some((record) =>
+    record.category === "authorizations" &&
+    record.residentId === residentId &&
+    (!authorizationId || record.id === authorizationId) &&
+    record.status !== "revoked" &&
+    record.meta?.status !== "revoked"
+  );
+}
+
+function canAccessReferralTeleconsultation(user, item, data) {
+  if (!canAccessResident(user, item.residentId, data)) return false;
+  if (user.role === "commission" || user.role === "county") return true;
+  if (user.role !== "institution") return false;
+  if (user.doctorId && ![item.applicantDoctor, item.receivingDoctor].includes(user.doctorId)) return false;
+  return [item.sourceInstitution, item.targetInstitution].some((name) => name && name === user.orgName) ||
+    [item.sourceInstitutionCode, item.targetInstitutionCode].some((code) => code && code === user.orgCode) ||
+    Boolean(user.doctorId && [item.applicantDoctor, item.receivingDoctor].includes(user.doctorId));
+}
+
 function redactSensitiveResponse(value, user) {
   if (!user || user.role === "commission") return value;
   return redactSensitiveValue(value);
@@ -5889,12 +6674,30 @@ function scopeStateForUser(data, user) {
   delete scoped.platformEvidence;
   delete scoped.productionDeploymentPlan;
   delete scoped.platformChangeLogs;
+  delete scoped.healthDashboardSnapshots;
   delete scoped.platformRoadmap;
   delete scoped.platformAudit;
   delete scoped.platformProcessAudit;
   delete scoped.applicationCatalog;
   delete scoped.institutionCreditEvaluations;
   delete scoped.securityAcceptanceLedger;
+  if (user.role !== "institution") {
+    delete scoped.regionalDataSharingScope;
+    delete scoped.regionalSharingPackages;
+    delete scoped.regionalSharingSnapshots;
+    delete scoped.regionalSharingAccessReviews;
+  } else {
+    scoped.regionalSharingPackages = (data.regionalSharingPackages || []).filter((item) => canAccessRegionalSharingPackage(user, item));
+    scoped.regionalSharingAccessReviews = (data.regionalSharingAccessReviews || []).filter((review) =>
+      scoped.regionalSharingPackages.some((item) => item.id === review.packageId)
+    );
+  }
+  delete scoped.qualitySafetyEvents;
+  delete scoped.criticalValueAlerts;
+  delete scoped.clinicalPathwayCases;
+  delete scoped.medicalRecordQualityReviews;
+  delete scoped.mutualRecognitionQualityReviews;
+  delete scoped.qualityRectificationOrders;
   delete scoped.hospitalOperationSnapshots;
   delete scoped.resourceDispatchRequests;
   delete scoped.statisticsReconciliationReviews;
@@ -5907,6 +6710,7 @@ function scopeStateForUser(data, user) {
       scoped.doctorProfiles = (data.doctorProfiles || []).filter((item) => item.id === user.doctorId);
       scoped.multiPracticeApplications = (data.multiPracticeApplications || []).filter((item) => item.doctorId === user.doctorId);
     }
+    scoped.referralTeleconsultations = (data.referralTeleconsultations || []).filter((item) => canAccessReferralTeleconsultation(user, item, data));
     if (scoped.mobileExperienceSettings) scoped.mobileExperienceSettings = { ...scoped.mobileExperienceSettings, userPreferences: undefined };
     return scoped;
   }
@@ -5925,7 +6729,7 @@ function scopeStateForUser(data, user) {
     const preferenceKey = user.residentId || user.accountId || user.username;
     scoped.mobileExperienceSettings = { ...scoped.mobileExperienceSettings, userPreferences: { [preferenceKey]: preferences[preferenceKey] || {} } };
   }
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "taskMessages"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "referralTeleconsultations", "taskMessages"].forEach((key) => {
     scoped[key] = (data[key] || []).filter(hasAllowedResident);
   });
   if (scoped.referralSystem) {
@@ -5966,6 +6770,200 @@ function buildMobileExperience(data, user) {
   };
 }
 
+function statusInPolicy(policy, group, status) {
+  return (policy?.statusGroups?.[group] || []).some((item) => String(status || "").includes(item) || String(item || "").includes(String(status || "")));
+}
+
+function latestRecord(records, residentId, category) {
+  return (records || [])
+    .filter((item) => item.residentId === residentId && (!category || item.category === category))
+    .sort((a, b) => String(b.date || b.createdAt || "").localeCompare(String(a.date || a.createdAt || "")))[0];
+}
+
+function medicationAdherenceForResident(data, residentId) {
+  const pickups = (data.medicationPickups || []).filter((item) => item.residentId === residentId);
+  const completed = pickups.filter((item) => /宸插畬鎴?|宸插彇鑽?|completed|picked/i.test(String(item.status || item.pharmacyStatus || ""))).length;
+  return {
+    total: pickups.length,
+    completed,
+    pending: pickups.length - completed,
+    rate: pickups.length ? Math.round((completed / pickups.length) * 100) : 0,
+    pickups
+  };
+}
+
+function buildChronicFollowupSummary(data, user, residentId = "") {
+  const scoped = scopeStateForUser(data, user);
+  const targetResidents = (scoped.residents || []).filter((resident) => !residentId || resident.id === residentId);
+  const policy = data.chronicFollowupStatusPolicy || seedChronicFollowupStatusPolicy();
+  const feedbackRecords = (scoped.personalRecords || []).filter((item) => item.category === "chronic-feedback");
+  const residents = targetResidents.map((resident) => {
+    const screenings = (scoped.chronicScreeningTasks || []).filter((item) => item.residentId === resident.id);
+    const plans = (scoped.chronicManagementPlans || []).filter((item) => item.residentId === resident.id);
+    const followups = (scoped.followups || []).filter((item) => item.residentId === resident.id);
+    const records = (scoped.personalRecords || []).filter((item) => item.residentId === resident.id);
+    const adherence = medicationAdherenceForResident(scoped, resident.id);
+    const latestFeedback = latestRecord(feedbackRecords, resident.id);
+    const openItems = [
+      ...screenings.filter((item) => !statusInPolicy(policy, "closed", item.status)),
+      ...plans.filter((item) => !statusInPolicy(policy, "closed", item.status)),
+      ...followups.filter((item) => !statusInPolicy(policy, "closed", item.status)),
+      ...adherence.pickups.filter((item) => !statusInPolicy(policy, "closed", item.status || item.pharmacyStatus))
+    ];
+    const highPriority = [
+      ...screenings,
+      ...plans,
+      ...followups
+    ].some((item) => statusInPolicy(policy, "escalated", item.status) || statusInPolicy(policy, "escalated", item.riskLevel || item.grade));
+    return {
+      residentId: resident.id,
+      residentName: resident.name,
+      organization: resident.organization,
+      familyDoctor: resident.familyDoctor,
+      riskLevel: highPriority ? "high" : openItems.length ? "medium" : "stable",
+      screeningTasks: screenings,
+      managementPlans: plans,
+      followups,
+      returnVisitReminders: followups.filter((item) => !statusInPolicy(policy, "closed", item.status)).map((item) => ({
+        id: item.id,
+        plannedAt: item.plannedAt,
+        assignee: item.assignee,
+        status: item.status,
+        advice: item.advice
+      })),
+      medicationAdherence: adherence,
+      familyDoctorCollaboration: {
+        doctor: resident.familyDoctor || plans[0]?.owner || followups[0]?.assignee || "",
+        openItems: openItems.length,
+        nextAction: openItems[0]?.nextStep || openItems[0]?.intervention || openItems[0]?.advice || "continue routine follow-up"
+      },
+      residentFeedback: {
+        latest: latestFeedback || null,
+        count: feedbackRecords.filter((item) => item.residentId === resident.id).length
+      },
+      archiveEvidence: {
+        authorizations: records.filter((item) => item.category === "authorizations").length,
+        emr: records.filter((item) => item.category === "emr").length,
+        labs: records.filter((item) => item.category === "labs").length
+      }
+    };
+  });
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    policy,
+    summary: {
+      residents: residents.length,
+      highPriority: residents.filter((item) => item.riskLevel === "high").length,
+      openFollowups: residents.reduce((sum, item) => sum + item.returnVisitReminders.length, 0),
+      medicationPending: residents.reduce((sum, item) => sum + item.medicationAdherence.pending, 0),
+      feedbackRecords: residents.reduce((sum, item) => sum + item.residentFeedback.count, 0)
+    },
+    residents
+  };
+}
+
+function normalizeChronicFeedback(payload, user) {
+  const residentId = String(payload.residentId || user.residentId || "").trim();
+  if (!residentId) throw new Error("residentId is required");
+  const now = new Date().toISOString();
+  return {
+    id: randomUUID(),
+    residentId,
+    category: "chronic-feedback",
+    date: String(payload.date || now.slice(0, 10)),
+    name: String(payload.name || "chronic follow-up feedback").trim(),
+    result: String(payload.result || payload.feedback || "").trim(),
+    source: String(payload.source || (user.role === "citizen" ? "resident portal" : "institution portal")).trim(),
+    meta: {
+      followupFeedback: true,
+      followupId: String(payload.followupId || "").trim(),
+      medicationTaken: payload.medicationTaken === undefined ? null : Boolean(payload.medicationTaken),
+      symptoms: String(payload.symptoms || "").trim(),
+      satisfaction: String(payload.satisfaction || "").trim(),
+      nextRequest: String(payload.nextRequest || "").trim(),
+      submittedBy: user.username || user.role,
+      submittedByName: user.name,
+      submittedAt: now
+    },
+    createdBy: user.username || user.role,
+    createdByName: user.name,
+    createdAt: now
+  };
+}
+
+function upsertChronicFeedback(data, user, payload) {
+  const feedback = normalizeChronicFeedback(payload, user);
+  if (!canAccessResident(user, feedback.residentId, data)) {
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "submit chronic feedback", target: feedback.residentId, result: "denied", detail: "resident scope denied" });
+    return { status: 403, body: { error: "Forbidden", message: "resident scope denied" } };
+  }
+  const residentMap = new Map((data.residents || []).map((resident) => [resident.id, resident]));
+  feedback.personIndex = personIndexForResident(residentMap, feedback.residentId);
+  data.personalRecords = [feedback, ...(Array.isArray(data.personalRecords) ? data.personalRecords : [])].slice(0, 500);
+  if (feedback.meta.followupId) {
+    const followup = (data.followups || []).find((item) => item.id === feedback.meta.followupId && item.residentId === feedback.residentId);
+    if (followup) {
+      followup.feedbackStatus = "received";
+      followup.feedbackSummary = feedback.result;
+      followup.medicationTaken = feedback.meta.medicationTaken;
+      followup.lastUpdated = feedback.createdAt;
+    }
+  }
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "submit chronic follow-up feedback",
+      target: feedback.residentId,
+      result: "allowed",
+      detail: feedback.name
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+  appendDataAccessLog(data, user, feedback.residentId, "chronic follow-up feedback", feedback.result || feedback.name);
+  writeDatabase(normalizeState(data));
+  return { status: 201, body: feedback };
+}
+
+function dispatchChronicFollowupAction(data, user, payload) {
+  const collection = String(payload.collection || "").trim();
+  const allowed = new Set(["chronicScreeningTasks", "chronicManagementPlans", "followups", "medicationPickups"]);
+  if (!allowed.has(collection)) return { status: 400, body: { error: "Bad Request", message: "unsupported chronic follow-up collection" } };
+  const rows = Array.isArray(data[collection]) ? data[collection] : [];
+  const item = rows.find((row) => row.id === payload.id);
+  if (!item) return { status: 404, body: { error: "Not Found", message: "business item not found" } };
+  if (!canAccessResident(user, item.residentId, data)) {
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "dispatch chronic follow-up", target: `${collection}/${payload.id}`, result: "denied", detail: "resident scope denied" });
+    return { status: 403, body: { error: "Forbidden", message: "resident scope denied" } };
+  }
+  Object.assign(item, cleanBusinessPatch(payload.updates));
+  if (payload.status) item.status = String(payload.status);
+  item.disposition = String(payload.disposition || item.disposition || "handled").trim();
+  item.dispositionNote = String(payload.note || item.dispositionNote || "").trim();
+  item.dispositionBy = user.username || user.role;
+  item.dispositionByName = user.name;
+  item.lastUpdated = new Date().toISOString();
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "dispatch chronic follow-up",
+      target: `${collection}/${item.id}`,
+      result: "allowed",
+      detail: item.dispositionNote || item.status || item.disposition
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+  appendDataAccessLog(data, user, item.residentId, "chronic follow-up disposition", item.dispositionNote || item.status || collection);
+  writeDatabase(data);
+  return { status: 200, body: item };
+}
+
 function appendSecurityEvent(event) {
   const data = readDatabase();
   data.securityEvents = [
@@ -5981,6 +6979,7 @@ function appendSecurityEvent(event) {
     },
     ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
   ].slice(0, 120);
+  data.securityEvents = sealAuditTrail(data.securityEvents, { recompute: true });
   writeDatabase(data);
 }
 
@@ -6000,6 +6999,7 @@ function appendDataAccessLog(data, user, residentId, scope, purpose, result = "�
     },
     ...(Array.isArray(data.dataAccessLogs) ? data.dataAccessLogs : [])
   ].slice(0, 120);
+  data.dataAccessLogs = sealAuditTrail(data.dataAccessLogs, { recompute: true });
 }
 
 function normalizeHealthStatisticsImportJob(payload, user) {
@@ -6179,6 +7179,7 @@ const TASK_SOURCES = [
   ["chronicEducationPushes", "institution", "宣教推送", "pushAt"],
   ["chronicManagementPlans", "institution", "慢病管理", "nextReview"],
   ["careOrders", "institution", "诊疗工单", "orderDate"],
+  ["referralTeleconsultations", ["institution", "county"], "referral teleconsultation", "due"],
   ["medicationPickups", "insurance", "固定取药", "nextPickup"],
   ["insuranceClaims", "insurance", "医保审核", "claimDate"],
   ["digitalCredentials", "insurance", "数字凭证", "lastUpdated"],
@@ -6203,7 +7204,8 @@ const SERVICE_DOMAIN_BY_COLLECTION = {
   countyCollaborationOrders: "collaboration",
   countyAiDiagnosisCases: "aiDiagnosis",
   countyMutualRecognitionRecords: "mutualRecognition",
-  diagnosticReports: "diagnosticReports"
+  diagnosticReports: "diagnosticReports",
+  referralTeleconsultations: "referralTeleconsultation"
 };
 
 function taskPriorityLevel(item) {
@@ -6232,7 +7234,11 @@ function buildUnifiedTasks(data, user) {
     const roles = Array.isArray(role) ? role : [role];
     if (user.role !== "commission" && !roles.includes(user.role)) return [];
     const rows = collection === "referrals" ? data.referralSystem?.referrals : data[collection];
-    return (Array.isArray(rows) ? rows : []).filter((item) => canAccessResident(user, item.residentId || item.maternalResidentId, data)).map((item) => {
+    return (Array.isArray(rows) ? rows : []).filter((item) =>
+      collection === "referralTeleconsultations"
+        ? canAccessReferralTeleconsultation(user, item, data)
+        : canAccessResident(user, item.residentId || item.maternalResidentId, data)
+    ).map((item) => {
       const task = {
         id: `${collection}:${item.id}`,
         collection,
@@ -6279,6 +7285,103 @@ function createTaskMessage({ task, payload, user }) {
     createdBy: user.username || user.role,
     createdByName: user.name
   };
+}
+
+function normalizeReferralTeleconsultation(payload, user, data) {
+  const residentId = String(payload.residentId || "").trim();
+  if (!residentId) throw new Error("residentId is required");
+  if (!canAccessResident(user, residentId, data)) throw new Error("resident scope denied");
+  const authorizationId = String(payload.residentAuthorizationId || "").trim();
+  if (!hasResidentAuthorization(data, residentId, authorizationId || undefined)) {
+    throw new Error("resident authorization is required before referral teleconsultation");
+  }
+  const now = new Date().toISOString();
+  const consultation = {
+    id: payload.id || `rtc-${randomUUID()}`,
+    referralId: String(payload.referralId || "").trim(),
+    residentId,
+    type: String(payload.type || "teleconsultation").trim(),
+    diseaseType: String(payload.diseaseType || "").trim(),
+    sourceInstitution: String(payload.sourceInstitution || user.orgName || "").trim(),
+    sourceInstitutionCode: String(payload.sourceInstitutionCode || user.orgCode || "").trim(),
+    targetInstitution: String(payload.targetInstitution || "").trim(),
+    targetInstitutionCode: String(payload.targetInstitutionCode || "").trim(),
+    department: String(payload.department || "").trim(),
+    applicantDoctor: String(payload.applicantDoctor || user.doctorId || user.username || "").trim(),
+    receivingDoctor: String(payload.receivingDoctor || "").trim(),
+    residentAuthorizationId: authorizationId,
+    authorizationStatus: "authorized",
+    status: normalizeReferralTeleconsultationStatus(payload.status || "requested"),
+    priority: String(payload.priority || "normal").trim(),
+    requestedAt: now,
+    due: String(payload.due || "").trim(),
+    meetingWindow: String(payload.meetingWindow || "").trim(),
+    clinicalQuestion: String(payload.clinicalQuestion || "").trim(),
+    materials: Array.isArray(payload.materials) ? payload.materials.map(String).filter(Boolean) : [],
+    receivingFeedback: "",
+    reportStatus: "pending-return",
+    reportReturnedAt: "",
+    reportSummary: "",
+    collaborationOrderId: String(payload.collaborationOrderId || "").trim(),
+    performance: { responseHours: 0, reportReturnHours: 0, satisfaction: "pending" },
+    auditTrail: [
+      { at: now, actor: user.username || user.role, action: "created", note: String(payload.note || "referral teleconsultation created").trim() }
+    ],
+    createdAt: now,
+    createdBy: user.username || user.role,
+    createdByName: user.name,
+    lastUpdated: now
+  };
+  if (!consultation.targetInstitution) throw new Error("targetInstitution is required");
+  return consultation;
+}
+
+function normalizeReferralTeleconsultationStatus(status) {
+  const value = String(status || "").trim().toLowerCase();
+  const aliases = {
+    request: "requested",
+    requested: "requested",
+    accept: "accepted",
+    accepted: "accepted",
+    scheduled: "scheduled",
+    feedback: "feedback-returned",
+    "feedback-returned": "feedback-returned",
+    report: "report-returned",
+    "report-returned": "report-returned",
+    closed: "closed",
+    cancel: "cancelled",
+    cancelled: "cancelled"
+  };
+  return aliases[value] || String(status || "requested").trim();
+}
+
+function applyReferralTeleconsultationAction(item, payload, user) {
+  const now = new Date().toISOString();
+  const action = String(payload.action || payload.status || "update").trim();
+  const updates = cleanWorkflowUpdates(payload.updates);
+  const nextStatus = normalizeReferralTeleconsultationStatus(payload.status || updates.status || item.status);
+  const next = {
+    ...item,
+    ...updates,
+    status: nextStatus,
+    lastUpdated: now,
+    updatedBy: user.username || user.role,
+    updatedByName: user.name
+  };
+  if (payload.feedback || updates.receivingFeedback) {
+    next.receivingFeedback = String(payload.feedback || updates.receivingFeedback).trim();
+    if (nextStatus === item.status) next.status = "feedback-returned";
+  }
+  if (payload.reportSummary || updates.reportSummary || next.status === "report-returned") {
+    next.reportStatus = "returned";
+    next.reportReturnedAt = now;
+    next.reportSummary = String(payload.reportSummary || updates.reportSummary || next.reportSummary || "").trim();
+  }
+  next.auditTrail = [
+    { at: now, actor: user.username || user.role, action, note: String(payload.note || next.status || "updated").trim() },
+    ...(Array.isArray(item.auditTrail) ? item.auditTrail : [])
+  ].slice(0, 40);
+  return next;
 }
 
 function buildDataQualityIssues(data) {
@@ -6345,6 +7448,147 @@ function buildDataQualityScorecard(data) {
     trustedSources,
     score: Math.max(0, 100 - issues.filter((issue) => issue.status !== "closed").length * 5)
   };
+}
+
+function normalizeQualitySafetyStatus(status) {
+  const text = String(status || "open").trim().toLowerCase();
+  if (/closed|resolved|approved|review_passed|completed|recognized/.test(text)) return "closed";
+  if (/feedback|submitted|review/.test(text)) return "reviewing";
+  if (/dispatch|in_progress|pending_disposition|variance_open/.test(text)) return "in_progress";
+  if (/reject|returned|overdue/.test(text)) return "returned";
+  return "open";
+}
+
+function qualitySafetyVisibleRows(rows, user) {
+  if (user.role === "commission") return rows;
+  if (user.role === "county") {
+    return rows.filter((item) => /county|regional|recognition/i.test(`${item.ownerRole || ""} ${item.sourceCollection || ""} ${item.type || ""} ${item.domain || ""}`));
+  }
+  if (user.role === "institution") {
+    return rows.filter((item) => ["institution", ""].includes(String(item.ownerRole || "")) || /hospital|community|institution/i.test(`${item.institutionName || ""}${item.owner || ""}`));
+  }
+  return [];
+}
+
+function buildQualitySafetyIssues(data) {
+  const eventRows = (Array.isArray(data.qualitySafetyEvents) ? data.qualitySafetyEvents : []).map((item) => ({
+    ...item,
+    sourceType: item.type || "quality_safety_event",
+    normalizedStatus: normalizeQualitySafetyStatus(item.status)
+  }));
+  const dataQualityRows = buildDataQualityIssues(data).map((issue) => ({
+    id: `qs-${issue.id}`,
+    domain: "data_quality",
+    type: issue.type || "data_quality_issue",
+    severity: issue.severity || "medium",
+    residentId: issue.residentId || "",
+    sourceCollection: "dataQualityIssues",
+    sourceId: issue.id,
+    title: issue.title || issue.type || "Data quality issue",
+    description: issue.comment || issue.nextAction || "",
+    status: issue.status || "open",
+    normalizedStatus: normalizeQualitySafetyStatus(issue.status),
+    ownerRole: issue.ownerRole || "commission",
+    owner: issue.owner || "Data quality steward"
+  }));
+  const creditRows = (Array.isArray(data.institutionCreditEvaluations) ? data.institutionCreditEvaluations : [])
+    .filter((item) => /rectification|整改|鏁存敼/i.test(`${item.status || ""}${item.next || ""}`))
+    .map((item) => ({
+      id: `qs-credit-${item.id}`,
+      domain: "institution_credit",
+      type: "credit_rectification",
+      severity: Number(item.score || 0) < 85 ? "medium" : "low",
+      institutionName: item.name,
+      sourceCollection: "institutionCreditEvaluations",
+      sourceId: item.id,
+      title: `Institution credit rectification: ${item.name}`,
+      description: item.next || "",
+      status: item.status || "open",
+      normalizedStatus: normalizeQualitySafetyStatus(item.status),
+      ownerRole: "commission",
+      owner: item.owner || ""
+    }));
+  const securityRows = highRiskSecurityEvents(data).slice(0, 20).map((item) => ({
+    id: `qs-security-${item.id}`,
+    domain: "security_audit",
+    type: "security_event",
+    severity: /denied|拒绝|鎷掔粷/i.test(`${item.result || ""}${item.detail || ""}`) ? "high" : "medium",
+    sourceCollection: "securityEvents",
+    sourceId: item.id,
+    title: `Security event: ${item.action || item.target || item.id}`,
+    description: item.detail || "",
+    status: "open",
+    normalizedStatus: "open",
+    ownerRole: "commission",
+    owner: item.actor || ""
+  }));
+  return [...eventRows, ...dataQualityRows, ...creditRows, ...securityRows];
+}
+
+function buildQualitySafetyDashboard(data, user) {
+  const issues = qualitySafetyVisibleRows(buildQualitySafetyIssues(data), user);
+  const rectifications = qualitySafetyVisibleRows(Array.isArray(data.qualityRectificationOrders) ? data.qualityRectificationOrders : [], user)
+    .map((item) => ({ ...item, normalizedStatus: normalizeQualitySafetyStatus(item.status) }));
+  const summary = {
+    issues: issues.length,
+    open: issues.filter((item) => item.normalizedStatus === "open").length,
+    inProgress: issues.filter((item) => item.normalizedStatus === "in_progress").length,
+    reviewing: issues.filter((item) => item.normalizedStatus === "reviewing").length,
+    closed: issues.filter((item) => item.normalizedStatus === "closed").length,
+    rectifications: rectifications.length,
+    criticalValues: Array.isArray(data.criticalValueAlerts) ? data.criticalValueAlerts.length : 0,
+    clinicalPathways: Array.isArray(data.clinicalPathwayCases) ? data.clinicalPathwayCases.length : 0,
+    medicalRecordReviews: Array.isArray(data.medicalRecordQualityReviews) ? data.medicalRecordQualityReviews.length : 0,
+    mutualRecognitionReviews: Array.isArray(data.mutualRecognitionQualityReviews) ? data.mutualRecognitionQualityReviews.length : 0
+  };
+  const reusableCollections = [
+    "diagnosticReports",
+    "countyMutualRecognitionRecords",
+    "dataQualityIssues",
+    "institutionCreditEvaluations",
+    "securityEvents",
+    "hospitalInteroperabilityFunctions"
+  ].map((collection) => ({
+    collection,
+    rows: Array.isArray(data[collection]) ? data[collection].length : 0,
+    reusedFor: {
+      diagnosticReports: "critical value and report quality signals",
+      countyMutualRecognitionRecords: "mutual recognition QC",
+      dataQualityIssues: "master-data issue dispatch",
+      institutionCreditEvaluations: "institution rectification context",
+      securityEvents: "audit trail and high-risk event evidence",
+      hospitalInteroperabilityFunctions: "HIS/EMR/LIS/PACS management boundary"
+    }[collection]
+  }));
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    role: user.role,
+    summary,
+    issues,
+    rectifications,
+    criticalValueAlerts: Array.isArray(data.criticalValueAlerts) ? data.criticalValueAlerts : [],
+    clinicalPathwayCases: Array.isArray(data.clinicalPathwayCases) ? data.clinicalPathwayCases : [],
+    medicalRecordQualityReviews: Array.isArray(data.medicalRecordQualityReviews) ? data.medicalRecordQualityReviews : [],
+    mutualRecognitionQualityReviews: Array.isArray(data.mutualRecognitionQualityReviews) ? data.mutualRecognitionQualityReviews : [],
+    reusedCollections: reusableCollections
+  };
+}
+
+function appendQualitySafetyAudit(data, user, action, target, detail) {
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action,
+      target,
+      result: "allowed",
+      detail
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
 }
 
 function buildComplianceReport(data) {
@@ -6444,6 +7688,107 @@ function buildConsortiumPerformanceReport(data) {
       completionRate: Math.round((tasks.filter((task) => isClosedTaskStatus(task.status)).length / totalTasks) * 100)
     }
   };
+}
+
+function drugConsumableStatus(value) {
+  const text = String(value || "").toLowerCase();
+  if (/closed|passed|complete|done|resolved|通过|完成/.test(text)) return "closed";
+  if (/reject|return|补正|整改|退回/.test(text)) return "remediation";
+  if (/pending|wait|待|初审|review/.test(text)) return "pending";
+  return text || "tracking";
+}
+
+function buildDrugConsumableSupervision(data) {
+  const supervisions = Array.isArray(data.drugConsumableSupervisions) ? data.drugConsumableSupervisions : seedDrugConsumableSupervisions();
+  const pickups = Array.isArray(data.medicationPickups) ? data.medicationPickups : [];
+  const claims = Array.isArray(data.insuranceClaims) ? data.insuranceClaims : [];
+  const institutionSupervisions = Array.isArray(data.institutionSupervisions) ? data.institutionSupervisions : [];
+  const contracts = Array.isArray(data.integrationContracts) ? data.integrationContracts : [];
+  const rows = supervisions.map((item) => {
+    const pickup = pickups.find((row) => row.id === item.relatedPickupId || row.id === item.sourceId);
+    const claim = claims.find((row) => row.id === item.relatedClaimId || row.id === item.sourceId);
+    const institutionIssue = institutionSupervisions.find((row) => row.id === item.sourceId || row.institution === item.institution);
+    return {
+      ...item,
+      normalizedStatus: drugConsumableStatus(item.status || item.reviewStatus || item.insuranceStatus),
+      pickup,
+      claim,
+      institutionIssue,
+      auditCount: Array.isArray(item.auditTrail) ? item.auditTrail.length : 0
+    };
+  });
+  const openRows = rows.filter((item) => item.normalizedStatus !== "closed");
+  const insuranceContract = contracts.find((item) => item.id === "insurance-settlement-v1");
+  return {
+    generatedAt: new Date().toISOString(),
+    boundaries: [
+      { id: "rational-medication", name: "Rational medication", source: "medicationPickups + personalRecords", count: rows.filter((item) => item.boundary === "rational-medication").length },
+      { id: "prescription-review", name: "Prescription and pharmacist review", source: "drugConsumableSupervisions.reviewStatus", count: rows.filter((item) => /review|rational/.test(item.boundary)).length },
+      { id: "fixed-pharmacy", name: "Fixed pickup", source: "medicationPickups", count: pickups.length },
+      { id: "consumable-clue", name: "High-value consumable clues", source: "institutionSupervisions + drugConsumableSupervisions", count: rows.filter((item) => item.boundary === "consumable-clue").length },
+      { id: "insurance-settlement", name: "Insurance settlement coordination", source: "insuranceClaims + integrationContracts", count: claims.length },
+      { id: "remediation-loop", name: "Remediation loop", source: "workflow-actions + securityEvents", count: rows.filter((item) => item.remediationStatus && item.remediationStatus !== "closed").length }
+    ],
+    summary: {
+      total: rows.length,
+      open: openRows.length,
+      highRisk: rows.filter((item) => item.riskLevel === "high").length,
+      pendingInsurance: rows.filter((item) => drugConsumableStatus(item.insuranceStatus) === "pending").length,
+      fixedPickup: pickups.length,
+      claims: claims.length,
+      contractReady: Boolean(insuranceContract?.status === "ready" && insuranceContract.signature && insuranceContract.retryPolicy)
+    },
+    rows,
+    insuranceCoordination: {
+      contractId: insuranceContract?.id || "",
+      status: insuranceContract?.status || "missing",
+      requiredFields: insuranceContract?.requiredFields || [],
+      claimIds: claims.map((item) => item.id),
+      openClaimIds: claims.filter((item) => drugConsumableStatus(item.status) !== "closed").map((item) => item.id)
+    }
+  };
+}
+
+function updateDrugConsumableSupervision(data, id, patch, user, action) {
+  data.drugConsumableSupervisions = Array.isArray(data.drugConsumableSupervisions) ? data.drugConsumableSupervisions : seedDrugConsumableSupervisions();
+  const index = data.drugConsumableSupervisions.findIndex((item) => item.id === id);
+  if (index < 0) return { status: 404, body: { error: "Not Found", message: "drug consumable supervision not found" } };
+  const current = data.drugConsumableSupervisions[index];
+  if (!canAccessResident(user, current.residentId, data)) {
+    appendSecurityEvent({ actor: user.name, role: user.role, action, target: `drugConsumableSupervisions/${id}`, result: "denied", detail: "resident scope denied" });
+    return { status: 403, body: { error: "Forbidden", message: "resident scope denied" } };
+  }
+  const safePatch = cleanBusinessPatch(patch);
+  const event = {
+    at: new Date().toISOString(),
+    actor: user.name,
+    role: user.role,
+    action,
+    result: safePatch.status || safePatch.reviewStatus || safePatch.remediationStatus || "updated"
+  };
+  data.drugConsumableSupervisions[index] = {
+    ...current,
+    ...safePatch,
+    auditTrail: [event, ...(Array.isArray(current.auditTrail) ? current.auditTrail : [])].slice(0, 20),
+    updatedBy: user.username || user.role,
+    updatedByName: user.name,
+    lastUpdated: new Date().toISOString()
+  };
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action,
+      target: `drugConsumableSupervisions/${id}`,
+      result: "allowed",
+      detail: safePatch.nextAction || safePatch.status || "drug consumable supervision updated"
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+  writeDatabase(data);
+  return { status: 200, body: data.drugConsumableSupervisions[index] };
 }
 
 function buildCountyAcceptanceLedger(data) {
@@ -6855,6 +8200,26 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/health-dashboard/summary") {
+    const user = requireApiRole(req, res, ["commission"], "/api/health-dashboard/summary");
+    if (!user) return;
+    const data = readDatabase();
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "health-dashboard-summary",
+      target: "/api/health-dashboard/summary",
+      result: "allowed",
+      detail: "Commission dashboard aggregate summary read."
+    });
+    sendJson(res, 200, buildHealthDashboardSummary({
+      data,
+      runtime: buildRuntimeMetrics(data),
+      readiness: buildSystemReadinessReport(data)
+    }));
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/process-audit") {
     const user = requireApiRole(req, res, ["commission"], "/api/process-audit");
     if (!user) return;
@@ -7236,6 +8601,58 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/drug-consumable-supervision") {
+    const user = requireApiRole(req, res, ["commission", "insurance", "institution"], "/api/drug-consumable-supervision");
+    if (!user) return;
+    sendJson(res, 200, redactSensitiveResponse(buildDrugConsumableSupervision(scopeStateForUser(readDatabase(), user)), user));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname.startsWith("/api/drug-consumable-supervision/") && url.pathname.endsWith("/review")) {
+    const user = requireApiRole(req, res, ["commission", "insurance"], "/api/drug-consumable-supervision/:id/review");
+    if (!user) return;
+    const id = decodeURIComponent(url.pathname.replace("/api/drug-consumable-supervision/", "").replace("/review", ""));
+    const payload = await collectJson(req);
+    const result = updateDrugConsumableSupervision(readDatabase(), id, {
+      reviewStatus: String(payload.reviewStatus || payload.status || "reviewed"),
+      insuranceStatus: String(payload.insuranceStatus || "coordinating"),
+      status: String(payload.status || "in-review"),
+      nextAction: String(payload.nextAction || payload.note || "Continue insurance and institution coordination.")
+    }, user, "drug-consumable-review");
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname.startsWith("/api/drug-consumable-supervision/") && url.pathname.endsWith("/remediation")) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/drug-consumable-supervision/:id/remediation");
+    if (!user) return;
+    const id = decodeURIComponent(url.pathname.replace("/api/drug-consumable-supervision/", "").replace("/remediation", ""));
+    const payload = await collectJson(req);
+    const result = updateDrugConsumableSupervision(readDatabase(), id, {
+      remediationStatus: String(payload.remediationStatus || payload.status || "submitted"),
+      status: String(payload.status || "remediation-submitted"),
+      evidence: String(payload.evidence || ""),
+      nextAction: String(payload.nextAction || payload.note || "Regulator reviews remediation evidence.")
+    }, user, "drug-consumable-remediation");
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname.startsWith("/api/drug-consumable-supervision/") && url.pathname.endsWith("/insurance-sync")) {
+    const user = requireApiRole(req, res, ["commission", "insurance"], "/api/drug-consumable-supervision/:id/insurance-sync");
+    if (!user) return;
+    const id = decodeURIComponent(url.pathname.replace("/api/drug-consumable-supervision/", "").replace("/insurance-sync", ""));
+    const payload = await collectJson(req);
+    const result = updateDrugConsumableSupervision(readDatabase(), id, {
+      insuranceStatus: String(payload.insuranceStatus || "synced"),
+      settlementBatch: String(payload.settlementBatch || "demo-batch"),
+      status: String(payload.status || "insurance-synced"),
+      nextAction: String(payload.nextAction || payload.note || "Archive settlement coordination evidence.")
+    }, user, "drug-consumable-insurance-sync");
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/service-acceptance-summary") {
     const user = requireApiRole(req, res, ["commission"], "/api/service-acceptance-summary");
     if (!user) return;
@@ -7433,6 +8850,110 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/regional-data-sharing") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/regional-data-sharing");
+    if (!user) return;
+    sendJson(res, 200, redactSensitiveResponse(buildRegionalDataSharingView(readDatabase(), user), user));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/regional-data-sharing/access-reviews") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/regional-data-sharing/access-reviews");
+    if (!user) return;
+    const result = createRegionalSharingAccessReview(readDatabase(), await collectJson(req), user);
+    sendJson(res, result.status, redactSensitiveResponse(result.body, user));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/referral-teleconsultations") {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/referral-teleconsultations");
+    if (!user) return;
+    const data = readDatabase();
+    const rows = (Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [])
+      .filter((item) => canAccessReferralTeleconsultation(user, item, data));
+    sendJson(res, 200, {
+      teleconsultations: rows,
+      summary: {
+        total: rows.length,
+        pending: rows.filter((item) => !isClosedTaskStatus(item.status) && item.reportStatus !== "returned").length,
+        reportReturned: rows.filter((item) => item.reportStatus === "returned" || item.status === "report-returned").length
+      }
+    });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/referral-teleconsultations") {
+    const user = requireApiRole(req, res, ["institution", "county", "commission"], "/api/referral-teleconsultations");
+    if (!user) return;
+    const data = readDatabase();
+    try {
+      const consultation = normalizeReferralTeleconsultation(await collectJson(req), user, data);
+      if (!canAccessReferralTeleconsultation(user, consultation, data)) {
+        appendSecurityEvent({ actor: user.name, role: user.role, action: "create referral teleconsultation", target: consultation.residentId, result: "denied", detail: "organization scope denied" });
+        sendJson(res, 403, { error: "Forbidden", message: "organization scope denied" });
+        return;
+      }
+      data.referralTeleconsultations = [consultation, ...(Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [])].slice(0, 300);
+      data.securityEvents = [
+        {
+          id: randomUUID(),
+          at: new Date().toLocaleString("zh-CN", { hour12: false }),
+          actor: user.name,
+          role: user.role,
+          action: "create referral teleconsultation",
+          target: consultation.id,
+          result: "allowed",
+          detail: `${consultation.sourceInstitution} -> ${consultation.targetInstitution}`
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120);
+      appendDataAccessLog(data, user, consultation.residentId, "referral teleconsultation", "create teleconsultation with resident authorization", "allowed");
+      writeDatabase(data);
+      sendJson(res, 201, consultation);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+    }
+    return;
+  }
+
+  const teleconsultationActionMatch = url.pathname.match(/^\/api\/referral-teleconsultations\/([^/]+)\/actions$/);
+  if (req.method === "POST" && teleconsultationActionMatch) {
+    const user = requireApiRole(req, res, ["institution", "county", "commission"], "/api/referral-teleconsultations/:id/actions");
+    if (!user) return;
+    const data = readDatabase();
+    const rows = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
+    const index = rows.findIndex((item) => item.id === decodeURIComponent(teleconsultationActionMatch[1]));
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "referral teleconsultation not found" });
+      return;
+    }
+    if (!canAccessReferralTeleconsultation(user, rows[index], data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "update referral teleconsultation", target: rows[index].id, result: "denied", detail: "scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
+      return;
+    }
+    const payload = await collectJson(req);
+    rows[index] = applyReferralTeleconsultationAction(rows[index], payload, user);
+    data.referralTeleconsultations = rows;
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "update referral teleconsultation",
+        target: rows[index].id,
+        result: "allowed",
+        detail: rows[index].status
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    appendDataAccessLog(data, user, rows[index].residentId, "referral teleconsultation", payload.note || rows[index].status, "allowed");
+    writeDatabase(data);
+    sendJson(res, 200, rows[index]);
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/tasks") {
     const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/tasks");
     if (!user) return;
@@ -7516,6 +9037,138 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/quality-safety/dashboard") {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/quality-safety/dashboard");
+    if (!user) return;
+    sendJson(res, 200, buildQualitySafetyDashboard(readDatabase(), user));
+    return;
+  }
+
+  const qualityDispatchMatch = url.pathname.match(/^\/api\/quality-safety\/issues\/([^/]+)\/dispatch$/);
+  if (req.method === "POST" && qualityDispatchMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/quality-safety/issues/:id/dispatch");
+    if (!user) return;
+    const data = readDatabase();
+    const issueId = decodeURIComponent(qualityDispatchMatch[1]);
+    const issue = buildQualitySafetyIssues(data).find((item) => item.id === issueId || item.sourceId === issueId);
+    if (!issue) {
+      sendJson(res, 404, { error: "Not Found", message: "Quality safety issue not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const now = new Date().toISOString();
+    const order = {
+      id: `qro-${randomUUID()}`,
+      issueId: issue.id,
+      sourceType: issue.type || issue.sourceType || "quality_safety_issue",
+      institutionName: String(payload.institutionName || issue.institutionName || issue.owner || "site-pending").trim(),
+      ownerRole: String(payload.ownerRole || issue.ownerRole || "institution").trim(),
+      owner: String(payload.owner || issue.owner || user.name || "").trim(),
+      requirement: String(payload.requirement || issue.description || issue.title || "Complete quality-safety rectification.").trim(),
+      status: "dispatched",
+      dispatchedAt: now,
+      dueAt: String(payload.dueAt || issue.dueAt || "").trim(),
+      feedback: [],
+      review: [],
+      auditTrail: [{ at: now, by: user.username || user.role, action: "dispatch", note: String(payload.comment || "").trim() }]
+    };
+    data.qualityRectificationOrders = [order, ...(Array.isArray(data.qualityRectificationOrders) ? data.qualityRectificationOrders : [])].slice(0, 300);
+    data.qualitySafetyEvents = (Array.isArray(data.qualitySafetyEvents) ? data.qualitySafetyEvents : []).map((item) => item.id === issue.sourceId || item.id === issue.id ? {
+      ...item,
+      status: "dispatched",
+      rectificationOrderId: order.id,
+      auditTrail: [{ at: now, by: user.username || user.role, action: "dispatch", note: order.requirement }, ...(item.auditTrail || [])].slice(0, 50)
+    } : item);
+    appendQualitySafetyAudit(data, user, "quality-safety dispatch", issue.id, order.requirement);
+    writeDatabase(data);
+    sendJson(res, 201, order);
+    return;
+  }
+
+  const qualityFeedbackMatch = url.pathname.match(/^\/api\/quality-safety\/rectifications\/([^/]+)\/feedback$/);
+  if (req.method === "POST" && qualityFeedbackMatch) {
+    const user = requireApiRole(req, res, ["institution", "county", "commission"], "/api/quality-safety/rectifications/:id/feedback");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(qualityFeedbackMatch[1]);
+    const orders = Array.isArray(data.qualityRectificationOrders) ? data.qualityRectificationOrders : [];
+    const index = orders.findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Quality rectification order not found" });
+      return;
+    }
+    if (user.role !== "commission" && ![user.role, ""].includes(String(orders[index].ownerRole || ""))) {
+      sendJson(res, 403, { error: "Forbidden", message: "Current role cannot submit this rectification feedback" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const now = new Date().toISOString();
+    const feedback = {
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      content: String(payload.content || payload.feedback || "").trim(),
+      attachments: Array.isArray(payload.attachments) ? payload.attachments.map((item) => String(item).trim()).filter(Boolean) : []
+    };
+    orders[index] = {
+      ...orders[index],
+      status: "feedback_submitted",
+      feedback: [feedback, ...(orders[index].feedback || [])].slice(0, 50),
+      auditTrail: [{ at: now, by: user.username || user.role, action: "feedback", note: feedback.content }, ...(orders[index].auditTrail || [])].slice(0, 50)
+    };
+    data.qualityRectificationOrders = orders;
+    appendQualitySafetyAudit(data, user, "quality-safety feedback", id, feedback.content);
+    writeDatabase(data);
+    sendJson(res, 200, orders[index]);
+    return;
+  }
+
+  const qualityReviewMatch = url.pathname.match(/^\/api\/quality-safety\/rectifications\/([^/]+)\/review$/);
+  if (req.method === "POST" && qualityReviewMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/quality-safety/rectifications/:id/review");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(qualityReviewMatch[1]);
+    const orders = Array.isArray(data.qualityRectificationOrders) ? data.qualityRectificationOrders : [];
+    const index = orders.findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Quality rectification order not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const decision = String(payload.decision || "approved").trim();
+    if (!["approved", "returned", "closed"].includes(decision)) {
+      sendJson(res, 400, { error: "Bad Request", message: "decision must be approved, returned or closed" });
+      return;
+    }
+    const now = new Date().toISOString();
+    const review = {
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      decision,
+      comment: String(payload.comment || "").trim()
+    };
+    const status = decision === "returned" ? "returned" : "closed";
+    orders[index] = {
+      ...orders[index],
+      status,
+      review: [review, ...(orders[index].review || [])].slice(0, 50),
+      auditTrail: [{ at: now, by: user.username || user.role, action: "review", note: `${decision}: ${review.comment}` }, ...(orders[index].auditTrail || [])].slice(0, 50)
+    };
+    data.qualityRectificationOrders = orders;
+    data.qualitySafetyEvents = (Array.isArray(data.qualitySafetyEvents) ? data.qualitySafetyEvents : []).map((item) => item.id === orders[index].issueId ? {
+      ...item,
+      status,
+      reviewedAt: now,
+      reviewedBy: user.username || user.role
+    } : item);
+    appendQualitySafetyAudit(data, user, "quality-safety review", id, `${decision}: ${review.comment}`);
+    writeDatabase(data);
+    sendJson(res, 200, orders[index]);
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/credit-evaluations/calculate") {
     const user = requireApiRole(req, res, ["commission"], "/api/credit-evaluations/calculate");
     if (!user) return;
@@ -7552,10 +9205,70 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/chronic/followup-summary") {
+    const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/chronic/followup-summary");
+    if (!user) return;
+    const data = readDatabase();
+    const residentId = url.searchParams.get("residentId") || "";
+    if (residentId && !canAccessResident(user, residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "read chronic follow-up summary", target: residentId, result: "denied", detail: "resident scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "resident scope denied" });
+      return;
+    }
+    sendJson(res, 200, redactSensitiveResponse(buildChronicFollowupSummary(data, user, residentId), user));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/chronic/followup-feedback") {
+    const user = requireApiRole(req, res, ["citizen", "institution", "commission"], "/api/chronic/followup-feedback");
+    if (!user) return;
+    let result;
+    try {
+      result = upsertChronicFeedback(readDatabase(), user, await collectJson(req));
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    sendJson(res, result.status, redactSensitiveResponse(result.body, user));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/chronic/followup-dispatch") {
+    const user = requireApiRole(req, res, ["institution", "commission"], "/api/chronic/followup-dispatch");
+    if (!user) return;
+    const result = dispatchChronicFollowupAction(readDatabase(), user, await collectJson(req));
+    sendJson(res, result.status, redactSensitiveResponse(result.body, user));
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/research/datasets") {
     const user = requireApiRole(req, res, ["commission"], "/api/research/datasets");
     if (!user) return;
     sendJson(res, 200, { datasets: readDatabase().researchDatasets || [] });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/research/sandbox") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/sandbox");
+    if (!user) return;
+    sendJson(res, 200, buildResearchSandboxSummary(readDatabase()));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/research/datasets") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/datasets");
+    if (!user) return;
+    const data = readDatabase();
+    try {
+      const payload = await collectJson(req);
+      const dataset = normalizeResearchDatasetApplication(payload, user, data);
+      data.researchDatasets = [dataset, ...(Array.isArray(data.researchDatasets) ? data.researchDatasets : [])].slice(0, 80);
+      appendResearchAudit(data, user, dataset, "application-submit", dataset.accessRequests[0].purpose, "submitted");
+      writeDatabase(data);
+      sendJson(res, 201, dataset);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+    }
     return;
   }
 
@@ -7690,6 +9403,91 @@ async function handleApi(req, res) {
       updatedAt: now,
       updatedBy: user.username || user.role
     };
+    writeDatabase(data);
+    sendJson(res, 200, data.researchDatasets[index]);
+    return;
+  }
+
+  const researchDatasetApprovalMatch = url.pathname.match(/^\/api\/research\/datasets\/([^/]+)\/approval$/);
+  if (req.method === "POST" && researchDatasetApprovalMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/research/datasets/:id/approval");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(researchDatasetApprovalMatch[1]);
+    const index = (data.researchDatasets || []).findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Research dataset not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    data.researchDatasets[index] = normalizeResearchApproval(data.researchDatasets[index], payload, user);
+    appendResearchAudit(data, user, data.researchDatasets[index], "ethics-approval", data.researchDatasets[index].approval?.decision || "approved");
+    writeDatabase(data);
+    sendJson(res, 200, data.researchDatasets[index]);
+    return;
+  }
+
+  const researchSandboxAccessMatch = url.pathname.match(/^\/api\/research\/datasets\/([^/]+)\/sandbox-access$/);
+  if (req.method === "POST" && researchSandboxAccessMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/datasets/:id/sandbox-access");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(researchSandboxAccessMatch[1]);
+    const index = (data.researchDatasets || []).findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Research dataset not found" });
+      return;
+    }
+    if (!requireDatasetSandboxAccess(data.researchDatasets[index])) {
+      appendResearchAudit(data, user, data.researchDatasets[index], "sandbox-access", "blocked by ethics/de-identification/authorization status", "denied");
+      writeDatabase(data);
+      sendJson(res, 403, { error: "Forbidden", message: "Dataset is not approved, de-identified, and active for sandbox access" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const purpose = String(payload.purpose || "approved sandbox analysis").trim();
+    data.researchDatasets[index].sandbox = {
+      ...(data.researchDatasets[index].sandbox || {}),
+      status: "active",
+      lastAccessAt: new Date().toISOString(),
+      lastAccessBy: user.username || user.role
+    };
+    appendResearchAudit(data, user, data.researchDatasets[index], "sandbox-access", purpose);
+    writeDatabase(data);
+    sendJson(res, 200, {
+      datasetId: id,
+      sandboxToken: `sandbox-${id}-${Date.now()}`,
+      deidentified: true,
+      records: data.researchDatasets[index].records || 0,
+      sourceCollections: data.researchDatasets[index].sourceCollections || [],
+      expiresInMinutes: 120
+    });
+    return;
+  }
+
+  const researchOutcomeMatch = url.pathname.match(/^\/api\/research\/datasets\/([^/]+)\/outcomes$/);
+  if (req.method === "POST" && researchOutcomeMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/datasets/:id/outcomes");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(researchOutcomeMatch[1]);
+    const index = (data.researchDatasets || []).findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Research dataset not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const now = new Date().toISOString();
+    const outcome = {
+      at: now,
+      by: user.username || user.role,
+      title: String(payload.title || "research outcome").trim(),
+      summary: String(payload.summary || "").trim(),
+      registryImpact: String(payload.registryImpact || "").trim(),
+      returnedTo: Array.isArray(payload.returnedTo) ? payload.returnedTo.map((item) => String(item).trim()).filter(Boolean) : ["diseaseRegistryModels"]
+    };
+    data.researchDatasets[index].outcomes = [outcome, ...(Array.isArray(data.researchDatasets[index].outcomes) ? data.researchDatasets[index].outcomes : [])].slice(0, 50);
+    appendResearchAudit(data, user, data.researchDatasets[index], "outcome-return", outcome.title);
     writeDatabase(data);
     sendJson(res, 200, data.researchDatasets[index]);
     return;
@@ -8842,12 +10640,21 @@ async function handleApi(req, res) {
       sendJson(res, 403, { error: "Forbidden", message: "无权更新该多点执业记录" });
       return;
     }
+    if (collection === "referralTeleconsultations" && !canAccessReferralTeleconsultation(user, item, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "update referral teleconsultation", target: `${collection}/${payload.id}`, result: "denied", detail: "scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
+      return;
+    }
     if (!canAccessResident(user, item.residentId, data)) {
       appendSecurityEvent({ actor: user.name, role: user.role, action: "更新业务闭环", target: `${collection}/${payload.id}`, result: "拒绝", detail: "超出居民授权范围" });
       sendJson(res, 403, { error: "Forbidden", message: "无权更新该居民业务记录" });
       return;
     }
-    Object.assign(item, cleanWorkflowUpdates(payload.updates));
+    if (collection === "referralTeleconsultations") {
+      Object.assign(item, applyReferralTeleconsultationAction(item, payload, user));
+    } else {
+      Object.assign(item, cleanWorkflowUpdates(payload.updates));
+    }
     if (payload.status) item.status = String(payload.status);
     item.lastUpdated = new Date().toISOString();
     data.securityEvents = [

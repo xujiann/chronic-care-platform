@@ -3,9 +3,12 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { buildAuditRetentionReport, renderMarkdown: renderAuditRetentionMarkdown } = require("./audit-retention");
+const { buildChronicFollowupReadinessReport, renderMarkdown: renderChronicFollowupMarkdown } = require("./chronic-followup-readiness");
 const { buildDataQualityReport, renderMarkdown: renderDataQualityMarkdown } = require("./data-quality-report");
+const { buildDrugConsumableReadinessReport, renderMarkdown: renderDrugConsumableMarkdown } = require("./drug-consumable-readiness");
 const { buildEvaluationEvidenceReport, renderMarkdown: renderEvaluationEvidenceMarkdown } = require("./evaluation-evidence");
 const { buildEnvironmentMatrixReport, renderMarkdown: renderEnvironmentMatrixMarkdown } = require("./environment-matrix");
+const { buildHealthDashboardSummary, renderMarkdown: renderHealthDashboardMarkdown } = require("./health-dashboard-summary");
 const { buildIdentityContract, renderMarkdown: renderIdentityContractMarkdown } = require("./identity-contract");
 const { buildIntegrationReadinessReport, renderMarkdown: renderIntegrationReadinessMarkdown } = require("./integration-readiness");
 const { buildInterfaceMappingReport, renderMarkdown: renderInterfaceMappingMarkdown } = require("./interface-mapping");
@@ -16,7 +19,11 @@ const { buildMonitoringReadinessReport, renderMarkdown: renderMonitoringReadines
 const { buildOperationsReadinessReport, renderMarkdown: renderOperationsReadinessMarkdown } = require("./operations-readiness");
 const { buildProcessAuditReport, renderMarkdown: renderProcessAuditMarkdown } = require("./process-audit");
 const { buildProductionDbReadinessReport, renderMarkdown: renderProductionDbReadinessMarkdown } = require("./production-db-readiness");
+const { buildRegionalDataSharingReport, renderMarkdown: renderRegionalDataSharingMarkdown } = require("./regional-data-sharing");
+const { buildQualitySafetyReport, renderMarkdown: renderQualitySafetyMarkdown } = require("./quality-safety-report");
 const { buildReleaseArtifactManifest, renderMarkdown: renderReleaseArtifactManifestMarkdown } = require("./release-artifact-manifest");
+const { buildReferralTeleconsultationReadinessReport, renderMarkdown: renderReferralTeleconsultationReadinessMarkdown } = require("./referral-teleconsultation-readiness");
+const { buildResearchSandboxReadiness, renderMarkdown: renderResearchSandboxMarkdown } = require("./research-sandbox-readiness");
 const { buildSiteReadinessPack, renderMarkdown: renderSiteReadinessMarkdown, writeTemplateReadmes } = require("./site-readiness-pack");
 const { inspectStorageModel } = require("./storage-admin");
 
@@ -214,8 +221,16 @@ function snapshotChecks(data) {
     "institutionCreditEvaluations",
     "researchDatasets",
     "diseaseRegistryModels",
+    "qualitySafetyEvents",
+    "qualityRectificationOrders",
+    "dataAccessLogs",
     "accessibilityChecklist",
-    "securityAcceptanceLedger"
+    "regionalDataSharingScope",
+    "regionalSharingPackages",
+    "regionalSharingSnapshots",
+    "regionalSharingAccessReviews",
+    "securityAcceptanceLedger",
+    "healthDashboardSnapshots"
   ];
   const raw = fs.readFileSync(path.join(ROOT, "data", "db.json"), "utf8");
   const p2 = (data.platformRoadmap || []).filter((item) => item.priority === "P2");
@@ -241,9 +256,11 @@ function snapshotChecks(data) {
     check("snapshot:securityAcceptance", securityAcceptanceLedger.length >= 4 && securityAcceptanceLedger.every((item) => item.id && item.category && item.owner && item.status && item.next), `${securityAcceptanceLedger.length} security acceptance items`, "error", "snapshot"),
     check("snapshot:productionDeploymentPlan", productionDeploymentPlan.length >= 4 && productionDeploymentPlan.every((item) => item.id && item.owner && item.nextAction), `${productionDeploymentPlan.length} deployment tracks`, "error", "snapshot"),
     check("snapshot:interfaceReadiness", p0Interfaces.length >= 4 && p0Interfaces.every((item) => item.id && item.owner && item.status && item.next), `${p0Interfaces.length} P0 interface tracks`, "error", "snapshot"),
+    check("snapshot:researchSandbox", (data.researchDatasets || []).some((item) => item.authorizationStatus === "approved" && (item.deidentificationStatus === "released" || item.anonymization) && (item.sandbox?.status === "active" || item.status === "published")) && (data.dataAccessLogs || []).some((item) => /research|科研|数据集|沙箱/i.test(`${item.scope || ""} ${item.purpose || ""}`)), `${data.researchDatasets?.length || 0} datasets / ${data.dataAccessLogs?.length || 0} audit logs`, "error", "snapshot"),
     check("snapshot:externalDependencyRisks", externalDependencyRiskIds.every((id) => serverSource.includes(id)), `${externalDependencyRiskIds.length} external dependency risks`, "error", "snapshot"),
     check("snapshot:noCorruptedPlaceholders", !/编码损坏|缂栫爜鎹熷潖|\?\?\?/.test(raw), "no known corrupted placeholders", "error", "snapshot"),
-    check("snapshot:accessibility", Array.isArray(data.accessibilityChecklist) && data.accessibilityChecklist.length >= 5, `${data.accessibilityChecklist?.length || 0} checklist items`, "error", "snapshot")
+    check("snapshot:accessibility", Array.isArray(data.accessibilityChecklist) && data.accessibilityChecklist.length >= 5, `${data.accessibilityChecklist?.length || 0} checklist items`, "error", "snapshot"),
+    check("snapshot:healthDashboard", Array.isArray(data.healthDashboardSnapshots) && data.healthDashboardSnapshots.some((item) => Array.isArray(item.sourceApplications) && item.sourceApplications.length === 7), `${data.healthDashboardSnapshots?.length || 0} dashboard snapshots`, "error", "snapshot")
   ];
 }
 
@@ -274,6 +291,14 @@ function auditRetentionChecks(auditRetention) {
   ];
 }
 
+function chronicFollowupChecks(chronicFollowup) {
+  return [
+    check("chronicFollowup:readiness", chronicFollowup.ok, chronicFollowup.ok ? "chronic follow-up readiness checks passed" : "chronic follow-up readiness checks failed", "error", "chronic-followup"),
+    check("chronicFollowup:boundaries", chronicFollowup.summary?.passed === chronicFollowup.summary?.boundaries, `${chronicFollowup.summary?.passed || 0}/${chronicFollowup.summary?.boundaries || 0} boundaries`, "error", "chronic-followup"),
+    check("chronicFollowup:feedback", chronicFollowup.summary?.feedbackRecords >= 1, `${chronicFollowup.summary?.feedbackRecords || 0} feedback records`, "error", "chronic-followup")
+  ];
+}
+
 function integrationReadinessChecks(integrationReadiness) {
   return [
     check("integration:readiness", integrationReadiness.ok, integrationReadiness.ok ? "integration readiness checks passed" : "integration readiness checks failed", "error", "integration"),
@@ -287,6 +312,23 @@ function interfaceMappingChecks(interfaceMapping) {
     check("interfaceMapping:report", interfaceMapping.ok, interfaceMapping.ok ? "interface field mappings passed" : "interface field mappings failed", "error", "integration"),
     check("interfaceMapping:requiredFields", interfaceMapping.mappings?.every((item) => item.fieldCoverage?.every((field) => field.mapped)), `${interfaceMapping.contractCount || 0} contracts mapped`, "error", "integration"),
     check("interfaceMapping:idempotency", interfaceMapping.mappings?.every((item) => item.idempotencyMapped), "idempotency keys mapped to platform fields", "error", "integration")
+  ];
+}
+
+function regionalDataSharingChecks(regionalDataSharing) {
+  return [
+    check("regionalDataSharing:report", regionalDataSharing.ok, regionalDataSharing.ok ? "regional data sharing checks passed" : "regional data sharing checks failed", "error", "regional-data-sharing"),
+    check("regionalDataSharing:packages", regionalDataSharing.summary?.packages >= 3, `${regionalDataSharing.summary?.packages || 0} packages`, "error", "regional-data-sharing"),
+    check("regionalDataSharing:accessReviews", regionalDataSharing.summary?.accessReviews >= 1, `${regionalDataSharing.summary?.accessReviews || 0} access reviews`, "error", "regional-data-sharing")
+  ];
+}
+
+function researchSandboxChecks(researchSandbox) {
+  return [
+    check("researchSandbox:readiness", researchSandbox.ok, researchSandbox.ok ? "research sandbox checks passed" : "research sandbox checks failed", "error", "research"),
+    check("researchSandbox:boundaries", researchSandbox.boundaries?.length >= 7, `${researchSandbox.boundaries?.length || 0} research boundaries`, "error", "research"),
+    check("researchSandbox:reusedCollections", ["researchDatasets", "diseaseRegistryModels", "dataAccessLogs", "securityAcceptanceLedger", "personalRecords", "diagnosticReports"].every((key) => researchSandbox.reusableCollections?.includes(key)), "required reusable collections mapped", "error", "research"),
+    check("researchSandbox:sandboxReady", researchSandbox.summary?.sandboxReady >= 1, `${researchSandbox.summary?.sandboxReady || 0} sandbox-ready datasets`, "error", "research")
   ];
 }
 
@@ -306,11 +348,36 @@ function environmentMatrixChecks(environmentMatrix) {
   ];
 }
 
+function healthDashboardChecks(healthDashboard) {
+  return [
+    check("healthDashboard:summary", healthDashboard.ok, healthDashboard.ok ? "health dashboard summary checks passed" : "health dashboard summary failed", "error", "health-dashboard"),
+    check("healthDashboard:applications", healthDashboard.applications?.length === 8 && healthDashboard.totals?.sourceApplications === 7, `${healthDashboard.applications?.length || 0} applications; ${healthDashboard.totals?.sourceApplications || 0} source applications`, "error", "health-dashboard"),
+    check("healthDashboard:developmentTemplate", healthDashboard.applications?.every((item) => item.functionalBoundary && item.reusePoints?.length && item.dataCollections?.length && item.apiRoutes?.length && item.frontendEntry && item.testEvidence?.length && item.acceptanceEvidence?.length), "boundary, reuse, data, API, frontend, test, and acceptance fields", "error", "health-dashboard"),
+    check("healthDashboard:boundary", /source business applications|source applications/.test(healthDashboard.scope?.rule || ""), healthDashboard.scope?.rule || "missing", "error", "health-dashboard")
+  ];
+}
+
 function dataQualityChecks(dataQuality) {
   return [
     check("dataQuality:report", dataQuality.ok, dataQuality.ok ? "data quality checks passed" : "data quality checks failed", "error", "data-quality"),
     check("dataQuality:masterIndexCompleteness", dataQuality.scorecard?.residentIndexCompleteness === 100, `${dataQuality.scorecard?.residentIndexCompleteness || 0}% resident index completeness`, "error", "data-quality"),
     check("dataQuality:residentReferences", dataQuality.issues?.missingReferences?.length === 0, `${dataQuality.issues?.missingReferences?.length || 0} broken resident references`, "error", "data-quality")
+  ];
+}
+
+function qualitySafetyChecks(qualitySafety) {
+  return [
+    check("qualitySafety:report", qualitySafety.ok, qualitySafety.ok ? "quality and safety supervision checks passed" : "quality and safety supervision checks failed", "error", "quality-safety"),
+    check("qualitySafety:boundaries", qualitySafety.summary?.modeledBoundaries === qualitySafety.summary?.boundaries, `${qualitySafety.summary?.modeledBoundaries || 0}/${qualitySafety.summary?.boundaries || 0} boundaries modeled`, "error", "quality-safety"),
+    check("qualitySafety:reuse", qualitySafety.reusedCollections?.every((item) => item.present), `${qualitySafety.summary?.reusedCollections || 0} reused collections`, "error", "quality-safety")
+  ];
+}
+
+function drugConsumableChecks(drugConsumable) {
+  return [
+    check("drugConsumable:readiness", drugConsumable.ok, drugConsumable.ok ? "drug consumable supervision checks passed" : "drug consumable supervision checks failed", "error", "drug-consumable"),
+    check("drugConsumable:boundaries", drugConsumable.requiredBoundaries?.every((boundary) => drugConsumable.checks?.find((item) => item.id === "drug-consumable:boundaries")?.detail?.includes(`${boundary}:present`)), `${drugConsumable.requiredBoundaries?.length || 0} boundaries`, "error", "drug-consumable"),
+    check("drugConsumable:links", drugConsumable.linkedRows?.every((item) => item.pickupLinked && item.claimLinked && item.auditTrailPresent), `${drugConsumable.linkedRows?.length || 0} linked supervision rows`, "error", "drug-consumable")
   ];
 }
 
@@ -352,6 +419,14 @@ function monitoringReadinessChecks(monitoringReadiness) {
     check("monitoring:readiness", monitoringReadiness.ok, monitoringReadiness.ok ? "monitoring readiness checks passed" : "monitoring readiness checks failed", "error", "monitoring"),
     check("monitoring:metricSignals", monitoringReadiness.metricSignals?.every((item) => item.present), `${monitoringReadiness.metricSignals?.length || 0} metric signals`, "error", "monitoring"),
     check("monitoring:sloTargets", monitoringReadiness.sloTargets?.every((item) => item.covered), `${monitoringReadiness.sloTargets?.length || 0} SLO targets`, "error", "monitoring")
+  ];
+}
+
+function referralTeleconsultationChecks(referralTeleconsultationReadiness) {
+  return [
+    check("referralTeleconsultation:readiness", referralTeleconsultationReadiness.ok, referralTeleconsultationReadiness.ok ? "referral teleconsultation readiness checks passed" : "referral teleconsultation readiness checks failed", "error", "referral"),
+    check("referralTeleconsultation:authorization", referralTeleconsultationReadiness.checks?.some((item) => item.id === "referral:residentAuthorization" && item.passed), "resident authorization evidence present", "error", "referral"),
+    check("referralTeleconsultation:frontend", referralTeleconsultationReadiness.checks?.some((item) => item.id === "referral:frontend" && item.passed), "institution and county runnable entries present", "error", "referral")
   ];
 }
 
@@ -487,18 +562,22 @@ function packageChecks(pkg) {
     "identity:contract",
     "audit:retention",
     "data-quality:report",
+    "quality-safety:report",
     "environment:matrix",
     "hospital-operations:readiness",
     "hospital-operations:release",
     "hospital-operations:module-report",
+    "health-dashboard:summary",
     "integration:readiness",
     "interface:mapping",
     "monitoring:readiness",
+    "referral:readiness",
     "operations:readiness",
     "process:audit",
     "site:pack",
     "production-db:readiness",
     "evaluation:evidence",
+    "regional-data-sharing:report",
     "storage:backup",
     "storage:inspect",
     "storage:assess",
@@ -544,19 +623,26 @@ function buildReleaseReport(options = {}) {
   const storageModel = inspectStorageModel({ dataDir: path.join(ROOT, "data") });
   const identityContract = buildIdentityContract({ data });
   const auditRetention = buildAuditRetentionReport({ data, env: options.env || process.env });
+  const chronicFollowup = buildChronicFollowupReadinessReport({ data });
   const dataQuality = buildDataQualityReport({ data });
+  const qualitySafety = buildQualitySafetyReport({ data });
+  const drugConsumable = buildDrugConsumableReadinessReport({ data, pkg });
   const integrationReadiness = buildIntegrationReadinessReport({ data });
   const interfaceMapping = buildInterfaceMappingReport({ data, pkg });
+  const regionalDataSharing = buildRegionalDataSharingReport({ data, pkg });
   const hospitalOperationsReadiness = buildHospitalOperationsReadinessReport({ data, pkg });
   const hospitalOperationsRelease = buildHospitalOperationsReleaseReport({ data, pkg, readiness: hospitalOperationsReadiness });
   const hospitalOperationsModule = buildHospitalOperationsModuleReport({ data, pkg, readiness: hospitalOperationsReadiness, release: hospitalOperationsRelease });
+  const researchSandbox = buildResearchSandboxReadiness(data);
   const monitoringReadiness = buildMonitoringReadinessReport({ data, pkg });
+  const referralTeleconsultationReadiness = buildReferralTeleconsultationReadinessReport({ data, pkg });
   const operationsReadiness = buildOperationsReadinessReport({ data, pkg });
   const processAudit = buildProcessAuditReport({ data });
   const serviceAcceptance = buildServiceAcceptanceSummary(data);
   const productionDbReadiness = buildProductionDbReadinessReport({ data, pkg, storageModel });
   const evaluationEvidence = buildEvaluationEvidenceReport({ data });
   const environmentMatrix = buildEnvironmentMatrixReport({ data, pkg });
+  const healthDashboard = buildHealthDashboardSummary({ data });
   const siteReadinessPack = buildSiteReadinessPack({ data, pkg, envFile: options.envFile || ".env.example", env: options.env || process.env, identityContract, interfaceMapping, monitoringReadiness });
   const checks = [
     assertFile("README.md"),
@@ -570,13 +656,19 @@ function buildReleaseReport(options = {}) {
     ...storageModelChecks(storageModel),
     ...identityContractChecks(identityContract),
     ...auditRetentionChecks(auditRetention),
+    ...chronicFollowupChecks(chronicFollowup),
     ...dataQualityChecks(dataQuality),
+    ...qualitySafetyChecks(qualitySafety),
+    ...drugConsumableChecks(drugConsumable),
     ...integrationReadinessChecks(integrationReadiness),
     ...interfaceMappingChecks(interfaceMapping),
+    ...regionalDataSharingChecks(regionalDataSharing),
     ...hospitalOperationsReadinessChecks(hospitalOperationsReadiness),
     ...hospitalOperationsReleaseChecks(hospitalOperationsRelease),
     ...hospitalOperationsModuleChecks(hospitalOperationsModule),
+    ...researchSandboxChecks(researchSandbox),
     ...monitoringReadinessChecks(monitoringReadiness),
+    ...referralTeleconsultationChecks(referralTeleconsultationReadiness),
     ...operationsReadinessChecks(operationsReadiness),
     ...processAuditChecks(processAudit),
     ...serviceAcceptanceChecks(serviceAcceptance),
@@ -584,6 +676,7 @@ function buildReleaseReport(options = {}) {
     ...productionDbReadinessChecks(productionDbReadiness),
     ...evaluationEvidenceChecks(evaluationEvidence),
     ...environmentMatrixChecks(environmentMatrix),
+    ...healthDashboardChecks(healthDashboard),
     ...env.checks,
     ...commandChecks(options.runCommands)
   ];
@@ -606,20 +699,27 @@ function buildReleaseReport(options = {}) {
     storageModel,
     identityContract,
     auditRetention,
+    chronicFollowup,
     dataQuality,
+    qualitySafety,
+    drugConsumable,
     integrationReadiness,
     interfaceMapping,
+    regionalDataSharing,
     hospitalOperationsReadiness,
     hospitalOperationsRelease,
     hospitalOperationsModule,
+    researchSandbox,
     monitoringReadiness,
+    referralTeleconsultationReadiness,
     operationsReadiness,
     processAudit,
     serviceAcceptance,
     siteReadinessPack,
     productionDbReadiness,
     evaluationEvidence,
-    environmentMatrix
+    environmentMatrix,
+    healthDashboard
   };
 }
 
@@ -769,6 +869,10 @@ function renderMarkdown(report) {
     "",
     "See `audit-retention-report.json` and `audit-retention-report.md` for audit-chain verification, export digest, retention targets, and security acceptance evidence.",
     "",
+    "## Chronic follow-up readiness report",
+    "",
+    "See `chronic-followup-readiness-report.json` and `chronic-followup-readiness-report.md` for screening, tiered management, post-discharge follow-up, return visit reminders, medication adherence, family doctor collaboration, and resident feedback evidence.",
+    "",
     "## Integration readiness report",
     "",
     "See `integration-readiness-report.json` and `integration-readiness-report.md` for P0 interface coverage, external contract readiness, idempotency, signature, and retry policy evidence.",
@@ -777,9 +881,20 @@ function renderMarkdown(report) {
     "",
     "See `interface-mapping-report.json` and `interface-mapping-report.md` for contract-to-platform collection mappings, required field coverage, idempotency field mapping, signature, and retry evidence.",
     "",
+    "## Research sandbox readiness report",
+    "",
+    "See `research-sandbox-readiness-report.json` and `research-sandbox-readiness-report.md` for dataset applications, disease registries, ethics approval, de-identification release, sandbox access, usage audit, and outcome return evidence.",
+    "",
     "## Data quality and master index report",
     "",
     "See `data-quality-report.json` and `data-quality-report.md` for resident master index completeness, resident reference checks, source traceability, and rectification issue evidence.",
+    "",
+    "## Medical quality and safety supervision report",
+    "",
+    "See `quality-safety-report.json` and `quality-safety-report.md` for medical quality, safety event, critical value, clinical pathway, medical record QC, mutual recognition QC, dispatch, feedback, and review evidence.",
+    "## Drug consumable readiness report",
+    "",
+    "See `drug-consumable-readiness-report.json` and `drug-consumable-readiness-report.md` for rational medication, prescription review, fixed pickup, high-value consumable clues, insurance settlement coordination, and remediation-loop evidence.",
     "",
     "## Operations readiness report",
     "",
@@ -809,6 +924,10 @@ function renderMarkdown(report) {
     "",
     "See `monitoring-readiness-report.json` and `monitoring-readiness-report.md` for health and metrics routes, runtime metric signals, alert signals, SLO targets, and on-call escalation evidence.",
     "",
+    "## Referral teleconsultation readiness report",
+    "",
+    "See `referral-teleconsultation-readiness-report.json` and `referral-teleconsultation-readiness-report.md` for referral, teleconsultation, receiving feedback, report return, collaboration order, resident authorization, and performance evidence.",
+    "",
     "## Production database readiness report",
     "",
     "See `production-db-readiness-report.json` and `production-db-readiness-report.md` for PostgreSQL cutover prerequisites, current SQLite/JSON model evidence, backup rehearsal documentation, and runtime adapter guardrails.",
@@ -820,6 +939,10 @@ function renderMarkdown(report) {
     "## Environment matrix report",
     "",
     "See `environment-matrix-report.json` and `environment-matrix-report.md` for demo, staging, and production environment variables, gate scripts, owners, and blocking rules.",
+    "",
+    "## Health dashboard summary",
+    "",
+    "See `health-dashboard-summary.json` and `health-dashboard-summary.md` for the aggregate entry across the first seven applications, open actions, interface tracks, evidence, and site dependencies.",
     "",
     "## Release artifact manifest",
     "",
@@ -882,6 +1005,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       auditRetention: report.auditRetention
     }, null, 2), "utf8");
+    const chronicFollowupJson = path.join(path.dirname(output), "chronic-followup-readiness-report.json");
+    fs.writeFileSync(chronicFollowupJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      chronicFollowup: report.chronicFollowup
+    }, null, 2), "utf8");
     const dataQualityJson = path.join(path.dirname(output), "data-quality-report.json");
     fs.writeFileSync(dataQualityJson, JSON.stringify({
       project: report.project,
@@ -889,6 +1020,14 @@ function writeOutput(report, flags) {
       profile: report.profile,
       generatedAt: report.generatedAt,
       dataQuality: report.dataQuality
+    }, null, 2), "utf8");
+    const qualitySafetyJson = path.join(path.dirname(output), "quality-safety-report.json");
+    fs.writeFileSync(qualitySafetyJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      qualitySafety: report.qualitySafety
     }, null, 2), "utf8");
     const integrationJson = path.join(path.dirname(output), "integration-readiness-report.json");
     fs.writeFileSync(integrationJson, JSON.stringify({
@@ -905,6 +1044,30 @@ function writeOutput(report, flags) {
       profile: report.profile,
       generatedAt: report.generatedAt,
       interfaceMapping: report.interfaceMapping
+    }, null, 2), "utf8");
+    const regionalDataSharingJson = path.join(path.dirname(output), "regional-data-sharing-report.json");
+    fs.writeFileSync(regionalDataSharingJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      regionalDataSharing: report.regionalDataSharing
+    }, null, 2), "utf8");
+    const drugConsumableJson = path.join(path.dirname(output), "drug-consumable-readiness-report.json");
+    fs.writeFileSync(drugConsumableJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      drugConsumable: report.drugConsumable
+    }, null, 2), "utf8");
+    const researchSandboxJson = path.join(path.dirname(output), "research-sandbox-readiness-report.json");
+    fs.writeFileSync(researchSandboxJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      researchSandbox: report.researchSandbox
     }, null, 2), "utf8");
     const operationsJson = path.join(path.dirname(output), "operations-readiness-report.json");
     fs.writeFileSync(operationsJson, JSON.stringify({
@@ -970,6 +1133,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       monitoringReadiness: report.monitoringReadiness
     }, null, 2), "utf8");
+    const referralTeleconsultationJson = path.join(path.dirname(output), "referral-teleconsultation-readiness-report.json");
+    fs.writeFileSync(referralTeleconsultationJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      referralTeleconsultationReadiness: report.referralTeleconsultationReadiness
+    }, null, 2), "utf8");
     const productionDbJson = path.join(path.dirname(output), "production-db-readiness-report.json");
     fs.writeFileSync(productionDbJson, JSON.stringify({
       project: report.project,
@@ -994,6 +1165,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       environmentMatrix: report.environmentMatrix
     }, null, 2), "utf8");
+    const healthDashboardJson = path.join(path.dirname(output), "health-dashboard-summary.json");
+    fs.writeFileSync(healthDashboardJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      healthDashboard: report.healthDashboard
+    }, null, 2), "utf8");
     const releaseArtifactManifest = buildReleaseArtifactManifest({ releaseReport: report });
     const releaseArtifactManifestJson = path.join(path.dirname(output), "release-artifact-manifest.json");
     fs.writeFileSync(releaseArtifactManifestJson, JSON.stringify({
@@ -1016,12 +1195,22 @@ function writeOutput(report, flags) {
     fs.writeFileSync(identityMarkdown, renderIdentityContractMarkdown(report.identityContract), "utf8");
     const auditMarkdown = path.join(path.dirname(markdown), "audit-retention-report.md");
     fs.writeFileSync(auditMarkdown, renderAuditRetentionMarkdown(report.auditRetention), "utf8");
+    const chronicFollowupMarkdown = path.join(path.dirname(markdown), "chronic-followup-readiness-report.md");
+    fs.writeFileSync(chronicFollowupMarkdown, renderChronicFollowupMarkdown(report.chronicFollowup), "utf8");
     const dataQualityMarkdown = path.join(path.dirname(markdown), "data-quality-report.md");
     fs.writeFileSync(dataQualityMarkdown, renderDataQualityMarkdown(report.dataQuality), "utf8");
+    const qualitySafetyMarkdown = path.join(path.dirname(markdown), "quality-safety-report.md");
+    fs.writeFileSync(qualitySafetyMarkdown, renderQualitySafetyMarkdown(report.qualitySafety), "utf8");
     const integrationMarkdown = path.join(path.dirname(markdown), "integration-readiness-report.md");
     fs.writeFileSync(integrationMarkdown, renderIntegrationReadinessMarkdown(report.integrationReadiness), "utf8");
     const interfaceMappingMarkdown = path.join(path.dirname(markdown), "interface-mapping-report.md");
     fs.writeFileSync(interfaceMappingMarkdown, renderInterfaceMappingMarkdown(report.interfaceMapping), "utf8");
+    const regionalDataSharingMarkdown = path.join(path.dirname(markdown), "regional-data-sharing-report.md");
+    fs.writeFileSync(regionalDataSharingMarkdown, renderRegionalDataSharingMarkdown(report.regionalDataSharing), "utf8");
+    const drugConsumableMarkdown = path.join(path.dirname(markdown), "drug-consumable-readiness-report.md");
+    fs.writeFileSync(drugConsumableMarkdown, renderDrugConsumableMarkdown(report.drugConsumable), "utf8");
+    const researchSandboxMarkdown = path.join(path.dirname(markdown), "research-sandbox-readiness-report.md");
+    fs.writeFileSync(researchSandboxMarkdown, renderResearchSandboxMarkdown(report.researchSandbox), "utf8");
     const operationsMarkdown = path.join(path.dirname(markdown), "operations-readiness-report.md");
     fs.writeFileSync(operationsMarkdown, renderOperationsReadinessMarkdown(report.operationsReadiness), "utf8");
     const hospitalOperationsMarkdown = path.join(path.dirname(markdown), "hospital-operations-readiness-report.md");
@@ -1039,12 +1228,16 @@ function writeOutput(report, flags) {
     writeTemplateReadmes(report.siteReadinessPack, path.join(path.dirname(path.relative(ROOT, markdown)), "templates"));
     const monitoringMarkdown = path.join(path.dirname(markdown), "monitoring-readiness-report.md");
     fs.writeFileSync(monitoringMarkdown, renderMonitoringReadinessMarkdown(report.monitoringReadiness), "utf8");
+    const referralTeleconsultationMarkdown = path.join(path.dirname(markdown), "referral-teleconsultation-readiness-report.md");
+    fs.writeFileSync(referralTeleconsultationMarkdown, renderReferralTeleconsultationReadinessMarkdown(report.referralTeleconsultationReadiness), "utf8");
     const productionDbMarkdown = path.join(path.dirname(markdown), "production-db-readiness-report.md");
     fs.writeFileSync(productionDbMarkdown, renderProductionDbReadinessMarkdown(report.productionDbReadiness), "utf8");
     const evaluationMarkdown = path.join(path.dirname(markdown), "evaluation-evidence-report.md");
     fs.writeFileSync(evaluationMarkdown, renderEvaluationEvidenceMarkdown(report.evaluationEvidence), "utf8");
     const environmentMarkdown = path.join(path.dirname(markdown), "environment-matrix-report.md");
     fs.writeFileSync(environmentMarkdown, renderEnvironmentMatrixMarkdown(report.environmentMatrix), "utf8");
+    const healthDashboardMarkdown = path.join(path.dirname(markdown), "health-dashboard-summary.md");
+    fs.writeFileSync(healthDashboardMarkdown, renderHealthDashboardMarkdown(report.healthDashboard), "utf8");
     const releaseArtifactManifestMarkdown = path.join(path.dirname(markdown), "release-artifact-manifest.md");
     fs.writeFileSync(releaseArtifactManifestMarkdown, renderReleaseArtifactManifestMarkdown(buildReleaseArtifactManifest({ releaseReport: report })), "utf8");
   }

@@ -171,6 +171,8 @@ npm.cmd run release:report:full
 
 `interface:mapping` 会生成 `release/interface-mapping-report.json` 和 `release/interface-mapping-report.md`，逐项检查外部契约必填字段、幂等字段、目标集合、目标字段、签名和重试策略是否有平台落点；现场 HIS/EMR/LIS/PACS/医保/证照/统计联调前，应把该报告与真实字段对照表、样例报文和整改记录一起归档。
 
+`research:sandbox` generates `release/research-sandbox-readiness-report.json` and `release/research-sandbox-readiness-report.md`, covering research dataset applications, disease registry models, ethics approval, de-identification release, sandbox access, usage audit, and outcome return evidence.
+
 `data-quality:report` 会生成 `release/data-quality-report.json` 和 `release/data-quality-report.md`，检查居民主索引完整度、跨集合居民引用、personIndex 一致性、来源可追溯和整改闭环，作为 P1 数据质量治理和主索引现场规则确认前的证据包。
 
 `environment:matrix` 会生成 `release/environment-matrix-report.json` 和 `release/environment-matrix-report.md`，把 demo、staging、production 三层环境的必填变量、阻断变量、责任人、门禁脚本和上线验收规则固化为可检查矩阵；`release:report` 会同步写出这些文件，作为环境分层、密钥注入、现场签字和生产切换审查的前置材料。
@@ -184,6 +186,8 @@ npm.cmd run release:report:full
 `site:pack` 会生成 `release/site-readiness-pack.json` 和 `release/site-readiness-pack.md`，把身份源映射、接口联调字段表、样例报文取证、监控值守、灾备演练和生产签字要求整理为现场准备模板；同时生成 `release/templates/*/README.md`，分别说明身份源映射、接口联调、监控值守、生产签字模板的当前能力、输入、输出、必备附件和 API 证据。`GET /api/site-template-readmes` 会在 Node 运行时返回这 4 份模板 README 的状态、责任方、行数、附件类型、live evidence 和文本预览，工作台可直接用于全流程审计；`release:report` 会同步写出这些文件，便于实施团队逐项挂接真实材料。
 
 `monitoring:readiness` 会生成 `release/monitoring-readiness-report.json` 和 `release/monitoring-readiness-report.md`，把 `/api/health`、`/api/metrics`、`/api/system/readiness`、请求状态码、慢请求、死信、数据质量、SLO 阈值、告警信号和 on-call escalation 归档为监控接入证据；生产切换前仍需将这些信号绑定到现场 Prometheus/OpenTelemetry 或平台日志服务，并取得 `CUTOVER_MONITORING_SIGNOFF`。
+
+`referral:readiness` 会生成 `release/referral-teleconsultation-readiness-report.json` 和 `release/referral-teleconsultation-readiness-report.md`，把双向转诊、远程会诊、接诊反馈、报告回传、协同工单、居民授权、审计留痕和绩效评价归档为专项证据；现场联调仍需接入 HIS/EMR 真实转诊单、预约号源/床位、远程视频系统、PACS/LIS 报告回传、医保支付路径和医共体绩效结算公式。
 
 `evaluation:evidence` 会生成 `release/evaluation-evidence-report.json` 和 `release/evaluation-evidence-report.md`，汇总互联互通四甲/五乙测评所需接口清单、标准映射、交易样例、整改记录、P1 接口需求和流程审计证据，作为现场截图、第三方测评结论和整改复测记录的前置材料。
 
@@ -247,6 +251,11 @@ npm.cmd run rollback:snapshot -- "data/backups/<备份目录>"
 - 公安、民政共享。
 - 等保、密评、日志保全、脱敏和容灾。
 
+## Medical quality and safety supervision release boundary
+
+Run `npm.cmd run quality-safety:report` before release. The generated `release/quality-safety-report.md` and `release/quality-safety-report.json` prove the demo boundary for medical quality, safety events, critical values, clinical pathways, medical record QC, mutual-recognition QC, dispatch, feedback, review, permission trimming, and audit evidence.
+
+Site joint testing still requires live HIS/EMR/LIS/PACS feeds, production critical-value acknowledgement routing, medical-record sampling signatures, clinical pathway rule dictionaries, mutual-recognition QC rules, and department rectification sign-off attachments.
 
 ## Hospital Operations Dispatch
 
@@ -259,3 +268,15 @@ hospital-operations:readiness generates release/hospital-operations-readiness-re
 hospital-operations:release generates release/hospital-operations-release-report.json and release/hospital-operations-release-report.md. The release report verifies the completed directions: field mapping for site integration, SLA command chains, alert playbooks, shift handover, shift handover owner matrix, shift handover signoff and audit trace, multi-status reconciliation review, performance-indicator details, dispatch lifecycle evidence, site joint-test closeout, production hardening, intelligent dispatch recommendations, and governance reporting. release:report and the CI release artifact upload include this report.
 
 hospital-operations:module-report generates release/hospital-operations-module-report.json and release/hospital-operations-module-report.md. The report summarizes the hospital operations module capabilities, signed hospital system ingest APIs, release evidence, audit checks, and completed development directions for site joint testing, production hardening, intelligent dispatch, and governance reporting; real production cutover still requires site payloads, signoffs, monitoring, and DR evidence.
+
+## Drug Consumable Supervision Evidence
+
+Before site joint testing for the drug and consumable supervision app, run `npm.cmd run drug-consumable:readiness` and archive `release/drug-consumable-readiness-report.json` plus `release/drug-consumable-readiness-report.md`. The report is the pre-field evidence bundle for rational medication, prescription review, fixed pickup, high-value consumable clues, insurance settlement coordination, and remediation-loop signoff.
+
+## Health Dashboard Deployment Evidence
+
+- Open `health-dashboard.html` after commission login to review the aggregate health dashboard.
+- Run `npm.cmd run health-dashboard:summary` to generate `release/health-dashboard-summary.json` and `release/health-dashboard-summary.md`.
+- Archive the generated development-template section as the handoff checklist for each of the eight application conversations: boundary, reuse, data, API, frontend entry, tests, and acceptance evidence.
+- `release:manifest` must include `health-dashboard-summary.md` so the eight-application template is part of the formal release package.
+- The dashboard remains blocked on real site joint-test inputs for identity, HIS/EMR/LIS/PACS, insurance, certificates, statistics, monitoring, and disaster recovery signoff.

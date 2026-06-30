@@ -512,10 +512,15 @@ function renderResearchGovernance(platform) {
       <td>${item.diseaseType}</td>
       <td>${item.version}</td>
       <td>${item.ethicsApproval || "待登记"}</td>
-      <td>${item.anonymization || "待登记"}</td>
-      <td>${statusBadge(item.authorizationStatus || item.status)}</td>
+      <td>${item.anonymization || "待登记"} / ${item.deidentificationStatus || "pending"}</td>
+      <td>${statusBadge(item.authorizationStatus || item.status)} ${statusBadge(item.sandbox?.status || "pending")}</td>
       <td>${item.records || 0}</td>
       <td>${(item.usageAudit || []).length} / ${(item.outcomes || []).length}</td>
+      <td>
+        <button class="inline-action" type="button" data-research-action="sandbox-access" data-id="${item.id}">Sandbox</button>
+        <button class="inline-action" type="button" data-research-action="outcome-return" data-id="${item.id}">Outcome</button>
+        <button class="inline-action" type="button" data-research-action="approve" data-id="${item.id}">Approve</button>
+      </td>
     </tr>
   `).join("");
   const modelRows = platform.diseaseRegistryModels.map((item) => `
@@ -532,8 +537,8 @@ function renderResearchGovernance(platform) {
   `).join("");
   document.querySelector("#research-governance").innerHTML = `
     <table>
-      <thead><tr><th>数据集</th><th>病种</th><th>版本</th><th>伦理审批</th><th>脱敏</th><th>授权</th><th>记录数</th><th>审计/成果</th></tr></thead>
-      <tbody>${datasetRows || `<tr><td colspan="8">暂无科研数据集。</td></tr>`}</tbody>
+      <thead><tr><th>数据集</th><th>病种</th><th>版本</th><th>伦理审批</th><th>脱敏</th><th>授权/沙箱</th><th>记录数</th><th>审计/成果</th><th>Action</th></tr></thead>
+      <tbody>${datasetRows || `<tr><td colspan="9">暂无科研数据集。</td></tr>`}</tbody>
     </table>
     <table>
       <thead><tr><th>模型</th><th>病种</th><th>版本</th><th>适用人群</th><th>触发阈值</th><th>复核状态</th><th>输出</th><th>复核人</th></tr></thead>
@@ -620,6 +625,11 @@ function bindPlatformEditor() {
       openEvidenceEditor(evidenceButton.dataset.editEvidence);
       return;
     }
+    const researchButton = event.target.closest("[data-research-action]");
+    if (researchButton) {
+      runResearchDatasetAction(researchButton.dataset.researchAction, researchButton.dataset.id);
+      return;
+    }
     if (event.target.matches("[data-close]")) {
       event.target.closest("dialog")?.close();
     }
@@ -686,6 +696,42 @@ function bindPlatformEditor() {
     });
     refreshReportSummary();
   });
+}
+
+async function runResearchDatasetAction(action, id) {
+  if (!PLATFORM_API_BASE || !id) return;
+  const dataset = (platformState.researchDatasets || []).find((item) => item.id === id);
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  const body = action === "approve"
+    ? { ethicsApproval: dataset?.ethicsApproval || `IRB-DEMO-${todayStamp()}`, anonymization: dataset?.anonymization || "k-anonymity-demo", deidentificationStatus: "released" }
+    : action === "outcome-return"
+      ? { title: `${dataset?.name || id} sandbox finding`, summary: "Returned from platform research sandbox.", registryImpact: "Review disease registry model thresholds." }
+      : { purpose: `${dataset?.name || id} de-identified sandbox review` };
+  const path = action === "approve"
+    ? `/research/datasets/${encodeURIComponent(id)}/approval`
+    : action === "outcome-return"
+      ? `/research/datasets/${encodeURIComponent(id)}/outcomes`
+      : `/research/datasets/${encodeURIComponent(id)}/sandbox-access`;
+  try {
+    const response = await request(`${PLATFORM_API_BASE}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (!response.ok) return;
+    await refreshPlatformState();
+  } catch (error) {
+    // Keep the static fallback usable when the page is opened directly.
+  }
+}
+
+async function refreshPlatformState() {
+  platformState = await loadPlatformState(fallbackPlatformState);
+  ensureEditablePlatformData(platformState);
+  platformData = platformModel(platformState);
+  renderResearchGovernance(platformData);
+  renderMetrics(platformState, platformData);
+  renderReportSummary(platformData, platformState.platformChangeLogs || []);
 }
 
 function openEvidenceEditor(id) {
