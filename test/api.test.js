@@ -734,6 +734,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(dashboard.body.siteCutoverPack.status, "ready-for-site-signoff");
     assert.equal(dashboard.body.siteCutoverPack.tracks.length, 5);
     assert.equal(dashboard.body.siteCutoverPack.tracks.some((item) => item.id === "nursing-cutover-payment-reconciliation"), true);
+
     const institution = dashboard.body.institutions.find((item) => item.id === "inh-mr1");
     assert.ok(institution);
 
@@ -1773,6 +1774,56 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(saved.body.institutionCreditEvaluations.length, 3);
     assert.equal(saved.body.securityAcceptanceLedger.length, 4);
     assert.equal(saved.body.productionDeploymentPlan.length, 4);
+  });
+
+  await t.test("reports blocked internet nursing site cutover tracks when policy evidence is incomplete", async () => {
+    const current = await api(baseUrl, "/api/state", authorized(commissionToken));
+    const blockedState = JSON.parse(JSON.stringify(current.body));
+    blockedState.internetNursingPolicy = {
+      ...(blockedState.internetNursingPolicy || {}),
+      productionIntegration: {
+        ...(blockedState.internetNursingPolicy?.productionIntegration || {}),
+        messageGateway: { status: "blocked" },
+        signatureStorage: { status: "blocked" },
+        hospitalConnectors: [
+          { system: "nursing management system", route: "/integration/internet-nursing/orders", status: "mapped" },
+          { system: "EMR", route: "/integration/internet-nursing/service-records", status: "pending" }
+        ]
+      },
+      paymentIntegration: {
+        ...(blockedState.internetNursingPolicy?.paymentIntegration || {}),
+        status: "blocked",
+        modes: ["mobile self-pay"]
+      },
+      deviceVerification: {
+        ...(blockedState.internetNursingPolicy?.deviceVerification || {}),
+        status: "blocked",
+        requiredSignals: ["mobile GPS"]
+      },
+      regulatorySubmission: {
+        ...(blockedState.internetNursingPolicy?.regulatorySubmission || {}),
+        pressureTest: { status: "failed", p95Ms: 1200 },
+        signoffs: []
+      }
+    };
+    const savedBlocked = await api(baseUrl, "/api/state", authorized(commissionToken, {
+      method: "PUT",
+      body: JSON.stringify(blockedState)
+    }));
+    assert.equal(savedBlocked.response.status, 200);
+
+    const blockedDashboard = await api(baseUrl, "/api/internet-nursing/dashboard", authorized(commissionToken));
+    assert.equal(blockedDashboard.response.status, 200);
+    assert.equal(blockedDashboard.body.siteCutoverPack.status, "blocked");
+    assert.equal(blockedDashboard.body.siteCutoverPack.tracks.every((item) => item.status === "blocked"), true);
+
+    const restored = await api(baseUrl, "/api/state", authorized(commissionToken, {
+      method: "PUT",
+      body: JSON.stringify(current.body)
+    }));
+    assert.equal(restored.response.status, 200);
+    const restoredDashboard = await api(baseUrl, "/api/internet-nursing/dashboard", authorized(commissionToken));
+    assert.equal(restoredDashboard.body.siteCutoverPack.status, "ready-for-site-signoff");
   });
 
   await t.test("verifies audit hash chains and detects tampering", async () => {
