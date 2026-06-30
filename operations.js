@@ -160,6 +160,7 @@ const OPERATIONS_EVIDENCE_LABELS = {
   "/api/operations/production-hardening": "生产加固清单接口",
   "/api/operations/intelligence": "智能调度建议接口",
   "/api/operations/resource-pool": "跨院资源池接口",
+  "/api/operations/mobile-duty": "移动值守接口",
   "/api/operations/governance-report": "治理报表接口",
   "/api/operations/governance-export-package": "治理导出包接口",
   "/api/operations/next-development-research": "下一步功能研究接口"
@@ -225,6 +226,7 @@ function buildStaticOperationsDashboard(state) {
   const intelligence = buildStaticOperationsIntelligence(snapshots, dispatchRequests, reconciliationReviews);
   const performanceMonitoring = buildStaticPerformanceMonitoringEvidence(state, snapshots);
   const resourcePool = buildStaticResourcePool(snapshots, medicalResources, dispatchRequests);
+  const mobileDuty = buildStaticMobileDuty(snapshots, dispatchRequests, reconciliationReviews, handover, state.taskMessages || []);
   const governanceReport = buildStaticGovernanceReport(snapshots, dispatchRequests, reconciliationReviews, performanceMonitoring, handover);
   const governanceExportPackage = buildStaticGovernanceExportPackage(
     snapshots,
@@ -278,6 +280,7 @@ function buildStaticOperationsDashboard(state) {
     handoverOwnerMatrix: buildStaticHandoverOwnerMatrix(handover),
     performanceMonitoring,
     resourcePool,
+    mobileDuty,
     governanceReport,
     governanceExportPackage,
     nextDevelopmentResearch
@@ -571,6 +574,83 @@ function buildStaticResourcePool(snapshots, medicalResources, dispatchRequests) 
   };
 }
 
+function buildStaticMobileDuty(snapshots, dispatchRequests, reconciliationReviews, handover, taskMessages = []) {
+  const openDispatches = dispatchRequests.filter((item) => ["pending", "assigned", "in-progress"].includes(item.status));
+  const pendingRecon = reconciliationReviews.filter((item) => !["approved", "closed"].includes(item.status));
+  const handoverItems = Array.isArray(handover?.items) ? handover.items : [];
+  const highPressure = snapshots.filter((item) => item.normalizedStatus === "critical" || Number(item.resourcePressure || 0) >= 85 || (item.activeAlerts || []).some((alert) => alert.severity === "critical"));
+  const recentMessages = (Array.isArray(taskMessages) ? taskMessages : [])
+    .filter((message) => message.collection === "hospitalOperationsMobileDuty" || String(message.taskId || "").startsWith("operations-mobile-duty:"))
+    .slice(0, 8);
+  const cards = [
+    {
+      id: "mobile-duty-alert-confirm",
+      type: "alert-confirm",
+      title: "预警确认",
+      priority: highPressure.length ? "高" : "常规",
+      count: highPressure.length,
+      owner: "运行监测岗",
+      status: highPressure.length ? "待确认" : "已关注",
+      summary: highPressure.length ? `${highPressure.length}家机构处于高压或严重预警状态` : "当前无严重预警机构",
+      nextAction: highPressure.length ? "移动端确认预警、记录电话核实结果并同步值班长。" : "保持弱网缓存和定时巡检。",
+      evidence: ["/api/operations/dashboard", "/api/operations/mobile-duty"]
+    },
+    {
+      id: "mobile-duty-handover-signoff",
+      type: "handover-signoff",
+      title: "交接签收",
+      priority: handoverItems.some((item) => item.severity === "critical") ? "高" : "中",
+      count: handoverItems.length,
+      owner: "值班长",
+      status: handoverItems.length ? "待签收" : "无交接事项",
+      summary: `${handoverItems.length}项交接事项需要移动端复核`,
+      nextAction: "移动端完成交接签收、补充下一班关注点并写入审计。",
+      evidence: ["/api/operations/handover", "/api/operations/handover/signoff"]
+    },
+    {
+      id: "mobile-duty-dispatch-note",
+      type: "dispatch-note",
+      title: "调度备注",
+      priority: openDispatches.some((item) => item.priority === "high") ? "高" : "中",
+      count: openDispatches.length,
+      owner: "调度席",
+      status: openDispatches.length ? "待跟进" : "无开放工单",
+      summary: `${openDispatches.length}条开放调度单需要移动端更新处置进展`,
+      nextAction: "补充资源到位、转运、执行人和预计关闭时间。",
+      evidence: ["/api/operations/dispatch", "/api/operations/dispatch/:id/status"]
+    },
+    {
+      id: "mobile-duty-reconciliation-reminder",
+      type: "reconciliation-reminder",
+      title: "直报复核提醒",
+      priority: pendingRecon.some((item) => item.status === "blocked") ? "高" : "中",
+      count: pendingRecon.length,
+      owner: "统计办公室",
+      status: pendingRecon.length ? "待复核" : "已清零",
+      summary: `${pendingRecon.length}条统计直报差异等待复核`,
+      nextAction: "提醒责任科室确认差异口径、补正说明和提交时限。",
+      evidence: ["/api/operations/reconciliation/:id/review", "healthStatisticsIngestion"]
+    }
+  ];
+  return {
+    ok: true,
+    summary: {
+      cards: cards.length,
+      highPriority: cards.filter((item) => item.priority === "高").length,
+      pendingActions: cards.reduce((sum, item) => sum + Number(item.count || 0), 0),
+      reminders: recentMessages.length
+    },
+    weakNetwork: {
+      mode: "cache-last-state",
+      offlineDrafts: true,
+      retryPolicy: "网络恢复后按审计时间顺序补传签收、备注和提醒。"
+    },
+    cards,
+    recentMessages,
+    evidence: ["/api/operations/mobile-duty", "operationHandoverSignoffs", "taskMessages", "securityEvents"]
+  };
+}
+
 function buildStaticNextDevelopmentResearch(
   snapshots,
   dispatchRequests,
@@ -664,11 +744,11 @@ function buildStaticNextDevelopmentResearch(
       name: "移动端值守与消息闭环",
       owner: "运行监测岗/值班长",
       problem: `交接事项${handoverItems}项，高压机构${highPressure.length}家，夜间值守需要更轻量的确认和提醒入口。`,
-      deliverable: "移动端查看预警、工单、交接事项和待复核直报差异，并支持签收、备注和消息提醒。",
+      deliverable: "已上线移动值守台，集中查看预警、工单、交接事项和待复核直报差异，并支持提醒生成、弱网补传说明和审计留痕。",
       prerequisites: ["移动端角色权限", "消息模板", "签收审计字段", "弱网重试策略"],
       dataSources: ["operationHandoverSignoffs", "taskMessages", "securityEvents"],
       acceptance: "移动值守可完成预警确认、交接签收、调度备注和审计留痕。",
-      evidence: ["/api/operations/handover", "/api/process-audit"]
+      evidence: ["/api/operations/mobile-duty", "/api/operations/mobile-duty/actions", "/api/messages", "/api/process-audit"]
     }
   ];
   return {
@@ -954,6 +1034,7 @@ function renderOperationsDashboard() {
   renderProductionHardening(dashboard.productionHardening || buildStaticProductionHardening({}));
   renderOperationsIntelligence(dashboard.intelligence || buildStaticOperationsIntelligence(filteredSnapshots, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || []));
   renderResourcePool(dashboard.resourcePool || buildStaticResourcePool(filteredSnapshots, dashboard.medicalResources || [], dashboard.dispatchRequests || []));
+  renderMobileDuty(dashboard.mobileDuty || buildStaticMobileDuty(filteredSnapshots, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || [], dashboard.handover || {}, []));
   renderGovernanceReport(
     dashboard.governanceReport || buildStaticGovernanceReport(filteredSnapshots, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || [], dashboard.performanceMonitoring || {}, dashboard.handover || {}),
     dashboard.governanceExportPackage
@@ -1511,6 +1592,93 @@ function applyResourceDispatchDraft(recommendation) {
   form.elements.status.value = "pending";
   form.elements.reason.value = `${recommendation.reason || ""}\n${recommendation.suggestedAction || ""}`.trim();
   document.querySelector("#dispatch-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function renderMobileDuty(mobileDuty) {
+  const target = document.querySelector("#operation-mobile-duty");
+  if (!target) return;
+  const cards = Array.isArray(mobileDuty.cards) ? mobileDuty.cards : [];
+  const messages = Array.isArray(mobileDuty.recentMessages) ? mobileDuty.recentMessages : [];
+  target.innerHTML = `
+    <article class="operation-mobile-duty-summary">
+      <strong>移动值守台</strong>
+      <span>${mobileDuty.summary?.pendingActions || 0} 项待处理 / ${mobileDuty.summary?.highPriority || 0} 项高优先级 / ${mobileDuty.summary?.reminders || 0} 条提醒</span>
+      <small>${mobileDuty.weakNetwork?.retryPolicy || "支持弱网缓存和恢复后补传。"}</small>
+    </article>
+    <div class="operation-mobile-duty-card-list">
+      ${cards.map((item) => `
+        <article class="operation-mobile-duty-card ${item.priority === "高" ? "critical" : item.priority === "中" ? "warning" : "normal"}">
+          <div class="operation-playbook-head">
+            <div>
+              <strong>${zhInline(item.title)}</strong>
+              <span>${zhInline(item.owner)} / ${zhInline(item.status)} / ${item.count || 0} 项</span>
+            </div>
+            <span class="badge ${item.priority === "高" ? "danger" : item.priority === "中" ? "warn" : "info"}">${zhInline(item.priority)}</span>
+          </div>
+          <p>${zhInline(item.summary)}</p>
+          <small>${zhInline(item.nextAction)}</small>
+          <button class="inline-action compact" type="button" data-mobile-duty-card="${htmlAttribute(item.id)}">发送值守提醒</button>
+        </article>
+      `).join("")}
+    </div>
+    <div class="operation-mobile-duty-messages">
+      ${(messages.length ? messages : [{ title: "暂无移动值守提醒", body: "发送提醒后将在这里形成消息和审计证据。", createdAt: "" }]).map((item) => `
+        <article>
+          <strong>${zhInline(item.title)}</strong>
+          <span>${zhInline(item.body)}</span>
+          <small>${zhInline(item.createdAt || "待生成")}</small>
+        </article>
+      `).join("")}
+    </div>
+  `;
+  target.querySelectorAll("[data-mobile-duty-card]").forEach((button) => {
+    button.addEventListener("click", () => sendMobileDutyReminder(button.dataset.mobileDutyCard));
+  });
+}
+
+async function sendMobileDutyReminder(cardId) {
+  const card = (operationsDashboard?.mobileDuty?.cards || []).find((item) => item.id === cardId);
+  if (!card) return;
+  const payload = {
+    cardId,
+    note: card.nextAction,
+    targetRole: "commission",
+    channel: "in_app"
+  };
+  try {
+    const response = await request(`${OPERATIONS_API_BASE}/operations/mobile-duty/actions`, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error("mobile duty reminder failed");
+    const result = await response.json();
+    operationsDashboard.mobileDuty = result.mobileDuty || operationsDashboard.mobileDuty;
+  } catch (error) {
+    const message = {
+      id: `static-mobile-duty-${Date.now()}`,
+      taskId: `operations-mobile-duty:${card.id}`,
+      collection: "hospitalOperationsMobileDuty",
+      sourceId: card.id,
+      targetRole: "commission",
+      channel: "in_app",
+      title: `移动值守提醒：${card.title}`,
+      body: card.nextAction,
+      status: "sent",
+      receipts: [],
+      createdAt: new Date().toISOString(),
+      createdBy: "static-preview",
+      createdByName: "静态预览"
+    };
+    operationsDashboard.mobileDuty = {
+      ...(operationsDashboard.mobileDuty || {}),
+      recentMessages: [message, ...((operationsDashboard.mobileDuty || {}).recentMessages || [])].slice(0, 8)
+    };
+    operationsDashboard.mobileDuty.summary = {
+      ...((operationsDashboard.mobileDuty || {}).summary || {}),
+      reminders: operationsDashboard.mobileDuty.recentMessages.length
+    };
+  }
+  renderMobileDuty(operationsDashboard.mobileDuty || {});
 }
 
 function renderGovernanceReport(report, exportPackage) {

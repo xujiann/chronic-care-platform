@@ -17,13 +17,14 @@ test("hospital operations module report audits capabilities and next plan", () =
   assert.equal(report.capabilities.some((item) => item.id === "production-hardening" && item.status === "ready"), true);
   assert.equal(report.capabilities.some((item) => item.id === "ops-intelligence" && item.status === "ready"), true);
   assert.equal(report.capabilities.some((item) => item.id === "cross-hospital-resource-pool" && item.status === "ready"), true);
+  assert.equal(report.capabilities.some((item) => item.id === "mobile-duty-command" && item.status === "ready"), true);
   assert.equal(report.capabilities.some((item) => item.id === "governance-reporting" && item.status === "ready"), true);
   assert.equal(report.capabilities.some((item) => item.id === "governance-export-package" && item.status === "ready"), true);
   assert.equal(report.capabilities.some((item) => item.id === "next-development-research" && item.status === "ready"), true);
   assert.equal(report.capabilities.some((item) => item.evidence.includes("/api/operations/dashboard")), true);
   assert.equal(report.nextPlan.some((item) => item.id === "production-hardening" && item.exitCriteria.includes("release:report:full")), true);
   assert.equal(report.nextPlan.some((item) => item.id === "cross-hospital-resource-market"), true);
-  assert.equal(report.nextPlan.some((item) => item.id === "mobile-command"), true);
+  assert.equal(report.nextPlan.some((item) => item.id === "mobile-command" && item.deliverable.includes("/api/operations/mobile-duty")), true);
   assert.equal(report.checks.every((item) => item.passed), true);
 });
 

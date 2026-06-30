@@ -1193,6 +1193,76 @@ dialog::backdrop {
   font-weight: 800;
 }
 
+.operations-mobile-duty-panel {
+  grid-column: 1 / -1;
+}
+
+.operation-mobile-duty-grid,
+.operation-mobile-duty-card-list,
+.operation-mobile-duty-messages {
+  display: grid;
+  gap: 10px;
+}
+
+.operation-mobile-duty-summary,
+.operation-mobile-duty-card,
+.operation-mobile-duty-messages article {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+
+.operation-mobile-duty-summary {
+  background: #f6f8fb;
+}
+
+.operation-mobile-duty-summary strong,
+.operation-mobile-duty-card strong,
+.operation-mobile-duty-messages strong {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.operation-mobile-duty-summary span,
+.operation-mobile-duty-summary small,
+.operation-mobile-duty-card p,
+.operation-mobile-duty-card small,
+.operation-mobile-duty-messages span,
+.operation-mobile-duty-messages small {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.operation-mobile-duty-card-list {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.operation-mobile-duty-card {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.operation-mobile-duty-card.critical {
+  background: #fff4f2;
+  border-color: #e7a19a;
+}
+
+.operation-mobile-duty-card.warning {
+  background: #fff9ea;
+  border-color: #edcf8f;
+}
+
+.operation-mobile-duty-card.normal {
+  background: #f4fbf9;
+  border-color: #b8d8d1;
+}
+
+.operation-mobile-duty-messages {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
 .operations-next-development-panel {
   grid-column: 1 / -1;
 }

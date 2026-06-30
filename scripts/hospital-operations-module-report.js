@@ -110,6 +110,13 @@ function buildCapabilities(data, serverSource, readiness, release) {
       detail: "基于医疗资源目录、运行快照和调度工单生成跨院床位、ICU、呼吸机、救护车和值班医生可支援能力，并提供调拨建议。"
     },
     {
+      id: "mobile-duty-command",
+      name: "移动值守台",
+      status: release.checks.some((item) => item.id === "release:mobileDuty" && item.passed) ? "ready" : "needs-attention",
+      evidence: ["/api/operations/mobile-duty", "/api/operations/mobile-duty/actions", "taskMessages"],
+      detail: "把预警确认、交接签收、调度备注和直报复核提醒汇总为移动值守卡片，并通过 taskMessages 生成提醒和审计证据。"
+    },
+    {
       id: "governance-reporting",
       name: "治理报表",
       status: release.checks.some((item) => item.id === "release:governanceReport" && item.passed) ? "ready" : "needs-attention",
@@ -191,8 +198,8 @@ function buildNextPlan() {
       phase: "P2 移动值守",
       owner: "运行监测岗/值班长",
       scope: "预警确认、交接签收、调度备注、直报复核提醒和消息闭环",
-      deliverable: "下一步复用交接签收和 taskMessages 通知链，形成移动值守入口和弱网重试策略。",
-      exitCriteria: "移动端可完成签收、备注、提醒确认和审计留痕。"
+      deliverable: "已上线 /api/operations/mobile-duty、/api/operations/mobile-duty/actions 和移动值守台面板，复用 taskMessages 形成提醒、弱网补传说明和审计留痕。",
+      exitCriteria: "代码侧已形成移动值守卡片和消息提醒闭环；生产前需现场确认 App/企业微信/短信通道、值班角色和离线补传策略。"
     }
   ];
 }

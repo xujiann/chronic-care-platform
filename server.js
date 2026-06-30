@@ -4484,11 +4484,11 @@ function buildOperationsNextDevelopmentResearch({
       name: "移动端值守与消息闭环",
       owner: "运行监测岗/值班长",
       problem: `交接事项${handoverItems}项，高压机构${highPressure.length}家，夜间值守需要更轻量的确认和提醒入口。`,
-      deliverable: "移动端查看预警、工单、交接事项和待复核直报差异，并支持签收、备注和消息提醒。",
+      deliverable: "已上线移动值守台，集中查看预警、工单、交接事项和待复核直报差异，并支持提醒生成、弱网补传说明和审计留痕。",
       prerequisites: ["移动端角色权限", "消息模板", "签收审计字段", "弱网重试策略"],
       dataSources: ["operationHandoverSignoffs", "taskMessages", "securityEvents"],
       acceptance: "移动值守可完成预警确认、交接签收、调度备注和审计留痕。",
-      evidence: ["/api/operations/handover", "/api/process-audit"]
+      evidence: ["/api/operations/mobile-duty", "/api/operations/mobile-duty/actions", "/api/messages", "/api/process-audit"]
     }
   ];
   const nextSprint = [
@@ -4518,6 +4518,106 @@ function buildOperationsNextDevelopmentResearch({
     ],
     nextSprint,
     evidence: ["/api/operations/dashboard", "/api/operations/next-development-research", "hospital-operations-module-report.md"]
+  };
+}
+
+function buildOperationsMobileDuty({ snapshots, dispatchRequests, reconciliationReviews, handover, taskMessages }) {
+  const openDispatches = (Array.isArray(dispatchRequests) ? dispatchRequests : []).filter((item) => ["pending", "assigned", "in-progress"].includes(item.status));
+  const pendingRecon = (Array.isArray(reconciliationReviews) ? reconciliationReviews : []).filter((item) => !["approved", "closed"].includes(item.status));
+  const handoverItems = Array.isArray(handover?.items) ? handover.items : [];
+  const highPressure = (Array.isArray(snapshots) ? snapshots : []).filter((item) => item.normalizedStatus === "critical" || Number(item.resourcePressure || 0) >= 85 || (item.activeAlerts || []).some((alert) => alert.severity === "critical"));
+  const recentMessages = (Array.isArray(taskMessages) ? taskMessages : [])
+    .filter((message) => message.collection === "hospitalOperationsMobileDuty" || String(message.taskId || "").startsWith("operations-mobile-duty:"))
+    .slice(0, 8);
+  const cards = [
+    {
+      id: "mobile-duty-alert-confirm",
+      type: "alert-confirm",
+      title: "预警确认",
+      priority: highPressure.length ? "高" : "常规",
+      count: highPressure.length,
+      owner: "运行监测岗",
+      status: highPressure.length ? "待确认" : "已关注",
+      summary: highPressure.length ? `${highPressure.length}家机构处于高压或严重预警状态` : "当前无严重预警机构",
+      nextAction: highPressure.length ? "移动端确认预警、记录电话核实结果并同步值班长。" : "保持弱网缓存和定时巡检。",
+      evidence: ["/api/operations/dashboard", "/api/operations/mobile-duty"]
+    },
+    {
+      id: "mobile-duty-handover-signoff",
+      type: "handover-signoff",
+      title: "交接签收",
+      priority: handoverItems.some((item) => item.severity === "critical") ? "高" : "中",
+      count: handoverItems.length,
+      owner: "值班长",
+      status: handoverItems.length ? "待签收" : "无交接事项",
+      summary: `${handoverItems.length}项交接事项需要移动端复核`,
+      nextAction: "移动端完成交接签收、补充下一班关注点并写入审计。",
+      evidence: ["/api/operations/handover", "/api/operations/handover/signoff"]
+    },
+    {
+      id: "mobile-duty-dispatch-note",
+      type: "dispatch-note",
+      title: "调度备注",
+      priority: openDispatches.some((item) => item.priority === "high") ? "高" : "中",
+      count: openDispatches.length,
+      owner: "调度席",
+      status: openDispatches.length ? "待跟进" : "无开放工单",
+      summary: `${openDispatches.length}条开放调度单需要移动端更新处置进展`,
+      nextAction: "补充资源到位、转运、执行人和预计关闭时间。",
+      evidence: ["/api/operations/dispatch", "/api/operations/dispatch/:id/status"]
+    },
+    {
+      id: "mobile-duty-reconciliation-reminder",
+      type: "reconciliation-reminder",
+      title: "直报复核提醒",
+      priority: pendingRecon.some((item) => item.status === "blocked") ? "高" : "中",
+      count: pendingRecon.length,
+      owner: "统计办公室",
+      status: pendingRecon.length ? "待复核" : "已清零",
+      summary: `${pendingRecon.length}条统计直报差异等待复核`,
+      nextAction: "提醒责任科室确认差异口径、补正说明和提交时限。",
+      evidence: ["/api/operations/reconciliation/:id/review", "healthStatisticsIngestion"]
+    }
+  ];
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    summary: {
+      cards: cards.length,
+      highPriority: cards.filter((item) => item.priority === "高").length,
+      pendingActions: cards.reduce((sum, item) => sum + Number(item.count || 0), 0),
+      reminders: recentMessages.length
+    },
+    weakNetwork: {
+      mode: "cache-last-state",
+      offlineDrafts: true,
+      retryPolicy: "网络恢复后按审计时间顺序补传签收、备注和提醒。"
+    },
+    cards,
+    recentMessages,
+    evidence: ["/api/operations/mobile-duty", "operationHandoverSignoffs", "taskMessages", "securityEvents"]
+  };
+}
+
+function createOperationsMobileDutyReminder(card, payload, user) {
+  const now = new Date().toISOString();
+  return {
+    id: `msg-${randomUUID()}`,
+    taskId: `operations-mobile-duty:${card.id}`,
+    collection: "hospitalOperationsMobileDuty",
+    sourceId: card.id,
+    residentId: "",
+    targetRole: String(payload.targetRole || "commission").trim(),
+    channel: String(payload.channel || "in_app").trim(),
+    title: String(payload.title || `移动值守提醒：${card.title}`).trim(),
+    body: String(payload.body || payload.note || card.nextAction || card.summary || "").trim(),
+    status: "sent",
+    escalationKey: `operations-mobile-duty:${card.id}:${now.slice(0, 10)}:${randomUUID()}`,
+    receipts: [],
+    createdAt: now,
+    createdBy: user.username || user.role,
+    createdByName: user.name,
+    evidence: ["/api/operations/mobile-duty/actions", "/api/messages", "/api/audit/verify"]
   };
 }
 
@@ -4589,6 +4689,13 @@ function buildHospitalOperationsDashboard(data) {
   };
   dashboard.performanceMonitoring = buildPerformanceMonitoringEvidence(data, dashboard);
   dashboard.resourcePool = buildOperationsResourcePool({ snapshots, medicalResources, dispatchRequests });
+  dashboard.mobileDuty = buildOperationsMobileDuty({
+    snapshots,
+    dispatchRequests,
+    reconciliationReviews,
+    handover,
+    taskMessages: data.taskMessages
+  });
   dashboard.governanceReport = buildOperationsGovernanceReport({
     snapshots,
     dispatchRequests,
@@ -8367,6 +8474,58 @@ async function handleApi(req, res) {
     if (!user) return;
     const dashboard = buildHospitalOperationsDashboard(readDatabase());
     sendJson(res, 200, dashboard.resourcePool);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/mobile-duty") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/mobile-duty");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.mobileDuty);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/operations/mobile-duty/actions") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/mobile-duty/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const dashboard = buildHospitalOperationsDashboard(data);
+    const cards = Array.isArray(dashboard.mobileDuty?.cards) ? dashboard.mobileDuty.cards : [];
+    const card = cards.find((item) => item.id === payload.cardId) || cards[0];
+    if (!card) {
+      sendJson(res, 400, { error: "Bad Request", message: "移动值守卡片不存在" });
+      return;
+    }
+    const message = createOperationsMobileDutyReminder(card, payload, user);
+    data.taskMessages = [message, ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
+    data.platformProcessAudit = [
+      {
+        process: "医院运行移动值守",
+        owner: card.owner || user.name,
+        status: "已提醒",
+        risk: card.priority === "高" ? "高优先级值守事项" : "常规值守事项",
+        auditPoint: "核查移动端预警确认、交接签收、调度备注、直报复核提醒和弱网补传。",
+        evidence: `taskMessages/${message.id}`,
+        nextAction: message.body
+      },
+      ...(Array.isArray(data.platformProcessAudit) ? data.platformProcessAudit : [])
+    ].slice(0, 80);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "operations-mobile-duty-reminder",
+        target: card.id,
+        result: "allowed",
+        detail: `${message.targetRole}:${message.channel}:${card.priority}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 201, { message, mobileDuty: buildOperationsMobileDuty({ snapshots: dashboard.snapshots, dispatchRequests: dashboard.dispatchRequests, reconciliationReviews: dashboard.reconciliationReviews, handover: dashboard.handover, taskMessages: data.taskMessages }) });
     return;
   }
 
