@@ -114,6 +114,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "regionalDataSharing:report" && item.passed), true);
   assert.equal(report.regionalDataSharing.ok, true);
   assert.equal(report.checks.some((item) => item.name === "regionalDataSharing:handoffEvidence" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "regionalDataSharing:handoffRuntime" && item.passed), true);
   assert.equal(report.regionalDataSharing.summary.referralHandoffReady >= 1, true);
   assert.equal(report.regionalDataSharing.packages.every((item) => item.referralHandoff?.total === 6), true);
   assert.equal(report.checks.some((item) => item.name === "regionalReferralOverlap:report" && item.passed), true);
