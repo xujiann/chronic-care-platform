@@ -8,6 +8,22 @@ let currentDepartmentStatus = "all";
 let currentJurisdictionDistrict = "";
 let currentJurisdictionType = "";
 let currentJurisdictionDetail = "";
+const DASHBOARD_TASK_COLLECTIONS = [
+  "followups",
+  "careOrders",
+  "medicationPickups",
+  "insuranceClaims",
+  "emergencySignals",
+  "chronicScreeningTasks",
+  "chronicEducationPushes",
+  "chronicManagementPlans",
+  "countyCollaborationOrders",
+  "countyMutualRecognitionRecords",
+  "countyAiDiagnosisCases",
+  "multiPracticeApplications",
+  "dataQualityIssues",
+  "integrationGatewayEvents"
+];
 
 document.addEventListener("DOMContentLoaded", async () => {
   const summary = await loadDashboardSummary();
@@ -66,7 +82,8 @@ function buildStaticDashboardSummary(state) {
   const evidence = Array.isArray(state.platformEvidence) ? state.platformEvidence : [];
   const interfaces = Array.isArray(state.platformInterfaces) ? state.platformInterfaces : [];
   const dependencies = Array.isArray(state.productionDeploymentPlan) ? state.productionDeploymentPlan : [];
-  const openActions = collectStaticOpenActions(state, applications);
+  const taskActions = collectStaticTaskActions(state, applications);
+  const openActions = taskActions.filter((item) => !item.closed).slice(0, 12);
   const actionSummary = openActions.reduce((summary, item) => {
     const current = summary[item.applicationId] || { openActions: 0, highRisks: 0 };
     current.openActions += 1;
@@ -94,9 +111,11 @@ function buildStaticDashboardSummary(state) {
   const riskDrilldowns = buildStaticRiskDrilldowns(openActions);
   const siteEvidencePackage = buildStaticSiteEvidencePackage(state, { interfaces, evidence, siteDependencies: dependencies });
   const jurisdictionScope = buildDashboardJurisdictionScope(state, { openActions, applications: enrichedApplications });
+  const actionClosureTrend = buildDashboardActionClosureTrend(taskActions, { openActions });
   const functionalReport = buildDashboardFunctionalReport({
     applications: enrichedApplications,
     openActions,
+    actionClosureTrend,
     populationServiceBoard,
     certificateExchange,
     riskDrilldowns,
@@ -131,6 +150,7 @@ function buildStaticDashboardSummary(state) {
     riskDrilldowns,
     siteEvidencePackage,
     jurisdictionScope,
+    actionClosureTrend,
     functionalReport,
     interfaces: interfaces.map((item) => ({ id: item.id, domain: item.domain || item.name, priority: item.priority, owner: item.owner, status: item.status, nextAction: item.next })),
     evidence: evidence.map((item) => ({ id: item.id, name: item.name || item.category, owner: item.owner, status: item.status, records: Array.isArray(item.records) ? item.records.length : 0, nextAction: item.next })),
@@ -502,6 +522,96 @@ function buildDashboardJurisdictionRow(district, context = {}) {
   };
 }
 
+function buildDashboardActionClosureTrend(actions, context = {}) {
+  const rows = Array.isArray(actions) ? actions : [];
+  const anchor = latestDashboardDate(rows.map((item) => item.dueAt), rows.map((item) => item.updatedAt)) || new Date();
+  const periods = [
+    { id: "day", label: "日", days: 1 },
+    { id: "week", label: "周", days: 7 },
+    { id: "month", label: "月", month: true },
+    { id: "year", label: "年", year: true }
+  ].map((period) => buildDashboardActionPeriod(period, rows, anchor));
+  const applications = Object.values(rows.reduce((summary, item) => {
+    const key = item.applicationId || item.application || "unknown";
+    const row = summary[key] || {
+      id: key,
+      application: item.application || item.applicationId || "源应用",
+      total: 0,
+      closed: 0,
+      open: 0,
+      overdue: 0,
+      highRisks: 0
+    };
+    row.total += 1;
+    if (item.closed) row.closed += 1;
+    else row.open += 1;
+    if (item.overdue) row.overdue += 1;
+    if (item.priority === "high") row.highRisks += 1;
+    summary[key] = row;
+    return summary;
+  }, {})).map((item) => ({
+    ...item,
+    closureRate: dashboardRate(item.closed, item.total),
+    overdueRate: dashboardRate(item.overdue, item.total)
+  })).sort((left, right) => right.overdueRate - left.overdueRate || right.open - left.open || left.application.localeCompare(right.application, "zh-CN"));
+  const total = rows.length;
+  const closed = rows.filter((item) => item.closed).length;
+  const overdue = rows.filter((item) => item.overdue).length;
+  const open = total - closed;
+  const closureRate = dashboardRate(closed, total);
+  const overdueRate = dashboardRate(overdue, total);
+  return {
+    status: overdue ? "watch" : "ready",
+    source: "source application task collections",
+    generatedAt: new Date().toISOString(),
+    summary: {
+      total,
+      open,
+      closed,
+      overdue,
+      highRisks: rows.filter((item) => item.priority === "high").length,
+      closureRate,
+      overdueRate,
+      previewOpenActions: context.openActions?.length || open
+    },
+    periods,
+    applications,
+    boundary: "仅用于卫生健康行政部门监管、督办和调度分析；具体办理、接诊、审核、随访和整改仍在源应用闭环。"
+  };
+}
+
+function buildDashboardActionPeriod(period, rows, anchor) {
+  const start = new Date(anchor);
+  start.setHours(0, 0, 0, 0);
+  if (period.days) start.setDate(start.getDate() - period.days + 1);
+  if (period.month) start.setDate(1);
+  if (period.year) start.setMonth(0, 1);
+  const end = new Date(anchor);
+  end.setHours(23, 59, 59, 999);
+  const periodRows = rows.filter((item) => {
+    const date = parseDashboardDate(item.dueAt || item.updatedAt);
+    return date && date >= start && date <= end;
+  });
+  const total = periodRows.length;
+  const closed = periodRows.filter((item) => item.closed).length;
+  const overdue = periodRows.filter((item) => item.overdue).length;
+  return {
+    id: period.id,
+    label: period.label,
+    rangeLabel: `${formatDashboardDate(start)} 至 ${formatDashboardDate(end)}`,
+    total,
+    closed,
+    open: total - closed,
+    overdue,
+    closureRate: dashboardRate(closed, total),
+    overdueRate: dashboardRate(overdue, total)
+  };
+}
+
+function dashboardRate(part, total) {
+  return total > 0 ? Math.round((Number(part || 0) / total) * 100) : 0;
+}
+
 function buildDashboardDepartmentFunctionMatrix(context = {}) {
   const applications = context.applications || [];
   const openActions = context.openActions || [];
@@ -639,6 +749,7 @@ function buildDashboardFunctionalReport(context) {
   const riskDrilldowns = context.riskDrilldowns || { summary: {}, items: [] };
   const siteEvidencePackage = context.siteEvidencePackage || { summary: {}, items: [] };
   const jurisdictionScope = context.jurisdictionScope || { summary: {}, districts: [] };
+  const actionClosureTrend = context.actionClosureTrend || { summary: {}, periods: [] };
   const departmentFunctionMatrix = buildDashboardDepartmentFunctionMatrix(context);
   const cityCountyFunctionMatrix = buildDashboardCityCountyFunctionMatrix(context);
   const sourceRecords = applications.reduce((sum, item) => sum + Number(item.records || 0), 0);
@@ -673,6 +784,13 @@ function buildDashboardFunctionalReport(context) {
       status: jurisdictionScope.districts?.length ? "ready" : "watch",
       evidence: `${jurisdictionScope.summary?.districts || 0} 个辖区，${jurisdictionScope.summary?.institutions || 0} 个机构，${jurisdictionScope.summary?.openActions || 0} 条待办`,
       boundary: "仅按辖区汇总机构目录、日报服务量和源应用待办，不替代区县或机构端办理。"
+    },
+    {
+      id: "task-closure-trend",
+      name: "任务闭环率与超期率趋势",
+      status: actionClosureTrend.summary?.overdue ? "watch" : "ready",
+      evidence: `${actionClosureTrend.summary?.closureRate || 0}% 闭环率，${actionClosureTrend.summary?.overdueRate || 0}% 超期率，${actionClosureTrend.periods?.length || 0} 个周期`,
+      boundary: "仅做行政监管、调度和审计分析；源任务办理继续在对应业务系统完成。"
     },
     {
       id: "department-workbench",
@@ -815,6 +933,7 @@ function renderDashboard(summary) {
   renderFunctionReport(summary.functionalReport || {});
   renderJurisdictionWorkbench(summary.functionalReport || {});
   renderJurisdictionScope(summary.jurisdictionScope || {});
+  renderActionClosureTrend(summary.actionClosureTrend || {});
   renderDepartmentWorkbench(summary.functionalReport || {});
   document.querySelector("#dashboard-scope").textContent = summary.scope?.rule || "";
   renderFilterOptions(summary);
@@ -1254,6 +1373,54 @@ function renderJurisdictionDetail(container, row, selectedType) {
   </article>`;
 }
 
+function renderActionClosureTrend(trend) {
+  const section = document.querySelector("#action-closure-trend-board");
+  const summary = document.querySelector("#action-trend-summary");
+  const cards = document.querySelector("#action-trend-cards");
+  const periods = document.querySelector("#action-trend-periods");
+  const apps = document.querySelector("#action-trend-apps");
+  const boundary = document.querySelector("#action-trend-boundary");
+  if (!section || !cards || !periods || !apps) return;
+  const totals = trend.summary || {};
+  const periodRows = Array.isArray(trend.periods) ? trend.periods : [];
+  const appRows = Array.isArray(trend.applications) ? trend.applications : [];
+  section.dataset.trendStatus = trend.status || "empty";
+  if (summary) {
+    summary.textContent = `${totals.total || 0} 条任务 / 闭环率 ${totals.closureRate || 0}% / 超期率 ${totals.overdueRate || 0}% / ${totals.overdue || 0} 条超期`;
+  }
+  cards.innerHTML = [
+    ["任务总量", totals.total || 0, "源应用任务全集"],
+    ["已闭环", totals.closed || 0, `${totals.closureRate || 0}% 闭环率`],
+    ["待闭环", totals.open || 0, `${totals.previewOpenActions || 0} 条进入驾驶舱预览`],
+    ["超期任务", totals.overdue || 0, `${totals.overdueRate || 0}% 超期率`]
+  ].map(([label, value, detail]) => `<article class="action-trend-card">
+    <span>${label}</span>
+    <strong>${formatDashboardNumber(value)}</strong>
+    <small>${detail}</small>
+  </article>`).join("");
+  periods.innerHTML = periodRows.map((item) => `<article class="action-trend-period" data-action-period="${item.id}">
+    <div>
+      <strong>${item.label}</strong>
+      <span>${item.rangeLabel || ""}</span>
+    </div>
+    <div class="trend-bar-row">
+      <span>闭环 ${item.closureRate || 0}%</span>
+      <div class="trend-bar"><i style="width:${Math.min(100, item.closureRate || 0)}%"></i></div>
+    </div>
+    <div class="trend-bar-row overdue">
+      <span>超期 ${item.overdueRate || 0}%</span>
+      <div class="trend-bar"><i style="width:${Math.min(100, item.overdueRate || 0)}%"></i></div>
+    </div>
+    <small>${item.total || 0} 条 / 已闭环 ${item.closed || 0} / 超期 ${item.overdue || 0}</small>
+  </article>`).join("") || `<article class="action-trend-period empty"><strong>等待周期数据</strong><span>源应用补齐任务日期后显示趋势。</span></article>`;
+  apps.innerHTML = appRows.slice(0, 6).map((item) => `<article class="action-trend-app" data-action-app="${item.id}">
+    <span>${item.application || item.id}</span>
+    <strong>${item.open || 0} 待闭环 / ${item.overdue || 0} 超期</strong>
+    <small>闭环率 ${item.closureRate || 0}% / 超期率 ${item.overdueRate || 0}% / 高风险 ${item.highRisks || 0}</small>
+  </article>`).join("") || `<article class="action-trend-app empty"><strong>等待源应用任务</strong><small>接入随访、转诊、慢病筛查、医共体协同等任务后显示。</small></article>`;
+  if (boundary) boundary.textContent = trend.boundary || "本趋势仅用于卫生健康行政部门监管、督办和调度分析，具体办理仍回到源应用。";
+}
+
 function bindDepartmentStatus() {
   const controls = document.querySelector("#department-status-controls");
   if (!controls || controls.dataset.bound === "true") return;
@@ -1535,29 +1702,52 @@ function renderEvidence(items) {
 }
 
 function collectStaticOpenActions(state, applications) {
+  return collectStaticTaskActions(state, applications).filter((item) => !item.closed).slice(0, 12);
+}
+
+function collectStaticTaskActions(state, applications) {
   const appByCollection = Object.fromEntries(applications.flatMap((app) =>
     app.collections.map((item) => [item.collection, app])
   ));
-  return ["followups", "careOrders", "medicationPickups", "insuranceClaims", "emergencySignals", "countyCollaborationOrders", "countyMutualRecognitionRecords", "countyAiDiagnosisCases"]
+  return DASHBOARD_TASK_COLLECTIONS
     .flatMap((collection) => {
       const app = appByCollection[collection] || applications[0];
-      return (Array.isArray(state[collection]) ? state[collection] : []).filter((item) => !isClosedDashboardStatus(item.status)).map((item) => ({
-        id: item.id || `${collection}-open`,
+      return (Array.isArray(state[collection]) ? state[collection] : []).map((item) => {
+        const status = item.status || item.reviewStatus || item.authorizationStatus || item.state || "";
+        const dueAt = item.dueAt || item.due || item.nextReview || item.plannedAt || item.requestedAt || item.lastUpdated || item.createdAt || "";
+        const closed = isClosedDashboardStatus(status);
+        return {
+        id: item.id || `${collection}-task`,
         collection,
         applicationId: app.id,
         application: app.name,
         entry: app.entry,
-        title: item.title || item.taskName || item.orderType || item.item || item.claimType || item.medication || collection,
-        owner: item.owner || item.assignee || item.institution || item.center || "owner-pending",
-        status: item.status || "open",
+        title: item.title || item.taskName || item.topic || item.orderType || item.item || item.claimType || item.medication || item.name || collection,
+        owner: item.owner || item.assignee || item.institution || item.center || item.sourceInstitution || item.targetInstitution || "owner-pending",
+        status: status || "open",
         region: item.region || item.district || item.area || "",
-        priority: dashboardPriority(item)
-      }));
-    }).slice(0, 12);
+        priority: dashboardPriority(item),
+        dueAt,
+        updatedAt: item.updatedAt || item.lastUpdated || item.createdAt || item.reportDate || dueAt,
+        closed,
+        overdue: !closed && isDashboardOverdue(dueAt, item)
+      };
+      });
+    });
 }
 
 function isClosedDashboardStatus(status) {
   return /closed|resolved|approved|recognized|completed|passed|ready|signed|done|已完成|已通过|已闭环/.test(String(status || ""));
+}
+
+function isDashboardOverdue(dueAt, item = {}) {
+  const text = [item.status, item.priority, item.level, item.risk, item.riskLevel].filter(Boolean).join(" ");
+  if (/overdue|逾期|超期|已逾期/i.test(text)) return true;
+  const dueDate = parseDashboardDate(dueAt);
+  if (!dueDate) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return dueDate < today;
 }
 
 function dashboardPriority(item) {

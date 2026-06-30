@@ -46,11 +46,16 @@ test("health dashboard summary aggregates the first seven applications without r
   assert.equal(report.riskDrilldowns.summary.withTrace, report.riskDrilldowns.items.length);
   assert.equal(report.siteEvidencePackage.items.length, 4);
   assert.equal(report.siteEvidencePackage.summary.ready, 3);
-  assert.equal(report.functionalReport.functions.length, 12);
+  assert.equal(report.functionalReport.functions.length, 13);
   assert.equal(report.functionalReport.functions.some((item) => item.id === "population-service-board" && item.status === "ready"), true);
   assert.equal(report.functionalReport.functions.some((item) => item.id === "jurisdiction-workbench" && item.status === "ready"), true);
   assert.equal(report.functionalReport.functions.some((item) => item.id === "jurisdiction-scope-drilldown" && item.status === "ready"), true);
+  assert.equal(report.functionalReport.functions.some((item) => item.id === "task-closure-trend"), true);
   assert.equal(report.functionalReport.functions.some((item) => item.id === "department-workbench" && item.status === "ready"), true);
+  assert.equal(report.actionClosureTrend.periods.length, 4);
+  assert.equal(report.actionClosureTrend.summary.total >= report.openActions.length, true);
+  assert.equal(report.actionClosureTrend.summary.overdue > 0, true);
+  assert.equal(report.actionClosureTrend.applications.length >= 2, true);
   assert.equal(report.jurisdictionScope.districts.length >= 2, true);
   assert.equal(report.jurisdictionScope.summary.institutions >= 3, true);
   assert.equal(report.jurisdictionScope.institutionTypeOptions.length >= 2, true);
@@ -76,6 +81,7 @@ test("health dashboard summary aggregates the first seven applications without r
   assert.equal(report.checks.some((item) => item.id === "dashboard:functional-report" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:jurisdiction-scope" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:jurisdiction-detail" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "dashboard:action-closure-trend" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:department-function-matrix" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:city-county-function-matrix" && item.passed), true);
   assert.equal(report.openActions.every((item) => item.applicationId && item.application && item.entry), true);

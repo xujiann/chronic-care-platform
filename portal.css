@@ -873,6 +873,107 @@ h1 { margin-top: 4px; font-size: 28px; }
   display: block;
 }
 
+.action-trend-board {
+  margin-bottom: 16px;
+}
+
+.action-trend-grid,
+.action-trend-bars,
+.action-trend-apps {
+  display: grid;
+  gap: 12px;
+}
+
+.action-trend-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.action-trend-bars {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 12px;
+}
+
+.action-trend-apps {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 12px;
+}
+
+.action-trend-card,
+.action-trend-period,
+.action-trend-app {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+
+.action-trend-card span,
+.action-trend-card strong,
+.action-trend-card small,
+.action-trend-period span,
+.action-trend-period strong,
+.action-trend-period small,
+.action-trend-app span,
+.action-trend-app strong,
+.action-trend-app small {
+  display: block;
+}
+
+.action-trend-card span,
+.action-trend-period span,
+.action-trend-app span,
+.action-trend-card small,
+.action-trend-period small,
+.action-trend-app small {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.action-trend-card span,
+.action-trend-app span {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.action-trend-card strong {
+  margin-top: 6px;
+  font-size: 24px;
+}
+
+.action-trend-period strong,
+.action-trend-app strong {
+  margin-top: 4px;
+  font-size: 16px;
+}
+
+.trend-bar-row {
+  margin-top: 10px;
+}
+
+.trend-bar-row span {
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.trend-bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e5e7eb;
+}
+
+.trend-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--green);
+}
+
+.trend-bar-row.overdue .trend-bar i {
+  background: var(--amber);
+}
+
 .jurisdiction-card {
   border: 1px solid var(--line);
   border-left: 4px solid var(--blue);
@@ -1737,6 +1838,9 @@ dialog::backdrop {
   .jurisdiction-scope-grid,
   .jurisdiction-detail-metrics,
   .jurisdiction-detail-columns,
+  .action-trend-grid,
+  .action-trend-bars,
+  .action-trend-apps,
   .department-grid,
   .portal-grid,
   .claim-grid,

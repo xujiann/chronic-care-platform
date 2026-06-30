@@ -14,6 +14,22 @@ const HIGH_RISK_PATTERN = /high|urgent|critical|overdue|dead_letter|楂|绱|閫�
 const APPLICATION_BY_COLLECTION = Object.fromEntries(
   APPLICATIONS.flatMap((app) => app.collections.map((collection) => [collection, app]))
 );
+const TASK_COLLECTIONS = [
+  "followups",
+  "careOrders",
+  "medicationPickups",
+  "insuranceClaims",
+  "emergencySignals",
+  "chronicScreeningTasks",
+  "chronicEducationPushes",
+  "chronicManagementPlans",
+  "countyCollaborationOrders",
+  "countyMutualRecognitionRecords",
+  "countyAiDiagnosisCases",
+  "multiPracticeApplications",
+  "dataQualityIssues",
+  "integrationGatewayEvents"
+];
 
 function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(ROOT, relativePath), "utf8"));
@@ -75,24 +91,18 @@ function summarizeApplication(data, app) {
 }
 
 function collectOpenActions(data, limit = 12) {
-  const taskCollections = [
-    "followups",
-    "careOrders",
-    "medicationPickups",
-    "insuranceClaims",
-    "emergencySignals",
-    "chronicScreeningTasks",
-    "chronicEducationPushes",
-    "chronicManagementPlans",
-    "countyCollaborationOrders",
-    "countyMutualRecognitionRecords",
-    "countyAiDiagnosisCases",
-    "multiPracticeApplications",
-    "dataQualityIssues",
-    "integrationGatewayEvents"
-  ];
-  return taskCollections.flatMap((collection) => rows(data, collection).filter(isOpen).map((item) => {
+  return collectTaskActionRows(data).filter((item) => !item.closed).sort((left, right) =>
+    ({ high: 3, medium: 2, normal: 1 }[right.priority] || 0) - ({ high: 3, medium: 2, normal: 1 }[left.priority] || 0) ||
+    String(left.dueAt || "").localeCompare(String(right.dueAt || ""))
+  ).slice(0, limit);
+}
+
+function collectTaskActionRows(data) {
+  return TASK_COLLECTIONS.flatMap((collection) => rows(data, collection).map((item) => {
     const app = APPLICATION_BY_COLLECTION[collection] || APPLICATIONS[0];
+    const status = statusOf(item) || "open";
+    const dueAt = item.dueAt || item.due || item.nextReview || item.plannedAt || item.requestedAt || item.lastUpdated || "";
+    const closed = !isOpen(item);
     return {
       id: item.id || `${collection}-${item.residentId || item.status || "open"}`,
       collection,
@@ -101,15 +111,25 @@ function collectOpenActions(data, limit = 12) {
       entry: app.entry,
       title: item.title || item.taskName || item.topic || item.orderType || item.item || item.claimType || item.medication || item.name || collection,
       owner: item.owner || item.assignee || item.institution || item.center || item.sourceInstitution || item.targetInstitution || "owner-pending",
-      status: statusOf(item) || "open",
+      status,
       priority: riskLevel(item),
       region: item.region || item.district || item.area || "",
-      dueAt: item.dueAt || item.due || item.nextReview || item.plannedAt || item.requestedAt || item.lastUpdated || ""
+      dueAt,
+      updatedAt: item.updatedAt || item.lastUpdated || item.createdAt || item.reportDate || dueAt,
+      closed,
+      overdue: !closed && isActionOverdue(dueAt, item)
     };
-  })).sort((left, right) =>
-    ({ high: 3, medium: 2, normal: 1 }[right.priority] || 0) - ({ high: 3, medium: 2, normal: 1 }[left.priority] || 0) ||
-    String(left.dueAt || "").localeCompare(String(right.dueAt || ""))
-  ).slice(0, limit);
+  }));
+}
+
+function isActionOverdue(dueAt, item = {}) {
+  const text = [item.status, item.priority, item.level, item.risk, item.riskLevel].filter(Boolean).join(" ");
+  if (/overdue|逾期|超期|已逾期/i.test(text)) return true;
+  const dueDate = parseDate(dueAt);
+  if (!dueDate) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return dueDate < today;
 }
 
 function parseDate(value) {
@@ -554,6 +574,94 @@ function buildJurisdictionScope(data, context = {}) {
   };
 }
 
+function buildActionClosureTrend(actions, context = {}) {
+  const rows = Array.isArray(actions) ? actions : [];
+  const anchor = latestAvailableDate(rows.map((item) => item.dueAt), rows.map((item) => item.updatedAt)) || new Date();
+  const periods = [
+    { id: "day", label: "日", days: 1 },
+    { id: "week", label: "周", days: 7 },
+    { id: "month", label: "月", month: true },
+    { id: "year", label: "年", year: true }
+  ].map((period) => buildActionClosurePeriod(period, rows, anchor));
+  const applications = Object.values(rows.reduce((summary, item) => {
+    const key = item.applicationId || item.application || "unknown";
+    const row = summary[key] || {
+      id: key,
+      application: item.application || item.applicationId || "源应用",
+      total: 0,
+      closed: 0,
+      open: 0,
+      overdue: 0,
+      highRisks: 0
+    };
+    row.total += 1;
+    if (item.closed) row.closed += 1;
+    else row.open += 1;
+    if (item.overdue) row.overdue += 1;
+    if (item.priority === "high") row.highRisks += 1;
+    summary[key] = row;
+    return summary;
+  }, {})).map((item) => ({
+    ...item,
+    closureRate: rate(item.closed, item.total),
+    overdueRate: rate(item.overdue, item.total)
+  })).sort((left, right) => right.overdueRate - left.overdueRate || right.open - left.open || left.application.localeCompare(right.application, "zh-CN"));
+  const total = rows.length;
+  const closed = rows.filter((item) => item.closed).length;
+  const overdue = rows.filter((item) => item.overdue).length;
+  const open = total - closed;
+  return {
+    status: overdue ? "watch" : "ready",
+    source: "source application task collections",
+    generatedAt: new Date().toISOString(),
+    summary: {
+      total,
+      open,
+      closed,
+      overdue,
+      highRisks: rows.filter((item) => item.priority === "high").length,
+      closureRate: rate(closed, total),
+      overdueRate: rate(overdue, total),
+      previewOpenActions: context.openActions?.length || open
+    },
+    periods,
+    applications,
+    boundary: "仅用于卫生健康行政部门监管、督办和调度分析；具体办理、接诊、审核、随访和整改仍在源应用闭环。"
+  };
+}
+
+function buildActionClosurePeriod(period, rows, anchor) {
+  const start = new Date(anchor);
+  start.setHours(0, 0, 0, 0);
+  if (period.days) start.setDate(start.getDate() - period.days + 1);
+  if (period.month) start.setDate(1);
+  if (period.year) start.setMonth(0, 1);
+  const end = new Date(anchor);
+  end.setHours(23, 59, 59, 999);
+  const periodRows = rows.filter((item) => {
+    const date = parseDate(item.dueAt || item.updatedAt);
+    return date && date >= start && date <= end;
+  });
+  const total = periodRows.length;
+  const closed = periodRows.filter((item) => item.closed).length;
+  const overdue = periodRows.filter((item) => item.overdue).length;
+  return {
+    id: period.id,
+    label: period.label,
+    rangeLabel: `${formatDate(start)} 至 ${formatDate(end)}`,
+    total,
+    closed,
+    open: total - closed,
+    overdue,
+    closureRate: rate(closed, total),
+    overdueRate: rate(overdue, total)
+  };
+}
+
+function rate(part, total) {
+  return total > 0 ? Math.round((Number(part || 0) / total) * 100) : 0;
+}
+
 function buildDepartmentFunctionMatrix(context = {}) {
   const applications = context.applications || [];
   const openActions = context.openActions || [];
@@ -736,6 +844,7 @@ function buildFunctionalReport(context) {
   const riskDrilldowns = context.riskDrilldowns || { summary: {}, items: [] };
   const siteEvidencePackage = context.siteEvidencePackage || { summary: {}, items: [] };
   const jurisdictionScope = context.jurisdictionScope || { summary: {}, districts: [] };
+  const actionClosureTrend = context.actionClosureTrend || { summary: {}, periods: [] };
   const departmentFunctionMatrix = buildDepartmentFunctionMatrix(context);
   const cityCountyFunctionMatrix = buildCityCountyFunctionMatrix(context);
   const sourceRecords = applications.reduce((sum, item) => sum + Number(item.records || 0), 0);
@@ -769,6 +878,13 @@ function buildFunctionalReport(context) {
       status: jurisdictionScope.districts?.length ? "ready" : "watch",
       evidence: `${jurisdictionScope.summary?.districts || 0} 个辖区，${jurisdictionScope.summary?.institutions || 0} 个机构，${jurisdictionScope.summary?.openActions || 0} 条待办`,
       boundary: "仅按辖区汇总机构目录、日报服务量和源应用待办，不替代区县或机构端办理。"
+    },
+    {
+      id: "task-closure-trend",
+      name: "任务闭环率与超期率趋势",
+      status: actionClosureTrend.summary?.overdue ? "watch" : "ready",
+      evidence: `${actionClosureTrend.summary?.closureRate || 0}% 闭环率，${actionClosureTrend.summary?.overdueRate || 0}% 超期率，${actionClosureTrend.periods?.length || 0} 个周期`,
+      boundary: "仅做行政监管、调度和审计分析；源任务办理继续在对应业务系统完成。"
     },
     {
       id: "department-workbench",
@@ -860,6 +976,7 @@ function buildHealthDashboardSummary(options = {}) {
   const readiness = options.readiness || null;
   const releaseReport = options.releaseReport || null;
   const applications = APPLICATIONS.map((app) => summarizeApplication(data, app));
+  const taskActions = collectTaskActionRows(data);
   const openActions = collectOpenActions(data);
   const sourceOpenActions = applications.reduce((sum, item) => sum + item.openActions, 0);
   const previewOpenActions = openActions.length;
@@ -871,7 +988,8 @@ function buildHealthDashboardSummary(options = {}) {
   const riskDrilldowns = buildRiskDrilldowns(openActions);
   const siteEvidencePackage = buildSiteEvidencePackage(data, { interfaceRows, evidenceRecords, siteDependencies });
   const jurisdictionScope = buildJurisdictionScope(data, { openActions, applications });
-  const functionalReport = buildFunctionalReport({ applications, openActions, populationServiceBoard, certificateExchange, riskDrilldowns, siteEvidencePackage, jurisdictionScope, interfaceRows, evidenceRecords, siteDependencies });
+  const actionClosureTrend = buildActionClosureTrend(taskActions, { openActions });
+  const functionalReport = buildFunctionalReport({ applications, openActions, actionClosureTrend, populationServiceBoard, certificateExchange, riskDrilldowns, siteEvidencePackage, jurisdictionScope, interfaceRows, evidenceRecords, siteDependencies });
   const departmentFunctionMatrix = functionalReport.departmentFunctionMatrix || [];
   const cityCountyFunctionMatrix = functionalReport.cityCountyFunctionMatrix || [];
   const checks = [
@@ -885,9 +1003,10 @@ function buildHealthDashboardSummary(options = {}) {
     { id: "dashboard:certificate-exchange", passed: certificateExchange.items.length >= 5 && certificateExchange.summary.receipts >= 3 && certificateExchange.summary.correctable >= 4, detail: `${certificateExchange.items.length} certificate exchange tracks, ${certificateExchange.summary.receipts} receipts` },
     { id: "dashboard:risk-drilldown", passed: riskDrilldowns.items.length >= 4 && riskDrilldowns.summary.withTrace === riskDrilldowns.items.length, detail: `${riskDrilldowns.items.length} risk drilldowns with trace` },
     { id: "dashboard:site-evidence-package", passed: siteEvidencePackage.items.length >= 4 && siteEvidencePackage.summary.ready >= 3, detail: `${siteEvidencePackage.items.length} evidence package artifacts` },
-    { id: "dashboard:functional-report", passed: functionalReport.functions.length >= 12 && functionalReport.releaseEvidence.length >= 4, detail: `${functionalReport.functions.length} module functions with release evidence` },
+    { id: "dashboard:functional-report", passed: functionalReport.functions.length >= 13 && functionalReport.releaseEvidence.length >= 4, detail: `${functionalReport.functions.length} module functions with release evidence` },
     { id: "dashboard:jurisdiction-scope", passed: jurisdictionScope.districts.length >= 2 && jurisdictionScope.summary.institutions >= 3 && jurisdictionScope.institutionTypeOptions.length >= 2, detail: `${jurisdictionScope.summary.districts} districts, ${jurisdictionScope.summary.institutions} institutions, ${jurisdictionScope.summary.openActions} open actions` },
     { id: "dashboard:jurisdiction-detail", passed: jurisdictionScope.districts.some((item) => item.id !== "all" && (item.institutionsList?.length || item.serviceReportList?.length || item.actionList?.length)), detail: "district drilldown includes institution, service, or action detail" },
+    { id: "dashboard:action-closure-trend", passed: actionClosureTrend.summary.total >= openActions.length && actionClosureTrend.periods.length === 4 && actionClosureTrend.applications.length >= 2, detail: `${actionClosureTrend.summary.closureRate}% closure, ${actionClosureTrend.summary.overdueRate}% overdue` },
     { id: "dashboard:department-function-matrix", passed: departmentFunctionMatrix.length >= 6 && departmentFunctionMatrix.every((item) => item.implemented?.length && item.nextPlan), detail: `${departmentFunctionMatrix.length} internal department function rows` },
     {
       id: "dashboard:city-county-function-matrix",
@@ -933,6 +1052,7 @@ function buildHealthDashboardSummary(options = {}) {
     riskDrilldowns,
     siteEvidencePackage,
     jurisdictionScope,
+    actionClosureTrend,
     functionalReport,
     interfaces: interfaceRows.map((item) => ({
       id: item.id || item.domain,
@@ -1033,6 +1153,7 @@ function dashboardReportCheckLabel(checkId) {
     "dashboard:functional-report": "主要功能报告",
     "dashboard:jurisdiction-scope": "辖区监管钻取",
     "dashboard:jurisdiction-detail": "区县监管详情",
+    "dashboard:action-closure-trend": "任务闭环率与超期率趋势",
     "dashboard:department-function-matrix": "内部机构功能矩阵",
     "dashboard:department-functions": "内部机构功能矩阵",
     "dashboard:city-county-function-matrix": "市县两级机构功能矩阵",
@@ -1093,6 +1214,8 @@ function renderMarkdown(report) {
   const cityCountyRows = (report.functionalReport?.cityCountyFunctionMatrix || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.level || ""} | ${item.agency || item.id} | ${(item.implemented || []).map((text) => String(text).replace(/\|/g, "/")).join("<br>")} | ${String(item.nextPlan || "").replace(/\|/g, "/")} |`);
   const jurisdictionRows = (report.jurisdictionScope?.districts || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.district || item.id} | ${item.institutions || 0} | ${item.beds || 0} | ${item.doctors || 0} | ${item.openActions || 0} | ${item.highRisks || 0} | ${item.serviceReports || 0} |`);
   const jurisdictionDetailRows = (report.jurisdictionScope?.districts || []).filter((item) => item.id !== "all").map((item) => `| ${item.district || item.id} | ${(item.institutionsList || []).slice(0, 4).map((row) => `${row.name || row.id}(${row.type || "未标注"})`).join("<br>") || "等待机构目录"} | ${(item.serviceReportList || []).slice(0, 3).map((row) => `${row.reportDate || "未标注"} 就诊${row.visits || 0}/入院${row.admissions || 0}`).join("<br>") || "等待日报"} | ${(item.actionList || []).slice(0, 3).map((row) => `${row.application || "源应用"}:${String(row.title || row.id || "").replace(/\|/g, "/")}`).join("<br>") || "暂无待办"} |`);
+  const actionTrendRows = (report.actionClosureTrend?.periods || []).map((item) => `| ${item.label || item.id} | ${item.rangeLabel || ""} | ${item.total || 0} | ${item.closed || 0} | ${item.open || 0} | ${item.overdue || 0} | ${item.closureRate || 0}% | ${item.overdueRate || 0}% |`);
+  const actionTrendAppRows = (report.actionClosureTrend?.applications || []).slice(0, 8).map((item) => `| ${item.application || item.id} | ${item.total || 0} | ${item.open || 0} | ${item.overdue || 0} | ${item.highRisks || 0} | ${item.closureRate || 0}% | ${item.overdueRate || 0}% |`);
   const reportEvidenceRows = (report.functionalReport?.releaseEvidence || []).map((item) => `| ${item.name || item.id} | ${dashboardReportEvidenceLabel(item.evidence || "").replace(/\|/g, "/")} |`);
   const onsiteBoundaryRows = (report.functionalReport?.onsiteBoundaries || []).map((item) => `- ${item}`);
   return [
@@ -1201,6 +1324,18 @@ function renderMarkdown(report) {
     "| 辖区 | 机构目录 | 日报服务量 | 源应用待办 |",
     "|---|---|---|---|",
     ...jurisdictionDetailRows,
+    "",
+    "### 任务闭环率与超期率趋势",
+    "",
+    report.actionClosureTrend?.boundary || "本趋势仅用于行政监管、督办和调度分析。",
+    "",
+    "| 周期 | 范围 | 任务 | 已闭环 | 待闭环 | 超期 | 闭环率 | 超期率 |",
+    "|---|---|---:|---:|---:|---:|---:|---:|",
+    ...actionTrendRows,
+    "",
+    "| 源应用 | 任务 | 待闭环 | 超期 | 高风险 | 闭环率 | 超期率 |",
+    "|---|---:|---:|---:|---:|---:|---:|",
+    ...actionTrendAppRows,
     "",
     "### 发布证据",
     "",

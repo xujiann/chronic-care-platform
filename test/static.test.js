@@ -120,6 +120,9 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(html, /jurisdiction-type-filter/);
   assert.match(html, /jurisdiction-scope-grid/);
   assert.match(html, /jurisdiction-detail-panel/);
+  assert.match(html, /action-closure-trend-board/);
+  assert.match(html, /action-trend-periods/);
+  assert.match(html, /action-trend-apps/);
   assert.match(html, /dashboard-department-board/);
   assert.match(html, /department-status-controls/);
   assert.match(html, /department-function-matrix/);
@@ -168,6 +171,8 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(js, /renderJurisdictionDetail/);
   assert.match(js, /bindJurisdictionScopeFilters/);
   assert.match(js, /currentJurisdictionDetail/);
+  assert.match(js, /buildDashboardActionClosureTrend/);
+  assert.match(js, /renderActionClosureTrend/);
   assert.match(js, /renderDepartmentWorkbench/);
   assert.match(js, /bindDepartmentStatus/);
   assert.match(js, /renderFunctionReport/);
@@ -188,6 +193,7 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(read("portal.css"), /jurisdiction-card/);
   assert.match(read("portal.css"), /jurisdiction-scope-card/);
   assert.match(read("portal.css"), /jurisdiction-detail-card/);
+  assert.match(read("portal.css"), /action-trend-card/);
   assert.match(read("portal.css"), /department-card/);
   assert.match(read("portal.css"), /population-bar-fill/);
   assert.match(read("portal.css"), /population-insight/);
