@@ -199,6 +199,30 @@ h1 { margin-top: 4px; font-size: 28px; }
   gap: 14px;
 }
 
+.login-scope-note {
+  display: grid;
+  gap: 5px;
+  border: 1px solid #cfe5df;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #f0fbf7;
+}
+
+.login-scope-note[hidden] {
+  display: none;
+}
+
+.login-scope-note strong {
+  color: var(--teal);
+  font-size: 14px;
+}
+
+.login-scope-note span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .login-form label {
   display: grid;
   gap: 6px;

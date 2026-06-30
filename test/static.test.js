@@ -344,6 +344,7 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   const data = JSON.parse(read("data/db.json"));
   const html = read("quality-safety.html");
   const about = read("quality-safety-about.html");
+  const login = read("login.html");
   const js = read("quality-safety.js");
   const server = read("server.js");
   const portalCss = read("portal.css");
@@ -372,6 +373,10 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.doesNotMatch(html, /Medical quality|Policy basis|Go-live readiness|Issue queue|Rectification loop/);
   assert.match(about, /data-quality-safety-about="policy-basis"/);
   assert.match(about, /data-quality-safety-about="joint-testing"/);
+  assert.match(about, /data-quality-safety-about="login-departments"/);
+  assert.match(about, /卫健监管部门/);
+  assert.match(about, /医疗机构/);
+  assert.match(about, /县域医共体/);
   assert.match(about, /data-policy-ref="medical-quality-management"/);
   assert.match(about, /data-policy-ref="core-safety-systems"/);
   assert.match(about, /data-policy-ref="mutual-recognition"/);
@@ -407,6 +412,11 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(portalCss, /quality-brief/);
   assert.match(portalCss, /\.table-wrap/);
   assert.match(portalCss, /position: sticky/);
+  assert.match(portalCss, /login-scope-note/);
+  assert.match(login, /moduleScopes/);
+  assert.match(login, /quality-safety\.html/);
+  assert.match(login, /医疗质量与安全监管平台准入部门/);
+  assert.match(login, /scope\.roles\.includes\(user\.role\)/);
   assert.match(server, /\/api\/quality-safety\/dashboard/);
   assert.match(server, /\/api\/quality-safety\/interface-standard/);
   assert.match(server, /\/api\/quality-safety\/interface-joint-test-pack/);

@@ -27,6 +27,7 @@
             <span>演示密码均为 123456</span>
           </div>
           <form id="login-form" class="login-form">
+            <div id="login-scope-note" class="login-scope-note" hidden></div>
             <label>账号
               <select name="username" id="login-user"></select>
             </label>
@@ -44,7 +45,22 @@
     <script src="./auth.js"></script>
     <script>
       const select = document.querySelector("#login-user");
-      const accounts = window.HealthCityAuth.demoUsers;
+      const params = new URLSearchParams(location.search);
+      const redirectPage = (params.get("redirect") || "").split("?")[0].replace(/^\.\//, "");
+      const moduleScopes = {
+        "quality-safety.html": {
+          title: "医疗质量与安全监管平台准入部门",
+          roles: ["commission", "institution", "county"],
+          message: "本模块仅开放给卫健监管、医疗机构和县域医共体。医保、居民等账号不进入质量安全监管集合。"
+        }
+      };
+      const scope = moduleScopes[redirectPage];
+      const accounts = scope ? window.HealthCityAuth.demoUsers.filter((user) => scope.roles.includes(user.role)) : window.HealthCityAuth.demoUsers;
+      const scopeNote = document.querySelector("#login-scope-note");
+      if (scope) {
+        scopeNote.hidden = false;
+        scopeNote.innerHTML = `<strong>${scope.title}</strong><span>${scope.message}</span>`;
+      }
       select.innerHTML = accounts.map((user) => `<option value="${user.username}">${user.roleName} · ${user.orgName || user.name} · ${user.username}</option>`).join("");
       document.querySelector("#demo-accounts").innerHTML = accounts.map((user) => `<button type="button" data-user="${user.username}">
         <strong>${user.roleName}</strong>
