@@ -28,6 +28,56 @@
 
       <section class="metric-grid" id="dashboard-metrics"></section>
 
+      <nav class="dashboard-section-nav" aria-label="综合管理服务系统页面导航">
+        <a href="#population-service-board">人口服务</a>
+        <a href="#dashboard-function-report">功能报告</a>
+        <a href="#dashboard-actions-panel">任务闭环</a>
+        <a href="#risk-drilldown-board">风险下钻</a>
+        <a href="#dashboard-integration-panel">接口证据</a>
+      </nav>
+
+      <section class="panel dashboard-command-center" id="dashboard-command-center">
+        <div class="panel-title">
+          <h2>运行控制台</h2>
+          <span id="dashboard-filter-summary">全部应用 / 全部优先级</span>
+        </div>
+        <div class="dashboard-control-grid">
+          <article class="dashboard-control-card">
+            <span>数据状态</span>
+            <strong id="dashboard-api-state">正在加载</strong>
+            <p id="dashboard-data-boundary">综合管理服务系统面向各级卫生健康行政部门，仅汇总前 7 个应用的指标、风险、任务和证据；业务办理仍回到源应用完成。</p>
+          </article>
+          <article class="dashboard-control-card dashboard-filter-panel">
+            <span>汇总筛选</span>
+            <div class="filter-grid">
+              <label>
+                源应用
+                <select id="dashboard-application-filter">
+                  <option value="">全部应用</option>
+                </select>
+              </label>
+              <label>
+                优先级
+                <select id="dashboard-priority-filter">
+                  <option value="">全部优先级</option>
+                  <option value="high">高</option>
+                  <option value="medium">中</option>
+                  <option value="normal">一般</option>
+                </select>
+              </label>
+            </div>
+          </article>
+          <article class="dashboard-control-card">
+            <span>操作</span>
+            <strong>验收与筛选</strong>
+            <div class="dashboard-filter-actions">
+              <button class="inline-action" id="dashboard-reset-filters" type="button">重置筛选</button>
+              <button class="inline-action" id="dashboard-export-json" type="button">导出验收数据</button>
+            </div>
+          </article>
+        </div>
+      </section>
+
       <section class="panel" id="dashboard-policy-notes">
         <div class="panel-title">
           <h2>相关政策说明</h2>
@@ -90,43 +140,8 @@
         <div class="certificate-exchange-grid" id="certificate-exchange-cards"></div>
       </section>
 
-      <section class="panel">
-        <div class="panel-title">
-          <h2>数据状态</h2>
-          <span id="dashboard-api-state">正在加载</span>
-        </div>
-        <p id="dashboard-data-boundary">综合管理服务系统面向各级卫生健康行政部门，仅汇总前 7 个应用的指标、风险、任务和证据；业务办理仍回到源应用完成。</p>
-        <div class="action-row">
-          <button class="inline-action" id="dashboard-export-json" type="button">导出验收数据</button>
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-title">
-          <h2>汇总筛选</h2>
-          <span id="dashboard-filter-summary">全部应用 / 全部优先级</span>
-        </div>
-        <div class="filter-grid">
-          <label>
-            源应用
-            <select id="dashboard-application-filter">
-              <option value="">全部应用</option>
-            </select>
-          </label>
-          <label>
-            优先级
-            <select id="dashboard-priority-filter">
-              <option value="">全部优先级</option>
-              <option value="high">高</option>
-              <option value="medium">中</option>
-              <option value="normal">一般</option>
-            </select>
-          </label>
-        </div>
-      </section>
-
       <section class="portal-grid">
-        <article class="panel wide">
+        <article class="panel wide" id="dashboard-application-panel">
           <div class="panel-title">
             <h2>应用汇总</h2>
             <span id="dashboard-scope"></span>
@@ -144,7 +159,7 @@
       </section>
 
       <section class="portal-grid">
-        <article class="panel wide">
+        <article class="panel wide" id="dashboard-actions-panel">
           <div class="panel-title">
             <h2>任务闭环</h2>
             <span>仅展示跨应用待办，办理入口保留在源业务端</span>
@@ -179,7 +194,7 @@
         </article>
       </section>
 
-      <section class="portal-grid">
+      <section class="portal-grid" id="dashboard-integration-panel">
         <article class="panel">
           <div class="panel-title">
             <h2>接口联调</h2>

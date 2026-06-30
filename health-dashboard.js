@@ -1007,6 +1007,17 @@ function bindDashboardFilters() {
       if (currentDashboardSummary) renderDashboard(currentDashboardSummary);
     });
   });
+  const resetButton = document.querySelector("#dashboard-reset-filters");
+  if (resetButton && resetButton.dataset.bound !== "true") {
+    resetButton.dataset.bound = "true";
+    resetButton.addEventListener("click", () => {
+      const appFilter = document.querySelector("#dashboard-application-filter");
+      const priorityFilter = document.querySelector("#dashboard-priority-filter");
+      if (appFilter) appFilter.value = "";
+      if (priorityFilter) priorityFilter.value = "";
+      if (currentDashboardSummary) renderDashboard(currentDashboardSummary);
+    });
+  }
 }
 
 function bindDashboardExport() {
@@ -1066,11 +1077,14 @@ function renderFilterSummary(summary) {
   const filters = dashboardFilters();
   const app = (summary.applications || []).find((item) => item.id === filters.applicationId);
   const count = filteredDashboardActions(summary).length;
-  document.querySelector("#dashboard-filter-summary").textContent = [
+  const summaryNode = document.querySelector("#dashboard-filter-summary");
+  if (!summaryNode) return;
+  summaryNode.textContent = [
     app?.name || "全部应用",
     filters.priority ? dashboardPriorityLabel(filters.priority) : "全部优先级",
     `${count} 条待办`
   ].join(" / ");
+  summaryNode.dataset.filtered = filters.applicationId || filters.priority ? "true" : "false";
 }
 
 function renderDependencies(items) {

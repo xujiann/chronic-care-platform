@@ -285,6 +285,32 @@ h1 { margin-top: 4px; font-size: 28px; }
   margin-top: 8px;
 }
 
+.dashboard-section-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -2px 0 16px;
+}
+
+.dashboard-section-nav a {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: #fff;
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.dashboard-section-nav a:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
 .portal-grid {
   display: grid;
   grid-template-columns: 1.4fr 0.9fr;
@@ -311,6 +337,66 @@ h1 { margin-top: 4px; font-size: 28px; }
 .panel-title span,
 .muted {
   color: var(--muted);
+}
+
+#dashboard-filter-summary[data-filtered="true"] {
+  color: var(--blue);
+  font-weight: 800;
+}
+
+.dashboard-command-center {
+  margin-bottom: 16px;
+}
+
+.dashboard-control-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(360px, 1fr) minmax(220px, 0.7fr);
+  gap: 12px;
+}
+
+.dashboard-control-card {
+  min-height: 146px;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: #f8fbfd;
+}
+
+.dashboard-control-card span,
+.dashboard-control-card strong,
+.dashboard-control-card p {
+  display: block;
+}
+
+.dashboard-control-card > span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.dashboard-control-card > strong {
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.dashboard-control-card p {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.dashboard-filter-panel .filter-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 0;
+}
+
+.dashboard-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
 }
 
 .list {
@@ -1280,6 +1366,7 @@ dialog::backdrop {
     justify-content: flex-start;
   }
   .metric-grid,
+  .dashboard-control-grid,
   .function-report-grid,
   .population-metric-grid,
   .population-insights,
@@ -1300,6 +1387,10 @@ dialog::backdrop {
   .demo-accounts,
   .item {
     grid-template-columns: 1fr;
+  }
+
+  .dashboard-control-card {
+    min-height: auto;
   }
 
   .population-bar-row {
