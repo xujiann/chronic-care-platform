@@ -299,6 +299,23 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(identityPreview.body.mapping.user.role, "institution");
     assert.equal(identityPreview.body.mapping.user.orgCode, "MR1");
     assert.equal(identityPreview.body.mapping.user.home, "doctor.html");
+
+    const institutionIdentityPreview = await api(baseUrl, "/api/auth/identity/preview", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        claims: {
+          sub: "oidc-institution-001",
+          preferred_username: "external_institution",
+          name: "External Institution Operator",
+          org_code: "MR1",
+          roles: ["institution"]
+        }
+      })
+    }));
+    assert.equal(institutionIdentityPreview.response.status, 200);
+    assert.equal(institutionIdentityPreview.body.mapping.user.role, "institution");
+    assert.equal(institutionIdentityPreview.body.mapping.user.orgCode, "MR1");
+    assert.equal(institutionIdentityPreview.body.mapping.user.home, "institution.html");
   });
 
   await t.test("rejects invalid credentials and unauthenticated state reads", async () => {
