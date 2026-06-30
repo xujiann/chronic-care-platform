@@ -659,6 +659,7 @@ function renderOperationsDashboard() {
   if (!filteredSnapshots.some((item) => item.id === selectedSnapshotId)) selectedSnapshotId = filteredSnapshots[0]?.id || dashboard.snapshots?.[0]?.id || "";
   const selected = (dashboard.snapshots || []).find((item) => item.id === selectedSnapshotId) || filteredSnapshots[0] || null;
   renderOperationsMetrics(dashboard.summary || {}, filteredSnapshots);
+  renderOperationsSituation(dashboard, filteredSnapshots, selected);
   renderPerformanceManual(dashboard, filteredSnapshots);
   renderInterfaceMapping(dashboard.interfaceMapping || buildStaticInterfaceMapping());
   renderSiteJointTests(dashboard.siteJointTests || buildStaticSiteJointTests(dashboard.interfaceMapping || buildStaticInterfaceMapping()));
@@ -677,6 +678,112 @@ function renderOperationsDashboard() {
   renderReconciliationReviews(dashboard.reconciliationReviews || []);
   const boundary = document.querySelector("#operations-boundary");
   if (boundary) boundary.textContent = `${zhList(dashboard.boundaries || [], " / ")} | 复用：${zhList(dashboard.reusedCollections || [])}`;
+}
+
+function renderOperationsSituation(dashboard, filteredSnapshots, selected) {
+  const strip = document.querySelector("#operations-situation-strip");
+  const links = document.querySelector("#operations-focus-links");
+  if (!strip || !links) return;
+  const snapshots = Array.isArray(dashboard.snapshots) ? dashboard.snapshots : [];
+  const dispatchRequests = Array.isArray(dashboard.dispatchRequests) ? dashboard.dispatchRequests : [];
+  const reconciliationReviews = Array.isArray(dashboard.reconciliationReviews) ? dashboard.reconciliationReviews : [];
+  const urgent = [...filteredSnapshots].sort((a, b) => Number(b.resourcePressure || 0) - Number(a.resourcePressure || 0))[0] || selected;
+  const openDispatches = dispatchRequests.filter((item) => ["pending", "assigned", "in-progress"].includes(item.status));
+  const blockedReviews = reconciliationReviews.filter((item) => ["blocked", "pending-review", "returned", "correcting"].includes(item.status));
+  const criticalCount = filteredSnapshots.filter((item) => item.normalizedStatus === "critical").length;
+  const warningCount = filteredSnapshots.filter((item) => item.normalizedStatus === "warning").length;
+  const selectedAlerts = selected?.activeAlerts?.length || 0;
+  const selectedPressure = Number(selected?.resourcePressure || 0);
+  strip.innerHTML = `
+    <article class="operations-situation-main ${urgent?.normalizedStatus || "normal"}">
+      <div>
+        <strong>${urgent ? zh(urgent.institution) : "暂无机构"}</strong>
+        <span>当前优先关注机构 / 资源压力 ${urgent?.resourcePressure || 0} / 预警 ${urgent?.activeAlerts?.length || 0}</span>
+      </div>
+      <button class="inline-action compact" type="button" data-situation-select="${urgent?.id || ""}" ${urgent ? "" : "disabled"}>查看详情</button>
+    </article>
+    <article>
+      <span>当前筛选</span>
+      <strong>${filteredSnapshots.length}/${snapshots.length}</strong>
+      <small>严重 ${criticalCount} / 一般 ${warningCount}</small>
+    </article>
+    <article>
+      <span>开放调度</span>
+      <strong>${openDispatches.length}</strong>
+      <small>${openDispatches.length ? "需跟踪分派与到位" : "暂无开放工单"}</small>
+    </article>
+    <article>
+      <span>直报复核</span>
+      <strong>${blockedReviews.length}</strong>
+      <small>${blockedReviews.length ? "需完成补正或阻断说明" : "暂无阻断复核"}</small>
+    </article>
+    <article>
+      <span>已选机构</span>
+      <strong>${selected ? zh(selected.institution) : "未选择"}</strong>
+      <small>压力 ${selectedPressure} / 预警 ${selectedAlerts}</small>
+    </article>
+  `;
+  links.innerHTML = [
+    ["all", "全部机构", "恢复全量监测"],
+    ["critical", "严重预警", "只看严重风险"],
+    ["warning", "一般预警", "只看一般预警"],
+    ["dispatch", "开放调度", "定位调度工单"],
+    ["reconciliation", "直报复核", "定位对账复核"]
+  ].map(([mode, title, hint]) => `
+    <button class="operations-focus-button" type="button" data-situation-filter="${mode}">
+      <strong>${title}</strong>
+      <span>${hint}</span>
+    </button>
+  `).join("");
+  strip.querySelector("[data-situation-select]")?.addEventListener("click", (event) => {
+    selectSnapshotById(event.currentTarget.dataset.situationSelect, "#operation-detail");
+  });
+  links.querySelectorAll("[data-situation-filter]").forEach((button) => {
+    button.addEventListener("click", () => applySituationFilter(button.dataset.situationFilter));
+  });
+}
+
+function applySituationFilter(mode) {
+  if (mode === "critical" || mode === "warning") {
+    operationFilters.status = mode;
+    operationFilters.domain = "all";
+    operationFilters.search = "";
+    operationFilters.sort = "pressure";
+    syncOperationFilterControls();
+    renderOperationsDashboard();
+    document.querySelector("#operations-snapshots")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+  operationFilters.status = "all";
+  operationFilters.domain = "all";
+  operationFilters.search = "";
+  operationFilters.sort = mode === "reconciliation" ? "variance" : "pressure";
+  syncOperationFilterControls();
+  renderOperationsDashboard();
+  const target = mode === "dispatch" ? "#dispatch-requests" : mode === "reconciliation" ? "#reconciliation-reviews" : "#operations-snapshots";
+  document.querySelector(target)?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function syncOperationFilterControls() {
+  const values = {
+    "#operation-status-filter": operationFilters.status,
+    "#operation-domain-filter": operationFilters.domain,
+    "#operation-search": operationFilters.search,
+    "#operation-sort": operationFilters.sort
+  };
+  Object.entries(values).forEach(([selector, value]) => {
+    const control = document.querySelector(selector);
+    if (control) control.value = value;
+  });
+}
+
+function selectSnapshotById(id, scrollTarget = "#operation-detail") {
+  if (!id) return;
+  const snapshot = (operationsDashboard?.snapshots || []).find((item) => item.id === id || item.institutionId === id || item.institution === id);
+  if (!snapshot) return;
+  selectedSnapshotId = snapshot.id;
+  renderOperationsDashboard();
+  document.querySelector(scrollTarget)?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function renderOperationsMetrics(summary, filteredSnapshots) {
@@ -1032,9 +1139,15 @@ function renderOperationsIntelligence(intelligence) {
       <div class="operation-playbook-actions">
         ${(item.reviewQueue || ["人工复核后采纳"]).map((row) => `<span>${zhInline(row)}</span>`).join("")}
       </div>
-      <footer><small>证据：${evidenceList(item.evidence)}</small></footer>
+      <footer>
+        <small>证据：${evidenceList(item.evidence)}</small>
+        <button class="inline-action compact" type="button" data-intelligence-institution="${item.institutionId}">查看机构</button>
+      </footer>
     </article>
   `).join("") || "<p class=\"muted\">暂无智能调度建议。</p>";
+  target.querySelectorAll("[data-intelligence-institution]").forEach((button) => {
+    button.addEventListener("click", () => selectSnapshotById(button.dataset.intelligenceInstitution, "#operation-detail"));
+  });
 }
 
 function renderGovernanceReport(report) {

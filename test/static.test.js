@@ -352,7 +352,10 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsHtml, /performance-actions/);
   assert.match(operationsHtml, /performance-readiness/);
   assert.match(operationsHtml, /performance-indicator-detail/);
+  assert.match(operationsHtml, /operations-situation-strip/);
+  assert.match(operationsHtml, /operations-focus-links/);
   assert.match(operationsHtml, /operations-interface-mapping/);
+  assert.match(operationsHtml, /operations-command-board/);
   assert.match(operationsHtml, /operations-site-joint-tests/);
   assert.match(operationsHtml, /operation-production-hardening/);
   assert.match(operationsHtml, /operation-intelligence/);
@@ -387,6 +390,9 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsJs, /renderPerformanceActions/);
   assert.match(operationsJs, /renderPerformanceReadiness/);
   assert.match(operationsJs, /renderPerformanceIndicatorDetail/);
+  assert.match(operationsJs, /renderOperationsSituation/);
+  assert.match(operationsJs, /applySituationFilter/);
+  assert.match(operationsJs, /selectSnapshotById/);
   assert.match(operationsJs, /renderInterfaceMapping/);
   assert.match(operationsJs, /renderSiteJointTests/);
   assert.match(operationsJs, /renderProductionHardening/);

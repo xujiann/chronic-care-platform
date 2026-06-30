@@ -629,6 +629,104 @@ dialog::backdrop {
   margin-bottom: 16px;
 }
 
+.operations-situation-panel {
+  margin-bottom: 16px;
+}
+
+.operations-situation-strip {
+  display: grid;
+  grid-template-columns: minmax(280px, 1.4fr) repeat(4, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.operations-situation-strip article,
+.operations-focus-button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+
+.operations-situation-strip article {
+  display: grid;
+  gap: 6px;
+  min-height: 96px;
+}
+
+.operations-situation-strip article span,
+.operations-situation-strip article small,
+.operations-focus-button span {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.operations-situation-strip article strong {
+  display: block;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.operations-situation-main {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.operations-situation-main.critical {
+  background: #fff3f1;
+  border-color: #efbbb5;
+}
+
+.operations-situation-main.warning {
+  background: #fff9ed;
+  border-color: #f1d49b;
+}
+
+.operations-situation-main.normal {
+  background: #f4fbf6;
+  border-color: #bddfc7;
+}
+
+.operations-focus-links {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.operations-focus-button {
+  cursor: pointer;
+  text-align: left;
+}
+
+.operations-focus-button strong {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.operations-focus-button:hover {
+  border-color: #b9c9e7;
+  background: #f6f9ff;
+}
+
+.operations-command-board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.operations-command-card {
+  margin-bottom: 0;
+  min-width: 0;
+}
+
+.operations-command-card .interface-mapping-grid,
+.operations-command-card .performance-readiness-grid,
+.operations-command-card .performance-action-grid,
+.operations-command-card .operation-playbook-grid {
+  grid-template-columns: 1fr;
+}
+
 .performance-manual-panel {
   margin-bottom: 16px;
 }
@@ -1884,6 +1982,9 @@ dialog::backdrop {
   }
   .metric-grid,
   .portal-grid,
+  .operations-situation-strip,
+  .operations-focus-links,
+  .operations-command-board,
   .claim-grid,
   .capability-grid,
   .model-grid,
