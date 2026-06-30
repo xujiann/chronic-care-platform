@@ -651,6 +651,11 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(jointTestPack.body.samples.some((item) => item.contractId === "referral-report-callback-v1"), true);
     assert.equal(jointTestPack.body.signoff.some((item) => item.role === "insurance"), true);
     assert.equal(jointTestPack.body.signoffSummary.some((item) => item.role === "county-performance" && item.localEvidence), true);
+    const jointTestLedger = await api(baseUrl, "/api/referral-teleconsultations/joint-test-ledger", authorized(county.body.token));
+    assert.equal(jointTestLedger.response.status, 200);
+    assert.equal(jointTestLedger.body.summary.rows, 5);
+    assert.equal(jointTestLedger.body.summary.callbackContracts, 3);
+    assert.equal(jointTestLedger.body.rows.some((item) => item.contractId === "referral-report-callback-v1" && item.status === "local-evidence-ready"), true);
     const signoffSummary = await api(baseUrl, "/api/referral-teleconsultations/signoff-summary", authorized(county.body.token));
     assert.equal(signoffSummary.response.status, 200);
     assert.equal(signoffSummary.body.ok, true);
@@ -851,6 +856,10 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(replayCallback.response.status, 200);
     assert.equal(replayCallback.body.integrationEvent.id, signedCallback.body.integrationEvent.id);
     assert.equal(replayCallback.body.integrationEvent.idempotentReplay, true);
+    const jointLedgerAfterCallbacks = await api(baseUrl, "/api/referral-teleconsultations/joint-test-ledger", authorized(county.body.token));
+    assert.equal(jointLedgerAfterCallbacks.response.status, 200);
+    assert.equal(jointLedgerAfterCallbacks.body.summary.callbackMatchedContracts, 3);
+    assert.equal(jointLedgerAfterCallbacks.body.rows.some((item) => item.contractId === "referral-report-callback-v1" && item.status === "matched" && item.matchedTargets >= 1), true);
     const callbackState = await api(baseUrl, "/api/state", authorized(institution.body.token));
     assert.equal(callbackState.body.personalRecords.some((item) => item.category === "teleconsultation-report" && item.teleconsultationId === createdTeleconsultation.body.id), true);
     const institutionMessages = await api(baseUrl, "/api/messages", authorized(institution.body.token));

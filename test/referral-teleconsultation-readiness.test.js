@@ -28,6 +28,9 @@ test("referral teleconsultation readiness validates closed-loop evidence", () =>
   assert.equal(report.summary.signoffDemoReady, report.summary.signoffRoles);
   assert.equal(report.summary.signoffSiteSigned >= 0, true);
   assert.equal(report.summary.signoffSitePending >= 5, true);
+  assert.equal(report.summary.jointLedgerRows, 5);
+  assert.equal(report.summary.jointLedgerLocalReady, 5);
+  assert.equal(report.summary.jointLedgerMatchedContracts >= 0, true);
   assert.equal(report.summary.countySupervisionRows >= 2, true);
   assert.equal(report.summary.insurancePerformanceRows >= 2, true);
   assert.equal(report.escalations.some((item) => item.teleconsultationId === "rtc-001" && item.severity === "high"), true);
@@ -45,6 +48,7 @@ test("referral teleconsultation readiness validates closed-loop evidence", () =>
   assert.equal(report.checks.some((item) => item.id === "referral:slaAcknowledgement" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:countySupervision" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:jointTestPack" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "referral:jointTestLedger" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:signoffSummary" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:signoffArchive" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:insurancePerformancePolicy" && item.passed), true);
@@ -73,6 +77,8 @@ test("referral teleconsultation readiness writes release artifacts", (t) => {
   assert.match(md, /Signoff demo-ready roles/);
   assert.match(md, /Site signoffs archived/);
   assert.match(md, /Site signoffs pending/);
+  assert.match(md, /Joint-test ledger rows/);
+  assert.match(md, /Joint-test matched contracts/);
   assert.match(md, /County supervision rows/);
   assert.match(md, /Insurance performance rows/);
   assert.match(md, /Avg response hours/);

@@ -1,4 +1,4 @@
-const fallbackState = { countyConsortium: null, countyProjectBlueprint: null, countyCollaborationOrders: [], countyAiDiagnosisCases: [], countyMutualRecognitionRecords: [], referralTeleconsultations: [], referralTeleconsultationSignoffs: [], residents: [], medicalResources: [], personalRecords: [], taskMessages: [], integrationContracts: [] };
+const fallbackState = { countyConsortium: null, countyProjectBlueprint: null, countyCollaborationOrders: [], countyAiDiagnosisCases: [], countyMutualRecognitionRecords: [], referralTeleconsultations: [], referralTeleconsultationSignoffs: [], residents: [], medicalResources: [], personalRecords: [], taskMessages: [], integrationContracts: [], integrationGatewayEvents: [] };
 let platformState = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -227,6 +227,7 @@ function renderCountyTeleconsultationLoop(state) {
       ["高优先级", rows.filter((item) => item.priority === "high").length, "医共体跟进队列"]
     ].map(([label, value, hint]) => `<article class="claim-card"><strong>${label}</strong><span>${value}<br>${hint}</span></article>`).join("");
   }
+  renderCountyTeleconsultationJointLedger(state, rows);
   renderCountyTeleconsultationRiskBoard(state, rows, escalations);
   renderCountyTeleconsultationSignoff(state, rows);
   const escalationMap = new Map(escalations.map((item) => [item.teleconsultationId, item]));
@@ -273,6 +274,99 @@ function renderCountyTeleconsultationSignoff(state, rows) {
       <button class="inline-action" type="button" data-referral-signoff-submit data-role="${item.role}" ${item.onsiteEvidence ? "disabled" : ""}>Archive signoff</button>
     </footer>
   </article>`).join("");
+}
+
+function renderCountyTeleconsultationJointLedger(state, rows) {
+  const el = document.querySelector("#county-teleconsultation-joint-ledger");
+  if (!el) return;
+  const ledgerRows = buildCountyTeleconsultationJointLedger(state, rows);
+  const matchedContracts = ledgerRows.filter((item) => item.type === "callback" && item.matched > 0).length;
+  el.innerHTML = [
+    `<article data-referral-joint-ledger-summary>
+      <div><span class="badge info">Joint test ledger</span></div>
+      <h3>${matchedContracts}/3 callback contracts replayed</h3>
+      <p>${ledgerRows.filter((item) => item.localEvidence).length}/${ledgerRows.length} rows have local demo evidence; site signoff is tracked below.</p>
+      <footer><small>Use this before onsite signoff to reconcile callback replay, SLA supervision, payment policy, and archived signatures.</small></footer>
+    </article>`,
+    ...ledgerRows.map((item) => `<article data-referral-joint-ledger="${item.role}">
+      <div><span class="badge ${item.status === "matched" || item.status === "signed" ? "info" : "warn"}">${item.role}</span><span class="badge ${item.localEvidence ? "info" : "warn"}">${item.status}</span></div>
+      <h3>${item.title}</h3>
+      <p>${item.evidence}</p>
+      <footer>
+        <small>${item.type === "callback" ? `${item.matched} gateway events / ${item.matchedTargets} teleconsultations` : item.siteStatus}</small>
+        <small>${item.nextAction}</small>
+      </footer>
+    </article>`)
+  ].join("");
+}
+
+function buildCountyTeleconsultationJointLedger(state, rows) {
+  const signoffByRole = new Map((state.referralTeleconsultationSignoffs || [])
+    .filter((item) => item.status === "signed")
+    .map((item) => [item.role, item]));
+  const events = (state.integrationGatewayEvents || []).filter((item) => ["referral-feedback-callback-v1", "referral-schedule-callback-v1", "referral-report-callback-v1"].includes(item.contractId));
+  const archivedReportIds = new Set((state.personalRecords || [])
+    .filter((item) => item.category === "teleconsultation-report" && item.teleconsultationId)
+    .map((item) => item.teleconsultationId));
+  const callbacks = [
+    {
+      role: "referral-center",
+      title: "Feedback callback replay",
+      contractId: "referral-feedback-callback-v1",
+      localEvidence: rows.some((item) => item.receivingFeedback),
+      evidence: "receivingFeedback, feedback taskMessages, and gateway feedback callback"
+    },
+    {
+      role: "receiving-hospital",
+      title: "Schedule callback replay",
+      contractId: "referral-schedule-callback-v1",
+      localEvidence: rows.some((item) => item.meetingWindow && item.receivingDoctor),
+      evidence: "meetingWindow, receivingDoctor, and gateway schedule callback"
+    },
+    {
+      role: "hospital-it",
+      title: "Report callback replay",
+      contractId: "referral-report-callback-v1",
+      localEvidence: rows.some((item) => item.reportStatus === "returned" || item.status === "report-returned") && rows.filter((item) => item.reportStatus === "returned" || item.status === "report-returned").every((item) => archivedReportIds.has(item.id)),
+      evidence: "report callback, teleconsultation-report archive, and resident notification"
+    }
+  ].map((item) => {
+    const matched = events.filter((event) => event.contractId === item.contractId && event.status === "matched");
+    const matchedTargets = new Set(matched.map((event) => event.targetId).filter(Boolean));
+    return {
+      ...item,
+      type: "callback",
+      matched: matched.length,
+      matchedTargets: matchedTargets.size,
+      siteStatus: signoffByRole.has(item.role) ? "signed" : "pending-site-signoff",
+      status: matched.length ? "matched" : (item.localEvidence ? "local-evidence-ready" : "pending-evidence"),
+      nextAction: matched.length ? "Archive onsite signoff after replay evidence is reviewed." : "Replay the signed callback against the onsite integration gateway."
+    };
+  });
+  const governance = [
+    {
+      role: "county-performance",
+      type: "governance",
+      title: "SLA supervision and performance ledger",
+      localEvidence: rows.every((item) => item.countySupervision?.status && item.slaDisposition?.status),
+      evidence: "countySupervision, slaDisposition, reminders, and performance settlement evidence"
+    },
+    {
+      role: "insurance",
+      type: "policy",
+      title: "Payment and repeat-exam policy ledger",
+      localEvidence: rows.every((item) => item.performance?.insurancePaymentPath && item.performance?.repeatExamControl),
+      evidence: "insurancePaymentPath, repeatExamControl, and performance-policy endpoint"
+    }
+  ].map((item) => ({
+    ...item,
+    matched: signoffByRole.has(item.role) ? 1 : 0,
+    matchedTargets: signoffByRole.has(item.role) ? 1 : 0,
+    siteStatus: signoffByRole.has(item.role) ? "signed" : "pending-site-signoff",
+    status: signoffByRole.has(item.role) ? "signed" : (item.localEvidence ? "local-evidence-ready" : "pending-evidence"),
+    nextAction: signoffByRole.has(item.role) ? "Keep the signed evidence pack with the release record." : "Confirm onsite owner and archive signoff evidence."
+  }));
+  return [...callbacks, ...governance];
 }
 
 function buildCountyTeleconsultationSignoffRows(state, rows) {

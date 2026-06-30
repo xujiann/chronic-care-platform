@@ -6612,6 +6612,108 @@ function buildReferralTeleconsultationJointTestPack(data) {
   };
 }
 
+function buildReferralTeleconsultationJointTestLedger(data) {
+  const teleconsultations = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
+  const events = (Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])
+    .filter((item) => ["referral-feedback-callback-v1", "referral-schedule-callback-v1", "referral-report-callback-v1"].includes(item.contractId));
+  const signoffSummary = buildReferralTeleconsultationSignoffSummary(data);
+  const signoffByRole = new Map(signoffSummary.signoff.map((item) => [item.role, item]));
+  const archivedReportIds = new Set((Array.isArray(data.personalRecords) ? data.personalRecords : [])
+    .filter((item) => item.category === "teleconsultation-report" && item.teleconsultationId)
+    .map((item) => item.teleconsultationId));
+  const callbackRows = [
+    {
+      role: "referral-center",
+      type: "callback",
+      title: "Feedback callback replay",
+      contractId: "referral-feedback-callback-v1",
+      localEvidence: teleconsultations.some((item) => item.receivingFeedback),
+      evidence: "receivingFeedback, feedback taskMessages, and signed gateway callback"
+    },
+    {
+      role: "receiving-hospital",
+      type: "callback",
+      title: "Schedule callback replay",
+      contractId: "referral-schedule-callback-v1",
+      localEvidence: teleconsultations.some((item) => item.meetingWindow && item.receivingDoctor),
+      evidence: "meetingWindow, receivingDoctor, and signed schedule callback"
+    },
+    {
+      role: "hospital-it",
+      type: "callback",
+      title: "Report callback replay",
+      contractId: "referral-report-callback-v1",
+      localEvidence: teleconsultations.some((item) => item.reportStatus === "returned" || item.status === "report-returned") &&
+        teleconsultations.filter((item) => item.reportStatus === "returned" || item.status === "report-returned").every((item) => archivedReportIds.has(item.id)),
+      evidence: "report callback, teleconsultation-report archive, and resident notification"
+    }
+  ].map((row) => {
+    const matched = events.filter((event) => event.contractId === row.contractId && event.status === "matched");
+    const matchedTargets = new Set(matched.map((event) => event.targetId).filter(Boolean));
+    const latestEvent = matched
+      .slice()
+      .sort((a, b) => String(b.receivedAt || "").localeCompare(String(a.receivedAt || "")))[0] || null;
+    const signoff = signoffByRole.get(row.role) || {};
+    return {
+      ...row,
+      matched: matched.length,
+      matchedTargets: matchedTargets.size,
+      latestAt: latestEvent?.receivedAt || "",
+      siteStatus: signoff.siteStatus || "pending-site-signoff",
+      onsiteEvidence: signoff.onsiteEvidence || null,
+      status: matched.length ? "matched" : (row.localEvidence ? "local-evidence-ready" : "pending-evidence"),
+      nextAction: matched.length ? "Archive onsite signoff after replay evidence is reviewed." : "Replay the signed callback against the onsite integration gateway."
+    };
+  });
+  const governanceRows = [
+    {
+      role: "county-performance",
+      type: "governance",
+      title: "SLA supervision and performance ledger",
+      localEvidence: teleconsultations.every((item) => item.countySupervision?.status && item.slaDisposition?.status),
+      evidence: "countySupervision, slaDisposition, reminders, and performance settlement evidence"
+    },
+    {
+      role: "insurance",
+      type: "policy",
+      title: "Payment and repeat-exam policy ledger",
+      localEvidence: teleconsultations.every((item) => item.performance?.insurancePaymentPath && item.performance?.repeatExamControl),
+      evidence: "insurancePaymentPath, repeatExamControl, and performance-policy endpoint"
+    }
+  ].map((row) => {
+    const signoff = signoffByRole.get(row.role) || {};
+    return {
+      ...row,
+      matched: signoff.onsiteEvidence ? 1 : 0,
+      matchedTargets: signoff.onsiteEvidence ? 1 : 0,
+      latestAt: signoff.onsiteEvidence?.signedAt || "",
+      siteStatus: signoff.siteStatus || "pending-site-signoff",
+      onsiteEvidence: signoff.onsiteEvidence || null,
+      status: signoff.onsiteEvidence ? "signed" : (row.localEvidence ? "local-evidence-ready" : "pending-evidence"),
+      nextAction: signoff.onsiteEvidence ? "Keep the signed evidence pack with the release record." : "Confirm onsite owner and archive signoff evidence."
+    };
+  });
+  const rows = [...callbackRows, ...governanceRows];
+  const callbackContracts = rows.filter((item) => item.type === "callback").length;
+  const callbackMatchedContracts = rows.filter((item) => item.type === "callback" && item.matched > 0).length;
+  return {
+    ok: rows.every((item) => item.localEvidence),
+    generatedAt: new Date().toISOString(),
+    summary: {
+      rows: rows.length,
+      localReady: rows.filter((item) => item.localEvidence).length,
+      pendingEvidence: rows.filter((item) => !item.localEvidence).length,
+      callbackContracts,
+      callbackMatchedContracts,
+      callbackPendingContracts: callbackContracts - callbackMatchedContracts,
+      gatewayEvents: events.length,
+      siteSigned: signoffSummary.summary.siteSigned,
+      sitePending: signoffSummary.summary.sitePending
+    },
+    rows
+  };
+}
+
 function buildReferralTeleconsultationSignoffSummary(data, options = {}) {
   const teleconsultations = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
   const signoffRecords = Array.isArray(data.referralTeleconsultationSignoffs) ? data.referralTeleconsultationSignoffs : [];
@@ -7995,6 +8097,13 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/referral-teleconsultations/joint-test-pack");
     if (!user) return;
     sendJson(res, 200, buildReferralTeleconsultationJointTestPack(readDatabase()));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/referral-teleconsultations/joint-test-ledger") {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/referral-teleconsultations/joint-test-ledger");
+    if (!user) return;
+    sendJson(res, 200, buildReferralTeleconsultationJointTestLedger(readDatabase()));
     return;
   }
 

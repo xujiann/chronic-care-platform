@@ -263,6 +263,8 @@ Use `POST /api/referral-teleconsultations/:id/report-callback` for HIS/EMR repor
 
 Use `GET /api/referral-teleconsultations/joint-test-pack` before field testing to export the callback sample payloads, checklist, and signoff matrix for referral center, receiving hospital, hospital IT, county performance, and insurance review.
 
+Use `GET /api/referral-teleconsultations/joint-test-ledger` during field testing to reconcile signed callback replay events, local demo evidence, onsite signoff status, SLA supervision, and insurance payment-policy readiness before final acceptance.
+
 Use `GET /api/referral-teleconsultations/signoff-summary` during field testing to review demo-ready evidence and site-pending signoff rows for referral center, receiving hospital, hospital IT, county performance, and insurance review before archiving real signatures.
 
 Use `POST /api/referral-teleconsultations/signoff-summary/:role/evidence` to archive onsite signoff evidence after each role validates its callback replay, report archive, SLA supervision, or payment-policy row. Keep the original signed file in the project evidence pack and store its attachment name or storage pointer in the request note.
