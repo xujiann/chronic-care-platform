@@ -468,16 +468,17 @@ function renderMetrics(summary) {
 function renderCoreSystemMatrix(rows) {
   setHtml("quality-safety-core-systems", `
     <table>
-      <thead><tr><th>核心制度</th><th>平台落实要求</th><th>证据源</th><th>状态与下一步</th></tr></thead>
+      <thead><tr><th>核心制度</th><th>平台落实要求</th><th>证据源</th><th>状态与下一步</th><th>操作</th></tr></thead>
       <tbody>
         ${rows.length ? rows.map((item) => `
           <tr>
             <td><strong>${zhText(item.name)}</strong><br /><small>${zhText(item.sourcePolicy)}</small></td>
             <td>${zhText(item.requirement)}<br /><small>${zhText(item.platformControl)}</small></td>
-            <td>${(item.evidenceCollections || []).map(zh).join("、")}<br /><small>${item.evidenceRows || 0} 条证据记录</small></td>
+            <td>${(item.evidenceCollections || []).map(zh).join("、")}<br /><small>${item.evidenceRows || 0} 条证据记录，${item.submittedEvidenceCount || 0} 条制度证据</small></td>
             <td>${zhText(item.status)}<br /><small>${zhText(item.nextAction)}</small></td>
+            <td><button class="inline-action" type="button" data-core-system-evidence="${text(item.id)}">提交证据</button></td>
           </tr>
-        `).join("") : emptyRow(4, "暂无核心制度矩阵")}
+        `).join("") : emptyRow(5, "暂无核心制度矩阵")}
       </tbody>
     </table>
   `);
@@ -866,6 +867,17 @@ async function submitSiteSignoffEvidence(signoffId) {
   await loadQualitySafety();
 }
 
+async function submitCoreSystemEvidence(coreSystemId) {
+  await qualityApi(`/quality-safety/core-systems/${encodeURIComponent(coreSystemId)}/evidence`, {
+    method: "POST",
+    body: JSON.stringify({
+      note: "通过质量安全监管平台提交核心制度落实证据。",
+      evidence: ["core-system-evidence-placeholder"]
+    })
+  });
+  await loadQualitySafety();
+}
+
 async function validateInterfaceSample(interfaceId) {
   const request = (qualitySafetyInterfacePack?.sampleRequests || []).find((item) => item.interfaceId === interfaceId);
   if (!request) throw new Error("接口样例尚未加载");
@@ -918,6 +930,7 @@ document.addEventListener("click", (event) => {
   const pathwayReview = event.target.closest("[data-pathway-review]");
   const signoffReview = event.target.closest("[data-signoff-review]");
   const signoffEvidence = event.target.closest("[data-signoff-evidence]");
+  const coreSystemEvidence = event.target.closest("[data-core-system-evidence]");
   const interfaceValidate = event.target.closest("[data-interface-validate]");
   if (scrollTarget) {
     const target = document.getElementById(scrollTarget.dataset.scrollTarget || "");
@@ -936,6 +949,7 @@ document.addEventListener("click", (event) => {
   if (pathwayReview) reviewClinicalPathway(pathwayReview.dataset.pathwayReview).catch((error) => alert(error.message));
   if (signoffEvidence) submitSiteSignoffEvidence(signoffEvidence.dataset.signoffEvidence).catch((error) => alert(error.message));
   if (signoffReview) reviewSiteSignoff(signoffReview.dataset.signoffReview).catch((error) => alert(error.message));
+  if (coreSystemEvidence) submitCoreSystemEvidence(coreSystemEvidence.dataset.coreSystemEvidence).catch((error) => alert(error.message));
   if (interfaceValidate) validateInterfaceSample(interfaceValidate.dataset.interfaceValidate).catch((error) => alert(error.message));
 });
 

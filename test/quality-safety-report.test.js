@@ -116,6 +116,13 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
   assert.equal(dashboard.body.coreSystemMatrix.length, 18);
   assert.equal(dashboard.body.coreSystemMatrix.some((item) => item.name === "危急值报告制度" && item.evidenceCollections.includes("criticalValueAlerts")), true);
   assert.equal(dashboard.body.coreSystemMatrix.some((item) => item.name === "信息安全管理制度" && item.evidenceCollections.includes("securityEvents")), true);
+  const coreEvidence = await api(baseUrl, "/api/quality-safety/core-systems/critical-value-reporting/evidence", authorized(token, {
+    method: "POST",
+    body: JSON.stringify({ note: "Critical value registry template and drill record submitted.", evidence: ["critical-value-registry-template", "drill-record"] })
+  }));
+  assert.equal(coreEvidence.response.status, 200);
+  assert.equal(coreEvidence.body.id, "critical-value-reporting");
+  assert.equal(coreEvidence.body.submittedEvidenceCount >= 1, true);
   assert.equal(dashboard.body.departmentTaskView.role, "commission");
   assert.equal(dashboard.body.departmentTaskView.profile.permissions.includes("review_rectification"), true);
   assert.equal(dashboard.body.departmentTaskView.metrics.some((item) => item.label === "逾期整改"), true);
@@ -263,4 +270,5 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
   assert.equal(JSON.stringify(audit.body).includes("quality-safety clinical pathway review"), true);
   assert.equal(JSON.stringify(audit.body).includes("quality-safety site signoff evidence"), true);
   assert.equal(JSON.stringify(audit.body).includes("quality-safety site signoff review"), true);
+  assert.equal(JSON.stringify(audit.body).includes("quality-safety core system evidence"), true);
 });

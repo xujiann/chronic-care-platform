@@ -34,6 +34,7 @@ const REQUIRED_ROUTES = [
   "/api/quality-safety/critical-values/:id/acknowledge",
   "/api/quality-safety/critical-values/:id/dispose",
   "/api/quality-safety/clinical-pathways/:id/review",
+  "/api/quality-safety/core-systems/:id/evidence",
   "/api/quality-safety/site-signoffs/:id/evidence",
   "/api/quality-safety/site-signoffs/:id/review"
 ];

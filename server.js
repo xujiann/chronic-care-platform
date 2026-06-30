@@ -547,6 +547,7 @@ function seedState() {
     mutualRecognitionQualityReviews: seedMutualRecognitionQualityReviews(),
     qualityRectificationOrders: seedQualityRectificationOrders(),
     qualitySafetySiteSignoffs: seedQualitySafetySiteSignoffs(),
+    qualitySafetyCoreSystemEvidence: [],
     careOrders: seedCareOrders(),
     medicationPickups: seedMedicationPickups(),
     institutionSupervisions: seedInstitutionSupervisions(),
@@ -3532,6 +3533,7 @@ function normalizeState(data) {
     mutualRecognitionQualityReviews: mergeByKey(seedMutualRecognitionQualityReviews(), data.mutualRecognitionQualityReviews, "id"),
     qualityRectificationOrders: mergeByKey(seedQualityRectificationOrders(), data.qualityRectificationOrders, "id"),
     qualitySafetySiteSignoffs: mergeByKey(seedQualitySafetySiteSignoffs(), data.qualitySafetySiteSignoffs, "id"),
+    qualitySafetyCoreSystemEvidence: Array.isArray(data.qualitySafetyCoreSystemEvidence) ? data.qualitySafetyCoreSystemEvidence : [],
     mutualRecognitionRules: mergeByKey(seedMutualRecognitionRules(), data.mutualRecognitionRules, "id"),
     diagnosticReports: mergeByKey(seedDiagnosticReports(), data.diagnosticReports, "id"),
     taskMessages: Array.isArray(data.taskMessages) ? data.taskMessages : [],
@@ -5487,8 +5489,11 @@ function buildQualitySafetyCoreSystemMatrix(data) {
     ["information-security", "信息安全管理制度", "诊疗信息全流程安全、授权、风险评估、自查和事故追溯", ["securityEvents", "dataAccessLogs"], "安全事件、访问审计和追溯机制"]
   ];
   const siteSignoffs = Array.isArray(data.qualitySafetySiteSignoffs) ? data.qualitySafetySiteSignoffs : [];
+  const submittedEvidence = Array.isArray(data.qualitySafetyCoreSystemEvidence) ? data.qualitySafetyCoreSystemEvidence : [];
   return rows.map(([id, name, requirement, evidenceCollections, platformControl]) => {
-    const evidenceRows = evidenceCollections.reduce((total, collection) => total + (Array.isArray(data[collection]) ? data[collection].length : 0), 0);
+    const submissions = submittedEvidence.filter((item) => item.coreSystemId === id);
+    const sourceEvidenceRows = evidenceCollections.reduce((total, collection) => total + (Array.isArray(data[collection]) ? data[collection].length : 0), 0);
+    const evidenceRows = sourceEvidenceRows + submissions.length;
     const signoffMatched = siteSignoffs.some((item) => {
       const sources = Array.isArray(item.sourceCollections) ? item.sourceCollections : [];
       return evidenceCollections.some((collection) => sources.includes(collection)) || String(item.item || "").includes(name.slice(0, 2));
@@ -5500,9 +5505,11 @@ function buildQualitySafetyCoreSystemMatrix(data) {
       platformControl,
       evidenceCollections,
       evidenceRows,
+      submittedEvidenceCount: submissions.length,
+      latestSubmission: submissions[0] || null,
       sourcePolicy: "国卫医发〔2018〕8号《医疗质量安全核心制度要点》",
-      status: signoffMatched ? "已纳入现场联调" : evidenceRows > 0 ? "已纳入监管看板" : "需扩展接口",
-      nextAction: signoffMatched ? "完成现场签收并固化生产证据" : evidenceRows > 0 ? "补充现场模板和抽查规则" : "对接业务系统并建立质控样例"
+      status: signoffMatched ? "已纳入现场联调" : submissions.length > 0 ? "已提交制度证据" : sourceEvidenceRows > 0 ? "已纳入监管看板" : "需扩展接口",
+      nextAction: submissions.length > 0 ? "等待监管复核并补充现场抽查材料" : signoffMatched ? "完成现场签收并固化生产证据" : sourceEvidenceRows > 0 ? "补充现场模板和抽查规则" : "对接业务系统并建立质控样例"
     };
   });
 }
@@ -6872,6 +6879,47 @@ async function handleApi(req, res) {
     appendQualitySafetyAudit(data, user, "quality-safety site signoff evidence", id, note || evidence.join(", "));
     writeDatabase(data);
     sendJson(res, 200, { ...signoffs[index], normalizedStatus: normalizeQualitySafetyStatus(signoffs[index].status), evidenceCount: (signoffs[index].evidence || []).length });
+    return;
+  }
+
+  const qualityCoreSystemEvidenceMatch = url.pathname.match(/^\/api\/quality-safety\/core-systems\/([^/]+)\/evidence$/);
+  if (req.method === "POST" && qualityCoreSystemEvidenceMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/quality-safety/core-systems/:id/evidence");
+    if (!user) return;
+    const data = readDatabase();
+    const coreSystemId = decodeURIComponent(qualityCoreSystemEvidenceMatch[1]);
+    const matrix = buildQualitySafetyCoreSystemMatrix(data);
+    const row = matrix.find((item) => item.id === coreSystemId);
+    if (!row) {
+      sendJson(res, 404, { error: "Not Found", message: "Core safety system item not found" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const evidence = Array.isArray(payload.evidence) ? payload.evidence.map((item) => String(item).trim()).filter(Boolean) : [];
+    const note = String(payload.note || payload.comment || "").trim();
+    if (!note && evidence.length === 0) {
+      sendJson(res, 400, { error: "Bad Request", message: "evidence or note is required" });
+      return;
+    }
+    const now = new Date().toISOString();
+    const submission = {
+      id: randomUUID(),
+      coreSystemId,
+      coreSystemName: row.name,
+      at: now,
+      by: user.username || user.role,
+      byName: user.name,
+      role: user.role,
+      orgCode: user.orgCode || "",
+      orgName: user.orgName || "",
+      note,
+      evidence
+    };
+    data.qualitySafetyCoreSystemEvidence = [submission, ...(Array.isArray(data.qualitySafetyCoreSystemEvidence) ? data.qualitySafetyCoreSystemEvidence : [])].slice(0, 300);
+    appendQualitySafetyAudit(data, user, "quality-safety core system evidence", coreSystemId, note || evidence.join(", "));
+    writeDatabase(data);
+    const updated = buildQualitySafetyCoreSystemMatrix(data).find((item) => item.id === coreSystemId);
+    sendJson(res, 200, updated);
     return;
   }
 
