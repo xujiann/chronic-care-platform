@@ -421,6 +421,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /deploy:check/);
   assert.match(read("README.md"), /release:report/);
   assert.match(read("README.md"), /release:manifest/);
+  assert.match(read("DEPLOYMENT.md"), /doctor\.html/);
   assert.match(read("scripts/release-report.js"), /test:coverage/);
   assert.match(read("scripts/release-report.js"), /test:e2e/);
   assert.match(read("scripts/release-report.js"), /Production cutover checklist/);
