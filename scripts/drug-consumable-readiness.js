@@ -139,7 +139,7 @@ function buildDrugConsumableReadinessReport(options = {}) {
 
 function renderMarkdown(report) {
   const checkRows = report.checks.map((item) => `| ${item.passed ? "PASS" : "FAIL"} | ${item.id} | ${String(item.detail || "").replace(/\|/g, "/")} |`);
-  const rowLines = report.linkedRows.map((item) => `| ${item.id} | ${item.boundary} | ${item.normalizedStatus} | ${item.pickupLinked ? "yes" : "no"} | ${item.claimLinked ? "yes" : "no"} | ${item.auditTrailPresent ? "yes" : "no"} |`);
+  const rowLines = report.linkedRows.map((item) => `| ${item.id} | ${item.boundary} | ${item.normalizedStatus} | ${item.pickupLinked ? "yes" : "no"} | ${item.claimLinked ? "yes" : "no"} | ${item.supervisionLinked ? "yes" : "no"} | ${item.auditTrailPresent ? "yes" : "no"} |`);
   const policyRows = (report.policySources || []).map((item) => `| ${String(item.documentNo || "").replace(/\|/g, "/")} | ${String(item.title || "").replace(/\|/g, "/")} | ${String(item.url || "").replace(/\|/g, "/")} |`);
   const evidenceRows = (report.traceabilityEvidenceChecklist || []).map((item) => `| ${item.ready ? "yes" : "no"} | ${String(item.id || "").replace(/\|/g, "/")} | ${String(item.owner || "").replace(/\|/g, "/")} | ${String((item.evidenceFields || []).join(", ")).replace(/\|/g, "/")} | ${String((item.policySourceIds || []).join(", ")).replace(/\|/g, "/")} | ${item.rowCount || 0} |`);
   return [
@@ -159,8 +159,8 @@ function renderMarkdown(report) {
     "",
     "## Supervision links",
     "",
-    "| Row | Boundary | Status | Pickup | Claim | Audit |",
-    "|---|---|---|---|---|---|",
+    "| Row | Boundary | Status | Pickup | Claim | Supervision | Audit |",
+    "|---|---|---|---|---|---|---|",
     ...rowLines,
     "",
     "## Traceability policy sources",

@@ -41,6 +41,7 @@ test("drug consumable readiness covers required supervision boundaries", () => {
   const markdown = renderMarkdown(report);
   assert.match(markdown, /Drug consumable readiness report/);
   assert.match(markdown, /Supervision links/);
+  assert.match(markdown, /\| Row \| Boundary \| Status \| Pickup \| Claim \| Supervision \| Audit \|/);
   assert.match(markdown, /Traceability policy sources/);
   assert.match(markdown, /Traceability evidence requirements/);
   assert.match(markdown, /Traceability coverage: ready/);
