@@ -33,8 +33,14 @@ function buildCitizenLaunchFoundationReadiness(options = {}) {
   const checks = [
     {
       id: "citizen-foundation:phone-login",
-      passed: hasAll(auth + login, [/loginByPhone/, /phone-login-form/, /DEMO-MOBILE-R1/, /888888/]),
-      detail: "phone verification demo login is visible and wired to resident auth"
+      passed: hasAll(auth + login, [/loginByPhone/, /sendPhoneCode/, /phone-login-form/, /data-send-phone-code/, /phone-code-hint/, /DEMO-MOBILE-R1/, /888888/]) &&
+        hasAll(readText("server.js"), [/\/api\/auth\/phone-code/, /PHONE_CODE_TTL_MS/, /PHONE_CODE_COOLDOWN_MS/, /maskPhone/, /\/api\/auth\/phone-login/]),
+      detail: "phone verification code issuing, cooldown, expiry, masked response, and login are wired to resident auth"
+    },
+    {
+      id: "citizen-foundation:phone-code-delivery",
+      passed: hasAll(auth + login, [/sendPhoneCode/, /\/auth\/phone-code/, /data-send-phone-code/, /phone-code-hint/, /retryAfterSeconds/, /expiresAt/]),
+      detail: "resident phone-code delivery exposes send action, cooldown, expiry, and demo gateway evidence"
     },
     {
       id: "citizen-foundation:mobile-install-shell",

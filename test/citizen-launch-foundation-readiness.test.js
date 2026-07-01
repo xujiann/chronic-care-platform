@@ -21,10 +21,13 @@ test("citizen launch foundation readiness captures phase-one gates", () => {
   assert.equal(report.externalDependencies.some((item) => item.id === "real-name-identity"), true);
   assert.equal(report.externalDependencies.some((item) => item.id === "guardian-relation"), true);
   assert.equal(report.checks.some((item) => item.id === "citizen-foundation:phone-login" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "citizen-foundation:phone-code-delivery" && item.passed), true);
+  assert.equal(report.checks.find((item) => item.id === "citizen-foundation:phone-code-delivery").detail.includes("cooldown"), true);
   assert.equal(report.checks.some((item) => item.id === "citizen-foundation:mobile-install-shell" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "citizen-foundation:app-shortcuts" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "citizen-foundation:launch-gates" && item.passed), true);
   assert.match(renderMarkdown(report), /Citizen launch foundation readiness/);
+  assert.match(renderMarkdown(report), /phone-code delivery/);
   assert.match(renderMarkdown(report), /production SMS gateway/);
 });
 

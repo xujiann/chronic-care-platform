@@ -6,7 +6,7 @@ Phase 1 turns the resident portal into a controlled-pilot-ready mobile entry acr
 
 ## Implemented Foundation
 
-- Phone verification login has a demo path and a visible mobile form.
+- Phone verification login has a demo code issuing endpoint, cooldown, expiry, masked phone response, and a visible mobile form.
 - Mini-program and APP channel routing is available through `client=mini-program|app`.
 - Resident service pages are shareable through `page=health-record|emr|nursing|escort|registration`.
 - APP/PWA install readiness includes manifest identity, mobile meta tags, service worker caching, and shortcuts for health archive, EMR, escort, and APP preview.
