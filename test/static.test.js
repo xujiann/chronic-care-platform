@@ -79,6 +79,8 @@ test("research sandbox about page documents policy and release boundaries", () =
   assert.match(page, /国家健康医疗大数据标准、安全和服务管理办法/);
   assert.match(page, /\/api\/research\/sandbox/);
   assert.match(page, /research:policy-controls/);
+  assert.match(page, /data-about-section="research-prelaunch-development"/);
+  assert.match(page, /SIEM\/WORM/);
   assert.match(page, /research-sandbox-readiness-report\.md/);
   assert.match(read("README.md"), /research-sandbox-about\.html/);
   assert.doesNotMatch(page, /requireRole/);

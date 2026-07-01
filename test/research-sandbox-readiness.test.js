@@ -30,7 +30,9 @@ test("research sandbox readiness covers datasets, ethics, de-identification, aud
   assert.equal(report.checks.every((item) => item.passed), true);
   assert.equal(report.summary.sandboxReady >= 2, true);
   assert.equal(report.summary.policyReady >= 2, true);
+  assert.equal(report.preLaunchDevelopment.some((item) => item.id === "launch:sandbox-isolation-export"), true);
   assert.match(renderMarkdown(report), /DUA-DEMO/);
+  assert.match(renderMarkdown(report), /Pre-launch Development/);
   assert.match(renderMarkdown(report), /Research Sandbox Readiness/);
 });
 

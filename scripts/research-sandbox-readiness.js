@@ -31,6 +31,18 @@ function governanceReady(item) {
   );
 }
 
+function buildPreLaunchDevelopmentBacklog() {
+  return [
+    { id: "launch:identity-project-auth", owner: "identity-integration", status: "site-required", item: "Connect real researcher identity, project membership, and organization authorization before issuing sandbox accounts." },
+    { id: "launch:ethics-document-vault", owner: "research-governance", status: "site-required", item: "Attach live IRB approval, consent or waiver evidence, review period, and continuing-review records to every dataset." },
+    { id: "launch:minimization-dictionary", owner: "data-governance", status: "site-required", item: "Map approved research fields to source-system dictionaries and block fields outside the minimum-necessary review." },
+    { id: "launch:deidentification-risk", owner: "security-and-data", status: "site-required", item: "Run de-identification and re-identification risk assessment for each release version before sandbox publication." },
+    { id: "launch:sandbox-isolation-export", owner: "platform-ops", status: "site-required", item: "Bind datasets to isolated compute, export review, watermarking, and short-lived access-token controls." },
+    { id: "launch:audit-retention-siem", owner: "security-ops", status: "site-required", item: "Route application, sandbox, export, and outcome audit trails to SIEM or WORM retention with incident review procedures." },
+    { id: "launch:outcome-model-review", owner: "clinical-research", status: "site-required", item: "Convert returned outcomes into disease-registry model review tasks with clinical expert signoff." }
+  ];
+}
+
 function buildResearchSandboxReadiness(data = readJson("data/db.json")) {
   const datasets = Array.isArray(data.researchDatasets) ? data.researchDatasets : [];
   const models = Array.isArray(data.diseaseRegistryModels) ? data.diseaseRegistryModels : [];
@@ -71,6 +83,7 @@ function buildResearchSandboxReadiness(data = readJson("data/db.json")) {
     ],
     reusableCollections: requiredCollections,
     checks,
+    preLaunchDevelopment: buildPreLaunchDevelopmentBacklog(),
     datasets: datasets.map((item) => ({
       id: item.id,
       diseaseType: item.diseaseType,
@@ -91,6 +104,7 @@ function buildResearchSandboxReadiness(data = readJson("data/db.json")) {
 function renderMarkdown(report) {
   const rows = report.checks.map((item) => `| ${item.passed ? "PASS" : "FAIL"} | ${item.id} | ${item.detail} |`);
   const datasetRows = report.datasets.map((item) => `| ${item.id} | ${item.diseaseType} | ${item.status} | ${item.authorizationStatus} | ${item.ethicsStatus} | ${item.deidentificationStatus} | ${item.governanceStatus} | ${item.dataUseAgreement || "pending"} | ${item.retentionDays || 0} | ${item.sandboxStatus} | ${item.records} |`);
+  const preLaunchRows = (report.preLaunchDevelopment || []).map((item) => `| ${item.id} | ${item.owner} | ${item.status} | ${item.item} |`);
   return [
     "# Research Sandbox Readiness",
     "",
@@ -116,7 +130,13 @@ function renderMarkdown(report) {
     "",
     "| Dataset | Disease | Status | Authorization | Ethics | De-identification | Governance | Agreement | Retention days | Sandbox | Records |",
     "|---|---|---|---|---|---|---|---|---:|---|---:|",
-    ...datasetRows
+    ...datasetRows,
+    "",
+    "## Pre-launch Development",
+    "",
+    "| Item | Owner | Status | Scope |",
+    "|---|---|---|---|",
+    ...preLaunchRows
   ].join("\n");
 }
 
