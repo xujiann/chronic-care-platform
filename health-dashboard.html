@@ -35,6 +35,7 @@
         <a href="#dashboard-function-report">功能报告</a>
         <a href="#dashboard-actions-panel">任务闭环</a>
         <a href="#risk-drilldown-board">风险下钻</a>
+        <a href="#site-issue-ledger-board">整改台账</a>
         <a href="#dashboard-integration-panel">接口证据</a>
       </nav>
 
@@ -256,6 +257,30 @@
           </div>
           <div class="site-evidence-grid" id="site-evidence-list"></div>
         </article>
+      </section>
+
+      <section class="panel site-issue-ledger-board" id="site-issue-ledger-board">
+        <div class="panel-title">
+          <h2>现场问题整改台账</h2>
+          <span id="site-issue-ledger-summary">正在汇总现场验收、联调和上线依赖中的待整改事项</span>
+        </div>
+        <div class="period-switch site-issue-ledger-switch" id="site-issue-ledger-status-controls" aria-label="现场问题状态筛选">
+          <button type="button" data-site-issue-status="all" class="active">全部</button>
+          <button type="button" data-site-issue-status="watch">待整改</button>
+          <button type="button" data-site-issue-status="ready">已就绪</button>
+          <button type="button" data-site-issue-status="blocked">阻塞</button>
+        </div>
+        <div class="filter-grid site-issue-ledger-filter-grid">
+          <label>
+            责任方
+            <select id="site-issue-owner-filter">
+              <option value="">全部责任方</option>
+            </select>
+          </label>
+          <button type="button" id="site-issue-reset-filters">重置筛选</button>
+        </div>
+        <div class="site-issue-ledger-grid" id="site-issue-ledger-list"></div>
+        <p class="muted site-issue-ledger-boundary" id="site-issue-ledger-boundary">台账只用于行政管理、上线督办和验收留痕，不替代源业务系统、医疗机构或平台厂商的实际整改办理。</p>
       </section>
 
       <section class="portal-grid" id="dashboard-integration-panel">

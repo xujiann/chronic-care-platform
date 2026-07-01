@@ -46,6 +46,8 @@ test("health dashboard summary aggregates the first seven applications without r
   assert.equal(report.riskDrilldowns.summary.withTrace, report.riskDrilldowns.items.length);
   assert.equal(report.siteEvidencePackage.items.length, 4);
   assert.equal(report.siteEvidencePackage.summary.ready, 3);
+  assert.equal(report.siteIssueLedger.summary.total >= 1, true);
+  assert.equal(report.siteIssueLedger.items.every((item) => item.owner && item.nextAction && item.boundary), true);
   assert.equal(report.functionalReport.functions.length, 13);
   assert.equal(report.functionalReport.functions.some((item) => item.id === "population-service-board" && item.status === "ready"), true);
   assert.equal(report.functionalReport.functions.some((item) => item.id === "jurisdiction-workbench" && item.status === "ready"), true);
@@ -78,6 +80,7 @@ test("health dashboard summary aggregates the first seven applications without r
   assert.equal(report.checks.some((item) => item.id === "dashboard:certificate-exchange" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:risk-drilldown" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:site-evidence-package" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "dashboard:site-issue-ledger" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:functional-report" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:jurisdiction-scope" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:jurisdiction-detail" && item.passed), true);
@@ -106,6 +109,7 @@ test("health dashboard summary aggregates the first seven applications without r
   assert.doesNotMatch(markdown, /\| .*县域医共体牵头医院 \|/);
   assert.match(markdown, /风险下钻/);
   assert.match(markdown, /现场验收证据包/);
+  assert.match(markdown, /现场问题整改台账/);
   assert.match(markdown, /发布证据/);
   assert.match(markdown, /92800/);
   assert.match(markdown, /证照交换链路/);

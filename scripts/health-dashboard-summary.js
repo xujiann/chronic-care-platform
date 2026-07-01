@@ -451,6 +451,41 @@ function buildSiteEvidencePackage(data, context = {}) {
   };
 }
 
+function buildSiteIssueLedger(context = {}) {
+  const evidenceItems = context.siteEvidencePackage?.items || [];
+  const siteDependencies = context.siteDependencies || [];
+  const evidenceIssues = evidenceItems.filter((item) => item.status !== "ready").map((item) => ({
+    id: `evidence-${item.id}`,
+    category: item.type || "现场证据",
+    owner: item.owner || "项目办",
+    status: item.status || "watch",
+    source: item.evidence || item.id,
+    nextAction: item.nextAction || "补齐现场验收材料并复核。",
+    boundary: "仅跟踪现场证据补齐，不替代源系统办理。"
+  }));
+  const dependencyIssues = siteDependencies.map((item) => ({
+    id: `dependency-${item.id}`,
+    category: item.track || item.name || "现场依赖",
+    owner: item.owner || "现场负责人",
+    status: item.status || "watch",
+    source: item.id,
+    nextAction: item.nextAction || item.next || "完成现场签字或联调确认。",
+    boundary: "仅跟踪上线依赖和签字状态，不替代外部系统建设。"
+  }));
+  const items = [...evidenceIssues, ...dependencyIssues];
+  return {
+    status: items.length ? "watch" : "ready",
+    source: "siteEvidencePackage/productionDeploymentPlan",
+    summary: {
+      total: items.length,
+      ready: items.filter((item) => item.status === "ready").length,
+      watch: items.filter((item) => item.status !== "ready").length,
+      owners: Array.from(new Set(items.map((item) => item.owner).filter(Boolean))).length
+    },
+    items
+  };
+}
+
 function districtName(name) {
   return String(name || "").replace(/健康城市平台|卫生健康局|县域医共体/g, "").trim();
 }
@@ -987,6 +1022,7 @@ function buildHealthDashboardSummary(options = {}) {
   const certificateExchange = buildCertificateExchangeChain(data);
   const riskDrilldowns = buildRiskDrilldowns(openActions);
   const siteEvidencePackage = buildSiteEvidencePackage(data, { interfaceRows, evidenceRecords, siteDependencies });
+  const siteIssueLedger = buildSiteIssueLedger({ siteEvidencePackage, siteDependencies });
   const jurisdictionScope = buildJurisdictionScope(data, { openActions, applications });
   const actionClosureTrend = buildActionClosureTrend(taskActions, { openActions });
   const functionalReport = buildFunctionalReport({ applications, openActions, actionClosureTrend, populationServiceBoard, certificateExchange, riskDrilldowns, siteEvidencePackage, jurisdictionScope, interfaceRows, evidenceRecords, siteDependencies });
@@ -1003,6 +1039,7 @@ function buildHealthDashboardSummary(options = {}) {
     { id: "dashboard:certificate-exchange", passed: certificateExchange.items.length >= 5 && certificateExchange.summary.receipts >= 3 && certificateExchange.summary.correctable >= 4, detail: `${certificateExchange.items.length} certificate exchange tracks, ${certificateExchange.summary.receipts} receipts` },
     { id: "dashboard:risk-drilldown", passed: riskDrilldowns.items.length >= 4 && riskDrilldowns.summary.withTrace === riskDrilldowns.items.length, detail: `${riskDrilldowns.items.length} risk drilldowns with trace` },
     { id: "dashboard:site-evidence-package", passed: siteEvidencePackage.items.length >= 4 && siteEvidencePackage.summary.ready >= 3, detail: `${siteEvidencePackage.items.length} evidence package artifacts` },
+    { id: "dashboard:site-issue-ledger", passed: siteIssueLedger.summary.total >= 1 && siteIssueLedger.items.every((item) => item.owner && item.nextAction && item.boundary), detail: `${siteIssueLedger.summary.total} site issue rows` },
     { id: "dashboard:functional-report", passed: functionalReport.functions.length >= 13 && functionalReport.releaseEvidence.length >= 4, detail: `${functionalReport.functions.length} module functions with release evidence` },
     { id: "dashboard:jurisdiction-scope", passed: jurisdictionScope.districts.length >= 2 && jurisdictionScope.summary.institutions >= 3 && jurisdictionScope.institutionTypeOptions.length >= 2, detail: `${jurisdictionScope.summary.districts} districts, ${jurisdictionScope.summary.institutions} institutions, ${jurisdictionScope.summary.openActions} open actions` },
     { id: "dashboard:jurisdiction-detail", passed: jurisdictionScope.districts.some((item) => item.id !== "all" && (item.institutionsList?.length || item.serviceReportList?.length || item.actionList?.length)), detail: "district drilldown includes institution, service, or action detail" },
@@ -1051,6 +1088,7 @@ function buildHealthDashboardSummary(options = {}) {
     certificateExchange,
     riskDrilldowns,
     siteEvidencePackage,
+    siteIssueLedger,
     jurisdictionScope,
     actionClosureTrend,
     functionalReport,
@@ -1209,6 +1247,7 @@ function renderMarkdown(report) {
   const certificateRows = (report.certificateExchange?.items || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.domain || item.id} | ${item.target || ""} | ${dashboardReportStatusLabel(item.receiptStatus)} | ${dashboardReportStatusLabel(item.reconciliationStatus)} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`);
   const drilldownRows = (report.riskDrilldowns?.items || []).map((item) => `| ${dashboardReportPriorityLabel(item.priority)} | ${item.application || ""} | ${dashboardReportCollectionLabel(item.collection)} | ${dashboardReportOwnerLabel(item.owner)} | ${dashboardReportStatusLabel(item.status)} | ${String(item.blocker || "").replace(/\|/g, "/")} |`);
   const siteEvidenceRows = (report.siteEvidencePackage?.items || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.type || item.id} | ${dashboardReportEvidenceLabel(item.evidence || "").replace(/\|/g, "/")} | ${dashboardReportOwnerLabel(item.owner)} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`);
+  const siteIssueRows = (report.siteIssueLedger?.items || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.category || item.id} | ${dashboardReportOwnerLabel(item.owner)} | ${dashboardReportEvidenceLabel(item.source || "").replace(/\|/g, "/")} | ${String(item.nextAction || "").replace(/\|/g, "/")} | ${String(item.boundary || "").replace(/\|/g, "/")} |`);
   const functionRows = (report.functionalReport?.functions || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.name || item.id} | ${dashboardReportEvidenceLabel(item.evidence || "").replace(/\|/g, "/")} | ${String(item.boundary || "").replace(/\|/g, "/")} |`);
   const departmentRows = (report.functionalReport?.departmentFunctionMatrix || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.name || item.id} | ${(item.implemented || []).map((text) => String(text).replace(/\|/g, "/")).join("<br>")} | ${String(item.nextPlan || "").replace(/\|/g, "/")} |`);
   const cityCountyRows = (report.functionalReport?.cityCountyFunctionMatrix || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.level || ""} | ${item.agency || item.id} | ${(item.implemented || []).map((text) => String(text).replace(/\|/g, "/")).join("<br>")} | ${String(item.nextPlan || "").replace(/\|/g, "/")} |`);
@@ -1287,6 +1326,12 @@ function renderMarkdown(report) {
     "| 状态 | 类型 | 证据 | 责任人 | 下一步 |",
     "|---|---|---|---|---|",
     ...siteEvidenceRows,
+    "",
+    "### 现场问题整改台账",
+    "",
+    "| 状态 | 类别 | 责任方 | 来源 | 下一步 | 边界 |",
+    "|---|---|---|---|---|---|",
+    ...siteIssueRows,
     "",
     "## 主要功能报告",
     "",

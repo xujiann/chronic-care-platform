@@ -139,6 +139,12 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(html, /risk-drilldown-list/);
   assert.match(html, /site-evidence-package/);
   assert.match(html, /site-evidence-list/);
+  assert.match(html, /site-issue-ledger-board/);
+  assert.match(html, /site-issue-ledger-status-controls/);
+  assert.match(html, /site-issue-owner-filter/);
+  assert.match(html, /site-issue-reset-filters/);
+  assert.match(html, /site-issue-ledger-list/);
+  assert.match(html, /site-issue-ledger-boundary/);
   assert.match(html, /dashboard-interfaces/);
   assert.match(html, /dashboard-evidence/);
   assert.match(html, /dashboard-dependencies/);
@@ -161,6 +167,13 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(js, /renderRiskDrilldowns/);
   assert.match(js, /buildStaticSiteEvidencePackage/);
   assert.match(js, /renderSiteEvidencePackage/);
+  assert.match(js, /buildStaticSiteIssueLedger/);
+  assert.match(js, /renderSiteIssueLedger/);
+  assert.match(js, /bindSiteIssueStatus/);
+  assert.match(js, /bindSiteIssueOwner/);
+  assert.match(js, /bindSiteIssueReset/);
+  assert.match(js, /currentSiteIssueStatus/);
+  assert.match(js, /currentSiteIssueOwner/);
   assert.match(js, /buildDashboardDepartmentFunctionMatrix/);
   assert.match(js, /buildDashboardCityCountyFunctionMatrix/);
   assert.match(js, /buildDashboardJurisdictionScope/);
@@ -201,6 +214,8 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(read("portal.css"), /certificate-exchange-card/);
   assert.match(read("portal.css"), /drilldown-card/);
   assert.match(read("portal.css"), /site-evidence-card/);
+  assert.match(read("portal.css"), /site-issue-ledger-card/);
+  assert.match(read("portal.css"), /site-issue-ledger-filter-grid/);
   assert.match(read("portal.css"), /function-matrix-card/);
   assert.match(js, /源待办/);
   assert.match(js, /预览待办/);

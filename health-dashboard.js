@@ -5,6 +5,8 @@ let currentDashboardSummary = null;
 let currentPopulationPeriod = "day";
 let currentJurisdictionLevel = "all";
 let currentDepartmentStatus = "all";
+let currentSiteIssueStatus = "all";
+let currentSiteIssueOwner = "";
 let currentJurisdictionDistrict = "";
 let currentJurisdictionType = "";
 let currentJurisdictionDetail = "";
@@ -34,6 +36,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindJurisdictionLevel();
   bindJurisdictionScopeFilters();
   bindDepartmentStatus();
+  bindSiteIssueStatus();
+  bindSiteIssueOwner();
+  bindSiteIssueReset();
   renderDashboard(summary);
 });
 
@@ -110,6 +115,7 @@ function buildStaticDashboardSummary(state) {
   const certificateExchange = buildStaticCertificateExchange(state);
   const riskDrilldowns = buildStaticRiskDrilldowns(openActions);
   const siteEvidencePackage = buildStaticSiteEvidencePackage(state, { interfaces, evidence, siteDependencies: dependencies });
+  const siteIssueLedger = buildStaticSiteIssueLedger(siteEvidencePackage, dependencies);
   const jurisdictionScope = buildDashboardJurisdictionScope(state, { openActions, applications: enrichedApplications });
   const actionClosureTrend = buildDashboardActionClosureTrend(taskActions, { openActions });
   const functionalReport = buildDashboardFunctionalReport({
@@ -120,6 +126,7 @@ function buildStaticDashboardSummary(state) {
     certificateExchange,
     riskDrilldowns,
     siteEvidencePackage,
+    siteIssueLedger,
     jurisdictionScope,
     interfaces,
     evidence,
@@ -394,6 +401,40 @@ function buildStaticSiteEvidencePackage(state, context = {}) {
       ready: items.filter((item) => item.status === "ready").length,
       watch: items.filter((item) => item.status === "watch").length,
       signed: items.filter((item) => /签字|signed|signoff/i.test(`${item.status} ${item.evidence}`)).length
+    },
+    items
+  };
+}
+
+function buildStaticSiteIssueLedger(siteEvidencePackage = {}, siteDependencies = []) {
+  const evidenceItems = Array.isArray(siteEvidencePackage.items) ? siteEvidencePackage.items : [];
+  const evidenceIssues = evidenceItems.filter((item) => item.status !== "ready").map((item) => ({
+    id: `evidence-${item.id}`,
+    category: item.type || "现场证据",
+    owner: item.owner || "项目办",
+    status: item.status || "watch",
+    source: item.evidence || item.id,
+    nextAction: item.nextAction || "补齐现场验收材料并复核。",
+    boundary: "只跟踪现场证据补齐，不替代源系统办理。"
+  }));
+  const dependencyIssues = siteDependencies.map((item) => ({
+    id: `dependency-${item.id}`,
+    category: item.track || item.name || "现场依赖",
+    owner: item.owner || "现场负责人",
+    status: item.status || "watch",
+    source: item.id,
+    nextAction: item.nextAction || item.next || "完成现场签字或联调确认。",
+    boundary: "只跟踪上线依赖和签字状态，不替代外部系统建设。"
+  }));
+  const items = [...evidenceIssues, ...dependencyIssues];
+  return {
+    status: items.length ? "watch" : "ready",
+    source: "siteEvidencePackage/productionDeploymentPlan",
+    summary: {
+      total: items.length,
+      ready: items.filter((item) => item.status === "ready").length,
+      watch: items.filter((item) => item.status !== "ready").length,
+      owners: Array.from(new Set(items.map((item) => item.owner).filter(Boolean))).length
     },
     items
   };
@@ -930,6 +971,7 @@ function renderDashboard(summary) {
   renderCertificateExchange(summary.certificateExchange || {});
   renderRiskDrilldowns(summary.riskDrilldowns || {});
   renderSiteEvidencePackage(summary.siteEvidencePackage || {});
+  renderSiteIssueLedger(summary.siteIssueLedger || {});
   renderFunctionReport(summary.functionalReport || {});
   renderJurisdictionWorkbench(summary.functionalReport || {});
   renderJurisdictionScope(summary.jurisdictionScope || {});
@@ -1163,6 +1205,44 @@ function renderSiteEvidencePackage(packageData) {
     <p>${dashboardStatusLabel(item.owner || "owner-pending")}</p>
     <p>${dashboardTechnicalLabel(item.nextAction || "")}</p>
   </article>`).join("") || `<article class="site-evidence-card empty"><strong>等待现场验收证据</strong><p>接口报文、截图、签字单、整改和复测结论归档后显示。</p></article>`;
+}
+
+function renderSiteIssueLedger(ledger) {
+  const section = document.querySelector("#site-issue-ledger-board");
+  const controls = document.querySelector("#site-issue-ledger-status-controls");
+  const ownerFilter = document.querySelector("#site-issue-owner-filter");
+  const summary = document.querySelector("#site-issue-ledger-summary");
+  const list = document.querySelector("#site-issue-ledger-list");
+  const boundary = document.querySelector("#site-issue-ledger-boundary");
+  if (!section || !summary || !list) return;
+  const items = Array.isArray(ledger.items) ? ledger.items : [];
+  const statuses = ["all", ...Array.from(new Set(items.map((item) => item.status).filter(Boolean)))];
+  const owners = Array.from(new Set(items.map((item) => item.owner).filter(Boolean)));
+  if (!statuses.includes(currentSiteIssueStatus)) currentSiteIssueStatus = "all";
+  if (currentSiteIssueOwner && !owners.includes(currentSiteIssueOwner)) currentSiteIssueOwner = "";
+  const statusItems = currentSiteIssueStatus === "all" ? items : items.filter((item) => item.status === currentSiteIssueStatus);
+  const visibleItems = currentSiteIssueOwner ? statusItems.filter((item) => item.owner === currentSiteIssueOwner) : statusItems;
+  const counts = ledger.summary || {};
+  section.dataset.issueStatus = ledger.status || "empty";
+  section.dataset.activeStatus = currentSiteIssueStatus;
+  if (controls) {
+    controls.innerHTML = statuses.map((status) => `<button type="button" data-site-issue-status="${status}" class="${status === currentSiteIssueStatus ? "active" : ""}">${status === "all" ? "全部" : dashboardStatusLabel(status)}</button>`).join("");
+  }
+  if (ownerFilter) {
+    ownerFilter.innerHTML = [`<option value="">全部责任方</option>`, ...owners.map((owner) => `<option value="${owner}">${dashboardTechnicalLabel(owner)}</option>`)].join("");
+    ownerFilter.value = currentSiteIssueOwner;
+  }
+  summary.textContent = `${currentSiteIssueStatus === "all" ? "全部状态" : dashboardStatusLabel(currentSiteIssueStatus)} / ${currentSiteIssueOwner || "全部责任方"} / ${counts.total || items.length} 项问题 / 当前 ${visibleItems.length} 项`;
+  if (boundary) {
+    boundary.textContent = "台账只用于行政管理、上线督办和验收留痕，不替代源业务系统、医疗机构或平台厂商的实际整改办理。";
+  }
+  list.innerHTML = visibleItems.map((item) => `<article class="site-issue-ledger-card ${item.status || "watch"}" data-site-issue="${item.id}" data-site-issue-status="${item.status || "watch"}">
+    <span>${dashboardStatusLabel(item.status || "watch")}</span>
+    <strong>${dashboardTechnicalLabel(item.category || item.id)}</strong>
+    <small>${dashboardTechnicalLabel(item.owner || "owner-pending")} / ${dashboardTechnicalLabel(item.source || "")}</small>
+    <p>${dashboardTechnicalLabel(item.nextAction || "")}</p>
+    <p>${dashboardTechnicalLabel(item.boundary || "")}</p>
+  </article>`).join("") || `<article class="site-issue-ledger-card empty"><strong>暂无匹配的现场整改问题</strong><p>切换其他状态查看，或等待现场联调产生新的整改记录。</p></article>`;
 }
 
 function renderDataState(summary) {
@@ -1430,6 +1510,39 @@ function bindDepartmentStatus() {
     if (!button) return;
     currentDepartmentStatus = button.dataset.departmentStatus || "all";
     if (currentDashboardSummary) renderDepartmentWorkbench(currentDashboardSummary.functionalReport || {});
+  });
+}
+
+function bindSiteIssueStatus() {
+  const controls = document.querySelector("#site-issue-ledger-status-controls");
+  if (!controls || controls.dataset.bound === "true") return;
+  controls.dataset.bound = "true";
+  controls.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-site-issue-status]");
+    if (!button) return;
+    currentSiteIssueStatus = button.dataset.siteIssueStatus || "all";
+    if (currentDashboardSummary) renderSiteIssueLedger(currentDashboardSummary.siteIssueLedger || {});
+  });
+}
+
+function bindSiteIssueOwner() {
+  const control = document.querySelector("#site-issue-owner-filter");
+  if (!control || control.dataset.bound === "true") return;
+  control.dataset.bound = "true";
+  control.addEventListener("change", () => {
+    currentSiteIssueOwner = control.value || "";
+    if (currentDashboardSummary) renderSiteIssueLedger(currentDashboardSummary.siteIssueLedger || {});
+  });
+}
+
+function bindSiteIssueReset() {
+  const button = document.querySelector("#site-issue-reset-filters");
+  if (!button || button.dataset.bound === "true") return;
+  button.dataset.bound = "true";
+  button.addEventListener("click", () => {
+    currentSiteIssueStatus = "all";
+    currentSiteIssueOwner = "";
+    if (currentDashboardSummary) renderSiteIssueLedger(currentDashboardSummary.siteIssueLedger || {});
   });
 }
 

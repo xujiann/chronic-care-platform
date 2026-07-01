@@ -198,11 +198,14 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(healthDashboard.body.certificateExchange.items.length, 5);
     assert.equal(healthDashboard.body.riskDrilldowns.items.length >= 4, true);
     assert.equal(healthDashboard.body.siteEvidencePackage.items.length, 4);
+    assert.equal(healthDashboard.body.siteIssueLedger.items.length >= 1, true);
+    assert.equal(healthDashboard.body.siteIssueLedger.items.every((item) => item.owner && item.nextAction && item.boundary), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:source-boundary" && item.passed), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:population-service-board" && item.passed), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:certificate-exchange" && item.passed), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:risk-drilldown" && item.passed), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:site-evidence-package" && item.passed), true);
+    assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:site-issue-ledger" && item.passed), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:functional-report" && item.passed), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:jurisdiction-scope" && item.passed), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:jurisdiction-detail" && item.passed), true);
