@@ -50,6 +50,7 @@ test("referral teleconsultation readiness validates closed-loop evidence", () =>
   assert.equal(report.checks.some((item) => item.id === "referral:jointTestPack" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:jointTestLedger" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:jointTestTaskDispatch" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "referral:jointTestTaskCompletion" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:signoffSummary" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:signoffArchive" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:insurancePerformancePolicy" && item.passed), true);

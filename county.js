@@ -282,7 +282,10 @@ function renderCountyTeleconsultationJointLedger(state, rows) {
   const ledgerRows = buildCountyTeleconsultationJointLedger(state, rows);
   const matchedContracts = ledgerRows.filter((item) => item.type === "callback" && item.matched > 0).length;
   const pendingRows = ledgerRows.filter((item) => !["matched", "signed"].includes(item.status));
-  const jointTaskKeys = new Set((state.taskMessages || []).map((message) => message.jointTestKey || message.notificationKey).filter(Boolean));
+  const jointTasks = new Map((state.taskMessages || [])
+    .filter((message) => message.jointTestKey || message.notificationKey)
+    .map((message) => [message.jointTestKey || message.notificationKey, message]));
+  const jointTaskKeys = new Set(jointTasks.keys());
   const assignedTasks = pendingRows.filter((item) => jointTaskKeys.has(`referralTeleconsultations:joint-test:${item.role}`)).length;
   el.innerHTML = [
     `<article data-referral-joint-ledger-summary>
@@ -295,15 +298,21 @@ function renderCountyTeleconsultationJointLedger(state, rows) {
         <button class="inline-action" type="button" data-referral-joint-ledger-tasks>Sync tasks</button>
       </footer>
     </article>`,
-    ...ledgerRows.map((item) => `<article data-referral-joint-ledger="${item.role}">
-      <div><span class="badge ${item.status === "matched" || item.status === "signed" ? "info" : "warn"}">${item.role}</span><span class="badge ${item.localEvidence ? "info" : "warn"}">${item.status}</span></div>
-      <h3>${item.title}</h3>
-      <p>${item.evidence}</p>
-      <footer>
-        <small>${item.type === "callback" ? `${item.matched} gateway events / ${item.matchedTargets} teleconsultations` : item.siteStatus}</small>
-        <small>${item.nextAction}</small>
-      </footer>
-    </article>`)
+    ...ledgerRows.map((item) => {
+      const task = jointTasks.get(`referralTeleconsultations:joint-test:${item.role}`);
+      const taskClosed = task && /completed|closed|signed|read/i.test(String(task.status || ""));
+      return `<article data-referral-joint-ledger="${item.role}">
+        <div><span class="badge ${item.status === "matched" || item.status === "signed" ? "info" : "warn"}">${item.role}</span><span class="badge ${item.localEvidence ? "info" : "warn"}">${item.status}</span></div>
+        <h3>${item.title}</h3>
+        <p>${item.evidence}</p>
+        <footer>
+          <small>${item.type === "callback" ? `${item.matched} gateway events / ${item.matchedTargets} teleconsultations` : item.siteStatus}</small>
+          <small>${item.nextAction}</small>
+          <small>${task ? `Task ${task.status || "sent"}` : "Task not assigned"}</small>
+          ${task ? `<button class="inline-action" type="button" data-referral-joint-ledger-complete data-role="${item.role}" ${taskClosed ? "disabled" : ""}>Complete task</button>` : ""}
+        </footer>
+      </article>`;
+    })
   ].join("");
 }
 
@@ -583,6 +592,13 @@ function bindCountyActions() {
       renderCountyTeleconsultationLoop(platformState);
       return;
     }
+    const jointTaskCompleteButton = event.target.closest("[data-referral-joint-ledger-complete]");
+    if (jointTaskCompleteButton && platformState) {
+      jointTaskCompleteButton.disabled = true;
+      await completeReferralJointLedgerTask(platformState, jointTaskCompleteButton.dataset.role);
+      renderCountyTeleconsultationLoop(platformState);
+      return;
+    }
     const button = event.target.closest("[data-county-action]");
     if (!button || !platformState) return;
     const updates = JSON.parse(button.dataset.updates || "{}");
@@ -782,6 +798,51 @@ async function createReferralJointLedgerTasks(state) {
   state.taskMessages = [...messages, ...(state.taskMessages || [])].slice(0, 300);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   return { ok: true, created: messages.length };
+}
+
+async function completeReferralJointLedgerTask(state, role) {
+  if (API_BASE) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/referral-teleconsultations/joint-test-ledger/tasks/${encodeURIComponent(role)}/complete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "completed", note: `${role} joint-test owner confirmed evidence follow-up.` })
+      });
+      if (response.ok) {
+        const result = await response.json();
+        state.taskMessages = [
+          result.message,
+          ...(state.taskMessages || []).filter((message) => message.id !== result.message.id)
+        ].slice(0, 300);
+        return { ok: true };
+      }
+    } catch (error) {
+      // Static preview falls back to local task completion below.
+    }
+  }
+  const key = `referralTeleconsultations:joint-test:${role}`;
+  const now = new Date().toISOString();
+  state.taskMessages = (state.taskMessages || []).map((message) => {
+    if (message.jointTestKey !== key && message.notificationKey !== key) return message;
+    return {
+      ...message,
+      status: "completed",
+      jointTestCompletedAt: now,
+      jointTestCompletedBy: "county-preview",
+      jointTestCompletionNote: `${role} joint-test owner confirmed evidence follow-up.`,
+      receipts: [{
+        at: now,
+        by: "county-preview",
+        byName: "County preview",
+        role: "county",
+        status: "completed",
+        note: `${role} joint-test owner confirmed evidence follow-up.`
+      }, ...(Array.isArray(message.receipts) ? message.receipts : [])].slice(0, 20)
+    };
+  });
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  return { ok: true };
 }
 
 function countyActionButton(collection, id, label, updates) {

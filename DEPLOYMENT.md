@@ -267,6 +267,8 @@ Use `GET /api/referral-teleconsultations/joint-test-ledger` during field testing
 
 Use `POST /api/referral-teleconsultations/joint-test-ledger/tasks` from the county command board when the ledger still has pending replay or signoff rows. The endpoint creates idempotent `taskMessages` for institution, county, or insurance owners without duplicating existing joint-test tasks.
 
+Use `POST /api/referral-teleconsultations/joint-test-ledger/tasks/:role/complete` when a responsible owner confirms callback replay, SLA supervision, or insurance-policy follow-up. The route records a completion receipt on the original `taskMessages` row and keeps an audit event before final onsite signoff evidence is archived.
+
 Use `GET /api/referral-teleconsultations/signoff-summary` during field testing to review demo-ready evidence and site-pending signoff rows for referral center, receiving hospital, hospital IT, county performance, and insurance review before archiving real signatures.
 
 Use `POST /api/referral-teleconsultations/signoff-summary/:role/evidence` to archive onsite signoff evidence after each role validates its callback replay, report archive, SLA supervision, or payment-policy row. Keep the original signed file in the project evidence pack and store its attachment name or storage pointer in the request note.

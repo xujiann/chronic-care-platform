@@ -663,6 +663,14 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(jointTaskDispatch.response.status, 201);
     assert.equal(jointTaskDispatch.body.summary.created, 5);
     assert.equal(jointTaskDispatch.body.messages.some((item) => item.jointTestKey === "referralTeleconsultations:joint-test:hospital-it"), true);
+    const jointTaskComplete = await api(baseUrl, "/api/referral-teleconsultations/joint-test-ledger/tasks/hospital-it/complete", authorized(county.body.token, {
+      method: "POST",
+      body: JSON.stringify({ status: "completed", note: "Hospital IT replay owner confirmed callback evidence." })
+    }));
+    assert.equal(jointTaskComplete.response.status, 200);
+    assert.equal(jointTaskComplete.body.message.status, "completed");
+    assert.equal(jointTaskComplete.body.message.jointTestKey, "referralTeleconsultations:joint-test:hospital-it");
+    assert.equal(jointTaskComplete.body.message.receipts[0].status, "completed");
     const jointTaskReplay = await api(baseUrl, "/api/referral-teleconsultations/joint-test-ledger/tasks", authorized(county.body.token, {
       method: "POST",
       body: JSON.stringify({})
