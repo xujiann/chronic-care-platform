@@ -393,9 +393,12 @@ function priorityApplicationTemplateChecks(priorityApplicationTemplates) {
 }
 
 function maternalChildReadinessChecks(maternalChildReadiness) {
+  const riskMetrics = maternalChildReadiness.summary?.riskMetrics || {};
+  const hasRiskMetricKeys = ["pendingPublicSecuritySync", "pendingMaternalChildSync", "qualityPending"].every((key) => Number.isFinite(Number(riskMetrics[key])));
   return [
     check("maternalChild:readiness", maternalChildReadiness.ok, maternalChildReadiness.ok ? "maternal-child readiness checks passed" : "maternal-child readiness checks failed", "error", "maternal-child"),
     check("maternalChild:policy", maternalChildReadiness.checks?.some((item) => item.id === "docs:policy" && item.passed), "policy documents and module policy summary present", "error", "maternal-child"),
+    check("maternalChild:riskMetrics", hasRiskMetricKeys && maternalChildReadiness.checks?.some((item) => item.id === "data:risk-metrics" && item.passed), `public-security pending ${riskMetrics.pendingPublicSecuritySync ?? 0}, maternal-child enrollment pending ${riskMetrics.pendingMaternalChildSync ?? 0}, quality correction pending ${riskMetrics.qualityPending ?? 0}`, "error", "maternal-child"),
     check("maternalChild:roles", ["role:institution", "role:commission", "role:citizen"].every((id) => maternalChildReadiness.checks?.some((item) => item.id === id && item.passed)), "institution, commission, and citizen roles covered", "error", "maternal-child")
   ];
 }

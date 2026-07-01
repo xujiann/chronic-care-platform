@@ -151,6 +151,8 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "priorityApps:conversationStarters" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "priorityApps:implementationChecklists" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "priorityApps:acceptanceGates" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "maternalChild:riskMetrics" && item.passed), true);
+  assert.deepEqual(Object.keys(report.maternalChildReadiness.summary.riskMetrics), ["pendingPublicSecuritySync", "pendingMaternalChildSync", "qualityPending"]);
   assert.equal(report.priorityApplicationTemplates.templates.every((item) => item.conversationStarter && item.implementationChecklist.length >= 8 && item.acceptanceGate.readyWhen.length >= 4), true);
   assert.equal(report.priorityApplicationTemplates.templates.every((item) => item.implementationChecklist.some((step) => /Follow Codex loop/.test(step))), true);
   assert.equal(report.environmentMatrix.profiles.some((item) => item.id === "staging"), true);
