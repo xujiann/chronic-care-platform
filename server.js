@@ -6647,6 +6647,41 @@ function buildReferralTeleconsultationJointTestPack(data) {
             : "Dispatch owner task from the joint-test ledger."
     };
   });
+  const replayedContracts = new Set((Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])
+    .filter((item) => ["referral-feedback-callback-v1", "referral-schedule-callback-v1", "referral-report-callback-v1"].includes(item.contractId))
+    .map((item) => item.contractId));
+  const pendingFinalSignoffRoles = exportSummary.filter((item) => !item.readyForFinalSignoff).map((item) => item.role);
+  const pendingOnsiteSignoffRoles = exportSummary.filter((item) => !item.onsiteSigned).map((item) => item.role);
+  const cutoverReadiness = {
+    readyForProductionCutover: contracts.length === 3 && replayedContracts.size === 3 && pendingFinalSignoffRoles.length === 0 && pendingOnsiteSignoffRoles.length === 0,
+    contractReplay: `${replayedContracts.size}/${contracts.length}`,
+    finalSignoffReadyRoles: exportSummary.filter((item) => item.readyForFinalSignoff).length,
+    onsiteSignedRoles: exportSummary.filter((item) => item.onsiteSigned).length,
+    blockers: [
+      replayedContracts.size < 3 ? {
+        id: "callback-replay-pending",
+        owner: "institution-integration",
+        detail: "Replay signed feedback, schedule, and report callbacks from target institution systems."
+      } : null,
+      pendingFinalSignoffRoles.length ? {
+        id: "final-signoff-pending",
+        owner: "county-command",
+        detail: `Complete final signoff readiness for ${pendingFinalSignoffRoles.join(", ")}.`
+      } : null,
+      pendingOnsiteSignoffRoles.length ? {
+        id: "onsite-signoff-pending",
+        owner: "county-command",
+        detail: `Archive onsite signed evidence for ${pendingOnsiteSignoffRoles.join(", ")}.`
+      } : null
+    ].filter(Boolean),
+    nextAction: pendingOnsiteSignoffRoles.length
+      ? "Archive onsite signed evidence before production cutover."
+      : replayedContracts.size < 3
+        ? "Replay all signed callback contracts against target institution systems."
+        : pendingFinalSignoffRoles.length
+          ? "Complete final owner task receipts."
+          : "Ready for production cutover after platform-level environment gates pass."
+  };
   const nextDevelopmentPlan = [
     {
       phase: "field-interface-replay",
@@ -6686,6 +6721,7 @@ function buildReferralTeleconsultationJointTestPack(data) {
     signoff,
     taskReceipts,
     exportSummary,
+    cutoverReadiness,
     nextDevelopmentPlan,
     signoffSummary
   };
