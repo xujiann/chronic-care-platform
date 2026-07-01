@@ -40,6 +40,9 @@ const runtimeMetrics = {
 };
 const sessions = new Map();
 const DEMO_SMS_CODE = process.env.DEMO_SMS_CODE || "888888";
+const PHONE_CODE_TTL_MS = 5 * 60 * 1000;
+const PHONE_CODE_COOLDOWN_MS = 60 * 1000;
+const phoneVerificationCodes = new Map();
 let sqliteModule = null;
 let sqliteError = null;
 const SQLITE_MIGRATIONS = [
@@ -5906,6 +5909,59 @@ function normalizePhone(phone) {
   return String(phone || "").replace(/\s+/g, "").trim();
 }
 
+function maskPhone(phone) {
+  const value = normalizePhone(phone);
+  if (value.length <= 7) return value.replace(/.(?=.{2})/g, "*");
+  return `${value.slice(0, 3)}****${value.slice(-4)}`;
+}
+
+function prunePhoneVerificationCodes(now = Date.now()) {
+  for (const [phone, item] of phoneVerificationCodes.entries()) {
+    if (!item || Number(item.expiresAtMs || 0) <= now) phoneVerificationCodes.delete(phone);
+  }
+}
+
+function issuePhoneVerificationCode(phone, user) {
+  const normalizedPhone = normalizePhone(phone);
+  const now = Date.now();
+  prunePhoneVerificationCodes(now);
+  const existing = phoneVerificationCodes.get(normalizedPhone);
+  if (existing && now - Number(existing.sentAtMs || 0) < PHONE_CODE_COOLDOWN_MS) {
+    return {
+      ok: false,
+      retryAfterSeconds: Math.ceil((PHONE_CODE_COOLDOWN_MS - (now - existing.sentAtMs)) / 1000),
+      expiresAt: new Date(existing.expiresAtMs).toISOString()
+    };
+  }
+  const record = {
+    phone: normalizedPhone,
+    code: DEMO_SMS_CODE,
+    userId: user.id,
+    sentAtMs: now,
+    expiresAtMs: now + PHONE_CODE_TTL_MS
+  };
+  phoneVerificationCodes.set(normalizedPhone, record);
+  return {
+    ok: true,
+    code: record.code,
+    retryAfterSeconds: Math.ceil(PHONE_CODE_COOLDOWN_MS / 1000),
+    expiresAt: new Date(record.expiresAtMs).toISOString()
+  };
+}
+
+function verifyPhoneCode(phone, code, user) {
+  const normalizedPhone = normalizePhone(phone);
+  const normalizedCode = String(code || "").trim();
+  const now = Date.now();
+  prunePhoneVerificationCodes(now);
+  const issued = phoneVerificationCodes.get(normalizedPhone);
+  if (issued && issued.userId === user.id && issued.expiresAtMs > now && timingSafeTextEqual(issued.code, normalizedCode)) {
+    phoneVerificationCodes.delete(normalizedPhone);
+    return true;
+  }
+  return timingSafeTextEqual(DEMO_SMS_CODE, normalizedCode);
+}
+
 function createSession(user) {
   const sessionId = randomUUID();
   const now = Date.now();
@@ -10967,12 +11023,39 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "POST" && url.pathname === "/api/auth/phone-code") {
+    const payload = await collectJson(req);
+    const phone = normalizePhone(payload.phone);
+    const user = findCitizenAuthUserByPhone(phone);
+    if (!user) {
+      appendSecurityEvent({ actor: phone || "unknown", role: "citizen", action: "发送手机号验证码", target: "统一认证", result: "拒绝", detail: "手机号未绑定居民账号" });
+      sendJson(res, 404, { ok: false, message: "手机号未绑定居民账号" });
+      return;
+    }
+    const issued = issuePhoneVerificationCode(phone, user);
+    if (!issued.ok) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "发送手机号验证码", target: "统一认证", result: "拒绝", detail: `验证码发送过于频繁，${issued.retryAfterSeconds} 秒后可重试` });
+      sendJson(res, 429, { ok: false, message: "验证码发送过于频繁", retryAfterSeconds: issued.retryAfterSeconds, expiresAt: issued.expiresAt });
+      return;
+    }
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "发送手机号验证码", target: "统一认证", result: "允许", detail: "居民端演示短信验证码已签发" });
+    sendJson(res, 200, {
+      ok: true,
+      channel: "demo-sms",
+      phone: maskPhone(phone),
+      expiresAt: issued.expiresAt,
+      retryAfterSeconds: issued.retryAfterSeconds,
+      demoCode: issued.code
+    });
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/auth/phone-login") {
     const credentials = await collectJson(req);
     const phone = normalizePhone(credentials.phone);
     const code = String(credentials.code || "").trim();
     const user = findCitizenAuthUserByPhone(phone);
-    if (!user || code !== DEMO_SMS_CODE) {
+    if (!user || !verifyPhoneCode(phone, code, user)) {
       appendSecurityEvent({ actor: phone || "unknown", role: "citizen", action: "手机号验证码登录", target: "统一认证", result: "拒绝", detail: "手机号或验证码错误" });
       sendJson(res, 401, { ok: false, message: "手机号或验证码不正确" });
       return;

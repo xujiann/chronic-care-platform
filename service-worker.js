@@ -1,4 +1,4 @@
-const CACHE_NAME = "chronic-care-citizen-v25";
+const CACHE_NAME = "chronic-care-citizen-v26";
 const APP_SHELL = [
   "./",
   "./citizen.html",
@@ -23,6 +23,7 @@ const APP_SHELL = [
   "./citizen.js?v=20260630sync",
   "./citizen.js?v=20260630lifecycle",
   "./citizen.js?v=20260630escortlink",
+  "./citizen.js?v=20260701actions",
   "./auth.js",
   "./auth.js?v=20260627",
   "./health-archive-standard.js",
@@ -57,14 +58,14 @@ self.addEventListener("fetch", (event) => {
 
   if (event.request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match("./citizen.html"))
+      fetch(event.request, { cache: "no-store" }).catch(() => caches.match("./citizen.html"))
     );
     return;
   }
 
   if (/\.(?:html|js|css)$/.test(requestUrl.pathname)) {
     event.respondWith(
-      fetch(event.request)
+      fetch(event.request, { cache: "no-store" })
         .then((response) => {
           const copy = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));

@@ -14,6 +14,8 @@
 | 访问日志复核 | `dataAccessLogs`, `/api/messages` | 居民端展示近期访问记录，管理端可通过 `/api/audit/export` 复核撤销、拒绝和敏感访问 | 接入统一审计链、SIEM 或审计导出路径 |
 | 消息触达回执 | `/api/messages`, `/api/tasks/:id/actions` | 居民通知、任务动作和回执提示 | 接入短信、订阅消息、APP 推送和送达回执 |
 
+- Auth code endpoint: `POST /api/auth/phone-code` issues the resident demo SMS code with cooldown, expiry, masked phone output, and security audit events before `POST /api/auth/phone-login`.
+
 ## 3. 页面证据
 
 - `citizen.html` 展示“授权与病历可信来源”面板。

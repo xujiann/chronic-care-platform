@@ -735,7 +735,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   const serviceWorker = read("service-worker.js");
   assert.match(citizenHtml, /rel="manifest"/);
   assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260630escortlink/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260701actions/);
   assert.match(citizenHtml, /mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-title/);
@@ -797,7 +797,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.shortcuts.some((item) => item.url === "./citizen.html?client=app&page=escort#service-escort"), true);
   assert.equal(manifest.shortcuts.some((item) => item.url === "./mobile-preview.html?client=app"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v25/);
+  assert.match(serviceWorker, /chronic-care-citizen-v26/);
   assert.match(serviceWorker, /internet-nursing\.js\?v=20260629prod/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627preview/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages/);
@@ -813,6 +813,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(serviceWorker, /citizen\.js\?v=20260630visible/);
   assert.match(serviceWorker, /citizen\.js\?v=20260630touch/);
   assert.match(serviceWorker, /citizen\.js\?v=20260630escortlink/);
+  assert.match(serviceWorker, /citizen\.js\?v=20260701actions/);
   assert.match(serviceWorker, /citizen\.css\?v=20260630lifecycle/);
   assert.match(serviceWorker, /citizen\.js\?v=20260630lifecycle/);
   assert.match(serviceWorker, /citizen\.html/);
@@ -820,6 +821,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(serviceWorker, /mobile-preview\.css/);
   assert.match(serviceWorker, /data\/db\.json/);
   assert.match(serviceWorker, /\?:html\|js\|css/);
+  assert.match(serviceWorker, /cache: "no-store"/);
   assert.match(read("package.json"), /node --check service-worker\.js/);
   assert.match(read("README.md"), /manifest\.webmanifest/);
   assert.match(read("README.md"), /service-worker\.js/);
@@ -906,8 +908,14 @@ test("citizen portal exposes resident service tabs and implementation states", (
   const server = read("server.js");
   assert.match(loginHtml, /phone-login-form/);
   assert.match(loginHtml, /手机号验证码/);
+  assert.match(loginHtml, /data-send-phone-code/);
+  assert.match(loginHtml, /phone-code-hint/);
   assert.match(auth, /loginByPhone/);
+  assert.match(auth, /sendPhoneCode/);
   assert.match(auth, /demoSmsCode/);
+  assert.match(server, /\/api\/auth\/phone-code/);
+  assert.match(server, /PHONE_CODE_TTL_MS/);
+  assert.match(server, /PHONE_CODE_COOLDOWN_MS/);
   assert.match(server, /\/api\/auth\/phone-login/);
   assert.match(server, /findCitizenAuthUserByPhone/);
   ["健康档案", "电子病历", "护理", "陪诊", "挂号"].forEach((label) => assert.match(citizenJs, new RegExp(label)));
@@ -1091,7 +1099,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /longterm-care-form/);
   assert.match(citizenCss, /registration-form/);
   assert.match(citizenHtml, /registration-summary/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260630escortlink/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260701actions/);
   assert.match(citizenJs, /registration-summary/);
   assert.match(citizenJs, /hisOrders/);
   assert.match(citizenJs, /insuranceReady/);

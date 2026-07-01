@@ -14,6 +14,7 @@
 | 护理 | `/api/internet-nursing/dashboard`, `/api/internet-nursing/orders` | `internetNursingOrders`, `internetNursingNurses`, `taskMessages`, `citizenExtra.longTermCareAssessments` | 已实现 | 补齐护士资质、电子签名、定位轨迹、质控监管、长期护理险和民政补贴正式接口 |
 | 陪诊 | `/api/escort-services/dashboard`, `/api/escort-services/orders`, `/api/messages` | `escortServiceOrders`, `escortServiceProviders`, `escortWorkers`, `taskMessages` | 已实现 | 对接医院接诊回执、保险保障和服务主体监管 |
 | 挂号 | `/api/registrations/dashboard`, `/api/registrations/orders`, `/api/registrations/orders/:id/cancel` | `registrationSchedules`, `registrationOrders`, `taskMessages`, `dataAccessLogs` | 接口闭环 | 替换为医院 HIS/互联网医院号源池、支付平台、医保电子凭证和短信网关 |
+| 登录与身份 | `/api/auth/phone-code`, `/api/auth/phone-login`, `/api/auth/me` | `accounts`, `authUsers`, `securityEvents` | 已实现 | 已具备演示短信验证码签发、冷却、有效期、居民会话和安全审计；生产接入真实短信网关、实名核验和风控策略 |
 | 消息与待办 | `/api/messages`, `/api/tasks/:id/actions` | `taskMessages`, `service tasks`, `dataAccessLogs` | 已实现 | 接入真实短信、订阅消息、送达回执和审计保全；居民端按确认、取消、评价状态隐藏重复操作按钮 |
 
 服务待办中心仅展示已上线动作，并按订单状态隐藏已确认、已申请取消或已完成评价后的重复按钮；陪诊和护理订单历史仍保留在各自业务页，供居民追溯医院回执、服务安排和质控记录。

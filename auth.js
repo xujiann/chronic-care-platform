@@ -134,6 +134,34 @@
     return { ok: true, user: session };
   }
 
+  async function sendPhoneCode(phone) {
+    const normalizedPhone = normalizePhone(phone);
+    if (API_BASE) {
+      try {
+        const response = await fetch(`${API_BASE}/auth/phone-code`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: normalizedPhone })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (response.ok && payload.ok) return { ok: true, ...payload };
+        return { ok: false, message: payload.message || "验证码发送失败", retryAfterSeconds: payload.retryAfterSeconds || 0 };
+      } catch (error) {
+        // Static preview and offline demos fall back to the built-in code.
+      }
+    }
+    const user = demoUsers.find((item) => item.role === "citizen" && normalizePhone(item.phone) === normalizedPhone);
+    if (!user) return { ok: false, message: "手机号未绑定居民账号" };
+    return {
+      ok: true,
+      channel: "local-demo",
+      phone: normalizedPhone,
+      demoCode: user.smsCode || DEMO_SMS_CODE,
+      retryAfterSeconds: 60,
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString()
+    };
+  }
+
   function normalizePhone(phone) {
     return String(phone || "").replace(/\s+/g, "").trim();
   }
@@ -299,6 +327,7 @@
     demoSmsCode: DEMO_SMS_CODE,
     login,
     loginByPhone,
+    sendPhoneCode,
     logout,
     getUser,
     authHeaders,

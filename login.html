@@ -45,8 +45,12 @@
               <input name="phone" id="login-phone" value="DEMO-MOBILE-R1" autocomplete="tel" required />
             </label>
             <label>验证码
-              <input name="code" inputmode="numeric" value="888888" maxlength="6" autocomplete="one-time-code" required />
+              <span class="phone-code-row">
+                <input name="code" id="login-phone-code" inputmode="numeric" value="888888" maxlength="6" autocomplete="one-time-code" required />
+                <button type="button" data-send-phone-code>获取验证码</button>
+              </span>
             </label>
+            <p class="login-hint" id="phone-code-hint">演示环境可发送验证码，也可使用 888888。</p>
             <button class="primary-action" type="submit">居民手机号登录</button>
             <p class="login-error" id="phone-login-error" role="alert"></p>
           </form>
@@ -61,6 +65,9 @@
       const accounts = window.HealthCityAuth.demoUsers;
       const phoneForm = document.querySelector("#phone-login-form");
       const accountForm = document.querySelector("#login-form");
+      const sendPhoneCodeButton = document.querySelector("[data-send-phone-code]");
+      const phoneCodeHint = document.querySelector("#phone-code-hint");
+      let phoneCodeTimer = 0;
       select.innerHTML = accounts.map((user) => `<option value="${user.username}">${user.roleName} · ${user.orgName || user.name} · ${user.username}</option>`).join("");
       document.querySelector("#demo-accounts").innerHTML = accounts.map((user) => `<button type="button" data-user="${user.username}">
         <strong>${user.roleName}</strong>
@@ -84,6 +91,38 @@
           const user = accounts.find((item) => item.username === button.dataset.user);
           if (user?.phone) document.querySelector("#login-phone").value = user.phone;
         });
+      });
+      function setPhoneCodeCooldown(seconds) {
+        window.clearInterval(phoneCodeTimer);
+        let remaining = Number(seconds || 0);
+        const render = () => {
+          if (remaining <= 0) {
+            sendPhoneCodeButton.disabled = false;
+            sendPhoneCodeButton.textContent = "获取验证码";
+            window.clearInterval(phoneCodeTimer);
+            return;
+          }
+          sendPhoneCodeButton.disabled = true;
+          sendPhoneCodeButton.textContent = `${remaining}秒`;
+          remaining -= 1;
+        };
+        render();
+        phoneCodeTimer = window.setInterval(render, 1000);
+      }
+      sendPhoneCodeButton.addEventListener("click", async () => {
+        const phone = document.querySelector("#login-phone").value;
+        sendPhoneCodeButton.disabled = true;
+        sendPhoneCodeButton.textContent = "发送中";
+        const result = await window.HealthCityAuth.sendPhoneCode(phone);
+        if (!result.ok) {
+          phoneCodeHint.textContent = result.message || "验证码发送失败";
+          setPhoneCodeCooldown(result.retryAfterSeconds || 5);
+          return;
+        }
+        if (result.demoCode) document.querySelector("#login-phone-code").value = result.demoCode;
+        const expiresAt = result.expiresAt ? new Date(result.expiresAt).toLocaleTimeString("zh-CN", { hour12: false }) : "5分钟内";
+        phoneCodeHint.textContent = `验证码已发送至 ${result.phone || phone}，${expiresAt} 前有效。`;
+        setPhoneCodeCooldown(result.retryAfterSeconds || 60);
       });
       document.querySelector("#login-form").addEventListener("submit", async (event) => {
         event.preventDefault();

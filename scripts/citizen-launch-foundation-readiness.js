@@ -70,8 +70,9 @@ function buildCitizenLaunchFoundationReadiness(options = {}) {
       passed: /CACHE_NAME = "chronic-care-citizen-v\d+"/.test(serviceWorker) &&
         /manifest\.webmanifest/.test(serviceWorker) &&
         /pwa-icon\.svg/.test(serviceWorker) &&
-        /citizen\.html/.test(serviceWorker),
-      detail: "offline shell caches resident app, manifest, and icon assets"
+        /citizen\.html/.test(serviceWorker) &&
+        /cache: "no-store"/.test(serviceWorker),
+      detail: "offline shell caches resident app and refreshes HTML/JS/CSS from network first"
     },
     {
       id: "citizen-foundation:script-wiring",
