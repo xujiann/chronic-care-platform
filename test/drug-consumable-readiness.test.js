@@ -46,6 +46,7 @@ test("drug consumable readiness covers required supervision boundaries", () => {
   assert.match(markdown, /Traceability evidence requirements/);
   assert.match(markdown, /Traceability coverage: ready/);
   assert.match(markdown, /trace-code-mapping/);
+  assert.match(markdown, /nhsa-2024-collection https:\/\/www\.nhsa\.gov\.cn\/art\/2024\/9\/30\/art_109_14042\.html/);
   assert.match(markdown, /医保发〔2025〕7号/);
   assert.match(markdown, /dcs-consumable-mr1/);
 });
