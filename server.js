@@ -6647,6 +6647,36 @@ function buildReferralTeleconsultationJointTestPack(data) {
             : "Dispatch owner task from the joint-test ledger."
     };
   });
+  const nextDevelopmentPlan = [
+    {
+      phase: "field-interface-replay",
+      owner: "institution-integration",
+      objective: "Replay real HIS/EMR/PACS/LIS referral, schedule, and report callbacks with signed payloads.",
+      dependencies: ["real referral order id", "gateway URL", "HMAC key", "failure replay queue"],
+      acceptance: "Three callback contracts match the joint-test ledger and referral-center, receiving-hospital, and hospital-it rows are ready for final signoff."
+    },
+    {
+      phase: "onsite-signoff-archive",
+      owner: "county-command",
+      objective: "Archive original signed evidence for referral center, receiving hospital, hospital IT, county performance, and insurance.",
+      dependencies: ["signed screenshots", "attachment storage pointer", "onsite signer list"],
+      acceptance: "Signoff summary has signed evidence for all roles and the export summary has no pending owner task."
+    },
+    {
+      phase: "insurance-performance-cutover",
+      owner: "insurance-performance",
+      objective: "Confirm payment path, repeat-exam control, settlement rule, and performance formula.",
+      dependencies: ["insurance rule catalogue", "settlement batch id", "county performance formula"],
+      acceptance: "Insurance and county-performance rows are signed with reviewed payment policy evidence."
+    },
+    {
+      phase: "production-cutover-controls",
+      owner: "platform-ops",
+      objective: "Bind production identity, audit retention, monitoring, storage, and disaster recovery controls.",
+      dependencies: ["OIDC or SAML parameters", "AUDIT_EXPORT_PATH or SIEM_ENDPOINT", "production database adapter", "monitoring signoff"],
+      acceptance: "Release report has no production cutover blockers outside field interface signoff."
+    }
+  ];
   return {
     ok: contracts.length === 3 && samples.length === 3,
     generatedAt: new Date().toISOString(),
@@ -6656,6 +6686,7 @@ function buildReferralTeleconsultationJointTestPack(data) {
     signoff,
     taskReceipts,
     exportSummary,
+    nextDevelopmentPlan,
     signoffSummary
   };
 }

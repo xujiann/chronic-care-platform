@@ -651,6 +651,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(jointTestPack.body.samples.some((item) => item.contractId === "referral-report-callback-v1"), true);
     assert.equal(jointTestPack.body.signoff.some((item) => item.role === "insurance"), true);
     assert.equal(jointTestPack.body.exportSummary.some((item) => item.role === "hospital-it" && item.hasSample && item.demoReady), true);
+    assert.equal(jointTestPack.body.nextDevelopmentPlan.some((item) => item.phase === "field-interface-replay" && item.acceptance), true);
     assert.equal(jointTestPack.body.signoffSummary.some((item) => item.role === "county-performance" && item.localEvidence), true);
     const jointTestLedger = await api(baseUrl, "/api/referral-teleconsultations/joint-test-ledger", authorized(county.body.token));
     assert.equal(jointTestLedger.response.status, 200);

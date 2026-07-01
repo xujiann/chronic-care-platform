@@ -261,7 +261,7 @@ Use `POST /api/referral-teleconsultations/:id/schedule-callback` for appointment
 
 Use `POST /api/referral-teleconsultations/:id/report-callback` for HIS/EMR report return joint testing. Requests must include `idempotencyKey` and `x-integration-signature`; successful callbacks move the teleconsultation to `report-returned`, merge performance evidence, archive the `teleconsultation-report` personal record, append audit/data-access logs, create institution/resident `taskMessages`, and create a matched `integrationGatewayEvents` record.
 
-Use `GET /api/referral-teleconsultations/joint-test-pack` before field testing to export the callback sample payloads, checklist, task receipt summaries, final-signoff export summary, and signoff matrix for referral center, receiving hospital, hospital IT, county performance, and insurance review.
+Use `GET /api/referral-teleconsultations/joint-test-pack` before field testing to export the callback sample payloads, checklist, task receipt summaries, final-signoff export summary, next-development plan, and signoff matrix for referral center, receiving hospital, hospital IT, county performance, and insurance review.
 
 Use `GET /api/referral-teleconsultations/joint-test-ledger` during field testing to reconcile signed callback replay events, local demo evidence, onsite signoff status, SLA supervision, and insurance payment-policy readiness before final acceptance.
 
