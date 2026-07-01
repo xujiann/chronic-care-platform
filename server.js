@@ -5381,6 +5381,96 @@ function buildQualitySafetyGoLiveReadiness({ summary, actionPlan, institutionRis
   };
 }
 
+function buildQualitySafetyOperationsRunbook({ summary, rectifications, criticalValueAlerts, clinicalPathwayCases, mutualRecognitionQualityReviews, siteSignoffs, actionPlan, user }) {
+  const pendingCritical = criticalValueAlerts.filter((item) => !item.acknowledgementComplete || !item.dispositionComplete).length;
+  const openPathways = clinicalPathwayCases.filter((item) => item.normalizedStatus !== "closed").length;
+  const openMutualRecognition = mutualRecognitionQualityReviews.filter((item) => normalizeQualitySafetyStatus(item.status || item.qcStatus) !== "closed").length;
+  const pendingSignoffs = siteSignoffs.filter((item) => !["accepted", "closed"].includes(String(item.status || item.normalizedStatus || ""))).length;
+  const auditRetention = siteSignoffs.find((item) => item.id === "qss-audit-retention") || {};
+  const rows = [
+    {
+      id: "critical-value-on-call",
+      domain: "critical_value",
+      ownerRole: "institution",
+      owner: "Medical institution duty desk",
+      watchItem: "Critical-value acknowledgement and disposition",
+      signal: `${pendingCritical}/${criticalValueAlerts.length} pending`,
+      threshold: "acknowledge and dispose before timeout escalation",
+      currentStatus: pendingCritical > 0 ? "attention_required" : "ready",
+      escalation: "notify department lead and commission duty officer",
+      evidence: "criticalValueAlerts, qualitySafetySiteSignoffs"
+    },
+    {
+      id: "rectification-sla-watch",
+      domain: "rectification",
+      ownerRole: "commission",
+      owner: "Quality supervision duty officer",
+      watchItem: "Rectification SLA and overdue escalation",
+      signal: `overdue ${summary.sla?.overdue || 0}, due soon ${summary.sla?.dueSoon || 0}`,
+      threshold: "overdue > 0 or missing feedback before due date",
+      currentStatus: (summary.sla?.overdue || 0) > 0 ? "attention_required" : "ready",
+      escalation: "issue leadership escalation and require signed correction evidence",
+      evidence: "qualityRectificationOrders, securityEvents"
+    },
+    {
+      id: "pathway-variance-watch",
+      domain: "clinical_pathway",
+      ownerRole: "commission",
+      owner: "Clinical pathway office",
+      watchItem: "Clinical pathway variance review",
+      signal: `${openPathways}/${clinicalPathwayCases.length} open`,
+      threshold: "variance case remains open after review window",
+      currentStatus: openPathways > 0 ? "attention_required" : "ready",
+      escalation: "assign pathway review and require EMR variance evidence",
+      evidence: "clinicalPathwayCases, qualitySafetyEvents"
+    },
+    {
+      id: "mutual-recognition-watch",
+      domain: "mutual_recognition_qc",
+      ownerRole: "county",
+      owner: "County consortium office",
+      watchItem: "Mutual-recognition QC exception handling",
+      signal: `${openMutualRecognition}/${mutualRecognitionQualityReviews.length} open`,
+      threshold: "negative-list or exception reason missing",
+      currentStatus: openMutualRecognition > 0 ? "attention_required" : "ready",
+      escalation: "coordinate member institutions and submit consortium evidence",
+      evidence: "mutualRecognitionQualityReviews, countyMutualRecognitionRecords"
+    },
+    {
+      id: "site-signoff-watch",
+      domain: "live_interfaces",
+      ownerRole: "commission",
+      owner: "Site integration lead",
+      watchItem: "HIS/EMR/LIS/PACS joint-test and sign-off",
+      signal: `${pendingSignoffs}/${siteSignoffs.length} pending`,
+      threshold: "any production cutover sign-off missing",
+      currentStatus: pendingSignoffs > 0 ? "attention_required" : "ready",
+      escalation: "freeze cutover, collect signed evidence, rerun joint-test pack",
+      evidence: "qualitySafetySiteSignoffs, hospitalInteroperabilityFunctions"
+    },
+    {
+      id: "audit-retention-watch",
+      domain: "audit_retention",
+      ownerRole: "commission",
+      owner: "Security and audit administrator",
+      watchItem: "Audit retention and SIEM export evidence",
+      signal: auditRetention.status || "pending_site_confirmation",
+      threshold: "production audit target not configured or unsigned",
+      currentStatus: ["accepted", "closed"].includes(String(auditRetention.status || "")) ? "ready" : "attention_required",
+      escalation: "bind audit export target and archive retention sign-off",
+      evidence: "securityEvents, dataAccessLogs, qualitySafetySiteSignoffs"
+    }
+  ];
+  const visibleRows = qualitySafetyVisibleRows(rows, user);
+  const rank = { attention_required: 0, ready: 1 };
+  return visibleRows
+    .sort((a, b) => (rank[a.currentStatus] ?? 9) - (rank[b.currentStatus] ?? 9) || a.id.localeCompare(b.id))
+    .map((item) => ({
+      ...item,
+      actionLink: actionPlan.find((action) => action.domain === item.domain)?.id || ""
+    }));
+}
+
 function buildQualitySafetyDepartmentTaskView({ user, summary, actionPlan, issues, rectifications, criticalValueAlerts, siteSignoffs, mutualRecognitionQualityReviews }) {
   const profileByRole = {
     commission: {
@@ -5663,6 +5753,18 @@ function buildQualitySafetyDashboard(data, user) {
   summary.coreSystems = coreSystemMatrix.length;
   summary.coreSystemsLinked = coreSystemMatrix.filter((item) => item.evidenceRows > 0).length;
   summary.coreSystemsInJointTest = coreSystemMatrix.filter((item) => item.status === "已纳入现场联调").length;
+  const operationsRunbook = buildQualitySafetyOperationsRunbook({
+    summary,
+    rectifications,
+    criticalValueAlerts,
+    clinicalPathwayCases,
+    mutualRecognitionQualityReviews,
+    siteSignoffs,
+    actionPlan,
+    user
+  });
+  summary.operationsWatchItems = operationsRunbook.length;
+  summary.operationsAttentionRequired = operationsRunbook.filter((item) => item.currentStatus === "attention_required").length;
   return {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -5677,6 +5779,7 @@ function buildQualitySafetyDashboard(data, user) {
     criticalValueAlerts,
     clinicalPathwayCases,
     siteSignoffs,
+    operationsRunbook,
     medicalRecordQualityReviews: Array.isArray(data.medicalRecordQualityReviews) ? data.medicalRecordQualityReviews : [],
     mutualRecognitionQualityReviews,
     reusedCollections: reusableCollections,

@@ -332,6 +332,82 @@ function buildGoLiveReadiness({ boundaryRows, collectionRows, reusedRows, routeR
   };
 }
 
+function buildOperationsRunbook({ slaSummary, criticalRows, clinicalPathwayRows, mutualRecognitionRows, siteSignoffRows }) {
+  const pendingCritical = criticalRows.filter((item) => !item.acknowledged || !item.disposed).length;
+  const openPathways = clinicalPathwayRows.filter((item) => !statusClosed(item.status)).length;
+  const openMutualRecognition = mutualRecognitionRows.filter((item) => !statusClosed(item.status || item.qcStatus)).length;
+  const pendingSignoffs = siteSignoffRows.filter((item) => !statusClosed(item.status)).length;
+  const auditRetention = siteSignoffRows.find((item) => item.id === "qss-audit-retention") || {};
+  return [
+    {
+      id: "critical-value-on-call",
+      domain: "critical_value",
+      owner: "Medical institution duty desk",
+      watchItem: "Critical-value acknowledgement and disposition",
+      signal: `${pendingCritical}/${criticalRows.length} pending`,
+      threshold: "acknowledge and dispose before timeout escalation",
+      currentStatus: pendingCritical > 0 ? "attention_required" : "ready",
+      escalation: "notify department lead and commission duty officer",
+      evidence: "criticalValueAlerts, qualitySafetySiteSignoffs"
+    },
+    {
+      id: "rectification-sla-watch",
+      domain: "rectification",
+      owner: "Quality supervision duty officer",
+      watchItem: "Rectification SLA and overdue escalation",
+      signal: `overdue ${slaSummary.overdue}, due soon ${slaSummary.dueSoon}`,
+      threshold: "overdue > 0 or missing feedback before due date",
+      currentStatus: slaSummary.overdue > 0 ? "attention_required" : "ready",
+      escalation: "issue leadership escalation and require signed correction evidence",
+      evidence: "qualityRectificationOrders, securityEvents"
+    },
+    {
+      id: "pathway-variance-watch",
+      domain: "clinical_pathway",
+      owner: "Clinical pathway office",
+      watchItem: "Clinical pathway variance review",
+      signal: `${openPathways}/${clinicalPathwayRows.length} open`,
+      threshold: "variance case remains open after review window",
+      currentStatus: openPathways > 0 ? "attention_required" : "ready",
+      escalation: "assign pathway review and require EMR variance evidence",
+      evidence: "clinicalPathwayCases, qualitySafetyEvents"
+    },
+    {
+      id: "mutual-recognition-watch",
+      domain: "mutual_recognition_qc",
+      owner: "County consortium office",
+      watchItem: "Mutual-recognition QC exception handling",
+      signal: `${openMutualRecognition}/${mutualRecognitionRows.length} open`,
+      threshold: "negative-list or exception reason missing",
+      currentStatus: openMutualRecognition > 0 ? "attention_required" : "ready",
+      escalation: "coordinate member institutions and submit consortium evidence",
+      evidence: "mutualRecognitionQualityReviews, countyMutualRecognitionRecords"
+    },
+    {
+      id: "site-signoff-watch",
+      domain: "live_interfaces",
+      owner: "Site integration lead",
+      watchItem: "HIS/EMR/LIS/PACS joint-test and sign-off",
+      signal: `${pendingSignoffs}/${siteSignoffRows.length} pending`,
+      threshold: "any production cutover sign-off missing",
+      currentStatus: pendingSignoffs > 0 ? "attention_required" : "ready",
+      escalation: "freeze cutover, collect signed evidence, rerun joint-test pack",
+      evidence: "qualitySafetySiteSignoffs, hospitalInteroperabilityFunctions"
+    },
+    {
+      id: "audit-retention-watch",
+      domain: "audit_retention",
+      owner: "Security and audit administrator",
+      watchItem: "Audit retention and SIEM export evidence",
+      signal: auditRetention.status || "pending_site_confirmation",
+      threshold: "production audit target not configured or unsigned",
+      currentStatus: statusClosed(auditRetention.status) ? "ready" : "attention_required",
+      escalation: "bind audit export target and archive retention sign-off",
+      evidence: "securityEvents, dataAccessLogs, qualitySafetySiteSignoffs"
+    }
+  ];
+}
+
 function buildQualitySafetyReport(options = {}) {
   const data = options.data || readJson("data/db.json");
   const server = options.serverSource || read("server.js");
@@ -438,6 +514,7 @@ function buildQualitySafetyReport(options = {}) {
   const institutionRisks = buildInstitutionRisks(qualityEvents, stateRows);
   const actionPlan = buildActionPlan({ qualityEvents, rectifications: stateRows, criticalRows, clinicalPathwayRows, mutualRecognitionRows, institutionRisks });
   const goLiveReadiness = buildGoLiveReadiness({ boundaryRows, collectionRows, reusedRows, routeRows, policyRows, stateRows, criticalRows, clinicalPathwayRows, mutualRecognitionRows, actionPlan, institutionRisks });
+  const operationsRunbook = buildOperationsRunbook({ slaSummary, criticalRows, clinicalPathwayRows, mutualRecognitionRows, siteSignoffRows });
   const checks = [
     { id: "quality-safety:boundaries", passed: boundaryRows.every((item) => item.modeled), detail: `${boundaryRows.filter((item) => item.modeled).length}/${boundaryRows.length} boundaries modeled` },
     { id: "quality-safety:collections", passed: collectionRows.every((item) => item.present && item.rows > 0), detail: collectionRows.map((item) => `${item.collection}:${item.rows}`).join(";") },
@@ -453,6 +530,7 @@ function buildQualitySafetyReport(options = {}) {
     { id: "quality-safety:action-plan", passed: actionPlan.length > 0 && actionPlan.every((item) => item.priority && item.action && item.evidence), detail: `${actionPlan.length} prioritized action items` },
     { id: "quality-safety:site-signoff-tracker", passed: siteSignoffRows.length >= 6 && siteSignoffRows.every((item) => item.requiredEvidence.length > 0 && item.auditCount > 0), detail: `${siteSignoffRows.length} site sign-off items; ${siteSignoffRows.filter((item) => statusClosed(item.status)).length} accepted` },
     { id: "quality-safety:site-evidence-submission", passed: routeRows.some((item) => item.route === "/api/quality-safety/site-signoffs/:id/evidence" && item.present), detail: "site owner evidence submission route implemented" },
+    { id: "quality-safety:operations-runbook", passed: operationsRunbook.length >= 6 && operationsRunbook.every((item) => item.owner && item.threshold && item.escalation && item.evidence), detail: `${operationsRunbook.length} runtime watch items` },
     { id: "quality-safety:go-live-readiness", passed: goLiveReadiness.usable, detail: `${goLiveReadiness.stage}; score=${goLiveReadiness.score}; blockers=${goLiveReadiness.blockers.length}` }
   ];
   return {
@@ -486,6 +564,8 @@ function buildQualitySafetyReport(options = {}) {
       },
       actionItems: actionPlan.length,
       highActionItems: actionPlan.filter((item) => ["critical", "high"].includes(item.priority)).length,
+      operationsWatchItems: operationsRunbook.length,
+      operationsAttentionRequired: operationsRunbook.filter((item) => item.currentStatus === "attention_required").length,
       readinessStage: goLiveReadiness.stage,
       readinessScore: goLiveReadiness.score
     },
@@ -501,6 +581,7 @@ function buildQualitySafetyReport(options = {}) {
     clinicalPathways: clinicalPathwayRows,
     rectifications: stateRows,
     siteSignoffs: siteSignoffRows,
+    operationsRunbook,
     checks
   };
 }
@@ -520,6 +601,7 @@ function renderMarkdown(report) {
     `- Policy references: ${report.summary.policyReferences}/${report.policyReferences.length}`,
     `- Site sign-offs: ${report.summary.siteSignoffs.total}, ready ${report.summary.siteSignoffs.ready}, accepted ${report.summary.siteSignoffs.accepted}`,
     `- Action plan: ${report.summary.actionItems} items, high priority ${report.summary.highActionItems}`,
+    `- Operations runbook: ${report.summary.operationsWatchItems} watch items, ${report.summary.operationsAttentionRequired} requiring attention`,
     `- Go-live readiness: ${report.goLiveReadiness.stage}, score ${report.goLiveReadiness.score}, usable ${report.goLiveReadiness.usable ? "yes" : "no"}`,
     "",
     "## Checks",
@@ -560,6 +642,12 @@ function renderMarkdown(report) {
     "| Production sign-off item |",
     "|---|",
     ...report.goLiveReadiness.productionSignoffPending.map((item) => `| ${item} |`),
+    "",
+    "## Operations Runbook",
+    "",
+    "| Watch item | Owner | Signal | Threshold | Escalation | Evidence |",
+    "|---|---|---|---|---|---|",
+    ...report.operationsRunbook.map((item) => `| ${item.watchItem} | ${item.owner} | ${String(item.signal || "").replace(/\|/g, "/")} | ${item.threshold} | ${item.escalation} | ${item.evidence} |`),
     "",
     "## Site Joint-testing Sign-offs",
     "",

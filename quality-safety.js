@@ -54,11 +54,35 @@ const QUALITY_TEXT = {
   "Security event:": "安全事件：",
   active: "持续跟踪",
   watch: "观察",
+  attention_required: "需要值守关注",
+  ready: "运行就绪",
   anonymous: "匿名账号",
   institutionRisks: "机构风险",
   dataAccessLogs: "数据访问日志",
   evidence: "证据",
   "risk points": "风险点",
+  "Medical institution duty desk": "医疗机构值班台",
+  "Quality supervision duty officer": "质控监管值守员",
+  "Site integration lead": "现场接口联调负责人",
+  "Security and audit administrator": "安全审计管理员",
+  "Critical-value acknowledgement and disposition": "危急值确认和处置",
+  "Rectification SLA and overdue escalation": "整改 SLA 和逾期升级",
+  "Clinical pathway variance review": "临床路径偏差复核",
+  "Mutual-recognition QC exception handling": "互认质控例外处置",
+  "HIS/EMR/LIS/PACS joint-test and sign-off": "HIS/EMR/LIS/PACS 联调签收",
+  "Audit retention and SIEM export evidence": "审计留存和 SIEM 导出证据",
+  "acknowledge and dispose before timeout escalation": "超时升级前完成确认和处置",
+  "overdue > 0 or missing feedback before due date": "存在逾期或到期前未反馈",
+  "variance case remains open after review window": "路径偏差超过复核窗口仍未关闭",
+  "negative-list or exception reason missing": "负面清单或例外原因缺失",
+  "any production cutover sign-off missing": "任一生产切换签收缺失",
+  "production audit target not configured or unsigned": "生产审计目标未配置或未签收",
+  "notify department lead and commission duty officer": "通知科室负责人和卫健监管值守员",
+  "issue leadership escalation and require signed correction evidence": "发起领导升级并要求签字整改证据",
+  "assign pathway review and require EMR variance evidence": "派发路径复核并要求 EMR 偏差证据",
+  "coordinate member institutions and submit consortium evidence": "协调成员机构并提交医共体证据",
+  "freeze cutover, collect signed evidence, rerun joint-test pack": "冻结切换、收集签字证据并重跑联调包",
+  "bind audit export target and archive retention sign-off": "绑定审计导出目标并归档留存签收",
   meets: "达到",
   threshold: "阈值",
   "method + path + timestamp + idempotencyKey + sha256(stable JSON body)": "请求方法 + 接口路径 + 时间戳 + 幂等键 + sha256(稳定 JSON 正文)",
@@ -593,6 +617,25 @@ function renderPrelaunchGaps(readiness = {}, siteSignoffs = []) {
   `);
 }
 
+function renderOperationsRunbook(rows = []) {
+  setHtml("quality-safety-operations-runbook", `
+    <table>
+      <thead><tr><th>值守事项</th><th>责任方</th><th>运行信号</th><th>触发阈值</th><th>升级和证据</th></tr></thead>
+      <tbody>
+        ${rows.length ? rows.map((item) => `
+          <tr>
+            <td><strong>${zhText(item.watchItem)}</strong><br /><small>${statusLabel(item.domain)} / ${text(item.id)}</small></td>
+            <td>${zhText(item.owner)}<br /><small>${statusLabel(item.ownerRole)}</small></td>
+            <td>${statusLabel(item.currentStatus)}<br /><small>${zhText(item.signal)}</small></td>
+            <td>${zhText(item.threshold)}</td>
+            <td>${zhText(item.escalation)}<br /><small>${zhText(item.evidence)}</small></td>
+          </tr>
+        `).join("") : emptyRow(5, "暂无运行值守事项")}
+      </tbody>
+    </table>
+  `);
+}
+
 function renderIssues(rows) {
   const canDispatch = qualitySafetyState?.role === "commission";
   setHtml("quality-safety-issues", `
@@ -773,6 +816,7 @@ function renderQualitySafety(data) {
   renderCoreSystemMatrix(data.coreSystemMatrix || []);
   renderGoLiveReadiness(data.goLiveReadiness || {});
   renderPrelaunchGaps(data.goLiveReadiness || {}, data.siteSignoffs || []);
+  renderOperationsRunbook(data.operationsRunbook || []);
   renderActionPlan(data.actionPlan || []);
   renderRisks(data.institutionRisks || []);
   renderReuse(data.reusedCollections || []);

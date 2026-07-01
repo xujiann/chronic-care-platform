@@ -55,11 +55,15 @@ test("quality safety report covers boundaries, reuse and routes", () => {
   assert.equal(report.checks.some((item) => item.id === "quality-safety:action-plan" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "quality-safety:risk-ranking" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "quality-safety:site-signoff-tracker" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "quality-safety:operations-runbook" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "quality-safety:go-live-readiness" && item.passed), true);
   assert.equal(report.goLiveReadiness.usable, true);
   assert.equal(report.goLiveReadiness.stage, "controlled_pilot_ready");
   assert.equal(report.summary.readinessScore, 100);
   assert.equal(report.summary.siteSignoffs.total >= 6, true);
+  assert.equal(report.summary.operationsWatchItems >= 6, true);
+  assert.equal(report.operationsRunbook.some((item) => item.id === "critical-value-on-call" && item.escalation), true);
+  assert.equal(report.operationsRunbook.some((item) => item.id === "audit-retention-watch" && item.evidence.includes("securityEvents")), true);
   assert.equal(report.siteSignoffs.some((item) => item.id === "qss-audit-retention" && item.requiredEvidence.length > 0), true);
   assert.equal(report.institutionRisks.length > 0, true);
   assert.equal(report.institutionRisks[0].score > 0, true);
@@ -75,6 +79,8 @@ test("quality safety report covers boundaries, reuse and routes", () => {
   assert.match(renderMarkdown(report), /Policy Basis/);
   assert.match(renderMarkdown(report), /Regulatory Action Plan/);
   assert.match(renderMarkdown(report), /Go-live Readiness/);
+  assert.match(renderMarkdown(report), /Operations Runbook/);
+  assert.match(renderMarkdown(report), /critical-value-on-call|Critical-value acknowledgement/);
   assert.match(renderMarkdown(report), /controlled_pilot_ready/);
   assert.match(renderMarkdown(report), /Site Joint-testing Sign-offs/);
   assert.match(renderMarkdown(report), /Institution risk ranking/);
@@ -111,6 +117,9 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
   assert.equal(dashboard.body.goLiveReadiness.stage, "controlled_pilot_ready");
   assert.equal(dashboard.body.summary.readinessScore, 100);
   assert.equal(dashboard.body.summary.siteSignoffs >= 6, true);
+  assert.equal(dashboard.body.summary.operationsWatchItems >= 4, true);
+  assert.equal(dashboard.body.operationsRunbook.some((item) => item.id === "rectification-sla-watch" && item.threshold), true);
+  assert.equal(dashboard.body.operationsRunbook.some((item) => item.evidence.includes("qualitySafetySiteSignoffs")), true);
   assert.equal(dashboard.body.summary.coreSystems, 18);
   assert.equal(dashboard.body.summary.coreSystemsLinked >= 18, true);
   assert.equal(dashboard.body.coreSystemMatrix.length, 18);
