@@ -563,6 +563,36 @@ function renderGoLiveReadiness(readiness = {}) {
   `);
 }
 
+function renderPrelaunchGaps(readiness = {}, siteSignoffs = []) {
+  const pending = readiness.productionSignoffPending || [];
+  const rows = pending.map((name) => {
+    const normalized = String(name || "").toLowerCase();
+    const signoff = siteSignoffs.find((item) => String(item.item || "").toLowerCase() === normalized) || {};
+    return {
+      name,
+      owner: signoff.owner || "现场联调组",
+      status: signoff.status || "pending_site_confirmation",
+      evidence: signoff.requiredEvidenceText || (signoff.requiredEvidence || []).join("、") || "待补充现场证据",
+      nextAction: signoff.latestNote || readiness.nextAction || "完成现场签收并归档生产证据"
+    };
+  });
+  setHtml("quality-safety-prelaunch-gaps", `
+    <table>
+      <thead><tr><th>上线前事项</th><th>责任方</th><th>证据状态</th><th>下一步</th></tr></thead>
+      <tbody>
+        ${rows.length ? rows.map((item) => `
+          <tr>
+            <td><strong>${zhText(item.name)}</strong></td>
+            <td>${zhText(item.owner)}</td>
+            <td>${statusLabel(item.status)}<br /><small>${zhText(item.evidence)}</small></td>
+            <td>${zhText(item.nextAction)}</td>
+          </tr>
+        `).join("") : emptyRow(4, "暂无上线前缺口")}
+      </tbody>
+    </table>
+  `);
+}
+
 function renderIssues(rows) {
   const canDispatch = qualitySafetyState?.role === "commission";
   setHtml("quality-safety-issues", `
@@ -742,6 +772,7 @@ function renderQualitySafety(data) {
   renderDepartmentTaskQueue(data);
   renderCoreSystemMatrix(data.coreSystemMatrix || []);
   renderGoLiveReadiness(data.goLiveReadiness || {});
+  renderPrelaunchGaps(data.goLiveReadiness || {}, data.siteSignoffs || []);
   renderActionPlan(data.actionPlan || []);
   renderRisks(data.institutionRisks || []);
   renderReuse(data.reusedCollections || []);

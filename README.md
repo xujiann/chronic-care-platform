@@ -264,6 +264,7 @@ GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下
 - Institution interface standard: the interface standard fixes document control, HTTPS/JSON transport, HMAC signature, idempotency key, message envelope, status codes, field dictionary requirements, sample payloads, retry/compensation, and joint-test acceptance checklist for HIS/EMR/LIS/PACS and mutual-recognition platform docking.
 - Institution joint-test pack: the portal and API expose sample requests, HMAC-SHA256 signature fixtures, body hash, idempotency replay checks, field dictionaries, and negative validation cases for missing fields, invalid signatures, and duplicate replay.
 - Go-live readiness: the dashboard, module report, and release report compute `controlled_pilot_ready` status with a score, evidence checks, blockers, and production sign-off items.
+- Pre-launch tracker: the runnable portal displays production sign-off gaps as owner, status, evidence, and next-action rows before the detailed site sign-off table.
 - Site sign-off tracker: production cutover items for live feeds, critical-value routing, pathway dictionaries, mutual-recognition rules, department attachments, and audit retention are tracked with owner, status, required evidence, and audit trail.
 - SLA evidence: rectification orders include due-date status, evidence completeness, and commission escalation records.
 - Risk ranking: the portal and release report derive institution priority from severity, open issues, SLA pressure, missing feedback, and escalations.
