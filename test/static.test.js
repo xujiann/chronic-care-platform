@@ -382,6 +382,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("server.js"), /referral-teleconsultations\/escalations\/run/);
   assert.match(read("server.js"), /referral-teleconsultations\/joint-test-pack/);
   assert.match(read("server.js"), /taskReceipts/);
+  assert.match(read("server.js"), /exportSummary/);
   assert.match(read("server.js"), /referral-teleconsultations\/joint-test-ledger/);
   assert.match(read("server.js"), /joint-test-ledger\/tasks/);
   assert.match(read("server.js"), /joint-test-ledger\/tasks\/:role\/complete/);

@@ -6615,6 +6615,38 @@ function buildReferralTeleconsultationJointTestPack(data) {
     { role: "county-performance", responsibility: "SLA supervision and performance settlement", evidence: "county supervision acknowledgement" },
     { role: "insurance", responsibility: "payment path and repeat-exam control review", evidence: "referral insurance performance policy" }
   ];
+  const signoffSummary = buildReferralTeleconsultationSignoffSummary(data, { includeRowsOnly: true });
+  const sampleRoles = new Set(samples.map((item) => {
+    if (item.contractId.includes("feedback")) return "referral-center";
+    if (item.contractId.includes("schedule")) return "receiving-hospital";
+    return "hospital-it";
+  }));
+  const receiptByRole = new Map(taskReceipts.map((item) => [item.role, item]));
+  const signoffByRole = new Map(signoffSummary.map((item) => [item.role, item]));
+  const exportSummary = signoff.map((item) => {
+    const receipt = receiptByRole.get(item.role) || {};
+    const signoffRow = signoffByRole.get(item.role) || {};
+    const hasSample = sampleRoles.has(item.role) || item.role === "county-performance" || item.role === "insurance";
+    const taskAssigned = Boolean(receipt.role);
+    const taskCompleted = /completed|closed|signed|read/i.test(String(receipt.status || ""));
+    const onsiteSigned = signoffRow.siteStatus === "signed";
+    return {
+      role: item.role,
+      hasSample,
+      taskAssigned,
+      taskCompleted,
+      demoReady: Boolean(signoffRow.localEvidence),
+      onsiteSigned,
+      readyForFinalSignoff: hasSample && Boolean(signoffRow.localEvidence) && (taskCompleted || onsiteSigned),
+      nextAction: onsiteSigned
+        ? "Archive production evidence pack with signed material."
+        : taskCompleted
+          ? "Attach onsite signed evidence for final acceptance."
+          : taskAssigned
+            ? "Complete owner task receipt before onsite signoff."
+            : "Dispatch owner task from the joint-test ledger."
+    };
+  });
   return {
     ok: contracts.length === 3 && samples.length === 3,
     generatedAt: new Date().toISOString(),
@@ -6623,7 +6655,8 @@ function buildReferralTeleconsultationJointTestPack(data) {
     checklist,
     signoff,
     taskReceipts,
-    signoffSummary: buildReferralTeleconsultationSignoffSummary(data, { includeRowsOnly: true })
+    exportSummary,
+    signoffSummary
   };
 }
 

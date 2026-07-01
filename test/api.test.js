@@ -650,6 +650,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(jointTestPack.body.contracts.length, 3);
     assert.equal(jointTestPack.body.samples.some((item) => item.contractId === "referral-report-callback-v1"), true);
     assert.equal(jointTestPack.body.signoff.some((item) => item.role === "insurance"), true);
+    assert.equal(jointTestPack.body.exportSummary.some((item) => item.role === "hospital-it" && item.hasSample && item.demoReady), true);
     assert.equal(jointTestPack.body.signoffSummary.some((item) => item.role === "county-performance" && item.localEvidence), true);
     const jointTestLedger = await api(baseUrl, "/api/referral-teleconsultations/joint-test-ledger", authorized(county.body.token));
     assert.equal(jointTestLedger.response.status, 200);
@@ -674,6 +675,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const jointTestPackAfterTasks = await api(baseUrl, "/api/referral-teleconsultations/joint-test-pack", authorized(county.body.token));
     assert.equal(jointTestPackAfterTasks.response.status, 200);
     assert.equal(jointTestPackAfterTasks.body.taskReceipts.some((item) => item.role === "hospital-it" && item.status === "completed" && item.receiptCount >= 1), true);
+    assert.equal(jointTestPackAfterTasks.body.exportSummary.some((item) => item.role === "hospital-it" && item.taskCompleted && item.readyForFinalSignoff), true);
     const jointTaskReplay = await api(baseUrl, "/api/referral-teleconsultations/joint-test-ledger/tasks", authorized(county.body.token, {
       method: "POST",
       body: JSON.stringify({})
