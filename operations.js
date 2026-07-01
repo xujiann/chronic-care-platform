@@ -499,6 +499,18 @@ function staticPostCutoverItem(id, title, owner, priority, metric, detail, nextA
   };
 }
 
+function buildPostCutoverEvidenceProgress(items, windows) {
+  const evidenceTotal = windows.reduce((sum, item) => sum + (Array.isArray(item.requiredEvidence) ? item.requiredEvidence.length : 0), 0);
+  const observedItems = items.filter((item) => item.status === "已观察").length;
+  const evidenceReady = evidenceTotal && items.length ? Math.min(evidenceTotal, Math.round((evidenceTotal * observedItems) / items.length)) : 0;
+  return {
+    evidenceTotal,
+    evidenceReady,
+    evidencePending: Math.max(0, evidenceTotal - evidenceReady),
+    completionRate: evidenceTotal ? Math.round((evidenceReady / evidenceTotal) * 100) : 0
+  };
+}
+
 function buildStaticPostCutoverObservation(snapshots, dispatchRequests, reconciliationReviews, siteJointPatrol, cutoverCommand, mobileDuty, processAudit = [], securityEvents = []) {
   const openDispatches = dispatchRequests.filter((item) => ["pending", "assigned", "in-progress"].includes(item.status));
   const pendingRecon = reconciliationReviews.filter((item) => !["approved", "closed"].includes(item.status));
@@ -517,21 +529,24 @@ function buildStaticPostCutoverObservation(snapshots, dispatchRequests, reconcil
     staticPostCutoverItem("observation-cutover-signoff", "割接签收与回退准备", "值班长", cutoverBlocking ? "高" : cutoverPending ? "中" : "常规", `${cutoverPending}项割接签收待完成`, "观察割接签收、回退策略、观察窗口和生产阻断项是否关闭。", "任一高优先级阻断项未签收时保持回退准备。", ["/api/operations/cutover-command", "/api/operations/cutover-command/actions"], processAudit),
     staticPostCutoverItem("observation-mobile-duty", "移动值守提醒", "运行监测岗", reminders ? "常规" : "中", `${reminders}条值守提醒`, "观察移动端提醒、弱网补传和消息回执是否形成留痕。", "尚无提醒时需向值班长发送一次上线后观察提醒。", ["/api/operations/mobile-duty", "/api/operations/mobile-duty/actions", "/api/messages"], processAudit)
   ];
+  const windows = [
+    { id: "t0-2h", name: "T+0 2小时", focus: "接口可用性、错误率、关键告警", owner: "平台运维", requiredEvidence: ["健康检查截图", "接口耗时截图", "关键告警记录"] },
+    { id: "t0-8h", name: "T+0 8小时", focus: "床位压力、调度积压、直报复核", owner: "运行调度席", requiredEvidence: ["床位压力截图", "调度单关闭凭证", "直报复核清单"] },
+    { id: "t1-24h", name: "T+1 24小时", focus: "巡检归档、回退准备、治理报告", owner: "值班长", requiredEvidence: ["巡检归档截图", "回退准备确认", "治理报告草稿"] }
+  ];
+  const evidenceProgress = buildPostCutoverEvidenceProgress(items, windows);
   return {
     ok: items.length > 0 && items.every((item) => item.status === "已观察" || item.priority !== "高"),
     watchWindow: "T+0 2小时、T+0 8小时、T+1 24小时",
-    windows: [
-      { id: "t0-2h", name: "T+0 2小时", focus: "接口可用性、错误率、关键告警", owner: "平台运维", requiredEvidence: ["健康检查截图", "接口耗时截图", "关键告警记录"] },
-      { id: "t0-8h", name: "T+0 8小时", focus: "床位压力、调度积压、直报复核", owner: "运行调度席", requiredEvidence: ["床位压力截图", "调度单关闭凭证", "直报复核清单"] },
-      { id: "t1-24h", name: "T+1 24小时", focus: "巡检归档、回退准备、治理报告", owner: "值班长", requiredEvidence: ["巡检归档截图", "回退准备确认", "治理报告草稿"] }
-    ],
+    windows,
     summary: {
       total: items.length,
       abnormal: items.filter((item) => item.priority === "高").length,
       watching: items.filter((item) => item.status === "观察中" || item.status === "异常待处置").length,
       observed: items.filter((item) => item.status === "已观察").length,
       auditEvents: processAudit.filter((item) => String(item.process || "").includes("上线后观察")).length,
-      securityEvents: securityEvents.filter((item) => String(item.action || "").includes("post-cutover")).length
+      securityEvents: securityEvents.filter((item) => String(item.action || "").includes("post-cutover")).length,
+      ...evidenceProgress
     },
     items,
     evidence: ["/api/operations/post-cutover-observation", "/api/operations/post-cutover-observation/actions", "platformProcessAudit", "securityEvents"]
@@ -1797,8 +1812,8 @@ function renderPostCutoverObservation(postCutoverObservation) {
   target.innerHTML = `
     <article class="operation-observation-summary ${postCutoverObservation.ok ? "ready" : "watching"}">
       <strong>上线后观察台</strong>
-      <span>${postCutoverObservation.summary?.observed || 0}/${postCutoverObservation.summary?.total || 0} 项已观察，${postCutoverObservation.summary?.abnormal || 0} 项异常</span>
-      <small>观察窗口：${zhInline(postCutoverObservation.watchWindow)}；证据：${evidenceList(postCutoverObservation.evidence)}</small>
+      <span>${postCutoverObservation.summary?.observed || 0}/${postCutoverObservation.summary?.total || 0} 项已观察，${postCutoverObservation.summary?.abnormal || 0} 项异常，证据完成 ${postCutoverObservation.summary?.completionRate || 0}%</span>
+      <small>观察窗口：${zhInline(postCutoverObservation.watchWindow)}；待补证据 ${postCutoverObservation.summary?.evidencePending || 0} 项；证据：${evidenceList(postCutoverObservation.evidence)}</small>
       <div class="operation-observation-windows">
         ${(postCutoverObservation.windows || []).map((windowItem) => `<span title="${htmlAttribute(`${windowItem.focus}；证据：${zhList(windowItem.requiredEvidence || [])}`)}">${zhInline(windowItem.name)} / ${zhInline(windowItem.owner)} / ${(windowItem.requiredEvidence || []).length}项证据</span>`).join("")}
       </div>
@@ -1850,12 +1865,15 @@ async function submitPostCutoverObservation(itemId) {
       items: (operationsDashboard.postCutoverObservation?.items || []).map((row) => row.id === itemId ? { ...row, status: "已观察", priority: "常规" } : row)
     };
     const rows = operationsDashboard.postCutoverObservation.items || [];
+    const windows = operationsDashboard.postCutoverObservation.windows || [];
+    const evidenceProgress = buildPostCutoverEvidenceProgress(rows, windows);
     operationsDashboard.postCutoverObservation.summary = {
       ...(operationsDashboard.postCutoverObservation.summary || {}),
       observed: rows.filter((row) => row.status === "已观察").length,
       abnormal: rows.filter((row) => row.priority === "高").length,
       watching: rows.filter((row) => row.status === "观察中" || row.status === "异常待处置").length,
-      total: rows.length
+      total: rows.length,
+      ...evidenceProgress
     };
   }
   renderPostCutoverObservation(operationsDashboard.postCutoverObservation || {});
