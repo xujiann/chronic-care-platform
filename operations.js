@@ -509,15 +509,20 @@ function buildPostCutoverEvidenceProgress(items, windows) {
     const windowTotal = requiredEvidence.length;
     const windowReady = Math.min(windowTotal, Math.max(0, remainingReady));
     remainingReady -= windowReady;
+    const completedEvidence = requiredEvidence.slice(0, windowReady);
+    const pendingEvidence = requiredEvidence.slice(windowReady);
     return {
       ...item,
       requiredEvidence,
-      completedEvidence: requiredEvidence.slice(0, windowReady),
-      pendingEvidence: requiredEvidence.slice(windowReady),
+      completedEvidence,
+      pendingEvidence,
       evidenceReady: windowReady,
       evidencePending: Math.max(0, windowTotal - windowReady),
       completionRate: windowTotal ? Math.round((windowReady / windowTotal) * 100) : 0,
-      status: windowReady >= windowTotal && windowTotal > 0 ? "已完成" : windowReady > 0 ? "观察中" : "待观察"
+      status: windowReady >= windowTotal && windowTotal > 0 ? "已完成" : windowReady > 0 ? "观察中" : "待观察",
+      nextEvidenceAction: pendingEvidence.length
+        ? `${item.owner || "责任人"}补齐${pendingEvidence.join("、")}并归档观察留痕。`
+        : `${item.owner || "责任人"}确认窗口证据齐套并进入归档复核。`
     };
   });
   return {
@@ -550,9 +555,9 @@ function buildStaticPostCutoverObservation(snapshots, dispatchRequests, reconcil
     staticPostCutoverItem("observation-mobile-duty", "移动值守提醒", "运行监测岗", reminders ? "常规" : "中", `${reminders}条值守提醒`, "观察移动端提醒、弱网补传和消息回执是否形成留痕。", "尚无提醒时需向值班长发送一次上线后观察提醒。", ["/api/operations/mobile-duty", "/api/operations/mobile-duty/actions", "/api/messages"], processAudit)
   ];
   const windows = [
-    { id: "t0-2h", name: "T+0 2小时", focus: "接口可用性、错误率、关键告警", owner: "平台运维", requiredEvidence: ["健康检查截图", "接口耗时截图", "关键告警记录"] },
-    { id: "t0-8h", name: "T+0 8小时", focus: "床位压力、调度积压、直报复核", owner: "运行调度席", requiredEvidence: ["床位压力截图", "调度单关闭凭证", "直报复核清单"] },
-    { id: "t1-24h", name: "T+1 24小时", focus: "巡检归档、回退准备、治理报告", owner: "值班长", requiredEvidence: ["巡检归档截图", "回退准备确认", "治理报告草稿"] }
+    { id: "t0-2h", name: "T+0 2小时", focus: "接口可用性、错误率、关键告警", owner: "平台运维", requiredEvidence: ["健康检查截图", "接口耗时截图", "关键告警记录"], acceptanceRule: "三项截图齐套且关键告警有处置编号。" },
+    { id: "t0-8h", name: "T+0 8小时", focus: "床位压力、调度积压、直报复核", owner: "运行调度席", requiredEvidence: ["床位压力截图", "调度单关闭凭证", "直报复核清单"], acceptanceRule: "压力、调度、直报三类证据均完成责任人复核。" },
+    { id: "t1-24h", name: "T+1 24小时", focus: "巡检归档、回退准备、治理报告", owner: "值班长", requiredEvidence: ["巡检归档截图", "回退准备确认", "治理报告草稿"], acceptanceRule: "现场巡检、回退确认和治理报告草稿完成归档。" }
   ];
   const evidenceProgress = buildPostCutoverEvidenceProgress(items, windows);
   return {
@@ -1838,7 +1843,7 @@ function renderPostCutoverObservation(postCutoverObservation) {
         ${(postCutoverObservation.windows || []).map((windowItem) => {
           const completedEvidence = windowItem.completedEvidence || [];
           const pendingEvidence = windowItem.pendingEvidence || [];
-          return `<span title="${htmlAttribute(`${windowItem.focus}；已完成：${completedEvidence.length ? zhList(completedEvidence) : "暂无"}；待补：${pendingEvidence.length ? zhList(pendingEvidence) : "无"}`)}">${zhInline(windowItem.name)} / ${zhInline(windowItem.owner)} / ${zhInline(windowItem.status)} / ${(windowItem.requiredEvidence || []).length}项证据 / 完成${windowItem.completionRate || 0}% / 待补${windowItem.evidencePending || 0}项</span>`;
+          return `<span title="${htmlAttribute(`${windowItem.focus}；验收：${windowItem.acceptanceRule || "按现场签收规则"}；已完成：${completedEvidence.length ? zhList(completedEvidence) : "暂无"}；待补：${pendingEvidence.length ? zhList(pendingEvidence) : "无"}；下一步：${windowItem.nextEvidenceAction || "继续观察"}`)}">${zhInline(windowItem.name)} / ${zhInline(windowItem.owner)} / ${zhInline(windowItem.status)} / ${(windowItem.requiredEvidence || []).length}项证据 / 完成${windowItem.completionRate || 0}% / 待补${windowItem.evidencePending || 0}项</span>`;
         }).join("")}
       </div>
     </article>

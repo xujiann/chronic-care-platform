@@ -4240,15 +4240,20 @@ function buildOperationsPostCutoverEvidenceProgress(items, windows) {
     const windowTotal = requiredEvidence.length;
     const windowReady = Math.min(windowTotal, Math.max(0, remainingReady));
     remainingReady -= windowReady;
+    const completedEvidence = requiredEvidence.slice(0, windowReady);
+    const pendingEvidence = requiredEvidence.slice(windowReady);
     return {
       ...item,
       requiredEvidence,
-      completedEvidence: requiredEvidence.slice(0, windowReady),
-      pendingEvidence: requiredEvidence.slice(windowReady),
+      completedEvidence,
+      pendingEvidence,
       evidenceReady: windowReady,
       evidencePending: Math.max(0, windowTotal - windowReady),
       completionRate: windowTotal ? Math.round((windowReady / windowTotal) * 100) : 0,
-      status: windowReady >= windowTotal && windowTotal > 0 ? "已完成" : windowReady > 0 ? "观察中" : "待观察"
+      status: windowReady >= windowTotal && windowTotal > 0 ? "已完成" : windowReady > 0 ? "观察中" : "待观察",
+      nextEvidenceAction: pendingEvidence.length
+        ? `${item.owner || "责任人"}补齐${pendingEvidence.join("、")}并归档观察留痕。`
+        : `${item.owner || "责任人"}确认窗口证据齐套并进入归档复核。`
     };
   });
   return {
@@ -4362,9 +4367,9 @@ function buildOperationsPostCutoverObservation({
     )
   ];
   const windows = [
-    { id: "t0-2h", name: "T+0 2小时", focus: "接口可用性、错误率、关键告警", owner: "平台运维", requiredEvidence: ["健康检查截图", "接口耗时截图", "关键告警记录"] },
-    { id: "t0-8h", name: "T+0 8小时", focus: "床位压力、调度积压、直报复核", owner: "运行调度席", requiredEvidence: ["床位压力截图", "调度单关闭凭证", "直报复核清单"] },
-    { id: "t1-24h", name: "T+1 24小时", focus: "巡检归档、回退准备、治理报告", owner: "值班长", requiredEvidence: ["巡检归档截图", "回退准备确认", "治理报告草稿"] }
+    { id: "t0-2h", name: "T+0 2小时", focus: "接口可用性、错误率、关键告警", owner: "平台运维", requiredEvidence: ["健康检查截图", "接口耗时截图", "关键告警记录"], acceptanceRule: "三项截图齐套且关键告警有处置编号。" },
+    { id: "t0-8h", name: "T+0 8小时", focus: "床位压力、调度积压、直报复核", owner: "运行调度席", requiredEvidence: ["床位压力截图", "调度单关闭凭证", "直报复核清单"], acceptanceRule: "压力、调度、直报三类证据均完成责任人复核。" },
+    { id: "t1-24h", name: "T+1 24小时", focus: "巡检归档、回退准备、治理报告", owner: "值班长", requiredEvidence: ["巡检归档截图", "回退准备确认", "治理报告草稿"], acceptanceRule: "现场巡检、回退确认和治理报告草稿完成归档。" }
   ];
   const evidenceProgress = buildOperationsPostCutoverEvidenceProgress(items, windows);
   return {
