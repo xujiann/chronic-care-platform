@@ -227,6 +227,7 @@ function renderCountyTeleconsultationLoop(state) {
       ["高优先级", rows.filter((item) => item.priority === "high").length, "医共体跟进队列"]
     ].map(([label, value, hint]) => `<article class="claim-card"><strong>${label}</strong><span>${value}<br>${hint}</span></article>`).join("");
   }
+  renderCountyTeleconsultationCutoverReadiness(state, rows);
   renderCountyTeleconsultationJointLedger(state, rows);
   renderCountyTeleconsultationRiskBoard(state, rows, escalations);
   renderCountyTeleconsultationSignoff(state, rows);
@@ -257,6 +258,27 @@ function renderCountyTeleconsultationLoop(state) {
       </tr>`;
     }).join("")}</tbody>
   </table>`;
+}
+
+function renderCountyTeleconsultationCutoverReadiness(state, rows) {
+  const el = document.querySelector("#county-teleconsultation-cutover");
+  if (!el) return;
+  const readiness = buildCountyTeleconsultationCutoverReadiness(state, rows);
+  el.innerHTML = [
+    `<article data-referral-cutover-readiness>
+      <div><span class="badge ${readiness.readyForProductionCutover ? "info" : "warn"}">Cutover gate</span></div>
+      <h3>${readiness.readyForProductionCutover ? "Ready for module cutover" : "Blocked before production cutover"}</h3>
+      <p>${readiness.contractReplay} callback contracts replayed; ${readiness.onsiteSignedRoles}/${readiness.totalRoles} onsite roles signed.</p>
+      <footer>
+        <small>${readiness.nextAction}</small>
+      </footer>
+    </article>`,
+    ...readiness.blockers.map((item) => `<article data-referral-cutover-blocker="${item.id}">
+      <div><span class="badge warn">${item.owner}</span></div>
+      <h3>${item.id}</h3>
+      <p>${item.detail}</p>
+    </article>`)
+  ].join("");
 }
 
 function renderCountyTeleconsultationSignoff(state, rows) {
@@ -387,6 +409,46 @@ function buildCountyTeleconsultationJointLedger(state, rows) {
     nextAction: signoffByRole.has(item.role) ? "Keep the signed evidence pack with the release record." : "Confirm onsite owner and archive signoff evidence."
   }));
   return [...callbacks, ...governance];
+}
+
+function buildCountyTeleconsultationCutoverReadiness(state, rows) {
+  const ledgerRows = buildCountyTeleconsultationJointLedger(state, rows);
+  const signoffRows = buildCountyTeleconsultationSignoffRows(state, rows);
+  const replayedContracts = ledgerRows.filter((item) => item.type === "callback" && item.matched > 0).length;
+  const completedTaskRoles = new Set((state.taskMessages || [])
+    .filter((message) =>
+      String(message.jointTestKey || message.notificationKey || "").startsWith("referralTeleconsultations:joint-test:")
+      && /completed|closed|signed|read/i.test(String(message.status || ""))
+    )
+    .map((message) => String(message.jointTestKey || message.notificationKey || "").replace("referralTeleconsultations:joint-test:", "")));
+  const onsiteSignedRoles = signoffRows.filter((item) => item.onsiteEvidence).length;
+  const finalReadyRoles = ledgerRows.filter((item) => item.localEvidence && (item.status === "matched" || item.status === "signed" || completedTaskRoles.has(item.role))).length;
+  const blockers = [
+    replayedContracts < 3 ? {
+      id: "callback-replay-pending",
+      owner: "institution-integration",
+      detail: "Replay feedback, schedule, and report callbacks with signed payloads from the target site."
+    } : null,
+    finalReadyRoles < signoffRows.length ? {
+      id: "owner-task-pending",
+      owner: "county-command",
+      detail: "Complete owner task receipts for all joint-test ledger rows before onsite signoff."
+    } : null,
+    onsiteSignedRoles < signoffRows.length ? {
+      id: "onsite-signoff-pending",
+      owner: "county-command",
+      detail: "Archive signed onsite evidence for referral center, receiving hospital, hospital IT, county performance, and insurance."
+    } : null
+  ].filter(Boolean);
+  return {
+    readyForProductionCutover: blockers.length === 0,
+    contractReplay: `${replayedContracts}/3`,
+    finalReadyRoles,
+    onsiteSignedRoles,
+    totalRoles: signoffRows.length,
+    blockers,
+    nextAction: blockers[0]?.detail || "Module cutover evidence is complete; continue with platform environment gates."
+  };
 }
 
 function buildCountyTeleconsultationSignoffRows(state, rows) {

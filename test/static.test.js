@@ -355,12 +355,16 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("county.html"), /county-teleconsultation-status-filter/);
   assert.match(read("county.html"), /county-teleconsultation-priority-filter/);
   assert.match(read("county.html"), /county-teleconsultation-performance/);
+  assert.match(read("county.html"), /county-teleconsultation-cutover/);
   assert.match(read("county.html"), /county-teleconsultation-risk-board/);
   assert.match(read("county.html"), /county-teleconsultation-signoff/);
   assert.match(read("county.js"), /averagePerformance/);
   assert.match(read("county.js"), /SLA risks/);
   assert.equal((read("county.js").match(/function renderCountyTeleconsultationLoop/g) || []).length, 1);
   assert.match(read("county.js"), /buildReferralTeleconsultationEscalations/);
+  assert.match(read("county.js"), /renderCountyTeleconsultationCutoverReadiness/);
+  assert.match(read("county.js"), /data-referral-cutover-readiness/);
+  assert.match(read("county.js"), /data-referral-cutover-blocker/);
   assert.match(read("county.js"), /renderCountyTeleconsultationRiskBoard/);
   assert.match(read("county.js"), /renderCountyTeleconsultationJointLedger/);
   assert.match(read("county.js"), /data-referral-joint-ledger/);
