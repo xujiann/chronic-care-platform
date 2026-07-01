@@ -247,6 +247,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(operationsDashboard.body.postCutoverObservation.windows.every((item) => Number.isInteger(item.completionRate)), true);
     assert.equal(operationsDashboard.body.postCutoverObservation.windows.every((item) => Array.isArray(item.pendingEvidence) && Array.isArray(item.completedEvidence)), true);
     assert.equal(operationsDashboard.body.postCutoverObservation.windows.every((item) => item.acceptanceRule && item.nextEvidenceAction), true);
+    assert.equal(operationsDashboard.body.postCutoverObservation.windows.every((item) => ["可签收", "待补证据"].includes(item.signoffStatus)), true);
+    assert.equal(Number.isInteger(operationsDashboard.body.postCutoverObservation.summary.signoffPendingWindows), true);
     assert.equal(operationsDashboard.body.postCutoverObservation.summary.evidenceTotal >= 9, true);
     assert.equal(Number.isInteger(operationsDashboard.body.postCutoverObservation.summary.completionRate), true);
     assert.equal(operationsDashboard.body.intelligence.recommendations.some((item) => item.recommendation && item.prediction), true);
@@ -374,6 +376,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(postCutoverObservation.body.windows.some((item) => item.evidencePending >= 0 && Number.isInteger(item.completionRate)), true);
     assert.equal(postCutoverObservation.body.windows.some((item) => item.pendingEvidence.includes("治理报告草稿") || item.completedEvidence.includes("治理报告草稿")), true);
     assert.equal(postCutoverObservation.body.windows.some((item) => item.nextEvidenceAction.includes("归档观察留痕") || item.nextEvidenceAction.includes("归档复核")), true);
+    assert.equal(postCutoverObservation.body.windows.some((item) => Array.isArray(item.signoffBlockers)), true);
     assert.equal(postCutoverObservation.body.windows.some((item) => item.requiredEvidence.includes("治理报告草稿")), true);
 
     const postCutoverAction = await api(baseUrl, "/api/operations/post-cutover-observation/actions", authorized(accountLogin.body.token, {

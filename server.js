@@ -4242,6 +4242,7 @@ function buildOperationsPostCutoverEvidenceProgress(items, windows) {
     remainingReady -= windowReady;
     const completedEvidence = requiredEvidence.slice(0, windowReady);
     const pendingEvidence = requiredEvidence.slice(windowReady);
+    const signoffReady = windowTotal > 0 && pendingEvidence.length === 0;
     return {
       ...item,
       requiredEvidence,
@@ -4251,17 +4252,23 @@ function buildOperationsPostCutoverEvidenceProgress(items, windows) {
       evidencePending: Math.max(0, windowTotal - windowReady),
       completionRate: windowTotal ? Math.round((windowReady / windowTotal) * 100) : 0,
       status: windowReady >= windowTotal && windowTotal > 0 ? "已完成" : windowReady > 0 ? "观察中" : "待观察",
+      signoffReady,
+      signoffStatus: signoffReady ? "可签收" : "待补证据",
+      signoffBlockers: pendingEvidence,
       nextEvidenceAction: pendingEvidence.length
         ? `${item.owner || "责任人"}补齐${pendingEvidence.join("、")}并归档观察留痕。`
         : `${item.owner || "责任人"}确认窗口证据齐套并进入归档复核。`
     };
   });
+  const signoffReadyWindows = windowsWithProgress.filter((item) => item.signoffReady).length;
   return {
     windows: windowsWithProgress,
     summary: {
       evidenceTotal,
       evidenceReady,
       evidencePending: Math.max(0, evidenceTotal - evidenceReady),
+      signoffReadyWindows,
+      signoffPendingWindows: Math.max(0, windowsWithProgress.length - signoffReadyWindows),
       completionRate: evidenceTotal ? Math.round((evidenceReady / evidenceTotal) * 100) : 0
     }
   };

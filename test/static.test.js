@@ -522,6 +522,8 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsJs, /completedEvidence/);
   assert.match(operationsJs, /acceptanceRule/);
   assert.match(operationsJs, /nextEvidenceAction/);
+  assert.match(operationsJs, /signoffStatus/);
+  assert.match(operationsJs, /可签收/);
   assert.match(operationsJs, /renderOperationsIntelligence/);
   assert.match(operationsJs, /renderResourcePool/);
   assert.match(operationsJs, /buildStaticResourcePool/);

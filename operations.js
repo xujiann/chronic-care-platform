@@ -511,6 +511,7 @@ function buildPostCutoverEvidenceProgress(items, windows) {
     remainingReady -= windowReady;
     const completedEvidence = requiredEvidence.slice(0, windowReady);
     const pendingEvidence = requiredEvidence.slice(windowReady);
+    const signoffReady = windowTotal > 0 && pendingEvidence.length === 0;
     return {
       ...item,
       requiredEvidence,
@@ -520,17 +521,23 @@ function buildPostCutoverEvidenceProgress(items, windows) {
       evidencePending: Math.max(0, windowTotal - windowReady),
       completionRate: windowTotal ? Math.round((windowReady / windowTotal) * 100) : 0,
       status: windowReady >= windowTotal && windowTotal > 0 ? "已完成" : windowReady > 0 ? "观察中" : "待观察",
+      signoffReady,
+      signoffStatus: signoffReady ? "可签收" : "待补证据",
+      signoffBlockers: pendingEvidence,
       nextEvidenceAction: pendingEvidence.length
         ? `${item.owner || "责任人"}补齐${pendingEvidence.join("、")}并归档观察留痕。`
         : `${item.owner || "责任人"}确认窗口证据齐套并进入归档复核。`
     };
   });
+  const signoffReadyWindows = windowsWithProgress.filter((item) => item.signoffReady).length;
   return {
     windows: windowsWithProgress,
     summary: {
       evidenceTotal,
       evidenceReady,
       evidencePending: Math.max(0, evidenceTotal - evidenceReady),
+      signoffReadyWindows,
+      signoffPendingWindows: Math.max(0, windowsWithProgress.length - signoffReadyWindows),
       completionRate: evidenceTotal ? Math.round((evidenceReady / evidenceTotal) * 100) : 0
     }
   };
@@ -1837,13 +1844,13 @@ function renderPostCutoverObservation(postCutoverObservation) {
   target.innerHTML = `
     <article class="operation-observation-summary ${postCutoverObservation.ok ? "ready" : "watching"}">
       <strong>上线后观察台</strong>
-      <span>${postCutoverObservation.summary?.observed || 0}/${postCutoverObservation.summary?.total || 0} 项已观察，${postCutoverObservation.summary?.abnormal || 0} 项异常，证据完成 ${postCutoverObservation.summary?.completionRate || 0}%</span>
+      <span>${postCutoverObservation.summary?.observed || 0}/${postCutoverObservation.summary?.total || 0} 项已观察，${postCutoverObservation.summary?.abnormal || 0} 项异常，证据完成 ${postCutoverObservation.summary?.completionRate || 0}%，${postCutoverObservation.summary?.signoffReadyWindows || 0} 个窗口可签收</span>
       <small>观察窗口：${zhInline(postCutoverObservation.watchWindow)}；待补证据 ${postCutoverObservation.summary?.evidencePending || 0} 项；证据：${evidenceList(postCutoverObservation.evidence)}</small>
       <div class="operation-observation-windows">
         ${(postCutoverObservation.windows || []).map((windowItem) => {
           const completedEvidence = windowItem.completedEvidence || [];
           const pendingEvidence = windowItem.pendingEvidence || [];
-          return `<span title="${htmlAttribute(`${windowItem.focus}；验收：${windowItem.acceptanceRule || "按现场签收规则"}；已完成：${completedEvidence.length ? zhList(completedEvidence) : "暂无"}；待补：${pendingEvidence.length ? zhList(pendingEvidence) : "无"}；下一步：${windowItem.nextEvidenceAction || "继续观察"}`)}">${zhInline(windowItem.name)} / ${zhInline(windowItem.owner)} / ${zhInline(windowItem.status)} / ${(windowItem.requiredEvidence || []).length}项证据 / 完成${windowItem.completionRate || 0}% / 待补${windowItem.evidencePending || 0}项</span>`;
+          return `<span title="${htmlAttribute(`${windowItem.focus}；签收：${windowItem.signoffStatus || "待复核"}；验收：${windowItem.acceptanceRule || "按现场签收规则"}；已完成：${completedEvidence.length ? zhList(completedEvidence) : "暂无"}；待补：${pendingEvidence.length ? zhList(pendingEvidence) : "无"}；下一步：${windowItem.nextEvidenceAction || "继续观察"}`)}">${zhInline(windowItem.name)} / ${zhInline(windowItem.owner)} / ${zhInline(windowItem.signoffStatus || windowItem.status)} / ${(windowItem.requiredEvidence || []).length}项证据 / 完成${windowItem.completionRate || 0}% / 待补${windowItem.evidencePending || 0}项</span>`;
         }).join("")}
       </div>
     </article>
