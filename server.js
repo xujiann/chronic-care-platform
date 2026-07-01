@@ -6374,7 +6374,8 @@ function normalizeEscortServiceOrder(payload, user, data) {
   if (!residentId) throw new Error("residentId is required");
   if (!canAccessResident(user, residentId, data)) throw new Error("resident scope denied");
   const providerId = String(payload.providerId || "esp-xuhui-daycare").trim();
-  const provider = (data.escortServiceProviders || []).find((item) => item.id === providerId) || seedEscortServiceProviders()[0];
+  const provider = (data.escortServiceProviders || []).find((item) => item.id === providerId);
+  if (!provider) throw new Error("provider not found");
   if (user.role === "citizen" && provider.published === false) throw new Error("provider is not published");
   const resident = (data.residents || []).find((item) => item.id === residentId) || {};
   const registrationOrderId = String(payload.registrationOrderId || "").trim();

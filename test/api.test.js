@@ -833,6 +833,20 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(missingRegistration.response.status, 400);
     assert.equal(missingRegistration.body.message, "registration order not found");
 
+    const missingProvider = await api(baseUrl, "/api/escort-services/orders", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        providerId: "esp-provider-not-in-registry",
+        hospital: "Dalian Central Hospital outpatient clinic demo",
+        department: "Cardiology",
+        appointmentAt: "2026-06-27",
+        serviceItems: ["registration", "exam escort"]
+      })
+    }));
+    assert.equal(missingProvider.response.status, 400);
+    assert.equal(missingProvider.body.message, "provider not found");
+
     const communitySchedule = registrationDashboard.body.schedules.find((item) => item.hospitalCode === "MR3" && item.remaining > 0);
     assert.ok(communitySchedule);
     const communityRegistration = await api(baseUrl, "/api/registrations/orders", authorized(citizenToken, {
