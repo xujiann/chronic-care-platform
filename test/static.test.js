@@ -174,6 +174,9 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(js, /bindSiteIssueReset/);
   assert.match(js, /currentSiteIssueStatus/);
   assert.match(js, /currentSiteIssueOwner/);
+  assert.match(js, /dataset\.activeOwner/);
+  assert.match(js, /dataset\.filtered/);
+  assert.match(js, /resetButton\.disabled/);
   assert.match(js, /buildDashboardDepartmentFunctionMatrix/);
   assert.match(js, /buildDashboardCityCountyFunctionMatrix/);
   assert.match(js, /buildDashboardJurisdictionScope/);
@@ -216,6 +219,7 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(read("portal.css"), /site-evidence-card/);
   assert.match(read("portal.css"), /site-issue-ledger-card/);
   assert.match(read("portal.css"), /site-issue-ledger-filter-grid/);
+  assert.match(read("portal.css"), /button:disabled/);
   assert.match(read("portal.css"), /function-matrix-card/);
   assert.match(js, /源待办/);
   assert.match(js, /预览待办/);

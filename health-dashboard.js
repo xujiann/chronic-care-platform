@@ -1211,6 +1211,7 @@ function renderSiteIssueLedger(ledger) {
   const section = document.querySelector("#site-issue-ledger-board");
   const controls = document.querySelector("#site-issue-ledger-status-controls");
   const ownerFilter = document.querySelector("#site-issue-owner-filter");
+  const resetButton = document.querySelector("#site-issue-reset-filters");
   const summary = document.querySelector("#site-issue-ledger-summary");
   const list = document.querySelector("#site-issue-ledger-list");
   const boundary = document.querySelector("#site-issue-ledger-boundary");
@@ -1225,12 +1226,17 @@ function renderSiteIssueLedger(ledger) {
   const counts = ledger.summary || {};
   section.dataset.issueStatus = ledger.status || "empty";
   section.dataset.activeStatus = currentSiteIssueStatus;
+  section.dataset.activeOwner = currentSiteIssueOwner || "all";
+  section.dataset.filtered = currentSiteIssueStatus !== "all" || Boolean(currentSiteIssueOwner) ? "true" : "false";
   if (controls) {
     controls.innerHTML = statuses.map((status) => `<button type="button" data-site-issue-status="${status}" class="${status === currentSiteIssueStatus ? "active" : ""}">${status === "all" ? "全部" : dashboardStatusLabel(status)}</button>`).join("");
   }
   if (ownerFilter) {
     ownerFilter.innerHTML = [`<option value="">全部责任方</option>`, ...owners.map((owner) => `<option value="${owner}">${dashboardTechnicalLabel(owner)}</option>`)].join("");
     ownerFilter.value = currentSiteIssueOwner;
+  }
+  if (resetButton) {
+    resetButton.disabled = currentSiteIssueStatus === "all" && !currentSiteIssueOwner;
   }
   summary.textContent = `${currentSiteIssueStatus === "all" ? "全部状态" : dashboardStatusLabel(currentSiteIssueStatus)} / ${currentSiteIssueOwner || "全部责任方"} / ${counts.total || items.length} 项问题 / 当前 ${visibleItems.length} 项`;
   if (boundary) {
