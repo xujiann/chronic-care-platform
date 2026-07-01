@@ -285,7 +285,7 @@ hospital-operations:readiness generates release/hospital-operations-readiness-re
 
 `escort.html` is the runnable commission entry for the older adult medical escort service pilot. It uses `GET /api/escort-services/dashboard`, `POST /api/escort-services/orders`, `POST /api/escort-services/orders/:id/actions`, and `POST /api/escort-services/orders/:id/hospital-handoff` to manage provider registry publication, trained escort workers, service requests, hospital handoff confirmation, contract and insurance evidence, subsidy categories, risk queue, quality callbacks, and task messages.
 
-`citizen.html` includes a resident-side medical escort appointment form. Citizen users can create an order for themselves or household members through `POST /api/escort-services/orders`; the same scoped dashboard returns only their household orders and published service providers. The order API rejects missing provider registry rows and unpublished providers before creating the resident appointment.
+`citizen.html` includes a resident-side medical escort appointment form. Citizen users can create an order for themselves or household members through `POST /api/escort-services/orders`; the same scoped dashboard returns only their household orders and published service providers. The order API rejects missing provider registry rows, unpublished providers, and duplicate active appointments for the same registration or visit slot before creating the resident appointment.
 
 The hospital interface development handoff is `docs/escort-hospital-interface.md`. It documents HIS/outpatient guidance boundaries, `hospitalCode` scoping, request/response fields, the `hospital-handoff` API, resident notification behavior, audit requirements, and joint-test acceptance steps.
 

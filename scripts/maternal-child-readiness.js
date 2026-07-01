@@ -106,19 +106,24 @@ function hasAll(source, needles) {
   return needles.every((needle) => source.includes(needle));
 }
 
+function hasUsableText(value) {
+  const text = String(value || "").trim();
+  return Boolean(text && !/^\?+$/.test(text) && !text.includes("???"));
+}
+
 function check(id, passed, detail, category = "maternal-child") {
   return { id, category, passed: Boolean(passed), detail };
 }
 
 function hasPolicyCertificateFields(item) {
   return Boolean(
-    item.certificateVersion &&
-      item.issueType &&
+    hasUsableText(item.certificateVersion) &&
+      hasUsableText(item.issueType) &&
       Array.isArray(item.materials) &&
       item.materials.length &&
-      item.qualityCheck &&
-      item.healthManagementStatus &&
-      item.nextService
+      hasUsableText(item.qualityCheck) &&
+      hasUsableText(item.healthManagementStatus) &&
+      hasUsableText(item.nextService)
   );
 }
 
@@ -218,6 +223,7 @@ function buildMaternalChildReadinessReport(options = {}) {
     check("role:commission-risk-metrics", hasCommissionRiskMetricCards(sources.commission), "commission portal consumes public-security, maternal-child sync, and quality risk metrics", "role"),
     check("role:institution", hasAll(sources.institution, ["birth-certificate-form", "birthCertificateNo", "submitBirthCertificate", "actionButton"]), "institution portal registers and advances certificate workflow", "role"),
     check("role:institution-risk-metrics", hasInstitutionRiskMetricCards(sources.institution), "institution portal renders public-security, maternal-child sync, and quality risk metric cards", "role"),
+    check("role:certificate-document-controls", hasAll(sources.commission, ["birthCertificateDocuments", "documentRules"]) && hasAll(sources.institution, ["birthCertificateDocuments", "documentCards"]), "commission and institution portals render certificate document control ledger", "role"),
     check("role:citizen", hasAll(sources.citizen, ["renderBirthHealth", "renderMaternalChildContinuity", "getBirthCertificatesForResident", "lifecycle-summary"]), "citizen portal exposes birth and maternal-child continuity tasks", "role"),
     check("role:citizen-lifecycle-8", hasAll(sources.citizen, ["儿童保健", "青少年健康", "成人健康", "慢病与康复", "老年与照护", "临终关怀与授权", "死亡与身后事项", "项需下发"]) && sources.citizen.includes("stages.length"), "citizen lifecycle timeline covers eight life stages and dispatch summary", "role"),
     check("role:isolation", hasAll(sources.policyDoc, ["不展示卫健监管", "机构办理"]) && sources.server.includes("canAccessResident") && !sources.citizen.includes("birth-certificate-form"), "citizen role excludes institution certificate form while server keeps resident-scoped access", "role"),

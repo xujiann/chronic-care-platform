@@ -191,7 +191,7 @@ test("static snapshot keeps completed P2 governance collections", () => {
   assert.equal(data.platformCapabilities.some((item) => item.id === "cap-security" && item.status === "安全证据已建档"), true);
   assert.equal(data.applicationCatalog.some((item) => item.id === "app-institution" && item.status === "演示对接完成"), true);
   assert.equal(data.securityAcceptanceLedger.every((item) => item.id && item.category && item.owner && item.status && item.next), true);
-  assert.equal(data.securityAcceptanceLedger.every((item) => /建档/.test(item.status)), true);
+  assert.equal(data.securityAcceptanceLedger.every((item) => item.status === "ready-已建档"), true);
   assert.equal(data.platformRoadmap.filter((item) => item.priority === "P2").every((item) => item.status === "已完成"), true);
 });
 
@@ -261,6 +261,13 @@ test("maternal child about page documents policy basis and release evidence", ()
   assert.match(readme, /maternal-child-about\.html/);
   assert.match(deployment, /maternal-child-policy\.md/);
   assert.match(workflow, /priority-apps:templates/);
+});
+
+test("birth certificate document controls are visible in portal surfaces", () => {
+  assert.match(read("institution.html"), /birth-certificate-documents/);
+  assert.match(read("institution.js"), /birthCertificateDocuments/);
+  assert.match(read("app.js"), /birthCertificateDocuments/);
+  assert.match(read("scripts/maternal-child-readiness.js"), /data:certificate-document-controls/);
 });
 
 test("chronic follow-up launch core is wired through docs api and portals", () => {

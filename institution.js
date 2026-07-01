@@ -1,4 +1,4 @@
-const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], referralTeleconsultations: [], medicationPickups: [], chronicScreeningTasks: [], chronicManagementPlans: [], chronicFollowupStatusPolicy: {}, deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthStatistics: {}, doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {}, taskMessages: [] };
+const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], referralTeleconsultations: [], medicationPickups: [], chronicScreeningTasks: [], chronicManagementPlans: [], chronicFollowupStatusPolicy: {}, deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthCertificateDocuments: [], birthStatistics: {}, doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {}, taskMessages: [] };
 const institutionApiBase = location.protocol === "file:" || location.hostname.endsWith("github.io") ? "" : "/api";
 let platformState = fallbackState;
 
@@ -651,6 +651,7 @@ function renderMultiPracticeApplications(state) {
 function renderBirthCertificates(state) {
   const certificates = state.birthCertificates || [];
   const forms = state.birthCertificateForms || [];
+  const certificateDocuments = state.birthCertificateDocuments || [];
   const statistics = state.birthStatistics || {};
   const metrics = statistics.metrics || {};
   const countEl = document.querySelector("#birth-certificate-count");
@@ -658,6 +659,7 @@ function renderBirthCertificates(state) {
   const listEl = document.querySelector("#birth-certificate-list");
   const formsEl = document.querySelector("#birth-certificate-forms");
   const alertsEl = document.querySelector("#birth-certificate-alerts");
+  const documentsEl = document.querySelector("#birth-certificate-documents");
   if (!countEl || !metricEl || !listEl || !formsEl) return;
 
   const statusFilter = document.querySelector("#birth-status-filter")?.value || "";
@@ -702,6 +704,13 @@ function renderBirthCertificates(state) {
     <span>${value}<br>${hint}</span>
   </article>`).join("");
 
+  if (documentsEl) {
+    documentsEl.innerHTML = certificateDocuments.map((item) => `<article class="claim-card">
+      <strong>${item.name || item.category}</strong>
+      <span>${item.serialRange || "待登记"}<br>${(item.controlPoints || []).join("、")}<br>${item.owner || "待明确"} · ${item.status || "待处理"}</span>
+    </article>`).join("") || `<p class="muted">暂无出生证明证件文书台账。</p>`;
+  }
+
   listEl.innerHTML = filtered.map((item) => {
     const resident = residentOf(state, item.maternalResidentId || item.residentId);
     const badge = item.status === "待签发" || item.status === "待上报" ? "warn" : item.qualityCheck === "待补正" ? "danger" : "info";
@@ -722,10 +731,17 @@ function renderBirthCertificates(state) {
     </section>`;
   }).join("") || `<p class="muted">暂无出生医学证明记录。</p>`;
 
-  formsEl.innerHTML = forms.map((form) => `<article class="claim-card">
-    <strong>${form.name}</strong>
-    <span>${form.scope}<br>${(form.keyFields || []).slice(0, 4).join("、")}<br>${form.status}</span>
-  </article>`).join("") || `<p class="muted">暂无出生证明材料模板。</p>`;
+  const documentCards = certificateDocuments.map((item) => `<article class="claim-card">
+    <strong>${item.name || item.category}</strong>
+    <span>${item.serialRange || "编号范围待登记"}<br>${(item.evidence || []).slice(0, 4).join("、")}<br>${item.owner || "责任方待确认"} · ${item.status || "待处理"}</span>
+  </article>`);
+  formsEl.innerHTML = [
+    ...forms.map((form) => `<article class="claim-card">
+      <strong>${form.name}</strong>
+      <span>${form.scope}<br>${(form.keyFields || []).slice(0, 4).join("、")}<br>${form.status}</span>
+    </article>`),
+    ...documentCards
+  ].join("") || `<p class="muted">暂无出生证明材料模板。</p>`;
 }
 
 function renderMetrics(state) {

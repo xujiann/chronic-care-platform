@@ -21,6 +21,8 @@ test("site readiness pack creates implementation templates", () => {
   assert.equal(report.templates.monitoring.some((item) => item.id.includes("undefined")), false);
   assert.equal(report.templates.signoff.some((item) => item.id === "signoff-cutover-institution-interfaces"), true);
   assert.equal(report.templates.signoff.some((item) => item.id === "signoff-cutover-chronic-launch-core"), true);
+  assert.equal(report.templates.signoff.some((item) => item.id === "signoff-cutover-identity" && /SMS_GATEWAY_URL/.test(item.blockingUntil)), true);
+  assert.equal(report.templates.identity.some((item) => item.evidenceToAttach.includes("SMS gateway delivery receipt")), true);
   assert.equal(report.checks.every((item) => item.passed), true);
 });
 
@@ -65,6 +67,7 @@ test("site readiness pack renders and writes release artifacts", (t) => {
   assert.match(writtenMarkdown, /Monitoring and on-call template/);
   assert.match(identityReadme, /Current status: template-ready/);
   assert.match(identityReadme, /How to verify now/);
+  assert.match(identityReadme, /SMS gateway delivery receipt/);
   assert.match(interfaceReadme, /Rows preview/);
 });
 

@@ -5791,8 +5791,8 @@
       "status": "已开通",
       "contact": "演示居民A",
       "nextAction": "每月 15 日提醒家属确认取药",
-      "careLevel": "中度失能",
-      "eligibility": "长护险待遇已核验",
+      "careLevel": "中度照护风险",
+      "eligibility": "长护险待遇已预核验",
       "assessmentScore": 72,
       "carePlan": "每周 2 次上门协助取药、血压复测和用药提醒",
       "provider": "青泥洼桥社区照护团队",
@@ -9447,7 +9447,17 @@
       ],
       "status": "已建档",
       "next": "为每个接口域建立责任人、环境、频率、样例和验收规则。",
-      "records": []
+      "records": [
+        {
+          "id": "evr-identity-sms-gateway",
+          "owner": "平台运维",
+          "testRecord": "统一身份源与短信网关联调记录",
+          "at": "2026-07-01 21:45:00",
+          "link": "release/site-readiness-pack.md#identity-source-mapping",
+          "fileName": "release/templates/identity-source-mapping/README.md",
+          "status": "已纳入上线前验收包"
+        }
+      ]
     },
     {
       "id": "ev-launch",

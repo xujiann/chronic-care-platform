@@ -749,6 +749,20 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(created.body.outpatientQueueNo, linkedRegistration.body.queueNo);
     assert.equal(created.body.appointmentSource, "registration-order");
 
+    const duplicateEscort = await api(baseUrl, "/api/escort-services/orders", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        providerId,
+        registrationOrderId: linkedRegistration.body.id,
+        serviceItems: ["registration", "exam escort"],
+        priority: "medium",
+        sourceChannel: "citizen.html"
+      })
+    }));
+    assert.equal(duplicateEscort.response.status, 409);
+    assert.equal(duplicateEscort.body.message, "duplicate active escort appointment");
+
     const hospitalLogin = await login(baseUrl, "hospital");
     assert.equal(hospitalLogin.response.status, 200);
     const hospitalToken = hospitalLogin.body.token;

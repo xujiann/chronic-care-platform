@@ -6369,6 +6369,33 @@ function buildEscortServiceDashboard(data, user) {
   };
 }
 
+function escortAppointmentDateKey(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  const datePrefix = text.match(/^\d{4}-\d{2}-\d{2}/);
+  if (datePrefix) return datePrefix[0];
+  const parsed = new Date(text).getTime();
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString().slice(0, 10) : text;
+}
+
+function isInactiveEscortOrderStatus(status) {
+  return isClosedTaskStatus(status) || /cancel|canceled|cancelled|取消/i.test(String(status || ""));
+}
+
+function findDuplicateActiveEscortAppointment(data, details) {
+  const appointmentDate = escortAppointmentDateKey(details.appointmentAt || details.due);
+  const hospitalKey = String(details.hospitalCode || details.hospital || "").trim().toLowerCase();
+  const departmentKey = String(details.department || "").trim().toLowerCase();
+  return (Array.isArray(data.escortServiceOrders) ? data.escortServiceOrders : []).find((item) => {
+    if (item.residentId !== details.residentId || isInactiveEscortOrderStatus(item.status)) return false;
+    if (details.registrationOrderId && item.registrationOrderId === details.registrationOrderId) return true;
+    const itemHospitalKey = String(item.hospitalCode || item.hospital || "").trim().toLowerCase();
+    const itemDepartmentKey = String(item.department || "").trim().toLowerCase();
+    const itemDate = escortAppointmentDateKey(item.appointmentAt || item.due);
+    return Boolean(appointmentDate && hospitalKey && itemDate === appointmentDate && itemHospitalKey === hospitalKey && (!departmentKey || itemDepartmentKey === departmentKey));
+  });
+}
+
 function normalizeEscortServiceOrder(payload, user, data) {
   const residentId = String(payload.residentId || user.residentId || "").trim();
   if (!residentId) throw new Error("residentId is required");
@@ -6392,6 +6419,9 @@ function normalizeEscortServiceOrder(payload, user, data) {
   const hospital = String(payload.hospital || registrationOrder?.hospital || "").trim();
   const hospitalCode = String(payload.hospitalCode || registrationOrder?.hospitalCode || (/(Dalian Central|central hospital|MR1)/i.test(hospital) ? "MR1" : "")).trim();
   const appointmentAt = String(payload.appointmentAt || payload.due || registrationOrder?.appointmentDate || "").trim();
+  const department = String(payload.department || registrationOrder?.department || "").trim();
+  const duplicate = findDuplicateActiveEscortAppointment(data, { residentId, registrationOrderId, hospital, hospitalCode, department, appointmentAt, due: payload.due });
+  if (duplicate) throw new Error("duplicate active escort appointment");
   return {
     id: payload.id || `eso-${randomUUID()}`,
     residentId,
@@ -6402,7 +6432,7 @@ function normalizeEscortServiceOrder(payload, user, data) {
     district: String(payload.district || provider.district || "").trim(),
     hospital,
     hospitalCode,
-    department: String(payload.department || registrationOrder?.department || "").trim(),
+    department,
     appointmentAt,
     due: String(payload.due || payload.appointmentAt || registrationOrder?.appointmentDate || "").trim(),
     serviceItems: serviceItems.length ? serviceItems : ["registration", "exam escort"],
@@ -11387,8 +11417,10 @@ async function handleApi(req, res) {
       writeDatabase(data);
       sendJson(res, 201, order);
     } catch (error) {
-      const denied = /scope denied|not published/i.test(error.message || "");
-      sendJson(res, denied ? 403 : 400, { error: denied ? "Forbidden" : "Bad Request", message: error.message });
+      const message = error.message || "";
+      const denied = /scope denied|not published/i.test(message);
+      const conflict = /duplicate active escort appointment/i.test(message);
+      sendJson(res, conflict ? 409 : denied ? 403 : 400, { error: conflict ? "Conflict" : denied ? "Forbidden" : "Bad Request", message });
     }
     return;
   }

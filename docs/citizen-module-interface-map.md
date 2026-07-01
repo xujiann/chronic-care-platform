@@ -17,7 +17,7 @@
 | 登录与身份 | `/api/auth/phone-code`, `/api/auth/phone-login`, `/api/auth/me` | `accounts`, `authUsers`, `securityEvents` | 已实现 | 已具备演示短信验证码签发、冷却、有效期、居民会话和安全审计；生产接入真实短信网关、实名核验和风控策略 |
 | 消息与待办 | `/api/messages`, `/api/tasks/:id/actions` | `taskMessages`, `service tasks`, `dataAccessLogs` | 已实现 | 接入真实短信、订阅消息、送达回执和审计保全；居民端按确认、取消、评价状态隐藏重复操作按钮 |
 
-服务待办中心仅展示已上线动作，并按订单状态隐藏已确认、已申请取消或已完成评价后的重复按钮；陪诊和护理订单历史仍保留在各自业务页，供居民追溯医院回执、服务安排和质控记录。居民端陪诊预约表单仅在存在已发布服务主体时启用，无已发布服务主体时保留订单追踪但禁止提交新预约。后端创建陪诊订单前会校验 `providerId` 必须存在于 `escortServiceProviders`，无效服务主体返回 `provider not found`，未发布服务主体返回 `provider is not published`，避免居民端生成游离于监管目录之外的预约。
+服务待办中心仅展示已上线动作，并按订单状态隐藏已确认、已申请取消或已完成评价后的重复按钮；陪诊和护理订单历史仍保留在各自业务页，供居民追溯医院回执、服务安排和质控记录。居民端陪诊预约表单仅在存在已发布服务主体时启用，无已发布服务主体时保留订单追踪但禁止提交新预约。后端创建陪诊订单前会校验 `providerId` 必须存在于 `escortServiceProviders`，无效服务主体返回 `provider not found`，未发布服务主体返回 `provider is not published`，同一居民同一挂号单或同一就诊日期/医院/科室存在开放陪诊预约时返回 `duplicate active escort appointment`，避免居民端生成游离于监管目录之外或重复派单的预约。
 
 ## 3. 挂号接口契约
 

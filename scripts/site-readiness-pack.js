@@ -35,7 +35,7 @@ function buildSignoffTemplates(env) {
   return [
     ["cutover-env-file", "environment", "platform-ops", "NODE_ENV/STORAGE_ENGINE/.env production review", "NODE_ENV=production and non-JSON production storage confirmed"],
     ["cutover-secrets", "security", "security-admin", "session and gateway secret review", "non-placeholder SESSION_SECRETS and INTEGRATION_GATEWAY_SECRET injected"],
-    ["cutover-identity", "identity", "identity-integration", "government identity source signoff", "OIDC/SAML metadata, client secret, callback URL, and organization mapping confirmed"],
+    ["cutover-identity", "identity", "identity-integration", "government identity and SMS gateway signoff", "OIDC/SAML metadata, client secret, callback URL, organization mapping, and SMS_GATEWAY_URL confirmed"],
     ["cutover-audit-retention", "audit", "security-admin", "audit retention signoff", "AUDIT_EXPORT_PATH or SIEM endpoint and retention permission confirmed"],
     ["cutover-storage-adapter", "storage", "data-platform", "production database and backup signoff", "database adapter, backup, rollback, and migration rehearsal confirmed"],
     ["cutover-institution-interfaces", "integration", "institution-integration", "HIS/EMR/LIS/PACS joint-test signoff", envSigned(env, "CUTOVER_SITE_INTERFACE_SIGNOFF") ? "signed" : "requires CUTOVER_SITE_INTERFACE_SIGNOFF"],
@@ -91,7 +91,7 @@ function buildSiteReadinessPack(options = {}) {
     field: claim.claim || claim.name,
     expectedSource: claim.source || "OIDC/SAML claim",
     platformUsage: claim.description || claim.usage || claim.purpose || "",
-    evidenceToAttach: ["OIDC/SAML metadata", "sample signed token", "role and organization mapping screenshot"]
+    evidenceToAttach: ["OIDC/SAML metadata", "sample signed token", "role and organization mapping screenshot", "SMS gateway delivery receipt"]
   }));
 
   const interfaceTemplates = toRows(interfaceMapping.mappings, (mapping) => ({
@@ -255,7 +255,7 @@ function renderTemplateReadmes(report) {
       pack: packById["identity-source-pack"],
       rows: templates.identity || [],
       capability: "Maps government OIDC/SAML claims, role codes, organization scope, and resident identity signals into the platform login and authorization model.",
-      input: "OIDC/SAML metadata, sample signed token, role and organization directory, callback URL, and identity source owner confirmation.",
+      input: "OIDC/SAML metadata, sample signed token, role and organization directory, callback URL, SMS gateway delivery receipt, and identity source owner confirmation.",
       output: "Claim mapping table, role-to-portal mapping, organization scope evidence, and signoff-ready identity integration notes.",
       apiEvidence: "/api/auth/login, /api/auth/me, /api/system/readiness, /api/site-readiness-pack"
     },

@@ -1407,6 +1407,7 @@ function renderBirthStatistics() {
   const rules = document.querySelector("#birth-stat-rules");
   if (!summary || !cards || !sources || !regionTable || !rules) return;
   const certificates = state.birthCertificates || [];
+  const certificateDocuments = state.birthCertificateDocuments || [];
   const metricValue = (key, fallback) => {
     const value = Number(metrics[key]);
     return Number.isFinite(value) ? value : fallback;
@@ -1461,7 +1462,13 @@ function renderBirthStatistics() {
     </tr>`).join("")}</tbody>
   </table>`;
 
-  rules.innerHTML = (birth.workflowRules || []).map((item) => `<div><strong>${item.rule}</strong><span>${item.deadline || item.detail}<br>${item.owner || ""} · ${item.status || ""}</span></div>`).join("");
+  const documentRules = certificateDocuments.map((item) => ({
+    rule: item.name || item.category,
+    deadline: `${item.serialRange || ""} · ${(item.controlPoints || []).join("、")}`,
+    owner: item.owner,
+    status: item.status
+  }));
+  rules.innerHTML = [...(birth.workflowRules || []), ...documentRules].map((item) => `<div><strong>${item.rule}</strong><span>${item.deadline || item.detail}<br>${item.owner || ""} · ${item.status || ""}</span></div>`).join("");
 }
 
 function renderBirthHealthManagement() {
