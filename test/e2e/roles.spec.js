@@ -114,8 +114,9 @@ test("commission health dashboard filters live source actions and drills into so
   await expect(page.locator("#dashboard-policy-notes")).toBeVisible();
   await expect(page.locator("[data-dashboard-policy='certificates']")).toContainText("出生");
   await expect(page.locator("#dashboard-policy-notes a[href='./health-dashboard-about.html']")).toHaveCount(1);
-  await expect(page.locator("#dashboard-function-list [data-function-report]")).toHaveCount(13);
+  await expect(page.locator("#dashboard-function-list [data-function-report]")).toHaveCount(14);
   await expect(page.locator("#dashboard-function-list [data-function-report='aggregate-entry']")).toContainText("7 个源应用");
+  await expect(page.locator("#dashboard-function-list [data-function-report='production-readiness-gate']")).toContainText("上线运行门禁");
   await expect(page.locator("#population-service-board")).toBeVisible();
   await expect(page.locator("#population-service-board")).toHaveAttribute("data-active-period", "day");
   await expect(page.locator("#population-metric-cards [data-population-metric]")).toHaveCount(4);
@@ -129,6 +130,9 @@ test("commission health dashboard filters live source actions and drills into so
   await expect(page.locator("#certificate-exchange-cards [data-certificate-exchange='exchange-birth-license']")).toContainText("出生医学证明");
   await expect(page.locator("#risk-drilldown-list [data-risk-drilldown]")).toHaveCount(8);
   await expect(page.locator("#site-evidence-list [data-site-evidence]")).toHaveCount(4);
+  await expect(page.locator("#production-readiness-board")).toHaveAttribute("data-production-status", "blocked");
+  await expect(page.locator("#production-readiness-list [data-production-gate]")).toHaveCount(5);
+  await expect(page.locator("#production-readiness-list [data-production-gate='operations-dr']")).toContainText("监控告警与灾备演练");
   await expect(page.locator("#site-issue-ledger-board")).toHaveAttribute("data-filtered", "false");
   await expect(page.locator("#site-issue-reset-filters")).toBeDisabled();
   await page.locator("#site-issue-owner-filter").selectOption({ index: 1 });
@@ -185,7 +189,7 @@ test("about page explains runnable platform capabilities", async ({ page }) => {
   await page.goto("/health-dashboard-about.html");
   await expect(page.locator("[data-dashboard-about-section='runtime-report']")).toBeVisible();
   await expect(page.locator("#dashboard-about-runtime-state")).toHaveAttribute("data-source-mode", "api");
-  await expect(page.locator("#dashboard-about-function-report [data-about-runtime-function]")).toHaveCount(13);
+  await expect(page.locator("#dashboard-about-function-report [data-about-runtime-function]")).toHaveCount(14);
   await expect(page.locator("#dashboard-about-function-report [data-about-runtime-function='aggregate-entry']")).toContainText("212 条源记录");
   await expect(page.locator("#dashboard-about-release-evidence [data-about-runtime-evidence='summary-script']")).toContainText("综合管理服务系统摘要脚本");
   await expect(page.locator("[data-dashboard-about-section='template-functions']")).toBeVisible();

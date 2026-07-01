@@ -35,6 +35,7 @@
         <a href="#dashboard-function-report">功能报告</a>
         <a href="#dashboard-actions-panel">任务闭环</a>
         <a href="#risk-drilldown-board">风险下钻</a>
+        <a href="#production-readiness-board">上线门禁</a>
         <a href="#site-issue-ledger-board">整改台账</a>
         <a href="#dashboard-integration-panel">接口证据</a>
       </nav>
@@ -228,6 +229,15 @@
           </div>
           <div id="dashboard-dependencies" class="rules"></div>
         </article>
+      </section>
+
+      <section class="panel production-readiness-board" id="production-readiness-board">
+        <div class="panel-title">
+          <h2>上线运行门禁</h2>
+          <span id="production-readiness-summary">正在汇总正式环境、身份审计、接口签字、运维灾备和数据库切换条件</span>
+        </div>
+        <div class="production-readiness-grid" id="production-readiness-list"></div>
+        <p class="muted production-readiness-boundary" id="production-readiness-boundary">上线门禁只用于行政管理端发布审计和现场切换确认；未完成正式环境配置、签字证据和灾备演练前不得按生产上线运行。</p>
       </section>
 
       <section class="panel action-trend-board" id="action-closure-trend-board">

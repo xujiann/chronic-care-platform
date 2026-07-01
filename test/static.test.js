@@ -139,6 +139,8 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(html, /risk-drilldown-list/);
   assert.match(html, /site-evidence-package/);
   assert.match(html, /site-evidence-list/);
+  assert.match(html, /production-readiness-board/);
+  assert.match(html, /production-readiness-list/);
   assert.match(html, /site-issue-ledger-board/);
   assert.match(html, /site-issue-ledger-status-controls/);
   assert.match(html, /site-issue-owner-filter/);
@@ -167,6 +169,8 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(js, /renderRiskDrilldowns/);
   assert.match(js, /buildStaticSiteEvidencePackage/);
   assert.match(js, /renderSiteEvidencePackage/);
+  assert.match(js, /buildDashboardProductionReadinessGate/);
+  assert.match(js, /renderProductionReadinessGate/);
   assert.match(js, /buildStaticSiteIssueLedger/);
   assert.match(js, /renderSiteIssueLedger/);
   assert.match(js, /bindSiteIssueStatus/);
@@ -219,6 +223,8 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(read("portal.css"), /site-evidence-card/);
   assert.match(read("portal.css"), /site-issue-ledger-card/);
   assert.match(read("portal.css"), /site-issue-ledger-filter-grid/);
+  assert.match(read("portal.css"), /production-readiness-card/);
+  assert.match(read("portal.css"), /production-readiness-grid/);
   assert.match(read("portal.css"), /button:disabled/);
   assert.match(read("portal.css"), /function-matrix-card/);
   assert.match(js, /源待办/);

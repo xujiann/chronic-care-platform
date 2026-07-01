@@ -48,7 +48,13 @@ test("health dashboard summary aggregates the first seven applications without r
   assert.equal(report.siteEvidencePackage.summary.ready, 3);
   assert.equal(report.siteIssueLedger.summary.total >= 1, true);
   assert.equal(report.siteIssueLedger.items.every((item) => item.owner && item.nextAction && item.boundary), true);
-  assert.equal(report.functionalReport.functions.length, 13);
+  assert.equal(report.productionReadinessGate.items.length, 5);
+  assert.equal(report.productionReadinessGate.overallStatus, "blocked");
+  assert.equal(report.productionReadinessGate.items.some((item) => item.id === "runtime-env" && item.status === "ready"), true);
+  assert.equal(report.productionReadinessGate.items.some((item) => item.id === "operations-dr" && item.status === "blocked"), true);
+  assert.equal(report.totals.productionReady, false);
+  assert.equal(report.functionalReport.functions.length, 14);
+  assert.equal(report.functionalReport.functions.some((item) => item.id === "production-readiness-gate" && item.status === "blocked"), true);
   assert.equal(report.functionalReport.functions.some((item) => item.id === "population-service-board" && item.status === "ready"), true);
   assert.equal(report.functionalReport.functions.some((item) => item.id === "jurisdiction-workbench" && item.status === "ready"), true);
   assert.equal(report.functionalReport.functions.some((item) => item.id === "jurisdiction-scope-drilldown" && item.status === "ready"), true);
@@ -81,6 +87,7 @@ test("health dashboard summary aggregates the first seven applications without r
   assert.equal(report.checks.some((item) => item.id === "dashboard:risk-drilldown" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:site-evidence-package" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:site-issue-ledger" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "dashboard:production-readiness-gate" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:functional-report" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:jurisdiction-scope" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:jurisdiction-detail" && item.passed), true);
@@ -110,6 +117,7 @@ test("health dashboard summary aggregates the first seven applications without r
   assert.match(markdown, /风险下钻/);
   assert.match(markdown, /现场验收证据包/);
   assert.match(markdown, /现场问题整改台账/);
+  assert.match(markdown, /上线运行门禁/);
   assert.match(markdown, /发布证据/);
   assert.match(markdown, /92800/);
   assert.match(markdown, /证照交换链路/);

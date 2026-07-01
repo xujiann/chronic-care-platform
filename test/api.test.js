@@ -170,8 +170,10 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(healthDashboard.body.populationServiceBoard.insights.some((item) => item.id === "site-cutover" && item.value === "5类接口"), true);
     assert.equal(healthDashboard.body.populationServiceBoard.sourceDetails.length, 4);
     assert.equal(healthDashboard.body.populationServiceBoard.sourceDetails.some((item) => item.id === "admissions" && item.field.includes("dailyServiceReports") && item.status === "ready"), true);
-    assert.equal(healthDashboard.body.functionalReport.functions.length, 13);
+    assert.equal(healthDashboard.body.functionalReport.functions.length, 14);
     assert.equal(healthDashboard.body.functionalReport.functions.some((item) => item.id === "aggregate-entry"), true);
+    assert.equal(healthDashboard.body.functionalReport.functions.some((item) => item.id === "production-readiness-gate"), true);
+    assert.equal(healthDashboard.body.productionReadinessGate.overallStatus, "blocked");
     assert.equal(healthDashboard.body.functionalReport.functions.some((item) => item.id === "jurisdiction-workbench"), true);
     assert.equal(healthDashboard.body.functionalReport.functions.some((item) => item.id === "jurisdiction-scope-drilldown"), true);
     assert.equal(healthDashboard.body.functionalReport.functions.some((item) => item.id === "task-closure-trend"), true);

@@ -1966,7 +1966,8 @@ dialog::backdrop {
 
 .drilldown-grid,
 .site-evidence-grid,
-.site-issue-ledger-grid {
+.site-issue-ledger-grid,
+.production-readiness-grid {
   display: grid;
   gap: 10px;
 }
@@ -1975,9 +1976,14 @@ dialog::backdrop {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.production-readiness-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .drilldown-card,
 .site-evidence-card,
-.site-issue-ledger-card {
+.site-issue-ledger-card,
+.production-readiness-card {
   border: 1px solid var(--line);
   border-left: 4px solid var(--blue);
   border-radius: 8px;
@@ -1987,16 +1993,20 @@ dialog::backdrop {
 
 .drilldown-card.high,
 .site-evidence-card.blocked,
-.site-issue-ledger-card.blocked { border-left-color: var(--red); }
+.site-issue-ledger-card.blocked,
+.production-readiness-card.blocked { border-left-color: var(--red); }
 .drilldown-card.medium,
 .site-evidence-card.watch,
-.site-issue-ledger-card.watch { border-left-color: var(--amber); }
+.site-issue-ledger-card.watch,
+.production-readiness-card.watch { border-left-color: var(--amber); }
 .drilldown-card.normal,
 .site-evidence-card.ready,
-.site-issue-ledger-card.ready { border-left-color: var(--green); }
+.site-issue-ledger-card.ready,
+.production-readiness-card.ready { border-left-color: var(--green); }
 .drilldown-card.empty,
 .site-evidence-card.empty,
-.site-issue-ledger-card.empty { border-left-color: var(--muted); }
+.site-issue-ledger-card.empty,
+.production-readiness-card.empty { border-left-color: var(--muted); }
 
 .drilldown-card span,
 .drilldown-card strong,
@@ -2006,13 +2016,17 @@ dialog::backdrop {
 .site-evidence-card small,
 .site-issue-ledger-card span,
 .site-issue-ledger-card strong,
-.site-issue-ledger-card small {
+.site-issue-ledger-card small,
+.production-readiness-card span,
+.production-readiness-card strong,
+.production-readiness-card small {
   display: block;
 }
 
 .drilldown-card span,
 .site-evidence-card span,
-.site-issue-ledger-card span {
+.site-issue-ledger-card span,
+.production-readiness-card span {
   color: var(--muted);
   font-size: 12px;
   font-weight: 800;
@@ -2021,7 +2035,8 @@ dialog::backdrop {
 
 .drilldown-card strong,
 .site-evidence-card strong,
-.site-issue-ledger-card strong {
+.site-issue-ledger-card strong,
+.production-readiness-card strong {
   margin-top: 6px;
   font-size: 15px;
 }
@@ -2031,7 +2046,9 @@ dialog::backdrop {
 .site-evidence-card small,
 .site-evidence-card p,
 .site-issue-ledger-card small,
-.site-issue-ledger-card p {
+.site-issue-ledger-card p,
+.production-readiness-card small,
+.production-readiness-card p {
   color: var(--muted);
   line-height: 1.55;
   overflow-wrap: anywhere;
@@ -2039,7 +2056,8 @@ dialog::backdrop {
 
 .drilldown-card p,
 .site-evidence-card p,
-.site-issue-ledger-card p {
+.site-issue-ledger-card p,
+.production-readiness-card p {
   margin: 8px 0 0;
 }
 
@@ -2054,9 +2072,11 @@ dialog::backdrop {
 @media (max-width: 1100px) {
   .certificate-exchange-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .drilldown-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .production-readiness-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 640px) {
   .certificate-exchange-grid { grid-template-columns: 1fr; }
   .drilldown-grid { grid-template-columns: 1fr; }
+  .production-readiness-grid { grid-template-columns: 1fr; }
 }

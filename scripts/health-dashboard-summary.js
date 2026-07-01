@@ -486,6 +486,82 @@ function buildSiteIssueLedger(context = {}) {
   };
 }
 
+function buildProductionReadinessGate(productionDeploymentPlan = [], context = {}) {
+  const planRows = Array.isArray(productionDeploymentPlan) ? productionDeploymentPlan : [];
+  const byId = Object.fromEntries(planRows.map((item) => [item.id, item]));
+  const statusValue = (item) => String(item?.status || "").toLowerCase();
+  const isReady = (item) => ["ready", "done", "passed", "complete"].includes(statusValue(item));
+  const isBlocked = (item) => !item || ["planned", "blocked", "missing", "pending"].includes(statusValue(item));
+  const gateStatus = (items, fallback = "blocked") => {
+    const rows = items.filter(Boolean);
+    if (!rows.length) return fallback;
+    if (rows.every(isReady)) return "ready";
+    return rows.some(isBlocked) ? "blocked" : "watch";
+  };
+  const evidenceCount = Number(context.siteEvidencePackage?.summary?.artifacts || 0);
+  const issueTotal = Number(context.siteIssueLedger?.summary?.total || 0);
+  const interfaceCount = Array.isArray(context.interfaceRows) ? context.interfaceRows.length : 0;
+  const gates = [
+    {
+      id: "runtime-env",
+      name: "正式环境与密钥",
+      owner: byId["prod-env-gate"]?.owner || "platform-ops",
+      status: gateStatus([byId["prod-env-gate"]], "watch"),
+      evidence: (byId["prod-env-gate"]?.evidence || ["env:check", "release:report"]).join(" / "),
+      nextAction: "在目标服务器执行生产环境检查，确认 NODE_ENV、会话密钥、接口网关密钥和存储模式。",
+      boundary: "演示环境通过不等同于生产环境通过。"
+    },
+    {
+      id: "identity-audit",
+      name: "统一身份与审计留存",
+      owner: "identity-integration / security-admin",
+      status: gateStatus([byId["prod-identity-adapter"], byId["prod-audit-retention"]]),
+      evidence: "统一身份映射、哈希链审计、日志留存目标",
+      nextAction: "完成政务统一认证映射、审计日志导出目标和留存年限签字。",
+      boundary: "未完成身份源和审计留存前不得开放生产管理端。"
+    },
+    {
+      id: "data-storage",
+      name: "生产数据库与备份恢复",
+      owner: byId["prod-storage-adapter"]?.owner || "data-platform",
+      status: gateStatus([byId["prod-storage-adapter"]]),
+      evidence: "数据库适配、迁移演练、备份恢复报告",
+      nextAction: byId["prod-storage-adapter"]?.nextAction || "完成生产数据库适配、迁移、回滚和备份恢复演练。",
+      boundary: "JSON/SQLite 演示快照不能作为生产主存储验收。"
+    },
+    {
+      id: "interface-signoff",
+      name: "接口联调与现场签字",
+      owner: "各级卫生健康行政部门 / 接口联调组",
+      status: evidenceCount >= 4 && interfaceCount >= 4 ? "watch" : "blocked",
+      evidence: `${interfaceCount} 条接口轨道 / ${evidenceCount} 项现场证据 / ${issueTotal} 项整改台账`,
+      nextAction: "补齐 HIS/EMR/LIS/PACS、医保、电子证照、统计直报和证照交换现场签字。",
+      boundary: "本系统只汇总签字状态，不替代外部系统联调验收。"
+    },
+    {
+      id: "operations-dr",
+      name: "监控告警与灾备演练",
+      owner: "platform-ops / data-platform",
+      status: "blocked",
+      evidence: "监控告警、值班升级、RTO/RPO、恢复演练",
+      nextAction: "绑定 /api/health、/api/metrics、告警路由、备份策略和恢复演练签字。",
+      boundary: "未完成监控和灾备演练前不得按连续运行系统上线。"
+    }
+  ];
+  const summary = {
+    total: gates.length,
+    ready: gates.filter((item) => item.status === "ready").length,
+    watch: gates.filter((item) => item.status === "watch").length,
+    blocked: gates.filter((item) => item.status === "blocked").length
+  };
+  return {
+    overallStatus: summary.blocked ? "blocked" : summary.watch ? "watch" : "ready",
+    summary,
+    items: gates,
+    boundary: "上线运行标准以正式环境、统一身份、审计留存、生产数据库、接口签字、监控告警和灾备演练全部闭环为准。"
+  };
+}
+
 function districtName(name) {
   return String(name || "").replace(/健康城市平台|卫生健康局|县域医共体/g, "").trim();
 }
@@ -880,6 +956,7 @@ function buildFunctionalReport(context) {
   const siteEvidencePackage = context.siteEvidencePackage || { summary: {}, items: [] };
   const jurisdictionScope = context.jurisdictionScope || { summary: {}, districts: [] };
   const actionClosureTrend = context.actionClosureTrend || { summary: {}, periods: [] };
+  const productionReadinessGate = context.productionReadinessGate || { overallStatus: "blocked", summary: {}, items: [] };
   const departmentFunctionMatrix = buildDepartmentFunctionMatrix(context);
   const cityCountyFunctionMatrix = buildCityCountyFunctionMatrix(context);
   const sourceRecords = applications.reduce((sum, item) => sum + Number(item.records || 0), 0);
@@ -971,6 +1048,13 @@ function buildFunctionalReport(context) {
       boundary: "发布报告呈现当前演示与联调状态，生产切换仍依赖现场签字。"
     },
     {
+      id: "production-readiness-gate",
+      name: "上线运行门禁",
+      status: productionReadinessGate.overallStatus === "ready" ? "ready" : "blocked",
+      evidence: `${productionReadinessGate.summary?.ready || 0}/${productionReadinessGate.summary?.total || 0} 项达到上线条件，${productionReadinessGate.summary?.blocked || 0} 项阻塞`,
+      boundary: "未完成正式环境、统一身份、审计留存、生产数据库、接口签字、监控告警和灾备演练前不得生产上线。"
+    },
+    {
       id: "site-evidence-package",
       name: "现场验收证据包",
       status: siteEvidencePackage.items?.length >= 4 ? "ready" : "watch",
@@ -1017,15 +1101,17 @@ function buildHealthDashboardSummary(options = {}) {
   const previewOpenActions = openActions.length;
   const interfaceRows = rows(data, "platformInterfaces");
   const evidenceRecords = rows(data, "platformEvidence").flatMap((item) => item.records || []);
-  const siteDependencies = rows(data, "productionDeploymentPlan").filter((item) => isOpen(item) || /missing|待|寰|blocked/i.test(JSON.stringify(item)));
+  const productionDeploymentPlan = rows(data, "productionDeploymentPlan");
+  const siteDependencies = productionDeploymentPlan.filter((item) => isOpen(item) || /missing|待|寰|blocked/i.test(JSON.stringify(item)));
   const populationServiceBoard = buildPopulationServiceBoard(data);
   const certificateExchange = buildCertificateExchangeChain(data);
   const riskDrilldowns = buildRiskDrilldowns(openActions);
   const siteEvidencePackage = buildSiteEvidencePackage(data, { interfaceRows, evidenceRecords, siteDependencies });
   const siteIssueLedger = buildSiteIssueLedger({ siteEvidencePackage, siteDependencies });
+  const productionReadinessGate = buildProductionReadinessGate(productionDeploymentPlan, { interfaceRows, siteEvidencePackage, siteIssueLedger });
   const jurisdictionScope = buildJurisdictionScope(data, { openActions, applications });
   const actionClosureTrend = buildActionClosureTrend(taskActions, { openActions });
-  const functionalReport = buildFunctionalReport({ applications, openActions, actionClosureTrend, populationServiceBoard, certificateExchange, riskDrilldowns, siteEvidencePackage, jurisdictionScope, interfaceRows, evidenceRecords, siteDependencies });
+  const functionalReport = buildFunctionalReport({ applications, openActions, actionClosureTrend, populationServiceBoard, certificateExchange, riskDrilldowns, siteEvidencePackage, jurisdictionScope, interfaceRows, evidenceRecords, siteDependencies, productionReadinessGate });
   const departmentFunctionMatrix = functionalReport.departmentFunctionMatrix || [];
   const cityCountyFunctionMatrix = functionalReport.cityCountyFunctionMatrix || [];
   const checks = [
@@ -1040,7 +1126,8 @@ function buildHealthDashboardSummary(options = {}) {
     { id: "dashboard:risk-drilldown", passed: riskDrilldowns.items.length >= 4 && riskDrilldowns.summary.withTrace === riskDrilldowns.items.length, detail: `${riskDrilldowns.items.length} risk drilldowns with trace` },
     { id: "dashboard:site-evidence-package", passed: siteEvidencePackage.items.length >= 4 && siteEvidencePackage.summary.ready >= 3, detail: `${siteEvidencePackage.items.length} evidence package artifacts` },
     { id: "dashboard:site-issue-ledger", passed: siteIssueLedger.summary.total >= 1 && siteIssueLedger.items.every((item) => item.owner && item.nextAction && item.boundary), detail: `${siteIssueLedger.summary.total} site issue rows` },
-    { id: "dashboard:functional-report", passed: functionalReport.functions.length >= 13 && functionalReport.releaseEvidence.length >= 4, detail: `${functionalReport.functions.length} module functions with release evidence` },
+    { id: "dashboard:production-readiness-gate", passed: productionReadinessGate.items.length >= 5 && productionReadinessGate.items.every((item) => item.owner && item.nextAction && item.boundary), detail: `${productionReadinessGate.summary.ready}/${productionReadinessGate.summary.total} production gates ready; ${productionReadinessGate.summary.blocked} blocked` },
+    { id: "dashboard:functional-report", passed: functionalReport.functions.length >= 14 && functionalReport.releaseEvidence.length >= 4, detail: `${functionalReport.functions.length} module functions with release evidence` },
     { id: "dashboard:jurisdiction-scope", passed: jurisdictionScope.districts.length >= 2 && jurisdictionScope.summary.institutions >= 3 && jurisdictionScope.institutionTypeOptions.length >= 2, detail: `${jurisdictionScope.summary.districts} districts, ${jurisdictionScope.summary.institutions} institutions, ${jurisdictionScope.summary.openActions} open actions` },
     { id: "dashboard:jurisdiction-detail", passed: jurisdictionScope.districts.some((item) => item.id !== "all" && (item.institutionsList?.length || item.serviceReportList?.length || item.actionList?.length)), detail: "district drilldown includes institution, service, or action detail" },
     { id: "dashboard:action-closure-trend", passed: actionClosureTrend.summary.total >= openActions.length && actionClosureTrend.periods.length === 4 && actionClosureTrend.applications.length >= 2, detail: `${actionClosureTrend.summary.closureRate}% closure, ${actionClosureTrend.summary.overdueRate}% overdue` },
@@ -1071,6 +1158,7 @@ function buildHealthDashboardSummary(options = {}) {
       interfaceTracks: interfaceRows.length,
       evidenceRecords: evidenceRecords.length,
       siteDependencies: siteDependencies.length,
+      productionReady: productionReadinessGate.overallStatus === "ready",
       runtimeRequests: runtime?.http?.apiRequests ?? null,
       readinessPassed: readiness?.passed ?? null,
       releasePassed: releaseReport?.ok ?? null
@@ -1089,6 +1177,7 @@ function buildHealthDashboardSummary(options = {}) {
     riskDrilldowns,
     siteEvidencePackage,
     siteIssueLedger,
+    productionReadinessGate,
     jurisdictionScope,
     actionClosureTrend,
     functionalReport,
@@ -1188,6 +1277,8 @@ function dashboardReportCheckLabel(checkId) {
     "dashboard:risk-drilldown": "风险下钻",
     "dashboard:risk-drilldowns": "风险下钻",
     "dashboard:site-evidence-package": "现场验收证据包",
+    "dashboard:site-issue-ledger": "现场问题整改台账",
+    "dashboard:production-readiness-gate": "上线运行门禁",
     "dashboard:functional-report": "主要功能报告",
     "dashboard:jurisdiction-scope": "辖区监管钻取",
     "dashboard:jurisdiction-detail": "区县监管详情",
@@ -1248,6 +1339,7 @@ function renderMarkdown(report) {
   const drilldownRows = (report.riskDrilldowns?.items || []).map((item) => `| ${dashboardReportPriorityLabel(item.priority)} | ${item.application || ""} | ${dashboardReportCollectionLabel(item.collection)} | ${dashboardReportOwnerLabel(item.owner)} | ${dashboardReportStatusLabel(item.status)} | ${String(item.blocker || "").replace(/\|/g, "/")} |`);
   const siteEvidenceRows = (report.siteEvidencePackage?.items || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.type || item.id} | ${dashboardReportEvidenceLabel(item.evidence || "").replace(/\|/g, "/")} | ${dashboardReportOwnerLabel(item.owner)} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`);
   const siteIssueRows = (report.siteIssueLedger?.items || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.category || item.id} | ${dashboardReportOwnerLabel(item.owner)} | ${dashboardReportEvidenceLabel(item.source || "").replace(/\|/g, "/")} | ${String(item.nextAction || "").replace(/\|/g, "/")} | ${String(item.boundary || "").replace(/\|/g, "/")} |`);
+  const productionGateRows = (report.productionReadinessGate?.items || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.name || item.id} | ${dashboardReportOwnerLabel(item.owner)} | ${String(item.evidence || "").replace(/\|/g, "/")} | ${String(item.nextAction || "").replace(/\|/g, "/")} | ${String(item.boundary || "").replace(/\|/g, "/")} |`);
   const functionRows = (report.functionalReport?.functions || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.name || item.id} | ${dashboardReportEvidenceLabel(item.evidence || "").replace(/\|/g, "/")} | ${String(item.boundary || "").replace(/\|/g, "/")} |`);
   const departmentRows = (report.functionalReport?.departmentFunctionMatrix || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.name || item.id} | ${(item.implemented || []).map((text) => String(text).replace(/\|/g, "/")).join("<br>")} | ${String(item.nextPlan || "").replace(/\|/g, "/")} |`);
   const cityCountyRows = (report.functionalReport?.cityCountyFunctionMatrix || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.level || ""} | ${item.agency || item.id} | ${(item.implemented || []).map((text) => String(text).replace(/\|/g, "/")).join("<br>")} | ${String(item.nextPlan || "").replace(/\|/g, "/")} |`);
@@ -1332,6 +1424,15 @@ function renderMarkdown(report) {
     "| 状态 | 类别 | 责任方 | 来源 | 下一步 | 边界 |",
     "|---|---|---|---|---|---|",
     ...siteIssueRows,
+    "",
+    "### 上线运行门禁",
+    "",
+    `- 总体状态：${dashboardReportStatusLabel(report.productionReadinessGate?.overallStatus || "blocked")}`,
+    report.productionReadinessGate?.boundary || "上线运行标准以正式环境、统一身份、审计留存、生产数据库、接口签字、监控告警和灾备演练全部闭环为准。",
+    "",
+    "| 状态 | 门禁 | 责任方 | 证据 | 下一步 | 边界 |",
+    "|---|---|---|---|---|---|",
+    ...productionGateRows,
     "",
     "## 主要功能报告",
     "",

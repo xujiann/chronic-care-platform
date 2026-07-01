@@ -116,6 +116,7 @@ function buildStaticDashboardSummary(state) {
   const riskDrilldowns = buildStaticRiskDrilldowns(openActions);
   const siteEvidencePackage = buildStaticSiteEvidencePackage(state, { interfaces, evidence, siteDependencies: dependencies });
   const siteIssueLedger = buildStaticSiteIssueLedger(siteEvidencePackage, dependencies);
+  const productionReadinessGate = buildDashboardProductionReadinessGate(dependencies, { interfaces, siteEvidencePackage, siteIssueLedger });
   const jurisdictionScope = buildDashboardJurisdictionScope(state, { openActions, applications: enrichedApplications });
   const actionClosureTrend = buildDashboardActionClosureTrend(taskActions, { openActions });
   const functionalReport = buildDashboardFunctionalReport({
@@ -130,7 +131,8 @@ function buildStaticDashboardSummary(state) {
     jurisdictionScope,
     interfaces,
     evidence,
-    siteDependencies: dependencies
+    siteDependencies: dependencies,
+    productionReadinessGate
   });
   return {
     ok: true,
@@ -147,7 +149,8 @@ function buildStaticDashboardSummary(state) {
       highRisks: openActions.filter((item) => item.priority === "high").length,
       interfaceTracks: interfaces.length,
       evidenceRecords: evidence.reduce((sum, item) => sum + (Array.isArray(item.records) ? item.records.length : 0), 0),
-      siteDependencies: dependencies.length
+      siteDependencies: dependencies.length,
+      productionReady: productionReadinessGate.overallStatus === "ready"
     },
     applications: enrichedApplications,
     risks,
@@ -156,6 +159,7 @@ function buildStaticDashboardSummary(state) {
     certificateExchange,
     riskDrilldowns,
     siteEvidencePackage,
+    productionReadinessGate,
     jurisdictionScope,
     actionClosureTrend,
     functionalReport,
@@ -437,6 +441,82 @@ function buildStaticSiteIssueLedger(siteEvidencePackage = {}, siteDependencies =
       owners: Array.from(new Set(items.map((item) => item.owner).filter(Boolean))).length
     },
     items
+  };
+}
+
+function buildDashboardProductionReadinessGate(productionDeploymentPlan = [], context = {}) {
+  const planRows = Array.isArray(productionDeploymentPlan) ? productionDeploymentPlan : [];
+  const byId = Object.fromEntries(planRows.map((item) => [item.id, item]));
+  const statusValue = (item) => String(item?.status || "").toLowerCase();
+  const isReady = (item) => ["ready", "done", "passed", "complete"].includes(statusValue(item));
+  const isBlocked = (item) => !item || ["planned", "blocked", "missing", "pending"].includes(statusValue(item));
+  const gateStatus = (items, fallback = "blocked") => {
+    const rows = items.filter(Boolean);
+    if (!rows.length) return fallback;
+    if (rows.every(isReady)) return "ready";
+    return rows.some(isBlocked) ? "blocked" : "watch";
+  };
+  const evidenceCount = Number(context.siteEvidencePackage?.summary?.artifacts || 0);
+  const issueTotal = Number(context.siteIssueLedger?.summary?.total || 0);
+  const interfaceCount = Array.isArray(context.interfaces) ? context.interfaces.length : 0;
+  const gates = [
+    {
+      id: "runtime-env",
+      name: "正式环境与密钥",
+      owner: byId["prod-env-gate"]?.owner || "platform-ops",
+      status: gateStatus([byId["prod-env-gate"]], "watch"),
+      evidence: (byId["prod-env-gate"]?.evidence || ["env:check", "release:report"]).join(" / "),
+      nextAction: "在目标服务器执行生产环境检查，确认 NODE_ENV、会话密钥、接口网关密钥和存储模式。",
+      boundary: "演示环境通过不等同于生产环境通过。"
+    },
+    {
+      id: "identity-audit",
+      name: "统一身份与审计留存",
+      owner: "identity-integration / security-admin",
+      status: gateStatus([byId["prod-identity-adapter"], byId["prod-audit-retention"]]),
+      evidence: "统一身份映射、哈希链审计、日志留存目标",
+      nextAction: "完成政务统一认证映射、审计日志导出目标和留存年限签字。",
+      boundary: "未完成身份源和审计留存前不得开放生产管理端。"
+    },
+    {
+      id: "data-storage",
+      name: "生产数据库与备份恢复",
+      owner: byId["prod-storage-adapter"]?.owner || "data-platform",
+      status: gateStatus([byId["prod-storage-adapter"]]),
+      evidence: "数据库适配、迁移演练、备份恢复报告",
+      nextAction: byId["prod-storage-adapter"]?.nextAction || "完成生产数据库适配、迁移、回滚和备份恢复演练。",
+      boundary: "JSON/SQLite 演示快照不能作为生产主存储验收。"
+    },
+    {
+      id: "interface-signoff",
+      name: "接口联调与现场签字",
+      owner: "各级卫生健康行政部门 / 接口联调组",
+      status: evidenceCount >= 4 && interfaceCount >= 4 ? "watch" : "blocked",
+      evidence: `${interfaceCount} 条接口轨道 / ${evidenceCount} 项现场证据 / ${issueTotal} 项整改台账`,
+      nextAction: "补齐 HIS/EMR/LIS/PACS、医保、电子证照、统计直报和证照交换现场签字。",
+      boundary: "本系统只汇总签字状态，不替代外部系统联调验收。"
+    },
+    {
+      id: "operations-dr",
+      name: "监控告警与灾备演练",
+      owner: "platform-ops / data-platform",
+      status: "blocked",
+      evidence: "监控告警、值班升级、RTO/RPO、恢复演练",
+      nextAction: "绑定 /api/health、/api/metrics、告警路由、备份策略和恢复演练签字。",
+      boundary: "未完成监控和灾备演练前不得按连续运行系统上线。"
+    }
+  ];
+  const summary = {
+    total: gates.length,
+    ready: gates.filter((item) => item.status === "ready").length,
+    watch: gates.filter((item) => item.status === "watch").length,
+    blocked: gates.filter((item) => item.status === "blocked").length
+  };
+  return {
+    overallStatus: summary.blocked ? "blocked" : summary.watch ? "watch" : "ready",
+    summary,
+    items: gates,
+    boundary: "上线运行标准以正式环境、统一身份、审计留存、生产数据库、接口签字、监控告警和灾备演练全部闭环为准。"
   };
 }
 
@@ -791,6 +871,7 @@ function buildDashboardFunctionalReport(context) {
   const siteEvidencePackage = context.siteEvidencePackage || { summary: {}, items: [] };
   const jurisdictionScope = context.jurisdictionScope || { summary: {}, districts: [] };
   const actionClosureTrend = context.actionClosureTrend || { summary: {}, periods: [] };
+  const productionReadinessGate = context.productionReadinessGate || { overallStatus: "blocked", summary: {}, items: [] };
   const departmentFunctionMatrix = buildDashboardDepartmentFunctionMatrix(context);
   const cityCountyFunctionMatrix = buildDashboardCityCountyFunctionMatrix(context);
   const sourceRecords = applications.reduce((sum, item) => sum + Number(item.records || 0), 0);
@@ -883,6 +964,13 @@ function buildDashboardFunctionalReport(context) {
       boundary: "生产切换仍依赖现场签字和正式环境配置。"
     },
     {
+      id: "production-readiness-gate",
+      name: "上线运行门禁",
+      status: productionReadinessGate.overallStatus === "ready" ? "ready" : "blocked",
+      evidence: `${productionReadinessGate.summary?.ready || 0}/${productionReadinessGate.summary?.total || 0} 项达到上线条件，${productionReadinessGate.summary?.blocked || 0} 项阻塞`,
+      boundary: "未完成正式环境、统一身份、审计留存、生产数据库、接口签字、监控告警和灾备演练前不得生产上线。"
+    },
+    {
       id: "site-evidence-package",
       name: "现场验收证据包",
       status: siteEvidencePackage.items?.length >= 4 ? "ready" : "watch",
@@ -972,6 +1060,7 @@ function renderDashboard(summary) {
   renderRiskDrilldowns(summary.riskDrilldowns || {});
   renderSiteEvidencePackage(summary.siteEvidencePackage || {});
   renderSiteIssueLedger(summary.siteIssueLedger || {});
+  renderProductionReadinessGate(summary.productionReadinessGate || {});
   renderFunctionReport(summary.functionalReport || {});
   renderJurisdictionWorkbench(summary.functionalReport || {});
   renderJurisdictionScope(summary.jurisdictionScope || {});
@@ -1249,6 +1338,28 @@ function renderSiteIssueLedger(ledger) {
     <p>${dashboardTechnicalLabel(item.nextAction || "")}</p>
     <p>${dashboardTechnicalLabel(item.boundary || "")}</p>
   </article>`).join("") || `<article class="site-issue-ledger-card empty"><strong>暂无匹配的现场整改问题</strong><p>切换其他状态查看，或等待现场联调产生新的整改记录。</p></article>`;
+}
+
+function renderProductionReadinessGate(gate) {
+  const board = document.querySelector("#production-readiness-board");
+  const summary = document.querySelector("#production-readiness-summary");
+  const list = document.querySelector("#production-readiness-list");
+  const boundary = document.querySelector("#production-readiness-boundary");
+  if (!board || !summary || !list) return;
+  const items = Array.isArray(gate.items) ? gate.items : [];
+  const counts = gate.summary || {};
+  board.dataset.productionStatus = gate.overallStatus || "blocked";
+  summary.textContent = `${dashboardStatusLabel(gate.overallStatus || "blocked")} / ${counts.ready || 0} 项就绪 / ${counts.watch || 0} 项关注 / ${counts.blocked || 0} 项阻塞`;
+  if (boundary) {
+    boundary.textContent = gate.boundary || "上线运行标准以正式环境、统一身份、审计留存、生产数据库、接口签字、监控告警和灾备演练全部闭环为准。";
+  }
+  list.innerHTML = items.map((item) => `<article class="production-readiness-card ${item.status || "blocked"}" data-production-gate="${item.id}" data-production-gate-status="${item.status || "blocked"}">
+    <span>${dashboardStatusLabel(item.status || "blocked")}</span>
+    <strong>${dashboardTechnicalLabel(item.name || item.id)}</strong>
+    <small>${dashboardTechnicalLabel(item.owner || "owner-pending")} / ${dashboardTechnicalLabel(item.evidence || "")}</small>
+    <p>${dashboardTechnicalLabel(item.nextAction || "")}</p>
+    <p>${dashboardTechnicalLabel(item.boundary || "")}</p>
+  </article>`).join("") || `<article class="production-readiness-card empty"><strong>等待上线门禁清单</strong><p>补齐生产部署计划、现场签字、监控和灾备演练记录后显示。</p></article>`;
 }
 
 function renderDataState(summary) {
