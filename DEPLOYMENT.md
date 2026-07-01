@@ -111,12 +111,13 @@ DATABASE_URL=postgres://health:replace-with-password@postgres.internal:5432/chro
 OIDC_ISSUER_URL=https://identity.example.gov.cn/real-issuer
 OIDC_CLIENT_ID=replace-with-oidc-client-id
 OIDC_CLIENT_SECRET=replace-with-oidc-client-secret
+SMS_GATEWAY_URL=https://sms.example.gov.cn/real-gateway
 AUDIT_EXPORT_PATH=/var/log/chronic-care-platform/audit
 SIEM_ENDPOINT=https://siem.example.gov.cn/ingest
 RETENTION_POLICY=10y-worm
 ```
 
-生产化如迁移 PostgreSQL 或正式数据库，需要先完成 `productionDeploymentPlan` 中的数据库适配器工作，再填入 `DATABASE_URL`；在适配器启用前，运行时和发布门禁会拒绝 `STORAGE_ENGINE=postgres/postgresql`，避免静默回落到 SQLite。接入政务统一认证时需要填入 `OIDC_ISSUER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET`；审计保全至少配置 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT`，并补充现场短信、CA、网关地址等变量。
+生产化如迁移 PostgreSQL 或正式数据库，需要先完成 `productionDeploymentPlan` 中的数据库适配器工作，再填入 `DATABASE_URL`；在适配器启用前，运行时和发布门禁会拒绝 `STORAGE_ENGINE=postgres/postgresql`，避免静默回落到 SQLite。接入政务统一认证时需要填入 `OIDC_ISSUER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET`；居民端验证码生产上线必须填入 `SMS_GATEWAY_URL`；审计保全至少配置 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT`，并补充现场 CA、网关地址等变量。
 
 生产环境上线前应执行严格环境校验：
 
@@ -124,7 +125,7 @@ RETENTION_POLICY=10y-worm
 npm.cmd run env:check:production
 ```
 
-该命令读取 `.env`，会拒绝缺失环境文件、占位密钥、过短密钥、`STORAGE_ENGINE=json` 和尚未启用的 `postgres/postgresql` 运行时适配器；生产模式还会要求 OIDC 身份适配和审计保全目标配置到位。
+该命令读取 `.env`，会拒绝缺失环境文件、占位密钥、过短密钥、`STORAGE_ENGINE=json` 和尚未启用的 `postgres/postgresql` 运行时适配器；生产模式还会要求 OIDC 身份适配、居民端短信网关和审计保全目标配置到位。
 
 `env:check:production` 和 `release:report` 还会输出 `cutoverChecklist` / `productionCutover`，按环境文件、生产密钥、统一身份、审计保全、存储适配、现场接口联调、医保/证照交换、监控值守和灾备演练列出责任方、阻断状态、当前证据和下一步动作。真实参数到位后，应先让环境与基础设施类通过，再进入外部接口联调和现场测评；外部系统项必须有 `CUTOVER_SITE_INTERFACE_SIGNOFF`、`CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF`、`CUTOVER_MONITORING_SIGNOFF`、`CUTOVER_DR_REHEARSAL_SIGNOFF` 等现场签字信号才会通过。
 

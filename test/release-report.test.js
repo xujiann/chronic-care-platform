@@ -32,6 +32,7 @@ test("release report validates demo and production environment profiles", () => 
   assert.equal(failedProduction.passed, false);
   assert.equal(failedProduction.checks.some((item) => item.name === "env:STORAGE_ENGINE.production" && !item.passed), true);
   assert.equal(failedProduction.checks.some((item) => item.name === "env:SESSION_SECRETS.productionQuality" && !item.passed), true);
+  assert.equal(failedProduction.checks.some((item) => item.name === "env:SMS.gateway" && !item.passed), true);
   assert.equal(failedProduction.cutoverChecklist.some((item) => item.id === "cutover-secrets" && !item.passed), true);
   assert.equal(failedProduction.cutoverChecklist.some((item) => item.id === "cutover-identity" && !item.passed), true);
 
@@ -46,6 +47,7 @@ test("release report validates demo and production environment profiles", () => 
       OIDC_ISSUER_URL: "https://identity.example.internal",
       OIDC_CLIENT_ID: "health-platform",
       OIDC_CLIENT_SECRET: "abcdef0123456789abcdef0123456789",
+      SMS_GATEWAY_URL: "https://sms.example.internal/send",
       AUDIT_EXPORT_PATH: "/var/log/chronic-care-platform/audit"
     }
   });
@@ -62,6 +64,7 @@ test("release report validates demo and production environment profiles", () => 
       OIDC_ISSUER_URL: "https://identity.example.internal",
       OIDC_CLIENT_ID: "health-platform",
       OIDC_CLIENT_SECRET: "abcdef0123456789abcdef0123456789",
+      SMS_GATEWAY_URL: "https://sms.example.internal/send",
       AUDIT_EXPORT_PATH: "/var/log/chronic-care-platform/audit"
     }
   });

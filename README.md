@@ -141,6 +141,7 @@ DATABASE_URL=postgres://health:replace-with-password@postgres.internal:5432/chro
 OIDC_ISSUER_URL=https://identity.example.gov.cn/real-issuer
 OIDC_CLIENT_ID=replace-with-oidc-client-id
 OIDC_CLIENT_SECRET=replace-with-oidc-client-secret
+SMS_GATEWAY_URL=https://sms.example.gov.cn/real-gateway
 AUDIT_EXPORT_PATH=/var/log/chronic-care-platform/audit
 SIEM_ENDPOINT=https://siem.example.gov.cn/ingest
 RETENTION_POLICY=10y-worm
@@ -151,7 +152,7 @@ RETENTION_POLICY=10y-worm
 - `STORAGE_ENGINE=auto` 会在 Node 支持 `node:sqlite` 时使用 SQLite，并继续维护 `data/db.json` 静态快照。
 - `SESSION_SECRETS` 支持逗号分隔多密钥，便于会话密钥轮换。
 - `INTEGRATION_GATEWAY_SECRET` 用于接口网关 HMAC 签名模拟。
-- `DATABASE_URL`、`OIDC_*`、`AUDIT_EXPORT_PATH`/`SIEM_ENDPOINT` 和 `RETENTION_POLICY` 是生产部署路径的正式数据库、政务身份和审计保全配置项。
+- `DATABASE_URL`、`OIDC_*`、`SMS_GATEWAY_URL`、`AUDIT_EXPORT_PATH`/`SIEM_ENDPOINT` 和 `RETENTION_POLICY` 是生产部署路径的正式数据库、政务身份、居民验证码短信网关和审计保全配置项。
 
 ## 验证与质量门禁
 
@@ -180,7 +181,7 @@ npm.cmd run hybrid:deployment-readiness
 
 `deploy:check` 会检查 README、部署文档、静态快照、P2 集合、P2 完成状态、P0 接口准备度、安全验收台账、环境脚本和关键 npm scripts；`deploy:check:full` 还会串行执行 `check`、`test`、`test:coverage`、`test:e2e` 和 `npm audit --omit=dev`。
 
-`env:check` 使用 `.env.example` 做演示/模板级校验，不要求真实密钥；`env:check:production` 会读取 `.env`，并按生产规则校验 `NODE_ENV=production`、非 JSON 存储、非占位且不少于 32 位的 `SESSION_SECRETS` 和 `INTEGRATION_GATEWAY_SECRET`。当前运行时正式支持 `STORAGE_ENGINE=auto` 或 `sqlite`；`postgres/postgresql` 仍在 `productionDeploymentPlan` 中作为后续适配项，配置后会被门禁拦截，避免静默回落。生产模式还要求政务身份 `OIDC_ISSUER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET` 与审计保全 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT` 至少一项可用。`env:check:production` 与 `release:report` 会附带生产切换清单，按环境文件、生产密钥、统一身份、审计保全、存储适配、现场接口联调、医保/证照交换、监控值守和灾备演练列出责任方、阻断状态和下一步动作；外部系统项必须有 `CUTOVER_SITE_INTERFACE_SIGNOFF`、`CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF`、`CUTOVER_MONITORING_SIGNOFF`、`CUTOVER_DR_REHEARSAL_SIGNOFF` 等现场签字信号才会通过。`release:report` 会汇总代码文件、关键 npm scripts、静态快照、P2 完成状态、接口准备度、安全验收、生产部署计划、验收证据和环境配置，默认输出 `release/release-report.json`、`release/release-report.md`、`release/production-cutover-checklist.json` 与 `release/production-cutover-checklist.md`；`release:manifest` 会生成 `release/release-artifact-manifest.json` 与 `release/release-artifact-manifest.md`，把所有发布报告、模板 README、生成命令和 API 证据整理成发布包目录清单；`release:report:full` 额外执行 `check`、`test`、`test:coverage`、`test:e2e`、`deploy:check` 和 `npm audit --omit=dev`。CI 会在每次检查中生成并上传 `release-readiness-report` artifact，便于发布取证。
+`env:check` 使用 `.env.example` 做演示/模板级校验，不要求真实密钥；`env:check:production` 会读取 `.env`，并按生产规则校验 `NODE_ENV=production`、非 JSON 存储、非占位且不少于 32 位的 `SESSION_SECRETS` 和 `INTEGRATION_GATEWAY_SECRET`。当前运行时正式支持 `STORAGE_ENGINE=auto` 或 `sqlite`；`postgres/postgresql` 仍在 `productionDeploymentPlan` 中作为后续适配项，配置后会被门禁拦截，避免静默回落。生产模式还要求政务身份 `OIDC_ISSUER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET`、居民验证码 `SMS_GATEWAY_URL` 与审计保全 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT` 至少一项可用。`env:check:production` 与 `release:report` 会附带生产切换清单，按环境文件、生产密钥、统一身份和短信网关、审计保全、存储适配、现场接口联调、医保/证照交换、监控值守和灾备演练列出责任方、阻断状态和下一步动作；外部系统项必须有 `CUTOVER_SITE_INTERFACE_SIGNOFF`、`CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF`、`CUTOVER_MONITORING_SIGNOFF`、`CUTOVER_DR_REHEARSAL_SIGNOFF` 等现场签字信号才会通过。`release:report` 会汇总代码文件、关键 npm scripts、静态快照、P2 完成状态、接口准备度、安全验收、生产部署计划、验收证据和环境配置，默认输出 `release/release-report.json`、`release/release-report.md`、`release/production-cutover-checklist.json` 与 `release/production-cutover-checklist.md`；`release:manifest` 会生成 `release/release-artifact-manifest.json` 与 `release/release-artifact-manifest.md`，把所有发布报告、模板 README、生成命令和 API 证据整理成发布包目录清单；`release:report:full` 额外执行 `check`、`test`、`test:coverage`、`test:e2e`、`deploy:check` 和 `npm audit --omit=dev`。CI 会在每次检查中生成并上传 `release-readiness-report` artifact，便于发布取证。
 
 `release:report` 同时输出 `release/storage-model-inspection.json` 与 `release/storage-model-inspection.md`，记录 JSON 快照集合数、记录量、最大集合，以及 SQLite 表、schema 版本和迁移元数据；SQLite 文件在干净 checkout 中不存在时只作为提示，不阻断 CI。`production-db:readiness` 会生成 `release/production-db-readiness-report.json` 与 `release/production-db-readiness-report.md`，把 PostgreSQL/正式数据库切换前的 `productionDeploymentPlan`、当前 SQLite/JSON 模型、备份恢复演练文档、RTO/RPO 说明和运行时 PostgreSQL 阻断汇总为专项证据包。
 

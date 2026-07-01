@@ -115,9 +115,9 @@ function buildProductionCutoverChecklist(env, checks = []) {
       id: "cutover-identity",
       phase: "identity",
       owner: "identity-integration",
-      passed: ready("env:OIDC.identityAdapter"),
-      evidence: detail("env:OIDC.identityAdapter"),
-      nextAction: "确认政务统一认证 OIDC/SAML 参数、客户端密钥、回调地址、机构目录和医生身份源映射。"
+      passed: ready("env:OIDC.identityAdapter", "env:SMS.gateway"),
+      evidence: detail("env:OIDC.identityAdapter", "env:SMS.gateway"),
+      nextAction: "确认政务统一认证 OIDC/SAML 参数、客户端密钥、回调地址、机构目录、医生身份源映射和居民端真实短信网关。"
     },
     {
       id: "cutover-audit-retention",
@@ -207,6 +207,7 @@ function validateProductionConfig(options = {}) {
       check("env:STORAGE_ENGINE.runtimeAdapter", ["auto", "sqlite"].includes(storageEngine), ["auto", "sqlite"].includes(storageEngine) ? storageEngine : `${storageEngine} adapter not enabled`, "error", "environment"),
       check("env:DATABASE_URL.requiredForPostgres", !["postgres", "postgresql"].includes(storageEngine) || Boolean(env.DATABASE_URL), env.DATABASE_URL ? "configured" : "missing", "error", "environment"),
       check("env:OIDC.identityAdapter", Boolean(env.OIDC_ISSUER_URL && env.OIDC_CLIENT_ID && env.OIDC_CLIENT_SECRET), env.OIDC_ISSUER_URL && env.OIDC_CLIENT_ID && env.OIDC_CLIENT_SECRET ? "configured" : "missing OIDC_ISSUER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET", "error", "environment"),
+      check("env:SMS.gateway", Boolean(env.SMS_GATEWAY_URL), env.SMS_GATEWAY_URL ? "configured" : "missing SMS_GATEWAY_URL", "error", "environment"),
       check("env:AUDIT.retentionTarget", Boolean(env.AUDIT_EXPORT_PATH || env.SIEM_ENDPOINT), env.AUDIT_EXPORT_PATH || env.SIEM_ENDPOINT ? "configured" : "missing AUDIT_EXPORT_PATH or SIEM_ENDPOINT", "error", "environment")
     );
   }
