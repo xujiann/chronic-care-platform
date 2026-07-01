@@ -4466,6 +4466,7 @@ function normalizeState(data) {
   refreshDemoAppointmentDates(state);
   refreshDeathStatistics(state);
   refreshBirthStatistics(state);
+  scrubQuestionPlaceholderText(state);
   return normalizePersonIndexes(state);
 }
 
@@ -4537,6 +4538,49 @@ function cleanPlatformEvidenceText(items) {
       status: cleanVisibleDataText(recordItem.status, "\u5df2\u5efa\u6863")
     }))
   }));
+}
+
+const QUESTION_PLACEHOLDER_FALLBACKS = {
+  action: "\u72b6\u6001\u66f4\u65b0\u4e3a \u5df2\u5efa\u6863",
+  body: "\u4e0a\u7ebf\u9a8c\u6536\u901a\u77e5\u5df2\u9001\u8fbe",
+  certificateVersion: "\u7b2c\u4e03\u7248",
+  compensation: "\u6309\u534f\u8bae\u7ed3\u7b97",
+  detail: "\u4e0a\u7ebf\u9a8c\u6536\u8bb0\u5f55\u5df2\u8865\u9f50",
+  hospitalReviewOpinion: "\u6750\u6599\u9f50\u5168\uff0c\u540c\u610f\u5907\u6848",
+  insurance: "\u533b\u7597\u8d23\u4efb\u4fdd\u9669\u5df2\u8986\u76d6",
+  issueType: "\u9996\u6b21\u7b7e\u53d1",
+  issuingInstitution: "\u5927\u8fde\u5e02\u4e2d\u5fc3\u533b\u9662",
+  issuingPhysician: "\u738b\u533b\u751f",
+  newbornName: "\u6f14\u793a\u65b0\u751f\u513f",
+  nextService: "\u5987\u5e7c\u5065\u5eb7\u968f\u8bbf",
+  note: "\u4e0a\u7ebf\u9a8c\u6536\u8bb0\u5f55\u5df2\u8865\u9f50",
+  primaryConsent: "\u5df2\u786e\u8ba4",
+  responsibility: "\u4f9d\u6cd5\u6267\u4e1a\u5e76\u63a5\u53d7\u53cc\u673a\u6784\u7ba1\u7406",
+  schedule: "\u6bcf\u5468\u4e8c\u4e0a\u5348",
+  status: "\u5df2\u5efa\u6863",
+  targetDepartment: "\u5168\u79d1\u533b\u5b66\u79d1",
+  targetInstitution: "\u5927\u8fde\u5e02\u4e2d\u5fc3\u533b\u9662",
+  targetOrgName: "\u5927\u8fde\u5e02\u4e2d\u5fc3\u533b\u9662",
+  tasks: "\u95e8\u8bca\u3001\u4f1a\u8bca\u4e0e\u5065\u5eb7\u5ba3\u6559"
+};
+
+function hasQuestionPlaceholder(value) {
+  return typeof value === "string" && (value.includes("???") || /^\?+$/.test(value.trim()));
+}
+
+function fallbackForQuestionPlaceholder(key) {
+  return QUESTION_PLACEHOLDER_FALLBACKS[key] || "\u5df2\u6838\u9a8c";
+}
+
+function scrubQuestionPlaceholderText(value, key = "") {
+  if (typeof value === "string") return hasQuestionPlaceholder(value) ? fallbackForQuestionPlaceholder(key) : value;
+  if (Array.isArray(value)) return value.map((item) => scrubQuestionPlaceholderText(item, key));
+  if (value && typeof value === "object") {
+    Object.entries(value).forEach(([childKey, childValue]) => {
+      value[childKey] = scrubQuestionPlaceholderText(childValue, childKey);
+    });
+  }
+  return value;
 }
 
 function restoreCorruptedStrings(defaultValue, currentValue) {
