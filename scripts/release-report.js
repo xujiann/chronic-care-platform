@@ -6,6 +6,7 @@ const { buildAuditRetentionReport, renderMarkdown: renderAuditRetentionMarkdown 
 const { buildChronicFollowupReadinessReport, renderMarkdown: renderChronicFollowupMarkdown } = require("./chronic-followup-readiness");
 const { buildChronicInstitutionInterfaceReport, renderMarkdown: renderChronicInstitutionInterfaceMarkdown } = require("./chronic-institution-interfaces");
 const { buildChronicLaunchCoreReport, renderMarkdown: renderChronicLaunchCoreMarkdown } = require("./chronic-launch-core");
+const { buildCitizenLaunchFoundationReadiness, renderMarkdown: renderCitizenLaunchFoundationMarkdown } = require("./citizen-launch-foundation-readiness");
 const { buildDataQualityReport, renderMarkdown: renderDataQualityMarkdown } = require("./data-quality-report");
 const { buildDrugConsumableReadinessReport, renderMarkdown: renderDrugConsumableMarkdown } = require("./drug-consumable-readiness");
 const { buildEvaluationEvidenceReport, renderMarkdown: renderEvaluationEvidenceMarkdown } = require("./evaluation-evidence");
@@ -298,10 +299,13 @@ function identityContractChecks(identityContract) {
 }
 
 function auditRetentionChecks(auditRetention) {
+  const retentionTargetDetail = (auditRetention.retentionTargets || [])
+    .map((item) => `${item.env}:${item.configured ? "configured" : "missing"}`)
+    .join(";") || "no retention targets declared";
   return [
     check("audit:retention", auditRetention.ok, auditRetention.ok ? "audit retention checks passed" : "audit retention checks failed", "error", "audit"),
     check("audit:exportDigest", Boolean(auditRetention.exportDigest), auditRetention.exportDigest || "missing", "error", "audit"),
-    check("audit:retentionTargetConfigured", auditRetention.retentionTargets?.some((item) => item.configured), "production target is required during site cutover", "warn", "audit")
+    check("audit:retentionTargetConfigured", auditRetention.retentionTargets?.some((item) => item.configured), retentionTargetDetail, "warn", "audit")
   ];
 }
 
@@ -472,7 +476,8 @@ function escortServiceChecks(escortServiceReadiness) {
   return [
     check("escortService:readiness", escortServiceReadiness.ok, escortServiceReadiness.ok ? "escort service readiness checks passed" : "escort service readiness checks failed", "error", "escort"),
     check("escortService:registry", escortServiceReadiness.summary?.providers >= 3 && escortServiceReadiness.summary?.trainedWorkers >= 3, `${escortServiceReadiness.summary?.providers || 0} providers / ${escortServiceReadiness.summary?.trainedWorkers || 0} trained workers`, "error", "escort"),
-    check("escortService:riskQuality", escortServiceReadiness.checks?.some((item) => item.id === "escort:riskQuality" && item.passed), "risk queue and quality callback evidence present", "error", "escort")
+    check("escortService:riskQuality", escortServiceReadiness.checks?.some((item) => item.id === "escort:riskQuality" && item.passed), "risk queue and quality callback evidence present", "error", "escort"),
+    check("escortService:citizenProviderAvailability", escortServiceReadiness.checks?.some((item) => item.id === "escort:citizenProviderAvailability" && item.passed), "citizen booking is guarded when no published provider is available", "error", "escort")
   ];
 }
 
@@ -481,6 +486,15 @@ function internetNursingChecks(internetNursingReadiness) {
     check("internetNursing:readiness", internetNursingReadiness.ok, internetNursingReadiness.ok ? "internet nursing readiness checks passed" : "internet nursing readiness checks failed", "error", "internet-nursing"),
     check("internetNursing:qualification", internetNursingReadiness.summary?.qualifiedNurses >= 2, `${internetNursingReadiness.summary?.qualifiedNurses || 0}/${internetNursingReadiness.summary?.nurses || 0} qualified nurses`, "error", "internet-nursing"),
     check("internetNursing:riskTrace", internetNursingReadiness.checks?.some((item) => item.id === "nursing:riskTrace" && item.passed), "risk queue and location tracking evidence present", "error", "internet-nursing")
+  ];
+}
+
+function citizenLaunchFoundationChecks(citizenLaunchFoundation) {
+  return [
+    check("citizenLaunch:readiness", citizenLaunchFoundation.ok, citizenLaunchFoundation.ok ? "citizen launch foundation checks passed" : "citizen launch foundation checks failed", "error", "citizen-launch"),
+    check("citizenLaunch:phoneCodeDelivery", citizenLaunchFoundation.checks?.some((item) => item.id === "citizen-foundation:phone-code-delivery" && item.passed), "phone-code delivery exposes send action, cooldown, expiry, and demo gateway evidence", "error", "citizen-launch"),
+    check("citizenLaunch:offlineCache", citizenLaunchFoundation.checks?.some((item) => item.id === "citizen-foundation:offline-cache" && item.passed), "resident PWA shell refreshes HTML/JS/CSS from network first", "error", "citizen-launch"),
+    check("citizenLaunch:externalDependencies", citizenLaunchFoundation.externalDependencies?.every((item) => item.status === "required-before-production"), `${citizenLaunchFoundation.externalDependencies?.length || 0} production dependencies surfaced`, "error", "citizen-launch")
   ];
 }
 
@@ -695,6 +709,12 @@ function buildReleaseReport(options = {}) {
   const referralTeleconsultationReadiness = buildReferralTeleconsultationReadinessReport({ data, pkg });
   const escortServiceReadiness = buildEscortServiceReadinessReport({ data, pkg });
   const internetNursingReadiness = buildInternetNursingReadinessReport({ data, pkg });
+  const citizenLaunchFoundation = buildCitizenLaunchFoundationReadiness({
+    pkg,
+    phaseDoc: fs.existsSync(path.join(ROOT, "docs", "citizen-launch-foundation-plan.md"))
+      ? fs.readFileSync(path.join(ROOT, "docs", "citizen-launch-foundation-plan.md"), "utf8")
+      : ""
+  });
   const operationsReadiness = buildOperationsReadinessReport({ data, pkg });
   const processAudit = buildProcessAuditReport({ data });
   const serviceAcceptance = buildServiceAcceptanceSummary(data);
@@ -732,6 +752,7 @@ function buildReleaseReport(options = {}) {
     ...referralTeleconsultationChecks(referralTeleconsultationReadiness),
     ...escortServiceChecks(escortServiceReadiness),
     ...internetNursingChecks(internetNursingReadiness),
+    ...citizenLaunchFoundationChecks(citizenLaunchFoundation),
     ...operationsReadinessChecks(operationsReadiness),
     ...processAuditChecks(processAudit),
     ...serviceAcceptanceChecks(serviceAcceptance),
@@ -781,6 +802,7 @@ function buildReleaseReport(options = {}) {
     referralTeleconsultationReadiness,
     escortServiceReadiness,
     internetNursingReadiness,
+    citizenLaunchFoundation,
     operationsReadiness,
     processAudit,
     serviceAcceptance,
@@ -996,6 +1018,10 @@ function renderMarkdown(report) {
     "## Internet nursing readiness report",
     "",
     "See `internet-nursing-readiness-report.json` and `internet-nursing-readiness-report.md` for resident appointment, hospital assessment and dispatch, nurse acceptance, location trace, service record, quality callback, and policy evidence.",
+    "",
+    "## Citizen launch foundation readiness report",
+    "",
+    "See `citizen-launch-foundation-readiness.json` and `citizen-launch-foundation-readiness.md` for resident phone-code delivery, PWA/app shell refresh, mini-program/app routing, and production SMS, real-name, guardian, HTTPS, signing, push, and monitoring dependencies.",
     "",
     "## Production database readiness report",
     "",
@@ -1234,6 +1260,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       internetNursingReadiness: report.internetNursingReadiness
     }, null, 2), "utf8");
+    const citizenLaunchFoundationJson = path.join(path.dirname(output), "citizen-launch-foundation-readiness.json");
+    fs.writeFileSync(citizenLaunchFoundationJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      citizenLaunchFoundation: report.citizenLaunchFoundation
+    }, null, 2), "utf8");
     const productionDbJson = path.join(path.dirname(output), "production-db-readiness-report.json");
     fs.writeFileSync(productionDbJson, JSON.stringify({
       project: report.project,
@@ -1359,6 +1393,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(escortServiceMarkdown, renderEscortServiceMarkdown(report.escortServiceReadiness), "utf8");
     const internetNursingMarkdown = path.join(path.dirname(markdown), "internet-nursing-readiness-report.md");
     fs.writeFileSync(internetNursingMarkdown, renderInternetNursingMarkdown(report.internetNursingReadiness), "utf8");
+    const citizenLaunchFoundationMarkdown = path.join(path.dirname(markdown), "citizen-launch-foundation-readiness.md");
+    fs.writeFileSync(citizenLaunchFoundationMarkdown, renderCitizenLaunchFoundationMarkdown(report.citizenLaunchFoundation), "utf8");
     const productionDbMarkdown = path.join(path.dirname(markdown), "production-db-readiness-report.md");
     fs.writeFileSync(productionDbMarkdown, renderProductionDbReadinessMarkdown(report.productionDbReadiness), "utf8");
     const evaluationMarkdown = path.join(path.dirname(markdown), "evaluation-evidence-report.md");

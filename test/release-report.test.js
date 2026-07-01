@@ -79,6 +79,23 @@ test("release report validates demo and production environment profiles", () => 
   assert.equal(missingEnvFile.checks.some((item) => item.name === "env:file" && !item.passed), true);
 });
 
+test("release report shows configured audit retention target detail", () => {
+  const report = buildReleaseReport({
+    profile: "demo",
+    env: {
+      NODE_ENV: "production",
+      STORAGE_ENGINE: "auto",
+      SESSION_SECRETS: "replace-with-long-random-secret",
+      INTEGRATION_GATEWAY_SECRET: "replace-with-integration-secret",
+      AUDIT_EXPORT_PATH: "/var/log/chronic-care-platform/audit"
+    }
+  });
+  const check = report.checks.find((item) => item.name === "audit:retentionTargetConfigured");
+  assert.equal(check.passed, true);
+  assert.match(check.detail, /AUDIT_EXPORT_PATH:configured/);
+  assert.match(check.detail, /SIEM_ENDPOINT:missing/);
+});
+
 test("release report summarizes repository readiness and renders markdown", () => {
   const report = buildReleaseReport({
     profile: "demo",
@@ -126,6 +143,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.monitoringReadiness.ok, true);
   assert.equal(report.checks.some((item) => item.name === "referralTeleconsultation:readiness" && item.passed), true);
   assert.equal(report.referralTeleconsultationReadiness.ok, true);
+  assert.equal(report.checks.some((item) => item.name === "escortService:citizenProviderAvailability" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "operations:readiness" && item.passed), true);
   assert.equal(report.operationsReadiness.ok, true);
   assert.equal(report.checks.some((item) => item.name === "process:audit" && item.passed), true);
@@ -153,6 +171,10 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "priorityApps:acceptanceGates" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "maternalChild:riskMetrics" && item.passed), true);
   assert.deepEqual(Object.keys(report.maternalChildReadiness.summary.riskMetrics), ["pendingPublicSecuritySync", "pendingMaternalChildSync", "qualityPending"]);
+  assert.equal(report.checks.some((item) => item.name === "citizenLaunch:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "citizenLaunch:phoneCodeDelivery" && item.passed), true);
+  assert.equal(report.citizenLaunchFoundation.ok, true);
+  assert.equal(report.citizenLaunchFoundation.checks.some((item) => item.id === "citizen-foundation:phone-code-delivery" && item.passed), true);
   assert.equal(report.priorityApplicationTemplates.templates.every((item) => item.conversationStarter && item.implementationChecklist.length >= 8 && item.acceptanceGate.readyWhen.length >= 4), true);
   assert.equal(report.priorityApplicationTemplates.templates.every((item) => item.implementationChecklist.some((step) => /Follow Codex loop/.test(step))), true);
   assert.equal(report.environmentMatrix.profiles.some((item) => item.id === "staging"), true);
@@ -176,6 +198,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(markdown, /Monitoring readiness report/);
   assert.match(markdown, /Referral teleconsultation readiness report/);
   assert.match(markdown, /Operations readiness report/);
+  assert.match(markdown, /Citizen launch foundation readiness report/);
   assert.match(markdown, /Full process audit report/);
   assert.match(markdown, /Service acceptance summary/);
   assert.match(markdown, /service:chronicDomains/);
@@ -277,6 +300,8 @@ test("release report writes standalone production cutover and storage artifacts"
   const monitoringMarkdown = fs.readFileSync(path.join(outputDir, "monitoring-readiness-report.md"), "utf8");
   const referralJson = JSON.parse(fs.readFileSync(path.join(outputDir, "referral-teleconsultation-readiness-report.json"), "utf8"));
   const referralMarkdown = fs.readFileSync(path.join(outputDir, "referral-teleconsultation-readiness-report.md"), "utf8");
+  const citizenLaunchJson = JSON.parse(fs.readFileSync(path.join(outputDir, "citizen-launch-foundation-readiness.json"), "utf8"));
+  const citizenLaunchMarkdown = fs.readFileSync(path.join(outputDir, "citizen-launch-foundation-readiness.md"), "utf8");
   const operationsJson = JSON.parse(fs.readFileSync(path.join(outputDir, "operations-readiness-report.json"), "utf8"));
   const operationsMarkdown = fs.readFileSync(path.join(outputDir, "operations-readiness-report.md"), "utf8");
   const processAuditJson = JSON.parse(fs.readFileSync(path.join(outputDir, "process-audit-report.json"), "utf8"));
@@ -329,6 +354,9 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(monitoringMarkdown, /SLO targets/);
   assert.equal(referralJson.referralTeleconsultationReadiness.ok, true);
   assert.match(referralMarkdown, /Referral teleconsultation readiness report/);
+  assert.equal(citizenLaunchJson.citizenLaunchFoundation.ok, true);
+  assert.match(citizenLaunchMarkdown, /Citizen launch foundation readiness/);
+  assert.match(citizenLaunchMarkdown, /phone-code delivery/);
   assert.equal(operationsJson.operationsReadiness.ok, true);
   assert.match(operationsMarkdown, /External dependency risks/);
   assert.equal(processAuditJson.processAudit.ok, true);
