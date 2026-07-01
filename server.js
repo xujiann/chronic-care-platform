@@ -4234,11 +4234,27 @@ function buildOperationsPostCutoverEvidenceProgress(items, windows) {
   const evidenceTotal = windows.reduce((sum, item) => sum + (Array.isArray(item.requiredEvidence) ? item.requiredEvidence.length : 0), 0);
   const observedItems = items.filter((item) => item.status === "已观察").length;
   const evidenceReady = evidenceTotal && items.length ? Math.min(evidenceTotal, Math.round((evidenceTotal * observedItems) / items.length)) : 0;
+  let remainingReady = evidenceReady;
+  const windowsWithProgress = windows.map((item) => {
+    const windowTotal = Array.isArray(item.requiredEvidence) ? item.requiredEvidence.length : 0;
+    const windowReady = Math.min(windowTotal, Math.max(0, remainingReady));
+    remainingReady -= windowReady;
+    return {
+      ...item,
+      evidenceReady: windowReady,
+      evidencePending: Math.max(0, windowTotal - windowReady),
+      completionRate: windowTotal ? Math.round((windowReady / windowTotal) * 100) : 0,
+      status: windowReady >= windowTotal && windowTotal > 0 ? "已完成" : windowReady > 0 ? "观察中" : "待观察"
+    };
+  });
   return {
-    evidenceTotal,
-    evidenceReady,
-    evidencePending: Math.max(0, evidenceTotal - evidenceReady),
-    completionRate: evidenceTotal ? Math.round((evidenceReady / evidenceTotal) * 100) : 0
+    windows: windowsWithProgress,
+    summary: {
+      evidenceTotal,
+      evidenceReady,
+      evidencePending: Math.max(0, evidenceTotal - evidenceReady),
+      completionRate: evidenceTotal ? Math.round((evidenceReady / evidenceTotal) * 100) : 0
+    }
   };
 }
 
@@ -4351,7 +4367,7 @@ function buildOperationsPostCutoverObservation({
     ok: items.length > 0 && items.every((item) => item.status === "已观察" || item.priority !== "高"),
     generatedAt: new Date().toISOString(),
     watchWindow: "T+0 2小时、T+0 8小时、T+1 24小时",
-    windows,
+    windows: evidenceProgress.windows,
     summary: {
       total: items.length,
       abnormal: items.filter((item) => item.priority === "高").length,
@@ -4359,7 +4375,7 @@ function buildOperationsPostCutoverObservation({
       observed: items.filter((item) => item.status === "已观察").length,
       auditEvents: auditRows.filter((item) => String(item.process || "").includes("上线后观察")).length,
       securityEvents: eventRows.filter((item) => String(item.action || "").includes("post-cutover")).length,
-      ...evidenceProgress
+      ...evidenceProgress.summary
     },
     items,
     evidence: ["/api/operations/post-cutover-observation", "/api/operations/post-cutover-observation/actions", "platformProcessAudit", "securityEvents"]

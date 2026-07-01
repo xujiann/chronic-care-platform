@@ -503,11 +503,27 @@ function buildPostCutoverEvidenceProgress(items, windows) {
   const evidenceTotal = windows.reduce((sum, item) => sum + (Array.isArray(item.requiredEvidence) ? item.requiredEvidence.length : 0), 0);
   const observedItems = items.filter((item) => item.status === "已观察").length;
   const evidenceReady = evidenceTotal && items.length ? Math.min(evidenceTotal, Math.round((evidenceTotal * observedItems) / items.length)) : 0;
+  let remainingReady = evidenceReady;
+  const windowsWithProgress = windows.map((item) => {
+    const windowTotal = Array.isArray(item.requiredEvidence) ? item.requiredEvidence.length : 0;
+    const windowReady = Math.min(windowTotal, Math.max(0, remainingReady));
+    remainingReady -= windowReady;
+    return {
+      ...item,
+      evidenceReady: windowReady,
+      evidencePending: Math.max(0, windowTotal - windowReady),
+      completionRate: windowTotal ? Math.round((windowReady / windowTotal) * 100) : 0,
+      status: windowReady >= windowTotal && windowTotal > 0 ? "已完成" : windowReady > 0 ? "观察中" : "待观察"
+    };
+  });
   return {
-    evidenceTotal,
-    evidenceReady,
-    evidencePending: Math.max(0, evidenceTotal - evidenceReady),
-    completionRate: evidenceTotal ? Math.round((evidenceReady / evidenceTotal) * 100) : 0
+    windows: windowsWithProgress,
+    summary: {
+      evidenceTotal,
+      evidenceReady,
+      evidencePending: Math.max(0, evidenceTotal - evidenceReady),
+      completionRate: evidenceTotal ? Math.round((evidenceReady / evidenceTotal) * 100) : 0
+    }
   };
 }
 
@@ -538,7 +554,7 @@ function buildStaticPostCutoverObservation(snapshots, dispatchRequests, reconcil
   return {
     ok: items.length > 0 && items.every((item) => item.status === "已观察" || item.priority !== "高"),
     watchWindow: "T+0 2小时、T+0 8小时、T+1 24小时",
-    windows,
+    windows: evidenceProgress.windows,
     summary: {
       total: items.length,
       abnormal: items.filter((item) => item.priority === "高").length,
@@ -546,7 +562,7 @@ function buildStaticPostCutoverObservation(snapshots, dispatchRequests, reconcil
       observed: items.filter((item) => item.status === "已观察").length,
       auditEvents: processAudit.filter((item) => String(item.process || "").includes("上线后观察")).length,
       securityEvents: securityEvents.filter((item) => String(item.action || "").includes("post-cutover")).length,
-      ...evidenceProgress
+      ...evidenceProgress.summary
     },
     items,
     evidence: ["/api/operations/post-cutover-observation", "/api/operations/post-cutover-observation/actions", "platformProcessAudit", "securityEvents"]
@@ -1815,7 +1831,7 @@ function renderPostCutoverObservation(postCutoverObservation) {
       <span>${postCutoverObservation.summary?.observed || 0}/${postCutoverObservation.summary?.total || 0} 项已观察，${postCutoverObservation.summary?.abnormal || 0} 项异常，证据完成 ${postCutoverObservation.summary?.completionRate || 0}%</span>
       <small>观察窗口：${zhInline(postCutoverObservation.watchWindow)}；待补证据 ${postCutoverObservation.summary?.evidencePending || 0} 项；证据：${evidenceList(postCutoverObservation.evidence)}</small>
       <div class="operation-observation-windows">
-        ${(postCutoverObservation.windows || []).map((windowItem) => `<span title="${htmlAttribute(`${windowItem.focus}；证据：${zhList(windowItem.requiredEvidence || [])}`)}">${zhInline(windowItem.name)} / ${zhInline(windowItem.owner)} / ${(windowItem.requiredEvidence || []).length}项证据</span>`).join("")}
+        ${(postCutoverObservation.windows || []).map((windowItem) => `<span title="${htmlAttribute(`${windowItem.focus}；证据：${zhList(windowItem.requiredEvidence || [])}`)}">${zhInline(windowItem.name)} / ${zhInline(windowItem.owner)} / ${zhInline(windowItem.status)} / ${(windowItem.requiredEvidence || []).length}项证据 / 完成${windowItem.completionRate || 0}% / 待补${windowItem.evidencePending || 0}项</span>`).join("")}
       </div>
     </article>
     ${items.map((item) => `
@@ -1867,13 +1883,14 @@ async function submitPostCutoverObservation(itemId) {
     const rows = operationsDashboard.postCutoverObservation.items || [];
     const windows = operationsDashboard.postCutoverObservation.windows || [];
     const evidenceProgress = buildPostCutoverEvidenceProgress(rows, windows);
+    operationsDashboard.postCutoverObservation.windows = evidenceProgress.windows;
     operationsDashboard.postCutoverObservation.summary = {
       ...(operationsDashboard.postCutoverObservation.summary || {}),
       observed: rows.filter((row) => row.status === "已观察").length,
       abnormal: rows.filter((row) => row.priority === "高").length,
       watching: rows.filter((row) => row.status === "观察中" || row.status === "异常待处置").length,
       total: rows.length,
-      ...evidenceProgress
+      ...evidenceProgress.summary
     };
   }
   renderPostCutoverObservation(operationsDashboard.postCutoverObservation || {});
