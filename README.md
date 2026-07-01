@@ -300,6 +300,8 @@ The module uses `GET /api/internet-nursing/dashboard`, `POST /api/internet-nursi
 The handoff document is `docs/互联网护理服务模块说明.md`; it covers role entries, data objects, API permissions, risk controls, workflow diagram, and acceptance evidence.
 
 `npm.cmd run internet-nursing:readiness` generates `release/internet-nursing-readiness-report.json` and `release/internet-nursing-readiness-report.md`, checking the Liaoning pilot policy boundary, institution registry, nurse qualification, order evidence, API guard, three-role frontend, and release script.
+
+`npm.cmd run citizen:launch-foundation` generates `release/citizen-launch-foundation-readiness.json` and `release/citizen-launch-foundation-readiness.md`; `release:report` includes the same resident phone-code login, PWA/mobile shell, mini-program/APP routing, and production dependency gates.
 ## Drug Consumable Supervision Evidence
 
 `drug-consumable:readiness` generates `release/drug-consumable-readiness-report.json` and `release/drug-consumable-readiness-report.md`, covering rational medication, prescription review, fixed pickup, high-value consumable clues, insurance settlement coordination, and remediation-loop evidence for the drug and consumable supervision app.
