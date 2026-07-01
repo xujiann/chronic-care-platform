@@ -388,6 +388,11 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(about, /data-quality-safety-about="core-systems-matrix"/);
   assert.match(about, /data-quality-safety-about="joint-testing"/);
   assert.match(about, /data-quality-safety-about="login-departments"/);
+  assert.match(about, /data-quality-safety-about="prelaunch-gaps"/);
+  assert.match(about, /生产接口联调/);
+  assert.match(about, /本地规则字典/);
+  assert.match(about, /通知与升级/);
+  assert.match(read("README.md"), /Pre-launch development gaps/);
   assert.match(about, /18项核心制度建设要求/);
   assert.match(about, /首诊负责、三级查房、会诊、分级护理、值班和交接班/);
   assert.match(about, /c24f4ba21d02422f81afc59efdd380a8/);

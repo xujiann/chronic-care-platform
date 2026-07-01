@@ -271,5 +271,6 @@ GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下
 - Critical-value loop: institution and commission users can acknowledge and dispose critical value alerts with audit records and linked event status updates.
 - Clinical-pathway loop: commission users can review pathway variance cases from the runnable portal, close or return the linked quality event, and preserve audit evidence.
 - Policy basis: the about page links the module to the Medical Quality Management Measures, 18 core safety systems, 2023-2025 quality action plan, inspection/test mutual-recognition rules, 2025 national improvement goals, and clinical pathway guidance.
+- Pre-launch development gaps: the about page now separates production interface joint-testing, local rule dictionaries, signed evidence attachments, notification/escalation receipts, audit/security hardening, and operations support as the remaining work before formal production launch.
 
 Site joint-testing boundary: production HIS/EMR/LIS/PACS critical-value rules, real clinical pathway dictionaries, signed medical-record sampling forms, mutual-recognition QC rules, department sign-off evidence, and notification channels remain site-owned inputs.
