@@ -249,5 +249,6 @@ npm.cmd run rollback:snapshot -- "data/backups/<备份目录>"
 ## Health Dashboard Deployment Evidence
 
 - Open `health-dashboard.html` after commission login to review the aggregate health dashboard.
+- Call `GET /api/health-dashboard/production-readiness` with a commission token to review production gates, blocked gates, cutover checklist rows, site issues, and evidence package records during site joint testing.
 - Run `npm.cmd run health-dashboard:summary` to generate `release/health-dashboard-summary.json` and `release/health-dashboard-summary.md`, including the module main function report.
 - The dashboard remains blocked on real site joint-test inputs for identity, HIS/EMR/LIS/PACS, insurance, certificates, statistics, monitoring, and disaster recovery signoff.

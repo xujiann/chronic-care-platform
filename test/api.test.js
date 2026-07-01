@@ -215,6 +215,14 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:department-function-matrix" && item.passed), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:city-county-function-matrix" && item.passed), true);
 
+    const productionReadiness = await api(baseUrl, "/api/health-dashboard/production-readiness", authorized(accountLogin.body.token));
+    assert.equal(productionReadiness.response.status, 200);
+    assert.equal(productionReadiness.body.productionReady, false);
+    assert.equal(productionReadiness.body.gates.length, 5);
+    assert.equal(productionReadiness.body.blockedGates.some((item) => item.id === "operations-dr"), true);
+    assert.equal(productionReadiness.body.cutover.ok, false);
+    assert.equal(productionReadiness.body.siteIssues.length >= 1, true);
+
     const processAudit = await api(baseUrl, "/api/process-audit", authorized(accountLogin.body.token));
     assert.equal(processAudit.response.status, 200);
     assert.equal(processAudit.body.ok, true);

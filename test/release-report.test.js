@@ -300,6 +300,7 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.equal(healthDashboardJson.healthDashboard.functionalReport.functions.length, 14);
   assert.equal(healthDashboardJson.healthDashboard.functionalReport.functions.some((item) => item.id === "production-readiness-gate"), true);
   assert.equal(healthDashboardJson.healthDashboard.productionReadinessGate.overallStatus, "blocked");
+  assert.equal(report.checks.some((item) => item.name === "healthDashboard:productionReadinessGate" && item.passed), true);
   assert.equal(healthDashboardJson.healthDashboard.functionalReport.functions.some((item) => item.id === "jurisdiction-workbench"), true);
   assert.equal(healthDashboardJson.healthDashboard.functionalReport.functions.some((item) => item.id === "jurisdiction-scope-drilldown"), true);
   assert.equal(healthDashboardJson.healthDashboard.functionalReport.functions.some((item) => item.id === "task-closure-trend"), true);

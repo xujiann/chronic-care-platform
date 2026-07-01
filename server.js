@@ -5409,6 +5409,47 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/health-dashboard/production-readiness") {
+    const user = requireApiRole(req, res, ["commission"], "/api/health-dashboard/production-readiness");
+    if (!user) return;
+    const data = readDatabase();
+    const healthDashboard = buildHealthDashboardSummary({
+      data,
+      runtime: buildRuntimeMetrics(data),
+      readiness: buildSystemReadinessReport(data)
+    });
+    const releaseReport = buildReleaseReport({ data, env: process.env, profile: "demo" });
+    const cutoverChecklist = releaseReport.productionCutover || [];
+    const blockedGates = (healthDashboard.productionReadinessGate?.items || []).filter((item) => item.status === "blocked");
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "health-dashboard-production-readiness",
+      target: "/api/health-dashboard/production-readiness",
+      result: "allowed",
+      detail: `Production readiness gate read: ${blockedGates.length} blocked gates.`
+    });
+    sendJson(res, 200, {
+      ok: healthDashboard.ok,
+      generatedAt: healthDashboard.generatedAt,
+      productionReady: healthDashboard.totals?.productionReady === true,
+      boundary: healthDashboard.productionReadinessGate?.boundary || "",
+      summary: healthDashboard.productionReadinessGate?.summary || {},
+      gates: healthDashboard.productionReadinessGate?.items || [],
+      blockedGates,
+      cutover: {
+        ok: cutoverChecklist.every((item) => item.passed),
+        total: cutoverChecklist.length,
+        passed: cutoverChecklist.filter((item) => item.passed).length,
+        blocked: cutoverChecklist.filter((item) => !item.passed).length,
+        checklist: cutoverChecklist
+      },
+      siteIssues: healthDashboard.siteIssueLedger?.items || [],
+      evidence: healthDashboard.siteEvidencePackage?.items || []
+    });
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/process-audit") {
     const user = requireApiRole(req, res, ["commission"], "/api/process-audit");
     if (!user) return;
