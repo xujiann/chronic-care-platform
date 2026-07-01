@@ -245,6 +245,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(operationsDashboard.body.postCutoverObservation.windows.every((item) => item.requiredEvidence.length >= 3), true);
     assert.equal(operationsDashboard.body.postCutoverObservation.windows.every((item) => ["待观察", "观察中", "已完成"].includes(item.status)), true);
     assert.equal(operationsDashboard.body.postCutoverObservation.windows.every((item) => Number.isInteger(item.completionRate)), true);
+    assert.equal(operationsDashboard.body.postCutoverObservation.windows.every((item) => Array.isArray(item.pendingEvidence) && Array.isArray(item.completedEvidence)), true);
     assert.equal(operationsDashboard.body.postCutoverObservation.summary.evidenceTotal >= 9, true);
     assert.equal(Number.isInteger(operationsDashboard.body.postCutoverObservation.summary.completionRate), true);
     assert.equal(operationsDashboard.body.intelligence.recommendations.some((item) => item.recommendation && item.prediction), true);
@@ -370,6 +371,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(postCutoverObservation.body.watchWindow.includes("T+1"), true);
     assert.equal(postCutoverObservation.body.windows.some((item) => item.id === "t1-24h" && item.owner), true);
     assert.equal(postCutoverObservation.body.windows.some((item) => item.evidencePending >= 0 && Number.isInteger(item.completionRate)), true);
+    assert.equal(postCutoverObservation.body.windows.some((item) => item.pendingEvidence.includes("治理报告草稿") || item.completedEvidence.includes("治理报告草稿")), true);
     assert.equal(postCutoverObservation.body.windows.some((item) => item.requiredEvidence.includes("治理报告草稿")), true);
 
     const postCutoverAction = await api(baseUrl, "/api/operations/post-cutover-observation/actions", authorized(accountLogin.body.token, {

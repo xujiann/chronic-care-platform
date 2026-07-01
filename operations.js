@@ -505,11 +505,15 @@ function buildPostCutoverEvidenceProgress(items, windows) {
   const evidenceReady = evidenceTotal && items.length ? Math.min(evidenceTotal, Math.round((evidenceTotal * observedItems) / items.length)) : 0;
   let remainingReady = evidenceReady;
   const windowsWithProgress = windows.map((item) => {
-    const windowTotal = Array.isArray(item.requiredEvidence) ? item.requiredEvidence.length : 0;
+    const requiredEvidence = Array.isArray(item.requiredEvidence) ? item.requiredEvidence : [];
+    const windowTotal = requiredEvidence.length;
     const windowReady = Math.min(windowTotal, Math.max(0, remainingReady));
     remainingReady -= windowReady;
     return {
       ...item,
+      requiredEvidence,
+      completedEvidence: requiredEvidence.slice(0, windowReady),
+      pendingEvidence: requiredEvidence.slice(windowReady),
       evidenceReady: windowReady,
       evidencePending: Math.max(0, windowTotal - windowReady),
       completionRate: windowTotal ? Math.round((windowReady / windowTotal) * 100) : 0,
@@ -1831,7 +1835,11 @@ function renderPostCutoverObservation(postCutoverObservation) {
       <span>${postCutoverObservation.summary?.observed || 0}/${postCutoverObservation.summary?.total || 0} 项已观察，${postCutoverObservation.summary?.abnormal || 0} 项异常，证据完成 ${postCutoverObservation.summary?.completionRate || 0}%</span>
       <small>观察窗口：${zhInline(postCutoverObservation.watchWindow)}；待补证据 ${postCutoverObservation.summary?.evidencePending || 0} 项；证据：${evidenceList(postCutoverObservation.evidence)}</small>
       <div class="operation-observation-windows">
-        ${(postCutoverObservation.windows || []).map((windowItem) => `<span title="${htmlAttribute(`${windowItem.focus}；证据：${zhList(windowItem.requiredEvidence || [])}`)}">${zhInline(windowItem.name)} / ${zhInline(windowItem.owner)} / ${zhInline(windowItem.status)} / ${(windowItem.requiredEvidence || []).length}项证据 / 完成${windowItem.completionRate || 0}% / 待补${windowItem.evidencePending || 0}项</span>`).join("")}
+        ${(postCutoverObservation.windows || []).map((windowItem) => {
+          const completedEvidence = windowItem.completedEvidence || [];
+          const pendingEvidence = windowItem.pendingEvidence || [];
+          return `<span title="${htmlAttribute(`${windowItem.focus}；已完成：${completedEvidence.length ? zhList(completedEvidence) : "暂无"}；待补：${pendingEvidence.length ? zhList(pendingEvidence) : "无"}`)}">${zhInline(windowItem.name)} / ${zhInline(windowItem.owner)} / ${zhInline(windowItem.status)} / ${(windowItem.requiredEvidence || []).length}项证据 / 完成${windowItem.completionRate || 0}% / 待补${windowItem.evidencePending || 0}项</span>`;
+        }).join("")}
       </div>
     </article>
     ${items.map((item) => `

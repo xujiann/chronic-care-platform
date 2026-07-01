@@ -518,6 +518,8 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsJs, /evidencePending/);
   assert.match(operationsJs, /逐窗口|待补/);
   assert.match(operationsJs, /completionRate/);
+  assert.match(operationsJs, /pendingEvidence/);
+  assert.match(operationsJs, /completedEvidence/);
   assert.match(operationsJs, /renderOperationsIntelligence/);
   assert.match(operationsJs, /renderResourcePool/);
   assert.match(operationsJs, /buildStaticResourcePool/);

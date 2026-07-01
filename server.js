@@ -4236,11 +4236,15 @@ function buildOperationsPostCutoverEvidenceProgress(items, windows) {
   const evidenceReady = evidenceTotal && items.length ? Math.min(evidenceTotal, Math.round((evidenceTotal * observedItems) / items.length)) : 0;
   let remainingReady = evidenceReady;
   const windowsWithProgress = windows.map((item) => {
-    const windowTotal = Array.isArray(item.requiredEvidence) ? item.requiredEvidence.length : 0;
+    const requiredEvidence = Array.isArray(item.requiredEvidence) ? item.requiredEvidence : [];
+    const windowTotal = requiredEvidence.length;
     const windowReady = Math.min(windowTotal, Math.max(0, remainingReady));
     remainingReady -= windowReady;
     return {
       ...item,
+      requiredEvidence,
+      completedEvidence: requiredEvidence.slice(0, windowReady),
+      pendingEvidence: requiredEvidence.slice(windowReady),
       evidenceReady: windowReady,
       evidencePending: Math.max(0, windowTotal - windowReady),
       completionRate: windowTotal ? Math.round((windowReady / windowTotal) * 100) : 0,
