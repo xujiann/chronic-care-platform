@@ -90,6 +90,10 @@
 
 医院回执成功后，平台生成 `collection=escortServiceOrders` 的站内消息，居民端展示接诊确认、到院提示或退回补充要求。
 
+### 4.4 Resident task actions
+
+`POST /api/tasks/escortServiceOrders:<id>/actions` accepts resident actions for the same order. `action=cancel-request` records `status=cancel-requested`, `cancellationReason`, `familyContactStatus=cancel-requested`, sends an institution-side task message, and removes the order from resident reminder cards while preserving it in the escort order history and audit trail.
+
 ## 5. 字段映射
 
 | 平台字段 | 医院来源 | 说明 |

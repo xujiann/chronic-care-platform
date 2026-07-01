@@ -2800,8 +2800,11 @@ function seedBirthStatistics() {
       electronicLicenses: 1,
       publicSecuritySynced: 1,
       maternalChildSynced: 2,
+      pendingPublicSecuritySync: 2,
+      pendingMaternalChildSync: 1,
       pending: 2,
       lowBirthWeight: 1,
+      qualityPending: 2,
       qualityPass: 1
     },
     regionStats: [
@@ -4995,8 +4998,11 @@ function refreshBirthStatistics(state) {
       electronicLicenses: records.filter((item) => String(item.electronicLicenseStatus || "").includes("已生成")).length,
       publicSecuritySynced: records.filter((item) => String(item.publicSecuritySync || "").includes("已共享")).length,
       maternalChildSynced: records.filter((item) => String(item.maternalChildSync || "").includes("已入册")).length,
+      pendingPublicSecuritySync: records.filter((item) => !String(item.publicSecuritySync || "").includes("已共享")).length,
+      pendingMaternalChildSync: records.filter((item) => !String(item.maternalChildSync || "").includes("已入册")).length,
       pending: records.filter((item) => ["待签发", "待上报"].includes(item.status)).length,
       lowBirthWeight: records.filter((item) => Number(item.birthWeight || 0) > 0 && Number(item.birthWeight || 0) < 2500).length,
+      qualityPending: records.filter((item) => ["待质控", "待复核", "待补正"].includes(item.qualityCheck)).length,
       qualityPass: records.filter((item) => item.qualityCheck === "通过").length
     },
     regionStats: [...regionCounts.entries()].map(([region, item]) => ({
@@ -9471,6 +9477,7 @@ function applyCitizenTaskAction(item, payload, collection, user) {
   if (action === "cancel-request") {
     updates.status = "cancel-requested";
     updates.cancellationReason = comment || "居民端申请取消";
+    if (collection === "escortServiceOrders") updates.familyContactStatus = "cancel-requested";
   }
   if (action === "followup-feedback") {
     updates.status = collection === "followups" ? "居民已反馈" : item.status;

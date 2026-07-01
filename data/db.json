@@ -1443,7 +1443,10 @@
       "maternalChildSynced": 2,
       "pending": 4,
       "lowBirthWeight": 2,
-      "qualityPass": 1
+      "qualityPass": 1,
+      "pendingPublicSecuritySync": 4,
+      "pendingMaternalChildSync": 3,
+      "qualityPending": 4
     },
     "regionStats": [
       {

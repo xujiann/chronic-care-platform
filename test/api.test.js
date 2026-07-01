@@ -770,6 +770,16 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(reviewed.body.qualityReview, "citizen-feedback");
     assert.equal(reviewed.body.satisfaction, "满意");
 
+    const cancelled = await api(baseUrl, `/api/tasks/${encodeURIComponent(`escortServiceOrders:${created.body.id}`)}/actions`, authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "cancel-request", comment: "居民临时取消陪诊预约" })
+    }));
+    assert.equal(cancelled.response.status, 200);
+    assert.equal(cancelled.body.status, "cancel-requested");
+    assert.equal(cancelled.body.cancellationReason, "居民临时取消陪诊预约");
+    assert.equal(cancelled.body.familyContactStatus, "cancel-requested");
+    assert.equal(cancelled.body.auditTrail[0].action, "cancel-request");
+
     const messages = await api(baseUrl, "/api/messages", authorized(citizenToken));
     assert.equal(messages.response.status, 200);
     assert.equal(messages.body.messages.some((item) => item.sourceId === created.body.id && /hospital handoff/i.test(item.title)), true);

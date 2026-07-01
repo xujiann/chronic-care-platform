@@ -24,6 +24,7 @@ test("escort service readiness validates policy, registry, workforce, orders and
   assert.equal(report.checks.some((item) => item.id === "escort:hospitalInterface" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:hospitalInterfaceDoc" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:frontend" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "escort:citizenCancellation" && item.passed), true);
   assert.match(renderMarkdown(report), /Medical escort service readiness report/);
   assert.match(renderMarkdown(report), /Hospital-confirmed orders/);
 });

@@ -44,6 +44,7 @@ function buildEscortServiceReadinessReport(options = {}) {
     { id: "escort:hospitalInterfaceDoc", passed: /POST \/api\/escort-services\/orders\/:id\/hospital-handoff/.test(hospitalInterfaceDoc) && /flowchart TD/.test(hospitalInterfaceDoc) && /hospitalCode/.test(hospitalInterfaceDoc) && /hisVisitId/.test(hospitalInterfaceDoc) && /outpatientQueueNo/.test(hospitalInterfaceDoc), detail: "hospital handoff contract and workflow documented" },
     { id: "escort:frontend", passed: /escort-order-form/.test(frontend) && /fetchEscortDashboard/.test(frontend) && /data-escort-action/.test(frontend) && /data-escort-hospital/.test(frontend) && /hospital-handoff/.test(frontend), detail: "runnable escort portal and hospital handoff controls present" },
     { id: "escort:citizenAppointment", passed: /escort-appointment-form/.test(citizenFrontend) && /bindEscortAppointment/.test(citizenFrontend) && /\/escort-services\/orders/.test(citizenFrontend) && /formatEscortHospitalHandoff/.test(citizenFrontend), detail: "citizen portal can create and inspect medical escort appointments" },
+    { id: "escort:citizenCancellation", passed: /cancel-request/.test(server) && /familyContactStatus = "cancel-requested"/.test(citizenFrontend) && /RESIDENT_TASK_CLOSED_STATUSES/.test(citizenFrontend) && /cancel-requested/.test(citizenFrontend), detail: "resident cancellation closes reminder cards and keeps order history" },
     { id: "escort:releaseScript", passed: Boolean(pkg.scripts?.["escort:readiness"]), detail: pkg.scripts?.["escort:readiness"] || "missing" }
   ];
   return {

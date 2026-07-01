@@ -128,6 +128,25 @@ function hasWorkflowRules(birthStatistics, tokens) {
   return tokens.every((token) => source.includes(token));
 }
 
+function expectedRiskMetrics(birthCertificates) {
+  const records = Array.isArray(birthCertificates) ? birthCertificates : [];
+  return {
+    pendingPublicSecuritySync: records.filter((item) => !String(item.publicSecuritySync || "").includes("已共享")).length,
+    pendingMaternalChildSync: records.filter((item) => !String(item.maternalChildSync || "").includes("已入册")).length,
+    qualityPending: records.filter((item) => ["待质控", "待复核", "待补正"].includes(item.qualityCheck)).length
+  };
+}
+
+function hasRiskMetrics(birthStatistics, birthCertificates) {
+  const metrics = birthStatistics && typeof birthStatistics.metrics === "object" ? birthStatistics.metrics : {};
+  const expected = expectedRiskMetrics(birthCertificates);
+  return Object.entries(expected).every(([key, value]) => Number(metrics[key]) === value);
+}
+
+function hasInstitutionRiskMetricCards(source) {
+  return hasAll(source, ["pendingPublicSecuritySync", "pendingMaternalChildSync", "qualityPending", "公安待共享", "妇幼待入册", "质控补正"]);
+}
+
 function parseArgs(argv = process.argv.slice(2)) {
   const flags = {};
   argv.forEach((flag) => {
@@ -171,11 +190,13 @@ function buildMaternalChildReadinessReport(options = {}) {
     check("data:certificate-policy-fields", birthCertificates.length >= 3 && birthCertificates.every(hasPolicyCertificateFields) && hasWorkflowRules(birthStatistics, ["首次签发", "换发/补发", "空白证件", "第七版证件"]), "certificate records and statistics cover version, issue type, materials, quality, archive, blank-certificate, and seventh-version rules", "data"),
     check("data:workflow-states", birthCertificates.some((item) => item.status) && birthCertificates.some((item) => item.maternalChildSync) && birthCertificates.some((item) => item.publicSecuritySync), "certificate status, maternal-child sync, and public-security sync are modeled", "data"),
     check("data:forms-statistics", birthForms.length >= 3 && Boolean(birthStatistics.title && birthStatistics.metrics), `${birthForms.length} forms; statistics ${birthStatistics.title || "missing"}`, "data"),
+    check("data:risk-metrics", hasRiskMetrics(birthStatistics, birthCertificates), "statistics expose accurate pending public-security, maternal-child sync, and quality risk counts", "data"),
     check("api:server", hasAll(sources.server, ["/api/birth-certificates", "statistics: data.birthStatistics", "canAccessResident", "appendSecurityEvent"]), "server exposes scoped birth certificate API and audit events", "api"),
     check("functions:domains", FUNCTION_DOMAINS.length >= 5 && FUNCTION_DOMAINS.every((item) => item.acceptance && item.evidence.length), `${FUNCTION_DOMAINS.length} function domains`, "function"),
     check("handoff:actions", HANDOFF_ACTIONS.length >= 4 && HANDOFF_ACTIONS.every((item) => item.acceptance && item.evidence.length), `${HANDOFF_ACTIONS.length} handoff actions`, "function"),
     check("role:commission", hasAll(sources.commission, ["renderBirthStatistics", "renderMaternalChildCare", "mch-risk-list"]), "commission portal renders statistics, maternal-child services, and risks", "role"),
     check("role:institution", hasAll(sources.institution, ["birth-certificate-form", "birthCertificateNo", "submitBirthCertificate", "actionButton"]), "institution portal registers and advances certificate workflow", "role"),
+    check("role:institution-risk-metrics", hasInstitutionRiskMetricCards(sources.institution), "institution portal renders public-security, maternal-child sync, and quality risk metric cards", "role"),
     check("role:citizen", hasAll(sources.citizen, ["renderBirthHealth", "renderMaternalChildContinuity", "getBirthCertificatesForResident", "lifecycle-summary"]), "citizen portal exposes birth and maternal-child continuity tasks", "role"),
     check("role:citizen-lifecycle-8", hasAll(sources.citizen, ["儿童保健", "青少年健康", "成人健康", "慢病与康复", "老年与照护", "临终关怀与授权", "死亡与身后事项", "项需下发"]) && sources.citizen.includes("stages.length"), "citizen lifecycle timeline covers eight life stages and dispatch summary", "role"),
     check("role:isolation", hasAll(sources.policyDoc, ["不展示卫健监管", "机构办理"]) && sources.server.includes("canAccessResident") && !sources.citizen.includes("birth-certificate-form"), "citizen role excludes institution certificate form while server keeps resident-scoped access", "role"),
