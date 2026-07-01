@@ -671,6 +671,9 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(jointTaskComplete.body.message.status, "completed");
     assert.equal(jointTaskComplete.body.message.jointTestKey, "referralTeleconsultations:joint-test:hospital-it");
     assert.equal(jointTaskComplete.body.message.receipts[0].status, "completed");
+    const jointTestPackAfterTasks = await api(baseUrl, "/api/referral-teleconsultations/joint-test-pack", authorized(county.body.token));
+    assert.equal(jointTestPackAfterTasks.response.status, 200);
+    assert.equal(jointTestPackAfterTasks.body.taskReceipts.some((item) => item.role === "hospital-it" && item.status === "completed" && item.receiptCount >= 1), true);
     const jointTaskReplay = await api(baseUrl, "/api/referral-teleconsultations/joint-test-ledger/tasks", authorized(county.body.token, {
       method: "POST",
       body: JSON.stringify({})

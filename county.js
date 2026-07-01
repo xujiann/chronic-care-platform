@@ -287,6 +287,10 @@ function renderCountyTeleconsultationJointLedger(state, rows) {
     .map((message) => [message.jointTestKey || message.notificationKey, message]));
   const jointTaskKeys = new Set(jointTasks.keys());
   const assignedTasks = pendingRows.filter((item) => jointTaskKeys.has(`referralTeleconsultations:joint-test:${item.role}`)).length;
+  const completedTasks = pendingRows.filter((item) => {
+    const task = jointTasks.get(`referralTeleconsultations:joint-test:${item.role}`);
+    return task && /completed|closed|signed|read/i.test(String(task.status || ""));
+  }).length;
   el.innerHTML = [
     `<article data-referral-joint-ledger-summary>
       <div><span class="badge info">Joint test ledger</span></div>
@@ -294,7 +298,7 @@ function renderCountyTeleconsultationJointLedger(state, rows) {
       <p>${ledgerRows.filter((item) => item.localEvidence).length}/${ledgerRows.length} rows have local demo evidence; site signoff is tracked below.</p>
       <footer>
         <small>Use this before onsite signoff to reconcile callback replay, SLA supervision, payment policy, and archived signatures.</small>
-        <small>${assignedTasks}/${pendingRows.length} owner tasks assigned from pending rows.</small>
+        <small>${assignedTasks}/${pendingRows.length} owner tasks assigned; ${completedTasks}/${pendingRows.length} completed.</small>
         <button class="inline-action" type="button" data-referral-joint-ledger-tasks>Sync tasks</button>
       </footer>
     </article>`,

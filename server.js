@@ -6569,6 +6569,20 @@ function buildReferralTeleconsultationJointTestPack(data) {
   const contracts = (Array.isArray(data.integrationContracts) ? data.integrationContracts : [])
     .filter((item) => ["referral-feedback-callback-v1", "referral-schedule-callback-v1", "referral-report-callback-v1"].includes(item.id));
   const teleconsultations = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
+  const taskReceipts = (Array.isArray(data.taskMessages) ? data.taskMessages : [])
+    .filter((message) => message.jointTestKey || String(message.notificationKey || "").startsWith("referralTeleconsultations:joint-test:"))
+    .map((message) => {
+      const role = String(message.jointTestKey || message.notificationKey || "").replace("referralTeleconsultations:joint-test:", "");
+      return {
+        role,
+        targetRole: message.targetRole || "",
+        status: message.status || "sent",
+        receiptCount: Array.isArray(message.receipts) ? message.receipts.length : 0,
+        completedAt: message.jointTestCompletedAt || "",
+        completedByName: message.jointTestCompletedByName || "",
+        note: message.jointTestCompletionNote || ""
+      };
+    });
   const sample = teleconsultations[0] || {};
   const samples = contracts.map((contract) => {
     const base = {
@@ -6608,6 +6622,7 @@ function buildReferralTeleconsultationJointTestPack(data) {
     samples,
     checklist,
     signoff,
+    taskReceipts,
     signoffSummary: buildReferralTeleconsultationSignoffSummary(data, { includeRowsOnly: true })
   };
 }
