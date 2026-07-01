@@ -24,6 +24,7 @@
 | 二级页面导航 | 已实现 | `citizen.html?page=health-record|emr|nursing|escort|registration` 支持按主功能进入二级页面，桌面服务导航、手机底部导航和预览页控制均同步 URL，并优先落到对应业务内容，摘要卡提供当前页面主操作 |
 | 手机端导航状态卡 | 已实现 | 居民端服务导航卡显示每个二级页的已实现能力数量、当前接口和待生产化边界；底部手机导航显示当前页或可用能力数量，并以固定触控徽标减少手机端误触和布局跳动 |
 | 模块接口映射 | 已实现 | `citizen.html` 展示居民端与健康档案、电子病历、护理、陪诊、挂号、消息与待办的接口、数据集合、当前状态和生产边界，`docs/citizen-module-interface-map.md` 提供联调说明 |
+| 跨服务待办操作 | 已实现 | 居民首页汇总随访、护理、陪诊、授权等待办，并按确认、取消、评价状态隐藏重复按钮，降低手机端误操作 |
 | 授权与病历可信来源 | 已实现 | `citizen.html` 展示实名/家庭关系、授权共享、电子病历来源、访问日志和消息回执的当前证据与生产化边界，`docs/citizen-authorization-emr-governance.md` 提供治理说明 |
 | 小程序与 APP 运行形态 | 已实现 | `citizen.html?client=mini-program|app&page=...` 支持按渠道预览居民端，页面展示入口、上线能力、发布条件、当前二级页入口、复制入口、发布检查清单和下一步动作 |
 | APP/PWA 手机安装配置 | 已实现 | `manifest.webmanifest` 提供 APP 形态 `id`、展示降级策略和健康档案/电子病历/陪诊快捷入口，`citizen.html` 提供 Android/iOS 添加到桌面的 meta |

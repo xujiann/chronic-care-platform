@@ -880,6 +880,8 @@ test("citizen portal aggregates cross-service resident tasks", () => {
   assert.match(citizenJs, /buildResidentServiceTasks/);
   assert.match(citizenJs, /bindResidentTaskActions/);
   assert.match(citizenJs, /submitResidentTaskAction/);
+  assert.match(citizenJs, /shouldShowResidentConfirm/);
+  assert.match(citizenJs, /shouldShowQualityFeedback/);
   assert.match(citizenJs, /renderCitizenNotifications/);
   assert.match(citizenJs, /submitMessageReceipt/);
   assert.match(citizenJs, /serviceTaskStatusClass/);

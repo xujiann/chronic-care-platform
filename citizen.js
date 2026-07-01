@@ -940,6 +940,11 @@ function buildResidentServiceTasks(residentId) {
       due: item.appointmentAt || item.due,
       page: "escort",
       action: "查看陪诊",
+      rawStatus: item.status,
+      taskAction: item.taskAction,
+      residentConfirmation: item.residentConfirmation,
+      familyContactStatus: item.familyContactStatus,
+      qualityReview: item.qualityReview,
       priority: item.priority === "high" || item.riskLevel === "high" ? "high" : "normal"
     })),
     ...(state.internetNursingOrders || []).filter((item) => item.residentId === residentId && !["completed", "closed"].includes(item.status)).map((item) => ({
@@ -952,6 +957,10 @@ function buildResidentServiceTasks(residentId) {
       due: item.preferredAt || item.requestedAt,
       page: "nursing",
       action: "查看护理",
+      rawStatus: item.status,
+      taskAction: item.taskAction,
+      residentServiceConfirmation: item.residentServiceConfirmation,
+      qualityCallback: item.qualityCallback,
       priority: item.riskLevel === "high" ? "high" : "normal"
     })),
     ...getPersonalRecords(residentId, "authorizations").filter((item) => !isRevoked(item) && item.date <= todayOffset(30)).map((item) => ({
@@ -970,13 +979,35 @@ function buildResidentServiceTasks(residentId) {
 }
 
 function renderServiceTaskButtons(item) {
-  const buttons = [
-    ["resident-confirm", "确认"],
-    ["cancel-request", "取消"]
-  ];
+  const buttons = [];
+  if (shouldShowResidentConfirm(item)) buttons.push(["resident-confirm", "确认"]);
+  if (shouldShowCancelRequest(item)) buttons.push(["cancel-request", "取消"]);
   if (item.collection === "followups") buttons.push(["followup-feedback", "反馈"]);
-  if (["escortServiceOrders", "internetNursingOrders"].includes(item.collection)) buttons.push(["quality-feedback", "评价"]);
+  if (shouldShowQualityFeedback(item)) buttons.push(["quality-feedback", "评价"]);
   return buttons.map(([action, label]) => `<button type="button" data-task-id="${item.taskId}" data-task-collection="${item.collection}" data-resident-task-action="${action}">${label}</button>`).join("");
+}
+
+function shouldShowResidentConfirm(item) {
+  return ![
+    item.residentConfirmation,
+    item.familyContactStatus,
+    item.residentServiceConfirmation,
+    item.taskAction
+  ].includes("confirmed") && item.taskAction !== "resident-confirm";
+}
+
+function shouldShowCancelRequest(item) {
+  const status = String(item.rawStatus || item.status || "").trim();
+  return !RESIDENT_TASK_CLOSED_STATUSES.has(status) && item.taskAction !== "cancel-request";
+}
+
+function shouldShowQualityFeedback(item) {
+  if (!["escortServiceOrders", "internetNursingOrders"].includes(item.collection)) return false;
+  return ![
+    item.qualityReview,
+    item.qualityCallback,
+    item.taskAction
+  ].includes("citizen-feedback") && item.taskAction !== "quality-feedback";
 }
 
 function bindResidentTaskActions() {

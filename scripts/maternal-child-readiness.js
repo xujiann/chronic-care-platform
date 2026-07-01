@@ -14,7 +14,7 @@ const FUNCTION_DOMAINS = [
     entry: "index.html",
     api: ["state.birthStatistics", "renderBirthStatistics", "renderMaternalChildCare"],
     data: ["birthStatistics", "birthCertificates"],
-    evidence: ["birth-stat-sources", "maternal-child-services", "mch-risk-list"],
+    evidence: ["birth-stat-sources", "pendingPublicSecuritySync", "pendingMaternalChildSync", "qualityPending", "maternal-child-services", "mch-risk-list"],
     acceptance: "可查看出生证明、签发、上报、电子证照、公安共享、妇幼入册、低体重儿、质控补正和风险清单。"
   },
   {
@@ -184,6 +184,7 @@ function buildMaternalChildReadinessReport(options = {}) {
   const birthCertificates = Array.isArray(data.birthCertificates) ? data.birthCertificates : [];
   const birthForms = Array.isArray(data.birthCertificateForms) ? data.birthCertificateForms : [];
   const birthStatistics = data.birthStatistics && typeof data.birthStatistics === "object" ? data.birthStatistics : {};
+  const riskMetrics = expectedRiskMetrics(birthCertificates);
   const dataKeys = Object.keys(data);
   const checks = [
     check("docs:policy", hasAll(sources.policyDoc, ["卫妇社发〔2009〕96 号", "国卫办妇幼发〔2023〕4 号", "flowchart TD"]) && hasAll(sources.moduleDoc, ["birthCertificates", "birthStatistics", "flowchart TD"]), "policy and module docs include policy numbers, data objects, and flow diagrams", "docs"),
@@ -217,6 +218,7 @@ function buildMaternalChildReadinessReport(options = {}) {
       functionDomains: FUNCTION_DOMAINS.length,
       certificates: birthCertificates.length,
       forms: birthForms.length,
+      riskMetrics,
       statisticsTitle: birthStatistics.title || ""
     },
     functionDomains: FUNCTION_DOMAINS,
@@ -246,6 +248,7 @@ function renderMarkdown(report) {
     `- Certificates: ${report.summary.certificates}`,
     `- Forms: ${report.summary.forms}`,
     `- Statistics: ${report.summary.statisticsTitle}`,
+    `- Risk metrics: public-security pending ${report.summary.riskMetrics.pendingPublicSecuritySync}, maternal-child enrollment pending ${report.summary.riskMetrics.pendingMaternalChildSync}, quality correction pending ${report.summary.riskMetrics.qualityPending}`,
     "",
     "## Main Functions",
     "",
