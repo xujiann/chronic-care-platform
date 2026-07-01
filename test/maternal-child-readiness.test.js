@@ -45,6 +45,7 @@ test("maternal child main function report validates policy, roles, API and relea
   assert.equal(report.checks.some((item) => item.id === "docs:function-report"), true);
   assert.equal(report.checks.some((item) => item.id === "data:certificate-policy-fields"), true);
   assert.equal(report.checks.some((item) => item.id === "data:risk-metrics" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "role:commission-risk-metrics" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "role:institution-risk-metrics" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "handoff:actions"), true);
   assert.equal(report.checks.some((item) => item.id === "role:citizen-lifecycle-8"), true);

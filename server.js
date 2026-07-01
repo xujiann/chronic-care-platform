@@ -4575,6 +4575,51 @@ function ensureChronicFieldClosureEvidence(state) {
     integrationStatus: "pharmacy callback accepted"
   });
 
+  const personalRecords = Array.isArray(state.personalRecords) ? state.personalRecords : [];
+  const ensurePersonalRecord = (record) => {
+    if (!personalRecords.some((item) => item.id === record.id)) personalRecords.unshift(record);
+  };
+  ensurePersonalRecord({
+    id: "pr-chronic-feedback-r1",
+    residentId: "r1",
+    category: "chronic-feedback",
+    date: "2026-06-24",
+    name: "慢病随访居民反馈",
+    result: "居民已确认家庭血压上传和下次随访提醒",
+    source: "个人端慢病随访反馈",
+    status: "feedback_submitted",
+    meta: {
+      followupFeedback: true,
+      followupId: "f1",
+      satisfaction: "已核验",
+      channel: "mobile"
+    },
+    createdBy: "citizen",
+    createdAt: "2026-06-24T09:20:00.000Z",
+    personIndex: "DEMO-ID-R1#DEMO-MOBILE-R1"
+  });
+  ensurePersonalRecord({
+    id: "pr-chronic-feedback-r4",
+    residentId: "r4",
+    category: "chronic-feedback",
+    date: "2026-06-24",
+    name: "高危慢病随访居民反馈",
+    result: "居民已上传 3 次家庭血压记录，反馈夜间头晕并申请家庭医生电话复核",
+    source: "个人端慢病随访反馈",
+    status: "feedback_submitted",
+    meta: {
+      followupFeedback: true,
+      followupId: "f3",
+      satisfaction: "待家庭医生复核",
+      channel: "mobile",
+      highRiskCoverage: true
+    },
+    createdBy: "citizen",
+    createdAt: "2026-06-24T10:00:00.000Z",
+    personIndex: "DEMO-ID-R4#DEMO-MOBILE-R4"
+  });
+  state.personalRecords = personalRecords;
+
   const hasFamilyDoctorClosure = (state.personalRecords || []).some((item) => item.category === "chronic-family-doctor-note" || item.meta?.familyDoctorClosure);
   if (!hasFamilyDoctorClosure) {
     state.personalRecords = [
@@ -4641,6 +4686,38 @@ function ensureChronicFieldClosureEvidence(state) {
       ...(Array.isArray(state.taskMessages) ? state.taskMessages : [])
     ];
   }
+  const taskMessages = Array.isArray(state.taskMessages) ? state.taskMessages : [];
+  if (!taskMessages.some((item) => item.id === "msg-chronic-feedback-r4")) {
+    taskMessages.unshift({
+      id: "msg-chronic-feedback-r4",
+      taskId: "followups:f3",
+      collection: "followups",
+      sourceId: "f3",
+      residentId: "r4",
+      targetRole: "institution",
+      channel: "in_app",
+      title: "High-risk chronic follow-up feedback received",
+      body: "居民已补充高危高血压家庭血压记录，请家庭医生复核并确认下一次随访。",
+      status: "sent",
+      chronicFollowup: true,
+      meta: {
+        followupFeedback: true,
+        highRiskCoverage: true,
+        fieldIntegration: true
+      },
+      receipts: [
+        {
+          at: "2026-06-24T10:05:00.000Z",
+          status: "delivered",
+          channel: "in_app"
+        }
+      ],
+      createdAt: "2026-06-24T10:05:00.000Z",
+      createdBy: "citizen",
+      createdByName: "演示居民D"
+    });
+  }
+  state.taskMessages = taskMessages;
 }
 
 function normalizePersonalRecord(data) {

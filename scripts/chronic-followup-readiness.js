@@ -122,6 +122,12 @@ function buildChronicFollowupReadinessReport(options = {}) {
   const feedback = (data.personalRecords || []).filter((item) => item.category === "chronic-feedback" || item.meta?.followupFeedback);
   const experienceRecords = (data.personalRecords || []).filter((item) => item.category === "chronic-self-checkin" || item.meta?.residentExperience);
   const followupMessages = (data.taskMessages || []).filter((item) => item.chronicFollowup);
+  const feedbackResidentIds = new Set(feedback.map((item) => item.residentId).filter(Boolean));
+  const highRiskResidentIds = new Set([
+    ...(data.chronicScreeningTasks || []).filter((item) => String(item.riskLevel || item.risk || "").includes("高危")).map((item) => item.residentId),
+    ...(data.chronicManagementPlans || []).filter((item) => String(item.grade || item.riskLevel || item.risk || "").includes("高危")).map((item) => item.residentId)
+  ].filter(Boolean));
+  const feedbackHighRiskCovered = highRiskResidentIds.size > 0 && [...highRiskResidentIds].every((residentId) => feedbackResidentIds.has(residentId));
   const policyAlignment = buildPolicyAlignment(data, feedback, followupMessages);
   const screeningResidents = recordsByResident(data, "chronicScreeningTasks");
   const planResidents = recordsByResident(data, "chronicManagementPlans");
@@ -183,7 +189,7 @@ function buildChronicFollowupReadinessReport(options = {}) {
     {
       id: "resident-feedback",
       name: "Resident feedback loop",
-      passed: feedback.length >= 1,
+      passed: feedback.length >= 2 && feedbackHighRiskCovered,
       evidence: "personalRecords[category=chronic-feedback]"
     },
     {
@@ -240,6 +246,7 @@ function buildChronicFollowupReadinessReport(options = {}) {
       passed: boundaries.filter((item) => item.passed).length,
       residents: residentCoverage.length,
       feedbackRecords: feedback.length,
+      feedbackHighRiskCovered,
       notificationMessages: followupMessages.length,
       alerts: alertQueue.length,
       overdueAlerts: alertQueue.filter((item) => item.dueBucket === "overdue").length,

@@ -432,6 +432,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /audit-retention-report\.md/);
   assert.match(read("docs/chronic-followup-readiness.md"), /chronic-followup-readiness-report\.md/);
   assert.match(read("docs/chronic-followup-readiness.md"), /\/api\/chronic\/followup-feedback/);
+  assert.match(read("docs/chronic-followup-readiness.md"), /high-risk resident feedback coverage/);
   assert.match(read("README.md"), /data-quality-report\.md/);
   assert.match(read("README.md"), /quality-safety-report\.md/);
   assert.match(read("README.md"), /drug-consumable-readiness-report\.md/);
@@ -991,7 +992,9 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /renderMobileServiceNav/);
   assert.match(citizenJs, /data-mobile-service-tab/);
   assert.match(citizenJs, /data-mobile-service-state/);
+  assert.match(citizenJs, /data-mobile-service-count/);
   assert.match(citizenJs, /mobileServiceBadgeLabel/);
+  assert.match(citizenJs, /service-count-badge/);
   assert.match(citizenJs, /title="\$\{item\.label\}：\$\{meta\.featureCount\}项已实现能力/);
   assert.match(citizenJs, /aria-label="\$\{item\.label\}，\$\{item\.status\}，\$\{meta\.featureCount\}项已实现能力/);
   assert.match(citizenJs, /badge\.textContent = mobileServiceBadgeLabel/);
@@ -1045,7 +1048,10 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /mobile-service-nav/);
   assert.match(citizenCss, /touch-action: manipulation/);
   assert.match(citizenCss, /user-select: none/);
+  assert.match(citizenCss, /-webkit-tap-highlight-color: transparent/);
   assert.match(citizenCss, /mobile-service-nav a\.active small/);
+  assert.match(citizenCss, /small\.service-count-badge/);
+  assert.match(citizenCss, /min-height: 62px/);
   assert.match(citizenCss, /service-command-panel/);
   assert.match(citizenCss, /\.service-tabs a/);
   assert.match(citizenCss, /service-tab-interface/);

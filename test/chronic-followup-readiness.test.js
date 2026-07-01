@@ -19,7 +19,8 @@ test("chronic follow-up readiness covers all priority application boundaries", (
   assert.equal(report.ok, true);
   assert.equal(report.boundaries.length, 13);
   assert.equal(report.boundaries.every((item) => item.passed), true);
-  assert.equal(report.summary.feedbackRecords >= 1, true);
+  assert.equal(report.summary.feedbackRecords >= 2, true);
+  assert.equal(report.summary.feedbackHighRiskCovered, true);
   assert.equal(report.summary.notificationMessages >= 1, true);
   assert.equal(report.summary.alerts >= 1, true);
   assert.equal(report.summary.highPriorityAlerts >= 1, true);
@@ -46,6 +47,16 @@ test("chronic follow-up readiness fails without resident feedback evidence", () 
   const report = buildChronicFollowupReadinessReport({ data });
 
   assert.equal(report.ok, false);
+  assert.equal(report.boundaries.find((item) => item.id === "resident-feedback").passed, false);
+});
+
+test("chronic follow-up readiness requires high-risk resident feedback coverage", () => {
+  const data = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "db.json"), "utf8"));
+  data.personalRecords = data.personalRecords.filter((item) => item.residentId !== "r4" || (item.category !== "chronic-feedback" && !item.meta?.followupFeedback));
+  const report = buildChronicFollowupReadinessReport({ data });
+
+  assert.equal(report.ok, false);
+  assert.equal(report.summary.feedbackHighRiskCovered, false);
   assert.equal(report.boundaries.find((item) => item.id === "resident-feedback").passed, false);
 });
 

@@ -2341,10 +2341,10 @@ dialog::backdrop {
 
   .mobile-service-nav a {
     display: grid;
-    gap: 3px;
+    gap: 4px;
     place-items: center;
     min-width: 0;
-    min-height: 58px;
+    min-height: 62px;
     border: 1px solid transparent;
     border-radius: 12px;
     padding: 6px 4px;
@@ -2354,6 +2354,7 @@ dialog::backdrop {
     font: inherit;
     text-decoration: none;
     user-select: none;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .mobile-service-nav a.active {
@@ -2389,6 +2390,14 @@ dialog::backdrop {
     color: var(--green);
     font-size: 10px;
     font-weight: 900;
+  }
+
+  .mobile-service-nav small.service-count-badge {
+    display: inline-grid;
+    place-items: center;
+    min-width: 34px;
+    min-height: 18px;
+    line-height: 1;
   }
 
   .mobile-service-nav small.pending {

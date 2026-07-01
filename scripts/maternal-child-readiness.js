@@ -147,6 +147,10 @@ function hasInstitutionRiskMetricCards(source) {
   return hasAll(source, ["pendingPublicSecuritySync", "pendingMaternalChildSync", "qualityPending", "公安待共享", "妇幼待入册", "质控补正"]);
 }
 
+function hasCommissionRiskMetricCards(source) {
+  return hasAll(source, ["pendingPublicSecuritySync", "pendingMaternalChildSync", "qualityPending", "公安待共享", "妇幼待入册", "质控补正", "metricValue"]);
+}
+
 function parseArgs(argv = process.argv.slice(2)) {
   const flags = {};
   argv.forEach((flag) => {
@@ -195,6 +199,7 @@ function buildMaternalChildReadinessReport(options = {}) {
     check("functions:domains", FUNCTION_DOMAINS.length >= 5 && FUNCTION_DOMAINS.every((item) => item.acceptance && item.evidence.length), `${FUNCTION_DOMAINS.length} function domains`, "function"),
     check("handoff:actions", HANDOFF_ACTIONS.length >= 4 && HANDOFF_ACTIONS.every((item) => item.acceptance && item.evidence.length), `${HANDOFF_ACTIONS.length} handoff actions`, "function"),
     check("role:commission", hasAll(sources.commission, ["renderBirthStatistics", "renderMaternalChildCare", "mch-risk-list"]), "commission portal renders statistics, maternal-child services, and risks", "role"),
+    check("role:commission-risk-metrics", hasCommissionRiskMetricCards(sources.commission), "commission portal consumes public-security, maternal-child sync, and quality risk metrics", "role"),
     check("role:institution", hasAll(sources.institution, ["birth-certificate-form", "birthCertificateNo", "submitBirthCertificate", "actionButton"]), "institution portal registers and advances certificate workflow", "role"),
     check("role:institution-risk-metrics", hasInstitutionRiskMetricCards(sources.institution), "institution portal renders public-security, maternal-child sync, and quality risk metric cards", "role"),
     check("role:citizen", hasAll(sources.citizen, ["renderBirthHealth", "renderMaternalChildContinuity", "getBirthCertificatesForResident", "lifecycle-summary"]), "citizen portal exposes birth and maternal-child continuity tasks", "role"),

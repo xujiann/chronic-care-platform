@@ -382,9 +382,9 @@ function renderMobileServiceNav() {
   target.innerHTML = getLaunchedCitizenServiceTabs().map((item) => {
     const active = item.key === activeServiceTab;
     const meta = serviceNavigationMeta(item);
-    return `<a href="${citizenPageHref(item.key)}" data-mobile-service-tab="${item.key}" data-mobile-service-state="${item.status}" title="${item.label}：${meta.featureCount}项已实现能力；接口：${meta.interfaceLabel}；待生产化：${meta.productionBoundary}" aria-label="${item.label}，${item.status}，${meta.featureCount}项已实现能力，接口：${meta.interfaceLabel}，待生产化：${meta.productionBoundary}" aria-current="${active ? "page" : "false"}">
+    return `<a href="${citizenPageHref(item.key)}" data-mobile-service-tab="${item.key}" data-mobile-service-state="${item.status}" data-mobile-service-count="${meta.featureCount}" title="${item.label}：${meta.featureCount}项已实现能力；接口：${meta.interfaceLabel}；待生产化：${meta.productionBoundary}" aria-label="${item.label}，${item.status}，${meta.featureCount}项已实现能力，接口：${meta.interfaceLabel}，待生产化：${meta.productionBoundary}" aria-current="${active ? "page" : "false"}">
     <span>${item.label}</span>
-    <small class="ready">${mobileServiceBadgeLabel(item, active)}</small>
+    <small class="ready service-count-badge">${mobileServiceBadgeLabel(item, active)}</small>
   </a>`;
   }).join("");
   target.querySelectorAll("[data-mobile-service-tab]").forEach((link) => {
@@ -612,6 +612,7 @@ function updateServicePanes() {
     link.setAttribute("href", citizenPageHref(link.dataset.mobileServiceTab));
     const badge = link.querySelector("small");
     const tab = launchedTabs.find((item) => item.key === link.dataset.mobileServiceTab);
+    if (tab) link.dataset.mobileServiceCount = String(serviceNavigationMeta(tab).featureCount);
     if (badge && tab) badge.textContent = mobileServiceBadgeLabel(tab, active);
   });
   document.querySelectorAll("[data-service-pane]").forEach((pane) => {

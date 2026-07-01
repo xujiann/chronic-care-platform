@@ -50,6 +50,8 @@ The API keeps resident authorization checks, role-gated institution handling, da
 
 Resident feedback also creates `taskMessages` for institution follow-up, and institution dispositions create resident-facing messages through the existing `/api/messages` channel.
 
+Readiness now requires at least two resident feedback records and high-risk resident feedback coverage for every resident currently flagged as high risk, so the follow-up loop is not limited to a single low-risk demonstration case.
+
 `GET /api/chronic/followup-summary` includes `alertQueue`, `summary.alerts`, `summary.overdueAlerts`, and `summary.highPriorityAlerts` so institution and resident entry points can share the same follow-up risk queue.
 
 Institution and resident pages now prefer that API queue when the backend is available, while retaining a local fallback for static preview.
@@ -78,3 +80,5 @@ Run `npm run chronic:followup-readiness` to generate:
 `release:report` gates `chronicFollowup:fieldIntegration`, requiring device measurement, pharmacy callback, family doctor closure, and reminder outreach evidence before publication.
 
 `release:report` gates `chronicFollowup:institutionInterfaces`, requiring the institution interface specification, runtime routes, API tests, and launch evidence to stay aligned.
+
+`chronic:followup-readiness` gates `resident-feedback`, requiring all currently high-risk residents to keep resident feedback coverage seeded and testable before publication.

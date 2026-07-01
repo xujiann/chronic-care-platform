@@ -25,7 +25,7 @@
 ## 4. 发布验证
 
 - 页面证据：`citizen.html?client=app&page=registration#service-registration`
-- 导航证据：`citizen.html?page=health-record|emr|nursing|escort|registration` 的服务导航卡展示已实现能力数、当前接口和“待生产化”边界；底部手机导航非当前项显示能力数量，并在无障碍标签中带出接口和生产边界。
+- 导航证据：`citizen.html?page=health-record|emr|nursing|escort|registration` 的服务导航卡展示已实现能力数、当前接口和“待生产化”边界；底部手机导航非当前项显示能力数量，提供 `data-mobile-service-count` 供预览/自动化读取，并在无障碍标签中带出接口和生产边界。
 - 手机预览：`mobile-preview.html?client=app`
 - 静态测试：`node --test --test-name-pattern "citizen portal exposes resident service tabs" test/static.test.js`
 - API 测试：`node --test --test-name-pattern "supports citizen registration HIS payment insurance and SMS workflow" test/api.test.js`
