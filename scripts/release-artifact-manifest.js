@@ -15,6 +15,7 @@ const ARTIFACTS = [
   ["audit-retention", "security", "Audit retention report", "release/audit-retention-report.json", "release/audit-retention-report.md", "audit:retention", "/api/audit/verify"],
   ["data-quality", "data", "Data quality report", "release/data-quality-report.json", "release/data-quality-report.md", "data-quality:report", "/api/data-quality/scorecard"],
   ["drug-consumable-readiness", "drug-consumable", "Drug consumable readiness report", "release/drug-consumable-readiness-report.json", "release/drug-consumable-readiness-report.md", "drug-consumable:readiness", "/api/drug-consumable-supervision"],
+  ["drug-consumable-about", "drug-consumable", "Drug consumable policy about page", "drug-consumable-about.html", "drug-consumable-about.html", "drug-consumable:readiness", "drug-consumable-about.html"],
   ["environment-matrix", "environment", "Environment matrix report", "release/environment-matrix-report.json", "release/environment-matrix-report.md", "environment:matrix", "env:check:production"],
   ["integration-readiness", "integration", "Integration readiness report", "release/integration-readiness-report.json", "release/integration-readiness-report.md", "integration:readiness", "/api/integration/contracts"],
   ["interface-mapping", "integration", "Interface mapping report", "release/interface-mapping-report.json", "release/interface-mapping-report.md", "interface:mapping", "/api/integrations/gateway"],

@@ -22,6 +22,7 @@ test("release artifact manifest indexes reports templates commands and evidence"
   assert.equal(report.artifacts.some((item) => item.id === "site-readiness" && item.evidence === "/api/site-readiness-pack"), true);
   assert.equal(report.artifacts.some((item) => item.id === "service-acceptance" && item.markdown === "release/service-acceptance-summary.md" && item.evidence === "/api/service-acceptance-summary"), true);
   assert.equal(report.artifacts.some((item) => item.id === "drug-consumable-readiness" && item.markdown === "release/drug-consumable-readiness-report.md" && item.evidence === "/api/drug-consumable-supervision"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "drug-consumable-about" && item.markdown === "drug-consumable-about.html" && item.evidence === "drug-consumable-about.html"), true);
   assert.equal(report.templateReadmes.some((item) => item.file === "release/templates/interface-joint-test/README.md"), true);
   assert.equal(report.templateReadmes.every((item) => item.evidence === "/api/site-template-readmes"), true);
   assert.equal(report.checks.every((item) => item.passed), true);
@@ -36,6 +37,7 @@ test("release artifact manifest renders and writes artifacts", (t) => {
   assert.match(markdown, /Template READMEs/);
   assert.match(markdown, /release-artifact-manifest\.md/);
   assert.match(markdown, /drug-consumable-readiness-report\.md/);
+  assert.match(markdown, /drug-consumable-about\.html/);
 
   writeOutput(report, {
     output: path.join("tmp", "release-artifact-manifest-test", "release-artifact-manifest.json"),
