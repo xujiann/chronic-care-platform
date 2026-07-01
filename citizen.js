@@ -3,6 +3,7 @@ const CITIZEN_EXTRA_KEY = "chronic-care-citizen-extra";
 const LARGE_MODE_KEY = "chronic-care-large-mode";
 const CLIENT_CHANNEL_KEY = "chronic-care-client-channel";
 const API_BASE = location.protocol === "file:" ? "" : "/api";
+const RESIDENT_TASK_CLOSED_STATUSES = new Set(["closed", "completed", "cancel-requested", "cancelled", "canceled"]);
 
 const fallbackState = {
   accounts: [
@@ -216,6 +217,10 @@ function serviceNavigationMeta(tab) {
   };
 }
 
+function mobileServiceBadgeLabel(tab, active) {
+  return active ? "当前" : `${serviceNavigationMeta(tab).featureCount}项`;
+}
+
 const registrationSchedules = [
   { id: "reg-sch-cardio-am", hospital: "大连市中心医院", department: "心内科", doctor: "王医生", date: todayOffset(2), period: "上午", remaining: 6, fee: 18, cancelBeforeHours: 24, source: "医院号源池", tags: ["高血压复诊", "支持陪诊"] },
   { id: "reg-sch-endocrine-pm", hospital: "大连医科大学附属医院", department: "内分泌科", doctor: "赵医生", date: todayOffset(3), period: "下午", remaining: 4, fee: 22, cancelBeforeHours: 12, source: "医院号源池", tags: ["糖尿病复诊", "检查解读"] },
@@ -374,10 +379,14 @@ function bindServiceTabs() {
 function renderMobileServiceNav() {
   const target = document.querySelector("#mobile-service-nav");
   if (!target) return;
-  target.innerHTML = getLaunchedCitizenServiceTabs().map((item) => `<a href="${citizenPageHref(item.key)}" data-mobile-service-tab="${item.key}" aria-label="${item.label}，${item.status}" aria-current="${item.key === activeServiceTab ? "page" : "false"}">
+  target.innerHTML = getLaunchedCitizenServiceTabs().map((item) => {
+    const active = item.key === activeServiceTab;
+    const meta = serviceNavigationMeta(item);
+    return `<a href="${citizenPageHref(item.key)}" data-mobile-service-tab="${item.key}" data-mobile-service-state="${item.status}" title="${item.label}：${meta.featureCount}项已实现能力；接口：${meta.interfaceLabel}；待生产化：${meta.productionBoundary}" aria-label="${item.label}，${item.status}，${meta.featureCount}项已实现能力，接口：${meta.interfaceLabel}，待生产化：${meta.productionBoundary}" aria-current="${active ? "page" : "false"}">
     <span>${item.label}</span>
-    <small class="ready">${item.key === activeServiceTab ? "当前" : "已开"}</small>
-  </a>`).join("");
+    <small class="ready">${mobileServiceBadgeLabel(item, active)}</small>
+  </a>`;
+  }).join("");
   target.querySelectorAll("[data-mobile-service-tab]").forEach((link) => {
     link.addEventListener("click", (event) => {
       event.preventDefault();
@@ -602,7 +611,8 @@ function updateServicePanes() {
     link.setAttribute("aria-current", active ? "page" : "false");
     link.setAttribute("href", citizenPageHref(link.dataset.mobileServiceTab));
     const badge = link.querySelector("small");
-    if (badge) badge.textContent = active ? "当前" : "已开";
+    const tab = launchedTabs.find((item) => item.key === link.dataset.mobileServiceTab);
+    if (badge && tab) badge.textContent = mobileServiceBadgeLabel(tab, active);
   });
   document.querySelectorAll("[data-service-pane]").forEach((pane) => {
     const launched = launchedTabs.some((item) => item.key === pane.dataset.servicePane);
@@ -858,6 +868,10 @@ function renderReminderCenter(residentId) {
   </article>`).join("") || `<p class="muted">暂无服务待办，居民端会在预约、随访或授权到期时自动汇总。</p>`;
 }
 
+function isResidentServiceTaskOpen(item) {
+  return !RESIDENT_TASK_CLOSED_STATUSES.has(String(item?.status || "").trim());
+}
+
 function buildResidentServiceTasks(residentId) {
   return [
     ...(state.followups || []).filter((item) => item.residentId === residentId && item.status !== "已完成").map((item) => ({
@@ -915,7 +929,7 @@ function buildResidentServiceTasks(residentId) {
       page: "registration",
       action: "查看挂号"
     })),
-    ...getEscortOrders(residentId).filter((item) => !["closed", "completed"].includes(item.status)).map((item) => ({
+    ...getEscortOrders(residentId).filter(isResidentServiceTaskOpen).map((item) => ({
       taskId: `escortServiceOrders:${item.id}`,
       collection: "escortServiceOrders",
       service: "助医陪诊",
@@ -1033,7 +1047,11 @@ function applyLocalResidentTaskAction(taskId, collection, payload) {
     residentFeedback: payload.comment || rows[index].residentFeedback,
     satisfaction: payload.satisfaction || rows[index].satisfaction
   };
-  if (payload.action === "cancel-request") rows[index].status = "cancel-requested";
+  if (payload.action === "cancel-request") {
+    rows[index].status = "cancel-requested";
+    rows[index].cancellationReason = payload.comment || rows[index].cancellationReason;
+    if (collection === "escortServiceOrders") rows[index].familyContactStatus = "cancel-requested";
+  }
   if (payload.action === "resident-confirm" && collection === "escortServiceOrders") rows[index].familyContactStatus = "confirmed";
   if (payload.action === "quality-feedback" && collection === "escortServiceOrders") rows[index].qualityReview = "citizen-feedback";
   if (payload.action === "quality-feedback" && collection === "internetNursingOrders") rows[index].qualityCallback = "citizen-feedback";
@@ -2154,6 +2172,7 @@ function formatEscortStatus(value) {
     "in-service": "服务中",
     completed: "已完成",
     closed: "已关闭",
+    "cancel-requested": "取消待确认",
     pending: "待确认",
     covered: "已保障",
     signed: "已签约",

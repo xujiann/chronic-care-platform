@@ -990,8 +990,12 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /APP/);
   assert.match(citizenJs, /renderMobileServiceNav/);
   assert.match(citizenJs, /data-mobile-service-tab/);
-  assert.match(citizenJs, /badge\.textContent = active \? "当前" : "已开"/);
-  assert.match(citizenJs, /\$\{item\.key === activeServiceTab \? "当前" : "已开"\}/);
+  assert.match(citizenJs, /data-mobile-service-state/);
+  assert.match(citizenJs, /mobileServiceBadgeLabel/);
+  assert.match(citizenJs, /title="\$\{item\.label\}：\$\{meta\.featureCount\}项已实现能力/);
+  assert.match(citizenJs, /aria-label="\$\{item\.label\}，\$\{item\.status\}，\$\{meta\.featureCount\}项已实现能力/);
+  assert.match(citizenJs, /badge\.textContent = mobileServiceBadgeLabel/);
+  assert.match(citizenJs, /active \? "当前" : `\$\{serviceNavigationMeta\(tab\)\.featureCount\}项`/);
   assert.match(citizenJs, /citizenPageHref/);
   assert.match(citizenJs, /serviceTabFromRoute/);
   assert.match(citizenJs, /params\.set\("page", key\)/);
