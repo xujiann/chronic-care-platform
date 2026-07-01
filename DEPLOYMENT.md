@@ -256,4 +256,6 @@ For drug traceability-code field joint testing, keep `drugTraceabilityEvidenceRe
 
 During scanner, pharmacy, and insurance settlement joint testing, submit sample evidence through `POST /api/drug-consumable-supervision/:id/traceability-evidence` or the insurance/institution portal buttons. Archive the returned `traceabilityEvidenceSubmissions`, completed/missing fields, and audit action with the site signoff package.
 
+When archiving `release/drug-consumable-readiness-report.md`, verify the summary line `Traceability coverage: ready` before signoff so the Markdown bundle matches the API coverage gate.
+
 Use `drug-consumable-about.html` during site walkthroughs as the policy explanation page for drug traceability-code collection, rational medication review, fixed pickup, high-value consumable clues, insurance settlement coordination, remediation evidence, role boundaries, and remaining field integration work.
