@@ -1991,9 +1991,11 @@ function renderEscortAppointments(residentId) {
   const providerSelect = form.elements.providerId;
   const registrationSelect = form.elements.registrationOrderId;
   const selected = providerSelect.value;
-  providerSelect.innerHTML = providers
-    .map((item) => `<option value="${item.id}">${formatEscortProviderName(item)} · ${formatEscortDistrict(item.district)} · ${item.pricing?.halfDayFee || item.feeEstimate || "待估价"} 元起</option>`)
-    .join("");
+  providerSelect.innerHTML = providers.length
+    ? providers
+      .map((item) => `<option value="${item.id}">${formatEscortProviderName(item)} · ${formatEscortDistrict(item.district)} · ${item.pricing?.halfDayFee || item.feeEstimate || "待估价"} 元起</option>`)
+      .join("")
+    : `<option value="">暂无可预约服务主体</option>`;
   if (selected && providers.some((item) => item.id === selected)) providerSelect.value = selected;
   if (registrationSelect) {
     const selectedRegistration = registrationSelect.value;
@@ -2006,7 +2008,10 @@ function renderEscortAppointments(residentId) {
   }
   if (!providerSelect.value && providers[0]) providerSelect.value = providers[0].id;
   if (!form.elements.appointmentAt.value) form.elements.appointmentAt.value = todayOffset(1);
-  summary.textContent = `${providers.length} 家可预约服务主体 · ${orders.length} 单本人/家庭陪诊预约`;
+  setEscortAppointmentAvailability(form, providers.length > 0);
+  summary.textContent = providers.length
+    ? `${providers.length} 家可预约服务主体 · ${orders.length} 单本人/家庭陪诊预约`
+    : `暂无已发布服务主体 · ${orders.length} 单本人/家庭陪诊预约可追踪`;
   cards.innerHTML = orders
     .sort((a, b) => String(a.appointmentAt || a.due || "").localeCompare(String(b.appointmentAt || b.due || "")))
     .map((item) => `<article class="mini-card escort-order-card">
@@ -2020,6 +2025,16 @@ function renderEscortAppointments(residentId) {
     .join("") || `<p class="muted">暂无陪诊预约。提交后将同步到助医陪诊监管端和服务主体待办。</p>`;
 }
 
+function setEscortAppointmentAvailability(form, available) {
+  form.dataset.escortProviderReady = available ? "true" : "false";
+  form.classList.toggle("is-unavailable", !available);
+  Array.from(form.elements).forEach((control) => {
+    if (control.type === "submit" || control.name) control.disabled = !available;
+  });
+  const submit = form.querySelector("button[type='submit']");
+  if (submit) submit.textContent = available ? "提交陪诊预约" : "暂无可预约服务主体";
+}
+
 function bindEscortAppointment() {
   const form = document.querySelector("#escort-appointment-form");
   if (!form) return;
@@ -2029,7 +2044,13 @@ function bindEscortAppointment() {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const data = new FormData(form);
-    const provider = getEscortProviders().find((item) => item.id === data.get("providerId"));
+    const providers = getEscortProviders();
+    if (!providers.length) {
+      setEscortAppointmentAvailability(form, false);
+      showToast("暂无已发布陪诊服务主体，暂不能提交预约");
+      return;
+    }
+    const provider = providers.find((item) => item.id === data.get("providerId"));
     const linkedRegistration = findEscortRegistrationOrder(currentResidentId, data.get("registrationOrderId"));
     const payload = {
       residentId: currentResidentId,

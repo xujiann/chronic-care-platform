@@ -17,7 +17,7 @@
 | 登录与身份 | `/api/auth/phone-code`, `/api/auth/phone-login`, `/api/auth/me` | `accounts`, `authUsers`, `securityEvents` | 已实现 | 已具备演示短信验证码签发、冷却、有效期、居民会话和安全审计；生产接入真实短信网关、实名核验和风控策略 |
 | 消息与待办 | `/api/messages`, `/api/tasks/:id/actions` | `taskMessages`, `service tasks`, `dataAccessLogs` | 已实现 | 接入真实短信、订阅消息、送达回执和审计保全；居民端按确认、取消、评价状态隐藏重复操作按钮 |
 
-服务待办中心仅展示已上线动作，并按订单状态隐藏已确认、已申请取消或已完成评价后的重复按钮；陪诊和护理订单历史仍保留在各自业务页，供居民追溯医院回执、服务安排和质控记录。
+服务待办中心仅展示已上线动作，并按订单状态隐藏已确认、已申请取消或已完成评价后的重复按钮；陪诊和护理订单历史仍保留在各自业务页，供居民追溯医院回执、服务安排和质控记录。居民端陪诊预约表单仅在存在已发布服务主体时启用，无已发布服务主体时保留订单追踪但禁止提交新预约。
 
 ## 3. 挂号接口契约
 
@@ -31,6 +31,7 @@
 - 导航证据：`citizen.html?page=health-record|emr|nursing|escort|registration` 的服务导航卡展示已实现能力数、当前接口和“待生产化”边界；底部手机导航非当前项显示能力数量，提供 `data-mobile-service-count` 供预览/自动化读取，并在无障碍标签中带出接口和生产边界。
 - 手机预览：`mobile-preview.html?client=app`
 - 静态测试：`node --test --test-name-pattern "citizen portal exposes resident service tabs" test/static.test.js`
+- 陪诊验收：`npm.cmd run escort:readiness`
 - API 测试：`node --test --test-name-pattern "supports citizen registration HIS payment insurance and SMS workflow" test/api.test.js`
 - 全量验证：`npm.cmd run check`, `npm.cmd test`, `npm.cmd run deploy:check`
 

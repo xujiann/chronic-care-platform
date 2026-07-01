@@ -1060,6 +1060,10 @@ select,
   min-width: 0;
 }
 
+.escort-appointment-form.is-unavailable {
+  background: #f3f6f8;
+}
+
 .escort-appointment-form label {
   display: grid;
   gap: 6px;
@@ -1083,6 +1087,13 @@ select,
   background: #fff;
   color: var(--ink);
   font: inherit;
+}
+
+.escort-appointment-form input:disabled,
+.escort-appointment-form select:disabled,
+.escort-appointment-form button:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
 }
 
 .escort-appointment-form input:focus,
