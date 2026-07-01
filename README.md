@@ -156,6 +156,8 @@ RETENTION_POLICY=10y-worm
 
 ## 验证与质量门禁
 
+`launch:smoke` generates `release/launch-smoke-report.json` and `release/launch-smoke-report.md`. Run it before release packaging for offline source/artifact checks, or run `npm.cmd run launch:smoke -- --base-url=https://your-runtime-host` after deployment to verify the live `/api/health` endpoint.
+
 ```powershell
 npm.cmd run check
 npm.cmd test
@@ -173,6 +175,7 @@ npm.cmd run env:check
 npm.cmd run release:report
 npm.cmd run release:report:full
 npm.cmd run release:manifest
+npm.cmd run launch:smoke
 npm.cmd run priority-apps:templates
 npm.cmd run maternal-child:readiness
 npm.cmd run policy:coverage
@@ -185,9 +188,11 @@ npm.cmd run hybrid:deployment-readiness
 
 `release:report` 同时输出 `release/storage-model-inspection.json` 与 `release/storage-model-inspection.md`，记录 JSON 快照集合数、记录量、最大集合，以及 SQLite 表、schema 版本和迁移元数据；SQLite 文件在干净 checkout 中不存在时只作为提示，不阻断 CI。`production-db:readiness` 会生成 `release/production-db-readiness-report.json` 与 `release/production-db-readiness-report.md`，把 PostgreSQL/正式数据库切换前的 `productionDeploymentPlan`、当前 SQLite/JSON 模型、备份恢复演练文档、RTO/RPO 说明和运行时 PostgreSQL 阻断汇总为专项证据包。
 
+`launch:smoke` 会生成 `release/launch-smoke-report.json` 与 `release/launch-smoke-report.md`，离线核对上线前只读运行路由、发布报告、生产割接清单、站点准备包、监控和运维证据是否齐备；传入 `--base-url=http://localhost:5173` 时会额外执行在线健康检查，适合作为发布前最后一跳冒烟。
+
 `identity:contract` 会生成 `release/identity-contract.json` 与 `release/identity-contract.md`，固化政务统一身份接入所需 claims、角色到门户映射、机构覆盖度和样例 claim 映射；`release:report` 与 CI 会同步归档该契约，便于现场 OIDC/SAML 联调前逐项确认。
 
-`audit:retention` 会生成 `release/audit-retention-report.json` 与 `release/audit-retention-report.md`，离线验证安全事件和数据访问日志哈希链，记录导出摘要、保全目标和安全验收台账；未配置 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT` 时只作为演示环境提示，生产切换仍由 `env:check:production` 阻断。
+`audit:retention` 会生成 `release/audit-retention-report.json` 与 `release/audit-retention-report.md`，离线验证安全事件和数据访问日志哈希链，记录导出摘要、保全目标和安全验收台账；默认 `release:report` 在演示环境使用发布包内审计报告作为本地归档目标，生产切换仍必须通过 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT` 绑定真实保全路径。
 
 `integration:readiness` 会生成 `release/integration-readiness-report.json` 与 `release/integration-readiness-report.md`，检查 P0 接口台账、HIS/EMR/LIS/PACS/医保/证照/统计契约、幂等键、签名和重试策略，并把身份、主索引、安全审计等 P0 覆盖关系纳入发布取证。
 
@@ -285,7 +290,7 @@ hospital-operations:readiness generates release/hospital-operations-readiness-re
 
 `escort.html` is the runnable commission entry for the older adult medical escort service pilot. It uses `GET /api/escort-services/dashboard`, `POST /api/escort-services/orders`, `POST /api/escort-services/orders/:id/actions`, and `POST /api/escort-services/orders/:id/hospital-handoff` to manage provider registry publication, trained escort workers, service requests, hospital handoff confirmation, contract and insurance evidence, subsidy categories, risk queue, quality callbacks, and task messages.
 
-`citizen.html` includes a resident-side medical escort appointment form. Citizen users can create an order for themselves or household members through `POST /api/escort-services/orders`; the same scoped dashboard returns only their household orders and published service providers. The order API rejects missing provider registry rows, unpublished providers, and duplicate active appointments for the same registration or visit slot before creating the resident appointment.
+`citizen.html` includes a resident-side medical escort appointment form. Citizen users can create an order for themselves or household members through `POST /api/escort-services/orders`; the same scoped dashboard returns only their household orders and published service providers. The order API rejects missing provider registry rows, unpublished providers, missing hospital or appointment date, past appointment dates, and duplicate active appointments for the same registration or visit slot before creating the resident appointment.
 
 The hospital interface development handoff is `docs/escort-hospital-interface.md`. It documents HIS/outpatient guidance boundaries, `hospitalCode` scoping, request/response fields, the `hospital-handoff` API, resident notification behavior, audit requirements, and joint-test acceptance steps.
 

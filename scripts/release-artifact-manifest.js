@@ -8,6 +8,7 @@ const DEFAULT_MARKDOWN = path.join(ROOT, "release", "release-artifact-manifest.m
 
 const ARTIFACTS = [
   ["release-report", "release", "Release readiness aggregate", "release/release-report.json", "release/release-report.md", "release:report", "/api/release-report"],
+  ["launch-smoke", "release", "Launch runtime smoke report", "release/launch-smoke-report.json", "release/launch-smoke-report.md", "launch:smoke", "/api/health"],
   ["release-artifact-manifest", "release", "Release artifact manifest", "release/release-artifact-manifest.json", "release/release-artifact-manifest.md", "release:manifest", "release/release-artifact-manifest.md"],
   ["production-cutover", "cutover", "Production cutover checklist", "release/production-cutover-checklist.json", "release/production-cutover-checklist.md", "release:report", "/api/system/readiness"],
   ["storage-model", "data", "Storage model inspection", "release/storage-model-inspection.json", "release/storage-model-inspection.md", "release:report", "npm.cmd run storage:inspect"],

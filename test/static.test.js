@@ -111,6 +111,9 @@ test("about page documents doctor multi-practice policy boundaries", () => {
   assert.match(doctorJs, /本人申请/);
   assert.doesNotMatch(doctorAssets, /锟|�|鍖|鎵|鐐|寰|宸|绛|澶|鏆/);
   assert.match(read("auth.js"), /"doctor\.html": \["institution"\]/);
+  assert.match(doctorHtml, /requireAccountType\(\["doctor"\]\)/);
+  assert.match(read("auth.js"), /function requireAccountType/);
+  assert.match(read("auth.js"), /pageName === "doctor\.html"[\s\S]*accountType === "doctor"/);
   assert.match(read("auth.js"), /home: "doctor\.html", doctorId: "doc-liu"/);
   assert.match(about, /医生账户与多点执业政策说明/);
   assert.match(about, /国卫医发〔2014〕86号/);
@@ -395,6 +398,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal(Boolean(pkg.scripts["env:check"]), true);
   assert.equal(Boolean(pkg.scripts["release:report"]), true);
   assert.equal(Boolean(pkg.scripts["release:manifest"]), true);
+  assert.equal(Boolean(pkg.scripts["launch:smoke"]), true);
   assert.equal(Boolean(pkg.scripts["priority-apps:templates"]), true);
   assert.equal(Boolean(pkg.scripts["maternal-child:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["rollback:snapshot"]), true);
@@ -431,11 +435,13 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /deploy:check/);
   assert.match(read("README.md"), /release:report/);
   assert.match(read("README.md"), /release:manifest/);
+  assert.match(read("README.md"), /launch:smoke/);
   assert.match(read("DEPLOYMENT.md"), /SMS_GATEWAY_URL/);
   assert.match(read("DEPLOYMENT.md"), /doctor\.html/);
   assert.match(read("scripts/release-report.js"), /test:coverage/);
   assert.match(read("scripts/release-report.js"), /test:e2e/);
   assert.match(read("scripts/release-report.js"), /Production cutover checklist/);
+  assert.match(read("scripts/launch-smoke.js"), /Launch smoke report/);
   assert.match(read("README.md"), /production-cutover-checklist\.md/);
   assert.match(read("README.md"), /storage-model-inspection\.md/);
   assert.match(read("README.md"), /identity-contract\.md/);
@@ -931,8 +937,11 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(server, /\/api\/auth\/phone-code/);
   assert.match(server, /PHONE_CODE_TTL_MS/);
   assert.match(server, /PHONE_CODE_COOLDOWN_MS/);
+  assert.match(server, /PHONE_LOGIN_MAX_FAILED_ATTEMPTS/);
+  assert.match(server, /PHONE_LOGIN_LOCK_MS/);
   assert.match(server, /\/api\/auth\/phone-login/);
   assert.match(server, /findCitizenAuthUserByPhone/);
+  assert.match(auth, /response\.status === 423/);
   ["健康档案", "电子病历", "护理", "陪诊", "挂号"].forEach((label) => assert.match(citizenJs, new RegExp(label)));
   assert.match(citizenHtml, /service-tabs/);
   assert.match(citizenHtml, /service-command-panel/);

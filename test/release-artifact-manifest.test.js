@@ -19,6 +19,7 @@ test("release artifact manifest indexes reports templates commands and evidence"
   assert.equal(report.templateReadmes.length, 4);
   assert.equal(report.artifacts.some((item) => item.id === "release-report" && item.command === "release:report"), true);
   assert.equal(report.artifacts.some((item) => item.id === "release-artifact-manifest" && item.command === "release:manifest"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "launch-smoke" && item.command === "launch:smoke" && item.markdown === "release/launch-smoke-report.md" && item.evidence === "/api/health"), true);
   assert.equal(report.artifacts.some((item) => item.id === "site-readiness" && item.evidence === "/api/site-readiness-pack"), true);
   assert.equal(report.artifacts.some((item) => item.id === "service-acceptance" && item.markdown === "release/service-acceptance-summary.md" && item.evidence === "/api/service-acceptance-summary"), true);
   assert.equal(report.artifacts.some((item) => item.id === "health-dashboard" && item.command === "health-dashboard:summary" && item.markdown === "release/health-dashboard-summary.md" && item.evidence === "/api/health-dashboard/summary"), true);
@@ -41,6 +42,7 @@ test("release artifact manifest renders and writes artifacts", (t) => {
   const report = buildReleaseArtifactManifest();
   const markdown = renderMarkdown(report);
   assert.match(markdown, /Release artifact manifest/);
+  assert.match(markdown, /launch-smoke-report\.md/);
   assert.match(markdown, /health-dashboard-summary\.md/);
   assert.match(markdown, /priority-application-templates\.md/);
   assert.match(markdown, /citizen-launch-foundation-readiness\.md/);

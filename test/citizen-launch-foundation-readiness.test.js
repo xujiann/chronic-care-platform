@@ -23,6 +23,7 @@ test("citizen launch foundation readiness captures phase-one gates", () => {
   assert.equal(report.checks.some((item) => item.id === "citizen-foundation:phone-login" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "citizen-foundation:phone-code-delivery" && item.passed), true);
   assert.equal(report.checks.find((item) => item.id === "citizen-foundation:phone-code-delivery").detail.includes("cooldown"), true);
+  assert.equal(report.checks.find((item) => item.id === "citizen-foundation:phone-login").detail.includes("failed-attempt lockout"), true);
   assert.equal(report.checks.some((item) => item.id === "citizen-foundation:mobile-install-shell" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "citizen-foundation:app-shortcuts" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "citizen-foundation:launch-gates" && item.passed), true);

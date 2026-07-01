@@ -140,6 +140,7 @@ npm.cmd run deploy:check
 npm.cmd run env:check
 npm.cmd run release:report
 npm.cmd run release:manifest
+npm.cmd run launch:smoke
 npm.cmd run priority-apps:templates
 npm.cmd run maternal-child:readiness
 npm.cmd run policy:coverage
@@ -171,7 +172,7 @@ npm.cmd run release:report:full
 
 `identity:contract` 会生成 `release/identity-contract.json` 和 `release/identity-contract.md`，记录政务统一身份接入所需 claims、角色到门户映射、机构覆盖度和样例 claim 映射；`release:report` 会同步写出这些文件，作为 OIDC/SAML 联调前的身份契约验收材料。
 
-`audit:retention` 会生成 `release/audit-retention-report.json` 和 `release/audit-retention-report.md`，离线验证安全事件与数据访问日志哈希链，记录导出摘要、保全目标、安全验收台账和生产审计保全路径；演示环境缺少 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT` 时仅提示，正式生产切换仍必须通过 `env:check:production`。
+`audit:retention` 会生成 `release/audit-retention-report.json` 和 `release/audit-retention-report.md`，离线验证安全事件与数据访问日志哈希链，记录导出摘要、保全目标、安全验收台账和生产审计保全路径；默认演示发布报告使用发布包内审计报告作为本地归档目标，正式生产切换仍必须通过 `env:check:production` 并配置 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT`。
 
 `integration:readiness` 会生成 `release/integration-readiness-report.json` 和 `release/integration-readiness-report.md`，检查 P0 接口台账、HIS/EMR/LIS/PACS/医保/证照/统计契约、幂等键、签名和重试策略，并将统一身份、居民主索引、医疗业务系统、分级诊疗和安全审计的覆盖关系归档为联调验收材料。
 

@@ -25,6 +25,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "snapshot:healthDashboard",
     "snapshot:multiPractice",
     "manifest:healthDashboardSummary",
+    "manifest:launchSmoke",
     "manifest:priorityApplicationTemplates",
     "manifest:citizenLaunchFoundation",
     "manifest:multiPracticeReadiness",

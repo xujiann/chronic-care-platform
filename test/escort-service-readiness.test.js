@@ -27,12 +27,14 @@ test("escort service readiness validates policy, registry, workforce, orders and
   assert.equal(report.checks.some((item) => item.id === "escort:citizenProviderAvailability" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:providerScopeGuard" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:duplicateAppointmentGuard" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "escort:appointmentFieldGuard" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:citizenCancellation" && item.passed), true);
   assert.match(renderMarkdown(report), /Medical escort service readiness report/);
   assert.match(renderMarkdown(report), /Hospital-confirmed orders/);
   assert.match(renderMarkdown(report), /citizen appointment is enabled only when a published provider is available/);
   assert.match(renderMarkdown(report), /order creation rejects missing or unpublished provider registry rows/);
   assert.match(renderMarkdown(report), /open resident escort appointments are idempotency-guarded/);
+  assert.match(renderMarkdown(report), /resident escort requests require hospital and non-past appointment date/);
 });
 
 test("escort service readiness writes release artifacts", (t) => {

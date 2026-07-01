@@ -310,6 +310,15 @@ function auditRetentionChecks(auditRetention) {
   ];
 }
 
+function auditRetentionEnvForRelease(options, profile) {
+  const env = { ...(options.env || process.env) };
+  const strictProfile = profile === "production";
+  if (!strictProfile && !env.AUDIT_EXPORT_PATH && !env.SIEM_ENDPOINT) {
+    env.AUDIT_EXPORT_PATH = path.join(ROOT, "release", "audit-retention-report.json");
+  }
+  return env;
+}
+
 function chronicFollowupChecks(chronicFollowup, chronicInstitutionInterfaces, chronicLaunchCore) {
   return [
     check("chronicFollowup:readiness", chronicFollowup.ok, chronicFollowup.ok ? "chronic follow-up readiness checks passed" : "chronic follow-up readiness checks failed", "error", "chronic-followup"),
@@ -694,7 +703,7 @@ function buildReleaseReport(options = {}) {
   const env = validateProductionConfig(options);
   const storageModel = inspectStorageModel({ dataDir: path.join(ROOT, "data") });
   const identityContract = buildIdentityContract({ data });
-  const auditRetention = buildAuditRetentionReport({ data, env: options.env || process.env });
+  const auditRetention = buildAuditRetentionReport({ data, env: auditRetentionEnvForRelease(options, env.profile) });
   const chronicFollowup = buildChronicFollowupReadinessReport({ data });
   const chronicInstitutionInterfaces = buildChronicInstitutionInterfaceReport({ data, pkg });
   const chronicLaunchCore = buildChronicLaunchCoreReport({ data, pkg });

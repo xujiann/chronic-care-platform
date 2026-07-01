@@ -126,6 +126,8 @@ flowchart TD
 | HTTP | 场景 | 处理建议 |
 | --- | --- | --- |
 | 400 | 请求体字段不合法 | 检查 JSON、日期和状态值 |
+| 400 | 缺少医院或就诊日期 | 补齐 `hospital`/`hospitalCode` 和 `appointmentAt` 后再提交 |
+| 400 | `appointmentAt` 早于当前日期 | 重新选择未来就诊日期，避免生成无法派单的预约 |
 | 400 | `providerId` 不在陪诊服务主体目录 | 先同步 `escortServiceProviders` 监管目录，再提交居民预约 |
 | 401 | 未登录或 token 失效 | 重新登录机构端 |
 | 403 | 居民端选择未发布服务主体 | 服务主体完成发布、保险和应急预案审核后再开放预约 |
@@ -153,3 +155,9 @@ These fields are optional in early pilots but should be included by production h
 | `outpatientQueueNo` | Outpatient calling/queue system | Queue number shown to the resident and escort worker. |
 
 Joint testing must prove the resident card, escort console, task message, audit trail, and data access log all carry the same `hisVisitId` or the agreed site-specific equivalent.
+
+## 10. Launch date guard
+
+- Demo registration schedules and seeded escort appointments are normalized against the current runtime date unless `DEMO_TODAY` is explicitly set.
+- `/api/escort-services/orders` still rejects direct past `appointmentAt` values, while stale seeded demo orders are ignored by duplicate detection after their date has passed.
+- API regression covers the resident path: registration order creation, escort order creation from that registration, duplicate rejection, hospital handoff, and resident cancellation.

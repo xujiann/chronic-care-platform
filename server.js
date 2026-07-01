@@ -42,7 +42,10 @@ const sessions = new Map();
 const DEMO_SMS_CODE = process.env.DEMO_SMS_CODE || "888888";
 const PHONE_CODE_TTL_MS = 5 * 60 * 1000;
 const PHONE_CODE_COOLDOWN_MS = 60 * 1000;
+const PHONE_LOGIN_MAX_FAILED_ATTEMPTS = 5;
+const PHONE_LOGIN_LOCK_MS = 10 * 60 * 1000;
 const phoneVerificationCodes = new Map();
+const phoneLoginFailures = new Map();
 let sqliteModule = null;
 let sqliteError = null;
 const SQLITE_MIGRATIONS = [
@@ -423,8 +426,9 @@ const mimeTypes = {
 };
 
 function demoBaseDate() {
-  const configured = String(process.env.DEMO_TODAY || "2026-06-22").trim();
-  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(configured) ? configured : "2026-06-22";
+  const fallback = new Date().toISOString().slice(0, 10);
+  const configured = String(process.env.DEMO_TODAY || fallback).trim();
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(configured) ? configured : fallback;
   return new Date(`${normalized}T00:00:00.000Z`);
 }
 
@@ -4459,9 +4463,37 @@ function normalizeState(data) {
     personalRecords: (Array.isArray(data.personalRecords) ? data.personalRecords : seedPersonalRecords()).map(cleanPersonalRecordText)
   };
   completeSystemTargets(state);
+  refreshDemoAppointmentDates(state);
   refreshDeathStatistics(state);
   refreshBirthStatistics(state);
   return normalizePersonIndexes(state);
+}
+
+function refreshDemoAppointmentDates(state) {
+  const seedSchedules = new Map(seedRegistrationSchedules().map((item) => [item.id, item]));
+  state.registrationSchedules = (Array.isArray(state.registrationSchedules) ? state.registrationSchedules : []).map((item) => {
+    const seed = seedSchedules.get(item.id);
+    if (!seed || !isPastEscortAppointmentDate(item.date)) return item;
+    return { ...item, date: seed.date };
+  });
+  const scheduleDates = new Map(state.registrationSchedules.map((item) => [item.id, item.date]));
+  const seedRegistrationOrderMap = new Map(seedRegistrationOrders().map((item) => [item.id, item]));
+  state.registrationOrders = (Array.isArray(state.registrationOrders) ? state.registrationOrders : []).map((item) => {
+    const seed = seedRegistrationOrderMap.get(item.id);
+    const appointmentDate = scheduleDates.get(item.scheduleId) || seed?.appointmentDate;
+    if (!appointmentDate || !isPastEscortAppointmentDate(item.appointmentDate)) return item;
+    return { ...item, appointmentDate };
+  });
+  const seedEscortOrders = new Map(seedEscortServiceOrders().map((item) => [item.id, item]));
+  state.escortServiceOrders = (Array.isArray(state.escortServiceOrders) ? state.escortServiceOrders : []).map((item) => {
+    const seed = seedEscortOrders.get(item.id);
+    if (!seed || (!isPastEscortAppointmentDate(item.appointmentAt) && !isPastEscortAppointmentDate(item.due))) return item;
+    return {
+      ...item,
+      appointmentAt: isPastEscortAppointmentDate(item.appointmentAt) ? seed.appointmentAt : item.appointmentAt,
+      due: isPastEscortAppointmentDate(item.due) ? seed.due : item.due
+    };
+  });
 }
 
 function hasCorruptedText(value) {
@@ -5984,10 +6016,50 @@ function prunePhoneVerificationCodes(now = Date.now()) {
   }
 }
 
+function prunePhoneLoginFailures(now = Date.now()) {
+  for (const [phone, item] of phoneLoginFailures.entries()) {
+    if (!item || (Number(item.lockedUntilMs || 0) > 0 && Number(item.lockedUntilMs || 0) <= now)) {
+      phoneLoginFailures.delete(phone);
+    }
+  }
+}
+
+function phoneLoginLockStatus(phone, now = Date.now()) {
+  const normalizedPhone = normalizePhone(phone);
+  prunePhoneLoginFailures(now);
+  const failure = phoneLoginFailures.get(normalizedPhone);
+  if (!failure || Number(failure.lockedUntilMs || 0) <= now) return { locked: false, retryAfterSeconds: 0, failedAttempts: failure?.failedAttempts || 0 };
+  return {
+    locked: true,
+    retryAfterSeconds: Math.ceil((Number(failure.lockedUntilMs) - now) / 1000),
+    failedAttempts: failure.failedAttempts || 0
+  };
+}
+
+function clearPhoneLoginFailures(phone) {
+  phoneLoginFailures.delete(normalizePhone(phone));
+}
+
+function recordPhoneLoginFailure(phone, now = Date.now()) {
+  const normalizedPhone = normalizePhone(phone);
+  prunePhoneLoginFailures(now);
+  const current = phoneLoginFailures.get(normalizedPhone) || { failedAttempts: 0, lockedUntilMs: 0 };
+  const failedAttempts = Number(current.failedAttempts || 0) + 1;
+  const lockedUntilMs = failedAttempts >= PHONE_LOGIN_MAX_FAILED_ATTEMPTS ? now + PHONE_LOGIN_LOCK_MS : 0;
+  const next = { failedAttempts, lockedUntilMs, lastFailedAtMs: now };
+  phoneLoginFailures.set(normalizedPhone, next);
+  return {
+    locked: lockedUntilMs > 0,
+    failedAttempts,
+    retryAfterSeconds: lockedUntilMs > 0 ? Math.ceil((lockedUntilMs - now) / 1000) : 0
+  };
+}
+
 function issuePhoneVerificationCode(phone, user) {
   const normalizedPhone = normalizePhone(phone);
   const now = Date.now();
   prunePhoneVerificationCodes(now);
+  clearPhoneLoginFailures(normalizedPhone);
   const existing = phoneVerificationCodes.get(normalizedPhone);
   if (existing && now - Number(existing.sentAtMs || 0) < PHONE_CODE_COOLDOWN_MS) {
     return {
@@ -6020,9 +6092,12 @@ function verifyPhoneCode(phone, code, user) {
   const issued = phoneVerificationCodes.get(normalizedPhone);
   if (issued && issued.userId === user.id && issued.expiresAtMs > now && timingSafeTextEqual(issued.code, normalizedCode)) {
     phoneVerificationCodes.delete(normalizedPhone);
+    clearPhoneLoginFailures(normalizedPhone);
     return true;
   }
-  return timingSafeTextEqual(DEMO_SMS_CODE, normalizedCode);
+  const demoMatched = timingSafeTextEqual(DEMO_SMS_CODE, normalizedCode);
+  if (demoMatched) clearPhoneLoginFailures(normalizedPhone);
+  return demoMatched;
 }
 
 function createSession(user) {
@@ -6378,6 +6453,15 @@ function escortAppointmentDateKey(value) {
   return Number.isFinite(parsed) ? new Date(parsed).toISOString().slice(0, 10) : text;
 }
 
+function isPastEscortAppointmentDate(value, now = new Date()) {
+  const dateKey = escortAppointmentDateKey(value);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return false;
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const appointmentStart = new Date(year, month - 1, day).getTime();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  return Number.isFinite(appointmentStart) && appointmentStart < todayStart;
+}
+
 function isInactiveEscortOrderStatus(status) {
   return isClosedTaskStatus(status) || /cancel|canceled|cancelled|取消/i.test(String(status || ""));
 }
@@ -6392,6 +6476,7 @@ function findDuplicateActiveEscortAppointment(data, details) {
     const itemHospitalKey = String(item.hospitalCode || item.hospital || "").trim().toLowerCase();
     const itemDepartmentKey = String(item.department || "").trim().toLowerCase();
     const itemDate = escortAppointmentDateKey(item.appointmentAt || item.due);
+    if (isPastEscortAppointmentDate(itemDate)) return false;
     return Boolean(appointmentDate && hospitalKey && itemDate === appointmentDate && itemHospitalKey === hospitalKey && (!departmentKey || itemDepartmentKey === departmentKey));
   });
 }
@@ -6420,6 +6505,9 @@ function normalizeEscortServiceOrder(payload, user, data) {
   const hospitalCode = String(payload.hospitalCode || registrationOrder?.hospitalCode || (/(Dalian Central|central hospital|MR1)/i.test(hospital) ? "MR1" : "")).trim();
   const appointmentAt = String(payload.appointmentAt || payload.due || registrationOrder?.appointmentDate || "").trim();
   const department = String(payload.department || registrationOrder?.department || "").trim();
+  if (!hospital && !hospitalCode) throw new Error("hospital is required");
+  if (!appointmentAt) throw new Error("appointmentAt is required");
+  if (isPastEscortAppointmentDate(appointmentAt)) throw new Error("appointmentAt cannot be in the past");
   const duplicate = findDuplicateActiveEscortAppointment(data, { residentId, registrationOrderId, hospital, hospitalCode, department, appointmentAt, due: payload.due });
   if (duplicate) throw new Error("duplicate active escort appointment");
   return {
@@ -11149,13 +11237,24 @@ async function handleApi(req, res) {
     const phone = normalizePhone(credentials.phone);
     const code = String(credentials.code || "").trim();
     const user = findCitizenAuthUserByPhone(phone);
+    const lock = phoneLoginLockStatus(phone);
+    if (lock.locked) {
+      appendSecurityEvent({ actor: phone || "unknown", role: "citizen", action: "phone-code login", target: "unified-auth", result: "denied", detail: `phone-code login locked, retry after ${lock.retryAfterSeconds} seconds` });
+      sendJson(res, 423, { ok: false, message: "phone-code login locked after repeated failures", retryAfterSeconds: lock.retryAfterSeconds, failedAttempts: lock.failedAttempts });
+      return;
+    }
     if (!user || !verifyPhoneCode(phone, code, user)) {
-      appendSecurityEvent({ actor: phone || "unknown", role: "citizen", action: "手机号验证码登录", target: "统一认证", result: "拒绝", detail: "手机号或验证码错误" });
-      sendJson(res, 401, { ok: false, message: "手机号或验证码不正确" });
+      const failure = recordPhoneLoginFailure(phone);
+      appendSecurityEvent({ actor: phone || "unknown", role: "citizen", action: "phone-code login", target: "unified-auth", result: "denied", detail: failure.locked ? "phone-code login locked after repeated failures" : "invalid phone or verification code" });
+      if (failure.locked) {
+        sendJson(res, 423, { ok: false, message: "phone-code login locked after repeated failures", retryAfterSeconds: failure.retryAfterSeconds, failedAttempts: failure.failedAttempts });
+        return;
+      }
+      sendJson(res, 401, { ok: false, message: "invalid phone or verification code" });
       return;
     }
     const session = createSession({ ...user, phone });
-    appendSecurityEvent({ actor: user.name, role: user.role, action: "手机号验证码登录", target: user.home, result: "允许", detail: "居民端验证码演示会话已签发" });
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "phone-code login", target: user.home, result: "allowed", detail: "resident phone-code session issued" });
     sendJson(res, 200, { ok: true, token: session.token, expiresAt: session.expiresAt, user: session.user });
     return;
   }
@@ -13665,6 +13764,9 @@ async function handleApi(req, res) {
         ...(data.storageMeta || {}),
         collectionVersions: { [workflowStateCollectionKey(collection)]: Number(payload.expectedVersion) }
       };
+    }
+    if (collection === "birthCertificates") {
+      refreshBirthStatistics(data);
     }
     writeDatabase(data);
     sendJson(res, 200, item);

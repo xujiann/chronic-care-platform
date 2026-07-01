@@ -96,6 +96,22 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     status: "启用",
     passwordHash: passwordHash("hashed-pass")
   });
+  fixture.authUsers.push({
+    id: "u-citizen-r2-test",
+    username: "citizen_r2",
+    name: "\u6f14\u793a\u5c45\u6c11B",
+    role: "citizen",
+    roleName: "\u4e2a\u4eba\u7aef",
+    orgCode: "PERSON-R2",
+    orgName: "\u6f14\u793a\u5c45\u6c11B\u5bb6\u5ead",
+    orgType: "citizen",
+    orgLevel: "\u4e2a\u4eba",
+    dataScope: "\u672c\u4eba",
+    home: "citizen.html",
+    residentId: "r2",
+    accountId: "a2",
+    status: "\u542f\u7528"
+  });
   fs.writeFileSync(path.join(dataDir, "db.json"), JSON.stringify(fixture, null, 2), "utf8");
 
   process.env.DATA_DIR = dataDir;
@@ -358,6 +374,21 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(badLogin.response.status, 401);
     const badPhoneLogin = await phoneLogin(baseUrl, "DEMO-MOBILE-R1", "000000");
     assert.equal(badPhoneLogin.response.status, 401);
+    for (let index = 0; index < 4; index += 1) {
+      const failed = await phoneLogin(baseUrl, "DEMO-MOBILE-R2", "000000");
+      assert.equal(failed.response.status, 401);
+    }
+    const lockedPhoneLogin = await phoneLogin(baseUrl, "DEMO-MOBILE-R2", "000000");
+    assert.equal(lockedPhoneLogin.response.status, 423);
+    assert.equal(lockedPhoneLogin.body.failedAttempts, 5);
+    assert.equal(lockedPhoneLogin.body.retryAfterSeconds > 0, true);
+    const lockedCorrectCode = await phoneLogin(baseUrl, "DEMO-MOBILE-R2", "888888");
+    assert.equal(lockedCorrectCode.response.status, 423);
+    const resetPhoneCode = await phoneCode(baseUrl, "DEMO-MOBILE-R2");
+    assert.equal(resetPhoneCode.response.status, 200);
+    const resetPhoneLogin = await phoneLogin(baseUrl, "DEMO-MOBILE-R2", resetPhoneCode.body.demoCode);
+    assert.equal(resetPhoneLogin.response.status, 200);
+    assert.equal(resetPhoneLogin.body.user.residentId, "r2");
 
     const hashedLogin = await login(baseUrl, "hashed_commission", "hashed-pass");
     assert.equal(hashedLogin.response.status, 200);
@@ -705,6 +736,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(dashboard.body.providers.every((item) => item.published !== false), true);
 
     const providerId = dashboard.body.providers[0].id;
+    const futureEscortDate = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const registrationDashboard = await api(baseUrl, "/api/registrations/dashboard", authorized(citizenToken));
     assert.equal(registrationDashboard.response.status, 200);
     const linkedSchedule = registrationDashboard.body.schedules.find((item) => item.hospitalCode === "MR1" && item.remaining > 0);
@@ -727,6 +759,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
         residentId: "r1",
         providerId,
         registrationOrderId: linkedRegistration.body.id,
+        appointmentAt: futureEscortDate,
         serviceItems: ["registration", "exam escort"],
         subsidyType: "80plus-living-alone",
         priority: "high",
@@ -744,7 +777,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(created.body.hospitalCode, "MR1");
     assert.equal(created.body.hospital, linkedRegistration.body.hospital);
     assert.equal(created.body.department, linkedRegistration.body.department);
-    assert.equal(created.body.appointmentAt, linkedRegistration.body.appointmentDate);
+    assert.equal(created.body.appointmentAt, futureEscortDate);
     assert.equal(created.body.hisVisitId, linkedRegistration.body.hisVisitId);
     assert.equal(created.body.outpatientQueueNo, linkedRegistration.body.queueNo);
     assert.equal(created.body.appointmentSource, "registration-order");
@@ -755,6 +788,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
         residentId: "r1",
         providerId,
         registrationOrderId: linkedRegistration.body.id,
+        appointmentAt: futureEscortDate,
         serviceItems: ["registration", "exam escort"],
         priority: "medium",
         sourceChannel: "citizen.html"
@@ -762,6 +796,45 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     }));
     assert.equal(duplicateEscort.response.status, 409);
     assert.equal(duplicateEscort.body.message, "duplicate active escort appointment");
+
+    const missingHospital = await api(baseUrl, "/api/escort-services/orders", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        providerId,
+        appointmentAt: futureEscortDate,
+        serviceItems: ["registration", "exam escort"]
+      })
+    }));
+    assert.equal(missingHospital.response.status, 400);
+    assert.equal(missingHospital.body.message, "hospital is required");
+
+    const missingAppointmentAt = await api(baseUrl, "/api/escort-services/orders", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        providerId,
+        hospital: "Dalian Central Hospital outpatient clinic demo",
+        department: "Cardiology",
+        serviceItems: ["registration", "exam escort"]
+      })
+    }));
+    assert.equal(missingAppointmentAt.response.status, 400);
+    assert.equal(missingAppointmentAt.body.message, "appointmentAt is required");
+
+    const pastAppointmentAt = await api(baseUrl, "/api/escort-services/orders", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        providerId,
+        hospital: "Dalian Central Hospital outpatient clinic demo",
+        department: "Cardiology",
+        appointmentAt: "2000-01-01",
+        serviceItems: ["registration", "exam escort"]
+      })
+    }));
+    assert.equal(pastAppointmentAt.response.status, 400);
+    assert.equal(pastAppointmentAt.body.message, "appointmentAt cannot be in the past");
 
     const hospitalLogin = await login(baseUrl, "hospital");
     assert.equal(hospitalLogin.response.status, 200);
@@ -1305,6 +1378,41 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(birthCreated.response.status, 201);
     assert.equal(birthCreated.body.maternalResidentId, "r1");
     assert.equal(birthCreated.body.createdBy, "hospital");
+
+    const birthStatsAfterCreate = await api(baseUrl, "/api/birth-certificates", authorized(institution.body.token));
+    assert.equal(birthStatsAfterCreate.response.status, 200);
+    assert.equal(
+      birthStatsAfterCreate.body.statistics.metrics.total,
+      birthStatsAfterCreate.body.certificates.length
+    );
+
+    const birthReported = await api(baseUrl, "/api/workflow-actions", authorized(institution.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        collection: "birthCertificates",
+        id: birthCreated.body.id,
+        status: "已上报",
+        updates: {
+          publicSecuritySync: "已共享",
+          maternalChildSync: "已入册",
+          healthManagementStatus: "已建档"
+        },
+        note: "出生医学证明上报入册"
+      })
+    }));
+    assert.equal(birthReported.response.status, 200);
+    assert.equal(birthReported.body.publicSecuritySync, "已共享");
+    assert.equal(birthReported.body.maternalChildSync, "已入册");
+    const birthStatsAfterWorkflow = await api(baseUrl, "/api/birth-certificates", authorized(institution.body.token));
+    assert.equal(birthStatsAfterWorkflow.response.status, 200);
+    assert.equal(
+      birthStatsAfterWorkflow.body.statistics.metrics.pendingPublicSecuritySync,
+      birthStatsAfterWorkflow.body.certificates.filter((item) => !String(item.publicSecuritySync || "").includes("已共享")).length
+    );
+    assert.equal(
+      birthStatsAfterWorkflow.body.statistics.metrics.pendingMaternalChildSync,
+      birthStatsAfterWorkflow.body.certificates.filter((item) => !String(item.maternalChildSync || "").includes("已入册")).length
+    );
 
     const deathCreated = await api(baseUrl, "/api/death-certificates", authorized(institution.body.token, {
       method: "POST",

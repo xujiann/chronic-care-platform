@@ -34,8 +34,8 @@ function buildCitizenLaunchFoundationReadiness(options = {}) {
     {
       id: "citizen-foundation:phone-login",
       passed: hasAll(auth + login, [/loginByPhone/, /sendPhoneCode/, /phone-login-form/, /data-send-phone-code/, /phone-code-hint/, /DEMO-MOBILE-R1/, /888888/]) &&
-        hasAll(readText("server.js"), [/\/api\/auth\/phone-code/, /PHONE_CODE_TTL_MS/, /PHONE_CODE_COOLDOWN_MS/, /maskPhone/, /\/api\/auth\/phone-login/]),
-      detail: "phone verification code issuing, cooldown, expiry, masked response, and login are wired to resident auth"
+        hasAll(readText("server.js"), [/\/api\/auth\/phone-code/, /PHONE_CODE_TTL_MS/, /PHONE_CODE_COOLDOWN_MS/, /PHONE_LOGIN_MAX_FAILED_ATTEMPTS/, /PHONE_LOGIN_LOCK_MS/, /maskPhone/, /\/api\/auth\/phone-login/]),
+      detail: "phone verification code issuing, cooldown, expiry, failed-attempt lockout, masked response, and login are wired to resident auth"
     },
     {
       id: "citizen-foundation:phone-code-delivery",

@@ -28,6 +28,7 @@ test("multi-practice readiness validates doctor accounts, review state, APIs and
   assert.equal(report.checks.some((item) => item.id === "multiPractice:doctorHospitalLoop" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "multiPractice:doctorApi" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "multiPractice:doctorPortal" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "multiPractice:doctorAccountGuard" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "multiPractice:doctorReceiptMessages" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "multiPractice:registryApi" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "multiPractice:scheduleConflict" && item.passed), true);

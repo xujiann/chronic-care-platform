@@ -118,7 +118,7 @@
           localStorage.setItem(SESSION_KEY, JSON.stringify(session));
           return { ok: true, user: session };
         }
-        if (response.status === 401 || response.status === 403 || response.status === 404) {
+        if (response.status === 401 || response.status === 403 || response.status === 404 || response.status === 423) {
           return { ok: false, message: payload.message || "手机号或验证码不正确" };
         }
       } catch (error) {
@@ -228,6 +228,21 @@
     return true;
   }
 
+  function requireAccountType(types) {
+    const allowed = Array.isArray(types) ? types : [types];
+    const user = getUser();
+    if (!user) {
+      window.location.replace(`./login.html?redirect=${encodeURIComponent(currentPage())}`);
+      return false;
+    }
+    if (!allowed.includes(user.accountType)) {
+      const target = roleHome[user.role] || "health-city.html";
+      window.location.replace(`./${target}?denied=${encodeURIComponent(currentPage())}`);
+      return false;
+    }
+    return true;
+  }
+
   function currentPage() {
     const name = location.pathname.split("/").pop() || "health-city.html";
     return `${name}${location.search || ""}`;
@@ -253,6 +268,7 @@
     if (!pageName || pageName.startsWith("#")) return true;
     if (!user) return pageName === "login.html" || pageName === "health-city.html" || pageName === "about.html";
     if (pageName === "login.html") return false;
+    if (pageName === "doctor.html") return user.accountType === "doctor";
     const allowed = routeAccess[pageName];
     return !allowed || allowed.includes(user.role);
   }
@@ -333,6 +349,7 @@
     authHeaders,
     authFetch,
     requireRole,
+    requireAccountType,
     redirectAfterLogin,
     renderSessionBar,
     filterRoleLinks

@@ -33,6 +33,7 @@ test("release report validates demo and production environment profiles", () => 
   assert.equal(failedProduction.checks.some((item) => item.name === "env:STORAGE_ENGINE.production" && !item.passed), true);
   assert.equal(failedProduction.checks.some((item) => item.name === "env:SESSION_SECRETS.productionQuality" && !item.passed), true);
   assert.equal(failedProduction.checks.some((item) => item.name === "env:SMS.gateway" && !item.passed), true);
+  assert.equal(failedProduction.checks.some((item) => item.name === "env:AUDIT.retentionTarget" && !item.passed), true);
   assert.equal(failedProduction.cutoverChecklist.some((item) => item.id === "cutover-secrets" && !item.passed), true);
   assert.equal(failedProduction.cutoverChecklist.some((item) => item.id === "cutover-identity" && !item.passed), true);
 
@@ -111,6 +112,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   });
   assert.equal(report.ok, true);
   assert.equal(report.summary.failed, 0);
+  assert.equal(report.summary.warnings, 0);
   assert.equal(report.checks.some((item) => item.name === "package:scripts" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "snapshot:acceptanceEvidence" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "snapshot:securityAcceptance" && item.passed), true);
@@ -125,6 +127,8 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.identityContract.ok, true);
   assert.equal(report.checks.some((item) => item.name === "audit:retention" && item.passed), true);
   assert.equal(report.auditRetention.ok, true);
+  assert.equal(report.checks.some((item) => item.name === "audit:retentionTargetConfigured" && item.passed), true);
+  assert.equal(report.auditRetention.retentionTargets.some((item) => item.env === "AUDIT_EXPORT_PATH" && item.configured), true);
   assert.equal(report.checks.some((item) => item.name === "chronicFollowup:readiness" && item.passed), true);
   assert.equal(report.chronicFollowup.ok, true);
   assert.equal(report.chronicFollowup.apiSurface.includes("POST /api/chronic/followup-feedback"), true);
