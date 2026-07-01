@@ -529,6 +529,7 @@ function seedState() {
     deathStatistics: seedDeathStatistics(),
     birthCertificates: seedBirthCertificates(),
     birthCertificateForms: seedBirthCertificateForms(),
+    birthCertificateDocuments: seedBirthCertificateDocuments(),
     birthStatistics: seedBirthStatistics(),
     healthBulletin2024: seedHealthBulletin2024(),
     dalianHealthStatistics2025: seedDalianHealthStatistics2025(),
@@ -2784,6 +2785,67 @@ function seedBirthCertificateForms() {
   ];
 }
 
+function seedBirthCertificateDocuments() {
+  return [
+    {
+      id: "birth-doc-annual-plan-2026",
+      category: "blank-certificate-plan",
+      name: "2026 年空白出生医学证明年度申领计划",
+      certificateVersion: "第七版",
+      institutionId: "commission",
+      owner: "大连市卫生健康委",
+      quantity: 1200,
+      serialRange: "BC-G210200-2026-000001 至 BC-G210200-2026-001200",
+      status: "已验收",
+      evidence: ["年度计划", "验收回执", "专人管理"],
+      controlPoints: ["空白证件", "年度申领", "验收回执"],
+      lastUpdated: "2026-06-01T08:30:00.000Z"
+    },
+    {
+      id: "birth-doc-quarter-distribution-2026q2",
+      category: "quarter-distribution",
+      name: "2026 年二季度第七版证件配发表",
+      certificateVersion: "第七版",
+      institutionId: "mr1",
+      owner: "大连市卫生健康委/大连市中心医院",
+      quantity: 300,
+      serialRange: "BC-G210200-2026-000301 至 BC-G210200-2026-000600",
+      status: "已签收",
+      evidence: ["季度申领", "配发记录", "签收记录"],
+      controlPoints: ["配发记录", "签收", "第七版"],
+      lastUpdated: "2026-06-05T09:20:00.000Z"
+    },
+    {
+      id: "birth-doc-waste-202606",
+      category: "waste-certificate",
+      name: "2026 年 6 月废证登记与销毁记录",
+      certificateVersion: "第七版",
+      institutionId: "mr2",
+      owner: "大连医科大学附属医院",
+      quantity: 2,
+      serialRange: "BC-G210211-2026-000118 至 BC-G210211-2026-000119",
+      status: "已销毁",
+      evidence: ["废证登记", "销毁记录", "双人复核"],
+      controlPoints: ["废证", "作废", "销毁记录"],
+      lastUpdated: "2026-06-18T11:00:00.000Z"
+    },
+    {
+      id: "birth-doc-old-version-cleanup",
+      category: "old-version-cleanup",
+      name: "第六版出生医学证明旧版清理台账",
+      certificateVersion: "第六版",
+      institutionId: "commission",
+      owner: "大连市卫生健康委",
+      quantity: 0,
+      serialRange: "第六版库存清零",
+      status: "已清理",
+      evidence: ["旧版清理", "库存清零", "销毁记录"],
+      controlPoints: ["旧版清理", "第七版启用", "监管留痕"],
+      lastUpdated: "2026-06-20T15:15:00.000Z"
+    }
+  ];
+}
+
 function seedBirthStatistics() {
   return {
     period: "2026-06",
@@ -4296,6 +4358,7 @@ function normalizeState(data) {
     deathStatistics: data.deathStatistics && typeof data.deathStatistics === "object" ? data.deathStatistics : seedDeathStatistics(),
     birthCertificates: mergeByKey(seedBirthCertificates(), data.birthCertificates, "id"),
     birthCertificateForms: mergeByKey(seedBirthCertificateForms(), data.birthCertificateForms, "id"),
+    birthCertificateDocuments: mergeByKey(seedBirthCertificateDocuments(), data.birthCertificateDocuments, "id"),
     birthStatistics: data.birthStatistics && typeof data.birthStatistics === "object" ? data.birthStatistics : seedBirthStatistics(),
     healthBulletin2024: data.healthBulletin2024 && typeof data.healthBulletin2024 === "object" ? data.healthBulletin2024 : seedHealthBulletin2024(),
     dalianHealthStatistics2025: data.dalianHealthStatistics2025 && typeof data.dalianHealthStatistics2025 === "object" ? data.dalianHealthStatistics2025 : seedDalianHealthStatistics2025(),

@@ -42,9 +42,12 @@ test("maternal child main function report validates policy, roles, API and relea
   assert.equal(report.artifacts.policyDoc, "docs/maternal-child-policy.md");
   assert.equal(report.artifacts.functionReport, "docs/妇幼健康主要功能报告.md");
   assert.equal(report.artifacts.api.includes("/api/birth-certificates"), true);
+  assert.equal(report.artifacts.data.includes("birthCertificateDocuments"), true);
+  assert.equal(report.summary.certificateDocumentControls, 4);
   assert.deepEqual(Object.keys(report.summary.riskMetrics), ["pendingPublicSecuritySync", "pendingMaternalChildSync", "qualityPending"]);
   assert.equal(report.checks.some((item) => item.id === "docs:function-report"), true);
   assert.equal(report.checks.some((item) => item.id === "data:certificate-policy-fields"), true);
+  assert.equal(report.checks.some((item) => item.id === "data:certificate-document-controls" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "data:risk-metrics" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "role:commission-risk-metrics" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "role:institution-risk-metrics" && item.passed), true);

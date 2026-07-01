@@ -128,6 +128,19 @@ function hasWorkflowRules(birthStatistics, tokens) {
   return tokens.every((token) => source.includes(token));
 }
 
+function hasCertificateDocumentControls(documents) {
+  const records = Array.isArray(documents) ? documents : [];
+  const requiredCategories = ["blank-certificate-plan", "quarter-distribution", "waste-certificate", "old-version-cleanup"];
+  const source = records
+    .map((item) => `${item.category || ""} ${item.certificateVersion || ""} ${item.name || ""} ${item.status || ""} ${(item.evidence || []).join(" ")} ${(item.controlPoints || []).join(" ")}`)
+    .join("\n");
+  return (
+    requiredCategories.every((category) => records.some((item) => item.category === category)) &&
+    records.every((item) => item.id && item.owner && item.status && item.serialRange && Array.isArray(item.evidence) && item.evidence.length) &&
+    ["空白证件", "配发记录", "废证", "销毁记录", "旧版清理", "第七版"].every((token) => source.includes(token))
+  );
+}
+
 function expectedRiskMetrics(birthCertificates) {
   const records = Array.isArray(birthCertificates) ? birthCertificates : [];
   return {
@@ -183,6 +196,7 @@ function buildMaternalChildReadinessReport(options = {}) {
   const sources = options.sources || defaultSources();
   const birthCertificates = Array.isArray(data.birthCertificates) ? data.birthCertificates : [];
   const birthForms = Array.isArray(data.birthCertificateForms) ? data.birthCertificateForms : [];
+  const birthCertificateDocuments = Array.isArray(data.birthCertificateDocuments) ? data.birthCertificateDocuments : [];
   const birthStatistics = data.birthStatistics && typeof data.birthStatistics === "object" ? data.birthStatistics : {};
   const riskMetrics = expectedRiskMetrics(birthCertificates);
   const dataKeys = Object.keys(data);
@@ -190,9 +204,10 @@ function buildMaternalChildReadinessReport(options = {}) {
     check("docs:policy", hasAll(sources.policyDoc, ["卫妇社发〔2009〕96 号", "国卫办妇幼发〔2023〕4 号", "flowchart TD"]) && hasAll(sources.moduleDoc, ["birthCertificates", "birthStatistics", "flowchart TD"]), "policy and module docs include policy numbers, data objects, and flow diagrams", "docs"),
     check("docs:function-report", hasAll(sources.functionReport, ["## 主要功能矩阵", "## 三端功能边界", "## 优化后交接要点", "## 发布证据"]), "main function report is present, structured, and includes handoff points", "docs"),
     check("about:page", hasAll(sources.about, ['data-maternal-about="policy-basis"', 'data-about-flow="maternal-child-policy"', "maternal-child-policy.md"]), "dedicated About page covers policy, flow, and policy document link", "about"),
-    check("data:objects", ["birthCertificates", "birthCertificateForms", "birthStatistics", "residents", "personalRecords"].every((key) => dataKeys.includes(key)), "required data objects are seeded", "data"),
+    check("data:objects", ["birthCertificates", "birthCertificateForms", "birthCertificateDocuments", "birthStatistics", "residents", "personalRecords"].every((key) => dataKeys.includes(key)), "required data objects are seeded", "data"),
     check("data:birth-certificates", birthCertificates.length >= 3 && birthCertificates.every((item) => item.id && item.certificateNo && item.maternalResidentId && item.newbornName), `${birthCertificates.length} certificate records`, "data"),
     check("data:certificate-policy-fields", birthCertificates.length >= 3 && birthCertificates.every(hasPolicyCertificateFields) && hasWorkflowRules(birthStatistics, ["首次签发", "换发/补发", "空白证件", "第七版证件"]), "certificate records and statistics cover version, issue type, materials, quality, archive, blank-certificate, and seventh-version rules", "data"),
+    check("data:certificate-document-controls", birthCertificateDocuments.length >= 4 && hasCertificateDocumentControls(birthCertificateDocuments), `${birthCertificateDocuments.length} certificate document control records`, "data"),
     check("data:workflow-states", birthCertificates.some((item) => item.status) && birthCertificates.some((item) => item.maternalChildSync) && birthCertificates.some((item) => item.publicSecuritySync), "certificate status, maternal-child sync, and public-security sync are modeled", "data"),
     check("data:forms-statistics", birthForms.length >= 3 && Boolean(birthStatistics.title && birthStatistics.metrics), `${birthForms.length} forms; statistics ${birthStatistics.title || "missing"}`, "data"),
     check("data:risk-metrics", hasRiskMetrics(birthStatistics, birthCertificates), "statistics expose accurate pending public-security, maternal-child sync, and quality risk counts", "data"),
@@ -218,6 +233,7 @@ function buildMaternalChildReadinessReport(options = {}) {
       functionDomains: FUNCTION_DOMAINS.length,
       certificates: birthCertificates.length,
       forms: birthForms.length,
+      certificateDocumentControls: birthCertificateDocuments.length,
       riskMetrics,
       statisticsTitle: birthStatistics.title || ""
     },
@@ -229,7 +245,7 @@ function buildMaternalChildReadinessReport(options = {}) {
       policyDoc: "docs/maternal-child-policy.md",
       functionReport: "docs/妇幼健康主要功能报告.md",
       api: ["/api/birth-certificates", "statistics in /api/birth-certificates"],
-      data: ["birthCertificates", "birthCertificateForms", "birthStatistics", "residents", "personalRecords"]
+      data: ["birthCertificates", "birthCertificateForms", "birthCertificateDocuments", "birthStatistics", "residents", "personalRecords"]
     },
     checks
   };
