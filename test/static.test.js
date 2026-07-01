@@ -1010,6 +1010,11 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /isCitizenLaunchVisible/);
   assert.match(citizenJs, /getLaunchedCitizenServiceTabs/);
   assert.match(citizenJs, /getLaunchedResidentFunctionAudit/);
+  assert.match(citizenJs, /serviceNavigationMeta/);
+  assert.match(citizenJs, /data-service-state/);
+  assert.match(citizenJs, /service-tab-boundary/);
+  assert.match(citizenJs, /service-summary-meta/);
+  assert.match(citizenJs, /待生产化：/);
   assert.doesNotMatch(citizenJs, /status: "待开发"/);
   assert.match(citizenJs, /手机号验证码登录/);
   assert.match(citizenJs, /长期照护评估/);
@@ -1039,6 +1044,9 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /mobile-service-nav a\.active small/);
   assert.match(citizenCss, /service-command-panel/);
   assert.match(citizenCss, /\.service-tabs a/);
+  assert.match(citizenCss, /service-tab-interface/);
+  assert.match(citizenCss, /service-tab-boundary/);
+  assert.match(citizenCss, /service-summary-meta/);
   assert.match(citizenCss, /\.mobile-service-nav a/);
   assert.match(citizenCss, /\.service-subnav/);
   assert.match(citizenCss, /grid-auto-columns: minmax\(138px, 64vw\)/);
@@ -1085,6 +1093,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /safe-area-inset-bottom/);
   assert.match(citizenCss, /resident-audit-card:not\(\.active\)/);
   assert.match(citizenCss, /grid-auto-columns: minmax\(168px, 74vw\)/);
+  assert.match(citizenCss, /min-height: 168px/);
   assert.match(citizenCss, /scroll-snap-type: x mandatory/);
   assert.match(citizenCss, /min-height: 44px/);
   assert.match(citizenCss, /service-status-card/);

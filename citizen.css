@@ -328,9 +328,9 @@ select,
 
 .service-tabs a {
   display: grid;
-  grid-template-rows: auto auto 1fr;
+  grid-template-rows: auto auto auto auto auto 1fr auto;
   gap: 6px;
-  min-height: 88px;
+  min-height: 142px;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 10px 12px;
@@ -394,6 +394,29 @@ select,
   color: var(--muted);
   line-height: 1.45;
   overflow-wrap: anywhere;
+}
+
+.service-tabs .service-tab-meta,
+.service-tabs .service-tab-interface,
+.service-tabs .service-tab-boundary {
+  border-radius: 7px;
+  padding: 5px 7px;
+  background: #f8fbfd;
+  color: #375569;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.service-tabs .service-tab-meta {
+  width: fit-content;
+  background: #edf7f2;
+  color: #17663a;
+  font-weight: 900;
+}
+
+.service-tabs .service-tab-boundary {
+  background: #fff8e6;
+  color: #7a5600;
 }
 
 .service-tabs em {
@@ -515,6 +538,24 @@ select,
 
 .service-summary-copy {
   min-width: 0;
+}
+
+.service-summary-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.service-summary-meta span {
+  width: fit-content;
+  border: 1px solid rgba(216, 226, 231, 0.9);
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: #f8fbfd;
+  color: #375569;
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .service-summary span,
@@ -2268,7 +2309,7 @@ dialog::backdrop {
   }
 
   .service-tabs a {
-    min-height: 112px;
+    min-height: 168px;
     scroll-snap-align: start;
   }
 

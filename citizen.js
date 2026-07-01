@@ -202,6 +202,20 @@ function getActiveCitizenService() {
   return launched.find((item) => item.key === activeServiceTab) || launched[0] || citizenServiceTabs[0];
 }
 
+function serviceInterfaceForTab(tab) {
+  return citizenModuleInterfaces.find((item) => item.module === tab.label) || null;
+}
+
+function serviceNavigationMeta(tab) {
+  const features = getLaunchedResidentFunctionAudit(tab.key);
+  const serviceInterface = serviceInterfaceForTab(tab);
+  return {
+    featureCount: features.length,
+    interfaceLabel: serviceInterface?.api || "居民端本地页面",
+    productionBoundary: serviceInterface?.boundary || tab.detail
+  };
+}
+
 const registrationSchedules = [
   { id: "reg-sch-cardio-am", hospital: "大连市中心医院", department: "心内科", doctor: "王医生", date: todayOffset(2), period: "上午", remaining: 6, fee: 18, cancelBeforeHours: 24, source: "医院号源池", tags: ["高血压复诊", "支持陪诊"] },
   { id: "reg-sch-endocrine-pm", hospital: "大连医科大学附属医院", department: "内分泌科", doctor: "赵医生", date: todayOffset(3), period: "下午", remaining: 4, fee: 22, cancelBeforeHours: 12, source: "医院号源池", tags: ["糖尿病复诊", "检查解读"] },
@@ -334,12 +348,18 @@ function bindServiceTabs() {
   const target = document.querySelector("#service-tabs");
   const launchedTabs = getLaunchedCitizenServiceTabs();
   if (target) {
-    target.innerHTML = launchedTabs.map((item) => `<a href="${citizenPageHref(item.key)}" data-service-tab="${item.key}" aria-current="${item.key === activeServiceTab ? "page" : "false"}">
+    target.innerHTML = launchedTabs.map((item) => {
+      const meta = serviceNavigationMeta(item);
+      return `<a href="${citizenPageHref(item.key)}" data-service-tab="${item.key}" data-service-state="${item.status}" aria-current="${item.key === activeServiceTab ? "page" : "false"}">
       <span>${item.label}</span>
       <strong class="ready">${item.status}</strong>
       <small>${item.detail}</small>
+      <small class="service-tab-meta">${meta.featureCount} 项可用能力</small>
+      <small class="service-tab-interface">${meta.interfaceLabel}</small>
+      <small class="service-tab-boundary">待生产化：${meta.productionBoundary}</small>
       <em>二级页面</em>
-    </a>`).join("");
+    </a>`;
+    }).join("");
     target.querySelectorAll("[data-service-tab]").forEach((link) => {
       link.addEventListener("click", (event) => {
         event.preventDefault();
@@ -600,10 +620,16 @@ function renderServiceSummary() {
   const channel = getActiveClientChannel();
   const internalAction = !active.actionHref;
   const activeItems = getLaunchedResidentFunctionAudit(active.key);
+  const meta = serviceNavigationMeta(active);
   target.innerHTML = `<div class="service-summary-copy">
     <span>当前二级页面 · ${channel.label}</span>
     <strong>${active.label}</strong>
     <small>${active.title} · ${active.detail}</small>
+    <div class="service-summary-meta">
+      <span>${meta.featureCount} 项已实现能力</span>
+      <span>接口：${meta.interfaceLabel}</span>
+      <span>待生产化：${meta.productionBoundary}</span>
+    </div>
   </div>
   <div class="service-summary-actions">
     <div class="service-summary-stats">
