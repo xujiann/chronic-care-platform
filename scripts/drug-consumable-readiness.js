@@ -156,6 +156,8 @@ function renderMarkdown(report) {
     `- Result: ${report.ok ? "PASS" : "FAIL"}`,
     `- Supervision rows: ${report.summary.supervisionRows}`,
     `- Open rows: ${report.summary.openRows}`,
+    `- Traceability policy sources: ${report.summary.traceabilityPolicySources}`,
+    `- Traceability evidence requirements: ${report.summary.traceabilityEvidenceReady}/${report.summary.traceabilityEvidenceRequirements} ready`,
     `- Traceability coverage: ${report.summary.traceabilityCoverageReady ? "ready" : "missing"}`,
     "",
     "## Checks",

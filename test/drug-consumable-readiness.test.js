@@ -44,6 +44,8 @@ test("drug consumable readiness covers required supervision boundaries", () => {
   assert.match(markdown, /\| Row \| Boundary \| Status \| Pickup \| Claim \| Supervision \| Audit \|/);
   assert.match(markdown, /Traceability policy sources/);
   assert.match(markdown, /Traceability evidence requirements/);
+  assert.match(markdown, /Traceability policy sources: 5/);
+  assert.match(markdown, /Traceability evidence requirements: 5\/5 ready/);
   assert.match(markdown, /Traceability coverage: ready/);
   assert.match(markdown, /trace-code-mapping/);
   assert.match(markdown, /nhsa-2024-collection https:\/\/www\.nhsa\.gov\.cn\/art\/2024\/9\/30\/art_109_14042\.html/);
