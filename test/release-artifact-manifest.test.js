@@ -21,6 +21,7 @@ test("release artifact manifest indexes reports templates commands and evidence"
   assert.equal(report.artifacts.some((item) => item.id === "release-artifact-manifest" && item.command === "release:manifest"), true);
   assert.equal(report.artifacts.some((item) => item.id === "site-readiness" && item.evidence === "/api/site-readiness-pack"), true);
   assert.equal(report.artifacts.some((item) => item.id === "service-acceptance" && item.markdown === "release/service-acceptance-summary.md" && item.evidence === "/api/service-acceptance-summary"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "health-dashboard" && item.markdown === "release/health-dashboard-summary.md" && item.evidence === "/api/health-dashboard/production-readiness"), true);
   assert.equal(report.templateReadmes.some((item) => item.file === "release/templates/interface-joint-test/README.md"), true);
   assert.equal(report.templateReadmes.every((item) => item.evidence === "/api/site-template-readmes"), true);
   assert.equal(report.checks.every((item) => item.passed), true);
@@ -32,6 +33,7 @@ test("release artifact manifest renders and writes artifacts", (t) => {
   const report = buildReleaseArtifactManifest();
   const markdown = renderMarkdown(report);
   assert.match(markdown, /Release artifact manifest/);
+  assert.match(markdown, /Health dashboard aggregate summary/);
   assert.match(markdown, /Template READMEs/);
   assert.match(markdown, /release-artifact-manifest\.md/);
 

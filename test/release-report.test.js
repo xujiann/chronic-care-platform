@@ -326,6 +326,7 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(healthDashboardMarkdown, /发布证据/);
   assert.equal(manifestJson.releaseArtifactManifest.ok, true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "service-acceptance"), true);
+  assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "health-dashboard" && item.evidence === "/api/health-dashboard/production-readiness"), true);
   assert.match(manifestMarkdown, /Release artifact manifest/);
   assert.match(manifestMarkdown, /service-acceptance-summary\.md/);
   assert.match(manifestMarkdown, /release\/templates\/identity-source-mapping\/README\.md/);
