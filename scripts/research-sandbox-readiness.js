@@ -18,6 +18,7 @@ function datasetReady(item) {
     (item.ethicsStatus === "approved" || (!item.ethicsStatus && item.ethicsApproval)) &&
     (["released", "approved", "completed"].includes(String(item.deidentificationStatus || "")) || (!item.deidentificationStatus && item.anonymization)) &&
     governanceReady(item) &&
+    evidenceReady(item) &&
     ["published", "active"].includes(String(item.status || ""));
 }
 
@@ -29,6 +30,11 @@ function governanceReady(item) {
     governance.reidentificationProhibited === true &&
     Number(governance.retentionDays || 0) > 0
   );
+}
+
+function evidenceReady(item) {
+  const documents = Array.isArray(item?.evidenceDocuments) ? item.evidenceDocuments : [];
+  return ["ethics-approval", "data-use-agreement"].every((type) => documents.some((doc) => doc.type === type && doc.status !== "rejected"));
 }
 
 function buildPreLaunchDevelopmentBacklog() {
@@ -55,6 +61,7 @@ function buildResearchSandboxReadiness(data = readJson("data/db.json")) {
     check("research:ethics", datasets.some((item) => item.ethicsApproval && (item.ethicsStatus === "approved" || !item.ethicsStatus)), "approved ethics evidence exists"),
     check("research:deidentification", datasets.some((item) => item.anonymization && (item.deidentificationStatus === "released" || !item.deidentificationStatus)), "de-identification release evidence exists"),
     check("research:policy-controls", datasets.every(governanceReady), `${datasets.filter(governanceReady).length}/${datasets.length} datasets have data-use agreement, minimum-necessary, no re-identification, and retention controls`),
+    check("research:evidence-documents", datasets.every(evidenceReady), `${datasets.filter(evidenceReady).length}/${datasets.length} datasets have ethics approval and data-use agreement documents`),
     check("research:sandbox", datasets.some(datasetReady), `${datasets.filter(datasetReady).length} sandbox-ready datasets`),
     check("research:models", models.length >= 2 && models.every((item) => item.id && item.diseaseType && item.version && item.reviewStatus), `${models.length} disease registry models`),
     check("research:audit", datasets.some((item) => Array.isArray(item.usageAudit)) && accessLogs.length >= 1, `${accessLogs.length} research access logs`),
@@ -67,6 +74,7 @@ function buildResearchSandboxReadiness(data = readJson("data/db.json")) {
       datasets: datasets.length,
       sandboxReady: datasets.filter(datasetReady).length,
       policyReady: datasets.filter(governanceReady).length,
+      evidenceReady: datasets.filter(evidenceReady).length,
       diseaseModels: models.length,
       accessLogs: accessLogs.length,
       outcomes: datasets.reduce((sum, item) => sum + (Array.isArray(item.outcomes) ? item.outcomes.length : 0), 0)
@@ -94,6 +102,8 @@ function buildResearchSandboxReadiness(data = readJson("data/db.json")) {
       dataUseAgreement: item.governance?.dataUseAgreement || "",
       retentionDays: item.governance?.retentionDays || 0,
       governanceStatus: governanceReady(item) ? "ready" : "pending",
+      evidenceStatus: evidenceReady(item) ? "ready" : "pending",
+      evidenceDocuments: Array.isArray(item.evidenceDocuments) ? item.evidenceDocuments.length : 0,
       sandboxStatus: item.sandbox?.status || "not-modeled",
       sourceCollections: item.sourceCollections || [],
       records: item.records || 0
@@ -103,7 +113,7 @@ function buildResearchSandboxReadiness(data = readJson("data/db.json")) {
 
 function renderMarkdown(report) {
   const rows = report.checks.map((item) => `| ${item.passed ? "PASS" : "FAIL"} | ${item.id} | ${item.detail} |`);
-  const datasetRows = report.datasets.map((item) => `| ${item.id} | ${item.diseaseType} | ${item.status} | ${item.authorizationStatus} | ${item.ethicsStatus} | ${item.deidentificationStatus} | ${item.governanceStatus} | ${item.dataUseAgreement || "pending"} | ${item.retentionDays || 0} | ${item.sandboxStatus} | ${item.records} |`);
+  const datasetRows = report.datasets.map((item) => `| ${item.id} | ${item.diseaseType} | ${item.status} | ${item.authorizationStatus} | ${item.ethicsStatus} | ${item.deidentificationStatus} | ${item.governanceStatus} | ${item.evidenceStatus} | ${item.evidenceDocuments || 0} | ${item.dataUseAgreement || "pending"} | ${item.retentionDays || 0} | ${item.sandboxStatus} | ${item.records} |`);
   const preLaunchRows = (report.preLaunchDevelopment || []).map((item) => `| ${item.id} | ${item.owner} | ${item.status} | ${item.item} |`);
   return [
     "# Research Sandbox Readiness",
@@ -128,8 +138,8 @@ function renderMarkdown(report) {
     "",
     "## Datasets",
     "",
-    "| Dataset | Disease | Status | Authorization | Ethics | De-identification | Governance | Agreement | Retention days | Sandbox | Records |",
-    "|---|---|---|---|---|---|---|---|---:|---|---:|",
+    "| Dataset | Disease | Status | Authorization | Ethics | De-identification | Governance | Evidence | Documents | Agreement | Retention days | Sandbox | Records |",
+    "|---|---|---|---|---|---|---|---|---:|---|---:|---|---:|",
     ...datasetRows,
     "",
     "## Pre-launch Development",

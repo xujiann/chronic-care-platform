@@ -327,6 +327,7 @@ function researchSandboxChecks(researchSandbox) {
     check("researchSandbox:boundaries", researchSandbox.boundaries?.length >= 7, `${researchSandbox.boundaries?.length || 0} research boundaries`, "error", "research"),
     check("researchSandbox:reusedCollections", ["researchDatasets", "diseaseRegistryModels", "dataAccessLogs", "securityAcceptanceLedger", "personalRecords", "diagnosticReports"].every((key) => researchSandbox.reusableCollections?.includes(key)), "required reusable collections mapped", "error", "research"),
     check("researchSandbox:policyControls", researchSandbox.summary?.policyReady >= researchSandbox.summary?.datasets && researchSandbox.summary?.datasets >= 1, `${researchSandbox.summary?.policyReady || 0}/${researchSandbox.summary?.datasets || 0} datasets policy-ready`, "error", "research"),
+    check("researchSandbox:evidenceDocuments", researchSandbox.summary?.evidenceReady >= researchSandbox.summary?.datasets && researchSandbox.summary?.datasets >= 1, `${researchSandbox.summary?.evidenceReady || 0}/${researchSandbox.summary?.datasets || 0} datasets evidence-ready`, "error", "research"),
     check("researchSandbox:sandboxReady", researchSandbox.summary?.sandboxReady >= 1, `${researchSandbox.summary?.sandboxReady || 0} sandbox-ready datasets`, "error", "research")
   ];
 }

@@ -850,6 +850,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(sandboxSummary.body.boundaries.includes("policy controls"), true);
     assert.equal(sandboxSummary.body.summary.activeDatasets >= 1, true);
     assert.equal(sandboxSummary.body.summary.policyReady >= 2, true);
+    assert.equal(sandboxSummary.body.summary.evidenceReady >= 2, true);
     assert.equal(Array.isArray(sandboxSummary.body.pendingApplications), true);
     assert.equal(Array.isArray(sandboxSummary.body.recentAudits), true);
     assert.equal(Array.isArray(sandboxSummary.body.recentOutcomes), true);
@@ -885,6 +886,23 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(application.body.authorizationStatus, "pending");
     assert.equal(application.body.governance.dataUseAgreement, "DUA-DEMO-COPD-2026");
     assert.equal(application.body.sourceCollections.includes("diagnosticReports"), true);
+    const evidenceRejected = await api(baseUrl, `/api/research/datasets/${application.body.id}/evidence`, authorized(researchInstitution.body.token, {
+      method: "POST",
+      body: JSON.stringify({ type: "spreadsheet", title: "Bad evidence", referenceNo: "BAD-1" })
+    }));
+    assert.equal(evidenceRejected.response.status, 400);
+    const ethicsEvidence = await api(baseUrl, `/api/research/datasets/${application.body.id}/evidence`, authorized(researchInstitution.body.token, {
+      method: "POST",
+      body: JSON.stringify({ type: "ethics-approval", title: "COPD IRB approval", referenceNo: "IRB-DEMO-COPD-2026", issuedBy: "demo-irb", issuedAt: "2026-06-03" })
+    }));
+    assert.equal(ethicsEvidence.response.status, 200);
+    assert.equal(ethicsEvidence.body.evidenceDocuments[0].type, "ethics-approval");
+    const duaEvidence = await api(baseUrl, `/api/research/datasets/${application.body.id}/evidence`, authorized(researchInstitution.body.token, {
+      method: "POST",
+      body: JSON.stringify({ type: "data-use-agreement", title: "COPD data use agreement", referenceNo: "DUA-DEMO-COPD-2026", issuedBy: "research-governance", issuedAt: "2026-06-03" })
+    }));
+    assert.equal(duaEvidence.response.status, 200);
+    assert.equal(duaEvidence.body.evidenceDocuments.some((item) => item.type === "data-use-agreement"), true);
     const blockedSandbox = await api(baseUrl, `/api/research/datasets/${application.body.id}/sandbox-access`, authorized(researchInstitution.body.token, {
       method: "POST",
       body: JSON.stringify({ purpose: "try before approval" })

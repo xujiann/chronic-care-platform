@@ -527,7 +527,7 @@ function renderResearchGovernance(platform, sandboxSummary = null) {
       <td>${item.version}</td>
       <td>${item.ethicsApproval || "待登记"}</td>
       <td>${item.anonymization || "待登记"} / ${item.deidentificationStatus || "pending"}</td>
-      <td>${item.governance?.dataUseAgreement || "pending"} / ${item.governance?.retentionDays || 0}d</td>
+      <td>${item.governance?.dataUseAgreement || "pending"} / ${item.governance?.retentionDays || 0}d / ${(item.evidenceDocuments || []).length} docs</td>
       <td>${statusBadge(item.authorizationStatus || item.status)} ${statusBadge(item.sandbox?.status || "pending")}</td>
       <td>${item.records || 0}</td>
       <td>${(item.usageAudit || []).length} / ${(item.outcomes || []).length}</td>

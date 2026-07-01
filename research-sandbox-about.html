@@ -83,6 +83,7 @@
           </div>
           <div class="rules">
             <div><strong>申请</strong><span><code>POST /api/research/datasets</code> 创建科研数据集申请，记录来源集合、用途、申请人和待审批状态。</span></div>
+            <div><strong>材料</strong><span><code>POST /api/research/datasets/:id/evidence</code> 登记伦理批件、数据使用协议、知情同意豁免、字段最小化、脱敏评估和导出复核材料。</span></div>
             <div><strong>审批</strong><span><code>POST /api/research/datasets/:id/approval</code> 写入伦理批件、脱敏策略、授权状态和沙箱启用状态。</span></div>
             <div><strong>政策控制</strong><span>申请必须登记数据使用协议、最小必要字段确认、禁止再识别声明和审计留存天数；readiness 报告以 <code>research:policy-controls</code> 作为发布门禁。</span></div>
             <div><strong>访问</strong><span><code>POST /api/research/datasets/:id/sandbox-access</code> 仅允许已审批、已脱敏、已发布且政策控制齐全的数据集进入沙箱，并写入审计。</span></div>

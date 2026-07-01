@@ -7923,6 +7923,26 @@
           "Ethics Review Measures"
         ]
       },
+      "evidenceDocuments": [
+        {
+          "id": "rd-hypertension-001-irb",
+          "type": "ethics-approval",
+          "title": "IRB approval for hypertension cohort",
+          "referenceNo": "IRB-DEMO-HTN-2026",
+          "issuedBy": "demo-irb",
+          "issuedAt": "2026-06-01",
+          "status": "verified"
+        },
+        {
+          "id": "rd-hypertension-001-dua",
+          "type": "data-use-agreement",
+          "title": "Data use agreement for hypertension cohort",
+          "referenceNo": "DUA-DEMO-HTN-2026",
+          "issuedBy": "research-governance",
+          "issuedAt": "2026-06-02",
+          "status": "verified"
+        }
+      ],
       "records": 2,
       "sourceCollections": [
         "personalRecords",
@@ -7963,6 +7983,26 @@
           "Ethics Review Measures"
         ]
       },
+      "evidenceDocuments": [
+        {
+          "id": "rd-diabetes-001-irb",
+          "type": "ethics-approval",
+          "title": "IRB approval for diabetes cohort",
+          "referenceNo": "IRB-DEMO-DM-2026",
+          "issuedBy": "demo-irb",
+          "issuedAt": "2026-06-01",
+          "status": "verified"
+        },
+        {
+          "id": "rd-diabetes-001-dua",
+          "type": "data-use-agreement",
+          "title": "Data use agreement for diabetes cohort",
+          "referenceNo": "DUA-DEMO-DM-2026",
+          "issuedBy": "research-governance",
+          "issuedAt": "2026-06-02",
+          "status": "verified"
+        }
+      ],
       "records": 1,
       "sourceCollections": [
         "personalRecords",
