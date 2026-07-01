@@ -133,6 +133,7 @@ function buildRegionalDataSharingReport(options = {}) {
     { id: "regional:referralHandoff", passed: /data-regional-section="referral-handoff"/.test(html) && /regional-referral-handoff/.test(html) && /renderRegionalReferralHandoff/.test(client) && /buildRegionalReferralHandoff/.test(client) && /不合并运行时/.test(client), detail: "referral handoff panel and runtime boundary present" },
     { id: "regional:handoffReportUi", passed: /regional-handoff-report-action/.test(html) && /regional-handoff-report/.test(html) && /generateRegionalHandoffReport/.test(client) && /\/api\/regional-data-sharing\/handoff-report/.test(client), detail: "runtime handoff report button and renderer present" },
     { id: "regional:aboutPolicy", passed: /regional-data-sharing-about\.html/.test(html) && /data-regional-about-section="policy-basis"/.test(about) && /医疗卫生机构信息互通共享三年攻坚/.test(about) && /医疗卫生机构网络安全管理办法/.test(about), detail: "policy explanation page linked" },
+    { id: "regional:aboutLaunchReadiness", passed: /data-regional-about-section="launch-readiness"/.test(about) && /已实现功能与上线前缺口/.test(about) && /上线前仍需开发/.test(about) && /OIDC\/SAML/.test(about) && /现场签字证据/.test(about), detail: "implemented features and launch gaps documented" },
     { id: "regional:releaseScript", passed: Boolean(pkg.scripts?.["regional-data-sharing:report"]), detail: pkg.scripts?.["regional-data-sharing:report"] || "missing" }
   ];
   return {

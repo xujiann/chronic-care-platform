@@ -314,8 +314,14 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(script, /referralHandoffReady/);
   assert.match(script, /转诊会诊交接证据/);
   assert.match(script, /regional:aboutPolicy/);
+  assert.match(script, /regional:aboutLaunchReadiness/);
   assert.match(about, /data-regional-about-section="policy-basis"/);
   assert.match(about, /data-regional-about-section="merge-boundary"/);
+  assert.match(about, /data-regional-about-section="launch-readiness"/);
+  assert.match(about, /已实现功能与上线前缺口/);
+  assert.match(about, /上线前仍需开发/);
+  assert.match(about, /OIDC\/SAML/);
+  assert.match(about, /现场签字证据/);
   assert.match(about, /与医联体转诊功能的关系/);
   assert.match(read("scripts/regional-referral-overlap.js"), /buildRegionalReferralOverlapReport/);
   assert.match(read("scripts/regional-referral-overlap.js"), /runtimeMergeAllowed/);
