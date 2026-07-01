@@ -175,6 +175,7 @@ npm.cmd run release:manifest
 npm.cmd run priority-apps:templates
 npm.cmd run maternal-child:readiness
 npm.cmd run policy:coverage
+npm.cmd run hybrid:deployment-readiness
 ```
 
 `deploy:check` 会检查 README、部署文档、静态快照、P2 集合、P2 完成状态、P0 接口准备度、安全验收台账、环境脚本和关键 npm scripts；`deploy:check:full` 还会串行执行 `check`、`test`、`test:coverage`、`test:e2e` 和 `npm audit --omit=dev`。
@@ -196,6 +197,8 @@ npm.cmd run policy:coverage
 `data-quality:report` 会生成 `release/data-quality-report.json` 与 `release/data-quality-report.md`，检查居民主索引完整度、跨集合居民引用、personIndex 一致性、来源可追溯和整改闭环。
 
 `environment:matrix` 会生成 `release/environment-matrix-report.json` 与 `release/environment-matrix-report.md`，把 demo、staging、production 三层环境的必填变量、阻断变量、责任人、门禁脚本和上线验收规则固化为可检查矩阵；`release:report` 会同步归档该矩阵，便于生产切换前逐项确认环境分层和签字证据。
+
+`hybrid:deployment-readiness` 会生成 `release/hybrid-deployment-readiness-report.json` 与 `release/hybrid-deployment-readiness-report.md`，核对 GitHub Pages/静态 HTML 预览层、`data/db.json` 快照回退、`server.js` Node API 后端、存储引擎边界、环境变量模板、CI 和发布门禁接线。
 
 `operations:readiness` 会生成 `release/operations-readiness-report.json` 与 `release/operations-readiness-report.md`，检查 `/api/health`、`/api/metrics`、`/api/system/readiness`、生产部署轨道、外部依赖风险和发布运维脚本。
 
@@ -315,5 +318,6 @@ The handoff document is `docs/互联网护理服务模块说明.md`; it covers r
 - Each priority application template now carries a copy-ready `conversationStarter`, an `implementationChecklist` with the Codex loop execution step, and an `acceptanceGate` so each independent conversation can start with the same release boundary and evidence requirements.
 - `release:report` fails the priority application template gate if any generated checklist drops the Codex loop execution step.
 - Development loop: plan first, make one small change, run the matching test or build, observe and fix failures, update docs and acceptance notes, then repeat until the module passes release gates.
+- Thread control: `docs/codex-loop-thread-control.md` records the active project thread groups and the small-batch loop for continuing all worktrees without mixing unrelated changes.
 - `release:manifest` indexes `health-dashboard-summary.md` as the release artifact for the eight-application template and aggregate dashboard evidence.
 - Boundary: the dashboard does not replace source workflows; source applications remain the system of record for business operations and acceptance.

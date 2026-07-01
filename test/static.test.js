@@ -400,6 +400,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal(Boolean(pkg.scripts["drug-consumable:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["environment:matrix"]), true);
   assert.equal(Boolean(pkg.scripts["hospital-operations:readiness"]), true);
+  assert.equal(Boolean(pkg.scripts["hybrid:deployment-readiness"]), true);
   assert.equal(Boolean(pkg.scripts["integration:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["interface:mapping"]), true);
   assert.equal(Boolean(pkg.scripts["regional-data-sharing:report"]), true);
@@ -435,6 +436,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /quality-safety-report\.md/);
   assert.match(read("README.md"), /drug-consumable-readiness-report\.md/);
   assert.match(read("README.md"), /environment-matrix-report\.md/);
+  assert.match(read("README.md"), /hybrid-deployment-readiness-report\.md/);
   assert.match(read("README.md"), /integration-readiness-report\.md/);
   assert.match(read("README.md"), /interface-mapping-report\.md/);
   assert.match(read("scripts/release-report.js"), /regional-data-sharing-report\.md/);
@@ -459,6 +461,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("DEPLOYMENT.md"), /quality-safety-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /drug-consumable-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /environment-matrix-report\.md/);
+  assert.match(read("DEPLOYMENT.md"), /hybrid-deployment-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /integration-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /interface-mapping-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /research-sandbox-readiness-report\.md/);
@@ -486,6 +489,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/deploy-check.js"), /quality-safety:report/);
   assert.match(read("scripts/deploy-check.js"), /drug-consumable:readiness/);
   assert.match(read("scripts/deploy-check.js"), /environment:matrix/);
+  assert.match(read("scripts/deploy-check.js"), /hybrid:deployment-readiness/);
   assert.match(read("scripts/deploy-check.js"), /integration:readiness/);
   assert.match(read("scripts/deploy-check.js"), /interface:mapping/);
   assert.match(read("scripts/deploy-check.js"), /regional-data-sharing:report/);
@@ -511,6 +515,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".github/workflows/ci.yml"), /npm run data-quality:report/);
   assert.match(read(".github/workflows/ci.yml"), /npm run quality-safety:report/);
   assert.match(read(".github/workflows/ci.yml"), /npm run drug-consumable:readiness/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run hybrid:deployment-readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run integration:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run interface:mapping/);
   assert.match(read(".github/workflows/ci.yml"), /npm run regional-data-sharing:report/);

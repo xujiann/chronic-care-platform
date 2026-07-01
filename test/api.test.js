@@ -235,7 +235,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
 
     const releaseReport = await api(baseUrl, "/api/release-report", authorized(accountLogin.body.token));
     assert.equal(releaseReport.response.status, 200);
-    assert.equal(releaseReport.body.ok, true);
+    assert.equal(releaseReport.body.ok, true, JSON.stringify(releaseReport.body.checks.filter((item) => !item.passed && item.severity !== "warn")));
     assert.equal(releaseReport.body.checks.some((item) => item.name === "sitePack:readiness" && item.passed), true);
     assert.equal(releaseReport.body.siteReadinessPack.templates.signoff.some((item) => item.id === "signoff-cutover-monitoring"), true);
 
@@ -482,6 +482,9 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(hospitalConfirmed.response.status, 200);
     assert.equal(hospitalConfirmed.body.primaryPracticeConfirmation.status, "已电子确认");
     assert.equal(hospitalConfirmed.body.externalSync.eSignature.status, "signed");
+    const multiPracticeAudit = await api(baseUrl, "/api/audit/export?trail=securityEvents", authorized(commissionToken));
+    assert.equal(multiPracticeAudit.response.status, 200);
+    assert.equal(multiPracticeAudit.body.securityEvents.some((item) => item.role === "institution" && item.target === `multiPracticeApplications/${createdPractice.body.id}`), true);
     const doctorLoop = await api(baseUrl, "/api/doctors/me", authorized(doctorLogin.body.token));
     assert.equal(doctorLoop.body.multiPracticeMessages.some((item) => item.sourceId === createdPractice.body.id && item.targetRole === "doctor" && /医院端已处理/.test(item.title)), true);
     const otherDoctorLogin = await login(baseUrl, "doctor_wang");

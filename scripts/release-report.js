@@ -13,6 +13,7 @@ const { buildEscortServiceReadinessReport, renderMarkdown: renderEscortServiceMa
 const { buildInternetNursingReadinessReport, renderMarkdown: renderInternetNursingMarkdown } = require("./internet-nursing-readiness");
 const { buildEnvironmentMatrixReport, renderMarkdown: renderEnvironmentMatrixMarkdown } = require("./environment-matrix");
 const { buildHealthDashboardSummary, buildPriorityApplicationTemplates, renderMarkdown: renderHealthDashboardMarkdown } = require("./health-dashboard-summary");
+const { buildHybridDeploymentReadinessReport, renderMarkdown: renderHybridDeploymentMarkdown } = require("./hybrid-deployment-readiness");
 const { buildIdentityContract, renderMarkdown: renderIdentityContractMarkdown } = require("./identity-contract");
 const { buildIntegrationReadinessReport, renderMarkdown: renderIntegrationReadinessMarkdown } = require("./integration-readiness");
 const { buildInterfaceMappingReport, renderMarkdown: renderInterfaceMappingMarkdown } = require("./interface-mapping");
@@ -363,6 +364,14 @@ function environmentMatrixChecks(environmentMatrix) {
   ];
 }
 
+function hybridDeploymentChecks(hybridDeploymentReadiness) {
+  return [
+    check("hybridDeployment:readiness", hybridDeploymentReadiness.ok, hybridDeploymentReadiness.ok ? "hybrid deployment topology checks passed" : "hybrid deployment topology failed", "error", "deployment"),
+    check("hybridDeployment:staticPreview", hybridDeploymentReadiness.checks?.some((item) => item.id === "hybrid:staticPreviewBoundary" && item.passed), "GitHub Pages/static preview boundary documented", "error", "deployment"),
+    check("hybridDeployment:dynamicBackend", hybridDeploymentReadiness.checks?.some((item) => item.id === "hybrid:dynamicBackendRoutes" && item.passed), "server.js dynamic API routes covered", "error", "deployment")
+  ];
+}
+
 function healthDashboardChecks(healthDashboard) {
   return [
     check("healthDashboard:summary", healthDashboard.ok, healthDashboard.ok ? "health dashboard summary checks passed" : "health dashboard summary failed", "error", "health-dashboard"),
@@ -606,6 +615,7 @@ function packageChecks(pkg) {
     "data-quality:report",
     "quality-safety:report",
     "environment:matrix",
+    "hybrid:deployment-readiness",
     "hospital-operations:readiness",
     "internet-nursing:readiness",
     "health-dashboard:summary",
@@ -688,6 +698,7 @@ function buildReleaseReport(options = {}) {
   const productionDbReadiness = buildProductionDbReadinessReport({ data, pkg, storageModel });
   const evaluationEvidence = buildEvaluationEvidenceReport({ data });
   const environmentMatrix = buildEnvironmentMatrixReport({ data, pkg });
+  const hybridDeploymentReadiness = buildHybridDeploymentReadinessReport({ data, pkg });
   const healthDashboard = buildHealthDashboardSummary({ data });
   const priorityApplicationTemplates = buildPriorityApplicationTemplates({ data });
   const maternalChildReadiness = buildMaternalChildReadinessReport({ data, packageSource: JSON.stringify(pkg) });
@@ -725,6 +736,7 @@ function buildReleaseReport(options = {}) {
     ...productionDbReadinessChecks(productionDbReadiness),
     ...evaluationEvidenceChecks(evaluationEvidence),
     ...environmentMatrixChecks(environmentMatrix),
+    ...hybridDeploymentChecks(hybridDeploymentReadiness),
     ...healthDashboardChecks(healthDashboard),
     ...priorityApplicationTemplateChecks(priorityApplicationTemplates),
     ...maternalChildReadinessChecks(maternalChildReadiness),
@@ -773,6 +785,7 @@ function buildReleaseReport(options = {}) {
     productionDbReadiness,
     evaluationEvidence,
     environmentMatrix,
+    hybridDeploymentReadiness,
     healthDashboard,
     priorityApplicationTemplates,
     maternalChildReadiness,
@@ -992,6 +1005,10 @@ function renderMarkdown(report) {
     "## Environment matrix report",
     "",
     "See `environment-matrix-report.json` and `environment-matrix-report.md` for demo, staging, and production environment variables, gate scripts, owners, and blocking rules.",
+    "",
+    "## Hybrid deployment readiness report",
+    "",
+    "See `hybrid-deployment-readiness-report.json` and `hybrid-deployment-readiness-report.md` for the static preview layer, Node dynamic backend routes, storage guardrails, environment template, release wiring, and CI evidence.",
     "",
     "## Health dashboard summary",
     "",
@@ -1238,6 +1255,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       environmentMatrix: report.environmentMatrix
     }, null, 2), "utf8");
+    const hybridDeploymentJson = path.join(path.dirname(output), "hybrid-deployment-readiness-report.json");
+    fs.writeFileSync(hybridDeploymentJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      hybridDeploymentReadiness: report.hybridDeploymentReadiness
+    }, null, 2), "utf8");
     const healthDashboardJson = path.join(path.dirname(output), "health-dashboard-summary.json");
     fs.writeFileSync(healthDashboardJson, JSON.stringify({
       project: report.project,
@@ -1337,6 +1362,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(evaluationMarkdown, renderEvaluationEvidenceMarkdown(report.evaluationEvidence), "utf8");
     const environmentMarkdown = path.join(path.dirname(markdown), "environment-matrix-report.md");
     fs.writeFileSync(environmentMarkdown, renderEnvironmentMatrixMarkdown(report.environmentMatrix), "utf8");
+    const hybridDeploymentMarkdown = path.join(path.dirname(markdown), "hybrid-deployment-readiness-report.md");
+    fs.writeFileSync(hybridDeploymentMarkdown, renderHybridDeploymentMarkdown(report.hybridDeploymentReadiness), "utf8");
     const healthDashboardMarkdown = path.join(path.dirname(markdown), "health-dashboard-summary.md");
     fs.writeFileSync(healthDashboardMarkdown, renderHealthDashboardMarkdown(report.healthDashboard), "utf8");
     const priorityApplicationTemplatesMarkdown = path.join(path.dirname(markdown), "priority-application-templates.md");

@@ -146,6 +146,8 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.evaluationEvidence.ok, true);
   assert.equal(report.checks.some((item) => item.name === "environment:matrix" && item.passed), true);
   assert.equal(report.environmentMatrix.ok, true);
+  assert.equal(report.checks.some((item) => item.name === "hybridDeployment:readiness" && item.passed), true);
+  assert.equal(report.hybridDeploymentReadiness.ok, true);
   assert.equal(report.checks.some((item) => item.name === "priorityApps:conversationStarters" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "priorityApps:implementationChecklists" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "priorityApps:acceptanceGates" && item.passed), true);
@@ -181,6 +183,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(markdown, /Production database readiness report/);
   assert.match(markdown, /Interoperability evaluation evidence report/);
   assert.match(markdown, /Environment matrix report/);
+  assert.match(markdown, /Hybrid deployment readiness report/);
   assert.match(markdown, /Release artifact manifest/);
   assert.match(markdown, /cutover-identity/);
   assert.match(markdown, /snapshot:acceptanceEvidence/);
@@ -290,6 +293,8 @@ test("release report writes standalone production cutover and storage artifacts"
   const evaluationMarkdown = fs.readFileSync(path.join(outputDir, "evaluation-evidence-report.md"), "utf8");
   const environmentJson = JSON.parse(fs.readFileSync(path.join(outputDir, "environment-matrix-report.json"), "utf8"));
   const environmentMarkdown = fs.readFileSync(path.join(outputDir, "environment-matrix-report.md"), "utf8");
+  const hybridDeploymentJson = JSON.parse(fs.readFileSync(path.join(outputDir, "hybrid-deployment-readiness-report.json"), "utf8"));
+  const hybridDeploymentMarkdown = fs.readFileSync(path.join(outputDir, "hybrid-deployment-readiness-report.md"), "utf8");
   const priorityTemplatesJson = JSON.parse(fs.readFileSync(path.join(outputDir, "priority-application-templates.json"), "utf8"));
   const priorityTemplatesMarkdown = fs.readFileSync(path.join(outputDir, "priority-application-templates.md"), "utf8");
   const manifestJson = JSON.parse(fs.readFileSync(path.join(outputDir, "release-artifact-manifest.json"), "utf8"));
@@ -342,6 +347,8 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(evaluationMarkdown, /Artifact coverage/);
   assert.equal(environmentJson.environmentMatrix.ok, true);
   assert.match(environmentMarkdown, /Environment matrix report/);
+  assert.equal(hybridDeploymentJson.hybridDeploymentReadiness.ok, true);
+  assert.match(hybridDeploymentMarkdown, /Hybrid deployment readiness report/);
   assert.equal(priorityTemplatesJson.priorityApplicationTemplates.ok, true);
   assert.equal(priorityTemplatesJson.priorityApplicationTemplates.templates.length, 8);
   assert.equal(priorityTemplatesJson.priorityApplicationTemplates.templates.every((item) => item.conversationStarter && item.acceptanceGate.evidence.length), true);
@@ -354,6 +361,7 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "referral-teleconsultation"), true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "chronic-followup"), true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "priority-application-templates"), true);
+  assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "hybrid-deployment"), true);
   assert.match(manifestMarkdown, /Release artifact manifest/);
   assert.match(manifestMarkdown, /service-acceptance-summary\.md/);
   assert.match(manifestMarkdown, /release\/templates\/identity-source-mapping\/README\.md/);

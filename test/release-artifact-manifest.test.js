@@ -24,6 +24,7 @@ test("release artifact manifest indexes reports templates commands and evidence"
   assert.equal(report.artifacts.some((item) => item.id === "health-dashboard" && item.command === "health-dashboard:summary" && item.markdown === "release/health-dashboard-summary.md" && item.evidence === "/api/health-dashboard/summary"), true);
   assert.equal(report.artifacts.some((item) => item.id === "priority-application-templates" && item.command === "priority-apps:templates" && item.markdown === "release/priority-application-templates.md" && item.evidence === "/api/priority-applications/templates"), true);
   assert.equal(report.artifacts.some((item) => item.id === "maternal-child-readiness" && item.command === "maternal-child:readiness" && item.markdown === "release/maternal-child-readiness-report.md" && item.evidence === "maternal-child-about.html"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "hybrid-deployment" && item.command === "hybrid:deployment-readiness" && item.markdown === "release/hybrid-deployment-readiness-report.md"), true);
   assert.equal(report.artifacts.some((item) => item.id === "multi-practice" && item.command === "multi-practice:readiness" && item.markdown === "release/multi-practice-readiness-report.md" && item.evidence === "/api/multi-practice-registry"), true);
   assert.equal(report.artifacts.some((item) => item.id === "chronic-followup" && item.command === "chronic:followup-readiness"), true);
   assert.equal(report.artifacts.some((item) => item.id === "chronic-institution-interfaces" && item.command === "chronic:institution-interfaces"), true);
@@ -43,6 +44,7 @@ test("release artifact manifest renders and writes artifacts", (t) => {
   assert.match(markdown, /priority-application-templates\.md/);
   assert.match(markdown, /maternal-child-readiness-report\.md/);
   assert.match(markdown, /Maternal-child main function and readiness report/);
+  assert.match(markdown, /Hybrid static preview and dynamic backend readiness/);
   assert.match(markdown, /Doctor multi-practice readiness report/);
   assert.match(markdown, /Template READMEs/);
   assert.match(markdown, /release-artifact-manifest\.md/);

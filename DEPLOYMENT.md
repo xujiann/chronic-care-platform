@@ -142,6 +142,7 @@ npm.cmd run release:manifest
 npm.cmd run priority-apps:templates
 npm.cmd run maternal-child:readiness
 npm.cmd run policy:coverage
+npm.cmd run hybrid:deployment-readiness
 ```
 
 本地服务启动后可访问：
@@ -180,6 +181,8 @@ npm.cmd run release:report:full
 `data-quality:report` 会生成 `release/data-quality-report.json` 和 `release/data-quality-report.md`，检查居民主索引完整度、跨集合居民引用、personIndex 一致性、来源可追溯和整改闭环，作为 P1 数据质量治理和主索引现场规则确认前的证据包。
 
 `environment:matrix` 会生成 `release/environment-matrix-report.json` 和 `release/environment-matrix-report.md`，把 demo、staging、production 三层环境的必填变量、阻断变量、责任人、门禁脚本和上线验收规则固化为可检查矩阵；`release:report` 会同步写出这些文件，作为环境分层、密钥注入、现场签字和生产切换审查的前置材料。
+
+`hybrid:deployment-readiness` 会生成 `release/hybrid-deployment-readiness-report.json` 和 `release/hybrid-deployment-readiness-report.md`，专项核对静态预览层、`data/db.json` 快照回退、Node API 后端、存储引擎边界、环境模板、CI 和发布门禁接线。
 
 `operations:readiness` 会生成 `release/operations-readiness-report.json` 和 `release/operations-readiness-report.md`，检查健康检查、运行指标、系统就绪报告、生产部署轨道、外部依赖风险和发布运维脚本，作为上线前运维审查证据。
 
@@ -292,3 +295,6 @@ Before site joint testing for the drug and consumable supervision app, run `npm.
 - `release:manifest` must include `health-dashboard-summary.md` so the eight-application template is part of the formal release package.
 - `release:manifest` must also include `priority-application-templates.md` so the standalone handoff contract is archived with the release package.
 - The dashboard remains blocked on real site joint-test inputs for identity, HIS/EMR/LIS/PACS, insurance, certificates, statistics, monitoring, and disaster recovery signoff.
+## Hybrid Deployment Readiness
+
+`hybrid:deployment-readiness` writes `release/hybrid-deployment-readiness-report.json` and `release/hybrid-deployment-readiness-report.md`. Use it before productionization reviews to confirm the intended hybrid topology: GitHub Pages/static HTML is only the preview layer, while `server.js` and `/api/*` require a Node-capable backend host.
