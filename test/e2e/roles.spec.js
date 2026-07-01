@@ -131,6 +131,7 @@ test("regional sharing page renders referral handoff boundary", async ({ page })
 
   await page.getByRole("button", { name: "生成交接清单" }).click();
   await expect(page.locator("#regional-handoff-report")).toContainText("区域共享-转诊会诊交接清单");
+  await expect(page.locator("#regional-handoff-report")).toContainText(/rshr-/);
   await expect(page.locator("#regional-handoff-report")).toContainText("证据进度");
   await expect(page.locator("#regional-handoff-report .handoff-report-list article")).toHaveCount(3);
 });
