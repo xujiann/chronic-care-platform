@@ -285,7 +285,7 @@ function renderRegionalHandoffReport() {
   panel.innerHTML = [
     `<div class="handoff-report-head">
       <strong>区域共享-转诊会诊交接清单</strong>
-      <span>${report.actor?.organization || report.actor?.role || "当前账号"} · ${formatDateTime(report.generatedAt)}</span>
+      <span>${report.reportId || "清单未编号"} · ${report.actor?.organization || report.actor?.role || "当前账号"} · ${formatDateTime(report.generatedAt)}</span>
     </div>`,
     `<div class="handoff-report-summary">
       <span>证据进度 ${report.summary?.evidenceReady || 0}/${report.summary?.evidenceTotal || 0}</span>

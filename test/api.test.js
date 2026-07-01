@@ -801,9 +801,11 @@ test("API authentication, scoping and governance regression suite", async (t) =>
 
     const commissionReport = await api(baseUrl, "/api/regional-data-sharing/handoff-report", authorized(commissionToken));
     assert.equal(commissionReport.response.status, 200);
+    assert.match(commissionReport.body.reportId, /^rshr-/);
     assert.equal(commissionReport.body.summary.packages, commission.body.summary.totalPackages);
     assert.equal(commissionReport.body.summary.evidenceTotal, commission.body.summary.totalPackages * 6);
     assert.equal(commissionReport.body.markdown.includes("区域共享-转诊会诊交接清单"), true);
+    assert.equal(commissionReport.body.markdown.includes(`清单编号：${commissionReport.body.reportId}`), true);
     assert.equal(commissionReport.body.packages.some((item) => item.id === "rsp-r3-imaging"), true);
     assert.equal(commissionReport.body.scope.runtimeBoundary.includes("不生成或改写转诊单"), true);
 
@@ -842,6 +844,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(refreshedDiabetes.referralHandoff.evidence.some((item) => item.id === "access-audit" && item.ready), true);
     const commissionState = await api(baseUrl, "/api/state", authorized(commissionToken));
     assert.equal(commissionState.body.dataAccessLogs.some((item) => item.scope === "regionalDataSharing" && item.residentId === "r2"), true);
+    assert.equal(commissionState.body.securityEvents.some((item) => item.action === "生成区域共享交接清单" && item.detail.includes(commissionReport.body.reportId)), true);
 
     const community = await login(baseUrl, "community");
     const deniedPackage = await api(baseUrl, "/api/regional-data-sharing/access-reviews", authorized(community.body.token, {

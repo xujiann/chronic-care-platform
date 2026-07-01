@@ -4365,6 +4365,7 @@ function buildRegionalHandoffReport(data, user) {
     };
   });
   const report = {
+    reportId: `rshr-${randomUUID()}`,
     generatedAt: new Date().toISOString(),
     actor: {
       role: user.role,
@@ -4403,6 +4404,7 @@ function renderRegionalHandoffMarkdown(report) {
   return [
     "# 区域共享-转诊会诊交接清单",
     "",
+    `- 清单编号：${report.reportId}`,
     `- 生成时间：${report.generatedAt}`,
     `- 生成角色：${report.actor.organization || report.actor.role}`,
     `- 权限范围：${report.scope.packageScope}`,
@@ -6014,7 +6016,7 @@ async function handleApi(req, res) {
       action: "生成区域共享交接清单",
       target: "/api/regional-data-sharing/handoff-report",
       result: "允许",
-      detail: `${report.summary.packages} 个共享包，${report.summary.handoffReady} 个可交接`
+      detail: `${report.reportId}；${report.summary.packages} 个共享包，${report.summary.handoffReady} 个可交接`
     });
     sendJson(res, 200, redactSensitiveResponse(report, user));
     return;
