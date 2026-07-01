@@ -417,11 +417,14 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".env.example"), /CUTOVER_SITE_INTERFACE_SIGNOFF/);
   assert.match(read(".env.example"), /CUTOVER_DR_REHEARSAL_SIGNOFF/);
   assert.match(read(".env.example"), /OIDC_ISSUER_URL=/);
+  assert.match(read(".env.example"), /SMS_GATEWAY_URL=/);
   assert.match(read(".env.example"), /AUDIT_EXPORT_PATH=/);
   assert.match(read("README.md"), /\/api\/health/);
+  assert.match(read("README.md"), /SMS_GATEWAY_URL/);
   assert.match(read("README.md"), /deploy:check/);
   assert.match(read("README.md"), /release:report/);
   assert.match(read("README.md"), /release:manifest/);
+  assert.match(read("DEPLOYMENT.md"), /SMS_GATEWAY_URL/);
   assert.match(read("DEPLOYMENT.md"), /doctor\.html/);
   assert.match(read("scripts/release-report.js"), /test:coverage/);
   assert.match(read("scripts/release-report.js"), /test:e2e/);
