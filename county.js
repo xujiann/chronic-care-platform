@@ -1,8 +1,9 @@
-const fallbackState = { countyConsortium: null, countyProjectBlueprint: null, countyCollaborationOrders: [], countyAiDiagnosisCases: [], countyMutualRecognitionRecords: [], referralTeleconsultations: [], referralTeleconsultationSignoffs: [], residents: [], medicalResources: [], personalRecords: [], taskMessages: [], integrationContracts: [], integrationGatewayEvents: [] };
+const fallbackState = { countyConsortium: null, countyProjectBlueprint: null, countyCollaborationOrders: [], countyAiDiagnosisCases: [], countyMutualRecognitionRecords: [], referralTeleconsultations: [], referralTeleconsultationSignoffs: [], referralTeleconsultationJointTestPack: null, residents: [], medicalResources: [], personalRecords: [], taskMessages: [], integrationContracts: [], integrationGatewayEvents: [] };
 let platformState = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
   const state = await loadPlatformState(fallbackState);
+  await loadCountyTeleconsultationJointTestPack(state);
   platformState = state;
   const county = state.countyConsortium || buildCountyConsortiumDefaults(state);
   renderCountyMetrics(county, state);
@@ -20,6 +21,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderCountyGovernance(county);
   bindCountyActions();
 });
+
+async function loadCountyTeleconsultationJointTestPack(state) {
+  if (!API_BASE) return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${API_BASE}/referral-teleconsultations/joint-test-pack`);
+    if (!response.ok) return null;
+    const pack = await response.json();
+    state.referralTeleconsultationJointTestPack = pack;
+    return pack;
+  } catch (error) {
+    return null;
+  }
+}
 
 function renderCountyMetrics(county, state) {
   const capabilities = county.capabilities || [];
@@ -271,6 +286,7 @@ function renderCountyTeleconsultationCutoverReadiness(state, rows) {
       <p>${readiness.contractReplay} callback contracts replayed; ${readiness.onsiteSignedRoles}/${readiness.totalRoles} onsite roles signed.</p>
       <footer>
         <small>${readiness.nextAction}</small>
+        <small>Evidence source: ${readiness.evidenceSource}</small>
       </footer>
     </article>`,
     ...readiness.blockers.map((item) => `<article data-referral-cutover-blocker="${item.id}">
@@ -412,6 +428,19 @@ function buildCountyTeleconsultationJointLedger(state, rows) {
 }
 
 function buildCountyTeleconsultationCutoverReadiness(state, rows) {
+  const apiReadiness = state.referralTeleconsultationJointTestPack?.cutoverReadiness;
+  if (apiReadiness) {
+    return {
+      readyForProductionCutover: Boolean(apiReadiness.readyForProductionCutover),
+      contractReplay: apiReadiness.contractReplay || "0/3",
+      finalReadyRoles: Number(apiReadiness.finalSignoffReadyRoles || 0),
+      onsiteSignedRoles: Number(apiReadiness.onsiteSignedRoles || 0),
+      totalRoles: 5,
+      blockers: Array.isArray(apiReadiness.blockers) ? apiReadiness.blockers : [],
+      nextAction: apiReadiness.nextAction || "Review the joint-test pack before production cutover.",
+      evidenceSource: "joint-test-pack API"
+    };
+  }
   const ledgerRows = buildCountyTeleconsultationJointLedger(state, rows);
   const signoffRows = buildCountyTeleconsultationSignoffRows(state, rows);
   const replayedContracts = ledgerRows.filter((item) => item.type === "callback" && item.matched > 0).length;
@@ -447,7 +476,8 @@ function buildCountyTeleconsultationCutoverReadiness(state, rows) {
     onsiteSignedRoles,
     totalRoles: signoffRows.length,
     blockers,
-    nextAction: blockers[0]?.detail || "Module cutover evidence is complete; continue with platform environment gates."
+    nextAction: blockers[0]?.detail || "Module cutover evidence is complete; continue with platform environment gates.",
+    evidenceSource: "local county state"
   };
 }
 

@@ -363,8 +363,11 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal((read("county.js").match(/function renderCountyTeleconsultationLoop/g) || []).length, 1);
   assert.match(read("county.js"), /buildReferralTeleconsultationEscalations/);
   assert.match(read("county.js"), /renderCountyTeleconsultationCutoverReadiness/);
+  assert.match(read("county.js"), /loadCountyTeleconsultationJointTestPack/);
   assert.match(read("county.js"), /data-referral-cutover-readiness/);
   assert.match(read("county.js"), /data-referral-cutover-blocker/);
+  assert.match(read("county.js"), /referral-teleconsultations\/joint-test-pack/);
+  assert.match(read("county.js"), /Evidence source/);
   assert.match(read("county.js"), /renderCountyTeleconsultationRiskBoard/);
   assert.match(read("county.js"), /renderCountyTeleconsultationJointLedger/);
   assert.match(read("county.js"), /data-referral-joint-ledger/);
