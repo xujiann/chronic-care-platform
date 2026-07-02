@@ -132,6 +132,7 @@ test("commission health dashboard filters live source actions and drills into so
   await expect(page.locator("#site-evidence-list [data-site-evidence]")).toHaveCount(4);
   await expect(page.locator("#production-readiness-board")).toHaveAttribute("data-production-status", "blocked");
   await expect(page.locator("#production-readiness-list [data-production-gate]")).toHaveCount(5);
+  await expect(page.locator("[data-production-requirements-link]")).toHaveAttribute("href", "./docs/health-dashboard-production-launch-requirements.md");
   await expect(page.locator("#production-readiness-list [data-production-gate='operations-dr']")).toContainText("监控告警与灾备演练");
   await expect(page.locator("#site-issue-ledger-board")).toHaveAttribute("data-filtered", "false");
   await expect(page.locator("#site-issue-reset-filters")).toBeDisabled();

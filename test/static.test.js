@@ -141,6 +141,8 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(html, /site-evidence-list/);
   assert.match(html, /production-readiness-board/);
   assert.match(html, /production-readiness-list/);
+  assert.match(html, /data-production-requirements-link/);
+  assert.match(html, /health-dashboard-production-launch-requirements\.md/);
   assert.match(html, /site-issue-ledger-board/);
   assert.match(html, /site-issue-ledger-status-controls/);
   assert.match(html, /site-issue-owner-filter/);
