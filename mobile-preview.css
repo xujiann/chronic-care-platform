@@ -231,13 +231,20 @@ code {
 }
 
 .preview-toolbar.compact {
+  grid-template-columns: minmax(0, 1fr) minmax(96px, auto);
+  align-items: center;
   gap: 7px;
   padding: 8px;
 }
 
 .preview-toolbar.compact .preview-status {
+  grid-column: 1;
   min-height: 32px;
   padding: 6px 8px;
+}
+
+.preview-toolbar.compact .preview-compact-toggle {
+  grid-column: 2;
 }
 
 .preview-toolbar.compact .preview-client-switch button,
@@ -258,6 +265,7 @@ code {
 }
 
 .preview-toolbar.compact .preview-entry-actions {
+  grid-column: 1 / -1;
   grid-template-columns: minmax(0, 1fr) minmax(96px, 0.42fr);
 }
 

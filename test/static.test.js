@@ -798,7 +798,8 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /renderCompactPreview/);
   assert.match(mobilePreviewHtml, /copyTextWithFallback/);
   assert.match(mobilePreviewHtml, /requestedCompactPreview/);
-  assert.match(mobilePreviewHtml, /activePreviewService !== "health-record"/);
+  assert.match(mobilePreviewHtml, /let isCompactPreview = requestedCompactPreview === "1"/);
+  assert.doesNotMatch(mobilePreviewHtml, /activePreviewService !== "health-record"/);
   assert.match(mobilePreviewHtml, /syncPreviewServiceControls/);
   assert.match(mobilePreviewHtml, /previewServiceLabels/);
   assert.match(mobilePreviewHtml, /390px 手机视口/);
@@ -830,6 +831,8 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /document\.execCommand\("copy"\)/);
   assert.match(mobilePreviewHtml, /previewEntryUrl\.select\(\)/);
   assert.match(mobilePreviewHtml, /isCompactPreview = !isCompactPreview/);
+  assert.match(mobilePreviewHtml, /isCompactPreview \? "打开当前页"/);
+  assert.match(mobilePreviewHtml, /isCompactPreview\s*\?\s*`\$\{previewClientLabels\[activePreviewClient\]\} · 390px 手机视口`/);
   assert.match(mobilePreviewHtml, /手机框：加载中/);
   assert.match(mobilePreviewHtml, /手机框：已加载/);
   assert.match(mobilePreviewHtml, /入口：当前与出生健康已同步/);
@@ -864,6 +867,9 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewCss, /preview-toolbar\.compact \.preview-birth-entry/);
   assert.match(mobilePreviewCss, /preview-toolbar\.compact \.preview-entry-actions/);
   assert.match(mobilePreviewCss, /preview-toolbar\.compact \.preview-status/);
+  assert.match(mobilePreviewCss, /grid-template-columns: minmax\(0, 1fr\) minmax\(96px, auto\)/);
+  assert.match(mobilePreviewCss, /preview-toolbar\.compact \.preview-compact-toggle/);
+  assert.match(mobilePreviewCss, /grid-column: 1 \/ -1/);
   assert.match(mobilePreviewCss, /min-height: 34px/);
   assert.match(mobilePreviewCss, /preview-copy-entry/);
   assert.match(mobilePreviewCss, /preview-checklist/);

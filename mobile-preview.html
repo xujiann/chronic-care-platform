@@ -140,7 +140,7 @@
       let activePreviewService = previewServices.includes(requestedPreviewService) ? requestedPreviewService : "health-record";
       let activePreviewClient = ["mini-program", "app"].includes(previewParams.get("client")) ? previewParams.get("client") : "mini-program";
       const requestedCompactPreview = previewParams.get("compact");
-      let isCompactPreview = requestedCompactPreview ? requestedCompactPreview === "1" : activePreviewService !== "health-record";
+      let isCompactPreview = requestedCompactPreview === "1";
       function citizenPreviewSrc(service) {
         return `./citizen.html?preview=mobile-nav&client=${activePreviewClient}&page=${service}#service-${service}`;
       }
@@ -159,7 +159,7 @@
         previewEntryUrl.value = absoluteEntryUrl;
         previewCopyEntry.dataset.previewEntry = absoluteEntryUrl;
         previewCopyEntry.textContent = "复制入口";
-        previewDirectEntry.textContent = `打开${previewClientLabels[activePreviewClient]} · ${previewServiceLabels[activePreviewService]}`;
+        previewDirectEntry.textContent = isCompactPreview ? "打开当前页" : `打开${previewClientLabels[activePreviewClient]} · ${previewServiceLabels[activePreviewService]}`;
         previewReadinessLink.textContent = "入口：当前与出生健康已同步";
       };
       const renderPreviewReadiness = () => {
@@ -167,7 +167,9 @@
         previewReadinessService.textContent = `服务：${previewServiceLabels[activePreviewService]}`;
       };
       const renderPreviewStatus = () => {
-        previewStatus.textContent = `${previewClientLabels[activePreviewClient]} · ${previewServiceLabels[activePreviewService]} · 390px 手机视口`;
+        previewStatus.textContent = isCompactPreview
+          ? `${previewClientLabels[activePreviewClient]} · 390px 手机视口`
+          : `${previewClientLabels[activePreviewClient]} · ${previewServiceLabels[activePreviewService]} · 390px 手机视口`;
         renderPreviewDirectEntry();
         renderPreviewReadiness();
       };
