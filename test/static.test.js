@@ -618,6 +618,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(workbenchHtml, /release-evidence-gates/);
   assert.match(workbenchHtml, /acceptance-ledgers/);
   assert.match(workbenchHtml, /site-readiness-pack/);
+  assert.match(workbenchHtml, /site-launch-evidence-form/);
   assert.match(workbenchJs, /loadOperationalMetrics/);
   assert.match(workbenchJs, /loadSystemReadiness/);
   assert.match(workbenchJs, /loadAcceptanceLedgers/);
@@ -625,6 +626,9 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(workbenchJs, /data-service-open-action/);
   assert.match(workbenchJs, /loadSiteReadinessPack/);
   assert.match(workbenchJs, /loadSiteTemplateReadmes/);
+  assert.match(workbenchJs, /loadSiteLaunchEvidence/);
+  assert.match(workbenchJs, /renderSiteLaunchEvidenceForm/);
+  assert.match(workbenchJs, /submitSiteLaunchEvidence/);
   assert.match(workbenchJs, /loadReleaseReport/);
   assert.match(workbenchJs, /loadProductionCutoverChecklist/);
   assert.match(workbenchJs, /loadReleaseArtifactManifest/);
@@ -646,6 +650,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(workbenchJs, /\/api\/service-acceptance-summary/);
   assert.match(workbenchJs, /\/api\/site-readiness-pack/);
   assert.match(workbenchJs, /\/api\/site-template-readmes/);
+  assert.match(workbenchJs, /\/api\/site-launch-evidence/);
   assert.match(workbenchJs, /\/api\/release-report/);
   assert.match(workbenchJs, /\/api\/production-cutover-checklist/);
   assert.match(workbenchJs, /\/api\/release-artifact-manifest/);
@@ -654,6 +659,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(workbenchJs, /\/api\/county\/acceptance-ledger/);
   assert.match(read("server.js"), /\/api\/process-audit/);
   assert.match(read("server.js"), /\/api\/service-acceptance-summary/);
+  assert.match(read("server.js"), /\/api\/site-launch-evidence/);
   assert.match(read("server.js"), /\/api\/site-readiness-pack/);
   assert.match(read("server.js"), /SERVICE_DOMAIN_BY_COLLECTION/);
   assert.match(read("server.js"), /priorityLevel/);
@@ -781,6 +787,8 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /preview-lan-url/);
   assert.match(mobilePreviewHtml, /preview-status/);
   assert.match(mobilePreviewHtml, /preview-compact-toggle/);
+  assert.match(mobilePreviewHtml, /preview-service-select/);
+  assert.match(mobilePreviewHtml, /服务导航/);
   assert.match(mobilePreviewHtml, /preview-direct-entry/);
   assert.match(mobilePreviewHtml, /preview-birth-entry/);
   assert.match(mobilePreviewHtml, /preview-copy-entry/);
@@ -803,13 +811,14 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /syncPreviewServiceControls/);
   assert.match(mobilePreviewHtml, /previewServiceLabels/);
   assert.match(mobilePreviewHtml, /390px 手机视口/);
-  assert.match(mobilePreviewHtml, /YOUR-LAN-IP/);
+  assert.match(mobilePreviewHtml, /本机局域网IP/);
   assert.match(mobilePreviewHtml, /DEMO-MOBILE-R1 \/ 888888/);
   assert.match(mobilePreviewHtml, /citizen\.html\?preview=mobile-nav&client=mini-program&page=health-record/);
   assert.match(mobilePreviewHtml, /value="\.\/citizen\.html\?preview=mobile-nav&client=mini-program&page=health-record#service-health-record"/);
   assert.doesNotMatch(mobilePreviewHtml, /localhost:5173\/citizen\.html/);
   assert.match(mobilePreviewHtml, /data-preview-client="mini-program"/);
   assert.match(mobilePreviewHtml, /data-preview-client="app"/);
+  assert.match(mobilePreviewHtml, /手机应用/);
   assert.match(mobilePreviewHtml, /URLSearchParams\(location\.search\)/);
   assert.match(mobilePreviewHtml, /previewParams\.get\("client"\)/);
   assert.match(mobilePreviewHtml, /params\.set\("page", activePreviewService\)/);
@@ -853,6 +862,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewCss, /preview-steps/);
   assert.match(mobilePreviewCss, /preview-client-switch/);
   assert.match(mobilePreviewCss, /preview-service-switch/);
+  assert.match(mobilePreviewCss, /preview-service-select/);
   assert.match(mobilePreviewCss, /preview-status/);
   assert.match(mobilePreviewCss, /preview-compact-toggle/);
   assert.match(mobilePreviewCss, /preview-direct-entry/);
@@ -863,6 +873,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewCss, /preview-toolbar\.compact \.preview-entry-url/);
   assert.match(mobilePreviewCss, /preview-toolbar\.compact \.preview-client-switch/);
   assert.match(mobilePreviewCss, /preview-toolbar\.compact \.preview-service-switch/);
+  assert.match(mobilePreviewCss, /preview-toolbar\.compact \.preview-service-select/);
   assert.match(mobilePreviewCss, /preview-toolbar\.compact \.preview-refresh/);
   assert.match(mobilePreviewCss, /preview-toolbar\.compact \.preview-birth-entry/);
   assert.match(mobilePreviewCss, /preview-toolbar\.compact \.preview-entry-actions/);
@@ -1121,7 +1132,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /mini-program/);
   assert.match(citizenJs, /app/);
   assert.match(citizenJs, /小程序/);
-  assert.match(citizenJs, /APP/);
+  assert.match(citizenJs, /手机应用/);
   assert.match(citizenJs, /renderMobileServiceNav/);
   assert.match(citizenJs, /data-mobile-service-tab/);
   assert.match(citizenJs, /data-mobile-service-state/);

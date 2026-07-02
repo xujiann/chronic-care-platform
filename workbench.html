@@ -56,6 +56,43 @@
           <h2>Site readiness pack</h2>
           <span>Identity, interface, monitoring and signoff templates</span>
         </div>
+        <form id="site-launch-evidence-form" class="form-grid site-launch-evidence-form">
+          <label>
+            Template
+            <select name="templateId" required></select>
+          </label>
+          <label>
+            Status
+            <select name="status">
+              <option value="submitted">submitted</option>
+              <option value="verified">verified</option>
+              <option value="rejected">rejected</option>
+            </select>
+          </label>
+          <label>
+            Artifact name
+            <input name="artifactName" required placeholder="joint-test receipt or signoff sheet" />
+          </label>
+          <label>
+            External system
+            <input name="externalSystem" placeholder="HIS / SMS / OIDC / monitoring" />
+          </label>
+          <label>
+            Joint-test no.
+            <input name="jointTestNo" placeholder="JT-20260702-001" />
+          </label>
+          <label>
+            Attachments
+            <input name="attachmentNames" placeholder="sample-request.json, signed-form.pdf" />
+          </label>
+          <label class="full">
+            Note
+            <textarea name="note" rows="2" placeholder="site owner, acceptance scope, remaining issue"></textarea>
+          </label>
+          <div class="full action-row">
+            <button class="primary-button" type="submit">Record site evidence</button>
+          </div>
+        </form>
         <div id="site-readiness-pack" class="priority-list"></div>
       </section>
 

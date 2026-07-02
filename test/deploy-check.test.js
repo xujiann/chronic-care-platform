@@ -30,6 +30,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "snapshot:multiPractice",
     "docs:productionGoLiveRequirements",
     "docs:onsiteLaunchMaterials",
+    "api:siteLaunchEvidence",
     "manifest:healthDashboardSummary",
     "manifest:launchSmoke",
     "manifest:onsiteLaunchRequirements",

@@ -268,12 +268,66 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(sitePack.body.templates.identity.some((item) => item.field === "sub"), true);
     assert.equal(sitePack.body.templates.signoff.some((item) => item.id === "signoff-cutover-monitoring"), true);
 
+    const siteLaunchEvidence = await api(baseUrl, "/api/site-launch-evidence", authorized(accountLogin.body.token));
+    assert.equal(siteLaunchEvidence.response.status, 200);
+    assert.equal(siteLaunchEvidence.body.ok, true);
+    assert.equal(siteLaunchEvidence.body.templates.length > 0, true);
+    const evidenceTemplate = siteLaunchEvidence.body.templates[0];
+    const recordedSiteEvidence = await api(baseUrl, "/api/site-launch-evidence", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        templateId: evidenceTemplate.id,
+        status: "verified",
+        artifactName: "site joint-test receipt",
+        externalSystem: "HIS",
+        jointTestNo: "JT-20260702-001",
+        attachmentNames: ["sample-request.json", "signed-form.pdf"],
+        note: "site owner accepted joint-test evidence"
+      })
+    }));
+    assert.equal(recordedSiteEvidence.response.status, 201);
+    assert.equal(recordedSiteEvidence.body.evidence.templateId, evidenceTemplate.id);
+    assert.equal(recordedSiteEvidence.body.evidence.status, "verified");
+    assert.equal(recordedSiteEvidence.body.siteLaunchEvidence.summary.evidence >= 1, true);
+
     const templateReadmes = await api(baseUrl, "/api/site-template-readmes", authorized(accountLogin.body.token));
     assert.equal(templateReadmes.response.status, 200);
     assert.equal(templateReadmes.body.ok, true);
     assert.equal(templateReadmes.body.summary.readmes, 4);
     assert.equal(templateReadmes.body.readmes.some((item) => item.file === "release/templates/identity-source-mapping/README.md"), true);
     assert.equal(templateReadmes.body.readmes.every((item) => item.content.includes("Current implementation coverage")), true);
+
+    const siteEvidence = await api(baseUrl, "/api/site-launch-evidence", authorized(accountLogin.body.token));
+    assert.equal(siteEvidence.response.status, 200);
+    assert.equal(siteEvidence.body.ok, true);
+    assert.equal(siteEvidence.body.templates.some((item) => item.id === "signoff-cutover-institution-interfaces"), true);
+    assert.equal(siteEvidence.body.summary.templates >= 20, true);
+
+    const createdSiteEvidence = await api(baseUrl, "/api/site-launch-evidence", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        templateId: "signoff-cutover-institution-interfaces",
+        artifactName: "HIS EMR LIS PACS joint-test receipt",
+        externalSystem: "Dalian Central Hospital HIS",
+        jointTestNo: "JT-API-20260702-001",
+        attachmentNames: ["request.json", "response.json", "signed-receipt.pdf"],
+        status: "verified",
+        note: "API regression site evidence"
+      })
+    }));
+    assert.equal(createdSiteEvidence.response.status, 201);
+    assert.equal(createdSiteEvidence.body.evidence.status, "verified");
+    assert.equal(createdSiteEvidence.body.evidence.attachmentNames.length, 3);
+    assert.equal(createdSiteEvidence.body.siteLaunchEvidence.summary.verified >= 1, true);
+
+    const refreshedSiteEvidence = await api(baseUrl, "/api/site-launch-evidence", authorized(accountLogin.body.token));
+    assert.equal(refreshedSiteEvidence.body.evidence.some((item) => item.jointTestNo === "JT-API-20260702-001"), true);
+    const hospitalForSiteEvidence = await login(baseUrl, "hospital");
+    const deniedSiteEvidence = await api(baseUrl, "/api/site-launch-evidence", authorized(hospitalForSiteEvidence.body.token, {
+      method: "POST",
+      body: JSON.stringify({ templateId: "signoff-cutover-monitoring", artifactName: "forbidden" })
+    }));
+    assert.equal(deniedSiteEvidence.response.status, 403);
 
     const releaseReport = await api(baseUrl, "/api/release-report", authorized(accountLogin.body.token));
     assert.equal(releaseReport.response.status, 200);

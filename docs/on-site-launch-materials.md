@@ -7,7 +7,8 @@
 1. 项目办在 T-7 前冻结上线范围，逐项确认材料责任方。
 2. 现场实施方按本清单收集原始材料、截图、样例报文、签字页和演练记录。
 3. 发布经理执行 `npm.cmd run site:pack`、`npm.cmd run release:report`、`npm.cmd run deploy:check` 和 `npm.cmd run launch:smoke`。
-4. 任何 P0 材料缺失时，不进入正式生产切换；可降级为白名单试点、只读试运行或继续联调。
+4. 委端统一工作台通过 `POST /api/site-launch-evidence` 登记身份源、接口联调、监控值守和生产签字证据，形成 `siteLaunchEvidence` 运行台账。
+5. 任何 P0 材料缺失时，不进入正式生产切换；可降级为白名单试点、只读试运行或继续联调。
 
 ## 材料总表
 

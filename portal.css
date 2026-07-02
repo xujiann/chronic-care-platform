@@ -858,6 +858,18 @@ dialog::backdrop {
   background: #f8fbfd;
 }
 
+.site-launch-evidence-form {
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f8fbfd;
+}
+
+.site-launch-evidence-form .action-row {
+  margin-top: 0;
+}
+
 .primary-button,
 .ghost-button,
 .icon-button {

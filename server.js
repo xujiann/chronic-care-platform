@@ -10835,6 +10835,174 @@ function buildChronicAcceptanceLedger(data) {
   };
 }
 
+function cleanSiteEvidenceText(value, fallback = "") {
+  return String(value || fallback).trim();
+}
+
+function normalizeStringList(value) {
+  const rows = Array.isArray(value) ? value : String(value || "").split(/[,\n;]+/);
+  return rows.map((item) => String(item || "").trim()).filter(Boolean);
+}
+
+function buildSiteLaunchEvidenceTemplates(data) {
+  const sitePack = buildSiteReadinessPack({ data, env: process.env });
+  const identity = (sitePack.templates?.identity || []).map((item) => ({
+    id: item.id,
+    domain: "identity",
+    owner: item.owner || "identity-integration",
+    title: `Identity claim ${item.field || item.id}`,
+    evidenceToAttach: item.evidenceToAttach || [],
+    source: "site-readiness-pack"
+  }));
+  const interfaces = (sitePack.templates?.interfaces || []).map((item) => ({
+    id: item.id,
+    domain: "interface",
+    owner: item.owner || "institution-integration",
+    title: `Interface joint test ${item.sourceSystem || item.id}`,
+    evidenceToAttach: item.evidenceToAttach || [],
+    source: "site-readiness-pack"
+  }));
+  const monitoring = (sitePack.templates?.monitoring || []).map((item) => ({
+    id: item.id,
+    domain: "monitoring",
+    owner: item.owner || "platform-ops",
+    title: `Monitoring evidence ${item.signal || item.id}`,
+    evidenceToAttach: item.requiredEvidence || [],
+    source: "site-readiness-pack"
+  }));
+  const signoff = (sitePack.templates?.signoff || []).map((item) => ({
+    id: item.id,
+    domain: item.phase || "signoff",
+    owner: item.owner || "project-office",
+    title: item.evidence || item.id,
+    evidenceToAttach: item.requiredSignatures || [],
+    blockingUntil: item.blockingUntil || "",
+    source: "site-readiness-pack"
+  }));
+  return [...identity, ...interfaces, ...monitoring, ...signoff];
+}
+
+function normalizeSiteLaunchEvidence(payload, user, data) {
+  const templates = buildSiteLaunchEvidenceTemplates(data);
+  const templateId = cleanSiteEvidenceText(payload.templateId || payload.requirementId || payload.itemId);
+  if (!templateId) throw new Error("templateId is required");
+  const template = templates.find((item) => item.id === templateId);
+  if (!template) throw new Error("templateId is not in site readiness templates");
+  const artifactName = cleanSiteEvidenceText(payload.artifactName || payload.artifact || payload.name);
+  if (!artifactName) throw new Error("artifactName is required");
+  const allowedStatuses = new Set(["submitted", "verified", "rejected", "superseded"]);
+  const status = cleanSiteEvidenceText(payload.status || "submitted").toLowerCase();
+  if (!allowedStatuses.has(status)) throw new Error("status must be submitted, verified, rejected or superseded");
+  const now = new Date().toISOString();
+  const note = cleanSiteEvidenceText(payload.note || payload.comment);
+  return {
+    id: cleanSiteEvidenceText(payload.id) || `sle-${randomUUID()}`,
+    templateId,
+    domain: cleanSiteEvidenceText(payload.domain || template.domain),
+    owner: cleanSiteEvidenceText(payload.owner || template.owner),
+    title: cleanSiteEvidenceText(payload.title || template.title),
+    artifactName,
+    evidenceType: cleanSiteEvidenceText(payload.evidenceType || payload.type || "site-joint-test-evidence"),
+    externalSystem: cleanSiteEvidenceText(payload.externalSystem || payload.sourceSystem),
+    jointTestNo: cleanSiteEvidenceText(payload.jointTestNo || payload.receiptNo || payload.ticketNo),
+    status,
+    attachmentNames: normalizeStringList(payload.attachmentNames || payload.attachments).slice(0, 12),
+    note,
+    submittedAt: cleanSiteEvidenceText(payload.submittedAt) || now,
+    submittedBy: user.username || user.role,
+    submittedByName: user.name || "",
+    verifiedAt: status === "verified" ? (cleanSiteEvidenceText(payload.verifiedAt) || now) : cleanSiteEvidenceText(payload.verifiedAt),
+    verifiedBy: status === "verified" ? (user.username || user.role) : cleanSiteEvidenceText(payload.verifiedBy),
+    auditTrail: [
+      {
+        at: now,
+        action: "site-launch-evidence-submit",
+        by: user.username || user.role,
+        byName: user.name || "",
+        status,
+        note
+      }
+    ]
+  };
+}
+
+function buildSiteLaunchEvidenceDashboard(data) {
+  const templates = buildSiteLaunchEvidenceTemplates(data);
+  const templateById = new Map(templates.map((item) => [item.id, item]));
+  const rows = (Array.isArray(data.siteLaunchEvidence) ? data.siteLaunchEvidence : [])
+    .filter((item) => item && item.templateId)
+    .map((item) => ({
+      ...item,
+      template: templateById.get(item.templateId) || null,
+      acceptedForCutover: ["submitted", "verified"].includes(String(item.status || "").toLowerCase())
+    }));
+  const activeTemplateIds = new Set(rows.filter((item) => item.acceptedForCutover).map((item) => item.templateId));
+  const missingTemplates = templates.filter((item) => !activeTemplateIds.has(item.id));
+  const byDomain = rows.reduce((result, item) => {
+    const domain = item.domain || item.template?.domain || "unknown";
+    result[domain] = (result[domain] || 0) + 1;
+    return result;
+  }, {});
+  const summary = {
+    templates: templates.length,
+    evidence: rows.length,
+    submitted: rows.filter((item) => item.status === "submitted").length,
+    verified: rows.filter((item) => item.status === "verified").length,
+    rejected: rows.filter((item) => item.status === "rejected").length,
+    missingTemplates: missingTemplates.length,
+    domainsWithEvidence: Object.keys(byDomain).length
+  };
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    state: summary.missingTemplates === 0 ? "all-template-evidence-recorded" : "evidence-collection-in-progress",
+    summary,
+    templates,
+    evidence: rows,
+    missingTemplates: missingTemplates.slice(0, 30),
+    byDomain
+  };
+}
+
+function upsertSiteLaunchEvidence(data, user, payload) {
+  const evidence = normalizeSiteLaunchEvidence(payload, user, data);
+  const rows = Array.isArray(data.siteLaunchEvidence) ? data.siteLaunchEvidence : [];
+  const existingIndex = rows.findIndex((item) => item.id === evidence.id);
+  if (existingIndex >= 0) {
+    evidence.auditTrail = [
+      ...evidence.auditTrail,
+      ...(Array.isArray(rows[existingIndex].auditTrail) ? rows[existingIndex].auditTrail : [])
+    ].slice(0, 30);
+    rows[existingIndex] = { ...rows[existingIndex], ...evidence };
+  } else {
+    rows.unshift(evidence);
+  }
+  data.siteLaunchEvidence = rows.slice(0, 300);
+  appendDataAccessLog(data, user, "", "siteLaunchEvidence", `${evidence.templateId}:${evidence.artifactName}`, "allowed");
+  data.securityEvents = [
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "record site launch evidence",
+      target: `siteLaunchEvidence/${evidence.id}`,
+      result: "allowed",
+      detail: `${evidence.templateId}:${evidence.status}`
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120);
+  data.securityEvents = sealAuditTrail(data.securityEvents, { recompute: true });
+  writeDatabase(normalizeState(data));
+  return {
+    status: existingIndex >= 0 ? 200 : 201,
+    body: {
+      evidence,
+      siteLaunchEvidence: buildSiteLaunchEvidenceDashboard(readDatabase())
+    }
+  };
+}
+
 function buildSiteTemplateReadmes(data) {
   const sitePack = buildSiteReadinessPack({ data, env: process.env });
   const contentByFile = renderTemplateReadmes(sitePack);
@@ -11103,6 +11271,25 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/site-template-readmes");
     if (!user) return;
     sendJson(res, 200, buildSiteTemplateReadmes(readDatabase()));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/site-launch-evidence") {
+    const user = requireApiRole(req, res, ["commission"], "/api/site-launch-evidence");
+    if (!user) return;
+    sendJson(res, 200, buildSiteLaunchEvidenceDashboard(readDatabase()));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/site-launch-evidence") {
+    const user = requireApiRole(req, res, ["commission"], "/api/site-launch-evidence");
+    if (!user) return;
+    try {
+      const result = upsertSiteLaunchEvidence(readDatabase(), user, await collectJson(req));
+      sendJson(res, result.status, result.body);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+    }
     return;
   }
 
