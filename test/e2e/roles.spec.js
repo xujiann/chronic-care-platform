@@ -110,7 +110,16 @@ test("about page explains runnable platform capabilities", async ({ page }) => {
   await expect(page.locator("[data-about-capability='site-template-readmes']")).toContainText("/api/site-template-readmes");
   await expect(page.locator("[data-about-capability='workflow-tasks']")).toContainText("/api/tasks");
   await expect(page.locator("[data-about-capability='release-gates']")).toContainText("npm run deploy:check");
+  await expect(page.locator("[data-about-section='referral-policy']")).toBeVisible();
   await expect(page.locator("[data-about-section='external-dependencies']")).toBeVisible();
+
+  await page.goto("/referral-teleconsultation-about.html");
+  await expect(page.locator("[data-referral-about-section='policy-basis']")).toBeVisible();
+  await expect(page.locator("[data-referral-policy='graded-diagnosis']")).toBeVisible();
+  await expect(page.locator("[data-referral-about-section='joint-signoff']")).toBeVisible();
+  await expect(page.locator("[data-referral-signoff='referral-center']")).toContainText("feedback-callback");
+  await expect(page.locator("[data-referral-signoff='hospital-it']")).toContainText("report-callback");
+  await expect(page.locator("[data-referral-about-section='developer']")).toContainText("Dr.Xu");
 
   await login(page, "health", "index.html");
   await page.goto("/about.html");

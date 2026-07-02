@@ -77,6 +77,42 @@ const FIELD_MAPPINGS = {
       institution: "institution",
       metrics: "metrics"
     }
+  },
+  "referral-feedback-callback-v1": {
+    targetCollection: "referralTeleconsultations",
+    owner: "referral-center",
+    fields: {
+      externalId: "externalFeedbackId",
+      teleconsultationId: "id",
+      residentId: "residentId",
+      receivingFeedback: "receivingFeedback",
+      feedbackAt: "feedbackAt",
+      sourceSystem: "feedbackSourceSystem"
+    }
+  },
+  "referral-schedule-callback-v1": {
+    targetCollection: "referralTeleconsultations",
+    owner: "referral-center",
+    fields: {
+      externalId: "externalScheduleId",
+      teleconsultationId: "id",
+      residentId: "residentId",
+      meetingWindow: "meetingWindow",
+      targetInstitution: "targetInstitution",
+      department: "department"
+    }
+  },
+  "referral-report-callback-v1": {
+    targetCollection: "referralTeleconsultations",
+    owner: "referral-center",
+    fields: {
+      externalId: "externalReportId",
+      teleconsultationId: "id",
+      residentId: "residentId",
+      reportSummary: "reportSummary",
+      reportReturnedAt: "reportReturnedAt",
+      sourceSystem: "reportSourceSystem"
+    }
   }
 };
 

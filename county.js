@@ -1,8 +1,9 @@
-const fallbackState = { countyConsortium: null, countyProjectBlueprint: null, countyCollaborationOrders: [], countyAiDiagnosisCases: [], countyMutualRecognitionRecords: [], referralTeleconsultations: [], residents: [], medicalResources: [], personalRecords: [] };
+const fallbackState = { countyConsortium: null, countyProjectBlueprint: null, countyCollaborationOrders: [], countyAiDiagnosisCases: [], countyMutualRecognitionRecords: [], referralTeleconsultations: [], referralTeleconsultationSignoffs: [], referralTeleconsultationJointTestPack: null, residents: [], medicalResources: [], personalRecords: [], taskMessages: [], integrationContracts: [], integrationGatewayEvents: [] };
 let platformState = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
   const state = await loadPlatformState(fallbackState);
+  await loadCountyTeleconsultationJointTestPack(state);
   platformState = state;
   const county = state.countyConsortium || buildCountyConsortiumDefaults(state);
   renderCountyMetrics(county, state);
@@ -20,6 +21,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderCountyGovernance(county);
   bindCountyActions();
 });
+
+async function loadCountyTeleconsultationJointTestPack(state) {
+  if (!API_BASE) return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${API_BASE}/referral-teleconsultations/joint-test-pack`);
+    if (!response.ok) return null;
+    const pack = await response.json();
+    state.referralTeleconsultationJointTestPack = pack;
+    return pack;
+  } catch (error) {
+    return null;
+  }
+}
 
 function renderCountyMetrics(county, state) {
   const capabilities = county.capabilities || [];
@@ -206,32 +221,576 @@ function renderCountyBusinessOperations(state) {
 }
 
 function renderCountyTeleconsultationLoop(state) {
-  const rows = state.referralTeleconsultations || [];
+  const rows = filterCountyTeleconsultations(state.referralTeleconsultations || []);
   const countEl = document.querySelector("#county-teleconsultation-count");
   const tableEl = document.querySelector("#county-teleconsultation-loop");
+  const performanceEl = document.querySelector("#county-teleconsultation-performance");
   if (!countEl || !tableEl) return;
-  countEl.textContent = `${rows.length} items`;
+  const allRows = state.referralTeleconsultations || [];
+  const escalations = buildReferralTeleconsultationEscalations(rows);
+  countEl.textContent = `${rows.length}/${allRows.length} 项`;
+  if (performanceEl) {
+    const reportReturned = rows.filter((item) => item.reportStatus === "returned" || item.status === "report-returned").length;
+    const avgResponse = averagePerformance(rows, "responseHours");
+    const avgReportReturn = averagePerformance(rows, "reportReturnHours");
+    performanceEl.innerHTML = [
+      ["报告回传", `${reportReturned}/${rows.length || 0}`, rows.length ? `${Math.round((reportReturned / rows.length) * 100)}% 回传率` : "暂无筛选记录"],
+      ["平均响应", Number.isFinite(avgResponse) ? `${avgResponse.toFixed(1)}h` : "-", "接诊反馈时效"],
+      ["平均回传", Number.isFinite(avgReportReturn) ? `${avgReportReturn.toFixed(1)}h` : "-", "报告回调时效"],
+      ["SLA 风险", `${escalations.length}`, `SLA risks：${escalations.filter((item) => item.severity === "high").length} 个高风险待跟进`],
+      ["已确认", allRows.filter((item) => item.slaDisposition?.status && item.slaDisposition.status !== "pending-ack").length, "机构或医共体 SLA 处置记录"],
+      ["高优先级", rows.filter((item) => item.priority === "high").length, "医共体跟进队列"]
+    ].map(([label, value, hint]) => `<article class="claim-card"><strong>${label}</strong><span>${value}<br>${hint}</span></article>`).join("");
+  }
+  renderCountyTeleconsultationCutoverReadiness(state, rows);
+  renderCountyTeleconsultationJointLedger(state, rows);
+  renderCountyTeleconsultationRiskBoard(state, rows, escalations);
+  renderCountyTeleconsultationSignoff(state, rows);
+  const escalationMap = new Map(escalations.map((item) => [item.teleconsultationId, item]));
   tableEl.innerHTML = `<table>
-    <thead><tr><th>Resident</th><th>Pathway</th><th>Question</th><th>Status</th><th>Report</th><th>Action</th></tr></thead>
+    <thead><tr><th>居民</th><th>路径</th><th>临床问题</th><th>状态</th><th>绩效</th><th>SLA</th><th>督办</th><th>报告</th><th>操作</th></tr></thead>
     <tbody>${rows.map((item) => {
       const resident = residentOf(state, item.residentId);
+      const responseHours = Number(item.performance?.responseHours);
+      const reportReturnHours = Number(item.performance?.reportReturnHours);
+      const escalation = escalationMap.get(item.id);
+      const reminderSent = escalation && hasReferralEscalationReminder(state, item.id, escalation.severity);
       return `<tr>
-        <td>${resident?.name || item.residentId || "Unknown"}</td>
-        <td>${item.sourceInstitution || "-"} -> ${item.targetInstitution || "-"}<br><small>${item.department || item.type || ""}</small></td>
+        <td>${resident?.name || item.residentId || "未知居民"}</td>
+        <td>${item.sourceInstitution || "-"} → ${item.targetInstitution || "-"}<br><small>${item.department || item.type || ""}</small></td>
         <td>${item.clinicalQuestion || item.receivingFeedback || item.reportSummary || "-"}</td>
-        <td><span class="badge ${item.priority === "high" ? "danger" : "info"}">${item.status}</span></td>
-        <td>${item.reportStatus || "pending"}</td>
+        <td><span class="badge ${item.priority === "high" ? "danger" : "info"}">${countyTeleconsultationStatusLabel(item.status)}</span></td>
+        <td>响应 ${Number.isFinite(responseHours) ? `${responseHours}h` : "-"}<br><small>报告 ${Number.isFinite(reportReturnHours) ? `${reportReturnHours}h` : "-"} · ${item.performance?.insurancePaymentPath || "支付路径待确认"}</small></td>
+        <td>${escalation ? `<span class="badge ${escalation.severity === "high" ? "danger" : "warn"}">${escalation.severity}</span><br><small>${escalation.reasons.join("; ")}</small>` : `<span class="badge info">正常</span>`}</td>
+        <td>${item.countySupervision?.status || item.slaDisposition?.status || "待处置"}<br><small>${item.slaDisposition?.action || item.countySupervision?.reason || "-"}</small></td>
+        <td>${item.reportStatus || "待回传"}</td>
         <td>
-          ${countyActionButton("referralTeleconsultations", item.id, "County follow-up", { status: "feedback-returned", receivingFeedback: "County consortium office followed up receiving feedback." })}
-          ${countyActionButton("referralTeleconsultations", item.id, "Report returned", { status: "report-returned", reportStatus: "returned", reportSummary: "County office confirmed report return evidence." })}
+          ${escalation ? countyEscalationButton(item.id, reminderSent ? "已提醒" : "发送 SLA 提醒", reminderSent) : ""}
+          ${item.slaDisposition?.status !== "closed" ? countySlaAckButton(item.id, item.slaDisposition?.status === "acknowledged" ? "关闭督办" : "确认督办") : ""}
+          ${countyActionButton("referralTeleconsultations", item.id, "医共体跟进", { status: "feedback-returned", receivingFeedback: "医共体办公室已跟进接诊反馈。" })}
+          ${countyActionButton("referralTeleconsultations", item.id, "确认回传", { status: "report-returned", reportStatus: "returned", reportSummary: "医共体办公室确认报告回传证据。" })}
         </td>
       </tr>`;
     }).join("")}</tbody>
   </table>`;
 }
 
+function renderCountyTeleconsultationCutoverReadiness(state, rows) {
+  const el = document.querySelector("#county-teleconsultation-cutover");
+  if (!el) return;
+  const readiness = buildCountyTeleconsultationCutoverReadiness(state, rows);
+  const planSummary = buildCountyTeleconsultationPlanSummary(readiness.nextDevelopmentPlan);
+  el.innerHTML = [
+    `<article data-referral-cutover-readiness>
+      <div><span class="badge ${readiness.readyForProductionCutover ? "info" : "warn"}">Cutover gate</span></div>
+      <h3>${readiness.readyForProductionCutover ? "Ready for module cutover" : "Blocked before production cutover"}</h3>
+      <p>${readiness.contractReplay} callback contracts replayed; ${readiness.onsiteSignedRoles}/${readiness.totalRoles} onsite roles signed.</p>
+      <footer>
+        <small>${readiness.nextAction}</small>
+        <small>Evidence source: ${readiness.evidenceSource}</small>
+      </footer>
+    </article>`,
+    `<article data-referral-cutover-plan-summary>
+      <div><span class="badge ${planSummary.pendingPhases ? "warn" : "info"}">Next plan</span></div>
+      <h3>${planSummary.readyPhases}/${planSummary.totalPhases} phases ready</h3>
+      <p>${planSummary.pendingPhases ? `${planSummary.pendingPhases} phases still need onsite evidence.` : "All listed phases have readiness evidence."}</p>
+      <footer>
+        <small>Next phase: ${planSummary.nextPhase}</small>
+        <small>Owners: ${planSummary.owners.join(", ") || "county-command"}</small>
+      </footer>
+    </article>`,
+    ...readiness.blockers.map((item) => `<article data-referral-cutover-blocker="${item.id}">
+      <div><span class="badge warn">${item.owner}</span></div>
+      <h3>${item.id}</h3>
+      <p>${item.detail}</p>
+    </article>`),
+    ...readiness.nextDevelopmentPlan.map((item) => `<article data-referral-cutover-plan="${item.phase}">
+      <div><span class="badge ${item.status === "ready" ? "info" : "warn"}">${item.statusLabel}</span><span class="badge info">${item.owner}</span></div>
+      <h3>${item.phase}</h3>
+      <p>${item.objective}</p>
+      <footer>
+        <small>${item.acceptance}</small>
+        <small>Dependencies: ${item.dependencies.join(", ") || "onsite evidence"}</small>
+      </footer>
+    </article>`)
+  ].join("");
+}
+
+function renderCountyTeleconsultationSignoff(state, rows) {
+  const el = document.querySelector("#county-teleconsultation-signoff");
+  if (!el) return;
+  const signoffRows = buildCountyTeleconsultationSignoffRows(state, rows);
+  el.innerHTML = signoffRows.map((item) => `<article data-referral-signoff-status="${item.role}">
+    <div><span class="badge ${item.localEvidence ? "info" : "warn"}">${item.institutionType}</span><span class="badge warn">现场待签</span></div>
+    <h3>${item.title}</h3>
+    <p>${item.responsibility}</p>
+    <footer>
+      <small>${item.localEvidence ? "本地证据已就绪" : "本地证据待补齐"}：${item.evidence}</small>
+      <small>${item.nextAction}</small>
+      ${item.onsiteEvidence ? `<small>Signed by ${item.onsiteEvidence.signerName} · ${item.onsiteEvidence.signerOrg}</small>` : ""}
+      <button class="inline-action" type="button" data-referral-signoff-submit data-role="${item.role}" ${item.onsiteEvidence ? "disabled" : ""}>Archive signoff</button>
+    </footer>
+  </article>`).join("");
+}
+
+function renderCountyTeleconsultationJointLedger(state, rows) {
+  const el = document.querySelector("#county-teleconsultation-joint-ledger");
+  if (!el) return;
+  const ledgerRows = buildCountyTeleconsultationJointLedger(state, rows);
+  const matchedContracts = ledgerRows.filter((item) => item.type === "callback" && item.matched > 0).length;
+  const pendingRows = ledgerRows.filter((item) => !["matched", "signed"].includes(item.status));
+  const jointTasks = new Map((state.taskMessages || [])
+    .filter((message) => message.jointTestKey || message.notificationKey)
+    .map((message) => [message.jointTestKey || message.notificationKey, message]));
+  const jointTaskKeys = new Set(jointTasks.keys());
+  const assignedTasks = pendingRows.filter((item) => jointTaskKeys.has(`referralTeleconsultations:joint-test:${item.role}`)).length;
+  const completedTasks = pendingRows.filter((item) => {
+    const task = jointTasks.get(`referralTeleconsultations:joint-test:${item.role}`);
+    return task && /completed|closed|signed|read/i.test(String(task.status || ""));
+  }).length;
+  el.innerHTML = [
+    `<article data-referral-joint-ledger-summary>
+      <div><span class="badge info">Joint test ledger</span></div>
+      <h3>${matchedContracts}/3 callback contracts replayed</h3>
+      <p>${ledgerRows.filter((item) => item.localEvidence).length}/${ledgerRows.length} rows have local demo evidence; site signoff is tracked below.</p>
+      <footer>
+        <small>Use this before onsite signoff to reconcile callback replay, SLA supervision, payment policy, and archived signatures.</small>
+        <small>${assignedTasks}/${pendingRows.length} owner tasks assigned; ${completedTasks}/${pendingRows.length} completed.</small>
+        <button class="inline-action" type="button" data-referral-joint-ledger-tasks>Sync tasks</button>
+      </footer>
+    </article>`,
+    ...ledgerRows.map((item) => {
+      const task = jointTasks.get(`referralTeleconsultations:joint-test:${item.role}`);
+      const taskClosed = task && /completed|closed|signed|read/i.test(String(task.status || ""));
+      return `<article data-referral-joint-ledger="${item.role}">
+        <div><span class="badge ${item.status === "matched" || item.status === "signed" ? "info" : "warn"}">${item.role}</span><span class="badge ${item.localEvidence ? "info" : "warn"}">${item.status}</span></div>
+        <h3>${item.title}</h3>
+        <p>${item.evidence}</p>
+        <footer>
+          <small>${item.type === "callback" ? `${item.matched} gateway events / ${item.matchedTargets} teleconsultations` : item.siteStatus}</small>
+          <small>${item.nextAction}</small>
+          <small>${task ? `Task ${task.status || "sent"}` : "Task not assigned"}</small>
+          ${task ? `<button class="inline-action" type="button" data-referral-joint-ledger-complete data-role="${item.role}" ${taskClosed ? "disabled" : ""}>Complete task</button>` : ""}
+        </footer>
+      </article>`;
+    })
+  ].join("");
+}
+
+function buildCountyTeleconsultationJointLedger(state, rows) {
+  const signoffByRole = new Map((state.referralTeleconsultationSignoffs || [])
+    .filter((item) => item.status === "signed")
+    .map((item) => [item.role, item]));
+  const events = (state.integrationGatewayEvents || []).filter((item) => ["referral-feedback-callback-v1", "referral-schedule-callback-v1", "referral-report-callback-v1"].includes(item.contractId));
+  const archivedReportIds = new Set((state.personalRecords || [])
+    .filter((item) => item.category === "teleconsultation-report" && item.teleconsultationId)
+    .map((item) => item.teleconsultationId));
+  const callbacks = [
+    {
+      role: "referral-center",
+      title: "Feedback callback replay",
+      contractId: "referral-feedback-callback-v1",
+      localEvidence: rows.some((item) => item.receivingFeedback),
+      evidence: "receivingFeedback, feedback taskMessages, and gateway feedback callback"
+    },
+    {
+      role: "receiving-hospital",
+      title: "Schedule callback replay",
+      contractId: "referral-schedule-callback-v1",
+      localEvidence: rows.some((item) => item.meetingWindow && item.receivingDoctor),
+      evidence: "meetingWindow, receivingDoctor, and gateway schedule callback"
+    },
+    {
+      role: "hospital-it",
+      title: "Report callback replay",
+      contractId: "referral-report-callback-v1",
+      localEvidence: rows.some((item) => item.reportStatus === "returned" || item.status === "report-returned") && rows.filter((item) => item.reportStatus === "returned" || item.status === "report-returned").every((item) => archivedReportIds.has(item.id)),
+      evidence: "report callback, teleconsultation-report archive, and resident notification"
+    }
+  ].map((item) => {
+    const matched = events.filter((event) => event.contractId === item.contractId && event.status === "matched");
+    const matchedTargets = new Set(matched.map((event) => event.targetId).filter(Boolean));
+    return {
+      ...item,
+      type: "callback",
+      matched: matched.length,
+      matchedTargets: matchedTargets.size,
+      siteStatus: signoffByRole.has(item.role) ? "signed" : "pending-site-signoff",
+      status: matched.length ? "matched" : (item.localEvidence ? "local-evidence-ready" : "pending-evidence"),
+      nextAction: matched.length ? "Archive onsite signoff after replay evidence is reviewed." : "Replay the signed callback against the onsite integration gateway."
+    };
+  });
+  const governance = [
+    {
+      role: "county-performance",
+      type: "governance",
+      title: "SLA supervision and performance ledger",
+      localEvidence: rows.every((item) => item.countySupervision?.status && item.slaDisposition?.status),
+      evidence: "countySupervision, slaDisposition, reminders, and performance settlement evidence"
+    },
+    {
+      role: "insurance",
+      type: "policy",
+      title: "Payment and repeat-exam policy ledger",
+      localEvidence: rows.every((item) => item.performance?.insurancePaymentPath && item.performance?.repeatExamControl),
+      evidence: "insurancePaymentPath, repeatExamControl, and performance-policy endpoint"
+    }
+  ].map((item) => ({
+    ...item,
+    matched: signoffByRole.has(item.role) ? 1 : 0,
+    matchedTargets: signoffByRole.has(item.role) ? 1 : 0,
+    siteStatus: signoffByRole.has(item.role) ? "signed" : "pending-site-signoff",
+    status: signoffByRole.has(item.role) ? "signed" : (item.localEvidence ? "local-evidence-ready" : "pending-evidence"),
+    nextAction: signoffByRole.has(item.role) ? "Keep the signed evidence pack with the release record." : "Confirm onsite owner and archive signoff evidence."
+  }));
+  return [...callbacks, ...governance];
+}
+
+function buildCountyTeleconsultationCutoverReadiness(state, rows) {
+  const apiReadiness = state.referralTeleconsultationJointTestPack?.cutoverReadiness;
+  if (apiReadiness) {
+    const readiness = {
+      readyForProductionCutover: Boolean(apiReadiness.readyForProductionCutover),
+      contractReplay: apiReadiness.contractReplay || "0/3",
+      finalReadyRoles: Number(apiReadiness.finalSignoffReadyRoles || 0),
+      onsiteSignedRoles: Number(apiReadiness.onsiteSignedRoles || 0),
+      totalRoles: 5,
+      blockers: Array.isArray(apiReadiness.blockers) ? apiReadiness.blockers : [],
+      nextAction: apiReadiness.nextAction || "Review the joint-test pack before production cutover.",
+      evidenceSource: "joint-test-pack API"
+    };
+    return {
+      ...readiness,
+      nextDevelopmentPlan: normalizeCountyTeleconsultationNextPlan(state.referralTeleconsultationJointTestPack?.nextDevelopmentPlan, readiness)
+    };
+  }
+  const ledgerRows = buildCountyTeleconsultationJointLedger(state, rows);
+  const signoffRows = buildCountyTeleconsultationSignoffRows(state, rows);
+  const replayedContracts = ledgerRows.filter((item) => item.type === "callback" && item.matched > 0).length;
+  const completedTaskRoles = new Set((state.taskMessages || [])
+    .filter((message) =>
+      String(message.jointTestKey || message.notificationKey || "").startsWith("referralTeleconsultations:joint-test:")
+      && /completed|closed|signed|read/i.test(String(message.status || ""))
+    )
+    .map((message) => String(message.jointTestKey || message.notificationKey || "").replace("referralTeleconsultations:joint-test:", "")));
+  const onsiteSignedRoles = signoffRows.filter((item) => item.onsiteEvidence).length;
+  const finalReadyRoles = ledgerRows.filter((item) => item.localEvidence && (item.status === "matched" || item.status === "signed" || completedTaskRoles.has(item.role))).length;
+  const blockers = [
+    replayedContracts < 3 ? {
+      id: "callback-replay-pending",
+      owner: "institution-integration",
+      detail: "Replay feedback, schedule, and report callbacks with signed payloads from the target site."
+    } : null,
+    finalReadyRoles < signoffRows.length ? {
+      id: "owner-task-pending",
+      owner: "county-command",
+      detail: "Complete owner task receipts for all joint-test ledger rows before onsite signoff."
+    } : null,
+    onsiteSignedRoles < signoffRows.length ? {
+      id: "onsite-signoff-pending",
+      owner: "county-command",
+      detail: "Archive signed onsite evidence for referral center, receiving hospital, hospital IT, county performance, and insurance."
+    } : null
+  ].filter(Boolean);
+  const readiness = {
+    readyForProductionCutover: blockers.length === 0,
+    contractReplay: `${replayedContracts}/3`,
+    finalReadyRoles,
+    onsiteSignedRoles,
+    totalRoles: signoffRows.length,
+    blockers,
+    nextAction: blockers[0]?.detail || "Module cutover evidence is complete; continue with platform environment gates.",
+    evidenceSource: "local county state"
+  };
+  return {
+    ...readiness,
+    nextDevelopmentPlan: normalizeCountyTeleconsultationNextPlan([], readiness)
+  };
+}
+
+function normalizeCountyTeleconsultationNextPlan(plan, readiness = {}) {
+  const fallback = [
+    {
+      phase: "field-interface-replay",
+      owner: "institution-integration",
+      objective: "Replay referral feedback, schedule, and report callbacks with signed payloads.",
+      dependencies: ["signed callback payloads", "target gateway"],
+      acceptance: "All three callback contracts have matched gateway events."
+    },
+    {
+      phase: "onsite-signoff-archive",
+      owner: "county-command",
+      objective: "Archive onsite signed evidence for referral center, receiving hospital, hospital IT, county performance, and insurance.",
+      dependencies: ["signed screenshots", "onsite signer list"],
+      acceptance: "All five roles have signed evidence in the signoff summary."
+    }
+  ];
+  const replay = parseCountyTeleconsultationProgress(readiness.contractReplay, 3);
+  const rows = Array.isArray(plan) && plan.length ? plan : fallback;
+  return rows.slice(0, 4).map((item) => ({
+    phase: item.phase || "next-step",
+    owner: item.owner || "county-command",
+    objective: item.objective || item.target || "Confirm the next onsite cutover action.",
+    dependencies: Array.isArray(item.dependencies) ? item.dependencies.slice(0, 4) : [],
+    acceptance: item.acceptance || "Acceptance evidence is attached to the joint-test pack.",
+    ...buildCountyTeleconsultationPlanStatus(item.phase || "next-step", readiness, replay)
+  }));
+}
+
+function parseCountyTeleconsultationProgress(value, fallbackTotal) {
+  const match = String(value || "").match(/(\d+)\s*\/\s*(\d+)/);
+  return match
+    ? { done: Number(match[1]), total: Number(match[2]) }
+    : { done: 0, total: fallbackTotal };
+}
+
+function buildCountyTeleconsultationPlanStatus(phase, readiness, replay) {
+  const normalizedPhase = String(phase || "").toLowerCase();
+  if (normalizedPhase.includes("field-interface")) {
+    return replay.done >= replay.total ? { status: "ready", statusLabel: "ready" } : { status: "pending", statusLabel: "replay pending" };
+  }
+  if (normalizedPhase.includes("onsite-signoff")) {
+    return Number(readiness.onsiteSignedRoles || 0) >= Number(readiness.totalRoles || 5)
+      ? { status: "ready", statusLabel: "signed" }
+      : { status: "pending", statusLabel: "signoff pending" };
+  }
+  if (normalizedPhase.includes("insurance")) {
+    return Number(readiness.finalReadyRoles || 0) >= Number(readiness.totalRoles || 5)
+      ? { status: "ready", statusLabel: "policy ready" }
+      : { status: "pending", statusLabel: "policy pending" };
+  }
+  return readiness.readyForProductionCutover
+    ? { status: "ready", statusLabel: "cutover ready" }
+    : { status: "pending", statusLabel: "cutover pending" };
+}
+
+function buildCountyTeleconsultationPlanSummary(plan) {
+  const rows = Array.isArray(plan) ? plan : [];
+  const readyPhases = rows.filter((item) => item.status === "ready").length;
+  const next = rows.find((item) => item.status !== "ready") || rows[0] || {};
+  return {
+    totalPhases: rows.length,
+    readyPhases,
+    pendingPhases: Math.max(rows.length - readyPhases, 0),
+    nextPhase: next.phase || "field-interface-replay",
+    owners: [...new Set(rows.map((item) => item.owner).filter(Boolean))]
+  };
+}
+
+function buildCountyTeleconsultationSignoffRows(state, rows) {
+  const messages = (state.taskMessages || []).filter((item) => item.collection === "referralTeleconsultations");
+  const signoffByRole = new Map((state.referralTeleconsultationSignoffs || [])
+    .filter((item) => item.status === "signed")
+    .map((item) => [item.role, item]));
+  const contractIds = new Set((state.integrationContracts || []).map((item) => item.id));
+  const archivedReportIds = new Set((state.personalRecords || [])
+    .filter((item) => item.category === "teleconsultation-report" && item.teleconsultationId)
+    .map((item) => item.teleconsultationId));
+  const reportReturned = rows.filter((item) => item.reportStatus === "returned" || item.status === "report-returned");
+  const hasSlaDispositionEvidence = rows.some((item) => {
+    const status = String(item.slaDisposition?.status || item.countySupervision?.status || "").toLowerCase();
+    return status && status !== "pending-ack" && (status.includes("acknowledged") || status.includes("closed") || status.includes("已确认") || status.includes("已闭环"));
+  });
+  const signoffRows = [
+    {
+      role: "referral-center",
+      institutionType: "转诊中心",
+      title: "转诊单与反馈",
+      responsibility: "转诊单接收、分诊意见和接诊反馈回调。",
+      localEvidence: contractIds.has("referral-feedback-callback-v1") && messages.some((item) => item.notificationKey?.includes(":feedback:")) && rows.some((item) => item.receivingFeedback),
+      evidence: "feedback-callback、receivingFeedback、反馈消息",
+      blocker: "真实转诊单号和失败补偿队列"
+    },
+    {
+      role: "receiving-hospital",
+      institutionType: "接诊医院",
+      title: "排期与会诊资源",
+      responsibility: "会诊排期、号源/床位/视频间和接诊医生确认。",
+      localEvidence: contractIds.has("referral-schedule-callback-v1") && rows.some((item) => item.meetingWindow && item.receivingDoctor),
+      evidence: "schedule-callback、meetingWindow、receivingDoctor",
+      blocker: "真实号源、床位和视频系统"
+    },
+    {
+      role: "hospital-it",
+      institutionType: "信息中心",
+      title: "报告回传归档",
+      responsibility: "HIS/EMR/PACS/LIS 报告回传、签名校验和归档。",
+      localEvidence: contractIds.has("referral-report-callback-v1") && reportReturned.length > 0 && reportReturned.every((item) => archivedReportIds.has(item.id)),
+      evidence: "report-callback、teleconsultation-report 归档",
+      blocker: "真实报告编号、附件地址和签名密钥"
+    },
+    {
+      role: "county-performance",
+      institutionType: "医共体办公室",
+      title: "督办与绩效",
+      responsibility: "SLA 督办、协同工单跟踪、绩效归集和闭环确认。",
+      localEvidence: rows.every((item) => item.countySupervision?.status && item.slaDisposition?.status) && (messages.some((item) => item.escalationKey) || hasSlaDispositionEvidence),
+      evidence: "countySupervision、slaDisposition、SLA 消息",
+      blocker: "值班人、升级渠道和签收截图"
+    },
+    {
+      role: "insurance",
+      institutionType: "医保/绩效",
+      title: "支付与互认口径",
+      responsibility: "支付路径、报告互认控费、重复检查控制和结算口径确认。",
+      localEvidence: rows.every((item) => item.performance?.insurancePaymentPath && item.performance?.repeatExamControl),
+      evidence: "insurancePaymentPath、repeatExamControl、绩效策略",
+      blocker: "统筹区支付细则和结算公式"
+    }
+  ];
+  return signoffRows.map((item) => ({
+    ...item,
+    onsiteEvidence: signoffByRole.get(item.role) || null,
+    nextAction: item.localEvidence ? `现场签收：${item.blocker}` : `补齐证据：${item.evidence}`
+  }));
+}
+
+function renderCountyTeleconsultationRiskBoard(state, rows, escalations) {
+  const board = document.querySelector("#county-teleconsultation-risk-board");
+  if (!board) return;
+  const reportPending = rows.filter((item) => item.reportStatus !== "returned");
+  const messageRows = rows.filter((item) => (state.taskMessages || []).some((message) => message.collection === "referralTeleconsultations" && message.sourceId === item.id));
+  const noEscalation = !escalations.length && rows.length;
+  const topEscalations = escalations.slice(0, 2);
+  board.innerHTML = [
+    {
+      badge: "医共体督办",
+      title: "SLA 风险队列",
+      body: topEscalations.length
+        ? topEscalations.map((item) => `${item.teleconsultationId}：${item.reasons.join("；")}`).join("；")
+        : (noEscalation ? "当前筛选范围未发现逾期或高优先级风险。" : "暂无筛选记录。"),
+      footer: `${escalations.filter((item) => item.severity === "high").length} 个高风险 · ${escalations.length} 个待跟进`
+    },
+    {
+      badge: "报告回传",
+      title: "未回传闭环",
+      body: reportPending.map((item) => item.targetInstitution || item.id).slice(0, 3).join("、") || "当前筛选范围报告已完成回传。",
+      footer: `${reportPending.length}/${rows.length || 0} 项需报告证据`
+    },
+    {
+      badge: "消息触达",
+      title: "机构/居民通知",
+      body: messageRows.map((item) => item.id).slice(0, 3).join("、") || "待生成提醒或居民触达消息。",
+      footer: `${messageRows.length} 项已有 taskMessages 留痕`
+    },
+    {
+      badge: "绩效支付",
+      title: "互认与结算口径",
+      body: [...new Set(rows.map((item) => item.performance?.repeatExamControl).filter(Boolean))].join("；") || "待医保和医共体确认重复检查控制口径。",
+      footer: "用于县域绩效与医保审核"
+    }
+  ].map((item) => `<article data-referral-risk-board>
+    <div><span class="badge info">${item.badge}</span></div>
+    <h3>${item.title}</h3>
+    <p>${item.body}</p>
+    <footer><small>${item.footer}</small></footer>
+  </article>`).join("");
+}
+
+function countyTeleconsultationStatusLabel(status) {
+  return {
+    requested: "已申请",
+    accepted: "已接诊",
+    scheduled: "已排期",
+    "feedback-returned": "已反馈",
+    "report-returned": "报告已回传",
+    closed: "已闭环"
+  }[status] || status || "待处理";
+}
+
+function filterCountyTeleconsultations(rows) {
+  const status = document.querySelector("#county-teleconsultation-status-filter")?.value || "all";
+  const priority = document.querySelector("#county-teleconsultation-priority-filter")?.value || "all";
+  return rows.filter((item) => {
+    const statusMatched = status === "all" || item.status === status;
+    const priorityMatched = priority === "all" || item.priority === priority;
+    return statusMatched && priorityMatched;
+  });
+}
+
+function parseReferralDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function buildReferralTeleconsultationEscalations(rows) {
+  const now = new Date();
+  return (Array.isArray(rows) ? rows : [])
+    .filter((item) => item.reportStatus !== "returned" && item.status !== "closed")
+    .map((item) => {
+      const dueDate = parseReferralDate(item.due);
+      const requestedAt = parseReferralDate(item.requestedAt || item.createdAt);
+      const daysOverdue = dueDate ? Math.floor((now.getTime() - dueDate.getTime()) / 86400000) : 0;
+      const ageDays = requestedAt ? Math.floor((now.getTime() - requestedAt.getTime()) / 86400000) : 0;
+      const responseHours = Number(item.performance?.responseHours);
+      const reportReturnHours = Number(item.performance?.reportReturnHours);
+      const reasons = [];
+      if (daysOverdue > 0) reasons.push(`逾期 ${daysOverdue} 天`);
+      if (item.priority === "high") reasons.push("高优先级报告未回传");
+      if (Number.isFinite(responseHours) && responseHours > 4) reasons.push(`响应 ${responseHours}h`);
+      if (Number.isFinite(reportReturnHours) && reportReturnHours > 24) reasons.push(`报告 ${reportReturnHours}h`);
+      if (!item.meetingWindow) reasons.push("缺少会诊窗口");
+      if (!reasons.length && ageDays >= 2) reasons.push(`开放 ${ageDays} 天`);
+      if (!reasons.length) return null;
+      return {
+        teleconsultationId: item.id,
+        severity: item.priority === "high" || daysOverdue > 0 ? "high" : "medium",
+        reasons,
+        daysOverdue: Math.max(0, daysOverdue)
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.daysOverdue - a.daysOverdue);
+}
+
+function averagePerformance(rows, field) {
+  const values = rows.map((item) => Number(item.performance?.[field])).filter(Number.isFinite);
+  if (!values.length) return Number.NaN;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
 function bindCountyActions() {
+  document.querySelector("#county-teleconsultation-status-filter")?.addEventListener("change", () => renderCountyTeleconsultationLoop(platformState));
+  document.querySelector("#county-teleconsultation-priority-filter")?.addEventListener("change", () => renderCountyTeleconsultationLoop(platformState));
   document.addEventListener("click", async (event) => {
+    const reminderButton = event.target.closest("[data-referral-escalation]");
+    if (reminderButton && platformState) {
+      reminderButton.disabled = true;
+      const result = await runReferralEscalation(platformState, reminderButton.dataset.id);
+      reminderButton.textContent = result.ok ? `Reminder ${result.created}` : "Retry reminder";
+      renderCountyTeleconsultationLoop(platformState);
+      return;
+    }
+    const ackButton = event.target.closest("[data-county-sla-ack]");
+    if (ackButton && platformState) {
+      ackButton.disabled = true;
+      await acknowledgeCountySla(platformState, ackButton.dataset.id, ackButton.dataset.mode || "acknowledged");
+      renderCountyTeleconsultationLoop(platformState);
+      return;
+    }
+    const signoffButton = event.target.closest("[data-referral-signoff-submit]");
+    if (signoffButton && platformState) {
+      signoffButton.disabled = true;
+      await archiveReferralSignoff(platformState, signoffButton.dataset.role);
+      renderCountyTeleconsultationLoop(platformState);
+      return;
+    }
+    const jointTaskButton = event.target.closest("[data-referral-joint-ledger-tasks]");
+    if (jointTaskButton && platformState) {
+      jointTaskButton.disabled = true;
+      const result = await createReferralJointLedgerTasks(platformState);
+      jointTaskButton.textContent = `Tasks ${result.created}`;
+      renderCountyTeleconsultationLoop(platformState);
+      return;
+    }
+    const jointTaskCompleteButton = event.target.closest("[data-referral-joint-ledger-complete]");
+    if (jointTaskCompleteButton && platformState) {
+      jointTaskCompleteButton.disabled = true;
+      await completeReferralJointLedgerTask(platformState, jointTaskCompleteButton.dataset.role);
+      renderCountyTeleconsultationLoop(platformState);
+      return;
+    }
     const button = event.target.closest("[data-county-action]");
     if (!button || !platformState) return;
     const updates = JSON.parse(button.dataset.updates || "{}");
@@ -242,8 +801,253 @@ function bindCountyActions() {
   });
 }
 
+async function runReferralEscalation(state, teleconsultationId) {
+  if (API_BASE) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/referral-teleconsultations/escalations/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teleconsultationId })
+      });
+      if (response.ok) {
+        const payload = await response.json();
+        state.taskMessages = [...(payload.messages || []), ...(state.taskMessages || [])].slice(0, 300);
+        return { ok: true, created: payload.summary?.created ?? 0 };
+      }
+    } catch (error) {
+      // Static preview falls back to a local in-app reminder below.
+    }
+  }
+  const item = (state.referralTeleconsultations || []).find((row) => row.id === teleconsultationId);
+  if (!item) return { ok: false, created: 0 };
+  const key = `referralTeleconsultations:${item.id}:sla:local`;
+  const existing = (state.taskMessages || []).some((message) => message.escalationKey === key);
+  if (!existing) {
+    state.taskMessages = [{
+      id: `msg-${Date.now()}`,
+      taskId: `referralTeleconsultations:${item.id}`,
+      collection: "referralTeleconsultations",
+      sourceId: item.id,
+      residentId: item.residentId || "",
+      targetRole: "institution",
+      channel: "in_app",
+      title: "Referral teleconsultation SLA reminder",
+      body: `${item.targetInstitution || "Receiving institution"} needs report callback follow-up.`,
+      status: "sent",
+      escalationKey: key,
+      createdAt: new Date().toISOString(),
+      createdBy: "county-preview"
+    }, ...(state.taskMessages || [])].slice(0, 300);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+  return { ok: true, created: existing ? 0 : 1 };
+}
+
+function hasReferralEscalationReminder(state, id, severity) {
+  return (state.taskMessages || []).some((message) =>
+    message.escalationKey === `referralTeleconsultations:${id}:sla:${severity}` ||
+    message.escalationKey === `referralTeleconsultations:${id}:sla:local`
+  );
+}
+
+async function acknowledgeCountySla(state, id, mode) {
+  const status = mode === "closed" ? "closed" : "acknowledged";
+  const action = status === "closed"
+    ? "County office closed SLA supervision after report evidence review."
+    : "County office acknowledged SLA supervision and assigned institution follow-up.";
+  if (API_BASE) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/referral-teleconsultations/${encodeURIComponent(id)}/escalations/ack`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status, action })
+      });
+      if (response.ok) {
+        const payload = await response.json();
+        state.referralTeleconsultations = (state.referralTeleconsultations || []).map((item) => item.id === id ? payload.teleconsultation : item);
+        state.taskMessages = [
+          ...(payload.messages || []),
+          ...(state.taskMessages || []).filter((message) => !(message.collection === "referralTeleconsultations" && message.sourceId === id))
+        ].slice(0, 300);
+        return { ok: true };
+      }
+    } catch (error) {
+      // Static preview falls back to local acknowledgement below.
+    }
+  }
+  const now = new Date().toISOString();
+  state.referralTeleconsultations = (state.referralTeleconsultations || []).map((item) => item.id === id
+    ? {
+        ...item,
+        slaDisposition: { status, action, owner: "county-preview", updatedAt: now },
+        countySupervision: { ...(item.countySupervision || {}), status: status === "closed" ? "已闭环" : "已确认", action, updatedAt: now }
+      }
+    : item);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  return { ok: true };
+}
+
+async function archiveReferralSignoff(state, role) {
+  const payload = {
+    signerName: "现场联调负责人",
+    signerOrg: "中山区县域医共体",
+    evidenceNote: `${role} onsite signoff archived from county command board`,
+    attachmentName: `${role}-signoff-screenshot.png`,
+    evidenceType: "onsite-signoff"
+  };
+  if (API_BASE) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/referral-teleconsultations/signoff-summary/${encodeURIComponent(role)}/evidence`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (response.ok) {
+        const result = await response.json();
+        state.referralTeleconsultationSignoffs = [
+          result.signoff,
+          ...(state.referralTeleconsultationSignoffs || []).filter((item) => !(item.role === role && item.status === "signed"))
+        ].slice(0, 50);
+        return { ok: true };
+      }
+    } catch (error) {
+      // Static preview falls back to local signoff below.
+    }
+  }
+  const now = new Date().toISOString();
+  const signoff = {
+    id: `local-signoff-${role}`,
+    role,
+    status: "signed",
+    signerName: payload.signerName,
+    signerOrg: payload.signerOrg,
+    evidenceNote: payload.evidenceNote,
+    attachmentName: payload.attachmentName,
+    evidenceType: payload.evidenceType,
+    signedAt: now,
+    submittedAt: now,
+    submittedBy: "county-preview"
+  };
+  state.referralTeleconsultationSignoffs = [
+    signoff,
+    ...(state.referralTeleconsultationSignoffs || []).filter((item) => !(item.role === role && item.status === "signed"))
+  ].slice(0, 50);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  return { ok: true };
+}
+
+async function createReferralJointLedgerTasks(state) {
+  if (API_BASE) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/referral-teleconsultations/joint-test-ledger/tasks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({})
+      });
+      if (response.ok) {
+        const result = await response.json();
+        state.taskMessages = [
+          ...(result.messages || []),
+          ...(state.taskMessages || []).filter((message) => !(message.jointTestKey && (result.messages || []).some((item) => item.jointTestKey === message.jointTestKey)))
+        ].slice(0, 300);
+        return { ok: true, created: result.summary?.created ?? 0 };
+      }
+    } catch (error) {
+      // Static preview falls back to local task creation below.
+    }
+  }
+  const existingKeys = new Set((state.taskMessages || []).map((message) => message.jointTestKey || message.notificationKey).filter(Boolean));
+  const rows = buildCountyTeleconsultationJointLedger(state, state.referralTeleconsultations || [])
+    .filter((row) => !["matched", "signed"].includes(row.status));
+  const now = new Date().toISOString();
+  const messages = rows.map((row) => {
+    const key = `referralTeleconsultations:joint-test:${row.role}`;
+    if (existingKeys.has(key)) return null;
+    const targetRole = row.role === "insurance" ? "insurance" : row.role === "county-performance" ? "county" : "institution";
+    return {
+      id: `msg-joint-${row.role}-${Date.now()}`,
+      taskId: `referralTeleconsultations:joint-test:${row.role}`,
+      collection: "referralTeleconsultations",
+      sourceId: row.role,
+      residentId: "",
+      targetRole,
+      channel: "in_app",
+      title: `Referral teleconsultation joint-test follow-up: ${row.role}`,
+      body: `${row.title}: ${row.nextAction}`,
+      status: "sent",
+      notificationKey: key,
+      jointTestKey: key,
+      receipts: [],
+      createdAt: now,
+      createdBy: "county-preview",
+      createdByName: "County preview"
+    };
+  }).filter(Boolean);
+  state.taskMessages = [...messages, ...(state.taskMessages || [])].slice(0, 300);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  return { ok: true, created: messages.length };
+}
+
+async function completeReferralJointLedgerTask(state, role) {
+  if (API_BASE) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/referral-teleconsultations/joint-test-ledger/tasks/${encodeURIComponent(role)}/complete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "completed", note: `${role} joint-test owner confirmed evidence follow-up.` })
+      });
+      if (response.ok) {
+        const result = await response.json();
+        state.taskMessages = [
+          result.message,
+          ...(state.taskMessages || []).filter((message) => message.id !== result.message.id)
+        ].slice(0, 300);
+        return { ok: true };
+      }
+    } catch (error) {
+      // Static preview falls back to local task completion below.
+    }
+  }
+  const key = `referralTeleconsultations:joint-test:${role}`;
+  const now = new Date().toISOString();
+  state.taskMessages = (state.taskMessages || []).map((message) => {
+    if (message.jointTestKey !== key && message.notificationKey !== key) return message;
+    return {
+      ...message,
+      status: "completed",
+      jointTestCompletedAt: now,
+      jointTestCompletedBy: "county-preview",
+      jointTestCompletionNote: `${role} joint-test owner confirmed evidence follow-up.`,
+      receipts: [{
+        at: now,
+        by: "county-preview",
+        byName: "County preview",
+        role: "county",
+        status: "completed",
+        note: `${role} joint-test owner confirmed evidence follow-up.`
+      }, ...(Array.isArray(message.receipts) ? message.receipts : [])].slice(0, 20)
+    };
+  });
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  return { ok: true };
+}
+
 function countyActionButton(collection, id, label, updates) {
   return `<button class="inline-action" type="button" data-county-action data-collection="${collection}" data-id="${id}" data-updates='${JSON.stringify(updates)}' data-note="${label}">${label}</button>`;
+}
+
+function countyEscalationButton(id, label, disabled = false) {
+  return `<button class="inline-action" type="button" data-referral-escalation data-id="${id}" ${disabled ? "disabled" : ""}>${label}</button>`;
+}
+
+function countySlaAckButton(id, label) {
+  const mode = label.includes("Close") || label.includes("关闭") ? "closed" : "acknowledged";
+  return `<button class="inline-action" type="button" data-county-sla-ack data-id="${id}" data-mode="${mode}">${label}</button>`;
 }
 
 function residentOf(state, id) {
