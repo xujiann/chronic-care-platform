@@ -2061,6 +2061,26 @@ dialog::backdrop {
   margin: 8px 0 0;
 }
 
+.production-readiness-requirements {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0 0;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #eff6ff;
+  color: #244061;
+  line-height: 1.5;
+}
+
+.production-readiness-requirements a {
+  flex: 0 0 auto;
+  color: var(--blue);
+  font-weight: 800;
+}
+
 .drilldown-card a {
   display: inline-block;
   margin-top: 8px;
@@ -2078,5 +2098,9 @@ dialog::backdrop {
 @media (max-width: 640px) {
   .certificate-exchange-grid { grid-template-columns: 1fr; }
   .drilldown-grid { grid-template-columns: 1fr; }
+  .production-readiness-requirements {
+    align-items: flex-start;
+    flex-direction: column;
+  }
   .production-readiness-grid { grid-template-columns: 1fr; }
 }

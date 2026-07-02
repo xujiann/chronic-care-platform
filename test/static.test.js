@@ -227,6 +227,7 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(read("portal.css"), /site-issue-ledger-filter-grid/);
   assert.match(read("portal.css"), /production-readiness-card/);
   assert.match(read("portal.css"), /production-readiness-grid/);
+  assert.match(read("portal.css"), /production-readiness-requirements/);
   assert.match(read("portal.css"), /button:disabled/);
   assert.match(read("portal.css"), /function-matrix-card/);
   assert.match(js, /源待办/);
