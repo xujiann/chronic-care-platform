@@ -370,6 +370,8 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(html, /quality-safety-readiness/);
   assert.match(html, /quality-safety-prelaunch-gaps/);
   assert.match(html, /data-quality-safety-prelaunch-panel/);
+  assert.match(html, /quality-safety-onsite-requirements/);
+  assert.match(html, /data-quality-safety-onsite-requirements-panel/);
   assert.match(html, /quality-safety-operations-runbook/);
   assert.match(html, /data-quality-safety-operations-panel/);
   assert.match(html, /quality-safety-signoffs/);
@@ -413,6 +415,8 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(js, /renderActionPlan/);
   assert.match(js, /renderGoLiveReadiness/);
   assert.match(js, /renderPrelaunchGaps/);
+  assert.match(js, /renderOnsiteRequirements/);
+  assert.match(js, /onsiteRequirements/);
   assert.match(js, /renderOperationsRunbook/);
   assert.match(js, /operationsRunbook/);
   assert.match(js, /productionSignoffPending/);
@@ -496,6 +500,8 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(read("README.md"), /Pre-launch tracker/);
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:go-live-readiness/);
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:operations-runbook/);
+  assert.match(read("scripts/quality-safety-report.js"), /quality-safety:onsite-requirements/);
+  assert.match(read("README.md"), /Onsite requirements/);
   assert.match(read("README.md"), /Operations runbook/);
   assert.match(read("scripts/release-report.js"), /qualitySafety:report/);
   assert.match(read("scripts/release-report.js"), /qualitySafetyInterface:standard/);

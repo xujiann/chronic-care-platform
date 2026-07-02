@@ -141,6 +141,9 @@ const QUALITY_TEXT = {
   rectification: "整改闭环",
   live_interfaces: "实时接口",
   audit_retention: "审计留存",
+  identity: "身份权限",
+  operations: "运行运维",
+  training: "培训切换",
   data_quality: "数据质量",
   institution_credit: "机构信用",
   security_audit: "安全审计",
@@ -636,6 +639,25 @@ function renderOperationsRunbook(rows = []) {
   `);
 }
 
+function renderOnsiteRequirements(rows = []) {
+  setHtml("quality-safety-onsite-requirements", `
+    <table>
+      <thead><tr><th>现场功能需求</th><th>责任方</th><th>现场输入</th><th>验收证据</th><th>状态和来源</th></tr></thead>
+      <tbody>
+        ${rows.length ? rows.map((item) => `
+          <tr>
+            <td><strong>${zhText(item.requirement)}</strong><br /><small>${statusLabel(item.domain)} / ${text(item.id)}</small></td>
+            <td>${zhText(item.owner)}<br /><small>${statusLabel(item.ownerRole)}</small></td>
+            <td>${zhText(item.onsiteInput)}</td>
+            <td>${zhText(item.acceptanceEvidence)}</td>
+            <td>${statusLabel(item.currentStatus)}<br /><small>${zhText(item.source)}</small></td>
+          </tr>
+        `).join("") : emptyRow(5, "暂无现场上线需求")}
+      </tbody>
+    </table>
+  `);
+}
+
 function renderIssues(rows) {
   const canDispatch = qualitySafetyState?.role === "commission";
   setHtml("quality-safety-issues", `
@@ -816,6 +838,7 @@ function renderQualitySafety(data) {
   renderCoreSystemMatrix(data.coreSystemMatrix || []);
   renderGoLiveReadiness(data.goLiveReadiness || {});
   renderPrelaunchGaps(data.goLiveReadiness || {}, data.siteSignoffs || []);
+  renderOnsiteRequirements(data.onsiteRequirements || []);
   renderOperationsRunbook(data.operationsRunbook || []);
   renderActionPlan(data.actionPlan || []);
   renderRisks(data.institutionRisks || []);

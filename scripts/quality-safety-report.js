@@ -408,6 +408,119 @@ function buildOperationsRunbook({ slaSummary, criticalRows, clinicalPathwayRows,
   ];
 }
 
+function buildOnsiteRequirementChecklist({ siteSignoffRows, operationsRunbook, goLiveReadiness }) {
+  const signoffById = new Map(siteSignoffRows.map((item) => [item.id, item]));
+  const runbookById = new Map(operationsRunbook.map((item) => [item.id, item]));
+  const signoffStatus = (id) => {
+    const signoff = signoffById.get(id);
+    if (!signoff) return "pending_site_confirmation";
+    if (statusClosed(signoff.status)) return "accepted";
+    return signoff.status || "pending_site_confirmation";
+  };
+  const runbookStatus = (id) => runbookById.get(id)?.currentStatus || "attention_required";
+  return [
+    {
+      id: "onsite-login-roles",
+      domain: "identity",
+      ownerRole: "commission",
+      owner: "City health commission administrator",
+      requirement: "Confirm commission, institution, and county-consortium login departments with least-privilege access",
+      onsiteInput: "government identity source, organization codes, role list, test accounts, disabled accounts",
+      acceptanceEvidence: "three-role login screenshots, denied-access records, audit logs",
+      currentStatus: goLiveReadiness.usable ? "ready_for_joint_test" : "pending_site_confirmation",
+      source: "authUsers, requireApiRole, securityEvents"
+    },
+    {
+      id: "onsite-live-feeds",
+      domain: "live_interfaces",
+      ownerRole: "commission",
+      owner: "Site integration lead",
+      requirement: "Bind HIS/EMR/LIS/PACS live or pre-production data feeds",
+      onsiteInput: "endpoint, institution code, interface secret, sample payload, retry window",
+      acceptanceEvidence: "joint-test signoff, sample validation result, idempotency replay record",
+      currentStatus: signoffStatus("qss-live-feeds"),
+      source: "qualitySafetySiteSignoffs, hospitalInteroperabilityFunctions"
+    },
+    {
+      id: "onsite-critical-routing",
+      domain: "critical_value",
+      ownerRole: "institution",
+      owner: "Medical institution duty desk",
+      requirement: "Configure critical-value recipients, timeout escalation, and disposition writeback",
+      onsiteInput: "critical-value list, duty phone, notification channel, department escalation matrix",
+      acceptanceEvidence: "critical-value drill record, acknowledgement screenshot, escalation receipt",
+      currentStatus: signoffStatus("qss-critical-routing") === "accepted" ? "accepted" : runbookStatus("critical-value-on-call"),
+      source: "criticalValueAlerts, qualitySafetySiteSignoffs"
+    },
+    {
+      id: "onsite-pathway-dictionaries",
+      domain: "clinical_pathway",
+      ownerRole: "commission",
+      owner: "Clinical pathway office",
+      requirement: "Confirm local clinical-pathway dictionaries, EMR nodes, and variance review rules",
+      onsiteInput: "pathway dictionary, node codes, variance reasons, EMR writeback fields",
+      acceptanceEvidence: "pathway variance cases, EMR evidence screenshots, commission review records",
+      currentStatus: signoffStatus("qss-pathway-dictionaries"),
+      source: "clinicalPathwayCases, medicalRecordQualityReviews"
+    },
+    {
+      id: "onsite-mutual-recognition",
+      domain: "mutual_recognition_qc",
+      ownerRole: "county",
+      owner: "County consortium office",
+      requirement: "Confirm mutual-recognition catalog, negative list, and exception review rules",
+      onsiteInput: "recognized items, institution scope, negative list, exception reason, reviewer",
+      acceptanceEvidence: "mutual-recognition QC samples, exception review record, consortium signoff",
+      currentStatus: signoffStatus("qss-mutual-recognition-rules") === "accepted" ? "accepted" : runbookStatus("mutual-recognition-watch"),
+      source: "mutualRecognitionQualityReviews, countyMutualRecognitionRecords"
+    },
+    {
+      id: "onsite-rectification-attachments",
+      domain: "rectification",
+      ownerRole: "institution",
+      owner: "Institution quality office",
+      requirement: "Confirm rectification attachments, department signoff, and commission review archive rules",
+      onsiteInput: "rectification template, attachment types, department owner, review deadline, return rules",
+      acceptanceEvidence: "feedback payload, signed attachment, approved/returned audit trail",
+      currentStatus: signoffStatus("qss-rectification-attachments") === "accepted" ? "accepted" : runbookStatus("rectification-sla-watch"),
+      source: "qualityRectificationOrders, securityEvents"
+    },
+    {
+      id: "onsite-audit-retention",
+      domain: "audit_retention",
+      ownerRole: "commission",
+      owner: "Security and audit administrator",
+      requirement: "Confirm audit retention, export, hash preservation, and SIEM boundary",
+      onsiteInput: "AUDIT_EXPORT_PATH or SIEM_ENDPOINT, retention period, audit account, preservation directory",
+      acceptanceEvidence: "audit export file, hash verification record, security signoff",
+      currentStatus: signoffStatus("qss-audit-retention") === "accepted" ? "accepted" : runbookStatus("audit-retention-watch"),
+      source: "securityEvents, dataAccessLogs, qualitySafetySiteSignoffs"
+    },
+    {
+      id: "onsite-monitoring-oncall",
+      domain: "operations",
+      ownerRole: "commission",
+      owner: "Platform operations on-call team",
+      requirement: "Bind health checks, metrics, alert rules, and on-call escalation table",
+      onsiteInput: "/api/health, /api/metrics, SLO thresholds, alert receivers, on-call schedule",
+      acceptanceEvidence: "monitoring screenshot, alert drill record, on-call signoff, escalation receipt",
+      currentStatus: operationsRunbook.every((item) => item.currentStatus === "ready") ? "accepted" : "attention_required",
+      source: "operationsRunbook, monitoring-readiness-report"
+    },
+    {
+      id: "onsite-training-cutover",
+      domain: "training",
+      ownerRole: "commission",
+      owner: "Implementation and quality joint team",
+      requirement: "Complete go-live training, pilot issue clearance, and rollback contact confirmation",
+      onsiteInput: "training attendance, operating guide, issue list, rollback contact, cutover window",
+      acceptanceEvidence: "attendance sheet, issue-clearance table, go-live confirmation form",
+      currentStatus: "pending_site_confirmation",
+      source: "site-readiness-pack, production-cutover-checklist"
+    }
+  ];
+}
+
 function buildQualitySafetyReport(options = {}) {
   const data = options.data || readJson("data/db.json");
   const server = options.serverSource || read("server.js");
@@ -515,6 +628,7 @@ function buildQualitySafetyReport(options = {}) {
   const actionPlan = buildActionPlan({ qualityEvents, rectifications: stateRows, criticalRows, clinicalPathwayRows, mutualRecognitionRows, institutionRisks });
   const goLiveReadiness = buildGoLiveReadiness({ boundaryRows, collectionRows, reusedRows, routeRows, policyRows, stateRows, criticalRows, clinicalPathwayRows, mutualRecognitionRows, actionPlan, institutionRisks });
   const operationsRunbook = buildOperationsRunbook({ slaSummary, criticalRows, clinicalPathwayRows, mutualRecognitionRows, siteSignoffRows });
+  const onsiteRequirements = buildOnsiteRequirementChecklist({ siteSignoffRows, operationsRunbook, goLiveReadiness });
   const checks = [
     { id: "quality-safety:boundaries", passed: boundaryRows.every((item) => item.modeled), detail: `${boundaryRows.filter((item) => item.modeled).length}/${boundaryRows.length} boundaries modeled` },
     { id: "quality-safety:collections", passed: collectionRows.every((item) => item.present && item.rows > 0), detail: collectionRows.map((item) => `${item.collection}:${item.rows}`).join(";") },
@@ -531,6 +645,7 @@ function buildQualitySafetyReport(options = {}) {
     { id: "quality-safety:site-signoff-tracker", passed: siteSignoffRows.length >= 6 && siteSignoffRows.every((item) => item.requiredEvidence.length > 0 && item.auditCount > 0), detail: `${siteSignoffRows.length} site sign-off items; ${siteSignoffRows.filter((item) => statusClosed(item.status)).length} accepted` },
     { id: "quality-safety:site-evidence-submission", passed: routeRows.some((item) => item.route === "/api/quality-safety/site-signoffs/:id/evidence" && item.present), detail: "site owner evidence submission route implemented" },
     { id: "quality-safety:operations-runbook", passed: operationsRunbook.length >= 6 && operationsRunbook.every((item) => item.owner && item.threshold && item.escalation && item.evidence), detail: `${operationsRunbook.length} runtime watch items` },
+    { id: "quality-safety:onsite-requirements", passed: onsiteRequirements.length >= 8 && onsiteRequirements.every((item) => item.requirement && item.onsiteInput && item.acceptanceEvidence && item.owner), detail: `${onsiteRequirements.length} onsite go-live requirements` },
     { id: "quality-safety:go-live-readiness", passed: goLiveReadiness.usable, detail: `${goLiveReadiness.stage}; score=${goLiveReadiness.score}; blockers=${goLiveReadiness.blockers.length}` }
   ];
   return {
@@ -566,6 +681,8 @@ function buildQualitySafetyReport(options = {}) {
       highActionItems: actionPlan.filter((item) => ["critical", "high"].includes(item.priority)).length,
       operationsWatchItems: operationsRunbook.length,
       operationsAttentionRequired: operationsRunbook.filter((item) => item.currentStatus === "attention_required").length,
+      onsiteRequirementItems: onsiteRequirements.length,
+      onsiteRequirementReady: onsiteRequirements.filter((item) => ["accepted", "ready_for_joint_test"].includes(String(item.currentStatus || ""))).length,
       readinessStage: goLiveReadiness.stage,
       readinessScore: goLiveReadiness.score
     },
@@ -582,6 +699,7 @@ function buildQualitySafetyReport(options = {}) {
     rectifications: stateRows,
     siteSignoffs: siteSignoffRows,
     operationsRunbook,
+    onsiteRequirements,
     checks
   };
 }
@@ -602,6 +720,7 @@ function renderMarkdown(report) {
     `- Site sign-offs: ${report.summary.siteSignoffs.total}, ready ${report.summary.siteSignoffs.ready}, accepted ${report.summary.siteSignoffs.accepted}`,
     `- Action plan: ${report.summary.actionItems} items, high priority ${report.summary.highActionItems}`,
     `- Operations runbook: ${report.summary.operationsWatchItems} watch items, ${report.summary.operationsAttentionRequired} requiring attention`,
+    `- Onsite requirements: ${report.summary.onsiteRequirementItems} items, ${report.summary.onsiteRequirementReady} ready or accepted`,
     `- Go-live readiness: ${report.goLiveReadiness.stage}, score ${report.goLiveReadiness.score}, usable ${report.goLiveReadiness.usable ? "yes" : "no"}`,
     "",
     "## Checks",
@@ -648,6 +767,12 @@ function renderMarkdown(report) {
     "| Watch item | Owner | Signal | Threshold | Escalation | Evidence |",
     "|---|---|---|---|---|---|",
     ...report.operationsRunbook.map((item) => `| ${item.watchItem} | ${item.owner} | ${String(item.signal || "").replace(/\|/g, "/")} | ${item.threshold} | ${item.escalation} | ${item.evidence} |`),
+    "",
+    "## Onsite Go-live Requirements",
+    "",
+    "| Requirement | Owner | Input | Acceptance evidence | Status | Source |",
+    "|---|---|---|---|---|---|",
+    ...report.onsiteRequirements.map((item) => `| ${String(item.requirement || "").replace(/\|/g, "/")} | ${item.owner} | ${String(item.onsiteInput || "").replace(/\|/g, "/")} | ${String(item.acceptanceEvidence || "").replace(/\|/g, "/")} | ${item.currentStatus} | ${item.source} |`),
     "",
     "## Site Joint-testing Sign-offs",
     "",

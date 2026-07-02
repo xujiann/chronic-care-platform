@@ -5471,6 +5471,122 @@ function buildQualitySafetyOperationsRunbook({ summary, rectifications, critical
     }));
 }
 
+function buildQualitySafetySiteRequirementChecklist({ siteSignoffs, operationsRunbook, coreSystemMatrix, goLiveReadiness, user }) {
+  const signoffById = new Map(siteSignoffs.map((item) => [item.id, item]));
+  const runbookById = new Map(operationsRunbook.map((item) => [item.id, item]));
+  const coreSystemNames = new Set(coreSystemMatrix.map((item) => item.name));
+  const signoffStatus = (id) => {
+    const signoff = signoffById.get(id);
+    if (!signoff) return "pending_site_confirmation";
+    if (["accepted", "closed"].includes(String(signoff.status || signoff.normalizedStatus || ""))) return "accepted";
+    if (String(signoff.status || "") === "ready_for_joint_test") return "ready_for_joint_test";
+    return signoff.status || "pending_site_confirmation";
+  };
+  const runbookStatus = (id) => runbookById.get(id)?.currentStatus || "attention_required";
+  const rows = [
+    {
+      id: "onsite-login-roles",
+      domain: "identity",
+      ownerRole: "commission",
+      owner: "市卫健委监管管理员",
+      requirement: "确认卫健监管、医疗机构、县域医共体三类登录部门和最小权限",
+      onsiteInput: "政务统一身份、机构编码、角色清单、测试账号和停用账号",
+      acceptanceEvidence: "三类账号登录截图、越权拒绝记录和审计日志",
+      currentStatus: goLiveReadiness.usable ? "ready_for_joint_test" : "pending_site_confirmation",
+      source: "authUsers, requireApiRole, securityEvents"
+    },
+    {
+      id: "onsite-live-feeds",
+      domain: "live_interfaces",
+      ownerRole: "commission",
+      owner: "现场接口联调负责人",
+      requirement: "接入 HIS/EMR/LIS/PACS 生产或准生产实时数据源",
+      onsiteInput: "接口地址、机构编码、接口密钥、报文样例、失败重试窗口",
+      acceptanceEvidence: "联调签字单、样例报文校验结果和幂等重放记录",
+      currentStatus: signoffStatus("qss-live-feeds"),
+      source: "qualitySafetySiteSignoffs, hospitalInteroperabilityFunctions"
+    },
+    {
+      id: "onsite-critical-routing",
+      domain: "critical_value",
+      ownerRole: "institution",
+      owner: "医疗机构值班台",
+      requirement: "配置危急值接收人、超时升级链路和闭环处置回写",
+      onsiteInput: "危急值项目清单、值班电话、短信/站内信通道、科室升级表",
+      acceptanceEvidence: "危急值演练记录、确认处置截图和超时升级回执",
+      currentStatus: signoffStatus("qss-critical-routing") === "accepted" ? "accepted" : runbookStatus("critical-value-on-call"),
+      source: "criticalValueAlerts, qualitySafetySiteSignoffs"
+    },
+    {
+      id: "onsite-pathway-dictionaries",
+      domain: "clinical_pathway",
+      ownerRole: "commission",
+      owner: "临床路径办公室",
+      requirement: "确认本地临床路径字典、EMR 节点和偏差复核规则",
+      onsiteInput: "病种路径字典、节点编码、偏差原因、EMR 回写字段",
+      acceptanceEvidence: "路径偏差用例、EMR 证据截图和监管复核记录",
+      currentStatus: signoffStatus("qss-pathway-dictionaries"),
+      source: coreSystemNames.has("会诊制度") ? "clinicalPathwayCases, medicalRecordQualityReviews" : "clinicalPathwayCases"
+    },
+    {
+      id: "onsite-mutual-recognition",
+      domain: "mutual_recognition_qc",
+      ownerRole: "county",
+      owner: "县域医共体办公室",
+      requirement: "确认检验检查互认目录、负面清单和例外复核规则",
+      onsiteInput: "互认项目、机构范围、负面清单、不互认原因和复核责任人",
+      acceptanceEvidence: "互认质控样例、例外复核记录和医共体签收材料",
+      currentStatus: signoffStatus("qss-mutual-recognition-rules") === "accepted" ? "accepted" : runbookStatus("mutual-recognition-watch"),
+      source: "mutualRecognitionQualityReviews, countyMutualRecognitionRecords"
+    },
+    {
+      id: "onsite-rectification-attachments",
+      domain: "rectification",
+      ownerRole: "institution",
+      owner: "机构质控办公室",
+      requirement: "确认整改反馈附件、科室签收和监管复核证据归档规则",
+      onsiteInput: "整改模板、附件类型、科室负责人、复核时限和退回规则",
+      acceptanceEvidence: "整改反馈、科室签字附件、复核通过/退回审计轨迹",
+      currentStatus: signoffStatus("qss-rectification-attachments") === "accepted" ? "accepted" : runbookStatus("rectification-sla-watch"),
+      source: "qualityRectificationOrders, securityEvents"
+    },
+    {
+      id: "onsite-audit-retention",
+      domain: "audit_retention",
+      ownerRole: "commission",
+      owner: "安全审计管理员",
+      requirement: "确认审计日志留存、导出、哈希保全和 SIEM 对接边界",
+      onsiteInput: "AUDIT_EXPORT_PATH 或 SIEM_ENDPOINT、留存周期、审计账号、保全目录",
+      acceptanceEvidence: "审计导出文件、哈希校验记录和安全签收单",
+      currentStatus: signoffStatus("qss-audit-retention") === "accepted" ? "accepted" : runbookStatus("audit-retention-watch"),
+      source: "securityEvents, dataAccessLogs, qualitySafetySiteSignoffs"
+    },
+    {
+      id: "onsite-monitoring-oncall",
+      domain: "operations",
+      ownerRole: "commission",
+      owner: "平台运维值守组",
+      requirement: "绑定健康检查、指标监控、告警规则和值班升级表",
+      onsiteInput: "/api/health、/api/metrics、SLO 阈值、告警接收人、值班表",
+      acceptanceEvidence: "监控截图、告警演练记录、值班签收和升级回执",
+      currentStatus: operationsRunbook.every((item) => item.currentStatus === "ready") ? "accepted" : "attention_required",
+      source: "operationsRunbook, monitoring-readiness-report"
+    },
+    {
+      id: "onsite-training-cutover",
+      domain: "training",
+      ownerRole: "commission",
+      owner: "项目实施和质控联合组",
+      requirement: "完成上线培训、试运行问题清零和回退联系人确认",
+      onsiteInput: "培训签到、操作手册、问题清单、回退联系人和切换窗口",
+      acceptanceEvidence: "培训签到表、试运行问题清零表和上线确认单",
+      currentStatus: "pending_site_confirmation",
+      source: "site-readiness-pack, production-cutover-checklist"
+    }
+  ];
+  return qualitySafetyVisibleRows(rows, user);
+}
+
 function buildQualitySafetyDepartmentTaskView({ user, summary, actionPlan, issues, rectifications, criticalValueAlerts, siteSignoffs, mutualRecognitionQualityReviews }) {
   const profileByRole = {
     commission: {
@@ -5765,6 +5881,15 @@ function buildQualitySafetyDashboard(data, user) {
   });
   summary.operationsWatchItems = operationsRunbook.length;
   summary.operationsAttentionRequired = operationsRunbook.filter((item) => item.currentStatus === "attention_required").length;
+  const onsiteRequirements = buildQualitySafetySiteRequirementChecklist({
+    siteSignoffs,
+    operationsRunbook,
+    coreSystemMatrix,
+    goLiveReadiness,
+    user
+  });
+  summary.onsiteRequirementItems = onsiteRequirements.length;
+  summary.onsiteRequirementReady = onsiteRequirements.filter((item) => ["accepted", "ready_for_joint_test"].includes(String(item.currentStatus || ""))).length;
   return {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -5780,6 +5905,7 @@ function buildQualitySafetyDashboard(data, user) {
     clinicalPathwayCases,
     siteSignoffs,
     operationsRunbook,
+    onsiteRequirements,
     medicalRecordQualityReviews: Array.isArray(data.medicalRecordQualityReviews) ? data.medicalRecordQualityReviews : [],
     mutualRecognitionQualityReviews,
     reusedCollections: reusableCollections,
