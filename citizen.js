@@ -326,7 +326,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   window.addEventListener("hashchange", () => setServiceTab(serviceTabFromRoute() || "health-record", { syncUrl: false }));
   window.addEventListener("message", (event) => {
     if (event.origin !== location.origin || event.data?.type !== "set-service-tab") return;
-    setServiceTab(event.data.service, { pushState: true, scrollToPane: true, notifyPreview: false });
+    setServiceTab(event.data.service, { pushState: true, scrollToPane: false, notifyPreview: false });
   });
   document.querySelector("#account-select").addEventListener("change", (event) => {
     currentAccountId = event.target.value;
@@ -390,7 +390,7 @@ function renderMobileServiceNav() {
   target.querySelectorAll("[data-mobile-service-tab]").forEach((link) => {
     link.addEventListener("click", (event) => {
       event.preventDefault();
-      setServiceTab(link.dataset.mobileServiceTab, { pushState: true, scrollToPane: true });
+      setServiceTab(link.dataset.mobileServiceTab, { pushState: true, scrollToPane: false });
     });
   });
 }
@@ -424,7 +424,7 @@ function renderMobileServiceRail() {
   target.querySelectorAll("[data-mobile-rail-tab]").forEach((link) => {
     link.addEventListener("click", (event) => {
       event.preventDefault();
-      setServiceTab(link.dataset.mobileRailTab, { pushState: true, scrollToPane: true });
+      setServiceTab(link.dataset.mobileRailTab, { pushState: true, scrollToPane: false });
     });
   });
   const activeLink = target.querySelector('[data-mobile-rail-tab][aria-current="page"]');
@@ -542,6 +542,11 @@ function clientChannelFromRoute() {
   return citizenClientChannels.some((item) => item.key === key) ? key : "";
 }
 
+function isPagedCitizenServiceMode() {
+  const params = new URLSearchParams(location.search);
+  return params.get("preview") === "mobile-nav" || ["app", "mini-program"].includes(activeClientChannel);
+}
+
 function clientChannelEntry(channelKey, serviceKey) {
   const params = new URLSearchParams();
   params.set("client", channelKey);
@@ -599,7 +604,7 @@ function setServiceTab(key, options = {}) {
     }
   }
   updateServicePanes();
-  if (options.scrollToPane) {
+  if (options.scrollToPane && !isPagedCitizenServiceMode()) {
     requestAnimationFrame(() => {
       getServicePageTarget(next)?.scrollIntoView({ block: "start", behavior: "smooth" });
     });
@@ -632,6 +637,8 @@ function updateServicePanes() {
   if (!launchedTabs.some((item) => item.key === activeServiceTab) && launchedTabs[0]) {
     activeServiceTab = launchedTabs[0].key;
   }
+  document.body.classList.toggle("service-paged-mode", isPagedCitizenServiceMode());
+  document.body.dataset.activeServicePage = activeServiceTab;
   renderServiceSummary();
   renderMobileServiceRail();
   renderResidentFunctionAudit();
@@ -654,7 +661,10 @@ function updateServicePanes() {
   });
   document.querySelectorAll("[data-service-pane]").forEach((pane) => {
     const launched = launchedTabs.some((item) => item.key === pane.dataset.servicePane);
-    pane.hidden = !launched || pane.dataset.servicePane !== activeServiceTab;
+    const activePane = launched && pane.dataset.servicePane === activeServiceTab;
+    pane.hidden = !activePane;
+    pane.dataset.activeServicePane = activePane ? "true" : "false";
+    pane.setAttribute("aria-hidden", activePane ? "false" : "true");
   });
   const active = getActiveCitizenService();
   document.title = `${active.label} · 居民端`;
@@ -1950,8 +1960,24 @@ function renderReferrals(residentId) {
 
 function renderBirthHealth(residentId) {
   const container = document.querySelector("#birth-health-cards");
+  const summary = document.querySelector("#birth-health-summary-strip");
   if (!container) return;
   const certificates = (state.birthCertificates || []).filter((item) => item.maternalResidentId === residentId || item.residentId === residentId);
+  if (summary) {
+    const pendingCount = certificates.filter((item) => item.healthManagementStatus?.includes("待") || item.status?.includes("待") || item.publicSecuritySync !== "已共享" || item.maternalChildSync !== "已入册").length;
+    const lowWeightCount = certificates.filter((item) => Number(item.birthWeight || 0) > 0 && Number(item.birthWeight || 0) < 2500).length;
+    const nextService = certificates.find((item) => item.nextService)?.nextService || "等待出生医学证明归集后生成接续任务";
+    summary.innerHTML = [
+      ["出生证", certificates.length, "家庭成员归集"],
+      ["待接续", pendingCount, "共享、入册或访视未闭环"],
+      ["低体重专案", lowWeightCount, "需营养和体重随访"],
+      ["下一服务", nextService, "居民端提醒"]
+    ].map(([label, value, hint]) => `<article>
+      <span>${label}</span>
+      <strong>${value}</strong>
+      <small>${hint}</small>
+    </article>`).join("");
+  }
   container.innerHTML = certificates.map((item) => {
     const lowWeight = Number(item.birthWeight || 0) > 0 && Number(item.birthWeight || 0) < 2500;
     const pending = item.healthManagementStatus?.includes("待") || item.status?.includes("待") || item.publicSecuritySync !== "已共享" || item.maternalChildSync !== "已入册";

@@ -436,6 +436,20 @@ select,
   display: none !important;
 }
 
+body.service-paged-mode .service-page-content-anchor {
+  display: none;
+}
+
+body.service-paged-mode .service-summary,
+body.service-paged-mode .summary-grid,
+body.service-paged-mode [data-internal-launch-panel] {
+  display: none !important;
+}
+
+body.service-paged-mode [data-service-pane] {
+  scroll-margin-top: 0;
+}
+
 .summary-card {
   padding: 16px;
   min-width: 0;
@@ -538,6 +552,49 @@ select,
 
 .mobile-service-rail {
   display: none;
+}
+
+.birth-health-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.birth-health-summary-strip article {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #f8fbfd;
+}
+
+.birth-health-summary-strip span,
+.birth-health-summary-strip strong,
+.birth-health-summary-strip small {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.birth-health-summary-strip span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.birth-health-summary-strip strong {
+  margin-top: 5px;
+  color: var(--ink);
+  font-size: 18px;
+  line-height: 1.15;
+}
+
+.birth-health-summary-strip small {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .service-summary-copy {
@@ -2196,6 +2253,10 @@ dialog::backdrop {
     padding: 12px 0 calc(104px + env(safe-area-inset-bottom, 0px));
   }
 
+  body.service-paged-mode .citizen-shell {
+    padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+  }
+
   .citizen-header {
     position: static;
     backdrop-filter: none;
@@ -2289,6 +2350,10 @@ dialog::backdrop {
     top: 0;
     z-index: 16;
     margin-inline: -2px;
+  }
+
+  .birth-health-summary-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .service-command-panel {
@@ -2451,6 +2516,43 @@ dialog::backdrop {
     box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
   }
 
+  body.service-paged-mode .mobile-service-rail {
+    position: fixed;
+    left: 50%;
+    bottom: max(10px, env(safe-area-inset-bottom, 0px));
+    z-index: 19;
+    width: min(620px, calc(100vw - 20px));
+    gap: 0;
+    padding: 8px;
+    border-radius: 18px;
+    transform: translateX(-50%);
+    box-shadow: 0 18px 46px rgba(15, 23, 42, 0.18);
+  }
+
+  body.service-paged-mode .mobile-service-rail-status {
+    display: none;
+  }
+
+  body.service-paged-mode .mobile-service-rail-scroll {
+    grid-auto-flow: initial;
+    grid-auto-columns: initial;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 6px;
+    overflow: visible;
+    padding-bottom: 0;
+    scroll-snap-type: none;
+  }
+
+  body.service-paged-mode .mobile-service-rail a {
+    min-height: 58px;
+    padding: 6px 4px;
+    scroll-snap-align: none;
+  }
+
+  body.service-paged-mode .mobile-service-rail a .mobile-service-rail-state {
+    display: none;
+  }
+
   .mobile-service-rail-status {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);
@@ -2592,6 +2694,10 @@ dialog::backdrop {
     box-shadow: 0 18px 46px rgba(15, 23, 42, 0.2);
     backdrop-filter: blur(12px);
     touch-action: manipulation;
+  }
+
+  body.service-paged-mode .mobile-service-nav {
+    display: none;
   }
 
   .mobile-service-nav a {
