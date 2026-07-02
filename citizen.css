@@ -557,6 +557,62 @@ body.service-paged-mode [data-service-pane] {
   display: none;
 }
 
+.service-mobile-pagebar {
+  display: none;
+}
+
+.service-page-step {
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.service-page-step.primary {
+  border-color: var(--blue);
+  background: var(--blue);
+  color: #fff;
+}
+
+.service-page-step:focus-visible {
+  outline: 3px solid rgba(39, 110, 241, 0.35);
+  outline-offset: 2px;
+}
+
+.service-mobile-pagebar-current {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  text-align: center;
+}
+
+.service-mobile-pagebar-current span,
+.service-mobile-pagebar-current strong,
+.service-mobile-pagebar-current small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.service-mobile-pagebar-current span,
+.service-mobile-pagebar-current small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.service-mobile-pagebar-current strong {
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 900;
+}
+
 .birth-health-summary-strip {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -2532,6 +2588,22 @@ dialog::backdrop {
     padding: 10px;
     background: #fff;
     box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+  }
+
+  body.service-paged-mode .service-mobile-pagebar {
+    position: sticky;
+    top: 0;
+    z-index: 18;
+    display: grid;
+    grid-template-columns: minmax(72px, 0.8fr) minmax(0, 1.4fr) minmax(72px, 0.8fr);
+    align-items: center;
+    gap: 8px;
+    border: 1px solid rgba(216, 226, 231, 0.92);
+    border-radius: 14px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 14px 34px rgba(15, 23, 42, 0.14);
+    backdrop-filter: blur(12px);
   }
 
   body.service-paged-mode .mobile-service-rail {

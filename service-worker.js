@@ -1,4 +1,4 @@
-const CACHE_NAME = "chronic-care-citizen-v27";
+const CACHE_NAME = "chronic-care-citizen-v28";
 const APP_SHELL = [
   "./",
   "./citizen.html",
@@ -59,7 +59,12 @@ self.addEventListener("fetch", (event) => {
 
   if (event.request.mode === "navigate") {
     event.respondWith(
-      fetch(event.request, { cache: "no-store" }).catch(() => caches.match("./citizen.html"))
+      fetch(event.request, { cache: "no-store" }).catch(() => {
+        const fallbackPage = requestUrl.pathname.endsWith("/mobile-preview.html")
+          ? "./mobile-preview.html"
+          : "./citizen.html";
+        return caches.match(fallbackPage);
+      })
     );
     return;
   }

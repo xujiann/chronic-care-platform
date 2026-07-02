@@ -217,6 +217,14 @@ function serviceNavigationMeta(tab) {
   };
 }
 
+function adjacentCitizenServiceTab(direction) {
+  const tabs = getLaunchedCitizenServiceTabs();
+  if (!tabs.length) return null;
+  const activeIndex = Math.max(0, tabs.findIndex((item) => item.key === activeServiceTab));
+  const nextIndex = (activeIndex + direction + tabs.length) % tabs.length;
+  return tabs[nextIndex] || tabs[0];
+}
+
 function mobileServiceBadgeLabel(tab, active) {
   return active ? "当前" : `${serviceNavigationMeta(tab).featureCount}项`;
 }
@@ -431,6 +439,31 @@ function renderMobileServiceRail() {
   activeLink?.scrollIntoView?.({ block: "nearest", inline: "center" });
 }
 
+function renderMobileServicePagebar() {
+  const target = document.querySelector("#service-mobile-pagebar");
+  if (!target) return;
+  const tabs = getLaunchedCitizenServiceTabs();
+  const active = getActiveCitizenService();
+  const activeIndex = Math.max(0, tabs.findIndex((item) => item.key === active.key));
+  const meta = serviceNavigationMeta(active);
+  const previous = adjacentCitizenServiceTab(-1);
+  const next = adjacentCitizenServiceTab(1);
+  target.hidden = !isPagedCitizenServiceMode();
+  target.innerHTML = `<button type="button" class="service-page-step" data-service-page-step="-1" aria-label="上一项：${previous?.label || active.label}">上一项</button>
+    <div class="service-mobile-pagebar-current" aria-live="polite">
+      <span>${activeIndex + 1}/${tabs.length} · ${getActiveClientChannel().label}</span>
+      <strong>${active.label}</strong>
+      <small>${active.status} · ${meta.featureCount} 项可用能力</small>
+    </div>
+    <button type="button" class="service-page-step primary" data-service-page-step="1" aria-label="下一项：${next?.label || active.label}">下一项</button>`;
+  target.querySelectorAll("[data-service-page-step]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const destination = adjacentCitizenServiceTab(Number(button.dataset.servicePageStep || 1));
+      if (destination) setServiceTab(destination.key, { pushState: true, scrollToPane: false });
+    });
+  });
+}
+
 function renderModuleInterfaces() {
   const target = document.querySelector("#module-interface-grid");
   if (!target) return;
@@ -640,6 +673,7 @@ function updateServicePanes() {
   document.body.classList.toggle("service-paged-mode", isPagedCitizenServiceMode());
   document.body.dataset.activeServicePage = activeServiceTab;
   renderServiceSummary();
+  renderMobileServicePagebar();
   renderMobileServiceRail();
   renderResidentFunctionAudit();
   renderClientChannels();

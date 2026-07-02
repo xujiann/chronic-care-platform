@@ -57,6 +57,7 @@
       <section class="preview-device" aria-label="居民端手机预览">
         <div class="preview-toolbar">
           <div class="preview-status" id="preview-status" aria-live="polite"></div>
+          <button type="button" class="preview-compact-toggle" id="preview-compact-toggle" aria-pressed="false">精简预览</button>
           <div class="preview-client-switch" aria-label="切换运行形态">
             <button type="button" class="active" data-preview-client="mini-program">小程序</button>
             <button type="button" data-preview-client="app">APP</button>
@@ -71,7 +72,15 @@
           <button type="button" class="preview-refresh" id="preview-refresh">重载手机框</button>
           <div class="preview-entry-actions">
             <a class="preview-direct-entry" id="preview-direct-entry" href="./citizen.html?preview=mobile-nav&client=mini-program&page=health-record#service-health-record">打开当前页面</a>
+            <a class="preview-birth-entry" id="preview-birth-entry" href="./citizen.html?preview=mobile-nav&client=mini-program&page=health-record#birth-health-summary-strip">出生健康直达</a>
             <button type="button" class="preview-copy-entry" id="preview-copy-entry">复制入口</button>
+          </div>
+          <input class="preview-entry-url" id="preview-entry-url" type="text" readonly value="./citizen.html?preview=mobile-nav&client=mini-program&page=health-record#service-health-record" aria-label="当前预览入口地址" />
+          <div class="preview-readiness" aria-label="预览验收状态">
+            <span id="preview-readiness-client">端型：小程序</span>
+            <span id="preview-readiness-service">服务：健康档案</span>
+            <span id="preview-readiness-frame">手机框：待加载</span>
+            <span id="preview-readiness-link">入口：已同步</span>
           </div>
         </div>
         <section class="phone-frame">
@@ -89,7 +98,15 @@
       const previewLanUrl = document.querySelector("#preview-lan-url");
       const previewStatus = document.querySelector("#preview-status");
       const previewDirectEntry = document.querySelector("#preview-direct-entry");
+      const previewBirthEntry = document.querySelector("#preview-birth-entry");
       const previewCopyEntry = document.querySelector("#preview-copy-entry");
+      const previewEntryUrl = document.querySelector("#preview-entry-url");
+      const previewCompactToggle = document.querySelector("#preview-compact-toggle");
+      const previewToolbar = document.querySelector(".preview-toolbar");
+      const previewReadinessClient = document.querySelector("#preview-readiness-client");
+      const previewReadinessService = document.querySelector("#preview-readiness-service");
+      const previewReadinessFrame = document.querySelector("#preview-readiness-frame");
+      const previewReadinessLink = document.querySelector("#preview-readiness-link");
       const previewServices = [...serviceButtons].map((button) => button.dataset.previewService);
       const previewServiceLabels = {
         "health-record": "健康档案",
@@ -102,22 +119,57 @@
         "mini-program": "小程序",
         app: "APP"
       };
+      const copyTextWithFallback = async (text) => {
+        try {
+          await navigator.clipboard.writeText(text);
+          return true;
+        } catch (error) {
+          const textarea = document.createElement("textarea");
+          textarea.value = text;
+          textarea.setAttribute("readonly", "");
+          textarea.style.position = "fixed";
+          textarea.style.left = "-9999px";
+          document.body.appendChild(textarea);
+          textarea.select();
+          const copied = document.execCommand("copy");
+          textarea.remove();
+          return copied;
+        }
+      };
       const requestedPreviewService = previewParams.get("service") || previewParams.get("page");
       let activePreviewService = previewServices.includes(requestedPreviewService) ? requestedPreviewService : "health-record";
       let activePreviewClient = ["mini-program", "app"].includes(previewParams.get("client")) ? previewParams.get("client") : "mini-program";
+      const requestedCompactPreview = previewParams.get("compact");
+      let isCompactPreview = requestedCompactPreview ? requestedCompactPreview === "1" : activePreviewService !== "health-record";
       function citizenPreviewSrc(service) {
         return `./citizen.html?preview=mobile-nav&client=${activePreviewClient}&page=${service}#service-${service}`;
       }
+      function birthHealthPreviewSrc() {
+        return `./citizen.html?preview=mobile-nav&client=${activePreviewClient}&page=health-record#birth-health-summary-strip`;
+      }
       const renderPreviewDirectEntry = () => {
         const entryUrl = citizenPreviewSrc(activePreviewService);
+        const absoluteEntryUrl = new URL(entryUrl, location.href).href;
+        const birthEntryUrl = birthHealthPreviewSrc();
+        previewBirthEntry.href = birthEntryUrl;
+        previewBirthEntry.dataset.previewEntry = new URL(birthEntryUrl, location.href).href;
+        previewBirthEntry.textContent = `${previewClientLabels[activePreviewClient]} · 出生健康直达`;
+        previewBirthEntry.setAttribute("aria-label", previewBirthEntry.textContent);
         previewDirectEntry.href = entryUrl;
-        previewCopyEntry.dataset.previewEntry = new URL(entryUrl, location.href).href;
+        previewEntryUrl.value = absoluteEntryUrl;
+        previewCopyEntry.dataset.previewEntry = absoluteEntryUrl;
         previewCopyEntry.textContent = "复制入口";
         previewDirectEntry.textContent = `打开${previewClientLabels[activePreviewClient]} · ${previewServiceLabels[activePreviewService]}`;
+        previewReadinessLink.textContent = "入口：当前与出生健康已同步";
+      };
+      const renderPreviewReadiness = () => {
+        previewReadinessClient.textContent = `端型：${previewClientLabels[activePreviewClient]}`;
+        previewReadinessService.textContent = `服务：${previewServiceLabels[activePreviewService]}`;
       };
       const renderPreviewStatus = () => {
         previewStatus.textContent = `${previewClientLabels[activePreviewClient]} · ${previewServiceLabels[activePreviewService]} · 390px 手机视口`;
         renderPreviewDirectEntry();
+        renderPreviewReadiness();
       };
       const syncPreviewServiceControls = () => {
         serviceButtons.forEach((button) => button.classList.toggle("active", button.dataset.previewService === activePreviewService));
@@ -133,16 +185,25 @@
         params.set("client", activePreviewClient);
         params.set("service", activePreviewService);
         params.set("page", activePreviewService);
+        params.set("compact", isCompactPreview ? "1" : "0");
         history.replaceState({ previewClient: activePreviewClient, previewService: activePreviewService }, "", `${location.pathname}?${params.toString()}`);
         renderPreviewUrls();
         renderPreviewStatus();
+      };
+      const renderCompactPreview = () => {
+        previewToolbar.classList.toggle("compact", isCompactPreview);
+        previewCompactToggle.setAttribute("aria-pressed", String(isCompactPreview));
+        previewCompactToggle.textContent = isCompactPreview ? "完整预览" : "精简预览";
       };
       const setPreviewService = (service, options = {}) => {
         activePreviewService = service;
         syncPreviewServiceControls();
         if (options.syncUrl !== false) syncPreviewUrl();
         if (options.syncUrl === false) renderPreviewStatus();
-        if (options.reload !== false) frame.src = citizenPreviewSrc(service);
+        if (options.reload !== false) {
+          previewReadinessFrame.textContent = "手机框：加载中";
+          frame.src = citizenPreviewSrc(service);
+        }
       };
       const setPreviewClient = (client, options = {}) => {
         activePreviewClient = client;
@@ -154,6 +215,7 @@
         setPreviewService(activePreviewService, { syncUrl: false });
       };
       frame.addEventListener("load", () => {
+        previewReadinessFrame.textContent = "手机框：已加载";
         frame.contentWindow?.postMessage({ type: "set-service-tab", service: activePreviewService }, location.origin);
       });
       window.addEventListener("message", (event) => {
@@ -168,18 +230,30 @@
         button.addEventListener("click", () => setPreviewClient(button.dataset.previewClient));
       });
       document.querySelector("#preview-refresh").addEventListener("click", () => {
+        previewReadinessFrame.textContent = "手机框：加载中";
         frame.src = frame.src;
+      });
+      previewCompactToggle.addEventListener("click", () => {
+        isCompactPreview = !isCompactPreview;
+        renderCompactPreview();
+        syncPreviewUrl();
       });
       previewCopyEntry.addEventListener("click", async () => {
         const entryUrl = previewCopyEntry.dataset.previewEntry || previewDirectEntry.href;
-        try {
-          await navigator.clipboard.writeText(entryUrl);
+        const copied = await copyTextWithFallback(entryUrl);
+        if (copied) {
           previewCopyEntry.textContent = "已复制";
-        } catch (error) {
+          previewReadinessLink.textContent = "入口：已复制";
+        } else {
+          previewCopyEntry.textContent = "手动复制";
+          previewEntryUrl.focus();
+          previewEntryUrl.select();
           previewStatus.textContent = `请手动复制：${entryUrl}`;
+          previewReadinessLink.textContent = "入口：需手动复制";
         }
       });
       renderPreviewUrls();
+      renderCompactPreview();
       setPreviewClient(activePreviewClient, { syncUrl: false });
     </script>
   </body>
