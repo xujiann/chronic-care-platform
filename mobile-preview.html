@@ -96,7 +96,8 @@
         "mini-program": "小程序",
         app: "APP"
       };
-      let activePreviewService = previewServices.includes(previewParams.get("service")) ? previewParams.get("service") : "health-record";
+      const requestedPreviewService = previewParams.get("service") || previewParams.get("page");
+      let activePreviewService = previewServices.includes(requestedPreviewService) ? requestedPreviewService : "health-record";
       let activePreviewClient = ["mini-program", "app"].includes(previewParams.get("client")) ? previewParams.get("client") : "mini-program";
       const renderPreviewStatus = () => {
         previewStatus.textContent = `${previewClientLabels[activePreviewClient]} · ${previewServiceLabels[activePreviewService]} · 390px 手机视口`;
@@ -114,6 +115,7 @@
         const params = new URLSearchParams(location.search);
         params.set("client", activePreviewClient);
         params.set("service", activePreviewService);
+        params.set("page", activePreviewService);
         history.replaceState({ previewClient: activePreviewClient, previewService: activePreviewService }, "", `${location.pathname}?${params.toString()}`);
         renderPreviewUrls();
         renderPreviewStatus();

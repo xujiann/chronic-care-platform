@@ -776,6 +776,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(citizenHtml, /apple-touch-icon/);
   assert.match(citizenHtml, /auth\.js\?v=20260627/);
   assert.match(mobilePreviewHtml, /preview=mobile-nav/);
+  assert.match(mobilePreviewHtml, /previewParams\.get\("service"\) \|\| previewParams\.get\("page"\)/);
   assert.match(mobilePreviewHtml, /preview-local-url/);
   assert.match(mobilePreviewHtml, /preview-lan-url/);
   assert.match(mobilePreviewHtml, /preview-status/);
@@ -791,6 +792,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /data-preview-client="app"/);
   assert.match(mobilePreviewHtml, /URLSearchParams\(location\.search\)/);
   assert.match(mobilePreviewHtml, /previewParams\.get\("client"\)/);
+  assert.match(mobilePreviewHtml, /params\.set\("page", activePreviewService\)/);
   assert.match(mobilePreviewHtml, /setPreviewClient\(activePreviewClient, \{ syncUrl: false \}\)/);
   assert.doesNotMatch(mobilePreviewHtml, /internet-nursing\.html\?preview=mobile-nursing/);
   assert.match(mobilePreviewHtml, /client=\$\{activePreviewClient\}/);
