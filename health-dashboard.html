@@ -110,6 +110,32 @@
         </div>
       </section>
 
+      <section class="panel" id="dashboard-review-quick-links" data-dashboard-review="launch-review">
+        <div class="panel-title">
+          <h2>上线审查快捷入口</h2>
+          <span>把当前已实现能力、后续生产计划和上线门禁集中给管理端审查</span>
+        </div>
+        <div class="capability-grid">
+          <article class="capability-card" data-dashboard-review-link="implemented-plan">
+            <strong>已实现功能与下一步计划</strong>
+            <span>查看综合汇总、人口服务看板、风险闭环、接口证据、上线门禁和政策说明的当前完成情况。</span>
+          </article>
+          <article class="capability-card" data-dashboard-review-link="production-requirements">
+            <strong>真实上线需求文档</strong>
+            <span>核对正式环境、统一身份、审计保全、生产数据库、接口签字、监控告警和灾备演练要求。</span>
+          </article>
+          <article class="capability-card" data-dashboard-review-link="readiness-gates">
+            <strong>当前上线门禁状态</strong>
+            <span>直接定位生产 ready 判定、阻塞门禁和现场切换边界，避免把演示环境误判为生产上线。</span>
+          </article>
+        </div>
+        <div class="action-row">
+          <a class="inline-action" href="./health-dashboard-about.html#dashboard-implementation-plan" data-dashboard-review-action="implemented-plan">查看功能与计划</a>
+          <a class="inline-action" href="./docs/health-dashboard-production-launch-requirements.md" data-dashboard-review-action="production-requirements">查看上线需求</a>
+          <a class="inline-action" href="#production-readiness-board" data-dashboard-review-action="readiness-gates">查看上线门禁</a>
+        </div>
+      </section>
+
       <section class="panel dashboard-function-report" id="dashboard-function-report">
         <div class="panel-title">
           <h2>主要功能报告</h2>

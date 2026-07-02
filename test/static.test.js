@@ -113,6 +113,10 @@ test("health dashboard exposes the aggregate application entry and API contract"
   assert.match(html, /dashboard-policy-notes/);
   assert.match(html, /data-dashboard-policy="certificates"/);
   assert.match(html, /health-dashboard-about\.html/);
+  assert.match(html, /dashboard-review-quick-links/);
+  assert.match(html, /data-dashboard-review-link="implemented-plan"/);
+  assert.match(html, /data-dashboard-review-action="production-requirements"/);
+  assert.match(html, /health-dashboard-about\.html#dashboard-implementation-plan/);
   assert.match(html, /dashboard-jurisdiction-board/);
   assert.match(html, /jurisdiction-level-controls/);
   assert.match(html, /jurisdiction-matrix/);

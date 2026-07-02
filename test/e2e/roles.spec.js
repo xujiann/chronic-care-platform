@@ -114,6 +114,10 @@ test("commission health dashboard filters live source actions and drills into so
   await expect(page.locator("#dashboard-policy-notes")).toBeVisible();
   await expect(page.locator("[data-dashboard-policy='certificates']")).toContainText("出生");
   await expect(page.locator("#dashboard-policy-notes a[href='./health-dashboard-about.html']")).toHaveCount(1);
+  await expect(page.locator("#dashboard-review-quick-links")).toContainText("上线审查快捷入口");
+  await expect(page.locator("[data-dashboard-review-link='implemented-plan']")).toContainText("已实现功能");
+  await expect(page.locator("[data-dashboard-review-action='implemented-plan']")).toHaveAttribute("href", "./health-dashboard-about.html#dashboard-implementation-plan");
+  await expect(page.locator("[data-dashboard-review-action='readiness-gates']")).toHaveAttribute("href", "#production-readiness-board");
   await expect(page.locator("#dashboard-function-list [data-function-report]")).toHaveCount(14);
   await expect(page.locator("#dashboard-function-list [data-function-report='aggregate-entry']")).toContainText("7 个源应用");
   await expect(page.locator("#dashboard-function-list [data-function-report='production-readiness-gate']")).toContainText("上线运行门禁");
