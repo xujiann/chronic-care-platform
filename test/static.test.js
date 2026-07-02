@@ -858,6 +858,9 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewCss, /preview-entry-url/);
   assert.match(mobilePreviewCss, /preview-readiness/);
   assert.match(mobilePreviewCss, /preview-toolbar\.compact \.preview-entry-url/);
+  assert.match(mobilePreviewCss, /preview-toolbar\.compact \.preview-client-switch/);
+  assert.match(mobilePreviewCss, /preview-toolbar\.compact \.preview-service-switch/);
+  assert.match(mobilePreviewCss, /preview-toolbar\.compact \.preview-refresh/);
   assert.match(mobilePreviewCss, /preview-toolbar\.compact \.preview-status/);
   assert.match(mobilePreviewCss, /min-height: 34px/);
   assert.match(mobilePreviewCss, /preview-copy-entry/);
