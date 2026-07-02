@@ -293,6 +293,12 @@ function renderCountyTeleconsultationCutoverReadiness(state, rows) {
       <div><span class="badge warn">${item.owner}</span></div>
       <h3>${item.id}</h3>
       <p>${item.detail}</p>
+    </article>`),
+    ...readiness.nextDevelopmentPlan.map((item) => `<article data-referral-cutover-plan="${item.phase}">
+      <div><span class="badge info">${item.owner}</span></div>
+      <h3>${item.phase}</h3>
+      <p>${item.objective}</p>
+      <footer><small>${item.acceptance}</small></footer>
     </article>`)
   ].join("");
 }
@@ -438,7 +444,8 @@ function buildCountyTeleconsultationCutoverReadiness(state, rows) {
       totalRoles: 5,
       blockers: Array.isArray(apiReadiness.blockers) ? apiReadiness.blockers : [],
       nextAction: apiReadiness.nextAction || "Review the joint-test pack before production cutover.",
-      evidenceSource: "joint-test-pack API"
+      evidenceSource: "joint-test-pack API",
+      nextDevelopmentPlan: normalizeCountyTeleconsultationNextPlan(state.referralTeleconsultationJointTestPack?.nextDevelopmentPlan)
     };
   }
   const ledgerRows = buildCountyTeleconsultationJointLedger(state, rows);
@@ -477,8 +484,33 @@ function buildCountyTeleconsultationCutoverReadiness(state, rows) {
     totalRoles: signoffRows.length,
     blockers,
     nextAction: blockers[0]?.detail || "Module cutover evidence is complete; continue with platform environment gates.",
-    evidenceSource: "local county state"
+    evidenceSource: "local county state",
+    nextDevelopmentPlan: normalizeCountyTeleconsultationNextPlan([])
   };
+}
+
+function normalizeCountyTeleconsultationNextPlan(plan) {
+  const fallback = [
+    {
+      phase: "field-interface-replay",
+      owner: "institution-integration",
+      objective: "Replay referral feedback, schedule, and report callbacks with signed payloads.",
+      acceptance: "All three callback contracts have matched gateway events."
+    },
+    {
+      phase: "onsite-signoff-archive",
+      owner: "county-command",
+      objective: "Archive onsite signed evidence for referral center, receiving hospital, hospital IT, county performance, and insurance.",
+      acceptance: "All five roles have signed evidence in the signoff summary."
+    }
+  ];
+  const rows = Array.isArray(plan) && plan.length ? plan : fallback;
+  return rows.slice(0, 4).map((item) => ({
+    phase: item.phase || "next-step",
+    owner: item.owner || "county-command",
+    objective: item.objective || item.target || "Confirm the next onsite cutover action.",
+    acceptance: item.acceptance || "Acceptance evidence is attached to the joint-test pack."
+  }));
 }
 
 function buildCountyTeleconsultationSignoffRows(state, rows) {
