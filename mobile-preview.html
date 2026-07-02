@@ -27,7 +27,7 @@
           <div>
             <strong>2. 真机预览</strong>
             <p>电脑和手机在同一 Wi-Fi 下，用电脑局域网 IP 加端口访问。</p>
-            <code id="preview-lan-url">http://YOUR-LAN-IP/mobile-preview.html</code>
+            <code id="preview-lan-url">http://本机局域网IP/mobile-preview.html</code>
           </div>
           <div>
             <strong>3. 操作重点</strong>
@@ -60,8 +60,16 @@
           <button type="button" class="preview-compact-toggle" id="preview-compact-toggle" aria-pressed="false">精简预览</button>
           <div class="preview-client-switch" aria-label="切换运行形态">
             <button type="button" class="active" data-preview-client="mini-program">小程序</button>
-            <button type="button" data-preview-client="app">APP</button>
+            <button type="button" data-preview-client="app">手机应用</button>
           </div>
+          <label class="preview-service-select-label" for="preview-service-select">服务导航</label>
+          <select class="preview-service-select" id="preview-service-select" aria-label="服务导航">
+            <option value="health-record">健康档案</option>
+            <option value="emr">电子病历</option>
+            <option value="nursing">护理</option>
+            <option value="escort">陪诊</option>
+            <option value="registration">挂号</option>
+          </select>
           <div class="preview-service-switch" aria-label="切换手机框服务">
             <button type="button" class="active" data-preview-service="health-record">健康档案</button>
             <button type="button" data-preview-service="emr">电子病历</button>
@@ -103,6 +111,7 @@
       const previewEntryUrl = document.querySelector("#preview-entry-url");
       const previewCompactToggle = document.querySelector("#preview-compact-toggle");
       const previewToolbar = document.querySelector(".preview-toolbar");
+      const previewServiceSelect = document.querySelector("#preview-service-select");
       const previewReadinessClient = document.querySelector("#preview-readiness-client");
       const previewReadinessService = document.querySelector("#preview-readiness-service");
       const previewReadinessFrame = document.querySelector("#preview-readiness-frame");
@@ -117,7 +126,7 @@
       };
       const previewClientLabels = {
         "mini-program": "小程序",
-        app: "APP"
+        app: "手机应用"
       };
       const copyTextWithFallback = async (text) => {
         try {
@@ -175,12 +184,13 @@
       };
       const syncPreviewServiceControls = () => {
         serviceButtons.forEach((button) => button.classList.toggle("active", button.dataset.previewService === activePreviewService));
+        previewServiceSelect.value = activePreviewService;
       };
       const renderPreviewUrls = () => {
         const previewPort = location.port ? `:${location.port}` : "";
         const previewPath = `${location.pathname}${location.search}`;
         previewLocalUrl.textContent = `${location.origin}${previewPath}`;
-        previewLanUrl.textContent = `${location.protocol}//YOUR-LAN-IP${previewPort}${previewPath}`;
+        previewLanUrl.textContent = `${location.protocol}//本机局域网IP${previewPort}${previewPath}`;
       };
       const syncPreviewUrl = () => {
         const params = new URLSearchParams(location.search);
@@ -228,6 +238,7 @@
       serviceButtons.forEach((button) => {
         button.addEventListener("click", () => setPreviewService(button.dataset.previewService));
       });
+      previewServiceSelect.addEventListener("change", () => setPreviewService(previewServiceSelect.value));
       clientButtons.forEach((button) => {
         button.addEventListener("click", () => setPreviewClient(button.dataset.previewClient));
       });

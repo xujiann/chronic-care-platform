@@ -168,6 +168,12 @@ code {
   gap: 6px;
 }
 
+.preview-service-select-label {
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--muted);
+}
+
 .preview-client-switch {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -178,6 +184,7 @@ code {
 
 .preview-client-switch button,
 .preview-service-switch button,
+.preview-service-select,
 .preview-refresh,
 .preview-compact-toggle,
 .preview-direct-entry,
@@ -197,6 +204,7 @@ code {
 
 .preview-client-switch button,
 .preview-service-switch button,
+.preview-service-select,
 .preview-compact-toggle,
 .preview-direct-entry,
 .preview-birth-entry,
@@ -247,9 +255,18 @@ code {
   grid-column: 2;
 }
 
+.preview-toolbar.compact .preview-service-select-label {
+  display: none;
+}
+
+.preview-toolbar.compact .preview-service-select {
+  grid-column: 1 / -1;
+}
+
 .preview-toolbar.compact .preview-client-switch button,
 .preview-toolbar.compact .preview-service-switch button,
 .preview-toolbar.compact .preview-refresh,
+.preview-toolbar.compact .preview-service-select,
 .preview-toolbar.compact .preview-direct-entry,
 .preview-toolbar.compact .preview-birth-entry,
 .preview-toolbar.compact .preview-copy-entry {

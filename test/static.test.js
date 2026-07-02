@@ -1091,6 +1091,18 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /renderRegistration/);
   assert.match(citizenJs, /cancelRegistrationOrder/);
   assert.match(citizenJs, /formatRegistrationStatus/);
+  assert.match(citizenJs, /formatRegistrationHospital/);
+  assert.match(citizenJs, /formatRegistrationDepartment/);
+  assert.match(citizenJs, /formatRegistrationDoctor/);
+  assert.match(citizenJs, /formatRegistrationSource/);
+  assert.match(citizenJs, /formatRegistrationTag/);
+  assert.match(citizenJs, /大连市中心医院门诊/);
+  assert.match(citizenJs, /大连医科大学附属医院门诊/);
+  assert.match(citizenJs, /心内科/);
+  assert.match(citizenJs, /内分泌科/);
+  assert.match(citizenJs, /王医生/);
+  assert.match(citizenJs, /高血压随访/);
+  assert.match(citizenJs, /支持陪诊/);
   assert.match(citizenJs, /bindLongTermCareAssessment/);
   assert.match(citizenJs, /renderLongTermCareAssessment/);
   assert.match(citizenJs, /buildLongTermCareAssessment/);
@@ -1326,6 +1338,8 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(html, /nursing-nurse-response/);
   assert.match(html, /nursing-regulatory-section/);
   assert.match(html, /nursing-mobile-workbench/);
+  assert.match(html, /nursing-closed-loop-section/);
+  assert.match(html, /nursing-closed-loop/);
   assert.match(html, /nursing-role-nav/);
   assert.match(html, /互联网护理角色工作台/);
   assert.match(html, /nursing-appointment-panel/);
@@ -1352,6 +1366,10 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(js, /nextNursingAction/);
   assert.match(js, /renderMobileAppointmentStatus/);
   assert.match(js, /renderMobileNurseCards/);
+  assert.match(js, /renderNursingClosedLoop/);
+  assert.match(js, /nursingLoopStep/);
+  assert.match(js, /居民下单/);
+  assert.match(js, /护士接单/);
   assert.match(js, /consentAttachmentText/);
   assert.match(js, /locationTraceSummary/);
   assert.match(js, /notificationSummary/);
@@ -1397,6 +1415,9 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(html, /手机端预约/);
   assert.match(html, /手机端接单/);
   assert.match(css, /nursing-mobile-workbench/);
+  assert.match(css, /nursing-closed-loop/);
+  assert.match(css, /nursing-loop-steps/);
+  assert.match(css, /grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
   assert.match(css, /nursing-role-nav/);
   assert.match(css, /nursing-mobile-card/);
   assert.match(css, /nursing-role-nav/);

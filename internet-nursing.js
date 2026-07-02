@@ -294,6 +294,7 @@ function renderInternetNursingDashboard(dashboard) {
   renderNurseSelect(dashboard.nurses || []);
   renderMobileAppointmentStatus(dashboard.orders || []);
   renderMobileNurseCards(dashboard.orders || []);
+  renderNursingClosedLoop(dashboard.orders || []);
   renderHospitalOrders(dashboard.orders || []);
   renderNurseQueue(dashboard.orders || []);
   renderPolicyControls(dashboard.policy || {});
@@ -310,6 +311,52 @@ function renderInternetNursingDashboard(dashboard) {
   if (citizenSummary) citizenSummary.textContent = `${dashboard.summary?.publishedInstitutions || 0} 家已发布机构`;
   const nurseSummary = document.querySelector("#nursing-nurse-summary");
   if (nurseSummary) nurseSummary.textContent = `${dashboard.summary?.qualifiedNurses || 0}/${dashboard.summary?.nurses || 0} 名护士合格`;
+}
+
+function renderNursingClosedLoop(items) {
+  const target = document.querySelector("#nursing-closed-loop");
+  if (!target) return;
+  const rows = (items || [])
+    .slice()
+    .sort((a, b) => String(b.requestedAt || b.createdAt || b.preferredAt || "").localeCompare(String(a.requestedAt || a.createdAt || a.preferredAt || "")))
+    .slice(0, 4);
+  target.innerHTML = rows.length ? rows.map((item) => `
+    <article class="nursing-loop-card">
+      <header>
+        <div>
+          <strong>${escapeHtml(displayText(item.residentName || item.residentId || ""))} · ${escapeHtml(displayText(item.serviceItem || ""))}</strong>
+          <span>${escapeHtml(displayText(item.institution?.name || item.institutionName || ""))} / ${escapeHtml(item.preferredAt || "")}</span>
+        </div>
+        ${statusBadge(item.status)}
+      </header>
+      <div class="nursing-loop-steps" aria-label="互联网护理下单接单闭环">
+        ${nursingLoopStep("居民下单", Boolean(item.id), item.sourceChannel || item.createdBy || "internet-nursing-mobile")}
+        ${nursingLoopStep("首诊评估", item.firstVisitAssessment === "passed", item.firstVisitAssessment || "pending")}
+        ${nursingLoopStep("知情同意", hasSignedNursingConsent(item), consentAttachmentText(item))}
+        ${nursingLoopStep("医院派单", Boolean(item.nurseId), item.nurseName || item.nurseId || "pending")}
+        ${nursingLoopStep("护士接单", ["accepted", "in-service", "completed", "closed"].includes(String(item.status || "")), locationTraceSummary(item))}
+      </div>
+      <small>${escapeHtml(nextNursingAction(item, item.riskLevel === "high") || "闭环已进入服务记录与质控回访。")}</small>
+    </article>
+  `).join("") : `
+    <article class="nursing-loop-card empty">
+      <header>
+        <div>
+          <strong>暂无互联网护理订单</strong>
+          <span>居民提交预约后，将在这里形成下单、评估、派单、接单闭环。</span>
+        </div>
+      </header>
+    </article>
+  `;
+}
+
+function nursingLoopStep(label, passed, detail) {
+  return `
+    <div class="nursing-loop-step ${passed ? "done" : "pending"}">
+      <strong>${escapeHtml(label)}</strong>
+      <span>${escapeHtml(displayText(detail || (passed ? "done" : "pending")))}</span>
+    </div>
+  `;
 }
 
 function renderNursingMetrics(summary) {

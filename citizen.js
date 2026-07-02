@@ -270,13 +270,13 @@ const citizenClientChannels = [
   },
   {
     key: "app",
-    label: "APP",
+    label: "手机应用",
     status: "可上线配置",
     entry: "citizen.html?client=app&page=health-record",
     audience: "Android / iOS 应用壳、桌面图标、离线缓存",
     capabilities: ["PWA 安装入口", "离线健康档案壳", "大字模式", "系统推送预留"],
     readiness: ["应用签名与包名", "应用市场隐私合规", "推送证书", "崩溃监控与版本升级"],
-    nextAction: "打包 APP 上架材料",
+    nextAction: "打包手机应用上架材料",
     launchChecklist: [
       { label: "安装入口", state: "已就绪", note: "PWA 壳支持浏览器安装" },
       { label: "离线访问", state: "已就绪", note: "Service Worker 缓存居民端壳" },
@@ -2517,6 +2517,44 @@ function activeRegistrationOrders(residentId) {
     .filter((item, index, rows) => rows.findIndex((row) => row.id === item.id) === index);
 }
 
+function formatRegistrationHospital(value) {
+  return {
+    "Dalian Central Hospital outpatient clinic demo": "大连市中心医院门诊",
+    "Dalian Medical University Affiliated Hospital demo": "大连医科大学附属医院门诊",
+    "Dalian Central Hospital": "大连市中心医院",
+    "Dalian Medical University Hospital": "大连医科大学附属医院"
+  }[value] || value || "待确认医院";
+}
+
+function formatRegistrationDepartment(value) {
+  return {
+    Cardiology: "心内科",
+    Endocrinology: "内分泌科",
+    Ophthalmology: "眼科"
+  }[value] || value || "待确认科室";
+}
+
+function formatRegistrationDoctor(value) {
+  return {
+    "Doctor Wang": "王医生"
+  }[value] || value || "待确认医生";
+}
+
+function formatRegistrationSource(value) {
+  return {
+    "HIS outpatient source pool": "HIS 门诊号源池",
+    "citizen-registration-static": "居民端挂号",
+    "citizen-registration-api": "居民端挂号接口"
+  }[value] || value || "HIS 号源池";
+}
+
+function formatRegistrationTag(value) {
+  return {
+    "hypertension follow-up": "高血压随访",
+    "escort supported": "支持陪诊"
+  }[value] || value || "";
+}
+
 function renderRegistration(residentId) {
   const form = document.querySelector("#registration-form");
   const scheduleCards = document.querySelector("#registration-schedule-cards");
@@ -2525,15 +2563,18 @@ function renderRegistration(residentId) {
   if (!form || !scheduleCards || !orderCards) return;
   const schedules = activeRegistrationSchedules();
   const selected = form.elements.scheduleId.value;
-  form.elements.scheduleId.innerHTML = schedules.map((item) => `<option value="${item.id}">${item.hospital} · ${item.department} · ${item.date} ${item.period} · ${item.remaining} 个号</option>`).join("");
+  form.elements.scheduleId.innerHTML = schedules.map((item) => `<option value="${item.id}">${formatRegistrationHospital(item.hospital)} · ${formatRegistrationDepartment(item.department)} · ${item.date} ${item.period} · ${item.remaining} 个号</option>`).join("");
   if (selected && schedules.some((item) => item.id === selected)) form.elements.scheduleId.value = selected;
-  scheduleCards.innerHTML = schedules.map((item) => `<article class="mini-card registration-schedule-card">
-    <h3>${item.hospital} · ${item.department}</h3>
-    <p class="muted">${item.date} ${item.period} · ${item.doctor} · ${item.source || item.sourceSystem || "HIS号源池"}</p>
+  scheduleCards.innerHTML = schedules.map((item) => {
+    const tags = (item.tags || []).map(formatRegistrationTag).filter(Boolean);
+    return `<article class="mini-card registration-schedule-card">
+    <h3>${formatRegistrationHospital(item.hospital)} · ${formatRegistrationDepartment(item.department)}</h3>
+    <p class="muted">${item.date} ${item.period} · ${formatRegistrationDoctor(item.doctor)} · ${formatRegistrationSource(item.source || item.sourceSystem)}</p>
     <p>HIS号源 ${item.hisScheduleId || item.id} · 余号 ${item.remaining} 个 · 挂号费 ${item.fee} 元</p>
     <p>支付 ${item.paymentRequired === false ? "免预付" : "待支付"} · 医保 ${item.insuranceSupported === false ? "不支持" : "电子凭证预核验"} · ${item.cancelBeforeHours} 小时前可取消</p>
-    <div class="visit-tags">${(item.tags || []).map((tag) => `<span class="tag">${tag}</span>`).join("")}</div>
-  </article>`).join("");
+    <div class="visit-tags">${tags.map((tag) => `<span class="tag">${tag}</span>`).join("")}</div>
+  </article>`;
+  }).join("");
   const orders = activeRegistrationOrders(residentId);
   if (summary) {
     const openOrders = orders.filter((item) => canCancelRegistration(item)).length;
@@ -2544,8 +2585,8 @@ function renderRegistration(residentId) {
   orderCards.innerHTML = orders
     .sort((a, b) => String(a.appointmentDate || "").localeCompare(String(b.appointmentDate || "")))
     .map((item) => `<article class="mini-card registration-order-card">
-      <h3>${item.hospital} · ${item.department}</h3>
-      <p class="muted">${item.appointmentDate} ${item.period} · ${item.doctor} · ${item.visitType === "internet" ? "互联网复诊" : "到院就诊"}</p>
+      <h3>${formatRegistrationHospital(item.hospital)} · ${formatRegistrationDepartment(item.department)}</h3>
+      <p class="muted">${item.appointmentDate} ${item.period} · ${formatRegistrationDoctor(item.doctor)} · ${item.visitType === "internet" ? "互联网复诊" : "到院就诊"}</p>
       <p>${item.reason || "居民端预约"} · 挂号费 ${item.fee} 元 · 队列 ${item.queueNo || item.registrationNo || "待回执"}</p>
       <p>HIS ${item.hisVisitId || item.hisScheduleId || "待同步"} · 支付 ${formatRegistrationStatus(item.paymentStatus)} · 退费 ${formatRegistrationStatus(item.refundStatus)}</p>
       <p>医保 ${formatRegistrationStatus(item.insuranceStatus)} ${item.insurancePrecheckNo ? `· ${item.insurancePrecheckNo}` : ""} · 短信 ${formatRegistrationDeliveryStatus(item)}</p>

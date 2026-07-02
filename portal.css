@@ -702,6 +702,76 @@ th {
   text-decoration: none;
 }
 
+.nursing-closed-loop {
+  display: grid;
+  gap: 12px;
+}
+
+.nursing-loop-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fbfd;
+  min-width: 0;
+}
+
+.nursing-loop-card header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+}
+
+.nursing-loop-card strong,
+.nursing-loop-card span,
+.nursing-loop-card small {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.nursing-loop-card span,
+.nursing-loop-card small {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.nursing-loop-steps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.nursing-loop-step {
+  min-width: 0;
+  border: 1px solid rgba(216, 226, 231, 0.96);
+  border-radius: 8px;
+  padding: 9px;
+  background: #fff;
+}
+
+.nursing-loop-step.done {
+  border-color: rgba(16, 185, 129, 0.34);
+  background: #ecfdf5;
+}
+
+.nursing-loop-step.pending {
+  border-color: rgba(245, 158, 11, 0.34);
+  background: #fffbeb;
+}
+
+.nursing-loop-step strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.nursing-loop-step span {
+  margin-top: 4px;
+  font-size: 12px;
+}
+
 .nursing-desktop-table {
   max-height: 520px;
 }
@@ -1458,6 +1528,11 @@ dialog::backdrop {
   }
 
   .nursing-mobile-card header {
+    grid-template-columns: 1fr;
+  }
+
+  .nursing-loop-card header,
+  .nursing-loop-steps {
     grid-template-columns: 1fr;
   }
 

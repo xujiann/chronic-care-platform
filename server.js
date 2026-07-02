@@ -4447,6 +4447,7 @@ function normalizeState(data) {
     platformDeliveryBatches: mergeByKey(seedPlatformDeliveryBatches(), data.platformDeliveryBatches, "id"),
     platformEvidence: cleanPlatformEvidenceText(mergeByKey(seedPlatformEvidence(), data.platformEvidence, "id")),
     productionDeploymentPlan: mergeByKey(seedProductionDeploymentPlan(), data.productionDeploymentPlan, "id"),
+    siteLaunchEvidence: Array.isArray(data.siteLaunchEvidence) ? data.siteLaunchEvidence : [],
     applicationCatalog: mergeByKey(seedApplicationCatalog(), data.applicationCatalog, "id"),
     institutionCreditEvaluations: mergeByKey(seedInstitutionCreditEvaluations(), data.institutionCreditEvaluations, "id"),
     creditEvaluationRules: data.creditEvaluationRules && typeof data.creditEvaluationRules === "object" ? data.creditEvaluationRules : seedCreditEvaluationRules(),

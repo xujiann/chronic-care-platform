@@ -1076,6 +1076,62 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(created.body.notificationDeliveries.some((item) => item.event === "appointment-submitted" && item.channel === "sms" && item.status === "queued"), true);
     assert.equal(created.body.notificationDeliveries.some((item) => item.event === "appointment-submitted" && item.channel === "hospital_message"), true);
 
+    const hospitalLogin = await login(baseUrl, "hospital");
+    const hospitalToken = hospitalLogin.body.token;
+    const assessed = await api(baseUrl, `/api/internet-nursing/orders/${created.body.id}/actions`, authorized(hospitalToken, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "first-visit-assessment",
+        status: "assessed",
+        firstVisitAssessment: "passed",
+        informedConsent: "signed",
+        consentAttachment: {
+          status: "signed",
+          type: "electronic-informed-consent",
+          version: "internet-nursing-consent-v1",
+          signerName: "演示居民A",
+          attachmentName: "internet-nursing-informed-consent.pdf"
+        }
+      })
+    }));
+    assert.equal(assessed.response.status, 200);
+    assert.equal(assessed.body.firstVisitAssessment, "passed");
+    assert.equal(assessed.body.consentAttachment.status, "signed");
+
+    const dispatched = await api(baseUrl, `/api/internet-nursing/orders/${created.body.id}/actions`, authorized(hospitalToken, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "dispatch-qualified-nurse",
+        status: "dispatched",
+        nurseId: "inn-001"
+      })
+    }));
+    assert.equal(dispatched.response.status, 200);
+    assert.equal(dispatched.body.status, "dispatched");
+    assert.equal(dispatched.body.nurseId, "inn-001");
+
+    const nurseLoginForClosedLoop = await login(baseUrl, "nurse");
+    const nurseAccepted = await api(baseUrl, `/api/internet-nursing/orders/${created.body.id}/actions`, authorized(nurseLoginForClosedLoop.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "nurse-accept",
+        status: "accepted",
+        nurseId: "inn-001",
+        tracePoint: { stage: "nurse-accept", lat: 38.914, lng: 121.614, source: "nurse-mobile" }
+      })
+    }));
+    assert.equal(nurseAccepted.response.status, 200);
+    assert.equal(nurseAccepted.body.status, "accepted");
+    assert.equal(nurseAccepted.body.locationTrace, "tracking");
+    assert.equal(nurseAccepted.body.locationTracePoints.some((item) => item.stage === "nurse-accept" && item.verified === true), true);
+    assert.equal(nurseAccepted.body.notificationDeliveries.some((item) => item.event === "nurse-accept" && item.channel === "sms"), true);
+
+    const closedLoopDashboard = await api(baseUrl, "/api/internet-nursing/dashboard", authorized(citizenToken));
+    const closedLoopOrder = closedLoopDashboard.body.orders.find((item) => item.id === created.body.id);
+    assert.equal(closedLoopOrder.status, "accepted");
+    assert.equal(closedLoopOrder.nurseId, "inn-001");
+    assert.equal(closedLoopOrder.locationTrace, "tracking");
+
     const residentConfirmation = await api(baseUrl, `/api/tasks/${encodeURIComponent(`internetNursingOrders:${created.body.id}`)}/actions`, authorized(citizenToken, {
       method: "POST",
       body: JSON.stringify({ action: "resident-confirm", comment: "居民确认护理预约" })
