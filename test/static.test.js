@@ -1153,6 +1153,15 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /registration-order-card/);
   assert.match(citizenCss, /position: fixed/);
   assert.match(citizenCss, /safe-area-inset-bottom/);
+  assert.match(citizenHtml, /mobile-service-rail/);
+  assert.match(citizenJs, /renderMobileServiceRail/);
+  assert.match(citizenJs, /data-mobile-rail-tab/);
+  assert.match(citizenJs, /aria-live="polite"/);
+  assert.match(citizenJs, /scrollIntoView/);
+  assert.match(citizenCss, /mobile-service-rail-scroll/);
+  assert.match(citizenCss, /grid-auto-columns: minmax\(74px, 24vw\)/);
+  assert.match(citizenCss, /overscroll-behavior-x: contain/);
+  assert.match(citizenCss, /scrollbar-width: none/);
   assert.match(citizenCss, /resident-audit-card:not\(\.active\)/);
   assert.match(citizenCss, /grid-auto-columns: minmax\(168px, 74vw\)/);
   assert.match(citizenCss, /min-height: 168px/);

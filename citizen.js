@@ -395,6 +395,41 @@ function renderMobileServiceNav() {
   });
 }
 
+function renderMobileServiceRail() {
+  const target = document.querySelector("#mobile-service-rail");
+  if (!target) return;
+  const tabs = getLaunchedCitizenServiceTabs();
+  if (!tabs.length) {
+    target.innerHTML = "";
+    return;
+  }
+  const activeIndex = Math.max(0, tabs.findIndex((item) => item.key === activeServiceTab));
+  const active = tabs[activeIndex] || tabs[0];
+  target.innerHTML = `<div class="mobile-service-rail-status" data-mobile-rail-status aria-live="polite">
+    <span>${active ? `${activeIndex + 1}/${tabs.length}` : "0/0"}</span>
+    <strong>${active?.label || "居民服务"}</strong>
+    <small>左右滑动切换二级页面</small>
+  </div>
+  <div class="mobile-service-rail-scroll" role="list">
+    ${tabs.map((item, index) => {
+      const activeItem = item.key === activeServiceTab;
+      const meta = serviceNavigationMeta(item);
+      return `<a href="${citizenPageHref(item.key)}" role="listitem" data-mobile-rail-tab="${item.key}" data-mobile-rail-index="${index + 1}" aria-current="${activeItem ? "page" : "false"}" aria-label="${item.label} - ${activeItem ? "current secondary page" : `${meta.featureCount} launched features`}">
+        <span>${item.label}</span>
+        <small>${activeItem ? "当前" : `${meta.featureCount}项`}</small>
+      </a>`;
+    }).join("")}
+  </div>`;
+  target.querySelectorAll("[data-mobile-rail-tab]").forEach((link) => {
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      setServiceTab(link.dataset.mobileRailTab, { pushState: true, scrollToPane: true });
+    });
+  });
+  const activeLink = target.querySelector('[data-mobile-rail-tab][aria-current="page"]');
+  activeLink?.scrollIntoView?.({ block: "nearest", inline: "center" });
+}
+
 function renderModuleInterfaces() {
   const target = document.querySelector("#module-interface-grid");
   if (!target) return;
@@ -597,6 +632,7 @@ function updateServicePanes() {
     activeServiceTab = launchedTabs[0].key;
   }
   renderServiceSummary();
+  renderMobileServiceRail();
   renderResidentFunctionAudit();
   renderClientChannels();
   document.querySelectorAll("[data-service-tab]").forEach((link) => {
