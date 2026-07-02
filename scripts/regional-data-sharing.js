@@ -31,6 +31,22 @@ function hasRequiredPackageFields(item) {
   ].every((key) => Object.prototype.hasOwnProperty.call(item, key));
 }
 
+function consentLabel(status) {
+  return {
+    active: "授权有效",
+    pending: "授权待确认",
+    revoked: "授权已撤销"
+  }[status] || status || "授权待确认";
+}
+
+function qualityLabel(status) {
+  return {
+    passed: "质控通过",
+    manual_review: "人工复核",
+    failed: "质控未通过"
+  }[status] || status || "质量待确认";
+}
+
 function buildRegionalReportHandoff(packageItem, data, reviews) {
   const collections = new Set(packageItem.sharedCollections || []);
   const contractsById = new Map((data.integrationContracts || []).map((item) => [item.id, item]));
@@ -70,7 +86,7 @@ function buildRegionalReportHandoff(packageItem, data, reviews) {
       id: "consent-quality",
       label: "授权与质控",
       ready: packageItem.consentStatus === "active" && packageItem.qualityStatus === "passed",
-      detail: `${packageItem.consentStatus || "unknown"} / ${packageItem.qualityStatus || "unknown"}`
+      detail: `${consentLabel(packageItem.consentStatus)} / ${qualityLabel(packageItem.qualityStatus)}`
     },
     {
       id: "access-audit",
@@ -130,6 +146,7 @@ function buildRegionalDataSharingReport(options = {}) {
     { id: "regional:frontendEntry", passed: /regional-data-sharing\.js/.test(html) && /regional-access-form/.test(html) && /authFetch/.test(client), detail: "page and client workflow present" },
     { id: "regional:frontendWorkflow", passed: /regional-sharing-loop/.test(html) && /regional-selected-package/.test(html) && /regional-access-feedback/.test(html) && /selectRegionalPackage/.test(client) && /renderRegionalLoop/.test(client), detail: "loop, selection and access feedback present" },
     { id: "regional:readinessChecklist", passed: /regional-readiness-checklist/.test(html) && /renderRegionalReadinessChecklist/.test(client) && /buildRegionalReadinessChecks/.test(client), detail: "selected package readiness checks present" },
+    { id: "regional:launchReadinessUi", passed: /data-regional-section="launch-readiness"/.test(html) && /regional-launch-readiness/.test(html) && /renderRegionalLaunchReadiness/.test(client) && /OIDC\/SAML/.test(client) && /现场签字/.test(client), detail: "main page launch readiness dashboard present" },
     { id: "regional:referralHandoff", passed: /data-regional-section="referral-handoff"/.test(html) && /regional-referral-handoff/.test(html) && /renderRegionalReferralHandoff/.test(client) && /buildRegionalReferralHandoff/.test(client) && /不合并运行时/.test(client), detail: "referral handoff panel and runtime boundary present" },
     { id: "regional:handoffReportUi", passed: /regional-handoff-report-action/.test(html) && /regional-handoff-report/.test(html) && /generateRegionalHandoffReport/.test(client) && /\/api\/regional-data-sharing\/handoff-report/.test(client), detail: "runtime handoff report button and renderer present" },
     { id: "regional:aboutPolicy", passed: /regional-data-sharing-about\.html/.test(html) && /data-regional-about-section="policy-basis"/.test(about) && /医疗卫生机构信息互通共享三年攻坚/.test(about) && /医疗卫生机构网络安全管理办法/.test(about), detail: "policy explanation page linked" },

@@ -93,6 +93,7 @@ function renderRegionalSharing() {
   if (!data) return;
   const packages = data.packages || [];
   renderRegionalMetrics(data.summary || {});
+  renderRegionalLaunchReadiness(data.summary || {}, packages);
   renderRegionalLoop(data.summary || {});
   renderRegionalBoundary(data.scope || {});
   renderRegionalSnapshots(data.snapshots || {});
@@ -119,6 +120,51 @@ function renderRegionalMetrics(summary) {
     <article>
       <strong>${value ?? 0}</strong>
       <span>${label}</span>
+    </article>
+  `).join("");
+}
+
+function renderRegionalLaunchReadiness(summary = {}, packages = []) {
+  const panel = document.querySelector("#regional-launch-readiness");
+  const target = document.querySelector("#regional-launch-readiness-summary");
+  if (!panel || !target) return;
+  const total = summary.totalPackages || packages.length;
+  const ready = summary.ready || 0;
+  const handoffReady = summary.referralHandoffReady || packages.filter((item) => item.referralHandoff?.ready).length;
+  const accessReviews = summary.accessReviews || 0;
+  const pendingEvidence = packages.reduce((sum, item) => {
+    const evidence = item.referralHandoff?.evidence || [];
+    return sum + evidence.filter((entry) => !entry.ready).length;
+  }, 0);
+  const operationalReady = total > 0 && ready === total && handoffReady === total && pendingEvidence === 0 && accessReviews > 0;
+  target.textContent = operationalReady ? "演示闭环已齐备，等待现场生产签字" : `${handoffReady}/${total} 个共享包可交接，${pendingEvidence} 项证据待补齐`;
+  const cards = [
+    {
+      title: "已实现能力",
+      status: total > 0 ? "已具备" : "待装载",
+      detail: `共享包 ${total} 个、可共享 ${ready} 个、调阅留痕 ${accessReviews} 条，已接入角色裁剪、调阅审计和交接清单。`
+    },
+    {
+      title: "交接证据",
+      status: handoffReady === total && total > 0 ? "已齐备" : "需补证",
+      detail: `${handoffReady}/${total} 个共享包达到转诊会诊交接条件，仍有 ${pendingEvidence} 项诊疗资料、互认依据、授权质控或审计证据待补。`
+    },
+    {
+      title: "待开发项",
+      status: "上线前",
+      detail: "正式数据库适配、迁移回滚、生产统一认证 OIDC/SAML、审计保全导出或 SIEM 接入仍需在现场环境完成。"
+    },
+    {
+      title: "待联调项",
+      status: "现场签字",
+      detail: "HIS、EMR、LIS、PACS、医保结算、电子证照、统计交换、监控值守和灾备演练需取得签字证据。"
+    }
+  ];
+  panel.innerHTML = cards.map((item) => `
+    <article class="capability-card">
+      <strong>${item.title}</strong>
+      <span class="badge ${item.status === "已具备" || item.status === "已齐备" ? "success" : "warn"}">${item.status}</span>
+      <span>${item.detail}</span>
     </article>
   `).join("");
 }
@@ -375,7 +421,7 @@ function buildRegionalReferralHandoff(packageItem, reviews) {
     evidence,
     note: "交接只证明资料可调阅、可追溯、可用于接诊判断；转诊单、号源床位、服务时限督办和绩效结算仍由转诊会诊模块负责。",
     mergeItems: [
-      "共享 residents、personalRecords、diagnosticReports、countyMutualRecognitionRecords、integrationContracts、dataAccessLogs 作为接诊前证据。",
+      `共享 ${["residents", "personalRecords", "diagnosticReports", "countyMutualRecognitionRecords", "integrationContracts", "dataAccessLogs"].map(labelCollection).join("、")} 作为接诊前证据。`,
       "现场验收报告合并呈现：区域共享证明资料可调阅，转诊会诊证明业务可流转。",
       "转诊回传报告进入诊断报告或健康档案后，可再次被共享包编目。"
     ],
@@ -423,11 +469,12 @@ function buildRegionalReadinessChecks(packageItem) {
 }
 
 function renderRegionalReviews(reviews) {
+  const packages = regionalState.data?.packages || [];
   document.querySelector("#regional-sharing-reviews").innerHTML = reviews.slice(0, 10).map((item) => `
     <div class="priority-row ${item.id === regionalState.lastReviewId ? "is-selected" : ""}">
       <span class="badge ${item.decision === "approved" ? "success" : "warning"}">${decisionLabel(item.decision)}</span>
       <div>
-        <strong>${item.packageId}${item.id === regionalState.lastReviewId ? " · 最新" : ""}</strong>
+        <strong>${packageTitle(item.packageId, packages)}${item.id === regionalState.lastReviewId ? " · 最新" : ""}</strong>
         <p>${item.organization || item.actor} · ${item.purpose}</p>
         <p>${item.note || "已登记调阅审计。"}</p>
       </div>
@@ -443,6 +490,10 @@ function renderAccessFeedback() {
   const target = document.querySelector("#regional-access-feedback");
   if (!target) return;
   target.textContent = regionalState.feedback || "";
+}
+
+function packageTitle(packageId, packages = []) {
+  return packages.find((item) => item.id === packageId)?.title || packageId || "共享包";
 }
 
 function fillPackageOptions(packages) {
@@ -488,7 +539,7 @@ async function submitRegionalAccessReview(event) {
   }
   const body = await response.json().catch(() => ({}));
   regionalState.lastReviewId = body.review?.id || "";
-  regionalState.feedback = `已登记 ${payload.packageId} 调阅审计，留痕编号 ${regionalState.lastReviewId || "已生成"}`;
+  regionalState.feedback = `已登记 ${packageTitle(payload.packageId, regionalState.data?.packages || [])} 调阅审计，留痕编号 ${regionalState.lastReviewId || "已生成"}`;
   form.elements.namedItem("note").value = "";
   await loadRegionalSharing();
 }
