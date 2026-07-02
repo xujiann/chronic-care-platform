@@ -279,6 +279,73 @@
         </div>
       </section>
 
+      <section class="panel" data-dashboard-about-section="implementation-plan" id="dashboard-implementation-plan">
+        <div class="panel-title">
+          <h2>已实现功能与下一步开发计划</h2>
+          <span>面向卫生健康行政部门内部上线审查，集中说明当前可用能力和后续生产接入边界</span>
+        </div>
+        <div class="capability-grid">
+          <article class="capability-card" data-dashboard-implemented="aggregate-dashboard">
+            <strong>综合汇总入口</strong>
+            <span>已汇聚前七个应用的指标、风险、开放任务、接口轨道、验收证据和现场依赖，作为各级卫生健康行政部门统一观察入口。</span>
+          </article>
+          <article class="capability-card" data-dashboard-implemented="population-board">
+            <strong>人口服务看板</strong>
+            <span>已按日、周、月、年展示出生、死亡、就诊、入院数据，并保留演示快照与现场真实接口的替换边界。</span>
+          </article>
+          <article class="capability-card" data-dashboard-implemented="risk-action-loop">
+            <strong>风险预警与任务闭环</strong>
+            <span>已规范化风险等级、来源应用、责任人、时限、处置状态和阻塞原因，支持从汇总页定位到源模块。</span>
+          </article>
+          <article class="capability-card" data-dashboard-implemented="interface-evidence">
+            <strong>接口联调与验收证据</strong>
+            <span>已集中呈现接口联调清单、现场验收材料、发布摘要、整改复测和上线批次证据。</span>
+          </article>
+          <article class="capability-card" data-dashboard-implemented="production-gates">
+            <strong>上线运行门禁</strong>
+            <span>已提供生产 ready 判定、阻塞门禁、现场问题和真实上线需求文档，避免把演示环境误判为生产上线。</span>
+          </article>
+          <article class="capability-card" data-dashboard-implemented="policy-about">
+            <strong>政策说明与关于页</strong>
+            <span>已补充政策依据、数据边界、部门职能边界、市县两级使用边界和本模块主要功能说明。</span>
+          </article>
+        </div>
+        <div class="priority-list">
+          <article class="priority-row" data-dashboard-next-plan="prod-identity-audit">
+            <strong>01</strong>
+            <div>
+              <h3>接入真实身份与机构目录</h3>
+              <p>下一步联调政务统一认证、CA、机构目录、行政区划和角色授权，形成管理端权限与审计闭环。</p>
+            </div>
+            <span>身份权限</span>
+          </article>
+          <article class="priority-row" data-dashboard-next-plan="prod-data-audit">
+            <strong>02</strong>
+            <div>
+              <h3>切换生产数据库与审计留存</h3>
+              <p>下一步把演示快照替换为生产库、对象存储、脱敏授权、日志留存和报表归档链路。</p>
+            </div>
+            <span>数据底座</span>
+          </article>
+          <article class="priority-row" data-dashboard-next-plan="prod-interface-signoff">
+            <strong>03</strong>
+            <div>
+              <h3>完成核心业务系统联调签字</h3>
+              <p>下一步完成 HIS、EMR、LIS、PACS、医保、电子证照、统计直报和疾控死因监测接口的现场签字。</p>
+            </div>
+            <span>接口联调</span>
+          </article>
+          <article class="priority-row" data-dashboard-next-plan="prod-ops-drill">
+            <strong>04</strong>
+            <div>
+              <h3>补齐监控告警与灾备演练</h3>
+              <p>下一步完成监控告警、备份恢复、等保密评、信创适配、压测记录和上线回退预案。</p>
+            </div>
+            <span>运维验收</span>
+          </article>
+        </div>
+      </section>
+
       <section class="panel" data-dashboard-about-section="next-plan">
         <div class="panel-title">
           <h2>下一步开发计划</h2>

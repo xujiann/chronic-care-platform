@@ -204,6 +204,10 @@ test("about page explains runnable platform capabilities", async ({ page }) => {
   await expect(page.locator("[data-dashboard-about-section='site-cutover']")).toBeVisible();
   await expect(page.locator("[data-dashboard-about-section='production-launch-requirements']")).toContainText("productionReady");
   await expect(page.locator("[data-dashboard-launch-requirements-link]")).toHaveAttribute("href", "./docs/health-dashboard-production-launch-requirements.md");
+  await expect(page.locator("[data-dashboard-about-section='implementation-plan']")).toContainText("已实现功能");
+  await expect(page.locator("[data-dashboard-about-section='implementation-plan'] [data-dashboard-implemented]")).toHaveCount(6);
+  await expect(page.locator("[data-dashboard-next-plan='prod-identity-audit']")).toContainText("真实身份");
+  await expect(page.locator("[data-dashboard-next-plan='prod-ops-drill']")).toContainText("灾备演练");
   await expect(page.locator("[data-dashboard-about-section='next-plan']")).toBeVisible();
   await expect(page.locator("[data-dashboard-next-plan='daily-interface-done']")).toContainText("日报");
   await expect(page.locator("[data-dashboard-next-plan='site-evidence-done']")).toContainText("验收");
