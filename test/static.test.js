@@ -885,6 +885,7 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   const escortHtml = read("escort.html");
   const escortJs = read("escort.js");
   assert.match(citizenHtml, /escort-appointment-form/);
+  assert.match(citizenHtml, /escort-appointment-check/);
   assert.match(citizenHtml, /助医陪诊预约/);
   assert.match(citizenHtml, /name="registrationOrderId"/);
   assert.match(citizenHtml, /关联挂号/);
@@ -897,10 +898,15 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   assert.match(citizenJs, /\/escort-services\/orders/);
   assert.match(citizenJs, /getEscortRegistrationOptions/);
   assert.match(citizenJs, /applyLinkedRegistrationToEscortForm/);
+  assert.match(citizenJs, /renderEscortAppointmentCheck/);
+  assert.match(citizenJs, /escapeHtml/);
+  assert.match(citizenJs, /提交前请核对服务主体、医院、日期和保障信息/);
   assert.match(citizenJs, /formatEscortHospitalHandoff/);
   assert.match(citizenJs, /hisVisitId/);
   assert.match(citizenJs, /outpatientQueueNo/);
   assert.match(citizenCss, /escort-appointment-layout/);
+  assert.match(citizenCss, /escort-appointment-check/);
+  assert.match(citizenCss, /grid-template-columns: max-content minmax\(0, 1fr\)/);
   assert.match(citizenCss, /escort-order-card/);
   assert.match(citizenCss, /escort-appointment-form\.is-unavailable/);
   assert.match(escortHtml, /requireRole\(\["commission", "institution"\]\)/);
@@ -1163,8 +1169,9 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /overscroll-behavior-x: contain/);
   assert.match(citizenCss, /scrollbar-width: none/);
   assert.match(citizenCss, /resident-audit-card:not\(\.active\)/);
-  assert.match(citizenCss, /grid-auto-columns: minmax\(168px, 74vw\)/);
-  assert.match(citizenCss, /min-height: 168px/);
+  assert.match(citizenCss, /grid-auto-columns: minmax\(108px, 32vw\)/);
+  assert.match(citizenCss, /min-height: 64px/);
+  assert.match(citizenCss, /\.service-tabs small,\s*\.service-tabs em/);
   assert.match(citizenCss, /scroll-snap-type: x mandatory/);
   assert.match(citizenCss, /min-height: 44px/);
   assert.match(citizenCss, /service-status-card/);

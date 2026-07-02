@@ -1114,6 +1114,50 @@ select,
   min-height: 92px;
 }
 
+.escort-appointment-check {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 14px;
+  background: #eff6ff;
+  color: var(--ink);
+  min-width: 0;
+}
+
+.escort-appointment-check strong {
+  font-size: 16px;
+}
+
+.escort-appointment-check p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.escort-appointment-check dl {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 8px 12px;
+  margin: 0;
+}
+
+.escort-appointment-check dt {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.escort-appointment-check dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.escort-appointment-check .status {
+  justify-self: start;
+}
+
 .escort-order-card {
   border-left: 4px solid var(--teal);
   min-width: 0;
@@ -2316,16 +2360,38 @@ dialog::backdrop {
     display: grid;
     position: static;
     grid-auto-flow: column;
-    grid-auto-columns: minmax(168px, 74vw);
+    grid-auto-columns: minmax(108px, 32vw);
     grid-template-columns: none;
     overflow-x: auto;
-    padding: 2px 2px 8px;
+    gap: 6px;
+    padding: 2px 2px 6px;
     scroll-snap-type: x mandatory;
   }
 
   .service-tabs a {
-    min-height: 168px;
+    grid-template-rows: auto auto;
+    align-content: center;
+    min-height: 64px;
+    gap: 5px;
+    padding: 8px 10px;
     scroll-snap-align: start;
+  }
+
+  .service-tabs span {
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .service-tabs strong {
+    padding: 2px 7px;
+    font-size: 11px;
+  }
+
+  .service-tabs small,
+  .service-tabs em {
+    display: none;
   }
 
   .mobile-service-rail {

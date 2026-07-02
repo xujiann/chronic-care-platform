@@ -2017,6 +2017,16 @@ async function fetchCitizenEscortDashboard() {
   };
 }
 
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;"
+  }[char]));
+}
+
 function renderEscortAppointments(residentId) {
   const form = document.querySelector("#escort-appointment-form");
   const cards = document.querySelector("#escort-appointment-cards");
@@ -2048,6 +2058,7 @@ function renderEscortAppointments(residentId) {
   summary.textContent = providers.length
     ? `${providers.length} 家可预约服务主体 · ${orders.length} 单本人/家庭陪诊预约`
     : `暂无已发布服务主体 · ${orders.length} 单本人/家庭陪诊预约可追踪`;
+  renderEscortAppointmentCheck(form, residentId);
   cards.innerHTML = orders
     .sort((a, b) => String(a.appointmentAt || a.due || "").localeCompare(String(b.appointmentAt || b.due || "")))
     .map((item) => `<article class="mini-card escort-order-card">
@@ -2071,11 +2082,49 @@ function setEscortAppointmentAvailability(form, available) {
   if (submit) submit.textContent = available ? "提交陪诊预约" : "暂无可预约服务主体";
 }
 
+function renderEscortAppointmentCheck(form = document.querySelector("#escort-appointment-form"), residentId = currentResidentId) {
+  const target = document.querySelector("#escort-appointment-check");
+  if (!target || !form) return;
+  const providers = getEscortProviders();
+  const provider = providers.find((item) => item.id === form.elements.providerId?.value) || providers[0] || null;
+  const linkedRegistration = findEscortRegistrationOrder(residentId, form.elements.registrationOrderId?.value);
+  const serviceLabels = Array.from(form.elements.serviceItems?.selectedOptions || [])
+    .map((option) => option.textContent.trim())
+    .filter(Boolean);
+  const fee = Number(provider?.pricing?.halfDayFee || provider?.feeEstimate || provider?.fee || 0);
+  const hospital = form.elements.hospital?.value || linkedRegistration?.hospital || "";
+  const department = form.elements.department?.value || linkedRegistration?.department || "";
+  const appointmentAt = form.elements.appointmentAt?.value || linkedRegistration?.appointmentDate || linkedRegistration?.appointmentAt || "";
+  const handoff = linkedRegistration
+    ? `${linkedRegistration.registrationNo || linkedRegistration.queueNo || "挂号回执待同步"} · ${linkedRegistration.hisVisitId || "HIS 就诊号待同步"}`
+    : "未关联挂号，提交后由服务主体确认医院接诊信息";
+  const rows = [
+    ["服务主体", provider ? formatEscortProviderName(provider) : "暂无可预约服务主体"],
+    ["预计费用", provider ? `${fee || "待评估"} 元起 · ${formatSubsidy(form.elements.subsidyType?.value)}` : "待确认"],
+    ["就诊安排", `${formatEscortHospital(hospital || "医院待填写")} · ${formatEscortDepartment(department || "科室待填写")} · ${appointmentAt || "日期待选择"}`],
+    ["服务内容", serviceLabels.length ? serviceLabels.join("、") : "挂号取号、检查陪同"],
+    ["医院交接", handoff],
+    ["保障状态", provider ? `保险 ${formatEscortStatus(provider.insurance || "covered")} · 家属 ${formatEscortContact(form.elements.familyContactStatus?.value)}` : "待发布服务主体"]
+  ];
+  target.innerHTML = `<strong>预约核对</strong>
+    <p>${provider ? "提交前请核对服务主体、医院、日期和保障信息。" : "暂无可预约服务主体时，表单会保持不可提交状态。"}</p>
+    <dl>${rows.map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`).join("")}</dl>
+    <span class="status ${provider ? "" : "warn"}">${provider ? "可提交预约" : "暂不可预约"}</span>`;
+}
+
 function bindEscortAppointment() {
   const form = document.querySelector("#escort-appointment-form");
   if (!form) return;
+  const refreshCheck = () => renderEscortAppointmentCheck(form, currentResidentId);
+  ["providerId", "appointmentAt", "serviceItems", "subsidyType", "priority", "familyContactStatus"].forEach((name) => {
+    form.elements[name]?.addEventListener("change", refreshCheck);
+  });
+  ["hospital", "department"].forEach((name) => {
+    form.elements[name]?.addEventListener("input", refreshCheck);
+  });
   form.elements.registrationOrderId?.addEventListener("change", () => {
     applyLinkedRegistrationToEscortForm(form, form.elements.registrationOrderId.value);
+    refreshCheck();
   });
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
