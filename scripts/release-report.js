@@ -958,6 +958,8 @@ function renderMarkdown(report) {
     "",
     "## Production cutover checklist",
     "",
+    "See `docs/production-go-live-requirements.md` for the real production go-live requirements, site-owned inputs, blocking conditions, drill schedule, and signoff evidence required before this checklist can be used for a formal production decision.",
+    "",
     "| Result | Phase | Owner | Item | Next action |",
     "|---|---|---|---|---|",
     ...cutoverRows,

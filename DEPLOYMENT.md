@@ -300,3 +300,7 @@ Before site joint testing for the drug and consumable supervision app, run `npm.
 ## Hybrid Deployment Readiness
 
 `hybrid:deployment-readiness` writes `release/hybrid-deployment-readiness-report.json` and `release/hybrid-deployment-readiness-report.md`. Use it before productionization reviews to confirm the intended hybrid topology: GitHub Pages/static HTML is only the preview layer, while `server.js` and `/api/*` require a Node-capable backend host.
+
+## Real Production Go-Live Requirements
+
+Use `docs/production-go-live-requirements.md` as the platform-level launch requirements baseline. It covers site-owned inputs, real interface joint testing, production database migration, identity and SMS integration, HIS/EMR/LIS/PACS, insurance, certificate sharing, security compliance, monitoring, backup/restore rehearsal, blocking conditions, and final signoff evidence.

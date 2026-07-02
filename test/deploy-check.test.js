@@ -11,6 +11,8 @@ test("deploy check report covers release-critical snapshot gates", () => {
   [
     "file:README.md",
     "file:DEPLOYMENT.md",
+    "file:docs/production-go-live-requirements.md",
+    "file:docs/citizen-production-launch-requirements.md",
     "package:scripts",
     "package:priorityApplicationTemplates",
     "package:hybridDeploymentReadiness",
@@ -24,6 +26,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "snapshot:accessibility",
     "snapshot:healthDashboard",
     "snapshot:multiPractice",
+    "docs:productionGoLiveRequirements",
     "manifest:healthDashboardSummary",
     "manifest:launchSmoke",
     "manifest:priorityApplicationTemplates",

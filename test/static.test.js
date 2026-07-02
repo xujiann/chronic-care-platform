@@ -436,7 +436,13 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /release:report/);
   assert.match(read("README.md"), /release:manifest/);
   assert.match(read("README.md"), /launch:smoke/);
+  assert.match(read("README.md"), /production-go-live-requirements\.md/);
   assert.match(read("DEPLOYMENT.md"), /SMS_GATEWAY_URL/);
+  assert.match(read("DEPLOYMENT.md"), /production-go-live-requirements\.md/);
+  const productionGoLiveRequirements = read("docs/production-go-live-requirements.md");
+  assert.match(productionGoLiveRequirements, /GL-01/);
+  assert.match(productionGoLiveRequirements, /launch:smoke -- --base-url/);
+  assert.match(productionGoLiveRequirements, /发布阻断条件/);
   assert.match(read("DEPLOYMENT.md"), /doctor\.html/);
   assert.match(read("scripts/release-report.js"), /test:coverage/);
   assert.match(read("scripts/release-report.js"), /test:e2e/);
@@ -517,6 +523,9 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/deploy-check.js"), /process:audit/);
   assert.match(read("scripts/deploy-check.js"), /site:pack/);
   assert.match(read("scripts/deploy-check.js"), /release:manifest/);
+  assert.match(read("scripts/deploy-check.js"), /docs:productionGoLiveRequirements/);
+  assert.match(read("scripts/release-artifact-manifest.js"), /production-go-live-requirements\.md/);
+  assert.match(read("scripts/release-report.js"), /production-go-live-requirements\.md/);
   assert.match(read("scripts/deploy-check.js"), /priority-apps:templates/);
   assert.match(read("scripts/deploy-check.js"), /maternal-child:readiness/);
   assert.match(read("docs/妇幼健康主要功能报告.md"), /## 主要功能矩阵/);
@@ -1154,6 +1163,12 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenGovernanceDoc, /\/api\/auth\/phone-login/);
   assert.match(citizenGovernanceDoc, /EMR\/LIS\/PACS -> \/api\/personal-records/);
   assert.match(citizenGovernanceDoc, /dataAccessLogs/);
+  const citizenProductionRequirements = read("docs/citizen-production-launch-requirements.md");
+  assert.match(citizenProductionRequirements, /居民端真实上线需求文档/);
+  assert.match(citizenProductionRequirements, /POST \/api\/auth\/phone-login/);
+  assert.match(citizenProductionRequirements, /HIS\/EMR\/LIS\/PACS/);
+  assert.match(citizenProductionRequirements, /npm\.cmd run citizen:launch-foundation/);
+  assert.match(citizenProductionRequirements, /灰度开放试点白名单/);
 });
 
 test("internet nursing module exposes appointment, management and nurse workflows", () => {

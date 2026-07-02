@@ -29,6 +29,7 @@ function buildCitizenLaunchFoundationReadiness(options = {}) {
   const serviceWorker = options.serviceWorker ?? readText("service-worker.js");
   const auditDoc = options.auditDoc ?? readText("docs/C端全流程审计与优化清单.md");
   const phaseDoc = options.phaseDoc ?? "";
+  const productionRequirements = options.productionRequirements ?? readText("docs/citizen-production-launch-requirements.md");
   const manifestUrls = new Set((manifest.shortcuts || []).map((item) => item.url));
   const checks = [
     {
@@ -96,6 +97,11 @@ function buildCitizenLaunchFoundationReadiness(options = {}) {
         /real-name/.test(phaseDoc) &&
         /guardian/.test(phaseDoc),
       detail: "phase-one scope and external integration boundaries are documented"
+    },
+    {
+      id: "citizen-foundation:production-requirements",
+      passed: hasAll(productionRequirements, [/SMS_GATEWAY_URL/, /OIDC_\*/, /HIS\/EMR\/LIS\/PACS/, /POST \/api\/auth\/phone-login/, /GET \/api\/messages/, /npm\.cmd run citizen:launch-foundation/, /launch:smoke/, /T0/, /T3/]),
+      detail: "production launch requirements cover identity, SMS, medical interfaces, messages, smoke tests, and pilot rollout"
     }
   ];
   const externalDependencies = [
