@@ -78,6 +78,8 @@ test("drug consumable about page documents policy sources and field boundaries",
   assert.match(page, /data-drug-consumable-about="system-boundaries"/);
   assert.match(page, /data-drug-consumable-about="role-boundary"/);
   assert.match(page, /data-drug-consumable-about="acceptance-boundary"/);
+  assert.match(page, /data-drug-consumable-about="launch-readiness"/);
+  assert.match(page, /生产上线阻断/);
   assert.match(page, /https:\/\/www\.nhsa\.gov\.cn\/art\/2025\/3\/19\/art_104_16045\.html/);
   assert.match(page, /https:\/\/www\.nhsa\.gov\.cn\/art\/2024\/9\/30\/art_109_14042\.html/);
   assert.match(page, /https:\/\/www\.nmpa\.gov\.cn\/directory\/web\/nmpa\/images\/1656320881524098380\.pdf/);
