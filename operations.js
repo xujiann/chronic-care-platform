@@ -1271,7 +1271,7 @@ function renderOperationsDashboard() {
   const filteredSnapshots = filterSnapshots(dashboard.snapshots || []);
   if (!filteredSnapshots.some((item) => item.id === selectedSnapshotId)) selectedSnapshotId = filteredSnapshots[0]?.id || dashboard.snapshots?.[0]?.id || "";
   const selected = (dashboard.snapshots || []).find((item) => item.id === selectedSnapshotId) || filteredSnapshots[0] || null;
-  renderOperationsMetrics(dashboard.summary || {}, filteredSnapshots);
+  renderOperationsMetrics(dashboard.summary || {}, filteredSnapshots, dashboard.launchReadiness || {});
   renderOperationsSituation(dashboard, filteredSnapshots, selected);
   renderPerformanceManual(dashboard, filteredSnapshots);
   renderInterfaceMapping(dashboard.interfaceMapping || buildStaticInterfaceMapping());
@@ -1422,10 +1422,11 @@ function selectSnapshotById(id, scrollTarget = "#operation-detail") {
   document.querySelector(scrollTarget)?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function renderOperationsMetrics(summary, filteredSnapshots) {
+function renderOperationsMetrics(summary, filteredSnapshots, launchReadiness = {}) {
   const maxPressure = Math.max(...filteredSnapshots.map((item) => Number(item.resourcePressure || 0)), 0);
   const emergencyVisits = filteredSnapshots.reduce((sum, item) => sum + Number(item.outpatient?.emergencyVisits || 0), 0);
   const metrics = [
+    ["上线判定", zhInline(launchReadiness.decision || "待判定"), `阻断项 ${launchReadiness.summary?.blockers || 0}`],
     ["机构数", summary.institutions || 0, "纳入运行监测的机构"],
     ["严重预警", summary.critical || 0, "严重运行预警"],
     ["一般预警", summary.warning || 0, "一般运行预警"],
