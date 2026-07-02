@@ -283,6 +283,8 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(html, /regional-readiness-checklist/);
   assert.match(html, /data-regional-section="launch-readiness"/);
   assert.match(html, /regional-launch-readiness/);
+  assert.match(html, /data-regional-section="site-integration"/);
+  assert.match(html, /regional-site-integration/);
   assert.match(html, /data-regional-section="referral-handoff"/);
   assert.match(html, /regional-referral-handoff/);
   assert.match(html, /regional-referral-boundary/);
@@ -294,6 +296,9 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(client, /selectRegionalPackage/);
   assert.match(client, /renderRegionalLoop/);
   assert.match(client, /renderRegionalLaunchReadiness/);
+  assert.match(client, /renderRegionalSiteIntegration/);
+  assert.match(client, /身份与权限/);
+  assert.match(client, /监控灾备/);
   assert.match(client, /renderRegionalReadinessChecklist/);
   assert.match(client, /buildRegionalReadinessChecks/);
   assert.match(client, /renderRegionalReferralHandoff/);
@@ -319,6 +324,7 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(script, /regional:aboutPolicy/);
   assert.match(script, /regional:aboutLaunchReadiness/);
   assert.match(script, /regional:launchReadinessUi/);
+  assert.match(script, /regional:siteIntegrationUi/);
   assert.match(about, /data-regional-about-section="policy-basis"/);
   assert.match(about, /data-regional-about-section="merge-boundary"/);
   assert.match(about, /data-regional-about-section="launch-readiness"/);

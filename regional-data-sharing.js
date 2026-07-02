@@ -94,6 +94,7 @@ function renderRegionalSharing() {
   const packages = data.packages || [];
   renderRegionalMetrics(data.summary || {});
   renderRegionalLaunchReadiness(data.summary || {}, packages);
+  renderRegionalSiteIntegration(data.summary || {}, packages);
   renderRegionalLoop(data.summary || {});
   renderRegionalBoundary(data.scope || {});
   renderRegionalSnapshots(data.snapshots || {});
@@ -165,6 +166,49 @@ function renderRegionalLaunchReadiness(summary = {}, packages = []) {
       <strong>${item.title}</strong>
       <span class="badge ${item.status === "已具备" || item.status === "已齐备" ? "success" : "warn"}">${item.status}</span>
       <span>${item.detail}</span>
+    </article>
+  `).join("");
+}
+
+function renderRegionalSiteIntegration(summary = {}, packages = []) {
+  const panel = document.querySelector("#regional-site-integration");
+  const target = document.querySelector("#regional-site-integration-summary");
+  if (!panel || !target) return;
+  const total = summary.totalPackages || packages.length;
+  const handoffReady = summary.referralHandoffReady || packages.filter((item) => item.referralHandoff?.ready).length;
+  const lanes = [
+    {
+      title: "身份与权限",
+      owner: "统一认证/机构目录",
+      status: "待现场接入",
+      evidence: "OIDC/SAML 参数、回调地址、机构医生映射和拒绝访问审计。"
+    },
+    {
+      title: "院内接口",
+      owner: "HIS/EMR/LIS/PACS 联调组",
+      status: "待签字",
+      evidence: "真实报文样例、字段映射、幂等签名和接收医师确认。"
+    },
+    {
+      title: "审计留存",
+      owner: "安全管理岗",
+      status: "待配置",
+      evidence: "审计导出路径或安全平台地址、留存年限、导出权限和哈希校验。"
+    },
+    {
+      title: "监控灾备",
+      owner: "平台运维/数据平台",
+      status: "待演练",
+      evidence: "健康检查、指标监控、告警路由、恢复目标和恢复演练签字。"
+    }
+  ];
+  target.textContent = `${lanes.length} 条现场责任域，${handoffReady}/${total} 个共享包具备交接证据`;
+  panel.innerHTML = lanes.map((item) => `
+    <article class="capability-card">
+      <strong>${item.title}</strong>
+      <span class="badge warn">${item.status}</span>
+      <span>${item.owner}</span>
+      <small>${item.evidence}</small>
     </article>
   `).join("");
 }

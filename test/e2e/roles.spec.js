@@ -125,6 +125,10 @@ test("regional sharing page renders referral handoff boundary", async ({ page })
   await expect(page.locator("#regional-launch-readiness")).toContainText("已实现能力");
   await expect(page.locator("#regional-launch-readiness")).toContainText("待开发项");
   await expect(page.locator("#regional-launch-readiness")).toContainText("OIDC/SAML");
+  await expect(page.locator("[data-regional-section='site-integration']")).toBeVisible();
+  await expect(page.locator("#regional-site-integration .capability-card")).toHaveCount(4);
+  await expect(page.locator("#regional-site-integration")).toContainText("身份与权限");
+  await expect(page.locator("#regional-site-integration")).toContainText("监控灾备");
   await expect(page.locator("#regional-launch-readiness")).toContainText("现场签字");
 
   await expect(page.getByRole("heading", { name: "转诊会诊交接" })).toBeVisible();
