@@ -2511,8 +2511,8 @@ dialog::backdrop {
     display: grid;
     align-content: center;
     justify-items: center;
-    gap: 4px;
-    min-height: 48px;
+    gap: 3px;
+    min-height: 58px;
     border: 1px solid var(--line);
     border-radius: 12px;
     padding: 6px;
@@ -2556,6 +2556,11 @@ dialog::backdrop {
     color: var(--green);
     font-size: 10px;
     font-weight: 900;
+  }
+
+  .mobile-service-rail a .mobile-service-rail-state {
+    background: #eef6f8;
+    color: #375569;
   }
 
   .mobile-service-rail a[aria-current="page"] small {

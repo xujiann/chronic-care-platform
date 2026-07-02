@@ -416,7 +416,8 @@ function renderMobileServiceRail() {
       const meta = serviceNavigationMeta(item);
       return `<a href="${citizenPageHref(item.key)}" role="listitem" data-mobile-rail-tab="${item.key}" data-mobile-rail-index="${index + 1}" aria-current="${activeItem ? "page" : "false"}" aria-label="${item.label} - ${activeItem ? "current secondary page" : `${meta.featureCount} launched features`}">
         <span>${item.label}</span>
-        <small>${activeItem ? "当前" : `${meta.featureCount}项`}</small>
+        <small class="mobile-service-rail-state">${item.status}</small>
+        <small>${activeItem ? "\u5f53\u524d" : `${meta.featureCount}\u9879`}</small>
       </a>`;
     }).join("")}
   </div>`;
