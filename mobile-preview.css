@@ -178,7 +178,9 @@ code {
 
 .preview-client-switch button,
 .preview-service-switch button,
-.preview-refresh {
+.preview-refresh,
+.preview-direct-entry,
+.preview-copy-entry {
   min-height: 42px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -192,7 +194,9 @@ code {
 }
 
 .preview-client-switch button,
-.preview-service-switch button {
+.preview-service-switch button,
+.preview-direct-entry,
+.preview-copy-entry {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -202,10 +206,28 @@ code {
 
 .preview-client-switch button.active,
 .preview-service-switch button.active,
-.preview-refresh {
+.preview-refresh,
+.preview-direct-entry {
   border-color: var(--blue);
   background: var(--blue);
   color: #fff;
+}
+
+.preview-entry-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(96px, 0.8fr);
+  gap: 6px;
+}
+
+.preview-direct-entry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.preview-copy-entry {
+  background: #fff;
 }
 
 .phone-frame {

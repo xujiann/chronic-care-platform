@@ -69,6 +69,10 @@
             <button type="button" data-preview-service="registration">挂号</button>
           </div>
           <button type="button" class="preview-refresh" id="preview-refresh">重载手机框</button>
+          <div class="preview-entry-actions">
+            <a class="preview-direct-entry" id="preview-direct-entry" href="./citizen.html?preview=mobile-nav&client=mini-program&page=health-record#service-health-record">打开当前页面</a>
+            <button type="button" class="preview-copy-entry" id="preview-copy-entry">复制入口</button>
+          </div>
         </div>
         <section class="phone-frame">
           <div class="phone-speaker"></div>
@@ -84,6 +88,8 @@
       const previewLocalUrl = document.querySelector("#preview-local-url");
       const previewLanUrl = document.querySelector("#preview-lan-url");
       const previewStatus = document.querySelector("#preview-status");
+      const previewDirectEntry = document.querySelector("#preview-direct-entry");
+      const previewCopyEntry = document.querySelector("#preview-copy-entry");
       const previewServices = [...serviceButtons].map((button) => button.dataset.previewService);
       const previewServiceLabels = {
         "health-record": "健康档案",
@@ -99,8 +105,19 @@
       const requestedPreviewService = previewParams.get("service") || previewParams.get("page");
       let activePreviewService = previewServices.includes(requestedPreviewService) ? requestedPreviewService : "health-record";
       let activePreviewClient = ["mini-program", "app"].includes(previewParams.get("client")) ? previewParams.get("client") : "mini-program";
+      function citizenPreviewSrc(service) {
+        return `./citizen.html?preview=mobile-nav&client=${activePreviewClient}&page=${service}#service-${service}`;
+      }
+      const renderPreviewDirectEntry = () => {
+        const entryUrl = citizenPreviewSrc(activePreviewService);
+        previewDirectEntry.href = entryUrl;
+        previewCopyEntry.dataset.previewEntry = new URL(entryUrl, location.href).href;
+        previewCopyEntry.textContent = "复制入口";
+        previewDirectEntry.textContent = `打开${previewClientLabels[activePreviewClient]} · ${previewServiceLabels[activePreviewService]}`;
+      };
       const renderPreviewStatus = () => {
         previewStatus.textContent = `${previewClientLabels[activePreviewClient]} · ${previewServiceLabels[activePreviewService]} · 390px 手机视口`;
+        renderPreviewDirectEntry();
       };
       const syncPreviewServiceControls = () => {
         serviceButtons.forEach((button) => button.classList.toggle("active", button.dataset.previewService === activePreviewService));
@@ -120,7 +137,6 @@
         renderPreviewUrls();
         renderPreviewStatus();
       };
-      const citizenPreviewSrc = (service) => `./citizen.html?preview=mobile-nav&client=${activePreviewClient}&page=${service}#service-${service}`;
       const setPreviewService = (service, options = {}) => {
         activePreviewService = service;
         syncPreviewServiceControls();
@@ -153,6 +169,15 @@
       });
       document.querySelector("#preview-refresh").addEventListener("click", () => {
         frame.src = frame.src;
+      });
+      previewCopyEntry.addEventListener("click", async () => {
+        const entryUrl = previewCopyEntry.dataset.previewEntry || previewDirectEntry.href;
+        try {
+          await navigator.clipboard.writeText(entryUrl);
+          previewCopyEntry.textContent = "已复制";
+        } catch (error) {
+          previewStatus.textContent = `请手动复制：${entryUrl}`;
+        }
       });
       renderPreviewUrls();
       setPreviewClient(activePreviewClient, { syncUrl: false });

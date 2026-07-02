@@ -780,8 +780,11 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /preview-local-url/);
   assert.match(mobilePreviewHtml, /preview-lan-url/);
   assert.match(mobilePreviewHtml, /preview-status/);
+  assert.match(mobilePreviewHtml, /preview-direct-entry/);
+  assert.match(mobilePreviewHtml, /preview-copy-entry/);
   assert.match(mobilePreviewHtml, /renderPreviewUrls/);
   assert.match(mobilePreviewHtml, /renderPreviewStatus/);
+  assert.match(mobilePreviewHtml, /renderPreviewDirectEntry/);
   assert.match(mobilePreviewHtml, /syncPreviewServiceControls/);
   assert.match(mobilePreviewHtml, /previewServiceLabels/);
   assert.match(mobilePreviewHtml, /390px 手机视口/);
@@ -797,6 +800,10 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.doesNotMatch(mobilePreviewHtml, /internet-nursing\.html\?preview=mobile-nursing/);
   assert.match(mobilePreviewHtml, /client=\$\{activePreviewClient\}/);
   assert.match(mobilePreviewHtml, /page=\$\{service\}/);
+  assert.match(mobilePreviewHtml, /const entryUrl = citizenPreviewSrc\(activePreviewService\)/);
+  assert.match(mobilePreviewHtml, /previewDirectEntry\.href = entryUrl/);
+  assert.match(mobilePreviewHtml, /previewCopyEntry\.dataset\.previewEntry/);
+  assert.match(mobilePreviewHtml, /navigator\.clipboard\.writeText/);
   assert.match(mobilePreviewHtml, /data-preview-service="nursing"/);
   assert.match(mobilePreviewHtml, /data-preview-service="registration"/);
   assert.match(mobilePreviewHtml, /preview-refresh/);
@@ -814,6 +821,9 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewCss, /preview-client-switch/);
   assert.match(mobilePreviewCss, /preview-service-switch/);
   assert.match(mobilePreviewCss, /preview-status/);
+  assert.match(mobilePreviewCss, /preview-direct-entry/);
+  assert.match(mobilePreviewCss, /preview-entry-actions/);
+  assert.match(mobilePreviewCss, /preview-copy-entry/);
   assert.match(mobilePreviewCss, /preview-checklist/);
   assert.match(mobilePreviewCss, /position: sticky/);
   assert.match(mobilePreviewCss, /grid-auto-columns: minmax\(74px, 1fr\)/);
