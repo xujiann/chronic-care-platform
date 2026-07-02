@@ -593,6 +593,10 @@ select,
   min-width: 220px;
 }
 
+.service-summary-mobile-status {
+  display: none;
+}
+
 .service-page-action {
   min-height: 44px;
   display: inline-flex;
@@ -2297,8 +2301,51 @@ dialog::backdrop {
     min-width: 0;
   }
 
+  .service-summary-mobile-status {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 4px 8px;
+    align-items: center;
+    border: 1px solid rgba(216, 226, 231, 0.9);
+    border-radius: 10px;
+    padding: 8px 10px;
+    background: #f8fbfd;
+  }
+
+  .service-summary-mobile-status span {
+    grid-row: span 2;
+    display: inline-grid;
+    place-items: center;
+    min-width: 42px;
+    min-height: 42px;
+    border-radius: 999px;
+    background: #eaf2ff;
+    color: var(--blue);
+    font-size: 12px;
+    font-weight: 900;
+  }
+
+  .service-summary-mobile-status strong,
+  .service-summary-mobile-status small {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .service-summary-mobile-status strong {
+    font-size: 15px;
+  }
+
+  .service-summary-mobile-status small {
+    color: var(--muted);
+    font-size: 12px;
+  }
+
   .service-page-action {
     width: 100%;
+    min-height: 50px;
+    font-size: 15px;
   }
 
   .service-subnav {

@@ -1162,9 +1162,13 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenHtml, /mobile-service-rail/);
   assert.match(citizenJs, /renderMobileServiceRail/);
   assert.match(citizenJs, /data-mobile-rail-tab/);
+  assert.match(citizenJs, /service-summary-mobile-status/);
+  assert.match(citizenJs, /activeIndex \+ 1/);
   assert.match(citizenJs, /aria-live="polite"/);
   assert.match(citizenJs, /scrollIntoView/);
   assert.match(citizenCss, /mobile-service-rail-scroll/);
+  assert.match(citizenCss, /service-summary-mobile-status/);
+  assert.match(citizenCss, /grid-template-columns: auto minmax\(0, 1fr\)/);
   assert.match(citizenCss, /grid-auto-columns: minmax\(74px, 24vw\)/);
   assert.match(citizenCss, /overscroll-behavior-x: contain/);
   assert.match(citizenCss, /scrollbar-width: none/);
@@ -1173,7 +1177,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /min-height: 64px/);
   assert.match(citizenCss, /\.service-tabs small,\s*\.service-tabs em/);
   assert.match(citizenCss, /scroll-snap-type: x mandatory/);
-  assert.match(citizenCss, /min-height: 44px/);
+  assert.match(citizenCss, /min-height: 50px/);
   assert.match(citizenCss, /service-status-card/);
   assert.match(citizenCss, /service-summary-stats/);
   const citizenInterfaceDoc = read("docs/citizen-module-interface-map.md");

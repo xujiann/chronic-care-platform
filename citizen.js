@@ -668,6 +668,7 @@ function renderServiceSummary() {
   const internalAction = !active.actionHref;
   const activeItems = getLaunchedResidentFunctionAudit(active.key);
   const meta = serviceNavigationMeta(active);
+  const activeIndex = Math.max(0, launchedTabs.findIndex((item) => item.key === active.key));
   target.innerHTML = `<div class="service-summary-copy">
     <span>当前二级页面 · ${channel.label}</span>
     <strong>${active.label}</strong>
@@ -679,6 +680,11 @@ function renderServiceSummary() {
     </div>
   </div>
   <div class="service-summary-actions">
+    <div class="service-summary-mobile-status" aria-live="polite">
+      <span>${activeIndex + 1}/${launchedTabs.length}</span>
+      <strong>${active.label}</strong>
+      <small>${active.status} · ${meta.featureCount} 项可用</small>
+    </div>
     <div class="service-summary-stats">
       <span class="feature-state ready">${launchedTabs.length} 项已上线</span>
       <span class="feature-state ready">仅显示上线功能</span>
