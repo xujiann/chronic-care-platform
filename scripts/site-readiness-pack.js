@@ -9,6 +9,10 @@ const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "site-readiness-pack.json");
 const DEFAULT_MARKDOWN = path.join(ROOT, "release", "site-readiness-pack.md");
 
+function readText(relativePath) {
+  return fs.readFileSync(path.join(ROOT, relativePath), "utf8");
+}
+
 function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(ROOT, relativePath), "utf8"));
 }
@@ -81,6 +85,7 @@ function buildSiteReadinessPack(options = {}) {
   const identity = options.identityContract || buildIdentityContract({ data });
   const interfaceMapping = options.interfaceMapping || buildInterfaceMappingReport({ data, pkg });
   const monitoring = options.monitoringReadiness || buildMonitoringReadinessReport({ data, pkg });
+  const onsiteMaterialsDoc = options.onsiteMaterialsDoc ?? readText("docs/on-site-launch-materials.md");
 
   const identityTemplates = toRows(identity.requiredClaims, (claim) => ({
     id: `identity-${claim.claim || claim.name}`,
@@ -168,7 +173,21 @@ function buildSiteReadinessPack(options = {}) {
     { id: "site-pack:interfaces", passed: interfaceTemplates.length >= 5 && interfaceTemplates.every((item) => item.targetCollection), detail: `${interfaceTemplates.length} interface mapping rows` },
     { id: "site-pack:monitoring", passed: monitoringTemplates.length >= 4, detail: `${monitoringTemplates.length} monitoring rows` },
     { id: "site-pack:signoff", passed: signoffTemplates.length >= 8, detail: `${signoffTemplates.length} signoff rows` },
-    { id: "site-pack:artifacts", passed: packs.every((item) => item.requiredArtifacts.length >= 4), detail: `${packs.length} packs with artifact lists` }
+    { id: "site-pack:artifacts", passed: packs.every((item) => item.requiredArtifacts.length >= 4), detail: `${packs.length} packs with artifact lists` },
+    {
+      id: "site-pack:onsite-materials",
+      passed: [
+        "GLM-01",
+        "GLM-04",
+        "GLM-05",
+        "GLM-08",
+        "GLM-10",
+        "CIT-01",
+        "CIT-06",
+        "launch:smoke -- --base-url"
+      ].every((marker) => onsiteMaterialsDoc.includes(marker)),
+      detail: "on-site launch material checklist covers platform and citizen cutover evidence"
+    }
   ];
 
   return {
@@ -186,6 +205,10 @@ function buildSiteReadinessPack(options = {}) {
       interfaces: interfaceTemplates,
       monitoring: monitoringTemplates,
       signoff: signoffTemplates
+    },
+    onsiteMaterials: {
+      document: "docs/on-site-launch-materials.md",
+      requiredDomains: ["environment", "identity", "sms", "medical-interfaces", "resident-mobile", "database", "security", "monitoring", "dr", "signoff"]
     },
     checks
   };
@@ -205,6 +228,7 @@ function renderMarkdown(report) {
     `- Result: ${report.ok ? "PASS" : "FAIL"}`,
     `- Template rows: ${report.summary.templateRows}`,
     `- Required artifact slots: ${report.summary.requiredArtifacts}`,
+    `- On-site materials: ${report.onsiteMaterials?.document || "missing"}`,
     "",
     "## Checks",
     "",
@@ -241,6 +265,10 @@ function renderMarkdown(report) {
     "| Phase | Owner | Item | Required signatures |",
     "|---|---|---|---|",
     ...signoffRows,
+    "",
+    "## On-site material checklist",
+    "",
+    `Use \`${report.onsiteMaterials?.document || "docs/on-site-launch-materials.md"}\` before production cutover. It lists the field-owned materials for identity, SMS, medical interfaces, resident mobile acceptance, database, security, monitoring, disaster recovery, and signoff.`,
     ""
   ].join("\n");
 }

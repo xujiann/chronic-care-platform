@@ -304,3 +304,5 @@ Before site joint testing for the drug and consumable supervision app, run `npm.
 ## Real Production Go-Live Requirements
 
 Use `docs/production-go-live-requirements.md` as the platform-level launch requirements baseline. It covers site-owned inputs, real interface joint testing, production database migration, identity and SMS integration, HIS/EMR/LIS/PACS, insurance, certificate sharing, security compliance, monitoring, backup/restore rehearsal, blocking conditions, and final signoff evidence.
+
+Use `docs/on-site-launch-materials.md` as the field material collection checklist before formal go-live. The checklist maps GLM/CIT evidence IDs to owners, acceptance criteria, archive locations, resident mobile validation, gray release controls, and hard blocking conditions.

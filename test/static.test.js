@@ -443,6 +443,11 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(productionGoLiveRequirements, /GL-01/);
   assert.match(productionGoLiveRequirements, /launch:smoke -- --base-url/);
   assert.match(productionGoLiveRequirements, /发布阻断条件/);
+  const onsiteLaunchMaterials = read("docs/on-site-launch-materials.md");
+  assert.match(onsiteLaunchMaterials, /真实上线现场补齐工作材料清单/);
+  assert.match(onsiteLaunchMaterials, /GLM-05/);
+  assert.match(onsiteLaunchMaterials, /CIT-06/);
+  assert.match(onsiteLaunchMaterials, /launch:smoke -- --base-url/);
   assert.match(read("DEPLOYMENT.md"), /doctor\.html/);
   assert.match(read("scripts/release-report.js"), /test:coverage/);
   assert.match(read("scripts/release-report.js"), /test:e2e/);
