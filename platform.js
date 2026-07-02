@@ -527,7 +527,7 @@ function renderResearchGovernance(platform, sandboxSummary = null) {
       <td>${item.version}</td>
       <td>${item.ethicsApproval || "待登记"}</td>
       <td>${item.anonymization || "待登记"} / ${item.deidentificationStatus || "pending"}</td>
-      <td>${item.governance?.dataUseAgreement || "pending"} / ${item.governance?.retentionDays || 0}d / ${(item.evidenceDocuments || []).length} docs</td>
+      <td>${researchEvidenceSummary(item)}</td>
       <td>${statusBadge(item.authorizationStatus || item.status)} ${statusBadge(item.sandbox?.status || "pending")}</td>
       <td>${item.records || 0}</td>
       <td>${(item.usageAudit || []).length} / ${(item.outcomes || []).length}</td>
@@ -535,6 +535,7 @@ function renderResearchGovernance(platform, sandboxSummary = null) {
         <button class="inline-action" type="button" data-research-action="sandbox-access" data-id="${item.id}">沙箱访问</button>
         <button class="inline-action" type="button" data-research-action="outcome-return" data-id="${item.id}">成果回流</button>
         <button class="inline-action" type="button" data-research-action="approve" data-id="${item.id}">审批发布</button>
+        <button class="inline-action" type="button" data-research-evidence="${item.id}">登记材料</button>
       </td>
     </tr>
   `).join("");
@@ -621,7 +622,7 @@ function renderResearchGovernance(platform, sandboxSummary = null) {
       </article>
     </div>
     <table>
-      <thead><tr><th>数据集</th><th>病种</th><th>版本</th><th>伦理审批</th><th>脱敏</th><th>协议/留存</th><th>授权/沙箱</th><th>记录数</th><th>审计/成果</th><th>Action</th></tr></thead>
+      <thead><tr><th>数据集</th><th>病种</th><th>版本</th><th>伦理审批</th><th>脱敏</th><th>协议/留存/材料</th><th>授权/沙箱</th><th>记录数</th><th>审计/成果</th><th>Action</th></tr></thead>
       <tbody>${datasetRows || `<tr><td colspan="10">暂无科研数据集。</td></tr>`}</tbody>
     </table>
     <table>
@@ -629,6 +630,19 @@ function renderResearchGovernance(platform, sandboxSummary = null) {
       <tbody>${modelRows || `<tr><td colspan="8">暂无专病库模型。</td></tr>`}</tbody>
     </table>
   `;
+}
+
+function researchEvidenceSummary(dataset) {
+  const documents = Array.isArray(dataset.evidenceDocuments) ? dataset.evidenceDocuments : [];
+  const required = ["ethics-approval", "data-use-agreement"];
+  const ready = required.every((type) => documents.some((item) => item.type === type && item.status !== "rejected"));
+  const latest = documents[0];
+  const latestText = latest ? `${latest.type}:${latest.referenceNo || latest.title || "registered"}` : "no evidence";
+  return [
+    `<span>${dataset.governance?.dataUseAgreement || "pending"} / ${dataset.governance?.retentionDays || 0}d</span>`,
+    `<span class="badge ${ready ? "info" : "warn"}">${ready ? "evidence-ready" : "evidence-pending"} / ${documents.length} docs</span>`,
+    `<small>${latestText}</small>`
+  ].join(" ");
 }
 
 function researchBoundaryLabel(value) {
@@ -802,6 +816,11 @@ function bindPlatformEditor() {
       openEvidenceEditor(evidenceButton.dataset.editEvidence);
       return;
     }
+    const researchEvidenceButton = event.target.closest("[data-research-evidence]");
+    if (researchEvidenceButton) {
+      openResearchEvidenceEditor(researchEvidenceButton.dataset.researchEvidence);
+      return;
+    }
     const researchButton = event.target.closest("[data-research-action]");
     if (researchButton) {
       runResearchDatasetAction(researchButton.dataset.researchAction, researchButton.dataset.id);
@@ -863,6 +882,11 @@ function bindPlatformEditor() {
     renderPlatform();
   });
 
+  document.querySelector("#research-evidence-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await submitResearchEvidenceDocument(event.currentTarget);
+  });
+
   document.querySelector("#export-platform-report")?.addEventListener("click", exportPlatformReport);
   const filters = document.querySelector("#platform-report-filters");
   filters?.addEventListener("input", refreshReportSummary);
@@ -906,6 +930,75 @@ async function runResearchDatasetAction(action, id) {
   } catch (error) {
     setResearchStatus("当前为静态预览或服务不可用，操作未提交。", true);
   }
+}
+
+function openResearchEvidenceEditor(id) {
+  const dataset = findResearchDataset(id);
+  if (!dataset) return;
+  const form = document.querySelector("#research-evidence-form");
+  const dialog = document.querySelector("#research-evidence-dialog");
+  const type = dataset.ethicsApproval ? "data-use-agreement" : "ethics-approval";
+  form.reset();
+  form.elements.namedItem("datasetId").value = dataset.id;
+  form.elements.namedItem("datasetName").value = dataset.name || dataset.id;
+  form.elements.namedItem("type").value = type;
+  form.elements.namedItem("title").value = type === "data-use-agreement"
+    ? `${dataset.name || dataset.id} data use agreement`
+    : `${dataset.name || dataset.id} ethics approval`;
+  form.elements.namedItem("referenceNo").value = type === "data-use-agreement"
+    ? (dataset.governance?.dataUseAgreement || `DUA-${dataset.id}`)
+    : (dataset.ethicsApproval || `IRB-${dataset.id}`);
+  form.elements.namedItem("issuedBy").value = type === "data-use-agreement" ? "research-governance" : "demo-irb";
+  form.elements.namedItem("issuedAt").value = new Date().toISOString().slice(0, 10);
+  document.querySelector("#research-evidence-title").textContent = `科研材料登记：${dataset.name || dataset.id}`;
+  dialog.showModal();
+}
+
+async function submitResearchEvidenceDocument(form) {
+  if (!PLATFORM_API_BASE) {
+    setResearchStatus("当前为静态预览，科研材料未提交。", true);
+    return;
+  }
+  const data = Object.fromEntries(new FormData(form));
+  const payload = {
+    type: String(data.type || "").trim(),
+    title: String(data.title || "").trim(),
+    referenceNo: String(data.referenceNo || "").trim(),
+    issuedBy: String(data.issuedBy || "").trim(),
+    issuedAt: String(data.issuedAt || "").trim(),
+    expiresAt: String(data.expiresAt || "").trim(),
+    fileName: String(data.fileName || "").trim(),
+    fileHash: String(data.fileHash || "").trim(),
+    note: String(data.note || "").trim()
+  };
+  if (!payload.type || !payload.title || !payload.referenceNo) {
+    setResearchStatus("请补齐科研材料类型、标题和编号。", true);
+    return;
+  }
+  try {
+    setResearchStatus("正在登记科研材料...");
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${PLATFORM_API_BASE}/research/datasets/${encodeURIComponent(data.datasetId)}/evidence`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      setResearchStatus(error.message || "科研材料登记失败。", true);
+      return;
+    }
+    form.closest("dialog")?.close();
+    await refreshPlatformState();
+    setResearchStatus(`科研材料已登记：${payload.referenceNo}`);
+  } catch (error) {
+    setResearchStatus("服务不可用，科研材料未提交。", true);
+  }
+}
+
+function findResearchDataset(id) {
+  return (platformState.researchDatasets || []).find((item) => item.id === id)
+    || (platformData?.researchDatasets || []).find((item) => item.id === id);
 }
 
 async function submitResearchDatasetApplication(form) {

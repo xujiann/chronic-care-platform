@@ -393,6 +393,10 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(platformJs, /researchPendingRows/);
   assert.match(platformJs, /submitResearchDatasetApplication/);
   assert.match(platformJs, /runResearchDatasetAction/);
+  assert.match(platformJs, /openResearchEvidenceEditor/);
+  assert.match(platformJs, /submitResearchEvidenceDocument/);
+  assert.match(platformHtml, /research-evidence-form/);
+  assert.match(platformJs, /data-research-evidence/);
   assert.match(platformJs, /sandbox-access/);
   assert.match(platformJs, /成果回流/);
   assert.match(read("portal.css"), /research-sandbox-summary/);
