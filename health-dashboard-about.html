@@ -258,6 +258,27 @@
         </div>
       </section>
 
+      <section class="panel" data-dashboard-about-section="production-launch-requirements">
+        <div class="panel-title">
+          <h2>真实上线要求</h2>
+          <span>用于区分当前可发布版本与生产 ready 条件</span>
+        </div>
+        <div class="rules">
+          <div>
+            <strong>上线判定</strong>
+            <span>必须完成真实环境、统一身份、审计保全、生产数据库、接口联调、监控告警、灾备演练和安全合规证据后，方可将 productionReady 标记为 true。</span>
+          </div>
+          <div>
+            <strong>门禁接口</strong>
+            <span>使用 /api/health-dashboard/production-readiness 核对 blocked gates、生产切换清单、现场问题和验收证据包。</span>
+          </div>
+          <div>
+            <strong>需求文档</strong>
+            <span><a href="./docs/health-dashboard-production-launch-requirements.md" data-dashboard-launch-requirements-link>查看真实上线需求文档</a></span>
+          </div>
+        </div>
+      </section>
+
       <section class="panel" data-dashboard-about-section="next-plan">
         <div class="panel-title">
           <h2>下一步开发计划</h2>

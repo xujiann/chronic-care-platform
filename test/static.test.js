@@ -265,6 +265,9 @@ test("health dashboard about page documents policies data boundary and site cuto
   assert.match(html, /data-dashboard-about-section="data-boundary"/);
   assert.match(html, /data-dashboard-about-section="api-evidence"/);
   assert.match(html, /data-dashboard-about-section="site-cutover"/);
+  assert.match(html, /data-dashboard-about-section="production-launch-requirements"/);
+  assert.match(html, /data-dashboard-launch-requirements-link/);
+  assert.match(html, /health-dashboard-production-launch-requirements\.md/);
   assert.match(html, /data-dashboard-about-section="next-plan"/);
   assert.match(html, /data-dashboard-template-function="aggregate-entry"/);
   assert.match(html, /data-dashboard-template-function="population-service-board"/);
