@@ -251,10 +251,12 @@ GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下
 - [部署说明](./DEPLOYMENT.md)
 - [后续开发优先级](./docs/后续开发优先级.md)
 - [GitHub 拆分部署方案](./docs/GitHub拆分部署方案.md)
+- [卫生健康综合管理服务系统真实上线需求文档](./docs/health-dashboard-production-launch-requirements.md)
 ## Health Dashboard Aggregate Entry
 
 - `health-dashboard.html` is priority application 8: 卫生健康综合管理服务系统, an aggregate entry for health administration departments across the first seven applications.
 - `GET /api/health-dashboard/summary` returns application metrics, daily service volume, certificate exchange tracks, risk counts, open actions, interface tracks, acceptance evidence, and site dependencies for commission users.
 - `GET /api/health-dashboard/production-readiness` returns the production readiness gate, blocked gates, cutover checklist, site issues, and evidence package for commission users; it writes an audit event and must remain blocked until real identity, audit-retention, storage, interface signoff, monitoring, and disaster recovery evidence is attached.
+- `docs/health-dashboard-production-launch-requirements.md` defines the real production launch requirements, acceptance evidence, site joint-test scope, and go/no-go criteria.
 - `npm.cmd run health-dashboard:summary` writes `release/health-dashboard-summary.json` and `release/health-dashboard-summary.md`, including the module main function report.
 - Boundary: the dashboard does not replace source workflows; source applications remain the system of record for business operations and acceptance.

@@ -399,6 +399,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /production-db-readiness-report\.md/);
   assert.match(read("README.md"), /evaluation-evidence-report\.md/);
   assert.match(read("README.md"), /release-artifact-manifest\.md/);
+  assert.match(read("README.md"), /health-dashboard-production-launch-requirements\.md/);
   assert.match(read("DEPLOYMENT.md"), /storage-model-inspection\.md/);
   assert.match(read("DEPLOYMENT.md"), /identity-contract\.md/);
   assert.match(read("DEPLOYMENT.md"), /audit-retention-report\.md/);
@@ -417,6 +418,10 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("DEPLOYMENT.md"), /production-db-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /evaluation-evidence-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /release-artifact-manifest\.md/);
+  assert.match(read("DEPLOYMENT.md"), /health-dashboard-production-launch-requirements\.md/);
+  assert.match(read("docs/health-dashboard-production-launch-requirements.md"), /productionReady: true/);
+  assert.match(read("docs/health-dashboard-production-launch-requirements.md"), /\/api\/health-dashboard\/production-readiness/);
+  assert.match(read("scripts/release-artifact-manifest.js"), /health-dashboard-production-requirements/);
   assert.match(read("scripts/deploy-check.js"), /test:coverage/);
   assert.match(read("scripts/deploy-check.js"), /test:e2e/);
   assert.match(read("scripts/deploy-check.js"), /audit/);
