@@ -559,7 +559,7 @@ body.service-paged-mode [data-service-pane] {
 
 .birth-health-summary-strip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 12px;
 }
@@ -598,6 +598,21 @@ body.service-paged-mode [data-service-pane] {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.35;
+}
+
+.birth-health-progress {
+  height: 6px;
+  margin-top: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e6edf2;
+}
+
+.birth-health-progress i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--green);
 }
 
 .service-summary-copy {

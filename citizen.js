@@ -1966,15 +1966,21 @@ function renderBirthHealth(residentId) {
   if (summary) {
     const pendingCount = certificates.filter((item) => item.healthManagementStatus?.includes("待") || item.status?.includes("待") || item.publicSecuritySync !== "已共享" || item.maternalChildSync !== "已入册").length;
     const lowWeightCount = certificates.filter((item) => Number(item.birthWeight || 0) > 0 && Number(item.birthWeight || 0) < 2500).length;
+    const closureRows = birthServiceClosureRows(certificates);
+    const closureDone = closureRows.filter((item) => item.done).length;
+    const closureTotal = closureRows.length || 1;
+    const closurePercent = Math.round((closureDone / closureTotal) * 100);
     const nextService = certificates.find((item) => item.nextService)?.nextService || "等待出生医学证明归集后生成接续任务";
     summary.innerHTML = [
       ["出生证", certificates.length, "家庭成员归集"],
       ["待接续", pendingCount, "共享、入册或访视未闭环"],
       ["低体重专案", lowWeightCount, "需营养和体重随访"],
+      ["闭环率", `${closurePercent}%`, `${closureDone}/${closureTotal} 项已完成`],
       ["下一服务", nextService, "居民端提醒"]
     ].map(([label, value, hint]) => `<article>
       <span>${label}</span>
       <strong>${value}</strong>
+      ${label === "闭环率" ? `<div class="birth-health-progress" aria-hidden="true"><i style="width: ${closurePercent}%"></i></div>` : ""}
       <small>${hint}</small>
     </article>`).join("");
   }
@@ -2000,6 +2006,19 @@ function renderBirthHealth(residentId) {
       <span class="badge ${badge}">${item.issueType || "首次签发"}</span>
     </article>`;
   }).join("") || `<p class="muted">当前家庭成员暂无出生医学证明或新生儿健康管理任务。</p>`;
+}
+
+function birthServiceClosureRows(certificates) {
+  return certificates.flatMap((item) => {
+    const lowWeight = Number(item.birthWeight || 0) > 0 && Number(item.birthWeight || 0) < 2500;
+    return [
+      { label: "出生证明", status: item.status || "待处理", done: /已|完成|签发|核验/.test(item.status || "") },
+      { label: "电子证照", status: item.electronicLicenseStatus || "待生成", done: /已|完成|生成|签发/.test(item.electronicLicenseStatus || "") },
+      { label: "公安共享", status: item.publicSecuritySync || "未共享", done: item.publicSecuritySync === "已共享" },
+      { label: "妇幼入册", status: item.maternalChildSync || "待入册", done: item.maternalChildSync === "已入册" },
+      { label: lowWeight ? "低体重专案" : "新生儿访视", status: lowWeight ? "需随访" : (item.healthManagementStatus || "待建档"), done: !/待|需|未/.test(`${lowWeight ? "需随访" : item.healthManagementStatus || ""}`) }
+    ];
+  });
 }
 
 function renderMaternalChildContinuity(residentId) {

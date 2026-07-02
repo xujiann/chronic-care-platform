@@ -1182,8 +1182,12 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenHtml, /birth-health-summary-strip/);
   assert.match(citizenJs, /birth-health-summary-strip/);
   assert.match(citizenJs, /pendingCount/);
+  assert.match(citizenJs, /birthServiceClosureRows/);
+  assert.match(citizenJs, /closurePercent/);
+  assert.match(citizenJs, /birth-health-progress/);
   assert.match(citizenCss, /birth-health-summary-strip/);
-  assert.match(citizenCss, /grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(citizenCss, /birth-health-progress/);
+  assert.match(citizenCss, /grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
   assert.match(citizenCss, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
   assert.match(citizenJs, /isPagedCitizenServiceMode/);
   assert.match(citizenJs, /service-paged-mode/);
