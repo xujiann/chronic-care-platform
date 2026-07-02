@@ -279,6 +279,7 @@ function renderCountyTeleconsultationCutoverReadiness(state, rows) {
   const el = document.querySelector("#county-teleconsultation-cutover");
   if (!el) return;
   const readiness = buildCountyTeleconsultationCutoverReadiness(state, rows);
+  const planSummary = buildCountyTeleconsultationPlanSummary(readiness.nextDevelopmentPlan);
   el.innerHTML = [
     `<article data-referral-cutover-readiness>
       <div><span class="badge ${readiness.readyForProductionCutover ? "info" : "warn"}">Cutover gate</span></div>
@@ -289,16 +290,28 @@ function renderCountyTeleconsultationCutoverReadiness(state, rows) {
         <small>Evidence source: ${readiness.evidenceSource}</small>
       </footer>
     </article>`,
+    `<article data-referral-cutover-plan-summary>
+      <div><span class="badge ${planSummary.pendingPhases ? "warn" : "info"}">Next plan</span></div>
+      <h3>${planSummary.readyPhases}/${planSummary.totalPhases} phases ready</h3>
+      <p>${planSummary.pendingPhases ? `${planSummary.pendingPhases} phases still need onsite evidence.` : "All listed phases have readiness evidence."}</p>
+      <footer>
+        <small>Next phase: ${planSummary.nextPhase}</small>
+        <small>Owners: ${planSummary.owners.join(", ") || "county-command"}</small>
+      </footer>
+    </article>`,
     ...readiness.blockers.map((item) => `<article data-referral-cutover-blocker="${item.id}">
       <div><span class="badge warn">${item.owner}</span></div>
       <h3>${item.id}</h3>
       <p>${item.detail}</p>
     </article>`),
     ...readiness.nextDevelopmentPlan.map((item) => `<article data-referral-cutover-plan="${item.phase}">
-      <div><span class="badge info">${item.owner}</span></div>
+      <div><span class="badge ${item.status === "ready" ? "info" : "warn"}">${item.statusLabel}</span><span class="badge info">${item.owner}</span></div>
       <h3>${item.phase}</h3>
       <p>${item.objective}</p>
-      <footer><small>${item.acceptance}</small></footer>
+      <footer>
+        <small>${item.acceptance}</small>
+        <small>Dependencies: ${item.dependencies.join(", ") || "onsite evidence"}</small>
+      </footer>
     </article>`)
   ].join("");
 }
@@ -436,7 +449,7 @@ function buildCountyTeleconsultationJointLedger(state, rows) {
 function buildCountyTeleconsultationCutoverReadiness(state, rows) {
   const apiReadiness = state.referralTeleconsultationJointTestPack?.cutoverReadiness;
   if (apiReadiness) {
-    return {
+    const readiness = {
       readyForProductionCutover: Boolean(apiReadiness.readyForProductionCutover),
       contractReplay: apiReadiness.contractReplay || "0/3",
       finalReadyRoles: Number(apiReadiness.finalSignoffReadyRoles || 0),
@@ -444,8 +457,11 @@ function buildCountyTeleconsultationCutoverReadiness(state, rows) {
       totalRoles: 5,
       blockers: Array.isArray(apiReadiness.blockers) ? apiReadiness.blockers : [],
       nextAction: apiReadiness.nextAction || "Review the joint-test pack before production cutover.",
-      evidenceSource: "joint-test-pack API",
-      nextDevelopmentPlan: normalizeCountyTeleconsultationNextPlan(state.referralTeleconsultationJointTestPack?.nextDevelopmentPlan)
+      evidenceSource: "joint-test-pack API"
+    };
+    return {
+      ...readiness,
+      nextDevelopmentPlan: normalizeCountyTeleconsultationNextPlan(state.referralTeleconsultationJointTestPack?.nextDevelopmentPlan, readiness)
     };
   }
   const ledgerRows = buildCountyTeleconsultationJointLedger(state, rows);
@@ -476,7 +492,7 @@ function buildCountyTeleconsultationCutoverReadiness(state, rows) {
       detail: "Archive signed onsite evidence for referral center, receiving hospital, hospital IT, county performance, and insurance."
     } : null
   ].filter(Boolean);
-  return {
+  const readiness = {
     readyForProductionCutover: blockers.length === 0,
     contractReplay: `${replayedContracts}/3`,
     finalReadyRoles,
@@ -484,33 +500,81 @@ function buildCountyTeleconsultationCutoverReadiness(state, rows) {
     totalRoles: signoffRows.length,
     blockers,
     nextAction: blockers[0]?.detail || "Module cutover evidence is complete; continue with platform environment gates.",
-    evidenceSource: "local county state",
-    nextDevelopmentPlan: normalizeCountyTeleconsultationNextPlan([])
+    evidenceSource: "local county state"
+  };
+  return {
+    ...readiness,
+    nextDevelopmentPlan: normalizeCountyTeleconsultationNextPlan([], readiness)
   };
 }
 
-function normalizeCountyTeleconsultationNextPlan(plan) {
+function normalizeCountyTeleconsultationNextPlan(plan, readiness = {}) {
   const fallback = [
     {
       phase: "field-interface-replay",
       owner: "institution-integration",
       objective: "Replay referral feedback, schedule, and report callbacks with signed payloads.",
+      dependencies: ["signed callback payloads", "target gateway"],
       acceptance: "All three callback contracts have matched gateway events."
     },
     {
       phase: "onsite-signoff-archive",
       owner: "county-command",
       objective: "Archive onsite signed evidence for referral center, receiving hospital, hospital IT, county performance, and insurance.",
+      dependencies: ["signed screenshots", "onsite signer list"],
       acceptance: "All five roles have signed evidence in the signoff summary."
     }
   ];
+  const replay = parseCountyTeleconsultationProgress(readiness.contractReplay, 3);
   const rows = Array.isArray(plan) && plan.length ? plan : fallback;
   return rows.slice(0, 4).map((item) => ({
     phase: item.phase || "next-step",
     owner: item.owner || "county-command",
     objective: item.objective || item.target || "Confirm the next onsite cutover action.",
-    acceptance: item.acceptance || "Acceptance evidence is attached to the joint-test pack."
+    dependencies: Array.isArray(item.dependencies) ? item.dependencies.slice(0, 4) : [],
+    acceptance: item.acceptance || "Acceptance evidence is attached to the joint-test pack.",
+    ...buildCountyTeleconsultationPlanStatus(item.phase || "next-step", readiness, replay)
   }));
+}
+
+function parseCountyTeleconsultationProgress(value, fallbackTotal) {
+  const match = String(value || "").match(/(\d+)\s*\/\s*(\d+)/);
+  return match
+    ? { done: Number(match[1]), total: Number(match[2]) }
+    : { done: 0, total: fallbackTotal };
+}
+
+function buildCountyTeleconsultationPlanStatus(phase, readiness, replay) {
+  const normalizedPhase = String(phase || "").toLowerCase();
+  if (normalizedPhase.includes("field-interface")) {
+    return replay.done >= replay.total ? { status: "ready", statusLabel: "ready" } : { status: "pending", statusLabel: "replay pending" };
+  }
+  if (normalizedPhase.includes("onsite-signoff")) {
+    return Number(readiness.onsiteSignedRoles || 0) >= Number(readiness.totalRoles || 5)
+      ? { status: "ready", statusLabel: "signed" }
+      : { status: "pending", statusLabel: "signoff pending" };
+  }
+  if (normalizedPhase.includes("insurance")) {
+    return Number(readiness.finalReadyRoles || 0) >= Number(readiness.totalRoles || 5)
+      ? { status: "ready", statusLabel: "policy ready" }
+      : { status: "pending", statusLabel: "policy pending" };
+  }
+  return readiness.readyForProductionCutover
+    ? { status: "ready", statusLabel: "cutover ready" }
+    : { status: "pending", statusLabel: "cutover pending" };
+}
+
+function buildCountyTeleconsultationPlanSummary(plan) {
+  const rows = Array.isArray(plan) ? plan : [];
+  const readyPhases = rows.filter((item) => item.status === "ready").length;
+  const next = rows.find((item) => item.status !== "ready") || rows[0] || {};
+  return {
+    totalPhases: rows.length,
+    readyPhases,
+    pendingPhases: Math.max(rows.length - readyPhases, 0),
+    nextPhase: next.phase || "field-interface-replay",
+    owners: [...new Set(rows.map((item) => item.owner).filter(Boolean))]
+  };
 }
 
 function buildCountyTeleconsultationSignoffRows(state, rows) {
