@@ -21,6 +21,7 @@ const { buildInterfaceMappingReport, renderMarkdown: renderInterfaceMappingMarkd
 const { buildHospitalOperationsReadinessReport, renderMarkdown: renderHospitalOperationsReadinessMarkdown } = require("./hospital-operations-readiness");
 const { buildMonitoringReadinessReport, renderMarkdown: renderMonitoringReadinessMarkdown } = require("./monitoring-readiness");
 const { buildOperationsReadinessReport, renderMarkdown: renderOperationsReadinessMarkdown } = require("./operations-readiness");
+const { buildOnsiteLaunchRequirements, renderMarkdown: renderOnsiteLaunchRequirementsMarkdown } = require("./onsite-launch-requirements");
 const { buildMaternalChildReadinessReport, renderMarkdown: renderMaternalChildReadinessMarkdown } = require("./maternal-child-readiness");
 const { buildPolicyCoverageReport, renderMarkdown: renderPolicyCoverageMarkdown } = require("./policy-coverage");
 const { buildProcessAuditReport, renderMarkdown: renderProcessAuditMarkdown } = require("./process-audit");
@@ -627,6 +628,14 @@ function siteReadinessChecks(siteReadinessPack) {
   ];
 }
 
+function onsiteLaunchRequirementsChecks(onsiteLaunchRequirements) {
+  return [
+    check("onsiteLaunch:requirements", onsiteLaunchRequirements.ok, onsiteLaunchRequirements.ok ? "on-site launch requirements passed" : "on-site launch requirements failed", "error", "onsite-launch"),
+    check("onsiteLaunch:p0Coverage", onsiteLaunchRequirements.summary?.p0Requirements >= 10, `${onsiteLaunchRequirements.summary?.p0Requirements || 0} P0 requirements`, "error", "onsite-launch"),
+    check("onsiteLaunch:blockers", onsiteLaunchRequirements.summary?.blockingConditions >= 10, `${onsiteLaunchRequirements.summary?.blockingConditions || 0} blocking conditions`, "error", "onsite-launch")
+  ];
+}
+
 function packageChecks(pkg) {
   const requiredScripts = [
     "check",
@@ -637,6 +646,7 @@ function packageChecks(pkg) {
     "env:check",
     "release:report",
     "release:manifest",
+    "onsite:launch-requirements",
     "identity:contract",
     "audit:retention",
     "data-quality:report",
@@ -737,6 +747,7 @@ function buildReleaseReport(options = {}) {
   const maternalChildReadiness = buildMaternalChildReadinessReport({ data, packageSource: JSON.stringify(pkg) });
   const policyCoverage = buildPolicyCoverageReport();
   const siteReadinessPack = buildSiteReadinessPack({ data, pkg, envFile: options.envFile || ".env.example", env: options.env || process.env, identityContract, interfaceMapping, monitoringReadiness });
+  const onsiteLaunchRequirements = buildOnsiteLaunchRequirements({ pkg, sitePack: siteReadinessPack, releaseReport: { ok: true }, envFile: options.envFile || ".env.example", env: options.env || process.env });
   const checks = [
     assertFile("README.md"),
     assertFile("DEPLOYMENT.md"),
@@ -767,6 +778,7 @@ function buildReleaseReport(options = {}) {
     ...processAuditChecks(processAudit),
     ...serviceAcceptanceChecks(serviceAcceptance),
     ...siteReadinessChecks(siteReadinessPack),
+    ...onsiteLaunchRequirementsChecks(onsiteLaunchRequirements),
     ...productionDbReadinessChecks(productionDbReadiness),
     ...evaluationEvidenceChecks(evaluationEvidence),
     ...environmentMatrixChecks(environmentMatrix),
@@ -817,6 +829,7 @@ function buildReleaseReport(options = {}) {
     processAudit,
     serviceAcceptance,
     siteReadinessPack,
+    onsiteLaunchRequirements,
     productionDbReadiness,
     evaluationEvidence,
     environmentMatrix,
@@ -1018,6 +1031,10 @@ function renderMarkdown(report) {
     "## Site readiness pack",
     "",
     "See `site-readiness-pack.json` and `site-readiness-pack.md` for identity source mapping, interface joint-test, monitoring/on-call, and production signoff templates.",
+    "",
+    "## On-site launch requirements",
+    "",
+    "See `onsite-launch-requirements.json` and `onsite-launch-requirements.md` for field-owned production inputs, P0 blockers, resident mobile acceptance, gray release scope, and signoff evidence.",
     "",
     "## Monitoring readiness report",
     "",
@@ -1240,6 +1257,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       siteReadinessPack: report.siteReadinessPack
     }, null, 2), "utf8");
+    const onsiteLaunchRequirementsJson = path.join(path.dirname(output), "onsite-launch-requirements.json");
+    fs.writeFileSync(onsiteLaunchRequirementsJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      onsiteLaunchRequirements: report.onsiteLaunchRequirements
+    }, null, 2), "utf8");
     const monitoringJson = path.join(path.dirname(output), "monitoring-readiness-report.json");
     fs.writeFileSync(monitoringJson, JSON.stringify({
       project: report.project,
@@ -1397,6 +1422,8 @@ function writeOutput(report, flags) {
     const siteReadinessMarkdown = path.join(path.dirname(markdown), "site-readiness-pack.md");
     fs.writeFileSync(siteReadinessMarkdown, renderSiteReadinessMarkdown(report.siteReadinessPack), "utf8");
     writeTemplateReadmes(report.siteReadinessPack, path.join(path.dirname(path.relative(ROOT, markdown)), "templates"));
+    const onsiteLaunchRequirementsMarkdown = path.join(path.dirname(markdown), "onsite-launch-requirements.md");
+    fs.writeFileSync(onsiteLaunchRequirementsMarkdown, renderOnsiteLaunchRequirementsMarkdown(report.onsiteLaunchRequirements), "utf8");
     const monitoringMarkdown = path.join(path.dirname(markdown), "monitoring-readiness-report.md");
     fs.writeFileSync(monitoringMarkdown, renderMonitoringReadinessMarkdown(report.monitoringReadiness), "utf8");
     const referralTeleconsultationMarkdown = path.join(path.dirname(markdown), "referral-teleconsultation-readiness-report.md");

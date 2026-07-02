@@ -399,6 +399,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal(Boolean(pkg.scripts["release:report"]), true);
   assert.equal(Boolean(pkg.scripts["release:manifest"]), true);
   assert.equal(Boolean(pkg.scripts["launch:smoke"]), true);
+  assert.equal(Boolean(pkg.scripts["onsite:launch-requirements"]), true);
   assert.equal(Boolean(pkg.scripts["priority-apps:templates"]), true);
   assert.equal(Boolean(pkg.scripts["maternal-child:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["rollback:snapshot"]), true);
@@ -436,6 +437,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /release:report/);
   assert.match(read("README.md"), /release:manifest/);
   assert.match(read("README.md"), /launch:smoke/);
+  assert.match(read("README.md"), /onsite:launch-requirements/);
   assert.match(read("README.md"), /production-go-live-requirements\.md/);
   assert.match(read("DEPLOYMENT.md"), /SMS_GATEWAY_URL/);
   assert.match(read("DEPLOYMENT.md"), /production-go-live-requirements\.md/);
@@ -453,6 +455,8 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/release-report.js"), /test:e2e/);
   assert.match(read("scripts/release-report.js"), /Production cutover checklist/);
   assert.match(read("scripts/launch-smoke.js"), /Launch smoke report/);
+  assert.match(read("scripts/onsite-launch-requirements.js"), /On-site launch requirements/);
+  assert.match(read("DEPLOYMENT.md"), /onsite:launch-requirements/);
   assert.match(read("README.md"), /production-cutover-checklist\.md/);
   assert.match(read("README.md"), /storage-model-inspection\.md/);
   assert.match(read("README.md"), /identity-contract\.md/);

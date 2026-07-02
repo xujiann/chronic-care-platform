@@ -165,6 +165,9 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.serviceAcceptance.county.openActions.find((item) => item.id === "cco-001").priority, "high");
   assert.equal(report.checks.some((item) => item.name === "sitePack:readiness" && item.passed), true);
   assert.equal(report.siteReadinessPack.ok, true);
+  assert.equal(report.checks.some((item) => item.name === "onsiteLaunch:requirements" && item.passed), true);
+  assert.equal(report.onsiteLaunchRequirements.ok, true);
+  assert.equal(report.onsiteLaunchRequirements.formalGoLiveState, "blocked-until-site-materials-signed");
   assert.equal(report.checks.some((item) => item.name === "productionDb:readiness" && item.passed), true);
   assert.equal(report.productionDbReadiness.ok, true);
   assert.equal(report.checks.some((item) => item.name === "evaluation:evidence" && item.passed), true);
@@ -212,6 +215,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(markdown, /Service open action preview/);
   assert.match(markdown, /cst-001/);
   assert.match(markdown, /Site readiness pack/);
+  assert.match(markdown, /On-site launch requirements/);
   assert.match(markdown, /Production database readiness report/);
   assert.match(markdown, /Interoperability evaluation evidence report/);
   assert.match(markdown, /Environment matrix report/);
@@ -317,6 +321,8 @@ test("release report writes standalone production cutover and storage artifacts"
   const serviceAcceptanceMarkdown = fs.readFileSync(path.join(outputDir, "service-acceptance-summary.md"), "utf8");
   const siteReadinessJson = JSON.parse(fs.readFileSync(path.join(outputDir, "site-readiness-pack.json"), "utf8"));
   const siteReadinessMarkdown = fs.readFileSync(path.join(outputDir, "site-readiness-pack.md"), "utf8");
+  const onsiteLaunchJson = JSON.parse(fs.readFileSync(path.join(outputDir, "onsite-launch-requirements.json"), "utf8"));
+  const onsiteLaunchMarkdown = fs.readFileSync(path.join(outputDir, "onsite-launch-requirements.md"), "utf8");
   const identityTemplateReadme = fs.readFileSync(path.join(outputDir, "templates", "identity-source-mapping", "README.md"), "utf8");
   const interfaceTemplateReadme = fs.readFileSync(path.join(outputDir, "templates", "interface-joint-test", "README.md"), "utf8");
   const monitoringTemplateReadme = fs.readFileSync(path.join(outputDir, "templates", "monitoring-on-call", "README.md"), "utf8");
@@ -374,6 +380,10 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(serviceAcceptanceMarkdown, /Open action preview/);
   assert.equal(siteReadinessJson.siteReadinessPack.ok, true);
   assert.match(siteReadinessMarkdown, /Site signoff template/);
+  assert.equal(onsiteLaunchJson.onsiteLaunchRequirements.ok, true);
+  assert.equal(onsiteLaunchJson.onsiteLaunchRequirements.summary.p0Requirements >= 10, true);
+  assert.match(onsiteLaunchMarkdown, /On-site launch requirements/);
+  assert.match(onsiteLaunchMarkdown, /resident-services/);
   assert.match(identityTemplateReadme, /Identity source mapping template/);
   assert.match(interfaceTemplateReadme, /Interface joint-test template/);
   assert.match(monitoringTemplateReadme, /Monitoring and on-call template/);
@@ -399,6 +409,7 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "chronic-followup"), true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "priority-application-templates"), true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "hybrid-deployment"), true);
+  assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "onsite-launch-requirements"), true);
   assert.match(manifestMarkdown, /Release artifact manifest/);
   assert.match(manifestMarkdown, /service-acceptance-summary\.md/);
   assert.match(manifestMarkdown, /release\/templates\/identity-source-mapping\/README\.md/);

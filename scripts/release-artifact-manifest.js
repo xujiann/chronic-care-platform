@@ -11,6 +11,7 @@ const ARTIFACTS = [
   ["launch-smoke", "release", "Launch runtime smoke report", "release/launch-smoke-report.json", "release/launch-smoke-report.md", "launch:smoke", "/api/health"],
   ["release-artifact-manifest", "release", "Release artifact manifest", "release/release-artifact-manifest.json", "release/release-artifact-manifest.md", "release:manifest", "release/release-artifact-manifest.md"],
   ["production-go-live-requirements", "cutover", "Real production go-live requirements", "docs/production-go-live-requirements.md", "docs/production-go-live-requirements.md", "release:report", "release/production-cutover-checklist.md"],
+  ["onsite-launch-requirements", "cutover", "On-site launch requirements", "release/onsite-launch-requirements.json", "release/onsite-launch-requirements.md", "onsite:launch-requirements", "docs/on-site-launch-materials.md"],
   ["production-cutover", "cutover", "Production cutover checklist", "release/production-cutover-checklist.json", "release/production-cutover-checklist.md", "release:report", "/api/system/readiness"],
   ["storage-model", "data", "Storage model inspection", "release/storage-model-inspection.json", "release/storage-model-inspection.md", "release:report", "npm.cmd run storage:inspect"],
   ["identity-contract", "identity", "Identity integration contract", "release/identity-contract.json", "release/identity-contract.md", "identity:contract", "/api/auth/identity/preview"],
