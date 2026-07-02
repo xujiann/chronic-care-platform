@@ -25,6 +25,7 @@ test("hospital operations readiness validates monitor dispatch and reconciliatio
   assert.equal(report.checks.some((item) => item.id === "hospitalOps:cutoverCommand" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "hospitalOps:postCutoverObservation" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "hospitalOps:postCutoverSignoffGate" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "hospitalOps:launchReadiness" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "hospitalOps:intelligence" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "hospitalOps:resourcePool" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "hospitalOps:mobileDuty" && item.passed), true);

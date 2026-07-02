@@ -117,6 +117,13 @@ function buildCapabilities(data, serverSource, readiness, release) {
       detail: "按 T+0 2小时、T+0 8小时、T+1 24小时观察窗口跟踪运行健康、资源压力、调度积压、直报复核、巡检归档、割接签收和移动值守提醒，并列出每个窗口的现场证据清单、逐窗口状态、验收规则、签收状态、已完成/待补证据、下一步补证动作与证据完成率。"
     },
     {
+      id: "launch-readiness",
+      name: "上线运行判定",
+      status: release.checks.some((item) => item.id === "release:launchReadiness" && item.passed) ? "ready" : "needs-attention",
+      evidence: ["/api/operations/dashboard", "/api/operations/production-hardening", "/api/operations/cutover-command", "/api/operations/post-cutover-observation"],
+      detail: "将生产加固阻断项、割接签收阻断项、上线后观察异常、待补证据和观察窗口签收状态汇总为可上线运行或暂缓上线运行结论。"
+    },
+    {
       id: "ops-intelligence",
       name: "智能调度建议",
       status: release.checks.some((item) => item.id === "release:intelligence" && item.passed) ? "ready" : "needs-attention",

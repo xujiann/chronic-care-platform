@@ -26,6 +26,8 @@ test("hospital operations module report audits capabilities and next plan", () =
   assert.equal(report.capabilities.some((item) => item.id === "post-cutover-observation" && item.detail.includes("验收规则")), true);
   assert.equal(report.capabilities.some((item) => item.id === "post-cutover-observation" && item.detail.includes("签收状态")), true);
   assert.equal(report.capabilities.some((item) => item.id === "post-cutover-observation" && item.detail.includes("下一步补证动作")), true);
+  assert.equal(report.capabilities.some((item) => item.id === "launch-readiness" && item.status === "ready"), true);
+  assert.equal(report.capabilities.some((item) => item.id === "launch-readiness" && item.detail.includes("可上线运行")), true);
   assert.equal(report.capabilities.some((item) => item.id === "ops-intelligence" && item.status === "ready"), true);
   assert.equal(report.capabilities.some((item) => item.id === "cross-hospital-resource-pool" && item.status === "ready"), true);
   assert.equal(report.capabilities.some((item) => item.id === "mobile-duty-command" && item.status === "ready"), true);

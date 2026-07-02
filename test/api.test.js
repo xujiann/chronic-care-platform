@@ -251,6 +251,10 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(Number.isInteger(operationsDashboard.body.postCutoverObservation.summary.signoffPendingWindows), true);
     assert.equal(operationsDashboard.body.postCutoverObservation.summary.evidenceTotal >= 9, true);
     assert.equal(Number.isInteger(operationsDashboard.body.postCutoverObservation.summary.completionRate), true);
+    assert.equal(typeof operationsDashboard.body.launchReadiness.decision, "string");
+    assert.equal(Array.isArray(operationsDashboard.body.launchReadiness.blockers), true);
+    assert.equal(Number.isInteger(operationsDashboard.body.launchReadiness.summary.blockers), true);
+    assert.equal(operationsDashboard.body.launchReadiness.evidence.includes("release:report:full"), true);
     assert.equal(operationsDashboard.body.intelligence.recommendations.some((item) => item.recommendation && item.prediction), true);
     assert.equal(operationsDashboard.body.resourcePool.rows.some((item) => item.resourceSlots.length >= 5), true);
     assert.equal(operationsDashboard.body.resourcePool.recommendations.length >= 1, true);

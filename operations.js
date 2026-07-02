@@ -233,6 +233,7 @@ function buildStaticOperationsDashboard(state) {
   const mobileDuty = buildStaticMobileDuty(snapshots, dispatchRequests, reconciliationReviews, handover, state.taskMessages || []);
   const cutoverCommand = buildStaticCutoverCommand(productionHardening, siteJointPatrol, mobileDuty, state.platformProcessAudit || [], state.securityEvents || []);
   const postCutoverObservation = buildStaticPostCutoverObservation(snapshots, dispatchRequests, reconciliationReviews, siteJointPatrol, cutoverCommand, mobileDuty, state.platformProcessAudit || [], state.securityEvents || []);
+  const launchReadiness = buildStaticLaunchReadiness(productionHardening, cutoverCommand, postCutoverObservation);
   const governanceReport = buildStaticGovernanceReport(snapshots, dispatchRequests, reconciliationReviews, performanceMonitoring, handover);
   const governanceExportPackage = buildStaticGovernanceExportPackage(
     snapshots,
@@ -290,6 +291,7 @@ function buildStaticOperationsDashboard(state) {
     mobileDuty,
     cutoverCommand,
     postCutoverObservation,
+    launchReadiness,
     governanceReport,
     governanceExportPackage,
     nextDevelopmentResearch
@@ -582,6 +584,40 @@ function buildStaticPostCutoverObservation(snapshots, dispatchRequests, reconcil
     },
     items,
     evidence: ["/api/operations/post-cutover-observation", "/api/operations/post-cutover-observation/actions", "platformProcessAudit", "securityEvents"]
+  };
+}
+
+function buildStaticLaunchReadiness(productionHardening, cutoverCommand, postCutoverObservation) {
+  const hardeningBlocked = Number(productionHardening?.summary?.blocked || 0);
+  const cutoverBlocking = Number(cutoverCommand?.summary?.blocking || 0);
+  const observationAbnormal = Number(postCutoverObservation?.summary?.abnormal || 0);
+  const evidencePending = Number(postCutoverObservation?.summary?.evidencePending || 0);
+  const signoffPendingWindows = Number(postCutoverObservation?.summary?.signoffPendingWindows || 0);
+  const blockers = [
+    hardeningBlocked ? { id: "production-hardening", name: "生产加固阻断项", count: hardeningBlocked, owner: "平台运维/安全管理岗", nextAction: "补齐生产密钥、审计保全、监控值守或灾备演练证据。" } : null,
+    cutoverBlocking ? { id: "cutover-signoff", name: "割接签收阻断项", count: cutoverBlocking, owner: "值班长", nextAction: "完成高优先级割接项签收，并保留回退准备。" } : null,
+    observationAbnormal ? { id: "post-cutover-abnormal", name: "上线后观察异常项", count: observationAbnormal, owner: "运行监测岗", nextAction: "关闭高风险观察项并补充处置记录。" } : null,
+    evidencePending ? { id: "post-cutover-evidence", name: "观察证据待补项", count: evidencePending, owner: "接口联调组/值班长", nextAction: "补齐健康检查、调度闭环、直报复核和治理报告归档证据。" } : null,
+    signoffPendingWindows ? { id: "post-cutover-window-signoff", name: "观察窗口待签收", count: signoffPendingWindows, owner: "值班长", nextAction: "按 T+0/T+1 观察窗口完成可签收复核。" } : null
+  ].filter(Boolean);
+  const ok = blockers.length === 0;
+  return {
+    ok,
+    status: ok ? "ready" : "blocked",
+    decision: ok ? "可上线运行" : "暂缓上线运行",
+    summary: {
+      hardeningBlocked,
+      cutoverBlocking,
+      observationAbnormal,
+      evidencePending,
+      signoffPendingWindows,
+      blockers: blockers.reduce((sum, item) => sum + item.count, 0)
+    },
+    blockers,
+    nextActions: blockers.length
+      ? blockers.map((item) => item.nextAction)
+      : ["保留 T+1 观察记录并归档签收材料。", "将上线结论同步治理导出包和发布报告。"],
+    evidence: ["/api/operations/production-hardening", "/api/operations/cutover-command", "/api/operations/post-cutover-observation", "release:report:full"]
   };
 }
 
@@ -1241,9 +1277,13 @@ function renderOperationsDashboard() {
   renderInterfaceMapping(dashboard.interfaceMapping || buildStaticInterfaceMapping());
   renderSiteJointTests(dashboard.siteJointTests || buildStaticSiteJointTests(dashboard.interfaceMapping || buildStaticInterfaceMapping()));
   renderSiteJointPatrol(dashboard.siteJointPatrol || buildStaticSiteJointPatrol(dashboard.siteJointTests || {}, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || []));
-  renderProductionHardening(dashboard.productionHardening || buildStaticProductionHardening({}));
-  renderCutoverCommand(dashboard.cutoverCommand || buildStaticCutoverCommand(dashboard.productionHardening || {}, dashboard.siteJointPatrol || {}, dashboard.mobileDuty || {}, [], []));
-  renderPostCutoverObservation(dashboard.postCutoverObservation || buildStaticPostCutoverObservation(filteredSnapshots, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || [], dashboard.siteJointPatrol || {}, dashboard.cutoverCommand || {}, dashboard.mobileDuty || {}, [], []));
+  const productionHardening = dashboard.productionHardening || buildStaticProductionHardening({});
+  const cutoverCommand = dashboard.cutoverCommand || buildStaticCutoverCommand(productionHardening, dashboard.siteJointPatrol || {}, dashboard.mobileDuty || {}, [], []);
+  const postCutoverObservation = dashboard.postCutoverObservation || buildStaticPostCutoverObservation(filteredSnapshots, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || [], dashboard.siteJointPatrol || {}, cutoverCommand, dashboard.mobileDuty || {}, [], []);
+  renderLaunchReadiness(dashboard.launchReadiness || buildStaticLaunchReadiness(productionHardening, cutoverCommand, postCutoverObservation));
+  renderProductionHardening(productionHardening);
+  renderCutoverCommand(cutoverCommand);
+  renderPostCutoverObservation(postCutoverObservation);
   renderOperationsIntelligence(dashboard.intelligence || buildStaticOperationsIntelligence(filteredSnapshots, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || []));
   renderResourcePool(dashboard.resourcePool || buildStaticResourcePool(filteredSnapshots, dashboard.medicalResources || [], dashboard.dispatchRequests || []));
   renderMobileDuty(dashboard.mobileDuty || buildStaticMobileDuty(filteredSnapshots, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || [], dashboard.handover || {}, []));
@@ -1739,6 +1779,34 @@ async function submitSiteJointPatrol(patrolId) {
     };
   }
   renderSiteJointPatrol(operationsDashboard.siteJointPatrol || {});
+}
+
+function renderLaunchReadiness(launchReadiness) {
+  const target = document.querySelector("#operation-launch-readiness");
+  if (!target) return;
+  const blockers = Array.isArray(launchReadiness.blockers) ? launchReadiness.blockers : [];
+  const actions = Array.isArray(launchReadiness.nextActions) ? launchReadiness.nextActions : [];
+  target.innerHTML = `
+    <article class="operation-launch-readiness-summary ${launchReadiness.ok ? "ready" : "blocked"}">
+      <div>
+        <strong>上线运行判定</strong>
+        <span>${zhInline(launchReadiness.decision || "待判定")}；阻断项 ${launchReadiness.summary?.blockers || 0} 个</span>
+        <small>生产加固 ${launchReadiness.summary?.hardeningBlocked || 0}，割接阻断 ${launchReadiness.summary?.cutoverBlocking || 0}，观察异常 ${launchReadiness.summary?.observationAbnormal || 0}，待补证据 ${launchReadiness.summary?.evidencePending || 0}，待签收窗口 ${launchReadiness.summary?.signoffPendingWindows || 0}</small>
+      </div>
+      <div class="operation-launch-readiness-actions">
+        ${actions.map((item) => `<span>${zhInline(item)}</span>`).join("") || "<span>继续观察并归档证据。</span>"}
+      </div>
+    </article>
+    ${blockers.length ? `<div class="operation-launch-readiness-blockers">
+      ${blockers.map((item) => `
+        <article>
+          <strong>${zhInline(item.name)} · ${item.count || 0}</strong>
+          <span>${zhInline(item.owner)}</span>
+          <p>${zhInline(item.nextAction)}</p>
+        </article>
+      `).join("")}
+    </div>` : ""}
+  `;
 }
 
 function renderProductionHardening(productionHardening) {

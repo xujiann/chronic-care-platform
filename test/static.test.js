@@ -458,6 +458,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsHtml, /operations-command-board/);
   assert.match(operationsHtml, /operations-site-joint-tests/);
   assert.match(operationsHtml, /operations-site-joint-patrol/);
+  assert.match(operationsHtml, /operation-launch-readiness/);
   assert.match(operationsHtml, /operation-production-hardening/);
   assert.match(operationsHtml, /operation-cutover-command/);
   assert.match(operationsHtml, /operation-post-cutover-observation/);
@@ -505,6 +506,9 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsJs, /buildStaticSiteJointPatrol/);
   assert.match(operationsJs, /submitSiteJointPatrol/);
   assert.match(operationsJs, /renderProductionHardening/);
+  assert.match(operationsJs, /renderLaunchReadiness/);
+  assert.match(operationsJs, /buildStaticLaunchReadiness/);
+  assert.match(operationsJs, /上线运行判定/);
   assert.match(operationsJs, /renderCutoverCommand/);
   assert.match(operationsJs, /buildStaticCutoverCommand/);
   assert.match(operationsJs, /signoffCutoverCommand/);
@@ -588,6 +592,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("portal.css"), /performance-detail-card/);
   assert.match(read("portal.css"), /interface-mapping-card/);
   assert.match(read("portal.css"), /site-joint-patrol-card/);
+  assert.match(read("portal.css"), /operation-launch-readiness-summary/);
   assert.match(read("portal.css"), /operation-cutover-card/);
   assert.match(read("portal.css"), /operation-observation-card/);
   assert.match(read("portal.css"), /operation-observation-windows/);
