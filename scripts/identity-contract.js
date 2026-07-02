@@ -8,7 +8,7 @@ const DEFAULT_MARKDOWN = path.join(ROOT, "release", "identity-contract.md");
 
 const ROLE_PORTALS = {
   commission: ["index.html", "workbench.html"],
-  institution: ["institution.html"],
+  institution: ["institution.html", "internet-nursing.html", "doctor.html"],
   insurance: ["insurance.html"],
   citizen: ["citizen.html"],
   county: ["county.html"]
@@ -27,7 +27,7 @@ const REQUIRED_CLAIMS = [
 
 const SAMPLE_CLAIMS = [
   { id: "identity-commission", orgCode: "ORG-HEALTH-DL", roles: ["health_admin", "commission"], expectedRole: "commission", expectedHome: "index.html" },
-  { id: "identity-institution", orgCode: "MR3", roles: ["doctor"], expectedRole: "institution", expectedHome: "institution.html" },
+  { id: "identity-institution", orgCode: "MR3", roles: ["doctor"], expectedRole: "institution", expectedHome: "doctor.html" },
   { id: "identity-insurance", orgCode: "ORG-MI-CENTER-DL", roles: ["insurance"], expectedRole: "insurance", expectedHome: "insurance.html" },
   { id: "identity-county", orgCode: "ORG-CONSORTIUM-ZS", roles: ["county"], expectedRole: "county", expectedHome: "county.html" },
   { id: "identity-citizen", orgCode: "PERSON-R1", roles: ["citizen"], expectedRole: "citizen", expectedHome: "citizen.html" }
@@ -52,7 +52,9 @@ function roleFromClaims(roles, organization) {
   return "commission";
 }
 
-function homeForRole(role, organization) {
+function homeForRole(role, organization, roles = []) {
+  const rawRoles = [roles].flat().filter(Boolean).map((item) => String(item).toLowerCase());
+  if (role === "institution" && rawRoles.some((item) => /doctor|physician/.test(item))) return "doctor.html";
   if (organization?.portal) return organization.portal;
   return ROLE_PORTALS[role]?.[0] || "health-city.html";
 }
@@ -77,7 +79,7 @@ function buildIdentityContract(options = {}) {
   const sampleMappings = SAMPLE_CLAIMS.map((sample) => {
     const organization = orgByCode.get(sample.orgCode);
     const role = roleFromClaims(sample.roles, organization);
-    const home = homeForRole(role, organization);
+    const home = homeForRole(role, organization, sample.roles);
     return {
       ...sample,
       mappedRole: role,

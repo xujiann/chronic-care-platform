@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>妇幼健康模块说明 · 大连市全民健康信息平台</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>妇幼健康 About</span>
+          <h1>出生医学证明与妇幼全生命周期健康管理</h1>
+          <p>面向卫健管理端、医疗机构端和个人用户端，说明政策依据、功能边界、角色入口、数据流转和上线验收口径。</p>
+        </div>
+        <nav>
+          <a href="./about.html">总 About</a>
+          <a href="./index.html">卫健管理</a>
+          <a href="./institution.html">医疗机构</a>
+          <a href="./citizen.html">个人用户端</a>
+          <a href="./health-dashboard.html">综合看板</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" data-maternal-about="policy-metrics">
+        <article class="metric-card">
+          <span>政策主线</span>
+          <strong>2 项</strong>
+          <small>出生医学证明管理通知、第七版启用通知</small>
+        </article>
+        <article class="metric-card">
+          <span>业务入口</span>
+          <strong>3 端</strong>
+          <small>卫健管理、医疗机构、个人用户端</small>
+        </article>
+        <article class="metric-card">
+          <span>核心数据</span>
+          <strong>4 类</strong>
+          <small>出生证明、统计、居民主索引、个人健康档案</small>
+        </article>
+        <article class="metric-card">
+          <span>服务链路</span>
+          <strong>8 步</strong>
+          <small>从孕产妇建册到儿童保健和统计预警</small>
+        </article>
+      </section>
+
+      <section class="panel wide" data-maternal-about="policy-basis">
+        <div class="panel-title">
+          <h2>相关政策说明</h2>
+          <span>页面只做系统建设口径摘要，正式执行以国家和地方现行文件为准。</span>
+        </div>
+        <div class="capability-grid">
+          <article class="capability-card">
+            <strong>《出生医学证明》法定属性</strong>
+            <span>出生医学证明是《中华人民共和国母婴保健法》规定的法定医学证明文书，也是户口登记机关办理出生登记的重要依据。</span>
+          </article>
+          <article class="capability-card">
+            <strong>签发类型与机构责任</strong>
+            <span>签发包括首次签发、换发和补发；具有助产技术服务资质的医疗保健机构应规范办理本机构内出生新生儿首次签发。</span>
+          </article>
+          <article class="capability-card">
+            <strong>证件、印章、废证和档案</strong>
+            <span>系统需要支撑专章管理、编号登记、废证原因、作废销毁、真伪核查、材料归档和永久保存等管理要求。</span>
+          </article>
+          <article class="capability-card">
+            <strong>第七版证件启用</strong>
+            <span>2023 年 4 月 1 日起启用第七版出生医学证明；第六版签发日期截至 2023 年 3 月 31 日，旧版空白证件按废证管理清理。</span>
+          </article>
+        </div>
+        <div class="rules">
+          <div><strong>系统落点</strong><span>医疗机构端登记、签发、上报入册；卫健管理端统计、预警、质控；个人用户端查看出生证明和后续妇幼健康服务清单。</span></div>
+          <div><strong>隐私与授权</strong><span>出生证明、父母身份、分娩信息、新生儿信息和妇幼随访均属于敏感健康与身份数据，必须按角色、居民授权和审计日志进行访问控制。</span></div>
+          <div><strong>政策来源</strong><span>国家卫健委官网：卫妇社发〔2009〕96 号、国卫办妇幼发〔2023〕4 号；本仓库同步沉淀到 <code>docs/maternal-child-policy.md</code>。</span></div>
+        </div>
+      </section>
+
+      <section class="panel wide" data-maternal-about="role-scope">
+        <div class="panel-title">
+          <h2>三端功能边界</h2>
+          <span>登录后只呈现对应账号可办理、可监管、可查看的功能。</span>
+        </div>
+        <div class="capability-grid">
+          <article class="capability-card">
+            <strong>卫健管理端</strong>
+            <span>出生人口统计、签发趋势、低体重儿风险、待妇幼入册、公安共享待办、质控补正、证件配发和废证监管。</span>
+          </article>
+          <article class="capability-card">
+            <strong>医疗机构端</strong>
+            <span>母亲居民主索引选择、新生儿信息登记、首次签发/换发补发、签发医师、材料核验、电子证照、上报入册。</span>
+          </article>
+          <article class="capability-card">
+            <strong>个人用户端</strong>
+            <span>家庭成员出生医学证明、妇幼入册、新生儿访视、出生缺陷筛查、低体重儿专案、预防接种和儿童保健接续。</span>
+          </article>
+          <article class="capability-card">
+            <strong>统一看板</strong>
+            <span>只汇总不替代源业务系统，作为风险、待办、接口、验收证据和模板规则的综合驾驶舱。</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel wide" data-maternal-about="workflow">
+        <div class="panel-title">
+          <h2>整理流程图</h2>
+          <span>覆盖数据来源、业务办理、跨部门共享、居民可见和管理统计。</span>
+        </div>
+        <div class="platform-map" data-about-flow="maternal-child-policy">
+          <article><strong>1. 孕产妇建册</strong><p>居民主索引关联母亲身份、孕产妇保健和高危管理。</p></article>
+          <article><strong>2. 分娩登记</strong><p>医疗机构记录出生时间、体重身长、父母身份和签发医师。</p></article>
+          <article><strong>3. 出生证明办理</strong><p>首次签发、换发补发、材料核验、编号、专章和电子证照状态。</p></article>
+          <article><strong>4. 证件管理</strong><p>空白证件申领、配发、废证、旧版清理、档案永久保存。</p></article>
+          <article><strong>5. 公安共享</strong><p>出生登记所需信息共享，失败时进入共享待办和审计。</p></article>
+          <article><strong>6. 妇幼入册</strong><p>自动生成新生儿访视、筛查、接种和儿童保健接续任务。</p></article>
+          <article><strong>7. 居民可见</strong><p>个人端按家庭关系和授权展示证明状态与健康管理清单。</p></article>
+          <article><strong>8. 统计预警</strong><p>卫健端形成出生人口统计、质控补正、低体重儿和未闭环风险。</p></article>
+        </div>
+      </section>
+
+      <section class="panel wide" data-maternal-about="acceptance">
+        <div class="panel-title">
+          <h2>上线验收口径</h2>
+          <span>作为后续妇幼模块和所有平台模板的统一交接规则。</span>
+        </div>
+        <div class="rules">
+          <div><strong>页面说明</strong><span>每个业务模块必须提供 About 说明页或 About 专区，写明政策依据、角色入口、业务边界和不可替代的源系统。</span></div>
+          <div><strong>文档说明</strong><span>每个业务模块必须在 <code>docs/</code> 下有说明文档，包含数据对象、API 权限、流程图、测试证据和上线依赖。</span></div>
+          <div><strong>证据说明</strong><span>模板 API、发布脚本、README 和部署说明必须能指向对应 About、文档、流程图、测试和验收产物。</span></div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

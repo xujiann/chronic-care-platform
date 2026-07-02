@@ -10,6 +10,7 @@ const SOURCE_APPLICATIONS = [
   {
     id: "regional-data-sharing",
     name: "Regional diagnosis data sharing",
+    conversationTitle: "区域诊疗数据共享平台",
     entry: "regional-data-sharing.html",
     owner: "commission",
     collections: ["residents", "personalRecords", "diagnosticReports", "integrationContracts", "dataAccessLogs", "platformInterfaces"],
@@ -22,6 +23,7 @@ const SOURCE_APPLICATIONS = [
   {
     id: "referral-teleconsultation",
     name: "Referral and teleconsultation",
+    conversationTitle: "医联体转诊与远程会诊平台",
     entry: "county.html",
     owner: "medical-services",
     collections: ["referralSystem", "referrals", "referralTeleconsultations", "careOrders", "countyCollaborationOrders", "countyAcceptanceLedger"],
@@ -34,6 +36,7 @@ const SOURCE_APPLICATIONS = [
   {
     id: "quality-safety",
     name: "Medical quality and safety supervision",
+    conversationTitle: "医疗质量与安全监管平台",
     entry: "quality-safety.html",
     owner: "quality-office",
     collections: ["diagnosticReports", "countyMutualRecognitionRecords", "dataQualityIssues", "institutionCreditEvaluations", "securityEvents", "hospitalInteroperabilityFunctions"],
@@ -46,6 +49,7 @@ const SOURCE_APPLICATIONS = [
   {
     id: "operations-dispatch",
     name: "Hospital operations and resource dispatch",
+    conversationTitle: "医院运行监测与资源调度平台",
     entry: "operations.html",
     owner: "operations",
     collections: ["healthStatistics", "healthStatisticsIngestion", "medicalResources", "platformProcessAudit", "operationsReadiness"],
@@ -58,6 +62,7 @@ const SOURCE_APPLICATIONS = [
   {
     id: "drug-consumable-supervision",
     name: "Drug, consumable, and rational medication supervision",
+    conversationTitle: "药品耗材与合理用药监管平台",
     entry: "insurance.html",
     owner: "insurance-and-institution",
     collections: ["drugConsumableSupervisions", "medicationPickups", "insuranceClaims", "institutionSupervisions", "integrationContracts"],
@@ -70,6 +75,7 @@ const SOURCE_APPLICATIONS = [
   {
     id: "chronic-followup",
     name: "Chronic disease management and post-discharge follow-up",
+    conversationTitle: "慢病管理与院后随访平台",
     entry: "index.html",
     owner: "primary-care",
     collections: ["chronicScreeningTasks", "chronicManagementPlans", "followups", "personalRecords", "medicationPickups", "chronicAcceptanceLedger"],
@@ -82,6 +88,7 @@ const SOURCE_APPLICATIONS = [
   {
     id: "research-sandbox",
     name: "Research datasets and data sandbox",
+    conversationTitle: "科研数据集与数据沙箱平台",
     entry: "platform.html",
     owner: "research-governance",
     collections: ["researchDatasets", "diseaseRegistryModels", "dataAccessLogs", "securityAcceptanceLedger", "personalRecords", "diagnosticReports"],
@@ -96,6 +103,7 @@ const SOURCE_APPLICATIONS = [
 const DASHBOARD_APPLICATION = {
   id: "health-dashboard",
   name: "Health commission aggregate dashboard",
+  conversationTitle: "卫生健康综合驾驶舱",
   entry: "health-dashboard.html",
   owner: "commission",
   aggregate: true,
@@ -108,6 +116,14 @@ const DASHBOARD_APPLICATION = {
 };
 
 const APPLICATIONS = [...SOURCE_APPLICATIONS, DASHBOARD_APPLICATION];
+const DOCUMENTATION_RULE = {
+  aboutPage: "about.html",
+  requiredDocument: "docs/<module-name>.md",
+  flowDiagram: "Each template must include a flow diagram covering data source, business workflow, sharing/collaboration, citizen visibility, and management statistics or alerts.",
+  requiredSections: ["功能边界", "角色入口", "数据对象", "API 权限", "页面入口", "测试证据", "验收证据", "流程图"],
+  codexLoop: "Plan first, make one small change, run the matching test or build, observe and fix failures, update docs and acceptance notes, then repeat until accepted.",
+  maternalChildReference: "docs/妇幼健康全模块说明.md"
+};
 
 const CLOSED_STATUS_PATTERN = /closed|resolved|approved|recognized|completed|passed|ready|signed|done|宸插畬鎴|宸查€氳繃|宸插彇鑽|宸插洖浼|宸蹭簰璁|宸叉牳楠|宸查棴鐜|已完成|已通过|已闭环/;
 const HIGH_RISK_PATTERN = /high|urgent|critical|overdue|dead_letter|楂|绱|閫炬湡|critical|高|逾期|危急/;
@@ -159,6 +175,7 @@ function summarizeApplication(data, app) {
   return {
     id: app.id,
     name: app.name,
+    conversationTitle: app.conversationTitle || app.name,
     entry: app.entry,
     owner: app.owner,
     collections: collectionRows.map((item) => ({ collection: item.collection, records: item.rows.length })),
@@ -174,9 +191,111 @@ function summarizeApplication(data, app) {
     frontendEntry: app.entry,
     testEvidence: app.testEvidence,
     acceptanceEvidence: app.acceptanceEvidence,
+    documentationRule: DOCUMENTATION_RULE,
     boundary: app.aggregate
       ? "Aggregate dashboard only; the first seven source applications remain the system of record."
       : "Aggregated in the dashboard; detailed workflow remains in the source application."
+  };
+}
+
+function buildConversationStarter(template) {
+  return [
+    `Thread title: ${template.conversationTitle}`,
+    `Goal: implement and verify ${template.id} using the unified template.`,
+    `Start from ${template.frontendEntry}, reuse ${template.dataCollections.join(", ")}, and keep ${template.acceptanceEvidence.join(", ")} as release evidence.`,
+    "Required sections: functional boundary, reuse points, data collections, API, frontend entry, tests, acceptance evidence, About section, module document, workflow diagram."
+  ].join(" ");
+}
+
+function buildImplementationChecklist(template) {
+  const docRule = template.documentationRule || DOCUMENTATION_RULE;
+  return [
+    `Confirm boundary and owner: ${template.owner}.`,
+    `Reuse source collections: ${template.dataCollections.join(", ")}.`,
+    `Wire or verify API routes: ${template.apiRoutes.join(", ")}.`,
+    `Verify frontend entry: ${template.frontendEntry}.`,
+    `Run evidence tests: ${template.testEvidence.join(", ")}.`,
+    `Follow Codex loop: ${docRule.codexLoop}`,
+    `Archive release evidence: ${template.acceptanceEvidence.join(", ")}.`,
+    `Keep About page and module docs current: ${docRule.aboutPage}, ${docRule.requiredDocument}.`,
+    "Include a workflow diagram covering data source, business workflow, sharing/collaboration, citizen visibility, and management statistics or alerts."
+  ];
+}
+
+function buildAcceptanceGate(template) {
+  return {
+    readyWhen: [
+      "Functional boundary is explicit and does not replace the owning source workflow.",
+      "All listed data collections and API routes have runnable tests or release evidence.",
+      "Frontend entry, About section, module document, workflow diagram, and acceptance artifacts are cross-linked.",
+      "Release report, release manifest, deploy check, and CI all reference the module evidence."
+    ],
+    blockers: [
+      template.openActions > 0 ? `${template.openActions} open source actions remain visible in dashboard evidence.` : "No open source actions recorded in dashboard evidence.",
+      template.highRisks > 0 ? `${template.highRisks} high-risk source records require owner review.` : "No high-risk source records recorded in dashboard evidence."
+    ],
+    evidence: template.acceptanceEvidence
+  };
+}
+
+function buildPriorityApplicationTemplates(options = {}) {
+  const summary = buildHealthDashboardSummary(options);
+  const templates = summary.applications.map((item, index) => {
+    const template = {
+      sequence: index + 1,
+      id: item.id,
+      conversationTitle: item.conversationTitle,
+      name: item.name,
+      owner: item.owner,
+      functionalBoundary: item.functionalBoundary,
+      reusePoints: item.reusePoints,
+      dataCollections: item.dataCollections,
+      apiRoutes: item.apiRoutes,
+      frontendEntry: item.frontendEntry,
+      testEvidence: item.testEvidence,
+      acceptanceEvidence: item.acceptanceEvidence,
+      sourceApplication: item.id !== DASHBOARD_APPLICATION.id,
+      aggregateApplication: item.id === DASHBOARD_APPLICATION.id,
+      status: item.status,
+      records: item.records,
+      openActions: item.openActions,
+      highRisks: item.highRisks,
+      documentationRule: item.documentationRule
+    };
+    return {
+      ...template,
+      conversationStarter: buildConversationStarter(template),
+      implementationChecklist: buildImplementationChecklist(template),
+      acceptanceGate: buildAcceptanceGate(template)
+    };
+  });
+  const checks = [
+    { id: "templates:count", passed: templates.length === 8, detail: `${templates.length} templates` },
+    { id: "templates:titles", passed: templates.every((item) => item.conversationTitle), detail: "all templates expose conversation titles" },
+    { id: "templates:required-fields", passed: templates.every((item) => item.functionalBoundary && item.reusePoints.length && item.dataCollections.length && item.apiRoutes.length && item.frontendEntry && item.testEvidence.length && item.acceptanceEvidence.length), detail: "all template fields populated" },
+    { id: "templates:documentation-rule", passed: templates.every((item) => item.documentationRule?.aboutPage && item.documentationRule?.requiredDocument && item.documentationRule?.flowDiagram), detail: "all templates require About docs and flow diagrams" },
+    { id: "templates:conversation-starter", passed: templates.every((item) => item.conversationStarter && item.conversationStarter.includes(item.id) && item.conversationStarter.includes(item.frontendEntry)), detail: "all templates expose copy-ready conversation starters" },
+    { id: "templates:implementation-checklist", passed: templates.every((item) => Array.isArray(item.implementationChecklist) && item.implementationChecklist.length >= 8), detail: "all templates expose implementation checklists" },
+    { id: "templates:acceptance-gate", passed: templates.every((item) => item.acceptanceGate?.readyWhen?.length >= 4 && item.acceptanceGate?.evidence?.length), detail: "all templates expose acceptance gates" },
+    { id: "templates:source-boundary", passed: templates.filter((item) => item.sourceApplication).length === 7 && templates.filter((item) => item.aggregateApplication).length === 1, detail: "7 source applications and 1 aggregate dashboard" }
+  ];
+  return {
+    ok: summary.ok && checks.every((item) => item.passed),
+    generatedAt: summary.generatedAt,
+    scope: {
+      role: "priority-application-development-templates",
+      rule: "Each template is the handoff contract for one independent application conversation: boundary, reuse, data, API, frontend, tests, acceptance evidence, About-page feature description, module documentation, and a workflow diagram."
+    },
+    summary: {
+      applications: templates.length,
+      sourceApplications: templates.filter((item) => item.sourceApplication).length,
+      aggregateApplications: templates.filter((item) => item.aggregateApplication).length,
+      apiRoutes: templates.reduce((sum, item) => sum + item.apiRoutes.length, 0),
+      dataCollections: new Set(templates.flatMap((item) => item.dataCollections)).size,
+      acceptanceArtifacts: templates.reduce((sum, item) => sum + item.acceptanceEvidence.length, 0)
+    },
+    templates,
+    checks
   };
 }
 
@@ -225,6 +344,7 @@ function buildHealthDashboardSummary(options = {}) {
   const checks = [
     { id: "dashboard:applications", passed: applications.length === 8 && sourceApplications.length === 7 && applications.every((item) => item.entry && item.collections.length), detail: `${applications.length} priority applications; ${sourceApplications.length} source applications` },
     { id: "dashboard:development-template", passed: applications.every((item) => item.functionalBoundary && item.reusePoints.length && item.dataCollections.length && item.apiRoutes.length && item.frontendEntry && item.testEvidence.length && item.acceptanceEvidence.length), detail: "all priority applications expose boundary, reuse, data, API, frontend, test, and acceptance fields" },
+    { id: "dashboard:documentation-rule", passed: applications.every((item) => item.documentationRule?.aboutPage && item.documentationRule?.requiredDocument && item.documentationRule?.flowDiagram), detail: "all priority applications expose About docs and flow diagram requirements" },
     { id: "dashboard:source-boundary", passed: sourceApplications.every((item) => /source application/.test(item.boundary)), detail: "source applications keep workflow ownership" },
     { id: "dashboard:aggregate-boundary", passed: /first seven source applications/.test(applications.find((item) => item.id === DASHBOARD_APPLICATION.id)?.boundary || ""), detail: "dashboard is aggregate-only" },
     { id: "dashboard:metrics", passed: applications.reduce((sum, item) => sum + item.records, 0) > 0, detail: `${applications.reduce((sum, item) => sum + item.records, 0)} source records` },
@@ -290,7 +410,12 @@ function buildHealthDashboardSummary(options = {}) {
 
 function renderMarkdown(report) {
   const appRows = report.applications.map((item) => `| ${item.id} | ${item.entry} | ${item.records} | ${item.openActions} | ${item.highRisks} | ${item.status} |`);
-  const templateRows = report.applications.map((item) => `| ${item.id} | ${String(item.functionalBoundary || "").replace(/\|/g, "/")} | ${item.reusePoints.join("<br>")} | ${item.dataCollections.join("<br>")} | ${item.apiRoutes.join("<br>")} | ${item.frontendEntry} | ${item.testEvidence.join("<br>")} | ${item.acceptanceEvidence.join("<br>")} |`);
+  const templateRows = report.applications.map((item) => {
+    const documentation = item.documentationRule
+      ? [`About: ${item.documentationRule.aboutPage}`, `Doc: ${item.documentationRule.requiredDocument}`, "Flow: required", `Reference: ${item.documentationRule.maternalChildReference}`].join("<br>")
+      : "";
+    return `| ${item.id} | ${String(item.functionalBoundary || "").replace(/\|/g, "/")} | ${item.reusePoints.join("<br>")} | ${item.dataCollections.join("<br>")} | ${item.apiRoutes.join("<br>")} | ${item.frontendEntry} | ${item.testEvidence.join("<br>")} | ${item.acceptanceEvidence.join("<br>")} | ${documentation} |`;
+  });
   const actionRows = report.openActions.map((item) => `| ${item.priority} | ${item.collection} | ${item.id} | ${String(item.title || "").replace(/\|/g, "/")} | ${item.status} | ${item.owner} |`);
   const checkRows = report.checks.map((item) => `| ${item.passed ? "PASS" : "FAIL"} | ${item.id} | ${String(item.detail || "").replace(/\|/g, "/")} |`);
   return [
@@ -323,8 +448,8 @@ function renderMarkdown(report) {
     "",
     "## Development template",
     "",
-    "| Application | Boundary | Reuse points | Data collections | API | Frontend entry | Tests | Acceptance evidence |",
-    "|---|---|---|---|---|---|---|---|",
+    "| Application | Boundary | Reuse points | Data collections | API | Frontend entry | Tests | Acceptance evidence | Documentation rule |",
+    "|---|---|---|---|---|---|---|---|---|",
     ...templateRows,
     "",
     "## Open action preview",
@@ -372,4 +497,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { APPLICATIONS, buildHealthDashboardSummary, parseArgs, renderMarkdown, writeOutput };
+module.exports = { APPLICATIONS, DOCUMENTATION_RULE, buildHealthDashboardSummary, buildPriorityApplicationTemplates, parseArgs, renderMarkdown, writeOutput };

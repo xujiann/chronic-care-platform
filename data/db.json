@@ -139,6 +139,12 @@
       "source": "家庭医生随访",
       "status": "稳定管理",
       "note": "按季度复查",
+      "careLevel": "中度失能",
+      "eligibility": "长护险待遇已核验",
+      "assessmentScore": 72,
+      "carePlan": "每周 2 次上门协助取药、血压复测和用药提醒",
+      "provider": "青泥洼桥社区照护团队",
+      "reviewCycle": "30 天复评",
       "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     }
   ],
@@ -152,6 +158,12 @@
       "status": "已逾期",
       "result": "未记录",
       "advice": "补充电话随访",
+      "careLevel": "轻度风险",
+      "eligibility": "暂不触发长护险待遇",
+      "assessmentScore": 38,
+      "carePlan": "手机大字模式、家庭血压上传和家庭医生月度复核",
+      "provider": "刘医生家庭医生团队",
+      "reviewCycle": "90 天复评",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
@@ -163,6 +175,12 @@
       "status": "待随访",
       "result": "未记录",
       "advice": "复测空腹血糖",
+      "careLevel": "自理",
+      "eligibility": "医保电子凭证待核验",
+      "assessmentScore": 18,
+      "carePlan": "社区帮办绑定凭证，糖尿病随访时同步复核照护风险",
+      "provider": "星海湾社区服务站",
+      "reviewCycle": "随访时复核",
       "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
@@ -1261,7 +1279,11 @@
       "issuingPhysician": "测试医师",
       "applicantName": "演示居民A",
       "applicantRelation": "母亲",
-      "materials": [],
+      "materials": [
+        "母亲身份证",
+        "首次签发登记表",
+        "分娩信息核验"
+      ],
       "status": "待签发",
       "electronicLicenseStatus": "待生成",
       "publicSecuritySync": "未共享",
@@ -1278,10 +1300,10 @@
     {
       "id": "birth-cert-016c9f75-b5c1-43d6-bb20-361b3665c97d",
       "certificateNo": "TEST-BIRTH-1782178052805",
-      "certificateVersion": "待补充",
-      "issueType": "待补充",
-      "newbornName": "待补充",
-      "newbornGender": "demo-placeholder",
+      "certificateVersion": "第七版",
+      "issueType": "首次签发",
+      "newbornName": "测试新生儿",
+      "newbornGender": "女",
       "birthDateTime": "2026-06-23 09:30",
       "gestationalWeeks": 40,
       "birthWeight": 2400,
@@ -1291,24 +1313,28 @@
       "residentId": "r1",
       "maternalResidentId": "r1",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
-      "motherName": "demo-placeholder",
+      "motherName": "演示居民A",
       "motherDocumentNo": "DEMO-ID-R1",
-      "fatherName": "demo-placeholder",
+      "fatherName": "演示父亲",
       "fatherDocumentNo": "",
       "issuingInstitutionId": "MR1",
-      "issuingInstitution": "待补充",
-      "issuingPhysician": "待补充",
+      "issuingInstitution": "大连市中心医院",
+      "issuingPhysician": "测试医师",
       "applicantName": "演示居民A",
       "applicantRelation": "母亲",
-      "materials": [],
-      "status": "待补充",
+      "materials": [
+        "母亲身份证",
+        "首次签发登记表",
+        "分娩信息核验"
+      ],
+      "status": "待签发",
       "electronicLicenseStatus": "待生成",
       "publicSecuritySync": "未共享",
       "maternalChildSync": "待入册",
       "qualityCheck": "待复核",
       "issueDeadline": "出生后及时办理，签发登记留痕",
       "healthManagementStatus": "待新生儿访视",
-      "nextService": "待补充",
+      "nextService": "新生儿家庭访视与预防接种提醒",
       "createdBy": "hospital",
       "createdByName": "医疗机构管理员",
       "createdAt": "2026-06-23T01:27:32.820Z",
@@ -1382,6 +1408,96 @@
       "status": "已建模"
     }
   ],
+  "birthCertificateDocuments": [
+    {
+      "id": "birth-doc-annual-plan-2026",
+      "category": "blank-certificate-plan",
+      "name": "2026 年空白出生医学证明年度申领计划",
+      "certificateVersion": "第七版",
+      "institutionId": "commission",
+      "owner": "大连市卫生健康委",
+      "quantity": 1200,
+      "serialRange": "BC-G210200-2026-000001 至 BC-G210200-2026-001200",
+      "status": "已验收",
+      "evidence": [
+        "年度计划",
+        "验收回执",
+        "专人管理"
+      ],
+      "controlPoints": [
+        "空白证件",
+        "年度申领",
+        "验收回执"
+      ],
+      "lastUpdated": "2026-06-01T08:30:00.000Z"
+    },
+    {
+      "id": "birth-doc-quarter-distribution-2026q2",
+      "category": "quarter-distribution",
+      "name": "2026 年二季度第七版证件配发表",
+      "certificateVersion": "第七版",
+      "institutionId": "mr1",
+      "owner": "大连市卫生健康委/大连市中心医院",
+      "quantity": 300,
+      "serialRange": "BC-G210200-2026-000301 至 BC-G210200-2026-000600",
+      "status": "已签收",
+      "evidence": [
+        "季度申领",
+        "配发记录",
+        "签收记录"
+      ],
+      "controlPoints": [
+        "配发记录",
+        "签收",
+        "第七版"
+      ],
+      "lastUpdated": "2026-06-05T09:20:00.000Z"
+    },
+    {
+      "id": "birth-doc-waste-202606",
+      "category": "waste-certificate",
+      "name": "2026 年 6 月废证登记与销毁记录",
+      "certificateVersion": "第七版",
+      "institutionId": "mr2",
+      "owner": "大连医科大学附属医院",
+      "quantity": 2,
+      "serialRange": "BC-G210211-2026-000118 至 BC-G210211-2026-000119",
+      "status": "已销毁",
+      "evidence": [
+        "废证登记",
+        "销毁记录",
+        "双人复核"
+      ],
+      "controlPoints": [
+        "废证",
+        "作废",
+        "销毁记录"
+      ],
+      "lastUpdated": "2026-06-18T11:00:00.000Z"
+    },
+    {
+      "id": "birth-doc-old-version-cleanup",
+      "category": "old-version-cleanup",
+      "name": "第六版出生医学证明旧版清理台账",
+      "certificateVersion": "第六版",
+      "institutionId": "commission",
+      "owner": "大连市卫生健康委",
+      "quantity": 0,
+      "serialRange": "第六版库存清零",
+      "status": "已清理",
+      "evidence": [
+        "旧版清理",
+        "库存清零",
+        "销毁记录"
+      ],
+      "controlPoints": [
+        "旧版清理",
+        "第七版启用",
+        "监管留痕"
+      ],
+      "lastUpdated": "2026-06-20T15:15:00.000Z"
+    }
+  ],
   "birthStatistics": {
     "period": "2026-06",
     "title": "出生医学证明与出生人口统计",
@@ -1408,22 +1524,25 @@
     ],
     "metrics": {
       "total": 5,
-      "firstIssued": 3,
+      "firstIssued": 4,
       "reissued": 1,
       "signed": 1,
       "reported": 3,
       "electronicLicenses": 1,
       "publicSecuritySynced": 1,
       "maternalChildSynced": 2,
-      "pending": 3,
+      "pending": 4,
       "lowBirthWeight": 2,
-      "qualityPass": 1
+      "qualityPass": 1,
+      "pendingPublicSecuritySync": 4,
+      "pendingMaternalChildSync": 3,
+      "qualityPending": 4
     },
     "regionStats": [
       {
         "region": "市级",
         "births": 4,
-        "firstIssueRate": "75%",
+        "firstIssueRate": "100%",
         "publicSecuritySyncRate": "25%",
         "lowBirthWeight": 2
       },
@@ -2102,6 +2221,18 @@
       "department": "家庭医生工作室",
       "licenseNo": "DEMO-DOC-210202-001",
       "registrationValidUntil": "2029-12-31",
+      "electronicRegistration": {
+        "registryId": "ER-DL-210202-0001",
+        "sourceSystem": "医师电子化注册系统",
+        "syncedAt": "2026-06-15T09:10:00+08:00",
+        "verificationStatus": "已核验",
+        "licenseNo": "DEMO-DOC-210202-001",
+        "category": "临床",
+        "practiceScope": "全科医学专业",
+        "primaryInstitutionId": "MR3",
+        "validUntil": "2029-12-31",
+        "signatureNo": "DL-ER-SIGN-20260615-001"
+      },
       "yearsInSpecialty": 12,
       "healthStatus": "适宜执业",
       "assessmentRecords": [
@@ -2133,6 +2264,18 @@
       "department": "心内科",
       "licenseNo": "DEMO-DOC-210200-002",
       "registrationValidUntil": "2030-06-30",
+      "electronicRegistration": {
+        "registryId": "ER-DL-210200-0002",
+        "sourceSystem": "医师电子化注册系统",
+        "syncedAt": "2026-06-15T09:25:00+08:00",
+        "verificationStatus": "已核验",
+        "licenseNo": "DEMO-DOC-210200-002",
+        "category": "临床",
+        "practiceScope": "内科专业",
+        "primaryInstitutionId": "MR1",
+        "validUntil": "2030-06-30",
+        "signatureNo": "DL-ER-SIGN-20260615-002"
+      },
       "yearsInSpecialty": 18,
       "healthStatus": "适宜执业",
       "assessmentRecords": [
@@ -2209,6 +2352,15 @@
         "scheduleConflict": false,
         "publicDisclosure": true
       },
+      "primaryPracticeConfirmation": {
+        "status": "已电子确认",
+        "mode": "第一执业地点电子签章",
+        "confirmedBy": "张主任",
+        "confirmedByOrg": "青泥洼桥社区卫生服务中心",
+        "confirmedAt": "2026-06-17T11:20:00+08:00",
+        "signatureNo": "DL-MP-CONSENT-20260617-001",
+        "opinion": "同意在医联体内开展慢病联合门诊"
+      },
       "lifecycle": [
         {
           "at": "2026-06-17 09:00",
@@ -2240,13 +2392,28 @@
         "titleQualified": true,
         "fiveYears": true,
         "assessmentQualified": true,
+        "electronicRegistrationVerified": true,
+        "registrationInForce": true,
         "categoryMatched": true,
         "scopeMatched": true,
         "agreementCompleted": true,
         "publicHospitalLeaderRestricted": false
       },
       "publicVisible": true,
-      "lastUpdated": "2026-06-17T09:00:00.000Z"
+      "lastUpdated": "2026-06-17T09:00:00.000Z",
+      "electronicRegistrationVerification": {
+        "registryId": "ER-DL-210202-0001",
+        "sourceSystem": "医师电子化注册系统",
+        "syncedAt": "2026-06-15T09:10:00+08:00",
+        "verificationStatus": "已核验",
+        "licenseMatched": true,
+        "categoryMatched": true,
+        "scopeMatched": true,
+        "primaryInstitutionMatched": true,
+        "inForce": true,
+        "validUntil": "2029-12-31",
+        "signatureNo": "DL-ER-SIGN-20260615-001"
+      }
     },
     {
       "id": "mp-002",
@@ -2273,6 +2440,15 @@
         "liabilityInsurance": true,
         "scheduleConflict": false,
         "publicDisclosure": true
+      },
+      "primaryPracticeConfirmation": {
+        "status": "医联体帮扶免办",
+        "mode": "医联体帮扶备案",
+        "confirmedBy": "医务部",
+        "confirmedByOrg": "大连市中心医院",
+        "confirmedAt": "2026-06-16T15:00:00+08:00",
+        "signatureNo": "DL-MP-AID-20260616-001",
+        "opinion": "按医联体帮扶任务管理"
       },
       "lifecycle": [
         {
@@ -2305,13 +2481,28 @@
         "titleQualified": true,
         "fiveYears": true,
         "assessmentQualified": true,
+        "electronicRegistrationVerified": true,
+        "registrationInForce": true,
         "categoryMatched": true,
         "scopeMatched": true,
         "agreementCompleted": true,
         "publicHospitalLeaderRestricted": false
       },
       "publicVisible": true,
-      "lastUpdated": "2026-06-16T10:30:00.000Z"
+      "lastUpdated": "2026-06-16T10:30:00.000Z",
+      "electronicRegistrationVerification": {
+        "registryId": "ER-DL-210200-0002",
+        "sourceSystem": "医师电子化注册系统",
+        "syncedAt": "2026-06-15T09:25:00+08:00",
+        "verificationStatus": "已核验",
+        "licenseMatched": true,
+        "categoryMatched": true,
+        "scopeMatched": true,
+        "primaryInstitutionMatched": true,
+        "inForce": true,
+        "validUntil": "2030-06-30",
+        "signatureNo": "DL-ER-SIGN-20260615-002"
+      }
     }
   ],
   "chronicScreeningTasks": [
@@ -2876,11 +3067,14 @@
   ],
   "chronicSelfManagement": [
     {
+      "uploadSource": "居民端自测",
+      "deviceId": "bp-device-demo-001",
+      "deviceExternalId": "device-bp-r1-20260622",
+      "integrationStatus": "device gateway accepted",
       "id": "csm-001",
       "residentId": "r1",
       "device": "电子血压计",
       "latestValue": "166/96 mmHg",
-      "uploadSource": "居民端自测",
       "group": "高血压互助小组",
       "incentive": "连续上传7天可兑换健康积分",
       "status": "需医生复核",
@@ -2888,11 +3082,14 @@
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
+      "uploadSource": "居民端自测",
+      "deviceId": "glucose-device-demo-002",
+      "deviceExternalId": "device-glucose-r2-20260622",
+      "integrationStatus": "device callback accepted",
       "id": "csm-002",
       "residentId": "r2",
       "device": "智能体重秤+血糖仪",
       "latestValue": "空腹血糖 7.8 mmol/L，BMI 25.1",
-      "uploadSource": "居民端自测",
       "group": "糖尿病饮食运动小组",
       "incentive": "完成运动打卡纳入签约服务包",
       "status": "持续监测",
@@ -3093,6 +3290,36 @@
       "requestedAt": "2026-06-19",
       "due": "2026-06-20",
       "result": "待接诊反馈",
+      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
+    },
+    {
+      "id": "cco-004",
+      "center": "teleconsultation-center",
+      "region": "zhongshan",
+      "fromInstitution": "Qingniwaqiao Community Health Service Center",
+      "toInstitution": "Dalian Central Hospital",
+      "residentId": "r1",
+      "orderType": "hypertension specialist teleconsultation",
+      "status": "scheduled",
+      "priority": "high",
+      "requestedAt": "2026-06-21",
+      "due": "2026-06-23",
+      "result": "specialist consultation window confirmed",
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
+    },
+    {
+      "id": "cco-005",
+      "center": "two-way-referral-center",
+      "region": "zhongshan",
+      "fromInstitution": "Dalian Central Hospital",
+      "toInstitution": "Qingniwaqiao Community Health Service Center",
+      "residentId": "r4",
+      "orderType": "down-referral report return",
+      "status": "report-returned",
+      "priority": "medium",
+      "requestedAt": "2026-06-19",
+      "due": "2026-06-21",
+      "result": "primary follow-up plan confirmed",
       "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     }
   ],
@@ -3730,7 +3957,7 @@
       "department": "Cardiology",
       "applicantDoctor": "doc-liu",
       "receivingDoctor": "doc-wang",
-      "residentAuthorizationId": "auth-r1-referral-demo",
+      "residentAuthorizationId": "pr-auth-r1",
       "authorizationStatus": "authorized",
       "status": "scheduled",
       "priority": "high",
@@ -3747,7 +3974,7 @@
       "reportStatus": "pending-return",
       "reportReturnedAt": "",
       "reportSummary": "",
-      "collaborationOrderId": "cco-001",
+      "collaborationOrderId": "cco-004",
       "performance": {
         "responseHours": 4,
         "reportReturnHours": 0,
@@ -3780,7 +4007,7 @@
       "department": "Family doctor studio",
       "applicantDoctor": "doc-wang",
       "receivingDoctor": "doc-liu",
-      "residentAuthorizationId": "auth-r4-referral-demo",
+      "residentAuthorizationId": "pr-auth-r4",
       "authorizationStatus": "authorized",
       "status": "report-returned",
       "priority": "medium",
@@ -3796,7 +4023,7 @@
       "reportStatus": "returned",
       "reportReturnedAt": "2026-06-21",
       "reportSummary": "Continue eight-week long prescription follow-up and weekly blood pressure upload.",
-      "collaborationOrderId": "cco-001",
+      "collaborationOrderId": "cco-005",
       "performance": {
         "responseHours": 2,
         "reportReturnHours": 18,
@@ -3819,7 +4046,1376 @@
       "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     }
   ],
-  "taskMessages": [],
+  "escortServicePolicy": {
+    "id": "escort-policy-shanghai-pilot-2025",
+    "name": "Older adult medical escort service pilot",
+    "source": "Shanghai older adult medical escort pilot plan, January 2025",
+    "scope": [
+      "service catalog",
+      "trained escort workers",
+      "provider registry",
+      "pricing and subsidy",
+      "risk control",
+      "quality monitoring"
+    ],
+    "pilotDistricts": [
+      "Pudong",
+      "Yangpu",
+      "Songjiang",
+      "Xuhui",
+      "Changning",
+      "Putuo",
+      "Jing'an",
+      "Hongkou",
+      "Huangpu"
+    ],
+    "serviceItems": [
+      "mobility assistance",
+      "registration",
+      "exam escort",
+      "payment and medication pickup",
+      "family communication",
+      "psychological comfort"
+    ],
+    "providerEntryRule": "Provider must have trained escort workers and regular professional service capacity before public registry publication.",
+    "trainingTargetPerDistrict": 100,
+    "statusCatalog": [
+      "requested",
+      "matched",
+      "contract-pending",
+      "in-service",
+      "completed",
+      "quality-review",
+      "closed",
+      "cancelled"
+    ],
+    "requiredEvidence": [
+      "service contract",
+      "worker training certificate",
+      "liability insurance",
+      "emergency plan",
+      "quality review",
+      "complaint disposition"
+    ],
+    "subsidyRules": [
+      {
+        "group": "low-income",
+        "coverage": "government subsidy or purchase-of-service guarantee"
+      },
+      {
+        "group": "80plus-living-alone",
+        "coverage": "low-price inclusive service package"
+      },
+      {
+        "group": "time-bank",
+        "coverage": "volunteer service hour exchange"
+      }
+    ],
+    "integrationTargets": [
+      "elder-care service platform",
+      "hospital outpatient guidance",
+      "non-emergency transfer",
+      "volunteer time bank"
+    ]
+  },
+  "escortServiceProviders": [
+    {
+      "id": "esp-pudong-carehub",
+      "name": "Pudong Elder Care Service Center",
+      "district": "Pudong",
+      "type": "elder-care-institution",
+      "institutionCode": "ORG-HOSPITAL",
+      "serviceCapacity": "regular",
+      "trainedWorkers": 128,
+      "published": true,
+      "pricing": {
+        "baseFee": 160,
+        "halfDayFee": 260,
+        "fullDayFee": 420,
+        "subsidyAccepted": true
+      },
+      "insurance": "liability-insurance-active",
+      "emergencyPlan": "hospital-fall-and-transfer-plan-v1",
+      "status": "published",
+      "qualityScore": 92,
+      "contact": "escort-demo-pudong"
+    },
+    {
+      "id": "esp-xuhui-daycare",
+      "name": "Xuhui Community Day-care Escort Team",
+      "district": "Xuhui",
+      "type": "community-day-care",
+      "institutionCode": "ORG-COMMUNITY",
+      "serviceCapacity": "regular",
+      "trainedWorkers": 104,
+      "published": true,
+      "pricing": {
+        "baseFee": 120,
+        "halfDayFee": 220,
+        "fullDayFee": 360,
+        "subsidyAccepted": true
+      },
+      "insurance": "liability-insurance-active",
+      "emergencyPlan": "community-emergency-contact-plan",
+      "status": "published",
+      "qualityScore": 88,
+      "contact": "escort-demo-xuhui"
+    },
+    {
+      "id": "esp-hongkou-volunteer",
+      "name": "Hongkou Time-bank Escort Service Station",
+      "district": "Hongkou",
+      "type": "time-bank-volunteer",
+      "institutionCode": "ORG-COUNTY",
+      "serviceCapacity": "pilot",
+      "trainedWorkers": 96,
+      "published": false,
+      "pricing": {
+        "baseFee": 0,
+        "halfDayFee": 80,
+        "fullDayFee": 160,
+        "subsidyAccepted": true
+      },
+      "insurance": "municipal-volunteer-insurance",
+      "emergencyPlan": "volunteer-supervision-plan",
+      "status": "training-gap",
+      "qualityScore": 81,
+      "contact": "escort-demo-hongkou"
+    }
+  ],
+  "escortWorkers": [
+    {
+      "id": "ew-pd-001",
+      "providerId": "esp-pudong-carehub",
+      "name": "Escort Worker A",
+      "district": "Pudong",
+      "trainingHours": 42,
+      "examStatus": "passed",
+      "skills": [
+        "mobility assistance",
+        "exam escort",
+        "family communication"
+      ],
+      "insuranceStatus": "covered",
+      "status": "available"
+    },
+    {
+      "id": "ew-pd-002",
+      "providerId": "esp-pudong-carehub",
+      "name": "Escort Worker B",
+      "district": "Pudong",
+      "trainingHours": 38,
+      "examStatus": "passed",
+      "skills": [
+        "registration",
+        "payment and medication pickup"
+      ],
+      "insuranceStatus": "covered",
+      "status": "assigned"
+    },
+    {
+      "id": "ew-xh-001",
+      "providerId": "esp-xuhui-daycare",
+      "name": "Escort Worker C",
+      "district": "Xuhui",
+      "trainingHours": 40,
+      "examStatus": "passed",
+      "skills": [
+        "mobility assistance",
+        "psychological comfort"
+      ],
+      "insuranceStatus": "covered",
+      "status": "available"
+    },
+    {
+      "id": "ew-hk-001",
+      "providerId": "esp-hongkou-volunteer",
+      "name": "Escort Volunteer D",
+      "district": "Hongkou",
+      "trainingHours": 28,
+      "examStatus": "pending",
+      "skills": [
+        "registration",
+        "family communication"
+      ],
+      "insuranceStatus": "covered",
+      "status": "training"
+    }
+  ],
+  "escortServiceOrders": [
+    {
+      "id": "eso-r1-20260622",
+      "residentId": "r1",
+      "providerId": "esp-pudong-carehub",
+      "workerId": "ew-pd-002",
+      "district": "Pudong",
+      "hospital": "Dalian Central Hospital outpatient clinic demo",
+      "hospitalCode": "MR1",
+      "department": "Cardiology",
+      "appointmentAt": "2026-06-23",
+      "due": "2026-06-23",
+      "serviceItems": [
+        "mobility assistance",
+        "registration",
+        "exam escort",
+        "payment and medication pickup"
+      ],
+      "status": "matched",
+      "priority": "high",
+      "riskLevel": "high",
+      "subsidyType": "80plus-living-alone",
+      "feeEstimate": 120,
+      "contractStatus": "signed",
+      "insuranceStatus": "covered",
+      "transportLink": "non-emergency-transfer-ready",
+      "familyContactStatus": "notified",
+      "qualityReview": "pending",
+      "complaintStatus": "none",
+      "satisfaction": "pending",
+      "hospitalInterfaceStatus": "confirmed",
+      "hospitalCheckInStatus": "confirmed",
+      "hospitalCheckInNo": "OP-MR1-20260622-001",
+      "hisVisitId": "HIS-MR1-20260622-0001",
+      "appointmentSource": "hospital-outpatient-guidance",
+      "departmentCode": "CARD",
+      "doctorCode": "DOC-CARD-01",
+      "outpatientQueueNo": "C08",
+      "hospitalDepartmentContact": "Cardiology outpatient guidance desk",
+      "hospitalConfirmedAt": "2026-06-22",
+      "hospitalNotice": "Arrive at first-floor outpatient service desk 20 minutes before the appointment.",
+      "sourceChannel": "community-worker",
+      "auditTrail": [
+        {
+          "at": "2026-06-22",
+          "action": "match-worker",
+          "by": "system",
+          "note": "High-risk older adult matched with trained worker."
+        }
+      ]
+    },
+    {
+      "id": "eso-r4-20260623",
+      "residentId": "r4",
+      "providerId": "esp-xuhui-daycare",
+      "workerId": "ew-xh-001",
+      "district": "Xuhui",
+      "hospital": "Community follow-up clinic demo",
+      "hospitalCode": "MR3",
+      "department": "Endocrinology",
+      "appointmentAt": "2026-06-24",
+      "due": "2026-06-24",
+      "serviceItems": [
+        "registration",
+        "exam escort",
+        "family communication",
+        "psychological comfort"
+      ],
+      "status": "contract-pending",
+      "priority": "medium",
+      "riskLevel": "medium",
+      "subsidyType": "low-income",
+      "feeEstimate": 80,
+      "contractStatus": "pending",
+      "insuranceStatus": "covered",
+      "transportLink": "family-arranged",
+      "familyContactStatus": "pending",
+      "qualityReview": "pending",
+      "complaintStatus": "none",
+      "satisfaction": "pending",
+      "hospitalInterfaceStatus": "pending",
+      "hospitalCheckInStatus": "pending",
+      "hospitalCheckInNo": "",
+      "hisVisitId": "",
+      "appointmentSource": "resident-mobile",
+      "departmentCode": "ENDO",
+      "doctorCode": "",
+      "outpatientQueueNo": "",
+      "hospitalDepartmentContact": "",
+      "hospitalConfirmedAt": "",
+      "hospitalNotice": "",
+      "sourceChannel": "family-proxy",
+      "auditTrail": [
+        {
+          "at": "2026-06-22",
+          "action": "request-created",
+          "by": "family-proxy",
+          "note": "Contract confirmation pending."
+        }
+      ]
+    },
+    {
+      "id": "eso-r2-20260621",
+      "residentId": "r2",
+      "providerId": "esp-hongkou-volunteer",
+      "workerId": "ew-hk-001",
+      "district": "Hongkou",
+      "hospital": "Specialist outpatient demo",
+      "hospitalCode": "",
+      "department": "Ophthalmology",
+      "appointmentAt": "2026-06-21",
+      "due": "2026-06-22",
+      "serviceItems": [
+        "registration",
+        "family communication"
+      ],
+      "status": "quality-review",
+      "priority": "medium",
+      "riskLevel": "medium",
+      "subsidyType": "time-bank",
+      "feeEstimate": 0,
+      "contractStatus": "signed",
+      "insuranceStatus": "covered",
+      "transportLink": "not-required",
+      "familyContactStatus": "completed",
+      "qualityReview": "follow-up-call-required",
+      "complaintStatus": "none",
+      "satisfaction": "pending",
+      "hospitalInterfaceStatus": "returned",
+      "hospitalCheckInStatus": "completed",
+      "hospitalCheckInNo": "TB-HK-20260621-002",
+      "hisVisitId": "TB-HK-20260621-002",
+      "appointmentSource": "time-bank-service-station",
+      "departmentCode": "OPH",
+      "doctorCode": "",
+      "outpatientQueueNo": "V02",
+      "hospitalDepartmentContact": "Outpatient volunteer desk",
+      "hospitalConfirmedAt": "2026-06-21",
+      "hospitalNotice": "Quality callback required after volunteer escort completion.",
+      "sourceChannel": "time-bank",
+      "auditTrail": [
+        {
+          "at": "2026-06-21",
+          "action": "service-completed",
+          "by": "escort-worker",
+          "note": "Quality review callback required."
+        }
+      ]
+    }
+  ],
+  "registrationSchedules": [
+    {
+      "id": "reg-sch-cardio-am",
+      "hisScheduleId": "HIS-SCH-MR1-CARD-20260631-AM",
+      "hospitalCode": "MR1",
+      "hospital": "Dalian Central Hospital outpatient clinic demo",
+      "departmentCode": "CARD",
+      "department": "Cardiology",
+      "doctorCode": "DOC-CARD-01",
+      "doctor": "Doctor Wang",
+      "date": "2026-06-24",
+      "period": "AM",
+      "source": "HIS outpatient source pool",
+      "sourceSystem": "hospital-HIS",
+      "sourceType": "hospital-his",
+      "remaining": 6,
+      "total": 30,
+      "fee": 18,
+      "paymentRequired": true,
+      "insuranceSupported": true,
+      "medicalInsuranceItemCode": "MI-OP-CARD-REG",
+      "cancelBeforeHours": 24,
+      "tags": [
+        "hypertension follow-up",
+        "escort supported"
+      ],
+      "status": "available",
+      "lockMinutes": 10,
+      "hospitalDepartmentContact": "Cardiology outpatient guidance desk"
+    },
+    {
+      "id": "reg-sch-endocrine-pm",
+      "hisScheduleId": "IH-SCH-MR2-ENDO-20260701-PM",
+      "hospitalCode": "MR2",
+      "hospital": "Dalian Medical University Affiliated Hospital demo",
+      "departmentCode": "ENDO",
+      "department": "Endocrinology",
+      "doctorCode": "DOC-ENDO-02",
+      "doctor": "Doctor Zhao",
+      "date": "2026-06-25",
+      "period": "PM",
+      "source": "Internet hospital source pool",
+      "sourceSystem": "internet-hospital",
+      "sourceType": "internet-hospital",
+      "remaining": 4,
+      "total": 20,
+      "fee": 22,
+      "paymentRequired": true,
+      "insuranceSupported": true,
+      "medicalInsuranceItemCode": "MI-OP-ENDO-REG",
+      "cancelBeforeHours": 12,
+      "tags": [
+        "diabetes follow-up",
+        "online revisit"
+      ],
+      "status": "available",
+      "lockMinutes": 10,
+      "hospitalDepartmentContact": "Internet hospital revisit desk"
+    },
+    {
+      "id": "reg-sch-community-am",
+      "hisScheduleId": "HIS-SCH-MR3-GP-20260630-AM",
+      "hospitalCode": "MR3",
+      "hospital": "Qingniwaqiao Community Health Service Center demo",
+      "departmentCode": "GP",
+      "department": "General Practice",
+      "doctorCode": "DOC-GP-01",
+      "doctor": "Doctor Liu",
+      "date": "2026-06-23",
+      "period": "AM",
+      "source": "Primary care appointment source pool",
+      "sourceSystem": "primary-care-HIS",
+      "sourceType": "primary-care",
+      "remaining": 12,
+      "total": 36,
+      "fee": 8,
+      "paymentRequired": false,
+      "insuranceSupported": true,
+      "medicalInsuranceItemCode": "MI-PC-GP-REG",
+      "cancelBeforeHours": 4,
+      "tags": [
+        "family doctor",
+        "chronic follow-up"
+      ],
+      "status": "available",
+      "lockMinutes": 10,
+      "hospitalDepartmentContact": "Community outpatient desk"
+    }
+  ],
+  "registrationOrders": [
+    {
+      "id": "reg-r1-20260630-cardio",
+      "residentId": "r1",
+      "scheduleId": "reg-sch-cardio-am",
+      "hisScheduleId": "HIS-SCH-MR1-CARD-20260631-AM",
+      "hisVisitId": "HIS-MR1-REG-20260630-0008",
+      "registrationNo": "REG-MR1-C08",
+      "queueNo": "C08",
+      "hospitalCode": "MR1",
+      "hospital": "Dalian Central Hospital outpatient clinic demo",
+      "departmentCode": "CARD",
+      "department": "Cardiology",
+      "doctorCode": "DOC-CARD-01",
+      "doctor": "Doctor Wang",
+      "appointmentDate": "2026-06-24",
+      "period": "AM",
+      "visitType": "onsite",
+      "reason": "Hypertension follow-up and medication adjustment",
+      "fee": 18,
+      "cancelBeforeHours": 24,
+      "status": "confirmed",
+      "scheduleLockStatus": "confirmed",
+      "paymentStatus": "pending",
+      "paymentTradeNo": "PAY-DEMO-REG-R1-0008",
+      "refundStatus": "none",
+      "insuranceStatus": "prechecked",
+      "insuranceCredentialNo": "MI-DEMO-MOBILE-R1",
+      "insurancePrecheckNo": "MI-PRE-REG-R1-0008",
+      "insuranceCoverage": 0,
+      "notificationStatus": "sent",
+      "notificationDeliveries": [
+        {
+          "event": "registration-submitted",
+          "channel": "in_app",
+          "status": "sent",
+          "sentAt": "2026-06-22",
+          "receiptAt": "2026-06-22"
+        },
+        {
+          "event": "registration-submitted",
+          "channel": "sms",
+          "status": "queued",
+          "sentAt": "",
+          "receiptAt": ""
+        }
+      ],
+      "source": "hospital-HIS",
+      "sourceChannel": "citizen",
+      "createdAt": "2026-06-22",
+      "updatedAt": "2026-06-22",
+      "auditTrail": [
+        {
+          "at": "2026-06-22",
+          "action": "seed-confirmed",
+          "by": "system",
+          "note": "Seeded registration order with HIS and insurance precheck evidence."
+        }
+      ]
+    }
+  ],
+  "internetNursingPolicy": {
+    "id": "internet-nursing-liaoning-pilot",
+    "source": "Liaoning Internet+ Nursing pilot implementation plan",
+    "scope": [
+      "online application",
+      "offline service",
+      "first-visit assessment",
+      "informed consent",
+      "nurse qualification",
+      "location tracking",
+      "full audit trail",
+      "workload statistics"
+    ],
+    "serviceObjects": [
+      "elderly or disabled people",
+      "rehabilitation patients",
+      "terminal-stage patients",
+      "maternal and infant people",
+      "mobility-limited chronic disease patients"
+    ],
+    "serviceCatalog": [
+      "daily living ability assessment",
+      "vital signs measurement",
+      "blood glucose measurement",
+      "wound care",
+      "tube care",
+      "postpartum care",
+      "infant care",
+      "PICC maintenance"
+    ],
+    "requiredEvidence": [
+      "identity authentication",
+      "first diagnosis assessment",
+      "signed informed consent",
+      "nurse practice certificate",
+      "service location trace",
+      "nursing record",
+      "quality callback"
+    ],
+    "platformRequirements": [
+      "grade-3 security protection",
+      "privacy protection",
+      "medical record storage",
+      "traceable service behavior",
+      "workload statistics"
+    ],
+    "riskControls": [
+      "emergency plan",
+      "one-click alert",
+      "liability insurance",
+      "medical accident insurance",
+      "service recorder"
+    ],
+    "notificationGateway": {
+      "mode": "simulation",
+      "enabled": true,
+      "channels": [
+        "in_app",
+        "sms",
+        "hospital_message"
+      ],
+      "events": [
+        "appointment-submitted",
+        "dispatch-qualified-nurse",
+        "nurse-accept",
+        "service-start",
+        "service-complete",
+        "quality-review"
+      ],
+      "readiness": "gateway-contract-ready"
+    },
+    "pricingRules": {
+      "currency": "CNY",
+      "settlementModes": [
+        "self-pay estimate",
+        "medical insurance pre-check"
+      ],
+      "items": {
+        "daily living ability assessment": {
+          "basePrice": 68,
+          "insuranceEligible": false
+        },
+        "vital signs measurement": {
+          "basePrice": 58,
+          "insuranceEligible": false
+        },
+        "blood glucose measurement": {
+          "basePrice": 86,
+          "insuranceEligible": true
+        },
+        "wound care": {
+          "basePrice": 168,
+          "insuranceEligible": true
+        },
+        "tube care": {
+          "basePrice": 198,
+          "insuranceEligible": true
+        },
+        "postpartum care": {
+          "basePrice": 220,
+          "insuranceEligible": false
+        },
+        "infant care": {
+          "basePrice": 180,
+          "insuranceEligible": false
+        },
+        "PICC maintenance": {
+          "basePrice": 260,
+          "insuranceEligible": true
+        }
+      }
+    },
+    "regulatoryContract": {
+      "version": "internet-nursing-regulatory-contract-v1",
+      "endpoints": [
+        "/api/internet-nursing/dashboard",
+        "/api/internet-nursing/orders",
+        "/api/internet-nursing/orders/:id/actions"
+      ],
+      "exchangeObjects": [
+        "internetNursingInstitutions",
+        "internetNursingNurses",
+        "internetNursingOrders",
+        "taskMessages"
+      ],
+      "targetSystems": [
+        "nursing management system",
+        "EMR",
+        "medical insurance settlement",
+        "health supervision platform"
+      ]
+    },
+    "productionIntegration": {
+      "version": "internet-nursing-production-integration-v1",
+      "gatewayMode": "simulation-contract-ready",
+      "messageGateway": {
+        "status": "contract-ready",
+        "channels": [
+          "sms",
+          "hospital_message",
+          "in_app"
+        ],
+        "fallback": "taskMessages"
+      },
+      "signatureStorage": {
+        "status": "contract-ready",
+        "bucket": "medical-consent-attachments",
+        "retentionYears": 15,
+        "hashAlgorithm": "SHA-256"
+      },
+      "hospitalConnectors": [
+        {
+          "system": "nursing management system",
+          "route": "/integration/internet-nursing/orders",
+          "status": "mapped",
+          "auth": "HMAC + idempotency-key"
+        },
+        {
+          "system": "EMR",
+          "route": "/integration/internet-nursing/service-records",
+          "status": "mapped",
+          "auth": "HMAC + resident consent"
+        },
+        {
+          "system": "health supervision platform",
+          "route": "/integration/internet-nursing/regulatory-report",
+          "status": "mapped",
+          "auth": "HMAC + signoff"
+        }
+      ],
+      "cutoverChecklist": [
+        "message gateway signoff",
+        "signature storage signoff",
+        "hospital connector signoff",
+        "fallback drill"
+      ]
+    },
+    "paymentIntegration": {
+      "version": "internet-nursing-payment-v1",
+      "modes": [
+        "medical insurance e-voucher pre-check",
+        "mobile self-pay",
+        "refund",
+        "invoice",
+        "daily reconciliation"
+      ],
+      "reconciliationCycle": "T+1",
+      "invoiceProvider": "electronic invoice platform",
+      "status": "contract-ready"
+    },
+    "deviceVerification": {
+      "version": "internet-nursing-device-verification-v1",
+      "requiredSignals": [
+        "mobile GPS",
+        "nurse location device",
+        "service recorder",
+        "one-click alert",
+        "photo attachment"
+      ],
+      "startEndDistanceMeters": 500,
+      "exceptionEscalation": "riskQueue + taskMessages",
+      "status": "contract-ready"
+    },
+    "regulatorySubmission": {
+      "version": "internet-nursing-regulatory-submission-v1",
+      "mappedFields": [
+        "institution",
+        "nurse",
+        "order",
+        "risk",
+        "trace",
+        "settlement",
+        "quality",
+        "adverseEvent"
+      ],
+      "submissionCycle": "monthly + high-risk realtime",
+      "pressureTest": {
+        "status": "passed",
+        "sampleSize": 1000,
+        "p95Ms": 420
+      },
+      "signoffs": [
+        "hospital nursing department",
+        "health commission supervision",
+        "platform operations"
+      ]
+    }
+  },
+  "internetNursingInstitutions": [
+    {
+      "id": "inh-mr1",
+      "institutionCode": "MR1",
+      "name": "Dalian Central Hospital",
+      "district": "Zhongshan",
+      "licenseNo": "PDY-INH-MR1",
+      "serviceModes": [
+        "home bed",
+        "patrol diagnosis",
+        "community nursing"
+      ],
+      "published": true,
+      "serviceArea": [
+        "Zhongshan",
+        "Xigang",
+        "Shahekou"
+      ],
+      "serviceItems": [
+        "wound care",
+        "PICC maintenance",
+        "blood glucose measurement",
+        "postpartum care"
+      ],
+      "dailyCapacity": 18,
+      "qualityOwner": "Nursing department",
+      "complaintHotline": "0411-12320",
+      "emergencyPlan": "hospital-nursing-home-service-emergency-plan",
+      "securityLevel": "grade-3-ready",
+      "admissionReview": {
+        "status": "approved",
+        "reviewedAt": "2026-05-13",
+        "reviewer": "health commission"
+      },
+      "catalogChangeRequests": [
+        {
+          "id": "cat-inh-mr1-001",
+          "item": "PICC maintenance",
+          "status": "approved",
+          "submittedAt": "2026-06-02"
+        }
+      ],
+      "monthlyCapacity": {
+        "month": "2026-06",
+        "plannedVisits": 180,
+        "completedVisits": 126,
+        "complaints": 1,
+        "adverseEvents": 0
+      }
+    },
+    {
+      "id": "inh-mr3",
+      "institutionCode": "MR3",
+      "name": "Qingniwaqiao Community Health Service Center",
+      "district": "Zhongshan",
+      "licenseNo": "PDY-INH-MR3",
+      "serviceModes": [
+        "community nursing",
+        "patrol diagnosis"
+      ],
+      "published": true,
+      "serviceArea": [
+        "Qingniwaqiao",
+        "Renmin Road"
+      ],
+      "serviceItems": [
+        "daily living ability assessment",
+        "vital signs measurement",
+        "blood glucose measurement",
+        "tube care"
+      ],
+      "dailyCapacity": 10,
+      "qualityOwner": "Community nursing office",
+      "complaintHotline": "0411-12320",
+      "emergencyPlan": "community-nursing-emergency-plan",
+      "securityLevel": "grade-3-platform-access",
+      "admissionReview": {
+        "status": "approved",
+        "reviewedAt": "2026-05-21",
+        "reviewer": "district health bureau"
+      },
+      "catalogChangeRequests": [
+        {
+          "id": "cat-inh-mr3-001",
+          "item": "tube care",
+          "status": "approved",
+          "submittedAt": "2026-06-04"
+        }
+      ],
+      "monthlyCapacity": {
+        "month": "2026-06",
+        "plannedVisits": 96,
+        "completedVisits": 71,
+        "complaints": 0,
+        "adverseEvents": 0
+      }
+    },
+    {
+      "id": "inh-mr5",
+      "institutionCode": "MR5",
+      "name": "Ganjingzi District People's Hospital",
+      "district": "Ganjingzi",
+      "licenseNo": "PDY-INH-MR5",
+      "serviceModes": [
+        "home bed",
+        "community nursing"
+      ],
+      "published": false,
+      "serviceArea": [
+        "Ganjingzi"
+      ],
+      "serviceItems": [
+        "wound care",
+        "postpartum care",
+        "infant care"
+      ],
+      "dailyCapacity": 8,
+      "qualityOwner": "Pilot office",
+      "complaintHotline": "0411-12320",
+      "emergencyPlan": "district-nursing-emergency-plan",
+      "securityLevel": "pending-review",
+      "admissionReview": {
+        "status": "pending",
+        "submittedAt": "2026-06-17",
+        "reviewer": "health commission"
+      },
+      "catalogChangeRequests": [
+        {
+          "id": "cat-inh-mr5-001",
+          "item": "infant care",
+          "status": "pending",
+          "submittedAt": "2026-06-18"
+        }
+      ],
+      "monthlyCapacity": {
+        "month": "2026-06",
+        "plannedVisits": 48,
+        "completedVisits": 0,
+        "complaints": 0,
+        "adverseEvents": 0
+      }
+    }
+  ],
+  "internetNursingNurses": [
+    {
+      "id": "inn-001",
+      "name": "Nurse Sun",
+      "institutionId": "inh-mr1",
+      "institutionCode": "MR1",
+      "title": "senior nurse",
+      "yearsClinical": 9,
+      "registrationStatus": "verified",
+      "badPracticeRecord": "none",
+      "specialties": [
+        "wound care",
+        "PICC maintenance",
+        "blood glucose measurement"
+      ],
+      "trainingStatus": "passed",
+      "insuranceStatus": "covered",
+      "locationDevice": "enabled",
+      "recorderStatus": "ready",
+      "oneClickAlert": "enabled",
+      "status": "available",
+      "serviceArea": [
+        "Zhongshan",
+        "Xigang"
+      ],
+      "dailyCapacity": 6,
+      "assignedToday": 2,
+      "qualificationExpiresAt": "2026-12-31"
+    },
+    {
+      "id": "inn-002",
+      "name": "Nurse Zhao",
+      "institutionId": "inh-mr3",
+      "institutionCode": "MR3",
+      "title": "nurse practitioner",
+      "yearsClinical": 6,
+      "registrationStatus": "verified",
+      "badPracticeRecord": "none",
+      "specialties": [
+        "vital signs measurement",
+        "daily living ability assessment",
+        "tube care"
+      ],
+      "trainingStatus": "passed",
+      "insuranceStatus": "covered",
+      "locationDevice": "enabled",
+      "recorderStatus": "ready",
+      "oneClickAlert": "enabled",
+      "status": "available",
+      "serviceArea": [
+        "Qingniwaqiao",
+        "Renmin Road"
+      ],
+      "dailyCapacity": 5,
+      "assignedToday": 1,
+      "qualificationExpiresAt": "2026-09-30"
+    },
+    {
+      "id": "inn-003",
+      "name": "Nurse Liu",
+      "institutionId": "inh-mr1",
+      "institutionCode": "MR1",
+      "title": "specialist nurse",
+      "yearsClinical": 12,
+      "registrationStatus": "verified",
+      "badPracticeRecord": "none",
+      "specialties": [
+        "postpartum care",
+        "infant care",
+        "wound care"
+      ],
+      "trainingStatus": "passed",
+      "insuranceStatus": "covered",
+      "locationDevice": "enabled",
+      "recorderStatus": "ready",
+      "oneClickAlert": "enabled",
+      "status": "in-service",
+      "serviceArea": [
+        "Zhongshan",
+        "Shahekou"
+      ],
+      "dailyCapacity": 4,
+      "assignedToday": 3,
+      "qualificationExpiresAt": "2026-07-20"
+    }
+  ],
+  "internetNursingOrders": [
+    {
+      "id": "ino-001",
+      "residentId": "r1",
+      "residentName": "Demo resident A",
+      "institutionId": "inh-mr1",
+      "institutionCode": "MR1",
+      "institutionName": "Dalian Central Hospital",
+      "nurseId": "inn-001",
+      "nurseName": "Nurse Sun",
+      "serviceItem": "wound care",
+      "serviceObject": "mobility-limited chronic disease patient",
+      "requestedAt": "2026-06-21",
+      "preferredAt": "2026-06-23",
+      "address": "Zhongshan district demo address",
+      "firstVisitAssessment": "passed",
+      "informedConsent": "signed",
+      "consentAttachment": {
+        "id": "consent-ino-001",
+        "type": "electronic-informed-consent",
+        "status": "signed",
+        "version": "internet-nursing-consent-v1",
+        "signerName": "Demo resident A",
+        "signedAt": "2026-06-21T08:00:00.000Z",
+        "attachmentName": "internet-nursing-informed-consent-ino-001.pdf",
+        "hash": "sha256:seed-consent-ino-001"
+      },
+      "identityVerified": true,
+      "riskLevel": "medium",
+      "status": "dispatched",
+      "locationTrace": "pending",
+      "locationTracePoints": [],
+      "serviceRecordStatus": "pending",
+      "serviceRecord": {
+        "status": "pending",
+        "attachments": [],
+        "attachmentCount": 0
+      },
+      "serviceAttachments": [],
+      "notificationReceiptSummary": {
+        "status": "pending",
+        "channels": [],
+        "sent": 0,
+        "queued": 0,
+        "read": 0,
+        "failed": 0,
+        "receipts": []
+      },
+      "qualityCallback": "pending",
+      "feeEstimate": 168,
+      "settlement": {
+        "mode": "medical insurance pre-check",
+        "estimatedSelfPay": 58,
+        "insuranceEstimate": 110,
+        "paymentStatus": "pending"
+      },
+      "satisfaction": {
+        "score": 0,
+        "status": "pending"
+      },
+      "complaintStatus": "none",
+      "qualityInspection": {
+        "status": "pending",
+        "inspector": "Nursing department",
+        "sampleType": "routine"
+      },
+      "adverseEvent": {
+        "status": "none",
+        "level": ""
+      },
+      "createdAt": "2026-06-21",
+      "auditTrail": [
+        {
+          "at": "2026-06-21",
+          "action": "order-created",
+          "by": "citizen",
+          "note": "Resident submitted internet nursing appointment."
+        }
+      ]
+    },
+    {
+      "id": "ino-002",
+      "residentId": "r2",
+      "residentName": "Demo resident B",
+      "institutionId": "inh-mr3",
+      "institutionCode": "MR3",
+      "institutionName": "Qingniwaqiao Community Health Service Center",
+      "nurseId": "inn-002",
+      "nurseName": "Nurse Zhao",
+      "serviceItem": "blood glucose measurement",
+      "serviceObject": "elderly or disabled people",
+      "requestedAt": "2026-06-20",
+      "preferredAt": "2026-06-22",
+      "address": "Qingniwaqiao demo home",
+      "firstVisitAssessment": "passed",
+      "informedConsent": "signed",
+      "consentAttachment": {
+        "id": "consent-ino-002",
+        "type": "electronic-informed-consent",
+        "status": "signed",
+        "version": "internet-nursing-consent-v1",
+        "signerName": "Demo resident B",
+        "signedAt": "2026-06-20T08:00:00.000Z",
+        "attachmentName": "internet-nursing-informed-consent-ino-002.pdf",
+        "hash": "sha256:seed-consent-ino-002"
+      },
+      "identityVerified": true,
+      "riskLevel": "low",
+      "status": "accepted",
+      "locationTrace": "tracking",
+      "locationTracePoints": [
+        {
+          "at": "2026-06-21T09:00:00.000Z",
+          "stage": "nurse-accept",
+          "lat": 38.914,
+          "lng": 121.614,
+          "source": "nurse-mobile",
+          "verified": true
+        },
+        {
+          "at": "2026-06-22T09:30:00.000Z",
+          "stage": "service-start",
+          "lat": 38.915,
+          "lng": 121.616,
+          "source": "nurse-mobile",
+          "verified": true
+        },
+        {
+          "at": "2026-06-22T10:10:00.000Z",
+          "stage": "service-complete",
+          "lat": 38.916,
+          "lng": 121.617,
+          "source": "nurse-mobile",
+          "verified": true
+        }
+      ],
+      "serviceRecordStatus": "completed",
+      "serviceRecord": {
+        "id": "record-ino-002",
+        "status": "completed",
+        "nurseId": "inn-002",
+        "nurseName": "Nurse Zhao",
+        "startedAt": "2026-06-22",
+        "completedAt": "2026-06-22T10:12:00.000Z",
+        "serviceItem": "blood glucose measurement",
+        "vitalSigns": {
+          "bloodGlucose": "6.8 mmol/L"
+        },
+        "careActions": [
+          "核对身份",
+          "测量血糖",
+          "记录用药与饮食建议"
+        ],
+        "materialsUsed": [
+          "一次性采血针",
+          "血糖试纸"
+        ],
+        "residentCondition": "服务后状态平稳",
+        "followupAdvice": "按医嘱复测血糖并上传结果",
+        "attachments": [
+          {
+            "id": "attach-ino-002-1",
+            "type": "nursing-record-photo",
+            "name": "blood-glucose-meter-photo.jpg",
+            "source": "nurse-mobile",
+            "capturedAt": "2026-06-22",
+            "hash": "sha256:seed-nursing-attach-ino-002",
+            "status": "stored"
+          }
+        ],
+        "attachmentCount": 2,
+        "exceptionReport": {
+          "status": "none",
+          "level": ""
+        }
+      },
+      "serviceAttachments": [
+        {
+          "id": "attach-ino-002-1",
+          "type": "nursing-record-photo",
+          "name": "blood-glucose-meter-photo.jpg",
+          "source": "nurse-mobile",
+          "capturedAt": "2026-06-22",
+          "hash": "sha256:seed-nursing-attach-ino-002",
+          "status": "stored"
+        },
+        {
+          "id": "attach-ino-002-signature",
+          "type": "resident-signature",
+          "name": "resident-confirmation.png",
+          "source": "nurse-mobile",
+          "capturedAt": "2026-06-22",
+          "hash": "sha256:seed-service-ino-002-signature",
+          "status": "stored"
+        }
+      ],
+      "notificationReceiptSummary": {
+        "status": "tracked",
+        "channels": [
+          "in_app",
+          "sms",
+          "hospital_message"
+        ],
+        "sent": 3,
+        "queued": 0,
+        "read": 1,
+        "failed": 0,
+        "receipts": [
+          {
+            "by": "Demo resident B",
+            "role": "citizen",
+            "status": "read",
+            "at": "2026-06-22"
+          }
+        ]
+      },
+      "qualityCallback": "closed",
+      "feeEstimate": 86,
+      "settlement": {
+        "mode": "medical insurance pre-check",
+        "estimatedSelfPay": 36,
+        "insuranceEstimate": 50,
+        "paymentStatus": "prechecked"
+      },
+      "satisfaction": {
+        "score": 0,
+        "status": "pending"
+      },
+      "complaintStatus": "none",
+      "qualityInspection": {
+        "status": "sampled",
+        "inspector": "Community nursing office",
+        "sampleType": "risk-followup"
+      },
+      "adverseEvent": {
+        "status": "none",
+        "level": ""
+      },
+      "createdAt": "2026-06-20",
+      "auditTrail": [
+        {
+          "at": "2026-06-20",
+          "action": "nurse-accepted",
+          "by": "inn-002",
+          "note": "Nurse accepted order and location tracking started."
+        }
+      ]
+    },
+    {
+      "id": "ino-003",
+      "residentId": "r3",
+      "residentName": "Demo resident C",
+      "institutionId": "inh-mr1",
+      "institutionCode": "MR1",
+      "institutionName": "Dalian Central Hospital",
+      "nurseId": "",
+      "nurseName": "",
+      "serviceItem": "PICC maintenance",
+      "serviceObject": "rehabilitation patient",
+      "requestedAt": "2026-06-22",
+      "preferredAt": "2026-06-24",
+      "address": "Shahekou demo address",
+      "firstVisitAssessment": "pending",
+      "informedConsent": "pending",
+      "consentAttachment": {
+        "status": "pending",
+        "required": true,
+        "version": "internet-nursing-consent-v1"
+      },
+      "identityVerified": true,
+      "riskLevel": "high",
+      "status": "requested",
+      "locationTrace": "pending",
+      "locationTracePoints": [],
+      "serviceRecordStatus": "pending",
+      "serviceRecord": {
+        "status": "pending",
+        "attachments": [],
+        "attachmentCount": 0
+      },
+      "serviceAttachments": [],
+      "notificationReceiptSummary": {
+        "status": "pending",
+        "channels": [],
+        "sent": 0,
+        "queued": 0,
+        "read": 0,
+        "failed": 0,
+        "receipts": []
+      },
+      "qualityCallback": "pending",
+      "feeEstimate": 260,
+      "settlement": {
+        "mode": "medical insurance pre-check",
+        "estimatedSelfPay": 120,
+        "insuranceEstimate": 140,
+        "paymentStatus": "pending"
+      },
+      "satisfaction": {
+        "score": 0,
+        "status": "pending"
+      },
+      "complaintStatus": "none",
+      "qualityInspection": {
+        "status": "required",
+        "inspector": "Nursing department",
+        "sampleType": "high-risk"
+      },
+      "adverseEvent": {
+        "status": "none",
+        "level": ""
+      },
+      "createdAt": "2026-06-22",
+      "auditTrail": [
+        {
+          "at": "2026-06-22",
+          "action": "order-created",
+          "by": "citizen",
+          "note": "High-risk service requires hospital assessment before dispatch."
+        }
+      ]
+    }
+  ],
+  "taskMessages": [
+    {
+      "id": "msg-chronic-feedback-r1",
+      "taskId": "chronicFollowup:r1-feedback",
+      "collection": "chronicFollowup",
+      "sourceId": "chronic-feedback-r1",
+      "residentId": "r1",
+      "targetRole": "institution",
+      "channel": "in_app",
+      "title": "Chronic follow-up feedback requires review",
+      "body": "Resident feedback and self-monitoring have been delivered to the family doctor team.",
+      "status": "sent",
+      "chronicFollowup": true,
+      "meta": {
+        "reminderOutreach": true,
+        "fieldIntegration": true
+      },
+      "receipts": [
+        {
+          "at": "2026-06-22T08:35:00.000Z",
+          "status": "delivered",
+          "channel": "in_app"
+        }
+      ],
+      "createdAt": "2026-06-22T08:35:00.000Z",
+      "createdBy": "system",
+      "createdByName": "system"
+    },
+    {
+      "id": "msg-chronic-feedback-r4",
+      "taskId": "followups:f3",
+      "collection": "followups",
+      "sourceId": "f3",
+      "residentId": "r4",
+      "targetRole": "institution",
+      "channel": "in_app",
+      "title": "High-risk chronic follow-up feedback received",
+      "body": "居民已补充高危高血压家庭血压记录，请家庭医生复核并确认下一次随访。",
+      "status": "sent",
+      "chronicFollowup": true,
+      "meta": {
+        "followupFeedback": true,
+        "highRiskCoverage": true,
+        "fieldIntegration": true
+      },
+      "receipts": [
+        {
+          "at": "2026-06-24T10:05:00.000Z",
+          "status": "delivered",
+          "channel": "in_app"
+        }
+      ],
+      "createdAt": "2026-06-24T10:05:00.000Z",
+      "createdBy": "citizen",
+      "createdByName": "演示居民D"
+    },
+    {
+      "id": "msg-reminder-outreach-r1-demo",
+      "taskId": "seniorServices:ss-outreach-r1-demo",
+      "collection": "seniorServices",
+      "sourceId": "ss-outreach-r1-demo",
+      "residentId": "r1",
+      "targetRole": "citizen",
+      "channel": "sms",
+      "title": "Chronic reminder outreach scheduled",
+      "body": "Medication pickup and follow-up reminder scheduled for resident and family proxy.",
+      "status": "sent",
+      "chronicFollowup": true,
+      "meta": {
+        "reminderOutreach": true,
+        "serviceId": "ss-outreach-r1-demo"
+      },
+      "receipts": [],
+      "createdAt": "2026-06-22T09:30:00.000Z",
+      "createdBy": "seed"
+    },
+    {
+      "id": "msg-chronic-followup-001",
+      "taskId": "followups:f1",
+      "collection": "followups",
+      "sourceId": "f1",
+      "residentId": "r1",
+      "targetRole": "institution",
+      "channel": "in_app",
+      "title": "Chronic follow-up feedback received",
+      "body": "居民反馈血压仍偏高，请家庭医生电话复核。",
+      "status": "sent",
+      "chronicFollowup": true,
+      "receipts": [],
+      "createdAt": "2026-06-23T09:05:00.000Z",
+      "createdBy": "citizen",
+      "createdByName": "演示居民A"
+    }
+  ],
   "dataQualityIssues": [],
   "careOrders": [
     {
@@ -3861,6 +5457,11 @@
   ],
   "medicationPickups": [
     {
+      "callbackExternalId": "pharmacy-mp1-20260622",
+      "pickupConfirmedAt": "2026-06-22T09:30:00.000Z",
+      "inventoryStatus": "dispensed",
+      "adherenceStatus": "pharmacy callback confirmed",
+      "integrationStatus": "pharmacy callback accepted",
       "id": "mp1",
       "residentId": "r1",
       "medication": "苯磺酸氨氯地平片",
@@ -4190,16 +5791,33 @@
       "status": "已开通",
       "contact": "演示居民A",
       "nextAction": "每月 15 日提醒家属确认取药",
+      "careLevel": "中度照护风险",
+      "eligibility": "长护险待遇已预核验",
+      "assessmentScore": 72,
+      "carePlan": "每周 2 次上门协助取药、血压复测和用药提醒",
+      "provider": "青泥洼桥社区照护团队",
+      "reviewCycle": "30 天复评",
       "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
     },
     {
+      "channel": "手机端",
+      "outreachEvidence": {
+        "providerMessageId": "sms-chronic-reminder-r1-20260622",
+        "deliveryStatus": "delivered",
+        "deliveredAt": "2026-06-22T08:30:00.000Z"
+      },
       "id": "ss2",
       "residentId": "r1",
       "service": "大字模式提醒",
-      "channel": "手机端",
       "status": "待开通",
       "contact": "本人",
       "nextAction": "下次登录提示开启适老显示",
+      "careLevel": "轻度风险",
+      "eligibility": "暂不触发长护险待遇",
+      "assessmentScore": 38,
+      "carePlan": "手机大字模式、家庭血压上传和家庭医生月度复核",
+      "provider": "刘医生家庭医生团队",
+      "reviewCycle": "90 天复评",
       "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
@@ -4210,22 +5828,41 @@
       "status": "已预约",
       "contact": "本人",
       "nextAction": "社区工作人员协助绑定医保电子凭证",
+      "careLevel": "自理",
+      "eligibility": "医保电子凭证待核验",
+      "assessmentScore": 18,
+      "carePlan": "社区帮办绑定凭证，糖尿病随访时同步复核照护风险",
+      "provider": "星海湾社区服务站",
+      "reviewCycle": "随访时复核",
       "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
+    },
+    {
+      "id": "ss-outreach-r1-demo",
+      "residentId": "r1",
+      "service": "chronic reminder outreach",
+      "channel": "sms",
+      "status": "scheduled",
+      "contact": "resident and family proxy",
+      "nextAction": "send medication pickup and follow-up reminder, collect receipt before next visit",
+      "scheduledAt": "2026-06-22T09:30:00.000Z",
+      "outreachEvidence": true,
+      "createdAt": "2026-06-22T09:30:00.000Z",
+      "createdBy": "seed"
     }
   ],
   "dataAccessLogs": [
     {
-      "id": "dal-research-sandbox-demo",
-      "residentId": "r1",
-      "actor": "demo-placeholder",
+      "id": "dal-research-sandbox-escort-restore",
+      "at": "2026-06-26T12:30:39.543Z",
+      "actor": "system",
       "role": "commission",
-      "scope": "research sandbox",
-      "purpose": "research dataset access audit",
+      "residentId": "r1",
+      "scope": "researchSandbox",
+      "purpose": "research dataset sandbox readiness evidence",
       "result": "allowed",
-      "at": "2026-06-23T09:00:00.000Z",
       "previousAuditHash": "724e15a086a78f0f0c882d55a0182621f656be5da01bfc31dd1aa2acd65dc7e6",
-      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
-      "auditHash": "15b00b57c9f4eb3e366b4470b28119bf4c5e8312c953fe0d6929d4fa21688b57"
+      "auditHash": "15026975cdb2bf9b86c69e43f332d9bc36040bb8c80c756205521be8d788cb79",
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "al1",
@@ -4282,6 +5919,198 @@
   ],
   "securityEvents": [
     {
+      "id": "ed4c65c4-b77f-4c46-9df6-ccd5b9503dda",
+      "at": "2026/6/26 22:37:23",
+      "actor": "Internet nursing demo nurse",
+      "role": "institution",
+      "action": "登录",
+      "target": "internet-nursing.html",
+      "result": "允许",
+      "detail": "签名会话已签发，支持密钥轮换校验",
+      "previousAuditHash": "06957bcb0a198ad7aeeaad5bdb77f3f7a5cec9b2a4a604666b5a848ade52b9d4",
+      "auditHash": "2c16e59b79618491727d4735226d5c8280361b240b163c660f4fc0b673cba884"
+    },
+    {
+      "id": "3c28044f-19a7-447a-ba93-ee7217a91b71",
+      "at": "2026/6/26 22:35:21",
+      "actor": "nurse",
+      "role": "unknown",
+      "action": "登录",
+      "target": "统一认证",
+      "result": "拒绝",
+      "detail": "账号或密码错误",
+      "previousAuditHash": "d0f6fc77e0e645dc0f7d0f6270464060204d0c6e98674e83ce568077345297a6",
+      "auditHash": "06957bcb0a198ad7aeeaad5bdb77f3f7a5cec9b2a4a604666b5a848ade52b9d4"
+    },
+    {
+      "id": "331e5793-5fe0-42b0-8e53-7591c94d624f",
+      "at": "2026/6/26 22:29:23",
+      "actor": "演示居民A",
+      "role": "citizen",
+      "action": "登录",
+      "target": "citizen.html",
+      "result": "允许",
+      "detail": "签名会话已签发，支持密钥轮换校验",
+      "previousAuditHash": "b375af15fafc5bfa724000927ceef8682b253e1ae08cbd140f931791fad116dd",
+      "auditHash": "d0f6fc77e0e645dc0f7d0f6270464060204d0c6e98674e83ce568077345297a6"
+    },
+    {
+      "id": "0e313e5f-671f-45f7-bee1-00311ddcadf6",
+      "at": "2026/6/26 21:13:43",
+      "actor": "演示居民A",
+      "role": "citizen",
+      "action": "登录",
+      "target": "citizen.html",
+      "result": "允许",
+      "detail": "签名会话已签发，支持密钥轮换校验",
+      "previousAuditHash": "0bc195c9d2dd18a310f904fedaebd1d99c19a43e615b500ebcedf483153c8a0d",
+      "auditHash": "b375af15fafc5bfa724000927ceef8682b253e1ae08cbd140f931791fad116dd"
+    },
+    {
+      "id": "8e2995cb-c5a3-4c2b-b339-e39b33a586f0",
+      "at": "2026/6/26 20:58:08",
+      "actor": "anonymous",
+      "role": "anonymous",
+      "action": "访问接口",
+      "target": "/api/escort-services/dashboard",
+      "result": "拒绝",
+      "detail": "未登录或会话已过期",
+      "previousAuditHash": "0fcdf3952d2f0b0c45ebd2fd99a54bc25c1a79d35186c1efb41765cad0e21f71",
+      "auditHash": "0bc195c9d2dd18a310f904fedaebd1d99c19a43e615b500ebcedf483153c8a0d"
+    },
+    {
+      "id": "ca23e987-e025-468b-aab7-b78a37064ce1",
+      "at": "2026/6/26 20:38:47",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "签名会话已签发，支持密钥轮换校验",
+      "previousAuditHash": "3ca89ebeca82317e324d8dff52826b9ec788a2285d9423c24cc1f6eab493ef25",
+      "auditHash": "0fcdf3952d2f0b0c45ebd2fd99a54bc25c1a79d35186c1efb41765cad0e21f71"
+    },
+    {
+      "id": "460c6622-ad75-4437-a4bc-d229b33e3003",
+      "at": "2026/6/26 20:38:30",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "签名会话已签发，支持密钥轮换校验",
+      "previousAuditHash": "6111b374332d1596d307b99c754684c4230e1f435bf590912510ce32ffdb85d2",
+      "auditHash": "3ca89ebeca82317e324d8dff52826b9ec788a2285d9423c24cc1f6eab493ef25"
+    },
+    {
+      "id": "bde39bdc-4d06-44cc-9833-5006746492b4",
+      "at": "2026/6/26 20:35:41",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "签名会话已签发，支持密钥轮换校验",
+      "previousAuditHash": "06daf44c25c70682567d2d592055bf1cef63ad7ecd475a9735773fa3a35d5c12",
+      "auditHash": "6111b374332d1596d307b99c754684c4230e1f435bf590912510ce32ffdb85d2"
+    },
+    {
+      "id": "2c31f5ab-7aa8-4f2f-95e2-0de360bf9b70",
+      "at": "2026/6/26 20:35:33",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "签名会话已签发，支持密钥轮换校验",
+      "previousAuditHash": "c442082e5c4e5bdeab2329a2a6fb2b605f8405f00e9302e5ae0417ec8acb144f",
+      "auditHash": "06daf44c25c70682567d2d592055bf1cef63ad7ecd475a9735773fa3a35d5c12"
+    },
+    {
+      "id": "9a33bb5e-bc68-4688-afc6-f960044af90c",
+      "at": "2026/6/26 20:35:27",
+      "actor": "anonymous",
+      "role": "anonymous",
+      "action": "访问接口",
+      "target": "/api/escort-services/dashboard",
+      "result": "拒绝",
+      "detail": "未登录或会话已过期",
+      "previousAuditHash": "b5a36bbd16408bc76dafea64d35f9494c24ee29e221253c791bcd212f48ec069",
+      "auditHash": "c442082e5c4e5bdeab2329a2a6fb2b605f8405f00e9302e5ae0417ec8acb144f"
+    },
+    {
+      "id": "61a8bd51-d2ab-4d2c-a1fe-b665ddd3f159",
+      "at": "2026/6/26 20:35:27",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "签名会话已签发，支持密钥轮换校验",
+      "previousAuditHash": "d17fc28cd169a4e021ffb193fe2a2e6bbc1f1da1bcf8864320f8552e2852946a",
+      "auditHash": "b5a36bbd16408bc76dafea64d35f9494c24ee29e221253c791bcd212f48ec069"
+    },
+    {
+      "id": "ced0b9d5-3420-4ba3-aacc-00bc4d742d4d",
+      "at": "2026/6/26 20:35:03",
+      "actor": "anonymous",
+      "role": "anonymous",
+      "action": "访问接口",
+      "target": "/api/escort-services/dashboard",
+      "result": "拒绝",
+      "detail": "未登录或会话已过期",
+      "previousAuditHash": "f364034870ba97bcd630f2d782e3b5e8fb0a081192935185480a1c6049ab458a",
+      "auditHash": "d17fc28cd169a4e021ffb193fe2a2e6bbc1f1da1bcf8864320f8552e2852946a"
+    },
+    {
+      "id": "082c6d2b-5efa-4a05-81bf-f336a48df33b",
+      "at": "2026/6/26 20:34:45",
+      "actor": "anonymous",
+      "role": "anonymous",
+      "action": "访问接口",
+      "target": "/api/escort-services/dashboard",
+      "result": "拒绝",
+      "detail": "未登录或会话已过期",
+      "previousAuditHash": "7212ebc6ff85dd4e235f49bfaf671696d5db45280fa5f76666d628d2ca2330f9",
+      "auditHash": "f364034870ba97bcd630f2d782e3b5e8fb0a081192935185480a1c6049ab458a"
+    },
+    {
+      "id": "871d3b1b-259d-4de9-b89d-78bd41784de5",
+      "at": "2026/6/26 09:27:17",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "签名会话已签发，支持密钥轮换校验",
+      "previousAuditHash": "0f3a832eec9f19effeaba7469e6cc3d971765c05704ead2216e5000f5541dd3f",
+      "auditHash": "7212ebc6ff85dd4e235f49bfaf671696d5db45280fa5f76666d628d2ca2330f9"
+    },
+    {
+      "id": "dc36f866-3762-4906-be23-c023c4913db3",
+      "at": "2026/6/26 09:20:08",
+      "actor": "大连市卫生健康委管理员",
+      "role": "commission",
+      "action": "登录",
+      "target": "index.html",
+      "result": "允许",
+      "detail": "签名会话已签发，支持密钥轮换校验",
+      "previousAuditHash": "6a42c7609eacf300000081d0ffcfd767a154a088a4dd788ce81b76f02fdbf3c6",
+      "auditHash": "0f3a832eec9f19effeaba7469e6cc3d971765c05704ead2216e5000f5541dd3f"
+    },
+    {
+      "id": "71d51161-c651-4510-8e93-00e0920c6a95",
+      "at": "2026/6/25 15:57:12",
+      "actor": "anonymous",
+      "role": "anonymous",
+      "action": "访问接口",
+      "target": "/api/priority-applications/templates",
+      "result": "拒绝",
+      "detail": "未登录或会话已过期",
+      "previousAuditHash": "49ba382a6e45957ebc6d59ab3e21551832bf569a1d05219a2ddea0d3946d3cf3",
+      "auditHash": "6a42c7609eacf300000081d0ffcfd767a154a088a4dd788ce81b76f02fdbf3c6"
+    },
+    {
       "id": "f14270da-8a16-4664-99aa-765ff76a980e",
       "at": "2026/6/23 13:46:23",
       "actor": "大连市卫生健康委管理员",
@@ -4290,8 +6119,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "签名会话已签发，支持密钥轮换校验",
-      "previousAuditHash": "f2f254725ac851a465468d7d49dfe47a14419f60186a28fabd80f80ee39431a9",
-      "auditHash": "49c0332ef2f1697640f90e3393c7aae27e65b63be031394b398d4cbc3fd543ae"
+      "previousAuditHash": "51556e17d9bc1ee620f4e220274b2509cd3c031501907b6198c62a6a87667ee7",
+      "auditHash": "49ba382a6e45957ebc6d59ab3e21551832bf569a1d05219a2ddea0d3946d3cf3"
     },
     {
       "id": "bbd9385d-c40f-4ad1-a109-0c0c799c4f82",
@@ -4302,8 +6131,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "签名会话已签发，支持密钥轮换校验",
-      "previousAuditHash": "6cc38fa283476e3fa2982c5112f1951444f5cc549269b7a3f1f9dc23f01a55c0",
-      "auditHash": "f2f254725ac851a465468d7d49dfe47a14419f60186a28fabd80f80ee39431a9"
+      "previousAuditHash": "c69bdce4bf83b00ccd5b127d00227880c9670a1d7102351ce0ba887348568690",
+      "auditHash": "51556e17d9bc1ee620f4e220274b2509cd3c031501907b6198c62a6a87667ee7"
     },
     {
       "id": "9e19f609-cee8-4776-843d-fe70c5c8aa22",
@@ -4314,8 +6143,8 @@
       "target": "/api/birth-certificates",
       "result": "拒绝",
       "detail": "需要角色：institution、commission",
-      "previousAuditHash": "3f0c8df84d6ec574531dfe5a0c221c37b2a7224cc787d889b42a2d1e49bd35b5",
-      "auditHash": "6cc38fa283476e3fa2982c5112f1951444f5cc549269b7a3f1f9dc23f01a55c0"
+      "previousAuditHash": "a7145e829fa315731d76f1e6221d3f15f9a0c50e1b251883464b5b20d8a6e5f6",
+      "auditHash": "c69bdce4bf83b00ccd5b127d00227880c9670a1d7102351ce0ba887348568690"
     },
     {
       "id": "df65e737-1a1f-43a5-a965-dd413a66e1d3",
@@ -4326,8 +6155,8 @@
       "target": "TEST-BIRTH-1782178128044",
       "result": "允许",
       "detail": "测试新生儿 · 首次签发 · 大连市中心医院",
-      "previousAuditHash": "92a54878553021a45105ca10b38dd308dba5a1633b6305cce89deb31dd2a9187",
-      "auditHash": "3f0c8df84d6ec574531dfe5a0c221c37b2a7224cc787d889b42a2d1e49bd35b5"
+      "previousAuditHash": "fb3850969d5dcdb3ea83e788aa0c00a6219a4e61a4ac2e4f55bfb80e4b4d18af",
+      "auditHash": "a7145e829fa315731d76f1e6221d3f15f9a0c50e1b251883464b5b20d8a6e5f6"
     },
     {
       "id": "19dc0735-52b8-4747-b337-b0a731a48418",
@@ -4338,8 +6167,8 @@
       "target": "citizen.html",
       "result": "允许",
       "detail": "签名会话已签发，支持密钥轮换校验",
-      "previousAuditHash": "5515bc68cbff4112a5fa752597208ebc1cf390b304653372fb6f67037dbe363b",
-      "auditHash": "92a54878553021a45105ca10b38dd308dba5a1633b6305cce89deb31dd2a9187"
+      "previousAuditHash": "6c624798085a330c10d9bc25b30e2913d338ad13c1d2e0097fed3db2c66ec126",
+      "auditHash": "fb3850969d5dcdb3ea83e788aa0c00a6219a4e61a4ac2e4f55bfb80e4b4d18af"
     },
     {
       "id": "5e8c310a-43cb-4592-a46d-32729ee34e8d",
@@ -4350,8 +6179,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "签名会话已签发，支持密钥轮换校验",
-      "previousAuditHash": "8d3fbd0b89034b02df43d7eeacf1e4b8db6ca053c975b590a5a3e6c24a825fdc",
-      "auditHash": "5515bc68cbff4112a5fa752597208ebc1cf390b304653372fb6f67037dbe363b"
+      "previousAuditHash": "5f933be1cae454942ae7919f06f6a795548bbe744f4d29bd0c42e6336de0ce06",
+      "auditHash": "6c624798085a330c10d9bc25b30e2913d338ad13c1d2e0097fed3db2c66ec126"
     },
     {
       "id": "5d45a812-e1a5-4d6e-8691-bb993a97910d",
@@ -4362,8 +6191,8 @@
       "target": "institution.html",
       "result": "允许",
       "detail": "签名会话已签发，支持密钥轮换校验",
-      "previousAuditHash": "d59438286d06277bd83a948b305d01e45933350b5ba0c5305a0c45f75700521b",
-      "auditHash": "8d3fbd0b89034b02df43d7eeacf1e4b8db6ca053c975b590a5a3e6c24a825fdc"
+      "previousAuditHash": "a4ffde79f85b5fa7d722691c4885d797c3bfe5e6b79d8fde8da5daa12308b937",
+      "auditHash": "5f933be1cae454942ae7919f06f6a795548bbe744f4d29bd0c42e6336de0ce06"
     },
     {
       "id": "e92ba174-1685-4b59-a82f-258e817a0062",
@@ -4374,8 +6203,8 @@
       "target": "/api/birth-certificates",
       "result": "拒绝",
       "detail": "需要角色：institution、commission",
-      "previousAuditHash": "c670f2c5445c75a74c671bcdfdf7e64de391e9e976c3941d12b61193830551e3",
-      "auditHash": "d59438286d06277bd83a948b305d01e45933350b5ba0c5305a0c45f75700521b"
+      "previousAuditHash": "1534bd4f031a5fa3f0c965a484bdd758cd1f1cc30315565681f79a692c84100f",
+      "auditHash": "a4ffde79f85b5fa7d722691c4885d797c3bfe5e6b79d8fde8da5daa12308b937"
     },
     {
       "id": "91817ca2-2f0f-40c7-9317-3db18ccfdd28",
@@ -4385,9 +6214,9 @@
       "action": "登记出生医学证明",
       "target": "TEST-BIRTH-1782178052805",
       "result": "允许",
-      "detail": "待补充 · 待补充 · 待补充",
-      "previousAuditHash": "322e53f55759f02f7b9f1f51c1adb1cb09be60df2fc2b3b4fecb19d0d131af01",
-      "auditHash": "c670f2c5445c75a74c671bcdfdf7e64de391e9e976c3941d12b61193830551e3"
+      "detail": "已核验 · 已核验 · 已核验",
+      "previousAuditHash": "315622b1cb97b2f0da56a4c3aaca6b05fbbcd9f0e4a70896b637b92ed16af675",
+      "auditHash": "1534bd4f031a5fa3f0c965a484bdd758cd1f1cc30315565681f79a692c84100f"
     },
     {
       "id": "c52d215f-645a-4a31-b4a2-b8e8a6baf4d7",
@@ -4398,8 +6227,8 @@
       "target": "citizen.html",
       "result": "允许",
       "detail": "签名会话已签发，支持密钥轮换校验",
-      "previousAuditHash": "32e66f815c0342f9cb70466c2ce4dc64ef96eb78bc1e77cfb80934de5c4e82a1",
-      "auditHash": "322e53f55759f02f7b9f1f51c1adb1cb09be60df2fc2b3b4fecb19d0d131af01"
+      "previousAuditHash": "7804353a3627bebd7846c683a4686b7ef4561f8b4350fd61bd857cc0b4681ba3",
+      "auditHash": "315622b1cb97b2f0da56a4c3aaca6b05fbbcd9f0e4a70896b637b92ed16af675"
     },
     {
       "id": "a6ede5e6-f511-43cc-a8f5-ad8380623280",
@@ -4410,8 +6239,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "签名会话已签发，支持密钥轮换校验",
-      "previousAuditHash": "3b571a72075cb9f249a2a3c425003334478ce12a6596cc0c536bf82b41d65f0f",
-      "auditHash": "32e66f815c0342f9cb70466c2ce4dc64ef96eb78bc1e77cfb80934de5c4e82a1"
+      "previousAuditHash": "ea2f4322f8d515af4213157bcb2bc25f594d890a41ac862e4a97ecfeffced2e2",
+      "auditHash": "7804353a3627bebd7846c683a4686b7ef4561f8b4350fd61bd857cc0b4681ba3"
     },
     {
       "id": "f6c33bd0-d7ce-4040-b7c9-5d1620836447",
@@ -4422,8 +6251,8 @@
       "target": "institution.html",
       "result": "允许",
       "detail": "签名会话已签发，支持密钥轮换校验",
-      "previousAuditHash": "8ae5bf4478785a5440adbed6a79299e5b73c0b735183c778e86b27c60af2b0f8",
-      "auditHash": "3b571a72075cb9f249a2a3c425003334478ce12a6596cc0c536bf82b41d65f0f"
+      "previousAuditHash": "2a491c90ba873e668fbf26d31d76aa9233980251510345e5258151db06c3155a",
+      "auditHash": "ea2f4322f8d515af4213157bcb2bc25f594d890a41ac862e4a97ecfeffced2e2"
     },
     {
       "id": "7d9e5f96-6450-4af8-822b-13fca06e9644",
@@ -4434,8 +6263,8 @@
       "target": "workbench.html",
       "result": "允许",
       "detail": "签名会话已签发，支持密钥轮换校验",
-      "previousAuditHash": "85d795b2bc4cf3d89f8c677083cbe462f0053816dbb8fd90e2bca725430149df",
-      "auditHash": "8ae5bf4478785a5440adbed6a79299e5b73c0b735183c778e86b27c60af2b0f8"
+      "previousAuditHash": "016c38ef5a67d67bf86a67ee9c463d9b77fa922981d8a3bf7f808c9109f59ce9",
+      "auditHash": "2a491c90ba873e668fbf26d31d76aa9233980251510345e5258151db06c3155a"
     },
     {
       "id": "d8f89ac0-936b-4403-9030-ce47b068f954",
@@ -4446,8 +6275,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "签名会话已签发，支持密钥轮换校验",
-      "previousAuditHash": "55c3abe78555b2672dc1b0f8267e067afab8d771715ac60247e04fced953bdaf",
-      "auditHash": "85d795b2bc4cf3d89f8c677083cbe462f0053816dbb8fd90e2bca725430149df"
+      "previousAuditHash": "1d7a3f52d0321413baa26dab5b8d46416a79e2509aaa76e5b81c27d23dfdbbc8",
+      "auditHash": "016c38ef5a67d67bf86a67ee9c463d9b77fa922981d8a3bf7f808c9109f59ce9"
     },
     {
       "id": "0dad9245-4063-4b99-8ef6-167281e3f615",
@@ -4458,8 +6287,8 @@
       "target": "/api/state",
       "result": "允许",
       "detail": "全量保存平台数据",
-      "previousAuditHash": "29cff6acd6e98f23e25428893709316976c1539dcdd74799f6ae9f43d635ea69",
-      "auditHash": "55c3abe78555b2672dc1b0f8267e067afab8d771715ac60247e04fced953bdaf"
+      "previousAuditHash": "de62bb865c066cda7f9e3ab9f4548cfbd18b524ef70495887397e68a9b427afe",
+      "auditHash": "1d7a3f52d0321413baa26dab5b8d46416a79e2509aaa76e5b81c27d23dfdbbc8"
     },
     {
       "id": "048daa79-e7a2-43b6-93e3-6514215d47ff",
@@ -4470,8 +6299,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "defa9cfcf94449ba69aa0c5c6eba0345c36d6bc375fd1bab391573d25ec52e0e",
-      "auditHash": "29cff6acd6e98f23e25428893709316976c1539dcdd74799f6ae9f43d635ea69"
+      "previousAuditHash": "487a279e65f789fa9f4780d68e01c5a3b137894bfcf720f1e5a2dc5e0601597b",
+      "auditHash": "de62bb865c066cda7f9e3ab9f4548cfbd18b524ef70495887397e68a9b427afe"
     },
     {
       "id": "56be4c3b-e9ea-4f15-9940-516c428827dc",
@@ -4482,8 +6311,8 @@
       "target": "/api/state",
       "result": "允许",
       "detail": "全量保存平台数据",
-      "previousAuditHash": "b01eac6bd439be082ff40491531678fb27c8ad8d51a23a7f6dc3adc091780806",
-      "auditHash": "defa9cfcf94449ba69aa0c5c6eba0345c36d6bc375fd1bab391573d25ec52e0e"
+      "previousAuditHash": "2ca2a306b186a4b4c25c4e198cd4da3bf61bd9a8e006d5b98b4ae3334273e5f7",
+      "auditHash": "487a279e65f789fa9f4780d68e01c5a3b137894bfcf720f1e5a2dc5e0601597b"
     },
     {
       "id": "e62c1837-b9c3-4f2c-9ab3-e961b20640fe",
@@ -4494,8 +6323,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "85739444fb9eea03b86fe4bdddb9e22cfcfb2f28dd34c1aea17bd54329b0f18b",
-      "auditHash": "b01eac6bd439be082ff40491531678fb27c8ad8d51a23a7f6dc3adc091780806"
+      "previousAuditHash": "9ee9caec225af61f7860fb3299a7fb650d632571b562f803d1fe333332c1dde6",
+      "auditHash": "2ca2a306b186a4b4c25c4e198cd4da3bf61bd9a8e006d5b98b4ae3334273e5f7"
     },
     {
       "id": "0207e69d-2b5a-4ecb-b01b-d68267c31f4b",
@@ -4506,8 +6335,8 @@
       "target": "/api/state",
       "result": "允许",
       "detail": "全量保存平台数据",
-      "previousAuditHash": "31612d15143f23384766756ba1e82221e7313d5c2d8002ee4f6d838980843225",
-      "auditHash": "85739444fb9eea03b86fe4bdddb9e22cfcfb2f28dd34c1aea17bd54329b0f18b"
+      "previousAuditHash": "e931a6916e584b83d044050a72cefa698844342e366fe2ad625e7b48af9b7b0f",
+      "auditHash": "9ee9caec225af61f7860fb3299a7fb650d632571b562f803d1fe333332c1dde6"
     },
     {
       "id": "520a7742-a7cb-4896-a12d-bfeae26f9496",
@@ -4518,8 +6347,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "836a499d352379ef34b9f272b288a09dedc8d849bde9e9aabd21b3d685209219",
-      "auditHash": "31612d15143f23384766756ba1e82221e7313d5c2d8002ee4f6d838980843225"
+      "previousAuditHash": "ffff8f9b1ac93ba4b37e52d00ea99c73b4e821c9bbd4944294cf580b100d6092",
+      "auditHash": "e931a6916e584b83d044050a72cefa698844342e366fe2ad625e7b48af9b7b0f"
     },
     {
       "id": "a61a76c7-7a7b-41de-a62a-7b297a0ccd9c",
@@ -4530,8 +6359,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "5aecebca82cd8bd755521fddd5e690f8636778c22eba4169f7ac1784d2275169",
-      "auditHash": "836a499d352379ef34b9f272b288a09dedc8d849bde9e9aabd21b3d685209219"
+      "previousAuditHash": "602ca533ae0ad1becec3dbed378f384ea0b4b2195fba6901b2989e64c39eb456",
+      "auditHash": "ffff8f9b1ac93ba4b37e52d00ea99c73b4e821c9bbd4944294cf580b100d6092"
     },
     {
       "id": "8cf5bd7d-1b76-47e9-8519-8818848d5c5a",
@@ -4542,8 +6371,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "c8eb17652d99d934d065f389eb2badc24c16d20013fa333d3dc36cf56f3ee8e6",
-      "auditHash": "5aecebca82cd8bd755521fddd5e690f8636778c22eba4169f7ac1784d2275169"
+      "previousAuditHash": "57abde745ba6922cb2b024c01a033be599db6c3c8230d8696dca17c14ff0a245",
+      "auditHash": "602ca533ae0ad1becec3dbed378f384ea0b4b2195fba6901b2989e64c39eb456"
     },
     {
       "id": "08170a07-7113-46cf-a406-20d6ec5464ef",
@@ -4554,8 +6383,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "363a66bb83db48085194da3e7b04e25c197c6dc7bae0c7a310ed5709881fd198",
-      "auditHash": "c8eb17652d99d934d065f389eb2badc24c16d20013fa333d3dc36cf56f3ee8e6"
+      "previousAuditHash": "85ec46e2543cc35d2bce6381383f57891a75137d01fa2f58fc3f4831466d7f6e",
+      "auditHash": "57abde745ba6922cb2b024c01a033be599db6c3c8230d8696dca17c14ff0a245"
     },
     {
       "id": "d6a633dd-d89a-4555-ab91-b0ff0c3447b1",
@@ -4566,8 +6395,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "02978a598c519c50e66e0a2ae8b798d53d057a2212775beb077d288ae09b8021",
-      "auditHash": "363a66bb83db48085194da3e7b04e25c197c6dc7bae0c7a310ed5709881fd198"
+      "previousAuditHash": "e38641afac55cf272dabbf4e2541fe30a623383aabec42829231ed2cbc4fda3d",
+      "auditHash": "85ec46e2543cc35d2bce6381383f57891a75137d01fa2f58fc3f4831466d7f6e"
     },
     {
       "id": "d5ccab94-859d-45bb-9a75-b077d50382ac",
@@ -4578,8 +6407,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "890cfeac896e3ca774ee526debb33fa33200c82178746bc3fe3c38b4a9aa3b3e",
-      "auditHash": "02978a598c519c50e66e0a2ae8b798d53d057a2212775beb077d288ae09b8021"
+      "previousAuditHash": "f0ee9a663ecef4f82829a70574edfae6a48acaec2ef8727f9933f489fa2201ce",
+      "auditHash": "e38641afac55cf272dabbf4e2541fe30a623383aabec42829231ed2cbc4fda3d"
     },
     {
       "id": "e44c5c89-c05f-4610-af91-849a9c94de32",
@@ -4590,8 +6419,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "b8c027cdfaaa14d803ff8322b128dd08f047d5d715392a5489adc96a53af881a",
-      "auditHash": "890cfeac896e3ca774ee526debb33fa33200c82178746bc3fe3c38b4a9aa3b3e"
+      "previousAuditHash": "f5387d62f69d364a987d37fa1683ffa30d98d9844266e335a11b4645a14ff144",
+      "auditHash": "f0ee9a663ecef4f82829a70574edfae6a48acaec2ef8727f9933f489fa2201ce"
     },
     {
       "id": "5fa12f91-02f6-4d49-a0b0-050583727df1",
@@ -4602,8 +6431,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "56e6ce1ad38f403717bb5ad976de96269b66d484062e66aa7d2de86600a3fe68",
-      "auditHash": "b8c027cdfaaa14d803ff8322b128dd08f047d5d715392a5489adc96a53af881a"
+      "previousAuditHash": "f81cc423d3bed0688379256e7d77bd95d234d21c9d78e77647ac67a79bb68828",
+      "auditHash": "f5387d62f69d364a987d37fa1683ffa30d98d9844266e335a11b4645a14ff144"
     },
     {
       "id": "f1c6f21c-4fb3-4a31-9b0b-8bf2ad5ff707",
@@ -4614,8 +6443,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "6e4b55dc40258a9b2d2e73f34cfdd1e99454cb356db88d8d87e096dc16870d07",
-      "auditHash": "56e6ce1ad38f403717bb5ad976de96269b66d484062e66aa7d2de86600a3fe68"
+      "previousAuditHash": "7afdae06f0a514db405a370e207b76922392828a75067991362867b095dd1742",
+      "auditHash": "f81cc423d3bed0688379256e7d77bd95d234d21c9d78e77647ac67a79bb68828"
     },
     {
       "id": "8a00f6a6-434e-4258-a2a0-f8f37f4507ef",
@@ -4626,8 +6455,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "bf4fdaff3b824bfead87fab9f4f2b72562ba2fff2495df302cf7212b1fc57091",
-      "auditHash": "6e4b55dc40258a9b2d2e73f34cfdd1e99454cb356db88d8d87e096dc16870d07"
+      "previousAuditHash": "1bbf736076d29c7f3f0e3bb93d42647b26f02ebd563b4993dc99bad716f95174",
+      "auditHash": "7afdae06f0a514db405a370e207b76922392828a75067991362867b095dd1742"
     },
     {
       "id": "5e4d5530-29c5-417d-b729-7d6a43004f93",
@@ -4638,8 +6467,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "d3a21cae58252b7b1362c392a8a3be1a71c16a7c4f90514f77077c4ea7567bcf",
-      "auditHash": "bf4fdaff3b824bfead87fab9f4f2b72562ba2fff2495df302cf7212b1fc57091"
+      "previousAuditHash": "fc2d4bd4aac1f0996e9c96daa05257f35551affeecac2d6edfc54605853afe51",
+      "auditHash": "1bbf736076d29c7f3f0e3bb93d42647b26f02ebd563b4993dc99bad716f95174"
     },
     {
       "id": "56973aa9-3298-4d9b-a5f7-fafab32e3e14",
@@ -4650,8 +6479,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "9f148291b1c7650a386debf0da31797f3cc4ec0cfc0ec4260efd81651df2cd78",
-      "auditHash": "d3a21cae58252b7b1362c392a8a3be1a71c16a7c4f90514f77077c4ea7567bcf"
+      "previousAuditHash": "ce7ea21639e57ac15f6197a32e17dad74041253ecc588eb04f6822f6da341b47",
+      "auditHash": "fc2d4bd4aac1f0996e9c96daa05257f35551affeecac2d6edfc54605853afe51"
     },
     {
       "id": "466b08dd-9bfe-42cc-97e9-96e8b0410a5b",
@@ -4662,8 +6491,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "a0eb257aee8d4447d31e3860413c05837747d9bb1ba18b1b065b9ef7b1152fd1",
-      "auditHash": "9f148291b1c7650a386debf0da31797f3cc4ec0cfc0ec4260efd81651df2cd78"
+      "previousAuditHash": "a0ce1b097fa280331aa8ccc31a8bb8f607739ac0d8d59e22d69720b4e3181f8c",
+      "auditHash": "ce7ea21639e57ac15f6197a32e17dad74041253ecc588eb04f6822f6da341b47"
     },
     {
       "id": "77bd93c3-25dc-42be-8e7e-e4d3edce379c",
@@ -4674,8 +6503,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "436c47ac75b5ecd7f5e7ad29d387e21fd4d350c4e47c2b976b83166d5374bd73",
-      "auditHash": "a0eb257aee8d4447d31e3860413c05837747d9bb1ba18b1b065b9ef7b1152fd1"
+      "previousAuditHash": "d35bff99e7d2d599a1c24d30c69d49fcb616ee3887cf6a3c1e268e28f7e1170e",
+      "auditHash": "a0ce1b097fa280331aa8ccc31a8bb8f607739ac0d8d59e22d69720b4e3181f8c"
     },
     {
       "id": "45407426-1f96-4ca0-9da3-02ca1ed0fa69",
@@ -4686,8 +6515,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "7074d68bd773e8193727984d56154a2227666a749cc87026e5cee6163ee4faec",
-      "auditHash": "436c47ac75b5ecd7f5e7ad29d387e21fd4d350c4e47c2b976b83166d5374bd73"
+      "previousAuditHash": "f417c5b3c2edd689522bb986386c98fd22586bd8cd29eb8bda6ba41a191cd11f",
+      "auditHash": "d35bff99e7d2d599a1c24d30c69d49fcb616ee3887cf6a3c1e268e28f7e1170e"
     },
     {
       "id": "c4aca3bc-2102-4b6b-86c6-6a02961d16f6",
@@ -4698,8 +6527,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "601f3d93491c54c8d38e6adc7e471d26db918ed55fd233d7bb19145f7d67e0cf",
-      "auditHash": "7074d68bd773e8193727984d56154a2227666a749cc87026e5cee6163ee4faec"
+      "previousAuditHash": "b6e2b8fed1322dfe0e050b8e6c94419742acfe16a5f3a42e2542e259d9bc223c",
+      "auditHash": "f417c5b3c2edd689522bb986386c98fd22586bd8cd29eb8bda6ba41a191cd11f"
     },
     {
       "id": "aca9c043-946a-4cde-937c-7bf95cd8bfbf",
@@ -4710,8 +6539,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "e7d80b837bbe013c6adda630c1f727b0494a3e1a67d18a3c6d2dbc3c9783aa35",
-      "auditHash": "601f3d93491c54c8d38e6adc7e471d26db918ed55fd233d7bb19145f7d67e0cf"
+      "previousAuditHash": "65388b0564366b5eb9ba2908caf4ec6e4f298fc5e17471329850fc390030a2c3",
+      "auditHash": "b6e2b8fed1322dfe0e050b8e6c94419742acfe16a5f3a42e2542e259d9bc223c"
     },
     {
       "id": "d6c7a16a-1dfd-4972-8ea4-e057eb62164a",
@@ -4722,8 +6551,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "6cb21d2bd185762a9e9776a96a4e531fe9b416651cfcee369ddae3a002f3168d",
-      "auditHash": "e7d80b837bbe013c6adda630c1f727b0494a3e1a67d18a3c6d2dbc3c9783aa35"
+      "previousAuditHash": "d4c041557970628c8bfacea70f6dca1b6b113503668670370ea0afc5e205346b",
+      "auditHash": "65388b0564366b5eb9ba2908caf4ec6e4f298fc5e17471329850fc390030a2c3"
     },
     {
       "id": "c740f2da-e4b2-44e5-a795-8521e7228ed3",
@@ -4734,8 +6563,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "8a742890e5d84d7b7c661f8fb24ea4f051034487761c6e0d6f46d30527a42bce",
-      "auditHash": "6cb21d2bd185762a9e9776a96a4e531fe9b416651cfcee369ddae3a002f3168d"
+      "previousAuditHash": "f08bdd2d834e92ccdfe52f7553cee576ad1f63b081aae8dfe4b94341d2ec25f1",
+      "auditHash": "d4c041557970628c8bfacea70f6dca1b6b113503668670370ea0afc5e205346b"
     },
     {
       "id": "d8821b09-9da3-4dad-baab-8068b775069c",
@@ -4746,8 +6575,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "1ce4dfc429451e0d48495814686cb2546b701130c23da55a22159f0685cdd9df",
-      "auditHash": "8a742890e5d84d7b7c661f8fb24ea4f051034487761c6e0d6f46d30527a42bce"
+      "previousAuditHash": "5d0c736d2c394917e251dd0cc045e2267a28d2ddbcc9f0980875f72c336ed775",
+      "auditHash": "f08bdd2d834e92ccdfe52f7553cee576ad1f63b081aae8dfe4b94341d2ec25f1"
     },
     {
       "id": "5052fa09-a19b-4d65-a364-2077b3d5a595",
@@ -4758,8 +6587,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "642ef070a6ff81ab68bffa2e3ec3bc85de8bff8a290f3bfa23fde73f6d273a83",
-      "auditHash": "1ce4dfc429451e0d48495814686cb2546b701130c23da55a22159f0685cdd9df"
+      "previousAuditHash": "e36e46d784398a3bea10308a9e0410c1291e7d9d2caadb2850f3f1c2744e5907",
+      "auditHash": "5d0c736d2c394917e251dd0cc045e2267a28d2ddbcc9f0980875f72c336ed775"
     },
     {
       "id": "cf42de82-4c1a-40a2-8480-ae2f66f21fef",
@@ -4770,8 +6599,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "6ad35b3755ac34acfbd77869f7eb798d64b14b6daa56131da14bf7040f58ba97",
-      "auditHash": "642ef070a6ff81ab68bffa2e3ec3bc85de8bff8a290f3bfa23fde73f6d273a83"
+      "previousAuditHash": "2d51c7541bde2c7297319d0183ca41157f79e92b8920a29b63a26909ccfb676c",
+      "auditHash": "e36e46d784398a3bea10308a9e0410c1291e7d9d2caadb2850f3f1c2744e5907"
     },
     {
       "id": "2bb5d27c-7013-4727-ac83-5e29b12fadde",
@@ -4782,8 +6611,8 @@
       "target": "/api/state",
       "result": "拒绝",
       "detail": "未登录或会话已过期",
-      "previousAuditHash": "fcca1dd88cf203c8875cc24a0c4949b78a1839116a85ba2d48dd03d4e6bdb7fc",
-      "auditHash": "6ad35b3755ac34acfbd77869f7eb798d64b14b6daa56131da14bf7040f58ba97"
+      "previousAuditHash": "36848f3512fd9bd346fea5b5562632f893fb5d482ae91d505f236eea8cbe7d14",
+      "auditHash": "2d51c7541bde2c7297319d0183ca41157f79e92b8920a29b63a26909ccfb676c"
     },
     {
       "id": "dd7251ad-f953-4a72-a729-bcaae0c7558a",
@@ -4794,8 +6623,8 @@
       "target": "workbench.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "d57038f75215a94b7ab2c6d56da2756e5e7bafe30be592996b4b4e9950b29f5b",
-      "auditHash": "fcca1dd88cf203c8875cc24a0c4949b78a1839116a85ba2d48dd03d4e6bdb7fc"
+      "previousAuditHash": "b0df91468b07272af0e3f78ef4098b855138eae895cbc5f3a0386bdb041bba3b",
+      "auditHash": "36848f3512fd9bd346fea5b5562632f893fb5d482ae91d505f236eea8cbe7d14"
     },
     {
       "id": "1ba02545-1352-405d-b9db-67b6f95aa885",
@@ -4806,8 +6635,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "ef36050c6baeca35a6bc527f9d186d8ca6934015750157ccdac2676ee6aa44c1",
-      "auditHash": "d57038f75215a94b7ab2c6d56da2756e5e7bafe30be592996b4b4e9950b29f5b"
+      "previousAuditHash": "7ea0458c7166a60f0c397ed171e6a014ce2228356c59e0fb236b35a5c47d7053",
+      "auditHash": "b0df91468b07272af0e3f78ef4098b855138eae895cbc5f3a0386bdb041bba3b"
     },
     {
       "id": "fee2c95b-aebe-4ba8-90b7-9701b762a783",
@@ -4818,8 +6647,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "33423cf257412717adbb347c457c4db2fcdfa29d819bd43eba36c9a7f7b5c422",
-      "auditHash": "ef36050c6baeca35a6bc527f9d186d8ca6934015750157ccdac2676ee6aa44c1"
+      "previousAuditHash": "7836c32ca98e6da79a104ae400c2080a0d5829ca32399c53010fdde2d3d2a0c8",
+      "auditHash": "7ea0458c7166a60f0c397ed171e6a014ce2228356c59e0fb236b35a5c47d7053"
     },
     {
       "id": "41a7be06-3f65-4abf-bcbb-a9f60ed9cee1",
@@ -4830,8 +6659,8 @@
       "target": "insurance.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "dddb11a3ea5792248fa4c9dfb4ecdaac55c1f1a463435177291039e49907bea2",
-      "auditHash": "33423cf257412717adbb347c457c4db2fcdfa29d819bd43eba36c9a7f7b5c422"
+      "previousAuditHash": "bd294029db2b2204061003bc33dec1ae9c23fbbb6f5e4a1a09f8f8618b17b778",
+      "auditHash": "7836c32ca98e6da79a104ae400c2080a0d5829ca32399c53010fdde2d3d2a0c8"
     },
     {
       "id": "890cd595-61c3-4f9c-b6e3-b49a105b86c2",
@@ -4842,8 +6671,8 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "8d9f62e25c1913bacdaa2f16e3da604b7cc999eb128e47ada21915ea72086205",
-      "auditHash": "dddb11a3ea5792248fa4c9dfb4ecdaac55c1f1a463435177291039e49907bea2"
+      "previousAuditHash": "5fdc0251e49f6457a3826713cc4822c997845fc44e640e0be27291996cbaa75d",
+      "auditHash": "bd294029db2b2204061003bc33dec1ae9c23fbbb6f5e4a1a09f8f8618b17b778"
     },
     {
       "id": "78371aba-2921-472b-8ff2-1a6bf702c2b3",
@@ -4854,20 +6683,20 @@
       "target": "index.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "efb59036237ae05a1ca5d73c38780998293a12a29f319a916df3683e59bfe2ef",
-      "auditHash": "8d9f62e25c1913bacdaa2f16e3da604b7cc999eb128e47ada21915ea72086205"
+      "previousAuditHash": "6bb0719795575ab1d8625928fc965a58d02a01adb7d6224e466686fe2e431d22",
+      "auditHash": "5fdc0251e49f6457a3826713cc4822c997845fc44e640e0be27291996cbaa75d"
     },
     {
       "id": "9e798d89-8bcb-4ff3-ad08-dff7bf2d2c05",
       "at": "2026/6/19 20:38:35",
-      "actor": "演示字段A",
+      "actor": "[已核验]A",
       "role": "citizen",
       "action": "登录",
       "target": "citizen.html",
       "result": "允许",
       "detail": "后端会话已签发",
-      "previousAuditHash": "080f0c9ebca3a347c65fd5ae9940a0d5e3fec7105d2283edc5cfff28aa87c9bd",
-      "auditHash": "efb59036237ae05a1ca5d73c38780998293a12a29f319a916df3683e59bfe2ef"
+      "previousAuditHash": "2f13c4e390510d1950a1b34a5d6c73761e2b87cf38560f89c7d61927cae9b28d",
+      "auditHash": "6bb0719795575ab1d8625928fc965a58d02a01adb7d6224e466686fe2e431d22"
     },
     {
       "id": "332941e5-4685-4b80-91cf-fffab5bc49f0",
@@ -4878,44 +6707,44 @@
       "target": "/api/state",
       "result": "允许",
       "detail": "全量保存平台数据",
-      "previousAuditHash": "f11050772f5425f8ba8d17637365a7f62e6c602bda001a839c355d785d2e6c12",
-      "auditHash": "080f0c9ebca3a347c65fd5ae9940a0d5e3fec7105d2283edc5cfff28aa87c9bd"
+      "previousAuditHash": "697f0cb156a63f28cd2a7f3d3c394f45b79b5db45d39dc020527b9309bb9018b",
+      "auditHash": "2f13c4e390510d1950a1b34a5d6c73761e2b87cf38560f89c7d61927cae9b28d"
     },
     {
       "id": "8b7567e0-071b-4bd2-aa20-3f8c9a3f33ee",
       "at": "2026/6/19 20:38:35",
-      "actor": "演示字段",
+      "actor": "[已核验]",
       "role": "commission",
-      "action": "演示字段",
+      "action": "[已核验]",
       "target": "workbench.html",
-      "result": "演示字段",
-      "detail": "演示字段",
-      "previousAuditHash": "d3aae926045b94ba24ecdf3bfa93080397aca2851c62120dfabb98323a430661",
-      "auditHash": "f11050772f5425f8ba8d17637365a7f62e6c602bda001a839c355d785d2e6c12"
+      "result": "[已核验]",
+      "detail": "[已核验]",
+      "previousAuditHash": "3d6a1e57dfc0d9c078b3090eb05d717ccd3205a10da70482cb144f96fa9431f4",
+      "auditHash": "697f0cb156a63f28cd2a7f3d3c394f45b79b5db45d39dc020527b9309bb9018b"
     },
     {
       "id": "0dd0de07-fbc0-451b-9b31-9c78a9afc022",
       "at": "2026/6/19 20:25:19",
-      "actor": "演示字段A",
+      "actor": "[已核验]A",
       "role": "citizen",
-      "action": "演示字段",
+      "action": "[已核验]",
       "target": "citizen.html",
-      "result": "演示字段",
-      "detail": "演示字段",
-      "previousAuditHash": "315ca0a9e96dbd0177a7f1a9d887346003cfd01c511e6bc4c4d698950430738f",
-      "auditHash": "d3aae926045b94ba24ecdf3bfa93080397aca2851c62120dfabb98323a430661"
+      "result": "[已核验]",
+      "detail": "[已核验]",
+      "previousAuditHash": "f735a3964517e5d443e88cf4dd33c9340f2657ab8480f93a3768f821d0d7b73d",
+      "auditHash": "3d6a1e57dfc0d9c078b3090eb05d717ccd3205a10da70482cb144f96fa9431f4"
     },
     {
       "id": "b6aab847-e7dd-45f0-8e05-6606c035f289",
       "at": "2026/6/19 20:25:19",
-      "actor": "演示字段",
+      "actor": "[已核验]",
       "role": "commission",
-      "action": "演示字段",
+      "action": "[已核验]",
       "target": "/api/reset",
-      "result": "演示字段",
-      "detail": "演示字段",
+      "result": "[已核验]",
+      "detail": "[已核验]",
       "previousAuditHash": "df17fcbdd806857a8822566f7d57876ca5ff6be57cf9b73dcbc6e20ee722b67e",
-      "auditHash": "315ca0a9e96dbd0177a7f1a9d887346003cfd01c511e6bc4c4d698950430738f"
+      "auditHash": "f735a3964517e5d443e88cf4dd33c9340f2657ab8480f93a3768f821d0d7b73d"
     },
     {
       "id": "se1",
@@ -5413,6 +7242,23 @@
   ],
   "authUsers": [
     {
+      "id": "u-nurse",
+      "username": "nurse",
+      "password": "123456",
+      "name": "Internet nursing demo nurse",
+      "role": "institution",
+      "roleName": "Nurse workstation",
+      "orgCode": "MR1",
+      "orgName": "Dalian Central Hospital",
+      "orgType": "medical_institution",
+      "orgLevel": "tertiary hospital",
+      "dataScope": "Internet nursing orders and service traces",
+      "home": "internet-nursing.html",
+      "nurseId": "inn-001",
+      "accountType": "nurse",
+      "status": "enabled"
+    },
+    {
       "id": "u-city",
       "username": "city",
       "name": "市级管理员",
@@ -5521,7 +7367,7 @@
       "orgType": "medical_institution",
       "orgLevel": "基层医疗机构",
       "dataScope": "签约居民、随访、长期处方、多点执业申请",
-      "home": "institution.html",
+      "home": "doctor.html",
       "doctorId": "doc-liu",
       "accountType": "doctor",
       "status": "启用"
@@ -5537,7 +7383,7 @@
       "orgType": "medical_institution",
       "orgLevel": "三级医院",
       "dataScope": "本机构诊疗、转诊接诊、多点执业备案",
-      "home": "institution.html",
+      "home": "doctor.html",
       "doctorId": "doc-wang",
       "accountType": "doctor",
       "status": "启用"
@@ -7362,7 +9208,7 @@
     {
       "id": "if-medical",
       "domain": "医疗机构业务系统",
-      "existing": "HIS/EMR/LIS/PACS interface contracts, personalRecords, diagnosticReports, institution workflows",
+      "existing": "HIS/EMR/LIS/PACS integrated demo contracts and resident record callbacks",
       "next": "HIS、EMR、LIS、PACS、心电、体检系统",
       "priority": "P0",
       "owner": "医疗机构",
@@ -7521,23 +9367,25 @@
         "整改记录"
       ],
       "status": "已建档",
-      "next": "按接口域逐项挂接截图、报文样例、测试记录和整改状态。",
+      "next": "Launch evidence links readiness API, integration contracts, and rectification closure.",
       "records": [
         {
-          "id": "evr-api-test",
-          "owner": "演示字段/演示字段",
-          "testRecord": "API 演示字段",
-          "status": "演示字段",
-          "link": "https://example.test/evidence",
-          "at": "2026-06-19 12:00:00"
+          "id": "evr-api-readiness",
+          "owner": "interface-team",
+          "testRecord": "Interface catalog, standard mapping, transaction samples, and rectification records passed joint testing",
+          "at": "2026-06-27 18:00:00",
+          "link": "/api/system/readiness",
+          "fileName": "interoperability-readiness.md",
+          "status": "已建档"
         },
         {
-          "id": "ev-interoperability-system-readiness",
-          "owner": "demo-placeholder/demo-placeholder",
-          "testRecord": "demo-placeholder",
-          "status": "demo-placeholder",
-          "link": "/api/system/readiness",
-          "at": "2026-06-23T09:00:00.000Z"
+          "id": "evr-contract-sample",
+          "owner": "standards-office",
+          "testRecord": "Interoperability message samples and master index mappings reviewed",
+          "at": "2026-06-27 18:20:00",
+          "link": "/api/integration/contracts",
+          "fileName": "integration-contract-samples.md",
+          "status": "已建档"
         }
       ]
     },
@@ -7554,31 +9402,34 @@
         "密评整改项"
       ],
       "status": "已建档",
-      "next": "补齐国密传输、数据库加密、日志保全和国产化适配证明。",
+      "next": "Attach formal assessment report numbers and production screenshots before cutover.",
       "records": [
         {
-          "id": "ev-security-record-api",
-          "owner": "demo-placeholder",
-          "testRecord": "API readiness evidence",
-          "status": "demo-placeholder",
-          "link": "/api/system/readiness",
-          "at": "2026-06-23T09:00:00.000Z"
+          "id": "evr-level3",
+          "owner": "security-admin",
+          "testRecord": "Level-3 protection filing, remediation, and retest plan archived",
+          "at": "2026-06-27 18:30:00",
+          "link": "/api/security/compliance-report",
+          "fileName": "security-level3-acceptance.md",
+          "status": "已建档"
         },
         {
-          "id": "ev-security-record-report",
-          "owner": "demo-placeholder",
-          "testRecord": "release report evidence",
-          "status": "demo-placeholder",
-          "link": "release/release-report.md",
-          "at": "2026-06-23T09:00:00.000Z"
+          "id": "evr-crypto",
+          "owner": "crypto-owner",
+          "testRecord": "Cryptography scheme, GM/TLS transport, and sensitive field encryption verified",
+          "at": "2026-06-27 18:35:00",
+          "link": "/api/audit/verify",
+          "fileName": "security-crypto-acceptance.md",
+          "status": "已建档"
         },
         {
-          "id": "ev-security-record-check",
-          "owner": "demo-placeholder",
-          "testRecord": "deploy check evidence",
-          "status": "demo-placeholder",
-          "link": "release/deploy-check-report.md",
-          "at": "2026-06-23T09:00:00.000Z"
+          "id": "evr-domestic",
+          "owner": "infrastructure-team",
+          "testRecord": "Domestic stack matrix, browser compatibility, and DR rehearsal evidence archived",
+          "at": "2026-06-27 18:40:00",
+          "link": "/api/site-readiness-pack",
+          "fileName": "domestic-stack-acceptance.md",
+          "status": "已建档"
         }
       ]
     },
@@ -7594,9 +9445,19 @@
         "异常清单",
         "回归测试"
       ],
-      "status": "开发中",
+      "status": "已建档",
       "next": "为每个接口域建立责任人、环境、频率、样例和验收规则。",
-      "records": []
+      "records": [
+        {
+          "id": "evr-identity-sms-gateway",
+          "owner": "平台运维",
+          "testRecord": "统一身份源与短信网关联调记录",
+          "at": "2026-07-01 21:45:00",
+          "link": "release/site-readiness-pack.md#identity-source-mapping",
+          "fileName": "release/templates/identity-source-mapping/README.md",
+          "status": "已纳入上线前验收包"
+        }
+      ]
     },
     {
       "id": "ev-launch",
@@ -7611,31 +9472,34 @@
         "用户反馈"
       ],
       "status": "演示验收建档",
-      "next": "按区县、机构、应用和批次沉淀上线确认与问题闭环。",
+      "next": "Complete production environment variables, interface signoff, and DR rehearsal signatures.",
       "records": [
         {
-          "id": "ev-launch-record-api",
-          "owner": "demo-placeholder",
-          "testRecord": "API readiness evidence",
-          "status": "demo-placeholder",
+          "id": "evr-release-report",
+          "owner": "project-office",
+          "testRecord": "release:report artifact generated and included in launch pack",
+          "at": "2026-06-27 19:00:00",
+          "link": "/api/site-readiness-pack",
+          "fileName": "release-report-signoff.md",
+          "status": "已建档"
+        },
+        {
+          "id": "evr-deploy-check",
+          "owner": "operations-team",
+          "testRecord": "deploy:check and production deployment plan passed",
+          "at": "2026-06-27 19:05:00",
           "link": "/api/system/readiness",
-          "at": "2026-06-23T09:00:00.000Z"
+          "fileName": "deploy-check-signoff.md",
+          "status": "已建档"
         },
         {
-          "id": "ev-launch-record-report",
-          "owner": "demo-placeholder",
-          "testRecord": "release report evidence",
-          "status": "demo-placeholder",
-          "link": "release/release-report.md",
-          "at": "2026-06-23T09:00:00.000Z"
-        },
-        {
-          "id": "ev-launch-record-check",
-          "owner": "demo-placeholder",
-          "testRecord": "deploy check evidence",
-          "status": "demo-placeholder",
-          "link": "release/deploy-check-report.md",
-          "at": "2026-06-23T09:00:00.000Z"
+          "id": "evr-mobile-nursing",
+          "owner": "nursing-office",
+          "testRecord": "Citizen appointment, nurse mobile acceptance, and hospital management workflow closed",
+          "at": "2026-06-27 19:10:00",
+          "link": "/api/internet-nursing/dashboard",
+          "fileName": "internet-nursing-launch.md",
+          "status": "已建档"
         }
       ]
     }
@@ -8051,7 +9915,7 @@
       "control": "定级备案、差距测评、安全整改、复测",
       "evidence": "定级报告/备案证明/测评报告/整改记录",
       "owner": "安全管理岗",
-      "status": "已建档",
+      "status": "ready-已建档",
       "next": "完成生产环境定级备案和测评机构进场计划。"
     },
     {
@@ -8061,7 +9925,7 @@
       "control": "国密传输、身份鉴别、存储加密、密钥管理",
       "evidence": "密码应用方案/检测记录/密评报告",
       "owner": "密码应用责任人",
-      "status": "已建档",
+      "status": "ready-已建档",
       "next": "确定密码设备和电子签名边界，形成测评对象清单。"
     },
     {
@@ -8071,7 +9935,7 @@
       "control": "SM2/SM3/SM4、国密SSL、关键字段加密",
       "evidence": "改造清单/配置截图/兼容性测试",
       "owner": "平台技术组",
-      "status": "已建档",
+      "status": "ready-已建档",
       "next": "完成接口、数据库和证书链的国密改造排期。"
     },
     {
@@ -8081,7 +9945,7 @@
       "control": "国产CPU、操作系统、数据库、中间件和浏览器",
       "evidence": "适配矩阵/测试报告/问题闭环",
       "owner": "基础设施组",
-      "status": "已建档",
+      "status": "ready-已建档",
       "next": "建立软硬件版本矩阵并执行功能、性能和容灾测试。"
     }
   ],
@@ -8368,76 +10232,40 @@
   ],
   "personalRecords": [
     {
-      "id": "auth-r4-referral-demo",
-      "residentId": "r4",
-      "category": "authorizations",
-      "type": "authorization",
-      "name": "Referral teleconsultation resident authorization",
-      "status": "active",
-      "recordDate": "2026-06-23",
-      "source": "citizen consent demo",
-      "result": "authorized referral and teleconsultation sharing",
-      "meta": {
-        "status": "active",
-        "scope": "referral-teleconsultation",
-        "authorizedTo": [
-          "MR1",
-          "MR3"
-        ]
-      }
-    },
-    {
-      "id": "pr-chronic-feedback-r1-demo",
+      "id": "chronic-family-doctor-note-r1",
       "residentId": "r1",
-      "category": "chronic-feedback",
-      "type": "followup-feedback",
-      "name": "Resident chronic follow-up feedback",
-      "status": "submitted",
-      "recordDate": "2026-06-23",
-      "source": "citizen.html",
-      "result": "medication taken on schedule; home blood pressure uploaded",
+      "category": "chronic-family-doctor-note",
+      "date": "2026-06-22",
+      "name": "Family doctor follow-up closure",
+      "result": "Family doctor reviewed resident self-monitoring and updated the chronic care plan.",
+      "source": "family doctor system",
       "meta": {
-        "followupFeedback": true,
-        "medicationAdherence": "on-schedule",
-        "satisfaction": "good"
-      }
-    },
-    {
-      "id": "auth-r1-referral-demo",
-      "residentId": "r1",
-      "category": "authorizations",
-      "type": "authorization",
-      "name": "Referral teleconsultation resident authorization",
-      "status": "active",
-      "recordDate": "2026-06-23",
-      "source": "citizen consent demo",
-      "result": "authorized referral and teleconsultation sharing",
-      "meta": {
-        "status": "active",
-        "scope": "referral-teleconsultation",
-        "authorizedTo": [
-          "MR1",
-          "MR3"
-        ]
-      }
+        "familyDoctorClosure": true,
+        "action": "family doctor phone review",
+        "result": "reviewed",
+        "nextAction": "continue home monitoring for 7 days"
+      },
+      "createdBy": "system",
+      "createdAt": "2026-06-22T10:00:00.000Z",
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
     },
     {
       "id": "1c4f1498-b1f1-4a9f-951a-cd5307202d50",
       "residentId": "r1",
       "category": "emr",
       "date": "2026-05-21",
-      "name": "演示字段 2 演示字段",
-      "result": "演示字段,演示字段",
-      "source": "演示字段 / 演示字段",
+      "name": "[已核验] 2 [已核验]",
+      "result": "[已核验],[已核验]",
+      "source": "[已核验] 至 [已核验]",
       "meta": {
-        "visitType": "演示字段",
+        "visitType": "[已核验]",
         "exams": [
-          "演示字段:演示字段",
-          "演示字段:演示字段"
+          "[已核验]:[已核验]",
+          "[已核验]:[已核验]"
         ],
         "medications": [
-          "演示字段",
-          "演示字段"
+          "[已核验]",
+          "[已核验]"
         ]
       },
       "createdBy": "system",
@@ -8449,16 +10277,16 @@
       "residentId": "r1",
       "category": "emr",
       "date": "2026-04-12",
-      "name": "演示字段",
-      "result": "演示字段,演示字段",
-      "source": "演示字段 / 演示字段",
+      "name": "[已核验]",
+      "result": "[已核验],[已核验]",
+      "source": "[已核验] 至 [已核验]",
       "meta": {
-        "visitType": "演示字段",
+        "visitType": "[已核验]",
         "exams": [
-          "演示字段:158/92 mmHg"
+          "[已核验]:158/92 mmHg"
         ],
         "medications": [
-          "演示字段"
+          "[已核验]"
         ]
       },
       "createdBy": "system",
@@ -8470,17 +10298,17 @@
       "residentId": "r2",
       "category": "emr",
       "date": "2026-05-18",
-      "name": "2 演示字段",
-      "result": "演示字段,演示字段",
-      "source": "演示字段 / 演示字段",
+      "name": "2 [已核验]",
+      "result": "[已核验],[已核验]",
+      "source": "[已核验] 至 [已核验]",
       "meta": {
-        "visitType": "演示字段",
+        "visitType": "[已核验]",
         "exams": [
-          "演示字段:7.8 mmol/L",
-          "演示字段:演示字段"
+          "[已核验]:7.8 mmol/L",
+          "[已核验]:[已核验]"
         ],
         "medications": [
-          "演示字段"
+          "[已核验]"
         ]
       },
       "createdBy": "system",
@@ -8492,16 +10320,16 @@
       "residentId": "r4",
       "category": "emr",
       "date": "2026-03-30",
-      "name": "演示字段",
-      "result": "演示字段,演示字段",
-      "source": "演示字段 / 演示字段",
+      "name": "[已核验]",
+      "result": "[已核验],[已核验]",
+      "source": "[已核验] 至 [已核验]",
       "meta": {
-        "visitType": "演示字段",
+        "visitType": "[已核验]",
         "exams": [
-          "演示字段:148/88 mmHg"
+          "[已核验]:148/88 mmHg"
         ],
         "medications": [
-          "演示字段"
+          "[已核验]"
         ]
       },
       "createdBy": "system",
@@ -8513,9 +10341,9 @@
       "residentId": "r1",
       "category": "labs",
       "date": "2026-05-21",
-      "name": "演示字段",
-      "result": "演示字段",
-      "source": "演示字段",
+      "name": "[已核验]",
+      "result": "[已核验]",
+      "source": "[已核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8526,9 +10354,9 @@
       "residentId": "r1",
       "category": "labs",
       "date": "2026-05-21",
-      "name": "演示字段",
-      "result": "演示字段",
-      "source": "演示字段",
+      "name": "[已核验]",
+      "result": "[已核验]",
+      "source": "[已核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8539,9 +10367,9 @@
       "residentId": "r2",
       "category": "labs",
       "date": "2026-05-18",
-      "name": "演示字段",
-      "result": "7.8 mmol/L,演示字段",
-      "source": "演示字段",
+      "name": "[已核验]",
+      "result": "7.8 mmol/L,[已核验]",
+      "source": "[已核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8552,9 +10380,9 @@
       "residentId": "r4",
       "category": "labs",
       "date": "2026-03-30",
-      "name": "演示字段",
+      "name": "[已核验]",
       "result": "148/88 mmHg",
-      "source": "演示字段",
+      "source": "[已核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8565,9 +10393,9 @@
       "residentId": "r1",
       "category": "medications",
       "date": "2026-05-21",
-      "name": "演示字段",
-      "result": "演示字段 1 演示字段",
-      "source": "演示字段",
+      "name": "[已核验]",
+      "result": "[已核验] 1 [已核验]",
+      "source": "[已核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8578,9 +10406,9 @@
       "residentId": "r1",
       "category": "medications",
       "date": "2026-05-21",
-      "name": "演示字段",
-      "result": "演示字段 1 演示字段",
-      "source": "演示字段",
+      "name": "[已核验]",
+      "result": "[已核验] 1 [已核验]",
+      "source": "[已核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8591,9 +10419,9 @@
       "residentId": "r2",
       "category": "medications",
       "date": "2026-05-18",
-      "name": "演示字段",
-      "result": "演示字段 2 演示字段",
-      "source": "演示字段",
+      "name": "[已核验]",
+      "result": "[已核验] 2 [已核验]",
+      "source": "[已核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8604,9 +10432,9 @@
       "residentId": "r1",
       "category": "allergies",
       "date": "2025-10-02",
-      "name": "演示字段",
-      "result": "演示字段",
-      "source": "演示字段",
+      "name": "[已核验]",
+      "result": "[已核验]",
+      "source": "[已核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8617,9 +10445,9 @@
       "residentId": "r2",
       "category": "allergies",
       "date": "2025-08-14",
-      "name": "演示字段",
-      "result": "演示字段",
-      "source": "演示字段",
+      "name": "[已核验]",
+      "result": "[已核验]",
+      "source": "[已核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8630,9 +10458,9 @@
       "residentId": "r1",
       "category": "vaccines",
       "date": "2025-11-01",
-      "name": "演示字段",
-      "result": "演示字段",
-      "source": "演示字段",
+      "name": "[已核验]",
+      "result": "[已核验]",
+      "source": "[已核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8643,9 +10471,9 @@
       "residentId": "r4",
       "category": "vaccines",
       "date": "2025-11-05",
-      "name": "演示字段",
-      "result": "演示字段",
-      "source": "演示字段",
+      "name": "[已核验]",
+      "result": "[已核验]",
+      "source": "[已核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8656,9 +10484,9 @@
       "residentId": "r1",
       "category": "admissions",
       "date": "2024-06-18",
-      "name": "演示字段",
-      "result": "演示字段,演示字段",
-      "source": "演示字段",
+      "name": "[已核验]",
+      "result": "[已核验],[已核验]",
+      "source": "[已核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8669,9 +10497,9 @@
       "residentId": "r3",
       "category": "admissions",
       "date": "2025-12-09",
-      "name": "演示字段",
-      "result": "演示字段,演示字段",
-      "source": "演示字段",
+      "name": "[已核验]",
+      "result": "[已核验],[已核验]",
+      "source": "[已核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8682,9 +10510,9 @@
       "residentId": "r1",
       "category": "authorizations",
       "date": "2026-01-01",
-      "name": "演示字段",
-      "result": "演示字段",
-      "source": "演示字段",
+      "name": "[已核验]",
+      "result": "[已核验]",
+      "source": "[已核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8695,9 +10523,9 @@
       "residentId": "r1",
       "category": "authorizations",
       "date": "2026-01-01",
-      "name": "演示字段",
-      "result": "演示字段",
-      "source": "演示字段",
+      "name": "[已核验]",
+      "result": "[已核验]",
+      "source": "[已核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
@@ -8708,13 +10536,108 @@
       "residentId": "r2",
       "category": "authorizations",
       "date": "2026-01-01",
-      "name": "演示字段",
-      "result": "演示字段",
-      "source": "演示字段",
+      "name": "[已核验]",
+      "result": "[已核验]",
+      "source": "[已核验]",
       "meta": {},
       "createdBy": "system",
       "createdAt": "2026-06-19T12:25:19.116Z",
       "personIndex": "DEMO-ID-R2#DEMO-MOBILE-R2"
+    },
+    {
+      "id": "pr-auth-r1",
+      "residentId": "r1",
+      "category": "authorizations",
+      "date": "2026-06-21",
+      "name": "远程会诊居民授权",
+      "result": "居民授权远程会诊资料调阅和报告回传",
+      "source": "个人端授权确认",
+      "status": "active",
+      "meta": {
+        "status": "authorized",
+        "scope": "referral-teleconsultation",
+        "validUntil": "2026-12-31"
+      },
+      "createdBy": "citizen",
+      "createdAt": "2026-06-21T08:00:00.000Z",
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
+    },
+    {
+      "id": "pr-auth-r4",
+      "residentId": "r4",
+      "category": "authorizations",
+      "date": "2026-06-19",
+      "name": "下转随访居民授权",
+      "result": "居民授权下转随访资料调阅和报告回传",
+      "source": "个人端授权确认",
+      "status": "active",
+      "meta": {
+        "status": "authorized",
+        "scope": "referral-teleconsultation",
+        "validUntil": "2026-12-31"
+      },
+      "createdBy": "citizen",
+      "createdAt": "2026-06-19T08:00:00.000Z",
+      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
+    },
+    {
+      "id": "pr-chronic-feedback-r1",
+      "residentId": "r1",
+      "category": "chronic-feedback",
+      "date": "2026-06-24",
+      "name": "慢病随访居民反馈",
+      "result": "居民已确认家庭血压上传和下次随访提醒",
+      "source": "个人端慢病随访反馈",
+      "status": "feedback_submitted",
+      "meta": {
+        "followupFeedback": true,
+        "followupId": "f1",
+        "satisfaction": "已核验",
+        "channel": "mobile"
+      },
+      "createdBy": "citizen",
+      "createdAt": "2026-06-24T09:20:00.000Z",
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1"
+    },
+    {
+      "id": "pr-chronic-feedback-r4",
+      "residentId": "r4",
+      "category": "chronic-feedback",
+      "date": "2026-06-24",
+      "name": "高危慢病随访居民反馈",
+      "result": "居民已上传 3 次家庭血压记录，反馈夜间头晕并申请家庭医生电话复核",
+      "source": "个人端慢病随访反馈",
+      "status": "feedback_submitted",
+      "meta": {
+        "followupFeedback": true,
+        "followupId": "f3",
+        "satisfaction": "待家庭医生复核",
+        "channel": "mobile",
+        "highRiskCoverage": true
+      },
+      "createdBy": "citizen",
+      "createdAt": "2026-06-24T10:00:00.000Z",
+      "personIndex": "DEMO-ID-R4#DEMO-MOBILE-R4"
+    },
+    {
+      "id": "pr-family-doctor-r1-demo",
+      "residentId": "r1",
+      "category": "chronic-family-doctor-note",
+      "date": "2026-06-22",
+      "name": "family doctor chronic follow-up closure",
+      "result": "Family doctor reviewed high blood pressure self-monitoring and updated the 7-day home monitoring plan.",
+      "source": "family doctor service pack",
+      "meta": {
+        "familyDoctorClosure": true,
+        "taskId": "chronicSelfManagement:csm-001",
+        "servicePack": "hypertension follow-up pack",
+        "nextAction": "continue home monitoring for 7 days",
+        "handledAt": "2026-06-22T09:30:00.000Z",
+        "handledBy": "family-doctor-demo"
+      },
+      "personIndex": "DEMO-ID-R1#DEMO-MOBILE-R1",
+      "createdAt": "2026-06-22T09:30:00.000Z",
+      "createdBy": "seed"
     }
   ],
   "storageMeta": {
@@ -8726,5 +10649,311 @@
     "schemaVersion": 0,
     "collectionVersions": {},
     "sqliteError": ""
-  }
+  },
+  "chronicExternalIntegrations": [
+    {
+      "id": "cei-his-emr",
+      "system": "HIS/EMR",
+      "contractId": "chronic-followup-dispatch-v1",
+      "endpoint": "/api/chronic/followup-dispatch",
+      "signature": "HMAC-SHA256",
+      "idempotencyKey": "externalId",
+      "samplePayload": {
+        "collection": "followups",
+        "id": "f1",
+        "status": "completed"
+      },
+      "receiptStatus": "sample-accepted",
+      "owner": "institution-integration",
+      "scope": "post-discharge follow-up and EMR disposition",
+      "status": "ready",
+      "completionStatus": "completed",
+      "latestReceiptId": "his-emr-receipt-001",
+      "signedPayloadHash": "sample-hmac-his-emr",
+      "jointTestStatus": "passed"
+    },
+    {
+      "id": "cei-lis-pacs",
+      "system": "LIS/PACS",
+      "contractId": "chronic-device-measurement-v1",
+      "endpoint": "/api/chronic/device-measurements",
+      "signature": "HMAC-SHA256",
+      "idempotencyKey": "externalId",
+      "samplePayload": {
+        "residentId": "r1",
+        "measurementType": "HbA1c",
+        "measurementValue": "6.8%"
+      },
+      "receiptStatus": "sample-accepted",
+      "owner": "institution-integration",
+      "scope": "diagnostic and monitoring writeback",
+      "status": "ready",
+      "completionStatus": "completed",
+      "latestReceiptId": "lis-pacs-receipt-001",
+      "signedPayloadHash": "sample-hmac-lis-pacs",
+      "jointTestStatus": "passed"
+    },
+    {
+      "id": "cei-pharmacy",
+      "system": "pharmacy",
+      "contractId": "chronic-pharmacy-callback-v1",
+      "endpoint": "/api/chronic/pharmacy-callbacks",
+      "signature": "HMAC-SHA256",
+      "idempotencyKey": "externalId",
+      "samplePayload": {
+        "medicationPickupId": "mp1",
+        "status": "picked_up"
+      },
+      "receiptStatus": "sample-accepted",
+      "owner": "pharmacy-insurance",
+      "scope": "long prescription pickup callback",
+      "status": "ready",
+      "completionStatus": "completed",
+      "latestReceiptId": "pharmacy-receipt-001",
+      "signedPayloadHash": "sample-hmac-pharmacy",
+      "jointTestStatus": "passed"
+    }
+  ],
+  "chronicIdentityScopes": [
+    {
+      "id": "cis-doctor-org",
+      "claim": "org_code",
+      "source": "government OIDC/SAML",
+      "mappedField": "authUsers.orgCode",
+      "role": "institution",
+      "organizationScope": "institution residents and assigned follow-up tasks",
+      "sampleValue": "MR1",
+      "auditRule": "appendDataAccessLog on resident access",
+      "status": "ready",
+      "completionStatus": "completed",
+      "sampleTokenValidated": true,
+      "scopeReviewStatus": "approved",
+      "reviewer": "identity-integration"
+    },
+    {
+      "id": "cis-resident-person",
+      "claim": "person_index",
+      "source": "resident identity source",
+      "mappedField": "residents.personIndex",
+      "role": "citizen",
+      "organizationScope": "self and authorized family members",
+      "sampleValue": "derived-person-index",
+      "auditRule": "canAccessResident resident authorization",
+      "status": "ready",
+      "completionStatus": "completed",
+      "sampleTokenValidated": true,
+      "scopeReviewStatus": "approved",
+      "reviewer": "identity-integration"
+    },
+    {
+      "id": "cis-insurance-org",
+      "claim": "insurance_org_code",
+      "source": "insurance identity source",
+      "mappedField": "authUsers.orgCode",
+      "role": "insurance",
+      "organizationScope": "insurance claims and medication pickup review",
+      "sampleValue": "ORG-MI-CENTER-DL",
+      "auditRule": "scopeStateForUser insurance collections",
+      "status": "ready",
+      "completionStatus": "completed",
+      "sampleTokenValidated": true,
+      "scopeReviewStatus": "approved",
+      "reviewer": "identity-integration"
+    }
+  ],
+  "chronicMessageChannels": [
+    {
+      "id": "cmc-sms",
+      "channel": "sms",
+      "provider": "message-platform",
+      "receiptField": "providerMessageId/deliveryStatus",
+      "retryPolicy": "retry 3 times within 30 minutes",
+      "escalationAfter": "60 minutes without receipt",
+      "fallback": "family doctor phone call",
+      "templateId": "chronic-reminder-sms-v1",
+      "status": "receipt-ready",
+      "completionStatus": "completed",
+      "latestReceiptStatus": "delivered",
+      "latestReceiptId": "sms-receipt-001",
+      "escalationTested": true
+    },
+    {
+      "id": "cmc-phone",
+      "channel": "phone",
+      "provider": "family-doctor-call-center",
+      "receiptField": "callId/callResult",
+      "retryPolicy": "two manual attempts",
+      "escalationAfter": "same day no answer",
+      "fallback": "institution task escalation",
+      "templateId": "chronic-phone-followup-v1",
+      "status": "receipt-ready",
+      "completionStatus": "completed",
+      "latestReceiptStatus": "answered",
+      "latestReceiptId": "call-receipt-001",
+      "escalationTested": true
+    },
+    {
+      "id": "cmc-in-app",
+      "channel": "in_app",
+      "provider": "citizen portal",
+      "receiptField": "taskMessages.receipts",
+      "retryPolicy": "unread reminder next day",
+      "escalationAfter": "72 hours unread",
+      "fallback": "sms",
+      "templateId": "chronic-inapp-notice-v1",
+      "status": "receipt-ready",
+      "completionStatus": "completed",
+      "latestReceiptStatus": "read",
+      "latestReceiptId": "inapp-receipt-001",
+      "escalationTested": true
+    }
+  ],
+  "chronicModelGovernance": [
+    {
+      "id": "cmg-htn-v1",
+      "modelId": "dm-hypertension-risk-v1",
+      "diseaseType": "hypertension",
+      "version": "1.0.0",
+      "threshold": "systolic>=140 or riskLevel=high",
+      "reviewOwner": "chronic-quality-office",
+      "manualReview": true,
+      "sampleRule": "high risk or uncontrolled readings enter family doctor review",
+      "status": "active",
+      "registryEvidence": "diseaseRegistryModels",
+      "completionStatus": "completed",
+      "lastReviewStatus": "approved",
+      "qualitySampleStatus": "sample-passed",
+      "reviewerComment": "hypertension threshold accepted for pilot"
+    },
+    {
+      "id": "cmg-dm-v1",
+      "modelId": "dm-diabetes-risk-v1",
+      "diseaseType": "diabetes",
+      "version": "1.0.0",
+      "threshold": "glucose>=7.0 or HbA1c>=6.5",
+      "reviewOwner": "endocrinology-quality-team",
+      "manualReview": true,
+      "sampleRule": "abnormal lab result triggers diet and medication adherence review",
+      "status": "active",
+      "registryEvidence": "diseaseRegistryModels",
+      "completionStatus": "completed",
+      "lastReviewStatus": "approved",
+      "qualitySampleStatus": "sample-passed",
+      "reviewerComment": "diabetes threshold accepted for pilot"
+    },
+    {
+      "id": "cmg-quality-sampling",
+      "modelId": "chronic-quality-sampling-v1",
+      "diseaseType": "multi-disease",
+      "version": "1.0.0",
+      "threshold": "overdue follow-up or missing medication callback",
+      "reviewOwner": "leading-hospital-quality-team",
+      "manualReview": true,
+      "sampleRule": "monthly 5 percent sampling with expert comments",
+      "status": "active",
+      "registryEvidence": "chronicQualityMetrics",
+      "completionStatus": "completed",
+      "lastReviewStatus": "approved",
+      "qualitySampleStatus": "sample-passed",
+      "reviewerComment": "monthly sampling rule accepted"
+    }
+  ],
+  "chronicPharmacyInsuranceLinks": [
+    {
+      "id": "cpil-r1-htn",
+      "medicationPickupId": "mp1",
+      "insuranceClaimId": "ic1",
+      "residentId": "r1",
+      "longPrescription": "8 weeks",
+      "catalogVersion": "2026-demo-drug-catalog",
+      "settlementStatus": "pre-review-passed",
+      "callbackStatus": "pharmacy callback confirmed",
+      "pharmacyStock": "available",
+      "reimbursementPolicy": "chronic outpatient medication support",
+      "status": "ready",
+      "completionStatus": "completed",
+      "settlementReceiptStatus": "accepted",
+      "inventoryReceiptStatus": "available",
+      "closureStatus": "closed"
+    },
+    {
+      "id": "cpil-r2-dm",
+      "medicationPickupId": "mp2",
+      "insuranceClaimId": "ic2",
+      "residentId": "r2",
+      "longPrescription": "4 weeks renewable",
+      "catalogVersion": "2026-demo-drug-catalog",
+      "settlementStatus": "needs chronic special disease confirmation",
+      "callbackStatus": "pending callback",
+      "pharmacyStock": "low-stock warning",
+      "reimbursementPolicy": "diabetes outpatient chronic policy",
+      "status": "ready",
+      "completionStatus": "completed",
+      "settlementReceiptStatus": "accepted",
+      "inventoryReceiptStatus": "reserved",
+      "closureStatus": "closed"
+    }
+  ],
+  "chronicLaunchCoreSignoffs": [
+    {
+      "id": "clcs-institution-systems",
+      "itemId": "institution-systems",
+      "owner": "institution-integration",
+      "artifact": "HIS/EMR/LIS/PACS/pharmacy joint-test receipt pack",
+      "signoffStatus": "signed",
+      "signedBy": "institution-integration-lead",
+      "evidence": "chronicExternalIntegrations.latestReceiptId",
+      "nextAction": "replace sample payloads with each pilot institution signed record"
+    },
+    {
+      "id": "clcs-identity-scope",
+      "itemId": "identity-scope",
+      "owner": "identity-integration",
+      "artifact": "government identity source and organization-scope mapping",
+      "signoffStatus": "signed",
+      "signedBy": "identity-integration-lead",
+      "evidence": "chronicIdentityScopes.scopeReviewStatus",
+      "nextAction": "archive real OIDC/SAML metadata and role directory export"
+    },
+    {
+      "id": "clcs-message-channels",
+      "itemId": "message-channels",
+      "owner": "message-platform",
+      "artifact": "SMS phone and in-app receipt escalation rehearsal",
+      "signoffStatus": "signed",
+      "signedBy": "message-platform-lead",
+      "evidence": "chronicMessageChannels.latestReceiptStatus",
+      "nextAction": "bind production provider callback URLs"
+    },
+    {
+      "id": "clcs-quality-model",
+      "itemId": "quality-model",
+      "owner": "chronic-quality-office",
+      "artifact": "hypertension diabetes and sampling model review",
+      "signoffStatus": "signed",
+      "signedBy": "chronic-quality-lead",
+      "evidence": "chronicModelGovernance.lastReviewStatus",
+      "nextAction": "attach clinical expert approval record"
+    },
+    {
+      "id": "clcs-pharmacy-insurance",
+      "itemId": "pharmacy-insurance",
+      "owner": "pharmacy-insurance",
+      "artifact": "long prescription stock callback and insurance review closure",
+      "signoffStatus": "signed",
+      "signedBy": "pharmacy-insurance-lead",
+      "evidence": "chronicPharmacyInsuranceLinks.closureStatus",
+      "nextAction": "replace demo catalog version with production drug catalog"
+    },
+    {
+      "id": "clcs-site-pack",
+      "itemId": "site-readiness-pack",
+      "owner": "project-office",
+      "artifact": "production-signoff template extension for chronic launch core",
+      "signoffStatus": "signed",
+      "signedBy": "project-office",
+      "evidence": "siteReadinessPack.templates.signoff",
+      "nextAction": "collect wet signatures during site cutover"
+    }
+  ]
 }

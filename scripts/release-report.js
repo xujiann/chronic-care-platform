@@ -4,19 +4,29 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const { buildAuditRetentionReport, renderMarkdown: renderAuditRetentionMarkdown } = require("./audit-retention");
 const { buildChronicFollowupReadinessReport, renderMarkdown: renderChronicFollowupMarkdown } = require("./chronic-followup-readiness");
+const { buildChronicInstitutionInterfaceReport, renderMarkdown: renderChronicInstitutionInterfaceMarkdown } = require("./chronic-institution-interfaces");
+const { buildChronicLaunchCoreReport, renderMarkdown: renderChronicLaunchCoreMarkdown } = require("./chronic-launch-core");
+const { buildCitizenLaunchFoundationReadiness, renderMarkdown: renderCitizenLaunchFoundationMarkdown } = require("./citizen-launch-foundation-readiness");
 const { buildDataQualityReport, renderMarkdown: renderDataQualityMarkdown } = require("./data-quality-report");
 const { buildDrugConsumableReadinessReport, renderMarkdown: renderDrugConsumableMarkdown } = require("./drug-consumable-readiness");
 const { buildEvaluationEvidenceReport, renderMarkdown: renderEvaluationEvidenceMarkdown } = require("./evaluation-evidence");
+const { buildEscortServiceReadinessReport, renderMarkdown: renderEscortServiceMarkdown } = require("./escort-service-readiness");
+const { buildInternetNursingReadinessReport, renderMarkdown: renderInternetNursingMarkdown } = require("./internet-nursing-readiness");
 const { buildEnvironmentMatrixReport, renderMarkdown: renderEnvironmentMatrixMarkdown } = require("./environment-matrix");
-const { buildHealthDashboardSummary, renderMarkdown: renderHealthDashboardMarkdown } = require("./health-dashboard-summary");
+const { buildHealthDashboardSummary, buildPriorityApplicationTemplates, renderMarkdown: renderHealthDashboardMarkdown } = require("./health-dashboard-summary");
+const { buildHybridDeploymentReadinessReport, renderMarkdown: renderHybridDeploymentMarkdown } = require("./hybrid-deployment-readiness");
 const { buildIdentityContract, renderMarkdown: renderIdentityContractMarkdown } = require("./identity-contract");
 const { buildIntegrationReadinessReport, renderMarkdown: renderIntegrationReadinessMarkdown } = require("./integration-readiness");
 const { buildInterfaceMappingReport, renderMarkdown: renderInterfaceMappingMarkdown } = require("./interface-mapping");
 const { buildHospitalOperationsReadinessReport, renderMarkdown: renderHospitalOperationsReadinessMarkdown } = require("./hospital-operations-readiness");
 const { buildMonitoringReadinessReport, renderMarkdown: renderMonitoringReadinessMarkdown } = require("./monitoring-readiness");
 const { buildOperationsReadinessReport, renderMarkdown: renderOperationsReadinessMarkdown } = require("./operations-readiness");
+const { buildOnsiteLaunchRequirements, renderMarkdown: renderOnsiteLaunchRequirementsMarkdown } = require("./onsite-launch-requirements");
+const { buildMaternalChildReadinessReport, renderMarkdown: renderMaternalChildReadinessMarkdown } = require("./maternal-child-readiness");
+const { buildPolicyCoverageReport, renderMarkdown: renderPolicyCoverageMarkdown } = require("./policy-coverage");
 const { buildProcessAuditReport, renderMarkdown: renderProcessAuditMarkdown } = require("./process-audit");
 const { buildProductionDbReadinessReport, renderMarkdown: renderProductionDbReadinessMarkdown } = require("./production-db-readiness");
+const { renderMarkdown: renderPriorityApplicationTemplatesMarkdown } = require("./priority-application-templates");
 const { buildRegionalDataSharingReport, renderMarkdown: renderRegionalDataSharingMarkdown } = require("./regional-data-sharing");
 const { buildQualitySafetyReport, renderMarkdown: renderQualitySafetyMarkdown } = require("./quality-safety-report");
 const { buildReleaseArtifactManifest, renderMarkdown: renderReleaseArtifactManifestMarkdown } = require("./release-artifact-manifest");
@@ -106,9 +116,9 @@ function buildProductionCutoverChecklist(env, checks = []) {
       id: "cutover-identity",
       phase: "identity",
       owner: "identity-integration",
-      passed: ready("env:OIDC.identityAdapter"),
-      evidence: detail("env:OIDC.identityAdapter"),
-      nextAction: "确认政务统一认证 OIDC/SAML 参数、客户端密钥、回调地址、机构目录和医生身份源映射。"
+      passed: ready("env:OIDC.identityAdapter", "env:SMS.gateway"),
+      evidence: detail("env:OIDC.identityAdapter", "env:SMS.gateway"),
+      nextAction: "确认政务统一认证 OIDC/SAML 参数、客户端密钥、回调地址、机构目录、医生身份源映射和居民端真实短信网关。"
     },
     {
       id: "cutover-audit-retention",
@@ -133,6 +143,14 @@ function buildProductionCutoverChecklist(env, checks = []) {
       passed: ready("integration:p0Coverage", "integration:contractsReady", "interfaceMapping:report", "interfaceMapping:requiredFields") && envFlagEnabled(env, "CUTOVER_SITE_INTERFACE_SIGNOFF"),
       evidence: `${detail("integration:p0Coverage", "integration:contractsReady", "interfaceMapping:report", "interfaceMapping:requiredFields")}; ${signoff("CUTOVER_SITE_INTERFACE_SIGNOFF")}`,
       nextAction: "Archive signed HIS/EMR/LIS/PACS and referral joint-test records from the target site before production cutover."
+    },
+    {
+      id: "cutover-chronic-launch-core",
+      phase: "integration",
+      owner: "chronic-followup",
+      passed: ready("chronicFollowup:institutionInterfaces", "chronicFollowup:launchCore") && envFlagEnabled(env, "CUTOVER_CHRONIC_LAUNCH_CORE_SIGNOFF"),
+      evidence: `${detail("chronicFollowup:institutionInterfaces", "chronicFollowup:launchCore")}; ${signoff("CUTOVER_CHRONIC_LAUNCH_CORE_SIGNOFF")}`,
+      nextAction: "Archive chronic launch core closure, site signoff, pharmacy callback, and resident check-in evidence before production cutover."
     },
     {
       id: "cutover-insurance-certificate",
@@ -190,6 +208,7 @@ function validateProductionConfig(options = {}) {
       check("env:STORAGE_ENGINE.runtimeAdapter", ["auto", "sqlite"].includes(storageEngine), ["auto", "sqlite"].includes(storageEngine) ? storageEngine : `${storageEngine} adapter not enabled`, "error", "environment"),
       check("env:DATABASE_URL.requiredForPostgres", !["postgres", "postgresql"].includes(storageEngine) || Boolean(env.DATABASE_URL), env.DATABASE_URL ? "configured" : "missing", "error", "environment"),
       check("env:OIDC.identityAdapter", Boolean(env.OIDC_ISSUER_URL && env.OIDC_CLIENT_ID && env.OIDC_CLIENT_SECRET), env.OIDC_ISSUER_URL && env.OIDC_CLIENT_ID && env.OIDC_CLIENT_SECRET ? "configured" : "missing OIDC_ISSUER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET", "error", "environment"),
+      check("env:SMS.gateway", Boolean(env.SMS_GATEWAY_URL), env.SMS_GATEWAY_URL ? "configured" : "missing SMS_GATEWAY_URL", "error", "environment"),
       check("env:AUDIT.retentionTarget", Boolean(env.AUDIT_EXPORT_PATH || env.SIEM_ENDPOINT), env.AUDIT_EXPORT_PATH || env.SIEM_ENDPOINT ? "configured" : "missing AUDIT_EXPORT_PATH or SIEM_ENDPOINT", "error", "environment")
     );
   }
@@ -282,18 +301,32 @@ function identityContractChecks(identityContract) {
 }
 
 function auditRetentionChecks(auditRetention) {
+  const retentionTargetDetail = (auditRetention.retentionTargets || [])
+    .map((item) => `${item.env}:${item.configured ? "configured" : "missing"}`)
+    .join(";") || "no retention targets declared";
   return [
     check("audit:retention", auditRetention.ok, auditRetention.ok ? "audit retention checks passed" : "audit retention checks failed", "error", "audit"),
     check("audit:exportDigest", Boolean(auditRetention.exportDigest), auditRetention.exportDigest || "missing", "error", "audit"),
-    check("audit:retentionTargetConfigured", auditRetention.retentionTargets?.some((item) => item.configured), "production target is required during site cutover", "warn", "audit")
+    check("audit:retentionTargetConfigured", auditRetention.retentionTargets?.some((item) => item.configured), retentionTargetDetail, "warn", "audit")
   ];
 }
 
-function chronicFollowupChecks(chronicFollowup) {
+function auditRetentionEnvForRelease(options, profile) {
+  const env = { ...(options.env || process.env) };
+  const strictProfile = profile === "production";
+  if (!strictProfile && !env.AUDIT_EXPORT_PATH && !env.SIEM_ENDPOINT) {
+    env.AUDIT_EXPORT_PATH = path.join(ROOT, "release", "audit-retention-report.json");
+  }
+  return env;
+}
+
+function chronicFollowupChecks(chronicFollowup, chronicInstitutionInterfaces, chronicLaunchCore) {
   return [
     check("chronicFollowup:readiness", chronicFollowup.ok, chronicFollowup.ok ? "chronic follow-up readiness checks passed" : "chronic follow-up readiness checks failed", "error", "chronic-followup"),
     check("chronicFollowup:boundaries", chronicFollowup.summary?.passed === chronicFollowup.summary?.boundaries, `${chronicFollowup.summary?.passed || 0}/${chronicFollowup.summary?.boundaries || 0} boundaries`, "error", "chronic-followup"),
-    check("chronicFollowup:feedback", chronicFollowup.summary?.feedbackRecords >= 1, `${chronicFollowup.summary?.feedbackRecords || 0} feedback records`, "error", "chronic-followup")
+    check("chronicFollowup:feedback", chronicFollowup.summary?.feedbackRecords >= 1, `${chronicFollowup.summary?.feedbackRecords || 0} feedback records`, "error", "chronic-followup"),
+    check("chronicFollowup:institutionInterfaces", chronicInstitutionInterfaces?.ok && chronicInstitutionInterfaces.summary?.readyContracts === chronicInstitutionInterfaces.summary?.contracts, `${chronicInstitutionInterfaces?.summary?.readyContracts || 0}/${chronicInstitutionInterfaces?.summary?.contracts || 0} institution contracts`, "error", "chronic-followup"),
+    check("chronicFollowup:launchCore", chronicLaunchCore?.ok && chronicLaunchCore.summary?.readyItems === chronicLaunchCore.summary?.items, `${chronicLaunchCore?.summary?.readyItems || 0}/${chronicLaunchCore?.summary?.items || 0} launch core items`, "error", "chronic-followup")
   ];
 }
 
@@ -346,12 +379,50 @@ function environmentMatrixChecks(environmentMatrix) {
   ];
 }
 
+function hybridDeploymentChecks(hybridDeploymentReadiness) {
+  return [
+    check("hybridDeployment:readiness", hybridDeploymentReadiness.ok, hybridDeploymentReadiness.ok ? "hybrid deployment topology checks passed" : "hybrid deployment topology failed", "error", "deployment"),
+    check("hybridDeployment:staticPreview", hybridDeploymentReadiness.checks?.some((item) => item.id === "hybrid:staticPreviewBoundary" && item.passed), "GitHub Pages/static preview boundary documented", "error", "deployment"),
+    check("hybridDeployment:dynamicBackend", hybridDeploymentReadiness.checks?.some((item) => item.id === "hybrid:dynamicBackendRoutes" && item.passed), "server.js dynamic API routes covered", "error", "deployment")
+  ];
+}
+
 function healthDashboardChecks(healthDashboard) {
   return [
     check("healthDashboard:summary", healthDashboard.ok, healthDashboard.ok ? "health dashboard summary checks passed" : "health dashboard summary failed", "error", "health-dashboard"),
     check("healthDashboard:applications", healthDashboard.applications?.length === 8 && healthDashboard.totals?.sourceApplications === 7, `${healthDashboard.applications?.length || 0} applications; ${healthDashboard.totals?.sourceApplications || 0} source applications`, "error", "health-dashboard"),
     check("healthDashboard:developmentTemplate", healthDashboard.applications?.every((item) => item.functionalBoundary && item.reusePoints?.length && item.dataCollections?.length && item.apiRoutes?.length && item.frontendEntry && item.testEvidence?.length && item.acceptanceEvidence?.length), "boundary, reuse, data, API, frontend, test, and acceptance fields", "error", "health-dashboard"),
     check("healthDashboard:boundary", /source business applications|source applications/.test(healthDashboard.scope?.rule || ""), healthDashboard.scope?.rule || "missing", "error", "health-dashboard")
+  ];
+}
+
+function priorityApplicationTemplateChecks(priorityApplicationTemplates) {
+  return [
+    check("priorityApps:templates", priorityApplicationTemplates.ok, priorityApplicationTemplates.ok ? "priority application templates passed" : "priority application templates failed", "error", "priority-apps"),
+    check("priorityApps:count", priorityApplicationTemplates.summary?.applications === 8 && priorityApplicationTemplates.summary?.sourceApplications === 7, `${priorityApplicationTemplates.summary?.applications || 0} applications; ${priorityApplicationTemplates.summary?.sourceApplications || 0} source applications`, "error", "priority-apps"),
+    check("priorityApps:conversationTitles", priorityApplicationTemplates.templates?.every((item) => item.conversationTitle), "conversation titles present", "error", "priority-apps"),
+    check("priorityApps:conversationStarters", priorityApplicationTemplates.templates?.every((item) => item.conversationStarter && item.conversationStarter.includes(item.id)), "conversation starters present", "error", "priority-apps"),
+    check("priorityApps:implementationChecklists", priorityApplicationTemplates.templates?.every((item) => Array.isArray(item.implementationChecklist) && item.implementationChecklist.length >= 8 && item.implementationChecklist.some((step) => /Follow Codex loop/.test(step))), "implementation checklists include Codex loop", "error", "priority-apps"),
+    check("priorityApps:acceptanceGates", priorityApplicationTemplates.templates?.every((item) => item.acceptanceGate?.readyWhen?.length >= 4 && item.acceptanceGate?.evidence?.length), "acceptance gates present", "error", "priority-apps")
+  ];
+}
+
+function maternalChildReadinessChecks(maternalChildReadiness) {
+  const riskMetrics = maternalChildReadiness.summary?.riskMetrics || {};
+  const hasRiskMetricKeys = ["pendingPublicSecuritySync", "pendingMaternalChildSync", "qualityPending"].every((key) => Number.isFinite(Number(riskMetrics[key])));
+  return [
+    check("maternalChild:readiness", maternalChildReadiness.ok, maternalChildReadiness.ok ? "maternal-child readiness checks passed" : "maternal-child readiness checks failed", "error", "maternal-child"),
+    check("maternalChild:policy", maternalChildReadiness.checks?.some((item) => item.id === "docs:policy" && item.passed), "policy documents and module policy summary present", "error", "maternal-child"),
+    check("maternalChild:riskMetrics", hasRiskMetricKeys && maternalChildReadiness.checks?.some((item) => item.id === "data:risk-metrics" && item.passed), `public-security pending ${riskMetrics.pendingPublicSecuritySync ?? 0}, maternal-child enrollment pending ${riskMetrics.pendingMaternalChildSync ?? 0}, quality correction pending ${riskMetrics.qualityPending ?? 0}`, "error", "maternal-child"),
+    check("maternalChild:roles", ["role:institution", "role:commission", "role:citizen"].every((id) => maternalChildReadiness.checks?.some((item) => item.id === id && item.passed)), "institution, commission, and citizen roles covered", "error", "maternal-child")
+  ];
+}
+
+function policyCoverageChecks(policyCoverage) {
+  return [
+    check("policyCoverage:report", policyCoverage.ok, policyCoverage.ok ? "policy coverage checks passed" : "policy coverage checks failed", "error", "policy"),
+    check("policyCoverage:documents", policyCoverage.summary?.documentsPassed === policyCoverage.summary?.documents, `${policyCoverage.summary?.documentsPassed || 0}/${policyCoverage.summary?.documents || 0} policy documents`, "error", "policy"),
+    check("policyCoverage:releaseGates", policyCoverage.checks?.filter((item) => /^policyCoverage:(releaseManifest|releaseReport|deployCheck|packageScript|ci)$/.test(item.id)).every((item) => item.passed), "policy coverage is wired into package, CI, deploy check, manifest, and release report", "error", "policy")
   ];
 }
 
@@ -409,6 +480,32 @@ function referralTeleconsultationChecks(referralTeleconsultationReadiness) {
     check("referralTeleconsultation:readiness", referralTeleconsultationReadiness.ok, referralTeleconsultationReadiness.ok ? "referral teleconsultation readiness checks passed" : "referral teleconsultation readiness checks failed", "error", "referral"),
     check("referralTeleconsultation:authorization", referralTeleconsultationReadiness.checks?.some((item) => item.id === "referral:residentAuthorization" && item.passed), "resident authorization evidence present", "error", "referral"),
     check("referralTeleconsultation:frontend", referralTeleconsultationReadiness.checks?.some((item) => item.id === "referral:frontend" && item.passed), "institution and county runnable entries present", "error", "referral")
+  ];
+}
+
+function escortServiceChecks(escortServiceReadiness) {
+  return [
+    check("escortService:readiness", escortServiceReadiness.ok, escortServiceReadiness.ok ? "escort service readiness checks passed" : "escort service readiness checks failed", "error", "escort"),
+    check("escortService:registry", escortServiceReadiness.summary?.providers >= 3 && escortServiceReadiness.summary?.trainedWorkers >= 3, `${escortServiceReadiness.summary?.providers || 0} providers / ${escortServiceReadiness.summary?.trainedWorkers || 0} trained workers`, "error", "escort"),
+    check("escortService:riskQuality", escortServiceReadiness.checks?.some((item) => item.id === "escort:riskQuality" && item.passed), "risk queue and quality callback evidence present", "error", "escort"),
+    check("escortService:citizenProviderAvailability", escortServiceReadiness.checks?.some((item) => item.id === "escort:citizenProviderAvailability" && item.passed), "citizen booking is guarded when no published provider is available", "error", "escort")
+  ];
+}
+
+function internetNursingChecks(internetNursingReadiness) {
+  return [
+    check("internetNursing:readiness", internetNursingReadiness.ok, internetNursingReadiness.ok ? "internet nursing readiness checks passed" : "internet nursing readiness checks failed", "error", "internet-nursing"),
+    check("internetNursing:qualification", internetNursingReadiness.summary?.qualifiedNurses >= 2, `${internetNursingReadiness.summary?.qualifiedNurses || 0}/${internetNursingReadiness.summary?.nurses || 0} qualified nurses`, "error", "internet-nursing"),
+    check("internetNursing:riskTrace", internetNursingReadiness.checks?.some((item) => item.id === "nursing:riskTrace" && item.passed), "risk queue and location tracking evidence present", "error", "internet-nursing")
+  ];
+}
+
+function citizenLaunchFoundationChecks(citizenLaunchFoundation) {
+  return [
+    check("citizenLaunch:readiness", citizenLaunchFoundation.ok, citizenLaunchFoundation.ok ? "citizen launch foundation checks passed" : "citizen launch foundation checks failed", "error", "citizen-launch"),
+    check("citizenLaunch:phoneCodeDelivery", citizenLaunchFoundation.checks?.some((item) => item.id === "citizen-foundation:phone-code-delivery" && item.passed), "phone-code delivery exposes send action, cooldown, expiry, and demo gateway evidence", "error", "citizen-launch"),
+    check("citizenLaunch:offlineCache", citizenLaunchFoundation.checks?.some((item) => item.id === "citizen-foundation:offline-cache" && item.passed), "resident PWA shell refreshes HTML/JS/CSS from network first", "error", "citizen-launch"),
+    check("citizenLaunch:externalDependencies", citizenLaunchFoundation.externalDependencies?.every((item) => item.status === "required-before-production"), `${citizenLaunchFoundation.externalDependencies?.length || 0} production dependencies surfaced`, "error", "citizen-launch")
   ];
 }
 
@@ -531,6 +628,14 @@ function siteReadinessChecks(siteReadinessPack) {
   ];
 }
 
+function onsiteLaunchRequirementsChecks(onsiteLaunchRequirements) {
+  return [
+    check("onsiteLaunch:requirements", onsiteLaunchRequirements.ok, onsiteLaunchRequirements.ok ? "on-site launch requirements passed" : "on-site launch requirements failed", "error", "onsite-launch"),
+    check("onsiteLaunch:p0Coverage", onsiteLaunchRequirements.summary?.p0Requirements >= 10, `${onsiteLaunchRequirements.summary?.p0Requirements || 0} P0 requirements`, "error", "onsite-launch"),
+    check("onsiteLaunch:blockers", onsiteLaunchRequirements.summary?.blockingConditions >= 10, `${onsiteLaunchRequirements.summary?.blockingConditions || 0} blocking conditions`, "error", "onsite-launch")
+  ];
+}
+
 function packageChecks(pkg) {
   const requiredScripts = [
     "check",
@@ -541,13 +646,19 @@ function packageChecks(pkg) {
     "env:check",
     "release:report",
     "release:manifest",
+    "onsite:launch-requirements",
     "identity:contract",
     "audit:retention",
     "data-quality:report",
     "quality-safety:report",
     "environment:matrix",
+    "hybrid:deployment-readiness",
     "hospital-operations:readiness",
+    "internet-nursing:readiness",
     "health-dashboard:summary",
+    "priority-apps:templates",
+    "maternal-child:readiness",
+    "policy:coverage",
     "integration:readiness",
     "interface:mapping",
     "monitoring:readiness",
@@ -602,8 +713,10 @@ function buildReleaseReport(options = {}) {
   const env = validateProductionConfig(options);
   const storageModel = inspectStorageModel({ dataDir: path.join(ROOT, "data") });
   const identityContract = buildIdentityContract({ data });
-  const auditRetention = buildAuditRetentionReport({ data, env: options.env || process.env });
+  const auditRetention = buildAuditRetentionReport({ data, env: auditRetentionEnvForRelease(options, env.profile) });
   const chronicFollowup = buildChronicFollowupReadinessReport({ data });
+  const chronicInstitutionInterfaces = buildChronicInstitutionInterfaceReport({ data, pkg });
+  const chronicLaunchCore = buildChronicLaunchCoreReport({ data, pkg });
   const dataQuality = buildDataQualityReport({ data });
   const qualitySafety = buildQualitySafetyReport({ data });
   const drugConsumable = buildDrugConsumableReadinessReport({ data, pkg });
@@ -614,14 +727,27 @@ function buildReleaseReport(options = {}) {
   const researchSandbox = buildResearchSandboxReadiness(data);
   const monitoringReadiness = buildMonitoringReadinessReport({ data, pkg });
   const referralTeleconsultationReadiness = buildReferralTeleconsultationReadinessReport({ data, pkg });
+  const escortServiceReadiness = buildEscortServiceReadinessReport({ data, pkg });
+  const internetNursingReadiness = buildInternetNursingReadinessReport({ data, pkg });
+  const citizenLaunchFoundation = buildCitizenLaunchFoundationReadiness({
+    pkg,
+    phaseDoc: fs.existsSync(path.join(ROOT, "docs", "citizen-launch-foundation-plan.md"))
+      ? fs.readFileSync(path.join(ROOT, "docs", "citizen-launch-foundation-plan.md"), "utf8")
+      : ""
+  });
   const operationsReadiness = buildOperationsReadinessReport({ data, pkg });
   const processAudit = buildProcessAuditReport({ data });
   const serviceAcceptance = buildServiceAcceptanceSummary(data);
   const productionDbReadiness = buildProductionDbReadinessReport({ data, pkg, storageModel });
   const evaluationEvidence = buildEvaluationEvidenceReport({ data });
   const environmentMatrix = buildEnvironmentMatrixReport({ data, pkg });
+  const hybridDeploymentReadiness = buildHybridDeploymentReadinessReport({ data, pkg });
   const healthDashboard = buildHealthDashboardSummary({ data });
+  const priorityApplicationTemplates = buildPriorityApplicationTemplates({ data });
+  const maternalChildReadiness = buildMaternalChildReadinessReport({ data, packageSource: JSON.stringify(pkg) });
+  const policyCoverage = buildPolicyCoverageReport();
   const siteReadinessPack = buildSiteReadinessPack({ data, pkg, envFile: options.envFile || ".env.example", env: options.env || process.env, identityContract, interfaceMapping, monitoringReadiness });
+  const onsiteLaunchRequirements = buildOnsiteLaunchRequirements({ pkg, sitePack: siteReadinessPack, releaseReport: { ok: true }, envFile: options.envFile || ".env.example", env: options.env || process.env });
   const checks = [
     assertFile("README.md"),
     assertFile("DEPLOYMENT.md"),
@@ -634,7 +760,7 @@ function buildReleaseReport(options = {}) {
     ...storageModelChecks(storageModel),
     ...identityContractChecks(identityContract),
     ...auditRetentionChecks(auditRetention),
-    ...chronicFollowupChecks(chronicFollowup),
+    ...chronicFollowupChecks(chronicFollowup, chronicInstitutionInterfaces, chronicLaunchCore),
     ...dataQualityChecks(dataQuality),
     ...qualitySafetyChecks(qualitySafety),
     ...drugConsumableChecks(drugConsumable),
@@ -645,14 +771,22 @@ function buildReleaseReport(options = {}) {
     ...researchSandboxChecks(researchSandbox),
     ...monitoringReadinessChecks(monitoringReadiness),
     ...referralTeleconsultationChecks(referralTeleconsultationReadiness),
+    ...escortServiceChecks(escortServiceReadiness),
+    ...internetNursingChecks(internetNursingReadiness),
+    ...citizenLaunchFoundationChecks(citizenLaunchFoundation),
     ...operationsReadinessChecks(operationsReadiness),
     ...processAuditChecks(processAudit),
     ...serviceAcceptanceChecks(serviceAcceptance),
     ...siteReadinessChecks(siteReadinessPack),
+    ...onsiteLaunchRequirementsChecks(onsiteLaunchRequirements),
     ...productionDbReadinessChecks(productionDbReadiness),
     ...evaluationEvidenceChecks(evaluationEvidence),
     ...environmentMatrixChecks(environmentMatrix),
+    ...hybridDeploymentChecks(hybridDeploymentReadiness),
     ...healthDashboardChecks(healthDashboard),
+    ...priorityApplicationTemplateChecks(priorityApplicationTemplates),
+    ...maternalChildReadinessChecks(maternalChildReadiness),
+    ...policyCoverageChecks(policyCoverage),
     ...env.checks,
     ...commandChecks(options.runCommands)
   ];
@@ -676,6 +810,8 @@ function buildReleaseReport(options = {}) {
     identityContract,
     auditRetention,
     chronicFollowup,
+    chronicInstitutionInterfaces,
+    chronicLaunchCore,
     dataQuality,
     qualitySafety,
     drugConsumable,
@@ -686,14 +822,22 @@ function buildReleaseReport(options = {}) {
     researchSandbox,
     monitoringReadiness,
     referralTeleconsultationReadiness,
+    escortServiceReadiness,
+    internetNursingReadiness,
+    citizenLaunchFoundation,
     operationsReadiness,
     processAudit,
     serviceAcceptance,
     siteReadinessPack,
+    onsiteLaunchRequirements,
     productionDbReadiness,
     evaluationEvidence,
     environmentMatrix,
-    healthDashboard
+    hybridDeploymentReadiness,
+    healthDashboard,
+    priorityApplicationTemplates,
+    maternalChildReadiness,
+    policyCoverage
   };
 }
 
@@ -827,6 +971,8 @@ function renderMarkdown(report) {
     "",
     "## Production cutover checklist",
     "",
+    "See `docs/production-go-live-requirements.md` for the real production go-live requirements, site-owned inputs, blocking conditions, drill schedule, and signoff evidence required before this checklist can be used for a formal production decision.",
+    "",
     "| Result | Phase | Owner | Item | Next action |",
     "|---|---|---|---|---|",
     ...cutoverRows,
@@ -886,6 +1032,10 @@ function renderMarkdown(report) {
     "",
     "See `site-readiness-pack.json` and `site-readiness-pack.md` for identity source mapping, interface joint-test, monitoring/on-call, and production signoff templates.",
     "",
+    "## On-site launch requirements",
+    "",
+    "See `onsite-launch-requirements.json` and `onsite-launch-requirements.md` for field-owned production inputs, P0 blockers, resident mobile acceptance, gray release scope, and signoff evidence.",
+    "",
     "## Monitoring readiness report",
     "",
     "See `monitoring-readiness-report.json` and `monitoring-readiness-report.md` for health and metrics routes, runtime metric signals, alert signals, SLO targets, and on-call escalation evidence.",
@@ -893,6 +1043,14 @@ function renderMarkdown(report) {
     "## Referral teleconsultation readiness report",
     "",
     "See `referral-teleconsultation-readiness-report.json` and `referral-teleconsultation-readiness-report.md` for referral, teleconsultation, receiving feedback, report return, collaboration order, resident authorization, and performance evidence.",
+    "",
+    "## Internet nursing readiness report",
+    "",
+    "See `internet-nursing-readiness-report.json` and `internet-nursing-readiness-report.md` for resident appointment, hospital assessment and dispatch, nurse acceptance, location trace, service record, quality callback, and policy evidence.",
+    "",
+    "## Citizen launch foundation readiness report",
+    "",
+    "See `citizen-launch-foundation-readiness.json` and `citizen-launch-foundation-readiness.md` for resident phone-code delivery, PWA/app shell refresh, mini-program/app routing, and production SMS, real-name, guardian, HTTPS, signing, push, and monitoring dependencies.",
     "",
     "## Production database readiness report",
     "",
@@ -906,9 +1064,17 @@ function renderMarkdown(report) {
     "",
     "See `environment-matrix-report.json` and `environment-matrix-report.md` for demo, staging, and production environment variables, gate scripts, owners, and blocking rules.",
     "",
+    "## Hybrid deployment readiness report",
+    "",
+    "See `hybrid-deployment-readiness-report.json` and `hybrid-deployment-readiness-report.md` for the static preview layer, Node dynamic backend routes, storage guardrails, environment template, release wiring, and CI evidence.",
+    "",
     "## Health dashboard summary",
     "",
     "See `health-dashboard-summary.json` and `health-dashboard-summary.md` for the aggregate entry across the first seven applications, open actions, interface tracks, evidence, and site dependencies.",
+    "`GET /api/priority-applications/templates` exposes the live eight-application handoff templates for independent conversation work.",
+    "See `priority-application-templates.json` and `priority-application-templates.md` for the standalone release artifact version of that handoff contract.",
+    "See `maternal-child-readiness-report.json` and `maternal-child-readiness-report.md` for maternal-child policy, birth certificate workflow, role scope, API, privacy, and release evidence.",
+    "See `policy-coverage-report.json` and `policy-coverage-report.md` for About-page policy IDs, policy documents, template rules, CI, deploy check, release manifest, and operator documentation coverage.",
     "",
     "## Release artifact manifest",
     "",
@@ -978,6 +1144,22 @@ function writeOutput(report, flags) {
       profile: report.profile,
       generatedAt: report.generatedAt,
       chronicFollowup: report.chronicFollowup
+    }, null, 2), "utf8");
+    const chronicInstitutionInterfacesJson = path.join(path.dirname(output), "chronic-institution-interfaces.json");
+    fs.writeFileSync(chronicInstitutionInterfacesJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      chronicInstitutionInterfaces: report.chronicInstitutionInterfaces
+    }, null, 2), "utf8");
+    const chronicLaunchCoreJson = path.join(path.dirname(output), "chronic-launch-core.json");
+    fs.writeFileSync(chronicLaunchCoreJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      chronicLaunchCore: report.chronicLaunchCore
     }, null, 2), "utf8");
     const dataQualityJson = path.join(path.dirname(output), "data-quality-report.json");
     fs.writeFileSync(dataQualityJson, JSON.stringify({
@@ -1075,6 +1257,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       siteReadinessPack: report.siteReadinessPack
     }, null, 2), "utf8");
+    const onsiteLaunchRequirementsJson = path.join(path.dirname(output), "onsite-launch-requirements.json");
+    fs.writeFileSync(onsiteLaunchRequirementsJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      onsiteLaunchRequirements: report.onsiteLaunchRequirements
+    }, null, 2), "utf8");
     const monitoringJson = path.join(path.dirname(output), "monitoring-readiness-report.json");
     fs.writeFileSync(monitoringJson, JSON.stringify({
       project: report.project,
@@ -1090,6 +1280,30 @@ function writeOutput(report, flags) {
       profile: report.profile,
       generatedAt: report.generatedAt,
       referralTeleconsultationReadiness: report.referralTeleconsultationReadiness
+    }, null, 2), "utf8");
+    const escortServiceJson = path.join(path.dirname(output), "escort-service-readiness-report.json");
+    fs.writeFileSync(escortServiceJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      escortServiceReadiness: report.escortServiceReadiness
+    }, null, 2), "utf8");
+    const internetNursingJson = path.join(path.dirname(output), "internet-nursing-readiness-report.json");
+    fs.writeFileSync(internetNursingJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      internetNursingReadiness: report.internetNursingReadiness
+    }, null, 2), "utf8");
+    const citizenLaunchFoundationJson = path.join(path.dirname(output), "citizen-launch-foundation-readiness.json");
+    fs.writeFileSync(citizenLaunchFoundationJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      citizenLaunchFoundation: report.citizenLaunchFoundation
     }, null, 2), "utf8");
     const productionDbJson = path.join(path.dirname(output), "production-db-readiness-report.json");
     fs.writeFileSync(productionDbJson, JSON.stringify({
@@ -1115,6 +1329,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       environmentMatrix: report.environmentMatrix
     }, null, 2), "utf8");
+    const hybridDeploymentJson = path.join(path.dirname(output), "hybrid-deployment-readiness-report.json");
+    fs.writeFileSync(hybridDeploymentJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      hybridDeploymentReadiness: report.hybridDeploymentReadiness
+    }, null, 2), "utf8");
     const healthDashboardJson = path.join(path.dirname(output), "health-dashboard-summary.json");
     fs.writeFileSync(healthDashboardJson, JSON.stringify({
       project: report.project,
@@ -1122,6 +1344,30 @@ function writeOutput(report, flags) {
       profile: report.profile,
       generatedAt: report.generatedAt,
       healthDashboard: report.healthDashboard
+    }, null, 2), "utf8");
+    const priorityApplicationTemplatesJson = path.join(path.dirname(output), "priority-application-templates.json");
+    fs.writeFileSync(priorityApplicationTemplatesJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      priorityApplicationTemplates: report.priorityApplicationTemplates
+    }, null, 2), "utf8");
+    const maternalChildReadinessJson = path.join(path.dirname(output), "maternal-child-readiness-report.json");
+    fs.writeFileSync(maternalChildReadinessJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      maternalChildReadiness: report.maternalChildReadiness
+    }, null, 2), "utf8");
+    const policyCoverageJson = path.join(path.dirname(output), "policy-coverage-report.json");
+    fs.writeFileSync(policyCoverageJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      policyCoverage: report.policyCoverage
     }, null, 2), "utf8");
     const releaseArtifactManifest = buildReleaseArtifactManifest({ releaseReport: report });
     const releaseArtifactManifestJson = path.join(path.dirname(output), "release-artifact-manifest.json");
@@ -1147,6 +1393,10 @@ function writeOutput(report, flags) {
     fs.writeFileSync(auditMarkdown, renderAuditRetentionMarkdown(report.auditRetention), "utf8");
     const chronicFollowupMarkdown = path.join(path.dirname(markdown), "chronic-followup-readiness-report.md");
     fs.writeFileSync(chronicFollowupMarkdown, renderChronicFollowupMarkdown(report.chronicFollowup), "utf8");
+    const chronicInstitutionInterfacesMarkdown = path.join(path.dirname(markdown), "chronic-institution-interfaces.md");
+    fs.writeFileSync(chronicInstitutionInterfacesMarkdown, renderChronicInstitutionInterfaceMarkdown(report.chronicInstitutionInterfaces), "utf8");
+    const chronicLaunchCoreMarkdown = path.join(path.dirname(markdown), "chronic-launch-core.md");
+    fs.writeFileSync(chronicLaunchCoreMarkdown, renderChronicLaunchCoreMarkdown(report.chronicLaunchCore), "utf8");
     const dataQualityMarkdown = path.join(path.dirname(markdown), "data-quality-report.md");
     fs.writeFileSync(dataQualityMarkdown, renderDataQualityMarkdown(report.dataQuality), "utf8");
     const qualitySafetyMarkdown = path.join(path.dirname(markdown), "quality-safety-report.md");
@@ -1172,18 +1422,34 @@ function writeOutput(report, flags) {
     const siteReadinessMarkdown = path.join(path.dirname(markdown), "site-readiness-pack.md");
     fs.writeFileSync(siteReadinessMarkdown, renderSiteReadinessMarkdown(report.siteReadinessPack), "utf8");
     writeTemplateReadmes(report.siteReadinessPack, path.join(path.dirname(path.relative(ROOT, markdown)), "templates"));
+    const onsiteLaunchRequirementsMarkdown = path.join(path.dirname(markdown), "onsite-launch-requirements.md");
+    fs.writeFileSync(onsiteLaunchRequirementsMarkdown, renderOnsiteLaunchRequirementsMarkdown(report.onsiteLaunchRequirements), "utf8");
     const monitoringMarkdown = path.join(path.dirname(markdown), "monitoring-readiness-report.md");
     fs.writeFileSync(monitoringMarkdown, renderMonitoringReadinessMarkdown(report.monitoringReadiness), "utf8");
     const referralTeleconsultationMarkdown = path.join(path.dirname(markdown), "referral-teleconsultation-readiness-report.md");
     fs.writeFileSync(referralTeleconsultationMarkdown, renderReferralTeleconsultationReadinessMarkdown(report.referralTeleconsultationReadiness), "utf8");
+    const escortServiceMarkdown = path.join(path.dirname(markdown), "escort-service-readiness-report.md");
+    fs.writeFileSync(escortServiceMarkdown, renderEscortServiceMarkdown(report.escortServiceReadiness), "utf8");
+    const internetNursingMarkdown = path.join(path.dirname(markdown), "internet-nursing-readiness-report.md");
+    fs.writeFileSync(internetNursingMarkdown, renderInternetNursingMarkdown(report.internetNursingReadiness), "utf8");
+    const citizenLaunchFoundationMarkdown = path.join(path.dirname(markdown), "citizen-launch-foundation-readiness.md");
+    fs.writeFileSync(citizenLaunchFoundationMarkdown, renderCitizenLaunchFoundationMarkdown(report.citizenLaunchFoundation), "utf8");
     const productionDbMarkdown = path.join(path.dirname(markdown), "production-db-readiness-report.md");
     fs.writeFileSync(productionDbMarkdown, renderProductionDbReadinessMarkdown(report.productionDbReadiness), "utf8");
     const evaluationMarkdown = path.join(path.dirname(markdown), "evaluation-evidence-report.md");
     fs.writeFileSync(evaluationMarkdown, renderEvaluationEvidenceMarkdown(report.evaluationEvidence), "utf8");
     const environmentMarkdown = path.join(path.dirname(markdown), "environment-matrix-report.md");
     fs.writeFileSync(environmentMarkdown, renderEnvironmentMatrixMarkdown(report.environmentMatrix), "utf8");
+    const hybridDeploymentMarkdown = path.join(path.dirname(markdown), "hybrid-deployment-readiness-report.md");
+    fs.writeFileSync(hybridDeploymentMarkdown, renderHybridDeploymentMarkdown(report.hybridDeploymentReadiness), "utf8");
     const healthDashboardMarkdown = path.join(path.dirname(markdown), "health-dashboard-summary.md");
     fs.writeFileSync(healthDashboardMarkdown, renderHealthDashboardMarkdown(report.healthDashboard), "utf8");
+    const priorityApplicationTemplatesMarkdown = path.join(path.dirname(markdown), "priority-application-templates.md");
+    fs.writeFileSync(priorityApplicationTemplatesMarkdown, renderPriorityApplicationTemplatesMarkdown(report.priorityApplicationTemplates), "utf8");
+    const maternalChildReadinessMarkdown = path.join(path.dirname(markdown), "maternal-child-readiness-report.md");
+    fs.writeFileSync(maternalChildReadinessMarkdown, renderMaternalChildReadinessMarkdown(report.maternalChildReadiness), "utf8");
+    const policyCoverageMarkdown = path.join(path.dirname(markdown), "policy-coverage-report.md");
+    fs.writeFileSync(policyCoverageMarkdown, renderPolicyCoverageMarkdown(report.policyCoverage), "utf8");
     const releaseArtifactManifestMarkdown = path.join(path.dirname(markdown), "release-artifact-manifest.md");
     fs.writeFileSync(releaseArtifactManifestMarkdown, renderReleaseArtifactManifestMarkdown(buildReleaseArtifactManifest({ releaseReport: report })), "utf8");
   }

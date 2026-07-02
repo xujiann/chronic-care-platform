@@ -32,6 +32,8 @@ test("release report validates demo and production environment profiles", () => 
   assert.equal(failedProduction.passed, false);
   assert.equal(failedProduction.checks.some((item) => item.name === "env:STORAGE_ENGINE.production" && !item.passed), true);
   assert.equal(failedProduction.checks.some((item) => item.name === "env:SESSION_SECRETS.productionQuality" && !item.passed), true);
+  assert.equal(failedProduction.checks.some((item) => item.name === "env:SMS.gateway" && !item.passed), true);
+  assert.equal(failedProduction.checks.some((item) => item.name === "env:AUDIT.retentionTarget" && !item.passed), true);
   assert.equal(failedProduction.cutoverChecklist.some((item) => item.id === "cutover-secrets" && !item.passed), true);
   assert.equal(failedProduction.cutoverChecklist.some((item) => item.id === "cutover-identity" && !item.passed), true);
 
@@ -46,6 +48,7 @@ test("release report validates demo and production environment profiles", () => 
       OIDC_ISSUER_URL: "https://identity.example.internal",
       OIDC_CLIENT_ID: "health-platform",
       OIDC_CLIENT_SECRET: "abcdef0123456789abcdef0123456789",
+      SMS_GATEWAY_URL: "https://sms.example.internal/send",
       AUDIT_EXPORT_PATH: "/var/log/chronic-care-platform/audit"
     }
   });
@@ -62,6 +65,7 @@ test("release report validates demo and production environment profiles", () => 
       OIDC_ISSUER_URL: "https://identity.example.internal",
       OIDC_CLIENT_ID: "health-platform",
       OIDC_CLIENT_SECRET: "abcdef0123456789abcdef0123456789",
+      SMS_GATEWAY_URL: "https://sms.example.internal/send",
       AUDIT_EXPORT_PATH: "/var/log/chronic-care-platform/audit"
     }
   });
@@ -79,6 +83,23 @@ test("release report validates demo and production environment profiles", () => 
   assert.equal(missingEnvFile.checks.some((item) => item.name === "env:file" && !item.passed), true);
 });
 
+test("release report shows configured audit retention target detail", () => {
+  const report = buildReleaseReport({
+    profile: "demo",
+    env: {
+      NODE_ENV: "production",
+      STORAGE_ENGINE: "auto",
+      SESSION_SECRETS: "replace-with-long-random-secret",
+      INTEGRATION_GATEWAY_SECRET: "replace-with-integration-secret",
+      AUDIT_EXPORT_PATH: "/var/log/chronic-care-platform/audit"
+    }
+  });
+  const check = report.checks.find((item) => item.name === "audit:retentionTargetConfigured");
+  assert.equal(check.passed, true);
+  assert.match(check.detail, /AUDIT_EXPORT_PATH:configured/);
+  assert.match(check.detail, /SIEM_ENDPOINT:missing/);
+});
+
 test("release report summarizes repository readiness and renders markdown", () => {
   const report = buildReleaseReport({
     profile: "demo",
@@ -91,6 +112,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   });
   assert.equal(report.ok, true);
   assert.equal(report.summary.failed, 0);
+  assert.equal(report.summary.warnings, 0);
   assert.equal(report.checks.some((item) => item.name === "package:scripts" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "snapshot:acceptanceEvidence" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "snapshot:securityAcceptance" && item.passed), true);
@@ -105,9 +127,15 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.identityContract.ok, true);
   assert.equal(report.checks.some((item) => item.name === "audit:retention" && item.passed), true);
   assert.equal(report.auditRetention.ok, true);
+  assert.equal(report.checks.some((item) => item.name === "audit:retentionTargetConfigured" && item.passed), true);
+  assert.equal(report.auditRetention.retentionTargets.some((item) => item.env === "AUDIT_EXPORT_PATH" && item.configured), true);
   assert.equal(report.checks.some((item) => item.name === "chronicFollowup:readiness" && item.passed), true);
   assert.equal(report.chronicFollowup.ok, true);
   assert.equal(report.chronicFollowup.apiSurface.includes("POST /api/chronic/followup-feedback"), true);
+  assert.equal(report.checks.some((item) => item.name === "chronicFollowup:institutionInterfaces" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "chronicFollowup:launchCore" && item.passed), true);
+  assert.equal(report.chronicInstitutionInterfaces.summary.readyContracts, report.chronicInstitutionInterfaces.summary.contracts);
+  assert.equal(report.chronicLaunchCore.summary.readyItems, 5);
   assert.equal(report.checks.some((item) => item.name === "dataQuality:report" && item.passed), true);
   assert.equal(report.dataQuality.ok, true);
   assert.equal(report.checks.some((item) => item.name === "drugConsumable:readiness" && item.passed), true);
@@ -122,6 +150,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.monitoringReadiness.ok, true);
   assert.equal(report.checks.some((item) => item.name === "referralTeleconsultation:readiness" && item.passed), true);
   assert.equal(report.referralTeleconsultationReadiness.ok, true);
+  assert.equal(report.checks.some((item) => item.name === "escortService:citizenProviderAvailability" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "operations:readiness" && item.passed), true);
   assert.equal(report.operationsReadiness.ok, true);
   assert.equal(report.checks.some((item) => item.name === "process:audit" && item.passed), true);
@@ -136,15 +165,32 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.serviceAcceptance.county.openActions.find((item) => item.id === "cco-001").priority, "high");
   assert.equal(report.checks.some((item) => item.name === "sitePack:readiness" && item.passed), true);
   assert.equal(report.siteReadinessPack.ok, true);
+  assert.equal(report.checks.some((item) => item.name === "onsiteLaunch:requirements" && item.passed), true);
+  assert.equal(report.onsiteLaunchRequirements.ok, true);
+  assert.equal(report.onsiteLaunchRequirements.formalGoLiveState, "blocked-until-site-materials-signed");
   assert.equal(report.checks.some((item) => item.name === "productionDb:readiness" && item.passed), true);
   assert.equal(report.productionDbReadiness.ok, true);
   assert.equal(report.checks.some((item) => item.name === "evaluation:evidence" && item.passed), true);
   assert.equal(report.evaluationEvidence.ok, true);
   assert.equal(report.checks.some((item) => item.name === "environment:matrix" && item.passed), true);
   assert.equal(report.environmentMatrix.ok, true);
+  assert.equal(report.checks.some((item) => item.name === "hybridDeployment:readiness" && item.passed), true);
+  assert.equal(report.hybridDeploymentReadiness.ok, true);
+  assert.equal(report.checks.some((item) => item.name === "priorityApps:conversationStarters" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "priorityApps:implementationChecklists" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "priorityApps:acceptanceGates" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "maternalChild:riskMetrics" && item.passed), true);
+  assert.deepEqual(Object.keys(report.maternalChildReadiness.summary.riskMetrics), ["pendingPublicSecuritySync", "pendingMaternalChildSync", "qualityPending"]);
+  assert.equal(report.checks.some((item) => item.name === "citizenLaunch:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "citizenLaunch:phoneCodeDelivery" && item.passed), true);
+  assert.equal(report.citizenLaunchFoundation.ok, true);
+  assert.equal(report.citizenLaunchFoundation.checks.some((item) => item.id === "citizen-foundation:phone-code-delivery" && item.passed), true);
+  assert.equal(report.priorityApplicationTemplates.templates.every((item) => item.conversationStarter && item.implementationChecklist.length >= 8 && item.acceptanceGate.readyWhen.length >= 4), true);
+  assert.equal(report.priorityApplicationTemplates.templates.every((item) => item.implementationChecklist.some((step) => /Follow Codex loop/.test(step))), true);
   assert.equal(report.environmentMatrix.profiles.some((item) => item.id === "staging"), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-env-file"), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-institution-interfaces" && !item.passed), true);
+  assert.equal(report.productionCutover.some((item) => item.id === "cutover-chronic-launch-core" && !item.passed), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-insurance-certificate" && !item.passed), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-monitoring" && !item.passed), true);
   assert.equal(report.productionCutover.some((item) => item.id === "cutover-dr-rehearsal" && !item.passed), true);
@@ -162,15 +208,18 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(markdown, /Monitoring readiness report/);
   assert.match(markdown, /Referral teleconsultation readiness report/);
   assert.match(markdown, /Operations readiness report/);
+  assert.match(markdown, /Citizen launch foundation readiness report/);
   assert.match(markdown, /Full process audit report/);
   assert.match(markdown, /Service acceptance summary/);
   assert.match(markdown, /service:chronicDomains/);
   assert.match(markdown, /Service open action preview/);
   assert.match(markdown, /cst-001/);
   assert.match(markdown, /Site readiness pack/);
+  assert.match(markdown, /On-site launch requirements/);
   assert.match(markdown, /Production database readiness report/);
   assert.match(markdown, /Interoperability evaluation evidence report/);
   assert.match(markdown, /Environment matrix report/);
+  assert.match(markdown, /Hybrid deployment readiness report/);
   assert.match(markdown, /Release artifact manifest/);
   assert.match(markdown, /cutover-identity/);
   assert.match(markdown, /snapshot:acceptanceEvidence/);
@@ -183,6 +232,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(cutoverMarkdown, /Production cutover checklist/);
   assert.match(cutoverMarkdown, /cutover-audit-retention/);
   assert.match(cutoverMarkdown, /cutover-institution-interfaces/);
+  assert.match(cutoverMarkdown, /cutover-chronic-launch-core/);
   assert.match(cutoverMarkdown, /missing site signoff/);
 
   const signedReport = buildReleaseReport({
@@ -193,12 +243,14 @@ test("release report summarizes repository readiness and renders markdown", () =
       SESSION_SECRETS: "replace-with-long-random-secret",
       INTEGRATION_GATEWAY_SECRET: "replace-with-integration-secret",
       CUTOVER_SITE_INTERFACE_SIGNOFF: "signed",
+      CUTOVER_CHRONIC_LAUNCH_CORE_SIGNOFF: "signed",
       CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF: "signed",
       CUTOVER_MONITORING_SIGNOFF: "signed",
       CUTOVER_DR_REHEARSAL_SIGNOFF: "signed"
     }
   });
   assert.equal(signedReport.productionCutover.some((item) => item.id === "cutover-institution-interfaces" && item.passed), true);
+  assert.equal(signedReport.productionCutover.some((item) => item.id === "cutover-chronic-launch-core" && item.passed), true);
   assert.equal(signedReport.productionCutover.some((item) => item.id === "cutover-monitoring" && item.passed), true);
 
   const storageMarkdown = renderStorageModelMarkdown(report);
@@ -243,6 +295,10 @@ test("release report writes standalone production cutover and storage artifacts"
   const auditMarkdown = fs.readFileSync(path.join(outputDir, "audit-retention-report.md"), "utf8");
   const chronicFollowupJson = JSON.parse(fs.readFileSync(path.join(outputDir, "chronic-followup-readiness-report.json"), "utf8"));
   const chronicFollowupMarkdown = fs.readFileSync(path.join(outputDir, "chronic-followup-readiness-report.md"), "utf8");
+  const chronicInstitutionInterfacesJson = JSON.parse(fs.readFileSync(path.join(outputDir, "chronic-institution-interfaces.json"), "utf8"));
+  const chronicInstitutionInterfacesMarkdown = fs.readFileSync(path.join(outputDir, "chronic-institution-interfaces.md"), "utf8");
+  const chronicLaunchCoreJson = JSON.parse(fs.readFileSync(path.join(outputDir, "chronic-launch-core.json"), "utf8"));
+  const chronicLaunchCoreMarkdown = fs.readFileSync(path.join(outputDir, "chronic-launch-core.md"), "utf8");
   const dataQualityJson = JSON.parse(fs.readFileSync(path.join(outputDir, "data-quality-report.json"), "utf8"));
   const dataQualityMarkdown = fs.readFileSync(path.join(outputDir, "data-quality-report.md"), "utf8");
   const drugConsumableJson = JSON.parse(fs.readFileSync(path.join(outputDir, "drug-consumable-readiness-report.json"), "utf8"));
@@ -255,6 +311,8 @@ test("release report writes standalone production cutover and storage artifacts"
   const monitoringMarkdown = fs.readFileSync(path.join(outputDir, "monitoring-readiness-report.md"), "utf8");
   const referralJson = JSON.parse(fs.readFileSync(path.join(outputDir, "referral-teleconsultation-readiness-report.json"), "utf8"));
   const referralMarkdown = fs.readFileSync(path.join(outputDir, "referral-teleconsultation-readiness-report.md"), "utf8");
+  const citizenLaunchJson = JSON.parse(fs.readFileSync(path.join(outputDir, "citizen-launch-foundation-readiness.json"), "utf8"));
+  const citizenLaunchMarkdown = fs.readFileSync(path.join(outputDir, "citizen-launch-foundation-readiness.md"), "utf8");
   const operationsJson = JSON.parse(fs.readFileSync(path.join(outputDir, "operations-readiness-report.json"), "utf8"));
   const operationsMarkdown = fs.readFileSync(path.join(outputDir, "operations-readiness-report.md"), "utf8");
   const processAuditJson = JSON.parse(fs.readFileSync(path.join(outputDir, "process-audit-report.json"), "utf8"));
@@ -263,6 +321,8 @@ test("release report writes standalone production cutover and storage artifacts"
   const serviceAcceptanceMarkdown = fs.readFileSync(path.join(outputDir, "service-acceptance-summary.md"), "utf8");
   const siteReadinessJson = JSON.parse(fs.readFileSync(path.join(outputDir, "site-readiness-pack.json"), "utf8"));
   const siteReadinessMarkdown = fs.readFileSync(path.join(outputDir, "site-readiness-pack.md"), "utf8");
+  const onsiteLaunchJson = JSON.parse(fs.readFileSync(path.join(outputDir, "onsite-launch-requirements.json"), "utf8"));
+  const onsiteLaunchMarkdown = fs.readFileSync(path.join(outputDir, "onsite-launch-requirements.md"), "utf8");
   const identityTemplateReadme = fs.readFileSync(path.join(outputDir, "templates", "identity-source-mapping", "README.md"), "utf8");
   const interfaceTemplateReadme = fs.readFileSync(path.join(outputDir, "templates", "interface-joint-test", "README.md"), "utf8");
   const monitoringTemplateReadme = fs.readFileSync(path.join(outputDir, "templates", "monitoring-on-call", "README.md"), "utf8");
@@ -273,6 +333,10 @@ test("release report writes standalone production cutover and storage artifacts"
   const evaluationMarkdown = fs.readFileSync(path.join(outputDir, "evaluation-evidence-report.md"), "utf8");
   const environmentJson = JSON.parse(fs.readFileSync(path.join(outputDir, "environment-matrix-report.json"), "utf8"));
   const environmentMarkdown = fs.readFileSync(path.join(outputDir, "environment-matrix-report.md"), "utf8");
+  const hybridDeploymentJson = JSON.parse(fs.readFileSync(path.join(outputDir, "hybrid-deployment-readiness-report.json"), "utf8"));
+  const hybridDeploymentMarkdown = fs.readFileSync(path.join(outputDir, "hybrid-deployment-readiness-report.md"), "utf8");
+  const priorityTemplatesJson = JSON.parse(fs.readFileSync(path.join(outputDir, "priority-application-templates.json"), "utf8"));
+  const priorityTemplatesMarkdown = fs.readFileSync(path.join(outputDir, "priority-application-templates.md"), "utf8");
   const manifestJson = JSON.parse(fs.readFileSync(path.join(outputDir, "release-artifact-manifest.json"), "utf8"));
   const manifestMarkdown = fs.readFileSync(path.join(outputDir, "release-artifact-manifest.md"), "utf8");
   assert.equal(cutoverJson.checklist.some((item) => item.id === "cutover-identity"), true);
@@ -286,6 +350,11 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(auditMarkdown, /Audit chains/);
   assert.equal(chronicFollowupJson.chronicFollowup.ok, true);
   assert.match(chronicFollowupMarkdown, /resident-feedback/);
+  assert.equal(chronicInstitutionInterfacesJson.chronicInstitutionInterfaces.ok, true);
+  assert.match(chronicInstitutionInterfacesMarkdown, /chronic-device-measurement-v1/);
+  assert.equal(chronicLaunchCoreJson.chronicLaunchCore.ok, true);
+  assert.equal(chronicLaunchCoreJson.chronicLaunchCore.summary.signedSignoffs, 6);
+  assert.match(chronicLaunchCoreMarkdown, /Site Signoffs/);
   assert.equal(dataQualityJson.dataQuality.ok, true);
   assert.match(dataQualityMarkdown, /Resident-linked collections/);
   assert.equal(drugConsumableJson.drugConsumable.ok, true);
@@ -298,6 +367,9 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(monitoringMarkdown, /SLO targets/);
   assert.equal(referralJson.referralTeleconsultationReadiness.ok, true);
   assert.match(referralMarkdown, /Referral teleconsultation readiness report/);
+  assert.equal(citizenLaunchJson.citizenLaunchFoundation.ok, true);
+  assert.match(citizenLaunchMarkdown, /Citizen launch foundation readiness/);
+  assert.match(citizenLaunchMarkdown, /phone-code delivery/);
   assert.equal(operationsJson.operationsReadiness.ok, true);
   assert.match(operationsMarkdown, /External dependency risks/);
   assert.equal(processAuditJson.processAudit.ok, true);
@@ -308,6 +380,10 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(serviceAcceptanceMarkdown, /Open action preview/);
   assert.equal(siteReadinessJson.siteReadinessPack.ok, true);
   assert.match(siteReadinessMarkdown, /Site signoff template/);
+  assert.equal(onsiteLaunchJson.onsiteLaunchRequirements.ok, true);
+  assert.equal(onsiteLaunchJson.onsiteLaunchRequirements.summary.p0Requirements >= 10, true);
+  assert.match(onsiteLaunchMarkdown, /On-site launch requirements/);
+  assert.match(onsiteLaunchMarkdown, /resident-services/);
   assert.match(identityTemplateReadme, /Identity source mapping template/);
   assert.match(interfaceTemplateReadme, /Interface joint-test template/);
   assert.match(monitoringTemplateReadme, /Monitoring and on-call template/);
@@ -318,10 +394,22 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(evaluationMarkdown, /Artifact coverage/);
   assert.equal(environmentJson.environmentMatrix.ok, true);
   assert.match(environmentMarkdown, /Environment matrix report/);
+  assert.equal(hybridDeploymentJson.hybridDeploymentReadiness.ok, true);
+  assert.match(hybridDeploymentMarkdown, /Hybrid deployment readiness report/);
+  assert.equal(priorityTemplatesJson.priorityApplicationTemplates.ok, true);
+  assert.equal(priorityTemplatesJson.priorityApplicationTemplates.templates.length, 8);
+  assert.equal(priorityTemplatesJson.priorityApplicationTemplates.templates.every((item) => item.conversationStarter && item.acceptanceGate.evidence.length), true);
+  assert.match(priorityTemplatesMarkdown, /Priority application templates/);
+  assert.match(priorityTemplatesMarkdown, /Conversation starters/);
+  assert.match(priorityTemplatesMarkdown, /Acceptance gates/);
+  assert.match(priorityTemplatesMarkdown, /卫生健康综合驾驶舱/);
   assert.equal(manifestJson.releaseArtifactManifest.ok, true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "service-acceptance"), true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "referral-teleconsultation"), true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "chronic-followup"), true);
+  assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "priority-application-templates"), true);
+  assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "hybrid-deployment"), true);
+  assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "onsite-launch-requirements"), true);
   assert.match(manifestMarkdown, /Release artifact manifest/);
   assert.match(manifestMarkdown, /service-acceptance-summary\.md/);
   assert.match(manifestMarkdown, /release\/templates\/identity-source-mapping\/README\.md/);

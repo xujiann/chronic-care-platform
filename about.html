@@ -20,6 +20,7 @@
           <a href="./platform.html">平台首页</a>
           <a href="./workbench.html">运营工作台</a>
           <a href="./index.html">卫健委端</a>
+          <a href="./maternal-child-about.html">妇幼说明</a>
           <a href="./login.html">登录</a>
         </nav>
       </header>
@@ -132,6 +133,131 @@
             <strong>集成与外部接口准备</strong>
             <span>已建成接口映射、集成就绪、生产库就绪和监控就绪报告；真实上线需替换统一身份、HIS/EMR/LIS/PACS、医保和短信等外部系统。</span>
           </article>
+        </div>
+      </section>
+
+      <section class="panel wide" data-about-section="policy-basis">
+        <div class="panel-title">
+          <h2>相关政策说明</h2>
+          <span>把政策要求转成可运行模块、接口、文档和验收证据</span>
+        </div>
+        <div class="capability-grid">
+          <article class="capability-card" data-policy-id="chronic-care-2025">
+            <strong>基层慢病健康管理</strong>
+            <span>对照国卫基层发〔2025〕15号，平台已落到高风险发现、分类分级管理、多病共管、自我监测、长期处方、缺药登记、医保协同和质量评价。</span>
+          </article>
+          <article class="capability-card" data-policy-id="chronic-capability-guide">
+            <strong>基层慢病能力建设指引</strong>
+            <span>按基层慢病健康管理服务能力建设指引，把一站式中心、健康服务区、诊疗区、人员配置、设施设备和数智化应用映射为慢病角色、条件、路径和验收台账。</span>
+          </article>
+          <article class="capability-card" data-policy-id="tiered-care-2026">
+            <strong>分级诊疗与紧密型医联体</strong>
+            <span>围绕国办发〔2026〕11号有关紧密型医联体、基层常见病和慢病管理、家庭医生签约、转诊渠道和资源共享要求，形成县域医共体、转诊会诊和医技互认闭环。</span>
+          </article>
+          <article class="capability-card" data-policy-id="multi-practice-2014">
+            <strong>医师多点执业</strong>
+            <span>依据国卫医发〔2014〕86号，平台支持医生申请、第一执业地点意见、协议责任、保险材料、公开备案、监管风险和医联体帮扶登记。</span>
+          </article>
+          <article class="capability-card" data-policy-id="digital-health">
+            <strong>数字健康与共享协同</strong>
+            <span>对照数字中国、全民健康信息平台、互联互通测评和电子健康档案开放要求，保留主索引、授权共享、接口映射、审计留痕和发布证据。</span>
+          </article>
+          <article class="capability-card" data-policy-id="maternal-child-certificates">
+            <strong>妇幼健康与证照统计</strong>
+            <span>将出生医学证明、电子证照、公安共享、妇幼入册、新生儿访视、出生缺陷筛查和出生人口统计纳入妇幼健康全模块说明。</span>
+          </article>
+        </div>
+        <div class="rules">
+          <div><strong>政策文档</strong><span><code>docs/政策依据说明.md</code> 汇总政策来源、系统映射、已实现证据和仍需现场接入的依赖。</span></div>
+          <div><strong>发布要求</strong><span>政策说明必须同时出现在关于页、模块说明文档、优先应用模板和发布检查中，避免只做页面展示。</span></div>
+        </div>
+      </section>
+
+      <section class="panel wide" data-about-section="maternal-child-module">
+        <div class="panel-title">
+          <h2>妇幼健康全模块</h2>
+          <span>孕产妇建册、出生证明、新生儿访视、筛查、儿童保健和统计预警</span>
+        </div>
+        <div class="capability-grid">
+          <article class="capability-card">
+            <strong>卫健管理端</strong>
+            <span>在卫健委端汇总出生医学证明、出生人口统计、妇幼入册、待访视、低体重儿、质控补正、共享待办和妇幼风险清单。</span>
+          </article>
+          <article class="capability-card">
+            <strong>医疗机构端</strong>
+            <span>登记出生医学证明，办理首次签发、换发补发、签发、上报入册，并跟踪材料核验、电子证照、公安共享和妇幼入册状态。</span>
+          </article>
+          <article class="capability-card">
+            <strong>个人用户端</strong>
+            <span>居民可查看家庭成员出生证明、妇幼入册、新生儿访视、出生缺陷筛查、低体重儿专案、预防接种和儿童保健接续清单。</span>
+          </article>
+          <article class="capability-card">
+            <strong>统一数据口径</strong>
+            <span>以 <code>birthCertificates</code>、<code>birthStatistics</code>、<code>residents</code> 和 <code>personalRecords</code> 串联母亲、新生儿和儿童保健。</span>
+          </article>
+        </div>
+        <div class="platform-map" data-about-flow="maternal-child">
+          <article><strong>1. 孕产妇建册</strong><p>居民主索引、孕产妇保健和高危管理起点。</p></article>
+          <article><strong>2. 产前筛查</strong><p>出生缺陷、听力、遗传代谢病和高危因素归集。</p></article>
+          <article><strong>3. 住院分娩</strong><p>分娩机构登记出生时间、体重身长和父母身份。</p></article>
+          <article><strong>4. 出生医学证明</strong><p>首次签发、换发补发、电子证照和质控补正。</p></article>
+          <article><strong>5. 共享入册</strong><p>公安出生登记共享，妇幼健康系统入册。</p></article>
+          <article><strong>6. 新生儿访视</strong><p>产后访视、黄疸复测、喂养指导和接种提醒。</p></article>
+          <article><strong>7. 儿童保健</strong><p>低体重儿专案、儿童体检、体弱儿童和发育评估。</p></article>
+          <article><strong>8. 统计预警</strong><p>卫健端生成出生人口统计、服务闭环和风险清单。</p></article>
+        </div>
+        <div class="rules">
+          <div><strong>说明文档</strong><span><code>docs/妇幼健康全模块说明.md</code> 已梳理功能边界、数据对象、API 权限、流程图和验收规则。</span></div>
+          <div><strong>统一模板规则</strong><span>所有平台模板必须提供 About 功能说明、独立说明文档、流程图、数据/API/测试/验收证据入口。</span></div>
+          <div><strong>政策说明页</strong><span><a href="./maternal-child-about.html">妇幼健康 About 页</a> 已补充出生医学证明政策依据、第七版证件启用、三端功能边界和整理流程图。</span></div>
+        </div>
+      </section>
+
+      <section class="panel wide" data-about-section="multi-practice-policy">
+        <div class="panel-title">
+          <h2>医生账户与多点执业政策说明</h2>
+          <span>依据国卫医发〔2014〕86号，服务优质医疗资源有序流动和基层能力提升</span>
+        </div>
+        <div class="capability-grid">
+          <article class="capability-card">
+            <strong>政策边界</strong>
+            <span>医师多点执业是医师在有效注册期内，于两个或两个以上医疗机构定期从事执业活动。慈善义诊、公益巡回医疗、突发事件救援、公共卫生项目和外出会诊不按本模块的多点执业申请管理。</span>
+          </article>
+          <article class="capability-card">
+            <strong>资格核验</strong>
+            <span>系统按执业类别、执业范围、中级及以上职称、同专业工作年限、最近两个周期定期考核、第一执业地点意见和公立医院院级领导限制等条件生成合规提示。</span>
+          </article>
+          <article class="capability-card">
+            <strong>协议与责任</strong>
+            <span>多点执业申请要求补齐执业期限、时间安排、工作任务、医疗责任、薪酬、相关保险等协议字段；发生医疗损害或纠纷时，由当事医疗机构和医师按协议及法律法规处理。</span>
+          </article>
+          <article class="capability-card">
+            <strong>医联体帮扶</strong>
+            <span>参加对口支援、支援基层、帮扶托管、医疗集团或医联体内服务的医师，系统支持按“医联体帮扶”登记，突出基层慢病联合门诊、会诊和培训任务。</span>
+          </article>
+          <article class="capability-card">
+            <strong>监管公开</strong>
+            <span>卫健委端展示多点执业监管摘要、公开备案台账、风险补正队列和材料核验结果；接口 <code>/api/multi-practice-registry</code> 支持按角色返回台账数据。</span>
+          </article>
+          <article class="capability-card">
+            <strong>上线依赖</strong>
+            <span>正式上线需对接医师电子化注册、医疗机构人事系统、定期考核、劳务协议、保险凭证、电子签章、医疗责任险和属地备案规则。</span>
+          </article>
+        </div>
+        <div class="rules">
+          <div><strong>角色入口</strong><span>医生账户在 <code>doctor.html</code> 查看本人档案、提交申请和接收医院端消息；医疗机构在 <code>institution.html</code> 补齐协议、执行第一执业地点同意/报备；卫健委在 <code>index.html</code> 监管视图查看公开台账和补正队列。</span></div>
+          <div><strong>说明文档</strong><span><code>docs/医师多点执业政策说明.md</code> 记录政策依据、系统边界、数据对象、API、流程和验收规则。</span></div>
+          <div><strong>主要功能报告</strong><span><code>docs/医师多点执业主要功能报告.md</code> 汇总医生账户、多点执业申请、材料核验、监管台账、公开备案和发布证据。</span></div>
+        </div>
+        <div class="platform-map" data-about-flow="multi-practice">
+          <article><strong>1. 医生账户建档</strong><p>关联医师执业证号、职称、专业、第一执业地点和定期考核记录。</p></article>
+          <article><strong>2. 申请登记</strong><p>填写拟执业机构、科室、范围、期限、排班、任务、责任、薪酬和保险。</p></article>
+          <article><strong>3. 政策核验</strong><p>核验资格条件、执业范围一致性、第一执业地点意见和协议完整性。</p></article>
+          <article><strong>4. 机构确认</strong><p>第一执业地点执行同意或知情报备，医联体帮扶按任务登记。</p></article>
+          <article><strong>5. 卫健备案</strong><p>监管端查看待审、退回、补正、已备案和公开状态。</p></article>
+          <article><strong>6. 公开台账</strong><p>按公开字段展示医师姓名、执业范围、机构、期限和监管状态。</p></article>
+          <article><strong>7. 风险补正</strong><p>对协议缺失、保险缺失、排班冲突、范围不一致等事项形成补正队列。</p></article>
+          <article><strong>8. 审计留痕</strong><p>申请、审核、拒绝、越权访问和状态变更写入安全事件和生命周期。</p></article>
         </div>
       </section>
 

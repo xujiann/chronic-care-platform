@@ -13,6 +13,7 @@ test("environment matrix validates demo staging and production gates", () => {
   assert.deepEqual(report.profiles.map((item) => item.id), ["demo", "staging", "production"]);
   assert.equal(report.profiles.every((item) => item.missingScripts.length === 0), true);
   assert.equal(report.profiles.every((item) => item.missingTemplateVars.length === 0), true);
+  assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => item.requiredVars.includes("SMS_GATEWAY_URL")), true);
   assert.equal(report.profiles.some((item) => item.id === "production" && item.blockedVars.includes("STORAGE_ENGINE=postgres")), true);
   assert.equal(report.checks.some((item) => item.id === "environment:productionTracks" && item.passed), true);
 });

@@ -20,7 +20,7 @@ const ENVIRONMENT_PROFILES = [
     name: "Pre-production joint testing",
     owner: "platform-ops",
     envFile: ".env.staging",
-    requiredVars: ["NODE_ENV", "STORAGE_ENGINE", "SESSION_SECRETS", "INTEGRATION_GATEWAY_SECRET", "OIDC_ISSUER_URL", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "AUDIT_EXPORT_PATH"],
+    requiredVars: ["NODE_ENV", "STORAGE_ENGINE", "SESSION_SECRETS", "INTEGRATION_GATEWAY_SECRET", "OIDC_ISSUER_URL", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "SMS_GATEWAY_URL", "AUDIT_EXPORT_PATH"],
     blockedVars: ["STORAGE_ENGINE=json"],
     gateScripts: ["env:check:production", "integration:readiness", "operations:readiness", "monitoring:readiness"],
     acceptance: "Staging must use non-placeholder secrets, identity adapter values, audit retention, and signed interface test records."
@@ -30,7 +30,7 @@ const ENVIRONMENT_PROFILES = [
     name: "Production cutover environment",
     owner: "release-manager",
     envFile: ".env",
-    requiredVars: ["NODE_ENV", "STORAGE_ENGINE", "SESSION_SECRETS", "INTEGRATION_GATEWAY_SECRET", "OIDC_ISSUER_URL", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "AUDIT_EXPORT_PATH", "CUTOVER_SITE_INTERFACE_SIGNOFF", "CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF", "CUTOVER_MONITORING_SIGNOFF", "CUTOVER_DR_REHEARSAL_SIGNOFF"],
+    requiredVars: ["NODE_ENV", "STORAGE_ENGINE", "SESSION_SECRETS", "INTEGRATION_GATEWAY_SECRET", "OIDC_ISSUER_URL", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "SMS_GATEWAY_URL", "AUDIT_EXPORT_PATH", "CUTOVER_SITE_INTERFACE_SIGNOFF", "CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF", "CUTOVER_MONITORING_SIGNOFF", "CUTOVER_DR_REHEARSAL_SIGNOFF"],
     blockedVars: ["STORAGE_ENGINE=json", "STORAGE_ENGINE=postgres", "STORAGE_ENGINE=postgresql"],
     gateScripts: ["env:check:production", "deploy:check:full", "release:report:full"],
     acceptance: "Production remains blocked until real site signoffs, monitoring, DR rehearsal, identity, and audit-retention evidence are archived."

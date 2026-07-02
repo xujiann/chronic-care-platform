@@ -5,7 +5,9 @@ const test = require("node:test");
 
 const {
   APPLICATIONS,
+  DOCUMENTATION_RULE,
   buildHealthDashboardSummary,
+  buildPriorityApplicationTemplates,
   renderMarkdown
 } = require("../scripts/health-dashboard-summary");
 
@@ -29,13 +31,44 @@ test("health dashboard summary tracks the eight priority applications without re
   assert.equal(report.checks.some((item) => item.id === "dashboard:source-boundary" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:aggregate-boundary" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:development-template" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "dashboard:documentation-rule" && item.passed), true);
+  assert.equal(report.applications.every((item) => item.documentationRule.aboutPage === DOCUMENTATION_RULE.aboutPage && item.documentationRule.requiredDocument === DOCUMENTATION_RULE.requiredDocument), true);
 
   const markdown = renderMarkdown(report);
   assert.match(markdown, /Health dashboard summary/);
   assert.match(markdown, /Development template/);
+  assert.match(markdown, /Documentation rule/);
+  assert.match(markdown, /docs\/<module-name>\.md/);
+  assert.match(markdown, /docs\/妇幼健康全模块说明\.md/);
   assert.match(markdown, /regional-data-sharing/);
   assert.match(markdown, /health-dashboard/);
   assert.match(markdown, /Open action preview/);
+});
+
+test("priority application templates expose the eight conversation handoff contracts", () => {
+  const data = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "db.json"), "utf8"));
+  const report = buildPriorityApplicationTemplates({ data });
+
+  assert.equal(report.ok, true);
+  assert.equal(report.scope.role, "priority-application-development-templates");
+  assert.equal(report.summary.applications, 8);
+  assert.equal(report.summary.sourceApplications, 7);
+  assert.equal(report.summary.aggregateApplications, 1);
+  assert.equal(report.templates[0].conversationTitle, "区域诊疗数据共享平台");
+  assert.equal(report.templates.some((item) => item.conversationTitle === "卫生健康综合驾驶舱" && item.aggregateApplication), true);
+  assert.equal(report.templates.every((item) => item.functionalBoundary && item.reusePoints.length && item.dataCollections.length && item.apiRoutes.length && item.frontendEntry && item.testEvidence.length && item.acceptanceEvidence.length), true);
+  assert.equal(report.templates.every((item) => item.documentationRule.aboutPage === "about.html" && item.documentationRule.flowDiagram), true);
+  assert.equal(report.templates.every((item) => /small change/.test(item.documentationRule.codexLoop) && /test or build/.test(item.documentationRule.codexLoop)), true);
+  assert.equal(report.templates.every((item) => item.conversationStarter && item.conversationStarter.includes(item.id)), true);
+  assert.equal(report.templates.every((item) => item.implementationChecklist.length >= 8), true);
+  assert.equal(report.templates.every((item) => item.implementationChecklist.some((step) => /Follow Codex loop/.test(step) && /small change/.test(step))), true);
+  assert.equal(report.templates.every((item) => item.acceptanceGate.readyWhen.length >= 4 && item.acceptanceGate.evidence.length), true);
+  assert.equal(report.templates[0].documentationRule.maternalChildReference, "docs/妇幼健康全模块说明.md");
+  assert.equal(report.checks.some((item) => item.id === "templates:documentation-rule" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "templates:conversation-starter" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "templates:implementation-checklist" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "templates:acceptance-gate" && item.passed), true);
+  assert.equal(report.checks.every((item) => item.passed), true);
 });
 
 test("health dashboard summary supports empty source application boundaries", () => {

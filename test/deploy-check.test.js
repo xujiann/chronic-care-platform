@@ -11,7 +11,13 @@ test("deploy check report covers release-critical snapshot gates", () => {
   [
     "file:README.md",
     "file:DEPLOYMENT.md",
+    "file:docs/production-go-live-requirements.md",
+    "file:docs/on-site-launch-materials.md",
+    "file:scripts/onsite-launch-requirements.js",
+    "file:docs/citizen-production-launch-requirements.md",
     "package:scripts",
+    "package:priorityApplicationTemplates",
+    "package:hybridDeploymentReadiness",
     "snapshot:collections",
     "snapshot:regionalDataSharing",
     "snapshot:interfaceReadiness",
@@ -21,7 +27,17 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "snapshot:p2-complete",
     "snapshot:accessibility",
     "snapshot:healthDashboard",
+    "snapshot:multiPractice",
+    "docs:productionGoLiveRequirements",
+    "docs:onsiteLaunchMaterials",
+    "api:siteLaunchEvidence",
     "manifest:healthDashboardSummary",
+    "manifest:launchSmoke",
+    "manifest:onsiteLaunchRequirements",
+    "manifest:priorityApplicationTemplates",
+    "manifest:citizenLaunchFoundation",
+    "manifest:multiPracticeReadiness",
+    "manifest:hybridDeploymentReadiness",
     "snapshot:storageMeta"
   ].forEach((name) => assert.equal(checkNames.has(name), true, `${name} should be checked`));
 });

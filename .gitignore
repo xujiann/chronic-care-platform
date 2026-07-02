@@ -12,6 +12,7 @@ coverage/
 playwright-report/
 test-results/
 release/
+output/
 .DS_Store
 Thumbs.db
 

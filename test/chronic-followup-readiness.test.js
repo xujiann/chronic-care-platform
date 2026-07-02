@@ -17,9 +17,25 @@ test("chronic follow-up readiness covers all priority application boundaries", (
   const report = buildChronicFollowupReadinessReport({ data });
 
   assert.equal(report.ok, true);
-  assert.equal(report.boundaries.length, 8);
+  assert.equal(report.boundaries.length, 13);
   assert.equal(report.boundaries.every((item) => item.passed), true);
-  assert.equal(report.summary.feedbackRecords >= 1, true);
+  assert.equal(report.summary.feedbackRecords >= 2, true);
+  assert.equal(report.summary.feedbackHighRiskCovered, true);
+  assert.equal(report.summary.notificationMessages >= 1, true);
+  assert.equal(report.summary.alerts >= 1, true);
+  assert.equal(report.summary.highPriorityAlerts >= 1, true);
+  assert.equal(report.summary.selfMonitoringRecords >= 1, true);
+  assert.equal(report.summary.familyProxyRecords >= 1, true);
+  assert.equal(report.summary.satisfactionRecords >= 1, true);
+  assert.equal(report.summary.deviceMeasurementRecords >= 1, true);
+  assert.equal(report.summary.pharmacyCallbackRecords >= 1, true);
+  assert.equal(report.summary.familyDoctorClosureRecords >= 1, true);
+  assert.equal(report.summary.reminderOutreachRecords >= 1, true);
+  assert.equal(report.summary.policyAligned, report.summary.policyItems);
+  assert.equal(report.boundaries.some((item) => item.id === "resident-experience" && item.passed), true);
+  assert.equal(report.boundaries.some((item) => item.id === "field-integration-closure" && item.passed), true);
+  assert.equal(report.alertQueue.some((item) => item.id === "followups:f1" && item.dueBucket === "overdue"), true);
+  assert.equal(report.policyAlignment.some((item) => item.id === "policy-feedback-dispatch" && item.covered), true);
   assert.equal(report.reusePoints.includes("chronicScreeningTasks"), true);
   assert.equal(report.reusePoints.includes("citizen.html"), true);
   assert.equal(report.apiSurface.includes("POST /api/chronic/followup-feedback"), true);
@@ -34,6 +50,82 @@ test("chronic follow-up readiness fails without resident feedback evidence", () 
   assert.equal(report.boundaries.find((item) => item.id === "resident-feedback").passed, false);
 });
 
+test("chronic follow-up readiness requires high-risk resident feedback coverage", () => {
+  const data = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "db.json"), "utf8"));
+  data.personalRecords = data.personalRecords.filter((item) => item.residentId !== "r4" || (item.category !== "chronic-feedback" && !item.meta?.followupFeedback));
+  const report = buildChronicFollowupReadinessReport({ data });
+
+  assert.equal(report.ok, false);
+  assert.equal(report.summary.feedbackHighRiskCovered, false);
+  assert.equal(report.boundaries.find((item) => item.id === "resident-feedback").passed, false);
+});
+
+test("chronic follow-up readiness fails without feedback notification messages", () => {
+  const data = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "db.json"), "utf8"));
+  data.taskMessages = [];
+  const report = buildChronicFollowupReadinessReport({ data });
+
+  assert.equal(report.ok, false);
+  assert.equal(report.boundaries.find((item) => item.id === "feedback-notification").passed, false);
+});
+
+test("chronic follow-up readiness fails without policy-aligned follow-up evidence", () => {
+  const data = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "db.json"), "utf8"));
+  data.medicationPickups = [];
+  const report = buildChronicFollowupReadinessReport({ data });
+
+  assert.equal(report.ok, false);
+  assert.equal(report.boundaries.find((item) => item.id === "policy-alignment").passed, false);
+  assert.equal(report.policyAlignment.find((item) => item.id === "policy-medication-support").covered, false);
+});
+
+test("chronic follow-up readiness fails without risk reminder queue evidence", () => {
+  const data = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "db.json"), "utf8"));
+  data.followups = data.followups.map((item) => ({ ...item, status: "已完成" }));
+  data.medicationPickups = data.medicationPickups.map((item) => ({ ...item, status: "已完成", pharmacyStatus: "已取药" }));
+  data.chronicManagementPlans = data.chronicManagementPlans.map((item) => ({ ...item, status: "已完成" }));
+  data.chronicScreeningTasks = data.chronicScreeningTasks.map((item) => ({ ...item, status: "已评估" }));
+  data.taskMessages = data.taskMessages.map((item) => ({ ...item, status: "handled" }));
+  const report = buildChronicFollowupReadinessReport({ data });
+
+  assert.equal(report.ok, false);
+  assert.equal(report.boundaries.find((item) => item.id === "risk-reminder-queue").passed, false);
+  assert.equal(report.summary.alerts, 0);
+});
+
+test("chronic follow-up readiness fails without resident experience evidence", () => {
+  const data = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "db.json"), "utf8"));
+  data.chronicSelfManagement = [];
+  data.seniorServices = [];
+  data.medicationPickups = data.medicationPickups.map((item) => ({ ...item, applyMode: "", deliveryMode: "" }));
+  data.personalRecords = data.personalRecords.filter((item) => item.category !== "chronic-self-checkin" && item.category !== "chronic-feedback");
+  const report = buildChronicFollowupReadinessReport({ data });
+
+  assert.equal(report.ok, false);
+  assert.equal(report.boundaries.find((item) => item.id === "resident-experience").passed, false);
+  assert.equal(report.summary.selfMonitoringRecords, 0);
+});
+
+test("chronic follow-up readiness fails without field integration evidence", () => {
+  const data = JSON.parse(fs.readFileSync(path.join(ROOT, "data", "db.json"), "utf8"));
+  data.chronicSelfManagement = data.chronicSelfManagement.map((item) => {
+    const { deviceId, deviceExternalId, integrationStatus, ...rest } = item;
+    return rest;
+  });
+  data.medicationPickups = data.medicationPickups.map((item) => {
+    const { callbackExternalId, pickupConfirmedAt, inventoryStatus, adherenceStatus, integrationStatus, ...rest } = item;
+    return rest;
+  });
+  data.personalRecords = data.personalRecords.filter((item) => item.category !== "chronic-family-doctor-note" && !item.meta?.familyDoctorClosure);
+  data.seniorServices = data.seniorServices.filter((item) => !item.outreachEvidence && !/outreach|sms|phone|call/i.test(`${item.service || ""}${item.channel || ""}${item.nextAction || ""}`));
+  data.taskMessages = data.taskMessages.map((item) => ({ ...item, status: item.targetRole === "institution" ? "sent" : item.status, meta: {} }));
+  const report = buildChronicFollowupReadinessReport({ data });
+
+  assert.equal(report.ok, false);
+  assert.equal(report.boundaries.find((item) => item.id === "field-integration-closure").passed, false);
+  assert.equal(report.summary.fieldIntegrationItems, 0);
+});
+
 test("chronic follow-up readiness renders and writes release artifacts", (t) => {
   const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "chronic-followup-readiness-"));
   t.after(() => fs.rmSync(outputDir, { recursive: true, force: true }));
@@ -45,6 +137,9 @@ test("chronic follow-up readiness renders and writes release artifacts", (t) => 
   });
 
   assert.match(markdown, /Chronic follow-up readiness report/);
+  assert.match(markdown, /Policy alignment/);
+  assert.match(markdown, /Alert queue/);
   assert.equal(JSON.parse(fs.readFileSync(written.output, "utf8")).ok, true);
   assert.match(fs.readFileSync(written.markdown, "utf8"), /resident-feedback/);
+  assert.match(fs.readFileSync(written.markdown, "utf8"), /policy-alignment/);
 });

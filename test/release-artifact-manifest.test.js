@@ -19,10 +19,20 @@ test("release artifact manifest indexes reports templates commands and evidence"
   assert.equal(report.templateReadmes.length, 4);
   assert.equal(report.artifacts.some((item) => item.id === "release-report" && item.command === "release:report"), true);
   assert.equal(report.artifacts.some((item) => item.id === "release-artifact-manifest" && item.command === "release:manifest"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "launch-smoke" && item.command === "launch:smoke" && item.markdown === "release/launch-smoke-report.md" && item.evidence === "/api/health"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "onsite-launch-requirements" && item.command === "onsite:launch-requirements" && item.markdown === "release/onsite-launch-requirements.md" && item.evidence === "docs/on-site-launch-materials.md"), true);
   assert.equal(report.artifacts.some((item) => item.id === "site-readiness" && item.evidence === "/api/site-readiness-pack"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "site-launch-evidence" && item.command === "site:pack" && item.evidence === "/api/site-launch-evidence"), true);
   assert.equal(report.artifacts.some((item) => item.id === "service-acceptance" && item.markdown === "release/service-acceptance-summary.md" && item.evidence === "/api/service-acceptance-summary"), true);
   assert.equal(report.artifacts.some((item) => item.id === "health-dashboard" && item.command === "health-dashboard:summary" && item.markdown === "release/health-dashboard-summary.md" && item.evidence === "/api/health-dashboard/summary"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "priority-application-templates" && item.command === "priority-apps:templates" && item.markdown === "release/priority-application-templates.md" && item.evidence === "/api/priority-applications/templates"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "citizen-launch-foundation" && item.command === "citizen:launch-foundation" && item.markdown === "release/citizen-launch-foundation-readiness.md" && item.evidence === "citizen.html?client=app&page=escort"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "maternal-child-readiness" && item.command === "maternal-child:readiness" && item.markdown === "release/maternal-child-readiness-report.md" && item.evidence === "maternal-child-about.html"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "hybrid-deployment" && item.command === "hybrid:deployment-readiness" && item.markdown === "release/hybrid-deployment-readiness-report.md"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "multi-practice" && item.command === "multi-practice:readiness" && item.markdown === "release/multi-practice-readiness-report.md" && item.evidence === "/api/multi-practice-registry"), true);
   assert.equal(report.artifacts.some((item) => item.id === "chronic-followup" && item.command === "chronic:followup-readiness"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "chronic-institution-interfaces" && item.command === "chronic:institution-interfaces"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "chronic-launch-core" && item.command === "chronic:launch-core" && item.evidence === "/api/chronic/launch-core"), true);
   assert.equal(report.templateReadmes.some((item) => item.file === "release/templates/interface-joint-test/README.md"), true);
   assert.equal(report.templateReadmes.every((item) => item.evidence === "/api/site-template-readmes"), true);
   assert.equal(report.checks.every((item) => item.passed), true);
@@ -34,7 +44,15 @@ test("release artifact manifest renders and writes artifacts", (t) => {
   const report = buildReleaseArtifactManifest();
   const markdown = renderMarkdown(report);
   assert.match(markdown, /Release artifact manifest/);
+  assert.match(markdown, /launch-smoke-report\.md/);
+  assert.match(markdown, /onsite-launch-requirements\.md/);
   assert.match(markdown, /health-dashboard-summary\.md/);
+  assert.match(markdown, /priority-application-templates\.md/);
+  assert.match(markdown, /citizen-launch-foundation-readiness\.md/);
+  assert.match(markdown, /maternal-child-readiness-report\.md/);
+  assert.match(markdown, /Maternal-child main function and readiness report/);
+  assert.match(markdown, /Hybrid static preview and dynamic backend readiness/);
+  assert.match(markdown, /Doctor multi-practice readiness report/);
   assert.match(markdown, /Template READMEs/);
   assert.match(markdown, /release-artifact-manifest\.md/);
 

@@ -57,6 +57,8 @@ jobs:
         run: npm run interface:mapping
       - name: Generate regional data sharing report
         run: npm run regional-data-sharing:report
+      - name: Generate hybrid deployment readiness report
+        run: npm run hybrid:deployment-readiness
       - name: Generate research sandbox readiness report
         run: npm run research:sandbox
       - name: Generate monitoring readiness report
@@ -65,12 +67,22 @@ jobs:
         run: npm run operations:readiness
       - name: Generate site readiness pack
         run: npm run site:pack
+      - name: Generate priority application templates
+        run: npm run priority-apps:templates
+      - name: Generate maternal child readiness report
+        run: npm run maternal-child:readiness
+      - name: Generate policy coverage report
+        run: npm run policy:coverage
       - name: Generate production database readiness report
         run: npm run production-db:readiness
       - name: Generate interoperability evaluation evidence
         run: npm run evaluation:evidence
       - name: Generate referral teleconsultation readiness report
         run: npm run referral:readiness
+      - name: Generate medical escort readiness report
+        run: npm run escort:readiness
+      - name: Generate internet nursing readiness report
+        run: npm run internet-nursing:readiness
       - name: Generate release artifact manifest
         run: npm run release:manifest
       - name: Generate release readiness report

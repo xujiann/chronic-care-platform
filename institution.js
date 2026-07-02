@@ -1,14 +1,48 @@
-const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], referralTeleconsultations: [], medicationPickups: [], chronicScreeningTasks: [], chronicManagementPlans: [], chronicFollowupStatusPolicy: {}, deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthStatistics: {}, doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {} };
+const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], referralTeleconsultations: [], medicationPickups: [], chronicScreeningTasks: [], chronicManagementPlans: [], chronicFollowupStatusPolicy: {}, deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthCertificateDocuments: [], birthStatistics: {}, doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {}, taskMessages: [] };
 const institutionApiBase = location.protocol === "file:" || location.hostname.endsWith("github.io") ? "" : "/api";
 let platformState = fallbackState;
 
 document.addEventListener("DOMContentLoaded", async () => {
   platformState = await loadPlatformState(fallbackState);
+  const [followupSummary, launchCore] = await Promise.all([loadChronicFollowupSummary(), loadChronicLaunchCore()]);
+  platformState.chronicFollowupSummary = followupSummary;
+  platformState.chronicLaunchCore = launchCore;
   bindInstitutionActions();
   renderAll(platformState);
 });
 
+async function loadChronicFollowupSummary() {
+  if (!institutionApiBase) return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/chronic/followup-summary`);
+    if (response.ok) return await response.json();
+  } catch (error) {
+    // Static preview falls back to local snapshot evidence.
+  }
+  return null;
+}
+
+async function loadChronicLaunchCore() {
+  if (!institutionApiBase) return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/chronic/launch-core`);
+    if (response.ok) return await response.json();
+  } catch (error) {
+    // Static preview falls back to local snapshot evidence.
+  }
+  return null;
+}
+
+async function refreshChronicRuntimeState() {
+  const [followupSummary, launchCore] = await Promise.all([loadChronicFollowupSummary(), loadChronicLaunchCore()]);
+  if (followupSummary) platformState.chronicFollowupSummary = followupSummary;
+  if (launchCore) platformState.chronicLaunchCore = launchCore;
+}
+
 function renderAll(state) {
+  renderChronicLaunchCore(state);
   renderChronicFollowupWorkbench(state);
   populateBirthCertificateForm(state);
   populateMultiPracticeForm(state);
@@ -33,10 +67,33 @@ function renderAll(state) {
 function bindInstitutionActions() {
   document.addEventListener("click", async (event) => {
       const button = event.target.closest("[data-workflow-action]");
+      const launchCoreButton = event.target.closest("[data-launch-core-action]");
+      const integrationButton = event.target.closest("[data-chronic-integration]");
+      if (launchCoreButton) {
+        launchCoreButton.disabled = true;
+        const result = await recordLaunchCoreAction(launchCoreButton.dataset.itemId, launchCoreButton.dataset.rowId);
+        launchCoreButton.disabled = false;
+        if (result.ok) renderAll(platformState);
+        return;
+      }
+      if (integrationButton) {
+        integrationButton.disabled = true;
+        const result = await runChronicIntegrationDemo(integrationButton.dataset.chronicIntegration);
+        integrationButton.disabled = false;
+        if (result.ok) renderAll(platformState);
+        return;
+      }
       if (!button) return;
     if (button.dataset.chronicDispatch) {
       button.disabled = true;
       const result = await dispatchChronicFollowup(button.dataset.collection, button.dataset.id, JSON.parse(button.dataset.updates || "{}"), button.dataset.note || "chronic follow-up disposition");
+      button.disabled = false;
+      if (result.ok) renderAll(platformState);
+      return;
+    }
+    if (button.dataset.chronicEscalation) {
+      button.disabled = true;
+      const result = await escalateChronicFollowup(button.dataset.collection, button.dataset.id, button.dataset.reason || "chronic follow-up escalation");
       button.disabled = false;
       if (result.ok) renderAll(platformState);
       return;
@@ -51,6 +108,21 @@ function bindInstitutionActions() {
   document.querySelector("#birth-status-filter")?.addEventListener("change", () => renderBirthCertificates(platformState));
   document.querySelector("#birth-risk-filter")?.addEventListener("change", () => renderBirthCertificates(platformState));
   document.querySelector("#multi-practice-form")?.addEventListener("submit", submitMultiPracticeApplication);
+  document.querySelector("#chronic-priority-filter")?.addEventListener("change", () => renderChronicFollowupWorkbench(platformState));
+  document.querySelector("#chronic-type-filter")?.addEventListener("change", () => renderChronicFollowupWorkbench(platformState));
+  document.querySelector("#chronic-sort")?.addEventListener("change", () => renderChronicFollowupWorkbench(platformState));
+  document.querySelector("#chronic-search")?.addEventListener("input", () => renderChronicFollowupWorkbench(platformState));
+  document.querySelector("#chronic-clear-filters")?.addEventListener("click", () => {
+    const priority = document.querySelector("#chronic-priority-filter");
+    const type = document.querySelector("#chronic-type-filter");
+    const sort = document.querySelector("#chronic-sort");
+    const search = document.querySelector("#chronic-search");
+    if (priority) priority.value = "all";
+    if (type) type.value = "all";
+    if (sort) sort.value = "priority";
+    if (search) search.value = "";
+    renderChronicFollowupWorkbench(platformState);
+  });
 }
 
 function actionButton(collection, id, label, updates, note) {
@@ -61,9 +133,136 @@ function chronicDispatchButton(collection, id, label, updates, note) {
   return `<button class="inline-action" type="button" data-workflow-action data-chronic-dispatch="true" data-collection="${collection}" data-id="${id}" data-updates='${JSON.stringify(updates)}' data-note="${note || label}">${label}</button>`;
 }
 
+function chronicEscalationButton(collection, id, reason) {
+  return `<button class="inline-action" type="button" data-workflow-action data-chronic-escalation="true" data-collection="${collection}" data-id="${id}" data-reason="${reason || "priority chronic follow-up escalation"}">升级处置</button>`;
+}
+
+function fallbackChronicLaunchCore(state) {
+  const items = [
+    ["institution-systems", "Institution systems", "chronicExternalIntegrations", "institution-integration"],
+    ["identity-scope", "Identity scope", "chronicIdentityScopes", "identity-integration"],
+    ["message-channels", "Message channels", "chronicMessageChannels", "message-platform"],
+    ["quality-model", "Quality model", "chronicModelGovernance", "chronic-quality-office"],
+    ["pharmacy-insurance", "Pharmacy insurance", "chronicPharmacyInsuranceLinks", "pharmacy-insurance"]
+  ].map(([id, title, collection, owner]) => {
+    const rows = state[collection] || [];
+    return {
+      id,
+      title,
+      owner,
+      collection,
+      ready: rows.length > 0,
+      collectionEvidence: { rows: rows.length, readyRows: rows.length },
+      closureEvidence: { rows: rows.length, readyRows: rows.length, rowsDetail: rows.slice(0, 2) }
+    };
+  });
+  return {
+    ok: items.every((item) => item.ready),
+    summary: {
+      items: items.length,
+      readyItems: items.filter((item) => item.ready).length,
+      closureRows: items.reduce((sum, item) => sum + (item.closureEvidence?.rows || 0), 0),
+      signoffs: (state.chronicLaunchCoreSignoffs || []).length,
+      signedSignoffs: (state.chronicLaunchCoreSignoffs || []).filter((item) => String(item.signoffStatus || "").toLowerCase() === "signed").length
+    },
+    items
+  };
+}
+
+function launchCoreActionButton(item) {
+  const row = (item.closureEvidence?.rowsDetail || [])[0] || {};
+  const rowId = row.id || row.itemId || item.id;
+  return `<button class="inline-action" type="button" data-launch-core-action data-item-id="${item.id}" data-row-id="${rowId}">Record closure</button>`;
+}
+
+function renderChronicLaunchCore(state) {
+  const summaryEl = document.querySelector("#chronic-launch-core-summary");
+  const gridEl = document.querySelector("#chronic-launch-core");
+  if (!summaryEl || !gridEl) return;
+  const report = state.chronicLaunchCore || fallbackChronicLaunchCore(state);
+  const signoffs = report.summary?.signoffs || 0;
+  const signedSignoffs = report.summary?.signedSignoffs || 0;
+  summaryEl.textContent = `${report.summary?.readyItems || 0}/${report.summary?.items || 0} ready - ${report.summary?.closureRows || 0} closure rows - ${signedSignoffs}/${signoffs} signoffs`;
+  gridEl.innerHTML = (report.items || []).map((item) => {
+    const rows = item.collectionEvidence || {};
+    const closure = item.closureEvidence || {};
+    return `<article class="claim-card">
+      <strong>${item.title}</strong>
+      <span>${item.ready ? "PASS" : "PENDING"}<br>${item.collection} - ${rows.readyRows || 0}/${rows.rows || 0}<br>closure - ${closure.readyRows || 0}/${closure.rows || 0}<br>${item.owner}</span>
+      <div class="action-row">${launchCoreActionButton(item)}</div>
+    </article>`;
+  }).join("");
+}
+
+async function recordLaunchCoreAction(itemId, rowId) {
+  if (!institutionApiBase) {
+    platformState.chronicLaunchCore = fallbackChronicLaunchCore(platformState);
+    return { ok: true };
+  }
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/chronic/launch-core/actions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        itemId,
+        rowId,
+        action: "site closure confirmation",
+        completionStatus: "closed",
+        receiptStatus: "accepted",
+        reviewStatus: "approved",
+        signoffStatus: "signed",
+        note: "institution launch core closure recorded from portal"
+      })
+    });
+    if (!response.ok) throw new Error(`launch core action failed: ${response.status}`);
+    const saved = await response.json();
+    platformState.chronicLaunchCore = saved.launchCore || await loadChronicLaunchCore();
+    return { ok: true };
+  } catch (error) {
+    alert(error.message || "launch core action failed");
+    return { ok: false };
+  }
+}
+
 function chronicClosed(state, status) {
   const closed = state.chronicFollowupStatusPolicy?.statusGroups?.closed || [];
   return closed.some((item) => String(status || "").includes(item) || String(item || "").includes(String(status || "")));
+}
+
+function chronicPriority(item) {
+  const status = `${item.status || ""} ${item.riskLevel || ""} ${item.grade || ""}`.toLowerCase();
+  const due = item.due ? new Date(`${String(item.due).slice(0, 10)}T00:00:00`) : null;
+  const days = due && !Number.isNaN(due.getTime()) ? Math.round((due.getTime() - new Date().setHours(0, 0, 0, 0)) / 86400000) : 999;
+  if (/overdue|alert|high|critical/.test(status) || String(item.status || "").includes("閫炬湡") || days < 0) return "critical";
+  if (days <= 3 || /warning/.test(status) || String(item.status || "").includes("棰勮")) return "high";
+  if (days <= 7) return "medium";
+  return "low";
+}
+
+function filterChronicWorkbenchRows(rows, state) {
+  const priority = document.querySelector("#chronic-priority-filter")?.value || "all";
+  const type = document.querySelector("#chronic-type-filter")?.value || "all";
+  const search = String(document.querySelector("#chronic-search")?.value || "").trim().toLowerCase();
+  const sort = document.querySelector("#chronic-sort")?.value || "priority";
+  const rank = { critical: 0, high: 1, medium: 2, low: 3 };
+  return rows.map((item) => {
+    const resident = residentOf(state, item.residentId);
+    const itemPriority = chronicPriority(item);
+    return {
+      ...item,
+      itemPriority,
+      searchText: [resident?.name, item.title, item.collection, item.status, item.due, item.assignee, item.owner, item.pharmacy, item.nextStep, item.intervention, item.advice, item.result].filter(Boolean).join(" ").toLowerCase()
+    };
+  }).filter((item) =>
+    (priority === "all" || item.itemPriority === priority) &&
+    (type === "all" || item.collection === type) &&
+    (!search || item.searchText.includes(search))
+  ).sort((a, b) => {
+    if (sort === "resident") return String(residentOf(state, a.residentId)?.name || "").localeCompare(String(residentOf(state, b.residentId)?.name || ""));
+    if (sort === "due") return String(a.due || "").localeCompare(String(b.due || ""));
+    return (rank[a.itemPriority] ?? 9) - (rank[b.itemPriority] ?? 9) || String(a.due || "").localeCompare(String(b.due || ""));
+  });
 }
 
 function renderChronicFollowupWorkbench(state) {
@@ -77,6 +276,10 @@ function renderChronicFollowupWorkbench(state) {
   const openScreenings = (state.chronicScreeningTasks || []).filter((item) => !chronicClosed(state, item.status));
   const pendingMedication = (state.medicationPickups || []).filter((item) => !chronicClosed(state, item.status || item.pharmacyStatus));
   summaryEl.textContent = `${openFollowups.length + openPlans.length + openScreenings.length} 项待处置`;
+  const apiSummary = state.chronicFollowupSummary?.summary || {};
+  if (apiSummary.alerts !== undefined) {
+    summaryEl.textContent = `${openFollowups.length + openPlans.length + openScreenings.length} 项待处置 · ${apiSummary.highPriorityAlerts || 0} 项高优先级 · ${apiSummary.policyAligned || 0}/${apiSummary.policyItems || 0} 政策覆盖`;
+  }
   metricsEl.innerHTML = [
     ["筛查分级", openScreenings.length, "高风险发现与分级评估"],
     ["管理计划", openPlans.length, "复核、升级预警、下次随访"],
@@ -85,12 +288,12 @@ function renderChronicFollowupWorkbench(state) {
     ["居民反馈", feedback.length, "居民端主动回填"]
   ].map(([label, value, hint]) => `<article class="claim-card"><strong>${label}</strong><span>${value}<br>${hint}</span></article>`).join("");
 
-  const rows = [
+  const rows = filterChronicWorkbenchRows([
     ...openScreenings.map((item) => ({ ...item, collection: "chronicScreeningTasks", title: item.taskName, due: item.due, primary: "完成评估", updates: { status: "已评估", result: "已生成风险分级和干预建议" } })),
     ...openPlans.map((item) => ({ ...item, collection: "chronicManagementPlans", title: `${item.diseaseType}管理计划`, due: item.nextReview, primary: "复核完成", updates: { status: "已复核", intervention: "已完成阶段复核并更新管理方案" } })),
     ...openFollowups.map((item) => ({ ...item, collection: "followups", title: `${item.diseaseType}随访`, due: item.plannedAt, primary: "完成随访", updates: { status: "已完成", result: "已完成院后随访并同步居民反馈" } })),
     ...pendingMedication.map((item) => ({ ...item, collection: "medicationPickups", title: item.medication, due: item.nextPickup, primary: "确认依从", updates: { status: "已完成", pharmacyStatus: "已取药" } }))
-  ].slice(0, 12);
+  ], state).slice(0, 12);
   listEl.innerHTML = rows.map((item) => {
     const resident = residentOf(state, item.residentId);
     const latestFeedback = feedback.find((record) => record.residentId === item.residentId);
@@ -103,6 +306,7 @@ function renderChronicFollowupWorkbench(state) {
         <div class="action-row">
           ${chronicDispatchButton(item.collection, item.id, item.primary, item.updates, `慢病随访处置：${item.primary}`)}
           ${item.collection === "chronicManagementPlans" ? chronicDispatchButton(item.collection, item.id, "升级预警", { status: "预警中", intervention: "已升级家庭医生重点管理" }, "慢病管理计划升级预警") : ""}
+          ${["critical", "high"].includes(item.itemPriority) ? chronicEscalationButton(item.collection, item.id, `priority ${item.itemPriority} chronic follow-up escalation`) : ""}
         </div>
       </div>
       <span class="badge ${String(item.status || "").includes("逾期") || String(item.status || "").includes("预警") ? "danger" : "warn"}">${item.status || "待处理"}</span>
@@ -127,9 +331,87 @@ async function dispatchChronicFollowup(collection, id, updates, note) {
     const rows = platformState[collection] || [];
     const index = rows.findIndex((item) => item.id === id);
     if (index >= 0) rows[index] = saved;
+    await refreshChronicRuntimeState();
     return { ok: true, saved };
   } catch (error) {
     alert(error.message || "慢病随访处置失败，请检查登录状态和网络连接");
+    return { ok: false };
+  }
+}
+
+async function escalateChronicFollowup(collection, id, reason) {
+  if (!institutionApiBase) {
+    Object.assign((platformState[collection] || []).find((item) => item.id === id) || {}, {
+      escalationStatus: "escalated",
+      escalationReason: reason,
+      escalatedAt: new Date().toISOString()
+    });
+    return { ok: true };
+  }
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/chronic/followup-escalations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ collection, id, reason })
+    });
+    if (!response.ok) throw new Error(`escalation failed: ${response.status}`);
+    const saved = await response.json();
+    const rows = platformState[collection] || [];
+    const index = rows.findIndex((item) => item.id === id);
+    if (index >= 0 && saved.item) rows[index] = saved.item;
+    await refreshChronicRuntimeState();
+    return { ok: true, saved };
+  } catch (error) {
+    alert(error.message || "慢病随访升级失败，请检查登录状态和网络连接");
+    return { ok: false };
+  }
+}
+
+function chronicIntegrationPayload(type) {
+  const resident = (platformState.residents || []).find((item) => item.id === "r1") || (platformState.residents || [])[0] || {};
+  const pickup = (platformState.medicationPickups || []).find((item) => item.residentId === resident.id) || (platformState.medicationPickups || [])[0] || {};
+  const message = (platformState.taskMessages || []).find((item) => item.chronicFollowup && item.targetRole === "institution" && item.residentId === resident.id) || {};
+  const residentId = resident.id || pickup.residentId || "r1";
+  const today = new Date().toISOString().slice(0, 10);
+  if (type === "device") {
+    return { path: "/chronic/device-measurements", body: { residentId, externalId: `demo-device-${residentId}-${today}`, deviceId: "bp-device-demo", deviceType: "blood pressure monitor", measurementType: "remote blood pressure", measurementValue: "151/91 mmHg high", medicationTaken: true, note: "device gateway demo upload" } };
+  }
+  if (type === "pharmacy") {
+    return { path: "/chronic/pharmacy-callbacks", body: { medicationPickupId: pickup.id || "mp1", externalId: `demo-pharmacy-${pickup.id || "mp1"}-${today}`, status: "picked_up", pharmacyStatus: "picked_up", medicationTaken: true, inventoryStatus: "dispensed", note: "pharmacy callback demo confirmed" } };
+  }
+  if (type === "familyDoctor") {
+    return { path: "/chronic/family-doctor-actions", body: { residentId, messageId: message.id || "", taskId: message.taskId || "", action: "family doctor phone review", result: "family doctor reviewed resident self-monitoring and updated plan", nextAction: "continue home monitoring for 7 days", servicePack: "hypertension follow-up pack" } };
+  }
+  return { path: "/chronic/reminder-outreach", body: { residentId, channel: "sms", reminderType: "chronic medication and follow-up reminder", reason: "send pickup and follow-up reminder to resident/family", status: "scheduled" } };
+}
+
+async function runChronicIntegrationDemo(type) {
+  const status = document.querySelector("#chronic-integration-status");
+  const demo = chronicIntegrationPayload(type);
+  try {
+    if (institutionApiBase) {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${institutionApiBase}${demo.path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(demo.body)
+      });
+      if (!response.ok) throw new Error(`integration demo failed: ${response.status}`);
+      await response.json();
+      await refreshChronicRuntimeState();
+    }
+    if (type === "device") {
+      platformState.personalRecords = [{ id: `local-device-${Date.now()}`, residentId: demo.body.residentId, category: "chronic-self-checkin", result: demo.body.measurementValue, source: "device gateway" }, ...(platformState.personalRecords || [])];
+    }
+    if (type === "pharmacy") {
+      const pickup = (platformState.medicationPickups || []).find((item) => item.id === demo.body.medicationPickupId);
+      if (pickup) Object.assign(pickup, { status: demo.body.status, pharmacyStatus: demo.body.pharmacyStatus, callbackExternalId: demo.body.externalId });
+    }
+    if (status) status.textContent = `${type} integration evidence recorded`;
+    return { ok: true };
+  } catch (error) {
+    if (status) status.textContent = error.message || "integration demo failed";
     return { ok: false };
   }
 }
@@ -268,15 +550,20 @@ function renderDoctorAccounts(state) {
   const listEl = document.querySelector("#doctor-accounts");
   if (!countEl || !listEl) return;
   countEl.textContent = `${doctors.length} 个账户`;
-  listEl.innerHTML = doctors.map((doctor) => `<section class="item">
+  listEl.innerHTML = doctors.map((doctor) => {
+    const registry = doctor.electronicRegistrationVerification || doctor.electronicRegistration || {};
+    const registryOk = registry.verificationStatus === "已核验" || registry.verificationStatus === "verified";
+    return `<section class="item">
     <div>
       <h3>${doctor.name} · ${doctor.title} · ${doctor.specialty}</h3>
       <p>${doctor.primaryInstitution} · ${doctor.department} · ${doctor.practiceScope}</p>
       <p>执业证号：${doctor.licenseNo} · 注册有效期至 ${doctor.registrationValidUntil} · 考核 ${doctor.assessmentRecords?.slice(-2).join("、") || "待补齐"}</p>
+      <p>电子化注册：${registry.sourceSystem || "医师电子化注册系统"} · ${registry.registryId || "待同步"} · ${registry.verificationStatus || "待核验"} · 签章 ${registry.signatureNo || "待签章"}</p>
       <p>关联功能：${(doctor.functions || []).join("、")}</p>
     </div>
-    <span class="badge ${doctor.accountStatus === "启用" ? "info" : "warn"}">${doctor.accountStatus || "待启用"}</span>
-  </section>`).join("") || `<p class="muted">暂无医生账户档案。</p>`;
+    <span class="badge ${doctor.accountStatus === "启用" && registryOk ? "info" : "warn"}">${registryOk ? doctor.accountStatus || "启用" : "注册待核验"}</span>
+  </section>`;
+  }).join("") || `<p class="muted">暂无医生账户档案。</p>`;
 }
 
 function renderMultiPracticePolicy(state) {
@@ -297,14 +584,26 @@ function renderMultiPracticePolicy(state) {
 
 function renderMultiPracticeApplications(state) {
   const applications = state.multiPracticeApplications || [];
+  const messages = state.taskMessages || [];
   const countEl = document.querySelector("#multi-practice-count");
   const listEl = document.querySelector("#multi-practice-applications");
   if (!countEl || !listEl) return;
   countEl.textContent = `${applications.length} 条`;
   listEl.innerHTML = applications.map((item) => {
     const checks = item.compliance || {};
+    const documents = item.documentChecks || {};
+    const riskFlags = Array.isArray(item.riskFlags) ? item.riskFlags : [];
+    const electronic = item.electronicRegistrationVerification || {};
+    const confirmation = item.primaryPracticeConfirmation || {};
+    const conflictEvidence = Array.isArray(item.scheduleConflictEvidence) ? item.scheduleConflictEvidence : [];
+    const externalSync = item.externalSync || {};
+    const applicationMessages = messages
+      .filter((message) => message.collection === "multiPracticeApplications" && message.sourceId === item.id)
+      .slice(0, 3);
     const passed = Object.entries(checks).filter(([key, value]) => key !== "publicHospitalLeaderRestricted" && value).length;
-    const blocked = checks.publicHospitalLeaderRestricted || Object.entries(checks).some(([key, value]) => key !== "publicHospitalLeaderRestricted" && !value);
+    const total = Object.entries(checks).filter(([key]) => key !== "publicHospitalLeaderRestricted").length || 6;
+    const documentBlocked = Object.values(documents).some((value) => value === false) || documents.scheduleConflict === true;
+    const blocked = checks.publicHospitalLeaderRestricted || Object.entries(checks).some(([key, value]) => key !== "publicHospitalLeaderRestricted" && !value) || documentBlocked || riskFlags.length > 0;
     const badge = item.status?.includes("待") ? "warn" : item.status?.includes("退回") || blocked ? "danger" : "info";
     return `<section class="item multi-practice-item">
       <div>
@@ -316,13 +615,32 @@ function renderMultiPracticeApplications(state) {
           <span class="badge ${checks.titleQualified ? "info" : "warn"}">职称${checks.titleQualified ? "符合" : "待核"}</span>
           <span class="badge ${checks.fiveYears ? "info" : "warn"}">年限${checks.fiveYears ? "符合" : "待核"}</span>
           <span class="badge ${checks.assessmentQualified ? "info" : "warn"}">考核${checks.assessmentQualified ? "合格" : "待核"}</span>
+          <span class="badge ${checks.electronicRegistrationVerified ? "info" : "warn"}">电子注册${checks.electronicRegistrationVerified ? "已核" : "待核"}</span>
+          <span class="badge ${checks.registrationInForce ? "info" : "warn"}">注册有效${checks.registrationInForce ? "期内" : "待复核"}</span>
           <span class="badge ${checks.scopeMatched ? "info" : "warn"}">范围${checks.scopeMatched ? "一致" : "待核"}</span>
           <span class="badge ${checks.agreementCompleted ? "info" : "warn"}">协议${checks.agreementCompleted ? "完整" : "待补"}</span>
         </div>
-        <p>第一执业地点：${item.primaryConsent || "待确认"} · ${item.registrationMode || "注册管理"} · 信息公开：${item.publicVisible ? "公开" : "不公开"} · 校验 ${passed}/6</p>
+        <div class="standard-tags">
+          <span class="badge ${documents.firstPracticeConsent ? "info" : "warn"}">第一执业地点${documents.firstPracticeConsent ? "已确认" : "待确认"}</span>
+          <span class="badge ${documents.cooperationAgreement ? "info" : "warn"}">劳务协议${documents.cooperationAgreement ? "完整" : "待补"}</span>
+          <span class="badge ${documents.liabilityInsurance ? "info" : "warn"}">责任保险${documents.liabilityInsurance ? "已核" : "待补"}</span>
+          <span class="badge ${documents.scheduleConflict ? "danger" : "info"}">排班${documents.scheduleConflict ? "冲突" : "正常"}</span>
+          <span class="badge ${documents.publicDisclosure ? "info" : "warn"}">公开${documents.publicDisclosure ? "已纳入" : "未公开"}</span>
+        </div>
+        ${riskFlags.length ? `<p class="muted">补正提示：${riskFlags.join("、")}</p>` : ""}
+        ${conflictEvidence.length ? `<p class="muted">排班冲突：${conflictEvidence.map((row) => `${row.targetInstitution || "其他机构"} ${row.schedule || ""}`).join("；")}</p>` : ""}
+        <p>电子化注册：${electronic.registryId || "待同步"} · ${electronic.verificationStatus || "待核验"} · 有效期 ${electronic.validUntil || "待同步"}</p>
+        <p>第一执业地点电子确认：${confirmation.status || item.primaryConsent || "待确认"} · ${confirmation.confirmedByOrg || item.primaryInstitution || "第一执业地点"} · 签章 ${confirmation.signatureNo || "待签章"}</p>
+        <p>外部同步：电子注册 ${externalSync.electronicRegistration?.status || "待同步"} · 电子签章 ${externalSync.eSignature?.status || "待签"} · HIS/HR ${externalSync.hisHr?.status || "待映射"}</p>
+        ${applicationMessages.length ? `<div class="list compact">${applicationMessages.map((message) => `<p><strong>${message.title}</strong>：${message.body || "待处理"} · ${String(message.createdAt || "").slice(0, 16)}</p>`).join("")}</div>` : ""}
+        <p>第一执业地点：${item.primaryConsent || "待确认"} · ${item.registrationMode || "注册管理"} · 信息公开：${item.publicVisible ? "公开" : "不公开"} · 校验 ${passed}/${total}</p>
         <div class="action-row">
           ${item.primaryConsent !== "已同意" ? actionButton("multiPracticeApplications", item.id, "同意/报备", { primaryConsent: "已同意", status: "待卫健审核" }, "第一执业地点同意多点执业") : ""}
           ${item.status !== "已备案" ? actionButton("multiPracticeApplications", item.id, "备案通过", { status: "已备案", publicVisible: true }, "多点执业备案通过并公开") : ""}
+          ${!String(item.status || "").includes("退回") ? actionButton("multiPracticeApplications", item.id, "退回补正", { action: "return-correction", correctionRequired: "请补齐协议、责任保险或第一执业地点意见" }, "医院端退回补正") : ""}
+          ${!String(item.status || "").includes("暂停") ? actionButton("multiPracticeApplications", item.id, "暂停执业", { action: "suspend" }, "排班冲突或监管要求暂停执业") : ""}
+          ${!String(item.status || "").includes("撤回") ? actionButton("multiPracticeApplications", item.id, "撤回申请", { action: "withdraw" }, "医生或机构撤回多点执业申请") : ""}
+          ${!String(item.status || "").includes("终止") ? actionButton("multiPracticeApplications", item.id, "终止备案", { action: "terminate" }, "终止多点执业备案并退出公开") : ""}
         </div>
       </div>
       <span class="badge ${badge}">${item.status || "待处理"}</span>
@@ -333,6 +651,7 @@ function renderMultiPracticeApplications(state) {
 function renderBirthCertificates(state) {
   const certificates = state.birthCertificates || [];
   const forms = state.birthCertificateForms || [];
+  const certificateDocuments = state.birthCertificateDocuments || [];
   const statistics = state.birthStatistics || {};
   const metrics = statistics.metrics || {};
   const countEl = document.querySelector("#birth-certificate-count");
@@ -340,6 +659,7 @@ function renderBirthCertificates(state) {
   const listEl = document.querySelector("#birth-certificate-list");
   const formsEl = document.querySelector("#birth-certificate-forms");
   const alertsEl = document.querySelector("#birth-certificate-alerts");
+  const documentsEl = document.querySelector("#birth-certificate-documents");
   if (!countEl || !metricEl || !listEl || !formsEl) return;
 
   const statusFilter = document.querySelector("#birth-status-filter")?.value || "";
@@ -351,11 +671,19 @@ function renderBirthCertificates(state) {
       || (riskFilter === "pending-sync" && (item.publicSecuritySync !== "已共享" || item.maternalChildSync !== "已入册"));
     return statusMatched && riskMatched;
   });
+  const metricValue = (key, fallback) => {
+    const value = Number(metrics[key]);
+    return Number.isFinite(value) ? value : fallback;
+  };
+  const pendingPublicSecuritySync = metricValue("pendingPublicSecuritySync", certificates.filter((item) => item.publicSecuritySync !== "已共享").length);
+  const pendingMaternalChildSync = metricValue("pendingMaternalChildSync", certificates.filter((item) => item.maternalChildSync !== "已入册").length);
+  const qualityPending = metricValue("qualityPending", certificates.filter((item) => ["待质控", "待复核", "待补正"].includes(item.qualityCheck)).length);
   const alerts = [
-    ["待签发", certificates.filter((item) => item.status === "待签发").length, "签发医师、材料和证件编号需核验"],
-    ["待入册共享", certificates.filter((item) => item.publicSecuritySync !== "已共享" || item.maternalChildSync !== "已入册").length, "公安户籍和妇幼健康管理未闭环"],
-    ["低体重儿", certificates.filter((item) => Number(item.birthWeight || 0) > 0 && Number(item.birthWeight || 0) < 2500).length, "需纳入专案访视和喂养指导"],
-    ["质控补正", certificates.filter((item) => ["待质控", "待复核", "待补正"].includes(item.qualityCheck)).length, "材料、编号、签章或共享状态需复核"]
+    ["待签发", metricValue("pending", certificates.filter((item) => item.status === "待签发").length), "签发医师、材料和证件编号需核验"],
+    ["公安待共享", pendingPublicSecuritySync, "户籍出生登记依据未完成推送"],
+    ["妇幼待入册", pendingMaternalChildSync, "妇幼健康管理档案未闭环"],
+    ["低体重儿", metricValue("lowBirthWeight", certificates.filter((item) => Number(item.birthWeight || 0) > 0 && Number(item.birthWeight || 0) < 2500).length), "需纳入专案访视和喂养指导"],
+    ["质控补正", qualityPending, "材料、编号、签章或共享状态需复核"]
   ];
 
   countEl.textContent = `${filtered.length}/${certificates.length} 张证明`;
@@ -366,14 +694,22 @@ function renderBirthCertificates(state) {
     </article>`).join("");
   }
   metricEl.innerHTML = [
-    ["首次签发", metrics.firstIssued || certificates.filter((item) => item.issueType === "首次签发").length, "机构内出生直接签发"],
-    ["电子证照", metrics.electronicLicenses || certificates.filter((item) => String(item.electronicLicenseStatus || "").includes("已生成")).length, "第七版编号/条形码"],
-    ["公安共享", metrics.publicSecuritySynced || certificates.filter((item) => String(item.publicSecuritySync || "").includes("已共享")).length, "户口出生登记依据"],
-    ["待处理", metrics.pending || certificates.filter((item) => ["待签发", "待上报"].includes(item.status)).length, "补正、签发或上报"]
+    ["首次签发", metricValue("firstIssued", certificates.filter((item) => item.issueType === "首次签发").length), "机构内出生直接签发"],
+    ["电子证照", metricValue("electronicLicenses", certificates.filter((item) => String(item.electronicLicenseStatus || "").includes("已生成")).length), "第七版编号/条形码"],
+    ["公安共享", metricValue("publicSecuritySynced", certificates.filter((item) => String(item.publicSecuritySync || "").includes("已共享")).length), "户口出生登记依据"],
+    ["妇幼入册", metricValue("maternalChildSynced", certificates.filter((item) => String(item.maternalChildSync || "").includes("已入册")).length), "新生儿健康管理接续"],
+    ["待处理", metricValue("pending", certificates.filter((item) => ["待签发", "待上报"].includes(item.status)).length), "补正、签发或上报"]
   ].map(([label, value, hint]) => `<article class="claim-card">
     <strong>${label}</strong>
     <span>${value}<br>${hint}</span>
   </article>`).join("");
+
+  if (documentsEl) {
+    documentsEl.innerHTML = certificateDocuments.map((item) => `<article class="claim-card">
+      <strong>${item.name || item.category}</strong>
+      <span>${item.serialRange || "待登记"}<br>${(item.controlPoints || []).join("、")}<br>${item.owner || "待明确"} · ${item.status || "待处理"}</span>
+    </article>`).join("") || `<p class="muted">暂无出生证明证件文书台账。</p>`;
+  }
 
   listEl.innerHTML = filtered.map((item) => {
     const resident = residentOf(state, item.maternalResidentId || item.residentId);
@@ -395,10 +731,17 @@ function renderBirthCertificates(state) {
     </section>`;
   }).join("") || `<p class="muted">暂无出生医学证明记录。</p>`;
 
-  formsEl.innerHTML = forms.map((form) => `<article class="claim-card">
-    <strong>${form.name}</strong>
-    <span>${form.scope}<br>${(form.keyFields || []).slice(0, 4).join("、")}<br>${form.status}</span>
-  </article>`).join("") || `<p class="muted">暂无出生证明材料模板。</p>`;
+  const documentCards = certificateDocuments.map((item) => `<article class="claim-card">
+    <strong>${item.name || item.category}</strong>
+    <span>${item.serialRange || "编号范围待登记"}<br>${(item.evidence || []).slice(0, 4).join("、")}<br>${item.owner || "责任方待确认"} · ${item.status || "待处理"}</span>
+  </article>`);
+  formsEl.innerHTML = [
+    ...forms.map((form) => `<article class="claim-card">
+      <strong>${form.name}</strong>
+      <span>${form.scope}<br>${(form.keyFields || []).slice(0, 4).join("、")}<br>${form.status}</span>
+    </article>`),
+    ...documentCards
+  ].join("") || `<p class="muted">暂无出生证明材料模板。</p>`;
 }
 
 function renderMetrics(state) {
@@ -498,12 +841,12 @@ function renderTeleconsultationLoop(state) {
       <div>
         <h3>${resident?.name || "Unknown resident"} · ${item.department || item.diseaseType || "Teleconsultation"}</h3>
         <p>${item.sourceInstitution || "-"} -> ${item.targetInstitution || "-"} · ${item.meetingWindow || item.due || "-"}</p>
-        <p>${item.clinicalQuestion || item.receivingFeedback || item.reportSummary || "Pending clinical note"}</p>
-        <p>Authorization: ${item.authorizationStatus || "pending"} · Report: ${item.reportStatus || "pending"}</p>
+        <p>${item.clinicalQuestion || item.receivingFeedback || item.reportSummary || "待补充临床说明"}</p>
+        <p>授权：${item.authorizationStatus || "待确认"} · 报告：${item.reportStatus || "待回传"}</p>
         <div class="action-row">
-          ${item.status === "requested" ? actionButton("referralTeleconsultations", item.id, "Accept", { status: "accepted", receivingFeedback: "Receiving institution accepted the teleconsultation." }, "Accept referral teleconsultation") : ""}
-          ${item.reportStatus !== "returned" ? actionButton("referralTeleconsultations", item.id, "Return report", { status: "report-returned", reportStatus: "returned", reportSummary: "Consultation report returned to the originating institution." }, "Return teleconsultation report") : ""}
-          ${item.status !== "closed" ? actionButton("referralTeleconsultations", item.id, "Close", { status: "closed" }, "Close referral teleconsultation loop") : ""}
+          ${item.status === "requested" ? actionButton("referralTeleconsultations", item.id, "接收会诊", { status: "accepted", receivingFeedback: "接收机构已确认远程会诊。" }, "接收转诊会诊") : ""}
+          ${item.reportStatus !== "returned" ? actionButton("referralTeleconsultations", item.id, "回传报告", { status: "report-returned", reportStatus: "returned", reportSummary: "会诊报告已回传至发起机构。" }, "回传会诊报告") : ""}
+          ${item.status !== "closed" ? actionButton("referralTeleconsultations", item.id, "关闭闭环", { status: "closed" }, "关闭转诊会诊闭环") : ""}
         </div>
       </div>
       <span class="badge ${badge}">${item.status}</span>

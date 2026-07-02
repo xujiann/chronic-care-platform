@@ -18,6 +18,7 @@
         </div>
         <nav>
           <a href="./health-city.html">系统总览</a>
+          <a href="./about.html">关于</a>
         </nav>
       </header>
 
@@ -28,7 +29,50 @@
           <h2>慢病管理与院后随访闭环</h2>
           <span id="chronic-followup-summary"></span>
         </div>
+        <div class="panel-title">
+          <h2>慢病上线核心联调</h2>
+          <span id="chronic-launch-core-summary"></span>
+        </div>
+        <div id="chronic-launch-core" class="claim-grid"></div>
         <div id="chronic-followup-metrics" class="claim-grid"></div>
+        <div class="chronic-workbench-controls" data-chronic-workbench-controls>
+          <label>优先级
+            <select id="chronic-priority-filter">
+              <option value="all">全部优先级</option>
+              <option value="critical">紧急</option>
+              <option value="high">高</option>
+              <option value="medium">中</option>
+              <option value="low">低</option>
+            </select>
+          </label>
+          <label>任务类型
+            <select id="chronic-type-filter">
+              <option value="all">全部任务类型</option>
+              <option value="chronicScreeningTasks">筛查分级</option>
+              <option value="chronicManagementPlans">管理计划</option>
+              <option value="followups">随访任务</option>
+              <option value="medicationPickups">用药取药</option>
+            </select>
+          </label>
+          <label>搜索
+            <input id="chronic-search" type="search" placeholder="居民、任务、状态" />
+          </label>
+          <label>排序
+            <select id="chronic-sort">
+              <option value="priority">优先级与到期时间</option>
+              <option value="due">到期时间</option>
+              <option value="resident">居民姓名</option>
+            </select>
+          </label>
+          <button class="inline-action" id="chronic-clear-filters" type="button">清空</button>
+        </div>
+        <div class="integration-actions" id="chronic-integration-actions">
+          <button class="inline-action" type="button" data-chronic-integration="device">设备上传</button>
+          <button class="inline-action" type="button" data-chronic-integration="pharmacy">药房回传</button>
+          <button class="inline-action" type="button" data-chronic-integration="familyDoctor">家庭医生闭环</button>
+          <button class="inline-action" type="button" data-chronic-integration="outreach">提醒触达</button>
+          <span id="chronic-integration-status" class="muted">现场联调已就绪</span>
+        </div>
         <div id="chronic-followup-workbench" class="list"></div>
       </section>
 
@@ -44,7 +88,7 @@
         <article class="panel">
           <div class="panel-title">
             <h2>多点执业政策校验</h2>
-            <span>国卫医发〔2014〕86号</span>
+            <span>国卫医发〔2014〕86号 · <a href="./about.html">政策说明</a></span>
           </div>
           <div id="multi-practice-policy" class="rules"></div>
         </article>
@@ -279,6 +323,7 @@
         </div>
         <div id="birth-certificate-alerts" class="claim-grid"></div>
         <div id="birth-certificate-metrics" class="claim-grid"></div>
+        <div id="birth-certificate-documents" class="claim-grid"></div>
         <div id="birth-certificate-list" class="list"></div>
       </section>
 

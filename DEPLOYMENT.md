@@ -32,6 +32,7 @@ http://localhost:5173/login.html
 - `workbench.html`
 - `index.html`
 - `institution.html`
+- `doctor.html`
 - `insurance.html`
 - `citizen.html`
 - `mobile-preview.html`
@@ -110,12 +111,13 @@ DATABASE_URL=postgres://health:replace-with-password@postgres.internal:5432/chro
 OIDC_ISSUER_URL=https://identity.example.gov.cn/real-issuer
 OIDC_CLIENT_ID=replace-with-oidc-client-id
 OIDC_CLIENT_SECRET=replace-with-oidc-client-secret
+SMS_GATEWAY_URL=https://sms.example.gov.cn/real-gateway
 AUDIT_EXPORT_PATH=/var/log/chronic-care-platform/audit
 SIEM_ENDPOINT=https://siem.example.gov.cn/ingest
 RETENTION_POLICY=10y-worm
 ```
 
-生产化如迁移 PostgreSQL 或正式数据库，需要先完成 `productionDeploymentPlan` 中的数据库适配器工作，再填入 `DATABASE_URL`；在适配器启用前，运行时和发布门禁会拒绝 `STORAGE_ENGINE=postgres/postgresql`，避免静默回落到 SQLite。接入政务统一认证时需要填入 `OIDC_ISSUER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET`；审计保全至少配置 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT`，并补充现场短信、CA、网关地址等变量。
+生产化如迁移 PostgreSQL 或正式数据库，需要先完成 `productionDeploymentPlan` 中的数据库适配器工作，再填入 `DATABASE_URL`；在适配器启用前，运行时和发布门禁会拒绝 `STORAGE_ENGINE=postgres/postgresql`，避免静默回落到 SQLite。接入政务统一认证时需要填入 `OIDC_ISSUER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET`；居民端验证码生产上线必须填入 `SMS_GATEWAY_URL`；审计保全至少配置 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT`，并补充现场 CA、网关地址等变量。
 
 生产环境上线前应执行严格环境校验：
 
@@ -123,7 +125,7 @@ RETENTION_POLICY=10y-worm
 npm.cmd run env:check:production
 ```
 
-该命令读取 `.env`，会拒绝缺失环境文件、占位密钥、过短密钥、`STORAGE_ENGINE=json` 和尚未启用的 `postgres/postgresql` 运行时适配器；生产模式还会要求 OIDC 身份适配和审计保全目标配置到位。
+该命令读取 `.env`，会拒绝缺失环境文件、占位密钥、过短密钥、`STORAGE_ENGINE=json` 和尚未启用的 `postgres/postgresql` 运行时适配器；生产模式还会要求 OIDC 身份适配、居民端短信网关和审计保全目标配置到位。
 
 `env:check:production` 和 `release:report` 还会输出 `cutoverChecklist` / `productionCutover`，按环境文件、生产密钥、统一身份、审计保全、存储适配、现场接口联调、医保/证照交换、监控值守和灾备演练列出责任方、阻断状态、当前证据和下一步动作。真实参数到位后，应先让环境与基础设施类通过，再进入外部接口联调和现场测评；外部系统项必须有 `CUTOVER_SITE_INTERFACE_SIGNOFF`、`CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF`、`CUTOVER_MONITORING_SIGNOFF`、`CUTOVER_DR_REHEARSAL_SIGNOFF` 等现场签字信号才会通过。
 
@@ -138,6 +140,11 @@ npm.cmd run deploy:check
 npm.cmd run env:check
 npm.cmd run release:report
 npm.cmd run release:manifest
+npm.cmd run launch:smoke
+npm.cmd run priority-apps:templates
+npm.cmd run maternal-child:readiness
+npm.cmd run policy:coverage
+npm.cmd run hybrid:deployment-readiness
 ```
 
 本地服务启动后可访问：
@@ -165,7 +172,7 @@ npm.cmd run release:report:full
 
 `identity:contract` 会生成 `release/identity-contract.json` 和 `release/identity-contract.md`，记录政务统一身份接入所需 claims、角色到门户映射、机构覆盖度和样例 claim 映射；`release:report` 会同步写出这些文件，作为 OIDC/SAML 联调前的身份契约验收材料。
 
-`audit:retention` 会生成 `release/audit-retention-report.json` 和 `release/audit-retention-report.md`，离线验证安全事件与数据访问日志哈希链，记录导出摘要、保全目标、安全验收台账和生产审计保全路径；演示环境缺少 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT` 时仅提示，正式生产切换仍必须通过 `env:check:production`。
+`audit:retention` 会生成 `release/audit-retention-report.json` 和 `release/audit-retention-report.md`，离线验证安全事件与数据访问日志哈希链，记录导出摘要、保全目标、安全验收台账和生产审计保全路径；默认演示发布报告使用发布包内审计报告作为本地归档目标，正式生产切换仍必须通过 `env:check:production` 并配置 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT`。
 
 `integration:readiness` 会生成 `release/integration-readiness-report.json` 和 `release/integration-readiness-report.md`，检查 P0 接口台账、HIS/EMR/LIS/PACS/医保/证照/统计契约、幂等键、签名和重试策略，并将统一身份、居民主索引、医疗业务系统、分级诊疗和安全审计的覆盖关系归档为联调验收材料。
 
@@ -177,6 +184,8 @@ npm.cmd run release:report:full
 
 `environment:matrix` 会生成 `release/environment-matrix-report.json` 和 `release/environment-matrix-report.md`，把 demo、staging、production 三层环境的必填变量、阻断变量、责任人、门禁脚本和上线验收规则固化为可检查矩阵；`release:report` 会同步写出这些文件，作为环境分层、密钥注入、现场签字和生产切换审查的前置材料。
 
+`hybrid:deployment-readiness` 会生成 `release/hybrid-deployment-readiness-report.json` 和 `release/hybrid-deployment-readiness-report.md`，专项核对静态预览层、`data/db.json` 快照回退、Node API 后端、存储引擎边界、环境模板、CI 和发布门禁接线。
+
 `operations:readiness` 会生成 `release/operations-readiness-report.json` 和 `release/operations-readiness-report.md`，检查健康检查、运行指标、系统就绪报告、生产部署轨道、外部依赖风险和发布运维脚本，作为上线前运维审查证据。
 
 `process:audit` 会生成 `release/process-audit-report.json` 和 `release/process-audit-report.md`，把居民主索引、慢病验收、医共体验收、医保取药、统计证照、安全合规和生产切换汇总为全流程审计证据域；`release:report` 会同步写出这些文件，作为上线前跨模块审查和现场签字材料。
@@ -184,6 +193,10 @@ npm.cmd run release:report:full
 `release:report` 会额外生成 `release/service-acceptance-summary.json` 和 `release/service-acceptance-summary.md`，汇总慢病与医共体服务域的建模状态、记录行数、开放事项数和 open actions，用于发布归档时核对 `/api/service-acceptance-summary` 与演示台账是否一致。
 
 `site:pack` 会生成 `release/site-readiness-pack.json` 和 `release/site-readiness-pack.md`，把身份源映射、接口联调字段表、样例报文取证、监控值守、灾备演练和生产签字要求整理为现场准备模板；同时生成 `release/templates/*/README.md`，分别说明身份源映射、接口联调、监控值守、生产签字模板的当前能力、输入、输出、必备附件和 API 证据。`GET /api/site-template-readmes` 会在 Node 运行时返回这 4 份模板 README 的状态、责任方、行数、附件类型、live evidence 和文本预览，工作台可直接用于全流程审计；`release:report` 会同步写出这些文件，便于实施团队逐项挂接真实材料。
+
+委端统一工作台的 Site readiness pack 面板已支持通过 `POST /api/site-launch-evidence` 登记现场证据，写入 `siteLaunchEvidence` 台账；上线前可用该台账核对每个身份、接口、监控和签字模板是否已有联调号、附件摘要和验收状态。
+
+`onsite:launch-requirements` 会生成 `release/onsite-launch-requirements.json` 和 `release/onsite-launch-requirements.md`，把现场上线必须交付的生产环境、密钥、身份、短信、医疗接口、居民服务、医保证照、数据库、安全、监控、灾备、移动端验收和灰度签字拆成可审计的 P0/P1 需求矩阵；该产物由 `release:report` 同步写出，并由 `release:manifest` 纳入发布包目录。
 
 `monitoring:readiness` 会生成 `release/monitoring-readiness-report.json` 和 `release/monitoring-readiness-report.md`，把 `/api/health`、`/api/metrics`、`/api/system/readiness`、请求状态码、慢请求、死信、数据质量、SLO 阈值、告警信号和 on-call escalation 归档为监控接入证据；生产切换前仍需将这些信号绑定到现场 Prometheus/OpenTelemetry 或平台日志服务，并取得 `CUTOVER_MONITORING_SIGNOFF`。
 
@@ -261,6 +274,14 @@ Site joint testing still requires live HIS/EMR/LIS/PACS feeds, production critic
 
 operations.html is the runnable management entry for hospital operation monitoring and resource dispatch. It uses GET /api/operations/dashboard, POST /api/operations/dispatch, and POST /api/operations/reconciliation/:id/review to cover bed, staff, equipment, outpatient, emergency, inpatient, dispatch, alert, and statistics direct-report reconciliation boundaries.
 
+## Medical Escort Service Platform
+
+Open `escort.html` after commission login to review the older adult medical escort service pilot dashboard. Open `citizen.html` with the citizen demo account to create a resident-side medical escort appointment for the current household. Run `npm.cmd run escort:readiness` before release; the generated `release/escort-service-readiness-report.md` and `release/escort-service-readiness-report.json` cover provider registry, trained escort workers, service order evidence, subsidy and time-bank coverage, contract and insurance risk controls, quality callbacks, API routes, commission frontend evidence, and citizen appointment evidence.
+
+Open `internet-nursing.html` after citizen, hospital, or commission login to review the Internet+ Nursing pilot. Run `npm.cmd run internet-nursing:readiness` before release; the generated `release/internet-nursing-readiness-report.md` and `release/internet-nursing-readiness-report.json` cover resident appointment, first-visit assessment, informed consent, qualified nurse dispatch, nurse acceptance, location tracking, service record, quality callback, and API route evidence.
+
+Use `docs/互联网护理服务模块说明.md` as the module handoff document for role entry, data object, API permission, workflow diagram, risk control, and browser acceptance checks.
+
 hospital-operations:readiness generates release/hospital-operations-readiness-report.json and release/hospital-operations-readiness-report.md. The report reuses healthStatistics, healthStatisticsIngestion, medicalResources, operations-readiness, /api/metrics, and platformProcessAudit evidence, and is included by release:report and deploy:check.
 ## Drug Consumable Supervision Evidence
 
@@ -269,6 +290,23 @@ Before site joint testing for the drug and consumable supervision app, run `npm.
 
 - Open `health-dashboard.html` after commission login to review the aggregate health dashboard.
 - Run `npm.cmd run health-dashboard:summary` to generate `release/health-dashboard-summary.json` and `release/health-dashboard-summary.md`.
+- Run `npm.cmd run priority-apps:templates` to generate `release/priority-application-templates.json` and `release/priority-application-templates.md`.
+- Run `npm.cmd run maternal-child:readiness` to generate the maternal-child main function report: `release/maternal-child-readiness-report.json` and `release/maternal-child-readiness-report.md`.
+- Run `npm.cmd run policy:coverage` to generate `release/policy-coverage-report.json` and `release/policy-coverage-report.md`.
+- Use `GET /api/priority-applications/templates` as the live handoff API for the eight independent application conversations.
 - Archive the generated development-template section as the handoff checklist for each of the eight application conversations: boundary, reuse, data, API, frontend entry, tests, and acceptance evidence.
+- Use the generated `conversationStarter`, `implementationChecklist`, and `acceptanceGate` fields as the required kickoff, build checklist, and release gate for every independent application conversation.
+- Enforce the unified template rule for every platform module: About feature description, `docs/` module document, workflow diagram, API/data/test/acceptance evidence. Use `docs/妇幼健康全模块说明.md` as the reference module package.
+- Maternal-child policy release evidence must include `maternal-child-about.html`, `docs/maternal-child-policy.md`, and the policy-to-system mapping for birth certificate signing, seventh-version certificate transition, blank certificate distribution, invalid certificate handling, permanent archiving, privacy, public-security sharing, and maternal-child enrollment.
 - `release:manifest` must include `health-dashboard-summary.md` so the eight-application template is part of the formal release package.
+- `release:manifest` must also include `priority-application-templates.md` so the standalone handoff contract is archived with the release package.
 - The dashboard remains blocked on real site joint-test inputs for identity, HIS/EMR/LIS/PACS, insurance, certificates, statistics, monitoring, and disaster recovery signoff.
+## Hybrid Deployment Readiness
+
+`hybrid:deployment-readiness` writes `release/hybrid-deployment-readiness-report.json` and `release/hybrid-deployment-readiness-report.md`. Use it before productionization reviews to confirm the intended hybrid topology: GitHub Pages/static HTML is only the preview layer, while `server.js` and `/api/*` require a Node-capable backend host.
+
+## Real Production Go-Live Requirements
+
+Use `docs/production-go-live-requirements.md` as the platform-level launch requirements baseline. It covers site-owned inputs, real interface joint testing, production database migration, identity and SMS integration, HIS/EMR/LIS/PACS, insurance, certificate sharing, security compliance, monitoring, backup/restore rehearsal, blocking conditions, and final signoff evidence.
+
+Use `docs/on-site-launch-materials.md` as the field material collection checklist before formal go-live. The checklist maps GLM/CIT evidence IDs to owners, acceptance criteria, archive locations, resident mobile validation, gray release controls, and hard blocking conditions.

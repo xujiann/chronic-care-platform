@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>互联网+护理服务</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+    <script>window.HealthCityAuth.requireRole(["commission", "institution", "citizen", "county"])</script>
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>互联网+护理服务</span>
+          <h1>预约申请、医院派单、护士接单闭环</h1>
+          <p>辽宁试点流程：线上申请、首诊评估、知情同意、合格护士派单、上门服务轨迹、护理记录和质量回访。</p>
+        </div>
+        <nav>
+          <a href="./citizen.html">个人端</a>
+          <a href="./institution.html">医院端</a>
+          <a href="./health-city.html">总览</a>
+          <a href="./about.html">关于</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" id="nursing-metrics"></section>
+      <div id="nursing-operation-message" class="auth-bar" role="status" aria-live="polite" hidden></div>
+
+      <nav class="nursing-role-nav" aria-label="互联网护理角色工作台">
+        <a href="#nursing-mobile-workbench">
+          <strong>手机端</strong>
+          <span>预约与接单</span>
+        </a>
+        <a href="#nursing-appointment-panel">
+          <strong>个人端</strong>
+          <span>居民预约</span>
+        </a>
+        <a href="#nursing-hospital-management">
+          <strong>医院端</strong>
+          <span>评估派单</span>
+        </a>
+        <a href="#nursing-nurse-response">
+          <strong>护士端</strong>
+          <span>响应闭环</span>
+        </a>
+        <a href="#nursing-regulatory-section">
+          <strong>监管端</strong>
+          <span>月报报送</span>
+        </a>
+      </nav>
+
+      <section class="portal-grid" id="nursing-risk-section">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>风险处置提示</h2>
+            <span id="nursing-risk-summary"></span>
+          </div>
+          <div id="nursing-risk-guidance" class="rules"></div>
+        </article>
+      </section>
+
+      <section class="nursing-mobile-workbench" id="nursing-mobile-workbench" aria-label="互联网护理手机端工作区">
+        <article class="panel nursing-mobile-panel" data-mobile-surface="citizen-appointment">
+          <div class="panel-title">
+            <h2>手机端预约</h2>
+            <span>居民提交</span>
+          </div>
+          <div id="nursing-mobile-appointment" class="nursing-mobile-card-list"></div>
+          <a class="primary-button nursing-mobile-submit" href="#nursing-appointment-form">填写预约</a>
+        </article>
+        <article class="panel nursing-mobile-panel" data-mobile-surface="nurse-response">
+          <div class="panel-title">
+            <h2>手机端接单</h2>
+            <span>护士响应</span>
+          </div>
+          <div id="nursing-nurse-mobile" class="nursing-mobile-card-list"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel nursing-mobile-appointment" id="nursing-appointment-panel">
+          <div class="panel-title">
+            <h2>个人端预约</h2>
+            <span id="nursing-citizen-summary"></span>
+          </div>
+          <form id="nursing-appointment-form" class="filter-grid">
+            <label>居民 ID<input name="residentId" value="r1" /></label>
+            <label>服务机构<select name="institutionId" id="nursing-institution-select"></select></label>
+            <label>服务项目
+              <select name="serviceItem" id="nursing-service-select">
+                <option value="vital signs measurement">生命体征测量</option>
+                <option value="blood glucose measurement">血糖测量</option>
+                <option value="wound care">伤口护理</option>
+                <option value="tube care">管路护理</option>
+                <option value="postpartum care">产后护理</option>
+                <option value="infant care">婴幼儿护理</option>
+                <option value="PICC maintenance">PICC 维护</option>
+              </select>
+            </label>
+            <label>服务对象
+              <select name="serviceObject">
+                <option value="elderly or disabled people">老年人或失能人群</option>
+                <option value="rehabilitation patient">康复期患者</option>
+                <option value="terminal-stage patient">终末期患者</option>
+                <option value="maternal and infant people">母婴人群</option>
+                <option value="mobility-limited chronic disease patient">行动不便慢病患者</option>
+              </select>
+            </label>
+            <label>预约日期<input name="preferredAt" type="date" /></label>
+            <label>风险等级
+              <select name="riskLevel">
+                <option value="medium">中风险</option>
+                <option value="low">低风险</option>
+                <option value="high">高风险</option>
+              </select>
+            </label>
+            <label class="full">服务地址<input name="address" value="中山区示例地址" /></label>
+            <label class="full">护理需求<input name="note" value="居民端提交上门护理预约" /></label>
+            <button class="inline-action" type="submit">提交预约</button>
+          </form>
+        </article>
+
+        <article class="panel wide" id="nursing-hospital-management">
+          <div class="panel-title">
+            <h2>医院端管理</h2>
+            <span>评估 / 知情同意 / 派单</span>
+          </div>
+          <div id="nursing-orders" class="table-wrap nursing-desktop-table"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel">
+          <div class="panel-title">
+            <h2>派单推荐</h2>
+            <span>运营管理</span>
+          </div>
+          <div id="nursing-dispatch-recommendations" class="rules"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>费用与质量</h2>
+            <span>结算 / 投诉 / 抽查</span>
+          </div>
+          <div id="nursing-finance-quality" class="rules"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid" id="nursing-nurse-response">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>护士端接单</h2>
+            <span id="nursing-nurse-summary"></span>
+          </div>
+          <div class="filter-grid">
+            <label>护士<select id="nursing-nurse-select"></select></label>
+          </div>
+          <div id="nursing-nurse-queue" class="table-wrap nursing-desktop-table"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>政策与风控</h2>
+            <span id="nursing-policy-summary"></span>
+          </div>
+          <div id="nursing-policy" class="rules"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid" id="nursing-regulatory-section">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>监管月报</h2>
+            <span>服务量 / 风险 / 轨迹完整率</span>
+          </div>
+          <div id="nursing-regulatory-report" class="table-wrap nursing-desktop-table"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>准入与接口契约</h2>
+            <span>监管扩展</span>
+          </div>
+          <div id="nursing-regulatory-contract" class="rules"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid single" id="nursing-closed-loop-section">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>下单接单闭环</h2>
+            <span>居民下单 / 医院派单 / 护士接单</span>
+          </div>
+          <div id="nursing-closed-loop" class="nursing-closed-loop"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel">
+          <div class="panel-title">
+            <h2>生产集成联调</h2>
+            <span>消息 / 签名 / 院内系统</span>
+          </div>
+          <div id="nursing-production-integration" class="rules"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>支付对账与票据</h2>
+            <span>医保凭证 / 移动支付 / 发票</span>
+          </div>
+          <div id="nursing-payment-readiness" class="rules"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel">
+          <div class="panel-title">
+            <h2>设备核验与附件</h2>
+            <span>定位 / 记录仪 / 一键报警</span>
+          </div>
+          <div id="nursing-device-verification" class="rules"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>监管报送签字压测</h2>
+            <span>字段映射 / 签字 / 压测</span>
+          </div>
+          <div id="nursing-regulatory-submission" class="rules"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>现场割接证据包</h2>
+            <span>签字轨道 / 审计留存 / 生产割接</span>
+          </div>
+          <div id="nursing-site-cutover-pack" class="rules"></div>
+        </article>
+      </section>
+    </main>
+
+    <script src="./shared.js"></script>
+    <script src="./internet-nursing.js?v=20260629prod"></script>
+  </body>
+</html>

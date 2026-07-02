@@ -20,6 +20,11 @@ test("site readiness pack creates implementation templates", () => {
   assert.equal(report.templates.identity.some((item) => item.id.includes("undefined")), false);
   assert.equal(report.templates.monitoring.some((item) => item.id.includes("undefined")), false);
   assert.equal(report.templates.signoff.some((item) => item.id === "signoff-cutover-institution-interfaces"), true);
+  assert.equal(report.templates.signoff.some((item) => item.id === "signoff-cutover-chronic-launch-core"), true);
+  assert.equal(report.templates.signoff.some((item) => item.id === "signoff-cutover-identity" && /SMS_GATEWAY_URL/.test(item.blockingUntil)), true);
+  assert.equal(report.templates.identity.some((item) => item.evidenceToAttach.includes("SMS gateway delivery receipt")), true);
+  assert.equal(report.onsiteMaterials.document, "docs/on-site-launch-materials.md");
+  assert.equal(report.checks.some((item) => item.id === "site-pack:onsite-materials" && item.passed), true);
   assert.equal(report.checks.every((item) => item.passed), true);
 });
 
@@ -45,6 +50,7 @@ test("site readiness pack renders and writes release artifacts", (t) => {
   assert.match(markdown, /Identity source mapping template/);
   assert.match(markdown, /Interface joint-test template/);
   assert.match(markdown, /Site signoff template/);
+  assert.match(markdown, /on-site-launch-materials\.md/);
   assert.match(readmes["identity-source-mapping/README.md"], /What this template supports now/);
   assert.match(readmes["identity-source-mapping/README.md"], /Current implementation coverage/);
   assert.match(readmes["interface-joint-test/README.md"], /\/api\/integrations\/gateway/);
@@ -64,6 +70,7 @@ test("site readiness pack renders and writes release artifacts", (t) => {
   assert.match(writtenMarkdown, /Monitoring and on-call template/);
   assert.match(identityReadme, /Current status: template-ready/);
   assert.match(identityReadme, /How to verify now/);
+  assert.match(identityReadme, /SMS gateway delivery receipt/);
   assert.match(interfaceReadme, /Rows preview/);
 });
 
