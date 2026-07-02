@@ -259,12 +259,20 @@ Site joint testing still requires live HIS/EMR/LIS/PACS feeds, production critic
 
 ## Hospital Operations Dispatch
 
-operations.html is the runnable management entry for hospital operation monitoring and resource dispatch. It uses GET /api/operations/dashboard, POST /api/operations/dispatch, and POST /api/operations/reconciliation/:id/review to cover bed, staff, equipment, outpatient, emergency, inpatient, dispatch, alert, and statistics direct-report reconciliation boundaries.
+operations.html is the runnable management entry for hospital operation monitoring and resource dispatch. It uses GET /api/operations/dashboard, GET /api/operations/site-joint-tests, GET /api/operations/production-hardening, GET /api/operations/intelligence, GET /api/operations/governance-report, GET /api/operations/handover, GET /api/operations/handover/owners, POST /api/operations/handover/signoff, POST /api/operations/dispatch, and POST /api/operations/reconciliation/:id/review to cover bed, staff, equipment, outpatient, emergency, inpatient, dispatch, alert, site joint-test closeout, production hardening, intelligent dispatch recommendations, governance reporting, shift handover owner assignment, shift handover signoff, and statistics direct-report reconciliation boundaries.
+
+operations-about.html is the policy and scope page for the hospital operations platform. It summarizes the 2025 secondary and tertiary public hospital performance monitoring manuals, hospital operation monitoring boundaries, direct-report reconciliation requirements, data source ownership, and on-site joint-test handoff points.
 
 hospital-operations:readiness generates release/hospital-operations-readiness-report.json and release/hospital-operations-readiness-report.md. The report reuses healthStatistics, healthStatisticsIngestion, medicalResources, operations-readiness, /api/metrics, and platformProcessAudit evidence, and is included by release:report and deploy:check.
+
+hospital-operations:release generates release/hospital-operations-release-report.json and release/hospital-operations-release-report.md. The release report verifies the completed directions: field mapping for site integration, SLA command chains, alert playbooks, shift handover, shift handover owner matrix, shift handover signoff and audit trace, multi-status reconciliation review, performance-indicator details, dispatch lifecycle evidence, site joint-test closeout, production hardening, intelligent dispatch recommendations, and governance reporting. release:report and the CI release artifact upload include this report.
+
+hospital-operations:module-report generates release/hospital-operations-module-report.json and release/hospital-operations-module-report.md. The report summarizes the hospital operations module capabilities, signed hospital system ingest APIs, release evidence, audit checks, and completed development directions for site joint testing, production hardening, intelligent dispatch, and governance reporting; real production cutover still requires site payloads, signoffs, monitoring, and DR evidence.
+
 ## Drug Consumable Supervision Evidence
 
 Before site joint testing for the drug and consumable supervision app, run `npm.cmd run drug-consumable:readiness` and archive `release/drug-consumable-readiness-report.json` plus `release/drug-consumable-readiness-report.md`. The report is the pre-field evidence bundle for rational medication, prescription review, fixed pickup, high-value consumable clues, insurance settlement coordination, and remediation-loop signoff.
+
 ## Health Dashboard Deployment Evidence
 
 - Open `health-dashboard.html` after commission login to review the aggregate health dashboard.

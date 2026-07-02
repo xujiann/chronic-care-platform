@@ -222,6 +222,262 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(operationsDashboard.body.summary.openDispatchRequests >= 2, true);
     assert.equal(operationsDashboard.body.snapshots.some((item) => item.normalizedStatus === "critical"), true);
     assert.equal(operationsDashboard.body.reusedCollections.includes("healthStatisticsIngestion"), true);
+    assert.equal(operationsDashboard.body.performanceMonitoring.manuals.secondary.total, 28);
+    assert.equal(operationsDashboard.body.performanceMonitoring.manuals.tertiary.total, 56);
+    assert.equal(operationsDashboard.body.commandChains.some((item) => item.stage === "直报阻断"), true);
+    assert.equal(operationsDashboard.body.commandChains.some((item) => item.steps.some((step) => step.name === "资源调度")), true);
+    assert.equal(operationsDashboard.body.commandChains.some((item) => item.sla && item.sla.status), true);
+    assert.equal(operationsDashboard.body.interfaceMapping.summary.total >= 5, true);
+    assert.equal(operationsDashboard.body.playbooks.some((item) => item.actions.length >= 4 && item.slaHours), true);
+    assert.equal(operationsDashboard.body.handover.summary.items >= 1, true);
+    assert.equal(operationsDashboard.body.handover.items.some((item) => item.checkpoints.length >= 4 && item.evidence.includes("/api/operations/handover")), true);
+    assert.equal(operationsDashboard.body.handoverOwnerMatrix.summary.owners >= 1, true);
+    assert.equal(operationsDashboard.body.handoverOwnerMatrix.matrix.some((item) => item.evidence.includes("/api/operations/handover/owners")), true);
+    assert.equal(operationsDashboard.body.siteJointTests.summary.total >= 5, true);
+    assert.equal(operationsDashboard.body.siteJointPatrol.summary.rows >= 5, true);
+    assert.equal(operationsDashboard.body.siteJointPatrol.rows.some((item) => item.checkpoints.length >= 5 && item.evidence.includes("/api/operations/site-joint-patrol")), true);
+    assert.equal(operationsDashboard.body.productionHardening.summary.total >= 5, true);
+    assert.equal(operationsDashboard.body.cutoverCommand.summary.total >= 5, true);
+    assert.equal(operationsDashboard.body.cutoverCommand.items.some((item) => item.evidence.includes("/api/operations/cutover-command")), true);
+    assert.equal(operationsDashboard.body.postCutoverObservation.summary.total >= 7, true);
+    assert.equal(operationsDashboard.body.postCutoverObservation.items.some((item) => item.evidence.includes("/api/operations/post-cutover-observation")), true);
+    assert.equal(operationsDashboard.body.postCutoverObservation.windows.length, 3);
+    assert.equal(operationsDashboard.body.postCutoverObservation.windows.every((item) => item.requiredEvidence.length >= 3), true);
+    assert.equal(operationsDashboard.body.postCutoverObservation.windows.every((item) => ["待观察", "观察中", "已完成"].includes(item.status)), true);
+    assert.equal(operationsDashboard.body.postCutoverObservation.windows.every((item) => Number.isInteger(item.completionRate)), true);
+    assert.equal(operationsDashboard.body.postCutoverObservation.windows.every((item) => Array.isArray(item.pendingEvidence) && Array.isArray(item.completedEvidence)), true);
+    assert.equal(operationsDashboard.body.postCutoverObservation.windows.every((item) => item.acceptanceRule && item.nextEvidenceAction), true);
+    assert.equal(operationsDashboard.body.postCutoverObservation.windows.every((item) => ["可签收", "待补证据"].includes(item.signoffStatus)), true);
+    assert.equal(Number.isInteger(operationsDashboard.body.postCutoverObservation.summary.signoffPendingWindows), true);
+    assert.equal(operationsDashboard.body.postCutoverObservation.summary.evidenceTotal >= 9, true);
+    assert.equal(Number.isInteger(operationsDashboard.body.postCutoverObservation.summary.completionRate), true);
+    assert.equal(typeof operationsDashboard.body.launchReadiness.decision, "string");
+    assert.equal(Array.isArray(operationsDashboard.body.launchReadiness.blockers), true);
+    assert.equal(Number.isInteger(operationsDashboard.body.launchReadiness.summary.blockers), true);
+    assert.equal(operationsDashboard.body.launchReadiness.evidence.includes("release:report:full"), true);
+    assert.equal(operationsDashboard.body.intelligence.recommendations.some((item) => item.recommendation && item.prediction), true);
+    assert.equal(operationsDashboard.body.resourcePool.rows.some((item) => item.resourceSlots.length >= 5), true);
+    assert.equal(operationsDashboard.body.resourcePool.recommendations.length >= 1, true);
+    assert.equal(operationsDashboard.body.mobileDuty.summary.cards >= 4, true);
+    assert.equal(operationsDashboard.body.mobileDuty.cards.some((item) => item.id === "mobile-duty-handover-signoff"), true);
+    assert.equal(operationsDashboard.body.governanceReport.sections.some((item) => item.id === "reconciliation-diff"), true);
+    assert.equal(operationsDashboard.body.governanceExportPackage.files.some((item) => item.id === "reconciliation-diff-list"), true);
+    assert.equal(operationsDashboard.body.nextDevelopmentResearch.tracks.length >= 5, true);
+    assert.equal(operationsDashboard.body.nextDevelopmentResearch.summary.p0 >= 1, true);
+
+    const performanceMonitoring = await api(baseUrl, "/api/operations/performance-monitoring", authorized(accountLogin.body.token));
+    assert.equal(performanceMonitoring.response.status, 200);
+    assert.equal(performanceMonitoring.body.ok, true);
+    assert.equal(performanceMonitoring.body.manuals.secondary.national, 21);
+    assert.equal(performanceMonitoring.body.manuals.tertiary.national, 26);
+    assert.equal(performanceMonitoring.body.manuals.secondary.readinessMatrix.some((item) => item.status === "ready"), true);
+    assert.equal(performanceMonitoring.body.manuals.secondary.readinessMatrix.some((item) => item.status === "pending"), true);
+    assert.equal(performanceMonitoring.body.manuals.tertiary.readinessMatrix.some((item) => item.owner && item.nextAction), true);
+    assert.equal(performanceMonitoring.body.manuals.secondary.indicatorDetails.some((item) => item.exceptionTemplate && item.sourceFields.length > 0), true);
+    assert.equal(performanceMonitoring.body.manuals.tertiary.indicatorDetails.some((item) => item.numerator && item.denominator), true);
+    assert.equal(performanceMonitoring.body.actions.some((item) => item.id === "performance-runtime-pressure"), true);
+
+    const commandChains = await api(baseUrl, "/api/operations/command-chains", authorized(accountLogin.body.token));
+    assert.equal(commandChains.response.status, 200);
+    assert.equal(commandChains.body.ok, true);
+    assert.equal(commandChains.body.summary.institutions >= 3, true);
+    assert.equal(commandChains.body.commandChains.some((item) => item.owner === "统计直报专班"), true);
+    assert.equal(commandChains.body.commandChains.every((item) => item.sla && item.sla.dueAt && item.sla.escalation), true);
+
+    const playbooks = await api(baseUrl, "/api/operations/playbooks", authorized(accountLogin.body.token));
+    assert.equal(playbooks.response.status, 200);
+    assert.equal(playbooks.body.ok, true);
+    assert.equal(playbooks.body.summary.playbooks >= 5, true);
+    assert.equal(playbooks.body.playbooks.some((item) => item.ruleId === "reporting-variance-high" && item.evidence.includes("/api/operations/reconciliation/:id/review")), true);
+    assert.equal(playbooks.body.playbooks.every((item) => item.owner && item.trigger && item.actions.length), true);
+
+    const handover = await api(baseUrl, "/api/operations/handover", authorized(accountLogin.body.token));
+    assert.equal(handover.response.status, 200);
+    assert.equal(handover.body.ok, true);
+    assert.equal(handover.body.summary.items >= 1, true);
+    assert.equal(handover.body.items.some((item) => item.riskSignals.length && item.nextActions.length), true);
+    assert.equal(handover.body.items.every((item) => item.owner && item.dueStatus && item.checkpoints.length >= 4), true);
+
+    const handoverOwners = await api(baseUrl, "/api/operations/handover/owners", authorized(accountLogin.body.token));
+    assert.equal(handoverOwners.response.status, 200);
+    assert.equal(handoverOwners.body.ok, true);
+    assert.equal(handoverOwners.body.summary.owners >= 1, true);
+    assert.equal(handoverOwners.body.matrix.every((item) => item.owner && item.itemCount >= 1 && item.institutions.length), true);
+
+    const handoverSignoff = await api(baseUrl, "/api/operations/handover/signoff", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        shift: "API 回归交接班",
+        itemIds: handover.body.items.slice(0, 2).map((item) => item.id),
+        note: "API regression handover signoff",
+        nextShiftFocus: "继续跟进严重预警和直报复核"
+      })
+    }));
+    assert.equal(handoverSignoff.response.status, 201);
+    assert.equal(handoverSignoff.body.itemCount >= 1, true);
+    assert.equal(handoverSignoff.body.auditTrail.some((item) => item.action === "handover-signoff"), true);
+
+    const handoverAfterSignoff = await api(baseUrl, "/api/operations/handover", authorized(accountLogin.body.token));
+    assert.equal(handoverAfterSignoff.body.recentSignoffs.some((item) => item.id === handoverSignoff.body.id), true);
+
+    const interfaceMapping = await api(baseUrl, "/api/operations/interface-mapping", authorized(accountLogin.body.token));
+    assert.equal(interfaceMapping.response.status, 200);
+    assert.equal(interfaceMapping.body.ok, true);
+    assert.equal(interfaceMapping.body.summary.total >= 5, true);
+    assert.equal(interfaceMapping.body.mappings.some((item) => item.status === "待联调"), true);
+    assert.equal(interfaceMapping.body.mappings.every((item) => item.fieldCoverage.every((field) => field.mapped)), true);
+
+    const siteJointTests = await api(baseUrl, "/api/operations/site-joint-tests", authorized(accountLogin.body.token));
+    assert.equal(siteJointTests.response.status, 200);
+    assert.equal(siteJointTests.body.rows.some((item) => item.validationPoints.includes("字段编码")), true);
+
+    const siteJointPatrol = await api(baseUrl, "/api/operations/site-joint-patrol", authorized(accountLogin.body.token));
+    assert.equal(siteJointPatrol.response.status, 200);
+    assert.equal(siteJointPatrol.body.summary.rows >= 5, true);
+    assert.equal(siteJointPatrol.body.dailyChecklist.includes("失败重试"), true);
+    assert.equal(siteJointPatrol.body.rows.some((item) => item.checkpoints.some((checkpoint) => checkpoint.id === "receiver-confirmation")), true);
+
+    const siteJointPatrolAction = await api(baseUrl, "/api/operations/site-joint-patrol/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        patrolId: siteJointPatrol.body.rows[0].id,
+        status: "已巡检",
+        note: "API regression site joint patrol"
+      })
+    }));
+    assert.equal(siteJointPatrolAction.response.status, 201);
+    assert.equal(siteJointPatrolAction.body.audit.process, "医院运行现场联调巡检");
+    assert.equal(siteJointPatrolAction.body.siteJointPatrol.rows.some((item) => item.id === siteJointPatrol.body.rows[0].id), true);
+
+    const productionHardening = await api(baseUrl, "/api/operations/production-hardening", authorized(accountLogin.body.token));
+    assert.equal(productionHardening.response.status, 200);
+    assert.equal(productionHardening.body.tracks.some((item) => item.id === "dr-rehearsal"), true);
+
+    const cutoverCommand = await api(baseUrl, "/api/operations/cutover-command", authorized(accountLogin.body.token));
+    assert.equal(cutoverCommand.response.status, 200);
+    assert.equal(cutoverCommand.body.summary.total >= 5, true);
+    assert.equal(cutoverCommand.body.rollbackPolicy.includes("生产切换"), true);
+
+    const cutoverSignoff = await api(baseUrl, "/api/operations/cutover-command/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        itemId: cutoverCommand.body.items[0].id,
+        status: "已签收",
+        note: "API regression cutover signoff"
+      })
+    }));
+    assert.equal(cutoverSignoff.response.status, 201);
+    assert.equal(cutoverSignoff.body.audit.process, "医院运行生产割接签收");
+    assert.equal(cutoverSignoff.body.cutoverCommand.items.some((item) => item.id === cutoverCommand.body.items[0].id), true);
+
+    const postCutoverObservation = await api(baseUrl, "/api/operations/post-cutover-observation", authorized(accountLogin.body.token));
+    assert.equal(postCutoverObservation.response.status, 200);
+    assert.equal(postCutoverObservation.body.summary.total >= 7, true);
+    assert.equal(postCutoverObservation.body.summary.evidenceTotal >= 9, true);
+    assert.equal(postCutoverObservation.body.summary.evidencePending >= 0, true);
+    assert.equal(postCutoverObservation.body.watchWindow.includes("T+1"), true);
+    assert.equal(postCutoverObservation.body.windows.some((item) => item.id === "t1-24h" && item.owner), true);
+    assert.equal(postCutoverObservation.body.windows.some((item) => item.evidencePending >= 0 && Number.isInteger(item.completionRate)), true);
+    assert.equal(postCutoverObservation.body.windows.some((item) => item.pendingEvidence.includes("治理报告草稿") || item.completedEvidence.includes("治理报告草稿")), true);
+    assert.equal(postCutoverObservation.body.windows.some((item) => item.nextEvidenceAction.includes("归档观察留痕") || item.nextEvidenceAction.includes("归档复核")), true);
+    assert.equal(postCutoverObservation.body.windows.some((item) => Array.isArray(item.signoffBlockers)), true);
+    assert.equal(postCutoverObservation.body.windows.some((item) => item.requiredEvidence.includes("治理报告草稿")), true);
+
+    const postCutoverAction = await api(baseUrl, "/api/operations/post-cutover-observation/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        itemId: postCutoverObservation.body.items[0].id,
+        status: "已观察",
+        note: "API regression post cutover observation"
+      })
+    }));
+    assert.equal(postCutoverAction.response.status, 201);
+    assert.equal(postCutoverAction.body.audit.process, "医院运行上线后观察");
+    assert.equal(postCutoverAction.body.postCutoverObservation.items.some((item) => item.id === postCutoverObservation.body.items[0].id), true);
+
+    const intelligence = await api(baseUrl, "/api/operations/intelligence", authorized(accountLogin.body.token));
+    assert.equal(intelligence.response.status, 200);
+    assert.equal(intelligence.body.recommendations.some((item) => item.prediction.reportingRisk), true);
+
+    const resourcePool = await api(baseUrl, "/api/operations/resource-pool", authorized(accountLogin.body.token));
+    assert.equal(resourcePool.response.status, 200);
+    assert.equal(resourcePool.body.summary.institutions >= 3, true);
+    assert.equal(resourcePool.body.rows.some((item) => item.protocol && item.evidence.includes("/api/operations/resource-pool")), true);
+    assert.equal(resourcePool.body.recommendations.some((item) => item.evidence.includes("/api/operations/dispatch")), true);
+
+    const mobileDuty = await api(baseUrl, "/api/operations/mobile-duty", authorized(accountLogin.body.token));
+    assert.equal(mobileDuty.response.status, 200);
+    assert.equal(mobileDuty.body.summary.cards >= 4, true);
+    assert.equal(mobileDuty.body.weakNetwork.mode, "cache-last-state");
+    assert.equal(mobileDuty.body.cards.some((item) => item.evidence.includes("/api/operations/mobile-duty")), true);
+
+    const mobileDutyReminder = await api(baseUrl, "/api/operations/mobile-duty/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        cardId: "mobile-duty-reconciliation-reminder",
+        note: "API regression mobile duty reminder"
+      })
+    }));
+    assert.equal(mobileDutyReminder.response.status, 201);
+    assert.equal(mobileDutyReminder.body.message.collection, "hospitalOperationsMobileDuty");
+    assert.equal(mobileDutyReminder.body.message.taskId, "operations-mobile-duty:mobile-duty-reconciliation-reminder");
+    assert.equal(mobileDutyReminder.body.mobileDuty.recentMessages.some((item) => item.id === mobileDutyReminder.body.message.id), true);
+
+    const operationMessages = await api(baseUrl, "/api/messages", authorized(accountLogin.body.token));
+    assert.equal(operationMessages.body.messages.some((item) => item.id === mobileDutyReminder.body.message.id), true);
+
+    const governanceReport = await api(baseUrl, "/api/operations/governance-report", authorized(accountLogin.body.token));
+    assert.equal(governanceReport.response.status, 200);
+    assert.equal(governanceReport.body.nextActions.some((item) => /月度运行治理报告/.test(item)), true);
+
+    const governanceExportPackage = await api(baseUrl, "/api/operations/governance-export-package", authorized(accountLogin.body.token));
+    assert.equal(governanceExportPackage.response.status, 200);
+    assert.equal(governanceExportPackage.body.files.some((item) => item.id === "monthly-governance-report"), true);
+    assert.equal(governanceExportPackage.body.files.some((item) => item.id === "attachment-index"), true);
+    assert.match(governanceExportPackage.body.markdown, /导出文件/);
+
+    const nextDevelopmentResearch = await api(baseUrl, "/api/operations/next-development-research", authorized(accountLogin.body.token));
+    assert.equal(nextDevelopmentResearch.response.status, 200);
+    assert.equal(nextDevelopmentResearch.body.tracks.some((item) => item.id === "field-integration-command-center"), true);
+    assert.equal(nextDevelopmentResearch.body.tracks.some((item) => item.id === "mobile-command"), true);
+    assert.equal(nextDevelopmentResearch.body.nextSprint.length >= 4, true);
+
+    const hospitalLogin = await login(baseUrl, "hospital");
+    const snapshotPayload = {
+      idempotencyKey: "ops-snapshot-mr1-live-001",
+      snapshots: [
+        {
+          id: "ops-mr1-live-api",
+          institutionId: "MR1",
+          institution: "Dalian Central Hospital",
+          district: "city",
+          snapshotAt: "2026-06-23T09:00:00+08:00",
+          sourceSystem: "HIS/ED/HR",
+          beds: { total: 1460, open: 1400, occupied: 1372, icuTotal: 72, icuOccupied: 70, emergencyObservation: 42 },
+          staff: { doctorsOnDuty: 190, nursesOnDuty: 418, emergencyDoctors: 29, shortage: 2 },
+          equipment: { ctTotal: 8, ctAvailable: 6, ventilatorsTotal: 96, ventilatorsAvailable: 12, ambulancesAvailable: 5 },
+          outpatient: { visitsToday: 5120, emergencyVisits: 650, feverClinicVisits: 95, waitingOver30Min: 88 },
+          inpatient: { admissionsToday: 214, dischargesToday: 188, surgeryScheduled: 90, averageLengthOfStay: 7.6 },
+          reporting: { directReportBatch: "stat-20260623-am", source: "healthStatisticsIngestion", reconciled: false, varianceRate: 0.052 },
+          dispatchSuggestion: "API regression snapshot should trigger critical operation monitoring."
+        }
+      ]
+    };
+    const unsignedSnapshot = await api(baseUrl, "/api/operations/integration/snapshots", authorized(hospitalLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify(snapshotPayload)
+    }));
+    assert.equal(unsignedSnapshot.response.status, 401);
+
+    const signedSnapshot = await api(baseUrl, "/api/operations/integration/snapshots", authorized(hospitalLogin.body.token, {
+      method: "POST",
+      headers: { "x-integration-signature": integrationSignature(snapshotPayload) },
+      body: JSON.stringify(snapshotPayload)
+    }));
+    assert.equal(signedSnapshot.response.status, 202);
+    assert.equal(signedSnapshot.body.accepted, 1);
+    assert.equal(signedSnapshot.body.ids.includes("ops-mr1-live-api"), true);
+    assert.equal(signedSnapshot.body.critical, 1);
 
     const dispatchAction = await api(baseUrl, "/api/operations/dispatch", authorized(accountLogin.body.token, {
       method: "POST",
@@ -241,6 +497,50 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(dispatchAction.body.id, "dispatch-api-test");
     assert.equal(dispatchAction.body.auditTrail.some((item) => item.action === "upsert"), true);
 
+    const dispatchStatus = await api(baseUrl, "/api/operations/dispatch/dispatch-api-test/status", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ status: "closed", note: "API regression closed" })
+    }));
+    assert.equal(dispatchStatus.response.status, 200);
+    assert.equal(dispatchStatus.body.status, "closed");
+    assert.equal(dispatchStatus.body.auditTrail.some((item) => item.action === "status-change"), true);
+
+    const integrationDispatch = await api(baseUrl, "/api/operations/dispatch", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        id: "dispatch-integration-feedback-test",
+        category: "bed",
+        priority: "high",
+        status: "assigned",
+        sourceInstitutionId: "MR3",
+        sourceInstitution: "Qingniwaqiao Community Health Service Center",
+        targetInstitutionId: "MR1",
+        targetInstitution: "Dalian Central Hospital",
+        resourceType: "step-down-bed",
+        quantity: 6,
+        reason: "API regression dispatch feedback"
+      })
+    }));
+    assert.equal(integrationDispatch.response.status, 201);
+
+    const feedbackPayload = {
+      dispatchId: "dispatch-integration-feedback-test",
+      status: "in-progress",
+      note: "Hospital accepted resource dispatch.",
+      sourceSystem: "hospital-dispatch-system",
+      receiptNo: "RECEIPT-MR1-001",
+      handledBy: "MR1 operations desk"
+    };
+    const dispatchFeedback = await api(baseUrl, "/api/operations/integration/dispatch-feedback", authorized(hospitalLogin.body.token, {
+      method: "POST",
+      headers: { "x-integration-signature": integrationSignature(feedbackPayload) },
+      body: JSON.stringify(feedbackPayload)
+    }));
+    assert.equal(dispatchFeedback.response.status, 200);
+    assert.equal(dispatchFeedback.body.status, "in-progress");
+    assert.equal(dispatchFeedback.body.externalReceipt.receiptNo, "RECEIPT-MR1-001");
+    assert.equal(dispatchFeedback.body.auditTrail.some((item) => item.action === "status-change"), true);
+
     const reconReview = await api(baseUrl, "/api/operations/reconciliation/recon-mr1-20260622-am/review", authorized(accountLogin.body.token, {
       method: "POST",
       body: JSON.stringify({ status: "approved", reviewNote: "API regression approved" })
@@ -248,6 +548,47 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(reconReview.response.status, 200);
     assert.equal(reconReview.body.status, "approved");
     assert.equal(reconReview.body.reviewedBy, "health");
+    assert.equal(reconReview.body.auditTrail.some((item) => item.action === "review-status-change"), true);
+
+    const reconCorrection = await api(baseUrl, "/api/operations/reconciliation/recon-mr3-20260622-am/review", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ status: "correcting", reviewNote: "API regression correction requested" })
+    }));
+    assert.equal(reconCorrection.response.status, 200);
+    assert.equal(reconCorrection.body.status, "correcting");
+    assert.equal(reconCorrection.body.auditTrail.some((item) => item.action === "review-status-change"), true);
+
+    const reconciliationPayload = {
+      idempotencyKey: "ops-recon-mr1-live-001",
+      reconciliations: [
+        {
+          id: "recon-mr1-live-api",
+          institutionId: "MR1",
+          institution: "Dalian Central Hospital",
+          period: "2026-06-23 AM",
+          sourceBatch: "stat-20260623-am",
+          status: "blocked",
+          varianceRate: 0.052,
+          fields: ["beds.occupied", "outpatient.visitsToday"],
+          platformValue: 5120,
+          directReportValue: 4860,
+          reviewNote: "Hospital direct-report staging value requires confirmation."
+        }
+      ]
+    };
+    const reconciliationIngest = await api(baseUrl, "/api/operations/integration/reconciliation", authorized(hospitalLogin.body.token, {
+      method: "POST",
+      headers: { "x-integration-signature": integrationSignature(reconciliationPayload) },
+      body: JSON.stringify(reconciliationPayload)
+    }));
+    assert.equal(reconciliationIngest.response.status, 202);
+    assert.equal(reconciliationIngest.body.accepted, 1);
+    assert.equal(reconciliationIngest.body.blocked, 1);
+
+    const operationsAfterIntegration = await api(baseUrl, "/api/operations/dashboard", authorized(accountLogin.body.token));
+    assert.equal(operationsAfterIntegration.body.snapshots.some((item) => item.id === "ops-mr1-live-api" && item.normalizedStatus === "critical"), true);
+    assert.equal(operationsAfterIntegration.body.dispatchRequests.some((item) => item.id === "dispatch-integration-feedback-test" && item.status === "in-progress"), true);
+    assert.equal(operationsAfterIntegration.body.reconciliationReviews.some((item) => item.id === "recon-mr1-live-api" && item.status === "blocked"), true);
 
     const identityPreview = await api(baseUrl, "/api/auth/identity/preview", authorized(accountLogin.body.token, {
       method: "POST",

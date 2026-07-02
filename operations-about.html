@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>医院运行监测平台说明</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+    <script>window.HealthCityAuth.requireRole(["commission"])</script>
+  </head>
+  <body>
+    <main class="portal-shell operations-about-page">
+      <header class="portal-header">
+        <div>
+          <span>医院运行监测与资源调度平台</span>
+          <h1>政策依据、业务边界与发布说明</h1>
+          <p>本页用于管理端统一查看运行监测平台的政策口径、流程闭环、数据来源、接口证据和现场联调边界。</p>
+        </div>
+        <nav>
+          <a href="./operations.html">运行平台</a>
+          <a href="./workbench.html">运营工作台</a>
+          <a href="./platform.html">平台驾驶舱</a>
+          <a href="./index.html">卫健委端</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" data-operations-about-section="summary">
+        <article class="metric-card">
+          <span>绩效手册</span>
+          <strong>2025版</strong>
+          <small>二级、三级公立医院绩效监测操作口径</small>
+        </article>
+        <article class="metric-card">
+          <span>指标覆盖</span>
+          <strong>28 / 56</strong>
+          <small>二级 28 项、三级 56 项，按指标域和来源拆解</small>
+        </article>
+        <article class="metric-card">
+          <span>运行对象</span>
+          <strong>6 类</strong>
+          <small>床位、人员、设备、门急诊、住院、统计直报</small>
+        </article>
+        <article class="metric-card">
+          <span>发布证据</span>
+          <strong>双报告</strong>
+          <small>readiness 与 release 两类专项报告</small>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide" data-operations-about-section="policy">
+          <div class="panel-title">
+            <h2>政策依据</h2>
+            <span>用于系统建模和现场验收说明，不替代正式政策文本</span>
+          </div>
+          <div class="policy-note-grid">
+            <article>
+              <strong>公立医院绩效监测</strong>
+              <span>依据《国家二级公立医院绩效监测操作手册（2025版）》和《国家三级公立医院绩效监测操作手册（2025版）》，平台按指标属性、数据来源、统计周期、责任科室和异常说明建立运行监测视图。</span>
+            </article>
+            <article>
+              <strong>医院运行监测</strong>
+              <span>运行快照聚焦床位使用、人员在岗、关键设备、急诊量、住院量、报告及时性和资源压力，支持卫健管理端发现异常、形成调度指令、追踪闭环结果。</span>
+            </article>
+            <article>
+              <strong>统计直报对账</strong>
+              <span>对账复核用于比较平台采集值、机构填报值和直报暂存值，保留差异字段、复核状态、审核意见和审计轨迹，正式上报仍以国家或省级直报平台为准。</span>
+            </article>
+          </div>
+        </article>
+
+        <article class="panel" data-operations-about-section="scope">
+          <div class="panel-title">
+            <h2>功能边界</h2>
+            <span>当前版本已落地的可运行范围</span>
+          </div>
+          <div class="rules">
+            <div><strong>监测</strong><span>机构运行快照、压力分级、预警队列、绩效指标详情、异常说明模板。</span></div>
+            <div><strong>调度</strong><span>资源需求登记、床位/设备/人员调拨、状态流转、SLA 到期提示、审计留痕。</span></div>
+            <div><strong>复核</strong><span>统计直报差异对账、通过、退回、补正中、阻断等多状态复核。</span></div>
+            <div><strong>取证</strong><span>就绪报告、发布报告、主发布报告、CI artifact 和运行时 API 证据。</span></div>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel" data-operations-about-section="workflow">
+        <div class="panel-title">
+          <h2>完整流程</h2>
+          <span>从数据接入到发布取证的闭环</span>
+        </div>
+        <div class="timeline-list operations-flow-list">
+          <article><strong>1. 数据接入</strong><span>HIS、病案首页、人力资源、排班、设备、急诊、统计直报和满意度平台按字段映射接入。</span></article>
+          <article><strong>2. 状态规范化</strong><span>将机构快照归一为正常、一般预警、严重预警，并计算床位、人员、设备、急诊和直报压力。</span></article>
+          <article><strong>3. 指挥链生成</strong><span>按床位满载、急诊高峰、设备冲突、人员缺口、直报阻断等场景生成责任科室、SLA 和升级建议。</span></article>
+          <article><strong>4. 资源调度</strong><span>管理端提交调度请求，记录来源机构、目标机构、资源类型、数量、要求完成时间和操作轨迹。</span></article>
+          <article><strong>5. 对账复核</strong><span>直报差异进入复核队列，支持通过、退回、补正中、阻断，审计记录写入平台过程审计。</span></article>
+          <article><strong>6. 值班交接</strong><span>汇总开放调度、活动预警、直报复核、命中预案和SLA临期风险，形成下一班跟进清单、责任组矩阵，并支持交接签收与审计留痕。</span></article>
+          <article><strong>7. 联调与加固</strong><span>现场联调闭环、生产加固清单、智能调度建议和治理报表已进入运行平台，真实报文与签字材料按现场归档。</span></article>
+          <article><strong>8. 发布归档</strong><span>运行 `hospital-operations:readiness`、`hospital-operations:release`、`hospital-operations:module-report` 和 `release:report` 生成发布证据。</span></article>
+        </div>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel" data-operations-about-section="api">
+          <div class="panel-title">
+            <h2>运行 API</h2>
+            <span>管理端权限与审计留痕</span>
+          </div>
+          <div class="api-list">
+            <code>GET /api/operations/dashboard</code>
+            <code>GET /api/operations/performance-monitoring</code>
+            <code>GET /api/operations/command-chains</code>
+            <code>GET /api/operations/playbooks</code>
+            <code>GET /api/operations/handover</code>
+            <code>GET /api/operations/handover/owners</code>
+            <code>POST /api/operations/handover/signoff</code>
+            <code>GET /api/operations/interface-mapping</code>
+            <code>GET /api/operations/site-joint-tests</code>
+            <code>GET /api/operations/production-hardening</code>
+            <code>GET /api/operations/intelligence</code>
+            <code>GET /api/operations/governance-report</code>
+            <code>POST /api/operations/dispatch</code>
+            <code>POST /api/operations/dispatch/:id/status</code>
+            <code>POST /api/operations/reconciliation/:id/review</code>
+          </div>
+        </article>
+
+        <article class="panel" data-operations-about-section="release">
+          <div class="panel-title">
+            <h2>发布证据</h2>
+            <span>本地、CI 和现场归档保持同一套口径</span>
+          </div>
+          <div class="rules">
+            <div><strong>专项就绪</strong><span><code>release/hospital-operations-readiness-report.md</code></span></div>
+            <div><strong>专项发布</strong><span><code>release/hospital-operations-release-report.md</code></span></div>
+            <div><strong>主发布包</strong><span><code>release/release-report.md</code> 与 <code>release/release-artifact-manifest.md</code></span></div>
+            <div><strong>验证命令</strong><span><code>npm.cmd run check</code>、<code>npm.cmd test</code>、<code>npm.cmd run deploy:check</code></span></div>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel" data-operations-about-section="handoff">
+        <div class="panel-title">
+          <h2>下一步现场联调边界</h2>
+          <span>真实上线前需要由院方和平台方共同确认</span>
+        </div>
+        <div class="policy-note-grid">
+          <article>
+            <strong>来源系统签字</strong>
+            <span>确认 HIS、EMR、病案首页、HRP/排班、设备、急诊、满意度和统计直报系统的字段负责人、更新频率、接口地址、失败重试和人工补录规则。</span>
+          </article>
+          <article>
+            <strong>调度制度固化</strong>
+            <span>把跨院床位协调、急诊分流、设备借用、人力支援和直报阻断的处置时限写入院内制度，并明确升级联系人。</span>
+          </article>
+          <article>
+            <strong>正式环境切换</strong>
+            <span>完成统一身份、生产数据库、审计保全、监控值守、灾备演练和外部接口签字后，再解除生产切换阻断项。</span>
+          </article>
+        </div>
+      </section>
+    </main>
+    <script>
+      window.HealthCityAuth.renderSessionBar();
+    </script>
+  </body>
+</html>

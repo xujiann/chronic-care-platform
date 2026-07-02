@@ -19,7 +19,33 @@ const REQUIRED_COLLECTIONS = [
 
 const REQUIRED_ROUTES = [
   "/api/operations/dashboard",
+  "/api/operations/performance-monitoring",
+  "/api/operations/command-chains",
+  "/api/operations/playbooks",
+  "/api/operations/handover",
+  "/api/operations/handover/owners",
+  "/api/operations/handover/signoff",
+  "/api/operations/interface-mapping",
+  "/api/operations/site-joint-tests",
+  "/api/operations/site-joint-patrol",
+  "/api/operations/site-joint-patrol/actions",
+  "/api/operations/production-hardening",
+  "/api/operations/cutover-command",
+  "/api/operations/cutover-command/actions",
+  "/api/operations/post-cutover-observation",
+  "/api/operations/post-cutover-observation/actions",
+  "/api/operations/intelligence",
+  "/api/operations/resource-pool",
+  "/api/operations/mobile-duty",
+  "/api/operations/mobile-duty/actions",
+  "/api/operations/governance-report",
+  "/api/operations/governance-export-package",
+  "/api/operations/next-development-research",
+  "/api/operations/integration/snapshots",
+  "/api/operations/integration/dispatch-feedback",
+  "/api/operations/integration/reconciliation",
   "/api/operations/dispatch",
+  "/api/operations/dispatch/:id/status",
   "/api/operations/reconciliation/:id/review"
 ];
 
@@ -40,6 +66,12 @@ function ratio(numerator, denominator) {
   return bottom > 0 ? Number(numerator || 0) / bottom : 0;
 }
 
+function routePresent(route, serverSource) {
+  if (route === "/api/operations/reconciliation/:id/review") return serverSource.includes("/api/operations/reconciliation/");
+  if (route === "/api/operations/dispatch/:id/status") return serverSource.includes("/api/operations/dispatch/:id/status") || (serverSource.includes("/api/operations/dispatch/") && serverSource.includes("/status"));
+  return serverSource.includes(route);
+}
+
 function buildHospitalOperationsReadinessReport(options = {}) {
   const data = options.data ?? readJson("data/db.json");
   const pkg = options.pkg ?? readJson("package.json");
@@ -58,9 +90,30 @@ function buildHospitalOperationsReadinessReport(options = {}) {
     { id: "hospitalOps:dispatch", passed: dispatchRequests.length >= 2 && dispatchRequests.every((item) => item.id && item.resourceType && item.quantity && item.status && Array.isArray(item.auditTrail)), detail: `${dispatchRequests.length} dispatch requests` },
     { id: "hospitalOps:reconciliation", passed: reconciliationReviews.length >= 2 && reconciliationReviews.every((item) => item.id && item.sourceBatch && item.status && Array.isArray(item.evidence)), detail: `${reconciliationReviews.length} reconciliation reviews` },
     { id: "hospitalOps:alertRules", passed: alertRules.length >= 5 && alertRules.every((item) => item.id && item.domain && item.threshold && item.dispatchBoundary), detail: `${alertRules.length} alert rules` },
-    { id: "hospitalOps:apiRoutes", passed: REQUIRED_ROUTES.every((route) => route.includes(":id") ? serverSource.includes("/api/operations/reconciliation/") : serverSource.includes(route)), detail: REQUIRED_ROUTES.join(", ") },
+    { id: "hospitalOps:apiRoutes", passed: REQUIRED_ROUTES.every((route) => routePresent(route, serverSource)), detail: REQUIRED_ROUTES.join(", ") },
     { id: "hospitalOps:permissions", passed: /requireApiRole\(req, res, \["commission"\], "\/api\/operations\/dashboard"\)/.test(serverSource) && /operations-dispatch/.test(serverSource) && /statistics-reconciliation-review/.test(serverSource), detail: "commission-only API and audit events" },
     { id: "hospitalOps:frontend", passed: /operations-snapshots/.test(operationsHtml) && /dispatch-form/.test(operationsHtml) && /fetchOperationsDashboard/.test(operationsJs), detail: "operations page renders live monitor, dispatch, and reconciliation controls" },
+    { id: "hospitalOps:interfaceMapping", passed: /buildOperationsInterfaceMappingEvidence/.test(serverSource) && /operations-interface-mapping/.test(operationsHtml) && /renderInterfaceMapping/.test(operationsJs), detail: "site joint-test field mapping API and panel" },
+    { id: "hospitalOps:integrationIngest", passed: /normalizeOperationSnapshot/.test(serverSource) && /\/api\/operations\/integration\/snapshots/.test(serverSource) && /\/api\/operations\/integration\/dispatch-feedback/.test(serverSource) && /\/api\/operations\/integration\/reconciliation/.test(serverSource) && /verifyIntegrationSignature/.test(serverSource), detail: "signed hospital system ingest APIs for snapshots, dispatch feedback, and reconciliation batches" },
+    { id: "hospitalOps:sla", passed: /buildCommandSla/.test(serverSource) && /command-chain-sla/.test(operationsJs), detail: "command-chain SLA status and escalation evidence" },
+    { id: "hospitalOps:playbooks", passed: /buildOperationsPlaybooks/.test(serverSource) && /operation-playbooks/.test(operationsHtml) && /renderOperationsPlaybooks/.test(operationsJs), detail: "alert playbook API evidence and panel" },
+    { id: "hospitalOps:handover", passed: /buildOperationsHandover/.test(serverSource) && /\/api\/operations\/handover/.test(serverSource) && /operation-handover/.test(operationsHtml) && /renderOperationsHandover/.test(operationsJs), detail: "shift handover list API and panel" },
+    { id: "hospitalOps:handoverOwners", passed: /buildOperationsHandoverOwnerMatrix/.test(serverSource) && /\/api\/operations\/handover\/owners/.test(serverSource) && /operation-handover-owner-matrix/.test(operationsHtml) && /renderHandoverOwnerMatrix/.test(operationsJs), detail: "shift handover owner matrix API and panel" },
+    { id: "hospitalOps:handoverSignoff", passed: /\/api\/operations\/handover\/signoff/.test(serverSource) && /normalizeHandoverSignoff/.test(serverSource) && /operation-handover-signoffs/.test(operationsHtml) && /signoffOperationsHandover/.test(operationsJs), detail: "shift handover signoff API, audit trace, and panel" },
+    { id: "hospitalOps:performanceDetail", passed: /indicatorDetails/.test(serverSource) && /performance-indicator-detail/.test(operationsHtml) && /renderPerformanceIndicatorDetail/.test(operationsJs), detail: "performance manual indicator details and exception template" },
+    { id: "hospitalOps:siteJointTests", passed: /buildOperationsSiteJointTests/.test(serverSource) && /\/api\/operations\/site-joint-tests/.test(serverSource) && /operations-site-joint-tests/.test(operationsHtml) && /renderSiteJointTests/.test(operationsJs), detail: "site joint-test closeout API and panel" },
+    { id: "hospitalOps:siteJointPatrol", passed: /buildOperationsSiteJointPatrol/.test(serverSource) && /\/api\/operations\/site-joint-patrol/.test(serverSource) && /operations-site-joint-patrol/.test(operationsHtml) && /renderSiteJointPatrol/.test(operationsJs), detail: "daily site joint-test patrol API, panel, retry checklist, and audit action" },
+    { id: "hospitalOps:productionHardening", passed: /buildOperationsProductionHardening/.test(serverSource) && /\/api\/operations\/production-hardening/.test(serverSource) && /operation-production-hardening/.test(operationsHtml) && /renderProductionHardening/.test(operationsJs), detail: "production hardening checklist API and panel" },
+    { id: "hospitalOps:cutoverCommand", passed: /buildOperationsCutoverCommand/.test(serverSource) && /\/api\/operations\/cutover-command/.test(serverSource) && /operation-cutover-command/.test(operationsHtml) && /signoffCutoverCommand/.test(operationsJs), detail: "production cutover command API, signoff panel, blockers, and audit trace" },
+    { id: "hospitalOps:postCutoverObservation", passed: /buildOperationsPostCutoverObservation/.test(serverSource) && /\/api\/operations\/post-cutover-observation/.test(serverSource) && /operation-post-cutover-observation/.test(operationsHtml) && /submitPostCutoverObservation/.test(operationsJs), detail: "post-cutover observation API, panel, observation windows, and audit trace" },
+    { id: "hospitalOps:postCutoverSignoffGate", passed: /signoffReady/.test(serverSource) && /signoffStatus/.test(serverSource) && /signoffBlockers/.test(serverSource) && /signoffReadyWindows/.test(serverSource) && /signoffStatus/.test(operationsJs) && /可签收/.test(operationsJs), detail: "post-cutover observation signoff status, blockers, and ready-window summary" },
+    { id: "hospitalOps:launchReadiness", passed: /buildOperationsLaunchReadiness/.test(serverSource) && /launchReadiness/.test(serverSource) && /operation-launch-readiness/.test(operationsHtml) && /renderLaunchReadiness/.test(operationsJs), detail: "launch readiness decision combines hardening, cutover, and post-cutover evidence" },
+    { id: "hospitalOps:intelligence", passed: /buildOperationsIntelligence/.test(serverSource) && /\/api\/operations\/intelligence/.test(serverSource) && /operation-intelligence/.test(operationsHtml) && /renderOperationsIntelligence/.test(operationsJs), detail: "intelligent dispatch recommendations API and panel" },
+    { id: "hospitalOps:resourcePool", passed: /buildOperationsResourcePool/.test(serverSource) && /\/api\/operations\/resource-pool/.test(serverSource) && /operation-resource-pool/.test(operationsHtml) && /renderResourcePool/.test(operationsJs), detail: "cross-hospital resource pool API and panel" },
+    { id: "hospitalOps:mobileDuty", passed: /buildOperationsMobileDuty/.test(serverSource) && /\/api\/operations\/mobile-duty/.test(serverSource) && /operation-mobile-duty/.test(operationsHtml) && /renderMobileDuty/.test(operationsJs) && /taskMessages/.test(serverSource), detail: "mobile duty command API, panel, message reminders, and audit evidence" },
+    { id: "hospitalOps:governanceReport", passed: /buildOperationsGovernanceReport/.test(serverSource) && /\/api\/operations\/governance-report/.test(serverSource) && /operation-governance-report/.test(operationsHtml) && /renderGovernanceReport/.test(operationsJs), detail: "monthly governance report API and panel" },
+    { id: "hospitalOps:governanceExportPackage", passed: /buildOperationsGovernanceExportPackage/.test(serverSource) && /\/api\/operations\/governance-export-package/.test(serverSource) && /downloadGovernanceExportPackage/.test(operationsJs) && /performance-action-card export/.test(operationsJs), detail: "governance export package API and download action" },
+    { id: "hospitalOps:nextDevelopmentResearch", passed: /buildOperationsNextDevelopmentResearch/.test(serverSource) && /\/api\/operations\/next-development-research/.test(serverSource) && /operation-next-development/.test(operationsHtml) && /renderNextDevelopmentResearch/.test(operationsJs), detail: "next development research API and panel" },
     { id: "hospitalOps:releaseScript", passed: Boolean(pkg.scripts?.["hospital-operations:readiness"]), detail: "package script registered" }
   ];
   return {

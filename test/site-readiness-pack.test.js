@@ -17,6 +17,8 @@ test("site readiness pack creates implementation templates", () => {
   assert.equal(report.templates.identity.some((item) => item.field === "sub"), true);
   assert.equal(report.templates.interfaces.some((item) => item.requiredFields.includes("residentId")), true);
   assert.equal(report.templates.monitoring.some((item) => item.signal === "/api/health"), true);
+  assert.equal(report.templates.monitoring.some((item) => item.template === "audit-chain-watch" && item.signal.includes("审计链路")), true);
+  assert.equal(report.templates.monitoring.some((item) => item.template === "audit-retention-target" && item.signal === "AUDIT_EXPORT_PATH"), true);
   assert.equal(report.templates.identity.some((item) => item.id.includes("undefined")), false);
   assert.equal(report.templates.monitoring.some((item) => item.id.includes("undefined")), false);
   assert.equal(report.templates.signoff.some((item) => item.id === "signoff-cutover-institution-interfaces"), true);
@@ -49,6 +51,9 @@ test("site readiness pack renders and writes release artifacts", (t) => {
   assert.match(readmes["identity-source-mapping/README.md"], /Current implementation coverage/);
   assert.match(readmes["interface-joint-test/README.md"], /\/api\/integrations\/gateway/);
   assert.match(readmes["monitoring-on-call/README.md"], /\/api\/metrics/);
+  assert.match(readmes["monitoring-on-call/README.md"], /\/api\/audit\/verify/);
+  assert.match(readmes["monitoring-on-call/README.md"], /审计链路/);
+  assert.match(readmes["monitoring-on-call/README.md"], /审计保全目标/);
   assert.match(readmes["production-signoff/README.md"], /production-cutover-checklist\.md/);
 
   writeOutput(report, {
@@ -60,11 +65,13 @@ test("site readiness pack renders and writes release artifacts", (t) => {
   const writtenMarkdown = fs.readFileSync(path.join(outputDir, "site-readiness-pack.md"), "utf8");
   const identityReadme = fs.readFileSync(path.join(outputDir, "templates", "identity-source-mapping", "README.md"), "utf8");
   const interfaceReadme = fs.readFileSync(path.join(outputDir, "templates", "interface-joint-test", "README.md"), "utf8");
+  const monitoringReadme = fs.readFileSync(path.join(outputDir, "templates", "monitoring-on-call", "README.md"), "utf8");
   assert.equal(writtenJson.ok, true);
   assert.match(writtenMarkdown, /Monitoring and on-call template/);
   assert.match(identityReadme, /Current status: template-ready/);
   assert.match(identityReadme, /How to verify now/);
   assert.match(interfaceReadme, /Rows preview/);
+  assert.match(monitoringReadme, /audit-retention-report\.md/);
 });
 
 test("site readiness CLI parser keeps output and env flags", () => {

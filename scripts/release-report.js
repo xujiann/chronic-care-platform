@@ -13,6 +13,8 @@ const { buildIdentityContract, renderMarkdown: renderIdentityContractMarkdown } 
 const { buildIntegrationReadinessReport, renderMarkdown: renderIntegrationReadinessMarkdown } = require("./integration-readiness");
 const { buildInterfaceMappingReport, renderMarkdown: renderInterfaceMappingMarkdown } = require("./interface-mapping");
 const { buildHospitalOperationsReadinessReport, renderMarkdown: renderHospitalOperationsReadinessMarkdown } = require("./hospital-operations-readiness");
+const { buildHospitalOperationsReleaseReport, renderMarkdown: renderHospitalOperationsReleaseMarkdown } = require("./hospital-operations-release");
+const { buildHospitalOperationsModuleReport, renderMarkdown: renderHospitalOperationsModuleMarkdown } = require("./hospital-operations-module-report");
 const { buildMonitoringReadinessReport, renderMarkdown: renderMonitoringReadinessMarkdown } = require("./monitoring-readiness");
 const { buildOperationsReadinessReport, renderMarkdown: renderOperationsReadinessMarkdown } = require("./operations-readiness");
 const { buildProcessAuditReport, renderMarkdown: renderProcessAuditMarkdown } = require("./process-audit");
@@ -396,6 +398,22 @@ function hospitalOperationsReadinessChecks(hospitalOperationsReadiness) {
   ];
 }
 
+function hospitalOperationsReleaseChecks(hospitalOperationsRelease) {
+  return [
+    check("hospitalOpsRelease:ready", hospitalOperationsRelease.ok, hospitalOperationsRelease.ok ? "hospital operations release checks passed" : "hospital operations release checks failed", "error", "operations"),
+    check("hospitalOpsRelease:scope", hospitalOperationsRelease.releaseItems?.length >= 5, `${hospitalOperationsRelease.releaseItems?.length || 0} release scope items`, "error", "operations"),
+    check("hospitalOpsRelease:checks", hospitalOperationsRelease.summary?.failed === 0, `${hospitalOperationsRelease.summary?.passed || 0}/${hospitalOperationsRelease.summary?.checks || 0} checks passed`, "error", "operations")
+  ];
+}
+
+function hospitalOperationsModuleChecks(hospitalOperationsModule) {
+  return [
+    check("hospitalOpsModule:ready", hospitalOperationsModule.ok, hospitalOperationsModule.ok ? "hospital operations module report passed" : "hospital operations module report failed", "error", "operations"),
+    check("hospitalOpsModule:capabilities", hospitalOperationsModule.summary?.readyCapabilities === hospitalOperationsModule.summary?.capabilities, `${hospitalOperationsModule.summary?.readyCapabilities || 0}/${hospitalOperationsModule.summary?.capabilities || 0} capabilities ready`, "error", "operations"),
+    check("hospitalOpsModule:nextPlan", (hospitalOperationsModule.nextPlan || []).length >= 4, `${hospitalOperationsModule.nextPlan?.length || 0} next-plan rows`, "error", "operations")
+  ];
+}
+
 function monitoringReadinessChecks(monitoringReadiness) {
   return [
     check("monitoring:readiness", monitoringReadiness.ok, monitoringReadiness.ok ? "monitoring readiness checks passed" : "monitoring readiness checks failed", "error", "monitoring"),
@@ -547,6 +565,8 @@ function packageChecks(pkg) {
     "quality-safety:report",
     "environment:matrix",
     "hospital-operations:readiness",
+    "hospital-operations:release",
+    "hospital-operations:module-report",
     "health-dashboard:summary",
     "integration:readiness",
     "interface:mapping",
@@ -611,6 +631,8 @@ function buildReleaseReport(options = {}) {
   const interfaceMapping = buildInterfaceMappingReport({ data, pkg });
   const regionalDataSharing = buildRegionalDataSharingReport({ data, pkg });
   const hospitalOperationsReadiness = buildHospitalOperationsReadinessReport({ data, pkg });
+  const hospitalOperationsRelease = buildHospitalOperationsReleaseReport({ data, pkg, readiness: hospitalOperationsReadiness });
+  const hospitalOperationsModule = buildHospitalOperationsModuleReport({ data, pkg, readiness: hospitalOperationsReadiness, release: hospitalOperationsRelease });
   const researchSandbox = buildResearchSandboxReadiness(data);
   const monitoringReadiness = buildMonitoringReadinessReport({ data, pkg });
   const referralTeleconsultationReadiness = buildReferralTeleconsultationReadinessReport({ data, pkg });
@@ -642,6 +664,8 @@ function buildReleaseReport(options = {}) {
     ...interfaceMappingChecks(interfaceMapping),
     ...regionalDataSharingChecks(regionalDataSharing),
     ...hospitalOperationsReadinessChecks(hospitalOperationsReadiness),
+    ...hospitalOperationsReleaseChecks(hospitalOperationsRelease),
+    ...hospitalOperationsModuleChecks(hospitalOperationsModule),
     ...researchSandboxChecks(researchSandbox),
     ...monitoringReadinessChecks(monitoringReadiness),
     ...referralTeleconsultationChecks(referralTeleconsultationReadiness),
@@ -683,6 +707,8 @@ function buildReleaseReport(options = {}) {
     interfaceMapping,
     regionalDataSharing,
     hospitalOperationsReadiness,
+    hospitalOperationsRelease,
+    hospitalOperationsModule,
     researchSandbox,
     monitoringReadiness,
     referralTeleconsultationReadiness,
@@ -878,6 +904,14 @@ function renderMarkdown(report) {
     "",
     "See `hospital-operations-readiness-report.json` and `hospital-operations-readiness-report.md` for hospital operation snapshots, resource dispatch, direct-report reconciliation, alert rules, API permissions, and audit evidence.",
     "",
+    "## Hospital operations release report",
+    "",
+    "See `hospital-operations-release-report.json` and `hospital-operations-release-report.md` for interface mapping, signed hospital system ingest APIs, SLA command chains, alert playbooks, shift handover, shift handover owner matrix, shift handover signoff audit trace, multi-status reconciliation review, performance indicator detail, dispatch lifecycle, and release script evidence.",
+    "",
+    "## Hospital operations module function report",
+    "",
+    "See `hospital-operations-module-report.json` and `hospital-operations-module-report.md` for module capability audit, signed hospital ingest coverage, release evidence, and next-step development plan.",
+    "",
     "## Full process audit report",
     "",
     "See `process-audit-report.json` and `process-audit-report.md` for resident, chronic disease, county consortium, insurance, statistics, certificate, security, and cutover process evidence.",
@@ -1051,6 +1085,22 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       hospitalOperationsReadiness: report.hospitalOperationsReadiness
     }, null, 2), "utf8");
+    const hospitalOperationsReleaseJson = path.join(path.dirname(output), "hospital-operations-release-report.json");
+    fs.writeFileSync(hospitalOperationsReleaseJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      hospitalOperationsRelease: report.hospitalOperationsRelease
+    }, null, 2), "utf8");
+    const hospitalOperationsModuleJson = path.join(path.dirname(output), "hospital-operations-module-report.json");
+    fs.writeFileSync(hospitalOperationsModuleJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      hospitalOperationsModule: report.hospitalOperationsModule
+    }, null, 2), "utf8");
     const processAuditJson = path.join(path.dirname(output), "process-audit-report.json");
     fs.writeFileSync(processAuditJson, JSON.stringify({
       project: report.project,
@@ -1165,6 +1215,10 @@ function writeOutput(report, flags) {
     fs.writeFileSync(operationsMarkdown, renderOperationsReadinessMarkdown(report.operationsReadiness), "utf8");
     const hospitalOperationsMarkdown = path.join(path.dirname(markdown), "hospital-operations-readiness-report.md");
     fs.writeFileSync(hospitalOperationsMarkdown, renderHospitalOperationsReadinessMarkdown(report.hospitalOperationsReadiness), "utf8");
+    const hospitalOperationsReleaseMarkdown = path.join(path.dirname(markdown), "hospital-operations-release-report.md");
+    fs.writeFileSync(hospitalOperationsReleaseMarkdown, renderHospitalOperationsReleaseMarkdown(report.hospitalOperationsRelease), "utf8");
+    const hospitalOperationsModuleMarkdown = path.join(path.dirname(markdown), "hospital-operations-module-report.md");
+    fs.writeFileSync(hospitalOperationsModuleMarkdown, renderHospitalOperationsModuleMarkdown(report.hospitalOperationsModule), "utf8");
     const processAuditMarkdown = path.join(path.dirname(markdown), "process-audit-report.md");
     fs.writeFileSync(processAuditMarkdown, renderProcessAuditMarkdown(report.processAudit), "utf8");
     const serviceAcceptanceMarkdown = path.join(path.dirname(markdown), "service-acceptance-summary.md");
