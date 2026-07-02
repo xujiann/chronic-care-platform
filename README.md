@@ -62,6 +62,7 @@ http://localhost:5173/login.html
 | `health-city.html` | 健康城市系统总览 |
 | `workbench.html` | 统一运营工作台、全流程审计矩阵、路线图、系统就绪报告 |
 | `platform.html` | 平台建设驾驶舱、应用目录、信用评价、科研专病库治理、移动无障碍治理、安全信创台账 |
+| `research-sandbox-about.html` | 科研数据沙箱政策说明、运行边界、政策依据、现场验收证据和发布证据 |
 | `index.html` | 卫健委端：慢病、统计、应急、质量、审计、互认、绩效 |
 | `institution.html` | 医疗机构端：授权档案、转诊、固定取药、证照、多点执业 |
 | `insurance.html` | 医保局/医保中心/区市县医保局：审核、监管、凭证、取药 |
@@ -188,6 +189,8 @@ npm.cmd run release:manifest
 `interface:mapping` 会生成 `release/interface-mapping-report.json` 与 `release/interface-mapping-report.md`，逐项归档 HIS/EMR/LIS/PACS/医保/电子证照/统计契约字段到平台集合和字段的映射、必填字段覆盖、幂等字段落点、签名与重试证据，作为现场接口字段差异确认和联调整改的前置材料。
 
 `research:sandbox` generates `release/research-sandbox-readiness-report.json` and `release/research-sandbox-readiness-report.md`, covering research dataset applications, disease registry models, ethics approval, de-identification release, sandbox access, usage audit, and outcome return evidence.
+
+科研数据沙箱的政策说明页为 `research-sandbox-about.html`，基于《中华人民共和国个人信息保护法》《中华人民共和国数据安全法》《网络数据安全管理条例》《涉及人的生命科学和医学研究伦理审查办法》《国家健康医疗大数据标准、安全和服务管理办法（试行）》整理演示边界。当前系统只证明申请、审批、脱敏状态、沙箱访问、审计和成果回流的本地闭环；真实科研共享仍需现场提供伦理批件、数据使用协议、字段最小化评审、脱敏/重识别风险评估、日志保全或 SIEM/WORM 留存配置，以及专病库模型复核意见。
 
 `data-quality:report` 会生成 `release/data-quality-report.json` 与 `release/data-quality-report.md`，检查居民主索引完整度、跨集合居民引用、personIndex 一致性、来源可追溯和整改闭环。
 

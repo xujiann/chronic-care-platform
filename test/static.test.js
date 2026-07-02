@@ -40,7 +40,7 @@ test("citizen pages do not expose cross-role module links or management collecti
 });
 
 test("application pages avoid placeholder navigation", () => {
-  const pages = ["about.html", "citizen.html", "mobile-preview.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html", "quality-safety.html", "health-dashboard.html"];
+  const pages = ["about.html", "research-sandbox-about.html", "citizen.html", "mobile-preview.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html", "quality-safety.html", "health-dashboard.html", "regional-data-sharing.html", "operations.html"];
   pages.forEach((file) => assert.doesNotMatch(read(file), /href=["']#["']/, `${file} 存在空链接占位`));
 });
 
@@ -54,16 +54,37 @@ test("about page documents runnable platform capabilities", () => {
   assert.match(about, /data-about-capability="workflow-tasks"/);
   assert.match(about, /data-about-capability="chronic-care"/);
   assert.match(about, /data-about-capability="county-consortium"/);
+  assert.match(about, /data-about-capability="research-sandbox-policy"/);
   assert.match(about, /\/api\/service-acceptance-summary/);
   assert.match(about, /\/api\/site-template-readmes/);
   assert.match(about, /\/api\/tasks/);
   assert.match(about, /npm run deploy:check/);
   assert.match(read("index.html"), /href="\.\/about\.html"/);
   assert.match(read("platform.html"), /href="\.\/about\.html"/);
+  assert.match(read("platform.html"), /href="\.\/research-sandbox-about\.html"/);
   assert.match(read("health-city.html"), /href="\.\/about\.html"/);
   assert.match(auth, /\["about\.html", "关于"\]/);
+  assert.match(auth, /research-sandbox-about\.html/);
   assert.match(auth, /pageName === "about\.html"/);
   assert.doesNotMatch(about, /requireRole/);
+});
+
+test("research sandbox about page documents policy and release boundaries", () => {
+  const page = read("research-sandbox-about.html");
+  assert.match(page, /data-about-section="research-policy-sources"/);
+  assert.match(page, /中华人民共和国个人信息保护法/);
+  assert.match(page, /中华人民共和国数据安全法/);
+  assert.match(page, /网络数据安全管理条例/);
+  assert.match(page, /涉及人的生命科学和医学研究伦理审查办法/);
+  assert.match(page, /国家健康医疗大数据标准、安全和服务管理办法/);
+  assert.match(page, /\/api\/research\/sandbox/);
+  assert.match(page, /\/api\/research\/datasets\/:id\/evidence/);
+  assert.match(page, /research:policy-controls/);
+  assert.match(page, /data-about-section="research-prelaunch-development"/);
+  assert.match(page, /SIEM\/WORM/);
+  assert.match(page, /research-sandbox-readiness-report\.md/);
+  assert.match(read("README.md"), /research-sandbox-about\.html/);
+  assert.doesNotMatch(page, /requireRole/);
 });
 
 test("static snapshot keeps completed P2 governance collections", () => {
@@ -71,6 +92,8 @@ test("static snapshot keeps completed P2 governance collections", () => {
   assert.equal(data.creditEvaluationRules.version, "credit-rules-2026.1");
   assert.equal(Array.isArray(data.researchDatasets), true);
   assert.equal(data.researchDatasets.some((item) => item.id === "rd-hypertension-001"), true);
+  assert.equal(data.researchDatasets.every((item) => item.governance?.dataUseAgreement && item.governance.minimumNecessary === true && item.governance.reidentificationProhibited === true && item.governance.retentionDays > 0), true);
+  assert.equal(data.researchDatasets.every((item) => ["ethics-approval", "data-use-agreement"].every((type) => item.evidenceDocuments?.some((doc) => doc.type === type && doc.status !== "rejected"))), true);
   assert.equal(data.researchDatasets.every((item) => item.ethicsStatus && item.deidentificationStatus && item.sandbox && Array.isArray(item.sourceCollections)), true);
   assert.equal(data.dataAccessLogs.some((item) => /research/i.test(`${item.scope || ""} ${item.purpose || ""}`)), true);
   assert.equal(Array.isArray(data.diseaseRegistryModels), true);
@@ -364,8 +387,22 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   const operationsHtml = read("operations.html");
   const operationsJs = read("operations.js");
   assert.match(platformHtml, /research-governance/);
+  assert.match(platformJs, /research-application-form/);
+  assert.match(platformJs, /refreshResearchSandboxSummary/);
+  assert.match(platformJs, /research-governance-board/);
+  assert.match(platformJs, /researchPendingRows/);
+  assert.match(platformJs, /submitResearchDatasetApplication/);
   assert.match(platformJs, /runResearchDatasetAction/);
+  assert.match(platformJs, /openResearchEvidenceEditor/);
+  assert.match(platformJs, /submitResearchEvidenceDocument/);
+  assert.match(platformHtml, /research-evidence-form/);
+  assert.match(platformJs, /data-research-evidence/);
   assert.match(platformJs, /sandbox-access/);
+  assert.match(platformJs, /成果回流/);
+  assert.match(read("portal.css"), /research-sandbox-summary/);
+  assert.match(read("portal.css"), /research-application-form/);
+  assert.match(read("portal.css"), /research-governance-board/);
+  assert.match(read("portal.css"), /research-audit-feed/);
   assert.match(platformJs, /outcome-return/);
   assert.match(platformHtml, /mobile-accessibility-governance/);
   assert.match(platformHtml, /production-deployment-plan/);

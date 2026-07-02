@@ -17,9 +17,9 @@
           <p>围绕申报材料建设内容，将城市级医疗健康大数据平台、助医、惠民、辅政、科研、区级实施、互联互通测评、安全信创和已上线模块整合纳入同一建设视图。</p>
         </div>
         <nav>
-          
           <a href="./quality-safety.html">Quality safety</a><a href="./health-city.html">系统总览</a>
           <a href="./about.html">关于</a>
+          <a href="./research-sandbox-about.html">科研沙箱说明</a>
           <a href="./regional-data-sharing.html">区域共享</a>
           <a href="./workbench.html">运营工作台</a>
           <a href="./index.html">卫健委端</a>
@@ -246,6 +246,41 @@
         <footer>
           <button type="button" class="ghost-button" data-close>取消</button>
           <button class="primary-button" value="save">保存证据</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="research-evidence-dialog">
+      <form method="dialog" class="dialog-form" id="research-evidence-form">
+        <header>
+          <h2 id="research-evidence-title">科研材料登记</h2>
+          <button type="button" class="icon-button" data-close>×</button>
+        </header>
+        <input type="hidden" name="datasetId" />
+        <div class="form-grid">
+          <label class="full">数据集<input name="datasetName" readonly /></label>
+          <label>材料类型
+            <select name="type" required>
+              <option value="ethics-approval">伦理审批</option>
+              <option value="data-use-agreement">数据使用协议</option>
+              <option value="consent-waiver">知情同意豁免</option>
+              <option value="minimization-review">最小必要审查</option>
+              <option value="deidentification-assessment">脱敏风险评估</option>
+              <option value="export-review">导出审查</option>
+            </select>
+          </label>
+          <label>材料标题<input name="title" required /></label>
+          <label>编号<input name="referenceNo" required /></label>
+          <label>签发方<input name="issuedBy" /></label>
+          <label>签发日期<input name="issuedAt" type="date" /></label>
+          <label>到期日期<input name="expiresAt" type="date" /></label>
+          <label>文件名<input name="fileName" placeholder="IRB-DEMO-2026.pdf" /></label>
+          <label class="full">文件哈希或归档说明<input name="fileHash" placeholder="sha256:... 或纸质归档位置" /></label>
+          <label class="full">备注<textarea name="note" rows="3"></textarea></label>
+        </div>
+        <footer>
+          <button type="button" class="ghost-button" data-close>取消</button>
+          <button class="primary-button" value="save">登记科研材料</button>
         </footer>
       </form>
     </dialog>

@@ -28,6 +28,18 @@ test("commission user reaches the governance dashboard and opens maintenance", a
   await expect(page.locator("#institution-credit-evaluations tbody tr")).toHaveCount(3);
   await expect(page.locator("#research-governance table").first().locator("tbody tr")).toHaveCount(2);
   await expect(page.locator("#research-governance table").nth(1).locator("tbody tr")).toHaveCount(2);
+  await expect(page.locator(".research-sandbox-summary > div")).toHaveCount(5);
+  await expect(page.locator("#research-application-form")).toBeVisible();
+  await expect(page.locator("#research-application-form input[name='diseaseType']")).toHaveValue("copd");
+  await expect(page.locator("#research-application-form input[name='name']")).toHaveValue("COPD pulmonary rehabilitation cohort");
+  await expect(page.locator("#research-application-form input[name='dataUseAgreement']")).toHaveValue("DUA-DEMO-COPD-2026");
+  await expect(page.locator("#research-application-form input[name='minimumNecessary']")).toBeChecked();
+  await expect(page.locator("#research-application-form input[name='reidentificationProhibited']")).toBeChecked();
+  await expect(page.locator("#research-application-form button[type='submit']")).toHaveText("提交申请");
+  await expect(page.locator("#research-governance [data-research-action='sandbox-access']").first()).toHaveText("沙箱访问");
+  await expect(page.locator(".research-governance-board > article")).toHaveCount(3);
+  await expect(page.locator(".research-boundary-list .badge")).toHaveCount(8);
+  await expect(page.locator(".research-reuse-list span")).toHaveCount(6);
   await expect(page.locator("#mobile-accessibility-governance > div")).toHaveCount(10);
   await expect(page.locator("#security-acceptance-ledger > div")).toHaveCount(4);
   await expect(page.locator("#production-deployment-plan .priority-row")).toHaveCount(4);
@@ -115,6 +127,16 @@ test("about page explains runnable platform capabilities", async ({ page }) => {
   await login(page, "health", "index.html");
   await page.goto("/about.html");
   await expect(page.locator(".auth-bar a[href='./about.html']")).toHaveCount(1);
+});
+
+test("research sandbox about page exposes policy and acceptance boundaries", async ({ page }) => {
+  await page.goto("/research-sandbox-about.html");
+
+  await expect(page.locator("[data-about-section='research-policy-sources']")).toBeVisible();
+  await expect(page.locator("[data-policy-source='pipl']")).toContainText("中华人民共和国个人信息保护法");
+  await expect(page.locator("[data-policy-source='ethics-review']")).toContainText("涉及人的生命科学和医学研究伦理审查办法");
+  await expect(page.locator("[data-about-section='research-sandbox-runtime']")).toContainText("/api/research/sandbox");
+  await expect(page.locator("[data-about-section='research-release-evidence']")).toContainText("research-sandbox-readiness-report.md");
 });
 
 test("citizen stays in the household experience and cannot open commission pages", async ({ page }) => {

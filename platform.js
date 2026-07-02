@@ -35,6 +35,7 @@ const PLATFORM_STORAGE_KEY = "chronic-care-platform-state";
 let platformState = structuredClone(fallbackPlatformState);
 let platformData = null;
 let activeEditSnapshot = null;
+let researchSandboxSummary = null;
 
 const defaultPlatformCapabilities = [
   {
@@ -232,6 +233,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   ensureEditablePlatformData(platformState);
   bindPlatformEditor();
   renderPlatform();
+  refreshResearchSandboxSummary();
 });
 
 function renderPlatform() {
@@ -505,25 +507,39 @@ function renderProductionDeploymentPlan(items) {
   }).join("");
 }
 
-function renderResearchGovernance(platform) {
-  const datasetRows = platform.researchDatasets.map((item) => `
+function renderResearchGovernance(platform, sandboxSummary = null) {
+  const datasets = Array.isArray(platform.researchDatasets) ? platform.researchDatasets : [];
+  const models = Array.isArray(platform.diseaseRegistryModels) ? platform.diseaseRegistryModels : [];
+  const summary = sandboxSummary?.summary || {};
+  const boundaries = Array.isArray(sandboxSummary?.boundaries) ? sandboxSummary.boundaries : ["research dataset", "disease registry", "ethics approval", "de-identification release", "policy controls", "sandbox access", "usage audit", "outcome return"];
+  const reusableCollections = Array.isArray(sandboxSummary?.reusableCollections) ? sandboxSummary.reusableCollections : ["researchDatasets", "diseaseRegistryModels", "dataAccessLogs", "securityAcceptanceLedger", "personalRecords", "diagnosticReports"];
+  const activeSandboxCount = Number.isFinite(summary.activeDatasets) ? summary.activeDatasets : datasets.filter((item) => item.authorizationStatus === "approved" && (item.sandbox?.status === "active" || item.status === "published")).length;
+  const pendingApplications = Number.isFinite(summary.pendingApplications) ? summary.pendingApplications : datasets.filter((item) => item.authorizationStatus === "pending" || item.status === "requested").length;
+  const usageAuditCount = Number.isFinite(summary.usageAudits) ? summary.usageAudits : datasets.reduce((sum, item) => sum + (Array.isArray(item.usageAudit) ? item.usageAudit.length : 0), 0);
+  const outcomeCount = Number.isFinite(summary.outcomes) ? summary.outcomes : datasets.reduce((sum, item) => sum + (Array.isArray(item.outcomes) ? item.outcomes.length : 0), 0);
+  const previousStatus = document.querySelector("#research-status");
+  const statusText = previousStatus?.textContent || "";
+  const statusState = previousStatus?.dataset.state || "";
+  const datasetRows = datasets.map((item) => `
     <tr>
       <td><strong>${item.name}</strong></td>
       <td>${item.diseaseType}</td>
       <td>${item.version}</td>
       <td>${item.ethicsApproval || "待登记"}</td>
       <td>${item.anonymization || "待登记"} / ${item.deidentificationStatus || "pending"}</td>
+      <td>${researchEvidenceSummary(item)}</td>
       <td>${statusBadge(item.authorizationStatus || item.status)} ${statusBadge(item.sandbox?.status || "pending")}</td>
       <td>${item.records || 0}</td>
       <td>${(item.usageAudit || []).length} / ${(item.outcomes || []).length}</td>
       <td>
-        <button class="inline-action" type="button" data-research-action="sandbox-access" data-id="${item.id}">Sandbox</button>
-        <button class="inline-action" type="button" data-research-action="outcome-return" data-id="${item.id}">Outcome</button>
-        <button class="inline-action" type="button" data-research-action="approve" data-id="${item.id}">Approve</button>
+        <button class="inline-action" type="button" data-research-action="sandbox-access" data-id="${item.id}">沙箱访问</button>
+        <button class="inline-action" type="button" data-research-action="outcome-return" data-id="${item.id}">成果回流</button>
+        <button class="inline-action" type="button" data-research-action="approve" data-id="${item.id}">审批发布</button>
+        <button class="inline-action" type="button" data-research-evidence="${item.id}">登记材料</button>
       </td>
     </tr>
   `).join("");
-  const modelRows = platform.diseaseRegistryModels.map((item) => `
+  const modelRows = models.map((item) => `
     <tr>
       <td><strong>${item.id}</strong></td>
       <td>${item.diseaseType}</td>
@@ -535,16 +551,184 @@ function renderResearchGovernance(platform) {
       <td>${item.reviewedBy || item.reviewer || "待复核"}</td>
     </tr>
   `).join("");
+  const pendingRows = researchPendingRows(sandboxSummary?.pendingApplications, datasets);
+  const auditRows = researchAuditRows(sandboxSummary?.recentAudits, datasets);
+  const outcomeRows = researchOutcomeRows(sandboxSummary?.recentOutcomes, datasets);
   document.querySelector("#research-governance").innerHTML = `
+    <div class="research-sandbox-summary">
+      <div><strong>${datasets.length}</strong><span>数据集</span></div>
+      <div><strong>${activeSandboxCount}</strong><span>已开放沙箱</span></div>
+      <div><strong>${pendingApplications}</strong><span>待审批申请</span></div>
+      <div><strong>${models.length}</strong><span>专病模型</span></div>
+      <div><strong>${usageAuditCount} / ${outcomeCount}</strong><span>审计 / 成果</span></div>
+    </div>
+    <form class="research-application-form" id="research-application-form">
+      <label>
+        病种
+        <input name="diseaseType" value="copd" required />
+      </label>
+      <label>
+        数据集名称
+        <input name="name" value="COPD pulmonary rehabilitation cohort" required />
+      </label>
+      <label>
+        研究目的
+        <input name="purpose" value="sandbox feasibility assessment" required />
+      </label>
+      <label>
+        数据使用协议
+        <input name="dataUseAgreement" value="DUA-DEMO-COPD-2026" required />
+      </label>
+      <label>
+        审计留存天数
+        <input name="retentionDays" type="number" min="1" max="3650" value="180" required />
+      </label>
+      <label class="checkbox-label">
+        <input name="minimumNecessary" type="checkbox" checked />
+        最小必要字段
+      </label>
+      <label class="checkbox-label">
+        <input name="reidentificationProhibited" type="checkbox" checked />
+        禁止再识别
+      </label>
+      <label>
+        来源集合
+        <select name="sourceProfile">
+          <option value="clinical">personalRecords + diagnosticReports</option>
+          <option value="chronic">personalRecords + diagnosticReports + chronicManagementPlans</option>
+          <option value="followup">personalRecords + diagnosticReports + followups</option>
+        </select>
+      </label>
+      <button class="inline-action" type="submit">提交申请</button>
+    </form>
+    <p class="research-status" id="research-status" role="status" data-state="${statusState}">${statusText}</p>
+    <div class="research-governance-board">
+      <article>
+        <h3>边界与复用集合</h3>
+        <div class="research-pill-list research-boundary-list">
+          ${boundaries.map((item) => `<span class="badge info">${researchBoundaryLabel(item)}</span>`).join("")}
+        </div>
+        <div class="research-pill-list research-reuse-list">
+          ${reusableCollections.map((item) => `<span>${item}</span>`).join("")}
+        </div>
+      </article>
+      <article>
+        <h3>审批队列</h3>
+        <ul class="research-queue">${pendingRows}</ul>
+      </article>
+      <article>
+        <h3>审计与成果回流</h3>
+        <ul class="research-audit-feed">${auditRows}${outcomeRows}</ul>
+      </article>
+    </div>
     <table>
-      <thead><tr><th>数据集</th><th>病种</th><th>版本</th><th>伦理审批</th><th>脱敏</th><th>授权/沙箱</th><th>记录数</th><th>审计/成果</th><th>Action</th></tr></thead>
-      <tbody>${datasetRows || `<tr><td colspan="9">暂无科研数据集。</td></tr>`}</tbody>
+      <thead><tr><th>数据集</th><th>病种</th><th>版本</th><th>伦理审批</th><th>脱敏</th><th>协议/留存/材料</th><th>授权/沙箱</th><th>记录数</th><th>审计/成果</th><th>Action</th></tr></thead>
+      <tbody>${datasetRows || `<tr><td colspan="10">暂无科研数据集。</td></tr>`}</tbody>
     </table>
     <table>
       <thead><tr><th>模型</th><th>病种</th><th>版本</th><th>适用人群</th><th>触发阈值</th><th>复核状态</th><th>输出</th><th>复核人</th></tr></thead>
       <tbody>${modelRows || `<tr><td colspan="8">暂无专病库模型。</td></tr>`}</tbody>
     </table>
   `;
+}
+
+function researchEvidenceSummary(dataset) {
+  const documents = Array.isArray(dataset.evidenceDocuments) ? dataset.evidenceDocuments : [];
+  const required = ["ethics-approval", "data-use-agreement"];
+  const ready = required.every((type) => documents.some((item) => item.type === type && item.status !== "rejected"));
+  const latest = documents[0];
+  const latestText = latest ? `${latest.type}:${latest.referenceNo || latest.title || "registered"}` : "no evidence";
+  return [
+    `<span>${dataset.governance?.dataUseAgreement || "pending"} / ${dataset.governance?.retentionDays || 0}d</span>`,
+    `<span class="badge ${ready ? "info" : "warn"}">${ready ? "evidence-ready" : "evidence-pending"} / ${documents.length} docs</span>`,
+    `<small>${latestText}</small>`
+  ].join(" ");
+}
+
+function researchBoundaryLabel(value) {
+  if (value === "policy controls") return "协议与最小必要";
+  return {
+    "research dataset": "科研数据集",
+    "disease registry": "专病库",
+    "ethics approval": "伦理审批",
+    "de-identification release": "脱敏发布",
+    "sandbox access": "沙箱访问",
+    "usage audit": "使用审计",
+    "outcome return": "成果回流"
+  }[value] || value;
+}
+
+function researchPendingRows(pendingApplications, datasets) {
+  const rows = Array.isArray(pendingApplications) && pendingApplications.length
+    ? pendingApplications
+    : datasets
+      .filter((item) => item.status === "requested" || item.authorizationStatus === "pending")
+      .map((item) => ({
+        id: item.id,
+        diseaseType: item.diseaseType,
+        name: item.name,
+        requestedBy: item.createdBy || item.accessRequests?.[0]?.by || "",
+        requestedAt: item.createdAt || item.accessRequests?.[0]?.at || "",
+        purpose: item.accessRequests?.[0]?.purpose || "",
+        ethicsStatus: item.ethicsStatus || "pending",
+        deidentificationStatus: item.deidentificationStatus || "pending"
+      }));
+  if (!rows.length) return `<li><strong>暂无待审批申请</strong><span>当前数据集均已完成伦理、脱敏和授权闭环。</span></li>`;
+  return rows.slice(0, 4).map((item) => `
+    <li>
+      <strong>${item.name || item.id}</strong>
+      <span>${item.diseaseType || "未标注病种"} / ${item.ethicsStatus || "pending"} / ${item.deidentificationStatus || "pending"}</span>
+      <small>${item.requestedBy || "申请方待确认"} ${formatResearchTime(item.requestedAt)} ${item.purpose || ""}</small>
+    </li>
+  `).join("");
+}
+
+function researchAuditRows(recentAudits, datasets) {
+  const rows = Array.isArray(recentAudits) && recentAudits.length
+    ? recentAudits
+    : datasets.flatMap((item) => (Array.isArray(item.usageAudit) ? item.usageAudit : []).map((audit) => ({
+      at: audit.at,
+      actor: audit.by,
+      role: audit.role,
+      action: audit.action || "usage-audit",
+      target: `${item.id}:${audit.purpose || ""}`,
+      result: audit.result || "allowed"
+    })));
+  if (!rows.length) return `<li><strong>暂无实时审计</strong><span>沙箱申请、拒绝、访问和成果回流会写入审计。</span></li>`;
+  return rows.slice(0, 4).map((item) => `
+    <li>
+      <strong>${item.action || "research-sandbox"} / ${item.result || "allowed"}</strong>
+      <span>${item.actor || "system"} ${item.role ? `(${item.role})` : ""}</span>
+      <small>${formatResearchTime(item.at)} ${item.target || ""}</small>
+    </li>
+  `).join("");
+}
+
+function researchOutcomeRows(recentOutcomes, datasets) {
+  const rows = Array.isArray(recentOutcomes) && recentOutcomes.length
+    ? recentOutcomes
+    : datasets.flatMap((item) => (Array.isArray(item.outcomes) ? item.outcomes : []).map((outcome) => ({
+      datasetId: item.id,
+      datasetName: item.name,
+      at: outcome.at,
+      by: outcome.by,
+      title: outcome.title,
+      registryImpact: outcome.registryImpact
+    })));
+  return rows.slice(0, 2).map((item) => `
+    <li>
+      <strong>成果回流 / ${item.datasetName || item.datasetId || "dataset"}</strong>
+      <span>${item.title || "research outcome"}</span>
+      <small>${formatResearchTime(item.at)} ${item.registryImpact || ""}</small>
+    </li>
+  `).join("");
+}
+
+function formatResearchTime(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("zh-CN", { hour12: false });
 }
 
 function renderMobileAccessibilityGovernance(platform) {
@@ -614,6 +798,13 @@ function listText(value) {
 }
 
 function bindPlatformEditor() {
+  document.addEventListener("submit", async (event) => {
+    if (event.target?.id === "research-application-form") {
+      event.preventDefault();
+      await submitResearchDatasetApplication(event.target);
+    }
+  });
+
   document.addEventListener("click", (event) => {
     const editButton = event.target.closest("[data-edit-platform]");
     if (editButton) {
@@ -623,6 +814,11 @@ function bindPlatformEditor() {
     const evidenceButton = event.target.closest("[data-edit-evidence]");
     if (evidenceButton) {
       openEvidenceEditor(evidenceButton.dataset.editEvidence);
+      return;
+    }
+    const researchEvidenceButton = event.target.closest("[data-research-evidence]");
+    if (researchEvidenceButton) {
+      openResearchEvidenceEditor(researchEvidenceButton.dataset.researchEvidence);
       return;
     }
     const researchButton = event.target.closest("[data-research-action]");
@@ -686,6 +882,11 @@ function bindPlatformEditor() {
     renderPlatform();
   });
 
+  document.querySelector("#research-evidence-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await submitResearchEvidenceDocument(event.currentTarget);
+  });
+
   document.querySelector("#export-platform-report")?.addEventListener("click", exportPlatformReport);
   const filters = document.querySelector("#platform-report-filters");
   filters?.addEventListener("input", refreshReportSummary);
@@ -713,25 +914,171 @@ async function runResearchDatasetAction(action, id) {
       ? `/research/datasets/${encodeURIComponent(id)}/outcomes`
       : `/research/datasets/${encodeURIComponent(id)}/sandbox-access`;
   try {
+    setResearchStatus("正在提交操作...");
     const response = await request(`${PLATFORM_API_BASE}${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
     });
-    if (!response.ok) return;
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      setResearchStatus(error.message || "操作未通过，请检查审批、脱敏和授权状态。", true);
+      return;
+    }
     await refreshPlatformState();
+    setResearchStatus(action === "sandbox-access" ? "沙箱访问已审计留痕。" : action === "outcome-return" ? "成果已回流登记。" : "数据集已审批发布。");
   } catch (error) {
-    // Keep the static fallback usable when the page is opened directly.
+    setResearchStatus("当前为静态预览或服务不可用，操作未提交。", true);
   }
+}
+
+function openResearchEvidenceEditor(id) {
+  const dataset = findResearchDataset(id);
+  if (!dataset) return;
+  const form = document.querySelector("#research-evidence-form");
+  const dialog = document.querySelector("#research-evidence-dialog");
+  const type = dataset.ethicsApproval ? "data-use-agreement" : "ethics-approval";
+  form.reset();
+  form.elements.namedItem("datasetId").value = dataset.id;
+  form.elements.namedItem("datasetName").value = dataset.name || dataset.id;
+  form.elements.namedItem("type").value = type;
+  form.elements.namedItem("title").value = type === "data-use-agreement"
+    ? `${dataset.name || dataset.id} data use agreement`
+    : `${dataset.name || dataset.id} ethics approval`;
+  form.elements.namedItem("referenceNo").value = type === "data-use-agreement"
+    ? (dataset.governance?.dataUseAgreement || `DUA-${dataset.id}`)
+    : (dataset.ethicsApproval || `IRB-${dataset.id}`);
+  form.elements.namedItem("issuedBy").value = type === "data-use-agreement" ? "research-governance" : "demo-irb";
+  form.elements.namedItem("issuedAt").value = new Date().toISOString().slice(0, 10);
+  document.querySelector("#research-evidence-title").textContent = `科研材料登记：${dataset.name || dataset.id}`;
+  dialog.showModal();
+}
+
+async function submitResearchEvidenceDocument(form) {
+  if (!PLATFORM_API_BASE) {
+    setResearchStatus("当前为静态预览，科研材料未提交。", true);
+    return;
+  }
+  const data = Object.fromEntries(new FormData(form));
+  const payload = {
+    type: String(data.type || "").trim(),
+    title: String(data.title || "").trim(),
+    referenceNo: String(data.referenceNo || "").trim(),
+    issuedBy: String(data.issuedBy || "").trim(),
+    issuedAt: String(data.issuedAt || "").trim(),
+    expiresAt: String(data.expiresAt || "").trim(),
+    fileName: String(data.fileName || "").trim(),
+    fileHash: String(data.fileHash || "").trim(),
+    note: String(data.note || "").trim()
+  };
+  if (!payload.type || !payload.title || !payload.referenceNo) {
+    setResearchStatus("请补齐科研材料类型、标题和编号。", true);
+    return;
+  }
+  try {
+    setResearchStatus("正在登记科研材料...");
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${PLATFORM_API_BASE}/research/datasets/${encodeURIComponent(data.datasetId)}/evidence`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      setResearchStatus(error.message || "科研材料登记失败。", true);
+      return;
+    }
+    form.closest("dialog")?.close();
+    await refreshPlatformState();
+    setResearchStatus(`科研材料已登记：${payload.referenceNo}`);
+  } catch (error) {
+    setResearchStatus("服务不可用，科研材料未提交。", true);
+  }
+}
+
+function findResearchDataset(id) {
+  return (platformState.researchDatasets || []).find((item) => item.id === id)
+    || (platformData?.researchDatasets || []).find((item) => item.id === id);
+}
+
+async function submitResearchDatasetApplication(form) {
+  if (!PLATFORM_API_BASE) {
+    setResearchStatus("当前为静态预览，申请未提交。", true);
+    return;
+  }
+  const data = Object.fromEntries(new FormData(form));
+  const sourceProfiles = {
+    clinical: ["personalRecords", "diagnosticReports"],
+    chronic: ["personalRecords", "diagnosticReports", "chronicManagementPlans"],
+    followup: ["personalRecords", "diagnosticReports", "followups"]
+  };
+  const payload = {
+    diseaseType: String(data.diseaseType || "").trim(),
+    name: String(data.name || "").trim(),
+    purpose: String(data.purpose || "").trim(),
+    sourceCollections: sourceProfiles[data.sourceProfile] || sourceProfiles.clinical,
+    governance: {
+      dataUseAgreement: String(data.dataUseAgreement || "").trim(),
+      minimumNecessary: data.minimumNecessary === "on",
+      reidentificationProhibited: data.reidentificationProhibited === "on",
+      exportReviewRequired: true,
+      retentionDays: Number(data.retentionDays || 180),
+      steward: "research-governance"
+    }
+  };
+  if (!payload.diseaseType || !payload.name || !payload.purpose || !payload.governance.dataUseAgreement || !payload.governance.minimumNecessary || !payload.governance.reidentificationProhibited) {
+    setResearchStatus("请补齐病种、数据集名称、研究目的、数据使用协议、最小必要和禁止再识别声明。", true);
+    return;
+  }
+  try {
+    setResearchStatus("正在提交科研数据集申请...");
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${PLATFORM_API_BASE}/research/datasets`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      setResearchStatus(error.message || "申请提交失败。", true);
+      return;
+    }
+    const created = await response.json();
+    await refreshPlatformState();
+    setResearchStatus(`申请已提交：${created.name}，等待伦理审批和脱敏发布。`);
+  } catch (error) {
+    setResearchStatus("服务不可用，申请未提交。", true);
+  }
+}
+
+function setResearchStatus(message, isError = false) {
+  const status = document.querySelector("#research-status");
+  if (!status) return;
+  status.textContent = message || "";
+  status.dataset.state = isError ? "error" : "ok";
 }
 
 async function refreshPlatformState() {
   platformState = await loadPlatformState(fallbackPlatformState);
   ensureEditablePlatformData(platformState);
   platformData = platformModel(platformState);
-  renderResearchGovernance(platformData);
+  renderResearchGovernance(platformData, researchSandboxSummary);
   renderMetrics(platformState, platformData);
   renderReportSummary(platformData, platformState.platformChangeLogs || []);
+  refreshResearchSandboxSummary();
+}
+
+async function refreshResearchSandboxSummary() {
+  if (!PLATFORM_API_BASE) return;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${PLATFORM_API_BASE}/research/sandbox`);
+    if (!response.ok) return;
+    researchSandboxSummary = await response.json();
+    renderResearchGovernance(platformData || platformModel(platformState), researchSandboxSummary);
+  } catch (error) {
+    // Static fallback keeps the page usable without the API.
+  }
 }
 
 function openEvidenceEditor(id) {
