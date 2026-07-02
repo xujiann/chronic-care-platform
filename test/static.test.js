@@ -1185,6 +1185,9 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /body\.service-paged-mode/);
   assert.match(citizenCss, /body\.service-paged-mode \.service-summary/);
   assert.match(citizenCss, /body\.service-paged-mode \.summary-grid/);
+  assert.match(citizenCss, /body\.service-paged-mode \.citizen-header/);
+  assert.match(citizenCss, /body\.service-paged-mode \.account-panel/);
+  assert.match(citizenCss, /body\.service-paged-mode \.profile-band/);
   assert.match(citizenCss, /body\.service-paged-mode \[data-internal-launch-panel\]/);
   assert.match(citizenCss, /body\.service-paged-mode \.mobile-service-rail/);
   assert.match(citizenCss, /body\.service-paged-mode \.mobile-service-rail-status/);
