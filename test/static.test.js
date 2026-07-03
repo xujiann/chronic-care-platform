@@ -340,9 +340,10 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(about, /现场交付物/);
   assert.match(about, /联调样例/);
   assert.match(about, /验收证据/);
-  assert.match(about, /AUDIT_EXPORT_PATH/);
+  assert.match(about, /审计导出路径/);
+  assert.match(about, /健康检查/);
   assert.match(about, /RTO\/RPO/);
-  assert.doesNotMatch(about, /residents|personalRecords|diagnosticReports|referralId|teleconsultationId|regionalPackageId|reportId/);
+  assert.doesNotMatch(about, /residents|personalRecords|diagnosticReports|referralId|teleconsultationId|regionalPackageId|reportId|AUDIT_EXPORT_PATH|SIEM_ENDPOINT|\/api\/health|\/api\/metrics/);
   assert.match(about, /与医联体转诊功能的关系/);
   assert.match(read("scripts/regional-referral-overlap.js"), /buildRegionalReferralOverlapReport/);
   assert.match(read("scripts/regional-referral-overlap.js"), /runtimeMergeAllowed/);

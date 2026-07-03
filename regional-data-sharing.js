@@ -199,13 +199,13 @@ function renderRegionalSiteIntegration(summary = {}, packages = []) {
       status: "待配置",
       sample: `${summary.accessReviews || 0} 条调阅留痕可用于导出校验。`,
       evidence: "审计导出路径或安全平台地址、留存年限、导出权限和哈希校验。",
-      nextAction: "配置 AUDIT_EXPORT_PATH 或 SIEM_ENDPOINT 并完成导出复核。"
+      nextAction: "配置审计导出路径或安全日志平台地址，并完成导出复核。"
     },
     {
       title: "监控灾备",
       owner: "平台运维/数据平台",
       status: "待演练",
-      sample: "复用 /api/health、/api/metrics 和发布门禁结果。",
+      sample: "复用健康检查、运行指标接口和发布门禁结果。",
       evidence: "健康检查、指标监控、告警路由、恢复目标和恢复演练签字。",
       nextAction: "完成告警值班、备份恢复和 RTO/RPO 演练签字。"
     }
