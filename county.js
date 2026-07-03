@@ -311,6 +311,7 @@ function renderCountyTeleconsultationCutoverReadiness(state, rows) {
       <footer>
         <small>${item.acceptance}</small>
         <small>Dependencies: ${item.dependencies.join(", ") || "onsite evidence"}</small>
+        <button class="inline-action" type="button" data-referral-plan-action="${item.phase}" data-target="${item.actionTarget}">${item.actionLabel}</button>
       </footer>
     </article>`)
   ].join("");
@@ -533,6 +534,7 @@ function normalizeCountyTeleconsultationNextPlan(plan, readiness = {}) {
     objective: item.objective || item.target || "Confirm the next onsite cutover action.",
     dependencies: Array.isArray(item.dependencies) ? item.dependencies.slice(0, 4) : [],
     acceptance: item.acceptance || "Acceptance evidence is attached to the joint-test pack.",
+    ...buildCountyTeleconsultationPlanAction(item.phase || "next-step"),
     ...buildCountyTeleconsultationPlanStatus(item.phase || "next-step", readiness, replay)
   }));
 }
@@ -562,6 +564,20 @@ function buildCountyTeleconsultationPlanStatus(phase, readiness, replay) {
   return readiness.readyForProductionCutover
     ? { status: "ready", statusLabel: "cutover ready" }
     : { status: "pending", statusLabel: "cutover pending" };
+}
+
+function buildCountyTeleconsultationPlanAction(phase) {
+  const normalizedPhase = String(phase || "").toLowerCase();
+  if (normalizedPhase.includes("field-interface")) {
+    return { actionLabel: "Open joint ledger", actionTarget: "county-teleconsultation-joint-ledger" };
+  }
+  if (normalizedPhase.includes("onsite-signoff")) {
+    return { actionLabel: "Open signoff", actionTarget: "county-teleconsultation-signoff" };
+  }
+  if (normalizedPhase.includes("insurance")) {
+    return { actionLabel: "Open performance board", actionTarget: "county-teleconsultation-risk-board" };
+  }
+  return { actionLabel: "Review gate", actionTarget: "county-teleconsultation-cutover" };
 }
 
 function buildCountyTeleconsultationPlanSummary(plan) {
@@ -789,6 +805,11 @@ function bindCountyActions() {
       jointTaskCompleteButton.disabled = true;
       await completeReferralJointLedgerTask(platformState, jointTaskCompleteButton.dataset.role);
       renderCountyTeleconsultationLoop(platformState);
+      return;
+    }
+    const planActionButton = event.target.closest("[data-referral-plan-action]");
+    if (planActionButton) {
+      document.querySelector(`#${planActionButton.dataset.target}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
     const button = event.target.closest("[data-county-action]");
