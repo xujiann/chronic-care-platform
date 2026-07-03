@@ -714,6 +714,13 @@ dialog::backdrop {
   margin-top: 10px;
 }
 
+.operations-duty-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .template-meta {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -734,6 +741,53 @@ dialog::backdrop {
 .operations-focus-button:hover {
   border-color: #b9c9e7;
   background: #f6f9ff;
+}
+
+.operations-duty-action {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fbfd;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.operations-duty-action.urgent {
+  border-color: #efbbb5;
+  background: #fff7f4;
+}
+
+.operations-duty-action:hover,
+.operations-duty-action:focus-visible {
+  border-color: #b9c9e7;
+  background: #f6f9ff;
+  outline: none;
+}
+
+.operations-duty-action span,
+.operations-duty-action small,
+.operations-duty-action em {
+  color: var(--muted);
+}
+
+.operations-duty-action strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--ink);
+  font-size: 24px;
+}
+
+.operations-duty-action small,
+.operations-duty-action em {
+  display: block;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.operations-duty-action em {
+  font-style: normal;
 }
 
 .operations-command-board {
@@ -2573,6 +2627,7 @@ dialog::backdrop {
   .portal-grid,
   .operations-situation-strip,
   .operations-focus-links,
+  .operations-duty-actions,
   .operations-command-board,
   .claim-grid,
   .capability-grid,

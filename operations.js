@@ -1319,10 +1319,12 @@ function renderOperationsDashboard() {
 function renderOperationsSituation(dashboard, filteredSnapshots, selected) {
   const strip = document.querySelector("#operations-situation-strip");
   const links = document.querySelector("#operations-focus-links");
-  if (!strip || !links) return;
+  const dutyActions = document.querySelector("#operations-duty-actions");
+  if (!strip || !links || !dutyActions) return;
   const snapshots = Array.isArray(dashboard.snapshots) ? dashboard.snapshots : [];
   const dispatchRequests = Array.isArray(dashboard.dispatchRequests) ? dashboard.dispatchRequests : [];
   const reconciliationReviews = Array.isArray(dashboard.reconciliationReviews) ? dashboard.reconciliationReviews : [];
+  const launchReadiness = dashboard.launchReadiness || {};
   const urgent = [...filteredSnapshots].sort((a, b) => Number(b.resourcePressure || 0) - Number(a.resourcePressure || 0))[0] || selected;
   const openDispatches = dispatchRequests.filter((item) => ["pending", "assigned", "in-progress"].includes(item.status));
   const blockedReviews = reconciliationReviews.filter((item) => ["blocked", "pending-review", "returned", "correcting"].includes(item.status));
@@ -1371,11 +1373,33 @@ function renderOperationsSituation(dashboard, filteredSnapshots, selected) {
       <span>${hint}</span>
     </button>
   `).join("");
+  dutyActions.innerHTML = [
+    { action: "launch", title: "上线判定", count: launchReadiness.summary?.blockers || 0, status: zhInline(launchReadiness.decision || "待判定"), hint: "查看生产加固、割接签收和观察阻断项", target: "#operation-launch-readiness" },
+    { action: "dispatch", title: "开放调度", count: openDispatches.length, status: openDispatches.length ? "需跟踪" : "已清零", hint: "定位资源调度工单与分派状态" },
+    { action: "reconciliation", title: "直报复核", count: blockedReviews.length, status: blockedReviews.length ? "需复核" : "已闭环", hint: "定位统计直报差异和补正说明" }
+  ].map((item) => `
+    <button class="operations-duty-action ${item.count ? "urgent" : ""}" type="button" data-duty-action="${item.action}" data-duty-target="${htmlAttribute(item.target || "")}">
+      <span>${item.title}</span>
+      <strong>${item.count}</strong>
+      <small>${item.status}</small>
+      <em>${item.hint}</em>
+    </button>
+  `).join("");
   strip.querySelector("[data-situation-select]")?.addEventListener("click", (event) => {
     selectSnapshotById(event.currentTarget.dataset.situationSelect, "#operation-detail");
   });
   links.querySelectorAll("[data-situation-filter]").forEach((button) => {
     button.addEventListener("click", () => applySituationFilter(button.dataset.situationFilter));
+  });
+  dutyActions.querySelectorAll("[data-duty-action]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const action = button.dataset.dutyAction;
+      if (action === "dispatch" || action === "reconciliation") {
+        applySituationFilter(action);
+        return;
+      }
+      document.querySelector(button.dataset.dutyTarget)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   });
 }
 
