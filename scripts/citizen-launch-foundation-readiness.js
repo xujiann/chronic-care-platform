@@ -73,6 +73,12 @@ function buildCitizenLaunchFoundationReadiness(options = {}) {
       detail: "mini-program and app channel routing, copyable entry links, and preview query handling are present"
     },
     {
+      id: "citizen-foundation:mobile-preview-service-switch",
+      passed: hasAll(mobilePreview, [/preview-service-select/, /preview-service-stepper/, /preview-prev-service/, /preview-next-service/, /preview-service-position/, /previewServicePosition\.setAttribute\("aria-label"/, /previewPrevService\.title = previousService/, /previewNextService\.title = nextService/, /data-preview-service="escort"/, /data-preview-service="registration"/, /citizenPreviewSrc\(service\)/]) &&
+        !/internet-nursing\.html\?preview=mobile-nursing/.test(mobilePreview),
+      detail: "mobile preview keeps service selector, previous/next controls, accessible position text, and resident-page service routing"
+    },
+    {
       id: "citizen-foundation:launch-gates",
       passed: hasAll(citizenJs, [/HTTPS/, /隐私协议/, /资质/, /消息模板/, /应用签名/, /推送证书/, /崩溃监控/]) &&
         hasAll(auditDoc, [/小程序与 APP 运行形态/, /APP\/PWA 手机安装配置/, /多系统真实接入/]),

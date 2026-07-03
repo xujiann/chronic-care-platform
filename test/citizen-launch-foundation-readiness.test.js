@@ -28,10 +28,12 @@ test("citizen launch foundation readiness captures phase-one gates", () => {
   assert.equal(report.checks.find((item) => item.id === "citizen-foundation:phone-login").detail.includes("failed-attempt lockout"), true);
   assert.equal(report.checks.some((item) => item.id === "citizen-foundation:mobile-install-shell" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "citizen-foundation:app-shortcuts" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "citizen-foundation:mobile-preview-service-switch" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "citizen-foundation:launch-gates" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "citizen-foundation:production-requirements" && item.passed), true);
   assert.match(renderMarkdown(report), /Citizen launch foundation readiness/);
   assert.match(renderMarkdown(report), /phone-code delivery/);
+  assert.match(renderMarkdown(report), /mobile-preview-service-switch/);
   assert.match(renderMarkdown(report), /account-provisioning-boundary/);
   assert.match(renderMarkdown(report), /production SMS gateway/);
 });

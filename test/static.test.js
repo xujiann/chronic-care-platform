@@ -774,6 +774,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   const citizenJs = read("citizen.js");
   const mobilePreviewHtml = read("mobile-preview.html");
   const mobilePreviewCss = read("mobile-preview.css");
+  const readme = read("README.md");
   const manifest = JSON.parse(read("manifest.webmanifest"));
   const serviceWorker = read("service-worker.js");
   assert.match(citizenHtml, /rel="manifest"/);
@@ -798,6 +799,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /服务导航/);
   assert.match(mobilePreviewHtml, /上一个/);
   assert.match(mobilePreviewHtml, /下一个/);
+  assert.match(readme, /手机预览页工具栏同步提供“上一个\/下一个”快捷切换/);
   assert.match(mobilePreviewHtml, /preview-direct-entry/);
   assert.match(mobilePreviewHtml, /preview-birth-entry/);
   assert.match(mobilePreviewHtml, /preview-copy-entry/);
@@ -819,13 +821,21 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.doesNotMatch(mobilePreviewHtml, /activePreviewService !== "health-record"/);
   assert.match(mobilePreviewHtml, /syncPreviewServiceControls/);
   assert.match(mobilePreviewHtml, /stepPreviewService/);
+  assert.match(mobilePreviewHtml, /activePreviewServicePosition/);
+  assert.match(mobilePreviewHtml, /const servicePosition = activePreviewServicePosition\(\)/);
+  assert.match(mobilePreviewHtml, /服务：\$\{previewServiceLabels\[activePreviewService\]\}（\$\{servicePosition\.label\}）/);
   assert.match(mobilePreviewHtml, /previewServicePosition\.textContent/);
+  assert.match(mobilePreviewHtml, /previewServicePosition\.textContent = servicePositionLabel/);
+  assert.match(mobilePreviewHtml, /previewServicePosition\.setAttribute\("aria-label"/);
+  assert.match(mobilePreviewHtml, /当前第 \$\{activeIndex \+ 1\} 个服务，共 \$\{previewServices\.length\} 个/);
   assert.match(mobilePreviewHtml, /previewPrevService\.disabled/);
   assert.match(mobilePreviewHtml, /previewNextService\.disabled/);
   assert.match(mobilePreviewHtml, /previousService \? `上一个：/);
   assert.match(mobilePreviewHtml, /nextService \? `下一个：/);
   assert.match(mobilePreviewHtml, /setAttribute\("aria-label", previousService/);
   assert.match(mobilePreviewHtml, /setAttribute\("aria-label", nextService/);
+  assert.match(mobilePreviewHtml, /previewPrevService\.title = previousService/);
+  assert.match(mobilePreviewHtml, /previewNextService\.title = nextService/);
   assert.match(mobilePreviewHtml, /previewServiceLabels/);
   assert.match(mobilePreviewHtml, /390px 手机视口/);
   assert.match(mobilePreviewHtml, /本机局域网IP/);
@@ -1079,6 +1089,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(auth, /response\.status === 423/);
   assert.match(read("portal.css"), /account-provisioning-note/);
   assert.match(read("scripts/citizen-launch-foundation-readiness.js"), /citizen-foundation:account-provisioning-boundary/);
+  assert.match(read("scripts/citizen-launch-foundation-readiness.js"), /citizen-foundation:mobile-preview-service-switch/);
+  assert.match(read("scripts/release-report.js"), /citizenLaunch:mobilePreviewServiceSwitch/);
   assert.doesNotMatch(server, /\/api\/auth\/register/);
   ["健康档案", "电子病历", "护理", "陪诊", "挂号"].forEach((label) => assert.match(citizenJs, new RegExp(label)));
   assert.match(citizenHtml, /service-tabs/);

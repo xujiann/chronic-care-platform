@@ -164,6 +164,10 @@
       function birthHealthPreviewSrc() {
         return `./citizen.html?preview=mobile-nav&client=${activePreviewClient}&page=health-record#birth-health-summary-strip`;
       }
+      function activePreviewServicePosition() {
+        const activeIndex = Math.max(0, previewServices.indexOf(activePreviewService));
+        return { activeIndex, label: `${activeIndex + 1} / ${previewServices.length}` };
+      }
       const renderPreviewDirectEntry = () => {
         const entryUrl = citizenPreviewSrc(activePreviewService);
         const absoluteEntryUrl = new URL(entryUrl, location.href).href;
@@ -180,8 +184,9 @@
         previewReadinessLink.textContent = "入口：当前与出生健康已同步";
       };
       const renderPreviewReadiness = () => {
+        const servicePosition = activePreviewServicePosition();
         previewReadinessClient.textContent = `端型：${previewClientLabels[activePreviewClient]}`;
-        previewReadinessService.textContent = `服务：${previewServiceLabels[activePreviewService]}`;
+        previewReadinessService.textContent = `服务：${previewServiceLabels[activePreviewService]}（${servicePosition.label}）`;
       };
       const renderPreviewStatus = () => {
         previewStatus.textContent = isCompactPreview
@@ -193,16 +198,19 @@
       const syncPreviewServiceControls = () => {
         serviceButtons.forEach((button) => button.classList.toggle("active", button.dataset.previewService === activePreviewService));
         previewServiceSelect.value = activePreviewService;
-        const activeIndex = previewServices.indexOf(activePreviewService);
+        const { activeIndex, label: servicePositionLabel } = activePreviewServicePosition();
         const previousService = previewServices[activeIndex - 1];
         const nextService = previewServices[activeIndex + 1];
-        previewServicePosition.textContent = `${activeIndex + 1} / ${previewServices.length}`;
+        previewServicePosition.textContent = servicePositionLabel;
+        previewServicePosition.setAttribute("aria-label", `当前第 ${activeIndex + 1} 个服务，共 ${previewServices.length} 个`);
         previewPrevService.disabled = activeIndex <= 0;
         previewNextService.disabled = activeIndex >= previewServices.length - 1;
         previewPrevService.textContent = previousService ? `上一个：${previewServiceLabels[previousService]}` : "上一个";
         previewNextService.textContent = nextService ? `下一个：${previewServiceLabels[nextService]}` : "下一个";
         previewPrevService.setAttribute("aria-label", previousService ? `切换到${previewServiceLabels[previousService]}` : "已经是第一个服务");
         previewNextService.setAttribute("aria-label", nextService ? `切换到${previewServiceLabels[nextService]}` : "已经是最后一个服务");
+        previewPrevService.title = previousService ? `切换到${previewServiceLabels[previousService]}` : "已经是第一个服务";
+        previewNextService.title = nextService ? `切换到${previewServiceLabels[nextService]}` : "已经是最后一个服务";
       };
       const stepPreviewService = (offset) => {
         const activeIndex = previewServices.indexOf(activePreviewService);
