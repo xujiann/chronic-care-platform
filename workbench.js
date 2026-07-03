@@ -542,13 +542,14 @@ function renderSiteReadinessPack(siteReadinessPack, siteTemplateReadmes, siteLau
   renderSiteLaunchEvidenceForm(siteLaunchEvidence);
   const evidenceSummary = siteLaunchEvidence?.summary || {};
   const evidenceState = siteLaunchEvidence?.state || "evidence-api-not-loaded";
+  const missingVerifiedTemplates = evidenceSummary.missingVerifiedTemplates ?? evidenceSummary.missingTemplates;
   const evidenceSummaryRow = `<article class="priority-row" data-site-launch-evidence="summary">
-    <div class="priority-rank ${evidenceSummary.missingTemplates === 0 ? "info" : "warn"}">${evidenceSummary.verified || 0}/${evidenceSummary.templates || 0}</div>
+    <div class="priority-rank ${missingVerifiedTemplates === 0 ? "info" : "warn"}">${evidenceSummary.verifiedTemplates || 0}/${evidenceSummary.templates || 0}</div>
     <div>
       <h3>Site launch evidence ledger</h3>
-      <p>${evidenceSummary.evidence || 0} evidence rows; submitted=${evidenceSummary.submitted || 0}; verified=${evidenceSummary.verified || 0}; missing templates=${evidenceSummary.missingTemplates ?? "n/a"}.</p>
+      <p>${evidenceSummary.evidence || 0} evidence rows; submitted=${evidenceSummary.submitted || 0}; verified=${evidenceSummary.verified || 0}; recorded templates=${evidenceSummary.recordedTemplates || 0}; missing verified templates=${missingVerifiedTemplates ?? "n/a"}.</p>
       <div class="standard-tags">
-        <span class="badge ${evidenceSummary.missingTemplates === 0 ? "info" : "warn"}">${evidenceState}</span>
+        <span class="badge ${missingVerifiedTemplates === 0 ? "info" : "warn"}">${evidenceState}</span>
         <span class="badge info">/api/site-launch-evidence</span>
       </div>
     </div>

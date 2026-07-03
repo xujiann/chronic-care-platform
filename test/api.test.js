@@ -272,7 +272,18 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(siteLaunchEvidence.response.status, 200);
     assert.equal(siteLaunchEvidence.body.ok, true);
     assert.equal(siteLaunchEvidence.body.templates.length > 0, true);
+    assert.equal(siteLaunchEvidence.body.summary.missingVerifiedTemplates >= 1, true);
     const evidenceTemplate = siteLaunchEvidence.body.templates[0];
+    const invalidVerifiedSiteEvidence = await api(baseUrl, "/api/site-launch-evidence", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        templateId: evidenceTemplate.id,
+        status: "verified",
+        artifactName: "site evidence without receipt"
+      })
+    }));
+    assert.equal(invalidVerifiedSiteEvidence.response.status, 400);
+    assert.match(invalidVerifiedSiteEvidence.body.message, /verified evidence requires/);
     const recordedSiteEvidence = await api(baseUrl, "/api/site-launch-evidence", authorized(accountLogin.body.token, {
       method: "POST",
       body: JSON.stringify({
@@ -289,6 +300,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(recordedSiteEvidence.body.evidence.templateId, evidenceTemplate.id);
     assert.equal(recordedSiteEvidence.body.evidence.status, "verified");
     assert.equal(recordedSiteEvidence.body.siteLaunchEvidence.summary.evidence >= 1, true);
+    assert.equal(recordedSiteEvidence.body.siteLaunchEvidence.summary.verifiedTemplates >= 1, true);
+    assert.equal(recordedSiteEvidence.body.siteLaunchEvidence.summary.missingVerifiedTemplates < recordedSiteEvidence.body.siteLaunchEvidence.summary.templates, true);
 
     const templateReadmes = await api(baseUrl, "/api/site-template-readmes", authorized(accountLogin.body.token));
     assert.equal(templateReadmes.response.status, 200);
@@ -319,6 +332,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(createdSiteEvidence.body.evidence.status, "verified");
     assert.equal(createdSiteEvidence.body.evidence.attachmentNames.length, 3);
     assert.equal(createdSiteEvidence.body.siteLaunchEvidence.summary.verified >= 1, true);
+    assert.equal(createdSiteEvidence.body.siteLaunchEvidence.state, "evidence-verification-in-progress");
 
     const refreshedSiteEvidence = await api(baseUrl, "/api/site-launch-evidence", authorized(accountLogin.body.token));
     assert.equal(refreshedSiteEvidence.body.evidence.some((item) => item.jointTestNo === "JT-API-20260702-001"), true);

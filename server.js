@@ -10895,6 +10895,11 @@ function normalizeSiteLaunchEvidence(payload, user, data) {
   const allowedStatuses = new Set(["submitted", "verified", "rejected", "superseded"]);
   const status = cleanSiteEvidenceText(payload.status || "submitted").toLowerCase();
   if (!allowedStatuses.has(status)) throw new Error("status must be submitted, verified, rejected or superseded");
+  const jointTestNo = cleanSiteEvidenceText(payload.jointTestNo || payload.receiptNo || payload.ticketNo);
+  const attachmentNames = normalizeStringList(payload.attachmentNames || payload.attachments).slice(0, 12);
+  if (status === "verified" && !jointTestNo && attachmentNames.length === 0) {
+    throw new Error("verified evidence requires jointTestNo or attachmentNames");
+  }
   const now = new Date().toISOString();
   const note = cleanSiteEvidenceText(payload.note || payload.comment);
   return {
@@ -10906,9 +10911,9 @@ function normalizeSiteLaunchEvidence(payload, user, data) {
     artifactName,
     evidenceType: cleanSiteEvidenceText(payload.evidenceType || payload.type || "site-joint-test-evidence"),
     externalSystem: cleanSiteEvidenceText(payload.externalSystem || payload.sourceSystem),
-    jointTestNo: cleanSiteEvidenceText(payload.jointTestNo || payload.receiptNo || payload.ticketNo),
+    jointTestNo,
     status,
-    attachmentNames: normalizeStringList(payload.attachmentNames || payload.attachments).slice(0, 12),
+    attachmentNames,
     note,
     submittedAt: cleanSiteEvidenceText(payload.submittedAt) || now,
     submittedBy: user.username || user.role,
@@ -10936,10 +10941,13 @@ function buildSiteLaunchEvidenceDashboard(data) {
     .map((item) => ({
       ...item,
       template: templateById.get(item.templateId) || null,
-      acceptedForCutover: ["submitted", "verified"].includes(String(item.status || "").toLowerCase())
+      recordedForCutover: ["submitted", "verified"].includes(String(item.status || "").toLowerCase()),
+      acceptedForCutover: String(item.status || "").toLowerCase() === "verified"
     }));
-  const activeTemplateIds = new Set(rows.filter((item) => item.acceptedForCutover).map((item) => item.templateId));
-  const missingTemplates = templates.filter((item) => !activeTemplateIds.has(item.id));
+  const recordedTemplateIds = new Set(rows.filter((item) => item.recordedForCutover).map((item) => item.templateId));
+  const verifiedTemplateIds = new Set(rows.filter((item) => item.acceptedForCutover).map((item) => item.templateId));
+  const missingTemplates = templates.filter((item) => !recordedTemplateIds.has(item.id));
+  const missingVerifiedTemplates = templates.filter((item) => !verifiedTemplateIds.has(item.id));
   const byDomain = rows.reduce((result, item) => {
     const domain = item.domain || item.template?.domain || "unknown";
     result[domain] = (result[domain] || 0) + 1;
@@ -10950,18 +10958,22 @@ function buildSiteLaunchEvidenceDashboard(data) {
     evidence: rows.length,
     submitted: rows.filter((item) => item.status === "submitted").length,
     verified: rows.filter((item) => item.status === "verified").length,
+    recordedTemplates: recordedTemplateIds.size,
+    verifiedTemplates: verifiedTemplateIds.size,
     rejected: rows.filter((item) => item.status === "rejected").length,
     missingTemplates: missingTemplates.length,
+    missingVerifiedTemplates: missingVerifiedTemplates.length,
     domainsWithEvidence: Object.keys(byDomain).length
   };
   return {
     ok: true,
     generatedAt: new Date().toISOString(),
-    state: summary.missingTemplates === 0 ? "all-template-evidence-recorded" : "evidence-collection-in-progress",
+    state: summary.missingVerifiedTemplates === 0 ? "all-template-evidence-verified" : "evidence-verification-in-progress",
     summary,
     templates,
     evidence: rows,
     missingTemplates: missingTemplates.slice(0, 30),
+    missingVerifiedTemplates: missingVerifiedTemplates.slice(0, 30),
     byDomain
   };
 }

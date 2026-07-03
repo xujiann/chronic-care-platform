@@ -220,7 +220,7 @@ npm.cmd run hybrid:deployment-readiness
 
 `site:pack` 会生成 `release/site-readiness-pack.json` 与 `release/site-readiness-pack.md`，把政务身份源、HIS/EMR/LIS/PACS/医保/证照接口联调、监控值守和生产签字事项转换为现场可填写的字段映射、样例报文、告警、值班和签字模板；同时生成 `release/templates/*/README.md`，按身份源映射、接口联调、监控值守、生产签字四类模板说明当前系统可实现的能力、需收集的输入、产出物和 API 证据。`GET /api/site-template-readmes` 会把这 4 个模板 README 作为运行时审计数据返回，工作台会展示每个模板的状态、责任方、行数、附件类型和 live evidence；`release:report` 会同步归档该准备包与模板 README。
 
-`GET /api/site-launch-evidence` 与 `POST /api/site-launch-evidence` 已支持委端登记现场上线证据，把身份源、接口联调、监控值守和生产签字模板转成可审计的 `siteLaunchEvidence` 台账；统一工作台的 Site readiness pack 面板可以选择模板、填写外部系统、联调单号、附件摘要和验收状态，并在提交后刷新证据缺口。
+`GET /api/site-launch-evidence` 与 `POST /api/site-launch-evidence` 已支持委端登记现场上线证据，把身份源、接口联调、监控值守和生产签字模板转成可审计的 `siteLaunchEvidence` 台账；统一工作台的 Site readiness pack 面板可以选择模板、填写外部系统、联调单号、附件摘要和验收状态，并在提交后刷新证据缺口。`verified` 状态必须带联调单号或附件摘要，台账会分别统计已登记模板和已验收模板，避免把仅提交材料误判为可上线签字证据。
 
 `onsite:launch-requirements` 会生成 `release/onsite-launch-requirements.json` 与 `release/onsite-launch-requirements.md`，把正式上线现场必须补齐的生产域名、密钥、统一身份、短信、HIS/EMR/LIS/PACS、陪诊/护理/挂号、医保/证照、生产数据库、安全、监控、灾备、居民移动端和灰度签字要求转成 P0/P1 阻断清单；`release:report` 和 `release:manifest` 会同步归档该产物。
 

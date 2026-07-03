@@ -629,6 +629,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(workbenchJs, /loadSiteLaunchEvidence/);
   assert.match(workbenchJs, /renderSiteLaunchEvidenceForm/);
   assert.match(workbenchJs, /submitSiteLaunchEvidence/);
+  assert.match(workbenchJs, /missing verified templates/);
   assert.match(workbenchJs, /loadReleaseReport/);
   assert.match(workbenchJs, /loadProductionCutoverChecklist/);
   assert.match(workbenchJs, /loadReleaseArtifactManifest/);
@@ -660,6 +661,8 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("server.js"), /\/api\/process-audit/);
   assert.match(read("server.js"), /\/api\/service-acceptance-summary/);
   assert.match(read("server.js"), /\/api\/site-launch-evidence/);
+  assert.match(read("server.js"), /verified evidence requires jointTestNo or attachmentNames/);
+  assert.match(read("server.js"), /missingVerifiedTemplates/);
   assert.match(read("server.js"), /\/api\/site-readiness-pack/);
   assert.match(read("server.js"), /SERVICE_DOMAIN_BY_COLLECTION/);
   assert.match(read("server.js"), /priorityLevel/);
