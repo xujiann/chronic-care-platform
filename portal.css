@@ -769,6 +769,35 @@ th {
   font-size: 18px;
 }
 
+.nursing-loop-risk-strip {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  border: 1px solid rgba(220, 38, 38, 0.24);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fff1f2;
+}
+
+.nursing-loop-risk-strip span,
+.nursing-loop-risk-strip strong,
+.nursing-loop-risk-strip small {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.nursing-loop-risk-strip span,
+.nursing-loop-risk-strip small {
+  color: #9f1239;
+  line-height: 1.45;
+}
+
+.nursing-loop-risk-strip strong {
+  color: #881337;
+  font-size: 16px;
+}
+
 .nursing-loop-card {
   display: grid;
   gap: 12px;

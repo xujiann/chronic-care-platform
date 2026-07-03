@@ -1417,6 +1417,8 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(js, /buildNursingClosedLoopSummary/);
   assert.match(js, /renderNursingClosedLoopSummary/);
   assert.match(js, /waitingAcceptance/);
+  assert.match(js, /highRiskOpen/);
+  assert.match(js, /slaOverdue/);
   assert.match(js, /闭环完成率/);
   assert.match(js, /居民下单/);
   assert.match(js, /护士接单/);
@@ -1445,6 +1447,10 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(js, /renderServiceItemSelect/);
   assert.match(js, /bindNurseActionButtons/);
   assert.match(js, /sourceChannel = "internet-nursing-mobile"/);
+  assert.match(js, /const submit = form\.querySelector\("button\[type='submit'\]"\)/);
+  assert.match(js, /if \(submit\?\.disabled\) return/);
+  assert.match(js, /const detail = await response\.json\(\)\.catch/);
+  assert.match(js, /if \(submit\) submit\.disabled = false/);
   assert.match(js, /nurseActionButtons/);
   assert.match(js, /nurseAcceptBlockReason/);
   assert.match(js, /hasSignedNursingConsent/);
@@ -1468,6 +1474,7 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(css, /nursing-closed-loop/);
   assert.match(css, /nursing-loop-summary/);
   assert.match(css, /nursing-loop-bottleneck/);
+  assert.match(css, /nursing-loop-risk-strip/);
   assert.match(css, /nursing-loop-steps/);
   assert.match(css, /grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
   assert.match(css, /nursing-role-nav/);

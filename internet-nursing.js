@@ -363,11 +363,18 @@ function nursingLoopStep(label, passed, detail) {
 
 function buildNursingClosedLoopSummary(items) {
   const rows = Array.isArray(items) ? items : [];
-  const accepted = rows.filter((item) => ["accepted", "in-service", "completed", "closed"].includes(String(item.status || ""))).length;
+  const acceptedStatuses = ["accepted", "in-service", "completed", "closed"];
+  const accepted = rows.filter((item) => acceptedStatuses.includes(String(item.status || ""))).length;
   const dispatched = rows.filter((item) => Boolean(item.nurseId)).length;
   const readyForDispatch = rows.filter((item) => item.firstVisitAssessment === "passed" && hasSignedNursingConsent(item) && !item.nurseId).length;
   const waitingAssessment = rows.filter((item) => item.firstVisitAssessment !== "passed" || !hasSignedNursingConsent(item)).length;
   const waitingAcceptance = Math.max(0, dispatched - accepted);
+  const highRiskOpen = rows.filter((item) => item.riskLevel === "high" && !acceptedStatuses.includes(String(item.status || ""))).length;
+  const slaOverdue = rows.filter((item) => {
+    const status = String(item.status || "");
+    const startedAt = Date.parse(item.requestedAt || item.createdAt || item.preferredAt || "");
+    return !acceptedStatuses.includes(status) && Number.isFinite(startedAt) && Date.now() - startedAt > 24 * 60 * 60 * 1000;
+  }).length;
   const bottlenecks = [
     { label: "待评估签署", count: waitingAssessment, hint: "先补首诊评估和知情同意" },
     { label: "待派单", count: readyForDispatch, hint: "选择合格护士并派单" },
@@ -385,6 +392,8 @@ function buildNursingClosedLoopSummary(items) {
     readyForDispatch,
     waitingAssessment,
     waitingAcceptance,
+    highRiskOpen,
+    slaOverdue,
     bottleneck,
     completionRate: rows.length ? Math.round((accepted / rows.length) * 100) : 0
   };
@@ -411,6 +420,11 @@ function renderNursingClosedLoopSummary(summary) {
       <span>下一步优先处理</span>
       <strong>${escapeHtml(summary.bottleneck.label)}</strong>
       <small>${escapeHtml(`${summary.bottleneck.count} 单 · ${summary.bottleneck.hint}`)}</small>
+    </div>
+    <div class="nursing-loop-risk-strip" aria-label="互联网护理SLA风险提示">
+      <span>SLA 风险提示</span>
+      <strong>${escapeHtml(`高风险未闭环 ${summary.highRiskOpen} 单 / 超 24 小时 ${summary.slaOverdue} 单`)}</strong>
+      <small>${escapeHtml(summary.highRiskOpen || summary.slaOverdue ? "请优先完成评估派单、护士接单和轨迹开启。" : "暂无超时或高风险未闭环订单。")}</small>
     </div>
   `;
 }
@@ -970,8 +984,11 @@ function bindNursingAppointmentForm() {
   if (dateInput && !dateInput.value) dateInput.value = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
+    const submit = form.querySelector("button[type='submit']");
+    if (submit?.disabled) return;
     const values = Object.fromEntries(new FormData(form).entries());
     values.sourceChannel = "internet-nursing-mobile";
+    if (submit) submit.disabled = true;
     try {
       if (NURSING_API_BASE) {
         const request = window.HealthCityAuth?.authFetch || fetch;
@@ -980,7 +997,10 @@ function bindNursingAppointmentForm() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(values)
         });
-        if (!response.ok) throw new Error(`互联网护理预约提交失败：${response.status}`);
+        if (!response.ok) {
+          const detail = await response.json().catch(() => ({}));
+          throw new Error(detail.message || `互联网护理预约提交失败：${response.status}`);
+        }
       } else {
         const localOrder = { ...values, id: `ino-local-${crypto.randomUUID()}`, status: "requested", firstVisitAssessment: "pending", informedConsent: "pending", consentAttachment: { status: "pending", required: true, version: "internet-nursing-consent-v1" }, locationTrace: "pending", locationTracePoints: [], serviceRecordStatus: "pending", qualityCallback: "pending" };
         localOrder.notificationDeliveries = staticNotificationDeliveries(localOrder);
@@ -992,6 +1012,8 @@ function bindNursingAppointmentForm() {
       await loadInternetNursingDashboard();
     } catch (error) {
       showNursingMessage(error.message || "预约提交失败，请稍后重试。", "danger");
+    } finally {
+      if (submit) submit.disabled = false;
     }
   });
 }
