@@ -488,7 +488,9 @@ function escortServiceChecks(escortServiceReadiness) {
     check("escortService:readiness", escortServiceReadiness.ok, escortServiceReadiness.ok ? "escort service readiness checks passed" : "escort service readiness checks failed", "error", "escort"),
     check("escortService:registry", escortServiceReadiness.summary?.providers >= 3 && escortServiceReadiness.summary?.trainedWorkers >= 3, `${escortServiceReadiness.summary?.providers || 0} providers / ${escortServiceReadiness.summary?.trainedWorkers || 0} trained workers`, "error", "escort"),
     check("escortService:riskQuality", escortServiceReadiness.checks?.some((item) => item.id === "escort:riskQuality" && item.passed), "risk queue and quality callback evidence present", "error", "escort"),
-    check("escortService:citizenProviderAvailability", escortServiceReadiness.checks?.some((item) => item.id === "escort:citizenProviderAvailability" && item.passed), "citizen booking is guarded when no published provider is available", "error", "escort")
+    check("escortService:citizenProviderAvailability", escortServiceReadiness.checks?.some((item) => item.id === "escort:citizenProviderAvailability" && item.passed), "citizen booking is guarded when no published provider is available", "error", "escort"),
+    check("escortService:citizenSubmitReadiness", escortServiceReadiness.checks?.some((item) => item.id === "escort:citizenSubmitReadiness" && item.passed), "resident appointment submit readiness evidence present", "error", "escort"),
+    check("escortService:appointmentFieldGuard", escortServiceReadiness.checks?.some((item) => item.id === "escort:appointmentFieldGuard" && item.passed), "resident appointment required field guard evidence present", "error", "escort")
   ];
 }
 
@@ -496,7 +498,8 @@ function internetNursingChecks(internetNursingReadiness) {
   return [
     check("internetNursing:readiness", internetNursingReadiness.ok, internetNursingReadiness.ok ? "internet nursing readiness checks passed" : "internet nursing readiness checks failed", "error", "internet-nursing"),
     check("internetNursing:qualification", internetNursingReadiness.summary?.qualifiedNurses >= 2, `${internetNursingReadiness.summary?.qualifiedNurses || 0}/${internetNursingReadiness.summary?.nurses || 0} qualified nurses`, "error", "internet-nursing"),
-    check("internetNursing:riskTrace", internetNursingReadiness.checks?.some((item) => item.id === "nursing:riskTrace" && item.passed), "risk queue and location tracking evidence present", "error", "internet-nursing")
+    check("internetNursing:riskTrace", internetNursingReadiness.checks?.some((item) => item.id === "nursing:riskTrace" && item.passed), "risk queue and location tracking evidence present", "error", "internet-nursing"),
+    check("internetNursing:closedLoopSummary", internetNursingReadiness.checks?.some((item) => item.id === "nursing:closedLoopSummary" && item.passed), "closed-loop summary evidence present", "error", "internet-nursing")
   ];
 }
 

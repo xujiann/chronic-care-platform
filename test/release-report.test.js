@@ -151,6 +151,9 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "referralTeleconsultation:readiness" && item.passed), true);
   assert.equal(report.referralTeleconsultationReadiness.ok, true);
   assert.equal(report.checks.some((item) => item.name === "escortService:citizenProviderAvailability" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "escortService:citizenSubmitReadiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "escortService:appointmentFieldGuard" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "internetNursing:closedLoopSummary" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "operations:readiness" && item.passed), true);
   assert.equal(report.operationsReadiness.ok, true);
   assert.equal(report.checks.some((item) => item.name === "process:audit" && item.passed), true);

@@ -863,6 +863,19 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(missingHospital.response.status, 400);
     assert.equal(missingHospital.body.message, "hospital is required");
 
+    const missingDepartment = await api(baseUrl, "/api/escort-services/orders", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        providerId,
+        hospital: "Dalian Central Hospital outpatient clinic demo",
+        appointmentAt: futureEscortDate,
+        serviceItems: ["registration", "exam escort"]
+      })
+    }));
+    assert.equal(missingDepartment.response.status, 400);
+    assert.equal(missingDepartment.body.message, "department is required");
+
     const missingAppointmentAt = await api(baseUrl, "/api/escort-services/orders", authorized(citizenToken, {
       method: "POST",
       body: JSON.stringify({
@@ -875,6 +888,20 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     }));
     assert.equal(missingAppointmentAt.response.status, 400);
     assert.equal(missingAppointmentAt.body.message, "appointmentAt is required");
+
+    const missingServiceItems = await api(baseUrl, "/api/escort-services/orders", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        providerId,
+        hospital: "Dalian Central Hospital outpatient clinic demo",
+        department: "Cardiology",
+        appointmentAt: futureEscortDate,
+        serviceItems: []
+      })
+    }));
+    assert.equal(missingServiceItems.response.status, 400);
+    assert.equal(missingServiceItems.body.message, "serviceItems is required");
 
     const pastAppointmentAt = await api(baseUrl, "/api/escort-services/orders", authorized(citizenToken, {
       method: "POST",

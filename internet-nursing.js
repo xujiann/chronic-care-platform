@@ -316,11 +316,13 @@ function renderInternetNursingDashboard(dashboard) {
 function renderNursingClosedLoop(items) {
   const target = document.querySelector("#nursing-closed-loop");
   if (!target) return;
+  const summary = buildNursingClosedLoopSummary(items || []);
+  const summaryHtml = renderNursingClosedLoopSummary(summary);
   const rows = (items || [])
     .slice()
     .sort((a, b) => String(b.requestedAt || b.createdAt || b.preferredAt || "").localeCompare(String(a.requestedAt || a.createdAt || a.preferredAt || "")))
     .slice(0, 4);
-  target.innerHTML = rows.length ? rows.map((item) => `
+  target.innerHTML = `${summaryHtml}${rows.length ? rows.map((item) => `
     <article class="nursing-loop-card">
       <header>
         <div>
@@ -347,7 +349,7 @@ function renderNursingClosedLoop(items) {
         </div>
       </header>
     </article>
-  `;
+  `}`;
 }
 
 function nursingLoopStep(label, passed, detail) {
@@ -355,6 +357,60 @@ function nursingLoopStep(label, passed, detail) {
     <div class="nursing-loop-step ${passed ? "done" : "pending"}">
       <strong>${escapeHtml(label)}</strong>
       <span>${escapeHtml(displayText(detail || (passed ? "done" : "pending")))}</span>
+    </div>
+  `;
+}
+
+function buildNursingClosedLoopSummary(items) {
+  const rows = Array.isArray(items) ? items : [];
+  const accepted = rows.filter((item) => ["accepted", "in-service", "completed", "closed"].includes(String(item.status || ""))).length;
+  const dispatched = rows.filter((item) => Boolean(item.nurseId)).length;
+  const readyForDispatch = rows.filter((item) => item.firstVisitAssessment === "passed" && hasSignedNursingConsent(item) && !item.nurseId).length;
+  const waitingAssessment = rows.filter((item) => item.firstVisitAssessment !== "passed" || !hasSignedNursingConsent(item)).length;
+  const waitingAcceptance = Math.max(0, dispatched - accepted);
+  const bottlenecks = [
+    { label: "待评估签署", count: waitingAssessment, hint: "先补首诊评估和知情同意" },
+    { label: "待派单", count: readyForDispatch, hint: "选择合格护士并派单" },
+    { label: "待接单", count: waitingAcceptance, hint: "提醒护士接单并开启轨迹" }
+  ];
+  const bottleneck = bottlenecks.find((item) => item.count > 0) || {
+    label: "闭环运行平稳",
+    count: accepted,
+    hint: "持续跟踪服务记录和质控回访"
+  };
+  return {
+    total: rows.length,
+    accepted,
+    dispatched,
+    readyForDispatch,
+    waitingAssessment,
+    waitingAcceptance,
+    bottleneck,
+    completionRate: rows.length ? Math.round((accepted / rows.length) * 100) : 0
+  };
+}
+
+function renderNursingClosedLoopSummary(summary) {
+  const rows = [
+    ["闭环完成率", `${summary.completionRate}%`, `${summary.accepted}/${summary.total} 单已接单`],
+    ["已派单", summary.dispatched, "护士任务已生成"],
+    ["待派单", summary.readyForDispatch, "评估和同意已齐"],
+    ["待评估签署", summary.waitingAssessment, "需医院补齐证据"]
+  ];
+  return `
+    <div class="nursing-loop-summary" aria-label="互联网护理闭环汇总">
+      ${rows.map(([label, value, hint]) => `
+        <div>
+          <span>${escapeHtml(label)}</span>
+          <strong>${escapeHtml(value)}</strong>
+          <small>${escapeHtml(hint)}</small>
+        </div>
+      `).join("")}
+    </div>
+    <div class="nursing-loop-bottleneck" aria-label="互联网护理下一步优先处理">
+      <span>下一步优先处理</span>
+      <strong>${escapeHtml(summary.bottleneck.label)}</strong>
+      <small>${escapeHtml(`${summary.bottleneck.count} 单 · ${summary.bottleneck.hint}`)}</small>
     </div>
   `;
 }

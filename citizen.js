@@ -249,7 +249,7 @@ const citizenGovernanceChecks = [
   { key: "authorization", title: "授权共享与撤销", interface: "/api/personal-records", ready: "已实现", production: "撤销后需要后端强制拦截、访问复核和审计保全联动" },
   { key: "emr", title: "电子病历来源", interface: "EMR/LIS/PACS -> /api/personal-records", ready: "演示归集", production: "接入院内 EMR、LIS、PACS、对象存储和原文调阅授权" },
   { key: "access", title: "访问日志复核", interface: "dataAccessLogs, /api/messages", ready: "已展示", production: "接入统一审计链、SIEM 或审计导出路径" },
-  { key: "notification", title: "消息触达回执", interface: "/api/messages, /api/tasks/:id/actions", ready: "已实现", production: "接入短信、订阅消息、APP 推送和送达回执" }
+  { key: "notification", title: "消息触达回执", interface: "/api/messages, /api/tasks/:id/actions", ready: "已实现", production: "接入短信、订阅消息、手机应用推送和送达回执" }
 ];
 
 const citizenClientChannels = [
@@ -273,12 +273,12 @@ const citizenClientChannels = [
     label: "手机应用",
     status: "可上线配置",
     entry: "citizen.html?client=app&page=health-record",
-    audience: "Android / iOS 应用壳、桌面图标、离线缓存",
-    capabilities: ["PWA 安装入口", "离线健康档案壳", "大字模式", "系统推送预留"],
+    audience: "安卓/苹果手机应用壳、桌面图标、离线缓存",
+    capabilities: ["可安装网页应用入口", "离线健康档案壳", "大字模式", "系统推送预留"],
     readiness: ["应用签名与包名", "应用市场隐私合规", "推送证书", "崩溃监控与版本升级"],
     nextAction: "打包手机应用上架材料",
     launchChecklist: [
-      { label: "安装入口", state: "已就绪", note: "PWA 壳支持浏览器安装" },
+      { label: "安装入口", state: "已就绪", note: "可安装网页应用壳支持浏览器安装" },
       { label: "离线访问", state: "已就绪", note: "Service Worker 缓存居民端壳" },
       { label: "应用上架", state: "上线前确认", note: "需补齐签名、隐私和推送证书" }
     ]
@@ -2174,6 +2174,9 @@ function renderEscortAppointmentCheck(form = document.querySelector("#escort-app
   const providers = getEscortProviders();
   const provider = providers.find((item) => item.id === form.elements.providerId?.value) || providers[0] || null;
   const linkedRegistration = findEscortRegistrationOrder(residentId, form.elements.registrationOrderId?.value);
+  const validation = buildEscortAppointmentValidation(form, residentId, provider, linkedRegistration);
+  const blockers = validation.filter((item) => !item.ready);
+  const readyCount = validation.length - blockers.length;
   const serviceLabels = Array.from(form.elements.serviceItems?.selectedOptions || [])
     .map((option) => option.textContent.trim())
     .filter(Boolean);
@@ -2195,7 +2198,55 @@ function renderEscortAppointmentCheck(form = document.querySelector("#escort-app
   target.innerHTML = `<strong>预约核对</strong>
     <p>${provider ? "提交前请核对服务主体、医院、日期和保障信息。" : "暂无可预约服务主体时，表单会保持不可提交状态。"}</p>
     <dl>${rows.map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`).join("")}</dl>
-    <span class="status ${provider ? "" : "warn"}">${provider ? "可提交预约" : "暂不可预约"}</span>`;
+    <div class="escort-appointment-gate-summary" aria-live="polite">已满足 ${readyCount} 项，${blockers.length ? `需补齐 ${blockers.length} 项` : "全部条件已满足"}</div>
+    <ul class="escort-appointment-gates" aria-label="陪诊预约提交条件">
+      ${validation.map((item) => `<li class="${item.ready ? "is-ready" : "is-blocked"}"><strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(item.detail)}</span></li>`).join("")}
+    </ul>
+    <span class="status ${blockers.length ? "warn" : ""}">${blockers.length ? `需补齐 ${blockers.map((item) => item.label).join("、")}` : "可提交预约"}</span>`;
+}
+
+function buildEscortAppointmentValidation(form, residentId = currentResidentId, provider = null, linkedRegistration = null) {
+  if (!form) return [];
+  const hospital = form.elements.hospital?.value || linkedRegistration?.hospital || "";
+  const department = form.elements.department?.value || linkedRegistration?.department || "";
+  const appointmentAt = form.elements.appointmentAt?.value || linkedRegistration?.appointmentDate || linkedRegistration?.appointmentAt || "";
+  const serviceItems = getEscortAppointmentServiceItems(form, linkedRegistration);
+  const serviceReady = serviceItems.length > 0;
+  return [
+    {
+      label: "服务主体",
+      ready: Boolean(provider),
+      detail: provider ? "已发布服务主体，可承接居民预约" : "暂无已发布服务主体"
+    },
+    {
+      label: "就诊医院",
+      ready: Boolean(String(hospital).trim()),
+      detail: hospital || "请填写医院或关联挂号"
+    },
+    {
+      label: "就诊科室",
+      ready: Boolean(String(department).trim()),
+      detail: department || "请填写科室或关联挂号"
+    },
+    {
+      label: "预约日期",
+      ready: Boolean(appointmentAt) && appointmentAt >= todayOffset(0),
+      detail: appointmentAt ? (appointmentAt < todayOffset(0) ? "预约日期不能早于今天" : appointmentAt) : "请选择就诊日期"
+    },
+    {
+      label: "服务内容",
+      ready: serviceReady,
+      detail: serviceReady ? "已选择陪诊服务内容" : "请选择至少一项服务内容"
+    }
+  ];
+}
+
+function getEscortAppointmentServiceItems(form, linkedRegistration = null) {
+  const selectedItems = Array.from(form?.elements.serviceItems?.selectedOptions || [])
+    .map((option) => option.value)
+    .filter(Boolean);
+  if (selectedItems.length) return selectedItems;
+  return linkedRegistration ? ["registration", "exam escort"] : [];
 }
 
 function bindEscortAppointment() {
@@ -2223,6 +2274,13 @@ function bindEscortAppointment() {
     }
     const provider = providers.find((item) => item.id === data.get("providerId"));
     const linkedRegistration = findEscortRegistrationOrder(currentResidentId, data.get("registrationOrderId"));
+    const validation = buildEscortAppointmentValidation(form, currentResidentId, provider, linkedRegistration);
+    const blockers = validation.filter((item) => !item.ready);
+    if (blockers.length) {
+      renderEscortAppointmentCheck(form, currentResidentId);
+      showToast(`请补齐${blockers.map((item) => item.label).join("、")}后再提交陪诊预约`);
+      return;
+    }
     const payload = {
       residentId: currentResidentId,
       providerId: data.get("providerId"),
@@ -2234,7 +2292,7 @@ function bindEscortAppointment() {
       doctorCode: linkedRegistration?.doctorCode || "",
       appointmentAt: data.get("appointmentAt") || linkedRegistration?.appointmentDate || "",
       due: data.get("appointmentAt") || linkedRegistration?.appointmentDate || "",
-      serviceItems: data.getAll("serviceItems").length ? data.getAll("serviceItems") : ["registration", "exam escort"],
+      serviceItems: getEscortAppointmentServiceItems(form, linkedRegistration),
       subsidyType: data.get("subsidyType"),
       priority: data.get("priority"),
       riskLevel: data.get("priority") === "high" ? "high" : "medium",
@@ -2258,7 +2316,10 @@ function bindEscortAppointment() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
-        if (!response.ok) throw new Error(`escort appointment failed: ${response.status}`);
+        if (!response.ok) {
+          const errorBody = await response.json().catch(() => ({}));
+          throw new Error(errorBody.message || `escort appointment failed: ${response.status}`);
+        }
         saved = await response.json();
       } else {
         saved = {

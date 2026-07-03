@@ -21,6 +21,7 @@ test("internet nursing readiness validates three-role workflow and policy eviden
   assert.equal(report.summary.orders >= 3, true);
   assert.equal(report.checks.some((item) => item.id === "nursing:api" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "nursing:frontend" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "nursing:closedLoopSummary" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "nursing:visibleText" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "nursing:mobileWorkflow" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "nursing:launchControls" && item.passed), true);
@@ -48,6 +49,7 @@ test("internet nursing readiness validates three-role workflow and policy eviden
   assert.match(renderMarkdown(report), /Internet nursing readiness report/);
   assert.match(renderMarkdown(report), /Site Cutover Pack/);
   assert.match(renderMarkdown(report), /Production Blockers/);
+  assert.match(renderMarkdown(report), /closed-loop summary exposes completion/);
   assert.match(renderMarkdown(report), /audit-retention/);
   assert.match(renderMarkdown(report), /nursing-cutover-payment-reconciliation/);
   assert.match(renderMarkdown(report), /docs\/互联网护理服务模块说明\.md/);

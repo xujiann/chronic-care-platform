@@ -69,13 +69,13 @@ http://localhost:5173/login.html
 | `mobile-preview.html` | 居民端手机预览 |
 | `county.html` | 县域医共体平台、16255 模型、协同工单、互认、基层 AI |
 
-居民端已提供 PWA 基础壳：`manifest.webmanifest`、`service-worker.js` 和 `pwa-icon.svg` 支持浏览器安装入口、静态资源缓存和弱网/离线回退到居民端健康档案页面；`citizen.html?client=mini-program|app&page=health-record|emr|nursing|escort|registration` 将健康档案、电子病历、护理、陪诊和挂号拆为可分享、可回退的二级页面，并区分小程序与 APP 两种上线运行形态；桌面服务导航、手机端压缩服务标签、手机顶部快速切换条与手机底部导航均按 URL 跳转并优先落到对应业务内容，摘要卡提供当前页面主操作入口，陪诊预约会在提交前汇总服务主体、费用、就诊安排、服务内容、医院交接和保障状态，服务待办中心会按居民汇总慢病随访、筛查宣教、固定取药、转诊号源、陪诊和互联网护理事项，并支持确认、取消、反馈、评价和满意度/投诉质控闭环；居民通知面板复用 `/api/messages` 和回执接口展示预约变更、护士接单、陪诊师匹配、授权到期等消息；运行形态面板展示入口、上线能力、发布条件、当前二级页入口、复制入口和发布检查清单，功能审计沉到页面后方作为状态证明；APP/PWA 形态已补齐 Android/iOS 添加到桌面的 meta、Manifest `id`、展示降级策略和健康档案/电子病历/陪诊快捷入口；`mobile-preview.html` 提供 390px 手机框、本机/真机访问地址、演示登录方式、服务切换控制、双端运行形态切换、底部服务导航和待办通知验收清单，并适配 `?client=app` 直接预览 APP 形态，便于发布前预览居民端手机操作；个人健康信息库已细分电子病历、检查检验、用药处方、影像资料和附件资料，正式上线时仍需结合生产域名、HTTPS、PACS/文档存储授权和现场移动端策略复核。
+居民端已提供可安装网页应用基础壳：`manifest.webmanifest`、`service-worker.js` 和 `pwa-icon.svg` 支持浏览器安装入口、静态资源缓存和弱网/离线回退到居民端健康档案页面；`citizen.html?client=mini-program|app&page=health-record|emr|nursing|escort|registration` 将健康档案、电子病历、护理、陪诊和挂号拆为可分享、可回退的二级页面，并区分小程序与手机应用两种上线运行形态；桌面服务导航、手机端压缩服务标签、手机顶部快速切换条与手机底部导航均按 URL 跳转并优先落到对应业务内容，摘要卡提供当前页面主操作入口，陪诊预约会在提交前汇总服务主体、费用、就诊安排、服务内容、医院交接和保障状态，服务待办中心会按居民汇总慢病随访、筛查宣教、固定取药、转诊号源、陪诊和互联网护理事项，并支持确认、取消、反馈、评价和满意度/投诉质控闭环；居民通知面板复用 `/api/messages` 和回执接口展示预约变更、护士接单、陪诊师匹配、授权到期等消息；运行形态面板展示入口、上线能力、发布条件、当前二级页入口、复制入口和发布检查清单，功能审计沉到页面后方作为状态证明；手机应用/可安装网页应用形态已补齐安卓/苹果添加到桌面的 meta、Manifest `id`、展示降级策略和健康档案/电子病历/陪诊快捷入口；`mobile-preview.html` 提供 390px 手机框、本机/真机访问地址、演示登录方式、服务切换控制、双端运行形态切换、底部服务导航和待办通知验收清单，并适配 `?client=app` 直接预览手机应用形态，便于发布前预览居民端手机操作；个人健康信息库已细分电子病历、检查检验、用药处方、影像资料和附件资料，正式上线时仍需结合生产域名、HTTPS、PACS/文档存储授权和现场移动端策略复核。
 
-居民端手机二级页摘要区新增当前页序号、已实现能力数和全宽主操作按钮，方便居民在小程序/APP 预览里确认当前位置并直接进入业务内容。
+居民端手机二级页摘要区新增当前页序号、已实现能力数和全宽主操作按钮，方便居民在小程序/手机应用预览里确认当前位置并直接进入业务内容。
 手机端底部二级导航同步展示每个服务的实现状态和可用能力数，居民在健康档案、电子病历、护理、陪诊和挂号之间切换时无需回到顶部即可判断功能是否可用。
-手机预览页现在兼容 `mobile-preview.html?client=app&page=nursing` 这类入口，发布前可直接打开指定 APP 形态和二级服务页。
+手机预览页现在兼容 `mobile-preview.html?client=app&page=nursing` 这类入口，发布前可直接打开指定手机应用形态和二级服务页。
 
-手机预览页工具栏同步提供“打开当前页面”“出生健康直达”“复制入口”“当前入口地址”“精简预览”和手机框验收状态，会随小程序/APP 和健康档案、电子病历、护理、陪诊、挂号切换生成真实居民端 URL，便于现场验收和真机分发。
+手机预览页工具栏同步提供“打开当前页面”“出生健康直达”“复制入口”“当前入口地址”“精简预览”和手机框验收状态，会随小程序/手机应用和健康档案、电子病历、护理、陪诊、挂号切换生成真实居民端 URL，便于现场验收和真机分发。
 
 ## 数据与存储
 
@@ -300,11 +300,11 @@ hospital-operations:readiness generates release/hospital-operations-readiness-re
 
 `escort.html` is the runnable commission entry for the older adult medical escort service pilot. It uses `GET /api/escort-services/dashboard`, `POST /api/escort-services/orders`, `POST /api/escort-services/orders/:id/actions`, and `POST /api/escort-services/orders/:id/hospital-handoff` to manage provider registry publication, trained escort workers, service requests, hospital handoff confirmation, contract and insurance evidence, subsidy categories, risk queue, quality callbacks, and task messages.
 
-`citizen.html` includes a resident-side medical escort appointment form. Citizen users can create an order for themselves or household members through `POST /api/escort-services/orders`; the same scoped dashboard returns only their household orders and published service providers. The order API rejects missing provider registry rows, unpublished providers, missing hospital or appointment date, past appointment dates, and duplicate active appointments for the same registration or visit slot before creating the resident appointment.
+`citizen.html` includes a resident-side medical escort appointment form. Citizen users can create an order for themselves or household members through `POST /api/escort-services/orders`; the same scoped dashboard returns only their household orders and published service providers. The resident form now shows a five-item submit-readiness checklist for provider, hospital, department, date, and service items, and blocks incomplete requests before POST. The order API rejects missing provider registry rows, unpublished providers, missing hospital, department, appointment date, or service items, past appointment dates, and duplicate active appointments for the same registration or visit slot before creating the resident appointment.
 
 The hospital interface development handoff is `docs/escort-hospital-interface.md`. It documents HIS/outpatient guidance boundaries, `hospitalCode` scoping, request/response fields, the `hospital-handoff` API, resident notification behavior, audit requirements, and joint-test acceptance steps.
 
-`npm.cmd run escort:readiness` generates `release/escort-service-readiness-report.json` and `release/escort-service-readiness-report.md`, proving the policy-to-system mapping, registry, workforce, order evidence, API guard, commission frontend entry, and citizen appointment entry.
+`npm.cmd run escort:readiness` generates `release/escort-service-readiness-report.json` and `release/escort-service-readiness-report.md`, proving the policy-to-system mapping, registry, workforce, order evidence, API guard, commission frontend entry, citizen appointment entry, and resident submit-readiness checklist.
 ## Internet Nursing Pilot
 
 `internet-nursing.html` is the runnable three-role entry for Internet+ Nursing. Citizens can submit nursing appointments, hospital users can complete first-visit assessment, informed consent, and nurse dispatch, and the nurse workstation can accept orders, start tracked home service, complete nursing records, and leave quality-callback evidence.
@@ -315,7 +315,7 @@ The module uses `GET /api/internet-nursing/dashboard`, `POST /api/internet-nursi
 
 The handoff document is `docs/互联网护理服务模块说明.md`; it covers role entries, data objects, API permissions, risk controls, workflow diagram, and acceptance evidence.
 
-`npm.cmd run internet-nursing:readiness` generates `release/internet-nursing-readiness-report.json` and `release/internet-nursing-readiness-report.md`, checking the Liaoning pilot policy boundary, institution registry, nurse qualification, order evidence, API guard, three-role frontend, and release script.
+`npm.cmd run internet-nursing:readiness` generates `release/internet-nursing-readiness-report.json` and `release/internet-nursing-readiness-report.md`, checking the Liaoning pilot policy boundary, institution registry, nurse qualification, order evidence, API guard, three-role frontend, closed-loop summary, and release script.
 
 `npm.cmd run citizen:launch-foundation` generates `release/citizen-launch-foundation-readiness.json` and `release/citizen-launch-foundation-readiness.md`; `release:report` includes the same resident phone-code login, PWA/mobile shell, mini-program/APP routing, and production dependency gates. `docs/citizen-production-launch-requirements.md` is the resident-side real production launch requirements document, covering role permissions, external interfaces, non-functional requirements, security/privacy, acceptance gates, rollout, and rollback.
 

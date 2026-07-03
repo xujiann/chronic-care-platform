@@ -70,6 +70,11 @@
             <option value="escort">陪诊</option>
             <option value="registration">挂号</option>
           </select>
+          <div class="preview-service-stepper" aria-label="服务快捷切换">
+            <button type="button" id="preview-prev-service">上一个</button>
+            <span id="preview-service-position" aria-live="polite">1 / 5</span>
+            <button type="button" id="preview-next-service">下一个</button>
+          </div>
           <div class="preview-service-switch" aria-label="切换手机框服务">
             <button type="button" class="active" data-preview-service="health-record">健康档案</button>
             <button type="button" data-preview-service="emr">电子病历</button>
@@ -112,6 +117,9 @@
       const previewCompactToggle = document.querySelector("#preview-compact-toggle");
       const previewToolbar = document.querySelector(".preview-toolbar");
       const previewServiceSelect = document.querySelector("#preview-service-select");
+      const previewPrevService = document.querySelector("#preview-prev-service");
+      const previewNextService = document.querySelector("#preview-next-service");
+      const previewServicePosition = document.querySelector("#preview-service-position");
       const previewReadinessClient = document.querySelector("#preview-readiness-client");
       const previewReadinessService = document.querySelector("#preview-readiness-service");
       const previewReadinessFrame = document.querySelector("#preview-readiness-frame");
@@ -185,6 +193,21 @@
       const syncPreviewServiceControls = () => {
         serviceButtons.forEach((button) => button.classList.toggle("active", button.dataset.previewService === activePreviewService));
         previewServiceSelect.value = activePreviewService;
+        const activeIndex = previewServices.indexOf(activePreviewService);
+        const previousService = previewServices[activeIndex - 1];
+        const nextService = previewServices[activeIndex + 1];
+        previewServicePosition.textContent = `${activeIndex + 1} / ${previewServices.length}`;
+        previewPrevService.disabled = activeIndex <= 0;
+        previewNextService.disabled = activeIndex >= previewServices.length - 1;
+        previewPrevService.textContent = previousService ? `上一个：${previewServiceLabels[previousService]}` : "上一个";
+        previewNextService.textContent = nextService ? `下一个：${previewServiceLabels[nextService]}` : "下一个";
+        previewPrevService.setAttribute("aria-label", previousService ? `切换到${previewServiceLabels[previousService]}` : "已经是第一个服务");
+        previewNextService.setAttribute("aria-label", nextService ? `切换到${previewServiceLabels[nextService]}` : "已经是最后一个服务");
+      };
+      const stepPreviewService = (offset) => {
+        const activeIndex = previewServices.indexOf(activePreviewService);
+        const nextIndex = Math.min(previewServices.length - 1, Math.max(0, activeIndex + offset));
+        if (nextIndex !== activeIndex) setPreviewService(previewServices[nextIndex]);
       };
       const renderPreviewUrls = () => {
         const previewPort = location.port ? `:${location.port}` : "";
@@ -239,6 +262,8 @@
         button.addEventListener("click", () => setPreviewService(button.dataset.previewService));
       });
       previewServiceSelect.addEventListener("change", () => setPreviewService(previewServiceSelect.value));
+      previewPrevService.addEventListener("click", () => stepPreviewService(-1));
+      previewNextService.addEventListener("click", () => stepPreviewService(1));
       clientButtons.forEach((button) => {
         button.addEventListener("click", () => setPreviewClient(button.dataset.previewClient));
       });

@@ -707,6 +707,68 @@ th {
   gap: 12px;
 }
 
+.nursing-loop-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.nursing-loop-summary div {
+  min-width: 0;
+  border: 1px solid rgba(39, 110, 241, 0.18);
+  border-radius: 8px;
+  padding: 10px;
+  background: #eff6ff;
+}
+
+.nursing-loop-summary span,
+.nursing-loop-summary strong,
+.nursing-loop-summary small {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.nursing-loop-summary span,
+.nursing-loop-summary small {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.nursing-loop-summary strong {
+  margin: 4px 0;
+  color: var(--blue);
+  font-size: 22px;
+}
+
+.nursing-loop-bottleneck {
+  min-width: 0;
+  border: 1px solid rgba(245, 158, 11, 0.32);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fffbeb;
+}
+
+.nursing-loop-bottleneck span,
+.nursing-loop-bottleneck strong,
+.nursing-loop-bottleneck small {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.nursing-loop-bottleneck span,
+.nursing-loop-bottleneck small {
+  color: #92400e;
+  line-height: 1.45;
+}
+
+.nursing-loop-bottleneck strong {
+  margin: 4px 0;
+  color: #78350f;
+  font-size: 18px;
+}
+
 .nursing-loop-card {
   display: grid;
   gap: 12px;
@@ -1544,6 +1606,7 @@ dialog::backdrop {
   }
 
   .nursing-loop-card header,
+  .nursing-loop-summary,
   .nursing-loop-steps {
     grid-template-columns: 1fr;
   }

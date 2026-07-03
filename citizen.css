@@ -1289,6 +1289,57 @@ body.service-paged-mode [data-service-pane] {
   overflow-wrap: anywhere;
 }
 
+.escort-appointment-gate-summary {
+  border: 1px solid rgba(20, 184, 166, 0.24);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #ecfeff;
+  color: var(--teal);
+  font-size: 13px;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.escort-appointment-gates {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.escort-appointment-gates li {
+  display: grid;
+  grid-template-columns: minmax(72px, 0.38fr) minmax(0, 1fr);
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fff;
+  min-width: 0;
+}
+
+.escort-appointment-gates li.is-ready {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.escort-appointment-gates li.is-blocked {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.escort-appointment-gates strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.escort-appointment-gates span {
+  color: var(--muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
 .escort-appointment-check .status {
   justify-self: start;
 }

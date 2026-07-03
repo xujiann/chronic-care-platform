@@ -6542,8 +6542,8 @@ function normalizeEscortServiceOrder(payload, user, data) {
   if (registrationOrderId && !registrationOrder) throw new Error("registration order not found");
   if (registrationOrder && !canAccessRegistrationOrder(user, registrationOrder, data)) throw new Error("registration scope denied");
   const serviceItems = Array.isArray(payload.serviceItems)
-    ? payload.serviceItems.map(String).filter(Boolean)
-    : String(payload.serviceItems || "registration,exam escort").split(",").map((item) => item.trim()).filter(Boolean);
+    ? payload.serviceItems.map((item) => String(item).trim()).filter(Boolean)
+    : String(payload.serviceItems || "").split(",").map((item) => item.trim()).filter(Boolean);
   const now = new Date().toISOString();
   const note = String(payload.note || "").trim();
   const hospital = String(payload.hospital || registrationOrder?.hospital || "").trim();
@@ -6551,7 +6551,9 @@ function normalizeEscortServiceOrder(payload, user, data) {
   const appointmentAt = String(payload.appointmentAt || payload.due || registrationOrder?.appointmentDate || "").trim();
   const department = String(payload.department || registrationOrder?.department || "").trim();
   if (!hospital && !hospitalCode) throw new Error("hospital is required");
+  if (!department) throw new Error("department is required");
   if (!appointmentAt) throw new Error("appointmentAt is required");
+  if (!serviceItems.length) throw new Error("serviceItems is required");
   if (isPastEscortAppointmentDate(appointmentAt)) throw new Error("appointmentAt cannot be in the past");
   const duplicate = findDuplicateActiveEscortAppointment(data, { residentId, registrationOrderId, hospital, hospitalCode, department, appointmentAt, due: payload.due });
   if (duplicate) throw new Error("duplicate active escort appointment");
@@ -6568,7 +6570,7 @@ function normalizeEscortServiceOrder(payload, user, data) {
     department,
     appointmentAt,
     due: String(payload.due || payload.appointmentAt || registrationOrder?.appointmentDate || "").trim(),
-    serviceItems: serviceItems.length ? serviceItems : ["registration", "exam escort"],
+    serviceItems,
     status: String(payload.status || "requested").trim(),
     priority: String(payload.priority || "medium").trim(),
     riskLevel: String(payload.riskLevel || "medium").trim(),
