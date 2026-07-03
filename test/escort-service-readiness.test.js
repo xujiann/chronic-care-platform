@@ -25,6 +25,7 @@ test("escort service readiness validates policy, registry, workforce, orders and
   assert.equal(report.checks.some((item) => item.id === "escort:hospitalInterfaceDoc" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:frontend" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:citizenProviderAvailability" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "escort:citizenProgressTracking" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:citizenSubmitReadiness" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:providerScopeGuard" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:duplicateAppointmentGuard" && item.passed), true);
@@ -33,6 +34,7 @@ test("escort service readiness validates policy, registry, workforce, orders and
   assert.match(renderMarkdown(report), /Medical escort service readiness report/);
   assert.match(renderMarkdown(report), /Hospital-confirmed orders/);
   assert.match(renderMarkdown(report), /citizen appointment is enabled only when a published provider is available/);
+  assert.match(renderMarkdown(report), /resident order cards expose contract, insurance, hospital handoff, service, and callback progress/);
   assert.match(renderMarkdown(report), /visible readiness summary/);
   assert.match(renderMarkdown(report), /order creation rejects missing or unpublished provider registry rows/);
   assert.match(renderMarkdown(report), /open resident escort appointments are idempotency-guarded/);

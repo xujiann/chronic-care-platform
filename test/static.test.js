@@ -779,7 +779,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   const serviceWorker = read("service-worker.js");
   assert.match(citizenHtml, /rel="manifest"/);
   assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260703escortcheck/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260703escortprogress/);
   assert.match(citizenHtml, /mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-title/);
@@ -796,11 +796,14 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /preview-prev-service/);
   assert.match(mobilePreviewHtml, /preview-next-service/);
   assert.match(mobilePreviewHtml, /preview-service-position/);
+  assert.match(mobilePreviewHtml, /1\/5 个服务/);
+  assert.doesNotMatch(mobilePreviewHtml, /1 \/ 5/);
   assert.match(mobilePreviewHtml, /服务导航/);
   assert.match(mobilePreviewHtml, /上一个/);
   assert.match(mobilePreviewHtml, /下一个/);
   assert.match(readme, /手机预览页工具栏同步提供“上一个\/下一个”快捷切换/);
   assert.match(readme, /精简预览会进入手机验收模式/);
+  assert.match(readme, /自动对齐到预览区/);
   assert.match(mobilePreviewHtml, /preview-direct-entry/);
   assert.match(mobilePreviewHtml, /preview-birth-entry/);
   assert.match(mobilePreviewHtml, /preview-copy-entry/);
@@ -817,6 +820,10 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /renderPreviewReadiness/);
   assert.match(mobilePreviewHtml, /renderCompactPreview/);
   assert.match(mobilePreviewHtml, /document\.body\.classList\.toggle\("preview-focus-mode", isCompactPreview\)/);
+  assert.match(mobilePreviewHtml, /const previewDevice = document\.querySelector\("\.preview-device"\)/);
+  assert.match(mobilePreviewHtml, /function alignFocusPreview\(\)/);
+  assert.match(mobilePreviewHtml, /const targetTop = previewDevice\.getBoundingClientRect\(\)\.top \+ window\.scrollY - 12/);
+  assert.match(mobilePreviewHtml, /window\.scrollTo\(\{ top: Math\.max\(0, targetTop\), left: 0, behavior: "auto" \}\)/);
   assert.match(mobilePreviewHtml, /copyTextWithFallback/);
   assert.match(mobilePreviewHtml, /requestedCompactPreview/);
   assert.match(mobilePreviewHtml, /let isCompactPreview = requestedCompactPreview === "1"/);
@@ -824,6 +831,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /syncPreviewServiceControls/);
   assert.match(mobilePreviewHtml, /stepPreviewService/);
   assert.match(mobilePreviewHtml, /activePreviewServicePosition/);
+  assert.match(mobilePreviewHtml, /label: `\$\{activeIndex \+ 1\}\/\$\{previewServices\.length\} 个服务`/);
   assert.match(mobilePreviewHtml, /const servicePosition = activePreviewServicePosition\(\)/);
   assert.match(mobilePreviewHtml, /服务：\$\{previewServiceLabels\[activePreviewService\]\}（\$\{servicePosition\.label\}）/);
   assert.match(mobilePreviewHtml, /previewServicePosition\.textContent/);
@@ -917,6 +925,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewCss, /body\.preview-focus-mode \.preview-copy/);
   assert.match(mobilePreviewCss, /body\.preview-focus-mode \.preview-device/);
   assert.match(mobilePreviewCss, /body\.preview-focus-mode \.phone-frame/);
+  assert.match(mobilePreviewCss, /scroll-margin-top: 12px/);
   assert.match(mobilePreviewCss, /display: none/);
   assert.match(mobilePreviewCss, /height: min\(780px, calc\(100dvh - 156px\)\)/);
   assert.match(mobilePreviewCss, /grid-column: 1 \/ -1/);
@@ -941,7 +950,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.shortcuts.some((item) => item.url === "./citizen.html?client=app&page=escort#service-escort"), true);
   assert.equal(manifest.shortcuts.some((item) => item.url === "./mobile-preview.html?client=app"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v30/);
+  assert.match(serviceWorker, /chronic-care-citizen-v32/);
   assert.match(serviceWorker, /internet-nursing\.js\?v=20260629prod/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627preview/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages/);
@@ -957,8 +966,8 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(serviceWorker, /citizen\.js\?v=20260630visible/);
   assert.match(serviceWorker, /citizen\.js\?v=20260630touch/);
   assert.match(serviceWorker, /citizen\.js\?v=20260630escortlink/);
-  assert.match(serviceWorker, /citizen\.js\?v=20260703escortcheck/);
-  assert.match(serviceWorker, /citizen\.css\?v=20260703escortcheck/);
+  assert.match(serviceWorker, /citizen\.js\?v=20260703escortprogress/);
+  assert.match(serviceWorker, /citizen\.css\?v=20260703escortprogress/);
   assert.match(serviceWorker, /citizen\.js\?v=20260630lifecycle/);
   assert.match(serviceWorker, /citizen\.html/);
   assert.match(serviceWorker, /mobile-preview\.html/);
@@ -1006,7 +1015,7 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   assert.match(citizenJs, /setEscortAppointmentAvailability/);
   assert.match(citizenJs, /escortProviderReady/);
   assert.match(citizenJs, /暂无可预约服务主体/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260703escortcheck/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260703escortprogress/);
   assert.match(citizenJs, /\/escort-services\/orders/);
   assert.match(citizenJs, /getEscortRegistrationOptions/);
   assert.match(citizenJs, /applyLinkedRegistrationToEscortForm/);
@@ -1024,6 +1033,9 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   assert.match(citizenJs, /escapeHtml/);
   assert.match(citizenJs, /提交前请核对服务主体、医院、日期和保障信息/);
   assert.match(citizenJs, /formatEscortHospitalHandoff/);
+  assert.match(citizenJs, /renderEscortOrderProgress/);
+  assert.match(citizenJs, /isEscortMilestoneReady/);
+  assert.match(citizenJs, /陪诊订单闭环进度/);
   assert.match(citizenJs, /hisVisitId/);
   assert.match(citizenJs, /outpatientQueueNo/);
   assert.match(citizenCss, /escort-appointment-layout/);
@@ -1033,6 +1045,8 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   assert.match(citizenCss, /is-blocked/);
   assert.match(citizenCss, /grid-template-columns: max-content minmax\(0, 1fr\)/);
   assert.match(citizenCss, /escort-order-card/);
+  assert.match(citizenCss, /escort-order-progress/);
+  assert.match(citizenCss, /grid-template-columns: repeat\(auto-fit, minmax\(72px, 1fr\)\)/);
   assert.match(citizenCss, /escort-appointment-form\.is-unavailable/);
   assert.match(escortHtml, /requireRole\(\["commission", "institution"\]\)/);
   assert.match(escortJs, /data-escort-hospital/);
@@ -1309,7 +1323,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /longterm-care-form/);
   assert.match(citizenCss, /registration-form/);
   assert.match(citizenHtml, /registration-summary/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260703escortcheck/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260703escortprogress/);
   assert.match(citizenJs, /registration-summary/);
   assert.match(citizenJs, /hisOrders/);
   assert.match(citizenJs, /insuranceReady/);

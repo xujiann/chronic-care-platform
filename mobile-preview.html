@@ -72,7 +72,7 @@
           </select>
           <div class="preview-service-stepper" aria-label="服务快捷切换">
             <button type="button" id="preview-prev-service">上一个</button>
-            <span id="preview-service-position" aria-live="polite">1 / 5</span>
+            <span id="preview-service-position" aria-live="polite">1/5 个服务</span>
             <button type="button" id="preview-next-service">下一个</button>
           </div>
           <div class="preview-service-switch" aria-label="切换手机框服务">
@@ -116,6 +116,7 @@
       const previewEntryUrl = document.querySelector("#preview-entry-url");
       const previewCompactToggle = document.querySelector("#preview-compact-toggle");
       const previewToolbar = document.querySelector(".preview-toolbar");
+      const previewDevice = document.querySelector(".preview-device");
       const previewServiceSelect = document.querySelector("#preview-service-select");
       const previewPrevService = document.querySelector("#preview-prev-service");
       const previewNextService = document.querySelector("#preview-next-service");
@@ -166,7 +167,14 @@
       }
       function activePreviewServicePosition() {
         const activeIndex = Math.max(0, previewServices.indexOf(activePreviewService));
-        return { activeIndex, label: `${activeIndex + 1} / ${previewServices.length}` };
+        return { activeIndex, label: `${activeIndex + 1}/${previewServices.length} 个服务` };
+      }
+      function alignFocusPreview() {
+        if (!isCompactPreview) return;
+        window.requestAnimationFrame(() => {
+          const targetTop = previewDevice.getBoundingClientRect().top + window.scrollY - 12;
+          window.scrollTo({ top: Math.max(0, targetTop), left: 0, behavior: "auto" });
+        });
       }
       const renderPreviewDirectEntry = () => {
         const entryUrl = citizenPreviewSrc(activePreviewService);
@@ -239,6 +247,7 @@
         previewCompactToggle.setAttribute("aria-pressed", String(isCompactPreview));
         previewCompactToggle.textContent = isCompactPreview ? "完整预览" : "精简预览";
         previewCompactToggle.setAttribute("aria-label", isCompactPreview ? "退出手机验收模式" : "进入手机验收模式");
+        alignFocusPreview();
       };
       const setPreviewService = (service, options = {}) => {
         activePreviewService = service;

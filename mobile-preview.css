@@ -135,6 +135,7 @@ code {
   display: grid;
   gap: 12px;
   justify-items: center;
+  scroll-margin-top: 12px;
 }
 
 body.preview-focus-mode .preview-shell {

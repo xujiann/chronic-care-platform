@@ -1350,6 +1350,48 @@ body.service-paged-mode [data-service-pane] {
   overflow-wrap: anywhere;
 }
 
+.escort-order-progress {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.escort-order-progress li {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 8px;
+  background: #f8fafc;
+}
+
+.escort-order-progress li.is-ready {
+  border-color: #99f6e4;
+  background: #f0fdfa;
+}
+
+.escort-order-progress strong,
+.escort-order-progress span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.escort-order-progress strong {
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.escort-order-progress span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .registration-workflow {
   display: grid;
   grid-template-columns: minmax(300px, 0.9fr) minmax(0, 1fr);

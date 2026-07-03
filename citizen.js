@@ -2153,6 +2153,7 @@ function renderEscortAppointments(residentId) {
       <p>${formatEscortItems(item.serviceItems)} · ${formatSubsidy(item.subsidyType)} · 预估 ${item.feeEstimate || 0} 元</p>
       <p>合同 ${formatEscortStatus(item.contractStatus)} · 保障 ${formatEscortStatus(item.insuranceStatus)} · 回访 ${formatEscortStatus(item.qualityReview)}</p>
       <p>${formatEscortHospitalHandoff(item)}</p>
+      ${renderEscortOrderProgress(item)}
       <span class="status ${item.priority === "high" || item.riskLevel === "high" ? "danger" : String(item.status || "").includes("requested") ? "warn" : ""}">${formatEscortStatus(item.status)}</span>
     </article>`)
     .join("") || `<p class="muted">暂无陪诊预约。提交后将同步到助医陪诊监管端和服务主体待办。</p>`;
@@ -2458,7 +2459,9 @@ function formatEscortStatus(value) {
     completed: "已完成",
     closed: "已关闭",
     "cancel-requested": "取消待确认",
+    "citizen-feedback": "居民已反馈",
     pending: "待确认",
+    required: "待回访",
     covered: "已保障",
     signed: "已签约",
     high: "较急",
@@ -2473,6 +2476,24 @@ function formatEscortHospitalHandoff(item) {
   const source = item.hisVisitId || item.appointmentSource || "HIS/预约回执待同步";
   const contact = formatEscortContact(item.hospitalDepartmentContact || item.hospitalNotice || "");
   return `医院回执 ${status} · ${queue} · ${source}${contact ? ` · ${contact}` : ""}`;
+}
+
+function renderEscortOrderProgress(item) {
+  const milestones = [
+    { label: "提交", ready: true, detail: formatEscortStatus(item.status || "requested") },
+    { label: "合同", ready: isEscortMilestoneReady(item.contractStatus, ["signed", "confirmed"]), detail: formatEscortStatus(item.contractStatus || "pending") },
+    { label: "保障", ready: isEscortMilestoneReady(item.insuranceStatus, ["covered", "confirmed"]), detail: formatEscortStatus(item.insuranceStatus || "pending") },
+    { label: "医院", ready: isEscortMilestoneReady(item.hospitalInterfaceStatus, ["confirmed", "hospital-confirmed"]), detail: formatEscortStatus(item.hospitalInterfaceStatus || "pending") },
+    { label: "回访", ready: isEscortMilestoneReady(item.qualityReview, ["closed", "citizen-feedback"]) || isEscortMilestoneReady(item.status, ["closed", "completed"]), detail: formatEscortStatus(item.qualityReview || "pending") }
+  ];
+  return `<ol class="escort-order-progress" aria-label="陪诊订单闭环进度">
+    ${milestones.map((step) => `<li class="${step.ready ? "is-ready" : "is-waiting"}"><strong>${escapeHtml(step.label)}</strong><span>${escapeHtml(step.detail)}</span></li>`).join("")}
+  </ol>`;
+}
+
+function isEscortMilestoneReady(value, readyStatuses = []) {
+  const normalized = String(value || "").toLowerCase();
+  return readyStatuses.includes(normalized);
 }
 
 function formatEscortContact(value) {
