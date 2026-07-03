@@ -101,7 +101,7 @@
               <strong>01</strong>
               <div>
                 <h3>共享包编目</h3>
-                <p>复用 residents、personalRecords、diagnosticReports、countyMutualRecognitionRecords、integrationContracts、dataAccessLogs 和 securityEvents，生成跨机构诊疗共享包。</p>
+                <p>复用居民主索引、个人健康档案、诊断检查报告、县域互认记录、接口契约、访问日志和安全事件，生成跨机构诊疗共享包。</p>
               </div>
               <span>已实现</span>
             </div>
@@ -154,7 +154,7 @@
         <div class="capability-grid">
           <article class="capability-card">
             <strong>已实现业务闭环</strong>
-            <span>已具备共享包编目、角色权限裁剪、共享包详情、联调检查、调阅审计、转诊会诊交接证据和 reportId 对账清单。</span>
+            <span>已具备共享包编目、角色权限裁剪、共享包详情、联调检查、调阅审计、转诊会诊交接证据和报告编号对账清单。</span>
           </article>
           <article class="capability-card">
             <strong>已实现发布证据</strong>
@@ -167,6 +167,39 @@
           <article class="capability-card">
             <strong>上线前仍需联调</strong>
             <span>需取得 HIS、EMR、LIS、PACS、医保结算、电子证照、统计交换、监控值守和灾备演练的现场签字证据。</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" data-regional-about-section="site-evidence-actions">
+        <div class="panel-title">
+          <h2>现场交付物</h2>
+          <span>与主页面现场联调清单保持一致</span>
+        </div>
+        <div class="capability-grid">
+          <article class="capability-card">
+            <strong>身份与权限</strong>
+            <span>联调样例：管理端与机构端账号完成角色裁剪验证。</span>
+            <span>验收证据：OIDC/SAML 参数、回调地址、机构医生映射和拒绝访问审计。</span>
+            <span>下一步：确认统一认证客户端、机构目录和医生身份源映射。</span>
+          </article>
+          <article class="capability-card">
+            <strong>院内接口</strong>
+            <span>联调样例：选择可交接共享包完成 HIS、EMR、LIS、PACS 报文闭环。</span>
+            <span>验收证据：真实报文样例、字段映射、幂等签名和接收医师确认。</span>
+            <span>下一步：完成试点机构联合测试记录和签字归档。</span>
+          </article>
+          <article class="capability-card">
+            <strong>审计留存</strong>
+            <span>联调样例：使用调阅留痕执行审计导出和哈希校验。</span>
+            <span>验收证据：AUDIT_EXPORT_PATH 或 SIEM_ENDPOINT、留存年限、导出权限和复核记录。</span>
+            <span>下一步：完成安全管理岗导出复核和留存策略确认。</span>
+          </article>
+          <article class="capability-card">
+            <strong>监控灾备</strong>
+            <span>联调样例：复用 /api/health、/api/metrics 和发布门禁结果。</span>
+            <span>验收证据：告警路由、值班表、备份恢复记录、RTO/RPO 和演练签字。</span>
+            <span>下一步：完成生产监控绑定、告警演练和灾备恢复签字。</span>
           </article>
         </div>
       </section>
@@ -191,7 +224,7 @@
           </article>
           <article class="capability-card">
             <strong>合并方式</strong>
-            <span>合并交接证据、发布报告和现场验收边界；后续深度集成时新增 referralId、teleconsultationId、regionalPackageId 显式关联字段。</span>
+            <span>合并交接证据、发布报告和现场验收边界；后续深度集成时新增转诊编号、会诊编号、区域共享包编号等显式关联字段。</span>
           </article>
         </div>
       </section>
