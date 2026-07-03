@@ -71,9 +71,9 @@
             <option value="registration">挂号</option>
           </select>
           <div class="preview-service-stepper" aria-label="服务快捷切换">
-            <button type="button" id="preview-prev-service">上一个</button>
+            <button type="button" id="preview-prev-service" aria-keyshortcuts="ArrowLeft">上一个</button>
             <span id="preview-service-position" aria-live="polite">1/5 个服务</span>
-            <button type="button" id="preview-next-service">下一个</button>
+            <button type="button" id="preview-next-service" aria-keyshortcuts="ArrowRight">下一个</button>
           </div>
           <div class="preview-service-switch" aria-label="切换手机框服务">
             <button type="button" class="active" data-preview-service="health-record">健康档案</button>
@@ -283,6 +283,18 @@
       previewServiceSelect.addEventListener("change", () => setPreviewService(previewServiceSelect.value));
       previewPrevService.addEventListener("click", () => stepPreviewService(-1));
       previewNextService.addEventListener("click", () => stepPreviewService(1));
+      window.addEventListener("keydown", (event) => {
+        if (event.altKey || event.ctrlKey || event.metaKey) return;
+        if (["INPUT", "SELECT", "TEXTAREA"].includes(event.target?.tagName)) return;
+        if (event.key === "ArrowLeft") {
+          event.preventDefault();
+          stepPreviewService(-1);
+        }
+        if (event.key === "ArrowRight") {
+          event.preventDefault();
+          stepPreviewService(1);
+        }
+      });
       clientButtons.forEach((button) => {
         button.addEventListener("click", () => setPreviewClient(button.dataset.previewClient));
       });

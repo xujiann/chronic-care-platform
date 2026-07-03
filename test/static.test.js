@@ -795,6 +795,8 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /preview-service-stepper/);
   assert.match(mobilePreviewHtml, /preview-prev-service/);
   assert.match(mobilePreviewHtml, /preview-next-service/);
+  assert.match(mobilePreviewHtml, /aria-keyshortcuts="ArrowLeft"/);
+  assert.match(mobilePreviewHtml, /aria-keyshortcuts="ArrowRight"/);
   assert.match(mobilePreviewHtml, /preview-service-position/);
   assert.match(mobilePreviewHtml, /1\/5 个服务/);
   assert.doesNotMatch(mobilePreviewHtml, /1 \/ 5/);
@@ -830,6 +832,10 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.doesNotMatch(mobilePreviewHtml, /activePreviewService !== "health-record"/);
   assert.match(mobilePreviewHtml, /syncPreviewServiceControls/);
   assert.match(mobilePreviewHtml, /stepPreviewService/);
+  assert.match(mobilePreviewHtml, /window\.addEventListener\("keydown"/);
+  assert.match(mobilePreviewHtml, /event\.key === "ArrowLeft"/);
+  assert.match(mobilePreviewHtml, /event\.key === "ArrowRight"/);
+  assert.match(mobilePreviewHtml, /\["INPUT", "SELECT", "TEXTAREA"\]\.includes\(event\.target\?\.tagName\)/);
   assert.match(mobilePreviewHtml, /activePreviewServicePosition/);
   assert.match(mobilePreviewHtml, /label: `\$\{activeIndex \+ 1\}\/\$\{previewServices\.length\} 个服务`/);
   assert.match(mobilePreviewHtml, /const servicePosition = activePreviewServicePosition\(\)/);
