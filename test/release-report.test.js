@@ -97,6 +97,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "snapshot:productionDeploymentPlan" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "snapshot:interfaceReadiness" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "snapshot:externalDependencyRisks" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "snapshot:researchSandbox" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "storage:jsonSnapshot.present" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "storage:jsonSnapshot.collections" && item.passed), true);
   assert.equal(report.storageModel.jsonSnapshot.present, true);

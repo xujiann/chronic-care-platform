@@ -118,7 +118,7 @@ SQLite 结构化镜像已覆盖居民、账户、主索引、个人健康档案�
 | `GET /api/credit-evaluations/calculate` | 信用评价自动计算 |
 | `GET /api/performance/consortium-report` | 医共体绩效、人财物、药耗、基层履约报表 |
 | `GET /api/research/datasets` / `POST /api/research/datasets/:id/actions` | 科研数据集治理 |
-| `GET /api/research/sandbox` / `POST /api/research/datasets` / `POST /api/research/datasets/:id/approval` / `POST /api/research/datasets/:id/sandbox-access` / `POST /api/research/datasets/:id/outcomes` | Research dataset application, ethics approval, de-identified sandbox access, audit trail, and outcome return |
+| `GET /api/research/sandbox` / `POST /api/research/datasets` / `POST /api/research/datasets/:id/evidence` / `POST /api/research/datasets/:id/approval` / `POST /api/research/datasets/:id/sandbox-access` / `POST /api/research/datasets/:id/outcomes` | Research dataset application, evidence-document registration, ethics approval, de-identified sandbox access, audit trail, and outcome return |
 | `GET /api/research/disease-models` / `POST /api/research/disease-models/:id/review` | 专病库模型和人工复核 |
 | `POST /api/auth/identity/preview` | 政务身份 claims 到角色、机构和首页的接入预映射 |
 | `GET /api/mobile/experience` / `POST /api/mobile/experience` | 移动体验和居民偏好 |
@@ -188,9 +188,9 @@ npm.cmd run release:manifest
 
 `interface:mapping` 会生成 `release/interface-mapping-report.json` 与 `release/interface-mapping-report.md`，逐项归档 HIS/EMR/LIS/PACS/医保/电子证照/统计契约字段到平台集合和字段的映射、必填字段覆盖、幂等字段落点、签名与重试证据，作为现场接口字段差异确认和联调整改的前置材料。
 
-`research:sandbox` generates `release/research-sandbox-readiness-report.json` and `release/research-sandbox-readiness-report.md`, covering research dataset applications, disease registry models, ethics approval, de-identification release, sandbox access, usage audit, and outcome return evidence.
+`research:sandbox` generates `release/research-sandbox-readiness-report.json` and `release/research-sandbox-readiness-report.md`, covering research dataset applications, disease registry models, ethics approval, data-use agreement evidence documents, de-identification release, sandbox access, usage audit, and outcome return evidence.
 
-科研数据沙箱的政策说明页为 `research-sandbox-about.html`，基于《中华人民共和国个人信息保护法》《中华人民共和国数据安全法》《网络数据安全管理条例》《涉及人的生命科学和医学研究伦理审查办法》《国家健康医疗大数据标准、安全和服务管理办法（试行）》整理演示边界。当前系统只证明申请、审批、脱敏状态、沙箱访问、审计和成果回流的本地闭环；真实科研共享仍需现场提供伦理批件、数据使用协议、字段最小化评审、脱敏/重识别风险评估、日志保全或 SIEM/WORM 留存配置，以及专病库模型复核意见。
+科研数据沙箱的政策说明页为 `research-sandbox-about.html`，基于《中华人民共和国个人信息保护法》《中华人民共和国数据安全法》《网络数据安全管理条例》《涉及人的生命科学和医学研究伦理审查办法》《国家健康医疗大数据标准、安全和服务管理办法（试行）》整理演示边界。当前系统只证明申请、材料登记、审批、脱敏状态、沙箱访问、审计和成果回流的本地闭环；真实科研共享仍需现场提供伦理批件、数据使用协议、字段最小化评审、脱敏/重识别风险评估、日志保全或 SIEM/WORM 留存配置，以及专病库模型复核意见。
 
 `data-quality:report` 会生成 `release/data-quality-report.json` 与 `release/data-quality-report.md`，检查居民主索引完整度、跨集合居民引用、personIndex 一致性、来源可追溯和整改闭环。
 
