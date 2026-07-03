@@ -24,6 +24,7 @@ test("escort service readiness validates policy, registry, workforce, orders and
   assert.equal(report.checks.some((item) => item.id === "escort:hospitalInterface" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:hospitalInterfaceDoc" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:responsibilityPlan" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "escort:launchOwnerChecklist" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:frontend" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:citizenProviderAvailability" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:citizenProgressTracking" && item.passed), true);
@@ -35,6 +36,7 @@ test("escort service readiness validates policy, registry, workforce, orders and
   assert.match(renderMarkdown(report), /Medical escort service readiness report/);
   assert.match(renderMarkdown(report), /Hospital-confirmed orders/);
   assert.match(renderMarkdown(report), /current functions, responsible departments, evidence, and next planned escort development are documented/);
+  assert.match(renderMarkdown(report), /go-live owner handoff checklist is visible/);
   assert.match(renderMarkdown(report), /citizen appointment is enabled only when a published provider is available/);
   assert.match(renderMarkdown(report), /resident order cards expose contract, insurance, hospital handoff, service, and callback progress/);
   assert.match(renderMarkdown(report), /visible readiness summary/);
