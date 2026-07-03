@@ -405,6 +405,7 @@ body.preview-focus-mode .preview-device {
   padding: 16px 10px 12px;
   background: #111827;
   box-shadow: var(--shadow);
+  touch-action: pan-y;
 }
 
 body.preview-focus-mode .phone-frame {
