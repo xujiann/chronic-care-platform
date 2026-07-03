@@ -453,6 +453,10 @@ body.service-paged-mode [data-service-pane] {
   scroll-margin-top: 0;
 }
 
+body.service-paged-mode .citizen-shell {
+  touch-action: pan-y;
+}
+
 .summary-card {
   padding: 16px;
   min-width: 0;

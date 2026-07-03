@@ -4,6 +4,8 @@ const LARGE_MODE_KEY = "chronic-care-large-mode";
 const CLIENT_CHANNEL_KEY = "chronic-care-client-channel";
 const API_BASE = location.protocol === "file:" ? "" : "/api";
 const RESIDENT_TASK_CLOSED_STATUSES = new Set(["closed", "completed", "cancel-requested", "cancelled", "canceled"]);
+const CITIZEN_SERVICE_SWIPE_THRESHOLD = 54;
+const CITIZEN_SERVICE_SWIPE_VERTICAL_LIMIT = 48;
 
 const fallbackState = {
   accounts: [
@@ -351,6 +353,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindResidentTaskActions();
   bindLifecycleActionButtons();
   bindCitizenMessageReceipts();
+  bindCitizenServiceSwipe();
   currentAccountId = state.accounts[0]?.id;
   const account = getCurrentAccount();
   renderAccount(account);
@@ -462,6 +465,35 @@ function renderMobileServicePagebar() {
       if (destination) setServiceTab(destination.key, { pushState: true, scrollToPane: false });
     });
   });
+}
+
+function bindCitizenServiceSwipe() {
+  const shell = document.querySelector(".citizen-shell");
+  if (!shell) return;
+  let startX = 0;
+  let startY = 0;
+  let startedAt = 0;
+  const interactiveSelector = "button, a, input, select, textarea, label, [role='button']";
+  shell.addEventListener("touchstart", (event) => {
+    if (!isPagedCitizenServiceMode() || event.touches.length !== 1) return;
+    if (event.target.closest(interactiveSelector)) return;
+    startX = event.touches[0].clientX;
+    startY = event.touches[0].clientY;
+    startedAt = Date.now();
+  }, { passive: true });
+  shell.addEventListener("touchend", (event) => {
+    if (!startX || !isPagedCitizenServiceMode()) return;
+    const touch = event.changedTouches[0];
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+    const elapsed = Date.now() - startedAt;
+    startX = 0;
+    startY = 0;
+    startedAt = 0;
+    if (elapsed > 900 || Math.abs(dx) < CITIZEN_SERVICE_SWIPE_THRESHOLD || Math.abs(dy) > CITIZEN_SERVICE_SWIPE_VERTICAL_LIMIT) return;
+    const destination = adjacentCitizenServiceTab(dx < 0 ? 1 : -1);
+    if (destination) setServiceTab(destination.key, { pushState: true, scrollToPane: false });
+  }, { passive: true });
 }
 
 function renderModuleInterfaces() {

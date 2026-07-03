@@ -31,6 +31,7 @@ test("citizen launch foundation readiness captures phase-one gates", () => {
   assert.equal(report.checks.some((item) => item.id === "citizen-foundation:mobile-preview-service-switch" && item.passed), true);
   assert.equal(report.checks.find((item) => item.id === "citizen-foundation:mobile-preview-service-switch").detail.includes("visible swipe hint"), true);
   assert.equal(report.checks.find((item) => item.id === "citizen-foundation:mobile-preview-service-switch").detail.includes("swipe gestures"), true);
+  assert.equal(report.checks.find((item) => item.id === "citizen-foundation:mobile-preview-service-switch").detail.includes("resident in-page swipe navigation"), true);
   assert.equal(report.checks.find((item) => item.id === "citizen-foundation:mobile-preview-service-switch").detail.includes("focus-mode layout"), true);
   assert.equal(report.checks.find((item) => item.id === "citizen-foundation:mobile-preview-service-switch").detail.includes("auto-aligned viewport"), true);
   assert.equal(report.checks.some((item) => item.id === "citizen-foundation:launch-gates" && item.passed), true);

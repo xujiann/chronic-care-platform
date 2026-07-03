@@ -779,7 +779,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   const serviceWorker = read("service-worker.js");
   assert.match(citizenHtml, /rel="manifest"/);
   assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260703escortprogress/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260704swipe/);
   assert.match(citizenHtml, /mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-title/);
@@ -970,7 +970,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.shortcuts.some((item) => item.url === "./citizen.html?client=app&page=escort#service-escort"), true);
   assert.equal(manifest.shortcuts.some((item) => item.url === "./mobile-preview.html?client=app"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v34/);
+  assert.match(serviceWorker, /chronic-care-citizen-v35/);
   assert.match(serviceWorker, /internet-nursing\.js\?v=20260629prod/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627preview/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages/);
@@ -986,8 +986,8 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(serviceWorker, /citizen\.js\?v=20260630visible/);
   assert.match(serviceWorker, /citizen\.js\?v=20260630touch/);
   assert.match(serviceWorker, /citizen\.js\?v=20260630escortlink/);
-  assert.match(serviceWorker, /citizen\.js\?v=20260703escortprogress/);
-  assert.match(serviceWorker, /citizen\.css\?v=20260703escortprogress/);
+  assert.match(serviceWorker, /citizen\.js\?v=20260704swipe/);
+  assert.match(serviceWorker, /citizen\.css\?v=20260704swipe/);
   assert.match(serviceWorker, /citizen\.js\?v=20260630lifecycle/);
   assert.match(serviceWorker, /citizen\.html/);
   assert.match(serviceWorker, /mobile-preview\.html/);
@@ -1037,7 +1037,7 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   assert.match(citizenJs, /setEscortAppointmentAvailability/);
   assert.match(citizenJs, /escortProviderReady/);
   assert.match(citizenJs, /暂无可预约服务主体/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260703escortprogress/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260704swipe/);
   assert.match(citizenJs, /\/escort-services\/orders/);
   assert.match(citizenJs, /getEscortRegistrationOptions/);
   assert.match(citizenJs, /applyLinkedRegistrationToEscortForm/);
@@ -1361,7 +1361,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /longterm-care-form/);
   assert.match(citizenCss, /registration-form/);
   assert.match(citizenHtml, /registration-summary/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260703escortprogress/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260704swipe/);
   assert.match(citizenJs, /registration-summary/);
   assert.match(citizenJs, /hisOrders/);
   assert.match(citizenJs, /insuranceReady/);
@@ -1376,6 +1376,11 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenHtml, /mobile-service-rail/);
   assert.match(citizenJs, /renderMobileServiceRail/);
   assert.match(citizenJs, /renderMobileServicePagebar/);
+  assert.match(citizenJs, /bindCitizenServiceSwipe/);
+  assert.match(citizenJs, /CITIZEN_SERVICE_SWIPE_THRESHOLD/);
+  assert.match(citizenJs, /CITIZEN_SERVICE_SWIPE_VERTICAL_LIMIT/);
+  assert.match(citizenJs, /interactiveSelector/);
+  assert.match(citizenJs, /adjacentCitizenServiceTab\(dx < 0 \? 1 : -1\)/);
   assert.match(citizenJs, /adjacentCitizenServiceTab/);
   assert.match(citizenJs, /data-service-page-step/);
   assert.match(citizenJs, /service-mobile-pagebar-current/);
@@ -1418,6 +1423,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /scroll-snap-type: none/);
   assert.match(citizenCss, /body\.service-paged-mode \.mobile-service-nav/);
   assert.match(citizenCss, /scroll-margin-top: 0/);
+  assert.match(citizenCss, /body\.service-paged-mode \.citizen-shell/);
+  assert.match(citizenCss, /touch-action: pan-y/);
   assert.match(citizenCss, /transform: translateX\(-50%\)/);
   assert.match(citizenCss, /service-summary-mobile-status/);
   assert.match(citizenCss, /grid-template-columns: auto minmax\(0, 1fr\)/);
@@ -1433,6 +1440,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /min-height: 50px/);
   assert.match(citizenCss, /service-status-card/);
   assert.match(citizenCss, /service-summary-stats/);
+  assert.match(read("README.md"), /二级页支持在页面空白区域左右滑动切换服务/);
   const citizenInterfaceDoc = read("docs/citizen-module-interface-map.md");
   assert.match(citizenInterfaceDoc, /C端居民端模块接口说明/);
   assert.match(citizenInterfaceDoc, /\/api\/internet-nursing\/dashboard/);

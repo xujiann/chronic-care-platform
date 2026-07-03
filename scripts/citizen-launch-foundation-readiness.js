@@ -77,8 +77,9 @@ function buildCitizenLaunchFoundationReadiness(options = {}) {
       id: "citizen-foundation:mobile-preview-service-switch",
       passed: hasAll(mobilePreview, [/preview-service-select/, /preview-service-stepper/, /preview-prev-service/, /preview-next-service/, /preview-service-position/, /previewServicePosition\.setAttribute\("aria-label"/, /previewPrevService\.title = previousService/, /previewNextService\.title = nextService/, /preview-focus-mode/, /进入手机验收模式/, /preview-swipe-hint/, /滑动切换服务/, /alignFocusPreview/, /window\.scrollTo\(\{ top: Math\.max\(0, targetTop\), left: 0, behavior: "auto" \}\)/, /handlePreviewSwipe/, /bindPreviewSwipeTarget/, /frame\.contentDocument/, /touchstart/, /touchend/, /data-preview-service="escort"/, /data-preview-service="registration"/, /citizenPreviewSrc\(service\)/]) &&
         hasAll(mobilePreviewCss, [/body\.preview-focus-mode \.preview-shell/, /body\.preview-focus-mode \.preview-copy/, /body\.preview-focus-mode \.preview-device/, /body\.preview-focus-mode \.phone-frame/, /preview-swipe-hint/, /scroll-margin-top: 12px/, /touch-action: pan-y/]) &&
+        hasAll(citizenJs, [/bindCitizenServiceSwipe/, /CITIZEN_SERVICE_SWIPE_THRESHOLD/, /CITIZEN_SERVICE_SWIPE_VERTICAL_LIMIT/, /touchstart/, /touchend/, /adjacentCitizenServiceTab\(dx < 0 \? 1 : -1\)/]) &&
         !/internet-nursing\.html\?preview=mobile-nursing/.test(mobilePreview),
-      detail: "mobile preview keeps service selector, previous/next controls, visible swipe hint, swipe gestures, focus-mode layout, auto-aligned viewport, accessible position text, and resident-page service routing"
+      detail: "mobile preview keeps service selector, previous/next controls, visible swipe hint, swipe gestures, resident in-page swipe navigation, focus-mode layout, auto-aligned viewport, accessible position text, and resident-page service routing"
     },
     {
       id: "citizen-foundation:launch-gates",
