@@ -26,6 +26,7 @@ function buildCitizenLaunchFoundationReadiness(options = {}) {
   const citizenHtml = options.citizenHtml ?? readText("citizen.html");
   const citizenJs = options.citizenJs ?? readText("citizen.js");
   const mobilePreview = options.mobilePreview ?? readText("mobile-preview.html");
+  const mobilePreviewCss = options.mobilePreviewCss ?? readText("mobile-preview.css");
   const serviceWorker = options.serviceWorker ?? readText("service-worker.js");
   const auditDoc = options.auditDoc ?? readText("docs/C端全流程审计与优化清单.md");
   const phaseDoc = options.phaseDoc ?? "";
@@ -74,9 +75,10 @@ function buildCitizenLaunchFoundationReadiness(options = {}) {
     },
     {
       id: "citizen-foundation:mobile-preview-service-switch",
-      passed: hasAll(mobilePreview, [/preview-service-select/, /preview-service-stepper/, /preview-prev-service/, /preview-next-service/, /preview-service-position/, /previewServicePosition\.setAttribute\("aria-label"/, /previewPrevService\.title = previousService/, /previewNextService\.title = nextService/, /data-preview-service="escort"/, /data-preview-service="registration"/, /citizenPreviewSrc\(service\)/]) &&
+      passed: hasAll(mobilePreview, [/preview-service-select/, /preview-service-stepper/, /preview-prev-service/, /preview-next-service/, /preview-service-position/, /previewServicePosition\.setAttribute\("aria-label"/, /previewPrevService\.title = previousService/, /previewNextService\.title = nextService/, /preview-focus-mode/, /进入手机验收模式/, /data-preview-service="escort"/, /data-preview-service="registration"/, /citizenPreviewSrc\(service\)/]) &&
+        hasAll(mobilePreviewCss, [/body\.preview-focus-mode \.preview-shell/, /body\.preview-focus-mode \.preview-copy/, /body\.preview-focus-mode \.preview-device/, /body\.preview-focus-mode \.phone-frame/]) &&
         !/internet-nursing\.html\?preview=mobile-nursing/.test(mobilePreview),
-      detail: "mobile preview keeps service selector, previous/next controls, accessible position text, and resident-page service routing"
+      detail: "mobile preview keeps service selector, previous/next controls, focus-mode layout, accessible position text, and resident-page service routing"
     },
     {
       id: "citizen-foundation:launch-gates",

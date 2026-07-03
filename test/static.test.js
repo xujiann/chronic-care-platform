@@ -800,6 +800,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /上一个/);
   assert.match(mobilePreviewHtml, /下一个/);
   assert.match(readme, /手机预览页工具栏同步提供“上一个\/下一个”快捷切换/);
+  assert.match(readme, /精简预览会进入手机验收模式/);
   assert.match(mobilePreviewHtml, /preview-direct-entry/);
   assert.match(mobilePreviewHtml, /preview-birth-entry/);
   assert.match(mobilePreviewHtml, /preview-copy-entry/);
@@ -815,6 +816,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /birthHealthPreviewSrc/);
   assert.match(mobilePreviewHtml, /renderPreviewReadiness/);
   assert.match(mobilePreviewHtml, /renderCompactPreview/);
+  assert.match(mobilePreviewHtml, /document\.body\.classList\.toggle\("preview-focus-mode", isCompactPreview\)/);
   assert.match(mobilePreviewHtml, /copyTextWithFallback/);
   assert.match(mobilePreviewHtml, /requestedCompactPreview/);
   assert.match(mobilePreviewHtml, /let isCompactPreview = requestedCompactPreview === "1"/);
@@ -869,6 +871,8 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /isCompactPreview = !isCompactPreview/);
   assert.match(mobilePreviewHtml, /isCompactPreview \? "打开当前页"/);
   assert.match(mobilePreviewHtml, /isCompactPreview\s*\?\s*`\$\{previewClientLabels\[activePreviewClient\]\} · 390px 手机视口`/);
+  assert.match(mobilePreviewHtml, /退出手机验收模式/);
+  assert.match(mobilePreviewHtml, /进入手机验收模式/);
   assert.match(mobilePreviewHtml, /手机框：加载中/);
   assert.match(mobilePreviewHtml, /手机框：已加载/);
   assert.match(mobilePreviewHtml, /入口：当前与出生健康已同步/);
@@ -909,6 +913,12 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewCss, /preview-toolbar\.compact \.preview-status/);
   assert.match(mobilePreviewCss, /grid-template-columns: minmax\(0, 1fr\) minmax\(96px, auto\)/);
   assert.match(mobilePreviewCss, /preview-toolbar\.compact \.preview-compact-toggle/);
+  assert.match(mobilePreviewCss, /body\.preview-focus-mode \.preview-shell/);
+  assert.match(mobilePreviewCss, /body\.preview-focus-mode \.preview-copy/);
+  assert.match(mobilePreviewCss, /body\.preview-focus-mode \.preview-device/);
+  assert.match(mobilePreviewCss, /body\.preview-focus-mode \.phone-frame/);
+  assert.match(mobilePreviewCss, /display: none/);
+  assert.match(mobilePreviewCss, /height: min\(780px, calc\(100dvh - 156px\)\)/);
   assert.match(mobilePreviewCss, /grid-column: 1 \/ -1/);
   assert.match(mobilePreviewCss, /min-height: 34px/);
   assert.match(mobilePreviewCss, /preview-copy-entry/);
@@ -931,7 +941,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.shortcuts.some((item) => item.url === "./citizen.html?client=app&page=escort#service-escort"), true);
   assert.equal(manifest.shortcuts.some((item) => item.url === "./mobile-preview.html?client=app"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v29/);
+  assert.match(serviceWorker, /chronic-care-citizen-v30/);
   assert.match(serviceWorker, /internet-nursing\.js\?v=20260629prod/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627preview/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages/);
@@ -1090,6 +1100,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(read("portal.css"), /account-provisioning-note/);
   assert.match(read("scripts/citizen-launch-foundation-readiness.js"), /citizen-foundation:account-provisioning-boundary/);
   assert.match(read("scripts/citizen-launch-foundation-readiness.js"), /citizen-foundation:mobile-preview-service-switch/);
+  assert.match(read("scripts/citizen-launch-foundation-readiness.js"), /mobilePreviewCss/);
+  assert.match(read("scripts/citizen-launch-foundation-readiness.js"), /body\\\.preview-focus-mode \\\./);
   assert.match(read("scripts/release-report.js"), /citizenLaunch:mobilePreviewServiceSwitch/);
   assert.doesNotMatch(server, /\/api\/auth\/register/);
   ["健康档案", "电子病历", "护理", "陪诊", "挂号"].forEach((label) => assert.match(citizenJs, new RegExp(label)));

@@ -234,9 +234,11 @@
         renderPreviewStatus();
       };
       const renderCompactPreview = () => {
+        document.body.classList.toggle("preview-focus-mode", isCompactPreview);
         previewToolbar.classList.toggle("compact", isCompactPreview);
         previewCompactToggle.setAttribute("aria-pressed", String(isCompactPreview));
         previewCompactToggle.textContent = isCompactPreview ? "完整预览" : "精简预览";
+        previewCompactToggle.setAttribute("aria-label", isCompactPreview ? "退出手机验收模式" : "进入手机验收模式");
       };
       const setPreviewService = (service, options = {}) => {
         activePreviewService = service;
