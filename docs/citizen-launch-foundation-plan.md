@@ -11,6 +11,7 @@ Phase 1 turns the resident portal into a controlled-pilot-ready mobile entry acr
 - Resident service pages are shareable through `page=health-record|emr|nursing|escort|registration`.
 - APP/PWA install readiness includes manifest identity, mobile meta tags, service worker caching, and shortcuts for health archive, EMR, escort, and APP preview.
 - The resident page exposes copyable launch entry links and channel-specific launch checklists.
+- The login page states the account provisioning boundary: resident accounts require real-name filing and phone binding by the platform, and nurse accounts require pilot-institution provisioning with nurse qualification and `nurseId` binding. Public self-registration remains closed for controlled pilot launch.
 
 ## Production Dependencies
 
@@ -30,4 +31,4 @@ Phase 1 turns the resident portal into a controlled-pilot-ready mobile entry acr
 
 ## Next Phase
 
-Phase 2 should close the resident registration workflow: hospital schedule source, appointment confirmation, payment/insurance placeholder states, cancellation rules, and resident notifications.
+Phase 2 should close the resident appointment workflow without opening public self-registration: hospital schedule source, appointment confirmation, payment/insurance placeholder states, cancellation rules, resident notifications, and back-office account provisioning audit trail.

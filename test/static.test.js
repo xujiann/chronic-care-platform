@@ -1056,6 +1056,10 @@ test("citizen portal exposes resident service tabs and implementation states", (
   const citizenCss = read("citizen.css");
   const server = read("server.js");
   assert.match(loginHtml, /phone-login-form/);
+  assert.match(loginHtml, /data-account-provisioning/);
+  assert.match(loginHtml, /居民端暂不开放自助注册/);
+  assert.match(loginHtml, /护理端护士账号需由试点机构开通/);
+  assert.doesNotMatch(loginHtml, /id="register-form"/);
   assert.match(loginHtml, /手机号验证码/);
   assert.match(loginHtml, /data-send-phone-code/);
   assert.match(loginHtml, /phone-code-hint/);
@@ -1070,6 +1074,9 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(server, /\/api\/auth\/phone-login/);
   assert.match(server, /findCitizenAuthUserByPhone/);
   assert.match(auth, /response\.status === 423/);
+  assert.match(read("portal.css"), /account-provisioning-note/);
+  assert.match(read("scripts/citizen-launch-foundation-readiness.js"), /citizen-foundation:account-provisioning-boundary/);
+  assert.doesNotMatch(server, /\/api\/auth\/register/);
   ["健康档案", "电子病历", "护理", "陪诊", "挂号"].forEach((label) => assert.match(citizenJs, new RegExp(label)));
   assert.match(citizenHtml, /service-tabs/);
   assert.match(citizenHtml, /service-command-panel/);
@@ -1537,6 +1544,7 @@ test("internet nursing module exposes appointment, management and nurse workflow
   assert.match(read("scripts/internet-nursing-readiness.js"), /nursing:regulatorySubmission/);
   assert.match(read("scripts/internet-nursing-readiness.js"), /nursing:siteCutoverPack/);
   assert.match(read("scripts/internet-nursing-readiness.js"), /nursing:closedLoopSummary/);
+  assert.match(read("scripts/internet-nursing-readiness.js"), /nursing:accountProvisioning/);
   assert.match(read("scripts/internet-nursing-readiness.js"), /nursing-cutover-payment-reconciliation/);
   assert.match(read("scripts/internet-nursing-readiness.js"), /release\/audit-retention-report\.md/);
   assert.match(read("scripts/internet-nursing-readiness.js"), /互联网护理现场割接证据包\.md/);

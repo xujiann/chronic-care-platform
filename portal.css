@@ -259,6 +259,28 @@ h1 { margin-top: 4px; font-size: 28px; }
   color: #184a91;
 }
 
+.account-provisioning-note {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 14px;
+  border: 1px solid rgba(39, 110, 241, 0.18);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #f8fbfd;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.account-provisioning-note strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.account-provisioning-note span {
+  overflow-wrap: anywhere;
+}
+
 .login-form label {
   display: grid;
   gap: 6px;

@@ -44,6 +44,12 @@ function buildCitizenLaunchFoundationReadiness(options = {}) {
       detail: "resident phone-code delivery exposes send action, cooldown, expiry, and demo gateway evidence"
     },
     {
+      id: "citizen-foundation:account-provisioning-boundary",
+      passed: hasAll(login, [/data-account-provisioning/, /居民端暂不开放自助注册/, /实名建档/, /手机号绑定/]) &&
+        !/id="register-form"|\/api\/auth\/register/.test(login + auth + readText("server.js")),
+      detail: "resident login states account provisioning boundary and does not expose public self-registration"
+    },
+    {
       id: "citizen-foundation:mobile-install-shell",
       passed: hasAll(citizenHtml, [/rel="manifest"/, /mobile-web-app-capable/, /apple-mobile-web-app-capable/, /apple-touch-icon/]) &&
         manifest.id === "./citizen.html?client=app" &&
