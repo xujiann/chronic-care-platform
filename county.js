@@ -280,6 +280,7 @@ function renderCountyTeleconsultationCutoverReadiness(state, rows) {
   if (!el) return;
   const readiness = buildCountyTeleconsultationCutoverReadiness(state, rows);
   const planSummary = buildCountyTeleconsultationPlanSummary(readiness.nextDevelopmentPlan);
+  const actionQueue = buildCountyTeleconsultationActionQueue(readiness.nextDevelopmentPlan);
   el.innerHTML = [
     `<article data-referral-cutover-readiness>
       <div><span class="badge ${readiness.readyForProductionCutover ? "info" : "warn"}">Cutover gate</span></div>
@@ -297,6 +298,14 @@ function renderCountyTeleconsultationCutoverReadiness(state, rows) {
       <footer>
         <small>Next phase: ${planSummary.nextPhase}</small>
         <small>Owners: ${planSummary.owners.join(", ") || "county-command"}</small>
+      </footer>
+    </article>`,
+    `<article data-referral-cutover-action-queue>
+      <div><span class="badge ${actionQueue.openItems ? "warn" : "info"}">Action queue</span></div>
+      <h3>${actionQueue.openItems}/${actionQueue.totalItems} onsite actions open</h3>
+      <p>${actionQueue.nextAction}</p>
+      <footer>
+        ${actionQueue.items.map((item) => `<small data-referral-cutover-action-item="${item.phase}">${item.statusLabel}: ${item.owner} -> ${item.actionLabel}</small>`).join("")}
       </footer>
     </article>`,
     ...readiness.blockers.map((item) => `<article data-referral-cutover-blocker="${item.id}">
@@ -590,6 +599,23 @@ function buildCountyTeleconsultationPlanSummary(plan) {
     pendingPhases: Math.max(rows.length - readyPhases, 0),
     nextPhase: next.phase || "field-interface-replay",
     owners: [...new Set(rows.map((item) => item.owner).filter(Boolean))]
+  };
+}
+
+function buildCountyTeleconsultationActionQueue(plan) {
+  const rows = Array.isArray(plan) ? plan : [];
+  const pending = rows.filter((item) => item.status !== "ready");
+  const next = pending[0] || rows[0] || {};
+  return {
+    totalItems: rows.length,
+    openItems: pending.length,
+    nextAction: next.phase ? `${next.phase}: ${next.actionLabel || "Review evidence"}` : "No onsite cutover actions are currently listed.",
+    items: rows.map((item) => ({
+      phase: item.phase,
+      owner: item.owner || "county-command",
+      statusLabel: item.statusLabel || item.status || "pending",
+      actionLabel: item.actionLabel || "Review evidence"
+    }))
   };
 }
 

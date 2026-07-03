@@ -368,9 +368,12 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("county.js"), /data-referral-cutover-blocker/);
   assert.match(read("county.js"), /data-referral-cutover-plan/);
   assert.match(read("county.js"), /data-referral-cutover-plan-summary/);
+  assert.match(read("county.js"), /data-referral-cutover-action-queue/);
+  assert.match(read("county.js"), /data-referral-cutover-action-item/);
   assert.match(read("county.js"), /data-referral-plan-action/);
   assert.match(read("county.js"), /normalizeCountyTeleconsultationNextPlan/);
   assert.match(read("county.js"), /buildCountyTeleconsultationPlanSummary/);
+  assert.match(read("county.js"), /buildCountyTeleconsultationActionQueue/);
   assert.match(read("county.js"), /buildCountyTeleconsultationPlanStatus/);
   assert.match(read("county.js"), /buildCountyTeleconsultationPlanAction/);
   assert.match(read("county.js"), /scrollIntoView/);
