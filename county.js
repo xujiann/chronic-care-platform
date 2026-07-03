@@ -280,7 +280,7 @@ function renderCountyTeleconsultationCutoverReadiness(state, rows) {
   if (!el) return;
   const readiness = buildCountyTeleconsultationCutoverReadiness(state, rows);
   const planSummary = buildCountyTeleconsultationPlanSummary(readiness.nextDevelopmentPlan);
-  const actionQueue = buildCountyTeleconsultationActionQueue(readiness.nextDevelopmentPlan);
+  const actionQueue = buildCountyTeleconsultationActionQueue(readiness.nextDevelopmentPlan, state.referralTeleconsultationJointTestPack);
   el.innerHTML = [
     `<article data-referral-cutover-readiness>
       <div><span class="badge ${readiness.readyForProductionCutover ? "info" : "warn"}">Cutover gate</span></div>
@@ -305,7 +305,7 @@ function renderCountyTeleconsultationCutoverReadiness(state, rows) {
       <h3>${actionQueue.openItems}/${actionQueue.totalItems} onsite actions open</h3>
       <p>${actionQueue.nextAction}</p>
       <footer>
-        ${actionQueue.items.map((item) => `<small data-referral-cutover-action-item="${item.phase}">${item.statusLabel}: ${item.owner} -> ${item.actionLabel}</small>`).join("")}
+        ${actionQueue.items.map((item) => `<small data-referral-cutover-action-item="${item.phase}">${item.statusLabel}: ${item.owner} -> ${item.actionLabel}; ${item.receiptSummary}</small>`).join("")}
       </footer>
     </article>`,
     ...readiness.blockers.map((item) => `<article data-referral-cutover-blocker="${item.id}">
@@ -602,10 +602,12 @@ function buildCountyTeleconsultationPlanSummary(plan) {
   };
 }
 
-function buildCountyTeleconsultationActionQueue(plan) {
+function buildCountyTeleconsultationActionQueue(plan, pack = {}) {
   const rows = Array.isArray(plan) ? plan : [];
   const pending = rows.filter((item) => item.status !== "ready");
   const next = pending[0] || rows[0] || {};
+  const receiptsByRole = new Map((Array.isArray(pack.taskReceipts) ? pack.taskReceipts : []).map((item) => [item.role, item]));
+  const exportByRole = new Map((Array.isArray(pack.exportSummary) ? pack.exportSummary : []).map((item) => [item.role, item]));
   return {
     totalItems: rows.length,
     openItems: pending.length,
@@ -614,9 +616,26 @@ function buildCountyTeleconsultationActionQueue(plan) {
       phase: item.phase,
       owner: item.owner || "county-command",
       statusLabel: item.statusLabel || item.status || "pending",
-      actionLabel: item.actionLabel || "Review evidence"
+      actionLabel: item.actionLabel || "Review evidence",
+      receiptSummary: buildCountyTeleconsultationReceiptSummary(item.phase, receiptsByRole, exportByRole)
     }))
   };
+}
+
+function buildCountyTeleconsultationReceiptSummary(phase, receiptsByRole, exportByRole) {
+  const roles = getCountyTeleconsultationPlanRoles(phase);
+  const completed = roles.filter((role) => /completed|closed|signed|read/i.test(String(receiptsByRole.get(role)?.status || ""))).length;
+  const ready = roles.filter((role) => Boolean(exportByRole.get(role)?.readyForFinalSignoff)).length;
+  const signed = roles.filter((role) => Boolean(exportByRole.get(role)?.onsiteSigned)).length;
+  return `${completed}/${roles.length} receipts, ${ready}/${roles.length} final-ready, ${signed}/${roles.length} signed`;
+}
+
+function getCountyTeleconsultationPlanRoles(phase) {
+  const normalizedPhase = String(phase || "").toLowerCase();
+  if (normalizedPhase.includes("field-interface")) return ["referral-center", "receiving-hospital", "hospital-it"];
+  if (normalizedPhase.includes("onsite-signoff")) return ["referral-center", "receiving-hospital", "hospital-it", "county-performance", "insurance"];
+  if (normalizedPhase.includes("insurance")) return ["county-performance", "insurance"];
+  return ["referral-center", "receiving-hospital", "hospital-it", "county-performance", "insurance"];
 }
 
 function buildCountyTeleconsultationSignoffRows(state, rows) {

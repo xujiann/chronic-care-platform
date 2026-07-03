@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
+const vm = require("node:vm");
 const test = require("node:test");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -374,6 +375,11 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("county.js"), /normalizeCountyTeleconsultationNextPlan/);
   assert.match(read("county.js"), /buildCountyTeleconsultationPlanSummary/);
   assert.match(read("county.js"), /buildCountyTeleconsultationActionQueue/);
+  assert.match(read("county.js"), /buildCountyTeleconsultationReceiptSummary/);
+  assert.match(read("county.js"), /getCountyTeleconsultationPlanRoles/);
+  assert.match(read("county.js"), /taskReceipts/);
+  assert.match(read("county.js"), /exportSummary/);
+  assert.match(read("county.js"), /final-ready/);
   assert.match(read("county.js"), /buildCountyTeleconsultationPlanStatus/);
   assert.match(read("county.js"), /buildCountyTeleconsultationPlanAction/);
   assert.match(read("county.js"), /scrollIntoView/);
@@ -454,6 +460,39 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".github/workflows/ci.yml"), /actions\/upload-artifact@v4/);
   assert.match(read(".github/workflows/ci.yml"), /release-readiness-report/);
   assert.match(read(".github/workflows/ci.yml"), /npm audit --omit=dev/);
+});
+
+test("county teleconsultation action queue summarizes receipt evidence", () => {
+  const sandbox = {
+    API_BASE: "",
+    document: { addEventListener() {}, querySelector() { return null; } },
+    window: {}
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(read("county.js"), sandbox);
+
+  const queue = sandbox.buildCountyTeleconsultationActionQueue([
+    {
+      phase: "field-interface-replay",
+      owner: "institution-integration",
+      status: "pending",
+      actionLabel: "Open joint ledger"
+    }
+  ], {
+    taskReceipts: [
+      { role: "referral-center", status: "completed" },
+      { role: "receiving-hospital", status: "closed" },
+      { role: "hospital-it", status: "read" }
+    ],
+    exportSummary: [
+      { role: "referral-center", readyForFinalSignoff: true, onsiteSigned: true },
+      { role: "receiving-hospital", readyForFinalSignoff: true, onsiteSigned: false },
+      { role: "hospital-it", readyForFinalSignoff: false, onsiteSigned: false }
+    ]
+  });
+
+  assert.equal(queue.items.length, 1);
+  assert.equal(queue.items[0].receiptSummary, "3/3 receipts, 2/3 final-ready, 1/3 signed");
 });
 
 test("regional data sharing application has runnable entry, API and evidence script", () => {
