@@ -800,6 +800,8 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /handlePreviewSwipe/);
   assert.match(mobilePreviewHtml, /recordPreviewSwipeStart/);
   assert.match(mobilePreviewHtml, /bindPreviewSwipeTarget/);
+  assert.match(mobilePreviewHtml, /preview-swipe-hint/);
+  assert.match(mobilePreviewHtml, /滑动切换服务/);
   assert.match(mobilePreviewHtml, /previewSwipeTargets = new WeakSet\(\)/);
   assert.match(mobilePreviewHtml, /frame\.contentDocument/);
   assert.match(mobilePreviewHtml, /touchstart/);
@@ -812,6 +814,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /下一个/);
   assert.match(readme, /手机预览页工具栏同步提供“上一个\/下一个”快捷切换/);
   assert.match(readme, /手机框左右滑动服务切换/);
+  assert.match(readme, /手机框顶部保留滑动切换提示/);
   assert.match(readme, /精简预览会进入手机验收模式/);
   assert.match(readme, /自动对齐到预览区/);
   assert.match(mobilePreviewHtml, /preview-direct-entry/);
@@ -939,6 +942,8 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewCss, /body\.preview-focus-mode \.preview-copy/);
   assert.match(mobilePreviewCss, /body\.preview-focus-mode \.preview-device/);
   assert.match(mobilePreviewCss, /body\.preview-focus-mode \.phone-frame/);
+  assert.match(mobilePreviewCss, /preview-swipe-hint/);
+  assert.match(mobilePreviewCss, /pointer-events: none/);
   assert.match(mobilePreviewCss, /scroll-margin-top: 12px/);
   assert.match(mobilePreviewCss, /touch-action: pan-y/);
   assert.match(mobilePreviewCss, /display: none/);
@@ -965,7 +970,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.shortcuts.some((item) => item.url === "./citizen.html?client=app&page=escort#service-escort"), true);
   assert.equal(manifest.shortcuts.some((item) => item.url === "./mobile-preview.html?client=app"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v33/);
+  assert.match(serviceWorker, /chronic-care-citizen-v34/);
   assert.match(serviceWorker, /internet-nursing\.js\?v=20260629prod/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627preview/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages/);

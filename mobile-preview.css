@@ -417,13 +417,26 @@ body.preview-focus-mode .phone-frame {
   width: 92px;
   height: 7px;
   border-radius: 999px;
-  margin: 0 auto 12px;
+  margin: 0 auto 8px;
   background: #2f3a4b;
+}
+
+.preview-swipe-hint {
+  min-height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  margin: 0 28px 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #dce9ff;
+  font-size: 12px;
+  font-weight: 800;
+  pointer-events: none;
 }
 
 iframe {
   width: 100%;
-  height: calc(100% - 19px);
+  height: calc(100% - 47px);
   border: 0;
   border-radius: 24px;
   background: #fff;
