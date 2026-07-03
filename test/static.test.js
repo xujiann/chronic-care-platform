@@ -499,6 +499,8 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsJs, /renderPerformanceIndicatorDetail/);
   assert.match(operationsJs, /renderOperationsSituation/);
   assert.match(operationsJs, /上线判定/);
+  assert.match(operationsJs, /data-metric-action/);
+  assert.match(operationsJs, /operation-launch-readiness/);
   assert.match(operationsJs, /applySituationFilter/);
   assert.match(operationsJs, /selectSnapshotById/);
   assert.match(operationsJs, /renderInterfaceMapping/);

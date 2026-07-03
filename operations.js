@@ -1426,24 +1426,35 @@ function renderOperationsMetrics(summary, filteredSnapshots, launchReadiness = {
   const maxPressure = Math.max(...filteredSnapshots.map((item) => Number(item.resourcePressure || 0)), 0);
   const emergencyVisits = filteredSnapshots.reduce((sum, item) => sum + Number(item.outpatient?.emergencyVisits || 0), 0);
   const metrics = [
-    ["上线判定", zhInline(launchReadiness.decision || "待判定"), `阻断项 ${launchReadiness.summary?.blockers || 0}`],
-    ["机构数", summary.institutions || 0, "纳入运行监测的机构"],
-    ["严重预警", summary.critical || 0, "严重运行预警"],
-    ["一般预警", summary.warning || 0, "一般运行预警"],
-    ["告警项", summary.alerts || 0, "规则触发总数"],
-    ["待调度", summary.openDispatchRequests || 0, "待处理、已分派、处理中"],
-    ["待对账", summary.pendingReconciliation || 0, "未关闭的直报复核"],
-    ["床位使用率", percent(summary.bedOccupancyRate), "占用床位/开放床位"],
-    ["筛选机构", filteredSnapshots.length, `最高资源压力 ${maxPressure}`],
-    ["急诊量", emergencyVisits, "当前筛选机构合计"]
+    { label: "上线判定", value: zhInline(launchReadiness.decision || "待判定"), hint: `阻断项 ${launchReadiness.summary?.blockers || 0}`, action: "scroll", target: "#operation-launch-readiness" },
+    { label: "机构数", value: summary.institutions || 0, hint: "纳入运行监测的机构", action: "all" },
+    { label: "严重预警", value: summary.critical || 0, hint: "严重运行预警", action: "critical" },
+    { label: "一般预警", value: summary.warning || 0, hint: "一般运行预警", action: "warning" },
+    { label: "告警项", value: summary.alerts || 0, hint: "规则触发总数", action: "scroll", target: "#operation-alert-queue" },
+    { label: "待调度", value: summary.openDispatchRequests || 0, hint: "待处理、已分派、处理中", action: "dispatch" },
+    { label: "待对账", value: summary.pendingReconciliation || 0, hint: "未关闭的直报复核", action: "reconciliation" },
+    { label: "床位使用率", value: percent(summary.bedOccupancyRate), hint: "占用床位/开放床位", action: "scroll", target: "#operations-snapshots" },
+    { label: "筛选机构", value: filteredSnapshots.length, hint: `最高资源压力 ${maxPressure}`, action: "all" },
+    { label: "急诊量", value: emergencyVisits, hint: "当前筛选机构合计", action: "scroll", target: "#operations-snapshots" }
   ];
-  document.querySelector("#operations-metrics").innerHTML = metrics.map(([label, value, hint]) => `
-    <article class="metric-card">
-      <span>${label}</span>
-      <strong>${value}</strong>
-      <small>${hint}</small>
-    </article>
+  const target = document.querySelector("#operations-metrics");
+  target.innerHTML = metrics.map((item) => `
+    <button class="metric-card metric-card-action" type="button" data-metric-action="${item.action}" data-metric-target="${htmlAttribute(item.target || "")}" aria-label="${htmlAttribute(`${item.label}：${item.hint}`)}">
+      <span>${item.label}</span>
+      <strong>${item.value}</strong>
+      <small>${item.hint}</small>
+    </button>
   `).join("");
+  target.querySelectorAll("[data-metric-action]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const action = button.dataset.metricAction;
+      if (["all", "critical", "warning", "dispatch", "reconciliation"].includes(action)) {
+        applySituationFilter(action);
+        return;
+      }
+      document.querySelector(button.dataset.metricTarget)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
 }
 
 function renderCommandChains(chains, filteredSnapshots) {
