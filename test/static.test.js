@@ -299,6 +299,9 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(client, /renderRegionalSiteIntegration/);
   assert.match(client, /身份与权限/);
   assert.match(client, /监控灾备/);
+  assert.match(client, /联调样例/);
+  assert.match(client, /验收证据/);
+  assert.match(client, /下一步/);
   assert.match(client, /renderRegionalReadinessChecklist/);
   assert.match(client, /buildRegionalReadinessChecks/);
   assert.match(client, /renderRegionalReferralHandoff/);

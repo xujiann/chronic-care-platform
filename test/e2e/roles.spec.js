@@ -129,6 +129,9 @@ test("regional sharing page renders referral handoff boundary", async ({ page })
   await expect(page.locator("#regional-site-integration .capability-card")).toHaveCount(4);
   await expect(page.locator("#regional-site-integration")).toContainText("身份与权限");
   await expect(page.locator("#regional-site-integration")).toContainText("监控灾备");
+  await expect(page.locator("#regional-site-integration")).toContainText("联调样例");
+  await expect(page.locator("#regional-site-integration")).toContainText("验收证据");
+  await expect(page.locator("#regional-site-integration")).toContainText("下一步");
   await expect(page.locator("#regional-launch-readiness")).toContainText("现场签字");
 
   await expect(page.getByRole("heading", { name: "转诊会诊交接" })).toBeVisible();

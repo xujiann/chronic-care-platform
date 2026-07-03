@@ -181,34 +181,44 @@ function renderRegionalSiteIntegration(summary = {}, packages = []) {
       title: "身份与权限",
       owner: "统一认证/机构目录",
       status: "待现场接入",
-      evidence: "OIDC/SAML 参数、回调地址、机构医生映射和拒绝访问审计。"
+      sample: "使用管理端和机构端账号验证角色裁剪。",
+      evidence: "OIDC/SAML 参数、回调地址、机构医生映射和拒绝访问审计。",
+      nextAction: "确认统一认证客户端、机构目录和医生身份源映射。"
     },
     {
       title: "院内接口",
       owner: "HIS/EMR/LIS/PACS 联调组",
-      status: "待签字",
-      evidence: "真实报文样例、字段映射、幂等签名和接收医师确认。"
+      status: handoffReady > 0 ? "已有样例" : "待签字",
+      sample: `${handoffReady}/${total} 个共享包可作为转诊会诊交接样例。`,
+      evidence: "真实报文样例、字段映射、幂等签名和接收医师确认。",
+      nextAction: "选择试点机构完成 HIS、EMR、LIS、PACS 联合测试记录。"
     },
     {
       title: "审计留存",
       owner: "安全管理岗",
       status: "待配置",
-      evidence: "审计导出路径或安全平台地址、留存年限、导出权限和哈希校验。"
+      sample: `${summary.accessReviews || 0} 条调阅留痕可用于导出校验。`,
+      evidence: "审计导出路径或安全平台地址、留存年限、导出权限和哈希校验。",
+      nextAction: "配置 AUDIT_EXPORT_PATH 或 SIEM_ENDPOINT 并完成导出复核。"
     },
     {
       title: "监控灾备",
       owner: "平台运维/数据平台",
       status: "待演练",
-      evidence: "健康检查、指标监控、告警路由、恢复目标和恢复演练签字。"
+      sample: "复用 /api/health、/api/metrics 和发布门禁结果。",
+      evidence: "健康检查、指标监控、告警路由、恢复目标和恢复演练签字。",
+      nextAction: "完成告警值班、备份恢复和 RTO/RPO 演练签字。"
     }
   ];
-  target.textContent = `${lanes.length} 条现场责任域，${handoffReady}/${total} 个共享包具备交接证据`;
+  target.textContent = `${lanes.length} 条现场责任域，${handoffReady}/${total} 个共享包可作为联调样例，0 项生产签字已归档`;
   panel.innerHTML = lanes.map((item) => `
     <article class="capability-card">
       <strong>${item.title}</strong>
-      <span class="badge warn">${item.status}</span>
+      <span class="badge ${item.status === "已有样例" ? "success" : "warn"}">${item.status}</span>
       <span>${item.owner}</span>
-      <small>${item.evidence}</small>
+      <small>联调样例：${item.sample}</small>
+      <small>验收证据：${item.evidence}</small>
+      <small>下一步：${item.nextAction}</small>
     </article>
   `).join("");
 }
