@@ -26,6 +26,64 @@
 
       <section class="metric-grid" id="escort-metrics"></section>
 
+      <section class="panel" id="escort-responsibility-board" data-escort-responsibility-plan>
+        <div class="panel-title">
+          <h2>功能责任与下一步计划</h2>
+          <span>已上线能力、责任部门和计划开发事项</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>现有功能</th>
+                <th>责任部门</th>
+                <th>当前证据</th>
+                <th>下一步计划开发功能</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>居民端陪诊预约、家庭成员代办、提交前核对</td>
+                <td>老龄健康服务部门、社区卫生服务中心</td>
+                <td>居民端表单、字段必填校验、重复预约拦截</td>
+                <td>接入实名身份、短信网关、电子健康卡和真机消息模板</td>
+              </tr>
+              <tr>
+                <td>服务主体名录、发布状态、价格和应急预案</td>
+                <td>老龄/民政协同服务部门、服务机构管理科</td>
+                <td>服务主体清单、保险状态、发布状态和风险预案</td>
+                <td>补齐资质附件、年度复核、黑名单和服务能力星级评价</td>
+              </tr>
+              <tr>
+                <td>陪诊师队伍、培训学时、考核和保险</td>
+                <td>服务机构运营部、培训管理部门</td>
+                <td>陪诊师台账、培训小时、考核状态和保险覆盖</td>
+                <td>建设陪诊师移动端签到、轨迹留痕、排班和服务记录</td>
+              </tr>
+              <tr>
+                <td>医院接诊回执、导诊交接和 HIS 就诊号映射</td>
+                <td>医疗机构门诊部、信息科</td>
+                <td>hospital-handoff API、医院回执状态、队列号和导诊提示</td>
+                <td>开展真实 HIS/门诊导诊台联调、异常退回和补证闭环</td>
+              </tr>
+              <tr>
+                <td>合同、保险、补贴类型、费用估算和质量回访</td>
+                <td>老龄服务监管、医保/民政补贴经办、财务部门</td>
+                <td>合同状态、保险状态、补贴分类、质控回访和居民反馈</td>
+                <td>上线电子签章、合同/保险附件、补贴结算和对账报表</td>
+              </tr>
+              <tr>
+                <td>风险队列、投诉处理、审计留痕和发布证据</td>
+                <td>卫健质控部门、投诉受理中心、规划信息/运维安全部门</td>
+                <td>高风险订单、质量回访、任务消息、审计事件和 release 报告</td>
+                <td>增加投诉工单、运营日报、现场签字、告警值守和 SIEM 归档</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="muted">完整清单见 <a href="./docs/陪诊信息平台功能责任与下一步计划.md">陪诊信息平台功能责任与下一步计划</a>。</p>
+      </section>
+
       <section class="portal-grid">
         <article class="panel wide">
           <div class="panel-title">

@@ -1020,6 +1020,8 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   const citizenCss = read("citizen.css");
   const escortHtml = read("escort.html");
   const escortJs = read("escort.js");
+  const escortResponsibilityDoc = read("docs/陪诊信息平台功能责任与下一步计划.md");
+  const readme = read("README.md");
   assert.match(citizenHtml, /escort-appointment-form/);
   assert.match(citizenHtml, /escort-appointment-check/);
   assert.match(citizenHtml, /助医陪诊预约/);
@@ -1063,6 +1065,16 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   assert.match(citizenCss, /escort-order-progress/);
   assert.match(citizenCss, /grid-template-columns: repeat\(auto-fit, minmax\(72px, 1fr\)\)/);
   assert.match(citizenCss, /escort-appointment-form\.is-unavailable/);
+  assert.match(escortHtml, /data-escort-responsibility-plan/);
+  assert.match(escortHtml, /功能责任与下一步计划/);
+  assert.match(escortHtml, /下一步计划开发功能/);
+  assert.match(escortHtml, /医疗机构门诊部、信息科/);
+  assert.match(escortResponsibilityDoc, /当前已上线功能/);
+  assert.match(escortResponsibilityDoc, /老龄健康服务部门、社区卫生服务中心/);
+  assert.match(escortResponsibilityDoc, /陪诊师移动端签到/);
+  assert.match(escortResponsibilityDoc, /补贴结算/);
+  assert.match(readme, /陪诊信息平台功能责任与下一步计划/);
+  assert.match(read("scripts/escort-service-readiness.js"), /escort:responsibilityPlan/);
   assert.match(escortHtml, /requireRole\(\["commission", "institution"\]\)/);
   assert.match(escortJs, /data-escort-hospital/);
   assert.match(escortJs, /hospital-handoff/);
