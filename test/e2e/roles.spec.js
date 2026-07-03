@@ -101,6 +101,29 @@ test("commission workbench renders live release gates and site templates", async
   expect(serviceAcceptance.serviceAcceptance.county.openActions.some((item) => item.id === "cco-001")).toBe(true);
 });
 
+test("operations metrics navigate to the matching work areas", async ({ page }) => {
+  await login(page, "health", "index.html");
+  await page.goto("/operations.html");
+
+  await expect(page.getByRole("heading", { name: "运行监测、资源调度、统计直报对账" })).toBeVisible();
+  await expect(page.locator("#operations-metrics [data-metric-action]")).toHaveCount(10);
+
+  await page.locator("#operations-metrics [data-metric-action='critical']").click();
+  await expect(page.locator("#operation-status-filter")).toHaveValue("critical");
+  await expect(page.locator("#operations-snapshots")).toBeInViewport({ ratio: 0.2 });
+
+  await page.locator("#operations-metrics [data-metric-action='dispatch']").click();
+  await expect(page.locator("#operation-status-filter")).toHaveValue("all");
+  await expect(page.locator("#dispatch-requests")).toBeInViewport({ ratio: 0.2 });
+
+  await page.locator("#operations-metrics [data-metric-action='reconciliation']").click();
+  await expect(page.locator("#operation-sort")).toHaveValue("variance");
+  await expect(page.locator("#reconciliation-reviews")).toBeInViewport({ ratio: 0.2 });
+
+  await page.locator("#operations-metrics [data-metric-target='#operation-launch-readiness']").click();
+  await expect(page.locator("#operation-launch-readiness")).toBeInViewport({ ratio: 0.2 });
+});
+
 test("about page explains runnable platform capabilities", async ({ page }) => {
   await page.goto("/about.html");
 
