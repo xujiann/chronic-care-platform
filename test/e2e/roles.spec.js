@@ -70,7 +70,7 @@ test("commission workbench renders live release gates and site templates", async
   await expect(page.locator("[data-service-open-action='chronic:cst-001']")).toContainText("high");
   await expect(page.locator("[data-acceptance-ledger='county']")).toContainText("service domains ready");
   await expect(page.locator("[data-service-open-action='county:cco-001']")).toContainText("countyCollaborationOrders");
-  await expect(page.locator("#site-readiness-pack .priority-row")).toHaveCount(8);
+  await expect(page.locator("#site-readiness-pack .priority-row")).toHaveCount(9);
   await expect(page.locator("#site-readiness-pack .site-template-readme")).toHaveCount(4);
   await expect(page.locator("#site-readiness-pack")).toContainText("release/site-readiness-pack.md");
   await expect(page.locator("[data-template-readme='identity-source-mapping']")).toContainText("README generated");
