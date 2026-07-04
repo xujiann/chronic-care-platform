@@ -624,10 +624,15 @@ function buildCountyTeleconsultationActionQueue(plan, pack = {}) {
 
 function buildCountyTeleconsultationReceiptSummary(phase, receiptsByRole, exportByRole) {
   const roles = getCountyTeleconsultationPlanRoles(phase);
-  const completed = roles.filter((role) => /completed|closed|signed|read/i.test(String(receiptsByRole.get(role)?.status || ""))).length;
-  const ready = roles.filter((role) => Boolean(exportByRole.get(role)?.readyForFinalSignoff)).length;
-  const signed = roles.filter((role) => Boolean(exportByRole.get(role)?.onsiteSigned)).length;
-  return `${completed}/${roles.length} receipts, ${ready}/${roles.length} final-ready, ${signed}/${roles.length} signed`;
+  const pendingReceipts = roles.filter((role) => !/completed|closed|signed|read/i.test(String(receiptsByRole.get(role)?.status || "")));
+  const pendingReady = roles.filter((role) => !exportByRole.get(role)?.readyForFinalSignoff);
+  const pendingSigned = roles.filter((role) => !exportByRole.get(role)?.onsiteSigned);
+  const pendingLabels = [
+    pendingReceipts.length ? `receipts: ${formatCountyTeleconsultationRoleList(pendingReceipts)}` : "",
+    pendingReady.length ? `final-ready: ${formatCountyTeleconsultationRoleList(pendingReady)}` : "",
+    pendingSigned.length ? `signed: ${formatCountyTeleconsultationRoleList(pendingSigned)}` : ""
+  ].filter(Boolean);
+  return `${roles.length - pendingReceipts.length}/${roles.length} receipts, ${roles.length - pendingReady.length}/${roles.length} final-ready, ${roles.length - pendingSigned.length}/${roles.length} signed${pendingLabels.length ? `; pending ${pendingLabels.join("; ")}` : ""}`;
 }
 
 function getCountyTeleconsultationPlanRoles(phase) {
@@ -636,6 +641,17 @@ function getCountyTeleconsultationPlanRoles(phase) {
   if (normalizedPhase.includes("onsite-signoff")) return ["referral-center", "receiving-hospital", "hospital-it", "county-performance", "insurance"];
   if (normalizedPhase.includes("insurance")) return ["county-performance", "insurance"];
   return ["referral-center", "receiving-hospital", "hospital-it", "county-performance", "insurance"];
+}
+
+function formatCountyTeleconsultationRoleList(roles) {
+  const labels = {
+    "referral-center": "referral center",
+    "receiving-hospital": "receiving hospital",
+    "hospital-it": "hospital IT",
+    "county-performance": "county performance",
+    insurance: "insurance"
+  };
+  return roles.map((role) => labels[role] || role).join(", ");
 }
 
 function buildCountyTeleconsultationSignoffRows(state, rows) {

@@ -377,6 +377,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("county.js"), /buildCountyTeleconsultationActionQueue/);
   assert.match(read("county.js"), /buildCountyTeleconsultationReceiptSummary/);
   assert.match(read("county.js"), /getCountyTeleconsultationPlanRoles/);
+  assert.match(read("county.js"), /formatCountyTeleconsultationRoleList/);
   assert.match(read("county.js"), /taskReceipts/);
   assert.match(read("county.js"), /exportSummary/);
   assert.match(read("county.js"), /final-ready/);
@@ -492,7 +493,21 @@ test("county teleconsultation action queue summarizes receipt evidence", () => {
   });
 
   assert.equal(queue.items.length, 1);
-  assert.equal(queue.items[0].receiptSummary, "3/3 receipts, 2/3 final-ready, 1/3 signed");
+  assert.equal(queue.items[0].receiptSummary, "3/3 receipts, 2/3 final-ready, 1/3 signed; pending final-ready: hospital IT; signed: receiving hospital, hospital IT");
+
+  const readyQueue = sandbox.buildCountyTeleconsultationActionQueue([
+    { phase: "insurance-performance-cutover", status: "ready" }
+  ], {
+    taskReceipts: [
+      { role: "county-performance", status: "completed" },
+      { role: "insurance", status: "signed" }
+    ],
+    exportSummary: [
+      { role: "county-performance", readyForFinalSignoff: true, onsiteSigned: true },
+      { role: "insurance", readyForFinalSignoff: true, onsiteSigned: true }
+    ]
+  });
+  assert.equal(readyQueue.items[0].receiptSummary, "2/2 receipts, 2/2 final-ready, 2/2 signed");
 });
 
 test("regional data sharing application has runnable entry, API and evidence script", () => {
