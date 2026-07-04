@@ -55,6 +55,33 @@ const recordTypeLabels = {
   countyMutualRecognitionRecords: "互认记录"
 };
 
+const regionalFunctionRoadmap = [
+  {
+    title: "共享包编目",
+    owner: "市级平台数据治理组、各医疗机构信息科",
+    implemented: "已按居民、来源机构、接收机构、诊疗资料和互认依据生成共享包。",
+    next: "接入正式居民主索引、院内主数据和批量质量核验。"
+  },
+  {
+    title: "角色权限裁剪",
+    owner: "市卫生健康委信息化处、机构管理员、安全管理岗",
+    implemented: "已支持管理端查看区域总览，机构端按来源或目标机构查看共享包。",
+    next: "接入统一认证、机构目录、医生身份源和细粒度授权策略。"
+  },
+  {
+    title: "联调检查与交接清单",
+    owner: "接口联调组、转诊中心、试点医疗机构",
+    implemented: "已按接口契约、居民授权、数据质控、记录引用和审计留痕生成核验清单。",
+    next: "对接真实报文样例、字段映射签字、接收医师确认和异常重放记录。"
+  },
+  {
+    title: "调阅审计与发布证据",
+    owner: "安全管理岗、平台运维、数据平台",
+    implemented: "已登记调阅目的、结论、操作者和机构范围，并纳入区域专项报告。",
+    next: "接入审计留存、监控告警、备份恢复演练和现场签字归档。"
+  }
+];
+
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelector("#regional-status-filter")?.addEventListener("change", (event) => {
     regionalState.filters.status = event.target.value;
@@ -95,6 +122,7 @@ function renderRegionalSharing() {
   renderRegionalMetrics(data.summary || {});
   renderRegionalLaunchReadiness(data.summary || {}, packages);
   renderRegionalSiteIntegration(data.summary || {}, packages);
+  renderRegionalFunctionRoadmap();
   renderRegionalLoop(data.summary || {});
   renderRegionalBoundary(data.scope || {});
   renderRegionalSnapshots(data.snapshots || {});
@@ -219,6 +247,21 @@ function renderRegionalSiteIntegration(summary = {}, packages = []) {
       <small>联调样例：${item.sample}</small>
       <small>验收证据：${item.evidence}</small>
       <small>下一步：${item.nextAction}</small>
+    </article>
+  `).join("");
+}
+
+function renderRegionalFunctionRoadmap() {
+  const panel = document.querySelector("#regional-function-roadmap");
+  const target = document.querySelector("#regional-function-roadmap-summary");
+  if (!panel || !target) return;
+  target.textContent = `${regionalFunctionRoadmap.length} 项现有功能已明确责任部门和下一步计划`;
+  panel.innerHTML = regionalFunctionRoadmap.map((item) => `
+    <article class="capability-card">
+      <strong>${item.title}</strong>
+      <span>责任部门：${item.owner}</span>
+      <small>已实现：${item.implemented}</small>
+      <small>下一步计划开发功能：${item.next}</small>
     </article>
   `).join("");
 }

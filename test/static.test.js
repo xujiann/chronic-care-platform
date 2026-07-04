@@ -285,6 +285,8 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(html, /regional-launch-readiness/);
   assert.match(html, /data-regional-section="site-integration"/);
   assert.match(html, /regional-site-integration/);
+  assert.match(html, /data-regional-section="function-roadmap"/);
+  assert.match(html, /regional-function-roadmap/);
   assert.match(html, /data-regional-section="referral-handoff"/);
   assert.match(html, /regional-referral-handoff/);
   assert.match(html, /regional-referral-boundary/);
@@ -297,6 +299,12 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(client, /renderRegionalLoop/);
   assert.match(client, /renderRegionalLaunchReadiness/);
   assert.match(client, /renderRegionalSiteIntegration/);
+  assert.match(client, /renderRegionalFunctionRoadmap/);
+  assert.match(client, /regionalFunctionRoadmap/);
+  assert.match(client, /责任部门/);
+  assert.match(client, /下一步计划开发功能/);
+  assert.match(client, /市级平台数据治理组/);
+  assert.match(client, /接口联调组/);
   assert.match(client, /身份与权限/);
   assert.match(client, /监控灾备/);
   assert.match(client, /联调样例/);
