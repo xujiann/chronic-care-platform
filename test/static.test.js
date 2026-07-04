@@ -828,7 +828,8 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(readme, /手机框左右滑动服务切换/);
   assert.match(readme, /手机框顶部保留滑动切换提示/);
   assert.match(readme, /验收状态区会标明滑动切换是否启用/);
-  assert.match(readme, /汇总端型、服务、序号和预览模式/);
+  assert.match(readme, /汇总端型、服务、序号、预览模式和验收方式/);
+  assert.match(readme, /展示 P0-P3 下一步开发优先级/);
   assert.match(readme, /精简预览会进入手机验收模式/);
   assert.match(readme, /自动对齐到预览区/);
   assert.match(mobilePreviewHtml, /preview-direct-entry/);
@@ -841,7 +842,14 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /preview-readiness-frame/);
   assert.match(mobilePreviewHtml, /preview-readiness-link/);
   assert.match(mobilePreviewHtml, /preview-readiness-summary/);
+  assert.match(mobilePreviewHtml, /preview-readiness-method/);
+  assert.match(mobilePreviewHtml, /preview-priority/);
+  assert.match(mobilePreviewHtml, /下一步优先级/);
+  assert.match(mobilePreviewHtml, /生产短信、实名\/家庭关系、HTTPS、隐私协议和移动端发布材料/);
+  assert.match(mobilePreviewHtml, /授权撤销强拦截/);
+  assert.match(mobilePreviewHtml, /试点白名单、消息触达回执、适老化和无障碍复核/);
   assert.match(mobilePreviewHtml, /验收摘要：小程序 · 健康档案 · 1\/5 个服务 · 完整/);
+  assert.match(mobilePreviewHtml, /验收方式：点击、方向键、滑动、复制入口/);
   assert.match(mobilePreviewHtml, /renderPreviewUrls/);
   assert.match(mobilePreviewHtml, /renderPreviewStatus/);
   assert.match(mobilePreviewHtml, /renderPreviewDirectEntry/);
@@ -947,7 +955,11 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewCss, /preview-entry-actions/);
   assert.match(mobilePreviewCss, /preview-entry-url/);
   assert.match(mobilePreviewCss, /preview-readiness/);
+  assert.match(mobilePreviewCss, /#preview-readiness-method/);
   assert.match(mobilePreviewCss, /#preview-readiness-summary/);
+  assert.match(mobilePreviewCss, /preview-priority/);
+  assert.match(mobilePreviewCss, /grid-template-columns: 42px minmax\(0, 1fr\)/);
+  assert.match(mobilePreviewCss, /overflow-wrap: anywhere/);
   assert.match(mobilePreviewCss, /grid-column: 1 \/ -1/);
   assert.match(mobilePreviewCss, /preview-toolbar\.compact \.preview-entry-url/);
   assert.match(mobilePreviewCss, /preview-toolbar\.compact \.preview-client-switch/);

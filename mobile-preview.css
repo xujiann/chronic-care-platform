@@ -79,7 +79,8 @@ body {
 
 .preview-steps div,
 .hint,
-.preview-checklist {
+.preview-checklist,
+.preview-priority {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 14px;
@@ -88,7 +89,8 @@ body {
 
 .preview-steps strong,
 .hint strong,
-.preview-checklist span {
+.preview-checklist span,
+.preview-priority span {
   display: block;
   margin-bottom: 6px;
 }
@@ -106,7 +108,8 @@ body {
   margin: 0 0 12px;
 }
 
-.preview-checklist span {
+.preview-checklist span,
+.preview-priority span {
   color: var(--teal);
   font-weight: 800;
 }
@@ -118,6 +121,47 @@ body {
   padding-left: 18px;
   color: var(--muted);
   line-height: 1.6;
+}
+
+.preview-priority {
+  margin: 0 0 12px;
+}
+
+.preview-priority ol {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.preview-priority li {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  border: 1px solid rgba(39, 110, 241, 0.14);
+  border-radius: 8px;
+  padding: 8px;
+  background: #f8fbfd;
+}
+
+.preview-priority strong {
+  display: inline-grid;
+  place-items: center;
+  min-height: 28px;
+  border-radius: 999px;
+  background: #eaf2ff;
+  color: #184a91;
+  font-size: 12px;
+}
+
+.preview-priority small {
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 code {
@@ -356,7 +400,8 @@ body.preview-focus-mode .preview-device {
   white-space: nowrap;
 }
 
-.preview-readiness #preview-readiness-summary {
+.preview-readiness #preview-readiness-summary,
+.preview-readiness #preview-readiness-method {
   grid-column: 1 / -1;
   background: #f8fbfd;
   color: #375569;
