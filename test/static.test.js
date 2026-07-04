@@ -454,6 +454,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsHtml, /performance-indicator-detail/);
   assert.match(operationsHtml, /operations-situation-strip/);
   assert.match(operationsHtml, /operations-focus-links/);
+  assert.match(operationsHtml, /operations-duty-priority/);
   assert.match(operationsHtml, /operations-duty-actions/);
   assert.match(operationsHtml, /operations-interface-mapping/);
   assert.match(operationsHtml, /operations-command-board/);
@@ -504,6 +505,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsJs, /data-duty-action/);
   assert.match(operationsJs, /launchDutyDetail/);
   assert.match(operationsJs, /dispatchDutySla/);
+  assert.match(operationsJs, /activateDutyAction/);
   assert.match(operationsJs, /operations-duty-detail/);
   assert.match(operationsJs, /operation-launch-readiness/);
   assert.match(operationsJs, /applySituationFilter/);

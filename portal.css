@@ -721,6 +721,10 @@ dialog::backdrop {
   margin-top: 10px;
 }
 
+.operations-duty-priority {
+  margin-top: 10px;
+}
+
 .template-meta {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -754,18 +758,39 @@ dialog::backdrop {
   cursor: pointer;
 }
 
+.operations-duty-priority-card {
+  width: 100%;
+  border: 1px solid #b9c9e7;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f6f9ff;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
 .operations-duty-action.urgent {
   border-color: #efbbb5;
   background: #fff7f4;
 }
 
+.operations-duty-priority-card.urgent {
+  border-color: #efbbb5;
+  background: #fff7f4;
+}
+
 .operations-duty-action:hover,
-.operations-duty-action:focus-visible {
+.operations-duty-action:focus-visible,
+.operations-duty-priority-card:hover,
+.operations-duty-priority-card:focus-visible {
   border-color: #b9c9e7;
   background: #f6f9ff;
   outline: none;
 }
 
+.operations-duty-priority-card span,
+.operations-duty-priority-card small,
 .operations-duty-action span,
 .operations-duty-action small,
 .operations-duty-action b,
@@ -773,6 +798,7 @@ dialog::backdrop {
   color: var(--muted);
 }
 
+.operations-duty-priority-card strong,
 .operations-duty-action strong {
   display: block;
   margin-top: 5px;
@@ -780,12 +806,20 @@ dialog::backdrop {
   font-size: 24px;
 }
 
+.operations-duty-priority-card small,
 .operations-duty-action small,
 .operations-duty-action b,
 .operations-duty-action em {
   display: block;
   margin-top: 4px;
   line-height: 1.4;
+}
+
+.operations-duty-priority-card p {
+  margin: 8px 0 0;
+  color: var(--ink);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .operations-duty-action b {
