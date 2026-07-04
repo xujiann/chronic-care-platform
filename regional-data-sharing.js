@@ -62,6 +62,7 @@ const regionalFunctionRoadmap = [
     priorityLabel: "P0 上线前必须",
     owner: "市级平台数据治理组、各医疗机构信息科",
     implemented: "已按居民、来源机构、接收机构、诊疗资料和互认依据生成共享包。",
+    acceptance: "每个共享包均可追溯居民主索引、来源机构、目标机构、记录引用、互认依据和质控状态。",
     next: "接入正式居民主索引、院内主数据和批量质量核验。"
   },
   {
@@ -70,6 +71,7 @@ const regionalFunctionRoadmap = [
     priorityLabel: "P0 上线前必须",
     owner: "市卫生健康委信息化处、机构管理员、安全管理岗",
     implemented: "已支持管理端查看区域总览，机构端按来源或目标机构查看共享包。",
+    acceptance: "管理端、来源机构、目标机构和无关机构分别验证可见范围，拒绝访问必须进入审计日志。",
     next: "接入统一认证、机构目录、医生身份源和细粒度授权策略。"
   },
   {
@@ -272,6 +274,7 @@ function renderRegionalFunctionRoadmap() {
       <span class="badge ${item.priority === "P0" ? "danger" : item.priority === "P1" ? "warn" : "info"}">${item.priorityLabel}</span>
       <span>责任部门：${item.owner}</span>
       <small>已实现：${item.implemented}</small>
+      ${item.acceptance ? `<small>P0 验收口径：${item.acceptance}</small>` : ""}
       <small>下一步计划开发功能：${item.next}</small>
     </article>
   `).join("");

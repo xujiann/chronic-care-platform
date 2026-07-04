@@ -313,6 +313,9 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(client, /P2 生产加固/);
   assert.match(client, /市级平台数据治理组/);
   assert.match(client, /接口联调组/);
+  assert.match(client, /P0 验收口径/);
+  assert.match(client, /居民主索引、来源机构、目标机构、记录引用、互认依据和质控状态/);
+  assert.match(client, /拒绝访问必须进入审计日志/);
   assert.match(client, /身份与权限/);
   assert.match(client, /监控灾备/);
   assert.match(client, /联调样例/);
@@ -360,6 +363,9 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(about, /责任部门：接口联调组/);
   assert.match(about, /责任部门：安全管理岗/);
   assert.match(about, /优先级：P0 上线前必须/);
+  assert.match(about, /P0 验收口径/);
+  assert.match(about, /居民主索引、来源机构、目标机构、记录引用、互认依据和质控状态/);
+  assert.match(about, /拒绝访问必须进入审计日志/);
   assert.match(about, /优先级：P1 试点联调/);
   assert.match(about, /优先级：P2 生产加固/);
   assert.match(about, /下一步计划开发功能/);
