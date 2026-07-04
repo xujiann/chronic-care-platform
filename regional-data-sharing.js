@@ -90,6 +90,8 @@ const regionalFunctionRoadmap = [
   }
 ];
 
+const regionalRoadmapPrioritySummary = "优先级排序：P0 共享包编目、角色权限裁剪；P1 联调检查与交接清单；P2 调阅审计与发布证据。";
+
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelector("#regional-status-filter")?.addEventListener("change", (event) => {
     regionalState.filters.status = event.target.value;
@@ -263,7 +265,7 @@ function renderRegionalFunctionRoadmap() {
   const panel = document.querySelector("#regional-function-roadmap");
   const target = document.querySelector("#regional-function-roadmap-summary");
   if (!panel || !target) return;
-  target.textContent = `${regionalFunctionRoadmap.length} 项现有功能已明确责任部门和下一步计划`;
+  target.textContent = regionalRoadmapPrioritySummary;
   panel.innerHTML = regionalFunctionRoadmap.map((item) => `
     <article class="capability-card">
       <strong>${item.title}</strong>

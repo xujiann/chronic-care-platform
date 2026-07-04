@@ -301,6 +301,7 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(client, /renderRegionalSiteIntegration/);
   assert.match(client, /renderRegionalFunctionRoadmap/);
   assert.match(client, /regionalFunctionRoadmap/);
+  assert.match(client, /优先级排序：P0 共享包编目、角色权限裁剪；P1 联调检查与交接清单；P2 调阅审计与发布证据/);
   assert.match(client, /责任部门/);
   assert.match(client, /下一步计划开发功能/);
   assert.match(client, /P0 上线前必须/);
@@ -348,6 +349,7 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(about, /data-regional-about-section="site-evidence-actions"/);
   assert.match(about, /已实现功能与上线前缺口/);
   assert.match(about, /现有功能及责任部门/);
+  assert.match(about, /优先级排序：P0 共享包编目、角色权限裁剪；P1 联调检查与交接清单；P2 调阅审计与发布证据/);
   assert.match(about, /责任部门：市级平台数据治理组/);
   assert.match(about, /责任部门：市卫生健康委信息化处/);
   assert.match(about, /责任部门：接口联调组/);
