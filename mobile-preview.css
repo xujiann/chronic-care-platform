@@ -356,6 +356,12 @@ body.preview-focus-mode .preview-device {
   white-space: nowrap;
 }
 
+.preview-readiness #preview-readiness-summary {
+  grid-column: 1 / -1;
+  background: #f8fbfd;
+  color: #375569;
+}
+
 .preview-direct-entry {
   display: inline-flex;
   align-items: center;

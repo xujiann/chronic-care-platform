@@ -94,6 +94,7 @@
             <span id="preview-readiness-service">服务：健康档案</span>
             <span id="preview-readiness-frame">手机框：待加载</span>
             <span id="preview-readiness-link">入口：已同步</span>
+            <span id="preview-readiness-summary">验收摘要：小程序 · 健康档案 · 1/5 个服务 · 完整</span>
           </div>
         </div>
         <section class="phone-frame">
@@ -126,6 +127,7 @@
       const previewReadinessService = document.querySelector("#preview-readiness-service");
       const previewReadinessFrame = document.querySelector("#preview-readiness-frame");
       const previewReadinessLink = document.querySelector("#preview-readiness-link");
+      const previewReadinessSummary = document.querySelector("#preview-readiness-summary");
       const phoneFrame = document.querySelector(".phone-frame");
       const previewServices = [...serviceButtons].map((button) => button.dataset.previewService);
       const previewServiceLabels = {
@@ -200,6 +202,7 @@
         const servicePosition = activePreviewServicePosition();
         previewReadinessClient.textContent = `端型：${previewClientLabels[activePreviewClient]}`;
         previewReadinessService.textContent = `服务：${previewServiceLabels[activePreviewService]}（${servicePosition.label}）`;
+        previewReadinessSummary.textContent = `验收摘要：${previewClientLabels[activePreviewClient]} · ${previewServiceLabels[activePreviewService]} · ${servicePosition.label} · ${isCompactPreview ? "精简" : "完整"}`;
       };
       const renderPreviewStatus = () => {
         previewStatus.textContent = isCompactPreview
@@ -298,8 +301,9 @@
         try {
           bindPreviewSwipeTarget(frame.contentDocument);
           bindPreviewSwipeTarget(frame.contentDocument?.body);
+          previewReadinessFrame.textContent = "手机框：已加载，滑动切换已启用";
         } catch (error) {
-          previewReadinessFrame.textContent = "手机框：已加载，滑动监听待重试";
+          previewReadinessFrame.textContent = "手机框：已加载，滑动切换请使用手机框外层";
         }
         frame.contentWindow?.postMessage({ type: "set-service-tab", service: activePreviewService }, location.origin);
       });
