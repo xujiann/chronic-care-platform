@@ -109,6 +109,8 @@ test("operations metrics navigate to the matching work areas", async ({ page }) 
   await expect(page.locator("#operations-metrics [data-metric-action]")).toHaveCount(10);
   await expect(page.locator("#operations-duty-actions [data-duty-action]")).toHaveCount(3);
   await expect(page.locator("#operations-duty-actions")).toContainText("上线判定");
+  await expect(page.locator("#operations-duty-actions")).toContainText("责任：");
+  await expect(page.locator("#operations-duty-actions")).toContainText("下一步：");
 
   await page.locator("#operations-metrics [data-metric-action='critical']").click();
   await expect(page.locator("#operation-status-filter")).toHaveValue("critical");

@@ -1316,6 +1316,25 @@ function renderOperationsDashboard() {
   if (boundary) boundary.textContent = `${zhList(dashboard.boundaries || [], " / ")} | 复用：${zhList(dashboard.reusedCollections || [])}`;
 }
 
+function launchDutyDetail(launchReadiness) {
+  const blocker = Array.isArray(launchReadiness.blockers) ? launchReadiness.blockers[0] : null;
+  if (blocker) return `责任：${zhInline(blocker.owner || "值班长")}；下一步：${zhInline(blocker.nextAction || "补齐上线阻断证据。")}`;
+  const nextAction = Array.isArray(launchReadiness.nextActions) ? launchReadiness.nextActions[0] : "";
+  return `责任：值班长；下一步：${zhInline(nextAction || "保持观察记录并归档上线签收材料。")}`;
+}
+
+function dispatchDutyDetail(openDispatches) {
+  const item = [...openDispatches].sort((a, b) => statusSeverity(b.priority) - statusSeverity(a.priority) || new Date(a.requiredBy || 0) - new Date(b.requiredBy || 0))[0];
+  if (!item) return "责任：运行调度席；下一步：保持调度池清零并巡检跨院资源池。";
+  return `责任：运行调度席；下一步：${zhInline(item.targetInstitution || item.sourceInstitution || "目标机构")} ${zhInline(item.resourceType || "资源")}×${item.quantity || 0} ${formatDateTime(item.requiredBy) || "尽快"}前确认。`;
+}
+
+function reconciliationDutyDetail(blockedReviews) {
+  const item = [...blockedReviews].sort((a, b) => statusSeverity(b.status) - statusSeverity(a.status) || Number(b.varianceRate || 0) - Number(a.varianceRate || 0))[0];
+  if (!item) return "责任：统计办公室；下一步：保持直报复核清零并归档对账凭证。";
+  return `责任：${zhInline(item.owner || "统计办公室")}；下一步：${zhInline(item.institution || "相关机构")} ${zhList(item.fields || []) || "直报字段"}差异${percent(item.varianceRate)}复核。`;
+}
+
 function renderOperationsSituation(dashboard, filteredSnapshots, selected) {
   const strip = document.querySelector("#operations-situation-strip");
   const links = document.querySelector("#operations-focus-links");
@@ -1374,15 +1393,16 @@ function renderOperationsSituation(dashboard, filteredSnapshots, selected) {
     </button>
   `).join("");
   dutyActions.innerHTML = [
-    { action: "launch", title: "上线判定", count: launchReadiness.summary?.blockers || 0, status: zhInline(launchReadiness.decision || "待判定"), hint: "查看生产加固、割接签收和观察阻断项", target: "#operation-launch-readiness" },
-    { action: "dispatch", title: "开放调度", count: openDispatches.length, status: openDispatches.length ? "需跟踪" : "已清零", hint: "定位资源调度工单与分派状态" },
-    { action: "reconciliation", title: "直报复核", count: blockedReviews.length, status: blockedReviews.length ? "需复核" : "已闭环", hint: "定位统计直报差异和补正说明" }
+    { action: "launch", title: "上线判定", count: launchReadiness.summary?.blockers || 0, status: zhInline(launchReadiness.decision || "待判定"), hint: "查看生产加固、割接签收和观察阻断项", detail: launchDutyDetail(launchReadiness), target: "#operation-launch-readiness" },
+    { action: "dispatch", title: "开放调度", count: openDispatches.length, status: openDispatches.length ? "需跟踪" : "已清零", hint: "定位资源调度工单与分派状态", detail: dispatchDutyDetail(openDispatches) },
+    { action: "reconciliation", title: "直报复核", count: blockedReviews.length, status: blockedReviews.length ? "需复核" : "已闭环", hint: "定位统计直报差异和补正说明", detail: reconciliationDutyDetail(blockedReviews) }
   ].map((item) => `
     <button class="operations-duty-action ${item.count ? "urgent" : ""}" type="button" data-duty-action="${item.action}" data-duty-target="${htmlAttribute(item.target || "")}">
       <span>${item.title}</span>
       <strong>${item.count}</strong>
       <small>${item.status}</small>
       <em>${item.hint}</em>
+      <p class="operations-duty-detail">${item.detail}</p>
     </button>
   `).join("");
   strip.querySelector("[data-situation-select]")?.addEventListener("click", (event) => {

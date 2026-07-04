@@ -790,6 +790,14 @@ dialog::backdrop {
   font-style: normal;
 }
 
+.operations-duty-detail {
+  margin: 8px 0 0;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .operations-command-board {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
