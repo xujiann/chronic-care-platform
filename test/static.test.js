@@ -486,6 +486,12 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /evaluation-evidence-report\.md/);
   assert.match(read("README.md"), /release-artifact-manifest\.md/);
   assert.match(read("README.md"), /priority-application-templates\.md/);
+  assert.match(read("README.md"), /卫生健康信息平台功能线程与部门责任梳理\.md/);
+  const platformThreadResponsibilityDoc = read("docs/卫生健康信息平台功能线程与部门责任梳理.md");
+  assert.match(platformThreadResponsibilityDoc, /慢病医防融合与院后随访/);
+  assert.match(platformThreadResponsibilityDoc, /居民端优先上线建议/);
+  assert.match(platformThreadResponsibilityDoc, /下一步开发队列/);
+  assert.match(platformThreadResponsibilityDoc, /当前剩余风险/);
   assert.match(read("DEPLOYMENT.md"), /storage-model-inspection\.md/);
   assert.match(read("DEPLOYMENT.md"), /identity-contract\.md/);
   assert.match(read("DEPLOYMENT.md"), /audit-retention-report\.md/);
@@ -1132,8 +1138,12 @@ test("citizen portal exposes resident service tabs and implementation states", (
   const server = read("server.js");
   assert.match(loginHtml, /phone-login-form/);
   assert.match(loginHtml, /data-account-provisioning/);
+  assert.match(loginHtml, /data-provisioning-step="resident"/);
+  assert.match(loginHtml, /data-provisioning-step="nurse"/);
+  assert.match(loginHtml, /data-provisioning-step="audit"/);
   assert.match(loginHtml, /居民端暂不开放自助注册/);
   assert.match(loginHtml, /护理端护士账号需由试点机构开通/);
+  assert.match(loginHtml, /账号审计留痕/);
   assert.doesNotMatch(loginHtml, /id="register-form"/);
   assert.match(loginHtml, /手机号验证码/);
   assert.match(loginHtml, /data-send-phone-code/);
@@ -1150,6 +1160,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(server, /findCitizenAuthUserByPhone/);
   assert.match(auth, /response\.status === 423/);
   assert.match(read("portal.css"), /account-provisioning-note/);
+  assert.match(read("portal.css"), /account-provisioning-note li/);
   assert.match(read("scripts/citizen-launch-foundation-readiness.js"), /citizen-foundation:account-provisioning-boundary/);
   assert.match(read("scripts/citizen-launch-foundation-readiness.js"), /citizen-foundation:mobile-preview-service-switch/);
   assert.match(read("scripts/citizen-launch-foundation-readiness.js"), /mobilePreviewCss/);

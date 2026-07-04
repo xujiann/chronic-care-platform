@@ -46,9 +46,9 @@ function buildCitizenLaunchFoundationReadiness(options = {}) {
     },
     {
       id: "citizen-foundation:account-provisioning-boundary",
-      passed: hasAll(login, [/data-account-provisioning/, /居民端暂不开放自助注册/, /实名建档/, /手机号绑定/]) &&
+      passed: hasAll(login, [/data-account-provisioning/, /data-provisioning-step="resident"/, /data-provisioning-step="audit"/, /居民端暂不开放自助注册/, /实名建档/, /手机号绑定/, /账号审计留痕/]) &&
         !/id="register-form"|\/api\/auth\/register/.test(login + auth + readText("server.js")),
-      detail: "resident login states account provisioning boundary and does not expose public self-registration"
+      detail: "resident login states account provisioning workflow and does not expose public self-registration"
     },
     {
       id: "citizen-foundation:mobile-install-shell",
