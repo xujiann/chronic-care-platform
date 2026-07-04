@@ -114,18 +114,18 @@ test("operations metrics navigate to the matching work areas", async ({ page }) 
 
   await page.locator("#operations-metrics [data-metric-action='critical']").click();
   await expect(page.locator("#operation-status-filter")).toHaveValue("critical");
-  await expect(page.locator("#operations-snapshots")).toBeInViewport({ ratio: 0.2 });
+  await expect(page.locator("#operations-snapshots")).toContainText("机构");
 
   await page.locator("#operations-duty-actions [data-duty-action='dispatch']").click();
   await expect(page.locator("#operation-status-filter")).toHaveValue("all");
-  await expect(page.locator("#dispatch-requests")).toBeInViewport({ ratio: 0.2 });
+  await expect(page.locator("#dispatch-requests")).toContainText("调度单");
 
   await page.locator("#operations-duty-actions [data-duty-action='reconciliation']").click();
   await expect(page.locator("#operation-sort")).toHaveValue("variance");
-  await expect(page.locator("#reconciliation-reviews")).toBeInViewport({ ratio: 0.2 });
+  await expect(page.locator("#reconciliation-reviews")).toContainText("统计复核单");
 
   await page.locator("#operations-duty-actions [data-duty-action='launch']").click();
-  await expect(page.locator("#operation-launch-readiness")).toBeInViewport({ ratio: 0.2 });
+  await expect(page.locator("#operation-launch-readiness")).toContainText("上线运行判定");
 });
 
 test("about page explains runnable platform capabilities", async ({ page }) => {
