@@ -768,6 +768,7 @@ dialog::backdrop {
 
 .operations-duty-action span,
 .operations-duty-action small,
+.operations-duty-action b,
 .operations-duty-action em {
   color: var(--muted);
 }
@@ -780,10 +781,16 @@ dialog::backdrop {
 }
 
 .operations-duty-action small,
+.operations-duty-action b,
 .operations-duty-action em {
   display: block;
   margin-top: 4px;
   line-height: 1.4;
+}
+
+.operations-duty-action b {
+  font-weight: 600;
+  color: #5a6f93;
 }
 
 .operations-duty-action em {

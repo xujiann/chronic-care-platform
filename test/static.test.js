@@ -503,6 +503,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsJs, /data-metric-action/);
   assert.match(operationsJs, /data-duty-action/);
   assert.match(operationsJs, /launchDutyDetail/);
+  assert.match(operationsJs, /dispatchDutySla/);
   assert.match(operationsJs, /operations-duty-detail/);
   assert.match(operationsJs, /operation-launch-readiness/);
   assert.match(operationsJs, /applySituationFilter/);
