@@ -958,6 +958,33 @@ dialog::backdrop {
   color: var(--ink);
 }
 
+.catalog-summary {
+  color: #184a91;
+  font-weight: 800;
+}
+
+.catalog-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  border-top: 1px solid rgba(216, 226, 231, 0.72);
+  padding-top: 8px;
+}
+
+.catalog-checks span {
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: #fff3d8;
+  color: var(--amber);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.catalog-checks span.is-ready {
+  background: #e6f7ef;
+  color: var(--green);
+}
+
 .regional-readiness-checklist {
   display: grid;
   gap: 8px;

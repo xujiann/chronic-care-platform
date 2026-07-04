@@ -332,6 +332,7 @@ function renderRegionalPackages(packages) {
         <p>${item.resident?.name || item.residentId} · ${item.sourceInstitution} → ${(item.targetInstitutions || []).join("、")}</p>
         <p>${(item.contracts || []).map((contract) => contractLabels[contract.id] || contract.id).join(" / ")} · ${evidenceText(item.evidenceCounts)}</p>
         <p>${(item.latestRecords || []).map((record) => `${recordTypeLabels[record.type] || record.type}：${record.name || record.id}`).join("；") || "暂无记录摘要"}</p>
+        ${catalogSummaryHtml(item)}
       </div>
       <div class="capability-side">
         <small>${consentLabel(item.consentStatus)}</small>
@@ -358,7 +359,10 @@ function renderSelectedPackage(packages) {
     `<p><strong>来源机构</strong><span>${packageItem.sourceInstitution || packageItem.sourceOrgCode}</span></p>`,
     `<p><strong>接收机构</strong><span>${(packageItem.targetInstitutions || packageItem.targetOrgCodes || []).join("、")}</span></p>`,
     `<p><strong>共享集合</strong><span>${(packageItem.sharedCollections || []).map(labelCollection).join("、")}</span></p>`,
-    `<p><strong>授权/质量</strong><span>${consentLabel(packageItem.consentStatus)} / ${qualityLabel(packageItem.qualityStatus)}</span></p>`
+    `<p><strong>授权/质量</strong><span>${consentLabel(packageItem.consentStatus)} / ${qualityLabel(packageItem.qualityStatus)}</span></p>`,
+    `<div class="catalog-checks">${buildRegionalCatalogChecks(packageItem).checks.map((item) => `
+      <span class="${item.passed ? "is-ready" : "needs-review"}">${item.label}</span>
+    `).join("")}</div>`
   ].join("");
 }
 
@@ -574,6 +578,30 @@ function buildRegionalReadinessChecks(packageItem) {
       detail: packageItem.lastAccessReviewId ? `最近留痕 ${packageItem.lastAccessReviewId}` : "调阅后自动写入数据访问日志"
     }
   ];
+}
+
+function buildRegionalCatalogChecks(packageItem) {
+  const collections = new Set(packageItem.sharedCollections || []);
+  const checks = [
+    { label: "居民主索引", passed: Boolean(packageItem.residentId && packageItem.personIndex) },
+    { label: "来源机构", passed: Boolean(packageItem.sourceOrgCode && packageItem.sourceInstitution) },
+    { label: "接收机构", passed: (packageItem.targetOrgCodes || []).length > 0 && (packageItem.targetInstitutions || []).length > 0 },
+    { label: "诊疗资料", passed: collections.has("personalRecords") || collections.has("diagnosticReports") },
+    { label: "记录引用", passed: (packageItem.recordRefs || []).length > 0 },
+    { label: "接口契约", passed: (packageItem.contractRefs || []).length > 0 },
+    { label: "授权质控", passed: packageItem.consentStatus === "active" && packageItem.qualityStatus === "passed" }
+  ];
+  return {
+    checks,
+    ready: checks.filter((item) => item.passed).length,
+    total: checks.length
+  };
+}
+
+function catalogSummaryHtml(packageItem) {
+  const catalog = buildRegionalCatalogChecks(packageItem);
+  const pending = catalog.checks.filter((item) => !item.passed).map((item) => item.label);
+  return `<p class="catalog-summary">编目完整度 ${catalog.ready}/${catalog.total} · ${pending.length ? `待补：${pending.join("、")}` : "关键字段已齐备"}</p>`;
 }
 
 function renderRegionalReviews(reviews) {
