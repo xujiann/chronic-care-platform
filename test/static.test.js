@@ -487,6 +487,12 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /release-artifact-manifest\.md/);
   assert.match(read("README.md"), /priority-application-templates\.md/);
   assert.match(read("README.md"), /卫生健康信息平台功能线程与部门责任梳理\.md/);
+  const nextPriorityDoc = read("docs/后续开发优先级.md");
+  assert.match(nextPriorityDoc, /更新日期：2026-07-04/);
+  assert.match(nextPriorityDoc, /P0-上线预览闭环/);
+  assert.match(nextPriorityDoc, /P0-账号与权限生产化/);
+  assert.match(nextPriorityDoc, /P1-居民服务闭环深化/);
+  assert.match(nextPriorityDoc, /P2-测试矩阵与可观测性/);
   const platformThreadResponsibilityDoc = read("docs/卫生健康信息平台功能线程与部门责任梳理.md");
   assert.match(platformThreadResponsibilityDoc, /慢病医防融合与院后随访/);
   assert.match(platformThreadResponsibilityDoc, /居民端优先上线建议/);
@@ -1480,6 +1486,15 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenProductionRequirements, /HIS\/EMR\/LIS\/PACS/);
   assert.match(citizenProductionRequirements, /npm\.cmd run citizen:launch-foundation/);
   assert.match(citizenProductionRequirements, /灰度开放试点白名单/);
+  const citizenNextPriority = read("docs/居民端下一步开发优先级.md");
+  assert.match(read("README.md"), /居民端下一步开发优先级/);
+  assert.match(citizenNextPriority, /P0 真实上线底座/);
+  assert.match(citizenNextPriority, /P1 医疗数据只读接入/);
+  assert.match(citizenNextPriority, /P2 服务闭环深化/);
+  assert.match(citizenNextPriority, /P3 运营推广与持续优化/);
+  assert.match(citizenNextPriority, /生产短信网关/);
+  assert.match(citizenNextPriority, /授权撤销强拦截/);
+  assert.match(citizenNextPriority, /适老化与无障碍复核/);
 });
 
 test("internet nursing module exposes appointment, management and nurse workflows", () => {

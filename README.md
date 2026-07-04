@@ -322,6 +322,8 @@ The handoff document is `docs/互联网护理服务模块说明.md`; it covers r
 
 `npm.cmd run citizen:launch-foundation` generates `release/citizen-launch-foundation-readiness.json` and `release/citizen-launch-foundation-readiness.md`; `release:report` includes the same resident phone-code login, account provisioning boundary, PWA/mobile shell, mini-program/APP routing, and production dependency gates. `docs/citizen-production-launch-requirements.md` is the resident-side real production launch requirements document, covering role permissions, external interfaces, non-functional requirements, security/privacy, acceptance gates, rollout, and rollback.
 
+`docs/居民端下一步开发优先级.md` lists the resident-side next development priorities from P0 production launch foundation through P1 medical data read-only integration, P2 nursing/escort/registration service closure, and P3 pilot operations and accessibility optimization.
+
 `docs/production-go-live-requirements.md` is the platform-level real production go-live requirements baseline. Use it with `release/production-cutover-checklist.md`, `release/site-readiness-pack.md`, `release/launch-smoke-report.md`, `release/release-report.md`, and `release/release-artifact-manifest.md` before deciding that a deployment is ready for real users.
 
 `docs/on-site-launch-materials.md` is the field-owned material checklist for real go-live. It names the production environment, secrets, identity, SMS, HIS/EMR/LIS/PACS, nursing/escort/registration, insurance/certificate, database, security, monitoring, disaster recovery, resident mobile acceptance, gray release, and signoff materials that must be attached before opening to real residents.
