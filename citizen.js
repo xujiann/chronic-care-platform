@@ -264,6 +264,11 @@ const citizenClientChannels = [
     capabilities: ["手机号授权登录", "轻量健康档案", "服务预约", "订阅消息提醒"],
     readiness: ["HTTPS 域名备案", "小程序隐私协议", "类目与医疗服务资质", "消息模板审核"],
     nextAction: "提交小程序审核包",
+    productionMaterials: [
+      { label: "生产短信网关", status: "现场补齐", note: "SMS_GATEWAY_URL、模板、签名和频控回执" },
+      { label: "实名与家庭关系核验", status: "现场补齐", note: "政务身份/OIDC、监护关系和家庭成员授权范围" },
+      { label: "HTTPS 与隐私协议", status: "现场补齐", note: "备案域名、隐私协议、类目和医疗服务资质" }
+    ],
     launchChecklist: [
       { label: "实名登录", state: "已就绪", note: "手机号验证码进入居民端" },
       { label: "服务入口", state: "已就绪", note: "按二级页面生成可分享链接" },
@@ -279,6 +284,11 @@ const citizenClientChannels = [
     capabilities: ["可安装网页应用入口", "离线健康档案壳", "大字模式", "系统推送预留"],
     readiness: ["应用签名与包名", "应用市场隐私合规", "推送证书", "崩溃监控与版本升级"],
     nextAction: "打包手机应用上架材料",
+    productionMaterials: [
+      { label: "应用签名与包名", status: "现场补齐", note: "Android/iOS 签名、包名和升级通道" },
+      { label: "推送与崩溃监控", status: "现场补齐", note: "推送证书、崩溃监控和版本回滚策略" },
+      { label: "HTTPS 与隐私合规", status: "现场补齐", note: "生产域名、隐私政策、应用市场合规材料" }
+    ],
     launchChecklist: [
       { label: "安装入口", state: "已就绪", note: "可安装网页应用壳支持浏览器安装" },
       { label: "离线访问", state: "已就绪", note: "Service Worker 缓存居民端壳" },
@@ -572,6 +582,10 @@ function renderClientChannels() {
     <section>
       <h3>发布条件</h3>
       ${active.readiness.map((item) => `<p>${item}</p>`).join("")}
+    </section>
+    <section class="client-production-materials">
+      <h3>P0现场材料</h3>
+      ${active.productionMaterials.map((item) => `<p><strong>${item.label}</strong><span>${item.status}</span><small>${item.note}</small></p>`).join("")}
     </section>
     <section>
       <h3>下一步</h3>

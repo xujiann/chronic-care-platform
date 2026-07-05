@@ -925,7 +925,7 @@ body.service-paged-mode .citizen-shell {
 
 .client-channel-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -938,7 +938,8 @@ body.service-paged-mode .citizen-shell {
   line-height: 1.55;
 }
 
-.client-launch-checklist p {
+.client-launch-checklist p,
+.client-production-materials p {
   display: grid;
   gap: 4px;
   color: var(--ink);
@@ -946,18 +947,30 @@ body.service-paged-mode .citizen-shell {
 
 .client-launch-checklist strong,
 .client-launch-checklist span,
-.client-launch-checklist small {
+.client-launch-checklist small,
+.client-production-materials strong,
+.client-production-materials span,
+.client-production-materials small {
   display: block;
 }
 
-.client-launch-checklist span {
+.client-launch-checklist span,
+.client-production-materials span {
   width: fit-content;
   border-radius: 999px;
   padding: 2px 8px;
-  background: #eaf7ef;
-  color: #17663a;
   font-size: 12px;
   font-weight: 900;
+}
+
+.client-launch-checklist span {
+  background: #eaf7ef;
+  color: #17663a;
+}
+
+.client-production-materials span {
+  background: #fff4d8;
+  color: #8a5a00;
 }
 
 .longterm-care-panel {

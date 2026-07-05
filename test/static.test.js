@@ -791,7 +791,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   const serviceWorker = read("service-worker.js");
   assert.match(citizenHtml, /rel="manifest"/);
   assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260704swipe/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260705p0materials/);
   assert.match(citizenHtml, /mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-title/);
@@ -1004,7 +1004,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.shortcuts.some((item) => item.url === "./citizen.html?client=app&page=escort#service-escort"), true);
   assert.equal(manifest.shortcuts.some((item) => item.url === "./mobile-preview.html?client=app"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v36/);
+  assert.match(serviceWorker, /chronic-care-citizen-v37/);
   assert.match(serviceWorker, /internet-nursing\.js\?v=20260629prod/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627preview/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages/);
@@ -1020,8 +1020,8 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(serviceWorker, /citizen\.js\?v=20260630visible/);
   assert.match(serviceWorker, /citizen\.js\?v=20260630touch/);
   assert.match(serviceWorker, /citizen\.js\?v=20260630escortlink/);
-  assert.match(serviceWorker, /citizen\.js\?v=20260704swipe/);
-  assert.match(serviceWorker, /citizen\.css\?v=20260704swipe/);
+  assert.match(serviceWorker, /citizen\.js\?v=20260705p0materials/);
+  assert.match(serviceWorker, /citizen\.css\?v=20260705p0materials/);
   assert.match(serviceWorker, /citizen\.js\?v=20260630lifecycle/);
   assert.match(serviceWorker, /citizen\.html/);
   assert.match(serviceWorker, /mobile-preview\.html/);
@@ -1071,7 +1071,7 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   assert.match(citizenJs, /setEscortAppointmentAvailability/);
   assert.match(citizenJs, /escortProviderReady/);
   assert.match(citizenJs, /暂无可预约服务主体/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260704swipe/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260705p0materials/);
   assert.match(citizenJs, /\/escort-services\/orders/);
   assert.match(citizenJs, /getEscortRegistrationOptions/);
   assert.match(citizenJs, /applyLinkedRegistrationToEscortForm/);
@@ -1283,7 +1283,12 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /copyClientEntry/);
   assert.match(citizenJs, /data-copy-client-entry/);
   assert.match(citizenJs, /launchChecklist/);
+  assert.match(citizenJs, /productionMaterials/);
+  assert.match(citizenJs, /SMS_GATEWAY_URL/);
+  assert.match(citizenJs, /OIDC/);
+  assert.match(citizenJs, /Android\/iOS/);
   assert.match(citizenJs, /client-launch-checklist/);
+  assert.match(citizenJs, /client-production-materials/);
   assert.match(citizenJs, /data-client-channel/);
   assert.match(citizenJs, /mini-program/);
   assert.match(citizenJs, /app/);
@@ -1395,12 +1400,14 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /client-channel-actions/);
   assert.match(citizenCss, /client-channel-action/);
   assert.match(citizenCss, /client-launch-checklist/);
+  assert.match(citizenCss, /client-production-materials/);
+  assert.match(citizenCss, /grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
   assert.match(citizenCss, /registration-workflow/);
   assert.match(citizenCss, /longterm-care-panel/);
   assert.match(citizenCss, /longterm-care-form/);
   assert.match(citizenCss, /registration-form/);
   assert.match(citizenHtml, /registration-summary/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260704swipe/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260705p0materials/);
   assert.match(citizenJs, /registration-summary/);
   assert.match(citizenJs, /hisOrders/);
   assert.match(citizenJs, /insuranceReady/);
