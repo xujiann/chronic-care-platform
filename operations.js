@@ -13,6 +13,7 @@ const performanceFilters = {
   source: "all"
 };
 let selectedPerformanceIndicatorNo = "";
+const selectedDispatchIds = new Set();
 
 const OPERATIONS_INTERFACE_MAPPINGS = [
   ["ops-his-beds", "HIS/住院管理", "病案首页", "hospitalOperationSnapshots", "beds", "开放床位、占用床位、重症床位、急诊留观", "医务部、病案室、信息中心", "日内15分钟", "已接入", "现场核对床位开放、占用和重症床位口径。"],
@@ -2828,11 +2829,32 @@ function renderAlertRules(items) {
 }
 
 function renderDispatchRequests(items) {
+  const dispatchableItems = items.filter((item) => dispatchNextStatus(item));
+  const dispatchableIds = new Set(dispatchableItems.map((item) => String(item.id || "")));
+  [...selectedDispatchIds].forEach((id) => {
+    if (!dispatchableIds.has(id)) selectedDispatchIds.delete(id);
+  });
+  const selectedItems = items.filter((item) => selectedDispatchIds.has(String(item.id || "")) && dispatchNextStatus(item));
+  const assignableCount = selectedItems.filter((item) => dispatchNextStatus(item) === "assigned").length;
+  const closableCount = selectedItems.filter((item) => dispatchNextStatus(item) === "closed").length;
   document.querySelector("#dispatch-requests").innerHTML = `
+    <div id="dispatch-batch-toolbar" class="dispatch-batch-toolbar">
+      <div>
+        <strong>批量处置</strong>
+        <span>已选择 ${selectedItems.length} / 可处置 ${dispatchableItems.length} 张调度单</span>
+      </div>
+      <div class="compact-action-row">
+        <button class="inline-action compact" type="button" data-dispatch-select-all>全选待处置</button>
+        <button class="inline-action compact" type="button" data-dispatch-clear>清空</button>
+        <button class="inline-action compact" type="button" data-dispatch-batch-status="assigned" ${assignableCount ? "" : "disabled"}>批量分派 ${assignableCount}</button>
+        <button class="inline-action compact" type="button" data-dispatch-batch-status="closed" ${closableCount ? "" : "disabled"}>批量关闭 ${closableCount}</button>
+      </div>
+    </div>
     <table>
-      <thead><tr><th>工单</th><th>资源</th><th>来源</th><th>目标</th><th>优先级</th><th>状态</th><th>原因</th><th>操作</th></tr></thead>
+      <thead><tr><th>选择</th><th>工单</th><th>资源</th><th>来源</th><th>目标</th><th>优先级</th><th>状态</th><th>原因</th><th>操作</th></tr></thead>
       <tbody>${items.map((item) => `
         <tr>
+          <td><input type="checkbox" data-dispatch-select="${htmlAttribute(item.id)}" ${dispatchNextStatus(item) ? "" : "disabled"} ${selectedDispatchIds.has(String(item.id || "")) ? "checked" : ""} /></td>
           <td><strong>${dispatchRequestName(item)}</strong><br /><small>${formatDateTime(item.requiredBy)}</small></td>
           <td>${zh(item.resourceType)} × ${item.quantity}</td>
           <td>${zh(item.sourceInstitution)}</td>
@@ -2847,6 +2869,27 @@ function renderDispatchRequests(items) {
   `;
   document.querySelectorAll("[data-dispatch-status]").forEach((button) => {
     button.addEventListener("click", () => updateDispatchStatus(button.dataset.dispatchStatus, button.dataset.nextStatus));
+  });
+  document.querySelectorAll("[data-dispatch-select]").forEach((checkbox) => {
+    checkbox.addEventListener("change", () => {
+      if (checkbox.checked) {
+        selectedDispatchIds.add(checkbox.dataset.dispatchSelect);
+      } else {
+        selectedDispatchIds.delete(checkbox.dataset.dispatchSelect);
+      }
+      renderDispatchRequests(items);
+    });
+  });
+  document.querySelector("[data-dispatch-select-all]")?.addEventListener("click", () => {
+    dispatchableItems.forEach((item) => selectedDispatchIds.add(String(item.id || "")));
+    renderDispatchRequests(items);
+  });
+  document.querySelector("[data-dispatch-clear]")?.addEventListener("click", () => {
+    selectedDispatchIds.clear();
+    renderDispatchRequests(items);
+  });
+  document.querySelectorAll("[data-dispatch-batch-status]").forEach((button) => {
+    button.addEventListener("click", () => updateSelectedDispatchStatuses(button.dataset.dispatchBatchStatus));
   });
 }
 
@@ -2970,8 +3013,9 @@ async function reviewReconciliation(id, status = "approved") {
   await loadOperationsDashboard();
 }
 
-async function updateDispatchStatus(id, status) {
+async function updateDispatchStatus(id, status, options = {}) {
   if (!id || !status) return;
+  const reload = options.reload !== false;
   const note = status === "assigned" ? "已由运行调度平台确认分派。" : status === "closed" ? "资源到位并关闭调度工单。" : `状态更新为${zh(status)}。`;
   if (OPERATIONS_API_BASE) {
     const request = window.HealthCityAuth?.authFetch || fetch;
@@ -2998,10 +3042,25 @@ async function updateDispatchStatus(id, status) {
       operationsDashboard.handover?.recentSignoffs || []
     );
     operationsDashboard.handoverOwnerMatrix = buildStaticHandoverOwnerMatrix(operationsDashboard.handover || {});
-    renderOperationsDashboard();
+    if (reload) renderOperationsDashboard();
     return;
   }
-  await loadOperationsDashboard();
+  if (reload) await loadOperationsDashboard();
+}
+
+async function updateSelectedDispatchStatuses(status) {
+  const selectedItems = (operationsDashboard?.dispatchRequests || [])
+    .filter((item) => selectedDispatchIds.has(String(item.id || "")) && dispatchNextStatus(item) === status);
+  if (!selectedItems.length) return;
+  for (const item of selectedItems) {
+    await updateDispatchStatus(item.id, status, { reload: false });
+    selectedDispatchIds.delete(String(item.id || ""));
+  }
+  if (OPERATIONS_API_BASE) {
+    await loadOperationsDashboard();
+  } else {
+    renderOperationsDashboard();
+  }
 }
 
 function filterSnapshots(items) {
@@ -3121,12 +3180,19 @@ function dispatchRequestName(item) {
   return `${type}调度单${suffix ? ` ${suffix}` : ""}`;
 }
 
-function dispatchStatusButtons(item) {
+function dispatchNextStatus(item) {
   const status = String(item.status || "");
-  if (status === "pending") {
+  if (status === "pending") return "assigned";
+  if (["assigned", "in-progress"].includes(status)) return "closed";
+  return "";
+}
+
+function dispatchStatusButtons(item) {
+  const nextStatus = dispatchNextStatus(item);
+  if (nextStatus === "assigned") {
     return `<button class="inline-action compact" type="button" data-dispatch-status="${item.id}" data-next-status="assigned">分派</button>`;
   }
-  if (["assigned", "in-progress"].includes(status)) {
+  if (nextStatus === "closed") {
     return `<button class="inline-action compact" type="button" data-dispatch-status="${item.id}" data-next-status="closed">关闭</button>`;
   }
   return "<span class=\"muted\">已闭环</span>";
