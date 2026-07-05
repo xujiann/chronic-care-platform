@@ -1193,6 +1193,12 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(loginHtml, /data-provisioning-step="doctor"/);
   assert.match(loginHtml, /data-provisioning-step="nurse"/);
   assert.match(loginHtml, /data-provisioning-step="audit"/);
+  assert.match(loginHtml, /data-provisioning-owner/);
+  assert.match(loginHtml, /data-owner-role="resident-master-index"/);
+  assert.match(loginHtml, /data-owner-role="audit-evidence"/);
+  assert.match(loginHtml, /authUsers/);
+  assert.match(loginHtml, /securityEvents/);
+  assert.match(loginHtml, /dataAccessLogs/);
   assert.match(loginHtml, /居民端暂不开放自助注册/);
   assert.match(loginHtml, /医生和护理端账号需由机构开通/);
   assert.match(loginHtml, /第一执业机构确认/);
@@ -1216,6 +1222,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(auth, /response\.status === 423/);
   assert.match(read("portal.css"), /account-provisioning-note/);
   assert.match(read("portal.css"), /account-provisioning-note li/);
+  assert.match(read("portal.css"), /account-provisioning-owners/);
   assert.match(read("scripts/citizen-launch-foundation-readiness.js"), /citizen-foundation:account-provisioning-boundary/);
   assert.match(read("scripts/citizen-launch-foundation-readiness.js"), /citizen-foundation:mobile-preview-service-switch/);
   assert.match(read("scripts/citizen-launch-foundation-readiness.js"), /mobilePreviewCss/);
@@ -1548,6 +1555,9 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenProductionRequirements, /居民端真实上线需求文档/);
   assert.match(citizenProductionRequirements, /POST \/api\/auth\/phone-login/);
   assert.match(citizenProductionRequirements, /HIS\/EMR\/LIS\/PACS/);
+  assert.match(citizenProductionRequirements, /居民主索引管理员/);
+  assert.match(citizenProductionRequirements, /平台账号管理员/);
+  assert.match(citizenProductionRequirements, /authUsers/);
   assert.match(citizenProductionRequirements, /npm\.cmd run citizen:launch-foundation/);
   assert.match(citizenProductionRequirements, /灰度开放试点白名单/);
   const citizenNextPriority = read("docs/居民端下一步开发优先级.md");

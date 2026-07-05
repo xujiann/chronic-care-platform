@@ -53,6 +53,7 @@ flowchart TD
 - 生产验证码必须接入 `SMS_GATEWAY_URL`，不得使用演示固定验证码。
 - 登录成功后必须绑定 `accountId`、`residentId`、`personIndex` 和家庭成员授权范围。
 - 连续错误验证码达到阈值后必须短时锁定，并返回重试时间。
+- 居民、医生和护士账号必须由居民主索引管理员、试点机构和平台账号管理员按职责开通；启用、变更、停用动作必须在 `authUsers`、`securityEvents` 和 `dataAccessLogs` 中形成可审计证据。
 
 ### 5.2 二级页面导航
 
