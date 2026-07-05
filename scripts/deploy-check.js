@@ -75,6 +75,7 @@ function buildDeployCheckReport(options = {}) {
   const manifestSource = fs.readFileSync(path.join(ROOT, "scripts", "release-artifact-manifest.js"), "utf8");
   const escortHospitalInterfaceDoc = fs.readFileSync(path.join(ROOT, "docs", "escort-hospital-interface.md"), "utf8");
   const internetNursingDoc = fs.readFileSync(path.join(ROOT, "docs", "互联网护理服务模块说明.md"), "utf8");
+  const citizenProductionRequirementsDoc = fs.readFileSync(path.join(ROOT, "docs", "citizen-production-launch-requirements.md"), "utf8");
   const productionGoLiveRequirementsDoc = fs.readFileSync(path.join(ROOT, "docs", "production-go-live-requirements.md"), "utf8");
   const onsiteLaunchMaterialsDoc = fs.readFileSync(path.join(ROOT, "docs", "on-site-launch-materials.md"), "utf8");
   const externalDependencyRiskIds = [
@@ -120,6 +121,7 @@ function buildDeployCheckReport(options = {}) {
     { name: "snapshot:internetNursingAuth", ok: (data.authUsers || []).some((item) => item.username === "nurse" && item.password === "123456" && item.home === "internet-nursing.html" && item.nurseId === "inn-001") && serverSource.includes('username: "nurse"') && serverSource.includes('password: "123456"'), detail: "nurse workstation demo account is seeded" },
     { name: "snapshot:multiPractice", ok: (data.doctorProfiles || []).length >= 2 && (data.multiPracticeApplications || []).length >= 2 && serverSource.includes("/api/multi-practice-registry") && serverSource.includes("multiPracticeSummary"), detail: `${data.doctorProfiles?.length || 0} doctors, ${data.multiPracticeApplications?.length || 0} applications` },
     { name: "docs:internetNursing", ok: internetNursingDoc.includes("flowchart TD") && internetNursingDoc.includes("nurse / 123456") && internetNursingDoc.includes("/api/internet-nursing/orders/:id/actions"), detail: "internet nursing module handoff document is complete" },
+    { name: "docs:citizenAccountProvisioning", ok: ["居民主索引管理员", "平台账号管理员", "authUsers", "securityEvents", "dataAccessLogs"].every((marker) => citizenProductionRequirementsDoc.includes(marker)), detail: "citizen launch requirements document account owners and audit evidence" },
     { name: "docs:productionGoLiveRequirements", ok: productionGoLiveRequirementsDoc.includes("GL-01") && productionGoLiveRequirementsDoc.includes("launch:smoke -- --base-url") && productionGoLiveRequirementsDoc.includes("发布阻断条件"), detail: "real production go-live requirements are documented" },
     { name: "docs:onsiteLaunchMaterials", ok: ["GLM-01", "GLM-04", "GLM-05", "GLM-08", "GLM-10", "CIT-01", "CIT-06", "launch:smoke -- --base-url"].every((marker) => onsiteLaunchMaterialsDoc.includes(marker)), detail: "on-site launch material checklist covers platform and citizen evidence" },
     { name: "api:siteLaunchEvidence", ok: serverSource.includes("/api/site-launch-evidence") && serverSource.includes("siteLaunchEvidence") && manifestSource.includes("site-launch-evidence"), detail: "runtime site launch evidence ledger API is wired" },
