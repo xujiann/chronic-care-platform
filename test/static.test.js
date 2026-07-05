@@ -325,6 +325,12 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(client, /拒绝审计证据/);
   assert.match(client, /越权拒绝由后端安全事件留痕/);
   assert.match(client, /管理端、来源机构、目标机构和无关机构账号/);
+  assert.match(client, /现场证据清单/);
+  assert.match(client, /管理端全域复核/);
+  assert.match(client, /来源机构复核/);
+  assert.match(client, /目标机构复核/);
+  assert.match(client, /无关机构拒绝复核/);
+  assert.match(client, /organization scope denied/);
   assert.match(client, /身份与权限/);
   assert.match(client, /监控灾备/);
   assert.match(client, /联调样例/);

@@ -275,7 +275,7 @@ function renderRegionalScopeSelfTest(data = {}) {
   const targetMatches = packages.filter((item) => (item.targetOrgCodes || []).includes(user.orgCode)).length;
   const deniedReviews = reviews.filter((item) => item.decision === "denied" || item.status === "denied").length;
   const packageScope = user.role === "commission" ? "管理端全域共享包" : "机构端仅来源或接收共享包";
-  target.textContent = `${user.roleName || "当前账号"} · ${packageScope} · 可见 ${packages.length} 个共享包`;
+  target.textContent = `${user.roleName || "当前账号"} · ${packageScope} · 可见 ${packages.length} 个共享包 · 4 项现场证据清单`;
   const cards = [
     {
       title: "当前账号范围",
@@ -298,13 +298,44 @@ function renderRegionalScopeSelfTest(data = {}) {
       detail: "分别使用管理端、来源机构、目标机构和无关机构账号复核可见范围，截图与拒绝审计一并归档。"
     }
   ];
-  panel.innerHTML = cards.map((item) => `
+  const evidenceRows = [
+    {
+      title: "管理端全域复核",
+      status: user.role === "commission" ? "当前账号" : "待切换",
+      detail: "管理端应看到区域全部共享包、共享范围和调阅留痕汇总。"
+    },
+    {
+      title: "来源机构复核",
+      status: sourceMatches > 0 ? "已命中" : "待截图",
+      detail: "来源机构账号仅查看本机构生成的共享包，截图保留包编号和来源机构。"
+    },
+    {
+      title: "目标机构复核",
+      status: targetMatches > 0 ? "已命中" : "待截图",
+      detail: "目标机构账号仅查看接收范围内共享包，截图保留目标机构和授权质控状态。"
+    },
+    {
+      title: "无关机构拒绝复核",
+      status: "必测",
+      detail: "无关机构调阅非授权共享包应返回拒绝，并在安全事件中形成 organization scope denied 留痕。"
+    }
+  ];
+  panel.innerHTML = [
+    ...cards.map((item) => `
     <article class="capability-card">
       <strong>${item.title}</strong>
       <span class="badge ${item.status === "P0" || item.status === "脚本覆盖" ? "warn" : "success"}">${item.status}</span>
       <span>${item.detail}</span>
     </article>
-  `).join("");
+  `),
+    ...evidenceRows.map((item) => `
+    <article class="capability-card">
+      <strong>${item.title}</strong>
+      <span class="badge ${item.status === "必测" || item.status === "待切换" || item.status === "待截图" ? "warn" : "success"}">${item.status}</span>
+      <span>现场证据清单：${item.detail}</span>
+    </article>
+  `)
+  ].join("");
 }
 
 function renderRegionalFunctionRoadmap() {
