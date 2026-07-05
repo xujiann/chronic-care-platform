@@ -835,6 +835,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /preview-direct-entry/);
   assert.match(mobilePreviewHtml, /preview-birth-entry/);
   assert.match(mobilePreviewHtml, /preview-copy-entry/);
+  assert.match(mobilePreviewHtml, /preview-copy-summary/);
   assert.match(mobilePreviewHtml, /preview-entry-url/);
   assert.match(mobilePreviewHtml, /preview-readiness/);
   assert.match(mobilePreviewHtml, /preview-readiness-client/);
@@ -850,6 +851,12 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /试点白名单、消息触达回执、适老化和无障碍复核/);
   assert.match(mobilePreviewHtml, /验收摘要：小程序 · 健康档案 · 1\/5 个服务 · 完整/);
   assert.match(mobilePreviewHtml, /验收方式：点击、方向键、滑动、复制入口/);
+  assert.match(mobilePreviewHtml, /居民端手机验收摘要/);
+  assert.match(mobilePreviewHtml, /previewAcceptanceSummaryText/);
+  assert.match(mobilePreviewHtml, /摘要已复制/);
+  assert.match(mobilePreviewHtml, /previewEntryUrl\.value = summaryText/);
+  assert.match(mobilePreviewHtml, /请手动复制验收摘要/);
+  assert.match(mobilePreviewHtml, /验收方式：摘要已复制，可粘贴到现场工单/);
   assert.match(mobilePreviewHtml, /renderPreviewUrls/);
   assert.match(mobilePreviewHtml, /renderPreviewStatus/);
   assert.match(mobilePreviewHtml, /renderPreviewDirectEntry/);
@@ -953,6 +960,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewCss, /preview-compact-toggle/);
   assert.match(mobilePreviewCss, /preview-direct-entry/);
   assert.match(mobilePreviewCss, /preview-birth-entry/);
+  assert.match(mobilePreviewCss, /preview-copy-summary/);
   assert.match(mobilePreviewCss, /preview-entry-actions/);
   assert.match(mobilePreviewCss, /preview-entry-url/);
   assert.match(mobilePreviewCss, /preview-readiness/);
@@ -1005,7 +1013,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.shortcuts.some((item) => item.url === "./citizen.html?client=app&page=escort#service-escort"), true);
   assert.equal(manifest.shortcuts.some((item) => item.url === "./mobile-preview.html?client=app"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v39/);
+  assert.match(serviceWorker, /chronic-care-citizen-v40/);
   assert.match(serviceWorker, /internet-nursing\.js\?v=20260629prod/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627preview/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages/);

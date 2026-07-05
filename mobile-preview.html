@@ -96,6 +96,7 @@
             <a class="preview-direct-entry" id="preview-direct-entry" href="./citizen.html?preview=mobile-nav&client=mini-program&page=health-record&launch=1#service-health-record">打开当前页面</a>
             <a class="preview-birth-entry" id="preview-birth-entry" href="./citizen.html?preview=mobile-nav&client=mini-program&page=health-record&launch=1#birth-health-summary-strip">出生健康直达</a>
             <button type="button" class="preview-copy-entry" id="preview-copy-entry">复制入口</button>
+            <button type="button" class="preview-copy-summary" id="preview-copy-summary">复制验收摘要</button>
           </div>
           <input class="preview-entry-url" id="preview-entry-url" type="text" readonly value="./citizen.html?preview=mobile-nav&client=mini-program&page=health-record&launch=1#service-health-record" aria-label="当前预览入口地址" />
           <div class="preview-readiness" aria-label="预览验收状态">
@@ -125,6 +126,7 @@
       const previewDirectEntry = document.querySelector("#preview-direct-entry");
       const previewBirthEntry = document.querySelector("#preview-birth-entry");
       const previewCopyEntry = document.querySelector("#preview-copy-entry");
+      const previewCopySummary = document.querySelector("#preview-copy-summary");
       const previewEntryUrl = document.querySelector("#preview-entry-url");
       const previewCompactToggle = document.querySelector("#preview-compact-toggle");
       const previewToolbar = document.querySelector(".preview-toolbar");
@@ -138,6 +140,7 @@
       const previewReadinessFrame = document.querySelector("#preview-readiness-frame");
       const previewReadinessLink = document.querySelector("#preview-readiness-link");
       const previewReadinessSummary = document.querySelector("#preview-readiness-summary");
+      const previewReadinessMethod = document.querySelector("#preview-readiness-method");
       const phoneFrame = document.querySelector(".phone-frame");
       const previewServices = [...serviceButtons].map((button) => button.dataset.previewService);
       const previewServiceLabels = {
@@ -205,8 +208,22 @@
         previewEntryUrl.value = absoluteEntryUrl;
         previewCopyEntry.dataset.previewEntry = absoluteEntryUrl;
         previewCopyEntry.textContent = "复制入口";
+        previewCopySummary.textContent = "复制验收摘要";
         previewDirectEntry.textContent = isCompactPreview ? "打开当前页" : `打开${previewClientLabels[activePreviewClient]} · ${previewServiceLabels[activePreviewService]}`;
         previewReadinessLink.textContent = "入口：当前与出生健康已同步";
+      };
+      const previewAcceptanceSummaryText = () => {
+        const servicePosition = activePreviewServicePosition();
+        const entryUrl = previewCopyEntry.dataset.previewEntry || new URL(citizenPreviewSrc(activePreviewService), location.href).href;
+        return [
+          "居民端手机验收摘要",
+          `端型：${previewClientLabels[activePreviewClient]}`,
+          `服务：${previewServiceLabels[activePreviewService]}（${servicePosition.label}）`,
+          `入口：${entryUrl}`,
+          "登录：DEMO-MOBILE-R1 / 888888",
+          "验收方式：点击、方向键、滑动、复制入口",
+          "上线材料：手机预览已带 launch=1，可显示 P0 材料、责任方和验收口径"
+        ].join("\n");
       };
       const renderPreviewReadiness = () => {
         const servicePosition = activePreviewServicePosition();
@@ -365,6 +382,21 @@
           previewEntryUrl.select();
           previewStatus.textContent = `请手动复制：${entryUrl}`;
           previewReadinessLink.textContent = "入口：需手动复制";
+        }
+      });
+      previewCopySummary.addEventListener("click", async () => {
+        const summaryText = previewAcceptanceSummaryText();
+        const copied = await copyTextWithFallback(summaryText);
+        if (copied) {
+          previewCopySummary.textContent = "摘要已复制";
+          previewReadinessMethod.textContent = "验收方式：摘要已复制，可粘贴到现场工单";
+        } else {
+          previewCopySummary.textContent = "手动复制摘要";
+          previewEntryUrl.value = summaryText;
+          previewEntryUrl.focus();
+          previewEntryUrl.select();
+          previewStatus.textContent = "请手动复制验收摘要";
+          previewReadinessMethod.textContent = "验收方式：请手动复制当前入口和验收摘要";
         }
       });
       renderPreviewUrls();
