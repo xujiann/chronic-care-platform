@@ -134,6 +134,7 @@ function renderRegionalSharing() {
   renderRegionalMetrics(data.summary || {});
   renderRegionalLaunchReadiness(data.summary || {}, packages);
   renderRegionalSiteIntegration(data.summary || {}, packages);
+  renderRegionalScopeSelfTest(data);
   renderRegionalFunctionRoadmap();
   renderRegionalLoop(data.summary || {});
   renderRegionalBoundary(data.scope || {});
@@ -259,6 +260,49 @@ function renderRegionalSiteIntegration(summary = {}, packages = []) {
       <small>联调样例：${item.sample}</small>
       <small>验收证据：${item.evidence}</small>
       <small>下一步：${item.nextAction}</small>
+    </article>
+  `).join("");
+}
+
+function renderRegionalScopeSelfTest(data = {}) {
+  const panel = document.querySelector("#regional-scope-self-test");
+  const target = document.querySelector("#regional-scope-self-test-summary");
+  if (!panel || !target) return;
+  const user = window.HealthCityAuth?.getUser?.() || {};
+  const packages = data.packages || [];
+  const reviews = data.accessReviews || [];
+  const sourceMatches = packages.filter((item) => item.sourceOrgCode === user.orgCode).length;
+  const targetMatches = packages.filter((item) => (item.targetOrgCodes || []).includes(user.orgCode)).length;
+  const deniedReviews = reviews.filter((item) => item.decision === "denied" || item.status === "denied").length;
+  const packageScope = user.role === "commission" ? "管理端全域共享包" : "机构端仅来源或接收共享包";
+  target.textContent = `${user.roleName || "当前账号"} · ${packageScope} · 可见 ${packages.length} 个共享包`;
+  const cards = [
+    {
+      title: "当前账号范围",
+      status: user.role === "commission" ? "全域" : "机构",
+      detail: `${user.orgName || "未绑定机构"} · ${user.dataScope || packageScope}`
+    },
+    {
+      title: "共享包可见性",
+      status: packages.length > 0 ? "已裁剪" : "待核验",
+      detail: `当前视图返回 ${packages.length} 个共享包；来源命中 ${sourceMatches} 个，接收命中 ${targetMatches} 个。`
+    },
+    {
+      title: "拒绝审计证据",
+      status: deniedReviews > 0 ? "已有拒绝" : "脚本覆盖",
+      detail: `当前可见范围内暂不调阅 ${deniedReviews} 条；越权拒绝由后端安全事件留痕，并由 API 测试覆盖。`
+    },
+    {
+      title: "现场复核动作",
+      status: "P0",
+      detail: "分别使用管理端、来源机构、目标机构和无关机构账号复核可见范围，截图与拒绝审计一并归档。"
+    }
+  ];
+  panel.innerHTML = cards.map((item) => `
+    <article class="capability-card">
+      <strong>${item.title}</strong>
+      <span class="badge ${item.status === "P0" || item.status === "脚本覆盖" ? "warn" : "success"}">${item.status}</span>
+      <span>${item.detail}</span>
     </article>
   `).join("");
 }

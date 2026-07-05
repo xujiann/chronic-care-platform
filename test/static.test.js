@@ -285,6 +285,9 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(html, /regional-launch-readiness/);
   assert.match(html, /data-regional-section="site-integration"/);
   assert.match(html, /regional-site-integration/);
+  assert.match(html, /data-regional-section="scope-self-test"/);
+  assert.match(html, /regional-scope-self-test/);
+  assert.match(html, /权限裁剪自测/);
   assert.match(html, /data-regional-section="function-roadmap"/);
   assert.match(html, /regional-function-roadmap/);
   assert.match(html, /data-regional-section="referral-handoff"/);
@@ -299,6 +302,7 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(client, /renderRegionalLoop/);
   assert.match(client, /renderRegionalLaunchReadiness/);
   assert.match(client, /renderRegionalSiteIntegration/);
+  assert.match(client, /renderRegionalScopeSelfTest/);
   assert.match(client, /renderRegionalFunctionRoadmap/);
   assert.match(client, /regionalFunctionRoadmap/);
   assert.match(client, /优先级排序：P0 共享包编目、角色权限裁剪；P1 联调检查与交接清单；P2 调阅审计与发布证据/);
@@ -316,6 +320,11 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(client, /P0 验收口径/);
   assert.match(client, /居民主索引、来源机构、目标机构、记录引用、互认依据和质控状态/);
   assert.match(client, /拒绝访问必须进入审计日志/);
+  assert.match(client, /当前账号范围/);
+  assert.match(client, /共享包可见性/);
+  assert.match(client, /拒绝审计证据/);
+  assert.match(client, /越权拒绝由后端安全事件留痕/);
+  assert.match(client, /管理端、来源机构、目标机构和无关机构账号/);
   assert.match(client, /身份与权限/);
   assert.match(client, /监控灾备/);
   assert.match(client, /联调样例/);
@@ -347,6 +356,7 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(script, /regional:aboutLaunchReadiness/);
   assert.match(script, /regional:launchReadinessUi/);
   assert.match(script, /regional:siteIntegrationUi/);
+  assert.match(script, /regional:scopeSelfTestUi/);
   assert.match(script, /regional:aboutFunctionRoadmap/);
   assert.match(script, /regional:aboutSiteEvidenceActions/);
   assert.match(about, /data-regional-about-section="policy-basis"/);
