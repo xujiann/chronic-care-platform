@@ -317,6 +317,7 @@ body.preview-focus-mode .preview-device {
 }
 
 .preview-toolbar.compact .preview-entry-url,
+.preview-toolbar.compact .preview-acceptance-summary,
 .preview-toolbar.compact .preview-readiness,
 .preview-toolbar.compact .preview-client-switch,
 .preview-toolbar.compact .preview-service-switch,
@@ -453,6 +454,37 @@ body.preview-focus-mode .preview-device {
 .preview-entry-url:focus {
   border-color: var(--blue);
   outline: 2px solid rgba(39, 110, 241, 0.16);
+}
+
+.preview-acceptance-summary {
+  display: none;
+  width: 100%;
+  min-width: 0;
+  min-height: 108px;
+  border: 1px solid rgba(15, 118, 110, 0.24);
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: #f8fbfd;
+  color: #375569;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.preview-acceptance-summary.is-visible {
+  display: block;
+  grid-column: 1 / -1;
+}
+
+.preview-toolbar.compact .preview-acceptance-summary.is-visible {
+  display: block;
+}
+
+.preview-acceptance-summary:focus {
+  border-color: #0f766e;
+  outline: 2px solid rgba(15, 118, 110, 0.16);
 }
 
 .phone-frame {

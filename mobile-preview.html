@@ -99,6 +99,7 @@
             <button type="button" class="preview-copy-summary" id="preview-copy-summary">复制验收摘要</button>
           </div>
           <input class="preview-entry-url" id="preview-entry-url" type="text" readonly value="./citizen.html?preview=mobile-nav&client=mini-program&page=health-record&launch=1#service-health-record" aria-label="当前预览入口地址" />
+          <textarea class="preview-acceptance-summary" id="preview-acceptance-summary" readonly aria-label="居民端手机验收摘要"></textarea>
           <div class="preview-readiness" aria-label="预览验收状态">
             <span id="preview-readiness-client">端型：小程序</span>
             <span id="preview-readiness-service">服务：健康档案</span>
@@ -128,6 +129,7 @@
       const previewCopyEntry = document.querySelector("#preview-copy-entry");
       const previewCopySummary = document.querySelector("#preview-copy-summary");
       const previewEntryUrl = document.querySelector("#preview-entry-url");
+      const previewAcceptanceSummary = document.querySelector("#preview-acceptance-summary");
       const previewCompactToggle = document.querySelector("#preview-compact-toggle");
       const previewToolbar = document.querySelector(".preview-toolbar");
       const previewDevice = document.querySelector(".preview-device");
@@ -209,6 +211,8 @@
         previewCopyEntry.dataset.previewEntry = absoluteEntryUrl;
         previewCopyEntry.textContent = "复制入口";
         previewCopySummary.textContent = "复制验收摘要";
+        previewAcceptanceSummary.value = previewAcceptanceSummaryText();
+        previewAcceptanceSummary.classList.remove("is-visible");
         previewDirectEntry.textContent = isCompactPreview ? "打开当前页" : `打开${previewClientLabels[activePreviewClient]} · ${previewServiceLabels[activePreviewService]}`;
         previewReadinessLink.textContent = "入口：当前与出生健康已同步";
       };
@@ -386,15 +390,16 @@
       });
       previewCopySummary.addEventListener("click", async () => {
         const summaryText = previewAcceptanceSummaryText();
+        previewAcceptanceSummary.value = summaryText;
+        previewAcceptanceSummary.classList.add("is-visible");
         const copied = await copyTextWithFallback(summaryText);
         if (copied) {
           previewCopySummary.textContent = "摘要已复制";
           previewReadinessMethod.textContent = "验收方式：摘要已复制，可粘贴到现场工单";
         } else {
           previewCopySummary.textContent = "手动复制摘要";
-          previewEntryUrl.value = summaryText;
-          previewEntryUrl.focus();
-          previewEntryUrl.select();
+          previewAcceptanceSummary.focus();
+          previewAcceptanceSummary.select();
           previewStatus.textContent = "请手动复制验收摘要";
           previewReadinessMethod.textContent = "验收方式：请手动复制当前入口和验收摘要";
         }
