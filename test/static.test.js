@@ -791,7 +791,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   const serviceWorker = read("service-worker.js");
   assert.match(citizenHtml, /rel="manifest"/);
   assert.match(citizenHtml, /serviceWorker\.register\("\.\/service-worker\.js"\)/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260705p0owner/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260705p0copy/);
   assert.match(citizenHtml, /mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-capable/);
   assert.match(citizenHtml, /apple-mobile-web-app-title/);
@@ -1004,7 +1004,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.shortcuts.some((item) => item.url === "./citizen.html?client=app&page=escort#service-escort"), true);
   assert.equal(manifest.shortcuts.some((item) => item.url === "./mobile-preview.html?client=app"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v38/);
+  assert.match(serviceWorker, /chronic-care-citizen-v39/);
   assert.match(serviceWorker, /internet-nursing\.js\?v=20260629prod/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627preview/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages/);
@@ -1020,8 +1020,8 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(serviceWorker, /citizen\.js\?v=20260630visible/);
   assert.match(serviceWorker, /citizen\.js\?v=20260630touch/);
   assert.match(serviceWorker, /citizen\.js\?v=20260630escortlink/);
-  assert.match(serviceWorker, /citizen\.js\?v=20260705p0owner/);
-  assert.match(serviceWorker, /citizen\.css\?v=20260705p0owner/);
+  assert.match(serviceWorker, /citizen\.js\?v=20260705p0copy/);
+  assert.match(serviceWorker, /citizen\.css\?v=20260705p0copy/);
   assert.match(serviceWorker, /citizen\.js\?v=20260630lifecycle/);
   assert.match(serviceWorker, /citizen\.html/);
   assert.match(serviceWorker, /mobile-preview\.html/);
@@ -1071,7 +1071,7 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   assert.match(citizenJs, /setEscortAppointmentAvailability/);
   assert.match(citizenJs, /escortProviderReady/);
   assert.match(citizenJs, /暂无可预约服务主体/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260705p0owner/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260705p0copy/);
   assert.match(citizenJs, /\/escort-services\/orders/);
   assert.match(citizenJs, /getEscortRegistrationOptions/);
   assert.match(citizenJs, /applyLinkedRegistrationToEscortForm/);
@@ -1167,10 +1167,14 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(loginHtml, /phone-login-form/);
   assert.match(loginHtml, /data-account-provisioning/);
   assert.match(loginHtml, /data-provisioning-step="resident"/);
+  assert.match(loginHtml, /data-provisioning-step="doctor"/);
   assert.match(loginHtml, /data-provisioning-step="nurse"/);
   assert.match(loginHtml, /data-provisioning-step="audit"/);
   assert.match(loginHtml, /居民端暂不开放自助注册/);
-  assert.match(loginHtml, /护理端护士账号需由试点机构开通/);
+  assert.match(loginHtml, /医生和护理端账号需由机构开通/);
+  assert.match(loginHtml, /第一执业机构确认/);
+  assert.match(loginHtml, /电子化注册核验/);
+  assert.match(loginHtml, /doctorId 绑定/);
   assert.match(loginHtml, /账号审计留痕/);
   assert.doesNotMatch(loginHtml, /id="register-form"/);
   assert.match(loginHtml, /手机号验证码/);
@@ -1282,6 +1286,10 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /clientChannelEntry/);
   assert.match(citizenJs, /copyClientEntry/);
   assert.match(citizenJs, /data-copy-client-entry/);
+  assert.match(citizenJs, /copyLaunchMaterials/);
+  assert.match(citizenJs, /copyTextToClipboard/);
+  assert.match(citizenJs, /data-copy-launch-materials/);
+  assert.match(citizenJs, /P0材料清单已复制/);
   assert.match(citizenJs, /launchChecklist/);
   assert.match(citizenJs, /productionMaterials/);
   assert.match(citizenJs, /productionMaterialSummary/);
@@ -1407,6 +1415,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /client-channel-grid/);
   assert.match(citizenCss, /client-channel-actions/);
   assert.match(citizenCss, /client-channel-action/);
+  assert.match(citizenCss, /client-channel-action\.wide/);
+  assert.match(citizenCss, /grid-column: 1 \/ -1/);
   assert.match(citizenCss, /client-material-summary/);
   assert.match(citizenCss, /client-launch-checklist/);
   assert.match(citizenCss, /client-production-materials/);
@@ -1416,7 +1426,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /longterm-care-form/);
   assert.match(citizenCss, /registration-form/);
   assert.match(citizenHtml, /registration-summary/);
-  assert.match(citizenHtml, /citizen\.js\?v=20260705p0owner/);
+  assert.match(citizenHtml, /citizen\.js\?v=20260705p0copy/);
   assert.match(citizenJs, /registration-summary/);
   assert.match(citizenJs, /hisOrders/);
   assert.match(citizenJs, /insuranceReady/);

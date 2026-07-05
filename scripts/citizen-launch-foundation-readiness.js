@@ -46,7 +46,7 @@ function buildCitizenLaunchFoundationReadiness(options = {}) {
     },
     {
       id: "citizen-foundation:account-provisioning-boundary",
-      passed: hasAll(login, [/data-account-provisioning/, /data-provisioning-step="resident"/, /data-provisioning-step="audit"/, /居民端暂不开放自助注册/, /实名建档/, /手机号绑定/, /账号审计留痕/]) &&
+      passed: hasAll(login, [/data-account-provisioning/, /data-provisioning-step="resident"/, /data-provisioning-step="doctor"/, /data-provisioning-step="nurse"/, /data-provisioning-step="audit"/, /居民端暂不开放自助注册/, /实名建档/, /手机号绑定/, /第一执业机构确认/, /电子化注册核验/, /doctorId 绑定/, /账号审计留痕/]) &&
         !/id="register-form"|\/api\/auth\/register/.test(login + auth + readText("server.js")),
       detail: "resident login states account provisioning workflow and does not expose public self-registration"
     },
@@ -70,8 +70,8 @@ function buildCitizenLaunchFoundationReadiness(options = {}) {
     },
     {
       id: "citizen-foundation:mini-app-app-routing",
-      passed: hasAll(citizenJs + mobilePreview, [/citizenClientChannels/, /mini-program/, /clientChannelEntry/, /copyClientEntry/, /launchChecklist/, /productionMaterials/, /productionMaterialSummary/, /client-material-summary/, /client-production-materials/, /owner/, /acceptance/, /SMS_GATEWAY_URL/, /OIDC/, /previewParams\.get\("client"\)/]),
-      detail: "mini-program and app channel routing, copyable entry links, production-material owners, acceptance prompts, and preview query handling are present"
+      passed: hasAll(citizenJs + mobilePreview, [/citizenClientChannels/, /mini-program/, /clientChannelEntry/, /copyClientEntry/, /copyLaunchMaterials/, /copyTextToClipboard/, /data-copy-launch-materials/, /launchChecklist/, /productionMaterials/, /productionMaterialSummary/, /client-material-summary/, /client-production-materials/, /owner/, /acceptance/, /SMS_GATEWAY_URL/, /OIDC/, /previewParams\.get\("client"\)/]),
+      detail: "mini-program and app channel routing, copyable entry links, copyable production-material owners, acceptance prompts, and preview query handling are present"
     },
     {
       id: "citizen-foundation:mobile-preview-service-switch",

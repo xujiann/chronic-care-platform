@@ -577,6 +577,7 @@ function renderClientChannels() {
       <div class="client-channel-actions">
         <a class="client-channel-action primary" href="./${currentEntry}">打开入口</a>
         <button type="button" class="client-channel-action" data-copy-client-entry="${currentEntry}">复制入口</button>
+        <button type="button" class="client-channel-action wide" data-copy-launch-materials="${active.key}">复制材料清单</button>
       </div>
     </div>
   </article>
@@ -603,6 +604,7 @@ function renderClientChannels() {
     </section>
   </div>`;
   detail.querySelector("[data-copy-client-entry]")?.addEventListener("click", (event) => copyClientEntry(event.currentTarget.dataset.copyClientEntry));
+  detail.querySelector("[data-copy-launch-materials]")?.addEventListener("click", () => copyLaunchMaterials(active, currentEntry));
 }
 
 function productionMaterialSummary(channel) {
@@ -652,13 +654,31 @@ function clientChannelEntry(channelKey, serviceKey) {
 
 async function copyClientEntry(entry) {
   const url = new URL(entry, location.href).href;
+  await copyTextToClipboard(url, "入口链接已复制");
+}
+
+async function copyLaunchMaterials(channel, entry) {
+  const summary = productionMaterialSummary(channel);
+  const active = getActiveCitizenService();
+  const url = new URL(entry, location.href).href;
+  const lines = [
+    `居民端${channel.label}P0上线材料`,
+    `二级页面：${active.label}`,
+    `入口：${url}`,
+    `摘要：${summary.total}项P0材料，${summary.onsite}项现场补齐，${summary.owners}个责任方`,
+    ...channel.productionMaterials.map((item, index) => `${index + 1}. ${item.label}｜${item.status}｜责任方：${item.owner}｜验收：${item.acceptance}｜材料：${item.note}`)
+  ];
+  await copyTextToClipboard(lines.join("\n"), "P0材料清单已复制");
+}
+
+async function copyTextToClipboard(text, successMessage) {
   try {
     if (!navigator.clipboard?.writeText) throw new Error("clipboard unavailable");
-    await navigator.clipboard.writeText(url);
-    showToast("入口链接已复制");
+    await navigator.clipboard.writeText(text);
+    showToast(successMessage);
   } catch (error) {
     const helper = document.createElement("textarea");
-    helper.value = url;
+    helper.value = text;
     helper.setAttribute("readonly", "");
     helper.style.position = "fixed";
     helper.style.opacity = "0";
@@ -666,7 +686,7 @@ async function copyClientEntry(entry) {
     helper.select();
     document.execCommand("copy");
     helper.remove();
-    showToast("入口链接已复制");
+    showToast(successMessage);
   }
 }
 
