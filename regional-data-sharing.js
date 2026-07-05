@@ -94,6 +94,13 @@ const regionalFunctionRoadmap = [
 
 const regionalRoadmapPrioritySummary = "优先级排序：P0 共享包编目、角色权限裁剪；P1 联调检查与交接清单；P2 调阅审计与发布证据。";
 
+const regionalInterfaceJointTestItems = [
+  ["his-patient-v1", "HIS 就诊信息联调样例", "挂号就诊号、机构编码、就诊时间、诊疗科室"],
+  ["emr-summary-v1", "EMR 病历摘要联调样例", "主诉、诊断、处置摘要、接收医师确认"],
+  ["lis-report-v1", "LIS 检验报告联调样例", "检验项目、结果值、单位、互认状态"],
+  ["pacs-report-v1", "PACS 影像报告联调样例", "检查部位、影像结论、报告编号、影像索引"]
+];
+
 document.addEventListener("DOMContentLoaded", () => {
   document.querySelector("#regional-status-filter")?.addEventListener("change", (event) => {
     regionalState.filters.status = event.target.value;
@@ -217,6 +224,7 @@ function renderRegionalSiteIntegration(summary = {}, packages = []) {
   if (!panel || !target) return;
   const total = summary.totalPackages || packages.length;
   const handoffReady = summary.referralHandoffReady || packages.filter((item) => item.referralHandoff?.ready).length;
+  const interfaceJointTests = buildRegionalInterfaceJointTests(packages);
   const lanes = [
     {
       title: "身份与权限",
@@ -251,8 +259,9 @@ function renderRegionalSiteIntegration(summary = {}, packages = []) {
       nextAction: "完成告警值班、备份恢复和 RTO/RPO 演练签字。"
     }
   ];
-  target.textContent = `${lanes.length} 条现场责任域，${handoffReady}/${total} 个共享包可作为联调样例，0 项生产签字已归档`;
-  panel.innerHTML = lanes.map((item) => `
+  target.textContent = `${lanes.length} 条现场责任域，${interfaceJointTests.length} 类接口联调样例，${handoffReady}/${total} 个共享包可作为联调样例`;
+  panel.innerHTML = [
+    ...lanes.map((item) => `
     <article class="capability-card">
       <strong>${item.title}</strong>
       <span class="badge ${item.status === "已有样例" ? "success" : "warn"}">${item.status}</span>
@@ -261,7 +270,30 @@ function renderRegionalSiteIntegration(summary = {}, packages = []) {
       <small>验收证据：${item.evidence}</small>
       <small>下一步：${item.nextAction}</small>
     </article>
-  `).join("");
+  `),
+    ...interfaceJointTests.map((item) => `
+    <article class="capability-card">
+      <strong>${item.title}</strong>
+      <span class="badge ${item.ready ? "success" : "warn"}">${item.ready ? "已有样例" : "待选样例"}</span>
+      <span>${item.sampleCount} 个共享包包含该契约</span>
+      <small>字段映射签字：${item.fields}</small>
+      <small>验收证据：真实报文样例、幂等键、接收医师确认截图。</small>
+    </article>
+  `)
+  ].join("");
+}
+
+function buildRegionalInterfaceJointTests(packages = []) {
+  return regionalInterfaceJointTestItems.map(([contractId, title, fields]) => {
+    const sampleCount = packages.filter((item) => (item.contractRefs || []).includes(contractId)).length;
+    return {
+      contractId,
+      title,
+      fields,
+      sampleCount,
+      ready: sampleCount > 0
+    };
+  });
 }
 
 function renderRegionalScopeSelfTest(data = {}) {

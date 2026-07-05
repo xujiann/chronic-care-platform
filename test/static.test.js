@@ -302,6 +302,7 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(client, /renderRegionalLoop/);
   assert.match(client, /renderRegionalLaunchReadiness/);
   assert.match(client, /renderRegionalSiteIntegration/);
+  assert.match(client, /buildRegionalInterfaceJointTests/);
   assert.match(client, /renderRegionalScopeSelfTest/);
   assert.match(client, /renderRegionalFunctionRoadmap/);
   assert.match(client, /regionalFunctionRoadmap/);
@@ -332,6 +333,13 @@ test("regional data sharing application has runnable entry, API and evidence scr
   assert.match(client, /无关机构拒绝复核/);
   assert.match(client, /organization scope denied/);
   assert.match(client, /身份与权限/);
+  assert.match(client, /HIS 就诊信息联调样例/);
+  assert.match(client, /EMR 病历摘要联调样例/);
+  assert.match(client, /LIS 检验报告联调样例/);
+  assert.match(client, /PACS 影像报告联调样例/);
+  assert.match(client, /字段映射签字/);
+  assert.match(client, /幂等键/);
+  assert.match(client, /接收医师确认/);
   assert.match(client, /监控灾备/);
   assert.match(client, /联调样例/);
   assert.match(client, /验收证据/);
