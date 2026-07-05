@@ -108,6 +108,7 @@ test("operations metrics navigate to the matching work areas", async ({ page }) 
   await expect(page.getByRole("heading", { name: "运行监测、资源调度、统计直报对账" })).toBeVisible();
   await expect(page.locator("#operations-metrics [data-metric-action]")).toHaveCount(10);
   await expect(page.locator("#operations-duty-priority")).toContainText("首要处置");
+  await expect(page.locator("#operations-duty-queue [data-duty-action]")).toHaveCount(3);
   await expect(page.locator("#operations-duty-actions [data-duty-action]")).toHaveCount(3);
   await expect(page.locator("#operations-duty-actions")).toContainText("上线判定");
   await expect(page.locator("#operations-duty-actions")).toContainText("责任：");
@@ -128,6 +129,16 @@ test("operations metrics navigate to the matching work areas", async ({ page }) 
 
   await page.locator("#operations-duty-actions [data-duty-action='launch']").click();
   await expect(page.locator("#operation-launch-readiness")).toContainText("上线运行判定");
+
+  const queueAction = await page.locator("#operations-duty-queue [data-duty-action]").first().getAttribute("data-duty-action");
+  await page.locator("#operations-duty-queue [data-duty-action]").first().click();
+  if (queueAction === "dispatch") {
+    await expect(page.locator("#dispatch-requests")).toContainText("调度单");
+  } else if (queueAction === "reconciliation") {
+    await expect(page.locator("#reconciliation-reviews")).toContainText("统计复核单");
+  } else {
+    await expect(page.locator("#operation-launch-readiness")).toContainText("上线运行判定");
+  }
 
   const primaryAction = await page.locator("#operations-duty-priority [data-duty-action]").getAttribute("data-duty-action");
   await page.locator("#operations-duty-priority [data-duty-action]").click();

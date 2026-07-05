@@ -725,6 +725,28 @@ dialog::backdrop {
   margin-top: 10px;
 }
 
+.operations-duty-queue {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.operations-duty-queue-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.operations-duty-queue-title strong {
+  color: var(--ink);
+}
+
+.operations-duty-queue-title span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .template-meta {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -770,9 +792,29 @@ dialog::backdrop {
   cursor: pointer;
 }
 
+.operations-duty-queue-item {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 4px 10px;
+  align-items: start;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #fbfcfd;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
 .operations-duty-action.urgent {
   border-color: #efbbb5;
   background: #fff7f4;
+}
+
+.operations-duty-queue-item.urgent {
+  border-color: #efbbb5;
+  background: #fffaf7;
 }
 
 .operations-duty-priority-card.urgent {
@@ -782,11 +824,31 @@ dialog::backdrop {
 
 .operations-duty-action:hover,
 .operations-duty-action:focus-visible,
+.operations-duty-queue-item:hover,
+.operations-duty-queue-item:focus-visible,
 .operations-duty-priority-card:hover,
 .operations-duty-priority-card:focus-visible {
   border-color: #b9c9e7;
   background: #f6f9ff;
   outline: none;
+}
+
+.operations-duty-queue-item span {
+  grid-row: 1 / span 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: #edf3fb;
+  color: #31567f;
+  font-weight: 700;
+}
+
+.operations-duty-queue-item.urgent span {
+  background: #ffe8e1;
+  color: #9d3c28;
 }
 
 .operations-duty-priority-card span,
@@ -798,6 +860,7 @@ dialog::backdrop {
   color: var(--muted);
 }
 
+.operations-duty-queue-item strong,
 .operations-duty-priority-card strong,
 .operations-duty-action strong {
   display: block;
@@ -806,6 +869,13 @@ dialog::backdrop {
   font-size: 24px;
 }
 
+.operations-duty-queue-item strong {
+  margin-top: 0;
+  font-size: 14px;
+}
+
+.operations-duty-queue-item small,
+.operations-duty-queue-item em,
 .operations-duty-priority-card small,
 .operations-duty-action small,
 .operations-duty-action b,
@@ -813,6 +883,13 @@ dialog::backdrop {
   display: block;
   margin-top: 4px;
   line-height: 1.4;
+}
+
+.operations-duty-queue-item em {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+  overflow-wrap: anywhere;
 }
 
 .operations-duty-priority-card p {

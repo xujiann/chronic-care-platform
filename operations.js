@@ -1365,8 +1365,9 @@ function renderOperationsSituation(dashboard, filteredSnapshots, selected) {
   const strip = document.querySelector("#operations-situation-strip");
   const links = document.querySelector("#operations-focus-links");
   const dutyPriority = document.querySelector("#operations-duty-priority");
+  const dutyQueue = document.querySelector("#operations-duty-queue");
   const dutyActions = document.querySelector("#operations-duty-actions");
-  if (!strip || !links || !dutyPriority || !dutyActions) return;
+  if (!strip || !links || !dutyPriority || !dutyQueue || !dutyActions) return;
   const snapshots = Array.isArray(dashboard.snapshots) ? dashboard.snapshots : [];
   const dispatchRequests = Array.isArray(dashboard.dispatchRequests) ? dashboard.dispatchRequests : [];
   const reconciliationReviews = Array.isArray(dashboard.reconciliationReviews) ? dashboard.reconciliationReviews : [];
@@ -1424,7 +1425,8 @@ function renderOperationsSituation(dashboard, filteredSnapshots, selected) {
     { action: "dispatch", title: "开放调度", count: openDispatches.length, status: openDispatches.length ? "需跟踪" : "已清零", hint: "定位资源调度工单与分派状态", detail: dispatchDutyDetail(openDispatches), sla: dispatchDutySla(openDispatches), priority: openDispatches.length ? 220 + openDispatches.length : 0 },
     { action: "reconciliation", title: "直报复核", count: blockedReviews.length, status: blockedReviews.length ? "需复核" : "已闭环", hint: "定位统计直报差异和补正说明", detail: reconciliationDutyDetail(blockedReviews), sla: reconciliationDutySla(blockedReviews), priority: blockedReviews.length ? 240 + blockedReviews.length : 0 }
   ];
-  const primaryDuty = [...dutyRows].sort((a, b) => b.priority - a.priority || b.count - a.count)[0];
+  const rankedDuties = [...dutyRows].sort((a, b) => b.priority - a.priority || b.count - a.count);
+  const primaryDuty = rankedDuties[0];
   dutyPriority.innerHTML = `
     <button class="operations-duty-priority-card ${primaryDuty.count ? "urgent" : ""}" type="button" data-duty-action="${primaryDuty.action}" data-duty-target="${htmlAttribute(primaryDuty.target || "")}">
       <span>首要处置</span>
@@ -1432,6 +1434,20 @@ function renderOperationsSituation(dashboard, filteredSnapshots, selected) {
       <small>${primaryDuty.status} / ${primaryDuty.sla}</small>
       <p>${primaryDuty.detail}</p>
     </button>
+  `;
+  dutyQueue.innerHTML = `
+    <div class="operations-duty-queue-title">
+      <strong>值班处置队列</strong>
+      <span>按阻断、直报差异和调度工单自动排序</span>
+    </div>
+    ${rankedDuties.map((item, index) => `
+      <button class="operations-duty-queue-item ${item.count ? "urgent" : ""}" type="button" data-duty-action="${item.action}" data-duty-target="${htmlAttribute(item.target || "")}">
+        <span>${index + 1}</span>
+        <strong>${item.title}</strong>
+        <small>${item.status} / ${item.sla}</small>
+        <em>${item.detail}</em>
+      </button>
+    `).join("")}
   `;
   dutyActions.innerHTML = dutyRows.map((item) => `
     <button class="operations-duty-action ${item.count ? "urgent" : ""}" type="button" data-duty-action="${item.action}" data-duty-target="${htmlAttribute(item.target || "")}">
@@ -1456,6 +1472,11 @@ function renderOperationsSituation(dashboard, filteredSnapshots, selected) {
   });
   dutyPriority.querySelector("[data-duty-action]")?.addEventListener("click", (event) => {
     activateDutyAction(event.currentTarget.dataset.dutyAction, event.currentTarget.dataset.dutyTarget);
+  });
+  dutyQueue.querySelectorAll("[data-duty-action]").forEach((button) => {
+    button.addEventListener("click", () => {
+      activateDutyAction(button.dataset.dutyAction, button.dataset.dutyTarget);
+    });
   });
 }
 
