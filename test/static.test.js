@@ -802,6 +802,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /preview-local-url/);
   assert.match(mobilePreviewHtml, /preview-lan-url/);
   assert.match(mobilePreviewHtml, /preview-status/);
+  assert.match(mobilePreviewHtml, /preview-handoff-card/);
   assert.match(mobilePreviewHtml, /preview-compact-toggle/);
   assert.match(mobilePreviewHtml, /preview-service-select/);
   assert.match(mobilePreviewHtml, /preview-service-stepper/);
@@ -853,6 +854,11 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /验收摘要：小程序 · 健康档案 · 1\/5 个服务 · 完整/);
   assert.match(mobilePreviewHtml, /验收方式：点击、方向键、滑动、复制入口/);
   assert.match(mobilePreviewHtml, /居民端手机验收摘要/);
+  assert.match(mobilePreviewHtml, /previewServiceMeta/);
+  assert.match(mobilePreviewHtml, /renderPreviewHandoffCard/);
+  assert.match(mobilePreviewHtml, /项已实现能力/);
+  assert.match(mobilePreviewHtml, /生产化提示/);
+  assert.match(mobilePreviewHtml, /生产需替换真实 HIS 号源、支付、医保电子凭证和短信网关/);
   assert.match(mobilePreviewHtml, /previewAcceptanceSummaryText/);
   assert.match(mobilePreviewHtml, /摘要已复制/);
   assert.match(mobilePreviewHtml, /previewAcceptanceSummary\.value = summaryText/);
@@ -885,7 +891,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /activePreviewServicePosition/);
   assert.match(mobilePreviewHtml, /label: `\$\{activeIndex \+ 1\}\/\$\{previewServices\.length\} 个服务`/);
   assert.match(mobilePreviewHtml, /const servicePosition = activePreviewServicePosition\(\)/);
-  assert.match(mobilePreviewHtml, /服务：\$\{previewServiceLabels\[activePreviewService\]\}（\$\{servicePosition\.label\}）/);
+  assert.match(mobilePreviewHtml, /服务：\$\{previewServiceLabels\[activePreviewService\]\}（\$\{servicePosition\.label\}，\$\{meta\.status\}）/);
   assert.match(mobilePreviewHtml, /previewReadinessSummary\.textContent/);
   assert.match(mobilePreviewHtml, /验收摘要：\$\{previewClientLabels\[activePreviewClient\]\} · \$\{previewServiceLabels\[activePreviewService\]\} · \$\{servicePosition\.label\} · \$\{isCompactPreview \? "精简" : "完整"\}/);
   assert.match(mobilePreviewHtml, /previewServicePosition\.textContent/);
@@ -961,6 +967,8 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewCss, /preview-service-select/);
   assert.match(mobilePreviewCss, /preview-service-stepper/);
   assert.match(mobilePreviewCss, /preview-status/);
+  assert.match(mobilePreviewCss, /preview-handoff-card/);
+  assert.match(mobilePreviewCss, /body\.preview-focus-mode \.preview-handoff-card/);
   assert.match(mobilePreviewCss, /preview-compact-toggle/);
   assert.match(mobilePreviewCss, /preview-direct-entry/);
   assert.match(mobilePreviewCss, /preview-birth-entry/);
@@ -1019,7 +1027,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.shortcuts.some((item) => item.url === "./citizen.html?client=app&page=escort#service-escort"), true);
   assert.equal(manifest.shortcuts.some((item) => item.url === "./mobile-preview.html?client=app"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v41/);
+  assert.match(serviceWorker, /chronic-care-citizen-v42/);
   assert.match(serviceWorker, /internet-nursing\.js\?v=20260629prod/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627preview/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages/);

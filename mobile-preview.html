@@ -66,6 +66,7 @@
       <section class="preview-device" aria-label="居民端手机预览">
         <div class="preview-toolbar">
           <div class="preview-status" id="preview-status" aria-live="polite"></div>
+          <div class="preview-handoff-card" id="preview-handoff-card" aria-label="当前服务验收卡片"></div>
           <button type="button" class="preview-compact-toggle" id="preview-compact-toggle" aria-pressed="false">精简预览</button>
           <div class="preview-client-switch" aria-label="切换运行形态">
             <button type="button" class="active" data-preview-client="mini-program">小程序</button>
@@ -124,6 +125,7 @@
       const previewLocalUrl = document.querySelector("#preview-local-url");
       const previewLanUrl = document.querySelector("#preview-lan-url");
       const previewStatus = document.querySelector("#preview-status");
+      const previewHandoffCard = document.querySelector("#preview-handoff-card");
       const previewDirectEntry = document.querySelector("#preview-direct-entry");
       const previewBirthEntry = document.querySelector("#preview-birth-entry");
       const previewCopyEntry = document.querySelector("#preview-copy-entry");
@@ -155,6 +157,13 @@
       const previewClientLabels = {
         "mini-program": "小程序",
         app: "手机应用"
+      };
+      const previewServiceMeta = {
+        "health-record": { status: "已实现", count: 7, boundary: "生产需接入主索引、公卫档案和居民实名关系核验" },
+        emr: { status: "已实现", count: 5, boundary: "生产需接入 EMR/LIS/PACS 和文档存储授权" },
+        nursing: { status: "已实现", count: 3, boundary: "生产需补齐护士资质、电子签名、定位轨迹和长护险接入" },
+        escort: { status: "已实现", count: 2, boundary: "生产需对接医院接诊回执、保险保障和服务主体监管" },
+        registration: { status: "已实现", count: 3, boundary: "生产需替换真实 HIS 号源、支付、医保电子凭证和短信网关" }
       };
       const copyTextWithFallback = async (text) => {
         try {
@@ -219,21 +228,37 @@
       const previewAcceptanceSummaryText = () => {
         const servicePosition = activePreviewServicePosition();
         const entryUrl = previewCopyEntry.dataset.previewEntry || new URL(citizenPreviewSrc(activePreviewService), location.href).href;
+        const meta = previewServiceMeta[activePreviewService];
         return [
           "居民端手机验收摘要",
           `端型：${previewClientLabels[activePreviewClient]}`,
           `服务：${previewServiceLabels[activePreviewService]}（${servicePosition.label}）`,
+          `状态：${meta.status}，${meta.count}项已实现能力`,
           `入口：${entryUrl}`,
           "登录：DEMO-MOBILE-R1 / 888888",
           "验收方式：点击、方向键、滑动、复制入口",
+          `生产化提示：${meta.boundary}`,
           "上线材料：手机预览已带 launch=1，可显示 P0 材料、责任方和验收口径"
         ].join("\n");
       };
+      const renderPreviewHandoffCard = () => {
+        const servicePosition = activePreviewServicePosition();
+        const meta = previewServiceMeta[activePreviewService];
+        const entryUrl = previewCopyEntry.dataset.previewEntry || new URL(citizenPreviewSrc(activePreviewService), location.href).href;
+        previewHandoffCard.innerHTML = `
+          <strong>${previewServiceLabels[activePreviewService]}</strong>
+          <span>${previewClientLabels[activePreviewClient]} · ${servicePosition.label} · ${meta.status}</span>
+          <small>${meta.count}项已实现能力；${meta.boundary}</small>
+          <code>${entryUrl}</code>
+        `;
+      };
       const renderPreviewReadiness = () => {
         const servicePosition = activePreviewServicePosition();
+        const meta = previewServiceMeta[activePreviewService];
         previewReadinessClient.textContent = `端型：${previewClientLabels[activePreviewClient]}`;
-        previewReadinessService.textContent = `服务：${previewServiceLabels[activePreviewService]}（${servicePosition.label}）`;
+        previewReadinessService.textContent = `服务：${previewServiceLabels[activePreviewService]}（${servicePosition.label}，${meta.status}）`;
         previewReadinessSummary.textContent = `验收摘要：${previewClientLabels[activePreviewClient]} · ${previewServiceLabels[activePreviewService]} · ${servicePosition.label} · ${isCompactPreview ? "精简" : "完整"}`;
+        renderPreviewHandoffCard();
       };
       const renderPreviewStatus = () => {
         previewStatus.textContent = isCompactPreview

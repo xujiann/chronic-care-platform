@@ -221,6 +221,45 @@ body.preview-focus-mode .preview-device {
   text-align: center;
 }
 
+.preview-handoff-card {
+  display: grid;
+  gap: 5px;
+  border: 1px solid rgba(15, 118, 110, 0.2);
+  border-radius: 10px;
+  padding: 9px 10px;
+  background: #f8fbfd;
+  color: #375569;
+}
+
+.preview-handoff-card strong {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.preview-handoff-card span,
+.preview-handoff-card small {
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.preview-handoff-card code {
+  display: block;
+  min-width: 0;
+  color: #0f766e;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+body.preview-focus-mode .preview-handoff-card {
+  display: none;
+}
+
 .preview-client-switch,
 .preview-service-switch {
   display: grid;
@@ -319,6 +358,7 @@ body.preview-focus-mode .preview-device {
 .preview-toolbar.compact .preview-entry-url,
 .preview-toolbar.compact .preview-acceptance-summary,
 .preview-toolbar.compact .preview-readiness,
+.preview-toolbar.compact .preview-handoff-card,
 .preview-toolbar.compact .preview-client-switch,
 .preview-toolbar.compact .preview-service-switch,
 .preview-toolbar.compact .preview-refresh,
