@@ -581,6 +581,8 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsJs, /updateSelectedDispatchStatuses/);
   assert.match(operationsJs, /dispatchNextStatus/);
   assert.match(operationsJs, /dispatch-batch-toolbar/);
+  assert.match(operationsJs, /dispatchBatchNote/);
+  assert.match(operationsJs, /window\.confirm/);
   assert.match(operationsJs, /dispatchStatusButtons/);
   assert.match(operationsJs, /reconciliationActionButtons/);
   assert.match(operationsJs, /\/operations\/dashboard/);
@@ -615,6 +617,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("portal.css"), /operation-playbook-card/);
   assert.match(read("portal.css"), /operation-resource-pool-card/);
   assert.match(read("portal.css"), /dispatch-batch-toolbar/);
+  assert.match(read("portal.css"), /dispatch-batch-note/);
   assert.match(read("portal.css"), /operation-mobile-duty-card/);
   assert.match(read("portal.css"), /operation-next-development-card/);
   assert.match(read("portal.css"), /operation-handover-card/);

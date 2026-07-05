@@ -123,8 +123,11 @@ test("operations metrics navigate to the matching work areas", async ({ page }) 
   await expect(page.locator("#operation-status-filter")).toHaveValue("all");
   await expect(page.locator("#dispatch-requests")).toContainText("调度单");
   await expect(page.locator("#dispatch-batch-toolbar")).toContainText("批量处置");
+  await page.locator("#dispatch-batch-toolbar [data-dispatch-batch-note]").fill("到位凭证 TEST-001");
+  await expect(page.locator("#dispatch-batch-toolbar [data-dispatch-batch-note]")).toHaveValue("到位凭证 TEST-001");
   await page.locator("#dispatch-requests [data-dispatch-select]:not([disabled])").first().check();
   await expect(page.locator("#dispatch-batch-toolbar")).toContainText("已选择 1");
+  await expect(page.locator("#dispatch-batch-toolbar [data-dispatch-batch-note]")).toHaveValue("到位凭证 TEST-001");
   await page.locator("#dispatch-batch-toolbar [data-dispatch-clear]").click();
   await expect(page.locator("#dispatch-batch-toolbar")).toContainText("已选择 0");
 

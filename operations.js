@@ -14,6 +14,7 @@ const performanceFilters = {
 };
 let selectedPerformanceIndicatorNo = "";
 const selectedDispatchIds = new Set();
+let dispatchBatchNote = "";
 
 const OPERATIONS_INTERFACE_MAPPINGS = [
   ["ops-his-beds", "HIS/住院管理", "病案首页", "hospitalOperationSnapshots", "beds", "开放床位、占用床位、重症床位、急诊留观", "医务部、病案室、信息中心", "日内15分钟", "已接入", "现场核对床位开放、占用和重症床位口径。"],
@@ -2837,17 +2838,21 @@ function renderDispatchRequests(items) {
   const selectedItems = items.filter((item) => selectedDispatchIds.has(String(item.id || "")) && dispatchNextStatus(item));
   const assignableCount = selectedItems.filter((item) => dispatchNextStatus(item) === "assigned").length;
   const closableCount = selectedItems.filter((item) => dispatchNextStatus(item) === "closed").length;
+  const hasBatchNote = dispatchBatchNote.trim().length > 0;
   document.querySelector("#dispatch-requests").innerHTML = `
     <div id="dispatch-batch-toolbar" class="dispatch-batch-toolbar">
       <div>
         <strong>批量处置</strong>
         <span>已选择 ${selectedItems.length} / 可处置 ${dispatchableItems.length} 张调度单</span>
       </div>
+      <label class="dispatch-batch-note">处置说明
+        <input data-dispatch-batch-note value="${htmlAttribute(dispatchBatchNote)}" placeholder="批量关闭需填写到位凭证或签收编号" />
+      </label>
       <div class="compact-action-row">
         <button class="inline-action compact" type="button" data-dispatch-select-all>全选待处置</button>
         <button class="inline-action compact" type="button" data-dispatch-clear>清空</button>
         <button class="inline-action compact" type="button" data-dispatch-batch-status="assigned" ${assignableCount ? "" : "disabled"}>批量分派 ${assignableCount}</button>
-        <button class="inline-action compact" type="button" data-dispatch-batch-status="closed" ${closableCount ? "" : "disabled"}>批量关闭 ${closableCount}</button>
+        <button class="inline-action compact" type="button" data-dispatch-batch-status="closed" ${closableCount && hasBatchNote ? "" : "disabled"}>批量关闭 ${closableCount}</button>
       </div>
     </div>
     <table>
@@ -2869,6 +2874,10 @@ function renderDispatchRequests(items) {
   `;
   document.querySelectorAll("[data-dispatch-status]").forEach((button) => {
     button.addEventListener("click", () => updateDispatchStatus(button.dataset.dispatchStatus, button.dataset.nextStatus));
+  });
+  document.querySelector("[data-dispatch-batch-note]")?.addEventListener("input", (event) => {
+    dispatchBatchNote = event.currentTarget.value;
+    renderDispatchRequests(items);
   });
   document.querySelectorAll("[data-dispatch-select]").forEach((checkbox) => {
     checkbox.addEventListener("change", () => {
@@ -3016,7 +3025,8 @@ async function reviewReconciliation(id, status = "approved") {
 async function updateDispatchStatus(id, status, options = {}) {
   if (!id || !status) return;
   const reload = options.reload !== false;
-  const note = status === "assigned" ? "已由运行调度平台确认分派。" : status === "closed" ? "资源到位并关闭调度工单。" : `状态更新为${zh(status)}。`;
+  const defaultNote = status === "assigned" ? "已由运行调度平台确认分派。" : status === "closed" ? "资源到位并关闭调度工单。" : `状态更新为${zh(status)}。`;
+  const note = options.note || defaultNote;
   if (OPERATIONS_API_BASE) {
     const request = window.HealthCityAuth?.authFetch || fetch;
     await request(`${OPERATIONS_API_BASE}/operations/dispatch/${encodeURIComponent(id)}/status`, {
@@ -3052,10 +3062,17 @@ async function updateSelectedDispatchStatuses(status) {
   const selectedItems = (operationsDashboard?.dispatchRequests || [])
     .filter((item) => selectedDispatchIds.has(String(item.id || "")) && dispatchNextStatus(item) === status);
   if (!selectedItems.length) return;
+  const actionName = status === "assigned" ? "分派" : status === "closed" ? "关闭" : zh(status);
+  const note = dispatchBatchNote.trim()
+    ? `批量${actionName}：${dispatchBatchNote.trim()}`
+    : `批量${actionName}：${selectedItems.length}张调度单`;
+  const confirmed = window.confirm ? window.confirm(`确认批量${actionName}${selectedItems.length}张调度单？`) : true;
+  if (!confirmed) return;
   for (const item of selectedItems) {
-    await updateDispatchStatus(item.id, status, { reload: false });
+    await updateDispatchStatus(item.id, status, { reload: false, note });
     selectedDispatchIds.delete(String(item.id || ""));
   }
+  dispatchBatchNote = "";
   if (OPERATIONS_API_BASE) {
     await loadOperationsDashboard();
   } else {
