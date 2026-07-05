@@ -892,6 +892,26 @@ body.service-paged-mode .citizen-shell {
   overflow-x: auto;
 }
 
+.client-material-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.client-material-summary span {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  background: #fff;
+}
+
+.client-material-summary b {
+  display: block;
+  color: var(--blue);
+  font-size: 18px;
+}
+
 .client-channel-entry {
   display: grid;
   gap: 10px;
@@ -950,6 +970,7 @@ body.service-paged-mode .citizen-shell {
 .client-launch-checklist small,
 .client-production-materials strong,
 .client-production-materials span,
+.client-production-materials em,
 .client-production-materials small {
   display: block;
 }
@@ -971,6 +992,12 @@ body.service-paged-mode .citizen-shell {
 .client-production-materials span {
   background: #fff4d8;
   color: #8a5a00;
+}
+
+.client-production-materials em {
+  color: var(--blue);
+  font-style: normal;
+  font-weight: 900;
 }
 
 .longterm-care-panel {

@@ -265,9 +265,9 @@ const citizenClientChannels = [
     readiness: ["HTTPS 域名备案", "小程序隐私协议", "类目与医疗服务资质", "消息模板审核"],
     nextAction: "提交小程序审核包",
     productionMaterials: [
-      { label: "生产短信网关", status: "现场补齐", note: "SMS_GATEWAY_URL、模板、签名和频控回执" },
-      { label: "实名与家庭关系核验", status: "现场补齐", note: "政务身份/OIDC、监护关系和家庭成员授权范围" },
-      { label: "HTTPS 与隐私协议", status: "现场补齐", note: "备案域名、隐私协议、类目和医疗服务资质" }
+      { label: "生产短信网关", status: "现场补齐", owner: "平台信息科", acceptance: "验证码可发、可验、可追踪失败回执", note: "SMS_GATEWAY_URL、模板、签名和频控回执" },
+      { label: "实名与家庭关系核验", status: "现场补齐", owner: "居民服务窗口", acceptance: "本人、监护人和家庭成员授权范围可核验", note: "政务身份/OIDC、监护关系和家庭成员授权范围" },
+      { label: "HTTPS 与隐私协议", status: "现场补齐", owner: "运营合规组", acceptance: "备案域名、隐私协议、类目和医疗服务资质完成审核", note: "备案域名、隐私协议、类目和医疗服务资质" }
     ],
     launchChecklist: [
       { label: "实名登录", state: "已就绪", note: "手机号验证码进入居民端" },
@@ -285,9 +285,9 @@ const citizenClientChannels = [
     readiness: ["应用签名与包名", "应用市场隐私合规", "推送证书", "崩溃监控与版本升级"],
     nextAction: "打包手机应用上架材料",
     productionMaterials: [
-      { label: "应用签名与包名", status: "现场补齐", note: "Android/iOS 签名、包名和升级通道" },
-      { label: "推送与崩溃监控", status: "现场补齐", note: "推送证书、崩溃监控和版本回滚策略" },
-      { label: "HTTPS 与隐私合规", status: "现场补齐", note: "生产域名、隐私政策、应用市场合规材料" }
+      { label: "应用签名与包名", status: "现场补齐", owner: "移动端发布组", acceptance: "Android/iOS 包名、签名、版本升级通道一致", note: "Android/iOS 签名、包名和升级通道" },
+      { label: "推送与崩溃监控", status: "现场补齐", owner: "运维监控组", acceptance: "推送证书、崩溃告警和版本回滚策略可演练", note: "推送证书、崩溃监控和版本回滚策略" },
+      { label: "HTTPS 与隐私合规", status: "现场补齐", owner: "运营合规组", acceptance: "生产域名、隐私政策和应用市场材料完成复核", note: "生产域名、隐私政策、应用市场合规材料" }
     ],
     launchChecklist: [
       { label: "安装入口", state: "已就绪", note: "可安装网页应用壳支持浏览器安装" },
@@ -552,6 +552,7 @@ function renderClientChannels() {
   if (!switcher || !detail) return;
   const active = getActiveClientChannel();
   const currentEntry = clientChannelEntry(active.key, activeServiceTab);
+  const materialSummary = productionMaterialSummary(active);
   document.body.dataset.clientChannel = active.key;
   switcher.innerHTML = citizenClientChannels.map((item) => `<button type="button" data-client-channel="${item.key}" aria-pressed="${item.key === active.key}">
     <span>${item.label}</span>
@@ -565,6 +566,11 @@ function renderClientChannels() {
       <span>当前运行形态</span>
       <strong>${active.label}</strong>
       <small>${active.audience}</small>
+      <div class="client-material-summary" aria-label="P0上线材料摘要">
+        <span><b>${materialSummary.total}</b><small>P0材料</small></span>
+        <span><b>${materialSummary.onsite}</b><small>现场补齐</small></span>
+        <span><b>${materialSummary.owners}</b><small>责任方</small></span>
+      </div>
     </div>
     <div class="client-channel-entry">
       <code>${currentEntry}</code>
@@ -585,7 +591,7 @@ function renderClientChannels() {
     </section>
     <section class="client-production-materials">
       <h3>P0现场材料</h3>
-      ${active.productionMaterials.map((item) => `<p><strong>${item.label}</strong><span>${item.status}</span><small>${item.note}</small></p>`).join("")}
+      ${active.productionMaterials.map((item) => `<p><strong>${item.label}</strong><span>${item.status}</span><em>${item.owner}</em><small>${item.note}</small><small>验收：${item.acceptance}</small></p>`).join("")}
     </section>
     <section>
       <h3>下一步</h3>
@@ -597,6 +603,17 @@ function renderClientChannels() {
     </section>
   </div>`;
   detail.querySelector("[data-copy-client-entry]")?.addEventListener("click", (event) => copyClientEntry(event.currentTarget.dataset.copyClientEntry));
+}
+
+function productionMaterialSummary(channel) {
+  const materials = channel.productionMaterials || [];
+  const onsite = materials.filter((item) => String(item.status || "").includes("现场补齐")).length;
+  const owners = new Set(materials.map((item) => item.owner).filter(Boolean));
+  return {
+    total: materials.length,
+    onsite,
+    owners: owners.size
+  };
 }
 
 function setClientChannel(key) {
