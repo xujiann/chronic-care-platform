@@ -70,8 +70,8 @@ function buildCitizenLaunchFoundationReadiness(options = {}) {
     },
     {
       id: "citizen-foundation:mini-app-app-routing",
-      passed: hasAll(citizenJs + mobilePreview, [/citizenClientChannels/, /mini-program/, /clientChannelEntry/, /copyClientEntry/, /copyLaunchMaterials/, /copyTextToClipboard/, /data-copy-launch-materials/, /launchChecklist/, /productionMaterials/, /productionMaterialSummary/, /client-material-summary/, /client-production-materials/, /owner/, /acceptance/, /SMS_GATEWAY_URL/, /OIDC/, /previewParams\.get\("client"\)/]),
-      detail: "mini-program and app channel routing, copyable entry links, copyable production-material owners, acceptance prompts, and preview query handling are present"
+      passed: hasAll(citizenJs + mobilePreview, [/citizenClientChannels/, /mini-program/, /clientChannelEntry/, /copyClientEntry/, /copyLaunchMaterials/, /copyTextToClipboard/, /data-copy-launch-materials/, /isLaunchReviewMode/, /launch-review-mode/, /launch=1/, /launchChecklist/, /productionMaterials/, /productionMaterialSummary/, /client-material-summary/, /client-production-materials/, /owner/, /acceptance/, /SMS_GATEWAY_URL/, /OIDC/, /previewParams\.get\("client"\)/]),
+      detail: "mini-program and app channel routing, copyable entry links, launch-review materials, copyable production-material owners, acceptance prompts, and preview query handling are present"
     },
     {
       id: "citizen-foundation:mobile-preview-service-switch",

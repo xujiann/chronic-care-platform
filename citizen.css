@@ -449,6 +449,10 @@ body.service-paged-mode [data-internal-launch-panel] {
   display: none !important;
 }
 
+body.service-paged-mode.launch-review-mode [data-internal-launch-panel] {
+  display: grid !important;
+}
+
 body.service-paged-mode [data-service-pane] {
   scroll-margin-top: 0;
 }

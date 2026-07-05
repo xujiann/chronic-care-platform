@@ -93,11 +93,11 @@
           </div>
           <button type="button" class="preview-refresh" id="preview-refresh">重载手机框</button>
           <div class="preview-entry-actions">
-            <a class="preview-direct-entry" id="preview-direct-entry" href="./citizen.html?preview=mobile-nav&client=mini-program&page=health-record#service-health-record">打开当前页面</a>
-            <a class="preview-birth-entry" id="preview-birth-entry" href="./citizen.html?preview=mobile-nav&client=mini-program&page=health-record#birth-health-summary-strip">出生健康直达</a>
+            <a class="preview-direct-entry" id="preview-direct-entry" href="./citizen.html?preview=mobile-nav&client=mini-program&page=health-record&launch=1#service-health-record">打开当前页面</a>
+            <a class="preview-birth-entry" id="preview-birth-entry" href="./citizen.html?preview=mobile-nav&client=mini-program&page=health-record&launch=1#birth-health-summary-strip">出生健康直达</a>
             <button type="button" class="preview-copy-entry" id="preview-copy-entry">复制入口</button>
           </div>
-          <input class="preview-entry-url" id="preview-entry-url" type="text" readonly value="./citizen.html?preview=mobile-nav&client=mini-program&page=health-record#service-health-record" aria-label="当前预览入口地址" />
+          <input class="preview-entry-url" id="preview-entry-url" type="text" readonly value="./citizen.html?preview=mobile-nav&client=mini-program&page=health-record&launch=1#service-health-record" aria-label="当前预览入口地址" />
           <div class="preview-readiness" aria-label="预览验收状态">
             <span id="preview-readiness-client">端型：小程序</span>
             <span id="preview-readiness-service">服务：健康档案</span>
@@ -110,7 +110,7 @@
         <section class="phone-frame">
           <div class="phone-speaker"></div>
           <div class="preview-swipe-hint" aria-hidden="true">← 滑动切换服务 →</div>
-          <iframe id="citizen-preview-frame" src="./citizen.html?preview=mobile-nav&client=mini-program&page=health-record#service-health-record" title="居民端"></iframe>
+          <iframe id="citizen-preview-frame" src="./citizen.html?preview=mobile-nav&client=mini-program&page=health-record&launch=1#service-health-record" title="居民端"></iframe>
         </section>
       </section>
     </main>
@@ -177,10 +177,10 @@
       let touchStartY = 0;
       const previewSwipeTargets = new WeakSet();
       function citizenPreviewSrc(service) {
-        return `./citizen.html?preview=mobile-nav&client=${activePreviewClient}&page=${service}#service-${service}`;
+        return `./citizen.html?preview=mobile-nav&client=${activePreviewClient}&page=${service}&launch=1#service-${service}`;
       }
       function birthHealthPreviewSrc() {
-        return `./citizen.html?preview=mobile-nav&client=${activePreviewClient}&page=health-record#birth-health-summary-strip`;
+        return `./citizen.html?preview=mobile-nav&client=${activePreviewClient}&page=health-record&launch=1#birth-health-summary-strip`;
       }
       function activePreviewServicePosition() {
         const activeIndex = Math.max(0, previewServices.indexOf(activePreviewService));

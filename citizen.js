@@ -645,6 +645,10 @@ function isPagedCitizenServiceMode() {
   return params.get("preview") === "mobile-nav" || ["app", "mini-program"].includes(activeClientChannel);
 }
 
+function isLaunchReviewMode() {
+  return new URLSearchParams(location.search).get("launch") === "1";
+}
+
 function clientChannelEntry(channelKey, serviceKey) {
   const params = new URLSearchParams();
   params.set("client", channelKey);
@@ -754,6 +758,7 @@ function updateServicePanes() {
     activeServiceTab = launchedTabs[0].key;
   }
   document.body.classList.toggle("service-paged-mode", isPagedCitizenServiceMode());
+  document.body.classList.toggle("launch-review-mode", isLaunchReviewMode());
   document.body.dataset.activeServicePage = activeServiceTab;
   renderServiceSummary();
   renderMobileServicePagebar();

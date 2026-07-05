@@ -893,8 +893,8 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(mobilePreviewHtml, /390px 手机视口/);
   assert.match(mobilePreviewHtml, /本机局域网IP/);
   assert.match(mobilePreviewHtml, /DEMO-MOBILE-R1 \/ 888888/);
-  assert.match(mobilePreviewHtml, /citizen\.html\?preview=mobile-nav&client=mini-program&page=health-record/);
-  assert.match(mobilePreviewHtml, /value="\.\/citizen\.html\?preview=mobile-nav&client=mini-program&page=health-record#service-health-record"/);
+  assert.match(mobilePreviewHtml, /citizen\.html\?preview=mobile-nav&client=mini-program&page=health-record&launch=1/);
+  assert.match(mobilePreviewHtml, /value="\.\/citizen\.html\?preview=mobile-nav&client=mini-program&page=health-record&launch=1#service-health-record"/);
   assert.doesNotMatch(mobilePreviewHtml, /localhost:5173\/citizen\.html/);
   assert.match(mobilePreviewHtml, /data-preview-client="mini-program"/);
   assert.match(mobilePreviewHtml, /data-preview-client="app"/);
@@ -907,6 +907,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.doesNotMatch(mobilePreviewHtml, /internet-nursing\.html\?preview=mobile-nursing/);
   assert.match(mobilePreviewHtml, /client=\$\{activePreviewClient\}/);
   assert.match(mobilePreviewHtml, /page=\$\{service\}/);
+  assert.match(mobilePreviewHtml, /launch=1/);
   assert.match(mobilePreviewHtml, /const entryUrl = citizenPreviewSrc\(activePreviewService\)/);
   assert.match(mobilePreviewHtml, /previewDirectEntry\.href = entryUrl/);
   assert.match(mobilePreviewHtml, /const birthEntryUrl = birthHealthPreviewSrc\(\)/);
@@ -1283,6 +1284,8 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /renderClientChannels/);
   assert.match(citizenJs, /setClientChannel/);
   assert.match(citizenJs, /clientChannelFromRoute/);
+  assert.match(citizenJs, /isLaunchReviewMode/);
+  assert.match(citizenJs, /launch-review-mode/);
   assert.match(citizenJs, /clientChannelEntry/);
   assert.match(citizenJs, /copyClientEntry/);
   assert.match(citizenJs, /data-copy-client-entry/);
@@ -1411,6 +1414,7 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /data-governance-grid/);
   assert.match(citizenCss, /data-governance-card/);
   assert.match(citizenCss, /client-channel-panel/);
+  assert.match(citizenCss, /body\.service-paged-mode\.launch-review-mode \[data-internal-launch-panel\]/);
   assert.match(citizenCss, /client-channel-switch/);
   assert.match(citizenCss, /client-channel-grid/);
   assert.match(citizenCss, /client-channel-actions/);
