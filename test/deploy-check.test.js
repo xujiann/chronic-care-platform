@@ -29,6 +29,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "snapshot:healthDashboard",
     "snapshot:multiPractice",
     "docs:citizenAccountProvisioning",
+    "docs:citizenExternalDependencyOwners",
     "docs:productionGoLiveRequirements",
     "docs:onsiteLaunchMaterials",
     "api:siteLaunchEvidence",

@@ -510,7 +510,7 @@ function citizenLaunchFoundationChecks(citizenLaunchFoundation) {
     check("citizenLaunch:accountProvisioning", citizenLaunchFoundation.checks?.some((item) => item.id === "citizen-foundation:account-provisioning-boundary" && item.passed), "resident, doctor, and nurse account provisioning owners and audit evidence are documented", "error", "citizen-launch"),
     check("citizenLaunch:offlineCache", citizenLaunchFoundation.checks?.some((item) => item.id === "citizen-foundation:offline-cache" && item.passed), "resident PWA shell refreshes HTML/JS/CSS from network first", "error", "citizen-launch"),
     check("citizenLaunch:mobilePreviewServiceSwitch", citizenLaunchFoundation.checks?.some((item) => item.id === "citizen-foundation:mobile-preview-service-switch" && item.passed), "mobile preview service switch evidence present", "error", "citizen-launch"),
-    check("citizenLaunch:externalDependencies", citizenLaunchFoundation.externalDependencies?.every((item) => item.status === "required-before-production" && item.owner && item.evidence), `${citizenLaunchFoundation.externalDependencies?.length || 0} production dependencies surfaced with owners and evidence`, "error", "citizen-launch")
+    check("citizenLaunch:externalDependencies", citizenLaunchFoundation.externalDependencies?.every((item) => item.status === "required-before-production" && item.owner && item.cutoverBlocker && item.evidence && item.onsiteAcceptance), `${citizenLaunchFoundation.externalDependencies?.length || 0} production dependencies surfaced with owners, blockers, evidence, and onsite acceptance`, "error", "citizen-launch")
   ];
 }
 
@@ -1055,7 +1055,7 @@ function renderMarkdown(report) {
     "",
     "## Citizen launch foundation readiness report",
     "",
-    "See `citizen-launch-foundation-readiness.json` and `citizen-launch-foundation-readiness.md` for resident phone-code delivery, PWA/app shell refresh, mini-program/app routing, and production SMS, real-name, guardian, HTTPS, signing, push, and monitoring dependencies.",
+    "See `citizen-launch-foundation-readiness.json` and `citizen-launch-foundation-readiness.md` for resident phone-code delivery, PWA/app shell refresh, mini-program/app routing, and production SMS, real-name, guardian, HTTPS, signing, push, and monitoring dependencies with owners, blockers, evidence, and onsite acceptance.",
     "",
     "## Production database readiness report",
     "",

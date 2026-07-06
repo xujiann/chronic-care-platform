@@ -125,35 +125,45 @@ function buildCitizenLaunchFoundationReadiness(options = {}) {
       label: "production SMS gateway",
       status: "required-before-production",
       owner: "platform-ops",
-      evidence: "signed SMS gateway contract, delivery callback URL, throttling limits, and launch test receipt"
+      cutoverBlocker: "phone-code login cannot open to production residents without delivery callback proof",
+      evidence: "signed SMS gateway contract, delivery callback URL, throttling limits, and launch test receipt",
+      onsiteAcceptance: "send code, verify callback, and archive a masked resident receipt during launch rehearsal"
     },
     {
       id: "real-name-identity",
       label: "real-name identity verification",
       status: "required-before-production",
       owner: "identity-integration",
-      evidence: "OIDC issuer, client credentials, claim mapping, and real-name verification acceptance record"
+      cutoverBlocker: "resident account binding and guardian authorization remain pilot-only until claims are verified",
+      evidence: "OIDC issuer, client credentials, claim mapping, and real-name verification acceptance record",
+      onsiteAcceptance: "run a real-name login sample and confirm residentId/personIndex binding in the audit log"
     },
     {
       id: "guardian-relation",
       label: "guardian and household relationship verification",
       status: "required-before-production",
       owner: "resident-master-index",
-      evidence: "guardian relationship source, manual review queue, and household binding audit sample"
+      cutoverBlocker: "family-member delegation must stay closed without relationship source and manual-review evidence",
+      evidence: "guardian relationship source, manual review queue, and household binding audit sample",
+      onsiteAcceptance: "complete one approved and one rejected guardian-binding sample with reviewer trace"
     },
     {
       id: "https-domain",
       label: "HTTPS domain, filing, and privacy agreement",
       status: "required-before-production",
       owner: "security-compliance",
-      evidence: "domain filing, TLS certificate, privacy agreement URL, and penetration test acceptance"
+      cutoverBlocker: "mobile containers and resident privacy notice cannot be published without a formal HTTPS origin",
+      evidence: "domain filing, TLS certificate, privacy agreement URL, and penetration test acceptance",
+      onsiteAcceptance: "open the HTTPS resident entry, privacy URL, and penetration-test acceptance record on site"
     },
     {
       id: "app-signing-monitoring",
       label: "app signing, push certificates, crash monitoring, and upgrade channel",
       status: "required-before-production",
       owner: "mobile-release",
-      evidence: "app signing certificate, push certificate, crash monitor project, and staged upgrade plan"
+      cutoverBlocker: "APP/mini-program release remains review-only until signed packages and monitoring are active",
+      evidence: "app signing certificate, push certificate, crash monitor project, and staged upgrade plan",
+      onsiteAcceptance: "install signed package, trigger a test push, and verify crash/upgrade monitoring dashboards"
     }
   ];
   return {
@@ -183,9 +193,9 @@ function renderMarkdown(report) {
     "",
     "## External Dependencies",
     "",
-    "| Dependency | Status | Owner | Required evidence |",
-    "| --- | --- | --- | --- |",
-    ...report.externalDependencies.map((item) => `| ${item.label} | ${item.status} | ${item.owner} | ${item.evidence} |`),
+    "| Dependency | Status | Owner | Cutover blocker | Required evidence | Onsite acceptance |",
+    "| --- | --- | --- | --- | --- | --- |",
+    ...report.externalDependencies.map((item) => `| ${item.label} | ${item.status} | ${item.owner} | ${item.cutoverBlocker} | ${item.evidence} | ${item.onsiteAcceptance} |`),
     "",
     "## Checks",
     "",
