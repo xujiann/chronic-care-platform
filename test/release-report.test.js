@@ -187,9 +187,11 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "citizenLaunch:readiness" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "citizenLaunch:phoneCodeDelivery" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "citizenLaunch:accountProvisioning" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "citizenLaunch:externalDependencies" && item.passed && /owners and evidence/.test(item.detail)), true);
   assert.equal(report.checks.some((item) => item.name === "citizenLaunch:mobilePreviewServiceSwitch" && item.passed), true);
   assert.equal(report.citizenLaunchFoundation.ok, true);
   assert.equal(report.citizenLaunchFoundation.checks.some((item) => item.id === "citizen-foundation:phone-code-delivery" && item.passed), true);
+  assert.equal(report.citizenLaunchFoundation.externalDependencies.every((item) => item.owner && item.evidence), true);
   assert.equal(report.priorityApplicationTemplates.templates.every((item) => item.conversationStarter && item.implementationChecklist.length >= 8 && item.acceptanceGate.readyWhen.length >= 4), true);
   assert.equal(report.priorityApplicationTemplates.templates.every((item) => item.implementationChecklist.some((step) => /Follow Codex loop/.test(step))), true);
   assert.equal(report.environmentMatrix.profiles.some((item) => item.id === "staging"), true);

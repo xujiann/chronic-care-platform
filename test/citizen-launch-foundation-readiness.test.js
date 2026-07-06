@@ -20,6 +20,9 @@ test("citizen launch foundation readiness captures phase-one gates", () => {
   assert.equal(report.externalDependencies.some((item) => item.id === "sms-gateway"), true);
   assert.equal(report.externalDependencies.some((item) => item.id === "real-name-identity"), true);
   assert.equal(report.externalDependencies.some((item) => item.id === "guardian-relation"), true);
+  assert.equal(report.externalDependencies.every((item) => item.status === "required-before-production" && item.owner && item.evidence), true);
+  assert.equal(report.externalDependencies.find((item) => item.id === "sms-gateway").owner, "platform-ops");
+  assert.match(report.externalDependencies.find((item) => item.id === "real-name-identity").evidence, /claim mapping/);
   assert.equal(report.checks.some((item) => item.id === "citizen-foundation:phone-login" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "citizen-foundation:phone-code-delivery" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "citizen-foundation:account-provisioning-boundary" && item.passed), true);
@@ -43,6 +46,8 @@ test("citizen launch foundation readiness captures phase-one gates", () => {
   assert.match(renderMarkdown(report), /mobile-preview-service-switch/);
   assert.match(renderMarkdown(report), /account-provisioning-boundary/);
   assert.match(renderMarkdown(report), /production SMS gateway/);
+  assert.match(renderMarkdown(report), /Required evidence/);
+  assert.match(renderMarkdown(report), /platform-ops/);
 });
 
 test("citizen launch foundation readiness writes release artifacts", (t) => {

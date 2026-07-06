@@ -120,11 +120,41 @@ function buildCitizenLaunchFoundationReadiness(options = {}) {
     }
   ];
   const externalDependencies = [
-    { id: "sms-gateway", label: "production SMS gateway", status: "required-before-production" },
-    { id: "real-name-identity", label: "real-name identity verification", status: "required-before-production" },
-    { id: "guardian-relation", label: "guardian and household relationship verification", status: "required-before-production" },
-    { id: "https-domain", label: "HTTPS domain, filing, and privacy agreement", status: "required-before-production" },
-    { id: "app-signing-monitoring", label: "app signing, push certificates, crash monitoring, and upgrade channel", status: "required-before-production" }
+    {
+      id: "sms-gateway",
+      label: "production SMS gateway",
+      status: "required-before-production",
+      owner: "platform-ops",
+      evidence: "signed SMS gateway contract, delivery callback URL, throttling limits, and launch test receipt"
+    },
+    {
+      id: "real-name-identity",
+      label: "real-name identity verification",
+      status: "required-before-production",
+      owner: "identity-integration",
+      evidence: "OIDC issuer, client credentials, claim mapping, and real-name verification acceptance record"
+    },
+    {
+      id: "guardian-relation",
+      label: "guardian and household relationship verification",
+      status: "required-before-production",
+      owner: "resident-master-index",
+      evidence: "guardian relationship source, manual review queue, and household binding audit sample"
+    },
+    {
+      id: "https-domain",
+      label: "HTTPS domain, filing, and privacy agreement",
+      status: "required-before-production",
+      owner: "security-compliance",
+      evidence: "domain filing, TLS certificate, privacy agreement URL, and penetration test acceptance"
+    },
+    {
+      id: "app-signing-monitoring",
+      label: "app signing, push certificates, crash monitoring, and upgrade channel",
+      status: "required-before-production",
+      owner: "mobile-release",
+      evidence: "app signing certificate, push certificate, crash monitor project, and staged upgrade plan"
+    }
   ];
   return {
     ok: checks.every((item) => item.passed),
@@ -153,9 +183,9 @@ function renderMarkdown(report) {
     "",
     "## External Dependencies",
     "",
-    "| Dependency | Status |",
-    "| --- | --- |",
-    ...report.externalDependencies.map((item) => `| ${item.label} | ${item.status} |`),
+    "| Dependency | Status | Owner | Required evidence |",
+    "| --- | --- | --- | --- |",
+    ...report.externalDependencies.map((item) => `| ${item.label} | ${item.status} | ${item.owner} | ${item.evidence} |`),
     "",
     "## Checks",
     "",
