@@ -15,6 +15,7 @@ const { buildInterfaceMappingReport, renderMarkdown: renderInterfaceMappingMarkd
 const { buildHospitalOperationsReadinessReport, renderMarkdown: renderHospitalOperationsReadinessMarkdown } = require("./hospital-operations-readiness");
 const { buildHospitalOperationsReleaseReport, renderMarkdown: renderHospitalOperationsReleaseMarkdown } = require("./hospital-operations-release");
 const { buildHospitalOperationsModuleReport, renderMarkdown: renderHospitalOperationsModuleMarkdown } = require("./hospital-operations-module-report");
+const { buildHospitalOperationsBriefPdfReport, renderMarkdown: renderHospitalOperationsBriefPdfMarkdown } = require("./hospital-operations-brief-pdf");
 const { buildMonitoringReadinessReport, renderMarkdown: renderMonitoringReadinessMarkdown } = require("./monitoring-readiness");
 const { buildOperationsReadinessReport, renderMarkdown: renderOperationsReadinessMarkdown } = require("./operations-readiness");
 const { buildProcessAuditReport, renderMarkdown: renderProcessAuditMarkdown } = require("./process-audit");
@@ -414,6 +415,14 @@ function hospitalOperationsModuleChecks(hospitalOperationsModule) {
   ];
 }
 
+function hospitalOperationsBriefPdfChecks(hospitalOperationsBriefPdf) {
+  return [
+    check("hospitalOpsBriefPdf:ready", hospitalOperationsBriefPdf.ok, hospitalOperationsBriefPdf.ok ? "hospital operations brief PDF passed" : "hospital operations brief PDF failed", "error", "operations"),
+    check("hospitalOpsBriefPdf:pages", hospitalOperationsBriefPdf.artifact?.pages === 2, `${hospitalOperationsBriefPdf.artifact?.pages || 0} pages`, "error", "operations"),
+    check("hospitalOpsBriefPdf:artifact", hospitalOperationsBriefPdf.artifact?.pdf === "output/pdf/hospital-operations-module-brief-report.pdf", hospitalOperationsBriefPdf.artifact?.pdf || "missing", "error", "operations")
+  ];
+}
+
 function monitoringReadinessChecks(monitoringReadiness) {
   return [
     check("monitoring:readiness", monitoringReadiness.ok, monitoringReadiness.ok ? "monitoring readiness checks passed" : "monitoring readiness checks failed", "error", "monitoring"),
@@ -567,6 +576,7 @@ function packageChecks(pkg) {
     "hospital-operations:readiness",
     "hospital-operations:release",
     "hospital-operations:module-report",
+    "hospital-operations:brief-pdf",
     "health-dashboard:summary",
     "integration:readiness",
     "interface:mapping",
@@ -633,6 +643,7 @@ function buildReleaseReport(options = {}) {
   const hospitalOperationsReadiness = buildHospitalOperationsReadinessReport({ data, pkg });
   const hospitalOperationsRelease = buildHospitalOperationsReleaseReport({ data, pkg, readiness: hospitalOperationsReadiness });
   const hospitalOperationsModule = buildHospitalOperationsModuleReport({ data, pkg, readiness: hospitalOperationsReadiness, release: hospitalOperationsRelease });
+  const hospitalOperationsBriefPdf = buildHospitalOperationsBriefPdfReport();
   const researchSandbox = buildResearchSandboxReadiness(data);
   const monitoringReadiness = buildMonitoringReadinessReport({ data, pkg });
   const referralTeleconsultationReadiness = buildReferralTeleconsultationReadinessReport({ data, pkg });
@@ -666,6 +677,7 @@ function buildReleaseReport(options = {}) {
     ...hospitalOperationsReadinessChecks(hospitalOperationsReadiness),
     ...hospitalOperationsReleaseChecks(hospitalOperationsRelease),
     ...hospitalOperationsModuleChecks(hospitalOperationsModule),
+    ...hospitalOperationsBriefPdfChecks(hospitalOperationsBriefPdf),
     ...researchSandboxChecks(researchSandbox),
     ...monitoringReadinessChecks(monitoringReadiness),
     ...referralTeleconsultationChecks(referralTeleconsultationReadiness),
@@ -709,6 +721,7 @@ function buildReleaseReport(options = {}) {
     hospitalOperationsReadiness,
     hospitalOperationsRelease,
     hospitalOperationsModule,
+    hospitalOperationsBriefPdf,
     researchSandbox,
     monitoringReadiness,
     referralTeleconsultationReadiness,
@@ -912,6 +925,10 @@ function renderMarkdown(report) {
     "",
     "See `hospital-operations-module-report.json` and `hospital-operations-module-report.md` for module capability audit, signed hospital ingest coverage, release evidence, and next-step development plan.",
     "",
+    "## Hospital operations brief PDF report",
+    "",
+    "See `hospital-operations-brief-pdf-report.json`, `hospital-operations-brief-pdf-report.md`, and `output/pdf/hospital-operations-module-brief-report.pdf` for the two-page on-site delivery brief and PDF artifact checks.",
+    "",
     "## Full process audit report",
     "",
     "See `process-audit-report.json` and `process-audit-report.md` for resident, chronic disease, county consortium, insurance, statistics, certificate, security, and cutover process evidence.",
@@ -1101,6 +1118,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       hospitalOperationsModule: report.hospitalOperationsModule
     }, null, 2), "utf8");
+    const hospitalOperationsBriefPdfJson = path.join(path.dirname(output), "hospital-operations-brief-pdf-report.json");
+    fs.writeFileSync(hospitalOperationsBriefPdfJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      hospitalOperationsBriefPdf: report.hospitalOperationsBriefPdf
+    }, null, 2), "utf8");
     const processAuditJson = path.join(path.dirname(output), "process-audit-report.json");
     fs.writeFileSync(processAuditJson, JSON.stringify({
       project: report.project,
@@ -1219,6 +1244,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(hospitalOperationsReleaseMarkdown, renderHospitalOperationsReleaseMarkdown(report.hospitalOperationsRelease), "utf8");
     const hospitalOperationsModuleMarkdown = path.join(path.dirname(markdown), "hospital-operations-module-report.md");
     fs.writeFileSync(hospitalOperationsModuleMarkdown, renderHospitalOperationsModuleMarkdown(report.hospitalOperationsModule), "utf8");
+    const hospitalOperationsBriefPdfMarkdown = path.join(path.dirname(markdown), "hospital-operations-brief-pdf-report.md");
+    fs.writeFileSync(hospitalOperationsBriefPdfMarkdown, renderHospitalOperationsBriefPdfMarkdown(report.hospitalOperationsBriefPdf), "utf8");
     const processAuditMarkdown = path.join(path.dirname(markdown), "process-audit-report.md");
     fs.writeFileSync(processAuditMarkdown, renderProcessAuditMarkdown(report.processAudit), "utf8");
     const serviceAcceptanceMarkdown = path.join(path.dirname(markdown), "service-acceptance-summary.md");

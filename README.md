@@ -283,6 +283,8 @@ hospital-operations:release generates release/hospital-operations-release-report
 
 hospital-operations:module-report generates release/hospital-operations-module-report.json and release/hospital-operations-module-report.md. The report summarizes the hospital operations module capabilities, signed hospital system ingest APIs, release evidence, audit checks, and completed development directions for site joint testing, production hardening, intelligent dispatch, and governance reporting; real production cutover still requires site payloads, signoffs, monitoring, and DR evidence.
 
+`hospital-operations:brief-pdf` verifies `output/pdf/hospital-operations-module-brief-report.pdf` as the two-page on-site brief. The same PDF is linked from `operations.html` under 上线报告与发布证据, alongside the module report and integration requirements.
+
 ## Drug Consumable Supervision Evidence
 
 `drug-consumable:readiness` generates `release/drug-consumable-readiness-report.json` and `release/drug-consumable-readiness-report.md`, covering rational medication, prescription review, fixed pickup, high-value consumable clues, insurance settlement coordination, and remediation-loop evidence for the drug and consumable supervision app.

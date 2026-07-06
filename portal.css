@@ -1781,6 +1781,48 @@ dialog::backdrop {
   grid-column: 1 / -1;
 }
 
+.operations-delivery-pack-panel {
+  grid-column: 1 / -1;
+}
+
+.operation-delivery-pack-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.operation-delivery-pack-card {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+  color: inherit;
+  text-decoration: none;
+}
+
+.operation-delivery-pack-card.primary {
+  background: #eef7f8;
+  border-color: #b8d8d1;
+}
+
+.operation-delivery-pack-card:hover {
+  border-color: var(--teal);
+  box-shadow: var(--shadow);
+  transform: translateY(-1px);
+}
+
+.operation-delivery-pack-card strong {
+  color: var(--ink);
+}
+
+.operation-delivery-pack-card span,
+.operation-delivery-pack-card small {
+  color: var(--muted);
+  line-height: 1.55;
+}
+
 .operation-next-development-grid {
   display: grid;
   gap: 12px;

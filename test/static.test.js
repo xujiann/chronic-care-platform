@@ -216,6 +216,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal(Boolean(pkg.scripts["hospital-operations:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["hospital-operations:release"]), true);
   assert.equal(Boolean(pkg.scripts["hospital-operations:module-report"]), true);
+  assert.equal(Boolean(pkg.scripts["hospital-operations:brief-pdf"]), true);
   assert.equal(Boolean(pkg.scripts["integration:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["interface:mapping"]), true);
   assert.equal(Boolean(pkg.scripts["regional-data-sharing:report"]), true);
@@ -259,6 +260,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /hospital-operations-readiness-report\.md/);
   assert.match(read("README.md"), /hospital-operations-release-report\.md/);
   assert.match(read("README.md"), /hospital-operations-module-report\.md/);
+  assert.match(read("README.md"), /hospital-operations-module-brief-report\.pdf/);
   assert.match(read("README.md"), /operations-about\.html/);
   assert.match(read("README.md"), /process-audit-report\.md/);
   assert.match(read("README.md"), /service-acceptance-summary\.md/);
@@ -284,6 +286,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("DEPLOYMENT.md"), /hospital-operations-readiness-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /hospital-operations-release-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /hospital-operations-module-report\.md/);
+  assert.match(read("DEPLOYMENT.md"), /hospital-operations-module-brief-report\.pdf/);
   assert.match(read("DEPLOYMENT.md"), /operations-about\.html/);
   assert.match(read("DEPLOYMENT.md"), /process-audit-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /site-readiness-pack\.md/);
@@ -314,6 +317,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/deploy-check.js"), /hospital-operations:readiness/);
   assert.match(read("scripts/deploy-check.js"), /hospital-operations:release/);
   assert.match(read("scripts/deploy-check.js"), /hospital-operations:module-report/);
+  assert.match(read("scripts/deploy-check.js"), /hospital-operations:brief-pdf/);
   assert.match(read("scripts/deploy-check.js"), /process:audit/);
   assert.match(read("scripts/deploy-check.js"), /site:pack/);
   assert.match(read("scripts/deploy-check.js"), /release:manifest/);
@@ -339,6 +343,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".github/workflows/ci.yml"), /npm run hospital-operations:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run hospital-operations:release/);
   assert.match(read(".github/workflows/ci.yml"), /npm run hospital-operations:module-report/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run hospital-operations:brief-pdf/);
   assert.match(read(".github/workflows/ci.yml"), /npm run site:pack/);
   assert.match(read(".github/workflows/ci.yml"), /npm run production-db:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run evaluation:evidence/);
@@ -469,6 +474,8 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsHtml, /operation-resource-pool/);
   assert.match(operationsHtml, /operation-mobile-duty/);
   assert.match(operationsHtml, /operation-governance-report/);
+  assert.match(operationsHtml, /operations-delivery-pack-panel/);
+  assert.match(operationsHtml, /hospital-operations-module-brief-report\.pdf/);
   assert.match(operationsHtml, /operation-next-development/);
   assert.match(operationsHtml, /operation-command-chains/);
   assert.match(operationsHtml, /operation-playbooks/);
@@ -619,6 +626,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("portal.css"), /dispatch-batch-toolbar/);
   assert.match(read("portal.css"), /dispatch-batch-note/);
   assert.match(read("portal.css"), /operation-mobile-duty-card/);
+  assert.match(read("portal.css"), /operation-delivery-pack-card/);
   assert.match(read("portal.css"), /operation-next-development-card/);
   assert.match(read("portal.css"), /operation-handover-card/);
   assert.match(read("portal.css"), /operation-handover-owner-card/);
