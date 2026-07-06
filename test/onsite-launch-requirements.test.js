@@ -16,14 +16,18 @@ test("onsite launch requirements model field-owned go-live blockers", () => {
   assert.equal(report.summary.requirements >= 12, true);
   assert.equal(report.summary.p0Requirements >= 10, true);
   assert.equal(report.requirements.some((item) => item.id === "OSL-04" && item.domain === "sms"), true);
+  assert.equal(report.requirements.some((item) => item.id === "OSL-04" && item.owner === "platform-ops" && item.evidence.includes("platform-ops signoff")), true);
   assert.equal(report.requirements.some((item) => item.id === "OSL-06" && item.domain === "resident-services"), true);
-  assert.equal(report.requirements.some((item) => item.id === "OSL-12" && item.domain === "resident-mobile" && item.priority === "P1"), true);
+  assert.equal(report.requirements.some((item) => item.id === "OSL-12" && item.domain === "resident-mobile" && item.priority === "P1" && item.owner === "mobile-release"), true);
   assert.equal(report.blockingConditions.some((item) => item.requirementId === "OSL-05" && item.owner === "institution-integration"), true);
+  assert.equal(report.checks.some((item) => item.id === "onsite:citizen-dependency-owners" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "onsite:site-pack" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "onsite:release-gates" && item.passed), true);
   assert.match(markdown, /On-site launch requirements/);
   assert.match(markdown, /blocked-until-site-materials-signed/);
   assert.match(markdown, /release\/production-cutover-checklist\.md/);
+  assert.match(markdown, /platform-ops signoff/);
+  assert.match(markdown, /mobile-release signoff/);
 });
 
 test("onsite launch requirements can render and write artifacts", (t) => {
