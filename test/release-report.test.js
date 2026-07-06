@@ -186,6 +186,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.deepEqual(Object.keys(report.maternalChildReadiness.summary.riskMetrics), ["pendingPublicSecuritySync", "pendingMaternalChildSync", "qualityPending"]);
   assert.equal(report.checks.some((item) => item.name === "citizenLaunch:readiness" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "citizenLaunch:phoneCodeDelivery" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "citizenLaunch:accountProvisioning" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "citizenLaunch:mobilePreviewServiceSwitch" && item.passed), true);
   assert.equal(report.citizenLaunchFoundation.ok, true);
   assert.equal(report.citizenLaunchFoundation.checks.some((item) => item.id === "citizen-foundation:phone-code-delivery" && item.passed), true);
@@ -290,6 +291,7 @@ test("release report writes standalone production cutover and storage artifacts"
   });
 
   const cutoverJson = JSON.parse(fs.readFileSync(path.join(outputDir, "production-cutover-checklist.json"), "utf8"));
+  const releaseMarkdown = fs.readFileSync(path.join(outputDir, "release-report.md"), "utf8");
   const cutoverMarkdown = fs.readFileSync(path.join(outputDir, "production-cutover-checklist.md"), "utf8");
   const storageJson = JSON.parse(fs.readFileSync(path.join(outputDir, "storage-model-inspection.json"), "utf8"));
   const storageMarkdown = fs.readFileSync(path.join(outputDir, "storage-model-inspection.md"), "utf8");
@@ -374,6 +376,7 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.equal(citizenLaunchJson.citizenLaunchFoundation.ok, true);
   assert.match(citizenLaunchMarkdown, /Citizen launch foundation readiness/);
   assert.match(citizenLaunchMarkdown, /phone-code delivery/);
+  assert.match(releaseMarkdown, /citizenLaunch:accountProvisioning/);
   assert.equal(operationsJson.operationsReadiness.ok, true);
   assert.match(operationsMarkdown, /External dependency risks/);
   assert.equal(processAuditJson.processAudit.ok, true);
