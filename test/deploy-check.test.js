@@ -42,6 +42,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "manifest:hybridDeploymentReadiness",
     "snapshot:storageMeta"
   ].forEach((name) => assert.equal(checkNames.has(name), true, `${name} should be checked`));
+  assert.match(report.checks.find((item) => item.name === "docs:citizenExternalDependencyOwners").detail, /blockers, evidence, and onsite acceptance/);
 });
 
 test("deploy check report does not run expensive commands by default", () => {
