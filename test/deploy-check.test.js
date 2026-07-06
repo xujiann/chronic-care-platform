@@ -28,6 +28,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "snapshot:accessibility",
     "snapshot:healthDashboard",
     "snapshot:multiPractice",
+    "docs:chronicLaunchCore",
     "docs:citizenAccountProvisioning",
     "docs:citizenExternalDependencyOwners",
     "docs:productionGoLiveRequirements",
@@ -42,6 +43,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "manifest:hybridDeploymentReadiness",
     "snapshot:storageMeta"
   ].forEach((name) => assert.equal(checkNames.has(name), true, `${name} should be checked`));
+  assert.match(report.checks.find((item) => item.name === "docs:chronicLaunchCore").detail, /closure, site signoff/);
   assert.match(report.checks.find((item) => item.name === "docs:citizenExternalDependencyOwners").detail, /blockers, evidence, and onsite acceptance/);
 });
 

@@ -76,6 +76,7 @@ function buildDeployCheckReport(options = {}) {
   const escortHospitalInterfaceDoc = fs.readFileSync(path.join(ROOT, "docs", "escort-hospital-interface.md"), "utf8");
   const internetNursingDoc = fs.readFileSync(path.join(ROOT, "docs", "互联网护理服务模块说明.md"), "utf8");
   const citizenProductionRequirementsDoc = fs.readFileSync(path.join(ROOT, "docs", "citizen-production-launch-requirements.md"), "utf8");
+  const chronicLaunchCoreDoc = fs.readFileSync(path.join(ROOT, "docs", "chronic-launch-core.md"), "utf8");
   const productionGoLiveRequirementsDoc = fs.readFileSync(path.join(ROOT, "docs", "production-go-live-requirements.md"), "utf8");
   const onsiteLaunchMaterialsDoc = fs.readFileSync(path.join(ROOT, "docs", "on-site-launch-materials.md"), "utf8");
   const externalDependencyRiskIds = [
@@ -113,6 +114,7 @@ function buildDeployCheckReport(options = {}) {
     { name: "package:hybridDeploymentReadiness", ok: Boolean(pkg.scripts?.["hybrid:deployment-readiness"]), detail: pkg.scripts?.["hybrid:deployment-readiness"] || "missing" },
     { name: "package:chronicInstitutionInterfaces", ok: Boolean(pkg.scripts?.["chronic:institution-interfaces"]), detail: pkg.scripts?.["chronic:institution-interfaces"] || "missing" },
     { name: "package:chronicLaunchCore", ok: Boolean(pkg.scripts?.["chronic:launch-core"]), detail: pkg.scripts?.["chronic:launch-core"] || "missing" },
+    { name: "docs:chronicLaunchCore", ok: ["GET /api/chronic/launch-core", "POST /api/chronic/launch-core/actions", "launch-core:actionClosure", "launch-core:siteSignoffs", "HIS/EMR/LIS/PACS"].every((marker) => chronicLaunchCoreDoc.includes(marker)), detail: "chronic launch core API, closure, site signoff, and institution joint-test evidence are documented" },
     { name: "snapshot:collections", ok: requiredCollections.every((key) => data[key]), detail: requiredCollections.filter((key) => !data[key]).join(",") || "all present" },
     { name: "snapshot:regionalDataSharing", ok: (data.regionalSharingPackages || []).length >= 3 && (data.regionalSharingAccessReviews || []).length >= 1 && serverSource.includes("/api/regional-data-sharing"), detail: `${data.regionalSharingPackages?.length || 0} packages, ${data.regionalSharingAccessReviews?.length || 0} access reviews` },
     { name: "snapshot:escortService", ok: (data.escortServiceProviders || []).length >= 3 && (data.escortWorkers || []).length >= 4 && (data.escortServiceOrders || []).length >= 3 && serverSource.includes("/api/escort-services/dashboard"), detail: `${data.escortServiceProviders?.length || 0} providers, ${data.escortWorkers?.length || 0} workers, ${data.escortServiceOrders?.length || 0} orders` },
