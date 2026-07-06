@@ -79,6 +79,33 @@ body {
   padding: 26px 0 42px;
 }
 
+.project-nav {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.project-nav a {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: #fff;
+  color: var(--ink);
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.project-nav a:hover,
+.project-nav a:focus-visible {
+  border-color: rgba(39, 110, 241, 0.42);
+  color: var(--blue);
+}
+
 .portal-header,
 .panel,
 .metric-card {
@@ -1004,6 +1031,15 @@ dialog::backdrop {
   }
   .portal-header nav {
     justify-content: flex-start;
+  }
+  .project-nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-content: stretch;
+    width: 100%;
+  }
+  .project-nav a {
+    justify-content: center;
   }
   .metric-grid,
   .portal-grid,
