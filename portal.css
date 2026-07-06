@@ -166,6 +166,8 @@ h1 { margin-top: 4px; font-size: 28px; }
   grid-template-columns: 1.1fr 0.9fr;
   gap: 16px;
   align-items: stretch;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .login-intro,
@@ -174,6 +176,8 @@ h1 { margin-top: 4px; font-size: 28px; }
   border-radius: 8px;
   background: #fff;
   box-shadow: var(--shadow);
+  min-width: 0;
+  max-width: 100%;
 }
 
 .login-intro {
@@ -224,6 +228,7 @@ h1 { margin-top: 4px; font-size: 28px; }
 .login-form {
   display: grid;
   gap: 14px;
+  min-width: 0;
 }
 
 .login-form label {
@@ -231,10 +236,13 @@ h1 { margin-top: 4px; font-size: 28px; }
   gap: 6px;
   color: var(--muted);
   font-size: 13px;
+  min-width: 0;
 }
 
 .login-form select,
 .login-form input {
+  width: 100%;
+  min-width: 0;
   min-height: 42px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -243,6 +251,8 @@ h1 { margin-top: 4px; font-size: 28px; }
 }
 
 .primary-action {
+  width: 100%;
+  min-width: 0;
   min-height: 42px;
   border: 0;
   border-radius: 8px;
@@ -1068,5 +1078,19 @@ dialog::backdrop {
 
   .capability-side small {
     text-align: left;
+  }
+}
+
+@media (max-width: 720px) {
+  .portal-shell {
+    width: min(480px, calc(100% - 20px));
+    padding-top: 14px;
+  }
+
+  .project-nav,
+  .login-layout {
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
   }
 }
