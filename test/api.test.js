@@ -2238,6 +2238,81 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(denied.response.status, 403);
   });
 
+  await t.test("supports imaging cloud ingest, EMR index sync and resident sharing scope", async () => {
+    const hospital = await login(baseUrl, "hospital");
+    const initialDashboard = await api(baseUrl, "/api/imaging-cloud", authorized(hospital.body.token));
+    assert.equal(initialDashboard.response.status, 200);
+    assert.equal(initialDashboard.body.summary.studies >= 2, true);
+    assert.equal(initialDashboard.body.emrCompatibility.mappedCollections.includes("diagnosticReports"), true);
+    assert.equal(initialDashboard.body.emrCompatibility.mappedCollections.includes("personalRecords"), true);
+    assert.equal(initialDashboard.body.implementedFeatures.some((item) => item.id === "imaging-feature-hospital-ingest" && item.status), true);
+    assert.equal(initialDashboard.body.developmentPlan.some((item) => item.id === "imaging-plan-p0-joint-test" && item.priority === "P0"), true);
+    assert.equal(initialDashboard.body.developmentPlan.some((item) => item.id === "imaging-plan-p0-security" && item.evidence.includes("dataAccessLogs")), true);
+
+    const ingest = await api(baseUrl, "/api/imaging-cloud/ingest", authorized(hospital.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        residentId: "r1",
+        institutionCode: "MR1",
+        accessionNumber: "CT-API-0707",
+        studyInstanceUID: "1.2.156.112605.api.0707",
+        modality: "CT",
+        bodyPart: "胸部",
+        reportConclusion: "API 测试影像已入云，并同步电子病历索引。",
+        finding: "DICOM TAG、RIS 检查信息和审核报告已归集。",
+        seriesCount: 3,
+        imageCount: 96,
+        shareEnabled: true
+      })
+    }));
+    assert.equal(ingest.response.status, 201);
+    assert.equal(ingest.body.study.mainIndex, "MR1#DEMO-ID-R1#CT-API-0707");
+    assert.equal(ingest.body.study.emrSyncStatus, "已写入电子病历索引");
+    assert.equal(ingest.body.report.category, "imaging");
+    assert.equal(ingest.body.report.imageCloudStudyId, ingest.body.study.id);
+    assert.equal(ingest.body.personalRecord.category, "imaging");
+    assert.equal(ingest.body.personalRecord.meta.imageCloudStudyId, ingest.body.study.id);
+    assert.equal(ingest.body.personalRecord.meta.emrCompatible, true);
+
+    const state = await api(baseUrl, "/api/state", authorized(commissionToken));
+    assert.equal(state.body.imageCloudStudies.some((item) => item.id === ingest.body.study.id), true);
+    assert.equal(state.body.diagnosticReports.some((item) => item.id === ingest.body.report.id && item.imageCloudStudyId === ingest.body.study.id), true);
+    assert.equal(state.body.personalRecords.some((item) => item.id === ingest.body.personalRecord.id && item.meta?.imageCloudStudyId === ingest.body.study.id), true);
+
+    const imagingRecords = await api(baseUrl, "/api/personal-records?residentId=r1&category=imaging", authorized(hospital.body.token));
+    assert.equal(imagingRecords.response.status, 200);
+    assert.equal(imagingRecords.body.some((item) => item.id === ingest.body.personalRecord.id), true);
+
+    const citizen = await login(baseUrl, "citizen");
+    const citizenDashboard = await api(baseUrl, "/api/imaging-cloud", authorized(citizen.body.token));
+    assert.equal(citizenDashboard.response.status, 200);
+    assert.equal(citizenDashboard.body.studies.some((item) => item.id === ingest.body.study.id), true);
+    assert.equal(citizenDashboard.body.studies.every((item) => item.residentId === "r1"), true);
+
+    const share = await api(baseUrl, `/api/imaging-cloud/studies/${encodeURIComponent(ingest.body.study.id)}/share`, authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({ validDays: 5, channel: "二维码/短信链接" })
+    }));
+    assert.equal(share.response.status, 201);
+    assert.equal(share.body.studyId, ingest.body.study.id);
+    assert.equal(share.body.status, "active");
+    assert.match(share.body.token, /^IMG-/);
+
+    const r2Citizen = await login(baseUrl, "citizen_r2");
+    const forbiddenDashboard = await api(baseUrl, "/api/imaging-cloud?residentId=r1", authorized(r2Citizen.body.token));
+    assert.equal(forbiddenDashboard.response.status, 403);
+
+    const r2Dashboard = await api(baseUrl, "/api/imaging-cloud", authorized(r2Citizen.body.token));
+    assert.equal(r2Dashboard.response.status, 200);
+    assert.equal(r2Dashboard.body.studies.every((item) => item.residentId === "r2"), true);
+
+    const forbiddenShare = await api(baseUrl, `/api/imaging-cloud/studies/${encodeURIComponent(ingest.body.study.id)}/share`, authorized(r2Citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({ validDays: 3 })
+    }));
+    assert.equal(forbiddenShare.response.status, 403);
+  });
+
   await t.test("supports regional diagnosis data sharing with role scoping and access audit", async () => {
     const commission = await api(baseUrl, "/api/regional-data-sharing", authorized(commissionToken));
     assert.equal(commission.response.status, 200);

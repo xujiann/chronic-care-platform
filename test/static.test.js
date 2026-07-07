@@ -1027,7 +1027,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.shortcuts.some((item) => item.url === "./citizen.html?client=app&page=escort#service-escort"), true);
   assert.equal(manifest.shortcuts.some((item) => item.url === "./mobile-preview.html?client=app"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v42/);
+  assert.match(serviceWorker, /chronic-care-citizen-v44-imaging-cloud/);
   assert.match(serviceWorker, /internet-nursing\.js\?v=20260629prod/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627preview/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages/);
@@ -1047,6 +1047,11 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.match(serviceWorker, /citizen\.css\?v=20260705p0copy/);
   assert.match(serviceWorker, /citizen\.js\?v=20260630lifecycle/);
   assert.match(serviceWorker, /citizen\.html/);
+  assert.match(serviceWorker, /immunization-schedule\.js/);
+  assert.match(serviceWorker, /immunization\.html/);
+  assert.match(serviceWorker, /immunization\.js/);
+  assert.match(serviceWorker, /imaging-cloud\.html/);
+  assert.match(serviceWorker, /imaging-cloud\.js/);
   assert.match(serviceWorker, /mobile-preview\.html/);
   assert.match(serviceWorker, /mobile-preview\.css/);
   assert.match(serviceWorker, /requestUrl\.pathname\.endsWith\("\/mobile-preview\.html"\)/);
@@ -1074,6 +1079,35 @@ test("citizen portal exposes P2 imaging and attachment archive categories", () =
   assert.match(read("README.md"), /影像资料和附件资料/);
   assert.match(read("docs/C端全流程审计与优化清单.md"), /PWA manifest/);
   assert.match(read("docs/C端全流程审计与优化清单.md"), /影像资料、附件资料/);
+});
+
+test("imaging cloud module exposes hospital ingest, mobile viewing and EMR compatibility", () => {
+  const page = read("imaging-cloud.html");
+  const pageJs = read("imaging-cloud.js");
+  const server = read("server.js");
+  const auth = read("auth.js");
+  const doc = read("docs/医学影像云功能说明.md");
+  const pkg = JSON.parse(read("package.json"));
+
+  assert.match(page, /区域医学影像云工作台/);
+  assert.match(page, /data-imaging-section="hospital-ingest"/);
+  assert.match(page, /data-imaging-section="development-plan"/);
+  assert.match(page, /imaging-current-capabilities/);
+  assert.match(page, /imaging-development-plan/);
+  assert.match(page, /患者手机查看/);
+  assert.match(page, /电子病历兼容/);
+  assert.match(pageJs, /\/imaging-cloud\/ingest/);
+  assert.match(pageJs, /renderDevelopmentPlan/);
+  assert.match(pageJs, /终端不保存原始 DICOM/);
+  assert.match(server, /\/api\/imaging-cloud/);
+  assert.match(server, /buildImageCloudDerivedRecords/);
+  assert.match(server, /seedImageCloudImplementedFeatures/);
+  assert.match(server, /seedImageCloudDevelopmentPlan/);
+  assert.match(server, /diagnosticReports/);
+  assert.match(server, /personalRecords/);
+  assert.match(auth, /"imaging-cloud\.html": \["commission", "institution", "county", "citizen"\]/);
+  assert.match(doc, /DICOM C-STORE\/C-MOVE/);
+  assert.equal(Boolean(pkg.scripts["imaging-cloud:readiness"]), true);
 });
 
 test("citizen portal exposes medical escort appointment workflow", () => {

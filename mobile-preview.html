@@ -85,6 +85,7 @@
             <span id="preview-service-position" aria-live="polite">1/5 个服务</span>
             <button type="button" id="preview-next-service" aria-keyshortcuts="ArrowRight">下一个</button>
           </div>
+          <div class="preview-service-progress" id="preview-service-progress" aria-label="服务切换进度"></div>
           <div class="preview-service-switch" aria-label="切换手机框服务">
             <button type="button" class="active" data-preview-service="health-record">健康档案</button>
             <button type="button" data-preview-service="emr">电子病历</button>
@@ -139,6 +140,7 @@
       const previewPrevService = document.querySelector("#preview-prev-service");
       const previewNextService = document.querySelector("#preview-next-service");
       const previewServicePosition = document.querySelector("#preview-service-position");
+      const previewServiceProgress = document.querySelector("#preview-service-progress");
       const previewReadinessClient = document.querySelector("#preview-readiness-client");
       const previewReadinessService = document.querySelector("#preview-readiness-service");
       const previewReadinessFrame = document.querySelector("#preview-readiness-frame");
@@ -275,6 +277,9 @@
         const nextService = previewServices[activeIndex + 1];
         previewServicePosition.textContent = servicePositionLabel;
         previewServicePosition.setAttribute("aria-label", `当前第 ${activeIndex + 1} 个服务，共 ${previewServices.length} 个`);
+        previewServiceProgress.innerHTML = previewServices
+          .map((service, index) => `<button type="button" class="${service === activePreviewService ? "active" : ""}" data-preview-progress="${service}" aria-label="切换到${previewServiceLabels[service]}，第 ${index + 1} 个服务">${index + 1}</button>`)
+          .join("");
         previewPrevService.disabled = activeIndex <= 0;
         previewNextService.disabled = activeIndex >= previewServices.length - 1;
         previewPrevService.textContent = previousService ? `上一个：${previewServiceLabels[previousService]}` : "上一个";
@@ -370,6 +375,10 @@
       });
       serviceButtons.forEach((button) => {
         button.addEventListener("click", () => setPreviewService(button.dataset.previewService));
+      });
+      previewServiceProgress.addEventListener("click", (event) => {
+        const service = event.target?.dataset?.previewProgress;
+        if (previewServices.includes(service)) setPreviewService(service);
       });
       previewServiceSelect.addEventListener("change", () => setPreviewService(previewServiceSelect.value));
       previewPrevService.addEventListener("click", () => stepPreviewService(-1));

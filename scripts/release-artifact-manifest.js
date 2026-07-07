@@ -39,6 +39,7 @@ const ARTIFACTS = [
   ["health-dashboard", "dashboard", "Health dashboard and eight-application template summary", "release/health-dashboard-summary.json", "release/health-dashboard-summary.md", "health-dashboard:summary", "/api/health-dashboard/summary"],
   ["priority-application-templates", "dashboard", "Priority application template handoff", "release/priority-application-templates.json", "release/priority-application-templates.md", "priority-apps:templates", "/api/priority-applications/templates"],
   ["maternal-child-readiness", "maternal-child", "Maternal-child main function and readiness report", "release/maternal-child-readiness-report.json", "release/maternal-child-readiness-report.md", "maternal-child:readiness", "maternal-child-about.html"],
+  ["immunization-readiness", "maternal-child", "National immunization program readiness report", "release/immunization-readiness-report.json", "release/immunization-readiness-report.md", "immunization:readiness", "immunization.html"],
   ["policy-coverage", "policy", "Policy coverage report", "release/policy-coverage-report.json", "release/policy-coverage-report.md", "policy:coverage", "release/policy-coverage-report.md"],
   ["site-readiness", "site", "Site readiness pack", "release/site-readiness-pack.json", "release/site-readiness-pack.md", "site:pack", "/api/site-readiness-pack"],
   ["site-launch-evidence", "site", "Runtime site launch evidence ledger", "release/site-readiness-pack.json", "release/site-readiness-pack.md", "site:pack", "/api/site-launch-evidence"],

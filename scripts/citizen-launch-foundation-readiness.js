@@ -89,7 +89,7 @@ function buildCitizenLaunchFoundationReadiness(options = {}) {
     },
     {
       id: "citizen-foundation:offline-cache",
-      passed: /CACHE_NAME = "chronic-care-citizen-v\d+"/.test(serviceWorker) &&
+      passed: /CACHE_NAME = "chronic-care-citizen-v\d+(?:-[\w-]+)?"/.test(serviceWorker) &&
         /manifest\.webmanifest/.test(serviceWorker) &&
         /pwa-icon\.svg/.test(serviceWorker) &&
         /citizen\.html/.test(serviceWorker) &&

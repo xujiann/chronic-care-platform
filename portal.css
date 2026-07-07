@@ -955,6 +955,50 @@ th {
   scroll-margin-top: 172px;
 }
 
+.immunization-selector label {
+  display: grid;
+  gap: 6px;
+  min-width: min(420px, 100%);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.immunization-selector select {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--ink);
+  background: #fff;
+}
+
+.immunization-timeline {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.immunization-stage {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fff;
+}
+
+.immunization-stage strong {
+  color: var(--ink);
+}
+
+.immunization-stage span,
+.immunization-stage p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 dialog {
   width: min(760px, calc(100vw - 28px));
   max-height: calc(100dvh - 28px);

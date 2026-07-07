@@ -37,6 +37,7 @@
     "operations.html": ["commission"],
     "escort.html": ["commission"],
     "internet-nursing.html": ["commission", "institution", "citizen", "county"],
+    "imaging-cloud.html": ["commission", "institution", "county", "citizen"],
     "doctor.html": ["institution"],
     "institution.html": ["institution"],
     "insurance.html": ["insurance"],
@@ -56,9 +57,13 @@
   };
 
   roleLinks.commission.splice(5, 0, ["internet-nursing.html", "互联网护理"]);
+  roleLinks.commission.splice(6, 0, ["imaging-cloud.html", "影像云"]);
   roleLinks.institution.splice(2, 0, ["internet-nursing.html", "互联网护理"]);
+  roleLinks.institution.splice(3, 0, ["imaging-cloud.html", "影像云"]);
   roleLinks.citizen.splice(1, 0, ["internet-nursing.html", "互联网护理"]);
+  roleLinks.citizen.splice(2, 0, ["imaging-cloud.html", "影像云"]);
   roleLinks.county.splice(1, 0, ["internet-nursing.html", "互联网护理"]);
+  roleLinks.county.splice(2, 0, ["imaging-cloud.html", "影像云"]);
 
   async function login(username, password) {
     if (API_BASE) {

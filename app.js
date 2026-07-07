@@ -1493,6 +1493,20 @@ function renderBirthHealthManagement() {
   </article>`).join("");
 }
 
+function computeImmunizationSummary(certificates = []) {
+  const toolkit = window.ImmunizationSchedule2026;
+  if (!toolkit?.buildPlansFromCertificates) return { plans: [], total: 0, overdue: 0, dueSoon: 0, nextDose: null };
+  const plans = toolkit.buildPlansFromCertificates(certificates, state.personalRecords || [], { referenceDate: toolkit.POLICY.referenceDate });
+  const totals = plans.reduce((acc, plan) => {
+    acc.total += plan.summary.total;
+    acc.overdue += plan.summary.overdue;
+    acc.dueSoon += plan.summary.dueSoon;
+    if (!acc.nextDose && plan.nextDose) acc.nextDose = plan.nextDose;
+    return acc;
+  }, { plans, total: 0, overdue: 0, dueSoon: 0, nextDose: null });
+  return totals;
+}
+
 function renderMaternalChildCare() {
   const summary = document.querySelector("#mch-summary");
   const cards = document.querySelector("#mch-cards");
@@ -1510,14 +1524,17 @@ function renderMaternalChildCare() {
   const lowWeight = certificates.filter((item) => Number(item.birthWeight || 0) > 0 && Number(item.birthWeight || 0) < 2500).length;
   const pendingSync = certificates.filter((item) => item.maternalChildSync !== "已入册" || item.publicSecuritySync !== "已共享").length;
   const qualityPending = certificates.filter((item) => ["待质控", "待复核", "待补正"].includes(item.qualityCheck)).length;
+  const immunization = computeImmunizationSummary(certificates);
 
-  summary.textContent = `${formatPeriod(birth.period)} · 孕产妇、出生证明、新生儿访视、筛查和儿童保健连续管理`;
+  summary.textContent = `${formatPeriod(birth.period)} · 孕产妇、出生证明、新生儿访视、筛查、免疫规划和儿童保健连续管理`;
   cards.innerHTML = [
     ["孕产妇个案", motherIds.size, "按母亲居民主索引汇聚"],
     ["出生证明", certificates.length, "分娩信息和法定证明"],
     ["签发/上报", signed, "证照与妇幼入册前置"],
     ["待访视", pendingVisit, "新生儿/产后访视待闭环"],
     ["筛查待确认", pendingScreening, "出生缺陷和黄疸等结果归集"],
+    ["免疫逾期", immunization.overdue, "按 2026 版国家免疫规划生成"],
+    ["接种到期", immunization.dueSoon, "30 天内到期提醒"],
     ["低体重儿", lowWeight, "专案随访和喂养指导"],
     ["共享待办", pendingSync, "公安户籍和妇幼系统"],
     ["质控待办", qualityPending, "材料、编号和签章复核"]
@@ -1529,7 +1546,8 @@ function renderMaternalChildCare() {
     ["住院分娩登记", certificates.length, "分娩机构、出生时间、体重身长和父母身份核验", "已建模"],
     ["出生医学证明", signed, "首次签发、换发补发、电子证照和公安共享", pendingSync ? "待共享" : "已闭环"],
     ["产后/新生儿访视", pendingVisit, "出生后 7 天内或出院后一周内访视", pendingVisit ? "待随访" : "已安排"],
-    ["儿童保健接续", healthTasks.length, "预防接种、体弱儿童管理和儿童体检", "居民端可见"]
+    ["儿童保健接续", healthTasks.length, "预防接种、体弱儿童管理和儿童体检", "居民端可见"],
+    ["免疫规划接续", immunization.plans.length, immunization.nextDose ? `下一剂次：${immunization.nextDose.childName} ${immunization.nextDose.vaccine} ${immunization.nextDose.dueDate}` : "按 2026 版规则库持续生成", immunization.overdue ? "免疫逾期" : "持续提醒"]
   ];
   table.innerHTML = `<table>
     <thead><tr><th>服务环节</th><th>数量</th><th>管理口径</th><th>状态</th></tr></thead>

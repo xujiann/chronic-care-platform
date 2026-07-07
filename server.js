@@ -565,6 +565,10 @@ function seedState() {
     countyAiDiagnosisCases: seedCountyAiDiagnosisCases(),
     countyMutualRecognitionRecords: seedCountyMutualRecognitionRecords(),
     countyAcceptanceLedger: seedCountyAcceptanceLedger(),
+    imageCloudGateways: seedImageCloudGateways(),
+    imageCloudStudies: seedImageCloudStudies(),
+    imageCloudShares: seedImageCloudShares(),
+    imageCloudQualityReviews: seedImageCloudQualityReviews(),
     qualitySafetyEvents: seedQualitySafetyEvents(),
     criticalValueAlerts: seedCriticalValueAlerts(),
     clinicalPathwayCases: seedClinicalPathwayCases(),
@@ -2272,6 +2276,251 @@ function seedMutualRecognitionRules() {
 function seedDiagnosticReports() {
   return [
     { id: "dr-001", externalId: "LIS-DEMO-001", residentId: "r2", item: "HbA1c", category: "lab", sourceInstitution: "Wafangdian Central Hospital", targetInstitution: "Dalian Medical University Hospital", result: "6.8%", conclusion: "HbA1c is elevated; continue chronic disease follow-up.", reportedAt: todayOffset(-1), status: "recognized", recognitionRecordId: "cmr-002" }
+  ];
+}
+
+function seedImageCloudGateways() {
+  return [
+    {
+      id: "icg-mr1",
+      institutionCode: "MR1",
+      institutionName: "大连市中心医院",
+      mode: "前置网关",
+      sourceSystems: ["PACS", "RIS", "EMR"],
+      dicomProtocols: ["C-STORE", "C-MOVE", "DICOM TLS"],
+      structuredUpload: "REST + IHE profile",
+      transport: "专线/SD-WAN + IPSEC",
+      encryption: "DICOM TLS + HTTPS + AES",
+      compression: "诊断级 DICOM 无损压缩，浏览级切片压缩",
+      status: "online",
+      lastHeartbeat: `${todayOffset(0)} 09:20`,
+      upgradePolicy: "云端规则下发后一键升级"
+    },
+    {
+      id: "icg-mr3",
+      institutionCode: "MR3",
+      institutionName: "青泥洼桥社区卫生服务中心",
+      mode: "无前置采集软件",
+      sourceSystems: ["RIS", "检查设备"],
+      dicomProtocols: ["C-STORE"],
+      structuredUpload: "REST",
+      transport: "SD-WAN + IPSEC",
+      encryption: "HTTPS + AES",
+      compression: "浏览级压缩预览，原始序列上云",
+      status: "warning",
+      lastHeartbeat: `${todayOffset(0)} 08:55`,
+      upgradePolicy: "待补齐院内 PACS 回溯配置"
+    }
+  ];
+}
+
+function seedImageCloudStudies() {
+  return [
+    {
+      id: "ics-ct-r1-20260521",
+      residentId: "r1",
+      institutionCode: "MR1",
+      institutionName: "大连市中心医院",
+      accessionNumber: "CT-DEMO-20260521",
+      studyInstanceUID: "1.2.156.112605.140380.20260521.1",
+      mainIndex: "MR1#DEMO-ID-R1#CT-DEMO-20260521",
+      patientName: "演示居民A",
+      modality: "CT",
+      bodyPart: "胸部",
+      examMethod: "胸部CT平扫",
+      device: "CT 64排",
+      studyDate: "2026-05-21",
+      reportStatus: "已审核",
+      reportConclusion: "双肺纹理增多，未见明确急性实变影。",
+      finding: "诊断报告和原始 DICOM 序列已归档。",
+      seriesCount: 4,
+      imageCount: 286,
+      diagnosticLevel: true,
+      browserLevel: true,
+      storageClass: "object-storage",
+      objectPath: "oss://liaoning-imaging-cloud/MR1/2026/CT-DEMO-20260521/",
+      accessUrl: "/api/imaging-cloud/studies/ics-ct-r1-20260521/viewer",
+      uploadMode: "前置网关",
+      uploadStatus: "已入云",
+      integrityCheck: "passed",
+      qcStatus: "质控通过",
+      emrSyncStatus: "已写入电子病历索引",
+      pacsReturnStatus: "可回传原院PACS",
+      shareEnabled: true,
+      createdAt: "2026-05-21T09:30:00.000Z",
+      updatedAt: "2026-05-21T10:20:00.000Z"
+    },
+    {
+      id: "ics-dr-r2-20260603",
+      residentId: "r2",
+      institutionCode: "MR3",
+      institutionName: "青泥洼桥社区卫生服务中心",
+      accessionNumber: "DR-DEMO-20260603",
+      studyInstanceUID: "1.2.156.112605.140380.20260603.2",
+      mainIndex: "MR3#DEMO-ID-R2#DR-DEMO-20260603",
+      patientName: "演示居民B",
+      modality: "DR",
+      bodyPart: "胸片",
+      examMethod: "胸部DR正位",
+      device: "DR",
+      studyDate: "2026-06-03",
+      reportStatus: "待上级审核",
+      reportConclusion: "基层初筛影像已上传，等待影像中心复核。",
+      finding: "浏览级影像已可调阅，诊断级序列完整性待复核。",
+      seriesCount: 1,
+      imageCount: 2,
+      diagnosticLevel: false,
+      browserLevel: true,
+      storageClass: "object-storage",
+      objectPath: "oss://liaoning-imaging-cloud/MR3/2026/DR-DEMO-20260603/",
+      accessUrl: "/api/imaging-cloud/studies/ics-dr-r2-20260603/viewer",
+      uploadMode: "无前置采集软件",
+      uploadStatus: "已入云",
+      integrityCheck: "pending",
+      qcStatus: "待质控",
+      emrSyncStatus: "待报告审核后写入",
+      pacsReturnStatus: "待配置",
+      shareEnabled: false,
+      createdAt: "2026-06-03T13:16:00.000Z",
+      updatedAt: "2026-06-03T13:20:00.000Z"
+    }
+  ];
+}
+
+function seedImageCloudShares() {
+  return [
+    {
+      id: "ics-share-r1-ct",
+      studyId: "ics-ct-r1-20260521",
+      residentId: "r1",
+      token: "IMG-SHARE-DEMO-R1",
+      channel: "二维码/短信链接",
+      expiresAt: "2026-07-31T23:59:59.000Z",
+      scope: "影像报告 + 浏览级序列",
+      createdBy: "citizen",
+      createdAt: "2026-07-01T09:00:00.000Z",
+      status: "active"
+    }
+  ];
+}
+
+function seedImageCloudQualityReviews() {
+  return [
+    {
+      id: "icq-r1-ct",
+      studyId: "ics-ct-r1-20260521",
+      group: "胸部CT抽样质控",
+      scanScore: 92,
+      reportScore: 90,
+      reviewer: "影像质控中心",
+      result: "质控通过",
+      sampledAt: "2026-05-22T09:00:00.000Z",
+      comment: "序列完整，报告要素齐全。"
+    },
+    {
+      id: "icq-r2-dr",
+      studyId: "ics-dr-r2-20260603",
+      group: "基层DR上传质控",
+      scanScore: 78,
+      reportScore: 0,
+      reviewer: "影像质控中心",
+      result: "待复核",
+      sampledAt: "2026-06-03T15:00:00.000Z",
+      comment: "诊断级序列完整性待确认。"
+    }
+  ];
+}
+
+function seedImageCloudImplementedFeatures() {
+  return [
+    {
+      id: "imaging-feature-hospital-ingest",
+      name: "医院影像数据接入",
+      status: "已实现",
+      evidence: "POST /api/imaging-cloud/ingest",
+      detail: "支持前置网关或无前置软件提交 DICOM/RIS/PACS 检查，生成影像云检查、诊断报告和居民健康信息库索引。"
+    },
+    {
+      id: "imaging-feature-mobile-viewer",
+      name: "患者手机查看",
+      status: "已实现",
+      evidence: "imaging-cloud.html #mobile-viewer",
+      detail: "移动端展示影像序列、报告结论、授权分享和终端不保存原始 DICOM 的安全提示。"
+    },
+    {
+      id: "imaging-feature-emr-index",
+      name: "电子病历兼容索引",
+      status: "已实现",
+      evidence: "diagnosticReports + personalRecords",
+      detail: "按医疗机构编码、身份证号和检查号形成主索引，并同步到诊断报告和个人健康信息库。"
+    },
+    {
+      id: "imaging-feature-share-qc",
+      name: "授权分享与质控回写",
+      status: "已实现",
+      evidence: "share/qc APIs",
+      detail: "支持二维码或短信链接限时分享，支持扫描评分、报告评分和质控结论回写。"
+    }
+  ];
+}
+
+function seedImageCloudDevelopmentPlan() {
+  return [
+    {
+      id: "imaging-plan-p0-joint-test",
+      priority: "P0",
+      phase: "试点医院联调",
+      owner: "institution-integration",
+      target: "形成首批医院 PACS/RIS/EMR 联调闭环。",
+      nextAction: "补齐真实联调单号、DICOM TLS 证书、前置网关心跳截图和回传原院 PACS 验收记录。",
+      acceptance: "至少 1 家医院完成入云、报告回写、居民调阅、EMR 调阅和越权拒绝测试。",
+      status: "开发中",
+      evidence: ["GET /api/imaging-cloud", "POST /api/imaging-cloud/ingest", "test/api.test.js"]
+    },
+    {
+      id: "imaging-plan-p0-security",
+      priority: "P0",
+      phase: "安全与合规加固",
+      owner: "security-admin",
+      target: "把规范中的省内本地存储、等保三级、访问留痕和传输加密转为现场验收清单。",
+      nextAction: "增加生产证书、密钥轮换、日志留存、脱敏导出和审计抽查证据入口。",
+      acceptance: "所有影像调阅、分享、质控和回传操作可追踪到账号、居民、主索引和用途。",
+      status: "待开发",
+      evidence: ["dataAccessLogs", "securityEvents", "audit-retention-report.md"]
+    },
+    {
+      id: "imaging-plan-p1-viewer-performance",
+      priority: "P1",
+      phase: "诊断级浏览能力",
+      owner: "imaging-product",
+      target: "完善二维、三维、窗宽窗位、序列切换和移动网络流畅性验收。",
+      nextAction: "接入真实影像浏览器组件或 DICOMweb/WADO-RS 代理，补移动端首屏和序列加载性能指标。",
+      acceptance: "移动端浏览不卡顿，医生端可按权限调阅诊断级原始序列并记录访问日志。",
+      status: "待开发",
+      evidence: ["imaging-cloud.html", "mobile-viewer"]
+    },
+    {
+      id: "imaging-plan-p1-statistics-screen",
+      priority: "P1",
+      phase: "统计监管大屏",
+      owner: "commission-operations",
+      target: "把上传量、诊断量、质控量、会诊量、医院排名和地市排名做成监管视图。",
+      nextAction: "扩展统计 API、地图维度和医院排名榜，联动运行监控和数据质量问题。",
+      acceptance: "监管端可按日、月、年查看上传、调阅、质控和分享数据，并定位异常医院。",
+      status: "待开发",
+      evidence: ["summary", "imageCloudQualityReviews"]
+    },
+    {
+      id: "imaging-plan-p2-cross-region",
+      priority: "P2",
+      phase: "跨机构互认扩展",
+      owner: "county-consortium-office",
+      target: "把影像云检查纳入县域检查互认、远程诊断和远程会诊闭环。",
+      nextAction: "将影像云检查与 countyCollaborationOrders、countyMutualRecognitionRecords、referralTeleconsultations 建立引用。",
+      acceptance: "基层申请、中心诊断、报告回传、结果互认和居民查询可串联到同一主索引。",
+      status: "待开发",
+      evidence: ["countyCollaborationOrders", "countyMutualRecognitionRecords"]
+    }
   ];
 }
 
@@ -4394,6 +4643,10 @@ function normalizeState(data) {
     countyAiDiagnosisCases: mergeByKey(seedCountyAiDiagnosisCases(), data.countyAiDiagnosisCases, "id"),
     countyMutualRecognitionRecords: mergeByKey(seedCountyMutualRecognitionRecords(), data.countyMutualRecognitionRecords, "id"),
     countyAcceptanceLedger: mergeByKey(seedCountyAcceptanceLedger(), data.countyAcceptanceLedger, "id"),
+    imageCloudGateways: mergeByKey(seedImageCloudGateways(), data.imageCloudGateways, "id"),
+    imageCloudStudies: mergeByKey(seedImageCloudStudies(), data.imageCloudStudies, "id"),
+    imageCloudShares: mergeByKey(seedImageCloudShares(), data.imageCloudShares, "id"),
+    imageCloudQualityReviews: mergeByKey(seedImageCloudQualityReviews(), data.imageCloudQualityReviews, "id"),
     qualitySafetyEvents: mergeByKey(seedQualitySafetyEvents(), data.qualitySafetyEvents, "id"),
     criticalValueAlerts: mergeByKey(seedCriticalValueAlerts(), data.criticalValueAlerts, "id"),
     clinicalPathwayCases: mergeByKey(seedClinicalPathwayCases(), data.clinicalPathwayCases, "id"),
@@ -4881,6 +5134,152 @@ function normalizePersonalRecord(data) {
     createdBy: data.createdBy || "resident",
     createdAt: data.createdAt || new Date().toISOString()
   };
+}
+
+function buildImageCloudDashboard(data, user, filters = {}) {
+  const residentId = filters.residentId || (user.role === "citizen" ? user.residentId : "");
+  const studies = (Array.isArray(data.imageCloudStudies) ? data.imageCloudStudies : [])
+    .filter((item) => (!residentId || item.residentId === residentId))
+    .filter((item) => !filters.institutionCode || item.institutionCode === filters.institutionCode);
+  const studyIds = new Set(studies.map((item) => item.id));
+  const shares = (Array.isArray(data.imageCloudShares) ? data.imageCloudShares : []).filter((item) => studyIds.has(item.studyId));
+  const reviews = (Array.isArray(data.imageCloudQualityReviews) ? data.imageCloudQualityReviews : []).filter((item) => studyIds.has(item.studyId));
+  const diagnosticReports = (Array.isArray(data.diagnosticReports) ? data.diagnosticReports : []).filter((item) => studyIds.has(item.imageCloudStudyId));
+  const personalRecords = (Array.isArray(data.personalRecords) ? data.personalRecords : []).filter((item) => item.category === "imaging" && studyIds.has(item.meta?.imageCloudStudyId));
+  const gateways = (Array.isArray(data.imageCloudGateways) ? data.imageCloudGateways : [])
+    .filter((item) => !filters.institutionCode || item.institutionCode === filters.institutionCode);
+  const activeShares = shares.filter((item) => item.status === "active" && new Date(item.expiresAt).getTime() > Date.now());
+  return {
+    summary: {
+      studies: studies.length,
+      institutions: new Set(studies.map((item) => item.institutionCode)).size,
+      diagnosticLevel: studies.filter((item) => item.diagnosticLevel).length,
+      browserLevel: studies.filter((item) => item.browserLevel).length,
+      qcPassed: studies.filter((item) => /通过|passed/i.test(item.qcStatus || "")).length,
+      emrSynced: studies.filter((item) => /已写入|synced/i.test(item.emrSyncStatus || "")).length,
+      activeShares: activeShares.length
+    },
+    gateways,
+    studies,
+    shares,
+    qualityReviews: reviews,
+    implementedFeatures: seedImageCloudImplementedFeatures(),
+    developmentPlan: seedImageCloudDevelopmentPlan(),
+    emrCompatibility: {
+      mainIndexRule: "医疗机构编码 + 身份证号 + 检查号",
+      sourceSystems: ["PACS", "RIS", "EMR"],
+      exchange: ["DICOM C-STORE/C-MOVE", "DICOM TLS", "REST/IHE", "HTTPS + AES"],
+      mappedCollections: ["imageCloudStudies", "diagnosticReports", "personalRecords"],
+      diagnosticReports,
+      personalRecords,
+      status: diagnosticReports.length || personalRecords.length ? "ready" : "pending"
+    },
+    securityBaseline: {
+      level: "等保三级",
+      controls: ["实名身份认证", "授权调阅", "访问留痕", "省内本地计算存储", "专线或 SD-WAN 加密传输", "云存储访问控制"],
+      terminalPolicy: "移动端只显示影像，不把原始 DICOM 直接存储到终端"
+    }
+  };
+}
+
+function normalizeImageCloudStudy(payload, user, data) {
+  const residentId = String(payload.residentId || "").trim();
+  const accessionNumber = String(payload.accessionNumber || payload.examNo || "").trim();
+  const studyInstanceUID = String(payload.studyInstanceUID || payload.studyUid || "").trim();
+  const institutionCode = String(payload.institutionCode || user.orgCode || "").trim();
+  if (!residentId || !accessionNumber || !studyInstanceUID || !institutionCode) {
+    throw new Error("residentId, institutionCode, accessionNumber and studyInstanceUID are required");
+  }
+  if (!canAccessResident(user, residentId, data)) throw new Error("forbidden resident scope");
+  const resident = (data.residents || []).find((item) => item.id === residentId);
+  if (!resident) throw new Error("resident not found");
+  const gateway = (data.imageCloudGateways || []).find((item) => item.institutionCode === institutionCode);
+  const now = new Date().toISOString();
+  const modality = String(payload.modality || "CT").trim().toUpperCase();
+  const bodyPart = String(payload.bodyPart || "未标注部位").trim();
+  const institutionName = String(payload.institutionName || gateway?.institutionName || user.orgName || "医疗机构").trim();
+  const id = String(payload.id || `ics-${institutionCode.toLowerCase()}-${accessionNumber.toLowerCase().replace(/[^a-z0-9-]/g, "-")}`).slice(0, 90);
+  return {
+    id,
+    residentId,
+    personIndex: personIndexForResident(new Map(data.residents.map((item) => [item.id, item])), residentId),
+    institutionCode,
+    institutionName,
+    accessionNumber,
+    studyInstanceUID,
+    mainIndex: `${institutionCode}#${resident.idCard || resident.personIndex || residentId}#${accessionNumber}`,
+    patientName: String(payload.patientName || resident.name || "").trim(),
+    modality,
+    bodyPart,
+    examMethod: String(payload.examMethod || `${bodyPart}${modality}检查`).trim(),
+    device: String(payload.device || modality).trim(),
+    studyDate: String(payload.studyDate || todayOffset(0)).trim(),
+    reportStatus: String(payload.reportStatus || "已审核").trim(),
+    reportConclusion: String(payload.reportConclusion || payload.conclusion || "影像检查已入云，报告结论待补充。").trim(),
+    finding: String(payload.finding || payload.reportFinding || "DICOM TAG、检查信息和报告结构化信息已采集。").trim(),
+    seriesCount: Number(payload.seriesCount || 1),
+    imageCount: Number(payload.imageCount || 1),
+    diagnosticLevel: payload.diagnosticLevel !== false,
+    browserLevel: payload.browserLevel !== false,
+    storageClass: String(payload.storageClass || "object-storage").trim(),
+    objectPath: String(payload.objectPath || `oss://liaoning-imaging-cloud/${institutionCode}/${todayOffset(0).slice(0, 4)}/${accessionNumber}/`).trim(),
+    accessUrl: String(payload.accessUrl || `/api/imaging-cloud/studies/${id}/viewer`).trim(),
+    uploadMode: String(payload.uploadMode || gateway?.mode || "前置网关").trim(),
+    uploadStatus: String(payload.uploadStatus || "已入云").trim(),
+    integrityCheck: String(payload.integrityCheck || "passed").trim(),
+    qcStatus: String(payload.qcStatus || "待质控").trim(),
+    emrSyncStatus: String(payload.emrSyncStatus || "已写入电子病历索引").trim(),
+    pacsReturnStatus: String(payload.pacsReturnStatus || "可回传原院PACS").trim(),
+    shareEnabled: Boolean(payload.shareEnabled),
+    createdAt: payload.createdAt || now,
+    updatedAt: now,
+    createdBy: user.username || user.role,
+    updatedBy: user.username || user.role
+  };
+}
+
+function buildImageCloudDerivedRecords(study, user) {
+  const reportedAt = `${study.studyDate} 10:00`;
+  const report = {
+    id: `dr-${study.id}`,
+    externalId: study.accessionNumber,
+    residentId: study.residentId,
+    personIndex: study.personIndex,
+    item: `${study.bodyPart}${study.modality}`,
+    category: "imaging",
+    sourceInstitution: study.institutionName,
+    targetInstitution: "区域医学影像云",
+    result: study.reportConclusion,
+    conclusion: study.reportConclusion,
+    finding: study.finding,
+    reportedAt,
+    status: /通过|已审核|recognized|synced/i.test(`${study.qcStatus} ${study.reportStatus}`) ? "recognized" : "pending-review",
+    imageCloudStudyId: study.id,
+    mainIndex: study.mainIndex,
+    accessUrl: study.accessUrl
+  };
+  const personalRecord = normalizePersonalRecord({
+    id: `pr-${study.id}`,
+    residentId: study.residentId,
+    category: "imaging",
+    date: study.studyDate,
+    name: `${study.bodyPart}${study.modality}影像云检查`,
+    result: `${study.reportConclusion}；主索引 ${study.mainIndex}；${study.emrSyncStatus}`,
+    source: `${study.institutionName} PACS/RIS`,
+    createdBy: user.username || user.role,
+    createdAt: study.createdAt,
+    meta: {
+      imageCloudStudyId: study.id,
+      attachmentType: "影像云",
+      fileName: `${study.accessionNumber}.dcm`,
+      accessMode: "授权调阅",
+      mainIndex: study.mainIndex,
+      studyInstanceUID: study.studyInstanceUID,
+      emrCompatible: true
+    }
+  });
+  personalRecord.personIndex = study.personIndex;
+  return { report, personalRecord };
 }
 
 function normalizeResearchDatasetApplication(payload, user, data) {
@@ -13140,6 +13539,143 @@ async function handleApi(req, res) {
     ].slice(0, 120);
     writeDatabase(data);
     sendJson(res, 200, event);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/imaging-cloud") {
+    const user = requireApiRole(req, res, ["commission", "institution", "county", "citizen"], "/api/imaging-cloud");
+    if (!user) return;
+    const data = readDatabase();
+    const residentId = url.searchParams.get("residentId") || "";
+    if (residentId && !canAccessResident(user, residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "access imaging cloud", target: residentId, result: "denied", detail: "resident scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权调阅该居民影像云资料" });
+      return;
+    }
+    if (residentId) {
+      appendDataAccessLog(data, user, residentId, "医学影像云", "查询影像检查、报告和电子病历索引");
+      writeDatabase(data);
+    }
+    const dashboard = buildImageCloudDashboard(data, user, {
+      residentId,
+      institutionCode: url.searchParams.get("institutionCode") || ""
+    });
+    sendJson(res, 200, redactSensitiveResponse(dashboard, user));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/imaging-cloud/ingest") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/imaging-cloud/ingest");
+    if (!user) return;
+    const data = readDatabase();
+    const payload = await collectJson(req);
+    let study;
+    try {
+      study = normalizeImageCloudStudy(payload, user, data);
+    } catch (error) {
+      if (error.message === "forbidden resident scope") {
+        appendSecurityEvent({ actor: user.name, role: user.role, action: "ingest imaging study", target: payload.residentId || "", result: "denied", detail: "resident scope denied" });
+        sendJson(res, 403, { error: "Forbidden", message: "无权为该居民接入影像数据" });
+        return;
+      }
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    const derived = buildImageCloudDerivedRecords(study, user);
+    const existingStudyIndex = (data.imageCloudStudies || []).findIndex((item) => item.studyInstanceUID === study.studyInstanceUID || item.id === study.id);
+    if (existingStudyIndex >= 0) data.imageCloudStudies[existingStudyIndex] = { ...data.imageCloudStudies[existingStudyIndex], ...study };
+    else data.imageCloudStudies = [study, ...(Array.isArray(data.imageCloudStudies) ? data.imageCloudStudies : [])].slice(0, 500);
+    data.diagnosticReports = mergeByKey([derived.report], data.diagnosticReports, "id").slice(0, 300);
+    data.personalRecords = mergeByKey([derived.personalRecord], data.personalRecords, "id").slice(0, 500);
+    appendDataAccessLog(data, user, study.residentId, "医学影像云", `接入 ${study.modality} ${study.accessionNumber}`);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "ingest imaging study",
+        target: `${study.institutionCode}/${study.accessionNumber}`,
+        result: "allowed",
+        detail: `${study.uploadMode} / ${study.integrityCheck} / ${study.emrSyncStatus}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, existingStudyIndex >= 0 ? 200 : 201, { study, ...derived });
+    return;
+  }
+
+  const imagingShareMatch = url.pathname.match(/^\/api\/imaging-cloud\/studies\/([^/]+)\/share$/);
+  if (req.method === "POST" && imagingShareMatch) {
+    const user = requireApiRole(req, res, ["citizen", "institution", "commission"], "/api/imaging-cloud/studies/:id/share");
+    if (!user) return;
+    const data = readDatabase();
+    const studyId = decodeURIComponent(imagingShareMatch[1]);
+    const study = (data.imageCloudStudies || []).find((item) => item.id === studyId);
+    if (!study) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到影像云检查" });
+      return;
+    }
+    if (!canAccessResident(user, study.residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "share imaging study", target: studyId, result: "denied", detail: "resident scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权分享该居民影像资料" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const days = Math.min(Math.max(Number(payload.validDays || 7), 1), 90);
+    const expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+    const share = {
+      id: `ics-share-${randomUUID()}`,
+      studyId,
+      residentId: study.residentId,
+      token: `IMG-${randomUUID().slice(0, 8).toUpperCase()}`,
+      channel: String(payload.channel || "二维码/短信链接").trim(),
+      expiresAt,
+      scope: String(payload.scope || "影像报告 + 浏览级序列").trim(),
+      createdBy: user.username || user.role,
+      createdAt: new Date().toISOString(),
+      status: "active"
+    };
+    data.imageCloudShares = [share, ...(Array.isArray(data.imageCloudShares) ? data.imageCloudShares : [])].slice(0, 300);
+    appendDataAccessLog(data, user, study.residentId, "医学影像云", `分享影像 ${study.accessionNumber} 至 ${share.channel}`);
+    writeDatabase(data);
+    sendJson(res, 201, share);
+    return;
+  }
+
+  const imagingQcMatch = url.pathname.match(/^\/api\/imaging-cloud\/studies\/([^/]+)\/qc$/);
+  if (req.method === "POST" && imagingQcMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/imaging-cloud/studies/:id/qc");
+    if (!user) return;
+    const data = readDatabase();
+    const studyId = decodeURIComponent(imagingQcMatch[1]);
+    const index = (data.imageCloudStudies || []).findIndex((item) => item.id === studyId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到影像云检查" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const review = {
+      id: `icq-${randomUUID()}`,
+      studyId,
+      group: String(payload.group || "影像云抽样质控").trim(),
+      scanScore: Number(payload.scanScore || 90),
+      reportScore: Number(payload.reportScore || 90),
+      reviewer: user.name,
+      result: String(payload.result || "质控通过").trim(),
+      sampledAt: new Date().toISOString(),
+      comment: String(payload.comment || "质控记录已回写影像云。").trim()
+    };
+    data.imageCloudStudies[index] = {
+      ...data.imageCloudStudies[index],
+      qcStatus: review.result,
+      updatedAt: new Date().toISOString(),
+      emrSyncStatus: /通过|合格|passed/i.test(review.result) ? "已写入电子病历索引" : data.imageCloudStudies[index].emrSyncStatus
+    };
+    data.imageCloudQualityReviews = [review, ...(Array.isArray(data.imageCloudQualityReviews) ? data.imageCloudQualityReviews : [])].slice(0, 300);
+    writeDatabase(data);
+    sendJson(res, 200, { study: data.imageCloudStudies[index], review });
     return;
   }
 

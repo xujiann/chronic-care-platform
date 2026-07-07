@@ -2160,6 +2160,7 @@ function renderMaternalChildContinuity(residentId) {
       { title: "妇幼健康入册", status: item.maternalChildSync || "待入册", detail: "同步孕产妇与新生儿健康管理系统", urgent: item.maternalChildSync !== "已入册" },
       { title: "新生儿家庭访视", status: item.healthManagementStatus || "待建档", detail: item.nextService || "出生后 7 天内或出院后一周内访视", urgent: /待|复测|确认/.test(`${item.healthManagementStatus || ""}${item.nextService || ""}`) },
       { title: "出生缺陷筛查", status: /筛查|黄疸|听力|遗传/.test(item.nextService || "") ? "待确认" : "持续关注", detail: "听力、遗传代谢病、先心病和黄疸复测结果归集", urgent: /筛查|黄疸|听力|遗传/.test(item.nextService || "") },
+      ...renderImmunizationPlanCards(item),
       { title: lowWeight ? "低体重儿专案" : "儿童保健接续", status: lowWeight ? "需随访" : "按月龄管理", detail: lowWeight ? "喂养指导、体重复测和高危儿随访" : "预防接种、儿童体检、发育评估和体弱儿童管理", urgent: lowWeight }
     ].map((row) => ({ ...row, newbornName: item.newbornName || "新生儿", birthDateTime: item.birthDateTime || "出生时间待确认" }));
   });
@@ -2169,6 +2170,23 @@ function renderMaternalChildContinuity(residentId) {
     <p>${row.detail}</p>
     <span class="status ${row.urgent ? "warn" : ""}">${row.status}</span>
   </article>`).join("");
+}
+
+function renderImmunizationPlanCards(certificate) {
+  const toolkit = window.ImmunizationSchedule2026;
+  if (!toolkit?.buildPlan) {
+    return [{ title: "免疫规划（2026版）", status: "待加载", detail: "规则库加载后生成国家免疫规划接种提醒", urgent: false }];
+  }
+  const child = toolkit.childFromCertificate(certificate);
+  const records = (state.personalRecords || []).filter((record) => record.meta?.birthCertificateId === certificate.id || record.residentId === child.id);
+  const plan = toolkit.buildPlan(child, { records, referenceDate: toolkit.POLICY.referenceDate });
+  const next = plan.nextDose;
+  return [{
+    title: "免疫规划（2026版）",
+    status: plan.summary.overdue ? `${plan.summary.overdue} 剂逾期` : plan.summary.dueSoon ? `${plan.summary.dueSoon} 剂将到期` : "按月龄提醒",
+    detail: next ? `${next.dueDate} · ${next.vaccine} 第 ${next.doseNo} 剂 · ${next.route}` : "默认程序下暂无待接种剂次",
+    urgent: Boolean(plan.summary.overdue || plan.summary.dueSoon)
+  }];
 }
 
 async function fetchCitizenEscortDashboard() {
