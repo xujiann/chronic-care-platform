@@ -505,6 +505,8 @@ function renderMetrics(summary) {
     ["复盘节奏", summary.nationalGoalCadencePlans || 0],
     ["上线阶段", summary.cutoverSequenceSteps || 0],
     ["需关注阶段", summary.cutoverSequenceAttention || 0],
+    ["开发计划", summary.nextDevelopmentItems || 0],
+    ["计划关注", summary.nextDevelopmentAttention || 0],
     ["核心制度", `${summary.coreSystemsLinked || 0}/${summary.coreSystems || 0}`],
     ["路径待复核", summary.clinicalPathwaysOpen || 0],
     ["即将到期", summary.sla?.dueSoon || 0],
@@ -739,6 +741,27 @@ function renderCutoverSequence(rows = []) {
   `);
 }
 
+function renderNextDevelopmentPlan(rows = []) {
+  setHtml("quality-safety-next-development", `
+    <table>
+      <thead><tr><th>优先级</th><th>阶段</th><th>责任方</th><th>开发增量</th><th>验收证据</th><th>验证命令</th><th>状态</th></tr></thead>
+      <tbody>
+        ${rows.length ? rows.map((item) => `
+          <tr>
+            <td>${statusLabel(item.priority)}</td>
+            <td><strong>${zhText(item.phase)}</strong><br /><small>${text(item.id)}</small></td>
+            <td>${zhText(item.owner)}<br /><small>${zhText(item.source)}</small></td>
+            <td>${zhText(item.developmentIncrement)}<br /><small>${zhText(item.currentGap || item.scope)}</small></td>
+            <td>${zhText(item.acceptanceEvidence)}</td>
+            <td><code>${text(item.verificationCommand)}</code></td>
+            <td>${statusLabel(item.status)}<br /><small>${item.requiresAttention ? "需要现场推进" : "可进入联调"}</small></td>
+          </tr>
+        `).join("") : emptyRow(7, "暂无下一步开发计划")}
+      </tbody>
+    </table>
+  `);
+}
+
 function renderIssues(rows) {
   const canDispatch = qualitySafetyState?.role === "commission";
   setHtml("quality-safety-issues", `
@@ -922,6 +945,7 @@ function renderQualitySafety(data) {
   renderGoLiveReadiness(data.goLiveReadiness || {});
   renderPrelaunchGaps(data.goLiveReadiness || {}, data.siteSignoffs || []);
   renderCutoverSequence(data.cutoverSequence || []);
+  renderNextDevelopmentPlan(data.nextDevelopmentPlan || []);
   renderOnsiteRequirements(data.onsiteRequirements || []);
   renderOperationsRunbook(data.operationsRunbook || []);
   renderActionPlan(data.actionPlan || []);

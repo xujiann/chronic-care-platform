@@ -376,6 +376,8 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(html, /data-quality-safety-prelaunch-panel/);
   assert.match(html, /quality-safety-cutover-sequence/);
   assert.match(html, /data-quality-safety-cutover-sequence-panel/);
+  assert.match(html, /quality-safety-next-development/);
+  assert.match(html, /data-quality-safety-next-development-panel/);
   assert.match(html, /quality-safety-onsite-requirements/);
   assert.match(html, /data-quality-safety-onsite-requirements-panel/);
   assert.match(html, /quality-safety-operations-runbook/);
@@ -423,6 +425,8 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(js, /renderGoLiveReadiness/);
   assert.match(js, /renderPrelaunchGaps/);
   assert.match(js, /renderCutoverSequence/);
+  assert.match(js, /renderNextDevelopmentPlan/);
+  assert.match(js, /nextDevelopmentPlan/);
   assert.match(js, /cutoverSequence/);
   assert.match(js, /上线阶段/);
   assert.match(js, /需关注阶段/);
@@ -526,11 +530,14 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:national-goals-2025/);
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:national-goal-site-inputs/);
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:national-goal-cadence-plan/);
+  assert.match(read("scripts/quality-safety-report.js"), /quality-safety:next-development-plan/);
   assert.match(read("scripts/quality-safety-report.js"), /2025 National Quality Goals/);
   assert.match(read("scripts/quality-safety-report.js"), /National Goal Cadence Plan/);
+  assert.match(read("scripts/quality-safety-report.js"), /Next Development Plan/);
   assert.match(read("README.md"), /Cutover sequence/);
   assert.match(read("README.md"), /Onsite requirements/);
   assert.match(read("README.md"), /Operations runbook/);
+  assert.match(read("README.md"), /Next development plan/);
   assert.match(read("scripts/release-report.js"), /qualitySafety:report/);
   assert.match(read("scripts/release-report.js"), /qualitySafetyInterface:standard/);
   assert.match(read("scripts/release-report.js"), /qualitySafetyInterfaceJointTest:pack/);

@@ -269,6 +269,7 @@ GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下
 - Pre-launch tracker: the runnable portal displays production sign-off gaps as owner, status, evidence, and next-action rows before the detailed site sign-off table.
 - Onsite requirements: the dashboard and release report list go-live functional requirements with onsite inputs, acceptance evidence, owner roles, status, and source collections.
 - Cutover sequence: the dashboard and release report group onsite requirements into before-cutover, cutover-day, and post-cutover stabilization phases.
+- Next development plan: the dashboard and module report convert live-interface docking, closed-loop drills, national-goal review, and production audit/operations gaps into prioritized development increments with owners, acceptance evidence, verification commands, and current status.
 - Department task queue: attention-required cutover phases are promoted to the top role queue and jump directly to the cutover sequence panel.
 - Operations runbook: the dashboard and release report derive module on-call watch items from critical values, rectification SLA, clinical pathways, mutual-recognition QC, site sign-offs, and audit-retention evidence.
 - Site sign-off tracker: production cutover items for live feeds, critical-value routing, pathway dictionaries, mutual-recognition rules, department attachments, and audit retention are tracked with owner, status, required evidence, and audit trail.

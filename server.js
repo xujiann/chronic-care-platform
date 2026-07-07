@@ -5810,6 +5810,77 @@ function buildQualitySafetyCutoverSequence({ onsiteRequirements }) {
   }).filter((item) => item.totalCount > 0);
 }
 
+function buildQualitySafetyNextDevelopmentPlan({ goLiveReadiness, operationsRunbook, onsiteRequirements, cutoverSequence, nationalGoalCadencePlan }) {
+  const requirementById = new Map((onsiteRequirements || []).map((item) => [item.id, item]));
+  const runbookById = new Map((operationsRunbook || []).map((item) => [item.id, item]));
+  const phaseById = new Map((cutoverSequence || []).map((item) => [item.id, item]));
+  const cadenceLabels = (nationalGoalCadencePlan || []).map((item) => item.cadenceLabel).filter(Boolean).join("、");
+  const plan = [
+    {
+      id: "plan-live-interface-joint-test",
+      phase: "上线前准备",
+      priority: "P0",
+      owner: "医疗机构接口联调组",
+      scope: "HIS、EMR、LIS、PACS 实时或准实时数据接入，完成字段映射、签名校验和幂等重放。",
+      currentGap: "仍需归档现场联合测试记录、样例报文和字段映射确认。",
+      developmentIncrement: "把真实机构样例接入现有接口标准和联调包，形成可重复回归的接口验收批次。",
+      acceptanceEvidence: "签字联调记录、样例入站报文、字段映射确认、失败重放记录。",
+      verificationCommand: "npm.cmd run quality-safety:joint-test; npm.cmd run integration:readiness",
+      status: requirementById.get("onsite-live-feeds")?.currentStatus || "pending_site_confirmation",
+      source: "qualitySafetySiteSignoffs, hospitalInteroperabilityFunctions, integrationContracts",
+      targetSurface: "quality-safety-interface-pack"
+    },
+    {
+      id: "plan-core-closure-drill",
+      phase: "上线当天切换",
+      priority: "P0",
+      owner: "医政医管、质控中心、医疗机构医务科",
+      scope: "危急值、整改工单、临床路径变异、互认异常和核心制度证据的闭环演练。",
+      currentGap: "危急值处置、整改附件、路径字典和互认规则仍需现场演练签收。",
+      developmentIncrement: "把现场演练结果写回现有闭环接口，形成监管复核和退回补正证据。",
+      acceptanceEvidence: "危急值回执、整改签字附件、路径变异复核、互认异常复核、监管审计日志。",
+      verificationCommand: "npm.cmd run quality-safety:report; npm.cmd test",
+      status: phaseById.get("cutover-day")?.currentStatus || "attention_required",
+      source: "criticalValueAlerts, qualityRectificationOrders, clinicalPathwayCases, mutualRecognitionQualityReviews",
+      targetSurface: "quality-safety-actions"
+    },
+    {
+      id: "plan-national-goal-review",
+      phase: "上线后稳定",
+      priority: "P1",
+      owner: "质控中心、病案室、护理部、药事和手术管理部门",
+      scope: "围绕 2025 年国家医疗质量安全改进目标形成按月、按季度和持续监测复盘。",
+      currentGap: `${cadenceLabels || "国家目标复盘"} 已建模，仍需现场确认科室口径、指标阈值和反馈模板。`,
+      developmentIncrement: "把月度/季度复盘口径转为机构科室分层看板和导出模板。",
+      acceptanceEvidence: "月度反馈表、季度分科室复盘记录、科室整改任务、绩效纳入确认。",
+      verificationCommand: "npm.cmd run quality-safety:report",
+      status: (nationalGoalCadencePlan || []).length >= 3 ? "ready_for_joint_test" : "pending_site_confirmation",
+      source: "nationalQualityGoals, nationalGoalCadencePlan, medicalRecordQualityReviews",
+      targetSurface: "quality-safety-national-goal-cadence"
+    },
+    {
+      id: "plan-production-audit-operations",
+      phase: "上线后稳定",
+      priority: "P0",
+      owner: "安全管理岗、平台运维和值班负责人",
+      scope: "生产审计留存、监控告警、值守升级、问题清零和回退联系人确认。",
+      currentGap: "生产审计留存目标和监控签收仍是正式切换前的现场配置项。",
+      developmentIncrement: "把审计留存、监控告警和上线培训签收纳入统一发布证据链。",
+      acceptanceEvidence: "AUDIT_EXPORT_PATH 或 SIEM_ENDPOINT、监控截图、告警演练记录、培训签到和上线确认单。",
+      verificationCommand: "npm.cmd run release:report; npm.cmd run deploy:check",
+      status: runbookById.get("audit-retention-watch")?.currentStatus || "attention_required",
+      source: "securityEvents, dataAccessLogs, monitoring-readiness-report, production-cutover-checklist",
+      targetSurface: "quality-safety-operations-runbook"
+    }
+  ];
+  return plan.map((item) => ({
+    ...item,
+    goLiveStage: goLiveReadiness?.stage || "unknown",
+    readyForPilot: Boolean(goLiveReadiness?.usable),
+    requiresAttention: !["accepted", "ready_for_joint_test", "closed", "ready"].includes(String(item.status || ""))
+  }));
+}
+
 function buildQualitySafetyDepartmentTaskView({ user, summary, actionPlan, issues, rectifications, criticalValueAlerts, siteSignoffs, mutualRecognitionQualityReviews, cutoverSequence = [] }) {
   const profileByRole = {
     commission: {
@@ -6129,6 +6200,15 @@ function buildQualitySafetyDashboard(data, user) {
   const cutoverSequence = buildQualitySafetyCutoverSequence({ onsiteRequirements });
   summary.cutoverSequenceSteps = cutoverSequence.length;
   summary.cutoverSequenceAttention = cutoverSequence.filter((item) => item.currentStatus === "attention_required").length;
+  const nextDevelopmentPlan = buildQualitySafetyNextDevelopmentPlan({
+    goLiveReadiness,
+    operationsRunbook,
+    onsiteRequirements,
+    cutoverSequence,
+    nationalGoalCadencePlan
+  });
+  summary.nextDevelopmentItems = nextDevelopmentPlan.length;
+  summary.nextDevelopmentAttention = nextDevelopmentPlan.filter((item) => item.requiresAttention).length;
   const departmentTaskView = buildQualitySafetyDepartmentTaskView({
     user,
     summary,
@@ -6159,6 +6239,7 @@ function buildQualitySafetyDashboard(data, user) {
     operationsRunbook,
     onsiteRequirements,
     cutoverSequence,
+    nextDevelopmentPlan,
     medicalRecordQualityReviews: Array.isArray(data.medicalRecordQualityReviews) ? data.medicalRecordQualityReviews : [],
     mutualRecognitionQualityReviews,
     reusedCollections: reusableCollections,
