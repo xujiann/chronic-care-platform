@@ -11,9 +11,23 @@ let qualitySafetyFilters = {
 
 const QUALITY_TEXT = {
   integrationContracts: "接口契约",
+  qualitySafetyEvents: "质量安全事件",
+  criticalValueAlerts: "危急值提醒",
+  clinicalPathwayCases: "临床路径病例",
+  medicalRecordQualityReviews: "病历质控复核",
+  mutualRecognitionQualityReviews: "互认质控复核",
+  qualityRectificationOrders: "整改工单",
+  qualitySafetySiteSignoffs: "现场联调签收",
+  diagnosticReports: "检查检验报告",
+  countyMutualRecognitionRecords: "县域互认记录",
+  hospitalInteroperabilityFunctions: "院内系统管理能力",
   personalRecords: "个人健康记录",
   creditEvaluationRules: "信用评价规则",
   integrationGatewayEvents: "接口网关事件",
+  action_plan: "行动计划",
+  cutover_sequence: "上线执行",
+  site_signoff: "现场签收",
+  cutoverSequence: "上线执行顺序",
   reviewTrail: "复核轨迹",
   auditTrail: "审计轨迹",
   feedback: "反馈",
@@ -483,6 +497,9 @@ function renderMetrics(summary) {
     ["整改工单", summary.rectifications],
     ["行动事项", summary.actionItems || 0],
     ["现场签收", summary.siteSignoffs || 0],
+    ["国家目标", `${summary.nationalQualityGoalsTracked || 0}/${summary.nationalQualityGoals || 0}`],
+    ["上线阶段", summary.cutoverSequenceSteps || 0],
+    ["需关注阶段", summary.cutoverSequenceAttention || 0],
     ["核心制度", `${summary.coreSystemsLinked || 0}/${summary.coreSystems || 0}`],
     ["路径待复核", summary.clinicalPathwaysOpen || 0],
     ["即将到期", summary.sla?.dueSoon || 0],
@@ -494,6 +511,25 @@ function renderMetrics(summary) {
       <strong>${value}</strong>
     </article>
   `).join(""));
+}
+
+function renderNationalQualityGoals(rows) {
+  setHtml("quality-safety-national-goals", `
+    <table>
+      <thead><tr><th>目标</th><th>监测重点</th><th>平台证据源</th><th>现场采集字段</th><th>下一步采集边界</th></tr></thead>
+      <tbody>
+        ${rows.length ? rows.map((item) => `
+          <tr>
+            <td><strong>${text(item.code)}</strong><br />${zhText(item.title)}<br /><small>${statusLabel(item.currentStatus)} · ${zhText(item.cadence)}</small></td>
+            <td>${statusLabel(item.domain)}<br /><small>${zhText(item.strategy)}</small></td>
+            <td>${(item.evidenceCollections || []).map((collection) => zhText(collection)).join("、")}<br /><small>${item.evidenceRows || 0} 条现有证据</small></td>
+            <td>${(item.siteInputs || []).map((input) => zhText(input)).join("、") || "-"}</td>
+            <td>${zhText(item.nextAction || "")}</td>
+          </tr>
+        `).join("") : emptyRow(5, "暂无国家改进目标映射")}
+      </tbody>
+    </table>
+  `);
 }
 
 function renderCoreSystemMatrix(rows) {
@@ -653,6 +689,26 @@ function renderOnsiteRequirements(rows = []) {
             <td>${statusLabel(item.currentStatus)}<br /><small>${zhText(item.source)}</small></td>
           </tr>
         `).join("") : emptyRow(5, "暂无现场上线需求")}
+      </tbody>
+    </table>
+  `);
+}
+
+function renderCutoverSequence(rows = []) {
+  setHtml("quality-safety-cutover-sequence", `
+    <table>
+      <thead><tr><th>阶段</th><th>时间窗口</th><th>责任方</th><th>现场动作</th><th>验收门槛</th><th>状态</th></tr></thead>
+      <tbody>
+        ${rows.length ? rows.map((item) => `
+          <tr>
+            <td><strong>${zhText(item.phase)}</strong><br /><small>${text(item.id)}</small></td>
+            <td>${zhText(item.window)}</td>
+            <td>${(item.owners || []).map(zhText).join("、") || "-"}</td>
+            <td>${zhText(item.objective)}<br /><small>${(item.requirements || []).map((requirement) => zhText(requirement.requirement)).join("；")}</small></td>
+            <td>${zhText(item.acceptanceGate)}</td>
+            <td>${statusLabel(item.currentStatus)}<br /><small>${item.readyCount || 0}/${item.totalCount || 0} 已就绪</small></td>
+          </tr>
+        `).join("") : emptyRow(6, "暂无上线执行顺序")}
       </tbody>
     </table>
   `);
@@ -835,9 +891,11 @@ function renderQualitySafety(data) {
   });
   renderDepartmentView(data);
   renderDepartmentTaskQueue(data);
+  renderNationalQualityGoals(data.nationalQualityGoals || []);
   renderCoreSystemMatrix(data.coreSystemMatrix || []);
   renderGoLiveReadiness(data.goLiveReadiness || {});
   renderPrelaunchGaps(data.goLiveReadiness || {}, data.siteSignoffs || []);
+  renderCutoverSequence(data.cutoverSequence || []);
   renderOnsiteRequirements(data.onsiteRequirements || []);
   renderOperationsRunbook(data.operationsRunbook || []);
   renderActionPlan(data.actionPlan || []);

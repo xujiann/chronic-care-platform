@@ -48,6 +48,32 @@ const REQUIRED_POLICY_REFERENCES = [
   { id: "clinical-pathway", title: "临床路径管理指导原则", url: "https://www.nhc.gov.cn/zwgk/jdjd/201709/e717bffb5fc445bcb4fa99e7063755c8.shtml" }
 ];
 
+const NATIONAL_QUALITY_GOALS_2025 = [
+  { code: "NIT-2025-I", title: "提高急性脑梗死再灌注治疗率", domain: "critical_value", cadence: "按月分析反馈", evidenceCollections: ["criticalValueAlerts", "diagnosticReports", "hospitalInteroperabilityFunctions"] },
+  { code: "NIT-2025-II", title: "提高肿瘤治疗前临床 TNM 分期评估率", domain: "clinical_pathway", cadence: "按季度分科室反馈", evidenceCollections: ["clinicalPathwayCases", "medicalRecordQualityReviews"] },
+  { code: "NIT-2025-III", title: "提高静脉血栓栓塞症规范预防率", domain: "medical_record_qc", cadence: "持续监测并纳入绩效", evidenceCollections: ["medicalRecordQualityReviews", "hospitalInteroperabilityFunctions"] },
+  { code: "NIT-2025-IV", title: "提高感染性休克集束化治疗完成率", domain: "safety_event", cadence: "按季度分科室反馈", evidenceCollections: ["qualitySafetyEvents", "criticalValueAlerts", "diagnosticReports"] },
+  { code: "NIT-2025-V", title: "提高住院患者静脉输液规范使用率", domain: "medical_quality", cadence: "按季度点评反馈", evidenceCollections: ["qualitySafetyEvents", "medicalRecordQualityReviews"] },
+  { code: "NIT-2025-VI", title: "提高医疗质量安全不良事件报告率", domain: "safety_event", cadence: "按季度分析反馈", evidenceCollections: ["qualitySafetyEvents", "securityEvents"] },
+  { code: "NIT-2025-VII", title: "提高四级手术术前多学科讨论完成率", domain: "clinical_pathway", cadence: "按季度监测评价", evidenceCollections: ["clinicalPathwayCases", "medicalRecordQualityReviews", "qualitySafetySiteSignoffs"] },
+  { code: "NIT-2025-VIII", title: "提高关键诊疗行为相关记录完整率", domain: "medical_record_qc", cadence: "按季度分科室反馈", evidenceCollections: ["medicalRecordQualityReviews", "qualityRectificationOrders"] },
+  { code: "NIT-2025-IX", title: "降低非计划重返手术室再手术率", domain: "medical_quality", cadence: "按季度分科室反馈", evidenceCollections: ["qualitySafetyEvents", "medicalRecordQualityReviews", "qualityRectificationOrders"] },
+  { code: "NIT-2025-X", title: "提高医疗机构检查检验结果互认率", domain: "mutual_recognition_qc", cadence: "按月分析反馈", evidenceCollections: ["mutualRecognitionQualityReviews", "countyMutualRecognitionRecords", "diagnosticReports"] }
+];
+
+const NATIONAL_QUALITY_GOAL_SITE_INPUTS = {
+  "NIT-2025-I": ["卒中发病时间", "到院时间", "再灌注方式", "处置完成时间"],
+  "NIT-2025-II": ["肿瘤病种", "治疗前 TNM 分期", "MDT 记录", "治疗启动时间"],
+  "NIT-2025-III": ["VTE 风险评估", "出血风险评估", "预防措施", "执行时间"],
+  "NIT-2025-IV": ["感染性休克识别时间", "1小时集束节点", "3小时集束节点", "6小时集束节点"],
+  "NIT-2025-V": ["住院医嘱", "输液频次", "液体总量", "药品品种"],
+  "NIT-2025-VI": ["事件分级", "事件分类", "主动报告时间", "成因分析"],
+  "NIT-2025-VII": ["四级手术目录", "术前 MDT 邀请", "讨论记录", "术前完成时限"],
+  "NIT-2025-VIII": ["医嘱记录", "病程记录", "查房记录", "知情同意", "安全核查"],
+  "NIT-2025-IX": ["重返手术室事件", "再手术原因", "术后管理记录", "整改闭环"],
+  "NIT-2025-X": ["互认目录", "互认标识", "未互认原因", "机构互认率"]
+};
+
 function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(ROOT, relativePath), "utf8"));
 }
@@ -521,6 +547,66 @@ function buildOnsiteRequirementChecklist({ siteSignoffRows, operationsRunbook, g
   ];
 }
 
+function buildCutoverSequence({ onsiteRequirements }) {
+  const requirementById = new Map(onsiteRequirements.map((item) => [item.id, item]));
+  const phases = [
+    {
+      id: "before-cutover",
+      phase: "Before cutover",
+      window: "T-5 to T-1 working days",
+      requirementIds: ["onsite-login-roles", "onsite-live-feeds", "onsite-pathway-dictionaries", "onsite-mutual-recognition"],
+      objective: "Confirm accounts, live feeds, pathway dictionaries, and mutual-recognition rules before cutover day.",
+      acceptanceGate: "Three role logins work; sample messages pass; dictionaries and recognition catalog are signed."
+    },
+    {
+      id: "cutover-day",
+      phase: "Cutover day",
+      window: "T day",
+      requirementIds: ["onsite-critical-routing", "onsite-rectification-attachments", "onsite-monitoring-oncall"],
+      objective: "Exercise critical-value routing, rectification evidence, monitoring alerts, and on-call escalation.",
+      acceptanceGate: "Critical-value drill has receipt; attachments can be reviewed; alerts reach on-call owners."
+    },
+    {
+      id: "after-cutover",
+      phase: "Post-cutover stabilization",
+      window: "T+1 to T+7 days",
+      requirementIds: ["onsite-audit-retention", "onsite-training-cutover"],
+      objective: "Archive audit-retention evidence, training records, issue clearance, and rollback contacts.",
+      acceptanceGate: "Audit export and hash evidence are verifiable; training and issue-clearance forms are archived."
+    }
+  ];
+  const rank = { attention_required: 0, pending_site_confirmation: 1, ready_for_joint_test: 2, accepted: 3, closed: 3 };
+  return phases.map((item) => {
+    const requirements = item.requirementIds.map((id) => requirementById.get(id)).filter(Boolean);
+    const statuses = requirements.map((requirement) => String(requirement.currentStatus || "pending_site_confirmation"));
+    const currentStatus = statuses.some((status) => status === "attention_required")
+      ? "attention_required"
+      : statuses.every((status) => ["accepted", "closed", "ready_for_joint_test"].includes(status))
+        ? "ready_for_joint_test"
+        : statuses.sort((a, b) => (rank[a] ?? 9) - (rank[b] ?? 9))[0] || "pending_site_confirmation";
+    return {
+      ...item,
+      owners: [...new Set(requirements.map((requirement) => requirement.owner).filter(Boolean))],
+      currentStatus,
+      readyCount: statuses.filter((status) => ["accepted", "closed", "ready_for_joint_test"].includes(status)).length,
+      totalCount: requirements.length,
+      requirements
+    };
+  }).filter((item) => item.totalCount > 0);
+}
+
+function buildNationalQualityGoals(data) {
+  return NATIONAL_QUALITY_GOALS_2025.map((goal) => {
+    const evidenceRows = goal.evidenceCollections.reduce((total, collection) => total + arrayOf(data, collection).length, 0);
+    return {
+      ...goal,
+      siteInputs: NATIONAL_QUALITY_GOAL_SITE_INPUTS[goal.code] || [],
+      evidenceRows,
+      currentStatus: evidenceRows > 0 ? "tracked" : "pending_site_confirmation"
+    };
+  });
+}
+
 function buildQualitySafetyReport(options = {}) {
   const data = options.data || readJson("data/db.json");
   const server = options.serverSource || read("server.js");
@@ -629,6 +715,8 @@ function buildQualitySafetyReport(options = {}) {
   const goLiveReadiness = buildGoLiveReadiness({ boundaryRows, collectionRows, reusedRows, routeRows, policyRows, stateRows, criticalRows, clinicalPathwayRows, mutualRecognitionRows, actionPlan, institutionRisks });
   const operationsRunbook = buildOperationsRunbook({ slaSummary, criticalRows, clinicalPathwayRows, mutualRecognitionRows, siteSignoffRows });
   const onsiteRequirements = buildOnsiteRequirementChecklist({ siteSignoffRows, operationsRunbook, goLiveReadiness });
+  const cutoverSequence = buildCutoverSequence({ onsiteRequirements });
+  const nationalQualityGoals = buildNationalQualityGoals(data);
   const checks = [
     { id: "quality-safety:boundaries", passed: boundaryRows.every((item) => item.modeled), detail: `${boundaryRows.filter((item) => item.modeled).length}/${boundaryRows.length} boundaries modeled` },
     { id: "quality-safety:collections", passed: collectionRows.every((item) => item.present && item.rows > 0), detail: collectionRows.map((item) => `${item.collection}:${item.rows}`).join(";") },
@@ -646,6 +734,8 @@ function buildQualitySafetyReport(options = {}) {
     { id: "quality-safety:site-evidence-submission", passed: routeRows.some((item) => item.route === "/api/quality-safety/site-signoffs/:id/evidence" && item.present), detail: "site owner evidence submission route implemented" },
     { id: "quality-safety:operations-runbook", passed: operationsRunbook.length >= 6 && operationsRunbook.every((item) => item.owner && item.threshold && item.escalation && item.evidence), detail: `${operationsRunbook.length} runtime watch items` },
     { id: "quality-safety:onsite-requirements", passed: onsiteRequirements.length >= 8 && onsiteRequirements.every((item) => item.requirement && item.onsiteInput && item.acceptanceEvidence && item.owner), detail: `${onsiteRequirements.length} onsite go-live requirements` },
+    { id: "quality-safety:cutover-sequence", passed: cutoverSequence.length >= 3 && cutoverSequence.every((item) => item.window && item.acceptanceGate && item.totalCount > 0), detail: `${cutoverSequence.length} cutover sequence phases` },
+    { id: "quality-safety:national-goals-2025", passed: nationalQualityGoals.length === 10 && nationalQualityGoals.every((item) => item.evidenceRows > 0), detail: `${nationalQualityGoals.filter((item) => item.currentStatus === "tracked").length}/${nationalQualityGoals.length} national goals mapped to evidence` },
     { id: "quality-safety:go-live-readiness", passed: goLiveReadiness.usable, detail: `${goLiveReadiness.stage}; score=${goLiveReadiness.score}; blockers=${goLiveReadiness.blockers.length}` }
   ];
   return {
@@ -683,6 +773,10 @@ function buildQualitySafetyReport(options = {}) {
       operationsAttentionRequired: operationsRunbook.filter((item) => item.currentStatus === "attention_required").length,
       onsiteRequirementItems: onsiteRequirements.length,
       onsiteRequirementReady: onsiteRequirements.filter((item) => ["accepted", "ready_for_joint_test"].includes(String(item.currentStatus || ""))).length,
+      cutoverSequenceSteps: cutoverSequence.length,
+      cutoverSequenceAttention: cutoverSequence.filter((item) => item.currentStatus === "attention_required").length,
+      nationalQualityGoals: nationalQualityGoals.length,
+      nationalQualityGoalsTracked: nationalQualityGoals.filter((item) => item.currentStatus === "tracked").length,
       readinessStage: goLiveReadiness.stage,
       readinessScore: goLiveReadiness.score
     },
@@ -700,6 +794,8 @@ function buildQualitySafetyReport(options = {}) {
     siteSignoffs: siteSignoffRows,
     operationsRunbook,
     onsiteRequirements,
+    cutoverSequence,
+    nationalQualityGoals,
     checks
   };
 }
@@ -717,10 +813,12 @@ function renderMarkdown(report) {
     `- Critical values: ${report.summary.criticalValues.total}, pending disposition ${report.summary.criticalValues.pending}`,
     `- Clinical pathways: ${report.summary.clinicalPathways.total}, pending review ${report.summary.clinicalPathways.pending}`,
     `- Policy references: ${report.summary.policyReferences}/${report.policyReferences.length}`,
+    `- 2025 national quality goals: ${report.summary.nationalQualityGoalsTracked}/${report.summary.nationalQualityGoals} mapped`,
     `- Site sign-offs: ${report.summary.siteSignoffs.total}, ready ${report.summary.siteSignoffs.ready}, accepted ${report.summary.siteSignoffs.accepted}`,
     `- Action plan: ${report.summary.actionItems} items, high priority ${report.summary.highActionItems}`,
     `- Operations runbook: ${report.summary.operationsWatchItems} watch items, ${report.summary.operationsAttentionRequired} requiring attention`,
     `- Onsite requirements: ${report.summary.onsiteRequirementItems} items, ${report.summary.onsiteRequirementReady} ready or accepted`,
+    `- Cutover sequence: ${report.summary.cutoverSequenceSteps} phases, ${report.summary.cutoverSequenceAttention} requiring attention`,
     `- Go-live readiness: ${report.goLiveReadiness.stage}, score ${report.goLiveReadiness.score}, usable ${report.goLiveReadiness.usable ? "yes" : "no"}`,
     "",
     "## Checks",
@@ -746,6 +844,12 @@ function renderMarkdown(report) {
     "| Policy | Reference | Linked |",
     "|---|---|---|",
     ...report.policyReferences.map((item) => `| ${item.title} | ${item.url} | ${item.present ? "yes" : "no"} |`),
+    "",
+    "## 2025 National Quality Goals",
+    "",
+    "| Code | Goal | Domain | Cadence | Evidence collections | Site inputs | Evidence rows | Status |",
+    "|---|---|---|---|---|---|---:|---|",
+    ...report.nationalQualityGoals.map((item) => `| ${item.code} | ${item.title} | ${item.domain} | ${item.cadence} | ${(item.evidenceCollections || []).join(", ")} | ${(item.siteInputs || []).join(", ")} | ${item.evidenceRows} | ${item.currentStatus} |`),
     "",
     "## Go-live Readiness",
     "",
@@ -773,6 +877,12 @@ function renderMarkdown(report) {
     "| Requirement | Owner | Input | Acceptance evidence | Status | Source |",
     "|---|---|---|---|---|---|",
     ...report.onsiteRequirements.map((item) => `| ${String(item.requirement || "").replace(/\|/g, "/")} | ${item.owner} | ${String(item.onsiteInput || "").replace(/\|/g, "/")} | ${String(item.acceptanceEvidence || "").replace(/\|/g, "/")} | ${item.currentStatus} | ${item.source} |`),
+    "",
+    "## Cutover Sequence",
+    "",
+    "| Phase | Window | Owners | Objective | Acceptance gate | Status |",
+    "|---|---|---|---|---|---|",
+    ...report.cutoverSequence.map((item) => `| ${item.phase} | ${item.window} | ${item.owners.join(", ")} | ${String(item.objective || "").replace(/\|/g, "/")} | ${String(item.acceptanceGate || "").replace(/\|/g, "/")} | ${item.currentStatus} (${item.readyCount}/${item.totalCount}) |`),
     "",
     "## Site Joint-testing Sign-offs",
     "",

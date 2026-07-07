@@ -363,6 +363,8 @@ test("quality safety supervision app exposes runnable portal, API and release ev
     assert.match(read("scripts/quality-safety-report.js"), new RegExp(key));
   });
   assert.match(html, /quality-safety-metrics/);
+  assert.match(html, /quality-safety-national-goals/);
+  assert.match(html, /data-quality-safety-national-goals-panel/);
   assert.match(html, /quality-safety-core-systems/);
   assert.match(html, /data-quality-safety-core-systems-panel/);
   assert.match(html, /quality-safety-risks/);
@@ -370,6 +372,8 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(html, /quality-safety-readiness/);
   assert.match(html, /quality-safety-prelaunch-gaps/);
   assert.match(html, /data-quality-safety-prelaunch-panel/);
+  assert.match(html, /quality-safety-cutover-sequence/);
+  assert.match(html, /data-quality-safety-cutover-sequence-panel/);
   assert.match(html, /quality-safety-onsite-requirements/);
   assert.match(html, /data-quality-safety-onsite-requirements-panel/);
   assert.match(html, /quality-safety-operations-runbook/);
@@ -408,6 +412,7 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(about, /data-policy-ref="medical-quality-management"/);
   assert.match(about, /data-policy-ref="core-safety-systems"/);
   assert.match(about, /data-policy-ref="mutual-recognition"/);
+  assert.match(about, /data-policy-ref="quality-goals-2025"/);
   assert.match(about, /data-policy-ref="clinical-pathway"/);
   assert.match(js, /loadQualitySafety/);
   assert.match(js, /renderCoreSystemMatrix/);
@@ -415,6 +420,10 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(js, /renderActionPlan/);
   assert.match(js, /renderGoLiveReadiness/);
   assert.match(js, /renderPrelaunchGaps/);
+  assert.match(js, /renderCutoverSequence/);
+  assert.match(js, /cutoverSequence/);
+  assert.match(js, /上线阶段/);
+  assert.match(js, /需关注阶段/);
   assert.match(js, /renderOnsiteRequirements/);
   assert.match(js, /onsiteRequirements/);
   assert.match(js, /renderOperationsRunbook/);
@@ -425,8 +434,15 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(js, /renderOperationsBrief/);
   assert.match(js, /renderDepartmentView/);
   assert.match(js, /renderDepartmentTaskQueue/);
+  assert.match(js, /renderNationalQualityGoals/);
+  assert.match(js, /nationalQualityGoals/);
+  assert.match(js, /siteInputs/);
+  assert.match(js, /现场采集字段/);
   assert.match(js, /qualityDepartmentProfile/);
   assert.match(js, /departmentTaskView/);
+  assert.match(js, /行动计划/);
+  assert.match(js, /上线执行/);
+  assert.match(js, /现场签收/);
   assert.match(js, /quality-queue-list/);
   assert.match(js, /data-scroll-target/);
   assert.match(js, /scrollIntoView/);
@@ -501,6 +517,10 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:go-live-readiness/);
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:operations-runbook/);
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:onsite-requirements/);
+  assert.match(read("scripts/quality-safety-report.js"), /quality-safety:cutover-sequence/);
+  assert.match(read("scripts/quality-safety-report.js"), /quality-safety:national-goals-2025/);
+  assert.match(read("scripts/quality-safety-report.js"), /2025 National Quality Goals/);
+  assert.match(read("README.md"), /Cutover sequence/);
   assert.match(read("README.md"), /Onsite requirements/);
   assert.match(read("README.md"), /Operations runbook/);
   assert.match(read("scripts/release-report.js"), /qualitySafety:report/);

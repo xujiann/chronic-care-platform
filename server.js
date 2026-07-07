@@ -5305,6 +5305,124 @@ function qualitySafetyVisibleRows(rows, user) {
   return [];
 }
 
+const QUALITY_SAFETY_NATIONAL_GOALS_2025 = [
+  {
+    code: "NIT-2025-I",
+    title: "提高急性脑梗死再灌注治疗率",
+    domain: "critical_value",
+    cadence: "按月分析反馈",
+    strategy: "急救转运、院内流程、再灌注团队和持续监测反馈",
+    evidenceCollections: ["criticalValueAlerts", "diagnosticReports", "hospitalInteroperabilityFunctions"],
+    nextAction: "接入卒中中心绿色通道、发病时间、到院时间和再灌注处置回写。"
+  },
+  {
+    code: "NIT-2025-II",
+    title: "提高肿瘤治疗前临床 TNM 分期评估率",
+    domain: "clinical_pathway",
+    cadence: "按季度分科室反馈",
+    strategy: "多学科协作、评估流程、病历书写和绩效约束",
+    evidenceCollections: ["clinicalPathwayCases", "medicalRecordQualityReviews"],
+    nextAction: "补齐肿瘤单病种字典、TNM 分期字段和治疗前评估证据。"
+  },
+  {
+    code: "NIT-2025-III",
+    title: "提高静脉血栓栓塞症规范预防率",
+    domain: "medical_record_qc",
+    cadence: "持续监测并纳入绩效",
+    strategy: "VTE 管理团队、风险评估、预防提醒和会诊转诊机制",
+    evidenceCollections: ["medicalRecordQualityReviews", "hospitalInteroperabilityFunctions"],
+    nextAction: "对接 VTE 风险评估、出血风险评估和预防措施执行记录。"
+  },
+  {
+    code: "NIT-2025-IV",
+    title: "提高感染性休克集束化治疗完成率",
+    domain: "safety_event",
+    cadence: "按季度分科室反馈",
+    strategy: "重症、急诊、感染、检验和医务多部门联合监测",
+    evidenceCollections: ["qualitySafetyEvents", "criticalValueAlerts", "diagnosticReports"],
+    nextAction: "增加 1 小时、3 小时、6 小时集束化治疗节点采集。"
+  },
+  {
+    code: "NIT-2025-V",
+    title: "提高住院患者静脉输液规范使用率",
+    domain: "medical_quality",
+    cadence: "按季度点评反馈",
+    strategy: "给药途径优化、无需输液病种清单、药物监测和预警",
+    evidenceCollections: ["qualitySafetyEvents", "medicalRecordQualityReviews"],
+    nextAction: "对接住院医嘱、输液频次、液体总量和药品品种监测。"
+  },
+  {
+    code: "NIT-2025-VI",
+    title: "提高医疗质量安全不良事件报告率",
+    domain: "safety_event",
+    cadence: "按季度分析反馈",
+    strategy: "不良事件分级分类、主动报告、国家平台利用和成因分析",
+    evidenceCollections: ["qualitySafetyEvents", "securityEvents"],
+    nextAction: "将隐患、未造成严重后果事件和严重事件统一纳入主动报告台账。"
+  },
+  {
+    code: "NIT-2025-VII",
+    title: "提高四级手术术前多学科讨论完成率",
+    domain: "clinical_pathway",
+    cadence: "按季度监测评价",
+    strategy: "四级手术目录、术前多学科讨论制度、时限和记录追溯",
+    evidenceCollections: ["clinicalPathwayCases", "medicalRecordQualityReviews", "qualitySafetySiteSignoffs"],
+    nextAction: "接入四级手术目录、MDT 邀请、讨论记录和术前时限校验。"
+  },
+  {
+    code: "NIT-2025-VIII",
+    title: "提高关键诊疗行为相关记录完整率",
+    domain: "medical_record_qc",
+    cadence: "按季度分科室反馈",
+    strategy: "运行病历、终末病历、核心制度和病历内涵质量常态化监测",
+    evidenceCollections: ["medicalRecordQualityReviews", "qualityRectificationOrders"],
+    nextAction: "把医嘱、病程、查房、讨论、知情同意和安全核查纳入抽检字段。"
+  },
+  {
+    code: "NIT-2025-IX",
+    title: "降低非计划重返手术室再手术率",
+    domain: "medical_quality",
+    cadence: "按季度分科室反馈",
+    strategy: "手术分级、医师授权、术前讨论、安全核查和术后管理联动",
+    evidenceCollections: ["qualitySafetyEvents", "medicalRecordQualityReviews", "qualityRectificationOrders"],
+    nextAction: "补齐非计划重返手术室事件、原因分析和再手术整改闭环。"
+  },
+  {
+    code: "NIT-2025-X",
+    title: "提高医疗机构检查检验结果互认率",
+    domain: "mutual_recognition_qc",
+    cadence: "按月分析反馈",
+    strategy: "互认目录、质控评价、互认标识、未互认原因和绩效考核",
+    evidenceCollections: ["mutualRecognitionQualityReviews", "countyMutualRecognitionRecords", "diagnosticReports"],
+    nextAction: "按地区互认目录监测互认率、未互认原因和偏离平均水平机构。"
+  }
+];
+
+const QUALITY_SAFETY_NATIONAL_GOAL_SITE_INPUTS = {
+  "NIT-2025-I": ["卒中发病时间", "到院时间", "再灌注方式", "处置完成时间"],
+  "NIT-2025-II": ["肿瘤病种", "治疗前 TNM 分期", "MDT 记录", "治疗启动时间"],
+  "NIT-2025-III": ["VTE 风险评估", "出血风险评估", "预防措施", "执行时间"],
+  "NIT-2025-IV": ["感染性休克识别时间", "1小时集束节点", "3小时集束节点", "6小时集束节点"],
+  "NIT-2025-V": ["住院医嘱", "输液频次", "液体总量", "药品品种"],
+  "NIT-2025-VI": ["事件分级", "事件分类", "主动报告时间", "成因分析"],
+  "NIT-2025-VII": ["四级手术目录", "术前 MDT 邀请", "讨论记录", "术前完成时限"],
+  "NIT-2025-VIII": ["医嘱记录", "病程记录", "查房记录", "知情同意", "安全核查"],
+  "NIT-2025-IX": ["重返手术室事件", "再手术原因", "术后管理记录", "整改闭环"],
+  "NIT-2025-X": ["互认目录", "互认标识", "未互认原因", "机构互认率"]
+};
+
+function buildQualitySafetyNationalGoals(data) {
+  return QUALITY_SAFETY_NATIONAL_GOALS_2025.map((goal) => {
+    const evidenceRows = goal.evidenceCollections.reduce((total, collection) => total + (Array.isArray(data[collection]) ? data[collection].length : 0), 0);
+    return {
+      ...goal,
+      siteInputs: QUALITY_SAFETY_NATIONAL_GOAL_SITE_INPUTS[goal.code] || [],
+      evidenceRows,
+      currentStatus: evidenceRows > 0 ? "tracked" : "pending_site_confirmation"
+    };
+  });
+}
+
 function buildQualitySafetySiteSignoffs(data, user) {
   const rows = (Array.isArray(data.qualitySafetySiteSignoffs) ? data.qualitySafetySiteSignoffs : []).map((item) => ({
     ...item,
@@ -5587,7 +5705,62 @@ function buildQualitySafetySiteRequirementChecklist({ siteSignoffs, operationsRu
   return qualitySafetyVisibleRows(rows, user);
 }
 
-function buildQualitySafetyDepartmentTaskView({ user, summary, actionPlan, issues, rectifications, criticalValueAlerts, siteSignoffs, mutualRecognitionQualityReviews }) {
+function buildQualitySafetyCutoverSequence({ onsiteRequirements }) {
+  const requirementById = new Map(onsiteRequirements.map((item) => [item.id, item]));
+  const phases = [
+    {
+      id: "before-cutover",
+      phase: "上线前准备",
+      window: "T-5 至 T-1 工作日",
+      requirementIds: ["onsite-login-roles", "onsite-live-feeds", "onsite-pathway-dictionaries", "onsite-mutual-recognition"],
+      objective: "完成账号、接口、路径和互认规则确认，避免上线当天补基础资料。",
+      acceptanceGate: "账号可登录、接口样例通过、字典和互认目录完成现场确认。"
+    },
+    {
+      id: "cutover-day",
+      phase: "上线当天切换",
+      window: "T 日",
+      requirementIds: ["onsite-critical-routing", "onsite-rectification-attachments", "onsite-monitoring-oncall"],
+      objective: "完成危急值路由、整改附件、监控告警和现场值守联动。",
+      acceptanceGate: "危急值演练有回执，整改附件可上传复核，监控告警可触达值守人。"
+    },
+    {
+      id: "after-cutover",
+      phase: "上线后稳定",
+      window: "T+1 至 T+7 日",
+      requirementIds: ["onsite-audit-retention", "onsite-training-cutover"],
+      objective: "完成审计保全、培训记录、试运行问题清零和回退联系人确认。",
+      acceptanceGate: "审计导出和哈希保全可验证，培训签到和问题清零表归档。"
+    }
+  ];
+  const rank = { attention_required: 0, pending_site_confirmation: 1, ready_for_joint_test: 2, accepted: 3, closed: 3 };
+  return phases.map((item) => {
+    const requirements = item.requirementIds.map((id) => requirementById.get(id)).filter(Boolean);
+    const owners = [...new Set(requirements.map((requirement) => requirement.owner).filter(Boolean))];
+    const statuses = requirements.map((requirement) => String(requirement.currentStatus || "pending_site_confirmation"));
+    const currentStatus = statuses.length === 0
+      ? "pending_site_confirmation"
+      : statuses.some((status) => status === "attention_required")
+        ? "attention_required"
+        : statuses.every((status) => ["accepted", "closed", "ready_for_joint_test"].includes(status))
+          ? "ready_for_joint_test"
+          : statuses.sort((a, b) => (rank[a] ?? 9) - (rank[b] ?? 9))[0] || "pending_site_confirmation";
+    return {
+      ...item,
+      owners,
+      currentStatus,
+      readyCount: statuses.filter((status) => ["accepted", "closed", "ready_for_joint_test"].includes(status)).length,
+      totalCount: requirements.length,
+      requirements: requirements.map((requirement) => ({
+        id: requirement.id,
+        requirement: requirement.requirement,
+        currentStatus: requirement.currentStatus
+      }))
+    };
+  }).filter((item) => item.totalCount > 0);
+}
+
+function buildQualitySafetyDepartmentTaskView({ user, summary, actionPlan, issues, rectifications, criticalValueAlerts, siteSignoffs, mutualRecognitionQualityReviews, cutoverSequence = [] }) {
   const profileByRole = {
     commission: {
       name: "卫健监管部门",
@@ -5656,6 +5829,20 @@ function buildQualitySafetyDepartmentTaskView({ user, summary, actionPlan, issue
       context: item.requiredEvidenceText || item.latestNote || "",
       targetSection: "quality-safety-signoffs",
       actionLabel: role === "commission" ? "记录联调" : "提交证据"
+    })),
+    ...cutoverSequence
+      .filter((item) => item.currentStatus === "attention_required")
+      .map((item) => ({
+        id: item.id,
+        kind: "cutover_sequence",
+        priority: item.id === "cutover-day" ? "critical" : "high",
+        title: `${item.phase}：${item.objective}`,
+        owner: (item.owners || []).join("、") || "现场上线联合组",
+        dueAt: item.window || "",
+        source: "cutoverSequence",
+        context: item.acceptanceGate || "",
+        targetSection: "quality-safety-cutover-sequence",
+        actionLabel: "查看执行顺序"
     }))
   ];
   const priorityRank = { critical: 0, high: 1, medium: 2, watch: 3 };
@@ -5669,7 +5856,7 @@ function buildQualitySafetyDepartmentTaskView({ user, summary, actionPlan, issue
     metrics: metricRows,
     queue: queue
       .sort((a, b) => (priorityRank[a.priority] ?? 9) - (priorityRank[b.priority] ?? 9) || String(a.dueAt || "9999").localeCompare(String(b.dueAt || "9999")) || a.id.localeCompare(b.id))
-      .slice(0, 6)
+      .slice(0, 8)
   };
 }
 
@@ -5790,6 +5977,7 @@ function buildQualitySafetyDashboard(data, user) {
     sourceId: item.id,
     normalizedStatus: normalizeQualitySafetyStatus(item.status || item.qcStatus)
   })), user);
+  const nationalQualityGoals = buildQualitySafetyNationalGoals(data);
   const actionPlan = buildQualitySafetyActionPlan({ issues, rectifications, criticalValueAlerts, clinicalPathwayCases, mutualRecognitionQualityReviews, institutionRisks });
   const slaSummary = {
     overdue: rectifications.filter((item) => item.slaStatus === "overdue").length,
@@ -5822,6 +6010,8 @@ function buildQualitySafetyDashboard(data, user) {
   summary.siteSignoffsAccepted = siteSignoffs.filter((item) => item.normalizedStatus === "closed").length;
   summary.siteSignoffsReady = siteSignoffs.filter((item) => item.status === "ready_for_joint_test").length;
   summary.siteSignoffsPending = siteSignoffs.filter((item) => !["accepted", "closed"].includes(String(item.status || ""))).length;
+  summary.nationalQualityGoals = nationalQualityGoals.length;
+  summary.nationalQualityGoalsTracked = nationalQualityGoals.filter((item) => item.currentStatus === "tracked").length;
   const reusableCollections = [
     "diagnosticReports",
     "countyMutualRecognitionRecords",
@@ -5855,16 +6045,6 @@ function buildQualitySafetyDashboard(data, user) {
   });
   summary.readinessScore = goLiveReadiness.score;
   summary.readinessStage = goLiveReadiness.stage;
-  const departmentTaskView = buildQualitySafetyDepartmentTaskView({
-    user,
-    summary,
-    actionPlan,
-    issues,
-    rectifications,
-    criticalValueAlerts,
-    siteSignoffs,
-    mutualRecognitionQualityReviews
-  });
   const coreSystemMatrix = buildQualitySafetyCoreSystemMatrix(data);
   summary.coreSystems = coreSystemMatrix.length;
   summary.coreSystemsLinked = coreSystemMatrix.filter((item) => item.evidenceRows > 0).length;
@@ -5890,6 +6070,20 @@ function buildQualitySafetyDashboard(data, user) {
   });
   summary.onsiteRequirementItems = onsiteRequirements.length;
   summary.onsiteRequirementReady = onsiteRequirements.filter((item) => ["accepted", "ready_for_joint_test"].includes(String(item.currentStatus || ""))).length;
+  const cutoverSequence = buildQualitySafetyCutoverSequence({ onsiteRequirements });
+  summary.cutoverSequenceSteps = cutoverSequence.length;
+  summary.cutoverSequenceAttention = cutoverSequence.filter((item) => item.currentStatus === "attention_required").length;
+  const departmentTaskView = buildQualitySafetyDepartmentTaskView({
+    user,
+    summary,
+    actionPlan,
+    issues,
+    rectifications,
+    criticalValueAlerts,
+    siteSignoffs,
+    mutualRecognitionQualityReviews,
+    cutoverSequence
+  });
   return {
     ok: true,
     generatedAt: new Date().toISOString(),
@@ -5903,9 +6097,11 @@ function buildQualitySafetyDashboard(data, user) {
     rectifications,
     criticalValueAlerts,
     clinicalPathwayCases,
+    nationalQualityGoals,
     siteSignoffs,
     operationsRunbook,
     onsiteRequirements,
+    cutoverSequence,
     medicalRecordQualityReviews: Array.isArray(data.medicalRecordQualityReviews) ? data.medicalRecordQualityReviews : [],
     mutualRecognitionQualityReviews,
     reusedCollections: reusableCollections,
