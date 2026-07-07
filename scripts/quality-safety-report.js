@@ -736,6 +736,7 @@ function buildQualitySafetyReport(options = {}) {
     { id: "quality-safety:onsite-requirements", passed: onsiteRequirements.length >= 8 && onsiteRequirements.every((item) => item.requirement && item.onsiteInput && item.acceptanceEvidence && item.owner), detail: `${onsiteRequirements.length} onsite go-live requirements` },
     { id: "quality-safety:cutover-sequence", passed: cutoverSequence.length >= 3 && cutoverSequence.every((item) => item.window && item.acceptanceGate && item.totalCount > 0), detail: `${cutoverSequence.length} cutover sequence phases` },
     { id: "quality-safety:national-goals-2025", passed: nationalQualityGoals.length === 10 && nationalQualityGoals.every((item) => item.evidenceRows > 0), detail: `${nationalQualityGoals.filter((item) => item.currentStatus === "tracked").length}/${nationalQualityGoals.length} national goals mapped to evidence` },
+    { id: "quality-safety:national-goal-site-inputs", passed: nationalQualityGoals.length === 10 && nationalQualityGoals.every((item) => Array.isArray(item.siteInputs) && item.siteInputs.length >= 4), detail: `${nationalQualityGoals.reduce((total, item) => total + (Array.isArray(item.siteInputs) ? item.siteInputs.length : 0), 0)} site input fields mapped` },
     { id: "quality-safety:go-live-readiness", passed: goLiveReadiness.usable, detail: `${goLiveReadiness.stage}; score=${goLiveReadiness.score}; blockers=${goLiveReadiness.blockers.length}` }
   ];
   return {
@@ -777,6 +778,8 @@ function buildQualitySafetyReport(options = {}) {
       cutoverSequenceAttention: cutoverSequence.filter((item) => item.currentStatus === "attention_required").length,
       nationalQualityGoals: nationalQualityGoals.length,
       nationalQualityGoalsTracked: nationalQualityGoals.filter((item) => item.currentStatus === "tracked").length,
+      nationalGoalsWithSiteInputs: nationalQualityGoals.filter((item) => Array.isArray(item.siteInputs) && item.siteInputs.length > 0).length,
+      nationalGoalSiteInputFields: nationalQualityGoals.reduce((total, item) => total + (Array.isArray(item.siteInputs) ? item.siteInputs.length : 0), 0),
       readinessStage: goLiveReadiness.stage,
       readinessScore: goLiveReadiness.score
     },
@@ -814,6 +817,7 @@ function renderMarkdown(report) {
     `- Clinical pathways: ${report.summary.clinicalPathways.total}, pending review ${report.summary.clinicalPathways.pending}`,
     `- Policy references: ${report.summary.policyReferences}/${report.policyReferences.length}`,
     `- 2025 national quality goals: ${report.summary.nationalQualityGoalsTracked}/${report.summary.nationalQualityGoals} mapped`,
+    `- National goal site inputs: ${report.summary.nationalGoalSiteInputFields} fields across ${report.summary.nationalGoalsWithSiteInputs}/${report.summary.nationalQualityGoals} goals`,
     `- Site sign-offs: ${report.summary.siteSignoffs.total}, ready ${report.summary.siteSignoffs.ready}, accepted ${report.summary.siteSignoffs.accepted}`,
     `- Action plan: ${report.summary.actionItems} items, high priority ${report.summary.highActionItems}`,
     `- Operations runbook: ${report.summary.operationsWatchItems} watch items, ${report.summary.operationsAttentionRequired} requiring attention`,

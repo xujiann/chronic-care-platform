@@ -438,6 +438,7 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(js, /nationalQualityGoals/);
   assert.match(js, /siteInputs/);
   assert.match(js, /现场采集字段/);
+  assert.match(js, /采集字段/);
   assert.match(js, /qualityDepartmentProfile/);
   assert.match(js, /departmentTaskView/);
   assert.match(js, /行动计划/);
@@ -519,6 +520,7 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:onsite-requirements/);
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:cutover-sequence/);
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:national-goals-2025/);
+  assert.match(read("scripts/quality-safety-report.js"), /quality-safety:national-goal-site-inputs/);
   assert.match(read("scripts/quality-safety-report.js"), /2025 National Quality Goals/);
   assert.match(read("README.md"), /Cutover sequence/);
   assert.match(read("README.md"), /Onsite requirements/);

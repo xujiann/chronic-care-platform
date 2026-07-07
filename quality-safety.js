@@ -498,6 +498,7 @@ function renderMetrics(summary) {
     ["行动事项", summary.actionItems || 0],
     ["现场签收", summary.siteSignoffs || 0],
     ["国家目标", `${summary.nationalQualityGoalsTracked || 0}/${summary.nationalQualityGoals || 0}`],
+    ["采集字段", summary.nationalGoalSiteInputFields || 0],
     ["上线阶段", summary.cutoverSequenceSteps || 0],
     ["需关注阶段", summary.cutoverSequenceAttention || 0],
     ["核心制度", `${summary.coreSystemsLinked || 0}/${summary.coreSystems || 0}`],

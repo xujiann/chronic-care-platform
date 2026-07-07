@@ -6012,6 +6012,8 @@ function buildQualitySafetyDashboard(data, user) {
   summary.siteSignoffsPending = siteSignoffs.filter((item) => !["accepted", "closed"].includes(String(item.status || ""))).length;
   summary.nationalQualityGoals = nationalQualityGoals.length;
   summary.nationalQualityGoalsTracked = nationalQualityGoals.filter((item) => item.currentStatus === "tracked").length;
+  summary.nationalGoalsWithSiteInputs = nationalQualityGoals.filter((item) => Array.isArray(item.siteInputs) && item.siteInputs.length > 0).length;
+  summary.nationalGoalSiteInputFields = nationalQualityGoals.reduce((total, item) => total + (Array.isArray(item.siteInputs) ? item.siteInputs.length : 0), 0);
   const reusableCollections = [
     "diagnosticReports",
     "countyMutualRecognitionRecords",
