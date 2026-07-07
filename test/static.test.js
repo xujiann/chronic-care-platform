@@ -365,6 +365,8 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(html, /quality-safety-metrics/);
   assert.match(html, /quality-safety-national-goals/);
   assert.match(html, /data-quality-safety-national-goals-panel/);
+  assert.match(html, /quality-safety-national-goal-cadence/);
+  assert.match(html, /data-quality-safety-national-goal-cadence-panel/);
   assert.match(html, /quality-safety-core-systems/);
   assert.match(html, /data-quality-safety-core-systems-panel/);
   assert.match(html, /quality-safety-risks/);
@@ -435,6 +437,8 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(js, /renderDepartmentView/);
   assert.match(js, /renderDepartmentTaskQueue/);
   assert.match(js, /renderNationalQualityGoals/);
+  assert.match(js, /renderNationalGoalCadencePlan/);
+  assert.match(js, /nationalGoalCadencePlan/);
   assert.match(js, /nationalQualityGoals/);
   assert.match(js, /siteInputs/);
   assert.match(js, /现场采集字段/);
@@ -521,7 +525,9 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:cutover-sequence/);
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:national-goals-2025/);
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:national-goal-site-inputs/);
+  assert.match(read("scripts/quality-safety-report.js"), /quality-safety:national-goal-cadence-plan/);
   assert.match(read("scripts/quality-safety-report.js"), /2025 National Quality Goals/);
+  assert.match(read("scripts/quality-safety-report.js"), /National Goal Cadence Plan/);
   assert.match(read("README.md"), /Cutover sequence/);
   assert.match(read("README.md"), /Onsite requirements/);
   assert.match(read("README.md"), /Operations runbook/);

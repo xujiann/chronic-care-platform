@@ -67,6 +67,9 @@ const QUALITY_TEXT = {
   "Keep routine QC tracking active.": "保持常规质控跟踪。",
   "Security event:": "安全事件：",
   active: "持续跟踪",
+  monthly: "按月",
+  quarterly: "按季度",
+  continuous: "持续监测",
   watch: "观察",
   attention_required: "需要值守关注",
   ready: "运行就绪",
@@ -499,6 +502,7 @@ function renderMetrics(summary) {
     ["现场签收", summary.siteSignoffs || 0],
     ["国家目标", `${summary.nationalQualityGoalsTracked || 0}/${summary.nationalQualityGoals || 0}`],
     ["采集字段", summary.nationalGoalSiteInputFields || 0],
+    ["复盘节奏", summary.nationalGoalCadencePlans || 0],
     ["上线阶段", summary.cutoverSequenceSteps || 0],
     ["需关注阶段", summary.cutoverSequenceAttention || 0],
     ["核心制度", `${summary.coreSystemsLinked || 0}/${summary.coreSystems || 0}`],
@@ -528,6 +532,26 @@ function renderNationalQualityGoals(rows) {
             <td>${zhText(item.nextAction || "")}</td>
           </tr>
         `).join("") : emptyRow(5, "暂无国家改进目标映射")}
+      </tbody>
+    </table>
+  `);
+}
+
+function renderNationalGoalCadencePlan(rows) {
+  setHtml("quality-safety-national-goal-cadence", `
+    <table>
+      <thead><tr><th>复盘周期</th><th>覆盖目标</th><th>复盘窗口</th><th>牵头部门</th><th>现场准备</th><th>下一步动作</th></tr></thead>
+      <tbody>
+        ${rows.length ? rows.map((item) => `
+          <tr>
+            <td><strong>${zhText(item.cadenceLabel)}</strong><br /><small>${statusLabel(item.cadenceType)}</small></td>
+            <td>${item.goalCount || 0} 项<br /><small>${(item.goals || []).map((goal) => text(goal.code)).join("、")}</small></td>
+            <td>${zhText(item.reviewWindow)}</td>
+            <td>${zhText(item.owner)}</td>
+            <td>${item.evidenceRows || 0} 条证据<br /><small>${item.siteInputFields || 0} 个采集字段</small></td>
+            <td>${zhText(item.nextAction)}</td>
+          </tr>
+        `).join("") : emptyRow(6, "暂无国家目标复盘节奏")}
       </tbody>
     </table>
   `);
@@ -893,6 +917,7 @@ function renderQualitySafety(data) {
   renderDepartmentView(data);
   renderDepartmentTaskQueue(data);
   renderNationalQualityGoals(data.nationalQualityGoals || []);
+  renderNationalGoalCadencePlan(data.nationalGoalCadencePlan || []);
   renderCoreSystemMatrix(data.coreSystemMatrix || []);
   renderGoLiveReadiness(data.goLiveReadiness || {});
   renderPrelaunchGaps(data.goLiveReadiness || {}, data.siteSignoffs || []);

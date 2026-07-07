@@ -60,6 +60,7 @@ test("quality safety report covers boundaries, reuse and routes", () => {
   assert.equal(report.checks.some((item) => item.id === "quality-safety:cutover-sequence" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "quality-safety:national-goals-2025" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "quality-safety:national-goal-site-inputs" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "quality-safety:national-goal-cadence-plan" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "quality-safety:go-live-readiness" && item.passed), true);
   assert.equal(report.goLiveReadiness.usable, true);
   assert.equal(report.goLiveReadiness.stage, "controlled_pilot_ready");
@@ -72,6 +73,9 @@ test("quality safety report covers boundaries, reuse and routes", () => {
   assert.equal(report.summary.nationalQualityGoalsTracked, 10);
   assert.equal(report.summary.nationalGoalsWithSiteInputs, 10);
   assert.equal(report.summary.nationalGoalSiteInputFields >= 40, true);
+  assert.equal(report.summary.nationalGoalCadencePlans, 3);
+  assert.equal(report.nationalGoalCadencePlan.some((item) => item.cadenceType === "monthly" && item.goalCount >= 2), true);
+  assert.equal(report.nationalGoalCadencePlan.some((item) => item.cadenceType === "quarterly" && item.reviewWindow.includes("季度")), true);
   assert.equal(report.nationalQualityGoals.some((item) => item.code === "NIT-2025-X" && item.evidenceCollections.includes("mutualRecognitionQualityReviews")), true);
   assert.equal(report.nationalQualityGoals.every((item) => Array.isArray(item.siteInputs) && item.siteInputs.length >= 4), true);
   assert.equal(report.nationalQualityGoals.some((item) => item.code === "NIT-2025-I" && item.siteInputs.includes("再灌注方式")), true);
@@ -103,6 +107,8 @@ test("quality safety report covers boundaries, reuse and routes", () => {
   assert.match(renderMarkdown(report), /NIT-2025-I/);
   assert.match(renderMarkdown(report), /Site inputs/);
   assert.match(renderMarkdown(report), /National goal site inputs/);
+  assert.match(renderMarkdown(report), /National Goal Cadence Plan/);
+  assert.match(renderMarkdown(report), /按季度分科室反馈/);
   assert.match(renderMarkdown(report), /再灌注方式/);
   assert.match(renderMarkdown(report), /Cutover day/);
   assert.match(renderMarkdown(report), /onsite-live-feeds|Bind HIS\/EMR\/LIS\/PACS/);
@@ -150,6 +156,9 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
   assert.equal(dashboard.body.summary.nationalQualityGoalsTracked, 10);
   assert.equal(dashboard.body.summary.nationalGoalsWithSiteInputs, 10);
   assert.equal(dashboard.body.summary.nationalGoalSiteInputFields >= 40, true);
+  assert.equal(dashboard.body.summary.nationalGoalCadencePlans, 3);
+  assert.equal(dashboard.body.nationalGoalCadencePlan.some((item) => item.cadenceType === "monthly" && item.reviewWindow.includes("每月")), true);
+  assert.equal(dashboard.body.nationalGoalCadencePlan.some((item) => item.cadenceType === "continuous" && item.siteInputFields >= 4), true);
   assert.equal(dashboard.body.nationalQualityGoals.some((item) => item.code === "NIT-2025-VIII" && item.evidenceCollections.includes("medicalRecordQualityReviews")), true);
   assert.equal(dashboard.body.nationalQualityGoals.every((item) => Array.isArray(item.siteInputs) && item.siteInputs.length >= 4), true);
   assert.equal(dashboard.body.nationalQualityGoals.some((item) => item.code === "NIT-2025-X" && item.siteInputs.includes("未互认原因")), true);

@@ -607,6 +607,56 @@ function buildNationalQualityGoals(data) {
   });
 }
 
+function nationalGoalCadenceType(cadence) {
+  const value = String(cadence || "");
+  if (value.includes("月")) return "monthly";
+  if (value.includes("季度")) return "quarterly";
+  return "continuous";
+}
+
+function buildNationalGoalCadencePlan(nationalQualityGoals) {
+  const meta = {
+    monthly: {
+      cadenceType: "monthly",
+      cadenceLabel: "按月复盘",
+      reviewWindow: "每月 5 日前完成上月数据分析和反馈",
+      owner: "医政医管与质控中心联合值守",
+      nextAction: "优先核对危急值、卒中再灌注和检查检验互认月度指标。"
+    },
+    quarterly: {
+      cadenceType: "quarterly",
+      cadenceLabel: "按季度分科室反馈",
+      reviewWindow: "每季度首月 10 日前形成上季度分科室反馈",
+      owner: "医务、病案、护理、药事和手术管理联合复盘",
+      nextAction: "按科室汇总 TNM、VTE、感染性休克、输液、事件报告、四级手术、病历完整性和再手术问题。"
+    },
+    continuous: {
+      cadenceType: "continuous",
+      cadenceLabel: "持续监测",
+      reviewWindow: "每周滚动监测，月度纳入绩效复盘",
+      owner: "质控办与信息化运维联合监测",
+      nextAction: "保持 VTE 风险评估、提醒、会诊转诊和绩效反馈常态化。"
+    }
+  };
+  const groups = new Map();
+  nationalQualityGoals.forEach((goal) => {
+    const cadenceType = nationalGoalCadenceType(goal.cadence);
+    const group = groups.get(cadenceType) || {
+      ...meta[cadenceType],
+      goals: [],
+      goalCount: 0,
+      evidenceRows: 0,
+      siteInputFields: 0
+    };
+    group.goals.push({ code: goal.code, title: goal.title, cadence: goal.cadence });
+    group.goalCount += 1;
+    group.evidenceRows += Number(goal.evidenceRows || 0);
+    group.siteInputFields += Array.isArray(goal.siteInputs) ? goal.siteInputs.length : 0;
+    groups.set(cadenceType, group);
+  });
+  return ["monthly", "quarterly", "continuous"].map((key) => groups.get(key)).filter(Boolean);
+}
+
 function buildQualitySafetyReport(options = {}) {
   const data = options.data || readJson("data/db.json");
   const server = options.serverSource || read("server.js");
@@ -717,6 +767,7 @@ function buildQualitySafetyReport(options = {}) {
   const onsiteRequirements = buildOnsiteRequirementChecklist({ siteSignoffRows, operationsRunbook, goLiveReadiness });
   const cutoverSequence = buildCutoverSequence({ onsiteRequirements });
   const nationalQualityGoals = buildNationalQualityGoals(data);
+  const nationalGoalCadencePlan = buildNationalGoalCadencePlan(nationalQualityGoals);
   const checks = [
     { id: "quality-safety:boundaries", passed: boundaryRows.every((item) => item.modeled), detail: `${boundaryRows.filter((item) => item.modeled).length}/${boundaryRows.length} boundaries modeled` },
     { id: "quality-safety:collections", passed: collectionRows.every((item) => item.present && item.rows > 0), detail: collectionRows.map((item) => `${item.collection}:${item.rows}`).join(";") },
@@ -737,6 +788,7 @@ function buildQualitySafetyReport(options = {}) {
     { id: "quality-safety:cutover-sequence", passed: cutoverSequence.length >= 3 && cutoverSequence.every((item) => item.window && item.acceptanceGate && item.totalCount > 0), detail: `${cutoverSequence.length} cutover sequence phases` },
     { id: "quality-safety:national-goals-2025", passed: nationalQualityGoals.length === 10 && nationalQualityGoals.every((item) => item.evidenceRows > 0), detail: `${nationalQualityGoals.filter((item) => item.currentStatus === "tracked").length}/${nationalQualityGoals.length} national goals mapped to evidence` },
     { id: "quality-safety:national-goal-site-inputs", passed: nationalQualityGoals.length === 10 && nationalQualityGoals.every((item) => Array.isArray(item.siteInputs) && item.siteInputs.length >= 4), detail: `${nationalQualityGoals.reduce((total, item) => total + (Array.isArray(item.siteInputs) ? item.siteInputs.length : 0), 0)} site input fields mapped` },
+    { id: "quality-safety:national-goal-cadence-plan", passed: nationalGoalCadencePlan.length >= 3 && nationalGoalCadencePlan.every((item) => item.goalCount > 0 && item.reviewWindow && item.owner), detail: `${nationalGoalCadencePlan.length} cadence plans; ${nationalGoalCadencePlan.map((item) => `${item.cadenceType}:${item.goalCount}`).join(",")}` },
     { id: "quality-safety:go-live-readiness", passed: goLiveReadiness.usable, detail: `${goLiveReadiness.stage}; score=${goLiveReadiness.score}; blockers=${goLiveReadiness.blockers.length}` }
   ];
   return {
@@ -780,6 +832,7 @@ function buildQualitySafetyReport(options = {}) {
       nationalQualityGoalsTracked: nationalQualityGoals.filter((item) => item.currentStatus === "tracked").length,
       nationalGoalsWithSiteInputs: nationalQualityGoals.filter((item) => Array.isArray(item.siteInputs) && item.siteInputs.length > 0).length,
       nationalGoalSiteInputFields: nationalQualityGoals.reduce((total, item) => total + (Array.isArray(item.siteInputs) ? item.siteInputs.length : 0), 0),
+      nationalGoalCadencePlans: nationalGoalCadencePlan.length,
       readinessStage: goLiveReadiness.stage,
       readinessScore: goLiveReadiness.score
     },
@@ -799,6 +852,7 @@ function buildQualitySafetyReport(options = {}) {
     onsiteRequirements,
     cutoverSequence,
     nationalQualityGoals,
+    nationalGoalCadencePlan,
     checks
   };
 }
@@ -818,6 +872,7 @@ function renderMarkdown(report) {
     `- Policy references: ${report.summary.policyReferences}/${report.policyReferences.length}`,
     `- 2025 national quality goals: ${report.summary.nationalQualityGoalsTracked}/${report.summary.nationalQualityGoals} mapped`,
     `- National goal site inputs: ${report.summary.nationalGoalSiteInputFields} fields across ${report.summary.nationalGoalsWithSiteInputs}/${report.summary.nationalQualityGoals} goals`,
+    `- National goal cadence plans: ${report.summary.nationalGoalCadencePlans}`,
     `- Site sign-offs: ${report.summary.siteSignoffs.total}, ready ${report.summary.siteSignoffs.ready}, accepted ${report.summary.siteSignoffs.accepted}`,
     `- Action plan: ${report.summary.actionItems} items, high priority ${report.summary.highActionItems}`,
     `- Operations runbook: ${report.summary.operationsWatchItems} watch items, ${report.summary.operationsAttentionRequired} requiring attention`,
@@ -854,6 +909,12 @@ function renderMarkdown(report) {
     "| Code | Goal | Domain | Cadence | Evidence collections | Site inputs | Evidence rows | Status |",
     "|---|---|---|---|---|---|---:|---|",
     ...report.nationalQualityGoals.map((item) => `| ${item.code} | ${item.title} | ${item.domain} | ${item.cadence} | ${(item.evidenceCollections || []).join(", ")} | ${(item.siteInputs || []).join(", ")} | ${item.evidenceRows} | ${item.currentStatus} |`),
+    "",
+    "## National Goal Cadence Plan",
+    "",
+    "| Cadence | Goals | Review window | Owner | Evidence rows | Site input fields | Next action |",
+    "|---|---:|---|---|---:|---:|---|",
+    ...report.nationalGoalCadencePlan.map((item) => `| ${item.cadenceLabel} | ${item.goalCount} (${item.goals.map((goal) => goal.code).join(", ")}) | ${item.reviewWindow} | ${item.owner} | ${item.evidenceRows} | ${item.siteInputFields} | ${item.nextAction} |`),
     "",
     "## Go-live Readiness",
     "",

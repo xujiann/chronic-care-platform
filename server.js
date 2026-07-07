@@ -5423,6 +5423,56 @@ function buildQualitySafetyNationalGoals(data) {
   });
 }
 
+function qualitySafetyNationalGoalCadenceType(cadence) {
+  const value = String(cadence || "");
+  if (value.includes("月")) return "monthly";
+  if (value.includes("季度")) return "quarterly";
+  return "continuous";
+}
+
+function buildQualitySafetyNationalGoalCadencePlan(nationalQualityGoals) {
+  const meta = {
+    monthly: {
+      cadenceType: "monthly",
+      cadenceLabel: "按月复盘",
+      reviewWindow: "每月 5 日前完成上月数据分析和反馈",
+      owner: "医政医管与质控中心联合值守",
+      nextAction: "优先核对危急值、卒中再灌注和检查检验互认月度指标。"
+    },
+    quarterly: {
+      cadenceType: "quarterly",
+      cadenceLabel: "按季度分科室反馈",
+      reviewWindow: "每季度首月 10 日前形成上季度分科室反馈",
+      owner: "医务、病案、护理、药事和手术管理联合复盘",
+      nextAction: "按科室汇总 TNM、VTE、感染性休克、输液、事件报告、四级手术、病历完整性和再手术问题。"
+    },
+    continuous: {
+      cadenceType: "continuous",
+      cadenceLabel: "持续监测",
+      reviewWindow: "每周滚动监测，月度纳入绩效复盘",
+      owner: "质控办与信息化运维联合监测",
+      nextAction: "保持 VTE 风险评估、提醒、会诊转诊和绩效反馈常态化。"
+    }
+  };
+  const groups = new Map();
+  nationalQualityGoals.forEach((goal) => {
+    const cadenceType = qualitySafetyNationalGoalCadenceType(goal.cadence);
+    const group = groups.get(cadenceType) || {
+      ...meta[cadenceType],
+      goals: [],
+      goalCount: 0,
+      evidenceRows: 0,
+      siteInputFields: 0
+    };
+    group.goals.push({ code: goal.code, title: goal.title, cadence: goal.cadence });
+    group.goalCount += 1;
+    group.evidenceRows += Number(goal.evidenceRows || 0);
+    group.siteInputFields += Array.isArray(goal.siteInputs) ? goal.siteInputs.length : 0;
+    groups.set(cadenceType, group);
+  });
+  return ["monthly", "quarterly", "continuous"].map((key) => groups.get(key)).filter(Boolean);
+}
+
 function buildQualitySafetySiteSignoffs(data, user) {
   const rows = (Array.isArray(data.qualitySafetySiteSignoffs) ? data.qualitySafetySiteSignoffs : []).map((item) => ({
     ...item,
@@ -5978,6 +6028,7 @@ function buildQualitySafetyDashboard(data, user) {
     normalizedStatus: normalizeQualitySafetyStatus(item.status || item.qcStatus)
   })), user);
   const nationalQualityGoals = buildQualitySafetyNationalGoals(data);
+  const nationalGoalCadencePlan = buildQualitySafetyNationalGoalCadencePlan(nationalQualityGoals);
   const actionPlan = buildQualitySafetyActionPlan({ issues, rectifications, criticalValueAlerts, clinicalPathwayCases, mutualRecognitionQualityReviews, institutionRisks });
   const slaSummary = {
     overdue: rectifications.filter((item) => item.slaStatus === "overdue").length,
@@ -6014,6 +6065,9 @@ function buildQualitySafetyDashboard(data, user) {
   summary.nationalQualityGoalsTracked = nationalQualityGoals.filter((item) => item.currentStatus === "tracked").length;
   summary.nationalGoalsWithSiteInputs = nationalQualityGoals.filter((item) => Array.isArray(item.siteInputs) && item.siteInputs.length > 0).length;
   summary.nationalGoalSiteInputFields = nationalQualityGoals.reduce((total, item) => total + (Array.isArray(item.siteInputs) ? item.siteInputs.length : 0), 0);
+  summary.nationalGoalCadencePlans = nationalGoalCadencePlan.length;
+  summary.nationalGoalMonthlyPlans = nationalGoalCadencePlan.filter((item) => item.cadenceType === "monthly").length;
+  summary.nationalGoalQuarterlyPlans = nationalGoalCadencePlan.filter((item) => item.cadenceType === "quarterly").length;
   const reusableCollections = [
     "diagnosticReports",
     "countyMutualRecognitionRecords",
@@ -6100,6 +6154,7 @@ function buildQualitySafetyDashboard(data, user) {
     criticalValueAlerts,
     clinicalPathwayCases,
     nationalQualityGoals,
+    nationalGoalCadencePlan,
     siteSignoffs,
     operationsRunbook,
     onsiteRequirements,
