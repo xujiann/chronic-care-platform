@@ -371,11 +371,16 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("county.js"), /data-referral-cutover-plan-summary/);
   assert.match(read("county.js"), /data-referral-cutover-action-queue/);
   assert.match(read("county.js"), /data-referral-cutover-action-item/);
+  assert.match(read("county.js"), /data-referral-action-role/);
+  assert.match(read("county.js"), /data-target-selector/);
   assert.match(read("county.js"), /data-referral-plan-action/);
   assert.match(read("county.js"), /normalizeCountyTeleconsultationNextPlan/);
   assert.match(read("county.js"), /buildCountyTeleconsultationPlanSummary/);
   assert.match(read("county.js"), /buildCountyTeleconsultationActionQueue/);
   assert.match(read("county.js"), /buildCountyTeleconsultationReceiptSummary/);
+  assert.match(read("county.js"), /buildCountyTeleconsultationPendingRoleActions/);
+  assert.match(read("county.js"), /buildCountyTeleconsultationRoleAction/);
+  assert.match(read("county.js"), /getCountyTeleconsultationRoleTarget/);
   assert.match(read("county.js"), /getCountyTeleconsultationPlanRoles/);
   assert.match(read("county.js"), /formatCountyTeleconsultationRoleList/);
   assert.match(read("county.js"), /taskReceipts/);
@@ -494,6 +499,20 @@ test("county teleconsultation action queue summarizes receipt evidence", () => {
 
   assert.equal(queue.items.length, 1);
   assert.equal(queue.items[0].receiptSummary, "3/3 receipts, 2/3 final-ready, 1/3 signed; pending final-ready: hospital IT; signed: receiving hospital, hospital IT");
+  assert.deepEqual(JSON.parse(JSON.stringify(queue.items[0].pendingRoleActions)), [
+    {
+      role: "receiving-hospital",
+      kind: "signed",
+      label: "Open receiving hospital",
+      targetSelector: "[data-referral-signoff-status='receiving-hospital']"
+    },
+    {
+      role: "hospital-it",
+      kind: "final-ready",
+      label: "Open hospital IT",
+      targetSelector: "[data-referral-joint-ledger='hospital-it']"
+    }
+  ]);
 
   const readyQueue = sandbox.buildCountyTeleconsultationActionQueue([
     { phase: "insurance-performance-cutover", status: "ready" }
@@ -508,6 +527,15 @@ test("county teleconsultation action queue summarizes receipt evidence", () => {
     ]
   });
   assert.equal(readyQueue.items[0].receiptSummary, "2/2 receipts, 2/2 final-ready, 2/2 signed");
+  assert.deepEqual(JSON.parse(JSON.stringify(readyQueue.items[0].pendingRoleActions)), []);
+
+  const insuranceQueue = sandbox.buildCountyTeleconsultationActionQueue([
+    { phase: "insurance-performance-cutover", status: "pending" }
+  ], {
+    taskReceipts: [],
+    exportSummary: []
+  });
+  assert.equal(insuranceQueue.items[0].pendingRoleActions[0].targetSelector, "#county-teleconsultation-risk-board");
 });
 
 test("regional data sharing application has runnable entry, API and evidence script", () => {

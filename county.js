@@ -305,7 +305,7 @@ function renderCountyTeleconsultationCutoverReadiness(state, rows) {
       <h3>${actionQueue.openItems}/${actionQueue.totalItems} onsite actions open</h3>
       <p>${actionQueue.nextAction}</p>
       <footer>
-        ${actionQueue.items.map((item) => `<small data-referral-cutover-action-item="${item.phase}">${item.statusLabel}: ${item.owner} -> ${item.actionLabel}; ${item.receiptSummary}</small>`).join("")}
+        ${actionQueue.items.map((item) => `<small data-referral-cutover-action-item="${item.phase}">${item.statusLabel}: ${item.owner} -> ${item.actionLabel}; ${item.receiptSummary}</small>${item.pendingRoleActions.map((action) => `<button class="inline-action" type="button" data-referral-action-role="${action.role}" data-target-selector="${action.targetSelector}">${action.label}</button>`).join("")}`).join("")}
       </footer>
     </article>`,
     ...readiness.blockers.map((item) => `<article data-referral-cutover-blocker="${item.id}">
@@ -617,7 +617,8 @@ function buildCountyTeleconsultationActionQueue(plan, pack = {}) {
       owner: item.owner || "county-command",
       statusLabel: item.statusLabel || item.status || "pending",
       actionLabel: item.actionLabel || "Review evidence",
-      receiptSummary: buildCountyTeleconsultationReceiptSummary(item.phase, receiptsByRole, exportByRole)
+      receiptSummary: buildCountyTeleconsultationReceiptSummary(item.phase, receiptsByRole, exportByRole),
+      pendingRoleActions: buildCountyTeleconsultationPendingRoleActions(item.phase, receiptsByRole, exportByRole)
     }))
   };
 }
@@ -633,6 +634,35 @@ function buildCountyTeleconsultationReceiptSummary(phase, receiptsByRole, export
     pendingSigned.length ? `signed: ${formatCountyTeleconsultationRoleList(pendingSigned)}` : ""
   ].filter(Boolean);
   return `${roles.length - pendingReceipts.length}/${roles.length} receipts, ${roles.length - pendingReady.length}/${roles.length} final-ready, ${roles.length - pendingSigned.length}/${roles.length} signed${pendingLabels.length ? `; pending ${pendingLabels.join("; ")}` : ""}`;
+}
+
+function buildCountyTeleconsultationPendingRoleActions(phase, receiptsByRole, exportByRole) {
+  const roles = getCountyTeleconsultationPlanRoles(phase);
+  return roles.map((role) => {
+    const receiptPending = !/completed|closed|signed|read/i.test(String(receiptsByRole.get(role)?.status || ""));
+    const readyPending = !exportByRole.get(role)?.readyForFinalSignoff;
+    const signedPending = !exportByRole.get(role)?.onsiteSigned;
+    const kind = receiptPending ? "receipt" : readyPending ? "final-ready" : signedPending ? "signed" : "";
+    return kind ? buildCountyTeleconsultationRoleAction(phase, role, kind) : null;
+  }).filter(Boolean);
+}
+
+function buildCountyTeleconsultationRoleAction(phase, role, kind) {
+  return {
+    role,
+    kind,
+    label: `Open ${formatCountyTeleconsultationRoleList([role])}`,
+    targetSelector: getCountyTeleconsultationRoleTarget(phase, role, kind)
+  };
+}
+
+function getCountyTeleconsultationRoleTarget(phase, role, kind) {
+  if (kind === "signed") return `[data-referral-signoff-status='${role}']`;
+  const normalizedPhase = String(phase || "").toLowerCase();
+  if (normalizedPhase.includes("insurance") && ["county-performance", "insurance"].includes(role)) {
+    return "#county-teleconsultation-risk-board";
+  }
+  return `[data-referral-joint-ledger='${role}']`;
 }
 
 function getCountyTeleconsultationPlanRoles(phase) {
@@ -871,6 +901,11 @@ function bindCountyActions() {
     const planActionButton = event.target.closest("[data-referral-plan-action]");
     if (planActionButton) {
       document.querySelector(`#${planActionButton.dataset.target}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+    const roleActionButton = event.target.closest("[data-referral-action-role]");
+    if (roleActionButton) {
+      document.querySelector(roleActionButton.dataset.targetSelector)?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     const button = event.target.closest("[data-county-action]");
