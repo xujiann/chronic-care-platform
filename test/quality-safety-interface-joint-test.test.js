@@ -44,6 +44,11 @@ test("quality safety joint-test pack validates samples signatures and negative c
   assert.equal(pack.ok, true);
   assert.equal(pack.summary.interfaces, 6);
   assert.equal(pack.summary.sampleAccepted, pack.summary.sampleRequests);
+  assert.equal(pack.summary.siteSampleAcceptance, pack.summary.sampleRequests);
+  assert.equal(pack.summary.siteSampleReady, pack.summary.sampleRequests);
+  assert.equal(pack.checks.some((item) => item.id === "joint-test:site-sample-acceptance" && item.passed), true);
+  assert.equal(pack.siteSampleAcceptance.every((item) => item.siteInputs.length >= 5 && item.acceptanceEvidence.length >= 4 && item.verificationCommand === "npm.cmd run quality-safety:joint-test"), true);
+  assert.equal(pack.siteSampleAcceptance.some((item) => item.interfaceId === "qs-critical-value-alert-v1" && item.acceptanceEvidence.includes("签字联调单")), true);
   assert.equal(pack.negativeCases.every((item) => !item.result.ok), true);
   assert.equal(pack.negativeCases.some((item) => item.result.errors.some((error) => error.code === "SIGNATURE_MISMATCH")), true);
   assert.equal(pack.fieldDictionaries.some((item) => item.interfaceId === "qs-critical-value-alert-v1" && item.fields.some((field) => field.field === "residentId")), true);
@@ -92,6 +97,8 @@ test("quality safety joint-test pack validates samples signatures and negative c
   const markdown = renderMarkdown(pack);
   assert.match(markdown, /Quality-safety institution joint-test pack/);
   assert.match(markdown, /HMAC-SHA256/);
+  assert.match(markdown, /Site Sample Acceptance/);
+  assert.match(markdown, /quality-safety:joint-test/);
 });
 
 test("quality safety joint-test pack writes release artifacts", (t) => {
@@ -106,6 +113,7 @@ test("quality safety joint-test pack writes release artifacts", (t) => {
   const markdown = fs.readFileSync(path.join(outputDir, "pack.md"), "utf8");
   assert.equal(json.ok, true);
   assert.match(markdown, /Validation Cases/);
+  assert.match(markdown, /Site Sample Acceptance/);
 });
 
 test("quality safety joint-test pack API exposes pack and audits message validation", async (t) => {
@@ -130,6 +138,8 @@ test("quality safety joint-test pack API exposes pack and audits message validat
   assert.equal(pack.response.status, 200);
   assert.equal(pack.body.ok, true);
   assert.equal(pack.body.sampleRequests.length >= 6, true);
+  assert.equal(pack.body.siteSampleAcceptance.length, pack.body.sampleRequests.length);
+  assert.equal(pack.body.siteSampleAcceptance.every((item) => item.status === "ready_for_joint_test"), true);
 
   const request = pack.body.sampleRequests[0];
   const accepted = await api(baseUrl, "/api/quality-safety/interface-messages/validate", authorized(commissionLogin.body.token, {

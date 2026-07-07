@@ -811,6 +811,7 @@ function renderSiteSignoffs(rows) {
 function renderInterfaceJointTestPack(pack, validationResult = null) {
   if (!pack) return;
   const sampleRows = pack.sampleRequests || [];
+  const acceptanceRows = pack.siteSampleAcceptance || [];
   const resultText = validationResult ? `${statusLabel(validationResult.status)}：${validationResult.errors?.map((item) => item.code).join("、") || "已通过"}` : "尚未手动校验";
   setHtml("quality-safety-interface-pack", `
     <div class="rules">
@@ -842,6 +843,21 @@ function renderInterfaceJointTestPack(pack, validationResult = null) {
             <td><button class="inline-action" type="button" data-interface-validate="${item.interfaceId}">校验样例</button></td>
           </tr>
         `).join("")}
+      </tbody>
+    </table>
+    <table>
+      <thead><tr><th>现场样例</th><th>责任系统</th><th>现场输入</th><th>验收证据</th><th>验证命令</th><th>状态</th></tr></thead>
+      <tbody>
+        ${acceptanceRows.length ? acceptanceRows.map((item) => `
+          <tr>
+            <td><strong>${zhText(item.interfaceId)}</strong><br /><small>${zhText(item.eventType)} / ${text(item.sampleMessageId)}</small></td>
+            <td>${zhText(item.owner)}<br /><small>${zhText(item.targetCollection)}</small></td>
+            <td>${(item.siteInputs || []).map(zhText).join("、")}</td>
+            <td>${(item.acceptanceEvidence || []).map(zhText).join("、")}<br /><small>${text(item.bodySha256).slice(0, 16)}...</small></td>
+            <td><code>${text(item.verificationCommand)}</code></td>
+            <td>${statusLabel(item.status)}<br /><small>${zhText(item.validationStatus)}</small></td>
+          </tr>
+        `).join("") : emptyRow(6, "暂无现场样例验收")}
       </tbody>
     </table>
   `);

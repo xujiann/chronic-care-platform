@@ -437,6 +437,8 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(js, /productionSignoffPending/);
   assert.match(js, /renderSiteSignoffs/);
   assert.match(js, /renderInterfaceJointTestPack/);
+  assert.match(js, /siteSampleAcceptance/);
+  assert.match(js, /现场样例/);
   assert.match(js, /renderOperationsBrief/);
   assert.match(js, /renderDepartmentView/);
   assert.match(js, /renderDepartmentTaskQueue/);
@@ -541,6 +543,10 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(read("scripts/release-report.js"), /qualitySafety:report/);
   assert.match(read("scripts/release-report.js"), /qualitySafetyInterface:standard/);
   assert.match(read("scripts/release-report.js"), /qualitySafetyInterfaceJointTest:pack/);
+  assert.match(read("scripts/release-report.js"), /qualitySafetyInterfaceJointTest:siteSampleAcceptance/);
+  assert.match(read("scripts/quality-safety-interface-joint-test.js"), /joint-test:site-sample-acceptance/);
+  assert.match(read("scripts/quality-safety-interface-joint-test.js"), /Site Sample Acceptance/);
+  assert.match(read("scripts/quality-safety-interface-joint-test.js"), /签字联调单/);
   assert.match(read("scripts/release-report.js"), /qualitySafety:siteSignoffTracker/);
   assert.match(read("scripts/release-report.js"), /qualitySafety:goLiveReadiness/);
   assert.match(read("platform.html"), /quality-safety\.html/);

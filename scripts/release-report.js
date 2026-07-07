@@ -338,7 +338,8 @@ function qualitySafetyInterfaceJointTestChecks(pack) {
   return [
     check("qualitySafetyInterfaceJointTest:pack", pack.ok, pack.ok ? "quality-safety joint-test pack checks passed" : "quality-safety joint-test pack checks failed", "error", "quality-safety"),
     check("qualitySafetyInterfaceJointTest:samples", pack.summary?.sampleAccepted === pack.summary?.sampleRequests, `${pack.summary?.sampleAccepted || 0}/${pack.summary?.sampleRequests || 0} sample messages accepted`, "error", "quality-safety"),
-    check("qualitySafetyInterfaceJointTest:negativeCases", pack.negativeCases?.every((item) => !item.result.ok), `${pack.negativeCases?.length || 0} rejection cases`, "error", "quality-safety")
+    check("qualitySafetyInterfaceJointTest:negativeCases", pack.negativeCases?.every((item) => !item.result.ok), `${pack.negativeCases?.length || 0} rejection cases`, "error", "quality-safety"),
+    check("qualitySafetyInterfaceJointTest:siteSampleAcceptance", pack.summary?.siteSampleReady === pack.summary?.siteSampleAcceptance && pack.summary?.siteSampleAcceptance === pack.summary?.sampleRequests, `${pack.summary?.siteSampleReady || 0}/${pack.summary?.siteSampleAcceptance || 0} site sample acceptance rows ready`, "error", "quality-safety")
   ];
 }
 
@@ -794,7 +795,7 @@ function renderMarkdown(report) {
     "",
     "## Quality-safety institution joint-test pack",
     "",
-    "See `quality-safety-interface-joint-test-pack.json` and `quality-safety-interface-joint-test-pack.md` for sample requests, HMAC-SHA256 signature fixtures, field dictionaries, idempotency replay checks, and negative validation cases.",
+    "See `quality-safety-interface-joint-test-pack.json` and `quality-safety-interface-joint-test-pack.md` for sample requests, HMAC-SHA256 signature fixtures, field dictionaries, site sample acceptance rows, idempotency replay checks, and negative validation cases.",
     "",
     "## Operations readiness report",
     "",

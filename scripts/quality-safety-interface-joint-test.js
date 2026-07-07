@@ -289,6 +289,42 @@ function buildNegativeCases(sampleRequests, secret) {
   ];
 }
 
+function buildSiteSampleAcceptance(standard, sampleRequests, sampleValidations) {
+  const validationByInterface = new Map(sampleValidations.map((item) => [String(item.result.interfaceId || "").trim(), item.result]));
+  return sampleRequests.map((request) => {
+    const interfaceDef = findInterface(standard, request.interfaceId) || {};
+    const validation = validationByInterface.get(request.interfaceId) || {};
+    const sourceSystems = interfaceDef.sourceSystems || [];
+    return {
+      id: `site-sample-${request.interfaceId}`,
+      interfaceId: request.interfaceId,
+      eventType: interfaceDef.eventType || request.message?.eventType || "",
+      owner: sourceSystems.length ? sourceSystems.join("/") : "institution integration group",
+      targetCollection: interfaceDef.targetCollection || "",
+      siteInputs: [
+        "生产或预生产接口地址",
+        "机构编码和客户端标识",
+        "INTEGRATION_GATEWAY_SECRET",
+        "已签名样例报文",
+        "字段映射确认"
+      ],
+      acceptanceEvidence: [
+        "样例校验通过结果",
+        "幂等重放记录",
+        "正文哈希比对",
+        "签字联调单"
+      ],
+      sampleMessageId: request.message?.messageId || "",
+      idempotencyKey: request.headers?.["X-Idempotency-Key"] || "",
+      bodySha256: request.bodySha256,
+      verificationCommand: "npm.cmd run quality-safety:joint-test",
+      status: validation.ok ? "ready_for_joint_test" : "attention_required",
+      validationStatus: validation.status || "pending",
+      errors: validation.errors || []
+    };
+  });
+}
+
 function buildQualitySafetyInterfaceJointTestPack(options = {}) {
   const standardReport = options.standardReport || buildQualitySafetyInterfaceStandard(options);
   const standard = standardReport.standard;
@@ -320,11 +356,13 @@ function buildQualitySafetyInterfaceJointTestPack(options = {}) {
       secret
     })
   }));
+  const siteSampleAcceptance = buildSiteSampleAcceptance(standard, sampleRequests, sampleValidations);
   const checks = [
     { id: "joint-test:samples", passed: sampleValidations.every((item) => item.result.ok), detail: `${sampleValidations.filter((item) => item.result.ok).length}/${sampleValidations.length} sample messages accepted` },
     { id: "joint-test:negative-cases", passed: negativeCases.every((item) => !item.result.ok && item.result.errors.some((error) => error.code === item.expectedCode)), detail: `${negativeCases.length} rejection cases verified` },
     { id: "joint-test:signature-fixture", passed: sampleRequests.every((item) => item.headers["X-Signature"] && item.signatureBase.includes(item.headers["X-Idempotency-Key"])), detail: "HMAC-SHA256 base strings generated" },
-    { id: "joint-test:field-dictionaries", passed: buildFieldDictionaries(standard).every((item) => item.fields.length >= standard.messageEnvelope.requiredFields.length), detail: `${standard.interfaces.length} field dictionaries` }
+    { id: "joint-test:field-dictionaries", passed: buildFieldDictionaries(standard).every((item) => item.fields.length >= standard.messageEnvelope.requiredFields.length), detail: `${standard.interfaces.length} field dictionaries` },
+    { id: "joint-test:site-sample-acceptance", passed: siteSampleAcceptance.length === sampleRequests.length && siteSampleAcceptance.every((item) => item.siteInputs.length >= 5 && item.acceptanceEvidence.length >= 4 && item.status === "ready_for_joint_test"), detail: `${siteSampleAcceptance.filter((item) => item.status === "ready_for_joint_test").length}/${siteSampleAcceptance.length} site sample rows ready` }
   ];
   return {
     ok: checks.every((item) => item.passed),
@@ -335,7 +373,9 @@ function buildQualitySafetyInterfaceJointTestPack(options = {}) {
       sampleRequests: sampleRequests.length,
       sampleAccepted: sampleValidations.filter((item) => item.result.ok).length,
       negativeCases: negativeCases.length,
-      fieldDictionaries: standard.interfaces.length
+      fieldDictionaries: standard.interfaces.length,
+      siteSampleAcceptance: siteSampleAcceptance.length,
+      siteSampleReady: siteSampleAcceptance.filter((item) => item.status === "ready_for_joint_test").length
     },
     securityFixture: {
       algorithm: "HMAC-SHA256",
@@ -346,6 +386,7 @@ function buildQualitySafetyInterfaceJointTestPack(options = {}) {
     fieldDictionaries: buildFieldDictionaries(standard),
     sampleRequests,
     sampleValidations,
+    siteSampleAcceptance,
     negativeCases,
     checks
   };
@@ -379,6 +420,12 @@ function renderMarkdown(report) {
     "|---|---|---|",
     ...report.sampleValidations.map((item) => `| ${item.id} | ${item.result.ok ? "PASS" : "FAIL"} | ${item.result.errors.map((error) => error.code).join(", ") || "accepted"} |`),
     ...report.negativeCases.map((item) => `| ${item.id} | ${!item.result.ok ? "PASS" : "FAIL"} | expected ${item.expectedCode}; got ${item.result.errors.map((error) => error.code).join(", ")} |`),
+    "",
+    "## Site Sample Acceptance",
+    "",
+    "| Interface | Owner | Site inputs | Acceptance evidence | Verification | Status |",
+    "|---|---|---|---|---|---|",
+    ...report.siteSampleAcceptance.map((item) => `| ${item.interfaceId} | ${item.owner} | ${item.siteInputs.join(", ")} | ${item.acceptanceEvidence.join(", ")} | ${item.verificationCommand} | ${item.status} |`),
     "",
     "## Field Dictionaries",
     "",
