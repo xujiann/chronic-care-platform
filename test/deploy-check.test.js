@@ -11,6 +11,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
   [
     "file:README.md",
     "file:DEPLOYMENT.md",
+    "file:docs/health-dashboard-indicator-center-report.md",
     "package:scripts",
     "snapshot:collections",
     "snapshot:interfaceReadiness",

@@ -486,6 +486,150 @@ function buildSiteIssueLedger(context = {}) {
   };
 }
 
+function buildProductionAcceptanceRouting() {
+  return [
+    {
+      id: "identity",
+      gateId: "identity-audit",
+      name: "统一身份接收判定",
+      receiver: "规划信息处、统一认证管理员",
+      requiredPreparation: "真实账号、角色映射、机构目录和区县科室权限样例",
+      passCondition: "真实账号完成登录、角色映射和区县科室权限验证。",
+      failedAction: "退回身份源配置并保留审计记录。",
+      status: "pending"
+    },
+    {
+      id: "audit-retention",
+      gateId: "identity-audit",
+      name: "审计留存接收判定",
+      receiver: "安全管理岗、项目办",
+      requiredPreparation: "审计导出目录、哈希链校验、留存周期和查询权限",
+      passCondition: "审计导出目录、哈希链校验和查询权限全部可复核。",
+      failedAction: "不得解除生产上线阻断。",
+      status: "pending"
+    },
+    {
+      id: "database",
+      gateId: "data-storage",
+      name: "生产数据库接收判定",
+      receiver: "数据平台、运维负责人",
+      requiredPreparation: "迁移日志、备份恢复截图、脱敏演练记录和回滚窗口",
+      passCondition: "迁移、备份、恢复、脱敏和回滚窗口均有演练记录。",
+      failedAction: "继续限定为演示或联调环境。",
+      status: "pending"
+    },
+    {
+      id: "monitoring-dr",
+      gateId: "operations-dr",
+      name: "监控灾备接收判定",
+      receiver: "运维、安全管理岗",
+      requiredPreparation: "健康检查、指标采集、告警路由、值班升级和 RTO/RPO 演练记录",
+      passCondition: "健康检查、指标采集、告警路由、值班升级和 RTO/RPO 演练可追溯。",
+      failedAction: "不得转连续运行。",
+      status: "pending"
+    },
+    {
+      id: "interface-signoff",
+      gateId: "interface-signoff",
+      name: "接口联调接收判定",
+      receiver: "医疗机构接口负责人、项目办",
+      requiredPreparation: "真实报文、截图、问题清单、整改复测和联合签字单",
+      passCondition: "真实报文、截图、问题清单、整改复测和联合签字单一致归档。",
+      failedAction: "保留接口试运行状态。",
+      status: "pending"
+    }
+  ];
+}
+
+function buildProductionBackendGoLiveChecklist() {
+  const items = [
+    {
+      id: "backend-runtime",
+      capability: "Node.js API 生产部署",
+      owner: "平台运维",
+      status: "watch",
+      requiredPreparation: "Node 运行时、进程守护、HTTPS、反向代理、环境变量、生产密钥和部署账号。",
+      evidence: "环境部署单、域名证书、env:check:production、发布记录。",
+      nextAction: "在目标服务器完成 Node API、反向代理、证书和生产环境变量配置。"
+    },
+    {
+      id: "backend-database",
+      capability: "生产数据库",
+      owner: "数据平台、数据库管理员",
+      status: "blocked",
+      requiredPreparation: "正式数据库、连接池、迁移脚本、账号权限、索引约束、备份恢复和回滚窗口。",
+      evidence: "数据库验收单、迁移日志、恢复演练报告、production-db:readiness。",
+      nextAction: "用正式数据库替换演示 JSON/SQLite 口径，并完成迁移和恢复演练。"
+    },
+    {
+      id: "backend-identity",
+      capability: "统一身份与机构目录",
+      owner: "规划信息处、统一认证管理员",
+      status: "blocked",
+      requiredPreparation: "政务统一认证或主管部门身份源、OIDC/SAML、claim 映射、机构目录和角色权限。",
+      evidence: "身份联调记录、权限矩阵、拒绝访问审计、签字单。",
+      nextAction: "完成真实身份源、机构目录、区县科室映射和拒绝访问审计测试。"
+    },
+    {
+      id: "backend-interfaces",
+      capability: "外部接口适配",
+      owner: "接口联调组、医疗机构接口负责人",
+      status: "blocked",
+      requiredPreparation: "HIS/EMR/LIS/PACS、医保、电子证照、统计直报等真实接口、签名、幂等、重试和死信。",
+      evidence: "字段映射表、真实报文、联调截图、整改复测、联合签字。",
+      nextAction: "按 P0 接口清单完成真实报文联调、失败重试、死信和对账验证。"
+    },
+    {
+      id: "backend-audit-retention",
+      capability: "审计留存",
+      owner: "安全管理岗、项目办",
+      status: "blocked",
+      requiredPreparation: "安全事件、访问日志、数据读取日志接入审计留存目录或 SIEM，并支持哈希链验证。",
+      evidence: "AUDIT_EXPORT_PATH 或 SIEM_ENDPOINT、导出样例、留存策略。",
+      nextAction: "配置生产审计留存目标，导出并校验哈希链审计样例。"
+    },
+    {
+      id: "backend-monitoring",
+      capability: "监控告警",
+      owner: "运维、安全管理岗",
+      status: "pending",
+      requiredPreparation: "健康检查、指标采集、错误率、响应时间、任务积压、接口失败率和告警路由。",
+      evidence: "监控截图、告警规则、值班表、演练记录。",
+      nextAction: "接入 /api/health、/api/metrics、接口失败率、响应时间和告警升级链路。"
+    },
+    {
+      id: "backend-dr",
+      capability: "备份恢复与灾备",
+      owner: "运维、数据平台",
+      status: "pending",
+      requiredPreparation: "自动备份、恢复脚本、RTO/RPO、灾备切换和回滚方案。",
+      evidence: "备份报告、恢复日志、灾备演练报告、签字单。",
+      nextAction: "完成真实数据库备份恢复、异地副本切换和 RTO/RPO 验收。"
+    },
+    {
+      id: "backend-security-compliance",
+      capability: "安全合规",
+      owner: "安全管理岗、测评机构",
+      status: "pending",
+      requiredPreparation: "等保、密评、信创、国密、漏洞整改、最小权限和脱敏策略。",
+      evidence: "测评报告、整改闭环、安全评审单。",
+      nextAction: "归档等保、密评、信创、国密和上线安全评审材料。"
+    }
+  ];
+  return {
+    status: items.some((item) => item.status === "blocked") ? "blocked" : items.some((item) => item.status === "pending" || item.status === "watch") ? "watch" : "ready",
+    summary: {
+      total: items.length,
+      ready: items.filter((item) => item.status === "ready").length,
+      watch: items.filter((item) => item.status === "watch").length,
+      pending: items.filter((item) => item.status === "pending").length,
+      blocked: items.filter((item) => item.status === "blocked").length
+    },
+    items,
+    boundary: "真实上线必须使用生产级后端；当前 Node API 是基础，仍需完成生产数据库、统一身份、真实接口、审计留存、监控告警、备份恢复和安全合规闭环。"
+  };
+}
+
 function buildProductionReadinessGate(productionDeploymentPlan = [], context = {}) {
   const planRows = Array.isArray(productionDeploymentPlan) ? productionDeploymentPlan : [];
   const byId = Object.fromEntries(planRows.map((item) => [item.id, item]));
@@ -558,6 +702,8 @@ function buildProductionReadinessGate(productionDeploymentPlan = [], context = {
     overallStatus: summary.blocked ? "blocked" : summary.watch ? "watch" : "ready",
     summary,
     items: gates,
+    acceptanceRouting: buildProductionAcceptanceRouting(),
+    backendGoLiveChecklist: buildProductionBackendGoLiveChecklist(),
     boundary: "上线运行标准以正式环境、统一身份、审计留存、生产数据库、接口签字、监控告警和灾备演练全部闭环为准。"
   };
 }
@@ -944,6 +1090,220 @@ function buildCityCountyFunctionMatrix(context = {}) {
   ];
 }
 
+function buildIndicatorCenter(context = {}) {
+  const applications = context.applications || [];
+  const populationServiceBoard = context.populationServiceBoard || { summary: {}, periods: [], insights: [], sourceDetails: [] };
+  const certificateExchange = context.certificateExchange || { summary: {}, items: [] };
+  const riskDrilldowns = context.riskDrilldowns || { summary: {}, items: [] };
+  const siteEvidencePackage = context.siteEvidencePackage || { summary: {}, items: [] };
+  const actionClosureTrend = context.actionClosureTrend || { summary: {}, periods: [] };
+  const productionReadinessGate = context.productionReadinessGate || { overallStatus: "blocked", summary: {}, items: [] };
+  const sourceRecords = applications.reduce((sum, item) => sum + Number(item.records || 0), 0);
+  const sourceOpenActions = applications.reduce((sum, item) => sum + Number(item.openActions || 0), 0);
+  const highRisks = applications.reduce((sum, item) => sum + Number(item.highRisks || 0), 0);
+  const backendChecklist = productionReadinessGate.backendGoLiveChecklist || { summary: {}, items: [] };
+  const monthPeriod = (populationServiceBoard.periods || []).find((item) => item.id === "month") || { metrics: [] };
+  const metricValue = (id) => monthPeriod.metrics?.find((item) => item.id === id)?.value || 0;
+  const dimensions = [
+    { id: "performance", name: "公立医院绩效考核", owner: "医政医管处、规划信息处", policy: "对齐国家公立医院绩效考核与高质量发展运营评价。" },
+    { id: "grade-review", name: "等级评审", owner: "医政医管处、项目办", policy: "围绕四甲/五乙评审、互联互通测评和现场证据闭环。" },
+    { id: "quality", name: "医疗质量", owner: "医政医管处、质控中心", policy: "聚焦高风险事件、质量安全、处置闭环和可追溯证据。" },
+    { id: "operation", name: "运营效率", owner: "规划信息处、财务运营协同", policy: "支持运行决策、服务量、任务效率和资源调度分析。" },
+    { id: "chronic", name: "慢病管理", owner: "基层卫生处、公卫处", policy: "汇总慢病筛查、随访、教育、用药和医防融合任务。" },
+    { id: "experience", name: "服务体验/便民惠民", owner: "妇幼处、基层卫生处、政务服务协同", policy: "关注出生死亡证照、居民服务、回执和便民协同。" },
+    { id: "interface-launch", name: "接口联调/上线准备", owner: "规划信息处、项目办、安全管理岗", policy: "覆盖接口联调、生产后端、审计留存、灾备和上线门禁。" },
+    { id: "standard", name: "标准指标集", owner: "规划信息处、统计信息岗", policy: "沉淀统一指标目录、口径、来源、质量和责任方。" }
+  ];
+  const indicators = [
+    {
+      id: "standard-indicator-catalog",
+      dimension: "standard",
+      name: "标准指标目录覆盖率",
+      definition: "已纳入统一目录的指标数 / 本期应纳入指标数，覆盖绩效、评审、质量、运营、慢病、体验和上线准备。",
+      source: "healthDashboardSummary / applicationCatalog / platformEvidence",
+      owner: "规划信息处、统计信息岗",
+      currentValue: `${sourceRecords} 条源记录 / 7 个源应用`,
+      targetValue: "形成可追溯标准指标集并逐项绑定口径、来源和责任方",
+      trend: "稳定扩展",
+      status: "ready",
+      quality: "高",
+      confidence: 88,
+      blockers: ["现场需确认最终标准指标编码和上报口径"],
+      drilldown: { label: "查看功能报告", href: "#dashboard-function-report", evidence: "functionalReport/functions" }
+    },
+    {
+      id: "performance-public-hospital",
+      dimension: "performance",
+      name: "公立医院绩效考核对齐度",
+      definition: "围绕国家公立医院绩效考核的医疗质量、运营效率、持续发展和满意度维度建立指标映射。",
+      source: "healthStatistics.dailyServiceReports / institutionCreditEvaluations / platformInterfaces",
+      owner: "医政医管处、规划信息处",
+      currentValue: `月就诊 ${metricValue("visits").toLocaleString("zh-CN")} 人次 / 入院 ${metricValue("admissions").toLocaleString("zh-CN")} 人次`,
+      targetValue: "接入国家绩效考核口径、病案首页和 DRG/DIP 评价数据",
+      trend: "需联调",
+      status: "watch",
+      quality: "中",
+      confidence: 76,
+      blockers: ["缺国家绩效考核平台真实回传", "缺病案首页质量与 DRG/DIP 明细"],
+      drilldown: { label: "查看运营服务看板", href: "#population-service-board", evidence: "populationServiceBoard" }
+    },
+    {
+      id: "grade-review-evidence",
+      dimension: "grade-review",
+      name: "等级评审证据闭环率",
+      definition: "已形成可审查证据的评审材料 / 等级评审与互联互通现场材料总数。",
+      source: "platformEvidence / siteEvidencePackage / release-artifact-manifest",
+      owner: "项目办、医政医管处",
+      currentValue: `${siteEvidencePackage.summary?.ready || 0}/${siteEvidencePackage.summary?.artifacts || 0} 项证据已就绪`,
+      targetValue: "四甲/五乙、互联互通、整改复测和签字材料全量闭环",
+      trend: "持续补证",
+      status: siteEvidencePackage.summary?.ready >= 3 ? "ready" : "watch",
+      quality: "高",
+      confidence: 84,
+      blockers: ["生产现场截图、第三方测评结论仍需替换演示样例"],
+      drilldown: { label: "查看现场验收证据包", href: "#site-evidence-package", evidence: "siteEvidencePackage" }
+    },
+    {
+      id: "quality-risk-closure",
+      dimension: "quality",
+      name: "医疗质量风险闭环率",
+      definition: "已闭环质量风险 / 全部高风险与预警任务，按责任人、时限、轨迹和阻塞项追踪。",
+      source: "riskDrilldowns / emergencySignals / followups / countyAcceptanceLedger",
+      owner: "医政医管处、质控中心",
+      currentValue: `${riskDrilldowns.summary?.items || 0} 条风险下钻 / ${highRisks} 条高风险`,
+      targetValue: "高风险 100% 明确责任人、时限和复核结论",
+      trend: "需督办",
+      status: highRisks > 0 ? "watch" : "ready",
+      quality: "中",
+      confidence: 78,
+      blockers: ["源应用处置结论尚未全部回写到驾驶舱"],
+      drilldown: { label: "查看风险下钻", href: "#risk-drilldown-board", evidence: "riskDrilldowns" }
+    },
+    {
+      id: "operation-closure-efficiency",
+      dimension: "operation",
+      name: "运营任务闭环效率",
+      definition: "跨应用任务闭环率、超期率和应用分布，用于行政调度和运营决策。",
+      source: "actionClosureTrend / openActions / sourceApplications",
+      owner: "规划信息处、运行调度岗",
+      currentValue: `闭环率 ${actionClosureTrend.summary?.closureRate || 0}% / 超期率 ${actionClosureTrend.summary?.overdueRate || 0}%`,
+      targetValue: "闭环率 >=95%，超期率 <=5%",
+      trend: "受阻",
+      status: (actionClosureTrend.summary?.overdueRate || 0) > 20 ? "blocked" : "watch",
+      quality: "中",
+      confidence: 74,
+      blockers: [`仍有 ${sourceOpenActions} 条源应用待办需回到源系统闭环`],
+      drilldown: { label: "查看任务闭环趋势", href: "#action-closure-trend-board", evidence: "actionClosureTrend" }
+    },
+    {
+      id: "chronic-management-continuity",
+      dimension: "chronic",
+      name: "慢病医防融合连续管理",
+      definition: "慢病筛查、随访、教育、管理计划和用药支持的连续服务任务汇总。",
+      source: "followups / chronicScreeningTasks / chronicEducationPushes / chronicManagementPlans",
+      owner: "基层卫生处、公卫处",
+      currentValue: `${applications.find((item) => item.id === "commission-supervision")?.openActions || 0} 条综合监管源待办`,
+      targetValue: "慢病筛查、随访、教育、处方和复核闭环可追踪",
+      trend: "需闭环",
+      status: "watch",
+      quality: "中",
+      confidence: 72,
+      blockers: ["家庭医生、药师和公卫随访结果仍需现场接口回写"],
+      drilldown: { label: "查看任务闭环", href: "#dashboard-actions-panel", evidence: "openActions/followups" }
+    },
+    {
+      id: "experience-certificate-service",
+      dimension: "experience",
+      name: "便民证照服务协同",
+      definition: "出生、死亡、电子证照、公安、民政、疾控和统计直报回执协同情况。",
+      source: "birthCertificates / deathCertificates / digitalCredentials / certificateExchange",
+      owner: "妇幼处、基层卫生处、政务服务协同",
+      currentValue: `${certificateExchange.summary?.receipts || 0} 条回执 / ${certificateExchange.summary?.tracks || 0} 条证照链路`,
+      targetValue: "证照回执、补正、撤销、对账和跨部门共享全链条闭环",
+      trend: "需补回执",
+      status: certificateExchange.status === "ready" ? "ready" : "watch",
+      quality: "中",
+      confidence: 75,
+      blockers: ["公安户籍、民政殡葬、疾控死因监测回执需现场确认"],
+      drilldown: { label: "查看证照交换", href: "#certificate-exchange-board", evidence: "certificateExchange" }
+    },
+    {
+      id: "interface-launch-readiness",
+      dimension: "interface-launch",
+      name: "接口联调与上线准备通过率",
+      definition: "接口联调、生产后端、统一身份、审计留存、监控告警、备份恢复和安全合规的上线门禁状态。",
+      source: "platformInterfaces / productionReadinessGate / backendGoLiveChecklist",
+      owner: "规划信息处、项目办、安全管理岗",
+      currentValue: `${productionReadinessGate.summary?.ready || 0}/${productionReadinessGate.summary?.total || 0} 项门禁就绪，后端 ${backendChecklist.summary?.blocked || 0} 项阻塞`,
+      targetValue: "生产门禁、后端清单和接口签字全部通过",
+      trend: "阻塞",
+      status: "blocked",
+      quality: "中",
+      confidence: 70,
+      blockers: ["生产数据库、统一身份、真实接口、审计留存仍未现场签字"],
+      drilldown: { label: "查看上线门禁", href: "#production-readiness-board", evidence: "productionReadinessGate/backendGoLiveChecklist" }
+    }
+  ];
+  const dimensionLookup = Object.fromEntries(dimensions.map((item) => [item.id, item]));
+  const reformCategories = [
+    { id: "operation", name: "运营", owner: "规划信息处、运行调度岗", target: "服务量、闭环效率、运营决策和资源调度。" },
+    { id: "quality", name: "质量", owner: "医政医管处、质控中心", target: "医疗质量、等级评审、风险下钻和整改复核。" },
+    { id: "safety", name: "安全", owner: "安全管理岗、项目办", target: "上线门禁、审计留存、灾备演练和安全合规。" },
+    { id: "coordination", name: "协同", owner: "医政医管处、基层卫生处", target: "医共体、转诊、证照交换和跨部门接口协同。" },
+    { id: "public-health", name: "公卫", owner: "公卫处、基层卫生处", target: "慢病、公卫随访、出生死亡和疾控协同。" },
+    { id: "research", name: "科研", owner: "科教处、科研管理岗", target: "科研数据集、专病库、转化证据和伦理合规。" },
+    { id: "resource-efficiency", name: "资源效率", owner: "规划信息处、财务运营协同", target: "床位、人力、设备、药耗和服务效率。" }
+  ];
+  const categoryByIndicator = {
+    "standard-indicator-catalog": "operation",
+    "performance-public-hospital": "resource-efficiency",
+    "grade-review-evidence": "quality",
+    "quality-risk-closure": "quality",
+    "operation-closure-efficiency": "operation",
+    "chronic-management-continuity": "public-health",
+    "experience-certificate-service": "coordination",
+    "interface-launch-readiness": "safety"
+  };
+  const enriched = indicators.map((item) => ({
+    ...item,
+    reformCategory: categoryByIndicator[item.id] || "operation",
+    dimensionName: dimensionLookup[item.dimension]?.name || item.dimension,
+    dimensionOwner: dimensionLookup[item.dimension]?.owner || item.owner
+  }));
+  return {
+    title: "指标中心",
+    basis: "吸收标准指标集、国家公立医院绩效考核、等级评审、运营决策和指标下钻思路，服务各级卫生健康行政部门审查。",
+    summary: {
+      indicators: enriched.length,
+      dimensions: dimensions.length,
+      ready: enriched.filter((item) => item.status === "ready").length,
+      watch: enriched.filter((item) => item.status === "watch").length,
+      blocked: enriched.filter((item) => item.status === "blocked").length,
+      averageConfidence: Math.round(enriched.reduce((sum, item) => sum + Number(item.confidence || 0), 0) / enriched.length)
+    },
+    dimensions: dimensions.map((item) => ({
+      ...item,
+      indicators: enriched.filter((indicator) => indicator.dimension === item.id).length
+    })),
+    reformCategories: reformCategories.map((item) => ({
+      ...item,
+      indicators: enriched.filter((indicator) => indicator.reformCategory === item.id).length
+    })),
+    aggregationEntrypoints: [
+      { id: "smart-hospital", name: "智慧医院管理线汇聚入口", href: "#dashboard-indicator-center", status: "planned", modules: ["医疗质量安全", "医院运行监测", "科研平台", "药品耗材监管"], nextAction: "等待各智慧医院子模块完成首轮指标 API 后接入本指标中心。" },
+      { id: "medical-consortium", name: "医共体协同指标汇聚入口", href: "#dashboard-indicator-center", status: "planned", modules: ["转诊", "会诊", "检查检验互认", "基层随访"], nextAction: "接收医共体协同闭环线程输出的协同效率和闭环完成率。" },
+      { id: "public-health", name: "公卫闭环指标汇聚入口", href: "#dashboard-indicator-center", status: "planned", modules: ["慢病管理", "监测预警", "任务派发", "随访回填"], nextAction: "接收公卫风险闭环线程输出的预警、干预和随访指标。" }
+    ],
+    indicators: enriched,
+    releaseEvidence: [
+      { id: "indicator-center-summary", name: "指标中心摘要", evidence: "healthDashboardSummary.indicatorCenter" },
+      { id: "indicator-center-page", name: "驾驶舱指标中心页面", evidence: "health-dashboard.html#dashboard-indicator-center" },
+      { id: "indicator-center-release", name: "指标中心发布证据", evidence: "docs/health-dashboard-indicator-center-report.md" }
+    ],
+    boundary: "指标中心只做行政管理、绩效评估、等级评审和上线审查的指标汇总与下钻，不替代国家平台、医院源系统或业务处置系统。"
+  };
+}
+
 function buildFunctionalReport(context) {
   const applications = context.applications || [];
   const openActions = context.openActions || [];
@@ -957,6 +1317,7 @@ function buildFunctionalReport(context) {
   const jurisdictionScope = context.jurisdictionScope || { summary: {}, districts: [] };
   const actionClosureTrend = context.actionClosureTrend || { summary: {}, periods: [] };
   const productionReadinessGate = context.productionReadinessGate || { overallStatus: "blocked", summary: {}, items: [] };
+  const indicatorCenter = context.indicatorCenter || { summary: {}, indicators: [] };
   const departmentFunctionMatrix = buildDepartmentFunctionMatrix(context);
   const cityCountyFunctionMatrix = buildCityCountyFunctionMatrix(context);
   const sourceRecords = applications.reduce((sum, item) => sum + Number(item.records || 0), 0);
@@ -1004,6 +1365,13 @@ function buildFunctionalReport(context) {
       status: departmentFunctionMatrix.length >= 6 ? "ready" : "watch",
       evidence: `${departmentFunctionMatrix.length} 条委机关内设机构职能矩阵`,
       boundary: "按规划信息、医政、基层公卫、妇幼、疾控、监督和项目安全职责关联源模块，不带入非本机关办理任务。"
+    },
+    {
+      id: "indicator-center",
+      name: "指标中心",
+      status: indicatorCenter.indicators?.length >= 8 ? "ready" : "watch",
+      evidence: `${indicatorCenter.summary?.indicators || 0} 个指标，${indicatorCenter.summary?.dimensions || 0} 个维度，平均可信度 ${indicatorCenter.summary?.averageConfidence || 0}%`,
+      boundary: "按标准指标集、绩效考核、等级评审、运营决策和上线准备形成可审查指标目录；不替代源系统上报。"
     },
     {
       id: "certificate-exchange-chain",
@@ -1077,6 +1445,7 @@ function buildFunctionalReport(context) {
     releaseEvidence: [
       { id: "summary-api", name: "综合管理服务系统摘要接口", evidence: "/api/health-dashboard/summary" },
       { id: "summary-script", name: "模块摘要与功能报告", evidence: "npm.cmd run health-dashboard:summary" },
+      { id: "indicator-center", name: "指标中心发布证据", evidence: "docs/health-dashboard-indicator-center-report.md" },
       { id: "release-gate", name: "发布聚合报告", evidence: "npm.cmd run release:report" },
       { id: "deploy-gate", name: "部署门禁", evidence: "npm.cmd run deploy:check" }
     ],
@@ -1111,7 +1480,8 @@ function buildHealthDashboardSummary(options = {}) {
   const productionReadinessGate = buildProductionReadinessGate(productionDeploymentPlan, { interfaceRows, siteEvidencePackage, siteIssueLedger });
   const jurisdictionScope = buildJurisdictionScope(data, { openActions, applications });
   const actionClosureTrend = buildActionClosureTrend(taskActions, { openActions });
-  const functionalReport = buildFunctionalReport({ applications, openActions, actionClosureTrend, populationServiceBoard, certificateExchange, riskDrilldowns, siteEvidencePackage, jurisdictionScope, interfaceRows, evidenceRecords, siteDependencies, productionReadinessGate });
+  const indicatorCenter = buildIndicatorCenter({ applications, actionClosureTrend, populationServiceBoard, certificateExchange, riskDrilldowns, siteEvidencePackage, productionReadinessGate });
+  const functionalReport = buildFunctionalReport({ applications, openActions, actionClosureTrend, populationServiceBoard, certificateExchange, riskDrilldowns, siteEvidencePackage, jurisdictionScope, interfaceRows, evidenceRecords, siteDependencies, productionReadinessGate, indicatorCenter });
   const departmentFunctionMatrix = functionalReport.departmentFunctionMatrix || [];
   const cityCountyFunctionMatrix = functionalReport.cityCountyFunctionMatrix || [];
   const checks = [
@@ -1127,7 +1497,10 @@ function buildHealthDashboardSummary(options = {}) {
     { id: "dashboard:site-evidence-package", passed: siteEvidencePackage.items.length >= 4 && siteEvidencePackage.summary.ready >= 3, detail: `${siteEvidencePackage.items.length} evidence package artifacts` },
     { id: "dashboard:site-issue-ledger", passed: siteIssueLedger.summary.total >= 1 && siteIssueLedger.items.every((item) => item.owner && item.nextAction && item.boundary), detail: `${siteIssueLedger.summary.total} site issue rows` },
     { id: "dashboard:production-readiness-gate", passed: productionReadinessGate.items.length >= 5 && productionReadinessGate.items.every((item) => item.owner && item.nextAction && item.boundary), detail: `${productionReadinessGate.summary.ready}/${productionReadinessGate.summary.total} production gates ready; ${productionReadinessGate.summary.blocked} blocked` },
-    { id: "dashboard:functional-report", passed: functionalReport.functions.length >= 14 && functionalReport.releaseEvidence.length >= 4, detail: `${functionalReport.functions.length} module functions with release evidence` },
+    { id: "dashboard:production-acceptance-routing", passed: (productionReadinessGate.acceptanceRouting || []).length === 5 && productionReadinessGate.acceptanceRouting.every((item) => item.receiver && item.requiredPreparation && item.passCondition && item.failedAction), detail: `${(productionReadinessGate.acceptanceRouting || []).length} P0 acceptance routing rows` },
+    { id: "dashboard:backend-go-live-checklist", passed: (productionReadinessGate.backendGoLiveChecklist?.items || []).length === 8 && productionReadinessGate.backendGoLiveChecklist.items.every((item) => item.owner && item.requiredPreparation && item.evidence && item.nextAction), detail: `${(productionReadinessGate.backendGoLiveChecklist?.items || []).length} backend go-live rows` },
+    { id: "dashboard:indicator-center", passed: indicatorCenter.indicators.length >= 8 && indicatorCenter.dimensions.length >= 7 && indicatorCenter.reformCategories?.length === 7 && indicatorCenter.aggregationEntrypoints?.length === 3 && indicatorCenter.indicators.every((item) => item.definition && item.source && item.owner && item.currentValue && item.targetValue && item.reformCategory && item.drilldown?.href), detail: `${indicatorCenter.indicators.length} indicators across ${indicatorCenter.dimensions.length} dimensions / ${indicatorCenter.reformCategories?.length || 0} reform categories / ${indicatorCenter.aggregationEntrypoints?.length || 0} entrypoints` },
+    { id: "dashboard:functional-report", passed: functionalReport.functions.length >= 15 && functionalReport.releaseEvidence.length >= 5, detail: `${functionalReport.functions.length} module functions with release evidence` },
     { id: "dashboard:jurisdiction-scope", passed: jurisdictionScope.districts.length >= 2 && jurisdictionScope.summary.institutions >= 3 && jurisdictionScope.institutionTypeOptions.length >= 2, detail: `${jurisdictionScope.summary.districts} districts, ${jurisdictionScope.summary.institutions} institutions, ${jurisdictionScope.summary.openActions} open actions` },
     { id: "dashboard:jurisdiction-detail", passed: jurisdictionScope.districts.some((item) => item.id !== "all" && (item.institutionsList?.length || item.serviceReportList?.length || item.actionList?.length)), detail: "district drilldown includes institution, service, or action detail" },
     { id: "dashboard:action-closure-trend", passed: actionClosureTrend.summary.total >= openActions.length && actionClosureTrend.periods.length === 4 && actionClosureTrend.applications.length >= 2, detail: `${actionClosureTrend.summary.closureRate}% closure, ${actionClosureTrend.summary.overdueRate}% overdue` },
@@ -1178,6 +1551,7 @@ function buildHealthDashboardSummary(options = {}) {
     siteEvidencePackage,
     siteIssueLedger,
     productionReadinessGate,
+    indicatorCenter,
     jurisdictionScope,
     actionClosureTrend,
     functionalReport,
@@ -1279,6 +1653,9 @@ function dashboardReportCheckLabel(checkId) {
     "dashboard:site-evidence-package": "现场验收证据包",
     "dashboard:site-issue-ledger": "现场问题整改台账",
     "dashboard:production-readiness-gate": "上线运行门禁",
+    "dashboard:production-acceptance-routing": "P0 接收判定",
+    "dashboard:backend-go-live-checklist": "生产后端上线清单",
+    "dashboard:indicator-center": "指标中心",
     "dashboard:functional-report": "主要功能报告",
     "dashboard:jurisdiction-scope": "辖区监管钻取",
     "dashboard:jurisdiction-detail": "区县监管详情",
@@ -1340,6 +1717,11 @@ function renderMarkdown(report) {
   const siteEvidenceRows = (report.siteEvidencePackage?.items || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.type || item.id} | ${dashboardReportEvidenceLabel(item.evidence || "").replace(/\|/g, "/")} | ${dashboardReportOwnerLabel(item.owner)} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`);
   const siteIssueRows = (report.siteIssueLedger?.items || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.category || item.id} | ${dashboardReportOwnerLabel(item.owner)} | ${dashboardReportEvidenceLabel(item.source || "").replace(/\|/g, "/")} | ${String(item.nextAction || "").replace(/\|/g, "/")} | ${String(item.boundary || "").replace(/\|/g, "/")} |`);
   const productionGateRows = (report.productionReadinessGate?.items || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.name || item.id} | ${dashboardReportOwnerLabel(item.owner)} | ${String(item.evidence || "").replace(/\|/g, "/")} | ${String(item.nextAction || "").replace(/\|/g, "/")} | ${String(item.boundary || "").replace(/\|/g, "/")} |`);
+  const acceptanceRoutingRows = (report.productionReadinessGate?.acceptanceRouting || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.name || item.id} | ${dashboardReportOwnerLabel(item.receiver)} | ${String(item.requiredPreparation || "").replace(/\|/g, "/")} | ${String(item.passCondition || "").replace(/\|/g, "/")} | ${String(item.failedAction || "").replace(/\|/g, "/")} |`);
+  const backendGoLiveRows = (report.productionReadinessGate?.backendGoLiveChecklist?.items || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.capability || item.id} | ${dashboardReportOwnerLabel(item.owner)} | ${String(item.requiredPreparation || "").replace(/\|/g, "/")} | ${String(item.evidence || "").replace(/\|/g, "/")} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`);
+  const indicatorRows = (report.indicatorCenter?.indicators || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.dimensionName || item.dimension} | ${item.name || item.id} | ${String(item.definition || "").replace(/\|/g, "/")} | ${dashboardReportEvidenceLabel(item.source || "").replace(/\|/g, "/")} | ${dashboardReportOwnerLabel(item.owner)} | ${String(item.currentValue || "").replace(/\|/g, "/")} | ${String(item.targetValue || "").replace(/\|/g, "/")} | ${item.confidence || 0}% | ${(item.blockers || []).map((text) => String(text).replace(/\|/g, "/")).join("<br>")} | ${item.drilldown?.href || ""} |`);
+  const indicatorCategoryRows = (report.indicatorCenter?.reformCategories || []).map((item) => `| ${item.name || item.id} | ${dashboardReportOwnerLabel(item.owner)} | ${item.indicators || 0} | ${String(item.target || "").replace(/\|/g, "/")} |`);
+  const indicatorEntrypointRows = (report.indicatorCenter?.aggregationEntrypoints || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.name || item.id} | ${(item.modules || []).map((text) => String(text).replace(/\|/g, "/")).join("<br>")} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`);
   const functionRows = (report.functionalReport?.functions || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.name || item.id} | ${dashboardReportEvidenceLabel(item.evidence || "").replace(/\|/g, "/")} | ${String(item.boundary || "").replace(/\|/g, "/")} |`);
   const departmentRows = (report.functionalReport?.departmentFunctionMatrix || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.name || item.id} | ${(item.implemented || []).map((text) => String(text).replace(/\|/g, "/")).join("<br>")} | ${String(item.nextPlan || "").replace(/\|/g, "/")} |`);
   const cityCountyRows = (report.functionalReport?.cityCountyFunctionMatrix || []).map((item) => `| ${dashboardReportStatusLabel(item.status)} | ${item.level || ""} | ${item.agency || item.id} | ${(item.implemented || []).map((text) => String(text).replace(/\|/g, "/")).join("<br>")} | ${String(item.nextPlan || "").replace(/\|/g, "/")} |`);
@@ -1433,6 +1815,45 @@ function renderMarkdown(report) {
     "| 状态 | 门禁 | 责任方 | 证据 | 下一步 | 边界 |",
     "|---|---|---|---|---|---|",
     ...productionGateRows,
+    "",
+    "#### P0 接收判定",
+    "",
+    "| 状态 | 判定项 | 接收岗位 | 上线前准备 | 通过条件 | 未通过处理 |",
+    "|---|---|---|---|---|---|",
+    ...acceptanceRoutingRows,
+    "",
+    "#### 生产后端上线清单",
+    "",
+    report.productionReadinessGate?.backendGoLiveChecklist?.boundary || "真实上线必须使用生产级后端。",
+    "",
+    "| 状态 | 后端能力 | 责任方 | 必须准备 | 验收证据 | 下一步 |",
+    "|---|---|---|---|---|---|",
+    ...backendGoLiveRows,
+    "",
+    "## 指标中心",
+    "",
+    report.indicatorCenter?.basis || "按标准指标集、绩效考核、等级评审、运营决策和指标下钻形成可审查指标目录。",
+    "",
+    `- 指标数：${report.indicatorCenter?.summary?.indicators || 0}`,
+    `- 维度数：${report.indicatorCenter?.summary?.dimensions || 0}`,
+    `- 平均可信度：${report.indicatorCenter?.summary?.averageConfidence || 0}%`,
+    report.indicatorCenter?.boundary || "指标中心只做行政管理、绩效评估和上线审查，不替代源系统上报。",
+    "",
+    "| 状态 | 维度 | 指标 | 口径/公式 | 数据来源 | 责任方 | 当前值 | 目标值 | 可信度 | 阻塞项 | 下钻 |",
+    "|---|---|---|---|---|---|---|---|---:|---|---|",
+    ...indicatorRows,
+    "",
+    "### 公立医院改革与高质量发展分类",
+    "",
+    "| 分类 | 责任方 | 指标数 | 目标 |",
+    "|---|---|---:|---|",
+    ...indicatorCategoryRows,
+    "",
+    "### 汇聚入口预留",
+    "",
+    "| 状态 | 入口 | 模块 | 下一步 |",
+    "|---|---|---|---|",
+    ...indicatorEntrypointRows,
     "",
     "## 主要功能报告",
     "",
@@ -1538,4 +1959,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { APPLICATIONS, buildFunctionalReport, buildHealthDashboardSummary, buildPopulationServiceBoard, parseArgs, renderMarkdown, writeOutput };
+module.exports = { APPLICATIONS, buildFunctionalReport, buildHealthDashboardSummary, buildIndicatorCenter, buildPopulationServiceBoard, parseArgs, renderMarkdown, writeOutput };

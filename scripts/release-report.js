@@ -321,6 +321,10 @@ function healthDashboardChecks(healthDashboard) {
   const departmentRows = healthDashboard.functionalReport?.departmentFunctionMatrix?.length || 0;
   const cityCountyRows = healthDashboard.functionalReport?.cityCountyFunctionMatrix?.length || 0;
   const productionGateRows = healthDashboard.productionReadinessGate?.items?.length || 0;
+  const indicatorRows = healthDashboard.indicatorCenter?.indicators?.length || 0;
+  const indicatorDimensions = healthDashboard.indicatorCenter?.dimensions?.length || 0;
+  const indicatorCategories = healthDashboard.indicatorCenter?.reformCategories?.length || 0;
+  const indicatorEntrypoints = healthDashboard.indicatorCenter?.aggregationEntrypoints?.length || 0;
   return [
     check("healthDashboard:summary", healthDashboard.ok, healthDashboard.ok ? "health dashboard summary checks passed" : "health dashboard summary failed", "error", "health-dashboard"),
     check("healthDashboard:applications", healthDashboard.applications?.length === 7, `${healthDashboard.applications?.length || 0} source applications`, "error", "health-dashboard"),
@@ -332,6 +336,7 @@ function healthDashboardChecks(healthDashboard) {
     check("healthDashboard:siteIssueLedger", siteIssueRows >= 1 && (healthDashboard.siteIssueLedger?.items || []).every((item) => item.owner && item.nextAction), `${siteIssueRows} site issue rows`, "error", "health-dashboard"),
     check("healthDashboard:functionalReport", functionalItems >= 14, `${functionalItems} module functions reported`, "error", "health-dashboard"),
     check("healthDashboard:productionReadinessGate", productionGateRows >= 5 && Boolean(healthDashboard.productionReadinessGate?.boundary), `${productionGateRows} production readiness gates`, "error", "health-dashboard"),
+    check("healthDashboard:indicatorCenter", indicatorRows >= 8 && indicatorDimensions >= 7 && indicatorCategories === 7 && indicatorEntrypoints === 3 && (healthDashboard.indicatorCenter?.indicators || []).every((item) => item.definition && item.source && item.owner && item.reformCategory && item.drilldown?.href), `${indicatorRows} indicators, ${indicatorDimensions} dimensions, ${indicatorCategories} categories, ${indicatorEntrypoints} entrypoints`, "error", "health-dashboard"),
     check("healthDashboard:jurisdictionScope", jurisdictionRows >= 2 && (healthDashboard.jurisdictionScope?.summary?.institutions || 0) >= 3, `${jurisdictionRows} jurisdiction rows`, "error", "health-dashboard"),
     check("healthDashboard:jurisdictionDetail", jurisdictionDetailRows >= 1, `${jurisdictionDetailRows} jurisdiction detail rows`, "error", "health-dashboard"),
     check("healthDashboard:actionClosureTrend", actionTrendPeriods === 4 && (healthDashboard.actionClosureTrend?.summary?.total || 0) >= (healthDashboard.openActions?.length || 0), `${actionTrendPeriods} action trend periods`, "error", "health-dashboard"),

@@ -1967,6 +1967,9 @@ dialog::backdrop {
 .drilldown-grid,
 .site-evidence-grid,
 .site-issue-ledger-grid,
+.indicator-center-grid,
+.indicator-category-grid,
+.indicator-entry-grid,
 .production-readiness-grid {
   display: grid;
   gap: 10px;
@@ -1980,9 +1983,22 @@ dialog::backdrop {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+.indicator-center-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.indicator-category-grid,
+.indicator-entry-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 10px;
+}
+
 .drilldown-card,
 .site-evidence-card,
 .site-issue-ledger-card,
+.indicator-card,
+.indicator-category-card,
+.indicator-entry-card,
 .production-readiness-card {
   border: 1px solid var(--line);
   border-left: 4px solid var(--blue);
@@ -1994,18 +2010,26 @@ dialog::backdrop {
 .drilldown-card.high,
 .site-evidence-card.blocked,
 .site-issue-ledger-card.blocked,
+.indicator-card.blocked,
+.indicator-entry-card.blocked,
 .production-readiness-card.blocked { border-left-color: var(--red); }
 .drilldown-card.medium,
 .site-evidence-card.watch,
 .site-issue-ledger-card.watch,
+.indicator-card.watch,
+.indicator-entry-card.watch,
 .production-readiness-card.watch { border-left-color: var(--amber); }
 .drilldown-card.normal,
 .site-evidence-card.ready,
 .site-issue-ledger-card.ready,
+.indicator-card.ready,
+.indicator-entry-card.ready,
 .production-readiness-card.ready { border-left-color: var(--green); }
 .drilldown-card.empty,
 .site-evidence-card.empty,
 .site-issue-ledger-card.empty,
+.indicator-card.empty,
+.indicator-entry-card.empty,
 .production-readiness-card.empty { border-left-color: var(--muted); }
 
 .drilldown-card span,
@@ -2017,6 +2041,15 @@ dialog::backdrop {
 .site-issue-ledger-card span,
 .site-issue-ledger-card strong,
 .site-issue-ledger-card small,
+.indicator-card span,
+.indicator-card strong,
+.indicator-card small,
+.indicator-category-card span,
+.indicator-category-card strong,
+.indicator-category-card small,
+.indicator-entry-card span,
+.indicator-entry-card strong,
+.indicator-entry-card small,
 .production-readiness-card span,
 .production-readiness-card strong,
 .production-readiness-card small {
@@ -2026,6 +2059,9 @@ dialog::backdrop {
 .drilldown-card span,
 .site-evidence-card span,
 .site-issue-ledger-card span,
+.indicator-card span,
+.indicator-category-card span,
+.indicator-entry-card span,
 .production-readiness-card span {
   color: var(--muted);
   font-size: 12px;
@@ -2036,6 +2072,9 @@ dialog::backdrop {
 .drilldown-card strong,
 .site-evidence-card strong,
 .site-issue-ledger-card strong,
+.indicator-card strong,
+.indicator-category-card strong,
+.indicator-entry-card strong,
 .production-readiness-card strong {
   margin-top: 6px;
   font-size: 15px;
@@ -2047,6 +2086,12 @@ dialog::backdrop {
 .site-evidence-card p,
 .site-issue-ledger-card small,
 .site-issue-ledger-card p,
+.indicator-card small,
+.indicator-card p,
+.indicator-category-card small,
+.indicator-category-card p,
+.indicator-entry-card small,
+.indicator-entry-card p,
 .production-readiness-card small,
 .production-readiness-card p {
   color: var(--muted);
@@ -2057,8 +2102,19 @@ dialog::backdrop {
 .drilldown-card p,
 .site-evidence-card p,
 .site-issue-ledger-card p,
+.indicator-card p,
+.indicator-category-card p,
+.indicator-entry-card p,
 .production-readiness-card p {
   margin: 8px 0 0;
+}
+
+.indicator-card .inline-action {
+  margin-top: 10px;
+}
+
+.indicator-entry-card .inline-action {
+  margin-top: 10px;
 }
 
 .production-readiness-requirements {
@@ -2092,6 +2148,9 @@ dialog::backdrop {
 @media (max-width: 1100px) {
   .certificate-exchange-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .drilldown-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .indicator-center-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .indicator-category-grid,
+  .indicator-entry-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .production-readiness-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
@@ -2103,4 +2162,7 @@ dialog::backdrop {
     flex-direction: column;
   }
   .production-readiness-grid { grid-template-columns: 1fr; }
+  .indicator-center-grid { grid-template-columns: 1fr; }
+  .indicator-category-grid,
+  .indicator-entry-grid { grid-template-columns: 1fr; }
 }

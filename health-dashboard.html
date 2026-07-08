@@ -29,10 +29,12 @@
       <section class="metric-grid" id="dashboard-metrics"></section>
 
       <nav class="dashboard-section-nav" aria-label="综合管理服务系统页面导航">
+        <a href="#dashboard-indicator-center">指标中心</a>
         <a href="#population-service-board">人口服务</a>
         <a href="#dashboard-jurisdiction-board">市县视角</a>
         <a href="#dashboard-department-board">内设机构</a>
         <a href="#dashboard-function-report">功能报告</a>
+        <a href="#dashboard-review-quick-links">上线审查</a>
         <a href="#dashboard-actions-panel">任务闭环</a>
         <a href="#risk-drilldown-board">风险下钻</a>
         <a href="#production-readiness-board">上线门禁</a>
@@ -82,6 +84,33 @@
         </div>
       </section>
 
+      <section class="panel indicator-center-board" id="dashboard-indicator-center" data-indicator-dimension="all" data-indicator-status="all">
+        <div class="panel-title">
+          <h2>指标中心</h2>
+          <span id="indicator-center-summary">正在汇总标准指标集、绩效考核、等级评审、运营决策和上线准备指标</span>
+        </div>
+        <div class="filter-grid indicator-center-filter-grid">
+          <label>
+            指标维度
+            <select id="indicator-dimension-filter">
+              <option value="all">全部维度</option>
+            </select>
+          </label>
+          <label>
+            指标状态
+            <select id="indicator-status-filter">
+              <option value="all">全部状态</option>
+            </select>
+          </label>
+          <button type="button" id="indicator-center-reset">重置筛选</button>
+        </div>
+        <div class="metric-grid" id="indicator-center-metrics"></div>
+        <div class="indicator-category-grid" id="indicator-category-list" aria-label="公立医院改革与高质量发展指标分类"></div>
+        <div class="indicator-entry-grid" id="indicator-aggregation-entrypoints" aria-label="指标中心汇聚入口"></div>
+        <div class="indicator-center-grid" id="indicator-center-list" aria-label="指标中心清单"></div>
+        <p class="muted indicator-center-boundary" id="indicator-center-boundary">指标中心只做行政管理、绩效评估、等级评审和上线审查的指标汇总与下钻，不替代源系统上报。</p>
+      </section>
+
       <section class="panel" id="dashboard-policy-notes">
         <div class="panel-title">
           <h2>相关政策说明</h2>
@@ -129,8 +158,333 @@
             <span>直接定位生产 ready 判定、阻塞门禁和现场切换边界，避免把演示环境误判为生产上线。</span>
           </article>
         </div>
+        <div class="metric-grid" data-dashboard-review-summary>
+          <article class="metric-card" data-dashboard-review-summary-item="ready">
+            <span>已建档</span>
+            <strong>1</strong>
+            <small>功能边界与汇总入口</small>
+          </article>
+          <article class="metric-card" data-dashboard-review-summary-item="blocked">
+            <span>待签字</span>
+            <strong>1</strong>
+            <small>生产上线门禁</small>
+          </article>
+          <article class="metric-card" data-dashboard-review-summary-item="watch">
+            <span>待推进</span>
+            <strong>2</strong>
+            <small>现场证据与运行交接</small>
+          </article>
+        </div>
+        <div class="priority-list" data-dashboard-review-checklist>
+          <article class="priority-row" data-dashboard-review-check="capability-scope">
+            <strong>01</strong>
+            <div>
+              <h3>确认已实现能力边界</h3>
+              <p>核对系统仅做前七个应用的汇总入口，不替代源业务系统办理、签收、处置和复核。</p>
+            </div>
+            <span data-dashboard-review-status="ready">已建档</span>
+          </article>
+          <article class="priority-row" data-dashboard-review-check="production-gates">
+            <strong>02</strong>
+            <div>
+              <h3>核查生产上线门禁</h3>
+              <p>逐项确认正式环境、统一身份、审计保全、生产数据库、接口签字、监控告警和灾备演练。</p>
+            </div>
+            <span data-dashboard-review-status="blocked">待签字</span>
+          </article>
+          <article class="priority-row" data-dashboard-review-check="onsite-evidence">
+            <strong>03</strong>
+            <div>
+              <h3>归档现场验收证据</h3>
+              <p>补齐接口报文、联调记录、截图、签字单、整改复测和上线批次材料。</p>
+            </div>
+            <span data-dashboard-review-status="watch">待替换</span>
+          </article>
+          <article class="priority-row" data-dashboard-review-check="operation-boundary">
+            <strong>04</strong>
+            <div>
+              <h3>明确运行交接责任</h3>
+              <p>确认市、县两级卫生健康行政部门使用边界，以及平台运维、数据平台和外部系统责任人。</p>
+            </div>
+            <span data-dashboard-review-status="watch">待交接</span>
+          </article>
+        </div>
+        <div class="rules" data-dashboard-review-rules>
+          <div data-dashboard-review-rule="demo-release">
+            <strong>可发布不等于生产 ready</strong>
+            <span>当前版本可用于演示、联调和上线审查；生产运行必须等真实环境、审计留存、接口签字和灾备演练全部闭环。</span>
+          </div>
+          <div data-dashboard-review-rule="source-boundary">
+            <strong>只汇总不替代办理</strong>
+            <span>综合管理服务系统只汇总指标、风险、任务和证据；处置、签收、复核和业务回写仍回到源应用完成。</span>
+          </div>
+          <div data-dashboard-review-rule="evidence-replacement">
+            <strong>现场证据替换演示样例</strong>
+            <span>上线前需把演示快照替换为真实接口报文、截图、签字单、整改复测和上线批次材料。</span>
+          </div>
+        </div>
+        <div class="priority-list" data-dashboard-next-feature-pool>
+          <article class="priority-row" data-dashboard-next-feature="jurisdiction-drilldown">
+            <strong>P1</strong>
+            <div>
+              <h3>市县辖区钻取与科室权限</h3>
+              <p>按市级处室、区县卫生健康局和业务科室筛选指标、风险、证据和待办；只做监管查看和督办留痕，不承接医疗机构办理职责。</p>
+            </div>
+            <span>规划信息牵头</span>
+          </article>
+          <article class="priority-row" data-dashboard-next-feature="realtime-warning">
+            <strong>P1</strong>
+            <div>
+              <h3>实时预警与趋势阈值</h3>
+              <p>在日、周、月、年看板基础上接入小时级出生、死亡、就诊、入院异常波动，形成行政监管预警和处置督办入口。</p>
+            </div>
+            <span>医政/公卫协同</span>
+          </article>
+          <article class="priority-row" data-dashboard-next-feature="evidence-signoff">
+            <strong>P1</strong>
+            <div>
+              <h3>上线证据签字闭环</h3>
+              <p>把接口报文、联调记录、截图、整改复测、签字单和上线批次材料绑定到门禁状态，支持审查、退回和补证。</p>
+            </div>
+            <span>项目办牵头</span>
+          </article>
+          <article class="priority-row" data-dashboard-next-feature="data-quality-lineage">
+            <strong>P2</strong>
+            <div>
+              <h3>数据质量与来源血缘</h3>
+              <p>展示出生、死亡、就诊、入院等核心指标的来源系统、采集时间、质量规则和异常原因，便于行政部门追踪数据责任。</p>
+            </div>
+            <span>统计/信息协同</span>
+          </article>
+          <article class="priority-row" data-dashboard-next-feature="operation-handover">
+            <strong>P2</strong>
+            <div>
+              <h3>运行交接与值守台账</h3>
+              <p>沉淀上线后巡检、告警、问题分派、整改期限和复盘记录，形成市县两级卫生健康行政部门可审计的运行台账。</p>
+            </div>
+            <span>运维/安全协同</span>
+          </article>
+        </div>
+        <div class="metric-grid" data-dashboard-function-responsibility-summary>
+          <article class="metric-card" data-dashboard-function-responsibility-summary-item="implemented">
+            <span>已实现功能</span>
+            <strong>5</strong>
+            <small>全部纳入责任矩阵</small>
+          </article>
+          <article class="metric-card" data-dashboard-function-responsibility-summary-item="p1-plan">
+            <span>P1 计划</span>
+            <strong>3</strong>
+            <small>预警、督办、证据闭环</small>
+          </article>
+          <article class="metric-card" data-dashboard-function-responsibility-summary-item="blocked">
+            <span>阻塞待办</span>
+            <strong>1</strong>
+            <small>生产审计留存与灾备签字</small>
+          </article>
+          <article class="metric-card" data-dashboard-function-responsibility-summary-item="owners">
+            <span>责任部门</span>
+            <strong>9</strong>
+            <small>按行政管理职责归口</small>
+          </article>
+        </div>
+        <div class="priority-list" data-dashboard-next-priority-roadmap>
+          <article class="priority-row" data-dashboard-next-priority="p0-production-gates">
+            <strong>P0</strong>
+            <div>
+              <h3>生产上线硬门禁</h3>
+              <p>优先补齐统一身份、生产审计留存、正式数据库、监控告警、灾备演练和接口签字；未闭环前仅可用于演示、培训和联调审查。</p>
+            </div>
+            <span>项目办/安全牵头</span>
+          </article>
+          <article class="priority-row" data-dashboard-next-priority="p1-management-views">
+            <strong>P1</strong>
+            <div>
+              <h3>行政监管业务增强</h3>
+              <p>开发市县辖区钻取、科室权限、小时级预警、超期督办和上线证据签字闭环，先服务卫生健康行政部门日常监管。</p>
+            </div>
+            <span>规划信息/业务处室协同</span>
+          </article>
+          <article class="priority-row" data-dashboard-next-priority="p2-operation-quality">
+            <strong>P2</strong>
+            <div>
+              <h3>运行优化与数据质量追溯</h3>
+              <p>补充来源血缘、质量规则、运行交接、值守台账和问题复盘，用于长期运行审计和持续改进。</p>
+            </div>
+            <span>统计/运维协同</span>
+          </article>
+        </div>
+        <div class="priority-list" data-dashboard-p0-gate-plan>
+          <article class="priority-row" data-dashboard-p0-gate="identity">
+            <strong>P0-1</strong>
+            <div>
+              <h3>统一身份接入签字</h3>
+              <p>接入政务统一认证、机构目录、角色权限和区县科室映射；验收材料为回调地址、测试账号、权限矩阵和签字记录。</p>
+            </div>
+            <span data-dashboard-p0-status="blocked">待联调</span>
+          </article>
+          <article class="priority-row" data-dashboard-p0-gate="audit-retention">
+            <strong>P0-2</strong>
+            <div>
+              <h3>生产审计留存配置</h3>
+              <p>配置 AUDIT_EXPORT_PATH 或 SIEM_ENDPOINT，完成哈希链导出、留存年限、访问审计和导出权限确认。</p>
+            </div>
+            <span data-dashboard-p0-status="blocked">待配置</span>
+          </article>
+          <article class="priority-row" data-dashboard-p0-gate="database">
+            <strong>P0-3</strong>
+            <div>
+              <h3>正式数据库与备份恢复</h3>
+              <p>明确生产存储方案、迁移脚本、脱敏演练、备份策略、恢复演练和回滚窗口，演示 JSON 快照不得作为生产主库。</p>
+            </div>
+            <span data-dashboard-p0-status="blocked">待演练</span>
+          </article>
+          <article class="priority-row" data-dashboard-p0-gate="monitoring-dr">
+            <strong>P0-4</strong>
+            <div>
+              <h3>监控告警与灾备演练</h3>
+              <p>把健康检查、指标接口、告警路由、值班升级、RTO/RPO 和灾备恢复脚本纳入生产监控平台。</p>
+            </div>
+            <span data-dashboard-p0-status="blocked">待签字</span>
+          </article>
+          <article class="priority-row" data-dashboard-p0-gate="interface-signoff">
+            <strong>P0-5</strong>
+            <div>
+              <h3>核心接口现场签字</h3>
+              <p>归档 HIS、EMR、LIS、PACS、医保核心、电子证照和统计直报的真实报文、截图、问题复测和联合签字单。</p>
+            </div>
+            <span data-dashboard-p0-status="blocked">待归档</span>
+          </article>
+        </div>
+        <div class="priority-list" data-dashboard-p0-evidence-pack>
+          <article class="priority-row" data-dashboard-p0-evidence="identity">
+            <strong>材料</strong>
+            <div>
+              <h3>统一身份验收材料</h3>
+              <p>需提交 OIDC/SAML 参数、回调地址、机构目录映射、角色权限矩阵和区县科室样例；签字人：统一认证管理员、规划信息处。</p>
+            </div>
+            <span data-dashboard-p0-evidence-status="missing">缺签字</span>
+          </article>
+          <article class="priority-row" data-dashboard-p0-evidence="audit-retention">
+            <strong>材料</strong>
+            <div>
+              <h3>审计留存验收材料</h3>
+              <p>需提交 SIEM 或导出目录配置、哈希链导出样例、留存周期、查询权限和审计导出记录；签字人：安全管理岗、项目办。</p>
+            </div>
+            <span data-dashboard-p0-evidence-status="missing">缺配置</span>
+          </article>
+          <article class="priority-row" data-dashboard-p0-evidence="database">
+            <strong>材料</strong>
+            <div>
+              <h3>生产数据库验收材料</h3>
+              <p>需提交连接参数、迁移日志、脱敏演练记录、备份恢复截图、回滚窗口和责任人清单；签字人：数据平台、运维负责人。</p>
+            </div>
+            <span data-dashboard-p0-evidence-status="missing">缺演练</span>
+          </article>
+          <article class="priority-row" data-dashboard-p0-evidence="monitoring-dr">
+            <strong>材料</strong>
+            <div>
+              <h3>监控灾备验收材料</h3>
+              <p>需提交 /api/health、/api/metrics、告警路由、值班表、灾备恢复脚本、RTO/RPO 记录和演练报告；签字人：运维、安全管理岗。</p>
+            </div>
+            <span data-dashboard-p0-evidence-status="missing">缺演练</span>
+          </article>
+          <article class="priority-row" data-dashboard-p0-evidence="interface-signoff">
+            <strong>材料</strong>
+            <div>
+              <h3>接口联调验收材料</h3>
+              <p>需提交真实报文、联调截图、问题清单、整改复测记录和联合签字单；签字人：医疗机构接口负责人、项目办。</p>
+            </div>
+            <span data-dashboard-p0-evidence-status="missing">缺归档</span>
+          </article>
+        </div>
+        <div class="priority-list" data-dashboard-p0-acceptance-routing>
+          <article class="priority-row" data-dashboard-p0-acceptance="identity">
+            <strong>接收</strong>
+            <div>
+              <h3>统一身份接收判定</h3>
+              <p>接收岗位：规划信息处、统一认证管理员。通过条件：真实账号完成登录、角色映射和区县科室权限验证；未通过则退回身份源配置并保留审计记录。</p>
+            </div>
+            <span data-dashboard-p0-acceptance-status="pending">待联调</span>
+          </article>
+          <article class="priority-row" data-dashboard-p0-acceptance="audit-retention">
+            <strong>接收</strong>
+            <div>
+              <h3>审计留存接收判定</h3>
+              <p>接收岗位：安全管理岗、项目办。通过条件：审计导出目录、哈希链校验和查询权限全部可复核；未通过则不得解除生产上线阻断。</p>
+            </div>
+            <span data-dashboard-p0-acceptance-status="pending">待复核</span>
+          </article>
+          <article class="priority-row" data-dashboard-p0-acceptance="database">
+            <strong>接收</strong>
+            <div>
+              <h3>生产数据库接收判定</h3>
+              <p>接收岗位：数据平台、运维负责人。通过条件：迁移、备份、恢复、脱敏和回滚窗口均有演练记录；未通过则继续限定为演示或联调环境。</p>
+            </div>
+            <span data-dashboard-p0-acceptance-status="pending">待演练</span>
+          </article>
+          <article class="priority-row" data-dashboard-p0-acceptance="monitoring-dr">
+            <strong>接收</strong>
+            <div>
+              <h3>监控灾备接收判定</h3>
+              <p>接收岗位：运维、安全管理岗。通过条件：健康检查、指标采集、告警路由、值班升级和 RTO/RPO 演练可追溯；未通过则不得转连续运行。</p>
+            </div>
+            <span data-dashboard-p0-acceptance-status="pending">待压测</span>
+          </article>
+          <article class="priority-row" data-dashboard-p0-acceptance="interface-signoff">
+            <strong>接收</strong>
+            <div>
+              <h3>接口联调接收判定</h3>
+              <p>接收岗位：医疗机构接口负责人、项目办。通过条件：真实报文、截图、问题清单、整改复测和联合签字单一致归档；未通过则保留接口试运行状态。</p>
+            </div>
+            <span data-dashboard-p0-acceptance-status="pending">待归档</span>
+          </article>
+        </div>
+        <div class="priority-list" data-dashboard-function-responsibility>
+          <article class="priority-row" data-dashboard-function-owner="aggregate-entry">
+            <strong>已实现</strong>
+            <div>
+              <h3>综合汇总入口</h3>
+              <p>责任部门：规划信息处/信息中心。已汇总前七个应用的指标、风险、任务、接口和证据；下一步接入真实机构目录、运行监控和区县权限。</p>
+            </div>
+            <span>继续增强</span>
+          </article>
+          <article class="priority-row" data-dashboard-function-owner="population-service-board">
+            <strong>已实现</strong>
+            <div>
+              <h3>出生、死亡、就诊、入院四周期看板</h3>
+              <p>责任部门：统计信息、医政医管、妇幼健康、疾控公卫。已支持日、周、月、年视图；下一步开发小时级预警、来源血缘和质量校验。</p>
+            </div>
+            <span>计划 P1</span>
+          </article>
+          <article class="priority-row" data-dashboard-function-owner="risk-action-closure">
+            <strong>已实现</strong>
+            <div>
+              <h3>风险预警与任务闭环</h3>
+              <p>责任部门：医政医管、基层卫生、公共卫生。已归集跨应用风险和待办；下一步开发超期督办、处置回写状态和科室权限视图。</p>
+            </div>
+            <span>计划 P1</span>
+          </article>
+          <article class="priority-row" data-dashboard-function-owner="interface-evidence">
+            <strong>已实现</strong>
+            <div>
+              <h3>接口联调与验收证据</h3>
+              <p>责任部门：项目办、信息中心、安全管理岗。已展示接口轨道、证据包和现场依赖；下一步开发签字闭环、退回补证和真实报文归档。</p>
+            </div>
+            <span>计划 P1</span>
+          </article>
+          <article class="priority-row" data-dashboard-function-owner="launch-policy">
+            <strong>已实现</strong>
+            <div>
+              <h3>上线门禁与政策说明</h3>
+              <p>责任部门：项目办、政策法规、综合监督、安全管理岗。已明确演示发布与生产上线边界；下一步开发生产审计留存、灾备演练和上线批次签字。</p>
+            </div>
+            <span>阻塞待办</span>
+          </article>
+        </div>
         <div class="action-row">
           <a class="inline-action" href="./health-dashboard-about.html#dashboard-implementation-plan" data-dashboard-review-action="implemented-plan">查看功能与计划</a>
+          <a class="inline-action" href="./docs/health-dashboard-function-roadmap-report.md" data-dashboard-review-action="function-roadmap-report">查看功能报告</a>
+          <a class="inline-action" href="./docs/health-dashboard-backend-go-live-checklist.md" data-dashboard-review-action="backend-go-live-checklist">查看后端上线清单</a>
           <a class="inline-action" href="./docs/health-dashboard-production-launch-requirements.md" data-dashboard-review-action="production-requirements">查看上线需求</a>
           <a class="inline-action" href="#production-readiness-board" data-dashboard-review-action="readiness-gates">查看上线门禁</a>
         </div>
@@ -263,6 +617,25 @@
           <span id="production-readiness-summary">正在汇总正式环境、身份审计、接口签字、运维灾备和数据库切换条件</span>
         </div>
         <div class="production-readiness-grid" id="production-readiness-list"></div>
+        <div class="panel-title compact">
+          <h3>P0 接收判定</h3>
+          <span id="production-acceptance-routing-summary">正在汇总上线前接收岗位、准备材料和未通过处理</span>
+        </div>
+        <div class="production-readiness-grid" id="production-acceptance-routing-list" aria-label="P0 接收判定清单"></div>
+        <div class="panel-title compact">
+          <h3>生产后端上线准备</h3>
+          <span id="production-backend-go-live-summary">正在汇总生产数据库、统一身份、真实接口、审计留存、监控告警和灾备条件</span>
+        </div>
+        <div class="period-switch production-backend-go-live-switch" id="production-backend-go-live-status-controls" aria-label="生产后端上线准备状态筛选">
+          <button type="button" data-production-backend-status-filter="all" class="active">全部</button>
+          <button type="button" data-production-backend-status-filter="blocked">阻塞</button>
+          <button type="button" data-production-backend-status-filter="pending">待办</button>
+          <button type="button" data-production-backend-status-filter="watch">关注</button>
+        </div>
+        <div class="dashboard-filter-actions production-backend-go-live-actions">
+          <button type="button" id="production-backend-go-live-reset">重置筛选</button>
+        </div>
+        <div class="production-readiness-grid production-backend-go-live-grid" id="production-backend-go-live-list" aria-label="生产后端上线准备清单"></div>
         <p class="muted production-readiness-requirements"><a href="./docs/health-dashboard-production-launch-requirements.md" data-production-requirements-link>查看真实上线需求文档</a>，按生产环境、统一身份、审计保全、生产数据库、接口签字、监控告警和灾备演练逐项确认。</p>
         <p class="muted production-readiness-boundary" id="production-readiness-boundary">上线门禁只用于行政管理端发布审计和现场切换确认；未完成正式环境配置、签字证据和灾备演练前不得按生产上线运行。</p>
       </section>

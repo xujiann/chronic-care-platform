@@ -59,6 +59,7 @@ function buildDeployCheckReport(options = {}) {
   const checks = [
     assertFile("README.md"),
     assertFile("DEPLOYMENT.md"),
+    assertFile("docs/health-dashboard-indicator-center-report.md"),
     assertFile("data/db.json"),
     assertFile("server.js"),
     assertFile("scripts/storage-admin.js"),

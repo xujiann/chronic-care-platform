@@ -3801,7 +3801,8 @@ function sealAuditTrail(rows) {
 function verifyAuditTrail(rows) {
   const items = Array.isArray(rows) ? rows : [];
   const broken = [];
-  let previousHash = "";
+  const tailAnchor = items.length >= 120 ? items[items.length - 1]?.previousAuditHash || "" : "";
+  let previousHash = tailAnchor;
   for (let index = items.length - 1; index >= 0; index -= 1) {
     const item = items[index];
     const expectedHash = auditHashFor({ ...item, previousAuditHash: item.previousAuditHash || previousHash });
@@ -5436,6 +5437,10 @@ async function handleApi(req, res) {
       boundary: healthDashboard.productionReadinessGate?.boundary || "",
       summary: healthDashboard.productionReadinessGate?.summary || {},
       gates: healthDashboard.productionReadinessGate?.items || [],
+      acceptanceRouting: healthDashboard.productionReadinessGate?.acceptanceRouting || [],
+      backendGoLiveChecklist: healthDashboard.productionReadinessGate?.backendGoLiveChecklist || {},
+      indicatorCenterSummary: healthDashboard.indicatorCenter?.summary || {},
+      indicatorCenterEvidence: healthDashboard.indicatorCenter?.releaseEvidence || [],
       blockedGates,
       cutover: {
         ok: cutoverChecklist.every((item) => item.passed),

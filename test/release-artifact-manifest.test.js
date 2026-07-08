@@ -23,6 +23,9 @@ test("release artifact manifest indexes reports templates commands and evidence"
   assert.equal(report.artifacts.some((item) => item.id === "service-acceptance" && item.markdown === "release/service-acceptance-summary.md" && item.evidence === "/api/service-acceptance-summary"), true);
   assert.equal(report.artifacts.some((item) => item.id === "health-dashboard" && item.markdown === "release/health-dashboard-summary.md" && item.evidence === "/api/health-dashboard/production-readiness"), true);
   assert.equal(report.artifacts.some((item) => item.id === "health-dashboard-production-requirements" && item.markdown === "docs/health-dashboard-production-launch-requirements.md"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "health-dashboard-function-roadmap" && item.markdown === "docs/health-dashboard-function-roadmap-report.md"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "health-dashboard-backend-go-live" && item.markdown === "docs/health-dashboard-backend-go-live-checklist.md"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "health-dashboard-indicator-center" && item.markdown === "docs/health-dashboard-indicator-center-report.md"), true);
   assert.equal(report.templateReadmes.some((item) => item.file === "release/templates/interface-joint-test/README.md"), true);
   assert.equal(report.templateReadmes.every((item) => item.evidence === "/api/site-template-readmes"), true);
   assert.equal(report.checks.every((item) => item.passed), true);
@@ -36,6 +39,9 @@ test("release artifact manifest renders and writes artifacts", (t) => {
   assert.match(markdown, /Release artifact manifest/);
   assert.match(markdown, /Health dashboard aggregate summary/);
   assert.match(markdown, /health-dashboard-production-launch-requirements\.md/);
+  assert.match(markdown, /health-dashboard-function-roadmap-report\.md/);
+  assert.match(markdown, /health-dashboard-backend-go-live-checklist\.md/);
+  assert.match(markdown, /health-dashboard-indicator-center-report\.md/);
   assert.match(markdown, /Template READMEs/);
   assert.match(markdown, /release-artifact-manifest\.md/);
 

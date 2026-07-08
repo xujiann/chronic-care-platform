@@ -297,10 +297,15 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(evaluationMarkdown, /Artifact coverage/);
   assert.equal(environmentJson.environmentMatrix.ok, true);
   assert.match(environmentMarkdown, /Environment matrix report/);
-  assert.equal(healthDashboardJson.healthDashboard.functionalReport.functions.length, 14);
+  assert.equal(healthDashboardJson.healthDashboard.functionalReport.functions.length, 15);
   assert.equal(healthDashboardJson.healthDashboard.functionalReport.functions.some((item) => item.id === "production-readiness-gate"), true);
   assert.equal(healthDashboardJson.healthDashboard.productionReadinessGate.overallStatus, "blocked");
   assert.equal(report.checks.some((item) => item.name === "healthDashboard:productionReadinessGate" && item.passed), true);
+  assert.equal(healthDashboardJson.healthDashboard.indicatorCenter.indicators.length, 8);
+  assert.equal(healthDashboardJson.healthDashboard.indicatorCenter.dimensions.length, 8);
+  assert.equal(healthDashboardJson.healthDashboard.indicatorCenter.reformCategories.length, 7);
+  assert.equal(healthDashboardJson.healthDashboard.indicatorCenter.aggregationEntrypoints.length, 3);
+  assert.equal(report.checks.some((item) => item.name === "healthDashboard:indicatorCenter" && item.passed), true);
   assert.equal(healthDashboardJson.healthDashboard.functionalReport.functions.some((item) => item.id === "jurisdiction-workbench"), true);
   assert.equal(healthDashboardJson.healthDashboard.functionalReport.functions.some((item) => item.id === "jurisdiction-scope-drilldown"), true);
   assert.equal(healthDashboardJson.healthDashboard.functionalReport.functions.some((item) => item.id === "task-closure-trend"), true);
@@ -321,6 +326,9 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(healthDashboardMarkdown, /主要功能报告/);
   assert.match(healthDashboardMarkdown, /内部机构功能矩阵/);
   assert.match(healthDashboardMarkdown, /市县两级机构功能矩阵/);
+  assert.match(healthDashboardMarkdown, /指标中心/);
+  assert.match(healthDashboardMarkdown, /公立医院绩效考核/);
+  assert.match(healthDashboardMarkdown, /智慧医院管理线汇聚入口/);
   assert.match(healthDashboardMarkdown, /风险下钻/);
   assert.match(healthDashboardMarkdown, /现场验收证据包/);
   assert.match(healthDashboardMarkdown, /发布证据/);
