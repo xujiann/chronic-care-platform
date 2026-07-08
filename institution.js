@@ -357,6 +357,8 @@ async function dispatchChronicFollowup(collection, id, updates, note) {
 function renderChronicPublicHealthLoop(state) {
   const summaryEl = document.querySelector("#public-health-loop-summary");
   const stageEl = document.querySelector("#public-health-loop-stages");
+  const integrationEl = document.querySelector("#public-health-loop-integrations");
+  const cdcSummaryEl = document.querySelector("#public-health-cdc-summary");
   const queueEl = document.querySelector("#public-health-loop-queue");
   if (!summaryEl || !stageEl || !queueEl) return;
   const loop = state.chronicPublicHealthLoop;
@@ -370,12 +372,35 @@ function renderChronicPublicHealthLoop(state) {
   ];
   const queue = loop?.queue || [];
   summaryEl.textContent = loop
-    ? `${loop.summary.readyStages}/${loop.summary.stages} 环节就绪 · ${loop.summary.highRiskResidents} 名重点人群 · 后续联动：免疫规划/传染病报告/区域公卫`
+    ? `${loop.summary.readyStages}/${loop.summary.stages} 环节就绪 · ${loop.summary.highRiskResidents} 名重点人群 · ${loop.summary.immunizationReminders || 0} 条免疫提醒 · ${loop.summary.infectiousSignals || 0} 条传染病信号`
     : "静态快照：监测-预警-派单-干预-随访-汇总闭环已入模";
   stageEl.innerHTML = stages.map((item) => `<article class="claim-card" data-public-health-stage="${item.id}">
     <strong>${item.name}</strong>
     <span>${item.count}<br>${item.owner}<br>${item.evidence}</span>
   </article>`).join("");
+  if (integrationEl) {
+    const immunization = loop?.immunizationPlanning?.summary || {};
+    const infectious = loop?.infectiousDiseaseReporting?.summary || {};
+    const cdc = loop?.cdcSummary?.summary || {};
+    integrationEl.innerHTML = [
+      { id: "immunization-planning", title: "免疫规划联动", value: immunization.dueReminders || 0, detail: `${immunization.targets || 0} 名对象 · ${immunization.completedRecords || 0} 条接种记录` },
+      { id: "infectious-reporting", title: "传染病前置报告", value: infectious.signals || 0, detail: `${infectious.infectiousDeaths || 0} 条死亡证线索 · ${infectious.feverClinicSignals || 0} 条发热门诊信号` },
+      { id: "cdc-command-summary", title: "疾控汇总视图", value: cdc.commandRows || 0, detail: `${cdc.chronicQueue || 0} 条慢病队列 · ${cdc.infectiousSignals || 0} 条公卫信号` }
+    ].map((item) => `<article class="claim-card" data-public-health-integration="${item.id}">
+      <strong>${item.title}</strong>
+      <span>${item.value}<br>${item.detail}</span>
+    </article>`).join("");
+  }
+  if (cdcSummaryEl) {
+    const commandRows = loop?.cdcSummary?.commandRows || [];
+    cdcSummaryEl.innerHTML = commandRows.slice(0, 5).map((item) => `<section class="item" data-cdc-command-row="${item.institution}">
+      <div>
+        <h3>${item.institution}</h3>
+        <p>慢病队列 ${item.chronicQueue} · 免疫提醒 ${item.immunizationQueue} · 传染病信号 ${item.infectiousSignals}</p>
+      </div>
+      <span class="badge ${item.priority === "high" ? "danger" : ""}">${item.priority}</span>
+    </section>`).join("") || `<p class="muted">暂无疾控汇总指挥行。</p>`;
+  }
   queueEl.innerHTML = queue.slice(0, 6).map((item) => `<section class="item" data-public-health-loop-row="${item.residentId}">
     <div>
       <h3>${item.residentName || "重点居民"} · ${item.warningLevel || "high"}</h3>
@@ -386,7 +411,6 @@ function renderChronicPublicHealthLoop(state) {
     <span class="badge danger">公卫预警</span>
   </section>`).join("") || `<p class="muted">暂无公卫高危闭环队列。</p>`;
 }
-
 async function escalateChronicFollowup(collection, id, reason) {
   if (!institutionApiBase) {
     Object.assign((platformState[collection] || []).find((item) => item.id === id) || {}, {

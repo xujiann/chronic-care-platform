@@ -8950,6 +8950,132 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
   };
 }
 
+function buildPublicHealthImmunizationPlanning(scoped, residents, highRiskQueue) {
+  const residentRows = Array.isArray(scoped.residents) ? scoped.residents : [];
+  const highRiskIds = new Set(highRiskQueue.map((item) => item.residentId));
+  const vaccineRecords = (scoped.personalRecords || []).filter((item) => item.category === "vaccines");
+  const birthCertificates = Array.isArray(scoped.birthCertificates) ? scoped.birthCertificates : [];
+  const targets = residents
+    .map((item) => {
+      const resident = residentRows.find((row) => row.id === item.residentId) || {};
+      const age = lifecycleAgeOf(resident.birthDate);
+      const records = vaccineRecords.filter((record) => record.residentId === item.residentId);
+      const chronicPriority = highRiskIds.has(item.residentId) || age >= 60;
+      if (!chronicPriority && age >= 7) return null;
+      const childCertificate = birthCertificates.find((certificate) => certificate.residentId === item.residentId || certificate.maternalResidentId === item.residentId);
+      const targetVaccine = age < 7 ? "routine-child-immunization" : "seasonal-influenza-and-pneumococcal-review";
+      const status = records.some((record) => /2026/.test(String(record.date || ""))) ? "current-year-recorded" : "needs-public-health-reminder";
+      return {
+        residentId: item.residentId,
+        residentName: item.residentName || resident.name || "",
+        organization: item.organization || resident.organization || "",
+        age,
+        targetVaccine,
+        status,
+        sourceCollection: age < 7 ? "birthCertificates/personalRecords[vaccines]" : "personalRecords[vaccines]/chronicManagementPlans",
+        dispatchTarget: age < 7 ? "immunization-clinic" : "family-doctor-team",
+        reason: age < 7
+          ? "Child health and vaccination plan should be checked with birth certificate continuity."
+          : "Chronic high-risk or older resident should receive seasonal vaccination review.",
+        evidence: records.map((record) => record.id).concat(childCertificate?.id ? [childCertificate.id] : []).filter(Boolean)
+      };
+    })
+    .filter(Boolean);
+  return {
+    ok: targets.length > 0,
+    summary: {
+      targets: targets.length,
+      dueReminders: targets.filter((item) => item.status === "needs-public-health-reminder").length,
+      completedRecords: vaccineRecords.length,
+      childContinuity: targets.filter((item) => item.targetVaccine === "routine-child-immunization").length,
+      chronicSeasonalReviews: targets.filter((item) => item.targetVaccine === "seasonal-influenza-and-pneumococcal-review").length
+    },
+    rules: [
+      { id: "immunization:child-continuity", source: "birthCertificates", action: "check routine child vaccination after birth certificate continuity" },
+      { id: "immunization:chronic-seasonal", source: "personalRecords[vaccines]/chronicManagementPlans", action: "review influenza and pneumococcal vaccination for chronic high-risk residents" }
+    ],
+    queue: targets
+  };
+}
+
+function buildPublicHealthInfectiousReporting(scoped) {
+  const deathCertificates = Array.isArray(scoped.deathCertificates) ? scoped.deathCertificates : [];
+  const operationSnapshots = Array.isArray(scoped.hospitalOperationSnapshots) ? scoped.hospitalOperationSnapshots : [];
+  const infectiousDeaths = deathCertificates.filter((item) => /传染|infectious|浼犳煋/i.test(`${item.deathReasonType || ""} ${item.underlyingCause || ""} ${item.causeCategory || ""}`));
+  const feverSignals = operationSnapshots.filter((item) => Number(item.outpatient?.feverClinicVisits || 0) >= 40);
+  const deathSignals = infectiousDeaths.map((item) => ({
+    id: `death:${item.id}`,
+    sourceCollection: "deathCertificates",
+    sourceId: item.id,
+    residentId: item.residentId,
+    institution: item.issuingInstitution || item.highestDiagnosisUnit || "",
+    signal: item.underlyingCause || item.deathReasonType || "infectious-death-report",
+    reportStatus: item.cdcReportStatus || item.nationalPlatformStatus || "pending-cdc-review",
+    priority: /待|pending|寰?/i.test(`${item.cdcReportStatus || ""} ${item.nationalPlatformStatus || ""}`) ? "high" : "medium",
+    action: "verify statutory infectious-disease reporting status and close CDC receipt"
+  }));
+  const feverQueue = feverSignals.map((item) => ({
+    id: `fever:${item.id}`,
+    sourceCollection: "hospitalOperationSnapshots",
+    sourceId: item.id,
+    institution: item.institution,
+    signal: `${item.outpatient?.feverClinicVisits || 0} fever-clinic visits`,
+    reportStatus: item.reporting?.reconciled ? "statistics-reconciled" : "needs-statistics-reconciliation",
+    priority: item.normalizedStatus === "critical" ? "high" : "medium",
+    action: "compare fever-clinic surge with public-health direct reporting"
+  }));
+  return {
+    ok: deathSignals.length + feverQueue.length > 0,
+    summary: {
+      signals: deathSignals.length + feverQueue.length,
+      infectiousDeaths: deathSignals.length,
+      feverClinicSignals: feverQueue.length,
+      pendingReports: [...deathSignals, ...feverQueue].filter((item) => /pending|needs|待|寰?/i.test(item.reportStatus)).length
+    },
+    reportQueue: [...deathSignals, ...feverQueue],
+    rules: [
+      { id: "infectious:death-certificate", source: "deathCertificates", action: "check CDC report receipt for infectious death certificates" },
+      { id: "infectious:fever-clinic-surge", source: "hospitalOperationSnapshots", action: "create pre-alert when fever-clinic visits exceed the pilot threshold" }
+    ]
+  };
+}
+
+function buildPublicHealthCdcSummary(stages, queue, immunizationPlanning, infectiousReporting) {
+  const stageCoverage = stages.map((item) => ({ id: item.id, ready: item.ready, count: item.count }));
+  const highPriorityInstitutions = new Map();
+  const collectInstitution = (name, priority = "medium") => {
+    const key = name || "unassigned";
+    const current = highPriorityInstitutions.get(key) || { institution: key, chronicQueue: 0, immunizationQueue: 0, infectiousSignals: 0, priority: "medium" };
+    if (priority === "high" || priority === "critical") current.priority = "high";
+    highPriorityInstitutions.set(key, current);
+    return current;
+  };
+  queue.forEach((item) => {
+    const row = collectInstitution(item.organization, item.warningLevel);
+    row.chronicQueue += 1;
+  });
+  (immunizationPlanning.queue || []).forEach((item) => {
+    const row = collectInstitution(item.organization, item.status === "needs-public-health-reminder" ? "high" : "medium");
+    row.immunizationQueue += 1;
+  });
+  (infectiousReporting.reportQueue || []).forEach((item) => {
+    const row = collectInstitution(item.institution, item.priority);
+    row.infectiousSignals += 1;
+  });
+  return {
+    ok: stages.every((item) => item.ready) && immunizationPlanning.ok && infectiousReporting.ok,
+    summary: {
+      readyStages: stages.filter((item) => item.ready).length,
+      chronicQueue: queue.length,
+      immunizationQueue: immunizationPlanning.summary.dueReminders,
+      infectiousSignals: infectiousReporting.summary.signals,
+      commandRows: highPriorityInstitutions.size
+    },
+    stageCoverage,
+    commandRows: [...highPriorityInstitutions.values()].sort((a, b) => (b.infectiousSignals + b.chronicQueue + b.immunizationQueue) - (a.infectiousSignals + a.chronicQueue + a.immunizationQueue))
+  };
+}
+
 function buildChronicPublicHealthLoop(data, user, residentId = "") {
   const scoped = scopeStateForUser(data, user);
   const risk = buildChronicRiskStratification(scoped);
@@ -9005,8 +9131,11 @@ function buildChronicPublicHealthLoop(data, user, residentId = "") {
       alertIds: residentAlerts.map((alert) => alert.id)
     };
   });
+  const immunizationPlanning = buildPublicHealthImmunizationPlanning(scoped, residents, highRiskQueue);
+  const infectiousDiseaseReporting = buildPublicHealthInfectiousReporting(scoped);
+  const cdcSummary = buildPublicHealthCdcSummary(stages, queue, immunizationPlanning, infectiousDiseaseReporting);
   return {
-    ok: stages.every((item) => item.ready),
+    ok: stages.every((item) => item.ready) && immunizationPlanning.ok && infectiousDiseaseReporting.ok && cdcSummary.ok,
     generatedAt: new Date().toISOString(),
     role: user.role,
     residentId,
@@ -9019,14 +9148,18 @@ function buildChronicPublicHealthLoop(data, user, residentId = "") {
       dispatches: dispatchMessages.length,
       interventions: interventionRecords.length + completedFollowups.length,
       followupEvidence: completedFollowups.length + feedbackRecords.length,
+      immunizationReminders: immunizationPlanning.summary.dueReminders,
+      infectiousSignals: infectiousDiseaseReporting.summary.signals,
+      cdcCommandRows: cdcSummary.summary.commandRows,
       policyAligned: followup.summary.policyAligned,
       policyItems: followup.summary.policyItems
     },
     stages,
     queue,
+    immunizationPlanning,
+    infectiousDiseaseReporting,
+    cdcSummary,
     nextIntegrations: [
-      "immunization planning",
-      "infectious disease reporting",
       "regional public health system"
     ]
   };

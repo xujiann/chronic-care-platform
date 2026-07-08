@@ -136,6 +136,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "chronicFollowup:institutionInterfaces" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "chronicFollowup:launchCore" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "chronicFollowup:publicHealthLoop" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "chronicFollowup:publicHealthIntegrations" && item.passed), true);
   assert.equal(report.chronicInstitutionInterfaces.summary.readyContracts, report.chronicInstitutionInterfaces.summary.contracts);
   assert.equal(report.chronicLaunchCore.summary.readyItems, 5);
   assert.equal(report.checks.some((item) => item.name === "dataQuality:report" && item.passed), true);

@@ -64,6 +64,12 @@ The field integration APIs reuse the same resident authorization, institution sc
 
 `GET /api/chronic/public-health-loop` exposes the first CDC and public-health slice for chronic high-risk residents and primary-care follow-up. It reuses risk stratification, follow-up summary, task messages, family-doctor closure records, resident feedback, and policy alignment to present the minimum runnable `monitor -> alert -> dispatch -> intervention -> follow-up -> summary` loop. The first slice is intentionally limited to chronic high-risk and primary follow-up; immunization planning, infectious disease reporting, and regional public-health systems remain the next integration tracks.
 
+The second public-health slice now links the chronic queue to three runnable public-health work packages:
+
+- Immunization planning: uses `personalRecords[category=vaccines]`, `birthCertificates`, and chronic high-risk residents to create vaccination review reminders.
+- Infectious disease reporting: uses `deathCertificates` and fever-clinic signals from `hospitalOperationSnapshots` to create pre-report and reconciliation signals.
+- CDC command summary: aggregates chronic queue rows, immunization reminders, and infectious disease signals by institution for the disease-control summary view.
+
 ## Release Evidence
 
 Run `npm run chronic:followup-readiness` to generate:
@@ -82,6 +88,8 @@ Run `npm run chronic:followup-readiness` to generate:
 `release:report` gates `chronicFollowup:fieldIntegration`, requiring device measurement, pharmacy callback, family doctor closure, and reminder outreach evidence before publication.
 
 `release:report` gates `chronicFollowup:publicHealthLoop`, requiring all six public-health loop stages to have evidence before publication.
+
+`release:report` gates `chronicFollowup:publicHealthIntegrations`, requiring immunization planning, infectious disease reporting, and CDC command-summary evidence before publication.
 
 `release:report` gates `chronicFollowup:institutionInterfaces`, requiring the institution interface specification, runtime routes, API tests, and launch evidence to stay aligned.
 

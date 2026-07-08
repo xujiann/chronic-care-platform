@@ -293,12 +293,17 @@ test("chronic follow-up launch core is wired through docs api and portals", () =
   assert.match(institutionHtml, /慢病上线核心联调/);
   assert.match(institutionHtml, /疾控和公卫闭环/);
   assert.match(institutionHtml, /public-health-loop-stages/);
+  assert.match(institutionHtml, /public-health-loop-integrations/);
+  assert.match(institutionHtml, /public-health-cdc-summary/);
   assert.match(institutionHtml, /设备上传/);
   assert.match(institutionHtml, /现场联调已就绪/);
   assert.doesNotMatch(institutionHtml, /Chronic Launch Core|Device upload|Pharmacy callback|Family doctor closure|Reminder outreach|Field integration ready|Resident, task, status/);
   assert.match(institutionJs, /loadChronicFollowupSummary/);
   assert.match(institutionJs, /loadChronicPublicHealthLoop/);
   assert.match(institutionJs, /renderChronicPublicHealthLoop/);
+  assert.match(institutionJs, /免疫规划联动/);
+  assert.match(institutionJs, /传染病前置报告/);
+  assert.match(institutionJs, /疾控汇总视图/);
   assert.match(institutionJs, /refreshChronicRuntimeState/);
   assert.match(institutionJs, /\/chronic\/device-measurements/);
   assert.match(institutionJs, /\/chronic\/launch-core\/actions/);

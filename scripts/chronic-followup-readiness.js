@@ -160,6 +160,22 @@ function buildChronicFollowupReadinessReport(options = {}) {
     ...item,
     passed: item.count > 0
   }));
+  const infectiousSignals =
+    count(data.deathCertificates, (item) => /传染|infectious|浼犳煋/i.test(`${item.deathReasonType || ""} ${item.underlyingCause || ""} ${item.causeCategory || ""}`)) +
+    count(data.hospitalOperationSnapshots, (item) => Number(item.outpatient?.feverClinicVisits || 0) >= 40);
+  const immunizationTargets =
+    count(data.personalRecords, (item) => item.category === "vaccines") +
+    highRiskResidentIds.size +
+    count(data.birthCertificates, (item) => item.residentId || item.maternalResidentId);
+  const cdcCommandRows = highRiskResidentIds.size + infectiousSignals;
+  const publicHealthIntegrationLinks = [
+    { id: "immunization-planning", evidence: "personalRecords[vaccines]/birthCertificates/chronicManagementPlans", count: immunizationTargets },
+    { id: "infectious-disease-reporting", evidence: "deathCertificates/hospitalOperationSnapshots[feverClinicVisits]", count: infectiousSignals },
+    { id: "cdc-command-summary", evidence: "publicHealthLoop.cdcSummary.commandRows", count: cdcCommandRows }
+  ].map((item) => ({
+    ...item,
+    passed: item.count > 0
+  }));
   const boundaries = [
     {
       id: "screening",
@@ -230,8 +246,8 @@ function buildChronicFollowupReadinessReport(options = {}) {
     {
       id: "public-health-risk-loop",
       name: "CDC and public health risk loop",
-      passed: publicHealthLoopStages.length === 6 && publicHealthLoopStages.every((item) => item.passed),
-      evidence: "monitor-alert-dispatch-intervention-followup-summary"
+      passed: publicHealthLoopStages.length === 6 && publicHealthLoopStages.every((item) => item.passed) && publicHealthIntegrationLinks.every((item) => item.passed),
+      evidence: "monitor-alert-dispatch-intervention-followup-summary-immunization-infectious-cdc"
     },
     {
       id: "policy-alignment",
@@ -279,6 +295,11 @@ function buildChronicFollowupReadinessReport(options = {}) {
       reminderOutreachRecords: fieldIntegration.reminderOutreach,
       publicHealthLoopStages: publicHealthLoopStages.length,
       publicHealthLoopReadyStages: publicHealthLoopStages.filter((item) => item.passed).length,
+      publicHealthIntegrationLinks: publicHealthIntegrationLinks.length,
+      publicHealthReadyIntegrationLinks: publicHealthIntegrationLinks.filter((item) => item.passed).length,
+      immunizationTargets,
+      infectiousSignals,
+      cdcCommandRows,
       policyAligned: policyAlignment.filter((item) => item.covered).length,
       policyItems: policyAlignment.length,
       highRiskScreenings: count(data.chronicScreeningTasks, (item) => /\u9ad8\u5371|high/i.test(String(item.riskLevel || ""))),
@@ -290,6 +311,7 @@ function buildChronicFollowupReadinessReport(options = {}) {
     residentExperience,
     fieldIntegration,
     publicHealthLoopStages,
+    publicHealthIntegrationLinks,
     residentCoverage,
     reusePoints: [
       "chronicScreeningTasks",
@@ -297,6 +319,9 @@ function buildChronicFollowupReadinessReport(options = {}) {
       "followups",
       "personalRecords",
       "medicationPickups",
+      "birthCertificates",
+      "deathCertificates",
+      "hospitalOperationSnapshots",
       "citizen.html",
       "institution.html"
     ],
@@ -320,6 +345,7 @@ function renderMarkdown(report) {
   const policyRows = (report.policyAlignment || []).map((item) => `| ${item.id} | ${item.covered ? "Y" : "N"} | ${item.count} | ${item.evidence} |`).join("\n");
   const alertRows = (report.alertQueue || []).slice(0, 12).map((item) => `| ${item.id} | ${item.residentId} | ${item.priority} | ${item.dueBucket} | ${item.dueAt || ""} |`).join("\n");
   const publicHealthRows = (report.publicHealthLoopStages || []).map((item) => `| ${item.id} | ${item.passed ? "PASS" : "FAIL"} | ${item.count} | ${item.evidence} |`).join("\n");
+  const publicHealthIntegrationRows = (report.publicHealthIntegrationLinks || []).map((item) => `| ${item.id} | ${item.passed ? "PASS" : "FAIL"} | ${item.count} | ${item.evidence} |`).join("\n");
   const residentRows = report.residentCoverage.map((item) => `| ${item.residentId} | ${item.screening ? "Y" : "N"} | ${item.plan ? "Y" : "N"} | ${item.followup ? "Y" : "N"} | ${item.medication ? "Y" : "N"} | ${item.feedback ? "Y" : "N"} |`).join("\n");
   return [
     "# Chronic follow-up readiness report",
@@ -351,6 +377,12 @@ function renderMarkdown(report) {
     "| Stage | Status | Count | Evidence |",
     "| --- | --- | --- | --- |",
     publicHealthRows,
+    "",
+    "## Public health integrations",
+    "",
+    "| Link | Status | Count | Evidence |",
+    "| --- | --- | --- | --- |",
+    publicHealthIntegrationRows,
     "",
     "## Resident coverage",
     "",

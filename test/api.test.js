@@ -1932,7 +1932,11 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(publicHealthLoop.body.summary.readyStages, 6);
     assert.deepEqual(publicHealthLoop.body.stages.map((item) => item.id), ["monitor", "alert", "dispatch", "intervention", "followup", "summary"]);
     assert.equal(publicHealthLoop.body.queue.some((item) => item.residentId === "r1" && item.dispatchTarget), true);
-    assert.equal(publicHealthLoop.body.nextIntegrations.includes("infectious disease reporting"), true);
+    assert.equal(publicHealthLoop.body.immunizationPlanning.summary.dueReminders >= 1, true);
+    assert.equal(publicHealthLoop.body.infectiousDiseaseReporting.summary.signals >= 1, true);
+    assert.equal(publicHealthLoop.body.cdcSummary.summary.commandRows >= 1, true);
+    assert.equal(publicHealthLoop.body.cdcSummary.commandRows.some((item) => item.chronicQueue >= 1 || item.infectiousSignals >= 1), true);
+    assert.equal(publicHealthLoop.body.nextIntegrations.includes("regional public health system"), true);
 
     const chronicEscalation = await api(baseUrl, "/api/chronic/followup-escalations", authorized(commissionToken, {
       method: "POST",
