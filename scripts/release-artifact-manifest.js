@@ -20,6 +20,7 @@ const ARTIFACTS = [
   ["chronic-institution-interfaces", "integration", "Chronic institution interface specification", "release/chronic-institution-interfaces.json", "release/chronic-institution-interfaces.md", "chronic:institution-interfaces", "/api/chronic/institution-interfaces"],
   ["chronic-launch-core", "integration", "Chronic launch core readiness", "release/chronic-launch-core.json", "release/chronic-launch-core.md", "chronic:launch-core", "/api/chronic/launch-core"],
   ["data-quality", "data", "Data quality report", "release/data-quality-report.json", "release/data-quality-report.md", "data-quality:report", "/api/data-quality/scorecard"],
+  ["data-governance", "data", "Data governance foundation readiness report", "release/data-governance-readiness-report.json", "release/data-governance-readiness-report.md", "data-governance:readiness", "/api/data-governance"],
   ["quality-safety", "quality", "Medical quality and safety supervision report", "release/quality-safety-report.json", "release/quality-safety-report.md", "quality-safety:report", "/api/quality-safety/dashboard"],
   ["environment-matrix", "environment", "Environment matrix report", "release/environment-matrix-report.json", "release/environment-matrix-report.md", "environment:matrix", "env:check:production"],
   ["hybrid-deployment", "deployment", "Hybrid static preview and dynamic backend readiness", "release/hybrid-deployment-readiness-report.json", "release/hybrid-deployment-readiness-report.md", "hybrid:deployment-readiness", "server.js + GitHub Pages"],

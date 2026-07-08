@@ -17,7 +17,7 @@ test("chronic follow-up readiness covers all priority application boundaries", (
   const report = buildChronicFollowupReadinessReport({ data });
 
   assert.equal(report.ok, true);
-  assert.equal(report.boundaries.length, 13);
+  assert.equal(report.boundaries.length, 14);
   assert.equal(report.boundaries.every((item) => item.passed), true);
   assert.equal(report.summary.feedbackRecords >= 2, true);
   assert.equal(report.summary.feedbackHighRiskCovered, true);
@@ -31,7 +31,10 @@ test("chronic follow-up readiness covers all priority application boundaries", (
   assert.equal(report.summary.pharmacyCallbackRecords >= 1, true);
   assert.equal(report.summary.familyDoctorClosureRecords >= 1, true);
   assert.equal(report.summary.reminderOutreachRecords >= 1, true);
+  assert.equal(report.summary.publicHealthLoopReadyStages, 6);
   assert.equal(report.summary.policyAligned, report.summary.policyItems);
+  assert.equal(report.boundaries.some((item) => item.id === "public-health-risk-loop" && item.passed), true);
+  assert.deepEqual(report.publicHealthLoopStages.map((item) => item.id), ["monitor", "alert", "dispatch", "intervention", "followup", "summary"]);
   assert.equal(report.boundaries.some((item) => item.id === "resident-experience" && item.passed), true);
   assert.equal(report.boundaries.some((item) => item.id === "field-integration-closure" && item.passed), true);
   assert.equal(report.alertQueue.some((item) => item.id === "followups:f1" && item.dueBucket === "overdue"), true);
@@ -39,6 +42,7 @@ test("chronic follow-up readiness covers all priority application boundaries", (
   assert.equal(report.reusePoints.includes("chronicScreeningTasks"), true);
   assert.equal(report.reusePoints.includes("citizen.html"), true);
   assert.equal(report.apiSurface.includes("POST /api/chronic/followup-feedback"), true);
+  assert.equal(report.apiSurface.includes("GET /api/chronic/public-health-loop"), true);
 });
 
 test("chronic follow-up readiness fails without resident feedback evidence", () => {
@@ -139,7 +143,9 @@ test("chronic follow-up readiness renders and writes release artifacts", (t) => 
   assert.match(markdown, /Chronic follow-up readiness report/);
   assert.match(markdown, /Policy alignment/);
   assert.match(markdown, /Alert queue/);
+  assert.match(markdown, /Public health loop/);
   assert.equal(JSON.parse(fs.readFileSync(written.output, "utf8")).ok, true);
   assert.match(fs.readFileSync(written.markdown, "utf8"), /resident-feedback/);
+  assert.match(fs.readFileSync(written.markdown, "utf8"), /public-health-risk-loop/);
   assert.match(fs.readFileSync(written.markdown, "utf8"), /policy-alignment/);
 });

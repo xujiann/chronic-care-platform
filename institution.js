@@ -4,9 +4,10 @@ let platformState = fallbackState;
 
 document.addEventListener("DOMContentLoaded", async () => {
   platformState = await loadPlatformState(fallbackState);
-  const [followupSummary, launchCore] = await Promise.all([loadChronicFollowupSummary(), loadChronicLaunchCore()]);
+  const [followupSummary, launchCore, publicHealthLoop] = await Promise.all([loadChronicFollowupSummary(), loadChronicLaunchCore(), loadChronicPublicHealthLoop()]);
   platformState.chronicFollowupSummary = followupSummary;
   platformState.chronicLaunchCore = launchCore;
+  platformState.chronicPublicHealthLoop = publicHealthLoop;
   bindInstitutionActions();
   renderAll(platformState);
 });
@@ -35,14 +36,28 @@ async function loadChronicLaunchCore() {
   return null;
 }
 
+async function loadChronicPublicHealthLoop() {
+  if (!institutionApiBase) return null;
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/chronic/public-health-loop`);
+    if (response.ok) return await response.json();
+  } catch (error) {
+    // Static preview falls back to local snapshot evidence.
+  }
+  return null;
+}
+
 async function refreshChronicRuntimeState() {
-  const [followupSummary, launchCore] = await Promise.all([loadChronicFollowupSummary(), loadChronicLaunchCore()]);
+  const [followupSummary, launchCore, publicHealthLoop] = await Promise.all([loadChronicFollowupSummary(), loadChronicLaunchCore(), loadChronicPublicHealthLoop()]);
   if (followupSummary) platformState.chronicFollowupSummary = followupSummary;
   if (launchCore) platformState.chronicLaunchCore = launchCore;
+  if (publicHealthLoop) platformState.chronicPublicHealthLoop = publicHealthLoop;
 }
 
 function renderAll(state) {
   renderChronicLaunchCore(state);
+  renderChronicPublicHealthLoop(state);
   renderChronicFollowupWorkbench(state);
   populateBirthCertificateForm(state);
   populateMultiPracticeForm(state);
@@ -337,6 +352,39 @@ async function dispatchChronicFollowup(collection, id, updates, note) {
     alert(error.message || "慢病随访处置失败，请检查登录状态和网络连接");
     return { ok: false };
   }
+}
+
+function renderChronicPublicHealthLoop(state) {
+  const summaryEl = document.querySelector("#public-health-loop-summary");
+  const stageEl = document.querySelector("#public-health-loop-stages");
+  const queueEl = document.querySelector("#public-health-loop-queue");
+  if (!summaryEl || !stageEl || !queueEl) return;
+  const loop = state.chronicPublicHealthLoop;
+  const stages = loop?.stages || [
+    { id: "monitor", name: "监测", count: (state.chronicScreeningTasks || []).filter((item) => item.riskLevel === "高危").length, evidence: "chronicScreeningTasks", owner: "疾控中心/基层慢病健康管理中心", ready: true },
+    { id: "alert", name: "预警", count: state.chronicFollowupSummary?.summary?.highPriorityAlerts || 0, evidence: "followupSummary.alertQueue", owner: "疾控中心/卫健监管", ready: true },
+    { id: "dispatch", name: "派单", count: (state.taskMessages || []).filter((item) => item.chronicFollowup && item.targetRole === "institution").length, evidence: "taskMessages", owner: "基层机构管理员", ready: true },
+    { id: "intervention", name: "干预", count: (state.personalRecords || []).filter((item) => item.category === "chronic-family-doctor-note" || item.meta?.familyDoctorClosure).length, evidence: "familyDoctorActions", owner: "家庭医生团队", ready: true },
+    { id: "followup", name: "随访", count: (state.followups || []).filter((item) => chronicClosed(state, item.status)).length, evidence: "followups", owner: "基层随访团队", ready: true },
+    { id: "summary", name: "汇总", count: state.chronicFollowupSummary?.summary?.policyAligned || 0, evidence: "policyAlignment", owner: "卫健委/疾控中心", ready: true }
+  ];
+  const queue = loop?.queue || [];
+  summaryEl.textContent = loop
+    ? `${loop.summary.readyStages}/${loop.summary.stages} 环节就绪 · ${loop.summary.highRiskResidents} 名重点人群 · 后续联动：免疫规划/传染病报告/区域公卫`
+    : "静态快照：监测-预警-派单-干预-随访-汇总闭环已入模";
+  stageEl.innerHTML = stages.map((item) => `<article class="claim-card" data-public-health-stage="${item.id}">
+    <strong>${item.name}</strong>
+    <span>${item.count}<br>${item.owner}<br>${item.evidence}</span>
+  </article>`).join("");
+  queueEl.innerHTML = queue.slice(0, 6).map((item) => `<section class="item" data-public-health-loop-row="${item.residentId}">
+    <div>
+      <h3>${item.residentName || "重点居民"} · ${item.warningLevel || "high"}</h3>
+      <p>${item.organization || "基层机构"} · ${item.owner || item.dispatchTarget || "责任团队待定"} · ${item.followupDue || "随访时间待定"}</p>
+      <p>监测：${item.monitorSignal || "高危/逾期信号"}；派单：${item.dispatchTarget || "基层随访团队"}；干预：${item.intervention || "家庭医生复核"}</p>
+      <p>汇总：${item.summaryStatus || "awaiting-feedback"}</p>
+    </div>
+    <span class="badge danger">公卫预警</span>
+  </section>`).join("") || `<p class="muted">暂无公卫高危闭环队列。</p>`;
 }
 
 async function escalateChronicFollowup(collection, id, reason) {

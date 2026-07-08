@@ -24,6 +24,10 @@ const fallbackPlatformState = {
   platformEvidence: [],
   applicationCatalog: [],
   hospitalInteroperabilityFunctions: [],
+  dataGovernanceAssets: [],
+  standardDataDictionaries: [],
+  dataLineageControls: [],
+  platformDataBusChannels: [],
   institutionCreditEvaluations: [],
   securityAcceptanceLedger: [],
   productionDeploymentPlan: [],
@@ -171,6 +175,42 @@ const defaultHospitalInteroperabilityFunctions = [
   { id: "mgmt-research-data", functionName: "科研数据资产与合规共享", owner: "科研管理/数据资产管理", sourceSystems: ["EMR", "LIS", "PACS", "专病库"], platformCollections: ["researchDatasets", "diseaseRegistryModels", "dataAccessLogs", "securityAcceptanceLedger"], managementActions: ["数据集治理", "伦理审批", "脱敏发布", "使用审计"], evidence: ["researchDatasets", "diseaseRegistryModels"], status: "demo-ready", nextAction: "归档伦理批件、数据使用协议和沙箱访问记录。" }
 ];
 
+const defaultDataGovernanceAssets = [
+  { id: "asset-his", sourceSystem: "HIS", domain: "patient-visit", owner: "institution-integration", status: "demo-contract-ready", updateFrequency: "near-real-time", platformCollections: ["personalRecords", "careOrders"], qualityScore: 92, risk: "onsite blocked: live HIS endpoint and signed sample messages are still required" },
+  { id: "asset-emr", sourceSystem: "EMR", domain: "clinical-summary", owner: "institution-integration", status: "demo-contract-ready", updateFrequency: "near-real-time", platformCollections: ["personalRecords", "diagnosticReports"], qualityScore: 91, risk: "onsite blocked: live EMR document templates and doctor signature policy are pending" },
+  { id: "asset-lis", sourceSystem: "LIS", domain: "lab-report", owner: "medical-resource-center", status: "demo-contract-ready", updateFrequency: "hourly", platformCollections: ["diagnosticReports", "countyMutualRecognitionRecords"], qualityScore: 90, risk: "onsite blocked: lab item dictionary and abnormal-value confirmation need hospital signoff" },
+  { id: "asset-pacs", sourceSystem: "PACS", domain: "image-report", owner: "medical-resource-center", status: "demo-contract-ready", updateFrequency: "hourly", platformCollections: ["diagnosticReports", "imageCloudStudies", "personalRecords"], qualityScore: 89, risk: "onsite blocked: image index, report callback, and storage authorization remain external" },
+  { id: "asset-insurance", sourceSystem: "Insurance core", domain: "settlement-and-benefit", owner: "cross-agency-integration", status: "demo-contract-ready", updateFrequency: "daily-or-event", platformCollections: ["insuranceClaims", "medicationPickups", "institutionSupervisions"], qualityScore: 88, risk: "external blocked: production settlement fields require insurance agency joint testing" },
+  { id: "asset-public-health", sourceSystem: "Public health/statistics", domain: "statistics-and-public-health", owner: "commission-statistics", status: "demo-ingestion-ready", updateFrequency: "daily/monthly", platformCollections: ["healthStatistics", "healthStatisticsIngestion", "chronicScreeningTasks"], qualityScore: 90, risk: "onsite blocked: national direct-report interface and reconciliation threshold need configuration" },
+  { id: "asset-followup-nursing", sourceSystem: "Follow-up / internet nursing", domain: "continuity-care", owner: "primary-care-and-nursing", status: "demo-closed-loop-ready", updateFrequency: "event", platformCollections: ["followups", "chronicManagementPlans", "internetNursingOrders", "personalRecords"], qualityScore: 87, risk: "onsite blocked: mobile service records, nurse qualification source, and payment callback are pending" }
+];
+
+const defaultStandardDataDictionaries = [
+  { id: "dict-person-index", name: "Resident master index", domain: "master-data", standardItems: ["personIndex", "residentId", "idCard", "phone", "accountId"], owner: "resident-master-index", platformCollections: ["residents", "accounts", "personalRecords"], status: "implemented-demo", blocker: "production population registry and electronic health code source are pending" },
+  { id: "dict-org-staff", name: "Organization, department and staff", domain: "master-data", standardItems: ["orgCode", "institutionId", "doctorId", "nurseId", "orgType"], owner: "platform-identity", platformCollections: ["authOrganizations", "authUsers", "medicalResources", "doctorProfiles", "internetNursingNurses"], status: "implemented-demo", blocker: "live unified social credit code, department code and staff registry need onsite mapping" },
+  { id: "dict-disease-surgery", name: "Disease and procedure dictionary", domain: "clinical-standard", standardItems: ["diseaseType", "diagnosis", "icdCode", "procedureCode"], owner: "medical-quality", platformCollections: ["diseases", "chronicManagementPlans", "diagnosticReports", "diseaseRegistryModels"], status: "structured-summary", blocker: "formal ICD/procedure version and mapping signoff are pending" },
+  { id: "dict-drug-consumable", name: "Drug and consumable dictionary", domain: "pharmacy-insurance", standardItems: ["drugCode", "consumableCode", "medication", "catalogVersion"], owner: "pharmacy-insurance", platformCollections: ["medicationPickups", "drugConsumableSupervisions", "insuranceClaims"], status: "structured-summary", blocker: "production drug/consumable catalog and insurance catalog version are pending" },
+  { id: "dict-lab-imaging", name: "Lab, examination and imaging dictionary", domain: "diagnostic-standard", standardItems: ["item", "modality", "result", "reportedAt", "recognitionRecordId"], owner: "medical-resource-center", platformCollections: ["diagnosticReports", "countyMutualRecognitionRecords", "imageCloudStudies"], status: "structured-summary", blocker: "LIS/PACS item code dictionary and mutual-recognition catalog need site confirmation" },
+  { id: "dict-indicator", name: "Statistics and operation indicators", domain: "indicator-standard", standardItems: ["period", "institution", "metrics", "varianceRate", "qualityScore"], owner: "commission-statistics", platformCollections: ["healthStatistics", "healthStatisticsIngestion", "hospitalOperationSnapshots", "dataQualityIssues"], status: "implemented-demo", blocker: "official direct-report indicator version and monthly reconciliation rules are pending" }
+];
+
+const defaultDataLineageControls = [
+  { id: "lineage-his-patient", sourceSystem: "HIS", targetCollection: "personalRecords", requiredControls: ["externalId", "residentId", "institution", "visitedAt", "HMAC-SHA256", "idempotency"], status: "demo-ready" },
+  { id: "lineage-emr-summary", sourceSystem: "EMR", targetCollection: "personalRecords", requiredControls: ["externalId", "residentId", "diagnosis", "recordDate", "HMAC-SHA256", "idempotency"], status: "demo-ready" },
+  { id: "lineage-lis-report", sourceSystem: "LIS", targetCollection: "diagnosticReports", requiredControls: ["externalId", "residentId", "item", "result", "reportedAt", "HMAC-SHA256"], status: "demo-ready" },
+  { id: "lineage-pacs-report", sourceSystem: "PACS", targetCollection: "diagnosticReports", requiredControls: ["externalId", "residentId", "modality", "conclusion", "reportedAt", "HMAC-SHA256"], status: "demo-ready" },
+  { id: "lineage-insurance", sourceSystem: "Insurance core", targetCollection: "insuranceClaims", requiredControls: ["externalId", "residentId", "claimStatus", "amount", "idempotency"], status: "external-blocked" },
+  { id: "lineage-statistics", sourceSystem: "Public health/statistics", targetCollection: "healthStatisticsIngestion", requiredControls: ["externalId", "period", "institution", "metrics", "manual-review"], status: "demo-ready" },
+  { id: "lineage-followup-nursing", sourceSystem: "Follow-up / internet nursing", targetCollection: "personalRecords", requiredControls: ["residentId", "serviceRecord", "nurseQualification", "auditTrail"], status: "onsite-blocked" }
+];
+
+const defaultPlatformDataBusChannels = [
+  { id: "bus-master-data-directory", name: "Master data directory bus", domain: "master-data", owner: "resident-master-index", producerCollections: ["residents", "authOrganizations", "authUsers", "medicalResources"], consumerModules: ["platform", "health-dashboard", "citizen", "institution", "county"], evidence: ["dict-person-index", "dict-org-staff"], blockerSource: "production population registry and staff registry onsite mapping", status: "implemented-demo" },
+  { id: "bus-standard-dictionary", name: "Standard dictionary bus", domain: "standard-dictionary", owner: "medical-quality", producerCollections: ["diseases", "diagnosticReports", "medicationPickups", "drugConsumableSupervisions"], consumerModules: ["quality-safety", "drug-consumable", "referral", "internet-nursing"], evidence: ["dict-disease-surgery", "dict-drug-consumable", "dict-lab-imaging"], blockerSource: "formal ICD, procedure, drug, consumable, LIS and PACS dictionary signoff", status: "structured-summary" },
+  { id: "bus-lineage-evidence", name: "Lineage evidence bus", domain: "lineage-quality", owner: "institution-integration", producerCollections: ["integrationContracts", "personalRecords", "diagnosticReports", "healthStatisticsIngestion"], consumerModules: ["release-report", "deploy-check", "interface-mapping", "data-quality"], evidence: ["lineage-his-patient", "lineage-emr-summary", "lineage-lis-report", "lineage-pacs-report", "lineage-statistics"], blockerSource: "live HIS/EMR/LIS/PACS endpoint, signature sample and callback joint testing", status: "demo-ready" },
+  { id: "bus-interface-blockers", name: "Interface blocker bus", domain: "external-blocker", owner: "cross-agency-integration", producerCollections: ["platformInterfaces", "productionDeploymentPlan", "siteLaunchEvidence", "securityAcceptanceLedger"], consumerModules: ["site-readiness", "onsite-launch", "operations", "release-manifest"], evidence: ["insurance-settlement-v1", "lineage-insurance", "lineage-followup-nursing"], blockerSource: "insurance agency settlement joint testing, image authorization, nurse qualification and payment callback", status: "external-blocked" }
+];
+
 const defaultInstitutionCreditEvaluations = [
   { id: "credit-central", name: "大连市中心医院", institutionType: "三级医院", period: "2026上半年", score: 92, grade: "A", indicators: "依法执业98/质量安全90/数据报送88/服务信用92", owner: "医政医管处", status: "已评价", next: "保持月度数据质量复核并公示优秀项。" },
   { id: "credit-ganjingzi", name: "甘井子区人民医院", institutionType: "二级医院", period: "2026上半年", score: 84, grade: "B", indicators: "依法执业92/质量安全86/数据报送76/服务信用82", owner: "属地卫生行政部门", status: "整改中", next: "30日内完成统计迟报和接口数据缺项整改。" },
@@ -241,6 +281,7 @@ function renderPlatform() {
   renderIntegrationRegistry(platformData.integrations);
   renderInterfacePlan(platformData.interfaces);
   renderDataFoundation(platformState);
+  renderDataGovernanceFoundation(platformData);
   renderRoadmap(platformData.deliveryBatches);
   renderHospitalManagementFunctions(platformData.hospitalManagementFunctions);
   renderApplicationCatalog(platformData.applicationCatalog);
@@ -264,6 +305,10 @@ function platformModel(state) {
     evidence: Array.isArray(state.platformEvidence) && state.platformEvidence.length ? state.platformEvidence : defaultPlatformEvidence,
     applicationCatalog: Array.isArray(state.applicationCatalog) && state.applicationCatalog.length ? state.applicationCatalog : defaultApplicationCatalog,
     hospitalManagementFunctions: Array.isArray(state.hospitalInteroperabilityFunctions) && state.hospitalInteroperabilityFunctions.length ? state.hospitalInteroperabilityFunctions : defaultHospitalInteroperabilityFunctions,
+    dataGovernanceAssets: Array.isArray(state.dataGovernanceAssets) && state.dataGovernanceAssets.length ? state.dataGovernanceAssets : defaultDataGovernanceAssets,
+    standardDataDictionaries: Array.isArray(state.standardDataDictionaries) && state.standardDataDictionaries.length ? state.standardDataDictionaries : defaultStandardDataDictionaries,
+    dataLineageControls: Array.isArray(state.dataLineageControls) && state.dataLineageControls.length ? state.dataLineageControls : defaultDataLineageControls,
+    platformDataBusChannels: Array.isArray(state.platformDataBusChannels) && state.platformDataBusChannels.length ? state.platformDataBusChannels : defaultPlatformDataBusChannels,
     creditEvaluations: Array.isArray(state.institutionCreditEvaluations) && state.institutionCreditEvaluations.length ? state.institutionCreditEvaluations : defaultInstitutionCreditEvaluations,
     securityLedger: Array.isArray(state.securityAcceptanceLedger) && state.securityAcceptanceLedger.length ? state.securityAcceptanceLedger : defaultSecurityAcceptanceLedger,
     productionDeploymentPlan: Array.isArray(state.productionDeploymentPlan) && state.productionDeploymentPlan.length ? state.productionDeploymentPlan : defaultProductionDeploymentPlan,
@@ -421,6 +466,47 @@ function renderDataFoundation(state) {
     const ready = keys.filter((key) => hasData(state, key));
     return `<div><strong>${label}</strong><span>${ready.length}/${keys.length} 个数据集合已在原项目中存在：${ready.join("、") || "待建设"}。</span></div>`;
   }).join("");
+}
+
+function renderDataGovernanceFoundation(data) {
+  const container = document.querySelector("#data-governance-foundation");
+  if (!container) return;
+  const assets = data.dataGovernanceAssets || [];
+  const dictionaries = data.standardDataDictionaries || [];
+  const lineage = data.dataLineageControls || [];
+  const busChannels = data.platformDataBusChannels || [];
+  const averageScore = Math.round(assets.reduce((sum, item) => sum + Number(item.qualityScore || 0), 0) / Math.max(assets.length, 1));
+  const blockers = [...assets.map((item) => item.risk || ""), ...lineage.map((item) => item.status || "")]
+    .filter((text) => /blocked/i.test(text)).length;
+  const cards = [
+    {
+      title: `数据资产目录 ${assets.length} 项`,
+      meta: `平均质量评分 ${averageScore} / 阻塞项 ${blockers}`,
+      rows: assets.map((item) => `${item.sourceSystem}: ${item.domain} -> ${listText(item.platformCollections)} (${item.status})`)
+    },
+    {
+      title: `标准字典与主数据 ${dictionaries.length} 类`,
+      meta: "personIndex / 机构人员 / 疾病手术 / 药品耗材 / 检查检验 / 指标",
+      rows: dictionaries.map((item) => `${item.name}: ${listText(item.standardItems)} (${item.status})`)
+    },
+    {
+      title: `数据质量与血缘 ${lineage.length} 条`,
+      meta: "必填、幂等、签名、质量规则和来源落点可审查",
+      rows: lineage.map((item) => `${item.sourceSystem} -> ${item.targetCollection}: ${listText(item.requiredControls)} (${item.status})`)
+    },
+    {
+      title: `平台总线复用出口 ${busChannels.length} 条`,
+      meta: "主数据、标准字典、血缘证据和接口阻断项统一给指标中心与智慧医院复用",
+      rows: busChannels.map((item) => `${item.name}: ${listText(item.producerCollections)} -> ${listText(item.consumerModules)} (${item.status})`)
+    }
+  ];
+  container.innerHTML = cards.map((card) => `
+    <article class="evidence-card">
+      <h3>${card.title}</h3>
+      <p>${card.meta}</p>
+      <ul>${card.rows.slice(0, 8).map((row) => `<li>${row}</li>`).join("")}</ul>
+    </article>
+  `).join("");
 }
 
 function renderRoadmap(deliveryBatches) {

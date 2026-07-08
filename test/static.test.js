@@ -288,12 +288,17 @@ test("chronic follow-up launch core is wired through docs api and portals", () =
   assert.match(read("server.js"), /\/api\/chronic\/pharmacy-callbacks/);
   assert.match(read("server.js"), /\/api\/chronic\/family-doctor-actions/);
   assert.match(read("server.js"), /\/api\/chronic\/reminder-outreach/);
+  assert.match(read("server.js"), /\/api\/chronic\/public-health-loop/);
   assert.match(institutionHtml, /chronic-launch-core/);
   assert.match(institutionHtml, /慢病上线核心联调/);
+  assert.match(institutionHtml, /疾控和公卫闭环/);
+  assert.match(institutionHtml, /public-health-loop-stages/);
   assert.match(institutionHtml, /设备上传/);
   assert.match(institutionHtml, /现场联调已就绪/);
   assert.doesNotMatch(institutionHtml, /Chronic Launch Core|Device upload|Pharmacy callback|Family doctor closure|Reminder outreach|Field integration ready|Resident, task, status/);
   assert.match(institutionJs, /loadChronicFollowupSummary/);
+  assert.match(institutionJs, /loadChronicPublicHealthLoop/);
+  assert.match(institutionJs, /renderChronicPublicHealthLoop/);
   assert.match(institutionJs, /refreshChronicRuntimeState/);
   assert.match(institutionJs, /\/chronic\/device-measurements/);
   assert.match(institutionJs, /\/chronic\/launch-core\/actions/);
@@ -408,6 +413,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.equal(Boolean(pkg.scripts["audit:retention"]), true);
   assert.equal(Boolean(pkg.scripts["chronic:followup-readiness"]), true);
   assert.equal(Boolean(pkg.scripts["data-quality:report"]), true);
+  assert.equal(Boolean(pkg.scripts["data-governance:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["quality-safety:report"]), true);
   assert.equal(Boolean(pkg.scripts["drug-consumable:readiness"]), true);
   assert.equal(Boolean(pkg.scripts["environment:matrix"]), true);
@@ -530,6 +536,8 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("scripts/deploy-check.js"), /chronic:followup-readiness/);
   assert.match(read("scripts/deploy-check.js"), /chronicFollowupStatusPolicy/);
   assert.match(read("scripts/deploy-check.js"), /data-quality:report/);
+  assert.match(read("scripts/deploy-check.js"), /data-governance:readiness/);
+  assert.match(read("scripts/deploy-check.js"), /snapshot:dataGovernance/);
   assert.match(read("scripts/deploy-check.js"), /quality-safety:report/);
   assert.match(read("scripts/deploy-check.js"), /drug-consumable:readiness/);
   assert.match(read("scripts/deploy-check.js"), /environment:matrix/);
@@ -560,6 +568,7 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".github/workflows/ci.yml"), /npm run audit:retention/);
   assert.match(read(".github/workflows/ci.yml"), /npm run chronic:followup-readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run data-quality:report/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run data-governance:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run quality-safety:report/);
   assert.match(read(".github/workflows/ci.yml"), /npm run drug-consumable:readiness/);
   assert.match(read(".github/workflows/ci.yml"), /npm run hybrid:deployment-readiness/);
@@ -731,6 +740,22 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(read("institution.js"), /data-chronic-escalation/);
   assert.match(read("citizen.html"), /followup-feedback-form/);
   assert.match(read("citizen.js"), /bindFollowupFeedback/);
+});
+
+test("data governance foundation exposes platform cards API and release evidence", () => {
+  const server = read("server.js");
+  assert.match(server, /seedDataGovernanceAssets/);
+  assert.match(server, /seedStandardDataDictionaries/);
+  assert.match(server, /seedDataLineageControls/);
+  assert.match(server, /seedPlatformDataBusChannels/);
+  assert.match(server, /\/api\/data-governance/);
+  assert.match(read("platform.html"), /data-governance-foundation/);
+  assert.match(read("platform.js"), /renderDataGovernanceFoundation/);
+  assert.match(read("platform.js"), /平台总线复用出口/);
+  assert.match(read("scripts/data-governance-readiness.js"), /Data governance readiness report/);
+  assert.match(read("scripts/data-governance-readiness.js"), /data-governance:platform-bus/);
+  assert.match(read("scripts/release-report.js"), /dataGovernance:readiness/);
+  assert.match(read("scripts/release-artifact-manifest.js"), /data-governance-readiness-report\.md/);
 });
 
 test("system structure documentation reflects completed local governance loops", () => {

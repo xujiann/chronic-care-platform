@@ -1926,6 +1926,14 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(chronicFollowupSummary.body.policyAlignment.some((item) => item.id === "policy-feedback-dispatch" && item.covered), true);
     assert.equal(chronicFollowupSummary.body.residents.some((item) => item.residentId === "r1" && item.medicationAdherence.total >= 1), true);
 
+    const publicHealthLoop = await api(baseUrl, "/api/chronic/public-health-loop", authorized(commissionToken));
+    assert.equal(publicHealthLoop.response.status, 200);
+    assert.equal(publicHealthLoop.body.ok, true);
+    assert.equal(publicHealthLoop.body.summary.readyStages, 6);
+    assert.deepEqual(publicHealthLoop.body.stages.map((item) => item.id), ["monitor", "alert", "dispatch", "intervention", "followup", "summary"]);
+    assert.equal(publicHealthLoop.body.queue.some((item) => item.residentId === "r1" && item.dispatchTarget), true);
+    assert.equal(publicHealthLoop.body.nextIntegrations.includes("infectious disease reporting"), true);
+
     const chronicEscalation = await api(baseUrl, "/api/chronic/followup-escalations", authorized(commissionToken, {
       method: "POST",
       body: JSON.stringify({

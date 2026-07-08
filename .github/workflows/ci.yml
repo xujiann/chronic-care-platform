@@ -47,6 +47,8 @@ jobs:
         run: npm run chronic:followup-readiness
       - name: Generate data quality report
         run: npm run data-quality:report
+      - name: Generate data governance readiness report
+        run: npm run data-governance:readiness
       - name: Generate medical quality and safety report
         run: npm run quality-safety:report
       - name: Generate drug consumable readiness report

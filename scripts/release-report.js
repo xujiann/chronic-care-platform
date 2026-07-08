@@ -7,6 +7,7 @@ const { buildChronicFollowupReadinessReport, renderMarkdown: renderChronicFollow
 const { buildChronicInstitutionInterfaceReport, renderMarkdown: renderChronicInstitutionInterfaceMarkdown } = require("./chronic-institution-interfaces");
 const { buildChronicLaunchCoreReport, renderMarkdown: renderChronicLaunchCoreMarkdown } = require("./chronic-launch-core");
 const { buildCitizenLaunchFoundationReadiness, renderMarkdown: renderCitizenLaunchFoundationMarkdown } = require("./citizen-launch-foundation-readiness");
+const { buildDataGovernanceReadiness, renderMarkdown: renderDataGovernanceMarkdown } = require("./data-governance-readiness");
 const { buildDataQualityReport, renderMarkdown: renderDataQualityMarkdown } = require("./data-quality-report");
 const { buildDrugConsumableReadinessReport, renderMarkdown: renderDrugConsumableMarkdown } = require("./drug-consumable-readiness");
 const { buildEvaluationEvidenceReport, renderMarkdown: renderEvaluationEvidenceMarkdown } = require("./evaluation-evidence");
@@ -325,6 +326,7 @@ function chronicFollowupChecks(chronicFollowup, chronicInstitutionInterfaces, ch
     check("chronicFollowup:readiness", chronicFollowup.ok, chronicFollowup.ok ? "chronic follow-up readiness checks passed" : "chronic follow-up readiness checks failed", "error", "chronic-followup"),
     check("chronicFollowup:boundaries", chronicFollowup.summary?.passed === chronicFollowup.summary?.boundaries, `${chronicFollowup.summary?.passed || 0}/${chronicFollowup.summary?.boundaries || 0} boundaries`, "error", "chronic-followup"),
     check("chronicFollowup:feedback", chronicFollowup.summary?.feedbackRecords >= 1, `${chronicFollowup.summary?.feedbackRecords || 0} feedback records`, "error", "chronic-followup"),
+    check("chronicFollowup:publicHealthLoop", chronicFollowup.summary?.publicHealthLoopReadyStages === 6, `${chronicFollowup.summary?.publicHealthLoopReadyStages || 0}/6 public health loop stages`, "error", "chronic-followup"),
     check("chronicFollowup:institutionInterfaces", chronicInstitutionInterfaces?.ok && chronicInstitutionInterfaces.summary?.readyContracts === chronicInstitutionInterfaces.summary?.contracts, `${chronicInstitutionInterfaces?.summary?.readyContracts || 0}/${chronicInstitutionInterfaces?.summary?.contracts || 0} institution contracts`, "error", "chronic-followup"),
     check("chronicFollowup:launchCore", chronicLaunchCore?.ok && chronicLaunchCore.summary?.readyItems === chronicLaunchCore.summary?.items, `${chronicLaunchCore?.summary?.readyItems || 0}/${chronicLaunchCore?.summary?.items || 0} launch core items`, "error", "chronic-followup")
   ];
@@ -431,6 +433,16 @@ function dataQualityChecks(dataQuality) {
     check("dataQuality:report", dataQuality.ok, dataQuality.ok ? "data quality checks passed" : "data quality checks failed", "error", "data-quality"),
     check("dataQuality:masterIndexCompleteness", dataQuality.scorecard?.residentIndexCompleteness === 100, `${dataQuality.scorecard?.residentIndexCompleteness || 0}% resident index completeness`, "error", "data-quality"),
     check("dataQuality:residentReferences", dataQuality.issues?.missingReferences?.length === 0, `${dataQuality.issues?.missingReferences?.length || 0} broken resident references`, "error", "data-quality")
+  ];
+}
+
+function dataGovernanceChecks(dataGovernance) {
+  return [
+    check("dataGovernance:readiness", dataGovernance.ok, dataGovernance.ok ? "data governance foundation passed" : "data governance foundation failed", "error", "data-governance"),
+    check("dataGovernance:assets", (dataGovernance.summary?.assets || 0) >= 7 && (dataGovernance.summary?.sourceSystems || 0) >= 7, `${dataGovernance.summary?.assets || 0} assets / ${dataGovernance.summary?.sourceSystems || 0} sources`, "error", "data-governance"),
+    check("dataGovernance:lineage", dataGovernance.lineage?.every((item) => item.contractPresent && item.targetCollectionPresent && item.signatureReady && item.idempotencyReady), `${dataGovernance.lineage?.length || 0} lineage controls linked`, "error", "data-governance"),
+    check("dataGovernance:platformBus", (dataGovernance.summary?.busChannels || 0) >= 4 && dataGovernance.busChannels?.every((item) => item.owner && item.producerCollections?.length && item.consumerModules?.length), `${dataGovernance.summary?.busChannels || 0} reusable platform bus channels`, "error", "data-governance"),
+    check("dataGovernance:onsiteBoundary", (dataGovernance.onsiteBlockers || []).length >= 3, `${dataGovernance.onsiteBlockers?.length || 0} onsite/external blockers surfaced`, "error", "data-governance")
   ];
 }
 
@@ -654,6 +666,7 @@ function packageChecks(pkg) {
     "onsite:launch-requirements",
     "identity:contract",
     "audit:retention",
+    "data-governance:readiness",
     "data-quality:report",
     "quality-safety:report",
     "environment:matrix",
@@ -727,6 +740,7 @@ function buildReleaseReport(options = {}) {
   const drugConsumable = buildDrugConsumableReadinessReport({ data, pkg });
   const integrationReadiness = buildIntegrationReadinessReport({ data });
   const interfaceMapping = buildInterfaceMappingReport({ data, pkg });
+  const dataGovernance = buildDataGovernanceReadiness({ data, pkg, interfaceMapping, dataQuality });
   const regionalDataSharing = buildRegionalDataSharingReport({ data, pkg });
   const hospitalOperationsReadiness = buildHospitalOperationsReadinessReport({ data, pkg });
   const researchSandbox = buildResearchSandboxReadiness(data);
@@ -767,6 +781,7 @@ function buildReleaseReport(options = {}) {
     ...auditRetentionChecks(auditRetention),
     ...chronicFollowupChecks(chronicFollowup, chronicInstitutionInterfaces, chronicLaunchCore),
     ...dataQualityChecks(dataQuality),
+    ...dataGovernanceChecks(dataGovernance),
     ...qualitySafetyChecks(qualitySafety),
     ...drugConsumableChecks(drugConsumable),
     ...integrationReadinessChecks(integrationReadiness),
@@ -818,6 +833,7 @@ function buildReleaseReport(options = {}) {
     chronicInstitutionInterfaces,
     chronicLaunchCore,
     dataQuality,
+    dataGovernance,
     qualitySafety,
     drugConsumable,
     integrationReadiness,
@@ -1174,6 +1190,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       dataQuality: report.dataQuality
     }, null, 2), "utf8");
+    const dataGovernanceJson = path.join(path.dirname(output), "data-governance-readiness-report.json");
+    fs.writeFileSync(dataGovernanceJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      dataGovernance: report.dataGovernance
+    }, null, 2), "utf8");
     const qualitySafetyJson = path.join(path.dirname(output), "quality-safety-report.json");
     fs.writeFileSync(qualitySafetyJson, JSON.stringify({
       project: report.project,
@@ -1404,6 +1428,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(chronicLaunchCoreMarkdown, renderChronicLaunchCoreMarkdown(report.chronicLaunchCore), "utf8");
     const dataQualityMarkdown = path.join(path.dirname(markdown), "data-quality-report.md");
     fs.writeFileSync(dataQualityMarkdown, renderDataQualityMarkdown(report.dataQuality), "utf8");
+    const dataGovernanceMarkdown = path.join(path.dirname(markdown), "data-governance-readiness-report.md");
+    fs.writeFileSync(dataGovernanceMarkdown, renderDataGovernanceMarkdown(report.dataGovernance), "utf8");
     const qualitySafetyMarkdown = path.join(path.dirname(markdown), "quality-safety-report.md");
     fs.writeFileSync(qualitySafetyMarkdown, renderQualitySafetyMarkdown(report.qualitySafety), "utf8");
     const integrationMarkdown = path.join(path.dirname(markdown), "integration-readiness-report.md");

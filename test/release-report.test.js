@@ -132,8 +132,10 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "chronicFollowup:readiness" && item.passed), true);
   assert.equal(report.chronicFollowup.ok, true);
   assert.equal(report.chronicFollowup.apiSurface.includes("POST /api/chronic/followup-feedback"), true);
+  assert.equal(report.chronicFollowup.apiSurface.includes("GET /api/chronic/public-health-loop"), true);
   assert.equal(report.checks.some((item) => item.name === "chronicFollowup:institutionInterfaces" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "chronicFollowup:launchCore" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "chronicFollowup:publicHealthLoop" && item.passed), true);
   assert.equal(report.chronicInstitutionInterfaces.summary.readyContracts, report.chronicInstitutionInterfaces.summary.contracts);
   assert.equal(report.chronicLaunchCore.summary.readyItems, 5);
   assert.equal(report.checks.some((item) => item.name === "dataQuality:report" && item.passed), true);

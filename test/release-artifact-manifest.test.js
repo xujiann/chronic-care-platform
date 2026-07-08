@@ -33,6 +33,7 @@ test("release artifact manifest indexes reports templates commands and evidence"
   assert.equal(report.artifacts.some((item) => item.id === "chronic-followup" && item.command === "chronic:followup-readiness"), true);
   assert.equal(report.artifacts.some((item) => item.id === "chronic-institution-interfaces" && item.command === "chronic:institution-interfaces"), true);
   assert.equal(report.artifacts.some((item) => item.id === "chronic-launch-core" && item.command === "chronic:launch-core" && item.evidence === "/api/chronic/launch-core"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "data-governance" && item.command === "data-governance:readiness" && item.markdown === "release/data-governance-readiness-report.md" && item.evidence === "/api/data-governance"), true);
   assert.equal(report.templateReadmes.some((item) => item.file === "release/templates/interface-joint-test/README.md"), true);
   assert.equal(report.templateReadmes.every((item) => item.evidence === "/api/site-template-readmes"), true);
   assert.equal(report.checks.every((item) => item.passed), true);
@@ -56,6 +57,7 @@ test("release artifact manifest renders and writes artifacts", (t) => {
   assert.match(markdown, /Doctor multi-practice readiness report/);
   assert.match(markdown, /Template READMEs/);
   assert.match(markdown, /release-artifact-manifest\.md/);
+  assert.match(markdown, /data-governance-readiness-report\.md/);
 
   writeOutput(report, {
     output: path.join("tmp", "release-artifact-manifest-test", "release-artifact-manifest.json"),

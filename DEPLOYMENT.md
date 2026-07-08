@@ -181,6 +181,7 @@ npm.cmd run release:report:full
 `research:sandbox` generates `release/research-sandbox-readiness-report.json` and `release/research-sandbox-readiness-report.md`, covering research dataset applications, disease registry models, ethics approval, de-identification release, sandbox access, usage audit, and outcome return evidence.
 
 `data-quality:report` 会生成 `release/data-quality-report.json` 和 `release/data-quality-report.md`，检查居民主索引完整度、跨集合居民引用、personIndex 一致性、来源可追溯和整改闭环，作为 P1 数据质量治理和主索引现场规则确认前的证据包。
+`data-governance:readiness` 会生成 `release/data-governance-readiness-report.json` 和 `release/data-governance-readiness-report.md`，检查数据资产台账、标准字典/主数据、字段映射、必填项、幂等键、签名校验、质量检查和来源系统到平台集合的血缘落点；医保核心、院内 HIS/EMR/LIS/PACS 等未完成真实外部联调的项会保留为 external/onsite blocked，不能作为生产已接入结论。
 
 `environment:matrix` 会生成 `release/environment-matrix-report.json` 和 `release/environment-matrix-report.md`，把 demo、staging、production 三层环境的必填变量、阻断变量、责任人、门禁脚本和上线验收规则固化为可检查矩阵；`release:report` 会同步写出这些文件，作为环境分层、密钥注入、现场签字和生产切换审查的前置材料。
 

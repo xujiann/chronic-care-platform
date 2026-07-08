@@ -215,6 +215,7 @@ npm.cmd run hybrid:deployment-readiness
 `research:sandbox` generates `release/research-sandbox-readiness-report.json` and `release/research-sandbox-readiness-report.md`, covering research dataset applications, disease registry models, ethics approval, de-identification release, sandbox access, usage audit, and outcome return evidence.
 
 `data-quality:report` 会生成 `release/data-quality-report.json` 与 `release/data-quality-report.md`，检查居民主索引完整度、跨集合居民引用、personIndex 一致性、来源可追溯和整改闭环。
+`data-governance:readiness` 会生成 `release/data-governance-readiness-report.json` 与 `release/data-governance-readiness-report.md`，把 HIS、EMR、LIS、PACS、医保、公卫、随访/互联网护理等来源系统纳入数据资产台账，汇总 personIndex、机构/科室/人员、疾病/手术/药品/检查检验等标准字典，并把字段映射、必填项、幂等、签名、质量检查和外部/现场阻塞项整理为可审查证据。
 
 `environment:matrix` 会生成 `release/environment-matrix-report.json` 与 `release/environment-matrix-report.md`，把 demo、staging、production 三层环境的必填变量、阻断变量、责任人、门禁脚本和上线验收规则固化为可检查矩阵；`release:report` 会同步归档该矩阵，便于生产切换前逐项确认环境分层和签字证据。
 

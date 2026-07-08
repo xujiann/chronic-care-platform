@@ -62,6 +62,8 @@ The field integration APIs reuse the same resident authorization, institution sc
 
 `POST /api/chronic/followup-escalations` lets institutions and the commission escalate overdue or high-priority screening, management plan, follow-up, and medication adherence items. It reuses the same resident scope checks, writes an institution task message, stamps the source business item with escalation owner/reason/status, and records data access plus security audit evidence.
 
+`GET /api/chronic/public-health-loop` exposes the first CDC and public-health slice for chronic high-risk residents and primary-care follow-up. It reuses risk stratification, follow-up summary, task messages, family-doctor closure records, resident feedback, and policy alignment to present the minimum runnable `monitor -> alert -> dispatch -> intervention -> follow-up -> summary` loop. The first slice is intentionally limited to chronic high-risk and primary follow-up; immunization planning, infectious disease reporting, and regional public-health systems remain the next integration tracks.
+
 ## Release Evidence
 
 Run `npm run chronic:followup-readiness` to generate:
@@ -78,6 +80,8 @@ Run `npm run chronic:followup-readiness` to generate:
 `release:report` gates `chronicFollowup:residentExperience`, requiring self-monitoring, satisfaction, family proxy, and senior reminder evidence to remain in the release package.
 
 `release:report` gates `chronicFollowup:fieldIntegration`, requiring device measurement, pharmacy callback, family doctor closure, and reminder outreach evidence before publication.
+
+`release:report` gates `chronicFollowup:publicHealthLoop`, requiring all six public-health loop stages to have evidence before publication.
 
 `release:report` gates `chronicFollowup:institutionInterfaces`, requiring the institution interface specification, runtime routes, API tests, and launch evidence to stay aligned.
 

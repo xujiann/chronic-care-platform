@@ -589,7 +589,12 @@ function seedState() {
     authOrganizations: seedAuthOrganizations(),
     authUsers: seedAuthUsers(),
     interfaceRequirements: seedInterfaceRequirements(),
+    integrationContracts: seedIntegrationContracts(),
     hospitalInteroperabilityFunctions: seedHospitalInteroperabilityFunctions(),
+    dataGovernanceAssets: seedDataGovernanceAssets(),
+    standardDataDictionaries: seedStandardDataDictionaries(),
+    dataLineageControls: seedDataLineageControls(),
+    platformDataBusChannels: seedPlatformDataBusChannels(),
     chronicProjectBlueprint: seedChronicProjectBlueprint(),
     countyProjectBlueprint: seedCountyProjectBlueprint(),
     countyConsortium: seedCountyConsortium(),
@@ -1589,6 +1594,136 @@ function seedIntegrationContracts() {
     { id: "certificate-sync-v1", domain: "电子证照", version: "1.0.0", direction: "outbound", resource: "CertificateStatus", requiredFields: ["externalId", "certificateNo", "status"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "失败进入补偿队列", status: "ready" },
     { id: "statistics-report-v1", domain: "卫生统计", version: "1.0.0", direction: "inbound", resource: "HealthStatistics", requiredFields: ["externalId", "period", "institution", "metrics"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "人工复核后重放", status: "ready" }
   ];
+}
+
+function seedDataGovernanceAssets() {
+  return [
+    { id: "asset-his", sourceSystem: "HIS", domain: "patient-visit", owner: "institution-integration", status: "demo-contract-ready", updateFrequency: "near-real-time", platformCollections: ["personalRecords", "careOrders"], qualityScore: 92, risk: "onsite blocked: live HIS endpoint and signed sample messages are still required" },
+    { id: "asset-emr", sourceSystem: "EMR", domain: "clinical-summary", owner: "institution-integration", status: "demo-contract-ready", updateFrequency: "near-real-time", platformCollections: ["personalRecords", "diagnosticReports"], qualityScore: 91, risk: "onsite blocked: live EMR document templates and doctor signature policy are pending" },
+    { id: "asset-lis", sourceSystem: "LIS", domain: "lab-report", owner: "medical-resource-center", status: "demo-contract-ready", updateFrequency: "hourly", platformCollections: ["diagnosticReports", "countyMutualRecognitionRecords"], qualityScore: 90, risk: "onsite blocked: lab item dictionary and abnormal-value confirmation need hospital signoff" },
+    { id: "asset-pacs", sourceSystem: "PACS", domain: "image-report", owner: "medical-resource-center", status: "demo-contract-ready", updateFrequency: "hourly", platformCollections: ["diagnosticReports", "imageCloudStudies", "personalRecords"], qualityScore: 89, risk: "onsite blocked: image index, report callback, and storage authorization remain external" },
+    { id: "asset-insurance", sourceSystem: "Insurance core", domain: "settlement-and-benefit", owner: "cross-agency-integration", status: "demo-contract-ready", updateFrequency: "daily-or-event", platformCollections: ["insuranceClaims", "medicationPickups", "institutionSupervisions"], qualityScore: 88, risk: "external blocked: production settlement fields require insurance agency joint testing" },
+    { id: "asset-public-health", sourceSystem: "Public health/statistics", domain: "statistics-and-public-health", owner: "commission-statistics", status: "demo-ingestion-ready", updateFrequency: "daily/monthly", platformCollections: ["healthStatistics", "healthStatisticsIngestion", "chronicScreeningTasks"], qualityScore: 90, risk: "onsite blocked: national direct-report interface and reconciliation threshold need configuration" },
+    { id: "asset-followup-nursing", sourceSystem: "Follow-up / internet nursing", domain: "continuity-care", owner: "primary-care-and-nursing", status: "demo-closed-loop-ready", updateFrequency: "event", platformCollections: ["followups", "chronicManagementPlans", "internetNursingOrders", "personalRecords"], qualityScore: 87, risk: "onsite blocked: mobile service records, nurse qualification source, and payment callback are pending" }
+  ];
+}
+
+function seedStandardDataDictionaries() {
+  return [
+    { id: "dict-person-index", name: "Resident master index", domain: "master-data", standardItems: ["personIndex", "residentId", "idCard", "phone", "accountId"], owner: "resident-master-index", platformCollections: ["residents", "accounts", "personalRecords"], status: "implemented-demo", blocker: "production population registry and electronic health code source are pending" },
+    { id: "dict-org-staff", name: "Organization, department and staff", domain: "master-data", standardItems: ["orgCode", "institutionId", "doctorId", "nurseId", "orgType"], owner: "platform-identity", platformCollections: ["authOrganizations", "authUsers", "medicalResources", "doctorProfiles", "internetNursingNurses"], status: "implemented-demo", blocker: "live unified social credit code, department code and staff registry need onsite mapping" },
+    { id: "dict-disease-surgery", name: "Disease and procedure dictionary", domain: "clinical-standard", standardItems: ["diseaseType", "diagnosis", "icdCode", "procedureCode"], owner: "medical-quality", platformCollections: ["diseases", "chronicManagementPlans", "diagnosticReports", "diseaseRegistryModels"], status: "structured-summary", blocker: "formal ICD/procedure version and mapping signoff are pending" },
+    { id: "dict-drug-consumable", name: "Drug and consumable dictionary", domain: "pharmacy-insurance", standardItems: ["drugCode", "consumableCode", "medication", "catalogVersion"], owner: "pharmacy-insurance", platformCollections: ["medicationPickups", "drugConsumableSupervisions", "insuranceClaims"], status: "structured-summary", blocker: "production drug/consumable catalog and insurance catalog version are pending" },
+    { id: "dict-lab-imaging", name: "Lab, examination and imaging dictionary", domain: "diagnostic-standard", standardItems: ["item", "modality", "result", "reportedAt", "recognitionRecordId"], owner: "medical-resource-center", platformCollections: ["diagnosticReports", "countyMutualRecognitionRecords", "imageCloudStudies"], status: "structured-summary", blocker: "LIS/PACS item code dictionary and mutual-recognition catalog need site confirmation" },
+    { id: "dict-indicator", name: "Statistics and operation indicators", domain: "indicator-standard", standardItems: ["period", "institution", "metrics", "varianceRate", "qualityScore"], owner: "commission-statistics", platformCollections: ["healthStatistics", "healthStatisticsIngestion", "hospitalOperationSnapshots", "dataQualityIssues"], status: "implemented-demo", blocker: "official direct-report indicator version and monthly reconciliation rules are pending" }
+  ];
+}
+
+function seedDataLineageControls() {
+  return [
+    { id: "lineage-his-patient", contractId: "his-patient-v1", sourceSystem: "HIS", targetCollection: "personalRecords", requiredControls: ["externalId", "residentId", "institution", "visitedAt", "HMAC-SHA256", "idempotency"], qualityRule: "resident master-index and visit date are required", status: "demo-ready" },
+    { id: "lineage-emr-summary", contractId: "emr-summary-v1", sourceSystem: "EMR", targetCollection: "personalRecords", requiredControls: ["externalId", "residentId", "diagnosis", "recordDate", "HMAC-SHA256", "idempotency"], qualityRule: "diagnosis and recordDate must land in the resident timeline", status: "demo-ready" },
+    { id: "lineage-lis-report", contractId: "lis-report-v1", sourceSystem: "LIS", targetCollection: "diagnosticReports", requiredControls: ["externalId", "residentId", "item", "result", "reportedAt", "HMAC-SHA256"], qualityRule: "lab report must keep item/result/reportedAt and resident linkage", status: "demo-ready" },
+    { id: "lineage-pacs-report", contractId: "pacs-report-v1", sourceSystem: "PACS", targetCollection: "diagnosticReports", requiredControls: ["externalId", "residentId", "modality", "conclusion", "reportedAt", "HMAC-SHA256"], qualityRule: "image report must keep modality/conclusion and image-cloud reference when available", status: "demo-ready" },
+    { id: "lineage-insurance", contractId: "insurance-settlement-v1", sourceSystem: "Insurance core", targetCollection: "insuranceClaims", requiredControls: ["externalId", "residentId", "claimStatus", "amount", "idempotency"], qualityRule: "settlement status must reconcile with fixed pickup and prescription evidence", status: "external-blocked" },
+    { id: "lineage-statistics", contractId: "statistics-report-v1", sourceSystem: "Public health/statistics", targetCollection: "healthStatisticsIngestion", requiredControls: ["externalId", "period", "institution", "metrics", "manual-review"], qualityRule: "variance over threshold must create reconciliation review", status: "demo-ready" },
+    { id: "lineage-followup-nursing", contractId: "internet-nursing-readiness", sourceSystem: "Follow-up / internet nursing", targetCollection: "personalRecords", requiredControls: ["residentId", "serviceRecord", "nurseQualification", "auditTrail"], qualityRule: "care service closure must append resident timeline and audit evidence", status: "onsite-blocked" }
+  ];
+}
+
+function seedPlatformDataBusChannels() {
+  return [
+    {
+      id: "bus-master-data-directory",
+      name: "Master data directory bus",
+      domain: "master-data",
+      owner: "resident-master-index",
+      producerCollections: ["residents", "authOrganizations", "authUsers", "medicalResources"],
+      consumerModules: ["platform", "health-dashboard", "citizen", "institution", "county"],
+      evidence: ["dict-person-index", "dict-org-staff"],
+      blockerSource: "production population registry and staff registry onsite mapping",
+      status: "implemented-demo"
+    },
+    {
+      id: "bus-standard-dictionary",
+      name: "Standard dictionary bus",
+      domain: "standard-dictionary",
+      owner: "medical-quality",
+      producerCollections: ["diseases", "diagnosticReports", "medicationPickups", "drugConsumableSupervisions"],
+      consumerModules: ["quality-safety", "drug-consumable", "referral", "internet-nursing"],
+      evidence: ["dict-disease-surgery", "dict-drug-consumable", "dict-lab-imaging"],
+      blockerSource: "formal ICD, procedure, drug, consumable, LIS and PACS dictionary signoff",
+      status: "structured-summary"
+    },
+    {
+      id: "bus-lineage-evidence",
+      name: "Lineage evidence bus",
+      domain: "lineage-quality",
+      owner: "institution-integration",
+      producerCollections: ["integrationContracts", "personalRecords", "diagnosticReports", "healthStatisticsIngestion"],
+      consumerModules: ["release-report", "deploy-check", "interface-mapping", "data-quality"],
+      evidence: ["lineage-his-patient", "lineage-emr-summary", "lineage-lis-report", "lineage-pacs-report", "lineage-statistics"],
+      blockerSource: "live HIS/EMR/LIS/PACS endpoint, signature sample and callback joint testing",
+      status: "demo-ready"
+    },
+    {
+      id: "bus-interface-blockers",
+      name: "Interface blocker bus",
+      domain: "external-blocker",
+      owner: "cross-agency-integration",
+      producerCollections: ["platformInterfaces", "productionDeploymentPlan", "siteLaunchEvidence", "securityAcceptanceLedger"],
+      consumerModules: ["site-readiness", "onsite-launch", "operations", "release-manifest"],
+      evidence: ["insurance-settlement-v1", "lineage-insurance", "lineage-followup-nursing"],
+      blockerSource: "insurance agency settlement joint testing, image authorization, nurse qualification and payment callback",
+      status: "external-blocked"
+    }
+  ];
+}
+
+function buildDataGovernanceOverview(data) {
+  const assets = Array.isArray(data.dataGovernanceAssets) ? data.dataGovernanceAssets : seedDataGovernanceAssets();
+  const dictionaries = Array.isArray(data.standardDataDictionaries) ? data.standardDataDictionaries : seedStandardDataDictionaries();
+  const lineage = Array.isArray(data.dataLineageControls) ? data.dataLineageControls : seedDataLineageControls();
+  const busChannels = Array.isArray(data.platformDataBusChannels) ? data.platformDataBusChannels : seedPlatformDataBusChannels();
+  const contracts = Array.isArray(data.integrationContracts) ? data.integrationContracts : [];
+  const qualityIssues = buildDataQualityIssues(data);
+  const contractIds = new Set(contracts.map((item) => item.id));
+  const enrichedLineage = lineage.map((item) => {
+    const contract = contracts.find((entry) => entry.id === item.contractId);
+    const requiredFields = contract?.requiredFields || item.requiredControls || [];
+    return {
+      ...item,
+      contractPresent: item.contractId === "internet-nursing-readiness" || contractIds.has(item.contractId),
+      requiredFields,
+      signatureReady: item.contractId === "internet-nursing-readiness" || Boolean(contract?.signature),
+      idempotencyReady: item.contractId === "internet-nursing-readiness" || Boolean(contract?.idempotencyKey),
+      targetCollectionPresent: Boolean(item.targetCollection && Object.prototype.hasOwnProperty.call(data, item.targetCollection)),
+      onsiteBlocked: /blocked/i.test(String(item.status || ""))
+    };
+  });
+  const summary = {
+    assets: assets.length,
+    readyAssets: assets.filter((item) => /ready|implemented/i.test(item.status)).length,
+    dictionaries: dictionaries.length,
+    lineage: enrichedLineage.length,
+    onsiteBlocked: [...assets, ...enrichedLineage].filter((item) => /blocked/i.test(`${item.status || ""} ${item.risk || ""}`)).length,
+    qualityIssues: qualityIssues.length,
+    busChannels: busChannels.length,
+    averageQualityScore: Math.round(assets.reduce((sum, item) => sum + Number(item.qualityScore || 0), 0) / Math.max(assets.length, 1))
+  };
+  return {
+    ok: assets.length >= 7
+      && dictionaries.length >= 6
+      && enrichedLineage.every((item) => item.contractPresent && item.targetCollectionPresent && item.signatureReady && item.idempotencyReady)
+      && summary.onsiteBlocked >= 2,
+    generatedAt: new Date().toISOString(),
+    summary,
+    assets,
+    dictionaries,
+    lineage: enrichedLineage,
+    busChannels,
+    qualityIssues: qualityIssues.slice(0, 12)
+  };
 }
 
 function seedHospitalInteroperabilityFunctions() {
@@ -4689,6 +4824,10 @@ function normalizeState(data) {
     interfaceRequirements: mergeByKey(seedInterfaceRequirements(), data.interfaceRequirements, "id"),
     hospitalInteroperabilityFunctions: mergeByKey(seedHospitalInteroperabilityFunctions(), data.hospitalInteroperabilityFunctions, "id"),
     integrationContracts: mergeByKey(seedIntegrationContracts(), data.integrationContracts, "id"),
+    dataGovernanceAssets: mergeByKey(seedDataGovernanceAssets(), data.dataGovernanceAssets, "id"),
+    standardDataDictionaries: mergeByKey(seedStandardDataDictionaries(), data.standardDataDictionaries, "id"),
+    dataLineageControls: mergeByKey(seedDataLineageControls(), data.dataLineageControls, "id"),
+    platformDataBusChannels: mergeByKey(seedPlatformDataBusChannels(), data.platformDataBusChannels, "id"),
     integrationGatewayEvents: Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [],
     chronicProjectBlueprint: data.chronicProjectBlueprint && typeof data.chronicProjectBlueprint === "object" ? data.chronicProjectBlueprint : seedChronicProjectBlueprint(),
     countyProjectBlueprint: data.countyProjectBlueprint && typeof data.countyProjectBlueprint === "object" ? data.countyProjectBlueprint : seedCountyProjectBlueprint(),
@@ -8382,6 +8521,10 @@ function scopeStateForUser(data, user) {
   delete scoped.securityEvents;
   delete scoped.interfaceRequirements;
   delete scoped.hospitalInteroperabilityFunctions;
+  delete scoped.dataGovernanceAssets;
+  delete scoped.standardDataDictionaries;
+  delete scoped.dataLineageControls;
+  delete scoped.platformDataBusChannels;
   delete scoped.integrationGatewayEvents;
   delete scoped.platformCapabilities;
   delete scoped.platformIntegrations;
@@ -8804,6 +8947,88 @@ function buildChronicFollowupSummary(data, user, residentId = "") {
     policyAlignment: readiness.policyAlignment || [],
     alertQueue,
     residents
+  };
+}
+
+function buildChronicPublicHealthLoop(data, user, residentId = "") {
+  const scoped = scopeStateForUser(data, user);
+  const risk = buildChronicRiskStratification(scoped);
+  const followup = buildChronicFollowupSummary(data, user, residentId);
+  const residents = residentId
+    ? followup.residents.filter((item) => item.residentId === residentId)
+    : followup.residents;
+  const residentIds = new Set(residents.map((item) => item.residentId));
+  const highRiskQueue = (risk.queue || []).filter((item) => (!residentId || item.residentId === residentId) && (item.priority === "high" || item.openCounts?.overdueFollowups > 0));
+  const alerts = (followup.alertQueue || []).filter((item) => (!residentId || item.residentId === residentId) && ["critical", "high"].includes(item.priority));
+  const dispatchMessages = (scoped.taskMessages || []).filter((item) =>
+    item.chronicFollowup &&
+    (!residentId || item.residentId === residentId) &&
+    item.targetRole === "institution"
+  );
+  const interventionRecords = (scoped.personalRecords || []).filter((item) =>
+    (!residentId || item.residentId === residentId) &&
+    (item.category === "chronic-family-doctor-note" || item.meta?.familyDoctorClosure)
+  );
+  const completedFollowups = (scoped.followups || []).filter((item) =>
+    (!residentId || item.residentId === residentId) &&
+    statusInPolicy(scoped.chronicFollowupStatusPolicy || seedChronicFollowupStatusPolicy(), "closed", item.status)
+  );
+  const feedbackRecords = (scoped.personalRecords || []).filter((item) =>
+    (!residentId || item.residentId === residentId) &&
+    (item.category === "chronic-feedback" || item.meta?.followupFeedback)
+  );
+  const stages = [
+    { id: "monitor", name: "监测", count: highRiskQueue.length || risk.summary.highPriority, evidence: "chronicScreeningTasks/chronicManagementPlans/followups", owner: "疾控中心/基层慢病健康管理中心" },
+    { id: "alert", name: "预警", count: alerts.length, evidence: "followupSummary.alertQueue", owner: "疾控中心/卫健监管" },
+    { id: "dispatch", name: "派单", count: dispatchMessages.length, evidence: "taskMessages[chronicFollowup]", owner: "基层机构管理员" },
+    { id: "intervention", name: "干预", count: interventionRecords.length + completedFollowups.length, evidence: "familyDoctorActions/followup-dispatch", owner: "家庭医生团队" },
+    { id: "followup", name: "随访", count: completedFollowups.length + feedbackRecords.length, evidence: "followups/personalRecords[chronic-feedback]", owner: "基层随访团队" },
+    { id: "summary", name: "汇总", count: followup.summary.policyAligned, evidence: "chronicFollowupReadiness.policyAlignment", owner: "卫健委/疾控中心" }
+  ].map((item) => ({
+    ...item,
+    ready: item.count > 0
+  }));
+  const queue = highRiskQueue.slice(0, 12).map((item) => {
+    const resident = residents.find((row) => row.residentId === item.residentId) || {};
+    const residentAlerts = alerts.filter((alert) => alert.residentId === item.residentId);
+    return {
+      residentId: item.residentId,
+      residentName: item.name || resident.residentName || "",
+      organization: item.organization || resident.organization || "",
+      owner: item.owner || resident.familyDoctor || "family-doctor-team",
+      monitorSignal: item.signals?.join("; ") || item.riskReason || "",
+      warningLevel: item.priority,
+      dispatchTarget: residentAlerts[0]?.escalationOwner || item.owner || "primary-care-team",
+      intervention: item.nextAction,
+      followupDue: item.dueAt || resident.returnVisitReminders?.[0]?.plannedAt || "",
+      summaryStatus: resident.residentFeedback?.count ? "resident-feedback-received" : "awaiting-feedback",
+      alertIds: residentAlerts.map((alert) => alert.id)
+    };
+  });
+  return {
+    ok: stages.every((item) => item.ready),
+    generatedAt: new Date().toISOString(),
+    role: user.role,
+    residentId,
+    summary: {
+      residents: residentIds.size,
+      stages: stages.length,
+      readyStages: stages.filter((item) => item.ready).length,
+      highRiskResidents: highRiskQueue.length,
+      alerts: alerts.length,
+      dispatches: dispatchMessages.length,
+      interventions: interventionRecords.length + completedFollowups.length,
+      followupEvidence: completedFollowups.length + feedbackRecords.length,
+      policyAligned: followup.summary.policyAligned,
+      policyItems: followup.summary.policyItems
+    },
+    stages,
+    queue,
+    nextIntegrations: [
+      "immunization planning",
+      "infectious disease reporting",
+      "regional public health system"
+    ]
   };
 }
 
@@ -12729,6 +12954,20 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/chronic/public-health-loop") {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/chronic/public-health-loop");
+    if (!user) return;
+    const data = readDatabase();
+    const residentId = url.searchParams.get("residentId") || "";
+    if (residentId && !canAccessResident(user, residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "read chronic public health loop", target: residentId, result: "denied", detail: "resident scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "resident scope denied" });
+      return;
+    }
+    sendJson(res, 200, redactSensitiveResponse(buildChronicPublicHealthLoop(data, user, residentId), user));
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/chronic/institution-interfaces") {
     const user = requireApiRole(req, res, ["commission", "institution"], "/api/chronic/institution-interfaces");
     if (!user) return;
@@ -13346,6 +13585,14 @@ async function handleApi(req, res) {
       },
       functions: rows
     });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/data-governance") {
+    const user = requireApiRole(req, res, ["commission"], "/api/data-governance");
+    if (!user) return;
+    const data = readDatabase();
+    sendJson(res, 200, buildDataGovernanceOverview(data));
     return;
   }
 
