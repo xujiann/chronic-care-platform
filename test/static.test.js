@@ -95,6 +95,8 @@ test("static snapshot keeps completed P2 governance collections", () => {
   assert.equal(data.researchDatasets.every((item) => item.governance?.dataUseAgreement && item.governance.minimumNecessary === true && item.governance.reidentificationProhibited === true && item.governance.retentionDays > 0), true);
   assert.equal(data.researchDatasets.every((item) => ["ethics-approval", "data-use-agreement"].every((type) => item.evidenceDocuments?.some((doc) => doc.type === type && doc.status !== "rejected"))), true);
   assert.equal(data.researchDatasets.every((item) => item.ethicsStatus && item.deidentificationStatus && item.sandbox && Array.isArray(item.sourceCollections)), true);
+  assert.equal(Array.isArray(data.compliantDataExports), true);
+  assert.equal(data.compliantDataExports.some((item) => item.datasetId === "rd-hypertension-001" && item.reviewStatus === "approved" && item.exportStatus === "released" && item.deidentified === true && item.minimumNecessary === true), true);
   assert.equal(data.dataAccessLogs.some((item) => /research/i.test(`${item.scope || ""} ${item.purpose || ""}`)), true);
   assert.equal(Array.isArray(data.diseaseRegistryModels), true);
   assert.equal(data.diseaseRegistryModels.some((item) => item.id === "dm-hypertension-risk-v1"), true);
@@ -398,12 +400,17 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(platformHtml, /research-evidence-form/);
   assert.match(platformJs, /data-research-evidence/);
   assert.match(platformJs, /sandbox-access/);
+  assert.match(platformJs, /compliant-export/);
+  assert.match(platformJs, /researchCompliantExportRows/);
+  assert.match(platformJs, /合规数据出口/);
   assert.match(platformJs, /成果回流/);
   assert.match(read("portal.css"), /research-sandbox-summary/);
   assert.match(read("portal.css"), /research-application-form/);
   assert.match(read("portal.css"), /research-governance-board/);
   assert.match(read("portal.css"), /research-audit-feed/);
   assert.match(platformJs, /outcome-return/);
+  assert.match(read("server.js"), /\/api\/research\/datasets\/:id\/compliant-exports/);
+  assert.match(read("server.js"), /\/api\/research\/compliant-exports/);
   assert.match(platformHtml, /mobile-accessibility-governance/);
   assert.match(platformHtml, /production-deployment-plan/);
   assert.match(platformJs, /renderResearchGovernance/);

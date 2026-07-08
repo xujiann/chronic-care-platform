@@ -25,6 +25,9 @@ const fallbackPlatformState = {
   applicationCatalog: [],
   hospitalInteroperabilityFunctions: [],
   institutionCreditEvaluations: [],
+  researchDatasets: [],
+  diseaseRegistryModels: [],
+  compliantDataExports: [],
   securityAcceptanceLedger: [],
   productionDeploymentPlan: [],
   platformChangeLogs: []
@@ -510,6 +513,9 @@ function renderProductionDeploymentPlan(items) {
 function renderResearchGovernance(platform, sandboxSummary = null) {
   const datasets = Array.isArray(platform.researchDatasets) ? platform.researchDatasets : [];
   const models = Array.isArray(platform.diseaseRegistryModels) ? platform.diseaseRegistryModels : [];
+  const compliantExports = Array.isArray(sandboxSummary?.recentExports) && sandboxSummary.recentExports.length
+    ? sandboxSummary.recentExports
+    : (Array.isArray(platform.compliantDataExports) ? platform.compliantDataExports : []);
   const summary = sandboxSummary?.summary || {};
   const boundaries = Array.isArray(sandboxSummary?.boundaries) ? sandboxSummary.boundaries : ["research dataset", "disease registry", "ethics approval", "de-identification release", "policy controls", "sandbox access", "usage audit", "outcome return"];
   const reusableCollections = Array.isArray(sandboxSummary?.reusableCollections) ? sandboxSummary.reusableCollections : ["researchDatasets", "diseaseRegistryModels", "dataAccessLogs", "securityAcceptanceLedger", "personalRecords", "diagnosticReports"];
@@ -517,6 +523,7 @@ function renderResearchGovernance(platform, sandboxSummary = null) {
   const pendingApplications = Number.isFinite(summary.pendingApplications) ? summary.pendingApplications : datasets.filter((item) => item.authorizationStatus === "pending" || item.status === "requested").length;
   const usageAuditCount = Number.isFinite(summary.usageAudits) ? summary.usageAudits : datasets.reduce((sum, item) => sum + (Array.isArray(item.usageAudit) ? item.usageAudit.length : 0), 0);
   const outcomeCount = Number.isFinite(summary.outcomes) ? summary.outcomes : datasets.reduce((sum, item) => sum + (Array.isArray(item.outcomes) ? item.outcomes.length : 0), 0);
+  const exportCount = Number.isFinite(summary.compliantExports) ? summary.compliantExports : compliantExports.length;
   const previousStatus = document.querySelector("#research-status");
   const statusText = previousStatus?.textContent || "";
   const statusState = previousStatus?.dataset.state || "";
@@ -533,6 +540,7 @@ function renderResearchGovernance(platform, sandboxSummary = null) {
       <td>${(item.usageAudit || []).length} / ${(item.outcomes || []).length}</td>
       <td>
         <button class="inline-action" type="button" data-research-action="sandbox-access" data-id="${item.id}">沙箱访问</button>
+        <button class="inline-action" type="button" data-research-action="compliant-export" data-id="${item.id}">合规出口</button>
         <button class="inline-action" type="button" data-research-action="outcome-return" data-id="${item.id}">成果回流</button>
         <button class="inline-action" type="button" data-research-action="approve" data-id="${item.id}">审批发布</button>
         <button class="inline-action" type="button" data-research-evidence="${item.id}">登记材料</button>
@@ -554,12 +562,14 @@ function renderResearchGovernance(platform, sandboxSummary = null) {
   const pendingRows = researchPendingRows(sandboxSummary?.pendingApplications, datasets);
   const auditRows = researchAuditRows(sandboxSummary?.recentAudits, datasets);
   const outcomeRows = researchOutcomeRows(sandboxSummary?.recentOutcomes, datasets);
+  const exportRows = researchCompliantExportRows(compliantExports);
   document.querySelector("#research-governance").innerHTML = `
     <div class="research-sandbox-summary">
       <div><strong>${datasets.length}</strong><span>数据集</span></div>
       <div><strong>${activeSandboxCount}</strong><span>已开放沙箱</span></div>
       <div><strong>${pendingApplications}</strong><span>待审批申请</span></div>
       <div><strong>${models.length}</strong><span>专病模型</span></div>
+      <div><strong>${exportCount}</strong><span>合规出口</span></div>
       <div><strong>${usageAuditCount} / ${outcomeCount}</strong><span>审计 / 成果</span></div>
     </div>
     <form class="research-application-form" id="research-application-form">
@@ -617,6 +627,10 @@ function renderResearchGovernance(platform, sandboxSummary = null) {
         <ul class="research-queue">${pendingRows}</ul>
       </article>
       <article>
+        <h3>合规数据出口</h3>
+        <ul class="research-audit-feed">${exportRows}</ul>
+      </article>
+      <article>
         <h3>审计与成果回流</h3>
         <ul class="research-audit-feed">${auditRows}${outcomeRows}</ul>
       </article>
@@ -653,6 +667,7 @@ function researchBoundaryLabel(value) {
     "ethics approval": "伦理审批",
     "de-identification release": "脱敏发布",
     "sandbox access": "沙箱访问",
+    "compliant data export": "合规数据出口",
     "usage audit": "使用审计",
     "outcome return": "成果回流"
   }[value] || value;
@@ -720,6 +735,18 @@ function researchOutcomeRows(recentOutcomes, datasets) {
       <strong>成果回流 / ${item.datasetName || item.datasetId || "dataset"}</strong>
       <span>${item.title || "research outcome"}</span>
       <small>${formatResearchTime(item.at)} ${item.registryImpact || ""}</small>
+    </li>
+  `).join("");
+}
+
+function researchCompliantExportRows(recentExports) {
+  const rows = Array.isArray(recentExports) ? recentExports : [];
+  if (!rows.length) return `<li><strong>暂无合规出口</strong><span>合规出口需先完成伦理、脱敏、授权、最小必要和审计留痕。</span></li>`;
+  return rows.slice(0, 4).map((item) => `
+    <li>
+      <strong>${item.datasetName || item.datasetId || "dataset"} / ${item.exportStatus || "pending"}</strong>
+      <span>${item.purpose || "approved export"} -> ${item.destination || "destination pending"}</span>
+      <small>${formatResearchTime(item.requestedAt)} ${(item.requestedFields || []).join(", ")} ${item.watermark || ""}</small>
     </li>
   `).join("");
 }
@@ -905,11 +932,15 @@ async function runResearchDatasetAction(action, id) {
   const request = window.HealthCityAuth?.authFetch || fetch;
   const body = action === "approve"
     ? { ethicsApproval: dataset?.ethicsApproval || `IRB-DEMO-${todayStamp()}`, anonymization: dataset?.anonymization || "k-anonymity-demo", deidentificationStatus: "released" }
+    : action === "compliant-export"
+      ? { purpose: `${dataset?.name || id} minimum-necessary de-identified export`, destination: "research-governance-reviewed-share", requestedFields: ["ageBand", "gender", "riskLevel", "followupCount"], exportFormat: "csv" }
     : action === "outcome-return"
       ? { title: `${dataset?.name || id} sandbox finding`, summary: "Returned from platform research sandbox.", registryImpact: "Review disease registry model thresholds." }
       : { purpose: `${dataset?.name || id} de-identified sandbox review` };
   const path = action === "approve"
     ? `/research/datasets/${encodeURIComponent(id)}/approval`
+    : action === "compliant-export"
+      ? `/research/datasets/${encodeURIComponent(id)}/compliant-exports`
     : action === "outcome-return"
       ? `/research/datasets/${encodeURIComponent(id)}/outcomes`
       : `/research/datasets/${encodeURIComponent(id)}/sandbox-access`;
@@ -926,7 +957,7 @@ async function runResearchDatasetAction(action, id) {
       return;
     }
     await refreshPlatformState();
-    setResearchStatus(action === "sandbox-access" ? "沙箱访问已审计留痕。" : action === "outcome-return" ? "成果已回流登记。" : "数据集已审批发布。");
+    setResearchStatus(action === "sandbox-access" ? "沙箱访问已审计留痕。" : action === "compliant-export" ? "合规数据出口已审查并留痕。" : action === "outcome-return" ? "成果已回流登记。" : "数据集已审批发布。");
   } catch (error) {
     setResearchStatus("当前为静态预览或服务不可用，操作未提交。", true);
   }

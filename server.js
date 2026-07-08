@@ -581,6 +581,7 @@ function seedState() {
     creditEvaluationRules: seedCreditEvaluationRules(),
     researchDatasets: seedResearchDatasets(),
     diseaseRegistryModels: seedDiseaseRegistryModels(),
+    compliantDataExports: seedCompliantDataExports(),
     mobileExperienceSettings: seedMobileExperienceSettings(),
     accessibilityChecklist: seedAccessibilityChecklist(),
     securityAcceptanceLedger: seedSecurityAcceptanceLedger(),
@@ -796,6 +797,32 @@ function seedDiseaseRegistryModels() {
   return [
     { id: "dm-hypertension-risk-v1", diseaseType: "hypertension", version: "1.0.0", population: "registered hypertension or high-risk residents", threshold: "systolic>=140 or riskLevel=high", reviewStatus: "active", reviewer: "chronic-center", outputs: ["follow-up plan", "specialist review"] },
     { id: "dm-diabetes-risk-v1", diseaseType: "diabetes", version: "1.0.0", population: "diabetes or impaired glucose residents", threshold: "glucose>=7.0 or HbA1c>=6.5", reviewStatus: "active", reviewer: "chronic-center", outputs: ["diet intervention", "HbA1c review"] }
+  ];
+}
+
+function seedCompliantDataExports() {
+  return [
+    {
+      id: "cde-htn-001",
+      datasetId: "rd-hypertension-001",
+      datasetName: "Hypertension chronic management cohort",
+      purpose: "Approved de-identified aggregate export for chronic management cohort review.",
+      destination: "research-governance-review-folder",
+      requestedFields: ["ageBand", "gender", "followupCount", "riskLevel"],
+      exportFormat: "csv",
+      reviewStatus: "approved",
+      exportStatus: "released",
+      deidentified: true,
+      minimumNecessary: true,
+      watermark: "wm-rd-hypertension-001-demo",
+      evidenceRef: "rd-hypertension-001-dua",
+      reviewer: "research-governance",
+      requestedBy: "research-governance",
+      requestedAt: "2026-06-20T09:30:00.000Z",
+      reviewedAt: "2026-06-20T10:00:00.000Z",
+      retentionDays: 180,
+      policyBasis: ["PIPL", "Data Security Law", "Network Data Security Regulation", "Ethics Review Measures"]
+    }
   ];
 }
 
@@ -3927,6 +3954,7 @@ function normalizeState(data) {
     creditEvaluationRules: data.creditEvaluationRules && typeof data.creditEvaluationRules === "object" ? data.creditEvaluationRules : seedCreditEvaluationRules(),
     researchDatasets: mergeByKey(seedResearchDatasets(), data.researchDatasets, "id"),
     diseaseRegistryModels: mergeByKey(seedDiseaseRegistryModels(), data.diseaseRegistryModels, "id"),
+    compliantDataExports: mergeByKey(seedCompliantDataExports(), data.compliantDataExports, "id"),
     mobileExperienceSettings: data.mobileExperienceSettings && typeof data.mobileExperienceSettings === "object" ? { ...seedMobileExperienceSettings(), ...data.mobileExperienceSettings } : seedMobileExperienceSettings(),
     accessibilityChecklist: mergeByKey(seedAccessibilityChecklist(), data.accessibilityChecklist, "id"),
     securityAcceptanceLedger: mergeByKey(seedSecurityAcceptanceLedger(), data.securityAcceptanceLedger, "id"),
@@ -3999,6 +4027,7 @@ function completeSystemTargets(state) {
   state.creditEvaluationRules = state.creditEvaluationRules && typeof state.creditEvaluationRules === "object" ? state.creditEvaluationRules : seedCreditEvaluationRules();
   state.researchDatasets = mergeByKey(seedResearchDatasets(), state.researchDatasets, "id");
   state.diseaseRegistryModels = mergeByKey(seedDiseaseRegistryModels(), state.diseaseRegistryModels, "id");
+  state.compliantDataExports = mergeByKey(seedCompliantDataExports(), state.compliantDataExports, "id");
   state.chronicServiceRoles = mergeByKey(seedChronicServiceRoles(), state.chronicServiceRoles, "id");
   state.chronicCapabilityConditions = mergeByKey(seedChronicCapabilityConditions(), state.chronicCapabilityConditions, "id");
   state.chronicServicePathways = mergeByKey(seedChronicServicePathways(), state.chronicServicePathways, "id");
@@ -4230,6 +4259,42 @@ function requireDatasetSandboxAccess(dataset) {
   return approved && deidentified && active && hasResearchGovernanceControls(dataset) && hasResearchEvidenceDocuments(dataset);
 }
 
+function normalizeCompliantDataExport(payload = {}, user, dataset) {
+  const purpose = String(payload.purpose || "").trim();
+  const destination = String(payload.destination || "").trim();
+  const requestedFields = Array.isArray(payload.requestedFields)
+    ? payload.requestedFields.map((item) => String(item).trim()).filter(Boolean)
+    : String(payload.requestedFields || "").split(/[,;\n]/).map((item) => item.trim()).filter(Boolean);
+  if (!purpose || !destination) throw new Error("purpose and destination are required");
+  if (!requestedFields.length) throw new Error("requestedFields are required");
+  const now = new Date().toISOString();
+  const retentionDays = Number(payload.retentionDays || dataset.governance?.retentionDays || 180);
+  if (!Number.isFinite(retentionDays) || retentionDays < 1 || retentionDays > 3650) throw new Error("retentionDays must be between 1 and 3650");
+  const evidenceDocument = (Array.isArray(dataset.evidenceDocuments) ? dataset.evidenceDocuments : []).find((item) => item.type === "export-review" && item.status !== "rejected")
+    || (Array.isArray(dataset.evidenceDocuments) ? dataset.evidenceDocuments : []).find((item) => item.type === "data-use-agreement" && item.status !== "rejected");
+  return {
+    id: payload.id || `cde-${dataset.id}-${Date.now()}`,
+    datasetId: dataset.id,
+    datasetName: dataset.name || dataset.id,
+    purpose,
+    destination,
+    requestedFields,
+    exportFormat: String(payload.exportFormat || "csv").trim(),
+    reviewStatus: "approved",
+    exportStatus: "released",
+    deidentified: true,
+    minimumNecessary: true,
+    watermark: String(payload.watermark || `wm-${dataset.id}-${Date.now()}`).trim(),
+    evidenceRef: String(payload.evidenceRef || evidenceDocument?.id || evidenceDocument?.referenceNo || "").trim(),
+    reviewer: String(payload.reviewer || "research-governance").trim(),
+    requestedBy: user.username || user.role,
+    requestedAt: now,
+    reviewedAt: now,
+    retentionDays,
+    policyBasis: Array.isArray(dataset.governance?.policyBasis) ? dataset.governance.policyBasis : normalizeResearchGovernanceControls({}).policyBasis
+  };
+}
+
 function appendResearchAudit(data, user, dataset, action, detail, result = "allowed") {
   const now = new Date().toISOString();
   dataset.usageAudit = [
@@ -4244,6 +4309,7 @@ function appendResearchAudit(data, user, dataset, action, detail, result = "allo
 function buildResearchSandboxSummary(data) {
   const datasets = Array.isArray(data.researchDatasets) ? data.researchDatasets : [];
   const models = Array.isArray(data.diseaseRegistryModels) ? data.diseaseRegistryModels : [];
+  const exports = Array.isArray(data.compliantDataExports) ? data.compliantDataExports : [];
   const auditLogs = (Array.isArray(data.dataAccessLogs) ? data.dataAccessLogs : []).filter((item) => String(item.scope || "").includes("research"));
   const activeDatasets = datasets.filter(requireDatasetSandboxAccess);
   const pendingApplications = datasets.filter((item) => item.status === "requested" || item.authorizationStatus === "pending");
@@ -4275,9 +4341,22 @@ function buildResearchSandboxSummary(data) {
     registryImpact: outcome.registryImpact,
     returnedTo: outcome.returnedTo || ["diseaseRegistryModels"]
   }))).sort((a, b) => Date.parse(b.at || "") - Date.parse(a.at || "")).slice(0, 8);
+  const recentExports = exports.map((item) => ({
+    id: item.id,
+    datasetId: item.datasetId,
+    datasetName: item.datasetName || datasets.find((dataset) => dataset.id === item.datasetId)?.name || item.datasetId,
+    purpose: item.purpose,
+    destination: item.destination,
+    requestedFields: item.requestedFields || [],
+    reviewStatus: item.reviewStatus,
+    exportStatus: item.exportStatus,
+    watermark: item.watermark,
+    requestedAt: item.requestedAt,
+    requestedBy: item.requestedBy
+  })).sort((a, b) => Date.parse(b.requestedAt || "") - Date.parse(a.requestedAt || "")).slice(0, 8);
   return {
     ok: datasets.length >= 2 && activeDatasets.length >= 1 && auditLogs.length >= 1,
-    boundaries: ["research dataset", "disease registry", "ethics approval", "de-identification release", "policy controls", "sandbox access", "usage audit", "outcome return"],
+    boundaries: ["research dataset", "disease registry", "ethics approval", "de-identification release", "policy controls", "sandbox access", "compliant data export", "usage audit", "outcome return"],
     summary: {
       datasets: datasets.length,
       activeDatasets: activeDatasets.length,
@@ -4287,6 +4366,8 @@ function buildResearchSandboxSummary(data) {
       evidenceReady: datasets.filter(hasResearchEvidenceDocuments).length,
       usageAudits: datasets.reduce((sum, item) => sum + (Array.isArray(item.usageAudit) ? item.usageAudit.length : 0), 0),
       outcomes: datasets.reduce((sum, item) => sum + (Array.isArray(item.outcomes) ? item.outcomes.length : 0), 0),
+      compliantExports: exports.length,
+      releasedExports: exports.filter((item) => item.reviewStatus === "approved" && item.exportStatus === "released" && item.deidentified === true && item.minimumNecessary === true).length,
       auditLogs: auditLogs.length
     },
     datasets: datasets.map((item) => ({
@@ -4323,7 +4404,8 @@ function buildResearchSandboxSummary(data) {
     })).slice(0, 8),
     recentAudits,
     recentOutcomes,
-    reusableCollections: ["researchDatasets", "diseaseRegistryModels", "dataAccessLogs", "securityAcceptanceLedger", "personalRecords", "diagnosticReports"]
+    recentExports,
+    reusableCollections: ["researchDatasets", "diseaseRegistryModels", "compliantDataExports", "dataAccessLogs", "securityAcceptanceLedger", "personalRecords", "diagnosticReports"]
   };
 }
 
@@ -7823,6 +7905,14 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/research/compliant-exports") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/compliant-exports");
+    if (!user) return;
+    const data = readDatabase();
+    sendJson(res, 200, { exports: Array.isArray(data.compliantDataExports) ? data.compliantDataExports : [] });
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/research/datasets") {
     const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/datasets");
     if (!user) return;
@@ -8058,6 +8148,39 @@ async function handleApi(req, res) {
       sourceCollections: data.researchDatasets[index].sourceCollections || [],
       expiresInMinutes: 120
     });
+    return;
+  }
+
+  const researchCompliantExportMatch = url.pathname.match(/^\/api\/research\/datasets\/([^/]+)\/compliant-exports$/);
+  if (req.method === "POST" && researchCompliantExportMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/research/datasets/:id/compliant-exports");
+    if (!user) return;
+    const data = readDatabase();
+    const id = decodeURIComponent(researchCompliantExportMatch[1]);
+    const index = (data.researchDatasets || []).findIndex((item) => item.id === id);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Research dataset not found" });
+      return;
+    }
+    if (!requireDatasetSandboxAccess(data.researchDatasets[index])) {
+      appendResearchAudit(data, user, data.researchDatasets[index], "compliant-data-export", "blocked by ethics/de-identification/authorization/governance/evidence status", "denied");
+      writeDatabase(data);
+      sendJson(res, 403, { error: "Forbidden", message: "Dataset is not approved, de-identified, governance-ready, evidence-ready, and active for compliant export" });
+      return;
+    }
+    try {
+      const payload = await collectJson(req);
+      const exportRequest = normalizeCompliantDataExport(payload, user, data.researchDatasets[index]);
+      data.compliantDataExports = [
+        exportRequest,
+        ...(Array.isArray(data.compliantDataExports) ? data.compliantDataExports : [])
+      ].slice(0, 120);
+      appendResearchAudit(data, user, data.researchDatasets[index], "compliant-data-export", `${exportRequest.id}:${exportRequest.destination}`);
+      writeDatabase(data);
+      sendJson(res, 201, exportRequest);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+    }
     return;
   }
 

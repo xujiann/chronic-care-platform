@@ -37,6 +37,23 @@ function evidenceReady(item) {
   return ["ethics-approval", "data-use-agreement"].every((type) => documents.some((doc) => doc.type === type && doc.status !== "rejected"));
 }
 
+function exportReady(item) {
+  return Boolean(
+    item?.id &&
+    item?.datasetId &&
+    item?.purpose &&
+    item?.destination &&
+    Array.isArray(item?.requestedFields) &&
+    item.requestedFields.length &&
+    item.reviewStatus === "approved" &&
+    item.exportStatus === "released" &&
+    item.deidentified === true &&
+    item.minimumNecessary === true &&
+    item.watermark &&
+    Number(item.retentionDays || 0) > 0
+  );
+}
+
 function buildPreLaunchDevelopmentBacklog() {
   return [
     { id: "launch:identity-project-auth", owner: "identity-integration", status: "site-required", item: "Connect real researcher identity, project membership, and organization authorization before issuing sandbox accounts." },
@@ -44,6 +61,7 @@ function buildPreLaunchDevelopmentBacklog() {
     { id: "launch:minimization-dictionary", owner: "data-governance", status: "site-required", item: "Map approved research fields to source-system dictionaries and block fields outside the minimum-necessary review." },
     { id: "launch:deidentification-risk", owner: "security-and-data", status: "site-required", item: "Run de-identification and re-identification risk assessment for each release version before sandbox publication." },
     { id: "launch:sandbox-isolation-export", owner: "platform-ops", status: "site-required", item: "Bind datasets to isolated compute, export review, watermarking, and short-lived access-token controls." },
+    { id: "launch:smart-hospital-research-platform", owner: "research-governance", status: "thread-in-progress", item: "Wave 4.1 smart-hospital research-platform scope is tracked here: key specialty, research cohort, translational project, and compliant data export; first runnable slice covers compliant data export only, with no AI diagnosis." },
     { id: "launch:audit-retention-siem", owner: "security-ops", status: "site-required", item: "Route application, sandbox, export, and outcome audit trails to SIEM or WORM retention with incident review procedures." },
     { id: "launch:outcome-model-review", owner: "clinical-research", status: "site-required", item: "Convert returned outcomes into disease-registry model review tasks with clinical expert signoff." }
   ];
@@ -52,8 +70,9 @@ function buildPreLaunchDevelopmentBacklog() {
 function buildResearchSandboxReadiness(data = readJson("data/db.json")) {
   const datasets = Array.isArray(data.researchDatasets) ? data.researchDatasets : [];
   const models = Array.isArray(data.diseaseRegistryModels) ? data.diseaseRegistryModels : [];
+  const exports = Array.isArray(data.compliantDataExports) ? data.compliantDataExports : [];
   const accessLogs = (Array.isArray(data.dataAccessLogs) ? data.dataAccessLogs : []).filter((item) => /research|科研|数据集|沙箱/i.test(`${item.scope || ""} ${item.purpose || ""}`));
-  const requiredCollections = ["researchDatasets", "diseaseRegistryModels", "dataAccessLogs", "securityAcceptanceLedger", "personalRecords", "diagnosticReports"];
+  const requiredCollections = ["researchDatasets", "diseaseRegistryModels", "compliantDataExports", "dataAccessLogs", "securityAcceptanceLedger", "personalRecords", "diagnosticReports"];
   const checks = [
     check("research:collections", requiredCollections.every((key) => data[key]), requiredCollections.filter((key) => !data[key]).join(",") || "all reusable collections present"),
     check("research:datasets", datasets.length >= 2, `${datasets.length} datasets`),
@@ -65,6 +84,7 @@ function buildResearchSandboxReadiness(data = readJson("data/db.json")) {
     check("research:sandbox", datasets.some(datasetReady), `${datasets.filter(datasetReady).length} sandbox-ready datasets`),
     check("research:models", models.length >= 2 && models.every((item) => item.id && item.diseaseType && item.version && item.reviewStatus), `${models.length} disease registry models`),
     check("research:audit", datasets.some((item) => Array.isArray(item.usageAudit)) && accessLogs.length >= 1, `${accessLogs.length} research access logs`),
+    check("research:compliant-data-export", exports.length >= 1 && exports.every(exportReady), `${exports.filter(exportReady).length}/${exports.length} compliant exports are approved, de-identified, watermarked, and minimum-necessary`),
     check("research:outcome-return", datasets.some((item) => Array.isArray(item.outcomes)), "outcome return arrays are modeled")
   ];
   return {
@@ -76,6 +96,8 @@ function buildResearchSandboxReadiness(data = readJson("data/db.json")) {
       policyReady: datasets.filter(governanceReady).length,
       evidenceReady: datasets.filter(evidenceReady).length,
       diseaseModels: models.length,
+      compliantExports: exports.length,
+      releasedExports: exports.filter(exportReady).length,
       accessLogs: accessLogs.length,
       outcomes: datasets.reduce((sum, item) => sum + (Array.isArray(item.outcomes) ? item.outcomes.length : 0), 0)
     },
@@ -86,6 +108,7 @@ function buildResearchSandboxReadiness(data = readJson("data/db.json")) {
       "de-identification release",
       "policy controls",
       "sandbox access",
+      "compliant data export",
       "usage audit",
       "outcome return"
     ],
@@ -107,6 +130,17 @@ function buildResearchSandboxReadiness(data = readJson("data/db.json")) {
       sandboxStatus: item.sandbox?.status || "not-modeled",
       sourceCollections: item.sourceCollections || [],
       records: item.records || 0
+    })),
+    compliantDataExports: exports.map((item) => ({
+      id: item.id,
+      datasetId: item.datasetId,
+      reviewStatus: item.reviewStatus,
+      exportStatus: item.exportStatus,
+      deidentified: item.deidentified === true,
+      minimumNecessary: item.minimumNecessary === true,
+      fields: Array.isArray(item.requestedFields) ? item.requestedFields.length : 0,
+      retentionDays: item.retentionDays || 0,
+      ready: exportReady(item) ? "ready" : "pending"
     }))
   };
 }
@@ -114,6 +148,7 @@ function buildResearchSandboxReadiness(data = readJson("data/db.json")) {
 function renderMarkdown(report) {
   const rows = report.checks.map((item) => `| ${item.passed ? "PASS" : "FAIL"} | ${item.id} | ${item.detail} |`);
   const datasetRows = report.datasets.map((item) => `| ${item.id} | ${item.diseaseType} | ${item.status} | ${item.authorizationStatus} | ${item.ethicsStatus} | ${item.deidentificationStatus} | ${item.governanceStatus} | ${item.evidenceStatus} | ${item.evidenceDocuments || 0} | ${item.dataUseAgreement || "pending"} | ${item.retentionDays || 0} | ${item.sandboxStatus} | ${item.records} |`);
+  const exportRows = (report.compliantDataExports || []).map((item) => `| ${item.id} | ${item.datasetId} | ${item.reviewStatus} | ${item.exportStatus} | ${item.deidentified} | ${item.minimumNecessary} | ${item.fields} | ${item.retentionDays} | ${item.ready} |`);
   const preLaunchRows = (report.preLaunchDevelopment || []).map((item) => `| ${item.id} | ${item.owner} | ${item.status} | ${item.item} |`);
   return [
     "# Research Sandbox Readiness",
@@ -141,6 +176,12 @@ function renderMarkdown(report) {
     "| Dataset | Disease | Status | Authorization | Ethics | De-identification | Governance | Evidence | Documents | Agreement | Retention days | Sandbox | Records |",
     "|---|---|---|---|---|---|---|---|---:|---|---:|---|---:|",
     ...datasetRows,
+    "",
+    "## Compliant Data Exports",
+    "",
+    "| Export | Dataset | Review | Status | De-identified | Minimum necessary | Fields | Retention days | Ready |",
+    "|---|---|---|---|---|---|---:|---:|---|",
+    ...exportRows,
     "",
     "## Pre-launch Development",
     "",

@@ -848,12 +848,18 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(sandboxSummary.body.reusableCollections.includes("personalRecords"), true);
     assert.equal(sandboxSummary.body.boundaries.includes("sandbox access"), true);
     assert.equal(sandboxSummary.body.boundaries.includes("policy controls"), true);
+    assert.equal(sandboxSummary.body.boundaries.includes("compliant data export"), true);
     assert.equal(sandboxSummary.body.summary.activeDatasets >= 1, true);
     assert.equal(sandboxSummary.body.summary.policyReady >= 2, true);
     assert.equal(sandboxSummary.body.summary.evidenceReady >= 2, true);
+    assert.equal(sandboxSummary.body.summary.compliantExports >= 1, true);
     assert.equal(Array.isArray(sandboxSummary.body.pendingApplications), true);
     assert.equal(Array.isArray(sandboxSummary.body.recentAudits), true);
     assert.equal(Array.isArray(sandboxSummary.body.recentOutcomes), true);
+    assert.equal(Array.isArray(sandboxSummary.body.recentExports), true);
+    const seededExports = await api(baseUrl, "/api/research/compliant-exports", authorized(commissionToken));
+    assert.equal(seededExports.response.status, 200);
+    assert.equal(seededExports.body.exports.some((item) => item.id === "cde-htn-001"), true);
     const researchInstitution = await login(baseUrl, "hospital");
     const invalidApplication = await api(baseUrl, "/api/research/datasets", authorized(researchInstitution.body.token, {
       method: "POST",
@@ -908,6 +914,11 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       body: JSON.stringify({ purpose: "try before approval" })
     }));
     assert.equal(blockedSandbox.response.status, 403);
+    const blockedExport = await api(baseUrl, `/api/research/datasets/${application.body.id}/compliant-exports`, authorized(researchInstitution.body.token, {
+      method: "POST",
+      body: JSON.stringify({ purpose: "try export before approval", destination: "research-share", requestedFields: ["ageBand"] })
+    }));
+    assert.equal(blockedExport.response.status, 403);
     const approval = await api(baseUrl, `/api/research/datasets/${application.body.id}/approval`, authorized(commissionToken, {
       method: "POST",
       body: JSON.stringify({ ethicsApproval: "IRB-DEMO-COPD-2026", anonymization: "k-anonymity-demo", deidentificationStatus: "released" })
@@ -923,6 +934,22 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(sandboxAccess.body.deidentified, true);
     assert.equal(sandboxAccess.body.governance.reidentificationProhibited, true);
     assert.equal(sandboxAccess.body.sourceCollections.includes("personalRecords"), true);
+    const compliantExport = await api(baseUrl, `/api/research/datasets/${application.body.id}/compliant-exports`, authorized(researchInstitution.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        purpose: "approved de-identified export for cohort counts",
+        destination: "research-governance-reviewed-share",
+        requestedFields: ["ageBand", "gender", "riskLevel"],
+        exportFormat: "csv"
+      })
+    }));
+    assert.equal(compliantExport.response.status, 201);
+    assert.equal(compliantExport.body.datasetId, application.body.id);
+    assert.equal(compliantExport.body.deidentified, true);
+    assert.equal(compliantExport.body.minimumNecessary, true);
+    assert.equal(compliantExport.body.reviewStatus, "approved");
+    const exportsAfterCreate = await api(baseUrl, "/api/research/compliant-exports", authorized(commissionToken));
+    assert.equal(exportsAfterCreate.body.exports.some((item) => item.id === compliantExport.body.id), true);
     const returnedOutcome = await api(baseUrl, `/api/research/datasets/${application.body.id}/outcomes`, authorized(researchInstitution.body.token, {
       method: "POST",
       body: JSON.stringify({ title: "COPD rehab feature set", summary: "Returned candidate model variables.", registryImpact: "Add pulmonary rehabilitation flags." })
@@ -934,6 +961,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(sandboxSummaryAfterOutcome.body.pendingApplications.some((item) => item.id === application.body.id), false);
     assert.equal(sandboxSummaryAfterOutcome.body.recentAudits.some((item) => String(item.target || "").includes(application.body.id)), true);
     assert.equal(sandboxSummaryAfterOutcome.body.recentOutcomes.some((item) => item.datasetId === application.body.id), true);
+    assert.equal(sandboxSummaryAfterOutcome.body.recentExports.some((item) => item.id === compliantExport.body.id), true);
     const usage = await api(baseUrl, "/api/research/datasets/rd-hypertension-001/actions", authorized(commissionToken, {
       method: "POST",
       body: JSON.stringify({ action: "usage-audit", purpose: "risk stratification model validation", result: "allowed" })
