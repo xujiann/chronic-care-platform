@@ -10955,5 +10955,1439 @@
       "evidence": "siteReadinessPack.templates.signoff",
       "nextAction": "collect wet signatures during site cutover"
     }
+  ],
+  "publicHealthStandards": [
+    {
+      "id": "ph-infectious",
+      "order": 1,
+      "name": "传染病防控",
+      "category": "management",
+      "source": "全国公共卫生信息化建设标准与规范（试行）",
+      "owner": "疾控中心",
+      "secondaryCount": 6,
+      "tertiaryCount": 49,
+      "tertiaryRange": "1-49",
+      "capabilities": [
+        "病例报告",
+        "流行病学调查",
+        "实验室检测",
+        "报告质量控制"
+      ],
+      "dataCollections": [
+        "publicHealthEvents",
+        "emergencySignals",
+        "diagnosticReports"
+      ],
+      "interfaces": [
+        "传染病网络直报",
+        "实验室报告",
+        "电子病历"
+      ],
+      "status": "已建模",
+      "nextAction": "接入现场业务系统、正式指标口径和属地验收证据。"
+    },
+    {
+      "id": "ph-parasitic",
+      "order": 2,
+      "name": "寄生虫病防控",
+      "category": "management",
+      "source": "全国公共卫生信息化建设标准与规范（试行）",
+      "owner": "疾控中心",
+      "secondaryCount": 7,
+      "tertiaryCount": 55,
+      "tertiaryRange": "50-104",
+      "capabilities": [
+        "流行区调查",
+        "病例发现",
+        "媒介监测",
+        "健康教育"
+      ],
+      "dataCollections": [
+        "publicHealthEvents",
+        "healthStatistics"
+      ],
+      "interfaces": [
+        "寄生虫病监测系统",
+        "区域统计直报"
+      ],
+      "status": "已建模",
+      "nextAction": "接入现场业务系统、正式指标口径和属地验收证据。"
+    },
+    {
+      "id": "ph-immunization",
+      "order": 3,
+      "name": "免疫规划",
+      "category": "management",
+      "source": "全国公共卫生信息化建设标准与规范（试行）",
+      "owner": "疾控中心/基层机构",
+      "secondaryCount": 2,
+      "tertiaryCount": 7,
+      "tertiaryRange": "105-111",
+      "capabilities": [
+        "预防接种服务",
+        "疫苗管理",
+        "冷链管理",
+        "异常反应监测"
+      ],
+      "dataCollections": [
+        "immunizationPlans",
+        "birthCertificates",
+        "publicHealthEvents"
+      ],
+      "interfaces": [
+        "预防接种系统",
+        "出生证照",
+        "居民端提醒"
+      ],
+      "status": "已建模",
+      "nextAction": "接入现场业务系统、正式指标口径和属地验收证据。"
+    },
+    {
+      "id": "ph-chronic",
+      "order": 4,
+      "name": "慢性病防控",
+      "category": "management",
+      "source": "全国公共卫生信息化建设标准与规范（试行）",
+      "owner": "基层卫生/疾控中心",
+      "secondaryCount": 14,
+      "tertiaryCount": 21,
+      "tertiaryRange": "112-132",
+      "capabilities": [
+        "高血压",
+        "糖尿病",
+        "慢阻肺",
+        "心脑血管",
+        "癌症",
+        "死因监测"
+      ],
+      "dataCollections": [
+        "chronicScreeningTasks",
+        "chronicManagementPlans",
+        "followups",
+        "deathCertificates"
+      ],
+      "interfaces": [
+        "慢病平台",
+        "家庭医生签约",
+        "死因监测"
+      ],
+      "status": "已建模",
+      "nextAction": "接入现场业务系统、正式指标口径和属地验收证据。"
+    },
+    {
+      "id": "ph-endemic",
+      "order": 5,
+      "name": "地方病防控",
+      "category": "management",
+      "source": "全国公共卫生信息化建设标准与规范（试行）",
+      "owner": "疾控中心/基层机构",
+      "secondaryCount": 12,
+      "tertiaryCount": 55,
+      "tertiaryRange": "133-187",
+      "capabilities": [
+        "碘缺乏",
+        "高碘危害",
+        "氟中毒",
+        "砷中毒",
+        "大骨节病",
+        "克山病"
+      ],
+      "dataCollections": [
+        "publicHealthEvents",
+        "healthStatistics"
+      ],
+      "interfaces": [
+        "地方病监测",
+        "实验室质控"
+      ],
+      "status": "已建模",
+      "nextAction": "接入现场业务系统、正式指标口径和属地验收证据。"
+    },
+    {
+      "id": "ph-mental",
+      "order": 6,
+      "name": "精神卫生防治",
+      "category": "management",
+      "source": "全国公共卫生信息化建设标准与规范（试行）",
+      "owner": "精卫中心/基层机构",
+      "secondaryCount": 6,
+      "tertiaryCount": 9,
+      "tertiaryRange": "188-196",
+      "capabilities": [
+        "严重精神障碍",
+        "抑郁测评",
+        "认知筛查",
+        "心理健康宣教"
+      ],
+      "dataCollections": [
+        "publicHealthEvents",
+        "followups",
+        "personalRecords"
+      ],
+      "interfaces": [
+        "精神卫生系统",
+        "基层随访"
+      ],
+      "status": "已建模",
+      "nextAction": "接入现场业务系统、正式指标口径和属地验收证据。"
+    },
+    {
+      "id": "ph-epilepsy",
+      "order": 7,
+      "name": "癫痫防治",
+      "category": "management",
+      "source": "全国公共卫生信息化建设标准与规范（试行）",
+      "owner": "基层机构/专科机构",
+      "secondaryCount": 2,
+      "tertiaryCount": 4,
+      "tertiaryRange": "197-200",
+      "capabilities": [
+        "病例报告",
+        "患者服务",
+        "健康教育",
+        "个案管理"
+      ],
+      "dataCollections": [
+        "publicHealthEvents",
+        "followups"
+      ],
+      "interfaces": [
+        "癫痫个案管理",
+        "基层随访"
+      ],
+      "status": "已建模",
+      "nextAction": "接入现场业务系统、正式指标口径和属地验收证据。"
+    },
+    {
+      "id": "ph-senior",
+      "order": 8,
+      "name": "老年人健康服务管理",
+      "category": "management",
+      "source": "全国公共卫生信息化建设标准与规范（试行）",
+      "owner": "基层机构/民政协同",
+      "secondaryCount": 8,
+      "tertiaryCount": 15,
+      "tertiaryRange": "201-215",
+      "capabilities": [
+        "健康教育",
+        "预防保健",
+        "失能评估",
+        "医养结合",
+        "中医药管理"
+      ],
+      "dataCollections": [
+        "seniorServices",
+        "personalRecords",
+        "followups"
+      ],
+      "interfaces": [
+        "老年健康服务",
+        "医养结合"
+      ],
+      "status": "已建模",
+      "nextAction": "接入现场业务系统、正式指标口径和属地验收证据。"
+    },
+    {
+      "id": "ph-maternal-child",
+      "order": 9,
+      "name": "妇幼健康服务管理",
+      "category": "management",
+      "source": "全国公共卫生信息化建设标准与规范（试行）",
+      "owner": "妇幼保健机构/医疗机构",
+      "secondaryCount": 7,
+      "tertiaryCount": 28,
+      "tertiaryRange": "216-243",
+      "capabilities": [
+        "孕产保健",
+        "儿童保健",
+        "出生缺陷防治",
+        "妇幼证照",
+        "母婴传播预防"
+      ],
+      "dataCollections": [
+        "birthCertificates",
+        "birthStatistics",
+        "personalRecords"
+      ],
+      "interfaces": [
+        "妇幼保健系统",
+        "出生医学证明",
+        "电子证照"
+      ],
+      "status": "已建模",
+      "nextAction": "接入现场业务系统、正式指标口径和属地验收证据。"
+    },
+    {
+      "id": "ph-health-education",
+      "order": 10,
+      "name": "健康教育",
+      "category": "management",
+      "source": "全国公共卫生信息化建设标准与规范（试行）",
+      "owner": "疾控中心/基层机构",
+      "secondaryCount": 1,
+      "tertiaryCount": 3,
+      "tertiaryRange": "244-246",
+      "capabilities": [
+        "健康教育计划",
+        "宣传活动",
+        "效果评价"
+      ],
+      "dataCollections": [
+        "chronicEducationPushes",
+        "publicHealthEvents"
+      ],
+      "interfaces": [
+        "健康教育平台",
+        "居民端消息"
+      ],
+      "status": "已建模",
+      "nextAction": "接入现场业务系统、正式指标口径和属地验收证据。"
+    },
+    {
+      "id": "ph-nutrition",
+      "order": 11,
+      "name": "营养健康服务管理",
+      "category": "management",
+      "source": "全国公共卫生信息化建设标准与规范（试行）",
+      "owner": "疾控中心/基层机构",
+      "secondaryCount": 3,
+      "tertiaryCount": 5,
+      "tertiaryRange": "247-251",
+      "capabilities": [
+        "营养监测",
+        "营养干预",
+        "食品营养宣教"
+      ],
+      "dataCollections": [
+        "publicHealthEvents",
+        "personalRecords"
+      ],
+      "interfaces": [
+        "营养监测系统",
+        "健康档案"
+      ],
+      "status": "已建模",
+      "nextAction": "接入现场业务系统、正式指标口径和属地验收证据。"
+    },
+    {
+      "id": "ph-archive",
+      "order": 12,
+      "name": "健康档案管理服务",
+      "category": "management",
+      "source": "全国公共卫生信息化建设标准与规范（试行）",
+      "owner": "基层机构",
+      "secondaryCount": 1,
+      "tertiaryCount": 1,
+      "tertiaryRange": "252",
+      "capabilities": [
+        "居民健康档案"
+      ],
+      "dataCollections": [
+        "residents",
+        "personalRecords",
+        "healthArchiveStandard"
+      ],
+      "interfaces": [
+        "居民主索引",
+        "个人健康信息库"
+      ],
+      "status": "已建模",
+      "nextAction": "接入现场业务系统、正式指标口径和属地验收证据。"
+    },
+    {
+      "id": "ph-injury",
+      "order": 13,
+      "name": "伤害防控",
+      "category": "management",
+      "source": "全国公共卫生信息化建设标准与规范（试行）",
+      "owner": "疾控中心/医疗机构",
+      "secondaryCount": 2,
+      "tertiaryCount": 3,
+      "tertiaryRange": "253-255",
+      "capabilities": [
+        "伤害监测",
+        "伤害干预",
+        "健康教育"
+      ],
+      "dataCollections": [
+        "publicHealthEvents",
+        "diagnosticReports"
+      ],
+      "interfaces": [
+        "伤害监测",
+        "急诊病历"
+      ],
+      "status": "已建模",
+      "nextAction": "接入现场业务系统、正式指标口径和属地验收证据。"
+    },
+    {
+      "id": "ph-emergency",
+      "order": 14,
+      "name": "突发公共卫生事件管理",
+      "category": "management",
+      "source": "全国公共卫生信息化建设标准与规范（试行）",
+      "owner": "卫健管理部门/疾控中心",
+      "secondaryCount": 3,
+      "tertiaryCount": 12,
+      "tertiaryRange": "256-267",
+      "capabilities": [
+        "事件报告",
+        "应急处置",
+        "资源调配",
+        "信息发布"
+      ],
+      "dataCollections": [
+        "publicHealthEvents",
+        "emergencySignals",
+        "resourceDispatchRequests"
+      ],
+      "interfaces": [
+        "应急指挥",
+        "视频会商",
+        "物资调度"
+      ],
+      "status": "已建模",
+      "nextAction": "接入现场业务系统、正式指标口径和属地验收证据。"
+    },
+    {
+      "id": "ph-environment",
+      "order": 15,
+      "name": "环境卫生管理",
+      "category": "management",
+      "source": "全国公共卫生信息化建设标准与规范（试行）",
+      "owner": "疾控中心/监督机构",
+      "secondaryCount": 6,
+      "tertiaryCount": 21,
+      "tertiaryRange": "268-288",
+      "capabilities": [
+        "饮用水",
+        "公共场所",
+        "学校卫生",
+        "病媒生物",
+        "环境监测"
+      ],
+      "dataCollections": [
+        "publicHealthEvents",
+        "healthStatistics"
+      ],
+      "interfaces": [
+        "环境卫生监测",
+        "卫生监督"
+      ],
+      "status": "已建模",
+      "nextAction": "接入现场业务系统、正式指标口径和属地验收证据。"
+    },
+    {
+      "id": "ph-supervision",
+      "order": 16,
+      "name": "监督执法服务管理",
+      "category": "management",
+      "source": "全国公共卫生信息化建设标准与规范（试行）",
+      "owner": "卫生监督机构",
+      "secondaryCount": 14,
+      "tertiaryCount": 34,
+      "tertiaryRange": "289-322",
+      "capabilities": [
+        "监督检查",
+        "行政处罚",
+        "信用管理",
+        "投诉举报",
+        "监督协管"
+      ],
+      "dataCollections": [
+        "institutionSupervisions",
+        "institutionCreditEvaluations",
+        "publicHealthEvents"
+      ],
+      "interfaces": [
+        "监督执法系统",
+        "信用评价"
+      ],
+      "status": "已建模",
+      "nextAction": "接入现场业务系统、正式指标口径和属地验收证据。"
+    },
+    {
+      "id": "ph-food",
+      "order": 17,
+      "name": "食品安全风险监测",
+      "category": "management",
+      "source": "全国公共卫生信息化建设标准与规范（试行）",
+      "owner": "疾控中心/食品安全部门",
+      "secondaryCount": 4,
+      "tertiaryCount": 21,
+      "tertiaryRange": "323-343",
+      "capabilities": [
+        "污染物监测",
+        "食源性疾病",
+        "暴发事件",
+        "实验室检测"
+      ],
+      "dataCollections": [
+        "publicHealthEvents",
+        "diagnosticReports"
+      ],
+      "interfaces": [
+        "食品安全风险监测",
+        "实验室系统"
+      ],
+      "status": "已建模",
+      "nextAction": "接入现场业务系统、正式指标口径和属地验收证据。"
+    },
+    {
+      "id": "ph-occupational",
+      "order": 18,
+      "name": "职业病防控",
+      "category": "management",
+      "source": "全国公共卫生信息化建设标准与规范（试行）",
+      "owner": "职业健康机构/监督机构",
+      "secondaryCount": 7,
+      "tertiaryCount": 22,
+      "tertiaryRange": "344-365",
+      "capabilities": [
+        "职业健康检查",
+        "职业病诊断",
+        "危害因素监测",
+        "风险预警",
+        "宣教培训"
+      ],
+      "dataCollections": [
+        "publicHealthEvents",
+        "institutionSupervisions"
+      ],
+      "interfaces": [
+        "职业健康检查",
+        "职业病防治"
+      ],
+      "status": "已建模",
+      "nextAction": "接入现场业务系统、正式指标口径和属地验收证据。"
+    },
+    {
+      "id": "ph-portal",
+      "order": 19,
+      "name": "信息平台管理",
+      "category": "technology",
+      "source": "全国公共卫生信息化建设标准与规范（试行）",
+      "owner": "平台技术组",
+      "secondaryCount": 7,
+      "tertiaryCount": 12,
+      "tertiaryRange": "366-377",
+      "capabilities": [
+        "统一门户",
+        "用户注册",
+        "授权管理",
+        "数据交换",
+        "日志管理"
+      ],
+      "dataCollections": [
+        "platformInterfaces",
+        "integrationContracts",
+        "dataAccessLogs"
+      ],
+      "interfaces": [
+        "统一应用门户",
+        "数据交换平台"
+      ],
+      "status": "已建模",
+      "nextAction": "接入现场业务系统、正式指标口径和属地验收证据。"
+    },
+    {
+      "id": "ph-security",
+      "order": 20,
+      "name": "网络安全管理",
+      "category": "technology",
+      "source": "全国公共卫生信息化建设标准与规范（试行）",
+      "owner": "安全管理岗",
+      "secondaryCount": 10,
+      "tertiaryCount": 34,
+      "tertiaryRange": "378-411",
+      "capabilities": [
+        "身份认证",
+        "终端安全",
+        "通信安全",
+        "数据防泄露",
+        "容灾备份",
+        "安全运维"
+      ],
+      "dataCollections": [
+        "securityEvents",
+        "securityAcceptanceLedger",
+        "dataAccessLogs"
+      ],
+      "interfaces": [
+        "等保三级",
+        "密评",
+        "审计保全"
+      ],
+      "status": "已建模",
+      "nextAction": "接入现场业务系统、正式指标口径和属地验收证据。"
+    },
+    {
+      "id": "ph-emerging-tech",
+      "order": 21,
+      "name": "新兴技术应用",
+      "category": "technology",
+      "source": "全国公共卫生信息化建设标准与规范（试行）",
+      "owner": "平台技术组/科研治理",
+      "secondaryCount": 3,
+      "tertiaryCount": 10,
+      "tertiaryRange": "412-421",
+      "capabilities": [
+        "大数据",
+        "云计算",
+        "人工智能",
+        "可视化展示",
+        "预测预警"
+      ],
+      "dataCollections": [
+        "researchDatasets",
+        "diseaseRegistryModels",
+        "healthDashboardSnapshots"
+      ],
+      "interfaces": [
+        "AI 预警",
+        "科研沙箱",
+        "云平台"
+      ],
+      "status": "已建模",
+      "nextAction": "接入现场业务系统、正式指标口径和属地验收证据。"
+    }
+  ],
+  "publicHealthInstitutionScopes": [
+    {
+      "id": "scope-cdc",
+      "name": "国家/省/市/县区级疾病预防控制中心",
+      "institutionType": "CDC",
+      "responsibilities": [
+        "监测预警",
+        "病例报告",
+        "流调溯源",
+        "实验室质控",
+        "健康教育"
+      ],
+      "coveredDomains": [
+        "传染病防控",
+        "寄生虫病防控",
+        "地方病防控",
+        "食品安全风险监测"
+      ],
+      "status": "标准覆盖已建模",
+      "interfaceMode": "国家/省/市县直报与实验室数据交换",
+      "nextAction": "补齐真实疾控直报账号、交换规则和应急会商责任人。"
+    },
+    {
+      "id": "scope-primary",
+      "name": "基层医疗卫生机构",
+      "institutionType": "primary-care",
+      "responsibilities": [
+        "居民档案",
+        "慢病随访",
+        "免疫接种",
+        "老年健康",
+        "健康教育"
+      ],
+      "coveredDomains": [
+        "慢性病防控",
+        "免疫规划",
+        "健康档案管理服务",
+        "老年人健康服务管理"
+      ],
+      "status": "业务闭环已复用",
+      "interfaceMode": "家庭医生/基层公卫系统/居民端",
+      "nextAction": "接入正式家庭医生签约、预防接种和基本公卫绩效口径。"
+    },
+    {
+      "id": "scope-health-admin",
+      "name": "卫生健康管理部门",
+      "institutionType": "health-admin",
+      "responsibilities": [
+        "综合监管",
+        "资源调配",
+        "统计质控",
+        "应急指挥",
+        "绩效评价"
+      ],
+      "coveredDomains": [
+        "突发公共卫生事件管理",
+        "信息平台管理",
+        "网络安全管理"
+      ],
+      "status": "驾驶舱已建模",
+      "interfaceMode": "统一门户、数据交换、指标看板",
+      "nextAction": "补齐属地月报、值守班表和现场签字材料。"
+    },
+    {
+      "id": "scope-supervision",
+      "name": "各级卫生健康监督机构",
+      "institutionType": "supervision",
+      "responsibilities": [
+        "监督检查",
+        "行政处罚",
+        "信用评价",
+        "投诉举报",
+        "协管巡查"
+      ],
+      "coveredDomains": [
+        "监督执法服务管理",
+        "环境卫生管理",
+        "职业病防控"
+      ],
+      "status": "监管台账已建模",
+      "interfaceMode": "卫生监督系统/信用评价/整改闭环",
+      "nextAction": "接入正式监督执法案件编号和处罚决定书归档。"
+    },
+    {
+      "id": "scope-maternal-child",
+      "name": "各级妇幼保健机构",
+      "institutionType": "maternal-child",
+      "responsibilities": [
+        "孕产保健",
+        "儿童保健",
+        "出生缺陷防治",
+        "妇幼入册",
+        "母婴安全"
+      ],
+      "coveredDomains": [
+        "妇幼健康服务管理",
+        "免疫规划",
+        "健康教育"
+      ],
+      "status": "妇幼证照已复用",
+      "interfaceMode": "妇幼保健系统/出生医学证明/电子证照",
+      "nextAction": "补齐真实妇幼入册、筛查和随访回传接口。"
+    },
+    {
+      "id": "scope-hospital",
+      "name": "二级及以上医院",
+      "institutionType": "hospital",
+      "responsibilities": [
+        "诊疗发现",
+        "实验室报告",
+        "院感预警",
+        "危急值协同",
+        "出院后连续管理"
+      ],
+      "coveredDomains": [
+        "传染病防控",
+        "突发公共卫生事件管理",
+        "食品安全风险监测",
+        "职业病防控"
+      ],
+      "status": "医防协同已建模",
+      "interfaceMode": "HIS/EMR/LIS/PACS/院感/报告回传",
+      "nextAction": "完成 HIS/EMR/LIS/PACS 和院感系统现场联调。"
+    },
+    {
+      "id": "scope-other-public-health",
+      "name": "其他公共卫生机构",
+      "institutionType": "public-health-other",
+      "responsibilities": [
+        "职业健康",
+        "采供血",
+        "急救",
+        "健康教育",
+        "专项监测"
+      ],
+      "coveredDomains": [
+        "职业病防控",
+        "伤害防控",
+        "营养健康服务管理",
+        "环境卫生管理"
+      ],
+      "status": "机构边界已纳入",
+      "interfaceMode": "专项业务系统/API/批量报送",
+      "nextAction": "按机构类型补齐业务目录、接口协议和数据共享授权。"
+    }
+  ],
+  "publicHealthEvents": [
+    {
+      "id": "phe-infectious-001",
+      "domain": "传染病防控",
+      "signal": "发热门诊聚集性呼吸道病例",
+      "institution": "大连市中心医院",
+      "region": "中山区",
+      "sourceSystem": "EMR/LIS",
+      "status": "待疾控复核",
+      "priority": "high",
+      "reportedAt": "2026-07-08T08:30:00+08:00",
+      "commandAction": "市疾控发起流调任务并锁定实验室复核样本。",
+      "followupAction": "24 小时内回写流调结论和报告质量控制记录。",
+      "linkedStandardItems": [
+        "病例报告",
+        "流行病学调查",
+        "呼吸道传染病实验室检测"
+      ]
+    },
+    {
+      "id": "phe-immunization-001",
+      "domain": "免疫规划",
+      "signal": "冷链温度越界与接种库存风险",
+      "institution": "青泥洼桥社区卫生服务中心",
+      "region": "中山区",
+      "sourceSystem": "预防接种系统",
+      "status": "处置中",
+      "priority": "medium",
+      "reportedAt": "2026-07-08T09:10:00+08:00",
+      "commandAction": "暂停相关批号出库并通知接种单位复核。",
+      "followupAction": "归档冷链记录、库存盘点和异常反应监测交叉核验。",
+      "linkedStandardItems": [
+        "疫苗管理",
+        "冷链管理",
+        "接种单位管理"
+      ]
+    },
+    {
+      "id": "phe-chronic-001",
+      "domain": "慢性病防控",
+      "signal": "高危慢病随访逾期",
+      "institution": "星海湾社区卫生服务中心",
+      "region": "沙河口区",
+      "sourceSystem": "慢病平台",
+      "status": "待家庭医生补访",
+      "priority": "high",
+      "reportedAt": "2026-07-08T10:00:00+08:00",
+      "commandAction": "推送家庭医生补访任务并同步居民端提醒。",
+      "followupAction": "补录随访结果、用药依从性和转诊建议。",
+      "linkedStandardItems": [
+        "高血压服务",
+        "2 型糖尿病服务",
+        "慢性病监测"
+      ]
+    },
+    {
+      "id": "phe-food-001",
+      "domain": "食品安全风险监测",
+      "signal": "疑似食源性疾病暴发事件",
+      "institution": "甘井子区人民医院",
+      "region": "甘井子区",
+      "sourceSystem": "急诊/LIS",
+      "status": "待样本检测",
+      "priority": "high",
+      "reportedAt": "2026-07-08T11:20:00+08:00",
+      "commandAction": "疾控中心登记可疑食品、生物标本和环境标本。",
+      "followupAction": "形成报告结论并同步监督执法线索。",
+      "linkedStandardItems": [
+        "报告基本信息",
+        "可疑食品信息",
+        "生物标本检测信息"
+      ]
+    },
+    {
+      "id": "phe-occupational-001",
+      "domain": "职业病防控",
+      "signal": "重点用人单位职业健康风险预警",
+      "institution": "职业健康检查机构",
+      "region": "金普新区",
+      "sourceSystem": "职业健康检查",
+      "status": "监督复核中",
+      "priority": "medium",
+      "reportedAt": "2026-07-08T13:20:00+08:00",
+      "commandAction": "触发监督机构现场核查和用人单位整改通知。",
+      "followupAction": "归档职业健康检查、危害因素检测和整改闭环。",
+      "linkedStandardItems": [
+        "职业健康检查",
+        "职业病危害因素监测",
+        "职业健康风险监控预警"
+      ]
+    },
+    {
+      "id": "phe-emergency-001",
+      "domain": "突发公共卫生事件管理",
+      "signal": "区县应急资源紧急调度",
+      "institution": "市卫生健康委",
+      "region": "全市",
+      "sourceSystem": "应急指挥",
+      "status": "已派发",
+      "priority": "high",
+      "reportedAt": "2026-07-08T14:00:00+08:00",
+      "commandAction": "联动医院床位、急救、检验和防控物资调度。",
+      "followupAction": "完成处置复盘、信息发布记录和资源消耗对账。",
+      "linkedStandardItems": [
+        "事件报告",
+        "应急处置",
+        "资源调配"
+      ]
+    }
+  ],
+  "publicHealthExchangeTasks": [
+    {
+      "id": "phx-national-direct-report",
+      "name": "国家/省市县公卫直报交换",
+      "category": "direct-report",
+      "sourceSystems": [
+        "疾控直报",
+        "卫生统计",
+        "基层公卫"
+      ],
+      "targetCollections": [
+        "publicHealthEvents",
+        "healthStatisticsIngestion"
+      ],
+      "frequency": "event/daily/monthly",
+      "owner": "疾控中心/规划信息",
+      "status": "演示契约就绪",
+      "evidence": [
+        "publicHealthStandards",
+        "healthStatisticsIngestion"
+      ],
+      "nextAction": "配置正式直报接口地址、指标版本和回执规则。"
+    },
+    {
+      "id": "phx-lab-surveillance",
+      "name": "实验室检测与质量控制交换",
+      "category": "laboratory",
+      "sourceSystems": [
+        "LIS",
+        "疾控实验室",
+        "食品安全实验室"
+      ],
+      "targetCollections": [
+        "diagnosticReports",
+        "publicHealthEvents"
+      ],
+      "frequency": "event",
+      "owner": "疾控实验室/医疗机构",
+      "status": "演示契约就绪",
+      "evidence": [
+        "diagnosticReports",
+        "integrationContracts"
+      ],
+      "nextAction": "补齐样本编号、检测方法、质控批次和阳性回传签名。"
+    },
+    {
+      "id": "phx-immunization",
+      "name": "免疫规划与出生证照接续",
+      "category": "immunization",
+      "sourceSystems": [
+        "预防接种系统",
+        "出生医学证明",
+        "居民端"
+      ],
+      "targetCollections": [
+        "birthCertificates",
+        "personalRecords",
+        "publicHealthEvents"
+      ],
+      "frequency": "event",
+      "owner": "疾控免疫规划/妇幼",
+      "status": "演示闭环",
+      "evidence": [
+        "immunization:readiness",
+        "birthCertificates"
+      ],
+      "nextAction": "接入正式儿童接种档案和冷链异常回执。"
+    },
+    {
+      "id": "phx-maternal-child",
+      "name": "妇幼健康入册与证照共享",
+      "category": "maternal-child",
+      "sourceSystems": [
+        "妇幼保健",
+        "电子证照",
+        "公安出生登记"
+      ],
+      "targetCollections": [
+        "birthCertificates",
+        "birthStatistics"
+      ],
+      "frequency": "event",
+      "owner": "妇幼保健/医政",
+      "status": "演示闭环",
+      "evidence": [
+        "maternal-child:readiness"
+      ],
+      "nextAction": "补齐妇幼入册、筛查、公安共享和质控补正接口。"
+    },
+    {
+      "id": "phx-emergency-command",
+      "name": "突发事件应急指挥协同",
+      "category": "emergency",
+      "sourceSystems": [
+        "应急指挥",
+        "医院运行",
+        "急救",
+        "物资调度"
+      ],
+      "targetCollections": [
+        "publicHealthEvents",
+        "emergencySignals",
+        "resourceDispatchRequests"
+      ],
+      "frequency": "real-time",
+      "owner": "卫健应急/疾控",
+      "status": "演示联动",
+      "evidence": [
+        "operations:readiness",
+        "publicHealthEvents"
+      ],
+      "nextAction": "绑定真实值班表、会商视频和资源消耗回执。"
+    },
+    {
+      "id": "phx-security-audit",
+      "name": "网络安全、审计与容灾证据交换",
+      "category": "security",
+      "sourceSystems": [
+        "统一认证",
+        "审计日志",
+        "安全设备",
+        "备份系统"
+      ],
+      "targetCollections": [
+        "securityEvents",
+        "dataAccessLogs",
+        "securityAcceptanceLedger"
+      ],
+      "frequency": "continuous",
+      "owner": "安全管理岗",
+      "status": "演示证据就绪",
+      "evidence": [
+        "audit:retention",
+        "securityAcceptanceLedger"
+      ],
+      "nextAction": "归档等保、密评、国密、备份恢复和日志保全现场证据。"
+    }
+  ],
+  "publicHealthReadinessEvidence": [
+    {
+      "id": "phev-standard-coverage",
+      "category": "标准覆盖",
+      "name": "21/125/421 标准矩阵覆盖",
+      "owner": "项目办/标准管理",
+      "status": "已建档",
+      "evidence": [
+        "publicHealthStandards",
+        "public-health:readiness"
+      ],
+      "nextAction": "按现场验收版本维护标准条目差异。"
+    },
+    {
+      "id": "phev-institution-scope",
+      "category": "机构覆盖",
+      "name": "七类机构责任边界",
+      "owner": "卫健管理部门",
+      "status": "已建档",
+      "evidence": [
+        "publicHealthInstitutionScopes"
+      ],
+      "nextAction": "确认属地真实机构清单、联系人和系统账号。"
+    },
+    {
+      "id": "phev-event-command",
+      "category": "平战结合",
+      "name": "监测预警-指挥处置-随访复盘闭环",
+      "owner": "疾控中心/应急办",
+      "status": "演示闭环",
+      "evidence": [
+        "publicHealthEvents",
+        "/api/public-health/system"
+      ],
+      "nextAction": "接入正式事件分级、处置时限和信息发布审批。"
+    },
+    {
+      "id": "phev-event-action-api",
+      "category": "处置闭环",
+      "name": "事件动作 API 与审计留痕",
+      "owner": "卫健管理部门/疾控中心",
+      "status": "已接入",
+      "evidence": [
+        "POST /api/public-health/events/:id/actions",
+        "publicHealthEvents.actionHistory",
+        "securityEvents"
+      ],
+      "nextAction": "接入正式责任人、处置时限、会商记录和现场签字材料。"
+    },
+    {
+      "id": "phev-exchange-security",
+      "category": "数据交换安全",
+      "name": "直报、实验室、妇幼、应急、安全审计交换",
+      "owner": "平台技术组/安全管理岗",
+      "status": "演示契约就绪",
+      "evidence": [
+        "publicHealthExchangeTasks",
+        "integrationContracts",
+        "audit:retention",
+        "publicHealthExchangeRuns"
+      ],
+      "nextAction": "完成外部接口联调、密钥、回执和异常补偿策略。"
+    },
+    {
+      "id": "phev-institution-collaboration",
+      "category": "机构协同",
+      "name": "七类机构角色化任务和现场账号清单",
+      "owner": "卫健管理部门/各机构联络员",
+      "status": "已建档",
+      "evidence": [
+        "publicHealthInstitutionTasks",
+        "authUsers"
+      ],
+      "nextAction": "现场确认联系人、授权范围和机构账号。"
+    },
+    {
+      "id": "phev-onsite-acceptance",
+      "category": "现场验收",
+      "name": "等保密评、备份恢复、接口联调和签字材料",
+      "owner": "项目办/安全管理岗/运维保障组",
+      "status": "待现场签字",
+      "evidence": [
+        "publicHealthOnsiteAcceptances",
+        "release:report",
+        "deploy:check"
+      ],
+      "nextAction": "收集现场签字页、测评报告和演练截图。"
+    }
+  ],
+  "publicHealthExchangeRuns": [
+    {
+      "id": "phxr-direct-report-001",
+      "taskId": "phx-national-direct-report",
+      "category": "direct-report",
+      "sourceSystem": "疾控直报",
+      "targetCollection": "publicHealthEvents",
+      "runType": "scheduled",
+      "status": "receipt-confirmed",
+      "receiptStatus": "accepted",
+      "compensationStatus": "not-required",
+      "payloadRecords": 18,
+      "failedRecords": 0,
+      "receiptId": "PH-DR-20260708-001",
+      "owner": "疾控中心/规划信息",
+      "startedAt": "2026-07-08T08:40:00+08:00",
+      "finishedAt": "2026-07-08T08:43:00+08:00",
+      "evidence": [
+        "publicHealthEvents",
+        "healthStatisticsIngestion"
+      ],
+      "nextAction": "归档国家/省市县直报回执和字段版本。"
+    },
+    {
+      "id": "phxr-lab-001",
+      "taskId": "phx-lab-surveillance",
+      "category": "laboratory",
+      "sourceSystem": "LIS/疾控实验室",
+      "targetCollection": "diagnosticReports",
+      "runType": "event",
+      "status": "compensated",
+      "receiptStatus": "accepted-after-retry",
+      "compensationStatus": "replayed",
+      "payloadRecords": 12,
+      "failedRecords": 2,
+      "receiptId": "PH-LAB-20260708-007",
+      "owner": "疾控实验室/医疗机构",
+      "startedAt": "2026-07-08T09:05:00+08:00",
+      "finishedAt": "2026-07-08T09:16:00+08:00",
+      "evidence": [
+        "diagnosticReports",
+        "integrationContracts"
+      ],
+      "nextAction": "保留失败样本重放日志、签名哈希和阳性回传回执。"
+    },
+    {
+      "id": "phxr-immunization-001",
+      "taskId": "phx-immunization",
+      "category": "immunization",
+      "sourceSystem": "预防接种系统",
+      "targetCollection": "birthCertificates",
+      "runType": "event",
+      "status": "receipt-confirmed",
+      "receiptStatus": "accepted",
+      "compensationStatus": "not-required",
+      "payloadRecords": 7,
+      "failedRecords": 0,
+      "receiptId": "PH-IMM-20260708-003",
+      "owner": "疾控免疫规划/妇幼",
+      "startedAt": "2026-07-08T09:30:00+08:00",
+      "finishedAt": "2026-07-08T09:33:00+08:00",
+      "evidence": [
+        "immunization:readiness",
+        "birthCertificates"
+      ],
+      "nextAction": "接入正式儿童接种档案和冷链异常回执。"
+    },
+    {
+      "id": "phxr-maternal-child-001",
+      "taskId": "phx-maternal-child",
+      "category": "maternal-child",
+      "sourceSystem": "妇幼保健/电子证照",
+      "targetCollection": "birthStatistics",
+      "runType": "daily",
+      "status": "manual-review",
+      "receiptStatus": "pending-manual-signoff",
+      "compensationStatus": "manual-review",
+      "payloadRecords": 6,
+      "failedRecords": 1,
+      "receiptId": "PH-MCH-20260708-002",
+      "owner": "妇幼保健/医政",
+      "startedAt": "2026-07-08T10:10:00+08:00",
+      "finishedAt": "2026-07-08T10:25:00+08:00",
+      "evidence": [
+        "maternal-child:readiness",
+        "birthStatistics"
+      ],
+      "nextAction": "补齐公安共享字段和质控补正签字材料。"
+    },
+    {
+      "id": "phxr-emergency-001",
+      "taskId": "phx-emergency-command",
+      "category": "emergency",
+      "sourceSystem": "应急指挥/医院运行",
+      "targetCollection": "resourceDispatchRequests",
+      "runType": "real-time",
+      "status": "receipt-confirmed",
+      "receiptStatus": "accepted",
+      "compensationStatus": "not-required",
+      "payloadRecords": 5,
+      "failedRecords": 0,
+      "receiptId": "PH-EMG-20260708-004",
+      "owner": "卫健应急/疾控",
+      "startedAt": "2026-07-08T14:05:00+08:00",
+      "finishedAt": "2026-07-08T14:08:00+08:00",
+      "evidence": [
+        "operations:readiness",
+        "publicHealthEvents"
+      ],
+      "nextAction": "绑定真实值班表、会商视频和资源消耗回执。"
+    },
+    {
+      "id": "phxr-security-001",
+      "taskId": "phx-security-audit",
+      "category": "security",
+      "sourceSystem": "统一认证/审计日志",
+      "targetCollection": "securityEvents",
+      "runType": "continuous",
+      "status": "receipt-confirmed",
+      "receiptStatus": "accepted",
+      "compensationStatus": "not-required",
+      "payloadRecords": 20,
+      "failedRecords": 0,
+      "receiptId": "PH-SEC-20260708-001",
+      "owner": "安全管理岗",
+      "startedAt": "2026-07-08T15:00:00+08:00",
+      "finishedAt": "2026-07-08T15:03:00+08:00",
+      "evidence": [
+        "audit:retention",
+        "securityAcceptanceLedger"
+      ],
+      "nextAction": "归档等保、密评、国密、备份恢复和日志保全现场证据。"
+    }
+  ],
+  "publicHealthInstitutionTasks": [
+    {
+      "id": "phit-cdc",
+      "scopeId": "scope-cdc",
+      "institutionType": "CDC",
+      "roleView": "疾控中心",
+      "taskType": "monitor-command",
+      "owner": "市疾控中心应急办",
+      "status": "ready-for-site",
+      "handoffStatus": "command-ready",
+      "accountStatus": "demo-account-ready",
+      "openItems": 1,
+      "dueAt": "2026-07-12",
+      "evidence": [
+        "publicHealthEvents",
+        "publicHealthExchangeRuns"
+      ],
+      "nextAction": "确认疾控直报账号、流调责任人和实验室回执规则。"
+    },
+    {
+      "id": "phit-primary",
+      "scopeId": "scope-primary",
+      "institutionType": "primary-care",
+      "roleView": "基层医疗卫生机构",
+      "taskType": "followup-service",
+      "owner": "基层公卫专班",
+      "status": "ready-for-site",
+      "handoffStatus": "task-ready",
+      "accountStatus": "demo-account-ready",
+      "openItems": 2,
+      "dueAt": "2026-07-13",
+      "evidence": [
+        "followups",
+        "chronicManagementPlans"
+      ],
+      "nextAction": "确认家庭医生签约、随访回写和居民端提醒口径。"
+    },
+    {
+      "id": "phit-health-admin",
+      "scopeId": "scope-health-admin",
+      "institutionType": "health-admin",
+      "roleView": "卫生健康管理部门",
+      "taskType": "command-dashboard",
+      "owner": "市卫健委规划信息处",
+      "status": "ready-for-site",
+      "handoffStatus": "dashboard-ready",
+      "accountStatus": "demo-account-ready",
+      "openItems": 1,
+      "dueAt": "2026-07-12",
+      "evidence": [
+        "/api/public-health/system",
+        "release:report"
+      ],
+      "nextAction": "确认属地月报、值守班表和发布审批责任人。"
+    },
+    {
+      "id": "phit-supervision",
+      "scopeId": "scope-supervision",
+      "institutionType": "supervision",
+      "roleView": "卫生健康监督机构",
+      "taskType": "rectification",
+      "owner": "卫生监督执法专班",
+      "status": "ready-for-site",
+      "handoffStatus": "rectification-ready",
+      "accountStatus": "demo-account-ready",
+      "openItems": 2,
+      "dueAt": "2026-07-14",
+      "evidence": [
+        "institutionSupervisions",
+        "institutionCreditEvaluations"
+      ],
+      "nextAction": "接入正式监督执法案件编号和处罚决定书归档。"
+    },
+    {
+      "id": "phit-maternal-child",
+      "scopeId": "scope-maternal-child",
+      "institutionType": "maternal-child",
+      "roleView": "妇幼保健机构",
+      "taskType": "certificate-continuity",
+      "owner": "妇幼保健/医政",
+      "status": "ready-for-site",
+      "handoffStatus": "certificate-ready",
+      "accountStatus": "demo-account-ready",
+      "openItems": 1,
+      "dueAt": "2026-07-14",
+      "evidence": [
+        "birthCertificates",
+        "birthStatistics"
+      ],
+      "nextAction": "补齐妇幼入册、筛查和公安共享回执。"
+    },
+    {
+      "id": "phit-hospital",
+      "scopeId": "scope-hospital",
+      "institutionType": "hospital",
+      "roleView": "二级及以上医院",
+      "taskType": "medical-prevention",
+      "owner": "医院信息/院感/检验联络员",
+      "status": "ready-for-site",
+      "handoffStatus": "interface-ready",
+      "accountStatus": "demo-account-ready",
+      "openItems": 3,
+      "dueAt": "2026-07-15",
+      "evidence": [
+        "diagnosticReports",
+        "integrationContracts"
+      ],
+      "nextAction": "完成 HIS/EMR/LIS/PACS 和院感系统现场联调。"
+    },
+    {
+      "id": "phit-other-public-health",
+      "scopeId": "scope-other-public-health",
+      "institutionType": "public-health-other",
+      "roleView": "其他公共卫生机构",
+      "taskType": "special-monitoring",
+      "owner": "职业健康/急救/采供血联络员",
+      "status": "ready-for-site",
+      "handoffStatus": "catalog-ready",
+      "accountStatus": "demo-account-ready",
+      "openItems": 2,
+      "dueAt": "2026-07-16",
+      "evidence": [
+        "publicHealthStandards",
+        "publicHealthOnsiteAcceptances"
+      ],
+      "nextAction": "按机构类型补齐业务目录、接口协议和数据共享授权。"
+    }
+  ],
+  "publicHealthOnsiteAcceptances": [
+    {
+      "id": "phoa-interface-joint-test",
+      "category": "接口联调",
+      "name": "疾控直报、实验室、妇幼、应急和安全审计接口联调",
+      "owner": "平台技术组/接口联调专班",
+      "status": "ready-for-signoff",
+      "severity": "P0",
+      "blocker": "需现场系统地址、密钥和回执样例",
+      "evidence": [
+        "publicHealthExchangeRuns",
+        "integrationContracts"
+      ],
+      "onsiteAction": "现场抽取 3 类接口样例并签署联调回执。",
+      "signoffStatus": "pending-site-signature"
+    },
+    {
+      "id": "phoa-security-level-protection",
+      "category": "等保密评",
+      "name": "等保、密评、国密设备和日志保全证据",
+      "owner": "安全管理岗",
+      "status": "ready-for-signoff",
+      "severity": "P0",
+      "blocker": "需正式测评报告或整改承诺",
+      "evidence": [
+        "securityAcceptanceLedger",
+        "audit:retention"
+      ],
+      "onsiteAction": "归档测评报告、整改项和日志保全截图。",
+      "signoffStatus": "pending-site-signature"
+    },
+    {
+      "id": "phoa-backup-restore",
+      "category": "备份恢复",
+      "name": "公共卫生事件和交换台账备份恢复演练",
+      "owner": "运维保障组",
+      "status": "ready-for-signoff",
+      "severity": "P0",
+      "blocker": "需现场备份介质和恢复截图",
+      "evidence": [
+        "rollback:snapshot",
+        "launch:smoke"
+      ],
+      "onsiteAction": "执行一次公共卫生数据恢复演练并记录 RPO/RTO。",
+      "signoffStatus": "pending-site-signature"
+    },
+    {
+      "id": "phoa-emergency-drill",
+      "category": "平战结合",
+      "name": "突发公共卫生事件指挥处置演练",
+      "owner": "卫健应急/疾控中心",
+      "status": "ready-for-signoff",
+      "severity": "P0",
+      "blocker": "需值班表、会商记录和资源调度回执",
+      "evidence": [
+        "publicHealthEvents",
+        "resourceDispatchRequests"
+      ],
+      "onsiteAction": "抽取一个高优先级事件完成派发、回执和复盘签字。",
+      "signoffStatus": "pending-site-signature"
+    },
+    {
+      "id": "phoa-institution-accounts",
+      "category": "机构协同",
+      "name": "七类机构账号、职责和现场联系人确认",
+      "owner": "卫健管理部门/各机构联络员",
+      "status": "ready-for-signoff",
+      "severity": "P1",
+      "blocker": "需现场联系人名单和授权确认",
+      "evidence": [
+        "publicHealthInstitutionTasks",
+        "authUsers"
+      ],
+      "onsiteAction": "按七类机构逐项核对账号、职责、数据范围和联系人。",
+      "signoffStatus": "pending-site-signature"
+    },
+    {
+      "id": "phoa-release-package",
+      "category": "发布材料",
+      "name": "公共卫生发布包、建设报告和下一步计划归档",
+      "owner": "项目办/发布经理",
+      "status": "ready-for-signoff",
+      "severity": "P1",
+      "blocker": "需现场签字页和版本号确认",
+      "evidence": [
+        "public-health:readiness",
+        "release:report",
+        "deploy:check"
+      ],
+      "onsiteAction": "归档发布报告、截图、验收清单和版本签字页。",
+      "signoffStatus": "pending-site-signature"
+    }
   ]
 }

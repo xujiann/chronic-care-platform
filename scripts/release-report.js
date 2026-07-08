@@ -27,6 +27,7 @@ const { buildMaternalChildReadinessReport, renderMarkdown: renderMaternalChildRe
 const { buildPolicyCoverageReport, renderMarkdown: renderPolicyCoverageMarkdown } = require("./policy-coverage");
 const { buildProcessAuditReport, renderMarkdown: renderProcessAuditMarkdown } = require("./process-audit");
 const { buildProductionDbReadinessReport, renderMarkdown: renderProductionDbReadinessMarkdown } = require("./production-db-readiness");
+const { buildPublicHealthReadinessReport, renderMarkdown: renderPublicHealthMarkdown } = require("./public-health-readiness");
 const { renderMarkdown: renderPriorityApplicationTemplatesMarkdown } = require("./priority-application-templates");
 const { buildRegionalDataSharingReport, renderMarkdown: renderRegionalDataSharingMarkdown } = require("./regional-data-sharing");
 const { buildQualitySafetyReport, renderMarkdown: renderQualitySafetyMarkdown } = require("./quality-safety-report");
@@ -421,6 +422,21 @@ function maternalChildReadinessChecks(maternalChildReadiness) {
   ];
 }
 
+function publicHealthReadinessChecks(publicHealthReadiness) {
+  return [
+    check("publicHealth:readiness", publicHealthReadiness.ok, publicHealthReadiness.ok ? "public health readiness checks passed" : "public health readiness failed", "error", "public-health"),
+    check("publicHealth:standardTotal", publicHealthReadiness.standardCoverage?.total?.domains === 21 && publicHealthReadiness.standardCoverage?.total?.secondary === 125 && publicHealthReadiness.standardCoverage?.total?.tertiary === 421, `${publicHealthReadiness.standardCoverage?.total?.domains || 0}/${publicHealthReadiness.standardCoverage?.total?.secondary || 0}/${publicHealthReadiness.standardCoverage?.total?.tertiary || 0}`, "error", "public-health"),
+    check("publicHealth:institutionScopes", publicHealthReadiness.institutionScopes?.length >= 7, `${publicHealthReadiness.institutionScopes?.length || 0} institution scopes`, "error", "public-health"),
+    check("publicHealth:eventLoop", publicHealthReadiness.riskQueue?.length >= 3 && publicHealthReadiness.riskQueue?.every((item) => item.commandAction && item.followupAction), `${publicHealthReadiness.riskQueue?.length || 0} risk queue items`, "error", "public-health"),
+    check("publicHealth:eventActionApi", ["events:action-api", "frontend:event-actions"].every((id) => publicHealthReadiness.checks?.some((item) => item.id === id && item.passed)), "event action API and risk queue actions are wired", "error", "public-health"),
+    check("publicHealth:nextPlan", publicHealthReadiness.checks?.some((item) => item.id === "docs:next-plan" && item.passed), "next development plan is documented", "error", "public-health"),
+    check("publicHealth:exchangeTasks", ["direct-report", "laboratory", "immunization", "maternal-child", "emergency", "security"].every((category) => publicHealthReadiness.exchangeTasks?.some((item) => item.category === category)), `${publicHealthReadiness.exchangeTasks?.length || 0} exchange tasks`, "error", "public-health"),
+    check("publicHealth:exchangeRuns", publicHealthReadiness.checks?.some((item) => item.id === "exchange:runs" && item.passed) && publicHealthReadiness.checks?.some((item) => item.id === "exchange:compensation" && item.passed), `${publicHealthReadiness.exchangeRuns?.length || 0} exchange runs with compensation evidence`, "error", "public-health"),
+    check("publicHealth:institutionTasks", publicHealthReadiness.checks?.some((item) => item.id === "institution:tasks" && item.passed), `${publicHealthReadiness.institutionTasks?.length || 0} institution collaboration tasks`, "error", "public-health"),
+    check("publicHealth:onsiteAcceptance", publicHealthReadiness.checks?.some((item) => item.id === "onsite:acceptance" && item.passed), `${publicHealthReadiness.onsiteAcceptances?.length || 0} onsite acceptance rows`, "error", "public-health")
+  ];
+}
+
 function policyCoverageChecks(policyCoverage) {
   return [
     check("policyCoverage:report", policyCoverage.ok, policyCoverage.ok ? "policy coverage checks passed" : "policy coverage checks failed", "error", "policy"),
@@ -677,6 +693,7 @@ function packageChecks(pkg) {
     "health-dashboard:summary",
     "priority-apps:templates",
     "maternal-child:readiness",
+    "public-health:readiness",
     "policy:coverage",
     "integration:readiness",
     "interface:mapping",
@@ -765,6 +782,7 @@ function buildReleaseReport(options = {}) {
   const healthDashboard = buildHealthDashboardSummary({ data });
   const priorityApplicationTemplates = buildPriorityApplicationTemplates({ data });
   const maternalChildReadiness = buildMaternalChildReadinessReport({ data, packageSource: JSON.stringify(pkg) });
+  const publicHealthReadiness = buildPublicHealthReadinessReport({ data, pkg });
   const policyCoverage = buildPolicyCoverageReport();
   const siteReadinessPack = buildSiteReadinessPack({ data, pkg, envFile: options.envFile || ".env.example", env: options.env || process.env, identityContract, interfaceMapping, monitoringReadiness });
   const onsiteLaunchRequirements = buildOnsiteLaunchRequirements({ pkg, sitePack: siteReadinessPack, releaseReport: { ok: true }, envFile: options.envFile || ".env.example", env: options.env || process.env });
@@ -807,6 +825,7 @@ function buildReleaseReport(options = {}) {
     ...healthDashboardChecks(healthDashboard),
     ...priorityApplicationTemplateChecks(priorityApplicationTemplates),
     ...maternalChildReadinessChecks(maternalChildReadiness),
+    ...publicHealthReadinessChecks(publicHealthReadiness),
     ...policyCoverageChecks(policyCoverage),
     ...env.checks,
     ...commandChecks(options.runCommands)
@@ -859,6 +878,7 @@ function buildReleaseReport(options = {}) {
     healthDashboard,
     priorityApplicationTemplates,
     maternalChildReadiness,
+    publicHealthReadiness,
     policyCoverage
   };
 }
@@ -1096,6 +1116,7 @@ function renderMarkdown(report) {
     "`GET /api/priority-applications/templates` exposes the live eight-application handoff templates for independent conversation work.",
     "See `priority-application-templates.json` and `priority-application-templates.md` for the standalone release artifact version of that handoff contract.",
     "See `maternal-child-readiness-report.json` and `maternal-child-readiness-report.md` for maternal-child policy, birth certificate workflow, role scope, API, privacy, and release evidence.",
+    "See `public-health-readiness-report.json` and `public-health-readiness-report.md` for the 21/125/421 public-health standard matrix, institution scopes, event loop, exchange tasks, API, and release evidence.",
     "See `policy-coverage-report.json` and `policy-coverage-report.md` for About-page policy IDs, policy documents, template rules, CI, deploy check, release manifest, and operator documentation coverage.",
     "",
     "## Release artifact manifest",
@@ -1391,6 +1412,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       maternalChildReadiness: report.maternalChildReadiness
     }, null, 2), "utf8");
+    const publicHealthReadinessJson = path.join(path.dirname(output), "public-health-readiness-report.json");
+    fs.writeFileSync(publicHealthReadinessJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      publicHealthReadiness: report.publicHealthReadiness
+    }, null, 2), "utf8");
     const policyCoverageJson = path.join(path.dirname(output), "policy-coverage-report.json");
     fs.writeFileSync(policyCoverageJson, JSON.stringify({
       project: report.project,
@@ -1480,6 +1509,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(priorityApplicationTemplatesMarkdown, renderPriorityApplicationTemplatesMarkdown(report.priorityApplicationTemplates), "utf8");
     const maternalChildReadinessMarkdown = path.join(path.dirname(markdown), "maternal-child-readiness-report.md");
     fs.writeFileSync(maternalChildReadinessMarkdown, renderMaternalChildReadinessMarkdown(report.maternalChildReadiness), "utf8");
+    const publicHealthReadinessMarkdown = path.join(path.dirname(markdown), "public-health-readiness-report.md");
+    fs.writeFileSync(publicHealthReadinessMarkdown, renderPublicHealthMarkdown(report.publicHealthReadiness), "utf8");
     const policyCoverageMarkdown = path.join(path.dirname(markdown), "policy-coverage-report.md");
     fs.writeFileSync(policyCoverageMarkdown, renderPolicyCoverageMarkdown(report.policyCoverage), "utf8");
     const releaseArtifactManifestMarkdown = path.join(path.dirname(markdown), "release-artifact-manifest.md");

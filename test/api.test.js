@@ -239,6 +239,88 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:development-template" && item.passed), true);
     assert.equal(healthDashboard.body.checks.some((item) => item.id === "dashboard:source-boundary" && item.passed), true);
 
+    const publicHealth = await api(baseUrl, "/api/public-health/system", authorized(accountLogin.body.token));
+    assert.equal(publicHealth.response.status, 200);
+    assert.equal(publicHealth.body.ok, true);
+    assert.equal(publicHealth.body.summary.domains, 21);
+    assert.equal(publicHealth.body.summary.secondaryIndicators, 125);
+    assert.equal(publicHealth.body.summary.tertiaryIndicators, 421);
+    assert.equal(publicHealth.body.institutionScopes.length >= 7, true);
+    assert.equal(publicHealth.body.riskQueue.some((item) => item.domain === "突发公共卫生事件管理" && item.commandAction), true);
+    assert.equal(publicHealth.body.exchangeTasks.some((item) => item.category === "direct-report"), true);
+
+    const publicHealthAction = await api(baseUrl, "/api/public-health/events/phe-infectious-001/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "dispatch",
+        note: "API regression dispatch",
+        assignedTo: "市疾控流调专班"
+      })
+    }));
+    assert.equal(publicHealthAction.response.status, 200);
+    assert.equal(publicHealthAction.body.ok, true);
+    assert.equal(publicHealthAction.body.event.status, "已派发");
+    assert.equal(publicHealthAction.body.event.assignedTo, "市疾控流调专班");
+    assert.equal(publicHealthAction.body.event.actionHistory[0].action, "dispatch");
+    assert.equal(publicHealthAction.body.system.summary.eventActions >= 1, true);
+
+    const publicHealthExchangeRun = await api(baseUrl, "/api/public-health/exchange-tasks/phx-lab-surveillance/runs", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        status: "compensated",
+        receiptStatus: "accepted-after-retry",
+        compensationStatus: "replayed",
+        payloadRecords: 4,
+        failedRecords: 1,
+        nextAction: "API regression exchange receipt"
+      })
+    }));
+    assert.equal(publicHealthExchangeRun.response.status, 200);
+    assert.equal(publicHealthExchangeRun.body.ok, true);
+    assert.equal(publicHealthExchangeRun.body.run.taskId, "phx-lab-surveillance");
+    assert.equal(publicHealthExchangeRun.body.run.compensationStatus, "replayed");
+    assert.equal(publicHealthExchangeRun.body.system.summary.exchangeRuns >= 6, true);
+    assert.equal(publicHealthExchangeRun.body.system.summary.compensatedExchangeRuns >= 1, true);
+
+    const publicHealthInstitutionTask = await api(baseUrl, "/api/public-health/institution-tasks/phit-hospital/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "site-handoff",
+        status: "site-handoff-ready",
+        handoffStatus: "handoff-confirmed",
+        accountStatus: "account-confirmed",
+        openItems: 0,
+        note: "API regression institution handoff"
+      })
+    }));
+    assert.equal(publicHealthInstitutionTask.response.status, 200);
+    assert.equal(publicHealthInstitutionTask.body.ok, true);
+    assert.equal(publicHealthInstitutionTask.body.task.id, "phit-hospital");
+    assert.equal(publicHealthInstitutionTask.body.task.actionHistory[0].action, "site-handoff");
+    assert.equal(publicHealthInstitutionTask.body.system.summary.institutionTasks >= 7, true);
+
+    const publicHealthOnsiteAcceptance = await api(baseUrl, "/api/public-health/onsite-acceptances/phoa-interface-joint-test/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "record-signoff",
+        status: "signed",
+        signoffStatus: "signed",
+        note: "API regression onsite signoff"
+      })
+    }));
+    assert.equal(publicHealthOnsiteAcceptance.response.status, 200);
+    assert.equal(publicHealthOnsiteAcceptance.body.ok, true);
+    assert.equal(publicHealthOnsiteAcceptance.body.acceptance.id, "phoa-interface-joint-test");
+    assert.equal(publicHealthOnsiteAcceptance.body.acceptance.signoffStatus, "signed");
+    assert.equal(publicHealthOnsiteAcceptance.body.system.summary.onsiteAcceptances >= 6, true);
+
+    const publicHealthAudit = await api(baseUrl, "/api/audit/export?trail=securityEvents", authorized(accountLogin.body.token));
+    assert.equal(publicHealthAudit.response.status, 200);
+    assert.equal(publicHealthAudit.body.securityEvents.some((item) => item.action === "public-health-event-action" && item.target === "phe-infectious-001"), true);
+    assert.equal(publicHealthAudit.body.securityEvents.some((item) => item.action === "public-health-exchange-run" && item.target === "phx-lab-surveillance"), true);
+    assert.equal(publicHealthAudit.body.securityEvents.some((item) => item.action === "public-health-institution-task-action" && item.target === "phit-hospital"), true);
+    assert.equal(publicHealthAudit.body.securityEvents.some((item) => item.action === "public-health-onsite-acceptance" && item.target === "phoa-interface-joint-test"), true);
+
     const priorityTemplates = await api(baseUrl, "/api/priority-applications/templates", authorized(accountLogin.body.token));
     assert.equal(priorityTemplates.response.status, 200);
     assert.equal(priorityTemplates.body.ok, true);

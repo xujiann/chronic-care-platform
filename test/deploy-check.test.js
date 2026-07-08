@@ -17,12 +17,18 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "file:docs/citizen-production-launch-requirements.md",
     "package:scripts",
     "package:priorityApplicationTemplates",
+    "package:publicHealthReadiness",
+    "file:docs/公共卫生信息化下一步开发计划.md",
     "package:hybridDeploymentReadiness",
     "snapshot:collections",
     "snapshot:regionalDataSharing",
     "snapshot:interfaceReadiness",
     "snapshot:securityAcceptance",
     "snapshot:chronicFollowupStatusPolicy",
+    "snapshot:publicHealth",
+    "api:publicHealth",
+    "api:publicHealthEventActions",
+    "api:publicHealthAdvancedActions",
     "api:chronicPublicHealthLoop",
     "snapshot:externalDependencyRisks",
     "snapshot:p2-complete",
@@ -34,17 +40,21 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "docs:citizenExternalDependencyOwners",
     "docs:productionGoLiveRequirements",
     "docs:onsiteLaunchMaterials",
+    "docs:publicHealth",
+    "docs:publicHealthNextPlan",
     "api:siteLaunchEvidence",
     "manifest:healthDashboardSummary",
     "manifest:launchSmoke",
     "manifest:onsiteLaunchRequirements",
     "manifest:priorityApplicationTemplates",
     "manifest:citizenLaunchFoundation",
+    "manifest:publicHealthReadiness",
     "manifest:multiPracticeReadiness",
     "manifest:hybridDeploymentReadiness",
     "snapshot:storageMeta"
   ].forEach((name) => assert.equal(checkNames.has(name), true, `${name} should be checked`));
   assert.match(report.checks.find((item) => item.name === "api:chronicPublicHealthLoop").detail, /immunization infectious-reporting and CDC command summary/);
+  assert.match(report.checks.find((item) => item.name === "api:publicHealthAdvancedActions").detail, /exchange, institution and onsite action APIs/);
   assert.match(report.checks.find((item) => item.name === "docs:chronicLaunchCore").detail, /closure, site signoff/);
   assert.match(report.checks.find((item) => item.name === "docs:citizenExternalDependencyOwners").detail, /blockers, evidence, and onsite acceptance/);
 });

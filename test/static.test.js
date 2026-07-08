@@ -19,6 +19,7 @@ test("role pages keep explicit page guards", () => {
     "county.html": "county",
     "index.html": "commission",
     "health-dashboard.html": "commission",
+    "public-health.html": "commission",
     "platform.html": "commission",
     "workbench.html": "commission",
     "quality-safety.html": "commission"
@@ -30,7 +31,7 @@ test("role pages keep explicit page guards", () => {
 
 test("citizen pages do not expose cross-role module links or management collections", () => {
   const citizenHtml = `${read("citizen.html")}\n${read("mobile-preview.html")}`;
-  ["institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html", "quality-safety.html", "health-dashboard.html"].forEach((target) => {
+  ["institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html", "quality-safety.html", "health-dashboard.html", "public-health.html"].forEach((target) => {
     assert.doesNotMatch(citizenHtml, new RegExp(`href=[\\"']\\./${target}`), `居民页面不应链接到 ${target}`);
   });
 
@@ -41,7 +42,7 @@ test("citizen pages do not expose cross-role module links or management collecti
 });
 
 test("application pages avoid placeholder navigation", () => {
-  const pages = ["about.html", "citizen.html", "mobile-preview.html", "doctor.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html", "quality-safety.html", "health-dashboard.html"];
+  const pages = ["about.html", "citizen.html", "mobile-preview.html", "doctor.html", "institution.html", "insurance.html", "county.html", "index.html", "platform.html", "workbench.html", "quality-safety.html", "health-dashboard.html", "public-health.html"];
   pages.forEach((file) => assert.doesNotMatch(read(file), /href=["']#["']/, `${file} 存在空链接占位`));
 });
 
@@ -73,6 +74,7 @@ test("about page documents runnable platform capabilities", () => {
   assert.match(read("citizen.html"), /href="\.\/about\.html"/);
   assert.match(read("workbench.html"), /href="\.\/about\.html"/);
   assert.match(read("platform.html"), /href="\.\/about\.html"/);
+  assert.match(read("public-health.html"), /href="\.\/about\.html"/);
   assert.match(read("health-city.html"), /href="\.\/about\.html"/);
   assert.match(auth, /\["about\.html", "关于"\]/);
   assert.match(auth, /pageName === "about\.html"/);
@@ -229,6 +231,63 @@ test("static snapshot keeps completed P2 governance collections", () => {
   assert.equal(data.securityAcceptanceLedger.every((item) => item.id && item.category && item.owner && item.status && item.next), true);
   assert.equal(data.securityAcceptanceLedger.every((item) => /\u5efa\u6863/.test(item.status)), true);
   assert.equal(data.platformRoadmap.filter((item) => item.priority === "P2").every((item) => item.status === "\u5df2\u5b8c\u6210"), true);
+});
+
+test("public health informatization system is reachable and source-standard aligned", () => {
+  const data = JSON.parse(read("data/db.json"));
+  const html = read("public-health.html");
+  const js = read("public-health.js");
+  const server = read("server.js");
+  const doc = read("docs/公共卫生信息化系统建设报告.md");
+  const plan = read("docs/公共卫生信息化下一步开发计划.md");
+
+  assert.match(html, /公共卫生信息化系统/);
+  assert.match(html, /public-health-standard-domains/);
+  assert.match(html, /public-health-risk-queue/);
+  assert.match(html, /public-health-exchange-runs/);
+  assert.match(html, /public-health-institution-tasks/);
+  assert.match(html, /public-health-onsite-acceptances/);
+  assert.match(js, /FALLBACK_STANDARD_DOMAINS/);
+  assert.match(js, /renderPublicHealthSystem/);
+  assert.match(js, /data-public-health-action/);
+  assert.match(js, /data-public-health-latest-action/);
+  assert.match(js, /data-public-health-exchange-run/);
+  assert.match(js, /data-public-health-institution-task/);
+  assert.match(js, /data-public-health-onsite-acceptance/);
+  assert.match(server, /\/api\/public-health\/system/);
+  assert.match(server, /\/api\/public-health\/events\/:id\/actions/);
+  assert.match(server, /\/api\/public-health\/exchange-tasks\/:id\/runs/);
+  assert.match(server, /\/api\/public-health\/institution-tasks\/:id\/actions/);
+  assert.match(server, /\/api\/public-health\/onsite-acceptances\/:id\/actions/);
+  assert.match(server, /public-health-event-action/);
+  assert.match(server, /public-health-exchange-run/);
+  assert.match(server, /public-health-institution-task-action/);
+  assert.match(server, /public-health-onsite-acceptance/);
+  assert.match(read("auth.js"), /"public-health\.html": \["commission"\]/);
+  assert.match(read("platform.html"), /public-health\.html/);
+  assert.match(read("health-dashboard.html"), /public-health\.html/);
+  assert.match(read("health-city.html"), /public-health\.html/);
+  assert.equal(Array.isArray(data.publicHealthStandards), true);
+  assert.equal(data.publicHealthStandards.length, 21);
+  assert.equal(data.publicHealthStandards.reduce((sum, item) => sum + item.secondaryCount, 0), 125);
+  assert.equal(data.publicHealthStandards.reduce((sum, item) => sum + item.tertiaryCount, 0), 421);
+  assert.equal(data.publicHealthInstitutionScopes.length >= 7, true);
+  assert.equal(data.publicHealthEvents.length >= 6, true);
+  assert.equal(data.publicHealthExchangeTasks.length >= 6, true);
+  assert.equal(data.publicHealthExchangeRuns.length >= 6, true);
+  assert.equal(data.publicHealthInstitutionTasks.length >= 7, true);
+  assert.equal(data.publicHealthOnsiteAcceptances.length >= 6, true);
+  assert.match(doc, /21\/125\/421/);
+  assert.match(doc, /\/api\/public-health\/system/);
+  assert.match(doc, /\/api\/public-health\/events\/:id\/actions/);
+  assert.match(doc, /\/api\/public-health\/exchange-tasks\/:id\/runs/);
+  assert.match(doc, /publicHealthExchangeRuns/);
+  assert.match(doc, /publicHealthInstitutionTasks/);
+  assert.match(doc, /publicHealthOnsiteAcceptances/);
+  assert.match(doc, /public-health:readiness/);
+  assert.match(plan, /5 小时开发切片/);
+  assert.match(plan, /事件处置闭环/);
+  assert.match(plan, /验收清单/);
 });
 
 test("health dashboard exposes the aggregate application entry and API contract", () => {

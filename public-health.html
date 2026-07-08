@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>公共卫生信息化系统</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+    <script>window.HealthCityAuth.requireRole(["commission"])</script>
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>公共卫生信息化</span>
+          <h1>公共卫生信息化系统</h1>
+          <p>按《全国公共卫生信息化建设标准与规范（试行）》和示意图落地标准矩阵、机构职责、医防协同、平战结合、数据交换、安全审计和发布证据。</p>
+        </div>
+        <nav>
+          <a href="./platform.html">平台建设</a>
+          <a href="./health-dashboard.html">综合驾驶舱</a>
+          <a href="./workbench.html">运营工作台</a>
+          <a href="./index.html">卫健委端</a>
+          <a href="./health-city.html">总览</a>
+          <a href="./about.html">关于</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" id="public-health-metrics"></section>
+      <p id="public-health-api-error" class="login-error" role="alert"></p>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>标准矩阵</h2>
+            <span id="public-health-standard-summary"></span>
+          </div>
+          <div id="public-health-standard-domains" class="table-wrap"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>标准来源</h2>
+            <span>PDF + 示意图</span>
+          </div>
+          <div id="public-health-source-documents" class="rules"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>机构责任</h2>
+            <span>按示意图覆盖疾控、基层、卫健、监督、妇幼、医院和其他公卫机构</span>
+          </div>
+          <div id="public-health-institution-scopes" class="evidence-grid"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>风险队列</h2>
+            <span>监测预警、指挥处置、随访复盘</span>
+          </div>
+          <div id="public-health-risk-queue" class="priority-list"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>数据交换</h2>
+            <span>直报、实验室、免疫、妇幼、应急和安全审计</span>
+          </div>
+          <div id="public-health-exchange-tasks" class="table-wrap"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>验收证据</h2>
+            <span>标准覆盖、机构覆盖、事件闭环和交换安全</span>
+          </div>
+          <div id="public-health-readiness-evidence" class="rules"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>交换运行</h2>
+            <span>回执、失败补偿、重放和手工复核</span>
+          </div>
+          <div id="public-health-exchange-runs" class="table-wrap"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-title">
+            <h2>机构协同</h2>
+            <span>七类机构任务、账号和责任人</span>
+          </div>
+          <div id="public-health-institution-tasks" class="evidence-grid"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide">
+          <div class="panel-title">
+            <h2>现场验收</h2>
+            <span>等保密评、接口联调、备份恢复、演练和签字材料</span>
+          </div>
+          <div id="public-health-onsite-acceptances" class="priority-list"></div>
+        </article>
+      </section>
+    </main>
+
+    <script src="./shared.js"></script>
+    <script src="./public-health.js"></script>
+  </body>
+</html>

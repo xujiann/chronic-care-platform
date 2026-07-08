@@ -10,6 +10,17 @@ const { buildReleaseArtifactManifest } = require("./scripts/release-artifact-man
 const { buildChronicInstitutionInterfaceReport } = require("./scripts/chronic-institution-interfaces");
 const { buildChronicLaunchCoreReport } = require("./scripts/chronic-launch-core");
 const { buildChronicFollowupReadinessReport } = require("./scripts/chronic-followup-readiness");
+const {
+  buildPublicHealthSystem,
+  seedPublicHealthExchangeRuns,
+  seedPublicHealthExchangeTasks,
+  seedPublicHealthEvents,
+  seedPublicHealthInstitutionTasks,
+  seedPublicHealthInstitutionScopes,
+  seedPublicHealthOnsiteAcceptances,
+  seedPublicHealthReadinessEvidence,
+  seedPublicHealthStandards
+} = require("./scripts/public-health-readiness");
 
 const PORT = Number(process.env.PORT || 5173);
 const ROOT = __dirname;
@@ -46,6 +57,29 @@ const PHONE_LOGIN_MAX_FAILED_ATTEMPTS = 5;
 const PHONE_LOGIN_LOCK_MS = 10 * 60 * 1000;
 const phoneVerificationCodes = new Map();
 const phoneLoginFailures = new Map();
+const PUBLIC_HEALTH_EVENT_ACTION_DEFAULTS = {
+  review: {
+    label: "疾控复核",
+    status: "疾控复核中",
+    commandAction: "疾控中心复核监测信号、锁定样本和责任机构。",
+    followupAction: "2 小时内补齐复核结论、质控记录和是否升级处置建议。",
+    assignedTo: "疾控中心值班组"
+  },
+  dispatch: {
+    label: "指挥派发",
+    status: "已派发",
+    commandAction: "卫健管理部门派发处置任务并同步责任机构。",
+    followupAction: "按处置时限回传现场进展、资源消耗和下一步措施。",
+    assignedTo: "属地处置专班"
+  },
+  close: {
+    label: "闭环归档",
+    status: "已闭环",
+    commandAction: "完成事件处置复盘、信息发布记录和证据归档。",
+    followupAction: "纳入公共卫生质量控制、绩效评价和后续监测。",
+    assignedTo: "卫健应急与项目办"
+  }
+};
 let sqliteModule = null;
 let sqliteError = null;
 const SQLITE_MIGRATIONS = [
@@ -528,6 +562,14 @@ function seedState() {
     statisticsReconciliationReviews: seedStatisticsReconciliationReviews(),
     operationAlertRules: seedOperationAlertRules(),
     healthStatistics: seedHealthStatistics(),
+    publicHealthStandards: seedPublicHealthStandards(),
+    publicHealthInstitutionScopes: seedPublicHealthInstitutionScopes(),
+    publicHealthEvents: seedPublicHealthEvents(),
+    publicHealthExchangeTasks: seedPublicHealthExchangeTasks(),
+    publicHealthExchangeRuns: seedPublicHealthExchangeRuns(),
+    publicHealthInstitutionTasks: seedPublicHealthInstitutionTasks(),
+    publicHealthOnsiteAcceptances: seedPublicHealthOnsiteAcceptances(),
+    publicHealthReadinessEvidence: seedPublicHealthReadinessEvidence(),
     deathCertificates: seedDeathCertificates(),
     deathCertificateForms: seedDeathCertificateForms(),
     deathStatistics: seedDeathStatistics(),
@@ -4741,6 +4783,14 @@ function normalizeState(data) {
     statisticsReconciliationReviews: mergeByKey(seedStatisticsReconciliationReviews(), data.statisticsReconciliationReviews, "id"),
     operationAlertRules: mergeByKey(seedOperationAlertRules(), data.operationAlertRules, "id"),
     healthStatistics: data.healthStatistics && typeof data.healthStatistics === "object" ? data.healthStatistics : seedHealthStatistics(),
+    publicHealthStandards: mergeByKey(seedPublicHealthStandards(), data.publicHealthStandards, "id"),
+    publicHealthInstitutionScopes: mergeByKey(seedPublicHealthInstitutionScopes(), data.publicHealthInstitutionScopes, "id"),
+    publicHealthEvents: mergeByKey(seedPublicHealthEvents(), data.publicHealthEvents, "id"),
+    publicHealthExchangeTasks: mergeByKey(seedPublicHealthExchangeTasks(), data.publicHealthExchangeTasks, "id"),
+    publicHealthExchangeRuns: mergeByKey(seedPublicHealthExchangeRuns(), data.publicHealthExchangeRuns, "id"),
+    publicHealthInstitutionTasks: mergeByKey(seedPublicHealthInstitutionTasks(), data.publicHealthInstitutionTasks, "id"),
+    publicHealthOnsiteAcceptances: mergeByKey(seedPublicHealthOnsiteAcceptances(), data.publicHealthOnsiteAcceptances, "id"),
+    publicHealthReadinessEvidence: mergeByKey(seedPublicHealthReadinessEvidence(), data.publicHealthReadinessEvidence, "id"),
     deathCertificates: mergeByKey(seedDeathCertificates(), data.deathCertificates, "id"),
     deathCertificateForms: mergeByKey(seedDeathCertificateForms(), data.deathCertificateForms, "id"),
     deathStatistics: data.deathStatistics && typeof data.deathStatistics === "object" ? data.deathStatistics : seedDeathStatistics(),
@@ -5087,6 +5137,14 @@ function completeSystemTargets(state) {
       nextAction: job.nextAction || "保持月度复核。"
     }));
   }
+  state.publicHealthStandards = mergeByKey(seedPublicHealthStandards(), state.publicHealthStandards, "id");
+  state.publicHealthInstitutionScopes = mergeByKey(seedPublicHealthInstitutionScopes(), state.publicHealthInstitutionScopes, "id");
+  state.publicHealthEvents = mergeByKey(seedPublicHealthEvents(), state.publicHealthEvents, "id");
+  state.publicHealthExchangeTasks = mergeByKey(seedPublicHealthExchangeTasks(), state.publicHealthExchangeTasks, "id");
+  state.publicHealthExchangeRuns = mergeByKey(seedPublicHealthExchangeRuns(), state.publicHealthExchangeRuns, "id");
+  state.publicHealthInstitutionTasks = mergeByKey(seedPublicHealthInstitutionTasks(), state.publicHealthInstitutionTasks, "id");
+  state.publicHealthOnsiteAcceptances = mergeByKey(seedPublicHealthOnsiteAcceptances(), state.publicHealthOnsiteAcceptances, "id");
+  state.publicHealthReadinessEvidence = mergeByKey(seedPublicHealthReadinessEvidence(), state.publicHealthReadinessEvidence, "id");
   ensureChronicFieldClosureEvidence(state);
 }
 
@@ -9986,6 +10044,140 @@ function appendDataAccessLog(data, user, residentId, scope, purpose, result = "�
   data.dataAccessLogs = sealAuditTrail(data.dataAccessLogs, { recompute: true });
 }
 
+function normalizePublicHealthEventAction(event, payload = {}, user = {}) {
+  const action = String(payload.action || "review").trim();
+  const defaults = PUBLIC_HEALTH_EVENT_ACTION_DEFAULTS[action] || PUBLIC_HEALTH_EVENT_ACTION_DEFAULTS.review;
+  const at = new Date().toISOString();
+  const history = {
+    id: randomUUID(),
+    at,
+    action,
+    label: String(payload.label || defaults.label || action).trim(),
+    status: String(payload.status || defaults.status || event.status || "处置中").trim(),
+    actor: user.name || user.username || "system",
+    role: user.role || "commission",
+    note: String(payload.note || payload.comment || defaults.label || "").trim(),
+    assignedTo: String(payload.assignedTo || defaults.assignedTo || event.assignedTo || "公共卫生处置组").trim(),
+    dueAt: String(payload.dueAt || payload.deadline || event.dueAt || "").trim(),
+    commandAction: String(payload.commandAction || defaults.commandAction || event.commandAction || "").trim(),
+    followupAction: String(payload.followupAction || defaults.followupAction || event.followupAction || "").trim()
+  };
+  return {
+    history,
+    event: {
+      ...event,
+      status: history.status,
+      assignedTo: history.assignedTo,
+      dueAt: history.dueAt,
+      commandAction: history.commandAction,
+      followupAction: history.followupAction,
+      lastAction: history,
+      actionHistory: [history, ...(Array.isArray(event.actionHistory) ? event.actionHistory : [])].slice(0, 20),
+      handledAt: at,
+      handledBy: user.username || user.role || "commission",
+      handledByName: user.name || "公共卫生处置人"
+    }
+  };
+}
+
+function normalizePublicHealthExchangeRun(task, payload = {}, user = {}) {
+  const now = new Date().toISOString();
+  const failedRecords = Number(payload.failedRecords ?? 0);
+  const run = {
+    id: String(payload.id || `phxr-${randomUUID()}`).trim(),
+    taskId: task.id,
+    category: String(payload.category || task.category || "").trim(),
+    sourceSystem: String(payload.sourceSystem || task.sourceSystems?.[0] || "").trim(),
+    targetCollection: String(payload.targetCollection || task.targetCollections?.[0] || "").trim(),
+    runType: String(payload.runType || task.frequency || "event").trim(),
+    status: String(payload.status || (failedRecords > 0 ? "compensated" : "receipt-confirmed")).trim(),
+    receiptStatus: String(payload.receiptStatus || (failedRecords > 0 ? "accepted-after-retry" : "accepted")).trim(),
+    compensationStatus: String(payload.compensationStatus || (failedRecords > 0 ? "replayed" : "not-required")).trim(),
+    payloadRecords: Number(payload.payloadRecords ?? 1),
+    failedRecords,
+    receiptId: String(payload.receiptId || `PH-${Date.now()}`).trim(),
+    owner: String(payload.owner || task.owner || "public health exchange owner").trim(),
+    startedAt: String(payload.startedAt || now).trim(),
+    finishedAt: String(payload.finishedAt || now).trim(),
+    evidence: Array.isArray(payload.evidence) && payload.evidence.length ? payload.evidence : (task.evidence || []),
+    nextAction: String(payload.nextAction || task.nextAction || "Archive exchange receipt and compensation evidence.").trim(),
+    recordedAt: now,
+    recordedBy: user.username || user.role || "commission",
+    recordedByName: user.name || "public health operator"
+  };
+  return {
+    run,
+    task: {
+      ...task,
+      status: run.status,
+      lastRunAt: now,
+      latestRunId: run.id,
+      receiptStatus: run.receiptStatus,
+      compensationStatus: run.compensationStatus,
+      nextAction: run.nextAction
+    }
+  };
+}
+
+function normalizePublicHealthInstitutionTaskAction(task, payload = {}, user = {}) {
+  const now = new Date().toISOString();
+  const history = {
+    id: randomUUID(),
+    at: now,
+    action: String(payload.action || "complete-handoff").trim(),
+    status: String(payload.status || "site-handoff-ready").trim(),
+    actor: user.name || user.username || "public health operator",
+    role: user.role || "commission",
+    note: String(payload.note || payload.comment || "Institution collaboration task updated.").trim()
+  };
+  return {
+    history,
+    task: {
+      ...task,
+      status: history.status,
+      handoffStatus: String(payload.handoffStatus || task.handoffStatus || "handoff-ready").trim(),
+      accountStatus: String(payload.accountStatus || task.accountStatus || "account-confirmed").trim(),
+      openItems: Number(payload.openItems ?? task.openItems ?? 0),
+      nextAction: String(payload.nextAction || task.nextAction || "Archive institution handoff evidence.").trim(),
+      lastAction: history,
+      actionHistory: [history, ...(Array.isArray(task.actionHistory) ? task.actionHistory : [])].slice(0, 20),
+      updatedAt: now,
+      updatedBy: user.username || user.role || "commission",
+      updatedByName: user.name || "public health operator"
+    }
+  };
+}
+
+function normalizePublicHealthOnsiteAcceptanceAction(item, payload = {}, user = {}) {
+  const now = new Date().toISOString();
+  const history = {
+    id: randomUUID(),
+    at: now,
+    action: String(payload.action || "record-signoff").trim(),
+    status: String(payload.status || "signed").trim(),
+    actor: user.name || user.username || "public health operator",
+    role: user.role || "commission",
+    note: String(payload.note || payload.comment || "On-site acceptance evidence recorded.").trim()
+  };
+  return {
+    history,
+    item: {
+      ...item,
+      status: history.status,
+      signoffStatus: String(payload.signoffStatus || "signed").trim(),
+      signedBy: String(payload.signedBy || user.name || item.signedBy || "").trim(),
+      signedAt: String(payload.signedAt || now).trim(),
+      evidence: Array.isArray(payload.evidence) && payload.evidence.length ? payload.evidence : (item.evidence || []),
+      onsiteAction: String(payload.onsiteAction || item.onsiteAction || history.note).trim(),
+      lastAction: history,
+      actionHistory: [history, ...(Array.isArray(item.actionHistory) ? item.actionHistory : [])].slice(0, 20),
+      updatedAt: now,
+      updatedBy: user.username || user.role || "commission",
+      updatedByName: user.name || "public health operator"
+    }
+  };
+}
+
 function normalizeHealthStatisticsImportJob(payload, user) {
   return {
     id: payload.id || `stat-job-${randomUUID()}`,
@@ -11867,6 +12059,199 @@ async function handleApi(req, res) {
       runtime: buildRuntimeMetrics(data),
       readiness: buildSystemReadinessReport(data)
     }));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/system") {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/system");
+    if (!user) return;
+    const data = readDatabase();
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "public-health-system",
+      target: "/api/public-health/system",
+      result: "allowed",
+      detail: "Public health standard matrix, institution scopes, events, and exchange tasks read."
+    });
+    sendJson(res, 200, buildPublicHealthSystem({ data }));
+    return;
+  }
+
+  const publicHealthEventActionMatch = url.pathname.match(/^\/api\/public-health\/events\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthEventActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/events/:id/actions");
+    if (!user) return;
+    const eventId = decodeURIComponent(publicHealthEventActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const events = Array.isArray(data.publicHealthEvents) ? data.publicHealthEvents : seedPublicHealthEvents();
+    const index = events.findIndex((item) => item.id === eventId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到公共卫生事件" });
+      return;
+    }
+    const { event, history } = normalizePublicHealthEventAction(events[index], payload, user);
+    events[index] = event;
+    data.publicHealthEvents = events;
+    data.publicHealthReadinessEvidence = (Array.isArray(data.publicHealthReadinessEvidence) ? data.publicHealthReadinessEvidence : seedPublicHealthReadinessEvidence()).map((item) => (
+      item.id === "phev-event-command"
+        ? { ...item, status: "动作闭环已验证", nextAction: "继续接入正式事件分级、处置时限、信息发布审批和现场签字材料。" }
+        : item
+    ));
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "public-health-event-action",
+        target: eventId,
+        result: "allowed",
+        detail: `${history.label} / ${history.status}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, {
+      ok: true,
+      event,
+      action: history,
+      system: buildPublicHealthSystem({ data })
+    });
+    return;
+  }
+
+  const publicHealthExchangeRunMatch = url.pathname.match(/^\/api\/public-health\/exchange-tasks\/([^/]+)\/runs$/);
+  if (req.method === "POST" && publicHealthExchangeRunMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/exchange-tasks/:id/runs");
+    if (!user) return;
+    const taskId = decodeURIComponent(publicHealthExchangeRunMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const tasks = Array.isArray(data.publicHealthExchangeTasks) ? data.publicHealthExchangeTasks : seedPublicHealthExchangeTasks();
+    const index = tasks.findIndex((item) => item.id === taskId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到公共卫生交换任务" });
+      return;
+    }
+    const { run, task } = normalizePublicHealthExchangeRun(tasks[index], payload, user);
+    tasks[index] = task;
+    data.publicHealthExchangeTasks = tasks;
+    data.publicHealthExchangeRuns = [run, ...(Array.isArray(data.publicHealthExchangeRuns) ? data.publicHealthExchangeRuns : [])].slice(0, 120);
+    data.publicHealthReadinessEvidence = (Array.isArray(data.publicHealthReadinessEvidence) ? data.publicHealthReadinessEvidence : seedPublicHealthReadinessEvidence()).map((item) => (
+      item.id === "phev-exchange-security"
+        ? { ...item, status: "运行回执已验证", evidence: Array.from(new Set([...(item.evidence || []), "publicHealthExchangeRuns"])) }
+        : item
+    ));
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "public-health-exchange-run",
+        target: taskId,
+        result: "allowed",
+        detail: `${run.status} / ${run.receiptStatus} / ${run.compensationStatus}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, {
+      ok: true,
+      task,
+      run,
+      system: buildPublicHealthSystem({ data })
+    });
+    return;
+  }
+
+  const publicHealthInstitutionTaskActionMatch = url.pathname.match(/^\/api\/public-health\/institution-tasks\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthInstitutionTaskActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/institution-tasks/:id/actions");
+    if (!user) return;
+    const taskId = decodeURIComponent(publicHealthInstitutionTaskActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const tasks = Array.isArray(data.publicHealthInstitutionTasks) ? data.publicHealthInstitutionTasks : seedPublicHealthInstitutionTasks();
+    const index = tasks.findIndex((item) => item.id === taskId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到公共卫生机构协同任务" });
+      return;
+    }
+    const { task, history } = normalizePublicHealthInstitutionTaskAction(tasks[index], payload, user);
+    tasks[index] = task;
+    data.publicHealthInstitutionTasks = tasks;
+    data.publicHealthReadinessEvidence = (Array.isArray(data.publicHealthReadinessEvidence) ? data.publicHealthReadinessEvidence : seedPublicHealthReadinessEvidence()).map((item) => (
+      item.id === "phev-institution-collaboration"
+        ? { ...item, status: "机构协同已验证", evidence: Array.from(new Set([...(item.evidence || []), "publicHealthInstitutionTasks"])) }
+        : item
+    ));
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "public-health-institution-task-action",
+        target: taskId,
+        result: "allowed",
+        detail: `${history.action} / ${history.status}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, {
+      ok: true,
+      task,
+      action: history,
+      system: buildPublicHealthSystem({ data })
+    });
+    return;
+  }
+
+  const publicHealthOnsiteAcceptanceActionMatch = url.pathname.match(/^\/api\/public-health\/onsite-acceptances\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthOnsiteAcceptanceActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/onsite-acceptances/:id/actions");
+    if (!user) return;
+    const acceptanceId = decodeURIComponent(publicHealthOnsiteAcceptanceActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const acceptances = Array.isArray(data.publicHealthOnsiteAcceptances) ? data.publicHealthOnsiteAcceptances : seedPublicHealthOnsiteAcceptances();
+    const index = acceptances.findIndex((item) => item.id === acceptanceId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到公共卫生现场验收项" });
+      return;
+    }
+    const { item, history } = normalizePublicHealthOnsiteAcceptanceAction(acceptances[index], payload, user);
+    acceptances[index] = item;
+    data.publicHealthOnsiteAcceptances = acceptances;
+    data.publicHealthReadinessEvidence = (Array.isArray(data.publicHealthReadinessEvidence) ? data.publicHealthReadinessEvidence : seedPublicHealthReadinessEvidence()).map((row) => (
+      row.id === "phev-onsite-acceptance"
+        ? { ...row, status: "现场验收动作已记录", evidence: Array.from(new Set([...(row.evidence || []), "publicHealthOnsiteAcceptances"])) }
+        : row
+    ));
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "public-health-onsite-acceptance",
+        target: acceptanceId,
+        result: "allowed",
+        detail: `${history.action} / ${history.status}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, {
+      ok: true,
+      acceptance: item,
+      action: history,
+      system: buildPublicHealthSystem({ data })
+    });
     return;
   }
 
