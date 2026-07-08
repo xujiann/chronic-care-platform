@@ -23,6 +23,7 @@ test("escort service readiness validates policy, registry, workforce, orders and
   assert.equal(report.checks.some((item) => item.id === "escort:api" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:hospitalInterface" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:hospitalInterfaceDoc" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "escort:developmentReport" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:responsibilityPlan" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:launchOwnerChecklist" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "escort:productionBlockers" && item.passed), true);
@@ -38,6 +39,7 @@ test("escort service readiness validates policy, registry, workforce, orders and
   assert.match(renderMarkdown(report), /Medical escort service readiness report/);
   assert.match(renderMarkdown(report), /Hospital-confirmed orders/);
   assert.match(renderMarkdown(report), /current functions, responsible departments, evidence, and next planned escort development are documented/);
+  assert.match(renderMarkdown(report), /policy basis, implemented functions, next development plan, and verification commands are consolidated/);
   assert.match(renderMarkdown(report), /go-live owner handoff checklist is visible/);
   assert.match(renderMarkdown(report), /production blockers and on-site external dependencies are visible/);
   assert.match(renderMarkdown(report), /server purchase, shared-platform deployment topology, and live smoke-test setup are documented/);

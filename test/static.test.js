@@ -93,6 +93,39 @@ test("policy basis document maps policies to runnable platform evidence", () => 
   assert.match(doc, /npm\.cmd run priority-apps:templates/);
 });
 
+test("platform research report summarizes policy basis features and roadmap", () => {
+  const report = read("docs/\u536b\u751f\u5065\u5eb7\u4fe1\u606f\u5e73\u53f0\u7814\u53d1\u62a5\u544a.md");
+  assert.match(report, /\u653f\u7b56\u6587\u4ef6\u4f9d\u636e/);
+  assert.match(report, /\u5df2\u5b9e\u73b0\u529f\u80fd/);
+  assert.match(report, /\u4e0b\u4e00\u6b65\u5f00\u53d1\u8ba1\u5212/);
+  assert.match(report, /\u56fd\u536b\u57fa\u5c42\u53d1\u30142025\u301515\u53f7/);
+  assert.match(report, /\u8fbd\u5b81\u7701\u533b\u5b66\u5f71\u50cf\u4e91\u529f\u80fd\u89c4\u8303/);
+  assert.match(report, /\u56fd\u5bb6\u514d\u75ab\u89c4\u5212\u75ab\u82d7\u513f\u7ae5\u514d\u75ab\u7a0b\u5e8f\u53ca\u8bf4\u660e\uff082026\u5e74\u7248\uff09/);
+  assert.match(report, /HIS\/EMR\/LIS\/PACS/);
+  assert.match(report, /imaging-cloud:readiness/);
+  assert.match(report, /internet-nursing:readiness/);
+  assert.match(report, /data-governance:readiness/);
+  assert.match(report, /health-dashboard:summary/);
+  assert.match(report, /release:manifest/);
+});
+
+test("citizen development report summarizes C-side policy features and roadmap", () => {
+  const report = read("docs/C\u7aef\u5f00\u53d1\u62a5\u544a.md");
+  assert.match(report, /C\u7aef\u5f00\u53d1\u62a5\u544a/);
+  assert.match(report, /\u653f\u7b56\u6587\u4ef6\u4f9d\u636e/);
+  assert.match(report, /\u5df2\u5b9e\u73b0\u529f\u80fd/);
+  assert.match(report, /\u4e0b\u4e00\u6b65\u5f00\u53d1\u8ba1\u5212/);
+  assert.match(report, /\u624b\u673a\u53f7\u9a8c\u8bc1\u7801\u767b\u5f55/);
+  assert.match(report, /\u5065\u5eb7\u6863\u6848/);
+  assert.match(report, /\u7535\u5b50\u75c5\u5386/);
+  assert.match(report, /\u62a4\u7406/);
+  assert.match(report, /\u966a\u8bca/);
+  assert.match(report, /\u6302\u53f7/);
+  assert.match(report, /citizen:launch-foundation/);
+  assert.match(report, /HIS\/EMR\/LIS\/PACS/);
+  assert.match(report, /SMS_GATEWAY_URL/);
+});
+
 test("about page documents doctor multi-practice policy boundaries", () => {
   const about = read("about.html");
   const doc = read("docs/医师多点执业政策说明.md");
@@ -456,6 +489,13 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(productionGoLiveRequirements, /GL-01/);
   assert.match(productionGoLiveRequirements, /launch:smoke -- --base-url/);
   assert.match(productionGoLiveRequirements, /发布阻断条件/);
+  const platformRAndDReport = read("docs/卫生健康信息平台研发报告.md");
+  assert.match(platformRAndDReport, /卫生健康信息平台研发报告/);
+  assert.match(platformRAndDReport, /政策文件依据/);
+  assert.match(platformRAndDReport, /已实现总体能力/);
+  assert.match(platformRAndDReport, /下一步开发计划/);
+  assert.match(platformRAndDReport, /internet-nursing:readiness/);
+  assert.match(platformRAndDReport, /health-dashboard:summary/);
   const onsiteLaunchMaterials = read("docs/on-site-launch-materials.md");
   assert.match(onsiteLaunchMaterials, /真实上线现场补齐工作材料清单/);
   assert.match(onsiteLaunchMaterials, /GLM-05/);
@@ -1148,6 +1188,7 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   const escortJs = read("escort.js");
   const escortResponsibilityDoc = read("docs/陪诊信息平台功能责任与下一步计划.md");
   const escortDeploymentDoc = read("docs/陪诊服务上线服务器采购与部署方案.md");
+  const escortDevelopmentReport = read("docs/陪诊信息平台研发报告.md");
   const readme = read("README.md");
   assert.match(citizenHtml, /escort-appointment-form/);
   assert.match(citizenHtml, /escort-appointment-check/);
@@ -1222,9 +1263,21 @@ test("citizen portal exposes medical escort appointment workflow", () => {
   assert.match(escortDeploymentDoc, /对象存储/);
   assert.match(escortDeploymentDoc, /launch:smoke -- --base-url/);
   assert.match(escortDeploymentDoc, /beian\.miit\.gov\.cn/);
+  assert.match(escortDevelopmentReport, /陪诊信息平台研发报告/);
+  assert.match(escortDevelopmentReport, /政策文件依据/);
+  assert.match(escortDevelopmentReport, /已实现功能/);
+  assert.match(escortDevelopmentReport, /下一步开发计划/);
+  assert.match(escortDevelopmentReport, /沪民养老发〔2025〕2 号/);
+  assert.match(escortDevelopmentReport, /中共中央 国务院关于深化养老服务改革发展的意见/);
+  assert.match(escortDevelopmentReport, /个人信息保护法/);
+  assert.match(escortDevelopmentReport, /居民端陪诊预约/);
+  assert.match(escortDevelopmentReport, /HIS\/导诊台/);
+  assert.match(escortDevelopmentReport, /陪诊师移动端签到/);
+  assert.match(escortDevelopmentReport, /npm\.cmd run escort:readiness/);
   assert.match(readme, /陪诊信息平台功能责任与下一步计划/);
   assert.match(readme, /陪诊服务上线服务器采购与部署方案/);
   assert.match(read("scripts/escort-service-readiness.js"), /escort:responsibilityPlan/);
+  assert.match(read("scripts/escort-service-readiness.js"), /escort:developmentReport/);
   assert.match(read("scripts/escort-service-readiness.js"), /escort:launchOwnerChecklist/);
   assert.match(read("scripts/escort-service-readiness.js"), /escort:productionBlockers/);
   assert.match(read("scripts/escort-service-readiness.js"), /escort:deploymentPlan/);
