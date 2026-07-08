@@ -395,6 +395,7 @@ function hospitalOperationsReadinessChecks(hospitalOperationsReadiness) {
     check("hospitalOps:readiness", hospitalOperationsReadiness.ok, hospitalOperationsReadiness.ok ? "hospital operations readiness checks passed" : "hospital operations readiness checks failed", "error", "operations"),
     check("hospitalOps:snapshots", hospitalOperationsReadiness.summary?.snapshots >= 3, `${hospitalOperationsReadiness.summary?.snapshots || 0} operation snapshots`, "error", "operations"),
     check("hospitalOps:dispatch", hospitalOperationsReadiness.summary?.dispatchRequests >= 2, `${hospitalOperationsReadiness.summary?.dispatchRequests || 0} dispatch requests`, "error", "operations"),
+    check("hospitalOps:emergencyDispatchLoops", hospitalOperationsReadiness.summary?.emergencyDispatchLoops >= 1, `${hospitalOperationsReadiness.summary?.emergencyDispatchLoops || 0} emergency dispatch loops`, "error", "operations"),
     check("hospitalOps:reconciliation", hospitalOperationsReadiness.summary?.reconciliationReviews >= 2, `${hospitalOperationsReadiness.summary?.reconciliationReviews || 0} reconciliation reviews`, "error", "operations")
   ];
 }

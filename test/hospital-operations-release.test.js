@@ -30,6 +30,7 @@ test("hospital operations release validates all completed directions", () => {
   assert.equal(report.checks.some((item) => item.id === "release:launchReadiness" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "release:intelligence" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "release:resourcePool" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "release:emergencyDispatchLoop" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "release:mobileDuty" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "release:governanceReport" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "release:governanceExportPackage" && item.passed), true);
@@ -56,6 +57,7 @@ test("hospital operations release renders and writes artifacts", (t) => {
   assert.match(markdown, /预警处置预案/);
   assert.match(markdown, /智能调度建议/);
   assert.match(markdown, /跨院资源池/);
+  assert.match(markdown, /急诊拥堵调度闭环/);
   assert.match(markdown, /治理报表/);
   assert.match(markdown, /治理导出包/);
   assert.match(markdown, /下一步功能研究/);
@@ -76,6 +78,7 @@ test("hospital operations release renders and writes artifacts", (t) => {
   assert.match(writtenMarkdown, /release:postCutoverSignoffGate/);
   assert.match(writtenMarkdown, /release:launchReadiness/);
   assert.match(writtenMarkdown, /release:resourcePool/);
+  assert.match(writtenMarkdown, /release:emergencyDispatchLoop/);
   assert.match(writtenMarkdown, /release:mobileDuty/);
   assert.match(writtenMarkdown, /release:governanceReport/);
   assert.match(writtenMarkdown, /release:governanceExportPackage/);

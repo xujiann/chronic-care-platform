@@ -9,6 +9,7 @@ const DEFAULT_MARKDOWN = path.join(ROOT, "release", "hospital-operations-readine
 const REQUIRED_COLLECTIONS = [
   "hospitalOperationSnapshots",
   "resourceDispatchRequests",
+  "emergencyDispatchLoops",
   "statisticsReconciliationReviews",
   "operationAlertRules",
   "healthStatistics",
@@ -36,6 +37,8 @@ const REQUIRED_ROUTES = [
   "/api/operations/post-cutover-observation/actions",
   "/api/operations/intelligence",
   "/api/operations/resource-pool",
+  "/api/operations/emergency-dispatch-loop",
+  "/api/operations/emergency-dispatch-loop/actions",
   "/api/operations/mobile-duty",
   "/api/operations/mobile-duty/actions",
   "/api/operations/governance-report",
@@ -80,6 +83,7 @@ function buildHospitalOperationsReadinessReport(options = {}) {
   const operationsJs = options.operationsJs ?? readText("operations.js");
   const snapshots = arrayOf(data, "hospitalOperationSnapshots");
   const dispatchRequests = arrayOf(data, "resourceDispatchRequests");
+  const emergencyDispatchLoops = arrayOf(data, "emergencyDispatchLoops");
   const reconciliationReviews = arrayOf(data, "statisticsReconciliationReviews");
   const alertRules = arrayOf(data, "operationAlertRules");
   const highPressure = snapshots.filter((item) => ["warning", "critical"].includes(item.normalizedStatus) || ratio(item.beds?.occupied, item.beds?.open) >= 0.9);
@@ -110,6 +114,7 @@ function buildHospitalOperationsReadinessReport(options = {}) {
     { id: "hospitalOps:launchReadiness", passed: /buildOperationsLaunchReadiness/.test(serverSource) && /launchReadiness/.test(serverSource) && /operation-launch-readiness/.test(operationsHtml) && /renderLaunchReadiness/.test(operationsJs), detail: "launch readiness decision combines hardening, cutover, and post-cutover evidence" },
     { id: "hospitalOps:intelligence", passed: /buildOperationsIntelligence/.test(serverSource) && /\/api\/operations\/intelligence/.test(serverSource) && /operation-intelligence/.test(operationsHtml) && /renderOperationsIntelligence/.test(operationsJs), detail: "intelligent dispatch recommendations API and panel" },
     { id: "hospitalOps:resourcePool", passed: /buildOperationsResourcePool/.test(serverSource) && /\/api\/operations\/resource-pool/.test(serverSource) && /operation-resource-pool/.test(operationsHtml) && /renderResourcePool/.test(operationsJs), detail: "cross-hospital resource pool API and panel" },
+    { id: "hospitalOps:emergencyDispatchLoop", passed: emergencyDispatchLoops.length >= 1 && /buildOperationsEmergencyDispatchLoop/.test(serverSource) && /\/api\/operations\/emergency-dispatch-loop/.test(serverSource) && /operation-emergency-dispatch-loop/.test(operationsHtml) && /renderEmergencyDispatchLoop/.test(operationsJs) && /operations-emergency-loop-panel/.test(operationsHtml), detail: `${emergencyDispatchLoops.length} emergency dispatch loop seeds and runnable API/panel/action evidence` },
     { id: "hospitalOps:mobileDuty", passed: /buildOperationsMobileDuty/.test(serverSource) && /\/api\/operations\/mobile-duty/.test(serverSource) && /operation-mobile-duty/.test(operationsHtml) && /renderMobileDuty/.test(operationsJs) && /taskMessages/.test(serverSource), detail: "mobile duty command API, panel, message reminders, and audit evidence" },
     { id: "hospitalOps:governanceReport", passed: /buildOperationsGovernanceReport/.test(serverSource) && /\/api\/operations\/governance-report/.test(serverSource) && /operation-governance-report/.test(operationsHtml) && /renderGovernanceReport/.test(operationsJs), detail: "monthly governance report API and panel" },
     { id: "hospitalOps:governanceExportPackage", passed: /buildOperationsGovernanceExportPackage/.test(serverSource) && /\/api\/operations\/governance-export-package/.test(serverSource) && /downloadGovernanceExportPackage/.test(operationsJs) && /performance-action-card export/.test(operationsJs), detail: "governance export package API and download action" },
@@ -130,6 +135,7 @@ function buildHospitalOperationsReadinessReport(options = {}) {
     summary: {
       snapshots: snapshots.length,
       dispatchRequests: dispatchRequests.length,
+      emergencyDispatchLoops: emergencyDispatchLoops.length,
       reconciliationReviews: reconciliationReviews.length,
       alertRules: alertRules.length,
       highPressure: highPressure.length
@@ -146,6 +152,7 @@ function renderMarkdown(report) {
     `- Result: ${report.ok ? "PASS" : "FAIL"}`,
     `- Snapshots: ${report.summary.snapshots}`,
     `- Dispatch requests: ${report.summary.dispatchRequests}`,
+    `- Emergency dispatch loops: ${report.summary.emergencyDispatchLoops}`,
     `- Reconciliation reviews: ${report.summary.reconciliationReviews}`,
     "",
     "## Checks",

@@ -138,6 +138,13 @@ function buildCapabilities(data, serverSource, readiness, release) {
       detail: "基于医疗资源目录、运行快照和调度工单生成跨院床位、ICU、呼吸机、救护车和值班医生可支援能力，并提供调拨建议。"
     },
     {
+      id: "emergency-dispatch-loop",
+      name: "急诊拥堵调度闭环",
+      status: release.checks.some((item) => item.id === "release:emergencyDispatchLoop" && item.passed) ? "ready" : "needs-attention",
+      evidence: ["/api/operations/emergency-dispatch-loop", "/api/operations/emergency-dispatch-loop/actions", "emergencyDispatchLoops"],
+      detail: `${arrayOf(data, "emergencyDispatchLoops").length} 条急诊闭环种子，串联候诊、留观、CT/救护车能力、资源池匹配、调度草稿和复核审计。`
+    },
+    {
       id: "mobile-duty-command",
       name: "移动值守台",
       status: release.checks.some((item) => item.id === "release:mobileDuty" && item.passed) ? "ready" : "needs-attention",

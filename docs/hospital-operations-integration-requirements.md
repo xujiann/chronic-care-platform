@@ -2,7 +2,7 @@
 
 ## 上线目标
 
-医院运行监测与资源调度平台上线前，需要完成医院侧运行数据、资源调度回执、统计直报对账、生产安全和移动值守通道的真实联通。代码侧已提供 `/api/operations/dashboard`、`/api/operations/integration/snapshots`、`/api/operations/integration/dispatch-feedback`、`/api/operations/integration/reconciliation`、`/api/operations/production-hardening`、`/api/operations/cutover-command` 和 `/api/operations/post-cutover-observation`，现场上线以真实报文、验签日志、接收端确认、割接签收和 T+1 观察签收为准。
+医院运行监测与资源调度平台上线前，需要完成医院侧运行数据、资源调度回执、急诊拥堵复核、统计直报对账、生产安全和移动值守通道的真实联通。代码侧已提供 `/api/operations/dashboard`、`/api/operations/resource-pool`、`/api/operations/emergency-dispatch-loop`、`/api/operations/emergency-dispatch-loop/actions`、`/api/operations/integration/snapshots`、`/api/operations/integration/dispatch-feedback`、`/api/operations/integration/reconciliation`、`/api/operations/production-hardening`、`/api/operations/cutover-command` 和 `/api/operations/post-cutover-observation`，现场上线以真实报文、验签日志、接收端确认、急诊调度复核留痕、割接签收和 T+1 观察签收为准。
 
 ## 接入系统清单
 
@@ -21,6 +21,10 @@
 | 短信/企业微信/App | 平台到外部 | 预警确认、交接签收、调度备注、直报复核提醒、移动值守回执 | 事件触发 | 消息发送记录、弱网补传说明、回执日志 | 值班长、运行监测岗 |
 | 生产数据库/备份 | 平台基础设施 | 正式存储、备份恢复、RTO/RPO、回退快照 | 上线前演练和日常备份 | 备份文件、恢复演练记录、回退确认 | 数据平台、基础设施组 |
 
+## 浪潮方案4.1任务纳入
+
+`智慧医院管理线-医院运行监测` 已纳入本线程开发计划，任务边界覆盖床位、手术、急诊、资源调度和效率指标。首轮已选择“急诊拥堵调度闭环”作为最小可运行增量：由医院运行快照识别急诊候诊和留观压力，匹配跨院资源池，生成调度草稿，并通过 `/api/operations/emergency-dispatch-loop/actions` 写入复核和审计留痕。后续增量按床位预测、手术排程、效率指标异常说明和调度采纳率继续拆分。
+
 ## API 对接要求
 
 | 平台接口 | 用途 | 调用方 | 上线阻断条件 |
@@ -29,6 +33,8 @@
 | `POST /api/operations/integration/dispatch-feedback` | 回写资源调度执行状态 | HIS、转运调度、医院值班端 | 调度单不存在、状态不可识别、无执行人或回执时间 |
 | `POST /api/operations/integration/reconciliation` | 上报统计直报对账批次 | 卫生统计直报或医院统计接口 | 差异字段缺失、复核状态缺失、回执编号缺失 |
 | `GET /api/operations/dashboard` | 委端运行监测总览和上线判定 | 管理端 | `launchReadiness.decision` 仍为暂缓上线运行 |
+| `GET /api/operations/emergency-dispatch-loop` | 读取急诊拥堵、资源池匹配和关联调度单闭环 | 管理端 | 急诊候诊、留观、CT/救护车能力缺少现场确认 |
+| `POST /api/operations/emergency-dispatch-loop/actions` | 写入急诊拥堵复核、调度确认和审计留痕 | 管理端 | 复核人、复核说明、关联调度单或下一步动作缺失 |
 | `GET /api/operations/production-hardening` | 生产加固清单 | 平台运维、安全管理岗 | 生产密钥、审计保全、监控值守、灾备演练任一阻断 |
 | `POST /api/operations/cutover-command/actions` | 割接签收留痕 | 值班长、平台运维 | 高优先级割接项未签收 |
 | `POST /api/operations/post-cutover-observation/actions` | 上线后观察留痕 | 运行监测岗、值班长 | T+0/T+1 观察窗口证据未齐套或待签收 |

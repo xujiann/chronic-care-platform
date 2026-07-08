@@ -472,6 +472,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsHtml, /operation-post-cutover-observation/);
   assert.match(operationsHtml, /operation-intelligence/);
   assert.match(operationsHtml, /operation-resource-pool/);
+  assert.match(operationsHtml, /operation-emergency-dispatch-loop/);
   assert.match(operationsHtml, /operation-mobile-duty/);
   assert.match(operationsHtml, /operation-governance-report/);
   assert.match(operationsHtml, /operations-delivery-pack-panel/);
@@ -600,6 +601,8 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsJs, /\/api\/operations\/post-cutover-observation/);
   assert.match(operationsJs, /\/api\/operations\/intelligence/);
   assert.match(operationsJs, /\/api\/operations\/resource-pool/);
+  assert.match(operationsJs, /\/api\/operations\/emergency-dispatch-loop/);
+  assert.match(operationsJs, /renderEmergencyDispatchLoop/);
   assert.match(operationsJs, /\/api\/operations\/mobile-duty/);
   assert.match(operationsJs, /\/api\/operations\/governance-report/);
   assert.match(operationsJs, /\/api\/operations\/governance-export-package/);
@@ -623,6 +626,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("portal.css"), /command-chain-sla/);
   assert.match(read("portal.css"), /operation-playbook-card/);
   assert.match(read("portal.css"), /operation-resource-pool-card/);
+  assert.match(read("portal.css"), /operation-emergency-loop-card/);
   assert.match(read("portal.css"), /dispatch-batch-toolbar/);
   assert.match(read("portal.css"), /dispatch-batch-note/);
   assert.match(read("portal.css"), /operation-mobile-duty-card/);

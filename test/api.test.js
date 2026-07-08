@@ -258,6 +258,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(operationsDashboard.body.intelligence.recommendations.some((item) => item.recommendation && item.prediction), true);
     assert.equal(operationsDashboard.body.resourcePool.rows.some((item) => item.resourceSlots.length >= 5), true);
     assert.equal(operationsDashboard.body.resourcePool.recommendations.length >= 1, true);
+    assert.equal(operationsDashboard.body.emergencyDispatchLoop.summary.rows >= 1, true);
+    assert.equal(operationsDashboard.body.emergencyDispatchLoop.rows.some((item) => item.evidence.includes("/api/operations/emergency-dispatch-loop")), true);
     assert.equal(operationsDashboard.body.mobileDuty.summary.cards >= 4, true);
     assert.equal(operationsDashboard.body.mobileDuty.cards.some((item) => item.id === "mobile-duty-handover-signoff"), true);
     assert.equal(operationsDashboard.body.governanceReport.sections.some((item) => item.id === "reconciliation-diff"), true);
@@ -404,6 +406,24 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(resourcePool.body.summary.institutions >= 3, true);
     assert.equal(resourcePool.body.rows.some((item) => item.protocol && item.evidence.includes("/api/operations/resource-pool")), true);
     assert.equal(resourcePool.body.recommendations.some((item) => item.evidence.includes("/api/operations/dispatch")), true);
+
+    const emergencyLoop = await api(baseUrl, "/api/operations/emergency-dispatch-loop", authorized(accountLogin.body.token));
+    assert.equal(emergencyLoop.response.status, 200);
+    assert.equal(emergencyLoop.body.summary.rows >= 1, true);
+    assert.equal(emergencyLoop.body.rows.some((item) => item.pressure.waitingOver30Min >= 30 && item.nextAction), true);
+
+    const emergencyLoopAction = await api(baseUrl, "/api/operations/emergency-dispatch-loop/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        loopId: emergencyLoop.body.rows[0].id,
+        status: "triage-confirmed",
+        note: "API regression emergency loop reviewed"
+      })
+    }));
+    assert.equal(emergencyLoopAction.response.status, 201);
+    assert.equal(emergencyLoopAction.body.loop.status, "triage-confirmed");
+    assert.equal(emergencyLoopAction.body.loop.auditTrail.some((item) => item.action === "triage-confirmed"), true);
+    assert.equal(emergencyLoopAction.body.emergencyDispatchLoop.rows.some((item) => item.id === emergencyLoop.body.rows[0].id), true);
 
     const mobileDuty = await api(baseUrl, "/api/operations/mobile-duty", authorized(accountLogin.body.token));
     assert.equal(mobileDuty.response.status, 200);

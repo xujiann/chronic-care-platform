@@ -53,6 +53,7 @@ function buildDeployCheckReport(options = {}) {
     "securityAcceptanceLedger",
     "hospitalOperationSnapshots",
     "resourceDispatchRequests",
+    "emergencyDispatchLoops",
     "statisticsReconciliationReviews",
     "operationAlertRules",
     "chronicFollowupStatusPolicy",

@@ -28,11 +28,13 @@ test("hospital operations readiness validates monitor dispatch and reconciliatio
   assert.equal(report.checks.some((item) => item.id === "hospitalOps:launchReadiness" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "hospitalOps:intelligence" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "hospitalOps:resourcePool" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "hospitalOps:emergencyDispatchLoop" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "hospitalOps:mobileDuty" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "hospitalOps:governanceReport" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "hospitalOps:governanceExportPackage" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "hospitalOps:nextDevelopmentResearch" && item.passed), true);
   assert.equal(report.summary.highPressure >= 1, true);
+  assert.equal(report.summary.emergencyDispatchLoops >= 1, true);
   assert.equal(report.reusedCollections.includes("healthStatisticsIngestion"), true);
 });
 

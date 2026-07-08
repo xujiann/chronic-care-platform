@@ -88,6 +88,7 @@ data/db.json
 - 协同业务：`careOrders`、`medicationPickups`、`insuranceClaims`、`referralSystem`、`referralTeleconsultations`
 - 县域医共体：`countyConsortium`、`countyCollaborationOrders`、`countyMutualRecognitionRecords`、`countyAiDiagnosisCases`
 - 证照统计：`deathCertificates`、`birthCertificates`、`healthStatistics`、`healthStatisticsIngestion`
+- 医院运行监测：`hospitalOperationSnapshots`、`resourceDispatchRequests`、`emergencyDispatchLoops`、`statisticsReconciliationReviews`、`operationAlertRules`
 - 治理审计：`securityEvents`、`dataAccessLogs`、`platformRoadmap`、`platformAudit`、`platformProcessAudit`
 - 生产部署：`productionDeploymentPlan` 记录发布门禁、正式数据库适配、政务身份适配和审计保全路径
 - P2 治理：`institutionCreditEvaluations`、`creditEvaluationRules`、`researchDatasets`、`diseaseRegistryModels`
@@ -119,6 +120,8 @@ SQLite 结构化镜像已覆盖居民、账户、主索引、个人健康档案�
 | `GET /api/research/datasets` / `POST /api/research/datasets/:id/actions` | 科研数据集治理 |
 | `GET /api/research/sandbox` / `POST /api/research/datasets` / `POST /api/research/datasets/:id/approval` / `POST /api/research/datasets/:id/sandbox-access` / `POST /api/research/datasets/:id/outcomes` | Research dataset application, ethics approval, de-identified sandbox access, audit trail, and outcome return |
 | `GET /api/research/disease-models` / `POST /api/research/disease-models/:id/review` | 专病库模型和人工复核 |
+| `GET /api/operations/dashboard` / `GET /api/operations/resource-pool` / `GET /api/operations/emergency-dispatch-loop` | 医院运行监测、跨院资源池和急诊拥堵调度闭环 |
+| `POST /api/operations/emergency-dispatch-loop/actions` / `POST /api/operations/dispatch` | 急诊拥堵复核留痕和资源调度工单管理 |
 | `POST /api/auth/identity/preview` | 政务身份 claims 到角色、机构和首页的接入预映射 |
 | `GET /api/mobile/experience` / `POST /api/mobile/experience` | 移动体验和居民偏好 |
 | `GET /api/mobile/accessibility-checklist` | 无障碍验收清单 |

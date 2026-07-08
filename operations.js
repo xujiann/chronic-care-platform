@@ -165,6 +165,7 @@ const OPERATIONS_EVIDENCE_LABELS = {
   "/api/operations/post-cutover-observation": "上线后观察接口",
   "/api/operations/intelligence": "智能调度建议接口",
   "/api/operations/resource-pool": "跨院资源池接口",
+  "/api/operations/emergency-dispatch-loop": "急诊拥堵调度闭环接口",
   "/api/operations/mobile-duty": "移动值守接口",
   "/api/operations/governance-report": "治理报表接口",
   "/api/operations/governance-export-package": "治理导出包接口",
@@ -232,6 +233,7 @@ function buildStaticOperationsDashboard(state) {
   const intelligence = buildStaticOperationsIntelligence(snapshots, dispatchRequests, reconciliationReviews);
   const performanceMonitoring = buildStaticPerformanceMonitoringEvidence(state, snapshots);
   const resourcePool = buildStaticResourcePool(snapshots, medicalResources, dispatchRequests);
+  const emergencyDispatchLoop = buildStaticEmergencyDispatchLoop(snapshots, dispatchRequests, resourcePool, state.emergencyDispatchLoops || []);
   const mobileDuty = buildStaticMobileDuty(snapshots, dispatchRequests, reconciliationReviews, handover, state.taskMessages || []);
   const cutoverCommand = buildStaticCutoverCommand(productionHardening, siteJointPatrol, mobileDuty, state.platformProcessAudit || [], state.securityEvents || []);
   const postCutoverObservation = buildStaticPostCutoverObservation(snapshots, dispatchRequests, reconciliationReviews, siteJointPatrol, cutoverCommand, mobileDuty, state.platformProcessAudit || [], state.securityEvents || []);
@@ -290,6 +292,7 @@ function buildStaticOperationsDashboard(state) {
     handoverOwnerMatrix: buildStaticHandoverOwnerMatrix(handover),
     performanceMonitoring,
     resourcePool,
+    emergencyDispatchLoop,
     mobileDuty,
     cutoverCommand,
     postCutoverObservation,
@@ -821,6 +824,87 @@ function buildStaticResourcePool(snapshots, medicalResources, dispatchRequests) 
   };
 }
 
+function emergencyDispatchMatched(dispatch) {
+  const text = `${dispatch.category || ""} ${dispatch.resourceType || ""} ${dispatch.reason || ""}`.toLowerCase();
+  return /emergency|急诊|候诊|ct|ambulance|observation|留观|救护/.test(text);
+}
+
+function emergencyLoopKey(snapshot) {
+  return `ed-loop-${String(snapshot.institutionId || snapshot.id || "unknown").toLowerCase()}-${String(snapshot.snapshotAt || "").replace(/[^0-9A-Za-z]/g, "").slice(0, 10)}`;
+}
+
+function emergencyLoopStatus(snapshot, dispatches, savedLoop) {
+  if (savedLoop?.status) return savedLoop.status;
+  if (dispatches.some((item) => item.status === "closed")) return "closed";
+  if (dispatches.some((item) => ["assigned", "in-progress"].includes(item.status))) return "dispatching";
+  if (dispatches.some((item) => item.status === "pending")) return "pending-dispatch";
+  return Number(snapshot.outpatient?.waitingOver30Min || 0) >= 50 ? "review-required" : "watching";
+}
+
+function buildStaticEmergencyDispatchLoop(snapshots, dispatchRequests, resourcePool, emergencyDispatchLoops = []) {
+  const savedBySnapshot = new Map((Array.isArray(emergencyDispatchLoops) ? emergencyDispatchLoops : []).map((item) => [item.snapshotId || item.id, item]));
+  const donorRows = Array.isArray(resourcePool?.rows) ? resourcePool.rows.filter((item) => item.status === "可调拨") : [];
+  const rows = (snapshots || [])
+    .filter((snapshot) => {
+      const waiting = Number(snapshot.outpatient?.waitingOver30Min || 0);
+      const emergencyVisits = Number(snapshot.outpatient?.emergencyVisits || 0);
+      const hasEmergencyAlert = (snapshot.activeAlerts || []).some((alert) => alert.id === "ed-waiting-high" || alert.domain === "outpatient");
+      const relatedDispatch = (dispatchRequests || []).some((item) => operationEntityMatched(snapshot, item) && emergencyDispatchMatched(item));
+      return waiting >= 30 || emergencyVisits >= 100 || hasEmergencyAlert || relatedDispatch;
+    })
+    .map((snapshot, index) => {
+      const dispatches = (dispatchRequests || []).filter((item) => operationEntityMatched(snapshot, item) && emergencyDispatchMatched(item));
+      const savedLoop = savedBySnapshot.get(snapshot.id) || savedBySnapshot.get(emergencyLoopKey(snapshot)) || {};
+      const target = donorRows.find((item) => String(item.institutionId || "").toLowerCase() !== String(snapshot.institutionId || "").toLowerCase()) || donorRows[index % Math.max(donorRows.length, 1)];
+      const waiting = Number(snapshot.outpatient?.waitingOver30Min || 0);
+      const emergencyVisits = Number(snapshot.outpatient?.emergencyVisits || 0);
+      const bedPressure = Math.round(ratio(snapshot.beds?.occupied, snapshot.beds?.open) * 1000) / 10;
+      const priority = waiting >= 50 || snapshot.normalizedStatus === "critical" ? "high" : "medium";
+      const resourceType = waiting >= 50 ? "ct-slot/emergency-triage" : "emergency-observation-bed";
+      const quantity = Math.max(1, Math.min(8, Math.ceil(waiting / 20) || 2));
+      return {
+        id: savedLoop.id || emergencyLoopKey(snapshot),
+        snapshotId: snapshot.id,
+        institutionId: snapshot.institutionId,
+        institution: snapshot.institution,
+        status: emergencyLoopStatus(snapshot, dispatches, savedLoop),
+        priority,
+        pressure: {
+          emergencyVisits,
+          waitingOver30Min: waiting,
+          emergencyObservation: Number(snapshot.beds?.emergencyObservation || 0),
+          bedOccupancyRate: bedPressure,
+          resourcePressure: Number(snapshot.resourcePressure || 0)
+        },
+        targetInstitutionId: savedLoop.targetInstitutionId || target?.institutionId || "",
+        targetInstitution: savedLoop.targetInstitution || target?.institution || "待人工指定",
+        resourceType: savedLoop.resourceType || resourceType,
+        quantity: Number(savedLoop.quantity || quantity),
+        trigger: savedLoop.trigger || `候诊超30分钟 ${waiting} 人，急诊 ${emergencyVisits} 人次，床位占用 ${bedPressure}%。`,
+        dispatchIds: dispatches.map((item) => item.id),
+        dispatchStatus: dispatches.length ? dispatches.map((item) => `${item.id}:${item.status}`).join(" / ") : "待生成调度单",
+        owner: savedLoop.owner || "急诊科/运行调度席",
+        reviewNote: savedLoop.reviewNote || "复核急诊分诊队列、CT/救护车优先能力和跨院分流边界。",
+        nextAction: dispatches.length ? "跟踪调度单受理、资源到位、转运签收和关闭复盘。" : "从闭环卡片生成调度草稿，提交后进入资源调度审计链。",
+        evidence: ["/api/operations/emergency-dispatch-loop", "/api/operations/dashboard", "/api/operations/resource-pool", "/api/operations/dispatch"],
+        auditTrail: Array.isArray(savedLoop.auditTrail) ? savedLoop.auditTrail : []
+      };
+    })
+    .sort((a, b) => (a.priority === "high" ? -1 : 1) - (b.priority === "high" ? -1 : 1) || b.pressure.waitingOver30Min - a.pressure.waitingOver30Min);
+  return {
+    ok: rows.length > 0,
+    summary: {
+      rows: rows.length,
+      highPriority: rows.filter((item) => item.priority === "high").length,
+      pendingReview: rows.filter((item) => ["review-required", "pending-dispatch", "watching"].includes(item.status)).length,
+      linkedDispatches: rows.reduce((sum, item) => sum + item.dispatchIds.length, 0)
+    },
+    actionBoundary: "急诊拥堵闭环只生成调度建议和复核留痕，正式跨院转运仍需医政医管处和值班长确认。",
+    rows,
+    evidence: ["/api/operations/emergency-dispatch-loop", "emergencyDispatchLoops", "hospitalOperationSnapshots", "resourceDispatchRequests", "medicalResources"]
+  };
+}
+
 function buildStaticMobileDuty(snapshots, dispatchRequests, reconciliationReviews, handover, taskMessages = []) {
   const openDispatches = dispatchRequests.filter((item) => ["pending", "assigned", "in-progress"].includes(item.status));
   const pendingRecon = reconciliationReviews.filter((item) => !["approved", "closed"].includes(item.status));
@@ -1288,6 +1372,7 @@ function renderOperationsDashboard() {
   renderPostCutoverObservation(postCutoverObservation);
   renderOperationsIntelligence(dashboard.intelligence || buildStaticOperationsIntelligence(filteredSnapshots, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || []));
   renderResourcePool(dashboard.resourcePool || buildStaticResourcePool(filteredSnapshots, dashboard.medicalResources || [], dashboard.dispatchRequests || []));
+  renderEmergencyDispatchLoop(dashboard.emergencyDispatchLoop || buildStaticEmergencyDispatchLoop(filteredSnapshots, dashboard.dispatchRequests || [], dashboard.resourcePool || {}, []));
   renderMobileDuty(dashboard.mobileDuty || buildStaticMobileDuty(filteredSnapshots, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || [], dashboard.handover || {}, []));
   renderGovernanceReport(
     dashboard.governanceReport || buildStaticGovernanceReport(filteredSnapshots, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || [], dashboard.performanceMonitoring || {}, dashboard.handover || {}),
@@ -2177,6 +2262,108 @@ function renderResourcePool(resourcePool) {
   target.querySelectorAll("[data-resource-dispatch]").forEach((button) => {
     button.addEventListener("click", () => applyResourceDispatchDraft(recommendations.find((item) => item.id === button.dataset.resourceDispatch)));
   });
+}
+
+function emergencyLoopStatusLabel(status) {
+  return {
+    "review-required": "待复核",
+    "pending-dispatch": "待调度",
+    dispatching: "调度中",
+    "triage-confirmed": "已复核",
+    watching: "观察中",
+    closed: "已闭环"
+  }[status] || zhInline(status);
+}
+
+function renderEmergencyDispatchLoop(loop) {
+  const target = document.querySelector("#operation-emergency-dispatch-loop");
+  if (!target) return;
+  const rows = Array.isArray(loop.rows) ? loop.rows : [];
+  target.innerHTML = `
+    <article class="operation-emergency-loop-summary">
+      <strong>急诊拥堵调度闭环</strong>
+      <span>${loop.summary?.rows || rows.length} 家机构 / 高优先级 ${loop.summary?.highPriority || 0} 项 / 关联调度 ${loop.summary?.linkedDispatches || 0} 单</span>
+      <small>${zhInline(loop.actionBoundary || "急诊拥堵先复核后调度，正式转运需人工确认。")}</small>
+      <small>证据：${evidenceList(loop.evidence)}</small>
+    </article>
+    <div class="operation-emergency-loop-list">
+      ${(rows.length ? rows : [{ institution: "暂无急诊拥堵闭环", status: "watching", priority: "low", pressure: {}, trigger: "当前未达到急诊拥堵阈值。", nextAction: "继续监测急诊人次、候诊超30分钟人数和救护车能力。", evidence: [] }]).map((item) => `
+        <article class="operation-emergency-loop-card ${item.priority === "high" ? "critical" : item.priority === "medium" ? "warning" : "normal"}">
+          <div class="operation-playbook-head">
+            <div>
+              <strong>${zhInline(item.institution)}</strong>
+              <span>${emergencyLoopStatusLabel(item.status)} / ${zhInline(item.owner || "运行调度席")}</span>
+            </div>
+            <span class="badge ${item.priority === "high" ? "danger" : item.priority === "medium" ? "warn" : "info"}">${item.priority === "high" ? "高" : item.priority === "medium" ? "中" : "常规"}</span>
+          </div>
+          <div class="operation-emergency-loop-metrics">
+            <span>急诊 ${item.pressure?.emergencyVisits || 0}</span>
+            <span>候诊超30分钟 ${item.pressure?.waitingOver30Min || 0}</span>
+            <span>留观 ${item.pressure?.emergencyObservation || 0}</span>
+            <span>压力 ${item.pressure?.resourcePressure || 0}</span>
+          </div>
+          <p>${zhInline(item.trigger || "")}</p>
+          <small>建议：${zhInline(item.targetInstitution || "待人工指定")} / ${zhInline(item.resourceType || "急诊资源")} × ${item.quantity || 1}</small>
+          <small>调度：${zhInline(item.dispatchStatus || "待生成调度单")}</small>
+          <footer class="compact-action-row">
+            <button class="inline-action compact" type="button" data-emergency-draft="${htmlAttribute(item.id)}">生成调度草稿</button>
+            <button class="inline-action compact" type="button" data-emergency-review="${htmlAttribute(item.id)}">标记已复核</button>
+          </footer>
+        </article>
+      `).join("")}
+    </div>
+  `;
+  target.querySelectorAll("[data-emergency-draft]").forEach((button) => {
+    button.addEventListener("click", () => applyEmergencyDispatchDraft(rows.find((item) => item.id === button.dataset.emergencyDraft)));
+  });
+  target.querySelectorAll("[data-emergency-review]").forEach((button) => {
+    button.addEventListener("click", () => reviewEmergencyDispatchLoop(button.dataset.emergencyReview));
+  });
+}
+
+function applyEmergencyDispatchDraft(loop) {
+  if (!loop) return;
+  const form = document.querySelector("#dispatch-form");
+  if (!form) return;
+  form.elements.sourceInstitution.value = loop.institution || "";
+  form.elements.targetInstitution.value = loop.targetInstitution || "";
+  form.elements.resourceType.value = loop.resourceType || "急诊资源支援";
+  form.elements.quantity.value = loop.quantity || 2;
+  form.elements.priority.value = loop.priority === "high" ? "high" : "medium";
+  form.elements.status.value = "pending";
+  form.elements.reason.value = `${loop.trigger || ""}\n${loop.nextAction || ""}`.trim();
+  form.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function reviewEmergencyDispatchLoop(loopId) {
+  const loop = (operationsDashboard?.emergencyDispatchLoop?.rows || []).find((item) => item.id === loopId);
+  if (!loop) return;
+  const payload = {
+    loopId,
+    status: "triage-confirmed",
+    note: loop.dispatchIds?.length ? "已复核急诊拥堵闭环，继续跟踪关联调度单资源到位。" : "已复核急诊拥堵闭环，请调度席生成资源调度单。"
+  };
+  if (OPERATIONS_API_BASE) {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${OPERATIONS_API_BASE}/operations/emergency-dispatch-loop/actions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (response.ok) {
+      const result = await response.json();
+      operationsDashboard.emergencyDispatchLoop = result.emergencyDispatchLoop || operationsDashboard.emergencyDispatchLoop;
+      renderEmergencyDispatchLoop(operationsDashboard.emergencyDispatchLoop || {});
+      return;
+    }
+  }
+  operationsDashboard.emergencyDispatchLoop.rows = (operationsDashboard.emergencyDispatchLoop.rows || []).map((item) => item.id === loopId ? {
+    ...item,
+    status: "triage-confirmed",
+    reviewNote: payload.note,
+    auditTrail: [...(item.auditTrail || []), { at: new Date().toISOString(), actor: "static-preview", action: "triage-confirmed", note: payload.note }]
+  } : item);
+  renderEmergencyDispatchLoop(operationsDashboard.emergencyDispatchLoop || {});
 }
 
 function applyResourceDispatchDraft(recommendation) {
