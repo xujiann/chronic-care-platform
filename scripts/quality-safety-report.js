@@ -434,6 +434,50 @@ function buildOperationsRunbook({ slaSummary, criticalRows, clinicalPathwayRows,
   ];
 }
 
+function buildWarningIndicators({ summary, operationsRunbook, actionPlan }) {
+  const runbookById = new Map((operationsRunbook || []).map((item) => [item.id, item]));
+  const actionByDomain = new Map((actionPlan || []).map((item) => [item.domain, item]));
+  const indicators = [
+    ["warning-critical-value-disposition", "critical_value", "Critical-value disposition warning", "critical-value-on-call", "quality-safety-critical", "pending critical values > 0", "criticalValueAlerts"],
+    ["warning-rectification-sla", "rectification", "Rectification SLA warning", "rectification-sla-watch", "quality-safety-rectifications", "overdue rectification > 0 or missing evidence", "qualityRectificationOrders"],
+    ["warning-pathway-variance", "clinical_pathway", "Clinical pathway variance warning", "pathway-variance-watch", "quality-safety-boundaries", "open pathway variance after review window", "clinicalPathwayCases"],
+    ["warning-mutual-recognition-qc", "mutual_recognition_qc", "Mutual-recognition QC warning", "mutual-recognition-watch", "quality-safety-boundaries", "exception lacks negative-list or review reason", "mutualRecognitionQualityReviews"],
+    ["warning-live-signoff", "live_interfaces", "Live interface sign-off warning", "site-signoff-watch", "quality-safety-signoffs", "any production cutover sign-off remains pending", "qualitySafetySiteSignoffs"],
+    ["warning-audit-retention", "audit_retention", "Audit retention warning", "audit-retention-watch", "quality-safety-prelaunch-gaps", "audit export or SIEM retention target unsigned", "securityEvents"]
+  ];
+  return indicators.map(([id, domain, name, runbookId, targetSection, threshold, sourceCollection]) => {
+    const runbook = runbookById.get(runbookId) || {};
+    const action = actionByDomain.get(domain) || {};
+    const currentStatus = runbook.currentStatus || "attention_required";
+    return {
+      id,
+      domain,
+      name,
+      runbookId,
+      targetSection,
+      threshold,
+      sourceCollection,
+      level: currentStatus === "attention_required" ? "high" : "watch",
+      owner: runbook.owner || action.owner || "Quality supervision duty officer",
+      signal: runbook.signal || "",
+      currentStatus,
+      nextAction: runbook.escalation || action.action || "Locate the closed-loop task and submit site evidence",
+      evidence: runbook.evidence || action.evidence || sourceCollection,
+      relatedActionId: action.id || "",
+      closedLoopReady: Boolean(runbook.threshold && runbook.escalation && (runbook.evidence || action.evidence)),
+      summarySnapshot: {
+        criticalValuesPending: summary.criticalValues?.pending || 0,
+        rectificationOverdue: summary.sla?.overdue || 0,
+        clinicalPathwaysOpen: summary.clinicalPathways?.pending || 0,
+        siteSignoffsPending: summary.siteSignoffs?.pending || 0
+      }
+    };
+  }).sort((a, b) => {
+    const rank = { attention_required: 0, ready: 1 };
+    return (rank[a.currentStatus] ?? 9) - (rank[b.currentStatus] ?? 9) || a.id.localeCompare(b.id);
+  });
+}
+
 function buildOnsiteRequirementChecklist({ siteSignoffRows, operationsRunbook, goLiveReadiness }) {
   const signoffById = new Map(siteSignoffRows.map((item) => [item.id, item]));
   const runbookById = new Map(operationsRunbook.map((item) => [item.id, item]));
@@ -835,6 +879,22 @@ function buildQualitySafetyReport(options = {}) {
   const actionPlan = buildActionPlan({ qualityEvents, rectifications: stateRows, criticalRows, clinicalPathwayRows, mutualRecognitionRows, institutionRisks });
   const goLiveReadiness = buildGoLiveReadiness({ boundaryRows, collectionRows, reusedRows, routeRows, policyRows, stateRows, criticalRows, clinicalPathwayRows, mutualRecognitionRows, actionPlan, institutionRisks });
   const operationsRunbook = buildOperationsRunbook({ slaSummary, criticalRows, clinicalPathwayRows, mutualRecognitionRows, siteSignoffRows });
+  const warningIndicators = buildWarningIndicators({
+    summary: {
+      sla: slaSummary,
+      criticalValues: {
+        pending: criticalRows.filter((item) => !item.disposed).length
+      },
+      clinicalPathways: {
+        pending: clinicalPathwayRows.filter((item) => !item.reviewed).length
+      },
+      siteSignoffs: {
+        pending: siteSignoffRows.filter((item) => !statusClosed(item.status)).length
+      }
+    },
+    operationsRunbook,
+    actionPlan
+  });
   const onsiteRequirements = buildOnsiteRequirementChecklist({ siteSignoffRows, operationsRunbook, goLiveReadiness });
   const cutoverSequence = buildCutoverSequence({ onsiteRequirements });
   const nationalQualityGoals = buildNationalQualityGoals(data);
@@ -856,6 +916,7 @@ function buildQualitySafetyReport(options = {}) {
     { id: "quality-safety:site-signoff-tracker", passed: siteSignoffRows.length >= 6 && siteSignoffRows.every((item) => item.requiredEvidence.length > 0 && item.auditCount > 0), detail: `${siteSignoffRows.length} site sign-off items; ${siteSignoffRows.filter((item) => statusClosed(item.status)).length} accepted` },
     { id: "quality-safety:site-evidence-submission", passed: routeRows.some((item) => item.route === "/api/quality-safety/site-signoffs/:id/evidence" && item.present), detail: "site owner evidence submission route implemented" },
     { id: "quality-safety:operations-runbook", passed: operationsRunbook.length >= 6 && operationsRunbook.every((item) => item.owner && item.threshold && item.escalation && item.evidence), detail: `${operationsRunbook.length} runtime watch items` },
+    { id: "quality-safety:warning-indicators", passed: warningIndicators.length >= 6 && warningIndicators.every((item) => item.threshold && item.nextAction && item.evidence && item.targetSection && item.closedLoopReady), detail: `${warningIndicators.length} warning indicators; ${warningIndicators.filter((item) => item.currentStatus === "attention_required").length} requiring attention` },
     { id: "quality-safety:onsite-requirements", passed: onsiteRequirements.length >= 8 && onsiteRequirements.every((item) => item.requirement && item.onsiteInput && item.acceptanceEvidence && item.owner), detail: `${onsiteRequirements.length} onsite go-live requirements` },
     { id: "quality-safety:cutover-sequence", passed: cutoverSequence.length >= 3 && cutoverSequence.every((item) => item.window && item.acceptanceGate && item.totalCount > 0), detail: `${cutoverSequence.length} cutover sequence phases` },
     { id: "quality-safety:national-goals-2025", passed: nationalQualityGoals.length === 10 && nationalQualityGoals.every((item) => item.evidenceRows > 0), detail: `${nationalQualityGoals.filter((item) => item.currentStatus === "tracked").length}/${nationalQualityGoals.length} national goals mapped to evidence` },
@@ -897,6 +958,9 @@ function buildQualitySafetyReport(options = {}) {
       highActionItems: actionPlan.filter((item) => ["critical", "high"].includes(item.priority)).length,
       operationsWatchItems: operationsRunbook.length,
       operationsAttentionRequired: operationsRunbook.filter((item) => item.currentStatus === "attention_required").length,
+      warningIndicators: warningIndicators.length,
+      warningIndicatorsAttention: warningIndicators.filter((item) => item.currentStatus === "attention_required").length,
+      warningIndicatorsClosedLoop: warningIndicators.filter((item) => item.closedLoopReady).length,
       onsiteRequirementItems: onsiteRequirements.length,
       onsiteRequirementReady: onsiteRequirements.filter((item) => ["accepted", "ready_for_joint_test"].includes(String(item.currentStatus || ""))).length,
       cutoverSequenceSteps: cutoverSequence.length,
@@ -924,6 +988,7 @@ function buildQualitySafetyReport(options = {}) {
     rectifications: stateRows,
     siteSignoffs: siteSignoffRows,
     operationsRunbook,
+    warningIndicators,
     onsiteRequirements,
     cutoverSequence,
     nationalQualityGoals,
@@ -952,6 +1017,7 @@ function renderMarkdown(report) {
     `- Site sign-offs: ${report.summary.siteSignoffs.total}, ready ${report.summary.siteSignoffs.ready}, accepted ${report.summary.siteSignoffs.accepted}`,
     `- Action plan: ${report.summary.actionItems} items, high priority ${report.summary.highActionItems}`,
     `- Operations runbook: ${report.summary.operationsWatchItems} watch items, ${report.summary.operationsAttentionRequired} requiring attention`,
+    `- Warning indicators: ${report.summary.warningIndicators} indicators, ${report.summary.warningIndicatorsAttention} requiring attention, ${report.summary.warningIndicatorsClosedLoop} closed-loop ready`,
     `- Onsite requirements: ${report.summary.onsiteRequirementItems} items, ${report.summary.onsiteRequirementReady} ready or accepted`,
     `- Cutover sequence: ${report.summary.cutoverSequenceSteps} phases, ${report.summary.cutoverSequenceAttention} requiring attention`,
     `- Next development plan: ${report.summary.nextDevelopmentItems} items, ${report.summary.nextDevelopmentAttention} requiring attention`,
@@ -1013,6 +1079,12 @@ function renderMarkdown(report) {
     "| Watch item | Owner | Signal | Threshold | Escalation | Evidence |",
     "|---|---|---|---|---|---|",
     ...report.operationsRunbook.map((item) => `| ${item.watchItem} | ${item.owner} | ${String(item.signal || "").replace(/\|/g, "/")} | ${item.threshold} | ${item.escalation} | ${item.evidence} |`),
+    "",
+    "## Warning Indicators",
+    "",
+    "| Indicator | Level | Signal | Threshold | Owner | Next action | Evidence | Target |",
+    "|---|---|---|---|---|---|---|---|",
+    ...report.warningIndicators.map((item) => `| ${item.name} | ${item.level} | ${String(item.signal || "").replace(/\|/g, "/")} | ${item.threshold} | ${item.owner} | ${String(item.nextAction || "").replace(/\|/g, "/")} | ${String(item.evidence || "").replace(/\|/g, "/")} | ${item.targetSection} |`),
     "",
     "## Onsite Go-live Requirements",
     "",

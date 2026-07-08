@@ -272,6 +272,7 @@ GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下
 - Next development plan: the dashboard and module report convert live-interface docking, closed-loop drills, national-goal review, and production audit/operations gaps into prioritized development increments with owners, acceptance evidence, verification commands, and current status.
 - Department task queue: attention-required cutover phases are promoted to the top role queue and jump directly to the cutover sequence panel.
 - Operations runbook: the dashboard and release report derive module on-call watch items from critical values, rectification SLA, clinical pathways, mutual-recognition QC, site sign-offs, and audit-retention evidence.
+- Warning indicators: the dashboard, module report, and release report now expose a first runnable Inspur 4.1 quality-safety increment that normalizes critical-value, rectification SLA, pathway variance, mutual-recognition QC, live sign-off, and audit-retention signals into closed-loop warning rows with thresholds, owners, evidence, and UI targets.
 - Site sign-off tracker: production cutover items for live feeds, critical-value routing, pathway dictionaries, mutual-recognition rules, department attachments, and audit retention are tracked with owner, status, required evidence, and audit trail.
 - SLA evidence: rectification orders include due-date status, evidence completeness, and commission escalation records.
 - Risk ranking: the portal and release report derive institution priority from severity, open issues, SLA pressure, missing feedback, and escalations.

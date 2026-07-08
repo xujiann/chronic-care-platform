@@ -56,6 +56,7 @@ test("quality safety report covers boundaries, reuse and routes", () => {
   assert.equal(report.checks.some((item) => item.id === "quality-safety:risk-ranking" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "quality-safety:site-signoff-tracker" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "quality-safety:operations-runbook" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "quality-safety:warning-indicators" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "quality-safety:onsite-requirements" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "quality-safety:cutover-sequence" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "quality-safety:national-goals-2025" && item.passed), true);
@@ -68,6 +69,8 @@ test("quality safety report covers boundaries, reuse and routes", () => {
   assert.equal(report.summary.readinessScore, 100);
   assert.equal(report.summary.siteSignoffs.total >= 6, true);
   assert.equal(report.summary.operationsWatchItems >= 6, true);
+  assert.equal(report.summary.warningIndicators >= 6, true);
+  assert.equal(report.summary.warningIndicatorsClosedLoop, report.summary.warningIndicators);
   assert.equal(report.summary.onsiteRequirementItems >= 8, true);
   assert.equal(report.summary.cutoverSequenceSteps, 3);
   assert.equal(report.summary.nationalQualityGoals, 10);
@@ -90,6 +93,8 @@ test("quality safety report covers boundaries, reuse and routes", () => {
   assert.equal(report.onsiteRequirements.some((item) => item.id === "onsite-monitoring-oncall" && item.acceptanceEvidence.includes("alert")), true);
   assert.equal(report.operationsRunbook.some((item) => item.id === "critical-value-on-call" && item.escalation), true);
   assert.equal(report.operationsRunbook.some((item) => item.id === "audit-retention-watch" && item.evidence.includes("securityEvents")), true);
+  assert.equal(report.warningIndicators.some((item) => item.id === "warning-rectification-sla" && item.targetSection === "quality-safety-rectifications"), true);
+  assert.equal(report.warningIndicators.some((item) => item.id === "warning-live-signoff" && item.evidence.includes("qualitySafetySiteSignoffs")), true);
   assert.equal(report.siteSignoffs.some((item) => item.id === "qss-audit-retention" && item.requiredEvidence.length > 0), true);
   assert.equal(report.institutionRisks.length > 0, true);
   assert.equal(report.institutionRisks[0].score > 0, true);
@@ -106,6 +111,8 @@ test("quality safety report covers boundaries, reuse and routes", () => {
   assert.match(renderMarkdown(report), /Regulatory Action Plan/);
   assert.match(renderMarkdown(report), /Go-live Readiness/);
   assert.match(renderMarkdown(report), /Operations Runbook/);
+  assert.match(renderMarkdown(report), /Warning Indicators/);
+  assert.match(renderMarkdown(report), /warning-rectification-sla|Rectification SLA warning/);
   assert.match(renderMarkdown(report), /Onsite Go-live Requirements/);
   assert.match(renderMarkdown(report), /Cutover Sequence/);
   assert.match(renderMarkdown(report), /2025 National Quality Goals/);
@@ -157,6 +164,8 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
   assert.equal(dashboard.body.summary.readinessScore, 100);
   assert.equal(dashboard.body.summary.siteSignoffs >= 6, true);
   assert.equal(dashboard.body.summary.operationsWatchItems >= 4, true);
+  assert.equal(dashboard.body.summary.warningIndicators >= 6, true);
+  assert.equal(dashboard.body.summary.warningIndicatorsClosedLoop, dashboard.body.summary.warningIndicators);
   assert.equal(dashboard.body.summary.onsiteRequirementItems >= 6, true);
   assert.equal(dashboard.body.summary.cutoverSequenceSteps >= 3, true);
   assert.equal(dashboard.body.summary.nationalQualityGoals, 10);
@@ -180,6 +189,8 @@ test("quality safety API supports dashboard, dispatch, feedback and review", asy
   assert.equal(dashboard.body.onsiteRequirements.some((item) => item.id === "onsite-audit-retention" && item.onsiteInput.includes("SIEM_ENDPOINT")), true);
   assert.equal(dashboard.body.operationsRunbook.some((item) => item.id === "rectification-sla-watch" && item.threshold), true);
   assert.equal(dashboard.body.operationsRunbook.some((item) => item.evidence.includes("qualitySafetySiteSignoffs")), true);
+  assert.equal(dashboard.body.warningIndicators.some((item) => item.id === "warning-critical-value-disposition" && item.targetSection === "quality-safety-critical"), true);
+  assert.equal(dashboard.body.warningIndicators.some((item) => item.id === "warning-audit-retention" && item.closedLoopReady), true);
   assert.equal(dashboard.body.summary.coreSystems, 18);
   assert.equal(dashboard.body.summary.coreSystemsLinked >= 18, true);
   assert.equal(dashboard.body.coreSystemMatrix.length, 18);

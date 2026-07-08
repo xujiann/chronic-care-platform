@@ -507,6 +507,8 @@ function renderMetrics(summary) {
     ["需关注阶段", summary.cutoverSequenceAttention || 0],
     ["开发计划", summary.nextDevelopmentItems || 0],
     ["计划关注", summary.nextDevelopmentAttention || 0],
+    ["预警指标", summary.warningIndicators || 0],
+    ["预警关注", summary.warningIndicatorsAttention || 0],
     ["核心制度", `${summary.coreSystemsLinked || 0}/${summary.coreSystems || 0}`],
     ["路径待复核", summary.clinicalPathwaysOpen || 0],
     ["即将到期", summary.sla?.dueSoon || 0],
@@ -697,6 +699,26 @@ function renderOperationsRunbook(rows = []) {
             <td>${zhText(item.escalation)}<br /><small>${zhText(item.evidence)}</small></td>
           </tr>
         `).join("") : emptyRow(5, "暂无运行值守事项")}
+      </tbody>
+    </table>
+  `);
+}
+
+function renderWarningIndicators(rows = []) {
+  setHtml("quality-safety-warning-indicators", `
+    <table>
+      <thead><tr><th>预警指标</th><th>等级与信号</th><th>触发阈值</th><th>责任方</th><th>闭环动作</th><th>定位</th></tr></thead>
+      <tbody>
+        ${rows.length ? rows.map((item) => `
+          <tr>
+            <td><strong>${zhText(item.name)}</strong><br /><small>${statusLabel(item.domain)} / ${text(item.id)}</small></td>
+            <td>${statusLabel(item.level)}<br /><small>${zhText(item.signal || item.currentStatus)}</small></td>
+            <td>${zhText(item.threshold)}</td>
+            <td>${zhText(item.owner)}<br /><small>${statusLabel(item.ownerRole)}</small></td>
+            <td>${zhText(item.nextAction)}<br /><small>${zhText(item.evidence)} / ${item.closedLoopReady ? "闭环证据已绑定" : "待补齐闭环证据"}</small></td>
+            <td><button class="inline-action" type="button" data-scroll-target="${text(item.targetSection || "quality-safety-actions")}">定位</button></td>
+          </tr>
+        `).join("") : emptyRow(6, "暂无预警指标")}
       </tbody>
     </table>
   `);
@@ -964,6 +986,7 @@ function renderQualitySafety(data) {
   renderNextDevelopmentPlan(data.nextDevelopmentPlan || []);
   renderOnsiteRequirements(data.onsiteRequirements || []);
   renderOperationsRunbook(data.operationsRunbook || []);
+  renderWarningIndicators(data.warningIndicators || []);
   renderActionPlan(data.actionPlan || []);
   renderRisks(data.institutionRisks || []);
   renderReuse(data.reusedCollections || []);

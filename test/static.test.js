@@ -382,6 +382,8 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(html, /data-quality-safety-onsite-requirements-panel/);
   assert.match(html, /quality-safety-operations-runbook/);
   assert.match(html, /data-quality-safety-operations-panel/);
+  assert.match(html, /quality-safety-warning-indicators/);
+  assert.match(html, /data-quality-safety-warning-indicators-panel/);
   assert.match(html, /quality-safety-signoffs/);
   assert.match(html, /quality-safety-interface-pack/);
   assert.match(html, /quality-safety-issues/);
@@ -434,6 +436,9 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(js, /onsiteRequirements/);
   assert.match(js, /renderOperationsRunbook/);
   assert.match(js, /operationsRunbook/);
+  assert.match(js, /renderWarningIndicators/);
+  assert.match(js, /warningIndicators/);
+  assert.match(js, /quality-safety-warning-indicators/);
   assert.match(js, /productionSignoffPending/);
   assert.match(js, /renderSiteSignoffs/);
   assert.match(js, /renderInterfaceJointTestPack/);
@@ -527,6 +532,8 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(read("README.md"), /Pre-launch tracker/);
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:go-live-readiness/);
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:operations-runbook/);
+  assert.match(read("scripts/quality-safety-report.js"), /quality-safety:warning-indicators/);
+  assert.match(read("scripts/quality-safety-report.js"), /Warning Indicators/);
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:onsite-requirements/);
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:cutover-sequence/);
   assert.match(read("scripts/quality-safety-report.js"), /quality-safety:national-goals-2025/);
@@ -539,8 +546,10 @@ test("quality safety supervision app exposes runnable portal, API and release ev
   assert.match(read("README.md"), /Cutover sequence/);
   assert.match(read("README.md"), /Onsite requirements/);
   assert.match(read("README.md"), /Operations runbook/);
+  assert.match(read("README.md"), /Warning indicators/);
   assert.match(read("README.md"), /Next development plan/);
   assert.match(read("scripts/release-report.js"), /qualitySafety:report/);
+  assert.match(read("scripts/release-report.js"), /qualitySafety:warningIndicators/);
   assert.match(read("scripts/release-report.js"), /qualitySafetyInterface:standard/);
   assert.match(read("scripts/release-report.js"), /qualitySafetyInterfaceJointTest:pack/);
   assert.match(read("scripts/release-report.js"), /qualitySafetyInterfaceJointTest:siteSampleAcceptance/);

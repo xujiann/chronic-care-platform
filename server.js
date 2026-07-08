@@ -5639,6 +5639,94 @@ function buildQualitySafetyOperationsRunbook({ summary, rectifications, critical
     }));
 }
 
+function buildQualitySafetyWarningIndicators({ summary, operationsRunbook, actionPlan }) {
+  const runbookById = new Map((operationsRunbook || []).map((item) => [item.id, item]));
+  const actionByDomain = new Map((actionPlan || []).map((item) => [item.domain, item]));
+  const indicators = [
+    {
+      id: "warning-critical-value-disposition",
+      domain: "critical_value",
+      name: "危急值处置超时预警",
+      runbookId: "critical-value-on-call",
+      targetSection: "quality-safety-critical",
+      threshold: "未确认或未处置危急值 > 0",
+      sourceCollection: "criticalValueAlerts"
+    },
+    {
+      id: "warning-rectification-sla",
+      domain: "rectification",
+      name: "整改 SLA 逾期预警",
+      runbookId: "rectification-sla-watch",
+      targetSection: "quality-safety-rectifications",
+      threshold: "逾期整改 > 0 或反馈证据缺失",
+      sourceCollection: "qualityRectificationOrders"
+    },
+    {
+      id: "warning-pathway-variance",
+      domain: "clinical_pathway",
+      name: "临床路径偏离复核预警",
+      runbookId: "pathway-variance-watch",
+      targetSection: "quality-safety-boundaries",
+      threshold: "路径偏离病例在复核窗口后仍未关闭",
+      sourceCollection: "clinicalPathwayCases"
+    },
+    {
+      id: "warning-mutual-recognition-qc",
+      domain: "mutual_recognition_qc",
+      name: "检查检验互认质控预警",
+      runbookId: "mutual-recognition-watch",
+      targetSection: "quality-safety-boundaries",
+      threshold: "互认例外未补齐负面清单或复核原因",
+      sourceCollection: "mutualRecognitionQualityReviews"
+    },
+    {
+      id: "warning-live-signoff",
+      domain: "live_interfaces",
+      name: "上线联调签收预警",
+      runbookId: "site-signoff-watch",
+      targetSection: "quality-safety-signoffs",
+      threshold: "生产切换前任一签收项未完成",
+      sourceCollection: "qualitySafetySiteSignoffs"
+    },
+    {
+      id: "warning-audit-retention",
+      domain: "audit_retention",
+      name: "审计留存对接预警",
+      runbookId: "audit-retention-watch",
+      targetSection: "quality-safety-prelaunch-gaps",
+      threshold: "审计导出或 SIEM 留存目标未签收",
+      sourceCollection: "securityEvents"
+    }
+  ];
+  return indicators.map((indicator) => {
+    const runbook = runbookById.get(indicator.runbookId) || {};
+    const action = actionByDomain.get(indicator.domain) || {};
+    const currentStatus = runbook.currentStatus || "attention_required";
+    const signal = runbook.signal || "";
+    return {
+      ...indicator,
+      level: currentStatus === "attention_required" ? "high" : "watch",
+      owner: runbook.owner || action.owner || "质控监管值守员",
+      ownerRole: runbook.ownerRole || action.ownerRole || "commission",
+      signal,
+      currentStatus,
+      nextAction: runbook.escalation || action.action || "定位闭环任务并补齐现场证据",
+      evidence: runbook.evidence || action.evidence || indicator.sourceCollection,
+      relatedActionId: runbook.actionLink || action.id || "",
+      closedLoopReady: Boolean(runbook.threshold && runbook.escalation && (runbook.evidence || action.evidence)),
+      summarySnapshot: {
+        criticalValuesPending: summary.criticalValuesPending || 0,
+        rectificationOverdue: summary.sla?.overdue || 0,
+        clinicalPathwaysOpen: summary.clinicalPathwaysOpen || 0,
+        siteSignoffsPending: summary.siteSignoffsPending || 0
+      }
+    };
+  }).sort((a, b) => {
+    const rank = { attention_required: 0, ready: 1 };
+    return (rank[a.currentStatus] ?? 9) - (rank[b.currentStatus] ?? 9) || a.id.localeCompare(b.id);
+  });
+}
+
 function buildQualitySafetySiteRequirementChecklist({ siteSignoffs, operationsRunbook, coreSystemMatrix, goLiveReadiness, user }) {
   const signoffById = new Map(siteSignoffs.map((item) => [item.id, item]));
   const runbookById = new Map(operationsRunbook.map((item) => [item.id, item]));
@@ -6188,6 +6276,10 @@ function buildQualitySafetyDashboard(data, user) {
   });
   summary.operationsWatchItems = operationsRunbook.length;
   summary.operationsAttentionRequired = operationsRunbook.filter((item) => item.currentStatus === "attention_required").length;
+  const warningIndicators = buildQualitySafetyWarningIndicators({ summary, operationsRunbook, actionPlan });
+  summary.warningIndicators = warningIndicators.length;
+  summary.warningIndicatorsAttention = warningIndicators.filter((item) => item.currentStatus === "attention_required").length;
+  summary.warningIndicatorsClosedLoop = warningIndicators.filter((item) => item.closedLoopReady).length;
   const onsiteRequirements = buildQualitySafetySiteRequirementChecklist({
     siteSignoffs,
     operationsRunbook,
@@ -6237,6 +6329,7 @@ function buildQualitySafetyDashboard(data, user) {
     nationalGoalCadencePlan,
     siteSignoffs,
     operationsRunbook,
+    warningIndicators,
     onsiteRequirements,
     cutoverSequence,
     nextDevelopmentPlan,
