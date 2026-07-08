@@ -242,6 +242,7 @@ function renderCountyTeleconsultationLoop(state) {
       ["高优先级", rows.filter((item) => item.priority === "high").length, "医共体跟进队列"]
     ].map(([label, value, hint]) => `<article class="claim-card"><strong>${label}</strong><span>${value}<br>${hint}</span></article>`).join("");
   }
+  renderCountyTeleconsultationClosedLoop(state, rows);
   renderCountyTeleconsultationCutoverReadiness(state, rows);
   renderCountyTeleconsultationJointLedger(state, rows);
   renderCountyTeleconsultationRiskBoard(state, rows, escalations);
@@ -273,6 +274,88 @@ function renderCountyTeleconsultationLoop(state) {
       </tr>`;
     }).join("")}</tbody>
   </table>`;
+}
+
+function renderCountyTeleconsultationClosedLoop(state, rows) {
+  const el = document.querySelector("#county-teleconsultation-closed-loop");
+  if (!el) return;
+  const model = buildCountyConsortiumClosedLoopChain(state, rows);
+  el.innerHTML = [
+    `<article data-referral-closed-loop-summary data-consortium-loop-summary>
+      <div><span class="badge ${model.readySteps === model.totalSteps && !model.onsiteBlockers ? "info" : "warn"}">Medical consortium closed loop</span></div>
+      <h3>${model.readySteps}/${model.totalSteps} steps locally evidenced</h3>
+      <p>Referral and teleconsultation share one chain: initiate -> accept -> execute -> report return -> feedback/evaluate -> performance archive.</p>
+      <footer>
+        <small>Implemented evidence: ${model.implementedEvidence.join(", ")}</small>
+        <small>Blockers: ${model.externalBlockers} external, ${model.onsiteBlockers} onsite.</small>
+      </footer>
+    </article>`,
+    `<article data-consortium-loop-metrics>
+      <div><span class="badge info">G-end metrics</span></div>
+      <h3>${model.metrics.length} collectible indicators</h3>
+      <p>County command can export collaboration efficiency, closed-loop completion, follow-up return, mutual-recognition, and quality feedback evidence without marking external HIS/EMR/LIS/PACS/insurance callbacks as production-ready.</p>
+      <footer>
+        ${model.metrics.map((item) => `<small data-gov-consortium-metric="${item.key}" data-metric-value="${item.numericValue ?? ""}" data-metric-source="${item.source}" data-metric-status="${item.status}">${item.label}: ${item.value}; target ${item.target}; ${item.blocker}</small>`).join("")}
+      </footer>
+    </article>`,
+    ...model.steps.map((item) => `<article data-referral-closed-loop-step="${item.id}" data-consortium-loop-step="${item.id}">
+      <div><span class="badge ${item.status === "ready" ? "info" : "warn"}">${item.status}</span><span class="badge info">${item.owner}</span></div>
+      <h3>${item.label}</h3>
+      <p>${item.evidence}</p>
+      <footer>
+        <small>Roles: ${item.roles.join(", ")}</small>
+        <small>Receipts: ${item.receiptsReady}/${item.roles.length}; final-ready: ${item.finalReady}/${item.roles.length}; signed: ${item.signed}/${item.roles.length}</small>
+        <small>${item.blockers.join("; ") || "Local closed-loop evidence is ready; keep external and onsite signoff evidence attached."}</small>
+        <button class="inline-action" type="button" data-referral-loop-target="${item.id}" data-target-selector="${item.targetSelector}">${item.actionLabel}</button>
+      </footer>
+    </article>`),
+    ...model.roles.map((item) => `<article data-referral-closed-loop-role="${item.role}">
+      <div><span class="badge ${item.blockers.length ? "warn" : "info"}">${item.role}</span></div>
+      <h3>${item.title}</h3>
+      <p>${item.responsibility}</p>
+      <footer>
+        <small data-consortium-role-todo="${item.role}" data-role-todo-count="${item.todoCount}">Role todos: ${item.todoCount}; ${item.receiptStatus}; ${item.signoffStatus}; blockers: ${item.blockers.join(", ") || "none"}</small>
+        ${item.todoItems.map((todo) => `<small data-consortium-role-todo-item="${item.role}">${todo}</small>`).join("")}
+        ${item.actions.map((action) => `<button class="inline-action" type="button" data-referral-action-role="${item.role}" data-referral-loop-target="${item.role}" data-target-selector="${action.targetSelector}">${action.label}</button>`).join("")}
+      </footer>
+    </article>`)
+  ].join("");
+}
+
+function buildCountyTeleconsultationClosedLoopRoles(receiptByRole, exportByRole, signoffByRole) {
+  const definitions = [
+    { role: "referral-center", title: "Leading hospital referral center", responsibility: "Owns referral order intake, resident authorization review, and receiving feedback closure." },
+    { role: "primary-institution", title: "Primary institution", responsibility: "Initiates two-way referral, follows resident service continuity, and receives report feedback.", alias: "referral-center" },
+    { role: "receiving-hospital", title: "Receiving hospital", responsibility: "Accepts referral, schedules consultation, executes specialist service, and returns clinical feedback." },
+    { role: "hospital-it", title: "Hospital IT", responsibility: "Replays signed feedback/schedule/report callbacks and keeps HIS/EMR/LIS/PACS report return evidence." },
+    { role: "county-performance", title: "County performance office", responsibility: "Closes SLA supervision, quality feedback, and performance evaluation evidence." },
+    { role: "insurance", title: "Insurance and settlement", responsibility: "Reviews payment path, repeat-exam control, settlement rule, and archive policy evidence." }
+  ];
+  return definitions.map((item) => {
+    const evidenceRole = item.alias || item.role;
+    const receipt = receiptByRole.get(evidenceRole);
+    const exported = exportByRole.get(evidenceRole);
+    const signed = signoffByRole.has(evidenceRole) || Boolean(exported?.onsiteSigned);
+    const receiptDone = /completed|closed|signed|read/i.test(String(receipt?.status || ""));
+    const finalReady = Boolean(exported?.readyForFinalSignoff);
+    const blockers = [
+      receiptDone ? "" : "receipt pending",
+      finalReady ? "" : "final-ready pending",
+      signed ? "" : "onsite signoff pending"
+    ].filter(Boolean);
+    return {
+      ...item,
+      receiptStatus: receiptDone ? "receipt completed" : "receipt pending",
+      signoffStatus: signed ? "onsite signed" : finalReady ? "ready for onsite signoff" : "onsite signoff pending",
+      blockers,
+      todoCount: blockers.length,
+      todoItems: blockers.map((blocker) => `${formatCountyTeleconsultationRoleList([item.role])}: ${blocker}`),
+      actions: [
+        { label: "Open ledger", targetSelector: getCountyTeleconsultationRoleTarget("field-interface-replay", evidenceRole, "receipt") },
+        { label: "Open signoff", targetSelector: getCountyTeleconsultationRoleTarget("onsite-signoff-archive", evidenceRole, "signed") }
+      ]
+    };
+  });
 }
 
 function renderCountyTeleconsultationCutoverReadiness(state, rows) {
@@ -623,6 +706,237 @@ function buildCountyTeleconsultationActionQueue(plan, pack = {}) {
   };
 }
 
+function buildCountyConsortiumClosedLoopChain(state, rows, actionQueue = {}) {
+  const pack = state.referralTeleconsultationJointTestPack || {};
+  const receiptsByRole = new Map((Array.isArray(pack.taskReceipts) ? pack.taskReceipts : []).map((item) => [item.role, item]));
+  const exportByRole = new Map((Array.isArray(pack.exportSummary) ? pack.exportSummary : []).map((item) => [item.role, item]));
+  const signoffByRole = new Map((state.referralTeleconsultationSignoffs || [])
+    .filter((item) => item.status === "signed")
+    .map((item) => [item.role, item]));
+  const actionTargetByRole = new Map((actionQueue.items || [])
+    .flatMap((item) => item.pendingRoleActions || [])
+    .map((item) => [item.role, item.targetSelector]));
+  const teleconsultations = Array.isArray(rows) ? rows : [];
+  const archivedReportIds = new Set((state.personalRecords || [])
+    .filter((item) => item.category === "teleconsultation-report" && item.teleconsultationId)
+    .map((item) => item.teleconsultationId));
+  const hasMutualRecognitionEvidence = (state.countyMutualRecognitionRecords || []).some((item) => item.status || item.reason || item.reportId);
+  const baseSteps = [
+    {
+      id: "initiate",
+      label: "Initiate / two-way referral",
+      owner: "primary institution + lead hospital",
+      roles: ["referral-center"],
+      evidenceReady: teleconsultations.length > 0 && teleconsultations.every((item) => item.referralId && item.residentAuthorizationId && item.collaborationOrderId),
+      evidence: "Referral order, resident authorization, and county collaboration order are linked before upward or downward transfer.",
+      targetSelector: "#county-teleconsultation-loop",
+      actionLabel: "Open referral table",
+      externalBlocker: "external: real HIS/EMR referral order and resident authorization callback still require onsite interface replay."
+    },
+    {
+      id: "accept",
+      label: "Accept / receiving feedback",
+      owner: "receiving hospital",
+      roles: ["receiving-hospital"],
+      evidenceReady: teleconsultations.length > 0 && teleconsultations.every((item) => Object.hasOwn(item, "receivingFeedback")),
+      evidence: "Receiving feedback and triage result are returned to the consortium command board.",
+      targetSelector: actionTargetByRole.get("receiving-hospital") || "[data-referral-joint-ledger='receiving-hospital']",
+      actionLabel: "Open receiving ledger",
+      externalBlocker: "external: real scheduling or admission feedback callback still requires signed gateway payload replay."
+    },
+    {
+      id: "execute",
+      label: "Execute / remote consultation",
+      owner: "lead hospital specialist team",
+      roles: ["receiving-hospital", "hospital-it"],
+      evidenceReady: teleconsultations.length > 0 && teleconsultations.some((item) => item.meetingWindow && item.receivingDoctor),
+      evidence: "Remote consultation window, receiving doctor, clinical question, and specialist execution evidence are visible.",
+      targetSelector: "[data-referral-joint-ledger='receiving-hospital']",
+      actionLabel: "Open consultation ledger",
+      externalBlocker: "external: real video room, EMR, LIS, PACS, and appointment source integration are not marked as production connected."
+    },
+    {
+      id: "report-return",
+      label: "Report return / mutual-recognition evidence",
+      owner: "hospital IT + medical technology center",
+      roles: ["hospital-it"],
+      evidenceReady: teleconsultations.some((item) => item.reportStatus === "returned" || item.status === "report-returned")
+        && teleconsultations.filter((item) => item.reportStatus === "returned" || item.status === "report-returned").every((item) => archivedReportIds.has(item.id)),
+      evidence: hasMutualRecognitionEvidence
+        ? "Report callback is archived to resident records; inspection, lab, or imaging mutual-recognition records are kept as light evidence."
+        : "Report callback is archived to resident records; inspection, lab, or imaging mutual-recognition remains a light evidence entry.",
+      targetSelector: actionTargetByRole.get("hospital-it") || "[data-referral-joint-ledger='hospital-it']",
+      actionLabel: "Open report ledger",
+      externalBlocker: "external: real LIS/PACS/report callback and mutual-recognition quality rule mapping still require field validation."
+    },
+    {
+      id: "feedback-evaluation",
+      label: "Feedback / county evaluation",
+      owner: "county performance office",
+      roles: ["county-performance"],
+      evidenceReady: teleconsultations.length > 0 && teleconsultations.every((item) => item.countySupervision?.status && item.slaDisposition?.status),
+      evidence: "County supervision, SLA acknowledgement, resident follow-up, and satisfaction/performance notes are tracked.",
+      targetSelector: actionTargetByRole.get("county-performance") || "#county-teleconsultation-risk-board",
+      actionLabel: "Open evaluation board",
+      externalBlocker: "onsite: county, township, and village responsibility signoff still needs original signed material."
+    },
+    {
+      id: "performance-archive",
+      label: "Performance archive / payment policy",
+      owner: "insurance + performance",
+      roles: ["county-performance", "insurance"],
+      evidenceReady: teleconsultations.length > 0 && teleconsultations.every((item) => item.performance?.insurancePaymentPath && item.performance?.repeatExamControl),
+      evidence: "Insurance payment path, repeat-exam control, and consortium performance archive are available for settlement review.",
+      targetSelector: actionTargetByRole.get("insurance") || "#county-teleconsultation-risk-board",
+      actionLabel: "Open performance archive",
+      externalBlocker: "external: real insurance settlement, performance formula, production identity, audit export, and monitoring signoff remain cutover blockers."
+    }
+  ];
+  const steps = baseSteps.map((item) => {
+    const receiptsReady = item.roles.filter((role) => /completed|closed|signed|read/i.test(String(receiptsByRole.get(role)?.status || ""))).length;
+    const finalReady = item.roles.filter((role) => Boolean(exportByRole.get(role)?.readyForFinalSignoff)).length;
+    const signed = item.roles.filter((role) => Boolean(exportByRole.get(role)?.onsiteSigned)).length;
+    const blockers = [
+      item.evidenceReady ? "" : "local workflow evidence pending",
+      receiptsReady === item.roles.length ? "" : `task receipt pending: ${formatCountyTeleconsultationRoleList(item.roles.filter((role) => !/completed|closed|signed|read/i.test(String(receiptsByRole.get(role)?.status || ""))))}`,
+      finalReady === item.roles.length ? "" : `final-ready pending: ${formatCountyTeleconsultationRoleList(item.roles.filter((role) => !exportByRole.get(role)?.readyForFinalSignoff))}`,
+      signed === item.roles.length ? "" : `onsite signoff pending: ${formatCountyTeleconsultationRoleList(item.roles.filter((role) => !exportByRole.get(role)?.onsiteSigned))}`,
+      item.externalBlocker
+    ].filter(Boolean);
+    return {
+      ...item,
+      receiptsReady,
+      finalReady,
+      signed,
+      roles: item.roles.map((role) => formatCountyTeleconsultationRoleList([role])),
+      status: item.evidenceReady ? "ready" : "blocked",
+      blockers
+    };
+  });
+  const roles = buildCountyTeleconsultationClosedLoopRoles(receiptsByRole, exportByRole, signoffByRole);
+  const metrics = buildCountyConsortiumClosedLoopMetrics(state, teleconsultations, steps, roles);
+  return {
+    totalSteps: steps.length,
+    readySteps: steps.filter((item) => item.status === "ready").length,
+    externalBlockers: steps.filter((item) => item.blockers.some((blocker) => blocker.startsWith("external:"))).length,
+    onsiteBlockers: steps.filter((item) => item.blockers.some((blocker) => blocker.startsWith("onsite") || blocker.includes("onsite signoff pending"))).length,
+    implementedEvidence: ["two-way referral", "remote consultation", "report return", "mutual-recognition evidence", "SLA feedback", "performance archive", "role jump actions"],
+    steps,
+    roles,
+    metrics
+  };
+}
+
+function buildCountyConsortiumClosedLoopMetrics(state, rows, steps, roles) {
+  const teleconsultations = Array.isArray(rows) ? rows : [];
+  const total = teleconsultations.length;
+  const returned = teleconsultations.filter((item) => item.reportStatus === "returned" || item.status === "report-returned");
+  const mutualRecognition = (state.countyMutualRecognitionRecords || []).filter((item) => item.status || item.reason || item.reportId);
+  const grassrootsFollowup = teleconsultations.filter(hasCountyGrassrootsFollowupReturn);
+  const qualityFeedbackClosed = teleconsultations.filter(hasCountyQualityFeedbackClosure);
+  const avgResponse = averagePerformance(teleconsultations, "responseHours");
+  const roleTodoBacklog = roles.reduce((sum, item) => sum + item.todoCount, 0);
+  const readySteps = steps.filter((item) => item.status === "ready").length;
+  const rate = (count, denominator = total) => denominator ? Math.round((count / denominator) * 100) : 100;
+  return [
+    {
+      key: "consortium-loop-completion-rate",
+      label: "Closed-loop completion",
+      value: `${rate(readySteps, steps.length)}%`,
+      numericValue: rate(readySteps, steps.length),
+      target: "100% local evidence",
+      source: "county closed-loop stage evidence",
+      status: readySteps === steps.length ? "ready" : "blocked",
+      blocker: "external and onsite blockers remain separately tracked"
+    },
+    {
+      key: "collaboration-efficiency-hours",
+      label: "Collaboration efficiency",
+      value: Number.isFinite(avgResponse) ? `${avgResponse.toFixed(1)}h` : "-",
+      numericValue: Number.isFinite(avgResponse) ? avgResponse : null,
+      target: "<=4h high-priority response",
+      source: "referralTeleconsultations.performance.responseHours",
+      status: Number.isFinite(avgResponse) && avgResponse <= 4 ? "ready" : "watch",
+      blocker: "field SLA formula and hospital HIS timestamps remain onsite inputs"
+    },
+    {
+      key: "report-return-rate",
+      label: "Report return rate",
+      value: `${rate(returned.length)}%`,
+      numericValue: rate(returned.length),
+      target: ">=90%",
+      source: "referralTeleconsultations.reportStatus",
+      status: returned.length === total ? "ready" : "watch",
+      blocker: "real HIS/EMR/LIS/PACS report callbacks still require replay"
+    },
+    {
+      key: "mutual-recognition-evidence",
+      label: "Mutual-recognition evidence",
+      value: `${mutualRecognition.length} rows`,
+      numericValue: mutualRecognition.length,
+      target: ">=1 light evidence row",
+      source: "countyMutualRecognitionRecords",
+      status: mutualRecognition.length ? "ready" : "blocked",
+      blocker: "real LIS/PACS QC rule mapping remains onsite"
+    },
+    {
+      key: "grassroots-followup-return",
+      label: "Primary follow-up return",
+      value: `${grassrootsFollowup.length} rows`,
+      numericValue: grassrootsFollowup.length,
+      target: ">=1 down-referral follow-up row",
+      source: "referralTeleconsultations down-referral feedback",
+      status: grassrootsFollowup.length ? "ready" : "blocked",
+      blocker: "primary institution follow-up signoff remains onsite"
+    },
+    {
+      key: "quality-feedback-closure",
+      label: "Quality feedback closure",
+      value: `${qualityFeedbackClosed.length} rows`,
+      numericValue: qualityFeedbackClosed.length,
+      target: ">=1 closed quality/SLA feedback row",
+      source: "slaDisposition + countySupervision",
+      status: qualityFeedbackClosed.length ? "ready" : "blocked",
+      blocker: "county/township/village original signatures remain onsite"
+    },
+    {
+      key: "role-todo-backlog",
+      label: "Role todo backlog",
+      value: `${roleTodoBacklog} items`,
+      numericValue: roleTodoBacklog,
+      target: "0 before production cutover",
+      source: "taskReceipts + exportSummary + onsite signoff",
+      status: roleTodoBacklog ? "blocked" : "ready",
+      blocker: roleTodoBacklog ? "owner receipts or onsite signoffs still pending" : "local role evidence complete"
+    }
+  ];
+}
+
+function hasCountyGrassrootsFollowupReturn(item) {
+  const text = [
+    item.type,
+    item.targetInstitution,
+    item.sourceInstitution,
+    item.reportSummary,
+    item.receivingFeedback,
+    item.performance?.insurancePaymentPath,
+    item.slaDisposition?.action,
+    item.countySupervision?.reason
+  ].join(" ").toLowerCase();
+  return text.includes("down-referral") || text.includes("primary") || text.includes("community") || text.includes("follow-up") || text.includes("followup") || text.includes("grassroots");
+}
+
+function hasCountyQualityFeedbackClosure(item) {
+  const text = [
+    item.slaDisposition?.status,
+    item.slaDisposition?.action,
+    item.countySupervision?.status,
+    item.countySupervision?.reason,
+    item.performance?.satisfaction
+  ].join(" ").toLowerCase();
+  return text.includes("closed") || text.includes("acknowledged") || text.includes("quality") || text.includes("satisfaction");
+}
+
 function buildCountyTeleconsultationReceiptSummary(phase, receiptsByRole, exportByRole) {
   const roles = getCountyTeleconsultationPlanRoles(phase);
   const pendingReceipts = roles.filter((role) => !/completed|closed|signed|read/i.test(String(receiptsByRole.get(role)?.status || "")));
@@ -906,6 +1220,11 @@ function bindCountyActions() {
     const roleActionButton = event.target.closest("[data-referral-action-role]");
     if (roleActionButton) {
       document.querySelector(roleActionButton.dataset.targetSelector)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    const loopTargetButton = event.target.closest("[data-referral-loop-target]");
+    if (loopTargetButton) {
+      document.querySelector(loopTargetButton.dataset.targetSelector)?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     const button = event.target.closest("[data-county-action]");

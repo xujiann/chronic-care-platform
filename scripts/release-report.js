@@ -408,6 +408,8 @@ function referralTeleconsultationChecks(referralTeleconsultationReadiness) {
   return [
     check("referralTeleconsultation:readiness", referralTeleconsultationReadiness.ok, referralTeleconsultationReadiness.ok ? "referral teleconsultation readiness checks passed" : "referral teleconsultation readiness checks failed", "error", "referral"),
     check("referralTeleconsultation:authorization", referralTeleconsultationReadiness.checks?.some((item) => item.id === "referral:residentAuthorization" && item.passed), "resident authorization evidence present", "error", "referral"),
+    check("referralTeleconsultation:closedLoop", referralTeleconsultationReadiness.checks?.some((item) => item.id === "referral:consortiumClosedLoop" && item.passed), "consortium closed-loop stage evidence present", "error", "referral"),
+    check("referralTeleconsultation:closedLoopMetrics", referralTeleconsultationReadiness.checks?.some((item) => item.id === "referral:consortiumMetrics" && item.passed), "G-end consortium efficiency and completion metrics present", "error", "referral"),
     check("referralTeleconsultation:frontend", referralTeleconsultationReadiness.checks?.some((item) => item.id === "referral:frontend" && item.passed), "institution and county runnable entries present", "error", "referral")
   ];
 }

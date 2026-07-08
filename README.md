@@ -203,7 +203,7 @@ npm.cmd run release:manifest
 
 `monitoring:readiness` 会生成 `release/monitoring-readiness-report.json` 与 `release/monitoring-readiness-report.md`，专项检查健康检查、运行指标、慢请求、状态码、死信、数据质量、SLO 阈值、告警信号和 on-call escalation 证据；真实 Prometheus/OpenTelemetry 或平台日志绑定完成后，再用 `CUTOVER_MONITORING_SIGNOFF` 作为现场签字信号。
 
-`referral:readiness` 会生成 `release/referral-teleconsultation-readiness-report.json` 与 `release/referral-teleconsultation-readiness-report.md`，检查医联体转诊、远程会诊、接诊反馈、报告回传、协同工单、绩效评价、居民授权、审计留痕、专用 API 与机构端/县域端入口，作为 HIS/EMR、预约号源、远程视频、PACS/LIS 报告和医共体绩效公式现场联调前的闭环证据。
+`referral:readiness` 会生成 `release/referral-teleconsultation-readiness-report.json` 与 `release/referral-teleconsultation-readiness-report.md`，检查医联体转诊、远程会诊、接诊反馈、报告回传、协同工单、绩效评价、居民授权、审计留痕、专用 API 与机构端/县域端入口，作为 HIS/EMR、预约号源、远程视频、PACS/LIS 报告和医共体绩效公式现场联调前的闭环证据。县域端已把医共体协同闭环呈现为 `发起 -> 受理 -> 执行/会诊 -> 报告回传 -> 反馈/评价 -> 绩效归档` 六步状态链，并联动 action queue、taskReceipts、exportSummary 与角色跳转按钮；真实 HIS/EMR/LIS/PACS/医保回调、现场签字、生产身份、审计和监控仍保留为 external/onsite blockers。
 
 `evaluation:evidence` 会生成 `release/evaluation-evidence-report.json` 与 `release/evaluation-evidence-report.md`，汇总互联互通四甲/五乙测评所需接口清单、标准映射、交易样例、整改记录、P1 接口需求和流程审计证据。
 
@@ -284,6 +284,8 @@ The field contracts are tracked as `referral-feedback-callback-v1`, `referral-sc
 `POST /api/referral-teleconsultations/:id/escalations/ack` lets institution, county, or commission users acknowledge or close an SLA reminder. The action updates the teleconsultation `slaDisposition`, county supervision status, reminder message receipts, data-access logs, and security audit trail.
 
 `GET /api/referral-teleconsultations/performance-policy` exposes the referral teleconsultation payment and performance policy, including report-return rate, follow-up closure, repeat-exam control, and payment-path metrics for insurance review and medical consortium settlement.
+
+The "medical consortium closed loop" task from `chronic-care-platform/docs/浪潮方案4.1立即采纳开发任务分派表.md` is tracked in this thread as a runnable county-portal slice: the six-step closed-loop chain, role-based todos, mutual-recognition light evidence, primary follow-up return, quality/SLA feedback closure, and G-end collectible metrics (`consortium-loop-completion-rate`, `collaboration-efficiency-hours`, `grassroots-followup-return`, `quality-feedback-closure`). These fields are release evidence only; real HIS/EMR/LIS/PACS/insurance callbacks, onsite signatures, production identity, audit export, and monitoring remain external or onsite blockers.
 
 ## Priority app 3: medical quality and safety supervision
 

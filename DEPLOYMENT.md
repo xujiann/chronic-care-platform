@@ -187,7 +187,7 @@ npm.cmd run release:report:full
 
 `monitoring:readiness` 会生成 `release/monitoring-readiness-report.json` 和 `release/monitoring-readiness-report.md`，把 `/api/health`、`/api/metrics`、`/api/system/readiness`、请求状态码、慢请求、死信、数据质量、SLO 阈值、告警信号和 on-call escalation 归档为监控接入证据；生产切换前仍需将这些信号绑定到现场 Prometheus/OpenTelemetry 或平台日志服务，并取得 `CUTOVER_MONITORING_SIGNOFF`。
 
-`referral:readiness` 会生成 `release/referral-teleconsultation-readiness-report.json` 和 `release/referral-teleconsultation-readiness-report.md`，把双向转诊、远程会诊、接诊反馈、报告回传、协同工单、居民授权、审计留痕和绩效评价归档为专项证据；现场联调仍需接入 HIS/EMR 真实转诊单、预约号源/床位、远程视频系统、PACS/LIS 报告回传、医保支付路径和医共体绩效结算公式。
+`referral:readiness` 会生成 `release/referral-teleconsultation-readiness-report.json` 和 `release/referral-teleconsultation-readiness-report.md`，把双向转诊、远程会诊、接诊反馈、报告回传、协同工单、居民授权、审计留痕和绩效评价归档为专项证据；县域端同步展示医共体协同闭环六步状态链，并把牵头医院、基层机构、接诊医院、医院 IT、医保/绩效等角色的回执、终签、现场签字和阻塞项纳入可机检证据。现场联调仍需接入 HIS/EMR 真实转诊单、预约号源/床位、远程视频系统、PACS/LIS 报告回传、医保支付路径、医共体绩效结算公式、生产身份、审计保全和监控签字。
 
 `evaluation:evidence` 会生成 `release/evaluation-evidence-report.json` 和 `release/evaluation-evidence-report.md`，汇总互联互通四甲/五乙测评所需接口清单、标准映射、交易样例、整改记录、P1 接口需求和流程审计证据，作为现场截图、第三方测评结论和整改复测记录的前置材料。
 
@@ -276,6 +276,8 @@ Use `POST /api/referral-teleconsultations/signoff-summary/:role/evidence` to arc
 Use `POST /api/referral-teleconsultations/:id/escalations/ack` after an SLA reminder is sent. Institution and county users can acknowledge or close the supervision item; the platform updates `slaDisposition`, county supervision status, reminder receipts, and audit logs.
 
 Use `GET /api/referral-teleconsultations/performance-policy` to confirm insurance-payment and medical-consortium performance rules. The report includes report-return rate, follow-up closure, repeat-exam control, and configured payment paths before site settlement formulas are finalized.
+
+For the "medical consortium closed loop" task in `chronic-care-platform/docs/浪潮方案4.1立即采纳开发任务分派表.md`, release evidence must include the county portal DOM markers for six closed-loop stages, role-based todos, G-end collectible indicators, mutual-recognition light evidence, primary follow-up return, and quality/SLA feedback closure. These are pre-field acceptance signals; production HIS/EMR/LIS/PACS/insurance callbacks, onsite signatures, production identity, audit export, and monitoring remain required site inputs.
 
 Before onsite testing, compare `referral-feedback-callback-v1`, `referral-schedule-callback-v1`, and `referral-report-callback-v1` in `release/interface-mapping-report.md` with the real HIS/EMR scheduling, receiving feedback, and report payloads.
 

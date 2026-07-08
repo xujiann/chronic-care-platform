@@ -373,10 +373,21 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("county.js"), /data-referral-cutover-action-item/);
   assert.match(read("county.js"), /data-referral-action-role/);
   assert.match(read("county.js"), /data-target-selector/);
+  assert.match(read("county.js"), /data-consortium-loop-summary/);
+  assert.match(read("county.js"), /data-consortium-loop-step/);
+  assert.match(read("county.js"), /data-referral-loop-target/);
+  assert.match(read("county.js"), /data-consortium-loop-metrics/);
+  assert.match(read("county.js"), /data-gov-consortium-metric/);
+  assert.match(read("county.js"), /data-consortium-role-todo/);
+  assert.match(read("county.js"), /consortium-loop-completion-rate/);
+  assert.match(read("county.js"), /collaboration-efficiency-hours/);
+  assert.match(read("county.js"), /grassroots-followup-return/);
+  assert.match(read("county.js"), /quality-feedback-closure/);
   assert.match(read("county.js"), /data-referral-plan-action/);
   assert.match(read("county.js"), /normalizeCountyTeleconsultationNextPlan/);
   assert.match(read("county.js"), /buildCountyTeleconsultationPlanSummary/);
   assert.match(read("county.js"), /buildCountyTeleconsultationActionQueue/);
+  assert.match(read("county.js"), /buildCountyConsortiumClosedLoopChain/);
   assert.match(read("county.js"), /buildCountyTeleconsultationReceiptSummary/);
   assert.match(read("county.js"), /buildCountyTeleconsultationPendingRoleActions/);
   assert.match(read("county.js"), /buildCountyTeleconsultationRoleAction/);
@@ -435,6 +446,13 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("server.js"), /escalations\/ack/);
   assert.match(read("server.js"), /createReferralTeleconsultationEscalationMessage/);
   assert.match(read("server.js"), /highRisk/);
+  assert.match(read("scripts/referral-teleconsultation-readiness.js"), /buildReferralConsortiumClosedLoopEvidence/);
+  assert.match(read("scripts/referral-teleconsultation-readiness.js"), /referral:consortiumClosedLoop/);
+  assert.match(read("scripts/referral-teleconsultation-readiness.js"), /referral:consortiumMetrics/);
+  assert.match(read("scripts/referral-teleconsultation-readiness.js"), /consortiumLoopCompletionRate/);
+  assert.match(read("scripts/referral-teleconsultation-readiness.js"), /consortiumLoopExternalBlockers/);
+  assert.match(read("scripts/release-report.js"), /referralTeleconsultation:closedLoop/);
+  assert.match(read("scripts/release-report.js"), /referralTeleconsultation:closedLoopMetrics/);
   assert.match(read("server.js"), /schedule-callback/);
   assert.match(read("server.js"), /feedback-callback/);
   assert.match(read("server.js"), /appendReferralTeleconsultationNotifications/);
@@ -536,6 +554,45 @@ test("county teleconsultation action queue summarizes receipt evidence", () => {
     exportSummary: []
   });
   assert.equal(insuranceQueue.items[0].pendingRoleActions[0].targetSelector, "#county-teleconsultation-risk-board");
+});
+
+test("county consortium closed-loop chain maps stages to blockers and targets", () => {
+  const sandbox = {
+    API_BASE: "",
+    document: { addEventListener() {}, querySelector() { return null; } },
+    window: {}
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(read("county.js"), sandbox);
+
+  const state = JSON.parse(read("data/db.json"));
+  const actionQueue = {
+    items: [
+      {
+        pendingRoleActions: [
+          { role: "hospital-it", targetSelector: "[data-referral-joint-ledger='hospital-it']" },
+          { role: "insurance", targetSelector: "#county-teleconsultation-risk-board" }
+        ]
+      }
+    ]
+  };
+  const chain = sandbox.buildCountyConsortiumClosedLoopChain(state, state.referralTeleconsultations, actionQueue);
+  const plain = JSON.parse(JSON.stringify(chain));
+
+  assert.equal(plain.totalSteps, 6);
+  assert.equal(plain.readySteps, 6);
+  assert.equal(plain.steps.map((item) => item.id).join("->"), "initiate->accept->execute->report-return->feedback-evaluation->performance-archive");
+  assert.equal(plain.steps.some((item) => item.blockers.some((blocker) => blocker.startsWith("external:"))), true);
+  assert.equal(plain.steps.some((item) => item.blockers.some((blocker) => blocker.includes("onsite signoff pending"))), true);
+  assert.equal(plain.steps.find((item) => item.id === "report-return").targetSelector, "[data-referral-joint-ledger='hospital-it']");
+  assert.equal(plain.steps.find((item) => item.id === "performance-archive").targetSelector, "#county-teleconsultation-risk-board");
+  assert.equal(plain.metrics.length >= 7, true);
+  assert.equal(plain.metrics.some((item) => item.key === "consortium-loop-completion-rate" && item.numericValue === 100), true);
+  assert.equal(plain.metrics.some((item) => item.key === "collaboration-efficiency-hours" && Number.isFinite(item.numericValue)), true);
+  assert.equal(plain.metrics.some((item) => item.key === "mutual-recognition-evidence" && item.numericValue >= 1), true);
+  assert.equal(plain.metrics.some((item) => item.key === "grassroots-followup-return" && item.numericValue >= 1), true);
+  assert.equal(plain.metrics.some((item) => item.key === "quality-feedback-closure" && item.numericValue >= 1), true);
+  assert.equal(plain.roles.every((item) => Number.isInteger(item.todoCount) && Array.isArray(item.todoItems)), true);
 });
 
 test("regional data sharing application has runnable entry, API and evidence script", () => {
