@@ -2422,6 +2422,28 @@ function seedDrugConsumableSupervisions() {
       personIndex: "DEMO-ID-R2#DEMO-MOBILE-R2"
     },
     {
+      id: "dcs-supply-mp3",
+      residentId: "r2",
+      category: "supply-assurance",
+      boundary: "supply-alert",
+      institution: "Xinghaiwan Community Health Service Center",
+      sourceCollection: "medicationPickups",
+      sourceId: "mp3",
+      relatedPickupId: "mp3",
+      relatedClaimId: "ic2",
+      issue: "Metformin fixed-pickup supply is under low-stock warning and needs procurement or transfer confirmation.",
+      riskLevel: "warning",
+      reviewStatus: "supply-alert-registered",
+      insuranceStatus: "pending-audit",
+      remediationStatus: "open",
+      status: "open",
+      ownerRole: "institution",
+      nextAction: "Institution pharmacy confirms stock transfer plan and insurance center keeps the pickup cycle payable.",
+      auditTrail: [{ at: "2026-06-20T09:08:00.000Z", actor: "system", role: "commission", action: "seed", result: "created" }],
+      lastUpdated: "2026-06-20T09:08:00.000Z",
+      personIndex: "DEMO-ID-R2#DEMO-MOBILE-R2"
+    },
+    {
       id: "dcs-consumable-mr1",
       residentId: "r4",
       category: "high-value-consumable",
@@ -3458,6 +3480,10 @@ function collectJson(req) {
 }
 
 function normalizeState(data) {
+  const auditTrailSource = {
+    dataAccessLogs: Array.isArray(data?.dataAccessLogs) ? data.dataAccessLogs : null,
+    securityEvents: Array.isArray(data?.securityEvents) ? data.securityEvents : null
+  };
   data = restoreCorruptedStrings(seedState(), data);
   const state = {
     accounts: Array.isArray(data.accounts) ? data.accounts : seedState().accounts,
@@ -3508,8 +3534,8 @@ function normalizeState(data) {
     drugTraceabilityEvidenceRequirements: mergeByKey(seedDrugTraceabilityEvidenceRequirements(), data.drugTraceabilityEvidenceRequirements, "id"),
     emergencySignals: Array.isArray(data.emergencySignals) ? data.emergencySignals : seedEmergencySignals(),
     seniorServices: Array.isArray(data.seniorServices) ? data.seniorServices : seedSeniorServices(),
-    dataAccessLogs: sealAuditTrail(Array.isArray(data.dataAccessLogs) ? data.dataAccessLogs : seedDataAccessLogs()),
-    securityEvents: sealAuditTrail(Array.isArray(data.securityEvents) ? data.securityEvents : seedSecurityEvents()),
+    dataAccessLogs: sealAuditTrail(auditTrailSource.dataAccessLogs || seedDataAccessLogs()),
+    securityEvents: sealAuditTrail(auditTrailSource.securityEvents || seedSecurityEvents()),
     digitalCredentials: Array.isArray(data.digitalCredentials) ? data.digitalCredentials : seedDigitalCredentials(),
     healthArchiveStandard: data.healthArchiveStandard && typeof data.healthArchiveStandard === "object" ? data.healthArchiveStandard : seedHealthArchiveStandard(),
     authOrganizations: mergeByKey(seedAuthOrganizations(), data.authOrganizations, "orgCode"),
@@ -3914,8 +3940,12 @@ function sealAuditTrail(rows) {
   let previousHash = "";
   for (let index = items.length - 1; index >= 0; index -= 1) {
     const item = items[index];
-    if (!item.previousAuditHash) item.previousAuditHash = previousHash;
-    if (!item.auditHash) item.auditHash = auditHashFor(item);
+    const expectedHash = auditHashFor({ ...item, previousAuditHash: item.previousAuditHash || previousHash });
+    const hasEncodingReplacement = Object.values(item).some((value) => typeof value === "string" && value.includes("�"));
+    if (!item.auditHash || item.previousAuditHash !== previousHash || (hasEncodingReplacement && item.auditHash !== expectedHash)) {
+      item.previousAuditHash = previousHash;
+      item.auditHash = auditHashFor(item);
+    }
     previousHash = item.auditHash;
   }
   return items;
@@ -3930,7 +3960,7 @@ function verifyAuditTrail(rows) {
     const expectedHash = auditHashFor({ ...item, previousAuditHash: item.previousAuditHash || previousHash });
     const expectedPreviousHash = previousHash;
     if (item.previousAuditHash !== expectedPreviousHash || item.auditHash !== expectedHash) {
-      broken.push({ index, id: item.id || "", expectedPreviousHash, actualPreviousHash: item.previousAuditHash || "", expectedHash, actualHash: item.auditHash || "" });
+      broken.push({ index, id: item.id || "", action: item.action || "", target: item.target || "", detail: item.detail || "", expectedPreviousHash, actualPreviousHash: item.previousAuditHash || "", expectedHash, actualHash: item.auditHash || "" });
     }
     previousHash = item.auditHash || expectedHash;
   }
@@ -5237,6 +5267,7 @@ function buildDrugConsumableSupervision(data) {
   });
   const openRows = rows.filter((item) => item.normalizedStatus !== "closed");
   const completeCoverageRows = rows.filter((item) => item.traceabilityEvidenceCoverage?.status === "complete");
+  const supplyAlerts = rows.filter((item) => item.boundary === "supply-alert" || item.category === "supply-assurance");
   const traceabilityEvidenceChecklist = buildDrugTraceabilityEvidenceChecklist(rows, traceabilityPolicySources, traceabilityEvidenceRequirements);
   const insuranceContract = contracts.find((item) => item.id === "insurance-settlement-v1");
   return {
@@ -5245,6 +5276,7 @@ function buildDrugConsumableSupervision(data) {
       { id: "rational-medication", name: "Rational medication", source: "medicationPickups + personalRecords", count: rows.filter((item) => item.boundary === "rational-medication").length },
       { id: "prescription-review", name: "Prescription and pharmacist review", source: "drugConsumableSupervisions.reviewStatus", count: rows.filter((item) => /review|rational/.test(item.boundary)).length },
       { id: "fixed-pharmacy", name: "Fixed pickup", source: "medicationPickups", count: pickups.length },
+      { id: "supply-alert", name: "Supply assurance alerts", source: "medicationPickups + drugConsumableSupervisions", count: supplyAlerts.length },
       { id: "consumable-clue", name: "High-value consumable clues", source: "institutionSupervisions + drugConsumableSupervisions", count: rows.filter((item) => item.boundary === "consumable-clue").length },
       { id: "insurance-settlement", name: "Insurance settlement coordination", source: "insuranceClaims + integrationContracts", count: claims.length },
       { id: "remediation-loop", name: "Remediation loop", source: "workflow-actions + securityEvents", count: rows.filter((item) => item.remediationStatus && item.remediationStatus !== "closed").length }
@@ -5253,6 +5285,7 @@ function buildDrugConsumableSupervision(data) {
       total: rows.length,
       open: openRows.length,
       highRisk: rows.filter((item) => item.riskLevel === "high").length,
+      supplyAlerts: supplyAlerts.length,
       pendingInsurance: rows.filter((item) => drugConsumableStatus(item.insuranceStatus) === "pending").length,
       fixedPickup: pickups.length,
       claims: claims.length,
@@ -5267,6 +5300,7 @@ function buildDrugConsumableSupervision(data) {
     traceabilityPolicySources,
     traceabilityEvidenceRequirements,
     traceabilityEvidenceChecklist,
+    supplyAlerts,
     insuranceCoordination: {
       contractId: insuranceContract?.id || "",
       status: insuranceContract?.status || "missing",
@@ -5976,7 +6010,7 @@ async function handleApi(req, res) {
       return;
     }
     const session = createSession(user);
-    appendSecurityEvent({ actor: user.name, role: user.role, action: "登录", target: user.home, result: "允许", detail: "签名会话已签发，支持密钥轮换校验" });
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "登录", target: user.home, result: "允许", detail: "signed session issued; key rotation verified" });
     sendJson(res, 200, { ok: true, token: session.token, expiresAt: session.expiresAt, user: session.user });
     return;
   }

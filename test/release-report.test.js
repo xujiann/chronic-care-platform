@@ -111,10 +111,12 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "dataQuality:report" && item.passed), true);
   assert.equal(report.dataQuality.ok, true);
   assert.equal(report.checks.some((item) => item.name === "drugConsumable:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "drugConsumable:supplyAlert" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "drugConsumable:traceabilityPolicy" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "drugConsumable:traceabilityEvidence" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "drugConsumable:traceabilitySubmission" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "drugConsumable:traceabilityCoverage" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "drugConsumable:launchReadiness" && item.passed), true);
   assert.equal(report.drugConsumable.ok, true);
   assert.equal(report.checks.some((item) => item.name === "integration:readiness" && item.passed), true);
   assert.equal(report.integrationReadiness.ok, true);
@@ -285,6 +287,7 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(dataQualityMarkdown, /Resident-linked collections/);
   assert.equal(drugConsumableJson.drugConsumable.ok, true);
   assert.match(drugConsumableMarkdown, /Drug consumable readiness report/);
+  assert.match(drugConsumableMarkdown, /Launch readiness/);
   assert.match(drugConsumableMarkdown, /Traceability policy sources/);
   assert.match(drugConsumableMarkdown, /Traceability evidence requirements/);
   assert.equal(integrationJson.integrationReadiness.ok, true);

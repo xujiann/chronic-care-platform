@@ -103,6 +103,7 @@ test("static snapshot keeps completed P2 governance collections", () => {
   assert.equal(data.diseaseRegistryModels.some((item) => item.id === "dm-hypertension-risk-v1"), true);
   assert.equal(Array.isArray(data.drugConsumableSupervisions), true);
   assert.equal(data.drugConsumableSupervisions.some((item) => item.id === "dcs-rational-r1" && item.boundary === "rational-medication"), true);
+  assert.equal(data.drugConsumableSupervisions.some((item) => item.id === "dcs-supply-mp3" && item.boundary === "supply-alert" && item.relatedPickupId === "mp3"), true);
   assert.equal(data.drugConsumableSupervisions.some((item) => item.id === "dcs-consumable-mr1" && item.boundary === "consumable-clue"), true);
   assert.equal(Array.isArray(data.drugTraceabilityPolicySources), true);
   assert.equal(data.drugTraceabilityPolicySources.some((item) => item.id === "nhsa-2025-7" && item.documentNo === "医保发〔2025〕7号"), true);
@@ -229,6 +230,7 @@ test("insurance portal exposes actionable drug consumable supervision workflow",
   assert.match(server, /traceabilityEvidenceChecklist/);
   assert.match(server, /traceabilityEvidenceCoverage/);
   assert.match(server, /traceabilityCoverageCompleteRows/);
+  assert.match(server, /supplyAlerts/);
   assert.match(server, /drug-consumable-traceability-evidence/);
   assert.match(server, /drug-consumable-review/);
   assert.match(server, /drug-consumable-remediation/);

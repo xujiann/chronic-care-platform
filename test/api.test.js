@@ -891,11 +891,14 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const supervision = await api(baseUrl, "/api/drug-consumable-supervision", authorized(insurance.body.token));
     assert.equal(supervision.response.status, 200);
     assert.equal(supervision.body.summary.total >= 3, true);
+    assert.equal(supervision.body.summary.supplyAlerts >= 1, true);
     assert.equal(supervision.body.summary.traceabilityPolicySources >= 5, true);
     assert.equal(supervision.body.summary.traceabilityEvidenceRequirements >= 5, true);
     assert.equal(supervision.body.summary.traceabilityEvidenceItems >= 5, true);
     assert.equal(supervision.body.summary.traceabilityEvidenceReady >= 5, true);
     assert.equal(supervision.body.boundaries.some((item) => item.id === "rational-medication"), true);
+    assert.equal(supervision.body.boundaries.some((item) => item.id === "supply-alert"), true);
+    assert.equal(supervision.body.supplyAlerts.some((item) => item.id === "dcs-supply-mp3" && item.relatedPickupId === "mp3"), true);
     assert.equal(supervision.body.insuranceCoordination.contractId, "insurance-settlement-v1");
     assert.equal(supervision.body.traceabilityPolicySources.some((item) => item.id === "nhsa-2025-7"), true);
     assert.equal(supervision.body.traceabilityEvidenceRequirements.some((item) => item.id === "trace-code-mapping"), true);
