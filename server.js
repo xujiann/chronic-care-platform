@@ -7117,6 +7117,168 @@ function buildReferralInsurancePerformancePolicy(data) {
   };
 }
 
+function averageReferralPerformance(rows, field) {
+  const values = rows.map((item) => Number(item.performance?.[field])).filter(Number.isFinite);
+  if (!values.length) return null;
+  return Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(1));
+}
+
+function referralMetricPercent(count, total) {
+  return total ? Math.round((count / total) * 100) : 100;
+}
+
+function hasReferralGrassrootsFollowupReturn(item) {
+  const text = [
+    item.type,
+    item.targetInstitution,
+    item.sourceInstitution,
+    item.reportSummary,
+    item.receivingFeedback,
+    item.performance?.insurancePaymentPath,
+    item.slaDisposition?.action,
+    item.countySupervision?.reason
+  ].join(" ").toLowerCase();
+  return text.includes("down-referral") || text.includes("primary") || text.includes("community") || text.includes("follow-up") || text.includes("followup") || text.includes("grassroots");
+}
+
+function hasReferralQualityFeedbackClosure(item) {
+  const text = [
+    item.slaDisposition?.status,
+    item.slaDisposition?.action,
+    item.countySupervision?.status,
+    item.countySupervision?.reason,
+    item.performance?.satisfaction
+  ].join(" ").toLowerCase();
+  return text.includes("closed") || text.includes("acknowledged") || text.includes("quality") || text.includes("satisfaction");
+}
+
+function buildReferralConsortiumClosedLoopMetrics(data) {
+  const teleconsultations = Array.isArray(data.referralTeleconsultations) ? data.referralTeleconsultations : [];
+  const archivedReportIds = new Set((Array.isArray(data.personalRecords) ? data.personalRecords : [])
+    .filter((item) => item.category === "teleconsultation-report" && item.teleconsultationId)
+    .map((item) => item.teleconsultationId));
+  const mutualRecognitionEvidence = (Array.isArray(data.countyMutualRecognitionRecords) ? data.countyMutualRecognitionRecords : [])
+    .filter((item) => item.status || item.reason || item.reportId);
+  const returned = teleconsultations.filter((item) => item.reportStatus === "returned" || item.status === "report-returned");
+  const grassrootsFollowupReturned = teleconsultations.filter(hasReferralGrassrootsFollowupReturn);
+  const qualityFeedbackClosed = teleconsultations.filter(hasReferralQualityFeedbackClosure);
+  const steps = [
+    {
+      id: "initiate",
+      label: "initiate",
+      owner: "primary institution + lead hospital",
+      roles: ["referral-center"],
+      localEvidence: teleconsultations.length > 0 && teleconsultations.every((item) => item.referralId && item.residentAuthorizationId && item.collaborationOrderId),
+      blockerType: "external",
+      source: "referralSystem + resident authorization + countyCollaborationOrders"
+    },
+    {
+      id: "accept",
+      label: "accept",
+      owner: "receiving hospital",
+      roles: ["receiving-hospital"],
+      localEvidence: teleconsultations.length > 0 && teleconsultations.every((item) => Object.hasOwn(item, "receivingFeedback")),
+      blockerType: "external",
+      source: "receivingFeedback + callback taskMessages"
+    },
+    {
+      id: "execute",
+      label: "execute / teleconsultation",
+      owner: "lead hospital specialist team",
+      roles: ["receiving-hospital", "hospital-it"],
+      localEvidence: teleconsultations.some((item) => item.meetingWindow && item.receivingDoctor),
+      blockerType: "external",
+      source: "meetingWindow + receivingDoctor"
+    },
+    {
+      id: "report-return",
+      label: "report return",
+      owner: "hospital IT + medical technology center",
+      roles: ["hospital-it"],
+      localEvidence: returned.length > 0 && returned.every((item) => archivedReportIds.has(item.id)),
+      blockerType: "external",
+      source: "personalRecords teleconsultation-report archive",
+      lightEvidence: mutualRecognitionEvidence.length
+    },
+    {
+      id: "feedback-evaluation",
+      label: "feedback / evaluation",
+      owner: "county performance office",
+      roles: ["county-performance"],
+      localEvidence: teleconsultations.length > 0 && teleconsultations.every((item) => item.countySupervision?.status && item.slaDisposition?.status),
+      blockerType: "onsite",
+      source: "countySupervision + slaDisposition"
+    },
+    {
+      id: "performance-archive",
+      label: "performance archive",
+      owner: "insurance + performance",
+      roles: ["county-performance", "insurance"],
+      localEvidence: teleconsultations.length > 0 && teleconsultations.every((item) => item.performance?.insurancePaymentPath && item.performance?.repeatExamControl),
+      blockerType: "external",
+      source: "performance insurancePaymentPath + repeatExamControl"
+    }
+  ];
+  const roleSet = new Set(steps.flatMap((item) => item.roles));
+  const signedRoles = new Set((Array.isArray(data.referralTeleconsultationSignoffs) ? data.referralTeleconsultationSignoffs : [])
+    .filter((item) => item.status === "signed")
+    .map((item) => item.role));
+  const roleTodoBacklog = [...roleSet].filter((role) => !signedRoles.has(role)).length;
+  const localReady = steps.filter((item) => item.localEvidence).length;
+  const avgResponseHours = averageReferralPerformance(teleconsultations, "responseHours");
+  const metrics = [
+    { id: "consortium-loop-completion-rate", label: "Consortium loop completion rate", value: referralMetricPercent(localReady, steps.length), unit: "%", numerator: localReady, denominator: steps.length, source: "closed-loop stage evidence", target: "100%", status: "demo-ready" },
+    { id: "collaboration-efficiency-hours", label: "Collaboration efficiency hours", value: avgResponseHours, unit: "h", source: "referralTeleconsultations.performance.responseHours", target: "<=4h", status: avgResponseHours !== null ? "demo-ready" : "blocked" },
+    { id: "report-return-rate", label: "Report return rate", value: referralMetricPercent(returned.length, teleconsultations.length), unit: "%", numerator: returned.length, denominator: teleconsultations.length, source: "referralTeleconsultations.reportStatus", target: ">=90%", status: returned.length ? "demo-ready" : "blocked" },
+    { id: "mutual-recognition-evidence", label: "Mutual-recognition evidence", value: mutualRecognitionEvidence.length, unit: "rows", source: "countyMutualRecognitionRecords", target: ">=1 light evidence row", status: mutualRecognitionEvidence.length ? "demo-ready" : "blocked" },
+    { id: "grassroots-followup-return", label: "Grassroots follow-up return", value: grassrootsFollowupReturned.length, unit: "rows", source: "down-referral follow-up feedback", target: ">=1 returned follow-up", status: grassrootsFollowupReturned.length ? "demo-ready" : "blocked" },
+    { id: "quality-feedback-closure", label: "Quality feedback closure", value: qualityFeedbackClosed.length, unit: "rows", source: "slaDisposition + countySupervision", target: ">=1 closed quality feedback", status: qualityFeedbackClosed.length ? "demo-ready" : "blocked" },
+    { id: "role-todo-backlog", label: "Role todo backlog", value: roleTodoBacklog, unit: "items", source: "onsite signoff roles", target: "0 before production", status: roleTodoBacklog === 0 ? "site-ready" : "onsite-blocked" }
+  ];
+  const externalBlockers = [
+    "production HIS/EMR referral order callback",
+    "telemedicine scheduling/video platform callback",
+    "LIS/PACS report-return and mutual-recognition callback",
+    "insurance payment and consortium settlement formula callback"
+  ];
+  const onsiteBlockers = [
+    "onsite role signoff archive",
+    "production identity and audit export",
+    "monitoring dashboard and incident response confirmation"
+  ];
+  return {
+    ok: localReady === steps.length && metrics.length >= 7,
+    generatedAt: new Date().toISOString(),
+    endpoint: "/api/referral-teleconsultations/consortium-metrics",
+    source: "referralTeleconsultations + countyMutualRecognitionRecords + personalRecords + signoff evidence",
+    implementationStatus: "local-evidence-ready",
+    productionStatus: "blocked-until-onsite-integration",
+    summary: {
+      total: teleconsultations.length,
+      closedLoopSteps: steps.length,
+      closedLoopLocalReady: localReady,
+      completionRate: referralMetricPercent(localReady, steps.length),
+      collaborationEfficiencyHours: avgResponseHours,
+      reportReturnRate: referralMetricPercent(returned.length, teleconsultations.length),
+      mutualRecognitionEvidenceRows: mutualRecognitionEvidence.length,
+      grassrootsFollowupReturned: grassrootsFollowupReturned.length,
+      qualityFeedbackClosed: qualityFeedbackClosed.length,
+      roleTodoBacklog,
+      externalBlockers: externalBlockers.length,
+      onsiteBlockers: onsiteBlockers.length
+    },
+    steps,
+    metrics,
+    externalBlockers,
+    onsiteBlockers,
+    gEndCollection: {
+      endpoint: "/api/referral-teleconsultations/consortium-metrics",
+      roleScope: ["commission", "county"],
+      suggestedKeys: metrics.map((item) => item.id)
+    }
+  };
+}
+
 function buildDataQualityIssues(data) {
   const issues = [];
   const indexes = new Map();
@@ -8376,6 +8538,13 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission", "insurance", "county"], "/api/referral-teleconsultations/performance-policy");
     if (!user) return;
     sendJson(res, 200, buildReferralInsurancePerformancePolicy(readDatabase()));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/referral-teleconsultations/consortium-metrics") {
+    const user = requireApiRole(req, res, ["commission", "county"], "/api/referral-teleconsultations/consortium-metrics");
+    if (!user) return;
+    sendJson(res, 200, buildReferralConsortiumClosedLoopMetrics(readDatabase()));
     return;
   }
 

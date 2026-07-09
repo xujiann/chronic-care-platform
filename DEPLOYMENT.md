@@ -277,6 +277,8 @@ Use `POST /api/referral-teleconsultations/:id/escalations/ack` after an SLA remi
 
 Use `GET /api/referral-teleconsultations/performance-policy` to confirm insurance-payment and medical-consortium performance rules. The report includes report-return rate, follow-up closure, repeat-exam control, and configured payment paths before site settlement formulas are finalized.
 
+Use `GET /api/referral-teleconsultations/consortium-metrics` as the G-end indicator-center collection endpoint for the closed-loop slice. It reports loop completion, collaboration efficiency, report return, mutual-recognition light evidence, grassroots follow-up return, quality feedback closure, role backlog, and the remaining external/onsite blockers before production callbacks and signoffs are available.
+
 For the "medical consortium closed loop" task in `chronic-care-platform/docs/浪潮方案4.1立即采纳开发任务分派表.md`, release evidence must include the county portal DOM markers for six closed-loop stages, role-based todos, G-end collectible indicators, mutual-recognition light evidence, primary follow-up return, and quality/SLA feedback closure. These are pre-field acceptance signals; production HIS/EMR/LIS/PACS/insurance callbacks, onsite signatures, production identity, audit export, and monitoring remain required site inputs.
 
 Before onsite testing, compare `referral-feedback-callback-v1`, `referral-schedule-callback-v1`, and `referral-report-callback-v1` in `release/interface-mapping-report.md` with the real HIS/EMR scheduling, receiving feedback, and report payloads.

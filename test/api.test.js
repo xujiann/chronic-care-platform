@@ -711,6 +711,23 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const performancePolicy = await api(baseUrl, "/api/referral-teleconsultations/performance-policy", authorized(referralInsuranceUser.body.token));
     assert.equal(performancePolicy.response.status, 200);
     assert.equal(performancePolicy.body.rules.some((item) => item.id === "repeat-exam-control"), true);
+    const consortiumMetrics = await api(baseUrl, "/api/referral-teleconsultations/consortium-metrics", authorized(county.body.token));
+    assert.equal(consortiumMetrics.response.status, 200);
+    assert.equal(consortiumMetrics.body.ok, true);
+    assert.equal(consortiumMetrics.body.endpoint, "/api/referral-teleconsultations/consortium-metrics");
+    assert.equal(consortiumMetrics.body.summary.closedLoopSteps, 6);
+    assert.equal(consortiumMetrics.body.summary.completionRate, 100);
+    assert.equal(consortiumMetrics.body.summary.mutualRecognitionEvidenceRows >= 1, true);
+    assert.equal(consortiumMetrics.body.summary.grassrootsFollowupReturned >= 1, true);
+    assert.equal(consortiumMetrics.body.summary.qualityFeedbackClosed >= 1, true);
+    assert.equal(consortiumMetrics.body.metrics.length >= 7, true);
+    assert.equal(consortiumMetrics.body.metrics.some((item) => item.id === "consortium-loop-completion-rate" && item.value === 100), true);
+    assert.equal(consortiumMetrics.body.metrics.some((item) => item.id === "role-todo-backlog" && item.status === "onsite-blocked"), true);
+    assert.equal(consortiumMetrics.body.externalBlockers.some((item) => item.includes("HIS/EMR")), true);
+    assert.equal(consortiumMetrics.body.onsiteBlockers.some((item) => item.includes("onsite role signoff")), true);
+    assert.deepEqual(consortiumMetrics.body.gEndCollection.roleScope, ["commission", "county"]);
+    const consortiumMetricsDenied = await api(baseUrl, "/api/referral-teleconsultations/consortium-metrics", authorized(citizenToken));
+    assert.equal(consortiumMetricsDenied.response.status, 403);
     const referralEscalationRun = await api(baseUrl, "/api/referral-teleconsultations/escalations/run", authorized(county.body.token, {
       method: "POST",
       body: JSON.stringify({ teleconsultationId: "rtc-001" })

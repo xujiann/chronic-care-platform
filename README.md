@@ -285,6 +285,8 @@ The field contracts are tracked as `referral-feedback-callback-v1`, `referral-sc
 
 `GET /api/referral-teleconsultations/performance-policy` exposes the referral teleconsultation payment and performance policy, including report-return rate, follow-up closure, repeat-exam control, and payment-path metrics for insurance review and medical consortium settlement.
 
+`GET /api/referral-teleconsultations/consortium-metrics` exposes the G-end collectible medical-consortium closed-loop metrics for commission/county users: loop completion, collaboration response hours, report-return rate, mutual-recognition evidence rows, grassroots follow-up return, quality feedback closure, and role todo backlog. The endpoint is release and indicator-center evidence; it still marks production HIS/EMR/LIS/PACS/insurance callbacks, onsite signatures, production identity, audit export, and monitoring as external or onsite blockers.
+
 The "medical consortium closed loop" task from `chronic-care-platform/docs/浪潮方案4.1立即采纳开发任务分派表.md` is tracked in this thread as a runnable county-portal slice: the six-step closed-loop chain, role-based todos, mutual-recognition light evidence, primary follow-up return, quality/SLA feedback closure, and G-end collectible metrics (`consortium-loop-completion-rate`, `collaboration-efficiency-hours`, `grassroots-followup-return`, `quality-feedback-closure`). These fields are release evidence only; real HIS/EMR/LIS/PACS/insurance callbacks, onsite signatures, production identity, audit export, and monitoring remain external or onsite blockers.
 
 ## Priority app 3: medical quality and safety supervision

@@ -15,6 +15,7 @@ test("referral teleconsultation readiness validates closed-loop evidence", () =>
   assert.equal(report.ok, true);
   assert.equal(report.boundaries.includes("teleconsultation"), true);
   assert.equal(report.boundaries.includes("report return"), true);
+  assert.equal(report.boundaries.includes("consortium metrics API"), true);
   assert.equal(report.statusCatalog.includes("report-returned"), true);
   assert.equal(report.summary.total >= 2, true);
   assert.equal(report.summary.reportReturned >= 1, true);
@@ -43,6 +44,7 @@ test("referral teleconsultation readiness validates closed-loop evidence", () =>
   assert.equal(report.summary.qualityFeedbackClosed >= 1, true);
   assert.equal(report.summary.roleTodoBacklog >= 1, true);
   assert.equal(report.summary.consortiumMetrics >= 7, true);
+  assert.equal(report.summary.consortiumMetricsApi, true);
   assert.equal(report.consortiumMetrics.some((item) => item.id === "consortium-loop-completion-rate" && item.value === 100), true);
   assert.equal(report.consortiumMetrics.some((item) => item.id === "grassroots-followup-return" && item.value >= 1), true);
   assert.equal(report.consortiumMetrics.some((item) => item.id === "quality-feedback-closure" && item.value >= 1), true);
@@ -70,6 +72,7 @@ test("referral teleconsultation readiness validates closed-loop evidence", () =>
   assert.equal(report.checks.some((item) => item.id === "referral:signoffArchive" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:consortiumClosedLoop" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:consortiumMetrics" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "referral:consortiumMetricsApi" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:insurancePerformancePolicy" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "referral:frontend" && item.passed), true);
   assert.match(renderMarkdown(report), /Referral teleconsultation readiness report/);
@@ -107,6 +110,7 @@ test("referral teleconsultation readiness writes release artifacts", (t) => {
   assert.match(md, /Quality feedback closed/);
   assert.match(md, /Role todo backlog/);
   assert.match(md, /G-end consortium metrics/);
+  assert.match(md, /G-end consortium metrics API/);
   assert.match(md, /County supervision rows/);
   assert.match(md, /Insurance performance rows/);
   assert.match(md, /Avg response hours/);

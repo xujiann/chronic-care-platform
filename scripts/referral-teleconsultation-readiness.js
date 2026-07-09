@@ -23,7 +23,8 @@ const REQUIRED_BOUNDARIES = [
   "onsite signoff summary",
   "onsite signoff archive",
   "consortium closed loop",
-  "consortium metrics"
+  "consortium metrics",
+  "consortium metrics API"
 ];
 
 function readJson(relativePath) {
@@ -351,7 +352,8 @@ function buildReferralTeleconsultationReadinessReport(options = {}) {
     "onsite signoff summary": signoffSummary.summary.roles >= 5 && signoffSummary.summary.demoReady >= 5,
     "onsite signoff archive": /upsertReferralTeleconsultationSignoff/.test(server) && /data-referral-signoff-submit/.test(county),
     "consortium closed loop": consortiumClosedLoop.summary.steps === 6 && consortiumClosedLoop.summary.localReady >= 6 && consortiumClosedLoop.summary.uiReady,
-    "consortium metrics": consortiumClosedLoop.summary.metricsCount >= 6 && consortiumClosedLoop.summary.metricsUiReady && consortiumClosedLoop.summary.grassrootsFollowupReturned >= 1 && consortiumClosedLoop.summary.qualityFeedbackClosed >= 1
+    "consortium metrics": consortiumClosedLoop.summary.metricsCount >= 6 && consortiumClosedLoop.summary.metricsUiReady && consortiumClosedLoop.summary.grassrootsFollowupReturned >= 1 && consortiumClosedLoop.summary.qualityFeedbackClosed >= 1,
+    "consortium metrics API": /referral-teleconsultations\/consortium-metrics/.test(server) && /buildReferralConsortiumClosedLoopMetrics/.test(server)
   };
   const checks = [
     { id: "referral:boundary", passed: REQUIRED_BOUNDARIES.every((item) => boundaryEvidence[item]), detail: REQUIRED_BOUNDARIES.join(", ") },
@@ -376,6 +378,7 @@ function buildReferralTeleconsultationReadinessReport(options = {}) {
     { id: "referral:signoffArchive", passed: /upsertReferralTeleconsultationSignoff/.test(server) && /signoff-summary\/:role\/evidence/.test(server) && /archiveReferralSignoff/.test(county) && /data-referral-signoff-submit/.test(county), detail: `${signoffSummary.summary.siteSigned}/${signoffSummary.summary.roles} onsite signoffs archived; ${signoffSummary.summary.sitePending} pending` },
     { id: "referral:consortiumClosedLoop", passed: consortiumClosedLoop.summary.steps === 6 && consortiumClosedLoop.summary.localReady >= 6 && consortiumClosedLoop.summary.uiReady && consortiumClosedLoop.summary.roleCount >= 5, detail: `${consortiumClosedLoop.summary.localReady}/${consortiumClosedLoop.summary.steps} stages local-ready; ${consortiumClosedLoop.summary.externalBlockers} external blockers; ${consortiumClosedLoop.summary.onsiteBlockers} onsite blockers; ${consortiumClosedLoop.summary.mutualRecognitionEvidence} mutual-recognition evidence rows` },
     { id: "referral:consortiumMetrics", passed: consortiumClosedLoop.summary.metricsCount >= 6 && consortiumClosedLoop.summary.metricsUiReady && consortiumClosedLoop.summary.grassrootsFollowupReturned >= 1 && consortiumClosedLoop.summary.qualityFeedbackClosed >= 1, detail: `${consortiumClosedLoop.summary.completionRate}% completion; ${consortiumClosedLoop.summary.collaborationEfficiencyHours ?? "-"}h avg response; ${consortiumClosedLoop.summary.grassrootsFollowupReturned} grassroots follow-up rows; ${consortiumClosedLoop.summary.qualityFeedbackClosed} quality feedback closures; ${consortiumClosedLoop.summary.roleTodoBacklog} role todos` },
+    { id: "referral:consortiumMetricsApi", passed: /referral-teleconsultations\/consortium-metrics/.test(server) && /buildReferralConsortiumClosedLoopMetrics/.test(server), detail: "G-end consortium metrics API exposes completion, efficiency, report-return, mutual-recognition, follow-up, quality closure, and role backlog keys" },
     { id: "referral:insurancePerformancePolicy", passed: insurancePerformanceRows.length === teleconsultations.length && /performance-policy/.test(server) && /referral-performance-policy/.test(readText("insurance.html") + readText("insurance.js")), detail: `${insurancePerformanceRows.length}/${teleconsultations.length} payment policy rows` },
     { id: "referral:api", passed: /\/api\/referral-teleconsultations/.test(server) && /feedback-callback/.test(server) && /schedule-callback/.test(server) && /report-callback/.test(server) && /verifyIntegrationSignature/.test(server) && /canAccessReferralTeleconsultation/.test(server) && /appendDataAccessLog/.test(server), detail: "specialized API, signed feedback/schedule/report callbacks, role guard, and audit log present" },
     { id: "referral:frontend", passed: /teleconsultation-form/.test(institution) && /teleconsultation-action-form/.test(institution) && /teleconsultation-loop/.test(institution) && /county-teleconsultation-loop/.test(county) && /county-teleconsultation-status-filter/.test(county), detail: "institution create form, feedback form, institution loop, and county command entry present" },
@@ -415,6 +418,7 @@ function buildReferralTeleconsultationReadinessReport(options = {}) {
       qualityFeedbackClosed: consortiumClosedLoop.summary.qualityFeedbackClosed,
       roleTodoBacklog: consortiumClosedLoop.summary.roleTodoBacklog,
       consortiumMetrics: consortiumClosedLoop.summary.metricsCount,
+      consortiumMetricsApi: boundaryEvidence["consortium metrics API"],
       countySupervisionRows: countySupervised.length,
       insurancePerformanceRows: insurancePerformanceRows.length,
       collaborationOrders: teleconsultations.filter((item) => collaborationOrderIds.has(item.collaborationOrderId)).length,
@@ -476,6 +480,7 @@ function renderMarkdown(report) {
     `- Quality feedback closed: ${report.summary.qualityFeedbackClosed}`,
     `- Role todo backlog: ${report.summary.roleTodoBacklog}`,
     `- G-end consortium metrics: ${report.summary.consortiumMetrics}`,
+    `- G-end consortium metrics API: ${report.summary.consortiumMetricsApi ? "/api/referral-teleconsultations/consortium-metrics" : "missing"}`,
     `- County supervision rows: ${report.summary.countySupervisionRows}`,
     `- Insurance performance rows: ${report.summary.insurancePerformanceRows}`,
     `- Linked collaboration orders: ${report.summary.collaborationOrders}`,
