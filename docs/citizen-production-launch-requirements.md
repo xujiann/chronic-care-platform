@@ -94,7 +94,9 @@ flowchart TD
 | `GET /api/escort-services/dashboard` | 陪诊服务 | 只展示已发布服务商 |
 | `POST /api/escort-services/orders` | 陪诊预约 | 服务商、医院、日期、重复预约校验 |
 | `GET /api/registrations/dashboard` | 号源和订单 | HIS/互联网医院号源 |
+| `GET /api/registrations/integration-center` | 预约回调与对账 | 按机构裁剪来源、匹配和死信证据 |
 | `POST /api/registrations/orders` | 预约挂号 | 支付、医保、短信通知 |
+| `POST /api/integration/events` | 外部预约回调 | HMAC、幂等、状态顺序、死信和重试 |
 | `POST /api/registrations/orders/:id/cancel` | 取消预约 | 释放号源、退费/通知 |
 | `GET /api/messages` | 居民消息 | 多渠道送达回执 |
 | `POST /api/tasks/:id/actions` | 待办动作 | 幂等、审计、重复按钮隐藏 |

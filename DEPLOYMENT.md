@@ -191,6 +191,8 @@ npm.cmd run release:report:full
 
 `registration:journey-readiness` 会生成 `release/registration-journey-readiness-report.json` 和 `release/registration-journey-readiness-report.md`，核对预约号源、订单、支付、HIS 确认、医保预核验、到院报到、完诊、退号退款、消息和审计证据。居民端与机构端共用 `POST /api/registrations/orders/:id/actions`，但本地支付和退款凭据不代表真实交易；生产切换前必须完成医院 HIS、支付退款网关、医保结算回调和现场业务签字。
 
+`registration:integration-readiness` 会生成 `release/registration-integration-readiness-report.json` 和 `release/registration-integration-readiness-report.md`，核对 `appointment-order-v1` 契约、HMAC 签名、`externalId` 幂等、预约订单落库、成功/失败状态顺序、死信重试、机构范围和对账中心。正式环境必须配置非占位 `INTEGRATION_GATEWAY_SECRET`、机器身份/证书、网络白名单、真实状态字典和多方联调证据；本地签名回调不自动打开生产门禁。
+
 `process:audit` 会生成 `release/process-audit-report.json` 和 `release/process-audit-report.md`，把居民主索引、慢病验收、医共体验收、医保取药、统计证照、安全合规和生产切换汇总为全流程审计证据域；`release:report` 会同步写出这些文件，作为上线前跨模块审查和现场签字材料。
 
 `release:report` 会额外生成 `release/service-acceptance-summary.json` 和 `release/service-acceptance-summary.md`，汇总慢病与医共体服务域的建模状态、记录行数、开放事项数和 open actions，用于发布归档时核对 `/api/service-acceptance-summary` 与演示台账是否一致。

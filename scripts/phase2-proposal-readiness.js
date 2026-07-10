@@ -119,12 +119,12 @@ function defaultGapLedger() {
       priority: "P1",
       domain: "citizen-service",
       proposalRequirement: "Use Liaoshitong/e-Dalian unified entry for health archive lookup, one-stop appointments and family doctor contract.",
-      currentEvidence: "Resident archive, EMR, authorization, nursing, escort and mobile preview exist; the registration journey now covers resident payment/check-in, hospital confirmation/completion/refund, insurance confirmation, messages and audit evidence.",
-      gap: "Government unified entry, real-name verification, 17 live hospital appointment sources, certified payment/refund, insurance settlement callback and official triage knowledge base remain external blockers.",
-      nextStep: "Use the completed registration journey during onsite joint testing and replace demo receipts with government identity, live schedule, payment/refund, insurance and messaging callbacks.",
+      currentEvidence: "Resident archive, EMR, authorization, nursing, escort and mobile preview exist; the registration journey covers cross-role actions, while appointment-order-v1 adds signed callbacks, idempotent landing, dead-letter retry, order reconciliation and an institution callback center.",
+      gap: "Government unified entry, real-name verification, 17 live hospital appointment sources, certified payment/refund endpoints, insurance production credentials, signed status dictionaries and official triage knowledge base remain external blockers.",
+      nextStep: "Use the callback integration center during onsite joint testing and bind government identity, live schedule, payment/refund, insurance and messaging endpoints with signed dictionaries and cutover evidence.",
       owner: "citizen-service",
       status: "journey-mvp-onsite-blocked",
-      stage: "appointment-journey-mvp"
+      stage: "appointment-callback-integration-mvp"
     },
     {
       id: "family-doctor-contract",

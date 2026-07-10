@@ -28,11 +28,18 @@ function hospitalConfirmed(order) {
 
 function normalizeRegistrationJourneyOrder(order = {}) {
   let journeyStage = order.journeyStage || "slot-reserved-demo";
-  if (paymentReady(order)) journeyStage = "payment-recorded-demo";
-  if (hospitalConfirmed(order)) journeyStage = "hospital-confirmed-demo";
-  if (order.checkInStatus === "checked-in-demo") journeyStage = "checked-in-demo";
-  if (order.status === "completed") journeyStage = "completed-demo";
-  if (order.status === "cancelled") journeyStage = order.refundStatus === "refund-pending" ? "cancelled-refund-pending" : "cancelled";
+  const callbackEvidence = Array.isArray(order.auditTrail) && order.auditTrail.some((item) => String(item.action || "").startsWith("integration-"));
+  if (paymentReady(order)) journeyStage = order.paymentStatus === "paid" ? "payment-recorded-callback" : "payment-recorded-demo";
+  if (hospitalConfirmed(order)) journeyStage = order.hisConfirmationStatus === "confirmed" ? "hospital-confirmed-callback" : "hospital-confirmed-demo";
+  if (["checked-in", "checked-in-demo"].includes(order.checkInStatus)) journeyStage = order.checkInStatus === "checked-in" ? "checked-in-callback" : "checked-in-demo";
+  if (order.status === "completed") journeyStage = callbackEvidence || order.completionNo ? "completed-callback" : "completed-demo";
+  if (order.status === "cancelled") {
+    if (order.refundStatus === "refund-pending") journeyStage = "cancelled-refund-pending";
+    else if (order.refundStatus === "refund-failed") journeyStage = "cancelled-refund-failed-callback";
+    else if (order.refundStatus === "refunded") journeyStage = "cancelled-refunded-callback";
+    else if (order.refundStatus === "refunded-demo") journeyStage = "cancelled-refunded-demo";
+    else journeyStage = "cancelled";
+  }
   return {
     ...order,
     journeyStage,
@@ -55,8 +62,8 @@ function registrationJourneyAllowedActions(order, user = {}) {
   if (row.paymentStatus === "pending" && ["commission", "citizen"].includes(role)) actions.push("pay-demo");
   if (paymentReady(row) && !hospitalConfirmed(row) && ["commission", "institution"].includes(role)) actions.push("confirm-his-demo");
   if (row.insuranceStatus === "prechecked" && ["commission", "insurance"].includes(role)) actions.push("confirm-insurance-demo");
-  if (paymentReady(row) && hospitalConfirmed(row) && row.checkInStatus !== "checked-in-demo" && ["commission", "institution", "citizen"].includes(role)) actions.push("check-in-demo");
-  if (row.checkInStatus === "checked-in-demo" && ["commission", "institution"].includes(role)) actions.push("complete-demo");
+  if (paymentReady(row) && hospitalConfirmed(row) && !["checked-in", "checked-in-demo"].includes(row.checkInStatus) && ["commission", "institution", "citizen"].includes(role)) actions.push("check-in-demo");
+  if (["checked-in", "checked-in-demo"].includes(row.checkInStatus) && ["commission", "institution"].includes(role)) actions.push("complete-demo");
   return actions;
 }
 
@@ -124,10 +131,10 @@ function buildRegistrationJourneyCenter(orders = []) {
       paymentPending: rows.filter((item) => item.paymentStatus === "pending").length,
       paid: rows.filter(paymentReady).length,
       hospitalConfirmed: rows.filter(hospitalConfirmed).length,
-      checkedIn: rows.filter((item) => item.checkInStatus === "checked-in-demo").length,
+      checkedIn: rows.filter((item) => ["checked-in", "checked-in-demo"].includes(item.checkInStatus)).length,
       completed: rows.filter((item) => item.status === "completed").length,
       refundPending: rows.filter((item) => item.refundStatus === "refund-pending").length,
-      refunded: rows.filter((item) => item.refundStatus === "refunded-demo").length,
+      refunded: rows.filter((item) => ["refunded", "refunded-demo"].includes(item.refundStatus)).length,
       productionReady: 0,
       onsiteBlockers: 4
     },

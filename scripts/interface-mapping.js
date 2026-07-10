@@ -49,6 +49,19 @@ const FIELD_MAPPINGS = {
       reportedAt: "reportedAt"
     }
   },
+  "appointment-order-v1": {
+    targetCollection: "registrationOrders",
+    owner: "citizen-service-integration",
+    fields: {
+      externalId: "auditTrail[].externalId",
+      residentId: "residentId",
+      orderNo: "registrationNo",
+      slotId: "scheduleId",
+      eventType: "auditTrail[].action",
+      orderStatus: "status",
+      occurredAt: "updatedAt"
+    }
+  },
   "insurance-settlement-v1": {
     targetCollection: "insuranceClaims",
     owner: "cross-agency-integration",

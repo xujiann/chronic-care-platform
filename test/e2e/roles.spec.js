@@ -132,6 +132,10 @@ test("citizen stays in the household experience and cannot open commission pages
 test("institution and insurance accounts land on their own modules", async ({ page }) => {
   await login(page, "hospital", "institution.html");
   await expect(page.getByRole("heading", { name: "诊疗协同工作台" })).toBeVisible();
+  await expect(page.locator("#registration-integration-center")).toBeVisible();
+  await expect(page.locator("#registration-integration-status")).toHaveText("appointment-order-v1");
+  await expect(page.locator('[data-registration-integration-source="MR1"]')).toHaveCount(1);
+  await expect(page.locator('[data-registration-integration-source="MR2"]')).toHaveCount(0);
 
   await page.goto("/login.html");
   await page.locator("#login-user").selectOption("insurance");
@@ -182,4 +186,75 @@ test("registration journey crosses resident and institution portals", async ({ p
   expect(result.order.journeyStage).toBe("completed-demo");
   expect(result.order.productionReady).toBe(false);
   expect(result.audit.passed).toBe(true);
+});
+
+test("registration journey remains readable on a mobile viewport", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  await login(page, "citizen", "citizen.html");
+  await page.goto("/citizen.html?client=app&page=registration#service-registration");
+  const citizenJourney = page.locator("#registration-journey-timeline").locator("..");
+  await expect(citizenJourney).toBeVisible();
+  await expect(citizenJourney).toContainText("已完成");
+  await citizenJourney.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("citizen-registration-mobile.png") });
+  const citizenLayout = await page.evaluate(() => {
+    const section = document.querySelector("#registration-journey-timeline")?.parentElement;
+    const rect = section?.getBoundingClientRect();
+    return {
+      pageOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      left: rect?.left ?? -1,
+      right: rect?.right ?? Number.POSITIVE_INFINITY,
+      viewportWidth: document.documentElement.clientWidth
+    };
+  });
+  expect(citizenLayout.pageOverflow).toBe(false);
+  expect(citizenLayout.left).toBeGreaterThanOrEqual(0);
+  expect(citizenLayout.right).toBeLessThanOrEqual(citizenLayout.viewportWidth);
+
+  await login(page, "hospital", "institution.html");
+  const institutionJourney = page.locator("#registration-journey-workbench");
+  await expect(institutionJourney).toBeVisible();
+  await expect(institutionJourney).toContainText("生产：否");
+  await institutionJourney.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("institution-registration-mobile.png") });
+  const institutionLayout = await page.evaluate(() => {
+    const panel = document.querySelector("#registration-journey-workbench");
+    const rect = panel?.getBoundingClientRect();
+    return {
+      pageOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      left: rect?.left ?? -1,
+      right: rect?.right ?? Number.POSITIVE_INFINITY,
+      viewportWidth: document.documentElement.clientWidth
+    };
+  });
+  expect(institutionLayout.pageOverflow).toBe(false);
+  expect(institutionLayout.left).toBeGreaterThanOrEqual(0);
+  expect(institutionLayout.right).toBeLessThanOrEqual(institutionLayout.viewportWidth);
+
+  const integrationCenter = page.locator("#registration-integration-center");
+  await integrationCenter.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("institution-registration-integration-mobile.png") });
+  const integrationLayout = await page.evaluate(() => {
+    const selectors = [
+      "#registration-integration-center",
+      "#registration-integration-metrics",
+      "#registration-integration-sources",
+      "#registration-integration-events",
+      "#registration-integration-boundary"
+    ];
+    return {
+      viewportWidth: document.documentElement.clientWidth,
+      pageOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      regions: selectors.map((selector) => {
+        const rect = document.querySelector(selector)?.getBoundingClientRect();
+        return { selector, left: rect?.left ?? -1, right: rect?.right ?? Number.POSITIVE_INFINITY };
+      })
+    };
+  });
+  expect(integrationLayout.pageOverflow).toBe(false);
+  integrationLayout.regions.forEach((region) => {
+    expect(region.left, `${region.selector} should start inside the viewport`).toBeGreaterThanOrEqual(0);
+    expect(region.right, `${region.selector} should end inside the viewport`).toBeLessThanOrEqual(integrationLayout.viewportWidth);
+  });
 });

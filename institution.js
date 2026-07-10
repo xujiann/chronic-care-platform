@@ -1051,12 +1051,17 @@ function institutionRegistrationStatus(value) {
     cancelled: "已取消",
     pending: "待处理",
     waived: "免预付",
+    paid: "已支付回调",
+    failed: "支付失败",
     "paid-demo": "演示支付已记录",
     "pending-demo": "待医院确认",
     "confirmed-demo": "演示确认",
+    "checked-in": "已报到回调",
     "checked-in-demo": "已演示报到",
     "not-checked-in": "未报到",
     "refund-pending": "待退款",
+    "refund-failed": "退款回调失败",
+    refunded: "已退款回调",
     "refunded-demo": "演示退款完成",
     prechecked: "医保已预核验"
   }[value] || value || "待处理";
@@ -1070,8 +1075,8 @@ function institutionRegistrationAllowedActions(order) {
   const paymentReady = ["paid", "paid-demo", "waived"].includes(order.paymentStatus);
   const confirmed = ["confirmed", "confirmed-demo"].includes(order.hisConfirmationStatus);
   if (paymentReady && !confirmed) actions.push("confirm-his-demo");
-  if (paymentReady && confirmed && order.checkInStatus !== "checked-in-demo") actions.push("check-in-demo");
-  if (order.checkInStatus === "checked-in-demo") actions.push("complete-demo");
+  if (paymentReady && confirmed && !["checked-in", "checked-in-demo"].includes(order.checkInStatus)) actions.push("check-in-demo");
+  if (["checked-in", "checked-in-demo"].includes(order.checkInStatus)) actions.push("complete-demo");
   return actions;
 }
 
@@ -1085,7 +1090,7 @@ function renderRegistrationJourneyWorkbench(state) {
   const metrics = [
     ["本院预约", orders.length, "HIS/互联网医院"],
     ["待医院确认", orders.filter((item) => ["paid", "paid-demo", "waived"].includes(item.paymentStatus) && !["confirmed", "confirmed-demo"].includes(item.hisConfirmationStatus)).length, "支付后处理"],
-    ["已报到", orders.filter((item) => item.checkInStatus === "checked-in-demo").length, "等待完诊"],
+    ["已报到", orders.filter((item) => ["checked-in", "checked-in-demo"].includes(item.checkInStatus)).length, "等待完诊"],
     ["待退款", orders.filter((item) => item.refundStatus === "refund-pending").length, "退款闭环"]
   ];
   metricsTarget.innerHTML = metrics.map(([name, value, detail]) => `<article class="metric-card"><span>${name}</span><strong>${value}</strong><small>${detail}</small></article>`).join("");
@@ -1110,6 +1115,45 @@ function renderRegistrationJourneyWorkbench(state) {
     </article>`;
   }).join("") || `<p class="muted">本机构暂无预约就诊订单。</p>`;
   boundaryTarget.textContent = dashboard.journey?.boundary || "本工作台动作仅为本地业务闭环证据，生产仍需 HIS、支付退款和医保结算接口。";
+  renderRegistrationIntegrationCenter(dashboard.integrationCenter || {});
+}
+
+function renderRegistrationIntegrationCenter(center = {}) {
+  const statusTarget = document.querySelector("#registration-integration-status");
+  const metricsTarget = document.querySelector("#registration-integration-metrics");
+  const sourcesTarget = document.querySelector("#registration-integration-sources");
+  const eventsTarget = document.querySelector("#registration-integration-events");
+  const boundaryTarget = document.querySelector("#registration-integration-boundary");
+  if (!statusTarget || !metricsTarget || !sourcesTarget || !eventsTarget || !boundaryTarget) return;
+  const summary = center.summary || {};
+  const sources = center.sources || [];
+  const events = center.events || [];
+  statusTarget.textContent = center.contract?.id || "appointment-order-v1";
+  const metrics = [
+    ["回调总数", summary.callbacks || 0, "签名网关"],
+    ["匹配入库", summary.matched || 0, "订单对账"],
+    ["待对账", summary.pendingReconciliation || 0, "人工复核"],
+    ["死信", summary.deadLetters || 0, "重试补偿"]
+  ];
+  metricsTarget.innerHTML = metrics.map(([name, value, detail]) => `<article class="metric-card"><span>${name}</span><strong>${value}</strong><small>${detail}</small></article>`).join("");
+  sourcesTarget.innerHTML = sources.map((source) => `<section class="item" data-registration-integration-source="${institutionEscapeHtml(source.id)}">
+    <div>
+      <h3>${institutionEscapeHtml(source.hospital || source.hospitalCode || source.id)}</h3>
+      <p>${institutionEscapeHtml((source.sourceSystems || []).join(" / ") || "预约源")}</p>
+      <small>回调 ${Number(source.callbacks || 0)} · 匹配 ${Number(source.matchedCallbacks || 0)} · 生产：否</small>
+    </div>
+    <span class="badge ${source.matchedCallbacks ? "info" : "warn"}">${institutionEscapeHtml(source.jointTestStatus || "pending-site-callback")}</span>
+  </section>`).join("") || `<p class="muted">尚未登记预约号源。</p>`;
+  eventsTarget.innerHTML = events.map((event) => `<section class="item" data-registration-integration-event="${institutionEscapeHtml(event.id)}">
+    <div>
+      <h3>${institutionEscapeHtml(event.eventType || "callback")} · ${institutionEscapeHtml(event.orderNo || event.orderId || "unmatched")}</h3>
+      <p>${institutionEscapeHtml(event.hospitalCode || event.sourceInstitution || "external-provider")} · ${institutionEscapeHtml(event.receivedAt || event.updatedAt || "pending")}</p>
+      <small>签名 ${event.signatureVerified ? "通过" : "待核验"} · 对账 ${institutionEscapeHtml(event.reconciliationStatus || "pending")} · 幂等键 ${institutionEscapeHtml(event.idempotencyKey || "missing")}</small>
+      ${event.deadLetterReason ? `<small class="danger-text">${institutionEscapeHtml(event.deadLetterReason)}</small>` : ""}
+    </div>
+    <span class="badge ${event.deadLetter ? "danger" : event.reconciliationStatus === "matched" ? "info" : "warn"}">${institutionEscapeHtml(event.landingStatus || event.status || "pending")}</span>
+  </section>`).join("") || `<p class="muted">尚未收到预约回调，等待现场联调。</p>`;
+  boundaryTarget.textContent = center.boundary || "本地签名回调仅证明契约、幂等、落库和对账能力；生产仍需真实端点、凭据、字典和现场签字。";
 }
 
 async function runInstitutionRegistrationJourneyAction(orderId, action) {

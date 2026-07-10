@@ -26,7 +26,7 @@ test("phase 2 proposal readiness covers gaps work packages and blockers", () => 
   assert.equal(report.workPackages.some((item) => item.id === "p0-production-db-gateway" && item.status === "rehearsal-center-ready-onsite-blocked"), true);
   assert.equal(report.gapLedger.some((item) => item.id === "lab-mutual-recognition-ledger" && item.status === "mvp-ready-onsite-blocked"), true);
   assert.equal(report.gapLedger.some((item) => item.id === "consumer-operations-backend" && item.status === "mvp-ready-onsite-blocked" && item.stage === "ops-console-mvp"), true);
-  assert.equal(report.gapLedger.some((item) => item.id === "citizen-unified-entry" && item.status === "journey-mvp-onsite-blocked" && item.stage === "appointment-journey-mvp"), true);
+  assert.equal(report.gapLedger.some((item) => item.id === "citizen-unified-entry" && item.status === "journey-mvp-onsite-blocked" && item.stage === "appointment-callback-integration-mvp"), true);
   assert.equal(report.gapLedger.some((item) => item.id === "ops-backup-dr" && item.status === "run-center-ready-onsite-blocked" && item.stage === "run-center-mvp"), true);
   assert.equal(report.workPackages.some((item) => item.id === "p1-citizen-and-family-doctor" && item.status === "mvp-ready-onsite-blocked"), true);
   assert.equal(report.gapLedger.every((item) => item.owner && item.nextStep && item.status), true);

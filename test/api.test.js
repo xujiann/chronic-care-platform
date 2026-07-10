@@ -2569,6 +2569,110 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const registrationJourneyAudit = await api(baseUrl, "/api/state", authorized(commissionToken));
     assert.equal(registrationJourneyAudit.body.securityEvents.some((item) => item.action === "registration-journey-action" && item.result === "allowed"), true);
 
+    const callbackCandidate = await api(baseUrl, "/api/registrations/orders", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ residentId: "r1", scheduleId: schedule.id, visitType: "onsite", reason: "signed callback journey regression" })
+    }));
+    assert.equal(callbackCandidate.response.status, 201);
+    const callbackPayload = (eventType, sequence, updates = {}) => ({
+      contractId: "appointment-order-v1",
+      idempotencyKey: `appointment-order-${callbackCandidate.body.id}-${sequence}`,
+      externalId: `APPT-CALLBACK-${sequence}-${callbackCandidate.body.id}`,
+      residentId: callbackCandidate.body.residentId,
+      orderNo: callbackCandidate.body.registrationNo,
+      slotId: callbackCandidate.body.scheduleId,
+      eventType,
+      orderStatus: eventType,
+      occurredAt: `2026-07-10T12:0${sequence}:00.000Z`,
+      ...updates
+    });
+    const postCallback = (token, payload) => api(baseUrl, "/api/integration/events", authorized(token, {
+      method: "POST",
+      headers: { "x-integration-signature": integrationSignature(payload) },
+      body: JSON.stringify(payload)
+    }));
+
+    const paymentCallbackPayload = callbackPayload("payment-succeeded", 1, { receiptNo: "PAY-LIVE-REGRESSION-001" });
+    const paymentCallback = await postCallback(hospitalRegistrationToken, paymentCallbackPayload);
+    assert.equal(paymentCallback.response.status, 202);
+    assert.equal(paymentCallback.body.contractId, "appointment-order-v1");
+    assert.equal(paymentCallback.body.signatureVerified, true);
+    assert.equal(paymentCallback.body.reconciliationStatus, "matched");
+    assert.equal(paymentCallback.body.orderId, callbackCandidate.body.id);
+
+    const paymentReplay = await postCallback(hospitalRegistrationToken, paymentCallbackPayload);
+    assert.equal(paymentReplay.response.status, 200);
+    assert.equal(paymentReplay.body.id, paymentCallback.body.id);
+    assert.equal(paymentReplay.body.idempotentReplay, true);
+
+    const hisCallback = await postCallback(hospitalRegistrationToken, callbackPayload("his-confirmed", 2));
+    assert.equal(hisCallback.response.status, 202);
+    assert.equal(hisCallback.body.reconciliationStatus, "matched");
+    const insuranceCallback = await postCallback(insuranceRegistrationLogin.body.token, callbackPayload("insurance-confirmed", 3, { settlementNo: "MI-LIVE-001", coverage: 12 }));
+    assert.equal(insuranceCallback.response.status, 202);
+    assert.equal(insuranceCallback.body.reconciliationStatus, "matched");
+    const checkInCallback = await postCallback(hospitalRegistrationToken, callbackPayload("checked-in", 4, { checkInNo: "CHECKIN-LIVE-001" }));
+    assert.equal(checkInCallback.response.status, 202);
+    const completionCallback = await postCallback(hospitalRegistrationToken, callbackPayload("completed", 5, { completionNo: "COMPLETE-LIVE-001" }));
+    assert.equal(completionCallback.response.status, 202);
+
+    const callbackDashboard = await api(baseUrl, "/api/registrations/dashboard", authorized(citizenToken));
+    const callbackOrder = callbackDashboard.body.orders.find((item) => item.id === callbackCandidate.body.id);
+    assert.equal(callbackOrder.status, "completed");
+    assert.equal(callbackOrder.paymentStatus, "paid");
+    assert.equal(callbackOrder.hisConfirmationStatus, "confirmed");
+    assert.equal(callbackOrder.insuranceStatus, "confirmed");
+    assert.equal(callbackOrder.checkInStatus, "checked-in");
+    assert.equal(callbackOrder.journeyStage, "completed-callback");
+    assert.equal(callbackOrder.productionReady, false);
+    assert.equal(callbackDashboard.body.integrationCenter, null);
+
+    const callbackCenter = await api(baseUrl, "/api/registrations/integration-center", authorized(hospitalRegistrationToken));
+    assert.equal(callbackCenter.response.status, 200);
+    assert.equal(callbackCenter.body.contract.id, "appointment-order-v1");
+    assert.equal(callbackCenter.body.summary.callbacks >= 5, true);
+    assert.equal(callbackCenter.body.summary.matched >= 5, true);
+    assert.equal(callbackCenter.body.summary.productionReady, 0);
+    assert.equal(callbackCenter.body.events.every((item) => item.hospitalCode === "MR1"), true);
+
+    const retryCandidate = await api(baseUrl, "/api/registrations/orders", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ residentId: "r1", scheduleId: schedule.id, visitType: "onsite", reason: "dead-letter retry regression" })
+    }));
+    assert.equal(retryCandidate.response.status, 201);
+    const retryPayload = (eventType, sequence) => ({
+      contractId: "appointment-order-v1",
+      idempotencyKey: `appointment-retry-${retryCandidate.body.id}-${sequence}`,
+      externalId: `APPT-RETRY-${sequence}-${retryCandidate.body.id}`,
+      residentId: retryCandidate.body.residentId,
+      orderNo: retryCandidate.body.registrationNo,
+      slotId: retryCandidate.body.scheduleId,
+      eventType,
+      orderStatus: eventType,
+      occurredAt: `2026-07-10T13:0${sequence}:00.000Z`
+    });
+    const earlyCheckInPayload = retryPayload("checked-in", 1);
+    const earlyCheckIn = await postCallback(hospitalRegistrationToken, earlyCheckInPayload);
+    assert.equal(earlyCheckIn.response.status, 202);
+    assert.equal(earlyCheckIn.body.deadLetter, true);
+    assert.match(earlyCheckIn.body.deadLetterReason, /requires an open order with payment and HIS confirmation/);
+    assert.equal((await postCallback(hospitalRegistrationToken, retryPayload("payment-succeeded", 2))).response.status, 202);
+    assert.equal((await postCallback(hospitalRegistrationToken, retryPayload("his-confirmed", 3))).response.status, 202);
+    const retriedCheckIn = await api(baseUrl, `/api/integration/events/${earlyCheckIn.body.id}/retry`, authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({ reason: "prerequisites landed" })
+    }));
+    assert.equal(retriedCheckIn.response.status, 200);
+    assert.equal(retriedCheckIn.body.deadLetter, false);
+    assert.equal(retriedCheckIn.body.reconciliationStatus, "matched");
+    assert.equal(retriedCheckIn.body.retryCount, 1);
+
+    const registrationIntegrationAudit = await api(baseUrl, "/api/state", authorized(commissionToken));
+    const retriedOrder = registrationIntegrationAudit.body.registrationOrders.find((item) => item.id === retryCandidate.body.id);
+    assert.equal(retriedOrder.checkInStatus, "checked-in");
+    assert.equal(retriedOrder.auditTrail.some((item) => item.action === "integration-checked-in" && item.idempotencyKey === earlyCheckInPayload.idempotencyKey), true);
+    assert.equal(registrationIntegrationAudit.body.integrationGatewayEvents.some((item) => item.id === earlyCheckIn.body.id && item.reconciliationStatus === "matched"), true);
+
     const denied = await api(baseUrl, "/api/registrations/orders", authorized(citizenToken, {
       method: "POST",
       body: JSON.stringify({ residentId: "r2", scheduleId: schedule.id, reason: "scope violation" })

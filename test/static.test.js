@@ -2558,3 +2558,33 @@ test("appointment registration journey closes resident institution insurance and
   assert.match(read("scripts/release-artifact-manifest.js"), /registration-journey-readiness-report\.md/);
   assert.match(read(".github/workflows/ci.yml"), /npm run registration:journey-readiness/);
 });
+
+test("appointment callbacks land through signed gateway reconciliation", () => {
+  const server = read("server.js");
+  const institutionHtml = read("institution.html");
+  const institutionJs = read("institution.js");
+  const readiness = read("scripts/registration-integration-readiness.js");
+  const documentation = read("docs/registration-integration-center.md");
+  const mapping = read("scripts/interface-mapping.js");
+
+  assert.match(server, /appointment-order-v1/);
+  assert.match(server, /applyRegistrationIntegrationCallback/);
+  assert.match(server, /landAppointmentIntegrationEvent/);
+  assert.match(server, /\/api\/registrations\/integration-center/);
+  assert.match(server, /verifyIntegrationSignature/);
+  assert.match(institutionHtml, /registration-integration-center/);
+  assert.match(institutionHtml, /registration-integration-events/);
+  assert.match(institutionJs, /renderRegistrationIntegrationCenter/);
+  assert.match(institutionJs, /data-registration-integration-event/);
+  assert.match(readiness, /payment-succeeded/);
+  assert.match(readiness, /refund-failed/);
+  assert.match(readiness, /reconciliationStatus/);
+  assert.match(mapping, /"appointment-order-v1"/);
+  assert.match(mapping, /registrationOrders/);
+  assert.match(documentation, /HMAC-SHA256/);
+  assert.match(documentation, /Production boundary/);
+  assert.match(read("package.json"), /registration:integration-readiness/);
+  assert.match(read("scripts/release-report.js"), /registrationIntegration:readiness/);
+  assert.match(read("scripts/release-artifact-manifest.js"), /registration-integration-readiness-report\.md/);
+  assert.match(read(".github/workflows/ci.yml"), /npm run registration:integration-readiness/);
+});

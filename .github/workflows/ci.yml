@@ -71,6 +71,8 @@ jobs:
         run: npm run phase2:citizen-operations-readiness
       - name: Generate appointment registration journey readiness report
         run: npm run registration:journey-readiness
+      - name: Generate appointment callback integration readiness report
+        run: npm run registration:integration-readiness
       - name: Generate commercial crypto adapter readiness report
         run: npm run security:commercial-crypto-readiness
       - name: Generate medical quality and safety report

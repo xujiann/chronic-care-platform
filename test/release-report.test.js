@@ -218,6 +218,12 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.registrationJourney.ok, true);
   assert.equal(report.registrationJourney.center.summary.orders >= 1, true);
   assert.equal(report.registrationJourney.center.summary.productionReady, 0);
+  assert.equal(report.checks.some((item) => item.name === "registrationIntegration:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "registrationIntegration:gateway" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "registrationIntegration:production-boundary" && item.passed), true);
+  assert.equal(report.registrationIntegration.ok, true);
+  assert.equal(report.registrationIntegration.center.contract.id, "appointment-order-v1");
+  assert.equal(report.registrationIntegration.center.summary.productionReady, 0);
   assert.equal(report.checks.some((item) => item.name === "commercialCrypto:readiness" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "commercialCrypto:production-boundary" && item.passed), true);
   assert.equal(report.commercialCrypto.ok, true);
@@ -530,6 +536,8 @@ test("release report writes standalone production cutover and storage artifacts"
   const citizenOperationsMarkdown = fs.readFileSync(path.join(outputDir, "citizen-operations-readiness-report.md"), "utf8");
   const registrationJourneyJson = JSON.parse(fs.readFileSync(path.join(outputDir, "registration-journey-readiness-report.json"), "utf8"));
   const registrationJourneyMarkdown = fs.readFileSync(path.join(outputDir, "registration-journey-readiness-report.md"), "utf8");
+  const registrationIntegrationJson = JSON.parse(fs.readFileSync(path.join(outputDir, "registration-integration-readiness-report.json"), "utf8"));
+  const registrationIntegrationMarkdown = fs.readFileSync(path.join(outputDir, "registration-integration-readiness-report.md"), "utf8");
   const commercialCryptoJson = JSON.parse(fs.readFileSync(path.join(outputDir, "commercial-crypto-readiness-report.json"), "utf8"));
   const commercialCryptoMarkdown = fs.readFileSync(path.join(outputDir, "commercial-crypto-readiness-report.md"), "utf8");
   const drugConsumableJson = JSON.parse(fs.readFileSync(path.join(outputDir, "drug-consumable-readiness-report.json"), "utf8"));
@@ -618,6 +626,9 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.equal(registrationJourneyJson.registrationJourney.ok, true);
   assert.match(registrationJourneyMarkdown, /Registration journey readiness report/);
   assert.match(registrationJourneyMarkdown, /registrationJourney:stateMachine/);
+  assert.equal(registrationIntegrationJson.registrationIntegration.ok, true);
+  assert.match(registrationIntegrationMarkdown, /Registration integration readiness report/);
+  assert.match(registrationIntegrationMarkdown, /registrationIntegration:gateway/);
   assert.match(citizenOperationsMarkdown, /Citizen service operations readiness report/);
   assert.match(citizenOperationsMarkdown, /Production boundary/);
   assert.equal(commercialCryptoJson.commercialCrypto.ok, true);

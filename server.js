@@ -14,6 +14,11 @@ const {
   registrationJourneyAllowedActions
 } = require("./scripts/registration-journey-readiness");
 const {
+  APPOINTMENT_CONTRACT_ID,
+  applyRegistrationIntegrationCallback,
+  buildRegistrationIntegrationCenter
+} = require("./scripts/registration-integration-readiness");
+const {
   applyProductionOperationsAction,
   buildProductionOperationsCenter,
   seedDisasterRecoveryDrills,
@@ -1745,6 +1750,7 @@ function seedIntegrationContracts() {
     { id: "emr-summary-v1", domain: "EMR", version: "1.0.0", direction: "inbound", resource: "MedicalSummary", requiredFields: ["externalId", "residentId", "diagnosis", "recordDate"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "3 次指数退避", status: "ready" },
     { id: "lis-report-v1", domain: "LIS", version: "1.0.0", direction: "inbound", resource: "LabReport", requiredFields: ["externalId", "residentId", "item", "result", "reportedAt"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "3 次指数退避", status: "ready" },
     { id: "pacs-report-v1", domain: "PACS", version: "1.0.0", direction: "inbound", resource: "ImagingReport", requiredFields: ["externalId", "residentId", "modality", "conclusion", "reportedAt"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "3 次指数退避", status: "ready" },
+    { id: "appointment-order-v1", domain: "Appointment", version: "1.0.0", direction: "inbound", resource: "AppointmentOrderStatus", requiredFields: ["externalId", "residentId", "orderNo", "slotId", "eventType", "orderStatus", "occurredAt"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "3 attempts then dead letter and reconciliation", status: "ready" },
     { id: "insurance-settlement-v1", domain: "医保", version: "1.0.0", direction: "bidirectional", resource: "SettlementStatus", requiredFields: ["externalId", "residentId", "claimStatus", "amount"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "失败进入补偿队列", status: "ready" },
     { id: "certificate-sync-v1", domain: "电子证照", version: "1.0.0", direction: "outbound", resource: "CertificateStatus", requiredFields: ["externalId", "certificateNo", "status"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "失败进入补偿队列", status: "ready" },
     { id: "statistics-report-v1", domain: "卫生统计", version: "1.0.0", direction: "inbound", resource: "HealthStatistics", requiredFields: ["externalId", "period", "institution", "metrics"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "人工复核后重放", status: "ready" }
@@ -7887,10 +7893,16 @@ function normalizeIntegrationEvent(payload, user, contract) {
     domain: contract.domain,
     resource: contract.resource,
     residentId: String(payload.residentId || "").trim(),
+    orderNo: String(payload.orderNo || payload.payload?.orderNo || "").trim(),
+    eventType: String(payload.eventType || payload.payload?.eventType || "").trim(),
+    orderStatus: String(payload.orderStatus || payload.payload?.orderStatus || "").trim(),
+    occurredAt: String(payload.occurredAt || payload.payload?.occurredAt || "").trim(),
     status: "accepted",
+    signatureVerified: true,
     receivedAt: now,
     receivedBy: user.username || user.role,
     payload: payload.payload && typeof payload.payload === "object" ? payload.payload : {},
+    requestPayload: payload,
     retryCount: 0,
     deadLetter: false,
     reconciliationStatus: "待对账"
@@ -7930,6 +7942,35 @@ function updateIntegrationEvent(data, eventId, updater) {
   return updated;
 }
 
+function landAppointmentIntegrationEvent(data, payload, event, user) {
+  if (event.contractId !== APPOINTMENT_CONTRACT_ID) return { applied: false, event };
+  try {
+    const result = applyRegistrationIntegrationCallback(data.registrationOrders || [], payload, event, user);
+    data.registrationOrders = result.orders;
+    Object.assign(event, result.receipt, {
+      status: "accepted",
+      deadLetter: false,
+      deadLetterReason: ""
+    });
+    data.taskMessages = [
+      buildRegistrationJourneyTaskMessage(result.order, `integration-${result.receipt.eventType}`, user),
+      ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])
+    ].slice(0, 300);
+    appendDataAccessLog(data, user, result.order.residentId, "registrationOrders", `appointment callback ${result.receipt.eventType}`, "allowed");
+    return { applied: true, event, order: result.order };
+  } catch (error) {
+    Object.assign(event, {
+      status: "failed",
+      deadLetter: true,
+      deadLetterReason: String(error.message || "appointment callback landing failed").slice(0, 240),
+      landingStatus: "rejected",
+      reconciliationStatus: "dead-letter",
+      productionEvidence: false
+    });
+    return { applied: false, event, error };
+  }
+}
+
 function integrationSampleValue(field, contract, sequence) {
   const values = {
     externalId: `${contract.domain}-${String(sequence).padStart(3, "0")}`,
@@ -7945,6 +7986,11 @@ function integrationSampleValue(field, contract, sequence) {
     conclusion: "未见急性异常",
     claimStatus: "已结算",
     amount: 128.5,
+    orderNo: "REG-MR1-C08",
+    slotId: "reg-sch-cardio-am",
+    eventType: "his-confirmed",
+    orderStatus: "confirmed",
+    occurredAt: "2026-07-10T10:00:00.000Z",
     certificateNo: `CERT-${String(sequence).padStart(6, "0")}`,
     status: "有效",
     period: "2026-06",
@@ -8820,6 +8866,9 @@ function buildRegistrationDashboard(data, user) {
     .filter((item) => canAccessRegistrationOrder(user, item, data))
     .map(normalizeRegistrationJourneyOrder);
   const journey = buildRegistrationJourneyCenter(orders);
+  const integrationCenter = ["commission", "institution", "insurance", "county"].includes(user.role)
+    ? buildRegistrationIntegrationCenter(data, user)
+    : null;
   return {
     ok: true,
     summary: {
@@ -8846,9 +8895,10 @@ function buildRegistrationDashboard(data, user) {
       blockers: journey.blockers,
       boundary: journey.boundary
     },
+    integrationCenter,
     integration: {
-      endpoints: ["/api/registrations/dashboard", "/api/registrations/orders", "/api/registrations/orders/:id/actions", "/api/registrations/orders/:id/cancel"],
-      exchangeObjects: ["registrationSchedules", "registrationOrders", "taskMessages", "dataAccessLogs"],
+      endpoints: ["/api/registrations/dashboard", "/api/registrations/integration-center", "/api/registrations/orders", "/api/registrations/orders/:id/actions", "/api/registrations/orders/:id/cancel", "/api/integration/events"],
+      exchangeObjects: ["registrationSchedules", "registrationOrders", "integrationGatewayEvents", "taskMessages", "dataAccessLogs"],
       targetSystems: ["hospital HIS", "internet hospital", "payment gateway", "medical insurance e-voucher", "sms gateway"],
       status: "contract-ready"
     }
@@ -8965,7 +9015,15 @@ function buildRegistrationJourneyTaskMessage(order, action, user) {
     "confirm-insurance-demo": "Insurance precheck confirmed",
     "check-in-demo": "Check-in recorded",
     "complete-demo": "Visit completed",
-    "refund-demo": "Refund evidence recorded"
+    "refund-demo": "Refund evidence recorded",
+    "integration-payment-succeeded": "Signed payment callback landed",
+    "integration-payment-failed": "Payment callback exception recorded",
+    "integration-his-confirmed": "Signed HIS confirmation landed",
+    "integration-insurance-confirmed": "Signed insurance callback landed",
+    "integration-checked-in": "Signed check-in callback landed",
+    "integration-completed": "Signed completion callback landed",
+    "integration-refund-completed": "Signed refund callback landed",
+    "integration-refund-failed": "Refund callback exception recorded"
   };
   return {
     id: `msg-${randomUUID()}`,
@@ -16806,6 +16864,13 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/registrations/integration-center") {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/registrations/integration-center");
+    if (!user) return;
+    sendJson(res, 200, buildRegistrationIntegrationCenter(readDatabase(), user));
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/registrations/dashboard") {
     const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county", "citizen"], "/api/registrations/dashboard");
     if (!user) return;
@@ -18946,6 +19011,7 @@ async function handleApi(req, res) {
       return;
     }
     const event = normalizeIntegrationEvent(payload, user, contract);
+    landAppointmentIntegrationEvent(data, payload, event, user);
     data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
     data.securityEvents = [
       {
@@ -18986,6 +19052,7 @@ async function handleApi(req, res) {
       simulated: true,
       simulatorSignature: sample.signature
     };
+    landAppointmentIntegrationEvent(data, sample.payload, event, user);
     data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
     data.securityEvents = [
       {
@@ -19033,6 +19100,9 @@ async function handleApi(req, res) {
     if (!event) {
       sendJson(res, 404, { error: "Not Found", message: "未找到集成网关事件" });
       return;
+    }
+    if (event.contractId === APPOINTMENT_CONTRACT_ID && event.requestPayload) {
+      landAppointmentIntegrationEvent(data, event.requestPayload, event, user);
     }
     data.securityEvents = [
       {

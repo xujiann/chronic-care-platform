@@ -13,7 +13,7 @@
 | 全生命周期待办 | `/api/citizen/lifecycle-actions`, `/api/state` | `birthCertificates`, `deathCertificates`, `followups`, `medicationPickups`, `seniorServices`, `personalRecords.authorizations` | 已实现 | 接入真实妇幼、公卫、慢病、老年照护和身后事项经办系统，按居民授权范围裁剪 |
 | 护理 | `/api/internet-nursing/dashboard`, `/api/internet-nursing/orders` | `internetNursingOrders`, `internetNursingNurses`, `taskMessages`, `citizenExtra.longTermCareAssessments` | 已实现 | 补齐护士资质、电子签名、定位轨迹、质控监管、长期护理险和民政补贴正式接口 |
 | 陪诊 | `/api/escort-services/dashboard`, `/api/escort-services/orders`, `/api/messages` | `escortServiceOrders`, `escortServiceProviders`, `escortWorkers`, `taskMessages` | 已实现 | 对接医院接诊回执、保险保障和服务主体监管 |
-| 挂号 | `/api/registrations/dashboard`, `/api/registrations/orders`, `/api/registrations/orders/:id/cancel` | `registrationSchedules`, `registrationOrders`, `taskMessages`, `dataAccessLogs` | 接口闭环 | 替换为医院 HIS/互联网医院号源池、支付平台、医保电子凭证和短信网关 |
+| 挂号 | `/api/registrations/dashboard`, `/api/registrations/integration-center`, `/api/registrations/orders`, `/api/registrations/orders/:id/actions`, `/api/registrations/orders/:id/cancel`, `/api/integration/events` | `registrationSchedules`, `registrationOrders`, `integrationGatewayEvents`, `taskMessages`, `dataAccessLogs` | 签名回调与对账闭环 | 绑定真实 HIS/互联网医院号源、支付、医保和短信端点及正式凭据 |
 | 登录与身份 | `/api/auth/phone-code`, `/api/auth/phone-login`, `/api/auth/me` | `accounts`, `authUsers`, `securityEvents` | 已实现 | 已具备演示短信验证码签发、冷却、有效期、居民会话和安全审计；生产接入真实短信网关、实名核验和风控策略 |
 | 消息与待办 | `/api/messages`, `/api/tasks/:id/actions` | `taskMessages`, `service tasks`, `dataAccessLogs` | 已实现 | 接入真实短信、订阅消息、送达回执和审计保全；居民端按确认、取消、评价状态隐藏重复操作按钮 |
 
@@ -23,7 +23,10 @@
 
 - `GET /api/registrations/dashboard`: 返回可预约号源、居民可见挂号订单、HIS/支付/医保/短信集成摘要。
 - `POST /api/registrations/orders`: 居民端提交挂号预约，锁定 `hisScheduleId`，生成 `hisVisitId`、`registrationNo`、`paymentTradeNo`、`insurancePrecheckNo` 和短信/站内信送达记录。
+- `POST /api/registrations/orders/:id/actions`: 居民、机构和医保角色完成本地支付、确认、报到、完诊和退款演练动作。
 - `POST /api/registrations/orders/:id/cancel`: 居民端或机构端取消预约，释放号源，更新 `scheduleLockStatus`、`paymentStatus`、`refundStatus`，并生成取消通知。
+- `POST /api/integration/events`: 按 `appointment-order-v1` 校验 HMAC、必填字段、幂等号、角色范围和状态顺序，成功回调落到挂号订单，异常进入死信。
+- `GET /api/registrations/integration-center`: 返回机构范围内的来源、签名、匹配、待对账和死信摘要。
 
 ## 4. 发布验证
 
@@ -37,4 +40,4 @@
 
 ## 5. 下一步
 
-挂号接口化已完成。下一步建议进入真实网关联调：医院 HIS/互联网医院号源、支付平台、医保电子凭证、短信服务商分别提供测试环境、签名密钥、幂等号规则和回调样例后，替换当前模拟契约。
+挂号接口化、跨角色状态机和签名回调对账中心已完成。下一步进入真实网关联调：医院 HIS/互联网医院号源、支付平台、医保电子凭证、短信服务商分别提供测试环境、正式凭据、网络白名单、状态字典和全场景回调样例，再完成重试、死信、回滚和多方签字。

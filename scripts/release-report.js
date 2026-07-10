@@ -33,6 +33,7 @@ const { buildHospitalOperationsReadinessReport, renderMarkdown: renderHospitalOp
 const { buildMonitoringReadinessReport, renderMarkdown: renderMonitoringReadinessMarkdown } = require("./monitoring-readiness");
 const { buildOperationsReadinessReport, renderMarkdown: renderOperationsReadinessMarkdown } = require("./operations-readiness");
 const { buildRegistrationJourneyReadiness, renderMarkdown: renderRegistrationJourneyMarkdown } = require("./registration-journey-readiness");
+const { buildRegistrationIntegrationReadiness, renderMarkdown: renderRegistrationIntegrationMarkdown } = require("./registration-integration-readiness");
 const { buildOnsiteLaunchRequirements, renderMarkdown: renderOnsiteLaunchRequirementsMarkdown } = require("./onsite-launch-requirements");
 const { buildMaternalChildReadinessReport, renderMarkdown: renderMaternalChildReadinessMarkdown } = require("./maternal-child-readiness");
 const { buildPolicyCoverageReport, renderMarkdown: renderPolicyCoverageMarkdown } = require("./policy-coverage");
@@ -572,6 +573,15 @@ function registrationJourneyChecks(registrationJourney) {
   ];
 }
 
+function registrationIntegrationChecks(registrationIntegration) {
+  return [
+    check("registrationIntegration:readiness", registrationIntegration.ok, registrationIntegration.ok ? "appointment callback integration checks passed" : "appointment callback integration checks failed", "error", "registration-integration"),
+    check("registrationIntegration:contract", registrationIntegration.center?.contract?.id === "appointment-order-v1", registrationIntegration.center?.contract?.id || "appointment contract missing", "error", "registration-integration"),
+    check("registrationIntegration:gateway", registrationIntegration.checks?.filter((item) => ["registrationIntegration:gateway", "registrationIntegration:mapping", "registrationIntegration:api"].includes(item.id)).every((item) => item.passed), "signature, idempotency, landing, mapping and reconciliation API are wired", "error", "registration-integration"),
+    check("registrationIntegration:production-boundary", registrationIntegration.center?.summary?.productionReady === 0 && (registrationIntegration.center?.summary?.onsiteBlockers || 0) >= 5, `${registrationIntegration.center?.summary?.productionReady || 0} production-ready / ${registrationIntegration.center?.summary?.onsiteBlockers || 0} onsite blockers`, "error", "registration-integration")
+  ];
+}
+
 function commercialCryptoChecks(commercialCrypto) {
   return [
     check("commercialCrypto:readiness", commercialCrypto.ok, commercialCrypto.ok ? "commercial crypto adapter checks passed" : "commercial crypto adapter checks failed", "error", "commercial-crypto"),
@@ -908,6 +918,7 @@ function buildReleaseReport(options = {}) {
   const phase2FamilyDoctor = buildPhase2FamilyDoctorReadiness({ data, pkg });
   const citizenOperations = buildCitizenOperationsReadiness({ data, pkg });
   const registrationJourney = buildRegistrationJourneyReadiness({ data, pkg });
+  const registrationIntegration = buildRegistrationIntegrationReadiness({ data, pkg });
   const commercialCrypto = buildCommercialCryptoReadiness({ data, pkg });
   const phase2Proposal = buildPhase2ProposalReadiness({ pkg });
   const regionalDataSharing = buildRegionalDataSharingReport({ data, pkg });
@@ -961,6 +972,7 @@ function buildReleaseReport(options = {}) {
     ...phase2FamilyDoctorChecks(phase2FamilyDoctor),
     ...citizenOperationsChecks(citizenOperations),
     ...registrationJourneyChecks(registrationJourney),
+    ...registrationIntegrationChecks(registrationIntegration),
     ...commercialCryptoChecks(commercialCrypto),
     ...phase2ProposalChecks(phase2Proposal),
     ...qualitySafetyChecks(qualitySafety),
@@ -1025,6 +1037,7 @@ function buildReleaseReport(options = {}) {
     phase2FamilyDoctor,
     citizenOperations,
     registrationJourney,
+    registrationIntegration,
     commercialCrypto,
     phase2Proposal,
     qualitySafety,
@@ -1513,6 +1526,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       registrationJourney: report.registrationJourney
     }, null, 2), "utf8");
+    const registrationIntegrationJson = path.join(path.dirname(output), "registration-integration-readiness-report.json");
+    fs.writeFileSync(registrationIntegrationJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      registrationIntegration: report.registrationIntegration
+    }, null, 2), "utf8");
     const commercialCryptoJson = path.join(path.dirname(output), "commercial-crypto-readiness-report.json");
     fs.writeFileSync(commercialCryptoJson, JSON.stringify({
       project: report.project,
@@ -1781,6 +1802,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(citizenOperationsMarkdown, renderCitizenOperationsMarkdown(report.citizenOperations), "utf8");
     const registrationJourneyMarkdown = path.join(path.dirname(markdown), "registration-journey-readiness-report.md");
     fs.writeFileSync(registrationJourneyMarkdown, renderRegistrationJourneyMarkdown(report.registrationJourney), "utf8");
+    const registrationIntegrationMarkdown = path.join(path.dirname(markdown), "registration-integration-readiness-report.md");
+    fs.writeFileSync(registrationIntegrationMarkdown, renderRegistrationIntegrationMarkdown(report.registrationIntegration), "utf8");
     const commercialCryptoMarkdown = path.join(path.dirname(markdown), "commercial-crypto-readiness-report.md");
     fs.writeFileSync(commercialCryptoMarkdown, renderCommercialCryptoMarkdown(report.commercialCrypto), "utf8");
     const qualitySafetyMarkdown = path.join(path.dirname(markdown), "quality-safety-report.md");

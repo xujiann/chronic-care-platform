@@ -229,6 +229,8 @@ npm.cmd run hybrid:deployment-readiness
 
 `registration:journey-readiness` 会生成 `release/registration-journey-readiness-report.json` 与 `release/registration-journey-readiness-report.md`。居民端挂号服务和机构端预约协同工作台通过 `POST /api/registrations/orders/:id/actions` 串联演示支付、HIS 确认、医保预核验确认、到院报到、完诊和退号退款，并把每一步写入消息、访问日志和安全审计；所有演示交易保持 `productionReady=false`，正式上线仍需真实 HIS、支付退款、医保结算和现场验收。
 
+`registration:integration-readiness` 会生成 `release/registration-integration-readiness-report.json` 与 `release/registration-integration-readiness-report.md`。`appointment-order-v1` 通过现有 HMAC 集成网关接收支付、HIS、医保、报到、完诊和退款成功/失败回调，执行必填字段、角色范围、状态顺序、幂等、订单落库、死信、重试和对账校验；机构端预约工作台展示来源、签名、匹配和异常摘要。回调证据仍保持 `productionEvidence=false`，正式切换需真实端点、非占位密钥、机器身份、字段字典、全场景联调和多方签字。
+
 `process:audit` 会生成 `release/process-audit-report.json` 与 `release/process-audit-report.md`，把居民主索引、慢病验收、医共体验收、医保取药、统计证照、安全合规和生产切换汇总为全流程审计证据域；`release:report` 会同步归档该报告。
 
 `release:report` 会额外生成 `release/service-acceptance-summary.json` 与 `release/service-acceptance-summary.md`，把慢病和医共体服务域的建模情况、记录行数、开放事项数和 open actions 整理为单独验收摘要，便于从发布包直接核对 `/api/service-acceptance-summary` 的运行时结果。

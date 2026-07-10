@@ -20,6 +20,7 @@ test("release artifact manifest indexes reports templates commands and evidence"
   assert.equal(report.templateReadmes.length, 4);
   assert.equal(report.artifacts.some((item) => item.id === "release-report" && item.command === "release:report"), true);
   assert.equal(report.artifacts.some((item) => item.id === "release-artifact-manifest" && item.command === "release:manifest"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "platform-rd-report" && item.command === "release:report" && item.markdown === "docs/卫生健康信息平台研发报告.md"), true);
   assert.equal(report.artifacts.some((item) => item.id === "launch-smoke" && item.command === "launch:smoke" && item.markdown === "release/launch-smoke-report.md" && item.evidence === "/api/health"), true);
   assert.equal(report.artifacts.some((item) => item.id === "onsite-launch-requirements" && item.command === "onsite:launch-requirements" && item.markdown === "release/onsite-launch-requirements.md" && item.evidence === "docs/on-site-launch-materials.md"), true);
   assert.equal(report.artifacts.some((item) => item.id === "site-readiness" && item.evidence === "/api/site-readiness-pack"), true);
@@ -47,6 +48,7 @@ test("release artifact manifest indexes reports templates commands and evidence"
   assert.equal(report.artifacts.some((item) => item.id === "phase2-clinical-assist" && item.command === "phase2:clinical-assist-readiness" && item.markdown === "release/phase2-clinical-assist-readiness-report.md" && item.evidence === "/api/phase2/clinical-assist"), true);
   assert.equal(report.artifacts.some((item) => item.id === "phase2-family-doctor" && item.command === "phase2:family-doctor-readiness" && item.markdown === "release/phase2-family-doctor-readiness-report.md" && item.evidence === "/api/phase2/family-doctor-contracts"), true);
   assert.equal(report.artifacts.some((item) => item.id === "registration-journey" && item.command === "registration:journey-readiness" && item.markdown === "release/registration-journey-readiness-report.md" && item.evidence === "/api/registrations/dashboard"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "registration-integration" && item.command === "registration:integration-readiness" && item.markdown === "release/registration-integration-readiness-report.md" && item.evidence === "/api/registrations/integration-center"), true);
   assert.equal(report.artifacts.some((item) => item.id === "citizen-operations" && item.command === "phase2:citizen-operations-readiness" && item.markdown === "release/citizen-operations-readiness-report.md" && item.evidence === "/api/citizen-operations/center"), true);
   assert.equal(report.artifacts.some((item) => item.id === "commercial-crypto" && item.command === "security:commercial-crypto-readiness" && item.markdown === "release/commercial-crypto-readiness-report.md" && item.evidence === "/api/commercial-crypto/center"), true);
   assert.equal(report.artifacts.some((item) => item.id === "operations-readiness" && item.command === "operations:readiness" && item.markdown === "release/operations-readiness-report.md" && item.evidence === "/api/production-operations/center"), true);
@@ -76,6 +78,7 @@ test("release artifact manifest renders and writes artifacts", (t) => {
   assert.match(markdown, /Doctor multi-practice readiness report/);
   assert.match(markdown, /Template READMEs/);
   assert.match(markdown, /release-artifact-manifest\.md/);
+  assert.match(markdown, /卫生健康信息平台研发报告\.md/);
   assert.match(markdown, /data-governance-readiness-report\.md/);
   assert.match(markdown, /digital-hospital-standards-readiness-report\.md/);
   assert.match(markdown, /phase2-proposal-readiness-report\.md/);
@@ -86,6 +89,7 @@ test("release artifact manifest renders and writes artifacts", (t) => {
   assert.match(markdown, /phase2-clinical-assist-readiness-report\.md/);
   assert.match(markdown, /phase2-family-doctor-readiness-report\.md/);
   assert.match(markdown, /registration-journey-readiness-report\.md/);
+  assert.match(markdown, /registration-integration-readiness-report\.md/);
   assert.match(markdown, /citizen-operations-readiness-report\.md/);
   assert.match(markdown, /commercial-crypto-readiness-report\.md/);
   assert.match(markdown, /\/api\/production-database\/cutover-center/);

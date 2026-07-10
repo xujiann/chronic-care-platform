@@ -7789,6 +7789,26 @@
       "status": "ready"
     },
     {
+      "id": "appointment-order-v1",
+      "domain": "Appointment",
+      "version": "1.0.0",
+      "direction": "inbound",
+      "resource": "AppointmentOrderStatus",
+      "requiredFields": [
+        "externalId",
+        "residentId",
+        "orderNo",
+        "slotId",
+        "eventType",
+        "orderStatus",
+        "occurredAt"
+      ],
+      "idempotencyKey": "externalId",
+      "signature": "HMAC-SHA256",
+      "retryPolicy": "3 attempts then dead letter and reconciliation",
+      "status": "ready"
+    },
+    {
       "id": "insurance-settlement-v1",
       "domain": "医保",
       "version": "1.0.0",
