@@ -11,6 +11,7 @@ tmp/
 .tmp/
 .tmp-preview-data/
 .tmp-preview-logs/
+.tmp-*/
 coverage/
 playwright-report/
 test-results/

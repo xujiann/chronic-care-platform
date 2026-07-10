@@ -337,6 +337,9 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.publicHealthReadiness.summary.launchCommandBriefs >= 5, true);
   assert.equal(report.publicHealthReadiness.summary.launchCommandReadyBriefs >= 5, true);
   assert.equal(report.publicHealthReadiness.summary.launchCommandBlockedBriefs, 0);
+  assert.equal(report.publicHealthReadiness.summary.launchCommandExpectedAcknowledgements, 0);
+  assert.equal(report.publicHealthReadiness.summary.launchCommandAcknowledgedRecipients, 0);
+  assert.equal(report.publicHealthReadiness.summary.launchCommandPendingAcknowledgements, 0);
   assert.equal(report.publicHealthReadiness.productionHandoffBoard.status, "blocked");
   assert.equal(report.publicHealthReadiness.productionHandoffBoard.summary.releaseArtifacts >= 8, true);
   assert.equal(report.publicHealthReadiness.goLiveObservationBoard.status, "watch-ready");
@@ -347,6 +350,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.publicHealthReadiness.launchDutyBoard.summary.backupContacts >= 6, true);
   assert.equal(report.publicHealthReadiness.launchCommandBriefBoard.status, "briefing-ready");
   assert.equal(report.publicHealthReadiness.launchCommandBriefBoard.summary.sourceBoards >= 4, true);
+  assert.equal(report.publicHealthReadiness.launchCommandBriefBoard.summary.expectedAcknowledgements, 0);
   assert.equal(report.publicHealthReadiness.summary.siteEvidenceBridgeLinks >= 8, true);
   assert.equal(report.publicHealthReadiness.summary.siteEvidenceVerificationTasks >= 9, true);
   assert.equal(report.publicHealthReadiness.summary.siteEvidenceVerificationVerifiedTasks, 0);

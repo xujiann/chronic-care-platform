@@ -631,6 +631,17 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(publicHealthLaunchCommandBriefs.body.board.status, "briefing-ready");
     assert.equal(publicHealthLaunchCommandBriefs.body.briefs.some((item) => item.id === "phlcb-prelaunch-go-no-go"), true);
 
+    const publicHealthLaunchCommandBriefReceiptBeforePublish = await api(baseUrl, "/api/public-health/launch-command-briefs/phlcb-t0-launch-start/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "acknowledge-launch-command-brief",
+        acknowledgementTarget: "release room",
+        note: "Attempting to record a receipt before broadcast."
+      })
+    }));
+    assert.equal(publicHealthLaunchCommandBriefReceiptBeforePublish.response.status, 400);
+    assert.match(publicHealthLaunchCommandBriefReceiptBeforePublish.body.message, /must be published before recording a delivery receipt/);
+
     const publicHealthLaunchCommandBriefAction = await api(baseUrl, "/api/public-health/launch-command-briefs/phlcb-prelaunch-go-no-go/actions", authorized(accountLogin.body.token, {
       method: "POST",
       body: JSON.stringify({
@@ -650,6 +661,43 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(publicHealthLaunchCommandBriefAction.body.board.status, "briefing-ready");
     assert.equal(publicHealthLaunchCommandBriefAction.body.system.summary.launchCommandReadyBriefs >= 5, true);
     assert.equal(publicHealthLaunchCommandBriefAction.body.system.launchGate.productionReady, false);
+
+    const publicHealthLaunchCommandBriefUnknownReceipt = await api(baseUrl, "/api/public-health/launch-command-briefs/phlcb-prelaunch-go-no-go/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "acknowledge-launch-command-brief",
+        acknowledgementTarget: "unknown launch observer",
+        note: "Unknown audience must not be accepted."
+      })
+    }));
+    assert.equal(publicHealthLaunchCommandBriefUnknownReceipt.response.status, 400);
+    assert.match(publicHealthLaunchCommandBriefUnknownReceipt.body.message, /must be one of the configured brief audiences/);
+
+    const publicHealthLaunchCommandBriefReceipt = await api(baseUrl, "/api/public-health/launch-command-briefs/phlcb-prelaunch-go-no-go/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "acknowledge-launch-command-brief",
+        acknowledgementTarget: "health commission launch board",
+        note: "Launch board receipt confirmed by the command recorder."
+      })
+    }));
+    assert.equal(publicHealthLaunchCommandBriefReceipt.response.status, 200);
+    assert.equal(publicHealthLaunchCommandBriefReceipt.body.brief.acknowledgements.some((item) => item.target === "health commission launch board" && item.status === "acknowledged"), true);
+    assert.equal(publicHealthLaunchCommandBriefReceipt.body.board.summary.expectedAcknowledgements, 3);
+    assert.equal(publicHealthLaunchCommandBriefReceipt.body.board.summary.acknowledgedRecipients, 1);
+    assert.equal(publicHealthLaunchCommandBriefReceipt.body.board.summary.pendingAcknowledgements, 2);
+
+    const publicHealthLaunchCommandBriefEscalation = await api(baseUrl, "/api/public-health/launch-command-briefs/phlcb-prelaunch-go-no-go/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "escalate-launch-command-brief-receipt",
+        acknowledgementTarget: "CDC command owner",
+        note: "CDC command owner has not returned the required delivery receipt."
+      })
+    }));
+    assert.equal(publicHealthLaunchCommandBriefEscalation.response.status, 200);
+    assert.equal(publicHealthLaunchCommandBriefEscalation.body.brief.acknowledgements.some((item) => item.target === "CDC command owner" && item.status === "escalated"), true);
+    assert.equal(publicHealthLaunchCommandBriefEscalation.body.board.summary.escalatedAcknowledgements, 1);
 
     const publicHealthLaunchCommandBriefDefaultAction = await api(baseUrl, "/api/public-health/launch-command-briefs/phlcb-prelaunch-go-no-go/actions", authorized(accountLogin.body.token, {
       method: "POST",

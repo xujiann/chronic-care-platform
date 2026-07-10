@@ -362,6 +362,9 @@ test("public health informatization system is reachable and source-standard alig
   assert.match(server, /\/api\/public-health\/launch-duty-shifts\/:id\/actions/);
   assert.match(server, /\/api\/public-health\/launch-command-briefs/);
   assert.match(server, /\/api\/public-health\/launch-command-briefs\/:id\/actions/);
+  assert.match(server, /acknowledge-launch-command-brief/);
+  assert.match(server, /escalate-launch-command-brief-receipt/);
+  assert.match(server, /acknowledgementTarget/);
   assert.match(server, /\/api\/public-health\/site-evidence-bridge/);
   assert.match(server, /\/api\/public-health\/site-evidence-bridge\/actions/);
   assert.match(server, /\/api\/public-health\/site-evidence-verification-tasks/);
@@ -468,6 +471,8 @@ test("public health informatization system is reachable and source-standard alig
   assert.match(doc, /publicHealthLaunchCommandBriefs/);
   assert.match(doc, /\/api\/public-health\/launch-command-briefs\/:id\/actions/);
   assert.match(doc, /launch command brief/);
+  assert.match(doc, /acknowledge-launch-command-brief/);
+  assert.match(doc, /delivery receipt/);
   assert.match(doc, /publicHealthSiteEvidenceBridge/);
   assert.match(doc, /\/api\/public-health\/site-evidence-bridge\/actions/);
   assert.match(doc, /publicHealthSiteEvidenceVerificationTasks/);
@@ -489,6 +494,7 @@ test("public health informatization system is reachable and source-standard alig
   assert.match(doc, /APPROVE PUBLIC HEALTH LAUNCH/);
   assert.match(doc, /public-health:readiness/);
   assert.match(plan, /publicHealthLaunchCommandBriefs/);
+  assert.match(plan, /acknowledge-launch-command-brief/);
   assert.match(plan, /publicHealthLaunchGate\.approvalPreflight/);
   assert.match(plan, /publicHealthStandardImplementationLedger/);
   assert.match(plan, /exchangeExceptionBoard/);
@@ -1675,7 +1681,7 @@ test("citizen portal exposes PWA install and offline shell assets", () => {
   assert.equal(manifest.shortcuts.some((item) => item.url === "./citizen.html?client=app&page=escort#service-escort"), true);
   assert.equal(manifest.shortcuts.some((item) => item.url === "./mobile-preview.html?client=app"), true);
   assert.match(serviceWorker, /CACHE_NAME/);
-  assert.match(serviceWorker, /chronic-care-citizen-v44-imaging-cloud/);
+  assert.match(serviceWorker, /chronic-care-citizen-v45-registration-journey/);
   assert.match(serviceWorker, /internet-nursing\.js\?v=20260629prod/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627preview/);
   assert.match(serviceWorker, /citizen\.js\?v=20260627pages/);

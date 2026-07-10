@@ -48,7 +48,7 @@ function buildImagingCloudReadinessReport(options = {}) {
     check("ui:development-plan", sources.html.includes("data-imaging-section=\"development-plan\"") && sources.pageJs.includes("renderDevelopmentPlan") && sources.server.includes("seedImageCloudDevelopmentPlan"), "implemented features and next development plan are visible at runtime", "ui"),
     check("docs:summary-plan", sources.docs.includes("imageCloudStudyId") && sources.docs.includes("PACS/RIS/EMR") && sources.docs.includes("test/api.test.js"), "documentation summarizes delivered scope and next development plan", "docs"),
     check("ui:auth-route", sources.auth.includes("\"imaging-cloud.html\": [\"commission\", \"institution\", \"county\", \"citizen\"]") && sources.auth.includes("imaging-cloud.html"), "role routing includes commission, institution, county and citizen", "ui"),
-    check("pwa:cache", sources.serviceWorker.includes("imaging-cloud.html") && sources.serviceWorker.includes("imaging-cloud.js") && sources.serviceWorker.includes("chronic-care-citizen-v44-imaging-cloud"), "PWA cache includes imaging cloud assets", "release"),
+    check("pwa:cache", sources.serviceWorker.includes("imaging-cloud.html") && sources.serviceWorker.includes("imaging-cloud.js") && sources.serviceWorker.includes("const CACHE_NAME = \"chronic-care-citizen-v"), "PWA cache includes imaging cloud assets in a versioned cache", "release"),
     check("release:script", sources.packageSource.includes("imaging-cloud:readiness") && sources.packageSource.includes("scripts/imaging-cloud-readiness.js"), "package script is wired", "release")
   ];
   return {

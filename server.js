@@ -12637,14 +12637,41 @@ function normalizePublicHealthLaunchDutyShiftAction(shift, payload = {}, user = 
 
 function normalizePublicHealthLaunchCommandBriefAction(brief, payload = {}, user = {}) {
   const now = new Date().toISOString();
-  const status = String(payload.status || "published").trim().toLowerCase();
+  const action = String(payload.action || "record-launch-command-brief").trim();
+  const receiptAction = ["acknowledge-launch-command-brief", "escalate-launch-command-brief-receipt"].includes(action);
+  const status = String(payload.status || (receiptAction ? brief.status || "published" : "published")).trim().toLowerCase();
   if (!new Set(["draft-ready", "published", "sent", "held", "escalated", "blocked", "archived", "closed"]).has(status)) {
     throw new Error("status must be draft-ready, published, sent, held, escalated, blocked, archived or closed");
+  }
+  const note = String(payload.note || payload.comment || "").trim();
+  const audience = normalizeStringList(brief.audience);
+  const acknowledgements = Array.isArray(brief.acknowledgements) ? brief.acknowledgements.filter((item) => item && typeof item === "object").slice(0, 48) : [];
+  let acknowledgementTarget = "";
+  let acknowledgementStatus = "";
+  let updatedAcknowledgements = acknowledgements;
+  if (receiptAction) {
+    const alreadyPublished = /published|sent|approved|archived|complete|closed/i.test(`${brief.status || ""} ${brief.decision || ""} ${brief.publishStatus || ""}`);
+    if (!alreadyPublished) throw new Error("launch command brief must be published before recording a delivery receipt");
+    acknowledgementTarget = String(payload.acknowledgementTarget || payload.recipient || payload.audience || "").trim();
+    if (!acknowledgementTarget) throw new Error("acknowledgementTarget is required for launch command brief delivery receipts");
+    if (!audience.includes(acknowledgementTarget)) throw new Error("acknowledgementTarget must be one of the configured brief audiences");
+    if (!note) throw new Error("note is required for launch command brief delivery receipts");
+    acknowledgementStatus = action === "acknowledge-launch-command-brief" ? "acknowledged" : "escalated";
+    const acknowledgement = {
+      id: randomUUID(),
+      at: now,
+      target: acknowledgementTarget,
+      status: acknowledgementStatus,
+      actor: user.name || user.username || "public health operator",
+      role: user.role || "commission",
+      note
+    };
+    updatedAcknowledgements = [acknowledgement, ...acknowledgements.filter((item) => String(item.target || "") !== acknowledgementTarget)].slice(0, 48);
   }
   const history = {
     id: randomUUID(),
     at: now,
-    action: String(payload.action || "record-launch-command-brief").trim(),
+    action,
     status,
     actor: user.name || user.username || "public health operator",
     role: user.role || "commission",
@@ -12654,7 +12681,9 @@ function normalizePublicHealthLaunchCommandBriefAction(brief, payload = {}, user
     publishChannel: String(payload.publishChannel || brief.publishChannel || "").trim(),
     artifactName: String(payload.artifactName || payload.artifact || brief.name || "public health launch command brief").trim(),
     attachmentNames: normalizeStringList(payload.attachmentNames || payload.attachments).slice(0, 16),
-    note: String(payload.note || payload.comment || "Public health launch command brief recorded.").trim()
+    acknowledgementTarget,
+    acknowledgementStatus,
+    note: note || "Public health launch command brief recorded."
   };
   return {
     history,
@@ -12666,8 +12695,9 @@ function normalizePublicHealthLaunchCommandBriefAction(brief, payload = {}, user
       decisionOwner: history.decisionOwner || brief.decisionOwner || "",
       publishChannel: history.publishChannel || brief.publishChannel || "",
       publishedBy: ["published", "sent", "archived", "closed"].includes(status) ? (user.name || user.username || brief.publishedBy || "") : (brief.publishedBy || ""),
-      publishedAt: ["published", "sent"].includes(status) ? now : (brief.publishedAt || ""),
+      publishedAt: ["published", "sent"].includes(status) && !receiptAction ? now : (brief.publishedAt || ""),
       archivedAt: ["archived", "closed"].includes(status) ? now : (brief.archivedAt || ""),
+      acknowledgements: updatedAcknowledgements,
       lastAction: history,
       actionHistory: [history, ...(Array.isArray(brief.actionHistory) ? brief.actionHistory : [])].slice(0, 30),
       updatedAt: now,

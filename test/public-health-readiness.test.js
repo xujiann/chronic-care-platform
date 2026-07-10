@@ -211,11 +211,14 @@ test("public health readiness exposes institution scopes, event loop, and exchan
   assert.equal(report.launchCommandBriefBoard.summary.readyBriefs >= 5, true);
   assert.equal(report.launchCommandBriefBoard.summary.sourceBoards >= 4, true);
   assert.equal(report.launchCommandBriefBoard.summary.blockedBriefs, 0);
+  assert.equal(report.launchCommandBriefBoard.summary.expectedAcknowledgements, 0);
+  assert.equal(report.launchCommandBriefBoard.summary.acknowledgedRecipients, 0);
+  assert.equal(report.launchCommandBriefBoard.summary.pendingAcknowledgements, 0);
   assert.equal(report.launchGate.requirements.some((item) => item.id === "launch-command-briefs" && item.passed), true);
   assert.equal(report.launchGate.approvalPreflight.status, "blocked");
   assert.equal(report.launchGate.approvalPreflight.blockedPrerequisites >= 1, true);
   assert.equal(report.launchGate.approvalPreflight.blockedRequirementIds.includes("launch-site-evidence-verification"), true);
-  ["standard:implementation-ledger", "exchange:runs", "exchange:compensation", "institution:tasks", "onsite:acceptance", "cutover:blockers", "cutover:open-boundary", "cutover:evidence-packets", "cutover:readiness-board", "cutover:drill-board", "production:handoffs", "go-live:observation-plan", "go-live:incident-desk", "go-live:duty-handoffs", "go-live:command-briefs", "site-evidence:bridge", "site-evidence:verification-desk", "launch:gate", "launch:approval-preflight", "frontend:standard-implementation-panel", "frontend:standard-implementation-actions", "frontend:cutover-readiness-panel", "frontend:cutover-evidence-panel", "frontend:cutover-drill-panel", "frontend:production-handoff-panel", "frontend:go-live-observation-panel", "frontend:launch-incident-panel", "frontend:launch-duty-panel", "frontend:launch-command-brief-panel", "frontend:site-evidence-bridge-panel", "frontend:site-evidence-verification-panel", "frontend:launch-gate-panel", "frontend:launch-approval-preflight", "api:standard-implementation-ledger", "api:cutover-readiness", "api:cutover-evidence-packets", "api:cutover-drills", "api:production-handoffs", "api:go-live-observations", "api:launch-incidents", "api:launch-duty-shifts", "api:launch-command-briefs", "api:site-evidence-bridge", "api:site-evidence-verification-tasks", "api:launch-gate", "docs:production-handoffs", "docs:go-live-observations", "docs:launch-incidents", "docs:launch-duty", "docs:launch-command-briefs"].forEach((id) => {
+  ["standard:implementation-ledger", "exchange:runs", "exchange:compensation", "institution:tasks", "onsite:acceptance", "cutover:blockers", "cutover:open-boundary", "cutover:evidence-packets", "cutover:readiness-board", "cutover:drill-board", "production:handoffs", "go-live:observation-plan", "go-live:incident-desk", "go-live:duty-handoffs", "go-live:command-briefs", "go-live:command-brief-delivery-receipts", "site-evidence:bridge", "site-evidence:verification-desk", "launch:gate", "launch:approval-preflight", "frontend:standard-implementation-panel", "frontend:standard-implementation-actions", "frontend:cutover-readiness-panel", "frontend:cutover-evidence-panel", "frontend:cutover-drill-panel", "frontend:production-handoff-panel", "frontend:go-live-observation-panel", "frontend:launch-incident-panel", "frontend:launch-duty-panel", "frontend:launch-command-brief-panel", "frontend:launch-command-brief-receipts", "frontend:site-evidence-bridge-panel", "frontend:site-evidence-verification-panel", "frontend:launch-gate-panel", "frontend:launch-approval-preflight", "api:standard-implementation-ledger", "api:cutover-readiness", "api:cutover-evidence-packets", "api:cutover-drills", "api:production-handoffs", "api:go-live-observations", "api:launch-incidents", "api:launch-duty-shifts", "api:launch-command-briefs", "api:site-evidence-bridge", "api:site-evidence-verification-tasks", "api:launch-gate", "docs:production-handoffs", "docs:go-live-observations", "docs:launch-incidents", "docs:launch-duty", "docs:launch-command-briefs"].forEach((id) => {
     assert.equal(report.checks.some((item) => item.id === id && item.passed), true, `${id} check missing`);
   });
   assert.equal(report.checks.every((item) => item.passed), true);
@@ -223,6 +226,7 @@ test("public health readiness exposes institution scopes, event loop, and exchan
   const markdown = renderMarkdown(report);
   assert.match(markdown, /Public health informatization readiness report/);
   assert.match(markdown, /Standard implementation ledger/);
+  assert.match(markdown, /Delivery receipts/);
   assert.match(markdown, /传染病防控/);
   assert.match(markdown, /二级及以上医院/);
   assert.match(markdown, /direct-report/);
@@ -346,6 +350,9 @@ test("public health page, API, docs and release manifest are wired", () => {
   assert.match(js, /buildStaticLaunchDutyBoard/);
   assert.match(js, /renderLaunchCommandBriefs/);
   assert.match(js, /data-public-health-launch-command-brief/);
+  assert.match(js, /data-public-health-launch-command-brief-receipt-target/);
+  assert.match(js, /acknowledge-launch-command-brief/);
+  assert.match(js, /escalate-launch-command-brief-receipt/);
   assert.match(js, /buildStaticLaunchCommandBriefBoard/);
   assert.match(js, /data-public-health-cutover-blocker/);
   assert.match(js, /renderSiteEvidenceBridge/);
@@ -394,6 +401,8 @@ test("public health page, API, docs and release manifest are wired", () => {
   assert.match(doc, /publicHealthLaunchCommandBriefs/);
   assert.match(doc, /\/api\/public-health\/launch-command-briefs\/:id\/actions/);
   assert.match(doc, /launch command brief/);
+  assert.match(doc, /acknowledge-launch-command-brief/);
+  assert.match(doc, /delivery receipt/);
   assert.match(doc, /publicHealthSiteEvidenceBridge/);
   assert.match(doc, /\/api\/public-health\/site-evidence-bridge\/actions/);
   assert.match(doc, /publicHealthSiteEvidenceVerificationTasks/);
@@ -404,6 +413,7 @@ test("public health page, API, docs and release manifest are wired", () => {
   assert.match(plan, /事件处置闭环/);
   assert.match(plan, /验收清单/);
   assert.match(plan, /publicHealthLaunchCommandBriefs/);
+  assert.match(plan, /acknowledge-launch-command-brief/);
   assert.match(manifest, /public-health-readiness-report\.md/);
   assert.match(manifest, /public-health:readiness/);
 });

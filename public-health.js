@@ -288,6 +288,10 @@ function buildStaticPublicHealthSystem(state) {
       launchCommandPendingBriefs: launchCommandBriefBoard.summary.pendingBriefs,
       launchCommandPublishedBriefs: launchCommandBriefBoard.summary.publishedBriefs,
       launchCommandBlockedBriefs: launchCommandBriefBoard.summary.blockedBriefs,
+      launchCommandExpectedAcknowledgements: launchCommandBriefBoard.summary.expectedAcknowledgements,
+      launchCommandAcknowledgedRecipients: launchCommandBriefBoard.summary.acknowledgedRecipients,
+      launchCommandPendingAcknowledgements: launchCommandBriefBoard.summary.pendingAcknowledgements,
+      launchCommandEscalatedAcknowledgements: launchCommandBriefBoard.summary.escalatedAcknowledgements,
       launchCommandStatus: launchCommandBriefBoard.status,
       dueSoonCutoverBlockers: cutoverReadiness.summary.dueSoon,
       overdueCutoverBlockers: cutoverReadiness.summary.overdue,
@@ -992,6 +996,7 @@ function renderLaunchCommandBriefs(boardOrItems) {
       <h3>Launch command briefs and status broadcast</h3>
       <p>${escapeHtml(board.status || "blocked")} / source boards ${escapeHtml(summary.sourceBoards || 0)} / audiences ${escapeHtml(summary.audiences || 0)}</p>
       <small>pending ${escapeHtml(summary.pendingBriefs || 0)} / published ${escapeHtml(summary.publishedBriefs || 0)} / blocked ${escapeHtml(summary.blockedBriefs || 0)}</small>
+      <small>delivery receipts ${escapeHtml(summary.acknowledgedRecipients || 0)}/${escapeHtml(summary.expectedAcknowledgements || 0)} / pending ${escapeHtml(summary.pendingAcknowledgements || 0)} / escalated ${escapeHtml(summary.escalatedAcknowledgements || 0)}</small>
       <small>launch gate ${escapeHtml(summary.launchGateStatus || "unknown")} / ${escapeHtml(summary.launchReleaseGate || "unknown")}</small>
     </div>
     <div class="capability-side">
@@ -1005,6 +1010,13 @@ function renderLaunchCommandBriefs(boardOrItems) {
     const ready = Boolean(item.briefReady);
     const published = Boolean(item.published);
     const rankClass = blocked ? "danger" : ready ? "ok" : "info";
+    const pendingReceiptTargets = Array.isArray(item.pendingAcknowledgementTargets) ? item.pendingAcknowledgementTargets : [];
+    const acknowledgementControls = canAct && published && pendingReceiptTargets.length ? `<div class="action-row" data-public-health-launch-command-brief-receipt-row="${escapeHtml(item.id || "")}">
+      <select class="inline-action-select" data-public-health-launch-command-brief-receipt-target><option value="">选择待确认受众</option>${pendingReceiptTargets.map((target) => `<option value="${escapeHtml(target)}">${escapeHtml(target)}</option>`).join("")}</select>
+      <input class="inline-action-input" type="text" maxlength="240" data-public-health-launch-command-brief-receipt-note placeholder="回执人或升级说明">
+      <button type="button" class="inline-action" data-public-health-launch-command-brief="${escapeHtml(item.id || "")}" data-public-health-launch-command-brief-action="acknowledge-launch-command-brief">确认送达</button>
+      <button type="button" class="inline-action" data-public-health-launch-command-brief="${escapeHtml(item.id || "")}" data-public-health-launch-command-brief-action="escalate-launch-command-brief-receipt">升级回执</button>
+    </div>` : canAct && published ? "<small>全部既定受众已登记回执</small>" : "";
     return `<article class="priority-row" data-public-health-launch-command-brief-row="${escapeHtml(item.id || "")}">
     <div class="priority-rank ${rankClass}">${escapeHtml(item.briefWindow || item.phase || "brief")}</div>
     <div>
@@ -1014,12 +1026,14 @@ function renderLaunchCommandBriefs(boardOrItems) {
       <small>sources: ${escapeHtml((item.sourceBoards || []).join(" / "))}</small>
       <small>sections: ${escapeHtml((item.requiredSections || []).join(" / "))}</small>
       <small>publish: ${escapeHtml(item.publishChannel || "")} -> ${escapeHtml(item.publishTarget || "")}</small>
+      ${published ? `<small>delivery receipts: ${escapeHtml(item.acknowledgedRecipientCount || 0)}/${escapeHtml(item.expectedAcknowledgementCount || 0)}; pending ${escapeHtml(pendingReceiptTargets.join(" / ") || "none")}</small>` : ""}
       ${item.lastAction ? `<small data-public-health-launch-command-brief-latest-action="${escapeHtml(item.lastAction.action || "latest")}">latest: ${escapeHtml(item.lastAction.status || "")} / ${escapeHtml(item.lastAction.decision || "")}</small>` : ""}
       ${canAct ? `<div class="action-row">
         <button type="button" class="inline-action" data-public-health-launch-command-brief="${escapeHtml(item.id || "")}" data-status="published">发布简报</button>
         <button type="button" class="inline-action" data-public-health-launch-command-brief="${escapeHtml(item.id || "")}" data-status="held">暂缓播报</button>
         <button type="button" class="inline-action" data-public-health-launch-command-brief="${escapeHtml(item.id || "")}" data-status="escalated">升级指挥</button>
       </div>` : ""}
+      ${acknowledgementControls}
     </div>
     <div class="capability-side">
       <span class="badge ${published ? "ok" : rankClass}">${escapeHtml(item.publishStatus || item.status || "")}</span>
@@ -1541,28 +1555,37 @@ async function handlePublicHealthLaunchCommandBriefAction(event) {
   if (!button || !PUBLIC_HEALTH_API_BASE || !window.HealthCityAuth?.authFetch) return;
   const briefId = button.dataset.publicHealthLaunchCommandBrief;
   const status = button.dataset.status || "published";
+  const action = button.dataset.publicHealthLaunchCommandBriefAction || "record-launch-command-brief";
+  const receiptAction = ["acknowledge-launch-command-brief", "escalate-launch-command-brief-receipt"].includes(action);
+  const row = button.closest("[data-public-health-launch-command-brief-row]");
+  const acknowledgementTarget = row?.querySelector("[data-public-health-launch-command-brief-receipt-target]")?.value || "";
+  const receiptNote = row?.querySelector("[data-public-health-launch-command-brief-receipt-note]")?.value?.trim() || "";
   const previousLabel = button.textContent;
   button.disabled = true;
   button.textContent = "记录中";
   setPublicHealthMessage("");
   try {
+    if (receiptAction && (!acknowledgementTarget || !receiptNote)) {
+      throw new Error("请选择待确认受众并填写回执或升级说明");
+    }
     const response = await window.HealthCityAuth.authFetch(`/api/public-health/launch-command-briefs/${encodeURIComponent(briefId)}/actions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        action: "record-launch-command-brief",
+        action,
         status,
         publishStatus: status === "published" ? "published" : status,
-        decision: status === "escalated" ? "escalate to launch board" : status === "held" ? "hold until gate review" : "broadcast",
+        decision: receiptAction ? (action === "acknowledge-launch-command-brief" ? "delivery receipt confirmed" : "delivery receipt escalated") : status === "escalated" ? "escalate to launch board" : status === "held" ? "hold until gate review" : "broadcast",
+        acknowledgementTarget,
         artifactName: `${briefId}-launch-command-brief`,
         attachmentNames: [`${briefId}-brief-note.pdf`],
-        note: "Public health launch command brief action recorded from the workbench."
+        note: receiptAction ? receiptNote : "Public health launch command brief action recorded from the workbench."
       })
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || "Launch command brief action failed");
     renderPublicHealthSystem(result.system || await loadPublicHealthSystem());
-    setPublicHealthMessage(`Launch command brief recorded: ${result.brief?.name || briefId}`);
+    setPublicHealthMessage(receiptAction ? `Launch command delivery receipt recorded: ${result.brief?.name || briefId}` : `Launch command brief recorded: ${result.brief?.name || briefId}`);
   } catch (error) {
     setPublicHealthMessage(error.message || "Launch command brief action failed");
   } finally {
@@ -2116,8 +2139,37 @@ function buildStaticLaunchCommandBriefBoard(briefs = [], options = {}) {
     const requiredSections = Array.isArray(item.requiredSections) ? item.requiredSections : [];
     const published = isLaunchCommandBriefPublished(item);
     const blocked = isLaunchCommandBriefBlocked(item);
+    const acknowledgementByTarget = new Map(
+      (Array.isArray(item.acknowledgements) ? item.acknowledgements : [])
+        .filter((entry) => entry && typeof entry === "object" && audience.includes(String(entry.target || "")))
+        .map((entry) => [String(entry.target || ""), { ...entry, status: String(entry.status || "").toLowerCase() }])
+    );
+    const acknowledgements = Array.from(acknowledgementByTarget.values());
+    const acknowledgedTargets = published ? audience.filter((target) => acknowledgementByTarget.get(target)?.status === "acknowledged") : [];
+    const escalatedTargets = published ? audience.filter((target) => acknowledgementByTarget.get(target)?.status === "escalated") : [];
+    const pendingAcknowledgementTargets = published ? audience.filter((target) => !acknowledgementByTarget.has(target) || acknowledgementByTarget.get(target)?.status !== "acknowledged") : [];
     const briefReady = Boolean(item.briefWindow && item.phase && item.owner && item.recorder && item.publishChannel && item.publishTarget && item.decisionOwner && audience.length && sourceBoards.length >= 2 && linkedDutyShiftIds.length && linkedObservationIds.length && linkedIncidentIds.length && requiredSections.length >= 3 && !blocked);
-    return { ...item, audience, sourceBoards, linkedDutyShiftIds, linkedObservationIds, linkedIncidentIds, requiredSections, published, blocked, briefReady, pending: !published };
+    return {
+      ...item,
+      audience,
+      sourceBoards,
+      linkedDutyShiftIds,
+      linkedObservationIds,
+      linkedIncidentIds,
+      requiredSections,
+      acknowledgements,
+      acknowledgedTargets,
+      escalatedTargets,
+      pendingAcknowledgementTargets,
+      expectedAcknowledgementCount: published ? audience.length : 0,
+      acknowledgedRecipientCount: acknowledgedTargets.length,
+      escalatedRecipientCount: escalatedTargets.length,
+      pendingAcknowledgementCount: pendingAcknowledgementTargets.length,
+      published,
+      blocked,
+      briefReady,
+      pending: !published
+    };
   });
   const readyBriefs = rows.filter((item) => item.briefReady).length;
   const blockedBriefs = rows.filter((item) => item.blocked).length;
@@ -2133,6 +2185,11 @@ function buildStaticLaunchCommandBriefBoard(briefs = [], options = {}) {
       pendingBriefs: Math.max(rows.length - publishedBriefs, 0),
       publishedBriefs,
       blockedBriefs,
+      expectedAcknowledgements: rows.reduce((sum, item) => sum + item.expectedAcknowledgementCount, 0),
+      acknowledgedRecipients: rows.reduce((sum, item) => sum + item.acknowledgedRecipientCount, 0),
+      pendingAcknowledgements: rows.reduce((sum, item) => sum + item.pendingAcknowledgementCount, 0),
+      escalatedAcknowledgements: rows.reduce((sum, item) => sum + item.escalatedRecipientCount, 0),
+      deliveryCompleteBriefs: rows.filter((item) => item.published && item.pendingAcknowledgementCount === 0).length,
       audiences: new Set(rows.flatMap((item) => item.audience || [])).size,
       sourceBoards: new Set(rows.flatMap((item) => item.sourceBoards || [])).size,
       linkedDutyShifts: new Set(rows.flatMap((item) => item.linkedDutyShiftIds || [])).size,
@@ -2143,7 +2200,16 @@ function buildStaticLaunchCommandBriefBoard(briefs = [], options = {}) {
       launchReleaseGate: options.launchGate?.releaseGate || "unknown"
     },
     briefs: rows,
-    nextActions: rows.filter((item) => !item.briefReady || item.blocked).map((item) => ({ id: item.id, phase: item.phase || "", briefWindow: item.briefWindow || "", owner: item.owner || "", nextAction: item.nextAction || "" }))
+    nextActions: rows.filter((item) => !item.briefReady || item.blocked || item.pendingAcknowledgementCount > 0).map((item) => ({
+      id: item.id,
+      phase: item.phase || "",
+      briefWindow: item.briefWindow || "",
+      owner: item.owner || "",
+      pendingAcknowledgementTargets: item.pendingAcknowledgementTargets || [],
+      nextAction: item.published && item.pendingAcknowledgementCount > 0
+        ? "Record delivery receipts for every configured audience or escalate the missing receipt."
+        : item.nextAction || ""
+    }))
   };
 }
 

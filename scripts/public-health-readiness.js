@@ -2072,6 +2072,15 @@ function buildPublicHealthLaunchCommandBriefBoard(briefs = [], options = {}) {
     const requiredSections = Array.isArray(item.requiredSections) ? item.requiredSections : [];
     const published = isLaunchCommandBriefPublished(item);
     const blocked = isLaunchCommandBriefBlocked(item);
+    const acknowledgementByTarget = new Map(
+      (Array.isArray(item.acknowledgements) ? item.acknowledgements : [])
+        .filter((entry) => entry && typeof entry === "object" && audience.includes(String(entry.target || "")))
+        .map((entry) => [String(entry.target || ""), { ...entry, status: String(entry.status || "").toLowerCase() }])
+    );
+    const acknowledgements = Array.from(acknowledgementByTarget.values());
+    const acknowledgedTargets = published ? audience.filter((target) => acknowledgementByTarget.get(target)?.status === "acknowledged") : [];
+    const escalatedTargets = published ? audience.filter((target) => acknowledgementByTarget.get(target)?.status === "escalated") : [];
+    const pendingAcknowledgementTargets = published ? audience.filter((target) => !acknowledgementByTarget.has(target) || acknowledgementByTarget.get(target)?.status !== "acknowledged") : [];
     const briefReady = Boolean(
       item.briefWindow &&
       item.phase &&
@@ -2096,6 +2105,14 @@ function buildPublicHealthLaunchCommandBriefBoard(briefs = [], options = {}) {
       linkedObservationIds,
       linkedIncidentIds,
       requiredSections,
+      acknowledgements,
+      acknowledgedTargets,
+      escalatedTargets,
+      pendingAcknowledgementTargets,
+      expectedAcknowledgementCount: published ? audience.length : 0,
+      acknowledgedRecipientCount: acknowledgedTargets.length,
+      escalatedRecipientCount: escalatedTargets.length,
+      pendingAcknowledgementCount: pendingAcknowledgementTargets.length,
       published,
       blocked,
       briefReady,
@@ -2120,6 +2137,11 @@ function buildPublicHealthLaunchCommandBriefBoard(briefs = [], options = {}) {
       pendingBriefs: Math.max(rows.length - publishedBriefs, 0),
       publishedBriefs,
       blockedBriefs,
+      expectedAcknowledgements: rows.reduce((sum, item) => sum + item.expectedAcknowledgementCount, 0),
+      acknowledgedRecipients: rows.reduce((sum, item) => sum + item.acknowledgedRecipientCount, 0),
+      pendingAcknowledgements: rows.reduce((sum, item) => sum + item.pendingAcknowledgementCount, 0),
+      escalatedAcknowledgements: rows.reduce((sum, item) => sum + item.escalatedRecipientCount, 0),
+      deliveryCompleteBriefs: rows.filter((item) => item.published && item.pendingAcknowledgementCount === 0).length,
       audiences: new Set(rows.flatMap((item) => item.audience || [])).size,
       sourceBoards: new Set(rows.flatMap((item) => item.sourceBoards || [])).size,
       linkedDutyShifts: new Set(rows.flatMap((item) => item.linkedDutyShiftIds || [])).size,
@@ -2131,7 +2153,7 @@ function buildPublicHealthLaunchCommandBriefBoard(briefs = [], options = {}) {
     },
     briefs: rows,
     nextActions: rows
-      .filter((item) => !item.briefReady || item.blocked)
+      .filter((item) => !item.briefReady || item.blocked || item.pendingAcknowledgementCount > 0)
       .map((item) => ({
         id: item.id,
         phase: item.phase || "",
@@ -2139,7 +2161,10 @@ function buildPublicHealthLaunchCommandBriefBoard(briefs = [], options = {}) {
         owner: item.owner || "",
         recorder: item.recorder || "",
         decisionOwner: item.decisionOwner || "",
-        nextAction: item.nextAction || ""
+        pendingAcknowledgementTargets: item.pendingAcknowledgementTargets || [],
+        nextAction: item.published && item.pendingAcknowledgementCount > 0
+          ? "Record delivery receipts for every configured audience or escalate the missing receipt."
+          : item.nextAction || ""
       }))
   };
 }
@@ -2446,6 +2471,10 @@ function buildPublicHealthSystem(options = {}) {
       launchCommandPendingBriefs: launchCommandBriefBoard.summary.pendingBriefs,
       launchCommandPublishedBriefs: launchCommandBriefBoard.summary.publishedBriefs,
       launchCommandBlockedBriefs: launchCommandBriefBoard.summary.blockedBriefs,
+      launchCommandExpectedAcknowledgements: launchCommandBriefBoard.summary.expectedAcknowledgements,
+      launchCommandAcknowledgedRecipients: launchCommandBriefBoard.summary.acknowledgedRecipients,
+      launchCommandPendingAcknowledgements: launchCommandBriefBoard.summary.pendingAcknowledgements,
+      launchCommandEscalatedAcknowledgements: launchCommandBriefBoard.summary.escalatedAcknowledgements,
       launchCommandStatus: launchCommandBriefBoard.status,
       dueSoonCutoverBlockers: cutoverReadiness.summary.dueSoon,
       overdueCutoverBlockers: cutoverReadiness.summary.overdue,
@@ -2550,6 +2579,7 @@ function buildPublicHealthReadinessReport(options = {}) {
     check("go-live:incident-desk", system.launchIncidentBoard?.summary?.lanes >= 6 && system.launchIncidentBoard?.summary?.deskReady === system.launchIncidentBoard?.summary?.lanes && system.launchIncidentBoard?.summary?.rollbackDecisionOwners >= 4 && system.launchIncidentBoard?.summary?.criticalOpenTickets === 0 && system.launchIncidentBoard?.status === "desk-ready", `${system.launchIncidentBoard?.summary?.deskReady || 0}/${system.launchIncidentBoard?.summary?.lanes || 0} incident lanes ready`, "go-live"),
     check("go-live:duty-handoffs", system.launchDutyBoard?.summary?.shifts >= 6 && system.launchDutyBoard?.summary?.readyShifts === system.launchDutyBoard?.summary?.shifts && system.launchDutyBoard?.summary?.backupContacts === system.launchDutyBoard?.summary?.shifts && system.launchDutyBoard?.summary?.missedHandoffs === 0 && system.launchDutyBoard?.status === "roster-ready", `${system.launchDutyBoard?.summary?.readyShifts || 0}/${system.launchDutyBoard?.summary?.shifts || 0} duty shifts ready`, "go-live"),
     check("go-live:command-briefs", system.launchCommandBriefBoard?.summary?.briefs >= 5 && system.launchCommandBriefBoard?.summary?.readyBriefs === system.launchCommandBriefBoard?.summary?.briefs && system.launchCommandBriefBoard?.summary?.sourceBoards >= 4 && system.launchCommandBriefBoard?.summary?.blockedBriefs === 0 && system.launchCommandBriefBoard?.status === "briefing-ready", `${system.launchCommandBriefBoard?.summary?.readyBriefs || 0}/${system.launchCommandBriefBoard?.summary?.briefs || 0} launch command briefs ready`, "go-live"),
+    check("go-live:command-brief-delivery-receipts", Number.isInteger(system.launchCommandBriefBoard?.summary?.expectedAcknowledgements) && Number.isInteger(system.launchCommandBriefBoard?.summary?.acknowledgedRecipients) && Number.isInteger(system.launchCommandBriefBoard?.summary?.pendingAcknowledgements) && Number.isInteger(system.launchCommandBriefBoard?.summary?.escalatedAcknowledgements), `${system.launchCommandBriefBoard?.summary?.acknowledgedRecipients || 0}/${system.launchCommandBriefBoard?.summary?.expectedAcknowledgements || 0} command brief delivery receipts / ${system.launchCommandBriefBoard?.summary?.pendingAcknowledgements || 0} pending`, "go-live"),
     check("site-evidence:bridge", system.siteEvidenceBridge?.summary?.links >= 8 && system.siteEvidenceBridge?.summary?.linkedItems >= 20 && ["missing-site-evidence", "partial", "verified"].includes(system.siteEvidenceBridge?.status), `${system.siteEvidenceBridge?.summary?.verifiedLinks || 0}/${system.siteEvidenceBridge?.summary?.links || 0} site evidence links verified`, "site-evidence"),
     check("site-evidence:verification-desk", system.siteEvidenceVerificationBoard?.summary?.tasks >= 9 && system.siteEvidenceVerificationBoard?.summary?.structurallyReadyTasks === system.siteEvidenceVerificationBoard?.summary?.tasks && ["evidence-pending", "verification-pending", "blocked", "verified"].includes(system.siteEvidenceVerificationBoard?.status), `${system.siteEvidenceVerificationBoard?.summary?.verifiedTasks || 0}/${system.siteEvidenceVerificationBoard?.summary?.tasks || 0} site evidence tasks verified`, "site-evidence"),
     check("launch:gate", system.launchGate?.releaseGate === "site-evidence-required" && system.launchGate?.requirements?.length >= 8 && system.launchGate?.approvals?.length >= 6 && system.launchGate?.summary?.blockedRequirements >= 1, `${system.launchGate?.summary?.passedRequirements || 0}/${system.launchGate?.summary?.requirements || 0} launch requirements passed`, "launch"),
@@ -2565,6 +2595,7 @@ function buildPublicHealthReadinessReport(options = {}) {
     check("frontend:launch-incident-panel", sources.html.includes("public-health-launch-incidents") && sources.js.includes("renderLaunchIncidents") && sources.js.includes("data-public-health-launch-incident"), "launch incident desk panel is visible and actionable", "frontend"),
     check("frontend:launch-duty-panel", sources.html.includes("public-health-launch-duty-shifts") && sources.js.includes("renderLaunchDutyShifts") && sources.js.includes("data-public-health-launch-duty-shift"), "launch duty handoff panel is visible and actionable", "frontend"),
     check("frontend:launch-command-brief-panel", sources.html.includes("public-health-launch-command-briefs") && sources.js.includes("renderLaunchCommandBriefs") && sources.js.includes("data-public-health-launch-command-brief"), "launch command brief panel is visible and actionable", "frontend"),
+    check("frontend:launch-command-brief-receipts", ["data-public-health-launch-command-brief-receipt-target", "data-public-health-launch-command-brief-receipt-note", "acknowledge-launch-command-brief", "escalate-launch-command-brief-receipt", "pendingAcknowledgementTargets"].every((token) => sources.js.includes(token)), "launch command brief delivery receipt and escalation controls are wired", "frontend"),
     check("frontend:site-evidence-bridge-panel", sources.html.includes("public-health-site-evidence-bridge") && sources.js.includes("renderSiteEvidenceBridge") && sources.js.includes("data-public-health-site-evidence-link"), "site evidence bridge panel is visible and actionable", "frontend"),
     check("frontend:site-evidence-verification-panel", sources.html.includes("public-health-site-evidence-verification") && sources.js.includes("renderSiteEvidenceVerificationTasks") && sources.js.includes("data-public-health-site-evidence-verification-task"), "site evidence verification task desk is visible and actionable", "frontend"),
     check("frontend:standard-implementation-panel", sources.html.includes("public-health-standard-implementation") && sources.js.includes("renderStandardImplementationLedger") && sources.js.includes("data-public-health-standard-implementation"), "standard implementation ledger is visible and actionable", "frontend"),
@@ -2580,7 +2611,7 @@ function buildPublicHealthReadinessReport(options = {}) {
     check("api:go-live-observations", sources.server.includes("/api/public-health/go-live-observations/:id/actions") && sources.server.includes("public-health-go-live-observation-action"), "go-live observation API is wired", "api"),
     check("api:launch-incidents", sources.server.includes("/api/public-health/launch-incidents/:id/actions") && sources.server.includes("public-health-launch-incident-action"), "launch incident desk API is wired", "api"),
     check("api:launch-duty-shifts", sources.server.includes("/api/public-health/launch-duty-shifts/:id/actions") && sources.server.includes("public-health-launch-duty-shift-action"), "launch duty shift API is wired", "api"),
-    check("api:launch-command-briefs", sources.server.includes("/api/public-health/launch-command-briefs/:id/actions") && sources.server.includes("public-health-launch-command-brief-action"), "launch command brief API is wired", "api"),
+    check("api:launch-command-briefs", ["/api/public-health/launch-command-briefs/:id/actions", "public-health-launch-command-brief-action", "acknowledge-launch-command-brief", "escalate-launch-command-brief-receipt", "acknowledgementTarget"].every((token) => sources.server.includes(token)), "launch command brief API is wired with delivery receipt safeguards", "api"),
     check("api:site-evidence-bridge", sources.server.includes("/api/public-health/site-evidence-bridge") && sources.server.includes("public-health-site-evidence-bridge-action"), "site evidence bridge API is wired", "api"),
     check("api:site-evidence-verification-tasks", sources.server.includes("/api/public-health/site-evidence-verification-tasks/:id/actions") && sources.server.includes("public-health-site-evidence-verification-action"), "site evidence verification task API is wired", "api"),
     check("api:standard-implementation-ledger", ["/api/public-health/standard-implementation-ledger/:id/actions", "public-health-standard-implementation-action", "assign-standard-gap-remediation", "verify-standard-gap-remediation", "remediationOwner and remediationDueAt"].every((token) => sources.server.includes(token)), "standard implementation ledger API is wired with remediation safeguards", "api"),
@@ -2594,7 +2625,7 @@ function buildPublicHealthReadinessReport(options = {}) {
     check("docs:go-live-observations", ["/api/public-health/go-live-observations/:id/actions", "publicHealthGoLiveObservations", "go-live observation"].every((token) => sources.docs.includes(token)), "public health report documents launch-day observation and rollback watch", "docs"),
     check("docs:launch-incidents", ["/api/public-health/launch-incidents/:id/actions", "publicHealthLaunchIncidents", "launch incident desk"].every((token) => sources.docs.includes(token)), "public health report documents launch incident triage and rollback decision desk", "docs"),
     check("docs:launch-duty", ["/api/public-health/launch-duty-shifts/:id/actions", "publicHealthLaunchDutyShifts", "launch duty handoff"].every((token) => sources.docs.includes(token)), "public health report documents launch duty roster and command handoff desk", "docs"),
-    check("docs:launch-command-briefs", ["/api/public-health/launch-command-briefs/:id/actions", "publicHealthLaunchCommandBriefs", "launch command brief"].every((token) => sources.docs.includes(token)), "public health report documents launch command briefs and status broadcast desk", "docs"),
+    check("docs:launch-command-briefs", ["/api/public-health/launch-command-briefs/:id/actions", "publicHealthLaunchCommandBriefs", "launch command brief", "acknowledge-launch-command-brief", "delivery receipt"].every((token) => sources.docs.includes(token)), "public health report documents launch command briefs, delivery receipts and status broadcasts", "docs"),
     check("docs:next-plan", ["5 小时开发切片", "事件处置闭环", "验收清单"].every((token) => sources.plan.includes(token)), "next development plan is documented", "docs")
   ];
   return {
@@ -2679,7 +2710,7 @@ function renderMarkdown(report) {
   const launchDutyRows = (launchDutyBoard.shifts || report.launchDutyShifts || []).map((item) => `| ${item.missed ? "MISSED" : item.escalated ? "WATCH" : item.shiftReady ? "READY" : "BLOCKED"} | ${item.shiftWindow || ""} | ${item.lane || ""} | ${item.name || ""} | ${item.owner || ""} | ${item.backupOwner || ""} | ${item.contactChannel || ""} | ${item.escalationOwner || ""} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`);
   const launchCommandBriefBoard = report.launchCommandBriefBoard || {};
   const launchCommandBriefSummary = launchCommandBriefBoard.summary || {};
-  const launchCommandBriefRows = (launchCommandBriefBoard.briefs || report.launchCommandBriefs || []).map((item) => `| ${item.blocked ? "WATCH" : item.briefReady ? "READY" : "BLOCKED"} | ${item.briefWindow || ""} | ${item.phase || ""} | ${item.name || ""} | ${item.owner || ""} | ${item.recorder || ""} | ${(item.sourceBoards || []).join(", ")} | ${item.publishChannel || ""} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`);
+  const launchCommandBriefRows = (launchCommandBriefBoard.briefs || report.launchCommandBriefs || []).map((item) => `| ${item.blocked ? "WATCH" : item.briefReady ? "READY" : "BLOCKED"} | ${item.briefWindow || ""} | ${item.phase || ""} | ${item.name || ""} | ${item.owner || ""} | ${item.recorder || ""} | ${(item.sourceBoards || []).join(", ")} | ${item.publishChannel || ""} | ${item.acknowledgedRecipientCount || 0}/${item.expectedAcknowledgementCount || 0} | ${(item.pendingAcknowledgementTargets || []).join(", ")} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`);
   const siteEvidenceBridge = report.siteEvidenceBridge || {};
   const siteEvidenceSummary = siteEvidenceBridge.summary || {};
   const siteEvidenceRows = (siteEvidenceBridge.links || []).map((item) => `| ${item.verified ? "PASS" : "MISSING"} | ${item.templateId || ""} | ${item.packetId || ""} | ${(item.itemIds || []).join(", ")} | ${item.acceptanceId || ""} | ${item.artifactName || ""} | ${String(item.requirement || "").replace(/\|/g, "/")} |`);
@@ -2714,7 +2745,7 @@ function renderMarkdown(report) {
     `- Go-live observation: ${goLiveObservationBoard.status || "unknown"}; plan ready ${goLiveObservationSummary.planReady || 0}/${goLiveObservationSummary.observations || 0}, pending observations ${goLiveObservationSummary.pendingObservations || 0}`,
     `- Launch incident desk: ${launchIncidentBoard.status || "unknown"}; lanes ready ${launchIncidentSummary.deskReady || 0}/${launchIncidentSummary.lanes || 0}, critical open ${launchIncidentSummary.criticalOpenTickets || 0}`,
     `- Launch duty handoff: ${launchDutyBoard.status || "unknown"}; shifts ready ${launchDutySummary.readyShifts || 0}/${launchDutySummary.shifts || 0}, missed handoffs ${launchDutySummary.missedHandoffs || 0}`,
-    `- Launch command briefs: ${launchCommandBriefBoard.status || "unknown"}; briefs ready ${launchCommandBriefSummary.readyBriefs || 0}/${launchCommandBriefSummary.briefs || 0}, pending publication ${launchCommandBriefSummary.pendingBriefs || 0}`,
+    `- Launch command briefs: ${launchCommandBriefBoard.status || "unknown"}; briefs ready ${launchCommandBriefSummary.readyBriefs || 0}/${launchCommandBriefSummary.briefs || 0}, pending publication ${launchCommandBriefSummary.pendingBriefs || 0}, delivery receipts ${launchCommandBriefSummary.acknowledgedRecipients || 0}/${launchCommandBriefSummary.expectedAcknowledgements || 0}, delivery pending ${launchCommandBriefSummary.pendingAcknowledgements || 0}, escalated ${launchCommandBriefSummary.escalatedAcknowledgements || 0}`,
     `- Site evidence bridge: ${siteEvidenceBridge.status || "unknown"}; links ${siteEvidenceSummary.verifiedLinks || 0}/${siteEvidenceSummary.links || 0}, mapped items ${siteEvidenceSummary.verifiedItems || 0}/${siteEvidenceSummary.linkedItems || 0}`,
     `- Site evidence verification desk: ${siteEvidenceVerificationBoard.status || "unknown"}; verified ${siteEvidenceVerificationSummary.verifiedTasks || 0}/${siteEvidenceVerificationSummary.tasks || 0}, evidence available ${siteEvidenceVerificationSummary.evidenceAvailableTasks || 0}, blocked ${siteEvidenceVerificationSummary.blockedTasks || 0}`,
     `- Production launch gate: ${launchGate.status || "unknown"} / ${launchGate.releaseGate || "unknown"}; requirements ${launchSummary.passedRequirements || 0}/${launchSummary.requirements || 0}, approvals ${launchSummary.signedApprovals || 0}/${launchSummary.approvals || 0}; approval preflight ${approvalPreflight.status || "unknown"} ${approvalPreflight.passedPrerequisites || 0}/${approvalPreflight.prerequisiteRequirements || 0}`,
@@ -2839,10 +2870,10 @@ function renderMarkdown(report) {
     "",
     "## Launch command briefs and status broadcast desk",
     "",
-    `Status: ${launchCommandBriefBoard.status || "unknown"}; ready briefs ${launchCommandBriefSummary.readyBriefs || 0}/${launchCommandBriefSummary.briefs || 0}; source boards ${launchCommandBriefSummary.sourceBoards || 0}; linked incidents ${launchCommandBriefSummary.linkedIncidents || 0}`,
+    `Status: ${launchCommandBriefBoard.status || "unknown"}; ready briefs ${launchCommandBriefSummary.readyBriefs || 0}/${launchCommandBriefSummary.briefs || 0}; source boards ${launchCommandBriefSummary.sourceBoards || 0}; linked incidents ${launchCommandBriefSummary.linkedIncidents || 0}; delivery receipts ${launchCommandBriefSummary.acknowledgedRecipients || 0}/${launchCommandBriefSummary.expectedAcknowledgements || 0}; pending ${launchCommandBriefSummary.pendingAcknowledgements || 0}; escalated ${launchCommandBriefSummary.escalatedAcknowledgements || 0}. Delivery receipts are an operational record and never replace site evidence or production approvals.`,
     "",
-    "| Result | Window | Phase | Brief | Owner | Recorder | Source boards | Publish channel | Next action |",
-    "|---|---|---|---|---|---|---|---|---|",
+    "| Result | Window | Phase | Brief | Owner | Recorder | Source boards | Publish channel | Delivery receipts | Pending recipients | Next action |",
+    "|---|---|---|---|---|---|---|---|---|---|---|",
     ...launchCommandBriefRows,
     "",
     "## Public health site evidence bridge",

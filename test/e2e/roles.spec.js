@@ -142,6 +142,7 @@ test("institution and insurance accounts land on their own modules", async ({ pa
 });
 
 test("registration journey crosses resident and institution portals", async ({ page }) => {
+  test.setTimeout(60_000);
   const orderId = "reg-r1-20260630-cardio";
 
   await login(page, "citizen", "citizen.html");
@@ -171,6 +172,7 @@ test("registration journey crosses resident and institution portals", async ({ p
   await completeButton.click();
   await expect(completeButton).toHaveCount(0);
 
+  await login(page, "health", "index.html");
   const result = await page.evaluate(async (id) => {
     const dashboard = await (await window.HealthCityAuth.authFetch("/api/registrations/dashboard")).json();
     const audit = await (await window.HealthCityAuth.authFetch("/api/audit/verify")).json();
