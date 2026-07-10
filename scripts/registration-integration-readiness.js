@@ -179,13 +179,15 @@ function applyRegistrationIntegrationCallback(orders = [], payload = {}, eventMe
 function scopeRegistrationIntegrationEvents(data, user = {}) {
   const orders = Array.isArray(data.registrationOrders) ? data.registrationOrders : [];
   const orderById = new Map(orders.map((item) => [item.id, item]));
+  const orderByNumber = new Map(orders.flatMap((item) => [item.registrationNo, item.hisVisitId, item.paymentTradeNo, item.insurancePrecheckNo].filter(Boolean).map((value) => [value, item])));
+  const orderForEvent = (item) => orderById.get(item.orderId) || orderByNumber.get(item.orderNo || item.requestPayload?.orderNo);
   const events = (Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])
     .filter((item) => item.contractId === APPOINTMENT_CONTRACT_ID);
-  if (user.role === "institution") return events.filter((item) => item.hospitalCode === user.orgCode || orderById.get(item.orderId)?.hospitalCode === user.orgCode);
+  if (user.role === "institution") return events.filter((item) => item.hospitalCode === user.orgCode || orderForEvent(item)?.hospitalCode === user.orgCode);
   if (user.role === "insurance") return events.filter((item) => ["insurance-confirmed", "payment-succeeded", "payment-failed", "refund-completed", "refund-failed"].includes(item.eventType));
   if (user.role === "citizen") {
     const residentIds = new Set(Array.isArray(user.residentIds) ? user.residentIds : [user.residentId].filter(Boolean));
-    return events.filter((item) => residentIds.has(item.residentId) || residentIds.has(orderById.get(item.orderId)?.residentId));
+    return events.filter((item) => residentIds.has(item.residentId) || residentIds.has(orderForEvent(item)?.residentId));
   }
   return events;
 }
@@ -233,6 +235,14 @@ function buildRegistrationIntegrationCenter(data = {}, user = {}) {
   const sources = [...sourceMap.values()];
   const matched = events.filter((item) => item.reconciliationStatus === "matched").length;
   const deadLetters = events.filter((item) => item.deadLetter || item.status === "dead_letter" || item.status === "failed").length;
+  const manualCases = events.filter((item) => item.manualReconciliation?.id);
+  const openManualCases = manualCases.filter((item) => item.manualReconciliation?.status === "assigned");
+  const resolvedManualCases = manualCases.filter((item) => item.manualReconciliation?.status === "resolved");
+  const overdueManualCases = openManualCases.filter((item) => {
+    const dueAt = String(item.manualReconciliation?.dueAt || "").trim();
+    const dueTime = /^\d{4}-\d{2}-\d{2}$/.test(dueAt) ? Date.parse(`${dueAt}T23:59:59`) : Date.parse(dueAt);
+    return Number.isFinite(dueTime) && dueTime < Date.now();
+  });
   return {
     ok: true,
     status: "callback-center-onsite-blocked",
@@ -241,9 +251,13 @@ function buildRegistrationIntegrationCenter(data = {}, user = {}) {
       sources: sources.length,
       callbacks: events.length,
       matched,
-      pendingReconciliation: events.filter((item) => item.reconciliationStatus !== "matched").length,
+      pendingReconciliation: events.filter((item) => !["matched", "manual-resolved"].includes(item.reconciliationStatus)).length,
       deadLetters,
       signatureVerified: events.filter((item) => item.signatureVerified).length,
+      manualCases: manualCases.length,
+      openManualCases: openManualCases.length,
+      overdueManualCases: overdueManualCases.length,
+      resolvedManualCases: resolvedManualCases.length,
       productionReady: 0,
       onsiteBlockers: 5
     },
@@ -256,7 +270,7 @@ function buildRegistrationIntegrationCenter(data = {}, user = {}) {
       "full success, failure, retry, dead-letter and reconciliation joint-test evidence",
       "multi-party production cutover approval and rollback rehearsal"
     ],
-    boundary: "Signed local callbacks prove contract, idempotency, landing and reconciliation behavior only. Production remains blocked until live endpoints, credentials, dictionaries and signed onsite evidence are present."
+    boundary: "本地签名回调仅证明契约、幂等、落库和对账能力；生产运行仍需真实端点、正式凭据、签署字典和现场验收证据。"
   };
 }
 
@@ -279,6 +293,8 @@ function buildRegistrationIntegrationReadiness(options = {}) {
     check("registrationIntegration:gateway", ["verifyIntegrationSignature", "idempotencyKey", "dead-letter", "applyRegistrationIntegrationCallback"].every((marker) => serverSource.includes(marker)), "signature, idempotency, landing and dead-letter paths are wired"),
     check("registrationIntegration:mapping", interfaceMappingSource.includes(`\"${APPOINTMENT_CONTRACT_ID}\"`) && interfaceMappingSource.includes("registrationOrders"), "appointment callback fields map to registrationOrders"),
     check("registrationIntegration:api", serverSource.includes("/api/registrations/integration-center") && serverSource.includes("buildRegistrationIntegrationCenter"), "role-scoped reconciliation API is wired"),
+    check("registrationIntegration:remediation", serverSource.includes("/api/registrations/integration-events/:id/retry") && serverSource.includes("canManageAppointmentIntegrationEvent") && institutionSource.includes("data-registration-integration-retry") && institutionSource.includes("runInstitutionRegistrationIntegrationRetry") && documentation.includes("/api/registrations/integration-events/:id/retry"), "owning institution dead-letter retry, note and scope controls are wired"),
+    check("registrationIntegration:manual-reconciliation", serverSource.includes("/api/registrations/integration-events/:id/reconciliation") && serverSource.includes("applyAppointmentIntegrationReconciliationAction") && institutionSource.includes("data-registration-reconciliation-action") && institutionSource.includes("runInstitutionRegistrationReconciliationAction") && documentation.includes("manual-compensation"), "manual case assignment, SLA, evidence resolution and reopen controls are wired"),
     check("registrationIntegration:institutionUi", institutionHtml.includes("registration-integration-center") && institutionSource.includes("renderRegistrationIntegrationCenter") && institutionSource.includes("registration-integration-events"), "institution callback and reconciliation center is visible"),
     check("registrationIntegration:productionBoundary", center.summary.productionReady === 0 && center.summary.onsiteBlockers >= 5 && center.sources.every((item) => item.productionReady === false), `production ready 0 / ${center.summary.onsiteBlockers} blockers`),
     check("registrationIntegration:releaseWiring", Boolean(pkg.scripts?.["registration:integration-readiness"]) && manifestSource.includes("registration-integration-readiness-report.md") && deploySource.includes("api:registrationIntegration") && releaseSource.includes("registrationIntegration:readiness"), "package, manifest, deploy and release gates are wired")

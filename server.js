@@ -8,9 +8,11 @@ const { buildHealthDashboardSummary, buildPriorityApplicationTemplates } = requi
 const { buildReleaseReport, buildServiceAcceptanceSummary } = require("./scripts/release-report");
 const { buildReleaseArtifactManifest } = require("./scripts/release-artifact-manifest");
 const {
+  applyRegistrationDisruptionAction,
   applyRegistrationJourneyAction,
   buildRegistrationJourneyCenter,
   normalizeRegistrationJourneyOrder,
+  registrationDisruptionAllowedActions,
   registrationJourneyAllowedActions
 } = require("./scripts/registration-journey-readiness");
 const {
@@ -1333,6 +1335,32 @@ function seedRegistrationSchedules() {
       medicalInsuranceItemCode: "MI-OP-CARD-REG",
       cancelBeforeHours: 24,
       tags: ["hypertension follow-up", "escort supported"],
+      status: "available",
+      lockMinutes: 10,
+      hospitalDepartmentContact: "Cardiology outpatient guidance desk"
+    },
+    {
+      id: "reg-sch-cardio-pm",
+      hisScheduleId: "HIS-SCH-MR1-CARD-RESCHEDULE-PM",
+      hospitalCode: "MR1",
+      hospital: "Dalian Central Hospital outpatient clinic demo",
+      departmentCode: "CARD",
+      department: "Cardiology",
+      doctorCode: "DOC-CARD-03",
+      doctor: "Doctor Chen",
+      date: todayOffset(4),
+      period: "PM",
+      source: "HIS outpatient source pool",
+      sourceSystem: "hospital-HIS",
+      sourceType: "hospital-his",
+      remaining: 8,
+      total: 24,
+      fee: 18,
+      paymentRequired: true,
+      insuranceSupported: true,
+      medicalInsuranceItemCode: "MI-OP-CARD-REG",
+      cancelBeforeHours: 24,
+      tags: ["schedule-change replacement", "escort supported"],
       status: "available",
       lockMinutes: 10,
       hospitalDepartmentContact: "Cardiology outpatient guidance desk"
@@ -7942,6 +7970,159 @@ function updateIntegrationEvent(data, eventId, updater) {
   return updated;
 }
 
+function findAppointmentIntegrationOrder(data, payload = {}, event = {}) {
+  const orders = Array.isArray(data.registrationOrders) ? data.registrationOrders : [];
+  const orderNo = String(payload.orderNo || event.orderNo || "").trim();
+  return orders.find((item) => item.id === event.orderId)
+    || orders.find((item) => orderNo && [item.registrationNo, item.hisVisitId, item.paymentTradeNo, item.insurancePrecheckNo].includes(orderNo))
+    || orders.find((item) => payload.residentId && payload.slotId && item.residentId === payload.residentId && item.scheduleId === payload.slotId)
+    || null;
+}
+
+function canManageAppointmentIntegrationEvent(data, user, event) {
+  if (!event || event.contractId !== APPOINTMENT_CONTRACT_ID) return false;
+  if (user.role === "commission") return true;
+  if (user.role !== "institution" || !user.orgCode) return false;
+  const order = findAppointmentIntegrationOrder(data, event.requestPayload, event);
+  return (event.hospitalCode || order?.hospitalCode || "") === user.orgCode;
+}
+
+function applyAppointmentIntegrationReconciliationAction(event, payload = {}, user = {}) {
+  const action = String(payload.action || "").trim();
+  const note = String(payload.note || "").trim();
+  const fail = (message, statusCode = 400) => {
+    const error = new Error(message);
+    error.statusCode = statusCode;
+    throw error;
+  };
+  if (!["assign", "resolve", "reopen"].includes(action)) fail("不支持的预约人工对账动作");
+  if (note.length < 2) fail("预约人工对账必须填写至少 2 个字符的处理备注");
+  const current = event.manualReconciliation && typeof event.manualReconciliation === "object" ? event.manualReconciliation : null;
+  const at = new Date().toISOString();
+  const actor = user.name || user.username || user.role || "integration-operator";
+  const baseHistory = Array.isArray(current?.history) ? current.history : [];
+
+  if (action === "assign") {
+    const owner = String(payload.owner || "").trim();
+    const dueAt = String(payload.dueAt || "").trim();
+    const priority = String(payload.priority || "P1").trim().toUpperCase();
+    if (!event.deadLetter || Number(event.retryCount || 0) < 3) fail("预约回调需完成 3 次自动重试后才能转人工对账", 409);
+    if (current?.status === "assigned") fail("预约人工对账工单已处于分派状态", 409);
+    if (current?.status === "resolved") fail("已结案工单请使用重新打开动作", 409);
+    if (owner.length < 2) fail("预约人工对账必须指定责任人");
+    if (!Number.isFinite(Date.parse(dueAt))) fail("预约人工对账必须填写有效处理时限");
+    if (!["P0", "P1", "P2"].includes(priority)) fail("预约人工对账优先级必须为 P0、P1 或 P2");
+    const caseId = current?.id || `regrec-${randomUUID()}`;
+    const history = {
+      id: randomUUID(),
+      action,
+      at,
+      actor,
+      role: user.role || "institution",
+      note,
+      fromStatus: current?.status || "none",
+      toStatus: "assigned",
+      productionEvidence: false
+    };
+    return {
+      ...event,
+      status: "manual-review",
+      deadLetter: true,
+      reconciliationStatus: "manual-review",
+      manualReconciliation: {
+        id: caseId,
+        status: "assigned",
+        owner,
+        dueAt,
+        priority,
+        openedAt: current?.openedAt || at,
+        openedBy: current?.openedBy || actor,
+        updatedAt: at,
+        updatedBy: actor,
+        latestNote: note.slice(0, 200),
+        originalDeadLetterReason: current?.originalDeadLetterReason || event.originalDeadLetterReason || event.deadLetterReason || "",
+        productionEvidence: false,
+        history: [history, ...baseHistory].slice(0, 20)
+      }
+    };
+  }
+
+  if (action === "resolve") {
+    const resolution = String(payload.resolution || "").trim();
+    const evidenceRef = String(payload.evidenceRef || "").trim();
+    if (!current || current.status !== "assigned") fail("仅已分派的预约人工对账工单可以结案", 409);
+    if (!["manual-compensation", "duplicate-confirmed", "upstream-cancelled"].includes(resolution)) fail("请选择有效的人工对账结论");
+    if (evidenceRef.length < 3) fail("人工对账结案必须登记补偿回执或证据引用");
+    const history = {
+      id: randomUUID(),
+      action,
+      at,
+      actor,
+      role: user.role || "institution",
+      note,
+      evidenceRef: evidenceRef.slice(0, 240),
+      resolution,
+      fromStatus: current.status,
+      toStatus: "resolved",
+      productionEvidence: false
+    };
+    return {
+      ...event,
+      status: "manual-resolved",
+      deadLetter: false,
+      deadLetterReason: "",
+      originalDeadLetterReason: event.originalDeadLetterReason || current.originalDeadLetterReason || "",
+      landingStatus: "manual-closure",
+      reconciliationStatus: "manual-resolved",
+      manualReconciliation: {
+        ...current,
+        status: "resolved",
+        resolution,
+        evidenceRef: evidenceRef.slice(0, 240),
+        resolutionNote: note.slice(0, 200),
+        resolvedAt: at,
+        resolvedBy: actor,
+        updatedAt: at,
+        updatedBy: actor,
+        productionEvidence: false,
+        history: [history, ...baseHistory].slice(0, 20)
+      }
+    };
+  }
+
+  if (!current || current.status !== "resolved") fail("仅已结案的预约人工对账工单可以重新打开", 409);
+  const history = {
+    id: randomUUID(),
+    action,
+    at,
+    actor,
+    role: user.role || "institution",
+    note,
+    fromStatus: current.status,
+    toStatus: "assigned",
+    productionEvidence: false
+  };
+  return {
+    ...event,
+    status: "manual-review",
+    deadLetter: true,
+    deadLetterReason: event.originalDeadLetterReason || current.originalDeadLetterReason || "人工对账工单已重新打开",
+    landingStatus: "rejected",
+    reconciliationStatus: "manual-review",
+    manualReconciliation: {
+      ...current,
+      status: "assigned",
+      reopenedAt: at,
+      reopenedBy: actor,
+      latestNote: note.slice(0, 200),
+      updatedAt: at,
+      updatedBy: actor,
+      productionEvidence: false,
+      history: [history, ...baseHistory].slice(0, 20)
+    }
+  };
+}
+
 function landAppointmentIntegrationEvent(data, payload, event, user) {
   if (event.contractId !== APPOINTMENT_CONTRACT_ID) return { applied: false, event };
   try {
@@ -7959,12 +8140,17 @@ function landAppointmentIntegrationEvent(data, payload, event, user) {
     appendDataAccessLog(data, user, result.order.residentId, "registrationOrders", `appointment callback ${result.receipt.eventType}`, "allowed");
     return { applied: true, event, order: result.order };
   } catch (error) {
+    const order = findAppointmentIntegrationOrder(data, payload, event);
     Object.assign(event, {
       status: "failed",
       deadLetter: true,
       deadLetterReason: String(error.message || "appointment callback landing failed").slice(0, 240),
       landingStatus: "rejected",
       reconciliationStatus: "dead-letter",
+      orderId: order?.id || event.orderId || "",
+      orderNo: order?.registrationNo || event.orderNo || String(payload.orderNo || ""),
+      hospitalCode: order?.hospitalCode || event.hospitalCode || "",
+      residentId: order?.residentId || event.residentId || String(payload.residentId || ""),
       productionEvidence: false
     });
     return { applied: false, event, error };
@@ -8884,10 +9070,19 @@ function buildRegistrationDashboard(data, user) {
       journeyHospitalConfirmed: journey.summary.hospitalConfirmed,
       journeyCheckedIn: journey.summary.checkedIn,
       journeyCompleted: journey.summary.completed,
-      journeyRefundPending: journey.summary.refundPending
+      journeyRefundPending: journey.summary.refundPending,
+      disruptionPending: journey.summary.disruptionPending,
+      disruptionOverdue: journey.summary.disruptionOverdue,
+      rescheduled: journey.summary.rescheduled,
+      disruptionCancelled: journey.summary.disruptionCancelled
     },
     schedules,
-    orders: orders.map((item) => ({ ...item, schedule: scheduleById.get(item.scheduleId) || null, allowedActions: registrationJourneyAllowedActions(item, user) })),
+    orders: orders.map((item) => ({
+      ...item,
+      schedule: scheduleById.get(item.scheduleId) || null,
+      allowedActions: registrationJourneyAllowedActions(item, user),
+      disruptionActions: registrationDisruptionAllowedActions(item, user)
+    })),
     journey: {
       status: journey.status,
       productionReady: journey.summary.productionReady,
@@ -8897,7 +9092,7 @@ function buildRegistrationDashboard(data, user) {
     },
     integrationCenter,
     integration: {
-      endpoints: ["/api/registrations/dashboard", "/api/registrations/integration-center", "/api/registrations/orders", "/api/registrations/orders/:id/actions", "/api/registrations/orders/:id/cancel", "/api/integration/events"],
+      endpoints: ["/api/registrations/dashboard", "/api/registrations/integration-center", "/api/registrations/orders", "/api/registrations/orders/:id/actions", "/api/registrations/orders/:id/disruption", "/api/registrations/orders/:id/cancel", "/api/integration/events"],
       exchangeObjects: ["registrationSchedules", "registrationOrders", "integrationGatewayEvents", "taskMessages", "dataAccessLogs"],
       targetSystems: ["hospital HIS", "internet hospital", "payment gateway", "medical insurance e-voucher", "sms gateway"],
       status: "contract-ready"
@@ -9023,7 +9218,11 @@ function buildRegistrationJourneyTaskMessage(order, action, user) {
     "integration-checked-in": "Signed check-in callback landed",
     "integration-completed": "Signed completion callback landed",
     "integration-refund-completed": "Signed refund callback landed",
-    "integration-refund-failed": "Refund callback exception recorded"
+    "integration-refund-failed": "Refund callback exception recorded",
+    "disruption-notify": "Hospital schedule change awaiting resident response",
+    "disruption-accept": "Resident accepted the replacement schedule",
+    "disruption-cancel": "Resident cancelled after the schedule change",
+    "disruption-withdraw": "Hospital withdrew the schedule change notice"
   };
   return {
     id: `msg-${randomUUID()}`,
@@ -16974,6 +17173,84 @@ async function handleApi(req, res) {
   }
 
   const registrationCancelMatch = url.pathname.match(/^\/api\/registrations\/orders\/([^/]+)\/cancel$/);
+  const registrationDisruptionMatch = url.pathname.match(/^\/api\/registrations\/orders\/([^/]+)\/disruption$/);
+  if (req.method === "POST" && registrationDisruptionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/registrations/orders/:id/disruption");
+    if (!user) return;
+    const data = readDatabase();
+    const rows = Array.isArray(data.registrationOrders) ? data.registrationOrders : [];
+    const index = rows.findIndex((item) => item.id === decodeURIComponent(registrationDisruptionMatch[1]));
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "registration order not found" });
+      return;
+    }
+    if (!canAccessRegistrationOrder(user, rows[index], data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "registration-disruption-action", target: rows[index].id, result: "denied", detail: "scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
+      return;
+    }
+    try {
+      const payload = await collectJson(req);
+      const action = String(payload.action || "").trim();
+      const schedules = Array.isArray(data.registrationSchedules) ? data.registrationSchedules : seedRegistrationSchedules();
+      const replacementScheduleId = String(payload.replacementScheduleId || rows[index].disruption?.proposedSchedule?.scheduleId || "").trim();
+      const replacementSchedule = schedules.find((item) => item.id === replacementScheduleId) || {};
+      const originalScheduleId = rows[index].scheduleId;
+      let next = applyRegistrationDisruptionAction(rows[index], payload, user, replacementSchedule);
+
+      if (action === "accept") {
+        data.registrationSchedules = schedules.map((schedule) => {
+          if (schedule.id === originalScheduleId) return { ...schedule, remaining: Number(schedule.remaining || 0) + 1 };
+          if (schedule.id === replacementScheduleId) return { ...schedule, remaining: Math.max(0, Number(schedule.remaining || 0) - 1) };
+          return schedule;
+        });
+      }
+      if (action === "cancel") {
+        next = applyRegistrationCancel(next, { reason: payload.note || "resident declined replacement schedule" }, user);
+        data.registrationSchedules = schedules.map((schedule) =>
+          schedule.id === originalScheduleId ? { ...schedule, remaining: Number(schedule.remaining || 0) + 1 } : schedule
+        );
+      }
+
+      next.notificationStatus = "queued";
+      next.notificationDeliveries = [
+        ...buildRegistrationNotificationDeliveries(next.id, next.residentId, `registration-disruption-${action}`, user, next.updatedAt),
+        ...(Array.isArray(next.notificationDeliveries) ? next.notificationDeliveries : [])
+      ].slice(0, 40);
+      rows[index] = next;
+      data.registrationOrders = rows;
+      data.taskMessages = [
+        buildRegistrationJourneyTaskMessage(next, `disruption-${action}`, user),
+        ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])
+      ].slice(0, 300);
+      appendDataAccessLog(data, user, next.residentId, "registrationOrders", `registration disruption ${action}`, "allowed");
+      data.securityEvents = sealAuditTrail([
+        {
+          id: randomUUID(),
+          at: new Date().toLocaleString("zh-CN", { hour12: false }),
+          actor: user.name,
+          role: user.role,
+          action: "registration-disruption-action",
+          target: next.id,
+          result: "allowed",
+          detail: `${action}:${next.disruption?.status || "unknown"}`
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120), { recompute: true });
+      writeDatabase(data);
+      sendJson(res, 200, {
+        ok: true,
+        action,
+        order: next,
+        dashboard: buildRegistrationDashboard(data, user)
+      });
+    } catch (error) {
+      const conflict = /not allowed|unavailable/i.test(error.message || "");
+      sendJson(res, conflict ? 409 : 400, { error: conflict ? "Conflict" : "Bad Request", message: error.message });
+    }
+    return;
+  }
+
   if (req.method === "POST" && registrationCancelMatch) {
     const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/registrations/orders/:id/cancel");
     if (!user) return;
@@ -19080,6 +19357,125 @@ async function handleApi(req, res) {
     sendJson(res, 200, {
       summary: summarizeIntegrationGateway(events),
       recentEvents: events.slice(0, 30)
+    });
+    return;
+  }
+
+  const registrationIntegrationRetryMatch = url.pathname.match(/^\/api\/registrations\/integration-events\/([^/]+)\/retry$/);
+  if (req.method === "POST" && registrationIntegrationRetryMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/registrations/integration-events/:id/retry");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const note = String(payload.note || "").trim();
+    if (note.length < 2) {
+      sendJson(res, 400, { error: "Validation Error", message: "预约回调重试必须填写至少 2 个字符的处理备注" });
+      return;
+    }
+    const data = readDatabase();
+    const sourceEvent = (Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])
+      .find((event) => event.id === registrationIntegrationRetryMatch[1] && event.contractId === APPOINTMENT_CONTRACT_ID);
+    if (!sourceEvent) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到预约回调事件" });
+      return;
+    }
+    if (!canManageAppointmentIntegrationEvent(data, user, sourceEvent)) {
+      sendJson(res, 403, { error: "Forbidden", message: "无权重试其他机构的预约回调事件" });
+      return;
+    }
+    if (!sourceEvent.deadLetter && sourceEvent.status !== "failed") {
+      sendJson(res, 409, { error: "Conflict", message: "仅死信或失败的预约回调可以重试" });
+      return;
+    }
+    if (!sourceEvent.requestPayload || typeof sourceEvent.requestPayload !== "object") {
+      sendJson(res, 409, { error: "Conflict", message: "预约回调缺少原始请求载荷，需转人工对账" });
+      return;
+    }
+    if (Number(sourceEvent.retryCount || 0) >= 3) {
+      sendJson(res, 409, { error: "Conflict", message: "预约回调已达到 3 次重试上限，需转人工对账" });
+      return;
+    }
+    const retriedAt = new Date().toISOString();
+    const event = updateIntegrationEvent(data, sourceEvent.id, (current) => ({
+      status: "retrying",
+      retryCount: Number(current.retryCount || 0) + 1,
+      deadLetter: false,
+      deadLetterReason: "",
+      lastRetriedAt: retriedAt,
+      lastRetryNote: note.slice(0, 200),
+      lastRetryBy: user.username || user.name || user.role,
+      reconciliationStatus: "retrying"
+    }));
+    landAppointmentIntegrationEvent(data, event.requestPayload, event, user);
+    Object.assign(event, {
+      lastRetryResult: event.deadLetter ? "failed" : "matched",
+      updatedAt: new Date().toISOString()
+    });
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "重试预约回调死信",
+        target: event.id,
+        result: event.deadLetter ? "失败" : "允许",
+        detail: `${event.contractId} · ${event.idempotencyKey} · retry=${event.retryCount} · ${event.lastRetryNote}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, {
+      ok: !event.deadLetter,
+      result: event.deadLetter ? "retry-failed" : "matched",
+      event,
+      dashboard: buildRegistrationDashboard(data, user)
+    });
+    return;
+  }
+
+  const registrationReconciliationMatch = url.pathname.match(/^\/api\/registrations\/integration-events\/([^/]+)\/reconciliation$/);
+  if (req.method === "POST" && registrationReconciliationMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/registrations/integration-events/:id/reconciliation");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const sourceEvent = (Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])
+      .find((event) => event.id === registrationReconciliationMatch[1] && event.contractId === APPOINTMENT_CONTRACT_ID);
+    if (!sourceEvent) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到预约回调事件" });
+      return;
+    }
+    if (!canManageAppointmentIntegrationEvent(data, user, sourceEvent)) {
+      sendJson(res, 403, { error: "Forbidden", message: "无权处理其他机构的预约人工对账工单" });
+      return;
+    }
+    let nextEvent;
+    try {
+      nextEvent = applyAppointmentIntegrationReconciliationAction(sourceEvent, payload, user);
+    } catch (error) {
+      sendJson(res, Number(error.statusCode || 400), { error: Number(error.statusCode || 400) === 409 ? "Conflict" : "Validation Error", message: error.message });
+      return;
+    }
+    const event = updateIntegrationEvent(data, sourceEvent.id, () => nextEvent);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: `预约回调人工对账-${String(payload.action || "").trim()}`,
+        target: event.id,
+        result: "允许",
+        detail: `${event.manualReconciliation?.id || "case-pending"} · ${event.reconciliationStatus} · ${event.manualReconciliation?.latestNote || event.manualReconciliation?.resolutionNote || ""}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, {
+      ok: true,
+      action: String(payload.action || "").trim(),
+      event,
+      dashboard: buildRegistrationDashboard(data, user)
     });
     return;
   }

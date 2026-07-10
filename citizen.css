@@ -1599,6 +1599,32 @@ body.service-paged-mode .citizen-shell {
   white-space: nowrap;
 }
 
+.registration-disruption-panel {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  border-left: 4px solid var(--amber);
+  padding: 10px 12px;
+  background: #fffbeb;
+}
+
+.registration-disruption-panel strong,
+.registration-disruption-panel p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.registration-disruption-panel p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.registration-disruption-panel .small-button.danger {
+  border-color: rgba(185, 28, 28, 0.34);
+  color: #991b1b;
+}
+
 .lifecycle-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

@@ -64,7 +64,7 @@ async function loadRegistrationJourneyDashboard() {
     ok: true,
     schedules: platformState.registrationSchedules || [],
     orders: platformState.registrationOrders || [],
-    journey: { status: "static-preview", productionReady: 0, onsiteBlockers: 4, boundary: "Static registration journey preview; production integrations remain required." }
+    journey: { status: "static-preview", productionReady: 0, onsiteBlockers: 4, boundary: "当前为预约流程静态预览，生产环境仍需完成真实接口联调。" }
   };
 }
 
@@ -109,6 +109,54 @@ function bindInstitutionActions() {
       const familyDoctorReviewButton = event.target.closest("[data-family-doctor-review]");
       const familyDoctorFulfillmentButton = event.target.closest("[data-family-doctor-fulfillment]");
       const registrationJourneyButton = event.target.closest("[data-registration-institution-action]");
+      const registrationDisruptionButton = event.target.closest("[data-registration-disruption-action]");
+      const registrationIntegrationRetryButton = event.target.closest("[data-registration-integration-retry]");
+      const registrationReconciliationButton = event.target.closest("[data-registration-reconciliation-action]");
+      if (registrationDisruptionButton) {
+        const orderRow = registrationDisruptionButton.closest("[data-registration-journey-order]");
+        const field = (selector) => orderRow?.querySelector(selector)?.value || "";
+        registrationDisruptionButton.disabled = true;
+        await runInstitutionRegistrationDisruptionAction(
+          registrationDisruptionButton.dataset.registrationId,
+          registrationDisruptionButton.dataset.registrationDisruptionAction,
+          {
+            type: field("[data-registration-disruption-type]"),
+            replacementScheduleId: field("[data-registration-disruption-schedule]"),
+            acknowledgementDueAt: field("[data-registration-disruption-due]"),
+            reason: field("[data-registration-disruption-reason]"),
+            note: field("[data-registration-disruption-note]")
+          }
+        );
+        registrationDisruptionButton.disabled = false;
+        return;
+      }
+      if (registrationReconciliationButton) {
+        const eventRow = registrationReconciliationButton.closest("[data-registration-integration-event]");
+        const field = (selector) => eventRow?.querySelector(selector)?.value || "";
+        registrationReconciliationButton.disabled = true;
+        await runInstitutionRegistrationReconciliationAction(
+          registrationReconciliationButton.dataset.registrationReconciliationEvent,
+          registrationReconciliationButton.dataset.registrationReconciliationAction,
+          {
+            owner: field("[data-registration-reconciliation-owner]"),
+            dueAt: field("[data-registration-reconciliation-due]"),
+            priority: field("[data-registration-reconciliation-priority]"),
+            note: field("[data-registration-reconciliation-note]"),
+            resolution: field("[data-registration-reconciliation-resolution]"),
+            evidenceRef: field("[data-registration-reconciliation-evidence]")
+          }
+        );
+        registrationReconciliationButton.disabled = false;
+        return;
+      }
+      if (registrationIntegrationRetryButton) {
+        const eventRow = registrationIntegrationRetryButton.closest("[data-registration-integration-event]");
+        const note = eventRow?.querySelector("[data-registration-integration-note]")?.value || "";
+        registrationIntegrationRetryButton.disabled = true;
+        await runInstitutionRegistrationIntegrationRetry(registrationIntegrationRetryButton.dataset.registrationIntegrationRetry, note);
+        registrationIntegrationRetryButton.disabled = false;
+        return;
+      }
       if (registrationJourneyButton) {
         registrationJourneyButton.disabled = true;
         const result = await runInstitutionRegistrationJourneyAction(registrationJourneyButton.dataset.registrationId, registrationJourneyButton.dataset.registrationInstitutionAction);
@@ -1067,8 +1115,58 @@ function institutionRegistrationStatus(value) {
   }[value] || value || "待处理";
 }
 
+function institutionRegistrationIntegrationLabel(value) {
+  return {
+    "payment-succeeded": "支付成功回调",
+    "payment-failed": "支付失败回调",
+    "his-confirmed": "HIS 确认回调",
+    "insurance-confirmed": "医保确认回调",
+    "checked-in": "报到回调",
+    completed: "完诊回调",
+    "refund-completed": "退费完成回调",
+    "refund-failed": "退费失败回调",
+    matched: "已匹配",
+    pending: "待对账",
+    failed: "失败",
+    rejected: "已拒绝",
+    "dead-letter": "死信",
+    retrying: "重试中",
+    "manual-review": "人工对账中",
+    "manual-resolved": "人工已结案",
+    "manual-closure": "人工结案",
+    assigned: "已分派",
+    resolved: "已结案",
+    "manual-compensation": "人工补偿完成",
+    "duplicate-confirmed": "确认重复回调",
+    "upstream-cancelled": "上游已撤销",
+    landed: "已入库",
+    "callback-received-demo": "已收到回调",
+    "callback-exception-open": "回调异常待处理"
+  }[value] || value || "待处理";
+}
+
+function institutionRegistrationIntegrationReason(value) {
+  const reason = String(value || "").trim();
+  if (reason.startsWith("role ") && reason.includes(" cannot submit ")) return "当前角色无权提交该预约回调。";
+  return {
+    "unsupported appointment callback eventType": "不支持的预约回调类型。",
+    "orderNo is required": "回调缺少预约订单号。",
+    "occurredAt is required": "回调缺少业务发生时间。",
+    "registration order not found for callback": "未找到与回调匹配的预约订单。",
+    "registration callback scope denied": "回调不属于当前机构。",
+    "payment callback is not allowed after closure": "订单关闭后不能再接收支付成功回调。",
+    "payment failure is not allowed after closure": "订单关闭后不能再接收支付失败回调。",
+    "HIS confirmation requires an open order with payment evidence": "HIS 确认要求订单未关闭且已有支付凭据。",
+    "check-in callback requires an open order with payment and HIS confirmation": "报到回调要求订单未关闭，且支付与 HIS 确认均已完成。",
+    "completion callback requires an open checked-in order": "完诊回调要求订单未关闭且已完成报到。",
+    "refund callback requires a cancelled refund-pending order": "退费完成回调要求订单已取消且处于待退费状态。",
+    "refund failure requires a cancelled refund-pending order": "退费失败回调要求订单已取消且处于待退费状态。"
+  }[reason] || reason;
+}
+
 function institutionRegistrationAllowedActions(order) {
   if (Array.isArray(order.allowedActions)) return order.allowedActions;
+  if (order.disruption?.status === "pending-resident") return [];
   if (order.status === "cancelled") return order.refundStatus === "refund-pending" ? ["refund-demo"] : [];
   if (["completed", "closed"].includes(order.status)) return [];
   const actions = [];
@@ -1080,6 +1178,56 @@ function institutionRegistrationAllowedActions(order) {
   return actions;
 }
 
+function institutionRegistrationDisruptionLabel(value) {
+  return {
+    "doctor-unavailable": "医生停诊",
+    "schedule-adjustment": "排班调整",
+    "clinic-suspended": "门诊暂停",
+    "pending-resident": "待居民确认",
+    accepted: "改签已确认",
+    cancelled: "居民选择退号",
+    withdrawn: "通知已撤回",
+    "supplement-pending": "待补缴差额",
+    "partial-refund-pending": "待退差额",
+    "not-required": "无需补退"
+  }[value] || value || "待处理";
+}
+
+function renderRegistrationDisruptionControls(order, schedules = []) {
+  const disruption = order.disruption && typeof order.disruption === "object" ? order.disruption : null;
+  const disruptionActions = Array.isArray(order.disruptionActions) ? order.disruptionActions : [];
+  const alternatives = schedules.filter((schedule) =>
+    schedule.id !== order.scheduleId &&
+    schedule.status !== "closed" &&
+    Number(schedule.remaining || 0) > 0 &&
+    (!order.hospitalCode || schedule.hospitalCode === order.hospitalCode) &&
+    (!order.departmentCode || schedule.departmentCode === order.departmentCode)
+  );
+  if (!disruption && disruptionActions.includes("notify")) {
+    if (!alternatives.length) return `<small>同院同科暂无可用替代号源，暂不能发起改签通知。</small>`;
+    const defaultDue = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16);
+    return `<div class="action-row registration-disruption-form" data-registration-disruption-form="notify">
+      <select class="inline-action-select" aria-label="停诊变更类型" data-registration-disruption-type><option value="doctor-unavailable">医生停诊</option><option value="schedule-adjustment">排班调整</option><option value="clinic-suspended">门诊暂停</option></select>
+      <select class="inline-action-select" aria-label="替代预约号源" data-registration-disruption-schedule>${alternatives.map((schedule) => `<option value="${institutionEscapeHtml(schedule.id)}">${institutionEscapeHtml(schedule.date)} ${institutionEscapeHtml(schedule.period)} · ${institutionEscapeHtml(schedule.doctor || "医生待确认")} · 余号 ${Number(schedule.remaining || 0)}</option>`).join("")}</select>
+      <input class="inline-action-input" type="datetime-local" value="${defaultDue}" aria-label="居民确认时限" data-registration-disruption-due>
+      <input class="inline-action-input" type="text" maxlength="200" aria-label="停诊改签原因" data-registration-disruption-reason placeholder="填写停诊或排班变更原因">
+      <button type="button" class="inline-action" data-registration-id="${institutionEscapeHtml(order.id)}" data-registration-disruption-action="notify">发送改签通知</button>
+    </div>`;
+  }
+  if (!disruption) return "";
+  const proposed = disruption.proposedSchedule || {};
+  const dueTime = Date.parse(disruption.acknowledgementDueAt || "");
+  const overdue = disruption.status === "pending-resident" && Number.isFinite(dueTime) && dueTime < Date.now();
+  const summary = `<div class="registration-disruption-summary"><small>${institutionEscapeHtml(institutionRegistrationDisruptionLabel(disruption.type))} · ${institutionEscapeHtml(institutionRegistrationDisruptionLabel(disruption.status))}${overdue ? " · 已逾期" : ""}</small><small>原预约 ${institutionEscapeHtml(disruption.originalSchedule?.appointmentDate || "待确认")} ${institutionEscapeHtml(disruption.originalSchedule?.period || "")} → 建议 ${institutionEscapeHtml(proposed.appointmentDate || "待确认")} ${institutionEscapeHtml(proposed.period || "")} · ${institutionEscapeHtml(proposed.doctor || "医生待确认")}</small><small>原因 ${institutionEscapeHtml(disruption.reason || "未登记")} · 居民确认时限 ${institutionEscapeHtml(disruption.acknowledgementDueAt || "未设置")}</small></div>`;
+  if (disruption.status === "pending-resident" && disruptionActions.includes("withdraw")) {
+    return `${summary}<div class="action-row" data-registration-disruption-form="withdraw"><input class="inline-action-input" type="text" maxlength="200" aria-label="撤回改签通知原因" data-registration-disruption-note placeholder="填写撤回原因"><button type="button" class="inline-action" data-registration-id="${institutionEscapeHtml(order.id)}" data-registration-disruption-action="withdraw">撤回改签通知</button></div>`;
+  }
+  if (disruption.status === "accepted") {
+    return `${summary}<small>费用差额 ${Number(disruption.feeDifference || 0).toFixed(2)} 元 · ${institutionEscapeHtml(institutionRegistrationDisruptionLabel(disruption.paymentAdjustmentStatus))} · 新号源仍待 HIS 确认</small>`;
+  }
+  return summary;
+}
+
 function renderRegistrationJourneyWorkbench(state) {
   const metricsTarget = document.querySelector("#registration-journey-metrics");
   const ordersTarget = document.querySelector("#registration-journey-orders");
@@ -1087,11 +1235,14 @@ function renderRegistrationJourneyWorkbench(state) {
   if (!metricsTarget || !ordersTarget || !boundaryTarget) return;
   const dashboard = institutionRegistrationDashboard || { orders: state.registrationOrders || [], journey: {} };
   const orders = dashboard.orders || [];
+  const schedules = dashboard.schedules || [];
   const metrics = [
     ["本院预约", orders.length, "HIS/互联网医院"],
     ["待医院确认", orders.filter((item) => ["paid", "paid-demo", "waived"].includes(item.paymentStatus) && !["confirmed", "confirmed-demo"].includes(item.hisConfirmationStatus)).length, "支付后处理"],
     ["已报到", orders.filter((item) => ["checked-in", "checked-in-demo"].includes(item.checkInStatus)).length, "等待完诊"],
-    ["待退款", orders.filter((item) => item.refundStatus === "refund-pending").length, "退款闭环"]
+    ["待退款", orders.filter((item) => item.refundStatus === "refund-pending").length, "退款闭环"],
+    ["待居民确认", orders.filter((item) => item.disruption?.status === "pending-resident").length, "停诊改签"],
+    ["改签已确认", orders.filter((item) => item.disruption?.status === "accepted").length, "重新锁号"]
   ];
   metricsTarget.innerHTML = metrics.map(([name, value, detail]) => `<article class="metric-card"><span>${name}</span><strong>${value}</strong><small>${detail}</small></article>`).join("");
   const actionLabels = {
@@ -1110,12 +1261,48 @@ function renderRegistrationJourneyWorkbench(state) {
         <p>${institutionEscapeHtml(order.appointmentDate)} ${institutionEscapeHtml(order.period)} · ${institutionEscapeHtml(order.doctor || "医生待确认")} · 队列 ${institutionEscapeHtml(order.queueNo || order.registrationNo || "待回执")}</p>
         <small>支付 ${institutionEscapeHtml(institutionRegistrationStatus(order.paymentStatus))} · 医院 ${institutionEscapeHtml(institutionRegistrationStatus(order.hisConfirmationStatus))} · 报到 ${institutionEscapeHtml(institutionRegistrationStatus(order.checkInStatus))} · 退款 ${institutionEscapeHtml(institutionRegistrationStatus(order.refundStatus))}</small>
         <div class="action-row">${actions.map((action) => `<button type="button" class="inline-action" data-registration-institution-action="${action}" data-registration-id="${institutionEscapeHtml(order.id)}">${actionLabels[action]}</button>`).join("")}</div>
+        ${renderRegistrationDisruptionControls(order, schedules)}
       </div>
       <div class="capability-side"><span class="badge ${actions.length ? "warn" : "info"}">${institutionEscapeHtml(institutionRegistrationStatus(order.status))}</span><small>生产：否</small></div>
     </article>`;
   }).join("") || `<p class="muted">本机构暂无预约就诊订单。</p>`;
   boundaryTarget.textContent = dashboard.journey?.boundary || "本工作台动作仅为本地业务闭环证据，生产仍需 HIS、支付退款和医保结算接口。";
   renderRegistrationIntegrationCenter(dashboard.integrationCenter || {});
+}
+
+function renderRegistrationReconciliationControls(event) {
+  const retryCount = Number(event.retryCount || 0);
+  const item = event.manualReconciliation && typeof event.manualReconciliation === "object" ? event.manualReconciliation : null;
+  const eventId = institutionEscapeHtml(event.id);
+  if (!item && event.deadLetter && retryCount >= 3) {
+    const defaultDue = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    return `<div class="action-row" data-registration-reconciliation-form="assign">
+      <input class="inline-action-input" type="text" maxlength="80" aria-label="人工对账责任人" data-registration-reconciliation-owner placeholder="责任人">
+      <input class="inline-action-input" type="date" value="${defaultDue}" aria-label="人工对账处理时限" data-registration-reconciliation-due>
+      <select class="inline-action-select" aria-label="人工对账优先级" data-registration-reconciliation-priority><option value="P0">P0</option><option value="P1" selected>P1</option><option value="P2">P2</option></select>
+      <input class="inline-action-input" type="text" maxlength="200" aria-label="人工对账分派备注" data-registration-reconciliation-note placeholder="分派与处置说明">
+      <button type="button" class="inline-action" data-registration-reconciliation-event="${eventId}" data-registration-reconciliation-action="assign">转人工对账</button>
+    </div>`;
+  }
+  if (!item) return "";
+  const dueTime = /^\d{4}-\d{2}-\d{2}$/.test(String(item.dueAt || "")) ? Date.parse(`${item.dueAt}T23:59:59`) : Date.parse(item.dueAt || "");
+  const overdue = item.status === "assigned" && Number.isFinite(dueTime) && dueTime < Date.now();
+  const summary = `<small>人工工单 ${institutionEscapeHtml(item.id)} · ${institutionEscapeHtml(item.priority || "P1")} · ${institutionEscapeHtml(item.owner || "责任人待定")} · 时限 ${institutionEscapeHtml(item.dueAt || "待设置")}${overdue ? " · 已逾期" : ""}</small>`;
+  if (item.status === "assigned") {
+    return `${summary}<div class="action-row" data-registration-reconciliation-form="resolve">
+      <select class="inline-action-select" aria-label="人工对账结论" data-registration-reconciliation-resolution><option value="">选择结案结论</option><option value="manual-compensation">人工补偿完成</option><option value="duplicate-confirmed">确认重复回调</option><option value="upstream-cancelled">上游已撤销</option></select>
+      <input class="inline-action-input" type="text" maxlength="240" aria-label="人工对账证据引用" data-registration-reconciliation-evidence placeholder="补偿回执或证据引用">
+      <input class="inline-action-input" type="text" maxlength="200" aria-label="人工对账结案备注" data-registration-reconciliation-note placeholder="结案说明">
+      <button type="button" class="inline-action" data-registration-reconciliation-event="${eventId}" data-registration-reconciliation-action="resolve">登记结案</button>
+    </div>`;
+  }
+  if (item.status === "resolved") {
+    return `${summary}<small>结论 ${institutionEscapeHtml(institutionRegistrationIntegrationLabel(item.resolution))} · 证据 ${institutionEscapeHtml(item.evidenceRef || "未登记")}</small><div class="action-row" data-registration-reconciliation-form="reopen">
+      <input class="inline-action-input" type="text" maxlength="200" aria-label="人工对账重开备注" data-registration-reconciliation-note placeholder="重新打开原因">
+      <button type="button" class="inline-action" data-registration-reconciliation-event="${eventId}" data-registration-reconciliation-action="reopen">重新打开</button>
+    </div>`;
+  }
+  return summary;
 }
 
 function renderRegistrationIntegrationCenter(center = {}) {
@@ -1133,7 +1320,11 @@ function renderRegistrationIntegrationCenter(center = {}) {
     ["回调总数", summary.callbacks || 0, "签名网关"],
     ["匹配入库", summary.matched || 0, "订单对账"],
     ["待对账", summary.pendingReconciliation || 0, "人工复核"],
-    ["死信", summary.deadLetters || 0, "重试补偿"]
+    ["死信", summary.deadLetters || 0, "重试补偿"],
+    ["人工工单", summary.manualCases || 0, "累计建单"],
+    ["待人工", summary.openManualCases || 0, "责任人处置"],
+    ["人工结案", summary.resolvedManualCases || 0, "证据归档"],
+    ["逾期工单", summary.overdueManualCases || 0, "SLA 预警"]
   ];
   metricsTarget.innerHTML = metrics.map(([name, value, detail]) => `<article class="metric-card"><span>${name}</span><strong>${value}</strong><small>${detail}</small></article>`).join("");
   sourcesTarget.innerHTML = sources.map((source) => `<section class="item" data-registration-integration-source="${institutionEscapeHtml(source.id)}">
@@ -1142,18 +1333,94 @@ function renderRegistrationIntegrationCenter(center = {}) {
       <p>${institutionEscapeHtml((source.sourceSystems || []).join(" / ") || "预约源")}</p>
       <small>回调 ${Number(source.callbacks || 0)} · 匹配 ${Number(source.matchedCallbacks || 0)} · 生产：否</small>
     </div>
-    <span class="badge ${source.matchedCallbacks ? "info" : "warn"}">${institutionEscapeHtml(source.jointTestStatus || "pending-site-callback")}</span>
+    <span class="badge ${source.matchedCallbacks ? "info" : "warn"}">${institutionEscapeHtml(institutionRegistrationIntegrationLabel(source.jointTestStatus || "pending-site-callback"))}</span>
   </section>`).join("") || `<p class="muted">尚未登记预约号源。</p>`;
-  eventsTarget.innerHTML = events.map((event) => `<section class="item" data-registration-integration-event="${institutionEscapeHtml(event.id)}">
-    <div>
-      <h3>${institutionEscapeHtml(event.eventType || "callback")} · ${institutionEscapeHtml(event.orderNo || event.orderId || "unmatched")}</h3>
-      <p>${institutionEscapeHtml(event.hospitalCode || event.sourceInstitution || "external-provider")} · ${institutionEscapeHtml(event.receivedAt || event.updatedAt || "pending")}</p>
-      <small>签名 ${event.signatureVerified ? "通过" : "待核验"} · 对账 ${institutionEscapeHtml(event.reconciliationStatus || "pending")} · 幂等键 ${institutionEscapeHtml(event.idempotencyKey || "missing")}</small>
-      ${event.deadLetterReason ? `<small class="danger-text">${institutionEscapeHtml(event.deadLetterReason)}</small>` : ""}
-    </div>
-    <span class="badge ${event.deadLetter ? "danger" : event.reconciliationStatus === "matched" ? "info" : "warn"}">${institutionEscapeHtml(event.landingStatus || event.status || "pending")}</span>
-  </section>`).join("") || `<p class="muted">尚未收到预约回调，等待现场联调。</p>`;
+  eventsTarget.innerHTML = events.map((event) => {
+    const retryCount = Number(event.retryCount || 0);
+    const retryable = Boolean(event.deadLetter) && retryCount < 3;
+    return `<section class="item" data-registration-integration-event="${institutionEscapeHtml(event.id)}">
+      <div>
+        <h3>${institutionEscapeHtml(institutionRegistrationIntegrationLabel(event.eventType || "callback"))} · ${institutionEscapeHtml(event.orderNo || event.orderId || "未匹配订单")}</h3>
+        <p>${institutionEscapeHtml(event.hospitalCode || event.sourceInstitution || "external-provider")} · ${institutionEscapeHtml(event.receivedAt || event.updatedAt || "pending")}</p>
+        <small>签名 ${event.signatureVerified ? "通过" : "待核验"} · 对账 ${institutionEscapeHtml(institutionRegistrationIntegrationLabel(event.reconciliationStatus || "pending"))} · 幂等键 ${institutionEscapeHtml(event.idempotencyKey || "缺失")}</small>
+        <small>重试 ${retryCount}/3${event.lastRetryNote ? ` · 最近处理：${institutionEscapeHtml(event.lastRetryNote)}` : ""}</small>
+        ${event.deadLetterReason ? `<small class="danger-text">${institutionEscapeHtml(institutionRegistrationIntegrationReason(event.deadLetterReason))}</small>` : ""}
+        ${retryable ? `<div class="action-row"><input class="inline-action-input" type="text" maxlength="200" aria-label="回调重试处理备注" data-registration-integration-note placeholder="填写处理备注"><button type="button" class="inline-action" data-registration-integration-retry="${institutionEscapeHtml(event.id)}">重试回调</button></div>` : ""}
+        ${event.deadLetter && !retryable && !event.manualReconciliation ? `<small class="danger-text">已达到重试上限，请转人工对账。</small>` : ""}
+        ${renderRegistrationReconciliationControls(event)}
+      </div>
+      <span class="badge ${event.deadLetter ? "danger" : event.reconciliationStatus === "matched" ? "info" : "warn"}">${institutionEscapeHtml(institutionRegistrationIntegrationLabel(event.landingStatus || event.status || "pending"))}</span>
+    </section>`;
+  }).join("") || `<p class="muted">尚未收到预约回调，等待现场联调。</p>`;
   boundaryTarget.textContent = center.boundary || "本地签名回调仅证明契约、幂等、落库和对账能力；生产仍需真实端点、凭据、字典和现场签字。";
+}
+
+async function runInstitutionRegistrationIntegrationRetry(eventId, note) {
+  const boundaryTarget = document.querySelector("#registration-integration-boundary");
+  const normalizedNote = String(note || "").trim();
+  if (normalizedNote.length < 2) {
+    if (boundaryTarget) boundaryTarget.textContent = "请填写至少 2 个字符的回调重试处理备注。";
+    return { ok: false, message: "处理备注不完整" };
+  }
+  if (!institutionApiBase) {
+    if (boundaryTarget) boundaryTarget.textContent = "静态预览不提交回调重试动作。";
+    return { ok: false, message: "静态预览不可重试" };
+  }
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/registrations/integration-events/${encodeURIComponent(eventId)}/retry`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ note: normalizedNote })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.message || `HTTP ${response.status}`);
+    institutionRegistrationDashboard = payload.dashboard || await loadRegistrationJourneyDashboard();
+    renderRegistrationJourneyWorkbench(platformState);
+    const refreshedBoundary = document.querySelector("#registration-integration-boundary");
+    if (refreshedBoundary) {
+      refreshedBoundary.textContent = payload.event?.deadLetter
+        ? `第 ${Number(payload.event.retryCount || 0)} 次重试仍未通过，已保留死信并等待人工对账。`
+        : `回调重试成功，事件已匹配入库；生产就绪仍为否。`;
+    }
+    return { ok: !payload.event?.deadLetter, event: payload.event };
+  } catch (error) {
+    if (boundaryTarget) boundaryTarget.textContent = error.message || "预约回调重试失败。";
+    return { ok: false, message: error.message };
+  }
+}
+
+async function runInstitutionRegistrationReconciliationAction(eventId, action, fields = {}) {
+  const boundaryTarget = document.querySelector("#registration-integration-boundary");
+  if (!institutionApiBase) {
+    if (boundaryTarget) boundaryTarget.textContent = "静态预览不提交人工对账动作。";
+    return { ok: false, message: "静态预览不可操作" };
+  }
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/registrations/integration-events/${encodeURIComponent(eventId)}/reconciliation`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ...fields })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.message || `HTTP ${response.status}`);
+    institutionRegistrationDashboard = payload.dashboard || await loadRegistrationJourneyDashboard();
+    renderRegistrationJourneyWorkbench(platformState);
+    const refreshedBoundary = document.querySelector("#registration-integration-boundary");
+    if (refreshedBoundary) {
+      const messages = {
+        assign: "人工对账工单已分派，SLA 与责任人已记录；生产就绪仍为否。",
+        resolve: "人工对账工单已凭证结案，原预约订单未被改写；生产就绪仍为否。",
+        reopen: "人工对账工单已重新打开并恢复待处置状态。"
+      };
+      refreshedBoundary.textContent = messages[action] || "人工对账动作已记录。";
+    }
+    return { ok: true, event: payload.event };
+  } catch (error) {
+    if (boundaryTarget) boundaryTarget.textContent = error.message || "预约人工对账操作失败。";
+    return { ok: false, message: error.message };
+  }
 }
 
 async function runInstitutionRegistrationJourneyAction(orderId, action) {
@@ -1161,7 +1428,7 @@ async function runInstitutionRegistrationJourneyAction(orderId, action) {
   if (!institutionApiBase) return { ok: false, message: "静态预览不提交机构业务动作。" };
   const notes = {
     "confirm-his-demo": "Institution confirmed the local HIS appointment evidence; live HIS callback remains required.",
-    "check-in-demo": "Institution recorded local check-in evidence; production QR or HIS check-in remains required.",
+    "check-in-demo": "机构端已记录本地报到证据，生产运行仍需接入二维码或 HIS 报到接口。",
     "complete-demo": "Institution recorded local consultation completion; EMR completion callback remains required.",
     "refund-demo": "Institution recorded local refund evidence; certified payment gateway receipt remains required."
   };
@@ -1179,6 +1446,44 @@ async function runInstitutionRegistrationJourneyAction(orderId, action) {
     return { ok: true, order: payload.order };
   } catch (error) {
     if (boundaryTarget) boundaryTarget.textContent = error.message || "预约就诊动作失败。";
+    return { ok: false, message: error.message };
+  }
+}
+
+async function runInstitutionRegistrationDisruptionAction(orderId, action, fields = {}) {
+  const boundaryTarget = document.querySelector("#registration-journey-boundary");
+  if (!institutionApiBase) {
+    if (boundaryTarget) boundaryTarget.textContent = "静态预览不提交停诊改签操作。";
+    return { ok: false, message: "静态预览不可操作" };
+  }
+  const payload = {
+    action,
+    type: fields.type,
+    replacementScheduleId: fields.replacementScheduleId,
+    acknowledgementDueAt: fields.acknowledgementDueAt,
+    reason: fields.reason,
+    note: fields.note || fields.reason
+  };
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/registrations/orders/${encodeURIComponent(orderId)}/disruption`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.message || `HTTP ${response.status}`);
+    institutionRegistrationDashboard = result.dashboard || await loadRegistrationJourneyDashboard();
+    renderRegistrationJourneyWorkbench(platformState);
+    const refreshedBoundary = document.querySelector("#registration-journey-boundary");
+    if (refreshedBoundary) {
+      refreshedBoundary.textContent = action === "notify"
+        ? "停诊改签通知已发送，原号源暂时保留，等待居民确认后再转移库存；生产就绪仍为否。"
+        : "停诊改签通知已撤回，原预约继续有效；生产就绪仍为否。";
+    }
+    return { ok: true, order: result.order };
+  } catch (error) {
+    if (boundaryTarget) boundaryTarget.textContent = error.message || "停诊改签操作失败。";
     return { ok: false, message: error.message };
   }
 }

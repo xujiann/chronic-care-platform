@@ -148,6 +148,11 @@ test("citizen development report summarizes C-side policy features and roadmap",
   assert.match(report, /citizen:launch-foundation/);
   assert.match(report, /HIS\/EMR\/LIS\/PACS/);
   assert.match(report, /SMS_GATEWAY_URL/);
+  assert.match(report, /\u63a5\u53e3\u77e9\u9635\u4e0e\u73b0\u573a\u9a8c\u6536\u6750\u6599/);
+  assert.match(report, /\/api\/auth\/phone-code/);
+  assert.match(report, /\/api\/personal-records/);
+  assert.match(report, /\/api\/registrations\/orders/);
+  assert.match(report, /manifest\.webmanifest/);
 });
 
 test("about page documents doctor multi-practice policy boundaries", () => {
@@ -1733,6 +1738,11 @@ test("citizen portal exposes P2 imaging and attachment archive categories", () =
   assert.match(read("README.md"), /影像资料和附件资料/);
   assert.match(read("docs/C端全流程审计与优化清单.md"), /PWA manifest/);
   assert.match(read("docs/C端全流程审计与优化清单.md"), /影像资料、附件资料/);
+  assert.match(read("docs/C端全流程审计与优化清单.md"), /全管线审计矩阵/);
+  assert.match(read("docs/C端全流程审计与优化清单.md"), /\/api\/auth\/phone-code/);
+  assert.match(read("docs/C端全流程审计与优化清单.md"), /\/api\/registrations\/integration-center/);
+  assert.match(read("docs/C端全流程审计与优化清单.md"), /registration:integration-readiness/);
+  assert.match(read("docs/C端全流程审计与优化清单.md"), /launch:smoke/);
 });
 
 test("imaging cloud module exposes hospital ingest, mobile viewing and EMR compatibility", () => {
@@ -2539,19 +2549,31 @@ test("appointment registration journey closes resident institution insurance and
   assert.match(server, /applyRegistrationJourneyAction/);
   assert.match(server, /\/api\/registrations\/orders\/:id\/actions/);
   assert.match(server, /registration-journey-action/);
+  assert.match(server, /applyRegistrationDisruptionAction/);
+  assert.match(server, /\/api\/registrations\/orders\/:id\/disruption/);
+  assert.match(server, /registration-disruption-action/);
   assert.match(server, /completed registration order cannot be cancelled/);
   assert.match(citizenHtml, /registration-journey-timeline/);
   assert.match(citizenJs, /runRegistrationJourneyAction/);
   assert.match(citizenJs, /data-registration-journey-action/);
+  assert.match(citizenJs, /runRegistrationDisruptionAction/);
+  assert.match(citizenJs, /data-registration-disruption-action/);
+  assert.match(read("citizen.css"), /registration-disruption-panel/);
   assert.match(institutionHtml, /registration-journey-workbench/);
   assert.match(institutionJs, /renderRegistrationJourneyWorkbench/);
   assert.match(institutionJs, /data-registration-institution-action/);
+  assert.match(institutionJs, /runInstitutionRegistrationDisruptionAction/);
+  assert.match(institutionJs, /data-registration-disruption-schedule/);
   assert.match(readiness, /pay-demo/);
   assert.match(readiness, /confirm-his-demo/);
   assert.match(readiness, /confirm-insurance-demo/);
   assert.match(readiness, /check-in-demo/);
   assert.match(readiness, /complete-demo/);
   assert.match(readiness, /refund-demo/);
+  assert.match(readiness, /registrationDisruptionAllowedActions/);
+  assert.match(readiness, /disruptionPending/);
+  assert.match(documentation, /resident-acceptance/);
+  assert.match(documentation, /same hospital and department/);
   assert.match(documentation, /productionReady=false/);
   assert.match(read("package.json"), /registration:journey-readiness/);
   assert.match(read("scripts/release-report.js"), /registrationJourney:readiness/);
@@ -2571,17 +2593,29 @@ test("appointment callbacks land through signed gateway reconciliation", () => {
   assert.match(server, /applyRegistrationIntegrationCallback/);
   assert.match(server, /landAppointmentIntegrationEvent/);
   assert.match(server, /\/api\/registrations\/integration-center/);
+  assert.match(server, /\/api\/registrations\/integration-events\/:id\/retry/);
+  assert.match(server, /\/api\/registrations\/integration-events\/:id\/reconciliation/);
+  assert.match(server, /canManageAppointmentIntegrationEvent/);
+  assert.match(server, /applyAppointmentIntegrationReconciliationAction/);
   assert.match(server, /verifyIntegrationSignature/);
   assert.match(institutionHtml, /registration-integration-center/);
   assert.match(institutionHtml, /registration-integration-events/);
   assert.match(institutionJs, /renderRegistrationIntegrationCenter/);
   assert.match(institutionJs, /data-registration-integration-event/);
+  assert.match(institutionJs, /data-registration-integration-retry/);
+  assert.match(institutionJs, /runInstitutionRegistrationIntegrationRetry/);
+  assert.match(institutionJs, /institutionRegistrationIntegrationReason/);
+  assert.match(institutionJs, /data-registration-reconciliation-action/);
+  assert.match(institutionJs, /runInstitutionRegistrationReconciliationAction/);
   assert.match(readiness, /payment-succeeded/);
   assert.match(readiness, /refund-failed/);
   assert.match(readiness, /reconciliationStatus/);
   assert.match(mapping, /"appointment-order-v1"/);
   assert.match(mapping, /registrationOrders/);
   assert.match(documentation, /HMAC-SHA256/);
+  assert.match(documentation, /\/api\/registrations\/integration-events\/:id\/retry/);
+  assert.match(documentation, /\/api\/registrations\/integration-events\/:id\/reconciliation/);
+  assert.match(documentation, /manual-compensation/);
   assert.match(documentation, /Production boundary/);
   assert.match(read("package.json"), /registration:integration-readiness/);
   assert.match(read("scripts/release-report.js"), /registrationIntegration:readiness/);

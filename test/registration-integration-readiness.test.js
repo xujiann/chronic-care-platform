@@ -119,16 +119,23 @@ test("integration center scopes callback receipts and preserves blockers", () =>
     registrationOrders: [baseOrder(), baseOrder({ id: "reg-2", registrationNo: "REG-2", hospitalCode: "MR2" })],
     integrationGatewayEvents: [
       { id: "e1", contractId: APPOINTMENT_CONTRACT_ID, orderId: "reg-integration-001", hospitalCode: "MR1", eventType: "his-confirmed", reconciliationStatus: "matched", signatureVerified: true },
-      { id: "e2", contractId: APPOINTMENT_CONTRACT_ID, orderId: "reg-2", hospitalCode: "MR2", eventType: "payment-failed", reconciliationStatus: "unmatched", deadLetter: true }
+      { id: "e2", contractId: APPOINTMENT_CONTRACT_ID, orderId: "reg-2", hospitalCode: "MR2", eventType: "payment-failed", reconciliationStatus: "unmatched", deadLetter: true },
+      { id: "e3", contractId: APPOINTMENT_CONTRACT_ID, orderNo: "REG-INTEGRATION-001", requestPayload: { orderNo: "REG-INTEGRATION-001" }, eventType: "checked-in", reconciliationStatus: "dead-letter", deadLetter: true },
+      { id: "e4", contractId: APPOINTMENT_CONTRACT_ID, orderId: "reg-integration-001", hospitalCode: "MR1", eventType: "checked-in", reconciliationStatus: "manual-review", deadLetter: true, manualReconciliation: { id: "case-open", status: "assigned", owner: "integration owner", dueAt: "2020-01-01", priority: "P0" } },
+      { id: "e5", contractId: APPOINTMENT_CONTRACT_ID, orderId: "reg-integration-001", hospitalCode: "MR1", eventType: "checked-in", reconciliationStatus: "manual-resolved", deadLetter: false, manualReconciliation: { id: "case-resolved", status: "resolved", owner: "integration owner", dueAt: "2026-07-20", priority: "P1", evidenceRef: "receipt-001" } }
     ]
   };
   const commissionCenter = buildRegistrationIntegrationCenter(data, { role: "commission" });
   const institutionCenter = buildRegistrationIntegrationCenter(data, { role: "institution", orgCode: "MR1" });
   const insuranceCenter = buildRegistrationIntegrationCenter(data, { role: "insurance" });
-  assert.equal(commissionCenter.summary.callbacks, 2);
-  assert.equal(commissionCenter.summary.deadLetters, 1);
-  assert.equal(institutionCenter.summary.callbacks, 1);
-  assert.equal(institutionCenter.events[0].hospitalCode, "MR1");
+  assert.equal(commissionCenter.summary.callbacks, 5);
+  assert.equal(commissionCenter.summary.deadLetters, 3);
+  assert.equal(institutionCenter.summary.callbacks, 4);
+  assert.equal(institutionCenter.events.some((item) => item.id === "e3"), true);
+  assert.equal(institutionCenter.summary.manualCases, 2);
+  assert.equal(institutionCenter.summary.openManualCases, 1);
+  assert.equal(institutionCenter.summary.overdueManualCases, 1);
+  assert.equal(institutionCenter.summary.resolvedManualCases, 1);
   assert.equal(insuranceCenter.summary.callbacks, 1);
   assert.equal(commissionCenter.summary.productionReady, 0);
   assert.equal(commissionCenter.blockers.length, 5);

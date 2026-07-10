@@ -1,4 +1,17 @@
 const { expect, test } = require("@playwright/test");
+const { createHmac } = require("node:crypto");
+
+function stableStringify(value) {
+  if (Array.isArray(value)) return `[${value.map((item) => stableStringify(item)).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function integrationSignature(payload) {
+  return createHmac("sha256", "health-platform-demo-integration-secret").update(stableStringify(payload)).digest("hex");
+}
 
 async function login(page, username, expectedPage) {
   await page.goto("/login.html");
@@ -10,6 +23,7 @@ async function login(page, username, expectedPage) {
 
 test("commission user reaches the governance dashboard and opens maintenance", async ({ page }) => {
   await login(page, "health", "index.html");
+  await expect(page.locator("#data-source")).toHaveText("本地服务");
 
   await page.locator("[data-view='chronic']").click();
   await expect(page.locator("#chronic-risk-summary")).toBeVisible();
@@ -145,6 +159,211 @@ test("institution and insurance accounts land on their own modules", async ({ pa
   await expect(page.getByRole("heading", { name: "医保支付、经办审核与基金监管" })).toBeVisible();
 });
 
+test("institution retries its own appointment callback dead letter", async ({ page, request }, testInfo) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const apiLogin = async (username) => {
+    const response = await request.post("/api/auth/login", { data: { username, password: "123456" } });
+    expect(response.ok()).toBe(true);
+    return (await response.json()).token;
+  };
+  const citizenToken = await apiLogin("citizen");
+  const hospitalToken = await apiLogin("hospital");
+  const dashboardResponse = await request.get("/api/registrations/dashboard", { headers: { Authorization: `Bearer ${citizenToken}` } });
+  const dashboard = await dashboardResponse.json();
+  const schedule = dashboard.schedules.find((item) => item.hospitalCode === "MR1");
+  const orderResponse = await request.post("/api/registrations/orders", {
+    headers: { Authorization: `Bearer ${citizenToken}` },
+    data: { residentId: "r1", scheduleId: schedule.id, visitType: "onsite", reason: "E2E callback remediation" }
+  });
+  expect(orderResponse.status()).toBe(201);
+  const order = await orderResponse.json();
+  const callback = (eventType, sequence) => ({
+    contractId: "appointment-order-v1",
+    idempotencyKey: `e2e-remediation-${order.id}-${sequence}`,
+    externalId: `E2E-REMEDIATION-${order.id}-${sequence}`,
+    residentId: order.residentId,
+    orderNo: order.registrationNo,
+    slotId: order.scheduleId,
+    eventType,
+    orderStatus: eventType,
+    occurredAt: `2026-07-10T15:0${sequence}:00.000Z`
+  });
+  const postCallback = async (payload) => request.post("/api/integration/events", {
+    headers: {
+      Authorization: `Bearer ${hospitalToken}`,
+      "x-integration-signature": integrationSignature(payload)
+    },
+    data: payload
+  });
+  const earlyCheckInResponse = await postCallback(callback("checked-in", 1));
+  expect(earlyCheckInResponse.status()).toBe(202);
+  const earlyCheckIn = await earlyCheckInResponse.json();
+  expect(earlyCheckIn.deadLetter).toBe(true);
+  expect((await postCallback(callback("payment-succeeded", 2))).status()).toBe(202);
+  expect((await postCallback(callback("his-confirmed", 3))).status()).toBe(202);
+
+  await login(page, "hospital", "institution.html");
+  const eventRow = page.locator(`[data-registration-integration-event="${earlyCheckIn.id}"]`);
+  await expect(eventRow).toContainText("重试 0/3");
+  await eventRow.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("institution-registration-remediation-mobile.png") });
+  const eventLayout = await eventRow.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return {
+      left: rect.left,
+      right: rect.right,
+      viewportWidth: document.documentElement.clientWidth,
+      pageOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth
+    };
+  });
+  expect(eventLayout.pageOverflow).toBe(false);
+  expect(eventLayout.left).toBeGreaterThanOrEqual(0);
+  expect(eventLayout.right).toBeLessThanOrEqual(eventLayout.viewportWidth);
+  const noteInput = eventRow.getByLabel("回调重试处理备注");
+  await noteInput.fill("HIS 与支付前置回调已补齐");
+  await eventRow.getByRole("button", { name: "重试回调" }).click();
+  await expect(eventRow.getByRole("button", { name: "重试回调" })).toHaveCount(0);
+  await expect(eventRow).toContainText("已匹配");
+  await expect(eventRow).toContainText("最近处理：HIS 与支付前置回调已补齐");
+  await expect(page.locator("#registration-integration-boundary")).toContainText("回调重试成功");
+});
+
+test("institution assigns and resolves an appointment reconciliation case", async ({ page, request }, testInfo) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const apiLogin = async (username) => {
+    const response = await request.post("/api/auth/login", { data: { username, password: "123456" } });
+    expect(response.ok()).toBe(true);
+    return (await response.json()).token;
+  };
+  const citizenToken = await apiLogin("citizen");
+  const hospitalToken = await apiLogin("hospital");
+  const dashboard = await (await request.get("/api/registrations/dashboard", { headers: { Authorization: `Bearer ${citizenToken}` } })).json();
+  const schedule = dashboard.schedules.find((item) => item.hospitalCode === "MR1");
+  const orderResponse = await request.post("/api/registrations/orders", {
+    headers: { Authorization: `Bearer ${citizenToken}` },
+    data: { residentId: "r1", scheduleId: schedule.id, visitType: "onsite", reason: "E2E manual reconciliation" }
+  });
+  expect(orderResponse.status()).toBe(201);
+  const order = await orderResponse.json();
+  const callback = {
+    contractId: "appointment-order-v1",
+    idempotencyKey: `e2e-manual-${order.id}`,
+    externalId: `E2E-MANUAL-${order.id}`,
+    residentId: order.residentId,
+    orderNo: order.registrationNo,
+    slotId: order.scheduleId,
+    eventType: "checked-in",
+    orderStatus: "checked-in",
+    occurredAt: "2026-07-10T16:30:00.000Z"
+  };
+  const deadLetterResponse = await request.post("/api/integration/events", {
+    headers: { Authorization: `Bearer ${hospitalToken}`, "x-integration-signature": integrationSignature(callback) },
+    data: callback
+  });
+  expect(deadLetterResponse.status()).toBe(202);
+  const deadLetter = await deadLetterResponse.json();
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const retryResponse = await request.post(`/api/registrations/integration-events/${deadLetter.id}/retry`, {
+      headers: { Authorization: `Bearer ${hospitalToken}` },
+      data: { note: `E2E exhausted retry ${attempt}` }
+    });
+    expect(retryResponse.status()).toBe(200);
+  }
+
+  await login(page, "hospital", "institution.html");
+  const eventRow = page.locator(`[data-registration-integration-event="${deadLetter.id}"]`);
+  await expect(eventRow).toContainText("已达到重试上限");
+  await eventRow.getByLabel("人工对账责任人").fill("医院接口负责人");
+  await eventRow.getByLabel("人工对账处理时限").fill("2026-07-20");
+  await eventRow.getByLabel("人工对账优先级").selectOption("P0");
+  await eventRow.getByLabel("人工对账分派备注").fill("自动重试耗尽，转人工核验回执");
+  await eventRow.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("institution-registration-reconciliation-mobile.png") });
+  const assignmentLayout = await eventRow.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return { left: rect.left, right: rect.right, viewportWidth: document.documentElement.clientWidth, pageOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+  });
+  expect(assignmentLayout.pageOverflow).toBe(false);
+  expect(assignmentLayout.left).toBeGreaterThanOrEqual(0);
+  expect(assignmentLayout.right).toBeLessThanOrEqual(assignmentLayout.viewportWidth);
+  await eventRow.getByRole("button", { name: "转人工对账" }).click();
+  await expect(eventRow).toContainText("人工工单");
+  await expect(eventRow).toContainText("医院接口负责人");
+  await eventRow.getByLabel("人工对账结论").selectOption("manual-compensation");
+  await eventRow.getByLabel("人工对账证据引用").fill("E2E-RECON-RECEIPT-001");
+  await eventRow.getByLabel("人工对账结案备注").fill("补偿回执已完成双人复核");
+  await eventRow.getByRole("button", { name: "登记结案" }).click();
+  await expect(eventRow).toContainText("人工已结案");
+  await expect(eventRow).toContainText("E2E-RECON-RECEIPT-001");
+  await expect(page.locator("#registration-integration-boundary")).toContainText("原预约订单未被改写");
+  await expect(page.locator("#registration-integration-metrics")).toContainText("人工结案");
+});
+
+test("hospital disruption notice is accepted by the resident on mobile", async ({ page, request }, testInfo) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const apiLogin = async (username) => {
+    const response = await request.post("/api/auth/login", { data: { username, password: "123456" } });
+    expect(response.ok()).toBe(true);
+    return (await response.json()).token;
+  };
+  const citizenToken = await apiLogin("citizen");
+  const dashboard = await (await request.get("/api/registrations/dashboard", { headers: { Authorization: `Bearer ${citizenToken}` } })).json();
+  const currentSchedule = dashboard.schedules.find((item) => item.id === "reg-sch-cardio-am");
+  const replacementSchedule = dashboard.schedules.find((item) => item.id !== currentSchedule.id && item.hospitalCode === currentSchedule.hospitalCode && item.departmentCode === currentSchedule.departmentCode && item.remaining > 0);
+  expect(replacementSchedule).toBeTruthy();
+  const orderResponse = await request.post("/api/registrations/orders", {
+    headers: { Authorization: `Bearer ${citizenToken}` },
+    data: { residentId: "r1", scheduleId: currentSchedule.id, visitType: "onsite", reason: "E2E hospital schedule disruption" }
+  });
+  expect(orderResponse.status()).toBe(201);
+  const order = await orderResponse.json();
+
+  await login(page, "hospital", "institution.html");
+  const institutionRow = page.locator(`[data-registration-journey-order="${order.id}"]`);
+  await expect(institutionRow.getByLabel("停诊变更类型")).toHaveCount(1);
+  await institutionRow.getByLabel("停诊变更类型").selectOption("doctor-unavailable");
+  await institutionRow.getByLabel("替代预约号源").selectOption(replacementSchedule.id);
+  await institutionRow.getByLabel("居民确认时限").fill("2099-07-20T18:00");
+  await institutionRow.getByLabel("停诊改签原因").fill("原接诊医生临时停诊，提供同科室替代号源");
+  await institutionRow.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("institution-registration-disruption-mobile.png") });
+  const institutionLayout = await institutionRow.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return { left: rect.left, right: rect.right, viewportWidth: document.documentElement.clientWidth, pageOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+  });
+  expect(institutionLayout.pageOverflow).toBe(false);
+  expect(institutionLayout.left).toBeGreaterThanOrEqual(0);
+  expect(institutionLayout.right).toBeLessThanOrEqual(institutionLayout.viewportWidth);
+  await institutionRow.getByRole("button", { name: "发送改签通知" }).click();
+  await expect(institutionRow).toContainText("待居民确认");
+  await expect(institutionRow).toContainText("原接诊医生临时停诊");
+  await expect(page.locator("#registration-journey-boundary")).toContainText("原号源暂时保留");
+
+  await login(page, "citizen", "citizen.html");
+  await page.goto("/citizen.html?client=app&page=registration#service-registration");
+  const citizenRow = page.locator(`[data-registration-order="${order.id}"]`);
+  await expect(citizenRow).toContainText("医生停诊");
+  await expect(citizenRow).toContainText("待我确认");
+  await expect(citizenRow.getByRole("button", { name: "确认改签" })).toHaveCount(1);
+  await citizenRow.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("citizen-registration-disruption-mobile.png") });
+  const citizenLayout = await citizenRow.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return { left: rect.left, right: rect.right, viewportWidth: document.documentElement.clientWidth, pageOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+  });
+  expect(citizenLayout.pageOverflow).toBe(false);
+  expect(citizenLayout.left).toBeGreaterThanOrEqual(0);
+  expect(citizenLayout.right).toBeLessThanOrEqual(citizenLayout.viewportWidth);
+  await citizenRow.getByRole("button", { name: "确认改签" }).click();
+  await expect(citizenRow).toContainText("改签已确认");
+  await expect(citizenRow).toContainText(replacementSchedule.date);
+  await expect(citizenRow).toContainText("新号源待医院再次确认");
+  await expect(citizenRow.getByRole("button", { name: "确认改签" })).toHaveCount(0);
+});
+
 test("registration journey crosses resident and institution portals", async ({ page }) => {
   test.setTimeout(60_000);
   const orderId = "reg-r1-20260630-cardio";
@@ -195,7 +414,7 @@ test("registration journey remains readable on a mobile viewport", async ({ page
   await page.goto("/citizen.html?client=app&page=registration#service-registration");
   const citizenJourney = page.locator("#registration-journey-timeline").locator("..");
   await expect(citizenJourney).toBeVisible();
-  await expect(citizenJourney).toContainText("已完成");
+  await expect(citizenJourney).toContainText("号源锁定");
   await citizenJourney.scrollIntoViewIfNeeded();
   await page.screenshot({ path: testInfo.outputPath("citizen-registration-mobile.png") });
   const citizenLayout = await page.evaluate(() => {

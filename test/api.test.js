@@ -2566,8 +2566,82 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(refunded.body.order.refundStatus, "refunded-demo");
     assert.equal(refunded.body.order.productionReady, false);
 
+    const replacementSchedule = dashboard.body.schedules.find((item) =>
+      item.id !== schedule.id && item.hospitalCode === schedule.hospitalCode && item.departmentCode === schedule.departmentCode && item.remaining > 1
+    );
+    assert.ok(replacementSchedule);
+    const disruptionCandidate = await api(baseUrl, "/api/registrations/orders", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ residentId: "r1", scheduleId: schedule.id, visitType: "onsite", reason: "schedule disruption regression" })
+    }));
+    assert.equal(disruptionCandidate.response.status, 201);
+    const disruptionOtherInstitutionLogin = await login(baseUrl, "community");
+    const crossInstitutionDisruption = await api(baseUrl, `/api/registrations/orders/${disruptionCandidate.body.id}/disruption`, authorized(disruptionOtherInstitutionLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "notify", type: "doctor-unavailable", replacementScheduleId: replacementSchedule.id, acknowledgementDueAt: "2099-07-20T18:00:00.000Z", reason: "wrong institution notice" })
+    }));
+    assert.equal(crossInstitutionDisruption.response.status, 403);
+    const invalidReplacement = await api(baseUrl, `/api/registrations/orders/${disruptionCandidate.body.id}/disruption`, authorized(hospitalRegistrationToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "notify", type: "doctor-unavailable", replacementScheduleId: schedule.id, acknowledgementDueAt: "2099-07-20T18:00:00.000Z", reason: "same slot is invalid" })
+    }));
+    assert.equal(invalidReplacement.response.status, 400);
+    const disruptionNotified = await api(baseUrl, `/api/registrations/orders/${disruptionCandidate.body.id}/disruption`, authorized(hospitalRegistrationToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "notify", type: "doctor-unavailable", replacementScheduleId: replacementSchedule.id, acknowledgementDueAt: "2099-07-20T18:00:00.000Z", reason: "doctor clinic suspended" })
+    }));
+    assert.equal(disruptionNotified.response.status, 200);
+    assert.equal(disruptionNotified.body.order.disruption.status, "pending-resident");
+    assert.equal(disruptionNotified.body.order.disruption.originalSchedule.scheduleId, schedule.id);
+    assert.equal(disruptionNotified.body.order.disruption.proposedSchedule.scheduleId, replacementSchedule.id);
+    assert.equal(disruptionNotified.body.dashboard.summary.disruptionPending >= 1, true);
+    const inventoryAtNotice = disruptionNotified.body.dashboard.schedules;
+    const oldRemainingAtNotice = inventoryAtNotice.find((item) => item.id === schedule.id).remaining;
+    const replacementRemainingAtNotice = inventoryAtNotice.find((item) => item.id === replacementSchedule.id).remaining;
+    const blockedJourneyDuringDisruption = await api(baseUrl, `/api/registrations/orders/${disruptionCandidate.body.id}/actions`, authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "pay-demo", note: "must respond to disruption first" })
+    }));
+    assert.equal(blockedJourneyDuringDisruption.response.status, 409);
+    const acceptedDisruption = await api(baseUrl, `/api/registrations/orders/${disruptionCandidate.body.id}/disruption`, authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "accept", note: "resident accepts replacement slot" })
+    }));
+    assert.equal(acceptedDisruption.response.status, 200);
+    assert.equal(acceptedDisruption.body.order.scheduleId, replacementSchedule.id);
+    assert.equal(acceptedDisruption.body.order.disruption.status, "accepted");
+    assert.equal(acceptedDisruption.body.order.hisConfirmationStatus, "pending-demo");
+    assert.equal(acceptedDisruption.body.order.productionReady, false);
+    assert.equal(acceptedDisruption.body.dashboard.schedules.find((item) => item.id === schedule.id).remaining, oldRemainingAtNotice + 1);
+    assert.equal(acceptedDisruption.body.dashboard.schedules.find((item) => item.id === replacementSchedule.id).remaining, replacementRemainingAtNotice - 1);
+    assert.equal(acceptedDisruption.body.dashboard.summary.rescheduled >= 1, true);
+
+    const disruptionCancelCandidate = await api(baseUrl, "/api/registrations/orders", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ residentId: "r1", scheduleId: schedule.id, visitType: "onsite", reason: "disruption cancellation regression" })
+    }));
+    assert.equal(disruptionCancelCandidate.response.status, 201);
+    assert.equal((await api(baseUrl, `/api/registrations/orders/${disruptionCancelCandidate.body.id}/actions`, authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "pay-demo", note: "paid before hospital disruption" })
+    }))).response.status, 200);
+    assert.equal((await api(baseUrl, `/api/registrations/orders/${disruptionCancelCandidate.body.id}/disruption`, authorized(hospitalRegistrationToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "notify", type: "schedule-adjustment", replacementScheduleId: replacementSchedule.id, acknowledgementDueAt: "2099-07-20T18:00:00.000Z", reason: "outpatient schedule adjusted" })
+    }))).response.status, 200);
+    const cancelledDisruption = await api(baseUrl, `/api/registrations/orders/${disruptionCancelCandidate.body.id}/disruption`, authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "cancel", note: "resident declines replacement and requests refund" })
+    }));
+    assert.equal(cancelledDisruption.response.status, 200);
+    assert.equal(cancelledDisruption.body.order.status, "cancelled");
+    assert.equal(cancelledDisruption.body.order.disruption.status, "cancelled");
+    assert.equal(cancelledDisruption.body.order.refundStatus, "refund-pending");
+    assert.equal(cancelledDisruption.body.order.notificationDeliveries.some((item) => item.event === "registration-disruption-cancel"), true);
+
     const registrationJourneyAudit = await api(baseUrl, "/api/state", authorized(commissionToken));
     assert.equal(registrationJourneyAudit.body.securityEvents.some((item) => item.action === "registration-journey-action" && item.result === "allowed"), true);
+    assert.equal(registrationJourneyAudit.body.securityEvents.some((item) => item.action === "registration-disruption-action" && item.result === "allowed"), true);
 
     const callbackCandidate = await api(baseUrl, "/api/registrations/orders", authorized(citizenToken, {
       method: "POST",
@@ -2656,22 +2730,132 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(earlyCheckIn.response.status, 202);
     assert.equal(earlyCheckIn.body.deadLetter, true);
     assert.match(earlyCheckIn.body.deadLetterReason, /requires an open order with payment and HIS confirmation/);
+    const retryWithoutNote = await api(baseUrl, `/api/registrations/integration-events/${earlyCheckIn.body.id}/retry`, authorized(hospitalRegistrationToken, {
+      method: "POST",
+      body: JSON.stringify({ note: "" })
+    }));
+    assert.equal(retryWithoutNote.response.status, 400);
+    const otherInstitutionLogin = await login(baseUrl, "community");
+    const crossInstitutionRetry = await api(baseUrl, `/api/registrations/integration-events/${earlyCheckIn.body.id}/retry`, authorized(otherInstitutionLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ note: "other institution must not retry" })
+    }));
+    assert.equal(crossInstitutionRetry.response.status, 403);
+    const failedInstitutionRetry = await api(baseUrl, `/api/registrations/integration-events/${earlyCheckIn.body.id}/retry`, authorized(hospitalRegistrationToken, {
+      method: "POST",
+      body: JSON.stringify({ note: "first retry before prerequisites" })
+    }));
+    assert.equal(failedInstitutionRetry.response.status, 200);
+    assert.equal(failedInstitutionRetry.body.ok, false);
+    assert.equal(failedInstitutionRetry.body.event.deadLetter, true);
+    assert.equal(failedInstitutionRetry.body.event.retryCount, 1);
+    assert.equal(failedInstitutionRetry.body.event.lastRetryResult, "failed");
     assert.equal((await postCallback(hospitalRegistrationToken, retryPayload("payment-succeeded", 2))).response.status, 202);
     assert.equal((await postCallback(hospitalRegistrationToken, retryPayload("his-confirmed", 3))).response.status, 202);
-    const retriedCheckIn = await api(baseUrl, `/api/integration/events/${earlyCheckIn.body.id}/retry`, authorized(commissionToken, {
+    const retriedCheckIn = await api(baseUrl, `/api/registrations/integration-events/${earlyCheckIn.body.id}/retry`, authorized(hospitalRegistrationToken, {
       method: "POST",
-      body: JSON.stringify({ reason: "prerequisites landed" })
+      body: JSON.stringify({ note: "payment and HIS prerequisites landed" })
     }));
     assert.equal(retriedCheckIn.response.status, 200);
-    assert.equal(retriedCheckIn.body.deadLetter, false);
-    assert.equal(retriedCheckIn.body.reconciliationStatus, "matched");
-    assert.equal(retriedCheckIn.body.retryCount, 1);
+    assert.equal(retriedCheckIn.body.ok, true);
+    assert.equal(retriedCheckIn.body.event.deadLetter, false);
+    assert.equal(retriedCheckIn.body.event.reconciliationStatus, "matched");
+    assert.equal(retriedCheckIn.body.event.retryCount, 2);
+    assert.equal(retriedCheckIn.body.event.lastRetryNote, "payment and HIS prerequisites landed");
+    assert.equal(retriedCheckIn.body.dashboard.integrationCenter.summary.deadLetters, 0);
 
     const registrationIntegrationAudit = await api(baseUrl, "/api/state", authorized(commissionToken));
     const retriedOrder = registrationIntegrationAudit.body.registrationOrders.find((item) => item.id === retryCandidate.body.id);
     assert.equal(retriedOrder.checkInStatus, "checked-in");
     assert.equal(retriedOrder.auditTrail.some((item) => item.action === "integration-checked-in" && item.idempotencyKey === earlyCheckInPayload.idempotencyKey), true);
     assert.equal(registrationIntegrationAudit.body.integrationGatewayEvents.some((item) => item.id === earlyCheckIn.body.id && item.reconciliationStatus === "matched"), true);
+    assert.equal(registrationIntegrationAudit.body.securityEvents.some((item) => item.action === "重试预约回调死信" && item.target === earlyCheckIn.body.id && item.result === "允许"), true);
+
+    const manualCandidate = await api(baseUrl, "/api/registrations/orders", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ residentId: "r1", scheduleId: schedule.id, visitType: "onsite", reason: "manual reconciliation regression" })
+    }));
+    assert.equal(manualCandidate.response.status, 201);
+    const manualPayload = {
+      contractId: "appointment-order-v1",
+      idempotencyKey: `appointment-manual-${manualCandidate.body.id}`,
+      externalId: `APPT-MANUAL-${manualCandidate.body.id}`,
+      residentId: manualCandidate.body.residentId,
+      orderNo: manualCandidate.body.registrationNo,
+      slotId: manualCandidate.body.scheduleId,
+      eventType: "checked-in",
+      orderStatus: "checked-in",
+      occurredAt: "2026-07-10T13:30:00.000Z"
+    };
+    const manualDeadLetter = await postCallback(hospitalRegistrationToken, manualPayload);
+    assert.equal(manualDeadLetter.response.status, 202);
+    assert.equal(manualDeadLetter.body.deadLetter, true);
+    const prematureAssignment = await api(baseUrl, `/api/registrations/integration-events/${manualDeadLetter.body.id}/reconciliation`, authorized(hospitalRegistrationToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "assign", owner: "hospital integration owner", dueAt: "2026-07-20", priority: "P0", note: "premature manual assignment" })
+    }));
+    assert.equal(prematureAssignment.response.status, 409);
+    let exhaustedRetry;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      exhaustedRetry = await api(baseUrl, `/api/registrations/integration-events/${manualDeadLetter.body.id}/retry`, authorized(hospitalRegistrationToken, {
+        method: "POST",
+        body: JSON.stringify({ note: `manual case retry ${attempt}` })
+      }));
+      assert.equal(exhaustedRetry.response.status, 200);
+      assert.equal(exhaustedRetry.body.event.deadLetter, true);
+      assert.equal(exhaustedRetry.body.event.retryCount, attempt);
+    }
+    const retryAfterLimit = await api(baseUrl, `/api/registrations/integration-events/${manualDeadLetter.body.id}/retry`, authorized(hospitalRegistrationToken, {
+      method: "POST",
+      body: JSON.stringify({ note: "retry after limit" })
+    }));
+    assert.equal(retryAfterLimit.response.status, 409);
+    const crossInstitutionAssignment = await api(baseUrl, `/api/registrations/integration-events/${manualDeadLetter.body.id}/reconciliation`, authorized(otherInstitutionLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "assign", owner: "wrong institution", dueAt: "2026-07-20", priority: "P1", note: "cross institution assignment" })
+    }));
+    assert.equal(crossInstitutionAssignment.response.status, 403);
+    const missingOwnerAssignment = await api(baseUrl, `/api/registrations/integration-events/${manualDeadLetter.body.id}/reconciliation`, authorized(hospitalRegistrationToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "assign", owner: "", dueAt: "2026-07-20", priority: "P1", note: "owner is required" })
+    }));
+    assert.equal(missingOwnerAssignment.response.status, 400);
+    const assignedManualCase = await api(baseUrl, `/api/registrations/integration-events/${manualDeadLetter.body.id}/reconciliation`, authorized(hospitalRegistrationToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "assign", owner: "hospital integration owner", dueAt: "2026-07-20", priority: "P0", note: "automatic retries exhausted" })
+    }));
+    assert.equal(assignedManualCase.response.status, 200);
+    assert.equal(assignedManualCase.body.event.reconciliationStatus, "manual-review");
+    assert.equal(assignedManualCase.body.event.manualReconciliation.status, "assigned");
+    assert.equal(assignedManualCase.body.dashboard.integrationCenter.summary.openManualCases, 1);
+    const resolveWithoutEvidence = await api(baseUrl, `/api/registrations/integration-events/${manualDeadLetter.body.id}/reconciliation`, authorized(hospitalRegistrationToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "resolve", resolution: "manual-compensation", evidenceRef: "", note: "evidence is required" })
+    }));
+    assert.equal(resolveWithoutEvidence.response.status, 400);
+    const resolvedManualCase = await api(baseUrl, `/api/registrations/integration-events/${manualDeadLetter.body.id}/reconciliation`, authorized(hospitalRegistrationToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "resolve", resolution: "manual-compensation", evidenceRef: "PAYMENT-RECON-RECEIPT-001", note: "manual compensation receipt verified" })
+    }));
+    assert.equal(resolvedManualCase.response.status, 200);
+    assert.equal(resolvedManualCase.body.event.deadLetter, false);
+    assert.equal(resolvedManualCase.body.event.reconciliationStatus, "manual-resolved");
+    assert.equal(resolvedManualCase.body.event.manualReconciliation.status, "resolved");
+    assert.equal(resolvedManualCase.body.event.manualReconciliation.productionEvidence, false);
+    assert.equal(resolvedManualCase.body.dashboard.integrationCenter.summary.resolvedManualCases, 1);
+    const reopenedManualCase = await api(baseUrl, `/api/registrations/integration-events/${manualDeadLetter.body.id}/reconciliation`, authorized(hospitalRegistrationToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "reopen", note: "receipt requires a second review" })
+    }));
+    assert.equal(reopenedManualCase.response.status, 200);
+    assert.equal(reopenedManualCase.body.event.deadLetter, true);
+    assert.equal(reopenedManualCase.body.event.manualReconciliation.status, "assigned");
+    const manualCaseState = await api(baseUrl, "/api/state", authorized(commissionToken));
+    const unchangedManualOrder = manualCaseState.body.registrationOrders.find((item) => item.id === manualCandidate.body.id);
+    assert.equal(unchangedManualOrder.checkInStatus, "not-checked-in");
+    assert.equal(manualCaseState.body.securityEvents.some((item) => item.action === "预约回调人工对账-assign" && item.target === manualDeadLetter.body.id), true);
+    assert.equal(manualCaseState.body.securityEvents.some((item) => item.action === "预约回调人工对账-resolve" && item.target === manualDeadLetter.body.id), true);
+    assert.equal(manualCaseState.body.securityEvents.some((item) => item.action === "预约回调人工对账-reopen" && item.target === manualDeadLetter.body.id), true);
 
     const denied = await api(baseUrl, "/api/registrations/orders", authorized(citizenToken, {
       method: "POST",

@@ -3005,21 +3005,70 @@ function registrationJourneySteps(order) {
   const paid = ["paid", "paid-demo", "waived"].includes(order.paymentStatus);
   const confirmed = ["confirmed", "confirmed-demo"].includes(order.hisConfirmationStatus);
   const cancelled = order.status === "cancelled";
-  return [
+  const steps = [
     { name: "号源锁定", done: ["confirmed", "released"].includes(order.scheduleLockStatus), detail: order.registrationNo || order.hisScheduleId || "待回执" },
     { name: "支付", done: paid, detail: formatRegistrationStatus(order.paymentStatus) },
     { name: "医院确认", done: confirmed, detail: formatRegistrationStatus(order.hisConfirmationStatus) },
     { name: "到院报到", done: order.checkInStatus === "checked-in-demo", detail: formatRegistrationStatus(order.checkInStatus) },
     { name: cancelled ? "退款" : "完诊", done: cancelled ? ["not-required", "refunded-demo"].includes(order.refundStatus) : order.status === "completed", detail: cancelled ? formatRegistrationStatus(order.refundStatus) : formatRegistrationStatus(order.status) }
   ];
+  if (order.disruption) {
+    steps.splice(1, 0, {
+      name: "停诊改签",
+      done: ["accepted", "cancelled", "withdrawn"].includes(order.disruption.status),
+      detail: citizenRegistrationDisruptionLabel(order.disruption.status)
+    });
+  }
+  return steps;
 }
 
 function localRegistrationAllowedActions(order) {
+  if (order.disruption?.status === "pending-resident") return [];
   if (order.status === "cancelled" || ["completed", "closed"].includes(order.status)) return [];
   const actions = [];
   if (order.paymentStatus === "pending") actions.push("pay-demo");
   if (["paid", "paid-demo", "waived"].includes(order.paymentStatus) && ["confirmed", "confirmed-demo"].includes(order.hisConfirmationStatus) && order.checkInStatus !== "checked-in-demo") actions.push("check-in-demo");
   return actions;
+}
+
+function citizenRegistrationDisruptionLabel(value) {
+  return {
+    "doctor-unavailable": "医生停诊",
+    "schedule-adjustment": "排班调整",
+    "clinic-suspended": "门诊暂停",
+    "pending-resident": "待我确认",
+    accepted: "改签已确认",
+    cancelled: "已选择退号",
+    withdrawn: "医院已撤回",
+    "supplement-pending": "待补缴差额",
+    "partial-refund-pending": "待退差额",
+    "not-required": "无需补退"
+  }[value] || value || "待处理";
+}
+
+function renderRegistrationDisruptionPanel(order) {
+  const disruption = order.disruption && typeof order.disruption === "object" ? order.disruption : null;
+  if (!disruption) return "";
+  const proposed = disruption.proposedSchedule || {};
+  const actions = Array.isArray(order.disruptionActions) ? order.disruptionActions : [];
+  const dueTime = Date.parse(disruption.acknowledgementDueAt || "");
+  const overdue = disruption.status === "pending-resident" && Number.isFinite(dueTime) && dueTime < Date.now();
+  const controls = disruption.status === "pending-resident"
+    ? `<div class="registration-order-actions">
+        ${actions.includes("accept") ? `<button type="button" class="small-button" data-registration-disruption-action="accept" data-registration-id="${escapeHtml(order.id)}">确认改签</button>` : ""}
+        ${actions.includes("cancel") ? `<button type="button" class="small-button danger" data-registration-disruption-action="cancel" data-registration-id="${escapeHtml(order.id)}">不接受并退号</button>` : ""}
+      </div>`
+    : "";
+  const feeSummary = disruption.status === "accepted"
+    ? `<p>费用差额 ${Number(disruption.feeDifference || 0).toFixed(2)} 元 · ${citizenRegistrationDisruptionLabel(disruption.paymentAdjustmentStatus)} · 新号源待医院再次确认</p>`
+    : "";
+  return `<section class="registration-disruption-panel" data-registration-disruption-status="${escapeHtml(disruption.status)}">
+    <strong>${escapeHtml(citizenRegistrationDisruptionLabel(disruption.type))} · ${escapeHtml(citizenRegistrationDisruptionLabel(disruption.status))}${overdue ? " · 已逾期" : ""}</strong>
+    <p>${escapeHtml(disruption.reason || "医院排班发生变更")}</p>
+    <p>原预约 ${escapeHtml(disruption.originalSchedule?.appointmentDate || "待确认")} ${escapeHtml(disruption.originalSchedule?.period || "")} · ${escapeHtml(disruption.originalSchedule?.doctor || "医生待确认")}</p>
+    <p>建议改至 ${escapeHtml(proposed.appointmentDate || "待确认")} ${escapeHtml(proposed.period || "")} · ${escapeHtml(proposed.doctor || "医生待确认")} · 确认时限 ${escapeHtml(disruption.acknowledgementDueAt || "待医院确认")}</p>
+    ${feeSummary}${controls}
+  </section>`;
 }
 
 function renderRegistrationJourneySummary(orders) {
@@ -3029,7 +3078,9 @@ function renderRegistrationJourneySummary(orders) {
     ["待支付", orders.filter((item) => item.paymentStatus === "pending").length, "居民处理"],
     ["医院已确认", orders.filter((item) => ["confirmed", "confirmed-demo"].includes(item.hisConfirmationStatus)).length, "HIS 回执"],
     ["已报到", orders.filter((item) => item.checkInStatus === "checked-in-demo").length, "到院闭环"],
-    ["退款处理中", orders.filter((item) => item.refundStatus === "refund-pending").length, "机构处理"]
+    ["退款处理中", orders.filter((item) => item.refundStatus === "refund-pending").length, "机构处理"],
+    ["待确认改签", orders.filter((item) => item.disruption?.status === "pending-resident").length, "停诊变更"],
+    ["已确认改签", orders.filter((item) => item.disruption?.status === "accepted").length, "新号源"]
   ];
   target.innerHTML = metrics.map(([name, value, detail]) => `<article><strong>${name}</strong><span>${value} 条 · ${detail}</span></article>`).join("");
 }
@@ -3064,12 +3115,13 @@ function renderRegistration(residentId) {
   }
   orderCards.innerHTML = orders
     .sort((a, b) => String(a.appointmentDate || "").localeCompare(String(b.appointmentDate || "")))
-    .map((item) => `<article class="mini-card registration-order-card">
+    .map((item) => `<article class="mini-card registration-order-card" data-registration-order="${escapeHtml(item.id)}">
       <h3>${formatRegistrationHospital(item.hospital)} · ${formatRegistrationDepartment(item.department)}</h3>
       <p class="muted">${item.appointmentDate} ${item.period} · ${formatRegistrationDoctor(item.doctor)} · ${item.visitType === "internet" ? "互联网复诊" : "到院就诊"}</p>
       <p>${item.reason || "居民端预约"} · 挂号费 ${item.fee} 元 · 队列 ${item.queueNo || item.registrationNo || "待回执"}</p>
       <p>HIS ${item.hisVisitId || item.hisScheduleId || "待同步"} · 支付 ${formatRegistrationStatus(item.paymentStatus)} · 退费 ${formatRegistrationStatus(item.refundStatus)}</p>
       <p>医保 ${formatRegistrationStatus(item.insuranceStatus)} ${item.insurancePrecheckNo ? `· ${item.insurancePrecheckNo}` : ""} · 短信 ${formatRegistrationDeliveryStatus(item)}</p>
+      ${renderRegistrationDisruptionPanel(item)}
       <div class="registration-journey-steps">${registrationJourneySteps(item).map((step) => `<span class="${step.done ? "done" : "pending"}"><strong>${step.name}</strong><small>${step.detail}</small></span>`).join("")}</div>
       <div class="registration-order-actions">
         <span class="status ${item.status === "cancelled" ? "danger" : item.paymentStatus === "pending" ? "warn" : ""}">${formatRegistrationStatus(item.status)}</span>
@@ -3084,6 +3136,9 @@ function renderRegistration(residentId) {
   });
   orderCards.querySelectorAll("[data-registration-journey-action]").forEach((button) => {
     button.addEventListener("click", () => runRegistrationJourneyAction(residentId, button.dataset.registrationId, button.dataset.registrationJourneyAction, button));
+  });
+  orderCards.querySelectorAll("[data-registration-disruption-action]").forEach((button) => {
+    button.addEventListener("click", () => runRegistrationDisruptionAction(residentId, button.dataset.registrationId, button.dataset.registrationDisruptionAction, button));
   });
 }
 
@@ -3124,6 +3179,33 @@ async function runRegistrationJourneyAction(residentId, orderId, action, button)
     showToast(action === "pay-demo" ? "支付演示凭据已记录，等待医院确认" : "到院报到已记录，等待医院接诊");
   } catch (error) {
     showToast(error.message || "挂号流程操作失败");
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+async function runRegistrationDisruptionAction(residentId, orderId, action, button) {
+  if (button) button.disabled = true;
+  const notes = {
+    accept: "居民确认接受医院提供的替代号源，并同意释放原号源。",
+    cancel: "居民不接受替代号源，选择退号并进入原支付退款流程。"
+  };
+  try {
+    if (!API_BASE) throw new Error("静态预览不提交停诊改签操作");
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${API_BASE}/registrations/orders/${encodeURIComponent(orderId)}/disruption`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, note: notes[action] || "居民处理停诊改签通知。" })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.message || `HTTP ${response.status}`);
+    registrationDashboard = payload.dashboard || await fetchCitizenRegistrationDashboard();
+    citizenMessages = await fetchCitizenMessages();
+    renderCitizen(residentId);
+    showToast(action === "accept" ? "改签已确认，原号源已释放，新号源等待医院确认" : "已选择退号，退款状态和通知已同步");
+  } catch (error) {
+    showToast(error.message || "停诊改签处理失败");
   } finally {
     if (button) button.disabled = false;
   }
@@ -3230,7 +3312,7 @@ function getRegistrationOrders(residentId) {
 }
 
 function canCancelRegistration(order) {
-  return !["cancelled", "completed", "closed"].includes(order.status);
+  return order.disruption?.status !== "pending-resident" && !["cancelled", "completed", "closed"].includes(order.status);
 }
 
 async function cancelRegistrationOrder(residentId, orderId) {

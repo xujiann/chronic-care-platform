@@ -1,8 +1,23 @@
 # C 端全流程审计与优化清单
 
-更新日期：2026-06-27
+更新日期：2026-07-10
 
 本清单用于审计居民端从建档到使用服务的完整链路，并标明当前系统已实现、演示可用和待生产化的内容。
+
+## 0. 全管线审计矩阵
+
+| 管线 | 居民端入口 | 当前接口/资产 | 当前状态 | 上线阻断项 | 验收脚本/证据 |
+|---|---|---|---|---|---|
+| 登录与账号 | `login.html`、居民端入口 | `/api/auth/phone-code`、`/api/auth/phone-login`、`auth.js` | 已实现演示手机号验证码、冷却、过期、失败锁定和账号开通边界 | `SMS_GATEWAY_URL`、实名/OIDC、家庭/监护关系、风控限流和短信回执 | `npm.cmd run citizen:launch-foundation`、`release/citizen-launch-foundation-readiness.md` |
+| 居民首页聚合 | `citizen.html` | `/api/state`、居民/家庭授权范围裁剪 | 已实现本人及家庭授权范围聚合展示 | 居民主索引、监护关系核验、越权访问测试、审计导出 | `test/static.test.js`、`docs/citizen-production-launch-requirements.md` |
+| 健康档案 | `page=health-record` | `/api/personal-records`、`healthArchiveStandard`、`personalRecords` | 已实现只读演示档案、慢病标签、关键指标、趋势和来源标签 | 真实公卫档案、基层慢病档案、来源机构、更新时间和数据质量规则 | `docs/citizen-module-interface-map.md`、真机健康档案截图 |
+| 电子病历 | `page=emr` | 门诊摘要、检查检验、用药、影像资料、附件资料 | 已实现 EMR/LIS/PACS 摘要和来源展示 | HIS/EMR/LIS/PACS 契约、影像对象授权、报告摘要样例、授权审计 | `docs/C端开发报告.md`、`test/static.test.js` |
+| 授权与审计 | 授权共享、访问复核区 | `/api/authorizations/:id/revoke`、`/api/access-reviews`、`dataAccessLogs` | 已实现授权展示、撤权提示和访问复核入口 | 撤权后强拦截、SIEM/审计导出、拒绝访问测试和复核台账 | `docs/citizen-authorization-emr-governance.md` |
+| 消息与待办 | 服务待办中心、通知面板 | `/api/messages`、`/api/tasks/:id/actions` | 已实现站内消息、待办确认/取消/反馈/评价状态隐藏 | 短信、订阅消息、APP 推送、送达回执、失败补偿队列 | `test/static.test.js`、消息回执样例 |
+| 护理服务 | `page=nursing` | `/api/internet-nursing/dashboard`、互联网护理订单接口 | 已实现申请、评估、派单、护士接单、服务记录和质控回访演示 | 护士资质、服务目录、知情同意、位置轨迹、费用和监管报送 | `npm.cmd run internet-nursing:readiness` |
+| 陪诊服务 | `page=escort` | `/api/escort-services/orders`、陪诊预约表单 | 已实现预约、取消、医院回执、订单进度和质量反馈 | 服务主体名录、HIS/导诊台、陪诊师签到、合同保险、评价投诉 | `npm.cmd run escort:readiness` |
+| 挂号服务 | `page=registration` | `/api/registrations/orders`、预约动作/停诊改签/取消接口、`/api/registrations/integration-center` | 已实现号源、预约、取消、停诊改签、居民确认或退号、签名回调、死信重试、人工工单和凭证结案演示 | HIS/互联网医院号源、排班变更事件、支付退款、医保电子凭证、真实通知及补偿回执 | `npm.cmd run registration:journey-readiness`、`npm.cmd run registration:integration-readiness` |
+| 移动发布 | `mobile-preview.html`、PWA/小程序/APP 入口 | `manifest.webmanifest`、`service-worker.js`、`mobile-preview.css` | 已实现 390px 手机框、精简预览、滑动切换、离线壳和验收摘要 | 域名备案、HTTPS、隐私协议、APP 签名、推送证书、崩溃监控、真机验收 | `npm.cmd run launch:smoke`、真机截图 |
 
 ## 1. 全流程状态
 
@@ -17,7 +32,7 @@
 | 查看随访计划 | 已实现 | 展示待随访、完成和逾期状态 |
 | 护理服务 | 已实现 | 居民端分标签进入互联网护理，提交上门护理申请并追踪机构派单、护士接单、服务记录、长期照护评估和照护计划 |
 | 陪诊服务 | 已实现 | 居民端分标签提交助医陪诊预约，记录服务主体、保障类型、合同、保险和回访状态 |
-| 挂号服务 | 已实现 | 居民端已提供演示号源查询、预约确认、本地订单、待支付/待医保核验状态和取消规则；生产仍需接入医院 HIS/互联网医院号源池、支付、退号和医保电子凭证核验 |
+| 挂号服务 | 已实现 | 居民端已提供演示号源查询、预约确认、停诊改签确认或退号、本地订单、待支付/待医保核验状态和取消规则；生产仍需接入医院 HIS/互联网医院号源池、排班变更、支付、退号和医保电子凭证核验 |
 | 授权共享 | 已实现 | 可记录授权对象和范围，撤销和访问日志仍需进一步生产化联动 |
 | 手机预览 | 已实现 | `mobile-preview.html` 可模拟移动端，展示本机/真机预览地址、演示登录方式、服务切换控制和底部服务导航检查项，并适配侧边浏览器等中等宽度窗口 |
 | 居民端功能审计 | 已实现 | `citizen.html` 首页展示全功能审计面板，按健康档案、电子病历、护理、陪诊、挂号列出已实现功能、移动端适配和生产边界 |
