@@ -12,6 +12,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "file:README.md",
     "file:DEPLOYMENT.md",
     "file:docs/production-go-live-requirements.md",
+    "file:docs/卫生健康信息平台研发报告.md",
     "file:docs/on-site-launch-materials.md",
     "file:docs/production-database-cutover-center.md",
     "file:docs/citizen-service-operations-center.md",
@@ -83,6 +84,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "snapshot:registrationIntegration",
     "snapshot:multiPractice",
     "docs:chronicLaunchCore",
+    "docs:platformResearchReport",
     "docs:citizenAccountProvisioning",
     "docs:citizenExternalDependencyOwners",
     "docs:productionGoLiveRequirements",
@@ -159,6 +161,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
   assert.match(report.checks.find((item) => item.name === "api:publicHealthLaunchApprovalPreflight").detail, /approval preflight blocks final approval/);
   assert.match(report.checks.find((item) => item.name === "api:digitalHospitalStandards").detail, /standards API, launch readiness gate, production evidence packets, command briefs, formal cutover approvals, seed data and frontend fetch fallback/);
   assert.match(report.checks.find((item) => item.name === "docs:chronicLaunchCore").detail, /closure, site signoff/);
+  assert.match(report.checks.find((item) => item.name === "docs:platformResearchReport").detail, /policy basis/);
   assert.match(report.checks.find((item) => item.name === "docs:citizenExternalDependencyOwners").detail, /blockers, evidence, and onsite acceptance/);
 });
 
