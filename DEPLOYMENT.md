@@ -187,7 +187,9 @@ npm.cmd run release:report:full
 
 `hybrid:deployment-readiness` 会生成 `release/hybrid-deployment-readiness-report.json` 和 `release/hybrid-deployment-readiness-report.md`，专项核对静态预览层、`data/db.json` 快照回退、Node API 后端、存储引擎边界、环境模板、CI 和发布门禁接线。
 
-`operations:readiness` 会生成 `release/operations-readiness-report.json` 和 `release/operations-readiness-report.md`，检查健康检查、运行指标、系统就绪报告、生产部署轨道、外部依赖风险和发布运维脚本，作为上线前运维审查证据。
+`operations:readiness` 会生成 `release/operations-readiness-report.json` 和 `release/operations-readiness-report.md`，检查健康检查、运行指标、系统就绪报告、生产部署轨道、外部依赖风险和发布运维脚本，作为上线前运维审查证据。`GET /api/production-operations/center` 和运行调度页进一步提供服务级别、24x365 值班、事件响应、RPO/RTO 恢复演练和证据门禁；本地样例演练不替代远端备份、全量恢复、真实呼叫渠道和灾备签字。
+
+`registration:journey-readiness` 会生成 `release/registration-journey-readiness-report.json` 和 `release/registration-journey-readiness-report.md`，核对预约号源、订单、支付、HIS 确认、医保预核验、到院报到、完诊、退号退款、消息和审计证据。居民端与机构端共用 `POST /api/registrations/orders/:id/actions`，但本地支付和退款凭据不代表真实交易；生产切换前必须完成医院 HIS、支付退款网关、医保结算回调和现场业务签字。
 
 `process:audit` 会生成 `release/process-audit-report.json` 和 `release/process-audit-report.md`，把居民主索引、慢病验收、医共体验收、医保取药、统计证照、安全合规和生产切换汇总为全流程审计证据域；`release:report` 会同步写出这些文件，作为上线前跨模块审查和现场签字材料。
 

@@ -1,13 +1,15 @@
-const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], referralTeleconsultations: [], medicationPickups: [], chronicScreeningTasks: [], chronicManagementPlans: [], chronicFollowupStatusPolicy: {}, deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthCertificateDocuments: [], birthStatistics: {}, doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {}, taskMessages: [] };
+const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], referralTeleconsultations: [], registrationSchedules: [], registrationOrders: [], medicationPickups: [], chronicScreeningTasks: [], chronicManagementPlans: [], chronicFollowupStatusPolicy: {}, deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthCertificateDocuments: [], birthStatistics: {}, doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {}, taskMessages: [], phase2FamilyDoctorTemplates: [], phase2FamilyDoctorTeams: [], phase2FamilyDoctorServicePackages: [], phase2FamilyDoctorApplications: [], phase2FamilyDoctorContracts: [], phase2FamilyDoctorFulfillments: [] };
 const institutionApiBase = location.protocol === "file:" || location.hostname.endsWith("github.io") ? "" : "/api";
 let platformState = fallbackState;
+let institutionRegistrationDashboard = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
   platformState = await loadPlatformState(fallbackState);
-  const [followupSummary, launchCore, publicHealthLoop] = await Promise.all([loadChronicFollowupSummary(), loadChronicLaunchCore(), loadChronicPublicHealthLoop()]);
+  const [followupSummary, launchCore, publicHealthLoop, registrationDashboard] = await Promise.all([loadChronicFollowupSummary(), loadChronicLaunchCore(), loadChronicPublicHealthLoop(), loadRegistrationJourneyDashboard()]);
   platformState.chronicFollowupSummary = followupSummary;
   platformState.chronicLaunchCore = launchCore;
   platformState.chronicPublicHealthLoop = publicHealthLoop;
+  institutionRegistrationDashboard = registrationDashboard;
   bindInstitutionActions();
   renderAll(platformState);
 });
@@ -48,6 +50,24 @@ async function loadChronicPublicHealthLoop() {
   return null;
 }
 
+async function loadRegistrationJourneyDashboard() {
+  if (institutionApiBase) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${institutionApiBase}/registrations/dashboard`);
+      if (response.ok) return await response.json();
+    } catch (error) {
+      // Static preview uses the scoped registration collections.
+    }
+  }
+  return {
+    ok: true,
+    schedules: platformState.registrationSchedules || [],
+    orders: platformState.registrationOrders || [],
+    journey: { status: "static-preview", productionReady: 0, onsiteBlockers: 4, boundary: "Static registration journey preview; production integrations remain required." }
+  };
+}
+
 async function refreshChronicRuntimeState() {
   const [followupSummary, launchCore, publicHealthLoop] = await Promise.all([loadChronicFollowupSummary(), loadChronicLaunchCore(), loadChronicPublicHealthLoop()]);
   if (followupSummary) platformState.chronicFollowupSummary = followupSummary;
@@ -59,6 +79,7 @@ function renderAll(state) {
   renderChronicLaunchCore(state);
   renderChronicPublicHealthLoop(state);
   renderChronicFollowupWorkbench(state);
+  renderPhase2FamilyDoctorContracts(state);
   populateBirthCertificateForm(state);
   populateMultiPracticeForm(state);
   renderMetrics(state);
@@ -69,6 +90,7 @@ function renderAll(state) {
   renderAuthorizedRecords(state);
   renderClaimLinks(state);
   renderReferralCenter(state);
+  renderRegistrationJourneyWorkbench(state);
   renderTeleconsultationLoop(state);
   renderReservedResources(state);
   renderIntegratedProfiles(state);
@@ -84,6 +106,30 @@ function bindInstitutionActions() {
       const button = event.target.closest("[data-workflow-action]");
       const launchCoreButton = event.target.closest("[data-launch-core-action]");
       const integrationButton = event.target.closest("[data-chronic-integration]");
+      const familyDoctorReviewButton = event.target.closest("[data-family-doctor-review]");
+      const familyDoctorFulfillmentButton = event.target.closest("[data-family-doctor-fulfillment]");
+      const registrationJourneyButton = event.target.closest("[data-registration-institution-action]");
+      if (registrationJourneyButton) {
+        registrationJourneyButton.disabled = true;
+        const result = await runInstitutionRegistrationJourneyAction(registrationJourneyButton.dataset.registrationId, registrationJourneyButton.dataset.registrationInstitutionAction);
+        registrationJourneyButton.disabled = false;
+        if (result.ok) renderAll(platformState);
+        return;
+      }
+      if (familyDoctorReviewButton) {
+        familyDoctorReviewButton.disabled = true;
+        const result = await reviewFamilyDoctorApplication(familyDoctorReviewButton.dataset.applicationId, familyDoctorReviewButton.dataset.familyDoctorReview || "approved");
+        familyDoctorReviewButton.disabled = false;
+        if (result.ok) renderAll(platformState);
+        return;
+      }
+      if (familyDoctorFulfillmentButton) {
+        familyDoctorFulfillmentButton.disabled = true;
+        const result = await recordFamilyDoctorFulfillment(familyDoctorFulfillmentButton.dataset.contractId);
+        familyDoctorFulfillmentButton.disabled = false;
+        if (result.ok) renderAll(platformState);
+        return;
+      }
       if (launchCoreButton) {
         launchCoreButton.disabled = true;
         const result = await recordLaunchCoreAction(launchCoreButton.dataset.itemId, launchCoreButton.dataset.rowId);
@@ -327,6 +373,123 @@ function renderChronicFollowupWorkbench(state) {
       <span class="badge ${String(item.status || "").includes("逾期") || String(item.status || "").includes("预警") ? "danger" : "warn"}">${item.status || "待处理"}</span>
     </section>`;
   }).join("") || `<p class="muted">暂无待处置慢病随访事项。</p>`;
+}
+
+function familyDoctorPackageName(state, packageId) {
+  const item = (state.phase2FamilyDoctorServicePackages || []).find((row) => row.id === packageId);
+  return item?.name || packageId || "服务包待确认";
+}
+
+function familyDoctorTeamName(state, teamId) {
+  const item = (state.phase2FamilyDoctorTeams || []).find((row) => row.id === teamId);
+  return item?.teamName || item?.institutionName || teamId || "团队待确认";
+}
+
+function renderPhase2FamilyDoctorContracts(state) {
+  const summaryEl = document.querySelector("#phase2-family-doctor-summary");
+  const gridEl = document.querySelector("#phase2-family-doctor-contracts");
+  const applicationsEl = document.querySelector("#phase2-family-doctor-applications");
+  const fulfillmentsEl = document.querySelector("#phase2-family-doctor-fulfillments");
+  if (!summaryEl || !gridEl || !applicationsEl || !fulfillmentsEl) return;
+  const teams = state.phase2FamilyDoctorTeams || [];
+  const packages = state.phase2FamilyDoctorServicePackages || [];
+  const applications = state.phase2FamilyDoctorApplications || [];
+  const contracts = state.phase2FamilyDoctorContracts || [];
+  const fulfillments = state.phase2FamilyDoctorFulfillments || [];
+  const pendingApplications = applications.filter((item) => /pending|submitted|review/i.test(`${item.reviewStatus || ""} ${item.status || ""}`));
+  const activeContracts = contracts.filter((item) => /active|renewal/i.test(String(item.status || "")));
+  const avgFulfillment = contracts.length ? Math.round(contracts.reduce((sum, item) => sum + Number(item.fulfillmentPercent || 0), 0) / contracts.length) : 0;
+  summaryEl.textContent = `${packages.length} 个服务包 · ${applications.length} 条申请 · ${pendingApplications.length} 条待审 · ${activeContracts.length} 份合同 · 平均履约 ${avgFulfillment}%`;
+  gridEl.innerHTML = [
+    ["签约团队", teams.length, teams.map((item) => item.teamName || item.id).join(" / ") || "暂无团队"],
+    ["服务包", packages.length, packages.map((item) => item.name || item.id).join(" / ") || "暂无服务包"],
+    ["待审申请", pendingApplications.length, "居民申请、续约和知情确认"],
+    ["合同履约", `${avgFulfillment}%`, `${fulfillments.length} 条履约记录`]
+  ].map(([label, value, hint]) => `<article class="claim-card"><strong>${label}</strong><span>${value}<br>${hint}</span></article>`).join("");
+  applicationsEl.innerHTML = applications.map((item) => `<section class="item">
+    <div>
+      <h3>${item.residentName || residentOf(state, item.residentId)?.name || item.residentId} · ${familyDoctorPackageName(state, item.packageId)}</h3>
+      <p>${familyDoctorTeamName(state, item.teamId)} · ${item.applicationType || "new-contract"} · ${item.consentStatus || "consent pending"}</p>
+      <p>${item.lastAction || "等待机构审核"} · ${item.desiredStartDate || item.submittedAt || "日期待确认"}</p>
+      <div class="action-row">
+        ${/pending|submitted|review/i.test(`${item.reviewStatus || ""} ${item.status || ""}`) ? `<button class="inline-action" type="button" data-family-doctor-review="approved" data-application-id="${item.id}">审核通过</button><button class="inline-action" type="button" data-family-doctor-review="rejected" data-application-id="${item.id}">退回补充</button>` : ""}
+      </div>
+    </div>
+    <span class="badge ${item.reviewStatus === "approved" ? "info" : item.reviewStatus === "rejected" ? "danger" : "warn"}">${item.reviewStatus || item.status || "pending"}</span>
+  </section>`).join("") || `<p class="muted">暂无家庭医生签约申请。</p>`;
+  fulfillmentsEl.innerHTML = contracts.map((contract) => {
+    const rows = fulfillments.filter((item) => item.contractId === contract.id);
+    return `<section class="item">
+      <div>
+        <h3>${contract.residentName || residentOf(state, contract.residentId)?.name || contract.residentId} · ${familyDoctorPackageName(state, contract.packageId)}</h3>
+        <p>${familyDoctorTeamName(state, contract.teamId)} · ${contract.startDate || ""} 至 ${contract.endDate || ""} · 履约 ${contract.fulfillmentPercent || 0}%</p>
+        <p>续约 ${contract.renewalStatus || "not-due"} · 满意度 ${contract.satisfactionScore || "待回访"} · 下次服务 ${contract.nextServiceAt || "待排期"}</p>
+        <p>${rows.slice(0, 3).map((row) => `${row.serviceItem || row.serviceType}/${row.status}`).join("；") || "暂无履约记录"}</p>
+        <div class="action-row"><button class="inline-action" type="button" data-family-doctor-fulfillment data-contract-id="${contract.id}">登记履约</button></div>
+      </div>
+      <span class="badge info">${contract.status || "active"}</span>
+    </section>`;
+  }).join("") || `<p class="muted">暂无家庭医生签约合同。</p>`;
+}
+
+function syncFamilyDoctorOverview(overview) {
+  if (!overview) return;
+  platformState.phase2FamilyDoctorTemplates = overview.templates || platformState.phase2FamilyDoctorTemplates || [];
+  platformState.phase2FamilyDoctorTeams = overview.teams || platformState.phase2FamilyDoctorTeams || [];
+  platformState.phase2FamilyDoctorServicePackages = overview.packages || platformState.phase2FamilyDoctorServicePackages || [];
+  platformState.phase2FamilyDoctorApplications = overview.applications || platformState.phase2FamilyDoctorApplications || [];
+  platformState.phase2FamilyDoctorContracts = overview.contracts || platformState.phase2FamilyDoctorContracts || [];
+  platformState.phase2FamilyDoctorFulfillments = overview.fulfillments || platformState.phase2FamilyDoctorFulfillments || [];
+}
+
+async function reviewFamilyDoctorApplication(applicationId, decision) {
+  if (!institutionApiBase) {
+    const rows = platformState.phase2FamilyDoctorApplications || [];
+    const application = rows.find((item) => item.id === applicationId);
+    if (application) Object.assign(application, { reviewStatus: decision, status: decision, reviewer: "local-institution", reviewedAt: new Date().toISOString() });
+    return { ok: true };
+  }
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/phase2/family-doctor-contracts/applications/${encodeURIComponent(applicationId)}/review`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision, comment: decision === "approved" ? "机构端审核通过" : "机构端退回补充" })
+    });
+    if (!response.ok) throw new Error(`family doctor review failed: ${response.status}`);
+    const result = await response.json();
+    syncFamilyDoctorOverview(result.overview);
+    return { ok: true, result };
+  } catch (error) {
+    alert(error.message || "家庭医生签约审核失败，请检查登录状态和网络连接");
+    return { ok: false };
+  }
+}
+
+async function recordFamilyDoctorFulfillment(contractId) {
+  const payload = { serviceType: "institution-followup", serviceItem: "机构端登记家庭医生履约", serviceDate: new Date().toISOString().slice(0, 10), status: "completed", fulfillmentValue: 8, satisfaction: "pending" };
+  if (!institutionApiBase) {
+    const contracts = platformState.phase2FamilyDoctorContracts || [];
+    const contract = contracts.find((item) => item.id === contractId);
+    if (contract) contract.fulfillmentPercent = Math.min(100, Number(contract.fulfillmentPercent || 0) + payload.fulfillmentValue);
+    platformState.phase2FamilyDoctorFulfillments = [{ id: `p2fdf-local-${Date.now()}`, contractId, ...payload }, ...(platformState.phase2FamilyDoctorFulfillments || [])];
+    return { ok: true };
+  }
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/phase2/family-doctor-contracts/contracts/${encodeURIComponent(contractId)}/fulfillments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error(`family doctor fulfillment failed: ${response.status}`);
+    const result = await response.json();
+    syncFamilyDoctorOverview(result.overview);
+    return { ok: true, result };
+  } catch (error) {
+    alert(error.message || "家庭医生履约登记失败，请检查登录状态和网络连接");
+    return { ok: false };
+  }
 }
 
 async function dispatchChronicFollowup(collection, id, updates, note) {
@@ -875,6 +1038,105 @@ function renderClaimLinks(state) {
       <span>${claim.institution}<br>${money(claim.totalAmount)} · ${claim.status}</span>
     </article>`;
   }).join("");
+}
+
+function institutionEscapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+}
+
+function institutionRegistrationStatus(value) {
+  return {
+    confirmed: "已预约",
+    completed: "已完诊",
+    cancelled: "已取消",
+    pending: "待处理",
+    waived: "免预付",
+    "paid-demo": "演示支付已记录",
+    "pending-demo": "待医院确认",
+    "confirmed-demo": "演示确认",
+    "checked-in-demo": "已演示报到",
+    "not-checked-in": "未报到",
+    "refund-pending": "待退款",
+    "refunded-demo": "演示退款完成",
+    prechecked: "医保已预核验"
+  }[value] || value || "待处理";
+}
+
+function institutionRegistrationAllowedActions(order) {
+  if (Array.isArray(order.allowedActions)) return order.allowedActions;
+  if (order.status === "cancelled") return order.refundStatus === "refund-pending" ? ["refund-demo"] : [];
+  if (["completed", "closed"].includes(order.status)) return [];
+  const actions = [];
+  const paymentReady = ["paid", "paid-demo", "waived"].includes(order.paymentStatus);
+  const confirmed = ["confirmed", "confirmed-demo"].includes(order.hisConfirmationStatus);
+  if (paymentReady && !confirmed) actions.push("confirm-his-demo");
+  if (paymentReady && confirmed && order.checkInStatus !== "checked-in-demo") actions.push("check-in-demo");
+  if (order.checkInStatus === "checked-in-demo") actions.push("complete-demo");
+  return actions;
+}
+
+function renderRegistrationJourneyWorkbench(state) {
+  const metricsTarget = document.querySelector("#registration-journey-metrics");
+  const ordersTarget = document.querySelector("#registration-journey-orders");
+  const boundaryTarget = document.querySelector("#registration-journey-boundary");
+  if (!metricsTarget || !ordersTarget || !boundaryTarget) return;
+  const dashboard = institutionRegistrationDashboard || { orders: state.registrationOrders || [], journey: {} };
+  const orders = dashboard.orders || [];
+  const metrics = [
+    ["本院预约", orders.length, "HIS/互联网医院"],
+    ["待医院确认", orders.filter((item) => ["paid", "paid-demo", "waived"].includes(item.paymentStatus) && !["confirmed", "confirmed-demo"].includes(item.hisConfirmationStatus)).length, "支付后处理"],
+    ["已报到", orders.filter((item) => item.checkInStatus === "checked-in-demo").length, "等待完诊"],
+    ["待退款", orders.filter((item) => item.refundStatus === "refund-pending").length, "退款闭环"]
+  ];
+  metricsTarget.innerHTML = metrics.map(([name, value, detail]) => `<article class="metric-card"><span>${name}</span><strong>${value}</strong><small>${detail}</small></article>`).join("");
+  const actionLabels = {
+    "confirm-his-demo": "确认 HIS 预约",
+    "check-in-demo": "登记报到",
+    "complete-demo": "登记完诊",
+    "refund-demo": "登记退款"
+  };
+  ordersTarget.innerHTML = orders.map((order, index) => {
+    const resident = residentOf(state, order.residentId);
+    const actions = institutionRegistrationAllowedActions(order).filter((action) => actionLabels[action]);
+    return `<article class="priority-row" data-registration-journey-order="${institutionEscapeHtml(order.id)}">
+      <div class="priority-rank ${order.status === "cancelled" ? "danger" : actions.length ? "warn" : "info"}">${index + 1}</div>
+      <div>
+        <h3>${institutionEscapeHtml(resident?.name || order.residentName || order.residentId)} · ${institutionEscapeHtml(order.department || "门诊")}</h3>
+        <p>${institutionEscapeHtml(order.appointmentDate)} ${institutionEscapeHtml(order.period)} · ${institutionEscapeHtml(order.doctor || "医生待确认")} · 队列 ${institutionEscapeHtml(order.queueNo || order.registrationNo || "待回执")}</p>
+        <small>支付 ${institutionEscapeHtml(institutionRegistrationStatus(order.paymentStatus))} · 医院 ${institutionEscapeHtml(institutionRegistrationStatus(order.hisConfirmationStatus))} · 报到 ${institutionEscapeHtml(institutionRegistrationStatus(order.checkInStatus))} · 退款 ${institutionEscapeHtml(institutionRegistrationStatus(order.refundStatus))}</small>
+        <div class="action-row">${actions.map((action) => `<button type="button" class="inline-action" data-registration-institution-action="${action}" data-registration-id="${institutionEscapeHtml(order.id)}">${actionLabels[action]}</button>`).join("")}</div>
+      </div>
+      <div class="capability-side"><span class="badge ${actions.length ? "warn" : "info"}">${institutionEscapeHtml(institutionRegistrationStatus(order.status))}</span><small>生产：否</small></div>
+    </article>`;
+  }).join("") || `<p class="muted">本机构暂无预约就诊订单。</p>`;
+  boundaryTarget.textContent = dashboard.journey?.boundary || "本工作台动作仅为本地业务闭环证据，生产仍需 HIS、支付退款和医保结算接口。";
+}
+
+async function runInstitutionRegistrationJourneyAction(orderId, action) {
+  const boundaryTarget = document.querySelector("#registration-journey-boundary");
+  if (!institutionApiBase) return { ok: false, message: "静态预览不提交机构业务动作。" };
+  const notes = {
+    "confirm-his-demo": "Institution confirmed the local HIS appointment evidence; live HIS callback remains required.",
+    "check-in-demo": "Institution recorded local check-in evidence; production QR or HIS check-in remains required.",
+    "complete-demo": "Institution recorded local consultation completion; EMR completion callback remains required.",
+    "refund-demo": "Institution recorded local refund evidence; certified payment gateway receipt remains required."
+  };
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/registrations/orders/${encodeURIComponent(orderId)}/actions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, note: notes[action] || "Institution registration journey action." })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.message || `HTTP ${response.status}`);
+    institutionRegistrationDashboard = payload.dashboard || await loadRegistrationJourneyDashboard();
+    if (boundaryTarget) boundaryTarget.textContent = `${notes[action]} 生产就绪仍为否。`;
+    return { ok: true, order: payload.order };
+  } catch (error) {
+    if (boundaryTarget) boundaryTarget.textContent = error.message || "预约就诊动作失败。";
+    return { ok: false, message: error.message };
+  }
 }
 
 function renderReferralCenter(state) {

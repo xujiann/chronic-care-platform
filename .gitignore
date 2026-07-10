@@ -8,6 +8,9 @@ data/*.sqlite-wal
 data/backups/
 data/sanitized/
 tmp/
+.tmp/
+.tmp-preview-data/
+.tmp-preview-logs/
 coverage/
 playwright-report/
 test-results/

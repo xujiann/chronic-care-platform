@@ -28,10 +28,18 @@ test("health dashboard summary tracks the eight priority applications without re
   assert.equal(report.totals.sourceRecords > 0, true);
   assert.equal(report.totals.interfaceTracks >= 4, true);
   assert.equal(report.totals.evidenceRecords >= 1, true);
+  assert.equal(report.indicatorCenter.indicators.length, 8);
+  assert.equal(report.indicatorCenter.periodViews.length, 2);
+  assert.equal(report.indicatorCenter.categories.includes("专项监管"), true);
+  assert.equal(report.indicatorCenter.indicators.some((item) => item.id === "industry-physical-exam" && item.status === "blocked"), true);
+  assert.equal(report.indicatorCenter.indicators.some((item) => item.id === "industry-appointment-reconciliation" && item.drilldown.href === "./citizen.html"), true);
+  assert.equal(report.indicatorCenter.indicators.every((item) => item.definition && item.owner && item.sourceCollections.length && item.sourceSystems.length && item.reports.length === 2 && item.drilldown.href), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:source-boundary" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:aggregate-boundary" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:development-template" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "dashboard:documentation-rule" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "dashboard:industry-governance-indicators" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "dashboard:industry-governance-reports" && item.passed), true);
   assert.equal(report.applications.every((item) => item.documentationRule.aboutPage === DOCUMENTATION_RULE.aboutPage && item.documentationRule.requiredDocument === DOCUMENTATION_RULE.requiredDocument), true);
 
   const markdown = renderMarkdown(report);
@@ -43,6 +51,9 @@ test("health dashboard summary tracks the eight priority applications without re
   assert.match(markdown, /regional-data-sharing/);
   assert.match(markdown, /health-dashboard/);
   assert.match(markdown, /Open action preview/);
+  assert.match(markdown, /Industry governance indicator center/);
+  assert.match(markdown, /健康体检覆盖/);
+  assert.match(markdown, /Monthly and yearly report views/);
 });
 
 test("priority application templates expose the eight conversation handoff contracts", () => {

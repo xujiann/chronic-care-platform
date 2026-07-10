@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>数智医院标准平台</title>
+    <link rel="stylesheet" href="./portal.css" />
+    <script src="./auth.js"></script>
+    <script>window.HealthCityAuth.requireRole(["commission"])</script>
+  </head>
+  <body>
+    <main class="portal-shell">
+      <header class="portal-header">
+        <div>
+          <span>数智医院建设与应用评价</span>
+          <h1>数智医院标准平台</h1>
+          <p>面向国家级、省级、医院端三级协同，先把标准库、指标映射、数据采集、自动校验、分级审核、整改闭环和安全合规做成可运行的最小闭环。</p>
+        </div>
+        <nav>
+          <a href="./platform.html">平台驾驶舱</a>
+          <a href="./workbench.html">运营工作台</a>
+          <a href="./public-health.html">公共卫生</a>
+          <a href="./quality-safety.html">质量安全</a>
+          <a href="./about.html">关于</a>
+        </nav>
+      </header>
+
+      <section class="metric-grid" id="digital-hospital-metrics"></section>
+
+      <section class="panel" data-digital-hospital-section="standard-center">
+        <div class="panel-title">
+          <h2>标准与指标中枢</h2>
+          <span>从既有评价体系到可执行指标模型</span>
+        </div>
+        <div class="filter-grid">
+          <label>
+            标准域
+            <select id="standard-domain-filter">
+              <option value="">全部标准域</option>
+            </select>
+          </label>
+          <label>
+            关键词
+            <input id="standard-search" type="search" placeholder="检索指标、证据、来源" />
+          </label>
+          <label class="checkbox-line">
+            <input id="standard-blocker-filter" type="checkbox" />
+            只看现场阻断项
+          </label>
+        </div>
+        <div id="digital-hospital-standard-map" class="priority-list"></div>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide" data-digital-hospital-section="workflow-loop">
+          <div class="panel-title">
+            <h2>评价闭环</h2>
+            <span>医院自评、省级初审、专家复核、国家抽查、整改复核</span>
+          </div>
+          <div id="digital-hospital-workflow" class="table-wrap"></div>
+        </article>
+
+        <article class="panel" data-digital-hospital-section="security-boundary">
+          <div class="panel-title">
+            <h2>安全边界</h2>
+            <span>最小必要、脱敏汇总、全程审计</span>
+          </div>
+          <div id="digital-hospital-security" class="rules"></div>
+        </article>
+      </section>
+
+      <section class="portal-grid">
+        <article class="panel wide" data-digital-hospital-section="evidence-model">
+          <div class="panel-title">
+            <h2>采集与证据模型</h2>
+            <span>接口、模板、材料、抽样核验并行</span>
+          </div>
+          <div id="digital-hospital-evidence" class="evidence-grid"></div>
+        </article>
+
+        <article class="panel" data-digital-hospital-section="review-queue">
+          <div class="panel-title">
+            <h2>审核任务</h2>
+            <span>分级审核留痕</span>
+          </div>
+          <div id="digital-hospital-review-queue" class="rules"></div>
+        </article>
+      </section>
+
+      <section class="panel" data-digital-hospital-section="pilot-readiness">
+        <div class="panel-title">
+          <h2>试点准备度</h2>
+          <span>以 2-3 个省份、不同类型医院形成最小联调样板</span>
+        </div>
+        <div id="digital-hospital-pilot-readiness" class="table-wrap"></div>
+      </section>
+
+      <section class="panel" data-digital-hospital-section="launch-readiness">
+        <div class="panel-title">
+          <h2>Launch Readiness</h2>
+          <span>Pilot launch gate, formal site signoff blockers and audit actions</span>
+        </div>
+        <div id="digital-hospital-launch-readiness" class="table-wrap"></div>
+      </section>
+
+      <section class="panel" data-digital-hospital-section="production-evidence-packets">
+        <div class="panel-title">
+          <h2>Production Evidence Packets</h2>
+          <span>Formal cutover evidence packets, item verification and linked requirement signoff</span>
+        </div>
+        <div id="digital-hospital-production-evidence" class="table-wrap"></div>
+      </section>
+
+      <section class="panel" data-digital-hospital-section="launch-command-briefs">
+        <div class="panel-title">
+          <h2>Launch Command Briefs</h2>
+          <span>Go/no-go, first receipt, security watch, rollback standby and first-day closure briefs</span>
+        </div>
+        <div id="digital-hospital-launch-command-briefs" class="table-wrap"></div>
+      </section>
+
+      <section class="panel" data-digital-hospital-section="formal-cutover-approvals">
+        <div class="panel-title">
+          <h2>Formal Cutover Approval Desk</h2>
+          <span>Independent authorization after site evidence, production packets and pilot checks are complete</span>
+        </div>
+        <div id="digital-hospital-formal-cutover-approvals" class="table-wrap"></div>
+      </section>
+
+      <section class="panel" data-digital-hospital-section="official-source-map">
+        <div class="panel-title">
+          <h2>依据映射</h2>
+          <span>官方政策与标准到平台能力的映射</span>
+        </div>
+        <div id="digital-hospital-source-map" class="table-wrap"></div>
+      </section>
+    </main>
+
+    <script src="./digital-hospital-standards.js"></script>
+  </body>
+</html>

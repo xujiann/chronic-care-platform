@@ -12,7 +12,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="format-detection" content="telephone=no" />
     <link rel="apple-touch-icon" href="./pwa-icon.svg" />
-    <link rel="stylesheet" href="./citizen.css?v=20260705p0copy" />
+    <link rel="stylesheet" href="./citizen.css?v=20260710journey" />
     <script src="./auth.js?v=20260627"></script>
     <script>window.HealthCityAuth.requireRole(["citizen"])</script>
   </head>
@@ -301,6 +301,45 @@
         </div>
       </section>
 
+      <section class="panel service-overview-panel" id="service-family-doctor" data-service-pane="family-doctor">
+        <div class="panel-title">
+          <h2>家庭医生签约</h2>
+          <span><em class="feature-state ready">已实现</em><span id="family-doctor-summary">签约申请、机构审核、履约、续约和满意度</span></span>
+        </div>
+        <div class="registration-workflow">
+          <form id="family-doctor-contract-form" class="registration-form">
+            <label>选择服务包
+              <select name="packageId" required></select>
+            </label>
+            <label>选择团队
+              <select name="teamId" required></select>
+            </label>
+            <label>申请类型
+              <select name="applicationType">
+                <option value="new-contract">新签约</option>
+                <option value="renewal">续约</option>
+              </select>
+            </label>
+            <label>补充说明
+              <input name="note" placeholder="例如：希望纳入高血压月度随访和复诊提醒" />
+            </label>
+            <button class="small-button primary" type="submit">提交签约申请</button>
+          </form>
+          <article class="registration-rule-card">
+            <strong>服务说明</strong>
+            <p>居民提交申请后，基层机构可在机构端审核并生成合同；合同履约、续约和满意度会持续回写到居民端。</p>
+          </article>
+        </div>
+        <div class="registration-section">
+          <h3>可选服务包</h3>
+          <div class="cards" id="family-doctor-package-cards"></div>
+        </div>
+        <div class="registration-section">
+          <h3>我的签约</h3>
+          <div class="cards" id="family-doctor-contract-cards"></div>
+        </div>
+      </section>
+
       <section class="panel service-overview-panel" id="service-registration" data-service-pane="registration">
         <div class="panel-title">
           <h2>挂号服务</h2>
@@ -333,6 +372,7 @@
         </div>
         <div class="registration-section">
           <h3>我的挂号</h3>
+          <div class="workflow-grid registration-journey-timeline" id="registration-journey-timeline"></div>
           <div class="cards registration-orders" id="registration-order-cards"></div>
         </div>
       </section>
@@ -455,6 +495,25 @@
         </aside>
       </section>
 
+      <section class="panel citizen-public-feed-panel" id="citizen-service-public-feed" aria-labelledby="citizen-service-public-feed-title">
+        <div class="panel-title">
+          <h2 id="citizen-service-public-feed-title">服务公告与协议</h2>
+          <span id="citizen-service-public-feed-summary">正在读取公开服务信息</span>
+        </div>
+        <div id="citizen-operation-content-feed" class="cards"></div>
+        <div class="two-column">
+          <article>
+            <h3>当前协议版本</h3>
+            <div id="citizen-agreement-feed" class="rules"></div>
+          </article>
+          <article>
+            <h3>已开放医院服务</h3>
+            <div id="citizen-hospital-service-feed" class="rules"></div>
+          </article>
+        </div>
+        <p id="citizen-service-public-boundary" class="implementation-boundary"></p>
+      </section>
+
       <section class="panel resident-audit-panel" id="resident-function-audit" aria-labelledby="resident-function-audit-title" data-internal-launch-panel hidden>
         <div class="panel-title">
           <h2 id="resident-function-audit-title">居民端功能审计</h2>
@@ -520,7 +579,7 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="./health-archive-standard.js"></script>
     <script src="./immunization-schedule.js"></script>
-    <script src="./citizen.js?v=20260705p0copy"></script>
+    <script src="./citizen.js?v=20260710journey"></script>
     <script>
       if ("serviceWorker" in navigator && location.protocol !== "file:") {
         window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js"));

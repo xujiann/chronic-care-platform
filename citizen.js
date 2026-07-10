@@ -67,6 +67,26 @@ const fallbackState = {
       qualityReview: "pending",
       feeEstimate: 120
     }
+  ],
+  phase2FamilyDoctorTemplates: [
+    { id: "p2fdt-basic", name: "家庭医生基础签约模板", requiredFields: ["residentId", "teamId", "packageId"], reviewSteps: ["resident-apply", "institution-review"], status: "active" },
+    { id: "p2fdt-chronic", name: "慢病连续管理签约模板", requiredFields: ["residentId", "diseaseType", "teamId", "packageId"], reviewSteps: ["resident-apply", "team-assessment", "institution-review"], status: "active" }
+  ],
+  phase2FamilyDoctorTeams: [
+    { id: "p2fdtm-qnw", teamName: "青泥洼桥社区家庭医生团队", institutionCode: "MR3", institutionName: "青泥洼桥社区卫生服务中心", leaderDoctorId: "doc-liu", leaderDoctorName: "刘医生", doctorIds: ["doc-liu"], status: "active" }
+  ],
+  phase2FamilyDoctorServicePackages: [
+    { id: "p2fdp-basic", packageCode: "FD-PKG-BASIC", templateId: "p2fdt-basic", name: "基础公卫签约包", serviceItems: ["健康档案复核", "年度健康评估"], visitFrequency: "quarterly", status: "active" },
+    { id: "p2fdp-hypertension", packageCode: "FD-PKG-HBP", templateId: "p2fdt-chronic", name: "高血压连续管理包", serviceItems: ["血压随访", "用药依从性", "复诊预约"], visitFrequency: "monthly", status: "active" }
+  ],
+  phase2FamilyDoctorApplications: [
+    { id: "p2fda-r1", residentId: "r1", residentName: "演示居民A", packageId: "p2fdp-hypertension", teamId: "p2fdtm-qnw", templateId: "p2fdt-chronic", applicationType: "new-contract", status: "approved", reviewStatus: "approved", consentStatus: "signed", desiredStartDate: todayOffset(-18), lastAction: "机构审核通过并生成签约合同。" }
+  ],
+  phase2FamilyDoctorContracts: [
+    { id: "p2fdc-r1", residentId: "r1", residentName: "演示居民A", applicationId: "p2fda-r1", packageId: "p2fdp-hypertension", teamId: "p2fdtm-qnw", templateId: "p2fdt-chronic", startDate: todayOffset(-18), endDate: todayOffset(347), status: "active", fulfillmentPercent: 72, renewalStatus: "not-due", satisfactionScore: 96, nextServiceAt: todayOffset(7) }
+  ],
+  phase2FamilyDoctorFulfillments: [
+    { id: "p2fdf-r1-bp", contractId: "p2fdc-r1", residentId: "r1", teamId: "p2fdtm-qnw", packageId: "p2fdp-hypertension", serviceDate: todayOffset(-12), serviceType: "monthly-followup", serviceItem: "血压随访", status: "completed" }
   ]
 };
 
@@ -177,6 +197,7 @@ const citizenServiceTabs = [
   { key: "emr", label: "电子病历", status: "已实现", detail: "诊疗时间线、慢病和访问记录", title: "电子病历二级页面", actionLabel: "查看电子病历" },
   { key: "nursing", label: "护理", status: "已实现", detail: "互联网护理预约与追踪", title: "护理服务二级页面", actionLabel: "进入护理服务", actionHref: "./internet-nursing.html" },
   { key: "escort", label: "陪诊", status: "已实现", detail: "陪诊预约、合同、保障和回访", title: "陪诊服务二级页面", actionLabel: "提交陪诊预约" },
+  { key: "family-doctor", label: "家医", status: "已实现", detail: "签约申请、机构审核、履约、续约和满意度", title: "家庭医生签约二级页面", actionLabel: "申请家庭医生签约" },
   { key: "registration", label: "挂号", status: "已实现", detail: "号源查询、预约确认、支付医保和取消规则", title: "挂号服务二级页面", actionLabel: "提交挂号预约" }
 ];
 
@@ -242,7 +263,8 @@ const citizenModuleInterfaces = [
   { module: "电子病历", status: "已实现", api: "/api/personal-records", collections: "personalRecords.emr, labs, medications, imaging, attachments", boundary: "生产需接入 EMR/LIS/PACS 和文档存储授权" },
   { module: "护理", status: "已实现", api: "/api/internet-nursing/dashboard, /api/internet-nursing/orders", collections: "internetNursingOrders, internetNursingNurses, taskMessages, citizenExtra.longTermCareAssessments", boundary: "生产需补齐护士资质、电子签名、定位轨迹、长期护理险和质控监管接入" },
   { module: "陪诊", status: "已实现", api: "/api/escort-services/dashboard, /api/escort-services/orders, /api/messages", collections: "escortServiceOrders, escortServiceProviders, escortWorkers, taskMessages", boundary: "生产需对接医院接诊回执、保险保障和陪诊服务主体监管" },
-  { module: "挂号", status: "已实现", api: "/api/registrations/dashboard, /api/registrations/orders, /api/registrations/orders/:id/cancel", collections: "registrationSchedules, registrationOrders, taskMessages", boundary: "已具备 HIS/互联网医院号源、支付、退号、医保电子凭证和短信通知契约，生产需替换真实网关" },
+  { module: "家医", status: "已实现", api: "/api/phase2/family-doctor-contracts, /api/phase2/family-doctor-contracts/applications", collections: "phase2FamilyDoctorTemplates, phase2FamilyDoctorTeams, phase2FamilyDoctorServicePackages, phase2FamilyDoctorApplications, phase2FamilyDoctorContracts, phase2FamilyDoctorFulfillments", boundary: "生产需接入居民实名签约、电子签名、服务包资金口径和基层机构正式签章" },
+  { module: "挂号", status: "已实现", api: "/api/registrations/dashboard, /api/registrations/orders, /api/registrations/orders/:id/actions, /api/registrations/orders/:id/cancel", collections: "registrationSchedules, registrationOrders, taskMessages", boundary: "已具备 HIS/互联网医院号源、支付、医院确认、报到、完诊、退号退款、医保电子凭证和短信通知契约，生产需替换真实网关" },
   { module: "消息与待办", status: "已实现", api: "/api/messages, /api/tasks/:id/actions", collections: "taskMessages, service tasks, dataAccessLogs", boundary: "生产需接入真实短信、订阅消息、站内信送达回执和审计保全" }
 ];
 
@@ -315,6 +337,8 @@ const residentFunctionAudit = [
   { service: "nursing", name: "长期照护评估", status: "已实现", evidence: "居民端可录入失能风险、照护人、长护险和民政预核验并生成照护建议", mobile: "护理标签内表单单列触控，评估结果即时更新" },
   { service: "escort", name: "助医陪诊预约", status: "已实现", evidence: "可为本人或家庭成员提交陪诊预约", mobile: "预约表单在手机端单列输入" },
   { service: "escort", name: "陪诊合同、保险和回访", status: "已实现", evidence: "订单同步服务主体、保障类型、保险和质控状态", mobile: "订单卡片跟随陪诊标签展示" },
+  { service: "family-doctor", name: "家庭医生签约申请", status: "已实现", evidence: "居民可选择服务包和团队提交签约申请，接口记录知情确认和机构审核状态", mobile: "签约表单单列展示，服务包可快速选择" },
+  { service: "family-doctor", name: "签约履约与续约", status: "已实现", evidence: "居民端展示签约合同、履约百分比、下一次服务、续约和满意度记录", mobile: "合同与履约卡片跟随家医标签展示" },
   { service: "registration", name: "医院号源查询", status: "已实现", evidence: "居民端展示医院号源池，按医院、科室、医生、日期、余号和费用呈现", mobile: "号源卡片单列显示，适合手机端选择" },
   { service: "registration", name: "预约挂号确认", status: "已实现", evidence: "可提交挂号预约，生成待支付/待医保核验状态并展示取消规则", mobile: "表单单列录入，订单卡可直接取消" },
   { service: "registration", name: "就医协同底座", status: "已实现", evidence: "陪诊、转诊和电子病历归集可支撑挂号上线", mobile: "作为挂号标签内已实现底座展示" }
@@ -326,7 +350,24 @@ let state = fallbackState;
 let citizenExtra = loadCitizenExtra();
 let escortDashboard = null;
 let registrationDashboard = null;
+let familyDoctorDashboard = null;
 let citizenMessages = [];
+let citizenOperationsPublicFeed = {
+  ok: true,
+  contents: [
+    { id: "cop-content-banner-registration", type: "banner", title: "预约挂号试点服务", summary: "展示预约、支付与退费状态，正式号源以医院联调结果为准。", status: "published-demo", owner: "居民服务运营岗" },
+    { id: "cop-content-family-doctor", type: "article", title: "家庭医生签约与履约说明", summary: "查看签约申请、机构审核、履约、续约和满意度记录。", status: "published-demo", owner: "基层卫生处" }
+  ],
+  agreements: [
+    { id: "cop-agreement-privacy-v2", name: "居民端隐私政策", version: "2.0-demo", acceptanceMode: "explicit-checkbox", status: "active-demo", legalReviewStatus: "onsite-pending" },
+    { id: "cop-agreement-service-v1", name: "居民服务使用协议", version: "1.0-demo", acceptanceMode: "explicit-checkbox", status: "active-demo", legalReviewStatus: "onsite-pending" }
+  ],
+  hospitalServices: [
+    { id: "cop-hospital-mr1", institutionName: "大连市中心医院", enabledServices: ["appointment", "report-query", "internet-nursing", "escort"], status: "active-demo", launchScope: "white-list-demo", productionReady: false },
+    { id: "cop-hospital-mr3", institutionName: "青泥洼桥社区卫生服务中心", enabledServices: ["family-doctor", "chronic-followup", "internet-nursing"], status: "active-demo", launchScope: "white-list-demo", productionReady: false }
+  ],
+  boundary: "当前为演示公开信息，正式服务范围、协议和支付退费规则以现场联调及审核发布版本为准。"
+};
 let currentResidentId;
 let currentAccountId;
 
@@ -334,7 +375,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   state = await loadState();
   escortDashboard = await fetchCitizenEscortDashboard();
   registrationDashboard = await fetchCitizenRegistrationDashboard();
+  familyDoctorDashboard = await fetchCitizenFamilyDoctorDashboard();
   citizenMessages = await fetchCitizenMessages();
+  citizenOperationsPublicFeed = await fetchCitizenOperationsPublicFeed();
   ensureAccounts();
   populateAccounts();
   bindLargeMode();
@@ -342,6 +385,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderModuleInterfaces();
   renderDataGovernance();
   renderClientChannels();
+  renderCitizenOperationsPublicFeed();
   window.addEventListener("popstate", () => setServiceTab(serviceTabFromRoute() || "health-record", { syncUrl: false }));
   window.addEventListener("hashchange", () => setServiceTab(serviceTabFromRoute() || "health-record", { syncUrl: false }));
   window.addEventListener("message", (event) => {
@@ -358,6 +402,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindFollowupFeedback();
   bindResidentCheckin();
   bindEscortAppointment();
+  bindFamilyDoctorApplication();
   bindRegistrationAppointment();
   bindLongTermCareAssessment();
   bindResidentTaskActions();
@@ -924,6 +969,77 @@ async function fetchCitizenRegistrationDashboard() {
   };
 }
 
+async function fetchCitizenFamilyDoctorDashboard() {
+  if (API_BASE) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/phase2/family-doctor-contracts`);
+      if (response.ok) return await response.json();
+    } catch (error) {
+      // Static and offline previews use local family doctor collections.
+    }
+  }
+  return {
+    ok: true,
+    templates: Array.isArray(state.phase2FamilyDoctorTemplates) ? state.phase2FamilyDoctorTemplates : [],
+    teams: Array.isArray(state.phase2FamilyDoctorTeams) ? state.phase2FamilyDoctorTeams : [],
+    packages: Array.isArray(state.phase2FamilyDoctorServicePackages) ? state.phase2FamilyDoctorServicePackages : [],
+    applications: Array.isArray(state.phase2FamilyDoctorApplications) ? state.phase2FamilyDoctorApplications : [],
+    contracts: Array.isArray(state.phase2FamilyDoctorContracts) ? state.phase2FamilyDoctorContracts : [],
+    fulfillments: Array.isArray(state.phase2FamilyDoctorFulfillments) ? state.phase2FamilyDoctorFulfillments : [],
+    summary: {}
+  };
+}
+
+async function fetchCitizenOperationsPublicFeed() {
+  if (API_BASE) {
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/citizen-operations/public`);
+      if (response.ok) return await response.json();
+    } catch (error) {
+      // Static and offline previews keep the public demo feed.
+    }
+  }
+  return citizenOperationsPublicFeed;
+}
+
+function renderCitizenOperationsPublicFeed() {
+  const contentTarget = document.querySelector("#citizen-operation-content-feed");
+  const agreementTarget = document.querySelector("#citizen-agreement-feed");
+  const hospitalTarget = document.querySelector("#citizen-hospital-service-feed");
+  if (!contentTarget || !agreementTarget || !hospitalTarget) return;
+  const contents = citizenOperationsPublicFeed.contents || [];
+  const agreements = citizenOperationsPublicFeed.agreements || [];
+  const hospitals = citizenOperationsPublicFeed.hospitalServices || [];
+  const contentTypeLabels = { banner: "服务焦点", article: "服务指南", message: "安全提示" };
+  const acceptanceLabels = { "explicit-checkbox": "勾选确认", "signed-consent": "签署授权" };
+  const serviceLabels = { appointment: "预约挂号", "report-query": "报告查询", "internet-nursing": "互联网护理", escort: "助医陪诊", "family-doctor": "家庭医生", "chronic-followup": "慢病随访" };
+  contentTarget.innerHTML = contents.map((item) => `<article class="card" data-citizen-operation-content="${escapeHtml(item.id)}">
+    <div class="card-head">
+      <span>${escapeHtml(contentTypeLabels[item.type] || "服务公告")}</span>
+      <em class="status">已发布</em>
+    </div>
+    <h3>${escapeHtml(item.title)}</h3>
+    <p>${escapeHtml(item.summary || "")}</p>
+    <small>${escapeHtml(item.owner || "居民服务运营岗")}</small>
+  </article>`).join("") || `<p class="muted">暂无已发布公告。</p>`;
+  agreementTarget.innerHTML = agreements.map((item) => `<div data-citizen-agreement="${escapeHtml(item.id)}">
+    <strong>${escapeHtml(item.name)}</strong>
+    <span>${escapeHtml(item.version)} · ${escapeHtml(acceptanceLabels[item.acceptanceMode] || "明确确认")}</span>
+    <small>${item.legalReviewStatus === "onsite-pending" ? "正式版待审核" : escapeHtml(item.legalReviewStatus || "有效")}</small>
+  </div>`).join("") || `<div><strong>暂无协议版本</strong><span>请联系居民服务窗口</span></div>`;
+  hospitalTarget.innerHTML = hospitals.map((item) => `<div data-citizen-hospital-service="${escapeHtml(item.id)}">
+    <strong>${escapeHtml(item.institutionName)}</strong>
+    <span>${(item.enabledServices || []).map((service) => escapeHtml(serviceLabels[service] || service)).join("、")}</span>
+    <small>${item.launchScope === "white-list-demo" ? "白名单演示" : "待开通"} · 生产：${item.productionReady ? "已开通" : "未开通"}</small>
+  </div>`).join("") || `<div><strong>暂无开放机构</strong><span>请稍后查看</span></div>`;
+  const summaryTarget = document.querySelector("#citizen-service-public-feed-summary");
+  if (summaryTarget) summaryTarget.textContent = `${contents.length} 条公告 · ${agreements.length} 个有效协议 · ${hospitals.length} 家演示开放机构`;
+  const boundaryTarget = document.querySelector("#citizen-service-public-boundary");
+  if (boundaryTarget) boundaryTarget.textContent = "当前为演示公开信息，不代表生产服务已经开通；正式服务范围、协议版本、实名结果及支付退费规则以现场联调和审核发布结果为准。";
+}
+
 function ensureAccounts() {
   if (Array.isArray(state.accounts) && state.accounts.length) return;
   state.accounts = [
@@ -999,6 +1115,7 @@ function renderCitizen(residentId) {
   renderBirthHealth(resident.id);
   renderMaternalChildContinuity(resident.id);
   renderEscortAppointments(resident.id);
+  renderFamilyDoctorContracts(resident.id);
   renderRegistration(resident.id);
   renderLongTermCareAssessment(resident.id);
   renderPickups(resident.id);
@@ -2691,6 +2808,147 @@ function formatLongTermCareEligibility(insurance, civilAffairs) {
   return `${insuranceText}；${civilText}`;
 }
 
+function familyDoctorTemplates() {
+  return familyDoctorDashboard?.templates?.length ? familyDoctorDashboard.templates : state.phase2FamilyDoctorTemplates || [];
+}
+
+function familyDoctorTeams() {
+  return familyDoctorDashboard?.teams?.length ? familyDoctorDashboard.teams : state.phase2FamilyDoctorTeams || [];
+}
+
+function familyDoctorPackages() {
+  return familyDoctorDashboard?.packages?.length ? familyDoctorDashboard.packages : state.phase2FamilyDoctorServicePackages || [];
+}
+
+function familyDoctorApplications(residentId) {
+  const rows = familyDoctorDashboard?.applications?.length ? familyDoctorDashboard.applications : state.phase2FamilyDoctorApplications || [];
+  return rows.filter((item) => item.residentId === residentId);
+}
+
+function familyDoctorContracts(residentId) {
+  const rows = familyDoctorDashboard?.contracts?.length ? familyDoctorDashboard.contracts : state.phase2FamilyDoctorContracts || [];
+  return rows.filter((item) => item.residentId === residentId);
+}
+
+function familyDoctorFulfillments(residentId) {
+  const rows = familyDoctorDashboard?.fulfillments?.length ? familyDoctorDashboard.fulfillments : state.phase2FamilyDoctorFulfillments || [];
+  return rows.filter((item) => item.residentId === residentId);
+}
+
+function familyDoctorPackageName(packageId) {
+  const item = familyDoctorPackages().find((row) => row.id === packageId);
+  return item?.name || packageId || "服务包待确认";
+}
+
+function familyDoctorTeamName(teamId) {
+  const item = familyDoctorTeams().find((row) => row.id === teamId);
+  return item?.teamName || item?.institutionName || teamId || "团队待确认";
+}
+
+function renderFamilyDoctorContracts(residentId) {
+  const form = document.querySelector("#family-doctor-contract-form");
+  const packageCards = document.querySelector("#family-doctor-package-cards");
+  const contractCards = document.querySelector("#family-doctor-contract-cards");
+  const summary = document.querySelector("#family-doctor-summary");
+  if (!form || !packageCards || !contractCards) return;
+  const packages = familyDoctorPackages();
+  const teams = familyDoctorTeams();
+  const packageSelect = form.elements.packageId;
+  const teamSelect = form.elements.teamId;
+  const selectedPackage = packageSelect.value;
+  const selectedTeam = teamSelect.value;
+  packageSelect.innerHTML = packages.map((item) => `<option value="${item.id}">${escapeHtml(item.name || item.id)} · ${escapeHtml(item.visitFrequency || "服务周期")}</option>`).join("");
+  teamSelect.innerHTML = teams.map((item) => `<option value="${item.id}">${escapeHtml(item.teamName || item.id)} · ${escapeHtml(item.institutionName || item.institutionCode || "")}</option>`).join("");
+  if (selectedPackage && packages.some((item) => item.id === selectedPackage)) packageSelect.value = selectedPackage;
+  if (selectedTeam && teams.some((item) => item.id === selectedTeam)) teamSelect.value = selectedTeam;
+  const applications = familyDoctorApplications(residentId);
+  const contracts = familyDoctorContracts(residentId);
+  const fulfillments = familyDoctorFulfillments(residentId);
+  const pending = applications.filter((item) => /pending|submitted|review/i.test(`${item.reviewStatus || ""} ${item.status || ""}`));
+  const avg = contracts.length ? Math.round(contracts.reduce((sum, item) => sum + Number(item.fulfillmentPercent || 0), 0) / contracts.length) : 0;
+  if (summary) summary.textContent = `${packages.length} 个服务包 · ${contracts.length} 份签约 · ${pending.length} 条待审 · ${fulfillments.length} 条履约 · 平均履约 ${avg}%`;
+  packageCards.innerHTML = packages.map((item) => `<article class="mini-card family-doctor-package-card">
+    <h3>${escapeHtml(item.name || item.id)}</h3>
+    <p class="muted">${escapeHtml(item.packageCode || item.id)} · ${escapeHtml(item.visitFrequency || "周期待确认")} · ${escapeHtml(item.priceType || "公卫服务")}</p>
+    <p>${(item.serviceItems || []).map(escapeHtml).join("、") || "服务项目待确认"}</p>
+    <span class="status">${escapeHtml(item.status || "active")}</span>
+  </article>`).join("") || `<p class="muted">暂无可选家庭医生服务包。</p>`;
+  const applicationCards = applications.map((item) => `<article class="mini-card family-doctor-contract-card">
+    <h3>申请：${escapeHtml(familyDoctorPackageName(item.packageId))}</h3>
+    <p class="muted">${escapeHtml(familyDoctorTeamName(item.teamId))} · ${escapeHtml(item.applicationType || "new-contract")} · ${escapeHtml(item.desiredStartDate || item.submittedAt || "")}</p>
+    <p>${escapeHtml(item.lastAction || "等待机构审核。")}</p>
+    <span class="status ${item.reviewStatus === "pending" ? "warn" : item.reviewStatus === "rejected" ? "danger" : ""}">${escapeHtml(item.reviewStatus || item.status || "pending")}</span>
+  </article>`);
+  const contractRows = contracts.map((item) => {
+    const rows = fulfillments.filter((row) => row.contractId === item.id);
+    return `<article class="mini-card family-doctor-contract-card">
+      <h3>${escapeHtml(familyDoctorPackageName(item.packageId))}</h3>
+      <p class="muted">${escapeHtml(familyDoctorTeamName(item.teamId))} · ${escapeHtml(item.startDate || "")} 至 ${escapeHtml(item.endDate || "")}</p>
+      <p>履约 ${Number(item.fulfillmentPercent || 0)}% · 续约 ${escapeHtml(item.renewalStatus || "not-due")} · 满意度 ${escapeHtml(item.satisfactionScore || "待回访")}</p>
+      <p>下次服务：${escapeHtml(item.nextServiceAt || "待排期")}</p>
+      <ol class="escort-order-progress" aria-label="家庭医生签约履约进度">
+        <li class="is-ready"><strong>签约</strong><span>${escapeHtml(item.status || "active")}</span></li>
+        <li class="${Number(item.fulfillmentPercent || 0) >= 50 ? "is-ready" : "is-waiting"}"><strong>履约</strong><span>${Number(item.fulfillmentPercent || 0)}%</span></li>
+        <li class="${/renew|family|pending/i.test(String(item.renewalStatus || "")) ? "is-ready" : "is-waiting"}"><strong>续约</strong><span>${escapeHtml(item.renewalStatus || "not-due")}</span></li>
+      </ol>
+      <div class="visit-tags">${rows.slice(0, 4).map((row) => `<span class="tag">${escapeHtml(row.serviceItem || row.serviceType)} · ${escapeHtml(row.status || "")}</span>`).join("")}</div>
+    </article>`;
+  });
+  contractCards.innerHTML = [...contractRows, ...applicationCards].join("") || `<p class="muted">暂无家庭医生签约记录。选择服务包并提交申请后，机构审核状态会显示在这里。</p>`;
+}
+
+function bindFamilyDoctorApplication() {
+  const form = document.querySelector("#family-doctor-contract-form");
+  if (!form) return;
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const submit = form.querySelector("button[type='submit']");
+    const data = Object.fromEntries(new FormData(form));
+    submit.disabled = true;
+    try {
+      const application = await submitFamilyDoctorApplication({ ...data, residentId: currentResidentId });
+      if (!Array.isArray(state.phase2FamilyDoctorApplications)) state.phase2FamilyDoctorApplications = [];
+      state.phase2FamilyDoctorApplications = [application, ...state.phase2FamilyDoctorApplications.filter((item) => item.id !== application.id)];
+      form.reset();
+      renderCitizen(currentResidentId);
+      showToast("家庭医生签约申请已提交，机构审核和履约状态会持续更新。");
+    } catch (error) {
+      showToast(error.message || "家庭医生签约申请提交失败，请检查登录状态。");
+    } finally {
+      submit.disabled = false;
+    }
+  });
+}
+
+async function submitFamilyDoctorApplication(payload) {
+  if (API_BASE) {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${API_BASE}/phase2/family-doctor-contracts/applications`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error(`家庭医生签约申请失败：${response.status}`);
+    const result = await response.json();
+    familyDoctorDashboard = await fetchCitizenFamilyDoctorDashboard();
+    citizenMessages = await fetchCitizenMessages();
+    return result.application;
+  }
+  return {
+    id: `p2fda-local-${crypto.randomUUID()}`,
+    residentId: payload.residentId,
+    packageId: payload.packageId,
+    teamId: payload.teamId,
+    applicationType: payload.applicationType || "new-contract",
+    consentStatus: "resident-confirmed",
+    status: "submitted",
+    reviewStatus: "pending",
+    desiredStartDate: todayOffset(1),
+    submittedAt: new Date().toISOString(),
+    lastAction: payload.note || "居民提交签约申请，等待机构审核。"
+  };
+}
+
 function activeRegistrationSchedules() {
   const schedules = registrationDashboard?.schedules;
   if (Array.isArray(schedules) && schedules.length) return schedules;
@@ -2743,6 +3001,39 @@ function formatRegistrationTag(value) {
   }[value] || value || "";
 }
 
+function registrationJourneySteps(order) {
+  const paid = ["paid", "paid-demo", "waived"].includes(order.paymentStatus);
+  const confirmed = ["confirmed", "confirmed-demo"].includes(order.hisConfirmationStatus);
+  const cancelled = order.status === "cancelled";
+  return [
+    { name: "号源锁定", done: ["confirmed", "released"].includes(order.scheduleLockStatus), detail: order.registrationNo || order.hisScheduleId || "待回执" },
+    { name: "支付", done: paid, detail: formatRegistrationStatus(order.paymentStatus) },
+    { name: "医院确认", done: confirmed, detail: formatRegistrationStatus(order.hisConfirmationStatus) },
+    { name: "到院报到", done: order.checkInStatus === "checked-in-demo", detail: formatRegistrationStatus(order.checkInStatus) },
+    { name: cancelled ? "退款" : "完诊", done: cancelled ? ["not-required", "refunded-demo"].includes(order.refundStatus) : order.status === "completed", detail: cancelled ? formatRegistrationStatus(order.refundStatus) : formatRegistrationStatus(order.status) }
+  ];
+}
+
+function localRegistrationAllowedActions(order) {
+  if (order.status === "cancelled" || ["completed", "closed"].includes(order.status)) return [];
+  const actions = [];
+  if (order.paymentStatus === "pending") actions.push("pay-demo");
+  if (["paid", "paid-demo", "waived"].includes(order.paymentStatus) && ["confirmed", "confirmed-demo"].includes(order.hisConfirmationStatus) && order.checkInStatus !== "checked-in-demo") actions.push("check-in-demo");
+  return actions;
+}
+
+function renderRegistrationJourneySummary(orders) {
+  const target = document.querySelector("#registration-journey-timeline");
+  if (!target) return;
+  const metrics = [
+    ["待支付", orders.filter((item) => item.paymentStatus === "pending").length, "居民处理"],
+    ["医院已确认", orders.filter((item) => ["confirmed", "confirmed-demo"].includes(item.hisConfirmationStatus)).length, "HIS 回执"],
+    ["已报到", orders.filter((item) => item.checkInStatus === "checked-in-demo").length, "到院闭环"],
+    ["退款处理中", orders.filter((item) => item.refundStatus === "refund-pending").length, "机构处理"]
+  ];
+  target.innerHTML = metrics.map(([name, value, detail]) => `<article><strong>${name}</strong><span>${value} 条 · ${detail}</span></article>`).join("");
+}
+
 function renderRegistration(residentId) {
   const form = document.querySelector("#registration-form");
   const scheduleCards = document.querySelector("#registration-schedule-cards");
@@ -2764,6 +3055,7 @@ function renderRegistration(residentId) {
   </article>`;
   }).join("");
   const orders = activeRegistrationOrders(residentId);
+  renderRegistrationJourneySummary(orders);
   if (summary) {
     const openOrders = orders.filter((item) => canCancelRegistration(item)).length;
     const hisOrders = orders.filter((item) => item.hisVisitId || item.registrationNo).length;
@@ -2778,8 +3070,11 @@ function renderRegistration(residentId) {
       <p>${item.reason || "居民端预约"} · 挂号费 ${item.fee} 元 · 队列 ${item.queueNo || item.registrationNo || "待回执"}</p>
       <p>HIS ${item.hisVisitId || item.hisScheduleId || "待同步"} · 支付 ${formatRegistrationStatus(item.paymentStatus)} · 退费 ${formatRegistrationStatus(item.refundStatus)}</p>
       <p>医保 ${formatRegistrationStatus(item.insuranceStatus)} ${item.insurancePrecheckNo ? `· ${item.insurancePrecheckNo}` : ""} · 短信 ${formatRegistrationDeliveryStatus(item)}</p>
+      <div class="registration-journey-steps">${registrationJourneySteps(item).map((step) => `<span class="${step.done ? "done" : "pending"}"><strong>${step.name}</strong><small>${step.detail}</small></span>`).join("")}</div>
       <div class="registration-order-actions">
         <span class="status ${item.status === "cancelled" ? "danger" : item.paymentStatus === "pending" ? "warn" : ""}">${formatRegistrationStatus(item.status)}</span>
+        ${(item.allowedActions || localRegistrationAllowedActions(item)).includes("pay-demo") ? `<button type="button" class="small-button" data-registration-journey-action="pay-demo" data-registration-id="${item.id}">模拟支付</button>` : ""}
+        ${(item.allowedActions || localRegistrationAllowedActions(item)).includes("check-in-demo") ? `<button type="button" class="small-button" data-registration-journey-action="check-in-demo" data-registration-id="${item.id}">到院报到</button>` : ""}
         ${canCancelRegistration(item) ? `<button type="button" class="small-button" data-registration-cancel="${item.id}">取消预约</button>` : ""}
       </div>
     </article>`)
@@ -2787,6 +3082,51 @@ function renderRegistration(residentId) {
   orderCards.querySelectorAll("[data-registration-cancel]").forEach((button) => {
     button.addEventListener("click", () => cancelRegistrationOrder(residentId, button.dataset.registrationCancel));
   });
+  orderCards.querySelectorAll("[data-registration-journey-action]").forEach((button) => {
+    button.addEventListener("click", () => runRegistrationJourneyAction(residentId, button.dataset.registrationId, button.dataset.registrationJourneyAction, button));
+  });
+}
+
+async function runRegistrationJourneyAction(residentId, orderId, action, button) {
+  if (button) button.disabled = true;
+  const notes = {
+    "pay-demo": "Resident recorded isolated demo payment evidence; no real financial transaction occurred.",
+    "check-in-demo": "Resident recorded local arrival evidence; production QR or HIS check-in remains required."
+  };
+  try {
+    if (API_BASE) {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${API_BASE}/registrations/orders/${encodeURIComponent(orderId)}/actions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, note: notes[action] || "Resident registration journey action." })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.message || `HTTP ${response.status}`);
+      registrationDashboard = payload.dashboard || await fetchCitizenRegistrationDashboard();
+      citizenMessages = await fetchCitizenMessages();
+    } else {
+      const order = getLocalRegistrationOrders(residentId).find((item) => item.id === orderId);
+      if (!order) return;
+      if (action === "pay-demo") {
+        order.paymentStatus = "paid-demo";
+        order.journeyStage = "payment-recorded-demo";
+      }
+      if (action === "check-in-demo") {
+        order.checkInStatus = "checked-in-demo";
+        order.journeyStage = "checked-in-demo";
+      }
+      order.productionReady = false;
+      order.updatedAt = new Date().toISOString();
+      localStorage.setItem(CITIZEN_EXTRA_KEY, JSON.stringify(citizenExtra));
+    }
+    renderCitizen(residentId);
+    showToast(action === "pay-demo" ? "支付演示凭据已记录，等待医院确认" : "到院报到已记录，等待医院接诊");
+  } catch (error) {
+    showToast(error.message || "挂号流程操作失败");
+  } finally {
+    if (button) button.disabled = false;
+  }
 }
 
 function bindRegistrationAppointment() {
@@ -2854,6 +3194,10 @@ function createLocalRegistrationOrder(residentId, data) {
     fee: Number(schedule.fee || 0),
     cancelBeforeHours: Number(schedule.cancelBeforeHours || 0),
     status: "confirmed",
+    journeyStage: "slot-reserved-demo",
+    hisConfirmationStatus: "pending-demo",
+    checkInStatus: "not-checked-in",
+    productionReady: false,
     paymentStatus: schedule.paymentRequired === false ? "waived" : "pending",
     paymentTradeNo: schedule.paymentRequired === false ? "" : `PAY-LOCAL-${id.slice(-8)}`,
     refundStatus: "none",
@@ -2940,12 +3284,18 @@ function formatRegistrationStatus(value) {
     completed: "已完成",
     pending: "待处理",
     paid: "已支付",
+    "paid-demo": "演示支付已记录",
     waived: "免预付",
     closed: "已关闭",
     "refund-pending": "待退款",
+    "refunded-demo": "演示退款已完成",
     "not-required": "无需退款",
     "not-supported": "不支持",
     prechecked: "已预核验",
+    "confirmed-demo": "演示确认",
+    "pending-demo": "待医院确认",
+    "checked-in-demo": "已演示报到",
+    "not-checked-in": "未报到",
     queued: "待通知",
     sent: "已通知",
     none: "无",

@@ -200,7 +200,11 @@ npm.cmd run hybrid:deployment-readiness
 
 `env:check` 使用 `.env.example` 做演示/模板级校验，不要求真实密钥；`env:check:production` 会读取 `.env`，并按生产规则校验 `NODE_ENV=production`、非 JSON 存储、非占位且不少于 32 位的 `SESSION_SECRETS` 和 `INTEGRATION_GATEWAY_SECRET`。当前运行时正式支持 `STORAGE_ENGINE=auto` 或 `sqlite`；`postgres/postgresql` 仍在 `productionDeploymentPlan` 中作为后续适配项，配置后会被门禁拦截，避免静默回落。生产模式还要求政务身份 `OIDC_ISSUER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET`、居民验证码 `SMS_GATEWAY_URL` 与审计保全 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT` 至少一项可用。`env:check:production` 与 `release:report` 会附带生产切换清单，按环境文件、生产密钥、统一身份和短信网关、审计保全、存储适配、现场接口联调、医保/证照交换、监控值守和灾备演练列出责任方、阻断状态和下一步动作；外部系统项必须有 `CUTOVER_SITE_INTERFACE_SIGNOFF`、`CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF`、`CUTOVER_MONITORING_SIGNOFF`、`CUTOVER_DR_REHEARSAL_SIGNOFF` 等现场签字信号才会通过。`release:report` 会汇总代码文件、关键 npm scripts、静态快照、P2 完成状态、接口准备度、安全验收、生产部署计划、验收证据和环境配置，默认输出 `release/release-report.json`、`release/release-report.md`、`release/production-cutover-checklist.json` 与 `release/production-cutover-checklist.md`；`release:manifest` 会生成 `release/release-artifact-manifest.json` 与 `release/release-artifact-manifest.md`，把所有发布报告、模板 README、生成命令和 API 证据整理成发布包目录清单；`release:report:full` 额外执行 `check`、`test`、`test:coverage`、`test:e2e`、`deploy:check` 和 `npm audit --omit=dev`。CI 会在每次检查中生成并上传 `release-readiness-report` artifact，便于发布取证。
 
-`release:report` 同时输出 `release/storage-model-inspection.json` 与 `release/storage-model-inspection.md`，记录 JSON 快照集合数、记录量、最大集合，以及 SQLite 表、schema 版本和迁移元数据；SQLite 文件在干净 checkout 中不存在时只作为提示，不阻断 CI。`production-db:readiness` 会生成 `release/production-db-readiness-report.json` 与 `release/production-db-readiness-report.md`，把 PostgreSQL/正式数据库切换前的 `productionDeploymentPlan`、当前 SQLite/JSON 模型、备份恢复演练文档、RTO/RPO 说明和运行时 PostgreSQL 阻断汇总为专项证据包。
+`release:report` 同时输出 `release/storage-model-inspection.json` 与 `release/storage-model-inspection.md`，记录 JSON 快照集合数、记录量、最大集合，以及 SQLite 表、schema 版本和迁移元数据；SQLite 文件在干净 checkout 中不存在时只作为提示，不阻断 CI。`production-db:readiness` 会生成 `release/production-db-readiness-report.json` 与 `release/production-db-readiness-report.md`，把 PostgreSQL/正式数据库切换前的 `productionDeploymentPlan`、当前 SQLite/JSON 模型、备份恢复演练文档、RTO/RPO 说明和运行时 PostgreSQL 阻断汇总为专项证据包。平台页同时提供生产数据库割接演练中心，通过 `GET /api/production-database/cutover-center`、`POST /api/production-database/cutover-runs` 和 `POST /api/production-database/cutover-runs/:id/actions` 管理四个迁移批次、居民/就诊/报告/统计样例校验、回滚检查点、复核及复测证据；演练成功不会绕过真实数据库驱动、全量迁移、容量测试和签字 gate。
+
+`phase2:citizen-operations-readiness` 会生成居民服务运营专项报告。平台“居民服务运营中心”通过 `GET /api/citizen-operations/center` 和分资源操作 API 管理内容发布、协议版本、实名人工复核、跨服务订单、黑名单及医院服务演示开通；居民端只调用 `GET /api/citizen-operations/public`，不会暴露实名复核和黑名单明细。所有本地动作都保留 `productionReady=false`，正式启用仍需政务实名、法务协议、医院授权、支付退费/医保回调和运营制度签字。
+
+`security:commercial-crypto-readiness` 会生成商用密码能力适配专项报告。平台“商用密码能力适配中心”通过 `GET /api/commercial-crypto/center` 和能力动作 API 管理国密 HTTPS、签名验签、重要数据加密、审计完整性、CA/USBKey 与安全浏览器六类适配合同，执行 SM2/SM3/SM4 运行时兼容性探测并登记现场证据。算法可用不代表产品认证或密评通过，所有记录保持 `productionReady=false`，正式启用仍需合格产品、生产证书与密钥管理、现场验证和第三方密评报告。
 
 `launch:smoke` 会生成 `release/launch-smoke-report.json` 与 `release/launch-smoke-report.md`，离线核对上线前只读运行路由、发布报告、生产割接清单、站点准备包、监控和运维证据是否齐备；传入 `--base-url=http://localhost:5173` 时会额外执行在线健康检查，适合作为发布前最后一跳冒烟。
 
@@ -221,7 +225,9 @@ npm.cmd run hybrid:deployment-readiness
 
 `hybrid:deployment-readiness` 会生成 `release/hybrid-deployment-readiness-report.json` 与 `release/hybrid-deployment-readiness-report.md`，核对 GitHub Pages/静态 HTML 预览层、`data/db.json` 快照回退、`server.js` Node API 后端、存储引擎边界、环境变量模板、CI 和发布门禁接线。
 
-`operations:readiness` 会生成 `release/operations-readiness-report.json` 与 `release/operations-readiness-report.md`，检查 `/api/health`、`/api/metrics`、`/api/system/readiness`、生产部署轨道、外部依赖风险和发布运维脚本。
+`operations:readiness` 会生成 `release/operations-readiness-report.json` 与 `release/operations-readiness-report.md`，检查 `/api/health`、`/api/metrics`、`/api/system/readiness`、生产部署轨道、外部依赖风险和发布运维脚本。运行调度页同时提供“生产运维与灾备运行中心”，通过 `GET /api/production-operations/center` 和分资源动作 API 管理 4 类服务级别、3 个 24x365 值班模板、故障事件、恢复演练、RPO/RTO 样例记录及证据包；本地动作均保持 `productionReady=false`，正式运行仍需远端备份、真实监控呼叫/工单、实名排班、全量恢复实测和多方签字。
+
+`registration:journey-readiness` 会生成 `release/registration-journey-readiness-report.json` 与 `release/registration-journey-readiness-report.md`。居民端挂号服务和机构端预约协同工作台通过 `POST /api/registrations/orders/:id/actions` 串联演示支付、HIS 确认、医保预核验确认、到院报到、完诊和退号退款，并把每一步写入消息、访问日志和安全审计；所有演示交易保持 `productionReady=false`，正式上线仍需真实 HIS、支付退款、医保结算和现场验收。
 
 `process:audit` 会生成 `release/process-audit-report.json` 与 `release/process-audit-report.md`，把居民主索引、慢病验收、医共体验收、医保取药、统计证照、安全合规和生产切换汇总为全流程审计证据域；`release:report` 会同步归档该报告。
 
@@ -316,6 +322,23 @@ hospital-operations:readiness generates release/hospital-operations-readiness-re
 The hospital interface development handoff is `docs/escort-hospital-interface.md`. It documents HIS/outpatient guidance boundaries, `hospitalCode` scoping, request/response fields, the `hospital-handoff` API, resident notification behavior, audit requirements, and joint-test acceptance steps.
 
 `npm.cmd run escort:readiness` generates `release/escort-service-readiness-report.json` and `release/escort-service-readiness-report.md`, proving the policy-to-system mapping, registry, workforce, order evidence, API guard, commission frontend entry, citizen appointment entry, and resident submit-readiness checklist.
+
+## Digital Hospital Standards Platform
+
+`digital-hospital-standards.html` is the runnable management entry for the digital hospital standards and evaluation platform. It models the standards center, official policy mapping, indicator inheritance, data/evidence collection, automatic validation, tiered review, pilot blockers, and security boundary for a national/provincial/hospital evaluation workflow.
+
+`GET /api/digital-hospital/standards` is the commission-only runtime summary for standards, evaluation tasks, evidence packets, review queues, risk blockers, and the no-patient-PII evidence boundary. The page uses `HealthCityAuth.authFetch` against this API and keeps a static fallback for offline preview.
+
+`GET /api/digital-hospital/launch-readiness` returns the pilot launch gate, formal production signoff blockers, owner approvals, P0 requirements, production evidence packet coverage, and action audit state. `POST /api/digital-hospital/launch-readiness/:id/actions` records site evidence or signoff actions into the digital hospital launch ledger and security event chain.
+
+`GET /api/digital-hospital/production-evidence-packets` exposes the formal cutover evidence packet board for HIS/EMR/LIS/PACS samples, security assessment material, rollback rehearsal receipts, and specialty casebook evidence. `POST /api/digital-hospital/production-evidence-packets/:id/actions` verifies one evidence item, writes a security event, and signs the linked launch requirement when the packet is complete.
+
+`GET /api/digital-hospital/launch-command-briefs` exposes the launch command desk for go/no-go, first interface receipt, security observation, rollback standby, and first-day closure briefs. `POST /api/digital-hospital/launch-command-briefs/:id/actions` publishes or archives one command brief and links it back to the affected launch requirements.
+
+`GET /api/digital-hospital/formal-cutover-approvals` exposes the independent formal production approval desk. `POST /api/digital-hospital/formal-cutover-approvals/:id/actions` remains blocked until every site signoff and production evidence item is complete, then requires a change ticket, cutover window, exact confirmation phrase, and a signer not reused by another approval role. Formal production readiness requires all four approvals.
+
+`npm.cmd run digital-hospital:standards-readiness` generates `release/digital-hospital-standards-readiness-report.json` and `release/digital-hospital-standards-readiness-report.md`. The release gate checks the commission-only page guard, standard domains, workflow loop, evidence modes, official source links, API contract, launch readiness gate, production evidence packet board, launch command brief desk, formal cutover approval desk, no patient-identifiable collection boundary, CI wiring, deploy check, release report, launch smoke, and release artifact manifest.
+
 ## Internet Nursing Pilot
 
 `internet-nursing.html` is the runnable three-role entry for Internet+ Nursing. Citizens can submit nursing appointments, hospital users can complete first-visit assessment, informed consent, and nurse dispatch, and the nurse workstation can accept orders, start tracked home service, complete nursing records, and leave quality-callback evidence.
@@ -342,6 +365,7 @@ The handoff document is `docs/互联网护理服务模块说明.md`; it covers r
 
 - `health-dashboard.html` is priority application 8: the aggregate entry for the first seven applications.
 - `GET /api/health-dashboard/summary` returns application metrics, risk counts, open actions, interface tracks, acceptance evidence, and site dependencies for commission users.
+- `GET /api/health-dashboard/industry-governance-indicators` returns the commission-only phase-2 indicator center covering physical examinations, fever clinics, disease reporting, clinical assistance, archive access, appointment reconciliation, family doctor fulfillment, and regional performance. The dashboard supports category/status/period filtering, monthly and yearly snapshot views, source drilldown, and JSON export while keeping missing production sources blocked.
 - `GET /api/priority-applications/templates` returns the eight independent conversation handoff templates, including the Chinese conversation titles and the required boundary, reuse, data, API, frontend, test, acceptance, About-page description, module documentation, and workflow-diagram fields.
 - Every application in the summary carries the unified development template: functional boundary, reuse points, data collections, API routes, frontend entry, test evidence, and acceptance artifacts.
 - Unified template rule: every platform template must include an About feature section, a module document under `docs/`, and a workflow diagram covering data source, business workflow, sharing/collaboration, citizen visibility, and management statistics or alerts. `docs/妇幼健康全模块说明.md` is the reference implementation for this rule.
@@ -349,6 +373,7 @@ The handoff document is `docs/互联网护理服务模块说明.md`; it covers r
 - `npm.cmd run maternal-child:readiness` writes `release/maternal-child-readiness-report.json` and `release/maternal-child-readiness-report.md`, forming the maternal-child main function report and checking policy basis, About page, module/function documents, birth certificate data, API routes, role boundaries, privacy audit, and release evidence.
 - `npm.cmd run policy:coverage` writes `release/policy-coverage-report.json` and `release/policy-coverage-report.md`, checking About-page policy IDs, policy documents, template rules, CI, deploy-check, release manifest, and operator documentation coverage.
 - `npm.cmd run health-dashboard:summary` writes `release/health-dashboard-summary.json` and `release/health-dashboard-summary.md`.
+- `docs/health-dashboard-indicator-center-report.md` documents the eight governance topics, source boundary, monthly/yearly views, export contract, API and release evidence.
 - `npm.cmd run priority-apps:templates` writes `release/priority-application-templates.json` and `release/priority-application-templates.md` for the eight independent application handoff templates.
 - Each priority application template now carries a copy-ready `conversationStarter`, an `implementationChecklist` with the Codex loop execution step, and an `acceptanceGate` so each independent conversation can start with the same release boundary and evidence requirements.
 - `release:report` fails the priority application template gate if any generated checklist drops the Codex loop execution step.

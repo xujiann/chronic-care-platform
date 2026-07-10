@@ -1,10 +1,11 @@
 const doctorApiBase = location.protocol === "file:" || location.hostname.endsWith("github.io") ? "" : "/api";
-const doctorFallbackState = { doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {}, taskMessages: [] };
-let doctorRuntime = { doctor: null, applications: [], messages: [], policy: {}, ledger: [], summary: {} };
+const doctorFallbackState = { doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {}, taskMessages: [], phase2ClinicalAssistRules: [], phase2ClinicalAssistAlerts: [], phase2ClinicalAssistReceipts: [], phase2ClinicalAssistPluginContracts: [] };
+let doctorRuntime = { doctor: null, applications: [], messages: [], policy: {}, ledger: [], summary: {}, clinicalAssist: {} };
 
 document.addEventListener("DOMContentLoaded", async () => {
   doctorRuntime = await loadDoctorRuntime();
   bindDoctorForm();
+  bindDoctorClinicalAssistActions();
   renderDoctorWorkbench();
 });
 
@@ -13,19 +14,22 @@ async function loadDoctorRuntime() {
   if (doctorApiBase) {
     try {
       const request = window.HealthCityAuth?.authFetch || fetch;
-      const [meResponse, ledgerResponse] = await Promise.all([
+      const [meResponse, ledgerResponse, clinicalAssistResponse] = await Promise.all([
         request(`${doctorApiBase}/doctors/me`),
-        fetch(`${doctorApiBase}/public/multi-practice-ledger`)
+        fetch(`${doctorApiBase}/public/multi-practice-ledger`),
+        request(`${doctorApiBase}/phase2/clinical-assist`)
       ]);
       if (meResponse.ok) {
         const me = await meResponse.json();
         const ledger = ledgerResponse.ok ? (await ledgerResponse.json()).publicLedger || [] : [];
+        const clinicalAssist = clinicalAssistResponse.ok ? await clinicalAssistResponse.json() : {};
         return {
           doctor: me.doctor,
           applications: me.multiPracticeApplications || [],
           messages: me.multiPracticeMessages || [],
           policy: me.policy || {},
           summary: me.multiPracticeSummary || {},
+          clinicalAssist,
           ledger
         };
       }
@@ -47,6 +51,7 @@ async function loadDoctorRuntime() {
       total: applications.length,
       pending: applications.filter((item) => /待|补正|pending/i.test(String(item.status || ""))).length
     },
+    clinicalAssist: buildStaticClinicalAssist(state, doctor),
     ledger: (state.multiPracticeApplications || []).filter((item) => item.publicVisible !== false)
   };
 }
@@ -57,6 +62,14 @@ function bindDoctorForm() {
   const scopeInput = form.elements.practiceScope;
   if (scopeInput && !scopeInput.value) scopeInput.value = doctorRuntime.doctor?.practiceScope || "";
   form.addEventListener("submit", submitDoctorMultiPractice);
+}
+
+function bindDoctorClinicalAssistActions() {
+  document.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-clinical-assist-receipt]");
+    if (!button) return;
+    await submitDoctorClinicalAssistReceipt(button.dataset.clinicalAssistReceipt, button.dataset.doctorAction || "acknowledged");
+  });
 }
 
 async function submitDoctorMultiPractice(event) {
@@ -97,6 +110,7 @@ async function submitDoctorMultiPractice(event) {
 
 function renderDoctorWorkbench() {
   renderDoctorMetrics();
+  renderDoctorClinicalAssist();
   renderDoctorProfile();
   renderDoctorPolicy();
   renderDoctorApplications();
@@ -108,17 +122,79 @@ function renderDoctorMetrics() {
   if (!target) return;
   const applications = doctorRuntime.applications || [];
   const messages = doctorRuntime.messages || [];
+  const clinicalAlerts = doctorRuntime.clinicalAssist?.alerts || [];
   const registry = doctorRuntime.doctor?.electronicRegistrationVerification || doctorRuntime.doctor?.electronicRegistration || {};
   const pending = applications.filter((item) => /待|补正|pending/i.test(String(item.status || ""))).length;
   const publicRows = applications.filter((item) => item.publicVisible !== false).length;
   target.innerHTML = [
     ["本人申请", applications.length, "多点执业申请和备案记录"],
     ["待处理", pending, "医院端或医生端仍需处理"],
+    ["临床辅助", clinicalAlerts.length, `${clinicalAlerts.filter((item) => /pending|待/i.test(`${item.status || ""} ${item.messageReceiptStatus || ""}`)).length} 条待回执`],
     ["医院消息", messages.length, "医院端确认、退回和备案通知"],
     ["电子注册", registry.verificationStatus || "待核验", registry.registryId || "医师电子化注册系统"]
   ].map(([label, value, hint]) => `<article class="metric-card"><strong>${escapeHtml(value)}</strong><span>${escapeHtml(label)}</span><small>${escapeHtml(hint)}</small></article>`).join("");
   const status = document.querySelector("#doctor-profile-status");
   if (status) status.textContent = `${publicRows} 条公开备案相关记录`;
+}
+
+function renderDoctorClinicalAssist() {
+  const target = document.querySelector("#doctor-clinical-assist");
+  const count = document.querySelector("#doctor-clinical-assist-count");
+  if (!target || !count) return;
+  const assist = doctorRuntime.clinicalAssist || {};
+  const alerts = assist.alerts || [];
+  const pending = alerts.filter((item) => /pending|待/i.test(`${item.status || ""} ${item.messageReceiptStatus || ""}`));
+  count.textContent = `${alerts.length} 条 · ${pending.length} 条待回执`;
+  target.innerHTML = alerts.map((item) => {
+    const pendingReceipt = /pending|待/i.test(`${item.status || ""} ${item.messageReceiptStatus || ""}`);
+    return `<section class="item">
+      <div>
+        <h3>${escapeHtml(item.alertTitle || item.category || "临床辅助提醒")} · ${escapeHtml(item.residentName || item.residentId || "")}</h3>
+        <p>${escapeHtml(item.alertDetail || "")}</p>
+        <p>建议：${escapeHtml(item.recommendation || "")}</p>
+        <p>工作站：${escapeHtml(item.pluginSurface || "doctor-workstation")} · 回执 ${escapeHtml(item.messageReceiptStatus || "pending")} · ${escapeHtml(item.lastAction || "")}</p>
+      </div>
+      <div class="actions">
+        <span class="badge ${doctorStatusClass(item.status)}">${escapeHtml(item.severity || item.status || "待处理")}</span>
+        ${pendingReceipt && doctorApiBase ? `<button class="inline-action" type="button" data-clinical-assist-receipt="${escapeHtml(item.id)}" data-doctor-action="accepted-recommendation">采纳提醒</button><button class="inline-action" type="button" data-clinical-assist-receipt="${escapeHtml(item.id)}" data-doctor-action="kept-order-with-reason">保留并说明</button>` : ""}
+      </div>
+    </section>`;
+  }).join("") || `<p class="muted">暂无本人临床辅助提醒。</p>`;
+}
+
+async function submitDoctorClinicalAssistReceipt(alertId, doctorAction) {
+  if (!doctorApiBase) return;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  const response = await request(`${doctorApiBase}/phase2/clinical-assist/alerts/${encodeURIComponent(alertId)}/receipt`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      receiptStatus: "received",
+      doctorAction,
+      actionDetail: doctorAction === "accepted-recommendation" ? "医生已采纳临床辅助提醒并回写处理结果。" : "医生登记临床理由后保留原医嘱。",
+      messageChannel: "doctor-workstation"
+    })
+  });
+  if (!response.ok) return;
+  doctorRuntime = await loadDoctorRuntime();
+  renderDoctorWorkbench();
+}
+
+function buildStaticClinicalAssist(state, doctor) {
+  const alerts = (state.phase2ClinicalAssistAlerts || []).filter((item) => item.doctorId === doctor.id);
+  const receipts = (state.phase2ClinicalAssistReceipts || []).filter((item) => alerts.some((alert) => alert.id === item.alertId));
+  return {
+    ok: true,
+    summary: {
+      alerts: alerts.length,
+      pendingAlerts: alerts.filter((item) => /pending|待/i.test(`${item.status || ""} ${item.messageReceiptStatus || ""}`)).length,
+      receipts: receipts.length
+    },
+    rules: state.phase2ClinicalAssistRules || [],
+    alerts,
+    receipts,
+    pluginContracts: state.phase2ClinicalAssistPluginContracts || []
+  };
 }
 
 function renderDoctorProfile() {

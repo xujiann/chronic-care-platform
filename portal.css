@@ -650,6 +650,20 @@ th {
   opacity: 0.55;
 }
 
+.inline-action-input,
+.inline-action-select {
+  min-height: 32px;
+  min-width: 180px;
+  flex: 1 1 220px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 9px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+}
+
 .nursing-mobile-workbench {
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
@@ -951,7 +965,8 @@ th {
 #nursing-nurse-response,
 #nursing-regulatory-section,
 #nursing-mobile-workbench,
-#nursing-risk-section {
+#nursing-risk-section,
+#production-operations-run-center {
   scroll-margin-top: 172px;
 }
 
@@ -1449,6 +1464,65 @@ dialog::backdrop {
   margin: 0;
 }
 
+.indicator-governance-toolbar,
+.indicator-governance-metrics {
+  margin-bottom: 16px;
+}
+
+.indicator-governance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.governance-indicator-card {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--amber);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fff;
+}
+
+.governance-indicator-card.ready { border-left-color: var(--green); }
+.governance-indicator-card.blocked { border-left-color: var(--red); }
+
+.governance-indicator-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.governance-indicator-card > strong {
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.governance-indicator-value {
+  color: var(--blue);
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.governance-indicator-card p,
+.governance-indicator-card small,
+.indicator-governance-boundary {
+  color: var(--muted);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.governance-indicator-card .inline-action {
+  justify-self: start;
+}
+
 .chronic-workbench-controls,
 .integration-actions {
   display: grid;
@@ -1689,7 +1763,8 @@ dialog::backdrop {
   #nursing-nurse-response,
   #nursing-regulatory-section,
   #nursing-mobile-workbench,
-  #nursing-risk-section {
+  #nursing-risk-section,
+  #production-operations-run-center {
     scroll-margin-top: 20px;
   }
 

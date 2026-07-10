@@ -7,8 +7,18 @@ const { buildChronicFollowupReadinessReport, renderMarkdown: renderChronicFollow
 const { buildChronicInstitutionInterfaceReport, renderMarkdown: renderChronicInstitutionInterfaceMarkdown } = require("./chronic-institution-interfaces");
 const { buildChronicLaunchCoreReport, renderMarkdown: renderChronicLaunchCoreMarkdown } = require("./chronic-launch-core");
 const { buildCitizenLaunchFoundationReadiness, renderMarkdown: renderCitizenLaunchFoundationMarkdown } = require("./citizen-launch-foundation-readiness");
+const { buildCitizenOperationsReadiness, renderMarkdown: renderCitizenOperationsMarkdown } = require("./citizen-operations-readiness");
+const { buildCommercialCryptoReadiness, renderMarkdown: renderCommercialCryptoMarkdown } = require("./commercial-crypto-readiness");
 const { buildDataGovernanceReadiness, renderMarkdown: renderDataGovernanceMarkdown } = require("./data-governance-readiness");
 const { buildDataQualityReport, renderMarkdown: renderDataQualityMarkdown } = require("./data-quality-report");
+const { buildDigitalHospitalStandardsReadiness, renderMarkdown: renderDigitalHospitalStandardsMarkdown } = require("./digital-hospital-standards-readiness");
+const { buildPhase2CatalogReadiness, renderMarkdown: renderPhase2CatalogMarkdown } = require("./phase2-catalog-readiness");
+const { buildPhase2JointTestReadiness, renderMarkdown: renderPhase2JointTestMarkdown } = require("./phase2-joint-test-readiness");
+const { buildPhase2MutualRecognitionReadiness, renderMarkdown: renderPhase2MutualRecognitionMarkdown } = require("./phase2-mutual-recognition-readiness");
+const { buildPhase2DiseaseReportingReadiness, renderMarkdown: renderPhase2DiseaseReportingMarkdown } = require("./phase2-disease-reporting-readiness");
+const { buildPhase2ClinicalAssistReadiness, renderMarkdown: renderPhase2ClinicalAssistMarkdown } = require("./phase2-clinical-assist-readiness");
+const { buildPhase2FamilyDoctorReadiness, renderMarkdown: renderPhase2FamilyDoctorMarkdown } = require("./phase2-family-doctor-readiness");
+const { buildPhase2ProposalReadiness, renderMarkdown: renderPhase2ProposalMarkdown } = require("./phase2-proposal-readiness");
 const { buildDrugConsumableReadinessReport, renderMarkdown: renderDrugConsumableMarkdown } = require("./drug-consumable-readiness");
 const { buildEvaluationEvidenceReport, renderMarkdown: renderEvaluationEvidenceMarkdown } = require("./evaluation-evidence");
 const { buildEscortServiceReadinessReport, renderMarkdown: renderEscortServiceMarkdown } = require("./escort-service-readiness");
@@ -22,6 +32,7 @@ const { buildInterfaceMappingReport, renderMarkdown: renderInterfaceMappingMarkd
 const { buildHospitalOperationsReadinessReport, renderMarkdown: renderHospitalOperationsReadinessMarkdown } = require("./hospital-operations-readiness");
 const { buildMonitoringReadinessReport, renderMarkdown: renderMonitoringReadinessMarkdown } = require("./monitoring-readiness");
 const { buildOperationsReadinessReport, renderMarkdown: renderOperationsReadinessMarkdown } = require("./operations-readiness");
+const { buildRegistrationJourneyReadiness, renderMarkdown: renderRegistrationJourneyMarkdown } = require("./registration-journey-readiness");
 const { buildOnsiteLaunchRequirements, renderMarkdown: renderOnsiteLaunchRequirementsMarkdown } = require("./onsite-launch-requirements");
 const { buildMaternalChildReadinessReport, renderMarkdown: renderMaternalChildReadinessMarkdown } = require("./maternal-child-readiness");
 const { buildPolicyCoverageReport, renderMarkdown: renderPolicyCoverageMarkdown } = require("./policy-coverage");
@@ -396,6 +407,7 @@ function healthDashboardChecks(healthDashboard) {
     check("healthDashboard:summary", healthDashboard.ok, healthDashboard.ok ? "health dashboard summary checks passed" : "health dashboard summary failed", "error", "health-dashboard"),
     check("healthDashboard:applications", healthDashboard.applications?.length === 8 && healthDashboard.totals?.sourceApplications === 7, `${healthDashboard.applications?.length || 0} applications; ${healthDashboard.totals?.sourceApplications || 0} source applications`, "error", "health-dashboard"),
     check("healthDashboard:developmentTemplate", healthDashboard.applications?.every((item) => item.functionalBoundary && item.reusePoints?.length && item.dataCollections?.length && item.apiRoutes?.length && item.frontendEntry && item.testEvidence?.length && item.acceptanceEvidence?.length), "boundary, reuse, data, API, frontend, test, and acceptance fields", "error", "health-dashboard"),
+    check("healthDashboard:industryGovernanceIndicators", healthDashboard.indicatorCenter?.indicators?.length === 8 && healthDashboard.indicatorCenter?.periodViews?.length === 2 && healthDashboard.indicatorCenter?.indicators?.every((item) => item.definition && item.owner && item.sourceCollections?.length && item.reports?.length === 2 && item.drilldown?.href), `${healthDashboard.indicatorCenter?.indicators?.length || 0} indicators / ${healthDashboard.indicatorCenter?.periodViews?.length || 0} report views`, "error", "health-dashboard"),
     check("healthDashboard:boundary", /source business applications|source applications/.test(healthDashboard.scope?.rule || ""), healthDashboard.scope?.rule || "missing", "error", "health-dashboard")
   ];
 }
@@ -423,17 +435,33 @@ function maternalChildReadinessChecks(maternalChildReadiness) {
 }
 
 function publicHealthReadinessChecks(publicHealthReadiness) {
+  const readinessSeverity = publicHealthReadiness.ok ? "error" : "warn";
   return [
-    check("publicHealth:readiness", publicHealthReadiness.ok, publicHealthReadiness.ok ? "public health readiness checks passed" : "public health readiness failed", "error", "public-health"),
+    check("publicHealth:readiness", publicHealthReadiness.ok, publicHealthReadiness.ok ? "public health readiness checks passed" : "public health readiness has site cutover blockers; see public health launch gate", readinessSeverity, "public-health"),
     check("publicHealth:standardTotal", publicHealthReadiness.standardCoverage?.total?.domains === 21 && publicHealthReadiness.standardCoverage?.total?.secondary === 125 && publicHealthReadiness.standardCoverage?.total?.tertiary === 421, `${publicHealthReadiness.standardCoverage?.total?.domains || 0}/${publicHealthReadiness.standardCoverage?.total?.secondary || 0}/${publicHealthReadiness.standardCoverage?.total?.tertiary || 0}`, "error", "public-health"),
+    check("publicHealth:standardImplementationLedger", publicHealthReadiness.standardImplementationBoard?.traceabilityReady === true && publicHealthReadiness.standardImplementationBoard?.summary?.domains === 21 && publicHealthReadiness.standardImplementationBoard?.summary?.mappingComplete === 21 && publicHealthReadiness.checks?.some((item) => item.id === "standard:implementation-ledger" && item.passed) && publicHealthReadiness.checks?.some((item) => item.id === "api:standard-implementation-ledger" && item.passed), `${publicHealthReadiness.standardImplementationBoard?.summary?.mappingComplete || 0}/${publicHealthReadiness.standardImplementationBoard?.summary?.domains || 0} mappings / ${publicHealthReadiness.standardImplementationBoard?.summary?.gaps || 0} gaps`, "error", "public-health"),
+    check("publicHealth:standardImplementationActions", Number.isInteger(publicHealthReadiness.summary?.standardImplementationEvidenceCandidates) && ["standardImplementationAssignedGaps", "standardImplementationVerifiedGaps", "standardImplementationUnassignedGaps", "standardImplementationDueSoonGaps", "standardImplementationOverdueGaps"].every((key) => Number.isInteger(publicHealthReadiness.summary?.[key])) && publicHealthReadiness.checks?.some((item) => item.id === "frontend:standard-implementation-actions" && item.passed), `${publicHealthReadiness.summary?.standardImplementationEvidenceCandidates || 0} verified evidence candidates / ${publicHealthReadiness.standardImplementationBoard?.summary?.evidenceLinked || 0} linked / ${publicHealthReadiness.summary?.standardImplementationUnassignedGaps || 0} unassigned / ${publicHealthReadiness.summary?.standardImplementationDueSoonGaps || 0} due soon / ${publicHealthReadiness.summary?.standardImplementationOverdueGaps || 0} overdue / ${publicHealthReadiness.summary?.standardImplementationAssignedGaps || 0} assigned / ${publicHealthReadiness.summary?.standardImplementationVerifiedGaps || 0} remediation verified`, "error", "public-health"),
     check("publicHealth:institutionScopes", publicHealthReadiness.institutionScopes?.length >= 7, `${publicHealthReadiness.institutionScopes?.length || 0} institution scopes`, "error", "public-health"),
     check("publicHealth:eventLoop", publicHealthReadiness.riskQueue?.length >= 3 && publicHealthReadiness.riskQueue?.every((item) => item.commandAction && item.followupAction), `${publicHealthReadiness.riskQueue?.length || 0} risk queue items`, "error", "public-health"),
     check("publicHealth:eventActionApi", ["events:action-api", "frontend:event-actions"].every((id) => publicHealthReadiness.checks?.some((item) => item.id === id && item.passed)), "event action API and risk queue actions are wired", "error", "public-health"),
     check("publicHealth:nextPlan", publicHealthReadiness.checks?.some((item) => item.id === "docs:next-plan" && item.passed), "next development plan is documented", "error", "public-health"),
     check("publicHealth:exchangeTasks", ["direct-report", "laboratory", "immunization", "maternal-child", "emergency", "security"].every((category) => publicHealthReadiness.exchangeTasks?.some((item) => item.category === category)), `${publicHealthReadiness.exchangeTasks?.length || 0} exchange tasks`, "error", "public-health"),
-    check("publicHealth:exchangeRuns", publicHealthReadiness.checks?.some((item) => item.id === "exchange:runs" && item.passed) && publicHealthReadiness.checks?.some((item) => item.id === "exchange:compensation" && item.passed), `${publicHealthReadiness.exchangeRuns?.length || 0} exchange runs with compensation evidence`, "error", "public-health"),
+    check("publicHealth:exchangeRuns", publicHealthReadiness.checks?.some((item) => item.id === "exchange:runs" && item.passed) && publicHealthReadiness.checks?.some((item) => item.id === "exchange:compensation" && item.passed) && publicHealthReadiness.checks?.some((item) => item.id === "exchange:exception-board" && item.passed) && ["exchangeExceptions", "openExchangeExceptions", "resolvedExchangeExceptions", "unassignedExchangeExceptions", "dueSoonExchangeExceptions", "overdueExchangeExceptions"].every((key) => Number.isInteger(publicHealthReadiness.summary?.[key])), `${publicHealthReadiness.exchangeRuns?.length || 0} exchange runs / ${publicHealthReadiness.summary?.openExchangeExceptions || 0} open exceptions / ${publicHealthReadiness.summary?.overdueExchangeExceptions || 0} overdue`, "error", "public-health"),
     check("publicHealth:institutionTasks", publicHealthReadiness.checks?.some((item) => item.id === "institution:tasks" && item.passed), `${publicHealthReadiness.institutionTasks?.length || 0} institution collaboration tasks`, "error", "public-health"),
-    check("publicHealth:onsiteAcceptance", publicHealthReadiness.checks?.some((item) => item.id === "onsite:acceptance" && item.passed), `${publicHealthReadiness.onsiteAcceptances?.length || 0} onsite acceptance rows`, "error", "public-health")
+    check("publicHealth:onsiteAcceptance", publicHealthReadiness.checks?.some((item) => item.id === "onsite:acceptance" && item.passed), `${publicHealthReadiness.onsiteAcceptances?.length || 0} onsite acceptance rows`, "error", "public-health"),
+    check("publicHealth:cutoverBlockers", publicHealthReadiness.checks?.some((item) => item.id === "cutover:blockers" && item.passed) && publicHealthReadiness.checks?.some((item) => item.id === "cutover:open-boundary" && item.passed), `${publicHealthReadiness.cutoverBlockers?.length || 0} cutover blockers, ${publicHealthReadiness.summary?.p0OpenCutoverBlockers || 0} P0 open`, "error", "public-health"),
+    check("publicHealth:cutoverReadiness", publicHealthReadiness.cutoverReadiness?.releaseGate === "site-evidence-required" && publicHealthReadiness.checks?.some((item) => item.id === "cutover:readiness-board" && item.passed) && publicHealthReadiness.checks?.some((item) => item.id === "api:cutover-readiness" && item.passed), `${publicHealthReadiness.cutoverReadiness?.readinessLevel || "unknown"} / ${publicHealthReadiness.cutoverReadiness?.summary?.p0Open || 0} P0 open / ${publicHealthReadiness.cutoverReadiness?.summary?.evidenceRecorded || 0} evidence recorded`, "error", "public-health"),
+    check("publicHealth:cutoverEvidencePackets", publicHealthReadiness.checks?.some((item) => item.id === "cutover:evidence-packets" && item.passed) && publicHealthReadiness.checks?.some((item) => item.id === "api:cutover-evidence-packets" && item.passed), `${publicHealthReadiness.cutoverEvidenceBoard?.summary?.packets || 0} packets / ${publicHealthReadiness.cutoverEvidenceBoard?.summary?.requiredItems || 0} required items / ${publicHealthReadiness.cutoverEvidenceBoard?.summary?.verifiedItems || 0} verified`, "error", "public-health"),
+    check("publicHealth:cutoverDrills", publicHealthReadiness.cutoverDrillBoard?.status === "blocked" && publicHealthReadiness.checks?.some((item) => item.id === "cutover:drill-board" && item.passed) && publicHealthReadiness.checks?.some((item) => item.id === "api:cutover-drills" && item.passed), `${publicHealthReadiness.cutoverDrillBoard?.summary?.blockedDrills || 0}/${publicHealthReadiness.cutoverDrillBoard?.summary?.drills || 0} drills blocked / ${publicHealthReadiness.cutoverDrillBoard?.summary?.openFindings || 0} findings`, "error", "public-health"),
+    check("publicHealth:productionHandoffs", publicHealthReadiness.productionHandoffBoard?.status === "blocked" && publicHealthReadiness.checks?.some((item) => item.id === "production:handoffs" && item.passed) && publicHealthReadiness.checks?.some((item) => item.id === "api:production-handoffs" && item.passed), `${publicHealthReadiness.productionHandoffBoard?.summary?.acceptedHandoffs || 0}/${publicHealthReadiness.productionHandoffBoard?.summary?.handoffs || 0} production handoffs accepted / ${publicHealthReadiness.productionHandoffBoard?.summary?.missingSignoffs || 0} missing signoffs`, "error", "public-health"),
+    check("publicHealth:goLiveObservations", publicHealthReadiness.goLiveObservationBoard?.status === "watch-ready" && publicHealthReadiness.checks?.some((item) => item.id === "go-live:observation-plan" && item.passed) && publicHealthReadiness.checks?.some((item) => item.id === "api:go-live-observations" && item.passed), `${publicHealthReadiness.goLiveObservationBoard?.summary?.planReady || 0}/${publicHealthReadiness.goLiveObservationBoard?.summary?.observations || 0} observation plans ready / ${publicHealthReadiness.goLiveObservationBoard?.summary?.openCriticalSignals || 0} critical signals`, "error", "public-health"),
+    check("publicHealth:launchIncidents", publicHealthReadiness.launchIncidentBoard?.status === "desk-ready" && publicHealthReadiness.checks?.some((item) => item.id === "go-live:incident-desk" && item.passed) && publicHealthReadiness.checks?.some((item) => item.id === "api:launch-incidents" && item.passed), `${publicHealthReadiness.launchIncidentBoard?.summary?.deskReady || 0}/${publicHealthReadiness.launchIncidentBoard?.summary?.lanes || 0} incident lanes ready / ${publicHealthReadiness.launchIncidentBoard?.summary?.criticalOpenTickets || 0} critical open`, "error", "public-health"),
+    check("publicHealth:launchDutyShifts", publicHealthReadiness.launchDutyBoard?.status === "roster-ready" && publicHealthReadiness.checks?.some((item) => item.id === "go-live:duty-handoffs" && item.passed) && publicHealthReadiness.checks?.some((item) => item.id === "api:launch-duty-shifts" && item.passed), `${publicHealthReadiness.launchDutyBoard?.summary?.readyShifts || 0}/${publicHealthReadiness.launchDutyBoard?.summary?.shifts || 0} duty shifts ready / ${publicHealthReadiness.launchDutyBoard?.summary?.missedHandoffs || 0} missed`, "error", "public-health"),
+    check("publicHealth:launchCommandBriefs", publicHealthReadiness.launchCommandBriefBoard?.status === "briefing-ready" && publicHealthReadiness.checks?.some((item) => item.id === "go-live:command-briefs" && item.passed) && publicHealthReadiness.checks?.some((item) => item.id === "api:launch-command-briefs" && item.passed), `${publicHealthReadiness.launchCommandBriefBoard?.summary?.readyBriefs || 0}/${publicHealthReadiness.launchCommandBriefBoard?.summary?.briefs || 0} command briefs ready / ${publicHealthReadiness.launchCommandBriefBoard?.summary?.blockedBriefs || 0} blocked`, "error", "public-health"),
+    check("publicHealth:siteEvidenceBridge", publicHealthReadiness.siteEvidenceBridge?.summary?.links >= 8 && publicHealthReadiness.checks?.some((item) => item.id === "site-evidence:bridge" && item.passed) && publicHealthReadiness.checks?.some((item) => item.id === "api:site-evidence-bridge" && item.passed), `${publicHealthReadiness.siteEvidenceBridge?.summary?.verifiedLinks || 0}/${publicHealthReadiness.siteEvidenceBridge?.summary?.links || 0} site evidence links`, "error", "public-health"),
+    check("publicHealth:siteEvidenceVerificationTasks", publicHealthReadiness.siteEvidenceVerificationBoard?.summary?.tasks >= 9 && publicHealthReadiness.siteEvidenceVerificationBoard?.summary?.structurallyReadyTasks === publicHealthReadiness.siteEvidenceVerificationBoard?.summary?.tasks && ["evidence-pending", "verification-pending", "blocked", "verified"].includes(publicHealthReadiness.siteEvidenceVerificationBoard?.status) && publicHealthReadiness.checks?.some((item) => item.id === "site-evidence:verification-desk" && item.passed) && publicHealthReadiness.checks?.some((item) => item.id === "api:site-evidence-verification-tasks" && item.passed), `${publicHealthReadiness.siteEvidenceVerificationBoard?.summary?.verifiedTasks || 0}/${publicHealthReadiness.siteEvidenceVerificationBoard?.summary?.tasks || 0} site evidence verification tasks / ${publicHealthReadiness.siteEvidenceVerificationBoard?.status || "unknown"}`, "error", "public-health"),
+    check("publicHealth:launchApprovalPreflight", publicHealthReadiness.launchGate?.approvalPreflight?.status === "blocked" && publicHealthReadiness.launchGate?.approvalPreflight?.blockedPrerequisites >= 1 && publicHealthReadiness.launchGate?.approvalPreflight?.blockedRequirementIds?.includes("launch-site-evidence-verification") && publicHealthReadiness.checks?.some((item) => item.id === "launch:approval-preflight" && item.passed), `${publicHealthReadiness.launchGate?.approvalPreflight?.passedPrerequisites || 0}/${publicHealthReadiness.launchGate?.approvalPreflight?.prerequisiteRequirements || 0} approval prerequisites / ${publicHealthReadiness.launchGate?.approvalPreflight?.status || "unknown"}`, "error", "public-health"),
+    check("publicHealth:launchGate", publicHealthReadiness.launchGate?.releaseGate === "site-evidence-required" && publicHealthReadiness.checks?.some((item) => item.id === "launch:gate" && item.passed) && publicHealthReadiness.checks?.some((item) => item.id === "api:launch-gate" && item.passed), `${publicHealthReadiness.launchGate?.summary?.passedRequirements || 0}/${publicHealthReadiness.launchGate?.summary?.requirements || 0} requirements / ${publicHealthReadiness.launchGate?.summary?.signedApprovals || 0}/${publicHealthReadiness.launchGate?.summary?.approvals || 0} approvals`, "error", "public-health")
   ];
 }
 
@@ -463,11 +491,111 @@ function dataGovernanceChecks(dataGovernance) {
   ];
 }
 
+function phase2ProposalChecks(phase2Proposal) {
+  return [
+    check("phase2Proposal:readiness", phase2Proposal.ok, phase2Proposal.ok ? "phase-2 proposal readiness checks passed" : "phase-2 proposal readiness failed", "error", "phase2-proposal"),
+    check("phase2Proposal:gapLedger", (phase2Proposal.summary?.gapRows || 0) >= 12 && (phase2Proposal.summary?.domains || 0) >= 10, `${phase2Proposal.summary?.gapRows || 0} gap rows / ${phase2Proposal.summary?.domains || 0} domains`, "error", "phase2-proposal"),
+    check("phase2Proposal:workPackages", (phase2Proposal.summary?.p0WorkPackages || 0) >= 4 && (phase2Proposal.summary?.p1WorkPackages || 0) >= 3 && (phase2Proposal.summary?.p2WorkPackages || 0) >= 1, `${phase2Proposal.summary?.p0WorkPackages || 0}/${phase2Proposal.summary?.p1WorkPackages || 0}/${phase2Proposal.summary?.p2WorkPackages || 0} P0/P1/P2 packages`, "error", "phase2-proposal"),
+    check("phase2Proposal:externalBoundary", (phase2Proposal.summary?.onsiteBlockers || 0) >= 8 && (phase2Proposal.summary?.blockedLedgerRows || 0) >= 4, `${phase2Proposal.summary?.onsiteBlockers || 0} blockers / ${phase2Proposal.summary?.blockedLedgerRows || 0} blocked rows`, "error", "phase2-proposal")
+  ];
+}
+
+function phase2CatalogChecks(phase2Catalog) {
+  return [
+    check("phase2Catalog:readiness", phase2Catalog.ok, phase2Catalog.ok ? "phase-2 catalog readiness checks passed" : "phase-2 catalog readiness failed", "error", "phase2-catalog"),
+    check("phase2Catalog:tables", (phase2Catalog.summary?.tablesMapped || 0) >= 216 && (phase2Catalog.summary?.dataCatalogs || 0) >= 6, `${phase2Catalog.summary?.tablesMapped || 0}/216 tables across ${phase2Catalog.summary?.dataCatalogs || 0} domains`, "error", "phase2-catalog"),
+    check("phase2Catalog:services", (phase2Catalog.summary?.serviceCatalogs || 0) >= 12 && (phase2Catalog.summary?.fieldLineage || 0) >= 10, `${phase2Catalog.summary?.serviceCatalogs || 0} services / ${phase2Catalog.summary?.fieldLineage || 0} lineage rows`, "error", "phase2-catalog"),
+    check("phase2Catalog:qualityRules", (phase2Catalog.summary?.qualityRules || 0) >= 12 && (phase2Catalog.summary?.onsiteBlockers || 0) >= 6, `${phase2Catalog.summary?.qualityRules || 0} quality rules / ${phase2Catalog.summary?.onsiteBlockers || 0} blockers`, "error", "phase2-catalog")
+  ];
+}
+
+function phase2JointTestChecks(phase2JointTest) {
+  return [
+    check("phase2JointTest:readiness", phase2JointTest.ok, phase2JointTest.ok ? "phase-2 joint-test pilot checks passed" : "phase-2 joint-test pilot failed", "error", "phase2-joint-test"),
+    check("phase2JointTest:institutions", (phase2JointTest.summary?.institutions || 0) >= 3 && (phase2JointTest.summary?.sourceSystems || 0) >= 6, `${phase2JointTest.summary?.institutions || 0} institutions / ${phase2JointTest.summary?.sourceSystems || 0} source systems`, "error", "phase2-joint-test"),
+    check("phase2JointTest:payloads", (phase2JointTest.summary?.samplePayloads || 0) >= 8 && (phase2JointTest.summary?.landedTraces || 0) >= 6, `${phase2JointTest.summary?.samplePayloads || 0} payloads / ${phase2JointTest.summary?.landedTraces || 0} landed traces`, "error", "phase2-joint-test"),
+    check("phase2JointTest:siteBoundary", (phase2JointTest.summary?.openIssues || 0) >= 3 && (phase2JointTest.summary?.runnableChains || 0) >= 5, `${phase2JointTest.summary?.openIssues || 0} open issues / ${phase2JointTest.summary?.runnableChains || 0} runnable chains`, "error", "phase2-joint-test")
+  ];
+}
+
+function phase2MutualRecognitionChecks(phase2MutualRecognition) {
+  return [
+    check("phase2MutualRecognition:readiness", phase2MutualRecognition.ok, phase2MutualRecognition.ok ? "phase-2 mutual recognition checks passed" : "phase-2 mutual recognition failed", "error", "phase2-mutual-recognition"),
+    check("phase2MutualRecognition:catalog", (phase2MutualRecognition.summary?.catalogItems || 0) >= 78, `${phase2MutualRecognition.summary?.catalogItems || 0}/78 catalog items`, "error", "phase2-mutual-recognition"),
+    check("phase2MutualRecognition:reports", (phase2MutualRecognition.summary?.reports || 0) >= 3 && (phase2MutualRecognition.summary?.citations || 0) >= 3, `${phase2MutualRecognition.summary?.reports || 0} reports / ${phase2MutualRecognition.summary?.citations || 0} citations`, "error", "phase2-mutual-recognition"),
+    check("phase2MutualRecognition:decisionStats", (phase2MutualRecognition.summary?.recognized || 0) >= 1 && ((phase2MutualRecognition.summary?.rejected || 0) >= 1 || (phase2MutualRecognition.summary?.pending || 0) >= 1), `${phase2MutualRecognition.summary?.recognized || 0} recognized / ${phase2MutualRecognition.summary?.rejected || 0} rejected / ${phase2MutualRecognition.summary?.pending || 0} pending`, "error", "phase2-mutual-recognition")
+  ];
+}
+
+function phase2DiseaseReportingChecks(phase2DiseaseReporting) {
+  return [
+    check("phase2DiseaseReporting:readiness", phase2DiseaseReporting.ok, phase2DiseaseReporting.ok ? "phase-2 disease reporting checks passed" : "phase-2 disease reporting failed", "error", "phase2-disease-reporting"),
+    check("phase2DiseaseReporting:rules", (phase2DiseaseReporting.summary?.rules || 0) >= 4 && (phase2DiseaseReporting.summary?.categories || 0) >= 3, `${phase2DiseaseReporting.summary?.rules || 0} rules / ${phase2DiseaseReporting.summary?.categories || 0} categories`, "error", "phase2-disease-reporting"),
+    check("phase2DiseaseReporting:receipts", (phase2DiseaseReporting.summary?.reportCards || 0) >= 4 && (phase2DiseaseReporting.summary?.receipts || 0) >= 3, `${phase2DiseaseReporting.summary?.reportCards || 0} report cards / ${phase2DiseaseReporting.summary?.receipts || 0} receipts`, "error", "phase2-disease-reporting"),
+    check("phase2DiseaseReporting:patientCenter", (phase2DiseaseReporting.summary?.patientCenterRows || 0) >= 4 && (phase2DiseaseReporting.summary?.openExceptions || 0) >= 1, `${phase2DiseaseReporting.summary?.patientCenterRows || 0} patient center rows / ${phase2DiseaseReporting.summary?.openExceptions || 0} open exceptions`, "error", "phase2-disease-reporting")
+  ];
+}
+
+function phase2ClinicalAssistChecks(phase2ClinicalAssist) {
+  return [
+    check("phase2ClinicalAssist:readiness", phase2ClinicalAssist.ok, phase2ClinicalAssist.ok ? "phase-2 clinical assist checks passed" : "phase-2 clinical assist failed", "error", "phase2-clinical-assist"),
+    check("phase2ClinicalAssist:rules", (phase2ClinicalAssist.summary?.rules || 0) >= 4 && (phase2ClinicalAssist.summary?.categories || 0) >= 4, `${phase2ClinicalAssist.summary?.rules || 0} rules / ${phase2ClinicalAssist.summary?.categories || 0} categories`, "error", "phase2-clinical-assist"),
+    check("phase2ClinicalAssist:alerts", (phase2ClinicalAssist.summary?.alerts || 0) >= 4 && (phase2ClinicalAssist.summary?.doctorScopes || 0) >= 2, `${phase2ClinicalAssist.summary?.alerts || 0} alerts / ${phase2ClinicalAssist.summary?.doctorScopes || 0} doctor scopes`, "error", "phase2-clinical-assist"),
+    check("phase2ClinicalAssist:receipts", (phase2ClinicalAssist.summary?.receipts || 0) >= 3 && (phase2ClinicalAssist.summary?.pluginContracts || 0) >= 3, `${phase2ClinicalAssist.summary?.receipts || 0} receipts / ${phase2ClinicalAssist.summary?.pluginContracts || 0} plugin contracts`, "error", "phase2-clinical-assist")
+  ];
+}
+
+function phase2FamilyDoctorChecks(phase2FamilyDoctor) {
+  return [
+    check("phase2FamilyDoctor:readiness", phase2FamilyDoctor.ok, phase2FamilyDoctor.ok ? "phase-2 family doctor checks passed" : "phase-2 family doctor failed", "error", "phase2-family-doctor"),
+    check("phase2FamilyDoctor:catalog", (phase2FamilyDoctor.summary?.templates || 0) >= 3 && (phase2FamilyDoctor.summary?.packages || 0) >= 4 && (phase2FamilyDoctor.summary?.teams || 0) >= 3, `${phase2FamilyDoctor.summary?.templates || 0} templates / ${phase2FamilyDoctor.summary?.packages || 0} packages / ${phase2FamilyDoctor.summary?.teams || 0} teams`, "error", "phase2-family-doctor"),
+    check("phase2FamilyDoctor:applications", (phase2FamilyDoctor.summary?.applications || 0) >= 4 && (phase2FamilyDoctor.summary?.pendingApplications || 0) >= 1, `${phase2FamilyDoctor.summary?.applications || 0} applications / ${phase2FamilyDoctor.summary?.pendingApplications || 0} pending`, "error", "phase2-family-doctor"),
+    check("phase2FamilyDoctor:fulfillment", (phase2FamilyDoctor.summary?.contracts || 0) >= 3 && (phase2FamilyDoctor.summary?.fulfillments || 0) >= 5 && (phase2FamilyDoctor.summary?.satisfactionRows || 0) >= 3, `${phase2FamilyDoctor.summary?.contracts || 0} contracts / ${phase2FamilyDoctor.summary?.fulfillments || 0} fulfillments / ${phase2FamilyDoctor.summary?.satisfactionRows || 0} satisfaction rows`, "error", "phase2-family-doctor")
+  ];
+}
+
+function citizenOperationsChecks(citizenOperations) {
+  return [
+    check("citizenOperations:readiness", citizenOperations.ok, citizenOperations.ok ? "citizen service operations checks passed" : "citizen service operations checks failed", "error", "citizen-operations"),
+    check("citizenOperations:governance", (citizenOperations.summary?.publishedContents || 0) >= 3 && (citizenOperations.summary?.activeAgreements || 0) >= 3 && (citizenOperations.summary?.pendingIdentityReviews || 0) >= 1, `${citizenOperations.summary?.publishedContents || 0} published / ${citizenOperations.summary?.activeAgreements || 0} agreements / ${citizenOperations.summary?.pendingIdentityReviews || 0} pending identity reviews`, "error", "citizen-operations"),
+    check("citizenOperations:service-control", (citizenOperations.summary?.enabledHospitals || 0) >= 2 && (citizenOperations.summary?.activeBlacklistEntries || 0) >= 1 && (citizenOperations.summary?.orders || 0) >= 7, `${citizenOperations.summary?.enabledHospitals || 0} hospitals / ${citizenOperations.summary?.activeBlacklistEntries || 0} active blacklist entries / ${citizenOperations.summary?.orders || 0} orders`, "error", "citizen-operations"),
+    check("citizenOperations:production-boundary", citizenOperations.summary?.productionReadyHospitals === 0 && (citizenOperations.summary?.onsiteBlockers || 0) >= 4, `${citizenOperations.summary?.productionReadyHospitals || 0} production-ready hospitals / ${citizenOperations.summary?.onsiteBlockers || 0} onsite blockers`, "error", "citizen-operations")
+  ];
+}
+
+function registrationJourneyChecks(registrationJourney) {
+  return [
+    check("registrationJourney:readiness", registrationJourney.ok, registrationJourney.ok ? "registration journey checks passed" : "registration journey checks failed", "error", "registration-journey"),
+    check("registrationJourney:orders", (registrationJourney.center?.summary?.orders || 0) >= 1, `${registrationJourney.center?.summary?.orders || 0} scoped appointment journeys`, "error", "registration-journey"),
+    check("registrationJourney:cross-role", registrationJourney.checks?.filter((item) => ["registrationJourney:citizenUi", "registrationJourney:institutionUi", "registrationJourney:api"].includes(item.id)).every((item) => item.passed), "resident, institution and API actions are wired", "error", "registration-journey"),
+    check("registrationJourney:production-boundary", registrationJourney.center?.summary?.productionReady === 0 && (registrationJourney.center?.summary?.onsiteBlockers || 0) >= 4, `${registrationJourney.center?.summary?.productionReady || 0} production-ready / ${registrationJourney.center?.summary?.onsiteBlockers || 0} onsite blockers`, "error", "registration-journey")
+  ];
+}
+
+function commercialCryptoChecks(commercialCrypto) {
+  return [
+    check("commercialCrypto:readiness", commercialCrypto.ok, commercialCrypto.ok ? "commercial crypto adapter checks passed" : "commercial crypto adapter checks failed", "error", "commercial-crypto"),
+    check("commercialCrypto:contracts", commercialCrypto.summary?.capabilities === 6 && commercialCrypto.summary?.contractsReady === 6, `${commercialCrypto.summary?.contractsReady || 0}/${commercialCrypto.summary?.capabilities || 0} adapter contracts`, "error", "commercial-crypto"),
+    check("commercialCrypto:runtime-probe", commercialCrypto.runtimeProbe?.primitives?.length === 3, `${commercialCrypto.summary?.primitiveAvailability || 0}/3 runtime primitives available`, "error", "commercial-crypto"),
+    check("commercialCrypto:production-boundary", commercialCrypto.summary?.productionReady === 0 && (commercialCrypto.summary?.onsiteBlockers || 0) >= 5, `${commercialCrypto.summary?.productionReady || 0} production-ready / ${commercialCrypto.summary?.onsiteBlockers || 0} onsite blockers`, "error", "commercial-crypto")
+  ];
+}
+
 function qualitySafetyChecks(qualitySafety) {
   return [
     check("qualitySafety:report", qualitySafety.ok, qualitySafety.ok ? "quality and safety supervision checks passed" : "quality and safety supervision checks failed", "error", "quality-safety"),
     check("qualitySafety:boundaries", qualitySafety.summary?.modeledBoundaries === qualitySafety.summary?.boundaries, `${qualitySafety.summary?.modeledBoundaries || 0}/${qualitySafety.summary?.boundaries || 0} boundaries modeled`, "error", "quality-safety"),
     check("qualitySafety:reuse", qualitySafety.reusedCollections?.every((item) => item.present), `${qualitySafety.summary?.reusedCollections || 0} reused collections`, "error", "quality-safety")
+  ];
+}
+
+function digitalHospitalStandardsChecks(digitalHospitalStandards) {
+  return [
+    check("digitalHospitalStandards:readiness", digitalHospitalStandards.ok, digitalHospitalStandards.ok ? "digital hospital standards checks passed" : "digital hospital standards checks failed", "error", "digital-hospital-standards"),
+    check("digitalHospitalStandards:domains", (digitalHospitalStandards.summary?.standardDomains || 0) >= 6 && (digitalHospitalStandards.summary?.officialSources || 0) >= 6, `${digitalHospitalStandards.summary?.standardDomains || 0} domains / ${digitalHospitalStandards.summary?.officialSources || 0} source markers`, "error", "digital-hospital-standards"),
+    check("digitalHospitalStandards:api", (digitalHospitalStandards.summary?.apiMarkers || 0) >= 5, `${digitalHospitalStandards.summary?.apiMarkers || 0} API contract markers`, "error", "digital-hospital-standards"),
+    check("digitalHospitalStandards:launchReadiness", (digitalHospitalStandards.summary?.launchMarkers || 0) >= 16, `${digitalHospitalStandards.summary?.launchMarkers || 0} launch readiness markers`, "error", "digital-hospital-standards"),
+    check("digitalHospitalStandards:evidence", (digitalHospitalStandards.summary?.evidenceModes || 0) >= 5 && (digitalHospitalStandards.summary?.workflowMarkers || 0) >= 6, `${digitalHospitalStandards.summary?.evidenceModes || 0} evidence modes / ${digitalHospitalStandards.summary?.workflowMarkers || 0} workflow markers`, "error", "digital-hospital-standards")
   ];
 }
 
@@ -483,7 +611,9 @@ function operationsReadinessChecks(operationsReadiness) {
   return [
     check("operations:readiness", operationsReadiness.ok, operationsReadiness.ok ? "operations readiness checks passed" : "operations readiness checks failed", "error", "operations"),
     check("operations:routes", operationsReadiness.operationRoutes?.every((item) => item.present && item.documented), `${operationsReadiness.operationRoutes?.length || 0} operation routes`, "error", "operations"),
-    check("operations:externalDependencies", operationsReadiness.externalDependencies?.every((item) => item.present), `${operationsReadiness.externalDependencies?.length || 0} external dependencies`, "error", "operations")
+    check("operations:externalDependencies", operationsReadiness.externalDependencies?.every((item) => item.present), `${operationsReadiness.externalDependencies?.length || 0} external dependencies`, "error", "operations"),
+    check("operations:runCenter", operationsReadiness.runCenter?.ok && operationsReadiness.runCenter?.summary?.serviceLevels >= 4 && operationsReadiness.runCenter?.summary?.dutyShifts >= 3 && operationsReadiness.runCenter?.summary?.drills >= 3, `${operationsReadiness.runCenter?.summary?.serviceLevels || 0} SLOs / ${operationsReadiness.runCenter?.summary?.dutyShifts || 0} shifts / ${operationsReadiness.runCenter?.summary?.drills || 0} drills`, "error", "operations"),
+    check("operations:production-boundary", operationsReadiness.runCenter?.summary?.productionReady === 0 && operationsReadiness.runCenter?.summary?.onsiteBlockers >= 5, `${operationsReadiness.runCenter?.summary?.productionReady || 0} production-ready / ${operationsReadiness.runCenter?.summary?.onsiteBlockers || 0} onsite blockers`, "error", "operations")
   ];
 }
 
@@ -547,7 +677,8 @@ function productionDbReadinessChecks(productionDbReadiness) {
   return [
     check("productionDb:readiness", productionDbReadiness.ok, productionDbReadiness.ok ? "production database readiness checks passed" : "production database readiness checks failed", "error", "production-db"),
     check("productionDb:runtimeBlock", productionDbReadiness.migrationEvidence?.runtimePostgresBlocked, "postgres runtime remains blocked until adapter cutover", "error", "production-db"),
-    check("productionDb:rehearsalDocs", productionDbReadiness.rehearsalEvidence && Object.values(productionDbReadiness.rehearsalEvidence).every(Boolean), "backup, restore, RTO/RPO, and release artifact docs", "error", "production-db")
+    check("productionDb:rehearsalDocs", productionDbReadiness.rehearsalEvidence && Object.values(productionDbReadiness.rehearsalEvidence).every(Boolean), "backup, restore, RTO/RPO, and release artifact docs", "error", "production-db"),
+    check("productionDb:cutoverCenter", productionDbReadiness.cutoverCenter?.ok && productionDbReadiness.cutoverCenter?.summary?.migrationBatches >= 4 && productionDbReadiness.cutoverCenter?.summary?.productionReadyRuns === 0, `${productionDbReadiness.cutoverCenter?.summary?.migrationBatches || 0} migration batches / ${productionDbReadiness.cutoverCenter?.summary?.cutoverRuns || 0} rehearsal runs / production gate preserved`, "error", "production-db")
   ];
 }
 
@@ -685,6 +816,15 @@ function packageChecks(pkg) {
     "audit:retention",
     "data-governance:readiness",
     "data-quality:report",
+    "digital-hospital:standards-readiness",
+    "phase2:catalog-readiness",
+    "phase2:joint-test-readiness",
+    "phase2:mutual-recognition-readiness",
+    "phase2:clinical-assist-readiness",
+    "phase2:disease-reporting-readiness",
+    "phase2:proposal-readiness",
+    "phase2:citizen-operations-readiness",
+    "security:commercial-crypto-readiness",
     "quality-safety:report",
     "environment:matrix",
     "hybrid:deployment-readiness",
@@ -759,6 +899,17 @@ function buildReleaseReport(options = {}) {
   const integrationReadiness = buildIntegrationReadinessReport({ data });
   const interfaceMapping = buildInterfaceMappingReport({ data, pkg });
   const dataGovernance = buildDataGovernanceReadiness({ data, pkg, interfaceMapping, dataQuality });
+  const digitalHospitalStandards = buildDigitalHospitalStandardsReadiness({ pkg });
+  const phase2Catalog = buildPhase2CatalogReadiness({ data, pkg });
+  const phase2JointTest = buildPhase2JointTestReadiness({ data, pkg });
+  const phase2MutualRecognition = buildPhase2MutualRecognitionReadiness({ data, pkg });
+  const phase2DiseaseReporting = buildPhase2DiseaseReportingReadiness({ data, pkg });
+  const phase2ClinicalAssist = buildPhase2ClinicalAssistReadiness({ data, pkg });
+  const phase2FamilyDoctor = buildPhase2FamilyDoctorReadiness({ data, pkg });
+  const citizenOperations = buildCitizenOperationsReadiness({ data, pkg });
+  const registrationJourney = buildRegistrationJourneyReadiness({ data, pkg });
+  const commercialCrypto = buildCommercialCryptoReadiness({ data, pkg });
+  const phase2Proposal = buildPhase2ProposalReadiness({ pkg });
   const regionalDataSharing = buildRegionalDataSharingReport({ data, pkg });
   const hospitalOperationsReadiness = buildHospitalOperationsReadinessReport({ data, pkg });
   const researchSandbox = buildResearchSandboxReadiness(data);
@@ -801,6 +952,17 @@ function buildReleaseReport(options = {}) {
     ...chronicFollowupChecks(chronicFollowup, chronicInstitutionInterfaces, chronicLaunchCore),
     ...dataQualityChecks(dataQuality),
     ...dataGovernanceChecks(dataGovernance),
+    ...digitalHospitalStandardsChecks(digitalHospitalStandards),
+    ...phase2CatalogChecks(phase2Catalog),
+    ...phase2JointTestChecks(phase2JointTest),
+    ...phase2MutualRecognitionChecks(phase2MutualRecognition),
+    ...phase2DiseaseReportingChecks(phase2DiseaseReporting),
+    ...phase2ClinicalAssistChecks(phase2ClinicalAssist),
+    ...phase2FamilyDoctorChecks(phase2FamilyDoctor),
+    ...citizenOperationsChecks(citizenOperations),
+    ...registrationJourneyChecks(registrationJourney),
+    ...commercialCryptoChecks(commercialCrypto),
+    ...phase2ProposalChecks(phase2Proposal),
     ...qualitySafetyChecks(qualitySafety),
     ...drugConsumableChecks(drugConsumable),
     ...integrationReadinessChecks(integrationReadiness),
@@ -854,6 +1016,17 @@ function buildReleaseReport(options = {}) {
     chronicLaunchCore,
     dataQuality,
     dataGovernance,
+    digitalHospitalStandards,
+    phase2Catalog,
+    phase2JointTest,
+    phase2MutualRecognition,
+    phase2DiseaseReporting,
+    phase2ClinicalAssist,
+    phase2FamilyDoctor,
+    citizenOperations,
+    registrationJourney,
+    commercialCrypto,
+    phase2Proposal,
     qualitySafety,
     drugConsumable,
     integrationReadiness,
@@ -1051,6 +1224,46 @@ function renderMarkdown(report) {
     "",
     "See `data-quality-report.json` and `data-quality-report.md` for resident master index completeness, resident reference checks, source traceability, and rectification issue evidence.",
     "",
+    "## Digital hospital standards readiness report",
+    "",
+    "See `digital-hospital-standards-readiness-report.json` and `digital-hospital-standards-readiness-report.md` for the standards center, official policy mapping, evaluation workflow, evidence model, review queue, pilot boundary, and no-patient-PII collection guardrails.",
+    "",
+    "## Phase 2 proposal readiness report",
+    "",
+    "See `phase2-proposal-readiness-report.json` and `phase2-proposal-readiness-report.md` for the phase-2 feasibility-study gap ledger, P0/P1/P2 work packages, onsite blockers, and release wiring evidence.",
+    "",
+    "## Phase 2 catalog readiness report",
+    "",
+    "See `phase2-catalog-readiness-report.json` and `phase2-catalog-readiness-report.md` for the 216-table mapping, data/service catalog, field lineage, quality rules, runtime API, and platform UI evidence.",
+    "",
+    "## Phase 2 joint-test readiness report",
+    "",
+    "See `phase2-joint-test-readiness-report.json` and `phase2-joint-test-readiness-report.md` for the tertiary-hospital, district-platform, and primary-care pilot institutions, signed sample payloads, gateway landing/replay traces, issue retest ledger, and onsite signoff boundary.",
+    "",
+    "## Phase 2 mutual recognition readiness report",
+    "",
+    "See `phase2-mutual-recognition-readiness-report.json` and `phase2-mutual-recognition-readiness-report.md` for the 78-item mutual-recognition catalog, report browser, recognition/non-recognition decision loop, citation evidence chain, supervision statistics, and onsite PDF/LIS/PACS blocker boundary.",
+    "",
+    "## Phase 2 disease reporting readiness report",
+    "",
+    "See `phase2-disease-reporting-readiness-report.json` and `phase2-disease-reporting-readiness-report.md` for diagnosis trigger rules, disease report queue, county receipts, patient-center import/export, supervision statistics, and onsite HIS/county-platform signoff boundary.",
+    "",
+    "## Phase 2 clinical assist readiness report",
+    "",
+    "See `phase2-clinical-assist-readiness-report.json` and `phase2-clinical-assist-readiness-report.md` for duplicate diagnosis/check/lab/medication rules, doctor workstation alerts, message receipts, plugin contracts, supervision statistics, and onsite HIS/EMR signoff boundary.",
+    "",
+    "## Phase 2 family doctor readiness report",
+    "",
+    "See `phase2-family-doctor-readiness-report.json` and `phase2-family-doctor-readiness-report.md` for templates, teams, service packages, resident applications, institution review, contract fulfillment, renewal/satisfaction evidence, citizen/institution/platform UI, and onsite unified-entry/e-signature blocker boundary.",
+    "",
+    "## Citizen service operations readiness report",
+    "",
+    "See `citizen-operations-readiness-report.json` and `citizen-operations-readiness-report.md` for content publishing, agreement versions, real-name review, cross-service order query, blacklist controls, hospital service enablement, resident public feed, and onsite production blockers.",
+    "",
+    "## Commercial crypto adapter center readiness report",
+    "",
+    "See `commercial-crypto-readiness-report.json` and `commercial-crypto-readiness-report.md` for six adapter contracts, SM2/SM3/SM4 runtime compatibility probes, evidence actions, onsite blockers and the production assessment boundary.",
+    "",
     "## Medical quality and safety supervision report",
     "",
     "See `quality-safety-report.json` and `quality-safety-report.md` for medical quality, safety event, critical value, clinical pathway, medical record QC, mutual recognition QC, dispatch, feedback, and review evidence.",
@@ -1116,7 +1329,7 @@ function renderMarkdown(report) {
     "`GET /api/priority-applications/templates` exposes the live eight-application handoff templates for independent conversation work.",
     "See `priority-application-templates.json` and `priority-application-templates.md` for the standalone release artifact version of that handoff contract.",
     "See `maternal-child-readiness-report.json` and `maternal-child-readiness-report.md` for maternal-child policy, birth certificate workflow, role scope, API, privacy, and release evidence.",
-    "See `public-health-readiness-report.json` and `public-health-readiness-report.md` for the 21/125/421 public-health standard matrix, institution scopes, event loop, exchange tasks, API, and release evidence.",
+    "See `public-health-readiness-report.json` and `public-health-readiness-report.md` for the 21/125/421 public-health standard matrix, institution scopes, event loop, exchange tasks, cutover blockers, API, and release evidence.",
     "See `policy-coverage-report.json` and `policy-coverage-report.md` for About-page policy IDs, policy documents, template rules, CI, deploy check, release manifest, and operator documentation coverage.",
     "",
     "## Release artifact manifest",
@@ -1219,6 +1432,94 @@ function writeOutput(report, flags) {
       profile: report.profile,
       generatedAt: report.generatedAt,
       dataGovernance: report.dataGovernance
+    }, null, 2), "utf8");
+    const digitalHospitalStandardsJson = path.join(path.dirname(output), "digital-hospital-standards-readiness-report.json");
+    fs.writeFileSync(digitalHospitalStandardsJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      digitalHospitalStandards: report.digitalHospitalStandards
+    }, null, 2), "utf8");
+    const phase2ProposalJson = path.join(path.dirname(output), "phase2-proposal-readiness-report.json");
+    fs.writeFileSync(phase2ProposalJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      phase2Proposal: report.phase2Proposal
+    }, null, 2), "utf8");
+    const phase2CatalogJson = path.join(path.dirname(output), "phase2-catalog-readiness-report.json");
+    fs.writeFileSync(phase2CatalogJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      phase2Catalog: report.phase2Catalog
+    }, null, 2), "utf8");
+    const phase2JointTestJson = path.join(path.dirname(output), "phase2-joint-test-readiness-report.json");
+    fs.writeFileSync(phase2JointTestJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      phase2JointTest: report.phase2JointTest
+    }, null, 2), "utf8");
+    const phase2MutualRecognitionJson = path.join(path.dirname(output), "phase2-mutual-recognition-readiness-report.json");
+    fs.writeFileSync(phase2MutualRecognitionJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      phase2MutualRecognition: report.phase2MutualRecognition
+    }, null, 2), "utf8");
+    const phase2DiseaseReportingJson = path.join(path.dirname(output), "phase2-disease-reporting-readiness-report.json");
+    fs.writeFileSync(phase2DiseaseReportingJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      phase2DiseaseReporting: report.phase2DiseaseReporting
+    }, null, 2), "utf8");
+    const phase2ClinicalAssistJson = path.join(path.dirname(output), "phase2-clinical-assist-readiness-report.json");
+    fs.writeFileSync(phase2ClinicalAssistJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      phase2ClinicalAssist: report.phase2ClinicalAssist
+    }, null, 2), "utf8");
+    const phase2FamilyDoctorJson = path.join(path.dirname(output), "phase2-family-doctor-readiness-report.json");
+    fs.writeFileSync(phase2FamilyDoctorJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      phase2FamilyDoctor: report.phase2FamilyDoctor
+    }, null, 2), "utf8");
+    const citizenOperationsJson = path.join(path.dirname(output), "citizen-operations-readiness-report.json");
+    fs.writeFileSync(citizenOperationsJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      citizenOperations: report.citizenOperations
+    }, null, 2), "utf8");
+    const registrationJourneyJson = path.join(path.dirname(output), "registration-journey-readiness-report.json");
+    fs.writeFileSync(registrationJourneyJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      registrationJourney: report.registrationJourney
+    }, null, 2), "utf8");
+    const commercialCryptoJson = path.join(path.dirname(output), "commercial-crypto-readiness-report.json");
+    fs.writeFileSync(commercialCryptoJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      commercialCrypto: report.commercialCrypto
     }, null, 2), "utf8");
     const qualitySafetyJson = path.join(path.dirname(output), "quality-safety-report.json");
     fs.writeFileSync(qualitySafetyJson, JSON.stringify({
@@ -1460,6 +1761,28 @@ function writeOutput(report, flags) {
     fs.writeFileSync(dataQualityMarkdown, renderDataQualityMarkdown(report.dataQuality), "utf8");
     const dataGovernanceMarkdown = path.join(path.dirname(markdown), "data-governance-readiness-report.md");
     fs.writeFileSync(dataGovernanceMarkdown, renderDataGovernanceMarkdown(report.dataGovernance), "utf8");
+    const digitalHospitalStandardsMarkdown = path.join(path.dirname(markdown), "digital-hospital-standards-readiness-report.md");
+    fs.writeFileSync(digitalHospitalStandardsMarkdown, renderDigitalHospitalStandardsMarkdown(report.digitalHospitalStandards), "utf8");
+    const phase2ProposalMarkdown = path.join(path.dirname(markdown), "phase2-proposal-readiness-report.md");
+    fs.writeFileSync(phase2ProposalMarkdown, renderPhase2ProposalMarkdown(report.phase2Proposal), "utf8");
+    const phase2CatalogMarkdown = path.join(path.dirname(markdown), "phase2-catalog-readiness-report.md");
+    fs.writeFileSync(phase2CatalogMarkdown, renderPhase2CatalogMarkdown(report.phase2Catalog), "utf8");
+    const phase2JointTestMarkdown = path.join(path.dirname(markdown), "phase2-joint-test-readiness-report.md");
+    fs.writeFileSync(phase2JointTestMarkdown, renderPhase2JointTestMarkdown(report.phase2JointTest), "utf8");
+    const phase2MutualRecognitionMarkdown = path.join(path.dirname(markdown), "phase2-mutual-recognition-readiness-report.md");
+    fs.writeFileSync(phase2MutualRecognitionMarkdown, renderPhase2MutualRecognitionMarkdown(report.phase2MutualRecognition), "utf8");
+    const phase2DiseaseReportingMarkdown = path.join(path.dirname(markdown), "phase2-disease-reporting-readiness-report.md");
+    fs.writeFileSync(phase2DiseaseReportingMarkdown, renderPhase2DiseaseReportingMarkdown(report.phase2DiseaseReporting), "utf8");
+    const phase2ClinicalAssistMarkdown = path.join(path.dirname(markdown), "phase2-clinical-assist-readiness-report.md");
+    fs.writeFileSync(phase2ClinicalAssistMarkdown, renderPhase2ClinicalAssistMarkdown(report.phase2ClinicalAssist), "utf8");
+    const phase2FamilyDoctorMarkdown = path.join(path.dirname(markdown), "phase2-family-doctor-readiness-report.md");
+    fs.writeFileSync(phase2FamilyDoctorMarkdown, renderPhase2FamilyDoctorMarkdown(report.phase2FamilyDoctor), "utf8");
+    const citizenOperationsMarkdown = path.join(path.dirname(markdown), "citizen-operations-readiness-report.md");
+    fs.writeFileSync(citizenOperationsMarkdown, renderCitizenOperationsMarkdown(report.citizenOperations), "utf8");
+    const registrationJourneyMarkdown = path.join(path.dirname(markdown), "registration-journey-readiness-report.md");
+    fs.writeFileSync(registrationJourneyMarkdown, renderRegistrationJourneyMarkdown(report.registrationJourney), "utf8");
+    const commercialCryptoMarkdown = path.join(path.dirname(markdown), "commercial-crypto-readiness-report.md");
+    fs.writeFileSync(commercialCryptoMarkdown, renderCommercialCryptoMarkdown(report.commercialCrypto), "utf8");
     const qualitySafetyMarkdown = path.join(path.dirname(markdown), "quality-safety-report.md");
     fs.writeFileSync(qualitySafetyMarkdown, renderQualitySafetyMarkdown(report.qualitySafety), "utf8");
     const integrationMarkdown = path.join(path.dirname(markdown), "integration-readiness-report.md");

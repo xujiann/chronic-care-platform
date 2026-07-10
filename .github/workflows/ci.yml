@@ -29,6 +29,8 @@ jobs:
         run: npm ci
       - name: Check JavaScript syntax
         run: npm run check
+      - name: Run commercial crypto adapter tests
+        run: node --test test/commercial-crypto-readiness.test.js
       - name: Run API regression tests
         run: npm run test:coverage
       - name: Install Chromium
@@ -49,6 +51,28 @@ jobs:
         run: npm run data-quality:report
       - name: Generate data governance readiness report
         run: npm run data-governance:readiness
+      - name: Generate digital hospital standards readiness report
+        run: npm run digital-hospital:standards-readiness
+      - name: Generate phase 2 proposal readiness report
+        run: npm run phase2:proposal-readiness
+      - name: Generate phase 2 catalog readiness report
+        run: npm run phase2:catalog-readiness
+      - name: Generate phase 2 joint-test readiness report
+        run: npm run phase2:joint-test-readiness
+      - name: Generate phase 2 mutual recognition readiness report
+        run: npm run phase2:mutual-recognition-readiness
+      - name: Generate phase 2 disease reporting readiness report
+        run: npm run phase2:disease-reporting-readiness
+      - name: Generate phase 2 clinical assist readiness report
+        run: npm run phase2:clinical-assist-readiness
+      - name: Generate phase 2 family doctor readiness report
+        run: npm run phase2:family-doctor-readiness
+      - name: Generate citizen service operations readiness report
+        run: npm run phase2:citizen-operations-readiness
+      - name: Generate appointment registration journey readiness report
+        run: npm run registration:journey-readiness
+      - name: Generate commercial crypto adapter readiness report
+        run: npm run security:commercial-crypto-readiness
       - name: Generate medical quality and safety report
         run: npm run quality-safety:report
       - name: Generate drug consumable readiness report

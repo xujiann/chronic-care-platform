@@ -4,6 +4,9 @@ const fallbackPlatformState = {
   followups: [],
   personalRecords: [],
   careOrders: [],
+  registrationOrders: [],
+  escortServiceOrders: [],
+  internetNursingOrders: [],
   medicationPickups: [],
   insuranceClaims: [],
   countyCollaborationOrders: [],
@@ -28,9 +31,41 @@ const fallbackPlatformState = {
   standardDataDictionaries: [],
   dataLineageControls: [],
   platformDataBusChannels: [],
+  phase2DataCatalogs: [],
+  phase2ServiceCatalogs: [],
+  phase2FieldLineage: [],
+  phase2CatalogQualityRules: [],
+  phase2PilotInstitutions: [],
+  phase2JointTestLinks: [],
+  phase2SamplePayloads: [],
+  phase2GatewayTraces: [],
+  phase2JointTestIssues: [],
+  phase2DiseaseReportingRules: [],
+  phase2DiseaseReportQueue: [],
+  phase2DiseaseReportReceipts: [],
+  phase2ClinicalAssistRules: [],
+  phase2ClinicalAssistAlerts: [],
+  phase2ClinicalAssistReceipts: [],
+  phase2ClinicalAssistPluginContracts: [],
+  phase2FamilyDoctorTemplates: [],
+  phase2FamilyDoctorTeams: [],
+  phase2FamilyDoctorServicePackages: [],
+  phase2FamilyDoctorApplications: [],
+  phase2FamilyDoctorContracts: [],
+  phase2FamilyDoctorFulfillments: [],
   institutionCreditEvaluations: [],
   securityAcceptanceLedger: [],
   productionDeploymentPlan: [],
+  productionDatabaseMigrationBatches: [],
+  productionDatabaseCutoverRuns: [],
+  citizenOperationContents: [],
+  citizenAgreementVersions: [],
+  citizenIdentityReviewCases: [],
+  citizenServiceBlacklist: [],
+  citizenHospitalServiceConfigs: [],
+  commercialCryptoCapabilities: [],
+  commercialCryptoProbeRuns: [],
+  commercialCryptoEvidencePackets: [],
   platformChangeLogs: []
 };
 
@@ -239,11 +274,11 @@ const defaultProductionDeploymentPlan = [
     id: "prod-storage-adapter",
     name: "Production database adapter",
     track: "database",
-    status: "planned",
+    status: "rehearsal-center-ready-onsite-blocked",
     owner: "data platform",
-    nextAction: "Provision PostgreSQL, set DATABASE_URL, run restore rehearsal, and freeze a migration window.",
+    nextAction: "Bind the cutover center to the selected database driver, run masked full-volume migration and rollback, then freeze a signed migration window.",
     requiredConfig: ["STORAGE_ENGINE=postgres", "DATABASE_URL", "BACKUP_RETENTION_DAYS"],
-    evidence: ["snapshot", "restore rehearsal", "migration checklist"]
+    evidence: ["four-domain sample validation", "rollback checkpoint", "migration checklist"]
   },
   {
     id: "prod-identity-adapter",
@@ -267,8 +302,58 @@ const defaultProductionDeploymentPlan = [
   }
 ];
 
+const defaultProductionDatabaseMigrationBatches = [
+  { id: "pdbm-resident-master", sequence: 1, domain: "resident-master", name: "Resident master and identity index", sourceCollections: ["residents", "authUsers"], targetTables: ["resident_master", "identity_account"], owner: "resident-master-index", status: "rehearsal-ready", rollbackStrategy: "Restore the pre-cutover resident master checkpoint." },
+  { id: "pdbm-clinical-encounter", sequence: 2, domain: "clinical-encounter", name: "Clinical encounter and health archive", sourceCollections: ["personalRecords", "careOrders"], targetTables: ["clinical_record", "care_order"], owner: "institution-integration", status: "rehearsal-ready", rollbackStrategy: "Revert the encounter batch and rebuild resident links." },
+  { id: "pdbm-lab-report", sequence: 3, domain: "lab-report", name: "Laboratory and diagnostic report", sourceCollections: ["diagnosticReports", "imageCloudStudies"], targetTables: ["diagnostic_report", "report_evidence"], owner: "medical-resource-center", status: "rehearsal-ready", rollbackStrategy: "Remove migrated report rows and replay the source receipt." },
+  { id: "pdbm-health-statistic", sequence: 4, domain: "health-statistic", name: "Health statistics and reconciliation evidence", sourceCollections: ["healthStatistics", "healthStatisticsIngestion"], targetTables: ["health_statistic", "statistic_ingestion"], owner: "commission-governance", status: "rehearsal-ready", rollbackStrategy: "Restore the signed period snapshot and rerun reconciliation." }
+];
+
+const defaultProductionDatabaseCutoverRuns = [
+  { id: "pdbcr-baseline", runNo: "PDB-DRYRUN-BASELINE", mode: "dry-run", targetAdapter: "postgresql", status: "planned", reviewStatus: "pending", createdAt: "2026-07-10T00:00:00.000Z", sampleValidations: [], rollbackCheckpoint: { id: "pdbcp-baseline", status: "planned", evidence: "" }, productionReady: false, blockers: ["live PostgreSQL-compatible target connection and driver", "masked full-volume migration rehearsal", "capacity and failover test evidence", "database owner and release manager signoff"] }
+];
+
+const defaultCitizenOperationContents = [
+  { id: "cop-content-banner-registration", type: "banner", title: "预约挂号试点服务", status: "published-demo", owner: "居民服务运营岗", channels: ["citizen-web", "app-shell"], productionReady: false },
+  { id: "cop-content-family-doctor", type: "article", title: "家庭医生签约与履约说明", status: "published-demo", owner: "基层卫生处", channels: ["citizen-web"], productionReady: false },
+  { id: "cop-content-refund-policy", type: "article", title: "预约退号与退费规则草案", status: "review-pending", owner: "财务与居民服务组", channels: ["citizen-web"], productionReady: false }
+];
+
+const defaultCitizenAgreementVersions = [
+  { id: "cop-agreement-privacy-v2", name: "居民端隐私政策", version: "2.0-demo", status: "active-demo", acceptanceMode: "explicit-checkbox", legalReviewStatus: "onsite-pending", productionReady: false },
+  { id: "cop-agreement-service-v1", name: "居民服务使用协议", version: "1.0-demo", status: "active-demo", acceptanceMode: "explicit-checkbox", legalReviewStatus: "onsite-pending", productionReady: false },
+  { id: "cop-agreement-health-auth-v1", name: "健康数据调阅授权书", version: "1.0-demo", status: "active-demo", acceptanceMode: "signed-consent", legalReviewStatus: "onsite-pending", productionReady: false }
+];
+
+const defaultCitizenIdentityReviewCases = [
+  { id: "cop-identity-r3", residentId: "r3", residentName: "演示居民 C", riskLevel: "medium", status: "pending-review", submittedEvidence: ["phone-token", "masked-id-card"], productionReady: false },
+  { id: "cop-identity-r4", residentId: "r4", residentName: "演示居民 D", riskLevel: "high", status: "material-requested", submittedEvidence: ["phone-token", "guardian-statement"], productionReady: false },
+  { id: "cop-identity-r1", residentId: "r1", residentName: "演示居民 A", riskLevel: "low", status: "approved-demo", submittedEvidence: ["phone-token", "master-index-match"], productionReady: false }
+];
+
+const defaultCitizenServiceBlacklist = [
+  { id: "cop-block-provider-demo", subjectType: "provider", subjectName: "演示暂停服务商", reason: "演示资质到期，暂停居民端服务展示。", status: "active-demo", productionReady: false },
+  { id: "cop-block-account-review", subjectType: "account", subjectName: "异常频次演示账号", reason: "短时间重复提交订单，等待人工复核。", status: "under-review", productionReady: false }
+];
+
+const defaultCitizenHospitalServiceConfigs = [
+  { id: "cop-hospital-mr1", institutionCode: "MR1", institutionName: "大连市中心医院", enabledServices: ["appointment", "report-query", "internet-nursing", "escort"], status: "active-demo", launchScope: "white-list-demo", productionReady: false },
+  { id: "cop-hospital-mr3", institutionCode: "MR3", institutionName: "青泥洼桥社区卫生服务中心", enabledServices: ["family-doctor", "chronic-followup", "internet-nursing"], status: "active-demo", launchScope: "white-list-demo", productionReady: false },
+  { id: "cop-hospital-mr5", institutionCode: "MR5", institutionName: "甘井子区人民医院", enabledServices: ["appointment", "report-query"], status: "onsite-confirmation-pending", launchScope: "disabled", productionReady: false }
+];
+
+const defaultCommercialCryptoCapabilities = [
+  { id: "cc-gm-tls", name: "国密 HTTPS 与传输保护", adapterKind: "gm-tls-gateway", requiredPrimitives: ["SM2", "SM3", "SM4"], status: "contract-ready", owner: "平台技术组/安全管理", evidenceRefs: ["securityAcceptanceLedger:security-crypto"], blockers: ["通过检测的国密 SSL 产品", "生产证书链"], onsiteVerification: "not-requested", productionReady: false },
+  { id: "cc-signature-service", name: "电子签名与验签服务", adapterKind: "signing-server", requiredPrimitives: ["SM2", "SM3"], status: "contract-ready", owner: "安全管理/业务应用组", evidenceRefs: ["identity-contract.md"], blockers: ["签名验签服务器", "时间戳服务"], onsiteVerification: "not-requested", productionReady: false },
+  { id: "cc-data-encryption", name: "重要数据与数据库加密", adapterKind: "kms-database-encryption", requiredPrimitives: ["SM4"], status: "contract-ready", owner: "数据管理/安全管理", evidenceRefs: ["production-database-cutover-center.md"], blockers: ["生产 KMS 或密码机", "密钥管理制度"], onsiteVerification: "not-requested", productionReady: false },
+  { id: "cc-audit-integrity", name: "审计日志完整性保护", adapterKind: "sm3-timestamp-worm", requiredPrimitives: ["SM3"], status: "contract-ready", owner: "安全管理/运维中心", evidenceRefs: ["audit-retention-report.md"], blockers: ["可信时间戳", "不可改写归档"], onsiteVerification: "not-requested", productionReady: false },
+  { id: "cc-ca-usbkey", name: "CA 身份认证与 USBKey", adapterKind: "ca-usbkey", requiredPrimitives: ["SM2", "SM3"], status: "contract-ready", owner: "统一认证组/安全管理", evidenceRefs: ["identity-source-mapping"], blockers: ["CA 信任协议", "USBKey 选型"], onsiteVerification: "not-requested", productionReady: false },
+  { id: "cc-secure-browser", name: "安全浏览器与终端兼容", adapterKind: "secure-browser-bridge", requiredPrimitives: ["SM2", "SM3", "SM4"], status: "contract-ready", owner: "终端运维/安全管理", evidenceRefs: ["environment-matrix-report.md"], blockers: ["安全浏览器采购", "中间件兼容矩阵"], onsiteVerification: "not-requested", productionReady: false }
+];
+
 document.addEventListener("DOMContentLoaded", async () => {
   platformState = await loadPlatformState(fallbackPlatformState);
+  await loadCommercialCryptoCenter();
   ensureEditablePlatformData(platformState);
   bindPlatformEditor();
   renderPlatform();
@@ -282,12 +367,20 @@ function renderPlatform() {
   renderInterfacePlan(platformData.interfaces);
   renderDataFoundation(platformState);
   renderDataGovernanceFoundation(platformData);
+  renderPhase2Catalog(platformData);
+  renderPhase2JointTestPilot(platformData);
+  renderPhase2DiseaseReporting(platformData);
+  renderPhase2ClinicalAssist(platformData);
+  renderPhase2FamilyDoctorContracts(platformData);
   renderRoadmap(platformData.deliveryBatches);
   renderHospitalManagementFunctions(platformData.hospitalManagementFunctions);
   renderApplicationCatalog(platformData.applicationCatalog);
   renderInstitutionCreditEvaluations(platformData.creditEvaluations);
   renderSecurityAcceptanceLedger(platformData.securityLedger);
   renderProductionDeploymentPlan(platformData.productionDeploymentPlan);
+  renderProductionDatabaseCutoverCenter(platformData);
+  renderCitizenOperationsCenter(platformData);
+  renderCommercialCryptoCenter(platformData);
   renderResearchGovernance(platformData);
   renderMobileAccessibilityGovernance(platformData);
   renderEvidenceLibrary(platformData.evidence);
@@ -309,9 +402,43 @@ function platformModel(state) {
     standardDataDictionaries: Array.isArray(state.standardDataDictionaries) && state.standardDataDictionaries.length ? state.standardDataDictionaries : defaultStandardDataDictionaries,
     dataLineageControls: Array.isArray(state.dataLineageControls) && state.dataLineageControls.length ? state.dataLineageControls : defaultDataLineageControls,
     platformDataBusChannels: Array.isArray(state.platformDataBusChannels) && state.platformDataBusChannels.length ? state.platformDataBusChannels : defaultPlatformDataBusChannels,
+    phase2DataCatalogs: Array.isArray(state.phase2DataCatalogs) ? state.phase2DataCatalogs : [],
+    phase2ServiceCatalogs: Array.isArray(state.phase2ServiceCatalogs) ? state.phase2ServiceCatalogs : [],
+    phase2FieldLineage: Array.isArray(state.phase2FieldLineage) ? state.phase2FieldLineage : [],
+    phase2CatalogQualityRules: Array.isArray(state.phase2CatalogQualityRules) ? state.phase2CatalogQualityRules : [],
+    phase2PilotInstitutions: Array.isArray(state.phase2PilotInstitutions) ? state.phase2PilotInstitutions : [],
+    phase2JointTestLinks: Array.isArray(state.phase2JointTestLinks) ? state.phase2JointTestLinks : [],
+    phase2SamplePayloads: Array.isArray(state.phase2SamplePayloads) ? state.phase2SamplePayloads : [],
+    phase2GatewayTraces: Array.isArray(state.phase2GatewayTraces) ? state.phase2GatewayTraces : [],
+    phase2JointTestIssues: Array.isArray(state.phase2JointTestIssues) ? state.phase2JointTestIssues : [],
+    phase2DiseaseReportingRules: Array.isArray(state.phase2DiseaseReportingRules) ? state.phase2DiseaseReportingRules : [],
+    phase2DiseaseReportQueue: Array.isArray(state.phase2DiseaseReportQueue) ? state.phase2DiseaseReportQueue : [],
+    phase2DiseaseReportReceipts: Array.isArray(state.phase2DiseaseReportReceipts) ? state.phase2DiseaseReportReceipts : [],
+    phase2ClinicalAssistRules: Array.isArray(state.phase2ClinicalAssistRules) ? state.phase2ClinicalAssistRules : [],
+    phase2ClinicalAssistAlerts: Array.isArray(state.phase2ClinicalAssistAlerts) ? state.phase2ClinicalAssistAlerts : [],
+    phase2ClinicalAssistReceipts: Array.isArray(state.phase2ClinicalAssistReceipts) ? state.phase2ClinicalAssistReceipts : [],
+    phase2ClinicalAssistPluginContracts: Array.isArray(state.phase2ClinicalAssistPluginContracts) ? state.phase2ClinicalAssistPluginContracts : [],
+    phase2FamilyDoctorTemplates: Array.isArray(state.phase2FamilyDoctorTemplates) ? state.phase2FamilyDoctorTemplates : [],
+    phase2FamilyDoctorTeams: Array.isArray(state.phase2FamilyDoctorTeams) ? state.phase2FamilyDoctorTeams : [],
+    phase2FamilyDoctorServicePackages: Array.isArray(state.phase2FamilyDoctorServicePackages) ? state.phase2FamilyDoctorServicePackages : [],
+    phase2FamilyDoctorApplications: Array.isArray(state.phase2FamilyDoctorApplications) ? state.phase2FamilyDoctorApplications : [],
+    phase2FamilyDoctorContracts: Array.isArray(state.phase2FamilyDoctorContracts) ? state.phase2FamilyDoctorContracts : [],
+    phase2FamilyDoctorFulfillments: Array.isArray(state.phase2FamilyDoctorFulfillments) ? state.phase2FamilyDoctorFulfillments : [],
     creditEvaluations: Array.isArray(state.institutionCreditEvaluations) && state.institutionCreditEvaluations.length ? state.institutionCreditEvaluations : defaultInstitutionCreditEvaluations,
     securityLedger: Array.isArray(state.securityAcceptanceLedger) && state.securityAcceptanceLedger.length ? state.securityAcceptanceLedger : defaultSecurityAcceptanceLedger,
     productionDeploymentPlan: Array.isArray(state.productionDeploymentPlan) && state.productionDeploymentPlan.length ? state.productionDeploymentPlan : defaultProductionDeploymentPlan,
+    productionDatabaseMigrationBatches: Array.isArray(state.productionDatabaseMigrationBatches) && state.productionDatabaseMigrationBatches.length ? state.productionDatabaseMigrationBatches : defaultProductionDatabaseMigrationBatches,
+    productionDatabaseCutoverRuns: Array.isArray(state.productionDatabaseCutoverRuns) && state.productionDatabaseCutoverRuns.length ? state.productionDatabaseCutoverRuns : defaultProductionDatabaseCutoverRuns,
+    citizenOperationContents: Array.isArray(state.citizenOperationContents) && state.citizenOperationContents.length ? state.citizenOperationContents : defaultCitizenOperationContents,
+    citizenAgreementVersions: Array.isArray(state.citizenAgreementVersions) && state.citizenAgreementVersions.length ? state.citizenAgreementVersions : defaultCitizenAgreementVersions,
+    citizenIdentityReviewCases: Array.isArray(state.citizenIdentityReviewCases) && state.citizenIdentityReviewCases.length ? state.citizenIdentityReviewCases : defaultCitizenIdentityReviewCases,
+    citizenServiceBlacklist: Array.isArray(state.citizenServiceBlacklist) && state.citizenServiceBlacklist.length ? state.citizenServiceBlacklist : defaultCitizenServiceBlacklist,
+    citizenHospitalServiceConfigs: Array.isArray(state.citizenHospitalServiceConfigs) && state.citizenHospitalServiceConfigs.length ? state.citizenHospitalServiceConfigs : defaultCitizenHospitalServiceConfigs,
+    citizenOperationsOrders: buildCitizenOperationsOrderRows(state),
+    commercialCryptoCapabilities: Array.isArray(state.commercialCryptoCapabilities) && state.commercialCryptoCapabilities.length ? state.commercialCryptoCapabilities : defaultCommercialCryptoCapabilities,
+    commercialCryptoProbeRuns: Array.isArray(state.commercialCryptoProbeRuns) ? state.commercialCryptoProbeRuns : [],
+    commercialCryptoEvidencePackets: Array.isArray(state.commercialCryptoEvidencePackets) ? state.commercialCryptoEvidencePackets : [],
+    commercialCryptoRuntimeProbe: state.commercialCryptoRuntimeProbe && typeof state.commercialCryptoRuntimeProbe === "object" ? state.commercialCryptoRuntimeProbe : null,
     researchDatasets: Array.isArray(state.researchDatasets) ? state.researchDatasets : [],
     diseaseRegistryModels: Array.isArray(state.diseaseRegistryModels) ? state.diseaseRegistryModels : [],
     accessibilityChecklist: Array.isArray(state.accessibilityChecklist) ? state.accessibilityChecklist : [],
@@ -344,6 +471,9 @@ function ensureEditablePlatformData(state) {
   if (!Array.isArray(state.institutionCreditEvaluations) || !state.institutionCreditEvaluations.length) state.institutionCreditEvaluations = structuredClone(defaultInstitutionCreditEvaluations);
   if (!Array.isArray(state.securityAcceptanceLedger) || !state.securityAcceptanceLedger.length) state.securityAcceptanceLedger = structuredClone(defaultSecurityAcceptanceLedger);
   if (!Array.isArray(state.productionDeploymentPlan) || !state.productionDeploymentPlan.length) state.productionDeploymentPlan = structuredClone(defaultProductionDeploymentPlan);
+  if (!Array.isArray(state.commercialCryptoCapabilities) || !state.commercialCryptoCapabilities.length) state.commercialCryptoCapabilities = structuredClone(defaultCommercialCryptoCapabilities);
+  if (!Array.isArray(state.commercialCryptoProbeRuns)) state.commercialCryptoProbeRuns = [];
+  if (!Array.isArray(state.commercialCryptoEvidencePackets)) state.commercialCryptoEvidencePackets = [];
   if (!Array.isArray(state.researchDatasets)) state.researchDatasets = [];
   if (!Array.isArray(state.diseaseRegistryModels)) state.diseaseRegistryModels = [];
   if (!Array.isArray(state.accessibilityChecklist)) state.accessibilityChecklist = [];
@@ -509,6 +639,244 @@ function renderDataGovernanceFoundation(data) {
   `).join("");
 }
 
+function renderPhase2Catalog(data) {
+  const container = document.querySelector("#phase2-catalog");
+  if (!container) return;
+  const dataCatalogs = data.phase2DataCatalogs || [];
+  const serviceCatalogs = data.phase2ServiceCatalogs || [];
+  const fieldLineage = data.phase2FieldLineage || [];
+  const qualityRules = data.phase2CatalogQualityRules || [];
+  const tableCount = dataCatalogs.reduce((sum, item) => sum + Number(item.tableCount || 0), 0);
+  const blocked = [...dataCatalogs, ...serviceCatalogs, ...fieldLineage, ...qualityRules]
+    .filter((item) => /blocked|external/i.test(`${item.status || ""} ${item.blocker || ""}`)).length;
+  container.innerHTML = `
+    <div class="evidence-grid">
+      <article class="evidence-card">
+        <h3>216 表映射 ${tableCount}/216</h3>
+        <p>覆盖 ${dataCatalogs.length} 个二期数据域，${blocked} 个现场/外部阻塞项单独列出。</p>
+        <ul>${dataCatalogs.map((item) => `<li>${item.tableRange} · ${item.name}：${item.tableCount} 张表 · ${statusBadge(item.status)}</li>`).join("")}</ul>
+      </article>
+      <article class="evidence-card">
+        <h3>服务资源目录 ${serviceCatalogs.length} 项</h3>
+        <p>统一登记 API、消费角色、权限范围、SLA 和责任部门。</p>
+        <ul>${serviceCatalogs.slice(0, 8).map((item) => `<li>${item.name} · ${item.apiRoute} · ${item.owner} · ${statusBadge(item.status)}</li>`).join("")}</ul>
+      </article>
+      <article class="evidence-card">
+        <h3>字段血缘 ${fieldLineage.length} 条</h3>
+        <p>把源系统字段、目标集合、契约和质量规则绑定到验收证据。</p>
+        <ul>${fieldLineage.slice(0, 8).map((item) => `<li>${item.sourceSystem} ${item.sourceField} -> ${item.targetCollection}.${item.targetField}</li>`).join("")}</ul>
+      </article>
+      <article class="evidence-card">
+        <h3>质量规则 ${qualityRules.length} 条</h3>
+        <p>按 P0/P1/P2 标记规则严重级、责任人和证据来源。</p>
+        <ul>${qualityRules.slice(0, 8).map((item) => `<li>${item.severity} · ${item.id} · ${item.owner} · ${statusBadge(item.status)}</li>`).join("")}</ul>
+      </article>
+    </div>
+  `;
+}
+
+function renderPhase2JointTestPilot(data) {
+  const container = document.querySelector("#phase2-joint-test-pilot");
+  if (!container) return;
+  const institutions = data.phase2PilotInstitutions || [];
+  const links = data.phase2JointTestLinks || [];
+  const payloads = data.phase2SamplePayloads || [];
+  const traces = data.phase2GatewayTraces || [];
+  const issues = data.phase2JointTestIssues || [];
+  const landed = traces.filter((item) => /landed|compensated/i.test(String(item.status || ""))).length;
+  const runnable = links.filter((item) => /passed|compensated/i.test(String(item.status || ""))).length;
+  container.innerHTML = `
+    <div class="evidence-grid">
+      <article class="evidence-card">
+        <h3>试点机构 ${institutions.length} 个</h3>
+        <p>覆盖三级医院、区县平台和基层机构，账号、环境和签字状态单独登记。</p>
+        <ul>${institutions.map((item) => `<li>${item.institutionLevel} · ${item.name} · ${item.region} · ${statusBadge(item.signoffStatus)}</li>`).join("")}</ul>
+      </article>
+      <article class="evidence-card">
+        <h3>联调链路 ${runnable}/${links.length}</h3>
+        <p>把机构、系统、接口、字段、样例报文和目标集合绑定到同一条链路。</p>
+        <ul>${links.slice(0, 8).map((item) => `<li>${item.chain} · ${item.sourceSystem} -> ${item.targetCollection} · ${statusBadge(item.status)}</li>`).join("")}</ul>
+      </article>
+      <article class="evidence-card">
+        <h3>样例报文 ${payloads.length} 份</h3>
+        <p>患者、就诊、检验报告、统计指标等样例均保留幂等键、签名算法和哈希。</p>
+        <ul>${payloads.slice(0, 8).map((item) => `<li>${item.category} · ${item.sourceSystem} · ${item.idempotencyKey} · ${statusBadge(item.status)}</li>`).join("")}</ul>
+      </article>
+      <article class="evidence-card">
+        <h3>网关轨迹 ${landed}/${traces.length}</h3>
+        <p>记录验签、落库集合、落库 ID、死信补偿和回放状态。</p>
+        <ul>${traces.slice(0, 8).map((item) => `<li>${item.payloadId} -> ${item.targetCollection} · ${item.replayStatus} · ${statusBadge(item.status)}</li>`).join("")}</ul>
+      </article>
+      <article class="evidence-card">
+        <h3>问题复测 ${issues.length} 项</h3>
+        <p>现场账号、密钥、字典、指标版本和回调口径保持开放阻塞边界。</p>
+        <ul>${issues.map((item) => `<li>${item.severity} · ${item.title} · ${item.owner} · ${statusBadge(item.retestStatus)}</li>`).join("")}</ul>
+      </article>
+    </div>
+  `;
+}
+
+function renderPhase2DiseaseReporting(data) {
+  const container = document.querySelector("#phase2-disease-reporting");
+  if (!container) return;
+  const rules = data.phase2DiseaseReportingRules || [];
+  const queue = data.phase2DiseaseReportQueue || [];
+  const receipts = data.phase2DiseaseReportReceipts || [];
+  const categories = [...new Set(rules.map((item) => item.diseaseCategory).filter(Boolean))];
+  const pushed = queue.filter((item) => /accepted|sent|pushed|receipt/i.test(`${item.status || ""} ${item.pushStatus || ""}`));
+  const openExceptions = queue.filter((item) => /open|review|required|pending/i.test(`${item.exceptionStatus || ""} ${item.pushStatus || ""}`));
+  const patientCenterRows = queue.filter((item) => item.patientCenterStatus && item.patientCenterRecordId);
+  const supervisionRows = categories.map((category) => {
+    const rows = queue.filter((item) => item.diseaseCategory === category);
+    const counties = [...new Set(rows.map((item) => item.targetCounty).filter(Boolean))].join(" / ");
+    return `<li>${category}：${rows.length} 张报卡 · ${counties || "待区县确认"} · ${rows.filter((item) => /open|review|required|pending/i.test(`${item.exceptionStatus || ""} ${item.pushStatus || ""}`)).length} 个异常</li>`;
+  }).join("");
+  container.innerHTML = `
+    <div class="evidence-grid">
+      <article class="evidence-card">
+        <h3>诊断触发规则 ${rules.length} 条</h3>
+        <p>覆盖慢病、传染病和重性精神障碍，绑定 HIS/EMR/LIS/专科随访触发源。</p>
+        <ul>${rules.map((item) => `<li>${item.diseaseCode} · ${item.diseaseName} · ${item.triggerSource} · ${statusBadge(item.status)}</li>`).join("")}</ul>
+      </article>
+      <article class="evidence-card">
+        <h3>报卡队列 ${pushed.length}/${queue.length}</h3>
+        <p>每条报卡保留规则、居民、区县平台、患者中心状态和异常闭环。</p>
+        <ul>${queue.map((item) => `<li>${item.reportCardNo} · ${item.diseaseName} · ${item.targetCounty} · ${statusBadge(item.pushStatus || item.status)}</li>`).join("")}</ul>
+      </article>
+      <article class="evidence-card">
+        <h3>区县回执 ${receipts.length} 条</h3>
+        <p>回执保留状态、编号、重试次数和审计哈希，支撑补偿重放。</p>
+        <ul>${receipts.map((item) => `<li>${item.receiptCode} · ${item.targetCounty} · ${item.receiptStatus} · retry ${item.retryCount || 0}</li>`).join("")}</ul>
+      </article>
+      <article class="evidence-card">
+        <h3>患者中心 ${patientCenterRows.length} 条</h3>
+        <p>导入导出状态与隐私展示策略单独保留，传染病和精防只展示授权摘要。</p>
+        <ul>${patientCenterRows.map((item) => `<li>${item.residentName || item.residentId} · ${item.diseaseName} · ${item.patientCenterStatus}/${item.exportStatus}</li>`).join("")}</ul>
+      </article>
+      <article class="evidence-card">
+        <h3>监管分类 ${categories.length} 类</h3>
+        <p>按病种类别、区县、推送状态和异常状态统计。</p>
+        <ul>${supervisionRows}</ul>
+      </article>
+      <article class="evidence-card">
+        <h3>异常闭环 ${openExceptions.length} 个</h3>
+        <p>现场接口、直报复核、精防签字和字段版本问题不会误报为生产完成。</p>
+        <ul>${openExceptions.map((item) => `<li>${item.diseaseName} · ${item.exceptionStatus} · ${item.lastAction}</li>`).join("") || "<li>暂无开放异常。</li>"}</ul>
+      </article>
+    </div>
+  `;
+}
+
+function renderPhase2ClinicalAssist(data) {
+  const container = document.querySelector("#phase2-clinical-assist");
+  if (!container) return;
+  const rules = data.phase2ClinicalAssistRules || [];
+  const alerts = data.phase2ClinicalAssistAlerts || [];
+  const receipts = data.phase2ClinicalAssistReceipts || [];
+  const contracts = data.phase2ClinicalAssistPluginContracts || [];
+  const categories = [...new Set(rules.map((item) => item.category).filter(Boolean))];
+  const pending = alerts.filter((item) => /pending|待/i.test(`${item.status || ""} ${item.messageReceiptStatus || ""}`));
+  const acknowledged = alerts.filter((item) => /acknowledged|received|已/i.test(`${item.status || ""} ${item.messageReceiptStatus || ""}`));
+  const doctors = [...new Set(alerts.map((item) => item.doctorName || item.doctorId).filter(Boolean))];
+  const supervisionRows = categories.map((category) => {
+    const rows = alerts.filter((item) => item.category === category);
+    return `<li>${category}：${rows.length} 条提醒 · ${rows.filter((item) => /pending|待/i.test(`${item.status || ""} ${item.messageReceiptStatus || ""}`)).length} 条待回执 · ${rows.filter((item) => /acknowledged|received|已/i.test(`${item.status || ""} ${item.messageReceiptStatus || ""}`)).length} 条已处理</li>`;
+  }).join("");
+  container.innerHTML = `
+    <div class="evidence-grid">
+      <article class="evidence-card">
+        <h3>规则配置 ${rules.length} 条</h3>
+        <p>覆盖重复诊断、重复检查、重复检验和重复用药，保留责任处室和灰度口径。</p>
+        <ul>${rules.map((item) => `<li>${item.name} · ${item.sourceSystem} · ${statusBadge(item.configStatus)} · ${item.owner}</li>`).join("")}</ul>
+      </article>
+      <article class="evidence-card">
+        <h3>工作站提醒 ${acknowledged.length}/${alerts.length}</h3>
+        <p>每条提醒绑定医生、居民、规则、医嘱来源、建议动作和患者中心关联。</p>
+        <ul>${alerts.map((item) => `<li>${item.doctorName} · ${item.alertTitle} · ${item.residentName} · ${statusBadge(item.messageReceiptStatus || item.status)}</li>`).join("")}</ul>
+      </article>
+      <article class="evidence-card">
+        <h3>消息回执 ${receipts.length} 条</h3>
+        <p>回执保留医生动作、消息通道、审计哈希和院内工作站处理记录。</p>
+        <ul>${receipts.map((item) => `<li>${item.doctorName} · ${item.doctorAction} · ${item.receiptStatus} · ${item.messageChannel}</li>`).join("")}</ul>
+      </article>
+      <article class="evidence-card">
+        <h3>插件契约 ${contracts.length} 项</h3>
+        <p>将提醒拉取、回执提交和规则配置固化为医生工作站集成协议。</p>
+        <ul>${contracts.map((item) => `<li>${item.name} · ${item.endpoint} · ${statusBadge(item.status)}</li>`).join("")}</ul>
+      </article>
+      <article class="evidence-card">
+        <h3>监管分类 ${categories.length} 类</h3>
+        <p>按辅助类型、医生、机构、回执状态和现场阻塞项统计。</p>
+        <ul>${supervisionRows}</ul>
+      </article>
+      <article class="evidence-card">
+        <h3>上线边界 ${pending.length} 条待回执</h3>
+        <p>医生工作站、院内消息中心、电子签名和质控规则审批仍保留现场签字边界。</p>
+        <ul>
+          <li>医生范围：${doctors.join(" / ") || "待绑定"}</li>
+          ${pending.map((item) => `<li>${item.alertTitle} · ${item.lastAction}</li>`).join("") || "<li>暂无待回执提醒。</li>"}
+        </ul>
+      </article>
+    </div>
+  `;
+}
+
+function renderPhase2FamilyDoctorContracts(data) {
+  const container = document.querySelector("#phase2-family-doctor-contracts");
+  if (!container) return;
+  const templates = data.phase2FamilyDoctorTemplates || [];
+  const teams = data.phase2FamilyDoctorTeams || [];
+  const packages = data.phase2FamilyDoctorServicePackages || [];
+  const applications = data.phase2FamilyDoctorApplications || [];
+  const contracts = data.phase2FamilyDoctorContracts || [];
+  const fulfillments = data.phase2FamilyDoctorFulfillments || [];
+  const pendingApplications = applications.filter((item) => /pending|submitted|review/i.test(`${item.reviewStatus || ""} ${item.status || ""}`));
+  const activeContracts = contracts.filter((item) => /active|renewal/i.test(String(item.status || "")));
+  const renewals = [...applications, ...contracts].filter((item) => /renewal|续约/i.test(`${item.applicationType || ""} ${item.renewalStatus || ""} ${item.status || ""}`));
+  const avgFulfillment = contracts.length ? Math.round(contracts.reduce((sum, item) => sum + Number(item.fulfillmentPercent || 0), 0) / contracts.length) : 0;
+  const teamRows = teams.map((team) => {
+    const teamContracts = contracts.filter((item) => item.teamId === team.id);
+    const teamApplications = applications.filter((item) => item.teamId === team.id);
+    const teamFulfillments = fulfillments.filter((item) => item.teamId === team.id);
+    const teamAvg = teamContracts.length ? Math.round(teamContracts.reduce((sum, item) => sum + Number(item.fulfillmentPercent || 0), 0) / teamContracts.length) : 0;
+    return `<li>${team.teamName || team.id}：${teamApplications.length} 申请 / ${teamContracts.length} 合同 / ${teamFulfillments.length} 履约 / ${teamAvg}%</li>`;
+  }).join("");
+  container.innerHTML = `
+    <div class="evidence-grid">
+      <article class="evidence-card">
+        <h3>签约模板 ${templates.length} 套</h3>
+        <p>模板固定必填字段、审核步骤、服务范围和版本，支撑居民端申请与机构端审核一致。</p>
+        <ul>${templates.map((item) => `<li>${item.name || item.id} / ${item.templateCode || item.version} / ${statusBadge(item.status)}</li>`).join("")}</ul>
+      </article>
+      <article class="evidence-card">
+        <h3>团队与服务包 ${teams.length}/${packages.length}</h3>
+        <p>家庭医生团队、基层机构、负责人、容量与服务包可按机构监管。</p>
+        <ul>${packages.map((item) => `<li>${item.name || item.id} / ${item.visitFrequency || "cycle"} / ${statusBadge(item.status)}</li>`).join("")}</ul>
+      </article>
+      <article class="evidence-card">
+        <h3>居民申请 ${pendingApplications.length}/${applications.length} 待审</h3>
+        <p>申请保留居民、服务包、团队、知情确认、目标起始日期和机构审核状态。</p>
+        <ul>${applications.map((item) => `<li>${item.residentName || item.residentId} / ${item.packageId} / ${item.reviewInstitutionCode} / ${statusBadge(item.reviewStatus || item.status)}</li>`).join("")}</ul>
+      </article>
+      <article class="evidence-card">
+        <h3>签约合同 ${activeContracts.length}/${contracts.length}</h3>
+        <p>合同记录服务包、团队、起止日期、履约进度、续约状态和居民满意度。</p>
+        <ul>${contracts.map((item) => `<li>${item.residentName || item.residentId} / ${item.packageId} / ${item.fulfillmentPercent || 0}% / ${statusBadge(item.status)}</li>`).join("")}</ul>
+      </article>
+      <article class="evidence-card">
+        <h3>履约与续约 ${fulfillments.length} / ${renewals.length}</h3>
+        <p>履约记录绑定合同、服务项目、证据集合、满意度和审计哈希，平均履约 ${avgFulfillment}%。</p>
+        <ul>${fulfillments.map((item) => `<li>${item.contractId} / ${item.serviceType} / ${item.serviceDate} / ${statusBadge(item.status)}</li>`).join("")}</ul>
+      </article>
+      <article class="evidence-card">
+        <h3>团队监管 ${teams.length} 行</h3>
+        <p>按团队查看申请、合同、履约和平均履约率，保留正式签约和资金口径现场确认边界。</p>
+        <ul>${teamRows || "<li>暂无团队监管数据</li>"}</ul>
+      </article>
+    </div>
+  `;
+}
+
 function renderRoadmap(deliveryBatches) {
   document.querySelector("#delivery-roadmap").innerHTML = deliveryBatches.map((item) => `
     <div class="priority-row">
@@ -589,6 +957,349 @@ function renderProductionDeploymentPlan(items) {
       </article>
     `;
   }).join("");
+}
+
+function platformEscapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function productionDatabaseCutoverModel(platform) {
+  const migrationBatches = platform.productionDatabaseMigrationBatches || [];
+  const cutoverRuns = [...(platform.productionDatabaseCutoverRuns || [])]
+    .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+  const latestRun = cutoverRuns[0] || null;
+  const sampleValidations = Array.isArray(latestRun?.sampleValidations) ? latestRun.sampleValidations : [];
+  return {
+    migrationBatches,
+    cutoverRuns,
+    latestRun,
+    summary: {
+      migrationBatches: migrationBatches.length,
+      cutoverRuns: cutoverRuns.length,
+      sampleDomains: sampleValidations.length,
+      passedSamples: sampleValidations.filter((item) => item.passed).length,
+      rollbackCheckpoints: cutoverRuns.filter((item) => item.rollbackCheckpoint?.id).length,
+      productionReadyRuns: cutoverRuns.filter((item) => item.productionReady).length,
+      blockers: new Set(cutoverRuns.flatMap((item) => item.blockers || [])).size
+    },
+    boundary: "割接中心只校验迁移样例与回滚证据，不写入真实目标数据库。正式切换仍需 PostgreSQL 兼容驱动、脱敏全量演练、容量与故障转移证据及签字审批。"
+  };
+}
+
+function renderProductionDatabaseCutoverCenter(platform) {
+  const metricsTarget = document.querySelector("#production-database-cutover-metrics");
+  const runsTarget = document.querySelector("#production-database-cutover-runs");
+  const batchesTarget = document.querySelector("#production-database-migration-batches");
+  const statusTarget = document.querySelector("#production-database-cutover-status");
+  const boundaryTarget = document.querySelector("#production-database-cutover-boundary");
+  if (!metricsTarget || !runsTarget || !batchesTarget) return;
+  const center = productionDatabaseCutoverModel(platform);
+  const summary = center.summary;
+  const latest = center.latestRun;
+  const metrics = [
+    ["迁移批次", summary.migrationBatches, "居民、诊疗、报告、统计"],
+    ["样例校验", `${summary.passedSamples}/${summary.sampleDomains}`, latest?.status || "planned"],
+    ["回滚检查点", summary.rollbackCheckpoints, latest?.rollbackCheckpoint?.status || "planned"],
+    ["生产就绪", summary.productionReadyRuns, `${summary.blockers} 项外部阻断`]
+  ];
+  metricsTarget.innerHTML = metrics.map(([label, value, hint]) => `<article class="metric-card">
+    <span>${platformEscapeHtml(label)}</span>
+    <strong>${platformEscapeHtml(value)}</strong>
+    <small>${platformEscapeHtml(hint)}</small>
+  </article>`).join("");
+  if (statusTarget) {
+    statusTarget.textContent = latest?.status || "planned";
+    statusTarget.className = `badge ${latest?.productionReady ? "ok" : latest?.status === "validation-failed" || latest?.status === "retest-required" ? "danger" : "warn"}`;
+  }
+  runsTarget.innerHTML = latest ? `<article class="priority-row" data-production-db-run="${platformEscapeHtml(latest.id)}">
+    <div class="priority-rank ${latest.productionReady ? "ok" : "warn"}">${platformEscapeHtml(latest.mode || "dry-run")}</div>
+    <div>
+      <h3>${platformEscapeHtml(latest.runNo || latest.id)}</h3>
+      <p>${platformEscapeHtml(latest.createdBy || "release-manager")} / ${platformEscapeHtml(latest.createdAt || "")}</p>
+      <small>样例：${platformEscapeHtml(summary.passedSamples)}/${platformEscapeHtml(summary.sampleDomains)}；复核：${platformEscapeHtml(latest.reviewStatus || "pending")}；回滚：${platformEscapeHtml(latest.rollbackCheckpoint?.status || "planned")}</small>
+      <small>${platformEscapeHtml((latest.blockers || []).join(" / "))}</small>
+      <div class="action-row">
+        <button class="inline-action" type="button" data-production-db-action="review" data-id="${platformEscapeHtml(latest.id)}">记录复核</button>
+        <button class="inline-action" type="button" data-production-db-action="record-rollback" data-id="${platformEscapeHtml(latest.id)}">记录回滚演练</button>
+        <button class="inline-action" type="button" data-production-db-action="request-retest" data-id="${platformEscapeHtml(latest.id)}">要求复测</button>
+      </div>
+    </div>
+    <div class="capability-side">
+      <span class="badge ${latest.productionReady ? "ok" : "warn"}">${platformEscapeHtml(latest.status || "planned")}</span>
+      <small>target: ${platformEscapeHtml(latest.targetAdapter || "postgresql")}</small>
+      <small>productionReady: ${latest.productionReady ? "yes" : "no"}</small>
+    </div>
+  </article>` : "";
+  batchesTarget.innerHTML = center.migrationBatches.map((item) => `<article class="priority-row" data-production-db-batch="${platformEscapeHtml(item.id)}">
+    <div class="priority-rank info">${platformEscapeHtml(item.sequence || "")}</div>
+    <div>
+      <h3>${platformEscapeHtml(item.name || item.domain)}</h3>
+      <p>${platformEscapeHtml((item.sourceCollections || []).join(" + "))} -> ${platformEscapeHtml((item.targetTables || []).join(" + "))}</p>
+      <small>${platformEscapeHtml(item.rollbackStrategy || "")}</small>
+    </div>
+    <div class="capability-side">
+      <span class="badge info">${platformEscapeHtml(item.status || "planned")}</span>
+      <small>${platformEscapeHtml(item.owner || "owner-pending")}</small>
+    </div>
+  </article>`).join("");
+  if (boundaryTarget) boundaryTarget.textContent = center.boundary;
+}
+
+function buildCitizenOperationsOrderRows(state) {
+  const sources = [
+    ["预约挂号", state.registrationOrders],
+    ["互联网护理", state.internetNursingOrders],
+    ["助医陪诊", state.escortServiceOrders],
+    ["家庭医生", state.phase2FamilyDoctorApplications]
+  ];
+  return sources.flatMap(([serviceType, rows]) => (Array.isArray(rows) ? rows : []).map((item) => ({
+    id: item.id,
+    serviceType,
+    residentId: item.residentId || "",
+    institutionCode: item.institutionCode || item.hospitalCode || item.reviewInstitutionCode || "",
+    status: item.status || item.reviewStatus || "pending",
+    paymentStatus: item.paymentStatus || item.settlement?.paymentStatus || "not-applicable",
+    refundStatus: item.refundStatus || "none",
+    createdAt: item.createdAt || item.requestedAt || item.applicationAt || ""
+  })));
+}
+
+function citizenOperationsBadgeClass(status) {
+  if (/approved|active-demo|published-demo|completed/i.test(String(status || ""))) return "ok";
+  if (/reject|disabled|withdrawn/i.test(String(status || ""))) return "danger";
+  return "warn";
+}
+
+function citizenOperationsStatusLabel(status) {
+  return {
+    "published-demo": "演示发布",
+    "review-pending": "待内容复核",
+    "active-demo": "演示生效",
+    archived: "已归档",
+    "pending-review": "待实名复核",
+    "material-requested": "待补材料",
+    "approved-demo": "演示通过",
+    "rejected-demo": "已驳回",
+    "under-review": "人工复核中",
+    "lifted-demo": "演示解除",
+    "onsite-confirmation-pending": "待现场确认",
+    "disabled-demo": "演示停用",
+    withdrawn: "已撤下"
+  }[status] || status || "待确认";
+}
+
+function renderCitizenOperationsCenter(platform) {
+  const metricsTarget = document.querySelector("#citizen-operations-metrics");
+  const identityTarget = document.querySelector("#citizen-identity-review-queue");
+  const hospitalTarget = document.querySelector("#citizen-hospital-service-configs");
+  const governanceTarget = document.querySelector("#citizen-operations-governance");
+  const ordersTarget = document.querySelector("#citizen-operations-orders");
+  if (!metricsTarget || !identityTarget || !hospitalTarget || !governanceTarget || !ordersTarget) return;
+  const contents = platform.citizenOperationContents || [];
+  const agreements = platform.citizenAgreementVersions || [];
+  const identityReviews = platform.citizenIdentityReviewCases || [];
+  const blacklist = platform.citizenServiceBlacklist || [];
+  const hospitals = platform.citizenHospitalServiceConfigs || [];
+  const orders = platform.citizenOperationsOrders || [];
+  const publishedContents = contents.filter((item) => item.status === "published-demo").length;
+  const activeAgreements = agreements.filter((item) => item.status === "active-demo").length;
+  const pendingIdentity = identityReviews.filter((item) => /pending|material-requested/i.test(item.status)).length;
+  const activeBlacklist = blacklist.filter((item) => item.status === "active-demo").length;
+  const enabledHospitals = hospitals.filter((item) => item.status === "active-demo").length;
+  const openOrders = orders.filter((item) => !/completed|closed|cancelled|canceled|refunded|rejected/i.test(item.status)).length;
+  const metrics = [
+    ["已发布内容", publishedContents, `${contents.length} 条运营内容`],
+    ["有效协议", activeAgreements, `${agreements.length} 个版本`],
+    ["实名待复核", pendingIdentity, `${identityReviews.length} 个案例`],
+    ["生效黑名单", activeBlacklist, `${blacklist.length} 条规则记录`],
+    ["演示开通机构", enabledHospitals, "生产开通 0"],
+    ["跨服务订单", orders.length, `${openOrders} 条处理中`]
+  ];
+  metricsTarget.innerHTML = metrics.map(([label, value, hint]) => `<article class="metric-card">
+    <span>${platformEscapeHtml(label)}</span>
+    <strong>${platformEscapeHtml(value)}</strong>
+    <small>${platformEscapeHtml(hint)}</small>
+  </article>`).join("");
+  identityTarget.innerHTML = identityReviews.map((item, index) => `<article class="priority-row" data-citizen-identity-review="${platformEscapeHtml(item.id)}">
+    <div class="priority-rank ${citizenOperationsBadgeClass(item.status)}">${index + 1}</div>
+    <div>
+      <h3>${platformEscapeHtml(item.residentName || item.residentId)}</h3>
+      <p>${platformEscapeHtml((item.submittedEvidence || []).join(" / "))}</p>
+      <small>${platformEscapeHtml(item.decisionNote || "等待人工复核说明")}</small>
+      <div class="action-row">
+        <button class="inline-action" type="button" data-citizen-operations-action="approve" data-resource="identity-reviews" data-id="${platformEscapeHtml(item.id)}">演示通过</button>
+        <button class="inline-action" type="button" data-citizen-operations-action="request-material" data-resource="identity-reviews" data-id="${platformEscapeHtml(item.id)}">补充材料</button>
+        <button class="inline-action" type="button" data-citizen-operations-action="reject" data-resource="identity-reviews" data-id="${platformEscapeHtml(item.id)}">驳回</button>
+      </div>
+    </div>
+    <div class="capability-side">
+      <span class="badge ${citizenOperationsBadgeClass(item.status)}">${platformEscapeHtml(citizenOperationsStatusLabel(item.status))}</span>
+      <small>${platformEscapeHtml(item.riskLevel || "low")} risk</small>
+    </div>
+  </article>`).join("");
+  hospitalTarget.innerHTML = hospitals.map((item, index) => `<article class="priority-row" data-citizen-hospital-service="${platformEscapeHtml(item.id)}">
+    <div class="priority-rank ${citizenOperationsBadgeClass(item.status)}">${index + 1}</div>
+    <div>
+      <h3>${platformEscapeHtml(item.institutionName)}</h3>
+      <p>${platformEscapeHtml((item.enabledServices || []).join(" / "))}</p>
+      <small>${platformEscapeHtml(item.onsiteBlocker || "生产参数待现场确认")}</small>
+      <div class="action-row">
+        <button class="inline-action" type="button" data-citizen-operations-action="enable-demo" data-resource="hospitals" data-id="${platformEscapeHtml(item.id)}">演示开通</button>
+        <button class="inline-action" type="button" data-citizen-operations-action="request-onsite" data-resource="hospitals" data-id="${platformEscapeHtml(item.id)}">转现场确认</button>
+        <button class="inline-action" type="button" data-citizen-operations-action="disable-demo" data-resource="hospitals" data-id="${platformEscapeHtml(item.id)}">停用</button>
+      </div>
+    </div>
+    <div class="capability-side">
+      <span class="badge ${citizenOperationsBadgeClass(item.status)}">${platformEscapeHtml(citizenOperationsStatusLabel(item.status))}</span>
+      <small>生产：否</small>
+    </div>
+  </article>`).join("");
+  const governanceRows = [
+    ...contents.map((item) => ({
+      type: "内容",
+      id: item.id,
+      name: item.title,
+      version: item.type,
+      owner: item.owner,
+      status: item.status,
+      action: item.status === "published-demo" ? "withdraw" : "publish",
+      actionLabel: item.status === "published-demo" ? "撤下" : "演示发布",
+      resource: "contents"
+    })),
+    ...agreements.map((item) => ({ type: "协议", id: item.id, name: item.name, version: item.version, owner: item.legalReviewStatus, status: item.status })),
+    ...blacklist.map((item) => ({
+      type: "黑名单",
+      id: item.id,
+      name: item.subjectName,
+      version: item.subjectType,
+      owner: item.reason,
+      status: item.status,
+      action: item.status === "active-demo" ? "lift" : "activate",
+      actionLabel: item.status === "active-demo" ? "解除" : "演示生效",
+      resource: "blacklist"
+    }))
+  ];
+  governanceTarget.innerHTML = `<table>
+    <thead><tr><th>类型</th><th>名称</th><th>版本/对象</th><th>责任与说明</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody>${governanceRows.map((item) => `<tr>
+      <td>${platformEscapeHtml(item.type)}</td>
+      <td><strong>${platformEscapeHtml(item.name)}</strong></td>
+      <td>${platformEscapeHtml(item.version)}</td>
+      <td>${platformEscapeHtml(item.owner || "")}</td>
+      <td><span class="badge ${citizenOperationsBadgeClass(item.status)}">${platformEscapeHtml(citizenOperationsStatusLabel(item.status))}</span></td>
+      <td>${item.action ? `<button class="inline-action" type="button" data-citizen-operations-action="${item.action}" data-resource="${item.resource}" data-id="${platformEscapeHtml(item.id)}">${item.actionLabel}</button>` : "现场法务复核"}</td>
+    </tr>`).join("")}</tbody>
+  </table>`;
+  ordersTarget.innerHTML = `<table>
+    <thead><tr><th>服务</th><th>订单</th><th>居民</th><th>机构</th><th>业务状态</th><th>支付</th><th>退费</th></tr></thead>
+    <tbody>${orders.slice(0, 20).map((item) => `<tr>
+      <td>${platformEscapeHtml(item.serviceType)}</td>
+      <td><strong>${platformEscapeHtml(item.id)}</strong></td>
+      <td>${platformEscapeHtml(item.residentId || "-")}</td>
+      <td>${platformEscapeHtml(item.institutionCode || "-")}</td>
+      <td>${platformEscapeHtml(item.status)}</td>
+      <td>${platformEscapeHtml(item.paymentStatus)}</td>
+      <td>${platformEscapeHtml(item.refundStatus)}</td>
+    </tr>`).join("") || `<tr><td colspan="7">暂无服务订单。</td></tr>`}</tbody>
+  </table>`;
+  const statusTarget = document.querySelector("#citizen-operations-status");
+  if (statusTarget) {
+    statusTarget.textContent = "运营 MVP，待现场联调";
+    statusTarget.className = "badge warn";
+  }
+  const boundaryTarget = document.querySelector("#citizen-operations-boundary");
+  if (boundaryTarget) boundaryTarget.textContent = "演示发布、复核和机构开通不产生生产授权。正式上线仍需政务实名、医院号源与支付退费回调、法务审定协议以及医院服务开通和黑名单制度签字。";
+}
+
+function commercialCryptoBadgeClass(status) {
+  if (/runtime-probe-recorded|evidence-recorded/i.test(String(status || ""))) return "info";
+  if (/onsite-requested/i.test(String(status || ""))) return "warn";
+  return "warn";
+}
+
+function commercialCryptoStatusLabel(status) {
+  return {
+    "contract-ready": "适配合同已建档",
+    "runtime-probe-recorded": "运行时自检已留痕",
+    "evidence-recorded": "证据已登记",
+    "onsite-requested": "已申请现场验证"
+  }[status] || status || "待建档";
+}
+
+function renderCommercialCryptoCenter(platform) {
+  const metricsTarget = document.querySelector("#commercial-crypto-metrics");
+  const runtimeTarget = document.querySelector("#commercial-crypto-runtime");
+  const capabilityTarget = document.querySelector("#commercial-crypto-capabilities");
+  const evidenceTarget = document.querySelector("#commercial-crypto-evidence");
+  if (!metricsTarget || !runtimeTarget || !capabilityTarget || !evidenceTarget) return;
+  const capabilities = platform.commercialCryptoCapabilities || [];
+  const probeRuns = platform.commercialCryptoProbeRuns || [];
+  const evidencePackets = platform.commercialCryptoEvidencePackets || [];
+  const runtimeProbe = platform.commercialCryptoRuntimeProbe;
+  const primitiveRows = runtimeProbe?.primitives || probeRuns[0]?.primitives || [];
+  const availableCount = primitiveRows.filter((item) => item.available).length;
+  const onsiteRequested = capabilities.filter((item) => item.onsiteVerification === "requested").length;
+  const metrics = [
+    ["能力合同", capabilities.length, "覆盖传输、签名、加密、审计、身份与终端"],
+    ["运行时算法", `${availableCount}/3`, "仅代表本机兼容性"],
+    ["自检记录", probeRuns.length, "不等同检测认证"],
+    ["证据包", evidencePackets.length, "均待现场复核"],
+    ["现场申请", onsiteRequested, "设备与证书验证"],
+    ["生产就绪", 0, "密评报告前保持阻断"]
+  ];
+  metricsTarget.innerHTML = metrics.map(([label, value, hint]) => `<article class="metric-card">
+    <span>${platformEscapeHtml(label)}</span>
+    <strong>${platformEscapeHtml(value)}</strong>
+    <small>${platformEscapeHtml(hint)}</small>
+  </article>`).join("");
+  runtimeTarget.innerHTML = primitiveRows.length ? `<table>
+    <thead><tr><th>算法</th><th>运行时可用</th><th>自检</th><th>证据</th></tr></thead>
+    <tbody>${primitiveRows.map((item) => `<tr>
+      <td><strong>${platformEscapeHtml(item.id)}</strong></td>
+      <td><span class="badge ${item.available ? "info" : "warn"}">${item.available ? "可用" : "未发现"}</span></td>
+      <td>${item.selfTestPassed ? "通过" : "未通过/未执行"}</td>
+      <td>${platformEscapeHtml(item.evidence || "-")}</td>
+    </tr>`).join("")}</tbody>
+  </table>` : `<p class="implementation-boundary">尚无运行时自检记录。可从任一能力执行“运行时自检”；结果仅作为适配兼容性证据。</p>`;
+  capabilityTarget.innerHTML = capabilities.map((item, index) => `<article class="priority-row" data-commercial-crypto-capability="${platformEscapeHtml(item.id)}">
+    <div class="priority-rank ${commercialCryptoBadgeClass(item.status)}">${index + 1}</div>
+    <div>
+      <h3>${platformEscapeHtml(item.name)}</h3>
+      <p>${platformEscapeHtml(item.adapterKind)} · ${platformEscapeHtml((item.requiredPrimitives || []).join(" / "))}</p>
+      <small>${platformEscapeHtml((item.blockers || []).join("；") || "等待现场设备与证书验证")}</small>
+      <div class="action-row">
+        <button class="inline-action" type="button" data-commercial-crypto-action="run-runtime-probe" data-id="${platformEscapeHtml(item.id)}">运行时自检</button>
+        <button class="inline-action" type="button" data-commercial-crypto-action="record-evidence" data-id="${platformEscapeHtml(item.id)}">登记证据</button>
+        <button class="inline-action" type="button" data-commercial-crypto-action="request-onsite" data-id="${platformEscapeHtml(item.id)}">申请现场验证</button>
+      </div>
+    </div>
+    <div class="capability-side">
+      <span class="badge ${commercialCryptoBadgeClass(item.status)}">${platformEscapeHtml(commercialCryptoStatusLabel(item.status))}</span>
+      <small>生产：否</small>
+    </div>
+  </article>`).join("");
+  evidenceTarget.innerHTML = `<table>
+    <thead><tr><th>能力</th><th>类型</th><th>证据引用</th><th>状态</th><th>生产证据</th></tr></thead>
+    <tbody>${evidencePackets.slice(0, 12).map((item) => `<tr>
+      <td>${platformEscapeHtml(item.capabilityId || "all")}</td>
+      <td>${platformEscapeHtml(item.type)}</td>
+      <td><strong>${platformEscapeHtml(item.reference)}</strong><br><small>${platformEscapeHtml(item.note || "")}</small></td>
+      <td>${platformEscapeHtml(item.status)}</td>
+      <td>否</td>
+    </tr>`).join("") || `<tr><td colspan="5">暂无证据包。</td></tr>`}</tbody>
+  </table>`;
+  const statusTarget = document.querySelector("#commercial-crypto-status");
+  if (statusTarget) {
+    statusTarget.textContent = "适配中心已就绪，采购与密评受阻";
+    statusTarget.className = "badge warn";
+  }
+  const boundaryTarget = document.querySelector("#commercial-crypto-boundary");
+  if (boundaryTarget) boundaryTarget.textContent = "本页只证明适配合同、运行时兼容性探测和证据流程可执行。正式启用仍需通过检测的商用密码产品、生产证书与密钥管理、现场验证、第三方密评报告和整改签字。";
 }
 
 function renderResearchGovernance(platform) {
@@ -701,6 +1412,26 @@ function listText(value) {
 
 function bindPlatformEditor() {
   document.addEventListener("click", (event) => {
+    const commercialCryptoButton = event.target.closest("[data-commercial-crypto-action]");
+    if (commercialCryptoButton) {
+      runCommercialCryptoAction(commercialCryptoButton.dataset.commercialCryptoAction, commercialCryptoButton.dataset.id, commercialCryptoButton);
+      return;
+    }
+    const citizenOperationsButton = event.target.closest("[data-citizen-operations-action]");
+    if (citizenOperationsButton) {
+      runCitizenOperationsAction(
+        citizenOperationsButton.dataset.resource,
+        citizenOperationsButton.dataset.citizenOperationsAction,
+        citizenOperationsButton.dataset.id,
+        citizenOperationsButton
+      );
+      return;
+    }
+    const productionDatabaseButton = event.target.closest("[data-production-db-action]");
+    if (productionDatabaseButton) {
+      runProductionDatabaseCutoverAction(productionDatabaseButton.dataset.productionDbAction, productionDatabaseButton.dataset.id, productionDatabaseButton);
+      return;
+    }
     const editButton = event.target.closest("[data-edit-platform]");
     if (editButton) {
       openPlatformEditor(editButton.dataset.editPlatform, editButton.dataset.id);
@@ -782,6 +1513,144 @@ function bindPlatformEditor() {
     });
     refreshReportSummary();
   });
+}
+
+async function loadCommercialCryptoCenter() {
+  if (!PLATFORM_API_BASE) return;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  try {
+    const response = await request(`${PLATFORM_API_BASE}/commercial-crypto/center`);
+    if (!response.ok) return;
+    const payload = await response.json();
+    const center = payload.center || {};
+    platformState.commercialCryptoCapabilities = center.capabilities || platformState.commercialCryptoCapabilities || [];
+    platformState.commercialCryptoProbeRuns = center.probeRuns || platformState.commercialCryptoProbeRuns || [];
+    platformState.commercialCryptoEvidencePackets = center.evidencePackets || platformState.commercialCryptoEvidencePackets || [];
+    platformState.commercialCryptoRuntimeProbe = center.runtimeProbe || null;
+  } catch (error) {
+    // Static and offline fallback remains usable without the commission API.
+  }
+}
+
+async function runCommercialCryptoAction(action, id, button) {
+  if (!PLATFORM_API_BASE || !action || !id) return;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  const statusTarget = document.querySelector("#commercial-crypto-status");
+  const notes = {
+    "run-runtime-probe": "Commission security operator ran the local OpenSSL compatibility probe; this is not a certification result.",
+    "record-evidence": "Commission security operator registered an adapter evidence reference for onsite validation.",
+    "request-onsite": "Commission security operator requested onsite device, certificate, key-management and assessment verification."
+  };
+  const body = {
+    action,
+    note: notes[action] || "Commercial crypto adapter action recorded.",
+    evidenceRef: action === "record-evidence" ? `platform-console/${id}/${Date.now()}` : ""
+  };
+  if (button) button.disabled = true;
+  if (statusTarget) statusTarget.textContent = "处理中";
+  try {
+    const response = await request(`${PLATFORM_API_BASE}/commercial-crypto/capabilities/${encodeURIComponent(id)}/actions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.message || `HTTP ${response.status}`);
+    const center = payload.center || {};
+    platformState.commercialCryptoCapabilities = center.capabilities || platformState.commercialCryptoCapabilities || [];
+    platformState.commercialCryptoProbeRuns = center.probeRuns || platformState.commercialCryptoProbeRuns || [];
+    platformState.commercialCryptoEvidencePackets = center.evidencePackets || platformState.commercialCryptoEvidencePackets || [];
+    platformState.commercialCryptoRuntimeProbe = center.runtimeProbe || platformState.commercialCryptoRuntimeProbe || null;
+    renderPlatform();
+  } catch (error) {
+    if (statusTarget) {
+      statusTarget.textContent = error.message || "操作失败";
+      statusTarget.className = "badge danger";
+    }
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+async function runProductionDatabaseCutoverAction(action, id, button) {
+  if (!PLATFORM_API_BASE || !action) return;
+  const statusTarget = document.querySelector("#production-database-cutover-status");
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  const isRehearsal = action === "rehearse";
+  const path = isRehearsal
+    ? "/production-database/cutover-runs"
+    : `/production-database/cutover-runs/${encodeURIComponent(id || "")}/actions`;
+  const body = isRehearsal
+    ? { note: "Platform cutover center four-domain sample rehearsal" }
+    : {
+        action,
+        note: action === "review" ? "Commission reviewer checked the dry-run evidence." : action === "record-rollback" ? "Rollback checkpoint rehearsal evidence recorded." : "Migration sample requires another rehearsal.",
+        evidence: action === "record-rollback" ? `rollback-checkpoint-${Date.now()}` : ""
+      };
+  if (button) button.disabled = true;
+  if (statusTarget) statusTarget.textContent = "处理中";
+  try {
+    const response = await request(`${PLATFORM_API_BASE}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.message || `HTTP ${response.status}`);
+    platformState.productionDatabaseMigrationBatches = payload.center?.migrationBatches || platformState.productionDatabaseMigrationBatches || [];
+    platformState.productionDatabaseCutoverRuns = payload.center?.cutoverRuns || platformState.productionDatabaseCutoverRuns || [];
+    renderPlatform();
+  } catch (error) {
+    if (statusTarget) {
+      statusTarget.textContent = error.message || "操作失败";
+      statusTarget.className = "badge danger";
+    }
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+async function runCitizenOperationsAction(resource, action, id, button) {
+  if (!PLATFORM_API_BASE || !resource || !action || !id) return;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  const statusTarget = document.querySelector("#citizen-operations-status");
+  const notes = {
+    publish: "Commission operator published this demo content after content review.",
+    withdraw: "Commission operator withdrew this demo content for revision.",
+    approve: "Commission operator completed the demo identity review; authoritative government verification remains required.",
+    reject: "Commission operator rejected the demo identity review after manual inspection.",
+    "request-material": "Commission operator requested additional identity or guardian evidence.",
+    activate: "Commission operator activated the demo blacklist rule after risk review.",
+    lift: "Commission operator lifted the demo blacklist rule after review.",
+    review: "Commission operator moved this blacklist record to manual review.",
+    "enable-demo": "Commission operator enabled this hospital for white-list demonstration only.",
+    "disable-demo": "Commission operator disabled this hospital demo service configuration.",
+    "request-onsite": "Commission operator requested signed hospital service enablement evidence."
+  };
+  if (button) button.disabled = true;
+  if (statusTarget) statusTarget.textContent = "处理中";
+  try {
+    const response = await request(`${PLATFORM_API_BASE}/citizen-operations/${encodeURIComponent(resource)}/${encodeURIComponent(id)}/actions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, note: notes[action] || "Citizen operations action recorded." })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.message || `HTTP ${response.status}`);
+    platformState.citizenOperationContents = payload.center?.contents || platformState.citizenOperationContents || [];
+    platformState.citizenAgreementVersions = payload.center?.agreements || platformState.citizenAgreementVersions || [];
+    platformState.citizenIdentityReviewCases = payload.center?.identityReviews || platformState.citizenIdentityReviewCases || [];
+    platformState.citizenServiceBlacklist = payload.center?.blacklist || platformState.citizenServiceBlacklist || [];
+    platformState.citizenHospitalServiceConfigs = payload.center?.hospitalServices || platformState.citizenHospitalServiceConfigs || [];
+    renderPlatform();
+  } catch (error) {
+    if (statusTarget) {
+      statusTarget.textContent = error.message || "操作失败";
+      statusTarget.className = "badge danger";
+    }
+  } finally {
+    if (button) button.disabled = false;
+  }
 }
 
 async function runResearchDatasetAction(action, id) {

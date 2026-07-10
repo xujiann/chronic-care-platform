@@ -21,6 +21,17 @@ const ARTIFACTS = [
   ["chronic-launch-core", "integration", "Chronic launch core readiness", "release/chronic-launch-core.json", "release/chronic-launch-core.md", "chronic:launch-core", "/api/chronic/launch-core"],
   ["data-quality", "data", "Data quality report", "release/data-quality-report.json", "release/data-quality-report.md", "data-quality:report", "/api/data-quality/scorecard"],
   ["data-governance", "data", "Data governance foundation readiness report", "release/data-governance-readiness-report.json", "release/data-governance-readiness-report.md", "data-governance:readiness", "/api/data-governance"],
+  ["digital-hospital-standards", "evaluation", "Digital hospital standards readiness report", "release/digital-hospital-standards-readiness-report.json", "release/digital-hospital-standards-readiness-report.md", "digital-hospital:standards-readiness", "digital-hospital-standards.html"],
+  ["phase2-proposal", "planning", "Phase 2 proposal gap ledger readiness report", "release/phase2-proposal-readiness-report.json", "release/phase2-proposal-readiness-report.md", "phase2:proposal-readiness", "docs/二期可研对标差距与下一步开发计划.md"],
+  ["phase2-catalog", "data", "Phase 2 data and service catalog readiness report", "release/phase2-catalog-readiness-report.json", "release/phase2-catalog-readiness-report.md", "phase2:catalog-readiness", "/api/phase2/catalog"],
+  ["phase2-joint-test", "integration", "Phase 2 minimum joint-test pilot readiness report", "release/phase2-joint-test-readiness-report.json", "release/phase2-joint-test-readiness-report.md", "phase2:joint-test-readiness", "/api/phase2/joint-test-pilot"],
+  ["phase2-mutual-recognition", "integration", "Phase 2 mutual recognition MVP readiness report", "release/phase2-mutual-recognition-readiness-report.json", "release/phase2-mutual-recognition-readiness-report.md", "phase2:mutual-recognition-readiness", "/api/phase2/mutual-recognition"],
+  ["phase2-disease-reporting", "integration", "Phase 2 disease reporting MVP readiness report", "release/phase2-disease-reporting-readiness-report.json", "release/phase2-disease-reporting-readiness-report.md", "phase2:disease-reporting-readiness", "/api/phase2/disease-reporting"],
+  ["phase2-clinical-assist", "integration", "Phase 2 clinical treatment assist readiness report", "release/phase2-clinical-assist-readiness-report.json", "release/phase2-clinical-assist-readiness-report.md", "phase2:clinical-assist-readiness", "/api/phase2/clinical-assist"],
+  ["phase2-family-doctor", "citizen", "Phase 2 family doctor contract readiness report", "release/phase2-family-doctor-readiness-report.json", "release/phase2-family-doctor-readiness-report.md", "phase2:family-doctor-readiness", "/api/phase2/family-doctor-contracts"],
+  ["registration-journey", "citizen", "Appointment registration cross-role journey readiness report", "release/registration-journey-readiness-report.json", "release/registration-journey-readiness-report.md", "registration:journey-readiness", "/api/registrations/dashboard"],
+  ["citizen-operations", "citizen", "Citizen service operations readiness report", "release/citizen-operations-readiness-report.json", "release/citizen-operations-readiness-report.md", "phase2:citizen-operations-readiness", "/api/citizen-operations/center"],
+  ["commercial-crypto", "security", "Commercial crypto adapter center readiness report", "release/commercial-crypto-readiness-report.json", "release/commercial-crypto-readiness-report.md", "security:commercial-crypto-readiness", "/api/commercial-crypto/center"],
   ["quality-safety", "quality", "Medical quality and safety supervision report", "release/quality-safety-report.json", "release/quality-safety-report.md", "quality-safety:report", "/api/quality-safety/dashboard"],
   ["environment-matrix", "environment", "Environment matrix report", "release/environment-matrix-report.json", "release/environment-matrix-report.md", "environment:matrix", "env:check:production"],
   ["hybrid-deployment", "deployment", "Hybrid static preview and dynamic backend readiness", "release/hybrid-deployment-readiness-report.json", "release/hybrid-deployment-readiness-report.md", "hybrid:deployment-readiness", "server.js + GitHub Pages"],
@@ -34,10 +45,11 @@ const ARTIFACTS = [
   ["internet-nursing", "nursing", "Internet nursing readiness report", "release/internet-nursing-readiness-report.json", "release/internet-nursing-readiness-report.md", "internet-nursing:readiness", "/api/internet-nursing/dashboard"],
   ["citizen-launch-foundation", "citizen", "Citizen launch foundation readiness report", "release/citizen-launch-foundation-readiness.json", "release/citizen-launch-foundation-readiness.md", "citizen:launch-foundation", "login.html?redirect=citizen.html&client=app&page=nursing#account-provisioning"],
   ["multi-practice", "doctor-governance", "Doctor multi-practice readiness report", "release/multi-practice-readiness-report.json", "release/multi-practice-readiness-report.md", "multi-practice:readiness", "/api/multi-practice-registry"],
-  ["operations-readiness", "operations", "Operations readiness report", "release/operations-readiness-report.json", "release/operations-readiness-report.md", "operations:readiness", "/api/system/readiness"],
+  ["operations-readiness", "operations", "Operations readiness and disaster-recovery run-center report", "release/operations-readiness-report.json", "release/operations-readiness-report.md", "operations:readiness", "/api/production-operations/center"],
   ["process-audit", "process", "Full process audit report", "release/process-audit-report.json", "release/process-audit-report.md", "process:audit", "/api/process-audit"],
   ["service-acceptance", "process", "Service acceptance summary", "release/service-acceptance-summary.json", "release/service-acceptance-summary.md", "release:report", "/api/service-acceptance-summary"],
   ["health-dashboard", "dashboard", "Health dashboard and eight-application template summary", "release/health-dashboard-summary.json", "release/health-dashboard-summary.md", "health-dashboard:summary", "/api/health-dashboard/summary"],
+  ["health-dashboard-indicator-center", "dashboard", "Phase-2 industry governance indicator center report", "docs/health-dashboard-indicator-center-report.md", "docs/health-dashboard-indicator-center-report.md", "health-dashboard:summary", "/api/health-dashboard/industry-governance-indicators"],
   ["priority-application-templates", "dashboard", "Priority application template handoff", "release/priority-application-templates.json", "release/priority-application-templates.md", "priority-apps:templates", "/api/priority-applications/templates"],
   ["maternal-child-readiness", "maternal-child", "Maternal-child main function and readiness report", "release/maternal-child-readiness-report.json", "release/maternal-child-readiness-report.md", "maternal-child:readiness", "maternal-child-about.html"],
   ["public-health-readiness", "public-health", "Public health informatization standard readiness report", "release/public-health-readiness-report.json", "release/public-health-readiness-report.md", "public-health:readiness", "/api/public-health/system"],
@@ -45,7 +57,7 @@ const ARTIFACTS = [
   ["policy-coverage", "policy", "Policy coverage report", "release/policy-coverage-report.json", "release/policy-coverage-report.md", "policy:coverage", "release/policy-coverage-report.md"],
   ["site-readiness", "site", "Site readiness pack", "release/site-readiness-pack.json", "release/site-readiness-pack.md", "site:pack", "/api/site-readiness-pack"],
   ["site-launch-evidence", "site", "Runtime site launch evidence ledger", "release/site-readiness-pack.json", "release/site-readiness-pack.md", "site:pack", "/api/site-launch-evidence"],
-  ["production-db", "data", "Production database readiness report", "release/production-db-readiness-report.json", "release/production-db-readiness-report.md", "production-db:readiness", "STORAGE_ENGINE=sqlite"],
+  ["production-db", "data", "Production database readiness and cutover rehearsal report", "release/production-db-readiness-report.json", "release/production-db-readiness-report.md", "production-db:readiness", "/api/production-database/cutover-center"],
   ["evaluation-evidence", "evaluation", "Interoperability evaluation evidence report", "release/evaluation-evidence-report.json", "release/evaluation-evidence-report.md", "evaluation:evidence", "release/evaluation-evidence-report.md"]
 ];
 
@@ -75,7 +87,8 @@ function parseArgs(argv = process.argv.slice(2)) {
 
 function buildReleaseArtifactManifest(options = {}) {
   const pkg = options.pkg || readJson("package.json");
-  const releaseReport = options.releaseReport || null;
+  const releaseReportPath = path.join(ROOT, "release", "release-report.json");
+  const releaseReport = options.releaseReport || (fs.existsSync(releaseReportPath) ? JSON.parse(fs.readFileSync(releaseReportPath, "utf8")) : null);
   const artifacts = ARTIFACTS.map(([id, category, title, json, markdown, command, evidence]) => ({
     id,
     category,

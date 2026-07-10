@@ -17,7 +17,12 @@ test("launch smoke report validates offline runtime routes and release artifacts
   assert.equal(report.checks.some((item) => item.id === "launch:routes" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "launch:artifacts" && item.passed), true);
   assert.equal(report.routes.includes("/api/health"), true);
+  assert.equal(report.routes.includes("/api/digital-hospital/launch-readiness"), true);
+  assert.equal(report.routes.includes("/api/digital-hospital/production-evidence-packets"), true);
+  assert.equal(report.routes.includes("/api/digital-hospital/launch-command-briefs"), true);
+  assert.equal(report.routes.includes("/api/digital-hospital/formal-cutover-approvals"), true);
   assert.equal(report.artifacts.includes("release/production-cutover-checklist.md"), true);
+  assert.equal(report.artifacts.includes("release/digital-hospital-standards-readiness-report.md"), true);
   assert.match(markdown, /Launch smoke report/);
   assert.match(markdown, /offline-source-check/);
 });

@@ -19,6 +19,7 @@
         <nav>
           
           <a href="./public-health.html">公共卫生</a>
+          <a href="./digital-hospital-standards.html">数智医院标准</a>
           <a href="./quality-safety.html">Quality safety</a><a href="./escort.html">助医陪诊</a><a href="./health-city.html">系统总览</a>
           <a href="./about.html">关于</a>
           <a href="./regional-data-sharing.html">区域共享</a>
@@ -85,6 +86,46 @@
 
       <section class="panel">
         <div class="panel-title">
+          <h2>二期数据与服务目录</h2>
+          <span>216 表映射、服务资源目录、字段血缘、质量规则和验收证据</span>
+        </div>
+        <div id="phase2-catalog"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>二期最小联调样板</h2>
+          <span>三级医院、区县平台、基层机构的样例报文、网关轨迹、问题复测和签字边界</span>
+        </div>
+        <div id="phase2-joint-test-pilot"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>二期慢病报病协同</h2>
+          <span>诊断触发、报卡队列、区县回执、患者中心和监管统计</span>
+        </div>
+        <div id="phase2-disease-reporting"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>二期临床治疗辅助</h2>
+          <span>医生工作站提醒、规则配置、消息回执、服务集成和监管统计</span>
+        </div>
+        <div id="phase2-clinical-assist"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
+          <h2>二期家庭医生签约监管</h2>
+          <span>签约模板、团队、服务包、居民申请、机构审核、履约、续约和满意度统计</span>
+        </div>
+        <div id="phase2-family-doctor-contracts"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-title">
           <h2>统一应用目录</h2>
           <span>统一登记来源系统、接口方式、责任处室、复用方式、上线批次和验收证据</span>
         </div>
@@ -141,6 +182,66 @@
           <span>Release gate, production storage, government identity, and audit retention tracks</span>
         </div>
         <div id="production-deployment-plan" class="priority-list"></div>
+      </section>
+
+      <section class="panel" id="production-database-cutover-center">
+        <div class="panel-title">
+          <h2>生产数据库割接演练中心</h2>
+          <span>迁移批次、四类样例校验、回滚检查点与生产阻断证据</span>
+        </div>
+        <div class="action-row">
+          <button class="primary-button" type="button" data-production-db-action="rehearse">运行迁移样例校验</button>
+          <span id="production-database-cutover-status" class="badge warn">等待演练</span>
+        </div>
+        <div id="production-database-cutover-metrics" class="metric-grid"></div>
+        <div id="production-database-cutover-runs" class="priority-list"></div>
+        <div id="production-database-migration-batches" class="priority-list"></div>
+        <p id="production-database-cutover-boundary" class="implementation-boundary"></p>
+      </section>
+
+      <section class="panel" id="citizen-operations-center">
+        <div class="panel-title">
+          <h2>居民服务运营中心</h2>
+          <span>内容发布、协议版本、实名复核、订单汇总、黑名单和医院服务开通</span>
+        </div>
+        <div class="action-row">
+          <span id="citizen-operations-status" class="badge warn">运营 MVP，现场受阻</span>
+          <a class="inline-action" href="./citizen.html#citizen-service-public-feed">查看居民端公开信息</a>
+        </div>
+        <div id="citizen-operations-metrics" class="metric-grid"></div>
+        <div class="portal-grid">
+          <div>
+            <h3>实名人工复核</h3>
+            <div id="citizen-identity-review-queue" class="priority-list"></div>
+          </div>
+          <div>
+            <h3>医院服务开通</h3>
+            <div id="citizen-hospital-service-configs" class="priority-list"></div>
+          </div>
+        </div>
+        <h3>内容、协议与黑名单</h3>
+        <div id="citizen-operations-governance" class="table-wrap"></div>
+        <h3>跨服务订单查询</h3>
+        <div id="citizen-operations-orders" class="table-wrap"></div>
+        <p id="citizen-operations-boundary" class="implementation-boundary"></p>
+      </section>
+
+      <section class="panel" id="commercial-crypto-center">
+        <div class="panel-title">
+          <h2>商用密码能力适配中心</h2>
+          <span>算法运行时探测、适配合同、证据留痕和生产密评门禁</span>
+        </div>
+        <div class="action-row">
+          <span id="commercial-crypto-status" class="badge warn">适配合同就绪，采购与密评受阻</span>
+        </div>
+        <div id="commercial-crypto-metrics" class="metric-grid"></div>
+        <h3>运行时兼容性探测</h3>
+        <div id="commercial-crypto-runtime" class="table-wrap"></div>
+        <h3>适配能力合同</h3>
+        <div id="commercial-crypto-capabilities" class="priority-list"></div>
+        <h3>证据包与现场复核</h3>
+        <div id="commercial-crypto-evidence" class="table-wrap"></div>
+        <p id="commercial-crypto-boundary" class="implementation-boundary"></p>
       </section>
 
       <section class="panel">

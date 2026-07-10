@@ -4502,9 +4502,13 @@
       "reason": "Hypertension follow-up and medication adjustment",
       "fee": 18,
       "cancelBeforeHours": 24,
-      "status": "confirmed",
-      "scheduleLockStatus": "confirmed",
-      "paymentStatus": "pending",
+        "status": "confirmed",
+        "scheduleLockStatus": "confirmed",
+        "journeyStage": "slot-reserved-demo",
+        "hisConfirmationStatus": "pending-demo",
+        "checkInStatus": "not-checked-in",
+        "productionReady": false,
+        "paymentStatus": "pending",
       "paymentTradeNo": "PAY-DEMO-REG-R1-0008",
       "refundStatus": "none",
       "insuranceStatus": "prechecked",
@@ -9528,7 +9532,7 @@
       "track": "database",
       "name": "Production database adapter path",
       "owner": "data-platform",
-      "status": "planned",
+      "status": "rehearsal-center-ready-onsite-blocked",
       "requiredConfig": [
         "DATABASE_URL",
         "STORAGE_ENGINE=postgres",
@@ -9537,10 +9541,12 @@
       ],
       "evidence": [
         "SQLite v7 mirror tables",
-        "storage backup and restore rehearsal",
+        "production database cutover center",
+        "four-domain sample validation",
+        "rollback checkpoint",
         "release readiness report"
       ],
-      "nextAction": "Implement PostgreSQL adapter behind the existing storage API and rehearse migration with masked data."
+      "nextAction": "Bind the cutover center to the selected PostgreSQL-compatible driver and rehearse masked full-volume migration, rollback, capacity and failover."
     },
     {
       "id": "prod-identity-adapter",
@@ -11948,6 +11954,78 @@
   ],
   "publicHealthReadinessEvidence": [
     {
+      "id": "phev-site-evidence-verification-desk",
+      "category": "site evidence verification",
+      "name": "Public health site evidence verification desk",
+      "owner": "release manager / commission reviewer",
+      "status": "verification-planned",
+      "evidence": [
+        "publicHealthSiteEvidenceVerificationTasks",
+        "/api/public-health/site-evidence-verification-tasks"
+      ],
+      "nextAction": "Assign each bridge item, record the signed source evidence, and verify it by matching evidence ID before launch approval."
+    },
+    {
+      "id": "phev-launch-command-briefs",
+      "category": "launch command brief",
+      "name": "Public health launch command brief and status broadcast desk",
+      "owner": "release manager / command room recorder",
+      "status": "briefing-ready",
+      "evidence": [
+        "publicHealthLaunchCommandBriefs",
+        "/api/public-health/launch-command-briefs"
+      ],
+      "nextAction": "Keep launch command briefs aligned with gate status, duty handoffs, incident lanes, observation windows and rollback decisions."
+    },
+    {
+      "id": "phev-launch-incident-desk",
+      "category": "launch incident desk",
+      "name": "Public health launch-day incident triage and rollback decision desk",
+      "owner": "release manager / emergency duty office",
+      "status": "desk-ready",
+      "evidence": [
+        "publicHealthLaunchIncidents",
+        "/api/public-health/launch-incidents"
+      ],
+      "nextAction": "Keep launch-day incident lanes, SLA, escalation paths, rollback decision owners and evidence artifacts ready."
+    },
+    {
+      "id": "phev-launch-duty-shifts",
+      "category": "launch duty handoff",
+      "name": "Public health launch-day duty roster and command handoff desk",
+      "owner": "release manager / operations duty office",
+      "status": "roster-ready",
+      "evidence": [
+        "publicHealthLaunchDutyShifts",
+        "/api/public-health/launch-duty-shifts"
+      ],
+      "nextAction": "Keep launch-day duty windows, primary and backup contacts, contact channels, handoff checklists and escalation owners ready."
+    },
+    {
+      "id": "phev-go-live-observation",
+      "category": "go-live observation",
+      "name": "Public health launch-day observation and rollback watch",
+      "owner": "release manager / operations duty lead",
+      "status": "watch-plan-ready",
+      "evidence": [
+        "publicHealthGoLiveObservations",
+        "/api/public-health/go-live-observations"
+      ],
+      "nextAction": "Record launch-day API smoke, exchange receipts, security audit, rollback standby and institution helpdesk observations during the first 24 hours."
+    },
+    {
+      "id": "phev-production-handoffs",
+      "category": "production handoff",
+      "name": "Public health production handoff packs",
+      "owner": "release manager / site implementation owner",
+      "status": "pending-site-handoff",
+      "evidence": [
+        "publicHealthProductionHandoffs",
+        "/api/public-health/production-handoffs"
+      ],
+      "nextAction": "Accept all interface, command, security, operations, institution and release handoff packs before final go/no-go."
+    },
+    {
       "id": "phev-standard-coverage",
       "category": "标准覆盖",
       "name": "21/125/421 标准矩阵覆盖",
@@ -12003,9 +12081,9 @@
       "status": "演示契约就绪",
       "evidence": [
         "publicHealthExchangeTasks",
+        "publicHealthExchangeRuns",
         "integrationContracts",
-        "audit:retention",
-        "publicHealthExchangeRuns"
+        "audit:retention"
       ],
       "nextAction": "完成外部接口联调、密钥、回执和异常补偿策略。"
     },
@@ -12033,6 +12111,67 @@
         "deploy:check"
       ],
       "nextAction": "收集现场签字页、测评报告和演练截图。"
+    },
+    {
+      "id": "phev-cutover-blockers",
+      "category": "上线阻塞",
+      "name": "正式接口、密钥、等保密评、备份演练和账号授权阻塞项",
+      "owner": "项目办/接口联调专班/安全管理岗",
+      "status": "已建档",
+      "evidence": [
+        "publicHealthCutoverBlockers",
+        "publicHealthOnsiteAcceptances"
+      ],
+      "nextAction": "按 P0/P1 阻塞项收集现场证据并逐项关闭。"
+    },
+    {
+      "id": "phev-cutover-evidence-packets",
+      "category": "上线证据包",
+      "name": "P0/P1 阻塞项现场证据包签收",
+      "owner": "项目办/现场实施负责人",
+      "status": "待现场签收",
+      "evidence": [
+        "publicHealthCutoverEvidencePackets",
+        "securityEvents"
+      ],
+      "nextAction": "逐项登记接口、密钥、测评、备份演练和账号授权证据并完成签收。"
+    },
+    {
+      "id": "phev-launch-gate",
+      "category": "上线审批",
+      "name": "公共卫生生产上线 gate 和多方审批",
+      "owner": "卫健委/疾控/医院/安全/运维/项目办",
+      "status": "待审批",
+      "evidence": [
+        "publicHealthLaunchApprovals",
+        "/api/public-health/launch-gate"
+      ],
+      "nextAction": "材料全部核验、阻塞全部关闭、审批全部签署后才能转为 production-ready。"
+    },
+    {
+      "id": "phev-cutover-drills",
+      "category": "上线演练",
+      "name": "公共卫生切换彩排和 go/no-go 台账",
+      "owner": "项目办/运维/疾控",
+      "status": "待现场复测",
+      "evidence": [
+        "publicHealthCutoverDrills",
+        "/api/public-health/cutover-drills"
+      ],
+      "nextAction": "记录接口、应急、安全、备份和上线会演练问题，现场复测通过后才能提交生产上线审批。"
+    },
+    {
+      "id": "phev-site-evidence-bridge",
+      "category": "现场材料桥接",
+      "name": "现场上线材料与公共卫生证据包映射",
+      "owner": "项目办/现场实施负责人",
+      "status": "待现场核验",
+      "evidence": [
+        "siteLaunchEvidence",
+        "publicHealthSiteEvidenceBridge",
+        "/api/public-health/site-evidence-bridge"
+      ],
+      "nextAction": "现场材料 verified 后自动抵扣公共卫生证据包，但阻塞项仍需责任人确认关闭。"
     }
   ],
   "publicHealthExchangeRuns": [
@@ -12389,5 +12528,2235 @@
       "onsiteAction": "归档发布报告、截图、验收清单和版本签字页。",
       "signoffStatus": "pending-site-signature"
     }
+  ],
+  "publicHealthCutoverBlockers": [
+    {
+      "id": "phcb-direct-report-endpoint",
+      "category": "外部接口",
+      "name": "疾控直报正式接口地址和回执规则",
+      "severity": "P0",
+      "owner": "疾控中心/规划信息",
+      "assignee": "接口联调专班",
+      "dependency": "疾控直报",
+      "status": "open",
+      "remediationStatus": "待联调",
+      "escalationLevel": "red",
+      "blocker": "缺少正式接口地址、VPN/专线策略、字段版本和回执样例。",
+      "requiredEvidence": [
+        "接口地址确认单",
+        "字段版本",
+        "回执样例"
+      ],
+      "linkedAcceptanceId": "phoa-interface-joint-test",
+      "linkedExchangeTaskId": "phx-national-direct-report",
+      "dueAt": "2026-07-18",
+      "siteWindow": "接口联调日 T-3",
+      "reminderChannel": "项目群+电话",
+      "resolutionAction": "完成现场联调并上传直报回执和字段版本签字页。"
+    },
+    {
+      "id": "phcb-lis-emr-credentials",
+      "category": "院内系统",
+      "name": "HIS/EMR/LIS/PACS 院内接口账号和签名密钥",
+      "severity": "P0",
+      "owner": "医院信息/院感/检验联络员",
+      "assignee": "医院接口负责人",
+      "dependency": "HIS/EMR/LIS/PACS",
+      "status": "open",
+      "remediationStatus": "待授权",
+      "escalationLevel": "red",
+      "blocker": "缺少院内测试账号、签名密钥、样本编号规则和阳性回传回执。",
+      "requiredEvidence": [
+        "账号授权单",
+        "签名密钥交接",
+        "阳性回传回执"
+      ],
+      "linkedAcceptanceId": "phoa-interface-joint-test",
+      "linkedExchangeTaskId": "phx-lab-surveillance",
+      "dueAt": "2026-07-19",
+      "siteWindow": "医院联调日 T-2",
+      "reminderChannel": "项目群+院内工单",
+      "resolutionAction": "完成院内系统样例联调并保全签名哈希。"
+    },
+    {
+      "id": "phcb-immunization-registry",
+      "category": "专项系统",
+      "name": "预防接种档案、冷链和异常反应回执",
+      "severity": "P1",
+      "owner": "疾控免疫规划/基层公卫专班",
+      "assignee": "免疫规划联络员",
+      "dependency": "预防接种系统",
+      "status": "open",
+      "remediationStatus": "待样例",
+      "escalationLevel": "amber",
+      "blocker": "缺少儿童接种档案、冷链异常和异常反应的正式回执口径。",
+      "requiredEvidence": [
+        "接种档案样例",
+        "冷链异常回执",
+        "异常反应回执"
+      ],
+      "linkedAcceptanceId": "phoa-emergency-drill",
+      "linkedExchangeTaskId": "phx-immunization",
+      "dueAt": "2026-07-20",
+      "siteWindow": "专项系统联调日",
+      "reminderChannel": "项目群",
+      "resolutionAction": "完成接种档案和冷链异常样例回放。"
+    },
+    {
+      "id": "phcb-security-assessment",
+      "category": "安全合规",
+      "name": "等保密评、国密设备和日志保全报告",
+      "severity": "P0",
+      "owner": "安全管理岗",
+      "assignee": "安全合规负责人",
+      "dependency": "等保密评和国密设备",
+      "status": "open",
+      "remediationStatus": "待报告",
+      "escalationLevel": "red",
+      "blocker": "缺少正式测评报告、整改承诺、国密设备配置和日志保全截图。",
+      "requiredEvidence": [
+        "等保报告",
+        "密评报告",
+        "国密配置",
+        "日志保全截图"
+      ],
+      "linkedAcceptanceId": "phoa-security-level-protection",
+      "linkedExchangeTaskId": "phx-security-audit",
+      "dueAt": "2026-07-21",
+      "siteWindow": "安全验收日 T-1",
+      "reminderChannel": "安全例会",
+      "resolutionAction": "归档测评报告、整改清单和日志保全证据。"
+    },
+    {
+      "id": "phcb-backup-drill",
+      "category": "运维演练",
+      "name": "公共卫生数据备份恢复演练",
+      "severity": "P0",
+      "owner": "运维保障组",
+      "assignee": "运维值班长",
+      "dependency": "备份系统",
+      "status": "open",
+      "remediationStatus": "待演练",
+      "escalationLevel": "red",
+      "blocker": "缺少现场备份介质、恢复截图、RPO/RTO 记录和演练签字。",
+      "requiredEvidence": [
+        "备份介质记录",
+        "恢复截图",
+        "RPO/RTO",
+        "演练签字页"
+      ],
+      "linkedAcceptanceId": "phoa-backup-restore",
+      "linkedExchangeTaskId": "phx-security-audit",
+      "dueAt": "2026-07-22",
+      "siteWindow": "切换演练日",
+      "reminderChannel": "运维工单",
+      "resolutionAction": "完成一次公共卫生事件和交换台账恢复演练。"
+    },
+    {
+      "id": "phcb-site-contacts",
+      "category": "现场组织",
+      "name": "七类机构联系人、授权范围和账号清单",
+      "severity": "P1",
+      "owner": "卫健管理部门/各机构联络员",
+      "assignee": "项目办",
+      "dependency": "现场联系人和账号授权",
+      "status": "open",
+      "remediationStatus": "待签字",
+      "escalationLevel": "amber",
+      "blocker": "缺少疾控、基层、卫健、监督、妇幼、医院和其他公卫机构联系人签字。",
+      "requiredEvidence": [
+        "联系人清单",
+        "授权范围",
+        "账号清单"
+      ],
+      "linkedAcceptanceId": "phoa-institution-accounts",
+      "linkedExchangeTaskId": "",
+      "dueAt": "2026-07-23",
+      "siteWindow": "上线确认会",
+      "reminderChannel": "项目群+邮件",
+      "resolutionAction": "完成七类机构账号、联系人和数据范围确认。"
+    }
+  ],
+  "publicHealthCutoverEvidencePackets": [
+    {
+      "id": "phcep-direct-report-endpoint",
+      "blockerId": "phcb-direct-report-endpoint",
+      "category": "外部接口",
+      "name": "疾控直报正式接口地址和回执规则证据包",
+      "severity": "P0",
+      "owner": "疾控中心/规划信息",
+      "assignee": "接口联调专班",
+      "status": "pending-site-evidence",
+      "signoffStatus": "pending",
+      "dueAt": "2026-07-18",
+      "siteWindow": "接口联调日 T-3",
+      "reminderChannel": "项目群+电话",
+      "requiredItems": [
+        {
+          "id": "phcb-direct-report-endpoint-e1",
+          "name": "接口地址确认单",
+          "required": true,
+          "status": "pending",
+          "artifactName": "",
+          "attachmentNames": [],
+          "verifiedBy": "",
+          "verifiedAt": "",
+          "note": ""
+        },
+        {
+          "id": "phcb-direct-report-endpoint-e2",
+          "name": "字段版本",
+          "required": true,
+          "status": "pending",
+          "artifactName": "",
+          "attachmentNames": [],
+          "verifiedBy": "",
+          "verifiedAt": "",
+          "note": ""
+        },
+        {
+          "id": "phcb-direct-report-endpoint-e3",
+          "name": "回执样例",
+          "required": true,
+          "status": "pending",
+          "artifactName": "",
+          "attachmentNames": [],
+          "verifiedBy": "",
+          "verifiedAt": "",
+          "note": ""
+        }
+      ],
+      "evidenceRecords": [],
+      "nextAction": "完成现场联调并上传直报回执和字段版本签字页。"
+    },
+    {
+      "id": "phcep-lis-emr-credentials",
+      "blockerId": "phcb-lis-emr-credentials",
+      "category": "院内系统",
+      "name": "HIS/EMR/LIS/PACS 院内接口账号和签名密钥证据包",
+      "severity": "P0",
+      "owner": "医院信息/院感/检验联络员",
+      "assignee": "医院接口负责人",
+      "status": "pending-site-evidence",
+      "signoffStatus": "pending",
+      "dueAt": "2026-07-19",
+      "siteWindow": "医院联调日 T-2",
+      "reminderChannel": "项目群+院内工单",
+      "requiredItems": [
+        {
+          "id": "phcb-lis-emr-credentials-e1",
+          "name": "账号授权单",
+          "required": true,
+          "status": "pending",
+          "artifactName": "",
+          "attachmentNames": [],
+          "verifiedBy": "",
+          "verifiedAt": "",
+          "note": ""
+        },
+        {
+          "id": "phcb-lis-emr-credentials-e2",
+          "name": "签名密钥交接",
+          "required": true,
+          "status": "pending",
+          "artifactName": "",
+          "attachmentNames": [],
+          "verifiedBy": "",
+          "verifiedAt": "",
+          "note": ""
+        },
+        {
+          "id": "phcb-lis-emr-credentials-e3",
+          "name": "阳性回传回执",
+          "required": true,
+          "status": "pending",
+          "artifactName": "",
+          "attachmentNames": [],
+          "verifiedBy": "",
+          "verifiedAt": "",
+          "note": ""
+        }
+      ],
+      "evidenceRecords": [],
+      "nextAction": "完成院内系统样例联调并保全签名哈希。"
+    },
+    {
+      "id": "phcep-immunization-registry",
+      "blockerId": "phcb-immunization-registry",
+      "category": "专项系统",
+      "name": "预防接种档案、冷链和异常反应回执证据包",
+      "severity": "P1",
+      "owner": "疾控免疫规划/基层公卫专班",
+      "assignee": "免疫规划联络员",
+      "status": "pending-site-evidence",
+      "signoffStatus": "pending",
+      "dueAt": "2026-07-20",
+      "siteWindow": "专项系统联调日",
+      "reminderChannel": "项目群",
+      "requiredItems": [
+        {
+          "id": "phcb-immunization-registry-e1",
+          "name": "接种档案样例",
+          "required": true,
+          "status": "pending",
+          "artifactName": "",
+          "attachmentNames": [],
+          "verifiedBy": "",
+          "verifiedAt": "",
+          "note": ""
+        },
+        {
+          "id": "phcb-immunization-registry-e2",
+          "name": "冷链异常回执",
+          "required": true,
+          "status": "pending",
+          "artifactName": "",
+          "attachmentNames": [],
+          "verifiedBy": "",
+          "verifiedAt": "",
+          "note": ""
+        },
+        {
+          "id": "phcb-immunization-registry-e3",
+          "name": "异常反应回执",
+          "required": true,
+          "status": "pending",
+          "artifactName": "",
+          "attachmentNames": [],
+          "verifiedBy": "",
+          "verifiedAt": "",
+          "note": ""
+        }
+      ],
+      "evidenceRecords": [],
+      "nextAction": "完成接种档案和冷链异常样例回放。"
+    },
+    {
+      "id": "phcep-security-assessment",
+      "blockerId": "phcb-security-assessment",
+      "category": "安全合规",
+      "name": "等保密评、国密设备和日志保全报告证据包",
+      "severity": "P0",
+      "owner": "安全管理岗",
+      "assignee": "安全合规负责人",
+      "status": "pending-site-evidence",
+      "signoffStatus": "pending",
+      "dueAt": "2026-07-21",
+      "siteWindow": "安全验收日 T-1",
+      "reminderChannel": "安全例会",
+      "requiredItems": [
+        {
+          "id": "phcb-security-assessment-e1",
+          "name": "等保报告",
+          "required": true,
+          "status": "pending",
+          "artifactName": "",
+          "attachmentNames": [],
+          "verifiedBy": "",
+          "verifiedAt": "",
+          "note": ""
+        },
+        {
+          "id": "phcb-security-assessment-e2",
+          "name": "密评报告",
+          "required": true,
+          "status": "pending",
+          "artifactName": "",
+          "attachmentNames": [],
+          "verifiedBy": "",
+          "verifiedAt": "",
+          "note": ""
+        },
+        {
+          "id": "phcb-security-assessment-e3",
+          "name": "国密配置",
+          "required": true,
+          "status": "pending",
+          "artifactName": "",
+          "attachmentNames": [],
+          "verifiedBy": "",
+          "verifiedAt": "",
+          "note": ""
+        },
+        {
+          "id": "phcb-security-assessment-e4",
+          "name": "日志保全截图",
+          "required": true,
+          "status": "pending",
+          "artifactName": "",
+          "attachmentNames": [],
+          "verifiedBy": "",
+          "verifiedAt": "",
+          "note": ""
+        }
+      ],
+      "evidenceRecords": [],
+      "nextAction": "归档测评报告、整改清单和日志保全证据。"
+    },
+    {
+      "id": "phcep-backup-drill",
+      "blockerId": "phcb-backup-drill",
+      "category": "运维演练",
+      "name": "公共卫生数据备份恢复演练证据包",
+      "severity": "P0",
+      "owner": "运维保障组",
+      "assignee": "运维值班长",
+      "status": "pending-site-evidence",
+      "signoffStatus": "pending",
+      "dueAt": "2026-07-22",
+      "siteWindow": "切换演练日",
+      "reminderChannel": "运维工单",
+      "requiredItems": [
+        {
+          "id": "phcb-backup-drill-e1",
+          "name": "备份介质记录",
+          "required": true,
+          "status": "pending",
+          "artifactName": "",
+          "attachmentNames": [],
+          "verifiedBy": "",
+          "verifiedAt": "",
+          "note": ""
+        },
+        {
+          "id": "phcb-backup-drill-e2",
+          "name": "恢复截图",
+          "required": true,
+          "status": "pending",
+          "artifactName": "",
+          "attachmentNames": [],
+          "verifiedBy": "",
+          "verifiedAt": "",
+          "note": ""
+        },
+        {
+          "id": "phcb-backup-drill-e3",
+          "name": "RPO/RTO",
+          "required": true,
+          "status": "pending",
+          "artifactName": "",
+          "attachmentNames": [],
+          "verifiedBy": "",
+          "verifiedAt": "",
+          "note": ""
+        },
+        {
+          "id": "phcb-backup-drill-e4",
+          "name": "演练签字页",
+          "required": true,
+          "status": "pending",
+          "artifactName": "",
+          "attachmentNames": [],
+          "verifiedBy": "",
+          "verifiedAt": "",
+          "note": ""
+        }
+      ],
+      "evidenceRecords": [],
+      "nextAction": "完成一次公共卫生事件和交换台账恢复演练。"
+    },
+    {
+      "id": "phcep-site-contacts",
+      "blockerId": "phcb-site-contacts",
+      "category": "现场组织",
+      "name": "七类机构联系人、授权范围和账号清单证据包",
+      "severity": "P1",
+      "owner": "卫健管理部门/各机构联络员",
+      "assignee": "项目办",
+      "status": "pending-site-evidence",
+      "signoffStatus": "pending",
+      "dueAt": "2026-07-23",
+      "siteWindow": "上线确认会",
+      "reminderChannel": "项目群+邮件",
+      "requiredItems": [
+        {
+          "id": "phcb-site-contacts-e1",
+          "name": "联系人清单",
+          "required": true,
+          "status": "pending",
+          "artifactName": "",
+          "attachmentNames": [],
+          "verifiedBy": "",
+          "verifiedAt": "",
+          "note": ""
+        },
+        {
+          "id": "phcb-site-contacts-e2",
+          "name": "授权范围",
+          "required": true,
+          "status": "pending",
+          "artifactName": "",
+          "attachmentNames": [],
+          "verifiedBy": "",
+          "verifiedAt": "",
+          "note": ""
+        },
+        {
+          "id": "phcb-site-contacts-e3",
+          "name": "账号清单",
+          "required": true,
+          "status": "pending",
+          "artifactName": "",
+          "attachmentNames": [],
+          "verifiedBy": "",
+          "verifiedAt": "",
+          "note": ""
+        }
+      ],
+      "evidenceRecords": [],
+      "nextAction": "完成七类机构账号、联系人和数据范围确认。"
+    }
+  ],
+  "publicHealthCutoverDrills": [
+    {
+      "id": "phdr-interface-dry-run",
+      "scenario": "interface-cutover",
+      "name": "Public health interface cutover dry run",
+      "phase": "T-3",
+      "owner": "interface joint-test team",
+      "status": "blocked",
+      "goNoGo": "no-go",
+      "retestStatus": "pending",
+      "linkedBlockerIds": [
+        "phcb-direct-report-endpoint",
+        "phcb-lis-emr-credentials"
+      ],
+      "linkedAcceptanceIds": [
+        "phoa-interface-joint-test"
+      ],
+      "evidence": [
+        "publicHealthExchangeRuns",
+        "publicHealthSiteEvidenceBridge"
+      ],
+      "blockers": [
+        "formal direct-report receipt missing",
+        "hospital signature key handoff pending"
+      ],
+      "findings": [
+        {
+          "id": "phdr-interface-dry-run-f1",
+          "severity": "P0",
+          "status": "open",
+          "finding": "Direct-report endpoint receipt and hospital signature key must be signed before production.",
+          "owner": "interface joint-test team",
+          "retestStatus": "pending"
+        }
+      ],
+      "nextAction": "Complete direct-report endpoint receipt, hospital account authorization and signature key handoff retest."
+    },
+    {
+      "id": "phdr-emergency-command",
+      "scenario": "emergency-command",
+      "name": "Emergency command tabletop and dispatch drill",
+      "phase": "T-2",
+      "owner": "health emergency and CDC team",
+      "status": "retest-required",
+      "goNoGo": "conditional",
+      "retestStatus": "pending",
+      "linkedBlockerIds": [
+        "phcb-immunization-registry"
+      ],
+      "linkedAcceptanceIds": [
+        "phoa-emergency-drill"
+      ],
+      "evidence": [
+        "publicHealthEvents",
+        "resourceDispatchRequests"
+      ],
+      "blockers": [
+        "duty roster signoff pending"
+      ],
+      "findings": [
+        {
+          "id": "phdr-emergency-command-f1",
+          "severity": "P1",
+          "status": "open",
+          "finding": "Duty roster, video conference record and dispatch receipt need one signed retest.",
+          "owner": "health emergency and CDC team",
+          "retestStatus": "pending"
+        }
+      ],
+      "nextAction": "Replay one high-priority event from signal to dispatch receipt and signed review."
+    },
+    {
+      "id": "phdr-security-compliance",
+      "scenario": "security-compliance",
+      "name": "Security assessment and audit retention drill",
+      "phase": "T-1",
+      "owner": "security compliance team",
+      "status": "blocked",
+      "goNoGo": "no-go",
+      "retestStatus": "pending",
+      "linkedBlockerIds": [
+        "phcb-security-assessment"
+      ],
+      "linkedAcceptanceIds": [
+        "phoa-security-level-protection"
+      ],
+      "evidence": [
+        "securityAcceptanceLedger",
+        "audit:retention"
+      ],
+      "blockers": [
+        "assessment report pending",
+        "GM device screenshots pending"
+      ],
+      "findings": [
+        {
+          "id": "phdr-security-compliance-f1",
+          "severity": "P0",
+          "status": "open",
+          "finding": "Security assessment report, remediation commitment and GM screenshots are not signed.",
+          "owner": "security compliance team",
+          "retestStatus": "pending"
+        }
+      ],
+      "nextAction": "Record assessment report, remediation list, GM configuration and audit-retention screenshots."
+    },
+    {
+      "id": "phdr-backup-rollback",
+      "scenario": "backup-rollback",
+      "name": "Backup restore and rollback rehearsal",
+      "phase": "T-1",
+      "owner": "operations support team",
+      "status": "blocked",
+      "goNoGo": "no-go",
+      "retestStatus": "pending",
+      "linkedBlockerIds": [
+        "phcb-backup-drill"
+      ],
+      "linkedAcceptanceIds": [
+        "phoa-backup-restore"
+      ],
+      "evidence": [
+        "launch:smoke",
+        "rollback:snapshot"
+      ],
+      "blockers": [
+        "RPO/RTO screenshot pending"
+      ],
+      "findings": [
+        {
+          "id": "phdr-backup-rollback-f1",
+          "severity": "P0",
+          "status": "open",
+          "finding": "Backup media, restore screenshot and RPO/RTO record are not signed.",
+          "owner": "operations support team",
+          "retestStatus": "pending"
+        }
+      ],
+      "nextAction": "Run one restore rehearsal for public-health event and exchange ledgers, then archive RPO/RTO evidence."
+    },
+    {
+      "id": "phdr-launch-tabletop",
+      "scenario": "launch-tabletop",
+      "name": "Launch command tabletop and go/no-go meeting",
+      "phase": "T-0",
+      "owner": "project office and release manager",
+      "status": "pending",
+      "goNoGo": "no-go",
+      "retestStatus": "pending",
+      "linkedBlockerIds": [
+        "phcb-site-contacts"
+      ],
+      "linkedAcceptanceIds": [
+        "phoa-institution-accounts",
+        "phoa-release-package"
+      ],
+      "evidence": [
+        "publicHealthLaunchApprovals",
+        "publicHealthReadinessEvidence"
+      ],
+      "blockers": [
+        "multi-party final signatures pending"
+      ],
+      "findings": [
+        {
+          "id": "phdr-launch-tabletop-f1",
+          "severity": "P1",
+          "status": "open",
+          "finding": "Final health-admin, CDC, hospital, security, operations and project-office approvals are pending.",
+          "owner": "project office and release manager",
+          "retestStatus": "pending"
+        }
+      ],
+      "nextAction": "Hold launch tabletop after all P0/P1 blockers and evidence packets are closed."
+    }
+  ],
+  "publicHealthProductionHandoffs": [
+    {
+      "id": "phhandoff-interface",
+      "packageType": "interface",
+      "name": "Direct-report and hospital interface handoff pack",
+      "owner": "interface joint-test team",
+      "receiver": "CDC direct-report owner and hospital interface owner",
+      "status": "pending-site-handoff",
+      "dueAt": "2026-07-24",
+      "requiredSignoffs": [
+        "CDC direct-report receipt",
+        "HIS/EMR/LIS/PACS account sheet",
+        "signature key handoff"
+      ],
+      "evidencePacketIds": [
+        "phcep-direct-report-endpoint",
+        "phcep-lis-emr-credentials"
+      ],
+      "blockerIds": [
+        "phcb-direct-report-endpoint",
+        "phcb-lis-emr-credentials"
+      ],
+      "acceptanceIds": [
+        "phoa-interface-joint-test"
+      ],
+      "drillIds": [
+        "phdr-interface-dry-run"
+      ],
+      "approvalIds": [
+        "phla-cdc",
+        "phla-hospital"
+      ],
+      "releaseArtifacts": [
+        "release/public-health-readiness-report.md",
+        "release/integration-readiness-report.md"
+      ],
+      "nextAction": "Collect signed direct-report receipt, hospital account sheet and signature-key custody page."
+    },
+    {
+      "id": "phhandoff-command",
+      "packageType": "command",
+      "name": "Emergency command and duty-roster handoff pack",
+      "owner": "health emergency and CDC team",
+      "receiver": "health emergency duty office",
+      "status": "pending-site-handoff",
+      "dueAt": "2026-07-24",
+      "requiredSignoffs": [
+        "duty roster",
+        "video meeting record",
+        "dispatch receipt"
+      ],
+      "evidencePacketIds": [
+        "phcep-immunization-registry"
+      ],
+      "blockerIds": [
+        "phcb-immunization-registry"
+      ],
+      "acceptanceIds": [
+        "phoa-emergency-drill"
+      ],
+      "drillIds": [
+        "phdr-emergency-command"
+      ],
+      "approvalIds": [
+        "phla-cdc",
+        "phla-health-admin"
+      ],
+      "releaseArtifacts": [
+        "release/public-health-readiness-report.md"
+      ],
+      "nextAction": "Archive emergency tabletop minutes, dispatch receipt and duty roster before go/no-go."
+    },
+    {
+      "id": "phhandoff-security",
+      "packageType": "security",
+      "name": "Security assessment and national-crypto handoff pack",
+      "owner": "security compliance team",
+      "receiver": "security compliance owner",
+      "status": "pending-site-handoff",
+      "dueAt": "2026-07-24",
+      "requiredSignoffs": [
+        "classified protection report",
+        "cryptography assessment",
+        "GM configuration screenshot",
+        "audit retention screenshot"
+      ],
+      "evidencePacketIds": [
+        "phcep-security-assessment"
+      ],
+      "blockerIds": [
+        "phcb-security-assessment"
+      ],
+      "acceptanceIds": [
+        "phoa-security-level-protection"
+      ],
+      "drillIds": [
+        "phdr-security-compliance"
+      ],
+      "approvalIds": [
+        "phla-security"
+      ],
+      "releaseArtifacts": [
+        "release/audit-retention-report.md",
+        "release/site-readiness-pack.md"
+      ],
+      "nextAction": "Attach assessment report, remediation commitment, GM configuration and audit-retention screenshots."
+    },
+    {
+      "id": "phhandoff-operations",
+      "packageType": "operations",
+      "name": "Backup restore and rollback handoff pack",
+      "owner": "operations support team",
+      "receiver": "operations duty lead",
+      "status": "pending-site-handoff",
+      "dueAt": "2026-07-24",
+      "requiredSignoffs": [
+        "backup media record",
+        "restore screenshot",
+        "RPO/RTO record",
+        "rollback window"
+      ],
+      "evidencePacketIds": [
+        "phcep-backup-drill"
+      ],
+      "blockerIds": [
+        "phcb-backup-drill"
+      ],
+      "acceptanceIds": [
+        "phoa-backup-restore"
+      ],
+      "drillIds": [
+        "phdr-backup-rollback"
+      ],
+      "approvalIds": [
+        "phla-operations"
+      ],
+      "releaseArtifacts": [
+        "release/launch-smoke-report.md",
+        "release/production-cutover-checklist.md"
+      ],
+      "nextAction": "Complete one restore rehearsal and attach RPO/RTO plus rollback owner evidence."
+    },
+    {
+      "id": "phhandoff-institution",
+      "packageType": "institution",
+      "name": "Seven-institution account and contact handoff pack",
+      "owner": "project office",
+      "receiver": "institution liaison group",
+      "status": "pending-site-handoff",
+      "dueAt": "2026-07-24",
+      "requiredSignoffs": [
+        "contact list",
+        "authorization scope",
+        "account list"
+      ],
+      "evidencePacketIds": [
+        "phcep-site-contacts"
+      ],
+      "blockerIds": [
+        "phcb-site-contacts"
+      ],
+      "acceptanceIds": [
+        "phoa-institution-accounts"
+      ],
+      "drillIds": [
+        "phdr-launch-tabletop"
+      ],
+      "approvalIds": [
+        "phla-health-admin",
+        "phla-project-office"
+      ],
+      "releaseArtifacts": [
+        "release/site-readiness-pack.md"
+      ],
+      "nextAction": "Confirm seven institution contacts, account scopes and escalation owners."
+    },
+    {
+      "id": "phhandoff-release",
+      "packageType": "release",
+      "name": "Release archive and final go/no-go handoff pack",
+      "owner": "release manager",
+      "receiver": "health commission launch board",
+      "status": "pending-site-handoff",
+      "dueAt": "2026-07-24",
+      "requiredSignoffs": [
+        "release report",
+        "deploy check",
+        "launch smoke",
+        "final go/no-go minutes"
+      ],
+      "evidencePacketIds": [
+        "phcep-site-contacts"
+      ],
+      "blockerIds": [
+        "phcb-site-contacts"
+      ],
+      "acceptanceIds": [
+        "phoa-release-package"
+      ],
+      "drillIds": [
+        "phdr-launch-tabletop"
+      ],
+      "approvalIds": [
+        "phla-health-admin",
+        "phla-project-office"
+      ],
+      "releaseArtifacts": [
+        "release/release-report.md",
+        "release/release-artifact-manifest.md",
+        "release/launch-smoke-report.md"
+      ],
+      "nextAction": "Archive release manifest, deploy check, launch smoke and final go/no-go minutes."
+    }
+  ],
+  "publicHealthGoLiveObservations": [
+    {
+      "id": "phgl-live-smoke",
+      "window": "T+0-15m",
+      "phase": "launch-open",
+      "name": "Live health and public-health API smoke watch",
+      "owner": "release manager",
+      "status": "scheduled",
+      "severity": "P0",
+      "metric": "/api/health and /api/public-health/system",
+      "threshold": "HTTP 200 within 5 seconds for three consecutive probes",
+      "rollbackTrigger": "Health or public-health system API unavailable for 5 minutes",
+      "rollbackOwner": "operations duty lead",
+      "evidence": [
+        "/api/health",
+        "/api/public-health/system",
+        "launch:smoke"
+      ],
+      "linkedHandoffIds": [
+        "phhandoff-release",
+        "phhandoff-operations"
+      ],
+      "linkedApprovalIds": [
+        "phla-operations",
+        "phla-project-office"
+      ],
+      "requiredArtifacts": [
+        "live-smoke-report",
+        "launch-room-screenshot"
+      ],
+      "nextAction": "Run authenticated live smoke from the launch room and archive the report."
+    },
+    {
+      "id": "phgl-direct-report-receipt",
+      "window": "T+15-60m",
+      "phase": "first-exchange",
+      "name": "Direct-report and hospital receipt watch",
+      "owner": "interface joint-test team",
+      "status": "scheduled",
+      "severity": "P0",
+      "metric": "direct-report, LIS and hospital callback receipts",
+      "threshold": "First production exchange batch has accepted receipt and zero untriaged failures",
+      "rollbackTrigger": "Receipt missing or untriaged P0 callback failure after 30 minutes",
+      "rollbackOwner": "CDC direct-report owner",
+      "evidence": [
+        "publicHealthExchangeRuns",
+        "publicHealthCutoverEvidencePackets"
+      ],
+      "linkedHandoffIds": [
+        "phhandoff-interface"
+      ],
+      "linkedApprovalIds": [
+        "phla-cdc",
+        "phla-hospital"
+      ],
+      "requiredArtifacts": [
+        "direct-report-receipt",
+        "hospital-callback-screenshot"
+      ],
+      "nextAction": "Capture the first accepted production receipt and any compensation decision."
+    },
+    {
+      "id": "phgl-command-duty",
+      "window": "T+1h-4h",
+      "phase": "command-duty",
+      "name": "Emergency command duty and event dispatch watch",
+      "owner": "health emergency duty office",
+      "status": "scheduled",
+      "severity": "P1",
+      "metric": "event dispatch, duty roster and command receipt",
+      "threshold": "Duty owner confirms event queue, dispatch channel and command receipt",
+      "rollbackTrigger": "Duty roster unavailable or command channel cannot receive event dispatch",
+      "rollbackOwner": "health emergency duty lead",
+      "evidence": [
+        "publicHealthEvents",
+        "resourceDispatchRequests"
+      ],
+      "linkedHandoffIds": [
+        "phhandoff-command"
+      ],
+      "linkedApprovalIds": [
+        "phla-health-admin",
+        "phla-cdc"
+      ],
+      "requiredArtifacts": [
+        "duty-roster-confirmation",
+        "event-dispatch-screenshot"
+      ],
+      "nextAction": "Record the duty roster confirmation and one command-channel probe."
+    },
+    {
+      "id": "phgl-security-audit",
+      "window": "T+0-4h",
+      "phase": "security-watch",
+      "name": "Security audit, authentication and GM-device watch",
+      "owner": "security compliance team",
+      "status": "scheduled",
+      "severity": "P0",
+      "metric": "login audit, high-risk event audit and GM-device evidence",
+      "threshold": "Audit chain verifies and no critical denied security event is open",
+      "rollbackTrigger": "Audit chain verification fails or GM/signature device is unavailable",
+      "rollbackOwner": "security compliance owner",
+      "evidence": [
+        "securityEvents",
+        "dataAccessLogs",
+        "audit:retention"
+      ],
+      "linkedHandoffIds": [
+        "phhandoff-security"
+      ],
+      "linkedApprovalIds": [
+        "phla-security"
+      ],
+      "requiredArtifacts": [
+        "audit-verify-report",
+        "gm-device-screenshot"
+      ],
+      "nextAction": "Run audit verification and archive security watch screenshots."
+    },
+    {
+      "id": "phgl-rollback-window",
+      "window": "T+0-24h",
+      "phase": "rollback-standby",
+      "name": "Backup restore and rollback standby watch",
+      "owner": "operations support team",
+      "status": "scheduled",
+      "severity": "P0",
+      "metric": "backup snapshot, restore rehearsal and rollback owner availability",
+      "threshold": "Rollback owner, latest backup and rollback checklist are available during the watch window",
+      "rollbackTrigger": "Latest backup unavailable, RPO/RTO breach, or rollback owner unreachable",
+      "rollbackOwner": "operations duty lead",
+      "evidence": [
+        "rollback:snapshot",
+        "release/production-cutover-checklist.md"
+      ],
+      "linkedHandoffIds": [
+        "phhandoff-operations",
+        "phhandoff-release"
+      ],
+      "linkedApprovalIds": [
+        "phla-operations"
+      ],
+      "requiredArtifacts": [
+        "backup-snapshot-id",
+        "rollback-owner-confirmation"
+      ],
+      "nextAction": "Confirm backup snapshot id, rollback owner and RPO/RTO watch interval."
+    },
+    {
+      "id": "phgl-institution-helpdesk",
+      "window": "T+0-24h",
+      "phase": "institution-support",
+      "name": "Seven-institution account and helpdesk watch",
+      "owner": "project office",
+      "status": "scheduled",
+      "severity": "P1",
+      "metric": "institution login, helpdesk queue and account authorization",
+      "threshold": "Seven institution contact paths and account support queue are staffed",
+      "rollbackTrigger": "More than one institution cannot access launch-critical role scope",
+      "rollbackOwner": "project office launch coordinator",
+      "evidence": [
+        "publicHealthInstitutionTasks",
+        "authUsers",
+        "siteLaunchEvidence"
+      ],
+      "linkedHandoffIds": [
+        "phhandoff-institution"
+      ],
+      "linkedApprovalIds": [
+        "phla-health-admin",
+        "phla-project-office"
+      ],
+      "requiredArtifacts": [
+        "institution-contact-roster",
+        "account-support-log"
+      ],
+      "nextAction": "Confirm institution contact roster and launch-day account support queue."
+    }
+  ],
+  "publicHealthLaunchApprovals": [
+    {
+      "id": "phla-health-admin",
+      "gateId": "public-health-production-launch",
+      "role": "health-admin",
+      "owner": "市卫健委规划信息处",
+      "approver": "卫健委上线审批人",
+      "status": "pending",
+      "decision": "pending",
+      "dueAt": "2026-07-24",
+      "requiredEvidence": [
+        "上线审批单",
+        "值守排班",
+        "发布版本号"
+      ],
+      "nextAction": "确认公共卫生生产上线范围、窗口和回退责任人。"
+    },
+    {
+      "id": "phla-cdc",
+      "gateId": "public-health-production-launch",
+      "role": "cdc",
+      "owner": "市疾控中心应急办",
+      "approver": "疾控业务负责人",
+      "status": "pending",
+      "decision": "pending",
+      "dueAt": "2026-07-24",
+      "requiredEvidence": [
+        "直报接口回执",
+        "流调责任人",
+        "应急会商记录"
+      ],
+      "nextAction": "确认疾控直报、流调、实验室和应急指挥闭环已签收。"
+    },
+    {
+      "id": "phla-hospital",
+      "gateId": "public-health-production-launch",
+      "role": "hospital",
+      "owner": "医院信息/院感/检验联络员",
+      "approver": "医院接口负责人",
+      "status": "pending",
+      "decision": "pending",
+      "dueAt": "2026-07-24",
+      "requiredEvidence": [
+        "HIS/EMR/LIS/PACS 联调回执",
+        "账号授权单",
+        "签名密钥交接"
+      ],
+      "nextAction": "确认医疗机构医防协同接口和账号授权已签收。"
+    },
+    {
+      "id": "phla-security",
+      "gateId": "public-health-production-launch",
+      "role": "security",
+      "owner": "安全管理岗",
+      "approver": "安全合规负责人",
+      "status": "pending",
+      "decision": "pending",
+      "dueAt": "2026-07-24",
+      "requiredEvidence": [
+        "等保报告",
+        "密评报告",
+        "国密配置",
+        "日志保全截图"
+      ],
+      "nextAction": "确认安全测评、国密和日志保全材料已归档。"
+    },
+    {
+      "id": "phla-operations",
+      "gateId": "public-health-production-launch",
+      "role": "operations",
+      "owner": "运维保障组",
+      "approver": "运维值班长",
+      "status": "pending",
+      "decision": "pending",
+      "dueAt": "2026-07-24",
+      "requiredEvidence": [
+        "备份恢复演练",
+        "RPO/RTO 记录",
+        "值守工单"
+      ],
+      "nextAction": "确认备份恢复、监控值守和回退窗口已签收。"
+    },
+    {
+      "id": "phla-project-office",
+      "gateId": "public-health-production-launch",
+      "role": "project-office",
+      "owner": "项目办/发布经理",
+      "approver": "项目发布经理",
+      "status": "pending",
+      "decision": "pending",
+      "dueAt": "2026-07-24",
+      "requiredEvidence": [
+        "验收清单",
+        "培训签到",
+        "发布报告"
+      ],
+      "nextAction": "汇总所有现场签字页并提交最终上线申请。"
+    }
+  ],
+  "publicHealthLaunchIncidents": [
+    {
+      "id": "phli-api-smoke",
+      "lane": "api-smoke",
+      "name": "Launch health and public-health API incident lane",
+      "owner": "release manager",
+      "status": "standby",
+      "severity": "P0",
+      "sla": "triage within 15 minutes, rollback decision within 30 minutes",
+      "escalationPath": [
+        "release manager",
+        "operations duty lead",
+        "health commission launch board"
+      ],
+      "rollbackDecisionOwner": "operations duty lead",
+      "linkedObservationIds": [
+        "phgl-live-smoke"
+      ],
+      "linkedHandoffIds": [
+        "phhandoff-release",
+        "phhandoff-operations"
+      ],
+      "evidence": [
+        "/api/health",
+        "/api/public-health/system",
+        "launch:smoke"
+      ],
+      "requiredArtifacts": [
+        "incident-ticket",
+        "decision-log",
+        "live-smoke-screenshot"
+      ],
+      "nextAction": "Keep launch room ticket owner, health check probe and rollback decision owner online."
+    },
+    {
+      "id": "phli-direct-report",
+      "lane": "direct-report",
+      "name": "Direct-report and hospital callback incident lane",
+      "owner": "interface joint-test team",
+      "status": "standby",
+      "severity": "P0",
+      "sla": "triage within 20 minutes, compensation or rollback decision within 45 minutes",
+      "escalationPath": [
+        "CDC direct-report owner",
+        "hospital interface owner",
+        "release manager"
+      ],
+      "rollbackDecisionOwner": "CDC direct-report owner",
+      "linkedObservationIds": [
+        "phgl-direct-report-receipt"
+      ],
+      "linkedHandoffIds": [
+        "phhandoff-interface"
+      ],
+      "evidence": [
+        "publicHealthExchangeRuns",
+        "publicHealthCutoverEvidencePackets"
+      ],
+      "requiredArtifacts": [
+        "receipt-screenshot",
+        "failed-payload-sample",
+        "compensation-decision"
+      ],
+      "nextAction": "Prepare first-batch receipt triage and compensation owner before opening production exchange."
+    },
+    {
+      "id": "phli-command-duty",
+      "lane": "command-duty",
+      "name": "Emergency command duty incident lane",
+      "owner": "health emergency duty office",
+      "status": "standby",
+      "severity": "P1",
+      "sla": "triage within 30 minutes, command workaround within 60 minutes",
+      "escalationPath": [
+        "health emergency duty lead",
+        "CDC command owner",
+        "health-admin approver"
+      ],
+      "rollbackDecisionOwner": "health emergency duty lead",
+      "linkedObservationIds": [
+        "phgl-command-duty"
+      ],
+      "linkedHandoffIds": [
+        "phhandoff-command"
+      ],
+      "evidence": [
+        "publicHealthEvents",
+        "resourceDispatchRequests"
+      ],
+      "requiredArtifacts": [
+        "duty-roster-note",
+        "dispatch-channel-test",
+        "workaround-decision"
+      ],
+      "nextAction": "Keep duty roster, video meeting room and fallback dispatch channel ready."
+    },
+    {
+      "id": "phli-security-audit",
+      "lane": "security-audit",
+      "name": "Security audit and authentication incident lane",
+      "owner": "security compliance team",
+      "status": "standby",
+      "severity": "P0",
+      "sla": "triage within 15 minutes, security go/no-go within 30 minutes",
+      "escalationPath": [
+        "security compliance owner",
+        "operations duty lead",
+        "health commission launch board"
+      ],
+      "rollbackDecisionOwner": "security compliance owner",
+      "linkedObservationIds": [
+        "phgl-security-audit"
+      ],
+      "linkedHandoffIds": [
+        "phhandoff-security"
+      ],
+      "evidence": [
+        "securityEvents",
+        "dataAccessLogs",
+        "audit:retention"
+      ],
+      "requiredArtifacts": [
+        "audit-verify-report",
+        "authentication-error-sample",
+        "security-decision-log"
+      ],
+      "nextAction": "Keep audit verification owner and authentication fallback decision path online."
+    },
+    {
+      "id": "phli-backup-rollback",
+      "lane": "backup-rollback",
+      "name": "Backup restore and rollback execution incident lane",
+      "owner": "operations support team",
+      "status": "standby",
+      "severity": "P0",
+      "sla": "triage within 15 minutes, rollback execution decision within 30 minutes",
+      "escalationPath": [
+        "operations duty lead",
+        "release manager",
+        "health commission launch board"
+      ],
+      "rollbackDecisionOwner": "operations duty lead",
+      "linkedObservationIds": [
+        "phgl-rollback-window"
+      ],
+      "linkedHandoffIds": [
+        "phhandoff-operations",
+        "phhandoff-release"
+      ],
+      "evidence": [
+        "rollback:snapshot",
+        "release/production-cutover-checklist.md"
+      ],
+      "requiredArtifacts": [
+        "backup-snapshot-id",
+        "rollback-command-log",
+        "rpo-rto-note"
+      ],
+      "nextAction": "Keep latest backup snapshot id, rollback command owner and RPO/RTO decision log ready."
+    },
+    {
+      "id": "phli-institution-helpdesk",
+      "lane": "institution-helpdesk",
+      "name": "Institution account and helpdesk incident lane",
+      "owner": "project office",
+      "status": "standby",
+      "severity": "P1",
+      "sla": "triage within 30 minutes, account workaround within 60 minutes",
+      "escalationPath": [
+        "project office launch coordinator",
+        "institution liaison",
+        "identity administrator"
+      ],
+      "rollbackDecisionOwner": "project office launch coordinator",
+      "linkedObservationIds": [
+        "phgl-institution-helpdesk"
+      ],
+      "linkedHandoffIds": [
+        "phhandoff-institution"
+      ],
+      "evidence": [
+        "publicHealthInstitutionTasks",
+        "authUsers",
+        "siteLaunchEvidence"
+      ],
+      "requiredArtifacts": [
+        "helpdesk-ticket",
+        "account-scope-check",
+        "institution-contact-note"
+      ],
+      "nextAction": "Keep institution contact roster and account-support escalation path ready."
+    }
+  ],
+  "publicHealthLaunchDutyShifts": [
+    {
+      "id": "phlds-release-room",
+      "shiftWindow": "T-2h to T+4h",
+      "lane": "release-room",
+      "name": "Release command room duty handoff",
+      "owner": "release manager",
+      "backupOwner": "project office launch coordinator",
+      "status": "scheduled",
+      "contactChannel": "launch-room bridge + work order group",
+      "escalationOwner": "health commission launch board",
+      "linkedObservationIds": [
+        "phgl-live-smoke"
+      ],
+      "linkedIncidentIds": [
+        "phli-api-smoke",
+        "phli-backup-rollback"
+      ],
+      "linkedHandoffIds": [
+        "phhandoff-release"
+      ],
+      "handoffChecklist": [
+        "go/no-go minutes",
+        "launch smoke owner",
+        "rollback decision path"
+      ],
+      "requiredArtifacts": [
+        "duty-roster",
+        "bridge-room-screenshot",
+        "handoff-note"
+      ],
+      "nextAction": "Confirm command room bridge, go/no-go recorder and release duty owner before launch window opens."
+    },
+    {
+      "id": "phlds-cdc-direct-report",
+      "shiftWindow": "T+0 to T+8h",
+      "lane": "direct-report",
+      "name": "CDC direct-report duty handoff",
+      "owner": "CDC direct-report owner",
+      "backupOwner": "CDC surveillance duty backup",
+      "status": "scheduled",
+      "contactChannel": "CDC duty phone + direct-report group",
+      "escalationOwner": "CDC business lead",
+      "linkedObservationIds": [
+        "phgl-direct-report-receipt"
+      ],
+      "linkedIncidentIds": [
+        "phli-direct-report"
+      ],
+      "linkedHandoffIds": [
+        "phhandoff-interface",
+        "phhandoff-command"
+      ],
+      "handoffChecklist": [
+        "first batch receipt",
+        "failed payload triage",
+        "manual compensation owner"
+      ],
+      "requiredArtifacts": [
+        "cdc-duty-roster",
+        "receipt-watch-note",
+        "compensation-owner-note"
+      ],
+      "nextAction": "Keep CDC receipt reviewer and compensation owner reachable for the first exchange batch."
+    },
+    {
+      "id": "phlds-hospital-interface",
+      "shiftWindow": "T+0 to T+8h",
+      "lane": "hospital-callback",
+      "name": "Hospital callback and LIS/EMR duty handoff",
+      "owner": "hospital interface owner",
+      "backupOwner": "hospital information duty engineer",
+      "status": "scheduled",
+      "contactChannel": "hospital IT group + interface vendor bridge",
+      "escalationOwner": "hospital launch approver",
+      "linkedObservationIds": [
+        "phgl-direct-report-receipt"
+      ],
+      "linkedIncidentIds": [
+        "phli-direct-report"
+      ],
+      "linkedHandoffIds": [
+        "phhandoff-interface"
+      ],
+      "handoffChecklist": [
+        "callback receipt owner",
+        "signature key owner",
+        "sample id query owner"
+      ],
+      "requiredArtifacts": [
+        "hospital-duty-roster",
+        "callback-receipt-note",
+        "interface-vendor-contact"
+      ],
+      "nextAction": "Confirm callback receipt and signature-key owners before the first production callback."
+    },
+    {
+      "id": "phlds-security-audit",
+      "shiftWindow": "T-1h to T+8h",
+      "lane": "security-audit",
+      "name": "Security audit and authentication duty handoff",
+      "owner": "security compliance owner",
+      "backupOwner": "security operations backup",
+      "status": "scheduled",
+      "contactChannel": "security duty phone + audit channel",
+      "escalationOwner": "security launch approver",
+      "linkedObservationIds": [
+        "phgl-security-audit"
+      ],
+      "linkedIncidentIds": [
+        "phli-security-audit"
+      ],
+      "linkedHandoffIds": [
+        "phhandoff-security"
+      ],
+      "handoffChecklist": [
+        "login audit monitor",
+        "denied event triage",
+        "GM device fallback"
+      ],
+      "requiredArtifacts": [
+        "security-duty-roster",
+        "audit-monitor-screenshot",
+        "gm-device-contact"
+      ],
+      "nextAction": "Confirm audit monitor, denied-event triage owner and GM-device fallback owner."
+    },
+    {
+      "id": "phlds-operations-rollback",
+      "shiftWindow": "T-2h to T+24h",
+      "lane": "operations-rollback",
+      "name": "Operations rollback and backup duty handoff",
+      "owner": "operations duty lead",
+      "backupOwner": "backup restore engineer",
+      "status": "scheduled",
+      "contactChannel": "operations bridge + backup restore group",
+      "escalationOwner": "operations launch approver",
+      "linkedObservationIds": [
+        "phgl-rollback-window"
+      ],
+      "linkedIncidentIds": [
+        "phli-backup-rollback"
+      ],
+      "linkedHandoffIds": [
+        "phhandoff-operations",
+        "phhandoff-release"
+      ],
+      "handoffChecklist": [
+        "backup snapshot id",
+        "restore command owner",
+        "RPO/RTO watch"
+      ],
+      "requiredArtifacts": [
+        "backup-snapshot-note",
+        "rollback-owner-roster",
+        "rpo-rto-watch-note"
+      ],
+      "nextAction": "Confirm backup snapshot id, restore command owner and rollback bridge before launch."
+    },
+    {
+      "id": "phlds-institution-helpdesk",
+      "shiftWindow": "T+0 to T+24h",
+      "lane": "institution-helpdesk",
+      "name": "Seven-institution helpdesk duty handoff",
+      "owner": "project office launch coordinator",
+      "backupOwner": "institution liaison backup",
+      "status": "scheduled",
+      "contactChannel": "institution helpdesk queue + contact roster",
+      "escalationOwner": "project office approver",
+      "linkedObservationIds": [
+        "phgl-institution-helpdesk"
+      ],
+      "linkedIncidentIds": [
+        "phli-institution-helpdesk"
+      ],
+      "linkedHandoffIds": [
+        "phhandoff-institution"
+      ],
+      "handoffChecklist": [
+        "contact roster",
+        "account scope support",
+        "first-line FAQ owner"
+      ],
+      "requiredArtifacts": [
+        "institution-contact-roster",
+        "account-helpdesk-log",
+        "faq-owner-note"
+      ],
+      "nextAction": "Confirm contact roster, account helpdesk queue and first-line FAQ owner."
+    }
+  ],
+  "publicHealthLaunchCommandBriefs": [
+    {
+      "id": "phlcb-prelaunch-go-no-go",
+      "briefWindow": "T-1h",
+      "phase": "prelaunch",
+      "name": "Prelaunch go/no-go command brief",
+      "owner": "release manager",
+      "recorder": "command room recorder",
+      "status": "draft-ready",
+      "audience": [
+        "health commission launch board",
+        "CDC command owner",
+        "operations duty lead"
+      ],
+      "sourceBoards": [
+        "launchGate",
+        "cutoverReadiness",
+        "productionHandoffBoard",
+        "launchDutyBoard"
+      ],
+      "linkedDutyShiftIds": [
+        "phlds-release-room",
+        "phlds-operations-rollback",
+        "phlds-security-audit"
+      ],
+      "linkedObservationIds": [
+        "phgl-live-smoke",
+        "phgl-security-audit",
+        "phgl-rollback-window"
+      ],
+      "linkedIncidentIds": [
+        "phli-api-smoke",
+        "phli-security-audit",
+        "phli-backup-rollback"
+      ],
+      "requiredSections": [
+        "gate status",
+        "open P0/P1 blockers",
+        "rollback decision path",
+        "duty roster confirmation"
+      ],
+      "publishChannel": "launch-room bridge + signed go/no-go minutes",
+      "publishTarget": "go/no-go meeting minutes",
+      "decisionOwner": "health commission launch board",
+      "nextAction": "Publish the prelaunch go/no-go status only after current launch gate, blockers, handoffs and rollback owners are reviewed."
+    },
+    {
+      "id": "phlcb-t0-launch-start",
+      "briefWindow": "T+0",
+      "phase": "launch-start",
+      "name": "Launch start command status brief",
+      "owner": "release manager",
+      "recorder": "project office launch coordinator",
+      "status": "draft-ready",
+      "audience": [
+        "release room",
+        "CDC direct-report owner",
+        "hospital interface owner",
+        "security compliance owner"
+      ],
+      "sourceBoards": [
+        "goLiveObservationBoard",
+        "launchIncidentBoard",
+        "launchDutyBoard"
+      ],
+      "linkedDutyShiftIds": [
+        "phlds-release-room",
+        "phlds-cdc-direct-report",
+        "phlds-hospital-interface",
+        "phlds-security-audit"
+      ],
+      "linkedObservationIds": [
+        "phgl-live-smoke",
+        "phgl-direct-report-receipt",
+        "phgl-security-audit"
+      ],
+      "linkedIncidentIds": [
+        "phli-api-smoke",
+        "phli-direct-report",
+        "phli-security-audit"
+      ],
+      "requiredSections": [
+        "API smoke",
+        "first exchange window",
+        "security audit watch",
+        "incident lane standby"
+      ],
+      "publishChannel": "launch-room bridge + work order group",
+      "publishTarget": "launch start status broadcast",
+      "decisionOwner": "release manager",
+      "nextAction": "Broadcast launch start state after health check, first exchange owner and incident desk standby are confirmed."
+    },
+    {
+      "id": "phlcb-t2-first-receipts",
+      "briefWindow": "T+2h",
+      "phase": "first-receipts",
+      "name": "First receipt and callback command brief",
+      "owner": "CDC direct-report owner",
+      "recorder": "interface joint-test recorder",
+      "status": "draft-ready",
+      "audience": [
+        "CDC command owner",
+        "hospital interface owner",
+        "interface vendor bridge"
+      ],
+      "sourceBoards": [
+        "goLiveObservationBoard",
+        "launchIncidentBoard",
+        "siteEvidenceBridge"
+      ],
+      "linkedDutyShiftIds": [
+        "phlds-cdc-direct-report",
+        "phlds-hospital-interface"
+      ],
+      "linkedObservationIds": [
+        "phgl-direct-report-receipt"
+      ],
+      "linkedIncidentIds": [
+        "phli-direct-report"
+      ],
+      "requiredSections": [
+        "direct-report receipt",
+        "hospital callback receipt",
+        "failed payload triage",
+        "manual compensation owner"
+      ],
+      "publishChannel": "CDC duty group + interface work order",
+      "publishTarget": "first receipt status note",
+      "decisionOwner": "CDC business lead",
+      "nextAction": "Record first receipt outcome and any manual compensation decision without closing external evidence blockers automatically."
+    },
+    {
+      "id": "phlcb-t8-stability-watch",
+      "briefWindow": "T+8h",
+      "phase": "stability-watch",
+      "name": "Stability watch and risk command brief",
+      "owner": "operations duty lead",
+      "recorder": "operations duty recorder",
+      "status": "draft-ready",
+      "audience": [
+        "operations bridge",
+        "security compliance owner",
+        "institution helpdesk"
+      ],
+      "sourceBoards": [
+        "goLiveObservationBoard",
+        "launchIncidentBoard",
+        "productionHandoffBoard"
+      ],
+      "linkedDutyShiftIds": [
+        "phlds-security-audit",
+        "phlds-operations-rollback",
+        "phlds-institution-helpdesk"
+      ],
+      "linkedObservationIds": [
+        "phgl-security-audit",
+        "phgl-rollback-window",
+        "phgl-institution-helpdesk"
+      ],
+      "linkedIncidentIds": [
+        "phli-security-audit",
+        "phli-backup-rollback",
+        "phli-institution-helpdesk"
+      ],
+      "requiredSections": [
+        "critical signals",
+        "security audit result",
+        "rollback standby",
+        "institution helpdesk queue"
+      ],
+      "publishChannel": "operations bridge + security channel",
+      "publishTarget": "T+8 stability watch note",
+      "decisionOwner": "operations launch approver",
+      "nextAction": "Publish stability watch summary while keeping rollback and incident decision owners reachable."
+    },
+    {
+      "id": "phlcb-t24-closure-handoff",
+      "briefWindow": "T+24h",
+      "phase": "closure-handoff",
+      "name": "First-day closure and handoff command brief",
+      "owner": "project office launch coordinator",
+      "recorder": "release archive owner",
+      "status": "draft-ready",
+      "audience": [
+        "health commission launch board",
+        "project office",
+        "operations duty lead",
+        "institution liaison"
+      ],
+      "sourceBoards": [
+        "launchGate",
+        "goLiveObservationBoard",
+        "launchIncidentBoard",
+        "launchDutyBoard",
+        "productionHandoffBoard"
+      ],
+      "linkedDutyShiftIds": [
+        "phlds-release-room",
+        "phlds-operations-rollback",
+        "phlds-institution-helpdesk"
+      ],
+      "linkedObservationIds": [
+        "phgl-live-smoke",
+        "phgl-rollback-window",
+        "phgl-institution-helpdesk"
+      ],
+      "linkedIncidentIds": [
+        "phli-api-smoke",
+        "phli-backup-rollback",
+        "phli-institution-helpdesk"
+      ],
+      "requiredSections": [
+        "first-day observations",
+        "open incidents",
+        "handoff gaps",
+        "next 72h watch plan"
+      ],
+      "publishChannel": "project office archive + launch board email",
+      "publishTarget": "first-day closure handoff brief",
+      "decisionOwner": "project office approver",
+      "nextAction": "Archive first-day closure brief and explicitly carry open site evidence, blocker and approval gaps into the next watch cycle."
+    }
+  ],
+  "publicHealthSiteEvidenceVerificationTasks": [
+    {
+      "id": "phsevt-direct-report",
+      "sequence": 1,
+      "linkId": "ph-sle-direct-report",
+      "templateId": "interface-statistics-report-v1",
+      "packetId": "phcep-direct-report-endpoint",
+      "blockerId": "phcb-direct-report-endpoint",
+      "acceptanceId": "phoa-interface-joint-test",
+      "name": "Site evidence verification: Direct report endpoint, field version and receipt sample",
+      "owner": "cdc-direct-report",
+      "reviewerRole": "commission",
+      "status": "scheduled",
+      "priority": "P0",
+      "verificationWindow": "T-3d to T-1h",
+      "requiredChecks": ["site evidence recorded", "joint-test receipt or signed artifact", "commission verification"],
+      "escalationPath": ["site implementation owner", "release manager", "health commission launch board"],
+      "nextAction": "Record the site evidence first, then verify this task against the matching evidence ID."
+    },
+    {
+      "id": "phsevt-his-account",
+      "sequence": 2,
+      "linkId": "ph-sle-his-account",
+      "templateId": "interface-his-patient-v1",
+      "packetId": "phcep-lis-emr-credentials",
+      "blockerId": "phcb-lis-emr-credentials",
+      "acceptanceId": "phoa-interface-joint-test",
+      "name": "Site evidence verification: Hospital account authorization",
+      "owner": "hospital-interface",
+      "reviewerRole": "commission",
+      "status": "scheduled",
+      "priority": "P1",
+      "verificationWindow": "T-3d to T-1h",
+      "requiredChecks": ["site evidence recorded", "joint-test receipt or signed artifact", "commission verification"],
+      "escalationPath": ["site implementation owner", "release manager", "health commission launch board"],
+      "nextAction": "Record the site evidence first, then verify this task against the matching evidence ID."
+    },
+    {
+      "id": "phsevt-emr-signature",
+      "sequence": 3,
+      "linkId": "ph-sle-emr-signature",
+      "templateId": "interface-emr-summary-v1",
+      "packetId": "phcep-lis-emr-credentials",
+      "blockerId": "phcb-lis-emr-credentials",
+      "acceptanceId": "phoa-interface-joint-test",
+      "name": "Site evidence verification: Signature key handoff",
+      "owner": "hospital-interface",
+      "reviewerRole": "commission",
+      "status": "scheduled",
+      "priority": "P1",
+      "verificationWindow": "T-3d to T-1h",
+      "requiredChecks": ["site evidence recorded", "joint-test receipt or signed artifact", "commission verification"],
+      "escalationPath": ["site implementation owner", "release manager", "health commission launch board"],
+      "nextAction": "Record the site evidence first, then verify this task against the matching evidence ID."
+    },
+    {
+      "id": "phsevt-lis-positive-receipt",
+      "sequence": 4,
+      "linkId": "ph-sle-lis-positive-receipt",
+      "templateId": "interface-lis-report-v1",
+      "packetId": "phcep-lis-emr-credentials",
+      "blockerId": "phcb-lis-emr-credentials",
+      "acceptanceId": "phoa-interface-joint-test",
+      "name": "Site evidence verification: Positive result callback receipt",
+      "owner": "hospital-lab",
+      "reviewerRole": "commission",
+      "status": "scheduled",
+      "priority": "P1",
+      "verificationWindow": "T-3d to T-1h",
+      "requiredChecks": ["site evidence recorded", "joint-test receipt or signed artifact", "commission verification"],
+      "escalationPath": ["site implementation owner", "release manager", "health commission launch board"],
+      "nextAction": "Record the site evidence first, then verify this task against the matching evidence ID."
+    },
+    {
+      "id": "phsevt-immunization-registry",
+      "sequence": 5,
+      "linkId": "ph-sle-immunization-registry",
+      "templateId": "interface-certificate-sync-v1",
+      "packetId": "phcep-immunization-registry",
+      "blockerId": "phcb-immunization-registry",
+      "acceptanceId": "phoa-emergency-drill",
+      "name": "Site evidence verification: Immunization registry, cold-chain and AEFI receipts",
+      "owner": "immunization-registry",
+      "reviewerRole": "commission",
+      "status": "scheduled",
+      "priority": "P0",
+      "verificationWindow": "T-3d to T-1h",
+      "requiredChecks": ["site evidence recorded", "joint-test receipt or signed artifact", "commission verification"],
+      "escalationPath": ["site implementation owner", "release manager", "health commission launch board"],
+      "nextAction": "Record the site evidence first, then verify this task against the matching evidence ID."
+    },
+    {
+      "id": "phsevt-security-assessment",
+      "sequence": 6,
+      "linkId": "ph-sle-security-assessment",
+      "templateId": "signoff-cutover-audit-retention",
+      "packetId": "phcep-security-assessment",
+      "blockerId": "phcb-security-assessment",
+      "acceptanceId": "phoa-security-level-protection",
+      "name": "Site evidence verification: Security assessment and audit retention evidence",
+      "owner": "security-compliance",
+      "reviewerRole": "commission",
+      "status": "scheduled",
+      "priority": "P0",
+      "verificationWindow": "T-3d to T-1h",
+      "requiredChecks": ["site evidence recorded", "joint-test receipt or signed artifact", "commission verification"],
+      "escalationPath": ["site implementation owner", "release manager", "health commission launch board"],
+      "nextAction": "Record the site evidence first, then verify this task against the matching evidence ID."
+    },
+    {
+      "id": "phsevt-gm-config",
+      "sequence": 7,
+      "linkId": "ph-sle-gm-config",
+      "templateId": "signoff-cutover-secrets",
+      "packetId": "phcep-security-assessment",
+      "blockerId": "phcb-security-assessment",
+      "acceptanceId": "phoa-security-level-protection",
+      "name": "Site evidence verification: Secret and national crypto configuration handoff",
+      "owner": "security-compliance",
+      "reviewerRole": "commission",
+      "status": "scheduled",
+      "priority": "P0",
+      "verificationWindow": "T-3d to T-1h",
+      "requiredChecks": ["site evidence recorded", "joint-test receipt or signed artifact", "commission verification"],
+      "escalationPath": ["site implementation owner", "release manager", "health commission launch board"],
+      "nextAction": "Record the site evidence first, then verify this task against the matching evidence ID."
+    },
+    {
+      "id": "phsevt-backup-drill",
+      "sequence": 8,
+      "linkId": "ph-sle-backup-drill",
+      "templateId": "signoff-cutover-dr-rehearsal",
+      "packetId": "phcep-backup-drill",
+      "blockerId": "phcb-backup-drill",
+      "acceptanceId": "phoa-backup-restore",
+      "name": "Site evidence verification: Backup media, restore screenshots, RPO/RTO and rehearsal signoff",
+      "owner": "platform-ops",
+      "reviewerRole": "commission",
+      "status": "scheduled",
+      "priority": "P0",
+      "verificationWindow": "T-3d to T-1h",
+      "requiredChecks": ["site evidence recorded", "joint-test receipt or signed artifact", "commission verification"],
+      "escalationPath": ["site implementation owner", "release manager", "health commission launch board"],
+      "nextAction": "Record the site evidence first, then verify this task against the matching evidence ID."
+    },
+    {
+      "id": "phsevt-institution-accounts",
+      "sequence": 9,
+      "linkId": "ph-sle-institution-accounts",
+      "templateId": "signoff-cutover-identity",
+      "packetId": "phcep-site-contacts",
+      "blockerId": "phcb-site-contacts",
+      "acceptanceId": "phoa-institution-accounts",
+      "name": "Site evidence verification: Institution contacts, authorization scope and account list",
+      "owner": "project-office",
+      "reviewerRole": "commission",
+      "status": "scheduled",
+      "priority": "P1",
+      "verificationWindow": "T-3d to T-1h",
+      "requiredChecks": ["site evidence recorded", "joint-test receipt or signed artifact", "commission verification"],
+      "escalationPath": ["site implementation owner", "release manager", "health commission launch board"],
+      "nextAction": "Record the site evidence first, then verify this task against the matching evidence ID."
+    }
+  ],
+  "citizenOperationContents": [
+    {
+      "id": "cop-content-banner-registration",
+      "type": "banner",
+      "title": "预约挂号试点服务",
+      "summary": "展示预约确认、退号、支付和医保预校验状态；正式号源以医院联调结果为准。",
+      "channels": ["citizen-web", "app-shell"],
+      "status": "published-demo",
+      "owner": "居民服务运营岗",
+      "productionReady": false
+    },
+    {
+      "id": "cop-content-family-doctor",
+      "type": "article",
+      "title": "家庭医生签约与履约说明",
+      "summary": "居民可查看签约申请、机构审核、履约、续约和满意度演示记录。",
+      "channels": ["citizen-web"],
+      "status": "published-demo",
+      "owner": "基层卫生处",
+      "productionReady": false
+    },
+    {
+      "id": "cop-content-nursing-safety",
+      "type": "message",
+      "title": "互联网护理服务安全提示",
+      "summary": "上门前核验护士、知情同意和服务地址，服务过程保留定位与护理记录。",
+      "channels": ["citizen-web", "in-app-message"],
+      "status": "published-demo",
+      "owner": "护理运营组",
+      "productionReady": false
+    },
+    {
+      "id": "cop-content-refund-policy",
+      "type": "article",
+      "title": "预约退号与退费规则草案",
+      "summary": "待医院、支付渠道和医保联调后发布正式时限、原路退回和异常申诉规则。",
+      "channels": ["citizen-web"],
+      "status": "review-pending",
+      "owner": "财务与居民服务组",
+      "productionReady": false
+    }
+  ],
+  "citizenAgreementVersions": [
+    {
+      "id": "cop-agreement-privacy-v2",
+      "agreementCode": "citizen-privacy",
+      "name": "居民端隐私政策",
+      "version": "2.0-demo",
+      "status": "active-demo",
+      "acceptanceMode": "explicit-checkbox",
+      "requiredScopes": ["identity", "health-archive", "service-order"],
+      "legalReviewStatus": "onsite-pending",
+      "productionReady": false
+    },
+    {
+      "id": "cop-agreement-service-v1",
+      "agreementCode": "citizen-service-terms",
+      "name": "居民服务使用协议",
+      "version": "1.0-demo",
+      "status": "active-demo",
+      "acceptanceMode": "explicit-checkbox",
+      "requiredScopes": ["appointment", "internet-nursing", "escort", "family-doctor"],
+      "legalReviewStatus": "onsite-pending",
+      "productionReady": false
+    },
+    {
+      "id": "cop-agreement-health-auth-v1",
+      "agreementCode": "health-data-authorization",
+      "name": "健康数据调阅授权书",
+      "version": "1.0-demo",
+      "status": "active-demo",
+      "acceptanceMode": "signed-consent",
+      "requiredScopes": ["archive-read", "report-share", "family-proxy"],
+      "legalReviewStatus": "onsite-pending",
+      "productionReady": false
+    },
+    {
+      "id": "cop-agreement-privacy-v1",
+      "agreementCode": "citizen-privacy",
+      "name": "居民端隐私政策",
+      "version": "1.0-demo",
+      "status": "archived",
+      "acceptanceMode": "explicit-checkbox",
+      "requiredScopes": ["identity", "health-archive"],
+      "legalReviewStatus": "superseded",
+      "productionReady": false
+    }
+  ],
+  "citizenIdentityReviewCases": [
+    {
+      "id": "cop-identity-r3",
+      "residentId": "r3",
+      "residentName": "演示居民 C",
+      "source": "citizen-phone-login",
+      "riskLevel": "medium",
+      "status": "pending-review",
+      "submittedEvidence": ["phone-token", "masked-id-card"],
+      "productionReady": false
+    },
+    {
+      "id": "cop-identity-r4",
+      "residentId": "r4",
+      "residentName": "演示居民 D",
+      "source": "family-proxy",
+      "riskLevel": "high",
+      "status": "material-requested",
+      "submittedEvidence": ["phone-token", "guardian-statement"],
+      "decisionNote": "待补监护关系证明。",
+      "productionReady": false
+    },
+    {
+      "id": "cop-identity-r1",
+      "residentId": "r1",
+      "residentName": "演示居民 A",
+      "source": "commission-demo-index",
+      "riskLevel": "low",
+      "status": "approved-demo",
+      "submittedEvidence": ["phone-token", "masked-id-card", "master-index-match"],
+      "decisionNote": "演示主索引核验通过，不替代政务实名结果。",
+      "productionReady": false
+    }
+  ],
+  "citizenServiceBlacklist": [
+    {
+      "id": "cop-block-provider-demo",
+      "subjectType": "provider",
+      "subjectId": "provider-demo-suspended",
+      "subjectName": "演示暂停服务商",
+      "reasonCode": "credential-expired",
+      "reason": "演示资质到期，暂停居民端服务展示。",
+      "status": "active-demo",
+      "productionReady": false
+    },
+    {
+      "id": "cop-block-account-review",
+      "subjectType": "account",
+      "subjectId": "citizen-risk-demo",
+      "subjectName": "异常频次演示账号",
+      "reasonCode": "abnormal-order-frequency",
+      "reason": "短时间重复提交服务订单，等待人工复核。",
+      "status": "under-review",
+      "productionReady": false
+    },
+    {
+      "id": "cop-block-device-lifted",
+      "subjectType": "device",
+      "subjectId": "device-demo-001",
+      "subjectName": "已解除演示设备",
+      "reasonCode": "login-risk",
+      "reason": "设备登录风险已完成复核。",
+      "status": "lifted-demo",
+      "productionReady": false
+    }
+  ],
+  "citizenHospitalServiceConfigs": [
+    {
+      "id": "cop-hospital-mr1",
+      "institutionCode": "MR1",
+      "institutionName": "大连市中心医院",
+      "enabledServices": ["appointment", "report-query", "internet-nursing", "escort"],
+      "orderChannels": ["citizen-web", "app-shell"],
+      "status": "active-demo",
+      "launchScope": "white-list-demo",
+      "onsiteBlocker": "正式号源、支付退费、医保状态和医院服务协议待现场联调。",
+      "productionReady": false
+    },
+    {
+      "id": "cop-hospital-mr3",
+      "institutionCode": "MR3",
+      "institutionName": "青泥洼桥社区卫生服务中心",
+      "enabledServices": ["family-doctor", "chronic-followup", "internet-nursing"],
+      "orderChannels": ["citizen-web"],
+      "status": "active-demo",
+      "launchScope": "white-list-demo",
+      "onsiteBlocker": "真实团队名册、服务包政策、电子签章和经费规则待现场确认。",
+      "productionReady": false
+    },
+    {
+      "id": "cop-hospital-mr5",
+      "institutionCode": "MR5",
+      "institutionName": "甘井子区人民医院",
+      "enabledServices": ["appointment", "report-query"],
+      "orderChannels": ["citizen-web"],
+      "status": "onsite-confirmation-pending",
+      "launchScope": "disabled",
+      "onsiteBlocker": "医院服务开通授权、号源目录和回调白名单待签字。",
+      "productionReady": false
+    }
+  ],
+  "commercialCryptoCapabilities": [
+    {
+      "id": "cc-gm-tls",
+      "name": "国密 HTTPS 与传输保护",
+      "domain": "transport",
+      "adapterKind": "gm-tls-gateway",
+      "requiredPrimitives": ["SM2", "SM3", "SM4"],
+      "status": "contract-ready",
+      "owner": "平台技术组/安全管理",
+      "evidenceRefs": ["securityAcceptanceLedger:security-crypto"],
+      "onsiteVerification": "not-requested",
+      "productionReady": false
+    },
+    {
+      "id": "cc-signature-service",
+      "name": "电子签名与验签服务",
+      "domain": "signature",
+      "adapterKind": "signing-server",
+      "requiredPrimitives": ["SM2", "SM3"],
+      "status": "contract-ready",
+      "owner": "安全管理/业务应用组",
+      "evidenceRefs": ["identity-contract.md"],
+      "onsiteVerification": "not-requested",
+      "productionReady": false
+    },
+    {
+      "id": "cc-data-encryption",
+      "name": "重要数据与数据库加密",
+      "domain": "data-at-rest",
+      "adapterKind": "kms-database-encryption",
+      "requiredPrimitives": ["SM4"],
+      "status": "contract-ready",
+      "owner": "数据管理/安全管理",
+      "evidenceRefs": ["production-database-cutover-center.md"],
+      "onsiteVerification": "not-requested",
+      "productionReady": false
+    },
+    {
+      "id": "cc-audit-integrity",
+      "name": "审计日志完整性保护",
+      "domain": "audit-integrity",
+      "adapterKind": "sm3-timestamp-worm",
+      "requiredPrimitives": ["SM3"],
+      "status": "contract-ready",
+      "owner": "安全管理/运维中心",
+      "evidenceRefs": ["audit-retention-report.md"],
+      "onsiteVerification": "not-requested",
+      "productionReady": false
+    },
+    {
+      "id": "cc-ca-usbkey",
+      "name": "CA 身份认证与 USBKey",
+      "domain": "identity",
+      "adapterKind": "ca-usbkey",
+      "requiredPrimitives": ["SM2", "SM3"],
+      "status": "contract-ready",
+      "owner": "统一认证组/安全管理",
+      "evidenceRefs": ["identity-source-mapping"],
+      "onsiteVerification": "not-requested",
+      "productionReady": false
+    },
+    {
+      "id": "cc-secure-browser",
+      "name": "安全浏览器与终端兼容",
+      "domain": "client-compatibility",
+      "adapterKind": "secure-browser-bridge",
+      "requiredPrimitives": ["SM2", "SM3", "SM4"],
+      "status": "contract-ready",
+      "owner": "终端运维/安全管理",
+      "evidenceRefs": ["environment-matrix-report.md"],
+      "onsiteVerification": "not-requested",
+      "productionReady": false
+    }
+  ],
+  "commercialCryptoProbeRuns": [],
+  "commercialCryptoEvidencePackets": [
+    {
+      "id": "cc-evidence-runtime-contract",
+      "capabilityId": "all",
+      "type": "adapter-contract",
+      "reference": "docs/commercial-crypto-adapter-center.md",
+      "note": "能力合同和生产边界已建档。",
+      "status": "demo-evidence",
+      "recordedAt": "2026-07-10T00:00:00.000Z",
+      "recordedBy": "platform-seed",
+      "productionEvidence": false
+    },
+    {
+      "id": "cc-evidence-security-ledger",
+      "capabilityId": "all",
+      "type": "existing-ledger",
+      "reference": "securityAcceptanceLedger",
+      "note": "复用等保、密评和国密改造验收台账。",
+      "status": "demo-evidence",
+      "recordedAt": "2026-07-10T00:00:00.000Z",
+      "recordedBy": "platform-seed",
+      "productionEvidence": false
+    }
+  ],
+  "productionServiceLevels": [
+    { "id": "ops-slo-core-api", "name": "核心 API 可用性", "scope": "/api/health /api/auth /api/state", "target": "monthly availability >= 99.9%", "responseTarget": "P1 acknowledge <= 10 minutes", "owner": "platform operations", "status": "policy-defined", "productionReady": false },
+    { "id": "ops-slo-integration", "name": "接口交换与回调", "scope": "HIS/EMR/LIS/PACS/insurance callbacks", "target": "P95 callback <= 5 minutes", "responseTarget": "P1 acknowledge <= 15 minutes", "owner": "integration operations", "status": "policy-defined", "productionReady": false },
+    { "id": "ops-slo-data", "name": "数据质量与统计直报", "scope": "master index, quality rules, direct-report reconciliation", "target": "critical variance closed before submission", "responseTarget": "critical issue assigned <= 30 minutes", "owner": "data operations", "status": "policy-defined", "productionReady": false },
+    { "id": "ops-slo-recovery", "name": "备份恢复与回滚", "scope": "database, audit, configuration and release artifacts", "target": "RPO <= 120 minutes; RTO <= 720 minutes", "responseTarget": "rollback owner reachable <= 10 minutes", "owner": "backup and recovery operations", "status": "policy-defined", "productionReady": false }
+  ],
+  "operationsDutyShifts": [
+    { "id": "ops-duty-day", "name": "日间运行值守", "window": "08:00-20:00", "primaryRole": "operations duty engineer", "backupRole": "platform operations backup", "status": "roster-template-ready", "handoffStatus": "pending", "productionReady": false },
+    { "id": "ops-duty-night", "name": "夜间运行值守", "window": "20:00-08:00", "primaryRole": "night operations duty", "backupRole": "infrastructure escalation owner", "status": "roster-template-ready", "handoffStatus": "pending", "productionReady": false },
+    { "id": "ops-duty-emergency", "name": "应急与发布窗口值守", "window": "change or incident window", "primaryRole": "release manager", "backupRole": "operations duty lead", "status": "roster-template-ready", "handoffStatus": "pending", "productionReady": false }
+  ],
+  "operationsIncidents": [
+    { "id": "ops-incident-api-latency", "title": "核心 API 延迟演示告警", "severity": "P2", "source": "runtime-metrics", "status": "open-demo", "owner": "operations duty engineer", "productionReady": false },
+    { "id": "ops-incident-callback", "title": "医院回调积压演示事件", "severity": "P1", "source": "integration-dead-letter", "status": "escalation-pending", "owner": "integration operations", "productionReady": false },
+    { "id": "ops-incident-backup-proof", "title": "远端备份介质证据待现场确认", "severity": "P1", "source": "disaster-recovery-gate", "status": "onsite-pending", "owner": "backup and recovery operations", "productionReady": false }
+  ],
+  "disasterRecoveryDrills": [
+    { "id": "ops-drill-backup-restore", "name": "数据库与审计备份恢复演练", "scenario": "backup-restore", "targetRpoMinutes": 120, "targetRtoMinutes": 720, "status": "planned-demo", "owner": "backup and recovery operations", "productionReady": false },
+    { "id": "ops-drill-api-rollback", "name": "应用发布回滚演练", "scenario": "application-rollback", "targetRpoMinutes": 0, "targetRtoMinutes": 30, "measuredRpoMinutes": 0, "measuredRtoMinutes": 12, "status": "validated-demo", "owner": "release operations", "productionReady": false },
+    { "id": "ops-drill-identity-fallback", "name": "统一认证降级与恢复演练", "scenario": "identity-fallback", "targetRpoMinutes": 0, "targetRtoMinutes": 60, "status": "planned-demo", "owner": "identity operations", "productionReady": false }
+  ],
+  "operationsEvidencePackets": [
+    { "id": "ops-evidence-runbook", "resource": "all", "type": "runbook", "reference": "docs/production-operations-run-center.md", "note": "运行策略、值班模板和生产边界已建档。", "status": "demo-evidence", "productionEvidence": false },
+    { "id": "ops-evidence-storage-tools", "resource": "drills:ops-drill-backup-restore", "type": "tooling", "reference": "scripts/storage-admin.js", "note": "备份校验、恢复排练和安全恢复工具已纳入发布测试。", "status": "demo-evidence", "productionEvidence": false }
   ]
 }

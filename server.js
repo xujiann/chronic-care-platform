@@ -7,18 +7,71 @@ const { buildSiteReadinessPack, renderTemplateReadmes } = require("./scripts/sit
 const { buildHealthDashboardSummary, buildPriorityApplicationTemplates } = require("./scripts/health-dashboard-summary");
 const { buildReleaseReport, buildServiceAcceptanceSummary } = require("./scripts/release-report");
 const { buildReleaseArtifactManifest } = require("./scripts/release-artifact-manifest");
+const {
+  applyRegistrationJourneyAction,
+  buildRegistrationJourneyCenter,
+  normalizeRegistrationJourneyOrder,
+  registrationJourneyAllowedActions
+} = require("./scripts/registration-journey-readiness");
+const {
+  applyProductionOperationsAction,
+  buildProductionOperationsCenter,
+  seedDisasterRecoveryDrills,
+  seedOperationsDutyShifts,
+  seedOperationsEvidencePackets,
+  seedOperationsIncidents,
+  seedProductionServiceLevels
+} = require("./scripts/operations-readiness");
+const {
+  applyProductionDatabaseCutoverAction,
+  buildProductionDatabaseCutoverCenter,
+  createProductionDatabaseCutoverRun,
+  seedProductionDatabaseCutoverRuns,
+  seedProductionDatabaseMigrationBatches
+} = require("./scripts/production-db-readiness");
+const {
+  applyCitizenOperationsAction,
+  buildCitizenOperationsCenter,
+  buildCitizenOperationsPublic,
+  seedCitizenAgreementVersions,
+  seedCitizenHospitalServiceConfigs,
+  seedCitizenIdentityReviewCases,
+  seedCitizenOperationContents,
+  seedCitizenServiceBlacklist
+} = require("./scripts/citizen-operations-readiness");
+const {
+  applyCommercialCryptoAction,
+  buildCommercialCryptoCenter,
+  seedCommercialCryptoCapabilities,
+  seedCommercialCryptoEvidencePackets
+} = require("./scripts/commercial-crypto-readiness");
 const { buildChronicInstitutionInterfaceReport } = require("./scripts/chronic-institution-interfaces");
 const { buildChronicLaunchCoreReport } = require("./scripts/chronic-launch-core");
 const { buildChronicFollowupReadinessReport } = require("./scripts/chronic-followup-readiness");
 const {
+  PUBLIC_HEALTH_SITE_EVIDENCE_LINKS,
+  buildPublicHealthCutoverReadiness,
+  buildPublicHealthSiteEvidenceBridge,
+  buildPublicHealthStandardImplementationBoard,
   buildPublicHealthSystem,
+  seedPublicHealthCutoverBlockers,
+  seedPublicHealthCutoverDrills,
+  seedPublicHealthCutoverEvidencePackets,
   seedPublicHealthExchangeRuns,
   seedPublicHealthExchangeTasks,
   seedPublicHealthEvents,
   seedPublicHealthInstitutionTasks,
   seedPublicHealthInstitutionScopes,
+  seedPublicHealthLaunchApprovals,
+  seedPublicHealthLaunchCommandBriefs,
+  seedPublicHealthLaunchDutyShifts,
+  seedPublicHealthLaunchIncidents,
+  seedPublicHealthSiteEvidenceVerificationTasks,
   seedPublicHealthOnsiteAcceptances,
+  seedPublicHealthProductionHandoffs,
+  seedPublicHealthGoLiveObservations,
   seedPublicHealthReadinessEvidence,
+  seedPublicHealthStandardImplementationLedger,
   seedPublicHealthStandards
 } = require("./scripts/public-health-readiness");
 
@@ -561,14 +614,27 @@ function seedState() {
     resourceDispatchRequests: seedResourceDispatchRequests(),
     statisticsReconciliationReviews: seedStatisticsReconciliationReviews(),
     operationAlertRules: seedOperationAlertRules(),
+    productionServiceLevels: seedProductionServiceLevels(),
+    operationsDutyShifts: seedOperationsDutyShifts(),
+    operationsIncidents: seedOperationsIncidents(),
+    disasterRecoveryDrills: seedDisasterRecoveryDrills(),
+    operationsEvidencePackets: seedOperationsEvidencePackets(),
     healthStatistics: seedHealthStatistics(),
     publicHealthStandards: seedPublicHealthStandards(),
+    publicHealthStandardImplementationLedger: seedPublicHealthStandardImplementationLedger(),
     publicHealthInstitutionScopes: seedPublicHealthInstitutionScopes(),
     publicHealthEvents: seedPublicHealthEvents(),
     publicHealthExchangeTasks: seedPublicHealthExchangeTasks(),
     publicHealthExchangeRuns: seedPublicHealthExchangeRuns(),
     publicHealthInstitutionTasks: seedPublicHealthInstitutionTasks(),
     publicHealthOnsiteAcceptances: seedPublicHealthOnsiteAcceptances(),
+    publicHealthCutoverBlockers: seedPublicHealthCutoverBlockers(),
+    publicHealthCutoverEvidencePackets: seedPublicHealthCutoverEvidencePackets(),
+    publicHealthCutoverDrills: seedPublicHealthCutoverDrills(),
+    publicHealthLaunchApprovals: seedPublicHealthLaunchApprovals(),
+    publicHealthLaunchDutyShifts: seedPublicHealthLaunchDutyShifts(),
+    publicHealthLaunchCommandBriefs: seedPublicHealthLaunchCommandBriefs(),
+    publicHealthSiteEvidenceVerificationTasks: seedPublicHealthSiteEvidenceVerificationTasks(),
     publicHealthReadinessEvidence: seedPublicHealthReadinessEvidence(),
     deathCertificates: seedDeathCertificates(),
     deathCertificateForms: seedDeathCertificateForms(),
@@ -637,6 +703,39 @@ function seedState() {
     standardDataDictionaries: seedStandardDataDictionaries(),
     dataLineageControls: seedDataLineageControls(),
     platformDataBusChannels: seedPlatformDataBusChannels(),
+    digitalHospitalStandards: seedDigitalHospitalStandards(),
+    digitalHospitalEvaluationTasks: seedDigitalHospitalEvaluationTasks(),
+    digitalHospitalEvidencePackets: seedDigitalHospitalEvidencePackets(),
+    digitalHospitalRiskItems: seedDigitalHospitalRiskItems(),
+    digitalHospitalLaunchRequirements: seedDigitalHospitalLaunchRequirements(),
+    digitalHospitalLaunchApprovals: seedDigitalHospitalLaunchApprovals(),
+    digitalHospitalProductionEvidencePackets: seedDigitalHospitalProductionEvidencePackets(),
+    digitalHospitalLaunchCommandBriefs: seedDigitalHospitalLaunchCommandBriefs(),
+    digitalHospitalFormalCutoverApprovals: seedDigitalHospitalFormalCutoverApprovals(),
+    phase2DataCatalogs: seedPhase2DataCatalogs(),
+    phase2ServiceCatalogs: seedPhase2ServiceCatalogs(),
+    phase2FieldLineage: seedPhase2FieldLineage(),
+    phase2CatalogQualityRules: seedPhase2CatalogQualityRules(),
+    phase2PilotInstitutions: seedPhase2PilotInstitutions(),
+    phase2JointTestLinks: seedPhase2JointTestLinks(),
+    phase2SamplePayloads: seedPhase2SamplePayloads(),
+    phase2GatewayTraces: seedPhase2GatewayTraces(),
+    phase2JointTestIssues: seedPhase2JointTestIssues(),
+    phase2DiseaseReportingRules: seedPhase2DiseaseReportingRules(),
+    phase2DiseaseReportQueue: seedPhase2DiseaseReportQueue(),
+    phase2DiseaseReportReceipts: seedPhase2DiseaseReportReceipts(),
+    phase2ClinicalAssistRules: seedPhase2ClinicalAssistRules(),
+    phase2ClinicalAssistAlerts: seedPhase2ClinicalAssistAlerts(),
+    phase2ClinicalAssistReceipts: seedPhase2ClinicalAssistReceipts(),
+    phase2ClinicalAssistPluginContracts: seedPhase2ClinicalAssistPluginContracts(),
+    phase2FamilyDoctorTemplates: seedPhase2FamilyDoctorTemplates(),
+    phase2FamilyDoctorTeams: seedPhase2FamilyDoctorTeams(),
+    phase2FamilyDoctorServicePackages: seedPhase2FamilyDoctorServicePackages(),
+    phase2FamilyDoctorApplications: seedPhase2FamilyDoctorApplications(),
+    phase2FamilyDoctorContracts: seedPhase2FamilyDoctorContracts(),
+    phase2FamilyDoctorFulfillments: seedPhase2FamilyDoctorFulfillments(),
+    phase2MutualRecognitionCatalog: seedPhase2MutualRecognitionCatalog(),
+    phase2MutualRecognitionCitations: seedPhase2MutualRecognitionCitations(),
     chronicProjectBlueprint: seedChronicProjectBlueprint(),
     countyProjectBlueprint: seedCountyProjectBlueprint(),
     countyConsortium: seedCountyConsortium(),
@@ -647,6 +746,16 @@ function seedState() {
     platformDeliveryBatches: seedPlatformDeliveryBatches(),
     platformEvidence: seedPlatformEvidence(),
     productionDeploymentPlan: seedProductionDeploymentPlan(),
+    productionDatabaseMigrationBatches: seedProductionDatabaseMigrationBatches(),
+    productionDatabaseCutoverRuns: seedProductionDatabaseCutoverRuns(),
+    citizenOperationContents: seedCitizenOperationContents(),
+    citizenAgreementVersions: seedCitizenAgreementVersions(),
+    citizenIdentityReviewCases: seedCitizenIdentityReviewCases(),
+    citizenServiceBlacklist: seedCitizenServiceBlacklist(),
+    citizenHospitalServiceConfigs: seedCitizenHospitalServiceConfigs(),
+    commercialCryptoCapabilities: seedCommercialCryptoCapabilities(),
+    commercialCryptoProbeRuns: [],
+    commercialCryptoEvidencePackets: seedCommercialCryptoEvidencePackets(),
     applicationCatalog: seedApplicationCatalog(),
     institutionCreditEvaluations: seedInstitutionCreditEvaluations(),
     creditEvaluationRules: seedCreditEvaluationRules(),
@@ -786,10 +895,10 @@ function seedProductionDeploymentPlan() {
       track: "database",
       name: "Production database adapter path",
       owner: "data-platform",
-      status: "planned",
+      status: "rehearsal-center-ready-onsite-blocked",
       requiredConfig: ["DATABASE_URL", "STORAGE_ENGINE=postgres", "backup policy", "migration window"],
-      evidence: ["SQLite v7 mirror tables", "storage backup and restore rehearsal", "release readiness report"],
-      nextAction: "Implement PostgreSQL adapter behind the existing storage API and rehearse migration with masked data."
+      evidence: ["SQLite v7 mirror tables", "production database cutover center", "four-domain sample validation", "rollback checkpoint", "release readiness report"],
+      nextAction: "Bind the cutover center to the selected PostgreSQL-compatible driver and rehearse masked full-volume migration, rollback, capacity and failover."
     },
     {
       id: "prod-identity-adapter",
@@ -1302,6 +1411,10 @@ function seedRegistrationOrders() {
       cancelBeforeHours: 24,
       status: "confirmed",
       scheduleLockStatus: "confirmed",
+      journeyStage: "slot-reserved-demo",
+      hisConfirmationStatus: "pending-demo",
+      checkInStatus: "not-checked-in",
+      productionReady: false,
       paymentStatus: "pending",
       paymentTradeNo: "PAY-DEMO-REG-R1-0008",
       refundStatus: "none",
@@ -1720,6 +1833,1073 @@ function seedPlatformDataBusChannels() {
       status: "external-blocked"
     }
   ];
+}
+
+function seedDigitalHospitalStandards() {
+  return [
+    {
+      id: "dhs-emr-leveling",
+      domain: "电子病历",
+      level: "P0",
+      title: "电子病历系统应用水平分级评价映射",
+      source: "国家卫生健康委电子病历系统应用水平分级评价",
+      sourceUrl: "https://www.nhc.gov.cn/wjw/c100175/201812/7d64363a20cd4ea798f8343842b28d0c.shtml",
+      indicators: ["病历闭环", "医嘱用药", "质量效率监测", "临床决策支持"],
+      evidence: ["EMR 功能清单", "医疗质量指标", "系统日志", "抽样病历质控记录"],
+      dataPath: "HIS/EMR -> 脱敏指标 -> 规则校验 -> 专家复核",
+      sourceCollections: ["personalRecords", "medicalRecordQualityReviews", "clinicalPathwayCases"],
+      nextAction: "补齐真实 EMR 字段、截图、质控抽样和科室签字材料。",
+      owner: "标准专家组",
+      blocker: "真实 EMR 功能截图、接口字段和质控抽样签字仍需医院现场提供。",
+      readinessStatus: "mapped-demo"
+    },
+    {
+      id: "dhs-interoperability",
+      domain: "互联互通",
+      level: "P0",
+      title: "医院信息互联互通标准化成熟度测评映射",
+      source: "医院信息互联互通标准化成熟度测评方案",
+      sourceUrl: "https://www.nhc.gov.cn/mohwsbwstjxxzx/s8553/202008/bdd0d4fcb1c747dda000e0adec3c17b9/files/1740035892298_26600.pdf",
+      indicators: ["标准符合性", "应用效果", "数据资源标准化", "基础设施"],
+      evidence: ["测试用例", "接口样例", "交易对账", "复测记录"],
+      dataPath: "HIS/LIS/PACS/平台网关 -> 标准符合性测试 -> 应用效果评价",
+      sourceCollections: ["integrationContracts", "dataLineageControls", "phase2GatewayTraces"],
+      nextAction: "将 integration readiness、interface mapping 和 evaluation evidence 统一纳入证据链。",
+      owner: "技术专家组",
+      blocker: "生产接口样例、厂商联调报告和签名密钥交接仍需现场确认。",
+      readinessStatus: "evidence-linked"
+    },
+    {
+      id: "dhs-smart-service",
+      domain: "智慧服务",
+      level: "P1",
+      title: "预约诊疗、互联网医院与患者服务体验评价",
+      source: "预约诊疗制度建设和智慧医院建设相关通知",
+      sourceUrl: "https://www.nhc.gov.cn/yzygj/c100068/202005/43b2d23ff48448ffae96700bc6eaccd7.shtml",
+      indicators: ["预约诊疗", "线上复诊", "移动支付", "诊间消息", "适老服务"],
+      evidence: ["居民端入口", "预约订单", "消息回执", "服务满意度", "无障碍验收"],
+      dataPath: "居民端/医院端 -> 服务订单 -> 回执与满意度 -> 整改闭环",
+      sourceCollections: ["registrationOrders", "escortServiceOrders", "internetNursingOrders", "phase2FamilyDoctorContracts"],
+      nextAction: "将居民端、互联网护理、陪诊、家庭医生签约证据统一归档。",
+      owner: "医院服务组",
+      blocker: "统一入口、实名关系、支付退费和线上线下服务边界需现场确认。",
+      readinessStatus: "service-loop-ready"
+    },
+    {
+      id: "dhs-smart-management",
+      domain: "智慧管理",
+      level: "P1",
+      title: "智慧管理分级评估与医院运营决策",
+      source: "智慧管理分级评估标准体系",
+      sourceUrl: "https://www.nhc.gov.cn/yzygj/c100068/202103/a14c60de4af9423cbbf45712e27e3cc8.shtml",
+      indicators: ["管理业务联动", "指标自动生成", "资源调度", "决策支持", "流程提示"],
+      evidence: ["运营看板", "资源调度台账", "管理指标口径", "部门协同记录"],
+      dataPath: "运营系统/统计直报 -> 指标口径 -> 决策看板 -> 审核留痕",
+      sourceCollections: ["hospitalOperationSnapshots", "resourceDispatchRequests", "statisticsReconciliationReviews"],
+      nextAction: "把 operations readiness 与 hospital operations readiness 纳入管理评价基线。",
+      owner: "省级组织实施组",
+      blocker: "医院运营管理数据口径和部门签字需现场固化。",
+      readinessStatus: "management-baseline"
+    },
+    {
+      id: "dhs-standard-service",
+      domain: "标准服务",
+      level: "P0",
+      title: "全民健康信息化标准服务与一体化评价",
+      source: "“十四五”全民健康信息化规划",
+      sourceUrl: "https://www.ndcpa.gov.cn/jbkzzx/c100030/common/content/content_1658745812574605312.html",
+      indicators: ["六类基础标准", "四统一", "元数据管理", "一体化评价", "结果应用"],
+      evidence: ["标准元数据", "指标版本", "数据元映射", "评价结果", "典型案例"],
+      dataPath: "标准中心 -> 指标库/规则库/证据库 -> 任务版本 -> 结果应用",
+      sourceCollections: ["standardDataDictionaries", "dataGovernanceAssets", "phase2DataCatalogs", "platformEvidence"],
+      nextAction: "落标准版本、指标解释、材料清单和规则库最小闭环。",
+      owner: "项目办公室",
+      blocker: "试行版指标口径和国家/省级结果发布权限需确认。",
+      readinessStatus: "standard-center-ready"
+    },
+    {
+      id: "dhs-security-compliance",
+      domain: "安全合规",
+      level: "P0",
+      title: "网络安全、数据安全、个人信息保护与等保基线",
+      source: "网安法、数据安全法、个人信息保护法、GB/T 22239-2019",
+      sourceUrl: "https://openstd.samr.gov.cn/bzgk/std/newGbInfo?hcno=BAFB47E8874764186BDB7865E8344DAF",
+      indicators: ["最小必要采集", "分类分级", "脱敏汇总", "权限隔离", "审计留痕"],
+      evidence: ["等保定级", "数据分类分级表", "脱敏规则", "访问审计", "导出审批"],
+      dataPath: "采集适配器 -> 脱敏汇总 -> 权限校验 -> 审计链",
+      sourceCollections: ["securityEvents", "dataAccessLogs", "securityAcceptanceLedger", "audit:retention"],
+      nextAction: "默认不集中采集患者姓名、身份证号、病历全文和影像原片。",
+      owner: "安全合规组",
+      blocker: "等保、密评、正式日志归档和第三方保密承诺需现场材料。",
+      readinessStatus: "security-boundary-ready"
+    }
+  ];
+}
+
+function seedDigitalHospitalEvaluationTasks() {
+  return [
+    { id: "dht-standard-release", stage: "standard-release", label: "标准发布", actor: "国家级平台", target: "标准版本、指标解释、证据清单", status: "ready", dueAt: "2026-07-15", evidenceCollection: "digitalHospitalStandards" },
+    { id: "dht-task-dispatch", stage: "task-dispatch", label: "任务下发", actor: "省级平台", target: "年度评价、专项评价和试点评价任务配置", status: "ready", dueAt: "2026-07-18", evidenceCollection: "digitalHospitalEvaluationTasks" },
+    { id: "dht-hospital-self", stage: "hospital-self-assessment", label: "医院自评", actor: "医疗机构", target: "指标填报、材料上传和历史评价继承", status: "site-material-required", dueAt: "2026-07-23", evidenceCollection: "digitalHospitalEvidencePackets" },
+    { id: "dht-auto-validation", stage: "auto-validation", label: "自动校验", actor: "规则引擎", target: "完整性、格式、逻辑、阈值和证据一致性", status: "demo-rule-ready", dueAt: "2026-07-26", evidenceCollection: "digitalHospitalRiskItems" },
+    { id: "dht-tiered-review", stage: "tiered-review", label: "分级审核", actor: "省级/专家/国家", target: "省级初审、专家复核、国家抽查、申诉复议", status: "review-queue-ready", dueAt: "2026-07-30", evidenceCollection: "digitalHospitalEvaluationTasks" },
+    { id: "dht-rectification", stage: "rectification-loop", label: "整改闭环", actor: "医院与省级平台", target: "问题整改、证据补充、复测和结果确认", status: "open-blockers", dueAt: "2026-08-08", evidenceCollection: "digitalHospitalRiskItems" }
+  ];
+}
+
+function seedDigitalHospitalEvidencePackets() {
+  return [
+    { id: "dhep-interface", standardId: "dhs-interoperability", title: "接口采集证据包", mode: "interface", owner: "技术专家组", status: "prototype-ready", detail: "统计指标、标准符合性测试结果、接口交易样例和对账结果。", linkedArtifacts: ["interface-mapping-report.md", "evaluation-evidence-report.md"], noPatientPii: true },
+    { id: "dhep-template", standardId: "dhs-smart-service", title: "模板填报证据包", mode: "template", owner: "医疗机构", status: "pilot-required", detail: "医院系统画像、管理流程、指标口径、历史评价结果和服务体验样本。", linkedArtifacts: ["citizen-launch-foundation-readiness.md", "internet-nursing-readiness-report.md"], noPatientPii: true },
+    { id: "dhep-material", standardId: "dhs-smart-management", title: "材料证据包", mode: "material", owner: "医疗机构", status: "site-material-required", detail: "制度文件、截图、报告、测评证书和部门签字表。", linkedArtifacts: ["hospital-operations-readiness-report.md"], noPatientPii: true },
+    { id: "dhep-sample", standardId: "dhs-emr-leveling", title: "抽样核验证据包", mode: "sample", owner: "省级审核组", status: "authorization-required", detail: "脱敏样本、现场核验记录、复核问题和复测报告。", linkedArtifacts: ["quality-safety-report.md"], noPatientPii: true },
+    { id: "dhep-audit", standardId: "dhs-security-compliance", title: "审计链证据包", mode: "audit", owner: "安全合规组", status: "baseline-ready", detail: "上传、查看、评分、修改、导出和发布全流程留痕。", linkedArtifacts: ["audit-retention-report.md", "security.test.js"], noPatientPii: true }
+  ];
+}
+
+function seedDigitalHospitalRiskItems() {
+  return [
+    { id: "dhr-live-emr-fields", severity: "P0", title: "真实 EMR 字段与截图未完成交接", owner: "医院信息中心", status: "open", blockerSource: "hospital-onsite", nextAction: "锁定 2 家试点医院 EMR 字段、功能截图和质控抽样签字。" },
+    { id: "dhr-vendor-interface-sample", severity: "P0", title: "HIS/LIS/PACS 标准符合性样例需厂商签字", owner: "接口联调专班", status: "open", blockerSource: "vendor-joint-test", nextAction: "按接口映射报告提交样例、回执、签名算法和复测记录。" },
+    { id: "dhr-evaluation-authority", severity: "P0", title: "国家/省级评价任务与结果发布权限待确认", owner: "项目办公室", status: "open", blockerSource: "governance-authority", nextAction: "形成试点组织实施方案和结果发布授权边界。" },
+    { id: "dhr-security-assessment", severity: "P0", title: "等保密评与日志归档材料需现场归档", owner: "安全合规组", status: "open", blockerSource: "security-assessment", nextAction: "补定级备案、测评机构进场计划、整改闭环和正式日志保全位置。" },
+    { id: "dhr-specialty-indicator-casebook", severity: "P1", title: "专科医院差异化指标案例库未成型", owner: "标准专家组", status: "tracking", blockerSource: "expert-review", nextAction: "收集专科争议指标、专家意见和复议样例，作为复核规则库。" }
+  ];
+}
+
+function seedDigitalHospitalLaunchRequirements() {
+  return [
+    { id: "dhlr-standards-api", priority: "P0", domain: "runtime-api", title: "Standards center API and page guard", owner: "platform-standards", status: "verified", evidence: ["/api/digital-hospital/standards", "digital-hospital:standards-readiness"], requiredEvidence: ["commission role guard", "standards API response", "release readiness report"], siteRequired: false, siteSigned: true, nextAction: "Keep API, page guard and release evidence green before launch." },
+    { id: "dhlr-role-audit", priority: "P0", domain: "security", title: "Role isolation and audit chain", owner: "security-admin", status: "verified", evidence: ["auth.js", "securityEvents", "audit-retention-report.md"], requiredEvidence: ["commission-only access", "403 for non-commission roles", "audit hash chain"], siteRequired: false, siteSigned: true, nextAction: "Export security event evidence with every launch package." },
+    { id: "dhlr-evidence-boundary", priority: "P0", domain: "privacy", title: "No patient-identifiable evidence boundary", owner: "security-compliance", status: "verified", evidence: ["digitalHospitalEvidencePackets", "digitalHospitalApi:evidenceBoundary"], requiredEvidence: ["noPatientPii=true", "minimum necessary evidence list", "desensitized sample rule"], siteRequired: false, siteSigned: true, nextAction: "Keep evidence packets on statistics, compliance result and desensitized sample only." },
+    { id: "dhlr-pilot-task-pack", priority: "P0", domain: "pilot", title: "Pilot task package and review owners", owner: "project-office", status: "verified", evidence: ["digitalHospitalEvaluationTasks", "digitalHospitalLaunchApprovals"], requiredEvidence: ["pilot task roster", "review owner list", "appeal and rectification loop"], siteRequired: false, siteSigned: true, nextAction: "Freeze the first pilot hospital roster and review assignment rule." },
+    { id: "dhlr-site-interface-signoff", priority: "P0", domain: "site-interface", title: "HIS EMR LIS PACS standard conformance sample signoff", owner: "interface-joint-test", status: "verified", evidence: ["interface-mapping-report.md", "evaluation-evidence-report.md"], requiredEvidence: ["sample request", "sample response", "vendor signature", "retry and reconciliation record"], siteRequired: true, siteSigned: false, nextAction: "Attach live hospital joint-test sheets before formal production cutover." },
+    { id: "dhlr-security-assessment", priority: "P0", domain: "security-assessment", title: "Level protection, crypto assessment and log retention signoff", owner: "security-admin", status: "verified", evidence: ["audit-retention-report.md", "security.test.js"], requiredEvidence: ["classified protection filing", "crypto assessment plan", "retention target", "third-party confidentiality commitment"], siteRequired: true, siteSigned: false, nextAction: "Archive signed assessment material from the launch site." },
+    { id: "dhlr-rollback-drill", priority: "P0", domain: "resilience", title: "Launch smoke, rollback and read-only downgrade rehearsal", owner: "platform-ops", status: "verified", evidence: ["launch-smoke-report.md", "production-cutover-checklist.md"], requiredEvidence: ["launch smoke", "rollback owner", "read-only downgrade plan", "rehearsal receipt"], siteRequired: true, siteSigned: false, nextAction: "Run launch smoke against the final base URL and attach rollback receipt." },
+    { id: "dhlr-command-approval", priority: "P0", domain: "approval", title: "Go/no-go command approval and duty roster", owner: "project-office", status: "approved", evidence: ["release-report.md", "digital-hospital-standards-readiness-report.md"], requiredEvidence: ["release report green", "duty roster", "go/no-go note"], siteRequired: false, siteSigned: true, nextAction: "Keep command approval synced with release report and duty roster." },
+    { id: "dhlr-specialty-casebook", priority: "P1", domain: "expert-review", title: "Specialty hospital disputed indicator casebook", owner: "expert-review", status: "tracking", evidence: ["digitalHospitalRiskItems"], requiredEvidence: ["expert comments", "appeal samples", "rule version"], siteRequired: true, siteSigned: false, nextAction: "Use first pilot round to expand the specialty casebook." }
+  ];
+}
+
+function seedDigitalHospitalLaunchApprovals() {
+  return [
+    { id: "dhla-health-admin", role: "health-admin", owner: "commission", status: "approved", signedBy: "health", signedAt: "2026-07-09T09:00:00.000Z", evidence: ["release-report.md"], note: "Management-side pilot launch evidence accepted." },
+    { id: "dhla-security", role: "security", owner: "security-admin", status: "approved", signedBy: "security-admin", signedAt: "2026-07-09T09:05:00.000Z", evidence: ["audit-retention-report.md"], note: "No patient-identifiable evidence boundary accepted for pilot launch." },
+    { id: "dhla-operations", role: "operations", owner: "platform-ops", status: "approved", signedBy: "platform-ops", signedAt: "2026-07-09T09:10:00.000Z", evidence: ["launch-smoke-report.md"], note: "Launch smoke and rollback owner are tracked for pilot launch." },
+    { id: "dhla-project-office", role: "project-office", owner: "project-office", status: "approved", signedBy: "project-office", signedAt: "2026-07-09T09:15:00.000Z", evidence: ["digital-hospital-standards-readiness-report.md"], note: "Pilot task package, review queue and rectification loop are accepted." }
+  ];
+}
+
+function seedDigitalHospitalFormalCutoverApprovals() {
+  return [
+    { id: "dhfca-health-command", sequence: 1, role: "health-command", title: "Health authority formal production authorization", owner: "commission release owner", status: "awaiting-site-evidence", nextAction: "Approve only after all site signoffs and production evidence packets are complete." },
+    { id: "dhfca-hospital-site", sequence: 2, role: "hospital-site", title: "Hospital site cutover acceptance", owner: "hospital launch owner", status: "awaiting-site-evidence", nextAction: "Confirm the live interface, site support roster and hospital-side rollback contact." },
+    { id: "dhfca-security", sequence: 3, role: "security", title: "Security and compliance production authorization", owner: "security compliance owner", status: "awaiting-site-evidence", nextAction: "Confirm assessment material, audit retention target and launch-day security watch." },
+    { id: "dhfca-operations", sequence: 4, role: "operations", title: "Operations cutover and rollback authorization", owner: "operations duty lead", status: "awaiting-site-evidence", nextAction: "Confirm final smoke result, cutover window, read-only downgrade and rollback command." }
+  ];
+}
+
+function seedDigitalHospitalProductionEvidencePackets() {
+  return [
+    {
+      id: "dhpep-site-interface-signoff",
+      linkedRequirementId: "dhlr-site-interface-signoff",
+      severity: "P0",
+      category: "site-interface",
+      title: "HIS EMR LIS PACS conformance sample packet",
+      owner: "interface-joint-test",
+      assignee: "hospital interface owner",
+      status: "pending-site-evidence",
+      dueAt: "2026-07-18",
+      siteWindow: "interface joint-test T-3",
+      requiredItems: [
+        { id: "dhpep-site-interface-e1", name: "Live sample request and response", status: "pending" },
+        { id: "dhpep-site-interface-e2", name: "Vendor signature and algorithm version", status: "pending" },
+        { id: "dhpep-site-interface-e3", name: "Retry reconciliation receipt", status: "pending" },
+        { id: "dhpep-site-interface-e4", name: "Desensitized conformance screenshot", status: "pending" }
+      ],
+      nextAction: "Upload signed joint-test sheets and response receipts before formal production cutover."
+    },
+    {
+      id: "dhpep-security-assessment",
+      linkedRequirementId: "dhlr-security-assessment",
+      severity: "P0",
+      category: "security-assessment",
+      title: "Level protection crypto and log-retention packet",
+      owner: "security-admin",
+      assignee: "security compliance owner",
+      status: "pending-site-evidence",
+      dueAt: "2026-07-21",
+      siteWindow: "security acceptance T-1",
+      requiredItems: [
+        { id: "dhpep-security-e1", name: "Classified protection filing or assessment plan", status: "pending" },
+        { id: "dhpep-security-e2", name: "Crypto assessment and confidentiality commitment", status: "pending" },
+        { id: "dhpep-security-e3", name: "Audit log retention target receipt", status: "pending" }
+      ],
+      nextAction: "Archive signed security assessment materials and retention receipts."
+    },
+    {
+      id: "dhpep-rollback-drill",
+      linkedRequirementId: "dhlr-rollback-drill",
+      severity: "P0",
+      category: "resilience",
+      title: "Launch smoke rollback and read-only downgrade rehearsal packet",
+      owner: "platform-ops",
+      assignee: "operations duty lead",
+      status: "pending-site-evidence",
+      dueAt: "2026-07-22",
+      siteWindow: "cutover rehearsal",
+      requiredItems: [
+        { id: "dhpep-rollback-e1", name: "Final base URL launch smoke result", status: "pending" },
+        { id: "dhpep-rollback-e2", name: "Rollback owner and command receipt", status: "pending" },
+        { id: "dhpep-rollback-e3", name: "Read-only downgrade rehearsal record", status: "pending" }
+      ],
+      nextAction: "Run launch smoke against final base URL and file rollback receipt."
+    },
+    {
+      id: "dhpep-specialty-casebook",
+      linkedRequirementId: "dhlr-specialty-casebook",
+      severity: "P1",
+      category: "expert-review",
+      title: "Specialty hospital disputed indicator casebook packet",
+      owner: "expert-review",
+      assignee: "expert review secretary",
+      status: "pending-site-evidence",
+      dueAt: "2026-07-25",
+      siteWindow: "pilot review round",
+      requiredItems: [
+        { id: "dhpep-specialty-e1", name: "Expert comment and dispute sample", status: "pending" },
+        { id: "dhpep-specialty-e2", name: "Rule version and appeal decision record", status: "pending" }
+      ],
+      nextAction: "Collect first pilot appeal samples and expert decisions."
+    }
+  ];
+}
+
+function seedDigitalHospitalLaunchCommandBriefs() {
+  return [
+    {
+      id: "dhlcb-prelaunch-go-no-go",
+      phase: "T-0",
+      title: "Prelaunch go/no-go command brief",
+      owner: "project-office",
+      decisionOwner: "commission release manager",
+      publishChannel: "command room + project group",
+      status: "ready",
+      linkedRequirementIds: ["dhlr-command-approval"],
+      linkedEvidencePacketIds: ["dhpep-site-interface-signoff", "dhpep-security-assessment", "dhpep-rollback-drill"],
+      requiredArtifacts: ["release-report", "launch-smoke", "production-evidence-summary"],
+      nextAction: "Publish the final go/no-go note after all P0 packets are verified."
+    },
+    {
+      id: "dhlcb-interface-first-receipt",
+      phase: "T+15-60m",
+      title: "First interface receipt observation brief",
+      owner: "interface-joint-test",
+      decisionOwner: "hospital interface owner",
+      publishChannel: "interface duty channel",
+      status: "ready",
+      linkedRequirementIds: ["dhlr-site-interface-signoff"],
+      linkedEvidencePacketIds: ["dhpep-site-interface-signoff"],
+      requiredArtifacts: ["first-receipt-screenshot", "reconciliation-result"],
+      nextAction: "Record first accepted HIS EMR LIS PACS exchange receipt or rollback decision."
+    },
+    {
+      id: "dhlcb-security-observation",
+      phase: "T+0-4h",
+      title: "Security audit and retention observation brief",
+      owner: "security-admin",
+      decisionOwner: "security duty owner",
+      publishChannel: "security operations channel",
+      status: "ready",
+      linkedRequirementIds: ["dhlr-security-assessment"],
+      linkedEvidencePacketIds: ["dhpep-security-assessment"],
+      requiredArtifacts: ["audit-chain-check", "retention-target-receipt"],
+      nextAction: "Confirm launch-day audit chain, retention target and high-risk event queue."
+    },
+    {
+      id: "dhlcb-rollback-standby",
+      phase: "T+0-24h",
+      title: "Rollback standby and read-only downgrade brief",
+      owner: "platform-ops",
+      decisionOwner: "operations duty lead",
+      publishChannel: "operations on-call channel",
+      status: "ready",
+      linkedRequirementIds: ["dhlr-rollback-drill"],
+      linkedEvidencePacketIds: ["dhpep-rollback-drill"],
+      requiredArtifacts: ["rollback-owner", "read-only-downgrade-plan", "rehearsal-receipt"],
+      nextAction: "Keep rollback and read-only downgrade decision owner online through the first watch window."
+    },
+    {
+      id: "dhlcb-first-day-closure",
+      phase: "T+24h",
+      title: "First-day closure and open evidence carry-over brief",
+      owner: "project-office",
+      decisionOwner: "commission release manager",
+      publishChannel: "command room archive",
+      status: "ready",
+      linkedRequirementIds: ["dhlr-command-approval", "dhlr-specialty-casebook"],
+      linkedEvidencePacketIds: ["dhpep-specialty-casebook"],
+      requiredArtifacts: ["first-day-closure-note", "open-evidence-ledger", "next-watch-plan"],
+      nextAction: "Archive first-day closure note and explicitly carry any open production evidence into the next watch cycle."
+    }
+  ];
+}
+
+function digitalHospitalRequirementReady(item) {
+  return ["verified", "approved", "signed", "accepted", "ready"].includes(String(item.status || "").toLowerCase());
+}
+
+function digitalHospitalLaunchBriefReady(item) {
+  return /ready|published|sent|archived|closed/i.test(String(item.status || ""));
+}
+
+function digitalHospitalEvidenceItemVerified(item) {
+  return /verified|signed|accepted|complete|ready/i.test(String(item.status || ""));
+}
+
+function buildDigitalHospitalLaunchCommandBriefBoard(briefs = []) {
+  const rows = briefs.map((brief) => ({
+    ...brief,
+    ready: digitalHospitalLaunchBriefReady(brief),
+    artifactCount: Array.isArray(brief.requiredArtifacts) ? brief.requiredArtifacts.length : 0
+  }));
+  const readyBriefs = rows.filter((item) => item.ready).length;
+  const publishedBriefs = rows.filter((item) => /published|sent|archived|closed/i.test(String(item.status || ""))).length;
+  const blockedBriefs = rows.filter((item) => !item.ready);
+  return {
+    status: rows.length > 0 && readyBriefs === rows.length ? "briefing-ready" : "briefing-blocked",
+    summary: {
+      briefs: rows.length,
+      readyBriefs,
+      publishedBriefs,
+      blockedBriefs: blockedBriefs.length,
+      linkedEvidencePackets: new Set(rows.flatMap((item) => item.linkedEvidencePacketIds || [])).size,
+      requiredArtifacts: rows.reduce((sum, item) => sum + item.artifactCount, 0)
+    },
+    briefs: rows,
+    blockedBriefs
+  };
+}
+
+function buildDigitalHospitalFormalCutoverApprovalBoard(approvals = [], prerequisites = {}) {
+  const rows = approvals.map((approval) => ({
+    ...approval,
+    approved: String(approval.status || "").toLowerCase() === "approved" && Boolean(String(approval.signedBy || "").trim()) && Boolean(String(approval.changeTicket || "").trim()) && Boolean(String(approval.cutoverWindow || "").trim())
+  }));
+  const approvedApprovals = rows.filter((item) => item.approved);
+  const signerKeys = approvedApprovals.map((item) => String(item.signedBy || "").trim().toLowerCase()).filter(Boolean);
+  const distinctSigners = new Set(signerKeys).size;
+  const duplicateSignerCount = Math.max(0, signerKeys.length - distinctSigners);
+  const pilotLaunchReady = prerequisites.pilotLaunchReady === true;
+  const siteUnsigned = Number(prerequisites.siteUnsigned || 0);
+  const productionEvidenceMissing = Number(prerequisites.productionEvidenceMissing || 0);
+  const eligible = pilotLaunchReady && siteUnsigned === 0 && productionEvidenceMissing === 0;
+  const allApproved = rows.length >= 4 && approvedApprovals.length === rows.length && duplicateSignerCount === 0;
+  return {
+    status: allApproved ? "formal-cutover-approved" : eligible ? "awaiting-independent-approvals" : "blocked-by-site-evidence",
+    eligible,
+    allApproved,
+    prerequisites: {
+      pilotLaunchReady,
+      siteUnsigned,
+      productionEvidenceMissing
+    },
+    summary: {
+      approvals: rows.length,
+      approvedApprovals: approvedApprovals.length,
+      pendingApprovals: Math.max(0, rows.length - approvedApprovals.length),
+      distinctSigners,
+      duplicateSignerCount
+    },
+    approvals: rows,
+    blockedApprovals: rows.filter((item) => !item.approved)
+  };
+}
+
+function buildDigitalHospitalProductionEvidenceBoard(packets = [], requirements = []) {
+  const requirementById = new Map(requirements.map((item) => [item.id, item]));
+  const rows = packets.map((packet) => {
+    const requiredItems = Array.isArray(packet.requiredItems) ? packet.requiredItems : [];
+    const verifiedItems = requiredItems.filter(digitalHospitalEvidenceItemVerified);
+    const requirement = requirementById.get(packet.linkedRequirementId) || null;
+    const complete = requiredItems.length > 0 && verifiedItems.length === requiredItems.length;
+    return {
+      ...packet,
+      linkedRequirementTitle: requirement?.title || "",
+      requiredCount: requiredItems.length,
+      verifiedCount: verifiedItems.length,
+      missingCount: Math.max(0, requiredItems.length - verifiedItems.length),
+      signoffStatus: complete ? "signed" : verifiedItems.length > 0 ? "partial" : "pending-site-evidence",
+      status: complete ? "signed" : verifiedItems.length > 0 ? "evidence-recorded" : (packet.status || "pending-site-evidence")
+    };
+  });
+  const requiredItems = rows.reduce((sum, item) => sum + item.requiredCount, 0);
+  const verifiedItems = rows.reduce((sum, item) => sum + item.verifiedCount, 0);
+  const completePackets = rows.filter((item) => item.requiredCount > 0 && item.verifiedCount === item.requiredCount).length;
+  const p0Packets = rows.filter((item) => item.severity === "P0");
+  return {
+    status: rows.length > 0 && completePackets === rows.length ? "verified" : verifiedItems > 0 ? "in-progress" : "pending-site-evidence",
+    summary: {
+      packets: rows.length,
+      requiredItems,
+      verifiedItems,
+      missingItems: Math.max(0, requiredItems - verifiedItems),
+      completePackets,
+      p0Packets: p0Packets.length,
+      p0CompletePackets: p0Packets.filter((item) => item.requiredCount > 0 && item.verifiedCount === item.requiredCount).length
+    },
+    packets: rows
+  };
+}
+
+function buildDigitalHospitalLaunchReadiness(data) {
+  const standards = Array.isArray(data.digitalHospitalStandards) ? data.digitalHospitalStandards : seedDigitalHospitalStandards();
+  const evidencePackets = Array.isArray(data.digitalHospitalEvidencePackets) ? data.digitalHospitalEvidencePackets : seedDigitalHospitalEvidencePackets();
+  const requirements = Array.isArray(data.digitalHospitalLaunchRequirements) ? data.digitalHospitalLaunchRequirements : seedDigitalHospitalLaunchRequirements();
+  const approvals = Array.isArray(data.digitalHospitalLaunchApprovals) ? data.digitalHospitalLaunchApprovals : seedDigitalHospitalLaunchApprovals();
+  const productionEvidencePackets = Array.isArray(data.digitalHospitalProductionEvidencePackets) ? data.digitalHospitalProductionEvidencePackets : seedDigitalHospitalProductionEvidencePackets();
+  const launchCommandBriefs = Array.isArray(data.digitalHospitalLaunchCommandBriefs) ? data.digitalHospitalLaunchCommandBriefs : seedDigitalHospitalLaunchCommandBriefs();
+  const formalCutoverApprovals = Array.isArray(data.digitalHospitalFormalCutoverApprovals) ? data.digitalHospitalFormalCutoverApprovals : seedDigitalHospitalFormalCutoverApprovals();
+  const productionEvidenceBoard = buildDigitalHospitalProductionEvidenceBoard(productionEvidencePackets, requirements);
+  const launchCommandBriefBoard = buildDigitalHospitalLaunchCommandBriefBoard(launchCommandBriefs);
+  const p0Requirements = requirements.filter((item) => item.priority === "P0");
+  const p0Blocking = p0Requirements.filter((item) => !digitalHospitalRequirementReady(item));
+  const siteUnsigned = requirements.filter((item) => item.siteRequired && item.siteSigned !== true);
+  const productionEvidenceSummary = productionEvidenceBoard.summary;
+  const approvalsReady = approvals.length >= 4 && approvals.every((item) => String(item.status || "").toLowerCase() === "approved");
+  const noPatientPii = evidencePackets.length >= 5 && evidencePackets.every((item) => item.noPatientPii === true);
+  const checks = [
+    { id: "digitalHospitalLaunch:standardsApi", passed: standards.length >= 6, detail: `${standards.length} standards modeled` },
+    { id: "digitalHospitalLaunch:evidenceBoundary", passed: noPatientPii, detail: `${evidencePackets.length} evidence packets / noPatientPii=${noPatientPii}` },
+    { id: "digitalHospitalLaunch:requirements", passed: requirements.length >= 8 && p0Requirements.length >= 7, detail: `${requirements.length} requirements / ${p0Requirements.length} P0` },
+    { id: "digitalHospitalLaunch:p0Ready", passed: p0Blocking.length === 0, detail: `${p0Blocking.length} P0 blockers` },
+    { id: "digitalHospitalLaunch:approvals", passed: approvalsReady, detail: `${approvals.filter((item) => item.status === "approved").length}/${approvals.length} approvals` },
+    { id: "digitalHospitalLaunch:productionEvidence", passed: productionEvidenceSummary.packets >= 4 && productionEvidenceSummary.requiredItems >= 12, detail: `${productionEvidenceSummary.verifiedItems}/${productionEvidenceSummary.requiredItems} production evidence items verified` },
+    { id: "digitalHospitalLaunch:commandBriefs", passed: launchCommandBriefBoard.summary.briefs >= 5 && launchCommandBriefBoard.summary.readyBriefs === launchCommandBriefBoard.summary.briefs, detail: `${launchCommandBriefBoard.summary.readyBriefs}/${launchCommandBriefBoard.summary.briefs} launch command briefs ready` }
+  ];
+  const pilotLaunchReady = checks.every((item) => item.passed);
+  const formalCutoverApprovalBoard = buildDigitalHospitalFormalCutoverApprovalBoard(formalCutoverApprovals, {
+    pilotLaunchReady,
+    siteUnsigned: siteUnsigned.length,
+    productionEvidenceMissing: productionEvidenceSummary.missingItems
+  });
+  checks.push(
+    { id: "digitalHospitalLaunch:formalApprovals", passed: formalCutoverApprovalBoard.allApproved, detail: `${formalCutoverApprovalBoard.summary.approvedApprovals}/${formalCutoverApprovalBoard.summary.approvals} independent formal cutover approvals` },
+    { id: "digitalHospitalLaunch:formalBoundary", passed: requirements.some((item) => item.siteRequired), detail: `${siteUnsigned.length} formal production site signoffs still required` }
+  );
+  const formalProductionReady = pilotLaunchReady && siteUnsigned.length === 0 && productionEvidenceSummary.missingItems === 0 && formalCutoverApprovalBoard.allApproved;
+  const formalNextAction = formalProductionReady
+    ? "Archive final signed production cutover package."
+    : !pilotLaunchReady
+      ? "Restore the pilot launch checks before formal production review."
+      : siteUnsigned.length > 0 || productionEvidenceSummary.missingItems > 0
+        ? "Collect signed site evidence and verify every production evidence item."
+        : "Complete the independent formal cutover approvals with unique signers.";
+  return {
+    ok: pilotLaunchReady,
+    generatedAt: new Date().toISOString(),
+    launchGate: {
+      pilotLaunchReady,
+      formalProductionReady,
+      releaseGate: pilotLaunchReady ? "pilot-launch-ready" : "site-evidence-required",
+      formalGoLiveState: formalProductionReady ? "formal-production-ready" : formalCutoverApprovalBoard.eligible ? "awaiting-formal-cutover-approvals" : "blocked-until-site-materials-signed",
+      nextAction: formalNextAction
+    },
+    summary: {
+      requirements: requirements.length,
+      p0Requirements: p0Requirements.length,
+      p0Blocking: p0Blocking.length,
+      siteRequired: requirements.filter((item) => item.siteRequired).length,
+      siteSigned: requirements.filter((item) => item.siteRequired && item.siteSigned === true).length,
+      formalBlockers: siteUnsigned.length,
+      productionEvidencePackets: productionEvidenceSummary.packets,
+      productionEvidenceItems: productionEvidenceSummary.requiredItems,
+      productionEvidenceVerified: productionEvidenceSummary.verifiedItems,
+      productionEvidenceMissing: productionEvidenceSummary.missingItems,
+      launchCommandBriefs: launchCommandBriefBoard.summary.briefs,
+      launchCommandBriefsReady: launchCommandBriefBoard.summary.readyBriefs,
+      launchCommandBriefsPublished: launchCommandBriefBoard.summary.publishedBriefs,
+      launchCommandBriefsBlocked: launchCommandBriefBoard.summary.blockedBriefs,
+      formalCutoverApprovals: formalCutoverApprovalBoard.summary.approvals,
+      formalCutoverApprovalsReady: formalCutoverApprovalBoard.summary.approvedApprovals,
+      formalCutoverApprovalBlockers: formalCutoverApprovalBoard.summary.pendingApprovals,
+      formalCutoverDistinctSigners: formalCutoverApprovalBoard.summary.distinctSigners,
+      approvals: approvals.length,
+      approvalsReady: approvals.filter((item) => item.status === "approved").length
+    },
+    requirements,
+    approvals,
+    productionEvidenceBoard,
+    productionEvidencePackets: productionEvidenceBoard.packets,
+    launchCommandBriefBoard,
+    launchCommandBriefs: launchCommandBriefBoard.briefs,
+    formalCutoverApprovalBoard,
+    formalCutoverApprovals: formalCutoverApprovalBoard.approvals,
+    pilotBlockers: p0Blocking,
+    formalBlockers: siteUnsigned,
+    formalApprovalBlockers: formalCutoverApprovalBoard.blockedApprovals,
+    checks
+  };
+}
+
+function normalizeDigitalHospitalFormalCutoverApprovalAction(approval, payload = {}, user = {}, existingApprovals = [], eligibility = {}) {
+  const now = new Date().toISOString();
+  const status = String(payload.status || payload.decision || "approved").trim().toLowerCase();
+  if (!new Set(["approved", "rejected", "revoked", "pending"]).has(status)) {
+    throw new Error("status must be approved, rejected, revoked or pending");
+  }
+  const signedBy = String(payload.signedBy || "").trim();
+  const changeTicket = String(payload.changeTicket || "").trim();
+  const cutoverWindow = String(payload.cutoverWindow || "").trim();
+  const confirmation = String(payload.confirmation || "").trim();
+  if (status === "approved") {
+    if (eligibility.eligible !== true) throw new Error("formal cutover approval is blocked until all site evidence is verified");
+    if (!signedBy || !changeTicket || !cutoverWindow) throw new Error("signedBy, changeTicket and cutoverWindow are required for approval");
+    if (confirmation !== "APPROVE FORMAL CUTOVER") throw new Error("confirmation must be APPROVE FORMAL CUTOVER");
+    const duplicateSigner = existingApprovals.some((item) => item.id !== approval.id && String(item.status || "").toLowerCase() === "approved" && String(item.signedBy || "").trim().toLowerCase() === signedBy.toLowerCase());
+    if (duplicateSigner) throw new Error("each formal cutover approval requires a unique signer");
+  }
+  const history = {
+    id: randomUUID(),
+    at: now,
+    action: String(payload.action || "record-formal-cutover-approval").trim(),
+    status,
+    signedBy,
+    changeTicket,
+    cutoverWindow,
+    actor: user.name || user.username || "digital hospital operator",
+    role: user.role || "commission",
+    note: String(payload.note || payload.comment || "Digital hospital formal cutover approval recorded.").trim()
+  };
+  const approved = status === "approved";
+  return {
+    history,
+    approval: {
+      ...approval,
+      status,
+      signedBy: approved ? signedBy : "",
+      signedAt: approved ? now : "",
+      changeTicket: approved ? changeTicket : "",
+      cutoverWindow: approved ? cutoverWindow : "",
+      latestAction: history,
+      actionHistory: [history, ...(Array.isArray(approval.actionHistory) ? approval.actionHistory : [])].slice(0, 30),
+      updatedAt: now,
+      updatedBy: user.username || user.role || "commission",
+      updatedByName: user.name || "digital hospital operator"
+    }
+  };
+}
+
+function normalizeDigitalHospitalProductionEvidencePacketAction(packet, payload = {}, user = {}) {
+  const now = new Date().toISOString();
+  const requiredItems = Array.isArray(packet.requiredItems) ? packet.requiredItems : [];
+  const itemId = String(payload.itemId || payload.evidenceItemId || requiredItems.find((item) => !digitalHospitalEvidenceItemVerified(item))?.id || requiredItems[0]?.id || "").trim();
+  if (!itemId) throw new Error("itemId is required");
+  const targetItem = requiredItems.find((item) => item.id === itemId);
+  if (!targetItem) throw new Error("itemId is not in digital hospital production evidence packet");
+  const status = String(payload.status || "verified").trim().toLowerCase();
+  if (!new Set(["submitted", "verified", "rejected", "superseded"]).has(status)) {
+    throw new Error("status must be submitted, verified, rejected or superseded");
+  }
+  const artifactName = String(payload.artifactName || payload.artifact || targetItem.name || "digital hospital production evidence").trim();
+  const attachmentNames = normalizeStringList(payload.attachmentNames || payload.attachments).slice(0, 12);
+  const note = String(payload.note || payload.comment || "Digital hospital production evidence packet item recorded.").trim();
+  const history = {
+    id: randomUUID(),
+    at: now,
+    action: String(payload.action || "record-production-evidence").trim(),
+    status,
+    itemId,
+    itemName: targetItem.name || "",
+    artifactName,
+    attachmentNames,
+    actor: user.name || user.username || "digital hospital operator",
+    role: user.role || "commission",
+    note
+  };
+  const nextItems = requiredItems.map((item) => item.id === itemId
+    ? {
+        ...item,
+        status,
+        artifactName,
+        attachmentNames,
+        verifiedBy: status === "verified" ? (user.name || user.username || "") : (item.verifiedBy || ""),
+        verifiedAt: status === "verified" ? now : (item.verifiedAt || ""),
+        note
+      }
+    : item);
+  const verified = nextItems.filter(digitalHospitalEvidenceItemVerified).length;
+  const complete = nextItems.length > 0 && verified === nextItems.length;
+  return {
+    history,
+    packet: {
+      ...packet,
+      requiredItems: nextItems,
+      status: complete ? "signed" : verified > 0 ? "evidence-recorded" : status,
+      signoffStatus: complete ? "signed" : verified > 0 ? "partial" : "pending-site-evidence",
+      verifiedCount: verified,
+      requiredCount: nextItems.length,
+      latestAction: history,
+      actionHistory: [history, ...(Array.isArray(packet.actionHistory) ? packet.actionHistory : [])].slice(0, 20),
+      updatedAt: now,
+      updatedBy: user.username || user.role || "commission",
+      updatedByName: user.name || "digital hospital operator"
+    }
+  };
+}
+
+function normalizeDigitalHospitalLaunchCommandBriefAction(brief, payload = {}, user = {}) {
+  const now = new Date().toISOString();
+  const status = String(payload.status || payload.decision || "published").trim().toLowerCase();
+  if (!new Set(["ready", "published", "sent", "archived", "closed", "blocked"]).has(status)) {
+    throw new Error("status must be ready, published, sent, archived, closed or blocked");
+  }
+  const history = {
+    id: randomUUID(),
+    at: now,
+    action: String(payload.action || "record-launch-command-brief").trim(),
+    status,
+    decisionOwner: String(payload.decisionOwner || brief.decisionOwner || "").trim(),
+    publishChannel: String(payload.publishChannel || brief.publishChannel || "").trim(),
+    artifactName: String(payload.artifactName || payload.artifact || brief.title || "digital hospital launch command brief").trim(),
+    attachmentNames: normalizeStringList(payload.attachmentNames || payload.attachments).slice(0, 12),
+    actor: user.name || user.username || "digital hospital operator",
+    role: user.role || "commission",
+    note: String(payload.note || payload.comment || "Digital hospital launch command brief recorded.").trim()
+  };
+  return {
+    history,
+    brief: {
+      ...brief,
+      status,
+      decisionOwner: history.decisionOwner || brief.decisionOwner || "",
+      publishChannel: history.publishChannel || brief.publishChannel || "",
+      publishedBy: ["published", "sent"].includes(status) ? (user.name || user.username || brief.publishedBy || "") : (brief.publishedBy || ""),
+      publishedAt: ["published", "sent"].includes(status) ? now : (brief.publishedAt || ""),
+      archivedAt: ["archived", "closed"].includes(status) ? now : (brief.archivedAt || ""),
+      latestAction: history,
+      actionHistory: [history, ...(Array.isArray(brief.actionHistory) ? brief.actionHistory : [])].slice(0, 30),
+      updatedAt: now,
+      updatedBy: user.username || user.role || "commission",
+      updatedByName: user.name || "digital hospital operator"
+    }
+  };
+}
+
+function normalizeDigitalHospitalLaunchRequirementAction(item, payload = {}, user = {}) {
+  const now = new Date().toISOString();
+  const status = String(payload.status || payload.result || "verified").trim();
+  const action = String(payload.action || "record-launch-evidence").trim();
+  const evidence = normalizeStringList(payload.evidence || payload.attachmentNames || payload.attachments);
+  const note = String(payload.note || payload.comment || "Digital hospital launch requirement evidence recorded.").trim();
+  const siteSigned = payload.siteSigned === undefined
+    ? (item.siteSigned === true || ["signed", "approved", "accepted"].includes(status.toLowerCase()))
+    : Boolean(payload.siteSigned);
+  const history = {
+    id: randomUUID(),
+    at: now,
+    action,
+    status,
+    actor: user.name || user.username || "digital hospital operator",
+    role: user.role || "commission",
+    evidence,
+    note
+  };
+  return {
+    history,
+    item: {
+      ...item,
+      status,
+      siteSigned,
+      evidence: Array.from(new Set([...(item.evidence || []), ...evidence].filter(Boolean))),
+      latestAction: history,
+      auditTrail: [history, ...(Array.isArray(item.auditTrail) ? item.auditTrail : [])].slice(0, 20),
+      updatedAt: now,
+      updatedBy: user.username || user.role || "commission",
+      updatedByName: user.name || "digital hospital operator",
+      nextAction: String(payload.nextAction || item.nextAction || "").trim()
+    }
+  };
+}
+
+function buildDigitalHospitalStandardsOverview(data) {
+  const standards = Array.isArray(data.digitalHospitalStandards) ? data.digitalHospitalStandards : seedDigitalHospitalStandards();
+  const evaluationTasks = Array.isArray(data.digitalHospitalEvaluationTasks) ? data.digitalHospitalEvaluationTasks : seedDigitalHospitalEvaluationTasks();
+  const evidencePackets = Array.isArray(data.digitalHospitalEvidencePackets) ? data.digitalHospitalEvidencePackets : seedDigitalHospitalEvidencePackets();
+  const riskItems = Array.isArray(data.digitalHospitalRiskItems) ? data.digitalHospitalRiskItems : seedDigitalHospitalRiskItems();
+  const domainSet = new Set(standards.map((item) => item.domain).filter(Boolean));
+  const p0Standards = standards.filter((item) => item.level === "P0");
+  const openTasks = evaluationTasks.filter((item) => !/closed|done|complete|ready$/i.test(String(item.status || "")));
+  const blockers = riskItems.filter((item) => !/closed|resolved|done/i.test(String(item.status || "")));
+  const noPatientPii = evidencePackets.every((item) => item.noPatientPii === true);
+  const reviewQueue = [
+    { id: "review-provincial", label: "省级初审", count: evaluationTasks.filter((item) => ["hospital-self-assessment", "auto-validation"].includes(item.stage)).length, status: "待材料补正", next: "按医院类型分派审核人" },
+    { id: "review-expert", label: "专家复核", count: riskItems.filter((item) => item.blockerSource === "expert-review").length + 1, status: "待争议指标复核", next: "锁定高等级申报样本" },
+    { id: "review-national", label: "国家抽查", count: p0Standards.length, status: "待抽查方案", next: "按风险等级抽样" },
+    { id: "review-appeal", label: "申诉复议", count: riskItems.filter((item) => item.status === "tracking").length, status: "待补充依据", next: "归档原始判定和复议材料" }
+  ];
+  const checks = [
+    { id: "digitalHospitalApi:standards", passed: standards.length >= 6 && domainSet.size >= 6, detail: `${standards.length} standards / ${domainSet.size} domains` },
+    { id: "digitalHospitalApi:p0Coverage", passed: p0Standards.length >= 3, detail: `${p0Standards.length} P0 standard domains` },
+    { id: "digitalHospitalApi:evidenceBoundary", passed: evidencePackets.length >= 5 && noPatientPii, detail: `${evidencePackets.length} evidence packets; no patient PII=${noPatientPii}` },
+    { id: "digitalHospitalApi:workflow", passed: evaluationTasks.length >= 6 && evaluationTasks.some((item) => item.stage === "rectification-loop"), detail: `${evaluationTasks.length} evaluation task stages` },
+    { id: "digitalHospitalApi:blockers", passed: blockers.length >= 4, detail: `${blockers.length} open or tracking blockers` }
+  ];
+  return {
+    ok: checks.every((item) => item.passed),
+    generatedAt: new Date().toISOString(),
+    summary: {
+      standards: standards.length,
+      domains: domainSet.size,
+      p0Standards: p0Standards.length,
+      evaluationTasks: evaluationTasks.length,
+      openTasks: openTasks.length,
+      evidencePackets: evidencePackets.length,
+      noPatientPii,
+      risks: riskItems.length,
+      blockers: blockers.length
+    },
+    standards,
+    evaluationTasks,
+    evidencePackets,
+    reviewQueue,
+    riskItems,
+    launchReadiness: buildDigitalHospitalLaunchReadiness(data),
+    securityBoundary: [
+      "原则上不集中采集患者可识别明细数据。",
+      "优先采集统计指标、符合性结果和脱敏证据。",
+      "材料导出、专家查看、结果发布均进入审计链。",
+      "AI 只能做预审提示，最终结论由授权审核主体确认。"
+    ],
+    checks
+  };
+}
+
+function seedPhase2DataCatalogs() {
+  return [
+    {
+      id: "p2dc-master-index",
+      domain: "master-index",
+      name: "居民主索引与机构人员目录",
+      tableRange: "001-036",
+      tableCount: 36,
+      sourceSystems: ["人口库", "电子健康码", "机构注册", "医师护士注册"],
+      platformCollections: ["residents", "authOrganizations", "authUsers", "medicalResources"],
+      owner: "resident-master-index",
+      qualityRules: ["identity-key-required", "org-code-required", "duplicate-person-index"],
+      serviceIds: ["p2svc-master-index-query", "p2svc-org-directory"],
+      acceptanceEvidence: ["identity-contract.md", "data-governance-readiness-report.md"],
+      status: "catalog-ready",
+      blocker: "population registry, electronic health code and staff registry need onsite mapping"
+    },
+    {
+      id: "p2dc-clinical-record",
+      domain: "clinical-record",
+      name: "诊疗、电子病历与患者中心目录",
+      tableRange: "037-092",
+      tableCount: 56,
+      sourceSystems: ["HIS", "EMR", "病案首页", "患者中心"],
+      platformCollections: ["personalRecords", "careOrders", "diagnosticReports", "chronicManagementPlans"],
+      owner: "institution-integration",
+      qualityRules: ["encounter-idempotency", "diagnosis-code-version", "resident-linkage"],
+      serviceIds: ["p2svc-clinical-timeline", "p2svc-disease-card-queue"],
+      acceptanceEvidence: ["integration-readiness-report.md", "chronic-followup-readiness-report.md"],
+      status: "joint-test-ready",
+      blocker: "live HIS/EMR templates and signed sample payloads are required"
+    },
+    {
+      id: "p2dc-lab-imaging-recognition",
+      domain: "lab-imaging",
+      name: "检验检查互认与报告目录",
+      tableRange: "093-124",
+      tableCount: 32,
+      sourceSystems: ["LIS", "PACS", "影像云", "互认目录"],
+      platformCollections: ["diagnosticReports", "countyMutualRecognitionRecords", "imageCloudStudies", "mutualRecognitionQualityReviews"],
+      owner: "medical-resource-center",
+      qualityRules: ["lab-item-78-map", "report-pdf-hash", "recognition-decision-reason"],
+      serviceIds: ["p2svc-mutual-recognition-browser", "p2svc-report-citation"],
+      acceptanceEvidence: ["phase2-proposal-readiness-report.md", "quality-safety-report.md"],
+      status: "mvp-planned",
+      blocker: "78-item catalog, report PDF source and city-level evidence chain resource are pending"
+    },
+    {
+      id: "p2dc-public-health-governance",
+      domain: "public-health-governance",
+      name: "公卫报病、行业治理与区域绩效目录",
+      tableRange: "125-172",
+      tableCount: 48,
+      sourceSystems: ["公卫系统", "卫生统计", "发热门诊", "体检系统"],
+      platformCollections: ["publicHealthEvents", "healthStatisticsIngestion", "hospitalOperationSnapshots", "institutionCreditEvaluations"],
+      owner: "commission-governance",
+      qualityRules: ["direct-report-reconciliation", "monthly-indicator-version", "exception-owner-required"],
+      serviceIds: ["p2svc-public-health-exchange", "p2svc-governance-indicators"],
+      acceptanceEvidence: ["public-health-readiness-report.md", "health-dashboard-summary.md"],
+      status: "catalog-ready",
+      blocker: "official monthly/yearly indicator versions and fever/physical-exam feeds need site confirmation"
+    },
+    {
+      id: "p2dc-citizen-service",
+      domain: "citizen-service",
+      name: "统一入口、预约订单与家庭医生目录",
+      tableRange: "173-208",
+      tableCount: 36,
+      sourceSystems: ["辽事通/e 大连", "预约号源", "支付平台", "基层签约"],
+      platformCollections: ["appointments", "internetNursingOrders", "escortServiceOrders", "chronicFamilyDoctorPackages"],
+      owner: "citizen-service",
+      qualityRules: ["real-name-token", "order-state-reconciliation", "contract-fulfillment-rate"],
+      serviceIds: ["p2svc-unified-entry", "p2svc-appointment-order", "p2svc-family-doctor-contract"],
+      acceptanceEvidence: ["citizen-launch-foundation-readiness.md", "onsite-launch-requirements.md"],
+      status: "external-blocked",
+      blocker: "government entry, real-name, 17 hospital sources and payment/refund callbacks are external"
+    },
+    {
+      id: "p2dc-security-operations",
+      domain: "security-operations",
+      name: "密码应用、安全审计、备份灾备与运维目录",
+      tableRange: "209-216",
+      tableCount: 8,
+      sourceSystems: ["国密设备", "数据库审计", "备份系统", "监控工单"],
+      platformCollections: ["securityEvents", "dataAccessLogs", "securityAcceptanceLedger", "productionDeploymentPlan"],
+      owner: "security-operations",
+      qualityRules: ["sm-signature-evidence", "audit-retention-target", "backup-drill-signoff"],
+      serviceIds: ["p2svc-crypto-evidence", "p2svc-backup-dr"],
+      acceptanceEvidence: ["audit-retention-report.md", "monitoring-readiness-report.md"],
+      status: "onsite-blocked",
+      blocker: "SM devices, database audit appliance, remote backup target and signed drills are required"
+    }
+  ];
+}
+
+function seedPhase2ServiceCatalogs() {
+  return [
+    { id: "p2svc-master-index-query", name: "居民主索引查询服务", type: "data-service", apiRoute: "/api/state", catalogIds: ["p2dc-master-index"], consumerRoles: ["commission", "institution", "citizen"], owner: "resident-master-index", authScope: "role-scoped", sla: "P95 < 500ms in production sizing", status: "demo-ready" },
+    { id: "p2svc-org-directory", name: "机构人员目录服务", type: "directory-service", apiRoute: "/api/state", catalogIds: ["p2dc-master-index"], consumerRoles: ["commission"], owner: "platform-identity", authScope: "commission-only", sla: "daily sync after onsite source binding", status: "catalog-ready" },
+    { id: "p2svc-clinical-timeline", name: "患者诊疗时间线服务", type: "clinical-service", apiRoute: "/api/personal-records", catalogIds: ["p2dc-clinical-record"], consumerRoles: ["commission", "institution", "citizen"], owner: "institution-integration", authScope: "resident-scope", sla: "near-real-time after HIS/EMR joint test", status: "demo-ready" },
+    { id: "p2svc-disease-card-queue", name: "慢病/传染病报卡队列服务", type: "public-health-service", apiRoute: "/api/chronic/public-health-loop", catalogIds: ["p2dc-clinical-record", "p2dc-public-health-governance"], consumerRoles: ["commission", "institution", "county"], owner: "public-health", authScope: "institution-county-scoped", sla: "event-driven after rule approval", status: "mvp-planned" },
+    { id: "p2svc-mutual-recognition-browser", name: "检验结果互认浏览服务", type: "medical-resource-service", apiRoute: "/api/phase2/mutual-recognition", catalogIds: ["p2dc-lab-imaging-recognition"], consumerRoles: ["commission", "institution", "county"], owner: "medical-resource-center", authScope: "clinical-record-scope", sla: "hourly LIS/PACS sync after joint test", status: "mvp-ready" },
+    { id: "p2svc-report-citation", name: "报告引用与确权哈希服务", type: "evidence-service", apiRoute: "/api/phase2/mutual-recognition/records/:id/decision", catalogIds: ["p2dc-lab-imaging-recognition", "p2dc-security-operations"], consumerRoles: ["commission", "county"], owner: "medical-resource-center", authScope: "signed-clinical-operation", sla: "append-only audit hash chain", status: "mvp-ready" },
+    { id: "p2svc-public-health-exchange", name: "公卫交换与区县回执服务", type: "exchange-service", apiRoute: "/api/public-health/system", catalogIds: ["p2dc-public-health-governance"], consumerRoles: ["commission", "county"], owner: "public-health", authScope: "commission-county", sla: "daily/monthly reconciliation", status: "ready-for-site" },
+    { id: "p2svc-governance-indicators", name: "行业治理指标中心服务", type: "analytics-service", apiRoute: "/api/health-dashboard/summary", catalogIds: ["p2dc-public-health-governance"], consumerRoles: ["commission"], owner: "commission-governance", authScope: "commission-only", sla: "monthly/yearly report generation", status: "catalog-ready" },
+    { id: "p2svc-unified-entry", name: "辽事通/e 大连统一入口适配服务", type: "citizen-entry-service", apiRoute: "/api/auth/login", catalogIds: ["p2dc-citizen-service"], consumerRoles: ["citizen"], owner: "citizen-service", authScope: "government-identity-token", sla: "blocked until government entry joint test", status: "external-blocked" },
+    { id: "p2svc-appointment-order", name: "一站式预约订单服务", type: "citizen-order-service", apiRoute: "/api/workflow-actions", catalogIds: ["p2dc-citizen-service"], consumerRoles: ["citizen", "institution"], owner: "citizen-service", authScope: "resident-order-scope", sla: "blocked until 17 hospital appointment sources are bound", status: "external-blocked" },
+    { id: "p2svc-family-doctor-contract", name: "家庭医生签约履约服务", type: "primary-care-service", apiRoute: "/api/chronic/followup-summary", catalogIds: ["p2dc-citizen-service", "p2dc-public-health-governance"], consumerRoles: ["commission", "institution", "citizen"], owner: "primary-care", authScope: "resident-contract-scope", sla: "monthly fulfillment statistics", status: "mvp-planned" },
+    { id: "p2svc-crypto-evidence", name: "商用密码证据服务", type: "security-service", apiRoute: "/api/audit/verify", catalogIds: ["p2dc-security-operations"], consumerRoles: ["commission"], owner: "security", authScope: "commission-security", sla: "blocked until SM devices are selected", status: "onsite-blocked" },
+    { id: "p2svc-backup-dr", name: "备份灾备与恢复演练服务", type: "operations-service", apiRoute: "/api/system/readiness", catalogIds: ["p2dc-security-operations"], consumerRoles: ["commission"], owner: "operations", authScope: "commission-operations", sla: "2h/12h target after remote backup resource is confirmed", status: "onsite-blocked" }
+  ];
+}
+
+function seedPhase2FieldLineage() {
+  return [
+    { id: "p2fl-person-index", catalogId: "p2dc-master-index", sourceSystem: "人口库/电子健康码", sourceField: "identityNo + healthCode", targetCollection: "residents", targetField: "personIndex", contractId: "identity-contract", qualityRuleId: "identity-key-required", status: "onsite-blocked" },
+    { id: "p2fl-org-code", catalogId: "p2dc-master-index", sourceSystem: "机构注册", sourceField: "orgCode", targetCollection: "authOrganizations", targetField: "orgCode", contractId: "identity-contract", qualityRuleId: "org-code-required", status: "catalog-ready" },
+    { id: "p2fl-encounter", catalogId: "p2dc-clinical-record", sourceSystem: "HIS", sourceField: "visitNo", targetCollection: "personalRecords", targetField: "externalId", contractId: "his-patient-v1", qualityRuleId: "encounter-idempotency", status: "demo-ready" },
+    { id: "p2fl-diagnosis", catalogId: "p2dc-clinical-record", sourceSystem: "EMR", sourceField: "diagnosisCode", targetCollection: "personalRecords", targetField: "diagnosis", contractId: "emr-summary-v1", qualityRuleId: "diagnosis-code-version", status: "demo-ready" },
+    { id: "p2fl-lab-item", catalogId: "p2dc-lab-imaging-recognition", sourceSystem: "LIS", sourceField: "itemCode + resultValue", targetCollection: "diagnosticReports", targetField: "item/result", contractId: "lis-report-v1", qualityRuleId: "lab-item-78-map", status: "mvp-planned" },
+    { id: "p2fl-report-citation", catalogId: "p2dc-lab-imaging-recognition", sourceSystem: "PACS/LIS", sourceField: "reportPdfDigest", targetCollection: "countyMutualRecognitionRecords", targetField: "evidenceHash", contractId: "p2svc-report-citation", qualityRuleId: "report-pdf-hash", status: "adapter-ready" },
+    { id: "p2fl-public-health-metric", catalogId: "p2dc-public-health-governance", sourceSystem: "卫生统计", sourceField: "indicatorCode + period", targetCollection: "healthStatisticsIngestion", targetField: "metrics", contractId: "statistics-report-v1", qualityRuleId: "monthly-indicator-version", status: "ready-for-site" },
+    { id: "p2fl-appointment-order", catalogId: "p2dc-citizen-service", sourceSystem: "预约号源/支付平台", sourceField: "orderNo + paymentStatus", targetCollection: "careOrders", targetField: "status", contractId: "p2svc-appointment-order", qualityRuleId: "order-state-reconciliation", status: "external-blocked" },
+    { id: "p2fl-contract-fulfillment", catalogId: "p2dc-citizen-service", sourceSystem: "基层签约", sourceField: "contractId + serviceRecord", targetCollection: "chronicManagementPlans", targetField: "familyDoctorService", contractId: "p2svc-family-doctor-contract", qualityRuleId: "contract-fulfillment-rate", status: "mvp-planned" },
+    { id: "p2fl-audit-retention", catalogId: "p2dc-security-operations", sourceSystem: "数据库审计/备份系统", sourceField: "auditHash + backupJobId", targetCollection: "securityAcceptanceLedger", targetField: "evidence", contractId: "audit-retention", qualityRuleId: "backup-drill-signoff", status: "onsite-blocked" }
+  ];
+}
+
+function seedPhase2CatalogQualityRules() {
+  return [
+    { id: "identity-key-required", catalogId: "p2dc-master-index", severity: "P0", rule: "居民主索引必须具备身份键、联系方式和来源系统标识。", evidence: "identity-contract.md", owner: "resident-master-index", status: "ready" },
+    { id: "org-code-required", catalogId: "p2dc-master-index", severity: "P0", rule: "机构、科室和人员目录必须保留统一社会信用代码、机构编码和人员执业标识。", evidence: "identity-contract.md", owner: "platform-identity", status: "ready" },
+    { id: "encounter-idempotency", catalogId: "p2dc-clinical-record", severity: "P0", rule: "HIS 就诊、EMR 摘要、LIS/PACS 报告必须以 externalId 或报告号做幂等控制。", evidence: "integration-readiness-report.md", owner: "institution-integration", status: "ready" },
+    { id: "diagnosis-code-version", catalogId: "p2dc-clinical-record", severity: "P1", rule: "诊断、手术、慢病报卡必须记录 ICD/版本口径和触发规则版本。", evidence: "chronic-followup-readiness-report.md", owner: "public-health", status: "mvp-planned" },
+    { id: "lab-item-78-map", catalogId: "p2dc-lab-imaging-recognition", severity: "P1", rule: "互认检验项目必须映射至 78 项目录，保留报告来源、结果值、异常标识和互认结论。", evidence: "phase2-proposal-readiness-report.md", owner: "medical-resource-center", status: "mvp-planned" },
+    { id: "report-pdf-hash", catalogId: "p2dc-lab-imaging-recognition", severity: "P1", rule: "报告浏览、引用和确权适配必须产生不可变哈希和审计事件。", evidence: "process-audit-report.md", owner: "medical-resource-center", status: "adapter-ready" },
+    { id: "direct-report-reconciliation", catalogId: "p2dc-public-health-governance", severity: "P0", rule: "公卫交换和统计直报差异超过阈值时必须生成复核记录和责任部门。", evidence: "public-health-readiness-report.md", owner: "public-health", status: "ready" },
+    { id: "monthly-indicator-version", catalogId: "p2dc-public-health-governance", severity: "P1", rule: "月报、年报和区域绩效指标必须固定版本、口径、数据源和导出口径。", evidence: "health-dashboard-summary.md", owner: "commission-governance", status: "catalog-ready" },
+    { id: "order-state-reconciliation", catalogId: "p2dc-citizen-service", severity: "P1", rule: "预约、退号、支付、医保和短信状态必须可对账并保留回调凭证。", evidence: "citizen-launch-foundation-readiness.md", owner: "citizen-service", status: "external-blocked" },
+    { id: "contract-fulfillment-rate", catalogId: "p2dc-citizen-service", severity: "P1", rule: "家庭医生签约必须统计履约百分比、续约、申请审核和满意度评价。", evidence: "chronic-followup-readiness-report.md", owner: "primary-care", status: "mvp-planned" },
+    { id: "sm-signature-evidence", catalogId: "p2dc-security-operations", severity: "P2", rule: "国密签名、验签、时间戳和重要数据加密必须有设备、证书和密评证据。", evidence: "securityAcceptanceLedger", owner: "security", status: "onsite-blocked" },
+    { id: "backup-drill-signoff", catalogId: "p2dc-security-operations", severity: "P2", rule: "备份、远程灾备和恢复演练必须记录 30/7 保留、2h/12h 目标和现场签字。", evidence: "monitoring-readiness-report.md", owner: "operations", status: "onsite-blocked" }
+  ];
+}
+
+function buildPhase2CatalogOverview(data) {
+  const dataCatalogs = Array.isArray(data.phase2DataCatalogs) ? data.phase2DataCatalogs : seedPhase2DataCatalogs();
+  const serviceCatalogs = Array.isArray(data.phase2ServiceCatalogs) ? data.phase2ServiceCatalogs : seedPhase2ServiceCatalogs();
+  const fieldLineage = Array.isArray(data.phase2FieldLineage) ? data.phase2FieldLineage : seedPhase2FieldLineage();
+  const qualityRules = Array.isArray(data.phase2CatalogQualityRules) ? data.phase2CatalogQualityRules : seedPhase2CatalogQualityRules();
+  const catalogIds = new Set(dataCatalogs.map((item) => item.id));
+  const serviceIds = new Set(serviceCatalogs.map((item) => item.id));
+  const qualityRuleIds = new Set(qualityRules.map((item) => item.id));
+  const tablesMapped = dataCatalogs.reduce((sum, item) => sum + Number(item.tableCount || 0), 0);
+  const onsiteBlocked = [...dataCatalogs, ...serviceCatalogs, ...fieldLineage, ...qualityRules].filter((item) => /blocked|external/i.test(String(item.status || item.blocker || ""))).length;
+  const checks = [
+    { id: "phase2Catalog:216TableMapping", passed: tablesMapped >= 216 && dataCatalogs.every((item) => item.tableRange && item.tableCount), detail: `${tablesMapped}/216 mapped table slots` },
+    { id: "phase2Catalog:dataCatalog", passed: dataCatalogs.length >= 6 && dataCatalogs.every((item) => item.owner && item.sourceSystems?.length && item.platformCollections?.length && item.qualityRules?.length && item.serviceIds?.length), detail: `${dataCatalogs.length} data catalog groups` },
+    { id: "phase2Catalog:serviceCatalog", passed: serviceCatalogs.length >= 12 && serviceCatalogs.every((item) => item.apiRoute && item.consumerRoles?.length && item.owner && item.authScope), detail: `${serviceCatalogs.length} service catalog items` },
+    { id: "phase2Catalog:lineage", passed: fieldLineage.length >= 10 && fieldLineage.every((item) => catalogIds.has(item.catalogId) && item.sourceSystem && item.targetCollection && qualityRuleIds.has(item.qualityRuleId)), detail: `${fieldLineage.length} field lineage rows` },
+    { id: "phase2Catalog:qualityRules", passed: qualityRules.length >= 12 && qualityRules.every((item) => catalogIds.has(item.catalogId) && item.owner && item.evidence), detail: `${qualityRules.length} quality rules` },
+    { id: "phase2Catalog:serviceLinks", passed: dataCatalogs.every((item) => (item.serviceIds || []).every((id) => serviceIds.has(id))), detail: "every data catalog links to declared services" },
+    { id: "phase2Catalog:externalBoundary", passed: onsiteBlocked >= 6, detail: `${onsiteBlocked} onsite/external blockers surfaced` }
+  ];
+  return {
+    ok: checks.every((item) => item.passed),
+    generatedAt: new Date().toISOString(),
+    summary: {
+      dataCatalogs: dataCatalogs.length,
+      serviceCatalogs: serviceCatalogs.length,
+      fieldLineage: fieldLineage.length,
+      qualityRules: qualityRules.length,
+      tablesMapped,
+      targetTables: 216,
+      sourceSystems: [...new Set(dataCatalogs.flatMap((item) => item.sourceSystems || []))].length,
+      platformCollections: [...new Set(dataCatalogs.flatMap((item) => item.platformCollections || []))].length,
+      onsiteBlocked
+    },
+    dataCatalogs,
+    serviceCatalogs,
+    fieldLineage,
+    qualityRules,
+    checks
+  };
+}
+
+function seedPhase2PilotInstitutions() {
+  return [
+    {
+      id: "p2pilot-hospital",
+      name: "大连市中心医院",
+      role: "tertiary-hospital",
+      institutionLevel: "三级医院",
+      region: "中山区",
+      sourceSystems: ["HIS", "EMR", "LIS", "PACS"],
+      jointTestLinks: ["p2link-his-patient", "p2link-emr-summary", "p2link-lis-report"],
+      accountStatus: "demo-account-ready",
+      environmentStatus: "test-vpn-pending",
+      signoffStatus: "pending-site-signature",
+      owner: "医院信息中心/接口联调专班",
+      nextAction: "现场提供测试账号、签名密钥、LIS 项目字典和 PACS 报告 PDF 源。"
+    },
+    {
+      id: "p2pilot-district",
+      name: "甘井子区卫生健康平台",
+      role: "district-platform",
+      institutionLevel: "区县平台",
+      region: "甘井子区",
+      sourceSystems: ["健康档案", "区域公卫", "卫生统计"],
+      jointTestLinks: ["p2link-health-archive", "p2link-statistics-indicator"],
+      accountStatus: "demo-account-ready",
+      environmentStatus: "gateway-whitelist-pending",
+      signoffStatus: "pending-district-signature",
+      owner: "区县信息中心/规划信息处",
+      nextAction: "确认区县平台字段版本、日/月报回执和历史数据抽样迁移范围。"
+    },
+    {
+      id: "p2pilot-primary",
+      name: "凌水社区卫生服务中心",
+      role: "primary-care",
+      institutionLevel: "基层机构",
+      region: "高新区",
+      sourceSystems: ["基层 HIS", "家庭医生签约", "慢病报病"],
+      jointTestLinks: ["p2link-master-index", "p2link-appointment-order", "p2link-chronic-report"],
+      accountStatus: "demo-account-ready",
+      environmentStatus: "ready-for-site",
+      signoffStatus: "pending-primary-signature",
+      owner: "基层卫生处/社区机构联络员",
+      nextAction: "用居民主索引、挂号/签约和慢病报病样例完成二次复测。"
+    }
+  ];
+}
+
+function seedPhase2JointTestLinks() {
+  return [
+    { id: "p2link-master-index", institutionId: "p2pilot-primary", chain: "identity-master-index", sourceSystem: "人口库/电子健康码", targetCollection: "residents", contractId: "identity-contract", payloadId: "p2msg-master-index", traceId: "p2trace-master-index", requiredFields: ["identityNo", "healthCode", "name", "mobile"], status: "passed-demo", signoffStatus: "pending-site-signature" },
+    { id: "p2link-his-patient", institutionId: "p2pilot-hospital", chain: "his-encounter", sourceSystem: "HIS", targetCollection: "personalRecords", contractId: "his-patient-v1", payloadId: "p2msg-his-visit", traceId: "p2trace-his-visit", requiredFields: ["residentId", "visitNo", "department", "doctorCode"], status: "passed-demo", signoffStatus: "pending-site-signature" },
+    { id: "p2link-emr-summary", institutionId: "p2pilot-hospital", chain: "emr-summary", sourceSystem: "EMR", targetCollection: "personalRecords", contractId: "emr-summary-v1", payloadId: "p2msg-emr-summary", traceId: "p2trace-emr-summary", requiredFields: ["residentId", "encounterId", "diagnosisCode", "recordDate"], status: "passed-demo", signoffStatus: "pending-template-signature" },
+    { id: "p2link-lis-report", institutionId: "p2pilot-hospital", chain: "lis-report", sourceSystem: "LIS", targetCollection: "diagnosticReports", contractId: "lis-report-v1", payloadId: "p2msg-lis-report", traceId: "p2trace-lis-report", requiredFields: ["reportNo", "itemCode", "resultValue", "reportedAt"], status: "compensated-demo", signoffStatus: "pending-dictionary-signature" },
+    { id: "p2link-health-archive", institutionId: "p2pilot-district", chain: "health-archive", sourceSystem: "健康档案", targetCollection: "personalRecords", contractId: "health-archive-standard", payloadId: "p2msg-health-archive", traceId: "p2trace-health-archive", requiredFields: ["archiveId", "residentId", "riskTags", "updatedAt"], status: "passed-demo", signoffStatus: "pending-district-signature" },
+    { id: "p2link-statistics-indicator", institutionId: "p2pilot-district", chain: "statistics-indicator", sourceSystem: "卫生统计", targetCollection: "healthStatisticsIngestion", contractId: "statistics-report-v1", payloadId: "p2msg-statistics-indicator", traceId: "p2trace-statistics-indicator", requiredFields: ["indicatorCode", "period", "value", "orgCode"], status: "passed-demo", signoffStatus: "pending-indicator-version" },
+    { id: "p2link-appointment-order", institutionId: "p2pilot-primary", chain: "appointment-order", sourceSystem: "基层 HIS/号源", targetCollection: "careOrders", contractId: "appointment-order-v1", payloadId: "p2msg-appointment-order", traceId: "p2trace-appointment-order", requiredFields: ["orderNo", "residentId", "slotId", "orderStatus"], status: "ready-for-site", signoffStatus: "pending-source-confirmation" },
+    { id: "p2link-chronic-report", institutionId: "p2pilot-primary", chain: "chronic-reporting", sourceSystem: "慢病报病", targetCollection: "chronicScreeningTasks", contractId: "chronic-report-v1", payloadId: "p2msg-chronic-report", traceId: "p2trace-chronic-report", requiredFields: ["residentId", "diseaseCode", "riskLevel", "reportedAt"], status: "passed-demo", signoffStatus: "pending-primary-signature" }
+  ];
+}
+
+function seedPhase2SamplePayloads() {
+  return [
+    { id: "p2msg-master-index", category: "patient", sourceSystem: "人口库/电子健康码", sampleType: "resident-master-index", idempotencyKey: "P2-MI-20260709-001", signatureAlgorithm: "HMAC-SHA256", requiredFields: ["identityNo", "healthCode", "name", "mobile"], sampleHash: "sha256:p2-mi-001", status: "validated" },
+    { id: "p2msg-his-visit", category: "visit", sourceSystem: "HIS", sampleType: "outpatient-encounter", idempotencyKey: "P2-HIS-20260709-001", signatureAlgorithm: "HMAC-SHA256", requiredFields: ["residentId", "visitNo", "department", "doctorCode"], sampleHash: "sha256:p2-his-001", status: "validated" },
+    { id: "p2msg-emr-summary", category: "emr", sourceSystem: "EMR", sampleType: "clinical-summary", idempotencyKey: "P2-EMR-20260709-001", signatureAlgorithm: "HMAC-SHA256", requiredFields: ["residentId", "encounterId", "diagnosisCode", "recordDate"], sampleHash: "sha256:p2-emr-001", status: "validated" },
+    { id: "p2msg-lis-report", category: "lab-report", sourceSystem: "LIS", sampleType: "mutual-recognition-lab", idempotencyKey: "P2-LIS-20260709-001", signatureAlgorithm: "HMAC-SHA256", requiredFields: ["reportNo", "itemCode", "resultValue", "reportedAt"], sampleHash: "sha256:p2-lis-001", status: "validated-after-replay" },
+    { id: "p2msg-health-archive", category: "health-archive", sourceSystem: "健康档案", sampleType: "archive-sync", idempotencyKey: "P2-ARCH-20260709-001", signatureAlgorithm: "HMAC-SHA256", requiredFields: ["archiveId", "residentId", "riskTags", "updatedAt"], sampleHash: "sha256:p2-archive-001", status: "validated" },
+    { id: "p2msg-statistics-indicator", category: "statistics", sourceSystem: "卫生统计", sampleType: "monthly-indicator", idempotencyKey: "P2-STAT-20260709-001", signatureAlgorithm: "HMAC-SHA256", requiredFields: ["indicatorCode", "period", "value", "orgCode"], sampleHash: "sha256:p2-stat-001", status: "validated" },
+    { id: "p2msg-appointment-order", category: "appointment", sourceSystem: "基层 HIS/号源", sampleType: "appointment-order", idempotencyKey: "P2-APPT-20260709-001", signatureAlgorithm: "HMAC-SHA256", requiredFields: ["orderNo", "residentId", "slotId", "orderStatus"], sampleHash: "sha256:p2-appt-001", status: "ready-for-site" },
+    { id: "p2msg-chronic-report", category: "chronic-report", sourceSystem: "慢病报病", sampleType: "disease-card", idempotencyKey: "P2-CHR-20260709-001", signatureAlgorithm: "HMAC-SHA256", requiredFields: ["residentId", "diseaseCode", "riskLevel", "reportedAt"], sampleHash: "sha256:p2-chr-001", status: "validated" }
+  ];
+}
+
+function seedPhase2GatewayTraces() {
+  return [
+    { id: "p2trace-master-index", payloadId: "p2msg-master-index", route: "/api/integrations/gateway", targetCollection: "residents", status: "landed", signatureVerified: true, idempotencyKey: "P2-MI-20260709-001", landedRecordId: "res-001", replayStatus: "replayable", auditEvent: "phase2-joint-test-gateway" },
+    { id: "p2trace-his-visit", payloadId: "p2msg-his-visit", route: "/api/integrations/gateway", targetCollection: "personalRecords", status: "landed", signatureVerified: true, idempotencyKey: "P2-HIS-20260709-001", landedRecordId: "pr-visit-p2-001", replayStatus: "replayable", auditEvent: "phase2-joint-test-gateway" },
+    { id: "p2trace-emr-summary", payloadId: "p2msg-emr-summary", route: "/api/integrations/gateway", targetCollection: "personalRecords", status: "landed", signatureVerified: true, idempotencyKey: "P2-EMR-20260709-001", landedRecordId: "pr-emr-p2-001", replayStatus: "replayable", auditEvent: "phase2-joint-test-gateway" },
+    { id: "p2trace-lis-report", payloadId: "p2msg-lis-report", route: "/api/integrations/gateway", targetCollection: "diagnosticReports", status: "compensated", signatureVerified: true, idempotencyKey: "P2-LIS-20260709-001", landedRecordId: "dr-p2-001", replayStatus: "replayed-after-dead-letter", auditEvent: "phase2-joint-test-gateway" },
+    { id: "p2trace-health-archive", payloadId: "p2msg-health-archive", route: "/api/integrations/gateway", targetCollection: "personalRecords", status: "landed", signatureVerified: true, idempotencyKey: "P2-ARCH-20260709-001", landedRecordId: "pr-archive-p2-001", replayStatus: "replayable", auditEvent: "phase2-joint-test-gateway" },
+    { id: "p2trace-statistics-indicator", payloadId: "p2msg-statistics-indicator", route: "/api/integrations/gateway", targetCollection: "healthStatisticsIngestion", status: "landed", signatureVerified: true, idempotencyKey: "P2-STAT-20260709-001", landedRecordId: "hsi-p2-001", replayStatus: "replayable", auditEvent: "phase2-joint-test-gateway" },
+    { id: "p2trace-appointment-order", payloadId: "p2msg-appointment-order", route: "/api/integrations/gateway", targetCollection: "careOrders", status: "dry-run", signatureVerified: true, idempotencyKey: "P2-APPT-20260709-001", landedRecordId: "pending-site-order", replayStatus: "site-replay-required", auditEvent: "phase2-joint-test-gateway" },
+    { id: "p2trace-chronic-report", payloadId: "p2msg-chronic-report", route: "/api/integrations/gateway", targetCollection: "chronicScreeningTasks", status: "landed", signatureVerified: true, idempotencyKey: "P2-CHR-20260709-001", landedRecordId: "cst-p2-001", replayStatus: "replayable", auditEvent: "phase2-joint-test-gateway" }
+  ];
+}
+
+function seedPhase2JointTestIssues() {
+  return [
+    { id: "p2issue-hospital-secret", institutionId: "p2pilot-hospital", severity: "P0", title: "院内接口账号和签名密钥未正式交接", owner: "医院信息中心", status: "open", retestStatus: "pending", dueAt: "2026-07-18", linkedLinkId: "p2link-his-patient", signoffStatus: "pending-site-signature" },
+    { id: "p2issue-lis-dictionary", institutionId: "p2pilot-hospital", severity: "P0", title: "LIS 项目字典与互认 78 项目录需要签字确认", owner: "医学检验中心", status: "open", retestStatus: "scheduled", dueAt: "2026-07-19", linkedLinkId: "p2link-lis-report", signoffStatus: "pending-dictionary-signature" },
+    { id: "p2issue-district-stat-version", institutionId: "p2pilot-district", severity: "P1", title: "区县卫生统计指标版本和月报回执规则待确认", owner: "区县信息中心", status: "open", retestStatus: "pending", dueAt: "2026-07-20", linkedLinkId: "p2link-statistics-indicator", signoffStatus: "pending-indicator-version" },
+    { id: "p2issue-primary-order-source", institutionId: "p2pilot-primary", severity: "P1", title: "基层号源/签约源系统需确认回调状态口径", owner: "基层卫生处", status: "open", retestStatus: "pending", dueAt: "2026-07-21", linkedLinkId: "p2link-appointment-order", signoffStatus: "pending-source-confirmation" }
+  ];
+}
+
+function buildPhase2JointTestPilotOverview(data) {
+  const institutions = Array.isArray(data.phase2PilotInstitutions) ? data.phase2PilotInstitutions : seedPhase2PilotInstitutions();
+  const links = Array.isArray(data.phase2JointTestLinks) ? data.phase2JointTestLinks : seedPhase2JointTestLinks();
+  const payloads = Array.isArray(data.phase2SamplePayloads) ? data.phase2SamplePayloads : seedPhase2SamplePayloads();
+  const traces = Array.isArray(data.phase2GatewayTraces) ? data.phase2GatewayTraces : seedPhase2GatewayTraces();
+  const issues = Array.isArray(data.phase2JointTestIssues) ? data.phase2JointTestIssues : seedPhase2JointTestIssues();
+  const institutionIds = new Set(institutions.map((item) => item.id));
+  const payloadIds = new Set(payloads.map((item) => item.id));
+  const traceIds = new Set(traces.map((item) => item.id));
+  const requiredCategories = ["patient", "visit", "lab-report", "statistics"];
+  const landedTraces = traces.filter((item) => /landed|compensated/i.test(String(item.status || "")));
+  const runnableChains = links.filter((item) => /passed|compensated/i.test(String(item.status || "")));
+  const openIssues = issues.filter((item) => !/closed|signed/i.test(String(item.status || "")));
+  const checks = [
+    { id: "phase2JointTest:pilotInstitutions", passed: institutions.length >= 3 && ["tertiary-hospital", "district-platform", "primary-care"].every((role) => institutions.some((item) => item.role === role)), detail: `${institutions.length} pilot institutions` },
+    { id: "phase2JointTest:linkLedger", passed: links.length >= 6 && links.every((item) => institutionIds.has(item.institutionId) && payloadIds.has(item.payloadId) && traceIds.has(item.traceId) && item.requiredFields?.length), detail: `${links.length} institution-system-interface-field links` },
+    { id: "phase2JointTest:samplePayloads", passed: requiredCategories.every((category) => payloads.some((item) => item.category === category)) && payloads.every((item) => item.idempotencyKey && item.signatureAlgorithm && item.sampleHash), detail: `${payloads.length} signed sample payloads` },
+    { id: "phase2JointTest:gatewayLanding", passed: landedTraces.length >= 6 && landedTraces.every((item) => item.signatureVerified && item.idempotencyKey && item.targetCollection && item.landedRecordId), detail: `${landedTraces.length} landed or compensated gateway traces` },
+    { id: "phase2JointTest:replayability", passed: traces.filter((item) => /replay/i.test(String(item.replayStatus || ""))).length >= 6, detail: `${traces.filter((item) => /replay/i.test(String(item.replayStatus || ""))).length} replayable traces` },
+    { id: "phase2JointTest:runnableChains", passed: runnableChains.length >= 5 && ["identity-master-index", "his-encounter", "lis-report", "health-archive", "chronic-reporting"].every((chain) => runnableChains.some((item) => item.chain === chain)), detail: `${runnableChains.length} runnable chains` },
+    { id: "phase2JointTest:issueRetestLedger", passed: issues.length >= 4 && issues.every((item) => institutionIds.has(item.institutionId) && item.owner && item.dueAt && item.retestStatus && item.signoffStatus), detail: `${issues.length} issue and retest rows` },
+    { id: "phase2JointTest:onsiteBoundary", passed: openIssues.length >= 3 && institutions.some((item) => /pending/i.test(String(item.signoffStatus || ""))), detail: `${openIssues.length} open onsite signoff issues` }
+  ];
+  return {
+    ok: checks.every((item) => item.passed),
+    generatedAt: new Date().toISOString(),
+    summary: {
+      institutions: institutions.length,
+      sourceSystems: [...new Set(institutions.flatMap((item) => item.sourceSystems || []))].length,
+      links: links.length,
+      samplePayloads: payloads.length,
+      gatewayTraces: traces.length,
+      landedTraces: landedTraces.length,
+      runnableChains: runnableChains.length,
+      openIssues: openIssues.length
+    },
+    institutions,
+    links,
+    samplePayloads: payloads,
+    gatewayTraces: traces,
+    issues,
+    checks
+  };
 }
 
 function buildDataGovernanceOverview(data) {
@@ -2442,6 +3622,465 @@ function seedCountyAcceptanceLedger() {
   ];
 }
 
+function seedPhase2DiseaseReportingRules() {
+  return [
+    { id: "p2dr-rule-htn", diseaseCategory: "chronic", diseaseCode: "I10", diseaseName: "高血压", triggerSource: "HIS/EMR 诊断", triggerCondition: "门诊或住院诊断含 I10/高血压且未在 30 天内报送", targetPlatform: "区县慢病平台", requiredFields: ["residentId", "personIndex", "diagnosisCode", "riskLevel", "reportedAt"], timeLimitHours: 24, status: "active", owner: "基层卫生处/医政医管处" },
+    { id: "p2dr-rule-dm", diseaseCategory: "chronic", diseaseCode: "E11", diseaseName: "2 型糖尿病", triggerSource: "HIS/EMR 诊断 + LIS 糖化血红蛋白", triggerCondition: "诊断含 E11 或 HbA1c 异常并进入慢病随访", targetPlatform: "区县慢病平台", requiredFields: ["residentId", "diagnosisCode", "labEvidence", "followupPlan", "reportedAt"], timeLimitHours: 24, status: "active", owner: "基层卫生处/疾控慢病科" },
+    { id: "p2dr-rule-infectious", diseaseCategory: "infectious", diseaseCode: "A15", diseaseName: "传染病疑似报卡", triggerSource: "HIS/EMR 诊断 + LIS 阳性信号", triggerCondition: "传染病诊断、阳性检测或发热门诊标记触发疾控复核", targetPlatform: "疾控直报/区县公卫平台", requiredFields: ["residentId", "diagnosisCode", "sampleNo", "cdcReviewStatus", "reportedAt"], timeLimitHours: 2, status: "active", owner: "疾控中心/公卫应急" },
+    { id: "p2dr-rule-mental", diseaseCategory: "severe-mental-disorder", diseaseCode: "F20", diseaseName: "重性精神障碍", triggerSource: "专科诊断/随访登记", triggerCondition: "重性精神障碍诊断或风险等级变更触发属地管理", targetPlatform: "区县精防平台", requiredFields: ["residentId", "diagnosisCode", "riskLevel", "guardianContact", "reportedAt"], timeLimitHours: 24, status: "active", owner: "疾控精防/基层卫生处" }
+  ];
+}
+
+function seedPhase2DiseaseReportQueue() {
+  return [
+    { id: "p2drq-htn-r1", residentId: "r1", personIndex: "DEMO-ID-R1#DEMO-MOBILE-R1", residentName: "张海", diseaseCategory: "chronic", diseaseCode: "I10", diseaseName: "高血压", ruleId: "p2dr-rule-htn", triggerSource: "HIS encounter HIS-20260709-001", sourceInstitution: "大连市中心医院", targetCounty: "中山区", targetPlatform: "区县慢病平台", reportCardNo: "P2-DR-HTN-20260709-001", status: "receipt-confirmed", pushStatus: "accepted", receiptId: "p2drr-htn-r1", patientCenterStatus: "imported", patientCenterRecordId: "pc-r1-htn", exportStatus: "available", exceptionStatus: "closed", riskLevel: "high", reportedAt: todayOffset(-1), dueAt: todayOffset(0), lastAction: "区县回执已确认，患者中心已导入。" },
+    { id: "p2drq-dm-r2", residentId: "r2", personIndex: "DEMO-ID-R2#DEMO-MOBILE-R2", residentName: "李梅", diseaseCategory: "chronic", diseaseCode: "E11", diseaseName: "2 型糖尿病", ruleId: "p2dr-rule-dm", triggerSource: "LIS HbA1c dr-001", sourceInstitution: "大连医科大学附属医院", targetCounty: "沙河口区", targetPlatform: "区县慢病平台", reportCardNo: "P2-DR-DM-20260709-002", status: "receipt-confirmed", pushStatus: "accepted-after-retry", receiptId: "p2drr-dm-r2", patientCenterStatus: "imported", patientCenterRecordId: "pc-r2-dm", exportStatus: "available", exceptionStatus: "compensated", riskLevel: "medium", reportedAt: todayOffset(-1), dueAt: todayOffset(0), lastAction: "首次字段版本不一致，补偿重放后回执通过。" },
+    { id: "p2drq-inf-r3", residentId: "r3", personIndex: "DEMO-ID-R3#DEMO-MOBILE-R3", residentName: "王强", diseaseCategory: "infectious", diseaseCode: "A15", diseaseName: "传染病疑似报卡", ruleId: "p2dr-rule-infectious", triggerSource: "发热门诊/实验室阳性信号", sourceInstitution: "甘井子区人民医院", targetCounty: "甘井子区", targetPlatform: "疾控直报/区县公卫平台", reportCardNo: "P2-DR-INF-20260709-003", status: "cdc-review", pushStatus: "pending-review", receiptId: "", patientCenterStatus: "imported", patientCenterRecordId: "pc-r3-inf", exportStatus: "restricted", exceptionStatus: "open", riskLevel: "urgent", reportedAt: todayOffset(0), dueAt: todayOffset(0), lastAction: "等待疾控复核和直报回执，居民端仅展示授权摘要。" },
+    { id: "p2drq-mental-r4", residentId: "r4", personIndex: "DEMO-ID-R4#DEMO-MOBILE-R4", residentName: "赵林", diseaseCategory: "severe-mental-disorder", diseaseCode: "F20", diseaseName: "重性精神障碍", ruleId: "p2dr-rule-mental", triggerSource: "专科诊断/基层随访登记", sourceInstitution: "庄河市中心医院", targetCounty: "庄河市", targetPlatform: "区县精防平台", reportCardNo: "P2-DR-MD-20260709-004", status: "pushed", pushStatus: "sent", receiptId: "p2drr-mental-r4", patientCenterStatus: "imported", patientCenterRecordId: "pc-r4-md", exportStatus: "restricted", exceptionStatus: "site-signoff-required", riskLevel: "controlled", reportedAt: todayOffset(0), dueAt: todayOffset(1), lastAction: "区县平台已收件，监护人联系方式和签字材料待现场确认。" }
+  ];
+}
+
+function seedPhase2DiseaseReportReceipts() {
+  return [
+    { id: "p2drr-htn-r1", reportId: "p2drq-htn-r1", targetCounty: "中山区", receiptStatus: "accepted", receiptCode: "ZS-DR-20260709-001", receivedAt: todayOffset(-1), detail: "慢病报卡已入库，随访任务已生成。", retryCount: 0, auditHash: phase2EvidenceHash("p2drr-htn-r1") },
+    { id: "p2drr-dm-r2", reportId: "p2drq-dm-r2", targetCounty: "沙河口区", receiptStatus: "accepted-after-retry", receiptCode: "SHK-DR-20260709-002", receivedAt: todayOffset(-1), detail: "字段版本补偿后入库。", retryCount: 1, auditHash: phase2EvidenceHash("p2drr-dm-r2") },
+    { id: "p2drr-mental-r4", reportId: "p2drq-mental-r4", targetCounty: "庄河市", receiptStatus: "received", receiptCode: "ZH-DR-20260709-004", receivedAt: todayOffset(0), detail: "已收件，等待现场签字材料。", retryCount: 0, auditHash: phase2EvidenceHash("p2drr-mental-r4") }
+  ];
+}
+
+function normalizePhase2DiseaseReportReceipt(report, payload = {}, user = {}) {
+  const now = new Date().toISOString();
+  const status = String(payload.receiptStatus || payload.status || "accepted").trim();
+  return {
+    id: `p2drr-${report.id}`,
+    reportId: report.id,
+    targetCounty: String(payload.targetCounty || report.targetCounty || "").trim(),
+    receiptStatus: status,
+    receiptCode: String(payload.receiptCode || `DR-${Date.now()}`).trim(),
+    receivedAt: now,
+    detail: String(payload.detail || payload.comment || "区县报病回执已登记。").trim(),
+    retryCount: Number.isFinite(Number(payload.retryCount)) ? Number(payload.retryCount) : 0,
+    receivedBy: user.username || user.role || "county",
+    auditHash: phase2EvidenceHash(`${report.id}/${status}/${now}`)
+  };
+}
+
+function buildPhase2DiseaseReportingOverview(data) {
+  const rules = Array.isArray(data.phase2DiseaseReportingRules) ? data.phase2DiseaseReportingRules : seedPhase2DiseaseReportingRules();
+  const queue = Array.isArray(data.phase2DiseaseReportQueue) ? data.phase2DiseaseReportQueue : seedPhase2DiseaseReportQueue();
+  const receipts = Array.isArray(data.phase2DiseaseReportReceipts) ? data.phase2DiseaseReportReceipts : seedPhase2DiseaseReportReceipts();
+  const ruleIds = new Set(rules.map((item) => item.id));
+  const reportIds = new Set(queue.map((item) => item.id));
+  const categories = [...new Set(rules.map((item) => item.diseaseCategory))];
+  const pushed = queue.filter((item) => /accepted|sent|pushed|receipt/i.test(`${item.status || ""} ${item.pushStatus || ""}`));
+  const openExceptions = queue.filter((item) => /open|review|required|pending/i.test(`${item.exceptionStatus || ""} ${item.pushStatus || ""}`));
+  const patientCenter = queue.map((item) => ({
+    reportId: item.id,
+    residentId: item.residentId,
+    diseaseName: item.diseaseName,
+    importStatus: item.patientCenterStatus,
+    exportStatus: item.exportStatus,
+    recordId: item.patientCenterRecordId,
+    privacyMode: item.diseaseCategory === "infectious" || item.diseaseCategory === "severe-mental-disorder" ? "restricted-summary" : "resident-visible"
+  }));
+  const supervisionStats = categories.map((category) => {
+    const rows = queue.filter((item) => item.diseaseCategory === category);
+    return {
+      category,
+      reports: rows.length,
+      pushed: rows.filter((item) => /accepted|sent|pushed|receipt/i.test(`${item.status || ""} ${item.pushStatus || ""}`)).length,
+      openExceptions: rows.filter((item) => /open|review|required|pending/i.test(`${item.exceptionStatus || ""} ${item.pushStatus || ""}`)).length,
+      counties: [...new Set(rows.map((item) => item.targetCounty).filter(Boolean))]
+    };
+  });
+  const onsiteBlockers = [
+    { id: "phase2-disease-report-live-his-diagnosis", owner: "hospital-integration", status: "onsite-blocked", blocker: "真实 HIS/EMR 诊断、发热门诊和精防系统触发源仍需现场接口签字。" },
+    { id: "phase2-disease-report-county-receipt-signoff", owner: "county-platform", status: "onsite-blocked", blocker: "区县慢病、公卫直报和精防平台正式回执规则仍需现场确认。" }
+  ];
+  const checks = [
+    { id: "phase2DiseaseReporting:ruleEngine", passed: ["chronic", "infectious", "severe-mental-disorder"].every((category) => categories.includes(category)) && rules.every((item) => item.requiredFields?.length && item.triggerCondition), detail: `${rules.length} diagnosis trigger rules across ${categories.length} categories` },
+    { id: "phase2DiseaseReporting:reportQueue", passed: queue.length >= 4 && queue.every((item) => ruleIds.has(item.ruleId) && item.reportCardNo && item.residentId && item.targetCounty), detail: `${queue.length} report cards queued` },
+    { id: "phase2DiseaseReporting:countyReceipts", passed: receipts.length >= 3 && receipts.every((item) => reportIds.has(item.reportId) && item.receiptStatus && item.auditHash) && pushed.length >= 3, detail: `${receipts.length} county receipts / ${pushed.length} pushed reports` },
+    { id: "phase2DiseaseReporting:patientCenter", passed: patientCenter.length >= 4 && patientCenter.every((item) => item.importStatus && item.exportStatus && item.recordId), detail: `${patientCenter.length} patient-center import/export rows` },
+    { id: "phase2DiseaseReporting:exceptionLoop", passed: openExceptions.length >= 1 && queue.every((item) => item.exceptionStatus && item.lastAction), detail: `${openExceptions.length} open review or signoff exceptions` },
+    { id: "phase2DiseaseReporting:supervisionStats", passed: supervisionStats.length >= 3 && supervisionStats.every((item) => item.reports >= 1 && item.counties.length >= 1), detail: `${supervisionStats.length} supervision categories` },
+    { id: "phase2DiseaseReporting:onsiteBoundary", passed: onsiteBlockers.length >= 2, detail: `${onsiteBlockers.length} onsite blockers surfaced` }
+  ];
+  return {
+    ok: checks.every((item) => item.passed),
+    generatedAt: new Date().toISOString(),
+    summary: {
+      rules: rules.length,
+      reportCards: queue.length,
+      pushed: pushed.length,
+      receipts: receipts.length,
+      patientCenterRows: patientCenter.length,
+      openExceptions: openExceptions.length,
+      categories: categories.length,
+      onsiteBlockers: onsiteBlockers.length
+    },
+    rules,
+    queue,
+    receipts,
+    patientCenter,
+    supervisionStats,
+    onsiteBlockers,
+    checks
+  };
+}
+
+function seedPhase2ClinicalAssistRules() {
+  return [
+    { id: "p2ca-rule-duplicate-diagnosis", category: "duplicate-diagnosis", name: "重复诊断提醒", sourceSystem: "EMR", triggerCondition: "同一居民 30 天内出现相同 ICD 诊断且未关闭既往诊疗计划", severity: "medium", defaultAction: "核对既往诊断并引用病历摘要", requiredFields: ["residentId", "doctorId", "icdCode", "encounterId"], configStatus: "active", owner: "医政医管处/医疗质量控制中心" },
+    { id: "p2ca-rule-duplicate-check", category: "duplicate-check", name: "重复检查提醒", sourceSystem: "HIS/PACS", triggerCondition: "14 天内已有同部位检查或可互认影像报告", severity: "medium", defaultAction: "优先调阅既有影像或说明重复检查原因", requiredFields: ["residentId", "doctorId", "checkItem", "priorReportId"], configStatus: "active", owner: "医学影像资源共享中心" },
+    { id: "p2ca-rule-duplicate-lab", category: "duplicate-lab", name: "重复检验提醒", sourceSystem: "HIS/LIS", triggerCondition: "有效期内已有 78 项互认目录内检验结果", severity: "high", defaultAction: "引用互认报告并减少重复检验", requiredFields: ["residentId", "doctorId", "labItem", "recognitionRecordId"], configStatus: "active", owner: "医学检验资源共享中心" },
+    { id: "p2ca-rule-duplicate-medication", category: "duplicate-medication", name: "重复用药提醒", sourceSystem: "HIS/药房/医保", triggerCondition: "处方药品与长期处方或固定取药记录存在同类重复", severity: "high", defaultAction: "调整处方或登记继续用药理由", requiredFields: ["residentId", "doctorId", "medication", "prescriptionNo"], configStatus: "active", owner: "药政处/医保中心" }
+  ];
+}
+
+function seedPhase2ClinicalAssistAlerts() {
+  return [
+    { id: "p2caa-lab-r1", residentId: "r1", residentName: "张海", doctorId: "doc-liu", doctorName: "刘医生", institution: "青泥洼桥社区卫生服务中心", ruleId: "p2ca-rule-duplicate-lab", category: "duplicate-lab", alertTitle: "糖化血红蛋白重复检验提醒", alertDetail: "30 天内已有大连市中心医院 HbA1c 报告，可进入互认引用流程。", severity: "high", sourceOrderNo: "HIS-ORDER-LAB-20260709-001", linkedEvidenceId: "cmr-002", recommendation: "引用互认报告并取消重复检验申请。", status: "pending-doctor-receipt", doctorAction: "pending", messageReceiptStatus: "pending", pluginSurface: "doctor-workstation-banner", serviceIntegrationStatus: "embedded-demo", patientCenterStatus: "linked", patientCenterRecordId: "pc-r1-lab", dueAt: todayOffset(0), lastAction: "等待医生工作站回执。" },
+    { id: "p2caa-med-r1", residentId: "r1", residentName: "张海", doctorId: "doc-liu", doctorName: "刘医生", institution: "青泥洼桥社区卫生服务中心", ruleId: "p2ca-rule-duplicate-medication", category: "duplicate-medication", alertTitle: "ACEI/ARB 同类重复用药提醒", alertDetail: "长期处方含缬沙坦，本次处方拟新增同类降压药。", severity: "high", sourceOrderNo: "RX-20260709-101", linkedEvidenceId: "mp1", recommendation: "调整处方或登记继续用药理由并回写药事审核。", status: "acknowledged", doctorAction: "adjusted-prescription", messageReceiptStatus: "received", pluginSurface: "prescription-inline-card", serviceIntegrationStatus: "embedded-demo", patientCenterStatus: "linked", patientCenterRecordId: "pc-r1-med", receiptId: "p2car-med-r1", dueAt: todayOffset(0), lastAction: "医生已调整处方并发送药事回执。" },
+    { id: "p2caa-dx-r2", residentId: "r2", residentName: "李梅", doctorId: "doc-wang", doctorName: "王医生", institution: "大连市中心医院", ruleId: "p2ca-rule-duplicate-diagnosis", category: "duplicate-diagnosis", alertTitle: "糖尿病重复诊断提醒", alertDetail: "既往 E11 诊断与随访计划已存在，建议引用既往诊断并补充控制状态。", severity: "medium", sourceOrderNo: "EMR-DX-20260709-203", linkedEvidenceId: "d2", recommendation: "引用既往诊断，避免重复新建病种档案。", status: "acknowledged", doctorAction: "cited-existing-diagnosis", messageReceiptStatus: "received", pluginSurface: "emr-diagnosis-sidebar", serviceIntegrationStatus: "embedded-demo", patientCenterStatus: "linked", patientCenterRecordId: "pc-r2-dx", receiptId: "p2car-dx-r2", dueAt: todayOffset(1), lastAction: "医生已引用既往诊断并补充病程说明。" },
+    { id: "p2caa-check-r4", residentId: "r4", residentName: "赵林", doctorId: "doc-wang", doctorName: "王医生", institution: "大连市中心医院", ruleId: "p2ca-rule-duplicate-check", category: "duplicate-check", alertTitle: "颈动脉超声重复检查提醒", alertDetail: "庄河市基层机构 7 天内已有颈动脉超声，图像质量待复核。", severity: "medium", sourceOrderNo: "HIS-CHECK-20260709-304", linkedEvidenceId: "cmr-003", recommendation: "等待复核或登记临床变化后再开立检查。", status: "pending-doctor-receipt", doctorAction: "pending", messageReceiptStatus: "pending", pluginSurface: "order-entry-inline-card", serviceIntegrationStatus: "embedded-demo", patientCenterStatus: "restricted", patientCenterRecordId: "pc-r4-check", dueAt: todayOffset(1), lastAction: "等待医生确认是否保留检查。" }
+  ];
+}
+
+function seedPhase2ClinicalAssistReceipts() {
+  return [
+    { id: "p2car-med-r1", alertId: "p2caa-med-r1", doctorId: "doc-liu", doctorName: "刘医生", receiptStatus: "received", doctorAction: "adjusted-prescription", actionDetail: "删除重复同类药品并保留原长期处方。", receivedAt: todayOffset(0), messageChannel: "doctor-workstation", auditHash: phase2EvidenceHash("p2car-med-r1") },
+    { id: "p2car-dx-r2", alertId: "p2caa-dx-r2", doctorId: "doc-wang", doctorName: "王医生", receiptStatus: "received", doctorAction: "cited-existing-diagnosis", actionDetail: "引用既往 E11 诊断并补充本次控制状态。", receivedAt: todayOffset(0), messageChannel: "emr-plugin", auditHash: phase2EvidenceHash("p2car-dx-r2") },
+    { id: "p2car-lab-supervision", alertId: "p2caa-lab-r1", doctorId: "doc-liu", doctorName: "刘医生", receiptStatus: "sent", doctorAction: "pending", actionDetail: "消息中心已投递，等待医生在工作站处理。", receivedAt: todayOffset(0), messageChannel: "message-center", auditHash: phase2EvidenceHash("p2car-lab-supervision") }
+  ];
+}
+
+function seedPhase2ClinicalAssistPluginContracts() {
+  return [
+    { id: "p2ca-plugin-workstation", name: "医生工作站嵌入式提醒协议", endpoint: "GET /api/phase2/clinical-assist", surface: "doctor-workstation-banner", payloadFields: ["alertId", "residentId", "doctorId", "ruleId", "recommendation"], status: "mvp-ready", onsiteBlocker: "真实 HIS/EMR 工作站菜单和单点登录参数待现场确认。" },
+    { id: "p2ca-plugin-receipt", name: "医生提醒回执协议", endpoint: "POST /api/phase2/clinical-assist/alerts/:id/receipt", surface: "message-center", payloadFields: ["receiptStatus", "doctorAction", "actionDetail", "messageChannel"], status: "mvp-ready", onsiteBlocker: "医生电子签名和院内消息中心正式回执字段待联调。" },
+    { id: "p2ca-plugin-rule-config", name: "临床辅助规则配置协议", endpoint: "POST /api/phase2/clinical-assist/rules/:id/config", surface: "platform-rule-admin", payloadFields: ["configStatus", "severity", "defaultAction", "owner"], status: "mvp-ready", onsiteBlocker: "质控中心正式规则版本、审批人和灰度范围待上线前签字。" }
+  ];
+}
+
+function canAccessPhase2ClinicalAssistAlert(user = {}, alert = {}) {
+  if (user.role === "commission") return true;
+  if (user.role !== "institution") return false;
+  if (user.doctorId) return alert.doctorId === user.doctorId;
+  return !user.orgName || alert.institution === user.orgName || alert.sourceInstitution === user.orgName;
+}
+
+function normalizePhase2ClinicalAssistReceipt(alert, payload = {}, user = {}) {
+  const now = new Date().toISOString();
+  const doctorAction = String(payload.doctorAction || payload.action || "acknowledged").trim();
+  const receiptStatus = String(payload.receiptStatus || payload.status || "received").trim();
+  return {
+    id: `p2car-${alert.id}`,
+    alertId: alert.id,
+    doctorId: alert.doctorId,
+    doctorName: alert.doctorName || user.name || "",
+    receiptStatus,
+    doctorAction,
+    actionDetail: String(payload.actionDetail || payload.detail || "医生工作站提醒回执已登记。").trim(),
+    receivedAt: now,
+    messageChannel: String(payload.messageChannel || alert.pluginSurface || "doctor-workstation").trim(),
+    receivedBy: user.username || user.role || "institution",
+    auditHash: phase2EvidenceHash(`${alert.id}/${doctorAction}/${receiptStatus}/${now}`)
+  };
+}
+
+function buildPhase2ClinicalAssistOverview(data, user = { role: "commission" }) {
+  const rules = Array.isArray(data.phase2ClinicalAssistRules) ? data.phase2ClinicalAssistRules : seedPhase2ClinicalAssistRules();
+  const allAlerts = Array.isArray(data.phase2ClinicalAssistAlerts) ? data.phase2ClinicalAssistAlerts : seedPhase2ClinicalAssistAlerts();
+  const alerts = allAlerts.filter((item) => canAccessPhase2ClinicalAssistAlert(user, item));
+  const allReceipts = Array.isArray(data.phase2ClinicalAssistReceipts) ? data.phase2ClinicalAssistReceipts : seedPhase2ClinicalAssistReceipts();
+  const receipts = allReceipts
+    .filter((item) => alerts.some((alert) => alert.id === item.alertId) || user.role === "commission");
+  const contracts = Array.isArray(data.phase2ClinicalAssistPluginContracts) ? data.phase2ClinicalAssistPluginContracts : seedPhase2ClinicalAssistPluginContracts();
+  const ruleIds = new Set(rules.map((item) => item.id));
+  const alertIds = new Set(allAlerts.map((item) => item.id));
+  const categories = [...new Set(rules.map((item) => item.category))];
+  const pendingAlerts = alerts.filter((item) => /pending|待/i.test(`${item.status || ""} ${item.messageReceiptStatus || ""}`));
+  const acknowledged = alerts.filter((item) => /acknowledged|received|已/i.test(`${item.status || ""} ${item.messageReceiptStatus || ""}`));
+  const doctorWorkstations = [...new Set(alerts.map((item) => item.doctorId).filter(Boolean))];
+  const messageReceipts = allReceipts.filter((item) => /received|sent|已|投递/i.test(String(item.receiptStatus || "")));
+  const ruleConfig = rules.map((item) => ({
+    ruleId: item.id,
+    category: item.category,
+    status: item.configStatus,
+    severity: item.severity,
+    owner: item.owner,
+    requiredFields: item.requiredFields || [],
+    defaultAction: item.defaultAction
+  }));
+  const supervisionStats = categories.map((category) => {
+    const rows = alerts.filter((item) => item.category === category);
+    return {
+      category,
+      alerts: rows.length,
+      pending: rows.filter((item) => /pending|待/i.test(`${item.status || ""} ${item.messageReceiptStatus || ""}`)).length,
+      acknowledged: rows.filter((item) => /acknowledged|received|已/i.test(`${item.status || ""} ${item.messageReceiptStatus || ""}`)).length,
+      doctors: [...new Set(rows.map((item) => item.doctorName).filter(Boolean))]
+    };
+  });
+  const allSupervisionStats = categories.map((category) => {
+    const rows = allAlerts.filter((item) => item.category === category);
+    return {
+      category,
+      alerts: rows.length,
+      pending: rows.filter((item) => /pending|待/i.test(`${item.status || ""} ${item.messageReceiptStatus || ""}`)).length,
+      acknowledged: rows.filter((item) => /acknowledged|received|已/i.test(`${item.status || ""} ${item.messageReceiptStatus || ""}`)).length
+    };
+  });
+  const onsiteBlockers = [
+    { id: "phase2-clinical-assist-his-plugin", owner: "hospital-integration", status: "onsite-blocked", blocker: "医生工作站菜单、单点登录、医嘱入口和院内消息中心字段仍需真实 HIS/EMR 厂商联调。" },
+    { id: "phase2-clinical-assist-rule-signoff", owner: "medical-quality-center", status: "onsite-blocked", blocker: "重复诊断、检查、检验和用药规则需质控中心审批、灰度范围和医生签名留痕。" }
+  ];
+  const checks = [
+    { id: "phase2ClinicalAssist:ruleConfig", passed: ["duplicate-diagnosis", "duplicate-check", "duplicate-lab", "duplicate-medication"].every((category) => categories.includes(category)) && rules.every((item) => item.requiredFields?.length && item.defaultAction && item.configStatus), detail: `${rules.length} rule configs across ${categories.length} categories` },
+    { id: "phase2ClinicalAssist:alertQueue", passed: allAlerts.length >= 4 && allAlerts.every((item) => ruleIds.has(item.ruleId) && item.residentId && item.doctorId && item.pluginSurface), detail: `${allAlerts.length} clinical assist alerts` },
+    { id: "phase2ClinicalAssist:doctorWorkstation", passed: doctorWorkstations.length >= 1 && alerts.every((item) => item.serviceIntegrationStatus && item.recommendation), detail: `${doctorWorkstations.length} doctor workstation scopes` },
+    { id: "phase2ClinicalAssist:messageReceipts", passed: allReceipts.length >= 3 && messageReceipts.length >= 3 && allReceipts.every((item) => alertIds.has(item.alertId) && item.auditHash), detail: `${allReceipts.length} receipts / ${messageReceipts.length} delivered or received` },
+    { id: "phase2ClinicalAssist:pluginContracts", passed: contracts.length >= 3 && contracts.every((item) => item.endpoint && item.payloadFields?.length && item.status), detail: `${contracts.length} plugin and service contracts` },
+    { id: "phase2ClinicalAssist:supervisionStats", passed: allSupervisionStats.length >= 4 && allSupervisionStats.every((item) => item.alerts >= 1), detail: `${allSupervisionStats.length} supervision categories` },
+    { id: "phase2ClinicalAssist:onsiteBoundary", passed: onsiteBlockers.length >= 2, detail: `${onsiteBlockers.length} onsite blockers surfaced` }
+  ];
+  return {
+    ok: checks.every((item) => item.passed),
+    generatedAt: new Date().toISOString(),
+    summary: {
+      rules: rules.length,
+      alerts: allAlerts.length,
+      scopedAlerts: alerts.length,
+      pendingAlerts: pendingAlerts.length,
+      acknowledged: acknowledged.length,
+      receipts: allReceipts.length,
+      pluginContracts: contracts.length,
+      categories: categories.length,
+      onsiteBlockers: onsiteBlockers.length
+    },
+    rules,
+    alerts,
+    receipts,
+    pluginContracts: contracts,
+    ruleConfig,
+    supervisionStats,
+    onsiteBlockers,
+    checks
+  };
+}
+
+function seedPhase2FamilyDoctorTemplates() {
+  return [
+    { id: "p2fdt-basic", templateCode: "FD-TPL-BASIC-2026", name: "家庭医生基础签约模板", serviceScope: ["基本公卫", "健康咨询", "年度评估"], requiredFields: ["residentId", "teamId", "packageId", "startDate", "endDate", "consentStatus"], reviewSteps: ["resident-apply", "institution-review", "contract-signoff"], status: "active", version: "2026.1" },
+    { id: "p2fdt-chronic", templateCode: "FD-TPL-CHRONIC-2026", name: "慢病连续管理签约模板", serviceScope: ["高血压", "糖尿病", "长期处方", "复诊提醒"], requiredFields: ["residentId", "diseaseType", "riskLevel", "teamId", "packageId", "fulfillmentPlan"], reviewSteps: ["resident-apply", "team-assessment", "institution-review", "quarterly-fulfillment"], status: "active", version: "2026.1" },
+    { id: "p2fdt-elderly", templateCode: "FD-TPL-ELDERLY-2026", name: "老年重点人群签约模板", serviceScope: ["老年评估", "用药安全", "上门随访", "满意度回访"], requiredFields: ["residentId", "caregiver", "familyContact", "teamId", "packageId", "renewalPolicy"], reviewSteps: ["resident-apply", "family-contact-check", "institution-review", "renewal-review"], status: "active", version: "2026.1" }
+  ];
+}
+
+function seedPhase2FamilyDoctorTeams() {
+  return [
+    { id: "p2fdtm-qnw", teamName: "青泥洼桥社区家庭医生团队", institutionCode: "MR3", institutionName: "青泥洼桥社区卫生服务中心", leaderDoctorId: "doc-liu", leaderDoctorName: "刘医生", doctorIds: ["doc-liu"], nurseCount: 2, publicHealthStaff: 1, serviceDistricts: ["中山区"], capacity: 1200, signedResidents: 685, status: "active" },
+    { id: "p2fdtm-central", teamName: "中心医院医联体家医协作团队", institutionCode: "MR1", institutionName: "大连市中心医院", leaderDoctorId: "doc-wang", leaderDoctorName: "王医生", doctorIds: ["doc-wang"], nurseCount: 3, publicHealthStaff: 1, serviceDistricts: ["中山区", "西岗区"], capacity: 900, signedResidents: 412, status: "active" },
+    { id: "p2fdtm-gjz", teamName: "甘井子慢病随访家庭医生团队", institutionCode: "MR5", institutionName: "甘井子区人民医院", leaderDoctorId: "doc-sun", leaderDoctorName: "孙医生", doctorIds: ["doc-sun"], nurseCount: 2, publicHealthStaff: 2, serviceDistricts: ["甘井子区"], capacity: 1000, signedResidents: 508, status: "active" }
+  ];
+}
+
+function seedPhase2FamilyDoctorServicePackages() {
+  return [
+    { id: "p2fdp-basic", packageCode: "FD-PKG-BASIC", templateId: "p2fdt-basic", name: "基础公卫签约包", serviceItems: ["健康档案复核", "年度健康评估", "咨询提醒"], visitFrequency: "quarterly", priceType: "public-health", fee: 0, availableInstitutionCodes: ["MR1", "MR3", "MR5"], status: "active" },
+    { id: "p2fdp-hypertension", packageCode: "FD-PKG-HBP", templateId: "p2fdt-chronic", name: "高血压连续管理包", serviceItems: ["血压随访", "用药依从性", "复诊预约", "互认报告引用"], visitFrequency: "monthly", priceType: "public-health-plus", fee: 0, availableInstitutionCodes: ["MR1", "MR3"], status: "active" },
+    { id: "p2fdp-diabetes", packageCode: "FD-PKG-DM", templateId: "p2fdt-chronic", name: "糖尿病连续管理包", serviceItems: ["血糖复测", "糖化血红蛋白提醒", "并发症筛查", "营养运动指导"], visitFrequency: "monthly", priceType: "public-health-plus", fee: 0, availableInstitutionCodes: ["MR1", "MR3", "MR5"], status: "active" },
+    { id: "p2fdp-elderly", packageCode: "FD-PKG-ELDERLY", templateId: "p2fdt-elderly", name: "老年重点人群照护包", serviceItems: ["上门评估", "用药安全", "跌倒风险", "满意度回访"], visitFrequency: "monthly", priceType: "elderly-care", fee: 0, availableInstitutionCodes: ["MR3", "MR5"], status: "active" }
+  ];
+}
+
+function seedPhase2FamilyDoctorApplications() {
+  return [
+    { id: "p2fda-r3-gjz", residentId: "r3", residentName: "Wang Qiang", packageId: "p2fdp-basic", teamId: "p2fdtm-gjz", templateId: "p2fdt-basic", applicationType: "new-contract", diseaseTags: [], submittedAt: todayOffset(-2), status: "submitted", reviewStatus: "pending", reviewInstitutionCode: "MR5", reviewer: "", consentStatus: "resident-confirmed", desiredStartDate: todayOffset(3), lastAction: "Resident submitted a family doctor contract application for the Ganjingzi team; institution review is pending." },
+    { id: "p2fda-r1", residentId: "r1", residentName: "张海", packageId: "p2fdp-hypertension", teamId: "p2fdtm-qnw", templateId: "p2fdt-chronic", applicationType: "new-contract", diseaseTags: ["hypertension"], submittedAt: todayOffset(-20), status: "approved", reviewStatus: "approved", reviewInstitutionCode: "MR3", reviewer: "community", consentStatus: "signed", desiredStartDate: todayOffset(-18), lastAction: "机构审核通过并生成签约合同。" },
+    { id: "p2fda-r2", residentId: "r2", residentName: "李梅", packageId: "p2fdp-diabetes", teamId: "p2fdtm-central", templateId: "p2fdt-chronic", applicationType: "renewal", diseaseTags: ["diabetes"], submittedAt: todayOffset(-8), status: "renewal-review", reviewStatus: "pending", reviewInstitutionCode: "MR1", reviewer: "", consentStatus: "signed", desiredStartDate: todayOffset(8), existingContractId: "p2fdc-r2", lastAction: "居民已提交续约，等待机构确认服务包。" },
+    { id: "p2fda-r3", residentId: "r3", residentName: "王强", packageId: "p2fdp-basic", teamId: "p2fdtm-qnw", templateId: "p2fdt-basic", applicationType: "new-contract", diseaseTags: [], submittedAt: todayOffset(-1), status: "submitted", reviewStatus: "pending", reviewInstitutionCode: "MR3", reviewer: "", consentStatus: "resident-confirmed", desiredStartDate: todayOffset(1), lastAction: "居民提交签约申请，待基层机构审核。" },
+    { id: "p2fda-r4", residentId: "r4", residentName: "赵林", packageId: "p2fdp-elderly", teamId: "p2fdtm-qnw", templateId: "p2fdt-elderly", applicationType: "renewal", diseaseTags: ["hypertension", "elderly"], submittedAt: todayOffset(-5), status: "approved", reviewStatus: "approved", reviewInstitutionCode: "MR3", reviewer: "doctor", consentStatus: "family-confirmed", desiredStartDate: todayOffset(5), existingContractId: "p2fdc-r4", lastAction: "家属确认续约，团队已排入月度上门评估。" }
+  ];
+}
+
+function seedPhase2FamilyDoctorContracts() {
+  return [
+    { id: "p2fdc-r1", residentId: "r1", residentName: "张海", applicationId: "p2fda-r1", packageId: "p2fdp-hypertension", teamId: "p2fdtm-qnw", templateId: "p2fdt-chronic", startDate: todayOffset(-18), endDate: todayOffset(347), status: "active", fulfillmentPercent: 72, renewalStatus: "not-due", satisfactionScore: 96, residentReview: "服务提醒及时，复诊和用药随访已收到。", lastServiceAt: todayOffset(-2), nextServiceAt: todayOffset(7), auditHash: phase2EvidenceHash("p2fdc-r1") },
+    { id: "p2fdc-r2", residentId: "r2", residentName: "李梅", applicationId: "p2fda-r2", packageId: "p2fdp-diabetes", teamId: "p2fdtm-central", templateId: "p2fdt-chronic", startDate: todayOffset(-360), endDate: todayOffset(5), status: "renewal-pending", fulfillmentPercent: 88, renewalStatus: "pending-review", satisfactionScore: 92, residentReview: "希望续约糖尿病随访和检查提醒。", lastServiceAt: todayOffset(-12), nextServiceAt: todayOffset(5), auditHash: phase2EvidenceHash("p2fdc-r2") },
+    { id: "p2fdc-r4", residentId: "r4", residentName: "赵林", applicationId: "p2fda-r4", packageId: "p2fdp-elderly", teamId: "p2fdtm-qnw", templateId: "p2fdt-elderly", startDate: todayOffset(-120), endDate: todayOffset(245), status: "active", fulfillmentPercent: 64, renewalStatus: "family-confirmed", satisfactionScore: 90, residentReview: "需要上门评估和用药安全提醒。", lastServiceAt: todayOffset(-6), nextServiceAt: todayOffset(3), auditHash: phase2EvidenceHash("p2fdc-r4") }
+  ];
+}
+
+function seedPhase2FamilyDoctorFulfillments() {
+  return [
+    { id: "p2fdf-r1-bp", contractId: "p2fdc-r1", residentId: "r1", teamId: "p2fdtm-qnw", packageId: "p2fdp-hypertension", serviceDate: todayOffset(-12), serviceType: "monthly-followup", serviceItem: "血压随访", status: "completed", evidenceCollection: "followups", evidenceId: "f1", fulfillmentValue: 18, satisfaction: "satisfied", auditHash: phase2EvidenceHash("p2fdf-r1-bp") },
+    { id: "p2fdf-r1-rx", contractId: "p2fdc-r1", residentId: "r1", teamId: "p2fdtm-qnw", packageId: "p2fdp-hypertension", serviceDate: todayOffset(-2), serviceType: "medication-review", serviceItem: "长期处方复核", status: "completed", evidenceCollection: "medicationPickups", evidenceId: "mp1", fulfillmentValue: 22, satisfaction: "satisfied", auditHash: phase2EvidenceHash("p2fdf-r1-rx") },
+    { id: "p2fdf-r2-dm", contractId: "p2fdc-r2", residentId: "r2", teamId: "p2fdtm-central", packageId: "p2fdp-diabetes", serviceDate: todayOffset(-25), serviceType: "lab-reminder", serviceItem: "糖化血红蛋白复查提醒", status: "completed", evidenceCollection: "personalRecords", evidenceId: "pr-lab-r2", fulfillmentValue: 20, satisfaction: "satisfied", auditHash: phase2EvidenceHash("p2fdf-r2-dm") },
+    { id: "p2fdf-r2-renewal", contractId: "p2fdc-r2", residentId: "r2", teamId: "p2fdtm-central", packageId: "p2fdp-diabetes", serviceDate: todayOffset(-8), serviceType: "renewal-review", serviceItem: "续约评估", status: "pending-signoff", evidenceCollection: "phase2FamilyDoctorApplications", evidenceId: "p2fda-r2", fulfillmentValue: 10, satisfaction: "pending", auditHash: phase2EvidenceHash("p2fdf-r2-renewal") },
+    { id: "p2fdf-r4-elderly", contractId: "p2fdc-r4", residentId: "r4", teamId: "p2fdtm-qnw", packageId: "p2fdp-elderly", serviceDate: todayOffset(-6), serviceType: "elderly-assessment", serviceItem: "老年综合评估", status: "completed", evidenceCollection: "seniorServices", evidenceId: "ss1", fulfillmentValue: 24, satisfaction: "satisfied", auditHash: phase2EvidenceHash("p2fdf-r4-elderly") }
+  ];
+}
+
+function canAccessPhase2FamilyDoctorRow(user = {}, row = {}, data = {}) {
+  if (user.role === "commission") return true;
+  if (user.role === "citizen") {
+    const allowedIds = allowedResidentIdsForUser(data, user);
+    return Boolean(allowedIds?.has(row.residentId));
+  }
+  if (user.role !== "institution") return false;
+  const team = (data.phase2FamilyDoctorTeams || seedPhase2FamilyDoctorTeams()).find((item) => item.id === row.teamId);
+  const institutionCodes = [row.institutionCode, row.reviewInstitutionCode, team?.institutionCode].filter(Boolean);
+  if (user.doctorId) return row.doctorId === user.doctorId || row.leaderDoctorId === user.doctorId || (team?.doctorIds || []).includes(user.doctorId);
+  return !user.orgCode || institutionCodes.includes(user.orgCode);
+}
+
+function phase2FamilyDoctorPackageFor(data, packageId) {
+  return (Array.isArray(data.phase2FamilyDoctorServicePackages) ? data.phase2FamilyDoctorServicePackages : seedPhase2FamilyDoctorServicePackages()).find((item) => item.id === packageId);
+}
+
+function buildPhase2FamilyDoctorOverview(data, user = { role: "commission" }) {
+  const templates = Array.isArray(data.phase2FamilyDoctorTemplates) ? data.phase2FamilyDoctorTemplates : seedPhase2FamilyDoctorTemplates();
+  const allTeams = Array.isArray(data.phase2FamilyDoctorTeams) ? data.phase2FamilyDoctorTeams : seedPhase2FamilyDoctorTeams();
+  const allPackages = Array.isArray(data.phase2FamilyDoctorServicePackages) ? data.phase2FamilyDoctorServicePackages : seedPhase2FamilyDoctorServicePackages();
+  const allApplications = Array.isArray(data.phase2FamilyDoctorApplications) ? data.phase2FamilyDoctorApplications : seedPhase2FamilyDoctorApplications();
+  const allContracts = Array.isArray(data.phase2FamilyDoctorContracts) ? data.phase2FamilyDoctorContracts : seedPhase2FamilyDoctorContracts();
+  const allFulfillments = Array.isArray(data.phase2FamilyDoctorFulfillments) ? data.phase2FamilyDoctorFulfillments : seedPhase2FamilyDoctorFulfillments();
+  const packages = user.role === "institution" && user.orgCode
+    ? allPackages.filter((item) => !item.availableInstitutionCodes?.length || item.availableInstitutionCodes.includes(user.orgCode))
+    : allPackages;
+  const teams = user.role === "institution" && user.orgCode
+    ? allTeams.filter((item) => item.institutionCode === user.orgCode || (user.doctorId && (item.doctorIds || []).includes(user.doctorId)))
+    : allTeams;
+  const applications = allApplications.filter((item) => canAccessPhase2FamilyDoctorRow(user, item, { ...data, phase2FamilyDoctorTeams: allTeams }));
+  const contracts = allContracts.filter((item) => canAccessPhase2FamilyDoctorRow(user, item, { ...data, phase2FamilyDoctorTeams: allTeams }));
+  const fulfillments = allFulfillments.filter((item) => canAccessPhase2FamilyDoctorRow(user, item, { ...data, phase2FamilyDoctorTeams: allTeams }));
+  const teamIds = new Set(allTeams.map((item) => item.id));
+  const packageIds = new Set(allPackages.map((item) => item.id));
+  const templateIds = new Set(templates.map((item) => item.id));
+  const activeContracts = contracts.filter((item) => /active|renewal-pending|family-confirmed/i.test(String(item.status || "")));
+  const pendingApplications = applications.filter((item) => /pending|submitted|review/i.test(`${item.reviewStatus || ""} ${item.status || ""}`));
+  const renewalRows = [...applications, ...contracts].filter((item) => /renewal|续约/i.test(`${item.applicationType || ""} ${item.renewalStatus || ""} ${item.status || ""}`));
+  const avgFulfillment = contracts.length ? Math.round(contracts.reduce((sum, item) => sum + Number(item.fulfillmentPercent || 0), 0) / contracts.length) : 0;
+  const satisfactionRows = contracts.filter((item) => Number(item.satisfactionScore || 0) > 0 || item.residentReview);
+  const supervisionStats = allTeams.map((team) => {
+    const teamContracts = allContracts.filter((item) => item.teamId === team.id);
+    const teamApplications = allApplications.filter((item) => item.teamId === team.id);
+    const teamFulfillments = allFulfillments.filter((item) => item.teamId === team.id);
+    return {
+      teamId: team.id,
+      teamName: team.teamName,
+      institutionCode: team.institutionCode,
+      applications: teamApplications.length,
+      pendingApplications: teamApplications.filter((item) => /pending|submitted|review/i.test(`${item.reviewStatus || ""} ${item.status || ""}`)).length,
+      activeContracts: teamContracts.filter((item) => /active|renewal-pending|family-confirmed/i.test(String(item.status || ""))).length,
+      fulfillments: teamFulfillments.length,
+      avgFulfillment: teamContracts.length ? Math.round(teamContracts.reduce((sum, item) => sum + Number(item.fulfillmentPercent || 0), 0) / teamContracts.length) : 0
+    };
+  });
+  const onsiteBlockers = [
+    { id: "phase2-family-doctor-real-signature", owner: "primary-care-office", status: "onsite-blocked", blocker: "正式签约需接入居民实名、电子签名、家庭成员授权和基层机构签章。" },
+    { id: "phase2-family-doctor-payment-policy", owner: "public-health-finance", status: "onsite-blocked", blocker: "服务包经费、绩效分配、医保或公卫资金口径需现场确认。" }
+  ];
+  const checks = [
+    { id: "phase2FamilyDoctor:templates", passed: templates.length >= 3 && templates.every((item) => item.requiredFields?.length && item.reviewSteps?.length && item.status), detail: `${templates.length} contract templates` },
+    { id: "phase2FamilyDoctor:teams", passed: allTeams.length >= 3 && allTeams.every((item) => item.institutionCode && item.leaderDoctorId && item.capacity), detail: `${allTeams.length} family doctor teams` },
+    { id: "phase2FamilyDoctor:packages", passed: allPackages.length >= 4 && allPackages.every((item) => templateIds.has(item.templateId) && item.serviceItems?.length && item.status), detail: `${allPackages.length} service packages` },
+    { id: "phase2FamilyDoctor:residentApplications", passed: allApplications.length >= 4 && allApplications.every((item) => item.residentId && packageIds.has(item.packageId) && teamIds.has(item.teamId) && item.consentStatus), detail: `${allApplications.length} resident applications` },
+    { id: "phase2FamilyDoctor:institutionReview", passed: allApplications.some((item) => item.reviewStatus === "pending") && allApplications.some((item) => item.reviewStatus === "approved") && allApplications.every((item) => item.reviewInstitutionCode), detail: `${allApplications.filter((item) => item.reviewStatus === "pending").length} pending / ${allApplications.filter((item) => item.reviewStatus === "approved").length} approved` },
+    { id: "phase2FamilyDoctor:fulfillmentRecords", passed: allContracts.length >= 3 && allFulfillments.length >= 5 && allFulfillments.every((item) => item.contractId && item.auditHash && item.serviceType), detail: `${allContracts.length} contracts / ${allFulfillments.length} fulfillments` },
+    { id: "phase2FamilyDoctor:renewalSatisfaction", passed: renewalRows.length >= 2 && satisfactionRows.length >= 3, detail: `${renewalRows.length} renewal rows / ${satisfactionRows.length} satisfaction rows` },
+    { id: "phase2FamilyDoctor:supervisionStats", passed: supervisionStats.length >= 3 && supervisionStats.every((item) => item.applications >= 1 || item.activeContracts >= 1), detail: `${supervisionStats.length} team supervision rows` },
+    { id: "phase2FamilyDoctor:onsiteBoundary", passed: onsiteBlockers.length >= 2, detail: `${onsiteBlockers.length} onsite blockers surfaced` }
+  ];
+  return {
+    ok: checks.every((item) => item.passed),
+    generatedAt: new Date().toISOString(),
+    summary: {
+      templates: templates.length,
+      teams: allTeams.length,
+      packages: allPackages.length,
+      applications: allApplications.length,
+      scopedApplications: applications.length,
+      pendingApplications: allApplications.filter((item) => /pending|submitted|review/i.test(`${item.reviewStatus || ""} ${item.status || ""}`)).length,
+      activeContracts: allContracts.filter((item) => /active|renewal-pending|family-confirmed/i.test(String(item.status || ""))).length,
+      scopedContracts: contracts.length,
+      fulfillments: allFulfillments.length,
+      avgFulfillment: allContracts.length ? Math.round(allContracts.reduce((sum, item) => sum + Number(item.fulfillmentPercent || 0), 0) / allContracts.length) : avgFulfillment,
+      renewals: renewalRows.length,
+      satisfactionRows: satisfactionRows.length,
+      onsiteBlockers: onsiteBlockers.length
+    },
+    templates,
+    teams,
+    packages,
+    applications,
+    contracts,
+    fulfillments,
+    supervisionStats,
+    onsiteBlockers,
+    checks
+  };
+}
+
+function normalizePhase2FamilyDoctorApplication(payload = {}, user = {}, data = {}) {
+  const packages = Array.isArray(data.phase2FamilyDoctorServicePackages) ? data.phase2FamilyDoctorServicePackages : seedPhase2FamilyDoctorServicePackages();
+  const teams = Array.isArray(data.phase2FamilyDoctorTeams) ? data.phase2FamilyDoctorTeams : seedPhase2FamilyDoctorTeams();
+  const packageId = String(payload.packageId || packages[0]?.id || "").trim();
+  const servicePackage = packages.find((item) => item.id === packageId) || packages[0] || {};
+  const teamId = String(payload.teamId || teams.find((item) => item.institutionCode === user.orgCode)?.id || teams[0]?.id || "").trim();
+  const team = teams.find((item) => item.id === teamId) || teams[0] || {};
+  const residentId = String(payload.residentId || user.residentId || "").trim();
+  const resident = (data.residents || []).find((item) => item.id === residentId) || {};
+  const now = new Date().toISOString();
+  return {
+    id: `p2fda-${residentId || "resident"}-${Date.now()}`,
+    residentId,
+    residentName: resident.name || payload.residentName || residentId,
+    packageId: servicePackage.id || packageId,
+    teamId: team.id || teamId,
+    templateId: servicePackage.templateId || payload.templateId || "p2fdt-basic",
+    applicationType: String(payload.applicationType || "new-contract").trim(),
+    diseaseTags: Array.isArray(payload.diseaseTags) ? payload.diseaseTags : String(payload.diseaseTags || "").split(",").map((item) => item.trim()).filter(Boolean),
+    submittedAt: now,
+    status: "submitted",
+    reviewStatus: "pending",
+    reviewInstitutionCode: team.institutionCode || user.orgCode || "",
+    reviewer: "",
+    consentStatus: String(payload.consentStatus || "resident-confirmed").trim(),
+    desiredStartDate: String(payload.desiredStartDate || todayOffset(1)).trim(),
+    contactPhone: String(payload.contactPhone || resident.phone || "").trim(),
+    lastAction: String(payload.note || "居民提交家庭医生签约申请，等待机构审核。").trim()
+  };
+}
+
+function buildPhase2FamilyDoctorContractFromApplication(application = {}, payload = {}, user = {}) {
+  const now = new Date().toISOString();
+  const startDate = String(payload.startDate || application.desiredStartDate || todayOffset(1)).trim();
+  return {
+    id: application.existingContractId || `p2fdc-${application.id}`,
+    residentId: application.residentId,
+    residentName: application.residentName,
+    applicationId: application.id,
+    packageId: application.packageId,
+    teamId: application.teamId,
+    templateId: application.templateId,
+    startDate,
+    endDate: String(payload.endDate || todayOffset(365)).trim(),
+    status: application.applicationType === "renewal" ? "renewal-active" : "active",
+    fulfillmentPercent: Number(payload.fulfillmentPercent || 0),
+    renewalStatus: application.applicationType === "renewal" ? "renewed" : "not-due",
+    satisfactionScore: Number(payload.satisfactionScore || 0),
+    residentReview: String(payload.residentReview || "").trim(),
+    lastServiceAt: "",
+    nextServiceAt: String(payload.nextServiceAt || todayOffset(30)).trim(),
+    reviewedBy: user.username || user.role || "institution",
+    reviewedAt: now,
+    auditHash: phase2EvidenceHash(`${application.id}/${application.packageId}/${application.teamId}/${now}`)
+  };
+}
+
 function seedMutualRecognitionRules() {
   return [
     { id: "mrr-ecg-001", item: "ECG", category: "electrocardiogram", validDays: 7, sourceLevels: ["primary", "secondary", "tertiary"], targetLevels: ["secondary", "tertiary"], qualityStandard: "waveform-readable", autoRecognize: true, savedCost: 86, nonRecognitionReasons: ["poor-quality", "expired", "clinical-change"], status: "active" },
@@ -2452,8 +4091,177 @@ function seedMutualRecognitionRules() {
 
 function seedDiagnosticReports() {
   return [
-    { id: "dr-001", externalId: "LIS-DEMO-001", residentId: "r2", item: "HbA1c", category: "lab", sourceInstitution: "Wafangdian Central Hospital", targetInstitution: "Dalian Medical University Hospital", result: "6.8%", conclusion: "HbA1c is elevated; continue chronic disease follow-up.", reportedAt: todayOffset(-1), status: "recognized", recognitionRecordId: "cmr-002" }
+    { id: "dr-ecg-001", externalId: "ECG-DEMO-001", residentId: "r1", item: "ECG", category: "electrocardiogram", sourceInstitution: "青泥洼桥社区卫生服务中心", targetInstitution: "大连市中心医院", result: "窦性心律，ST-T 未见急性改变", conclusion: "心电图质控通过，可用于本次复诊。", reportedAt: todayOffset(-2), status: "recognized", recognitionRecordId: "cmr-001", reportPdfHash: phase2EvidenceHash("dr-ecg-001") },
+    { id: "dr-001", externalId: "LIS-DEMO-001", residentId: "r2", item: "HbA1c", category: "lab", sourceInstitution: "Wafangdian Central Hospital", targetInstitution: "Dalian Medical University Hospital", result: "6.8%", conclusion: "HbA1c is elevated; continue chronic disease follow-up.", reportedAt: todayOffset(-1), status: "recognized", recognitionRecordId: "cmr-002", reportPdfHash: phase2EvidenceHash("dr-001") },
+    { id: "dr-us-001", externalId: "US-DEMO-001", residentId: "r4", item: "Carotid ultrasound", category: "ultrasound", sourceInstitution: "庄河市基层医疗机构", targetInstitution: "庄河市中心医院", result: "图像质量不足，建议复核", conclusion: "不满足互认质控要求，退回复核。", reportedAt: todayOffset(-1), status: "not_recognized", recognitionRecordId: "cmr-003", reportPdfHash: phase2EvidenceHash("dr-us-001") }
   ];
+}
+
+function phase2EvidenceHash(value) {
+  return `sha256:${createHash("sha256").update(String(value || "")).digest("hex").slice(0, 24)}`;
+}
+
+function seedPhase2MutualRecognitionCatalog() {
+  const named = [
+    ["P2-MR-001", "HbA1c", "糖化血红蛋白", "lab", "mrr-hba1c-001", 30, "lab-qc-passed", "auto"],
+    ["P2-MR-002", "ECG", "常规心电图", "electrocardiogram", "mrr-ecg-001", 7, "waveform-readable", "auto"],
+    ["P2-MR-003", "Carotid ultrasound", "颈动脉超声", "ultrasound", "mrr-ct-001", 14, "image-quality-passed", "manual"],
+    ["P2-MR-004", "Chest CT", "胸部 CT", "imaging", "mrr-ct-001", 14, "dicom-complete", "manual"],
+    ["P2-MR-005", "Blood glucose", "空腹血糖", "lab", "mrr-hba1c-001", 7, "lab-qc-passed", "auto"],
+    ["P2-MR-006", "Blood lipids", "血脂四项", "lab", "mrr-hba1c-001", 30, "lab-qc-passed", "auto"],
+    ["P2-MR-007", "Urine routine", "尿常规", "lab", "mrr-hba1c-001", 7, "lab-qc-passed", "auto"],
+    ["P2-MR-008", "Liver function", "肝功能", "lab", "mrr-hba1c-001", 14, "lab-qc-passed", "auto"],
+    ["P2-MR-009", "Kidney function", "肾功能", "lab", "mrr-hba1c-001", 14, "lab-qc-passed", "auto"],
+    ["P2-MR-010", "DR chest film", "胸部 DR", "imaging", "mrr-ct-001", 14, "image-quality-passed", "manual"]
+  ];
+  const generated = Array.from({ length: 68 }, (_, index) => {
+    const seq = index + 11;
+    return [
+      `P2-MR-${String(seq).padStart(3, "0")}`,
+      `Mutual recognition item ${seq}`,
+      `互认目录项目 ${seq}`,
+      seq % 5 === 0 ? "imaging" : "lab",
+      seq % 5 === 0 ? "mrr-ct-001" : "mrr-hba1c-001",
+      seq % 5 === 0 ? 14 : 30,
+      seq % 5 === 0 ? "image-quality-passed" : "lab-qc-passed",
+      seq % 5 === 0 ? "manual" : "auto"
+    ];
+  });
+  return [...named, ...generated].map(([catalogCode, item, standardName, category, ruleId, validDays, qualityStandard, recognitionMode], index) => ({
+    id: catalogCode,
+    catalogCode,
+    item,
+    standardName,
+    category,
+    sourceItemCodes: [`LIS-${String(index + 1).padStart(3, "0")}`, `P2-${category.toUpperCase()}-${String(index + 1).padStart(3, "0")}`],
+    ruleId,
+    validDays,
+    qualityStandard,
+    recognitionMode,
+    reportFields: ["residentId", "reportNo", "itemCode", "resultValue", "reportedAt", "reportPdfHash"],
+    sourceSystems: category === "imaging" || category === "ultrasound" ? ["PACS", "RIS", "影像云"] : ["LIS", "检验中心"],
+    status: index >= 70 ? "onsite-blocked" : "mapped",
+    blocker: index >= 70 ? "现场确认互认目录、报告 PDF 源和质控签字后启用。" : ""
+  }));
+}
+
+function seedPhase2MutualRecognitionCitations() {
+  return [
+    { id: "p2mrc-cmr-001", recognitionRecordId: "cmr-001", reportId: "dr-ecg-001", catalogCode: "P2-MR-002", decision: "recognized", citedByRole: "county", citedBy: "county", chainNode: "DL-health-chain-demo-node", reportPdfHash: phase2EvidenceHash("dr-ecg-001"), evidenceHash: phase2EvidenceHash("cmr-001/dr-ecg-001/recognized"), signedAt: todayOffset(-2), verificationStatus: "verified", status: "active" },
+    { id: "p2mrc-cmr-002", recognitionRecordId: "cmr-002", reportId: "dr-001", catalogCode: "P2-MR-001", decision: "recognized", citedByRole: "county", citedBy: "county", chainNode: "DL-health-chain-demo-node", reportPdfHash: phase2EvidenceHash("dr-001"), evidenceHash: phase2EvidenceHash("cmr-002/dr-001/recognized"), signedAt: todayOffset(-1), verificationStatus: "verified", status: "active" },
+    { id: "p2mrc-cmr-003", recognitionRecordId: "cmr-003", reportId: "dr-us-001", catalogCode: "P2-MR-003", decision: "rejected", citedByRole: "county", citedBy: "county", chainNode: "DL-health-chain-demo-node", reportPdfHash: phase2EvidenceHash("dr-us-001"), evidenceHash: phase2EvidenceHash("cmr-003/dr-us-001/rejected"), signedAt: todayOffset(-1), verificationStatus: "verified", status: "active", nonRecognitionReason: "图像质量不足，需要复核" }
+  ];
+}
+
+function findPhase2RecognitionCatalogItem(data, item, category = "") {
+  const normalizedItem = String(item || "").trim().toLowerCase();
+  const normalizedCategory = String(category || "").trim().toLowerCase();
+  return (Array.isArray(data.phase2MutualRecognitionCatalog) ? data.phase2MutualRecognitionCatalog : seedPhase2MutualRecognitionCatalog()).find((entry) =>
+    String(entry.item || "").trim().toLowerCase() === normalizedItem ||
+    String(entry.standardName || "").trim().toLowerCase() === normalizedItem ||
+    ((entry.sourceItemCodes || []).some((code) => String(code).trim().toLowerCase() === normalizedItem) && (!normalizedCategory || String(entry.category || "").toLowerCase() === normalizedCategory))
+  );
+}
+
+function upsertPhase2MutualRecognitionCitation(data, record, payload, user) {
+  if (!record?.reportId) return null;
+  const report = (data.diagnosticReports || []).find((item) => item.id === record.reportId);
+  const catalog = findPhase2RecognitionCatalogItem(data, record.item || report?.item, report?.category);
+  const decision = /reject|退回|不互认|not_recognized/i.test(`${record.status || ""} ${record.reviewStatus || ""}`) ? "rejected" : "recognized";
+  const citation = {
+    id: `p2mrc-${record.id}`,
+    recognitionRecordId: record.id,
+    reportId: record.reportId,
+    catalogCode: catalog?.catalogCode || catalog?.id || "",
+    decision,
+    citedByRole: user.role,
+    citedBy: user.username || user.role,
+    chainNode: String(payload.chainNode || "DL-health-chain-demo-node").trim(),
+    reportPdfHash: report?.reportPdfHash || phase2EvidenceHash(record.reportId),
+    evidenceHash: phase2EvidenceHash(`${record.id}/${record.reportId}/${decision}/${record.reviewedAt || Date.now()}`),
+    signedAt: new Date().toISOString(),
+    verificationStatus: "verified",
+    status: "active",
+    nonRecognitionReason: decision === "rejected" ? (record.nonRecognitionReason || record.reviewReasonCode || payload.reasonCode || "") : ""
+  };
+  data.phase2MutualRecognitionCitations = mergeByKey(data.phase2MutualRecognitionCitations, [citation], "id");
+  return citation;
+}
+
+function buildPhase2MutualRecognitionOverview(data) {
+  const catalog = Array.isArray(data.phase2MutualRecognitionCatalog) ? data.phase2MutualRecognitionCatalog : seedPhase2MutualRecognitionCatalog();
+  const citations = Array.isArray(data.phase2MutualRecognitionCitations) ? data.phase2MutualRecognitionCitations : seedPhase2MutualRecognitionCitations();
+  const reports = Array.isArray(data.diagnosticReports) ? data.diagnosticReports : seedDiagnosticReports();
+  const records = Array.isArray(data.countyMutualRecognitionRecords) ? data.countyMutualRecognitionRecords : seedCountyMutualRecognitionRecords();
+  const rules = Array.isArray(data.mutualRecognitionRules) ? data.mutualRecognitionRules : seedMutualRecognitionRules();
+  const reviews = Array.isArray(data.mutualRecognitionQualityReviews) ? data.mutualRecognitionQualityReviews : seedMutualRecognitionQualityReviews();
+  const reportIds = new Set(reports.map((item) => item.id));
+  const recordIds = new Set(records.map((item) => item.id));
+  const catalogCodes = new Set(catalog.map((item) => item.catalogCode || item.id));
+  const recognized = records.filter((item) => /recognized|已互认|已/.test(String(item.status || "")));
+  const rejected = records.filter((item) => /reject|退回|不互认|not_recognized/i.test(`${item.status || ""} ${item.reviewStatus || ""}`));
+  const pending = records.filter((item) => /pending|待|复核/i.test(`${item.status || ""} ${item.reviewStatus || ""}`));
+  const reportBrowser = reports.map((report) => {
+    const record = records.find((item) => item.id === report.recognitionRecordId);
+    const citation = citations.find((item) => item.reportId === report.id || item.recognitionRecordId === report.recognitionRecordId);
+    const catalogItem = findPhase2RecognitionCatalogItem({ phase2MutualRecognitionCatalog: catalog }, report.item, report.category);
+    return {
+      reportId: report.id,
+      recognitionRecordId: report.recognitionRecordId || "",
+      residentId: report.residentId,
+      item: report.item,
+      category: report.category,
+      sourceInstitution: report.sourceInstitution,
+      targetInstitution: report.targetInstitution,
+      status: report.status,
+      recognitionStatus: record?.status || "",
+      catalogCode: catalogItem?.catalogCode || citation?.catalogCode || "",
+      citationId: citation?.id || "",
+      reportPdfHash: report.reportPdfHash || citation?.reportPdfHash || "",
+      result: report.result,
+      conclusion: report.conclusion,
+      reportedAt: report.reportedAt
+    };
+  });
+  const sourceChannels = [...new Set(catalog.flatMap((item) => item.sourceSystems || []))];
+  const onsiteBlockers = [
+    ...catalog.filter((item) => /blocked/i.test(String(item.status || item.blocker || ""))),
+    { id: "phase2-mutual-recognition-live-pdf-source", blocker: "真实报告 PDF/版式文件源、LIS/PACS 字典和互认目录签字仍需现场确认。", owner: "medical-resource-center", status: "onsite-blocked" }
+  ];
+  const checks = [
+    { id: "phase2MutualRecognition:78ItemMapping", passed: catalog.length >= 78 && catalog.every((item) => item.catalogCode && item.item && item.ruleId && item.qualityStandard), detail: `${catalog.length}/78 mapped recognition items` },
+    { id: "phase2MutualRecognition:reportBrowser", passed: reportBrowser.length >= 3 && reportBrowser.every((item) => item.reportId && item.recognitionRecordId && item.catalogCode), detail: `${reportBrowser.length} report browser rows` },
+    { id: "phase2MutualRecognition:decisionLoop", passed: records.length >= 3 && recognized.length >= 1 && (rejected.length >= 1 || pending.length >= 1) && records.every((item) => item.reason), detail: `${recognized.length} recognized / ${rejected.length} rejected / ${pending.length} pending` },
+    { id: "phase2MutualRecognition:citationChain", passed: citations.length >= 3 && citations.every((item) => reportIds.has(item.reportId) && recordIds.has(item.recognitionRecordId) && catalogCodes.has(item.catalogCode) && item.evidenceHash && item.chainNode), detail: `${citations.length} report citations with evidence hashes` },
+    { id: "phase2MutualRecognition:supervisionStats", passed: rules.length >= 3 && reviews.length >= 1 && sourceChannels.length >= 3, detail: `${rules.length} rules / ${reviews.length} QC reviews / ${sourceChannels.length} source channels` },
+    { id: "phase2MutualRecognition:onsiteBoundary", passed: onsiteBlockers.length >= 2, detail: `${onsiteBlockers.length} onsite blockers surfaced` }
+  ];
+  return {
+    ok: checks.every((item) => item.passed),
+    generatedAt: new Date().toISOString(),
+    summary: {
+      catalogItems: catalog.length,
+      targetCatalogItems: 78,
+      reports: reports.length,
+      recognitionRecords: records.length,
+      recognized: recognized.length,
+      rejected: rejected.length,
+      pending: pending.length,
+      citations: citations.length,
+      qualityReviews: reviews.length,
+      sourceChannels: sourceChannels.length,
+      estimatedSavedCost: records.reduce((sum, item) => sum + Number(item.savedCost || 0), 0),
+      onsiteBlockers: onsiteBlockers.length
+    },
+    catalog,
+    reportBrowser,
+    recognitionRecords: records,
+    citations,
+    rules,
+    qualityReviews: reviews,
+    onsiteBlockers,
+    checks
+  };
 }
 
 function seedImageCloudGateways() {
@@ -3875,7 +5683,8 @@ function writeSqliteState(data, event = "write-state", expectedVersions = null) 
   try {
     db.exec("PRAGMA foreign_keys = ON");
     db.exec("BEGIN");
-    const entries = Object.entries(data).filter(([key]) => key !== "storageMeta");
+    const normalized = normalizeState(data);
+    const entries = Object.entries(normalized).filter(([key]) => key !== "storageMeta");
     verifySqliteCollectionVersions(db, entries.map(([key]) => key), expectedVersions);
     const incomingKeys = new Set(entries.map(([key]) => key));
     const existingPayloads = new Map(db.prepare("SELECT key, payload FROM state_collections").all().map((row) => [row.key, row.payload]));
@@ -3896,7 +5705,7 @@ function writeSqliteState(data, event = "write-state", expectedVersions = null) 
         updateStatement.run(payload, now, key);
       }
     });
-    syncSqliteIdentityTables(db, data, event, now);
+    syncSqliteIdentityTables(db, normalized, event, now);
     db.prepare("INSERT INTO storage_events (id, at, event, detail) VALUES (?, ?, ?, ?)").run(randomUUID(), now, event, "platform state persisted");
     db.exec("COMMIT");
   } catch (error) {
@@ -4782,14 +6591,30 @@ function normalizeState(data) {
     resourceDispatchRequests: mergeByKey(seedResourceDispatchRequests(), data.resourceDispatchRequests, "id"),
     statisticsReconciliationReviews: mergeByKey(seedStatisticsReconciliationReviews(), data.statisticsReconciliationReviews, "id"),
     operationAlertRules: mergeByKey(seedOperationAlertRules(), data.operationAlertRules, "id"),
+    productionServiceLevels: mergeByKey(seedProductionServiceLevels(), data.productionServiceLevels, "id").map((item) => ({ ...item, productionReady: false })),
+    operationsDutyShifts: mergeByKey(seedOperationsDutyShifts(), data.operationsDutyShifts, "id").map((item) => ({ ...item, handoffChecklist: Array.isArray(item.handoffChecklist) ? item.handoffChecklist : [], actionHistory: Array.isArray(item.actionHistory) ? item.actionHistory.slice(0, 20) : [], productionReady: false })),
+    operationsIncidents: mergeByKey(seedOperationsIncidents(), data.operationsIncidents, "id").map((item) => ({ ...item, evidenceRefs: Array.isArray(item.evidenceRefs) ? item.evidenceRefs : [], actionHistory: Array.isArray(item.actionHistory) ? item.actionHistory.slice(0, 20) : [], productionReady: false })),
+    disasterRecoveryDrills: mergeByKey(seedDisasterRecoveryDrills(), data.disasterRecoveryDrills, "id").map((item) => ({ ...item, requiredEvidence: Array.isArray(item.requiredEvidence) ? item.requiredEvidence : [], checks: Array.isArray(item.checks) ? item.checks : [], actionHistory: Array.isArray(item.actionHistory) ? item.actionHistory.slice(0, 20) : [], productionReady: false })),
+    operationsEvidencePackets: mergeByKey(seedOperationsEvidencePackets(), data.operationsEvidencePackets, "id").map((item) => ({ ...item, productionEvidence: false })),
     healthStatistics: data.healthStatistics && typeof data.healthStatistics === "object" ? data.healthStatistics : seedHealthStatistics(),
     publicHealthStandards: mergeByKey(seedPublicHealthStandards(), data.publicHealthStandards, "id"),
+    publicHealthStandardImplementationLedger: mergeByKey(seedPublicHealthStandardImplementationLedger(), data.publicHealthStandardImplementationLedger, "id"),
     publicHealthInstitutionScopes: mergeByKey(seedPublicHealthInstitutionScopes(), data.publicHealthInstitutionScopes, "id"),
     publicHealthEvents: mergeByKey(seedPublicHealthEvents(), data.publicHealthEvents, "id"),
     publicHealthExchangeTasks: mergeByKey(seedPublicHealthExchangeTasks(), data.publicHealthExchangeTasks, "id"),
     publicHealthExchangeRuns: mergeByKey(seedPublicHealthExchangeRuns(), data.publicHealthExchangeRuns, "id"),
     publicHealthInstitutionTasks: mergeByKey(seedPublicHealthInstitutionTasks(), data.publicHealthInstitutionTasks, "id"),
     publicHealthOnsiteAcceptances: mergeByKey(seedPublicHealthOnsiteAcceptances(), data.publicHealthOnsiteAcceptances, "id"),
+    publicHealthCutoverBlockers: mergeByKey(seedPublicHealthCutoverBlockers(), data.publicHealthCutoverBlockers, "id"),
+    publicHealthCutoverEvidencePackets: mergeByKey(seedPublicHealthCutoverEvidencePackets(data.publicHealthCutoverBlockers), data.publicHealthCutoverEvidencePackets, "id"),
+    publicHealthCutoverDrills: mergeByKey(seedPublicHealthCutoverDrills(), data.publicHealthCutoverDrills, "id"),
+    publicHealthProductionHandoffs: mergeByKey(seedPublicHealthProductionHandoffs(), data.publicHealthProductionHandoffs, "id"),
+    publicHealthGoLiveObservations: mergeByKey(seedPublicHealthGoLiveObservations(), data.publicHealthGoLiveObservations, "id"),
+    publicHealthLaunchIncidents: mergeByKey(seedPublicHealthLaunchIncidents(), data.publicHealthLaunchIncidents, "id"),
+    publicHealthLaunchDutyShifts: mergeByKey(seedPublicHealthLaunchDutyShifts(), data.publicHealthLaunchDutyShifts, "id"),
+    publicHealthLaunchCommandBriefs: mergeByKey(seedPublicHealthLaunchCommandBriefs(), data.publicHealthLaunchCommandBriefs, "id"),
+    publicHealthSiteEvidenceVerificationTasks: mergeByKey(seedPublicHealthSiteEvidenceVerificationTasks(), data.publicHealthSiteEvidenceVerificationTasks, "id"),
+    publicHealthLaunchApprovals: mergeByKey(seedPublicHealthLaunchApprovals(), data.publicHealthLaunchApprovals, "id"),
     publicHealthReadinessEvidence: mergeByKey(seedPublicHealthReadinessEvidence(), data.publicHealthReadinessEvidence, "id"),
     deathCertificates: mergeByKey(seedDeathCertificates(), data.deathCertificates, "id"),
     deathCertificateForms: mergeByKey(seedDeathCertificateForms(), data.deathCertificateForms, "id"),
@@ -4850,7 +6675,7 @@ function normalizeState(data) {
     escortWorkers: mergeByKey(seedEscortWorkers(), data.escortWorkers, "id"),
     escortServiceOrders: mergeByKey(seedEscortServiceOrders(), data.escortServiceOrders, "id"),
     registrationSchedules: mergeByKey(seedRegistrationSchedules(), data.registrationSchedules, "id"),
-    registrationOrders: mergeByKey(seedRegistrationOrders(), data.registrationOrders, "id"),
+    registrationOrders: mergeByKey(seedRegistrationOrders(), data.registrationOrders, "id").map(normalizeRegistrationJourneyOrder),
     internetNursingPolicy: data.internetNursingPolicy && typeof data.internetNursingPolicy === "object" ? { ...seedInternetNursingPolicy(), ...data.internetNursingPolicy } : seedInternetNursingPolicy(),
     internetNursingInstitutions: mergeByKey(seedInternetNursingInstitutions(), data.internetNursingInstitutions, "id"),
     internetNursingNurses: mergeByKey(seedInternetNursingNurses(), data.internetNursingNurses, "id"),
@@ -4878,6 +6703,39 @@ function normalizeState(data) {
     standardDataDictionaries: mergeByKey(seedStandardDataDictionaries(), data.standardDataDictionaries, "id"),
     dataLineageControls: mergeByKey(seedDataLineageControls(), data.dataLineageControls, "id"),
     platformDataBusChannels: mergeByKey(seedPlatformDataBusChannels(), data.platformDataBusChannels, "id"),
+    digitalHospitalStandards: mergeByKey(seedDigitalHospitalStandards(), data.digitalHospitalStandards, "id"),
+    digitalHospitalEvaluationTasks: mergeByKey(seedDigitalHospitalEvaluationTasks(), data.digitalHospitalEvaluationTasks, "id"),
+    digitalHospitalEvidencePackets: mergeByKey(seedDigitalHospitalEvidencePackets(), data.digitalHospitalEvidencePackets, "id"),
+    digitalHospitalRiskItems: mergeByKey(seedDigitalHospitalRiskItems(), data.digitalHospitalRiskItems, "id"),
+    digitalHospitalLaunchRequirements: mergeByKey(seedDigitalHospitalLaunchRequirements(), data.digitalHospitalLaunchRequirements, "id"),
+    digitalHospitalLaunchApprovals: mergeByKey(seedDigitalHospitalLaunchApprovals(), data.digitalHospitalLaunchApprovals, "id"),
+    digitalHospitalProductionEvidencePackets: mergeByKey(seedDigitalHospitalProductionEvidencePackets(), data.digitalHospitalProductionEvidencePackets, "id"),
+    digitalHospitalLaunchCommandBriefs: mergeByKey(seedDigitalHospitalLaunchCommandBriefs(), data.digitalHospitalLaunchCommandBriefs, "id"),
+    digitalHospitalFormalCutoverApprovals: mergeByKey(seedDigitalHospitalFormalCutoverApprovals(), data.digitalHospitalFormalCutoverApprovals, "id"),
+    phase2DataCatalogs: mergeByKey(seedPhase2DataCatalogs(), data.phase2DataCatalogs, "id"),
+    phase2ServiceCatalogs: mergeByKey(seedPhase2ServiceCatalogs(), data.phase2ServiceCatalogs, "id"),
+    phase2FieldLineage: mergeByKey(seedPhase2FieldLineage(), data.phase2FieldLineage, "id"),
+    phase2CatalogQualityRules: mergeByKey(seedPhase2CatalogQualityRules(), data.phase2CatalogQualityRules, "id"),
+    phase2PilotInstitutions: mergeByKey(seedPhase2PilotInstitutions(), data.phase2PilotInstitutions, "id"),
+    phase2JointTestLinks: mergeByKey(seedPhase2JointTestLinks(), data.phase2JointTestLinks, "id"),
+    phase2SamplePayloads: mergeByKey(seedPhase2SamplePayloads(), data.phase2SamplePayloads, "id"),
+    phase2GatewayTraces: mergeByKey(seedPhase2GatewayTraces(), data.phase2GatewayTraces, "id"),
+    phase2JointTestIssues: mergeByKey(seedPhase2JointTestIssues(), data.phase2JointTestIssues, "id"),
+    phase2DiseaseReportingRules: mergeByKey(seedPhase2DiseaseReportingRules(), data.phase2DiseaseReportingRules, "id"),
+    phase2DiseaseReportQueue: mergeByKey(seedPhase2DiseaseReportQueue(), data.phase2DiseaseReportQueue, "id"),
+    phase2DiseaseReportReceipts: mergeByKey(seedPhase2DiseaseReportReceipts(), data.phase2DiseaseReportReceipts, "id"),
+    phase2ClinicalAssistRules: mergeByKey(seedPhase2ClinicalAssistRules(), data.phase2ClinicalAssistRules, "id"),
+    phase2ClinicalAssistAlerts: mergeByKey(seedPhase2ClinicalAssistAlerts(), data.phase2ClinicalAssistAlerts, "id"),
+    phase2ClinicalAssistReceipts: mergeByKey(seedPhase2ClinicalAssistReceipts(), data.phase2ClinicalAssistReceipts, "id"),
+    phase2ClinicalAssistPluginContracts: mergeByKey(seedPhase2ClinicalAssistPluginContracts(), data.phase2ClinicalAssistPluginContracts, "id"),
+    phase2FamilyDoctorTemplates: mergeByKey(seedPhase2FamilyDoctorTemplates(), data.phase2FamilyDoctorTemplates, "id"),
+    phase2FamilyDoctorTeams: mergeByKey(seedPhase2FamilyDoctorTeams(), data.phase2FamilyDoctorTeams, "id"),
+    phase2FamilyDoctorServicePackages: mergeByKey(seedPhase2FamilyDoctorServicePackages(), data.phase2FamilyDoctorServicePackages, "id"),
+    phase2FamilyDoctorApplications: mergeByKey(seedPhase2FamilyDoctorApplications(), data.phase2FamilyDoctorApplications, "id"),
+    phase2FamilyDoctorContracts: mergeByKey(seedPhase2FamilyDoctorContracts(), data.phase2FamilyDoctorContracts, "id"),
+    phase2FamilyDoctorFulfillments: mergeByKey(seedPhase2FamilyDoctorFulfillments(), data.phase2FamilyDoctorFulfillments, "id"),
+    phase2MutualRecognitionCatalog: mergeByKey(seedPhase2MutualRecognitionCatalog(), data.phase2MutualRecognitionCatalog, "id"),
+    phase2MutualRecognitionCitations: mergeByKey(seedPhase2MutualRecognitionCitations(), data.phase2MutualRecognitionCitations, "id"),
     integrationGatewayEvents: Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [],
     chronicProjectBlueprint: data.chronicProjectBlueprint && typeof data.chronicProjectBlueprint === "object" ? data.chronicProjectBlueprint : seedChronicProjectBlueprint(),
     countyProjectBlueprint: data.countyProjectBlueprint && typeof data.countyProjectBlueprint === "object" ? data.countyProjectBlueprint : seedCountyProjectBlueprint(),
@@ -4889,6 +6747,16 @@ function normalizeState(data) {
     platformDeliveryBatches: mergeByKey(seedPlatformDeliveryBatches(), data.platformDeliveryBatches, "id"),
     platformEvidence: cleanPlatformEvidenceText(mergeByKey(seedPlatformEvidence(), data.platformEvidence, "id")),
     productionDeploymentPlan: mergeByKey(seedProductionDeploymentPlan(), data.productionDeploymentPlan, "id"),
+    productionDatabaseMigrationBatches: mergeByKey(seedProductionDatabaseMigrationBatches(), data.productionDatabaseMigrationBatches, "id"),
+    productionDatabaseCutoverRuns: mergeByKey(seedProductionDatabaseCutoverRuns(), data.productionDatabaseCutoverRuns, "id"),
+    citizenOperationContents: mergeByKey(seedCitizenOperationContents(), data.citizenOperationContents, "id"),
+    citizenAgreementVersions: mergeByKey(seedCitizenAgreementVersions(), data.citizenAgreementVersions, "id"),
+    citizenIdentityReviewCases: mergeByKey(seedCitizenIdentityReviewCases(), data.citizenIdentityReviewCases, "id"),
+    citizenServiceBlacklist: mergeByKey(seedCitizenServiceBlacklist(), data.citizenServiceBlacklist, "id"),
+    citizenHospitalServiceConfigs: mergeByKey(seedCitizenHospitalServiceConfigs(), data.citizenHospitalServiceConfigs, "id"),
+    commercialCryptoCapabilities: mergeByKey(seedCommercialCryptoCapabilities(), data.commercialCryptoCapabilities, "id"),
+    commercialCryptoProbeRuns: Array.isArray(data.commercialCryptoProbeRuns) ? data.commercialCryptoProbeRuns : [],
+    commercialCryptoEvidencePackets: mergeByKey(seedCommercialCryptoEvidencePackets(), data.commercialCryptoEvidencePackets, "id"),
     siteLaunchEvidence: Array.isArray(data.siteLaunchEvidence) ? data.siteLaunchEvidence : [],
     applicationCatalog: mergeByKey(seedApplicationCatalog(), data.applicationCatalog, "id"),
     institutionCreditEvaluations: mergeByKey(seedInstitutionCreditEvaluations(), data.institutionCreditEvaluations, "id"),
@@ -5077,6 +6945,61 @@ function completeSystemTargets(state) {
     requiredConfig: Array.isArray(item.requiredConfig) ? item.requiredConfig : [],
     evidence: Array.isArray(item.evidence) ? item.evidence : []
   }));
+  state.productionDatabaseMigrationBatches = mergeByKey(seedProductionDatabaseMigrationBatches(), state.productionDatabaseMigrationBatches, "id").map((item) => ({
+    ...item,
+    sourceCollections: Array.isArray(item.sourceCollections) ? item.sourceCollections : [],
+    targetTables: Array.isArray(item.targetTables) ? item.targetTables : [],
+    businessKeyFields: Array.isArray(item.businessKeyFields) ? item.businessKeyFields : [],
+    validationRules: Array.isArray(item.validationRules) ? item.validationRules : []
+  }));
+  state.productionDatabaseCutoverRuns = mergeByKey(seedProductionDatabaseCutoverRuns(), state.productionDatabaseCutoverRuns, "id").map((item) => ({
+    ...item,
+    sampleValidations: Array.isArray(item.sampleValidations) ? item.sampleValidations : [],
+    blockers: Array.isArray(item.blockers) ? item.blockers : [],
+    actionHistory: Array.isArray(item.actionHistory) ? item.actionHistory.slice(0, 20) : []
+  }));
+  state.citizenOperationContents = mergeByKey(seedCitizenOperationContents(), state.citizenOperationContents, "id").map((item) => ({
+    ...item,
+    channels: Array.isArray(item.channels) ? item.channels : [],
+    actionHistory: Array.isArray(item.actionHistory) ? item.actionHistory.slice(0, 20) : [],
+    productionReady: false
+  }));
+  state.citizenAgreementVersions = mergeByKey(seedCitizenAgreementVersions(), state.citizenAgreementVersions, "id").map((item) => ({
+    ...item,
+    requiredScopes: Array.isArray(item.requiredScopes) ? item.requiredScopes : [],
+    productionReady: false
+  }));
+  state.citizenIdentityReviewCases = mergeByKey(seedCitizenIdentityReviewCases(), state.citizenIdentityReviewCases, "id").map((item) => ({
+    ...item,
+    submittedEvidence: Array.isArray(item.submittedEvidence) ? item.submittedEvidence : [],
+    actionHistory: Array.isArray(item.actionHistory) ? item.actionHistory.slice(0, 20) : [],
+    productionReady: false
+  }));
+  state.citizenServiceBlacklist = mergeByKey(seedCitizenServiceBlacklist(), state.citizenServiceBlacklist, "id").map((item) => ({
+    ...item,
+    actionHistory: Array.isArray(item.actionHistory) ? item.actionHistory.slice(0, 20) : [],
+    productionReady: false
+  }));
+  state.citizenHospitalServiceConfigs = mergeByKey(seedCitizenHospitalServiceConfigs(), state.citizenHospitalServiceConfigs, "id").map((item) => ({
+    ...item,
+    enabledServices: Array.isArray(item.enabledServices) ? item.enabledServices : [],
+    orderChannels: Array.isArray(item.orderChannels) ? item.orderChannels : [],
+    actionHistory: Array.isArray(item.actionHistory) ? item.actionHistory.slice(0, 20) : [],
+    productionReady: false
+  }));
+  state.commercialCryptoCapabilities = mergeByKey(seedCommercialCryptoCapabilities(), state.commercialCryptoCapabilities, "id").map((item) => ({
+    ...item,
+    requiredPrimitives: Array.isArray(item.requiredPrimitives) ? item.requiredPrimitives : [],
+    evidenceRefs: Array.isArray(item.evidenceRefs) ? item.evidenceRefs : [],
+    blockers: Array.isArray(item.blockers) ? item.blockers : [],
+    actionHistory: Array.isArray(item.actionHistory) ? item.actionHistory.slice(0, 20) : [],
+    productionReady: false
+  }));
+  state.commercialCryptoProbeRuns = (Array.isArray(state.commercialCryptoProbeRuns) ? state.commercialCryptoProbeRuns : []).slice(0, 40);
+  state.commercialCryptoEvidencePackets = mergeByKey(seedCommercialCryptoEvidencePackets(), state.commercialCryptoEvidencePackets, "id").map((item) => ({
+    ...item,
+    productionEvidence: false
+  }));
   state.applicationCatalog = mergeByKey(seedApplicationCatalog(), state.applicationCatalog, "id");
   state.institutionCreditEvaluations = mergeByKey(seedInstitutionCreditEvaluations(), state.institutionCreditEvaluations, "id");
   state.creditEvaluationRules = state.creditEvaluationRules && typeof state.creditEvaluationRules === "object" ? state.creditEvaluationRules : seedCreditEvaluationRules();
@@ -5102,7 +7025,7 @@ function completeSystemTargets(state) {
   state.escortWorkers = mergeByKey(seedEscortWorkers(), state.escortWorkers, "id");
   state.escortServiceOrders = mergeByKey(seedEscortServiceOrders(), state.escortServiceOrders, "id");
   state.registrationSchedules = mergeByKey(seedRegistrationSchedules(), state.registrationSchedules, "id");
-  state.registrationOrders = mergeByKey(seedRegistrationOrders(), state.registrationOrders, "id");
+  state.registrationOrders = mergeByKey(seedRegistrationOrders(), state.registrationOrders, "id").map(normalizeRegistrationJourneyOrder);
   state.internetNursingPolicy = state.internetNursingPolicy && typeof state.internetNursingPolicy === "object" ? { ...seedInternetNursingPolicy(), ...state.internetNursingPolicy } : seedInternetNursingPolicy();
   state.internetNursingInstitutions = mergeByKey(seedInternetNursingInstitutions(), state.internetNursingInstitutions, "id");
   state.internetNursingNurses = mergeByKey(seedInternetNursingNurses(), state.internetNursingNurses, "id");
@@ -5144,6 +7067,16 @@ function completeSystemTargets(state) {
   state.publicHealthExchangeRuns = mergeByKey(seedPublicHealthExchangeRuns(), state.publicHealthExchangeRuns, "id");
   state.publicHealthInstitutionTasks = mergeByKey(seedPublicHealthInstitutionTasks(), state.publicHealthInstitutionTasks, "id");
   state.publicHealthOnsiteAcceptances = mergeByKey(seedPublicHealthOnsiteAcceptances(), state.publicHealthOnsiteAcceptances, "id");
+  state.publicHealthCutoverBlockers = mergeByKey(seedPublicHealthCutoverBlockers(), state.publicHealthCutoverBlockers, "id");
+  state.publicHealthCutoverEvidencePackets = mergeByKey(seedPublicHealthCutoverEvidencePackets(state.publicHealthCutoverBlockers), state.publicHealthCutoverEvidencePackets, "id");
+  state.publicHealthCutoverDrills = mergeByKey(seedPublicHealthCutoverDrills(), state.publicHealthCutoverDrills, "id");
+  state.publicHealthProductionHandoffs = mergeByKey(seedPublicHealthProductionHandoffs(), state.publicHealthProductionHandoffs, "id");
+  state.publicHealthGoLiveObservations = mergeByKey(seedPublicHealthGoLiveObservations(), state.publicHealthGoLiveObservations, "id");
+  state.publicHealthLaunchIncidents = mergeByKey(seedPublicHealthLaunchIncidents(), state.publicHealthLaunchIncidents, "id");
+  state.publicHealthLaunchDutyShifts = mergeByKey(seedPublicHealthLaunchDutyShifts(), state.publicHealthLaunchDutyShifts, "id");
+  state.publicHealthLaunchCommandBriefs = mergeByKey(seedPublicHealthLaunchCommandBriefs(), state.publicHealthLaunchCommandBriefs, "id");
+  state.publicHealthSiteEvidenceVerificationTasks = mergeByKey(seedPublicHealthSiteEvidenceVerificationTasks(), state.publicHealthSiteEvidenceVerificationTasks, "id");
+  state.publicHealthLaunchApprovals = mergeByKey(seedPublicHealthLaunchApprovals(), state.publicHealthLaunchApprovals, "id");
   state.publicHealthReadinessEvidence = mergeByKey(seedPublicHealthReadinessEvidence(), state.publicHealthReadinessEvidence, "id");
   ensureChronicFieldClosureEvidence(state);
 }
@@ -6884,7 +8817,9 @@ function buildRegistrationDashboard(data, user) {
     .filter((item) => canAccessRegistrationSchedule(user, item));
   const scheduleById = new Map(schedules.map((item) => [item.id, item]));
   const orders = (Array.isArray(data.registrationOrders) ? data.registrationOrders : [])
-    .filter((item) => canAccessRegistrationOrder(user, item, data));
+    .filter((item) => canAccessRegistrationOrder(user, item, data))
+    .map(normalizeRegistrationJourneyOrder);
+  const journey = buildRegistrationJourneyCenter(orders);
   return {
     ok: true,
     summary: {
@@ -6895,12 +8830,24 @@ function buildRegistrationDashboard(data, user) {
       hisConfirmed: orders.filter((item) => item.hisVisitId || item.registrationNo).length,
       paymentPending: orders.filter((item) => item.paymentStatus === "pending").length,
       insurancePrechecked: orders.filter((item) => item.insuranceStatus === "prechecked").length,
-      smsQueued: orders.filter((item) => (item.notificationDeliveries || []).some((delivery) => delivery.channel === "sms" && delivery.status === "queued")).length
+      smsQueued: orders.filter((item) => (item.notificationDeliveries || []).some((delivery) => delivery.channel === "sms" && delivery.status === "queued")).length,
+      journeyPaid: journey.summary.paid,
+      journeyHospitalConfirmed: journey.summary.hospitalConfirmed,
+      journeyCheckedIn: journey.summary.checkedIn,
+      journeyCompleted: journey.summary.completed,
+      journeyRefundPending: journey.summary.refundPending
     },
     schedules,
-    orders: orders.map((item) => ({ ...item, schedule: scheduleById.get(item.scheduleId) || null })),
+    orders: orders.map((item) => ({ ...item, schedule: scheduleById.get(item.scheduleId) || null, allowedActions: registrationJourneyAllowedActions(item, user) })),
+    journey: {
+      status: journey.status,
+      productionReady: journey.summary.productionReady,
+      onsiteBlockers: journey.summary.onsiteBlockers,
+      blockers: journey.blockers,
+      boundary: journey.boundary
+    },
     integration: {
-      endpoints: ["/api/registrations/dashboard", "/api/registrations/orders", "/api/registrations/orders/:id/cancel"],
+      endpoints: ["/api/registrations/dashboard", "/api/registrations/orders", "/api/registrations/orders/:id/actions", "/api/registrations/orders/:id/cancel"],
       exchangeObjects: ["registrationSchedules", "registrationOrders", "taskMessages", "dataAccessLogs"],
       targetSystems: ["hospital HIS", "internet hospital", "payment gateway", "medical insurance e-voucher", "sms gateway"],
       status: "contract-ready"
@@ -6946,6 +8893,10 @@ function normalizeRegistrationOrder(payload, user, data) {
     cancelBeforeHours: Number(schedule.cancelBeforeHours || 0),
     status: "confirmed",
     scheduleLockStatus: "confirmed",
+    journeyStage: "slot-reserved-demo",
+    hisConfirmationStatus: "pending-demo",
+    checkInStatus: "not-checked-in",
+    productionReady: false,
     lockExpireAt: new Date(Date.now() + Number(schedule.lockMinutes || 10) * 60_000).toISOString(),
     paymentStatus: paymentRequired ? "pending" : "waived",
     paymentTradeNo: paymentRequired ? `PAY-REG-${id.slice(-8).toUpperCase()}` : "",
@@ -7005,14 +8956,48 @@ function buildRegistrationTaskMessage(order, event, user) {
   };
 }
 
+function buildRegistrationJourneyTaskMessage(order, action, user) {
+  const actorRole = user.role || "unknown";
+  const targetRole = actorRole === "citizen" ? "institution" : "citizen";
+  const labels = {
+    "pay-demo": "Payment evidence recorded",
+    "confirm-his-demo": "Hospital appointment confirmed",
+    "confirm-insurance-demo": "Insurance precheck confirmed",
+    "check-in-demo": "Check-in recorded",
+    "complete-demo": "Visit completed",
+    "refund-demo": "Refund evidence recorded"
+  };
+  return {
+    id: `msg-${randomUUID()}`,
+    taskId: `registrationOrders:${order.id}`,
+    collection: "registrationOrders",
+    sourceId: order.id,
+    residentId: order.residentId,
+    targetRole,
+    channel: "in_app",
+    notificationEvent: `registration-${action}`,
+    deliveryChannels: ["in_app", "sms"],
+    title: labels[action] || "Registration journey updated",
+    body: `${order.hospital || "Hospital"} ${order.department || ""} · ${order.appointmentDate || "appointment"} · ${order.journeyStage}.`,
+    status: "sent",
+    receipts: [],
+    createdAt: new Date().toISOString(),
+    createdBy: user.username || user.role || "system",
+    createdByName: user.name || "system"
+  };
+}
+
 function applyRegistrationCancel(order, payload, user) {
   const now = new Date().toISOString();
+  const paid = ["paid", "paid-demo"].includes(order.paymentStatus);
   return {
     ...order,
     status: "cancelled",
     scheduleLockStatus: "released",
-    paymentStatus: order.paymentStatus === "paid" ? "refund-pending" : ["pending", "waived"].includes(order.paymentStatus) ? "closed" : order.paymentStatus,
-    refundStatus: order.paymentStatus === "paid" ? "refund-pending" : "not-required",
+    journeyStage: paid ? "cancelled-refund-pending" : "cancelled",
+    paymentStatus: paid ? "refund-pending" : ["pending", "waived"].includes(order.paymentStatus) ? "closed" : order.paymentStatus,
+    refundStatus: paid ? "refund-pending" : "not-required",
+    productionReady: false,
     notificationStatus: "queued",
     notificationDeliveries: [
       ...buildRegistrationNotificationDeliveries(order.id, order.residentId, "registration-cancelled", user, now),
@@ -8583,6 +10568,38 @@ function scopeStateForUser(data, user) {
   delete scoped.standardDataDictionaries;
   delete scoped.dataLineageControls;
   delete scoped.platformDataBusChannels;
+  delete scoped.phase2DataCatalogs;
+  delete scoped.phase2ServiceCatalogs;
+  delete scoped.phase2FieldLineage;
+  delete scoped.phase2CatalogQualityRules;
+  delete scoped.phase2PilotInstitutions;
+  delete scoped.phase2JointTestLinks;
+  delete scoped.phase2SamplePayloads;
+  delete scoped.phase2GatewayTraces;
+  delete scoped.phase2JointTestIssues;
+  if (!["county", "institution"].includes(user.role)) {
+    delete scoped.phase2DiseaseReportingRules;
+    delete scoped.phase2DiseaseReportQueue;
+    delete scoped.phase2DiseaseReportReceipts;
+  }
+  if (!["institution"].includes(user.role)) {
+    delete scoped.phase2ClinicalAssistRules;
+    delete scoped.phase2ClinicalAssistAlerts;
+    delete scoped.phase2ClinicalAssistReceipts;
+    delete scoped.phase2ClinicalAssistPluginContracts;
+  }
+  if (!["institution", "citizen"].includes(user.role)) {
+    delete scoped.phase2FamilyDoctorTemplates;
+    delete scoped.phase2FamilyDoctorTeams;
+    delete scoped.phase2FamilyDoctorServicePackages;
+    delete scoped.phase2FamilyDoctorApplications;
+    delete scoped.phase2FamilyDoctorContracts;
+    delete scoped.phase2FamilyDoctorFulfillments;
+  }
+  if (!["commission", "county", "institution"].includes(user.role)) {
+    delete scoped.phase2MutualRecognitionCatalog;
+    delete scoped.phase2MutualRecognitionCitations;
+  }
   delete scoped.integrationGatewayEvents;
   delete scoped.platformCapabilities;
   delete scoped.platformIntegrations;
@@ -8590,6 +10607,21 @@ function scopeStateForUser(data, user) {
   delete scoped.platformDeliveryBatches;
   delete scoped.platformEvidence;
   delete scoped.productionDeploymentPlan;
+  delete scoped.productionDatabaseMigrationBatches;
+  delete scoped.productionDatabaseCutoverRuns;
+  delete scoped.citizenOperationContents;
+  delete scoped.citizenAgreementVersions;
+  delete scoped.citizenIdentityReviewCases;
+  delete scoped.citizenServiceBlacklist;
+  delete scoped.citizenHospitalServiceConfigs;
+  delete scoped.commercialCryptoCapabilities;
+  delete scoped.commercialCryptoProbeRuns;
+  delete scoped.commercialCryptoEvidencePackets;
+  delete scoped.productionServiceLevels;
+  delete scoped.operationsDutyShifts;
+  delete scoped.operationsIncidents;
+  delete scoped.disasterRecoveryDrills;
+  delete scoped.operationsEvidencePackets;
   delete scoped.platformChangeLogs;
   delete scoped.healthDashboardSnapshots;
   delete scoped.platformRoadmap;
@@ -8626,6 +10658,17 @@ function scopeStateForUser(data, user) {
     if (user.role === "institution" && user.doctorId) {
       scoped.doctorProfiles = (data.doctorProfiles || []).filter((item) => item.id === user.doctorId);
       scoped.multiPracticeApplications = (data.multiPracticeApplications || []).filter((item) => item.doctorId === user.doctorId);
+      scoped.phase2ClinicalAssistAlerts = (data.phase2ClinicalAssistAlerts || []).filter((item) => item.doctorId === user.doctorId);
+      scoped.phase2ClinicalAssistReceipts = (data.phase2ClinicalAssistReceipts || []).filter((item) =>
+        scoped.phase2ClinicalAssistAlerts.some((alert) => alert.id === item.alertId)
+      );
+    }
+    if (user.role === "institution") {
+      scoped.phase2FamilyDoctorTeams = (data.phase2FamilyDoctorTeams || []).filter((item) => item.institutionCode === user.orgCode || (user.doctorId && (item.doctorIds || []).includes(user.doctorId)));
+      scoped.phase2FamilyDoctorServicePackages = (data.phase2FamilyDoctorServicePackages || []).filter((item) => !item.availableInstitutionCodes?.length || item.availableInstitutionCodes.includes(user.orgCode));
+      scoped.phase2FamilyDoctorApplications = (data.phase2FamilyDoctorApplications || []).filter((item) => canAccessPhase2FamilyDoctorRow(user, item, data));
+      scoped.phase2FamilyDoctorContracts = (data.phase2FamilyDoctorContracts || []).filter((item) => canAccessPhase2FamilyDoctorRow(user, item, data));
+      scoped.phase2FamilyDoctorFulfillments = (data.phase2FamilyDoctorFulfillments || []).filter((item) => canAccessPhase2FamilyDoctorRow(user, item, data));
     }
     scoped.referralTeleconsultations = (data.referralTeleconsultations || []).filter((item) => canAccessReferralTeleconsultation(user, item, data));
     scoped.escortServiceOrders = (data.escortServiceOrders || []).filter((item) => canAccessEscortOrder(user, item, data));
@@ -8657,6 +10700,9 @@ function scopeStateForUser(data, user) {
     scoped.mobileExperienceSettings = { ...scoped.mobileExperienceSettings, userPreferences: { [preferenceKey]: preferences[preferenceKey] || {} } };
   }
   ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "referralTeleconsultations", "escortServiceOrders", "registrationOrders", "internetNursingOrders", "taskMessages"].forEach((key) => {
+    scoped[key] = (data[key] || []).filter(hasAllowedResident);
+  });
+  ["phase2FamilyDoctorApplications", "phase2FamilyDoctorContracts", "phase2FamilyDoctorFulfillments"].forEach((key) => {
     scoped[key] = (data[key] || []).filter(hasAllowedResident);
   });
   if (scoped.referralSystem) {
@@ -10119,6 +12165,77 @@ function normalizePublicHealthExchangeRun(task, payload = {}, user = {}) {
   };
 }
 
+function normalizePublicHealthExchangeExceptionAction(run, payload = {}, user = {}) {
+  const now = new Date().toISOString();
+  const action = String(payload.action || "assign-exchange-exception").trim();
+  const supportedActions = new Set([
+    "assign-exchange-exception",
+    "escalate-exchange-exception",
+    "resolve-exchange-exception"
+  ]);
+  if (!supportedActions.has(action)) {
+    throw new Error("unsupported public health exchange exception action");
+  }
+  if (Number(run.failedRecords || 0) <= 0) {
+    throw new Error("an exchange run with failedRecords greater than 0 is required before exception handling");
+  }
+  const note = String(payload.note || payload.comment || "").trim();
+  if (!note) {
+    throw new Error("note is required when assigning, escalating or resolving an exchange exception");
+  }
+  const exceptionOwner = String(payload.exceptionOwner || run.exceptionOwner || "").trim();
+  const exceptionDueAt = String(payload.exceptionDueAt || run.exceptionDueAt || "").trim();
+  if (action === "assign-exchange-exception" && (!exceptionOwner || !/^\d{4}-\d{2}-\d{2}$/.test(exceptionDueAt))) {
+    throw new Error("exceptionOwner and exceptionDueAt (YYYY-MM-DD) are required when assigning an exchange exception");
+  }
+  const compensationReceiptId = String(payload.compensationReceiptId || payload.receiptId || run.compensationReceiptId || "").trim();
+  if (action === "resolve-exchange-exception" && !compensationReceiptId) {
+    throw new Error("compensationReceiptId is required before resolving an exchange exception");
+  }
+  const exceptionStatus = action === "resolve-exchange-exception"
+    ? "resolved"
+    : action === "escalate-exchange-exception"
+      ? "escalated"
+      : "assigned";
+  const history = {
+    id: randomUUID(),
+    at: now,
+    action,
+    status: exceptionStatus,
+    exceptionOwner,
+    exceptionDueAt,
+    compensationReceiptId,
+    actor: user.name || user.username || "public health operator",
+    role: user.role || "commission",
+    note
+  };
+  return {
+    history,
+    run: {
+      ...run,
+      status: action === "resolve-exchange-exception" ? "compensated" : action === "escalate-exchange-exception" ? "exception-escalated" : "exception-assigned",
+      receiptStatus: action === "resolve-exchange-exception" ? "accepted-after-retry" : String(run.receiptStatus || "pending-manual-review").trim(),
+      compensationStatus: action === "resolve-exchange-exception" ? "replayed" : String(run.compensationStatus || "manual-review").trim(),
+      exceptionStatus,
+      exceptionOwner,
+      exceptionDueAt,
+      exceptionSummary: String(payload.exceptionSummary || run.exceptionSummary || note).trim(),
+      compensationReceiptId: action === "resolve-exchange-exception" ? compensationReceiptId : String(run.compensationReceiptId || "").trim(),
+      exceptionAssignedAt: action === "assign-exchange-exception" ? now : (run.exceptionAssignedAt || ""),
+      exceptionEscalatedAt: action === "escalate-exchange-exception" ? now : (run.exceptionEscalatedAt || ""),
+      exceptionResolvedAt: action === "resolve-exchange-exception" ? now : (run.exceptionResolvedAt || ""),
+      nextAction: action === "resolve-exchange-exception"
+        ? "Archive compensation receipt and replay evidence; this does not replace required site evidence."
+        : String(payload.nextAction || run.nextAction || "Complete exchange exception compensation and archive the receipt.").trim(),
+      lastExceptionAction: history,
+      exceptionHistory: [history, ...(Array.isArray(run.exceptionHistory) ? run.exceptionHistory : [])].slice(0, 30),
+      updatedAt: now,
+      updatedBy: user.username || user.role || "commission",
+      updatedByName: user.name || "public health operator"
+    }
+  };
+}
+
 function normalizePublicHealthInstitutionTaskAction(task, payload = {}, user = {}) {
   const now = new Date().toISOString();
   const history = {
@@ -10171,6 +12288,585 @@ function normalizePublicHealthOnsiteAcceptanceAction(item, payload = {}, user = 
       onsiteAction: String(payload.onsiteAction || item.onsiteAction || history.note).trim(),
       lastAction: history,
       actionHistory: [history, ...(Array.isArray(item.actionHistory) ? item.actionHistory : [])].slice(0, 20),
+      updatedAt: now,
+      updatedBy: user.username || user.role || "commission",
+      updatedByName: user.name || "public health operator"
+    }
+  };
+}
+
+function normalizePublicHealthCutoverBlockerAction(item, payload = {}, user = {}) {
+  const now = new Date().toISOString();
+  const action = String(payload.action || "record-evidence").trim();
+  const status = String(payload.status || (action === "resolve" ? "resolved" : "evidence-recorded")).trim();
+  const evidence = Array.isArray(payload.evidence) && payload.evidence.length
+    ? payload.evidence.map((entry) => String(entry).trim()).filter(Boolean)
+    : (item.evidence || []);
+  const history = {
+    id: randomUUID(),
+    at: now,
+    action,
+    status,
+    actor: user.name || user.username || "public health operator",
+    role: user.role || "commission",
+    note: String(payload.note || payload.comment || "Production cutover blocker evidence recorded.").trim(),
+    evidence,
+    nextAction: String(payload.nextAction || item.resolutionAction || "").trim()
+  };
+  return {
+    history,
+    item: {
+      ...item,
+      status,
+      resolutionStatus: status,
+      evidence,
+      evidenceStatus: String(payload.evidenceStatus || "recorded").trim(),
+      assignee: String(payload.assignee || item.assignee || item.owner || "").trim(),
+      remediationStatus: String(payload.remediationStatus || status || item.remediationStatus || "").trim(),
+      siteWindow: String(payload.siteWindow || item.siteWindow || "").trim(),
+      reminderChannel: String(payload.reminderChannel || item.reminderChannel || "").trim(),
+      escalationLevel: String(payload.escalationLevel || item.escalationLevel || "").trim(),
+      blocker: String(payload.blocker || item.blocker || "").trim(),
+      resolutionAction: history.nextAction || String(item.resolutionAction || "").trim(),
+      resolvedBy: /resolved|closed|complete|已关闭|已完成/i.test(status) ? (user.name || user.username || item.resolvedBy || "") : (item.resolvedBy || ""),
+      resolvedAt: /resolved|closed|complete|已关闭|已完成/i.test(status) ? now : (item.resolvedAt || ""),
+      lastAction: history,
+      actionHistory: [history, ...(Array.isArray(item.actionHistory) ? item.actionHistory : [])].slice(0, 20),
+      updatedAt: now,
+      updatedBy: user.username || user.role || "commission",
+      updatedByName: user.name || "public health operator"
+    }
+  };
+}
+
+function normalizePublicHealthCutoverEvidencePacketAction(packet, payload = {}, user = {}) {
+  const now = new Date().toISOString();
+  const requiredItems = Array.isArray(packet.requiredItems) ? packet.requiredItems : [];
+  const itemId = String(payload.itemId || payload.evidenceItemId || requiredItems.find((item) => !/verified|signed|accepted|complete|已核验|已签收|已完成|通过/i.test(String(item.status || "")))?.id || requiredItems[0]?.id || "").trim();
+  if (!itemId) throw new Error("itemId is required");
+  const targetItem = requiredItems.find((item) => item.id === itemId);
+  if (!targetItem) throw new Error("itemId is not in cutover evidence packet");
+  const status = String(payload.status || "verified").trim().toLowerCase();
+  if (!new Set(["submitted", "verified", "rejected", "superseded"]).has(status)) {
+    throw new Error("status must be submitted, verified, rejected or superseded");
+  }
+  const artifactName = String(payload.artifactName || payload.artifact || targetItem.name || "public health cutover evidence").trim();
+  const attachmentNames = normalizeStringList(payload.attachmentNames || payload.attachments).slice(0, 12);
+  if (status === "verified" && !artifactName && attachmentNames.length === 0) {
+    throw new Error("verified evidence requires artifactName or attachmentNames");
+  }
+  const note = String(payload.note || payload.comment || "Public health cutover evidence packet item recorded.").trim();
+  const history = {
+    id: randomUUID(),
+    at: now,
+    action: String(payload.action || "record-evidence-packet").trim(),
+    status,
+    itemId,
+    itemName: targetItem.name || "",
+    artifactName,
+    attachmentNames,
+    actor: user.name || user.username || "public health operator",
+    role: user.role || "commission",
+    note
+  };
+  const nextItems = requiredItems.map((item) => item.id === itemId
+    ? {
+        ...item,
+        status,
+        artifactName,
+        attachmentNames,
+        verifiedBy: status === "verified" ? (user.name || user.username || "") : (item.verifiedBy || ""),
+        verifiedAt: status === "verified" ? now : (item.verifiedAt || ""),
+        note
+      }
+    : item);
+  const verified = nextItems.filter((item) => /verified|signed|accepted|complete|已核验|已签收|已完成|通过/i.test(String(item.status || ""))).length;
+  const complete = nextItems.length > 0 && verified === nextItems.length;
+  return {
+    history,
+    packet: {
+      ...packet,
+      status: complete ? "verified" : "evidence-recorded",
+      signoffStatus: complete ? "signed" : "partial",
+      requiredItems: nextItems,
+      evidenceRecords: [history, ...(Array.isArray(packet.evidenceRecords) ? packet.evidenceRecords : [])].slice(0, 50),
+      lastAction: history,
+      actionHistory: [history, ...(Array.isArray(packet.actionHistory) ? packet.actionHistory : [])].slice(0, 20),
+      updatedAt: now,
+      updatedBy: user.username || user.role || "commission",
+      updatedByName: user.name || "public health operator"
+    }
+  };
+}
+
+function normalizePublicHealthCutoverDrillAction(drill, payload = {}, user = {}) {
+  const now = new Date().toISOString();
+  const status = String(payload.status || "retest-required").trim().toLowerCase();
+  if (!new Set(["blocked", "retest-required", "passed", "failed", "observed"]).has(status)) {
+    throw new Error("status must be blocked, retest-required, passed, failed or observed");
+  }
+  const action = String(payload.action || "record-drill-finding").trim();
+  const findingText = String(payload.finding || payload.note || payload.comment || "Public health cutover drill finding recorded.").trim();
+  const severity = String(payload.severity || (status === "passed" ? "P2" : "P1")).trim();
+  const attachmentNames = normalizeStringList(payload.attachmentNames || payload.attachments).slice(0, 12);
+  const blockers = Object.prototype.hasOwnProperty.call(payload, "blockers")
+    ? normalizeStringList(payload.blockers)
+    : Array.isArray(drill.blockers) ? drill.blockers : [];
+  const goNoGo = String(payload.goNoGo || (status === "passed" ? "go" : drill.goNoGo || "no-go")).trim();
+  const retestStatus = String(payload.retestStatus || (status === "passed" ? "passed" : "pending")).trim();
+  const history = {
+    id: randomUUID(),
+    at: now,
+    action,
+    status,
+    scenario: drill.scenario || "",
+    finding: findingText,
+    severity,
+    owner: String(payload.owner || drill.owner || "").trim(),
+    actor: user.name || user.username || "public health operator",
+    role: user.role || "commission",
+    goNoGo,
+    retestStatus,
+    attachmentNames,
+    note: findingText
+  };
+  const finding = {
+    id: `phdrf-${randomUUID()}`,
+    severity,
+    status: status === "passed" ? "closed" : "open",
+    finding: findingText,
+    owner: history.owner,
+    retestStatus,
+    attachmentNames,
+    recordedAt: now,
+    recordedBy: history.actor
+  };
+  return {
+    history,
+    drill: {
+      ...drill,
+      status,
+      goNoGo,
+      retestStatus,
+      blockers,
+      findings: [finding, ...(Array.isArray(drill.findings) ? drill.findings : [])].slice(0, 30),
+      lastAction: history,
+      actionHistory: [history, ...(Array.isArray(drill.actionHistory) ? drill.actionHistory : [])].slice(0, 30),
+      nextAction: String(payload.nextAction || drill.nextAction || "").trim(),
+      updatedAt: now,
+      updatedBy: user.username || user.role || "commission",
+      updatedByName: user.name || "public health operator"
+    }
+  };
+}
+
+function normalizePublicHealthProductionHandoffAction(handoff, payload = {}, user = {}) {
+  const now = new Date().toISOString();
+  const status = String(payload.status || "accepted").trim().toLowerCase();
+  if (!new Set(["submitted", "accepted", "rejected", "revoked"]).has(status)) {
+    throw new Error("status must be submitted, accepted, rejected or revoked");
+  }
+  const attachmentNames = normalizeStringList(payload.attachmentNames || payload.attachments).slice(0, 16);
+  const releaseArtifacts = normalizeStringList(payload.releaseArtifacts).length
+    ? normalizeStringList(payload.releaseArtifacts).slice(0, 16)
+    : (Array.isArray(handoff.releaseArtifacts) ? handoff.releaseArtifacts : []);
+  const history = {
+    id: randomUUID(),
+    at: now,
+    action: String(payload.action || "record-production-handoff").trim(),
+    status,
+    actor: user.name || user.username || "public health operator",
+    role: user.role || "commission",
+    receiver: String(payload.receiver || handoff.receiver || "").trim(),
+    artifactName: String(payload.artifactName || payload.artifact || handoff.name || "public health production handoff").trim(),
+    attachmentNames,
+    releaseArtifacts,
+    note: String(payload.note || payload.comment || "Public health production handoff action recorded.").trim()
+  };
+  return {
+    history,
+    handoff: {
+      ...handoff,
+      status,
+      signoffStatus: status === "accepted" ? "signed" : status,
+      handoffStatus: status === "accepted" ? "handed-off" : status,
+      receiver: history.receiver || handoff.receiver || "",
+      releaseArtifacts,
+      acceptedBy: status === "accepted" ? (user.name || user.username || handoff.acceptedBy || "") : (handoff.acceptedBy || ""),
+      acceptedAt: status === "accepted" ? now : (handoff.acceptedAt || ""),
+      lastAction: history,
+      actionHistory: [history, ...(Array.isArray(handoff.actionHistory) ? handoff.actionHistory : [])].slice(0, 30),
+      updatedAt: now,
+      updatedBy: user.username || user.role || "commission",
+      updatedByName: user.name || "public health operator"
+    }
+  };
+}
+
+function normalizePublicHealthGoLiveObservationAction(observation, payload = {}, user = {}) {
+  const now = new Date().toISOString();
+  const status = String(payload.status || "monitoring").trim().toLowerCase();
+  if (!new Set(["scheduled", "monitoring", "passed", "blocked", "rollback", "closed"]).has(status)) {
+    throw new Error("status must be scheduled, monitoring, passed, blocked, rollback or closed");
+  }
+  const history = {
+    id: randomUUID(),
+    at: now,
+    action: String(payload.action || "record-go-live-observation").trim(),
+    status,
+    actor: user.name || user.username || "public health operator",
+    role: user.role || "commission",
+    signalStatus: String(payload.signalStatus || payload.signal || status).trim(),
+    decision: String(payload.decision || "").trim(),
+    metric: String(payload.metric || observation.metric || "").trim(),
+    threshold: String(payload.threshold || observation.threshold || "").trim(),
+    rollbackTrigger: String(payload.rollbackTrigger || observation.rollbackTrigger || "").trim(),
+    rollbackOwner: String(payload.rollbackOwner || observation.rollbackOwner || "").trim(),
+    artifactName: String(payload.artifactName || payload.artifact || observation.name || "public health go-live observation").trim(),
+    attachmentNames: normalizeStringList(payload.attachmentNames || payload.attachments).slice(0, 16),
+    note: String(payload.note || payload.comment || "Public health go-live observation recorded.").trim()
+  };
+  return {
+    history,
+    observation: {
+      ...observation,
+      status,
+      signalStatus: history.signalStatus,
+      decision: history.decision || observation.decision || "",
+      metric: history.metric || observation.metric || "",
+      threshold: history.threshold || observation.threshold || "",
+      rollbackTrigger: history.rollbackTrigger || observation.rollbackTrigger || "",
+      rollbackOwner: history.rollbackOwner || observation.rollbackOwner || "",
+      observedBy: user.name || user.username || observation.observedBy || "",
+      observedAt: now,
+      lastAction: history,
+      actionHistory: [history, ...(Array.isArray(observation.actionHistory) ? observation.actionHistory : [])].slice(0, 30),
+      updatedAt: now,
+      updatedBy: user.username || user.role || "commission",
+      updatedByName: user.name || "public health operator"
+    }
+  };
+}
+
+function normalizePublicHealthLaunchIncidentAction(incident, payload = {}, user = {}) {
+  const now = new Date().toISOString();
+  const status = String(payload.status || "triaged").trim().toLowerCase();
+  if (!new Set(["standby", "opened", "triaged", "monitoring", "escalated", "rollback-recommended", "resolved", "closed", "false-positive"]).has(status)) {
+    throw new Error("status must be standby, opened, triaged, monitoring, escalated, rollback-recommended, resolved, closed or false-positive");
+  }
+  const activeStatuses = new Set(["opened", "triaged", "monitoring", "escalated", "rollback-recommended"]);
+  const resolvedStatuses = new Set(["resolved", "closed", "false-positive"]);
+  const history = {
+    id: randomUUID(),
+    at: now,
+    action: String(payload.action || "record-launch-incident").trim(),
+    status,
+    actor: user.name || user.username || "public health operator",
+    role: user.role || "commission",
+    severity: String(payload.severity || incident.severity || "P1").trim(),
+    signalStatus: String(payload.signalStatus || payload.signal || status).trim(),
+    decision: String(payload.decision || "").trim(),
+    sla: String(payload.sla || incident.sla || "").trim(),
+    rollbackDecisionOwner: String(payload.rollbackDecisionOwner || incident.rollbackDecisionOwner || "").trim(),
+    artifactName: String(payload.artifactName || payload.artifact || incident.name || "public health launch incident").trim(),
+    attachmentNames: normalizeStringList(payload.attachmentNames || payload.attachments).slice(0, 16),
+    note: String(payload.note || payload.comment || "Public health launch incident action recorded.").trim()
+  };
+  return {
+    history,
+    incident: {
+      ...incident,
+      status,
+      severity: history.severity,
+      signalStatus: history.signalStatus,
+      decision: history.decision || incident.decision || "",
+      sla: history.sla || incident.sla || "",
+      rollbackDecisionOwner: history.rollbackDecisionOwner || incident.rollbackDecisionOwner || "",
+      lastAction: history,
+      actionHistory: [history, ...(Array.isArray(incident.actionHistory) ? incident.actionHistory : [])].slice(0, 30),
+      openedAt: activeStatuses.has(status) ? (incident.openedAt || now) : (incident.openedAt || ""),
+      resolvedAt: resolvedStatuses.has(status) ? now : (incident.resolvedAt || ""),
+      updatedAt: now,
+      updatedBy: user.username || user.role || "commission",
+      updatedByName: user.name || "public health operator"
+    }
+  };
+}
+
+function normalizePublicHealthLaunchDutyShiftAction(shift, payload = {}, user = {}) {
+  const now = new Date().toISOString();
+  const status = String(payload.status || "confirmed").trim().toLowerCase();
+  if (!new Set(["scheduled", "confirmed", "handoff-started", "relieved", "escalated", "missed", "closed"]).has(status)) {
+    throw new Error("status must be scheduled, confirmed, handoff-started, relieved, escalated, missed or closed");
+  }
+  const history = {
+    id: randomUUID(),
+    at: now,
+    action: String(payload.action || "record-launch-duty-handoff").trim(),
+    status,
+    actor: user.name || user.username || "public health operator",
+    role: user.role || "commission",
+    signalStatus: String(payload.signalStatus || payload.signal || status).trim(),
+    handoffStatus: String(payload.handoffStatus || status).trim(),
+    contactChannel: String(payload.contactChannel || shift.contactChannel || "").trim(),
+    escalationOwner: String(payload.escalationOwner || shift.escalationOwner || "").trim(),
+    artifactName: String(payload.artifactName || payload.artifact || shift.name || "public health launch duty handoff").trim(),
+    attachmentNames: normalizeStringList(payload.attachmentNames || payload.attachments).slice(0, 16),
+    note: String(payload.note || payload.comment || "Public health launch duty handoff recorded.").trim()
+  };
+  return {
+    history,
+    shift: {
+      ...shift,
+      status,
+      signalStatus: history.signalStatus,
+      handoffStatus: history.handoffStatus,
+      contactChannel: history.contactChannel || shift.contactChannel || "",
+      escalationOwner: history.escalationOwner || shift.escalationOwner || "",
+      confirmedBy: ["confirmed", "handoff-started"].includes(status) ? (user.name || user.username || shift.confirmedBy || "") : (shift.confirmedBy || ""),
+      confirmedAt: ["confirmed", "handoff-started"].includes(status) ? now : (shift.confirmedAt || ""),
+      relievedAt: ["relieved", "closed"].includes(status) ? now : (shift.relievedAt || ""),
+      lastAction: history,
+      actionHistory: [history, ...(Array.isArray(shift.actionHistory) ? shift.actionHistory : [])].slice(0, 30),
+      updatedAt: now,
+      updatedBy: user.username || user.role || "commission",
+      updatedByName: user.name || "public health operator"
+    }
+  };
+}
+
+function normalizePublicHealthLaunchCommandBriefAction(brief, payload = {}, user = {}) {
+  const now = new Date().toISOString();
+  const status = String(payload.status || "published").trim().toLowerCase();
+  if (!new Set(["draft-ready", "published", "sent", "held", "escalated", "blocked", "archived", "closed"]).has(status)) {
+    throw new Error("status must be draft-ready, published, sent, held, escalated, blocked, archived or closed");
+  }
+  const history = {
+    id: randomUUID(),
+    at: now,
+    action: String(payload.action || "record-launch-command-brief").trim(),
+    status,
+    actor: user.name || user.username || "public health operator",
+    role: user.role || "commission",
+    publishStatus: String(payload.publishStatus || status).trim(),
+    decision: String(payload.decision || (status === "published" ? "broadcast" : status)).trim(),
+    decisionOwner: String(payload.decisionOwner || brief.decisionOwner || "").trim(),
+    publishChannel: String(payload.publishChannel || brief.publishChannel || "").trim(),
+    artifactName: String(payload.artifactName || payload.artifact || brief.name || "public health launch command brief").trim(),
+    attachmentNames: normalizeStringList(payload.attachmentNames || payload.attachments).slice(0, 16),
+    note: String(payload.note || payload.comment || "Public health launch command brief recorded.").trim()
+  };
+  return {
+    history,
+    brief: {
+      ...brief,
+      status,
+      publishStatus: history.publishStatus,
+      decision: history.decision,
+      decisionOwner: history.decisionOwner || brief.decisionOwner || "",
+      publishChannel: history.publishChannel || brief.publishChannel || "",
+      publishedBy: ["published", "sent", "archived", "closed"].includes(status) ? (user.name || user.username || brief.publishedBy || "") : (brief.publishedBy || ""),
+      publishedAt: ["published", "sent"].includes(status) ? now : (brief.publishedAt || ""),
+      archivedAt: ["archived", "closed"].includes(status) ? now : (brief.archivedAt || ""),
+      lastAction: history,
+      actionHistory: [history, ...(Array.isArray(brief.actionHistory) ? brief.actionHistory : [])].slice(0, 30),
+      updatedAt: now,
+      updatedBy: user.username || user.role || "commission",
+      updatedByName: user.name || "public health operator"
+    }
+  };
+}
+
+function normalizePublicHealthSiteEvidenceVerificationTaskAction(task, payload = {}, data = {}, user = {}) {
+  const now = new Date().toISOString();
+  const action = String(payload.action || "start-site-evidence-verification").trim();
+  const defaultStatus = action === "verify-site-evidence" ? "verified" : "verification-pending";
+  const status = String(payload.status || defaultStatus).trim().toLowerCase();
+  if (!new Set(["scheduled", "verification-pending", "verified", "rejected", "escalated"]).has(status)) {
+    throw new Error("status must be scheduled, verification-pending, verified, rejected or escalated");
+  }
+  const evidenceId = String(payload.evidenceId || payload.siteEvidenceId || task.evidenceId || "").trim();
+  const evidenceRows = Array.isArray(data.siteLaunchEvidence) ? data.siteLaunchEvidence : [];
+  const evidence = evidenceRows.find((item) => item.id === evidenceId);
+  if (status === "verified") {
+    if (!evidenceId) throw new Error("evidenceId is required to verify a site evidence task");
+    if (!evidence || String(evidence.status || "").toLowerCase() !== "verified") {
+      throw new Error("evidenceId must reference verified site launch evidence");
+    }
+    if (String(evidence.templateId || "") !== String(task.templateId || "")) {
+      throw new Error("evidenceId template does not match this site evidence verification task");
+    }
+  }
+  const history = {
+    id: randomUUID(),
+    at: now,
+    action,
+    status,
+    evidenceId,
+    actor: user.name || user.username || "public health operator",
+    role: user.role || "commission",
+    artifactName: String(payload.artifactName || payload.artifact || evidence?.artifactName || task.name || "public health site evidence verification").trim(),
+    attachmentNames: normalizeStringList(payload.attachmentNames || payload.attachments || evidence?.attachmentNames).slice(0, 16),
+    note: String(payload.note || payload.comment || "Public health site evidence verification task recorded.").trim()
+  };
+  return {
+    history,
+    task: {
+      ...task,
+      status,
+      evidenceId: status === "verified" ? evidenceId : (evidenceId || task.evidenceId || ""),
+      evidenceTemplateId: status === "verified" ? evidence?.templateId || task.templateId : (task.evidenceTemplateId || ""),
+      verifiedBy: status === "verified" ? (user.name || user.username || task.verifiedBy || "") : (task.verifiedBy || ""),
+      verifiedAt: status === "verified" ? now : (task.verifiedAt || ""),
+      rejectedAt: status === "rejected" ? now : (task.rejectedAt || ""),
+      escalatedAt: status === "escalated" ? now : (task.escalatedAt || ""),
+      lastAction: history,
+      actionHistory: [history, ...(Array.isArray(task.actionHistory) ? task.actionHistory : [])].slice(0, 30),
+      updatedAt: now,
+      updatedBy: user.username || user.role || "commission",
+      updatedByName: user.name || "public health operator"
+    }
+  };
+}
+
+function normalizePublicHealthStandardImplementationAction(entry, payload = {}, data = {}, user = {}) {
+  const now = new Date().toISOString();
+  const action = String(payload.action || "review-standard-mapping").trim();
+  const supportedActions = new Set([
+    "review-standard-mapping",
+    "record-standard-gap",
+    "escalate-standard-gap",
+    "assign-standard-gap-remediation",
+    "link-standard-site-evidence",
+    "verify-standard-gap-remediation"
+  ]);
+  if (!supportedActions.has(action)) {
+    throw new Error("unsupported public health standard implementation action");
+  }
+  const defaultStatus = action === "record-standard-gap"
+    ? "gap-recorded"
+    : action === "escalate-standard-gap"
+      ? "escalated"
+      : action === "assign-standard-gap-remediation"
+        ? (String(entry.status || "").toLowerCase() === "escalated" ? "escalated" : "gap-recorded")
+        : ["link-standard-site-evidence", "verify-standard-gap-remediation"].includes(action)
+          ? "evidence-linked"
+          : "reviewed";
+  const status = String(payload.status || defaultStatus).trim().toLowerCase();
+  if (!new Set(["modeled", "reviewed", "gap-recorded", "escalated", "evidence-linked"]).has(status)) {
+    throw new Error("status must be modeled, reviewed, gap-recorded, escalated or evidence-linked");
+  }
+  const note = String(payload.note || payload.comment || "").trim();
+  if (["record-standard-gap", "escalate-standard-gap", "assign-standard-gap-remediation", "verify-standard-gap-remediation"].includes(action) && !note) {
+    throw new Error("note is required when recording, escalating, assigning or verifying a standard implementation gap");
+  }
+  const existingGapStatus = String(entry.gapStatus || "").toLowerCase();
+  const hasRecordedGap = ["gap-recorded", "escalated"].includes(String(entry.status || "").toLowerCase()) || /open|gap|blocked|escalated|assigned|in-progress|evidence-submitted/.test(existingGapStatus);
+  const remediationOwner = String(payload.remediationOwner || entry.remediationOwner || "").trim();
+  const remediationDueAt = String(payload.remediationDueAt || entry.remediationDueAt || "").trim();
+  if (action === "assign-standard-gap-remediation") {
+    if (!hasRecordedGap) throw new Error("a recorded standard implementation gap is required before remediation can be assigned");
+    if (!remediationOwner || !/^\d{4}-\d{2}-\d{2}$/.test(remediationDueAt)) {
+      throw new Error("remediationOwner and remediationDueAt (YYYY-MM-DD) are required when assigning a standard implementation gap");
+    }
+  }
+  if (action === "verify-standard-gap-remediation" && !hasRecordedGap) {
+    throw new Error("a recorded standard implementation gap is required before remediation can be verified");
+  }
+  const siteEvidenceId = String(payload.siteEvidenceId || payload.evidenceId || entry.siteEvidenceId || "").trim();
+  const evidenceRows = Array.isArray(data.siteLaunchEvidence) ? data.siteLaunchEvidence : [];
+  const evidence = evidenceRows.find((item) => item.id === siteEvidenceId);
+  if (["link-standard-site-evidence", "verify-standard-gap-remediation"].includes(action) && (!siteEvidenceId || !evidence || String(evidence.status || "").toLowerCase() !== "verified")) {
+    throw new Error("siteEvidenceId must reference verified site launch evidence before linking it to a standard implementation entry");
+  }
+  const gapStatus = action === "verify-standard-gap-remediation"
+    ? "verified"
+    : action === "assign-standard-gap-remediation"
+      ? "assigned"
+      : status === "gap-recorded" || status === "escalated"
+    ? String(payload.gapStatus || (status === "escalated" ? "escalated" : "open")).trim()
+    : String(payload.gapStatus || entry.gapStatus || "not-assessed").trim();
+  const remediationStatus = action === "verify-standard-gap-remediation"
+    ? "verified"
+    : action === "assign-standard-gap-remediation"
+      ? "assigned"
+      : String(entry.remediationStatus || "not-planned").trim();
+  const history = {
+    id: randomUUID(),
+    at: now,
+    action,
+    status,
+    siteEvidenceId,
+    gapStatus,
+    remediationOwner,
+    remediationDueAt,
+    remediationStatus,
+    actor: user.name || user.username || "public health operator",
+    role: user.role || "commission",
+    artifactName: String(payload.artifactName || payload.artifact || evidence?.artifactName || entry.name || "public health standard implementation mapping").trim(),
+    attachmentNames: normalizeStringList(payload.attachmentNames || payload.attachments || evidence?.attachmentNames).slice(0, 16),
+    note: note || "Public health standard implementation mapping recorded."
+  };
+  return {
+    history,
+    entry: {
+      ...entry,
+      status,
+      gapStatus,
+      siteEvidenceId: ["link-standard-site-evidence", "verify-standard-gap-remediation"].includes(action) ? siteEvidenceId : (siteEvidenceId || entry.siteEvidenceId || ""),
+      reviewedBy: status === "reviewed" ? (user.name || user.username || entry.reviewedBy || "") : (entry.reviewedBy || ""),
+      reviewedAt: status === "reviewed" ? now : (entry.reviewedAt || ""),
+      gapRecordedAt: status === "gap-recorded" ? now : (entry.gapRecordedAt || ""),
+      escalatedAt: status === "escalated" ? now : (entry.escalatedAt || ""),
+      remediationOwner,
+      remediationDueAt,
+      remediationStatus,
+      remediationAssignedAt: action === "assign-standard-gap-remediation" ? now : (entry.remediationAssignedAt || ""),
+      remediationVerifiedAt: action === "verify-standard-gap-remediation" ? now : (entry.remediationVerifiedAt || ""),
+      lastAction: history,
+      actionHistory: [history, ...(Array.isArray(entry.actionHistory) ? entry.actionHistory : [])].slice(0, 30),
+      updatedAt: now,
+      updatedBy: user.username || user.role || "commission",
+      updatedByName: user.name || "public health operator"
+    }
+  };
+}
+
+function normalizePublicHealthLaunchGateAction(approval, payload = {}, user = {}, approvalPreflight = {}) {
+  const now = new Date().toISOString();
+  const status = String(payload.status || payload.decision || "submitted").trim().toLowerCase();
+  if (!new Set(["submitted", "approved", "rejected", "revoked"]).has(status)) {
+    throw new Error("status must be submitted, approved, rejected or revoked");
+  }
+  if (status === "approved" && !approvalPreflight.eligible) {
+    throw new Error("launch approval is blocked until all prerequisite launch requirements pass");
+  }
+  if (status === "approved" && String(payload.confirmation || "").trim() !== "APPROVE PUBLIC HEALTH LAUNCH") {
+    throw new Error("confirmation must be APPROVE PUBLIC HEALTH LAUNCH");
+  }
+  const history = {
+    id: randomUUID(),
+    at: now,
+    action: String(payload.action || "submit-launch-approval").trim(),
+    status,
+    actor: user.name || user.username || "public health operator",
+    role: user.role || "commission",
+    note: String(payload.note || payload.comment || "Public health launch gate approval recorded.").trim(),
+    artifactName: String(payload.artifactName || payload.artifact || "public health launch approval").trim(),
+    attachmentNames: normalizeStringList(payload.attachmentNames || payload.attachments).slice(0, 12),
+    preflightStatus: approvalPreflight.status || "unknown",
+    blockedRequirementIds: Array.isArray(approvalPreflight.blockedRequirementIds) ? approvalPreflight.blockedRequirementIds : []
+  };
+  return {
+    history,
+    approval: {
+      ...approval,
+      status,
+      decision: status,
+      signedBy: status === "approved" ? (user.name || user.username || approval.signedBy || "") : (approval.signedBy || ""),
+      signedAt: status === "approved" ? now : (approval.signedAt || ""),
+      lastAction: history,
+      actionHistory: [history, ...(Array.isArray(approval.actionHistory) ? approval.actionHistory : [])].slice(0, 20),
       updatedAt: now,
       updatedBy: user.username || user.role || "commission",
       updatedByName: user.name || "public health operator"
@@ -12062,6 +14758,38 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/health-dashboard/industry-governance-indicators") {
+    const user = requireApiRole(req, res, ["commission"], "/api/health-dashboard/industry-governance-indicators");
+    if (!user) return;
+    const data = readDatabase();
+    const dashboard = buildHealthDashboardSummary({
+      data,
+      runtime: buildRuntimeMetrics(data),
+      readiness: buildSystemReadinessReport(data)
+    });
+    const indicatorCenter = dashboard.indicatorCenter;
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "health-dashboard-industry-governance-indicators",
+      target: "/api/health-dashboard/industry-governance-indicators",
+      result: "allowed",
+      detail: `${indicatorCenter.summary.indicators} indicators / ${indicatorCenter.summary.blocked} blocked sources`
+    });
+    sendJson(res, 200, {
+      ok: dashboard.ok,
+      generatedAt: dashboard.generatedAt,
+      summary: indicatorCenter.summary,
+      categories: indicatorCenter.categories,
+      periodViews: indicatorCenter.periodViews,
+      indicators: indicatorCenter.indicators,
+      exportFields: indicatorCenter.exportFields,
+      releaseEvidence: indicatorCenter.releaseEvidence,
+      boundary: indicatorCenter.boundary
+    });
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/public-health/system") {
     const user = requireApiRole(req, res, ["commission"], "/api/public-health/system");
     if (!user) return;
@@ -12075,6 +14803,107 @@ async function handleApi(req, res) {
       detail: "Public health standard matrix, institution scopes, events, and exchange tasks read."
     });
     sendJson(res, 200, buildPublicHealthSystem({ data }));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/standard-implementation-ledger") {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/standard-implementation-ledger");
+    if (!user) return;
+    const data = readDatabase();
+    const system = buildPublicHealthSystem({ data });
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "public-health-standard-implementation-ledger",
+      target: "/api/public-health/standard-implementation-ledger",
+      result: "allowed",
+      detail: `${system.standardImplementationBoard?.summary?.mappingComplete || 0}/${system.standardImplementationBoard?.summary?.domains || 0} standard mappings complete`
+    });
+    sendJson(res, 200, {
+      ok: true,
+      generatedAt: system.generatedAt,
+      summary: system.standardImplementationBoard?.summary || {},
+      board: system.standardImplementationBoard,
+      entries: system.standardImplementationLedger || [],
+      standardImplementationEvidenceCandidates: system.standardImplementationEvidenceCandidates || []
+    });
+    return;
+  }
+
+  const publicHealthStandardImplementationActionMatch = url.pathname.match(/^\/api\/public-health\/standard-implementation-ledger\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthStandardImplementationActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/standard-implementation-ledger/:id/actions");
+    if (!user) return;
+    const entryId = decodeURIComponent(publicHealthStandardImplementationActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const ledger = mergeByKey(seedPublicHealthStandardImplementationLedger(), data.publicHealthStandardImplementationLedger, "id");
+    const index = ledger.findIndex((item) => item.id === entryId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "public health standard implementation entry not found" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizePublicHealthStandardImplementationAction(ledger[index], payload, data, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    ledger[index] = normalized.entry;
+    data.publicHealthStandardImplementationLedger = ledger;
+    data.publicHealthReadinessEvidence = mergeByKey(seedPublicHealthReadinessEvidence(), data.publicHealthReadinessEvidence, "id").map((row) => (
+      row.id === "phev-standard-implementation-ledger"
+        ? { ...row, status: "standard implementation action recorded", evidence: Array.from(new Set([...(row.evidence || []), "publicHealthStandardImplementationLedger"])) }
+        : row
+    ));
+    data.securityEvents = sealAuditTrail([
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "public-health-standard-implementation-action",
+        target: entryId,
+        result: "allowed",
+        detail: `${normalized.history.action} / ${normalized.history.status} / ${normalized.history.gapStatus}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120), { recompute: true });
+    writeDatabase(data);
+    const system = buildPublicHealthSystem({ data: readDatabase() });
+    sendJson(res, 200, {
+      ok: true,
+      entry: normalized.entry,
+      action: normalized.history,
+      board: system.standardImplementationBoard,
+      system
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/cutover-readiness") {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/cutover-readiness");
+    if (!user) return;
+    const data = readDatabase();
+    const system = buildPublicHealthSystem({ data });
+    const readiness = system.cutoverReadiness || buildPublicHealthCutoverReadiness(system.cutoverBlockers || []);
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "public-health-cutover-readiness",
+      target: "/api/public-health/cutover-readiness",
+      result: "allowed",
+      detail: `${readiness.readinessLevel} / ${readiness.releaseGate} / ${readiness.summary?.p0Open || 0} P0 open`
+    });
+    sendJson(res, 200, {
+      ok: true,
+      generatedAt: system.generatedAt,
+      productionReady: readiness.releaseGate === "production-ready",
+      summary: readiness.summary,
+      readiness,
+      blockers: system.cutoverBlockers || []
+    });
     return;
   }
 
@@ -12118,6 +14947,56 @@ async function handleApi(req, res) {
       event,
       action: history,
       system: buildPublicHealthSystem({ data })
+    });
+    return;
+  }
+
+  const publicHealthExchangeExceptionActionMatch = url.pathname.match(/^\/api\/public-health\/exchange-runs\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthExchangeExceptionActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/exchange-runs/:id/actions");
+    if (!user) return;
+    const runId = decodeURIComponent(publicHealthExchangeExceptionActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const runs = mergeByKey(seedPublicHealthExchangeRuns(), data.publicHealthExchangeRuns, "id");
+    const index = runs.findIndex((item) => item.id === runId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "public health exchange run not found" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizePublicHealthExchangeExceptionAction(runs[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    runs[index] = normalized.run;
+    data.publicHealthExchangeRuns = runs;
+    data.publicHealthReadinessEvidence = mergeByKey(seedPublicHealthReadinessEvidence(), data.publicHealthReadinessEvidence, "id").map((item) => (
+      item.id === "phev-exchange-security"
+        ? { ...item, status: "exchange exception compensation recorded", evidence: Array.from(new Set([...(item.evidence || []), "publicHealthExchangeRuns"])) }
+        : item
+    ));
+    data.securityEvents = sealAuditTrail([
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "public-health-exchange-exception-action",
+        target: runId,
+        result: "allowed",
+        detail: `${normalized.history.action} / ${normalized.history.status} / ${normalized.history.compensationReceiptId || "pending"}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120), { recompute: true });
+    writeDatabase(data);
+    sendJson(res, 200, {
+      ok: true,
+      run: normalized.run,
+      action: normalized.history,
+      system: buildPublicHealthSystem({ data: readDatabase() })
     });
     return;
   }
@@ -12255,6 +15134,819 @@ async function handleApi(req, res) {
     return;
   }
 
+  const publicHealthCutoverBlockerActionMatch = url.pathname.match(/^\/api\/public-health\/cutover-blockers\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthCutoverBlockerActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/cutover-blockers/:id/actions");
+    if (!user) return;
+    const blockerId = decodeURIComponent(publicHealthCutoverBlockerActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const blockers = Array.isArray(data.publicHealthCutoverBlockers) ? data.publicHealthCutoverBlockers : seedPublicHealthCutoverBlockers();
+    const index = blockers.findIndex((item) => item.id === blockerId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到公共卫生上线阻塞项" });
+      return;
+    }
+    const { item, history } = normalizePublicHealthCutoverBlockerAction(blockers[index], payload, user);
+    blockers[index] = item;
+    data.publicHealthCutoverBlockers = blockers;
+    data.publicHealthReadinessEvidence = (Array.isArray(data.publicHealthReadinessEvidence) ? data.publicHealthReadinessEvidence : seedPublicHealthReadinessEvidence()).map((row) => (
+      row.id === "phev-cutover-blockers"
+        ? { ...row, status: "上线阻塞动作已记录", evidence: Array.from(new Set([...(row.evidence || []), "publicHealthCutoverBlockers"])) }
+        : row
+    ));
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "public-health-cutover-blocker-action",
+        target: blockerId,
+        result: "allowed",
+        detail: `${history.action} / ${history.status}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, {
+      ok: true,
+      blocker: item,
+      action: history,
+      system: buildPublicHealthSystem({ data })
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/cutover-evidence-packets") {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/cutover-evidence-packets");
+    if (!user) return;
+    const data = readDatabase();
+    const system = buildPublicHealthSystem({ data });
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "public-health-cutover-evidence-packets",
+      target: "/api/public-health/cutover-evidence-packets",
+      result: "allowed",
+      detail: `${system.cutoverEvidenceBoard?.summary?.packets || 0} packets / ${system.cutoverEvidenceBoard?.summary?.verifiedItems || 0} verified items`
+    });
+    sendJson(res, 200, {
+      ok: true,
+      generatedAt: system.generatedAt,
+      summary: system.cutoverEvidenceBoard?.summary || {},
+      board: system.cutoverEvidenceBoard,
+      packets: system.cutoverEvidencePackets || []
+    });
+    return;
+  }
+
+  const publicHealthCutoverEvidencePacketActionMatch = url.pathname.match(/^\/api\/public-health\/cutover-evidence-packets\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthCutoverEvidencePacketActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/cutover-evidence-packets/:id/actions");
+    if (!user) return;
+    const packetId = decodeURIComponent(publicHealthCutoverEvidencePacketActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const blockers = Array.isArray(data.publicHealthCutoverBlockers) ? data.publicHealthCutoverBlockers : seedPublicHealthCutoverBlockers();
+    const packets = Array.isArray(data.publicHealthCutoverEvidencePackets) ? data.publicHealthCutoverEvidencePackets : seedPublicHealthCutoverEvidencePackets(blockers);
+    const index = packets.findIndex((item) => item.id === packetId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到公共卫生上线证据包" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizePublicHealthCutoverEvidencePacketAction(packets[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    packets[index] = normalized.packet;
+    data.publicHealthCutoverEvidencePackets = packets;
+    data.publicHealthCutoverBlockers = blockers.map((row) => row.id === normalized.packet.blockerId
+      ? {
+          ...row,
+          evidenceStatus: normalized.packet.signoffStatus === "signed" ? "packet-signed" : "packet-recorded",
+          evidence: Array.from(new Set([...(row.evidence || []), normalized.history.artifactName].filter(Boolean)))
+        }
+      : row);
+    data.publicHealthReadinessEvidence = (Array.isArray(data.publicHealthReadinessEvidence) ? data.publicHealthReadinessEvidence : seedPublicHealthReadinessEvidence()).map((row) => (
+      row.id === "phev-cutover-evidence-packets"
+        ? { ...row, status: "证据包动作已记录", evidence: Array.from(new Set([...(row.evidence || []), "publicHealthCutoverEvidencePackets"])) }
+        : row
+    ));
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "public-health-cutover-evidence-packet-action",
+        target: packetId,
+        result: "allowed",
+        detail: `${normalized.history.itemId} / ${normalized.history.status}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, {
+      ok: true,
+      packet: normalized.packet,
+      action: normalized.history,
+      system: buildPublicHealthSystem({ data })
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/site-evidence-bridge") {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/site-evidence-bridge");
+    if (!user) return;
+    const data = readDatabase();
+    const system = buildPublicHealthSystem({ data });
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "public-health-site-evidence-bridge",
+      target: "/api/public-health/site-evidence-bridge",
+      result: "allowed",
+      detail: `${system.siteEvidenceBridge?.summary?.verifiedLinks || 0}/${system.siteEvidenceBridge?.summary?.links || 0} verified links`
+    });
+    sendJson(res, 200, {
+      ok: true,
+      generatedAt: system.generatedAt,
+      bridge: system.siteEvidenceBridge,
+      summary: system.siteEvidenceBridge?.summary || {},
+      links: system.siteEvidenceBridge?.links || []
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/cutover-drills") {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/cutover-drills");
+    if (!user) return;
+    const data = readDatabase();
+    const system = buildPublicHealthSystem({ data });
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "public-health-cutover-drills",
+      target: "/api/public-health/cutover-drills",
+      result: "allowed",
+      detail: `${system.cutoverDrillBoard?.summary?.blockedDrills || 0}/${system.cutoverDrillBoard?.summary?.drills || 0} drills blocked`
+    });
+    sendJson(res, 200, {
+      ok: true,
+      generatedAt: system.generatedAt,
+      summary: system.cutoverDrillBoard?.summary || {},
+      board: system.cutoverDrillBoard,
+      drills: system.cutoverDrills || []
+    });
+    return;
+  }
+
+  const publicHealthCutoverDrillActionMatch = url.pathname.match(/^\/api\/public-health\/cutover-drills\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthCutoverDrillActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/cutover-drills/:id/actions");
+    if (!user) return;
+    const drillId = decodeURIComponent(publicHealthCutoverDrillActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const drills = Array.isArray(data.publicHealthCutoverDrills) ? data.publicHealthCutoverDrills : seedPublicHealthCutoverDrills();
+    const index = drills.findIndex((item) => item.id === drillId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "public health cutover drill not found" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizePublicHealthCutoverDrillAction(drills[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    drills[index] = normalized.drill;
+    data.publicHealthCutoverDrills = drills;
+    data.publicHealthReadinessEvidence = (Array.isArray(data.publicHealthReadinessEvidence) ? data.publicHealthReadinessEvidence : seedPublicHealthReadinessEvidence()).map((row) => (
+      row.id === "phev-cutover-drills"
+        ? { ...row, status: "上线演练动作已记录", evidence: Array.from(new Set([...(row.evidence || []), "publicHealthCutoverDrills"])) }
+        : row
+    ));
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "public-health-cutover-drill-action",
+        target: drillId,
+        result: "allowed",
+        detail: `${normalized.history.action} / ${normalized.history.status} / ${normalized.history.goNoGo}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    const system = buildPublicHealthSystem({ data });
+    sendJson(res, 200, {
+      ok: true,
+      drill: normalized.drill,
+      action: normalized.history,
+      board: system.cutoverDrillBoard,
+      system
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/production-handoffs") {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/production-handoffs");
+    if (!user) return;
+    const data = readDatabase();
+    const system = buildPublicHealthSystem({ data });
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "public-health-production-handoffs",
+      target: "/api/public-health/production-handoffs",
+      result: "allowed",
+      detail: `${system.productionHandoffBoard?.summary?.acceptedHandoffs || 0}/${system.productionHandoffBoard?.summary?.handoffs || 0} handoffs accepted`
+    });
+    sendJson(res, 200, {
+      ok: true,
+      generatedAt: system.generatedAt,
+      summary: system.productionHandoffBoard?.summary || {},
+      board: system.productionHandoffBoard,
+      handoffs: system.productionHandoffs || []
+    });
+    return;
+  }
+
+  const publicHealthProductionHandoffActionMatch = url.pathname.match(/^\/api\/public-health\/production-handoffs\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthProductionHandoffActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/production-handoffs/:id/actions");
+    if (!user) return;
+    const handoffId = decodeURIComponent(publicHealthProductionHandoffActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const handoffs = Array.isArray(data.publicHealthProductionHandoffs) ? data.publicHealthProductionHandoffs : seedPublicHealthProductionHandoffs();
+    const index = handoffs.findIndex((item) => item.id === handoffId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "public health production handoff not found" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizePublicHealthProductionHandoffAction(handoffs[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    handoffs[index] = normalized.handoff;
+    data.publicHealthProductionHandoffs = handoffs;
+    data.publicHealthReadinessEvidence = (Array.isArray(data.publicHealthReadinessEvidence) ? data.publicHealthReadinessEvidence : seedPublicHealthReadinessEvidence()).map((row) => (
+      row.id === "phev-production-handoffs"
+        ? { ...row, status: "production handoff action recorded", evidence: Array.from(new Set([...(row.evidence || []), "publicHealthProductionHandoffs"])) }
+        : row
+    ));
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "public-health-production-handoff-action",
+        target: handoffId,
+        result: "allowed",
+        detail: `${normalized.history.action} / ${normalized.history.status}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    const system = buildPublicHealthSystem({ data });
+    sendJson(res, 200, {
+      ok: true,
+      handoff: normalized.handoff,
+      action: normalized.history,
+      board: system.productionHandoffBoard,
+      system
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/go-live-observations") {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/go-live-observations");
+    if (!user) return;
+    const data = readDatabase();
+    const system = buildPublicHealthSystem({ data });
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "public-health-go-live-observations",
+      target: "/api/public-health/go-live-observations",
+      result: "allowed",
+      detail: `${system.goLiveObservationBoard?.summary?.planReady || 0}/${system.goLiveObservationBoard?.summary?.observations || 0} observation plans ready`
+    });
+    sendJson(res, 200, {
+      ok: true,
+      generatedAt: system.generatedAt,
+      summary: system.goLiveObservationBoard?.summary || {},
+      board: system.goLiveObservationBoard,
+      observations: system.goLiveObservations || []
+    });
+    return;
+  }
+
+  const publicHealthGoLiveObservationActionMatch = url.pathname.match(/^\/api\/public-health\/go-live-observations\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthGoLiveObservationActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/go-live-observations/:id/actions");
+    if (!user) return;
+    const observationId = decodeURIComponent(publicHealthGoLiveObservationActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const observations = Array.isArray(data.publicHealthGoLiveObservations) ? data.publicHealthGoLiveObservations : seedPublicHealthGoLiveObservations();
+    const index = observations.findIndex((item) => item.id === observationId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "public health go-live observation not found" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizePublicHealthGoLiveObservationAction(observations[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    observations[index] = normalized.observation;
+    data.publicHealthGoLiveObservations = observations;
+    data.publicHealthReadinessEvidence = (Array.isArray(data.publicHealthReadinessEvidence) ? data.publicHealthReadinessEvidence : seedPublicHealthReadinessEvidence()).map((row) => (
+      row.id === "phev-go-live-observation"
+        ? { ...row, status: "go-live observation action recorded", evidence: Array.from(new Set([...(row.evidence || []), "publicHealthGoLiveObservations"])) }
+        : row
+    ));
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "public-health-go-live-observation-action",
+        target: observationId,
+        result: "allowed",
+        detail: `${normalized.history.action} / ${normalized.history.status} / ${normalized.history.signalStatus}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    const system = buildPublicHealthSystem({ data });
+    sendJson(res, 200, {
+      ok: true,
+      observation: normalized.observation,
+      action: normalized.history,
+      board: system.goLiveObservationBoard,
+      system
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/launch-incidents") {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/launch-incidents");
+    if (!user) return;
+    const data = readDatabase();
+    const system = buildPublicHealthSystem({ data });
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "public-health-launch-incidents",
+      target: "/api/public-health/launch-incidents",
+      result: "allowed",
+      detail: `${system.launchIncidentBoard?.summary?.deskReady || 0}/${system.launchIncidentBoard?.summary?.lanes || 0} incident lanes ready`
+    });
+    sendJson(res, 200, {
+      ok: true,
+      generatedAt: system.generatedAt,
+      summary: system.launchIncidentBoard?.summary || {},
+      board: system.launchIncidentBoard,
+      incidents: system.launchIncidents || []
+    });
+    return;
+  }
+
+  const publicHealthLaunchIncidentActionMatch = url.pathname.match(/^\/api\/public-health\/launch-incidents\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthLaunchIncidentActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/launch-incidents/:id/actions");
+    if (!user) return;
+    const incidentId = decodeURIComponent(publicHealthLaunchIncidentActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const incidents = mergeByKey(seedPublicHealthLaunchIncidents(), data.publicHealthLaunchIncidents, "id");
+    const index = incidents.findIndex((item) => item.id === incidentId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "public health launch incident not found" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizePublicHealthLaunchIncidentAction(incidents[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    incidents[index] = normalized.incident;
+    data.publicHealthLaunchIncidents = incidents;
+    data.publicHealthReadinessEvidence = (Array.isArray(data.publicHealthReadinessEvidence) ? data.publicHealthReadinessEvidence : seedPublicHealthReadinessEvidence()).map((row) => (
+      row.id === "phev-launch-incident-desk"
+        ? { ...row, status: "launch incident action recorded", evidence: Array.from(new Set([...(row.evidence || []), "publicHealthLaunchIncidents"])) }
+        : row
+    ));
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "public-health-launch-incident-action",
+        target: incidentId,
+        result: "allowed",
+        detail: `${normalized.history.action} / ${normalized.history.status} / ${normalized.history.signalStatus}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    const system = buildPublicHealthSystem({ data });
+    sendJson(res, 200, {
+      ok: true,
+      incident: normalized.incident,
+      action: normalized.history,
+      board: system.launchIncidentBoard,
+      system
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/launch-duty-shifts") {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/launch-duty-shifts");
+    if (!user) return;
+    const data = readDatabase();
+    const system = buildPublicHealthSystem({ data });
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "public-health-launch-duty-shifts",
+      target: "/api/public-health/launch-duty-shifts",
+      result: "allowed",
+      detail: `${system.launchDutyBoard?.summary?.readyShifts || 0}/${system.launchDutyBoard?.summary?.shifts || 0} duty shifts ready`
+    });
+    sendJson(res, 200, {
+      ok: true,
+      generatedAt: system.generatedAt,
+      summary: system.launchDutyBoard?.summary || {},
+      board: system.launchDutyBoard,
+      shifts: system.launchDutyShifts || []
+    });
+    return;
+  }
+
+  const publicHealthLaunchDutyShiftActionMatch = url.pathname.match(/^\/api\/public-health\/launch-duty-shifts\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthLaunchDutyShiftActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/launch-duty-shifts/:id/actions");
+    if (!user) return;
+    const shiftId = decodeURIComponent(publicHealthLaunchDutyShiftActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const shifts = mergeByKey(seedPublicHealthLaunchDutyShifts(), data.publicHealthLaunchDutyShifts, "id");
+    const index = shifts.findIndex((item) => item.id === shiftId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "public health launch duty shift not found" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizePublicHealthLaunchDutyShiftAction(shifts[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    shifts[index] = normalized.shift;
+    data.publicHealthLaunchDutyShifts = shifts;
+    data.publicHealthReadinessEvidence = (Array.isArray(data.publicHealthReadinessEvidence) ? data.publicHealthReadinessEvidence : seedPublicHealthReadinessEvidence()).map((row) => (
+      row.id === "phev-launch-duty-shifts"
+        ? { ...row, status: "launch duty handoff action recorded", evidence: Array.from(new Set([...(row.evidence || []), "publicHealthLaunchDutyShifts"])) }
+        : row
+    ));
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "public-health-launch-duty-shift-action",
+        target: shiftId,
+        result: "allowed",
+        detail: `${normalized.history.action} / ${normalized.history.status} / ${normalized.history.signalStatus}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    const system = buildPublicHealthSystem({ data });
+    sendJson(res, 200, {
+      ok: true,
+      shift: normalized.shift,
+      action: normalized.history,
+      board: system.launchDutyBoard,
+      system
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/launch-command-briefs") {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/launch-command-briefs");
+    if (!user) return;
+    const data = readDatabase();
+    const system = buildPublicHealthSystem({ data });
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "public-health-launch-command-briefs",
+      target: "/api/public-health/launch-command-briefs",
+      result: "allowed",
+      detail: `${system.launchCommandBriefBoard?.summary?.readyBriefs || 0}/${system.launchCommandBriefBoard?.summary?.briefs || 0} launch command briefs ready`
+    });
+    sendJson(res, 200, {
+      ok: true,
+      generatedAt: system.generatedAt,
+      summary: system.launchCommandBriefBoard?.summary || {},
+      board: system.launchCommandBriefBoard,
+      briefs: system.launchCommandBriefs || []
+    });
+    return;
+  }
+
+  const publicHealthLaunchCommandBriefActionMatch = url.pathname.match(/^\/api\/public-health\/launch-command-briefs\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthLaunchCommandBriefActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/launch-command-briefs/:id/actions");
+    if (!user) return;
+    const briefId = decodeURIComponent(publicHealthLaunchCommandBriefActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const briefs = mergeByKey(seedPublicHealthLaunchCommandBriefs(), data.publicHealthLaunchCommandBriefs, "id");
+    const index = briefs.findIndex((item) => item.id === briefId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "public health launch command brief not found" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizePublicHealthLaunchCommandBriefAction(briefs[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    briefs[index] = normalized.brief;
+    data.publicHealthLaunchCommandBriefs = briefs;
+    data.publicHealthReadinessEvidence = (Array.isArray(data.publicHealthReadinessEvidence) ? data.publicHealthReadinessEvidence : seedPublicHealthReadinessEvidence()).map((row) => (
+      row.id === "phev-launch-command-briefs"
+        ? { ...row, status: "launch command brief action recorded", evidence: Array.from(new Set([...(row.evidence || []), "publicHealthLaunchCommandBriefs"])) }
+        : row
+    ));
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "public-health-launch-command-brief-action",
+        target: briefId,
+        result: "allowed",
+        detail: `${normalized.history.action} / ${normalized.history.status} / ${normalized.history.decision}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    const system = buildPublicHealthSystem({ data });
+    sendJson(res, 200, {
+      ok: true,
+      brief: normalized.brief,
+      action: normalized.history,
+      board: system.launchCommandBriefBoard,
+      system
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/site-evidence-verification-tasks") {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/site-evidence-verification-tasks");
+    if (!user) return;
+    const data = readDatabase();
+    const system = buildPublicHealthSystem({ data });
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "public-health-site-evidence-verification-tasks",
+      target: "/api/public-health/site-evidence-verification-tasks",
+      result: "allowed",
+      detail: `${system.siteEvidenceVerificationBoard?.summary?.verifiedTasks || 0}/${system.siteEvidenceVerificationBoard?.summary?.tasks || 0} site evidence verification tasks verified`
+    });
+    sendJson(res, 200, {
+      ok: true,
+      generatedAt: system.generatedAt,
+      summary: system.siteEvidenceVerificationBoard?.summary || {},
+      board: system.siteEvidenceVerificationBoard,
+      tasks: system.siteEvidenceVerificationTasks || []
+    });
+    return;
+  }
+
+  const publicHealthSiteEvidenceVerificationTaskActionMatch = url.pathname.match(/^\/api\/public-health\/site-evidence-verification-tasks\/([^/]+)\/actions$/);
+  if (req.method === "POST" && publicHealthSiteEvidenceVerificationTaskActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/site-evidence-verification-tasks/:id/actions");
+    if (!user) return;
+    const taskId = decodeURIComponent(publicHealthSiteEvidenceVerificationTaskActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const tasks = mergeByKey(seedPublicHealthSiteEvidenceVerificationTasks(), data.publicHealthSiteEvidenceVerificationTasks, "id");
+    const index = tasks.findIndex((item) => item.id === taskId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "public health site evidence verification task not found" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizePublicHealthSiteEvidenceVerificationTaskAction(tasks[index], payload, data, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    tasks[index] = normalized.task;
+    data.publicHealthSiteEvidenceVerificationTasks = tasks;
+    data.publicHealthReadinessEvidence = mergeByKey(seedPublicHealthReadinessEvidence(), data.publicHealthReadinessEvidence, "id").map((row) => (
+      row.id === "phev-site-evidence-verification-desk"
+        ? { ...row, status: "site evidence verification action recorded", evidence: Array.from(new Set([...(row.evidence || []), "publicHealthSiteEvidenceVerificationTasks", "siteLaunchEvidence"])) }
+        : row
+    ));
+    data.securityEvents = sealAuditTrail([
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "public-health-site-evidence-verification-action",
+        target: taskId,
+        result: "allowed",
+        detail: `${normalized.history.action} / ${normalized.history.status} / ${normalized.history.evidenceId || "no-evidence"}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120), { recompute: true });
+    writeDatabase(data);
+    const system = buildPublicHealthSystem({ data: readDatabase() });
+    sendJson(res, 200, {
+      ok: true,
+      task: normalized.task,
+      action: normalized.history,
+      board: system.siteEvidenceVerificationBoard,
+      system
+    });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/public-health/site-evidence-bridge/actions") {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/site-evidence-bridge/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const linkId = String(payload.linkId || payload.bridgeId || payload.id || "").trim();
+    const templateId = String(payload.templateId || "").trim();
+    const bridge = buildPublicHealthSiteEvidenceBridge(data.siteLaunchEvidence);
+    const link = bridge.links.find((item) => (linkId && item.id === linkId) || (templateId && item.templateId === templateId))
+      || PUBLIC_HEALTH_SITE_EVIDENCE_LINKS.find((item) => (linkId && item.id === linkId) || (templateId && item.templateId === templateId));
+    if (!link) {
+      sendJson(res, 404, { error: "Not Found", message: "public health site evidence bridge link not found" });
+      return;
+    }
+    let upsertResult;
+    try {
+      upsertResult = upsertSiteLaunchEvidence(data, user, {
+        ...payload,
+        templateId: link.templateId,
+        status: payload.status || "verified",
+        artifactName: payload.artifactName || payload.artifact || link.requirement || "public health site evidence",
+        jointTestNo: payload.jointTestNo || payload.receiptNo || `PH-SITE-${Date.now()}`,
+        attachmentNames: payload.attachmentNames || payload.attachments || [`${link.id}.pdf`],
+        note: payload.note || `Mapped to public health evidence packet ${link.packetId}.`
+      });
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    const latestData = readDatabase();
+    latestData.publicHealthReadinessEvidence = (Array.isArray(latestData.publicHealthReadinessEvidence) ? latestData.publicHealthReadinessEvidence : seedPublicHealthReadinessEvidence()).map((row) => (
+      row.id === "phev-site-evidence-bridge"
+        ? { ...row, status: "现场材料桥接已记录", evidence: Array.from(new Set([...(row.evidence || []), "siteLaunchEvidence", "publicHealthSiteEvidenceBridge"])) }
+        : row
+    ));
+    latestData.securityEvents = sealAuditTrail([
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "public-health-site-evidence-bridge-action",
+        target: link.id,
+        result: "allowed",
+        detail: `${link.templateId} -> ${link.packetId}`
+      },
+      ...(Array.isArray(latestData.securityEvents) ? latestData.securityEvents : [])
+    ].slice(0, 120), { recompute: true });
+    writeDatabase(latestData);
+    const system = buildPublicHealthSystem({ data: readDatabase() });
+    sendJson(res, upsertResult.status || 200, {
+      ok: true,
+      evidence: upsertResult.body?.evidence,
+      link: system.siteEvidenceBridge?.links?.find((item) => item.id === link.id) || link,
+      bridge: system.siteEvidenceBridge,
+      system
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/public-health/launch-gate") {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/launch-gate");
+    if (!user) return;
+    const data = readDatabase();
+    const system = buildPublicHealthSystem({ data });
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "public-health-launch-gate",
+      target: "/api/public-health/launch-gate",
+      result: "allowed",
+      detail: `${system.launchGate?.status || "unknown"} / ${system.launchGate?.summary?.blockedRequirements || 0} blocked requirements`
+    });
+    sendJson(res, 200, {
+      ok: true,
+      generatedAt: system.generatedAt,
+      gate: system.launchGate,
+      summary: system.launchGate?.summary || {},
+      approvals: system.launchApprovals || [],
+      requirements: system.launchGate?.requirements || [],
+      approvalPreflight: system.launchGate?.approvalPreflight || {}
+    });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/public-health/launch-gate/actions") {
+    const user = requireApiRole(req, res, ["commission"], "/api/public-health/launch-gate/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const approvalId = String(payload.approvalId || payload.id || "").trim();
+    const data = readDatabase();
+    const approvals = Array.isArray(data.publicHealthLaunchApprovals) ? data.publicHealthLaunchApprovals : seedPublicHealthLaunchApprovals();
+    const currentSystem = buildPublicHealthSystem({ data });
+    const index = approvalId
+      ? approvals.findIndex((item) => item.id === approvalId)
+      : approvals.findIndex((item) => !/approved|signed|accepted|complete|已批准|已签署|已完成/i.test(`${item.status || ""} ${item.decision || ""}`));
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "public health launch approval not found" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizePublicHealthLaunchGateAction(approvals[index], payload, user, currentSystem.launchGate?.approvalPreflight || {});
+    } catch (error) {
+      const statusCode = /launch approval is blocked until all prerequisite launch requirements pass/.test(String(error.message || "")) ? 409 : 400;
+      sendJson(res, statusCode, { error: statusCode === 409 ? "Conflict" : "Bad Request", message: error.message });
+      return;
+    }
+    approvals[index] = normalized.approval;
+    data.publicHealthLaunchApprovals = approvals;
+    data.publicHealthReadinessEvidence = (Array.isArray(data.publicHealthReadinessEvidence) ? data.publicHealthReadinessEvidence : seedPublicHealthReadinessEvidence()).map((row) => (
+      row.id === "phev-launch-gate"
+        ? { ...row, status: "上线审批动作已记录", evidence: Array.from(new Set([...(row.evidence || []), "publicHealthLaunchApprovals"])) }
+        : row
+    ));
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "public-health-launch-gate-action",
+        target: normalized.approval.id,
+        result: "allowed",
+        detail: `${normalized.history.action} / ${normalized.history.status}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    const system = buildPublicHealthSystem({ data });
+    sendJson(res, 200, {
+      ok: true,
+      approval: normalized.approval,
+      action: normalized.history,
+      gate: system.launchGate,
+      system
+    });
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/priority-applications/templates") {
     const user = requireApiRole(req, res, ["commission"], "/api/priority-applications/templates");
     if (!user) return;
@@ -12281,7 +15973,84 @@ async function handleApi(req, res) {
   if (req.method === "GET" && url.pathname === "/api/operations/dashboard") {
     const user = requireApiRole(req, res, ["commission"], "/api/operations/dashboard");
     if (!user) return;
-    sendJson(res, 200, buildHospitalOperationsDashboard(readDatabase()));
+    const data = readDatabase();
+    const dashboard = buildHospitalOperationsDashboard(data);
+    dashboard.runCenter = buildProductionOperationsCenter(data, { runtimeMetrics: buildRuntimeMetrics(data) });
+    sendJson(res, 200, dashboard);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/production-operations/center") {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-operations/center");
+    if (!user) return;
+    const data = readDatabase();
+    const center = buildProductionOperationsCenter(data, { runtimeMetrics: buildRuntimeMetrics(data) });
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "production-operations-center-read",
+      target: "/api/production-operations/center",
+      result: "allowed",
+      detail: `${center.summary.serviceLevels} SLOs / ${center.summary.openIncidents} open incidents / ${center.summary.validatedDrills} local drills / production ready 0`
+    });
+    sendJson(res, 200, { ok: center.ok, generatedAt: new Date().toISOString(), center });
+    return;
+  }
+
+  const productionOperationsActionMatch = url.pathname.match(/^\/api\/production-operations\/(incidents|duty-shifts|drills)\/([^/]+)\/actions$/);
+  if (req.method === "POST" && productionOperationsActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-operations/:resource/:id/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const resource = productionOperationsActionMatch[1];
+    const itemId = decodeURIComponent(productionOperationsActionMatch[2]);
+    const definitions = {
+      incidents: { collection: "operationsIncidents", seed: seedOperationsIncidents },
+      "duty-shifts": { collection: "operationsDutyShifts", seed: seedOperationsDutyShifts },
+      drills: { collection: "disasterRecoveryDrills", seed: seedDisasterRecoveryDrills }
+    };
+    const definition = definitions[resource];
+    const data = readDatabase();
+    const rows = mergeByKey(definition.seed(), data[definition.collection], "id");
+    const index = rows.findIndex((item) => item.id === itemId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "production operations item not found" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = applyProductionOperationsAction(resource, rows[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    rows[index] = normalized.item;
+    data[definition.collection] = rows;
+    if (normalized.evidencePacket) {
+      data.operationsEvidencePackets = [normalized.evidencePacket, ...mergeByKey(seedOperationsEvidencePackets(), data.operationsEvidencePackets, "id")].slice(0, 80);
+    }
+    data.securityEvents = sealAuditTrail([
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "production-operations-action",
+        target: `${resource}:${itemId}`,
+        result: "allowed",
+        detail: `${normalized.history.action} / ${normalized.history.fromStatus} -> ${normalized.history.toStatus} / production ready false`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    const refreshed = readDatabase();
+    sendJson(res, 200, {
+      ok: true,
+      item: normalized.item,
+      action: normalized.history,
+      evidencePacket: normalized.evidencePacket,
+      center: buildProductionOperationsCenter(refreshed, { runtimeMetrics: buildRuntimeMetrics(refreshed) })
+    });
     return;
   }
 
@@ -13053,6 +16822,62 @@ async function handleApi(req, res) {
     return;
   }
 
+  const registrationJourneyActionMatch = url.pathname.match(/^\/api\/registrations\/orders\/([^/]+)\/actions$/);
+  if (req.method === "POST" && registrationJourneyActionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance", "citizen"], "/api/registrations/orders/:id/actions");
+    if (!user) return;
+    const data = readDatabase();
+    const rows = Array.isArray(data.registrationOrders) ? data.registrationOrders : [];
+    const index = rows.findIndex((item) => item.id === decodeURIComponent(registrationJourneyActionMatch[1]));
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "registration order not found" });
+      return;
+    }
+    if (!canAccessRegistrationOrder(user, rows[index], data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "registration-journey-action", target: rows[index].id, result: "denied", detail: "scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
+      return;
+    }
+    try {
+      const payload = await collectJson(req);
+      rows[index] = applyRegistrationJourneyAction(rows[index], payload, user);
+      rows[index].notificationStatus = "queued";
+      rows[index].notificationDeliveries = [
+        ...buildRegistrationNotificationDeliveries(rows[index].id, rows[index].residentId, `registration-${payload.action}`, user, rows[index].updatedAt),
+        ...(Array.isArray(rows[index].notificationDeliveries) ? rows[index].notificationDeliveries : [])
+      ].slice(0, 40);
+      data.registrationOrders = rows;
+      data.taskMessages = [
+        buildRegistrationJourneyTaskMessage(rows[index], payload.action, user),
+        ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])
+      ].slice(0, 300);
+      appendDataAccessLog(data, user, rows[index].residentId, "registrationOrders", `registration journey ${payload.action}`, "allowed");
+      data.securityEvents = sealAuditTrail([
+        {
+          id: randomUUID(),
+          at: new Date().toLocaleString("zh-CN", { hour12: false }),
+          actor: user.name,
+          role: user.role,
+          action: "registration-journey-action",
+          target: rows[index].id,
+          result: "allowed",
+          detail: `${payload.action}:${rows[index].journeyStage}`
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120), { recompute: true });
+      writeDatabase(data);
+      sendJson(res, 200, {
+        ok: true,
+        order: rows[index],
+        dashboard: buildRegistrationDashboard(data, user)
+      });
+    } catch (error) {
+      const conflict = /not allowed/i.test(error.message || "");
+      sendJson(res, conflict ? 409 : 400, { error: conflict ? "Conflict" : "Bad Request", message: error.message });
+    }
+    return;
+  }
+
   const registrationCancelMatch = url.pathname.match(/^\/api\/registrations\/orders\/([^/]+)\/cancel$/);
   if (req.method === "POST" && registrationCancelMatch) {
     const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/registrations/orders/:id/cancel");
@@ -13067,6 +16892,14 @@ async function handleApi(req, res) {
     if (!canAccessRegistrationOrder(user, rows[index], data)) {
       appendSecurityEvent({ actor: user.name, role: user.role, action: "cancel registration order", target: rows[index].id, result: "denied", detail: "scope denied" });
       sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
+      return;
+    }
+    if (["completed", "closed"].includes(rows[index].status)) {
+      sendJson(res, 409, { error: "Conflict", message: "completed registration order cannot be cancelled" });
+      return;
+    }
+    if (rows[index].status === "cancelled") {
+      sendJson(res, 409, { error: "Conflict", message: "registration order is already cancelled" });
       return;
     }
     const payload = await collectJson(req);
@@ -14114,6 +17947,923 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/digital-hospital/standards") {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/standards");
+    if (!user) return;
+    const data = readDatabase();
+    sendJson(res, 200, buildDigitalHospitalStandardsOverview(data));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/digital-hospital/launch-readiness") {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/launch-readiness");
+    if (!user) return;
+    const data = readDatabase();
+    const launchReadiness = buildDigitalHospitalLaunchReadiness(data);
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "digital-hospital-launch-readiness",
+      target: "/api/digital-hospital/launch-readiness",
+      result: "allowed",
+      detail: `${launchReadiness.launchGate.releaseGate} / ${launchReadiness.summary.formalBlockers} formal blockers`
+    });
+    sendJson(res, 200, launchReadiness);
+    return;
+  }
+
+  const digitalHospitalLaunchActionMatch = url.pathname.match(/^\/api\/digital-hospital\/launch-readiness\/([^/]+)\/actions$/);
+  if (req.method === "POST" && digitalHospitalLaunchActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/launch-readiness/:id/actions");
+    if (!user) return;
+    const requirementId = decodeURIComponent(digitalHospitalLaunchActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const requirements = Array.isArray(data.digitalHospitalLaunchRequirements) ? data.digitalHospitalLaunchRequirements : seedDigitalHospitalLaunchRequirements();
+    const index = requirements.findIndex((item) => item.id === requirementId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "Digital hospital launch requirement not found" });
+      return;
+    }
+    const normalized = normalizeDigitalHospitalLaunchRequirementAction(requirements[index], payload, user);
+    requirements[index] = normalized.item;
+    data.digitalHospitalLaunchRequirements = requirements;
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "digital-hospital-launch-requirement-action",
+        target: requirementId,
+        result: "allowed",
+        detail: `${normalized.history.action} / ${normalized.history.status}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    data.securityEvents = sealAuditTrail(data.securityEvents, { recompute: true });
+    writeDatabase(normalizeState(data));
+    const refreshed = readDatabase();
+    sendJson(res, 200, {
+      ok: true,
+      requirement: normalized.item,
+      action: normalized.history,
+      launchReadiness: buildDigitalHospitalLaunchReadiness(refreshed),
+      standards: buildDigitalHospitalStandardsOverview(refreshed)
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/digital-hospital/production-evidence-packets") {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/production-evidence-packets");
+    if (!user) return;
+    const data = readDatabase();
+    const requirements = Array.isArray(data.digitalHospitalLaunchRequirements) ? data.digitalHospitalLaunchRequirements : seedDigitalHospitalLaunchRequirements();
+    const packets = Array.isArray(data.digitalHospitalProductionEvidencePackets) ? data.digitalHospitalProductionEvidencePackets : seedDigitalHospitalProductionEvidencePackets();
+    const board = buildDigitalHospitalProductionEvidenceBoard(packets, requirements);
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "digital-hospital-production-evidence-packets",
+      target: "/api/digital-hospital/production-evidence-packets",
+      result: "allowed",
+      detail: `${board.summary.verifiedItems}/${board.summary.requiredItems} evidence items verified`
+    });
+    sendJson(res, 200, {
+      ok: true,
+      generatedAt: new Date().toISOString(),
+      summary: board.summary,
+      board,
+      packets: board.packets,
+      launchReadiness: buildDigitalHospitalLaunchReadiness(data)
+    });
+    return;
+  }
+
+  const digitalHospitalProductionEvidenceActionMatch = url.pathname.match(/^\/api\/digital-hospital\/production-evidence-packets\/([^/]+)\/actions$/);
+  if (req.method === "POST" && digitalHospitalProductionEvidenceActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/production-evidence-packets/:id/actions");
+    if (!user) return;
+    const packetId = decodeURIComponent(digitalHospitalProductionEvidenceActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const packets = Array.isArray(data.digitalHospitalProductionEvidencePackets) ? data.digitalHospitalProductionEvidencePackets : seedDigitalHospitalProductionEvidencePackets();
+    const index = packets.findIndex((item) => item.id === packetId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "digital hospital production evidence packet not found" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizeDigitalHospitalProductionEvidencePacketAction(packets[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    packets[index] = normalized.packet;
+    data.digitalHospitalProductionEvidencePackets = packets;
+    const requirements = Array.isArray(data.digitalHospitalLaunchRequirements) ? data.digitalHospitalLaunchRequirements : seedDigitalHospitalLaunchRequirements();
+    data.digitalHospitalLaunchRequirements = requirements.map((item) => {
+      if (item.id !== normalized.packet.linkedRequirementId || normalized.packet.signoffStatus !== "signed") return item;
+      return {
+        ...item,
+        status: "signed",
+        siteSigned: true,
+        evidence: Array.from(new Set([...(item.evidence || []), normalized.history.artifactName, "digitalHospitalProductionEvidencePackets"].filter(Boolean))),
+        latestAction: normalized.history,
+        auditTrail: [normalized.history, ...(Array.isArray(item.auditTrail) ? item.auditTrail : [])].slice(0, 20),
+        updatedAt: new Date().toISOString(),
+        updatedBy: user.username || user.role || "commission",
+        updatedByName: user.name || "digital hospital operator"
+      };
+    });
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "digital-hospital-production-evidence-packet-action",
+        target: packetId,
+        result: "allowed",
+        detail: `${normalized.history.itemId} / ${normalized.history.status}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    const refreshed = readDatabase();
+    const launchReadiness = buildDigitalHospitalLaunchReadiness(refreshed);
+    sendJson(res, 200, {
+      ok: true,
+      packet: normalized.packet,
+      action: normalized.history,
+      board: launchReadiness.productionEvidenceBoard,
+      launchReadiness,
+      standards: buildDigitalHospitalStandardsOverview(refreshed)
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/digital-hospital/launch-command-briefs") {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/launch-command-briefs");
+    if (!user) return;
+    const data = readDatabase();
+    const briefs = Array.isArray(data.digitalHospitalLaunchCommandBriefs) ? data.digitalHospitalLaunchCommandBriefs : seedDigitalHospitalLaunchCommandBriefs();
+    const board = buildDigitalHospitalLaunchCommandBriefBoard(briefs);
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "digital-hospital-launch-command-briefs",
+      target: "/api/digital-hospital/launch-command-briefs",
+      result: "allowed",
+      detail: `${board.summary.readyBriefs}/${board.summary.briefs} launch command briefs ready`
+    });
+    sendJson(res, 200, {
+      ok: true,
+      generatedAt: new Date().toISOString(),
+      summary: board.summary,
+      board,
+      briefs: board.briefs,
+      launchReadiness: buildDigitalHospitalLaunchReadiness(data)
+    });
+    return;
+  }
+
+  const digitalHospitalLaunchCommandBriefActionMatch = url.pathname.match(/^\/api\/digital-hospital\/launch-command-briefs\/([^/]+)\/actions$/);
+  if (req.method === "POST" && digitalHospitalLaunchCommandBriefActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/launch-command-briefs/:id/actions");
+    if (!user) return;
+    const briefId = decodeURIComponent(digitalHospitalLaunchCommandBriefActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const briefs = Array.isArray(data.digitalHospitalLaunchCommandBriefs) ? data.digitalHospitalLaunchCommandBriefs : seedDigitalHospitalLaunchCommandBriefs();
+    const index = briefs.findIndex((item) => item.id === briefId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "digital hospital launch command brief not found" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = normalizeDigitalHospitalLaunchCommandBriefAction(briefs[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    briefs[index] = normalized.brief;
+    data.digitalHospitalLaunchCommandBriefs = briefs;
+    data.digitalHospitalLaunchRequirements = (Array.isArray(data.digitalHospitalLaunchRequirements) ? data.digitalHospitalLaunchRequirements : seedDigitalHospitalLaunchRequirements()).map((item) => (
+      Array.isArray(normalized.brief.linkedRequirementIds) && normalized.brief.linkedRequirementIds.includes(item.id)
+        ? { ...item, evidence: Array.from(new Set([...(item.evidence || []), "digitalHospitalLaunchCommandBriefs", normalized.history.artifactName].filter(Boolean))), latestBriefAction: normalized.history }
+        : item
+    ));
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "digital-hospital-launch-command-brief-action",
+        target: briefId,
+        result: "allowed",
+        detail: `${normalized.history.status} / ${normalized.history.publishChannel}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    const refreshed = readDatabase();
+    const launchReadiness = buildDigitalHospitalLaunchReadiness(refreshed);
+    sendJson(res, 200, {
+      ok: true,
+      brief: normalized.brief,
+      action: normalized.history,
+      board: launchReadiness.launchCommandBriefBoard,
+      launchReadiness,
+      standards: buildDigitalHospitalStandardsOverview(refreshed)
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/digital-hospital/formal-cutover-approvals") {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/formal-cutover-approvals");
+    if (!user) return;
+    const data = readDatabase();
+    const launchReadiness = buildDigitalHospitalLaunchReadiness(data);
+    const board = launchReadiness.formalCutoverApprovalBoard;
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "digital-hospital-formal-cutover-approvals",
+      target: "/api/digital-hospital/formal-cutover-approvals",
+      result: "allowed",
+      detail: `${board.summary.approvedApprovals}/${board.summary.approvals} formal cutover approvals`
+    });
+    sendJson(res, 200, {
+      ok: true,
+      generatedAt: new Date().toISOString(),
+      summary: board.summary,
+      board,
+      approvals: board.approvals,
+      launchReadiness
+    });
+    return;
+  }
+
+  const digitalHospitalFormalCutoverApprovalActionMatch = url.pathname.match(/^\/api\/digital-hospital\/formal-cutover-approvals\/([^/]+)\/actions$/);
+  if (req.method === "POST" && digitalHospitalFormalCutoverApprovalActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/digital-hospital/formal-cutover-approvals/:id/actions");
+    if (!user) return;
+    const approvalId = decodeURIComponent(digitalHospitalFormalCutoverApprovalActionMatch[1]);
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const approvals = Array.isArray(data.digitalHospitalFormalCutoverApprovals) ? data.digitalHospitalFormalCutoverApprovals : seedDigitalHospitalFormalCutoverApprovals();
+    const index = approvals.findIndex((item) => item.id === approvalId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "digital hospital formal cutover approval not found" });
+      return;
+    }
+    const currentReadiness = buildDigitalHospitalLaunchReadiness(data);
+    let normalized;
+    try {
+      normalized = normalizeDigitalHospitalFormalCutoverApprovalAction(approvals[index], payload, user, approvals, currentReadiness.formalCutoverApprovalBoard);
+    } catch (error) {
+      const blocked = /blocked until all site evidence/i.test(String(error.message || ""));
+      data.securityEvents = sealAuditTrail([
+        {
+          id: randomUUID(),
+          at: new Date().toLocaleString("zh-CN", { hour12: false }),
+          actor: user.name,
+          role: user.role,
+          action: "digital-hospital-formal-cutover-approval-action",
+          target: approvalId,
+          result: blocked ? "blocked" : "denied",
+          detail: String(error.message || "formal cutover approval rejected")
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120), { recompute: true });
+      writeDatabase(normalizeState(data));
+      sendJson(res, blocked ? 409 : 400, { error: blocked ? "Conflict" : "Bad Request", message: error.message, launchReadiness: currentReadiness });
+      return;
+    }
+    approvals[index] = normalized.approval;
+    data.digitalHospitalFormalCutoverApprovals = approvals;
+    data.securityEvents = sealAuditTrail([
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "digital-hospital-formal-cutover-approval-action",
+        target: approvalId,
+        result: "allowed",
+        detail: `${normalized.history.status} / ${normalized.history.changeTicket || "no-ticket"}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    const refreshed = readDatabase();
+    const launchReadiness = buildDigitalHospitalLaunchReadiness(refreshed);
+    sendJson(res, 200, {
+      ok: true,
+      approval: normalized.approval,
+      action: normalized.history,
+      board: launchReadiness.formalCutoverApprovalBoard,
+      launchReadiness,
+      standards: buildDigitalHospitalStandardsOverview(refreshed)
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/citizen-operations/public") {
+    const user = requireApiRole(req, res, ["commission", "county", "institution", "citizen"], "/api/citizen-operations/public");
+    if (!user) return;
+    const publicFeed = buildCitizenOperationsPublic(readDatabase());
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "citizen-operations-public-read",
+      target: "/api/citizen-operations/public",
+      result: "allowed",
+      detail: `${publicFeed.contents.length} contents / ${publicFeed.agreements.length} agreements / ${publicFeed.hospitalServices.length} hospitals`
+    });
+    sendJson(res, 200, publicFeed);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/citizen-operations/center") {
+    const user = requireApiRole(req, res, ["commission"], "/api/citizen-operations/center");
+    if (!user) return;
+    const center = buildCitizenOperationsCenter(readDatabase());
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "citizen-operations-center-read",
+      target: "/api/citizen-operations/center",
+      result: "allowed",
+      detail: `${center.summary.publishedContents} published / ${center.summary.pendingIdentityReviews} identity reviews / ${center.summary.orders} orders`
+    });
+    sendJson(res, 200, { ok: center.ok, generatedAt: new Date().toISOString(), center });
+    return;
+  }
+
+  const citizenOperationsActionMatch = url.pathname.match(/^\/api\/citizen-operations\/(contents|identity-reviews|blacklist|hospitals)\/([^/]+)\/actions$/);
+  if (req.method === "POST" && citizenOperationsActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/citizen-operations/:resource/:id/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const resource = citizenOperationsActionMatch[1];
+    const itemId = decodeURIComponent(citizenOperationsActionMatch[2]);
+    const resources = {
+      contents: { collection: "citizenOperationContents", seed: seedCitizenOperationContents },
+      "identity-reviews": { collection: "citizenIdentityReviewCases", seed: seedCitizenIdentityReviewCases },
+      blacklist: { collection: "citizenServiceBlacklist", seed: seedCitizenServiceBlacklist },
+      hospitals: { collection: "citizenHospitalServiceConfigs", seed: seedCitizenHospitalServiceConfigs }
+    };
+    const definition = resources[resource];
+    const data = readDatabase();
+    const rows = mergeByKey(definition.seed(), data[definition.collection], "id");
+    const index = rows.findIndex((item) => item.id === itemId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "citizen operations item not found" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = applyCitizenOperationsAction(resource, rows[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    rows[index] = normalized.item;
+    data[definition.collection] = rows;
+    data.securityEvents = sealAuditTrail([
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "citizen-operations-action",
+        target: `${resource}:${itemId}`,
+        result: "allowed",
+        detail: `${normalized.history.action} / ${normalized.history.fromStatus} -> ${normalized.history.toStatus}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    const refreshed = readDatabase();
+    sendJson(res, 200, {
+      ok: true,
+      item: normalized.item,
+      action: normalized.history,
+      center: buildCitizenOperationsCenter(refreshed),
+      publicFeed: buildCitizenOperationsPublic(refreshed)
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/production-database/cutover-center") {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-database/cutover-center");
+    if (!user) return;
+    const data = readDatabase();
+    const center = buildProductionDatabaseCutoverCenter(data);
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "production-database-cutover-center-read",
+      target: "/api/production-database/cutover-center",
+      result: "allowed",
+      detail: `${center.summary.migrationBatches} batches / ${center.summary.cutoverRuns} rehearsal runs`
+    });
+    sendJson(res, 200, { ok: center.ok, generatedAt: new Date().toISOString(), center });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/commercial-crypto/center") {
+    const user = requireApiRole(req, res, ["commission"], "/api/commercial-crypto/center");
+    if (!user) return;
+    const center = buildCommercialCryptoCenter(readDatabase());
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "commercial-crypto-center-read",
+      target: "/api/commercial-crypto/center",
+      result: "allowed",
+      detail: `${center.summary.contractsReady}/${center.summary.capabilities} contracts / ${center.summary.primitiveAvailability}/3 runtime primitives / production ready 0`
+    });
+    sendJson(res, 200, { ok: center.ok, generatedAt: new Date().toISOString(), center });
+    return;
+  }
+
+  const commercialCryptoActionMatch = url.pathname.match(/^\/api\/commercial-crypto\/capabilities\/([^/]+)\/actions$/);
+  if (req.method === "POST" && commercialCryptoActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/commercial-crypto/capabilities/:id/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const capabilityId = decodeURIComponent(commercialCryptoActionMatch[1]);
+    const data = readDatabase();
+    const capabilities = mergeByKey(seedCommercialCryptoCapabilities(), data.commercialCryptoCapabilities, "id");
+    const index = capabilities.findIndex((item) => item.id === capabilityId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "commercial crypto capability not found" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = applyCommercialCryptoAction(capabilities[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    capabilities[index] = normalized.item;
+    data.commercialCryptoCapabilities = capabilities;
+    if (normalized.probeRun) {
+      data.commercialCryptoProbeRuns = [normalized.probeRun, ...(Array.isArray(data.commercialCryptoProbeRuns) ? data.commercialCryptoProbeRuns : [])].slice(0, 40);
+    }
+    if (normalized.evidencePacket) {
+      data.commercialCryptoEvidencePackets = [normalized.evidencePacket, ...mergeByKey(seedCommercialCryptoEvidencePackets(), data.commercialCryptoEvidencePackets, "id")].slice(0, 80);
+    }
+    data.securityEvents = sealAuditTrail([
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "commercial-crypto-action",
+        target: capabilityId,
+        result: "allowed",
+        detail: `${normalized.history.action} / ${normalized.history.fromStatus} -> ${normalized.history.toStatus} / production ready false`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    const refreshed = readDatabase();
+    sendJson(res, 200, {
+      ok: true,
+      capability: normalized.item,
+      action: normalized.history,
+      probeRun: normalized.probeRun,
+      evidencePacket: normalized.evidencePacket,
+      center: buildCommercialCryptoCenter(refreshed)
+    });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/production-database/cutover-runs") {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-database/cutover-runs");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const run = createProductionDatabaseCutoverRun(data, {
+      createdBy: user.name,
+      note: payload.note
+    });
+    data.productionDatabaseMigrationBatches = mergeByKey(seedProductionDatabaseMigrationBatches(), data.productionDatabaseMigrationBatches, "id");
+    data.productionDatabaseCutoverRuns = [
+      run,
+      ...mergeByKey(seedProductionDatabaseCutoverRuns(), data.productionDatabaseCutoverRuns, "id").filter((item) => item.id !== run.id)
+    ].slice(0, 20);
+    data.securityEvents = sealAuditTrail([
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "production-database-cutover-rehearsal",
+        target: run.id,
+        result: "allowed",
+        detail: `${run.status} / ${run.sampleValidations.filter((item) => item.passed).length}/${run.sampleValidations.length} sample validations`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    const center = buildProductionDatabaseCutoverCenter(readDatabase());
+    sendJson(res, 201, { ok: true, run, center });
+    return;
+  }
+
+  const productionDatabaseCutoverActionMatch = url.pathname.match(/^\/api\/production-database\/cutover-runs\/([^/]+)\/actions$/);
+  if (req.method === "POST" && productionDatabaseCutoverActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-database/cutover-runs/:id/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const runs = mergeByKey(seedProductionDatabaseCutoverRuns(), data.productionDatabaseCutoverRuns, "id");
+    const runId = decodeURIComponent(productionDatabaseCutoverActionMatch[1]);
+    const index = runs.findIndex((item) => item.id === runId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "production database cutover run not found" });
+      return;
+    }
+    let normalized;
+    try {
+      normalized = applyProductionDatabaseCutoverAction(runs[index], payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    runs[index] = normalized.run;
+    data.productionDatabaseCutoverRuns = runs;
+    data.securityEvents = sealAuditTrail([
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "production-database-cutover-action",
+        target: runId,
+        result: "allowed",
+        detail: `${normalized.history.action} / ${normalized.run.status} / ${normalized.run.reviewStatus}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    const center = buildProductionDatabaseCutoverCenter(readDatabase());
+    sendJson(res, 200, { ok: true, run: normalized.run, action: normalized.history, center });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/phase2/catalog") {
+    const user = requireApiRole(req, res, ["commission"], "/api/phase2/catalog");
+    if (!user) return;
+    const data = readDatabase();
+    sendJson(res, 200, buildPhase2CatalogOverview(data));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/phase2/joint-test-pilot") {
+    const user = requireApiRole(req, res, ["commission"], "/api/phase2/joint-test-pilot");
+    if (!user) return;
+    const data = readDatabase();
+    sendJson(res, 200, buildPhase2JointTestPilotOverview(data));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/phase2/disease-reporting") {
+    const user = requireApiRole(req, res, ["commission", "county", "institution"], "/api/phase2/disease-reporting");
+    if (!user) return;
+    const data = readDatabase();
+    sendJson(res, 200, buildPhase2DiseaseReportingOverview(data));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/phase2/clinical-assist") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/phase2/clinical-assist");
+    if (!user) return;
+    const data = readDatabase();
+    sendJson(res, 200, buildPhase2ClinicalAssistOverview(data, user));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/phase2/family-doctor-contracts") {
+    const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/phase2/family-doctor-contracts");
+    if (!user) return;
+    const data = readDatabase();
+    sendJson(res, 200, buildPhase2FamilyDoctorOverview(data, user));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/phase2/family-doctor-contracts/applications") {
+    const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/phase2/family-doctor-contracts/applications");
+    if (!user) return;
+    const data = readDatabase();
+    const payload = await collectJson(req);
+    const application = normalizePhase2FamilyDoctorApplication(payload, user, data);
+    if (user.role === "citizen") {
+      const allowedIds = allowedResidentIdsForUser(data, user);
+      if (!application.residentId || !allowedIds?.has(application.residentId)) {
+        appendSecurityEvent({ actor: user.name, role: user.role, action: "phase2-family-doctor-application", target: application.residentId, result: "denied", detail: "resident scope denied" });
+        sendJson(res, 403, { error: "Forbidden", message: "无权为该居民提交家庭医生签约申请" });
+        return;
+      }
+    }
+    data.phase2FamilyDoctorApplications = mergeByKey(data.phase2FamilyDoctorApplications, [application], "id");
+    data.taskMessages = [
+      {
+        id: randomUUID(),
+        taskId: `phase2FamilyDoctorApplications:${application.id}`,
+        collection: "phase2FamilyDoctorApplications",
+        sourceId: application.id,
+        residentId: application.residentId,
+        targetRole: "institution",
+        targetOrgCode: application.reviewInstitutionCode,
+        channel: "in_app",
+        title: "家庭医生签约申请待审核",
+        body: `${application.residentName || application.residentId} 提交 ${application.packageId} 签约申请`,
+        status: "sent",
+        receipts: [],
+        createdAt: new Date().toISOString(),
+        createdBy: user.username || user.role
+      },
+      ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])
+    ].slice(0, 300);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "phase2-family-doctor-application",
+        target: application.id,
+        result: "allowed",
+        detail: `${application.residentId} / ${application.packageId} / ${application.teamId}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 201, { application, overview: buildPhase2FamilyDoctorOverview(data, user) });
+    return;
+  }
+
+  const phase2FamilyDoctorReviewMatch = url.pathname.match(/^\/api\/phase2\/family-doctor-contracts\/applications\/([^/]+)\/review$/);
+  if (req.method === "POST" && phase2FamilyDoctorReviewMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/phase2/family-doctor-contracts/applications/:id/review");
+    if (!user) return;
+    const data = readDatabase();
+    const applicationId = decodeURIComponent(phase2FamilyDoctorReviewMatch[1]);
+    const applications = Array.isArray(data.phase2FamilyDoctorApplications) ? data.phase2FamilyDoctorApplications : seedPhase2FamilyDoctorApplications();
+    const index = applications.findIndex((item) => item.id === applicationId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到家庭医生签约申请" });
+      return;
+    }
+    if (!canAccessPhase2FamilyDoctorRow(user, applications[index], data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "phase2-family-doctor-application-review", target: applicationId, result: "denied", detail: "institution scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权审核该家庭医生签约申请" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const decision = String(payload.decision || payload.reviewStatus || "approved").trim();
+    const approved = /approve|approved|pass|通过|同意/i.test(decision);
+    const now = new Date().toISOString();
+    applications[index] = {
+      ...applications[index],
+      status: approved ? "approved" : "rejected",
+      reviewStatus: approved ? "approved" : "rejected",
+      reviewer: user.username || user.role,
+      reviewedAt: now,
+      reviewComment: String(payload.comment || payload.reviewComment || (approved ? "机构审核通过。" : "机构审核退回。")).trim(),
+      lastAction: approved ? "机构审核通过并生成或续约签约合同。" : "机构审核退回，等待居民补充。"
+    };
+    data.phase2FamilyDoctorApplications = applications;
+    let contract = null;
+    if (approved) {
+      contract = buildPhase2FamilyDoctorContractFromApplication(applications[index], payload, user);
+      const existingContracts = Array.isArray(data.phase2FamilyDoctorContracts) ? data.phase2FamilyDoctorContracts : seedPhase2FamilyDoctorContracts();
+      data.phase2FamilyDoctorContracts = mergeByKey(existingContracts, [contract], "id");
+    }
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "phase2-family-doctor-application-review",
+        target: applicationId,
+        result: "allowed",
+        detail: `${applications[index].reviewStatus} / ${applications[index].reviewInstitutionCode}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, { application: applications[index], contract, overview: buildPhase2FamilyDoctorOverview(data, user) });
+    return;
+  }
+
+  const phase2FamilyDoctorFulfillmentMatch = url.pathname.match(/^\/api\/phase2\/family-doctor-contracts\/contracts\/([^/]+)\/fulfillments$/);
+  if (req.method === "POST" && phase2FamilyDoctorFulfillmentMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/phase2/family-doctor-contracts/contracts/:id/fulfillments");
+    if (!user) return;
+    const data = readDatabase();
+    const contractId = decodeURIComponent(phase2FamilyDoctorFulfillmentMatch[1]);
+    const contracts = Array.isArray(data.phase2FamilyDoctorContracts) ? data.phase2FamilyDoctorContracts : seedPhase2FamilyDoctorContracts();
+    const index = contracts.findIndex((item) => item.id === contractId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到家庭医生签约合同" });
+      return;
+    }
+    if (!canAccessPhase2FamilyDoctorRow(user, contracts[index], data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "phase2-family-doctor-fulfillment", target: contractId, result: "denied", detail: "institution scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权登记该家庭医生履约记录" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const now = new Date().toISOString();
+    const fulfillment = {
+      id: `p2fdf-${contractId}-${Date.now()}`,
+      contractId,
+      residentId: contracts[index].residentId,
+      teamId: contracts[index].teamId,
+      packageId: contracts[index].packageId,
+      serviceDate: String(payload.serviceDate || todayOffset(0)).trim(),
+      serviceType: String(payload.serviceType || "followup").trim(),
+      serviceItem: String(payload.serviceItem || payload.note || "家庭医生履约服务").trim(),
+      status: String(payload.status || "completed").trim(),
+      evidenceCollection: String(payload.evidenceCollection || "phase2FamilyDoctorFulfillments").trim(),
+      evidenceId: String(payload.evidenceId || "").trim(),
+      fulfillmentValue: Number(payload.fulfillmentValue || 10),
+      satisfaction: String(payload.satisfaction || "pending").trim(),
+      createdBy: user.username || user.role,
+      createdAt: now,
+      auditHash: phase2EvidenceHash(`${contractId}/${payload.serviceType || "followup"}/${now}`)
+    };
+    data.phase2FamilyDoctorFulfillments = mergeByKey(data.phase2FamilyDoctorFulfillments, [fulfillment], "id");
+    contracts[index] = {
+      ...contracts[index],
+      status: contracts[index].status || "active",
+      fulfillmentPercent: Math.min(100, Number(contracts[index].fulfillmentPercent || 0) + Number(fulfillment.fulfillmentValue || 0)),
+      lastServiceAt: fulfillment.serviceDate,
+      nextServiceAt: String(payload.nextServiceAt || contracts[index].nextServiceAt || todayOffset(30)).trim()
+    };
+    data.phase2FamilyDoctorContracts = contracts;
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "phase2-family-doctor-fulfillment",
+        target: contractId,
+        result: "allowed",
+        detail: `${fulfillment.serviceType} / ${fulfillment.auditHash}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 201, { contract: contracts[index], fulfillment, overview: buildPhase2FamilyDoctorOverview(data, user) });
+    return;
+  }
+
+  const phase2ClinicalAssistReceiptMatch = url.pathname.match(/^\/api\/phase2\/clinical-assist\/alerts\/([^/]+)\/receipt$/);
+  if (req.method === "POST" && phase2ClinicalAssistReceiptMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/phase2/clinical-assist/alerts/:id/receipt");
+    if (!user) return;
+    const data = readDatabase();
+    const alertId = decodeURIComponent(phase2ClinicalAssistReceiptMatch[1]);
+    const alerts = Array.isArray(data.phase2ClinicalAssistAlerts) ? data.phase2ClinicalAssistAlerts : seedPhase2ClinicalAssistAlerts();
+    const index = alerts.findIndex((item) => item.id === alertId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到临床辅助提醒" });
+      return;
+    }
+    if (!canAccessPhase2ClinicalAssistAlert(user, alerts[index])) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "phase2-clinical-assist-receipt", target: alertId, result: "denied", detail: "超出医生工作站授权范围" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权处理该临床辅助提醒" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const receipt = normalizePhase2ClinicalAssistReceipt(alerts[index], payload, user);
+    alerts[index] = {
+      ...alerts[index],
+      status: /dismiss|ignore|拒绝|忽略|保留/i.test(receipt.doctorAction) ? "dismissed-with-reason" : "acknowledged",
+      doctorAction: receipt.doctorAction,
+      messageReceiptStatus: receipt.receiptStatus,
+      receiptId: receipt.id,
+      lastAction: receipt.actionDetail,
+      lastReceiptAt: receipt.receivedAt
+    };
+    data.phase2ClinicalAssistAlerts = alerts;
+    data.phase2ClinicalAssistReceipts = mergeByKey(data.phase2ClinicalAssistReceipts, [receipt], "id");
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "phase2-clinical-assist-receipt",
+        target: alertId,
+        result: "allowed",
+        detail: `${receipt.doctorAction} · ${receipt.receiptStatus} · ${receipt.auditHash}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, { alert: alerts[index], receipt, overview: buildPhase2ClinicalAssistOverview(data, user) });
+    return;
+  }
+
+  const phase2ClinicalAssistRuleConfigMatch = url.pathname.match(/^\/api\/phase2\/clinical-assist\/rules\/([^/]+)\/config$/);
+  if (req.method === "POST" && phase2ClinicalAssistRuleConfigMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/phase2/clinical-assist/rules/:id/config");
+    if (!user) return;
+    const data = readDatabase();
+    const ruleId = decodeURIComponent(phase2ClinicalAssistRuleConfigMatch[1]);
+    const rules = Array.isArray(data.phase2ClinicalAssistRules) ? data.phase2ClinicalAssistRules : seedPhase2ClinicalAssistRules();
+    const index = rules.findIndex((item) => item.id === ruleId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到临床辅助规则" });
+      return;
+    }
+    const payload = await collectJson(req);
+    rules[index] = {
+      ...rules[index],
+      configStatus: String(payload.configStatus || payload.status || rules[index].configStatus || "active").trim(),
+      severity: String(payload.severity || rules[index].severity || "medium").trim(),
+      defaultAction: String(payload.defaultAction || rules[index].defaultAction || "").trim(),
+      owner: String(payload.owner || rules[index].owner || user.orgName || "").trim(),
+      lastConfiguredBy: user.username || user.role,
+      lastConfiguredAt: new Date().toISOString()
+    };
+    data.phase2ClinicalAssistRules = rules;
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "phase2-clinical-assist-rule-config",
+        target: ruleId,
+        result: "allowed",
+        detail: `${rules[index].configStatus} · ${rules[index].severity}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, { rule: rules[index], overview: buildPhase2ClinicalAssistOverview(data, user) });
+    return;
+  }
+
+  const phase2DiseaseReportReceiptMatch = url.pathname.match(/^\/api\/phase2\/disease-reporting\/reports\/([^/]+)\/receipt$/);
+  if (req.method === "POST" && phase2DiseaseReportReceiptMatch) {
+    const user = requireApiRole(req, res, ["commission", "county"], "/api/phase2/disease-reporting/reports/:id/receipt");
+    if (!user) return;
+    const data = readDatabase();
+    const reportId = decodeURIComponent(phase2DiseaseReportReceiptMatch[1]);
+    const queue = Array.isArray(data.phase2DiseaseReportQueue) ? data.phase2DiseaseReportQueue : seedPhase2DiseaseReportQueue();
+    const index = queue.findIndex((item) => item.id === reportId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到二期报病记录" });
+      return;
+    }
+    const payload = await collectJson(req);
+    const receipt = normalizePhase2DiseaseReportReceipt(queue[index], payload, user);
+    queue[index] = {
+      ...queue[index],
+      status: /accept|received|通过|接收/i.test(receipt.receiptStatus) ? "receipt-confirmed" : "receipt-review",
+      pushStatus: receipt.receiptStatus,
+      receiptId: receipt.id,
+      exceptionStatus: /reject|error|退回|失败/i.test(receipt.receiptStatus) ? "open" : "closed",
+      lastAction: receipt.detail,
+      lastReceiptAt: receipt.receivedAt
+    };
+    data.phase2DiseaseReportQueue = queue;
+    data.phase2DiseaseReportReceipts = mergeByKey(data.phase2DiseaseReportReceipts, [receipt], "id");
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "phase2-disease-report-receipt",
+        target: reportId,
+        result: "allowed",
+        detail: `${receipt.receiptStatus} · ${receipt.receiptCode} · ${receipt.auditHash}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, { report: queue[index], receipt, overview: buildPhase2DiseaseReportingOverview(data) });
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/integration/contracts") {
     const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/integration/contracts");
     if (!user) return;
@@ -14452,6 +19202,14 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/phase2/mutual-recognition") {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/phase2/mutual-recognition");
+    if (!user) return;
+    const data = readDatabase();
+    sendJson(res, 200, buildPhase2MutualRecognitionOverview(data));
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/mutual-recognition/reports") {
     const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/mutual-recognition/reports");
     if (!user) return;
@@ -14490,6 +19248,42 @@ async function handleApi(req, res) {
     ].slice(0, 120);
     writeDatabase(data);
     sendJson(res, 201, normalized);
+    return;
+  }
+
+  const phase2MutualRecognitionDecisionMatch = url.pathname.match(/^\/api\/phase2\/mutual-recognition\/records\/([^/]+)\/decision$/);
+  if (req.method === "POST" && phase2MutualRecognitionDecisionMatch) {
+    const user = requireApiRole(req, res, ["county", "commission"], "/api/phase2/mutual-recognition/records/:id/decision");
+    if (!user) return;
+    const data = readDatabase();
+    const payload = await collectJson(req);
+    let reviewed;
+    try {
+      reviewed = reviewMutualRecognitionRecord(data, decodeURIComponent(phase2MutualRecognitionDecisionMatch[1]), payload, user);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    if (!reviewed) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到互认记录" });
+      return;
+    }
+    const citation = upsertPhase2MutualRecognitionCitation(data, reviewed, payload, user);
+    data.securityEvents = [
+      {
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "phase2-mutual-recognition-decision",
+        target: reviewed.id,
+        result: "allowed",
+        detail: `${reviewed.reviewStatus} · ${reviewed.reviewReasonCode} · ${citation?.evidenceHash || "no-citation"}`
+      },
+      ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+    ].slice(0, 120);
+    writeDatabase(data);
+    sendJson(res, 200, { record: reviewed, citation, overview: buildPhase2MutualRecognitionOverview(data) });
     return;
   }
 

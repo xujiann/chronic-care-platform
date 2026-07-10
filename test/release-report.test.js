@@ -100,6 +100,33 @@ test("release report shows configured audit retention target detail", () => {
   assert.match(check.detail, /SIEM_ENDPOINT:missing/);
 });
 
+test("release report keeps the site evidence verification desk ready while evidence is awaiting review", () => {
+  const data = JSON.parse(fs.readFileSync(path.join(ROOT, "data/db.json"), "utf8"));
+  data.siteLaunchEvidence = [{
+    id: "sle-release-report-partial",
+    templateId: "interface-statistics-report-v1",
+    status: "verified",
+    artifactName: "signed direct-report receipt",
+    verifiedAt: "2026-07-10T09:00:00+08:00",
+    verifiedBy: "commission reviewer",
+    attachmentNames: ["signed-receipt.pdf"]
+  }];
+  const report = buildReleaseReport({
+    profile: "demo",
+    data,
+    env: {
+      NODE_ENV: "production",
+      STORAGE_ENGINE: "auto",
+      SESSION_SECRETS: "replace-with-long-random-secret",
+      INTEGRATION_GATEWAY_SECRET: "replace-with-integration-secret"
+    }
+  });
+  const deskCheck = report.checks.find((item) => item.name === "publicHealth:siteEvidenceVerificationTasks");
+  assert.equal(report.publicHealthReadiness.siteEvidenceVerificationBoard.status, "verification-pending");
+  assert.equal(deskCheck.passed, true);
+  assert.match(deskCheck.detail, /verification-pending/);
+});
+
 test("release report summarizes repository readiness and renders markdown", () => {
   const report = buildReleaseReport({
     profile: "demo",
@@ -141,6 +168,61 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.chronicLaunchCore.summary.readyItems, 5);
   assert.equal(report.checks.some((item) => item.name === "dataQuality:report" && item.passed), true);
   assert.equal(report.dataQuality.ok, true);
+  assert.equal(report.checks.some((item) => item.name === "healthDashboard:industryGovernanceIndicators" && item.passed), true);
+  assert.equal(report.healthDashboard.indicatorCenter.indicators.length, 8);
+  assert.equal(report.healthDashboard.indicatorCenter.periodViews.length, 2);
+  assert.equal(report.checks.some((item) => item.name === "digitalHospitalStandards:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "digitalHospitalStandards:api" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "digitalHospitalStandards:launchReadiness" && item.passed), true);
+  assert.equal(report.digitalHospitalStandards.ok, true);
+  assert.equal(report.digitalHospitalStandards.summary.standardDomains >= 6, true);
+  assert.equal(report.digitalHospitalStandards.summary.apiMarkers >= 5, true);
+  assert.equal(report.digitalHospitalStandards.summary.launchMarkers >= 16, true);
+  assert.equal(report.digitalHospitalStandards.summary.evidenceModes >= 5, true);
+  assert.equal(report.checks.some((item) => item.name === "phase2Proposal:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "phase2Proposal:externalBoundary" && item.passed), true);
+  assert.equal(report.phase2Proposal.ok, true);
+  assert.equal(report.phase2Proposal.summary.gapRows >= 12, true);
+  assert.equal(report.checks.some((item) => item.name === "phase2Catalog:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "phase2Catalog:tables" && item.passed), true);
+  assert.equal(report.phase2Catalog.ok, true);
+  assert.equal(report.phase2Catalog.summary.tablesMapped >= 216, true);
+  assert.equal(report.checks.some((item) => item.name === "phase2JointTest:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "phase2JointTest:payloads" && item.passed), true);
+  assert.equal(report.phase2JointTest.ok, true);
+  assert.equal(report.phase2JointTest.summary.institutions >= 3, true);
+  assert.equal(report.checks.some((item) => item.name === "phase2MutualRecognition:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "phase2MutualRecognition:catalog" && item.passed), true);
+  assert.equal(report.phase2MutualRecognition.ok, true);
+  assert.equal(report.phase2MutualRecognition.summary.catalogItems >= 78, true);
+  assert.equal(report.checks.some((item) => item.name === "phase2DiseaseReporting:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "phase2DiseaseReporting:receipts" && item.passed), true);
+  assert.equal(report.phase2DiseaseReporting.ok, true);
+  assert.equal(report.phase2DiseaseReporting.summary.reportCards >= 4, true);
+  assert.equal(report.checks.some((item) => item.name === "phase2ClinicalAssist:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "phase2ClinicalAssist:alerts" && item.passed), true);
+  assert.equal(report.phase2ClinicalAssist.ok, true);
+  assert.equal(report.phase2ClinicalAssist.summary.alerts >= 4, true);
+  assert.equal(report.checks.some((item) => item.name === "phase2FamilyDoctor:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "phase2FamilyDoctor:fulfillment" && item.passed), true);
+  assert.equal(report.phase2FamilyDoctor.ok, true);
+  assert.equal(report.phase2FamilyDoctor.summary.contracts >= 3, true);
+  assert.equal(report.checks.some((item) => item.name === "citizenOperations:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "citizenOperations:production-boundary" && item.passed), true);
+  assert.equal(report.citizenOperations.ok, true);
+  assert.equal(report.citizenOperations.summary.publishedContents >= 3, true);
+  assert.equal(report.citizenOperations.summary.productionReadyHospitals, 0);
+  assert.equal(report.checks.some((item) => item.name === "registrationJourney:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "registrationJourney:cross-role" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "registrationJourney:production-boundary" && item.passed), true);
+  assert.equal(report.registrationJourney.ok, true);
+  assert.equal(report.registrationJourney.center.summary.orders >= 1, true);
+  assert.equal(report.registrationJourney.center.summary.productionReady, 0);
+  assert.equal(report.checks.some((item) => item.name === "commercialCrypto:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "commercialCrypto:production-boundary" && item.passed), true);
+  assert.equal(report.commercialCrypto.ok, true);
+  assert.equal(report.commercialCrypto.summary.capabilities, 6);
+  assert.equal(report.commercialCrypto.summary.productionReady, 0);
   assert.equal(report.checks.some((item) => item.name === "drugConsumable:readiness" && item.passed), true);
   assert.equal(report.drugConsumable.ok, true);
   assert.equal(report.checks.some((item) => item.name === "integration:readiness" && item.passed), true);
@@ -158,7 +240,11 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "escortService:appointmentFieldGuard" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "internetNursing:closedLoopSummary" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "operations:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "operations:runCenter" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "operations:production-boundary" && item.passed), true);
   assert.equal(report.operationsReadiness.ok, true);
+  assert.equal(report.operationsReadiness.runCenter.summary.serviceLevels, 4);
+  assert.equal(report.operationsReadiness.runCenter.summary.productionReady, 0);
   assert.equal(report.checks.some((item) => item.name === "process:audit" && item.passed), true);
   assert.equal(report.processAudit.ok, true);
   assert.equal(report.checks.some((item) => item.name === "service:chronicDomains" && item.passed), true);
@@ -175,7 +261,10 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.onsiteLaunchRequirements.ok, true);
   assert.equal(report.onsiteLaunchRequirements.formalGoLiveState, "blocked-until-site-materials-signed");
   assert.equal(report.checks.some((item) => item.name === "productionDb:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "productionDb:cutoverCenter" && item.passed), true);
   assert.equal(report.productionDbReadiness.ok, true);
+  assert.equal(report.productionDbReadiness.cutoverCenter.summary.migrationBatches, 4);
+  assert.equal(report.productionDbReadiness.cutoverCenter.summary.productionReadyRuns, 0);
   assert.equal(report.checks.some((item) => item.name === "evaluation:evidence" && item.passed), true);
   assert.equal(report.evaluationEvidence.ok, true);
   assert.equal(report.checks.some((item) => item.name === "environment:matrix" && item.passed), true);
@@ -187,21 +276,94 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "priorityApps:acceptanceGates" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "maternalChild:riskMetrics" && item.passed), true);
   assert.deepEqual(Object.keys(report.maternalChildReadiness.summary.riskMetrics), ["pendingPublicSecuritySync", "pendingMaternalChildSync", "qualityPending"]);
-  assert.equal(report.checks.some((item) => item.name === "publicHealth:readiness" && item.passed), true);
+  const publicHealthReadiness = report.checks.find((item) => item.name === "publicHealth:readiness");
+  assert.equal(Boolean(publicHealthReadiness), true);
+  assert.equal(publicHealthReadiness.passed || (publicHealthReadiness.severity === "warn" && /site cutover blockers/.test(publicHealthReadiness.detail)), true);
   assert.equal(report.checks.some((item) => item.name === "publicHealth:standardTotal" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "publicHealth:standardImplementationLedger" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "publicHealth:standardImplementationActions" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "publicHealth:eventActionApi" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "publicHealth:nextPlan" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "publicHealth:exchangeRuns" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "publicHealth:institutionTasks" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "publicHealth:onsiteAcceptance" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "publicHealth:cutoverBlockers" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "publicHealth:cutoverReadiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "publicHealth:cutoverEvidencePackets" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "publicHealth:cutoverDrills" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "publicHealth:productionHandoffs" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "publicHealth:goLiveObservations" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "publicHealth:launchIncidents" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "publicHealth:launchDutyShifts" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "publicHealth:launchCommandBriefs" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "publicHealth:siteEvidenceBridge" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "publicHealth:siteEvidenceVerificationTasks" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "publicHealth:launchApprovalPreflight" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "publicHealth:launchGate" && item.passed), true);
   assert.equal(report.publicHealthReadiness.ok, true);
   assert.equal(report.publicHealthReadiness.summary.domains, 21);
   assert.equal(report.publicHealthReadiness.summary.secondaryIndicators, 125);
   assert.equal(report.publicHealthReadiness.summary.tertiaryIndicators, 421);
+  assert.equal(report.publicHealthReadiness.standardImplementationBoard.status, "mapping-review-pending");
+  assert.equal(report.publicHealthReadiness.standardImplementationBoard.summary.domains, 21);
+  assert.equal(report.publicHealthReadiness.standardImplementationBoard.summary.mappingComplete, 21);
+  assert.equal(report.publicHealthReadiness.standardImplementationBoard.summary.gaps, 0);
+  assert.equal(report.publicHealthReadiness.summary.standardImplementationEvidenceCandidates, 0);
+  assert.equal(report.publicHealthReadiness.summary.standardImplementationAssignedGaps, 0);
+  assert.equal(report.publicHealthReadiness.summary.standardImplementationVerifiedGaps, 0);
+  assert.equal(report.publicHealthReadiness.summary.standardImplementationUnassignedGaps, 0);
+  assert.equal(report.publicHealthReadiness.summary.standardImplementationDueSoonGaps, 0);
+  assert.equal(report.publicHealthReadiness.summary.standardImplementationOverdueGaps, 0);
+  assert.equal(report.publicHealthReadiness.summary.exchangeExceptions >= 2, true);
+  assert.equal(report.publicHealthReadiness.summary.openExchangeExceptions >= 1, true);
+  assert.equal(report.publicHealthReadiness.summary.resolvedExchangeExceptions >= 1, true);
   assert.equal(Number.isFinite(report.publicHealthReadiness.summary.eventActions), true);
   assert.equal(report.publicHealthReadiness.summary.exchangeRuns >= 6, true);
   assert.equal(report.publicHealthReadiness.summary.institutionTasks >= 7, true);
   assert.equal(report.publicHealthReadiness.summary.onsiteAcceptances >= 6, true);
+  assert.equal(report.publicHealthReadiness.summary.cutoverBlockers >= 6, true);
+  assert.equal(report.publicHealthReadiness.summary.cutoverEvidencePackets >= 6, true);
+  assert.equal(report.publicHealthReadiness.summary.cutoverDrills >= 4, true);
+  assert.equal(report.publicHealthReadiness.summary.productionHandoffs >= 6, true);
+  assert.equal(report.publicHealthReadiness.summary.goLiveObservations >= 6, true);
+  assert.equal(report.publicHealthReadiness.summary.goLiveObservationPlanReady >= 6, true);
+  assert.equal(report.publicHealthReadiness.summary.goLiveOpenCriticalSignals, 0);
+  assert.equal(report.publicHealthReadiness.summary.launchIncidentLanes >= 6, true);
+  assert.equal(report.publicHealthReadiness.summary.launchIncidentDeskReady >= 6, true);
+  assert.equal(report.publicHealthReadiness.summary.launchIncidentCriticalOpen, 0);
+  assert.equal(report.publicHealthReadiness.summary.launchDutyShifts >= 6, true);
+  assert.equal(report.publicHealthReadiness.summary.launchDutyReadyShifts >= 6, true);
+  assert.equal(report.publicHealthReadiness.summary.launchDutyMissedHandoffs, 0);
+  assert.equal(report.publicHealthReadiness.summary.launchCommandBriefs >= 5, true);
+  assert.equal(report.publicHealthReadiness.summary.launchCommandReadyBriefs >= 5, true);
+  assert.equal(report.publicHealthReadiness.summary.launchCommandBlockedBriefs, 0);
+  assert.equal(report.publicHealthReadiness.productionHandoffBoard.status, "blocked");
+  assert.equal(report.publicHealthReadiness.productionHandoffBoard.summary.releaseArtifacts >= 8, true);
+  assert.equal(report.publicHealthReadiness.goLiveObservationBoard.status, "watch-ready");
+  assert.equal(report.publicHealthReadiness.goLiveObservationBoard.summary.rollbackPlans >= 6, true);
+  assert.equal(report.publicHealthReadiness.launchIncidentBoard.status, "desk-ready");
+  assert.equal(report.publicHealthReadiness.launchIncidentBoard.summary.rollbackDecisionOwners >= 4, true);
+  assert.equal(report.publicHealthReadiness.launchDutyBoard.status, "roster-ready");
+  assert.equal(report.publicHealthReadiness.launchDutyBoard.summary.backupContacts >= 6, true);
+  assert.equal(report.publicHealthReadiness.launchCommandBriefBoard.status, "briefing-ready");
+  assert.equal(report.publicHealthReadiness.launchCommandBriefBoard.summary.sourceBoards >= 4, true);
+  assert.equal(report.publicHealthReadiness.summary.siteEvidenceBridgeLinks >= 8, true);
+  assert.equal(report.publicHealthReadiness.summary.siteEvidenceVerificationTasks >= 9, true);
+  assert.equal(report.publicHealthReadiness.summary.siteEvidenceVerificationVerifiedTasks, 0);
+  assert.equal(report.publicHealthReadiness.siteEvidenceVerificationBoard.status, "evidence-pending");
+  assert.equal(report.publicHealthReadiness.summary.launchApprovals >= 6, true);
+  assert.equal(report.publicHealthReadiness.launchGate.approvalPreflight.status, "blocked");
+  assert.equal(report.publicHealthReadiness.launchGate.approvalPreflight.blockedPrerequisites >= 1, true);
+  assert.equal(report.publicHealthReadiness.cutoverEvidenceBoard.summary.requiredItems >= 20, true);
+  assert.equal(report.publicHealthReadiness.siteEvidenceBridge.summary.linkedItems >= 20, true);
+  assert.equal(report.publicHealthReadiness.siteEvidenceBridge.status, "missing-site-evidence");
+  assert.equal(report.publicHealthReadiness.summary.p0OpenCutoverBlockers >= 1, true);
+  assert.equal(report.publicHealthReadiness.cutoverReadiness.readinessLevel, "blocked");
+  assert.equal(report.publicHealthReadiness.cutoverReadiness.releaseGate, "site-evidence-required");
+  assert.equal(report.publicHealthReadiness.cutoverDrillBoard.status, "blocked");
+  assert.equal(report.publicHealthReadiness.cutoverDrillBoard.summary.openFindings >= 4, true);
+  assert.equal(report.publicHealthReadiness.launchGate.summary.requirements >= 8, true);
+  assert.equal(report.publicHealthReadiness.launchGate.releaseGate, "site-evidence-required");
   assert.equal(report.checks.some((item) => item.name === "citizenLaunch:readiness" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "citizenLaunch:phoneCodeDelivery" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "citizenLaunch:accountProvisioning" && item.passed), true);
@@ -229,6 +391,22 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(markdown, /Integration readiness report/);
   assert.match(markdown, /Interface mapping report/);
   assert.match(markdown, /Data quality and master index report/);
+  assert.match(markdown, /Digital hospital standards readiness report/);
+  assert.match(markdown, /digital-hospital-standards-readiness-report\.md/);
+  assert.match(markdown, /Phase 2 proposal readiness report/);
+  assert.match(markdown, /phase2-proposal-readiness-report\.md/);
+  assert.match(markdown, /Phase 2 catalog readiness report/);
+  assert.match(markdown, /phase2-catalog-readiness-report\.md/);
+  assert.match(markdown, /Phase 2 joint-test readiness report/);
+  assert.match(markdown, /phase2-joint-test-readiness-report\.md/);
+  assert.match(markdown, /Phase 2 mutual recognition readiness report/);
+  assert.match(markdown, /phase2-mutual-recognition-readiness-report\.md/);
+  assert.match(markdown, /Phase 2 disease reporting readiness report/);
+  assert.match(markdown, /phase2-disease-reporting-readiness-report\.md/);
+  assert.match(markdown, /Phase 2 clinical assist readiness report/);
+  assert.match(markdown, /phase2-clinical-assist-readiness-report\.md/);
+  assert.match(markdown, /Phase 2 family doctor readiness report/);
+  assert.match(markdown, /phase2-family-doctor-readiness-report\.md/);
   assert.match(markdown, /Drug consumable readiness report/);
   assert.match(markdown, /Monitoring readiness report/);
   assert.match(markdown, /Referral teleconsultation readiness report/);
@@ -328,6 +506,28 @@ test("release report writes standalone production cutover and storage artifacts"
   const chronicLaunchCoreMarkdown = fs.readFileSync(path.join(outputDir, "chronic-launch-core.md"), "utf8");
   const dataQualityJson = JSON.parse(fs.readFileSync(path.join(outputDir, "data-quality-report.json"), "utf8"));
   const dataQualityMarkdown = fs.readFileSync(path.join(outputDir, "data-quality-report.md"), "utf8");
+  const digitalHospitalStandardsJson = JSON.parse(fs.readFileSync(path.join(outputDir, "digital-hospital-standards-readiness-report.json"), "utf8"));
+  const digitalHospitalStandardsMarkdown = fs.readFileSync(path.join(outputDir, "digital-hospital-standards-readiness-report.md"), "utf8");
+  const phase2ProposalJson = JSON.parse(fs.readFileSync(path.join(outputDir, "phase2-proposal-readiness-report.json"), "utf8"));
+  const phase2ProposalMarkdown = fs.readFileSync(path.join(outputDir, "phase2-proposal-readiness-report.md"), "utf8");
+  const phase2CatalogJson = JSON.parse(fs.readFileSync(path.join(outputDir, "phase2-catalog-readiness-report.json"), "utf8"));
+  const phase2CatalogMarkdown = fs.readFileSync(path.join(outputDir, "phase2-catalog-readiness-report.md"), "utf8");
+  const phase2JointTestJson = JSON.parse(fs.readFileSync(path.join(outputDir, "phase2-joint-test-readiness-report.json"), "utf8"));
+  const phase2JointTestMarkdown = fs.readFileSync(path.join(outputDir, "phase2-joint-test-readiness-report.md"), "utf8");
+  const phase2MutualRecognitionJson = JSON.parse(fs.readFileSync(path.join(outputDir, "phase2-mutual-recognition-readiness-report.json"), "utf8"));
+  const phase2MutualRecognitionMarkdown = fs.readFileSync(path.join(outputDir, "phase2-mutual-recognition-readiness-report.md"), "utf8");
+  const phase2DiseaseReportingJson = JSON.parse(fs.readFileSync(path.join(outputDir, "phase2-disease-reporting-readiness-report.json"), "utf8"));
+  const phase2DiseaseReportingMarkdown = fs.readFileSync(path.join(outputDir, "phase2-disease-reporting-readiness-report.md"), "utf8");
+  const phase2ClinicalAssistJson = JSON.parse(fs.readFileSync(path.join(outputDir, "phase2-clinical-assist-readiness-report.json"), "utf8"));
+  const phase2ClinicalAssistMarkdown = fs.readFileSync(path.join(outputDir, "phase2-clinical-assist-readiness-report.md"), "utf8");
+  const phase2FamilyDoctorJson = JSON.parse(fs.readFileSync(path.join(outputDir, "phase2-family-doctor-readiness-report.json"), "utf8"));
+  const phase2FamilyDoctorMarkdown = fs.readFileSync(path.join(outputDir, "phase2-family-doctor-readiness-report.md"), "utf8");
+  const citizenOperationsJson = JSON.parse(fs.readFileSync(path.join(outputDir, "citizen-operations-readiness-report.json"), "utf8"));
+  const citizenOperationsMarkdown = fs.readFileSync(path.join(outputDir, "citizen-operations-readiness-report.md"), "utf8");
+  const registrationJourneyJson = JSON.parse(fs.readFileSync(path.join(outputDir, "registration-journey-readiness-report.json"), "utf8"));
+  const registrationJourneyMarkdown = fs.readFileSync(path.join(outputDir, "registration-journey-readiness-report.md"), "utf8");
+  const commercialCryptoJson = JSON.parse(fs.readFileSync(path.join(outputDir, "commercial-crypto-readiness-report.json"), "utf8"));
+  const commercialCryptoMarkdown = fs.readFileSync(path.join(outputDir, "commercial-crypto-readiness-report.md"), "utf8");
   const drugConsumableJson = JSON.parse(fs.readFileSync(path.join(outputDir, "drug-consumable-readiness-report.json"), "utf8"));
   const drugConsumableMarkdown = fs.readFileSync(path.join(outputDir, "drug-consumable-readiness-report.md"), "utf8");
   const integrationJson = JSON.parse(fs.readFileSync(path.join(outputDir, "integration-readiness-report.json"), "utf8"));
@@ -384,6 +584,42 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(chronicLaunchCoreMarkdown, /Site Signoffs/);
   assert.equal(dataQualityJson.dataQuality.ok, true);
   assert.match(dataQualityMarkdown, /Resident-linked collections/);
+  assert.equal(digitalHospitalStandardsJson.digitalHospitalStandards.ok, true);
+  assert.match(digitalHospitalStandardsMarkdown, /Digital hospital standards readiness report/);
+  assert.match(digitalHospitalStandardsMarkdown, /digitalHospital:apiContract/);
+  assert.match(digitalHospitalStandardsMarkdown, /digitalHospital:launchReadiness/);
+  assert.match(digitalHospitalStandardsMarkdown, /digitalHospital:officialSources/);
+  assert.equal(phase2ProposalJson.phase2Proposal.ok, true);
+  assert.match(phase2ProposalMarkdown, /Phase 2 proposal readiness report/);
+  assert.match(phase2ProposalMarkdown, /commercial-crypto-devices/);
+  assert.equal(phase2CatalogJson.phase2Catalog.ok, true);
+  assert.match(phase2CatalogMarkdown, /Phase 2 catalog readiness report/);
+  assert.match(phase2CatalogMarkdown, /p2dc-lab-imaging-recognition/);
+  assert.equal(phase2JointTestJson.phase2JointTest.ok, true);
+  assert.match(phase2JointTestMarkdown, /Phase 2 joint-test readiness report/);
+  assert.match(phase2JointTestMarkdown, /p2trace-lis-report/);
+  assert.equal(phase2MutualRecognitionJson.phase2MutualRecognition.ok, true);
+  assert.match(phase2MutualRecognitionMarkdown, /Phase 2 mutual recognition readiness report/);
+  assert.match(phase2MutualRecognitionMarkdown, /P2-MR-001/);
+  assert.equal(phase2DiseaseReportingJson.phase2DiseaseReporting.ok, true);
+  assert.match(phase2DiseaseReportingMarkdown, /Phase 2 disease reporting readiness report/);
+  assert.match(phase2DiseaseReportingMarkdown, /County receipts/);
+  assert.equal(phase2ClinicalAssistJson.phase2ClinicalAssist.ok, true);
+  assert.match(phase2ClinicalAssistMarkdown, /Phase 2 clinical assist readiness report/);
+  assert.match(phase2ClinicalAssistMarkdown, /Plugin contracts/);
+  assert.equal(phase2FamilyDoctorJson.phase2FamilyDoctor.ok, true);
+  assert.match(phase2FamilyDoctorMarkdown, /Phase 2 family doctor readiness report/);
+  assert.match(phase2FamilyDoctorMarkdown, /Applications/);
+  assert.equal(citizenOperationsJson.citizenOperations.ok, true);
+  assert.equal(registrationJourneyJson.registrationJourney.ok, true);
+  assert.match(registrationJourneyMarkdown, /Registration journey readiness report/);
+  assert.match(registrationJourneyMarkdown, /registrationJourney:stateMachine/);
+  assert.match(citizenOperationsMarkdown, /Citizen service operations readiness report/);
+  assert.match(citizenOperationsMarkdown, /Production boundary/);
+  assert.equal(commercialCryptoJson.commercialCrypto.ok, true);
+  assert.match(commercialCryptoMarkdown, /Commercial crypto adapter center readiness report/);
+  assert.match(commercialCryptoMarkdown, /Runtime compatibility probe/);
+  assert.match(commercialCryptoMarkdown, /Production boundary/);
   assert.equal(drugConsumableJson.drugConsumable.ok, true);
   assert.match(drugConsumableMarkdown, /Drug consumable readiness report/);
   assert.equal(integrationJson.integrationReadiness.ok, true);
@@ -400,6 +636,8 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(releaseMarkdown, /citizenLaunch:accountProvisioning/);
   assert.equal(operationsJson.operationsReadiness.ok, true);
   assert.match(operationsMarkdown, /External dependency risks/);
+  assert.match(operationsMarkdown, /Production operations run center/);
+  assert.match(operationsMarkdown, /Production boundary/);
   assert.equal(processAuditJson.processAudit.ok, true);
   assert.match(processAuditMarkdown, /Full process audit report/);
   assert.equal(serviceAcceptanceJson.serviceAcceptance.ok, true);
@@ -437,6 +675,14 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "chronic-followup"), true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "priority-application-templates"), true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "hybrid-deployment"), true);
+  assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "digital-hospital-standards"), true);
+  assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "phase2-proposal"), true);
+  assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "phase2-catalog"), true);
+  assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "phase2-joint-test"), true);
+  assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "phase2-mutual-recognition"), true);
+  assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "phase2-disease-reporting"), true);
+  assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "phase2-clinical-assist"), true);
+  assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "phase2-family-doctor"), true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "onsite-launch-requirements"), true);
   assert.match(manifestMarkdown, /Release artifact manifest/);
   assert.match(manifestMarkdown, /service-acceptance-summary\.md/);

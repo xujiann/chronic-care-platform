@@ -13,17 +13,49 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "file:DEPLOYMENT.md",
     "file:docs/production-go-live-requirements.md",
     "file:docs/on-site-launch-materials.md",
+    "file:docs/production-database-cutover-center.md",
+    "file:docs/citizen-service-operations-center.md",
+    "file:docs/commercial-crypto-adapter-center.md",
+    "file:docs/production-operations-run-center.md",
+    "file:docs/registration-journey-center.md",
     "file:scripts/onsite-launch-requirements.js",
+    "file:scripts/digital-hospital-standards-readiness.js",
+    "file:scripts/phase2-proposal-readiness.js",
+    "file:scripts/phase2-catalog-readiness.js",
+    "file:scripts/phase2-joint-test-readiness.js",
+    "file:scripts/phase2-mutual-recognition-readiness.js",
+    "file:scripts/phase2-disease-reporting-readiness.js",
+    "file:scripts/phase2-clinical-assist-readiness.js",
+    "file:scripts/phase2-family-doctor-readiness.js",
+    "file:scripts/citizen-operations-readiness.js",
+    "file:scripts/commercial-crypto-readiness.js",
+    "file:scripts/registration-journey-readiness.js",
     "file:docs/citizen-production-launch-requirements.md",
+    "file:docs/数智医院标准平台研发报告.md",
+    "file:docs/二期可研对标差距与下一步开发计划.md",
     "package:scripts",
     "package:priorityApplicationTemplates",
     "package:publicHealthReadiness",
+    "package:digitalHospitalStandards",
+    "package:phase2ProposalReadiness",
+    "package:phase2CatalogReadiness",
+    "package:phase2JointTestReadiness",
+    "package:phase2MutualRecognitionReadiness",
+    "package:phase2DiseaseReportingReadiness",
+    "package:phase2ClinicalAssistReadiness",
+    "package:phase2FamilyDoctorReadiness",
+    "package:citizenOperationsReadiness",
+    "package:commercialCryptoReadiness",
+    "package:registrationJourneyReadiness",
     "file:docs/公共卫生信息化下一步开发计划.md",
     "package:hybridDeploymentReadiness",
     "snapshot:collections",
     "snapshot:regionalDataSharing",
     "snapshot:interfaceReadiness",
     "snapshot:securityAcceptance",
+    "ui:digitalHospitalStandards",
+    "digitalHospitalStandards:readiness",
+    "api:digitalHospitalStandards",
     "snapshot:chronicFollowupStatusPolicy",
     "snapshot:publicHealth",
     "api:publicHealth",
@@ -34,6 +66,17 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "snapshot:p2-complete",
     "snapshot:accessibility",
     "snapshot:healthDashboard",
+    "snapshot:healthDashboardIndicatorCenter",
+    "snapshot:phase2Catalog",
+    "snapshot:phase2JointTest",
+    "snapshot:phase2MutualRecognition",
+    "snapshot:phase2DiseaseReporting",
+    "snapshot:phase2ClinicalAssist",
+    "snapshot:phase2FamilyDoctor",
+    "snapshot:citizenOperations",
+    "snapshot:commercialCrypto",
+    "snapshot:productionOperations",
+    "snapshot:registrationJourney",
     "snapshot:multiPractice",
     "docs:chronicLaunchCore",
     "docs:citizenAccountProvisioning",
@@ -42,19 +85,73 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "docs:onsiteLaunchMaterials",
     "docs:publicHealth",
     "docs:publicHealthNextPlan",
+    "docs:phase2ProposalPlan",
     "api:siteLaunchEvidence",
+    "api:publicHealthCutoverReadiness",
+    "api:publicHealthCutoverEvidencePackets",
+    "api:publicHealthCutoverDrills",
+    "api:publicHealthProductionHandoffs",
+    "api:publicHealthGoLiveObservations",
+    "api:publicHealthLaunchIncidents",
+    "api:publicHealthLaunchDutyShifts",
+    "api:publicHealthLaunchCommandBriefs",
+    "api:publicHealthSiteEvidenceBridge",
+    "api:publicHealthSiteEvidenceVerificationTasks",
+    "api:publicHealthStandardImplementationLedger",
+    "api:productionDatabaseCutoverCenter",
+    "api:citizenOperationsCenter",
+    "api:commercialCryptoCenter",
+    "api:productionOperationsCenter",
+    "api:registrationJourney",
+    "api:publicHealthLaunchGate",
+    "api:publicHealthLaunchApprovalPreflight",
+    "docs:publicHealthGoLiveObservations",
+    "docs:publicHealthLaunchIncidents",
+    "docs:publicHealthLaunchDutyShifts",
+    "docs:publicHealthLaunchCommandBriefs",
     "manifest:healthDashboardSummary",
+    "manifest:healthDashboardIndicatorCenter",
     "manifest:launchSmoke",
     "manifest:onsiteLaunchRequirements",
     "manifest:priorityApplicationTemplates",
     "manifest:citizenLaunchFoundation",
     "manifest:publicHealthReadiness",
+    "manifest:digitalHospitalStandards",
+    "manifest:phase2ProposalReadiness",
+    "manifest:phase2CatalogReadiness",
+    "manifest:phase2JointTestReadiness",
+    "manifest:phase2MutualRecognitionReadiness",
+    "manifest:phase2DiseaseReportingReadiness",
+    "manifest:phase2ClinicalAssistReadiness",
+    "manifest:phase2FamilyDoctorReadiness",
+    "manifest:citizenOperationsReadiness",
+    "manifest:commercialCryptoReadiness",
+    "manifest:productionOperationsReadiness",
+    "manifest:registrationJourneyReadiness",
     "manifest:multiPracticeReadiness",
     "manifest:hybridDeploymentReadiness",
     "snapshot:storageMeta"
   ].forEach((name) => assert.equal(checkNames.has(name), true, `${name} should be checked`));
   assert.match(report.checks.find((item) => item.name === "api:chronicPublicHealthLoop").detail, /immunization infectious-reporting and CDC command summary/);
-  assert.match(report.checks.find((item) => item.name === "api:publicHealthAdvancedActions").detail, /exchange, institution and onsite action APIs/);
+  assert.match(report.checks.find((item) => item.name === "api:publicHealthAdvancedActions").detail, /exchange exception, institution, onsite and cutover action APIs/);
+  assert.match(report.checks.find((item) => item.name === "api:publicHealthCutoverReadiness").detail, /cutover readiness API and board/);
+  assert.match(report.checks.find((item) => item.name === "api:publicHealthCutoverEvidencePackets").detail, /cutover evidence packet API and board/);
+  assert.match(report.checks.find((item) => item.name === "api:publicHealthCutoverDrills").detail, /cutover drill API and board/);
+  assert.match(report.checks.find((item) => item.name === "api:publicHealthProductionHandoffs").detail, /production handoff API and board/);
+  assert.match(report.checks.find((item) => item.name === "api:publicHealthGoLiveObservations").detail, /go-live observation API and board/);
+  assert.match(report.checks.find((item) => item.name === "api:publicHealthLaunchIncidents").detail, /launch incident desk API and board/);
+  assert.match(report.checks.find((item) => item.name === "api:publicHealthLaunchDutyShifts").detail, /launch duty handoff API and board/);
+  assert.match(report.checks.find((item) => item.name === "api:publicHealthLaunchCommandBriefs").detail, /launch command brief API and board/);
+  assert.match(report.checks.find((item) => item.name === "snapshot:publicHealth").detail, /launch incidents/);
+  assert.match(report.checks.find((item) => item.name === "snapshot:publicHealth").detail, /launch duty shifts/);
+  assert.match(report.checks.find((item) => item.name === "snapshot:publicHealth").detail, /launch command briefs/);
+  assert.match(report.checks.find((item) => item.name === "snapshot:publicHealth").detail, /site evidence verification tasks/);
+  assert.match(report.checks.find((item) => item.name === "api:publicHealthSiteEvidenceBridge").detail, /site evidence bridge API and board/);
+  assert.match(report.checks.find((item) => item.name === "api:publicHealthSiteEvidenceVerificationTasks").detail, /site evidence verification task API and board/);
+  assert.match(report.checks.find((item) => item.name === "api:publicHealthStandardImplementationLedger").detail, /standard implementation ledger API and board/);
+  assert.match(report.checks.find((item) => item.name === "api:publicHealthLaunchGate").detail, /production launch gate API and board/);
+  assert.match(report.checks.find((item) => item.name === "api:publicHealthLaunchApprovalPreflight").detail, /approval preflight blocks final approval/);
+  assert.match(report.checks.find((item) => item.name === "api:digitalHospitalStandards").detail, /standards API, launch readiness gate, production evidence packets, command briefs, formal cutover approvals, seed data and frontend fetch fallback/);
   assert.match(report.checks.find((item) => item.name === "docs:chronicLaunchCore").detail, /closure, site signoff/);
   assert.match(report.checks.find((item) => item.name === "docs:citizenExternalDependencyOwners").detail, /blockers, evidence, and onsite acceptance/);
 });

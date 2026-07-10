@@ -140,3 +140,44 @@ test("institution and insurance accounts land on their own modules", async ({ pa
   await expect(page).toHaveURL(/insurance\.html$/);
   await expect(page.getByRole("heading", { name: "医保支付、经办审核与基金监管" })).toBeVisible();
 });
+
+test("registration journey crosses resident and institution portals", async ({ page }) => {
+  const orderId = "reg-r1-20260630-cardio";
+
+  await login(page, "citizen", "citizen.html");
+  await page.goto("/citizen.html?client=app&page=registration#service-registration");
+  const payButton = page.locator(`[data-registration-journey-action="pay-demo"][data-registration-id="${orderId}"]`);
+  await expect(payButton).toHaveCount(1);
+  await payButton.click();
+  await expect(payButton).toHaveCount(0);
+
+  await login(page, "hospital", "institution.html");
+  await expect(page.locator("#registration-journey-workbench")).toBeVisible();
+  const confirmButton = page.locator(`[data-registration-institution-action="confirm-his-demo"][data-registration-id="${orderId}"]`);
+  await expect(confirmButton).toHaveCount(1);
+  await confirmButton.click();
+  await expect(confirmButton).toHaveCount(0);
+
+  await login(page, "citizen", "citizen.html");
+  await page.goto("/citizen.html?client=app&page=registration#service-registration");
+  const checkInButton = page.locator(`[data-registration-journey-action="check-in-demo"][data-registration-id="${orderId}"]`);
+  await expect(checkInButton).toHaveCount(1);
+  await checkInButton.click();
+  await expect(checkInButton).toHaveCount(0);
+
+  await login(page, "hospital", "institution.html");
+  const completeButton = page.locator(`[data-registration-institution-action="complete-demo"][data-registration-id="${orderId}"]`);
+  await expect(completeButton).toHaveCount(1);
+  await completeButton.click();
+  await expect(completeButton).toHaveCount(0);
+
+  const result = await page.evaluate(async (id) => {
+    const dashboard = await (await window.HealthCityAuth.authFetch("/api/registrations/dashboard")).json();
+    const audit = await (await window.HealthCityAuth.authFetch("/api/audit/verify")).json();
+    return { order: dashboard.orders.find((item) => item.id === id), audit };
+  }, orderId);
+  expect(result.order.status).toBe("completed");
+  expect(result.order.journeyStage).toBe("completed-demo");
+  expect(result.order.productionReady).toBe(false);
+  expect(result.audit.passed).toBe(true);
+});
