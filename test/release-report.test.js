@@ -34,6 +34,8 @@ test("release report validates demo and production environment profiles", () => 
   assert.equal(failedProduction.checks.some((item) => item.name === "env:SESSION_SECRETS.productionQuality" && !item.passed), true);
   assert.equal(failedProduction.checks.some((item) => item.name === "env:SMS.gateway" && !item.passed), true);
   assert.equal(failedProduction.checks.some((item) => item.name === "env:AUDIT.retentionTarget" && !item.passed), true);
+  assert.equal(failedProduction.checks.some((item) => item.name === "env:ALERTING.routes" && !item.passed), true);
+  assert.equal(failedProduction.checks.some((item) => item.name === "env:ALERTING.secretQuality" && !item.passed), true);
   assert.equal(failedProduction.cutoverChecklist.some((item) => item.id === "cutover-secrets" && !item.passed), true);
   assert.equal(failedProduction.cutoverChecklist.some((item) => item.id === "cutover-identity" && !item.passed), true);
 
@@ -78,6 +80,8 @@ test("release report validates demo and production environment profiles", () => 
       PAYMENT_GATEWAY_URL: "https://payment.example.internal/transactions",
       INSURANCE_GATEWAY_URL: "https://insurance.example.internal/settlements",
       CERTIFICATE_GATEWAY_URL: "https://certificate.example.internal/certificates",
+      SIEM_ENDPOINT: "https://siem.example.internal/events",
+      SIEM_SIGNING_SECRET: "0123456789abcdef0123456789abcdef",
       AUDIT_EXPORT_PATH: "/var/log/chronic-care-platform/audit"
     }
   });
@@ -112,6 +116,8 @@ test("release report validates demo and production environment profiles", () => 
       PAYMENT_GATEWAY_URL: "https://payment.example.internal/transactions",
       INSURANCE_GATEWAY_URL: "https://insurance.example.internal/settlements",
       CERTIFICATE_GATEWAY_URL: "https://certificate.example.internal/certificates",
+      SIEM_ENDPOINT: "https://siem.example.internal/events",
+      SIEM_SIGNING_SECRET: "0123456789abcdef0123456789abcdef",
       AUDIT_EXPORT_PATH: "/var/log/chronic-care-platform/audit"
     }
   });
@@ -128,6 +134,8 @@ test("release report validates demo and production environment profiles", () => 
   assert.equal(production.checks.some((item) => item.name === "env:OBJECT_STORAGE.secretQuality" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:FINANCIAL.gateways" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:FINANCIAL.secretQuality" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:ALERTING.routes" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:ALERTING.secretQuality" && item.passed), true);
   assert.equal(production.cutoverChecklist.some((item) => item.id === "cutover-institution-interfaces" && !item.passed), true);
   assert.equal(production.cutoverChecklist.some((item) => item.id === "cutover-monitoring" && /missing site signoff/.test(item.evidence)), true);
 
@@ -174,7 +182,10 @@ test("release report keeps the site evidence verification desk ready while evide
       NODE_ENV: "production",
       STORAGE_ENGINE: "auto",
       SESSION_SECRETS: "replace-with-long-random-secret",
-      INTEGRATION_GATEWAY_SECRET: "replace-with-integration-secret"
+      INTEGRATION_GATEWAY_SECRET: "replace-with-integration-secret",
+      SIEM_ENDPOINT: "https://siem.example.internal/events",
+      SIEM_SIGNING_SECRET: "0123456789abcdef0123456789abcdef",
+      AUDIT_EXPORT_PATH: "release/audit-export-test.ndjson"
     }
   });
   const deskCheck = report.checks.find((item) => item.name === "publicHealth:siteEvidenceVerificationTasks");
@@ -190,12 +201,18 @@ test("release report summarizes repository readiness and renders markdown", () =
       NODE_ENV: "production",
       STORAGE_ENGINE: "auto",
       SESSION_SECRETS: "replace-with-long-random-secret",
-      INTEGRATION_GATEWAY_SECRET: "replace-with-integration-secret"
+      INTEGRATION_GATEWAY_SECRET: "replace-with-integration-secret",
+      SIEM_ENDPOINT: "https://siem.example.internal/events",
+      SIEM_SIGNING_SECRET: "0123456789abcdef0123456789abcdef",
+      AUDIT_EXPORT_PATH: "release/audit-export-test.ndjson"
     }
   });
   assert.equal(report.ok, true);
   assert.equal(report.summary.failed, 0);
   assert.equal(report.summary.warnings, 0);
+  assert.equal(report.checks.some((item) => item.name === "monitoring:alertRouting" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "monitoring:productionBoundary" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "env:ALERTING.routes" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "package:scripts" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "snapshot:acceptanceEvidence" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "snapshot:securityAcceptance" && item.passed), true);
@@ -529,6 +546,8 @@ test("release report summarizes repository readiness and renders markdown", () =
       CUTOVER_CHRONIC_LAUNCH_CORE_SIGNOFF: "signed",
       CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF: "signed",
       CUTOVER_MONITORING_SIGNOFF: "signed",
+      SIEM_ENDPOINT: "https://siem.example.internal/events",
+      SIEM_SIGNING_SECRET: "0123456789abcdef0123456789abcdef",
       CUTOVER_DR_REHEARSAL_SIGNOFF: "signed"
     }
   });

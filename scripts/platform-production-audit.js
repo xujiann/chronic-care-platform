@@ -139,11 +139,11 @@ const MVP_REQUIRED_MODULES = [
   {
     id: "mvp-observability-audit",
     name: "生产监控、告警与审计保全",
-    status: "foundation-ready",
+    status: "adapter-foundation-ready",
     priority: "P0",
-    implemented: "健康指标、SLO、事件处置、审计哈希、导出和割接观察模型",
-    remainingCode: "接入目标监控、告警路由、SIEM/WORM 留存和生产日志采集适配",
-    siteDependency: "监控平台、值班联系人、留存目标和告警演练"
+    implemented: "健康指标、SLO、事件处置、审计哈希、去标识化 SIEM/Webhook 告警路由、HMAC 签名、幂等重试、投递回执和失败事件闭环",
+    remainingCode: "按目标监控平台补充厂商协议、最终送达回调、分页值班升级、SIEM/WORM 留存和生产日志采集适配",
+    siteDependency: "监控接收端、值班联系人、升级策略、留存目标、告警演练和正式签字"
   },
   {
     id: "mvp-secrets-deployment",
@@ -184,7 +184,7 @@ const PRODUCTION_BLOCKERS = [
   doneWhen,
   status: id === "P0-02"
     ? "in-progress-sqlite-profile-ready"
-    : (["P0-03", "P0-04", "P0-05", "P0-06"].includes(id) ? "adapter-foundation-ready-site-joint-test-pending" : "blocked-until-site-evidence"),
+    : (["P0-03", "P0-04", "P0-05", "P0-06", "P0-08", "P0-09"].includes(id) ? "adapter-foundation-ready-site-joint-test-pending" : "blocked-until-site-evidence"),
   progress: id === "P0-02"
     ? "已实现 SQLite WAL、FULL 同步、外键、忙等待、自动检查点、quick_check 和健康接口运行证据；PostgreSQL、全量迁移和灾备签字仍未完成。"
     : (id === "P0-03"
@@ -193,14 +193,18 @@ const PRODUCTION_BLOCKERS = [
         ? "已实现短信 HTTP 适配、随机验证码、摘要存储和供应商受理回执；供应商签名、最终送达回调、移动发布和签字未完成。"
         : (id === "P0-05"
           ? "已实现 HIS/EMR/LIS/PACS/号源通用出站适配、签名、幂等、有限重试、受理回执和死信对账；厂商专有协议、字典、网络、性能和联合签字未完成。"
-          : (id === "P0-06" ? "已实现支付、医保与电子证照通用生产网关、14 个受控操作、签名、幂等、敏感字段拦截、有限重试和死信对账；机构专有协议、回调验签、日终对账和联合签字未完成。" : ""))))
+          : (id === "P0-06"
+            ? "已实现支付、医保与电子证照通用生产网关、14 个受控操作、签名、幂等、敏感字段拦截、有限重试和死信对账；机构专有协议、回调验签、日终对账和联合签字未完成。"
+            : (id === "P0-08"
+              ? "已实现去标识化 SIEM/Webhook 投递、HMAC 签名、投递回执和审计链；目标 SIEM/WORM 留存策略、查询验证和防篡改签字未完成。"
+              : (id === "P0-09" ? "已实现告警信号、路由状态、幂等投递、有限重试、失败运维事件和恢复关闭；真实值班升级、生产演练和首日观察签字未完成。" : ""))))))
 }));
 
 const ROADMAP = [
   {
     phase: "P0 / 0-30 天",
     objective: "建立可部署、可联调、可审计的生产基线",
-    deliverables: ["已完成 SQLite 试点生产配置加固；继续 PostgreSQL 适配、全量迁移和原生备份工具", "已完成统一身份和短信通用适配基础；继续真实供应商联调和密钥托管", "已完成医院出站连接器基础；继续厂商协议、字典、网络环境和签名回执联调", "接入审计留存、监控告警和值班升级链"],
+    deliverables: ["已完成 SQLite 试点生产配置加固；继续 PostgreSQL 适配、全量迁移和原生备份工具", "已完成统一身份和短信通用适配基础；继续真实供应商联调和密钥托管", "已完成医院出站连接器基础；继续厂商协议、字典、网络环境和签名回执联调", "已完成 SIEM/Webhook 告警适配基础；继续目标接收端、WORM 留存、值班升级和生产演练"],
     exit: "P0-01 至 P0-09 均形成可验证证据，生产配置检查不再使用占位值。"
   },
   {

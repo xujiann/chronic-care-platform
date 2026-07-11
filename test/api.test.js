@@ -10,6 +10,7 @@ const test = require("node:test");
 const ROOT = path.resolve(__dirname, "..");
 const { signHospitalRequest, stableStringify: stableHospitalStringify } = require("../hospital-connectors");
 const { signFinancialRequest, stableStringify: stableFinancialStringify } = require("../financial-gateways");
+const { signAlertRequest, stableStringify: stableAlertStringify } = require("../observability-alerting");
 
 async function waitForHealth(baseUrl) {
   for (let attempt = 0; attempt < 60; attempt += 1) {
@@ -3745,6 +3746,117 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(certificate.body.gatewayType, "CERTIFICATE");
     assert.equal(certificate.body.contractId, "certificate-sync-v1");
     assert.equal(financialRequests.length, 3);
+  });
+
+  await t.test("routes minimized alerts to SIEM and closes delivery incidents after retry", async (t) => {
+    const alertRequests = [];
+    let failDelivery = false;
+    const alertMock = http.createServer(async (request, response) => {
+      const chunks = [];
+      for await (const chunk of request) chunks.push(chunk);
+      const bodyText = Buffer.concat(chunks).toString("utf8");
+      const body = JSON.parse(bodyText);
+      alertRequests.push({ headers: request.headers, bodyText, body });
+      response.writeHead(failDelivery ? 503 : 200, { "Content-Type": "application/json" });
+      response.end(JSON.stringify(failDelivery
+        ? { message: "receiver temporarily unavailable" }
+        : { eventId: `siem-event-${alertRequests.length}`, status: "accepted" }));
+    });
+    alertMock.listen(0, "127.0.0.1");
+    await once(alertMock, "listening");
+    const alertPort = alertMock.address().port;
+    process.env.SIEM_ENDPOINT = `http://127.0.0.1:${alertPort}/events`;
+    process.env.SIEM_SIGNING_SECRET = "api-test-siem-signing-secret";
+    process.env.ALERTING_MAX_ATTEMPTS = "1";
+    t.after(async () => {
+      delete process.env.SIEM_ENDPOINT;
+      delete process.env.SIEM_SIGNING_SECRET;
+      delete process.env.ALERTING_MAX_ATTEMPTS;
+      alertMock.closeAllConnections?.();
+      await new Promise((resolve) => alertMock.close(resolve));
+    });
+
+    const commission = await login(baseUrl, "health");
+    const citizen = await login(baseUrl, "citizen");
+    const center = await api(baseUrl, "/api/observability/alerts", authorized(commission.body.token));
+    assert.equal(center.response.status, 200);
+    assert.equal(center.body.routing.summary.total, 2);
+    assert.equal(center.body.routing.summary.configured, 1);
+    assert.equal(center.body.productionReady, false);
+    assert.equal(center.body.activeSignals.length > 0, true);
+    assert.equal(JSON.stringify(center.body).includes(String(alertPort)), false);
+    assert.equal(JSON.stringify(center.body).includes("api-test-siem-signing-secret"), false);
+    assert.equal((await api(baseUrl, "/api/observability/alerts", authorized(citizen.body.token))).response.status, 403);
+
+    const alert = {
+      fingerprint: "api-test-alert-001",
+      source: "api-regression",
+      severity: "critical",
+      title: "API regression alert",
+      summary: "A minimized operational alert used to verify the SIEM delivery contract.",
+      occurredAt: "2026-07-11T06:00:00.000Z",
+      labels: { environment: "test", owner: "platform-operations" },
+      metrics: { failures: "1" },
+      evidenceRefs: ["/api/metrics"]
+    };
+    const dispatched = await api(baseUrl, "/api/observability/alerts/dispatch", authorized(commission.body.token, {
+      method: "POST",
+      body: JSON.stringify({ route: "SIEM", idempotencyKey: "api-alert-delivery-001", alert })
+    }));
+    assert.equal(dispatched.response.status, 202);
+    assert.equal(dispatched.body.delivery.adapterReceipt.receiptId, "siem-event-1");
+    assert.equal(alertRequests.length, 1);
+    assert.equal(alertRequests[0].headers["x-idempotency-key"], "api-alert-delivery-001");
+    assert.equal(alertRequests[0].headers["x-signature"], signAlertRequest(
+      stableAlertStringify(alertRequests[0].body),
+      process.env.SIEM_SIGNING_SECRET,
+      alertRequests[0].headers["x-timestamp"],
+      alertRequests[0].headers["x-request-id"]
+    ));
+
+    const replay = await api(baseUrl, "/api/observability/alerts/dispatch", authorized(commission.body.token, {
+      method: "POST",
+      body: JSON.stringify({ route: "SIEM", idempotencyKey: "api-alert-delivery-001", alert })
+    }));
+    assert.equal(replay.response.status, 200);
+    assert.equal(replay.body.id, dispatched.body.delivery.id);
+    assert.equal(replay.body.idempotentReplay, true);
+    assert.equal(alertRequests.length, 1);
+
+    const sensitive = await api(baseUrl, "/api/observability/alerts/dispatch", authorized(commission.body.token, {
+      method: "POST",
+      body: JSON.stringify({ route: "SIEM", alert: { ...alert, fingerprint: "sensitive-alert", residentId: "r1" } })
+    }));
+    assert.equal(sensitive.response.status, 400);
+    assert.match(sensitive.body.message, /sensitive field/);
+    assert.equal(alertRequests.length, 1);
+
+    failDelivery = true;
+    const failed = await api(baseUrl, "/api/observability/alerts/dispatch", authorized(commission.body.token, {
+      method: "POST",
+      body: JSON.stringify({ route: "SIEM", idempotencyKey: "api-alert-delivery-002", alert: { ...alert, fingerprint: "api-test-alert-002", title: "Receiver failure alert" } })
+    }));
+    assert.equal(failed.response.status, 502);
+    assert.equal(failed.body.delivery.deadLetter, true);
+    assert.equal(failed.body.incident.status, "open-delivery-failure");
+    const failedDeliveryId = failed.body.delivery.id;
+
+    const operationsAfterFailure = await api(baseUrl, "/api/operations/dashboard", authorized(commission.body.token));
+    assert.equal(operationsAfterFailure.response.status, 200);
+    assert.equal(operationsAfterFailure.body.observability.summary.failed >= 1, true);
+    assert.equal(operationsAfterFailure.body.runCenter.incidents.some((item) => item.id === `ops-alert-delivery-${failedDeliveryId}` && item.status === "open-delivery-failure"), true);
+
+    failDelivery = false;
+    const retried = await api(baseUrl, `/api/observability/alert-deliveries/${failedDeliveryId}/retry`, authorized(commission.body.token, {
+      method: "POST",
+      body: JSON.stringify({ reason: "receiver recovered" })
+    }));
+    assert.equal(retried.response.status, 200);
+    assert.equal(retried.body.ok, true);
+    assert.equal(retried.body.delivery.deadLetter, false);
+    assert.equal(retried.body.delivery.lastRetryResult, "receiver-accepted");
+    assert.equal(retried.body.incident.status, "resolved-after-delivery");
+    assert.equal(retried.body.center.summary.failed, 0);
   });
 
   await t.test("secures attachment upload completion download and lifecycle through object storage", async (t) => {

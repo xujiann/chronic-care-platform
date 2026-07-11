@@ -14787,6 +14787,7 @@
     { "id": "ops-incident-callback", "title": "医院回调积压演示事件", "severity": "P1", "source": "integration-dead-letter", "status": "escalation-pending", "owner": "integration operations", "productionReady": false },
     { "id": "ops-incident-backup-proof", "title": "远端备份介质证据待现场确认", "severity": "P1", "source": "disaster-recovery-gate", "status": "onsite-pending", "owner": "backup and recovery operations", "productionReady": false }
   ],
+  "observabilityAlertDeliveries": [],
   "disasterRecoveryDrills": [
     { "id": "ops-drill-backup-restore", "name": "数据库与审计备份恢复演练", "scenario": "backup-restore", "targetRpoMinutes": 120, "targetRtoMinutes": 720, "status": "planned-demo", "owner": "backup and recovery operations", "productionReady": false },
     { "id": "ops-drill-api-rollback", "name": "应用发布回滚演练", "scenario": "application-rollback", "targetRpoMinutes": 0, "targetRtoMinutes": 30, "measuredRpoMinutes": 0, "measuredRtoMinutes": 12, "status": "validated-demo", "owner": "release operations", "productionReady": false },

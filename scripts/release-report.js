@@ -5,6 +5,7 @@ const { spawnSync } = require("node:child_process");
 const { hospitalConnectorCenter } = require("../hospital-connectors");
 const { financialGatewayCenter } = require("../financial-gateways");
 const { objectStorageCenter } = require("../secure-object-storage");
+const { alertRoutingCenter } = require("../observability-alerting");
 const { buildAuditRetentionReport, renderMarkdown: renderAuditRetentionMarkdown } = require("./audit-retention");
 const { buildChronicFollowupReadinessReport, renderMarkdown: renderChronicFollowupMarkdown } = require("./chronic-followup-readiness");
 const { buildChronicInstitutionInterfaceReport, renderMarkdown: renderChronicInstitutionInterfaceMarkdown } = require("./chronic-institution-interfaces");
@@ -187,8 +188,8 @@ function buildProductionCutoverChecklist(env, checks = []) {
       id: "cutover-monitoring",
       phase: "operations",
       owner: "platform-ops",
-      passed: ready("operations:readiness", "operations:routes", "operations:externalDependencies", "monitoring:readiness", "monitoring:sloTargets") && envFlagEnabled(env, "CUTOVER_MONITORING_SIGNOFF"),
-      evidence: `${detail("operations:readiness", "operations:routes", "operations:externalDependencies", "monitoring:readiness", "monitoring:sloTargets")}; ${signoff("CUTOVER_MONITORING_SIGNOFF")}`,
+      passed: ready("operations:readiness", "operations:routes", "operations:externalDependencies", "monitoring:readiness", "monitoring:sloTargets", "monitoring:alertRouting", "monitoring:productionBoundary", "env:ALERTING.routes", "env:ALERTING.secretQuality") && envFlagEnabled(env, "CUTOVER_MONITORING_SIGNOFF"),
+      evidence: `${detail("operations:readiness", "operations:routes", "operations:externalDependencies", "monitoring:readiness", "monitoring:sloTargets", "monitoring:alertRouting", "monitoring:productionBoundary", "env:ALERTING.routes", "env:ALERTING.secretQuality")}; ${signoff("CUTOVER_MONITORING_SIGNOFF")}`,
       nextAction: "Bind /api/health, /api/metrics, readiness, alert routing, and on-call escalation to the production monitoring platform."
     },
     {
@@ -216,6 +217,12 @@ function validateProductionConfig(options = {}) {
   const sqliteSynchronous = String(env.SQLITE_SYNCHRONOUS || "").toUpperCase();
   const sqliteBusyTimeout = Number(env.SQLITE_BUSY_TIMEOUT_MS || 0);
   const nodeEnv = String(env.NODE_ENV || "");
+  const alertRouting = alertRoutingCenter(env);
+  const alertSecrets = [
+    env.SIEM_ENDPOINT ? env.SIEM_SIGNING_SECRET || env.ALERTING_SIGNING_SECRET : "",
+    env.ALERT_WEBHOOK_URL ? env.ALERT_WEBHOOK_SECRET || env.ALERTING_SIGNING_SECRET : ""
+  ].filter((_, index) => index === 0 ? Boolean(env.SIEM_ENDPOINT) : Boolean(env.ALERT_WEBHOOK_URL));
+  const configuredAlertInputs = alertRouting.routes.filter((item) => item.endpointConfigured);
 
   const checks = [
     check("env:file", envFileExists, envFileExists ? envFile : `${envFile} missing`, strict ? "error" : "warn", "environment"),
@@ -224,7 +231,9 @@ function validateProductionConfig(options = {}) {
     check("env:SESSION_SECRETS.present", sessionSecretItems.length > 0, `${sessionSecretItems.length} configured`, "error", "environment"),
     check("env:SESSION_SECRETS.productionQuality", !strict || sessionSecretItems.every((item) => secretQuality(item).strongEnough), strict ? "production secrets must be non-placeholder and at least 32 chars" : "not enforced outside production", strict ? "error" : "warn", "environment"),
     check("env:INTEGRATION_GATEWAY_SECRET.present", Boolean(gatewaySecret), gatewaySecret ? "configured" : "missing", "error", "environment"),
-    check("env:INTEGRATION_GATEWAY_SECRET.productionQuality", !strict || secretQuality(gatewaySecret).strongEnough, strict ? "production secret must be non-placeholder and at least 32 chars" : "not enforced outside production", strict ? "error" : "warn", "environment")
+    check("env:INTEGRATION_GATEWAY_SECRET.productionQuality", !strict || secretQuality(gatewaySecret).strongEnough, strict ? "production secret must be non-placeholder and at least 32 chars" : "not enforced outside production", strict ? "error" : "warn", "environment"),
+    check("env:ALERTING.routes", alertRouting.adapterReady && configuredAlertInputs.every((item) => item.configured && item.productionHttps), `${alertRouting.summary.configured}/${alertRouting.summary.total} SIEM or webhook routes configured; ${configuredAlertInputs.length} endpoints declared`, strict ? "error" : "warn", "environment"),
+    check("env:ALERTING.secretQuality", !strict || (alertSecrets.length > 0 && alertSecrets.every((secret) => secretQuality(secret).strongEnough)), strict ? "configured alert route secrets must be non-placeholder and at least 32 chars" : "not enforced outside production", strict ? "error" : "warn", "environment")
   ];
 
   if (strict) {
@@ -287,7 +296,8 @@ function snapshotChecks(data) {
     "regionalSharingSnapshots",
     "regionalSharingAccessReviews",
     "securityAcceptanceLedger",
-    "healthDashboardSnapshots"
+    "healthDashboardSnapshots",
+    "observabilityAlertDeliveries"
   ];
   const raw = fs.readFileSync(path.join(ROOT, "data", "db.json"), "utf8");
   const p2 = (data.platformRoadmap || []).filter((item) => item.priority === "P2");
@@ -693,7 +703,9 @@ function monitoringReadinessChecks(monitoringReadiness) {
   return [
     check("monitoring:readiness", monitoringReadiness.ok, monitoringReadiness.ok ? "monitoring readiness checks passed" : "monitoring readiness checks failed", "error", "monitoring"),
     check("monitoring:metricSignals", monitoringReadiness.metricSignals?.every((item) => item.present), `${monitoringReadiness.metricSignals?.length || 0} metric signals`, "error", "monitoring"),
-    check("monitoring:sloTargets", monitoringReadiness.sloTargets?.every((item) => item.covered), `${monitoringReadiness.sloTargets?.length || 0} SLO targets`, "error", "monitoring")
+    check("monitoring:sloTargets", monitoringReadiness.sloTargets?.every((item) => item.covered), `${monitoringReadiness.sloTargets?.length || 0} SLO targets`, "error", "monitoring"),
+    check("monitoring:alertRouting", ["adapter", "runtime", "ui", "environment", "releaseWiring"].every((section) => Object.values(monitoringReadiness.alertRouting?.[section] || {}).every(Boolean)), "signed, minimized, retryable SIEM/webhook alert delivery with runtime receipts and UI is wired", "error", "monitoring"),
+    check("monitoring:productionBoundary", monitoringReadiness.productionReady === false && monitoringReadiness.summary?.blockers >= 6, `${monitoringReadiness.summary?.blockers || 0} site acceptance blockers remain explicit`, "error", "monitoring")
   ];
 }
 

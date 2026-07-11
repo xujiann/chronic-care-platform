@@ -4,6 +4,7 @@ let operationsDashboard = null;
 document.addEventListener("DOMContentLoaded", async () => {
   bindDispatchForm();
   bindProductionOperationsActions();
+  bindObservabilityAlertActions();
   await loadOperationsDashboard();
 });
 
@@ -50,6 +51,24 @@ function buildStaticOperationsDashboard(state) {
     dispatchRequests,
     reconciliationReviews,
     alertRules,
+    observability: {
+      ok: true,
+      status: "adapter-foundation-ready-configuration-pending",
+      productionReady: false,
+      routing: {
+        adapterReady: false,
+        productionReady: false,
+        summary: { total: 2, configured: 0 },
+        routes: [
+          { route: "SIEM", configured: false, productionHttps: true },
+          { route: "WEBHOOK", configured: false, productionHttps: true }
+        ]
+      },
+      summary: { activeSignals: 0, deliveries: 0, accepted: 0, failed: 0, configuredRoutes: 0, totalRoutes: 2 },
+      activeSignals: [],
+      deliveries: [],
+      boundary: "Static preview exposes the alert-routing contract only. Production requires a configured receiver and signed acceptance."
+    },
     runCenter: {
       ok: true,
       status: "run-center-ready-onsite-blocked",
@@ -83,8 +102,109 @@ function renderOperationsDashboard(dashboard) {
   renderDispatchRequests(dashboard.dispatchRequests || []);
   renderReconciliationReviews(dashboard.reconciliationReviews || []);
   renderProductionOperationsCenter(dashboard.runCenter || {});
+  renderObservabilityAlertCenter(dashboard.observability || {});
   const boundary = document.querySelector("#operations-boundary");
   if (boundary) boundary.textContent = `${(dashboard.boundaries || []).join(" / ")} | reuse: ${(dashboard.reusedCollections || []).join(", ")}`;
+}
+
+function renderObservabilityAlertCenter(center) {
+  const metricsTarget = document.querySelector("#observability-alert-metrics");
+  const routesTarget = document.querySelector("#observability-alert-routes");
+  const signalsTarget = document.querySelector("#observability-active-signals");
+  const deliveriesTarget = document.querySelector("#observability-alert-deliveries");
+  if (!metricsTarget || !routesTarget || !signalsTarget || !deliveriesTarget) return;
+  const summary = center.summary || {};
+  const routes = center.routing?.routes || [];
+  const configuredRoutes = routes.filter((item) => item.configured && item.productionHttps);
+  const signals = center.activeSignals || [];
+  const deliveries = center.deliveries || [];
+  const metrics = [
+    ["活动信号", summary.activeSignals || 0, "慢请求、死信、数据质量、医院运行与安全"],
+    ["已配置路由", summary.configuredRoutes || 0, `${summary.totalRoutes || 0} 条候选路由`],
+    ["接收回执", summary.accepted || 0, `${summary.deliveries || 0} 次投递`],
+    ["失败待重放", summary.failed || 0, "失败自动进入运维事件队列"]
+  ];
+  metricsTarget.innerHTML = metrics.map(([label, value, hint]) => `<article class="metric-card"><span>${operationsEscapeHtml(label)}</span><strong>${operationsEscapeHtml(value)}</strong><small>${operationsEscapeHtml(hint)}</small></article>`).join("");
+  routesTarget.innerHTML = `<table><thead><tr><th>路由</th><th>地址</th><th>签名</th><th>HTTPS</th><th>生产验收</th></tr></thead><tbody>${routes.map((item) => `<tr><td><strong>${operationsEscapeHtml(item.route)}</strong></td><td>${item.endpointConfigured ? "已配置" : "未配置"}</td><td>${item.signingSecretConfigured ? "已配置" : "未配置"}</td><td>${item.productionHttps ? "通过" : "阻断"}</td><td>未完成</td></tr>`).join("")}</tbody></table>`;
+  signalsTarget.innerHTML = signals.length ? `<table><thead><tr><th>级别</th><th>信号</th><th>摘要</th><th>指标</th><th>投递</th></tr></thead><tbody>${signals.map((item) => `<tr><td><span class="badge ${productionOperationsBadge(item.severity)}">${operationsEscapeHtml(item.severity)}</span></td><td><strong>${operationsEscapeHtml(item.title)}</strong><br><small>${operationsEscapeHtml(item.source)}</small></td><td>${operationsEscapeHtml(item.summary)}</td><td>${operationsEscapeHtml(Object.entries(item.metrics || {}).map(([key, value]) => `${key}=${value}`).join("；"))}</td><td>${configuredRoutes.length ? configuredRoutes.map((route) => `<button class="inline-action" type="button" data-observability-alert-action="dispatch" data-fingerprint="${operationsEscapeHtml(item.fingerprint)}" data-route="${operationsEscapeHtml(route.route)}">发送至 ${operationsEscapeHtml(route.route)}</button>`).join(" ") : "待配置生产路由"}</td></tr>`).join("")}</tbody></table>` : "<p>当前没有达到投递条件的运行信号。</p>";
+  deliveriesTarget.innerHTML = deliveries.length ? `<table><thead><tr><th>时间</th><th>路由</th><th>告警</th><th>状态</th><th>回执</th><th>操作</th></tr></thead><tbody>${deliveries.map((item) => `<tr><td>${operationsEscapeHtml(item.createdAt || "")}</td><td>${operationsEscapeHtml(item.route)}</td><td><strong>${operationsEscapeHtml(item.alert?.title || item.fingerprint)}</strong><br><small>${operationsEscapeHtml(item.idempotencyKey)}</small></td><td><span class="badge ${productionOperationsBadge(item.deadLetter ? "critical" : item.status)}">${operationsEscapeHtml(item.status)}</span></td><td>${operationsEscapeHtml(item.adapterReceipt?.receiptId || item.deadLetterReason || "-")}</td><td>${item.deadLetter ? `<button class="inline-action" type="button" data-observability-alert-action="retry" data-delivery-id="${operationsEscapeHtml(item.id)}">重试</button>` : "已接收"}</td></tr>`).join("")}</tbody></table>` : "<p>尚无告警投递记录。</p>";
+  const statusTarget = document.querySelector("#observability-alert-status");
+  if (statusTarget) {
+    statusTarget.textContent = center.routing?.adapterReady ? "路由已配置，现场验收待完成" : "生产路由待配置";
+    statusTarget.className = `badge ${center.routing?.adapterReady ? "info" : "warn"}`;
+  }
+  const boundaryTarget = document.querySelector("#observability-alert-boundary");
+  if (boundaryTarget) boundaryTarget.textContent = center.boundary || "告警适配器基础不等于生产监控验收完成。";
+}
+
+function bindObservabilityAlertActions() {
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-observability-alert-action]");
+    if (!button) return;
+    if (button.dataset.observabilityAlertAction === "dispatch") {
+      dispatchObservabilityAlert(button.dataset.fingerprint, button.dataset.route, button);
+    } else if (button.dataset.observabilityAlertAction === "retry") {
+      retryObservabilityAlert(button.dataset.deliveryId, button);
+    }
+  });
+}
+
+async function dispatchObservabilityAlert(fingerprint, route, button) {
+  if (!OPERATIONS_API_BASE || !fingerprint || !route) return;
+  const alert = (operationsDashboard?.observability?.activeSignals || []).find((item) => item.fingerprint === fingerprint);
+  if (!alert) return;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  button.disabled = true;
+  try {
+    const response = await request(`${OPERATIONS_API_BASE}/observability/alerts/dispatch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ route, idempotencyKey: `${route}:${fingerprint}`, alert })
+    });
+    const payload = await response.json().catch(() => ({}));
+    await loadOperationsDashboard();
+    const statusTarget = document.querySelector("#observability-alert-status");
+    if (statusTarget) {
+      statusTarget.textContent = response.ok ? `已投递：${payload.delivery?.adapterReceipt?.receiptId || route}` : `投递失败：${payload.delivery?.deadLetterReason || payload.message || response.status}`;
+      statusTarget.className = `badge ${response.ok ? "info" : "danger"}`;
+    }
+  } catch (error) {
+    const statusTarget = document.querySelector("#observability-alert-status");
+    if (statusTarget) {
+      statusTarget.textContent = `投递失败：${error.message}`;
+      statusTarget.className = "badge danger";
+    }
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function retryObservabilityAlert(deliveryId, button) {
+  if (!OPERATIONS_API_BASE || !deliveryId) return;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  button.disabled = true;
+  try {
+    const response = await request(`${OPERATIONS_API_BASE}/observability/alert-deliveries/${encodeURIComponent(deliveryId)}/retry`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: "operations console manual retry" })
+    });
+    const payload = await response.json().catch(() => ({}));
+    await loadOperationsDashboard();
+    const statusTarget = document.querySelector("#observability-alert-status");
+    if (statusTarget) {
+      statusTarget.textContent = payload.ok ? `重放成功：${payload.delivery?.adapterReceipt?.receiptId || deliveryId}` : `重放失败：${payload.delivery?.deadLetterReason || payload.message || response.status}`;
+      statusTarget.className = `badge ${payload.ok ? "info" : "danger"}`;
+    }
+  } catch (error) {
+    const statusTarget = document.querySelector("#observability-alert-status");
+    if (statusTarget) {
+      statusTarget.textContent = `重放失败：${error.message}`;
+      statusTarget.className = "badge danger";
+    }
+  } finally {
+    button.disabled = false;
+  }
 }
 
 function productionOperationsBadge(status) {

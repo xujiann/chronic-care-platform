@@ -37,10 +37,14 @@ test("platform production audit separates implemented capabilities from producti
   assert.equal(report.productionBlockers.find((item) => item.id === "P0-05").status, "adapter-foundation-ready-site-joint-test-pending");
   assert.equal(report.productionBlockers.find((item) => item.id === "P0-06").status, "adapter-foundation-ready-site-joint-test-pending");
   assert.match(report.productionBlockers.find((item) => item.id === "P0-06").progress, /14 个受控操作/);
+  assert.equal(report.productionBlockers.find((item) => item.id === "P0-08").status, "adapter-foundation-ready-site-joint-test-pending");
+  assert.equal(report.productionBlockers.find((item) => item.id === "P0-09").status, "adapter-foundation-ready-site-joint-test-pending");
+  assert.match(report.productionBlockers.find((item) => item.id === "P0-09").progress, /失败运维事件/);
   assert.equal(report.mvpRequiredModules.find((item) => item.id === "mvp-identity-message").status, "adapter-foundation-ready");
   assert.equal(report.mvpRequiredModules.find((item) => item.id === "mvp-hospital-connectors").status, "adapter-foundation-ready");
   assert.equal(report.mvpRequiredModules.find((item) => item.id === "mvp-payment-insurance").status, "adapter-foundation-ready");
   assert.equal(report.mvpRequiredModules.find((item) => item.id === "mvp-object-storage").status, "adapter-foundation-ready");
+  assert.equal(report.mvpRequiredModules.find((item) => item.id === "mvp-observability-audit").status, "adapter-foundation-ready");
   assert.equal(report.mvpRequiredModules.every((item) => item.remainingCode && item.siteDependency), true);
   assert.deepEqual(report.roadmap.map((item) => item.phase), ["P0 / 0-30 天", "P1 / 31-60 天", "P2 / 61-90 天", "持续优化 / 90 天后"]);
 });

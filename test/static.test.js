@@ -2568,6 +2568,38 @@ test("production operations run center exposes duty incidents recovery drills an
   assert.match(read("scripts/release-artifact-manifest.js"), /\/api\/production-operations\/center/);
 });
 
+test("production observability routes minimized alerts with receipts retry and explicit site boundaries", () => {
+  const adapter = read("observability-alerting.js");
+  const server = read("server.js");
+  const html = read("operations.html");
+  const js = read("operations.js");
+  const readiness = read("scripts/monitoring-readiness.js");
+  const release = read("scripts/release-report.js");
+  const deploy = read("scripts/deploy-check.js");
+  const documentation = read("docs/production-observability-alerting.md");
+
+  assert.match(adapter, /HMAC-SHA256/);
+  assert.match(adapter, /FORBIDDEN_ALERT_KEYS/);
+  assert.match(adapter, /X-Idempotency-Key/);
+  assert.match(adapter, /ALERTING_MAX_ATTEMPTS/);
+  assert.match(server, /\/api\/observability\/alerts\/dispatch/);
+  assert.match(server, /\/api\/observability\/alert-deliveries\//);
+  assert.match(server, /observabilityAlertDeliveries/);
+  assert.match(server, /alert-delivery-recovered/);
+  assert.match(html, /observability-alert-deliveries/);
+  assert.match(js, /renderObservabilityAlertCenter/);
+  assert.match(js, /data-observability-alert-action/);
+  assert.match(readiness, /monitoring:alertAdapter/);
+  assert.match(readiness, /monitoring:productionBoundary/);
+  assert.match(release, /env:ALERTING.routes/);
+  assert.match(release, /monitoring:alertRouting/);
+  assert.match(deploy, /snapshot:observabilityAlertDeliveries/);
+  assert.match(read(".env.example"), /SIEM_SIGNING_SECRET=/);
+  assert.match(documentation, /告警适配器基础通过不等于生产监控已经正式验收/);
+  assert.match(documentation, /失败进入运维事件/);
+  assert.match(documentation, /CUTOVER_MONITORING_SIGNOFF/);
+});
+
 test("appointment registration journey closes resident institution insurance and refund actions", () => {
   const server = read("server.js");
   const citizenHtml = read("citizen.html");
@@ -2782,7 +2814,7 @@ test("financial gateways enforce signed minimized requests and production bounda
 
 test("dated platform development report records verification blockers and next plan", () => {
   const report = read("docs/数智医院标准平台开发报告与下一步计划-2026-07-11.md");
-  ["本轮主要开发成果", "正式生产前已实现的主要标准平台功能", "验证证据", "当前生产阻断项", "下一步开发计划", "301/301", "230/230", "P0：0-30 天", "P1：31-60 天", "P2：61-90 天"].forEach((marker) => assert.match(report, new RegExp(marker)));
+  ["本轮主要开发成果", "生产可观测性与 SIEM 告警闭环", "正式生产前已实现的主要标准平台功能", "验证证据", "当前生产阻断项", "下一步开发计划", "304/304", "233/234", "195/195", "P0：0-30 天", "P1：31-60 天", "P2：61-90 天"].forEach((marker) => assert.match(report, new RegExp(marker)));
   assert.match(read("scripts/release-artifact-manifest.js"), /platform-development-report-20260711/);
   assert.match(read("scripts/deploy-check.js"), /docs:platformDevelopmentReport20260711/);
 });

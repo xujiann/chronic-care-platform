@@ -19,6 +19,7 @@ test("environment matrix validates demo staging and production gates", () => {
   assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => ["HIS", "EMR", "LIS", "PACS", "APPOINTMENT"].every((domain) => item.requiredVars.includes(`${domain}_ADAPTER_URL`))), true);
   assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => ["OBJECT_STORAGE_GATEWAY_URL", "OBJECT_STORAGE_BUCKET", "OBJECT_STORAGE_SIGNING_SECRET"].every((variable) => item.requiredVars.includes(variable))), true);
   assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => ["FINANCIAL_GATEWAY_SECRET", "PAYMENT_GATEWAY_URL", "INSURANCE_GATEWAY_URL", "CERTIFICATE_GATEWAY_URL"].every((variable) => item.requiredVars.includes(variable))), true);
+  assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => ["SIEM_ENDPOINT", "SIEM_SIGNING_SECRET"].every((variable) => item.requiredVars.includes(variable))), true);
   assert.equal(report.profiles.some((item) => item.id === "production" && item.blockedVars.includes("STORAGE_ENGINE=postgres")), true);
   assert.equal(report.checks.some((item) => item.id === "environment:productionTracks" && item.passed), true);
 });

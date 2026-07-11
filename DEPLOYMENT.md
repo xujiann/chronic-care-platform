@@ -145,6 +145,9 @@ FINANCIAL_GATEWAY_TIMEOUT_MS=8000
 FINANCIAL_GATEWAY_MAX_ATTEMPTS=3
 AUDIT_EXPORT_PATH=/var/log/chronic-care-platform/audit
 SIEM_ENDPOINT=https://siem.example.gov.cn/ingest
+SIEM_SIGNING_SECRET=replace-with-siem-alert-signing-secret
+ALERTING_TIMEOUT_MS=8000
+ALERTING_MAX_ATTEMPTS=3
 RETENTION_POLICY=10y-worm
 ```
 
@@ -156,7 +159,9 @@ RETENTION_POLICY=10y-worm
 npm.cmd run env:check:production
 ```
 
-该命令读取 `.env`，会拒绝缺失环境文件、占位密钥、过短密钥、`STORAGE_ENGINE=json` 和尚未启用的 `postgres/postgresql` 运行时适配器；使用 SQLite 时还会要求 `WAL`、`FULL` 同步和不少于 5000ms 的忙等待配置。生产模式还会要求 OIDC 身份适配、居民端短信网关、医院连接器、对象存储、支付/医保/电子证照网关和审计保全目标配置到位。
+该命令读取 `.env`，会拒绝缺失环境文件、占位密钥、过短密钥、`STORAGE_ENGINE=json` 和尚未启用的 `postgres/postgresql` 运行时适配器；使用 SQLite 时还会要求 `WAL`、`FULL` 同步和不少于 5000ms 的忙等待配置。生产模式还会要求 OIDC 身份适配、居民端短信网关、医院连接器、对象存储、支付/医保/电子证照网关、SIEM/Webhook 告警路由和审计保全目标配置到位。
+
+生产可观测性闭环使用 `GET /api/observability/alerts`、`POST /api/observability/alerts/dispatch` 和 `POST /api/observability/alert-deliveries/:id/retry`。运行时会对慢请求、集成死信、数据质量、医院运行和高风险审计信号生成去标识化告警；投递失败自动进入运维事件，重放成功后自动关闭。完整边界见 `docs/production-observability-alerting.md`。
 
 `env:check:production` 和 `release:report` 还会输出 `cutoverChecklist` / `productionCutover`，按环境文件、生产密钥、统一身份、审计保全、存储适配、现场接口联调、医保/证照交换、监控值守和灾备演练列出责任方、阻断状态、当前证据和下一步动作。真实参数到位后，应先让环境与基础设施类通过，再进入外部接口联调和现场测评；外部系统项必须有 `CUTOVER_SITE_INTERFACE_SIGNOFF`、`CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF`、`CUTOVER_MONITORING_SIGNOFF`、`CUTOVER_DR_REHEARSAL_SIGNOFF` 等现场签字信号才会通过。
 

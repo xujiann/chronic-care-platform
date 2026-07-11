@@ -20,6 +20,11 @@ const {
   validateFinancialRequest
 } = require("./financial-gateways");
 const {
+  alertRoutingCenter,
+  dispatchAlert,
+  validateAlert
+} = require("./observability-alerting");
+const {
   applyObjectLifecycle,
   createObjectDownloadIntent,
   createObjectUploadIntent,
@@ -663,6 +668,7 @@ function seedState() {
     productionServiceLevels: seedProductionServiceLevels(),
     operationsDutyShifts: seedOperationsDutyShifts(),
     operationsIncidents: seedOperationsIncidents(),
+    observabilityAlertDeliveries: [],
     disasterRecoveryDrills: seedDisasterRecoveryDrills(),
     operationsEvidencePackets: seedOperationsEvidencePackets(),
     healthStatistics: seedHealthStatistics(),
@@ -6426,6 +6432,139 @@ function buildRuntimeMetrics(data) {
   };
 }
 
+function buildObservabilitySignals(data) {
+  const metrics = buildRuntimeMetrics(data);
+  const highRiskEvents = highRiskSecurityEvents(data).length;
+  const definitions = [
+    {
+      fingerprint: `integration-dead-letters:${metrics.workload.integrationDeadLetters}`,
+      source: "integration-gateway",
+      severity: "critical",
+      title: "Integration dead letters require triage",
+      summary: `${metrics.workload.integrationDeadLetters} integration events are awaiting reconciliation.`,
+      metric: "integrationDeadLetters",
+      value: metrics.workload.integrationDeadLetters,
+      owner: "integration-operations",
+      evidenceRefs: ["/api/integration/monitor", "integration-readiness-report.md"]
+    },
+    {
+      fingerprint: `slow-requests:${metrics.http.slowRequests.length}`,
+      source: "runtime-http",
+      severity: "warning",
+      title: "Slow API requests detected",
+      summary: `${metrics.http.slowRequests.length} recent requests exceeded the 500ms observation threshold.`,
+      metric: "slowRequests",
+      value: metrics.http.slowRequests.length,
+      owner: "platform-operations",
+      evidenceRefs: ["/api/metrics", "monitoring-readiness-report.md"]
+    },
+    {
+      fingerprint: `data-quality-issues:${metrics.workload.dataQualityIssues}`,
+      source: "data-quality",
+      severity: "warning",
+      title: "Data quality issues are open",
+      summary: `${metrics.workload.dataQualityIssues} data quality issues require owner review.`,
+      metric: "dataQualityIssues",
+      value: metrics.workload.dataQualityIssues,
+      owner: "data-governance",
+      evidenceRefs: ["/api/data-quality/scorecard", "data-quality-report.md"]
+    },
+    {
+      fingerprint: `hospital-operation-alerts:${metrics.workload.operationAlerts}`,
+      source: "hospital-operations",
+      severity: "warning",
+      title: "Hospital operation rules triggered",
+      summary: `${metrics.workload.operationAlerts} hospital operation rule signals are active.`,
+      metric: "operationAlerts",
+      value: metrics.workload.operationAlerts,
+      owner: "hospital-operations",
+      evidenceRefs: ["/api/operations/dashboard", "hospital-operations-readiness-report.md"]
+    },
+    {
+      fingerprint: `high-risk-security-events:${highRiskEvents}`,
+      source: "security-audit",
+      severity: "critical",
+      title: "High-risk security events require review",
+      summary: `${highRiskEvents} high-risk security events are present in the protected audit trail.`,
+      metric: "highRiskSecurityEvents",
+      value: highRiskEvents,
+      owner: "security-operations",
+      evidenceRefs: ["/api/security/high-risk-events", "audit-retention-report.md"]
+    }
+  ];
+  return definitions.filter((item) => Number(item.value || 0) > 0).map((item) => ({
+    fingerprint: item.fingerprint,
+    source: item.source,
+    severity: item.severity,
+    title: item.title,
+    summary: item.summary,
+    occurredAt: new Date().toISOString(),
+    labels: {
+      environment: process.env.NODE_ENV || "development",
+      owner: item.owner,
+      service: "chronic-care-platform"
+    },
+    metrics: { [item.metric]: String(item.value) },
+    evidenceRefs: item.evidenceRefs
+  }));
+}
+
+function buildObservabilityAlertCenter(data) {
+  const routing = alertRoutingCenter(process.env);
+  const deliveries = (Array.isArray(data.observabilityAlertDeliveries) ? data.observabilityAlertDeliveries : []).slice(0, 100);
+  const activeSignals = buildObservabilitySignals(data);
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    status: routing.adapterReady ? "adapter-configured-site-acceptance-pending" : "adapter-foundation-ready-configuration-pending",
+    productionReady: false,
+    routing,
+    summary: {
+      activeSignals: activeSignals.length,
+      deliveries: deliveries.length,
+      accepted: deliveries.filter((item) => !item.deadLetter && /accepted|delivered|completed/i.test(item.status)).length,
+      failed: deliveries.filter((item) => item.deadLetter || item.status === "failed").length,
+      configuredRoutes: routing.summary.configured,
+      totalRoutes: routing.summary.total
+    },
+    activeSignals,
+    deliveries,
+    boundary: "Alert routing is production-capable after configuration, but receiver ownership, paging policy, escalation rehearsal and signed monitoring acceptance remain mandatory."
+  };
+}
+
+function upsertAlertDeliveryIncident(data, delivery, resolved = false) {
+  const incidentId = `ops-alert-delivery-${delivery.id}`;
+  const incidents = mergeByKey(seedOperationsIncidents(), data.operationsIncidents, "id");
+  const existingIndex = incidents.findIndex((item) => item.id === incidentId);
+  const now = new Date().toISOString();
+  const history = {
+    at: now,
+    action: resolved ? "alert-delivery-recovered" : "alert-delivery-failed",
+    by: "observability-alerting",
+    note: resolved ? `Receiver accepted ${delivery.adapterReceipt?.receiptId || delivery.id}.` : delivery.deadLetterReason
+  };
+  const incident = {
+    ...(existingIndex >= 0 ? incidents[existingIndex] : {}),
+    id: incidentId,
+    title: `Alert delivery ${resolved ? "recovered" : "failed"}: ${delivery.alert?.title || delivery.fingerprint}`,
+    severity: delivery.alert?.severity === "critical" ? "P1" : "P2",
+    source: "observability-alert-delivery",
+    status: resolved ? "resolved-after-delivery" : "open-delivery-failure",
+    detectedAt: existingIndex >= 0 ? incidents[existingIndex].detectedAt : now,
+    owner: "platform operations duty engineer",
+    acknowledgeWithinMinutes: delivery.alert?.severity === "critical" ? 10 : 30,
+    rollbackDecisionOwner: "operations duty lead",
+    evidenceRefs: Array.from(new Set([...(delivery.alert?.evidenceRefs || []), `/api/observability/alert-deliveries/${delivery.id}/retry`])),
+    productionReady: false,
+    actionHistory: [history, ...(existingIndex >= 0 && Array.isArray(incidents[existingIndex].actionHistory) ? incidents[existingIndex].actionHistory : [])].slice(0, 20)
+  };
+  if (existingIndex >= 0) incidents[existingIndex] = incident;
+  else incidents.unshift(incident);
+  data.operationsIncidents = incidents;
+  return incident;
+}
+
 function ratio(numerator, denominator) {
   const top = Number(numerator || 0);
   const bottom = Number(denominator || 0);
@@ -6793,6 +6932,7 @@ function normalizeState(data) {
     productionServiceLevels: mergeByKey(seedProductionServiceLevels(), data.productionServiceLevels, "id").map((item) => ({ ...item, productionReady: false })),
     operationsDutyShifts: mergeByKey(seedOperationsDutyShifts(), data.operationsDutyShifts, "id").map((item) => ({ ...item, handoffChecklist: Array.isArray(item.handoffChecklist) ? item.handoffChecklist : [], actionHistory: Array.isArray(item.actionHistory) ? item.actionHistory.slice(0, 20) : [], productionReady: false })),
     operationsIncidents: mergeByKey(seedOperationsIncidents(), data.operationsIncidents, "id").map((item) => ({ ...item, evidenceRefs: Array.isArray(item.evidenceRefs) ? item.evidenceRefs : [], actionHistory: Array.isArray(item.actionHistory) ? item.actionHistory.slice(0, 20) : [], productionReady: false })),
+    observabilityAlertDeliveries: Array.isArray(data.observabilityAlertDeliveries) ? data.observabilityAlertDeliveries.slice(0, 200) : [],
     disasterRecoveryDrills: mergeByKey(seedDisasterRecoveryDrills(), data.disasterRecoveryDrills, "id").map((item) => ({ ...item, requiredEvidence: Array.isArray(item.requiredEvidence) ? item.requiredEvidence : [], checks: Array.isArray(item.checks) ? item.checks : [], actionHistory: Array.isArray(item.actionHistory) ? item.actionHistory.slice(0, 20) : [], productionReady: false })),
     operationsEvidencePackets: mergeByKey(seedOperationsEvidencePackets(), data.operationsEvidencePackets, "id").map((item) => ({ ...item, productionEvidence: false })),
     healthStatistics: data.healthStatistics && typeof data.healthStatistics === "object" ? data.healthStatistics : seedHealthStatistics(),
@@ -16573,7 +16713,155 @@ async function handleApi(req, res) {
     const data = readDatabase();
     const dashboard = buildHospitalOperationsDashboard(data);
     dashboard.runCenter = buildProductionOperationsCenter(data, { runtimeMetrics: buildRuntimeMetrics(data) });
+    dashboard.observability = buildObservabilityAlertCenter(data);
     sendJson(res, 200, dashboard);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/observability/alerts") {
+    const user = requireApiRole(req, res, ["commission"], "/api/observability/alerts");
+    if (!user) return;
+    const data = readDatabase();
+    const center = buildObservabilityAlertCenter(data);
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "observability-alert-center-read",
+      target: "/api/observability/alerts",
+      result: "allowed",
+      detail: `${center.summary.activeSignals} signals / ${center.summary.failed} failed deliveries / production ready false`
+    });
+    sendJson(res, 200, center);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/observability/alerts/dispatch") {
+    const user = requireApiRole(req, res, ["commission"], "/api/observability/alerts/dispatch");
+    if (!user) return;
+    const payload = await collectJson(req);
+    let validated;
+    try {
+      validated = validateAlert(payload);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    const data = readDatabase();
+    const idempotencyKey = validated.idempotencyKey;
+    const duplicate = (data.observabilityAlertDeliveries || []).find((item) => item.route === validated.route && item.idempotencyKey === idempotencyKey);
+    if (duplicate) {
+      sendJson(res, 200, { ...duplicate, idempotentReplay: true });
+      return;
+    }
+    const baseDelivery = {
+      id: `oad-${randomUUID()}`,
+      route: validated.route,
+      fingerprint: validated.alert.fingerprint,
+      idempotencyKey,
+      alert: validated.alert,
+      status: "dispatching",
+      retryCount: 0,
+      deadLetter: false,
+      deadLetterReason: "",
+      createdAt: new Date().toISOString(),
+      createdBy: user.username || user.role
+    };
+    let delivery;
+    let incident;
+    try {
+      const receipt = await dispatchAlert({ route: validated.route, idempotencyKey, alert: validated.alert });
+      delivery = {
+        ...baseDelivery,
+        status: receipt.status,
+        adapterReceipt: receipt,
+        deliveredAt: receipt.acceptedAt,
+        reconciliationStatus: "receiver-accepted"
+      };
+    } catch (error) {
+      delivery = {
+        ...baseDelivery,
+        status: "failed",
+        deadLetter: true,
+        deadLetterReason: String(error.message || "alert delivery failed").slice(0, 240),
+        failedAt: new Date().toISOString(),
+        reconciliationStatus: "operations-incident-open"
+      };
+      incident = upsertAlertDeliveryIncident(data, delivery, false);
+    }
+    data.observabilityAlertDeliveries = [delivery, ...(Array.isArray(data.observabilityAlertDeliveries) ? data.observabilityAlertDeliveries : [])].slice(0, 200);
+    data.securityEvents = sealAuditTrail([{
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "observability-alert-dispatch",
+      target: `${validated.route}:${validated.alert.fingerprint}`,
+      result: delivery.deadLetter ? "failed" : "allowed",
+      detail: delivery.deadLetter ? `${delivery.id} moved to operations incident` : `${delivery.adapterReceipt.receiptId} receiver accepted`
+    }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    sendJson(res, delivery.deadLetter ? 502 : 202, { ok: !delivery.deadLetter, delivery, incident, center: buildObservabilityAlertCenter(readDatabase()) });
+    return;
+  }
+
+  const observabilityAlertRetryMatch = url.pathname.match(/^\/api\/observability\/alert-deliveries\/([^/]+)\/retry$/);
+  if (req.method === "POST" && observabilityAlertRetryMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/observability/alert-deliveries/:id/retry");
+    if (!user) return;
+    const data = readDatabase();
+    const deliveries = Array.isArray(data.observabilityAlertDeliveries) ? data.observabilityAlertDeliveries : [];
+    const index = deliveries.findIndex((item) => item.id === decodeURIComponent(observabilityAlertRetryMatch[1]));
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "alert delivery not found" });
+      return;
+    }
+    if (Number(deliveries[index].retryCount || 0) >= 3) {
+      sendJson(res, 409, { error: "Conflict", message: "alert delivery reached the manual retry limit" });
+      return;
+    }
+    const delivery = {
+      ...deliveries[index],
+      retryCount: Number(deliveries[index].retryCount || 0) + 1,
+      lastRetriedAt: new Date().toISOString()
+    };
+    let incident;
+    try {
+      const receipt = await dispatchAlert({ route: delivery.route, idempotencyKey: delivery.idempotencyKey, alert: delivery.alert });
+      Object.assign(delivery, {
+        status: receipt.status,
+        adapterReceipt: receipt,
+        deliveredAt: receipt.acceptedAt,
+        deadLetter: false,
+        deadLetterReason: "",
+        reconciliationStatus: "receiver-accepted-after-retry",
+        lastRetryResult: "receiver-accepted"
+      });
+      incident = upsertAlertDeliveryIncident(data, delivery, true);
+    } catch (error) {
+      Object.assign(delivery, {
+        status: "failed",
+        deadLetter: true,
+        deadLetterReason: String(error.message || "alert delivery retry failed").slice(0, 240),
+        failedAt: new Date().toISOString(),
+        reconciliationStatus: "operations-incident-open",
+        lastRetryResult: "failed"
+      });
+      incident = upsertAlertDeliveryIncident(data, delivery, false);
+    }
+    deliveries[index] = delivery;
+    data.observabilityAlertDeliveries = deliveries;
+    data.securityEvents = sealAuditTrail([{
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: user.name,
+      role: user.role,
+      action: "observability-alert-delivery-retry",
+      target: delivery.id,
+      result: delivery.deadLetter ? "failed" : "allowed",
+      detail: `${delivery.route}:${delivery.fingerprint} / retry=${delivery.retryCount} / ${delivery.lastRetryResult}`
+    }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120), { recompute: true });
+    writeDatabase(normalizeState(data));
+    sendJson(res, 200, { ok: !delivery.deadLetter, delivery, incident, center: buildObservabilityAlertCenter(readDatabase()) });
     return;
   }
 
