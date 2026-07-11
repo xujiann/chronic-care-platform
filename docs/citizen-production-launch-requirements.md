@@ -115,7 +115,7 @@ flowchart TD
 
 ## 8. 生产上线前置条件
 
-- 配置 `NODE_ENV=production`、正式 `SESSION_SECRETS`、`INTEGRATION_GATEWAY_SECRET`、`SMS_GATEWAY_URL`、`OIDC_*` 和审计保全目标。
+- 配置 `NODE_ENV=production`、正式 `SESSION_SECRETS`、`INTEGRATION_GATEWAY_SECRET`、`SMS_GATEWAY_URL`、`SMS_TEMPLATE_ID`、`OIDC_*` 和审计保全目标。
 - 完成政务实名、家庭关系、短信网关、HIS/EMR/LIS/PACS、护理、陪诊、医保和支付联调。
 - 完成小程序备案、隐私协议、APP 签名、推送证书、崩溃监控和升级通道配置。
 - 完成等保/密评材料、生产数据库备份恢复、监控值班和灾备演练。
@@ -132,6 +132,10 @@ flowchart TD
 | APP 签名、推送和崩溃监控 | `required-before-production` | `mobile-release` | 未完成签名包、推送证书、监控和灰度升级前，APP/小程序仅作验收预览 | APP 签名证书、推送证书、崩溃监控项目和灰度升级计划 | 安装签名包、触发测试推送并核验崩溃/升级监控面板 |
 
 上述 5 类依赖未完成时，居民端只能进入受控试点或演示发布，不得标记为正式生产上线。
+
+### 8.2 当前运行时进展
+
+平台已实现 `POST /api/auth/oidc/exchange`、`GET /api/auth/adapters` 和生产短信验证码运行时适配。生产验证码使用随机六位码并仅保存 HMAC 摘要，OIDC 仅允许已绑定且启用的本地账号签发会话。该进展属于“适配器基础就绪”；供应商专有签名、最终送达回调、机构目录同步、真实凭据联调和现场签字仍是上线阻断项，详见 `docs/production-identity-message-adapters.md`。
 
 ## 9. 验收标准
 

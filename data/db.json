@@ -7809,6 +7809,23 @@
       "status": "ready"
     },
     {
+      "id": "payment-transaction-v1",
+      "domain": "Payment",
+      "version": "1.0.0",
+      "direction": "bidirectional",
+      "resource": "PaymentTransaction",
+      "requiredFields": [
+        "externalId",
+        "orderNo",
+        "amountFen",
+        "currency"
+      ],
+      "idempotencyKey": "externalId",
+      "signature": "HMAC-SHA256",
+      "retryPolicy": "3 attempts then dead letter and reconciliation",
+      "status": "ready"
+    },
+    {
       "id": "insurance-settlement-v1",
       "domain": "医保",
       "version": "1.0.0",

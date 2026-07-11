@@ -757,7 +757,8 @@ body.service-paged-mode .citizen-shell {
 }
 
 .module-interface-panel,
-.data-governance-panel {
+.data-governance-panel,
+.citizen-pipeline-panel {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 16px;
@@ -768,14 +769,25 @@ body.service-paged-mode .citizen-shell {
 }
 
 .module-interface-grid,
-.data-governance-grid {
+.data-governance-grid,
+.citizen-pipeline-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 10px;
 }
 
+.citizen-pipeline-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 220px;
+}
+
 .module-interface-card,
-.data-governance-card {
+.data-governance-card,
+.citizen-pipeline-card {
   display: grid;
   gap: 8px;
   border: 1px solid var(--line);
@@ -785,7 +797,8 @@ body.service-paged-mode .citizen-shell {
 }
 
 .module-interface-card > div,
-.data-governance-card > div {
+.data-governance-card > div,
+.citizen-pipeline-card > div {
   display: flex;
   gap: 8px;
   align-items: center;
@@ -793,20 +806,24 @@ body.service-paged-mode .citizen-shell {
 }
 
 .module-interface-card strong,
-.data-governance-card strong {
+.data-governance-card strong,
+.citizen-pipeline-card strong {
   font-size: 16px;
 }
 
 .module-interface-card p,
 .module-interface-card small,
 .data-governance-card p,
-.data-governance-card small {
+.data-governance-card small,
+.citizen-pipeline-card p,
+.citizen-pipeline-card small {
   color: var(--muted);
   line-height: 1.55;
 }
 
 .module-interface-card b,
-.data-governance-card b {
+.data-governance-card b,
+.citizen-pipeline-card b {
   display: block;
   color: var(--ink);
 }
@@ -2755,6 +2772,7 @@ dialog::backdrop {
 
   .module-interface-panel,
   .data-governance-panel,
+  .citizen-pipeline-panel,
   .client-channel-panel,
   .resident-audit-panel {
     order: 30;
@@ -2768,9 +2786,16 @@ dialog::backdrop {
   .client-channel-switch,
   .module-interface-grid,
   .data-governance-grid,
+  .citizen-pipeline-grid,
   .client-channel-detail article,
   .client-channel-grid {
     grid-template-columns: 1fr;
+  }
+
+  .citizen-pipeline-actions {
+    width: 100%;
+    min-width: 0;
+    justify-content: flex-start;
   }
 
   .client-channel-switch {
@@ -2878,6 +2903,12 @@ dialog::backdrop {
     border-radius: 18px;
     transform: translateX(-50%);
     box-shadow: 0 18px 46px rgba(15, 23, 42, 0.18);
+  }
+
+  body.service-paged-mode.launch-review-mode .mobile-service-rail {
+    position: static;
+    width: 100%;
+    transform: none;
   }
 
   body.service-paged-mode .mobile-service-rail-status {

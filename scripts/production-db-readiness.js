@@ -269,6 +269,7 @@ function buildProductionDbReadinessReport(options = {}) {
   const pkg = options.pkg ?? readJson("package.json");
   const serverSource = options.serverSource ?? readText("server.js");
   const deployment = options.deployment ?? readText("DEPLOYMENT.md");
+  const envTemplate = options.envTemplate ?? readText(".env.example");
   const readme = options.readme ?? readText("README.md");
   const platformSource = options.platformSource ?? readText("platform.js");
   const platformHtml = options.platformHtml ?? readText("platform.html");
@@ -279,7 +280,7 @@ function buildProductionDbReadinessReport(options = {}) {
   const sqlite = storageModel.sqlite || {};
   const requiredScripts = ["storage:backup", "storage:inspect", "storage:assess", "rollback:snapshot", "release:report"];
   const migrationEvidence = {
-    currentAdapter: "sqlite-json-mirror",
+    currentAdapter: "sqlite-wal-json-snapshot",
     targetAdapter: "postgresql",
     runtimePostgresEnabled: !/PostgreSQL is tracked in productionDeploymentPlan but the runtime adapter is not enabled yet/.test(serverSource),
     runtimePostgresBlocked: /PostgreSQL is tracked in productionDeploymentPlan but the runtime adapter is not enabled yet/.test(serverSource),
@@ -293,6 +294,12 @@ function buildProductionDbReadinessReport(options = {}) {
     rtoRpoDocumented: hasText(deployment, /RTO/) && hasText(deployment, /RPO/),
     releaseArtifactDocumented: hasText(readme, /storage-model-inspection\.md/) && hasText(readme, /release:report/)
   };
+  const sqliteRuntimeProfile = {
+    connectionHardening: ["configureSqliteConnection", "PRAGMA foreign_keys = ON", "PRAGMA journal_mode", "PRAGMA synchronous", "PRAGMA busy_timeout", "PRAGMA wal_autocheckpoint"].every((marker) => serverSource.includes(marker)),
+    healthProbe: serverSource.includes("sqliteRuntimeProfile") && serverSource.includes("quickCheck") && serverSource.includes("productionProfile"),
+    environmentContract: ["SQLITE_JOURNAL_MODE=WAL", "SQLITE_SYNCHRONOUS=FULL", "SQLITE_BUSY_TIMEOUT_MS=5000", "SQLITE_WAL_AUTOCHECKPOINT_PAGES=1000"].every((marker) => envTemplate.includes(marker)),
+    deploymentDocumented: ["storage.sqliteProfile", "WAL", "FULL", "quickCheck"].every((marker) => deployment.includes(marker))
+  };
   const cutoverCenter = buildProductionDatabaseCutoverCenter(data);
   const checks = [
     { id: "production-db:track", passed: Boolean(productionTrack?.owner && productionTrack?.nextAction), detail: productionTrack?.status || "missing production deployment track" },
@@ -300,6 +307,7 @@ function buildProductionDbReadinessReport(options = {}) {
     { id: "production-db:runtimeBlock", passed: migrationEvidence.runtimePostgresBlocked, detail: migrationEvidence.runtimePostgresBlocked ? "postgres runtime intentionally blocked until adapter is implemented" : "postgres runtime appears enabled" },
     { id: "production-db:jsonSnapshot", passed: Boolean(json.present && Number(json.collections || 0) >= 40 && Number(json.totalRecords || 0) > 0), detail: `${json.collections || 0} collections / ${json.totalRecords || 0} records` },
     { id: "production-db:sqliteSchema", passed: !sqlite.present || Boolean(sqlite.available && Number(sqlite.schemaVersion || 0) >= 7 && Number(sqlite.tableCount || 0) >= 10), detail: sqlite.present ? `schema v${sqlite.schemaVersion || 0}, ${sqlite.tableCount || 0} tables` : "sqlite file not present in this checkout" },
+    { id: "production-db:sqliteRuntimeProfile", passed: Object.values(sqliteRuntimeProfile).every(Boolean), detail: Object.entries(sqliteRuntimeProfile).map(([key, value]) => `${key}:${value ? "yes" : "no"}`).join(";") },
     { id: "production-db:backupScripts", passed: requiredScripts.every((name) => pkg.scripts?.[name]), detail: requiredScripts.filter((name) => !pkg.scripts?.[name]).join(",") || "all required scripts present" },
     { id: "production-db:rehearsalDocs", passed: Object.values(rehearsalEvidence).every(Boolean), detail: Object.entries(rehearsalEvidence).map(([key, value]) => `${key}:${value ? "yes" : "no"}`).join(";") },
     { id: "production-db:cutoverCenter", passed: cutoverCenter.ok && cutoverCenter.summary.migrationBatches >= 4, detail: `${cutoverCenter.summary.migrationBatches} migration batches / ${cutoverCenter.summary.cutoverRuns} rehearsal runs` },
@@ -314,6 +322,7 @@ function buildProductionDbReadinessReport(options = {}) {
     productionTrack,
     migrationEvidence,
     rehearsalEvidence,
+    sqliteRuntimeProfile,
     cutoverCenter,
     checks
   };
@@ -346,6 +355,7 @@ function renderMarkdown(report) {
     "",
     `- JSON snapshot: ${json.present ? "present" : "missing"}, ${json.collections || 0} collections, ${json.totalRecords || 0} records`,
     `- SQLite: ${sqlite.present ? "present" : "not present"}, schema v${sqlite.schemaVersion || 0}, ${sqlite.tableCount || 0} tables`,
+    `- SQLite production profile: ${Object.values(report.sqliteRuntimeProfile || {}).every(Boolean) ? "configured" : "incomplete"} (WAL, FULL synchronous, foreign keys, busy timeout, quick check)`,
     "",
     "## Required production database configuration",
     "",

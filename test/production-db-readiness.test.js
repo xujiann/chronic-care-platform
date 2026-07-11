@@ -22,6 +22,8 @@ test("production database readiness validates migration and rehearsal evidence",
   assert.equal(report.migrationEvidence.runtimePostgresBlocked, true);
   assert.equal(report.checks.some((item) => item.id === "production-db:runtimeBlock" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "production-db:sqliteSchema" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "production-db:sqliteRuntimeProfile" && item.passed), true);
+  assert.equal(Object.values(report.sqliteRuntimeProfile).every(Boolean), true);
   assert.equal(report.checks.some((item) => item.id === "production-db:rehearsalDocs" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "production-db:cutoverCenter" && item.passed), true);
   assert.equal(report.cutoverCenter.summary.migrationBatches, 4);
@@ -32,6 +34,7 @@ test("production database readiness validates migration and rehearsal evidence",
   assert.match(markdown, /postgresql/);
   assert.match(markdown, /DATABASE_URL/);
   assert.match(markdown, /Production database cutover center/);
+  assert.match(markdown, /SQLite production profile: configured/);
 });
 
 test("production database cutover rehearsal validates four samples and preserves the production gate", () => {

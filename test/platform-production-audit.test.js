@@ -1,0 +1,80 @@
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const test = require("node:test");
+
+const {
+  buildPlatformProductionAudit,
+  parseArgs,
+  renderMarkdown,
+  writeOutput
+} = require("../scripts/platform-production-audit");
+
+const ROOT = path.resolve(__dirname, "..");
+
+test("platform production audit separates implemented capabilities from production readiness", () => {
+  const document = ["审计结论", "正式生产前已实现的主要功能", "生产割接差距", "下一步开发规划", "正式上线退出条件"].join("\n");
+  const report = buildPlatformProductionAudit({
+    document,
+    cutoverRows: Array.from({ length: 10 }, (_, index) => ({ id: `cutover-${index + 1}`, passed: index === 0 }))
+  });
+
+  assert.equal(report.ok, true);
+  assert.equal(report.productionReady, false);
+  assert.equal(report.summary.capabilityDomains, 10);
+  assert.equal(report.summary.implementedDomains, 10);
+  assert.equal(report.summary.productionReadyDomains, 0);
+  assert.equal(report.summary.productionBlockers, 10);
+  assert.equal(report.summary.mvpRequiredModules, 8);
+  assert.equal(report.summary.cutoverPassed, 1);
+  assert.equal(report.summary.cutoverBlocked, 9);
+  assert.equal(report.capabilities.every((item) => item.evidenceReady && item.boundary), true);
+  assert.equal(report.productionBlockers.every((item) => item.owner && item.evidence && item.doneWhen), true);
+  assert.equal(report.productionBlockers.find((item) => item.id === "P0-02").status, "in-progress-sqlite-profile-ready");
+  assert.match(report.productionBlockers.find((item) => item.id === "P0-02").progress, /SQLite WAL/);
+  assert.equal(report.productionBlockers.find((item) => item.id === "P0-03").status, "adapter-foundation-ready-site-joint-test-pending");
+  assert.equal(report.productionBlockers.find((item) => item.id === "P0-04").status, "adapter-foundation-ready-site-joint-test-pending");
+  assert.equal(report.productionBlockers.find((item) => item.id === "P0-05").status, "adapter-foundation-ready-site-joint-test-pending");
+  assert.equal(report.productionBlockers.find((item) => item.id === "P0-06").status, "adapter-foundation-ready-site-joint-test-pending");
+  assert.match(report.productionBlockers.find((item) => item.id === "P0-06").progress, /14 个受控操作/);
+  assert.equal(report.mvpRequiredModules.find((item) => item.id === "mvp-identity-message").status, "adapter-foundation-ready");
+  assert.equal(report.mvpRequiredModules.find((item) => item.id === "mvp-hospital-connectors").status, "adapter-foundation-ready");
+  assert.equal(report.mvpRequiredModules.find((item) => item.id === "mvp-payment-insurance").status, "adapter-foundation-ready");
+  assert.equal(report.mvpRequiredModules.find((item) => item.id === "mvp-object-storage").status, "adapter-foundation-ready");
+  assert.equal(report.mvpRequiredModules.every((item) => item.remainingCode && item.siteDependency), true);
+  assert.deepEqual(report.roadmap.map((item) => item.phase), ["P0 / 0-30 天", "P1 / 31-60 天", "P2 / 61-90 天", "持续优化 / 90 天后"]);
+});
+
+test("platform production audit renders and writes machine-readable and formal reports", (t) => {
+  const outputDir = path.join(ROOT, "tmp", "platform-production-audit-test");
+  t.after(() => fs.rmSync(outputDir, { recursive: true, force: true }));
+  const report = buildPlatformProductionAudit({
+    document: ["审计结论", "正式生产前已实现的主要功能", "生产割接差距", "下一步开发规划", "正式上线退出条件"].join("\n")
+  });
+  const markdown = renderMarkdown(report);
+
+  assert.match(markdown, /正式生产前已实现的主要功能/);
+  assert.match(markdown, /MVP 剩余必开发模块/);
+  assert.match(markdown, /统一身份与消息网关/);
+  assert.match(markdown, /P0-10/);
+  assert.match(markdown, /P0 \/ 0-30 天/);
+  assert.match(markdown, /生产割接清单达到 10\/10/);
+  assert.match(markdown, /platform:production-audit/);
+
+  writeOutput(report, {
+    output: "tmp/platform-production-audit-test/audit.json",
+    markdown: "tmp/platform-production-audit-test/audit.md",
+    document: "tmp/platform-production-audit-test/formal.md"
+  });
+
+  const written = JSON.parse(fs.readFileSync(path.join(outputDir, "audit.json"), "utf8"));
+  assert.equal(written.productionReady, false);
+  assert.match(fs.readFileSync(path.join(outputDir, "formal.md"), "utf8"), /正式上线退出条件/);
+});
+
+test("platform production audit CLI parser keeps output paths", () => {
+  assert.deepEqual(parseArgs(["--output=release/audit.json", "--document=docs/audit.md"]), {
+    output: "release/audit.json",
+    document: "docs/audit.md"
+  });
+});

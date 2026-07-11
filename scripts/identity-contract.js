@@ -37,6 +37,10 @@ function readJson(relativePath) {
   return JSON.parse(fs.readFileSync(path.join(ROOT, relativePath), "utf8"));
 }
 
+function readText(relativePath) {
+  return fs.readFileSync(path.join(ROOT, relativePath), "utf8");
+}
+
 function roleFromClaims(roles, organization) {
   const rawRoles = [roles].flat().filter(Boolean).map((item) => String(item).toLowerCase());
   if (rawRoles.some((item) => /citizen|resident/.test(item))) return "citizen";
@@ -61,6 +65,10 @@ function homeForRole(role, organization, roles = []) {
 
 function buildIdentityContract(options = {}) {
   const data = options.data || readJson("data/db.json");
+  const adapterSource = options.adapterSource ?? readText("production-adapters.js");
+  const serverSource = options.serverSource ?? readText("server.js");
+  const adapterDocument = options.adapterDocument ?? readText("docs/production-identity-message-adapters.md");
+  const envTemplate = options.envTemplate ?? readText(".env.example");
   const users = Array.isArray(data.authUsers) ? data.authUsers : [];
   const organizations = Array.isArray(data.authOrganizations) ? data.authOrganizations : [];
   const orgByCode = new Map(organizations.map((item) => [item.orgCode, item]));
@@ -89,13 +97,29 @@ function buildIdentityContract(options = {}) {
     };
   });
 
+  const adapterContracts = {
+    oidc: {
+      runtime: adapterSource.includes("fetchOidcUserInfo") && serverSource.includes("/api/auth/oidc/exchange"),
+      configuration: ["OIDC_ISSUER_URL", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET"].every((marker) => envTemplate.includes(marker)),
+      boundary: adapterDocument.includes("受控本地账号绑定") && adapterDocument.includes("现场联合测试回执")
+    },
+    sms: {
+      runtime: adapterSource.includes("sendSmsVerificationCode") && serverSource.includes("/api/auth/phone-code"),
+      protectedCode: adapterSource.includes("digestPhoneVerificationCode") && serverSource.includes("codeDigest"),
+      configuration: ["SMS_GATEWAY_URL", "SMS_TEMPLATE_ID", "SMS_GATEWAY_TOKEN"].every((marker) => envTemplate.includes(marker)),
+      boundary: adapterDocument.includes("最终送达回调") && adapterDocument.includes("供应商专有签名")
+    }
+  };
+
   const checks = [
     { id: "identity:p0Requirements", passed: p0IdentityRequirements.length >= 3, detail: `${p0IdentityRequirements.length} P0 identity/org requirements` },
     { id: "identity:requiredClaims", passed: REQUIRED_CLAIMS.filter((item) => item.required).length >= 5, detail: `${REQUIRED_CLAIMS.length} claims documented` },
     { id: "identity:roleCoverage", passed: Object.values(roleCoverage).every((item) => item.users >= 1), detail: Object.entries(roleCoverage).map(([role, item]) => `${role}:${item.users}`).join(";") },
     { id: "identity:organizationCoverage", passed: users.every((item) => item.role === "citizen" || orgByCode.has(item.orgCode)), detail: `${organizations.length} organizations, ${users.length} users` },
     { id: "identity:portalMapping", passed: users.every((item) => ROLE_PORTALS[item.role]?.includes(item.home)), detail: "role home pages match allowed portals" },
-    { id: "identity:sampleMappings", passed: sampleMappings.every((item) => item.passed), detail: sampleMappings.map((item) => `${item.id}:${item.mappedRole}/${item.mappedHome}`).join(";") }
+    { id: "identity:sampleMappings", passed: sampleMappings.every((item) => item.passed), detail: sampleMappings.map((item) => `${item.id}:${item.mappedRole}/${item.mappedHome}`).join(";") },
+    { id: "identity:oidcRuntimeAdapter", passed: Object.values(adapterContracts.oidc).every(Boolean), detail: "OIDC UserInfo runtime, configuration and controlled-binding boundary documented" },
+    { id: "identity:smsRuntimeAdapter", passed: Object.values(adapterContracts.sms).every(Boolean), detail: "SMS runtime, keyed code digest, provider configuration and delivery boundary documented" }
   ];
 
   return {
@@ -108,6 +132,7 @@ function buildIdentityContract(options = {}) {
     userCount: users.length,
     p0IdentityRequirements,
     sampleMappings,
+    adapterContracts,
     checks
   };
 }
@@ -117,6 +142,7 @@ function renderMarkdown(contract) {
   const claimRows = contract.requiredClaims.map((item) => `| ${item.required ? "required" : "optional"} | ${item.claim} | ${item.purpose} |`);
   const roleRows = Object.entries(contract.roleCoverage).map(([role, item]) => `| ${role} | ${item.users} | ${item.homes.join(", ")} | ${item.orgCodes.join(", ")} |`);
   const sampleRows = contract.sampleMappings.map((item) => `| ${item.passed ? "PASS" : "FAIL"} | ${item.id} | ${item.orgCode} | ${item.roles.join(", ")} | ${item.mappedRole} | ${item.mappedHome} |`);
+  const adapterRows = Object.entries(contract.adapterContracts).map(([adapter, controls]) => `| ${adapter} | ${Object.values(controls).every(Boolean) ? "foundation-ready" : "incomplete"} | ${Object.entries(controls).map(([name, passed]) => `${name}:${passed ? "PASS" : "FAIL"}`).join("; ")} |`);
   return [
     "# Identity integration contract",
     "",
@@ -148,6 +174,14 @@ function renderMarkdown(contract) {
     "| Result | Sample | Org code | Roles | Mapped role | Mapped home |",
     "|---|---|---|---|---|---|",
     ...sampleRows,
+    "",
+    "## Production runtime adapters",
+    "",
+    "| Adapter | Status | Controls |",
+    "|---|---|---|",
+    ...adapterRows,
+    "",
+    "Runtime adapter readiness does not replace real provider joint-test receipts, directory synchronization, delivery callbacks or site signoff.",
     ""
   ].join("\n");
 }

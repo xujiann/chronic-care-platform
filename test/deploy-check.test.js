@@ -11,6 +11,13 @@ test("deploy check report covers release-critical snapshot gates", () => {
   [
     "file:README.md",
     "file:DEPLOYMENT.md",
+    "file:production-adapters.js",
+    "file:docs/production-identity-message-adapters.md",
+    "file:hospital-connectors.js",
+    "file:docs/production-hospital-connectors.md",
+    "file:secure-object-storage.js",
+    "file:scripts/object-storage-readiness.js",
+    "file:docs/production-object-storage.md",
     "file:docs/production-go-live-requirements.md",
     "file:docs/卫生健康信息平台研发报告.md",
     "file:docs/on-site-launch-materials.md",
@@ -33,6 +40,8 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "file:scripts/commercial-crypto-readiness.js",
     "file:scripts/registration-journey-readiness.js",
     "file:scripts/registration-integration-readiness.js",
+    "file:scripts/platform-production-audit.js",
+    "file:docs/数智医院标准平台全程审计与生产前开发规划.md",
     "file:docs/citizen-production-launch-requirements.md",
     "file:docs/数智医院标准平台研发报告.md",
     "file:docs/二期可研对标差距与下一步开发计划.md",
@@ -51,6 +60,8 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "package:commercialCryptoReadiness",
     "package:registrationJourneyReadiness",
     "package:registrationIntegrationReadiness",
+    "package:platformProductionAudit",
+    "package:objectStorageReadiness",
     "file:docs/公共卫生信息化下一步开发计划.md",
     "package:hybridDeploymentReadiness",
     "snapshot:collections",
@@ -85,6 +96,10 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "snapshot:multiPractice",
     "docs:chronicLaunchCore",
     "docs:platformResearchReport",
+    "docs:platformProductionAudit",
+    "api:productionIdentityMessageAdapters",
+    "api:productionHospitalConnectors",
+    "api:secureObjectStorage",
     "docs:citizenAccountProvisioning",
     "docs:citizenExternalDependencyOwners",
     "docs:productionGoLiveRequirements",
@@ -105,6 +120,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "api:publicHealthSiteEvidenceVerificationTasks",
     "api:publicHealthStandardImplementationLedger",
     "api:productionDatabaseCutoverCenter",
+    "runtime:sqliteProductionProfile",
     "api:citizenOperationsCenter",
     "api:commercialCryptoCenter",
     "api:productionOperationsCenter",
@@ -136,6 +152,8 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "manifest:productionOperationsReadiness",
     "manifest:registrationJourneyReadiness",
     "manifest:registrationIntegrationReadiness",
+    "manifest:platformProductionAudit",
+    "manifest:objectStorageReadiness",
     "manifest:multiPracticeReadiness",
     "manifest:hybridDeploymentReadiness",
     "snapshot:storageMeta"
@@ -162,6 +180,9 @@ test("deploy check report covers release-critical snapshot gates", () => {
   assert.match(report.checks.find((item) => item.name === "api:digitalHospitalStandards").detail, /standards API, launch readiness gate, production evidence packets, command briefs, formal cutover approvals, seed data and frontend fetch fallback/);
   assert.match(report.checks.find((item) => item.name === "docs:chronicLaunchCore").detail, /closure, site signoff/);
   assert.match(report.checks.find((item) => item.name === "docs:platformResearchReport").detail, /policy basis/);
+  assert.match(report.checks.find((item) => item.name === "api:productionIdentityMessageAdapters").detail, /production adapter foundation/);
+  assert.match(report.checks.find((item) => item.name === "api:productionHospitalConnectors").detail, /outbound connectors/);
+  assert.match(report.checks.find((item) => item.name === "api:secureObjectStorage").detail, /malware scan/);
   assert.match(report.checks.find((item) => item.name === "docs:citizenExternalDependencyOwners").detail, /blockers, evidence, and onsite acceptance/);
 });
 

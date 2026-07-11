@@ -277,6 +277,19 @@ const citizenGovernanceChecks = [
   { key: "notification", title: "消息触达回执", interface: "/api/messages, /api/tasks/:id/actions", ready: "已实现", production: "接入短信、订阅消息、手机应用推送和送达回执" }
 ];
 
+const citizenPipelineAudit = [
+  { pipeline: "登录与账号", entry: "login.html", interface: "/api/auth/phone-code, /api/auth/phone-login", status: "演示闭环", owner: "平台信息科/身份集成组", onsiteAcceptance: "现场发送验证码、核对回执、确认居民ID绑定审计", blocker: "SMS_GATEWAY_URL、实名/OIDC、家庭关系和短信回执", evidence: "citizen:launch-foundation" },
+  { pipeline: "居民首页聚合", entry: "citizen.html", interface: "/api/state", status: "已裁剪", owner: "居民主索引组", onsiteAcceptance: "抽查本人、家庭成员和越权访问样例", blocker: "居民主索引、监护关系核验和越权测试", evidence: "test/static.test.js" },
+  { pipeline: "健康档案", entry: "page=health-record", interface: "/api/personal-records", status: "只读展示", owner: "公卫档案接口组", onsiteAcceptance: "核对来源机构、更新时间和慢病档案样例", blocker: "公卫档案、基层慢病档案和来源更新时间", evidence: "citizen-module-interface-map" },
+  { pipeline: "电子病历", entry: "page=emr", interface: "HIS/EMR/LIS/PACS -> /api/personal-records", status: "摘要归集", owner: "医院接口联调组", onsiteAcceptance: "核对门诊摘要、检验报告、影像授权和原文追溯", blocker: "真实 EMR/LIS/PACS 契约和影像对象授权", evidence: "C端开发报告" },
+  { pipeline: "授权与审计", entry: "授权共享/访问复核", interface: "/api/authorizations/:id/revoke, /api/access-reviews", status: "已展示", owner: "安全合规组", onsiteAcceptance: "演练撤权拒绝访问、访问复核和审计导出", blocker: "撤权强拦截、SIEM/审计导出和复核台账", evidence: "citizen-authorization-emr-governance" },
+  { pipeline: "消息与待办", entry: "服务待办中心", interface: "/api/messages, /api/tasks/:id/actions", status: "站内闭环", owner: "消息平台组", onsiteAcceptance: "演练站内信、短信或订阅消息送达和失败补偿", blocker: "短信、订阅消息、移动端推送和失败补偿", evidence: "消息回执样例" },
+  { pipeline: "护理服务", entry: "page=nursing", interface: "/api/internet-nursing/dashboard", status: "演示闭环", owner: "护理服务运营组", onsiteAcceptance: "核对护士资质、知情同意、位置轨迹和质控回访", blocker: "护士资质、知情同意、位置轨迹和监管报送", evidence: "internet-nursing:readiness" },
+  { pipeline: "陪诊服务", entry: "page=escort", interface: "/api/escort-services/orders", status: "演示闭环", owner: "陪诊服务运营组", onsiteAcceptance: "核对服务主体、陪诊师签到、合同保险和评价投诉", blocker: "服务主体、HIS/导诊台、陪诊师签到和合同保险", evidence: "escort:readiness" },
+  { pipeline: "挂号服务", entry: "page=registration", interface: "/api/registrations/orders, /api/registrations/integration-center", status: "回调对账", owner: "互联网医院/HIS 联调组", onsiteAcceptance: "演练锁号、支付退费、排班变更回调和人工对账", blocker: "真实号源、支付退款、医保电子凭证和签署字典", evidence: "registration:integration-readiness" },
+  { pipeline: "移动发布", entry: "mobile-preview.html", interface: "manifest.webmanifest, service-worker.js", status: "可预览", owner: "移动端发布组/运营合规组", onsiteAcceptance: "核对备案域名、HTTPS、隐私协议、签名包和真机截图", blocker: "域名备案、HTTPS、隐私协议、APP签名和推送证书", evidence: "launch:smoke" }
+];
+
 const citizenClientChannels = [
   {
     key: "mini-program",
@@ -385,6 +398,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindServiceTabs();
   renderModuleInterfaces();
   renderDataGovernance();
+  renderCitizenPipelineAudit();
   renderClientChannels();
   renderCitizenOperationsPublicFeed();
   window.addEventListener("popstate", () => setServiceTab(serviceTabFromRoute() || "health-record", { syncUrl: false }));
@@ -590,6 +604,38 @@ function renderDataGovernance(residentId = currentResidentId) {
     <p><b>接口</b>${item.interface}</p>
     <small>${item.production}</small>
   </article>`).join("");
+}
+
+function renderCitizenPipelineAudit() {
+  const target = document.querySelector("#citizen-pipeline-grid");
+  const summary = document.querySelector("#citizen-pipeline-summary");
+  const copyButton = document.querySelector("#copy-citizen-pipeline-audit");
+  if (!target) return;
+  const blocked = citizenPipelineAudit.filter((item) => item.blocker).length;
+  const owners = new Set(citizenPipelineAudit.map((item) => item.owner).filter(Boolean));
+  if (summary) summary.textContent = `${citizenPipelineAudit.length} 条管线 · ${blocked} 项上线阻断 · ${owners.size} 类责任方`;
+  target.innerHTML = citizenPipelineAudit.map((item) => `<article class="citizen-pipeline-card">
+    <div>
+      <strong>${item.pipeline}</strong>
+      <span class="status ${item.status.includes("演示") || item.status.includes("可预览") ? "warn" : ""}">${item.status}</span>
+    </div>
+    <p><b>入口</b>${item.entry}</p>
+    <p><b>接口</b>${item.interface}</p>
+    <p><b>责任</b>${item.owner}</p>
+    <p><b>验收</b>${item.evidence}</p>
+    <p><b>现场动作</b>${item.onsiteAcceptance}</p>
+    <small>${item.blocker}</small>
+  </article>`).join("");
+  copyButton?.addEventListener("click", copyCitizenPipelineAcceptance);
+}
+
+async function copyCitizenPipelineAcceptance() {
+  const lines = [
+    "C端全管线现场验收清单",
+    `摘要：${citizenPipelineAudit.length}条管线，${citizenPipelineAudit.filter((item) => item.blocker).length}项上线阻断`,
+    ...citizenPipelineAudit.map((item, index) => `${index + 1}. ${item.pipeline}｜状态：${item.status}｜入口：${item.entry}｜接口：${item.interface}｜责任方：${item.owner}｜现场动作：${item.onsiteAcceptance}｜阻断项：${item.blocker}｜证据：${item.evidence}`)
+  ];
+  await copyTextToClipboard(lines.join("\n"), "C端验收清单已复制");
 }
 
 function renderClientChannels() {

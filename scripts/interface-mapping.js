@@ -62,6 +62,16 @@ const FIELD_MAPPINGS = {
       occurredAt: "updatedAt"
     }
   },
+  "payment-transaction-v1": {
+    targetCollection: "registrationOrders",
+    owner: "citizen-service-integration",
+    fields: {
+      externalId: "auditTrail[].externalId",
+      orderNo: "registrationNo",
+      amountFen: "fee",
+      currency: "paymentCurrency"
+    }
+  },
   "insurance-settlement-v1": {
     targetCollection: "insuranceClaims",
     owner: "cross-agency-integration",

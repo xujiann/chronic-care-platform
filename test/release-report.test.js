@@ -37,6 +37,21 @@ test("release report validates demo and production environment profiles", () => 
   assert.equal(failedProduction.cutoverChecklist.some((item) => item.id === "cutover-secrets" && !item.passed), true);
   assert.equal(failedProduction.cutoverChecklist.some((item) => item.id === "cutover-identity" && !item.passed), true);
 
+  const weakSqliteProfile = validateProductionConfig({
+    profile: "production",
+    env: {
+      NODE_ENV: "production",
+      STORAGE_ENGINE: "sqlite",
+      SQLITE_JOURNAL_MODE: "DELETE",
+      SQLITE_SYNCHRONOUS: "NORMAL",
+      SQLITE_BUSY_TIMEOUT_MS: "1000"
+    }
+  });
+  assert.equal(weakSqliteProfile.checks.some((item) => item.name === "env:SQLITE.journalMode" && !item.passed), true);
+  assert.equal(weakSqliteProfile.checks.some((item) => item.name === "env:SQLITE.synchronous" && !item.passed), true);
+  assert.equal(weakSqliteProfile.checks.some((item) => item.name === "env:SQLITE.busyTimeout" && !item.passed), true);
+  assert.equal(weakSqliteProfile.cutoverChecklist.some((item) => item.id === "cutover-storage-adapter" && !item.passed), true);
+
   const postgresBeforeAdapter = validateProductionConfig({
     profile: "production",
     env: {
@@ -49,6 +64,20 @@ test("release report validates demo and production environment profiles", () => 
       OIDC_CLIENT_ID: "health-platform",
       OIDC_CLIENT_SECRET: "abcdef0123456789abcdef0123456789",
       SMS_GATEWAY_URL: "https://sms.example.internal/send",
+      SMS_TEMPLATE_ID: "resident-login-code",
+      HOSPITAL_ADAPTER_SECRET: "0123456789abcdef0123456789abcdef",
+      HIS_ADAPTER_URL: "https://his.example.internal/events",
+      EMR_ADAPTER_URL: "https://emr.example.internal/events",
+      LIS_ADAPTER_URL: "https://lis.example.internal/events",
+      PACS_ADAPTER_URL: "https://pacs.example.internal/events",
+      APPOINTMENT_ADAPTER_URL: "https://his.example.internal/appointments",
+      OBJECT_STORAGE_GATEWAY_URL: "https://storage.example.internal/api/",
+      OBJECT_STORAGE_BUCKET: "health-attachments",
+      OBJECT_STORAGE_SIGNING_SECRET: "0123456789abcdef0123456789abcdef",
+      FINANCIAL_GATEWAY_SECRET: "0123456789abcdef0123456789abcdef",
+      PAYMENT_GATEWAY_URL: "https://payment.example.internal/transactions",
+      INSURANCE_GATEWAY_URL: "https://insurance.example.internal/settlements",
+      CERTIFICATE_GATEWAY_URL: "https://certificate.example.internal/certificates",
       AUDIT_EXPORT_PATH: "/var/log/chronic-care-platform/audit"
     }
   });
@@ -60,18 +89,45 @@ test("release report validates demo and production environment profiles", () => 
     env: {
       NODE_ENV: "production",
       STORAGE_ENGINE: "sqlite",
+      SQLITE_JOURNAL_MODE: "WAL",
+      SQLITE_SYNCHRONOUS: "FULL",
+      SQLITE_BUSY_TIMEOUT_MS: "5000",
       SESSION_SECRETS: "0123456789abcdef0123456789abcdef,abcdef0123456789abcdef0123456789",
       INTEGRATION_GATEWAY_SECRET: "fedcba9876543210fedcba9876543210",
       OIDC_ISSUER_URL: "https://identity.example.internal",
       OIDC_CLIENT_ID: "health-platform",
       OIDC_CLIENT_SECRET: "abcdef0123456789abcdef0123456789",
       SMS_GATEWAY_URL: "https://sms.example.internal/send",
+      SMS_TEMPLATE_ID: "resident-login-code",
+      HOSPITAL_ADAPTER_SECRET: "0123456789abcdef0123456789abcdef",
+      HIS_ADAPTER_URL: "https://his.example.internal/events",
+      EMR_ADAPTER_URL: "https://emr.example.internal/events",
+      LIS_ADAPTER_URL: "https://lis.example.internal/events",
+      PACS_ADAPTER_URL: "https://pacs.example.internal/events",
+      APPOINTMENT_ADAPTER_URL: "https://his.example.internal/appointments",
+      OBJECT_STORAGE_GATEWAY_URL: "https://storage.example.internal/api/",
+      OBJECT_STORAGE_BUCKET: "health-attachments",
+      OBJECT_STORAGE_SIGNING_SECRET: "0123456789abcdef0123456789abcdef",
+      FINANCIAL_GATEWAY_SECRET: "0123456789abcdef0123456789abcdef",
+      PAYMENT_GATEWAY_URL: "https://payment.example.internal/transactions",
+      INSURANCE_GATEWAY_URL: "https://insurance.example.internal/settlements",
+      CERTIFICATE_GATEWAY_URL: "https://certificate.example.internal/certificates",
       AUDIT_EXPORT_PATH: "/var/log/chronic-care-platform/audit"
     }
   });
   assert.equal(production.passed, true);
   assert.equal(production.cutoverChecklist.some((item) => item.id === "cutover-identity" && item.passed), true);
   assert.equal(production.cutoverChecklist.some((item) => item.id === "cutover-audit-retention" && item.passed), true);
+  assert.equal(production.cutoverChecklist.some((item) => item.id === "cutover-storage-adapter" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:SQLITE.journalMode" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:SQLITE.synchronous" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:SQLITE.busyTimeout" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:HOSPITAL.connectors" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:HOSPITAL.secretQuality" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:OBJECT_STORAGE.adapter" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:OBJECT_STORAGE.secretQuality" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:FINANCIAL.gateways" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:FINANCIAL.secretQuality" && item.passed), true);
   assert.equal(production.cutoverChecklist.some((item) => item.id === "cutover-institution-interfaces" && !item.passed), true);
   assert.equal(production.cutoverChecklist.some((item) => item.id === "cutover-monitoring" && /missing site signoff/.test(item.evidence)), true);
 
@@ -175,6 +231,10 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "digitalHospitalStandards:api" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "digitalHospitalStandards:launchReadiness" && item.passed), true);
   assert.equal(report.digitalHospitalStandards.ok, true);
+  assert.equal(report.platformProductionAudit.ok, true);
+  assert.equal(report.platformProductionAudit.productionReady, false);
+  assert.equal(report.checks.some((item) => item.name === "platformProductionAudit:capabilities" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "platformProductionAudit:mvpRequiredModules" && item.passed), true);
   assert.equal(report.digitalHospitalStandards.summary.standardDomains >= 6, true);
   assert.equal(report.digitalHospitalStandards.summary.apiMarkers >= 5, true);
   assert.equal(report.digitalHospitalStandards.summary.launchMarkers >= 16, true);
@@ -232,7 +292,16 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "drugConsumable:readiness" && item.passed), true);
   assert.equal(report.drugConsumable.ok, true);
   assert.equal(report.checks.some((item) => item.name === "integration:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "integration:runtimeAdapters" && item.passed), true);
   assert.equal(report.integrationReadiness.ok, true);
+  assert.equal(report.checks.some((item) => item.name === "objectStorage:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "objectStorage:productionBoundary" && item.passed), true);
+  assert.equal(report.objectStorageReadiness.ok, true);
+  assert.equal(report.objectStorageReadiness.productionReady, false);
+  assert.equal(report.checks.some((item) => item.name === "financialGateway:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "financialGateway:productionBoundary" && item.passed), true);
+  assert.equal(report.financialGatewayReadiness.ok, true);
+  assert.equal(report.financialGatewayReadiness.productionReady, false);
   assert.equal(report.checks.some((item) => item.name === "interfaceMapping:report" && item.passed), true);
   assert.equal(report.interfaceMapping.ok, true);
   assert.equal(report.checks.some((item) => item.name === "regionalDataSharing:report" && item.passed), true);
@@ -544,6 +613,8 @@ test("release report writes standalone production cutover and storage artifacts"
   const drugConsumableMarkdown = fs.readFileSync(path.join(outputDir, "drug-consumable-readiness-report.md"), "utf8");
   const integrationJson = JSON.parse(fs.readFileSync(path.join(outputDir, "integration-readiness-report.json"), "utf8"));
   const integrationMarkdown = fs.readFileSync(path.join(outputDir, "integration-readiness-report.md"), "utf8");
+  const objectStorageJson = JSON.parse(fs.readFileSync(path.join(outputDir, "object-storage-readiness-report.json"), "utf8"));
+  const objectStorageMarkdown = fs.readFileSync(path.join(outputDir, "object-storage-readiness-report.md"), "utf8");
   const interfaceMappingJson = JSON.parse(fs.readFileSync(path.join(outputDir, "interface-mapping-report.json"), "utf8"));
   const interfaceMappingMarkdown = fs.readFileSync(path.join(outputDir, "interface-mapping-report.md"), "utf8");
   const monitoringJson = JSON.parse(fs.readFileSync(path.join(outputDir, "monitoring-readiness-report.json"), "utf8"));
@@ -639,6 +710,9 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(drugConsumableMarkdown, /Drug consumable readiness report/);
   assert.equal(integrationJson.integrationReadiness.ok, true);
   assert.match(integrationMarkdown, /P0 coverage/);
+  assert.equal(objectStorageJson.objectStorageReadiness.ok, true);
+  assert.equal(objectStorageJson.objectStorageReadiness.productionReady, false);
+  assert.match(objectStorageMarkdown, /Object storage and attachment security readiness/);
   assert.equal(interfaceMappingJson.interfaceMapping.ok, true);
   assert.match(interfaceMappingMarkdown, /Contract field mappings/);
   assert.equal(monitoringJson.monitoringReadiness.ok, true);

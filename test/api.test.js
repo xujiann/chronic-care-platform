@@ -1,12 +1,15 @@
 const assert = require("node:assert/strict");
 const { createHmac, pbkdf2Sync } = require("node:crypto");
 const { once } = require("node:events");
+const http = require("node:http");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 
 const ROOT = path.resolve(__dirname, "..");
+const { signHospitalRequest, stableStringify: stableHospitalStringify } = require("../hospital-connectors");
+const { signFinancialRequest, stableStringify: stableFinancialStringify } = require("../financial-gateways");
 
 async function waitForHealth(baseUrl) {
   for (let attempt = 0; attempt < 60; attempt += 1) {
@@ -159,12 +162,30 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(accountLogin.body.user.password, undefined);
     assert.equal(accountLogin.body.user.passwordHash, undefined);
 
+    const adapterCenter = await api(baseUrl, "/api/auth/adapters", authorized(accountLogin.body.token));
+    assert.equal(adapterCenter.response.status, 200);
+    assert.equal(adapterCenter.body.production, false);
+    assert.equal(adapterCenter.body.ready, false);
+    assert.equal(adapterCenter.body.identity.configured, false);
+    assert.equal(adapterCenter.body.sms.configured, false);
+
+    const unavailableOidc = await api(baseUrl, "/api/auth/oidc/exchange", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accessToken: "not-a-real-upstream-token" })
+    });
+    assert.equal(unavailableOidc.response.status, 502);
+    assert.equal(unavailableOidc.body.message, "identity provider verification failed");
+
     const residentPhoneLogin = await phoneLogin(baseUrl, "DEMO-MOBILE-R1");
     assert.equal(residentPhoneLogin.response.status, 200);
     assert.equal(residentPhoneLogin.body.user.role, "citizen");
     assert.equal(residentPhoneLogin.body.user.home, "citizen.html");
     assert.equal(residentPhoneLogin.body.user.residentId, "r1");
     assert.equal(residentPhoneLogin.body.user.password, undefined);
+
+    const deniedAdapterCenter = await api(baseUrl, "/api/auth/adapters", authorized(residentPhoneLogin.body.token));
+    assert.equal(deniedAdapterCenter.response.status, 403);
 
     const sentPhoneCode = await phoneCode(baseUrl, "DEMO-MOBILE-R1");
     assert.equal(sentPhoneCode.response.status, 200);
@@ -3412,7 +3433,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(referralTeleconsultations.response.status, 403);
   });
 
-  await t.test("accepts signed idempotent integration gateway events", async () => {
+  await t.test("accepts signed idempotent integration gateway events", async (t) => {
     const institution = await login(baseUrl, "hospital");
     const contracts = await api(baseUrl, "/api/integration/contracts", authorized(institution.body.token));
     assert.equal(contracts.response.status, 200);
@@ -3459,6 +3480,96 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(replay.body.idempotentReplay, true);
 
     const commission = await login(baseUrl, "health");
+
+    const hospitalRequests = [];
+    const hospitalMock = http.createServer(async (request, response) => {
+      const chunks = [];
+      for await (const chunk of request) chunks.push(chunk);
+      const bodyText = Buffer.concat(chunks).toString("utf8");
+      hospitalRequests.push({ headers: request.headers, bodyText, body: JSON.parse(bodyText) });
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ receiptId: `his-provider-${hospitalRequests.length}`, status: "accepted" }));
+    });
+    hospitalMock.listen(0, "127.0.0.1");
+    await once(hospitalMock, "listening");
+    const hospitalPort = hospitalMock.address().port;
+    process.env.HIS_ADAPTER_URL = `http://127.0.0.1:${hospitalPort}/his/events`;
+    process.env.HIS_ADAPTER_SECRET = "api-test-his-adapter-secret";
+    process.env.HOSPITAL_ADAPTER_MAX_ATTEMPTS = "1";
+    t.after(async () => {
+      delete process.env.HIS_ADAPTER_URL;
+      delete process.env.HIS_ADAPTER_SECRET;
+      delete process.env.HOSPITAL_ADAPTER_MAX_ATTEMPTS;
+      await new Promise((resolve) => hospitalMock.close(resolve));
+    });
+
+    const adapters = await api(baseUrl, "/api/integration/adapters", authorized(institution.body.token));
+    assert.equal(adapters.response.status, 200);
+    assert.equal(adapters.body.summary.total, 5);
+    assert.equal(adapters.body.summary.configured, 1);
+    assert.equal(adapters.body.connectors.find((item) => item.domain === "HIS").configured, true);
+    assert.equal(JSON.stringify(adapters.body).includes(String(hospitalPort)), false);
+    assert.equal(JSON.stringify(adapters.body).includes("api-test-his-adapter-secret"), false);
+
+    const residentForAdapter = await login(baseUrl, "citizen");
+    const deniedAdapters = await api(baseUrl, "/api/integration/adapters", authorized(residentForAdapter.body.token));
+    assert.equal(deniedAdapters.response.status, 403);
+
+    const outboundPayload = {
+      contractId: "his-patient-v1",
+      idempotencyKey: "outbound-his-visit-001",
+      payload: {
+        externalId: "OUT-HIS-VISIT-001",
+        residentId: "r1",
+        institution: "大连市中心医院",
+        visitedAt: "2026-07-11T03:00:00.000Z"
+      }
+    };
+    const dispatched = await api(baseUrl, "/api/integration/dispatch", authorized(institution.body.token, {
+      method: "POST",
+      body: JSON.stringify(outboundPayload)
+    }));
+    assert.equal(dispatched.response.status, 202);
+    assert.equal(dispatched.body.direction, "outbound");
+    assert.equal(dispatched.body.adapterReceipt.receiptId, "his-provider-1");
+    assert.equal(dispatched.body.reconciliationStatus, "provider-accepted");
+    assert.equal(hospitalRequests.length, 1);
+    assert.equal(hospitalRequests[0].headers["x-platform-contract"], "his-patient-v1");
+    assert.equal(hospitalRequests[0].headers["x-idempotency-key"], "outbound-his-visit-001");
+    assert.equal(hospitalRequests[0].headers["x-signature"], signHospitalRequest(
+      stableHospitalStringify(hospitalRequests[0].body),
+      process.env.HIS_ADAPTER_SECRET,
+      hospitalRequests[0].headers["x-timestamp"],
+      hospitalRequests[0].headers["x-request-id"]
+    ));
+
+    const outboundReplay = await api(baseUrl, "/api/integration/dispatch", authorized(institution.body.token, {
+      method: "POST",
+      body: JSON.stringify(outboundPayload)
+    }));
+    assert.equal(outboundReplay.response.status, 200);
+    assert.equal(outboundReplay.body.id, dispatched.body.id);
+    assert.equal(outboundReplay.body.idempotentReplay, true);
+    assert.equal(hospitalRequests.length, 1);
+
+    const outboundDeadLetter = await api(baseUrl, `/api/integration/events/${dispatched.body.id}/dead-letter`, authorized(commission.body.token, {
+      method: "POST",
+      body: JSON.stringify({ reason: "provider-reconciliation-retest" })
+    }));
+    assert.equal(outboundDeadLetter.response.status, 200);
+    assert.equal(outboundDeadLetter.body.deadLetter, true);
+
+    const outboundRetry = await api(baseUrl, `/api/integration/events/${dispatched.body.id}/retry`, authorized(commission.body.token, {
+      method: "POST",
+      body: JSON.stringify({ reason: "provider-recovered" })
+    }));
+    assert.equal(outboundRetry.response.status, 200);
+    assert.equal(outboundRetry.body.deadLetter, false);
+    assert.equal(outboundRetry.body.lastRetryResult, "provider-accepted");
+    assert.equal(outboundRetry.body.retryCount, 1);
+    assert.equal(outboundRetry.body.adapterReceipt.receiptId, "his-provider-2");
+    assert.equal(hospitalRequests.length, 2);
+
     const retry = await api(baseUrl, `/api/integration/events/${accepted.body.id}/retry`, authorized(commission.body.token, {
       method: "POST",
       body: JSON.stringify({ reason: "upstream-timeout" })
@@ -3499,6 +3610,280 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(simulatedReplay.response.status, 200);
     assert.equal(simulatedReplay.body.event.id, simulated.body.event.id);
     assert.equal(simulatedReplay.body.event.idempotentReplay, true);
+  });
+
+  await t.test("dispatches payment insurance and certificate requests through audited production gateways", async (t) => {
+    const financialRequests = [];
+    const financialMock = http.createServer(async (request, response) => {
+      const chunks = [];
+      for await (const chunk of request) chunks.push(chunk);
+      const bodyText = Buffer.concat(chunks).toString("utf8");
+      const body = JSON.parse(bodyText);
+      financialRequests.push({ headers: request.headers, bodyText, body });
+      response.writeHead(200, { "Content-Type": "application/json" });
+      const receiptId = body.type === "PAYMENT"
+        ? `payment-provider-${financialRequests.length}`
+        : body.type === "INSURANCE"
+          ? `insurance-provider-${financialRequests.length}`
+          : `certificate-provider-${financialRequests.length}`;
+      response.end(JSON.stringify({ receiptId, status: "accepted" }));
+    });
+    financialMock.listen(0, "127.0.0.1");
+    await once(financialMock, "listening");
+    const financialPort = financialMock.address().port;
+    process.env.PAYMENT_GATEWAY_URL = `http://127.0.0.1:${financialPort}/payment`;
+    process.env.INSURANCE_GATEWAY_URL = `http://127.0.0.1:${financialPort}/insurance`;
+    process.env.CERTIFICATE_GATEWAY_URL = `http://127.0.0.1:${financialPort}/certificate`;
+    process.env.FINANCIAL_GATEWAY_SECRET = "api-test-financial-gateway-secret";
+    process.env.FINANCIAL_GATEWAY_MAX_ATTEMPTS = "1";
+    t.after(async () => {
+      delete process.env.PAYMENT_GATEWAY_URL;
+      delete process.env.INSURANCE_GATEWAY_URL;
+      delete process.env.CERTIFICATE_GATEWAY_URL;
+      delete process.env.FINANCIAL_GATEWAY_SECRET;
+      delete process.env.FINANCIAL_GATEWAY_MAX_ATTEMPTS;
+      financialMock.closeAllConnections?.();
+      await new Promise((resolve) => financialMock.close(resolve));
+    });
+
+    const institution = await login(baseUrl, "hospital");
+    const commission = await login(baseUrl, "health");
+    const insurance = await login(baseUrl, "insurance");
+    const citizen = await login(baseUrl, "citizen");
+
+    const center = await api(baseUrl, "/api/financial-gateways", authorized(insurance.body.token));
+    assert.equal(center.response.status, 200);
+    assert.equal(center.body.summary.total, 3);
+    assert.equal(center.body.summary.configured, 3);
+    assert.equal(center.body.summary.operations, 14);
+    assert.equal(center.body.productionReady, false);
+    assert.equal(JSON.stringify(center.body).includes(String(financialPort)), false);
+    assert.equal(JSON.stringify(center.body).includes("api-test-financial-gateway-secret"), false);
+    assert.equal((await api(baseUrl, "/api/financial-gateways", authorized(citizen.body.token))).response.status, 403);
+
+    const paymentPayload = {
+      type: "PAYMENT",
+      operation: "create-payment",
+      idempotencyKey: "financial-payment-001",
+      payload: { externalId: "pay-ext-001", orderNo: "REG-001", amountFen: 12600, currency: "CNY" }
+    };
+    const dispatched = await api(baseUrl, "/api/financial-gateways/dispatch", authorized(institution.body.token, {
+      method: "POST",
+      body: JSON.stringify(paymentPayload)
+    }));
+    assert.equal(dispatched.response.status, 202);
+    assert.equal(dispatched.body.adapterType, "financial");
+    assert.equal(dispatched.body.gatewayType, "PAYMENT");
+    assert.equal(dispatched.body.contractId, "payment-transaction-v1");
+    assert.equal(dispatched.body.adapterReceipt.receiptId, "payment-provider-1");
+    assert.equal(financialRequests.length, 1);
+    assert.equal(financialRequests[0].headers["x-idempotency-key"], "financial-payment-001");
+    assert.equal(financialRequests[0].headers["x-signature"], signFinancialRequest(
+      stableFinancialStringify(financialRequests[0].body),
+      process.env.FINANCIAL_GATEWAY_SECRET,
+      financialRequests[0].headers["x-timestamp"],
+      financialRequests[0].headers["x-request-id"]
+    ));
+
+    const replay = await api(baseUrl, "/api/financial-gateways/dispatch", authorized(institution.body.token, {
+      method: "POST",
+      body: JSON.stringify(paymentPayload)
+    }));
+    assert.equal(replay.response.status, 200);
+    assert.equal(replay.body.id, dispatched.body.id);
+    assert.equal(replay.body.idempotentReplay, true);
+    assert.equal(financialRequests.length, 1);
+
+    assert.equal((await api(baseUrl, "/api/financial-gateways/dispatch", authorized(insurance.body.token, {
+      method: "POST",
+      body: JSON.stringify({ ...paymentPayload, idempotencyKey: "insurance-out-of-scope" })
+    }))).response.status, 403);
+    const sensitive = await api(baseUrl, "/api/financial-gateways/dispatch", authorized(insurance.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        type: "INSURANCE",
+        operation: "credential-verify",
+        idempotencyKey: "insurance-sensitive-001",
+        payload: { credentialReference: "vault-ref-1", institutionCode: "MR1", credentialToken: "raw-token" }
+      })
+    }));
+    assert.equal(sensitive.response.status, 400);
+    assert.match(sensitive.body.message, /sensitive field/);
+    assert.equal(financialRequests.length, 1);
+
+    const marked = await api(baseUrl, `/api/integration/events/${dispatched.body.id}/dead-letter`, authorized(commission.body.token, {
+      method: "POST",
+      body: JSON.stringify({ reason: "provider-reconciliation-retest" })
+    }));
+    assert.equal(marked.response.status, 200);
+    assert.equal(marked.body.deadLetter, true);
+    const retried = await api(baseUrl, `/api/integration/events/${dispatched.body.id}/retry`, authorized(commission.body.token, {
+      method: "POST",
+      body: JSON.stringify({ reason: "provider-recovered" })
+    }));
+    assert.equal(retried.response.status, 200);
+    assert.equal(retried.body.deadLetter, false);
+    assert.equal(retried.body.lastRetryResult, "provider-accepted");
+    assert.equal(retried.body.adapterReceipt.receiptId, "payment-provider-2");
+    assert.equal(financialRequests.length, 2);
+
+    const certificate = await api(baseUrl, "/api/financial-gateways/dispatch", authorized(commission.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        type: "CERTIFICATE",
+        operation: "issue",
+        idempotencyKey: "certificate-issue-001",
+        payload: {
+          externalId: "birth-cert-001",
+          certificateType: "birth",
+          subjectReference: "resident-vault-ref-r1",
+          documentDigest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      })
+    }));
+    assert.equal(certificate.response.status, 202);
+    assert.equal(certificate.body.gatewayType, "CERTIFICATE");
+    assert.equal(certificate.body.contractId, "certificate-sync-v1");
+    assert.equal(financialRequests.length, 3);
+  });
+
+  await t.test("secures attachment upload completion download and lifecycle through object storage", async (t) => {
+    const storageRequests = [];
+    let scanStatus = "clean";
+    const storageMock = http.createServer(async (request, response) => {
+      const chunks = [];
+      for await (const chunk of request) chunks.push(chunk);
+      const bodyText = Buffer.concat(chunks).toString("utf8");
+      const body = JSON.parse(bodyText);
+      storageRequests.push({ path: request.url, headers: request.headers, body });
+      response.writeHead(200, { "Content-Type": "application/json" });
+      if (request.url === "/storage/upload-intents") {
+        response.end(JSON.stringify({ uploadId: `upload-${body.attachmentId}`, uploadUrl: `http://127.0.0.1:${storageMock.address().port}/direct-upload/${body.attachmentId}`, expiresAt: "2026-07-11T05:00:00.000Z" }));
+        return;
+      }
+      if (request.url === "/storage/objects/complete") {
+        response.end(JSON.stringify({ sizeBytes: body.expectedSizeBytes, checksumSha256: body.expectedChecksumSha256, scanStatus, scannedAt: "2026-07-11T04:10:00.000Z", objectVersion: `version-${body.attachmentId}` }));
+        return;
+      }
+      if (request.url === "/storage/download-intents") {
+        response.end(JSON.stringify({ downloadUrl: `http://127.0.0.1:${storageMock.address().port}/short-download/${body.attachmentId}`, expiresAt: "2026-07-11T04:15:00.000Z" }));
+        return;
+      }
+      response.end(JSON.stringify({ accepted: true, status: "accepted", effectiveAt: "2026-07-11T04:12:00.000Z" }));
+    });
+    storageMock.listen(0, "127.0.0.1");
+    await once(storageMock, "listening");
+    const storagePort = storageMock.address().port;
+    process.env.OBJECT_STORAGE_GATEWAY_URL = `http://127.0.0.1:${storagePort}/storage/`;
+    process.env.OBJECT_STORAGE_BUCKET = "api-test-attachments";
+    process.env.OBJECT_STORAGE_SIGNING_SECRET = "api-test-object-storage-signing-secret";
+    process.env.OBJECT_STORAGE_TOKEN = "api-test-object-storage-token";
+    t.after(async () => {
+      delete process.env.OBJECT_STORAGE_GATEWAY_URL;
+      delete process.env.OBJECT_STORAGE_BUCKET;
+      delete process.env.OBJECT_STORAGE_SIGNING_SECRET;
+      delete process.env.OBJECT_STORAGE_TOKEN;
+      storageMock.closeAllConnections?.();
+      await new Promise((resolve) => storageMock.close(resolve));
+    });
+
+    const commission = await login(baseUrl, "health");
+    const citizen = await login(baseUrl, "citizen");
+    const institution = await login(baseUrl, "hospital");
+    const storageCenter = await api(baseUrl, "/api/attachments/storage", authorized(commission.body.token));
+    assert.equal(storageCenter.response.status, 200);
+    assert.equal(storageCenter.body.adapterReady, true);
+    assert.equal(storageCenter.body.productionReady, false);
+    assert.equal(JSON.stringify(storageCenter.body).includes(String(storagePort)), false);
+    assert.equal(JSON.stringify(storageCenter.body).includes("api-test-attachments"), false);
+
+    const deniedStorageCenter = await api(baseUrl, "/api/attachments/storage", authorized(citizen.body.token));
+    assert.equal(deniedStorageCenter.response.status, 403);
+
+    const invalidUpload = await api(baseUrl, "/api/attachments/upload-intents", authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({ residentId: "r1", filename: "malware.exe", contentType: "application/octet-stream", sizeBytes: 100, checksumSha256: "a".repeat(64) })
+    }));
+    assert.equal(invalidUpload.response.status, 400);
+    assert.match(invalidUpload.body.message, /content type is not allowed/);
+
+    const uploadPayload = {
+      residentId: "r1",
+      purpose: "resident-lab-report",
+      sourceCollection: "personalRecords",
+      sourceId: "record-api-storage-001",
+      filename: "lab-report.pdf",
+      contentType: "application/pdf",
+      sizeBytes: 4096,
+      checksumSha256: "c".repeat(64),
+      classification: "clinical",
+      retentionPolicy: "clinical-record"
+    };
+    const uploadIntent = await api(baseUrl, "/api/attachments/upload-intents", authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify(uploadPayload)
+    }));
+    assert.equal(uploadIntent.response.status, 201);
+    assert.equal(uploadIntent.body.attachment.status, "upload-authorized");
+    assert.equal(uploadIntent.body.attachment.uploadId, undefined);
+    assert.equal(uploadIntent.body.uploadIntent.uploadUrl.includes("direct-upload"), true);
+    assert.equal(storageRequests[0].headers["x-signature-algorithm"], "HMAC-SHA256");
+
+    const attachmentId = uploadIntent.body.attachment.id;
+    const deniedInstitutionList = await api(baseUrl, "/api/attachments?residentId=r1", authorized(institution.body.token));
+    assert.equal(deniedInstitutionList.response.status, 200);
+    assert.equal(deniedInstitutionList.body.attachments.some((item) => item.id === attachmentId), false);
+
+    const completed = await api(baseUrl, `/api/attachments/${attachmentId}/complete`, authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({})
+    }));
+    assert.equal(completed.response.status, 200);
+    assert.equal(completed.body.attachment.status, "active");
+    assert.equal(completed.body.attachment.scanStatus, "clean");
+    assert.equal(completed.body.attachment.checksumSha256, "c".repeat(64));
+
+    const download = await api(baseUrl, `/api/attachments/${attachmentId}/download-intent`, authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({})
+    }));
+    assert.equal(download.response.status, 200);
+    assert.equal(download.body.downloadIntent.downloadUrl.includes("short-download"), true);
+    assert.equal(typeof download.body.downloadIntent.expiresAt, "string");
+
+    const legalHold = await api(baseUrl, `/api/attachments/${attachmentId}/actions`, authorized(commission.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "legal-hold", reason: "API audit evidence preservation" })
+    }));
+    assert.equal(legalHold.response.status, 200);
+    assert.equal(legalHold.body.attachment.legalHold, true);
+
+    const immutableDelete = await api(baseUrl, `/api/attachments/${attachmentId}/actions`, authorized(commission.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "delete", reason: "should remain blocked" })
+    }));
+    assert.equal(immutableDelete.response.status, 409);
+
+    scanStatus = "infected";
+    const infectedIntent = await api(baseUrl, "/api/attachments/upload-intents", authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({ ...uploadPayload, filename: "suspicious-report.pdf", checksumSha256: "d".repeat(64) })
+    }));
+    assert.equal(infectedIntent.response.status, 201);
+    const infectedCompletion = await api(baseUrl, `/api/attachments/${infectedIntent.body.attachment.id}/complete`, authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({})
+    }));
+    assert.equal(infectedCompletion.response.status, 422);
+    assert.equal(infectedCompletion.body.attachment.status, "quarantined");
+    assert.equal(infectedCompletion.body.attachment.scanStatus, "blocked");
+    assert.equal(infectedCompletion.body.attachment.storageQuarantineStatus, "accepted");
+
+    const blockedDownload = await api(baseUrl, `/api/attachments/${infectedIntent.body.attachment.id}/download-intent`, authorized(citizen.body.token, {
+      method: "POST",
+      body: JSON.stringify({})
+    }));
+    assert.equal(blockedDownload.response.status, 409);
   });
 
   await t.test("closes mutual recognition report callback into resident records", async () => {

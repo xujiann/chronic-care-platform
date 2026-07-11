@@ -41,6 +41,11 @@ test("SQLite migrations are idempotent and collection versions change only on wr
       assert.ok(columns.includes("version"));
       const indexes = db.prepare("PRAGMA index_list(state_collections)").all().map((item) => item.name);
       assert.ok(indexes.includes("idx_state_collections_updated_at"));
+      assert.equal(db.prepare("PRAGMA journal_mode").get().journal_mode, "wal");
+      assert.equal(Number(db.prepare("PRAGMA synchronous").get().synchronous), 2);
+      assert.equal(Number(db.prepare("PRAGMA foreign_keys").get().foreign_keys), 1);
+      assert.equal(Number(db.prepare("PRAGMA busy_timeout").get().timeout) >= 5000, true);
+      assert.equal(db.prepare("PRAGMA quick_check").get().quick_check, "ok");
 
       const tableNames = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((item) => item.name);
       [
@@ -222,7 +227,17 @@ test("SQLite migrations are idempotent and collection versions change only on wr
       orphanServiceState.careOrders[0].residentId = "missing-resident";
       storage.writeDatabase(orphanServiceState);
     }, /FOREIGN KEY constraint failed/);
-    assert.equal(storage.storageMeta().schemaVersion, 7);
+    const meta = storage.storageMeta();
+    assert.equal(meta.schemaVersion, 7);
+    assert.deepEqual(meta.sqliteProfile, {
+      journalMode: "wal",
+      synchronous: "FULL",
+      foreignKeys: true,
+      busyTimeoutMs: 5000,
+      walAutocheckpointPages: 1000,
+      quickCheck: "ok",
+      productionProfile: true
+    });
   } finally {
     fs.rmSync(dataDir, { recursive: true, force: true });
   }

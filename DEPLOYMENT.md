@@ -104,20 +104,51 @@ node scripts/storage-admin.js sanitize data/sanitized --file-name=db.json
 PORT=5173
 NODE_ENV=production
 STORAGE_ENGINE=auto
+SQLITE_JOURNAL_MODE=WAL
+SQLITE_SYNCHRONOUS=FULL
+SQLITE_BUSY_TIMEOUT_MS=5000
+SQLITE_WAL_AUTOCHECKPOINT_PAGES=1000
+SQLITE_HEALTH_CHECK_TTL_MS=30000
 DATA_DIR=/var/lib/chronic-care-platform
 SESSION_SECRETS=replace-with-long-random-secret
 INTEGRATION_GATEWAY_SECRET=replace-with-integration-secret
 DATABASE_URL=postgres://health:replace-with-password@postgres.internal:5432/chronic_care
 OIDC_ISSUER_URL=https://identity.example.gov.cn/real-issuer
+OIDC_USERINFO_URL=https://identity.example.gov.cn/real-issuer/userinfo
 OIDC_CLIENT_ID=replace-with-oidc-client-id
 OIDC_CLIENT_SECRET=replace-with-oidc-client-secret
+IDENTITY_ADAPTER_TIMEOUT_MS=8000
 SMS_GATEWAY_URL=https://sms.example.gov.cn/real-gateway
+SMS_GATEWAY_TOKEN=replace-with-provider-token
+SMS_TEMPLATE_ID=resident-login-code
+SMS_SENDER=health-platform
+SMS_GATEWAY_TIMEOUT_MS=8000
+HOSPITAL_ADAPTER_SECRET=replace-with-hospital-connector-signing-secret
+HIS_ADAPTER_URL=https://his.example.gov.cn/platform/events
+EMR_ADAPTER_URL=https://emr.example.gov.cn/platform/events
+LIS_ADAPTER_URL=https://lis.example.gov.cn/platform/events
+PACS_ADAPTER_URL=https://pacs.example.gov.cn/platform/events
+APPOINTMENT_ADAPTER_URL=https://his.example.gov.cn/platform/appointments
+HOSPITAL_ADAPTER_TIMEOUT_MS=8000
+HOSPITAL_ADAPTER_MAX_ATTEMPTS=3
+OBJECT_STORAGE_GATEWAY_URL=https://storage.example.gov.cn/api/
+OBJECT_STORAGE_BUCKET=health-platform-attachments
+OBJECT_STORAGE_SIGNING_SECRET=replace-with-object-storage-signing-secret
+OBJECT_STORAGE_TIMEOUT_MS=8000
+OBJECT_STORAGE_MAX_BYTES=104857600
+OBJECT_STORAGE_DOWNLOAD_TTL_SECONDS=300
+FINANCIAL_GATEWAY_SECRET=replace-with-financial-gateway-signing-secret
+PAYMENT_GATEWAY_URL=https://payment.example.gov.cn/platform/transactions
+INSURANCE_GATEWAY_URL=https://insurance.example.gov.cn/platform/settlements
+CERTIFICATE_GATEWAY_URL=https://certificate.example.gov.cn/platform/certificates
+FINANCIAL_GATEWAY_TIMEOUT_MS=8000
+FINANCIAL_GATEWAY_MAX_ATTEMPTS=3
 AUDIT_EXPORT_PATH=/var/log/chronic-care-platform/audit
 SIEM_ENDPOINT=https://siem.example.gov.cn/ingest
 RETENTION_POLICY=10y-worm
 ```
 
-生产化如迁移 PostgreSQL 或正式数据库，需要先完成 `productionDeploymentPlan` 中的数据库适配器工作，再填入 `DATABASE_URL`；在适配器启用前，运行时和发布门禁会拒绝 `STORAGE_ENGINE=postgres/postgresql`，避免静默回落到 SQLite。接入政务统一认证时需要填入 `OIDC_ISSUER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET`；居民端验证码生产上线必须填入 `SMS_GATEWAY_URL`；审计保全至少配置 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT`，并补充现场 CA、网关地址等变量。
+生产化如迁移 PostgreSQL 或正式数据库，需要先完成 `productionDeploymentPlan` 中的数据库适配器工作，再填入 `DATABASE_URL`；在适配器启用前，运行时和发布门禁会拒绝 `STORAGE_ENGINE=postgres/postgresql`，避免静默回落到 SQLite。接入政务统一认证时需要填入 `OIDC_ISSUER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET`，可通过 `OIDC_USERINFO_URL` 跳过发现请求；居民端验证码生产上线必须填入 `SMS_GATEWAY_URL/SMS_TEMPLATE_ID`，凭据仅通过环境变量或密钥托管注入。医院连接器至少配置五类 `*_ADAPTER_URL` 和共享 `HOSPITAL_ADAPTER_SECRET`，也可使用每域独立密钥。安全附件需要配置 `OBJECT_STORAGE_GATEWAY_URL/OBJECT_STORAGE_BUCKET/OBJECT_STORAGE_SIGNING_SECRET`，并完成恶意文件扫描和不可变保留锁验收。支付、医保和电子证照必须配置三类 `*_GATEWAY_URL` 与共享或分域 `*_GATEWAY_SECRET`，并完成回调验签、日终对账和联合测试。完整运行时边界见 `docs/production-identity-message-adapters.md`、`docs/production-hospital-connectors.md`、`docs/production-object-storage.md` 和 `docs/production-financial-certificate-gateways.md`。审计保全至少配置 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT`，并补充现场 CA、网关地址等变量。
 
 生产环境上线前应执行严格环境校验：
 
@@ -125,7 +156,7 @@ RETENTION_POLICY=10y-worm
 npm.cmd run env:check:production
 ```
 
-该命令读取 `.env`，会拒绝缺失环境文件、占位密钥、过短密钥、`STORAGE_ENGINE=json` 和尚未启用的 `postgres/postgresql` 运行时适配器；生产模式还会要求 OIDC 身份适配、居民端短信网关和审计保全目标配置到位。
+该命令读取 `.env`，会拒绝缺失环境文件、占位密钥、过短密钥、`STORAGE_ENGINE=json` 和尚未启用的 `postgres/postgresql` 运行时适配器；使用 SQLite 时还会要求 `WAL`、`FULL` 同步和不少于 5000ms 的忙等待配置。生产模式还会要求 OIDC 身份适配、居民端短信网关、医院连接器、对象存储、支付/医保/电子证照网关和审计保全目标配置到位。
 
 `env:check:production` 和 `release:report` 还会输出 `cutoverChecklist` / `productionCutover`，按环境文件、生产密钥、统一身份、审计保全、存储适配、现场接口联调、医保/证照交换、监控值守和灾备演练列出责任方、阻断状态、当前证据和下一步动作。真实参数到位后，应先让环境与基础设施类通过，再进入外部接口联调和现场测评；外部系统项必须有 `CUTOVER_SITE_INTERFACE_SIGNOFF`、`CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF`、`CUTOVER_MONITORING_SIGNOFF`、`CUTOVER_DR_REHEARSAL_SIGNOFF` 等现场签字信号才会通过。
 
@@ -213,7 +244,7 @@ npm.cmd run release:report:full
 
 ## 存储迁移与备份
 
-SQLite 启动时会通过 `schema_migrations` 自动执行幂等迁移，当前 schema 版本为 7。部署升级前应先停止写入并创建备份。v7 已把机构信用评价、科研数据集、专病库模型和无障碍验收清单纳入结构化镜像表：
+SQLite 启动时会通过 `schema_migrations` 自动执行幂等迁移，当前 schema 版本为 7。每个运行时连接都会启用外键、`WAL`、`FULL` 同步、忙等待和 WAL 自动检查点，并在 `/api/health` 的 `storage.sqliteProfile` 中暴露 `quickCheck` 与生产配置判定。部署升级前应先停止写入并创建备份。v7 已把机构信用评价、科研数据集、专病库模型和无障碍验收清单纳入结构化镜像表：
 
 ```powershell
 npm.cmd run storage:backup

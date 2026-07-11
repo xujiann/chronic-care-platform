@@ -2,6 +2,31 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
+const {
+  digestPhoneVerificationCode,
+  fetchOidcUserInfo,
+  generatePhoneVerificationCode,
+  productionAdapterCenter,
+  sendSmsVerificationCode
+} = require("./production-adapters");
+const {
+  dispatchHospitalRequest,
+  hospitalConnectorCenter,
+  normalizeDomain: normalizeHospitalConnectorDomain
+} = require("./hospital-connectors");
+const {
+  dispatchFinancialRequest,
+  financialGatewayCenter,
+  validateFinancialRequest
+} = require("./financial-gateways");
+const {
+  applyObjectLifecycle,
+  createObjectDownloadIntent,
+  createObjectUploadIntent,
+  finalizeObjectUpload,
+  objectStorageCenter,
+  validateAttachmentMetadata
+} = require("./secure-object-storage");
 const { buildProcessAuditReport } = require("./scripts/process-audit");
 const { buildSiteReadinessPack, renderTemplateReadmes } = require("./scripts/site-readiness-pack");
 const { buildHealthDashboardSummary, buildPriorityApplicationTemplates } = require("./scripts/health-dashboard-summary");
@@ -93,6 +118,15 @@ const DB_FILE = path.join(DATA_DIR, "db.json");
 const SQLITE_FILE = path.join(DATA_DIR, "health-city.sqlite");
 const STORAGE_ENGINE = String(process.env.STORAGE_ENGINE || "auto").toLowerCase();
 const RUNTIME_STORAGE_ENGINES = new Set(["auto", "json", "sqlite"]);
+const SQLITE_JOURNAL_MODE = ["WAL", "DELETE", "TRUNCATE"].includes(String(process.env.SQLITE_JOURNAL_MODE || "WAL").toUpperCase())
+  ? String(process.env.SQLITE_JOURNAL_MODE || "WAL").toUpperCase()
+  : "WAL";
+const SQLITE_SYNCHRONOUS = ["FULL", "EXTRA", "NORMAL"].includes(String(process.env.SQLITE_SYNCHRONOUS || "FULL").toUpperCase())
+  ? String(process.env.SQLITE_SYNCHRONOUS || "FULL").toUpperCase()
+  : "FULL";
+const SQLITE_BUSY_TIMEOUT_MS = Math.min(60000, Math.max(1000, Number(process.env.SQLITE_BUSY_TIMEOUT_MS || 5000) || 5000));
+const SQLITE_WAL_AUTOCHECKPOINT_PAGES = Math.min(10000, Math.max(100, Number(process.env.SQLITE_WAL_AUTOCHECKPOINT_PAGES || 1000) || 1000));
+const SQLITE_HEALTH_CHECK_TTL_MS = Math.min(300000, Math.max(5000, Number(process.env.SQLITE_HEALTH_CHECK_TTL_MS || 30000) || 30000));
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const DEMO_PASSWORD = "123456";
 const PASSWORD_HASH_ITERATIONS = 120_000;
@@ -146,6 +180,7 @@ const PUBLIC_HEALTH_EVENT_ACTION_DEFAULTS = {
 };
 let sqliteModule = null;
 let sqliteError = null;
+let sqliteProfileCache = null;
 const SQLITE_MIGRATIONS = [
   {
     version: 1,
@@ -688,6 +723,7 @@ function seedState() {
     imageCloudStudies: seedImageCloudStudies(),
     imageCloudShares: seedImageCloudShares(),
     imageCloudQualityReviews: seedImageCloudQualityReviews(),
+    secureAttachments: [],
     qualitySafetyEvents: seedQualitySafetyEvents(),
     criticalValueAlerts: seedCriticalValueAlerts(),
     clinicalPathwayCases: seedClinicalPathwayCases(),
@@ -1857,6 +1893,7 @@ function seedIntegrationContracts() {
     { id: "lis-report-v1", domain: "LIS", version: "1.0.0", direction: "inbound", resource: "LabReport", requiredFields: ["externalId", "residentId", "item", "result", "reportedAt"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "3 次指数退避", status: "ready" },
     { id: "pacs-report-v1", domain: "PACS", version: "1.0.0", direction: "inbound", resource: "ImagingReport", requiredFields: ["externalId", "residentId", "modality", "conclusion", "reportedAt"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "3 次指数退避", status: "ready" },
     { id: "appointment-order-v1", domain: "Appointment", version: "1.0.0", direction: "inbound", resource: "AppointmentOrderStatus", requiredFields: ["externalId", "residentId", "orderNo", "slotId", "eventType", "orderStatus", "occurredAt"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "3 attempts then dead letter and reconciliation", status: "ready" },
+    { id: "payment-transaction-v1", domain: "Payment", version: "1.0.0", direction: "bidirectional", resource: "PaymentTransaction", requiredFields: ["externalId", "orderNo", "amountFen", "currency"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "3 attempts then dead letter and reconciliation", status: "ready" },
     { id: "insurance-settlement-v1", domain: "医保", version: "1.0.0", direction: "bidirectional", resource: "SettlementStatus", requiredFields: ["externalId", "residentId", "claimStatus", "amount"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "失败进入补偿队列", status: "ready" },
     { id: "certificate-sync-v1", domain: "电子证照", version: "1.0.0", direction: "outbound", resource: "CertificateStatus", requiredFields: ["externalId", "certificateNo", "status"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "失败进入补偿队列", status: "ready" },
     { id: "statistics-report-v1", domain: "卫生统计", version: "1.0.0", direction: "inbound", resource: "HealthStatistics", requiredFields: ["externalId", "period", "institution", "metrics"], idempotencyKey: "externalId", signature: "HMAC-SHA256", retryPolicy: "人工复核后重放", status: "ready" }
@@ -5703,7 +5740,56 @@ function openSqliteDatabase() {
   if (!sqlite?.DatabaseSync) {
     throw new Error("SQLite runtime unavailable");
   }
-  return new sqlite.DatabaseSync(SQLITE_FILE);
+  const db = new sqlite.DatabaseSync(SQLITE_FILE);
+  configureSqliteConnection(db);
+  return db;
+}
+
+function configureSqliteConnection(db) {
+  db.exec("PRAGMA foreign_keys = ON");
+  db.exec(`PRAGMA journal_mode = ${SQLITE_JOURNAL_MODE}`);
+  db.exec(`PRAGMA synchronous = ${SQLITE_SYNCHRONOUS}`);
+  db.exec(`PRAGMA busy_timeout = ${SQLITE_BUSY_TIMEOUT_MS}`);
+  db.exec(`PRAGMA wal_autocheckpoint = ${SQLITE_WAL_AUTOCHECKPOINT_PAGES}`);
+}
+
+function sqlitePragmaValue(db, statement, preferredKey) {
+  const row = db.prepare(statement).get() || {};
+  if (Object.hasOwn(row, preferredKey)) return row[preferredKey];
+  return Object.values(row)[0];
+}
+
+function sqliteRuntimeProfile() {
+  if (!fs.existsSync(SQLITE_FILE)) return null;
+  const now = Date.now();
+  if (sqliteProfileCache && now - sqliteProfileCache.checkedAtMs < SQLITE_HEALTH_CHECK_TTL_MS) {
+    return sqliteProfileCache.value;
+  }
+  const db = openSqliteDatabase();
+  try {
+    const synchronousCode = Number(sqlitePragmaValue(db, "PRAGMA synchronous", "synchronous"));
+    const synchronousNames = { 0: "OFF", 1: "NORMAL", 2: "FULL", 3: "EXTRA" };
+    const profile = {
+      journalMode: String(sqlitePragmaValue(db, "PRAGMA journal_mode", "journal_mode") || "").toLowerCase(),
+      synchronous: synchronousNames[synchronousCode] || String(synchronousCode),
+      foreignKeys: Number(sqlitePragmaValue(db, "PRAGMA foreign_keys", "foreign_keys")) === 1,
+      busyTimeoutMs: Number(sqlitePragmaValue(db, "PRAGMA busy_timeout", "timeout") || 0),
+      walAutocheckpointPages: Number(sqlitePragmaValue(db, "PRAGMA wal_autocheckpoint", "wal_autocheckpoint") || 0),
+      quickCheck: String(sqlitePragmaValue(db, "PRAGMA quick_check", "quick_check") || "")
+    };
+    const value = {
+      ...profile,
+      productionProfile: profile.journalMode === "wal"
+        && ["FULL", "EXTRA"].includes(profile.synchronous)
+        && profile.foreignKeys
+        && profile.busyTimeoutMs >= 5000
+        && profile.quickCheck === "ok"
+    };
+    sqliteProfileCache = { checkedAtMs: now, value };
+    return value;
+  } finally {
+    db.close();
+  }
 }
 
 function ensureSqliteDatabase() {
@@ -6260,6 +6346,7 @@ function storageMeta() {
     sqliteAvailable: sqlite,
     schemaVersion: sqlite ? STORAGE_SCHEMA_VERSION : 0,
     collectionVersions: sqlite ? sqliteCollectionVersions() : {},
+    sqliteProfile: sqlite ? sqliteRuntimeProfile() : null,
     sqliteError: sqliteError ? sqliteError.message : ""
   };
 }
@@ -6769,6 +6856,7 @@ function normalizeState(data) {
     imageCloudStudies: mergeByKey(seedImageCloudStudies(), data.imageCloudStudies, "id"),
     imageCloudShares: mergeByKey(seedImageCloudShares(), data.imageCloudShares, "id"),
     imageCloudQualityReviews: mergeByKey(seedImageCloudQualityReviews(), data.imageCloudQualityReviews, "id"),
+    secureAttachments: Array.isArray(data.secureAttachments) ? data.secureAttachments : [],
     qualitySafetyEvents: mergeByKey(seedQualitySafetyEvents(), data.qualitySafetyEvents, "id"),
     criticalValueAlerts: mergeByKey(seedCriticalValueAlerts(), data.criticalValueAlerts, "id"),
     clinicalPathwayCases: mergeByKey(seedClinicalPathwayCases(), data.clinicalPathwayCases, "id"),
@@ -8941,9 +9029,10 @@ function recordPhoneLoginFailure(phone, now = Date.now()) {
   };
 }
 
-function issuePhoneVerificationCode(phone, user) {
+async function issuePhoneVerificationCode(phone, user) {
   const normalizedPhone = normalizePhone(phone);
   const now = Date.now();
+  const production = String(process.env.NODE_ENV || "").toLowerCase() === "production";
   prunePhoneVerificationCodes(now);
   clearPhoneLoginFailures(normalizedPhone);
   const existing = phoneVerificationCodes.get(normalizedPhone);
@@ -8954,17 +9043,35 @@ function issuePhoneVerificationCode(phone, user) {
       expiresAt: new Date(existing.expiresAtMs).toISOString()
     };
   }
+  const code = production ? generatePhoneVerificationCode() : DEMO_SMS_CODE;
+  const clientRequestId = randomUUID();
+  const receipt = production
+    ? await sendSmsVerificationCode({
+      phone: normalizedPhone,
+      code,
+      expiresInMinutes: Math.ceil(PHONE_CODE_TTL_MS / 60000),
+      clientRequestId
+    })
+    : null;
   const record = {
     phone: normalizedPhone,
-    code: DEMO_SMS_CODE,
     userId: user.id,
     sentAtMs: now,
-    expiresAtMs: now + PHONE_CODE_TTL_MS
+    expiresAtMs: now + PHONE_CODE_TTL_MS,
+    clientRequestId,
+    channel: production ? "sms-gateway" : "demo-sms",
+    receipt,
+    ...(production
+      ? { codeDigest: digestPhoneVerificationCode(normalizedPhone, code, authSecrets()[0]) }
+      : { code })
   };
   phoneVerificationCodes.set(normalizedPhone, record);
   return {
     ok: true,
-    code: record.code,
+    demo: !production,
+    channel: record.channel,
+    receipt,
+    ...(production ? {} : { code }),
     retryAfterSeconds: Math.ceil(PHONE_CODE_COOLDOWN_MS / 1000),
     expiresAt: new Date(record.expiresAtMs).toISOString()
   };
@@ -8976,12 +9083,15 @@ function verifyPhoneCode(phone, code, user) {
   const now = Date.now();
   prunePhoneVerificationCodes(now);
   const issued = phoneVerificationCodes.get(normalizedPhone);
-  if (issued && issued.userId === user.id && issued.expiresAtMs > now && timingSafeTextEqual(issued.code, normalizedCode)) {
+  const issuedCodeMatches = issued?.codeDigest
+    ? timingSafeTextEqual(issued.codeDigest, digestPhoneVerificationCode(normalizedPhone, normalizedCode, authSecrets()[0]))
+    : timingSafeTextEqual(issued?.code || "", normalizedCode);
+  if (issued && issued.userId === user.id && issued.expiresAtMs > now && issuedCodeMatches) {
     phoneVerificationCodes.delete(normalizedPhone);
     clearPhoneLoginFailures(normalizedPhone);
     return true;
   }
-  const demoMatched = timingSafeTextEqual(DEMO_SMS_CODE, normalizedCode);
+  const demoMatched = String(process.env.NODE_ENV || "").toLowerCase() !== "production" && timingSafeTextEqual(DEMO_SMS_CODE, normalizedCode);
   if (demoMatched) clearPhoneLoginFailures(normalizedPhone);
   return demoMatched;
 }
@@ -9076,6 +9186,14 @@ function hasResidentAuthorization(data, residentId, authorizationId) {
     record.meta?.status !== "revoked" &&
     isActiveAuthorizationRecord(record)
   );
+}
+
+function canAccessSecureAttachment(user, attachment, data) {
+  if (!attachment) return false;
+  if (user.role === "commission") return true;
+  if (user.role === "citizen") return canAccessResident(user, attachment.residentId, data);
+  if (user.role === "institution") return attachment.createdByOrgCode === user.orgCode || attachment.createdBy === user.username;
+  return false;
 }
 
 function isActiveAuthorizationRecord(record = {}) {
@@ -11048,6 +11166,7 @@ function scopeStateForUser(data, user) {
     delete scoped.phase2MutualRecognitionCitations;
   }
   delete scoped.integrationGatewayEvents;
+  delete scoped.secureAttachments;
   delete scoped.platformCapabilities;
   delete scoped.platformIntegrations;
   delete scoped.platformInterfaces;
@@ -16840,6 +16959,47 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/auth/adapters") {
+    const user = requireApiRole(req, res, ["commission"], "/api/auth/adapters");
+    if (!user) return;
+    sendJson(res, 200, productionAdapterCenter(process.env));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/auth/oidc/exchange") {
+    const payload = await collectJson(req);
+    try {
+      const upstream = await fetchOidcUserInfo(payload.accessToken);
+      const data = readDatabase();
+      const mapping = mapExternalIdentityClaims(upstream.claims, data);
+      if (mapping.status !== "matched-existing-user") {
+        appendSecurityEvent({ actor: upstream.claims.sub || "external", role: "external", action: "OIDC login", target: "unified-auth", result: "denied", detail: "external identity requires controlled account binding" });
+        sendJson(res, 403, { ok: false, message: "external identity requires account binding", mapping: { status: mapping.status, warnings: mapping.warnings } });
+        return;
+      }
+      const user = (data.authUsers || []).find((item) => item.id === mapping.user.id && item.status !== "停用");
+      if (!user) {
+        appendSecurityEvent({ actor: upstream.claims.sub || "external", role: "external", action: "OIDC login", target: "unified-auth", result: "denied", detail: "bound local account is disabled or missing" });
+        sendJson(res, 403, { ok: false, message: "bound local account is disabled or missing" });
+        return;
+      }
+      const session = createSession(user);
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "OIDC login", target: user.home, result: "allowed", detail: `verified by ${upstream.adapter}` });
+      sendJson(res, 200, {
+        ok: true,
+        token: session.token,
+        expiresAt: session.expiresAt,
+        user: session.user,
+        adapter: upstream.adapter,
+        mappedAt: upstream.fetchedAt
+      });
+    } catch (error) {
+      appendSecurityEvent({ actor: "external", role: "external", action: "OIDC login", target: "unified-auth", result: "denied", detail: error.message });
+      sendJson(res, 502, { ok: false, message: "identity provider verification failed" });
+    }
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/auth/phone-code") {
     const payload = await collectJson(req);
     const phone = normalizePhone(payload.phone);
@@ -16849,20 +17009,27 @@ async function handleApi(req, res) {
       sendJson(res, 404, { ok: false, message: "手机号未绑定居民账号" });
       return;
     }
-    const issued = issuePhoneVerificationCode(phone, user);
+    let issued;
+    try {
+      issued = await issuePhoneVerificationCode(phone, user);
+    } catch (error) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "发送手机号验证码", target: "统一认证", result: "拒绝", detail: `短信网关发送失败：${error.message}` });
+      sendJson(res, 502, { ok: false, message: "短信网关发送失败" });
+      return;
+    }
     if (!issued.ok) {
       appendSecurityEvent({ actor: user.name, role: user.role, action: "发送手机号验证码", target: "统一认证", result: "拒绝", detail: `验证码发送过于频繁，${issued.retryAfterSeconds} 秒后可重试` });
       sendJson(res, 429, { ok: false, message: "验证码发送过于频繁", retryAfterSeconds: issued.retryAfterSeconds, expiresAt: issued.expiresAt });
       return;
     }
-    appendSecurityEvent({ actor: user.name, role: user.role, action: "发送手机号验证码", target: "统一认证", result: "允许", detail: "居民端演示短信验证码已签发" });
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "发送手机号验证码", target: "统一认证", result: "允许", detail: issued.demo ? "居民端演示短信验证码已签发" : `短信网关已受理：${issued.receipt.providerMessageId}` });
     sendJson(res, 200, {
       ok: true,
-      channel: "demo-sms",
+      channel: issued.channel,
       phone: maskPhone(phone),
       expiresAt: issued.expiresAt,
       retryAfterSeconds: issued.retryAfterSeconds,
-      demoCode: issued.code
+      ...(issued.demo ? { demoCode: issued.code } : { receipt: issued.receipt })
     });
     return;
   }
@@ -19582,11 +19749,516 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/attachments/storage") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/attachments/storage");
+    if (!user) return;
+    sendJson(res, 200, objectStorageCenter(process.env));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/attachments") {
+    const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/attachments");
+    if (!user) return;
+    const data = readDatabase();
+    const residentId = String(url.searchParams.get("residentId") || "").trim();
+    if (residentId && !canAccessResident(user, residentId, data)) {
+      sendJson(res, 403, { error: "Forbidden", message: "无权查看该居民附件" });
+      return;
+    }
+    const attachments = (data.secureAttachments || [])
+      .filter((item) => (!residentId || item.residentId === residentId) && canAccessSecureAttachment(user, item, data))
+      .map(({ uploadId, ...item }) => item);
+    sendJson(res, 200, {
+      attachments,
+      summary: {
+        total: attachments.length,
+        active: attachments.filter((item) => item.status === "active").length,
+        quarantined: attachments.filter((item) => item.status === "quarantined").length,
+        legalHold: attachments.filter((item) => item.legalHold === true).length
+      }
+    });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/attachments/upload-intents") {
+    const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/attachments/upload-intents");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const residentId = String(payload.residentId || user.residentId || "").trim();
+    if (residentId && !(data.residents || []).some((item) => item.id === residentId)) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到附件关联居民" });
+      return;
+    }
+    if (residentId && !canAccessResident(user, residentId, data)) {
+      sendJson(res, 403, { error: "Forbidden", message: "无权为该居民创建附件" });
+      return;
+    }
+    if (user.role === "citizen" && !residentId) {
+      sendJson(res, 400, { error: "Bad Request", message: "居民附件必须关联 residentId" });
+      return;
+    }
+    try {
+      validateAttachmentMetadata(payload);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message });
+      return;
+    }
+    const attachmentId = `att-${randomUUID()}`;
+    try {
+      const intent = await createObjectUploadIntent({
+        ...payload,
+        attachmentId,
+        namespace: String(payload.namespace || (residentId ? "clinical-records" : "platform-evidence"))
+      });
+      const now = new Date().toISOString();
+      const attachment = {
+        id: attachmentId,
+        residentId,
+        purpose: String(payload.purpose || "supporting-document").trim().slice(0, 100),
+        sourceCollection: String(payload.sourceCollection || "").trim().slice(0, 80),
+        sourceId: String(payload.sourceId || "").trim().slice(0, 120),
+        filename: intent.metadata.filename,
+        contentType: intent.metadata.contentType,
+        expectedSizeBytes: intent.metadata.sizeBytes,
+        expectedChecksumSha256: intent.metadata.checksumSha256,
+        classification: intent.metadata.classification,
+        retentionPolicy: intent.metadata.retentionPolicy,
+        retentionYears: intent.metadata.retentionYears,
+        immutable: intent.metadata.immutable,
+        objectKey: intent.objectKey,
+        uploadId: intent.uploadId,
+        uploadIntentExpiresAt: intent.expiresAt,
+        status: "upload-authorized",
+        scanStatus: "pending",
+        legalHold: false,
+        createdAt: now,
+        createdBy: user.username || user.name || user.role,
+        createdByRole: user.role,
+        createdByOrgCode: user.orgCode || ""
+      };
+      data.secureAttachments = [attachment, ...(Array.isArray(data.secureAttachments) ? data.secureAttachments : [])].slice(0, 500);
+      data.securityEvents = [{
+        id: randomUUID(), at: new Date().toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role,
+        action: "创建安全附件上传授权", target: attachmentId, result: "允许", detail: `${attachment.classification} · ${attachment.retentionPolicy} · ${attachment.expectedSizeBytes} bytes`
+      }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120);
+      writeDatabase(data);
+      sendJson(res, 201, {
+        attachment: { ...attachment, uploadId: undefined },
+        uploadIntent: {
+          uploadId: intent.uploadId,
+          uploadUrl: intent.uploadUrl,
+          expiresAt: intent.expiresAt,
+          requiredChecksumSha256: attachment.expectedChecksumSha256,
+          requiredContentType: attachment.contentType
+        }
+      });
+    } catch (error) {
+      sendJson(res, 502, { ok: false, message: "对象存储上传授权创建失败" });
+    }
+    return;
+  }
+
+  const attachmentCompleteMatch = url.pathname.match(/^\/api\/attachments\/([^/]+)\/complete$/);
+  if (req.method === "POST" && attachmentCompleteMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/attachments/:id/complete");
+    if (!user) return;
+    const data = readDatabase();
+    const attachmentId = decodeURIComponent(attachmentCompleteMatch[1]);
+    const index = (data.secureAttachments || []).findIndex((item) => item.id === attachmentId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到安全附件" });
+      return;
+    }
+    const attachment = data.secureAttachments[index];
+    if (!canAccessSecureAttachment(user, attachment, data)) {
+      sendJson(res, 403, { error: "Forbidden", message: "无权完成该附件上传" });
+      return;
+    }
+    if (attachment.status !== "upload-authorized") {
+      sendJson(res, 409, { error: "Conflict", message: "附件当前状态不能完成上传" });
+      return;
+    }
+    try {
+      const receipt = await finalizeObjectUpload({
+        attachmentId,
+        uploadId: attachment.uploadId,
+        objectKey: attachment.objectKey,
+        expectedSizeBytes: attachment.expectedSizeBytes,
+        expectedChecksumSha256: attachment.expectedChecksumSha256
+      });
+      data.secureAttachments[index] = {
+        ...attachment,
+        status: "active",
+        scanStatus: receipt.scanStatus,
+        scannedAt: receipt.scannedAt,
+        checksumSha256: receipt.checksumSha256,
+        sizeBytes: receipt.sizeBytes,
+        objectVersion: receipt.objectVersion,
+        activatedAt: new Date().toISOString(),
+        uploadId: ""
+      };
+      appendDataAccessLog(data, user, attachment.residentId, "secureAttachments", "complete upload and verify malware scan");
+      data.securityEvents = [{
+        id: randomUUID(), at: new Date().toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role,
+        action: "完成安全附件上传", target: attachmentId, result: "允许", detail: `checksum verified · scan=${receipt.scanStatus} · ${receipt.sizeBytes} bytes`
+      }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120);
+      writeDatabase(data);
+      sendJson(res, 200, { attachment: data.secureAttachments[index], receipt });
+    } catch (error) {
+      let quarantineReceipt = null;
+      try {
+        quarantineReceipt = await applyObjectLifecycle({
+          attachmentId,
+          objectKey: attachment.objectKey,
+          objectVersion: attachment.objectVersion || "",
+          action: "quarantine",
+          reason: String(error.message || "attachment verification failed").slice(0, 200)
+        });
+      } catch {
+        quarantineReceipt = null;
+      }
+      data.secureAttachments[index] = {
+        ...attachment,
+        status: "quarantined",
+        scanStatus: /malware scan/.test(error.message) ? "blocked" : "integrity-failed",
+        quarantineReason: String(error.message).slice(0, 200),
+        quarantinedAt: new Date().toISOString(),
+        storageQuarantineStatus: quarantineReceipt ? "accepted" : "pending-reconciliation",
+        storageQuarantineReceipt: quarantineReceipt ? { requestId: quarantineReceipt.requestId, effectiveAt: quarantineReceipt.effectiveAt, status: quarantineReceipt.status } : null
+      };
+      data.securityEvents = [{
+        id: randomUUID(), at: new Date().toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role,
+        action: "隔离安全附件", target: attachmentId, result: "拒绝", detail: data.secureAttachments[index].scanStatus
+      }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120);
+      writeDatabase(data);
+      sendJson(res, 422, { ok: false, message: "附件完整性或恶意文件扫描未通过", attachment: data.secureAttachments[index] });
+    }
+    return;
+  }
+
+  const attachmentDownloadMatch = url.pathname.match(/^\/api\/attachments\/([^/]+)\/download-intent$/);
+  if (req.method === "POST" && attachmentDownloadMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/attachments/:id/download-intent");
+    if (!user) return;
+    const data = readDatabase();
+    const attachment = (data.secureAttachments || []).find((item) => item.id === decodeURIComponent(attachmentDownloadMatch[1]));
+    if (!attachment) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到安全附件" });
+      return;
+    }
+    if (!canAccessSecureAttachment(user, attachment, data)) {
+      sendJson(res, 403, { error: "Forbidden", message: "无权下载该附件" });
+      return;
+    }
+    if (attachment.status !== "active" || attachment.scanStatus !== "clean") {
+      sendJson(res, 409, { error: "Conflict", message: "附件未通过完整性与恶意文件扫描，不能下载" });
+      return;
+    }
+    try {
+      const intent = await createObjectDownloadIntent({ attachmentId: attachment.id, objectKey: attachment.objectKey, objectVersion: attachment.objectVersion });
+      appendDataAccessLog(data, user, attachment.residentId, "secureAttachments", "issue short-lived attachment download intent");
+      writeDatabase(data);
+      sendJson(res, 200, { attachmentId: attachment.id, filename: attachment.filename, downloadIntent: intent });
+    } catch (error) {
+      sendJson(res, 502, { ok: false, message: "对象存储下载授权创建失败" });
+    }
+    return;
+  }
+
+  const attachmentActionMatch = url.pathname.match(/^\/api\/attachments\/([^/]+)\/actions$/);
+  if (req.method === "POST" && attachmentActionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/attachments/:id/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const attachmentId = decodeURIComponent(attachmentActionMatch[1]);
+    const index = (data.secureAttachments || []).findIndex((item) => item.id === attachmentId);
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到安全附件" });
+      return;
+    }
+    const attachment = data.secureAttachments[index];
+    if (!canAccessSecureAttachment(user, attachment, data)) {
+      sendJson(res, 403, { error: "Forbidden", message: "无权管理该附件" });
+      return;
+    }
+    const action = String(payload.action || "").trim().toLowerCase();
+    const reason = String(payload.reason || "").trim();
+    if (reason.length < 2) {
+      sendJson(res, 400, { error: "Bad Request", message: "附件生命周期操作必须填写处理原因" });
+      return;
+    }
+    if (["legal-hold", "release-hold", "delete"].includes(action) && user.role !== "commission") {
+      sendJson(res, 403, { error: "Forbidden", message: "法律保全和删除仅限监管角色" });
+      return;
+    }
+    if (action === "delete" && (attachment.immutable || attachment.legalHold)) {
+      sendJson(res, 409, { error: "Conflict", message: "不可变留存或法律保全附件不能删除" });
+      return;
+    }
+    try {
+      const receipt = await applyObjectLifecycle({ attachmentId, objectKey: attachment.objectKey, objectVersion: attachment.objectVersion, action, reason });
+      const nextStatus = action === "quarantine" ? "quarantined" : action === "delete" ? "deleted" : attachment.status;
+      data.secureAttachments[index] = {
+        ...attachment,
+        status: nextStatus,
+        legalHold: action === "legal-hold" ? true : action === "release-hold" ? false : attachment.legalHold,
+        lastLifecycleAction: action,
+        lastLifecycleReason: reason.slice(0, 200),
+        lastLifecycleAt: receipt.effectiveAt,
+        lastLifecycleBy: user.username || user.name || user.role,
+        ...(action === "delete" ? { deletedAt: receipt.effectiveAt } : {})
+      };
+      data.securityEvents = [{
+        id: randomUUID(), at: new Date().toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role,
+        action: `安全附件生命周期-${action}`, target: attachmentId, result: "允许", detail: reason.slice(0, 200)
+      }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120);
+      writeDatabase(data);
+      sendJson(res, 200, { attachment: data.secureAttachments[index], receipt });
+    } catch (error) {
+      sendJson(res, 502, { ok: false, message: "对象存储生命周期操作失败" });
+    }
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/integration/contracts") {
     const user = requireApiRole(req, res, ["commission", "institution", "insurance", "county"], "/api/integration/contracts");
     if (!user) return;
     const data = readDatabase();
     sendJson(res, 200, { contracts: data.integrationContracts });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/integration/adapters") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/integration/adapters");
+    if (!user) return;
+    sendJson(res, 200, hospitalConnectorCenter(process.env));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/integration/dispatch") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/integration/dispatch");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const contract = (data.integrationContracts || []).find((item) => item.id === String(payload.contractId || "").trim());
+    if (!contract) {
+      sendJson(res, 404, { error: "Not Found", message: "未找到接口契约" });
+      return;
+    }
+    let domain;
+    try {
+      domain = normalizeHospitalConnectorDomain(contract.domain);
+    } catch {
+      sendJson(res, 400, { error: "Bad Request", message: "该契约不属于医院核心系统连接器" });
+      return;
+    }
+    const idempotencyKey = String(payload.idempotencyKey || payload.payload?.[contract.idempotencyKey] || "").trim();
+    const businessPayload = payload.payload && typeof payload.payload === "object" && !Array.isArray(payload.payload) ? payload.payload : {};
+    if (!idempotencyKey) {
+      sendJson(res, 400, { error: "Bad Request", message: "医院连接器调用必须提供 idempotencyKey" });
+      return;
+    }
+    const missingFields = (contract.requiredFields || []).filter((field) => businessPayload[field] === undefined);
+    if (missingFields.length) {
+      sendJson(res, 400, { error: "Bad Request", message: "医院连接器载荷缺少必填字段", missingFields });
+      return;
+    }
+    const duplicate = (data.integrationGatewayEvents || []).find((item) => item.direction === "outbound" && item.contractId === contract.id && item.idempotencyKey === idempotencyKey);
+    if (duplicate) {
+      sendJson(res, 200, { ...duplicate, idempotentReplay: true });
+      return;
+    }
+    const requestPayload = { contractId: contract.id, domain, idempotencyKey, payload: businessPayload };
+    const baseEvent = {
+      id: `igw-${randomUUID()}`,
+      direction: "outbound",
+      adapterType: "hospital",
+      contractId: contract.id,
+      domain,
+      resource: contract.resource,
+      idempotencyKey,
+      externalId: String(businessPayload.externalId || "").trim(),
+      residentId: String(businessPayload.residentId || "").trim(),
+      status: "dispatching",
+      signatureVerified: false,
+      outboundSigned: true,
+      receivedBy: user.username || user.role,
+      requestPayload,
+      payload: businessPayload,
+      retryCount: 0,
+      deadLetter: false,
+      reconciliationStatus: "dispatching",
+      receivedAt: new Date().toISOString()
+    };
+    try {
+      const receipt = await dispatchHospitalRequest(requestPayload);
+      const event = {
+        ...baseEvent,
+        status: receipt.status,
+        adapterReceipt: receipt,
+        dispatchedAt: receipt.acceptedAt,
+        reconciliationStatus: "provider-accepted"
+      };
+      data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
+      data.securityEvents = [{
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "调用医院核心系统连接器",
+        target: `${domain}/${contract.id}`,
+        result: "允许",
+        detail: `${receipt.receiptId} · ${idempotencyKey} · attempts=${receipt.attempts}`
+      }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120);
+      writeDatabase(data);
+      sendJson(res, 202, event);
+    } catch (error) {
+      const event = {
+        ...baseEvent,
+        status: "failed",
+        deadLetter: true,
+        deadLetterReason: String(error.message || "hospital connector dispatch failed").slice(0, 200),
+        failedAt: new Date().toISOString(),
+        reconciliationStatus: "dead-letter"
+      };
+      data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
+      data.securityEvents = [{
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "调用医院核心系统连接器",
+        target: `${domain}/${contract.id}`,
+        result: "失败",
+        detail: `${event.id} · ${idempotencyKey} · 已进入死信对账`
+      }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120);
+      writeDatabase(data);
+      sendJson(res, 502, { ok: false, message: "医院核心系统连接器调用失败", event });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/financial-gateways") {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance"], "/api/financial-gateways");
+    if (!user) return;
+    sendJson(res, 200, financialGatewayCenter(process.env));
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/financial-gateways/dispatch") {
+    const user = requireApiRole(req, res, ["commission", "institution", "insurance"], "/api/financial-gateways/dispatch");
+    if (!user) return;
+    const payload = await collectJson(req);
+    let validated;
+    try {
+      validated = validateFinancialRequest(payload);
+    } catch (error) {
+      sendJson(res, 400, { error: "Bad Request", message: error.message, missingFields: error.missingFields || [] });
+      return;
+    }
+    if (validated.type !== "INSURANCE" && user.role === "insurance") {
+      sendJson(res, 403, { error: "Forbidden", message: "insurance role is limited to the insurance gateway" });
+      return;
+    }
+    const contractByType = {
+      PAYMENT: "payment-transaction-v1",
+      INSURANCE: "insurance-settlement-v1",
+      CERTIFICATE: "certificate-sync-v1"
+    };
+    const contractId = contractByType[validated.type];
+    const idempotencyKey = String(payload.idempotencyKey || "").trim();
+    if (!idempotencyKey) {
+      sendJson(res, 400, { error: "Bad Request", message: "financial gateway idempotencyKey is required" });
+      return;
+    }
+    const data = readDatabase();
+    const duplicate = (data.integrationGatewayEvents || []).find((item) =>
+      item.adapterType === "financial" &&
+      item.gatewayType === validated.type &&
+      item.operation === validated.operation &&
+      item.idempotencyKey === idempotencyKey
+    );
+    if (duplicate) {
+      sendJson(res, 200, { ...duplicate, idempotentReplay: true });
+      return;
+    }
+    const requestPayload = {
+      type: validated.type,
+      operation: validated.operation,
+      contractId,
+      idempotencyKey,
+      payload: validated.payload
+    };
+    const baseEvent = {
+      id: `igw-${randomUUID()}`,
+      direction: "outbound",
+      adapterType: "financial",
+      gatewayType: validated.type,
+      operation: validated.operation,
+      contractId,
+      domain: validated.type,
+      resource: "FinancialGatewayRequest",
+      idempotencyKey,
+      externalId: String(validated.payload.externalId || validated.payload.orderNo || validated.payload.claimNo || "").trim(),
+      residentId: String(validated.payload.residentId || "").trim(),
+      status: "dispatching",
+      signatureVerified: false,
+      outboundSigned: true,
+      receivedBy: user.username || user.role,
+      requestPayload,
+      payload: validated.payload,
+      retryCount: 0,
+      deadLetter: false,
+      reconciliationStatus: "dispatching",
+      receivedAt: new Date().toISOString()
+    };
+    try {
+      const receipt = await dispatchFinancialRequest(requestPayload);
+      const event = {
+        ...baseEvent,
+        status: receipt.status,
+        adapterReceipt: receipt,
+        dispatchedAt: receipt.acceptedAt,
+        reconciliationStatus: "provider-accepted"
+      };
+      data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
+      data.securityEvents = [{
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "dispatch financial gateway request",
+        target: `${validated.type}/${validated.operation}`,
+        result: "allowed",
+        detail: `${receipt.receiptId} | ${idempotencyKey} | attempts=${receipt.attempts}`
+      }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120);
+      writeDatabase(data);
+      sendJson(res, 202, event);
+    } catch (error) {
+      const event = {
+        ...baseEvent,
+        status: "failed",
+        deadLetter: true,
+        deadLetterReason: String(error.message || "financial gateway dispatch failed").slice(0, 200),
+        failedAt: new Date().toISOString(),
+        reconciliationStatus: "dead-letter"
+      };
+      data.integrationGatewayEvents = [event, ...(Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [])].slice(0, 200);
+      data.securityEvents = [{
+        id: randomUUID(),
+        at: new Date().toLocaleString("zh-CN", { hour12: false }),
+        actor: user.name,
+        role: user.role,
+        action: "dispatch financial gateway request",
+        target: `${validated.type}/${validated.operation}`,
+        result: "failed",
+        detail: `${event.id} | ${idempotencyKey} | moved to reconciliation`
+      }, ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])].slice(0, 120);
+      writeDatabase(data);
+      sendJson(res, 502, { ok: false, message: "financial gateway dispatch failed", event });
+    }
     return;
   }
 
@@ -19831,6 +20503,11 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/integration/events/:id/retry");
     if (!user) return;
     const data = readDatabase();
+    const sourceEvent = (Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : []).find((item) => item.id === integrationRetryMatch[1]);
+    if (sourceEvent?.direction === "outbound" && Number(sourceEvent.retryCount || 0) >= 3) {
+      sendJson(res, 409, { error: "Conflict", message: "outbound adapter event reached the manual retry limit and requires reconciliation" });
+      return;
+    }
     const event = updateIntegrationEvent(data, integrationRetryMatch[1], (current) => ({
       status: "retrying",
       retryCount: Number(current.retryCount || 0) + 1,
@@ -19846,6 +20523,52 @@ async function handleApi(req, res) {
     if (event.contractId === APPOINTMENT_CONTRACT_ID && event.requestPayload) {
       landAppointmentIntegrationEvent(data, event.requestPayload, event, user);
     }
+    if (event.adapterType === "hospital" && event.requestPayload) {
+      try {
+        const receipt = await dispatchHospitalRequest(event.requestPayload);
+        Object.assign(event, {
+          status: receipt.status,
+          adapterReceipt: receipt,
+          dispatchedAt: receipt.acceptedAt,
+          deadLetter: false,
+          deadLetterReason: "",
+          reconciliationStatus: "provider-accepted",
+          lastRetryResult: "provider-accepted"
+        });
+      } catch (error) {
+        Object.assign(event, {
+          status: "failed",
+          deadLetter: true,
+          deadLetterReason: String(error.message || "hospital connector retry failed").slice(0, 200),
+          failedAt: new Date().toISOString(),
+          reconciliationStatus: "dead-letter",
+          lastRetryResult: "failed"
+        });
+      }
+    }
+    if (event.adapterType === "financial" && event.requestPayload) {
+      try {
+        const receipt = await dispatchFinancialRequest(event.requestPayload);
+        Object.assign(event, {
+          status: receipt.status,
+          adapterReceipt: receipt,
+          dispatchedAt: receipt.acceptedAt,
+          deadLetter: false,
+          deadLetterReason: "",
+          reconciliationStatus: "provider-accepted",
+          lastRetryResult: "provider-accepted"
+        });
+      } catch (error) {
+        Object.assign(event, {
+          status: "failed",
+          deadLetter: true,
+          deadLetterReason: String(error.message || "financial gateway retry failed").slice(0, 200),
+          failedAt: new Date().toISOString(),
+          reconciliationStatus: "dead-letter",
+          lastRetryResult: "failed"
+        });
+      }
+    }
     data.securityEvents = [
       {
         id: randomUUID(),
@@ -19854,8 +20577,8 @@ async function handleApi(req, res) {
         role: user.role,
         action: "重试集成网关事件",
         target: event.id,
-        result: "允许",
-        detail: `${event.contractId} · ${event.idempotencyKey} · retry=${event.retryCount}`
+        result: event.deadLetter ? "失败" : "允许",
+        detail: `${event.contractId} · ${event.idempotencyKey} · retry=${event.retryCount}${event.direction === "outbound" ? ` · ${event.lastRetryResult}` : ""}`
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
     ].slice(0, 120);

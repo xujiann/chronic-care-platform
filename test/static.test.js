@@ -778,6 +778,9 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("server.js"), /\/api\/production-database\/cutover-center/);
   assert.match(read("server.js"), /production-database-cutover-rehearsal/);
   assert.match(read("server.js"), /delete scoped\.productionDatabaseCutoverRuns/);
+  assert.match(read("server.js"), /configureSqliteConnection/);
+  assert.match(read("server.js"), /sqliteRuntimeProfile/);
+  assert.match(read("server.js"), /PRAGMA quick_check/);
   assert.match(read("docs/production-database-cutover-center.md"), /rollback checkpoint/);
   assert.match(read("docs/production-database-cutover-center.md"), /does not prove that a production database is connected/);
   assert.match(read(".env.example"), /SESSION_SECRETS=/);
@@ -787,6 +790,10 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read(".env.example"), /OIDC_ISSUER_URL=/);
   assert.match(read(".env.example"), /SMS_GATEWAY_URL=/);
   assert.match(read(".env.example"), /AUDIT_EXPORT_PATH=/);
+  assert.match(read(".env.example"), /SQLITE_JOURNAL_MODE=WAL/);
+  assert.match(read(".env.example"), /SQLITE_SYNCHRONOUS=FULL/);
+  assert.match(read(".env.example"), /SQLITE_BUSY_TIMEOUT_MS=5000/);
+  assert.match(read("DEPLOYMENT.md"), /storage\.sqliteProfile/);
   assert.match(read("README.md"), /\/api\/health/);
   assert.match(read("README.md"), /SMS_GATEWAY_URL/);
   assert.match(read("README.md"), /deploy:check/);
@@ -1978,6 +1985,11 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenHtml, /data-governance-panel/);
   assert.match(citizenHtml, /data-governance-panel"[^>]*data-internal-launch-panel hidden/);
   assert.match(citizenHtml, /data-governance-grid/);
+  assert.match(citizenHtml, /citizen-pipeline-panel/);
+  assert.match(citizenHtml, /citizen-pipeline-panel"[^>]*data-internal-launch-panel hidden/);
+  assert.match(citizenHtml, /citizen-pipeline-grid/);
+  assert.match(citizenHtml, /copy-citizen-pipeline-audit/);
+  assert.match(citizenHtml, /复制验收清单/);
   assert.match(citizenHtml, /client-channel-panel/);
   assert.match(citizenHtml, /client-channel-panel"[^>]*data-internal-launch-panel hidden/);
   assert.match(citizenHtml, /client-channel-switch/);
@@ -2003,6 +2015,17 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /renderModuleInterfaces/);
   assert.match(citizenJs, /citizenGovernanceChecks/);
   assert.match(citizenJs, /renderDataGovernance/);
+  assert.match(citizenJs, /citizenPipelineAudit/);
+  assert.match(citizenJs, /renderCitizenPipelineAudit/);
+  assert.match(citizenJs, /registration:integration-readiness/);
+  assert.match(citizenJs, /onsiteAcceptance/);
+  assert.match(citizenJs, /现场动作/);
+  assert.match(citizenJs, /copyCitizenPipelineAcceptance/);
+  assert.match(citizenJs, /C端全管线现场验收清单/);
+  assert.match(citizenJs, /C端验收清单已复制/);
+  assert.match(citizenJs, /平台信息科\/身份集成组/);
+  assert.match(citizenJs, /互联网医院\/HIS 联调组/);
+  assert.match(citizenJs, /移动端发布组\/运营合规组/);
   assert.match(citizenJs, /EMR\/LIS\/PACS -> \/api\/personal-records/);
   assert.match(citizenJs, /dataAccessLogs, \/api\/messages/);
   assert.match(citizenJs, /\/api\/personal-records/);
@@ -2174,6 +2197,14 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenCss, /data-governance-panel/);
   assert.match(citizenCss, /data-governance-grid/);
   assert.match(citizenCss, /data-governance-card/);
+  assert.match(citizenCss, /citizen-pipeline-panel/);
+  assert.match(citizenCss, /citizen-pipeline-actions/);
+  assert.match(citizenCss, /citizen-pipeline-grid/);
+  assert.match(citizenCss, /citizen-pipeline-card/);
+  assert.match(read("docs/C端全流程审计与优化清单.md"), /居民端内部发布面板同步展示每条管线的责任角色和现场验收动作/);
+  assert.match(read("docs/C端全流程审计与优化清单.md"), /复制验收清单/);
+  assert.match(read("docs/C端全流程审计与优化清单.md"), /平台信息科\/身份集成组/);
+  assert.match(read("docs/C端全流程审计与优化清单.md"), /移动端发布组\/运营合规组/);
   assert.match(citizenCss, /client-channel-panel/);
   assert.match(citizenCss, /body\.service-paged-mode\.launch-review-mode \[data-internal-launch-panel\]/);
   assert.match(citizenCss, /client-channel-switch/);
@@ -2636,4 +2667,138 @@ test("appointment callbacks land through signed gateway reconciliation", () => {
   assert.match(read("scripts/release-report.js"), /registrationIntegration:readiness/);
   assert.match(read("scripts/release-artifact-manifest.js"), /registration-integration-readiness-report\.md/);
   assert.match(read(".github/workflows/ci.yml"), /npm run registration:integration-readiness/);
+});
+
+test("platform production audit separates runnable capabilities from formal cutover", () => {
+  const script = read("scripts/platform-production-audit.js");
+  const documentation = read("docs/数智医院标准平台全程审计与生产前开发规划.md");
+  const manifest = read("scripts/release-artifact-manifest.js");
+  const releaseReport = read("scripts/release-report.js");
+  const deployCheck = read("scripts/deploy-check.js");
+
+  assert.match(script, /CAPABILITY_DOMAINS/);
+  assert.match(script, /MVP_REQUIRED_MODULES/);
+  assert.match(script, /PRODUCTION_BLOCKERS/);
+  assert.match(script, /pre-production-implemented-site-cutover-blocked/);
+  assert.match(script, /P0 \/ 0-30 天/);
+  assert.match(documentation, /正式生产前已实现的主要功能/);
+  assert.match(documentation, /MVP 剩余必开发模块/);
+  assert.match(documentation, /生产割接差距/);
+  assert.match(documentation, /下一步开发规划/);
+  assert.match(documentation, /正式上线退出条件/);
+  assert.match(documentation, /生产割接清单达到 10\/10/);
+  assert.match(manifest, /platform-production-audit\.json/);
+  assert.match(releaseReport, /platformProductionAudit:productionBoundary/);
+  assert.match(releaseReport, /platformProductionAudit:mvpRequiredModules/);
+  assert.match(deployCheck, /docs:platformProductionAudit/);
+  assert.match(read("package.json"), /platform:production-audit/);
+});
+
+test("production identity and message adapters keep runtime and site boundaries explicit", () => {
+  const adapters = read("production-adapters.js");
+  const server = read("server.js");
+  const documentation = read("docs/production-identity-message-adapters.md");
+  const environment = read(".env.example");
+
+  assert.match(adapters, /fetchOidcUserInfo/);
+  assert.match(adapters, /sendSmsVerificationCode/);
+  assert.match(adapters, /digestPhoneVerificationCode/);
+  assert.match(server, /\/api\/auth\/oidc\/exchange/);
+  assert.match(server, /\/api\/auth\/adapters/);
+  assert.match(server, /codeDigest/);
+  assert.match(documentation, /最终送达回调/);
+  assert.match(documentation, /现场联合测试回执/);
+  assert.match(environment, /SMS_TEMPLATE_ID/);
+  assert.match(environment, /OIDC_USERINFO_URL/);
+});
+
+test("production hospital connectors reuse integration contracts and preserve site boundaries", () => {
+  const connectors = read("hospital-connectors.js");
+  const server = read("server.js");
+  const readiness = read("scripts/integration-readiness.js");
+  const documentation = read("docs/production-hospital-connectors.md");
+  const environment = read(".env.example");
+
+  assert.match(connectors, /dispatchHospitalRequest/);
+  assert.match(connectors, /X-Idempotency-Key/);
+  assert.match(connectors, /X-Signature/);
+  assert.match(connectors, /HOSPITAL_ADAPTER_MAX_ATTEMPTS/);
+  assert.match(server, /\/api\/integration\/adapters/);
+  assert.match(server, /\/api\/integration\/dispatch/);
+  assert.match(server, /direction === "outbound"/);
+  assert.match(server, /provider-accepted/);
+  assert.match(readiness, /integration:runtimeAdapters/);
+  assert.match(documentation, /适配器基础通过不等于医院接口已正式验收/);
+  ["HIS", "EMR", "LIS", "PACS", "APPOINTMENT"].forEach((domain) => assert.match(environment, new RegExp(`${domain}_ADAPTER_URL`)));
+});
+
+test("secure object storage enforces integrity scan authorization and retention boundaries", () => {
+  const adapter = read("secure-object-storage.js");
+  const server = read("server.js");
+  const readiness = read("scripts/object-storage-readiness.js");
+  const documentation = read("docs/production-object-storage.md");
+  const environment = read(".env.example");
+
+  assert.match(adapter, /createObjectUploadIntent/);
+  assert.match(adapter, /finalizeObjectUpload/);
+  assert.match(adapter, /createObjectDownloadIntent/);
+  assert.match(adapter, /malware scan did not pass/);
+  assert.match(adapter, /legal-hold/);
+  assert.match(server, /secureAttachments/);
+  assert.match(server, /\/api\/attachments\/upload-intents/);
+  assert.match(server, /attachmentCompleteMatch/);
+  assert.match(server, /attachmentDownloadMatch/);
+  assert.match(server, /attachmentActionMatch/);
+  assert.match(readiness, /objectStorage:releaseWiring/);
+  assert.match(documentation, /适配器基础通过不等于真实附件存储已经正式验收/);
+  assert.match(environment, /OBJECT_STORAGE_GATEWAY_URL/);
+  assert.match(environment, /OBJECT_STORAGE_SIGNING_SECRET/);
+  assert.match(read("package.json"), /object-storage:readiness/);
+  assert.match(read("scripts/release-report.js"), /objectStorage:productionBoundary/);
+  assert.match(read("scripts/release-artifact-manifest.js"), /object-storage-readiness-report\.json/);
+});
+
+test("financial gateways enforce signed minimized requests and production boundaries", () => {
+  const adapter = read("financial-gateways.js");
+  const server = read("server.js");
+  const readiness = read("scripts/financial-gateway-readiness.js");
+  const documentation = read("docs/production-financial-certificate-gateways.md");
+  const environment = read(".env.example");
+
+  assert.match(adapter, /dispatchFinancialRequest/);
+  assert.match(adapter, /FORBIDDEN_PAYLOAD_KEYS/);
+  assert.match(adapter, /positive integer in cents/);
+  assert.match(adapter, /FINANCIAL_GATEWAY_MAX_ATTEMPTS/);
+  assert.match(server, /\/api\/financial-gateways\/dispatch/);
+  assert.match(server, /adapterType: "financial"/);
+  assert.match(server, /event\.adapterType === "financial"/);
+  assert.match(readiness, /financialGateway:releaseWiring/);
+  assert.match(documentation, /适配器基础通过不等于支付、医保或电子证照已经正式验收/);
+  ["PAYMENT", "INSURANCE", "CERTIFICATE"].forEach((type) => assert.match(environment, new RegExp(`${type}_GATEWAY_URL`)));
+  assert.match(read("package.json"), /financial-gateway:readiness/);
+  assert.match(read("scripts/release-report.js"), /financialGateway:productionBoundary/);
+  assert.match(read("scripts/release-artifact-manifest.js"), /financial-gateway-readiness-report\.json/);
+});
+
+test("dated platform development report records verification blockers and next plan", () => {
+  const report = read("docs/数智医院标准平台开发报告与下一步计划-2026-07-11.md");
+  ["本轮主要开发成果", "正式生产前已实现的主要标准平台功能", "验证证据", "当前生产阻断项", "下一步开发计划", "301/301", "230/230", "P0：0-30 天", "P1：31-60 天", "P2：61-90 天"].forEach((marker) => assert.match(report, new RegExp(marker)));
+  assert.match(read("scripts/release-artifact-manifest.js"), /platform-development-report-20260711/);
+  assert.match(read("scripts/deploy-check.js"), /docs:platformDevelopmentReport20260711/);
+});
+
+test("citizen launch review exposes ten audited service pipelines without affecting normal mode", () => {
+  const html = read("citizen.html");
+  const js = read("citizen.js");
+  const css = read("citizen.css");
+
+  assert.match(html, /id="citizen-pipeline-panel"/);
+  assert.match(html, /data-internal-launch-panel hidden/);
+  assert.match(js, /const citizenPipelineAudit = \[/);
+  assert.equal((js.match(/\{ pipeline:/g) || []).length, 10);
+  assert.match(js, /renderCitizenPipelineAudit/);
+  assert.match(js, /copyCitizenPipelineAcceptance/);
+  assert.match(css, /body\.service-paged-mode\.launch-review-mode \[data-internal-launch-panel\]/);
+  assert.match(css, /body\.service-paged-mode\.launch-review-mode \.mobile-service-rail/);
+  assert.match(css, /\.citizen-pipeline-card/);
 });

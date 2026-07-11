@@ -2,6 +2,9 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
+const { hospitalConnectorCenter } = require("../hospital-connectors");
+const { financialGatewayCenter } = require("../financial-gateways");
+const { objectStorageCenter } = require("../secure-object-storage");
 const { buildAuditRetentionReport, renderMarkdown: renderAuditRetentionMarkdown } = require("./audit-retention");
 const { buildChronicFollowupReadinessReport, renderMarkdown: renderChronicFollowupMarkdown } = require("./chronic-followup-readiness");
 const { buildChronicInstitutionInterfaceReport, renderMarkdown: renderChronicInstitutionInterfaceMarkdown } = require("./chronic-institution-interfaces");
@@ -12,6 +15,7 @@ const { buildCommercialCryptoReadiness, renderMarkdown: renderCommercialCryptoMa
 const { buildDataGovernanceReadiness, renderMarkdown: renderDataGovernanceMarkdown } = require("./data-governance-readiness");
 const { buildDataQualityReport, renderMarkdown: renderDataQualityMarkdown } = require("./data-quality-report");
 const { buildDigitalHospitalStandardsReadiness, renderMarkdown: renderDigitalHospitalStandardsMarkdown } = require("./digital-hospital-standards-readiness");
+const { buildPlatformProductionAudit, renderMarkdown: renderPlatformProductionAuditMarkdown } = require("./platform-production-audit");
 const { buildPhase2CatalogReadiness, renderMarkdown: renderPhase2CatalogMarkdown } = require("./phase2-catalog-readiness");
 const { buildPhase2JointTestReadiness, renderMarkdown: renderPhase2JointTestMarkdown } = require("./phase2-joint-test-readiness");
 const { buildPhase2MutualRecognitionReadiness, renderMarkdown: renderPhase2MutualRecognitionMarkdown } = require("./phase2-mutual-recognition-readiness");
@@ -28,6 +32,8 @@ const { buildHealthDashboardSummary, buildPriorityApplicationTemplates, renderMa
 const { buildHybridDeploymentReadinessReport, renderMarkdown: renderHybridDeploymentMarkdown } = require("./hybrid-deployment-readiness");
 const { buildIdentityContract, renderMarkdown: renderIdentityContractMarkdown } = require("./identity-contract");
 const { buildIntegrationReadinessReport, renderMarkdown: renderIntegrationReadinessMarkdown } = require("./integration-readiness");
+const { buildObjectStorageReadiness, renderMarkdown: renderObjectStorageMarkdown } = require("./object-storage-readiness");
+const { buildFinancialGatewayReadiness, renderMarkdown: renderFinancialGatewayMarkdown } = require("./financial-gateway-readiness");
 const { buildInterfaceMappingReport, renderMarkdown: renderInterfaceMappingMarkdown } = require("./interface-mapping");
 const { buildHospitalOperationsReadinessReport, renderMarkdown: renderHospitalOperationsReadinessMarkdown } = require("./hospital-operations-readiness");
 const { buildMonitoringReadinessReport, renderMarkdown: renderMonitoringReadinessMarkdown } = require("./monitoring-readiness");
@@ -109,6 +115,9 @@ function buildProductionCutoverChecklist(env, checks = []) {
   const detail = (...names) => names.map((name) => `${name}: ${byName[name]?.detail || "missing"}`).join("; ");
   const signoff = (name) => `${name}: ${envFlagEnabled(env, name) ? "signed" : "missing site signoff"}`;
   const storageEngine = String(env.STORAGE_ENGINE || "auto").toLowerCase();
+  const sqliteProfileChecks = ["auto", "sqlite"].includes(storageEngine)
+    ? ["env:SQLITE.journalMode", "env:SQLITE.synchronous", "env:SQLITE.busyTimeout"]
+    : [];
   return [
     {
       id: "cutover-env-file",
@@ -146,8 +155,8 @@ function buildProductionCutoverChecklist(env, checks = []) {
       id: "cutover-storage-adapter",
       phase: "storage",
       owner: "data-platform",
-      passed: ready("env:STORAGE_ENGINE.runtimeAdapter", "env:DATABASE_URL.requiredForPostgres") && !["postgres", "postgresql"].includes(storageEngine),
-      evidence: detail("env:STORAGE_ENGINE.runtimeAdapter", "env:DATABASE_URL.requiredForPostgres"),
+      passed: ready("env:STORAGE_ENGINE.runtimeAdapter", "env:DATABASE_URL.requiredForPostgres", ...sqliteProfileChecks) && !["postgres", "postgresql"].includes(storageEngine),
+      evidence: detail("env:STORAGE_ENGINE.runtimeAdapter", "env:DATABASE_URL.requiredForPostgres", ...sqliteProfileChecks),
       nextAction: "当前运行时支持 auto/sqlite；如切换 PostgreSQL，需先完成正式数据库适配器、迁移、回滚和原生备份演练。"
     },
     {
@@ -170,8 +179,8 @@ function buildProductionCutoverChecklist(env, checks = []) {
       id: "cutover-insurance-certificate",
       phase: "integration",
       owner: "cross-agency-integration",
-      passed: ready("integration:contractsReady") && envFlagEnabled(env, "CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF"),
-      evidence: `${detail("integration:contractsReady")}; ${signoff("CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF")}`,
+      passed: ready("integration:contractsReady", "env:FINANCIAL.gateways", "env:FINANCIAL.secretQuality") && envFlagEnabled(env, "CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF"),
+      evidence: `${detail("integration:contractsReady", "env:FINANCIAL.gateways", "env:FINANCIAL.secretQuality")}; ${signoff("CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF")}`,
       nextAction: "Attach signed insurance settlement, electronic certificate, and statistics exchange acceptance evidence from upstream agencies."
     },
     {
@@ -203,6 +212,9 @@ function validateProductionConfig(options = {}) {
   const sessionSecretItems = sessionSecrets.split(",").map((item) => item.trim()).filter(Boolean);
   const gatewaySecret = String(env.INTEGRATION_GATEWAY_SECRET || "");
   const storageEngine = String(env.STORAGE_ENGINE || "auto").toLowerCase();
+  const sqliteJournalMode = String(env.SQLITE_JOURNAL_MODE || "").toUpperCase();
+  const sqliteSynchronous = String(env.SQLITE_SYNCHRONOUS || "").toUpperCase();
+  const sqliteBusyTimeout = Number(env.SQLITE_BUSY_TIMEOUT_MS || 0);
   const nodeEnv = String(env.NODE_ENV || "");
 
   const checks = [
@@ -216,13 +228,27 @@ function validateProductionConfig(options = {}) {
   ];
 
   if (strict) {
+    const hospitalConnectors = hospitalConnectorCenter(env);
+    const hospitalSecrets = ["HIS", "EMR", "LIS", "PACS", "APPOINTMENT"].map((domain) => String(env[`${domain}_ADAPTER_SECRET`] || env.HOSPITAL_ADAPTER_SECRET || ""));
+    const financialGateways = financialGatewayCenter(env);
+    const financialSecrets = ["PAYMENT", "INSURANCE", "CERTIFICATE"].map((type) => String(env[`${type}_GATEWAY_SECRET`] || env.FINANCIAL_GATEWAY_SECRET || ""));
+    const secureObjectStorage = objectStorageCenter(env);
     checks.push(
       check("env:NODE_ENV.production", nodeEnv === "production", nodeEnv || "missing", "error", "environment"),
       check("env:STORAGE_ENGINE.production", storageEngine !== "json", "json storage is demo-only", "error", "environment"),
       check("env:STORAGE_ENGINE.runtimeAdapter", ["auto", "sqlite"].includes(storageEngine), ["auto", "sqlite"].includes(storageEngine) ? storageEngine : `${storageEngine} adapter not enabled`, "error", "environment"),
       check("env:DATABASE_URL.requiredForPostgres", !["postgres", "postgresql"].includes(storageEngine) || Boolean(env.DATABASE_URL), env.DATABASE_URL ? "configured" : "missing", "error", "environment"),
+      check("env:SQLITE.journalMode", !["auto", "sqlite"].includes(storageEngine) || sqliteJournalMode === "WAL", sqliteJournalMode || "missing SQLITE_JOURNAL_MODE", "error", "environment"),
+      check("env:SQLITE.synchronous", !["auto", "sqlite"].includes(storageEngine) || ["FULL", "EXTRA"].includes(sqliteSynchronous), sqliteSynchronous || "missing SQLITE_SYNCHRONOUS", "error", "environment"),
+      check("env:SQLITE.busyTimeout", !["auto", "sqlite"].includes(storageEngine) || sqliteBusyTimeout >= 5000, Number.isFinite(sqliteBusyTimeout) ? `${sqliteBusyTimeout}ms` : "invalid SQLITE_BUSY_TIMEOUT_MS", "error", "environment"),
       check("env:OIDC.identityAdapter", Boolean(env.OIDC_ISSUER_URL && env.OIDC_CLIENT_ID && env.OIDC_CLIENT_SECRET), env.OIDC_ISSUER_URL && env.OIDC_CLIENT_ID && env.OIDC_CLIENT_SECRET ? "configured" : "missing OIDC_ISSUER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET", "error", "environment"),
-      check("env:SMS.gateway", Boolean(env.SMS_GATEWAY_URL), env.SMS_GATEWAY_URL ? "configured" : "missing SMS_GATEWAY_URL", "error", "environment"),
+      check("env:SMS.gateway", Boolean(env.SMS_GATEWAY_URL && env.SMS_TEMPLATE_ID), env.SMS_GATEWAY_URL && env.SMS_TEMPLATE_ID ? "configured" : "missing SMS_GATEWAY_URL/SMS_TEMPLATE_ID", "error", "environment"),
+      check("env:HOSPITAL.connectors", hospitalConnectors.adapterReady, `${hospitalConnectors.summary.configured}/${hospitalConnectors.summary.total} hospital connectors configured with production HTTPS`, "error", "environment"),
+      check("env:HOSPITAL.secretQuality", hospitalSecrets.every((secret) => secretQuality(secret).strongEnough), "hospital adapter signing secrets must be non-placeholder and at least 32 chars", "error", "environment"),
+      check("env:OBJECT_STORAGE.adapter", secureObjectStorage.adapterReady, secureObjectStorage.adapterReady ? "object storage gateway, bucket and HTTPS are configured" : "missing OBJECT_STORAGE_GATEWAY_URL/OBJECT_STORAGE_BUCKET/OBJECT_STORAGE_SIGNING_SECRET or production HTTPS", "error", "environment"),
+      check("env:OBJECT_STORAGE.secretQuality", secretQuality(env.OBJECT_STORAGE_SIGNING_SECRET).strongEnough, "object storage signing secret must be non-placeholder and at least 32 chars", "error", "environment"),
+      check("env:FINANCIAL.gateways", financialGateways.adapterReady, `${financialGateways.summary.configured}/${financialGateways.summary.total} payment, insurance and certificate gateways configured with production HTTPS`, "error", "environment"),
+      check("env:FINANCIAL.secretQuality", financialSecrets.every((secret) => secretQuality(secret).strongEnough), "financial gateway signing secrets must be non-placeholder and at least 32 chars", "error", "environment"),
       check("env:AUDIT.retentionTarget", Boolean(env.AUDIT_EXPORT_PATH || env.SIEM_ENDPOINT), env.AUDIT_EXPORT_PATH || env.SIEM_ENDPOINT ? "configured" : "missing AUDIT_EXPORT_PATH or SIEM_ENDPOINT", "error", "environment")
     );
   }
@@ -350,7 +376,8 @@ function integrationReadinessChecks(integrationReadiness) {
   return [
     check("integration:readiness", integrationReadiness.ok, integrationReadiness.ok ? "integration readiness checks passed" : "integration readiness checks failed", "error", "integration"),
     check("integration:contractsReady", integrationReadiness.contracts?.every((item) => item.status === "ready"), `${integrationReadiness.contractCount || 0} contracts`, "error", "integration"),
-    check("integration:p0Coverage", integrationReadiness.p0Coverage?.every((item) => item.ready), `${integrationReadiness.p0InterfaceCount || 0} P0 interfaces`, "error", "integration")
+    check("integration:p0Coverage", integrationReadiness.p0Coverage?.every((item) => item.ready), `${integrationReadiness.p0InterfaceCount || 0} P0 interfaces`, "error", "integration"),
+    check("integration:runtimeAdapters", integrationReadiness.runtimeAdapters?.length === 5 && integrationReadiness.runtimeAdapters.every((item) => item.sourceReady && item.environmentReady && item.runtimeReady && item.boundaryReady), `${integrationReadiness.runtimeAdapters?.length || 0}/5 hospital runtime adapter foundations`, "error", "integration")
   ];
 }
 
@@ -392,6 +419,23 @@ function environmentMatrixChecks(environmentMatrix) {
     check("environment:matrix", environmentMatrix.ok, environmentMatrix.ok ? "environment matrix checks passed" : "environment matrix checks failed", "error", "environment"),
     check("environment:profiles", environmentMatrix.profiles?.length === 3, `${environmentMatrix.profiles?.length || 0} environment profiles`, "error", "environment"),
     check("environment:gateScripts", environmentMatrix.profiles?.every((item) => item.missingScripts?.length === 0), "demo, staging, and production gate scripts mapped", "error", "environment")
+  ];
+}
+
+function objectStorageReadinessChecks(objectStorageReadiness) {
+  return [
+    check("objectStorage:readiness", objectStorageReadiness.ok, objectStorageReadiness.ok ? "object storage security checks passed" : "object storage security checks failed", "error", "object-storage"),
+    check("objectStorage:controls", objectStorageReadiness.summary?.controlsReady === objectStorageReadiness.summary?.controls && (objectStorageReadiness.summary?.controls || 0) >= 6, `${objectStorageReadiness.summary?.controlsReady || 0}/${objectStorageReadiness.summary?.controls || 0} security controls`, "error", "object-storage"),
+    check("objectStorage:api", objectStorageReadiness.summary?.apiGroupsReady === objectStorageReadiness.summary?.apiGroups && (objectStorageReadiness.summary?.apiGroups || 0) >= 5, `${objectStorageReadiness.summary?.apiGroupsReady || 0}/${objectStorageReadiness.summary?.apiGroups || 0} runtime API groups`, "error", "object-storage"),
+    check("objectStorage:productionBoundary", objectStorageReadiness.productionReady === false && (objectStorageReadiness.summary?.productionBlockers || 0) >= 8, `${objectStorageReadiness.summary?.productionBlockers || 0} site production blockers remain explicit`, "error", "object-storage")
+  ];
+}
+
+function financialGatewayReadinessChecks(financialGatewayReadiness) {
+  return [
+    check("financialGateway:readiness", financialGatewayReadiness.ok, financialGatewayReadiness.ok ? "financial gateway adapter checks passed" : "financial gateway adapter checks failed", "error", "financial-gateway"),
+    check("financialGateway:capabilities", financialGatewayReadiness.summary?.capabilityGroupsReady === financialGatewayReadiness.summary?.capabilityGroups && (financialGatewayReadiness.summary?.operations || 0) === 14, `${financialGatewayReadiness.summary?.capabilityGroupsReady || 0}/${financialGatewayReadiness.summary?.capabilityGroups || 0} capability groups and ${financialGatewayReadiness.summary?.operations || 0} operations`, "error", "financial-gateway"),
+    check("financialGateway:productionBoundary", financialGatewayReadiness.productionReady === false && (financialGatewayReadiness.summary?.productionBlockers || 0) >= 6, `${financialGatewayReadiness.summary?.productionBlockers || 0} production blockers remain explicit`, "error", "financial-gateway")
   ];
 }
 
@@ -609,6 +653,15 @@ function digitalHospitalStandardsChecks(digitalHospitalStandards) {
   ];
 }
 
+function platformProductionAuditChecks(platformProductionAudit) {
+  return [
+    check("platformProductionAudit:readiness", platformProductionAudit.ok, platformProductionAudit.ok ? "platform production audit checks passed" : "platform production audit checks failed", "error", "platform-production-audit"),
+    check("platformProductionAudit:capabilities", platformProductionAudit.summary?.implementedDomains === platformProductionAudit.summary?.capabilityDomains && (platformProductionAudit.summary?.capabilityDomains || 0) >= 10, `${platformProductionAudit.summary?.implementedDomains || 0}/${platformProductionAudit.summary?.capabilityDomains || 0} capability domains have runnable evidence`, "error", "platform-production-audit"),
+    check("platformProductionAudit:mvpRequiredModules", (platformProductionAudit.summary?.mvpRequiredModules || 0) >= 8 && platformProductionAudit.mvpRequiredModules?.every((item) => item.priority === "P0" && item.remainingCode && item.siteDependency), `${platformProductionAudit.summary?.mvpRequiredModules || 0} mandatory MVP production modules are explicitly scoped`, "error", "platform-production-audit"),
+    check("platformProductionAudit:productionBoundary", platformProductionAudit.productionReady === false && (platformProductionAudit.summary?.productionBlockers || 0) >= 10, `${platformProductionAudit.summary?.productionBlockers || 0} production blockers remain explicitly owned`, "error", "platform-production-audit")
+  ];
+}
+
 function drugConsumableChecks(drugConsumable) {
   return [
     check("drugConsumable:readiness", drugConsumable.ok, drugConsumable.ok ? "drug consumable supervision checks passed" : "drug consumable supervision checks failed", "error", "drug-consumable"),
@@ -687,6 +740,7 @@ function productionDbReadinessChecks(productionDbReadiness) {
   return [
     check("productionDb:readiness", productionDbReadiness.ok, productionDbReadiness.ok ? "production database readiness checks passed" : "production database readiness checks failed", "error", "production-db"),
     check("productionDb:runtimeBlock", productionDbReadiness.migrationEvidence?.runtimePostgresBlocked, "postgres runtime remains blocked until adapter cutover", "error", "production-db"),
+    check("productionDb:sqliteRuntimeProfile", productionDbReadiness.sqliteRuntimeProfile && Object.values(productionDbReadiness.sqliteRuntimeProfile).every(Boolean), "SQLite WAL, FULL synchronous, foreign keys, busy timeout and integrity probe are wired", "error", "production-db"),
     check("productionDb:rehearsalDocs", productionDbReadiness.rehearsalEvidence && Object.values(productionDbReadiness.rehearsalEvidence).every(Boolean), "backup, restore, RTO/RPO, and release artifact docs", "error", "production-db"),
     check("productionDb:cutoverCenter", productionDbReadiness.cutoverCenter?.ok && productionDbReadiness.cutoverCenter?.summary?.migrationBatches >= 4 && productionDbReadiness.cutoverCenter?.summary?.productionReadyRuns === 0, `${productionDbReadiness.cutoverCenter?.summary?.migrationBatches || 0} migration batches / ${productionDbReadiness.cutoverCenter?.summary?.cutoverRuns || 0} rehearsal runs / production gate preserved`, "error", "production-db")
   ];
@@ -907,9 +961,12 @@ function buildReleaseReport(options = {}) {
   const qualitySafety = buildQualitySafetyReport({ data });
   const drugConsumable = buildDrugConsumableReadinessReport({ data, pkg });
   const integrationReadiness = buildIntegrationReadinessReport({ data });
+  const objectStorageReadiness = buildObjectStorageReadiness({ data, pkg });
+  const financialGatewayReadiness = buildFinancialGatewayReadiness({ pkg });
   const interfaceMapping = buildInterfaceMappingReport({ data, pkg });
   const dataGovernance = buildDataGovernanceReadiness({ data, pkg, interfaceMapping, dataQuality });
   const digitalHospitalStandards = buildDigitalHospitalStandardsReadiness({ pkg });
+  const platformProductionAudit = buildPlatformProductionAudit({ pkg });
   const phase2Catalog = buildPhase2CatalogReadiness({ data, pkg });
   const phase2JointTest = buildPhase2JointTestReadiness({ data, pkg });
   const phase2MutualRecognition = buildPhase2MutualRecognitionReadiness({ data, pkg });
@@ -964,6 +1021,7 @@ function buildReleaseReport(options = {}) {
     ...dataQualityChecks(dataQuality),
     ...dataGovernanceChecks(dataGovernance),
     ...digitalHospitalStandardsChecks(digitalHospitalStandards),
+    ...platformProductionAuditChecks(platformProductionAudit),
     ...phase2CatalogChecks(phase2Catalog),
     ...phase2JointTestChecks(phase2JointTest),
     ...phase2MutualRecognitionChecks(phase2MutualRecognition),
@@ -978,6 +1036,8 @@ function buildReleaseReport(options = {}) {
     ...qualitySafetyChecks(qualitySafety),
     ...drugConsumableChecks(drugConsumable),
     ...integrationReadinessChecks(integrationReadiness),
+    ...objectStorageReadinessChecks(objectStorageReadiness),
+    ...financialGatewayReadinessChecks(financialGatewayReadiness),
     ...interfaceMappingChecks(interfaceMapping),
     ...regionalDataSharingChecks(regionalDataSharing),
     ...hospitalOperationsReadinessChecks(hospitalOperationsReadiness),
@@ -1006,6 +1066,8 @@ function buildReleaseReport(options = {}) {
   ];
 
   const failed = checks.filter((item) => item.severity === "error" && !item.passed);
+  platformProductionAudit.summary.releaseChecks = checks.length;
+  platformProductionAudit.summary.releaseChecksPassed = checks.filter((item) => item.passed).length;
   return {
     ok: failed.length === 0,
     generatedAt: new Date().toISOString(),
@@ -1029,6 +1091,7 @@ function buildReleaseReport(options = {}) {
     dataQuality,
     dataGovernance,
     digitalHospitalStandards,
+    platformProductionAudit,
     phase2Catalog,
     phase2JointTest,
     phase2MutualRecognition,
@@ -1043,6 +1106,8 @@ function buildReleaseReport(options = {}) {
     qualitySafety,
     drugConsumable,
     integrationReadiness,
+    objectStorageReadiness,
+    financialGatewayReadiness,
     interfaceMapping,
     regionalDataSharing,
     hospitalOperationsReadiness,
@@ -1454,6 +1519,8 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       digitalHospitalStandards: report.digitalHospitalStandards
     }, null, 2), "utf8");
+    const platformProductionAuditJson = path.join(path.dirname(output), "platform-production-audit.json");
+    fs.writeFileSync(platformProductionAuditJson, JSON.stringify(report.platformProductionAudit, null, 2), "utf8");
     const phase2ProposalJson = path.join(path.dirname(output), "phase2-proposal-readiness-report.json");
     fs.writeFileSync(phase2ProposalJson, JSON.stringify({
       project: report.project,
@@ -1630,6 +1697,22 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       siteReadinessPack: report.siteReadinessPack
     }, null, 2), "utf8");
+    const objectStorageJson = path.join(path.dirname(output), "object-storage-readiness-report.json");
+    fs.writeFileSync(objectStorageJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      objectStorageReadiness: report.objectStorageReadiness
+    }, null, 2), "utf8");
+    const financialGatewayJson = path.join(path.dirname(output), "financial-gateway-readiness-report.json");
+    fs.writeFileSync(financialGatewayJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      financialGatewayReadiness: report.financialGatewayReadiness
+    }, null, 2), "utf8");
     const onsiteLaunchRequirementsJson = path.join(path.dirname(output), "onsite-launch-requirements.json");
     fs.writeFileSync(onsiteLaunchRequirementsJson, JSON.stringify({
       project: report.project,
@@ -1784,6 +1867,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(dataGovernanceMarkdown, renderDataGovernanceMarkdown(report.dataGovernance), "utf8");
     const digitalHospitalStandardsMarkdown = path.join(path.dirname(markdown), "digital-hospital-standards-readiness-report.md");
     fs.writeFileSync(digitalHospitalStandardsMarkdown, renderDigitalHospitalStandardsMarkdown(report.digitalHospitalStandards), "utf8");
+    const platformProductionAuditMarkdown = path.join(path.dirname(markdown), "platform-production-audit.md");
+    fs.writeFileSync(platformProductionAuditMarkdown, renderPlatformProductionAuditMarkdown(report.platformProductionAudit), "utf8");
     const phase2ProposalMarkdown = path.join(path.dirname(markdown), "phase2-proposal-readiness-report.md");
     fs.writeFileSync(phase2ProposalMarkdown, renderPhase2ProposalMarkdown(report.phase2Proposal), "utf8");
     const phase2CatalogMarkdown = path.join(path.dirname(markdown), "phase2-catalog-readiness-report.md");
@@ -1810,6 +1895,10 @@ function writeOutput(report, flags) {
     fs.writeFileSync(qualitySafetyMarkdown, renderQualitySafetyMarkdown(report.qualitySafety), "utf8");
     const integrationMarkdown = path.join(path.dirname(markdown), "integration-readiness-report.md");
     fs.writeFileSync(integrationMarkdown, renderIntegrationReadinessMarkdown(report.integrationReadiness), "utf8");
+    const objectStorageMarkdown = path.join(path.dirname(markdown), "object-storage-readiness-report.md");
+    fs.writeFileSync(objectStorageMarkdown, renderObjectStorageMarkdown(report.objectStorageReadiness), "utf8");
+    const financialGatewayMarkdown = path.join(path.dirname(markdown), "financial-gateway-readiness-report.md");
+    fs.writeFileSync(financialGatewayMarkdown, renderFinancialGatewayMarkdown(report.financialGatewayReadiness), "utf8");
     const interfaceMappingMarkdown = path.join(path.dirname(markdown), "interface-mapping-report.md");
     fs.writeFileSync(interfaceMappingMarkdown, renderInterfaceMappingMarkdown(report.interfaceMapping), "utf8");
     const regionalDataSharingMarkdown = path.join(path.dirname(markdown), "regional-data-sharing-report.md");

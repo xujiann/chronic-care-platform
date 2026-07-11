@@ -19,6 +19,8 @@
 | 挂号服务 | `page=registration` | `/api/registrations/orders`、候补队列、预约动作/停诊改签/取消接口、`/api/registrations/integration-center` | 已实现号源、预约、满号候补、自动补位、限时确认、取消、停诊改签、居民确认或退号、签名回调、死信重试、人工工单和凭证结案演示 | HIS/互联网医院号源、正式锁号、排班变更事件、支付退款、医保电子凭证、真实通知及补偿回执 | `npm.cmd run registration:journey-readiness`、`npm.cmd run registration:integration-readiness` |
 | 移动发布 | `mobile-preview.html`、PWA/小程序/APP 入口 | `manifest.webmanifest`、`service-worker.js`、`mobile-preview.css` | 已实现 390px 手机框、精简预览、滑动切换、离线壳和验收摘要 | 域名备案、HTTPS、隐私协议、APP 签名、推送证书、崩溃监控、真机验收 | `npm.cmd run launch:smoke`、真机截图 |
 
+上线评审时，居民端内部发布面板同步展示每条管线的责任角色和现场验收动作，并提供“复制验收清单”用于现场会签或发布评审流转：平台信息科/身份集成组负责手机号验证码、短信回执和实名绑定；居民主索引组负责本人/家庭成员/监护关系裁剪和越权抽查；医院接口联调组负责 HIS/EMR/LIS/PACS、号源、回调和对账；安全合规组负责撤权拦截、审计导出和复核台账；移动端发布组/运营合规组负责 HTTPS、隐私协议、签名包、推送证书和真机截图。
+
 ## 1. 全流程状态
 
 | 流程 | 当前状态 | 说明 |
