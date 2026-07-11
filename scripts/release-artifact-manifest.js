@@ -65,6 +65,7 @@ const ARTIFACTS = [
   ["site-readiness", "site", "Site readiness pack", "release/site-readiness-pack.json", "release/site-readiness-pack.md", "site:pack", "/api/site-readiness-pack"],
   ["site-launch-evidence", "site", "Runtime site launch evidence ledger", "release/site-readiness-pack.json", "release/site-readiness-pack.md", "site:pack", "/api/site-launch-evidence"],
   ["production-db", "data", "Production database readiness and cutover rehearsal report", "release/production-db-readiness-report.json", "release/production-db-readiness-report.md", "production-db:readiness", "/api/production-database/cutover-center"],
+  ["postgres-migration-package", "data", "PostgreSQL migration schema count and integrity package", "release/postgres-migration-package/manifest.json", "release/postgres-migration-package/README.md", "postgres:migration-package", "npm run postgres:migration-verify"],
   ["evaluation-evidence", "evaluation", "Interoperability evaluation evidence report", "release/evaluation-evidence-report.json", "release/evaluation-evidence-report.md", "evaluation:evidence", "release/evaluation-evidence-report.md"]
 ];
 

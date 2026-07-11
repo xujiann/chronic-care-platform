@@ -30,6 +30,7 @@ test("release artifact manifest indexes reports templates commands and evidence"
   assert.equal(report.artifacts.some((item) => item.id === "site-readiness" && item.evidence === "/api/site-readiness-pack"), true);
   assert.equal(report.artifacts.some((item) => item.id === "site-launch-evidence" && item.command === "site:pack" && item.evidence === "/api/site-launch-evidence"), true);
   assert.equal(report.artifacts.some((item) => item.id === "production-db" && item.command === "production-db:readiness" && item.evidence === "/api/production-database/cutover-center"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "postgres-migration-package" && item.command === "postgres:migration-package" && item.markdown === "release/postgres-migration-package/README.md" && item.evidence === "npm run postgres:migration-verify"), true);
   assert.equal(report.artifacts.some((item) => item.id === "service-acceptance" && item.markdown === "release/service-acceptance-summary.md" && item.evidence === "/api/service-acceptance-summary"), true);
   assert.equal(report.artifacts.some((item) => item.id === "health-dashboard" && item.command === "health-dashboard:summary" && item.markdown === "release/health-dashboard-summary.md" && item.evidence === "/api/health-dashboard/summary"), true);
   assert.equal(report.artifacts.some((item) => item.id === "health-dashboard-indicator-center" && item.command === "health-dashboard:summary" && item.markdown === "docs/health-dashboard-indicator-center-report.md" && item.evidence === "/api/health-dashboard/industry-governance-indicators"), true);
@@ -100,6 +101,7 @@ test("release artifact manifest renders and writes artifacts", (t) => {
   assert.match(markdown, /citizen-operations-readiness-report\.md/);
   assert.match(markdown, /commercial-crypto-readiness-report\.md/);
   assert.match(markdown, /\/api\/production-database\/cutover-center/);
+  assert.match(markdown, /PostgreSQL migration schema count and integrity package/);
 
   writeOutput(report, {
     output: path.join("tmp", "release-artifact-manifest-test", "release-artifact-manifest.json"),

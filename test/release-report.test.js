@@ -366,6 +366,9 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.productionDbReadiness.ok, true);
   assert.equal(report.productionDbReadiness.cutoverCenter.summary.migrationBatches, 4);
   assert.equal(report.productionDbReadiness.cutoverCenter.summary.productionReadyRuns, 0);
+  assert.equal(report.checks.some((item) => item.name === "productionDb:migrationPackage" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "productionDb:migrationBoundary" && item.passed), true);
+  assert.equal(report.productionDbReadiness.postgresMigrationPackage.manifest.mode, "manifest");
   assert.equal(report.checks.some((item) => item.name === "evaluation:evidence" && item.passed), true);
   assert.equal(report.evaluationEvidence.ok, true);
   assert.equal(report.checks.some((item) => item.name === "environment:matrix" && item.passed), true);

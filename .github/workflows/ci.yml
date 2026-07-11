@@ -103,6 +103,10 @@ jobs:
         run: npm run policy:coverage
       - name: Generate production database readiness report
         run: npm run production-db:readiness
+      - name: Build PostgreSQL migration manifest package
+        run: npm run postgres:migration-package
+      - name: Verify PostgreSQL migration manifest package
+        run: npm run postgres:migration-verify
       - name: Generate interoperability evaluation evidence
         run: npm run evaluation:evidence
       - name: Generate referral teleconsultation readiness report

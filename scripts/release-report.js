@@ -771,7 +771,9 @@ function productionDbReadinessChecks(productionDbReadiness) {
     check("productionDb:runtimeBlock", productionDbReadiness.migrationEvidence?.runtimePostgresBlocked, "postgres runtime remains blocked until adapter cutover", "error", "production-db"),
     check("productionDb:sqliteRuntimeProfile", productionDbReadiness.sqliteRuntimeProfile && Object.values(productionDbReadiness.sqliteRuntimeProfile).every(Boolean), "SQLite WAL, FULL synchronous, foreign keys, busy timeout and integrity probe are wired", "error", "production-db"),
     check("productionDb:rehearsalDocs", productionDbReadiness.rehearsalEvidence && Object.values(productionDbReadiness.rehearsalEvidence).every(Boolean), "backup, restore, RTO/RPO, and release artifact docs", "error", "production-db"),
-    check("productionDb:cutoverCenter", productionDbReadiness.cutoverCenter?.ok && productionDbReadiness.cutoverCenter?.summary?.migrationBatches >= 4 && productionDbReadiness.cutoverCenter?.summary?.productionReadyRuns === 0, `${productionDbReadiness.cutoverCenter?.summary?.migrationBatches || 0} migration batches / ${productionDbReadiness.cutoverCenter?.summary?.cutoverRuns || 0} rehearsal runs / production gate preserved`, "error", "production-db")
+    check("productionDb:cutoverCenter", productionDbReadiness.cutoverCenter?.ok && productionDbReadiness.cutoverCenter?.summary?.migrationBatches >= 4 && productionDbReadiness.cutoverCenter?.summary?.productionReadyRuns === 0, `${productionDbReadiness.cutoverCenter?.summary?.migrationBatches || 0} migration batches / ${productionDbReadiness.cutoverCenter?.summary?.cutoverRuns || 0} rehearsal runs / production gate preserved`, "error", "production-db"),
+    check("productionDb:migrationPackage", productionDbReadiness.postgresMigrationPackage?.ok && productionDbReadiness.postgresMigrationPackage?.manifest?.mode === "manifest" && !productionDbReadiness.postgresMigrationPackage?.files?.["records.copy.tsv"], `${productionDbReadiness.postgresMigrationPackage?.manifest?.summary?.records || 0} source records summarized without payload export`, "error", "production-db"),
+    check("productionDb:migrationBoundary", productionDbReadiness.postgresMigrationPackage?.manifest?.productionReady === false && productionDbReadiness.migrationEvidence?.runtimePostgresBlocked, "migration package cannot enable PostgreSQL runtime or production readiness", "error", "production-db")
   ];
 }
 
@@ -1422,7 +1424,7 @@ function renderMarkdown(report) {
     "",
     "## Production database readiness report",
     "",
-    "See `production-db-readiness-report.json` and `production-db-readiness-report.md` for PostgreSQL cutover prerequisites, current SQLite/JSON model evidence, backup rehearsal documentation, and runtime adapter guardrails.",
+    "See `production-db-readiness-report.json`, `production-db-readiness-report.md`, and `postgres-migration-package/manifest.json` for PostgreSQL cutover prerequisites, current SQLite/JSON model evidence, payload-free migration counts and digests, backup rehearsal documentation, and runtime adapter guardrails.",
     "",
     "## Interoperability evaluation evidence report",
     "",

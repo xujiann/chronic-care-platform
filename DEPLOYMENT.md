@@ -215,6 +215,15 @@ npm.cmd run release:report:full
 
 `production-db:readiness` 会生成 `release/production-db-readiness-report.json` 和 `release/production-db-readiness-report.md`，专项检查 PostgreSQL/正式数据库切换前的生产轨道、必填配置、当前 SQLite/JSON 模型证据、备份恢复演练文档、RTO/RPO 说明和运行时阻断，避免在正式适配器完成前误启用 `STORAGE_ENGINE=postgres/postgresql`。
 
+PostgreSQL 切换还必须先生成无业务正文的迁移清单包并复核文件摘要：
+
+```powershell
+npm.cmd run postgres:migration-package
+npm.cmd run postgres:migration-verify
+```
+
+默认制品位于 `release/postgres-migration-package/`，只包含 `health_platform` 落地区 schema、集合与记录计数、逐集合摘要、装载/校验/回滚模板和文件摘要，不包含居民记录正文或数据库凭据。真实全量导出必须使用 `--mode=full --acknowledge-sensitive-data` 并写入仓库之外的受控目录，完整流程见 `docs/postgresql-migration-package.md`。迁移包通过不代表 PostgreSQL 运行时适配器已经启用；`STORAGE_ENGINE=postgres` 继续保持阻断，直到全量迁移、读写一致性、容量、故障切换、原生备份恢复和现场签字全部完成。
+
 `identity:contract` 会生成 `release/identity-contract.json` 和 `release/identity-contract.md`，记录政务统一身份接入所需 claims、角色到门户映射、机构覆盖度和样例 claim 映射；`release:report` 会同步写出这些文件，作为 OIDC/SAML 联调前的身份契约验收材料。
 
 `audit:retention` 会生成 `release/audit-retention-report.json` 和 `release/audit-retention-report.md`，离线验证安全事件与数据访问日志哈希链，记录导出摘要、保全目标、安全验收台账和生产审计保全路径；默认演示发布报告使用发布包内审计报告作为本地归档目标，正式生产切换仍必须通过 `env:check:production` 并配置 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT`。

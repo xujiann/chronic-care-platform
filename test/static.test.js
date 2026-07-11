@@ -2838,9 +2838,28 @@ test("production deployment automation keeps artifacts immutable and secrets ext
   assert.match(read("scripts/release-artifact-manifest.js"), /production-deployment-package\.md/);
 });
 
+test("PostgreSQL migration package keeps CI payload-free and full exports controlled", () => {
+  const migrationPackage = read("scripts/postgres-migration-package.js");
+  const readiness = read("scripts/production-db-readiness.js");
+  const documentation = read("docs/postgresql-migration-package.md");
+  const ci = read(".github/workflows/ci.yml");
+
+  assert.match(migrationPackage, /buildPostgresMigrationPackage/);
+  assert.match(migrationPackage, /verifyPostgresMigrationPackage/);
+  assert.match(migrationPackage, /credentialsPersisted: false/);
+  assert.match(migrationPackage, /full PostgreSQL migration exports must be written outside the repository/);
+  assert.match(readiness, /production-db:migrationPackage/);
+  assert.match(readiness, /production-db:secureFullExportBoundary/);
+  assert.match(documentation, /不得上传 Git/);
+  assert.match(documentation, /迁移包通过不等于 PostgreSQL 运行时适配器已经启用/);
+  assert.match(ci, /postgres:migration-package/);
+  assert.match(ci, /postgres:migration-verify/);
+  assert.match(read("scripts/release-artifact-manifest.js"), /postgres-migration-package\/manifest\.json/);
+});
+
 test("dated platform development report records verification blockers and next plan", () => {
   const report = read("docs/数智医院标准平台开发报告与下一步计划-2026-07-11.md");
-  ["本轮主要开发成果", "生产可观测性与 SIEM 告警闭环", "不可变部署包与密钥外置", "正式生产前已实现的主要标准平台功能", "验证证据", "当前生产阻断项", "下一步开发计划", "308/308", "242/243", "201/201", "P0：0-30 天", "P1：31-60 天", "P2：61-90 天"].forEach((marker) => assert.match(report, new RegExp(marker)));
+  ["本轮主要开发成果", "生产可观测性与 SIEM 告警闭环", "不可变部署包与密钥外置", "PostgreSQL 迁移制品与安全导出", "正式生产前已实现的主要标准平台功能", "验证证据", "当前生产阻断项", "下一步开发计划", "310/310", "244/245", "206/206", "P0：0-30 天", "P1：31-60 天", "P2：61-90 天"].forEach((marker) => assert.match(report, new RegExp(marker)));
   assert.match(read("scripts/release-artifact-manifest.js"), /platform-development-report-20260711/);
   assert.match(read("scripts/deploy-check.js"), /docs:platformDevelopmentReport20260711/);
 });

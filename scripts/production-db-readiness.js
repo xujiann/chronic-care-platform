@@ -3,6 +3,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { createHash, randomUUID } = require("node:crypto");
 const { inspectStorageModel } = require("./storage-admin");
+const { buildPostgresMigrationPackage } = require("./postgres-migration-package");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "production-db-readiness-report.json");
@@ -274,11 +275,13 @@ function buildProductionDbReadinessReport(options = {}) {
   const platformSource = options.platformSource ?? readText("platform.js");
   const platformHtml = options.platformHtml ?? readText("platform.html");
   const cutoverDocument = options.cutoverDocument ?? readText(path.join("docs", "production-database-cutover-center.md"));
+  const migrationPackageSource = options.migrationPackageSource ?? readText(path.join("scripts", "postgres-migration-package.js"));
+  const migrationPackageDocument = options.migrationPackageDocument ?? readText(path.join("docs", "postgresql-migration-package.md"));
   const storageModel = options.storageModel ?? inspectStorageModel({ dataDir: path.join(ROOT, "data") });
   const productionTrack = arrayOf(data, "productionDeploymentPlan").find((item) => item.id === "prod-storage-adapter") || null;
   const json = storageModel.jsonSnapshot || {};
   const sqlite = storageModel.sqlite || {};
-  const requiredScripts = ["storage:backup", "storage:inspect", "storage:assess", "rollback:snapshot", "release:report"];
+  const requiredScripts = ["storage:backup", "storage:inspect", "storage:assess", "rollback:snapshot", "postgres:migration-package", "postgres:migration-verify", "release:report"];
   const migrationEvidence = {
     currentAdapter: "sqlite-wal-json-snapshot",
     targetAdapter: "postgresql",
@@ -301,6 +304,8 @@ function buildProductionDbReadinessReport(options = {}) {
     deploymentDocumented: ["storage.sqliteProfile", "WAL", "FULL", "quickCheck"].every((marker) => deployment.includes(marker))
   };
   const cutoverCenter = buildProductionDatabaseCutoverCenter(data);
+  const postgresMigrationPackage = buildPostgresMigrationPackage({ data });
+  const migrationSourceRecords = Object.values(data).filter(Array.isArray).reduce((sum, rows) => sum + rows.length, 0);
   const checks = [
     { id: "production-db:track", passed: Boolean(productionTrack?.owner && productionTrack?.nextAction), detail: productionTrack?.status || "missing production deployment track" },
     { id: "production-db:requiredConfig", passed: ["DATABASE_URL", "STORAGE_ENGINE=postgres"].every((item) => migrationEvidence.requiredConfig.includes(item)), detail: migrationEvidence.requiredConfig.join(",") || "missing" },
@@ -313,7 +318,9 @@ function buildProductionDbReadinessReport(options = {}) {
     { id: "production-db:cutoverCenter", passed: cutoverCenter.ok && cutoverCenter.summary.migrationBatches >= 4, detail: `${cutoverCenter.summary.migrationBatches} migration batches / ${cutoverCenter.summary.cutoverRuns} rehearsal runs` },
     { id: "production-db:cutoverApi", passed: serverSource.includes("/api/production-database/cutover-center") && serverSource.includes("/api/production-database/cutover-runs"), detail: "commission-only cutover center and rehearsal action APIs" },
     { id: "production-db:cutoverUi", passed: platformHtml.includes("production-database-cutover-center") && platformSource.includes("renderProductionDatabaseCutoverCenter") && platformSource.includes("data-production-db-action"), detail: "platform cutover rehearsal center is visible and actionable" },
-    { id: "production-db:cutoverDocs", passed: ["migration batch", "rollback checkpoint", "/api/production-database/cutover-runs"].every((token) => cutoverDocument.includes(token)), detail: "cutover center model, APIs and production boundary are documented" }
+    { id: "production-db:cutoverDocs", passed: ["migration batch", "rollback checkpoint", "/api/production-database/cutover-runs"].every((token) => cutoverDocument.includes(token)), detail: "cutover center model, APIs and production boundary are documented" },
+    { id: "production-db:migrationPackage", passed: postgresMigrationPackage.ok && postgresMigrationPackage.manifest.mode === "manifest" && postgresMigrationPackage.manifest.summary.records === migrationSourceRecords && !postgresMigrationPackage.files["records.copy.tsv"], detail: `${postgresMigrationPackage.manifest.summary.collections} collections / ${postgresMigrationPackage.manifest.summary.records} source records / no payload artifact` },
+    { id: "production-db:secureFullExportBoundary", passed: ["acknowledge-sensitive-data", "must be written outside the repository", "credentialsPersisted: false"].every((marker) => migrationPackageSource.includes(marker)) && ["仓库之外", "不得上传 Git", "迁移包通过不等于 PostgreSQL 运行时适配器已经启用"].every((marker) => migrationPackageDocument.includes(marker)), detail: "full export requires explicit acknowledgement, external protected path and keeps credentials out" }
   ];
   return {
     ok: checks.every((item) => item.passed),
@@ -324,6 +331,7 @@ function buildProductionDbReadinessReport(options = {}) {
     rehearsalEvidence,
     sqliteRuntimeProfile,
     cutoverCenter,
+    postgresMigrationPackage,
     checks
   };
 }
@@ -376,6 +384,9 @@ function renderMarkdown(report) {
     `- Passed samples: ${report.cutoverCenter?.summary?.passedSamples || 0}`,
     `- Rollback checkpoints: ${report.cutoverCenter?.summary?.rollbackCheckpoints || 0}`,
     `- Production-ready runs: ${report.cutoverCenter?.summary?.productionReadyRuns || 0}`,
+    `- PostgreSQL manifest package: ${report.postgresMigrationPackage?.ok ? "verified" : "failed"}`,
+    `- Packaged source records: ${report.postgresMigrationPackage?.manifest?.summary?.records || 0}`,
+    `- Sensitive payload files in CI package: ${report.postgresMigrationPackage?.files?.["records.copy.tsv"] ? "present" : "absent"}`,
     "",
     "| Batch | Domain | Sources | Targets | Owner | Status |",
     "|---|---|---|---|---|---|",
