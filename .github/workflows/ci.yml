@@ -115,6 +115,10 @@ jobs:
         run: npm run release:manifest
       - name: Generate release readiness report
         run: npm run release:report
+      - name: Build immutable production deployment package
+        run: npm run deployment:package -- --strict --release-id=${{ github.sha }}
+      - name: Verify immutable production deployment package
+        run: npm run deployment:verify
       - name: Upload release readiness report
         uses: actions/upload-artifact@v4
         with:

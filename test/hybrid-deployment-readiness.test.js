@@ -18,7 +18,9 @@ test("hybrid deployment readiness validates static and dynamic deployment bounda
   assert.equal(report.topology.staticPreview.snapshotFallback, true);
   assert.equal(report.topology.dynamicBackend.routeCoverage.every((item) => item.present), true);
   assert.equal(report.topology.storageBoundary.postgresBlocked, true);
+  assert.equal(Object.values(report.topology.immutablePackage).every(Boolean), true);
   assert.equal(report.checks.some((item) => item.id === "hybrid:dynamicBackendRoutes" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "hybrid:immutableDeploymentPackage" && item.passed), true);
 
   const markdown = renderMarkdown(report);
   assert.match(markdown, /Hybrid deployment readiness report/);
@@ -31,6 +33,12 @@ test("hybrid deployment readiness fails when a required backend route is absent"
   const report = buildHybridDeploymentReadinessReport({ serverSource });
   assert.equal(report.ok, false);
   assert.equal(report.checks.some((item) => item.id === "hybrid:dynamicBackendRoutes" && !item.passed), true);
+});
+
+test("hybrid deployment readiness fails when deployment package verification is absent", () => {
+  const report = buildHybridDeploymentReadinessReport({ deploymentPackageSource: "function buildProductionDeploymentPackage() {}" });
+  assert.equal(report.ok, false);
+  assert.equal(report.checks.some((item) => item.id === "hybrid:immutableDeploymentPackage" && !item.passed), true);
 });
 
 test("hybrid deployment readiness writes release artifacts", (t) => {

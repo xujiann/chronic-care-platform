@@ -82,6 +82,9 @@ test("release report validates demo and production environment profiles", () => 
       CERTIFICATE_GATEWAY_URL: "https://certificate.example.internal/certificates",
       SIEM_ENDPOINT: "https://siem.example.internal/events",
       SIEM_SIGNING_SECRET: "0123456789abcdef0123456789abcdef",
+      DEPLOYMENT_SECRET_PROVIDER: "vault",
+      DEPLOYMENT_RELEASE_ID: "release-20260711-001",
+      DEPLOYMENT_ARTIFACT_DIGEST: `sha256:${"a".repeat(64)}`,
       AUDIT_EXPORT_PATH: "/var/log/chronic-care-platform/audit"
     }
   });
@@ -118,6 +121,9 @@ test("release report validates demo and production environment profiles", () => 
       CERTIFICATE_GATEWAY_URL: "https://certificate.example.internal/certificates",
       SIEM_ENDPOINT: "https://siem.example.internal/events",
       SIEM_SIGNING_SECRET: "0123456789abcdef0123456789abcdef",
+      DEPLOYMENT_SECRET_PROVIDER: "vault",
+      DEPLOYMENT_RELEASE_ID: "release-20260711-001",
+      DEPLOYMENT_ARTIFACT_DIGEST: `sha256:${"a".repeat(64)}`,
       AUDIT_EXPORT_PATH: "/var/log/chronic-care-platform/audit"
     }
   });
@@ -136,6 +142,9 @@ test("release report validates demo and production environment profiles", () => 
   assert.equal(production.checks.some((item) => item.name === "env:FINANCIAL.secretQuality" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:ALERTING.routes" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:ALERTING.secretQuality" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:DEPLOYMENT.secretProvider" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:DEPLOYMENT.releaseId" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:DEPLOYMENT.artifactDigest" && item.passed), true);
   assert.equal(production.cutoverChecklist.some((item) => item.id === "cutover-institution-interfaces" && !item.passed), true);
   assert.equal(production.cutoverChecklist.some((item) => item.id === "cutover-monitoring" && /missing site signoff/.test(item.evidence)), true);
 
@@ -363,6 +372,11 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.environmentMatrix.ok, true);
   assert.equal(report.checks.some((item) => item.name === "hybridDeployment:readiness" && item.passed), true);
   assert.equal(report.hybridDeploymentReadiness.ok, true);
+  assert.equal(report.checks.some((item) => item.name === "deploymentPackage:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "deploymentPackage:secretBoundary" && item.passed), true);
+  assert.equal(report.productionDeploymentPackage.ok, true);
+  assert.equal(report.productionDeploymentPackage.verification.ok, true);
+  assert.equal(report.productionDeploymentPackage.productionReady, false);
   assert.equal(report.checks.some((item) => item.name === "priorityApps:conversationStarters" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "priorityApps:implementationChecklists" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "priorityApps:acceptanceGates" && item.passed), true);
@@ -664,6 +678,8 @@ test("release report writes standalone production cutover and storage artifacts"
   const environmentMarkdown = fs.readFileSync(path.join(outputDir, "environment-matrix-report.md"), "utf8");
   const hybridDeploymentJson = JSON.parse(fs.readFileSync(path.join(outputDir, "hybrid-deployment-readiness-report.json"), "utf8"));
   const hybridDeploymentMarkdown = fs.readFileSync(path.join(outputDir, "hybrid-deployment-readiness-report.md"), "utf8");
+  const productionDeploymentPackageJson = JSON.parse(fs.readFileSync(path.join(outputDir, "production-deployment-package.json"), "utf8"));
+  const productionDeploymentPackageMarkdown = fs.readFileSync(path.join(outputDir, "production-deployment-package.md"), "utf8");
   const priorityTemplatesJson = JSON.parse(fs.readFileSync(path.join(outputDir, "priority-application-templates.json"), "utf8"));
   const priorityTemplatesMarkdown = fs.readFileSync(path.join(outputDir, "priority-application-templates.md"), "utf8");
   const manifestJson = JSON.parse(fs.readFileSync(path.join(outputDir, "release-artifact-manifest.json"), "utf8"));
@@ -770,6 +786,8 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.match(environmentMarkdown, /Environment matrix report/);
   assert.equal(hybridDeploymentJson.hybridDeploymentReadiness.ok, true);
   assert.match(hybridDeploymentMarkdown, /Hybrid deployment readiness report/);
+  assert.equal(productionDeploymentPackageJson.verification.ok, true);
+  assert.match(productionDeploymentPackageMarkdown, /Production deployment package/);
   assert.equal(priorityTemplatesJson.priorityApplicationTemplates.ok, true);
   assert.equal(priorityTemplatesJson.priorityApplicationTemplates.templates.length, 8);
   assert.equal(priorityTemplatesJson.priorityApplicationTemplates.templates.every((item) => item.conversationStarter && item.acceptanceGate.evidence.length), true);
@@ -783,6 +801,7 @@ test("release report writes standalone production cutover and storage artifacts"
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "chronic-followup"), true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "priority-application-templates"), true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "hybrid-deployment"), true);
+  assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "production-deployment-package"), true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "digital-hospital-standards"), true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "phase2-proposal"), true);
   assert.equal(manifestJson.releaseArtifactManifest.artifacts.some((item) => item.id === "phase2-catalog"), true);

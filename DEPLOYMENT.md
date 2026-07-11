@@ -149,6 +149,11 @@ SIEM_SIGNING_SECRET=replace-with-siem-alert-signing-secret
 ALERTING_TIMEOUT_MS=8000
 ALERTING_MAX_ATTEMPTS=3
 RETENTION_POLICY=10y-worm
+DEPLOYMENT_SECRET_PROVIDER=vault
+DEPLOYMENT_RELEASE_ID=approved-release-id
+DEPLOYMENT_ARTIFACT_DIGEST=sha256:replace-with-64-hex-artifact-digest
+DEPLOYMENT_APP_DIR=/opt/chronic-care-platform/releases/approved-release-id
+DEPLOYMENT_SECRET_ENV_FILE=/run/secrets/chronic-care-platform.env
 ```
 
 生产化如迁移 PostgreSQL 或正式数据库，需要先完成 `productionDeploymentPlan` 中的数据库适配器工作，再填入 `DATABASE_URL`；在适配器启用前，运行时和发布门禁会拒绝 `STORAGE_ENGINE=postgres/postgresql`，避免静默回落到 SQLite。接入政务统一认证时需要填入 `OIDC_ISSUER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET`，可通过 `OIDC_USERINFO_URL` 跳过发现请求；居民端验证码生产上线必须填入 `SMS_GATEWAY_URL/SMS_TEMPLATE_ID`，凭据仅通过环境变量或密钥托管注入。医院连接器至少配置五类 `*_ADAPTER_URL` 和共享 `HOSPITAL_ADAPTER_SECRET`，也可使用每域独立密钥。安全附件需要配置 `OBJECT_STORAGE_GATEWAY_URL/OBJECT_STORAGE_BUCKET/OBJECT_STORAGE_SIGNING_SECRET`，并完成恶意文件扫描和不可变保留锁验收。支付、医保和电子证照必须配置三类 `*_GATEWAY_URL` 与共享或分域 `*_GATEWAY_SECRET`，并完成回调验签、日终对账和联合测试。完整运行时边界见 `docs/production-identity-message-adapters.md`、`docs/production-hospital-connectors.md`、`docs/production-object-storage.md` 和 `docs/production-financial-certificate-gateways.md`。审计保全至少配置 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT`，并补充现场 CA、网关地址等变量。
@@ -162,6 +167,8 @@ npm.cmd run env:check:production
 该命令读取 `.env`，会拒绝缺失环境文件、占位密钥、过短密钥、`STORAGE_ENGINE=json` 和尚未启用的 `postgres/postgresql` 运行时适配器；使用 SQLite 时还会要求 `WAL`、`FULL` 同步和不少于 5000ms 的忙等待配置。生产模式还会要求 OIDC 身份适配、居民端短信网关、医院连接器、对象存储、支付/医保/电子证照网关、SIEM/Webhook 告警路由和审计保全目标配置到位。
 
 生产可观测性闭环使用 `GET /api/observability/alerts`、`POST /api/observability/alerts/dispatch` 和 `POST /api/observability/alert-deliveries/:id/retry`。运行时会对慢请求、集成死信、数据质量、医院运行和高风险审计信号生成去标识化告警；投递失败自动进入运维事件，重放成功后自动关闭。完整边界见 `docs/production-observability-alerting.md`。
+
+生产部署必须先执行 `deployment:package` 生成运行文件 SHA-256 清单、整体制品摘要、进程契约和回滚契约，再执行 `deployment:verify` 复算验证。密钥只允许由 Vault、KMS 或编排器注入，部署包不读取或保存密钥值；systemd 最小权限模板位于 `deploy/chronic-care-platform.service.template`，完整流程见 `docs/production-deployment-automation.md`。
 
 `env:check:production` 和 `release:report` 还会输出 `cutoverChecklist` / `productionCutover`，按环境文件、生产密钥、统一身份、审计保全、存储适配、现场接口联调、医保/证照交换、监控值守和灾备演练列出责任方、阻断状态、当前证据和下一步动作。真实参数到位后，应先让环境与基础设施类通过，再进入外部接口联调和现场测评；外部系统项必须有 `CUTOVER_SITE_INTERFACE_SIGNOFF`、`CUTOVER_INSURANCE_CERTIFICATE_SIGNOFF`、`CUTOVER_MONITORING_SIGNOFF`、`CUTOVER_DR_REHEARSAL_SIGNOFF` 等现场签字信号才会通过。
 
@@ -181,6 +188,8 @@ npm.cmd run priority-apps:templates
 npm.cmd run maternal-child:readiness
 npm.cmd run policy:coverage
 npm.cmd run hybrid:deployment-readiness
+npm.cmd run deployment:package
+npm.cmd run deployment:verify
 ```
 
 本地服务启动后可访问：

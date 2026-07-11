@@ -44,12 +44,14 @@ function buildHybridDeploymentReadinessReport(options = {}) {
   const deployCheckSource = options.deployCheckSource ?? readText("scripts/deploy-check.js");
   const ciSource = options.ciSource ?? readText(".github/workflows/ci.yml");
   const envExample = options.envExample ?? readText(".env.example");
+  const deploymentPackageSource = options.deploymentPackageSource ?? readText("scripts/production-deployment-package.js");
+  const serviceTemplate = options.serviceTemplate ?? readText("deploy/chronic-care-platform.service.template");
 
   const productionTracks = Array.isArray(data.productionDeploymentPlan) ? data.productionDeploymentPlan : [];
-  const requiredScripts = ["dev", "hybrid:deployment-readiness", "deploy:check", "release:report", "release:manifest", "env:check"];
+  const requiredScripts = ["dev", "hybrid:deployment-readiness", "deploy:check", "release:report", "release:manifest", "env:check", "deployment:package", "deployment:verify"];
   const staticEntries = ["index.html", "login.html", "workbench.html", "citizen.html", "institution.html", "insurance.html", "county.html"];
   const dynamicRoutes = ["/api/health", "/api/auth/login", "/api/auth/me", "/api/state", "/api/metrics"];
-  const envVars = ["PORT", "NODE_ENV", "STORAGE_ENGINE", "DATA_DIR", "SESSION_SECRETS", "INTEGRATION_GATEWAY_SECRET"];
+  const envVars = ["PORT", "NODE_ENV", "STORAGE_ENGINE", "DATA_DIR", "SESSION_SECRETS", "INTEGRATION_GATEWAY_SECRET", "DEPLOYMENT_SECRET_PROVIDER", "DEPLOYMENT_RELEASE_ID", "DEPLOYMENT_ARTIFACT_DIGEST"];
 
   const topology = {
     staticPreview: {
@@ -79,6 +81,14 @@ function buildHybridDeploymentReadinessReport(options = {}) {
     },
     environment: {
       variables: envVars.map((name) => ({ name, present: envExample.includes(`${name}=`) }))
+    },
+    immutablePackage: {
+      builder: hasText(deploymentPackageSource, /buildProductionDeploymentPackage/),
+      verifier: hasText(deploymentPackageSource, /verifyProductionDeploymentPackage/),
+      secretReferencesOnly: hasText(deploymentPackageSource, /valuesPersisted:\s*false/),
+      rollbackDigest: hasText(deploymentPackageSource, /requirePreviousArtifactDigest:\s*true/),
+      hardenedService: ["NoNewPrivileges=true", "ProtectSystem=strict", "EnvironmentFile=__SECRET_ENV_FILE__"].every((marker) => serviceTemplate.includes(marker)),
+      ciVerification: ciSource.includes("deployment:package -- --strict") && ciSource.includes("deployment:verify")
     }
   };
 
@@ -90,6 +100,7 @@ function buildHybridDeploymentReadinessReport(options = {}) {
     check("hybrid:dynamicBackendRoutes", topology.dynamicBackend.createServer && topology.dynamicBackend.routeCoverage.every((item) => item.present) && topology.dynamicBackend.authClient, routeDetail, "dynamic-backend"),
     check("hybrid:storageBoundary", topology.storageBoundary.storageEngineGuard && topology.storageBoundary.sqliteMirror && topology.storageBoundary.postgresBlocked && topology.storageBoundary.productionTrack, "auto/sqlite runtime supported; postgres remains guarded until adapter cutover", "storage"),
     check("hybrid:environmentTemplate", topology.environment.variables.every((item) => item.present), envDetail, "environment"),
+    check("hybrid:immutableDeploymentPackage", Object.values(topology.immutablePackage).every(Boolean), "runtime digest, secret references, hardened service, CI verification and rollback digest are wired", "deployment-package"),
     check("hybrid:releaseWiring", topology.releaseWiring.scripts.every((item) => item.present) && topology.releaseWiring.manifest && topology.releaseWiring.releaseReport && topology.releaseWiring.deployCheck, scriptDetail, "release"),
     check("hybrid:ciWiring", topology.releaseWiring.ci, "CI generates hybrid deployment readiness artifact", "release")
   ];

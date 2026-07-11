@@ -52,21 +52,27 @@ function parseArgs(argv = process.argv.slice(2)) {
   };
 }
 
-function buildOfflineChecks() {
+function buildOfflineChecks(options = {}) {
   const pkg = readJson("package.json");
   const serverSource = fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
   const manifestSource = fs.readFileSync(path.join(ROOT, "scripts", "release-artifact-manifest.js"), "utf8");
-  const releaseReport = fs.existsSync(path.join(ROOT, "release", "release-report.json"))
+  const artifactExists = options.artifactExists || ((file) => fs.existsSync(path.join(ROOT, file)));
+  const releaseReport = options.releaseReport !== undefined
+    ? options.releaseReport
+    : artifactExists("release/release-report.json")
     ? readJson("release/release-report.json")
     : null;
-  const cutover = fs.existsSync(path.join(ROOT, "release", "production-cutover-checklist.json"))
+  const cutover = options.cutover !== undefined
+    ? options.cutover
+    : artifactExists("release/production-cutover-checklist.json")
     ? readJson("release/production-cutover-checklist.json")
     : null;
+  const presentArtifacts = REQUIRED_ARTIFACTS.filter(artifactExists);
 
   return [
     check("launch:script", Boolean(pkg.scripts?.["launch:smoke"]), pkg.scripts?.["launch:smoke"] || "missing package script"),
     check("launch:routes", REQUIRED_ROUTES.every((route) => serverSource.includes(route)), `${REQUIRED_ROUTES.length} read-only runtime routes declared`),
-    check("launch:artifacts", REQUIRED_ARTIFACTS.every((file) => fs.existsSync(path.join(ROOT, file))), `${REQUIRED_ARTIFACTS.filter((file) => fs.existsSync(path.join(ROOT, file))).length}/${REQUIRED_ARTIFACTS.length} release artifacts present`),
+    check("launch:artifacts", presentArtifacts.length === REQUIRED_ARTIFACTS.length, `${presentArtifacts.length}/${REQUIRED_ARTIFACTS.length} release artifacts present`),
     check("launch:manifest", ["release-report", "production-cutover", "site-readiness", "monitoring-readiness", "operations-readiness"].every((id) => manifestSource.includes(id)), "release manifest indexes launch smoke evidence"),
     check("launch:releaseReport", releaseReport?.ok === true && releaseReport?.summary?.failed === 0, releaseReport ? `${releaseReport.summary?.passed || 0}/${releaseReport.summary?.total || 0} checks passed` : "release report missing"),
     check("launch:cutoverChecklist", Array.isArray(cutover?.checklist) && cutover.checklist.length >= 8, cutover ? `${cutover.checklist?.length || 0} cutover rows` : "cutover checklist missing")
@@ -96,7 +102,7 @@ async function buildLiveChecks(baseUrl, fetcher = globalThis.fetch) {
 }
 
 async function buildLaunchSmokeReport(options = {}) {
-  const offlineChecks = buildOfflineChecks();
+  const offlineChecks = buildOfflineChecks(options);
   const liveChecks = await buildLiveChecks(options.baseUrl || "", options.fetcher);
   const checks = [...offlineChecks, ...liveChecks];
   return {

@@ -30,6 +30,8 @@ test("platform production audit separates implemented capabilities from producti
   assert.equal(report.summary.cutoverBlocked, 9);
   assert.equal(report.capabilities.every((item) => item.evidenceReady && item.boundary), true);
   assert.equal(report.productionBlockers.every((item) => item.owner && item.evidence && item.doneWhen), true);
+  assert.equal(report.productionBlockers.find((item) => item.id === "P0-01").status, "automation-foundation-ready-site-acceptance-pending");
+  assert.match(report.productionBlockers.find((item) => item.id === "P0-01").progress, /不可变部署包/);
   assert.equal(report.productionBlockers.find((item) => item.id === "P0-02").status, "in-progress-sqlite-profile-ready");
   assert.match(report.productionBlockers.find((item) => item.id === "P0-02").progress, /SQLite WAL/);
   assert.equal(report.productionBlockers.find((item) => item.id === "P0-03").status, "adapter-foundation-ready-site-joint-test-pending");
@@ -45,8 +47,18 @@ test("platform production audit separates implemented capabilities from producti
   assert.equal(report.mvpRequiredModules.find((item) => item.id === "mvp-payment-insurance").status, "adapter-foundation-ready");
   assert.equal(report.mvpRequiredModules.find((item) => item.id === "mvp-object-storage").status, "adapter-foundation-ready");
   assert.equal(report.mvpRequiredModules.find((item) => item.id === "mvp-observability-audit").status, "adapter-foundation-ready");
+  assert.equal(report.mvpRequiredModules.find((item) => item.id === "mvp-secrets-deployment").status, "automation-foundation-ready");
   assert.equal(report.mvpRequiredModules.every((item) => item.remainingCode && item.siteDependency), true);
   assert.deepEqual(report.roadmap.map((item) => item.phase), ["P0 / 0-30 天", "P1 / 31-60 天", "P2 / 61-90 天", "持续优化 / 90 天后"]);
+});
+
+test("platform production audit does not require ignored release artifacts before report generation", () => {
+  const report = buildPlatformProductionAudit({
+    evidenceExists: (item) => !item.startsWith("release/")
+  });
+  assert.equal(report.ok, true);
+  assert.equal(report.capabilities.every((item) => item.evidenceReady), true);
+  assert.equal(report.capabilities.some((item) => item.generatedEvidence.some((evidence) => !evidence.present)), true);
 });
 
 test("platform production audit renders and writes machine-readable and formal reports", (t) => {

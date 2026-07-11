@@ -6,9 +6,14 @@ const test = require("node:test");
 const { buildLaunchSmokeReport, parseArgs, renderMarkdown, writeOutput } = require("../scripts/launch-smoke");
 
 const ROOT = path.resolve(__dirname, "..");
+const RELEASE_FIXTURE = {
+  artifactExists: () => true,
+  releaseReport: { ok: true, summary: { passed: 242, total: 243, failed: 0 } },
+  cutover: { checklist: Array.from({ length: 10 }, (_, index) => ({ id: `cutover-${index + 1}` })) }
+};
 
 test("launch smoke report validates offline runtime routes and release artifacts", async () => {
-  const report = await buildLaunchSmokeReport();
+  const report = await buildLaunchSmokeReport(RELEASE_FIXTURE);
   const markdown = renderMarkdown(report);
 
   assert.equal(report.ok, true);
@@ -33,7 +38,7 @@ test("launch smoke report can run a live health check when a base URL is supplie
     status: 200,
     json: async () => ({ ok: true, url })
   });
-  const report = await buildLaunchSmokeReport({ baseUrl: "http://localhost:5173/", fetcher });
+  const report = await buildLaunchSmokeReport({ ...RELEASE_FIXTURE, baseUrl: "http://localhost:5173/", fetcher });
 
   assert.equal(report.ok, true);
   assert.equal(report.summary.liveChecks, 1);
@@ -48,11 +53,18 @@ test("launch smoke parser and writer keep artifact paths", async (t) => {
   assert.equal(parsed.output, "tmp/launch-smoke-test/report.json");
   assert.equal(parsed.markdown, "tmp/launch-smoke-test/report.md");
 
-  const report = await buildLaunchSmokeReport();
+  const report = await buildLaunchSmokeReport(RELEASE_FIXTURE);
   writeOutput(report, parsed);
 
   const writtenJson = JSON.parse(fs.readFileSync(path.join(outputDir, "report.json"), "utf8"));
   const writtenMarkdown = fs.readFileSync(path.join(outputDir, "report.md"), "utf8");
   assert.equal(writtenJson.ok, true);
   assert.match(writtenMarkdown, /Runtime Routes/);
+});
+
+test("launch smoke remains blocked when generated release evidence is absent", async () => {
+  const report = await buildLaunchSmokeReport({ artifactExists: () => false, releaseReport: null, cutover: null });
+  assert.equal(report.ok, false);
+  assert.equal(report.checks.some((item) => item.id === "launch:artifacts" && !item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "launch:releaseReport" && !item.passed), true);
 });

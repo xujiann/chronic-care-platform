@@ -2812,9 +2812,35 @@ test("financial gateways enforce signed minimized requests and production bounda
   assert.match(read("scripts/release-artifact-manifest.js"), /financial-gateway-readiness-report\.json/);
 });
 
+test("production deployment automation keeps artifacts immutable and secrets external", () => {
+  const deploymentPackage = read("scripts/production-deployment-package.js");
+  const serviceTemplate = read("deploy/chronic-care-platform.service.template");
+  const documentation = read("docs/production-deployment-automation.md");
+  const releaseReport = read("scripts/release-report.js");
+  const deployCheck = read("scripts/deploy-check.js");
+  const ci = read(".github/workflows/ci.yml");
+
+  assert.match(deploymentPackage, /buildProductionDeploymentPackage/);
+  assert.match(deploymentPackage, /verifyProductionDeploymentPackage/);
+  assert.match(deploymentPackage, /DEPLOYMENT_ARTIFACT_DIGEST/);
+  assert.match(deploymentPackage, /valuesPersisted: false/);
+  assert.match(deploymentPackage, /requirePreviousArtifactDigest: true/);
+  assert.match(serviceTemplate, /NoNewPrivileges=true/);
+  assert.match(serviceTemplate, /ProtectSystem=strict/);
+  assert.match(serviceTemplate, /ReadWritePaths=__DATA_DIR__ __LOG_DIR__/);
+  assert.match(documentation, /Vault、KMS 或容器\/进程编排器注入密钥/);
+  assert.match(documentation, /部署包校验通过不等于生产环境已经正式验收/);
+  assert.match(releaseReport, /deploymentPackage:readiness/);
+  assert.match(deployCheck, /deployment:immutablePackage/);
+  assert.match(ci, /deployment:package -- --strict/);
+  assert.match(ci, /deployment:verify/);
+  assert.match(read(".env.example"), /DEPLOYMENT_SECRET_PROVIDER=/);
+  assert.match(read("scripts/release-artifact-manifest.js"), /production-deployment-package\.md/);
+});
+
 test("dated platform development report records verification blockers and next plan", () => {
   const report = read("docs/数智医院标准平台开发报告与下一步计划-2026-07-11.md");
-  ["本轮主要开发成果", "生产可观测性与 SIEM 告警闭环", "正式生产前已实现的主要标准平台功能", "验证证据", "当前生产阻断项", "下一步开发计划", "304/304", "233/234", "195/195", "P0：0-30 天", "P1：31-60 天", "P2：61-90 天"].forEach((marker) => assert.match(report, new RegExp(marker)));
+  ["本轮主要开发成果", "生产可观测性与 SIEM 告警闭环", "不可变部署包与密钥外置", "正式生产前已实现的主要标准平台功能", "验证证据", "当前生产阻断项", "下一步开发计划", "308/308", "242/243", "201/201", "P0：0-30 天", "P1：31-60 天", "P2：61-90 天"].forEach((marker) => assert.match(report, new RegExp(marker)));
   assert.match(read("scripts/release-artifact-manifest.js"), /platform-development-report-20260711/);
   assert.match(read("scripts/deploy-check.js"), /docs:platformDevelopmentReport20260711/);
 });

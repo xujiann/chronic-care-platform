@@ -31,6 +31,7 @@ const { buildInternetNursingReadinessReport, renderMarkdown: renderInternetNursi
 const { buildEnvironmentMatrixReport, renderMarkdown: renderEnvironmentMatrixMarkdown } = require("./environment-matrix");
 const { buildHealthDashboardSummary, buildPriorityApplicationTemplates, renderMarkdown: renderHealthDashboardMarkdown } = require("./health-dashboard-summary");
 const { buildHybridDeploymentReadinessReport, renderMarkdown: renderHybridDeploymentMarkdown } = require("./hybrid-deployment-readiness");
+const { buildProductionDeploymentPackage, verifyProductionDeploymentPackage, renderMarkdown: renderProductionDeploymentMarkdown } = require("./production-deployment-package");
 const { buildIdentityContract, renderMarkdown: renderIdentityContractMarkdown } = require("./identity-contract");
 const { buildIntegrationReadinessReport, renderMarkdown: renderIntegrationReadinessMarkdown } = require("./integration-readiness");
 const { buildObjectStorageReadiness, renderMarkdown: renderObjectStorageMarkdown } = require("./object-storage-readiness");
@@ -124,17 +125,17 @@ function buildProductionCutoverChecklist(env, checks = []) {
       id: "cutover-env-file",
       phase: "environment",
       owner: "platform-ops",
-      passed: ready("env:file", "env:NODE_ENV.production", "env:STORAGE_ENGINE", "env:STORAGE_ENGINE.production"),
-      evidence: detail("env:file", "env:NODE_ENV.production", "env:STORAGE_ENGINE", "env:STORAGE_ENGINE.production"),
-      nextAction: "在目标服务器创建真实 .env，设置 NODE_ENV=production，并确认不使用 JSON 作为生产主存储。"
+      passed: ready("env:file", "env:NODE_ENV.production", "env:STORAGE_ENGINE", "env:STORAGE_ENGINE.production", "env:DEPLOYMENT.releaseId", "env:DEPLOYMENT.artifactDigest"),
+      evidence: detail("env:file", "env:NODE_ENV.production", "env:STORAGE_ENGINE", "env:STORAGE_ENGINE.production", "env:DEPLOYMENT.releaseId", "env:DEPLOYMENT.artifactDigest"),
+      nextAction: "在目标服务器创建真实 .env，设置 NODE_ENV=production，绑定已批准发布编号和不可变制品摘要，并确认不使用 JSON 作为生产主存储。"
     },
     {
       id: "cutover-secrets",
       phase: "security",
       owner: "security-admin",
-      passed: ready("env:SESSION_SECRETS.present", "env:SESSION_SECRETS.productionQuality", "env:INTEGRATION_GATEWAY_SECRET.present", "env:INTEGRATION_GATEWAY_SECRET.productionQuality"),
-      evidence: detail("env:SESSION_SECRETS.present", "env:SESSION_SECRETS.productionQuality", "env:INTEGRATION_GATEWAY_SECRET.present", "env:INTEGRATION_GATEWAY_SECRET.productionQuality"),
-      nextAction: "生成不少于 32 位、非占位的会话密钥和接口网关 HMAC 密钥；按轮换策略把新密钥放在 SESSION_SECRETS 首位。"
+      passed: ready("env:SESSION_SECRETS.present", "env:SESSION_SECRETS.productionQuality", "env:INTEGRATION_GATEWAY_SECRET.present", "env:INTEGRATION_GATEWAY_SECRET.productionQuality", "env:DEPLOYMENT.secretProvider"),
+      evidence: detail("env:SESSION_SECRETS.present", "env:SESSION_SECRETS.productionQuality", "env:INTEGRATION_GATEWAY_SECRET.present", "env:INTEGRATION_GATEWAY_SECRET.productionQuality", "env:DEPLOYMENT.secretProvider"),
+      nextAction: "由 Vault、KMS 或编排器注入不少于 32 位、非占位的会话和接口签名密钥；按轮换策略把新密钥放在 SESSION_SECRETS 首位。"
     },
     {
       id: "cutover-identity",
@@ -217,6 +218,9 @@ function validateProductionConfig(options = {}) {
   const sqliteSynchronous = String(env.SQLITE_SYNCHRONOUS || "").toUpperCase();
   const sqliteBusyTimeout = Number(env.SQLITE_BUSY_TIMEOUT_MS || 0);
   const nodeEnv = String(env.NODE_ENV || "");
+  const deploymentSecretProvider = String(env.DEPLOYMENT_SECRET_PROVIDER || "").trim().toLowerCase();
+  const deploymentReleaseId = String(env.DEPLOYMENT_RELEASE_ID || "").trim();
+  const deploymentArtifactDigest = String(env.DEPLOYMENT_ARTIFACT_DIGEST || "").trim().toLowerCase();
   const alertRouting = alertRoutingCenter(env);
   const alertSecrets = [
     env.SIEM_ENDPOINT ? env.SIEM_SIGNING_SECRET || env.ALERTING_SIGNING_SECRET : "",
@@ -233,7 +237,10 @@ function validateProductionConfig(options = {}) {
     check("env:INTEGRATION_GATEWAY_SECRET.present", Boolean(gatewaySecret), gatewaySecret ? "configured" : "missing", "error", "environment"),
     check("env:INTEGRATION_GATEWAY_SECRET.productionQuality", !strict || secretQuality(gatewaySecret).strongEnough, strict ? "production secret must be non-placeholder and at least 32 chars" : "not enforced outside production", strict ? "error" : "warn", "environment"),
     check("env:ALERTING.routes", alertRouting.adapterReady && configuredAlertInputs.every((item) => item.configured && item.productionHttps), `${alertRouting.summary.configured}/${alertRouting.summary.total} SIEM or webhook routes configured; ${configuredAlertInputs.length} endpoints declared`, strict ? "error" : "warn", "environment"),
-    check("env:ALERTING.secretQuality", !strict || (alertSecrets.length > 0 && alertSecrets.every((secret) => secretQuality(secret).strongEnough)), strict ? "configured alert route secrets must be non-placeholder and at least 32 chars" : "not enforced outside production", strict ? "error" : "warn", "environment")
+    check("env:ALERTING.secretQuality", !strict || (alertSecrets.length > 0 && alertSecrets.every((secret) => secretQuality(secret).strongEnough)), strict ? "configured alert route secrets must be non-placeholder and at least 32 chars" : "not enforced outside production", strict ? "error" : "warn", "environment"),
+    check("env:DEPLOYMENT.secretProvider", !strict || ["vault", "kms", "orchestrator"].includes(deploymentSecretProvider), strict ? deploymentSecretProvider || "missing DEPLOYMENT_SECRET_PROVIDER" : "not enforced outside production", strict ? "error" : "warn", "environment"),
+    check("env:DEPLOYMENT.releaseId", !strict || (Boolean(deploymentReleaseId) && !hasPlaceholder(deploymentReleaseId)), strict ? deploymentReleaseId || "missing DEPLOYMENT_RELEASE_ID" : "not enforced outside production", strict ? "error" : "warn", "environment"),
+    check("env:DEPLOYMENT.artifactDigest", !strict || /^sha256:[a-f0-9]{64}$/.test(deploymentArtifactDigest), strict ? deploymentArtifactDigest || "missing DEPLOYMENT_ARTIFACT_DIGEST" : "not enforced outside production", strict ? "error" : "warn", "environment")
   ];
 
   if (strict) {
@@ -454,6 +461,16 @@ function hybridDeploymentChecks(hybridDeploymentReadiness) {
     check("hybridDeployment:readiness", hybridDeploymentReadiness.ok, hybridDeploymentReadiness.ok ? "hybrid deployment topology checks passed" : "hybrid deployment topology failed", "error", "deployment"),
     check("hybridDeployment:staticPreview", hybridDeploymentReadiness.checks?.some((item) => item.id === "hybrid:staticPreviewBoundary" && item.passed), "GitHub Pages/static preview boundary documented", "error", "deployment"),
     check("hybridDeployment:dynamicBackend", hybridDeploymentReadiness.checks?.some((item) => item.id === "hybrid:dynamicBackendRoutes" && item.passed), "server.js dynamic API routes covered", "error", "deployment")
+  ];
+}
+
+function productionDeploymentPackageChecks(deploymentPackage) {
+  return [
+    check("deploymentPackage:readiness", deploymentPackage.ok && deploymentPackage.verification?.ok, deploymentPackage.ok && deploymentPackage.verification?.ok ? "immutable deployment package and integrity verification passed" : "deployment package or integrity verification failed", "error", "deployment"),
+    check("deploymentPackage:secretBoundary", deploymentPackage.secretContract?.valuesPersisted === false && deploymentPackage.secretContract?.variables?.every((item) => !("value" in item)), `${deploymentPackage.secretContract?.variables?.length || 0} secret references; no values persisted`, "error", "deployment"),
+    check("deploymentPackage:processContract", deploymentPackage.processContract?.healthChecks?.length === 3 && deploymentPackage.processContract?.restartPolicy === "on-failure" && deploymentPackage.processContract?.gracefulShutdownSeconds >= 30, "entrypoint, restart, graceful shutdown and health probes declared", "error", "deployment"),
+    check("deploymentPackage:rollbackContract", deploymentPackage.rollbackContract?.requirePreviousArtifactDigest && deploymentPackage.rollbackContract?.requireStorageBackup, "previous digest and storage backup required before rollback", "error", "deployment"),
+    check("deploymentPackage:productionBoundary", deploymentPackage.productionReady === false && deploymentPackage.blockers?.length >= 6, `${deploymentPackage.blockers?.length || 0} site deployment blockers remain explicit`, "error", "deployment")
   ];
 }
 
@@ -904,6 +921,8 @@ function packageChecks(pkg) {
     "quality-safety:report",
     "environment:matrix",
     "hybrid:deployment-readiness",
+    "deployment:package",
+    "deployment:verify",
     "hospital-operations:readiness",
     "internet-nursing:readiness",
     "health-dashboard:summary",
@@ -1010,6 +1029,8 @@ function buildReleaseReport(options = {}) {
   const evaluationEvidence = buildEvaluationEvidenceReport({ data });
   const environmentMatrix = buildEnvironmentMatrixReport({ data, pkg });
   const hybridDeploymentReadiness = buildHybridDeploymentReadinessReport({ data, pkg });
+  const productionDeploymentPackage = buildProductionDeploymentPackage();
+  productionDeploymentPackage.verification = verifyProductionDeploymentPackage(productionDeploymentPackage);
   const healthDashboard = buildHealthDashboardSummary({ data });
   const priorityApplicationTemplates = buildPriorityApplicationTemplates({ data });
   const maternalChildReadiness = buildMaternalChildReadinessReport({ data, packageSource: JSON.stringify(pkg) });
@@ -1068,6 +1089,7 @@ function buildReleaseReport(options = {}) {
     ...evaluationEvidenceChecks(evaluationEvidence),
     ...environmentMatrixChecks(environmentMatrix),
     ...hybridDeploymentChecks(hybridDeploymentReadiness),
+    ...productionDeploymentPackageChecks(productionDeploymentPackage),
     ...healthDashboardChecks(healthDashboard),
     ...priorityApplicationTemplateChecks(priorityApplicationTemplates),
     ...maternalChildReadinessChecks(maternalChildReadiness),
@@ -1138,6 +1160,7 @@ function buildReleaseReport(options = {}) {
     evaluationEvidence,
     environmentMatrix,
     hybridDeploymentReadiness,
+    productionDeploymentPackage,
     healthDashboard,
     priorityApplicationTemplates,
     maternalChildReadiness,
@@ -1412,6 +1435,10 @@ function renderMarkdown(report) {
     "## Hybrid deployment readiness report",
     "",
     "See `hybrid-deployment-readiness-report.json` and `hybrid-deployment-readiness-report.md` for the static preview layer, Node dynamic backend routes, storage guardrails, environment template, release wiring, and CI evidence.",
+    "",
+    "## Production deployment package",
+    "",
+    "See `production-deployment-package.json` and `production-deployment-package.md` for immutable runtime file hashes, the aggregate artifact digest, secret-reference boundary, process health contract, integrity verification and rollback prerequisites.",
     "",
     "## Health dashboard summary",
     "",
@@ -1805,6 +1832,8 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       hybridDeploymentReadiness: report.hybridDeploymentReadiness
     }, null, 2), "utf8");
+    const productionDeploymentPackageJson = path.join(path.dirname(output), "production-deployment-package.json");
+    fs.writeFileSync(productionDeploymentPackageJson, JSON.stringify(report.productionDeploymentPackage, null, 2), "utf8");
     const healthDashboardJson = path.join(path.dirname(output), "health-dashboard-summary.json");
     fs.writeFileSync(healthDashboardJson, JSON.stringify({
       project: report.project,
@@ -1950,6 +1979,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(environmentMarkdown, renderEnvironmentMatrixMarkdown(report.environmentMatrix), "utf8");
     const hybridDeploymentMarkdown = path.join(path.dirname(markdown), "hybrid-deployment-readiness-report.md");
     fs.writeFileSync(hybridDeploymentMarkdown, renderHybridDeploymentMarkdown(report.hybridDeploymentReadiness), "utf8");
+    const productionDeploymentPackageMarkdown = path.join(path.dirname(markdown), "production-deployment-package.md");
+    fs.writeFileSync(productionDeploymentPackageMarkdown, renderProductionDeploymentMarkdown(report.productionDeploymentPackage, report.productionDeploymentPackage.verification), "utf8");
     const healthDashboardMarkdown = path.join(path.dirname(markdown), "health-dashboard-summary.md");
     fs.writeFileSync(healthDashboardMarkdown, renderHealthDashboardMarkdown(report.healthDashboard), "utf8");
     const priorityApplicationTemplatesMarkdown = path.join(path.dirname(markdown), "priority-application-templates.md");

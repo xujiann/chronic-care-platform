@@ -38,6 +38,7 @@ test("release artifact manifest indexes reports templates commands and evidence"
   assert.equal(report.artifacts.some((item) => item.id === "maternal-child-readiness" && item.command === "maternal-child:readiness" && item.markdown === "release/maternal-child-readiness-report.md" && item.evidence === "maternal-child-about.html"), true);
   assert.equal(report.artifacts.some((item) => item.id === "public-health-readiness" && item.command === "public-health:readiness" && item.markdown === "release/public-health-readiness-report.md" && item.evidence === "/api/public-health/system"), true);
   assert.equal(report.artifacts.some((item) => item.id === "hybrid-deployment" && item.command === "hybrid:deployment-readiness" && item.markdown === "release/hybrid-deployment-readiness-report.md"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "production-deployment-package" && item.command === "deployment:package" && item.markdown === "release/production-deployment-package.md" && item.evidence === "npm run deployment:verify"), true);
   assert.equal(report.artifacts.some((item) => item.id === "multi-practice" && item.command === "multi-practice:readiness" && item.markdown === "release/multi-practice-readiness-report.md" && item.evidence === "/api/multi-practice-registry"), true);
   assert.equal(report.artifacts.some((item) => item.id === "chronic-followup" && item.command === "chronic:followup-readiness"), true);
   assert.equal(report.artifacts.some((item) => item.id === "chronic-institution-interfaces" && item.command === "chronic:institution-interfaces"), true);
@@ -79,6 +80,7 @@ test("release artifact manifest renders and writes artifacts", (t) => {
   assert.match(markdown, /Maternal-child main function and readiness report/);
   assert.match(markdown, /Public health informatization standard readiness report/);
   assert.match(markdown, /Hybrid static preview and dynamic backend readiness/);
+  assert.match(markdown, /Immutable production deployment package and verification/);
   assert.match(markdown, /Doctor multi-practice readiness report/);
   assert.match(markdown, /Template READMEs/);
   assert.match(markdown, /release-artifact-manifest\.md/);

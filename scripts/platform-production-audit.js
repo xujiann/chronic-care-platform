@@ -148,11 +148,11 @@ const MVP_REQUIRED_MODULES = [
   {
     id: "mvp-secrets-deployment",
     name: "密钥配置与自动化部署",
-    status: "foundation-ready",
+    status: "automation-foundation-ready",
     priority: "P0",
-    implemented: "生产环境校验、发布报告、部署检查、回滚快照和启动 smoke",
-    remainingCode: "接入密钥托管、TLS 证书轮换、进程编排、不可变制品和环境级部署流水线",
-    siteDependency: "域名证书、网络区划、主机或容器资源和变更窗口"
+    implemented: "生产环境校验、运行文件 SHA-256 清单、整体制品摘要、密钥引用契约、systemd 最小权限模板、完整性复核、回滚前置条件、CI 制品生成和启动 smoke",
+    remainingCode: "按目标基础设施接入 Vault/KMS、TLS 证书轮换、制品仓库签名证明、环境级部署编排和自动回滚审批",
+    siteDependency: "密钥提供方、域名证书、不可变制品仓库、网络区划、主机或容器资源和变更窗口"
   },
   {
     id: "mvp-security-compliance",
@@ -182,10 +182,14 @@ const PRODUCTION_BLOCKERS = [
   owner,
   evidence,
   doneWhen,
-  status: id === "P0-02"
+  status: id === "P0-01"
+    ? "automation-foundation-ready-site-acceptance-pending"
+    : id === "P0-02"
     ? "in-progress-sqlite-profile-ready"
     : (["P0-03", "P0-04", "P0-05", "P0-06", "P0-08", "P0-09"].includes(id) ? "adapter-foundation-ready-site-joint-test-pending" : "blocked-until-site-evidence"),
-  progress: id === "P0-02"
+  progress: id === "P0-01"
+    ? "已实现不可变部署包、运行文件摘要复核、密钥仅引用不落盘、最小权限进程模板、CI 验证和回滚契约；真实 Vault/KMS、TLS、制品仓库、服务账号和生产 smoke 签字未完成。"
+    : id === "P0-02"
     ? "已实现 SQLite WAL、FULL 同步、外键、忙等待、自动检查点、quick_check 和健康接口运行证据；PostgreSQL、全量迁移和灾备签字仍未完成。"
     : (id === "P0-03"
       ? "已实现 OIDC UserInfo 运行时适配、受控本地账号绑定和配置状态接口；真实目录同步、注销刷新回调、联合测试和签字未完成。"
@@ -204,7 +208,7 @@ const ROADMAP = [
   {
     phase: "P0 / 0-30 天",
     objective: "建立可部署、可联调、可审计的生产基线",
-    deliverables: ["已完成 SQLite 试点生产配置加固；继续 PostgreSQL 适配、全量迁移和原生备份工具", "已完成统一身份和短信通用适配基础；继续真实供应商联调和密钥托管", "已完成医院出站连接器基础；继续厂商协议、字典、网络环境和签名回执联调", "已完成 SIEM/Webhook 告警适配基础；继续目标接收端、WORM 留存、值班升级和生产演练"],
+    deliverables: ["已完成不可变部署包、密钥引用和进程模板；继续 Vault/KMS、TLS、制品仓库和环境级编排", "已完成 SQLite 试点生产配置加固；继续 PostgreSQL 适配、全量迁移和原生备份工具", "已完成统一身份和短信通用适配基础；继续真实供应商联调和密钥托管", "已完成医院出站连接器与 SIEM/Webhook 告警适配基础；继续厂商协议、目标接收端、网络环境和生产演练"],
     exit: "P0-01 至 P0-09 均形成可验证证据，生产配置检查不再使用占位值。"
   },
   {
@@ -256,6 +260,7 @@ function buildPlatformProductionAudit(options = {}) {
   const releaseReport = options.releaseReport || readJson("release/release-report.json");
   const cutoverArtifact = options.cutoverArtifact || readJson("release/production-cutover-checklist.json");
   const cutoverRows = options.cutoverRows || cutoverArtifact.checklist || releaseReport.productionCutover || [];
+  const evidenceExists = options.evidenceExists || exists;
   const scriptSources = options.scriptSources || {
     manifest: read("scripts/release-artifact-manifest.js"),
     deploy: read("scripts/deploy-check.js"),
@@ -264,11 +269,17 @@ function buildPlatformProductionAudit(options = {}) {
   const document = options.document ?? (exists("docs/数智医院标准平台全程审计与生产前开发规划.md")
     ? read("docs/数智医院标准平台全程审计与生产前开发规划.md")
     : "");
-  const capabilities = CAPABILITY_DOMAINS.map((domain) => ({
-    ...domain,
-    evidenceReady: domain.evidence.every(exists),
-    missingEvidence: domain.evidence.filter((item) => !exists(item))
-  }));
+  const capabilities = CAPABILITY_DOMAINS.map((domain) => {
+    const sourceEvidence = domain.evidence.filter((item) => !item.startsWith("release/"));
+    const generatedEvidence = domain.evidence.filter((item) => item.startsWith("release/"));
+    return {
+      ...domain,
+      sourceEvidence,
+      generatedEvidence: generatedEvidence.map((item) => ({ path: item, present: evidenceExists(item) })),
+      evidenceReady: sourceEvidence.every(evidenceExists),
+      missingEvidence: sourceEvidence.filter((item) => !evidenceExists(item))
+    };
+  });
   const passedCutover = cutoverRows.filter((item) => item.passed).length;
   const checks = [
     check("platformAudit:capabilities", capabilities.every((item) => item.evidenceReady), `${capabilities.filter((item) => item.evidenceReady).length}/${capabilities.length} capability domains have repository evidence`),
