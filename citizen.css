@@ -1490,14 +1490,16 @@ body.service-paged-mode .citizen-shell {
 
 .registration-rule-card,
 .registration-schedule-card,
-.registration-order-card {
+.registration-order-card,
+.registration-waitlist-card {
   border-left: 4px solid var(--blue);
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
 .registration-schedule-card,
-.registration-order-card {
+.registration-order-card,
+.registration-waitlist-card {
   display: grid;
   gap: 8px;
   align-content: start;
@@ -1597,6 +1599,31 @@ body.service-paged-mode .citizen-shell {
 
 .registration-order-actions .small-button {
   white-space: nowrap;
+}
+
+.registration-order-actions select {
+  min-height: 40px;
+  min-width: 140px;
+  flex: 1 1 160px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+
+.registration-waitlist-card {
+  border-left-color: var(--amber);
+}
+
+.registration-waitlist-inline {
+  margin: 0;
+  border-left: 4px solid var(--amber);
+  padding: 8px 10px;
+  background: #fffbeb;
+  color: #92400e;
+  font-weight: 700;
 }
 
 .registration-disruption-panel {

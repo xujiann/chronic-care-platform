@@ -2639,9 +2639,65 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(cancelledDisruption.body.order.refundStatus, "refund-pending");
     assert.equal(cancelledDisruption.body.order.notificationDeliveries.some((item) => item.event === "registration-disruption-cancel"), true);
 
+    const waitlistDashboard = await api(baseUrl, "/api/registrations/dashboard", authorized(citizenToken));
+    const fullSchedule = waitlistDashboard.body.schedules.find((item) => item.id === "reg-sch-cardio-waitlist-am");
+    assert.ok(fullSchedule);
+    assert.equal(fullSchedule.remaining, 0);
+    assert.equal(waitlistDashboard.body.integration.exchangeObjects.includes("registrationWaitlistEntries"), true);
+    const joinedWaitlist = await api(baseUrl, "/api/registrations/waitlist", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ residentId: "r1", scheduleId: fullSchedule.id, preferredChannel: "sms", visitType: "onsite", note: "API regression full schedule waitlist" })
+    }));
+    assert.equal(joinedWaitlist.response.status, 201);
+    assert.equal(joinedWaitlist.body.entry.status, "waiting");
+    assert.equal(joinedWaitlist.body.entry.position, 1);
+    assert.deepEqual(joinedWaitlist.body.entry.allowedActions, ["withdraw"]);
+    const duplicateWaitlist = await api(baseUrl, "/api/registrations/waitlist", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ residentId: "r1", scheduleId: fullSchedule.id, preferredChannel: "sms", note: "duplicate waitlist must fail" })
+    }));
+    assert.equal(duplicateWaitlist.response.status, 409);
+    const crossInstitutionWaitlist = await api(baseUrl, `/api/registrations/waitlist/${joinedWaitlist.body.entry.id}/actions`, authorized(disruptionOtherInstitutionLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "promote", note: "other institution cannot promote" })
+    }));
+    assert.equal(crossInstitutionWaitlist.response.status, 403);
+    const promoteWithoutCapacity = await api(baseUrl, `/api/registrations/waitlist/${joinedWaitlist.body.entry.id}/actions`, authorized(hospitalRegistrationToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "promote", note: "capacity is still full", offerMinutes: 30 })
+    }));
+    assert.equal(promoteWithoutCapacity.response.status, 409);
+    const releasedWaitlistSlot = await api(baseUrl, "/api/registrations/orders/reg-r4-waitlist-capacity/cancel", authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ reason: "release slot for automatic waitlist promotion" })
+    }));
+    assert.equal(releasedWaitlistSlot.response.status, 200);
+    const promotedWaitlistDashboard = await api(baseUrl, "/api/registrations/dashboard", authorized(citizenToken));
+    const promotedWaitlist = promotedWaitlistDashboard.body.waitlist.entries.find((item) => item.id === joinedWaitlist.body.entry.id);
+    assert.equal(promotedWaitlist.status, "offer-pending");
+    assert.equal(promotedWaitlist.position, null);
+    assert.deepEqual(promotedWaitlist.allowedActions, ["accept", "decline"]);
+    assert.equal(promotedWaitlist.notificationDeliveries.some((item) => item.event === "registration-waitlist-offer" && item.channel === "sms"), true);
+    assert.equal(promotedWaitlistDashboard.body.schedules.find((item) => item.id === fullSchedule.id).remaining, 0);
+    assert.equal(promotedWaitlistDashboard.body.schedules.find((item) => item.id === fullSchedule.id).waitlistHeld, 1);
+    const acceptedWaitlist = await api(baseUrl, `/api/registrations/waitlist/${joinedWaitlist.body.entry.id}/actions`, authorized(citizenToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "accept", note: "resident accepts automatically promoted slot" })
+    }));
+    assert.equal(acceptedWaitlist.response.status, 200);
+    assert.equal(acceptedWaitlist.body.entry.status, "accepted");
+    assert.equal(acceptedWaitlist.body.order.waitlistEntryId, joinedWaitlist.body.entry.id);
+    assert.equal(acceptedWaitlist.body.order.scheduleId, fullSchedule.id);
+    assert.equal(acceptedWaitlist.body.order.productionReady, false);
+    assert.equal(acceptedWaitlist.body.dashboard.summary.waitlistAccepted >= 1, true);
+    assert.equal(acceptedWaitlist.body.dashboard.schedules.find((item) => item.id === fullSchedule.id).waitlistHeld, 0);
+
     const registrationJourneyAudit = await api(baseUrl, "/api/state", authorized(commissionToken));
     assert.equal(registrationJourneyAudit.body.securityEvents.some((item) => item.action === "registration-journey-action" && item.result === "allowed"), true);
     assert.equal(registrationJourneyAudit.body.securityEvents.some((item) => item.action === "registration-disruption-action" && item.result === "allowed"), true);
+    assert.equal(registrationJourneyAudit.body.securityEvents.some((item) => item.action === "registration-waitlist-join" && item.result === "allowed"), true);
+    assert.equal(registrationJourneyAudit.body.securityEvents.some((item) => item.action === "registration-waitlist-auto-promote" && item.result === "allowed"), true);
+    assert.equal(registrationJourneyAudit.body.securityEvents.some((item) => item.action === "registration-waitlist-action" && item.detail === "accept:accepted"), true);
 
     const callbackCandidate = await api(baseUrl, "/api/registrations/orders", authorized(citizenToken, {
       method: "POST",

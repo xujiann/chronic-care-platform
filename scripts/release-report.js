@@ -568,7 +568,7 @@ function registrationJourneyChecks(registrationJourney) {
   return [
     check("registrationJourney:readiness", registrationJourney.ok, registrationJourney.ok ? "registration journey checks passed" : "registration journey checks failed", "error", "registration-journey"),
     check("registrationJourney:orders", (registrationJourney.center?.summary?.orders || 0) >= 1, `${registrationJourney.center?.summary?.orders || 0} scoped appointment journeys`, "error", "registration-journey"),
-    check("registrationJourney:cross-role", registrationJourney.checks?.filter((item) => ["registrationJourney:citizenUi", "registrationJourney:institutionUi", "registrationJourney:api", "registrationJourney:disruption"].includes(item.id)).every((item) => item.passed), "resident, institution, API and disruption-rescheduling actions are wired", "error", "registration-journey"),
+    check("registrationJourney:cross-role", registrationJourney.checks?.filter((item) => ["registrationJourney:citizenUi", "registrationJourney:institutionUi", "registrationJourney:api", "registrationJourney:disruption", "registrationJourney:waitlist"].includes(item.id)).every((item) => item.passed), "resident, institution, API, disruption-rescheduling and waitlist actions are wired", "error", "registration-journey"),
     check("registrationJourney:production-boundary", registrationJourney.center?.summary?.productionReady === 0 && (registrationJourney.center?.summary?.onsiteBlockers || 0) >= 4, `${registrationJourney.center?.summary?.productionReady || 0} production-ready / ${registrationJourney.center?.summary?.onsiteBlockers || 0} onsite blockers`, "error", "registration-journey")
   ];
 }

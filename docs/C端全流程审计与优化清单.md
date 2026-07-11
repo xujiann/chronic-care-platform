@@ -16,7 +16,7 @@
 | 消息与待办 | 服务待办中心、通知面板 | `/api/messages`、`/api/tasks/:id/actions` | 已实现站内消息、待办确认/取消/反馈/评价状态隐藏 | 短信、订阅消息、APP 推送、送达回执、失败补偿队列 | `test/static.test.js`、消息回执样例 |
 | 护理服务 | `page=nursing` | `/api/internet-nursing/dashboard`、互联网护理订单接口 | 已实现申请、评估、派单、护士接单、服务记录和质控回访演示 | 护士资质、服务目录、知情同意、位置轨迹、费用和监管报送 | `npm.cmd run internet-nursing:readiness` |
 | 陪诊服务 | `page=escort` | `/api/escort-services/orders`、陪诊预约表单 | 已实现预约、取消、医院回执、订单进度和质量反馈 | 服务主体名录、HIS/导诊台、陪诊师签到、合同保险、评价投诉 | `npm.cmd run escort:readiness` |
-| 挂号服务 | `page=registration` | `/api/registrations/orders`、预约动作/停诊改签/取消接口、`/api/registrations/integration-center` | 已实现号源、预约、取消、停诊改签、居民确认或退号、签名回调、死信重试、人工工单和凭证结案演示 | HIS/互联网医院号源、排班变更事件、支付退款、医保电子凭证、真实通知及补偿回执 | `npm.cmd run registration:journey-readiness`、`npm.cmd run registration:integration-readiness` |
+| 挂号服务 | `page=registration` | `/api/registrations/orders`、候补队列、预约动作/停诊改签/取消接口、`/api/registrations/integration-center` | 已实现号源、预约、满号候补、自动补位、限时确认、取消、停诊改签、居民确认或退号、签名回调、死信重试、人工工单和凭证结案演示 | HIS/互联网医院号源、正式锁号、排班变更事件、支付退款、医保电子凭证、真实通知及补偿回执 | `npm.cmd run registration:journey-readiness`、`npm.cmd run registration:integration-readiness` |
 | 移动发布 | `mobile-preview.html`、PWA/小程序/APP 入口 | `manifest.webmanifest`、`service-worker.js`、`mobile-preview.css` | 已实现 390px 手机框、精简预览、滑动切换、离线壳和验收摘要 | 域名备案、HTTPS、隐私协议、APP 签名、推送证书、崩溃监控、真机验收 | `npm.cmd run launch:smoke`、真机截图 |
 
 ## 1. 全流程状态
@@ -32,7 +32,7 @@
 | 查看随访计划 | 已实现 | 展示待随访、完成和逾期状态 |
 | 护理服务 | 已实现 | 居民端分标签进入互联网护理，提交上门护理申请并追踪机构派单、护士接单、服务记录、长期照护评估和照护计划 |
 | 陪诊服务 | 已实现 | 居民端分标签提交助医陪诊预约，记录服务主体、保障类型、合同、保险和回访状态 |
-| 挂号服务 | 已实现 | 居民端已提供演示号源查询、预约确认、停诊改签确认或退号、本地订单、待支付/待医保核验状态和取消规则；生产仍需接入医院 HIS/互联网医院号源池、排班变更、支付、退号和医保电子凭证核验 |
+| 挂号服务 | 已实现 | 居民端已提供演示号源查询、预约确认、满号候补与自动补位、停诊改签确认或退号、本地订单、待支付/待医保核验状态和取消规则；生产仍需接入医院 HIS/互联网医院号源池、正式锁号、排班变更、支付、退号和医保电子凭证核验 |
 | 授权共享 | 已实现 | 可记录授权对象和范围，撤销和访问日志仍需进一步生产化联动 |
 | 手机预览 | 已实现 | `mobile-preview.html` 可模拟移动端，展示本机/真机预览地址、演示登录方式、服务切换控制和底部服务导航检查项，并适配侧边浏览器等中等宽度窗口 |
 | 居民端功能审计 | 已实现 | `citizen.html` 首页展示全功能审计面板，按健康档案、电子病历、护理、陪诊、挂号列出已实现功能、移动端适配和生产边界 |

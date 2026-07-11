@@ -6,12 +6,15 @@ const test = require("node:test");
 const {
   applyRegistrationDisruptionAction,
   applyRegistrationJourneyAction,
+  applyRegistrationWaitlistAction,
   buildRegistrationJourneyCenter,
   buildRegistrationJourneyReadiness,
+  buildRegistrationWaitlistCenter,
   normalizeRegistrationJourneyOrder,
   parseArgs,
   registrationDisruptionAllowedActions,
   registrationJourneyAllowedActions,
+  registrationWaitlistAllowedActions,
   renderMarkdown,
   writeOutput
 } = require("../scripts/registration-journey-readiness");
@@ -148,6 +151,41 @@ test("registration disruption supports institution withdrawal and resident cance
     acknowledgementDueAt: "2026-07-12T18:00:00.000Z",
     at: "2026-07-10T10:00:00.000Z"
   }, { role: "institution" }, replacementSchedule({ departmentCode: "ENDO" })), /same department/);
+});
+
+test("registration waitlist promotes FIFO and closes resident response states", () => {
+  const schedule = replacementSchedule({ id: "reg-sch-full", remaining: 1 });
+  const entries = [
+    { id: "wait-2", residentId: "r4", scheduleId: schedule.id, status: "waiting", joinedAt: "2026-07-11T09:05:00.000Z" },
+    { id: "wait-1", residentId: "r1", scheduleId: schedule.id, status: "waiting", joinedAt: "2026-07-11T09:00:00.000Z" }
+  ];
+  const center = buildRegistrationWaitlistCenter(entries, [schedule], Date.parse("2026-07-11T09:10:00.000Z"));
+  const first = center.entries.find((item) => item.id === "wait-1");
+  const second = center.entries.find((item) => item.id === "wait-2");
+  assert.equal(first.position, 1);
+  assert.equal(second.position, 2);
+  assert.deepEqual(registrationWaitlistAllowedActions(first, { role: "institution" }, first), ["promote"]);
+  assert.deepEqual(registrationWaitlistAllowedActions(second, { role: "institution" }, second), []);
+
+  const offered = applyRegistrationWaitlistAction(first, {
+    action: "promote",
+    note: "released slot offered to first resident",
+    offerMinutes: 30,
+    at: "2026-07-11T09:10:00.000Z"
+  }, { role: "institution", name: "Hospital A" }, first);
+  assert.equal(offered.status, "offer-pending");
+  assert.equal(offered.offerExpiresAt, "2026-07-11T09:40:00.000Z");
+  const offeredContext = buildRegistrationWaitlistCenter([offered], [{ ...schedule, remaining: 0 }], Date.parse("2026-07-11T09:20:00.000Z")).entries[0];
+  assert.deepEqual(registrationWaitlistAllowedActions(offered, { role: "citizen" }, offeredContext), ["accept", "decline"]);
+  const accepted = applyRegistrationWaitlistAction(offered, { action: "accept", note: "resident accepts slot", at: "2026-07-11T09:20:00.000Z" }, { role: "citizen", name: "Resident A" }, offeredContext);
+  assert.equal(accepted.status, "accepted");
+  assert.equal(accepted.productionReady, false);
+
+  const expiredContext = buildRegistrationWaitlistCenter([offered], [{ ...schedule, remaining: 0 }], Date.parse("2026-07-11T10:00:00.000Z")).entries[0];
+  assert.deepEqual(registrationWaitlistAllowedActions(offered, { role: "citizen" }, expiredContext), []);
+  assert.deepEqual(registrationWaitlistAllowedActions(offered, { role: "institution" }, expiredContext), ["expire"]);
+  const expired = applyRegistrationWaitlistAction(offered, { action: "expire", note: "confirmation timeout", at: "2026-07-11T10:00:00.000Z" }, { role: "institution", name: "Hospital A" }, expiredContext);
+  assert.equal(expired.status, "expired");
 });
 
 test("registration journey requires notes and reports production blockers", () => {

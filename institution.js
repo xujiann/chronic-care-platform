@@ -1,4 +1,4 @@
-const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], referralTeleconsultations: [], registrationSchedules: [], registrationOrders: [], medicationPickups: [], chronicScreeningTasks: [], chronicManagementPlans: [], chronicFollowupStatusPolicy: {}, deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthCertificateDocuments: [], birthStatistics: {}, doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {}, taskMessages: [], phase2FamilyDoctorTemplates: [], phase2FamilyDoctorTeams: [], phase2FamilyDoctorServicePackages: [], phase2FamilyDoctorApplications: [], phase2FamilyDoctorContracts: [], phase2FamilyDoctorFulfillments: [] };
+const fallbackState = { residents: [], diseases: [], followups: [], personalRecords: [], careOrders: [], insuranceClaims: [], referralTeleconsultations: [], registrationSchedules: [], registrationOrders: [], registrationWaitlistEntries: [], medicationPickups: [], chronicScreeningTasks: [], chronicManagementPlans: [], chronicFollowupStatusPolicy: {}, deathCertificates: [], deathCertificateForms: [], deathStatistics: {}, birthCertificates: [], birthCertificateForms: [], birthCertificateDocuments: [], birthStatistics: {}, doctorProfiles: [], multiPracticeApplications: [], multiPracticePolicy: {}, taskMessages: [], phase2FamilyDoctorTemplates: [], phase2FamilyDoctorTeams: [], phase2FamilyDoctorServicePackages: [], phase2FamilyDoctorApplications: [], phase2FamilyDoctorContracts: [], phase2FamilyDoctorFulfillments: [] };
 const institutionApiBase = location.protocol === "file:" || location.hostname.endsWith("github.io") ? "" : "/api";
 let platformState = fallbackState;
 let institutionRegistrationDashboard = null;
@@ -110,8 +110,24 @@ function bindInstitutionActions() {
       const familyDoctorFulfillmentButton = event.target.closest("[data-family-doctor-fulfillment]");
       const registrationJourneyButton = event.target.closest("[data-registration-institution-action]");
       const registrationDisruptionButton = event.target.closest("[data-registration-disruption-action]");
+      const registrationWaitlistButton = event.target.closest("[data-registration-waitlist-action]");
       const registrationIntegrationRetryButton = event.target.closest("[data-registration-integration-retry]");
       const registrationReconciliationButton = event.target.closest("[data-registration-reconciliation-action]");
+      if (registrationWaitlistButton) {
+        const entryRow = registrationWaitlistButton.closest("[data-registration-waitlist-entry]");
+        const field = (selector) => entryRow?.querySelector(selector)?.value || "";
+        registrationWaitlistButton.disabled = true;
+        await runInstitutionRegistrationWaitlistAction(
+          registrationWaitlistButton.dataset.registrationWaitlistId,
+          registrationWaitlistButton.dataset.registrationWaitlistAction,
+          {
+            offerMinutes: field("[data-registration-waitlist-offer-minutes]"),
+            note: field("[data-registration-waitlist-note]") || "机构处理预约候补队列"
+          }
+        );
+        registrationWaitlistButton.disabled = false;
+        return;
+      }
       if (registrationDisruptionButton) {
         const orderRow = registrationDisruptionButton.closest("[data-registration-journey-order]");
         const field = (selector) => orderRow?.querySelector(selector)?.value || "";
@@ -1193,6 +1209,22 @@ function institutionRegistrationDisruptionLabel(value) {
   }[value] || value || "待处理";
 }
 
+function institutionRegistrationWaitlistLabel(value) {
+  return {
+    waiting: "候补排队中",
+    "offer-pending": "待居民确认",
+    accepted: "候补已转预约",
+    declined: "居民已拒绝",
+    withdrawn: "居民已退出",
+    expired: "确认已超时"
+  }[value] || value || "待处理";
+}
+
+function institutionRegistrationWaitlistTime(value) {
+  const parsed = new Date(value || "");
+  return Number.isNaN(parsed.getTime()) ? String(value || "待确认") : parsed.toLocaleString("zh-CN", { hour12: false });
+}
+
 function renderRegistrationDisruptionControls(order, schedules = []) {
   const disruption = order.disruption && typeof order.disruption === "object" ? order.disruption : null;
   const disruptionActions = Array.isArray(order.disruptionActions) ? order.disruptionActions : [];
@@ -1267,7 +1299,46 @@ function renderRegistrationJourneyWorkbench(state) {
     </article>`;
   }).join("") || `<p class="muted">本机构暂无预约就诊订单。</p>`;
   boundaryTarget.textContent = dashboard.journey?.boundary || "本工作台动作仅为本地业务闭环证据，生产仍需 HIS、支付退款和医保结算接口。";
+  renderRegistrationWaitlistWorkbench(dashboard.waitlist || {});
   renderRegistrationIntegrationCenter(dashboard.integrationCenter || {});
+}
+
+function renderRegistrationWaitlistWorkbench(center = {}) {
+  const statusTarget = document.querySelector("#registration-waitlist-status");
+  const metricsTarget = document.querySelector("#registration-waitlist-metrics");
+  const entriesTarget = document.querySelector("#registration-waitlist-entries");
+  const boundaryTarget = document.querySelector("#registration-waitlist-boundary");
+  if (!statusTarget || !metricsTarget || !entriesTarget || !boundaryTarget) return;
+  const summary = center.summary || {};
+  const entries = center.entries || [];
+  statusTarget.textContent = `${Number(summary.waiting || 0)} 人候补 · ${Number(summary.offers || 0)} 人待确认`;
+  const metrics = [
+    ["候补排队", summary.waiting || 0, "FIFO 队列"],
+    ["待居民确认", summary.offers || 0, "限时占号"],
+    ["确认超时", summary.overdueOffers || 0, "释放递补"],
+    ["已转预约", summary.accepted || 0, "闭环订单"]
+  ];
+  metricsTarget.innerHTML = metrics.map(([name, value, detail]) => `<article class="metric-card"><span>${name}</span><strong>${Number(value || 0)}</strong><small>${detail}</small></article>`).join("");
+  entriesTarget.innerHTML = entries.map((entry) => {
+    const actions = Array.isArray(entry.allowedActions) ? entry.allowedActions : [];
+    const schedule = entry.schedule || {};
+    const offerControls = actions.includes("promote") ? `<div class="action-row">
+      <select class="inline-action-select" aria-label="候补确认时限" data-registration-waitlist-offer-minutes><option value="15">15 分钟</option><option value="30" selected>30 分钟</option><option value="60">60 分钟</option></select>
+      <input class="inline-action-input" type="text" maxlength="200" aria-label="候补补位说明" data-registration-waitlist-note value="释放号源按 FIFO 顺序自动补位">
+      <button type="button" class="inline-action" data-registration-waitlist-id="${institutionEscapeHtml(entry.id)}" data-registration-waitlist-action="promote">发送候补号源</button>
+    </div>` : "";
+    const expireControls = actions.includes("expire") ? `<div class="action-row"><input class="inline-action-input" type="text" maxlength="200" aria-label="候补超时释放说明" data-registration-waitlist-note value="居民确认超时，释放号源并递补下一位"><button type="button" class="inline-action" data-registration-waitlist-id="${institutionEscapeHtml(entry.id)}" data-registration-waitlist-action="expire">释放并递补</button></div>` : "";
+    return `<section class="item" data-registration-waitlist-entry="${institutionEscapeHtml(entry.id)}">
+      <div>
+        <h3>${institutionEscapeHtml(entry.residentName || entry.residentId)} · ${institutionEscapeHtml(schedule.department || entry.department || "门诊")}</h3>
+        <p>${institutionEscapeHtml(schedule.date || entry.appointmentDate || "待确认")} ${institutionEscapeHtml(schedule.period || entry.period || "")} · ${institutionEscapeHtml(schedule.doctor || entry.doctor || "医生待确认")} · 余号 ${Number(schedule.remaining || 0)}</p>
+        <small>${entry.position ? `候补第 ${Number(entry.position)} 位 · ` : ""}${institutionEscapeHtml(institutionRegistrationWaitlistLabel(entry.status))}${entry.offerExpiresAt ? ` · 确认截止 ${institutionEscapeHtml(institutionRegistrationWaitlistTime(entry.offerExpiresAt))}` : ""}</small>
+        ${offerControls}${expireControls}
+      </div>
+      <span class="badge ${entry.offerExpired ? "danger" : entry.status === "offer-pending" ? "warn" : entry.status === "accepted" ? "info" : ""}">${institutionEscapeHtml(institutionRegistrationWaitlistLabel(entry.status))}</span>
+    </section>`;
+  }).join("") || `<p class="muted">本机构暂无预约候补记录。</p>`;
+  boundaryTarget.textContent = center.boundary || "候补补位仅形成本地号源占用与通知证据，生产仍需 HIS 锁号和正式送达回执。";
 }
 
 function renderRegistrationReconciliationControls(event) {
@@ -1484,6 +1555,34 @@ async function runInstitutionRegistrationDisruptionAction(orderId, action, field
     return { ok: true, order: result.order };
   } catch (error) {
     if (boundaryTarget) boundaryTarget.textContent = error.message || "停诊改签操作失败。";
+    return { ok: false, message: error.message };
+  }
+}
+
+async function runInstitutionRegistrationWaitlistAction(entryId, action, fields = {}) {
+  const boundaryTarget = document.querySelector("#registration-waitlist-boundary");
+  if (!institutionApiBase) {
+    if (boundaryTarget) boundaryTarget.textContent = "静态预览不提交候补补位操作。";
+    return { ok: false, message: "静态预览不可操作" };
+  }
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${institutionApiBase}/registrations/waitlist/${encodeURIComponent(entryId)}/actions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, note: fields.note, offerMinutes: Number(fields.offerMinutes || 30) })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.message || `HTTP ${response.status}`);
+    institutionRegistrationDashboard = payload.dashboard || await loadRegistrationJourneyDashboard();
+    renderRegistrationJourneyWorkbench(platformState);
+    const refreshedBoundary = document.querySelector("#registration-waitlist-boundary");
+    if (refreshedBoundary) refreshedBoundary.textContent = action === "promote"
+      ? "候补号源已按 FIFO 顺序发送并进入限时占号；生产就绪仍为否。"
+      : "超时候补已释放，系统已尝试自动递补下一位；生产就绪仍为否。";
+    return { ok: true, entry: payload.entry };
+  } catch (error) {
+    if (boundaryTarget) boundaryTarget.textContent = error.message || "候补队列操作失败。";
     return { ok: false, message: error.message };
   }
 }

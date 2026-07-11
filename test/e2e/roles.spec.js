@@ -364,6 +364,49 @@ test("hospital disruption notice is accepted by the resident on mobile", async (
   await expect(citizenRow.getByRole("button", { name: "确认改签" })).toHaveCount(0);
 });
 
+test("full appointment schedule automatically promotes the first waitlist resident", async ({ page, request }, testInfo) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const loginResponse = await request.post("/api/auth/login", { data: { username: "citizen", password: "123456" } });
+  expect(loginResponse.ok()).toBe(true);
+  const citizenToken = (await loginResponse.json()).token;
+
+  await login(page, "citizen", "citizen.html");
+  await page.goto("/citizen.html?client=app&page=registration#service-registration");
+  const fullScheduleCard = page.locator(".registration-schedule-card", { hasText: "Doctor Sun" });
+  await expect(fullScheduleCard).toContainText("余号 0 个");
+  await expect(fullScheduleCard.getByRole("button", { name: "加入候补" })).toHaveCount(1);
+  await fullScheduleCard.getByLabel("候补通知方式").selectOption("sms");
+  await fullScheduleCard.getByRole("button", { name: "加入候补" }).click();
+  const waitingCard = page.locator("[data-registration-waitlist-entry]", { hasText: "Doctor Sun" });
+  await expect(waitingCard).toContainText("候补排队中");
+  await expect(waitingCard).toContainText("当前第 1 位");
+
+  const releaseResponse = await request.post("/api/registrations/orders/reg-r4-waitlist-capacity/cancel", {
+    headers: { Authorization: `Bearer ${citizenToken}` },
+    data: { reason: "E2E cancellation releases the full schedule slot" }
+  });
+  expect(releaseResponse.status()).toBe(200);
+  await page.reload();
+  const offerCard = page.locator("[data-registration-waitlist-entry]", { hasText: "Doctor Sun" });
+  await expect(offerCard).toContainText("号源待我确认");
+  await expect(offerCard.getByRole("button", { name: "确认候补号源" })).toHaveCount(1);
+  await offerCard.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("citizen-registration-waitlist-offer-mobile.png") });
+  const waitlistLayout = await offerCard.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return { left: rect.left, right: rect.right, viewportWidth: document.documentElement.clientWidth, pageOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+  });
+  expect(waitlistLayout.pageOverflow).toBe(false);
+  expect(waitlistLayout.left).toBeGreaterThanOrEqual(0);
+  expect(waitlistLayout.right).toBeLessThanOrEqual(waitlistLayout.viewportWidth);
+  await offerCard.getByRole("button", { name: "确认候补号源" }).click();
+  await expect(offerCard).toContainText("候补已转预约");
+  await expect(offerCard.getByRole("button", { name: "确认候补号源" })).toHaveCount(0);
+  await expect(page.locator("[data-registration-order]", { hasText: "Doctor Sun" })).toContainText("候补");
+  await expect(page.locator("#registration-journey-timeline")).toContainText("候补待确认");
+});
+
 test("registration journey crosses resident and institution portals", async ({ page }) => {
   test.setTimeout(60_000);
   const orderId = "reg-r1-20260630-cardio";

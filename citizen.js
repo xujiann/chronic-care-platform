@@ -254,6 +254,7 @@ function mobileServiceBadgeLabel(tab, active) {
 
 const registrationSchedules = [
   { id: "reg-sch-cardio-am", hospital: "大连市中心医院", department: "心内科", doctor: "王医生", date: todayOffset(2), period: "上午", remaining: 6, fee: 18, cancelBeforeHours: 24, source: "医院号源池", tags: ["高血压复诊", "支持陪诊"] },
+  { id: "reg-sch-cardio-waitlist-am", hospital: "大连市中心医院", department: "心内科", doctor: "孙医生", date: todayOffset(1), period: "上午", remaining: 0, fee: 18, cancelBeforeHours: 12, source: "医院号源池", tags: ["号源已满", "支持候补"] },
   { id: "reg-sch-endocrine-pm", hospital: "大连医科大学附属医院", department: "内分泌科", doctor: "赵医生", date: todayOffset(3), period: "下午", remaining: 4, fee: 22, cancelBeforeHours: 12, source: "医院号源池", tags: ["糖尿病复诊", "检查解读"] },
   { id: "reg-sch-community-am", hospital: "青泥洼桥社区卫生服务中心", department: "全科门诊", doctor: "刘医生", date: todayOffset(1), period: "上午", remaining: 12, fee: 8, cancelBeforeHours: 4, source: "基层预约池", tags: ["家庭医生", "慢病随访"] }
 ];
@@ -264,7 +265,7 @@ const citizenModuleInterfaces = [
   { module: "护理", status: "已实现", api: "/api/internet-nursing/dashboard, /api/internet-nursing/orders", collections: "internetNursingOrders, internetNursingNurses, taskMessages, citizenExtra.longTermCareAssessments", boundary: "生产需补齐护士资质、电子签名、定位轨迹、长期护理险和质控监管接入" },
   { module: "陪诊", status: "已实现", api: "/api/escort-services/dashboard, /api/escort-services/orders, /api/messages", collections: "escortServiceOrders, escortServiceProviders, escortWorkers, taskMessages", boundary: "生产需对接医院接诊回执、保险保障和陪诊服务主体监管" },
   { module: "家医", status: "已实现", api: "/api/phase2/family-doctor-contracts, /api/phase2/family-doctor-contracts/applications", collections: "phase2FamilyDoctorTemplates, phase2FamilyDoctorTeams, phase2FamilyDoctorServicePackages, phase2FamilyDoctorApplications, phase2FamilyDoctorContracts, phase2FamilyDoctorFulfillments", boundary: "生产需接入居民实名签约、电子签名、服务包资金口径和基层机构正式签章" },
-  { module: "挂号", status: "已实现", api: "/api/registrations/dashboard, /api/registrations/orders, /api/registrations/orders/:id/actions, /api/registrations/orders/:id/cancel", collections: "registrationSchedules, registrationOrders, taskMessages", boundary: "已具备 HIS/互联网医院号源、支付、医院确认、报到、完诊、退号退款、医保电子凭证和短信通知契约，生产需替换真实网关" },
+  { module: "挂号", status: "已实现", api: "/api/registrations/dashboard, /api/registrations/orders, /api/registrations/waitlist, /api/registrations/orders/:id/actions, /api/registrations/orders/:id/cancel", collections: "registrationSchedules, registrationOrders, registrationWaitlistEntries, taskMessages", boundary: "已具备 HIS/互联网医院号源、候补补位、支付、医院确认、报到、完诊、退号退款、医保电子凭证和短信通知契约，生产需替换真实网关" },
   { module: "消息与待办", status: "已实现", api: "/api/messages, /api/tasks/:id/actions", collections: "taskMessages, service tasks, dataAccessLogs", boundary: "生产需接入真实短信、订阅消息、站内信送达回执和审计保全" }
 ];
 
@@ -965,6 +966,7 @@ async function fetchCitizenRegistrationDashboard() {
     schedules: Array.isArray(state.registrationSchedules) && state.registrationSchedules.length ? state.registrationSchedules : registrationSchedules,
     orders: Array.isArray(state.registrationOrders) ? state.registrationOrders : [],
     summary: {},
+    waitlist: { summary: {}, entries: [], boundary: "静态预览不提交候补队列操作。" },
     integration: { status: "static-preview" }
   };
 }
@@ -3071,7 +3073,54 @@ function renderRegistrationDisruptionPanel(order) {
   </section>`;
 }
 
-function renderRegistrationJourneySummary(orders) {
+function citizenRegistrationWaitlistLabel(value) {
+  return {
+    waiting: "候补排队中",
+    "offer-pending": "号源待我确认",
+    accepted: "候补已转预约",
+    declined: "已拒绝候补号源",
+    withdrawn: "已退出候补",
+    expired: "确认已超时"
+  }[value] || value || "待处理";
+}
+
+function citizenRegistrationWaitlistTime(value) {
+  const parsed = new Date(value || "");
+  return Number.isNaN(parsed.getTime()) ? String(value || "待确认") : parsed.toLocaleString("zh-CN", { hour12: false });
+}
+
+function activeRegistrationWaitlistEntries(residentId) {
+  return (registrationDashboard?.waitlist?.entries || []).filter((entry) => entry.residentId === residentId);
+}
+
+function renderRegistrationWaitlistCards(residentId) {
+  const target = document.querySelector("#registration-waitlist-cards");
+  const boundary = document.querySelector("#registration-waitlist-boundary");
+  if (!target || !boundary) return;
+  const entries = activeRegistrationWaitlistEntries(residentId);
+  target.innerHTML = entries.map((entry) => {
+    const schedule = entry.schedule || {};
+    const actions = Array.isArray(entry.allowedActions) ? entry.allowedActions : [];
+    const actionButtons = [
+      actions.includes("accept") ? `<button type="button" class="small-button primary" data-registration-waitlist-action="accept" data-registration-waitlist-id="${escapeHtml(entry.id)}">确认候补号源</button>` : "",
+      actions.includes("decline") ? `<button type="button" class="small-button danger" data-registration-waitlist-action="decline" data-registration-waitlist-id="${escapeHtml(entry.id)}">放弃本次号源</button>` : "",
+      actions.includes("withdraw") ? `<button type="button" class="small-button" data-registration-waitlist-action="withdraw" data-registration-waitlist-id="${escapeHtml(entry.id)}">退出候补</button>` : ""
+    ].filter(Boolean).join("");
+    return `<article class="mini-card registration-waitlist-card" data-registration-waitlist-entry="${escapeHtml(entry.id)}">
+      <h3>${escapeHtml(formatRegistrationHospital(schedule.hospital || entry.hospital))} · ${escapeHtml(formatRegistrationDepartment(schedule.department || entry.department))}</h3>
+      <p class="muted">${escapeHtml(schedule.date || entry.appointmentDate || "待确认")} ${escapeHtml(schedule.period || entry.period || "")} · ${escapeHtml(formatRegistrationDoctor(schedule.doctor || entry.doctor))}</p>
+      <p>${entry.position ? `当前第 ${Number(entry.position)} 位 · ` : ""}${escapeHtml(citizenRegistrationWaitlistLabel(entry.status))}${entry.offerExpiresAt ? ` · 确认截止 ${escapeHtml(citizenRegistrationWaitlistTime(entry.offerExpiresAt))}` : ""}</p>
+      <p>通知方式 ${escapeHtml(entry.preferredChannel || "sms")} · 生产：否</p>
+      ${actionButtons ? `<div class="registration-order-actions">${actionButtons}</div>` : ""}
+    </article>`;
+  }).join("") || `<p class="muted">暂无候补记录。满号时可在号源卡片加入候补队列。</p>`;
+  boundary.textContent = registrationDashboard?.waitlist?.boundary || "候补补位仅作为本地流程证据，生产仍需 HIS 锁号和正式通知回执。";
+  target.querySelectorAll("[data-registration-waitlist-action]").forEach((button) => {
+    button.addEventListener("click", () => runRegistrationWaitlistAction(residentId, button.dataset.registrationWaitlistId, button.dataset.registrationWaitlistAction, button));
+  });
+}
+
+function renderRegistrationJourneySummary(orders, waitlistEntries = []) {
   const target = document.querySelector("#registration-journey-timeline");
   if (!target) return;
   const metrics = [
@@ -3080,7 +3129,9 @@ function renderRegistrationJourneySummary(orders) {
     ["已报到", orders.filter((item) => item.checkInStatus === "checked-in-demo").length, "到院闭环"],
     ["退款处理中", orders.filter((item) => item.refundStatus === "refund-pending").length, "机构处理"],
     ["待确认改签", orders.filter((item) => item.disruption?.status === "pending-resident").length, "停诊变更"],
-    ["已确认改签", orders.filter((item) => item.disruption?.status === "accepted").length, "新号源"]
+    ["已确认改签", orders.filter((item) => item.disruption?.status === "accepted").length, "新号源"],
+    ["候补排队", waitlistEntries.filter((item) => item.status === "waiting").length, "等待余号"],
+    ["候补待确认", waitlistEntries.filter((item) => item.status === "offer-pending").length, "限时占号"]
   ];
   target.innerHTML = metrics.map(([name, value, detail]) => `<article><strong>${name}</strong><span>${value} 条 · ${detail}</span></article>`).join("");
 }
@@ -3092,26 +3143,38 @@ function renderRegistration(residentId) {
   const summary = document.querySelector("#registration-summary");
   if (!form || !scheduleCards || !orderCards) return;
   const schedules = activeRegistrationSchedules();
+  const availableSchedules = schedules.filter((item) => item.status !== "closed" && Number(item.remaining || 0) > 0);
+  const waitlistEntries = activeRegistrationWaitlistEntries(residentId);
   const selected = form.elements.scheduleId.value;
-  form.elements.scheduleId.innerHTML = schedules.map((item) => `<option value="${item.id}">${formatRegistrationHospital(item.hospital)} · ${formatRegistrationDepartment(item.department)} · ${item.date} ${item.period} · ${item.remaining} 个号</option>`).join("");
-  if (selected && schedules.some((item) => item.id === selected)) form.elements.scheduleId.value = selected;
+  form.elements.scheduleId.innerHTML = availableSchedules.map((item) => `<option value="${item.id}">${formatRegistrationHospital(item.hospital)} · ${formatRegistrationDepartment(item.department)} · ${item.date} ${item.period} · ${item.remaining} 个号</option>`).join("");
+  if (selected && availableSchedules.some((item) => item.id === selected)) form.elements.scheduleId.value = selected;
+  form.querySelector("button[type='submit']").disabled = availableSchedules.length === 0;
+  const orders = activeRegistrationOrders(residentId);
   scheduleCards.innerHTML = schedules.map((item) => {
     const tags = (item.tags || []).map(formatRegistrationTag).filter(Boolean);
+    const activeWaitlist = waitlistEntries.find((entry) => entry.scheduleId === item.id && ["waiting", "offer-pending"].includes(entry.status));
+    const activeOrder = orders.find((order) => order.scheduleId === item.id && !["cancelled", "completed", "closed"].includes(order.status));
+    const full = item.status !== "closed" && Number(item.remaining || 0) <= 0;
+    const waitlistControls = full && !activeWaitlist && !activeOrder ? `<div class="registration-order-actions" data-registration-waitlist-join-form>
+      <select aria-label="候补通知方式" data-registration-waitlist-channel><option value="sms">短信优先</option><option value="in_app">站内信</option><option value="phone">电话联系</option></select>
+      <button type="button" class="small-button" data-registration-waitlist-join="${escapeHtml(item.id)}">加入候补</button>
+    </div>` : activeWaitlist ? `<p class="registration-waitlist-inline">${escapeHtml(citizenRegistrationWaitlistLabel(activeWaitlist.status))}${activeWaitlist.position ? ` · 第 ${Number(activeWaitlist.position)} 位` : ""}</p>` : activeOrder ? `<p class="registration-waitlist-inline">该号源已有预约订单</p>` : "";
     return `<article class="mini-card registration-schedule-card">
     <h3>${formatRegistrationHospital(item.hospital)} · ${formatRegistrationDepartment(item.department)}</h3>
     <p class="muted">${item.date} ${item.period} · ${formatRegistrationDoctor(item.doctor)} · ${formatRegistrationSource(item.source || item.sourceSystem)}</p>
     <p>HIS号源 ${item.hisScheduleId || item.id} · 余号 ${item.remaining} 个 · 挂号费 ${item.fee} 元</p>
     <p>支付 ${item.paymentRequired === false ? "免预付" : "待支付"} · 医保 ${item.insuranceSupported === false ? "不支持" : "电子凭证预核验"} · ${item.cancelBeforeHours} 小时前可取消</p>
     <div class="visit-tags">${tags.map((tag) => `<span class="tag">${tag}</span>`).join("")}</div>
+    ${waitlistControls}
   </article>`;
   }).join("");
-  const orders = activeRegistrationOrders(residentId);
-  renderRegistrationJourneySummary(orders);
+  renderRegistrationJourneySummary(orders, waitlistEntries);
+  renderRegistrationWaitlistCards(residentId);
   if (summary) {
     const openOrders = orders.filter((item) => canCancelRegistration(item)).length;
     const hisOrders = orders.filter((item) => item.hisVisitId || item.registrationNo).length;
     const insuranceReady = orders.filter((item) => item.insuranceStatus === "prechecked").length;
-    summary.textContent = `${schedules.length} 个可约号源 · ${orders.length} 个我的挂号 · HIS ${hisOrders} 个回执 · 医保 ${insuranceReady} 个预核验 · ${openOrders} 个可操作`;
+    summary.textContent = `${availableSchedules.length} 个可约号源 · ${waitlistEntries.filter((item) => ["waiting", "offer-pending"].includes(item.status)).length} 个候补 · ${orders.length} 个我的挂号 · HIS ${hisOrders} 个回执 · 医保 ${insuranceReady} 个预核验 · ${openOrders} 个可操作`;
   }
   orderCards.innerHTML = orders
     .sort((a, b) => String(a.appointmentDate || "").localeCompare(String(b.appointmentDate || "")))
@@ -3139,6 +3202,12 @@ function renderRegistration(residentId) {
   });
   orderCards.querySelectorAll("[data-registration-disruption-action]").forEach((button) => {
     button.addEventListener("click", () => runRegistrationDisruptionAction(residentId, button.dataset.registrationId, button.dataset.registrationDisruptionAction, button));
+  });
+  scheduleCards.querySelectorAll("[data-registration-waitlist-join]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const formRow = button.closest("[data-registration-waitlist-join-form]");
+      joinRegistrationWaitlist(residentId, button.dataset.registrationWaitlistJoin, formRow?.querySelector("[data-registration-waitlist-channel]")?.value || "sms", button);
+    });
   });
 }
 
@@ -3206,6 +3275,68 @@ async function runRegistrationDisruptionAction(residentId, orderId, action, butt
     showToast(action === "accept" ? "改签已确认，原号源已释放，新号源等待医院确认" : "已选择退号，退款状态和通知已同步");
   } catch (error) {
     showToast(error.message || "停诊改签处理失败");
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+async function joinRegistrationWaitlist(residentId, scheduleId, preferredChannel, button) {
+  if (button) button.disabled = true;
+  try {
+    if (!API_BASE) throw new Error("静态预览不提交预约候补");
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${API_BASE}/registrations/waitlist`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        residentId,
+        scheduleId,
+        preferredChannel,
+        visitType: "onsite",
+        note: "居民在满号后申请进入预约候补队列"
+      })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.message || `HTTP ${response.status}`);
+    registrationDashboard = payload.dashboard || await fetchCitizenRegistrationDashboard();
+    citizenMessages = await fetchCitizenMessages();
+    renderCitizen(residentId);
+    showToast(`已加入候补队列，当前第 ${Number(payload.entry?.position || 1)} 位`);
+  } catch (error) {
+    showToast(error.message || "加入候补失败");
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+async function runRegistrationWaitlistAction(residentId, entryId, action, button) {
+  if (button) button.disabled = true;
+  const notes = {
+    accept: "居民确认候补号源并生成预约订单",
+    decline: "居民放弃本次候补号源，继续递补下一位",
+    withdraw: "居民主动退出预约候补队列"
+  };
+  try {
+    if (!API_BASE) throw new Error("静态预览不提交候补操作");
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${API_BASE}/registrations/waitlist/${encodeURIComponent(entryId)}/actions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, note: notes[action] || "居民处理预约候补" })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.message || `HTTP ${response.status}`);
+    registrationDashboard = payload.dashboard || await fetchCitizenRegistrationDashboard();
+    citizenMessages = await fetchCitizenMessages();
+    renderCitizen(residentId);
+    const messages = {
+      accept: "候补号源已确认，预约订单已经生成",
+      decline: "已放弃本次号源，系统将递补下一位",
+      withdraw: "已退出候补队列"
+    };
+    showToast(messages[action] || "候补状态已更新");
+  } catch (error) {
+    showToast(error.message || "候补操作失败");
   } finally {
     if (button) button.disabled = false;
   }

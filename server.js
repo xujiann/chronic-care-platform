@@ -10,10 +10,14 @@ const { buildReleaseArtifactManifest } = require("./scripts/release-artifact-man
 const {
   applyRegistrationDisruptionAction,
   applyRegistrationJourneyAction,
+  applyRegistrationWaitlistAction,
   buildRegistrationJourneyCenter,
+  buildRegistrationWaitlistCenter,
   normalizeRegistrationJourneyOrder,
+  normalizeRegistrationWaitlistEntry,
   registrationDisruptionAllowedActions,
-  registrationJourneyAllowedActions
+  registrationJourneyAllowedActions,
+  registrationWaitlistAllowedActions
 } = require("./scripts/registration-journey-readiness");
 const {
   APPOINTMENT_CONTRACT_ID,
@@ -1366,6 +1370,32 @@ function seedRegistrationSchedules() {
       hospitalDepartmentContact: "Cardiology outpatient guidance desk"
     },
     {
+      id: "reg-sch-cardio-waitlist-am",
+      hisScheduleId: "HIS-SCH-MR1-CARD-WAITLIST-AM",
+      hospitalCode: "MR1",
+      hospital: "Dalian Central Hospital outpatient clinic demo",
+      departmentCode: "CARD",
+      department: "Cardiology",
+      doctorCode: "DOC-CARD-04",
+      doctor: "Doctor Sun",
+      date: todayOffset(1),
+      period: "AM",
+      source: "HIS outpatient source pool",
+      sourceSystem: "hospital-HIS",
+      sourceType: "hospital-his",
+      remaining: 0,
+      total: 18,
+      fee: 18,
+      paymentRequired: true,
+      insuranceSupported: true,
+      medicalInsuranceItemCode: "MI-OP-CARD-REG",
+      cancelBeforeHours: 12,
+      tags: ["full-capacity", "waitlist-enabled"],
+      status: "available",
+      lockMinutes: 10,
+      hospitalDepartmentContact: "Cardiology outpatient guidance desk"
+    },
+    {
       id: "reg-sch-endocrine-pm",
       hisScheduleId: "IH-SCH-MR2-ENDO-20260701-PM",
       hospitalCode: "MR2",
@@ -1465,8 +1495,56 @@ function seedRegistrationOrders() {
       createdAt: todayOffset(0),
       updatedAt: todayOffset(0),
       auditTrail: [{ at: todayOffset(0), action: "seed-confirmed", by: "system", note: "Seeded registration order with HIS and insurance precheck evidence." }]
+    },
+    {
+      id: "reg-r4-waitlist-capacity",
+      residentId: "r4",
+      scheduleId: "reg-sch-cardio-waitlist-am",
+      hisScheduleId: "HIS-SCH-MR1-CARD-WAITLIST-AM",
+      hisVisitId: "HIS-MR1-WAITLIST-CAPACITY",
+      registrationNo: "REG-MR1-WL18",
+      queueNo: "WL18",
+      hospitalCode: "MR1",
+      hospital: "Dalian Central Hospital outpatient clinic demo",
+      departmentCode: "CARD",
+      department: "Cardiology",
+      doctorCode: "DOC-CARD-04",
+      doctor: "Doctor Sun",
+      appointmentDate: todayOffset(1),
+      period: "AM",
+      visitType: "onsite",
+      reason: "Seeded final slot for waitlist promotion evidence",
+      fee: 18,
+      cancelBeforeHours: 12,
+      status: "confirmed",
+      scheduleLockStatus: "confirmed",
+      journeyStage: "hospital-confirmed-demo",
+      hisConfirmationStatus: "confirmed-demo",
+      checkInStatus: "not-checked-in",
+      productionReady: false,
+      paymentStatus: "paid-demo",
+      paymentTradeNo: "PAY-DEMO-WAITLIST-CAPACITY",
+      refundStatus: "none",
+      insuranceStatus: "prechecked",
+      insuranceCredentialNo: "MI-DEMO-MOBILE-R4",
+      insurancePrecheckNo: "MI-PRE-WAITLIST-R4",
+      insuranceCoverage: 0,
+      notificationStatus: "sent",
+      notificationDeliveries: [
+        { event: "registration-submitted", channel: "in_app", status: "sent", sentAt: todayOffset(0), receiptAt: todayOffset(0) },
+        { event: "registration-submitted", channel: "sms", status: "queued", sentAt: "", receiptAt: "" }
+      ],
+      source: "hospital-HIS",
+      sourceChannel: "citizen",
+      createdAt: todayOffset(0),
+      updatedAt: todayOffset(0),
+      auditTrail: [{ at: todayOffset(0), action: "seed-confirmed", by: "system", note: "Seeded full-capacity appointment for waitlist release rehearsal." }]
     }
   ];
+}
+
+function seedRegistrationWaitlistEntries() {
+  return [];
 }
 
 function seedEscortServiceOrders() {
@@ -6710,6 +6788,7 @@ function normalizeState(data) {
     escortServiceOrders: mergeByKey(seedEscortServiceOrders(), data.escortServiceOrders, "id"),
     registrationSchedules: mergeByKey(seedRegistrationSchedules(), data.registrationSchedules, "id"),
     registrationOrders: mergeByKey(seedRegistrationOrders(), data.registrationOrders, "id").map(normalizeRegistrationJourneyOrder),
+    registrationWaitlistEntries: mergeByKey(seedRegistrationWaitlistEntries(), data.registrationWaitlistEntries, "id").map(normalizeRegistrationWaitlistEntry),
     internetNursingPolicy: data.internetNursingPolicy && typeof data.internetNursingPolicy === "object" ? { ...seedInternetNursingPolicy(), ...data.internetNursingPolicy } : seedInternetNursingPolicy(),
     internetNursingInstitutions: mergeByKey(seedInternetNursingInstitutions(), data.internetNursingInstitutions, "id"),
     internetNursingNurses: mergeByKey(seedInternetNursingNurses(), data.internetNursingNurses, "id"),
@@ -7060,6 +7139,7 @@ function completeSystemTargets(state) {
   state.escortServiceOrders = mergeByKey(seedEscortServiceOrders(), state.escortServiceOrders, "id");
   state.registrationSchedules = mergeByKey(seedRegistrationSchedules(), state.registrationSchedules, "id");
   state.registrationOrders = mergeByKey(seedRegistrationOrders(), state.registrationOrders, "id").map(normalizeRegistrationJourneyOrder);
+  state.registrationWaitlistEntries = mergeByKey(seedRegistrationWaitlistEntries(), state.registrationWaitlistEntries, "id").map(normalizeRegistrationWaitlistEntry);
   state.internetNursingPolicy = state.internetNursingPolicy && typeof state.internetNursingPolicy === "object" ? { ...seedInternetNursingPolicy(), ...state.internetNursingPolicy } : seedInternetNursingPolicy();
   state.internetNursingInstitutions = mergeByKey(seedInternetNursingInstitutions(), state.internetNursingInstitutions, "id");
   state.internetNursingNurses = mergeByKey(seedInternetNursingNurses(), state.internetNursingNurses, "id");
@@ -9044,6 +9124,14 @@ function canAccessRegistrationSchedule(user, item) {
   return true;
 }
 
+function canAccessRegistrationWaitlistEntry(user, item, data) {
+  if (!canAccessResident(user, item.residentId, data)) return false;
+  if (["commission", "county", "citizen", "insurance"].includes(user.role)) return true;
+  if (user.role !== "institution") return false;
+  const schedule = (data.registrationSchedules || []).find((row) => row.id === item.scheduleId);
+  return Boolean(schedule && canAccessRegistrationSchedule(user, schedule));
+}
+
 function buildRegistrationDashboard(data, user) {
   const schedules = (Array.isArray(data.registrationSchedules) ? data.registrationSchedules : seedRegistrationSchedules())
     .filter((item) => canAccessRegistrationSchedule(user, item));
@@ -9051,7 +9139,10 @@ function buildRegistrationDashboard(data, user) {
   const orders = (Array.isArray(data.registrationOrders) ? data.registrationOrders : [])
     .filter((item) => canAccessRegistrationOrder(user, item, data))
     .map(normalizeRegistrationJourneyOrder);
-  const journey = buildRegistrationJourneyCenter(orders);
+  const waitlistEntries = (Array.isArray(data.registrationWaitlistEntries) ? data.registrationWaitlistEntries : [])
+    .filter((item) => canAccessRegistrationWaitlistEntry(user, item, data));
+  const journey = buildRegistrationJourneyCenter(orders, waitlistEntries, schedules);
+  const waitlist = journey.waitlist;
   const integrationCenter = ["commission", "institution", "insurance", "county"].includes(user.role)
     ? buildRegistrationIntegrationCenter(data, user)
     : null;
@@ -9074,7 +9165,10 @@ function buildRegistrationDashboard(data, user) {
       disruptionPending: journey.summary.disruptionPending,
       disruptionOverdue: journey.summary.disruptionOverdue,
       rescheduled: journey.summary.rescheduled,
-      disruptionCancelled: journey.summary.disruptionCancelled
+      disruptionCancelled: journey.summary.disruptionCancelled,
+      waitlistWaiting: journey.summary.waitlistWaiting,
+      waitlistOffers: journey.summary.waitlistOffers,
+      waitlistAccepted: journey.summary.waitlistAccepted
     },
     schedules,
     orders: orders.map((item) => ({
@@ -9090,10 +9184,17 @@ function buildRegistrationDashboard(data, user) {
       blockers: journey.blockers,
       boundary: journey.boundary
     },
+    waitlist: {
+      ...waitlist,
+      entries: waitlist.entries.map((item) => ({
+        ...item,
+        allowedActions: registrationWaitlistAllowedActions(item, user, item)
+      }))
+    },
     integrationCenter,
     integration: {
       endpoints: ["/api/registrations/dashboard", "/api/registrations/integration-center", "/api/registrations/orders", "/api/registrations/orders/:id/actions", "/api/registrations/orders/:id/disruption", "/api/registrations/orders/:id/cancel", "/api/integration/events"],
-      exchangeObjects: ["registrationSchedules", "registrationOrders", "integrationGatewayEvents", "taskMessages", "dataAccessLogs"],
+      exchangeObjects: ["registrationSchedules", "registrationOrders", "registrationWaitlistEntries", "integrationGatewayEvents", "taskMessages", "dataAccessLogs"],
       targetSystems: ["hospital HIS", "internet hospital", "payment gateway", "medical insurance e-voucher", "sms gateway"],
       status: "contract-ready"
     }
@@ -9199,6 +9300,95 @@ function buildRegistrationTaskMessage(order, event, user) {
     createdBy: user.username || user.role || "system",
     createdByName: user.name || "system"
   };
+}
+
+function buildRegistrationWaitlistDeliveries(entry, event, user, now = new Date().toISOString()) {
+  return ["in_app", "sms"].map((channel) => ({
+    event,
+    channel,
+    status: channel === "in_app" ? "sent" : "queued",
+    taskId: `registrationWaitlistEntries:${entry.id}`,
+    sourceId: entry.id,
+    residentId: entry.residentId,
+    queuedAt: now,
+    sentAt: channel === "in_app" ? now : "",
+    receiptAt: channel === "in_app" ? now : "",
+    createdBy: user.username || user.role || "system"
+  }));
+}
+
+function buildRegistrationWaitlistTaskMessage(entry, event, user, schedule = {}) {
+  const citizenTarget = ["registration-waitlist-offer", "registration-waitlist-expired"].includes(event);
+  const labels = {
+    "registration-waitlist-joined": "New appointment waitlist entry",
+    "registration-waitlist-offer": "Appointment slot offer awaiting confirmation",
+    "registration-waitlist-accepted": "Waitlist offer accepted",
+    "registration-waitlist-declined": "Waitlist offer declined",
+    "registration-waitlist-withdrawn": "Waitlist entry withdrawn",
+    "registration-waitlist-expired": "Waitlist offer expired"
+  };
+  return {
+    id: `msg-${randomUUID()}`,
+    taskId: `registrationWaitlistEntries:${entry.id}`,
+    collection: "registrationWaitlistEntries",
+    sourceId: entry.id,
+    residentId: entry.residentId,
+    targetRole: citizenTarget ? "citizen" : "institution",
+    channel: "in_app",
+    notificationEvent: event,
+    deliveryChannels: ["in_app", "sms"],
+    title: labels[event] || "Appointment waitlist updated",
+    body: `${schedule.hospital || entry.hospital || "Hospital"} ${schedule.department || entry.department || ""} ${schedule.date || ""} ${schedule.period || ""} · ${entry.status}.`,
+    status: "sent",
+    receipts: [],
+    createdAt: new Date().toISOString(),
+    createdBy: user.username || user.role || "system",
+    createdByName: user.name || "system"
+  };
+}
+
+function promoteNextRegistrationWaitlist(data, scheduleId, user = {}) {
+  const schedules = Array.isArray(data.registrationSchedules) ? data.registrationSchedules : seedRegistrationSchedules();
+  const schedule = schedules.find((item) => item.id === scheduleId);
+  if (!schedule || schedule.status === "closed" || Number(schedule.remaining || 0) <= 0) return null;
+  const entries = Array.isArray(data.registrationWaitlistEntries) ? data.registrationWaitlistEntries : [];
+  const center = buildRegistrationWaitlistCenter(entries.filter((item) => item.scheduleId === scheduleId), [schedule]);
+  const candidate = center.entries.find((item) => item.status === "waiting" && item.position === 1);
+  if (!candidate) return null;
+  const systemUser = {
+    username: user.username || "registration-waitlist-auto",
+    name: user.name || "Appointment waitlist auto promotion",
+    role: "commission"
+  };
+  const promoted = applyRegistrationWaitlistAction(candidate, {
+    action: "promote",
+    note: "released slot automatically offered to the first waitlist resident",
+    offerMinutes: 30
+  }, systemUser, candidate);
+  promoted.notificationStatus = "queued";
+  promoted.notificationDeliveries = [
+    ...buildRegistrationWaitlistDeliveries(promoted, "registration-waitlist-offer", systemUser, promoted.updatedAt),
+    ...(Array.isArray(candidate.notificationDeliveries) ? candidate.notificationDeliveries : [])
+  ].slice(0, 30);
+  data.registrationWaitlistEntries = entries.map((item) => item.id === promoted.id ? promoted : item);
+  data.registrationSchedules = schedules.map((item) => item.id === scheduleId
+    ? { ...item, remaining: Math.max(0, Number(item.remaining || 0) - 1), waitlistHeld: Number(item.waitlistHeld || 0) + 1 }
+    : item);
+  data.taskMessages = [buildRegistrationWaitlistTaskMessage(promoted, "registration-waitlist-offer", systemUser, schedule), ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
+  data.securityEvents = sealAuditTrail([
+    {
+      id: randomUUID(),
+      at: new Date().toLocaleString("zh-CN", { hour12: false }),
+      actor: systemUser.name,
+      role: "commission",
+      action: "registration-waitlist-auto-promote",
+      target: promoted.id,
+      result: "allowed",
+      detail: `${scheduleId}:${promoted.offerExpiresAt}`
+    },
+    ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+  ].slice(0, 120), { recompute: true });
+  return promoted;
 }
 
 function buildRegistrationJourneyTaskMessage(order, action, user) {
@@ -10930,6 +11120,7 @@ function scopeStateForUser(data, user) {
     scoped.referralTeleconsultations = (data.referralTeleconsultations || []).filter((item) => canAccessReferralTeleconsultation(user, item, data));
     scoped.escortServiceOrders = (data.escortServiceOrders || []).filter((item) => canAccessEscortOrder(user, item, data));
     scoped.registrationOrders = (data.registrationOrders || []).filter((item) => canAccessRegistrationOrder(user, item, data));
+    scoped.registrationWaitlistEntries = (data.registrationWaitlistEntries || []).filter((item) => canAccessRegistrationWaitlistEntry(user, item, data));
     scoped.internetNursingOrders = (data.internetNursingOrders || []).filter((item) => canAccessInternetNursingOrder(user, item, data));
     if (user.role === "institution") {
       scoped.escortServiceProviders = (data.escortServiceProviders || []).filter((item) => item.institutionCode === user.orgCode || item.name === user.orgName);
@@ -10956,7 +11147,7 @@ function scopeStateForUser(data, user) {
     const preferenceKey = user.residentId || user.accountId || user.username;
     scoped.mobileExperienceSettings = { ...scoped.mobileExperienceSettings, userPreferences: { [preferenceKey]: preferences[preferenceKey] || {} } };
   }
-  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "referralTeleconsultations", "escortServiceOrders", "registrationOrders", "internetNursingOrders", "taskMessages"].forEach((key) => {
+  ["diseases", "followups", "personalRecords", "careOrders", "medicationPickups", "insuranceClaims", "seniorServices", "dataAccessLogs", "digitalCredentials", "deathCertificates", "birthCertificates", "chronicScreeningTasks", "chronicEducationPushes", "chronicManagementPlans", "chronicComorbidityPlans", "chronicTcmServices", "chronicSelfManagement", "countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "referralTeleconsultations", "escortServiceOrders", "registrationOrders", "registrationWaitlistEntries", "internetNursingOrders", "taskMessages"].forEach((key) => {
     scoped[key] = (data[key] || []).filter(hasAllowedResident);
   });
   ["phase2FamilyDoctorApplications", "phase2FamilyDoctorContracts", "phase2FamilyDoctorFulfillments"].forEach((key) => {
@@ -17077,6 +17268,159 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "POST" && url.pathname === "/api/registrations/waitlist") {
+    const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/registrations/waitlist");
+    if (!user) return;
+    const data = readDatabase();
+    try {
+      const payload = await collectJson(req);
+      const residentId = String(payload.residentId || user.residentId || "").trim();
+      const scheduleId = String(payload.scheduleId || "").trim();
+      const note = String(payload.note || "").trim();
+      if (!residentId) throw new Error("residentId is required");
+      if (!scheduleId) throw new Error("scheduleId is required");
+      if (note.length < 2) throw new Error("note is required");
+      if (!canAccessResident(user, residentId, data)) throw new Error("resident scope denied");
+      const schedules = Array.isArray(data.registrationSchedules) ? data.registrationSchedules : seedRegistrationSchedules();
+      const schedule = schedules.find((item) => item.id === scheduleId);
+      if (!schedule) throw new Error("schedule not found");
+      if (!canAccessRegistrationSchedule(user, schedule)) throw new Error("schedule scope denied");
+      if (schedule.status === "closed") throw new Error("schedule is unavailable");
+      if (Number(schedule.remaining || 0) > 0) throw new Error("schedule still has available slots");
+      const activeOrder = (data.registrationOrders || []).find((item) => item.residentId === residentId && item.scheduleId === scheduleId && !["cancelled", "completed", "closed"].includes(item.status));
+      if (activeOrder) throw new Error("resident already has an active appointment for this schedule");
+      const entries = Array.isArray(data.registrationWaitlistEntries) ? data.registrationWaitlistEntries : [];
+      const duplicate = entries.find((item) => item.residentId === residentId && item.scheduleId === scheduleId && ["waiting", "offer-pending"].includes(item.status));
+      if (duplicate) throw new Error("resident already has an active waitlist entry for this schedule");
+      const now = new Date().toISOString();
+      const resident = (data.residents || []).find((item) => item.id === residentId) || {};
+      const entry = normalizeRegistrationWaitlistEntry({
+        id: `regwait-${randomUUID()}`,
+        residentId,
+        residentName: resident.name || "",
+        scheduleId,
+        hospitalCode: schedule.hospitalCode || "",
+        hospital: schedule.hospital || "",
+        departmentCode: schedule.departmentCode || "",
+        department: schedule.department || "",
+        doctorCode: schedule.doctorCode || "",
+        doctor: schedule.doctor || "",
+        appointmentDate: schedule.date || "",
+        period: schedule.period || "",
+        visitType: String(payload.visitType || "onsite").trim(),
+        preferredChannel: ["sms", "in_app", "phone"].includes(payload.preferredChannel) ? payload.preferredChannel : "sms",
+        status: "waiting",
+        joinedAt: now,
+        joinedBy: user.name || user.username || user.role,
+        note,
+        notificationStatus: "queued",
+        notificationDeliveries: buildRegistrationWaitlistDeliveries({ id: "pending", residentId }, "registration-waitlist-joined", user, now),
+        productionReady: false,
+        auditTrail: [{ at: now, action: "registration-waitlist-join", by: user.name || user.username || user.role, role: user.role, note, productionEvidence: false }]
+      });
+      entry.notificationDeliveries = buildRegistrationWaitlistDeliveries(entry, "registration-waitlist-joined", user, now);
+      data.registrationWaitlistEntries = [entry, ...entries].slice(0, 500);
+      data.taskMessages = [buildRegistrationWaitlistTaskMessage(entry, "registration-waitlist-joined", user, schedule), ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])].slice(0, 300);
+      appendDataAccessLog(data, user, residentId, "registrationWaitlistEntries", "join appointment waitlist", "allowed");
+      data.securityEvents = sealAuditTrail([
+        { id: randomUUID(), at: new Date().toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role, action: "registration-waitlist-join", target: entry.id, result: "allowed", detail: scheduleId },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120), { recompute: true });
+      writeDatabase(data);
+      const dashboard = buildRegistrationDashboard(data, user);
+      sendJson(res, 201, { ok: true, entry: dashboard.waitlist.entries.find((item) => item.id === entry.id), dashboard });
+    } catch (error) {
+      const forbidden = /scope denied/i.test(error.message || "");
+      const conflict = /already has|available slots/i.test(error.message || "");
+      sendJson(res, forbidden ? 403 : conflict ? 409 : 400, { error: forbidden ? "Forbidden" : conflict ? "Conflict" : "Bad Request", message: error.message });
+    }
+    return;
+  }
+
+  const registrationWaitlistActionMatch = url.pathname.match(/^\/api\/registrations\/waitlist\/([^/]+)\/actions$/);
+  if (req.method === "POST" && registrationWaitlistActionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/registrations/waitlist/:id/actions");
+    if (!user) return;
+    const data = readDatabase();
+    const entries = Array.isArray(data.registrationWaitlistEntries) ? data.registrationWaitlistEntries : [];
+    const index = entries.findIndex((item) => item.id === decodeURIComponent(registrationWaitlistActionMatch[1]));
+    if (index < 0) {
+      sendJson(res, 404, { error: "Not Found", message: "registration waitlist entry not found" });
+      return;
+    }
+    if (!canAccessRegistrationWaitlistEntry(user, entries[index], data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "registration-waitlist-action", target: entries[index].id, result: "denied", detail: "scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "scope denied" });
+      return;
+    }
+    try {
+      const payload = await collectJson(req);
+      const action = String(payload.action || "").trim();
+      const schedules = Array.isArray(data.registrationSchedules) ? data.registrationSchedules : seedRegistrationSchedules();
+      const schedule = schedules.find((item) => item.id === entries[index].scheduleId);
+      if (!schedule) throw new Error("schedule not found");
+      const center = buildRegistrationWaitlistCenter(entries.filter((item) => item.scheduleId === entries[index].scheduleId), [schedule]);
+      const context = center.entries.find((item) => item.id === entries[index].id) || {};
+      let next = applyRegistrationWaitlistAction(entries[index], payload, user, context);
+      let createdOrder = null;
+
+      if (action === "promote") {
+        data.registrationSchedules = schedules.map((item) => item.id === schedule.id
+          ? { ...item, remaining: Math.max(0, Number(item.remaining || 0) - 1), waitlistHeld: Number(item.waitlistHeld || 0) + 1 }
+          : item);
+      }
+      if (action === "accept") {
+        const syntheticData = {
+          ...data,
+          registrationSchedules: schedules.map((item) => item.id === schedule.id ? { ...item, remaining: Math.max(1, Number(item.remaining || 0)) } : item)
+        };
+        createdOrder = normalizeRegistrationOrder({
+          residentId: next.residentId,
+          scheduleId: next.scheduleId,
+          visitType: next.visitType || "onsite",
+          reason: next.note || "accepted appointment waitlist offer",
+          sourceChannel: "registration-waitlist"
+        }, user, syntheticData);
+        createdOrder.waitlistEntryId = next.id;
+        createdOrder.journeyStage = "waitlist-slot-reserved-demo";
+        createdOrder.auditTrail = [{ at: next.updatedAt, action: "registration-waitlist-accepted", by: user.name || user.username || user.role, note: payload.note, productionEvidence: false }, ...(createdOrder.auditTrail || [])].slice(0, 30);
+        next.registrationOrderId = createdOrder.id;
+        data.registrationOrders = [createdOrder, ...(Array.isArray(data.registrationOrders) ? data.registrationOrders : [])].slice(0, 500);
+        data.registrationSchedules = schedules.map((item) => item.id === schedule.id
+          ? { ...item, waitlistHeld: Math.max(0, Number(item.waitlistHeld || 0) - 1) }
+          : item);
+      }
+      if (["decline", "expire"].includes(action)) {
+        data.registrationSchedules = schedules.map((item) => item.id === schedule.id
+          ? { ...item, remaining: Number(item.remaining || 0) + 1, waitlistHeld: Math.max(0, Number(item.waitlistHeld || 0) - 1) }
+          : item);
+      }
+
+      const event = `registration-waitlist-${action === "promote" ? "offer" : action === "expire" ? "expired" : action === "accept" ? "accepted" : action === "decline" ? "declined" : "withdrawn"}`;
+      next.notificationStatus = "queued";
+      next.notificationDeliveries = [...buildRegistrationWaitlistDeliveries(next, event, user, next.updatedAt), ...(Array.isArray(next.notificationDeliveries) ? next.notificationDeliveries : [])].slice(0, 30);
+      entries[index] = next;
+      data.registrationWaitlistEntries = entries;
+      data.taskMessages = [
+        buildRegistrationWaitlistTaskMessage(next, event, user, schedule),
+        ...(createdOrder ? [buildRegistrationTaskMessage(createdOrder, "registration-submitted", user)] : []),
+        ...(Array.isArray(data.taskMessages) ? data.taskMessages : [])
+      ].slice(0, 300);
+      appendDataAccessLog(data, user, next.residentId, "registrationWaitlistEntries", `registration waitlist ${action}`, "allowed");
+      data.securityEvents = sealAuditTrail([
+        { id: randomUUID(), at: new Date().toLocaleString("zh-CN", { hour12: false }), actor: user.name, role: user.role, action: "registration-waitlist-action", target: next.id, result: "allowed", detail: `${action}:${next.status}` },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120), { recompute: true });
+      if (["decline", "expire"].includes(action)) promoteNextRegistrationWaitlist(data, schedule.id, user);
+      writeDatabase(data);
+      sendJson(res, 200, { ok: true, action, entry: next, order: createdOrder, dashboard: buildRegistrationDashboard(data, user) });
+    } catch (error) {
+      const conflict = /not allowed|unavailable/i.test(error.message || "");
+      sendJson(res, conflict ? 409 : 400, { error: conflict ? "Conflict" : "Bad Request", message: error.message });
+    }
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/registrations/orders") {
     const user = requireApiRole(req, res, ["commission", "institution", "citizen"], "/api/registrations/orders");
     if (!user) return;
@@ -17237,6 +17581,7 @@ async function handleApi(req, res) {
         },
         ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
       ].slice(0, 120), { recompute: true });
+      if (["accept", "cancel"].includes(action)) promoteNextRegistrationWaitlist(data, originalScheduleId, user);
       writeDatabase(data);
       sendJson(res, 200, {
         ok: true,
@@ -17298,6 +17643,7 @@ async function handleApi(req, res) {
       },
       ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
     ].slice(0, 120);
+    promoteNextRegistrationWaitlist(data, rows[index].scheduleId, user);
     writeDatabase(data);
     sendJson(res, 200, rows[index]);
     return;

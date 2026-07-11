@@ -69,6 +69,16 @@ function normalizeRegistrationJourneyOrder(order = {}) {
   };
 }
 
+function normalizeRegistrationWaitlistEntry(entry = {}) {
+  return {
+    ...entry,
+    status: entry.status || "waiting",
+    preferredChannel: entry.preferredChannel || "sms",
+    productionReady: false,
+    auditTrail: Array.isArray(entry.auditTrail) ? entry.auditTrail : []
+  };
+}
+
 function registrationJourneyAllowedActions(order, user = {}) {
   const row = normalizeRegistrationJourneyOrder(order);
   const role = user.role || "citizen";
@@ -100,6 +110,70 @@ function registrationDisruptionAllowedActions(order, user = {}) {
   if (row.disruption && row.disruption.status !== "withdrawn") return [];
   if (["commission", "institution"].includes(role)) return ["notify"];
   return [];
+}
+
+function registrationWaitlistAllowedActions(entry, user = {}, context = {}) {
+  const row = normalizeRegistrationWaitlistEntry(entry);
+  const role = user.role || "citizen";
+  if (row.status === "waiting") {
+    if (role === "citizen") return ["withdraw"];
+    if (["commission", "institution"].includes(role) && context.position === 1 && context.hasCapacity) return ["promote"];
+    return [];
+  }
+  if (row.status === "offer-pending") {
+    if (role === "citizen" && !context.offerExpired) return ["accept", "decline"];
+    if (["commission", "institution"].includes(role) && context.offerExpired) return ["expire"];
+  }
+  return [];
+}
+
+function applyRegistrationWaitlistAction(entry, payload = {}, user = {}, context = {}) {
+  const action = String(payload.action || "").trim();
+  const note = String(payload.note || "").trim();
+  if (!action) throw new Error("action is required");
+  if (note.length < 2) throw new Error("note is required");
+  if (!registrationWaitlistAllowedActions(entry, user, context).includes(action)) {
+    throw new Error(`waitlist action ${action} is not allowed for current entry`);
+  }
+  const now = payload.at || new Date().toISOString();
+  const actor = user.name || user.username || user.role || "system";
+  const next = normalizeRegistrationWaitlistEntry(entry);
+  if (action === "promote") {
+    const offerMinutes = Math.max(5, Math.min(120, Number(payload.offerMinutes || 30)));
+    next.status = "offer-pending";
+    next.offerId = String(payload.offerId || `regoffer-${randomUUID()}`);
+    next.offeredAt = now;
+    next.offerExpiresAt = payload.offerExpiresAt || new Date(Date.parse(now) + offerMinutes * 60_000).toISOString();
+    next.offeredBy = actor;
+  }
+  if (action === "accept") {
+    next.status = "accepted";
+    next.acceptedAt = now;
+    next.acceptedBy = actor;
+  }
+  if (action === "decline") {
+    next.status = "declined";
+    next.declinedAt = now;
+    next.declinedBy = actor;
+  }
+  if (action === "withdraw") {
+    next.status = "withdrawn";
+    next.withdrawnAt = now;
+    next.withdrawnBy = actor;
+  }
+  if (action === "expire") {
+    next.status = "expired";
+    next.expiredAt = now;
+    next.expiredBy = actor;
+  }
+  next.updatedAt = now;
+  next.updatedBy = actor;
+  next.productionReady = false;
+  next.auditTrail = [
+    { at: now, action: `registration-waitlist-${action}`, by: actor, role: user.role || "unknown", note, productionEvidence: false },
+    ...(Array.isArray(next.auditTrail) ? next.auditTrail : [])
+  ].slice(0, 30);
+  return normalizeRegistrationWaitlistEntry(next);
 }
 
 function validateReplacementSchedule(order, schedule = {}) {
@@ -282,8 +356,48 @@ function applyRegistrationJourneyAction(order, payload = {}, user = {}) {
   return normalizeRegistrationJourneyOrder(next);
 }
 
-function buildRegistrationJourneyCenter(orders = []) {
+function buildRegistrationWaitlistCenter(entries = [], schedules = [], now = Date.now()) {
+  const scheduleById = new Map(schedules.map((item) => [item.id, item]));
+  const waitingBySchedule = new Map();
+  entries.map(normalizeRegistrationWaitlistEntry)
+    .filter((item) => item.status === "waiting")
+    .sort((a, b) => String(a.joinedAt || "").localeCompare(String(b.joinedAt || "")))
+    .forEach((item) => {
+      const rows = waitingBySchedule.get(item.scheduleId) || [];
+      rows.push(item.id);
+      waitingBySchedule.set(item.scheduleId, rows);
+    });
+  const rows = entries.map(normalizeRegistrationWaitlistEntry).map((item) => {
+    const schedule = scheduleById.get(item.scheduleId) || null;
+    const waiting = waitingBySchedule.get(item.scheduleId) || [];
+    const position = item.status === "waiting" ? waiting.indexOf(item.id) + 1 : null;
+    const offerTime = Date.parse(item.offerExpiresAt || "");
+    return {
+      ...item,
+      schedule,
+      position,
+      hasCapacity: Boolean(schedule && schedule.status !== "closed" && Number(schedule.remaining || 0) > 0),
+      offerExpired: item.status === "offer-pending" && Number.isFinite(offerTime) && offerTime <= now
+    };
+  });
+  return {
+    ok: true,
+    summary: {
+      entries: rows.length,
+      waiting: rows.filter((item) => item.status === "waiting").length,
+      offers: rows.filter((item) => item.status === "offer-pending").length,
+      overdueOffers: rows.filter((item) => item.offerExpired).length,
+      accepted: rows.filter((item) => item.status === "accepted").length,
+      productionReady: 0
+    },
+    entries: rows,
+    boundary: "候补补位仅保留本地号源占用与通知证据；生产仍需 HIS 正式锁号、签名送达回执和超时补偿。"
+  };
+}
+
+function buildRegistrationJourneyCenter(orders = [], waitlistEntries = [], schedules = []) {
   const rows = orders.map(normalizeRegistrationJourneyOrder);
+  const waitlist = buildRegistrationWaitlistCenter(waitlistEntries, schedules);
   return {
     ok: true,
     status: "journey-mvp-onsite-blocked",
@@ -300,10 +414,14 @@ function buildRegistrationJourneyCenter(orders = []) {
       disruptionOverdue: rows.filter((item) => disruptionOverdue(item.disruption)).length,
       rescheduled: rows.filter((item) => item.disruption?.status === "accepted").length,
       disruptionCancelled: rows.filter((item) => item.disruption?.status === "cancelled").length,
+      waitlistWaiting: waitlist.summary.waiting,
+      waitlistOffers: waitlist.summary.offers,
+      waitlistAccepted: waitlist.summary.accepted,
       productionReady: 0,
       onsiteBlockers: 4
     },
     orders: rows,
+    waitlist,
     blockers: [
       "live hospital HIS schedule lock, confirmation and check-in callback",
       "certified payment and refund gateway with signed receipts",
@@ -326,7 +444,7 @@ function buildRegistrationJourneyReadiness(options = {}) {
   const manifestSource = options.manifestSource ?? readText(path.join("scripts", "release-artifact-manifest.js"));
   const deploySource = options.deploySource ?? readText(path.join("scripts", "deploy-check.js"));
   const releaseSource = options.releaseSource ?? readText(path.join("scripts", "release-report.js"));
-  const center = buildRegistrationJourneyCenter(data.registrationOrders || []);
+  const center = buildRegistrationJourneyCenter(data.registrationOrders || [], data.registrationWaitlistEntries || [], data.registrationSchedules || []);
   const sample = normalizeRegistrationJourneyOrder((data.registrationOrders || [])[0] || { id: "sample", paymentStatus: "pending", insuranceStatus: "prechecked" });
   const checks = [
     check("registrationJourney:model", center.summary.orders >= 1 && center.orders.every((item) => item.productionReady === false && item.journeyStage), `${center.summary.orders} registration journeys`),
@@ -336,6 +454,7 @@ function buildRegistrationJourneyReadiness(options = {}) {
     check("registrationJourney:citizenUi", citizenHtml.includes("registration-journey-timeline") && citizenSource.includes("runRegistrationJourneyAction") && citizenSource.includes("data-registration-journey-action"), "resident payment and check-in actions are visible"),
     check("registrationJourney:institutionUi", institutionHtml.includes("registration-journey-workbench") && institutionSource.includes("renderRegistrationJourneyWorkbench") && institutionSource.includes("data-registration-institution-action"), "institution confirmation, completion and refund desk is visible"),
     check("registrationJourney:disruption", serverSource.includes("/api/registrations/orders/:id/disruption") && serverSource.includes("applyRegistrationDisruptionAction") && institutionSource.includes("data-registration-disruption-action") && citizenSource.includes("runRegistrationDisruptionAction") && documentation.includes("resident-acceptance"), "institution disruption notice, resident reschedule or cancellation, inventory transfer and SLA evidence are wired"),
+    check("registrationJourney:waitlist", serverSource.includes("/api/registrations/waitlist/:id/actions") && serverSource.includes("promoteNextRegistrationWaitlist") && institutionSource.includes("data-registration-waitlist-action") && citizenSource.includes("runRegistrationWaitlistAction") && documentation.includes("FIFO"), "full-slot waitlist, automatic promotion, resident response, timeout release and audit evidence are wired"),
     check("registrationJourney:docs", ["payment", "refund", "HIS", "insurance", "productionReady=false"].every((marker) => documentation.includes(marker)), "cross-role flow and production boundary are documented"),
     check("registrationJourney:releaseWiring", Boolean(pkg.scripts?.["registration:journey-readiness"]) && manifestSource.includes("registration-journey-readiness-report.md") && deploySource.includes("api:registrationJourney") && releaseSource.includes("registrationJourney:readiness"), "package, manifest, deploy and release gates are wired")
   ];
@@ -356,6 +475,7 @@ function renderMarkdown(report) {
     `- Paid / hospital confirmed / checked in / completed: ${report.center.summary.paid} / ${report.center.summary.hospitalConfirmed} / ${report.center.summary.checkedIn} / ${report.center.summary.completed}`,
     `- Refund pending / refunded: ${report.center.summary.refundPending} / ${report.center.summary.refunded}`,
     `- Disruption pending / overdue / rescheduled / cancelled: ${report.center.summary.disruptionPending} / ${report.center.summary.disruptionOverdue} / ${report.center.summary.rescheduled} / ${report.center.summary.disruptionCancelled}`,
+    `- Waitlist waiting / offers / accepted: ${report.center.summary.waitlistWaiting} / ${report.center.summary.waitlistOffers} / ${report.center.summary.waitlistAccepted}`,
     `- Production ready: ${report.center.summary.productionReady}`,
     "",
     "## Checks",
@@ -402,12 +522,16 @@ if (require.main === module) {
 module.exports = {
   applyRegistrationDisruptionAction,
   applyRegistrationJourneyAction,
+  applyRegistrationWaitlistAction,
   buildRegistrationJourneyCenter,
   buildRegistrationJourneyReadiness,
+  buildRegistrationWaitlistCenter,
   normalizeRegistrationJourneyOrder,
+  normalizeRegistrationWaitlistEntry,
   parseArgs,
   registrationDisruptionAllowedActions,
   registrationJourneyAllowedActions,
+  registrationWaitlistAllowedActions,
   renderMarkdown,
   writeOutput
 };
