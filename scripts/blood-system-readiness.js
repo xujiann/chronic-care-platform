@@ -17,6 +17,7 @@ function buildBloodSystemReadinessReport(options = {}) {
   const js = options.js ?? readText("blood.js");
   const server = options.server ?? readText("server.js");
   const transaction = options.transaction ?? readText("blood-transaction-service.js");
+  const service = options.service ?? readText("blood-service.js");
   const domain = options.domain ?? require(path.join(ROOT, "blood-domain.js"));
   const pkg = options.pkg ?? readJson("package.json");
   const ci = options.ci ?? readText(".github/workflows/ci.yml");
@@ -55,14 +56,21 @@ function buildBloodSystemReadinessReport(options = {}) {
     ["血液角色和权限种子", server.includes("BLOOD-DL") && server.includes("u-blood-quality") && server.includes("u-blood-tech-1") && server.includes("bloodPermissions")],
     ["默认测试与覆盖率门禁", pkg.scripts?.pretest?.includes("test/blood-transaction-service.test.js") && pkg.scripts?.["pretest:coverage"]?.includes("blood-system:test")],
     ["CI发布链覆盖", ci.includes("npm run blood-system:readiness") && releaseReport.includes("blood-system:readiness") && artifactManifest.includes("blood-system:readiness") && deployCheck.includes("blood-system:readiness")]
+    ,["Versioned blood master data", server.includes("BloodMasterData.snapshot") && readText("blood-master-data.js").includes("recallDispositions")],
+    ["Recall acknowledgement and closure", server.includes("acknowledgeRecall") && server.includes("closeRecall")],
+    ["Reaction investigation closure", server.includes("investigateReaction")],
+    ["Emergency allocation execution", server.includes("actEmergencyAllocation")],
+    ["Recall acknowledgement idempotency and exchange", service.includes("acknowledgementSummary") && service.includes("bloodIdempotencyRecords") && server.includes("idempotencyKey") && domain.buildExchangeMessage("recall_acknowledgement", {}).type === "recall_acknowledgement"],
+    ["Recall institution confirmation UI", html.includes("blood-recall.js") && readText("blood-recall.js").includes("data-recall-action")]
   ];
+  const normalizedChecks = checks.map((item) => ({ name: item?.[0] || "Unnamed check", ok: Boolean(item?.[1]) }));
   return {
     system: "区域血液信息系统",
     generatedAt: new Date().toISOString(),
-    passed: checks.filter((item) => item[1]).length,
+    passed: normalizedChecks.filter((item) => item.ok).length,
     total: checks.length,
-    ok: checks.every((item) => item[1]),
-    checks: checks.map(([name, ok]) => ({ name, ok }))
+    ok: normalizedChecks.every((item) => item.ok),
+    checks: normalizedChecks
   };
 }
 

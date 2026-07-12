@@ -4,6 +4,7 @@ const path = require("path");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
 const BloodService = require("./blood-service");
 const BloodTransactionService = require("./blood-transaction-service");
+const BloodMasterData = require("./blood-master-data");
 const {
   digestPhoneVerificationCode,
   fetchOidcUserInfo,
@@ -20965,6 +20966,13 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/blood-system/master-data") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/master-data");
+    if (!user) return;
+    sendJson(res, 200, BloodMasterData.snapshot());
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/blood-system/transfusion-requests") {
     const user = requireApiRole(req, res, ["institution"], "/api/blood-system/transfusion-requests");
     if (!user) return;
@@ -21011,6 +21019,28 @@ async function handleApi(req, res) {
     const data = readDatabase();
     const result = BloodService.createEmergencyAllocation(data, user, await collectJson(req));
     if (result.status < 400) writeDatabase(data);
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  const recallAcknowledgeMatch = url.pathname.match(/^\/api\/blood-system\/recalls\/([^/]+)\/acknowledge$/);
+  const recallCloseMatch = url.pathname.match(/^\/api\/blood-system\/recalls\/([^/]+)\/close$/);
+  const reactionInvestigateMatch = url.pathname.match(/^\/api\/blood-system\/transfusion-reactions\/([^/]+)\/investigate$/);
+  const emergencyActionMatch = url.pathname.match(/^\/api\/blood-system\/emergency-allocations\/([^/]+)\/actions$/);
+  const bloodWorkflowMatch = recallAcknowledgeMatch || recallCloseMatch || reactionInvestigateMatch || emergencyActionMatch;
+  if (req.method === "POST" && bloodWorkflowMatch) {
+    const roles = recallAcknowledgeMatch ? ["institution"] : reactionInvestigateMatch ? ["commission", "institution"] : emergencyActionMatch ? ["commission", "institution"] : ["commission"];
+    const user = requireApiRole(req, res, roles, url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    const payload = await collectJson(req);
+    const id = decodeURIComponent(bloodWorkflowMatch[1]);
+    const idempotencyKey = String(req.headers["idempotency-key"] || payload.idempotencyKey || "").trim();
+    const result = recallAcknowledgeMatch ? BloodService.acknowledgeRecall(data, user, id, payload, idempotencyKey)
+      : recallCloseMatch ? BloodService.closeRecall(data, user, id, payload, idempotencyKey)
+        : reactionInvestigateMatch ? BloodService.investigateReaction(data, user, id, payload)
+          : BloodService.actEmergencyAllocation(data, user, id, payload);
+    if (result.status < 500) writeDatabase(data);
     sendJson(res, result.status, result.body);
     return;
   }
