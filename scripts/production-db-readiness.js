@@ -277,11 +277,16 @@ function buildProductionDbReadinessReport(options = {}) {
   const cutoverDocument = options.cutoverDocument ?? readText(path.join("docs", "production-database-cutover-center.md"));
   const migrationPackageSource = options.migrationPackageSource ?? readText(path.join("scripts", "postgres-migration-package.js"));
   const migrationPackageDocument = options.migrationPackageDocument ?? readText(path.join("docs", "postgresql-migration-package.md"));
+  const runtimeSyncSource = options.runtimeSyncSource ?? readText("postgres-runtime-sync.js");
+  const runtimeSyncWorker = options.runtimeSyncWorker ?? readText(path.join("scripts", "postgres-sync-worker.js"));
+  const runtimeSyncDocument = options.runtimeSyncDocument ?? readText(path.join("docs", "postgresql-runtime-sync.md"));
+  const runtimeSyncService = options.runtimeSyncService ?? readText(path.join("deploy", "postgres-sync-worker.service.template"));
+  const runtimeSyncTimer = options.runtimeSyncTimer ?? readText(path.join("deploy", "postgres-sync-worker.timer.template"));
   const storageModel = options.storageModel ?? inspectStorageModel({ dataDir: path.join(ROOT, "data") });
   const productionTrack = arrayOf(data, "productionDeploymentPlan").find((item) => item.id === "prod-storage-adapter") || null;
   const json = storageModel.jsonSnapshot || {};
   const sqlite = storageModel.sqlite || {};
-  const requiredScripts = ["storage:backup", "storage:inspect", "storage:assess", "rollback:snapshot", "postgres:migration-package", "postgres:migration-verify", "release:report"];
+  const requiredScripts = ["storage:backup", "storage:inspect", "storage:assess", "rollback:snapshot", "postgres:migration-package", "postgres:migration-verify", "postgres:sync-worker", "release:report"];
   const migrationEvidence = {
     currentAdapter: "sqlite-wal-json-snapshot",
     targetAdapter: "postgresql",
@@ -306,6 +311,17 @@ function buildProductionDbReadinessReport(options = {}) {
   const cutoverCenter = buildProductionDatabaseCutoverCenter(data);
   const postgresMigrationPackage = buildPostgresMigrationPackage({ data });
   const migrationSourceRecords = Object.values(data).filter(Array.isArray).reduce((sum, rows) => sum + rows.length, 0);
+  const postgresRuntimeSync = {
+    transactionalOutbox: ["postgres_sync_outbox", "enqueuePostgresSyncBatch", "db.exec(\"COMMIT\")", "STORAGE_SCHEMA_VERSION = 8"].every((marker) => serverSource.includes(marker)),
+    batchIntegrity: ["buildPostgresSyncBatch", "payloadSha256", "previousChainHash", "chainHash", "validatePostgresSyncBatch"].every((marker) => runtimeSyncSource.includes(marker)),
+    idempotentApply: ["runtime_sync_batches", "ON CONFLICT (batch_id) DO NOTHING", "runtime_collection_state", "source_version <= EXCLUDED.source_version"].every((marker) => runtimeSyncSource.includes(marker)),
+    retryState: ["pending", "retry", "delivered", "failed", "next_attempt_at", "maxAttempts"].every((marker) => runtimeSyncSource.includes(marker)),
+    healthStatus: serverSource.includes("postgresSync") && serverSource.includes("readPostgresSyncStatus") && serverSource.includes("productionPrimary: false"),
+    workerCommand: runtimeSyncWorker.includes("runPostgresSyncWorker") && pkg.scripts?.["postgres:sync-worker"],
+    environmentContract: ["POSTGRES_SYNC_MODE=disabled", "POSTGRES_SSL_MODE=verify-full", "POSTGRES_CA_FILE=", "POSTGRES_POOL_MAX="].every((marker) => envTemplate.includes(marker)),
+    hardenedService: ["Type=oneshot", "Environment=POSTGRES_SYNC_MODE=outbox", "NoNewPrivileges=true", "ProtectSystem=strict"].every((marker) => runtimeSyncService.includes(marker)) && ["OnUnitActiveSec=15s", "Persistent=true"].every((marker) => runtimeSyncTimer.includes(marker)),
+    documentedBoundary: ["事务型 outbox", "不得上传 Git", "STORAGE_ENGINE=postgres", "productionPrimary"].every((marker) => runtimeSyncDocument.includes(marker) || serverSource.includes(marker))
+  };
   const checks = [
     { id: "production-db:track", passed: Boolean(productionTrack?.owner && productionTrack?.nextAction), detail: productionTrack?.status || "missing production deployment track" },
     { id: "production-db:requiredConfig", passed: ["DATABASE_URL", "STORAGE_ENGINE=postgres"].every((item) => migrationEvidence.requiredConfig.includes(item)), detail: migrationEvidence.requiredConfig.join(",") || "missing" },
@@ -320,7 +336,10 @@ function buildProductionDbReadinessReport(options = {}) {
     { id: "production-db:cutoverUi", passed: platformHtml.includes("production-database-cutover-center") && platformSource.includes("renderProductionDatabaseCutoverCenter") && platformSource.includes("data-production-db-action"), detail: "platform cutover rehearsal center is visible and actionable" },
     { id: "production-db:cutoverDocs", passed: ["migration batch", "rollback checkpoint", "/api/production-database/cutover-runs"].every((token) => cutoverDocument.includes(token)), detail: "cutover center model, APIs and production boundary are documented" },
     { id: "production-db:migrationPackage", passed: postgresMigrationPackage.ok && postgresMigrationPackage.manifest.mode === "manifest" && postgresMigrationPackage.manifest.summary.records === migrationSourceRecords && !postgresMigrationPackage.files["records.copy.tsv"], detail: `${postgresMigrationPackage.manifest.summary.collections} collections / ${postgresMigrationPackage.manifest.summary.records} source records / no payload artifact` },
-    { id: "production-db:secureFullExportBoundary", passed: ["acknowledge-sensitive-data", "must be written outside the repository", "credentialsPersisted: false"].every((marker) => migrationPackageSource.includes(marker)) && ["仓库之外", "不得上传 Git", "迁移包通过不等于 PostgreSQL 运行时适配器已经启用"].every((marker) => migrationPackageDocument.includes(marker)), detail: "full export requires explicit acknowledgement, external protected path and keeps credentials out" }
+    { id: "production-db:secureFullExportBoundary", passed: ["acknowledge-sensitive-data", "must be written outside the repository", "credentialsPersisted: false"].every((marker) => migrationPackageSource.includes(marker)) && ["仓库之外", "不得上传 Git", "迁移包通过不等于 PostgreSQL 运行时适配器已经启用"].every((marker) => migrationPackageDocument.includes(marker)), detail: "full export requires explicit acknowledgement, external protected path and keeps credentials out" },
+    { id: "production-db:transactionalOutbox", passed: postgresRuntimeSync.transactionalOutbox && postgresRuntimeSync.batchIntegrity && postgresRuntimeSync.healthStatus, detail: "SQLite schema v8 commits signed collection changes and health-visible queue state atomically" },
+    { id: "production-db:idempotentWorker", passed: postgresRuntimeSync.idempotentApply && postgresRuntimeSync.retryState && postgresRuntimeSync.workerCommand, detail: "worker applies batch ids once, rejects stale collection versions and records retry outcomes" },
+    { id: "production-db:workerDeployment", passed: postgresRuntimeSync.hardenedService && postgresRuntimeSync.environmentContract && postgresRuntimeSync.documentedBoundary, detail: "hardened one-shot timer, TLS environment contract and shadow-primary boundary documented" }
   ];
   return {
     ok: checks.every((item) => item.passed),
@@ -332,6 +351,7 @@ function buildProductionDbReadinessReport(options = {}) {
     sqliteRuntimeProfile,
     cutoverCenter,
     postgresMigrationPackage,
+    postgresRuntimeSync,
     checks
   };
 }
@@ -387,6 +407,9 @@ function renderMarkdown(report) {
     `- PostgreSQL manifest package: ${report.postgresMigrationPackage?.ok ? "verified" : "failed"}`,
     `- Packaged source records: ${report.postgresMigrationPackage?.manifest?.summary?.records || 0}`,
     `- Sensitive payload files in CI package: ${report.postgresMigrationPackage?.files?.["records.copy.tsv"] ? "present" : "absent"}`,
+    `- Transactional PostgreSQL outbox: ${report.postgresRuntimeSync?.transactionalOutbox ? "configured" : "missing"}`,
+    `- Idempotent sync worker: ${report.postgresRuntimeSync?.idempotentApply ? "configured" : "missing"}`,
+    `- PostgreSQL production primary: no`,
     "",
     "| Batch | Domain | Sources | Targets | Owner | Status |",
     "|---|---|---|---|---|---|",

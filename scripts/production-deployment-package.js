@@ -8,7 +8,15 @@ const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OUTPUT = path.join(ROOT, "release", "production-deployment-package.json");
 const DEFAULT_MARKDOWN = path.join(ROOT, "release", "production-deployment-package.md");
 const ALLOWED_RUNTIME_EXTENSIONS = new Set([".js", ".html", ".css", ".svg", ".webmanifest"]);
-const REQUIRED_RUNTIME_FILES = ["server.js", "package.json", "package-lock.json", "service-worker.js", "manifest.webmanifest"];
+const REQUIRED_RUNTIME_FILES = [
+  "server.js",
+  "package.json",
+  "package-lock.json",
+  "service-worker.js",
+  "manifest.webmanifest",
+  "scripts/postgres-sync-worker.js"
+];
+const ADDITIONAL_RUNTIME_FILES = ["scripts/postgres-sync-worker.js"];
 const EXCLUDED_RUNTIME_FILES = new Set(["playwright.config.js"]);
 
 const SECRET_CONTRACT = [
@@ -39,7 +47,7 @@ function normalizePath(value) {
 }
 
 function collectRuntimeFiles(root = ROOT) {
-  return fs.readdirSync(root, { withFileTypes: true })
+  const rootFiles = fs.readdirSync(root, { withFileTypes: true })
     .filter((entry) => entry.isFile())
     .map((entry) => entry.name)
     .filter((name) => {
@@ -47,7 +55,7 @@ function collectRuntimeFiles(root = ROOT) {
       if (["package.json", "package-lock.json"].includes(name)) return true;
       return ALLOWED_RUNTIME_EXTENSIONS.has(path.extname(name).toLowerCase());
     })
-    .sort();
+  return [...rootFiles, ...ADDITIONAL_RUNTIME_FILES.filter((name) => fs.existsSync(path.join(root, name)))].sort();
 }
 
 function fileEvidence(root, relativePath) {

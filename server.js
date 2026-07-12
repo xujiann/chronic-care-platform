@@ -2,6 +2,12 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
+const {
+  assertSyncMode,
+  buildCollectionChanges,
+  enqueuePostgresSyncBatch,
+  readPostgresSyncStatus
+} = require("./postgres-runtime-sync");
 const BloodService = require("./blood-service");
 const BloodTransactionService = require("./blood-transaction-service");
 const BloodMasterData = require("./blood-master-data");
@@ -126,6 +132,7 @@ const DB_FILE = path.join(DATA_DIR, "db.json");
 const SQLITE_FILE = path.join(DATA_DIR, "health-city.sqlite");
 const STORAGE_ENGINE = String(process.env.STORAGE_ENGINE || "auto").toLowerCase();
 const RUNTIME_STORAGE_ENGINES = new Set(["auto", "json", "sqlite"]);
+const POSTGRES_SYNC_MODE = String(process.env.POSTGRES_SYNC_MODE || "disabled").trim().toLowerCase();
 const SQLITE_JOURNAL_MODE = ["WAL", "DELETE", "TRUNCATE"].includes(String(process.env.SQLITE_JOURNAL_MODE || "WAL").toUpperCase())
   ? String(process.env.SQLITE_JOURNAL_MODE || "WAL").toUpperCase()
   : "WAL";
@@ -138,7 +145,7 @@ const SQLITE_HEALTH_CHECK_TTL_MS = Math.min(300000, Math.max(5000, Number(proces
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const DEMO_PASSWORD = "123456";
 const PASSWORD_HASH_ITERATIONS = 120_000;
-const STORAGE_SCHEMA_VERSION = 7;
+const STORAGE_SCHEMA_VERSION = 8;
 const PROJECT_VERSION = (() => {
   try {
     return JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version || "0.0.0";
@@ -525,6 +532,32 @@ const SQLITE_MIGRATIONS = [
         );
         CREATE INDEX IF NOT EXISTS idx_accessibility_checklist_category_status
           ON accessibility_checklist_records(category, status);
+      `);
+    }
+  },
+  {
+    version: 8,
+    name: "add PostgreSQL transactional sync outbox",
+    apply(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS postgres_sync_outbox (
+          sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+          batch_id TEXT NOT NULL UNIQUE,
+          created_at TEXT NOT NULL,
+          payload TEXT NOT NULL,
+          payload_sha256 TEXT NOT NULL,
+          previous_chain_hash TEXT NOT NULL DEFAULT '',
+          chain_hash TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'retry', 'delivered', 'failed')),
+          attempts INTEGER NOT NULL DEFAULT 0,
+          last_error TEXT NOT NULL DEFAULT '',
+          next_attempt_at TEXT NOT NULL,
+          delivered_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_postgres_sync_outbox_delivery
+          ON postgres_sync_outbox(status, next_attempt_at, sequence);
+        CREATE INDEX IF NOT EXISTS idx_postgres_sync_outbox_created_at
+          ON postgres_sync_outbox(created_at);
       `);
     }
   }
@@ -5753,14 +5786,20 @@ function loadSqliteModule() {
 }
 
 function assertSupportedStorageEngine() {
+  assertSyncMode(POSTGRES_SYNC_MODE);
   if (RUNTIME_STORAGE_ENGINES.has(STORAGE_ENGINE)) return;
   throw new Error(`Unsupported STORAGE_ENGINE=${STORAGE_ENGINE}. PostgreSQL is tracked in productionDeploymentPlan but the runtime adapter is not enabled yet.`);
 }
 
 function shouldUseSqlite() {
   assertSupportedStorageEngine();
-  if (STORAGE_ENGINE === "json") return false;
-  return Boolean(loadSqliteModule()?.DatabaseSync);
+  if (STORAGE_ENGINE === "json") {
+    if (POSTGRES_SYNC_MODE === "outbox") throw new Error("POSTGRES_SYNC_MODE=outbox requires SQLite storage");
+    return false;
+  }
+  const available = Boolean(loadSqliteModule()?.DatabaseSync);
+  if (POSTGRES_SYNC_MODE === "outbox" && !available) throw new Error("POSTGRES_SYNC_MODE=outbox requires SQLite runtime availability");
+  return available;
 }
 
 function openSqliteDatabase() {
@@ -5913,7 +5952,9 @@ function writeSqliteState(data, event = "write-state", expectedVersions = null) 
     const entries = Object.entries(normalized).filter(([key]) => key !== "storageMeta");
     verifySqliteCollectionVersions(db, entries.map(([key]) => key), expectedVersions);
     const incomingKeys = new Set(entries.map(([key]) => key));
-    const existingPayloads = new Map(db.prepare("SELECT key, payload FROM state_collections").all().map((row) => [row.key, row.payload]));
+    const existingRows = db.prepare("SELECT key, payload, version FROM state_collections").all();
+    const postgresSyncChanges = POSTGRES_SYNC_MODE === "outbox" ? buildCollectionChanges(existingRows, entries) : [];
+    const existingPayloads = new Map(existingRows.map((row) => [row.key, row.payload]));
     const deleteStatement = db.prepare("DELETE FROM state_collections WHERE key = ?");
     existingPayloads.forEach((_, key) => {
       if (!incomingKeys.has(key)) deleteStatement.run(key);
@@ -5932,6 +5973,9 @@ function writeSqliteState(data, event = "write-state", expectedVersions = null) 
       }
     });
     syncSqliteIdentityTables(db, normalized, event, now);
+    if (postgresSyncChanges.length) {
+      enqueuePostgresSyncBatch(db, postgresSyncChanges, { createdAt: now, sourceEvent: event });
+    }
     db.prepare("INSERT INTO storage_events (id, at, event, detail) VALUES (?, ?, ?, ?)").run(randomUUID(), now, event, "platform state persisted");
     db.exec("COMMIT");
   } catch (error) {
@@ -6366,6 +6410,7 @@ function cleanSqliteText(value) {
 
 function storageMeta() {
   const sqlite = shouldUseSqlite();
+  const postgresSyncStatus = sqlite ? readPostgresSyncStatus(SQLITE_FILE) : { pending: 0, retry: 0, delivered: 0, failed: 0, oldestPendingAt: "", lastDeliveredAt: "" };
   return {
     engine: sqlite ? "sqlite" : "json",
     mode: sqlite ? "SQLite 主存储 + JSON 快照" : "JSON 文件存储",
@@ -6375,7 +6420,14 @@ function storageMeta() {
     schemaVersion: sqlite ? STORAGE_SCHEMA_VERSION : 0,
     collectionVersions: sqlite ? sqliteCollectionVersions() : {},
     sqliteProfile: sqlite ? sqliteRuntimeProfile() : null,
-    sqliteError: sqliteError ? sqliteError.message : ""
+    sqliteError: sqliteError ? sqliteError.message : "",
+    postgresSync: {
+      mode: POSTGRES_SYNC_MODE,
+      enabled: POSTGRES_SYNC_MODE === "outbox",
+      targetRole: "shadow-readiness",
+      productionPrimary: false,
+      ...postgresSyncStatus
+    }
   };
 }
 

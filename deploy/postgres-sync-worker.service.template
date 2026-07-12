@@ -1,0 +1,24 @@
+[Unit]
+Description=Chronic Care Platform PostgreSQL Outbox Worker
+After=network-online.target chronic-care-platform.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=__SERVICE_USER__
+Group=__SERVICE_GROUP__
+WorkingDirectory=__APP_DIR__
+Environment=NODE_ENV=production
+Environment=POSTGRES_SYNC_MODE=outbox
+EnvironmentFile=__SECRET_ENV_FILE__
+ExecStart=__NODE_BINARY__ scripts/postgres-sync-worker.js --sqlite-file=__DATA_DIR__/health-city.sqlite --limit=50 --max-attempts=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=__DATA_DIR__ __LOG_DIR__
+UMask=0077
+TimeoutStartSec=120
+
+[Install]
+WantedBy=multi-user.target

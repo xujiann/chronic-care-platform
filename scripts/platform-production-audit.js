@@ -94,10 +94,10 @@ const MVP_REQUIRED_MODULES = [
   {
     id: "mvp-production-database",
     name: "生产数据库与迁移",
-    status: "migration-foundation-ready",
+    status: "shadow-sync-foundation-ready",
     priority: "P0",
-    implemented: "SQLite WAL/FULL、外键、忙等待、自动检查点、quick_check、健康探针、迁移台账、无明文 PostgreSQL 迁移清单、落地区 schema、全量受控导出、摘要验签和回滚模板",
-    remainingCode: "按目标容量完成 PostgreSQL 运行时适配器、领域表转换、增量同步、全量迁移复核和原生备份恢复工具；小规模单机试点可在评审批准后继续 SQLite",
+    implemented: "SQLite schema v8、WAL/FULL、乐观锁、事务 outbox、链式批次摘要、PostgreSQL 幂等影子同步 worker、重试状态、迁移清单、受控全量导出和回滚模板",
+    remainingCode: "完成 PostgreSQL 生产主存储读路径、领域表转换、双向一致性核对、容量切换、原生备份恢复和正式回切工具；小规模单机试点可在评审批准后继续 SQLite",
     siteDependency: "目标容量、RTO/RPO、数据库资源和灾备签字"
   },
   {
@@ -185,12 +185,12 @@ const PRODUCTION_BLOCKERS = [
   status: id === "P0-01"
     ? "automation-foundation-ready-site-acceptance-pending"
     : id === "P0-02"
-    ? "migration-package-ready-runtime-adapter-pending"
+    ? "shadow-sync-ready-primary-cutover-pending"
     : (["P0-03", "P0-04", "P0-05", "P0-06", "P0-08", "P0-09"].includes(id) ? "adapter-foundation-ready-site-joint-test-pending" : "blocked-until-site-evidence"),
   progress: id === "P0-01"
     ? "已实现不可变部署包、运行文件摘要复核、密钥仅引用不落盘、最小权限进程模板、CI 验证和回滚契约；真实 Vault/KMS、TLS、制品仓库、服务账号和生产 smoke 签字未完成。"
     : id === "P0-02"
-    ? "已实现 SQLite WAL/FULL、quick_check、无明文 PostgreSQL 迁移清单、落地区 schema、受控全量导出、逐文件摘要复核和回滚模板；运行时适配器、领域表转换、容量故障切换和灾备签字仍未完成。"
+    ? "已实现 SQLite schema v8 事务 outbox、集合版本、批次链式摘要、PostgreSQL 幂等影子同步、重试状态、迁移包和回滚模板；生产主存储读路径、领域转换、容量故障切换和灾备签字仍未完成。"
     : (id === "P0-03"
       ? "已实现 OIDC UserInfo 运行时适配、受控本地账号绑定和配置状态接口；真实目录同步、注销刷新回调、联合测试和签字未完成。"
       : (id === "P0-04"
@@ -208,7 +208,7 @@ const ROADMAP = [
   {
     phase: "P0 / 0-30 天",
     objective: "建立可部署、可联调、可审计的生产基线",
-    deliverables: ["已完成不可变部署包、密钥引用和进程模板；继续 Vault/KMS、TLS、制品仓库和环境级编排", "已完成 SQLite 加固与 PostgreSQL 迁移包；继续运行时适配器、领域转换、容量故障切换和原生备份工具", "已完成统一身份和短信通用适配基础；继续真实供应商联调和密钥托管", "已完成医院出站连接器与 SIEM/Webhook 告警适配基础；继续厂商协议、目标接收端、网络环境和生产演练"],
+    deliverables: ["已完成不可变部署包、密钥引用和进程模板；继续 Vault/KMS、TLS、制品仓库和环境级编排", "已完成 SQLite schema v8、PostgreSQL 迁移包与事务 outbox 影子同步；继续主存储读路径、领域转换、容量故障切换和原生备份工具", "已完成统一身份和短信通用适配基础；继续真实供应商联调和密钥托管", "已完成医院出站连接器与 SIEM/Webhook 告警适配基础；继续厂商协议、目标接收端、网络环境和生产演练"],
     exit: "P0-01 至 P0-09 均形成可验证证据，生产配置检查不再使用占位值。"
   },
   {

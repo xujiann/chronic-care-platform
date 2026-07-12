@@ -222,6 +222,8 @@ function validateProductionConfig(options = {}) {
   const deploymentSecretProvider = String(env.DEPLOYMENT_SECRET_PROVIDER || "").trim().toLowerCase();
   const deploymentReleaseId = String(env.DEPLOYMENT_RELEASE_ID || "").trim();
   const deploymentArtifactDigest = String(env.DEPLOYMENT_ARTIFACT_DIGEST || "").trim().toLowerCase();
+  const postgresSyncMode = String(env.POSTGRES_SYNC_MODE || "disabled").trim().toLowerCase();
+  const postgresSslMode = String(env.POSTGRES_SSL_MODE || "verify-full").trim().toLowerCase();
   const alertRouting = alertRoutingCenter(env);
   const alertSecrets = [
     env.SIEM_ENDPOINT ? env.SIEM_SIGNING_SECRET || env.ALERTING_SIGNING_SECRET : "",
@@ -241,7 +243,10 @@ function validateProductionConfig(options = {}) {
     check("env:ALERTING.secretQuality", !strict || (alertSecrets.length > 0 && alertSecrets.every((secret) => secretQuality(secret).strongEnough)), strict ? "configured alert route secrets must be non-placeholder and at least 32 chars" : "not enforced outside production", strict ? "error" : "warn", "environment"),
     check("env:DEPLOYMENT.secretProvider", !strict || ["vault", "kms", "orchestrator"].includes(deploymentSecretProvider), strict ? deploymentSecretProvider || "missing DEPLOYMENT_SECRET_PROVIDER" : "not enforced outside production", strict ? "error" : "warn", "environment"),
     check("env:DEPLOYMENT.releaseId", !strict || (Boolean(deploymentReleaseId) && !hasPlaceholder(deploymentReleaseId)), strict ? deploymentReleaseId || "missing DEPLOYMENT_RELEASE_ID" : "not enforced outside production", strict ? "error" : "warn", "environment"),
-    check("env:DEPLOYMENT.artifactDigest", !strict || /^sha256:[a-f0-9]{64}$/.test(deploymentArtifactDigest), strict ? deploymentArtifactDigest || "missing DEPLOYMENT_ARTIFACT_DIGEST" : "not enforced outside production", strict ? "error" : "warn", "environment")
+    check("env:DEPLOYMENT.artifactDigest", !strict || /^sha256:[a-f0-9]{64}$/.test(deploymentArtifactDigest), strict ? deploymentArtifactDigest || "missing DEPLOYMENT_ARTIFACT_DIGEST" : "not enforced outside production", strict ? "error" : "warn", "environment"),
+    check("env:POSTGRES_SYNC.mode", ["disabled", "outbox"].includes(postgresSyncMode), postgresSyncMode, "error", "environment"),
+    check("env:POSTGRES_SYNC.database", postgresSyncMode !== "outbox" || /^postgres(?:ql)?:\/\//i.test(String(env.DATABASE_URL || "")), postgresSyncMode === "outbox" ? "PostgreSQL URL required for shadow sync" : "shadow sync disabled", strict ? "error" : "warn", "environment"),
+    check("env:POSTGRES_SYNC.tls", postgresSyncMode !== "outbox" || postgresSslMode === "verify-full", postgresSyncMode === "outbox" ? postgresSslMode : "shadow sync disabled", strict ? "error" : "warn", "environment")
   ];
 
   if (strict) {
@@ -775,7 +780,10 @@ function productionDbReadinessChecks(productionDbReadiness) {
     check("productionDb:rehearsalDocs", productionDbReadiness.rehearsalEvidence && Object.values(productionDbReadiness.rehearsalEvidence).every(Boolean), "backup, restore, RTO/RPO, and release artifact docs", "error", "production-db"),
     check("productionDb:cutoverCenter", productionDbReadiness.cutoverCenter?.ok && productionDbReadiness.cutoverCenter?.summary?.migrationBatches >= 4 && productionDbReadiness.cutoverCenter?.summary?.productionReadyRuns === 0, `${productionDbReadiness.cutoverCenter?.summary?.migrationBatches || 0} migration batches / ${productionDbReadiness.cutoverCenter?.summary?.cutoverRuns || 0} rehearsal runs / production gate preserved`, "error", "production-db"),
     check("productionDb:migrationPackage", productionDbReadiness.postgresMigrationPackage?.ok && productionDbReadiness.postgresMigrationPackage?.manifest?.mode === "manifest" && !productionDbReadiness.postgresMigrationPackage?.files?.["records.copy.tsv"], `${productionDbReadiness.postgresMigrationPackage?.manifest?.summary?.records || 0} source records summarized without payload export`, "error", "production-db"),
-    check("productionDb:migrationBoundary", productionDbReadiness.postgresMigrationPackage?.manifest?.productionReady === false && productionDbReadiness.migrationEvidence?.runtimePostgresBlocked, "migration package cannot enable PostgreSQL runtime or production readiness", "error", "production-db")
+    check("productionDb:migrationBoundary", productionDbReadiness.postgresMigrationPackage?.manifest?.productionReady === false && productionDbReadiness.migrationEvidence?.runtimePostgresBlocked, "migration package cannot enable PostgreSQL runtime or production readiness", "error", "production-db"),
+    check("productionDb:transactionalOutbox", productionDbReadiness.postgresRuntimeSync?.transactionalOutbox && productionDbReadiness.postgresRuntimeSync?.batchIntegrity && productionDbReadiness.postgresRuntimeSync?.healthStatus, "SQLite schema v8 provides atomic signed PostgreSQL change batches and health status", "error", "production-db"),
+    check("productionDb:idempotentWorker", productionDbReadiness.postgresRuntimeSync?.idempotentApply && productionDbReadiness.postgresRuntimeSync?.retryState && productionDbReadiness.postgresRuntimeSync?.workerCommand, "PostgreSQL worker is idempotent, version-aware and retryable", "error", "production-db"),
+    check("productionDb:shadowBoundary", productionDbReadiness.migrationEvidence?.runtimePostgresBlocked && productionDbReadiness.postgresMigrationPackage?.manifest?.target?.runtimeAdapterEnabled === false, "PostgreSQL remains a shadow target and cannot become primary through the worker", "error", "production-db")
   ];
 }
 
@@ -943,6 +951,9 @@ function packageChecks(pkg) {
     "process:audit",
     "site:pack",
     "production-db:readiness",
+    "postgres:migration-package",
+    "postgres:migration-verify",
+    "postgres:sync-worker",
     "evaluation:evidence",
     "regional-data-sharing:report",
     "storage:backup",
