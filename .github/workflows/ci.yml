@@ -29,6 +29,8 @@ jobs:
         run: npm ci
       - name: Check JavaScript syntax
         run: npm run check
+      - name: Run blood system readiness gate
+        run: npm run blood-system:readiness
       - name: Run commercial crypto adapter tests
         run: node --test test/commercial-crypto-readiness.test.js
       - name: Run API regression tests

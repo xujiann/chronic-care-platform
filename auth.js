@@ -4,6 +4,9 @@
   const DEMO_SMS_CODE = "888888";
   const demoUsers = [
     { id: "u-nurse", username: "nurse", password: "123456", name: "互联网护理演示护士", role: "institution", roleName: "护士工作站", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "互联网护理订单与服务轨迹", home: "internet-nursing.html", nurseId: "inn-001", accountType: "nurse" },
+    { id: "u-blood-quality", username: "blood_quality", password: "123456", name: "血液中心质控审核员", role: "commission", roleName: "血液中心冷链质控", orgCode: "BLOOD-DL", orgName: "大连市血液中心", orgType: "blood_center", orgLevel: "市级", dataScope: "冷链异常、质量处置与血液放行", home: "blood.html", accountType: "blood_quality", bloodPermissions: ["cold_chain_quality_review"] },
+    { id: "u-blood-tech-1", username: "blood_tech_1", password: "123456", name: "输血科配血复核员甲", role: "institution", roleName: "输血科检验技师", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构交叉配血与发血复核", home: "blood.html", accountType: "blood_technologist", bloodPermissions: ["compatibility_review"] },
+    { id: "u-blood-tech-2", username: "blood_tech_2", password: "123456", name: "输血科配血复核员乙", role: "institution", roleName: "输血科检验技师", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构交叉配血与发血复核", home: "blood.html", accountType: "blood_technologist", bloodPermissions: ["compatibility_review"] },
     { id: "u-city", username: "city", password: "123456", name: "市级管理员", role: "commission", roleName: "市级健康城市管理", orgCode: "ORG-CITY-DL", orgName: "大连市健康城市平台", orgType: "city", orgLevel: "市级", dataScope: "全市", home: "workbench.html" },
     { id: "u-district", username: "district", password: "123456", name: "区市县管理员", role: "commission", roleName: "区市县管理端", orgCode: "ORG-DIST-ZS", orgName: "中山区健康城市平台", orgType: "district", orgLevel: "区市县", dataScope: "中山区", home: "workbench.html" },
     { id: "u-health", username: "health", password: "123456", name: "大连市卫生健康委管理员", role: "commission", roleName: "大连市卫生健康委", orgCode: "ORG-HEALTH-DL", orgName: "大连市卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管", home: "index.html" },
@@ -47,12 +50,13 @@
     "citizen.html": ["citizen"],
     "mobile-preview.html": ["citizen"],
     "health-city.html": ["commission", "institution", "insurance", "citizen", "county"],
-    "login.html": ["commission", "institution", "insurance", "citizen", "county"]
+    "login.html": ["commission", "institution", "insurance", "citizen", "county"],
+    "blood.html": ["commission", "institution"]
   };
 
   const roleLinks = {
-    commission: [["platform.html", "全民健康平台"], ["digital-hospital-standards.html", "数智医院"], ["public-health.html", "公共卫生"], ["regional-data-sharing.html", "区域共享"], ["quality-safety.html", "质量安全"], ["operations.html", "运行调度"], ["escort.html", "助医陪诊"], ["health-city.html", "总览"], ["about.html", "关于"], ["workbench.html", "工作台"], ["index.html", "卫健管理"]],
-    institution: [["health-city.html", "总览"], ["doctor.html", "医生端"], ["regional-data-sharing.html", "区域共享"], ["about.html", "关于"], ["institution.html", "医疗机构"]],
+    commission: [["platform.html", "全民健康平台"], ["digital-hospital-standards.html", "数智医院"], ["public-health.html", "公共卫生"], ["regional-data-sharing.html", "区域共享"], ["quality-safety.html", "质量安全"], ["operations.html", "运行调度"], ["escort.html", "助医陪诊"], ["blood.html", "血液管理"], ["health-city.html", "总览"], ["about.html", "关于"], ["workbench.html", "工作台"], ["index.html", "卫健管理"]],
+    institution: [["health-city.html", "总览"], ["doctor.html", "医生端"], ["regional-data-sharing.html", "区域共享"], ["blood.html", "血液管理"], ["about.html", "关于"], ["institution.html", "医疗机构"]],
     insurance: [["health-city.html", "总览"], ["about.html", "关于"], ["insurance.html", "医保"]],
     citizen: [["health-city.html", "总览"], ["about.html", "关于"], ["citizen.html", "个人端"], ["mobile-preview.html", "手机预览"]],
     county: [["health-city.html", "总览"], ["about.html", "关于"], ["county.html", "医共体"]]

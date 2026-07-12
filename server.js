@@ -2,6 +2,8 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
+const BloodService = require("./blood-service");
+const BloodTransactionService = require("./blood-transaction-service");
 const {
   digestPhoneVerificationCode,
   fetchOidcUserInfo,
@@ -727,6 +729,21 @@ function seedState() {
     countyAcceptanceLedger: seedCountyAcceptanceLedger(),
     imageCloudGateways: seedImageCloudGateways(),
     imageCloudStudies: seedImageCloudStudies(),
+    bloodUnits: BloodService.seedBloodUnits(),
+    transfusionRequests: BloodService.seedTransfusionRequests(),
+    bloodAuditEvents: BloodService.seedBloodAuditEvents(),
+    donorSafetyCases: BloodService.seedDonorSafetyCases(),
+    bloodSpecimens: BloodService.seedBloodSpecimens(),
+    bloodRecalls: BloodService.seedBloodRecalls(),
+    transfusionReactions: BloodService.seedTransfusionReactions(),
+    emergencyBloodAllocations: BloodService.seedEmergencyAllocations(),
+    bloodTestReports: BloodTransactionService.seedBloodTestReports(),
+    bloodReleaseReviews: BloodTransactionService.seedBloodReleaseReviews(),
+    bloodShipments: BloodTransactionService.seedBloodShipments(),
+    compatibilityTests: BloodTransactionService.seedCompatibilityTests(),
+    transfusionEpisodes: BloodTransactionService.seedTransfusionEpisodes(),
+    bloodSafetyIncidents: BloodTransactionService.seedBloodSafetyIncidents(),
+    bloodIdempotencyRecords: [],
     imageCloudShares: seedImageCloudShares(),
     imageCloudQualityReviews: seedImageCloudQualityReviews(),
     secureAttachments: [],
@@ -1711,6 +1728,9 @@ function seedEscortServiceOrders() {
 function seedAuthUsers() {
   return [
     { id: "u-nurse", username: "nurse", password: "123456", name: "互联网护理演示护士", role: "institution", roleName: "护士工作站", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "互联网护理订单与服务轨迹", home: "internet-nursing.html", nurseId: "inn-001", accountType: "nurse", status: "启用" },
+    { id: "u-blood-quality", username: "blood_quality", password: "123456", name: "血液中心质控审核员", role: "commission", roleName: "血液中心冷链质控", orgCode: "BLOOD-DL", orgName: "大连市血液中心", orgType: "blood_center", orgLevel: "市级", dataScope: "冷链异常、质量处置与血液放行", home: "blood.html", accountType: "blood_quality", bloodPermissions: ["cold_chain_quality_review"], status: "启用" },
+    { id: "u-blood-tech-1", username: "blood_tech_1", password: "123456", name: "输血科配血复核员甲", role: "institution", roleName: "输血科检验技师", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构交叉配血与发血复核", home: "blood.html", accountType: "blood_technologist", bloodPermissions: ["compatibility_review"], status: "启用" },
+    { id: "u-blood-tech-2", username: "blood_tech_2", password: "123456", name: "输血科配血复核员乙", role: "institution", roleName: "输血科检验技师", orgCode: "MR1", orgName: "大连市中心医院", orgType: "medical_institution", orgLevel: "三级医院", dataScope: "本机构交叉配血与发血复核", home: "blood.html", accountType: "blood_technologist", bloodPermissions: ["compatibility_review"], status: "启用" },
     { id: "u-city", username: "city", name: "市级管理员", role: "commission", roleName: "市级健康城市管理", orgCode: "ORG-CITY-DL", orgName: "大连市健康城市平台", orgType: "city", orgLevel: "市级", dataScope: "全市", home: "workbench.html", status: "启用" },
     { id: "u-district", username: "district", name: "区市县管理员", role: "commission", roleName: "区市县管理端", orgCode: "ORG-DIST-ZS", orgName: "中山区健康城市平台", orgType: "district", orgLevel: "区市县", dataScope: "中山区", home: "workbench.html", status: "启用" },
     { id: "u-health", username: "health", name: "大连市卫生健康委管理员", role: "commission", roleName: "大连市卫生健康委", orgCode: "ORG-HEALTH-DL", orgName: "大连市卫生健康委", orgType: "health_admin", orgLevel: "市级", dataScope: "医疗资源、统计直报、公共卫生、分级诊疗和数据质量监管", home: "index.html", status: "启用" },
@@ -1732,6 +1752,7 @@ function seedAuthOrganizations() {
     { orgCode: "ORG-CITY-DL", name: "大连市健康城市平台", orgType: "city", orgLevel: "市级", parentCode: "", portal: "workbench.html", dataScope: "全市总览、跨部门协同、运行监测", interfaces: ["统一认证", "人口主索引", "城市运行指标"] },
     { orgCode: "ORG-DIST-ZS", name: "中山区健康城市平台", orgType: "district", orgLevel: "区市县", parentCode: "ORG-CITY-DL", portal: "workbench.html", dataScope: "本区市县居民、机构、公共卫生和慢病管理", interfaces: ["区县数据交换", "基层治理平台"] },
     { orgCode: "ORG-HEALTH-DL", name: "大连市卫生健康委", orgType: "health_admin", orgLevel: "市级", parentCode: "ORG-CITY-DL", portal: "index.html", dataScope: "医疗资源、统计直报、公共卫生、分级诊疗监管", interfaces: ["卫生健康统计直报", "全民健康信息平台", "电子病历共享"] },
+    { orgCode: "BLOOD-DL", name: "大连市血液中心", orgType: "blood_center", orgLevel: "市级", parentCode: "ORG-HEALTH-DL", portal: "blood.html", dataScope: "血液采集、检测、冷链质控、库存、配送和输血安全", interfaces: ["血液信息系统", "血站质量管理", "医院输血科"] },
     { orgCode: "ORG-MI-DL", name: "大连市医保局", orgType: "insurance_bureau", orgLevel: "市级", parentCode: "ORG-CITY-DL", portal: "insurance.html", dataScope: "医保政策、基金监管、待遇管理、跨区县监督和部门协同", interfaces: ["医保政策管理", "基金监管", "待遇管理", "跨区县监督"] },
     { orgCode: "ORG-MI-CENTER-DL", name: "大连市医保中心", orgType: "insurance_center", orgLevel: "市级", parentCode: "ORG-MI-DL", portal: "insurance.html", dataScope: "医保结算经办、凭证核验、固定取药审核和业务留痕", interfaces: ["医保结算经办", "医保电子凭证", "慢病待遇经办", "固定取药审核"] },
     { orgCode: "ORG-MI-DIST-ZS", name: "中山区医保局", orgType: "district_insurance_bureau", orgLevel: "区市县", parentCode: "ORG-MI-DL", portal: "insurance.html", dataScope: "本区医保基金监管、机构监管、慢病待遇协同和基层服务监督", interfaces: ["区县医保监管", "机构监管", "基层待遇协同"] },
@@ -6994,6 +7015,21 @@ function normalizeState(data) {
     countyAcceptanceLedger: mergeByKey(seedCountyAcceptanceLedger(), data.countyAcceptanceLedger, "id"),
     imageCloudGateways: mergeByKey(seedImageCloudGateways(), data.imageCloudGateways, "id"),
     imageCloudStudies: mergeByKey(seedImageCloudStudies(), data.imageCloudStudies, "id"),
+    bloodUnits: mergeByKey(BloodService.seedBloodUnits(), data.bloodUnits, "id"),
+    transfusionRequests: mergeByKey(BloodService.seedTransfusionRequests(), data.transfusionRequests, "id"),
+    bloodAuditEvents: mergeByKey(BloodService.seedBloodAuditEvents(), data.bloodAuditEvents, "id"),
+    donorSafetyCases: mergeByKey(BloodService.seedDonorSafetyCases(), data.donorSafetyCases, "id"),
+    bloodSpecimens: mergeByKey(BloodService.seedBloodSpecimens(), data.bloodSpecimens, "id"),
+    bloodRecalls: mergeByKey(BloodService.seedBloodRecalls(), data.bloodRecalls, "id"),
+    transfusionReactions: mergeByKey(BloodService.seedTransfusionReactions(), data.transfusionReactions, "id"),
+    emergencyBloodAllocations: mergeByKey(BloodService.seedEmergencyAllocations(), data.emergencyBloodAllocations, "id"),
+    bloodTestReports: mergeByKey(BloodTransactionService.seedBloodTestReports(), data.bloodTestReports, "id"),
+    bloodReleaseReviews: mergeByKey(BloodTransactionService.seedBloodReleaseReviews(), data.bloodReleaseReviews, "id"),
+    bloodShipments: mergeByKey(BloodTransactionService.seedBloodShipments(), data.bloodShipments, "id"),
+    compatibilityTests: mergeByKey(BloodTransactionService.seedCompatibilityTests(), data.compatibilityTests, "id"),
+    transfusionEpisodes: mergeByKey(BloodTransactionService.seedTransfusionEpisodes(), data.transfusionEpisodes, "id"),
+    bloodSafetyIncidents: mergeByKey(BloodTransactionService.seedBloodSafetyIncidents(), data.bloodSafetyIncidents, "id"),
+    bloodIdempotencyRecords: Array.isArray(data.bloodIdempotencyRecords) ? data.bloodIdempotencyRecords.slice(0, 2000) : [],
     imageCloudShares: mergeByKey(seedImageCloudShares(), data.imageCloudShares, "id"),
     imageCloudQualityReviews: mergeByKey(seedImageCloudQualityReviews(), data.imageCloudQualityReviews, "id"),
     secureAttachments: Array.isArray(data.secureAttachments) ? data.secureAttachments : [],
@@ -20907,6 +20943,119 @@ async function handleApi(req, res) {
     ].slice(0, 120);
     writeDatabase(data);
     sendJson(res, 200, event);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/blood-system") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system");
+    if (!user) return;
+    const data = readDatabase();
+    BloodTransactionService.normalizeTransactionState(data);
+    const dashboard = BloodService.buildDashboard(data, user);
+    const scoped = (item) => user.role === "commission" || item.institutionCode === user.orgCode || item.destinationInstitution === user.orgCode;
+    sendJson(res, 200, {
+      ...dashboard,
+      testReports: user.role === "commission" ? data.bloodTestReports : [],
+      releaseReviews: user.role === "commission" ? data.bloodReleaseReviews : [],
+      shipments: data.bloodShipments.filter(scoped),
+      safetyIncidents: data.bloodSafetyIncidents.filter(scoped),
+      compatibilityTests: user.role === "institution" ? data.compatibilityTests.filter((item) => dashboard.transfusionRequests.some((request) => request.id === item.requestId)) : data.compatibilityTests,
+      transfusionEpisodes: data.transfusionEpisodes.filter(scoped)
+    });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/blood-system/transfusion-requests") {
+    const user = requireApiRole(req, res, ["institution"], "/api/blood-system/transfusion-requests");
+    if (!user) return;
+    const data = readDatabase();
+    const result = BloodService.createRequest(data, user, await collectJson(req));
+    if (result.status < 400) writeDatabase(data);
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/blood-system/specimens/assess") {
+    const user = requireApiRole(req, res, ["institution"], "/api/blood-system/specimens/assess");
+    if (!user) return;
+    const data = readDatabase();
+    const result = BloodService.assessSpecimen(data, user, await collectJson(req));
+    writeDatabase(data);
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/blood-system/recalls") {
+    const user = requireApiRole(req, res, ["commission"], "/api/blood-system/recalls");
+    if (!user) return;
+    const data = readDatabase();
+    const result = BloodService.createRecall(data, user, await collectJson(req));
+    if (result.status < 400) writeDatabase(data);
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/blood-system/transfusion-reactions") {
+    const user = requireApiRole(req, res, ["institution"], "/api/blood-system/transfusion-reactions");
+    if (!user) return;
+    const data = readDatabase();
+    const result = BloodService.reportReaction(data, user, await collectJson(req));
+    if (result.status < 400) writeDatabase(data);
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/blood-system/emergency-allocations") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/emergency-allocations");
+    if (!user) return;
+    const data = readDatabase();
+    const result = BloodService.createEmergencyAllocation(data, user, await collectJson(req));
+    if (result.status < 400) writeDatabase(data);
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  const bloodTransactionRoutes = {
+    "/api/blood-system/test-reports/sign": { roles: ["commission"], action: BloodTransactionService.signTestReport },
+    "/api/blood-system/release-reviews": { roles: ["commission"], action: BloodTransactionService.reviewRelease },
+    "/api/blood-system/shipments": { roles: ["commission"], action: BloodTransactionService.createShipment },
+    "/api/blood-system/shipments/receive": { roles: ["institution"], action: BloodTransactionService.receiveShipment },
+    "/api/blood-system/safety-incidents/cold-chain/review": { roles: ["commission"], action: BloodTransactionService.reviewColdChainIncident },
+    "/api/blood-system/compatibility-tests": { roles: ["institution"], action: BloodTransactionService.recordCompatibility },
+    "/api/blood-system/transfusions/start": { roles: ["institution"], action: BloodTransactionService.startTransfusion },
+    "/api/blood-system/transfusions/complete": { roles: ["institution"], action: BloodTransactionService.completeTransfusion }
+  };
+  if (req.method === "POST" && bloodTransactionRoutes[url.pathname]) {
+    const route = bloodTransactionRoutes[url.pathname];
+    const user = requireApiRole(req, res, route.roles, url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    const payload = await collectJson(req);
+    const idempotencyKey = String(req.headers["idempotency-key"] || payload.idempotencyKey || "").trim();
+    const result = route.action(data, user, payload, idempotencyKey);
+    writeDatabase(data);
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  const bloodTransitionMatch = url.pathname.match(/^\/api\/blood-system\/blood-units\/([^/]+)\/transition$/);
+  if (req.method === "POST" && bloodTransitionMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/blood-units/:id/transition");
+    if (!user) return;
+    const data = readDatabase();
+    const payload = await collectJson(req);
+    const result = BloodService.transitionBloodUnit(data, user, decodeURIComponent(bloodTransitionMatch[1]), String(payload.to || ""), payload.context || {});
+    writeDatabase(data);
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  const bloodTraceMatch = url.pathname.match(/^\/api\/blood-system\/trace\/([^/]+)$/);
+  if (req.method === "GET" && bloodTraceMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/trace/:code");
+    if (!user) return;
+    const result = BloodService.trace(readDatabase(), user, decodeURIComponent(bloodTraceMatch[1]));
+    sendJson(res, result.status, result.body);
     return;
   }
 

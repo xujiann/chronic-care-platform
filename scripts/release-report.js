@@ -48,6 +48,7 @@ const { buildPolicyCoverageReport, renderMarkdown: renderPolicyCoverageMarkdown 
 const { buildProcessAuditReport, renderMarkdown: renderProcessAuditMarkdown } = require("./process-audit");
 const { buildProductionDbReadinessReport, renderMarkdown: renderProductionDbReadinessMarkdown } = require("./production-db-readiness");
 const { buildPublicHealthReadinessReport, renderMarkdown: renderPublicHealthMarkdown } = require("./public-health-readiness");
+const { buildBloodSystemReadinessReport, renderMarkdown: renderBloodSystemMarkdown } = require("./blood-system-readiness");
 const { renderMarkdown: renderPriorityApplicationTemplatesMarkdown } = require("./priority-application-templates");
 const { buildRegionalDataSharingReport, renderMarkdown: renderRegionalDataSharingMarkdown } = require("./regional-data-sharing");
 const { buildQualitySafetyReport, renderMarkdown: renderQualitySafetyMarkdown } = require("./quality-safety-report");
@@ -761,6 +762,7 @@ function citizenLaunchFoundationChecks(citizenLaunchFoundation) {
     check("citizenLaunch:accountProvisioning", citizenLaunchFoundation.checks?.some((item) => item.id === "citizen-foundation:account-provisioning-boundary" && item.passed), "resident, doctor, and nurse account provisioning owners and audit evidence are documented", "error", "citizen-launch"),
     check("citizenLaunch:offlineCache", citizenLaunchFoundation.checks?.some((item) => item.id === "citizen-foundation:offline-cache" && item.passed), "resident PWA shell refreshes HTML/JS/CSS from network first", "error", "citizen-launch"),
     check("citizenLaunch:mobilePreviewServiceSwitch", citizenLaunchFoundation.checks?.some((item) => item.id === "citizen-foundation:mobile-preview-service-switch" && item.passed), "mobile preview service switch evidence present", "error", "citizen-launch"),
+    check("citizenLaunch:pipelineAcceptanceChecklist", citizenLaunchFoundation.checks?.some((item) => item.id === "citizen-foundation:pipeline-acceptance-checklist" && item.passed), "C-end pipeline audit exposes copyable onsite acceptance checklist", "error", "citizen-launch"),
     check("citizenLaunch:externalDependencies", citizenLaunchFoundation.externalDependencies?.every((item) => item.status === "required-before-production" && item.owner && item.cutoverBlocker && item.evidence && item.onsiteAcceptance), `${citizenLaunchFoundation.externalDependencies?.length || 0} production dependencies surfaced with owners, blockers, evidence, and onsite acceptance`, "error", "citizen-launch")
   ];
 }
@@ -931,6 +933,7 @@ function packageChecks(pkg) {
     "priority-apps:templates",
     "maternal-child:readiness",
     "public-health:readiness",
+    "blood-system:readiness",
     "policy:coverage",
     "integration:readiness",
     "interface:mapping",
@@ -972,6 +975,7 @@ function commandChecks(runCommands) {
   const npm = process.platform === "win32" ? "npm.cmd" : "npm";
   return [
     run(npm, ["run", "check"]),
+    run(npm, ["run", "blood-system:readiness"]),
     run(npm, ["test"]),
     run(npm, ["run", "test:coverage"]),
     run(npm, ["run", "test:e2e"]),
@@ -1037,6 +1041,7 @@ function buildReleaseReport(options = {}) {
   const priorityApplicationTemplates = buildPriorityApplicationTemplates({ data });
   const maternalChildReadiness = buildMaternalChildReadinessReport({ data, packageSource: JSON.stringify(pkg) });
   const publicHealthReadiness = buildPublicHealthReadinessReport({ data, pkg });
+  const bloodSystemReadiness = buildBloodSystemReadinessReport({ pkg });
   const policyCoverage = buildPolicyCoverageReport();
   const siteReadinessPack = buildSiteReadinessPack({ data, pkg, envFile: options.envFile || ".env.example", env: options.env || process.env, identityContract, interfaceMapping, monitoringReadiness });
   const onsiteLaunchRequirements = buildOnsiteLaunchRequirements({ pkg, sitePack: siteReadinessPack, releaseReport: { ok: true }, envFile: options.envFile || ".env.example", env: options.env || process.env });
@@ -1096,6 +1101,7 @@ function buildReleaseReport(options = {}) {
     ...priorityApplicationTemplateChecks(priorityApplicationTemplates),
     ...maternalChildReadinessChecks(maternalChildReadiness),
     ...publicHealthReadinessChecks(publicHealthReadiness),
+    check("bloodSystem:readiness", bloodSystemReadiness.ok, bloodSystemReadiness.ok ? "blood system readiness checks passed" : "blood system readiness failed", "error", "blood-system"),
     ...policyCoverageChecks(policyCoverage),
     ...env.checks,
     ...commandChecks(options.runCommands)
@@ -1167,6 +1173,7 @@ function buildReleaseReport(options = {}) {
     priorityApplicationTemplates,
     maternalChildReadiness,
     publicHealthReadiness,
+    bloodSystemReadiness,
     policyCoverage
   };
 }
@@ -1868,6 +1875,14 @@ function writeOutput(report, flags) {
       generatedAt: report.generatedAt,
       publicHealthReadiness: report.publicHealthReadiness
     }, null, 2), "utf8");
+    const bloodSystemReadinessJson = path.join(path.dirname(output), "blood-system-readiness-report.json");
+    fs.writeFileSync(bloodSystemReadinessJson, JSON.stringify({
+      project: report.project,
+      version: report.version,
+      profile: report.profile,
+      generatedAt: report.generatedAt,
+      bloodSystemReadiness: report.bloodSystemReadiness
+    }, null, 2), "utf8");
     const policyCoverageJson = path.join(path.dirname(output), "policy-coverage-report.json");
     fs.writeFileSync(policyCoverageJson, JSON.stringify({
       project: report.project,
@@ -1991,6 +2006,8 @@ function writeOutput(report, flags) {
     fs.writeFileSync(maternalChildReadinessMarkdown, renderMaternalChildReadinessMarkdown(report.maternalChildReadiness), "utf8");
     const publicHealthReadinessMarkdown = path.join(path.dirname(markdown), "public-health-readiness-report.md");
     fs.writeFileSync(publicHealthReadinessMarkdown, renderPublicHealthMarkdown(report.publicHealthReadiness), "utf8");
+    const bloodSystemReadinessMarkdown = path.join(path.dirname(markdown), "blood-system-readiness-report.md");
+    fs.writeFileSync(bloodSystemReadinessMarkdown, renderBloodSystemMarkdown(report.bloodSystemReadiness), "utf8");
     const policyCoverageMarkdown = path.join(path.dirname(markdown), "policy-coverage-report.md");
     fs.writeFileSync(policyCoverageMarkdown, renderPolicyCoverageMarkdown(report.policyCoverage), "utf8");
     const releaseArtifactManifestMarkdown = path.join(path.dirname(markdown), "release-artifact-manifest.md");

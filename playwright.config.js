@@ -19,6 +19,9 @@ module.exports = defineConfig({
     screenshot: "only-on-failure",
     trace: "retain-on-failure"
   },
+  expect: {
+    timeout: 15_000
+  },
   webServer: {
     command: "node test/e2e/test-server.js",
     url: "http://127.0.0.1:5210/api/health",

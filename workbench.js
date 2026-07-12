@@ -19,19 +19,35 @@ let currentSiteReadinessPack = null;
 let currentSiteTemplateReadmes = null;
 
 document.addEventListener("DOMContentLoaded", async () => {
-  const state = await loadPlatformState(fallbackState);
-  const operations = await loadOperationalMetrics();
-  const readiness = await loadSystemReadiness();
-  const processAudit = await loadProcessAudit();
-  const serviceAcceptanceSummary = await loadServiceAcceptanceSummary();
-  const acceptanceLedgers = await loadAcceptanceLedgers();
-  const siteReadinessPack = await loadSiteReadinessPack();
-  const siteTemplateReadmes = await loadSiteTemplateReadmes();
-  const siteLaunchEvidence = await loadSiteLaunchEvidence();
-  const releaseReport = await loadReleaseReport();
-  const productionCutover = await loadProductionCutoverChecklist();
-  const releaseArtifactManifest = await loadReleaseArtifactManifest();
-  const unifiedTaskReport = await loadUnifiedTaskReport();
+  const [
+    state,
+    operations,
+    readiness,
+    processAudit,
+    serviceAcceptanceSummary,
+    acceptanceLedgers,
+    siteReadinessPack,
+    siteTemplateReadmes,
+    siteLaunchEvidence,
+    releaseReport,
+    productionCutover,
+    releaseArtifactManifest,
+    unifiedTaskReport
+  ] = await Promise.all([
+    loadPlatformState(fallbackState),
+    loadOperationalMetrics(),
+    loadSystemReadiness(),
+    loadProcessAudit(),
+    loadServiceAcceptanceSummary(),
+    loadAcceptanceLedgers(),
+    loadSiteReadinessPack(),
+    loadSiteTemplateReadmes(),
+    loadSiteLaunchEvidence(),
+    loadReleaseReport(),
+    loadProductionCutoverChecklist(),
+    loadReleaseArtifactManifest(),
+    loadUnifiedTaskReport()
+  ]);
   const tasks = unifiedTaskReport?.tasks?.length ? normalizeApiTasks(unifiedTaskReport.tasks) : collectUnifiedTasks(state);
   const roadmap = state.platformRoadmap?.length ? state.platformRoadmap : defaultRoadmap();
   currentSiteReadinessPack = siteReadinessPack;
