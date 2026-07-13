@@ -132,6 +132,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "database:postgresWorkerDeployment",
     "database:postgresBaselineBootstrap",
     "database:postgresShadowReconciliation",
+    "database:postgresReconciliationCaseWorkflow",
     "database:postgresReconciliationDeployment",
     "runtime:sqliteProductionProfile",
     "api:citizenOperationsCenter",

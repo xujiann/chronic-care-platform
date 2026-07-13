@@ -5,6 +5,7 @@ const path = require("node:path");
 const test = require("node:test");
 
 const {
+  applyPostgresReconciliationCaseAction,
   applyPostgresSyncBatch,
   buildCollectionChanges,
   buildCollectionSnapshotChanges,
@@ -12,11 +13,15 @@ const {
   comparePostgresShadowState,
   enqueuePostgresSyncBatch,
   enqueuePostgresSyncBaseline,
+  listPostgresReconciliationCases,
+  listPostgresReconciliationHistory,
   loadPendingPostgresSyncBatches,
   loadSqliteCollectionState,
   markPostgresSyncBatch,
   postgresPoolConfig,
   readLatestPostgresReconciliation,
+  readPostgresReconciliationCase,
+  readPostgresReconciliationRun,
   readPostgresSyncStatus,
   runPostgresShadowReconciliation,
   runPostgresSyncWorker,
@@ -63,6 +68,43 @@ function createOutboxDatabase(file) {
       duration_ms INTEGER NOT NULL DEFAULT 0,
       error_code TEXT NOT NULL DEFAULT '',
       detail_json TEXT NOT NULL DEFAULT '[]'
+    );
+    CREATE TABLE postgres_sync_reconciliation_cases (
+      case_id TEXT PRIMARY KEY,
+      collection_name TEXT NOT NULL UNIQUE,
+      status TEXT NOT NULL DEFAULT 'open',
+      owner TEXT NOT NULL DEFAULT 'database-operations',
+      severity TEXT NOT NULL DEFAULT 'critical',
+      first_run_id TEXT NOT NULL,
+      latest_run_id TEXT NOT NULL,
+      cleared_run_id TEXT NOT NULL DEFAULT '',
+      first_seen_at TEXT NOT NULL,
+      last_seen_at TEXT NOT NULL,
+      cleared_at TEXT NOT NULL DEFAULT '',
+      occurrence_count INTEGER NOT NULL DEFAULT 1,
+      difference_types_json TEXT NOT NULL DEFAULT '[]',
+      local_version INTEGER,
+      remote_version INTEGER,
+      local_digest TEXT NOT NULL DEFAULT '',
+      remote_digest TEXT NOT NULL DEFAULT '',
+      resolution_note TEXT NOT NULL DEFAULT '',
+      resolved_at TEXT NOT NULL DEFAULT '',
+      resolved_by TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL
+    );
+    CREATE TABLE postgres_sync_reconciliation_case_actions (
+      action_id TEXT PRIMARY KEY,
+      case_id TEXT NOT NULL,
+      action TEXT NOT NULL,
+      from_status TEXT NOT NULL,
+      to_status TEXT NOT NULL,
+      actor TEXT NOT NULL,
+      role TEXT NOT NULL,
+      owner TEXT NOT NULL DEFAULT '',
+      note TEXT NOT NULL DEFAULT '',
+      evidence_json TEXT NOT NULL DEFAULT '[]',
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (case_id) REFERENCES postgres_sync_reconciliation_cases(case_id) ON DELETE RESTRICT
     );
   `);
   return db;
@@ -249,6 +291,87 @@ test("PostgreSQL shadow reconciliation uses a read-only transaction and persists
   assert.equal(persisted.status, "matched");
   assert.equal(readPostgresSyncStatus(sqliteFile).reconciliation.mismatched, 0);
   assert.doesNotMatch(JSON.stringify(report), /enabled|DATABASE_URL|postgres:\/\//);
+});
+
+test("PostgreSQL reconciliation cases preserve assignment, clearance, resolution and automatic reopening", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "postgres-reconciliation-case-test-"));
+  const sqliteFile = path.join(dir, "outbox.sqlite");
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const db = createOutboxDatabase(sqliteFile);
+  db.prepare("INSERT INTO state_collections (key, payload, version) VALUES (?, ?, ?)").run("settings", JSON.stringify({ enabled: true }), 3);
+  db.close();
+  const [local] = loadSqliteCollectionState(sqliteFile);
+  const poolWithRows = (rows) => ({
+    async connect() {
+      return {
+        async query(sql) {
+          return /SELECT collection_name/.test(sql) ? { rows } : { rows: [] };
+        },
+        release() {}
+      };
+    }
+  });
+
+  const first = await runPostgresShadowReconciliation({
+    mode: "outbox",
+    sqliteFile,
+    pool: poolWithRows([]),
+    runId: "pgrecon-case-1",
+    checkedAt: "2026-07-12T03:00:00.000Z"
+  });
+  assert.equal(first.status, "mismatched");
+  let ledger = listPostgresReconciliationCases(sqliteFile);
+  assert.equal(ledger.summary.open, 1);
+  assert.equal(ledger.summary.unresolved, 1);
+  const caseId = ledger.cases[0].caseId;
+  assert.deepEqual(ledger.cases[0].differenceTypes, ["missing-remote"]);
+
+  const acknowledged = applyPostgresReconciliationCaseAction(sqliteFile, caseId, {
+    action: "acknowledge",
+    owner: "database-platform-team",
+    note: "Owner confirmed the shadow delivery investigation."
+  }, { name: "release reviewer", role: "commission" });
+  assert.equal(acknowledged.status, "acknowledged");
+  assert.equal(acknowledged.owner, "database-platform-team");
+  assert.throws(() => applyPostgresReconciliationCaseAction(sqliteFile, caseId, {
+    action: "resolve",
+    note: "Validated after replay.",
+    evidenceRefs: ["reconciliation:pgrecon-case-2"]
+  }, { name: "release reviewer", role: "commission" }), (error) => error.code === "RECONCILIATION_CLEARANCE_REQUIRED" && error.statusCode === 409);
+
+  await runPostgresShadowReconciliation({
+    mode: "outbox",
+    sqliteFile,
+    pool: poolWithRows([{ collection_name: local.collection, payload_sha256: local.payloadSha256, source_version: local.sourceVersion, batch_id: "batch-case-2" }]),
+    runId: "pgrecon-case-2",
+    checkedAt: "2026-07-12T03:05:00.000Z"
+  });
+  ledger = listPostgresReconciliationCases(sqliteFile);
+  assert.equal(ledger.summary.clearedAwaitingResolution, 1);
+  const resolved = applyPostgresReconciliationCaseAction(sqliteFile, caseId, {
+    action: "resolve",
+    note: "Validated by a later matched reconciliation run.",
+    evidenceRefs: ["reconciliation:pgrecon-case-2", "ticket:DB-42"]
+  }, { name: "release reviewer", role: "commission" });
+  assert.equal(resolved.status, "resolved");
+  assert.equal(resolved.clearedRunId, "pgrecon-case-2");
+  assert.equal(resolved.actions.some((item) => item.action === "verified-clear"), true);
+  assert.equal(listPostgresReconciliationHistory(sqliteFile).length, 2);
+  assert.equal(readPostgresReconciliationRun(sqliteFile, "pgrecon-case-1").summary.missingRemote, 1);
+
+  await runPostgresShadowReconciliation({
+    mode: "outbox",
+    sqliteFile,
+    pool: poolWithRows([]),
+    runId: "pgrecon-case-3",
+    checkedAt: "2026-07-12T03:10:00.000Z"
+  });
+  const reopened = readPostgresReconciliationCase(sqliteFile, caseId);
+  assert.equal(reopened.status, "reopened");
+  assert.equal(reopened.occurrenceCount, 2);
+  assert.equal(reopened.actions.some((item) => item.action === "auto-reopen"), true);
+  assert.equal(readPostgresSyncStatus(sqliteFile).reconciliation.cases.unresolved, 1);
+  assert.doesNotMatch(JSON.stringify(reopened), /enabled|DATABASE_URL|postgres:\/\//);
 });
 
 test("PostgreSQL shadow reconciliation stores only a safe error code", async (t) => {

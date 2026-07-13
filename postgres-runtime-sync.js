@@ -7,6 +7,17 @@ const SYNC_MODE = String(process.env.POSTGRES_SYNC_MODE || "disabled").trim().to
 const SYNC_MODES = new Set(["disabled", "outbox"]);
 const MAX_BATCH_LIMIT = 100;
 const MAX_RECONCILIATION_HISTORY = 100;
+const RECONCILIATION_CASE_STATUSES = new Set(["open", "acknowledged", "resolved", "reopened"]);
+const RECONCILIATION_CASE_ACTIONS = new Set(["assign", "acknowledge", "resolve", "reopen", "comment"]);
+
+class PostgresReconciliationCaseError extends Error {
+  constructor(message, code, statusCode = 400) {
+    super(message);
+    this.name = "PostgresReconciliationCaseError";
+    this.code = code;
+    this.statusCode = statusCode;
+  }
+}
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -159,7 +170,266 @@ function enqueuePostgresSyncBaseline(sqliteFile, options = {}) {
 function openSqlite(sqliteFile) {
   const sqlite = require("node:sqlite");
   if (!sqlite?.DatabaseSync) throw new Error("node:sqlite DatabaseSync unavailable");
-  return new sqlite.DatabaseSync(sqliteFile);
+  const db = new sqlite.DatabaseSync(sqliteFile);
+  db.exec("PRAGMA foreign_keys = ON");
+  db.exec("PRAGMA busy_timeout = 5000");
+  return db;
+}
+
+function sqliteTableExists(db, name) {
+  return Boolean(db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?").get(name));
+}
+
+function parseJsonArray(value) {
+  try {
+    const parsed = JSON.parse(value || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function reconciliationRow(row) {
+  if (!row) return null;
+  return {
+    runId: row.run_id,
+    checkedAt: row.checked_at,
+    status: row.status,
+    durationMs: Number(row.duration_ms || 0),
+    errorCode: row.error_code || "",
+    summary: {
+      localCollections: Number(row.local_collections || 0),
+      remoteCollections: Number(row.remote_collections || 0),
+      matched: Number(row.matched || 0),
+      mismatched: Number(row.mismatched || 0),
+      missingRemote: Number(row.missing_remote || 0),
+      unexpectedRemote: Number(row.unexpected_remote || 0),
+      versionMismatches: Number(row.version_mismatches || 0),
+      digestMismatches: Number(row.digest_mismatches || 0)
+    },
+    differences: parseJsonArray(row.detail_json),
+    productionPrimary: false
+  };
+}
+
+function reconciliationCaseActionRow(row) {
+  return {
+    actionId: row.action_id,
+    action: row.action,
+    fromStatus: row.from_status,
+    toStatus: row.to_status,
+    actor: row.actor,
+    role: row.role,
+    owner: row.owner,
+    note: row.note,
+    evidenceRefs: parseJsonArray(row.evidence_json),
+    createdAt: row.created_at
+  };
+}
+
+function reconciliationCaseRow(row, actions = []) {
+  if (!row) return null;
+  return {
+    caseId: row.case_id,
+    collection: row.collection_name,
+    status: row.status,
+    owner: row.owner,
+    severity: row.severity,
+    firstRunId: row.first_run_id,
+    latestRunId: row.latest_run_id,
+    clearedRunId: row.cleared_run_id,
+    firstSeenAt: row.first_seen_at,
+    lastSeenAt: row.last_seen_at,
+    clearedAt: row.cleared_at,
+    occurrenceCount: Number(row.occurrence_count || 0),
+    differenceTypes: parseJsonArray(row.difference_types_json),
+    localVersion: row.local_version === null ? null : Number(row.local_version),
+    remoteVersion: row.remote_version === null ? null : Number(row.remote_version),
+    localDigest: row.local_digest || "",
+    remoteDigest: row.remote_digest || "",
+    resolutionNote: row.resolution_note || "",
+    resolvedAt: row.resolved_at || "",
+    resolvedBy: row.resolved_by || "",
+    updatedAt: row.updated_at,
+    actions
+  };
+}
+
+function emptyReconciliationCaseLedger() {
+  return {
+    summary: { total: 0, open: 0, acknowledged: 0, resolved: 0, reopened: 0, unresolved: 0, clearedAwaitingResolution: 0 },
+    cases: []
+  };
+}
+
+function readReconciliationCaseFromDb(db, caseId, includeActions = true) {
+  const row = db.prepare("SELECT * FROM postgres_sync_reconciliation_cases WHERE case_id = ?").get(caseId);
+  if (!row) return null;
+  const actions = includeActions
+    ? db.prepare("SELECT * FROM postgres_sync_reconciliation_case_actions WHERE case_id = ? ORDER BY created_at DESC, rowid DESC").all(caseId).map(reconciliationCaseActionRow)
+    : [];
+  return reconciliationCaseRow(row, actions);
+}
+
+function listPostgresReconciliationHistory(sqliteFile, options = {}) {
+  if (!fs.existsSync(sqliteFile)) return [];
+  const limit = Math.min(MAX_RECONCILIATION_HISTORY, Math.max(1, Number(options.limit || 20) || 20));
+  const status = String(options.status || "").trim();
+  if (status && !["matched", "mismatched", "error"].includes(status)) {
+    throw new PostgresReconciliationCaseError("Unsupported reconciliation status", "INVALID_RECONCILIATION_STATUS");
+  }
+  const db = openSqlite(sqliteFile);
+  try {
+    if (!sqliteTableExists(db, "postgres_sync_reconciliations")) return [];
+    const rows = status
+      ? db.prepare("SELECT * FROM postgres_sync_reconciliations WHERE status = ? ORDER BY checked_at DESC, rowid DESC LIMIT ?").all(status, limit)
+      : db.prepare("SELECT * FROM postgres_sync_reconciliations ORDER BY checked_at DESC, rowid DESC LIMIT ?").all(limit);
+    return rows.map(reconciliationRow);
+  } finally {
+    db.close();
+  }
+}
+
+function readPostgresReconciliationRun(sqliteFile, runId) {
+  if (!fs.existsSync(sqliteFile)) return null;
+  const db = openSqlite(sqliteFile);
+  try {
+    if (!sqliteTableExists(db, "postgres_sync_reconciliations")) return null;
+    return reconciliationRow(db.prepare("SELECT * FROM postgres_sync_reconciliations WHERE run_id = ?").get(String(runId || "")));
+  } finally {
+    db.close();
+  }
+}
+
+function listPostgresReconciliationCases(sqliteFile, options = {}) {
+  if (!fs.existsSync(sqliteFile)) return emptyReconciliationCaseLedger();
+  const limit = Math.min(200, Math.max(1, Number(options.limit || 50) || 50));
+  const status = String(options.status || "").trim();
+  if (status && !RECONCILIATION_CASE_STATUSES.has(status)) {
+    throw new PostgresReconciliationCaseError("Unsupported reconciliation case status", "INVALID_RECONCILIATION_CASE_STATUS");
+  }
+  const db = openSqlite(sqliteFile);
+  try {
+    if (!sqliteTableExists(db, "postgres_sync_reconciliation_cases")) return emptyReconciliationCaseLedger();
+    const rows = status
+      ? db.prepare("SELECT * FROM postgres_sync_reconciliation_cases WHERE status = ? ORDER BY updated_at DESC, rowid DESC LIMIT ?").all(status, limit)
+      : db.prepare("SELECT * FROM postgres_sync_reconciliation_cases ORDER BY CASE status WHEN 'reopened' THEN 0 WHEN 'open' THEN 1 WHEN 'acknowledged' THEN 2 ELSE 3 END, updated_at DESC, rowid DESC LIMIT ?").all(limit);
+    const counts = db.prepare("SELECT status, COUNT(*) AS count FROM postgres_sync_reconciliation_cases GROUP BY status").all()
+      .reduce((summary, row) => ({ ...summary, [row.status]: Number(row.count || 0) }), {});
+    const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
+    const cleared = db.prepare("SELECT COUNT(*) AS count FROM postgres_sync_reconciliation_cases WHERE status != 'resolved' AND cleared_at != ''").get();
+    return {
+      summary: {
+        total,
+        open: counts.open || 0,
+        acknowledged: counts.acknowledged || 0,
+        resolved: counts.resolved || 0,
+        reopened: counts.reopened || 0,
+        unresolved: (counts.open || 0) + (counts.acknowledged || 0) + (counts.reopened || 0),
+        clearedAwaitingResolution: Number(cleared?.count || 0)
+      },
+      cases: rows.map((row) => reconciliationCaseRow(row))
+    };
+  } finally {
+    db.close();
+  }
+}
+
+function readPostgresReconciliationCase(sqliteFile, caseId) {
+  if (!fs.existsSync(sqliteFile)) return null;
+  const db = openSqlite(sqliteFile);
+  try {
+    if (!sqliteTableExists(db, "postgres_sync_reconciliation_cases")) return null;
+    return readReconciliationCaseFromDb(db, String(caseId || ""));
+  } finally {
+    db.close();
+  }
+}
+
+function boundedCaseText(value, maxLength) {
+  return String(value || "").trim().slice(0, maxLength);
+}
+
+function normalizeCaseEvidenceRefs(value) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) throw new PostgresReconciliationCaseError("evidenceRefs must be an array", "INVALID_RECONCILIATION_EVIDENCE");
+  return [...new Set(value.map((item) => boundedCaseText(item, 240)).filter(Boolean))].slice(0, 10);
+}
+
+function applyPostgresReconciliationCaseAction(sqliteFile, caseId, input = {}, actor = {}) {
+  const action = boundedCaseText(input.action, 40);
+  if (!RECONCILIATION_CASE_ACTIONS.has(action)) {
+    throw new PostgresReconciliationCaseError("Unsupported reconciliation case action", "INVALID_RECONCILIATION_CASE_ACTION");
+  }
+  const db = openSqlite(sqliteFile);
+  try {
+    if (!sqliteTableExists(db, "postgres_sync_reconciliation_cases")) {
+      throw new PostgresReconciliationCaseError("Reconciliation case ledger is unavailable", "RECONCILIATION_CASE_LEDGER_UNAVAILABLE", 409);
+    }
+    db.exec("BEGIN IMMEDIATE");
+    const current = readReconciliationCaseFromDb(db, String(caseId || ""), false);
+    if (!current) throw new PostgresReconciliationCaseError("Reconciliation case not found", "RECONCILIATION_CASE_NOT_FOUND", 404);
+    const note = boundedCaseText(input.note, 1000);
+    const requestedOwner = boundedCaseText(input.owner, 120);
+    const evidenceRefs = normalizeCaseEvidenceRefs(input.evidenceRefs);
+    const now = input.at || new Date().toISOString();
+    const actorName = boundedCaseText(actor.name || actor.username || actor.id || "unknown", 120);
+    const actorRole = boundedCaseText(actor.role || "unknown", 60);
+    let nextStatus = current.status;
+    let owner = requestedOwner || current.owner;
+    let resolutionNote = current.resolutionNote;
+    let resolvedAt = current.resolvedAt;
+    let resolvedBy = current.resolvedBy;
+    let clearedAt = current.clearedAt;
+    let clearedRunId = current.clearedRunId;
+
+    if (action === "assign") {
+      if (requestedOwner.length < 2) throw new PostgresReconciliationCaseError("owner is required", "RECONCILIATION_CASE_OWNER_REQUIRED");
+    } else if (action === "acknowledge") {
+      if (!["open", "reopened"].includes(current.status)) throw new PostgresReconciliationCaseError("Only open or reopened cases can be acknowledged", "INVALID_RECONCILIATION_CASE_TRANSITION", 409);
+      if (!owner) throw new PostgresReconciliationCaseError("owner is required before acknowledgement", "RECONCILIATION_CASE_OWNER_REQUIRED");
+      if (note.length < 4) throw new PostgresReconciliationCaseError("acknowledgement note is required", "RECONCILIATION_CASE_NOTE_REQUIRED");
+      nextStatus = "acknowledged";
+    } else if (action === "resolve") {
+      if (current.status !== "acknowledged") throw new PostgresReconciliationCaseError("Only acknowledged cases can be resolved", "INVALID_RECONCILIATION_CASE_TRANSITION", 409);
+      if (!current.clearedAt) throw new PostgresReconciliationCaseError("A matched reconciliation run is required before resolution", "RECONCILIATION_CLEARANCE_REQUIRED", 409);
+      if (note.length < 8 || evidenceRefs.length === 0) throw new PostgresReconciliationCaseError("resolution note and evidenceRefs are required", "RECONCILIATION_RESOLUTION_EVIDENCE_REQUIRED");
+      nextStatus = "resolved";
+      resolutionNote = note;
+      resolvedAt = now;
+      resolvedBy = actorName;
+    } else if (action === "reopen") {
+      if (current.status !== "resolved") throw new PostgresReconciliationCaseError("Only resolved cases can be reopened", "INVALID_RECONCILIATION_CASE_TRANSITION", 409);
+      if (note.length < 8) throw new PostgresReconciliationCaseError("reopen note is required", "RECONCILIATION_CASE_NOTE_REQUIRED");
+      nextStatus = "reopened";
+      resolutionNote = "";
+      resolvedAt = "";
+      resolvedBy = "";
+      clearedAt = "";
+      clearedRunId = "";
+    } else if (action === "comment" && note.length < 2) {
+      throw new PostgresReconciliationCaseError("comment note is required", "RECONCILIATION_CASE_NOTE_REQUIRED");
+    }
+
+    db.prepare(`
+      UPDATE postgres_sync_reconciliation_cases
+      SET status = ?, owner = ?, resolution_note = ?, resolved_at = ?, resolved_by = ?,
+          cleared_at = ?, cleared_run_id = ?, updated_at = ?
+      WHERE case_id = ?
+    `).run(nextStatus, owner, resolutionNote, resolvedAt, resolvedBy, clearedAt, clearedRunId, now, current.caseId);
+    db.prepare(`
+      INSERT INTO postgres_sync_reconciliation_case_actions (
+        action_id, case_id, action, from_status, to_status, actor, role, owner, note, evidence_json, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(`pgrca-${randomUUID()}`, current.caseId, action, current.status, nextStatus, actorName, actorRole, owner, note, JSON.stringify(evidenceRefs), now);
+    db.exec("COMMIT");
+    return readPostgresReconciliationCase(sqliteFile, current.caseId);
+  } catch (error) {
+    try { db.exec("ROLLBACK"); } catch {}
+    throw error;
+  } finally {
+    db.close();
+  }
 }
 
 function readPostgresSyncStatus(sqliteFile) {
@@ -170,7 +440,15 @@ function readPostgresSyncStatus(sqliteFile) {
     failed: 0,
     oldestPendingAt: "",
     lastDeliveredAt: "",
-    reconciliation: { status: "never", runId: "", checkedAt: "", matched: 0, mismatched: 0, durationMs: 0 }
+    reconciliation: {
+      status: "never",
+      runId: "",
+      checkedAt: "",
+      matched: 0,
+      mismatched: 0,
+      durationMs: 0,
+      cases: emptyReconciliationCaseLedger().summary
+    }
   };
   if (!fs.existsSync(sqliteFile)) return empty;
   const db = openSqlite(sqliteFile);
@@ -188,6 +466,24 @@ function readPostgresSyncStatus(sqliteFile) {
       ORDER BY checked_at DESC, rowid DESC
       LIMIT 1
     `).get() : null;
+    const caseTable = sqliteTableExists(db, "postgres_sync_reconciliation_cases");
+    const caseCounts = caseTable
+      ? db.prepare("SELECT status, COUNT(*) AS count FROM postgres_sync_reconciliation_cases GROUP BY status").all()
+        .reduce((summary, row) => ({ ...summary, [row.status]: Number(row.count || 0) }), {})
+      : {};
+    const caseTotal = Object.values(caseCounts).reduce((sum, count) => sum + count, 0);
+    const clearedAwaitingResolution = caseTable
+      ? Number(db.prepare("SELECT COUNT(*) AS count FROM postgres_sync_reconciliation_cases WHERE status != 'resolved' AND cleared_at != ''").get()?.count || 0)
+      : 0;
+    const caseSummary = {
+      total: caseTotal,
+      open: caseCounts.open || 0,
+      acknowledged: caseCounts.acknowledged || 0,
+      resolved: caseCounts.resolved || 0,
+      reopened: caseCounts.reopened || 0,
+      unresolved: (caseCounts.open || 0) + (caseCounts.acknowledged || 0) + (caseCounts.reopened || 0),
+      clearedAwaitingResolution
+    };
     return {
       pending: counts.pending || 0,
       retry: counts.retry || 0,
@@ -201,7 +497,8 @@ function readPostgresSyncStatus(sqliteFile) {
         checkedAt: latest.checked_at,
         matched: Number(latest.matched || 0),
         mismatched: Number(latest.mismatched || 0),
-        durationMs: Number(latest.duration_ms || 0)
+        durationMs: Number(latest.duration_ms || 0),
+        cases: caseSummary
       } : empty.reconciliation
     };
   } finally {
@@ -267,9 +564,104 @@ function comparePostgresShadowState(localRows = [], remoteRows = []) {
   };
 }
 
+function insertSystemReconciliationCaseAction(db, caseId, action, fromStatus, toStatus, owner, runId, createdAt) {
+  db.prepare(`
+    INSERT INTO postgres_sync_reconciliation_case_actions (
+      action_id, case_id, action, from_status, to_status, actor, role, owner, note, evidence_json, created_at
+    ) VALUES (?, ?, ?, ?, ?, 'shadow-reconciler', 'system', ?, ?, ?, ?)
+  `).run(
+    `pgrca-${randomUUID()}`,
+    caseId,
+    action,
+    fromStatus,
+    toStatus,
+    owner,
+    action === "detected" ? "Difference detected by read-only shadow reconciliation." : action === "auto-reopen" ? "Resolved difference appeared again." : "A later reconciliation no longer observed this difference.",
+    JSON.stringify([`reconciliation:${runId}`]),
+    createdAt
+  );
+}
+
+function syncPostgresReconciliationCases(db, report) {
+  if (!sqliteTableExists(db, "postgres_sync_reconciliation_cases") || !sqliteTableExists(db, "postgres_sync_reconciliation_case_actions")) return;
+  if (report.status === "error") return;
+  const observedCollections = new Set();
+  (report.differences || []).forEach((difference) => {
+    const collection = boundedCaseText(difference.collection, 240);
+    if (!collection) return;
+    observedCollections.add(collection);
+    const existing = db.prepare("SELECT * FROM postgres_sync_reconciliation_cases WHERE collection_name = ?").get(collection);
+    const caseId = existing?.case_id || `pgrc-${sha256(collection).slice(0, 24)}`;
+    const differenceTypes = [...new Set((difference.types || []).map((item) => boundedCaseText(item, 80)).filter(Boolean))];
+    if (!existing) {
+      db.prepare(`
+        INSERT INTO postgres_sync_reconciliation_cases (
+          case_id, collection_name, status, owner, severity, first_run_id, latest_run_id, cleared_run_id,
+          first_seen_at, last_seen_at, cleared_at, occurrence_count, difference_types_json,
+          local_version, remote_version, local_digest, remote_digest,
+          resolution_note, resolved_at, resolved_by, updated_at
+        ) VALUES (?, ?, 'open', 'database-operations', 'critical', ?, ?, '', ?, ?, '', 1, ?, ?, ?, ?, ?, '', '', '', ?)
+      `).run(
+        caseId,
+        collection,
+        report.runId,
+        report.runId,
+        report.checkedAt,
+        report.checkedAt,
+        JSON.stringify(differenceTypes),
+        difference.localVersion ?? null,
+        difference.remoteVersion ?? null,
+        boundedCaseText(difference.localDigest, 128),
+        boundedCaseText(difference.remoteDigest, 128),
+        report.checkedAt
+      );
+      insertSystemReconciliationCaseAction(db, caseId, "detected", "none", "open", "database-operations", report.runId, report.checkedAt);
+      return;
+    }
+    const nextStatus = existing.status === "resolved" ? "reopened" : existing.status;
+    db.prepare(`
+      UPDATE postgres_sync_reconciliation_cases
+      SET status = ?, latest_run_id = ?, cleared_run_id = '', last_seen_at = ?, cleared_at = '',
+          occurrence_count = occurrence_count + 1, difference_types_json = ?,
+          local_version = ?, remote_version = ?, local_digest = ?, remote_digest = ?,
+          resolution_note = CASE WHEN status = 'resolved' THEN '' ELSE resolution_note END,
+          resolved_at = CASE WHEN status = 'resolved' THEN '' ELSE resolved_at END,
+          resolved_by = CASE WHEN status = 'resolved' THEN '' ELSE resolved_by END,
+          updated_at = ?
+      WHERE case_id = ?
+    `).run(
+      nextStatus,
+      report.runId,
+      report.checkedAt,
+      JSON.stringify(differenceTypes),
+      difference.localVersion ?? null,
+      difference.remoteVersion ?? null,
+      boundedCaseText(difference.localDigest, 128),
+      boundedCaseText(difference.remoteDigest, 128),
+      report.checkedAt,
+      caseId
+    );
+    if (existing.status === "resolved") {
+      insertSystemReconciliationCaseAction(db, caseId, "auto-reopen", "resolved", "reopened", existing.owner, report.runId, report.checkedAt);
+    }
+  });
+
+  db.prepare("SELECT * FROM postgres_sync_reconciliation_cases WHERE status != 'resolved' AND cleared_at = ''").all()
+    .filter((row) => !observedCollections.has(row.collection_name))
+    .forEach((row) => {
+      db.prepare(`
+        UPDATE postgres_sync_reconciliation_cases
+        SET cleared_run_id = ?, cleared_at = ?, updated_at = ?
+        WHERE case_id = ?
+      `).run(report.runId, report.checkedAt, report.checkedAt, row.case_id);
+      insertSystemReconciliationCaseAction(db, row.case_id, "verified-clear", row.status, row.status, row.owner, report.runId, report.checkedAt);
+    });
+}
+
 function recordPostgresReconciliation(sqliteFile, report) {
   const db = openSqlite(sqliteFile);
   try {
+    db.exec("BEGIN IMMEDIATE");
     db.prepare(`
       INSERT INTO postgres_sync_reconciliations (
         run_id, checked_at, status, local_collections, remote_collections, matched, mismatched,
@@ -292,12 +684,17 @@ function recordPostgresReconciliation(sqliteFile, report) {
       report.errorCode || "",
       JSON.stringify(report.differences || [])
     );
+    syncPostgresReconciliationCases(db, report);
     db.prepare(`
       DELETE FROM postgres_sync_reconciliations
       WHERE rowid NOT IN (
         SELECT rowid FROM postgres_sync_reconciliations ORDER BY checked_at DESC, rowid DESC LIMIT ?
       )
     `).run(MAX_RECONCILIATION_HISTORY);
+    db.exec("COMMIT");
+  } catch (error) {
+    try { db.exec("ROLLBACK"); } catch {}
+    throw error;
   } finally {
     db.close();
   }
@@ -307,29 +704,9 @@ function readLatestPostgresReconciliation(sqliteFile) {
   if (!fs.existsSync(sqliteFile)) return null;
   const db = openSqlite(sqliteFile);
   try {
-    const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'postgres_sync_reconciliations'").get();
-    if (!table) return null;
+    if (!sqliteTableExists(db, "postgres_sync_reconciliations")) return null;
     const row = db.prepare("SELECT * FROM postgres_sync_reconciliations ORDER BY checked_at DESC, rowid DESC LIMIT 1").get();
-    if (!row) return null;
-    return {
-      runId: row.run_id,
-      checkedAt: row.checked_at,
-      status: row.status,
-      durationMs: Number(row.duration_ms || 0),
-      errorCode: row.error_code || "",
-      summary: {
-        localCollections: Number(row.local_collections || 0),
-        remoteCollections: Number(row.remote_collections || 0),
-        matched: Number(row.matched || 0),
-        mismatched: Number(row.mismatched || 0),
-        missingRemote: Number(row.missing_remote || 0),
-        unexpectedRemote: Number(row.unexpected_remote || 0),
-        versionMismatches: Number(row.version_mismatches || 0),
-        digestMismatches: Number(row.digest_mismatches || 0)
-      },
-      differences: JSON.parse(row.detail_json || "[]"),
-      productionPrimary: false
-    };
+    return reconciliationRow(row);
   } finally {
     db.close();
   }
@@ -556,7 +933,9 @@ async function runPostgresSyncWorker(options = {}) {
 }
 
 module.exports = {
+  PostgresReconciliationCaseError,
   SYNC_MODES,
+  applyPostgresReconciliationCaseAction,
   applyPostgresSyncBatch,
   assertSyncMode,
   buildCollectionChanges,
@@ -565,10 +944,14 @@ module.exports = {
   comparePostgresShadowState,
   enqueuePostgresSyncBatch,
   enqueuePostgresSyncBaseline,
+  listPostgresReconciliationCases,
+  listPostgresReconciliationHistory,
   loadPendingPostgresSyncBatches,
   loadSqliteCollectionState,
   markPostgresSyncBatch,
   postgresPoolConfig,
+  readPostgresReconciliationCase,
+  readPostgresReconciliationRun,
   readLatestPostgresReconciliation,
   readPostgresSyncStatus,
   recordPostgresReconciliation,

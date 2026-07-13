@@ -1150,8 +1150,26 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(shadowReconciliation.body.productionPrimary, false);
     assert.equal(shadowReconciliation.body.configured, false);
     assert.equal(shadowReconciliation.body.report, null);
+    assert.equal(shadowReconciliation.body.cases, null);
     const deniedShadowReconciliation = await api(baseUrl, "/api/production-database/shadow-reconciliation", authorized(residentPhoneLogin.body.token));
     assert.equal(deniedShadowReconciliation.response.status, 403);
+
+    const reconciliationHistory = await api(baseUrl, "/api/production-database/shadow-reconciliations?limit=10", authorized(accountLogin.body.token));
+    assert.equal(reconciliationHistory.response.status, 200);
+    assert.equal(reconciliationHistory.body.productionPrimary, false);
+    assert.deepEqual(reconciliationHistory.body.runs, []);
+    const reconciliationCases = await api(baseUrl, "/api/production-database/reconciliation-cases", authorized(accountLogin.body.token));
+    assert.equal(reconciliationCases.response.status, 200);
+    assert.equal(reconciliationCases.body.summary.total, 0);
+    assert.deepEqual(reconciliationCases.body.cases, []);
+    const unavailableReconciliationAction = await api(baseUrl, "/api/production-database/reconciliation-cases/pgrc-missing/actions", authorized(accountLogin.body.token, {
+      method: "POST",
+      body: JSON.stringify({ action: "acknowledge", owner: "database-operations", note: "Review started" })
+    }));
+    assert.equal(unavailableReconciliationAction.response.status, 409);
+    assert.equal(unavailableReconciliationAction.body.code, "RECONCILIATION_CASE_LEDGER_UNAVAILABLE");
+    const deniedReconciliationCases = await api(baseUrl, "/api/production-database/reconciliation-cases", authorized(residentPhoneLogin.body.token));
+    assert.equal(deniedReconciliationCases.response.status, 403);
 
     const citizenOperationsCenter = await api(baseUrl, "/api/citizen-operations/center", authorized(accountLogin.body.token));
     assert.equal(citizenOperationsCenter.response.status, 200);

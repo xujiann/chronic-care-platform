@@ -2859,9 +2859,18 @@ test("PostgreSQL migration package keeps CI payload-free and full exports contro
   assert.match(read("postgres-runtime-sync.js"), /ON CONFLICT \(batch_id\) DO NOTHING/);
   assert.match(read("postgres-runtime-sync.js"), /source_version <= EXCLUDED\.source_version/);
   assert.match(read("server.js"), /postgres_sync_outbox/);
-  assert.match(read("server.js"), /STORAGE_SCHEMA_VERSION = 9/);
+  assert.match(read("server.js"), /STORAGE_SCHEMA_VERSION = 10/);
   assert.match(read("server.js"), /postgres_sync_reconciliations/);
+  assert.match(read("server.js"), /postgres_sync_reconciliation_cases/);
+  assert.match(read("server.js"), /postgres_sync_reconciliation_case_actions/);
   assert.match(read("server.js"), /\/api\/production-database\/shadow-reconciliation/);
+  assert.match(read("server.js"), /\/api\/production-database\/shadow-reconciliations/);
+  assert.match(read("server.js"), /\/api\/production-database\/reconciliation-cases/);
+  assert.match(read("postgres-runtime-sync.js"), /applyPostgresReconciliationCaseAction/);
+  assert.match(read("postgres-runtime-sync.js"), /RECONCILIATION_CLEARANCE_REQUIRED/);
+  assert.match(read("scripts/production-db-readiness.js"), /production-db:reconciliationCaseWorkflow/);
+  assert.match(read("scripts/release-report.js"), /productionDb:reconciliationCaseWorkflow/);
+  assert.match(read("docs/postgresql-runtime-sync.md"), /matched 核对/);
   assert.match(read("docs/postgresql-runtime-sync.md"), /事务型 outbox/);
   assert.match(read("docs/postgresql-runtime-sync.md"), /不得上传 Git/);
   assert.match(read("deploy/postgres-sync-worker.service.template"), /NoNewPrivileges=true/);
@@ -2873,7 +2882,7 @@ test("PostgreSQL migration package keeps CI payload-free and full exports contro
 
 test("dated platform development report records verification blockers and next plan", () => {
   const report = read("docs/数智医院标准平台开发报告与下一步计划-2026-07-13.md");
-  ["本轮主要开发成果", "安全基线入队", "PostgreSQL 只读影子核对", "验证证据", "当前生产阻断项", "下一步开发计划", "86/86", "311/311", "254/255", "233/233", "P0：0-30 天", "P1：31-60 天", "P2：61-90 天"].forEach((marker) => assert.match(report, new RegExp(marker)));
+  ["本轮主要开发成果", "安全基线入队", "PostgreSQL 只读影子核对", "验证证据", "当前生产阻断项", "下一步开发计划", "88/88", "311/311", "255/256", "234/234", "P0：0-30 天", "P1：31-60 天", "P2：61-90 天"].forEach((marker) => assert.match(report, new RegExp(marker)));
   assert.match(read("scripts/release-artifact-manifest.js"), /platform-development-report-20260713/);
   assert.match(read("scripts/deploy-check.js"), /docs:platformDevelopmentReport20260713/);
 });

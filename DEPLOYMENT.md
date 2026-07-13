@@ -224,7 +224,7 @@ npm.cmd run postgres:migration-verify
 
 默认制品位于 `release/postgres-migration-package/`，只包含 `health_platform` 落地区 schema、集合与记录计数、逐集合摘要、装载/校验/回滚模板和文件摘要，不包含居民记录正文或数据库凭据。真实全量导出必须使用 `--mode=full --acknowledge-sensitive-data` 并写入仓库之外的受控目录，完整流程见 `docs/postgresql-migration-package.md`。迁移包通过不代表 PostgreSQL 运行时适配器已经启用；`STORAGE_ENGINE=postgres` 继续保持阻断，直到全量迁移、读写一致性、容量、故障切换、原生备份恢复和现场签字全部完成。
 
-基线装载验收后，可设置 `POSTGRES_SYNC_MODE=outbox` 启用 SQLite schema v9 事务 outbox，先执行 `npm.cmd run postgres:sync-bootstrap` 入队当前集合基线，再使用 `npm.cmd run postgres:sync-worker` 增量同步。`npm.cmd run postgres:shadow-reconcile` 以 PostgreSQL 只读事务比较集合版本和 SHA-256；同步与核对均提供加固的 service/timer 模板。完整启用顺序、TLS 配置、敏感数据边界和退出条件见 `docs/postgresql-runtime-sync.md`。影子核对通过仍不允许 PostgreSQL 成为生产主库。
+基线装载验收后，可设置 `POSTGRES_SYNC_MODE=outbox` 启用 SQLite schema v10 事务 outbox，先执行 `npm.cmd run postgres:sync-bootstrap` 入队当前集合基线，再使用 `npm.cmd run postgres:sync-worker` 增量同步。`npm.cmd run postgres:shadow-reconcile` 以 PostgreSQL 只读事务比较集合版本和 SHA-256；差异进入带责任人、清除门禁、证据化关闭和自动重开的处置工单。同步与核对均提供加固的 service/timer 模板。完整启用顺序、TLS 配置、敏感数据边界和退出条件见 `docs/postgresql-runtime-sync.md`。影子核对通过仍不允许 PostgreSQL 成为生产主库。
 
 `identity:contract` 会生成 `release/identity-contract.json` 和 `release/identity-contract.md`，记录政务统一身份接入所需 claims、角色到门户映射、机构覆盖度和样例 claim 映射；`release:report` 会同步写出这些文件，作为 OIDC/SAML 联调前的身份契约验收材料。
 

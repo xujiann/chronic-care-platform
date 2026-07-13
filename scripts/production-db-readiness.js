@@ -315,7 +315,7 @@ function buildProductionDbReadinessReport(options = {}) {
   const postgresMigrationPackage = buildPostgresMigrationPackage({ data });
   const migrationSourceRecords = Object.values(data).filter(Array.isArray).reduce((sum, rows) => sum + rows.length, 0);
   const postgresRuntimeSync = {
-    transactionalOutbox: ["postgres_sync_outbox", "enqueuePostgresSyncBatch", "db.exec(\"COMMIT\")", "STORAGE_SCHEMA_VERSION = 9"].every((marker) => serverSource.includes(marker)),
+    transactionalOutbox: ["postgres_sync_outbox", "enqueuePostgresSyncBatch", "db.exec(\"COMMIT\")", "STORAGE_SCHEMA_VERSION = 10"].every((marker) => serverSource.includes(marker)),
     batchIntegrity: ["buildPostgresSyncBatch", "payloadSha256", "previousChainHash", "chainHash", "validatePostgresSyncBatch"].every((marker) => runtimeSyncSource.includes(marker)),
     idempotentApply: ["runtime_sync_batches", "ON CONFLICT (batch_id) DO NOTHING", "runtime_collection_state", "source_version <= EXCLUDED.source_version"].every((marker) => runtimeSyncSource.includes(marker)),
     retryState: ["pending", "retry", "delivered", "failed", "next_attempt_at", "maxAttempts"].every((marker) => runtimeSyncSource.includes(marker)),
@@ -324,6 +324,7 @@ function buildProductionDbReadinessReport(options = {}) {
     baselineBootstrap: runtimeSyncSource.includes("enqueuePostgresSyncBaseline") && shadowReconcileSource.includes('command === "bootstrap"') && pkg.scripts?.["postgres:sync-bootstrap"],
     readOnlyReconciliation: ["BEGIN READ ONLY", "comparePostgresShadowState", "runPostgresShadowReconciliation", "recordPostgresReconciliation"].every((marker) => runtimeSyncSource.includes(marker)),
     reconciliationLedger: serverSource.includes("postgres_sync_reconciliations") && serverSource.includes("readLatestPostgresReconciliation") && serverSource.includes("/api/production-database/shadow-reconciliation"),
+    reconciliationCaseWorkflow: ["syncPostgresReconciliationCases", "listPostgresReconciliationHistory", "listPostgresReconciliationCases", "applyPostgresReconciliationCaseAction", "RECONCILIATION_CLEARANCE_REQUIRED", "auto-reopen"].every((marker) => runtimeSyncSource.includes(marker)) && ["postgres_sync_reconciliation_cases", "postgres_sync_reconciliation_case_actions", "/api/production-database/shadow-reconciliations", "/api/production-database/reconciliation-cases", "postgres-reconciliation-case-action"].every((marker) => serverSource.includes(marker)),
     reconciliationCommand: shadowReconcileSource.includes("runPostgresShadowReconciliation") && shadowReconcileSource.includes("contains no business payloads or database credentials") && pkg.scripts?.["postgres:shadow-reconcile"],
     reconciliationScheduler: ["Type=oneshot", "BEGIN READ ONLY", "NoNewPrivileges=true", "ProtectSystem=strict"].every((marker) => shadowReconcileService.includes(marker) || runtimeSyncSource.includes(marker)) && ["OnUnitActiveSec=5min", "Persistent=true"].every((marker) => shadowReconcileTimer.includes(marker)),
     environmentContract: ["POSTGRES_SYNC_MODE=disabled", "POSTGRES_SSL_MODE=verify-full", "POSTGRES_CA_FILE=", "POSTGRES_POOL_MAX="].every((marker) => envTemplate.includes(marker)),
@@ -345,11 +346,12 @@ function buildProductionDbReadinessReport(options = {}) {
     { id: "production-db:cutoverDocs", passed: ["migration batch", "rollback checkpoint", "/api/production-database/cutover-runs"].every((token) => cutoverDocument.includes(token)), detail: "cutover center model, APIs and production boundary are documented" },
     { id: "production-db:migrationPackage", passed: postgresMigrationPackage.ok && postgresMigrationPackage.manifest.mode === "manifest" && postgresMigrationPackage.manifest.summary.records === migrationSourceRecords && !postgresMigrationPackage.files["records.copy.tsv"], detail: `${postgresMigrationPackage.manifest.summary.collections} collections / ${postgresMigrationPackage.manifest.summary.records} source records / no payload artifact` },
     { id: "production-db:secureFullExportBoundary", passed: ["acknowledge-sensitive-data", "must be written outside the repository", "credentialsPersisted: false"].every((marker) => migrationPackageSource.includes(marker)) && ["仓库之外", "不得上传 Git", "迁移包通过不等于 PostgreSQL 运行时适配器已经启用"].every((marker) => migrationPackageDocument.includes(marker)), detail: "full export requires explicit acknowledgement, external protected path and keeps credentials out" },
-    { id: "production-db:transactionalOutbox", passed: postgresRuntimeSync.transactionalOutbox && postgresRuntimeSync.batchIntegrity && postgresRuntimeSync.healthStatus, detail: "SQLite schema v9 commits signed collection changes and health-visible queue state atomically" },
+    { id: "production-db:transactionalOutbox", passed: postgresRuntimeSync.transactionalOutbox && postgresRuntimeSync.batchIntegrity && postgresRuntimeSync.healthStatus, detail: "SQLite schema v10 commits signed collection changes and health-visible queue state atomically" },
     { id: "production-db:idempotentWorker", passed: postgresRuntimeSync.idempotentApply && postgresRuntimeSync.retryState && postgresRuntimeSync.workerCommand, detail: "worker applies batch ids once, rejects stale collection versions and records retry outcomes" },
     { id: "production-db:workerDeployment", passed: postgresRuntimeSync.hardenedService && postgresRuntimeSync.environmentContract && postgresRuntimeSync.documentedBoundary, detail: "hardened one-shot timer, TLS environment contract and shadow-primary boundary documented" },
     { id: "production-db:baselineBootstrap", passed: postgresRuntimeSync.baselineBootstrap, detail: "current SQLite collection versions can be queued once before incremental shadow sync" },
     { id: "production-db:shadowReconciliation", passed: postgresRuntimeSync.readOnlyReconciliation && postgresRuntimeSync.reconciliationLedger && postgresRuntimeSync.reconciliationCommand, detail: "read-only collection version and SHA-256 comparison persists payload-free differences and exposes a commission-only status API" },
+    { id: "production-db:reconciliationCaseWorkflow", passed: postgresRuntimeSync.reconciliationCaseWorkflow, detail: "commission-only history and case APIs enforce assignment, matched-run clearance, evidence-backed resolution and automatic reopening" },
     { id: "production-db:reconciliationScheduler", passed: postgresRuntimeSync.reconciliationScheduler, detail: "hardened five-minute reconciliation timer writes reports outside the application artifact" }
   ];
   return {
@@ -422,6 +424,7 @@ function renderMarkdown(report) {
     `- Idempotent sync worker: ${report.postgresRuntimeSync?.idempotentApply ? "configured" : "missing"}`,
     `- Baseline bootstrap: ${report.postgresRuntimeSync?.baselineBootstrap ? "configured" : "missing"}`,
     `- Read-only shadow reconciliation: ${report.postgresRuntimeSync?.readOnlyReconciliation ? "configured" : "missing"}`,
+    `- Reconciliation case workflow: ${report.postgresRuntimeSync?.reconciliationCaseWorkflow ? "configured" : "missing"}`,
     `- PostgreSQL production primary: no`,
     "",
     "| Batch | Domain | Sources | Targets | Owner | Status |",

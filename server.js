@@ -3,10 +3,15 @@ const fs = require("fs");
 const path = require("path");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
 const {
+  applyPostgresReconciliationCaseAction,
   assertSyncMode,
   buildCollectionChanges,
   enqueuePostgresSyncBatch,
+  listPostgresReconciliationCases,
+  listPostgresReconciliationHistory,
   readLatestPostgresReconciliation,
+  readPostgresReconciliationCase,
+  readPostgresReconciliationRun,
   readPostgresSyncStatus
 } = require("./postgres-runtime-sync");
 const BloodService = require("./blood-service");
@@ -146,7 +151,7 @@ const SQLITE_HEALTH_CHECK_TTL_MS = Math.min(300000, Math.max(5000, Number(proces
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const DEMO_PASSWORD = "123456";
 const PASSWORD_HASH_ITERATIONS = 120_000;
-const STORAGE_SCHEMA_VERSION = 9;
+const STORAGE_SCHEMA_VERSION = 10;
 const PROJECT_VERSION = (() => {
   try {
     return JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version || "0.0.0";
@@ -587,6 +592,57 @@ const SQLITE_MIGRATIONS = [
           ON postgres_sync_reconciliations(checked_at DESC);
         CREATE INDEX IF NOT EXISTS idx_postgres_sync_reconciliations_status
           ON postgres_sync_reconciliations(status, checked_at DESC);
+      `);
+    }
+  },
+  {
+    version: 10,
+    name: "add PostgreSQL reconciliation case workflow",
+    apply(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS postgres_sync_reconciliation_cases (
+          case_id TEXT PRIMARY KEY,
+          collection_name TEXT NOT NULL UNIQUE,
+          status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'acknowledged', 'resolved', 'reopened')),
+          owner TEXT NOT NULL DEFAULT 'database-operations',
+          severity TEXT NOT NULL DEFAULT 'critical',
+          first_run_id TEXT NOT NULL,
+          latest_run_id TEXT NOT NULL,
+          cleared_run_id TEXT NOT NULL DEFAULT '',
+          first_seen_at TEXT NOT NULL,
+          last_seen_at TEXT NOT NULL,
+          cleared_at TEXT NOT NULL DEFAULT '',
+          occurrence_count INTEGER NOT NULL DEFAULT 1,
+          difference_types_json TEXT NOT NULL DEFAULT '[]',
+          local_version INTEGER,
+          remote_version INTEGER,
+          local_digest TEXT NOT NULL DEFAULT '',
+          remote_digest TEXT NOT NULL DEFAULT '',
+          resolution_note TEXT NOT NULL DEFAULT '',
+          resolved_at TEXT NOT NULL DEFAULT '',
+          resolved_by TEXT NOT NULL DEFAULT '',
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_postgres_sync_reconciliation_cases_status
+          ON postgres_sync_reconciliation_cases(status, updated_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_postgres_sync_reconciliation_cases_owner
+          ON postgres_sync_reconciliation_cases(owner, status);
+        CREATE TABLE IF NOT EXISTS postgres_sync_reconciliation_case_actions (
+          action_id TEXT PRIMARY KEY,
+          case_id TEXT NOT NULL,
+          action TEXT NOT NULL,
+          from_status TEXT NOT NULL,
+          to_status TEXT NOT NULL,
+          actor TEXT NOT NULL,
+          role TEXT NOT NULL,
+          owner TEXT NOT NULL DEFAULT '',
+          note TEXT NOT NULL DEFAULT '',
+          evidence_json TEXT NOT NULL DEFAULT '[]',
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (case_id) REFERENCES postgres_sync_reconciliation_cases(case_id) ON DELETE RESTRICT
+        );
+        CREATE INDEX IF NOT EXISTS idx_postgres_sync_reconciliation_case_actions_case
+          ON postgres_sync_reconciliation_case_actions(case_id, created_at DESC);
       `);
     }
   }
@@ -6446,7 +6502,15 @@ function storageMeta() {
     failed: 0,
     oldestPendingAt: "",
     lastDeliveredAt: "",
-    reconciliation: { status: "never", runId: "", checkedAt: "", matched: 0, mismatched: 0, durationMs: 0 }
+    reconciliation: {
+      status: "never",
+      runId: "",
+      checkedAt: "",
+      matched: 0,
+      mismatched: 0,
+      durationMs: 0,
+      cases: { total: 0, open: 0, acknowledged: 0, resolved: 0, reopened: 0, unresolved: 0, clearedAwaitingResolution: 0 }
+    }
   };
   return {
     engine: sqlite ? "sqlite" : "json",
@@ -6547,17 +6611,19 @@ function buildObservabilitySignals(data) {
   const metrics = buildRuntimeMetrics(data);
   const highRiskEvents = highRiskSecurityEvents(data).length;
   const postgresReconciliationMismatches = Number(metrics.storage?.postgresSync?.reconciliation?.mismatched || 0);
+  const postgresReconciliationOpenCases = Number(metrics.storage?.postgresSync?.reconciliation?.cases?.unresolved || 0);
+  const postgresReconciliationRisk = Math.max(postgresReconciliationMismatches, postgresReconciliationOpenCases);
   const definitions = [
     {
-      fingerprint: `postgres-shadow-mismatch:${postgresReconciliationMismatches}`,
+      fingerprint: `postgres-shadow-mismatch:${postgresReconciliationRisk}`,
       source: "postgres-shadow-reconciliation",
       severity: "critical",
       title: "PostgreSQL shadow state differs from SQLite",
-      summary: `${postgresReconciliationMismatches} collections require shadow reconciliation review.`,
-      metric: "postgresReconciliationMismatches",
-      value: postgresReconciliationMismatches,
+      summary: `${postgresReconciliationMismatches} current differences and ${postgresReconciliationOpenCases} unresolved cases require review.`,
+      metric: "postgresReconciliationOpenCases",
+      value: postgresReconciliationRisk,
       owner: "database-operations",
-      evidenceRefs: ["/api/production-database/shadow-reconciliation", "postgres-shadow-reconciliation.md"]
+      evidenceRefs: ["/api/production-database/reconciliation-cases", "postgres-shadow-reconciliation.md"]
     },
     {
       fingerprint: `integration-dead-letters:${metrics.workload.integrationDeadLetters}`,
@@ -19762,12 +19828,110 @@ async function handleApi(req, res) {
     const user = requireApiRole(req, res, ["commission"], "/api/production-database/shadow-reconciliation");
     if (!user) return;
     const report = shouldUseSqlite() ? readLatestPostgresReconciliation(SQLITE_FILE) : null;
+    const caseLedger = shouldUseSqlite() ? listPostgresReconciliationCases(SQLITE_FILE, { limit: 20 }) : null;
     sendJson(res, 200, {
       ok: true,
       configured: POSTGRES_SYNC_MODE === "outbox",
       productionPrimary: false,
-      report
+      report,
+      cases: caseLedger
     });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/production-database/shadow-reconciliations") {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-database/shadow-reconciliations");
+    if (!user) return;
+    try {
+      const runs = shouldUseSqlite()
+        ? listPostgresReconciliationHistory(SQLITE_FILE, { limit: url.searchParams.get("limit"), status: url.searchParams.get("status") })
+        : [];
+      sendJson(res, 200, {
+        ok: true,
+        configured: POSTGRES_SYNC_MODE === "outbox",
+        productionPrimary: false,
+        summary: {
+          runs: runs.length,
+          matched: runs.filter((item) => item.status === "matched").length,
+          mismatched: runs.filter((item) => item.status === "mismatched").length,
+          errors: runs.filter((item) => item.status === "error").length
+        },
+        runs
+      });
+    } catch (error) {
+      sendJson(res, error.statusCode || 400, { error: "Bad Request", code: error.code || "RECONCILIATION_HISTORY_QUERY_FAILED", message: error.message });
+    }
+    return;
+  }
+
+  const shadowReconciliationRunMatch = url.pathname.match(/^\/api\/production-database\/shadow-reconciliations\/([^/]+)$/);
+  if (req.method === "GET" && shadowReconciliationRunMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-database/shadow-reconciliations/:id");
+    if (!user) return;
+    const run = shouldUseSqlite() ? readPostgresReconciliationRun(SQLITE_FILE, decodeURIComponent(shadowReconciliationRunMatch[1])) : null;
+    if (!run) {
+      sendJson(res, 404, { error: "Not Found", code: "RECONCILIATION_RUN_NOT_FOUND", message: "Shadow reconciliation run not found" });
+      return;
+    }
+    sendJson(res, 200, { ok: true, productionPrimary: false, run });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/production-database/reconciliation-cases") {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-database/reconciliation-cases");
+    if (!user) return;
+    try {
+      const ledger = shouldUseSqlite()
+        ? listPostgresReconciliationCases(SQLITE_FILE, { limit: url.searchParams.get("limit"), status: url.searchParams.get("status") })
+        : { summary: { total: 0, open: 0, acknowledged: 0, resolved: 0, reopened: 0, unresolved: 0, clearedAwaitingResolution: 0 }, cases: [] };
+      sendJson(res, 200, { ok: true, configured: POSTGRES_SYNC_MODE === "outbox", productionPrimary: false, ...ledger });
+    } catch (error) {
+      sendJson(res, error.statusCode || 400, { error: "Bad Request", code: error.code || "RECONCILIATION_CASE_QUERY_FAILED", message: error.message });
+    }
+    return;
+  }
+
+  const reconciliationCaseMatch = url.pathname.match(/^\/api\/production-database\/reconciliation-cases\/([^/]+)$/);
+  if (req.method === "GET" && reconciliationCaseMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-database/reconciliation-cases/:id");
+    if (!user) return;
+    const item = shouldUseSqlite() ? readPostgresReconciliationCase(SQLITE_FILE, decodeURIComponent(reconciliationCaseMatch[1])) : null;
+    if (!item) {
+      sendJson(res, 404, { error: "Not Found", code: "RECONCILIATION_CASE_NOT_FOUND", message: "Reconciliation case not found" });
+      return;
+    }
+    sendJson(res, 200, { ok: true, productionPrimary: false, case: item });
+    return;
+  }
+
+  const reconciliationCaseActionMatch = url.pathname.match(/^\/api\/production-database\/reconciliation-cases\/([^/]+)\/actions$/);
+  if (req.method === "POST" && reconciliationCaseActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-database/reconciliation-cases/:id/actions");
+    if (!user) return;
+    if (!shouldUseSqlite()) {
+      sendJson(res, 409, { error: "Conflict", code: "RECONCILIATION_CASE_LEDGER_UNAVAILABLE", message: "SQLite reconciliation case ledger is unavailable" });
+      return;
+    }
+    const payload = await collectJson(req);
+    try {
+      const item = applyPostgresReconciliationCaseAction(
+        SQLITE_FILE,
+        decodeURIComponent(reconciliationCaseActionMatch[1]),
+        payload,
+        user
+      );
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: "postgres-reconciliation-case-action",
+        target: item.caseId,
+        result: "allowed",
+        detail: `${String(payload.action || "").slice(0, 40)} -> ${item.status}; evidence refs: ${Array.isArray(payload.evidenceRefs) ? payload.evidenceRefs.length : 0}`
+      });
+      sendJson(res, 200, { ok: true, productionPrimary: false, case: item });
+    } catch (error) {
+      sendJson(res, error.statusCode || 400, { error: error.statusCode === 404 ? "Not Found" : error.statusCode === 409 ? "Conflict" : "Bad Request", code: error.code || "RECONCILIATION_CASE_ACTION_FAILED", message: error.message });
+    }
     return;
   }
 

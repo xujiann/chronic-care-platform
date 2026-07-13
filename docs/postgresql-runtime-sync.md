@@ -12,7 +12,7 @@ outbox 包含业务集合正文，属于敏感生产数据。SQLite 文件、备
 
 1. 使用 `postgres:migration-package -- --mode=full` 在受控目录完成 PostgreSQL 基线装载并验证源摘要和集合计数。
 2. 在应用环境设置 `POSTGRES_SYNC_MODE=outbox`、`DATABASE_URL`、`POSTGRES_SSL_MODE=verify-full`，按需要设置 `POSTGRES_CA_FILE`。
-3. 重启应用，使 SQLite schema 升级到 v9；确认 `/api/health` 的 `storage.postgresSync.enabled=true`。
+3. 重启应用，使 SQLite schema 升级到 v10；确认 `/api/health` 的 `storage.postgresSync.enabled=true`。
 4. 首次启用时执行一次 `postgres:sync-bootstrap`，把当前集合版本和正文作为受控基线批次写入 outbox；已有 outbox 时命令默认跳过，避免重复基线。
 5. 部署同步 worker 与影子核对 service/timer，以独立最小权限账号运行。
 6. 观察 pending、retry、failed、delivered、oldestPendingAt、lastDeliveredAt 和 reconciliation；failed 或 mismatched 必须进入运维事件并人工复核。
@@ -29,12 +29,22 @@ npm.cmd run postgres:shadow-reconcile -- --sqlite-file=D:\platform-data\health-c
 
 worker 在队列为空时仍会校验 PostgreSQL 连接配置，但不会输出连接串。远端批次使用 `health_platform.runtime_sync_batches` 去重，集合状态写入 `health_platform.runtime_collection_state`；低版本批次不能覆盖更高版本状态。
 
-影子核对器通过 `BEGIN READ ONLY` 读取 PostgreSQL，只比较集合名、源版本和 payload SHA-256。SQLite v9 的 `postgres_sync_reconciliations` 仅保存核对汇总、差异类型和摘要，不保存业务正文或数据库凭据；最近一次结果通过 `/api/health`、`/api/metrics` 和仅限卫健管理角色的 `/api/production-database/shadow-reconciliation` 暴露。定时核对模板为 `deploy/postgres-shadow-reconcile.service.template` 与 `deploy/postgres-shadow-reconcile.timer.template`。
+影子核对器通过 `BEGIN READ ONLY` 读取 PostgreSQL，只比较集合名、源版本和 payload SHA-256。SQLite v10 的 `postgres_sync_reconciliations` 仅保存核对汇总、差异类型和摘要，不保存业务正文或数据库凭据；最近一次结果通过 `/api/health`、`/api/metrics` 和仅限卫健管理角色的 `/api/production-database/shadow-reconciliation` 暴露。定时核对模板为 `deploy/postgres-shadow-reconcile.service.template` 与 `deploy/postgres-shadow-reconcile.timer.template`。
+
+## 差异处置闭环
+
+- `GET /api/production-database/shadow-reconciliations` 查询最近 100 次核对历史，`GET /api/production-database/shadow-reconciliations/:id` 查询单次差异摘要。
+- `GET /api/production-database/reconciliation-cases` 查询按集合持续归并的差异工单，`GET /api/production-database/reconciliation-cases/:id` 同时返回不可变操作历史。
+- `POST /api/production-database/reconciliation-cases/:id/actions` 支持 `assign`、`acknowledge`、`resolve`、`reopen` 和 `comment`；全部接口仅允许卫健管理角色访问，变更同时写入平台安全审计链。
+- 工单首次发现为 `open`，确认责任人后进入 `acknowledged`。只有后续 matched 核对确认该集合差异已消失，并提供处理说明与证据引用后，才能进入 `resolved`。
+- 已解决集合再次出现差异时自动进入 `reopened`，保留首次发现、最近发现、累计出现次数、清除核对批次和历史动作。
+- 工单只保存集合名、差异类型、版本、SHA-256、责任人、备注和证据引用，不保存业务正文、数据库连接信息或凭据。
 
 ## 退出条件
 
 - 全量基线与增量集合计数、摘要连续一致。
 - pending/retry 在目标时限内归零，failed 为零。
+- open、acknowledged 和 reopened 差异工单归零，关闭工单均有 matched 核对批次和处置证据。
 - 断网、数据库重启、重复批次、乱序批次和 worker 崩溃演练通过。
 - PostgreSQL 原生备份、恢复和主从切换达到批准的 RPO/RTO。
 - 数据库责任人、平台运维、业务责任方和发布经理完成签字。

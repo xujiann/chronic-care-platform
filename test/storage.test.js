@@ -34,7 +34,7 @@ test("SQLite migrations are idempotent and collection versions change only on wr
 
     withDatabase(storage, (db) => {
       const migrations = db.prepare("SELECT version, name, checksum FROM schema_migrations ORDER BY version").all();
-      assert.deepEqual(migrations.map((item) => Number(item.version)), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
+      assert.deepEqual(migrations.map((item) => Number(item.version)), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
       assert.ok(migrations.every((item) => item.name && /^[a-f0-9]{64}$/.test(item.checksum)));
 
       const columns = db.prepare("PRAGMA table_info(state_collections)").all().map((item) => item.name);
@@ -66,7 +66,9 @@ test("SQLite migrations are idempotent and collection versions change only on wr
         "disease_registry_model_records",
         "accessibility_checklist_records",
         "postgres_sync_outbox",
-        "postgres_sync_reconciliations"
+        "postgres_sync_reconciliations",
+        "postgres_sync_reconciliation_cases",
+        "postgres_sync_reconciliation_case_actions"
       ].forEach((tableName) => {
         assert.ok(tableNames.includes(tableName), `${tableName} mirror table should exist`);
       });
@@ -230,8 +232,9 @@ test("SQLite migrations are idempotent and collection versions change only on wr
       storage.writeDatabase(orphanServiceState);
     }, /FOREIGN KEY constraint failed/);
     const meta = storage.storageMeta();
-    assert.equal(meta.schemaVersion, 9);
+    assert.equal(meta.schemaVersion, 10);
     assert.equal(meta.postgresSync.reconciliation.status, "never");
+    assert.equal(meta.postgresSync.reconciliation.cases.unresolved, 0);
     assert.deepEqual(meta.sqliteProfile, {
       journalMode: "wal",
       synchronous: "FULL",
