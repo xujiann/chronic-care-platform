@@ -2859,18 +2859,23 @@ test("PostgreSQL migration package keeps CI payload-free and full exports contro
   assert.match(read("postgres-runtime-sync.js"), /ON CONFLICT \(batch_id\) DO NOTHING/);
   assert.match(read("postgres-runtime-sync.js"), /source_version <= EXCLUDED\.source_version/);
   assert.match(read("server.js"), /postgres_sync_outbox/);
-  assert.match(read("server.js"), /STORAGE_SCHEMA_VERSION = 8/);
+  assert.match(read("server.js"), /STORAGE_SCHEMA_VERSION = 9/);
+  assert.match(read("server.js"), /postgres_sync_reconciliations/);
+  assert.match(read("server.js"), /\/api\/production-database\/shadow-reconciliation/);
   assert.match(read("docs/postgresql-runtime-sync.md"), /事务型 outbox/);
   assert.match(read("docs/postgresql-runtime-sync.md"), /不得上传 Git/);
   assert.match(read("deploy/postgres-sync-worker.service.template"), /NoNewPrivileges=true/);
   assert.match(read("deploy/postgres-sync-worker.timer.template"), /OnUnitActiveSec=15s/);
+  assert.match(read("scripts/postgres-shadow-reconcile.js"), /runPostgresShadowReconciliation/);
+  assert.match(read("deploy/postgres-shadow-reconcile.service.template"), /NoNewPrivileges=true/);
+  assert.match(read("deploy/postgres-shadow-reconcile.timer.template"), /OnUnitActiveSec=5min/);
 });
 
 test("dated platform development report records verification blockers and next plan", () => {
-  const report = read("docs/数智医院标准平台开发报告与下一步计划-2026-07-12.md");
-  ["本轮主要开发成果", "PostgreSQL 事务 outbox", "PostgreSQL 幂等影子同步", "正式生产前已实现的主要标准平台功能", "验证证据", "当前生产阻断项", "下一步开发计划", "82/82", "311/311", "251/252", "226/226", "P0：0-30 天", "P1：31-60 天", "P2：61-90 天"].forEach((marker) => assert.match(report, new RegExp(marker)));
-  assert.match(read("scripts/release-artifact-manifest.js"), /platform-development-report-20260712/);
-  assert.match(read("scripts/deploy-check.js"), /docs:platformDevelopmentReport20260712/);
+  const report = read("docs/数智医院标准平台开发报告与下一步计划-2026-07-13.md");
+  ["本轮主要开发成果", "安全基线入队", "PostgreSQL 只读影子核对", "验证证据", "当前生产阻断项", "下一步开发计划", "86/86", "311/311", "254/255", "233/233", "P0：0-30 天", "P1：31-60 天", "P2：61-90 天"].forEach((marker) => assert.match(report, new RegExp(marker)));
+  assert.match(read("scripts/release-artifact-manifest.js"), /platform-development-report-20260713/);
+  assert.match(read("scripts/deploy-check.js"), /docs:platformDevelopmentReport20260713/);
 });
 
 test("citizen launch review exposes ten audited service pipelines without affecting normal mode", () => {

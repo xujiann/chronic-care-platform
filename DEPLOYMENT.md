@@ -213,7 +213,7 @@ npm.cmd run release:report:full
 
 同一次报告还会生成 `release/storage-model-inspection.json` 和 `release/storage-model-inspection.md`，用于归档 JSON 快照集合/记录规模、最大集合、SQLite 表清单、schema 版本和迁移元数据；干净 CI checkout 中缺少 SQLite 文件时仅记录为提示，不影响演示快照发布门禁。
 
-`production-db:readiness` 会生成 `release/production-db-readiness-report.json` 和 `release/production-db-readiness-report.md`，专项检查 PostgreSQL/正式数据库切换前的生产轨道、必填配置、当前 SQLite/JSON 模型证据、事务 outbox、影子同步 worker、备份恢复演练文档、RTO/RPO 说明和运行时阻断，避免在正式适配器完成前误启用 `STORAGE_ENGINE=postgres/postgresql`。
+`production-db:readiness` 会生成 `release/production-db-readiness-report.json` 和 `release/production-db-readiness-report.md`，专项检查 PostgreSQL/正式数据库切换前的生产轨道、必填配置、当前 SQLite/JSON 模型证据、事务 outbox、影子同步 worker、基线入队、只读一致性核对、备份恢复演练文档、RTO/RPO 说明和运行时阻断，避免在正式适配器完成前误启用 `STORAGE_ENGINE=postgres/postgresql`。
 
 PostgreSQL 切换还必须先生成无业务正文的迁移清单包并复核文件摘要：
 
@@ -224,7 +224,7 @@ npm.cmd run postgres:migration-verify
 
 默认制品位于 `release/postgres-migration-package/`，只包含 `health_platform` 落地区 schema、集合与记录计数、逐集合摘要、装载/校验/回滚模板和文件摘要，不包含居民记录正文或数据库凭据。真实全量导出必须使用 `--mode=full --acknowledge-sensitive-data` 并写入仓库之外的受控目录，完整流程见 `docs/postgresql-migration-package.md`。迁移包通过不代表 PostgreSQL 运行时适配器已经启用；`STORAGE_ENGINE=postgres` 继续保持阻断，直到全量迁移、读写一致性、容量、故障切换、原生备份恢复和现场签字全部完成。
 
-基线装载验收后，可设置 `POSTGRES_SYNC_MODE=outbox` 启用 SQLite schema v8 事务 outbox，并使用 `npm.cmd run postgres:sync-worker` 将集合变更幂等同步到 PostgreSQL 影子库。worker 由 `deploy/postgres-sync-worker.service.template` 和 `deploy/postgres-sync-worker.timer.template` 以最小权限定时运行；完整启用顺序、TLS 配置、敏感数据边界和退出条件见 `docs/postgresql-runtime-sync.md`。影子同步通过仍不允许 PostgreSQL 成为生产主库。
+基线装载验收后，可设置 `POSTGRES_SYNC_MODE=outbox` 启用 SQLite schema v9 事务 outbox，先执行 `npm.cmd run postgres:sync-bootstrap` 入队当前集合基线，再使用 `npm.cmd run postgres:sync-worker` 增量同步。`npm.cmd run postgres:shadow-reconcile` 以 PostgreSQL 只读事务比较集合版本和 SHA-256；同步与核对均提供加固的 service/timer 模板。完整启用顺序、TLS 配置、敏感数据边界和退出条件见 `docs/postgresql-runtime-sync.md`。影子核对通过仍不允许 PostgreSQL 成为生产主库。
 
 `identity:contract` 会生成 `release/identity-contract.json` 和 `release/identity-contract.md`，记录政务统一身份接入所需 claims、角色到门户映射、机构覆盖度和样例 claim 映射；`release:report` 会同步写出这些文件，作为 OIDC/SAML 联调前的身份契约验收材料。
 
@@ -269,7 +269,7 @@ npm.cmd run postgres:migration-verify
 
 ## 存储迁移与备份
 
-SQLite 启动时会通过 `schema_migrations` 自动执行幂等迁移，当前 schema 版本为 8。每个运行时连接都会启用外键、`WAL`、`FULL` 同步、忙等待和 WAL 自动检查点，并在 `/api/health` 的 `storage.sqliteProfile` 中暴露 `quickCheck` 与生产配置判定。部署升级前应先停止写入并创建备份。v7 已把机构信用评价、科研数据集、专病库模型和无障碍验收清单纳入结构化镜像表，v8 新增 PostgreSQL 事务 outbox：
+SQLite 启动时会通过 `schema_migrations` 自动执行幂等迁移，当前 schema 版本为 9。每个运行时连接都会启用外键、`WAL`、`FULL` 同步、忙等待和 WAL 自动检查点，并在 `/api/health` 的 `storage.sqliteProfile` 中暴露 `quickCheck` 与生产配置判定。部署升级前应先停止写入并创建备份。v7 已把机构信用评价、科研数据集、专病库模型和无障碍验收清单纳入结构化镜像表，v8 新增 PostgreSQL 事务 outbox，v9 新增无正文的影子核对台账：
 
 ```powershell
 npm.cmd run storage:backup

@@ -6,6 +6,7 @@ const {
   assertSyncMode,
   buildCollectionChanges,
   enqueuePostgresSyncBatch,
+  readLatestPostgresReconciliation,
   readPostgresSyncStatus
 } = require("./postgres-runtime-sync");
 const BloodService = require("./blood-service");
@@ -145,7 +146,7 @@ const SQLITE_HEALTH_CHECK_TTL_MS = Math.min(300000, Math.max(5000, Number(proces
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
 const DEMO_PASSWORD = "123456";
 const PASSWORD_HASH_ITERATIONS = 120_000;
-const STORAGE_SCHEMA_VERSION = 8;
+const STORAGE_SCHEMA_VERSION = 9;
 const PROJECT_VERSION = (() => {
   try {
     return JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version || "0.0.0";
@@ -558,6 +559,34 @@ const SQLITE_MIGRATIONS = [
           ON postgres_sync_outbox(status, next_attempt_at, sequence);
         CREATE INDEX IF NOT EXISTS idx_postgres_sync_outbox_created_at
           ON postgres_sync_outbox(created_at);
+      `);
+    }
+  },
+  {
+    version: 9,
+    name: "add PostgreSQL shadow reconciliation ledger",
+    apply(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS postgres_sync_reconciliations (
+          run_id TEXT PRIMARY KEY,
+          checked_at TEXT NOT NULL,
+          status TEXT NOT NULL CHECK (status IN ('matched', 'mismatched', 'error')),
+          local_collections INTEGER NOT NULL DEFAULT 0,
+          remote_collections INTEGER NOT NULL DEFAULT 0,
+          matched INTEGER NOT NULL DEFAULT 0,
+          mismatched INTEGER NOT NULL DEFAULT 0,
+          missing_remote INTEGER NOT NULL DEFAULT 0,
+          unexpected_remote INTEGER NOT NULL DEFAULT 0,
+          version_mismatches INTEGER NOT NULL DEFAULT 0,
+          digest_mismatches INTEGER NOT NULL DEFAULT 0,
+          duration_ms INTEGER NOT NULL DEFAULT 0,
+          error_code TEXT NOT NULL DEFAULT '',
+          detail_json TEXT NOT NULL DEFAULT '[]'
+        );
+        CREATE INDEX IF NOT EXISTS idx_postgres_sync_reconciliations_checked_at
+          ON postgres_sync_reconciliations(checked_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_postgres_sync_reconciliations_status
+          ON postgres_sync_reconciliations(status, checked_at DESC);
       `);
     }
   }
@@ -6410,7 +6439,15 @@ function cleanSqliteText(value) {
 
 function storageMeta() {
   const sqlite = shouldUseSqlite();
-  const postgresSyncStatus = sqlite ? readPostgresSyncStatus(SQLITE_FILE) : { pending: 0, retry: 0, delivered: 0, failed: 0, oldestPendingAt: "", lastDeliveredAt: "" };
+  const postgresSyncStatus = sqlite ? readPostgresSyncStatus(SQLITE_FILE) : {
+    pending: 0,
+    retry: 0,
+    delivered: 0,
+    failed: 0,
+    oldestPendingAt: "",
+    lastDeliveredAt: "",
+    reconciliation: { status: "never", runId: "", checkedAt: "", matched: 0, mismatched: 0, durationMs: 0 }
+  };
   return {
     engine: sqlite ? "sqlite" : "json",
     mode: sqlite ? "SQLite 主存储 + JSON 快照" : "JSON 文件存储",
@@ -6509,7 +6546,19 @@ function buildRuntimeMetrics(data) {
 function buildObservabilitySignals(data) {
   const metrics = buildRuntimeMetrics(data);
   const highRiskEvents = highRiskSecurityEvents(data).length;
+  const postgresReconciliationMismatches = Number(metrics.storage?.postgresSync?.reconciliation?.mismatched || 0);
   const definitions = [
+    {
+      fingerprint: `postgres-shadow-mismatch:${postgresReconciliationMismatches}`,
+      source: "postgres-shadow-reconciliation",
+      severity: "critical",
+      title: "PostgreSQL shadow state differs from SQLite",
+      summary: `${postgresReconciliationMismatches} collections require shadow reconciliation review.`,
+      metric: "postgresReconciliationMismatches",
+      value: postgresReconciliationMismatches,
+      owner: "database-operations",
+      evidenceRefs: ["/api/production-database/shadow-reconciliation", "postgres-shadow-reconciliation.md"]
+    },
     {
       fingerprint: `integration-dead-letters:${metrics.workload.integrationDeadLetters}`,
       source: "integration-gateway",
@@ -19705,6 +19754,19 @@ async function handleApi(req, res) {
       probeRun: normalized.probeRun,
       evidencePacket: normalized.evidencePacket,
       center: buildCommercialCryptoCenter(refreshed)
+    });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/production-database/shadow-reconciliation") {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-database/shadow-reconciliation");
+    if (!user) return;
+    const report = shouldUseSqlite() ? readLatestPostgresReconciliation(SQLITE_FILE) : null;
+    sendJson(res, 200, {
+      ok: true,
+      configured: POSTGRES_SYNC_MODE === "outbox",
+      productionPrimary: false,
+      report
     });
     return;
   }

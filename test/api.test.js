@@ -1145,6 +1145,14 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     const deniedProductionDatabaseCutoverCenter = await api(baseUrl, "/api/production-database/cutover-center", authorized(residentPhoneLogin.body.token));
     assert.equal(deniedProductionDatabaseCutoverCenter.response.status, 403);
 
+    const shadowReconciliation = await api(baseUrl, "/api/production-database/shadow-reconciliation", authorized(accountLogin.body.token));
+    assert.equal(shadowReconciliation.response.status, 200);
+    assert.equal(shadowReconciliation.body.productionPrimary, false);
+    assert.equal(shadowReconciliation.body.configured, false);
+    assert.equal(shadowReconciliation.body.report, null);
+    const deniedShadowReconciliation = await api(baseUrl, "/api/production-database/shadow-reconciliation", authorized(residentPhoneLogin.body.token));
+    assert.equal(deniedShadowReconciliation.response.status, 403);
+
     const citizenOperationsCenter = await api(baseUrl, "/api/citizen-operations/center", authorized(accountLogin.body.token));
     assert.equal(citizenOperationsCenter.response.status, 200);
     assert.equal(citizenOperationsCenter.body.ok, true);

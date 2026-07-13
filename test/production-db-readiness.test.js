@@ -37,6 +37,9 @@ test("production database readiness validates migration and rehearsal evidence",
   assert.equal(report.checks.some((item) => item.id === "production-db:transactionalOutbox" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "production-db:idempotentWorker" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "production-db:workerDeployment" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "production-db:baselineBootstrap" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "production-db:shadowReconciliation" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "production-db:reconciliationScheduler" && item.passed), true);
 
   const markdown = renderMarkdown(report);
   assert.match(markdown, /Production database readiness report/);
@@ -46,6 +49,8 @@ test("production database readiness validates migration and rehearsal evidence",
   assert.match(markdown, /SQLite production profile: configured/);
   assert.match(markdown, /PostgreSQL manifest package: verified/);
   assert.match(markdown, /Transactional PostgreSQL outbox: configured/);
+  assert.match(markdown, /Baseline bootstrap: configured/);
+  assert.match(markdown, /Read-only shadow reconciliation: configured/);
 });
 
 test("production database readiness fails when secure export boundaries are removed", () => {

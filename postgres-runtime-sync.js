@@ -1,11 +1,12 @@
 const fs = require("node:fs");
 const path = require("node:path");
-const { createHash } = require("node:crypto");
+const { createHash, randomUUID } = require("node:crypto");
 const { canonicalStringify } = require("./scripts/postgres-migration-package");
 
 const SYNC_MODE = String(process.env.POSTGRES_SYNC_MODE || "disabled").trim().toLowerCase();
 const SYNC_MODES = new Set(["disabled", "outbox"]);
 const MAX_BATCH_LIMIT = 100;
+const MAX_RECONCILIATION_HISTORY = 100;
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -39,6 +40,22 @@ function buildCollectionChanges(existingRows = [], incomingEntries = []) {
     }
   });
   return changes.sort((a, b) => a.collection.localeCompare(b.collection));
+}
+
+function buildCollectionSnapshotChanges(rows = []) {
+  return rows
+    .filter((row) => row.key !== "storageMeta")
+    .map((row) => {
+      const payload = canonicalStringify(JSON.parse(row.payload));
+      return {
+        collection: row.key,
+        operation: "upsert",
+        sourceVersion: Number(row.version || 0),
+        payload,
+        payloadSha256: sha256(payload)
+      };
+    })
+    .sort((a, b) => a.collection.localeCompare(b.collection));
 }
 
 function buildPostgresSyncBatch(changes, options = {}) {
@@ -112,6 +129,33 @@ function enqueuePostgresSyncBatch(db, changes, options = {}) {
   return batch;
 }
 
+function enqueuePostgresSyncBaseline(sqliteFile, options = {}) {
+  const resolvedSqliteFile = path.resolve(sqliteFile || path.join(process.env.DATA_DIR || path.join(__dirname, "data"), "health-city.sqlite"));
+  const db = openSqlite(resolvedSqliteFile);
+  try {
+    db.exec("BEGIN IMMEDIATE");
+    const existingBatch = db.prepare("SELECT batch_id FROM postgres_sync_outbox ORDER BY sequence LIMIT 1").get();
+    if (existingBatch && !options.force) {
+      db.exec("ROLLBACK");
+      return { ok: true, enqueued: false, reason: "outbox-not-empty", batchId: existingBatch.batch_id, collections: 0 };
+    }
+    const rows = db.prepare("SELECT key, payload, version FROM state_collections ORDER BY key").all();
+    const changes = buildCollectionSnapshotChanges(rows);
+    if (!changes.length) throw new Error("SQLite collection state is empty");
+    const batch = enqueuePostgresSyncBatch(db, changes, {
+      createdAt: options.createdAt,
+      sourceEvent: "baseline-snapshot"
+    });
+    db.exec("COMMIT");
+    return { ok: true, enqueued: true, batchId: batch.batchId, collections: changes.length };
+  } catch (error) {
+    try { db.exec("ROLLBACK"); } catch {}
+    throw error;
+  } finally {
+    db.close();
+  }
+}
+
 function openSqlite(sqliteFile) {
   const sqlite = require("node:sqlite");
   if (!sqlite?.DatabaseSync) throw new Error("node:sqlite DatabaseSync unavailable");
@@ -119,22 +163,172 @@ function openSqlite(sqliteFile) {
 }
 
 function readPostgresSyncStatus(sqliteFile) {
-  if (!fs.existsSync(sqliteFile)) return { pending: 0, retry: 0, delivered: 0, failed: 0, oldestPendingAt: "", lastDeliveredAt: "" };
+  const empty = {
+    pending: 0,
+    retry: 0,
+    delivered: 0,
+    failed: 0,
+    oldestPendingAt: "",
+    lastDeliveredAt: "",
+    reconciliation: { status: "never", runId: "", checkedAt: "", matched: 0, mismatched: 0, durationMs: 0 }
+  };
+  if (!fs.existsSync(sqliteFile)) return empty;
   const db = openSqlite(sqliteFile);
   try {
     const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'postgres_sync_outbox'").get();
-    if (!table) return { pending: 0, retry: 0, delivered: 0, failed: 0, oldestPendingAt: "", lastDeliveredAt: "" };
+    if (!table) return empty;
     const counts = db.prepare("SELECT status, COUNT(*) AS count FROM postgres_sync_outbox GROUP BY status").all()
       .reduce((result, row) => ({ ...result, [row.status]: Number(row.count) }), {});
     const pending = db.prepare("SELECT MIN(created_at) AS oldest FROM postgres_sync_outbox WHERE status IN ('pending', 'retry')").get();
     const delivered = db.prepare("SELECT MAX(delivered_at) AS latest FROM postgres_sync_outbox WHERE status = 'delivered'").get();
+    const reconciliationTable = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'postgres_sync_reconciliations'").get();
+    const latest = reconciliationTable ? db.prepare(`
+      SELECT run_id, checked_at, status, matched, mismatched, duration_ms
+      FROM postgres_sync_reconciliations
+      ORDER BY checked_at DESC, rowid DESC
+      LIMIT 1
+    `).get() : null;
     return {
       pending: counts.pending || 0,
       retry: counts.retry || 0,
       delivered: counts.delivered || 0,
       failed: counts.failed || 0,
       oldestPendingAt: pending?.oldest || "",
-      lastDeliveredAt: delivered?.latest || ""
+      lastDeliveredAt: delivered?.latest || "",
+      reconciliation: latest ? {
+        status: latest.status,
+        runId: latest.run_id,
+        checkedAt: latest.checked_at,
+        matched: Number(latest.matched || 0),
+        mismatched: Number(latest.mismatched || 0),
+        durationMs: Number(latest.duration_ms || 0)
+      } : empty.reconciliation
+    };
+  } finally {
+    db.close();
+  }
+}
+
+function loadSqliteCollectionState(sqliteFile) {
+  const db = openSqlite(sqliteFile);
+  try {
+    return buildCollectionSnapshotChanges(db.prepare("SELECT key, payload, version FROM state_collections ORDER BY key").all())
+      .map((item) => ({
+        collection: item.collection,
+        sourceVersion: item.sourceVersion,
+        payloadSha256: item.payloadSha256
+      }));
+  } finally {
+    db.close();
+  }
+}
+
+function comparePostgresShadowState(localRows = [], remoteRows = []) {
+  const local = new Map(localRows.map((row) => [row.collection, row]));
+  const remote = new Map(remoteRows.map((row) => [row.collection, row]));
+  const names = [...new Set([...local.keys(), ...remote.keys()])].sort();
+  const differences = [];
+  let matched = 0;
+  names.forEach((collection) => {
+    const source = local.get(collection);
+    const target = remote.get(collection);
+    const types = [];
+    if (!target) types.push("missing-remote");
+    else if (!source) types.push("unexpected-remote");
+    else {
+      if (Number(source.sourceVersion) !== Number(target.sourceVersion)) types.push("version-mismatch");
+      if (source.payloadSha256 !== target.payloadSha256) types.push("digest-mismatch");
+    }
+    if (!types.length) {
+      matched += 1;
+      return;
+    }
+    differences.push({
+      collection,
+      types,
+      localVersion: source ? Number(source.sourceVersion) : null,
+      remoteVersion: target ? Number(target.sourceVersion) : null,
+      localDigest: source?.payloadSha256 || "",
+      remoteDigest: target?.payloadSha256 || "",
+      batchId: target?.batchId || ""
+    });
+  });
+  const countType = (type) => differences.filter((item) => item.types.includes(type)).length;
+  return {
+    localCollections: local.size,
+    remoteCollections: remote.size,
+    matched,
+    mismatched: differences.length,
+    missingRemote: countType("missing-remote"),
+    unexpectedRemote: countType("unexpected-remote"),
+    versionMismatches: countType("version-mismatch"),
+    digestMismatches: countType("digest-mismatch"),
+    differences
+  };
+}
+
+function recordPostgresReconciliation(sqliteFile, report) {
+  const db = openSqlite(sqliteFile);
+  try {
+    db.prepare(`
+      INSERT INTO postgres_sync_reconciliations (
+        run_id, checked_at, status, local_collections, remote_collections, matched, mismatched,
+        missing_remote, unexpected_remote, version_mismatches, digest_mismatches,
+        duration_ms, error_code, detail_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      report.runId,
+      report.checkedAt,
+      report.status,
+      report.summary.localCollections,
+      report.summary.remoteCollections,
+      report.summary.matched,
+      report.summary.mismatched,
+      report.summary.missingRemote,
+      report.summary.unexpectedRemote,
+      report.summary.versionMismatches,
+      report.summary.digestMismatches,
+      report.durationMs,
+      report.errorCode || "",
+      JSON.stringify(report.differences || [])
+    );
+    db.prepare(`
+      DELETE FROM postgres_sync_reconciliations
+      WHERE rowid NOT IN (
+        SELECT rowid FROM postgres_sync_reconciliations ORDER BY checked_at DESC, rowid DESC LIMIT ?
+      )
+    `).run(MAX_RECONCILIATION_HISTORY);
+  } finally {
+    db.close();
+  }
+}
+
+function readLatestPostgresReconciliation(sqliteFile) {
+  if (!fs.existsSync(sqliteFile)) return null;
+  const db = openSqlite(sqliteFile);
+  try {
+    const table = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'postgres_sync_reconciliations'").get();
+    if (!table) return null;
+    const row = db.prepare("SELECT * FROM postgres_sync_reconciliations ORDER BY checked_at DESC, rowid DESC LIMIT 1").get();
+    if (!row) return null;
+    return {
+      runId: row.run_id,
+      checkedAt: row.checked_at,
+      status: row.status,
+      durationMs: Number(row.duration_ms || 0),
+      errorCode: row.error_code || "",
+      summary: {
+        localCollections: Number(row.local_collections || 0),
+        remoteCollections: Number(row.remote_collections || 0),
+        matched: Number(row.matched || 0),
+        mismatched: Number(row.mismatched || 0),
+        missingRemote: Number(row.missing_remote || 0),
+        unexpectedRemote: Number(row.unexpected_remote || 0),
+        versionMismatches: Number(row.version_mismatches || 0),
+        digestMismatches: Number(row.digest_mismatches || 0)
+      },
+      differences: JSON.parse(row.detail_json || "[]"),
+      productionPrimary: false
     };
   } finally {
     db.close();
@@ -251,6 +445,84 @@ function postgresPoolConfig(env = process.env) {
   return { connectionString, max: Math.min(10, Math.max(1, Number(env.POSTGRES_POOL_MAX || 2) || 2)), ssl };
 }
 
+async function runPostgresShadowReconciliation(options = {}) {
+  assertSyncMode(options.mode || SYNC_MODE);
+  if ((options.mode || SYNC_MODE) !== "outbox") throw new Error("POSTGRES_SYNC_MODE=outbox is required");
+  const startedAt = Date.now();
+  const checkedAt = options.checkedAt || new Date().toISOString();
+  const sqliteFile = path.resolve(options.sqliteFile || path.join(process.env.DATA_DIR || path.join(__dirname, "data"), "health-city.sqlite"));
+  const localRows = loadSqliteCollectionState(sqliteFile);
+  const poolConfig = options.pool ? null : (options.poolConfig || postgresPoolConfig(options.env || process.env));
+  const PoolClass = options.PoolClass || require("pg").Pool;
+  const pool = options.pool || new PoolClass(poolConfig);
+  const runId = options.runId || `pgrecon-${randomUUID()}`;
+  let client;
+  let report;
+  try {
+    client = await pool.connect();
+    await client.query("BEGIN READ ONLY");
+    const result = await client.query(`
+      SELECT collection_name, payload_sha256, source_version, batch_id
+      FROM health_platform.runtime_collection_state
+      ORDER BY collection_name
+    `);
+    await client.query("COMMIT");
+    const remoteRows = result.rows.map((row) => ({
+      collection: row.collection_name,
+      payloadSha256: row.payload_sha256,
+      sourceVersion: Number(row.source_version || 0),
+      batchId: row.batch_id || ""
+    }));
+    const comparison = comparePostgresShadowState(localRows, remoteRows);
+    report = {
+      ok: comparison.mismatched === 0,
+      runId,
+      checkedAt,
+      status: comparison.mismatched === 0 ? "matched" : "mismatched",
+      durationMs: Math.max(0, Date.now() - startedAt),
+      summary: {
+        localCollections: comparison.localCollections,
+        remoteCollections: comparison.remoteCollections,
+        matched: comparison.matched,
+        mismatched: comparison.mismatched,
+        missingRemote: comparison.missingRemote,
+        unexpectedRemote: comparison.unexpectedRemote,
+        versionMismatches: comparison.versionMismatches,
+        digestMismatches: comparison.digestMismatches
+      },
+      differences: comparison.differences,
+      productionPrimary: false
+    };
+  } catch (error) {
+    try { await client?.query?.("ROLLBACK"); } catch {}
+    report = {
+      ok: false,
+      runId,
+      checkedAt,
+      status: "error",
+      durationMs: Math.max(0, Date.now() - startedAt),
+      errorCode: String(error.code || "POSTGRES_RECONCILIATION_FAILED").slice(0, 80),
+      summary: {
+        localCollections: localRows.length,
+        remoteCollections: 0,
+        matched: 0,
+        mismatched: 0,
+        missingRemote: 0,
+        unexpectedRemote: 0,
+        versionMismatches: 0,
+        digestMismatches: 0
+      },
+      differences: [],
+      productionPrimary: false
+    };
+  } finally {
+    client?.release?.();
+    if (!options.pool) await pool.end();
+  }
+  recordPostgresReconciliation(sqliteFile, report);
+  return report;
+}
+
 async function runPostgresSyncWorker(options = {}) {
   assertSyncMode(options.mode || SYNC_MODE);
   if ((options.mode || SYNC_MODE) !== "outbox") throw new Error("POSTGRES_SYNC_MODE=outbox is required");
@@ -288,12 +560,19 @@ module.exports = {
   applyPostgresSyncBatch,
   assertSyncMode,
   buildCollectionChanges,
+  buildCollectionSnapshotChanges,
   buildPostgresSyncBatch,
+  comparePostgresShadowState,
   enqueuePostgresSyncBatch,
+  enqueuePostgresSyncBaseline,
   loadPendingPostgresSyncBatches,
+  loadSqliteCollectionState,
   markPostgresSyncBatch,
   postgresPoolConfig,
+  readLatestPostgresReconciliation,
   readPostgresSyncStatus,
+  recordPostgresReconciliation,
+  runPostgresShadowReconciliation,
   runPostgresSyncWorker,
   validatePostgresSyncBatch
 };

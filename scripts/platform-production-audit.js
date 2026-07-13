@@ -94,10 +94,10 @@ const MVP_REQUIRED_MODULES = [
   {
     id: "mvp-production-database",
     name: "生产数据库与迁移",
-    status: "shadow-sync-foundation-ready",
+    status: "shadow-reconciliation-foundation-ready",
     priority: "P0",
-    implemented: "SQLite schema v8、WAL/FULL、乐观锁、事务 outbox、链式批次摘要、PostgreSQL 幂等影子同步 worker、重试状态、迁移清单、受控全量导出和回滚模板",
-    remainingCode: "完成 PostgreSQL 生产主存储读路径、领域表转换、双向一致性核对、容量切换、原生备份恢复和正式回切工具；小规模单机试点可在评审批准后继续 SQLite",
+    implemented: "SQLite schema v9、WAL/FULL、乐观锁、事务 outbox、链式批次摘要、基线入队、PostgreSQL 幂等影子同步 worker、只读版本与摘要核对、差异台账、重试状态、迁移清单、受控全量导出和回滚模板",
+    remainingCode: "完成 PostgreSQL 生产主存储读路径、领域表转换、容量切换、原生备份恢复和正式回切工具；小规模单机试点可在评审批准后继续 SQLite",
     siteDependency: "目标容量、RTO/RPO、数据库资源和灾备签字"
   },
   {
@@ -185,12 +185,12 @@ const PRODUCTION_BLOCKERS = [
   status: id === "P0-01"
     ? "automation-foundation-ready-site-acceptance-pending"
     : id === "P0-02"
-    ? "shadow-sync-ready-primary-cutover-pending"
+    ? "shadow-reconciliation-ready-primary-cutover-pending"
     : (["P0-03", "P0-04", "P0-05", "P0-06", "P0-08", "P0-09"].includes(id) ? "adapter-foundation-ready-site-joint-test-pending" : "blocked-until-site-evidence"),
   progress: id === "P0-01"
     ? "已实现不可变部署包、运行文件摘要复核、密钥仅引用不落盘、最小权限进程模板、CI 验证和回滚契约；真实 Vault/KMS、TLS、制品仓库、服务账号和生产 smoke 签字未完成。"
     : id === "P0-02"
-    ? "已实现 SQLite schema v8 事务 outbox、集合版本、批次链式摘要、PostgreSQL 幂等影子同步、重试状态、迁移包和回滚模板；生产主存储读路径、领域转换、容量故障切换和灾备签字仍未完成。"
+    ? "已实现 SQLite schema v9 事务 outbox、集合版本、基线入队、批次链式摘要、PostgreSQL 幂等影子同步、只读版本与 SHA-256 核对、差异台账、重试状态、迁移包和回滚模板；生产主存储读路径、领域转换、容量故障切换和灾备签字仍未完成。"
     : (id === "P0-03"
       ? "已实现 OIDC UserInfo 运行时适配、受控本地账号绑定和配置状态接口；真实目录同步、注销刷新回调、联合测试和签字未完成。"
       : (id === "P0-04"

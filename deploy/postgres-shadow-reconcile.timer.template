@@ -1,0 +1,11 @@
+[Unit]
+Description=Run PostgreSQL shadow reconciliation every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Persistent=true
+Unit=postgres-shadow-reconcile.service
+
+[Install]
+WantedBy=timers.target

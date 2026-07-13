@@ -14,9 +14,10 @@ const REQUIRED_RUNTIME_FILES = [
   "package-lock.json",
   "service-worker.js",
   "manifest.webmanifest",
-  "scripts/postgres-sync-worker.js"
+  "scripts/postgres-sync-worker.js",
+  "scripts/postgres-shadow-reconcile.js"
 ];
-const ADDITIONAL_RUNTIME_FILES = ["scripts/postgres-sync-worker.js"];
+const ADDITIONAL_RUNTIME_FILES = ["scripts/postgres-sync-worker.js", "scripts/postgres-shadow-reconcile.js"];
 const EXCLUDED_RUNTIME_FILES = new Set(["playwright.config.js"]);
 
 const SECRET_CONTRACT = [

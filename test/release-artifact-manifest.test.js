@@ -21,7 +21,7 @@ test("release artifact manifest indexes reports templates commands and evidence"
   assert.equal(report.artifacts.some((item) => item.id === "release-report" && item.command === "release:report"), true);
   assert.equal(report.artifacts.some((item) => item.id === "release-artifact-manifest" && item.command === "release:manifest"), true);
   assert.equal(report.artifacts.some((item) => item.id === "platform-production-audit" && item.command === "platform:production-audit" && item.markdown === "docs/数智医院标准平台全程审计与生产前开发规划.md" && item.evidence === "release/production-cutover-checklist.md"), true);
-  assert.equal(report.artifacts.some((item) => item.id === "platform-development-report-20260712" && item.command === "release:report" && item.markdown === "docs/数智医院标准平台开发报告与下一步计划-2026-07-12.md"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "platform-development-report-20260713" && item.command === "release:report" && item.markdown === "docs/数智医院标准平台开发报告与下一步计划-2026-07-13.md"), true);
   assert.equal(report.artifacts.some((item) => item.id === "object-storage-readiness" && item.command === "object-storage:readiness" && item.markdown === "release/object-storage-readiness-report.md" && item.evidence === "/api/attachments/storage"), true);
   assert.equal(report.artifacts.some((item) => item.id === "financial-gateway-readiness" && item.command === "financial-gateway:readiness" && item.markdown === "release/financial-gateway-readiness-report.md" && item.evidence === "/api/financial-gateways"), true);
   assert.equal(report.artifacts.some((item) => item.id === "platform-rd-report" && item.command === "release:report" && item.markdown === "docs/卫生健康信息平台研发报告.md"), true);

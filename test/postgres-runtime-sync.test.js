@@ -7,16 +7,23 @@ const test = require("node:test");
 const {
   applyPostgresSyncBatch,
   buildCollectionChanges,
+  buildCollectionSnapshotChanges,
   buildPostgresSyncBatch,
+  comparePostgresShadowState,
   enqueuePostgresSyncBatch,
+  enqueuePostgresSyncBaseline,
   loadPendingPostgresSyncBatches,
+  loadSqliteCollectionState,
   markPostgresSyncBatch,
   postgresPoolConfig,
+  readLatestPostgresReconciliation,
   readPostgresSyncStatus,
+  runPostgresShadowReconciliation,
   runPostgresSyncWorker,
   validatePostgresSyncBatch
 } = require("../postgres-runtime-sync");
-const { parseArgs } = require("../scripts/postgres-sync-worker");
+const { parseArgs: parseWorkerArgs } = require("../scripts/postgres-sync-worker");
+const { parseArgs: parseReconcileArgs, renderMarkdown } = require("../scripts/postgres-shadow-reconcile");
 
 function createOutboxDatabase(file) {
   const { DatabaseSync } = require("node:sqlite");
@@ -35,7 +42,28 @@ function createOutboxDatabase(file) {
       last_error TEXT NOT NULL DEFAULT '',
       next_attempt_at TEXT NOT NULL,
       delivered_at TEXT
-    )
+    );
+    CREATE TABLE state_collections (
+      key TEXT PRIMARY KEY,
+      payload TEXT NOT NULL,
+      version INTEGER NOT NULL
+    );
+    CREATE TABLE postgres_sync_reconciliations (
+      run_id TEXT PRIMARY KEY,
+      checked_at TEXT NOT NULL,
+      status TEXT NOT NULL,
+      local_collections INTEGER NOT NULL DEFAULT 0,
+      remote_collections INTEGER NOT NULL DEFAULT 0,
+      matched INTEGER NOT NULL DEFAULT 0,
+      mismatched INTEGER NOT NULL DEFAULT 0,
+      missing_remote INTEGER NOT NULL DEFAULT 0,
+      unexpected_remote INTEGER NOT NULL DEFAULT 0,
+      version_mismatches INTEGER NOT NULL DEFAULT 0,
+      digest_mismatches INTEGER NOT NULL DEFAULT 0,
+      duration_ms INTEGER NOT NULL DEFAULT 0,
+      error_code TEXT NOT NULL DEFAULT '',
+      detail_json TEXT NOT NULL DEFAULT '[]'
+    );
   `);
   return db;
 }
@@ -67,6 +95,46 @@ test("SQLite outbox chains batches and tracks delivery state", (t) => {
   const status = readPostgresSyncStatus(sqliteFile);
   assert.equal(status.delivered, 1);
   assert.equal(status.pending, 1);
+});
+
+test("PostgreSQL baseline bootstrap snapshots every collection once without storage metadata", (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "postgres-baseline-test-"));
+  const sqliteFile = path.join(dir, "outbox.sqlite");
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const db = createOutboxDatabase(sqliteFile);
+  const insert = db.prepare("INSERT INTO state_collections (key, payload, version) VALUES (?, ?, ?)");
+  insert.run("residents", JSON.stringify([{ name: "Resident", id: "r1" }]), 4);
+  insert.run("settings", JSON.stringify({ enabled: true }), 2);
+  insert.run("storageMeta", JSON.stringify({ engine: "sqlite" }), 9);
+  db.close();
+
+  const result = enqueuePostgresSyncBaseline(sqliteFile, { createdAt: "2026-07-12T01:00:00.000Z" });
+  assert.deepEqual({ enqueued: result.enqueued, collections: result.collections }, { enqueued: true, collections: 2 });
+  const [batch] = loadPendingPostgresSyncBatches(sqliteFile);
+  assert.equal(JSON.parse(batch.payload).sourceEvent, "baseline-snapshot");
+  assert.deepEqual(batch.changes.map((item) => [item.collection, item.sourceVersion]), [["residents", 4], ["settings", 2]]);
+  assert.equal(enqueuePostgresSyncBaseline(sqliteFile).reason, "outbox-not-empty");
+});
+
+test("PostgreSQL shadow comparison reports version digest and presence differences without payloads", () => {
+  const local = buildCollectionSnapshotChanges([
+    { key: "matched", payload: JSON.stringify({ id: 1 }), version: 2 },
+    { key: "changed", payload: JSON.stringify({ id: 2 }), version: 3 },
+    { key: "missing", payload: JSON.stringify({ id: 3 }), version: 1 }
+  ]).map((item) => ({ collection: item.collection, sourceVersion: item.sourceVersion, payloadSha256: item.payloadSha256 }));
+  const matched = local.find((item) => item.collection === "matched");
+  const result = comparePostgresShadowState(local, [
+    { ...matched, batchId: "b1" },
+    { collection: "changed", sourceVersion: 2, payloadSha256: "0".repeat(64), batchId: "b2" },
+    { collection: "unexpected", sourceVersion: 1, payloadSha256: "1".repeat(64), batchId: "b3" }
+  ]);
+  assert.equal(result.matched, 1);
+  assert.equal(result.mismatched, 3);
+  assert.equal(result.versionMismatches, 1);
+  assert.equal(result.digestMismatches, 1);
+  assert.equal(result.missingRemote, 1);
+  assert.equal(result.unexpectedRemote, 1);
+  assert.equal(JSON.stringify(result).includes('"id":'), false);
 });
 
 test("PostgreSQL apply uses a transaction and treats duplicate batches as delivered", async () => {
@@ -148,13 +216,84 @@ test("PostgreSQL worker records retry and terminal failure states", async (t) =>
   assert.equal(status.retry, 0);
 });
 
+test("PostgreSQL shadow reconciliation uses a read-only transaction and persists a payload-free result", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "postgres-reconciliation-test-"));
+  const sqliteFile = path.join(dir, "outbox.sqlite");
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const db = createOutboxDatabase(sqliteFile);
+  db.prepare("INSERT INTO state_collections (key, payload, version) VALUES (?, ?, ?)").run("settings", JSON.stringify({ enabled: true }), 3);
+  db.close();
+  const [local] = loadSqliteCollectionState(sqliteFile);
+  const queries = [];
+  const client = {
+    async query(sql) {
+      queries.push(sql.trim());
+      if (/SELECT collection_name/.test(sql)) {
+        return { rows: [{ collection_name: local.collection, payload_sha256: local.payloadSha256, source_version: local.sourceVersion, batch_id: "batch-1" }] };
+      }
+      return { rows: [] };
+    },
+    release() {}
+  };
+  const report = await runPostgresShadowReconciliation({
+    mode: "outbox",
+    sqliteFile,
+    pool: { async connect() { return client; } },
+    checkedAt: "2026-07-12T02:00:00.000Z"
+  });
+  assert.equal(report.ok, true);
+  assert.equal(report.summary.matched, 1);
+  assert.equal(queries[0], "BEGIN READ ONLY");
+  assert.equal(queries.at(-1), "COMMIT");
+  const persisted = readLatestPostgresReconciliation(sqliteFile);
+  assert.equal(persisted.status, "matched");
+  assert.equal(readPostgresSyncStatus(sqliteFile).reconciliation.mismatched, 0);
+  assert.doesNotMatch(JSON.stringify(report), /enabled|DATABASE_URL|postgres:\/\//);
+});
+
+test("PostgreSQL shadow reconciliation stores only a safe error code", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "postgres-reconciliation-error-test-"));
+  const sqliteFile = path.join(dir, "outbox.sqlite");
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  const db = createOutboxDatabase(sqliteFile);
+  db.prepare("INSERT INTO state_collections (key, payload, version) VALUES (?, ?, ?)").run("settings", JSON.stringify({ enabled: true }), 1);
+  db.close();
+  const client = {
+    async query(sql) {
+      if (sql === "BEGIN READ ONLY") return { rows: [] };
+      if (sql === "ROLLBACK") return { rows: [] };
+      const error = new Error("postgres://user:secret@db/internal unavailable");
+      error.code = "ECONNREFUSED";
+      throw error;
+    },
+    release() {}
+  };
+  const report = await runPostgresShadowReconciliation({ mode: "outbox", sqliteFile, pool: { async connect() { return client; } } });
+  assert.equal(report.status, "error");
+  assert.equal(report.errorCode, "ECONNREFUSED");
+  assert.doesNotMatch(JSON.stringify(report), /user:secret|internal unavailable/);
+  assert.equal(readLatestPostgresReconciliation(sqliteFile).errorCode, "ECONNREFUSED");
+});
+
 test("PostgreSQL pool and CLI contracts require secure explicit configuration", () => {
   assert.throws(() => postgresPoolConfig({ DATABASE_URL: "http://not-postgres" }), /must use postgres/);
   const config = postgresPoolConfig({ DATABASE_URL: "postgres://user:secret@db/app", POSTGRES_SSL_MODE: "require" });
   assert.equal(config.ssl.rejectUnauthorized, false);
   assert.equal(config.max, 2);
-  const parsed = parseArgs(["--sqlite-file=C:/data/health.sqlite", "--limit=10", "--max-attempts=4"]);
+  const parsed = parseWorkerArgs(["--sqlite-file=C:/data/health.sqlite", "--limit=10", "--max-attempts=4"]);
   assert.equal(parsed["sqlite-file"], "C:/data/health.sqlite");
   assert.equal(parsed.limit, "10");
   assert.equal(parsed["max-attempts"], "4");
+  assert.deepEqual(parseReconcileArgs(["reconcile", "--sqlite-file=C:/data/health.sqlite", "--output=C:/logs/reconcile.json"]), {
+    command: "reconcile",
+    flags: { "sqlite-file": "C:/data/health.sqlite", output: "C:/logs/reconcile.json" }
+  });
+  assert.match(renderMarkdown({
+    checkedAt: "2026-07-12T00:00:00.000Z",
+    runId: "pgrecon-test",
+    status: "matched",
+    durationMs: 1,
+    summary: { localCollections: 1, remoteCollections: 1, matched: 1, mismatched: 0 },
+    differences: []
+  }), /contains no business payloads or database credentials/);
 });
