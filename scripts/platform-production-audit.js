@@ -103,10 +103,10 @@ const MVP_REQUIRED_MODULES = [
   {
     id: "mvp-identity-message",
     name: "统一身份与消息网关",
-    status: "adapter-foundation-ready",
+    status: "identity-lifecycle-ready-site-joint-test-pending",
     priority: "P0",
-    implemented: "OIDC UserInfo、受控账号绑定、短信 HTTP 适配、随机验证码、摘要存储和供应商受理回执",
-    remainingCode: "按实际供应商补充专有签名、最终送达回调、注销刷新回调和机构目录同步",
+    implemented: "OIDC UserInfo、稳定 subject 受控绑定、同名回退阻断、token 刷新、token 撤销与本地注销、SCIM 目录预览、受控停用与会话撤销、短信 HTTP 适配、随机验证码、摘要存储和供应商受理回执",
+    remainingCode: "按实际身份与短信供应商补充专有签名、最终送达回调、协议差异和现场映射配置",
     siteDependency: "真实凭据、短信模板、目录映射、联合测试回执和责任方签字"
   },
   {
@@ -186,13 +186,15 @@ const PRODUCTION_BLOCKERS = [
     ? "automation-foundation-ready-site-acceptance-pending"
     : id === "P0-02"
     ? "primary-read-production-adapter-ready-site-acceptance-pending"
-    : (["P0-03", "P0-04", "P0-05", "P0-06", "P0-08", "P0-09"].includes(id) ? "adapter-foundation-ready-site-joint-test-pending" : "blocked-until-site-evidence"),
+    : id === "P0-03"
+    ? "identity-lifecycle-ready-site-joint-test-pending"
+    : (["P0-04", "P0-05", "P0-06", "P0-08", "P0-09"].includes(id) ? "adapter-foundation-ready-site-joint-test-pending" : "blocked-until-site-evidence"),
   progress: id === "P0-01"
     ? "已实现不可变部署包、运行文件摘要复核、密钥仅引用不落盘、最小权限进程模板、CI 验证和回滚契约；真实 Vault/KMS、TLS、制品仓库、服务账号和生产 smoke 签字未完成。"
     : id === "P0-02"
     ? "已实现 SQLite schema v10 事务 outbox、集合版本、基线入队、批次链式摘要、PostgreSQL 幂等影子同步、只读版本与 SHA-256 核对、核对历史、差异责任人、确认/关闭/自动重开、处置审计、完整状态主读取演练，以及具备 SERIALIZABLE 主写、全集合乐观锁和无正文写审计的异步生产适配器；主服务正式切换、领域转换、容量故障切换、原生备份恢复和灾备签字仍未完成。"
     : (id === "P0-03"
-      ? "已实现 OIDC UserInfo 运行时适配、受控本地账号绑定和配置状态接口；真实目录同步、注销刷新回调、联合测试和签字未完成。"
+      ? "已实现 OIDC 稳定 subject 受控绑定、同名回退阻断、UserInfo、刷新、撤销、本地注销、SCIM 目录预览、受控账号停用、会话撤销和运维状态界面，并阻止自动开户、提权、复活、静默改绑、当前操作员停用及最后卫健委账号停用；真实凭据、目录归属与映射验收、供应商差异、联合测试和签字未完成。"
       : (id === "P0-04"
         ? "已实现短信 HTTP 适配、随机验证码、摘要存储和供应商受理回执；供应商签名、最终送达回调、移动发布和签字未完成。"
         : (id === "P0-05"
@@ -274,7 +276,9 @@ function buildPlatformProductionAudit(options = {}) {
     documentation: read("docs/platform-capability-operations-center.md"),
     postgresRuntime: read("postgres-runtime-sync.js"),
     postgresAdapter: read("postgres-production-adapter.js"),
-    postgresDocumentation: read("docs/postgresql-runtime-sync.md")
+    postgresDocumentation: read("docs/postgresql-runtime-sync.md"),
+    identityAdapter: read("production-adapters.js"),
+    identityDocumentation: read("docs/production-identity-message-adapters.md")
   };
   const document = options.document ?? (exists("docs/数智医院标准平台全程审计与生产前开发规划.md")
     ? read("docs/数智医院标准平台全程审计与生产前开发规划.md")
@@ -298,6 +302,7 @@ function buildPlatformProductionAudit(options = {}) {
     check("platformAudit:roadmap", ROADMAP.length === 4 && ROADMAP.every((item) => item.deliverables.length >= 4 && item.exit), "30/60/90-day and continuous-improvement roadmap is complete"),
     check("platformAudit:capabilityOperationsCenter", runtimeSources.domain.includes("applyPlatformCapabilityReviewAction") && runtimeSources.domain.includes("applyPlatformProductionBlockerAction") && runtimeSources.server.includes("/api/platform/capability-operations/blockers/") && runtimeSources.html.includes("platform-capability-operations-center") && runtimeSources.client.includes("renderPlatformCapabilityOperationsCenter") && runtimeSources.client.includes("runPlatformProductionBlockerAction") && runtimeSources.documentation.includes("reviewed-preproduction") && runtimeSources.documentation.includes("evidence-reviewed-site-pending"), "capability review and production-blocker evidence workflows are runnable, audited and documented"),
     check("platformAudit:productionDatabaseAdapter", ["runPostgresPrimaryReadRehearsal", "buildPostgresPrimaryReadSnapshot"].every((marker) => runtimeSources.postgresRuntime.includes(marker)) && ["readPostgresProductionState", "writePostgresProductionState", "runtime_primary_write_audit", "POSTGRES_PRIMARY_WRITE_BLOCKED"].every((marker) => runtimeSources.postgresAdapter.includes(marker)) && ["/api/production-database/adapter", "/api/production-database/primary-read-rehearsal"].every((marker) => runtimeSources.server.includes(marker)) && ["生产数据库适配器", "SERIALIZABLE", "productionPrimary"].every((marker) => runtimeSources.postgresDocumentation.includes(marker)), "P0-02 primary-read rehearsal and evidence-gated production adapter are runnable, audited and documented"),
+    check("platformAudit:identityLifecycleAdapter", ["refreshOidcAccessToken", "revokeOidcToken", "fetchIdentityDirectory", "identityLifecycleReady"].every((marker) => runtimeSources.identityAdapter.includes(marker)) && ["/api/auth/identity-lifecycle", "/api/auth/oidc/refresh", "/api/auth/oidc/revoke", "/api/auth/identity-directory/preview", "/api/auth/identity-directory/bind", "/api/auth/identity-directory/apply", "BIND EXTERNAL IDENTITY", "IDENTITY_BINDING_REASSIGNMENT_BLOCKED", "IDENTITY_DIRECTORY_SELF_DEACTIVATION_BLOCKED", "IDENTITY_DIRECTORY_LAST_COMMISSION_BLOCKED"].every((marker) => runtimeSources.server.includes(marker)) && runtimeSources.html.includes("identity-lifecycle-center") && ["renderIdentityLifecycleCenter", "runIdentityBindingAction", "runIdentityDirectoryAction"].every((marker) => runtimeSources.client.includes(marker)) && ["不按同名用户名自动回退", "不自动开户", "不自动提权", "不自动复活", "现场联合测试回执"].every((marker) => runtimeSources.identityDocumentation.includes(marker)), "P0-03 OIDC subject binding, lifecycle, safe directory deactivation, operations UI and production boundary are runnable, audited and documented"),
     check("platformAudit:releaseWiring", Boolean(pkg.scripts?.["platform:production-audit"]) && scriptSources.manifest.includes("platform-production-audit") && scriptSources.deploy.includes("platformProductionAudit") && scriptSources.release.includes("buildPlatformProductionAudit"), "package, manifest, deploy check and release report are wired"),
     check("platformAudit:formalDocument", ["审计结论", "正式生产前已实现的主要功能", "生产割接差距", "下一步开发规划", "正式上线退出条件"].every((marker) => document.includes(marker)), "formal audit document contains conclusion, capability inventory, gaps, roadmap and exit criteria")
   ];
@@ -322,7 +327,8 @@ function buildPlatformProductionAudit(options = {}) {
       releaseChecks: Number(releaseReport.summary?.total || 0),
       releaseChecksPassed: Number(releaseReport.summary?.passed || 0),
       capabilityOperationsCenter: checks.some((item) => item.id === "platformAudit:capabilityOperationsCenter" && item.passed),
-      productionDatabaseAdapter: checks.some((item) => item.id === "platformAudit:productionDatabaseAdapter" && item.passed)
+      productionDatabaseAdapter: checks.some((item) => item.id === "platformAudit:productionDatabaseAdapter" && item.passed),
+      identityLifecycleAdapter: checks.some((item) => item.id === "platformAudit:identityLifecycleAdapter" && item.passed)
     },
     auditBasis: [
       "运行页面与角色入口",
@@ -356,6 +362,7 @@ function renderMarkdown(report) {
     `本次审计覆盖 ${report.summary.capabilityDomains} 个能力域，其中 ${report.summary.implementedDomains} 个具备仓库内可运行证据；正式生产就绪能力按审慎口径计为 ${report.summary.productionReadyDomains} 个。当前演示发布检查为 ${report.summary.releaseChecksPassed}/${report.summary.releaseChecks}，生产割接检查为 ${report.summary.cutoverPassed}/${report.summary.cutoverChecks}。发布检查通过只证明代码、文档和演示证据结构完整，不等同于现场生产验收。`,
     `平台能力运营中心已${report.summary.capabilityOperationsCenter ? "纳入" : "未纳入"}发布门禁，用于统一管理能力域责任人、生产阻断整改、证据提交、生产前复核和审计留痕。`,
     `P0-02 PostgreSQL 主读取演练与生产适配器已${report.summary.productionDatabaseAdapter ? "纳入" : "未纳入"}发布门禁；正式主库切换仍由现场数据库、灾备和四方审批证据阻断。`,
+    `P0-03 统一身份生命周期与目录安全停用已${report.summary.identityLifecycleAdapter ? "纳入" : "未纳入"}发布门禁；真实身份源、目录映射、供应商联合测试和责任方签字仍为上线阻断项。`,
     "",
     "## 二、审计范围与方法",
     "",

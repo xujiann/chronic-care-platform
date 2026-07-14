@@ -6,6 +6,7 @@ const { hospitalConnectorCenter } = require("../hospital-connectors");
 const { financialGatewayCenter } = require("../financial-gateways");
 const { objectStorageCenter } = require("../secure-object-storage");
 const { alertRoutingCenter } = require("../observability-alerting");
+const { productionAdapterCenter } = require("../production-adapters");
 const { buildAuditRetentionReport, renderMarkdown: renderAuditRetentionMarkdown } = require("./audit-retention");
 const { buildChronicFollowupReadinessReport, renderMarkdown: renderChronicFollowupMarkdown } = require("./chronic-followup-readiness");
 const { buildChronicInstitutionInterfaceReport, renderMarkdown: renderChronicInstitutionInterfaceMarkdown } = require("./chronic-institution-interfaces");
@@ -142,8 +143,8 @@ function buildProductionCutoverChecklist(env, checks = []) {
       id: "cutover-identity",
       phase: "identity",
       owner: "identity-integration",
-      passed: ready("env:OIDC.identityAdapter", "env:SMS.gateway"),
-      evidence: detail("env:OIDC.identityAdapter", "env:SMS.gateway"),
+      passed: ready("env:OIDC.identityAdapter", "env:OIDC.lifecycle", "env:SMS.gateway"),
+      evidence: detail("env:OIDC.identityAdapter", "env:OIDC.lifecycle", "env:SMS.gateway"),
       nextAction: "确认政务统一认证 OIDC/SAML 参数、客户端密钥、回调地址、机构目录、医生身份源映射和居民端真实短信网关。"
     },
     {
@@ -255,6 +256,7 @@ function validateProductionConfig(options = {}) {
     const financialGateways = financialGatewayCenter(env);
     const financialSecrets = ["PAYMENT", "INSURANCE", "CERTIFICATE"].map((type) => String(env[`${type}_GATEWAY_SECRET`] || env.FINANCIAL_GATEWAY_SECRET || ""));
     const secureObjectStorage = objectStorageCenter(env);
+    const productionAdapters = productionAdapterCenter(env);
     checks.push(
       check("env:NODE_ENV.production", nodeEnv === "production", nodeEnv || "missing", "error", "environment"),
       check("env:STORAGE_ENGINE.production", storageEngine !== "json", "json storage is demo-only", "error", "environment"),
@@ -264,6 +266,7 @@ function validateProductionConfig(options = {}) {
       check("env:SQLITE.synchronous", !["auto", "sqlite"].includes(storageEngine) || ["FULL", "EXTRA"].includes(sqliteSynchronous), sqliteSynchronous || "missing SQLITE_SYNCHRONOUS", "error", "environment"),
       check("env:SQLITE.busyTimeout", !["auto", "sqlite"].includes(storageEngine) || sqliteBusyTimeout >= 5000, Number.isFinite(sqliteBusyTimeout) ? `${sqliteBusyTimeout}ms` : "invalid SQLITE_BUSY_TIMEOUT_MS", "error", "environment"),
       check("env:OIDC.identityAdapter", Boolean(env.OIDC_ISSUER_URL && env.OIDC_CLIENT_ID && env.OIDC_CLIENT_SECRET), env.OIDC_ISSUER_URL && env.OIDC_CLIENT_ID && env.OIDC_CLIENT_SECRET ? "configured" : "missing OIDC_ISSUER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET", "error", "environment"),
+      check("env:OIDC.lifecycle", productionAdapters.identityLifecycleReady, productionAdapters.identityLifecycleReady ? "refresh, revocation and identity directory adapters configured with production HTTPS" : productionAdapters.blockers.join("; "), "error", "environment"),
       check("env:SMS.gateway", Boolean(env.SMS_GATEWAY_URL && env.SMS_TEMPLATE_ID), env.SMS_GATEWAY_URL && env.SMS_TEMPLATE_ID ? "configured" : "missing SMS_GATEWAY_URL/SMS_TEMPLATE_ID", "error", "environment"),
       check("env:HOSPITAL.connectors", hospitalConnectors.adapterReady, `${hospitalConnectors.summary.configured}/${hospitalConnectors.summary.total} hospital connectors configured with production HTTPS`, "error", "environment"),
       check("env:HOSPITAL.secretQuality", hospitalSecrets.every((secret) => secretQuality(secret).strongEnough), "hospital adapter signing secrets must be non-placeholder and at least 32 chars", "error", "environment"),

@@ -1374,6 +1374,7 @@ dialog::backdrop {
 .evidence-grid article {
   display: grid;
   align-content: start;
+  min-width: 0;
   gap: 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -1392,9 +1393,11 @@ dialog::backdrop {
 }
 
 .evidence-grid p,
-.evidence-grid small {
+.evidence-grid small,
+.evidence-grid li {
   color: var(--muted);
   line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 
 .evidence-grid footer {

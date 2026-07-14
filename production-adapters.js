@@ -25,16 +25,25 @@ function boundedTimeout(value) {
 function identityAdapterStatus(env = process.env) {
   const issuer = String(env.OIDC_ISSUER_URL || "").trim();
   const userInfo = String(env.OIDC_USERINFO_URL || "").trim();
+  const tokenEndpoint = String(env.OIDC_TOKEN_URL || "").trim();
+  const revocationEndpoint = String(env.OIDC_REVOCATION_URL || "").trim();
+  const directoryEndpoint = String(env.IDENTITY_DIRECTORY_URL || "").trim();
   const configured = Boolean(issuer && env.OIDC_CLIENT_ID && env.OIDC_CLIENT_SECRET);
+  const directoryConfigured = Boolean(directoryEndpoint && env.IDENTITY_DIRECTORY_TOKEN);
   return {
     type: "oidc-userinfo",
     configured,
     issuerConfigured: Boolean(issuer),
     userInfoConfigured: Boolean(userInfo),
     clientConfigured: Boolean(env.OIDC_CLIENT_ID && env.OIDC_CLIENT_SECRET),
-    productionHttps: !isProduction(env) || [issuer, userInfo].filter(Boolean).every((item) => /^https:\/\//i.test(item)),
+    refreshConfigured: configured && Boolean(tokenEndpoint || issuer),
+    revocationConfigured: configured && Boolean(revocationEndpoint || issuer),
+    directoryConfigured,
+    directoryEndpointConfigured: Boolean(directoryEndpoint),
+    directoryCredentialConfigured: Boolean(env.IDENTITY_DIRECTORY_TOKEN),
+    productionHttps: !isProduction(env) || [issuer, userInfo, tokenEndpoint, revocationEndpoint, directoryEndpoint].filter(Boolean).every((item) => /^https:\/\//i.test(item)),
     timeoutMs: boundedTimeout(env.IDENTITY_ADAPTER_TIMEOUT_MS),
-    boundary: "The adapter exchanges an upstream access token for verified UserInfo claims. Account provisioning and organization binding remain controlled workflows."
+    boundary: "The adapter verifies UserInfo, refreshes and revokes upstream tokens, and previews directory deactivations. Provisioning, privilege changes and reactivation remain controlled workflows."
   };
 }
 
@@ -80,11 +89,22 @@ async function fetchJson(url, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS, fetc
 
 async function resolveOidcUserInfoEndpoint(env = process.env, fetchImpl = globalThis.fetch) {
   if (env.OIDC_USERINFO_URL) return validatedHttpUrl(env.OIDC_USERINFO_URL, "OIDC_USERINFO_URL", env).toString();
-  const issuer = validatedHttpUrl(env.OIDC_ISSUER_URL, "OIDC_ISSUER_URL", env);
-  const discoveryUrl = new URL(".well-known/openid-configuration", issuer.toString().endsWith("/") ? issuer : `${issuer}/`);
-  const discovery = await fetchJson(discoveryUrl, { headers: { Accept: "application/json" } }, env.IDENTITY_ADAPTER_TIMEOUT_MS, fetchImpl);
+  const discovery = await fetchOidcDiscovery(env, fetchImpl);
   if (!discovery.userinfo_endpoint) throw new Error("OIDC discovery does not expose userinfo_endpoint");
   return validatedHttpUrl(discovery.userinfo_endpoint, "OIDC userinfo_endpoint", env).toString();
+}
+
+async function fetchOidcDiscovery(env = process.env, fetchImpl = globalThis.fetch) {
+  const issuer = validatedHttpUrl(env.OIDC_ISSUER_URL, "OIDC_ISSUER_URL", env);
+  const discoveryUrl = new URL(".well-known/openid-configuration", issuer.toString().endsWith("/") ? issuer : `${issuer}/`);
+  return fetchJson(discoveryUrl, { headers: { Accept: "application/json" } }, env.IDENTITY_ADAPTER_TIMEOUT_MS, fetchImpl);
+}
+
+async function resolveOidcLifecycleEndpoint(envName, discoveryField, label, env = process.env, fetchImpl = globalThis.fetch) {
+  if (env[envName]) return validatedHttpUrl(env[envName], envName, env).toString();
+  const discovery = await fetchOidcDiscovery(env, fetchImpl);
+  if (!discovery[discoveryField]) throw new Error(`OIDC discovery does not expose ${discoveryField}`);
+  return validatedHttpUrl(discovery[discoveryField], label, env).toString();
 }
 
 async function fetchOidcUserInfo(accessToken, options = {}) {
@@ -108,6 +128,114 @@ async function fetchOidcUserInfo(accessToken, options = {}) {
     endpoint,
     fetchedAt: new Date().toISOString(),
     adapter: "oidc-userinfo"
+  };
+}
+
+function oidcClientAuthorization(env) {
+  const clientId = String(env.OIDC_CLIENT_ID || "").trim();
+  const clientSecret = String(env.OIDC_CLIENT_SECRET || "").trim();
+  if (!clientId || !clientSecret) throw new Error("OIDC client credentials are required");
+  return `Basic ${Buffer.from(`${clientId}:${clientSecret}`, "utf8").toString("base64")}`;
+}
+
+async function refreshOidcAccessToken(refreshToken, options = {}) {
+  const env = options.env || process.env;
+  const token = String(refreshToken || "").trim();
+  if (!token) throw new Error("OIDC refresh token is required");
+  const status = identityAdapterStatus(env);
+  if (!status.refreshConfigured) throw new Error("OIDC refresh adapter is not configured");
+  if (!status.productionHttps) throw new Error("OIDC adapter endpoints must use HTTPS in production");
+  const endpoint = await resolveOidcLifecycleEndpoint("OIDC_TOKEN_URL", "token_endpoint", "OIDC token_endpoint", env, options.fetchImpl);
+  const body = await fetchJson(endpoint, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      Authorization: oidcClientAuthorization(env),
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: token }).toString()
+  }, status.timeoutMs, options.fetchImpl);
+  const accessToken = String(body.access_token || "").trim();
+  if (!accessToken) throw new Error("OIDC token response is missing access_token");
+  return {
+    accessToken,
+    refreshToken: String(body.refresh_token || token).trim(),
+    refreshRotated: Boolean(body.refresh_token && body.refresh_token !== token),
+    tokenType: String(body.token_type || "Bearer").trim(),
+    expiresIn: Math.max(0, Number(body.expires_in || 0) || 0),
+    refreshedAt: new Date().toISOString(),
+    adapter: "oidc-refresh"
+  };
+}
+
+async function revokeOidcToken(upstreamToken, options = {}) {
+  const env = options.env || process.env;
+  const token = String(upstreamToken || "").trim();
+  if (!token) throw new Error("OIDC token is required for revocation");
+  const status = identityAdapterStatus(env);
+  if (!status.revocationConfigured) throw new Error("OIDC revocation adapter is not configured");
+  if (!status.productionHttps) throw new Error("OIDC adapter endpoints must use HTTPS in production");
+  const endpoint = await resolveOidcLifecycleEndpoint("OIDC_REVOCATION_URL", "revocation_endpoint", "OIDC revocation_endpoint", env, options.fetchImpl);
+  await fetchJson(endpoint, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      Authorization: oidcClientAuthorization(env),
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: new URLSearchParams({
+      token,
+      token_type_hint: String(options.tokenTypeHint || "access_token").trim()
+    }).toString()
+  }, status.timeoutMs, options.fetchImpl);
+  return {
+    ok: true,
+    status: "revoked",
+    revokedAt: new Date().toISOString(),
+    adapter: "oidc-revocation",
+    credentialsPersisted: false
+  };
+}
+
+function normalizeIdentityDirectoryRecord(record = {}) {
+  const enterprise = record["urn:ietf:params:scim:schemas:extension:enterprise:2.0:User"] || {};
+  const status = String(record.status || "").trim().toLowerCase();
+  return {
+    externalSubject: String(record.id || record.externalId || record.sub || "").trim().slice(0, 240),
+    username: String(record.userName || record.username || record.preferred_username || "").trim().slice(0, 160),
+    displayName: String(record.displayName || record.name?.formatted || "").trim().slice(0, 160),
+    orgCode: String(record.orgCode || record.org_code || enterprise.organization || enterprise.department || "").trim().slice(0, 120),
+    active: record.active !== false && !["disabled", "inactive", "deleted", "revoked"].includes(status),
+    sourceUpdatedAt: String(record.meta?.lastModified || record.updatedAt || "").trim().slice(0, 80)
+  };
+}
+
+async function fetchIdentityDirectory(options = {}) {
+  const env = options.env || process.env;
+  const status = identityAdapterStatus(env);
+  if (!status.directoryConfigured) throw new Error("identity directory adapter is not configured");
+  if (!status.productionHttps) throw new Error("identity directory endpoint must use HTTPS in production");
+  const endpoint = validatedHttpUrl(env.IDENTITY_DIRECTORY_URL, "IDENTITY_DIRECTORY_URL", env);
+  const startIndex = Math.max(1, Math.floor(Number(options.startIndex || 1) || 1));
+  const count = Math.min(200, Math.max(1, Math.floor(Number(options.count || 100) || 100)));
+  endpoint.searchParams.set("startIndex", String(startIndex));
+  endpoint.searchParams.set("count", String(count));
+  const body = await fetchJson(endpoint, {
+    headers: {
+      Accept: "application/scim+json, application/json",
+      Authorization: `Bearer ${String(env.IDENTITY_DIRECTORY_TOKEN).trim()}`
+    }
+  }, status.timeoutMs, options.fetchImpl);
+  const resources = Array.isArray(body.Resources) ? body.Resources : Array.isArray(body.users) ? body.users : [];
+  const records = resources.map(normalizeIdentityDirectoryRecord).filter((item) => item.externalSubject || item.username);
+  return {
+    records,
+    totalResults: Math.max(records.length, Number(body.totalResults || body.total || records.length) || records.length),
+    startIndex,
+    itemsPerPage: records.length,
+    fetchedAt: new Date().toISOString(),
+    adapter: "scim-directory",
+    credentialsPersisted: false
   };
 }
 
@@ -161,18 +289,23 @@ async function sendSmsVerificationCode(message, options = {}) {
 function productionAdapterCenter(env = process.env) {
   const identity = identityAdapterStatus(env);
   const sms = smsAdapterStatus(env);
-  const adapterReady = identity.configured && identity.productionHttps && sms.configured && sms.productionHttps;
+  const identityLifecycleReady = identity.configured && identity.productionHttps && identity.refreshConfigured && identity.revocationConfigured && identity.directoryConfigured;
+  const adapterReady = identityLifecycleReady && sms.configured && sms.productionHttps;
   return {
     generatedAt: new Date().toISOString(),
     production: isProduction(env),
     ready: adapterReady,
     adapterReady,
     productionReady: false,
+    identityLifecycleReady,
     identity,
     sms,
     blockers: [
       ...(!identity.configured ? ["OIDC issuer/client configuration"] : []),
-      ...(!identity.productionHttps ? ["OIDC HTTPS endpoints"] : []),
+      ...(!identity.productionHttps ? ["OIDC and directory HTTPS endpoints"] : []),
+      ...(!identity.refreshConfigured ? ["OIDC token refresh endpoint"] : []),
+      ...(!identity.revocationConfigured ? ["OIDC token revocation endpoint"] : []),
+      ...(!identity.directoryConfigured ? ["identity directory endpoint and credential"] : []),
       ...(!sms.configured ? ["SMS gateway URL and template"] : []),
       ...(!sms.productionHttps ? ["SMS gateway HTTPS endpoint"] : []),
       "real provider joint-test receipts and site signoff"
@@ -182,11 +315,17 @@ function productionAdapterCenter(env = process.env) {
 
 module.exports = {
   digestPhoneVerificationCode,
+  fetchIdentityDirectory,
+  fetchOidcDiscovery,
   fetchOidcUserInfo,
   generatePhoneVerificationCode,
   identityAdapterStatus,
+  normalizeIdentityDirectoryRecord,
   productionAdapterCenter,
+  refreshOidcAccessToken,
+  resolveOidcLifecycleEndpoint,
   resolveOidcUserInfoEndpoint,
+  revokeOidcToken,
   sendSmsVerificationCode,
   smsAdapterStatus
 };

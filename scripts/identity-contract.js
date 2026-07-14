@@ -67,6 +67,8 @@ function buildIdentityContract(options = {}) {
   const data = options.data || readJson("data/db.json");
   const adapterSource = options.adapterSource ?? readText("production-adapters.js");
   const serverSource = options.serverSource ?? readText("server.js");
+  const platformHtml = options.platformHtml ?? readText("platform.html");
+  const platformSource = options.platformSource ?? readText("platform.js");
   const adapterDocument = options.adapterDocument ?? readText("docs/production-identity-message-adapters.md");
   const envTemplate = options.envTemplate ?? readText(".env.example");
   const users = Array.isArray(data.authUsers) ? data.authUsers : [];
@@ -103,6 +105,16 @@ function buildIdentityContract(options = {}) {
       configuration: ["OIDC_ISSUER_URL", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET"].every((marker) => envTemplate.includes(marker)),
       boundary: adapterDocument.includes("受控本地账号绑定") && adapterDocument.includes("现场联合测试回执")
     },
+    oidcLifecycle: {
+      refresh: adapterSource.includes("refreshOidcAccessToken") && serverSource.includes("/api/auth/oidc/refresh"),
+      revocation: adapterSource.includes("revokeOidcToken") && serverSource.includes("/api/auth/oidc/revoke"),
+      directory: adapterSource.includes("fetchIdentityDirectory") && ["/api/auth/identity-directory/preview", "/api/auth/identity-directory/bind", "/api/auth/identity-directory/apply"].every((marker) => serverSource.includes(marker)),
+      controlledBinding: ["BIND EXTERNAL IDENTITY", "IDENTITY_BINDING_SUBJECT_CONFLICT", "IDENTITY_BINDING_REASSIGNMENT_BLOCKED", "local username exists but external subject requires controlled binding"].every((marker) => serverSource.includes(marker)),
+      deactivationSafety: ["IDENTITY_DIRECTORY_SELF_DEACTIVATION_BLOCKED", "IDENTITY_DIRECTORY_LAST_COMMISSION_BLOCKED", "APPLY IDENTITY DIRECTORY DEACTIVATIONS"].every((marker) => serverSource.includes(marker)),
+      operationsUi: platformHtml.includes("identity-lifecycle-center") && ["renderIdentityLifecycleCenter", "runIdentityBindingAction", "runIdentityDirectoryAction"].every((marker) => platformSource.includes(marker)),
+      configuration: ["OIDC_TOKEN_URL", "OIDC_REVOCATION_URL", "IDENTITY_DIRECTORY_URL", "IDENTITY_DIRECTORY_TOKEN"].every((marker) => envTemplate.includes(marker)),
+      boundary: ["不自动开户", "不自动提权", "不自动复活", "真实机构目录"].every((marker) => adapterDocument.includes(marker))
+    },
     sms: {
       runtime: adapterSource.includes("sendSmsVerificationCode") && serverSource.includes("/api/auth/phone-code"),
       protectedCode: adapterSource.includes("digestPhoneVerificationCode") && serverSource.includes("codeDigest"),
@@ -119,6 +131,7 @@ function buildIdentityContract(options = {}) {
     { id: "identity:portalMapping", passed: users.every((item) => ROLE_PORTALS[item.role]?.includes(item.home)), detail: "role home pages match allowed portals" },
     { id: "identity:sampleMappings", passed: sampleMappings.every((item) => item.passed), detail: sampleMappings.map((item) => `${item.id}:${item.mappedRole}/${item.mappedHome}`).join(";") },
     { id: "identity:oidcRuntimeAdapter", passed: Object.values(adapterContracts.oidc).every(Boolean), detail: "OIDC UserInfo runtime, configuration and controlled-binding boundary documented" },
+    { id: "identity:oidcLifecycle", passed: Object.values(adapterContracts.oidcLifecycle).every(Boolean), detail: "OIDC subject binding, refresh, revocation, safe directory deactivation, operations UI and production boundary documented" },
     { id: "identity:smsRuntimeAdapter", passed: Object.values(adapterContracts.sms).every(Boolean), detail: "SMS runtime, keyed code digest, provider configuration and delivery boundary documented" }
   ];
 
@@ -181,7 +194,7 @@ function renderMarkdown(contract) {
     "|---|---|---|",
     ...adapterRows,
     "",
-    "Runtime adapter readiness does not replace real provider joint-test receipts, directory synchronization, delivery callbacks or site signoff.",
+    "Runtime adapter readiness does not replace real provider joint-test receipts, directory ownership and mapping acceptance, delivery callbacks or site signoff.",
     ""
   ].join("\n");
 }

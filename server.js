@@ -35,9 +35,12 @@ const DiseasePaymentIntake = require("./disease-payment-intake");
 const { buildOhifStudyUrl, listOrthancStudySummaries, publishDiagnosticReportToFhir, publishImagingStudyToFhir, solutionAHealth } = require("./solution-a-connectors");
 const {
   digestPhoneVerificationCode,
+  fetchIdentityDirectory,
   fetchOidcUserInfo,
   generatePhoneVerificationCode,
   productionAdapterCenter,
+  refreshOidcAccessToken,
+  revokeOidcToken,
   sendSmsVerificationCode
 } = require("./production-adapters");
 const {
@@ -9363,7 +9366,7 @@ function mapExternalIdentityClaims(claims, data) {
   const username = String(claims.preferred_username || claims.username || claims.loginName || subject || "").trim();
   const orgCode = String(claims.orgCode || claims.org_code || claims.organizationCode || claims.dept_code || claims.departmentCode || "").trim();
   const organization = (data.authOrganizations || []).find((item) => item.orgCode === orgCode);
-  const existing = (data.authUsers || []).find((item) => item.username === username || (subject && item.externalSubject === subject));
+  const existing = subject ? (data.authUsers || []).find((item) => item.externalSubject === subject) : null;
   if (existing) {
     return {
       status: "matched-existing-user",
@@ -9376,6 +9379,7 @@ function mapExternalIdentityClaims(claims, data) {
   const warnings = [];
   if (!username) warnings.push("missing username/sub");
   if (!organization) warnings.push("organization not found; using claim fallback");
+  if (username && (data.authUsers || []).some((item) => String(item.username || "").toLowerCase() === username.toLowerCase())) warnings.push("local username exists but external subject requires controlled binding");
   return {
     status: warnings.length ? "mapped-with-warnings" : "mapped",
     warnings,
@@ -9395,6 +9399,144 @@ function mapExternalIdentityClaims(claims, data) {
       status: "待绑定"
     }),
     organization: organization || null
+  };
+}
+
+function buildIdentityDirectorySyncPlan(directoryRecords = [], data = {}) {
+  const users = Array.isArray(data.authUsers) ? data.authUsers : [];
+  const items = directoryRecords.map((record) => {
+    const subjectMatch = record.externalSubject ? users.find((item) => item.externalSubject === record.externalSubject) : null;
+    const usernameMatch = record.username ? users.find((item) => String(item.username || "").toLowerCase() === record.username.toLowerCase()) : null;
+    const local = subjectMatch || usernameMatch;
+    const localDisabled = local?.status === "停用";
+    let action = "new-account-review-required";
+    if (subjectMatch && !record.active && !localDisabled) action = "deactivate";
+    else if (subjectMatch && !record.active && localDisabled) action = "already-deactivated";
+    else if (subjectMatch && record.active && localDisabled) action = "reactivation-review-required";
+    else if (subjectMatch && record.active) action = "matched-active";
+    else if (usernameMatch?.externalSubject && usernameMatch.externalSubject !== record.externalSubject) action = "binding-conflict-review-required";
+    else if (usernameMatch && !record.active) action = "inactive-binding-review-required";
+    else if (usernameMatch) action = "controlled-binding-required";
+    return {
+      externalSubject: record.externalSubject,
+      username: record.username || local?.username || "",
+      displayName: record.displayName || local?.name || "",
+      orgCode: record.orgCode || local?.orgCode || "",
+      remoteActive: Boolean(record.active),
+      localUserId: local?.id || "",
+      localRole: local?.role || "",
+      localStatus: local?.status || "unbound",
+      action,
+      sourceUpdatedAt: record.sourceUpdatedAt || ""
+    };
+  });
+  const summary = {
+    remoteRecords: items.length,
+    matched: items.filter((item) => item.localUserId).length,
+    deactivations: items.filter((item) => item.action === "deactivate").length,
+    alreadyDeactivated: items.filter((item) => item.action === "already-deactivated").length,
+    reactivationReviews: items.filter((item) => item.action === "reactivation-review-required").length,
+    bindingReviews: items.filter((item) => /binding|required/.test(item.action)).length,
+    bindingConflicts: items.filter((item) => item.action === "binding-conflict-review-required").length
+  };
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    summary,
+    items,
+    productionReady: false,
+    boundary: "Directory synchronization may deactivate an already-bound account only. New accounts, role changes, organization changes and reactivation require controlled review."
+  };
+}
+
+function applyIdentityDirectoryBinding(data, directoryRecords, payload, operator) {
+  const localUserId = String(payload.localUserId || "").trim();
+  const externalSubject = String(payload.externalSubject || "").trim();
+  const note = String(payload.note || "").trim();
+  const local = (data.authUsers || []).find((item) => item.id === localUserId);
+  const remote = directoryRecords.find((item) => item.externalSubject === externalSubject);
+  const fail = (code, message) => {
+    const error = new Error(message);
+    error.code = code;
+    throw error;
+  };
+  if (!local || !remote) fail("IDENTITY_BINDING_RECORD_NOT_FOUND", "local account or directory identity was not found");
+  if (!remote.active || local.status === "停用") fail("IDENTITY_BINDING_ACCOUNT_INACTIVE", "inactive directory or local accounts cannot be bound");
+  if (!remote.username || remote.username.toLowerCase() !== String(local.username || "").toLowerCase()) fail("IDENTITY_BINDING_USERNAME_MISMATCH", "directory and local usernames do not match");
+  if (remote.orgCode && local.orgCode && remote.orgCode !== local.orgCode) fail("IDENTITY_BINDING_ORGANIZATION_MISMATCH", "directory and local organizations do not match");
+  const subjectOwner = (data.authUsers || []).find((item) => item.externalSubject === externalSubject && item.id !== local.id);
+  if (subjectOwner) fail("IDENTITY_BINDING_SUBJECT_CONFLICT", "external subject is already bound to another local account");
+  if (local.externalSubject && local.externalSubject !== externalSubject) fail("IDENTITY_BINDING_REASSIGNMENT_BLOCKED", "external subject reassignment requires a separate security review");
+  const boundAt = new Date().toISOString();
+  data.authUsers = (data.authUsers || []).map((item) => item.id === local.id ? {
+    ...item,
+    externalSubject,
+    identityLifecycle: {
+      state: "directory-bound",
+      source: "scim-directory",
+      appliedAt: boundAt,
+      appliedBy: operator.username || operator.id,
+      note: note.slice(0, 500)
+    }
+  } : item);
+  return {
+    boundAt,
+    localUserId: local.id,
+    username: local.username,
+    externalSubject,
+    orgCode: local.orgCode || "",
+    roleChanged: false,
+    organizationChanged: false
+  };
+}
+
+function revokeSessionsForUserIds(userIds = []) {
+  const targets = new Set(userIds.filter(Boolean));
+  let revoked = 0;
+  sessions.forEach((session, sessionId) => {
+    if (targets.has(session.user?.id)) {
+      sessions.delete(sessionId);
+      revoked += 1;
+    }
+  });
+  return revoked;
+}
+
+function applyIdentityDirectoryDeactivations(data, plan, operator, note) {
+  const candidates = plan.items.filter((item) => item.action === "deactivate");
+  if (candidates.some((item) => item.localUserId === operator.id)) {
+    const error = new Error("identity directory sync cannot deactivate the current operator");
+    error.code = "IDENTITY_DIRECTORY_SELF_DEACTIVATION_BLOCKED";
+    throw error;
+  }
+  const candidateIds = new Set(candidates.map((item) => item.localUserId));
+  const activeCommissionAfter = (data.authUsers || []).filter((item) => item.role === "commission" && item.status !== "停用" && !candidateIds.has(item.id));
+  if (candidates.some((item) => item.localRole === "commission") && activeCommissionAfter.length === 0) {
+    const error = new Error("identity directory sync cannot deactivate the last commission account");
+    error.code = "IDENTITY_DIRECTORY_LAST_COMMISSION_BLOCKED";
+    throw error;
+  }
+  const appliedAt = new Date().toISOString();
+  const applied = [];
+  data.authUsers = (data.authUsers || []).map((item) => {
+    if (!candidateIds.has(item.id)) return item;
+    applied.push({ userId: item.id, username: item.username, role: item.role, orgCode: item.orgCode || "" });
+    return {
+      ...item,
+      status: "停用",
+      identityLifecycle: {
+        state: "directory-deactivated",
+        source: "scim-directory",
+        appliedAt,
+        appliedBy: operator.username || operator.id,
+        note: String(note || "").trim().slice(0, 500)
+      }
+    };
+  });
+  return {
+    appliedAt,
+    applied,
+    revokedSessions: revokeSessionsForUserIds(applied.map((item) => item.userId))
   };
 }
 
@@ -17614,6 +17756,26 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/auth/identity-lifecycle") {
+    const user = requireApiRole(req, res, ["commission"], "/api/auth/identity-lifecycle");
+    if (!user) return;
+    const center = productionAdapterCenter(process.env);
+    sendJson(res, 200, {
+      ok: true,
+      identity: center.identity,
+      capabilities: {
+        login: "oidc-userinfo-controlled-binding",
+        refresh: "upstream-refresh-to-local-session",
+        logout: "upstream-revocation-and-local-session-delete",
+        directory: "controlled-binding-preview-and-deactivation"
+      },
+      blockers: center.blockers.filter((item) => /OIDC|identity|provider|site/i.test(item)),
+      productionReady: false,
+      boundary: "Provider configuration and lifecycle code do not replace directory ownership, provider receipts, privilege review or site signoff."
+    });
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/auth/oidc/exchange") {
     const payload = await collectJson(req);
     try {
@@ -17644,6 +17806,120 @@ async function handleApi(req, res) {
     } catch (error) {
       appendSecurityEvent({ actor: "external", role: "external", action: "OIDC login", target: "unified-auth", result: "denied", detail: error.message });
       sendJson(res, 502, { ok: false, message: "identity provider verification failed" });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/auth/oidc/refresh") {
+    const payload = await collectJson(req);
+    try {
+      const refreshed = await refreshOidcAccessToken(payload.refreshToken);
+      const upstream = await fetchOidcUserInfo(refreshed.accessToken);
+      const data = readDatabase();
+      const mapping = mapExternalIdentityClaims(upstream.claims, data);
+      const user = mapping.status === "matched-existing-user"
+        ? (data.authUsers || []).find((item) => item.id === mapping.user.id && item.status !== "停用")
+        : null;
+      if (!user) {
+        appendSecurityEvent({ actor: upstream.claims.sub || "external", role: "external", action: "OIDC refresh", target: "unified-auth", result: "denied", detail: "refreshed identity is unbound, disabled or missing" });
+        sendJson(res, 403, { ok: false, message: "refreshed identity is unbound, disabled or missing" });
+        return;
+      }
+      const session = createSession(user);
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "OIDC refresh", target: user.home, result: "allowed", detail: "upstream refresh verified and a new signed local session was issued" });
+      sendJson(res, 200, {
+        ok: true,
+        token: session.token,
+        expiresAt: session.expiresAt,
+        user: session.user,
+        adapter: refreshed.adapter,
+        upstreamRefreshRotated: refreshed.refreshRotated,
+        ...(refreshed.refreshRotated ? { upstreamRefreshToken: refreshed.refreshToken } : {})
+      });
+    } catch (error) {
+      appendSecurityEvent({ actor: "external", role: "external", action: "OIDC refresh", target: "unified-auth", result: "denied", detail: "upstream refresh or identity verification failed" });
+      sendJson(res, 502, { ok: false, message: "identity provider refresh failed" });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/auth/oidc/revoke") {
+    const session = currentSession(req);
+    if (!session) {
+      sendJson(res, 401, { ok: false, message: "未登录或会话已过期" });
+      return;
+    }
+    const payload = await collectJson(req);
+    try {
+      const receipt = await revokeOidcToken(payload.upstreamToken, { tokenTypeHint: payload.tokenTypeHint });
+      sessions.delete(session.sessionId);
+      appendSecurityEvent({ actor: session.user.name, role: session.user.role, action: "OIDC revoke logout", target: "unified-auth", result: "allowed", detail: "upstream token revoked and local session deleted" });
+      sendJson(res, 200, { ok: true, receipt, localSessionRevoked: true, productionReady: false });
+    } catch (error) {
+      sessions.delete(session.sessionId);
+      appendSecurityEvent({ actor: session.user.name, role: session.user.role, action: "OIDC revoke logout", target: "unified-auth", result: "partial", detail: "local session deleted; upstream revocation requires reconciliation" });
+      sendJson(res, 502, { ok: false, message: "upstream token revocation failed", localSessionRevoked: true, upstreamRevoked: false });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/auth/identity-directory/preview") {
+    const user = requireApiRole(req, res, ["commission"], "/api/auth/identity-directory/preview");
+    if (!user) return;
+    try {
+      const directory = await fetchIdentityDirectory();
+      const plan = buildIdentityDirectorySyncPlan(directory.records, readDatabase());
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "identity directory preview", target: "unified-auth", result: "allowed", detail: `${plan.summary.remoteRecords} records; ${plan.summary.deactivations} deactivations; production ready false` });
+      sendJson(res, 200, { ok: true, directory: { totalResults: directory.totalResults, fetchedAt: directory.fetchedAt, adapter: directory.adapter }, plan });
+    } catch (error) {
+      sendJson(res, 409, { ok: false, code: "IDENTITY_DIRECTORY_PREVIEW_BLOCKED", message: "identity directory preview is unavailable" });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/auth/identity-directory/bind") {
+    const user = requireApiRole(req, res, ["commission"], "/api/auth/identity-directory/bind");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const note = String(payload.note || "").trim();
+    if (note.length < 8 || payload.confirmation !== "BIND EXTERNAL IDENTITY") {
+      sendJson(res, 400, { ok: false, code: "IDENTITY_BINDING_CONFIRMATION_REQUIRED", message: "external identity binding requires a note and exact confirmation" });
+      return;
+    }
+    try {
+      const directory = await fetchIdentityDirectory();
+      const data = readDatabase();
+      const result = applyIdentityDirectoryBinding(data, directory.records, payload, user);
+      writeDatabase(normalizeState(data));
+      const plan = buildIdentityDirectorySyncPlan(directory.records, data);
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "external identity binding", target: result.localUserId, result: "allowed", detail: `${result.username} bound to a verified directory subject; no role or organization changes` });
+      sendJson(res, 200, { ok: true, result, plan, productionReady: false });
+    } catch (error) {
+      sendJson(res, 409, { ok: false, code: error.code || "IDENTITY_BINDING_FAILED", message: error.code ? error.message : "external identity binding failed" });
+    }
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/auth/identity-directory/apply") {
+    const user = requireApiRole(req, res, ["commission"], "/api/auth/identity-directory/apply");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const note = String(payload.note || "").trim();
+    if (note.length < 8 || payload.confirmation !== "APPLY IDENTITY DIRECTORY DEACTIVATIONS") {
+      sendJson(res, 400, { ok: false, code: "IDENTITY_DIRECTORY_CONFIRMATION_REQUIRED", message: "directory deactivation sync requires a note and exact confirmation" });
+      return;
+    }
+    try {
+      const directory = await fetchIdentityDirectory();
+      const data = readDatabase();
+      const plan = buildIdentityDirectorySyncPlan(directory.records, data);
+      const result = applyIdentityDirectoryDeactivations(data, plan, user, note);
+      writeDatabase(normalizeState(data));
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "identity directory deactivation sync", target: "unified-auth", result: "allowed", detail: `${result.applied.length} accounts deactivated; ${result.revokedSessions} sessions revoked; no role changes` });
+      sendJson(res, 200, { ok: true, plan, result, productionReady: false });
+    } catch (error) {
+      const status = ["IDENTITY_DIRECTORY_SELF_DEACTIVATION_BLOCKED", "IDENTITY_DIRECTORY_LAST_COMMISSION_BLOCKED"].includes(error.code) ? 409 : 502;
+      sendJson(res, status, { ok: false, code: error.code || "IDENTITY_DIRECTORY_APPLY_FAILED", message: error.code ? error.message : "identity directory sync failed" });
     }
     return;
   }

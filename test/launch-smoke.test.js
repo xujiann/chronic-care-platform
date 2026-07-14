@@ -24,6 +24,7 @@ test("launch smoke report validates offline runtime routes and release artifacts
   assert.equal(report.checks.some((item) => item.id === "launch:citizenAcceptancePanel" && item.passed), true);
   assert.match(report.checks.find((item) => item.id === "launch:citizenAcceptancePanel").detail, /resident C-end acceptance panel/);
   assert.equal(report.routes.includes("/api/health"), true);
+  assert.equal(report.routes.includes("/api/auth/identity-lifecycle"), true);
   assert.equal(report.routes.includes("/api/digital-hospital/launch-readiness"), true);
   assert.equal(report.routes.includes("/api/digital-hospital/production-evidence-packets"), true);
   assert.equal(report.routes.includes("/api/digital-hospital/launch-command-briefs"), true);

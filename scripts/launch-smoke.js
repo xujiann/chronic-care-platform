@@ -10,6 +10,7 @@ const REQUIRED_ROUTES = [
   "/api/health",
   "/api/metrics",
   "/api/system/readiness",
+  "/api/auth/identity-lifecycle",
   "/api/digital-hospital/launch-readiness",
   "/api/digital-hospital/production-evidence-packets",
   "/api/digital-hospital/launch-command-briefs",

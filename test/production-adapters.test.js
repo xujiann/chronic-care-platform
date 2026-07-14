@@ -3,9 +3,12 @@ const test = require("node:test");
 
 const {
   digestPhoneVerificationCode,
+  fetchIdentityDirectory,
   fetchOidcUserInfo,
   generatePhoneVerificationCode,
   productionAdapterCenter,
+  refreshOidcAccessToken,
+  revokeOidcToken,
   sendSmsVerificationCode
 } = require("../production-adapters");
 
@@ -40,6 +43,66 @@ test("OIDC adapter discovers UserInfo and returns verified subject claims", asyn
   assert.equal(result.claims.sub, "external-health-001");
   assert.equal(requests.length, 2);
   assert.equal(requests[1].options.headers.Authorization, "Bearer upstream-access-token");
+});
+
+test("OIDC lifecycle refreshes and revokes tokens without persisting credentials", async () => {
+  const requests = [];
+  const fetchImpl = async (url, options = {}) => {
+    requests.push({ url: String(url), options });
+    if (String(url).includes("openid-configuration")) {
+      return jsonResponse({
+        token_endpoint: "https://identity.example.gov.cn/token",
+        revocation_endpoint: "https://identity.example.gov.cn/revoke"
+      });
+    }
+    if (String(url).endsWith("/token")) {
+      return jsonResponse({ access_token: "rotated-access-token", refresh_token: "rotated-refresh-token", token_type: "Bearer", expires_in: 600 });
+    }
+    return jsonResponse({});
+  };
+  const env = {
+    NODE_ENV: "production",
+    OIDC_ISSUER_URL: "https://identity.example.gov.cn/real-issuer",
+    OIDC_CLIENT_ID: "health-platform",
+    OIDC_CLIENT_SECRET: "client-secret"
+  };
+  const refreshed = await refreshOidcAccessToken("initial-refresh-token", { env, fetchImpl });
+  assert.equal(refreshed.accessToken, "rotated-access-token");
+  assert.equal(refreshed.refreshRotated, true);
+  assert.match(requests.find((item) => item.url.endsWith("/token")).options.body, /grant_type=refresh_token/);
+  const receipt = await revokeOidcToken("rotated-access-token", { env, fetchImpl });
+  assert.equal(receipt.status, "revoked");
+  assert.equal(receipt.credentialsPersisted, false);
+  assert.doesNotMatch(JSON.stringify(receipt), /rotated-access-token|client-secret/);
+});
+
+test("identity directory adapter normalizes SCIM users and keeps credentials out of results", async () => {
+  let request;
+  const directory = await fetchIdentityDirectory({
+    env: {
+      NODE_ENV: "production",
+      OIDC_ISSUER_URL: "https://identity.example.gov.cn",
+      OIDC_CLIENT_ID: "health-platform",
+      OIDC_CLIENT_SECRET: "client-secret",
+      IDENTITY_DIRECTORY_URL: "https://directory.example.gov.cn/scim/v2/Users",
+      IDENTITY_DIRECTORY_TOKEN: "directory-secret"
+    },
+    fetchImpl: async (url, options) => {
+      request = { url: String(url), options };
+      return jsonResponse({
+        totalResults: 2,
+        Resources: [
+          { id: "sub-health", userName: "health", displayName: "Health operator", active: true, orgCode: "ORG-HEALTH-DL" },
+          { id: "sub-old", userName: "retired-user", displayName: "Retired user", active: false, orgCode: "MR1" }
+        ]
+      });
+    }
+  });
+  assert.equal(directory.records.length, 2);
+  assert.equal(directory.records[1].active, false);
+  assert.match(request.url, /startIndex=1/);
+  assert.equal(request.options.headers.Authorization, "Bearer directory-secret");
+  assert.doesNotMatch(JSON.stringify(directory), /directory-secret|IDENTITY_DIRECTORY_URL/);
 });
 
 test("production identity and SMS adapters require HTTPS", async () => {
@@ -117,11 +180,14 @@ test("adapter center separates configured code from site joint-test readiness", 
     OIDC_ISSUER_URL: "https://identity.example.gov.cn",
     OIDC_CLIENT_ID: "health-platform",
     OIDC_CLIENT_SECRET: "secret",
+    IDENTITY_DIRECTORY_URL: "https://identity.example.gov.cn/scim/v2/Users",
+    IDENTITY_DIRECTORY_TOKEN: "directory-secret",
     SMS_GATEWAY_URL: "https://sms.example.gov.cn/send",
     SMS_TEMPLATE_ID: "resident-login-code"
   });
   assert.equal(center.ready, true);
   assert.equal(center.adapterReady, true);
+  assert.equal(center.identityLifecycleReady, true);
   assert.equal(center.productionReady, false);
   assert.equal(center.blockers.includes("real provider joint-test receipts and site signoff"), true);
 });

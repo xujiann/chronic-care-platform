@@ -35,6 +35,7 @@ test("platform production audit separates implemented capabilities from producti
   assert.equal(report.summary.mvpRequiredModules, 8);
   assert.equal(report.summary.capabilityOperationsCenter, true);
   assert.equal(report.summary.productionDatabaseAdapter, true);
+  assert.equal(report.summary.identityLifecycleAdapter, true);
   assert.equal(report.summary.cutoverPassed, 1);
   assert.equal(report.summary.cutoverBlocked, 9);
   assert.equal(report.capabilities.every((item) => item.evidenceReady && item.boundary), true);
@@ -43,7 +44,8 @@ test("platform production audit separates implemented capabilities from producti
   assert.match(report.productionBlockers.find((item) => item.id === "P0-01").progress, /不可变部署包/);
   assert.equal(report.productionBlockers.find((item) => item.id === "P0-02").status, "primary-read-production-adapter-ready-site-acceptance-pending");
   assert.match(report.productionBlockers.find((item) => item.id === "P0-02").progress, /SERIALIZABLE 主写/);
-  assert.equal(report.productionBlockers.find((item) => item.id === "P0-03").status, "adapter-foundation-ready-site-joint-test-pending");
+  assert.equal(report.productionBlockers.find((item) => item.id === "P0-03").status, "identity-lifecycle-ready-site-joint-test-pending");
+  assert.match(report.productionBlockers.find((item) => item.id === "P0-03").progress, /SCIM 目录预览/);
   assert.equal(report.productionBlockers.find((item) => item.id === "P0-04").status, "adapter-foundation-ready-site-joint-test-pending");
   assert.equal(report.productionBlockers.find((item) => item.id === "P0-05").status, "adapter-foundation-ready-site-joint-test-pending");
   assert.equal(report.productionBlockers.find((item) => item.id === "P0-06").status, "adapter-foundation-ready-site-joint-test-pending");
@@ -51,7 +53,7 @@ test("platform production audit separates implemented capabilities from producti
   assert.equal(report.productionBlockers.find((item) => item.id === "P0-08").status, "adapter-foundation-ready-site-joint-test-pending");
   assert.equal(report.productionBlockers.find((item) => item.id === "P0-09").status, "adapter-foundation-ready-site-joint-test-pending");
   assert.match(report.productionBlockers.find((item) => item.id === "P0-09").progress, /失败运维事件/);
-  assert.equal(report.mvpRequiredModules.find((item) => item.id === "mvp-identity-message").status, "adapter-foundation-ready");
+  assert.equal(report.mvpRequiredModules.find((item) => item.id === "mvp-identity-message").status, "identity-lifecycle-ready-site-joint-test-pending");
   assert.equal(report.mvpRequiredModules.find((item) => item.id === "mvp-hospital-connectors").status, "adapter-foundation-ready");
   assert.equal(report.mvpRequiredModules.find((item) => item.id === "mvp-payment-insurance").status, "adapter-foundation-ready");
   assert.equal(report.mvpRequiredModules.find((item) => item.id === "mvp-object-storage").status, "adapter-foundation-ready");
@@ -62,6 +64,7 @@ test("platform production audit separates implemented capabilities from producti
   assert.deepEqual(report.roadmap.map((item) => item.phase), ["P0 / 0-30 天", "P1 / 31-60 天", "P2 / 61-90 天", "持续优化 / 90 天后"]);
   assert.equal(report.checks.find((item) => item.id === "platformAudit:capabilityOperationsCenter").passed, true);
   assert.equal(report.checks.find((item) => item.id === "platformAudit:productionDatabaseAdapter").passed, true);
+  assert.equal(report.checks.find((item) => item.id === "platformAudit:identityLifecycleAdapter").passed, true);
 });
 
 test("platform capability operations center keeps evidence-backed reviews pre-production only", () => {

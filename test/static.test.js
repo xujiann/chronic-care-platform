@@ -2751,15 +2751,42 @@ test("production identity and message adapters keep runtime and site boundaries 
   const environment = read(".env.example");
 
   assert.match(adapters, /fetchOidcUserInfo/);
+  assert.match(adapters, /refreshOidcAccessToken/);
+  assert.match(adapters, /revokeOidcToken/);
+  assert.match(adapters, /fetchIdentityDirectory/);
+  assert.match(adapters, /identityLifecycleReady/);
   assert.match(adapters, /sendSmsVerificationCode/);
   assert.match(adapters, /digestPhoneVerificationCode/);
   assert.match(server, /\/api\/auth\/oidc\/exchange/);
+  assert.match(server, /\/api\/auth\/oidc\/refresh/);
+  assert.match(server, /\/api\/auth\/oidc\/revoke/);
+  assert.match(server, /\/api\/auth\/identity-lifecycle/);
+  assert.match(server, /\/api\/auth\/identity-directory\/preview/);
+  assert.match(server, /\/api\/auth\/identity-directory\/bind/);
+  assert.match(server, /\/api\/auth\/identity-directory\/apply/);
+  assert.match(server, /BIND EXTERNAL IDENTITY/);
+  assert.match(server, /IDENTITY_BINDING_REASSIGNMENT_BLOCKED/);
+  assert.match(server, /IDENTITY_DIRECTORY_SELF_DEACTIVATION_BLOCKED/);
+  assert.match(server, /IDENTITY_DIRECTORY_LAST_COMMISSION_BLOCKED/);
   assert.match(server, /\/api\/auth\/adapters/);
   assert.match(server, /codeDigest/);
   assert.match(documentation, /最终送达回调/);
   assert.match(documentation, /现场联合测试回执/);
+  assert.match(documentation, /不自动开户/);
+  assert.match(documentation, /不自动提权/);
+  assert.match(documentation, /不自动复活/);
   assert.match(environment, /SMS_TEMPLATE_ID/);
   assert.match(environment, /OIDC_USERINFO_URL/);
+  assert.match(environment, /OIDC_TOKEN_URL/);
+  assert.match(environment, /OIDC_REVOCATION_URL/);
+  assert.match(environment, /IDENTITY_DIRECTORY_URL/);
+  assert.match(environment, /IDENTITY_DIRECTORY_TOKEN/);
+  assert.match(read("platform.html"), /identity-lifecycle-center/);
+  assert.match(read("platform.js"), /renderIdentityLifecycleCenter/);
+  assert.match(read("platform.js"), /runIdentityBindingAction/);
+  assert.match(read("platform.js"), /runIdentityDirectoryAction/);
+  assert.match(read("portal.css"), /\.evidence-grid article[\s\S]*?min-width:\s*0/);
+  assert.match(read("portal.css"), /\.evidence-grid li[\s\S]*?overflow-wrap:\s*anywhere/);
 });
 
 test("production hospital connectors reuse integration contracts and preserve site boundaries", () => {

@@ -65,6 +65,8 @@ test("release report validates demo and production environment profiles", () => 
       OIDC_ISSUER_URL: "https://identity.example.internal",
       OIDC_CLIENT_ID: "health-platform",
       OIDC_CLIENT_SECRET: "abcdef0123456789abcdef0123456789",
+      IDENTITY_DIRECTORY_URL: "https://identity.example.internal/scim/v2/Users",
+      IDENTITY_DIRECTORY_TOKEN: "0123456789abcdef0123456789abcdef",
       SMS_GATEWAY_URL: "https://sms.example.internal/send",
       SMS_TEMPLATE_ID: "resident-login-code",
       HOSPITAL_ADAPTER_SECRET: "0123456789abcdef0123456789abcdef",
@@ -104,6 +106,8 @@ test("release report validates demo and production environment profiles", () => 
       OIDC_ISSUER_URL: "https://identity.example.internal",
       OIDC_CLIENT_ID: "health-platform",
       OIDC_CLIENT_SECRET: "abcdef0123456789abcdef0123456789",
+      IDENTITY_DIRECTORY_URL: "https://identity.example.internal/scim/v2/Users",
+      IDENTITY_DIRECTORY_TOKEN: "0123456789abcdef0123456789abcdef",
       SMS_GATEWAY_URL: "https://sms.example.internal/send",
       SMS_TEMPLATE_ID: "resident-login-code",
       HOSPITAL_ADAPTER_SECRET: "0123456789abcdef0123456789abcdef",
@@ -134,6 +138,7 @@ test("release report validates demo and production environment profiles", () => 
   assert.equal(production.checks.some((item) => item.name === "env:SQLITE.journalMode" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:SQLITE.synchronous" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:SQLITE.busyTimeout" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:OIDC.lifecycle" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:HOSPITAL.connectors" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:HOSPITAL.secretQuality" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:OBJECT_STORAGE.adapter" && item.passed), true);

@@ -105,6 +105,21 @@ let postgresProductionAdapterCenter = {
   primaryReadConfigured: false,
   primaryReadReport: null
 };
+let identityLifecycleCenter = {
+  identity: {
+    configured: false,
+    refreshConfigured: false,
+    revocationConfigured: false,
+    directoryConfigured: false,
+    productionHttps: true
+  },
+  capabilities: {},
+  blockers: [],
+  plan: null,
+  result: null,
+  productionReady: false,
+  boundary: ""
+};
 
 const defaultPlatformCapabilities = [
   {
@@ -388,6 +403,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadCommercialCryptoCenter();
   await loadPostgresReconciliationCenter();
   await loadPostgresProductionAdapterCenter();
+  await loadIdentityLifecycleCenter();
   ensureEditablePlatformData(platformState);
   bindPlatformEditor();
   renderPlatform();
@@ -413,6 +429,7 @@ function renderPlatform() {
   renderSecurityAcceptanceLedger(platformData.securityLedger);
   renderPlatformCapabilityOperationsCenter();
   renderProductionDeploymentPlan(platformData.productionDeploymentPlan);
+  renderIdentityLifecycleCenter();
   renderProductionDatabaseCutoverCenter(platformData);
   renderCitizenOperationsCenter(platformData);
   renderCommercialCryptoCenter(platformData);
@@ -992,6 +1009,49 @@ function renderProductionDeploymentPlan(items) {
       </article>
     `;
   }).join("");
+}
+
+function renderIdentityLifecycleCenter() {
+  const metricsTarget = document.querySelector("#identity-lifecycle-metrics");
+  const planTarget = document.querySelector("#identity-directory-plan");
+  const statusTarget = document.querySelector("#identity-lifecycle-status");
+  const boundaryTarget = document.querySelector("#identity-lifecycle-boundary");
+  if (!metricsTarget || !planTarget) return;
+  const center = identityLifecycleCenter;
+  const identity = center.identity || {};
+  const summary = center.plan?.summary || {};
+  const metrics = [
+    ["OIDC 登录", identity.configured ? "已配置" : "未配置", "UserInfo + 受控账号绑定"],
+    ["令牌刷新", identity.refreshConfigured ? "可用" : "未配置", "刷新后重新校验身份"],
+    ["撤销登出", identity.revocationConfigured ? "可用" : "未配置", "上游撤销 + 本地会话删除"],
+    ["目录停用", identity.directoryConfigured ? `${summary.deactivations || 0} 待停用` : "未配置", `${summary.bindingReviews || 0} 项待绑定复核`]
+  ];
+  metricsTarget.innerHTML = metrics.map(([label, value, hint]) => `<article class="metric-card">
+    <span>${platformEscapeHtml(label)}</span>
+    <strong>${platformEscapeHtml(value)}</strong>
+    <small>${platformEscapeHtml(hint)}</small>
+  </article>`).join("");
+  const ready = identity.configured && identity.refreshConfigured && identity.revocationConfigured && identity.directoryConfigured && identity.productionHttps;
+  if (statusTarget) {
+    statusTarget.textContent = ready ? "生命周期适配就绪" : "配置待补";
+    statusTarget.className = `badge ${ready ? "info" : "warn"}`;
+    statusTarget.removeAttribute("title");
+  }
+  const items = center.plan?.items || [];
+  planTarget.innerHTML = items.length ? items.map((item) => `<article class="priority-row" data-identity-directory-item="${platformEscapeHtml(item.localUserId || item.externalSubject)}">
+    <div class="priority-rank ${item.action === "deactivate" ? "danger" : item.action.includes("review") || item.action.includes("binding") ? "warn" : "ok"}">${item.remoteActive ? "启" : "停"}</div>
+    <div>
+      <h3>${platformEscapeHtml(item.displayName || item.username || "未命名目录账号")}</h3>
+      <p>${platformEscapeHtml(item.username || "-")} · ${platformEscapeHtml(item.orgCode || "机构待映射")}</p>
+      <small>${platformEscapeHtml(item.action)}</small>
+    </div>
+    <div class="capability-side">
+      <span class="badge ${item.action === "deactivate" ? "danger" : "info"}">${platformEscapeHtml(item.localStatus)}</span>
+      <small>${platformEscapeHtml(item.localRole || "unbound")}</small>
+      ${item.action === "controlled-binding-required" && item.localUserId && item.externalSubject && item.remoteActive ? `<button class="inline-action" type="button" data-identity-binding-action data-local-user-id="${platformEscapeHtml(item.localUserId)}" data-external-subject="${platformEscapeHtml(item.externalSubject)}">受控绑定</button>` : ""}
+    </div>
+  </article>`).join("") : `<p class="muted">尚未运行目录同步预检。</p>`;
+  if (boundaryTarget) boundaryTarget.textContent = center.boundary || "目录同步只允许停用已绑定账号；开户、提权、机构变更和恢复启用必须人工复核。";
 }
 
 function platformEscapeHtml(value) {
@@ -1666,6 +1726,16 @@ function bindPlatformEditor() {
       runPostgresReconciliationCaseAction(postgresReconciliationButton.dataset.postgresReconciliationAction, postgresReconciliationButton.dataset.id, postgresReconciliationButton);
       return;
     }
+    const identityDirectoryButton = event.target.closest("[data-identity-directory-action]");
+    if (identityDirectoryButton) {
+      runIdentityDirectoryAction(identityDirectoryButton.dataset.identityDirectoryAction, identityDirectoryButton);
+      return;
+    }
+    const identityBindingButton = event.target.closest("[data-identity-binding-action]");
+    if (identityBindingButton) {
+      runIdentityBindingAction(identityBindingButton);
+      return;
+    }
     const postgresPrimaryReadButton = event.target.closest("[data-postgres-primary-read-action]");
     if (postgresPrimaryReadButton) {
       runPostgresPrimaryReadRehearsal(postgresPrimaryReadButton);
@@ -1960,6 +2030,97 @@ async function loadPostgresProductionAdapterCenter() {
     };
   } catch (error) {
     // Static and offline fallback remains usable without the commission API.
+  }
+}
+
+async function loadIdentityLifecycleCenter() {
+  if (!PLATFORM_API_BASE) return;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  try {
+    const response = await request(`${PLATFORM_API_BASE}/auth/identity-lifecycle`);
+    if (!response.ok) return;
+    const payload = await response.json();
+    identityLifecycleCenter = { ...identityLifecycleCenter, ...payload, plan: identityLifecycleCenter.plan, result: identityLifecycleCenter.result };
+  } catch (error) {
+    // Static and offline fallback remains usable without the commission API.
+  }
+}
+
+async function runIdentityDirectoryAction(action, button) {
+  if (!PLATFORM_API_BASE || !["preview", "apply"].includes(action)) return;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  const statusTarget = document.querySelector("#identity-lifecycle-status");
+  const payload = {};
+  if (action === "apply") {
+    payload.note = window.prompt("停用同步审计说明", "统一身份目录停用同步经责任人复核") || "";
+    if (payload.note.trim().length < 8) return;
+    payload.confirmation = window.prompt("输入停用同步确认短语", "") || "";
+    if (payload.confirmation !== "APPLY IDENTITY DIRECTORY DEACTIVATIONS") return;
+  }
+  if (button) button.disabled = true;
+  if (statusTarget) {
+    statusTarget.textContent = action === "preview" ? "预检中" : "同步中";
+    statusTarget.className = "badge info";
+  }
+  try {
+    const response = await request(`${PLATFORM_API_BASE}/auth/identity-directory/${action}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.message || `HTTP ${response.status}`);
+    identityLifecycleCenter.plan = body.plan || identityLifecycleCenter.plan;
+    identityLifecycleCenter.result = body.result || null;
+    renderIdentityLifecycleCenter();
+  } catch (error) {
+    if (statusTarget) {
+      statusTarget.textContent = action === "preview" ? "预检受阻" : "同步受阻";
+      statusTarget.title = error.message || "身份目录操作失败";
+      statusTarget.className = "badge danger";
+    }
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+async function runIdentityBindingAction(button) {
+  if (!PLATFORM_API_BASE || !button) return;
+  const note = window.prompt("外部身份受控绑定说明", "统一身份目录账号与本地账号经责任人核对") || "";
+  if (note.trim().length < 8) return;
+  const confirmation = window.prompt("输入身份绑定确认短语", "") || "";
+  if (confirmation !== "BIND EXTERNAL IDENTITY") return;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  const statusTarget = document.querySelector("#identity-lifecycle-status");
+  button.disabled = true;
+  if (statusTarget) {
+    statusTarget.textContent = "绑定中";
+    statusTarget.className = "badge info";
+  }
+  try {
+    const response = await request(`${PLATFORM_API_BASE}/auth/identity-directory/bind`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        localUserId: button.dataset.localUserId,
+        externalSubject: button.dataset.externalSubject,
+        note,
+        confirmation
+      })
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.message || `HTTP ${response.status}`);
+    identityLifecycleCenter.plan = body.plan || identityLifecycleCenter.plan;
+    identityLifecycleCenter.result = body.result || null;
+    renderIdentityLifecycleCenter();
+  } catch (error) {
+    if (statusTarget) {
+      statusTarget.textContent = "绑定受阻";
+      statusTarget.title = error.message || "外部身份绑定失败";
+      statusTarget.className = "badge danger";
+    }
+  } finally {
+    button.disabled = false;
   }
 }
 
