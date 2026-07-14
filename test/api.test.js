@@ -1889,6 +1889,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       if (role !== "commission") {
         assert.equal(scopedState.body.applicationCatalog, undefined, `${username} 不应读取平台建设目录`);
         assert.equal(scopedState.body.securityAcceptanceLedger, undefined, `${username} 不应读取安全验收台账`);
+        assert.equal(scopedState.body.platformCapabilityReviews, undefined, `${username} should not read platform capability review ledger`);
+        assert.equal(scopedState.body.platformProductionBlockerReviews, undefined, `${username} should not read production blocker review ledger`);
         assert.equal(scopedState.body.productionDeploymentPlan, undefined, `${username} should not read production deployment plan`);
         assert.equal(scopedState.body.hospitalInteroperabilityFunctions, undefined, `${username} should not read hospital interoperability management functions`);
       }
@@ -1911,7 +1913,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(body.securityAcceptanceLedger.length, 4);
     assert.equal(body.productionDeploymentPlan.length, 4);
     assert.equal(body.healthDashboardSnapshots.length, 1);
-    ["residents", "personalRecords", "platformEvidence", "productionDeploymentPlan", "applicationCatalog", "hospitalInteroperabilityFunctions", "institutionCreditEvaluations", "securityAcceptanceLedger", "healthDashboardSnapshots"].forEach((key) => {
+    ["residents", "personalRecords", "platformEvidence", "platformCapabilityReviews", "platformProductionBlockerReviews", "productionDeploymentPlan", "applicationCatalog", "hospitalInteroperabilityFunctions", "institutionCreditEvaluations", "securityAcceptanceLedger", "healthDashboardSnapshots"].forEach((key) => {
       assert.ok(Array.isArray(body[key]), `${key} should keep array contract`);
     });
   });
@@ -1950,9 +1952,37 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(reviewed.body.center.summary.reviewedPreproduction, 1);
     assert.equal(reviewed.body.center.productionReady, false);
 
+    const prematureBlockerSubmission = await api(baseUrl, "/api/platform/capability-operations/blockers/P0-02/actions", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({ action: "submit-evidence", note: "Submission attempted before remediation started." })
+    }));
+    assert.equal(prematureBlockerSubmission.response.status, 409);
+    assert.equal(prematureBlockerSubmission.body.code, "PLATFORM_PRODUCTION_BLOCKER_REMEDIATION_REQUIRED");
+
+    const blockerActions = [
+      { action: "start-remediation", note: "Database cutover remediation started." },
+      { action: "record-evidence", evidenceRef: "ticket:DB-CUTOVER-API-02", note: "Recorded the database rehearsal ticket." },
+      { action: "submit-evidence", note: "Submitted current database cutover evidence." },
+      { action: "review-evidence", note: "Reviewed current evidence; site acceptance remains required." }
+    ];
+    let blockerResult;
+    for (const action of blockerActions) {
+      blockerResult = await api(baseUrl, "/api/platform/capability-operations/blockers/P0-02/actions", authorized(commissionToken, {
+        method: "POST",
+        body: JSON.stringify(action)
+      }));
+      assert.equal(blockerResult.response.status, 200);
+    }
+    assert.equal(blockerResult.body.blocker.workflowStatus, "evidence-reviewed-site-pending");
+    assert.equal(blockerResult.body.blocker.siteAcceptanceRequired, true);
+    assert.equal(blockerResult.body.blocker.productionReady, false);
+    assert.equal(blockerResult.body.center.summary.blockerEvidenceReviewed, 1);
+
     const state = await api(baseUrl, "/api/state", authorized(commissionToken));
     assert.equal(state.body.securityEvents.some((item) => item.action === "platform-capability-review-action"), true);
+    assert.equal(state.body.securityEvents.some((item) => item.action === "platform-production-blocker-action"), true);
     assert.equal(state.body.platformCapabilityReviews.find((item) => item.capabilityId === "data-governance").productionReady, false);
+    assert.equal(state.body.platformProductionBlockerReviews.find((item) => item.blockerId === "P0-02").siteAcceptanceRequired, true);
   });
 
   await t.test("exposes scoped multi-practice registry for supervision and public ledger", async () => {

@@ -26,6 +26,7 @@ const fallbackPlatformState = {
   platformDeliveryBatches: [],
   platformEvidence: [],
   platformCapabilityReviews: [],
+  platformProductionBlockerReviews: [],
   applicationCatalog: [],
   hospitalInteroperabilityFunctions: [],
   dataGovernanceAssets: [],
@@ -77,7 +78,7 @@ let platformData = null;
 let activeEditSnapshot = null;
 let platformCapabilityOperationsCenter = {
   productionReady: false,
-  summary: { capabilityDomains: 0, repositoryEvidenceReady: 0, reviewedPreproduction: 0, improvementRequired: 0, pendingReview: 0, evidenceRecorded: 0, productionReady: 0, mvpRequiredModules: 0, productionBlockers: 0 },
+  summary: { capabilityDomains: 0, repositoryEvidenceReady: 0, reviewedPreproduction: 0, improvementRequired: 0, pendingReview: 0, evidenceRecorded: 0, productionReady: 0, mvpRequiredModules: 0, productionBlockers: 0, blockersOpen: 0, blockersInProgress: 0, blockerEvidenceSubmitted: 0, blockerEvidenceReviewed: 0, blockerEvidenceRecorded: 0 },
   capabilities: [],
   mvpRequiredModules: [],
   productionBlockers: [],
@@ -1024,6 +1025,13 @@ function platformCapabilityBlockerLabel(status) {
   return "等待现场证据";
 }
 
+function platformProductionBlockerBadge(status) {
+  if (status === "evidence-reviewed-site-pending") return "info";
+  if (status === "evidence-submitted") return "warn";
+  if (status === "in-progress") return "warn";
+  return "danger";
+}
+
 function renderPlatformCapabilityOperationsCenter() {
   const metricsTarget = document.querySelector("#platform-capability-operations-metrics");
   const ledgerTarget = document.querySelector("#platform-capability-review-ledger");
@@ -1037,7 +1045,7 @@ function renderPlatformCapabilityOperationsCenter() {
     ["主要能力域", summary.capabilityDomains || 0, `${summary.repositoryEvidenceReady || 0} 项仓库证据齐备`],
     ["生产前复核", summary.reviewedPreproduction || 0, `${summary.pendingReview || 0} 项待复核`],
     ["已补录证据", summary.evidenceRecorded || 0, `${summary.improvementRequired || 0} 项要求整改`],
-    ["生产阻断", summary.productionBlockers || 0, `${summary.mvpRequiredModules || 0} 个 MVP 必需模块`]
+    ["生产阻断", summary.productionBlockers || 0, `${summary.blockerEvidenceRecorded || 0} 项有证据 / ${summary.blockerEvidenceReviewed || 0} 项已复核`]
   ];
   metricsTarget.innerHTML = metrics.map(([label, value, hint]) => `<article class="metric-card">
     <span>${platformEscapeHtml(label)}</span>
@@ -1073,18 +1081,34 @@ function renderPlatformCapabilityOperationsCenter() {
       </div>
     </article>`;
   }).join("") || `<p class="muted">当前没有可复核能力域。</p>`;
-  blockerTarget.innerHTML = (center.productionBlockers || []).map((item) => `<article class="priority-row" data-platform-blocker="${platformEscapeHtml(item.id)}">
-    <div class="priority-rank danger">${platformEscapeHtml(item.id)}</div>
-    <div>
-      <h3>${platformEscapeHtml(item.name)}</h3>
-      <p>${platformEscapeHtml(item.progress || item.status)}</p>
-      <small>${platformEscapeHtml(item.doneWhen)}</small>
-    </div>
-    <div class="capability-side">
-      <span class="badge warn" title="${platformEscapeHtml(item.status)}">${platformEscapeHtml(platformCapabilityBlockerLabel(item.status))}</span>
-      <small>${platformEscapeHtml(item.owner)}</small>
-    </div>
-  </article>`).join("") || `<p class="muted">当前没有生产阻断记录。</p>`;
+  blockerTarget.innerHTML = (center.productionBlockers || []).map((item) => {
+    const review = item.review || {};
+    const latest = review.actionHistory?.[0];
+    const status = review.workflowStatus || "open";
+    return `<article class="priority-row" data-platform-blocker="${platformEscapeHtml(item.id)}">
+      <div class="priority-rank danger">${platformEscapeHtml(item.id)}</div>
+      <div>
+        <h3>${platformEscapeHtml(item.name)}</h3>
+        <p>${platformEscapeHtml(item.progress || item.status)}</p>
+        <small>责任人：${platformEscapeHtml(review.owner || item.owner)} · 证据 ${platformEscapeHtml(review.evidenceRefs?.length || 0)} 条</small>
+        <small>${latest ? `${platformEscapeHtml(latest.action)} · ${platformEscapeHtml(latest.actor)} · ${platformEscapeHtml(latest.at)}` : platformEscapeHtml(item.doneWhen)}</small>
+        <div class="action-row">
+          <button class="inline-action" type="button" data-platform-blocker-action="assign" data-id="${platformEscapeHtml(item.id)}">分派</button>
+          <button class="inline-action" type="button" data-platform-blocker-action="record-evidence" data-id="${platformEscapeHtml(item.id)}">补录证据</button>
+          ${status === "open" ? `<button class="inline-action" type="button" data-platform-blocker-action="start-remediation" data-id="${platformEscapeHtml(item.id)}">启动整改</button>` : ""}
+          ${status === "in-progress" && review.evidenceRefs?.length ? `<button class="inline-action" type="button" data-platform-blocker-action="submit-evidence" data-id="${platformEscapeHtml(item.id)}">提交证据</button>` : ""}
+          ${status === "evidence-submitted" ? `<button class="inline-action" type="button" data-platform-blocker-action="review-evidence" data-id="${platformEscapeHtml(item.id)}">复核证据</button>` : ""}
+          ${status === "evidence-reviewed-site-pending" ? `<button class="inline-action" type="button" data-platform-blocker-action="reopen" data-id="${platformEscapeHtml(item.id)}">重新整改</button>` : ""}
+          <button class="inline-action" type="button" data-platform-blocker-action="comment" data-id="${platformEscapeHtml(item.id)}">备注</button>
+        </div>
+      </div>
+      <div class="capability-side">
+        <span class="badge ${platformProductionBlockerBadge(status)}">${platformEscapeHtml(status)}</span>
+        <small title="${platformEscapeHtml(item.status)}">${platformEscapeHtml(platformCapabilityBlockerLabel(item.status))}</small>
+        <small>现场验收：仍需完成</small>
+      </div>
+    </article>`;
+  }).join("") || `<p class="muted">当前没有生产阻断记录。</p>`;
   if (boundaryTarget) boundaryTarget.textContent = center.boundary || "正式上线仍需完成现场验收与 go/no-go 签字。";
 }
 
@@ -1579,6 +1603,11 @@ function listText(value) {
 
 function bindPlatformEditor() {
   document.addEventListener("click", (event) => {
+    const platformBlockerButton = event.target.closest("[data-platform-blocker-action]");
+    if (platformBlockerButton) {
+      runPlatformProductionBlockerAction(platformBlockerButton.dataset.platformBlockerAction, platformBlockerButton.dataset.id, platformBlockerButton);
+      return;
+    }
     const platformCapabilityButton = event.target.closest("[data-platform-capability-action]");
     if (platformCapabilityButton) {
       runPlatformCapabilityReviewAction(platformCapabilityButton.dataset.platformCapabilityAction, platformCapabilityButton.dataset.id, platformCapabilityButton);
@@ -1701,6 +1730,7 @@ async function loadPlatformCapabilityOperationsCenter() {
     const payload = await response.json();
     platformCapabilityOperationsCenter = payload.center || platformCapabilityOperationsCenter;
     platformState.platformCapabilityReviews = (payload.center?.capabilities || []).map((item) => item.review).filter(Boolean);
+    platformState.platformProductionBlockerReviews = (payload.center?.productionBlockers || []).map((item) => item.review).filter(Boolean);
   } catch (error) {
     // Static and offline fallback remains usable without the commission API.
   }
@@ -1746,10 +1776,65 @@ async function runPlatformCapabilityReviewAction(action, id, button) {
     if (!response.ok) throw new Error(body.message || `HTTP ${response.status}`);
     platformCapabilityOperationsCenter = body.center || platformCapabilityOperationsCenter;
     platformState.platformCapabilityReviews = (body.center?.capabilities || []).map((item) => item.review).filter(Boolean);
+    platformState.platformProductionBlockerReviews = (body.center?.productionBlockers || []).map((item) => item.review).filter(Boolean);
     renderPlatformCapabilityOperationsCenter();
   } catch (error) {
     if (statusTarget) {
       statusTarget.textContent = error.message || "能力复核操作失败";
+      statusTarget.className = "badge danger";
+    }
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+async function runPlatformProductionBlockerAction(action, id, button) {
+  if (!PLATFORM_API_BASE || !action || !id) return;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  const statusTarget = document.querySelector("#platform-capability-operations-status");
+  const blocker = (platformCapabilityOperationsCenter.productionBlockers || []).find((item) => item.id === id);
+  if (!blocker) return;
+  const payload = { action, note: "" };
+  if (action === "assign") {
+    payload.owner = window.prompt("生产阻断责任人", blocker.review?.owner || blocker.owner || "") || "";
+    if (!payload.owner.trim()) return;
+    payload.note = `生产阻断 ${id} 已分派给 ${payload.owner.trim()}。`;
+  } else if (action === "record-evidence") {
+    payload.evidenceRef = window.prompt("请输入证据文件、工单或验收记录引用", `ticket:${id}`) || "";
+    if (!payload.evidenceRef.trim()) return;
+    payload.note = `补录生产阻断证据：${payload.evidenceRef.trim()}`;
+  } else if (action === "start-remediation") {
+    payload.note = `已启动 ${id} 整改并保留现场验收要求。`;
+  } else if (action === "submit-evidence") {
+    payload.note = `已提交 ${id} 当前证据，申请生产前证据复核。`;
+  } else if (action === "review-evidence") {
+    payload.note = `已复核 ${id} 当前证据；正式放行仍等待现场验收与签字。`;
+  } else if (action === "reopen") {
+    payload.note = window.prompt("请输入重新整改原因", "现场条件或证据发生变化，需要重新整改。") || "";
+    if (!payload.note.trim()) return;
+  } else {
+    payload.note = window.prompt("请输入生产阻断处置备注", "") || "";
+    if (!payload.note.trim()) return;
+  }
+  if (button) button.disabled = true;
+  if (statusTarget) {
+    statusTarget.textContent = `正在更新 ${id} 处置台账`;
+    statusTarget.className = "badge warn";
+  }
+  try {
+    const response = await request(`${PLATFORM_API_BASE}/platform/capability-operations/blockers/${encodeURIComponent(id)}/actions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.message || `HTTP ${response.status}`);
+    platformCapabilityOperationsCenter = body.center || platformCapabilityOperationsCenter;
+    platformState.platformProductionBlockerReviews = (body.center?.productionBlockers || []).map((item) => item.review).filter(Boolean);
+    renderPlatformCapabilityOperationsCenter();
+  } catch (error) {
+    if (statusTarget) {
+      statusTarget.textContent = error.message || "生产阻断处置失败";
       statusTarget.className = "badge danger";
     }
   } finally {

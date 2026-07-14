@@ -10,6 +10,8 @@ const {
 
 const ROOT = __dirname;
 const ALLOWED_ACTIONS = ["assign", "record-evidence", "review", "request-improvement", "comment"];
+const BLOCKER_ALLOWED_ACTIONS = ["assign", "start-remediation", "record-evidence", "submit-evidence", "review-evidence", "reopen", "comment"];
+const BLOCKER_WORKFLOW_STATUSES = ["open", "in-progress", "evidence-submitted", "evidence-reviewed-site-pending"];
 const DEFAULT_OWNERS = {
   "standards-governance": "standards-office",
   "data-governance": "data-platform",
@@ -69,6 +71,44 @@ function normalizePlatformCapabilityReviews(currentRows) {
   });
 }
 
+function seedPlatformProductionBlockerReviews() {
+  return PRODUCTION_BLOCKERS.map((blocker) => ({
+    id: `ppbr-${blocker.id.toLowerCase()}`,
+    blockerId: blocker.id,
+    owner: blocker.owner,
+    workflowStatus: "open",
+    evidenceRefs: [],
+    actionHistory: [],
+    updatedAt: "",
+    updatedBy: "",
+    siteAcceptanceRequired: true,
+    productionReady: false
+  }));
+}
+
+function normalizePlatformProductionBlockerReviews(currentRows) {
+  const current = new Map(
+    (Array.isArray(currentRows) ? currentRows : [])
+      .filter((item) => item && item.blockerId)
+      .map((item) => [item.blockerId, item])
+  );
+  return seedPlatformProductionBlockerReviews().map((seed) => {
+    const item = current.get(seed.blockerId) || {};
+    return {
+      ...seed,
+      ...item,
+      id: seed.id,
+      blockerId: seed.blockerId,
+      owner: String(item.owner || seed.owner).trim(),
+      workflowStatus: BLOCKER_WORKFLOW_STATUSES.includes(item.workflowStatus) ? item.workflowStatus : seed.workflowStatus,
+      evidenceRefs: [...new Set(Array.isArray(item.evidenceRefs) ? item.evidenceRefs.map(String).filter(Boolean) : [])].slice(0, 30),
+      actionHistory: Array.isArray(item.actionHistory) ? item.actionHistory.slice(0, 30) : [],
+      siteAcceptanceRequired: true,
+      productionReady: false
+    };
+  });
+}
+
 function repositoryEvidenceReady(capability, evidenceExists) {
   return capability.evidence
     .filter((item) => !item.startsWith("release/"))
@@ -79,6 +119,8 @@ function buildPlatformCapabilityOperationsCenter(data = {}, options = {}) {
   const evidenceExists = options.evidenceExists || ((relativePath) => fs.existsSync(path.join(ROOT, relativePath)));
   const reviews = normalizePlatformCapabilityReviews(data.platformCapabilityReviews);
   const reviewByCapability = new Map(reviews.map((item) => [item.capabilityId, item]));
+  const blockerReviews = normalizePlatformProductionBlockerReviews(data.platformProductionBlockerReviews);
+  const reviewByBlocker = new Map(blockerReviews.map((item) => [item.blockerId, item]));
   const capabilities = CAPABILITY_DOMAINS.map((capability) => {
     const review = reviewByCapability.get(capability.id);
     const sourceEvidence = capability.evidence.filter((item) => !item.startsWith("release/"));
@@ -91,6 +133,13 @@ function buildPlatformCapabilityOperationsCenter(data = {}, options = {}) {
       productionReady: false
     };
   });
+  const productionBlockers = PRODUCTION_BLOCKERS.map((blocker) => ({
+    ...blocker,
+    review: reviewByBlocker.get(blocker.id),
+    allowedActions: BLOCKER_ALLOWED_ACTIONS,
+    siteAcceptanceRequired: true,
+    productionReady: false
+  }));
   const summary = {
     capabilityDomains: capabilities.length,
     repositoryEvidenceReady: capabilities.filter((item) => item.repositoryEvidenceReady).length,
@@ -101,7 +150,12 @@ function buildPlatformCapabilityOperationsCenter(data = {}, options = {}) {
     evidenceRecorded: capabilities.filter((item) => item.review.evidenceRefs.length > 0).length,
     productionReady: 0,
     mvpRequiredModules: MVP_REQUIRED_MODULES.length,
-    productionBlockers: PRODUCTION_BLOCKERS.length
+    productionBlockers: productionBlockers.length,
+    blockersOpen: productionBlockers.filter((item) => item.review.workflowStatus === "open").length,
+    blockersInProgress: productionBlockers.filter((item) => item.review.workflowStatus === "in-progress").length,
+    blockerEvidenceSubmitted: productionBlockers.filter((item) => item.review.workflowStatus === "evidence-submitted").length,
+    blockerEvidenceReviewed: productionBlockers.filter((item) => item.review.workflowStatus === "evidence-reviewed-site-pending").length,
+    blockerEvidenceRecorded: productionBlockers.filter((item) => item.review.evidenceRefs.length > 0).length
   };
   return {
     ok: capabilities.every((item) => item.repositoryEvidenceReady),
@@ -111,7 +165,7 @@ function buildPlatformCapabilityOperationsCenter(data = {}, options = {}) {
     summary,
     capabilities,
     mvpRequiredModules: MVP_REQUIRED_MODULES,
-    productionBlockers: PRODUCTION_BLOCKERS
+    productionBlockers
   };
 }
 
@@ -192,11 +246,101 @@ function applyPlatformCapabilityReviewAction(data, capabilityId, payload = {}, a
   return { reviews, item, history };
 }
 
+function applyPlatformProductionBlockerAction(data, blockerId, payload = {}, actor = {}) {
+  const blocker = PRODUCTION_BLOCKERS.find((item) => item.id === blockerId);
+  if (!blocker) {
+    throw new PlatformCapabilityOperationsError("platform production blocker not found", "PLATFORM_PRODUCTION_BLOCKER_NOT_FOUND", 404);
+  }
+  const action = String(payload.action || "").trim();
+  if (!BLOCKER_ALLOWED_ACTIONS.includes(action)) {
+    throw new PlatformCapabilityOperationsError("unsupported platform production blocker action", "PLATFORM_PRODUCTION_BLOCKER_ACTION_UNSUPPORTED");
+  }
+  const note = cleanText(payload.note, "note", 4, 1000);
+  const reviews = normalizePlatformProductionBlockerReviews(data.platformProductionBlockerReviews);
+  const index = reviews.findIndex((item) => item.blockerId === blockerId);
+  const previous = reviews[index];
+  const now = new Date().toISOString();
+  let owner = previous.owner;
+  let workflowStatus = previous.workflowStatus;
+  const submittedEvidence = [
+    ...(Array.isArray(payload.evidenceRefs) ? payload.evidenceRefs : []),
+    ...(payload.evidenceRef ? [payload.evidenceRef] : [])
+  ].map((item) => String(item || "").trim()).filter(Boolean);
+  let evidenceRefs = [...new Set([...previous.evidenceRefs, ...submittedEvidence])].slice(0, 30);
+
+  if (action === "assign") owner = cleanText(payload.owner, "owner", 2, 120);
+  if (action === "start-remediation") {
+    if (workflowStatus === "evidence-reviewed-site-pending") {
+      throw new PlatformCapabilityOperationsError("reviewed evidence must be reopened before remediation resumes", "PLATFORM_PRODUCTION_BLOCKER_REOPEN_REQUIRED", 409);
+    }
+    workflowStatus = "in-progress";
+  }
+  if (action === "record-evidence" && !submittedEvidence.length) {
+    throw new PlatformCapabilityOperationsError("evidenceRef is required", "PLATFORM_PRODUCTION_BLOCKER_EVIDENCE_REQUIRED");
+  }
+  if (action === "submit-evidence") {
+    if (workflowStatus !== "in-progress") {
+      throw new PlatformCapabilityOperationsError("remediation must be in progress before evidence submission", "PLATFORM_PRODUCTION_BLOCKER_REMEDIATION_REQUIRED", 409);
+    }
+    if (!evidenceRefs.length) {
+      throw new PlatformCapabilityOperationsError("at least one evidence reference is required", "PLATFORM_PRODUCTION_BLOCKER_EVIDENCE_REQUIRED", 409);
+    }
+    workflowStatus = "evidence-submitted";
+  }
+  if (action === "review-evidence") {
+    if (workflowStatus !== "evidence-submitted") {
+      throw new PlatformCapabilityOperationsError("submitted evidence is required before review", "PLATFORM_PRODUCTION_BLOCKER_SUBMISSION_REQUIRED", 409);
+    }
+    if (!owner || !evidenceRefs.length) {
+      throw new PlatformCapabilityOperationsError("evidence review requires an owner and evidence", "PLATFORM_PRODUCTION_BLOCKER_REVIEW_REQUIREMENTS_MISSING", 409);
+    }
+    workflowStatus = "evidence-reviewed-site-pending";
+  }
+  if (action === "reopen") {
+    if (workflowStatus !== "evidence-reviewed-site-pending") {
+      throw new PlatformCapabilityOperationsError("only reviewed evidence can be reopened", "PLATFORM_PRODUCTION_BLOCKER_REOPEN_INVALID", 409);
+    }
+    workflowStatus = "in-progress";
+  }
+
+  const history = {
+    id: randomUUID(),
+    at: now,
+    action,
+    actor: String(actor.name || actor.username || "commission-operator"),
+    role: String(actor.role || "commission"),
+    note,
+    fromStatus: previous.workflowStatus,
+    toStatus: workflowStatus,
+    owner,
+    evidenceRefs: submittedEvidence
+  };
+  const item = {
+    ...previous,
+    owner,
+    workflowStatus,
+    evidenceRefs,
+    actionHistory: [history, ...previous.actionHistory].slice(0, 30),
+    evidenceReviewedAt: action === "review-evidence" ? now : previous.evidenceReviewedAt || "",
+    evidenceReviewedBy: action === "review-evidence" ? history.actor : previous.evidenceReviewedBy || "",
+    updatedAt: now,
+    updatedBy: history.actor,
+    siteAcceptanceRequired: true,
+    productionReady: false
+  };
+  reviews[index] = item;
+  return { reviews, item, history };
+}
+
 module.exports = {
   ALLOWED_ACTIONS,
+  BLOCKER_ALLOWED_ACTIONS,
   PlatformCapabilityOperationsError,
   applyPlatformCapabilityReviewAction,
+  applyPlatformProductionBlockerAction,
   buildPlatformCapabilityOperationsCenter,
   normalizePlatformCapabilityReviews,
-  seedPlatformCapabilityReviews
+  normalizePlatformProductionBlockerReviews,
+  seedPlatformCapabilityReviews,
+  seedPlatformProductionBlockerReviews
 };

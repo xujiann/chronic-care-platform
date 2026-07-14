@@ -16,9 +16,12 @@ const {
 } = require("./postgres-runtime-sync");
 const {
   applyPlatformCapabilityReviewAction,
+  applyPlatformProductionBlockerAction,
   buildPlatformCapabilityOperationsCenter,
   normalizePlatformCapabilityReviews,
-  seedPlatformCapabilityReviews
+  normalizePlatformProductionBlockerReviews,
+  seedPlatformCapabilityReviews,
+  seedPlatformProductionBlockerReviews
 } = require("./platform-capability-operations");
 const BloodService = require("./blood-service");
 const BloodTransactionService = require("./blood-transaction-service");
@@ -952,6 +955,7 @@ function seedState() {
     platformDeliveryBatches: seedPlatformDeliveryBatches(),
     platformEvidence: seedPlatformEvidence(),
     platformCapabilityReviews: seedPlatformCapabilityReviews(),
+    platformProductionBlockerReviews: seedPlatformProductionBlockerReviews(),
     productionDeploymentPlan: seedProductionDeploymentPlan(),
     productionDatabaseMigrationBatches: seedProductionDatabaseMigrationBatches(),
     productionDatabaseCutoverRuns: seedProductionDatabaseCutoverRuns(),
@@ -7416,6 +7420,7 @@ function normalizeState(data) {
     platformDeliveryBatches: mergeByKey(seedPlatformDeliveryBatches(), data.platformDeliveryBatches, "id"),
     platformEvidence: cleanPlatformEvidenceText(mergeByKey(seedPlatformEvidence(), data.platformEvidence, "id")),
     platformCapabilityReviews: normalizePlatformCapabilityReviews(data.platformCapabilityReviews),
+    platformProductionBlockerReviews: normalizePlatformProductionBlockerReviews(data.platformProductionBlockerReviews),
     productionDeploymentPlan: mergeByKey(seedProductionDeploymentPlan(), data.productionDeploymentPlan, "id"),
     productionDatabaseMigrationBatches: mergeByKey(seedProductionDatabaseMigrationBatches(), data.productionDatabaseMigrationBatches, "id"),
     productionDatabaseCutoverRuns: mergeByKey(seedProductionDatabaseCutoverRuns(), data.productionDatabaseCutoverRuns, "id"),
@@ -7611,6 +7616,7 @@ function completeSystemTargets(state) {
     records: Array.isArray(item.records) ? item.records.slice(0, 20) : []
   }));
   state.platformCapabilityReviews = normalizePlatformCapabilityReviews(state.platformCapabilityReviews);
+  state.platformProductionBlockerReviews = normalizePlatformProductionBlockerReviews(state.platformProductionBlockerReviews);
   state.productionDeploymentPlan = mergeByKey(seedProductionDeploymentPlan(), state.productionDeploymentPlan, "id").map((item) => ({
     ...item,
     requiredConfig: Array.isArray(item.requiredConfig) ? item.requiredConfig : [],
@@ -11643,6 +11649,7 @@ function scopeStateForUser(data, user) {
   delete scoped.platformDeliveryBatches;
   delete scoped.platformEvidence;
   delete scoped.platformCapabilityReviews;
+  delete scoped.platformProductionBlockerReviews;
   delete scoped.productionDeploymentPlan;
   delete scoped.productionDatabaseMigrationBatches;
   delete scoped.productionDatabaseCutoverRuns;
@@ -19939,6 +19946,47 @@ async function handleApi(req, res) {
       sendJson(res, status, {
         error: status === 404 ? "Not Found" : status === 409 ? "Conflict" : "Bad Request",
         code: error.code || "PLATFORM_CAPABILITY_ACTION_FAILED",
+        message: error.message
+      });
+    }
+    return;
+  }
+
+  const platformProductionBlockerActionMatch = url.pathname.match(/^\/api\/platform\/capability-operations\/blockers\/([^/]+)\/actions$/);
+  if (req.method === "POST" && platformProductionBlockerActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/platform/capability-operations/blockers/:id/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const blockerId = decodeURIComponent(platformProductionBlockerActionMatch[1]);
+    const data = readDatabase();
+    try {
+      const normalized = applyPlatformProductionBlockerAction(data, blockerId, payload, user);
+      data.platformProductionBlockerReviews = normalized.reviews;
+      data.securityEvents = sealAuditTrail([
+        {
+          id: randomUUID(),
+          at: new Date().toLocaleString("zh-CN", { hour12: false }),
+          actor: user.name,
+          role: user.role,
+          action: "platform-production-blocker-action",
+          target: blockerId,
+          result: "allowed",
+          detail: `${normalized.history.action} / ${normalized.history.fromStatus} -> ${normalized.history.toStatus} / site acceptance required`
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120), { recompute: true });
+      writeDatabase(normalizeState(data));
+      sendJson(res, 200, {
+        ok: true,
+        blocker: normalized.item,
+        action: normalized.history,
+        center: buildPlatformCapabilityOperationsCenter(readDatabase())
+      });
+    } catch (error) {
+      const status = error.statusCode || 400;
+      sendJson(res, status, {
+        error: status === 404 ? "Not Found" : status === 409 ? "Conflict" : "Bad Request",
+        code: error.code || "PLATFORM_PRODUCTION_BLOCKER_ACTION_FAILED",
         message: error.message
       });
     }

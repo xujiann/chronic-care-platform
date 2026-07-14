@@ -11,8 +11,10 @@ const {
 } = require("../scripts/platform-production-audit");
 const {
   applyPlatformCapabilityReviewAction,
+  applyPlatformProductionBlockerAction,
   buildPlatformCapabilityOperationsCenter,
-  seedPlatformCapabilityReviews
+  seedPlatformCapabilityReviews,
+  seedPlatformProductionBlockerReviews
 } = require("../platform-capability-operations");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -92,6 +94,55 @@ test("platform capability operations center keeps evidence-backed reviews pre-pr
   const center = buildPlatformCapabilityOperationsCenter({ platformCapabilityReviews: reviewed.reviews }, { evidenceExists: () => true });
   assert.equal(center.summary.reviewedPreproduction, 1);
   assert.equal(center.productionReady, false);
+});
+
+test("platform production blocker workflow requires remediation, evidence submission and site acceptance", () => {
+  const data = { platformProductionBlockerReviews: seedPlatformProductionBlockerReviews() };
+  const initial = buildPlatformCapabilityOperationsCenter(data, { evidenceExists: () => true });
+  assert.equal(initial.summary.blockersOpen, 10);
+  assert.equal(initial.summary.blockerEvidenceReviewed, 0);
+
+  assert.throws(
+    () => applyPlatformProductionBlockerAction(data, "P0-02", {
+      action: "submit-evidence",
+      note: "Attempted to submit before remediation."
+    }, { name: "Release Reviewer", role: "commission" }),
+    (error) => error.code === "PLATFORM_PRODUCTION_BLOCKER_REMEDIATION_REQUIRED" && error.statusCode === 409
+  );
+
+  const started = applyPlatformProductionBlockerAction(data, "P0-02", {
+    action: "start-remediation",
+    note: "Database remediation has started."
+  }, { name: "Release Reviewer", role: "commission" });
+  const evidence = applyPlatformProductionBlockerAction({ platformProductionBlockerReviews: started.reviews }, "P0-02", {
+    action: "record-evidence",
+    evidenceRef: "ticket:DB-CUTOVER-02",
+    note: "Recorded the database rehearsal ticket."
+  }, { name: "Release Reviewer", role: "commission" });
+  const submitted = applyPlatformProductionBlockerAction({ platformProductionBlockerReviews: evidence.reviews }, "P0-02", {
+    action: "submit-evidence",
+    note: "Submitted current database rehearsal evidence."
+  }, { name: "Release Reviewer", role: "commission" });
+  const reviewed = applyPlatformProductionBlockerAction({ platformProductionBlockerReviews: submitted.reviews }, "P0-02", {
+    action: "review-evidence",
+    note: "Reviewed current evidence; site acceptance remains required."
+  }, { name: "Release Reviewer", role: "commission" });
+  assert.equal(reviewed.item.workflowStatus, "evidence-reviewed-site-pending");
+  assert.equal(reviewed.item.siteAcceptanceRequired, true);
+  assert.equal(reviewed.item.productionReady, false);
+  assert.equal(reviewed.item.actionHistory.length, 4);
+
+  const center = buildPlatformCapabilityOperationsCenter({ platformProductionBlockerReviews: reviewed.reviews }, { evidenceExists: () => true });
+  assert.equal(center.summary.blockerEvidenceReviewed, 1);
+  assert.equal(center.summary.blockerEvidenceRecorded, 1);
+  assert.equal(center.productionReady, false);
+
+  const reopened = applyPlatformProductionBlockerAction({ platformProductionBlockerReviews: reviewed.reviews }, "P0-02", {
+    action: "reopen",
+    note: "Capacity evidence changed and remediation must resume."
+  }, { name: "Release Reviewer", role: "commission" });
+  assert.equal(reopened.item.workflowStatus, "in-progress");
+  assert.equal(reopened.item.productionReady, false);
 });
 
 test("platform production audit does not require ignored release artifacts before report generation", () => {
