@@ -621,6 +621,38 @@ body.service-paged-mode .citizen-shell {
   font-weight: 900;
 }
 
+.service-mobile-actionbar {
+  display: none;
+}
+
+.service-mobile-action {
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 900;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.service-mobile-action.primary {
+  border-color: var(--blue);
+  background: var(--blue);
+  color: #fff;
+}
+
+.service-mobile-action:focus-visible {
+  outline: 3px solid rgba(39, 110, 241, 0.35);
+  outline-offset: 2px;
+}
+
 .birth-health-summary-strip {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -2890,6 +2922,13 @@ dialog::backdrop {
     background: rgba(255, 255, 255, 0.96);
     box-shadow: 0 14px 34px rgba(15, 23, 42, 0.14);
     backdrop-filter: blur(12px);
+  }
+
+  body.service-paged-mode .service-mobile-actionbar {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(96px, 0.7fr);
+    gap: 8px;
   }
 
   body.service-paged-mode .mobile-service-rail {

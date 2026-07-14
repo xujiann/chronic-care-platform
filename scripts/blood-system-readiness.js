@@ -62,6 +62,15 @@ function buildBloodSystemReadinessReport(options = {}) {
     ["Emergency allocation execution", server.includes("actEmergencyAllocation")],
     ["Recall acknowledgement idempotency and exchange", service.includes("acknowledgementSummary") && service.includes("bloodIdempotencyRecords") && server.includes("idempotencyKey") && domain.buildExchangeMessage("recall_acknowledgement", {}).type === "recall_acknowledgement"],
     ["Recall institution confirmation UI", html.includes("blood-recall.js") && readText("blood-recall.js").includes("data-recall-action")]
+    ,["Blood integration contract registry", server.includes("BloodIntegrationGateway.dashboard") && readText("blood-integration-gateway.js").includes("IOT-TEMPERATURE")],
+    ["Integration idempotency and dead letter", server.includes("BloodIntegrationGateway.retry") && server.includes("bloodIntegrationDeadLetters") && readText("blood-integration-gateway.js").includes("idempotentReplay")],
+    ["Hospital and regional exchange mapping", readText("blood-integration-gateway.js").includes("WS/T 866+WS/T 867-2025") && readText("blood-integration-gateway.js").includes("REGIONAL-REPORT")]
+    ,["Integration operations workbench", html.includes('id="integration"') && js.includes("renderIntegration")],
+    ["Integration test and retry actions", js.includes("IOT-TEMPERATURE/receive") && js.includes("dead-letters/")]
+    ,["All BIS and BTIS business domains", server.includes("BloodBusinessService.dashboard") && readText("blood-business-service.js").includes("autologous-treatment")],
+    ["Business records and governed actions", server.includes("BloodBusinessService.create") && server.includes("BloodBusinessService.action")]
+    ,["Role-scoped business operations UI", readText("blood-business.html").includes("血液业务中心") && readText("blood-business.js").includes("business/resources")],
+    ["All business page entry", html.includes("blood-business.html")]
   ];
   const normalizedChecks = checks.map((item) => ({ name: item?.[0] || "Unnamed check", ok: Boolean(item?.[1]) }));
   return {

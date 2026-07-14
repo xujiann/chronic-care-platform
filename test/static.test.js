@@ -2148,8 +2148,13 @@ test("citizen portal exposes resident service tabs and implementation states", (
   assert.match(citizenJs, /renderMobileServicePagebar/);
   assert.match(citizenJs, /service-mobile-pagebar-current/);
   assert.match(citizenJs, /data-service-page-step/);
+  assert.match(citizenJs, /service-mobile-actionbar/);
+  assert.match(citizenJs, /data-mobile-primary-action/);
+  assert.match(citizenJs, /data-mobile-feature-list/);
   assert.match(citizenCss, /service-mobile-pagebar/);
   assert.match(citizenCss, /service-page-step/);
+  assert.match(citizenCss, /service-mobile-actionbar/);
+  assert.match(citizenCss, /service-mobile-action/);
   assert.match(citizenJs, /data-service-state/);
   assert.match(citizenJs, /service-tab-boundary/);
   assert.match(citizenJs, /service-summary-meta/);

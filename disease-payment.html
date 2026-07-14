@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>按病种付费管理中心</title>
+  <link rel="stylesheet" href="./portal.css">
+  <link rel="stylesheet" href="./disease-payment.css">
+  <script src="./auth.js"></script>
+  <script>window.HealthCityAuth.requireRole(["insurance", "commission", "institution"])</script>
+</head>
+<body>
+  <main class="portal-shell payment-shell">
+    <header class="portal-header payment-hero">
+      <div><span>医保发〔2025〕18号落地工作台</span><h1>按病种付费管理中心</h1><p>覆盖结算清单质控、DRG/DIP分组、支付测算、特例单议、月度结算、年度清算、智能监管和运行监测。</p></div>
+      <nav><a href="./insurance.html">医保经办</a><a href="./health-city.html">系统总览</a></nav>
+    </header>
+
+    <section class="payment-toolbar panel">
+      <div><strong>支付模式</strong><select id="payment-mode"><option value="DRG">DRG 按病组</option><option value="DIP">DIP 按病种分值</option></select></div>
+      <button id="calculate-all" type="button">执行清单质控、分组与测算</button>
+      <button id="create-settlement" class="secondary" type="button">生成本月结算批次</button>
+      <span id="action-message" role="status"></span>
+    </section>
+
+    <section class="metric-grid" id="payment-metrics"></section>
+
+    <section class="panel">
+      <div class="panel-title"><h2>生产化清单接入与分组运行</h2><span id="intake-summary"></span></div>
+      <div class="payment-toolbar">
+        <button type="button" data-payment-action="import-sample">导入标准清单样例</button>
+        <button type="button" class="secondary" data-payment-action="import-error-sample">导入错误样例</button>
+        <button type="button" data-payment-action="run-simulation">运行模拟分组</button>
+      </div>
+      <div id="adapter-list" class="list compact"></div>
+      <div id="import-list" class="list compact"></div>
+      <div id="retry-list" class="list compact"></div>
+      <div id="grouping-run-list" class="list compact"></div>
+    </section>
+
+    <section class="payment-grid">
+      <article class="panel wide"><div class="panel-title"><h2>病例分组与支付测算</h2><span id="case-count"></span></div><div id="case-list" class="case-table"></div></article>
+      <article class="panel"><div class="panel-title"><h2>政策与生产依赖</h2></div><div id="policy-panel" class="rules"></div><div id="dependency-list" class="list compact"></div></article>
+    </section>
+
+    <section class="payment-grid">
+      <article class="panel"><div class="panel-title"><h2>分组与支付参数版本</h2></div><div id="version-list" class="list compact"></div></article>
+      <article class="panel"><div class="panel-title"><h2>特例单议</h2><span id="special-count"></span></div><div id="special-list" class="list compact"></div></article>
+    </section>
+
+    <section class="payment-grid">
+      <article class="panel"><div class="panel-title"><h2>结算与清算批次</h2><span id="settlement-count"></span></div><div id="settlement-list" class="list compact"></div></article>
+      <article class="panel"><div class="panel-title"><h2>基金预算与机构监测</h2></div><div id="budget-list" class="list compact"></div><div id="institution-list" class="list compact"></div></article>
+    </section>
+
+    <section class="payment-grid">
+      <article class="panel"><div class="panel-title"><h2>预付金与应付未付清理</h2><span>约1个月预付规模</span></div><div id="prepayment-list" class="list compact"></div><div id="unpaid-list" class="list compact"></div></article>
+      <article class="panel"><div class="panel-title"><h2>谈判协商与数据工作组</h2><span>公开透明</span></div><div id="negotiation-list" class="list compact"></div><div id="working-group" class="rules"></div></article>
+    </section>
+
+    <section class="payment-grid">
+      <article class="panel"><div class="panel-title"><h2>分级分类培训</h2><span id="training-count"></span></div><div id="training-list" class="list compact"></div></article>
+      <article class="panel"><div class="panel-title"><h2>2.0版政策控制</h2><span>强制规则</span></div><div id="compliance-list" class="list compact"></div></article>
+    </section>
+
+    <section class="payment-grid">
+      <article class="panel"><div class="panel-title"><h2>常态化意见反馈</h2></div><form id="feedback-form"><select name="category"><option>分组方案</option><option>权重费率</option><option>信息化建设</option><option>编码标准</option></select><textarea name="content" required placeholder="填写医疗机构或一线人员意见"></textarea><button type="submit">提交反馈</button></form><div id="feedback-list" class="list compact"></div></article>
+      <article class="panel"><div class="panel-title"><h2>操作审计</h2></div><div id="audit-list" class="list compact"></div></article>
+    </section>
+  </main>
+  <script src="./shared.js"></script>
+  <script src="./disease-payment.js"></script>
+</body>
+</html>

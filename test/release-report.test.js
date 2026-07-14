@@ -493,6 +493,8 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "citizenLaunch:mobilePreviewServiceSwitch" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "citizenLaunch:pipelineAcceptanceChecklist" && item.passed), true);
   assert.equal(report.citizenLaunchFoundation.ok, true);
+  assert.equal(report.citizenLaunchFoundation.acceptancePanel.entry, "citizen.html?client=app&page=health-record&launch=1#citizen-pipeline-panel");
+  assert.equal(report.citizenLaunchFoundation.acceptancePanel.copyActionId, "copy-citizen-pipeline-audit");
   assert.equal(report.citizenLaunchFoundation.checks.some((item) => item.id === "citizen-foundation:phone-code-delivery" && item.passed), true);
   assert.equal(report.citizenLaunchFoundation.checks.some((item) => item.id === "citizen-foundation:pipeline-acceptance-checklist" && item.passed), true);
   assert.equal(report.citizenLaunchFoundation.externalDependencies.every((item) => item.owner && item.cutoverBlocker && item.evidence && item.onsiteAcceptance), true);
@@ -517,6 +519,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.match(markdown, /Data quality and master index report/);
   assert.match(markdown, /Digital hospital standards readiness report/);
   assert.match(markdown, /digital-hospital-standards-readiness-report\.md/);
+  assert.match(markdown, /copyable C-end pipeline acceptance checklist/);
   assert.match(markdown, /Phase 2 proposal readiness report/);
   assert.match(markdown, /phase2-proposal-readiness-report\.md/);
   assert.match(markdown, /Phase 2 catalog readiness report/);

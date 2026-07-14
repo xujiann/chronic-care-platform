@@ -1,0 +1,42 @@
+services:
+  hapi-fhir:
+    image: ${HAPI_FHIR_IMAGE:-hapiproject/hapi:latest}
+    restart: unless-stopped
+    ports: ["127.0.0.1:${HAPI_FHIR_PORT:-8080}:8080"]
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://hapi-db:5432/hapi
+      SPRING_DATASOURCE_USERNAME: hapi
+      SPRING_DATASOURCE_PASSWORD: ${HAPI_DB_PASSWORD:?set HAPI_DB_PASSWORD}
+      SPRING_DATASOURCE_DRIVERCLASSNAME: org.postgresql.Driver
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: ca.uhn.fhir.jpa.model.dialect.HapiFhirPostgresDialect
+    depends_on: { hapi-db: { condition: service_healthy } }
+    networks: [clinical]
+  hapi-db:
+    image: ${POSTGRES_IMAGE:-postgres:16.4-alpine}
+    restart: unless-stopped
+    environment: { POSTGRES_DB: hapi, POSTGRES_USER: hapi, POSTGRES_PASSWORD: "${HAPI_DB_PASSWORD:?set HAPI_DB_PASSWORD}" }
+    volumes: [hapi-db:/var/lib/postgresql/data]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U hapi"], interval: 10s, timeout: 5s, retries: 10 }
+    networks: [clinical]
+  orthanc:
+    image: ${ORTHANC_IMAGE:-orthancteam/orthanc:latest}
+    restart: unless-stopped
+    ports: ["127.0.0.1:${ORTHANC_PORT:-8042}:8042", "${ORTHANC_DICOM_PORT:-4242}:4242"]
+    environment:
+      ORTHANC__NAME: solution-a-orthanc
+      ORTHANC__REGISTERED_USERS: '{"${ORTHANC_USERNAME:-orthanc}":"${ORTHANC_PASSWORD:?set ORTHANC_PASSWORD}"}'
+      ORTHANC__AUTHENTICATION_ENABLED: ${ORTHANC_AUTHENTICATION_ENABLED:-false}
+      DICOM_WEB_PLUGIN_ENABLED: "true"
+    volumes: [orthanc-db:/var/lib/orthanc/db]
+    networks: [clinical]
+  ohif:
+    image: ${OHIF_IMAGE:-ohif/app:latest}
+    restart: unless-stopped
+    ports: ["127.0.0.1:${OHIF_PORT:-3000}:80"]
+    volumes:
+      - ./ohif-app-config.js:/usr/share/nginx/html/app-config.js:ro
+      - ./ohif-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on: [orthanc]
+    networks: [clinical]
+networks: { clinical: {} }
+volumes: { hapi-db: {}, orthanc-db: {} }

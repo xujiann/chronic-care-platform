@@ -9,7 +9,7 @@ const imagingState = {
 const IMAGING_API_BASE = location.protocol === "file:" ? "" : `${location.origin}/api`;
 
 document.addEventListener("DOMContentLoaded", async () => {
-  await loadImagingCloud();
+  await Promise.all([loadImagingCloud(), loadSolutionAHealth(), loadSolutionAStudies()]);
   bindImagingControls();
   renderImagingCloud();
 });
@@ -48,6 +48,8 @@ function bindImagingControls() {
     await loadImagingCloud();
     renderImagingCloud();
   });
+  document.querySelector("#reload-solution-a")?.addEventListener("click", loadSolutionAHealth);
+  document.querySelector("#reload-solution-a-studies")?.addEventListener("click", loadSolutionAStudies);
   document.querySelector("#ingest-form")?.addEventListener("submit", submitImagingIngest);
   document.addEventListener("click", handleImagingAction);
 }
@@ -117,6 +119,7 @@ function renderStudyTable(studies) {
       <td><span class="badge ${/通过|已写入|passed/i.test(`${item.qcStatus} ${item.emrSyncStatus}`) ? "ok" : "warn"}">${escapeHtml(item.qcStatus)}</span><br><small>${escapeHtml(item.emrSyncStatus)}</small></td>
       <td>
         <button class="inline-action" type="button" data-view-study="${escapeHtml(item.id)}">手机查看</button>
+        <button class="inline-action primary" type="button" data-open-ohif="${escapeHtml(item.id)}">OHIF调阅</button>
         <button class="inline-action" type="button" data-share-study="${escapeHtml(item.id)}">分享</button>
       </td>
     </tr>`).join("") || `<tr><td colspan="6">暂无影像云检查。</td></tr>`}</tbody>
@@ -261,8 +264,23 @@ async function submitImagingIngest(event) {
 }
 
 async function handleImagingAction(event) {
+  const linkExternalButton = event.target.closest("[data-link-external-study]");
+  const externalOhifButton = event.target.closest("[data-open-external-ohif]");
+  const ohifButton = event.target.closest("[data-open-ohif]");
   const viewButton = event.target.closest("[data-view-study]");
   const shareButton = event.target.closest("[data-share-study]");
+  if (linkExternalButton) {
+    await linkExternalStudy(linkExternalButton.dataset.linkExternalStudy);
+    return;
+  }
+  if (externalOhifButton) {
+    window.open(externalOhifButton.dataset.openExternalOhif, "_blank", "noopener,noreferrer");
+    return;
+  }
+  if (ohifButton) {
+    await openOhifViewer(ohifButton.dataset.openOhif);
+    return;
+  }
   if (viewButton) {
     imagingState.selectedStudyId = viewButton.dataset.viewStudy;
     renderImagingCloud();
@@ -271,6 +289,67 @@ async function handleImagingAction(event) {
   if (shareButton) {
     await shareStudy(shareButton.dataset.shareStudy);
   }
+}
+
+async function linkExternalStudy(studyInstanceUID) {
+  if (!imagingState.selectedResidentId) { window.alert("请先在运行总览中选择要关联的演示居民。"); return; }
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  const response = await request(`${IMAGING_API_BASE}/imaging-cloud/solution-a/studies/${encodeURIComponent(studyInstanceUID)}/link`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ residentId: imagingState.selectedResidentId, approvalEvidence: "synthetic-test-data" })
+  });
+  const payload = await response.json();
+  if (!response.ok) { window.alert(payload.message || "外部影像关联失败"); return; }
+  await Promise.all([loadImagingCloud(), loadSolutionAStudies()]);
+  renderImagingCloud();
+  window.alert(payload.created ? "合成检查已关联到当前居民。" : "关联信息已更新。");
+}
+
+async function loadSolutionAHealth() {
+  const target = document.querySelector("#solution-a-health");
+  if (!target || !IMAGING_API_BASE) return;
+  target.setAttribute("aria-busy", "true");
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${IMAGING_API_BASE}/imaging-cloud/solution-a/health`);
+    const payload = await response.json();
+    target.innerHTML = (payload.services || []).map((item) => `<article class="metric-card">
+      <span>${escapeHtml(item.name)}</span><strong>${item.ok ? "在线" : "异常"}</strong>
+      <small>HTTP ${escapeHtml(item.status)} · ${escapeHtml(item.latencyMs)} ms</small>
+    </article>`).join("") || `<article class="metric-card"><span>方案A</span><strong>不可用</strong><small>${escapeHtml(payload.message || "健康探测失败")}</small></article>`;
+  } catch (error) {
+    target.innerHTML = `<article class="metric-card"><span>方案A</span><strong>不可用</strong><small>${escapeHtml(error.message)}</small></article>`;
+  } finally { target.removeAttribute("aria-busy"); }
+}
+
+async function openOhifViewer(studyId) {
+  if (!IMAGING_API_BASE) return;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  const response = await request(`${IMAGING_API_BASE}/imaging-cloud/studies/${encodeURIComponent(studyId)}/viewer`);
+  const payload = await response.json();
+  if (!response.ok) { window.alert(payload.message || "OHIF调阅失败"); return; }
+  window.open(payload.viewerUrl, "_blank", "noopener,noreferrer");
+}
+
+async function loadSolutionAStudies() {
+  const target = document.querySelector("#solution-a-studies");
+  if (!target || !IMAGING_API_BASE) return;
+  target.setAttribute("aria-busy", "true");
+  try {
+    const request = window.HealthCityAuth?.authFetch || fetch;
+    const response = await request(`${IMAGING_API_BASE}/imaging-cloud/solution-a/studies`);
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.message || "DICOMweb检查清单读取失败");
+    target.innerHTML = `<table><thead><tr><th>患者边界</th><th>检查</th><th>模态</th><th>StudyInstanceUID</th><th>操作</th></tr></thead><tbody>${(payload.studies || []).map((item) => `<tr>
+      <td><strong>${escapeHtml(item.patientName)}</strong><br><small>${escapeHtml(item.patientId)} · ${item.synthetic ? "合成数据" : "身份已脱敏"}</small></td>
+      <td>${escapeHtml(item.studyDescription || "未命名检查")}<br><small>${escapeHtml(item.studyDate || "日期未提供")}</small></td>
+      <td>${escapeHtml(item.modalities || "OT")}</td>
+      <td><small>${escapeHtml(item.studyInstanceUID)}</small></td>
+      <td><button class="inline-action primary" type="button" data-open-external-ohif="${escapeHtml(item.viewerUrl)}">OHIF调阅</button>
+      <button class="inline-action" type="button" data-link-external-study="${escapeHtml(item.studyInstanceUID)}">关联当前居民</button></td>
+    </tr>`).join("") || `<tr><td colspan="5">Orthanc中暂无检查。</td></tr>`}</tbody></table><p class="hint">${escapeHtml(payload.boundary || "")}</p>`;
+  } catch (error) {
+    target.innerHTML = `<p class="error">${escapeHtml(error.message)}</p>`;
+  } finally { target.removeAttribute("aria-busy"); }
 }
 
 async function shareStudy(studyId) {

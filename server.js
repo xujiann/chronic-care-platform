@@ -28,6 +28,11 @@ const { buildPostgresProductionAdapterConfig } = require("./postgres-production-
 const BloodService = require("./blood-service");
 const BloodTransactionService = require("./blood-transaction-service");
 const BloodMasterData = require("./blood-master-data");
+const BloodIntegrationGateway = require("./blood-integration-gateway");
+const BloodBusinessService = require("./blood-business-service");
+const DiseasePaymentService = require("./disease-payment-service");
+const DiseasePaymentIntake = require("./disease-payment-intake");
+const { buildOhifStudyUrl, listOrthancStudySummaries, publishDiagnosticReportToFhir, publishImagingStudyToFhir, solutionAHealth } = require("./solution-a-connectors");
 const {
   digestPhoneVerificationCode,
   fetchOidcUserInfo,
@@ -886,6 +891,8 @@ function seedState() {
     transfusionEpisodes: BloodTransactionService.seedTransfusionEpisodes(),
     bloodSafetyIncidents: BloodTransactionService.seedBloodSafetyIncidents(),
     bloodIdempotencyRecords: [],
+    ...BloodIntegrationGateway.seedBloodIntegrationState(),
+    ...BloodBusinessService.seed(),
     imageCloudShares: seedImageCloudShares(),
     imageCloudQualityReviews: seedImageCloudQualityReviews(),
     secureAttachments: [],
@@ -7329,6 +7336,10 @@ function normalizeState(data) {
     transfusionEpisodes: mergeByKey(BloodTransactionService.seedTransfusionEpisodes(), data.transfusionEpisodes, "id"),
     bloodSafetyIncidents: mergeByKey(BloodTransactionService.seedBloodSafetyIncidents(), data.bloodSafetyIncidents, "id"),
     bloodIdempotencyRecords: Array.isArray(data.bloodIdempotencyRecords) ? data.bloodIdempotencyRecords.slice(0, 2000) : [],
+    bloodIntegrationEvents: Array.isArray(data.bloodIntegrationEvents) ? data.bloodIntegrationEvents.slice(0, 5000) : [],
+    bloodIntegrationDeadLetters: Array.isArray(data.bloodIntegrationDeadLetters) ? data.bloodIntegrationDeadLetters.slice(0, 1000) : [],
+    bloodIntegrationEndpoints: Array.isArray(data.bloodIntegrationEndpoints) && data.bloodIntegrationEndpoints.length ? data.bloodIntegrationEndpoints : BloodIntegrationGateway.seedBloodIntegrationState().bloodIntegrationEndpoints,
+    bloodBusinessRecords: Array.isArray(data.bloodBusinessRecords) ? data.bloodBusinessRecords.slice(0, 5000) : BloodBusinessService.seed().bloodBusinessRecords,
     imageCloudShares: mergeByKey(seedImageCloudShares(), data.imageCloudShares, "id"),
     imageCloudQualityReviews: mergeByKey(seedImageCloudQualityReviews(), data.imageCloudQualityReviews, "id"),
     secureAttachments: Array.isArray(data.secureAttachments) ? data.secureAttachments : [],
@@ -7363,6 +7374,7 @@ function normalizeState(data) {
     institutionSupervisions: Array.isArray(data.institutionSupervisions) ? data.institutionSupervisions : seedInstitutionSupervisions(),
     drugConsumableSupervisions: mergeByKey(seedDrugConsumableSupervisions(), data.drugConsumableSupervisions, "id"),
     insuranceClaims: Array.isArray(data.insuranceClaims) ? data.insuranceClaims : seedInsuranceClaims(),
+    diseasePayment: DiseasePaymentService.normalizeState(data.diseasePayment),
     policyAlignment: Array.isArray(data.policyAlignment) ? data.policyAlignment : seedPolicyAlignment(),
     emergencySignals: Array.isArray(data.emergencySignals) ? data.emergencySignals : seedEmergencySignals(),
     seniorServices: Array.isArray(data.seniorServices) ? data.seniorServices : seedSeniorServices(),
@@ -14390,7 +14402,7 @@ const SERVICE_DOMAIN_BY_COLLECTION = {
 };
 
 function taskPriorityLevel(item) {
-  const text = [item?.priority, item?.risk, item?.riskLevel, item?.grade, item?.status, item?.level].filter(Boolean).join(" ");
+  const text = [item?.priorityLevel, item?.priority, item?.risk, item?.riskLevel, item?.grade, item?.status, item?.level].filter(Boolean).join(" ");
   if (/高|危急|预警|逾期|紧急|high|urgent/i.test(text)) return "high";
   if (/中|待|需|warning|medium/i.test(text)) return "medium";
   return "normal";
@@ -21588,6 +21600,53 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/blood-system/integration") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/integration");
+    if (!user) return;
+    sendJson(res, 200, BloodIntegrationGateway.dashboard(readDatabase()));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/blood-system/business") {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/business");
+    if (!user) return;
+    sendJson(res, 200, BloodBusinessService.dashboard(readDatabase(), user));
+    return;
+  }
+
+  const bloodBusinessCreateMatch = url.pathname.match(/^\/api\/blood-system\/business\/resources\/([^/]+)$/);
+  const bloodBusinessActionMatch = url.pathname.match(/^\/api\/blood-system\/business\/records\/([^/]+)\/actions$/);
+  if (req.method === "POST" && (bloodBusinessCreateMatch || bloodBusinessActionMatch)) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/business/actions");
+    if (!user) return;
+    const data = readDatabase();
+    const payload = await collectJson(req);
+    const result = bloodBusinessCreateMatch
+      ? BloodBusinessService.create(data, user, decodeURIComponent(bloodBusinessCreateMatch[1]), payload)
+      : BloodBusinessService.action(data, user, decodeURIComponent(bloodBusinessActionMatch[1]), payload);
+    if (result.status < 500) writeDatabase(data);
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
+  const bloodIntegrationReceiveMatch = url.pathname.match(/^\/api\/blood-system\/integration\/contracts\/([^/]+)\/receive$/);
+  const bloodIntegrationEnqueueMatch = url.pathname.match(/^\/api\/blood-system\/integration\/contracts\/([^/]+)\/enqueue$/);
+  const bloodIntegrationRetryMatch = url.pathname.match(/^\/api\/blood-system\/integration\/dead-letters\/([^/]+)\/retry$/);
+  if (req.method === "POST" && (bloodIntegrationReceiveMatch || bloodIntegrationEnqueueMatch || bloodIntegrationRetryMatch)) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/blood-system/integration/actions");
+    if (!user) return;
+    const data = readDatabase();
+    const payload = await collectJson(req);
+    const result = bloodIntegrationReceiveMatch
+      ? BloodIntegrationGateway.receive(data, user, decodeURIComponent(bloodIntegrationReceiveMatch[1]), payload)
+      : bloodIntegrationEnqueueMatch
+        ? BloodIntegrationGateway.enqueue(data, user, decodeURIComponent(bloodIntegrationEnqueueMatch[1]), payload)
+        : BloodIntegrationGateway.retry(data, user, decodeURIComponent(bloodIntegrationRetryMatch[1]));
+    writeDatabase(data);
+    sendJson(res, result.status, result.body);
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/blood-system/transfusion-requests") {
     const user = requireApiRole(req, res, ["institution"], "/api/blood-system/transfusion-requests");
     if (!user) return;
@@ -21723,6 +21782,100 @@ async function handleApi(req, res) {
       institutionCode: url.searchParams.get("institutionCode") || ""
     });
     sendJson(res, 200, redactSensitiveResponse(dashboard, user));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/imaging-cloud/solution-a/health") {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/imaging-cloud/solution-a/health");
+    if (!user) return;
+    const health = await solutionAHealth();
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "probe solution A", target: url.pathname, result: health.ok ? "allowed" : "degraded", detail: `${health.services.filter((item) => item.ok).length}/${health.services.length} services ready` });
+    sendJson(res, health.ok ? 200 : 503, health);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/imaging-cloud/solution-a/studies") {
+    const user = requireApiRole(req, res, ["commission", "institution", "county"], "/api/imaging-cloud/solution-a/studies");
+    if (!user) return;
+    const studies = await listOrthancStudySummaries();
+    appendSecurityEvent({ actor: user.name, role: user.role, action: "list solution A studies", target: url.pathname, result: "allowed", detail: `${studies.length} normalized DICOMweb studies` });
+    sendJson(res, 200, { generatedAt: new Date().toISOString(), summary: { studies: studies.length, synthetic: studies.filter((item) => item.synthetic).length }, studies, boundary: "Non-synthetic patient identity is masked; resident linkage requires an explicit governed mapping workflow." });
+    return;
+  }
+
+  const solutionAStudyLinkMatch = url.pathname.match(/^\/api\/imaging-cloud\/solution-a\/studies\/([^/]+)\/link$/);
+  if (req.method === "POST" && solutionAStudyLinkMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution"], "/api/imaging-cloud/solution-a/studies/:uid/link");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const residentId = String(payload.residentId || "").trim();
+    const approvalEvidence = String(payload.approvalEvidence || "").trim();
+    const data = readDatabase();
+    if (!residentId || !canAccessResident(user, residentId, data)) {
+      sendJson(res, residentId ? 403 : 400, { error: residentId ? "Forbidden" : "Bad Request", message: residentId ? "无权关联该居民" : "residentId不能为空" });
+      return;
+    }
+    const studyInstanceUID = decodeURIComponent(solutionAStudyLinkMatch[1]);
+    const externalStudy = (await listOrthancStudySummaries()).find((item) => item.studyInstanceUID === studyInstanceUID);
+    if (!externalStudy) { sendJson(res, 404, { error: "Not Found", message: "Orthanc中未找到该检查" }); return; }
+    if (!externalStudy.synthetic && approvalEvidence.length < 12) {
+      sendJson(res, 409, { error: "Governance Evidence Required", message: "非合成检查必须提供经复核的主索引匹配证据" });
+      return;
+    }
+    const resident = (data.residents || []).find((item) => item.id === residentId);
+    if (!resident) { sendJson(res, 404, { error: "Not Found", message: "未找到居民" }); return; }
+    const existingIndex = (data.imageCloudStudies || []).findIndex((item) => item.studyInstanceUID === studyInstanceUID);
+    const now = new Date().toISOString();
+    const study = {
+      ...(existingIndex >= 0 ? data.imageCloudStudies[existingIndex] : {}),
+      id: existingIndex >= 0 ? data.imageCloudStudies[existingIndex].id : `ics-orthanc-${createHash("sha256").update(studyInstanceUID).digest("hex").slice(0, 16)}`,
+      residentId, personIndex: personIndexForResident(new Map(data.residents.map((item) => [item.id, item])), residentId),
+      institutionCode: String(payload.institutionCode || user.orgCode || "SOLUTION-A"), institutionName: String(payload.institutionName || user.orgName || "方案A试点机构"),
+      accessionNumber: externalStudy.accessionNumber || `ORTHANC-${studyInstanceUID.split(".").pop()}`,
+      studyInstanceUID, mainIndex: `${String(payload.institutionCode || user.orgCode || "SOLUTION-A")}#${resident.idCard || residentId}#${externalStudy.accessionNumber || studyInstanceUID}`,
+      patientName: resident.name, modality: externalStudy.modalities || "OT", bodyPart: externalStudy.studyDescription || "合成影像预览",
+      studyDate: externalStudy.studyDate || new Date().toISOString().slice(0, 10), reportConclusion: "方案A外部影像已完成受控索引关联，诊断报告待正式系统回传。",
+      seriesCount: 1, imageCount: 1, diagnosticLevel: false, browserLevel: true, uploadMode: "Orthanc DICOMweb",
+      uploadStatus: "已入云", integrityCheck: "DICOMweb可检索", qcStatus: "待质控", emrSyncStatus: "待报告审核后写入",
+      externalSource: "solution-a-orthanc", synthetic: externalStudy.synthetic, approvalEvidence: externalStudy.synthetic ? "synthetic-test-data" : approvalEvidence,
+      viewerUrl: externalStudy.viewerUrl, linkedBy: user.username || user.name, linkedAt: now, updatedAt: now
+    };
+    let fhirSync;
+    try { fhirSync = await publishImagingStudyToFhir(study, resident); }
+    catch (error) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "sync ImagingStudy to FHIR", target: studyInstanceUID, result: "failed", detail: error.message });
+      sendJson(res, 502, { error: "FHIR Sync Failed", message: error.message });
+      return;
+    }
+    study.fhirPatientId = fhirSync.patient.id;
+    study.fhirImagingStudyId = fhirSync.imagingStudy.id;
+    study.fhirSyncStatus = "synced";
+    study.fhirSyncedAt = now;
+    if (existingIndex >= 0) data.imageCloudStudies[existingIndex] = study;
+    else data.imageCloudStudies = [study, ...(data.imageCloudStudies || [])].slice(0, 500);
+    appendDataAccessLog(data, user, residentId, "医学影像云", `关联Orthanc检查 ${study.accessionNumber}`);
+    writeDatabase(data);
+    sendJson(res, existingIndex >= 0 ? 200 : 201, { study, created: existingIndex < 0, governance: { synthetic: externalStudy.synthetic, evidence: study.approvalEvidence }, fhirSync });
+    return;
+  }
+
+  const imagingViewerMatch = url.pathname.match(/^\/api\/imaging-cloud\/studies\/([^/]+)\/viewer$/);
+  if (req.method === "GET" && imagingViewerMatch) {
+    const user = requireApiRole(req, res, ["commission", "institution", "county", "citizen"], "/api/imaging-cloud/studies/:id/viewer");
+    if (!user) return;
+    const data = readDatabase();
+    const studyId = decodeURIComponent(imagingViewerMatch[1]);
+    const study = (data.imageCloudStudies || []).find((item) => item.id === studyId);
+    if (!study) { sendJson(res, 404, { error: "Not Found", message: "未找到影像检查" }); return; }
+    if (!canAccessResident(user, study.residentId, data)) {
+      appendSecurityEvent({ actor: user.name, role: user.role, action: "open OHIF viewer", target: studyId, result: "denied", detail: "resident scope denied" });
+      sendJson(res, 403, { error: "Forbidden", message: "无权调阅该居民影像" });
+      return;
+    }
+    const viewerUrl = buildOhifStudyUrl(study.studyInstanceUID);
+    appendDataAccessLog(data, user, study.residentId, "医学影像云", `通过OHIF调阅 ${study.accessionNumber}`);
+    writeDatabase(data);
+    sendJson(res, 200, { studyId, studyInstanceUID: study.studyInstanceUID, viewerUrl, viewer: "OHIF", archive: "Orthanc DICOMweb", expiresAt: null });
     return;
   }
 
@@ -22157,6 +22310,144 @@ async function handleApi(req, res) {
     ].slice(0, 120);
     writeDatabase(data);
     sendJson(res, 200, data.multiPracticeApplications[index]);
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment" && req.method === "GET") {
+    const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    sendJson(res, 200, DiseasePaymentService.buildOverview(data.diseasePayment));
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/calculate" && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const current = DiseasePaymentService.normalizeState(data.diseasePayment);
+    if (["DRG", "DIP"].includes(payload.mode)) current.mode = payload.mode;
+    data.diseasePayment = DiseasePaymentService.calculateAll(current, user.name);
+    writeDatabase(data);
+    sendJson(res, 200, DiseasePaymentService.buildOverview(data.diseasePayment));
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/special-cases" && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    const result = DiseasePaymentService.createSpecialCase(data.diseasePayment, await collectJson(req), user.name);
+    data.diseasePayment = result.state;
+    writeDatabase(data);
+    sendJson(res, 201, result.row);
+    return;
+  }
+
+  const diseasePaymentSpecialReviewMatch = url.pathname.match(/^\/api\/disease-payment\/special-cases\/([^/]+)\/review$/);
+  if (diseasePaymentSpecialReviewMatch && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    const result = DiseasePaymentService.reviewSpecialCase(data.diseasePayment, decodeURIComponent(diseasePaymentSpecialReviewMatch[1]), await collectJson(req), user.name);
+    data.diseasePayment = result.state;
+    writeDatabase(data);
+    sendJson(res, 200, result.row);
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/settlements" && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    const result = DiseasePaymentService.createSettlementBatch(data.diseasePayment, await collectJson(req), user.name);
+    data.diseasePayment = result.state;
+    writeDatabase(data);
+    sendJson(res, 201, result.batch);
+    return;
+  }
+
+  const diseasePaymentReconcileMatch = url.pathname.match(/^\/api\/disease-payment\/settlements\/([^/]+)\/reconcile$/);
+  if (diseasePaymentReconcileMatch && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    const result = DiseasePaymentService.reconcileBatch(data.diseasePayment, decodeURIComponent(diseasePaymentReconcileMatch[1]), await collectJson(req), user.name);
+    data.diseasePayment = result.state;
+    writeDatabase(data);
+    sendJson(res, 200, result.batch);
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/feedbacks" && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const state = DiseasePaymentService.normalizeState(data.diseasePayment);
+    const row = { id: `feedback-${Date.now()}`, category: String(payload.category || "分组方案"), content: String(payload.content || "").trim(), institution: user.orgName, status: "待反馈", submittedBy: user.name, submittedAt: new Date().toISOString() };
+    if (!row.content) { sendJson(res, 400, { error: "反馈内容不能为空" }); return; }
+    state.feedbacks.unshift(row);
+    data.diseasePayment = state;
+    writeDatabase(data);
+    sendJson(res, 201, row);
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/intake/imports" && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
+    if (!user) return;
+    const payload = await collectJson(req);
+    const data = readDatabase();
+    const state = DiseasePaymentService.normalizeState(data.diseasePayment);
+    const result = DiseasePaymentIntake.importBatch(state, payload, user.name);
+    data.diseasePayment = result.state;
+    writeDatabase(data);
+    sendJson(res, 201, result.report);
+    return;
+  }
+
+  const diseasePaymentImportRetryMatch = url.pathname.match(/^\/api\/disease-payment\/intake\/retries\/([^/]+)$/);
+  if (diseasePaymentImportRetryMatch && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    const result = DiseasePaymentIntake.retryImport(DiseasePaymentService.normalizeState(data.diseasePayment), decodeURIComponent(diseasePaymentImportRetryMatch[1]), await collectJson(req), user.name);
+    data.diseasePayment = result.state;
+    writeDatabase(data);
+    sendJson(res, 200, { retry: result.retry, report: result.report, idempotent: result.idempotent || false });
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/grouping-runs" && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    const result = DiseasePaymentIntake.runGrouping(DiseasePaymentService.normalizeState(data.diseasePayment), await collectJson(req), user.name, DiseasePaymentService.calculateCase);
+    data.diseasePayment = result.state;
+    writeDatabase(data);
+    sendJson(res, 201, result.run);
+    return;
+  }
+
+  if (url.pathname === "/api/disease-payment/intake/errors" && req.method === "GET") {
+    const user = requireApiRole(req, res, ["insurance", "commission", "institution"], url.pathname);
+    if (!user) return;
+    const state = DiseasePaymentIntake.ensureIntakeState(DiseasePaymentService.normalizeState(readDatabase().diseasePayment));
+    sendJson(res, 200, { rows: state.importRetryQueue, summary: DiseasePaymentIntake.buildIntakeSummary(state) });
+    return;
+  }
+
+  const diseasePaymentGovernanceMatch = url.pathname.match(/^\/api\/disease-payment\/governance\/(prepayments|unpaid|negotiations|trainings)\/([^/]+)$/);
+  if (diseasePaymentGovernanceMatch && req.method === "POST") {
+    const user = requireApiRole(req, res, ["insurance", "commission"], url.pathname);
+    if (!user) return;
+    const data = readDatabase();
+    const result = DiseasePaymentService.applyGovernanceAction(data.diseasePayment, diseasePaymentGovernanceMatch[1], decodeURIComponent(diseasePaymentGovernanceMatch[2]), await collectJson(req), user.name);
+    data.diseasePayment = result.state;
+    writeDatabase(data);
+    sendJson(res, 200, result.row);
     return;
   }
 

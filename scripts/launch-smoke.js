@@ -25,6 +25,8 @@ const REQUIRED_ARTIFACTS = [
   "release/production-cutover-checklist.md",
   "release/site-readiness-pack.json",
   "release/site-readiness-pack.md",
+  "release/citizen-launch-foundation-readiness.json",
+  "release/citizen-launch-foundation-readiness.md",
   "release/digital-hospital-standards-readiness-report.md",
   "release/monitoring-readiness-report.md",
   "release/operations-readiness-report.md"
@@ -56,6 +58,8 @@ function buildOfflineChecks(options = {}) {
   const pkg = readJson("package.json");
   const serverSource = fs.readFileSync(path.join(ROOT, "server.js"), "utf8");
   const manifestSource = fs.readFileSync(path.join(ROOT, "scripts", "release-artifact-manifest.js"), "utf8");
+  const citizenHtml = fs.readFileSync(path.join(ROOT, "citizen.html"), "utf8");
+  const citizenJs = fs.readFileSync(path.join(ROOT, "citizen.js"), "utf8");
   const artifactExists = options.artifactExists || ((file) => fs.existsSync(path.join(ROOT, file)));
   const releaseReport = options.releaseReport !== undefined
     ? options.releaseReport
@@ -74,6 +78,7 @@ function buildOfflineChecks(options = {}) {
     check("launch:routes", REQUIRED_ROUTES.every((route) => serverSource.includes(route)), `${REQUIRED_ROUTES.length} read-only runtime routes declared`),
     check("launch:artifacts", presentArtifacts.length === REQUIRED_ARTIFACTS.length, `${presentArtifacts.length}/${REQUIRED_ARTIFACTS.length} release artifacts present`),
     check("launch:manifest", ["release-report", "production-cutover", "site-readiness", "monitoring-readiness", "operations-readiness"].every((id) => manifestSource.includes(id)), "release manifest indexes launch smoke evidence"),
+    check("launch:citizenAcceptancePanel", manifestSource.includes("citizen.html?client=app&page=health-record&launch=1#citizen-pipeline-panel") && citizenHtml.includes("copy-citizen-pipeline-audit") && citizenJs.includes("copyCitizenPipelineAcceptance"), "resident C-end acceptance panel and copy checklist are launch-visible"),
     check("launch:releaseReport", releaseReport?.ok === true && releaseReport?.summary?.failed === 0, releaseReport ? `${releaseReport.summary?.passed || 0}/${releaseReport.summary?.total || 0} checks passed` : "release report missing"),
     check("launch:cutoverChecklist", Array.isArray(cutover?.checklist) && cutover.checklist.length >= 8, cutover ? `${cutover.checklist?.length || 0} cutover rows` : "cutover checklist missing")
   ];

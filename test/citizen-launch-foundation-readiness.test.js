@@ -16,6 +16,10 @@ test("citizen launch foundation readiness captures phase-one gates", () => {
   assert.equal(report.ok, true);
   assert.equal(report.phase, "Phase 1 - launch foundation");
   assert.equal(report.launchState, "controlled-pilot-ready");
+  assert.equal(report.acceptancePanel.entry, "citizen.html?client=app&page=health-record&launch=1#citizen-pipeline-panel");
+  assert.equal(report.acceptancePanel.panelId, "citizen-pipeline-panel");
+  assert.equal(report.acceptancePanel.copyActionId, "copy-citizen-pipeline-audit");
+  assert.equal(report.acceptancePanel.checklistTitle, "C端全管线现场验收清单");
   assert.deepEqual(report.summary.channels, ["mini-program", "app", "pwa"]);
   assert.equal(report.externalDependencies.some((item) => item.id === "sms-gateway"), true);
   assert.equal(report.externalDependencies.some((item) => item.id === "real-name-identity"), true);
@@ -46,6 +50,9 @@ test("citizen launch foundation readiness captures phase-one gates", () => {
   assert.equal(report.checks.some((item) => item.id === "citizen-foundation:launch-gates" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "citizen-foundation:production-requirements" && item.passed), true);
   assert.match(renderMarkdown(report), /Citizen launch foundation readiness/);
+  assert.match(renderMarkdown(report), /Resident Acceptance Panel/);
+  assert.match(renderMarkdown(report), /citizen\.html\?client=app&page=health-record&launch=1#citizen-pipeline-panel/);
+  assert.match(renderMarkdown(report), /copy-citizen-pipeline-audit/);
   assert.match(renderMarkdown(report), /phone-code delivery/);
   assert.match(renderMarkdown(report), /mobile-preview-service-switch/);
   assert.match(renderMarkdown(report), /pipeline-acceptance-checklist/);
@@ -69,5 +76,6 @@ test("citizen launch foundation readiness writes release artifacts", (t) => {
   const md = fs.readFileSync(markdown, "utf8");
   assert.equal(json.ok, true);
   assert.equal(json.citizenLaunchFoundationReadiness.ok, true);
+  assert.equal(json.citizenLaunchFoundationReadiness.acceptancePanel.panelId, "citizen-pipeline-panel");
   assert.match(md, /External Dependencies/);
 });

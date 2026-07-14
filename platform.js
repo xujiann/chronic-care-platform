@@ -647,28 +647,28 @@ function renderDataGovernanceFoundation(data) {
     {
       title: `数据资产目录 ${assets.length} 项`,
       meta: `平均质量评分 ${averageScore} / 阻塞项 ${blockers}`,
-      rows: assets.map((item) => `${item.sourceSystem}: ${item.domain} -> ${listText(item.platformCollections)} (${item.status})`)
+      rows: assets.map((item) => `${platformEscapeHtml(item.sourceSystem)}: ${platformEscapeHtml(item.domain)} -> ${listText(item.platformCollections)} (${platformEscapeHtml(item.status)})`)
     },
     {
       title: `标准字典与主数据 ${dictionaries.length} 类`,
       meta: "personIndex / 机构人员 / 疾病手术 / 药品耗材 / 检查检验 / 指标",
-      rows: dictionaries.map((item) => `${item.name}: ${listText(item.standardItems)} (${item.status})`)
+      rows: dictionaries.map((item) => `${platformEscapeHtml(item.name)}: ${listText(item.standardItems)} (${platformEscapeHtml(item.status)})`)
     },
     {
       title: `数据质量与血缘 ${lineage.length} 条`,
       meta: "必填、幂等、签名、质量规则和来源落点可审查",
-      rows: lineage.map((item) => `${item.sourceSystem} -> ${item.targetCollection}: ${listText(item.requiredControls)} (${item.status})`)
+      rows: lineage.map((item) => `${platformEscapeHtml(item.sourceSystem)} -> ${platformEscapeHtml(item.targetCollection)}: ${listText(item.requiredControls)} (${platformEscapeHtml(item.status)})`)
     },
     {
       title: `平台总线复用出口 ${busChannels.length} 条`,
       meta: "主数据、标准字典、血缘证据和接口阻断项统一给指标中心与智慧医院复用",
-      rows: busChannels.map((item) => `${item.name}: ${listText(item.producerCollections)} -> ${listText(item.consumerModules)} (${item.status})`)
+      rows: busChannels.map((item) => `${platformEscapeHtml(item.name)}: ${listText(item.producerCollections)} -> ${listText(item.consumerModules)} (${platformEscapeHtml(item.status)})`)
     }
   ];
   container.innerHTML = cards.map((card) => `
     <article class="evidence-card">
-      <h3>${card.title}</h3>
-      <p>${card.meta}</p>
+      <h3>${platformEscapeHtml(card.title)}</h3>
+      <p>${platformEscapeHtml(card.meta)}</p>
       <ul>${card.rows.slice(0, 8).map((row) => `<li>${row}</li>`).join("")}</ul>
     </article>
   `).join("");
@@ -1640,11 +1640,13 @@ function renderEvidenceRecords(records) {
 function statusBadge(status) {
   const value = status || "待确认";
   const cls = value.includes("待") ? "warn" : value.includes("完成") || value.includes("已") ? "info" : "";
-  return `<span class="badge ${cls}">${value}</span>`;
+  return `<span class="badge ${cls}">${platformEscapeHtml(value)}</span>`;
 }
 
 function listText(value) {
-  return Array.isArray(value) ? value.join("、") : (value || "");
+  return Array.isArray(value)
+    ? value.map((item) => platformEscapeHtml(item)).join("、")
+    : platformEscapeHtml(value || "");
 }
 
 function bindPlatformEditor() {

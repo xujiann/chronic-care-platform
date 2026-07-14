@@ -521,6 +521,7 @@ function renderMobileServicePagebar() {
   const meta = serviceNavigationMeta(active);
   const previous = adjacentCitizenServiceTab(-1);
   const next = adjacentCitizenServiceTab(1);
+  const internalAction = !active.actionHref;
   target.hidden = !isPagedCitizenServiceMode();
   target.innerHTML = `<button type="button" class="service-page-step" data-service-page-step="-1" aria-label="上一项：${previous?.label || active.label}">上一项</button>
     <div class="service-mobile-pagebar-current" aria-live="polite">
@@ -528,12 +529,23 @@ function renderMobileServicePagebar() {
       <strong>${active.label}</strong>
       <small>${active.status} · ${meta.featureCount} 项可用能力</small>
     </div>
-    <button type="button" class="service-page-step primary" data-service-page-step="1" aria-label="下一项：${next?.label || active.label}">下一项</button>`;
+    <button type="button" class="service-page-step primary" data-service-page-step="1" aria-label="下一项：${next?.label || active.label}">下一项</button>
+    <div class="service-mobile-actionbar" aria-label="${active.label}手机端快捷操作">
+      <a class="service-mobile-action primary" href="${internalAction ? citizenPageHref(active.key) : active.actionHref}" ${internalAction ? `data-mobile-primary-action="${active.key}"` : ""}>${active.actionLabel}</a>
+      <button type="button" class="service-mobile-action" data-mobile-feature-list>功能清单</button>
+    </div>`;
   target.querySelectorAll("[data-service-page-step]").forEach((button) => {
     button.addEventListener("click", () => {
       const destination = adjacentCitizenServiceTab(Number(button.dataset.servicePageStep || 1));
       if (destination) setServiceTab(destination.key, { pushState: true, scrollToPane: false });
     });
+  });
+  target.querySelector("[data-mobile-primary-action]")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    getServicePageTarget(event.currentTarget.dataset.mobilePrimaryAction)?.scrollIntoView({ block: "start", behavior: "smooth" });
+  });
+  target.querySelector("[data-mobile-feature-list]")?.addEventListener("click", () => {
+    document.querySelector("#service-summary .service-subnav")?.scrollIntoView({ block: "start", behavior: "smooth" });
   });
 }
 

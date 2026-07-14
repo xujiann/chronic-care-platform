@@ -82,7 +82,7 @@ function buildCitizenLaunchFoundationReadiness(options = {}) {
       id: "citizen-foundation:mobile-preview-service-switch",
       passed: hasAll(mobilePreview, [/preview-service-select/, /preview-service-stepper/, /preview-prev-service/, /preview-next-service/, /preview-service-position/, /previewServicePosition\.setAttribute\("aria-label"/, /previewPrevService\.title = previousService/, /previewNextService\.title = nextService/, /preview-focus-mode/, /进入手机验收模式/, /preview-swipe-hint/, /滑动切换服务/, /preview-readiness-summary/, /preview-readiness-method/, /preview-handoff-card/, /previewServiceMeta/, /renderPreviewHandoffCard/, /生产化提示/, /项已实现能力/, /preview-copy-summary/, /preview-acceptance-summary/, /previewAcceptanceSummaryText/, /previewAcceptanceSummary\.classList\.add\("is-visible"\)/, /居民端手机验收摘要/, /DEMO-MOBILE-R1 \/ 888888/, /摘要已复制/, /preview-priority/, /下一步优先级/, /P0/, /P1/, /P2/, /P3/, /验收摘要/, /验收方式：点击、方向键、滑动、复制入口/, /alignFocusPreview/, /window\.scrollTo\(\{ top: Math\.max\(0, targetTop\), left: 0, behavior: "auto" \}\)/, /handlePreviewSwipe/, /bindPreviewSwipeTarget/, /frame\.contentDocument/, /touchstart/, /touchend/, /data-preview-service="escort"/, /data-preview-service="registration"/, /citizenPreviewSrc\(service\)/]) &&
         hasAll(mobilePreviewCss, [/body\.preview-focus-mode \.preview-shell/, /body\.preview-focus-mode \.preview-copy/, /body\.preview-focus-mode \.preview-device/, /body\.preview-focus-mode \.phone-frame/, /preview-swipe-hint/, /#preview-readiness-summary/, /#preview-readiness-method/, /preview-handoff-card/, /body\.preview-focus-mode \.preview-handoff-card/, /preview-copy-summary/, /preview-acceptance-summary/, /preview-acceptance-summary\.is-visible/, /preview-priority/, /scroll-margin-top: 12px/, /touch-action: pan-y/]) &&
-        hasAll(citizenJs, [/bindCitizenServiceSwipe/, /CITIZEN_SERVICE_SWIPE_THRESHOLD/, /CITIZEN_SERVICE_SWIPE_VERTICAL_LIMIT/, /touchstart/, /touchend/, /adjacentCitizenServiceTab\(dx < 0 \? 1 : -1\)/]) &&
+        hasAll(citizenJs, [/bindCitizenServiceSwipe/, /CITIZEN_SERVICE_SWIPE_THRESHOLD/, /CITIZEN_SERVICE_SWIPE_VERTICAL_LIMIT/, /touchstart/, /touchend/, /adjacentCitizenServiceTab\(dx < 0 \? 1 : -1\)/, /service-mobile-actionbar/, /data-mobile-primary-action/, /data-mobile-feature-list/]) &&
         !/internet-nursing\.html\?preview=mobile-nursing/.test(mobilePreview),
       detail: "mobile preview keeps service selector, previous/next controls, visible swipe hint, swipe gestures, resident in-page swipe navigation, acceptance summary, priority roadmap, focus-mode layout, auto-aligned viewport, accessible position text, and resident-page service routing"
     },
@@ -176,6 +176,12 @@ function buildCitizenLaunchFoundationReadiness(options = {}) {
     generatedAt: new Date().toISOString(),
     phase: "Phase 1 - launch foundation",
     launchState: "controlled-pilot-ready",
+    acceptancePanel: {
+      entry: "citizen.html?client=app&page=health-record&launch=1#citizen-pipeline-panel",
+      panelId: "citizen-pipeline-panel",
+      copyActionId: "copy-citizen-pipeline-audit",
+      checklistTitle: "C端全管线现场验收清单"
+    },
     summary: {
       checks: checks.length,
       passed: checks.filter((item) => item.passed).length,
@@ -195,6 +201,13 @@ function renderMarkdown(report) {
     `Phase: ${report.phase}`,
     `Result: ${report.ok ? "PASS" : "FAIL"}`,
     `Launch state: ${report.launchState}`,
+    "",
+    "## Resident Acceptance Panel",
+    "",
+    `- Entry: ${report.acceptancePanel.entry}`,
+    `- Panel: ${report.acceptancePanel.panelId}`,
+    `- Copy action: ${report.acceptancePanel.copyActionId}`,
+    `- Checklist: ${report.acceptancePanel.checklistTitle}`,
     "",
     "## External Dependencies",
     "",
