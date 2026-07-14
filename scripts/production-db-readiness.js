@@ -325,9 +325,11 @@ function buildProductionDbReadinessReport(options = {}) {
     readOnlyReconciliation: ["BEGIN READ ONLY", "comparePostgresShadowState", "runPostgresShadowReconciliation", "recordPostgresReconciliation"].every((marker) => runtimeSyncSource.includes(marker)),
     reconciliationLedger: serverSource.includes("postgres_sync_reconciliations") && serverSource.includes("readLatestPostgresReconciliation") && serverSource.includes("/api/production-database/shadow-reconciliation"),
     reconciliationCaseWorkflow: ["syncPostgresReconciliationCases", "listPostgresReconciliationHistory", "listPostgresReconciliationCases", "applyPostgresReconciliationCaseAction", "RECONCILIATION_CLEARANCE_REQUIRED", "auto-reopen"].every((marker) => runtimeSyncSource.includes(marker)) && ["postgres_sync_reconciliation_cases", "postgres_sync_reconciliation_case_actions", "/api/production-database/shadow-reconciliations", "/api/production-database/reconciliation-cases", "postgres-reconciliation-case-action"].every((marker) => serverSource.includes(marker)),
+    reconciliationOperationsUi: ["postgres-reconciliation-metrics", "postgres-reconciliation-cases", "postgres-reconciliation-history"].every((marker) => platformHtml.includes(marker)) && ["loadPostgresReconciliationCenter", "renderPostgresReconciliationCenter", "runPostgresReconciliationCaseAction", "data-postgres-reconciliation-action"].every((marker) => platformSource.includes(marker)),
+    prometheusSlo: ["buildPostgresSyncSlo", "renderPrometheusRuntimeMetrics", "/api/metrics/prometheus", "health_platform_postgres_sync_slo_breaches"].every((marker) => serverSource.includes(marker)) && ["POSTGRES_SYNC_BACKLOG_SLO_MAX=20", "POSTGRES_SYNC_PENDING_AGE_SLO_SECONDS=300", "POSTGRES_RECONCILIATION_AGE_SLO_SECONDS=600", "POSTGRES_RECONCILIATION_OPEN_CASES_SLO_MAX=0"].every((marker) => envTemplate.includes(marker)),
     reconciliationCommand: shadowReconcileSource.includes("runPostgresShadowReconciliation") && shadowReconcileSource.includes("contains no business payloads or database credentials") && pkg.scripts?.["postgres:shadow-reconcile"],
     reconciliationScheduler: ["Type=oneshot", "BEGIN READ ONLY", "NoNewPrivileges=true", "ProtectSystem=strict"].every((marker) => shadowReconcileService.includes(marker) || runtimeSyncSource.includes(marker)) && ["OnUnitActiveSec=5min", "Persistent=true"].every((marker) => shadowReconcileTimer.includes(marker)),
-    environmentContract: ["POSTGRES_SYNC_MODE=disabled", "POSTGRES_SSL_MODE=verify-full", "POSTGRES_CA_FILE=", "POSTGRES_POOL_MAX="].every((marker) => envTemplate.includes(marker)),
+    environmentContract: ["POSTGRES_SYNC_MODE=disabled", "POSTGRES_SSL_MODE=verify-full", "POSTGRES_CA_FILE=", "POSTGRES_POOL_MAX=", "POSTGRES_SYNC_BACKLOG_SLO_MAX=20", "POSTGRES_RECONCILIATION_AGE_SLO_SECONDS=600"].every((marker) => envTemplate.includes(marker)),
     hardenedService: ["Type=oneshot", "Environment=POSTGRES_SYNC_MODE=outbox", "NoNewPrivileges=true", "ProtectSystem=strict"].every((marker) => runtimeSyncService.includes(marker)) && ["OnUnitActiveSec=15s", "Persistent=true"].every((marker) => runtimeSyncTimer.includes(marker)),
     documentedBoundary: ["事务型 outbox", "不得上传 Git", "STORAGE_ENGINE=postgres", "productionPrimary"].every((marker) => runtimeSyncDocument.includes(marker) || serverSource.includes(marker))
   };
@@ -352,6 +354,8 @@ function buildProductionDbReadinessReport(options = {}) {
     { id: "production-db:baselineBootstrap", passed: postgresRuntimeSync.baselineBootstrap, detail: "current SQLite collection versions can be queued once before incremental shadow sync" },
     { id: "production-db:shadowReconciliation", passed: postgresRuntimeSync.readOnlyReconciliation && postgresRuntimeSync.reconciliationLedger && postgresRuntimeSync.reconciliationCommand, detail: "read-only collection version and SHA-256 comparison persists payload-free differences and exposes a commission-only status API" },
     { id: "production-db:reconciliationCaseWorkflow", passed: postgresRuntimeSync.reconciliationCaseWorkflow, detail: "commission-only history and case APIs enforce assignment, matched-run clearance, evidence-backed resolution and automatic reopening" },
+    { id: "production-db:reconciliationOperationsUi", passed: postgresRuntimeSync.reconciliationOperationsUi, detail: "platform cutover center exposes commission-only case ownership, acknowledgement, comments, verified closure, reopening and reconciliation history" },
+    { id: "production-db:prometheusSlo", passed: postgresRuntimeSync.prometheusSlo, detail: "configurable backlog, pending age, reconciliation freshness, unresolved case and failed batch SLOs are Prometheus-scrapeable" },
     { id: "production-db:reconciliationScheduler", passed: postgresRuntimeSync.reconciliationScheduler, detail: "hardened five-minute reconciliation timer writes reports outside the application artifact" }
   ];
   return {
@@ -425,6 +429,8 @@ function renderMarkdown(report) {
     `- Baseline bootstrap: ${report.postgresRuntimeSync?.baselineBootstrap ? "configured" : "missing"}`,
     `- Read-only shadow reconciliation: ${report.postgresRuntimeSync?.readOnlyReconciliation ? "configured" : "missing"}`,
     `- Reconciliation case workflow: ${report.postgresRuntimeSync?.reconciliationCaseWorkflow ? "configured" : "missing"}`,
+    `- Reconciliation operations UI: ${report.postgresRuntimeSync?.reconciliationOperationsUi ? "configured" : "missing"}`,
+    `- Prometheus SLO metrics: ${report.postgresRuntimeSync?.prometheusSlo ? "configured" : "missing"}`,
     `- PostgreSQL production primary: no`,
     "",
     "| Batch | Domain | Sources | Targets | Owner | Status |",

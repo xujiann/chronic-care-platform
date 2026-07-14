@@ -40,6 +40,21 @@ worker 在队列为空时仍会校验 PostgreSQL 连接配置，但不会输出�
 - 已解决集合再次出现差异时自动进入 `reopened`，保留首次发现、最近发现、累计出现次数、清除核对批次和历史动作。
 - 工单只保存集合名、差异类型、版本、SHA-256、责任人、备注和证据引用，不保存业务正文、数据库连接信息或凭据。
 
+卫健管理角色可在 `platform.html#production-database-cutover-center` 查看差异工单和最近核对历史，并执行分派、签收、备注、核验关闭和重新打开。界面通过上述受限 API 操作，不在浏览器本地复制工单账本；关闭动作仍由服务端强制校验 matched 核对批次和证据引用。
+
+## SLO 与监控采集
+
+`/api/metrics` 在 `storage.postgresSync.slo` 输出结构化目标、指标与当前违反项；`/api/metrics/prometheus` 输出 Prometheus 0.0.4 文本格式。两个端点均仅允许卫健管理角色访问，文本指标只有计数、时长和开关状态，不包含集合名、业务正文、SHA-256、连接串或凭据。
+
+默认上线阈值可通过环境变量调整：
+
+- `POSTGRES_SYNC_BACKLOG_SLO_MAX=20`：pending 与 retry 批次总量上限。
+- `POSTGRES_SYNC_PENDING_AGE_SLO_SECONDS=300`：最老待处理批次允许停留时长。
+- `POSTGRES_RECONCILIATION_AGE_SLO_SECONDS=600`：最近一次只读核对允许陈旧时长。
+- `POSTGRES_RECONCILIATION_OPEN_CASES_SLO_MAX=0`：允许未关闭差异工单数。
+
+Prometheus 指标包括 `health_platform_postgres_sync_backlog`、`health_platform_postgres_sync_oldest_pending_age_seconds`、`health_platform_postgres_reconciliation_age_seconds`、`health_platform_postgres_reconciliation_unresolved_cases`、`health_platform_postgres_sync_failed_batches` 和 `health_platform_postgres_sync_slo_breaches`。仅当 `POSTGRES_SYNC_MODE=outbox` 时评估违反项；禁用影子同步不会制造误告警。
+
 ## 退出条件
 
 - 全量基线与增量集合计数、摘要连续一致。

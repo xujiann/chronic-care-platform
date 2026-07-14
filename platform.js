@@ -74,6 +74,14 @@ const PLATFORM_STORAGE_KEY = "chronic-care-platform-state";
 let platformState = structuredClone(fallbackPlatformState);
 let platformData = null;
 let activeEditSnapshot = null;
+let postgresReconciliationCenter = {
+  configured: false,
+  productionPrimary: false,
+  summary: { total: 0, open: 0, acknowledged: 0, resolved: 0, reopened: 0, unresolved: 0, clearedAwaitingResolution: 0 },
+  cases: [],
+  historySummary: { runs: 0, matched: 0, mismatched: 0, errors: 0 },
+  runs: []
+};
 
 const defaultPlatformCapabilities = [
   {
@@ -354,6 +362,7 @@ const defaultCommercialCryptoCapabilities = [
 document.addEventListener("DOMContentLoaded", async () => {
   platformState = await loadPlatformState(fallbackPlatformState);
   await loadCommercialCryptoCenter();
+  await loadPostgresReconciliationCenter();
   ensureEditablePlatformData(platformState);
   bindPlatformEditor();
   renderPlatform();
@@ -1047,7 +1056,77 @@ function renderProductionDatabaseCutoverCenter(platform) {
       <small>${platformEscapeHtml(item.owner || "owner-pending")}</small>
     </div>
   </article>`).join("");
+  renderPostgresReconciliationCenter();
   if (boundaryTarget) boundaryTarget.textContent = center.boundary;
+}
+
+function postgresReconciliationBadgeClass(status) {
+  if (status === "matched" || status === "resolved") return "ok";
+  if (status === "mismatched" || status === "error" || status === "reopened") return "danger";
+  return "warn";
+}
+
+function renderPostgresReconciliationCenter() {
+  const metricsTarget = document.querySelector("#postgres-reconciliation-metrics");
+  const casesTarget = document.querySelector("#postgres-reconciliation-cases");
+  const historyTarget = document.querySelector("#postgres-reconciliation-history");
+  const statusTarget = document.querySelector("#postgres-reconciliation-status");
+  if (!metricsTarget || !casesTarget || !historyTarget) return;
+  const summary = postgresReconciliationCenter.summary || {};
+  const historySummary = postgresReconciliationCenter.historySummary || {};
+  const latestRun = postgresReconciliationCenter.runs?.[0] || null;
+  const metrics = [
+    ["未关闭工单", summary.unresolved || 0, `${summary.reopened || 0} 项重新打开`],
+    ["已签收", summary.acknowledged || 0, `${summary.clearedAwaitingResolution || 0} 项可核验关闭`],
+    ["最近核对", latestRun?.status || "never", latestRun?.checkedAt || "尚无运行记录"],
+    ["核对历史", historySummary.runs || 0, `${historySummary.mismatched || 0} 次发现差异`]
+  ];
+  metricsTarget.innerHTML = metrics.map(([label, value, hint]) => `<article class="metric-card">
+    <span>${platformEscapeHtml(label)}</span>
+    <strong>${platformEscapeHtml(value)}</strong>
+    <small>${platformEscapeHtml(hint)}</small>
+  </article>`).join("");
+  if (statusTarget) {
+    const status = latestRun?.status || (postgresReconciliationCenter.configured ? "never" : "disabled");
+    statusTarget.textContent = status;
+    statusTarget.className = `badge ${postgresReconciliationBadgeClass(status)}`;
+  }
+  const cases = postgresReconciliationCenter.cases || [];
+  casesTarget.innerHTML = cases.length ? cases.map((item) => {
+    const canAcknowledge = ["open", "reopened"].includes(item.status);
+    const canResolve = item.status === "acknowledged" && item.clearedAt;
+    const canReopen = item.status === "resolved";
+    return `<article class="priority-row" data-postgres-reconciliation-case="${platformEscapeHtml(item.caseId)}">
+      <div class="priority-rank ${postgresReconciliationBadgeClass(item.status)}">${platformEscapeHtml(item.severity || "high")}</div>
+      <div>
+        <h3>${platformEscapeHtml(item.collection || item.caseId)}</h3>
+        <p>${platformEscapeHtml((item.differenceTypes || []).join(" / ") || "difference pending classification")}</p>
+        <small>${platformEscapeHtml(item.owner || "未分派")} · ${platformEscapeHtml(item.occurrenceCount || 0)} 次 · ${platformEscapeHtml(item.updatedAt || "")}</small>
+        <small>${item.clearedAt ? `核对清除：${platformEscapeHtml(item.clearedRunId || item.clearedAt)}` : "等待 matched 核对结果"}</small>
+        <div class="action-row">
+          <button class="inline-action" type="button" data-postgres-reconciliation-action="assign" data-id="${platformEscapeHtml(item.caseId)}">分派</button>
+          ${canAcknowledge ? `<button class="inline-action" type="button" data-postgres-reconciliation-action="acknowledge" data-id="${platformEscapeHtml(item.caseId)}">签收</button>` : ""}
+          ${canResolve ? `<button class="inline-action" type="button" data-postgres-reconciliation-action="resolve" data-id="${platformEscapeHtml(item.caseId)}">核验关闭</button>` : ""}
+          ${canReopen ? `<button class="inline-action" type="button" data-postgres-reconciliation-action="reopen" data-id="${platformEscapeHtml(item.caseId)}">重新打开</button>` : ""}
+          <button class="inline-action" type="button" data-postgres-reconciliation-action="comment" data-id="${platformEscapeHtml(item.caseId)}">备注</button>
+        </div>
+      </div>
+      <div class="capability-side">
+        <span class="badge ${postgresReconciliationBadgeClass(item.status)}">${platformEscapeHtml(item.status)}</span>
+        <small>local v${platformEscapeHtml(item.localVersion ?? "-")}</small>
+        <small>remote v${platformEscapeHtml(item.remoteVersion ?? "-")}</small>
+      </div>
+    </article>`;
+  }).join("") : `<p class="muted">当前没有差异工单。</p>`;
+  const runs = postgresReconciliationCenter.runs || [];
+  historyTarget.innerHTML = runs.length ? runs.map((run) => `<article class="priority-row" data-postgres-reconciliation-run="${platformEscapeHtml(run.runId)}">
+    <div class="priority-rank ${postgresReconciliationBadgeClass(run.status)}">${platformEscapeHtml(run.status)}</div>
+    <div>
+      <h3>${platformEscapeHtml(run.runId)}</h3>
+      <p>${platformEscapeHtml(run.checkedAt || "")}</p>
+      <small>matched ${platformEscapeHtml(run.summary?.matched || 0)} · mismatched ${platformEscapeHtml(run.summary?.mismatched || 0)} · ${platformEscapeHtml(run.durationMs || 0)} ms</small>
+    </div>
+  </article>`).join("") : `<p class="muted">当前没有核对运行记录。</p>`;
 }
 
 function buildCitizenOperationsOrderRows(state) {
@@ -1412,6 +1491,11 @@ function listText(value) {
 
 function bindPlatformEditor() {
   document.addEventListener("click", (event) => {
+    const postgresReconciliationButton = event.target.closest("[data-postgres-reconciliation-action]");
+    if (postgresReconciliationButton) {
+      runPostgresReconciliationCaseAction(postgresReconciliationButton.dataset.postgresReconciliationAction, postgresReconciliationButton.dataset.id, postgresReconciliationButton);
+      return;
+    }
     const commercialCryptoButton = event.target.closest("[data-commercial-crypto-action]");
     if (commercialCryptoButton) {
       runCommercialCryptoAction(commercialCryptoButton.dataset.commercialCryptoAction, commercialCryptoButton.dataset.id, commercialCryptoButton);
@@ -1529,6 +1613,72 @@ async function loadCommercialCryptoCenter() {
     platformState.commercialCryptoRuntimeProbe = center.runtimeProbe || null;
   } catch (error) {
     // Static and offline fallback remains usable without the commission API.
+  }
+}
+
+async function loadPostgresReconciliationCenter() {
+  if (!PLATFORM_API_BASE) return;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  try {
+    const [casesResponse, historyResponse] = await Promise.all([
+      request(`${PLATFORM_API_BASE}/production-database/reconciliation-cases?limit=20`),
+      request(`${PLATFORM_API_BASE}/production-database/shadow-reconciliations?limit=10`)
+    ]);
+    if (!casesResponse.ok || !historyResponse.ok) return;
+    const [casesPayload, historyPayload] = await Promise.all([casesResponse.json(), historyResponse.json()]);
+    postgresReconciliationCenter = {
+      configured: Boolean(casesPayload.configured || historyPayload.configured),
+      productionPrimary: false,
+      summary: casesPayload.summary || postgresReconciliationCenter.summary,
+      cases: casesPayload.cases || [],
+      historySummary: historyPayload.summary || postgresReconciliationCenter.historySummary,
+      runs: historyPayload.runs || []
+    };
+  } catch (error) {
+    // Static and offline fallback remains usable without the commission API.
+  }
+}
+
+async function runPostgresReconciliationCaseAction(action, id, button) {
+  if (!PLATFORM_API_BASE || !action || !id) return;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  const statusTarget = document.querySelector("#postgres-reconciliation-status");
+  const item = (postgresReconciliationCenter.cases || []).find((candidate) => candidate.caseId === id);
+  let owner = item?.owner || "database-operations";
+  let note = "";
+  let evidenceRefs = [];
+  if (action === "assign") {
+    owner = window.prompt("责任组", owner) || "";
+    if (!owner.trim()) return;
+    note = `Assigned from the platform cutover center to ${owner.trim()}.`;
+  } else if (action === "acknowledge") {
+    note = "Database operations accepted this reconciliation case from the platform cutover center.";
+  } else if (action === "resolve") {
+    note = "Matched shadow reconciliation verified; difference case closed from the platform cutover center.";
+    evidenceRefs = [`reconciliation:${item?.clearedRunId || "matched-run"}`, `case:${id}`];
+  } else {
+    note = window.prompt(action === "reopen" ? "重新打开原因" : "处置备注", "") || "";
+    if (!note.trim()) return;
+  }
+  if (button) button.disabled = true;
+  if (statusTarget) statusTarget.textContent = "处理中";
+  try {
+    const response = await request(`${PLATFORM_API_BASE}/production-database/reconciliation-cases/${encodeURIComponent(id)}/actions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, owner, note, evidenceRefs })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.message || `HTTP ${response.status}`);
+    await loadPostgresReconciliationCenter();
+    renderPostgresReconciliationCenter();
+  } catch (error) {
+    if (statusTarget) {
+      statusTarget.textContent = error.message || "操作失败";
+      statusTarget.className = "badge danger";
+    }
+  } finally {
+    if (button) button.disabled = false;
   }
 }
 

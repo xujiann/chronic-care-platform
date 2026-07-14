@@ -775,6 +775,12 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("platform.html"), /production-database-cutover-center/);
   assert.match(read("platform.js"), /renderProductionDatabaseCutoverCenter/);
   assert.match(read("platform.js"), /data-production-db-action/);
+  assert.match(read("platform.html"), /postgres-reconciliation-metrics/);
+  assert.match(read("platform.html"), /postgres-reconciliation-cases/);
+  assert.match(read("platform.html"), /postgres-reconciliation-history/);
+  assert.match(read("platform.js"), /loadPostgresReconciliationCenter/);
+  assert.match(read("platform.js"), /runPostgresReconciliationCaseAction/);
+  assert.match(read("platform.js"), /data-postgres-reconciliation-action/);
   assert.match(read("server.js"), /\/api\/production-database\/cutover-center/);
   assert.match(read("server.js"), /production-database-cutover-rehearsal/);
   assert.match(read("server.js"), /delete scoped\.productionDatabaseCutoverRuns/);
@@ -2866,6 +2872,11 @@ test("PostgreSQL migration package keeps CI payload-free and full exports contro
   assert.match(read("server.js"), /\/api\/production-database\/shadow-reconciliation/);
   assert.match(read("server.js"), /\/api\/production-database\/shadow-reconciliations/);
   assert.match(read("server.js"), /\/api\/production-database\/reconciliation-cases/);
+  assert.match(read("server.js"), /\/api\/metrics\/prometheus/);
+  assert.match(read("server.js"), /buildPostgresSyncSlo/);
+  assert.match(read("server.js"), /health_platform_postgres_sync_slo_breaches/);
+  assert.match(read(".env.example"), /POSTGRES_SYNC_BACKLOG_SLO_MAX=20/);
+  assert.match(read(".env.example"), /POSTGRES_RECONCILIATION_AGE_SLO_SECONDS=600/);
   assert.match(read("postgres-runtime-sync.js"), /applyPostgresReconciliationCaseAction/);
   assert.match(read("postgres-runtime-sync.js"), /RECONCILIATION_CLEARANCE_REQUIRED/);
   assert.match(read("scripts/production-db-readiness.js"), /production-db:reconciliationCaseWorkflow/);

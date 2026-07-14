@@ -40,6 +40,8 @@ test("production database readiness validates migration and rehearsal evidence",
   assert.equal(report.checks.some((item) => item.id === "production-db:baselineBootstrap" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "production-db:shadowReconciliation" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "production-db:reconciliationCaseWorkflow" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "production-db:reconciliationOperationsUi" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "production-db:prometheusSlo" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "production-db:reconciliationScheduler" && item.passed), true);
 
   const markdown = renderMarkdown(report);
@@ -53,6 +55,8 @@ test("production database readiness validates migration and rehearsal evidence",
   assert.match(markdown, /Baseline bootstrap: configured/);
   assert.match(markdown, /Read-only shadow reconciliation: configured/);
   assert.match(markdown, /Reconciliation case workflow: configured/);
+  assert.match(markdown, /Reconciliation operations UI: configured/);
+  assert.match(markdown, /Prometheus SLO metrics: configured/);
 });
 
 test("production database readiness fails when secure export boundaries are removed", () => {

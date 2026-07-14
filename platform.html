@@ -196,6 +196,21 @@
         <div id="production-database-cutover-metrics" class="metric-grid"></div>
         <div id="production-database-cutover-runs" class="priority-list"></div>
         <div id="production-database-migration-batches" class="priority-list"></div>
+        <div class="panel-title compact-title">
+          <h3>影子核对差异处置</h3>
+          <span id="postgres-reconciliation-status" class="badge warn">等待核对数据</span>
+        </div>
+        <div id="postgres-reconciliation-metrics" class="metric-grid"></div>
+        <div class="portal-grid">
+          <div>
+            <h3>差异工单</h3>
+            <div id="postgres-reconciliation-cases" class="priority-list"></div>
+          </div>
+          <div>
+            <h3>最近核对</h3>
+            <div id="postgres-reconciliation-history" class="priority-list"></div>
+          </div>
+        </div>
         <p id="production-database-cutover-boundary" class="implementation-boundary"></p>
       </section>
 

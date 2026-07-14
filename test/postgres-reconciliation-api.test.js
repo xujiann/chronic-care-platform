@@ -19,6 +19,13 @@ async function request(baseUrl, pathname, token, options = {}) {
   return { response, body: await response.json() };
 }
 
+async function requestText(baseUrl, pathname, token) {
+  const response = await fetch(`${baseUrl}${pathname}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {}
+  });
+  return { response, body: await response.text() };
+}
+
 test("commission API closes only cleared PostgreSQL reconciliation cases and preserves audit history", async (t) => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "postgres-reconciliation-api-"));
   fs.copyFileSync(path.join(ROOT, "data", "db.json"), path.join(dataDir, "db.json"));
@@ -69,6 +76,19 @@ test("commission API closes only cleared PostgreSQL reconciliation cases and pre
   assert.equal(cases.response.status, 200);
   assert.equal(cases.body.summary.open, 1);
   const caseId = cases.body.cases[0].caseId;
+
+  const prometheus = await requestText(baseUrl, "/api/metrics/prometheus", token);
+  assert.equal(prometheus.response.status, 200);
+  assert.match(prometheus.response.headers.get("content-type"), /text\/plain/);
+  assert.match(prometheus.body, /health_platform_postgres_reconciliation_unresolved_cases 1/);
+  assert.match(prometheus.body, /health_platform_postgres_sync_slo_breaches 0/);
+  assert.doesNotMatch(prometheus.body, /residents|123456|DATABASE_URL|postgres:\/\//);
+  const jsonMetrics = await request(baseUrl, "/api/metrics", token);
+  assert.equal(jsonMetrics.response.status, 200);
+  assert.equal(jsonMetrics.body.storage.postgresSync.slo.enabled, false);
+  assert.equal(jsonMetrics.body.storage.postgresSync.slo.healthy, true);
+  assert.equal(jsonMetrics.body.storage.postgresSync.slo.targets.reconciliationAgeSecondsMax, 600);
+  assert.equal(jsonMetrics.body.storage.postgresSync.slo.indicators.unresolvedCases, 1);
 
   const acknowledge = await request(baseUrl, `/api/production-database/reconciliation-cases/${caseId}/actions`, token, {
     method: "POST",

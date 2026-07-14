@@ -139,6 +139,10 @@ const SQLITE_FILE = path.join(DATA_DIR, "health-city.sqlite");
 const STORAGE_ENGINE = String(process.env.STORAGE_ENGINE || "auto").toLowerCase();
 const RUNTIME_STORAGE_ENGINES = new Set(["auto", "json", "sqlite"]);
 const POSTGRES_SYNC_MODE = String(process.env.POSTGRES_SYNC_MODE || "disabled").trim().toLowerCase();
+const POSTGRES_SYNC_BACKLOG_SLO_MAX = boundedEnvironmentNumber("POSTGRES_SYNC_BACKLOG_SLO_MAX", 20, 0, 100000);
+const POSTGRES_SYNC_PENDING_AGE_SLO_SECONDS = boundedEnvironmentNumber("POSTGRES_SYNC_PENDING_AGE_SLO_SECONDS", 300, 30, 86400);
+const POSTGRES_RECONCILIATION_AGE_SLO_SECONDS = boundedEnvironmentNumber("POSTGRES_RECONCILIATION_AGE_SLO_SECONDS", 600, 60, 86400);
+const POSTGRES_RECONCILIATION_OPEN_CASES_SLO_MAX = boundedEnvironmentNumber("POSTGRES_RECONCILIATION_OPEN_CASES_SLO_MAX", 0, 0, 10000);
 const SQLITE_JOURNAL_MODE = ["WAL", "DELETE", "TRUNCATE"].includes(String(process.env.SQLITE_JOURNAL_MODE || "WAL").toUpperCase())
   ? String(process.env.SQLITE_JOURNAL_MODE || "WAL").toUpperCase()
   : "WAL";
@@ -175,6 +179,13 @@ const PHONE_CODE_COOLDOWN_MS = 60 * 1000;
 const PHONE_LOGIN_MAX_FAILED_ATTEMPTS = 5;
 const PHONE_LOGIN_LOCK_MS = 10 * 60 * 1000;
 const phoneVerificationCodes = new Map();
+
+function boundedEnvironmentNumber(name, fallback, minimum, maximum) {
+  const raw = String(process.env[name] ?? "").trim();
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? Math.min(maximum, Math.max(minimum, parsed)) : fallback;
+}
 const phoneLoginFailures = new Map();
 const PUBLIC_HEALTH_EVENT_ACTION_DEFAULTS = {
   review: {
@@ -6512,6 +6523,14 @@ function storageMeta() {
       cases: { total: 0, open: 0, acknowledged: 0, resolved: 0, reopened: 0, unresolved: 0, clearedAwaitingResolution: 0 }
     }
   };
+  const postgresSync = {
+    mode: POSTGRES_SYNC_MODE,
+    enabled: POSTGRES_SYNC_MODE === "outbox",
+    targetRole: "shadow-readiness",
+    productionPrimary: false,
+    ...postgresSyncStatus
+  };
+  postgresSync.slo = buildPostgresSyncSlo(postgresSync);
   return {
     engine: sqlite ? "sqlite" : "json",
     mode: sqlite ? "SQLite 主存储 + JSON 快照" : "JSON 文件存储",
@@ -6522,13 +6541,51 @@ function storageMeta() {
     collectionVersions: sqlite ? sqliteCollectionVersions() : {},
     sqliteProfile: sqlite ? sqliteRuntimeProfile() : null,
     sqliteError: sqliteError ? sqliteError.message : "",
-    postgresSync: {
-      mode: POSTGRES_SYNC_MODE,
-      enabled: POSTGRES_SYNC_MODE === "outbox",
-      targetRole: "shadow-readiness",
-      productionPrimary: false,
-      ...postgresSyncStatus
-    }
+    postgresSync
+  };
+}
+
+function timestampAgeSeconds(value, now = Date.now()) {
+  const timestamp = Date.parse(String(value || ""));
+  return Number.isFinite(timestamp) ? Math.max(0, Math.floor((now - timestamp) / 1000)) : null;
+}
+
+function buildPostgresSyncSlo(status, now = Date.now()) {
+  const enabled = Boolean(status?.enabled);
+  const backlog = Number(status?.pending || 0) + Number(status?.retry || 0);
+  const unresolvedCases = Number(status?.reconciliation?.cases?.unresolved || 0);
+  const failedBatches = Number(status?.failed || 0);
+  const oldestPendingAgeSeconds = timestampAgeSeconds(status?.oldestPendingAt, now);
+  const lastDeliveryAgeSeconds = timestampAgeSeconds(status?.lastDeliveredAt, now);
+  const reconciliationAgeSeconds = timestampAgeSeconds(status?.reconciliation?.checkedAt, now);
+  const indicators = {
+    backlog,
+    oldestPendingAgeSeconds,
+    lastDeliveryAgeSeconds,
+    reconciliationAgeSeconds,
+    unresolvedCases,
+    failedBatches
+  };
+  const breaches = enabled ? [
+    backlog > POSTGRES_SYNC_BACKLOG_SLO_MAX ? "backlog" : "",
+    backlog > 0 && (oldestPendingAgeSeconds === null || oldestPendingAgeSeconds > POSTGRES_SYNC_PENDING_AGE_SLO_SECONDS) ? "oldest-pending-age" : "",
+    reconciliationAgeSeconds === null || reconciliationAgeSeconds > POSTGRES_RECONCILIATION_AGE_SLO_SECONDS ? "reconciliation-age" : "",
+    unresolvedCases > POSTGRES_RECONCILIATION_OPEN_CASES_SLO_MAX ? "unresolved-cases" : "",
+    failedBatches > 0 ? "failed-batches" : ""
+  ].filter(Boolean) : [];
+  return {
+    enabled,
+    healthy: breaches.length === 0,
+    breachCount: breaches.length,
+    breaches,
+    targets: {
+      backlogMax: POSTGRES_SYNC_BACKLOG_SLO_MAX,
+      oldestPendingAgeSecondsMax: POSTGRES_SYNC_PENDING_AGE_SLO_SECONDS,
+      reconciliationAgeSecondsMax: POSTGRES_RECONCILIATION_AGE_SLO_SECONDS,
+      unresolvedCasesMax: POSTGRES_RECONCILIATION_OPEN_CASES_SLO_MAX,
+      failedBatchesMax: 0
+    },
+    indicators
   };
 }
 
@@ -6557,6 +6614,14 @@ function sendJson(res, status, payload) {
     "Cache-Control": "no-store"
   });
   res.end(JSON.stringify(payload));
+}
+
+function sendText(res, status, payload, contentType = "text/plain; charset=utf-8") {
+  res.writeHead(status, {
+    "Content-Type": contentType,
+    "Cache-Control": "no-store"
+  });
+  res.end(String(payload));
 }
 
 function recordRequestMetrics(req, res, startedAt) {
@@ -6607,13 +6672,65 @@ function buildRuntimeMetrics(data) {
   };
 }
 
+function renderPrometheusRuntimeMetrics(data) {
+  const metrics = buildRuntimeMetrics(data);
+  const postgres = metrics.storage?.postgresSync || {};
+  const slo = postgres.slo || buildPostgresSyncSlo(postgres);
+  const value = (input, fallback = -1) => input !== null && input !== "" && Number.isFinite(Number(input)) ? Number(input) : fallback;
+  return [
+    "# HELP health_platform_postgres_sync_enabled Whether PostgreSQL shadow synchronization is enabled.",
+    "# TYPE health_platform_postgres_sync_enabled gauge",
+    `health_platform_postgres_sync_enabled ${postgres.enabled ? 1 : 0}`,
+    "# HELP health_platform_postgres_sync_backlog Pending and retry outbox batches.",
+    "# TYPE health_platform_postgres_sync_backlog gauge",
+    `health_platform_postgres_sync_backlog ${value(slo.indicators?.backlog, 0)}`,
+    "# HELP health_platform_postgres_sync_oldest_pending_age_seconds Age of the oldest pending outbox batch, or -1 when absent.",
+    "# TYPE health_platform_postgres_sync_oldest_pending_age_seconds gauge",
+    `health_platform_postgres_sync_oldest_pending_age_seconds ${value(slo.indicators?.oldestPendingAgeSeconds)}`,
+    "# HELP health_platform_postgres_sync_last_delivery_age_seconds Age of the last delivered outbox batch, or -1 when absent.",
+    "# TYPE health_platform_postgres_sync_last_delivery_age_seconds gauge",
+    `health_platform_postgres_sync_last_delivery_age_seconds ${value(slo.indicators?.lastDeliveryAgeSeconds)}`,
+    "# HELP health_platform_postgres_reconciliation_age_seconds Age of the latest read-only reconciliation, or -1 when absent.",
+    "# TYPE health_platform_postgres_reconciliation_age_seconds gauge",
+    `health_platform_postgres_reconciliation_age_seconds ${value(slo.indicators?.reconciliationAgeSeconds)}`,
+    "# HELP health_platform_postgres_reconciliation_unresolved_cases Unresolved reconciliation cases.",
+    "# TYPE health_platform_postgres_reconciliation_unresolved_cases gauge",
+    `health_platform_postgres_reconciliation_unresolved_cases ${value(slo.indicators?.unresolvedCases, 0)}`,
+    "# HELP health_platform_postgres_reconciliation_cleared_awaiting_resolution Cases cleared by a matched run and awaiting evidence-backed closure.",
+    "# TYPE health_platform_postgres_reconciliation_cleared_awaiting_resolution gauge",
+    `health_platform_postgres_reconciliation_cleared_awaiting_resolution ${value(postgres.reconciliation?.cases?.clearedAwaitingResolution, 0)}`,
+    "# HELP health_platform_postgres_sync_failed_batches Failed outbox batches.",
+    "# TYPE health_platform_postgres_sync_failed_batches gauge",
+    `health_platform_postgres_sync_failed_batches ${value(slo.indicators?.failedBatches, 0)}`,
+    "# HELP health_platform_postgres_sync_slo_breaches Number of active PostgreSQL shadow synchronization SLO breaches.",
+    "# TYPE health_platform_postgres_sync_slo_breaches gauge",
+    `health_platform_postgres_sync_slo_breaches ${value(slo.breachCount, 0)}`,
+    "# HELP health_platform_postgres_production_primary Whether PostgreSQL is the production primary storage engine.",
+    "# TYPE health_platform_postgres_production_primary gauge",
+    `health_platform_postgres_production_primary ${postgres.productionPrimary ? 1 : 0}`,
+    ""
+  ].join("\n");
+}
+
 function buildObservabilitySignals(data) {
   const metrics = buildRuntimeMetrics(data);
   const highRiskEvents = highRiskSecurityEvents(data).length;
+  const postgresSloBreaches = Number(metrics.storage?.postgresSync?.slo?.breachCount || 0);
   const postgresReconciliationMismatches = Number(metrics.storage?.postgresSync?.reconciliation?.mismatched || 0);
   const postgresReconciliationOpenCases = Number(metrics.storage?.postgresSync?.reconciliation?.cases?.unresolved || 0);
   const postgresReconciliationRisk = Math.max(postgresReconciliationMismatches, postgresReconciliationOpenCases);
   const definitions = [
+    {
+      fingerprint: `postgres-sync-slo:${postgresSloBreaches}`,
+      source: "postgres-sync-slo",
+      severity: "critical",
+      title: "PostgreSQL shadow synchronization SLO breached",
+      summary: `${postgresSloBreaches} PostgreSQL shadow synchronization SLO indicators require review.`,
+      metric: "postgresSyncSloBreaches",
+      value: postgresSloBreaches,
+      owner: "database-operations",
+      evidenceRefs: ["/api/metrics/prometheus", "/api/production-database/reconciliation-cases"]
+    },
     {
       fingerprint: `postgres-shadow-mismatch:${postgresReconciliationRisk}`,
       source: "postgres-shadow-reconciliation",
@@ -15696,6 +15813,13 @@ async function handleApi(req, res) {
       runtime: buildRuntimeMetrics(data),
       readiness: buildSystemReadinessReport(data)
     }));
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/metrics/prometheus") {
+    const user = requireApiRole(req, res, ["commission"], "/api/metrics/prometheus");
+    if (!user) return;
+    sendText(res, 200, renderPrometheusRuntimeMetrics(readDatabase()), "text/plain; version=0.0.4; charset=utf-8");
     return;
   }
 
