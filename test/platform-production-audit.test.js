@@ -9,6 +9,11 @@ const {
   renderMarkdown,
   writeOutput
 } = require("../scripts/platform-production-audit");
+const {
+  applyPlatformCapabilityReviewAction,
+  buildPlatformCapabilityOperationsCenter,
+  seedPlatformCapabilityReviews
+} = require("../platform-capability-operations");
 
 const ROOT = path.resolve(__dirname, "..");
 
@@ -26,6 +31,7 @@ test("platform production audit separates implemented capabilities from producti
   assert.equal(report.summary.productionReadyDomains, 0);
   assert.equal(report.summary.productionBlockers, 10);
   assert.equal(report.summary.mvpRequiredModules, 8);
+  assert.equal(report.summary.capabilityOperationsCenter, true);
   assert.equal(report.summary.cutoverPassed, 1);
   assert.equal(report.summary.cutoverBlocked, 9);
   assert.equal(report.capabilities.every((item) => item.evidenceReady && item.boundary), true);
@@ -51,6 +57,41 @@ test("platform production audit separates implemented capabilities from producti
   assert.equal(report.mvpRequiredModules.find((item) => item.id === "mvp-production-database").status, "shadow-reconciliation-case-workflow-ready");
   assert.equal(report.mvpRequiredModules.every((item) => item.remainingCode && item.siteDependency), true);
   assert.deepEqual(report.roadmap.map((item) => item.phase), ["P0 / 0-30 天", "P1 / 31-60 天", "P2 / 61-90 天", "持续优化 / 90 天后"]);
+  assert.equal(report.checks.find((item) => item.id === "platformAudit:capabilityOperationsCenter").passed, true);
+});
+
+test("platform capability operations center keeps evidence-backed reviews pre-production only", () => {
+  const data = { platformCapabilityReviews: seedPlatformCapabilityReviews() };
+  const initial = buildPlatformCapabilityOperationsCenter(data, { evidenceExists: () => true });
+  assert.equal(initial.summary.capabilityDomains, 10);
+  assert.equal(initial.summary.pendingReview, 10);
+  assert.equal(initial.summary.productionReady, 0);
+
+  assert.throws(
+    () => applyPlatformCapabilityReviewAction(data, "data-governance", {
+      action: "review",
+      note: "Review attempted without evidence."
+    }, { name: "Audit User", role: "commission" }),
+    (error) => error.code === "PLATFORM_CAPABILITY_REVIEW_EVIDENCE_REQUIRED" && error.statusCode === 409
+  );
+
+  const evidence = applyPlatformCapabilityReviewAction(data, "data-governance", {
+    action: "record-evidence",
+    evidenceRef: "release:data-governance-readiness",
+    note: "Readiness evidence has been registered."
+  }, { name: "Audit User", role: "commission" });
+  const reviewed = applyPlatformCapabilityReviewAction({ platformCapabilityReviews: evidence.reviews }, "data-governance", {
+    action: "review",
+    note: "Repository capability and current production boundary were reviewed."
+  }, { name: "Audit User", role: "commission" });
+  assert.equal(reviewed.item.reviewStatus, "reviewed-preproduction");
+  assert.equal(reviewed.item.productionReady, false);
+  assert.equal(reviewed.item.evidenceRefs.length, 1);
+  assert.equal(reviewed.item.actionHistory.length, 2);
+
+  const center = buildPlatformCapabilityOperationsCenter({ platformCapabilityReviews: reviewed.reviews }, { evidenceExists: () => true });
+  assert.equal(center.summary.reviewedPreproduction, 1);
+  assert.equal(center.productionReady, false);
 });
 
 test("platform production audit does not require ignored release artifacts before report generation", () => {

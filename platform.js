@@ -25,6 +25,7 @@ const fallbackPlatformState = {
   platformInterfaces: [],
   platformDeliveryBatches: [],
   platformEvidence: [],
+  platformCapabilityReviews: [],
   applicationCatalog: [],
   hospitalInteroperabilityFunctions: [],
   dataGovernanceAssets: [],
@@ -74,6 +75,14 @@ const PLATFORM_STORAGE_KEY = "chronic-care-platform-state";
 let platformState = structuredClone(fallbackPlatformState);
 let platformData = null;
 let activeEditSnapshot = null;
+let platformCapabilityOperationsCenter = {
+  productionReady: false,
+  summary: { capabilityDomains: 0, repositoryEvidenceReady: 0, reviewedPreproduction: 0, improvementRequired: 0, pendingReview: 0, evidenceRecorded: 0, productionReady: 0, mvpRequiredModules: 0, productionBlockers: 0 },
+  capabilities: [],
+  mvpRequiredModules: [],
+  productionBlockers: [],
+  boundary: ""
+};
 let postgresReconciliationCenter = {
   configured: false,
   productionPrimary: false,
@@ -361,6 +370,7 @@ const defaultCommercialCryptoCapabilities = [
 
 document.addEventListener("DOMContentLoaded", async () => {
   platformState = await loadPlatformState(fallbackPlatformState);
+  await loadPlatformCapabilityOperationsCenter();
   await loadCommercialCryptoCenter();
   await loadPostgresReconciliationCenter();
   ensureEditablePlatformData(platformState);
@@ -386,6 +396,7 @@ function renderPlatform() {
   renderApplicationCatalog(platformData.applicationCatalog);
   renderInstitutionCreditEvaluations(platformData.creditEvaluations);
   renderSecurityAcceptanceLedger(platformData.securityLedger);
+  renderPlatformCapabilityOperationsCenter();
   renderProductionDeploymentPlan(platformData.productionDeploymentPlan);
   renderProductionDatabaseCutoverCenter(platformData);
   renderCitizenOperationsCenter(platformData);
@@ -1000,6 +1011,83 @@ function productionDatabaseCutoverModel(platform) {
   };
 }
 
+function platformCapabilityReviewBadge(status) {
+  if (status === "reviewed-preproduction") return "info";
+  if (status === "improvement-required") return "danger";
+  return "warn";
+}
+
+function platformCapabilityBlockerLabel(status) {
+  if (String(status).includes("automation-foundation")) return "自动化基础就绪";
+  if (String(status).includes("shadow-case-workflow")) return "影子核对闭环就绪";
+  if (String(status).includes("adapter-foundation")) return "适配基础就绪";
+  return "等待现场证据";
+}
+
+function renderPlatformCapabilityOperationsCenter() {
+  const metricsTarget = document.querySelector("#platform-capability-operations-metrics");
+  const ledgerTarget = document.querySelector("#platform-capability-review-ledger");
+  const blockerTarget = document.querySelector("#platform-capability-production-blockers");
+  const statusTarget = document.querySelector("#platform-capability-operations-status");
+  const boundaryTarget = document.querySelector("#platform-capability-operations-boundary");
+  if (!metricsTarget || !ledgerTarget || !blockerTarget) return;
+  const center = platformCapabilityOperationsCenter;
+  const summary = center.summary || {};
+  const metrics = [
+    ["主要能力域", summary.capabilityDomains || 0, `${summary.repositoryEvidenceReady || 0} 项仓库证据齐备`],
+    ["生产前复核", summary.reviewedPreproduction || 0, `${summary.pendingReview || 0} 项待复核`],
+    ["已补录证据", summary.evidenceRecorded || 0, `${summary.improvementRequired || 0} 项要求整改`],
+    ["生产阻断", summary.productionBlockers || 0, `${summary.mvpRequiredModules || 0} 个 MVP 必需模块`]
+  ];
+  metricsTarget.innerHTML = metrics.map(([label, value, hint]) => `<article class="metric-card">
+    <span>${platformEscapeHtml(label)}</span>
+    <strong>${platformEscapeHtml(value)}</strong>
+    <small>${platformEscapeHtml(hint)}</small>
+  </article>`).join("");
+  if (statusTarget) {
+    statusTarget.textContent = `${summary.reviewedPreproduction || 0}/${summary.capabilityDomains || 0} 已完成生产前复核`;
+    statusTarget.className = `badge ${summary.reviewedPreproduction ? "info" : "warn"}`;
+  }
+  ledgerTarget.innerHTML = (center.capabilities || []).map((item, index) => {
+    const review = item.review || {};
+    const latest = review.actionHistory?.[0];
+    return `<article class="priority-row" data-platform-capability="${platformEscapeHtml(item.id)}">
+      <div class="priority-rank ${item.repositoryEvidenceReady ? "ok" : "danger"}">${platformEscapeHtml(index + 1)}</div>
+      <div>
+        <h3>${platformEscapeHtml(item.name)}</h3>
+        <p>${platformEscapeHtml((item.functions || []).join(" / "))}</p>
+        <small>责任人：${platformEscapeHtml(review.owner || "待分派")} · 证据 ${platformEscapeHtml(review.evidenceRefs?.length || 0)} 条</small>
+        <small>${latest ? `${platformEscapeHtml(latest.action)} · ${platformEscapeHtml(latest.actor)} · ${platformEscapeHtml(latest.at)}` : "尚无人工复核记录"}</small>
+        <div class="action-row">
+          <button class="inline-action" type="button" data-platform-capability-action="assign" data-id="${platformEscapeHtml(item.id)}">分派</button>
+          <button class="inline-action" type="button" data-platform-capability-action="record-evidence" data-id="${platformEscapeHtml(item.id)}">补录证据</button>
+          <button class="inline-action" type="button" data-platform-capability-action="review" data-id="${platformEscapeHtml(item.id)}">生产前复核</button>
+          <button class="inline-action" type="button" data-platform-capability-action="request-improvement" data-id="${platformEscapeHtml(item.id)}">要求整改</button>
+          <button class="inline-action" type="button" data-platform-capability-action="comment" data-id="${platformEscapeHtml(item.id)}">备注</button>
+        </div>
+      </div>
+      <div class="capability-side">
+        <span class="badge ${platformCapabilityReviewBadge(review.reviewStatus)}">${platformEscapeHtml(review.reviewStatus || "pending-review")}</span>
+        <small>${item.repositoryEvidenceReady ? "仓库证据齐备" : "仓库证据缺失"}</small>
+        <small>productionReady: no</small>
+      </div>
+    </article>`;
+  }).join("") || `<p class="muted">当前没有可复核能力域。</p>`;
+  blockerTarget.innerHTML = (center.productionBlockers || []).map((item) => `<article class="priority-row" data-platform-blocker="${platformEscapeHtml(item.id)}">
+    <div class="priority-rank danger">${platformEscapeHtml(item.id)}</div>
+    <div>
+      <h3>${platformEscapeHtml(item.name)}</h3>
+      <p>${platformEscapeHtml(item.progress || item.status)}</p>
+      <small>${platformEscapeHtml(item.doneWhen)}</small>
+    </div>
+    <div class="capability-side">
+      <span class="badge warn" title="${platformEscapeHtml(item.status)}">${platformEscapeHtml(platformCapabilityBlockerLabel(item.status))}</span>
+      <small>${platformEscapeHtml(item.owner)}</small>
+    </div>
+  </article>`).join("") || `<p class="muted">当前没有生产阻断记录。</p>`;
+  if (boundaryTarget) boundaryTarget.textContent = center.boundary || "正式上线仍需完成现场验收与 go/no-go 签字。";
+}
+
 function renderProductionDatabaseCutoverCenter(platform) {
   const metricsTarget = document.querySelector("#production-database-cutover-metrics");
   const runsTarget = document.querySelector("#production-database-cutover-runs");
@@ -1491,6 +1579,11 @@ function listText(value) {
 
 function bindPlatformEditor() {
   document.addEventListener("click", (event) => {
+    const platformCapabilityButton = event.target.closest("[data-platform-capability-action]");
+    if (platformCapabilityButton) {
+      runPlatformCapabilityReviewAction(platformCapabilityButton.dataset.platformCapabilityAction, platformCapabilityButton.dataset.id, platformCapabilityButton);
+      return;
+    }
     const postgresReconciliationButton = event.target.closest("[data-postgres-reconciliation-action]");
     if (postgresReconciliationButton) {
       runPostgresReconciliationCaseAction(postgresReconciliationButton.dataset.postgresReconciliationAction, postgresReconciliationButton.dataset.id, postgresReconciliationButton);
@@ -1597,6 +1690,71 @@ function bindPlatformEditor() {
     });
     refreshReportSummary();
   });
+}
+
+async function loadPlatformCapabilityOperationsCenter() {
+  if (!PLATFORM_API_BASE) return;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  try {
+    const response = await request(`${PLATFORM_API_BASE}/platform/capability-operations`);
+    if (!response.ok) return;
+    const payload = await response.json();
+    platformCapabilityOperationsCenter = payload.center || platformCapabilityOperationsCenter;
+    platformState.platformCapabilityReviews = (payload.center?.capabilities || []).map((item) => item.review).filter(Boolean);
+  } catch (error) {
+    // Static and offline fallback remains usable without the commission API.
+  }
+}
+
+async function runPlatformCapabilityReviewAction(action, id, button) {
+  if (!PLATFORM_API_BASE || !action || !id) return;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  const statusTarget = document.querySelector("#platform-capability-operations-status");
+  const capability = (platformCapabilityOperationsCenter.capabilities || []).find((item) => item.id === id);
+  if (!capability) return;
+  const payload = { action, note: "" };
+  if (action === "assign") {
+    payload.owner = window.prompt("能力域责任人", capability.review?.owner || "") || "";
+    if (!payload.owner.trim()) return;
+    payload.note = `能力域责任已分派给 ${payload.owner.trim()}。`;
+  } else if (action === "record-evidence") {
+    payload.evidenceRef = window.prompt("证据文件、工单或验收记录引用", capability.sourceEvidence?.[0] || "") || "";
+    if (!payload.evidenceRef.trim()) return;
+    payload.note = `补录能力域复核证据：${payload.evidenceRef.trim()}`;
+  } else if (action === "review") {
+    payload.evidenceRefs = capability.review?.evidenceRefs?.length ? [] : (capability.sourceEvidence || []).slice(0, 3);
+    payload.note = "仓库实现、自动化检查和当前生产边界已完成生产前复核。";
+  } else if (action === "request-improvement") {
+    payload.note = window.prompt("请输入整改要求", "请补齐验收证据并完成责任人复核。") || "";
+    if (!payload.note.trim()) return;
+  } else {
+    payload.note = window.prompt("请输入能力域复核备注", "") || "";
+    if (!payload.note.trim()) return;
+  }
+  if (button) button.disabled = true;
+  if (statusTarget) {
+    statusTarget.textContent = "正在更新能力复核台账";
+    statusTarget.className = "badge warn";
+  }
+  try {
+    const response = await request(`${PLATFORM_API_BASE}/platform/capability-operations/${encodeURIComponent(id)}/actions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.message || `HTTP ${response.status}`);
+    platformCapabilityOperationsCenter = body.center || platformCapabilityOperationsCenter;
+    platformState.platformCapabilityReviews = (body.center?.capabilities || []).map((item) => item.review).filter(Boolean);
+    renderPlatformCapabilityOperationsCenter();
+  } catch (error) {
+    if (statusTarget) {
+      statusTarget.textContent = error.message || "能力复核操作失败";
+      statusTarget.className = "badge danger";
+    }
+  } finally {
+    if (button) button.disabled = false;
+  }
 }
 
 async function loadCommercialCryptoCenter() {

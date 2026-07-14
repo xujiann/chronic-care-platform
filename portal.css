@@ -1331,6 +1331,24 @@ dialog::backdrop {
   line-height: 1.55;
 }
 
+#platform-capability-operations-center .portal-grid > *,
+#platform-capability-operations-center .priority-row > * {
+  min-width: 0;
+}
+
+#platform-capability-operations-center .priority-row p,
+#platform-capability-operations-center .priority-row small,
+#platform-capability-operations-center .capability-side {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+#platform-capability-operations-center .badge {
+  max-width: 100%;
+  text-align: center;
+  white-space: normal;
+}
+
 #process-audit-matrix .priority-row {
   grid-template-columns: 58px minmax(0, 1fr) minmax(240px, 0.62fr);
 }

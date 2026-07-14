@@ -1916,6 +1916,45 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     });
   });
 
+  await t.test("operates the evidence-backed platform capability review ledger", async () => {
+    const denied = await api(baseUrl, "/api/platform/capability-operations");
+    assert.equal(denied.response.status, 401);
+
+    const initial = await api(baseUrl, "/api/platform/capability-operations", authorized(commissionToken));
+    assert.equal(initial.response.status, 200);
+    assert.equal(initial.body.center.summary.capabilityDomains, 10);
+    assert.equal(initial.body.center.summary.productionReady, 0);
+    assert.equal(initial.body.center.capabilities.every((item) => item.review && item.productionReady === false), true);
+
+    const evidence = await api(baseUrl, "/api/platform/capability-operations/data-governance/actions", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "record-evidence",
+        evidenceRef: "release:data-governance-readiness",
+        note: "Registered the data governance readiness evidence."
+      })
+    }));
+    assert.equal(evidence.response.status, 200);
+    assert.equal(evidence.body.capability.reviewStatus, "in-review");
+    assert.equal(evidence.body.capability.productionReady, false);
+
+    const reviewed = await api(baseUrl, "/api/platform/capability-operations/data-governance/actions", authorized(commissionToken, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "review",
+        note: "Repository implementation and current production boundary were reviewed."
+      })
+    }));
+    assert.equal(reviewed.response.status, 200);
+    assert.equal(reviewed.body.capability.reviewStatus, "reviewed-preproduction");
+    assert.equal(reviewed.body.center.summary.reviewedPreproduction, 1);
+    assert.equal(reviewed.body.center.productionReady, false);
+
+    const state = await api(baseUrl, "/api/state", authorized(commissionToken));
+    assert.equal(state.body.securityEvents.some((item) => item.action === "platform-capability-review-action"), true);
+    assert.equal(state.body.platformCapabilityReviews.find((item) => item.capabilityId === "data-governance").productionReady, false);
+  });
+
   await t.test("exposes scoped multi-practice registry for supervision and public ledger", async () => {
     const registry = await api(baseUrl, "/api/multi-practice-registry", authorized(commissionToken));
     assert.equal(registry.response.status, 200);

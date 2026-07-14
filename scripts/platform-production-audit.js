@@ -266,6 +266,13 @@ function buildPlatformProductionAudit(options = {}) {
     deploy: read("scripts/deploy-check.js"),
     release: read("scripts/release-report.js")
   };
+  const runtimeSources = options.runtimeSources || {
+    domain: read("platform-capability-operations.js"),
+    server: read("server.js"),
+    html: read("platform.html"),
+    client: read("platform.js"),
+    documentation: read("docs/platform-capability-operations-center.md")
+  };
   const document = options.document ?? (exists("docs/数智医院标准平台全程审计与生产前开发规划.md")
     ? read("docs/数智医院标准平台全程审计与生产前开发规划.md")
     : "");
@@ -286,6 +293,7 @@ function buildPlatformProductionAudit(options = {}) {
     check("platformAudit:boundaries", PRODUCTION_BLOCKERS.every((item) => item.owner && item.evidence && item.doneWhen), `${PRODUCTION_BLOCKERS.length} production blockers have owners, evidence and exit criteria`),
     check("platformAudit:mvpRequiredModules", MVP_REQUIRED_MODULES.length >= 8 && MVP_REQUIRED_MODULES.every((item) => item.priority === "P0" && item.remainingCode && item.siteDependency), `${MVP_REQUIRED_MODULES.length} mandatory MVP production modules have code scope and site dependencies`),
     check("platformAudit:roadmap", ROADMAP.length === 4 && ROADMAP.every((item) => item.deliverables.length >= 4 && item.exit), "30/60/90-day and continuous-improvement roadmap is complete"),
+    check("platformAudit:capabilityOperationsCenter", runtimeSources.domain.includes("applyPlatformCapabilityReviewAction") && runtimeSources.server.includes("/api/platform/capability-operations") && runtimeSources.html.includes("platform-capability-operations-center") && runtimeSources.client.includes("renderPlatformCapabilityOperationsCenter") && runtimeSources.documentation.includes("reviewed-preproduction"), "capability ownership, evidence, pre-production review and improvement workflow is runnable and documented"),
     check("platformAudit:releaseWiring", Boolean(pkg.scripts?.["platform:production-audit"]) && scriptSources.manifest.includes("platform-production-audit") && scriptSources.deploy.includes("platformProductionAudit") && scriptSources.release.includes("buildPlatformProductionAudit"), "package, manifest, deploy check and release report are wired"),
     check("platformAudit:formalDocument", ["审计结论", "正式生产前已实现的主要功能", "生产割接差距", "下一步开发规划", "正式上线退出条件"].every((marker) => document.includes(marker)), "formal audit document contains conclusion, capability inventory, gaps, roadmap and exit criteria")
   ];
@@ -308,7 +316,8 @@ function buildPlatformProductionAudit(options = {}) {
       cutoverPassed: passedCutover,
       cutoverBlocked: Math.max(0, cutoverRows.length - passedCutover),
       releaseChecks: Number(releaseReport.summary?.total || 0),
-      releaseChecksPassed: Number(releaseReport.summary?.passed || 0)
+      releaseChecksPassed: Number(releaseReport.summary?.passed || 0),
+      capabilityOperationsCenter: checks.some((item) => item.id === "platformAudit:capabilityOperationsCenter" && item.passed)
     },
     auditBasis: [
       "运行页面与角色入口",
@@ -340,6 +349,7 @@ function renderMarkdown(report) {
     report.conclusion,
     "",
     `本次审计覆盖 ${report.summary.capabilityDomains} 个能力域，其中 ${report.summary.implementedDomains} 个具备仓库内可运行证据；正式生产就绪能力按审慎口径计为 ${report.summary.productionReadyDomains} 个。当前演示发布检查为 ${report.summary.releaseChecksPassed}/${report.summary.releaseChecks}，生产割接检查为 ${report.summary.cutoverPassed}/${report.summary.cutoverChecks}。发布检查通过只证明代码、文档和演示证据结构完整，不等同于现场生产验收。`,
+    `平台能力运营中心已${report.summary.capabilityOperationsCenter ? "纳入" : "未纳入"}发布门禁，用于统一管理能力域责任人、证据、生产前复核、整改要求和审计留痕。`,
     "",
     "## 二、审计范围与方法",
     "",

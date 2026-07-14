@@ -14,6 +14,12 @@ const {
   readPostgresReconciliationRun,
   readPostgresSyncStatus
 } = require("./postgres-runtime-sync");
+const {
+  applyPlatformCapabilityReviewAction,
+  buildPlatformCapabilityOperationsCenter,
+  normalizePlatformCapabilityReviews,
+  seedPlatformCapabilityReviews
+} = require("./platform-capability-operations");
 const BloodService = require("./blood-service");
 const BloodTransactionService = require("./blood-transaction-service");
 const BloodMasterData = require("./blood-master-data");
@@ -945,6 +951,7 @@ function seedState() {
     platformInterfaces: seedPlatformInterfaces(),
     platformDeliveryBatches: seedPlatformDeliveryBatches(),
     platformEvidence: seedPlatformEvidence(),
+    platformCapabilityReviews: seedPlatformCapabilityReviews(),
     productionDeploymentPlan: seedProductionDeploymentPlan(),
     productionDatabaseMigrationBatches: seedProductionDatabaseMigrationBatches(),
     productionDatabaseCutoverRuns: seedProductionDatabaseCutoverRuns(),
@@ -7408,6 +7415,7 @@ function normalizeState(data) {
     platformInterfaces: mergeByKey(seedPlatformInterfaces(), data.platformInterfaces, "id"),
     platformDeliveryBatches: mergeByKey(seedPlatformDeliveryBatches(), data.platformDeliveryBatches, "id"),
     platformEvidence: cleanPlatformEvidenceText(mergeByKey(seedPlatformEvidence(), data.platformEvidence, "id")),
+    platformCapabilityReviews: normalizePlatformCapabilityReviews(data.platformCapabilityReviews),
     productionDeploymentPlan: mergeByKey(seedProductionDeploymentPlan(), data.productionDeploymentPlan, "id"),
     productionDatabaseMigrationBatches: mergeByKey(seedProductionDatabaseMigrationBatches(), data.productionDatabaseMigrationBatches, "id"),
     productionDatabaseCutoverRuns: mergeByKey(seedProductionDatabaseCutoverRuns(), data.productionDatabaseCutoverRuns, "id"),
@@ -7602,6 +7610,7 @@ function completeSystemTargets(state) {
     ...item,
     records: Array.isArray(item.records) ? item.records.slice(0, 20) : []
   }));
+  state.platformCapabilityReviews = normalizePlatformCapabilityReviews(state.platformCapabilityReviews);
   state.productionDeploymentPlan = mergeByKey(seedProductionDeploymentPlan(), state.productionDeploymentPlan, "id").map((item) => ({
     ...item,
     requiredConfig: Array.isArray(item.requiredConfig) ? item.requiredConfig : [],
@@ -11633,6 +11642,7 @@ function scopeStateForUser(data, user) {
   delete scoped.platformInterfaces;
   delete scoped.platformDeliveryBatches;
   delete scoped.platformEvidence;
+  delete scoped.platformCapabilityReviews;
   delete scoped.productionDeploymentPlan;
   delete scoped.productionDatabaseMigrationBatches;
   delete scoped.productionDatabaseCutoverRuns;
@@ -19875,6 +19885,63 @@ async function handleApi(req, res) {
       detail: `${center.summary.migrationBatches} batches / ${center.summary.cutoverRuns} rehearsal runs`
     });
     sendJson(res, 200, { ok: center.ok, generatedAt: new Date().toISOString(), center });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/platform/capability-operations") {
+    const user = requireApiRole(req, res, ["commission"], "/api/platform/capability-operations");
+    if (!user) return;
+    const center = buildPlatformCapabilityOperationsCenter(readDatabase());
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "platform-capability-operations-read",
+      target: "/api/platform/capability-operations",
+      result: "allowed",
+      detail: `${center.summary.reviewedPreproduction}/${center.summary.capabilityDomains} reviewed / production ready 0`
+    });
+    sendJson(res, 200, { ok: center.ok, generatedAt: center.generatedAt, center });
+    return;
+  }
+
+  const platformCapabilityActionMatch = url.pathname.match(/^\/api\/platform\/capability-operations\/([^/]+)\/actions$/);
+  if (req.method === "POST" && platformCapabilityActionMatch) {
+    const user = requireApiRole(req, res, ["commission"], "/api/platform/capability-operations/:id/actions");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const capabilityId = decodeURIComponent(platformCapabilityActionMatch[1]);
+    const data = readDatabase();
+    try {
+      const normalized = applyPlatformCapabilityReviewAction(data, capabilityId, payload, user);
+      data.platformCapabilityReviews = normalized.reviews;
+      data.securityEvents = sealAuditTrail([
+        {
+          id: randomUUID(),
+          at: new Date().toLocaleString("zh-CN", { hour12: false }),
+          actor: user.name,
+          role: user.role,
+          action: "platform-capability-review-action",
+          target: capabilityId,
+          result: "allowed",
+          detail: `${normalized.history.action} / ${normalized.history.fromStatus} -> ${normalized.history.toStatus} / production ready false`
+        },
+        ...(Array.isArray(data.securityEvents) ? data.securityEvents : [])
+      ].slice(0, 120), { recompute: true });
+      writeDatabase(normalizeState(data));
+      sendJson(res, 200, {
+        ok: true,
+        capability: normalized.item,
+        action: normalized.history,
+        center: buildPlatformCapabilityOperationsCenter(readDatabase())
+      });
+    } catch (error) {
+      const status = error.statusCode || 400;
+      sendJson(res, status, {
+        error: status === 404 ? "Not Found" : status === 409 ? "Conflict" : "Bad Request",
+        code: error.code || "PLATFORM_CAPABILITY_ACTION_FAILED",
+        message: error.message
+      });
+    }
     return;
   }
 
