@@ -12,7 +12,8 @@ const {
   readLatestPostgresReconciliation,
   readPostgresReconciliationCase,
   readPostgresReconciliationRun,
-  readPostgresSyncStatus
+  readPostgresSyncStatus,
+  runPostgresPrimaryReadRehearsal
 } = require("./postgres-runtime-sync");
 const {
   applyPlatformCapabilityReviewAction,
@@ -23,6 +24,7 @@ const {
   seedPlatformCapabilityReviews,
   seedPlatformProductionBlockerReviews
 } = require("./platform-capability-operations");
+const { buildPostgresProductionAdapterConfig } = require("./postgres-production-adapter");
 const BloodService = require("./blood-service");
 const BloodTransactionService = require("./blood-transaction-service");
 const BloodMasterData = require("./blood-master-data");
@@ -148,6 +150,7 @@ const SQLITE_FILE = path.join(DATA_DIR, "health-city.sqlite");
 const STORAGE_ENGINE = String(process.env.STORAGE_ENGINE || "auto").toLowerCase();
 const RUNTIME_STORAGE_ENGINES = new Set(["auto", "json", "sqlite"]);
 const POSTGRES_SYNC_MODE = String(process.env.POSTGRES_SYNC_MODE || "disabled").trim().toLowerCase();
+const POSTGRES_PRIMARY_READ_MODE = String(process.env.POSTGRES_PRIMARY_READ_MODE || "disabled").trim().toLowerCase();
 const POSTGRES_SYNC_BACKLOG_SLO_MAX = boundedEnvironmentNumber("POSTGRES_SYNC_BACKLOG_SLO_MAX", 20, 0, 100000);
 const POSTGRES_SYNC_PENDING_AGE_SLO_SECONDS = boundedEnvironmentNumber("POSTGRES_SYNC_PENDING_AGE_SLO_SECONDS", 300, 30, 86400);
 const POSTGRES_RECONCILIATION_AGE_SLO_SECONDS = boundedEnvironmentNumber("POSTGRES_RECONCILIATION_AGE_SLO_SECONDS", 600, 60, 86400);
@@ -20060,6 +20063,101 @@ async function handleApi(req, res) {
       evidencePacket: normalized.evidencePacket,
       center: buildCommercialCryptoCenter(refreshed)
     });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/production-database/adapter") {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-database/adapter");
+    if (!user) return;
+    try {
+      const config = buildPostgresProductionAdapterConfig(process.env);
+      sendJson(res, 200, {
+        ok: true,
+        configured: config.configured,
+        adapterMode: config.adapterMode,
+        writeMode: config.writeMode,
+        writeEnabled: config.writeEnabled,
+        evidenceReady: config.evidenceReady,
+        requirements: config.requirements,
+        capabilities: {
+          readTransaction: "repeatable-read-read-only",
+          writeTransaction: "serializable",
+          optimisticLock: "all-collection-versions",
+          writeAudit: "runtime_primary_write_audit"
+        },
+        productionPrimary: false,
+        runtimeCutoverEnabled: false
+      });
+    } catch (error) {
+      sendJson(res, error.statusCode || 400, { error: "Bad Request", code: error.code || "POSTGRES_ADAPTER_CONFIG_INVALID", message: error.message });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/production-database/primary-read-rehearsal") {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-database/primary-read-rehearsal");
+    if (!user) return;
+    const requirements = {
+      readMode: POSTGRES_PRIMARY_READ_MODE === "rehearsal",
+      shadowSync: POSTGRES_SYNC_MODE === "outbox",
+      sqliteBaseline: shouldUseSqlite() && fs.existsSync(SQLITE_FILE),
+      databaseUrl: Boolean(process.env.DATABASE_URL)
+    };
+    sendJson(res, 200, {
+      ok: true,
+      configured: Object.values(requirements).every(Boolean),
+      mode: POSTGRES_PRIMARY_READ_MODE,
+      requirements,
+      transaction: "repeatable-read-read-only",
+      productionPrimary: false,
+      writePrimary: false,
+      runtimeCutoverEnabled: false
+    });
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/production-database/primary-read-rehearsal") {
+    const user = requireApiRole(req, res, ["commission"], "/api/production-database/primary-read-rehearsal");
+    if (!user) return;
+    const payload = await collectJson(req);
+    const note = String(payload.note || "").trim();
+    if (note.length < 8) {
+      sendJson(res, 400, { error: "Bad Request", code: "PRIMARY_READ_REHEARSAL_NOTE_REQUIRED", message: "Primary read rehearsal requires an operational note" });
+      return;
+    }
+    const configured = POSTGRES_PRIMARY_READ_MODE === "rehearsal"
+      && POSTGRES_SYNC_MODE === "outbox"
+      && shouldUseSqlite()
+      && fs.existsSync(SQLITE_FILE)
+      && Boolean(process.env.DATABASE_URL);
+    if (!configured) {
+      sendJson(res, 409, { error: "Conflict", code: "PRIMARY_READ_REHEARSAL_NOT_CONFIGURED", message: "PostgreSQL primary read rehearsal configuration is incomplete" });
+      return;
+    }
+    try {
+      const result = await runPostgresPrimaryReadRehearsal({
+        mode: POSTGRES_PRIMARY_READ_MODE,
+        syncMode: POSTGRES_SYNC_MODE,
+        sqliteFile: SQLITE_FILE,
+        env: process.env,
+        requiredCollections: Array.isArray(payload.requiredCollections) ? payload.requiredCollections : []
+      });
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: "postgres-primary-read-rehearsal",
+        target: result.report.runId,
+        result: "allowed",
+        detail: `${result.report.status}; ${result.report.collections} collections; production primary false`
+      });
+      sendJson(res, 200, { ok: true, report: result.report });
+    } catch (error) {
+      sendJson(res, error.statusCode || 502, {
+        error: error.statusCode === 409 ? "Conflict" : "Bad Gateway",
+        code: error.code || "POSTGRES_PRIMARY_READ_FAILED",
+        message: error.message === "PostgreSQL primary read rehearsal failed" ? error.message : "PostgreSQL primary read rehearsal was blocked by verification"
+      });
+    }
     return;
   }
 

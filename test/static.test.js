@@ -781,6 +781,13 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("platform.js"), /loadPostgresReconciliationCenter/);
   assert.match(read("platform.js"), /runPostgresReconciliationCaseAction/);
   assert.match(read("platform.js"), /data-postgres-reconciliation-action/);
+  assert.match(read("platform.html"), /postgres-adapter-status/);
+  assert.match(read("platform.html"), /postgres-primary-read-status/);
+  assert.match(read("platform.html"), /postgres-adapter-metrics/);
+  assert.match(read("platform.html"), /data-postgres-primary-read-action/);
+  assert.match(read("platform.js"), /loadPostgresProductionAdapterCenter/);
+  assert.match(read("platform.js"), /renderPostgresProductionAdapterCenter/);
+  assert.match(read("platform.js"), /runPostgresPrimaryReadRehearsal/);
   assert.match(read("server.js"), /\/api\/production-database\/cutover-center/);
   assert.match(read("server.js"), /production-database-cutover-rehearsal/);
   assert.match(read("server.js"), /delete scoped\.productionDatabaseCutoverRuns/);

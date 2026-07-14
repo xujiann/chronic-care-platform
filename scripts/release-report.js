@@ -785,6 +785,8 @@ function productionDbReadinessChecks(productionDbReadiness) {
     check("productionDb:idempotentWorker", productionDbReadiness.postgresRuntimeSync?.idempotentApply && productionDbReadiness.postgresRuntimeSync?.retryState && productionDbReadiness.postgresRuntimeSync?.workerCommand, "PostgreSQL worker is idempotent, version-aware and retryable", "error", "production-db"),
     check("productionDb:baselineBootstrap", productionDbReadiness.postgresRuntimeSync?.baselineBootstrap, "SQLite collection baseline can be queued once before incremental sync", "error", "production-db"),
     check("productionDb:shadowReconciliation", productionDbReadiness.postgresRuntimeSync?.readOnlyReconciliation && productionDbReadiness.postgresRuntimeSync?.reconciliationLedger && productionDbReadiness.postgresRuntimeSync?.reconciliationCommand, "read-only collection version and digest reconciliation is payload-free and health-visible", "error", "production-db"),
+    check("productionDb:primaryReadRehearsal", productionDbReadiness.postgresRuntimeSync?.primaryReadRehearsal, "repeatable-read read-only PostgreSQL snapshot reconstruction verifies payload digests and the complete shadow baseline without enabling cutover", "error", "production-db"),
+    check("productionDb:productionAdapter", productionDbReadiness.postgresRuntimeSync?.productionAdapter, "PostgreSQL adapter provides verified reads, serializable writes, complete optimistic locking and payload-free evidence-gated audit", "error", "production-db"),
     check("productionDb:reconciliationCaseWorkflow", productionDbReadiness.postgresRuntimeSync?.reconciliationCaseWorkflow, "commission-only reconciliation cases require ownership, matched-run clearance and resolution evidence", "error", "production-db"),
     check("productionDb:reconciliationScheduler", productionDbReadiness.postgresRuntimeSync?.reconciliationScheduler, "hardened reconciliation service runs every five minutes", "error", "production-db"),
     check("productionDb:shadowBoundary", productionDbReadiness.migrationEvidence?.runtimePostgresBlocked && productionDbReadiness.postgresMigrationPackage?.manifest?.target?.runtimeAdapterEnabled === false, "PostgreSQL remains a shadow target and cannot become primary through the worker", "error", "production-db")
@@ -960,6 +962,9 @@ function packageChecks(pkg) {
     "postgres:sync-worker",
     "postgres:sync-bootstrap",
     "postgres:shadow-reconcile",
+    "postgres:primary-read-rehearsal",
+    "postgres:adapter-status",
+    "postgres:adapter-verify",
     "evaluation:evidence",
     "regional-data-sharing:report",
     "storage:backup",

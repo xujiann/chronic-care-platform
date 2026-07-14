@@ -5,8 +5,12 @@ const { canonicalStringify } = require("./scripts/postgres-migration-package");
 
 const SYNC_MODE = String(process.env.POSTGRES_SYNC_MODE || "disabled").trim().toLowerCase();
 const SYNC_MODES = new Set(["disabled", "outbox"]);
+const PRIMARY_READ_MODE = String(process.env.POSTGRES_PRIMARY_READ_MODE || "disabled").trim().toLowerCase();
+const PRIMARY_READ_MODES = new Set(["disabled", "rehearsal"]);
 const MAX_BATCH_LIMIT = 100;
 const MAX_RECONCILIATION_HISTORY = 100;
+const DEFAULT_PRIMARY_READ_MAX_BYTES = 128 * 1024 * 1024;
+const MAX_PRIMARY_READ_COLLECTIONS = 2000;
 const RECONCILIATION_CASE_STATUSES = new Set(["open", "acknowledged", "resolved", "reopened"]);
 const RECONCILIATION_CASE_ACTIONS = new Set(["assign", "acknowledge", "resolve", "reopen", "comment"]);
 
@@ -19,12 +23,26 @@ class PostgresReconciliationCaseError extends Error {
   }
 }
 
+class PostgresPrimaryReadError extends Error {
+  constructor(message, code, statusCode = 400) {
+    super(message);
+    this.name = "PostgresPrimaryReadError";
+    this.code = code;
+    this.statusCode = statusCode;
+  }
+}
+
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
 }
 
 function assertSyncMode(mode = SYNC_MODE) {
   if (!SYNC_MODES.has(mode)) throw new Error(`Unsupported POSTGRES_SYNC_MODE=${mode}`);
+  return mode;
+}
+
+function assertPrimaryReadMode(mode = PRIMARY_READ_MODE) {
+  if (!PRIMARY_READ_MODES.has(mode)) throw new PostgresPrimaryReadError(`Unsupported POSTGRES_PRIMARY_READ_MODE=${mode}`, "INVALID_POSTGRES_PRIMARY_READ_MODE");
   return mode;
 }
 
@@ -564,6 +582,176 @@ function comparePostgresShadowState(localRows = [], remoteRows = []) {
   };
 }
 
+function boundedPrimaryReadLimit(value, fallback, min, max) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(parsed)));
+}
+
+function normalizePostgresPrimaryReadRow(row) {
+  const collection = String(row?.collection_name || row?.collection || "").trim();
+  if (!/^[A-Za-z][A-Za-z0-9_-]{0,239}$/.test(collection) || collection === "storageMeta") {
+    throw new PostgresPrimaryReadError("PostgreSQL primary read returned an invalid collection name", "INVALID_PRIMARY_READ_COLLECTION", 409);
+  }
+  const sourceVersion = Number(row?.source_version ?? row?.sourceVersion);
+  if (!Number.isInteger(sourceVersion) || sourceVersion < 0) {
+    throw new PostgresPrimaryReadError("PostgreSQL primary read returned an invalid collection version", "INVALID_PRIMARY_READ_VERSION", 409);
+  }
+  let value;
+  try {
+    value = typeof row?.payload === "string" ? JSON.parse(row.payload) : row?.payload;
+  } catch {
+    throw new PostgresPrimaryReadError("PostgreSQL primary read returned invalid JSON", "INVALID_PRIMARY_READ_PAYLOAD", 409);
+  }
+  if (value === undefined) {
+    throw new PostgresPrimaryReadError("PostgreSQL primary read returned an empty payload", "INVALID_PRIMARY_READ_PAYLOAD", 409);
+  }
+  const payload = canonicalStringify(value);
+  const payloadSha256 = String(row?.payload_sha256 || row?.payloadSha256 || "").trim().toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(payloadSha256) || sha256(payload) !== payloadSha256) {
+    throw new PostgresPrimaryReadError("PostgreSQL primary read payload digest verification failed", "PRIMARY_READ_DIGEST_MISMATCH", 409);
+  }
+  return {
+    collection,
+    sourceVersion,
+    payloadSha256,
+    batchId: String(row?.batch_id || row?.batchId || "").trim().slice(0, 120),
+    value,
+    bytes: Buffer.byteLength(payload)
+  };
+}
+
+function buildPostgresPrimaryReadSnapshot(rows = [], options = {}) {
+  if (!Array.isArray(rows) || !rows.length) {
+    throw new PostgresPrimaryReadError("PostgreSQL primary read returned no collections", "PRIMARY_READ_EMPTY", 409);
+  }
+  const maxCollections = boundedPrimaryReadLimit(options.maxCollections, MAX_PRIMARY_READ_COLLECTIONS, 1, MAX_PRIMARY_READ_COLLECTIONS);
+  const maxBytes = boundedPrimaryReadLimit(options.maxBytes, DEFAULT_PRIMARY_READ_MAX_BYTES, 1024, 512 * 1024 * 1024);
+  if (rows.length > maxCollections) {
+    throw new PostgresPrimaryReadError("PostgreSQL primary read collection limit exceeded", "PRIMARY_READ_COLLECTION_LIMIT", 409);
+  }
+  const normalized = rows.map(normalizePostgresPrimaryReadRow).sort((a, b) => a.collection.localeCompare(b.collection));
+  const names = new Set();
+  let payloadBytes = 0;
+  normalized.forEach((item) => {
+    if (names.has(item.collection)) {
+      throw new PostgresPrimaryReadError("PostgreSQL primary read returned duplicate collections", "PRIMARY_READ_DUPLICATE_COLLECTION", 409);
+    }
+    names.add(item.collection);
+    payloadBytes += item.bytes;
+    if (payloadBytes > maxBytes) {
+      throw new PostgresPrimaryReadError("PostgreSQL primary read payload limit exceeded", "PRIMARY_READ_PAYLOAD_LIMIT", 409);
+    }
+  });
+  const requiredCollections = [...new Set((options.requiredCollections || []).map((item) => String(item || "").trim()).filter(Boolean))];
+  const missingRequired = requiredCollections.filter((item) => !names.has(item));
+  if (missingRequired.length) {
+    throw new PostgresPrimaryReadError("PostgreSQL primary read is missing required collections", "PRIMARY_READ_REQUIRED_COLLECTION_MISSING", 409);
+  }
+  const metadata = normalized.map((item) => ({
+    collection: item.collection,
+    sourceVersion: item.sourceVersion,
+    payloadSha256: item.payloadSha256,
+    batchId: item.batchId
+  }));
+  const expectedRows = Array.isArray(options.expectedRows) ? options.expectedRows : [];
+  const comparison = expectedRows.length ? comparePostgresShadowState(expectedRows, metadata) : null;
+  if (comparison && comparison.mismatched > 0) {
+    const error = new PostgresPrimaryReadError("PostgreSQL primary read does not match the verified shadow baseline", "PRIMARY_READ_BASELINE_MISMATCH", 409);
+    error.report = {
+      localCollections: comparison.localCollections,
+      remoteCollections: comparison.remoteCollections,
+      matched: comparison.matched,
+      mismatched: comparison.mismatched
+    };
+    throw error;
+  }
+  const manifest = metadata.map(({ collection, sourceVersion, payloadSha256 }) => ({ collection, sourceVersion, payloadSha256 }));
+  const state = normalized.reduce((result, item) => {
+    result[item.collection] = item.value;
+    return result;
+  }, {});
+  const versions = normalized.map((item) => item.sourceVersion);
+  return {
+    state,
+    report: {
+      collections: normalized.length,
+      payloadBytes,
+      matchedBaselineCollections: comparison?.matched || 0,
+      sourceVersionMin: Math.min(...versions),
+      sourceVersionMax: Math.max(...versions),
+      snapshotSha256: sha256(canonicalStringify(manifest)),
+      credentialsPersisted: false,
+      payloadsExposed: false,
+      productionPrimary: false,
+      writePrimary: false,
+      runtimeCutoverEnabled: false
+    }
+  };
+}
+
+async function runPostgresPrimaryReadRehearsal(options = {}) {
+  const mode = assertPrimaryReadMode(options.mode || PRIMARY_READ_MODE);
+  if (mode !== "rehearsal") {
+    throw new PostgresPrimaryReadError("POSTGRES_PRIMARY_READ_MODE=rehearsal is required", "PRIMARY_READ_REHEARSAL_DISABLED", 409);
+  }
+  const syncMode = assertSyncMode(options.syncMode || SYNC_MODE);
+  if (syncMode !== "outbox") {
+    throw new PostgresPrimaryReadError("POSTGRES_SYNC_MODE=outbox is required", "PRIMARY_READ_OUTBOX_REQUIRED", 409);
+  }
+  const sqliteFile = path.resolve(options.sqliteFile || path.join(process.env.DATA_DIR || path.join(__dirname, "data"), "health-city.sqlite"));
+  if (!fs.existsSync(sqliteFile)) {
+    throw new PostgresPrimaryReadError("SQLite shadow baseline is unavailable", "PRIMARY_READ_BASELINE_UNAVAILABLE", 409);
+  }
+  const expectedRows = options.expectedRows || loadSqliteCollectionState(sqliteFile);
+  if (!expectedRows.length) {
+    throw new PostgresPrimaryReadError("SQLite shadow baseline is empty", "PRIMARY_READ_BASELINE_UNAVAILABLE", 409);
+  }
+  const env = options.env || process.env;
+  const poolConfig = options.pool ? null : (options.poolConfig || postgresPoolConfig(env));
+  const pool = options.pool || new (options.PoolClass || require("pg").Pool)(poolConfig);
+  const runId = options.runId || `pgread-${randomUUID()}`;
+  const checkedAt = options.checkedAt || new Date().toISOString();
+  const startedAt = Date.now();
+  let client;
+  try {
+    client = await pool.connect();
+    await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
+    const result = await client.query(`
+      SELECT collection_name, payload, payload_sha256, source_version, batch_id, updated_at
+      FROM health_platform.runtime_collection_state
+      ORDER BY collection_name
+    `);
+    const snapshot = buildPostgresPrimaryReadSnapshot(result.rows, {
+      expectedRows,
+      requiredCollections: options.requiredCollections,
+      maxCollections: options.maxCollections || env.POSTGRES_PRIMARY_READ_MAX_COLLECTIONS,
+      maxBytes: options.maxBytes || env.POSTGRES_PRIMARY_READ_MAX_BYTES
+    });
+    await client.query("COMMIT");
+    return {
+      state: snapshot.state,
+      report: {
+        ok: true,
+        runId,
+        checkedAt,
+        status: "verified-rehearsal",
+        durationMs: Math.max(0, Date.now() - startedAt),
+        transaction: "repeatable-read-read-only",
+        ...snapshot.report
+      }
+    };
+  } catch (error) {
+    try { await client?.query?.("ROLLBACK"); } catch {}
+    if (error instanceof PostgresPrimaryReadError) throw error;
+    const safeCode = /^[A-Z0-9_]{2,80}$/.test(String(error?.code || "")) ? String(error.code) : "POSTGRES_PRIMARY_READ_FAILED";
+    throw new PostgresPrimaryReadError("PostgreSQL primary read rehearsal failed", safeCode, 502);
+  } finally {
+    client?.release?.();
+    if (!options.pool) await pool.end();
+  }
+}
+
 function insertSystemReconciliationCaseAction(db, caseId, action, fromStatus, toStatus, owner, runId, createdAt) {
   db.prepare(`
     INSERT INTO postgres_sync_reconciliation_case_actions (
@@ -933,14 +1121,18 @@ async function runPostgresSyncWorker(options = {}) {
 }
 
 module.exports = {
+  PostgresPrimaryReadError,
   PostgresReconciliationCaseError,
+  PRIMARY_READ_MODES,
   SYNC_MODES,
   applyPostgresReconciliationCaseAction,
   applyPostgresSyncBatch,
+  assertPrimaryReadMode,
   assertSyncMode,
   buildCollectionChanges,
   buildCollectionSnapshotChanges,
   buildPostgresSyncBatch,
+  buildPostgresPrimaryReadSnapshot,
   comparePostgresShadowState,
   enqueuePostgresSyncBatch,
   enqueuePostgresSyncBaseline,
@@ -955,6 +1147,7 @@ module.exports = {
   readLatestPostgresReconciliation,
   readPostgresSyncStatus,
   recordPostgresReconciliation,
+  runPostgresPrimaryReadRehearsal,
   runPostgresShadowReconciliation,
   runPostgresSyncWorker,
   validatePostgresSyncBatch

@@ -24,12 +24,14 @@ test("PostgreSQL manifest package exposes counts and digests without record payl
   assert.equal(pkg.manifest.summary.records, 2);
   assert.equal(pkg.manifest.summary.snapshots, 1);
   assert.equal(pkg.manifest.secretBoundary.databaseUrlPersisted, false);
+  assert.equal(pkg.manifest.target.runtimeAdapterImplemented, true);
   assert.equal(pkg.manifest.target.runtimeAdapterEnabled, false);
   assert.equal(pkg.manifest.productionReady, false);
   assert.doesNotMatch(serialized, /Sensitive Name|13800000000/);
   assert.match(pkg.files["schema.sql"], /CREATE TABLE IF NOT EXISTS health_platform\.collection_records/);
   assert.match(pkg.files["schema.sql"], /CREATE TABLE IF NOT EXISTS health_platform\.runtime_sync_batches/);
   assert.match(pkg.files["schema.sql"], /CREATE TABLE IF NOT EXISTS health_platform\.runtime_collection_state/);
+  assert.match(pkg.files["schema.sql"], /CREATE TABLE IF NOT EXISTS health_platform\.runtime_primary_write_audit/);
   assert.match(pkg.files["rollback.sql"], /DELETE FROM health_platform\.migration_runs/);
 });
 

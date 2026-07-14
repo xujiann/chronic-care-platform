@@ -49,6 +49,36 @@ test("commission API closes only cleared PostgreSQL reconciliation cases and pre
   });
   assert.equal(login.response.status, 200);
   const token = login.body.token;
+  const adapterStatus = await request(baseUrl, "/api/production-database/adapter", token);
+  assert.equal(adapterStatus.response.status, 200);
+  assert.equal(adapterStatus.body.configured, false);
+  assert.equal(adapterStatus.body.capabilities.readTransaction, "repeatable-read-read-only");
+  assert.equal(adapterStatus.body.capabilities.writeTransaction, "serializable");
+  assert.equal(adapterStatus.body.capabilities.optimisticLock, "all-collection-versions");
+  assert.equal(adapterStatus.body.productionPrimary, false);
+  assert.equal(adapterStatus.body.runtimeCutoverEnabled, false);
+  assert.doesNotMatch(JSON.stringify(adapterStatus.body), /DATABASE_URL|postgres:\/\//);
+  const deniedPrimaryRead = await request(baseUrl, "/api/production-database/primary-read-rehearsal", "");
+  assert.equal(deniedPrimaryRead.response.status, 401);
+  const primaryReadStatus = await request(baseUrl, "/api/production-database/primary-read-rehearsal", token);
+  assert.equal(primaryReadStatus.response.status, 200);
+  assert.equal(primaryReadStatus.body.configured, false);
+  assert.equal(primaryReadStatus.body.transaction, "repeatable-read-read-only");
+  assert.equal(primaryReadStatus.body.productionPrimary, false);
+  assert.equal(primaryReadStatus.body.writePrimary, false);
+  const missingPrimaryReadNote = await request(baseUrl, "/api/production-database/primary-read-rehearsal", token, {
+    method: "POST",
+    body: JSON.stringify({})
+  });
+  assert.equal(missingPrimaryReadNote.response.status, 400);
+  assert.equal(missingPrimaryReadNote.body.code, "PRIMARY_READ_REHEARSAL_NOTE_REQUIRED");
+  const unavailablePrimaryRead = await request(baseUrl, "/api/production-database/primary-read-rehearsal", token, {
+    method: "POST",
+    body: JSON.stringify({ note: "API regression verifies the disabled rehearsal boundary." })
+  });
+  assert.equal(unavailablePrimaryRead.response.status, 409);
+  assert.equal(unavailablePrimaryRead.body.code, "PRIMARY_READ_REHEARSAL_NOT_CONFIGURED");
+  assert.doesNotMatch(JSON.stringify(unavailablePrimaryRead.body), /DATABASE_URL|postgres:\/\//);
   const summary = {
     localCollections: 1,
     remoteCollections: 0,

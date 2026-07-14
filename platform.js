@@ -92,6 +92,19 @@ let postgresReconciliationCenter = {
   historySummary: { runs: 0, matched: 0, mismatched: 0, errors: 0 },
   runs: []
 };
+let postgresProductionAdapterCenter = {
+  configured: false,
+  adapterMode: "disabled",
+  writeMode: "disabled",
+  writeEnabled: false,
+  evidenceReady: false,
+  requirements: {},
+  capabilities: {},
+  productionPrimary: false,
+  runtimeCutoverEnabled: false,
+  primaryReadConfigured: false,
+  primaryReadReport: null
+};
 
 const defaultPlatformCapabilities = [
   {
@@ -374,6 +387,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadPlatformCapabilityOperationsCenter();
   await loadCommercialCryptoCenter();
   await loadPostgresReconciliationCenter();
+  await loadPostgresProductionAdapterCenter();
   ensureEditablePlatformData(platformState);
   bindPlatformEditor();
   renderPlatform();
@@ -1168,8 +1182,40 @@ function renderProductionDatabaseCutoverCenter(platform) {
       <small>${platformEscapeHtml(item.owner || "owner-pending")}</small>
     </div>
   </article>`).join("");
+  renderPostgresProductionAdapterCenter();
   renderPostgresReconciliationCenter();
   if (boundaryTarget) boundaryTarget.textContent = center.boundary;
+}
+
+function renderPostgresProductionAdapterCenter() {
+  const metricsTarget = document.querySelector("#postgres-adapter-metrics");
+  const adapterStatusTarget = document.querySelector("#postgres-adapter-status");
+  const primaryReadStatusTarget = document.querySelector("#postgres-primary-read-status");
+  if (!metricsTarget) return;
+  const center = postgresProductionAdapterCenter;
+  const report = center.primaryReadReport;
+  const requirements = center.requirements || {};
+  const evidenceCount = [requirements.cutoverApproval, requirements.backupEvidence, requirements.recoveryEvidence].filter(Boolean).length;
+  const metrics = [
+    ["主读取配置", center.primaryReadConfigured ? "已就绪" : "未配置", "REPEATABLE READ / READ ONLY"],
+    ["最近演练", report?.status || "尚未运行", report ? `${report.collections || 0} collections / ${report.durationMs || 0} ms` : "全量摘要与 SQLite 基线核对"],
+    ["写入证据门禁", center.writeEnabled ? "已满足" : `${evidenceCount}/3`, center.writeMode || "disabled"],
+    ["生产主库", center.productionPrimary ? "已切换" : "未切换", "runtimeCutoverEnabled=false"]
+  ];
+  metricsTarget.innerHTML = metrics.map(([label, value, hint]) => `<article class="metric-card">
+    <span>${platformEscapeHtml(label)}</span>
+    <strong>${platformEscapeHtml(value)}</strong>
+    <small>${platformEscapeHtml(hint)}</small>
+  </article>`).join("");
+  if (adapterStatusTarget) {
+    adapterStatusTarget.textContent = center.configured ? `${center.adapterMode} / ${center.writeMode}` : "未配置";
+    adapterStatusTarget.className = `badge ${center.writeEnabled ? "ok" : center.configured ? "info" : "warn"}`;
+  }
+  if (primaryReadStatusTarget) {
+    const status = report?.status || (center.primaryReadConfigured ? "可演练" : "等待配置");
+    primaryReadStatusTarget.textContent = status;
+    primaryReadStatusTarget.className = `badge ${report?.ok ? "ok" : center.primaryReadConfigured ? "info" : "warn"}`;
+  }
 }
 
 function postgresReconciliationBadgeClass(status) {
@@ -1618,6 +1664,11 @@ function bindPlatformEditor() {
       runPostgresReconciliationCaseAction(postgresReconciliationButton.dataset.postgresReconciliationAction, postgresReconciliationButton.dataset.id, postgresReconciliationButton);
       return;
     }
+    const postgresPrimaryReadButton = event.target.closest("[data-postgres-primary-read-action]");
+    if (postgresPrimaryReadButton) {
+      runPostgresPrimaryReadRehearsal(postgresPrimaryReadButton);
+      return;
+    }
     const commercialCryptoButton = event.target.closest("[data-commercial-crypto-action]");
     if (commercialCryptoButton) {
       runCommercialCryptoAction(commercialCryptoButton.dataset.commercialCryptoAction, commercialCryptoButton.dataset.id, commercialCryptoButton);
@@ -1879,6 +1930,67 @@ async function loadPostgresReconciliationCenter() {
     };
   } catch (error) {
     // Static and offline fallback remains usable without the commission API.
+  }
+}
+
+async function loadPostgresProductionAdapterCenter() {
+  if (!PLATFORM_API_BASE) return;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  try {
+    const [adapterResponse, primaryReadResponse] = await Promise.all([
+      request(`${PLATFORM_API_BASE}/production-database/adapter`),
+      request(`${PLATFORM_API_BASE}/production-database/primary-read-rehearsal`)
+    ]);
+    if (!adapterResponse.ok || !primaryReadResponse.ok) return;
+    const [adapter, primaryRead] = await Promise.all([adapterResponse.json(), primaryReadResponse.json()]);
+    postgresProductionAdapterCenter = {
+      ...postgresProductionAdapterCenter,
+      configured: Boolean(adapter.configured),
+      adapterMode: adapter.adapterMode || "disabled",
+      writeMode: adapter.writeMode || "disabled",
+      writeEnabled: Boolean(adapter.writeEnabled),
+      evidenceReady: Boolean(adapter.evidenceReady),
+      requirements: adapter.requirements || {},
+      capabilities: adapter.capabilities || {},
+      productionPrimary: false,
+      runtimeCutoverEnabled: false,
+      primaryReadConfigured: Boolean(primaryRead.configured)
+    };
+  } catch (error) {
+    // Static and offline fallback remains usable without the commission API.
+  }
+}
+
+async function runPostgresPrimaryReadRehearsal(button) {
+  if (!PLATFORM_API_BASE) return;
+  const note = window.prompt("主读取演练说明", "平台割接前 PostgreSQL 主读取完整性复核") || "";
+  if (note.trim().length < 8) return;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  const statusTarget = document.querySelector("#postgres-primary-read-status");
+  if (button) button.disabled = true;
+  if (statusTarget) {
+    statusTarget.textContent = "演练中";
+    statusTarget.className = "badge info";
+  }
+  try {
+    const response = await request(`${PLATFORM_API_BASE}/production-database/primary-read-rehearsal`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ note: note.trim() })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.message || `HTTP ${response.status}`);
+    postgresProductionAdapterCenter.primaryReadReport = payload.report || null;
+    renderPostgresProductionAdapterCenter();
+  } catch (error) {
+    if (statusTarget) {
+      const message = error.message || "演练失败";
+      statusTarget.textContent = message.includes("configuration is incomplete") ? "配置不完整" : "演练失败";
+      statusTarget.title = message;
+      statusTarget.className = "badge danger";
+    }
+  } finally {
+    if (button) button.disabled = false;
   }
 }
 

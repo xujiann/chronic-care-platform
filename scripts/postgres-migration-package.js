@@ -132,6 +132,19 @@ function schemaSql() {
     "  updated_at timestamptz NOT NULL",
     ");",
     "CREATE INDEX IF NOT EXISTS runtime_collection_state_updated_idx ON health_platform.runtime_collection_state (updated_at);",
+    "CREATE TABLE IF NOT EXISTS health_platform.runtime_primary_write_audit (",
+    "  write_id text PRIMARY KEY,",
+    "  batch_id text NOT NULL REFERENCES health_platform.runtime_sync_batches(batch_id) ON DELETE RESTRICT,",
+    "  actor text NOT NULL,",
+    "  reason text NOT NULL,",
+    "  expected_snapshot_sha256 char(64) NOT NULL,",
+    "  resulting_snapshot_sha256 char(64) NOT NULL,",
+    "  changed_collections integer NOT NULL CHECK (changed_collections >= 0),",
+    "  deleted_collections integer NOT NULL CHECK (deleted_collections >= 0),",
+    "  status text NOT NULL CHECK (status IN ('applied', 'rolled-back')),",
+    "  applied_at timestamptz NOT NULL",
+    ");",
+    "CREATE INDEX IF NOT EXISTS runtime_primary_write_audit_applied_idx ON health_platform.runtime_primary_write_audit (applied_at DESC);",
     "COMMIT;",
     ""
   ].join("\n");
@@ -235,7 +248,7 @@ function buildPostgresMigrationPackage(options = {}) {
     mode,
     migrationRunId,
     source: { type: "json-snapshot", digest: sourceDigest, canonicalBytes: Buffer.byteLength(sourceCanonical) },
-    target: { engine: "postgresql", schema: "health_platform", runtimeAdapterEnabled: false },
+    target: { engine: "postgresql", schema: "health_platform", runtimeAdapterImplemented: true, runtimeAdapterEnabled: false },
     summary,
     collections: inventory,
     secretBoundary: { databaseUrlPersisted: false, credentialsPersisted: false },
@@ -262,7 +275,7 @@ function buildPostgresMigrationPackage(options = {}) {
     check("postgresPackage:inventory", summary.collections > 0 && summary.records > 0, `${summary.collections} collections / ${summary.records} records`),
     check("postgresPackage:sourceDigest", /^[a-f0-9]{64}$/.test(sourceDigest), sourceDigest),
     check("postgresPackage:secretBoundary", manifest.secretBoundary.databaseUrlPersisted === false && manifest.secretBoundary.credentialsPersisted === false, "database credentials are not persisted"),
-    check("postgresPackage:runtimeBoundary", manifest.target.runtimeAdapterEnabled === false && manifest.productionReady === false, "migration tooling cannot enable production runtime"),
+    check("postgresPackage:runtimeBoundary", manifest.target.runtimeAdapterImplemented === true && manifest.target.runtimeAdapterEnabled === false && manifest.productionReady === false, "production adapter schema is present but migration tooling cannot enable runtime cutover"),
     check("postgresPackage:fullExport", mode === "manifest" || (files["records.copy.tsv"].split("\n").filter(Boolean).length === summary.records && files["snapshots.copy.tsv"].split("\n").filter(Boolean).length === summary.snapshots), mode)
   ];
   return { ok: checks.every((item) => item.passed), manifest, files, checks };

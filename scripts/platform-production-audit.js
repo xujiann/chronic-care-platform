@@ -94,10 +94,10 @@ const MVP_REQUIRED_MODULES = [
   {
     id: "mvp-production-database",
     name: "生产数据库与迁移",
-    status: "shadow-reconciliation-case-workflow-ready",
+    status: "primary-read-production-adapter-ready-site-acceptance-pending",
     priority: "P0",
-    implemented: "SQLite schema v10、WAL/FULL、乐观锁、事务 outbox、链式批次摘要、基线入队、PostgreSQL 幂等影子同步 worker、只读版本与摘要核对、100 次核对历史、差异责任人、确认/关闭/自动重开、不可变处置历史、重试状态、迁移清单、受控全量导出和回滚模板",
-    remainingCode: "完成 PostgreSQL 生产主存储读路径、领域表转换、容量切换、原生备份恢复和正式回切工具；小规模单机试点可在评审批准后继续 SQLite",
+    implemented: "SQLite schema v10、WAL/FULL、乐观锁、事务 outbox、链式批次摘要、基线入队、PostgreSQL 幂等影子同步 worker、只读版本与摘要核对、100 次核对历史、差异责任人、确认/关闭/自动重开、不可变处置历史、重试状态、迁移清单、受控全量导出、完整状态主读取演练、异步生产适配器、SERIALIZABLE 主写事务、全集合乐观锁和无正文写审计",
+    remainingCode: "完成领域表转换、目标容量与故障切换、PostgreSQL 原生备份恢复和正式回切工具；主服务切换仍须数据库、灾备和四方审批证据",
     siteDependency: "目标容量、RTO/RPO、数据库资源和灾备签字"
   },
   {
@@ -185,12 +185,12 @@ const PRODUCTION_BLOCKERS = [
   status: id === "P0-01"
     ? "automation-foundation-ready-site-acceptance-pending"
     : id === "P0-02"
-    ? "shadow-case-workflow-ready-primary-cutover-pending"
+    ? "primary-read-production-adapter-ready-site-acceptance-pending"
     : (["P0-03", "P0-04", "P0-05", "P0-06", "P0-08", "P0-09"].includes(id) ? "adapter-foundation-ready-site-joint-test-pending" : "blocked-until-site-evidence"),
   progress: id === "P0-01"
     ? "已实现不可变部署包、运行文件摘要复核、密钥仅引用不落盘、最小权限进程模板、CI 验证和回滚契约；真实 Vault/KMS、TLS、制品仓库、服务账号和生产 smoke 签字未完成。"
     : id === "P0-02"
-    ? "已实现 SQLite schema v10 事务 outbox、集合版本、基线入队、批次链式摘要、PostgreSQL 幂等影子同步、只读版本与 SHA-256 核对、核对历史、差异责任人、确认/关闭/自动重开、处置审计、重试状态、迁移包和回滚模板；生产主存储读路径、领域转换、容量故障切换和灾备签字仍未完成。"
+    ? "已实现 SQLite schema v10 事务 outbox、集合版本、基线入队、批次链式摘要、PostgreSQL 幂等影子同步、只读版本与 SHA-256 核对、核对历史、差异责任人、确认/关闭/自动重开、处置审计、完整状态主读取演练，以及具备 SERIALIZABLE 主写、全集合乐观锁和无正文写审计的异步生产适配器；主服务正式切换、领域转换、容量故障切换、原生备份恢复和灾备签字仍未完成。"
     : (id === "P0-03"
       ? "已实现 OIDC UserInfo 运行时适配、受控本地账号绑定和配置状态接口；真实目录同步、注销刷新回调、联合测试和签字未完成。"
       : (id === "P0-04"
@@ -208,7 +208,7 @@ const ROADMAP = [
   {
     phase: "P0 / 0-30 天",
     objective: "建立可部署、可联调、可审计的生产基线",
-    deliverables: ["已完成不可变部署包、密钥引用和进程模板；继续 Vault/KMS、TLS、制品仓库和环境级编排", "已完成 SQLite schema v8、PostgreSQL 迁移包与事务 outbox 影子同步；继续主存储读路径、领域转换、容量故障切换和原生备份工具", "已完成统一身份和短信通用适配基础；继续真实供应商联调和密钥托管", "已完成医院出站连接器与 SIEM/Webhook 告警适配基础；继续厂商协议、目标接收端、网络环境和生产演练"],
+    deliverables: ["已完成不可变部署包、密钥引用和进程模板；继续 Vault/KMS、TLS、制品仓库和环境级编排", "已完成 PostgreSQL 主读取演练与证据门禁生产适配器；继续领域转换、容量故障切换、原生备份恢复和正式回切", "已完成统一身份和短信通用适配基础；继续真实供应商联调和密钥托管", "已完成医院出站连接器与 SIEM/Webhook 告警适配基础；继续厂商协议、目标接收端、网络环境和生产演练"],
     exit: "P0-01 至 P0-09 均形成可验证证据，生产配置检查不再使用占位值。"
   },
   {
@@ -271,7 +271,10 @@ function buildPlatformProductionAudit(options = {}) {
     server: read("server.js"),
     html: read("platform.html"),
     client: read("platform.js"),
-    documentation: read("docs/platform-capability-operations-center.md")
+    documentation: read("docs/platform-capability-operations-center.md"),
+    postgresRuntime: read("postgres-runtime-sync.js"),
+    postgresAdapter: read("postgres-production-adapter.js"),
+    postgresDocumentation: read("docs/postgresql-runtime-sync.md")
   };
   const document = options.document ?? (exists("docs/数智医院标准平台全程审计与生产前开发规划.md")
     ? read("docs/数智医院标准平台全程审计与生产前开发规划.md")
@@ -294,6 +297,7 @@ function buildPlatformProductionAudit(options = {}) {
     check("platformAudit:mvpRequiredModules", MVP_REQUIRED_MODULES.length >= 8 && MVP_REQUIRED_MODULES.every((item) => item.priority === "P0" && item.remainingCode && item.siteDependency), `${MVP_REQUIRED_MODULES.length} mandatory MVP production modules have code scope and site dependencies`),
     check("platformAudit:roadmap", ROADMAP.length === 4 && ROADMAP.every((item) => item.deliverables.length >= 4 && item.exit), "30/60/90-day and continuous-improvement roadmap is complete"),
     check("platformAudit:capabilityOperationsCenter", runtimeSources.domain.includes("applyPlatformCapabilityReviewAction") && runtimeSources.domain.includes("applyPlatformProductionBlockerAction") && runtimeSources.server.includes("/api/platform/capability-operations/blockers/") && runtimeSources.html.includes("platform-capability-operations-center") && runtimeSources.client.includes("renderPlatformCapabilityOperationsCenter") && runtimeSources.client.includes("runPlatformProductionBlockerAction") && runtimeSources.documentation.includes("reviewed-preproduction") && runtimeSources.documentation.includes("evidence-reviewed-site-pending"), "capability review and production-blocker evidence workflows are runnable, audited and documented"),
+    check("platformAudit:productionDatabaseAdapter", ["runPostgresPrimaryReadRehearsal", "buildPostgresPrimaryReadSnapshot"].every((marker) => runtimeSources.postgresRuntime.includes(marker)) && ["readPostgresProductionState", "writePostgresProductionState", "runtime_primary_write_audit", "POSTGRES_PRIMARY_WRITE_BLOCKED"].every((marker) => runtimeSources.postgresAdapter.includes(marker)) && ["/api/production-database/adapter", "/api/production-database/primary-read-rehearsal"].every((marker) => runtimeSources.server.includes(marker)) && ["生产数据库适配器", "SERIALIZABLE", "productionPrimary"].every((marker) => runtimeSources.postgresDocumentation.includes(marker)), "P0-02 primary-read rehearsal and evidence-gated production adapter are runnable, audited and documented"),
     check("platformAudit:releaseWiring", Boolean(pkg.scripts?.["platform:production-audit"]) && scriptSources.manifest.includes("platform-production-audit") && scriptSources.deploy.includes("platformProductionAudit") && scriptSources.release.includes("buildPlatformProductionAudit"), "package, manifest, deploy check and release report are wired"),
     check("platformAudit:formalDocument", ["审计结论", "正式生产前已实现的主要功能", "生产割接差距", "下一步开发规划", "正式上线退出条件"].every((marker) => document.includes(marker)), "formal audit document contains conclusion, capability inventory, gaps, roadmap and exit criteria")
   ];
@@ -317,7 +321,8 @@ function buildPlatformProductionAudit(options = {}) {
       cutoverBlocked: Math.max(0, cutoverRows.length - passedCutover),
       releaseChecks: Number(releaseReport.summary?.total || 0),
       releaseChecksPassed: Number(releaseReport.summary?.passed || 0),
-      capabilityOperationsCenter: checks.some((item) => item.id === "platformAudit:capabilityOperationsCenter" && item.passed)
+      capabilityOperationsCenter: checks.some((item) => item.id === "platformAudit:capabilityOperationsCenter" && item.passed),
+      productionDatabaseAdapter: checks.some((item) => item.id === "platformAudit:productionDatabaseAdapter" && item.passed)
     },
     auditBasis: [
       "运行页面与角色入口",
@@ -350,6 +355,7 @@ function renderMarkdown(report) {
     "",
     `本次审计覆盖 ${report.summary.capabilityDomains} 个能力域，其中 ${report.summary.implementedDomains} 个具备仓库内可运行证据；正式生产就绪能力按审慎口径计为 ${report.summary.productionReadyDomains} 个。当前演示发布检查为 ${report.summary.releaseChecksPassed}/${report.summary.releaseChecks}，生产割接检查为 ${report.summary.cutoverPassed}/${report.summary.cutoverChecks}。发布检查通过只证明代码、文档和演示证据结构完整，不等同于现场生产验收。`,
     `平台能力运营中心已${report.summary.capabilityOperationsCenter ? "纳入" : "未纳入"}发布门禁，用于统一管理能力域责任人、生产阻断整改、证据提交、生产前复核和审计留痕。`,
+    `P0-02 PostgreSQL 主读取演练与生产适配器已${report.summary.productionDatabaseAdapter ? "纳入" : "未纳入"}发布门禁；正式主库切换仍由现场数据库、灾备和四方审批证据阻断。`,
     "",
     "## 二、审计范围与方法",
     "",

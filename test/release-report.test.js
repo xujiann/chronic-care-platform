@@ -373,6 +373,8 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "productionDb:idempotentWorker" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "productionDb:baselineBootstrap" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "productionDb:shadowReconciliation" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "productionDb:primaryReadRehearsal" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "productionDb:productionAdapter" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "productionDb:reconciliationCaseWorkflow" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "productionDb:reconciliationScheduler" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "productionDb:shadowBoundary" && item.passed), true);

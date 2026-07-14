@@ -219,6 +219,15 @@
         <div id="production-database-cutover-runs" class="priority-list"></div>
         <div id="production-database-migration-batches" class="priority-list"></div>
         <div class="panel-title compact-title">
+          <h3>PostgreSQL 主读取与生产适配</h3>
+          <span id="postgres-adapter-status" class="badge warn">未配置</span>
+        </div>
+        <div class="action-row">
+          <button class="primary-button" type="button" data-postgres-primary-read-action="run">运行主读取演练</button>
+          <span id="postgres-primary-read-status" class="badge warn">等待演练</span>
+        </div>
+        <div id="postgres-adapter-metrics" class="metric-grid"></div>
+        <div class="panel-title compact-title">
           <h3>影子核对差异处置</h3>
           <span id="postgres-reconciliation-status" class="badge warn">等待核对数据</span>
         </div>

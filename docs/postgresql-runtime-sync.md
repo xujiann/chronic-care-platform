@@ -55,6 +55,29 @@ worker 在队列为空时仍会校验 PostgreSQL 连接配置，但不会输出�
 
 Prometheus 指标包括 `health_platform_postgres_sync_backlog`、`health_platform_postgres_sync_oldest_pending_age_seconds`、`health_platform_postgres_reconciliation_age_seconds`、`health_platform_postgres_reconciliation_unresolved_cases`、`health_platform_postgres_sync_failed_batches` 和 `health_platform_postgres_sync_slo_breaches`。仅当 `POSTGRES_SYNC_MODE=outbox` 时评估违反项；禁用影子同步不会制造误告警。
 
+## PostgreSQL 主读取演练
+
+影子核对连续一致后，可在受控环境设置 `POSTGRES_PRIMARY_READ_MODE=rehearsal`，执行 `npm.cmd run postgres:primary-read-rehearsal`。演练使用 `REPEATABLE READ + READ ONLY` 事务读取 `health_platform.runtime_collection_state`，逐集合验证 payload SHA-256、源版本、必需集合和 SQLite 影子基线，然后在内存中重建完整平台状态快照。
+
+- `GET /api/production-database/primary-read-rehearsal` 仅向卫健管理角色返回配置状态、事务级别和生产边界。
+- `POST /api/production-database/primary-read-rehearsal` 仅在 `POSTGRES_SYNC_MODE=outbox`、SQLite 基线、`DATABASE_URL` 和演练模式全部就绪时执行，并要求填写操作说明。
+- API、CLI JSON 和 Markdown 报告只返回集合计数、校验字节数、版本范围和快照摘要，不返回业务 payload、连接串或凭据。
+- `POSTGRES_PRIMARY_READ_MAX_COLLECTIONS` 和 `POSTGRES_PRIMARY_READ_MAX_BYTES` 限制单次读取规模，避免错误配置导致无界内存占用。
+
+演练通过只证明 PostgreSQL 影子库可在一致性事务中重建经过摘要校验的完整状态。它不会设置 `STORAGE_ENGINE=postgres`，不会启用 PostgreSQL 写主库、自动切换或生产就绪标记；正式主存储仍需领域表转换、容量与故障切换、原生备份恢复和现场签字。
+
+## 生产数据库适配器
+
+`postgres-production-adapter.js` 提供独立异步适配层，避免把异步 PostgreSQL 驱动硬塞入现有同步状态调用。适配器具备以下生产控制：
+
+- 主读取使用 `REPEATABLE READ + READ ONLY`，验证全部集合 payload SHA-256 后返回状态和集合版本。
+- 主写入使用 `SERIALIZABLE`、事务级 advisory lock、`FOR UPDATE` 和全集合 `expectedVersions`，任何缺失版本或版本漂移均拒绝提交，并避免空表首写或并发批次造成摘要链分叉。
+- 写入复用链式批次摘要，并在 `runtime_primary_write_audit` 记录操作者、原因、前后快照摘要和变更计数，不保存业务正文或数据库凭据。
+- `npm.cmd run postgres:adapter-status` 输出无凭据配置状态；`npm.cmd run postgres:adapter-verify` 以只读事务验证运行表、状态表和主写审计表。
+- `GET /api/production-database/adapter` 仅向卫健管理角色暴露安全状态和事务能力，不返回连接串或证据正文。
+
+写能力必须同时配置 `POSTGRES_ADAPTER_MODE=rehearsal`、`POSTGRES_PRODUCTION_WRITE_MODE=evidence-gated`、`POSTGRES_CUTOVER_APPROVAL_ID`、`POSTGRES_BACKUP_EVIDENCE_ID` 和 `POSTGRES_RTO_RPO_EVIDENCE_ID`，调用方还必须显式传入写许可、操作者、原因和完整预期版本。上述门禁只允许开展受控适配器验收，不会自动修改主服务的 `STORAGE_ENGINE`，也不会把 `productionPrimary` 或 `runtimeCutoverEnabled` 标记为真。
+
 ## 退出条件
 
 - 全量基线与增量集合计数、摘要连续一致。

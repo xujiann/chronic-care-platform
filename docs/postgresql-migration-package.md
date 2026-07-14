@@ -16,7 +16,7 @@ npm.cmd run postgres:migration-verify -- --output-dir=D:\secure-migration\PDB-00
 ## 制品内容
 
 - `manifest.json`：源快照摘要、集合计数、逐集合摘要、文件摘要和生产阻断项。
-- `schema.sql`：`health_platform` schema、迁移运行台账、记录表和快照表。
+- `schema.sql`：`health_platform` schema、迁移运行台账、记录表、快照表、运行状态表和无正文主写审计表。
 - `load.sql`：迁移运行登记和受控装载事务模板。
 - `verify.sql`：导入记录数、唯一键和摘要格式复核。
 - `rollback.sql`：按 `migration_run_id` 删除本批数据；执行前仍必须有可验证的数据库原生备份。
@@ -28,6 +28,7 @@ npm.cmd run postgres:migration-verify -- --output-dir=D:\secure-migration\PDB-00
 2. 在脱敏数据上完成一次全量生成、装载、计数复核和回滚演练。
 3. 在目标容量数据上验证事务时长、索引构建、锁等待、磁盘增长、主从延迟和故障切换。
 4. 归档源摘要、目标计数、差异清单、原生备份编号、RPO/RTO、回滚回执和责任方签字。
-5. 只有运行时 PostgreSQL 适配器、读写一致性、容量与灾备全部验收后，才允许解除 `STORAGE_ENGINE=postgres` 阻断。
+5. 使用 `postgres:primary-read-rehearsal` 验证完整状态读取，使用 `postgres:adapter-verify` 验证运行表、状态表和 `runtime_primary_write_audit`。
+6. 只有运行时 PostgreSQL 适配器、读写一致性、容量与灾备全部验收后，才允许解除 `STORAGE_ENGINE=postgres` 阻断。
 
 迁移包通过不等于 PostgreSQL 运行时适配器已经启用，也不等于生产数据库已经正式验收。
