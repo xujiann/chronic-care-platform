@@ -8,12 +8,13 @@
 
 - `NODE_ENV=production` 时禁用 `POST /api/auth/login` 本地口令入口，演示账号和固定口令仅保留给开发、测试与静态预览；生产登录必须走已配置的 OIDC 等外部身份链路。
 - 生产启动要求 `SESSION_SECRETS` 或 `SESSION_SECRET` 至少包含 32 个字符，缺失、弱值或占位值会以 `PRODUCTION_SESSION_SECRET_INVALID` 拒绝启动。
-- 生产会话使用 `SESSION_STORE=sqlite`；显式配置 `memory` 会以 `PRODUCTION_SESSION_STORE_INVALID` 拒绝启动。会话只持久化随机会话标识、脱敏用户快照、有效期和撤销审计，不保存签名令牌。
+- 生产会话按拓扑使用 `SESSION_STORE=sqlite`（单主机）或 `SESSION_STORE=postgres`（多主机）；显式配置 `memory` 会以 `PRODUCTION_SESSION_STORE_INVALID` 拒绝启动。会话只持久化随机会话标识、脱敏用户快照、有效期和撤销审计，不保存签名令牌。
 - 生产环境缺失或非法的会话保留期、清理周期会以 `PRODUCTION_SESSION_RETENTION_INVALID` 拒绝启动；撤销审计保留期不得短于普通过期会话保留期。
 - 浏览器在 API 认证失败或网络异常时失败关闭，不再回退到本地演示账号；只有 `file:` 等静态预览场景允许本地演示身份。
 - 非市级监管角色按居民家庭、机构归属或医保/区县业务关系收敛居民数据；机构修改居民主索引时还必须匹配居民归属机构。
 - 动态血液业务字段在进入 `innerHTML` 前统一编码，服务端下发 CSP、`nosniff`、同源嵌入、引用策略和生产 HSTS 响应头。
-- SQLite 会话可跨进程读取，并在共享同一 `DATA_DIR` 的实例间同步注销、账号停用和撤销审计；进程重启不会使有效会话丢失。多主机部署仍须采用可靠共享存储或独立集中式会话服务，并完成并发、故障切换和跨节点撤销演练，本实现不把该现场基础设施误报为已完成。
+- SQLite 会话可跨进程读取，并在共享同一 `DATA_DIR` 的实例间同步注销、账号停用和撤销审计；进程重启不会使有效会话丢失。多主机集中式会话使用 PostgreSQL 中央会话表：请求先装载中央状态再进入现有角色守卫，签发、注销和目录停用在响应前完成中央写入；数据库不可用时返回 `SESSION_STORE_UNAVAILABLE` 并失败关闭。
+- `SESSION_TOPOLOGY=multi-host` 强制要求 `SESSION_STORE=postgres`、有效 `DATABASE_URL` 和显式的生产 `POSTGRES_SSL_MODE=verify-full`；中央表由 PostgreSQL 迁移包创建，应用启动只校验表结构，不以运行账号执行 DDL。依赖就绪检查使用轻量 PostgreSQL 探针，中央会话不可用时 `/api/health` 返回 503 且不暴露数据库错误；无依赖的 `/api/live` 仍用于进程存活判定。
 - 过期会话与撤销会话分别按 `SESSION_EXPIRED_RETENTION_DAYS`、`SESSION_REVOKED_RETENTION_DAYS` 保留，服务启动及 `SESSION_CLEANUP_INTERVAL_MS` 周期执行幂等清理；最近结果、删除分类和失败状态通过身份生命周期接口暴露。
 
 ## 运行接口

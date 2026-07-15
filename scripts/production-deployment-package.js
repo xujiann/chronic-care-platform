@@ -105,9 +105,10 @@ function buildProductionDeploymentPackage(options = {}) {
     restartPolicy: "on-failure",
     gracefulShutdownSeconds: 30,
     healthChecks: [
-      { route: "/api/health", expectedStatus: 200, purpose: "liveness" },
-      { route: "/api/system/readiness", expectedStatus: 200, purpose: "readiness" },
-      { route: "/api/metrics", expectedStatus: 200, purpose: "operations evidence" }
+      { route: "/api/live", expectedStatus: 200, purpose: "process-liveness", authentication: "none" },
+      { route: "/api/health", expectedStatus: 200, purpose: "dependency-readiness", authentication: "none" },
+      { route: "/api/system/readiness", expectedStatus: 200, purpose: "operations-readiness-evidence", authentication: "commission" },
+      { route: "/api/metrics", expectedStatus: 200, purpose: "operations-metrics", authentication: "commission" }
     ],
     template: "deploy/chronic-care-platform.service.template"
   };
@@ -130,7 +131,7 @@ function buildProductionDeploymentPackage(options = {}) {
     check("deploymentPackage:runtimeFiles", files.length >= 30 && REQUIRED_RUNTIME_FILES.every((name) => files.some((item) => item.path === name)), `${files.length} runtime files with required entrypoints`),
     check("deploymentPackage:digest", /^[a-f0-9]{64}$/.test(digest) && files.every((item) => /^[a-f0-9]{64}$/.test(item.sha256)), `sha256:${digest}`),
     check("deploymentPackage:secretBoundary", secretContract.valuesPersisted === false && secretContract.variables.length >= 10 && secretContract.variables.every((item) => item.name && item.persistedInArtifact === false && !("value" in item)), `${secretContract.variables.length} secret references; values persisted false`),
-    check("deploymentPackage:processContract", processContract.healthChecks.length === 3 && processContract.restartPolicy === "on-failure" && processContract.gracefulShutdownSeconds >= 30, `${processContract.supervisor} / ${processContract.healthChecks.length} health checks`),
+    check("deploymentPackage:processContract", processContract.healthChecks.length === 4 && processContract.healthChecks.some((item) => item.route === "/api/live" && item.purpose === "process-liveness" && item.authentication === "none") && processContract.healthChecks.some((item) => item.route === "/api/health" && item.purpose === "dependency-readiness" && item.authentication === "none") && processContract.restartPolicy === "on-failure" && processContract.gracefulShutdownSeconds >= 30, `${processContract.supervisor} / ${processContract.healthChecks.length} health checks`),
     check("deploymentPackage:rollbackContract", rollbackContract.requirePreviousArtifactDigest && rollbackContract.requireStorageBackup && rollbackContract.rollbackCommand.includes("rollback:snapshot"), "previous digest, storage backup and post-rollback health are mandatory"),
     check("deploymentPackage:provenance", Boolean(source.commit) && (!strict || !source.dirty), `${source.commit} / ${source.dirty ? "working tree dirty" : "working tree clean"}${strict ? " / strict" : ""}`)
   ];

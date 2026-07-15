@@ -32,6 +32,9 @@ test("PostgreSQL manifest package exposes counts and digests without record payl
   assert.match(pkg.files["schema.sql"], /CREATE TABLE IF NOT EXISTS health_platform\.runtime_sync_batches/);
   assert.match(pkg.files["schema.sql"], /CREATE TABLE IF NOT EXISTS health_platform\.runtime_collection_state/);
   assert.match(pkg.files["schema.sql"], /CREATE TABLE IF NOT EXISTS health_platform\.runtime_primary_write_audit/);
+  assert.match(pkg.files["schema.sql"], /CREATE TABLE IF NOT EXISTS health_platform\.auth_sessions/);
+  assert.match(pkg.files["schema.sql"], /auth_sessions_user_active_idx/);
+  assert.match(pkg.files["schema.sql"], /auth_sessions_retention_idx/);
   assert.match(pkg.files["rollback.sql"], /DELETE FROM health_platform\.migration_runs/);
 });
 

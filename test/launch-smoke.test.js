@@ -23,6 +23,7 @@ test("launch smoke report validates offline runtime routes and release artifacts
   assert.equal(report.checks.some((item) => item.id === "launch:artifacts" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "launch:citizenAcceptancePanel" && item.passed), true);
   assert.match(report.checks.find((item) => item.id === "launch:citizenAcceptancePanel").detail, /resident C-end acceptance panel/);
+  assert.equal(report.routes.includes("/api/live"), true);
   assert.equal(report.routes.includes("/api/health"), true);
   assert.equal(report.routes.includes("/api/auth/identity-lifecycle"), true);
   assert.equal(report.routes.includes("/api/digital-hospital/launch-readiness"), true);
@@ -45,7 +46,8 @@ test("launch smoke report can run a live health check when a base URL is supplie
   const report = await buildLaunchSmokeReport({ ...RELEASE_FIXTURE, baseUrl: "http://localhost:5173/", fetcher });
 
   assert.equal(report.ok, true);
-  assert.equal(report.summary.liveChecks, 1);
+  assert.equal(report.summary.liveChecks, 2);
+  assert.equal(report.checks.some((item) => item.id === "live:liveness" && item.passed && /HTTP 200/.test(item.detail)), true);
   assert.equal(report.checks.some((item) => item.id === "live:health" && item.passed && /HTTP 200/.test(item.detail)), true);
 });
 

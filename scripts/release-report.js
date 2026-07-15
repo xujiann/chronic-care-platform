@@ -128,8 +128,8 @@ function buildProductionCutoverChecklist(env, checks = []) {
       id: "cutover-env-file",
       phase: "environment",
       owner: "platform-ops",
-      passed: ready("env:file", "env:NODE_ENV.production", "env:STORAGE_ENGINE", "env:STORAGE_ENGINE.production", "env:SESSION_STORE.present", "env:SESSION_STORE", "env:SESSION_STORE.productionDurable", "env:SESSION_RETENTION.present", "env:SESSION_RETENTION.policy", "env:SESSION_RETENTION.interval", "env:DEPLOYMENT.releaseId", "env:DEPLOYMENT.artifactDigest"),
-      evidence: detail("env:file", "env:NODE_ENV.production", "env:STORAGE_ENGINE", "env:STORAGE_ENGINE.production", "env:SESSION_STORE.present", "env:SESSION_STORE", "env:SESSION_STORE.productionDurable", "env:SESSION_RETENTION.present", "env:SESSION_RETENTION.policy", "env:SESSION_RETENTION.interval", "env:DEPLOYMENT.releaseId", "env:DEPLOYMENT.artifactDigest"),
+      passed: ready("env:file", "env:NODE_ENV.production", "env:STORAGE_ENGINE", "env:STORAGE_ENGINE.production", "env:SESSION_STORE.present", "env:SESSION_STORE", "env:SESSION_STORE.productionDurable", "env:SESSION_TOPOLOGY.present", "env:SESSION_TOPOLOGY", "env:SESSION_TOPOLOGY.storeCompatible", "env:SESSION_POSTGRES.database", "env:SESSION_POSTGRES.tls", "env:SESSION_RETENTION.present", "env:SESSION_RETENTION.policy", "env:SESSION_RETENTION.interval", "env:DEPLOYMENT.releaseId", "env:DEPLOYMENT.artifactDigest"),
+      evidence: detail("env:file", "env:NODE_ENV.production", "env:STORAGE_ENGINE", "env:STORAGE_ENGINE.production", "env:SESSION_STORE.present", "env:SESSION_STORE", "env:SESSION_STORE.productionDurable", "env:SESSION_TOPOLOGY.present", "env:SESSION_TOPOLOGY", "env:SESSION_TOPOLOGY.storeCompatible", "env:SESSION_POSTGRES.database", "env:SESSION_POSTGRES.tls", "env:SESSION_RETENTION.present", "env:SESSION_RETENTION.policy", "env:SESSION_RETENTION.interval", "env:DEPLOYMENT.releaseId", "env:DEPLOYMENT.artifactDigest"),
       nextAction: "在目标服务器创建真实 .env，设置 NODE_ENV=production，绑定已批准发布编号和不可变制品摘要，并确认不使用 JSON 作为生产主存储。"
     },
     {
@@ -194,7 +194,7 @@ function buildProductionCutoverChecklist(env, checks = []) {
       owner: "platform-ops",
       passed: ready("operations:readiness", "operations:routes", "operations:externalDependencies", "monitoring:readiness", "monitoring:sloTargets", "monitoring:alertRouting", "monitoring:productionBoundary", "env:ALERTING.routes", "env:ALERTING.secretQuality") && envFlagEnabled(env, "CUTOVER_MONITORING_SIGNOFF"),
       evidence: `${detail("operations:readiness", "operations:routes", "operations:externalDependencies", "monitoring:readiness", "monitoring:sloTargets", "monitoring:alertRouting", "monitoring:productionBoundary", "env:ALERTING.routes", "env:ALERTING.secretQuality")}; ${signoff("CUTOVER_MONITORING_SIGNOFF")}`,
-      nextAction: "Bind /api/health, /api/metrics, readiness, alert routing, and on-call escalation to the production monitoring platform."
+      nextAction: "Bind /api/live, /api/health, /api/metrics, readiness, alert routing, and on-call escalation to the production monitoring platform."
     },
     {
       id: "cutover-dr-rehearsal",
@@ -219,6 +219,8 @@ function validateProductionConfig(options = {}) {
   const storageEngine = String(env.STORAGE_ENGINE || "auto").toLowerCase();
   const configuredSessionStore = String(env.SESSION_STORE || "").trim().toLowerCase();
   const sessionStore = configuredSessionStore || (strict ? "sqlite" : "memory");
+  const configuredSessionTopology = String(env.SESSION_TOPOLOGY || "").trim().toLowerCase();
+  const sessionTopology = configuredSessionTopology || "single-host";
   const sessionRetentionConfigured = ["SESSION_EXPIRED_RETENTION_DAYS", "SESSION_REVOKED_RETENTION_DAYS", "SESSION_CLEANUP_INTERVAL_MS"]
     .every((name) => String(env[name] || "").trim());
   const sessionExpiredRetentionDays = Number(env.SESSION_EXPIRED_RETENTION_DAYS || 7);
@@ -245,8 +247,13 @@ function validateProductionConfig(options = {}) {
     check("env:NODE_ENV", Boolean(nodeEnv), nodeEnv || "missing", strict ? "error" : "warn", "environment"),
     check("env:STORAGE_ENGINE", ["auto", "json", "sqlite", "postgres", "postgresql"].includes(storageEngine), storageEngine, "error", "environment"),
     check("env:SESSION_STORE.present", !strict || Boolean(configuredSessionStore), strict ? configuredSessionStore || "missing SESSION_STORE" : "not enforced outside production", strict ? "error" : "warn", "environment"),
-    check("env:SESSION_STORE", ["memory", "sqlite"].includes(sessionStore), sessionStore || "missing", "error", "environment"),
-    check("env:SESSION_STORE.productionDurable", !strict || sessionStore === "sqlite", strict ? `${sessionStore}; production requires durable SQLite sessions` : "not enforced outside production", strict ? "error" : "warn", "environment"),
+    check("env:SESSION_STORE", ["memory", "sqlite", "postgres"].includes(sessionStore), sessionStore || "missing", "error", "environment"),
+    check("env:SESSION_STORE.productionDurable", !strict || ["sqlite", "postgres"].includes(sessionStore), strict ? `${sessionStore}; production requires durable SQLite or PostgreSQL sessions` : "not enforced outside production", strict ? "error" : "warn", "environment"),
+    check("env:SESSION_TOPOLOGY.present", !strict || Boolean(configuredSessionTopology), strict ? configuredSessionTopology || "missing SESSION_TOPOLOGY" : "defaults to single-host", strict ? "error" : "warn", "environment"),
+    check("env:SESSION_TOPOLOGY", ["single-host", "multi-host"].includes(sessionTopology), sessionTopology, "error", "environment"),
+    check("env:SESSION_TOPOLOGY.storeCompatible", sessionTopology !== "multi-host" || sessionStore === "postgres", `${sessionTopology} / ${sessionStore}`, "error", "environment"),
+    check("env:SESSION_POSTGRES.database", sessionStore !== "postgres" || /^postgres(?:ql)?:\/\//i.test(String(env.DATABASE_URL || "")), sessionStore === "postgres" ? env.DATABASE_URL ? "configured" : "missing DATABASE_URL" : "not required", "error", "environment"),
+    check("env:SESSION_POSTGRES.tls", sessionStore !== "postgres" || !strict || (Boolean(String(env.POSTGRES_SSL_MODE || "").trim()) && postgresSslMode === "verify-full"), sessionStore === "postgres" ? String(env.POSTGRES_SSL_MODE || "").trim() || "missing POSTGRES_SSL_MODE" : "not required", strict ? "error" : "warn", "environment"),
     check("env:SESSION_RETENTION.present", !strict || sessionRetentionConfigured, strict ? sessionRetentionConfigured ? "configured" : "missing session retention settings" : "defaults allowed outside production", strict ? "error" : "warn", "environment"),
     check("env:SESSION_RETENTION.policy", Number.isInteger(sessionExpiredRetentionDays) && sessionExpiredRetentionDays >= 1 && sessionExpiredRetentionDays <= 3650 && Number.isInteger(sessionRevokedRetentionDays) && sessionRevokedRetentionDays >= sessionExpiredRetentionDays && sessionRevokedRetentionDays <= 3650, `${sessionExpiredRetentionDays}d expired / ${sessionRevokedRetentionDays}d revoked`, "error", "environment"),
     check("env:SESSION_RETENTION.interval", Number.isInteger(sessionCleanupIntervalMs) && sessionCleanupIntervalMs >= 60000 && sessionCleanupIntervalMs <= 86400000, `${sessionCleanupIntervalMs}ms`, "error", "environment"),
@@ -491,7 +498,7 @@ function productionDeploymentPackageChecks(deploymentPackage) {
   return [
     check("deploymentPackage:readiness", deploymentPackage.ok && deploymentPackage.verification?.ok, deploymentPackage.ok && deploymentPackage.verification?.ok ? "immutable deployment package and integrity verification passed" : "deployment package or integrity verification failed", "error", "deployment"),
     check("deploymentPackage:secretBoundary", deploymentPackage.secretContract?.valuesPersisted === false && deploymentPackage.secretContract?.variables?.every((item) => !("value" in item)), `${deploymentPackage.secretContract?.variables?.length || 0} secret references; no values persisted`, "error", "deployment"),
-    check("deploymentPackage:processContract", deploymentPackage.processContract?.healthChecks?.length === 3 && deploymentPackage.processContract?.restartPolicy === "on-failure" && deploymentPackage.processContract?.gracefulShutdownSeconds >= 30, "entrypoint, restart, graceful shutdown and health probes declared", "error", "deployment"),
+    check("deploymentPackage:processContract", deploymentPackage.processContract?.healthChecks?.length === 4 && deploymentPackage.processContract.healthChecks.some((item) => item.route === "/api/live" && item.purpose === "process-liveness" && item.authentication === "none") && deploymentPackage.processContract.healthChecks.some((item) => item.route === "/api/health" && item.purpose === "dependency-readiness" && item.authentication === "none") && deploymentPackage.processContract?.restartPolicy === "on-failure" && deploymentPackage.processContract?.gracefulShutdownSeconds >= 30, "entrypoint, restart, graceful shutdown and split liveness/readiness probes declared", "error", "deployment"),
     check("deploymentPackage:rollbackContract", deploymentPackage.rollbackContract?.requirePreviousArtifactDigest && deploymentPackage.rollbackContract?.requireStorageBackup, "previous digest and storage backup required before rollback", "error", "deployment"),
     check("deploymentPackage:productionBoundary", deploymentPackage.productionReady === false && deploymentPackage.blockers?.length >= 6, `${deploymentPackage.blockers?.length || 0} site deployment blockers remain explicit`, "error", "deployment")
   ];

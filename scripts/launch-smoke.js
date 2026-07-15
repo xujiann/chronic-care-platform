@@ -7,6 +7,7 @@ const DEFAULT_OUTPUT = path.join(ROOT, "release", "launch-smoke-report.json");
 const DEFAULT_MARKDOWN = path.join(ROOT, "release", "launch-smoke-report.md");
 
 const REQUIRED_ROUTES = [
+  "/api/live",
   "/api/health",
   "/api/metrics",
   "/api/system/readiness",
@@ -98,6 +99,12 @@ async function buildLiveChecks(baseUrl, fetcher = globalThis.fetch) {
   }
   const root = String(baseUrl).replace(/\/+$/, "");
   const checks = [];
+  try {
+    const live = await fetchJson(fetcher, `${root}/api/live`);
+    checks.push(check("live:liveness", live.ok && live.body?.ok !== false, `HTTP ${live.status}`, "live"));
+  } catch (error) {
+    checks.push(check("live:liveness", false, error.message, "live"));
+  }
   try {
     const health = await fetchJson(fetcher, `${root}/api/health`);
     checks.push(check("live:health", health.ok && health.body?.ok !== false, `HTTP ${health.status}`, "live"));

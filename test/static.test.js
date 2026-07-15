@@ -2798,6 +2798,10 @@ test("production identity and message adapters keep runtime and site boundaries 
   assert.match(environment, /SESSION_EXPIRED_RETENTION_DAYS/);
   assert.match(environment, /SESSION_REVOKED_RETENTION_DAYS/);
   assert.match(environment, /SESSION_CLEANUP_INTERVAL_MS/);
+  assert.match(environment, /SESSION_TOPOLOGY/);
+  assert.match(read("session-store.js"), /class PostgresSessionStore/);
+  assert.match(read("session-store.js"), /request-hydrated-memory/);
+  assert.match(read("docs\/production-identity-message-adapters.md"), /SESSION_TOPOLOGY=multi-host/);
   assert.match(read("platform.html"), /identity-lifecycle-center/);
   assert.match(read("platform.js"), /renderIdentityLifecycleCenter/);
   assert.match(read("platform.js"), /runIdentityBindingAction/);

@@ -41,6 +41,17 @@ test("release report validates demo and production environment profiles", () => 
   assert.equal(failedProduction.cutoverChecklist.some((item) => item.id === "cutover-secrets" && !item.passed), true);
   assert.equal(failedProduction.cutoverChecklist.some((item) => item.id === "cutover-identity" && !item.passed), true);
 
+  const invalidMultiHostSessions = validateProductionConfig({
+    profile: "production",
+    env: {
+      NODE_ENV: "production",
+      STORAGE_ENGINE: "sqlite",
+      SESSION_STORE: "sqlite",
+      SESSION_TOPOLOGY: "multi-host"
+    }
+  });
+  assert.equal(invalidMultiHostSessions.checks.some((item) => item.name === "env:SESSION_TOPOLOGY.storeCompatible" && !item.passed), true);
+
   const weakSqliteProfile = validateProductionConfig({
     profile: "production",
     env: {
@@ -105,6 +116,7 @@ test("release report validates demo and production environment profiles", () => 
       SQLITE_BUSY_TIMEOUT_MS: "5000",
       SESSION_SECRETS: "0123456789abcdef0123456789abcdef,abcdef0123456789abcdef0123456789",
       SESSION_STORE: "sqlite",
+      SESSION_TOPOLOGY: "single-host",
       SESSION_EXPIRED_RETENTION_DAYS: "7",
       SESSION_REVOKED_RETENTION_DAYS: "30",
       SESSION_CLEANUP_INTERVAL_MS: "900000",
@@ -145,6 +157,8 @@ test("release report validates demo and production environment profiles", () => 
   assert.equal(production.checks.some((item) => item.name === "env:SQLITE.synchronous" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:SQLITE.busyTimeout" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:SESSION_STORE.productionDurable" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:SESSION_TOPOLOGY.present" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:SESSION_TOPOLOGY.storeCompatible" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:SESSION_RETENTION.present" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:SESSION_RETENTION.policy" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:SESSION_RETENTION.interval" && item.passed), true);

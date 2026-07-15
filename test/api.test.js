@@ -136,15 +136,26 @@ test("API authentication, scoping and governance regression suite", async (t) =>
   assert.equal(health.storage.engine, "json");
 
   await t.test("keeps health, authentication and error response contracts stable", async () => {
+    const liveResponse = await fetch(`${baseUrl}/api/live`);
+    assert.equal(liveResponse.status, 200);
+    const liveBody = await liveResponse.json();
+    assert.deepEqual(Object.keys(liveBody).sort(), ["ok", "service"]);
+    assert.equal(liveBody.ok, true);
+    assert.equal(liveBody.service.name, "chronic-care-platform");
+
     const healthResponse = await fetch(`${baseUrl}/api/health`);
     assert.match(healthResponse.headers.get("content-type") || "", /^application\/json/);
     const healthBody = await healthResponse.json();
-    assert.deepEqual(Object.keys(healthBody).sort(), ["ok", "service", "storage"]);
+    assert.deepEqual(Object.keys(healthBody).sort(), ["ok", "service", "sessionStore", "storage"]);
     assert.equal(healthBody.service.name, "chronic-care-platform");
     assert.equal(typeof healthBody.service.version, "string");
     assert.equal(typeof healthBody.service.uptimeSeconds, "number");
     assert.equal(typeof healthBody.storage.mode, "string");
     assert.equal(typeof healthBody.storage.jsonFile, "string");
+    assert.equal(healthBody.sessionStore.mode, "memory");
+    assert.equal(healthBody.sessionStore.topology, "single-host");
+    assert.equal(healthBody.sessionStore.durable, false);
+    assert.deepEqual(Object.keys(healthBody.sessionStore).sort(), ["available", "centralized", "checkedAt", "crossHost", "crossProcess", "durable", "errorCode", "mode", "topology"]);
 
     const doctorPage = await fetch(`${baseUrl}/doctor.html`);
     assert.equal(doctorPage.status, 200);

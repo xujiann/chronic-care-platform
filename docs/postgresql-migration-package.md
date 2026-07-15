@@ -16,7 +16,7 @@ npm.cmd run postgres:migration-verify -- --output-dir=D:\secure-migration\PDB-00
 ## 制品内容
 
 - `manifest.json`：源快照摘要、集合计数、逐集合摘要、文件摘要和生产阻断项。
-- `schema.sql`：`health_platform` schema、迁移运行台账、记录表、快照表、运行状态表和无正文主写审计表。
+- `schema.sql`：`health_platform` schema、迁移运行台账、记录表、快照表、运行状态表、无正文主写审计表和多主机中央认证会话表。
 - `load.sql`：迁移运行登记和受控装载事务模板。
 - `verify.sql`：导入记录数、唯一键和摘要格式复核。
 - `rollback.sql`：按 `migration_run_id` 删除本批数据；执行前仍必须有可验证的数据库原生备份。

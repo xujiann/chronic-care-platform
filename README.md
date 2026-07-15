@@ -115,7 +115,8 @@ SQLite 结构化镜像已覆盖居民、账户、主索引、个人健康档案�
 
 | API | 说明 |
 |---|---|
-| `GET /api/health` | 健康检查，返回服务版本、环境、uptime 和存储元信息 |
+| `GET /api/live` | 无外部依赖的进程存活检查，供编排器判断是否需要重启实例 |
+| `GET /api/health` | 依赖就绪检查，返回服务、存储和会话存储状态；中央会话不可用时返回 503 |
 | `GET /api/metrics` | 管理端运行指标，返回请求数、状态码、慢请求、任务堆积、死信、质量问题；运营工作台会在服务模式下展示部分指标 |
 | `GET /api/system/readiness` | 管理端系统就绪报告，汇总 P2 集合、接口准备度、审计链、运行负载和现场外部依赖边界 |
 | `GET /api/process-audit` | 管理端全流程审计报告，汇总居民、慢病、医共体、医保取药、统计证照、安全合规和生产切换证据域 |
@@ -151,6 +152,7 @@ STORAGE_ENGINE=auto
 DATA_DIR=/var/lib/chronic-care-platform
 SESSION_SECRETS=replace-with-long-random-secret
 SESSION_STORE=sqlite
+SESSION_TOPOLOGY=single-host
 SESSION_EXPIRED_RETENTION_DAYS=7
 SESSION_REVOKED_RETENTION_DAYS=30
 SESSION_CLEANUP_INTERVAL_MS=900000
@@ -169,14 +171,15 @@ RETENTION_POLICY=10y-worm
 
 - `STORAGE_ENGINE=auto` 会在 Node 支持 `node:sqlite` 时使用 SQLite，并继续维护 `data/db.json` 静态快照。
 - `SESSION_SECRETS` 支持逗号分隔多密钥，便于会话密钥轮换。
-- `SESSION_STORE=sqlite` 在生产环境为必选项；会话可跨进程读取和撤销并保留撤销审计。开发、测试可显式使用 `memory`。
+- 单主机生产环境使用 `SESSION_STORE=sqlite` 时，会话可跨进程读取和撤销并保留撤销审计；多主机生产环境使用中央 PostgreSQL 会话。开发、测试可显式使用 `memory`。
+- 单主机可使用 `SESSION_STORE=sqlite`；多主机必须设置 `SESSION_TOPOLOGY=multi-host`、`SESSION_STORE=postgres`、`DATABASE_URL` 和 `POSTGRES_SSL_MODE=verify-full`。每次鉴权请求从中央表装载会话，跨节点签发、撤销和账号停用立即生效。
 - `SESSION_EXPIRED_RETENTION_DAYS`、`SESSION_REVOKED_RETENTION_DAYS` 和 `SESSION_CLEANUP_INTERVAL_MS` 控制过期/撤销会话保留期及自动清理周期；启动清理、周期清理和管理员手动清理均通过身份生命周期中心暴露结果。
 - `INTEGRATION_GATEWAY_SECRET` 用于接口网关 HMAC 签名模拟。
 - `DATABASE_URL`、`OIDC_*`、`SMS_GATEWAY_URL`、`AUDIT_EXPORT_PATH`/`SIEM_ENDPOINT` 和 `RETENTION_POLICY` 是生产部署路径的正式数据库、政务身份、居民验证码短信网关和审计保全配置项。
 
 ## 验证与质量门禁
 
-`launch:smoke` generates `release/launch-smoke-report.json` and `release/launch-smoke-report.md`. Run it before release packaging for offline source/artifact checks, or run `npm.cmd run launch:smoke -- --base-url=https://your-runtime-host` after deployment to verify the live `/api/health` endpoint.
+`launch:smoke` generates `release/launch-smoke-report.json` and `release/launch-smoke-report.md`. Run it before release packaging for offline source/artifact checks, or run `npm.cmd run launch:smoke -- --base-url=https://your-runtime-host` after deployment to verify both `/api/live` liveness and `/api/health` dependency readiness.
 
 ```powershell
 npm.cmd run check
@@ -231,7 +234,7 @@ npm.cmd run hybrid:deployment-readiness
 
 `hybrid:deployment-readiness` 会生成 `release/hybrid-deployment-readiness-report.json` 与 `release/hybrid-deployment-readiness-report.md`，核对 GitHub Pages/静态 HTML 预览层、`data/db.json` 快照回退、`server.js` Node API 后端、存储引擎边界、环境变量模板、CI 和发布门禁接线。
 
-`operations:readiness` 会生成 `release/operations-readiness-report.json` 与 `release/operations-readiness-report.md`，检查 `/api/health`、`/api/metrics`、`/api/system/readiness`、生产部署轨道、外部依赖风险和发布运维脚本。运行调度页同时提供“生产运维与灾备运行中心”，通过 `GET /api/production-operations/center` 和分资源动作 API 管理 4 类服务级别、3 个 24x365 值班模板、故障事件、恢复演练、RPO/RTO 样例记录及证据包；本地动作均保持 `productionReady=false`，正式运行仍需远端备份、真实监控呼叫/工单、实名排班、全量恢复实测和多方签字。
+`operations:readiness` 会生成 `release/operations-readiness-report.json` 与 `release/operations-readiness-report.md`，检查 `/api/live`、`/api/health`、`/api/metrics`、`/api/system/readiness`、生产部署轨道、外部依赖风险和发布运维脚本。运行调度页同时提供“生产运维与灾备运行中心”，通过 `GET /api/production-operations/center` 和分资源动作 API 管理 4 类服务级别、3 个 24x365 值班模板、故障事件、恢复演练、RPO/RTO 样例记录及证据包；本地动作均保持 `productionReady=false`，正式运行仍需远端备份、真实监控呼叫/工单、实名排班、全量恢复实测和多方签字。
 
 `registration:journey-readiness` 会生成 `release/registration-journey-readiness-report.json` 与 `release/registration-journey-readiness-report.md`。居民端挂号服务和机构端预约协同工作台通过 `POST /api/registrations/orders/:id/actions` 串联演示支付、HIS 确认、医保预核验确认、到院报到、完诊和退号退款，并把每一步写入消息、访问日志和安全审计；所有演示交易保持 `productionReady=false`，正式上线仍需真实 HIS、支付退款、医保结算和现场验收。
 
@@ -275,7 +278,7 @@ GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下
 - SQLite 主存储、集合版本和乐观锁
 - 工作流动作、任务消息、审计写入
 - 接口网关签名、幂等、重试、死信
-- `/api/health` 和 `/api/metrics`
+- `/api/live`、`/api/health` 和 `/api/metrics`
 
 在独立后端、身份源、专线网关、生产数据库和现场联调完成前，不应将当前演示站描述为生产系统。
 

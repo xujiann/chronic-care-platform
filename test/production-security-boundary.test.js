@@ -11,6 +11,7 @@ process.env.STORAGE_ENGINE = "sqlite";
 process.env.NODE_ENV = "production";
 process.env.SESSION_SECRETS = "prod-session-signing-key-2026-07-15-rotation-a";
 process.env.SESSION_STORE = "sqlite";
+process.env.SESSION_TOPOLOGY = "single-host";
 process.env.SESSION_EXPIRED_RETENTION_DAYS = "7";
 process.env.SESSION_REVOKED_RETENTION_DAYS = "30";
 process.env.SESSION_CLEANUP_INTERVAL_MS = "900000";
@@ -51,7 +52,8 @@ test("production startup rejects missing, weak and placeholder session secrets",
     () => assertProductionRuntimeSecurity({
       NODE_ENV: "production",
       SESSION_SECRET: "production-session-signing-key-with-adequate-entropy",
-      SESSION_STORE: "sqlite"
+      SESSION_STORE: "sqlite",
+      SESSION_TOPOLOGY: "single-host"
     }),
     (error) => error.code === "PRODUCTION_SESSION_RETENTION_INVALID" && /SESSION_EXPIRED_RETENTION_DAYS/.test(error.message)
   );
@@ -60,12 +62,49 @@ test("production startup rejects missing, weak and placeholder session secrets",
       NODE_ENV: "production",
       SESSION_SECRET: "production-session-signing-key-with-adequate-entropy",
       SESSION_STORE: "sqlite",
+      SESSION_TOPOLOGY: "single-host",
       SESSION_EXPIRED_RETENTION_DAYS: "60",
       SESSION_REVOKED_RETENTION_DAYS: "30",
       SESSION_CLEANUP_INTERVAL_MS: "1000"
     }),
     (error) => error.code === "PRODUCTION_SESSION_RETENTION_INVALID" && /greater than or equal|60000/.test(error.message)
   );
+  assert.throws(
+    () => assertProductionRuntimeSecurity({
+      NODE_ENV: "production",
+      SESSION_SECRET: "production-session-signing-key-with-adequate-entropy",
+      SESSION_STORE: "sqlite",
+      SESSION_TOPOLOGY: "multi-host",
+      SESSION_EXPIRED_RETENTION_DAYS: "7",
+      SESSION_REVOKED_RETENTION_DAYS: "30",
+      SESSION_CLEANUP_INTERVAL_MS: "900000"
+    }),
+    (error) => error.code === "PRODUCTION_SESSION_STORE_INVALID" && /SESSION_STORE=postgres/.test(error.message)
+  );
+  assert.throws(
+    () => assertProductionRuntimeSecurity({
+      NODE_ENV: "production",
+      SESSION_SECRET: "production-session-signing-key-with-adequate-entropy",
+      SESSION_STORE: "postgres",
+      SESSION_TOPOLOGY: "multi-host",
+      SESSION_EXPIRED_RETENTION_DAYS: "7",
+      SESSION_REVOKED_RETENTION_DAYS: "30",
+      SESSION_CLEANUP_INTERVAL_MS: "900000",
+      DATABASE_URL: "postgres://health:secret@postgres.internal:5432/health"
+    }),
+    (error) => error.code === "PRODUCTION_SESSION_STORE_INVALID" && /POSTGRES_SSL_MODE/.test(error.message)
+  );
+  assert.equal(assertProductionRuntimeSecurity({
+    NODE_ENV: "production",
+    SESSION_SECRET: "production-session-signing-key-with-adequate-entropy",
+    SESSION_STORE: "postgres",
+    SESSION_TOPOLOGY: "multi-host",
+    SESSION_EXPIRED_RETENTION_DAYS: "7",
+    SESSION_REVOKED_RETENTION_DAYS: "30",
+    SESSION_CLEANUP_INTERVAL_MS: "900000",
+    DATABASE_URL: "postgres://health:secret@postgres.internal:5432/health",
+    POSTGRES_SSL_MODE: "verify-full"
+  }), true);
 });
 
 test("production runtime disables local passwords and emits browser security headers", async () => {

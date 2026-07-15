@@ -7,6 +7,7 @@ const DEFAULT_OUTPUT = path.join(ROOT, "release", "monitoring-readiness-report.j
 const DEFAULT_MARKDOWN = path.join(ROOT, "release", "monitoring-readiness-report.md");
 
 const REQUIRED_ROUTES = [
+  "/api/live",
   "/api/health",
   "/api/metrics",
   "/api/system/readiness",

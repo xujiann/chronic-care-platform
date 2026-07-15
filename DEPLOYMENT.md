@@ -22,7 +22,7 @@ http://localhost:5173/login.html
 - SQLite 主存储。
 - 同步生成 `data/db.json` 静态快照。
 - 安全事件和访问日志留痕。
-- `/api/health` 健康检查和 `/api/metrics` 管理端运行指标。
+- `/api/live` 无依赖存活检查、`/api/health` 依赖就绪检查和 `/api/metrics` 管理端运行指标。
 
 ## 静态预览模式
 
@@ -112,6 +112,7 @@ SQLITE_HEALTH_CHECK_TTL_MS=30000
 DATA_DIR=/var/lib/chronic-care-platform
 SESSION_SECRETS=replace-with-long-random-secret
 SESSION_STORE=sqlite
+SESSION_TOPOLOGY=single-host
 SESSION_EXPIRED_RETENTION_DAYS=7
 SESSION_REVOKED_RETENTION_DAYS=30
 SESSION_CLEANUP_INTERVAL_MS=900000
@@ -160,7 +161,7 @@ DEPLOYMENT_APP_DIR=/opt/chronic-care-platform/releases/approved-release-id
 DEPLOYMENT_SECRET_ENV_FILE=/run/secrets/chronic-care-platform.env
 ```
 
-生产化如迁移 PostgreSQL 或正式数据库，需要先完成 `productionDeploymentPlan` 中的数据库适配器工作，再填入 `DATABASE_URL`；在适配器启用前，运行时和发布门禁会拒绝 `STORAGE_ENGINE=postgres/postgresql`，避免静默回落到 SQLite。生产认证会话必须设置 `SESSION_STORE=sqlite`，以支持重启恢复、同一主机跨进程读取和持久化撤销；还必须显式配置过期/撤销会话保留天数及自动清理周期，清理结果可在身份生命周期中心审计。多主机仍需可靠共享存储或独立集中式会话服务。接入政务统一认证时需要填入 `OIDC_ISSUER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET`，可通过 `OIDC_USERINFO_URL` 跳过发现请求；居民端验证码生产上线必须填入 `SMS_GATEWAY_URL/SMS_TEMPLATE_ID`，凭据仅通过环境变量或密钥托管注入。医院连接器至少配置五类 `*_ADAPTER_URL` 和共享 `HOSPITAL_ADAPTER_SECRET`，也可使用每域独立密钥。安全附件需要配置 `OBJECT_STORAGE_GATEWAY_URL/OBJECT_STORAGE_BUCKET/OBJECT_STORAGE_SIGNING_SECRET`，并完成恶意文件扫描和不可变保留锁验收。支付、医保和电子证照必须配置三类 `*_GATEWAY_URL` 与共享或分域 `*_GATEWAY_SECRET`，并完成回调验签、日终对账和联合测试。完整运行时边界见 `docs/production-identity-message-adapters.md`、`docs/production-hospital-connectors.md`、`docs/production-object-storage.md` 和 `docs/production-financial-certificate-gateways.md`。审计保全至少配置 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT`，并补充现场 CA、网关地址等变量。
+生产化如迁移 PostgreSQL 或正式数据库，需要先完成 `productionDeploymentPlan` 中的数据库适配器工作，再填入 `DATABASE_URL`；在适配器启用前，运行时和发布门禁会拒绝 `STORAGE_ENGINE=postgres/postgresql`，避免静默回落到 SQLite。单主机认证会话可设置 `SESSION_STORE=sqlite`，支持重启恢复、同机跨进程读取和持久化撤销；多主机必须设置 `SESSION_TOPOLOGY=multi-host` 与 `SESSION_STORE=postgres`，并通过 `DATABASE_URL`、`POSTGRES_SSL_MODE=verify-full` 使用迁移包创建的中央会话表。签发和撤销在响应前写入中央表，每个带令牌请求先从中央表装载会话，数据库不可用时鉴权失败关闭且 `/api/health` 返回 503。还必须显式配置过期/撤销会话保留天数及自动清理周期，清理结果可在身份生命周期中心审计。接入政务统一认证时需要填入 `OIDC_ISSUER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET`，可通过 `OIDC_USERINFO_URL` 跳过发现请求；居民端验证码生产上线必须填入 `SMS_GATEWAY_URL/SMS_TEMPLATE_ID`，凭据仅通过环境变量或密钥托管注入。医院连接器至少配置五类 `*_ADAPTER_URL` 和共享 `HOSPITAL_ADAPTER_SECRET`，也可使用每域独立密钥。安全附件需要配置 `OBJECT_STORAGE_GATEWAY_URL/OBJECT_STORAGE_BUCKET/OBJECT_STORAGE_SIGNING_SECRET`，并完成恶意文件扫描和不可变保留锁验收。支付、医保和电子证照必须配置三类 `*_GATEWAY_URL` 与共享或分域 `*_GATEWAY_SECRET`，并完成回调验签、日终对账和联合测试。完整运行时边界见 `docs/production-identity-message-adapters.md`、`docs/production-hospital-connectors.md`、`docs/production-object-storage.md` 和 `docs/production-financial-certificate-gateways.md`。审计保全至少配置 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT`，并补充现场 CA、网关地址等变量。
 
 生产环境上线前应执行严格环境校验：
 
@@ -201,10 +202,11 @@ npm.cmd run deployment:verify
 ```text
 http://localhost:5173/login.html
 http://localhost:5173/workbench.html
+http://localhost:5173/api/live
 http://localhost:5173/api/health
 ```
 
-`/api/metrics` 需要卫健委管理端 token，可用于检查请求数、状态码、慢请求、统一任务堆积、死信事件和数据质量问题。`/api/system/readiness` 汇总 P2 集合完整性、审计哈希链、运行负载和仍需现场资源的外部依赖，可作为发布前人工审查入口。
+`/api/live` 不访问存储或外部依赖，只用于判断 Node 进程是否存活；`/api/health` 校验存储与中央会话依赖，任一关键依赖不可用时返回 503。`/api/metrics` 需要卫健委管理端 token，可用于检查请求数、状态码、慢请求、统一任务堆积、死信事件和数据质量问题。`/api/system/readiness` 同样需要管理端 token，汇总 P2 集合完整性、审计哈希链、运行负载和仍需现场资源的外部依赖，可作为发布前人工审查入口。
 
 部署前如需执行完整命令门禁：
 
@@ -263,7 +265,7 @@ npm.cmd run postgres:migration-verify
 
 `onsite:launch-requirements` 会生成 `release/onsite-launch-requirements.json` 和 `release/onsite-launch-requirements.md`，把现场上线必须交付的生产环境、密钥、身份、短信、医疗接口、居民服务、医保证照、数据库、安全、监控、灾备、移动端验收和灰度签字拆成可审计的 P0/P1 需求矩阵；该产物由 `release:report` 同步写出，并由 `release:manifest` 纳入发布包目录。
 
-`monitoring:readiness` 会生成 `release/monitoring-readiness-report.json` 和 `release/monitoring-readiness-report.md`，把 `/api/health`、`/api/metrics`、`/api/system/readiness`、请求状态码、慢请求、死信、数据质量、SLO 阈值、告警信号和 on-call escalation 归档为监控接入证据；生产切换前仍需将这些信号绑定到现场 Prometheus/OpenTelemetry 或平台日志服务，并取得 `CUTOVER_MONITORING_SIGNOFF`。
+`monitoring:readiness` 会生成 `release/monitoring-readiness-report.json` 和 `release/monitoring-readiness-report.md`，把 `/api/live`、`/api/health`、`/api/metrics`、`/api/system/readiness`、请求状态码、慢请求、死信、数据质量、SLO 阈值、告警信号和 on-call escalation 归档为监控接入证据；生产切换前仍需将这些信号绑定到现场 Prometheus/OpenTelemetry 或平台日志服务，并取得 `CUTOVER_MONITORING_SIGNOFF`。
 
 `referral:readiness` 会生成 `release/referral-teleconsultation-readiness-report.json` 和 `release/referral-teleconsultation-readiness-report.md`，把双向转诊、远程会诊、接诊反馈、报告回传、协同工单、居民授权、审计留痕和绩效评价归档为专项证据；现场联调仍需接入 HIS/EMR 真实转诊单、预约号源/床位、远程视频系统、PACS/LIS 报告回传、医保支付路径和医共体绩效结算公式。
 

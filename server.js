@@ -2,7 +2,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
-const { MemorySessionStore, SqliteSessionStore, createSqliteSessionSchema } = require("./session-store");
+const { MemorySessionStore, PostgresSessionStore, SqliteSessionStore, createSqliteSessionSchema } = require("./session-store");
 const {
   applyPostgresReconciliationCaseAction,
   assertSyncMode,
@@ -14,7 +14,8 @@ const {
   readPostgresReconciliationCase,
   readPostgresReconciliationRun,
   readPostgresSyncStatus,
-  runPostgresPrimaryReadRehearsal
+  runPostgresPrimaryReadRehearsal,
+  postgresPoolConfig
 } = require("./postgres-runtime-sync");
 const {
   applyPlatformCapabilityReviewAction,
@@ -178,7 +179,8 @@ const SESSION_RETENTION_DAY_MS = 24 * 60 * 60 * 1000;
 const SESSION_EXPIRED_RETENTION_DAYS = boundedEnvironmentNumber("SESSION_EXPIRED_RETENTION_DAYS", 7, 1, 3650);
 const SESSION_REVOKED_RETENTION_DAYS = boundedEnvironmentNumber("SESSION_REVOKED_RETENTION_DAYS", 30, 1, 3650);
 const SESSION_CLEANUP_INTERVAL_MS = boundedEnvironmentNumber("SESSION_CLEANUP_INTERVAL_MS", 15 * 60 * 1000, 60 * 1000, 24 * 60 * 60 * 1000);
-const RUNTIME_SESSION_STORES = new Set(["memory", "sqlite"]);
+const RUNTIME_SESSION_STORES = new Set(["memory", "sqlite", "postgres"]);
+const SESSION_TOPOLOGIES = new Set(["single-host", "multi-host"]);
 const DEMO_PASSWORD = "123456";
 const PASSWORD_HASH_ITERATIONS = 120_000;
 const STORAGE_SCHEMA_VERSION = 11;
@@ -9532,11 +9534,15 @@ function applyIdentityDirectoryBinding(data, directoryRecords, payload, operator
   };
 }
 
-function revokeSessionsForUserIds(userIds = [], options = {}) {
-  return runtimeSessionStore().revokeByUserIds(userIds, options);
+async function revokeSessionsForUserIds(userIds = [], options = {}) {
+  try {
+    return await runtimeSessionStore().revokeByUserIds(userIds, options);
+  } catch (error) {
+    throw sessionStoreUnavailableError(error, "revoke sessions by user");
+  }
 }
 
-function applyIdentityDirectoryDeactivations(data, plan, operator, note) {
+async function applyIdentityDirectoryDeactivations(data, plan, operator, note) {
   const candidates = plan.items.filter((item) => item.action === "deactivate");
   if (candidates.some((item) => item.localUserId === operator.id)) {
     const error = new Error("identity directory sync cannot deactivate the current operator");
@@ -9567,13 +9573,14 @@ function applyIdentityDirectoryDeactivations(data, plan, operator, note) {
       }
     };
   });
+  const revokedSessions = await revokeSessionsForUserIds(applied.map((item) => item.userId), {
+    reason: "identity-directory-deactivation",
+    actor: operator.username || operator.id
+  });
   return {
     appliedAt,
     applied,
-    revokedSessions: revokeSessionsForUserIds(applied.map((item) => item.userId), {
-      reason: "identity-directory-deactivation",
-      actor: operator.username || operator.id
-    })
+    revokedSessions
   };
 }
 
@@ -9601,14 +9608,31 @@ function sessionStoreMode(env = process.env) {
   const configured = String(env.SESSION_STORE || "").trim().toLowerCase();
   const mode = configured || (isProductionRuntime(env) ? "sqlite" : "memory");
   if (RUNTIME_SESSION_STORES.has(mode)) return mode;
-  const error = new Error(`unsupported SESSION_STORE=${mode}; expected memory or sqlite`);
+  const error = new Error(`unsupported SESSION_STORE=${mode}; expected memory, sqlite or postgres`);
   error.code = "SESSION_STORE_INVALID";
+  throw error;
+}
+
+function sessionTopology(env = process.env) {
+  const topology = String(env.SESSION_TOPOLOGY || "single-host").trim().toLowerCase();
+  if (SESSION_TOPOLOGIES.has(topology)) return topology;
+  const error = new Error(`unsupported SESSION_TOPOLOGY=${topology}; expected single-host or multi-host`);
+  error.code = "SESSION_TOPOLOGY_INVALID";
   throw error;
 }
 
 function productionSessionStoreErrors(env = process.env) {
   if (!isProductionRuntime(env)) return [];
-  return sessionStoreMode(env) === "sqlite" ? [] : ["SESSION_STORE=sqlite is required in production"];
+  const mode = sessionStoreMode(env);
+  const topology = sessionTopology(env);
+  const errors = [];
+  if (!String(env.SESSION_TOPOLOGY || "").trim()) errors.push("SESSION_TOPOLOGY is required in production");
+  if (!["sqlite", "postgres"].includes(mode)) errors.push("SESSION_STORE=sqlite or postgres is required in production");
+  if (topology === "multi-host" && mode !== "postgres") errors.push("SESSION_STORE=postgres is required for multi-host production");
+  if (mode === "postgres" && !/^postgres(?:ql)?:\/\//i.test(String(env.DATABASE_URL || "").trim())) errors.push("DATABASE_URL is required for PostgreSQL sessions");
+  if (mode === "postgres" && !String(env.POSTGRES_SSL_MODE || "").trim()) errors.push("POSTGRES_SSL_MODE is required for PostgreSQL sessions in production");
+  else if (mode === "postgres" && String(env.POSTGRES_SSL_MODE).trim().toLowerCase() !== "verify-full") errors.push("POSTGRES_SSL_MODE=verify-full is required for PostgreSQL sessions in production");
+  return errors;
 }
 
 function productionSessionRetentionErrors(env = process.env) {
@@ -9659,13 +9683,29 @@ function assertProductionRuntimeSecurity(env = process.env) {
 
 function runtimeSessionStore() {
   const mode = sessionStoreMode();
-  const key = `${mode}:${mode === "sqlite" ? SQLITE_FILE : "process"}`;
+  const postgresKey = mode === "postgres"
+    ? createHash("sha256").update(String(process.env.DATABASE_URL || "missing")).digest("hex").slice(0, 16)
+    : "";
+  const key = `${mode}:${mode === "sqlite" ? SQLITE_FILE : mode === "postgres" ? postgresKey : "process"}`;
   if (runtimeSessionStoreInstance && runtimeSessionStoreKey === key) return runtimeSessionStoreInstance;
-  runtimeSessionStoreInstance = mode === "sqlite"
-    ? new SqliteSessionStore({ openDatabase: openSqliteDatabase })
-    : new MemorySessionStore();
+  if (mode === "sqlite") runtimeSessionStoreInstance = new SqliteSessionStore({ openDatabase: openSqliteDatabase });
+  else if (mode === "postgres") runtimeSessionStoreInstance = new PostgresSessionStore({
+    PoolClass: require("pg").Pool,
+    poolConfig: postgresPoolConfig(process.env)
+  });
+  else runtimeSessionStoreInstance = new MemorySessionStore();
   runtimeSessionStoreKey = key;
   return runtimeSessionStoreInstance;
+}
+
+function sessionStoreUnavailableError(error, operation) {
+  if (error?.code === "SESSION_STORE_UNAVAILABLE") return error;
+  console.error(`session store ${operation} failed: ${error?.message || "unknown error"}`);
+  const unavailable = new Error("authentication session service is temporarily unavailable");
+  unavailable.code = "SESSION_STORE_UNAVAILABLE";
+  unavailable.statusCode = 503;
+  unavailable.cause = error;
+  return unavailable;
 }
 
 function sessionRetentionPolicy(now = new Date()) {
@@ -9685,11 +9725,7 @@ function cleanupRuntimeSessions(options = {}) {
   const policy = sessionRetentionPolicy(now);
   const trigger = String(options.trigger || "scheduled").trim().slice(0, 40);
   const actor = String(options.actor || "system").trim().slice(0, 200);
-  try {
-    const result = runtimeSessionStore().cleanup({
-      expiredBefore: policy.expiredBefore,
-      revokedBefore: policy.revokedBefore
-    });
+  const complete = (result) => {
     sessionCleanupState = {
       status: "ok",
       trigger,
@@ -9699,7 +9735,8 @@ function cleanupRuntimeSessions(options = {}) {
       error: ""
     };
     return { ...sessionCleanupState };
-  } catch (error) {
+  };
+  const fail = (error) => {
     sessionCleanupState = {
       status: "failed",
       trigger,
@@ -9712,6 +9749,15 @@ function cleanupRuntimeSessions(options = {}) {
       error: "session cleanup failed"
     };
     throw error;
+  };
+  try {
+    const result = runtimeSessionStore().cleanup({
+      expiredBefore: policy.expiredBefore,
+      revokedBefore: policy.revokedBefore
+    });
+    return result && typeof result.then === "function" ? result.then(complete, fail) : complete(result);
+  } catch (error) {
+    return fail(error);
   }
 }
 
@@ -9724,7 +9770,8 @@ function scheduleSessionCleanup() {
   clearSessionCleanupSchedule();
   sessionCleanupTimer = setInterval(() => {
     try {
-      cleanupRuntimeSessions({ trigger: "scheduled", actor: "system" });
+      Promise.resolve(cleanupRuntimeSessions({ trigger: "scheduled", actor: "system" }))
+        .catch((error) => console.error(`session cleanup failed: ${error.message}`));
     } catch (error) {
       console.error(`session cleanup failed: ${error.message}`);
     }
@@ -9735,12 +9782,39 @@ function scheduleSessionCleanup() {
 function sessionStoreStatus() {
   return {
     ...runtimeSessionStore().status(),
+    topology: sessionTopology(),
     retention: {
       expiredDays: SESSION_EXPIRED_RETENTION_DAYS,
       revokedDays: SESSION_REVOKED_RETENTION_DAYS,
       cleanupIntervalMs: SESSION_CLEANUP_INTERVAL_MS
     },
     cleanup: { ...sessionCleanupState }
+  };
+}
+
+async function refreshSessionStoreStatus() {
+  const store = runtimeSessionStore();
+  if (typeof store.refreshStatus === "function") await store.refreshStatus();
+  return sessionStoreStatus();
+}
+
+async function probeSessionStoreStatus() {
+  const store = runtimeSessionStore();
+  if (typeof store.health === "function") await store.health();
+  return sessionStoreStatus();
+}
+
+function sessionStoreHealthStatus(status = sessionStoreStatus()) {
+  return {
+    mode: status.mode,
+    topology: status.topology,
+    durable: status.durable,
+    crossProcess: Boolean(status.crossProcess),
+    crossHost: Boolean(status.crossHost),
+    centralized: Boolean(status.centralized),
+    available: status.available !== false,
+    checkedAt: status.checkedAt || "",
+    errorCode: status.errorCode || ""
   };
 }
 
@@ -9935,7 +10009,7 @@ function verifyPhoneCode(phone, code, user) {
   return demoMatched;
 }
 
-function createSession(user) {
+async function createSession(user) {
   const sessionId = randomUUID();
   const now = Date.now();
   const issuedAt = new Date(now).toISOString();
@@ -9949,14 +10023,32 @@ function createSession(user) {
     issuedAt,
     expiresAt
   };
-  runtimeSessionStore().create(session);
+  try {
+    await runtimeSessionStore().create(session);
+  } catch (error) {
+    throw sessionStoreUnavailableError(error, "create");
+  }
   return session;
 }
 
-function currentSession(req) {
+function requestSessionToken(req) {
   const auth = String(req.headers.authorization || "");
   const bearer = auth.match(/^Bearer\s+(.+)$/i);
-  const token = bearer?.[1] || req.headers["x-auth-token"];
+  return bearer?.[1] || req.headers["x-auth-token"] || "";
+}
+
+async function hydrateRequestSession(req) {
+  const store = runtimeSessionStore();
+  if (typeof store.hydrate !== "function") return null;
+  const token = requestSessionToken(req);
+  if (!token) return null;
+  const verified = verifySignedSessionToken(token);
+  if (!verified) return null;
+  return store.hydrate(verified.sessionId);
+}
+
+function currentSession(req) {
+  const token = requestSessionToken(req);
   if (!token) return null;
   const verified = verifySignedSessionToken(token);
   if (!verified) return null;
@@ -9965,9 +10057,13 @@ function currentSession(req) {
   return session;
 }
 
-function revokeSession(session, options = {}) {
+async function revokeSession(session, options = {}) {
   if (!session?.sessionId) return 0;
-  return runtimeSessionStore().revoke(session.sessionId, options);
+  try {
+    return await runtimeSessionStore().revoke(session.sessionId, options);
+  } catch (error) {
+    throw sessionStoreUnavailableError(error, "revoke");
+  }
 }
 
 function requireApiRole(req, res, roles, target) {
@@ -16296,7 +16392,40 @@ function buildSiteTemplateReadmes(data) {
 async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
+  if (req.method === "GET" && req.url === "/api/live") {
+    sendJson(res, 200, {
+      ok: true,
+      service: {
+        name: "chronic-care-platform",
+        version: PROJECT_VERSION,
+        environment: process.env.NODE_ENV || "development",
+        uptimeSeconds: Math.round((Date.now() - RUNTIME_STARTED_AT.getTime()) / 1000)
+      }
+    });
+    return;
+  }
+
   if (req.method === "GET" && req.url === "/api/health") {
+    let sessionStore;
+    try {
+      sessionStore = await probeSessionStoreStatus();
+    } catch (error) {
+      console.error(`session store health check failed: ${error.message}`);
+      sendJson(res, 503, {
+        ok: false,
+        code: "SESSION_STORE_UNAVAILABLE",
+        message: "authentication session service is temporarily unavailable",
+        service: {
+          name: "chronic-care-platform",
+          version: PROJECT_VERSION,
+          environment: process.env.NODE_ENV || "development",
+          uptimeSeconds: Math.round((Date.now() - RUNTIME_STARTED_AT.getTime()) / 1000)
+        },
+        storage: storageMeta(),
+        sessionStore: sessionStoreHealthStatus()
+      });
+      return;
+    }
     sendJson(res, 200, {
       ok: true,
       service: {
@@ -16305,7 +16434,8 @@ async function handleApi(req, res) {
         environment: process.env.NODE_ENV || "development",
         uptimeSeconds: Math.round((Date.now() - RUNTIME_STARTED_AT.getTime()) / 1000)
       },
-      storage: storageMeta()
+      storage: storageMeta(),
+      sessionStore: sessionStoreHealthStatus(sessionStore)
     });
     return;
   }
@@ -18102,7 +18232,7 @@ async function handleApi(req, res) {
       sendJson(res, 401, { ok: false, message: "账号或密码不正确" });
       return;
     }
-    const session = createSession(user);
+    const session = await createSession(user);
     appendSecurityEvent({ actor: user.name, role: user.role, action: "登录", target: user.home, result: "允许", detail: "签名会话已签发，支持密钥轮换校验" });
     sendJson(res, 200, { ok: true, token: session.token, expiresAt: session.expiresAt, user: session.user });
     return;
@@ -18127,7 +18257,7 @@ async function handleApi(req, res) {
         refresh: "upstream-refresh-to-local-session",
         logout: "upstream-revocation-and-local-session-delete",
         directory: "controlled-binding-preview-and-deactivation",
-        sessionStore: sessionStoreStatus()
+        sessionStore: await refreshSessionStoreStatus()
       },
       blockers: center.blockers.filter((item) => /OIDC|identity|provider|site/i.test(item)),
       productionReady: false,
@@ -18150,7 +18280,7 @@ async function handleApi(req, res) {
     }
     let result;
     try {
-      result = cleanupRuntimeSessions({
+      result = await cleanupRuntimeSessions({
         trigger: "manual",
         actor: user.username || user.id
       });
@@ -18192,7 +18322,7 @@ async function handleApi(req, res) {
         sendJson(res, 403, { ok: false, message: "bound local account is disabled or missing" });
         return;
       }
-      const session = createSession(user);
+      const session = await createSession(user);
       appendSecurityEvent({ actor: user.name, role: user.role, action: "OIDC login", target: user.home, result: "allowed", detail: `verified by ${upstream.adapter}` });
       sendJson(res, 200, {
         ok: true,
@@ -18224,7 +18354,7 @@ async function handleApi(req, res) {
         sendJson(res, 403, { ok: false, message: "refreshed identity is unbound, disabled or missing" });
         return;
       }
-      const session = createSession(user);
+      const session = await createSession(user);
       appendSecurityEvent({ actor: user.name, role: user.role, action: "OIDC refresh", target: user.home, result: "allowed", detail: "upstream refresh verified and a new signed local session was issued" });
       sendJson(res, 200, {
         ok: true,
@@ -18251,11 +18381,11 @@ async function handleApi(req, res) {
     const payload = await collectJson(req);
     try {
       const receipt = await revokeOidcToken(payload.upstreamToken, { tokenTypeHint: payload.tokenTypeHint });
-      revokeSession(session, { reason: "oidc-revoke", actor: session.user.username || session.user.id });
+      await revokeSession(session, { reason: "oidc-revoke", actor: session.user.username || session.user.id });
       appendSecurityEvent({ actor: session.user.name, role: session.user.role, action: "OIDC revoke logout", target: "unified-auth", result: "allowed", detail: "upstream token revoked and local session retained as revoked audit evidence" });
       sendJson(res, 200, { ok: true, receipt, localSessionRevoked: true, productionReady: false });
     } catch (error) {
-      revokeSession(session, { reason: "oidc-revoke-upstream-failed", actor: session.user.username || session.user.id });
+      await revokeSession(session, { reason: "oidc-revoke-upstream-failed", actor: session.user.username || session.user.id });
       appendSecurityEvent({ actor: session.user.name, role: session.user.role, action: "OIDC revoke logout", target: "unified-auth", result: "partial", detail: "local session revoked; upstream revocation requires reconciliation" });
       sendJson(res, 502, { ok: false, message: "upstream token revocation failed", localSessionRevoked: true, upstreamRevoked: false });
     }
@@ -18312,12 +18442,14 @@ async function handleApi(req, res) {
       const directory = await fetchIdentityDirectory();
       const data = readDatabase();
       const plan = buildIdentityDirectorySyncPlan(directory.records, data);
-      const result = applyIdentityDirectoryDeactivations(data, plan, user, note);
+      const result = await applyIdentityDirectoryDeactivations(data, plan, user, note);
       writeDatabase(normalizeState(data));
       appendSecurityEvent({ actor: user.name, role: user.role, action: "identity directory deactivation sync", target: "unified-auth", result: "allowed", detail: `${result.applied.length} accounts deactivated; ${result.revokedSessions} sessions revoked; no role changes` });
       sendJson(res, 200, { ok: true, plan, result, productionReady: false });
     } catch (error) {
-      const status = ["IDENTITY_DIRECTORY_SELF_DEACTIVATION_BLOCKED", "IDENTITY_DIRECTORY_LAST_COMMISSION_BLOCKED"].includes(error.code) ? 409 : 502;
+      const status = error.code === "SESSION_STORE_UNAVAILABLE"
+        ? 503
+        : ["IDENTITY_DIRECTORY_SELF_DEACTIVATION_BLOCKED", "IDENTITY_DIRECTORY_LAST_COMMISSION_BLOCKED"].includes(error.code) ? 409 : 502;
       sendJson(res, status, { ok: false, code: error.code || "IDENTITY_DIRECTORY_APPLY_FAILED", message: error.code ? error.message : "identity directory sync failed" });
     }
     return;
@@ -18378,7 +18510,7 @@ async function handleApi(req, res) {
       sendJson(res, 401, { ok: false, message: "invalid phone or verification code" });
       return;
     }
-    const session = createSession({ ...user, phone });
+    const session = await createSession({ ...user, phone });
     appendSecurityEvent({ actor: user.name, role: user.role, action: "phone-code login", target: user.home, result: "allowed", detail: "resident phone-code session issued" });
     sendJson(res, 200, { ok: true, token: session.token, expiresAt: session.expiresAt, user: session.user });
     return;
@@ -18397,7 +18529,7 @@ async function handleApi(req, res) {
   if (req.method === "POST" && url.pathname === "/api/auth/logout") {
     const session = currentSession(req);
     if (session) {
-      revokeSession(session, { reason: "logout", actor: session.user.username || session.user.id });
+      await revokeSession(session, { reason: "logout", actor: session.user.username || session.user.id });
       appendSecurityEvent({ actor: session.user.name, role: session.user.role, action: "退出登录", target: "统一认证", result: "允许", detail: "后端会话已注销" });
     }
     sendJson(res, 200, { ok: true });
@@ -23923,6 +24055,13 @@ const server = http.createServer(async (req, res) => {
   res.on("finish", () => recordRequestMetrics(req, res, startedAt));
   try {
     if (req.url.startsWith("/api/")) {
+      try {
+        await hydrateRequestSession(req);
+      } catch (error) {
+        console.error(`central session lookup failed: ${error.message}`);
+        sendJson(res, 503, { ok: false, code: "SESSION_STORE_UNAVAILABLE", message: "authentication session service is temporarily unavailable" });
+        return;
+      }
       await handleApi(req, res);
       return;
     }
@@ -23932,12 +24071,21 @@ const server = http.createServer(async (req, res) => {
       sendStorageConflict(res, error);
       return;
     }
+    if (error?.code === "SESSION_STORE_UNAVAILABLE") {
+      sendJson(res, 503, { ok: false, code: error.code, message: error.message });
+      return;
+    }
     sendJson(res, 500, { error: error.message });
   }
 });
 
 function startServer(port = PORT) {
   assertProductionRuntimeSecurity();
+  if (sessionStoreMode() === "postgres") {
+    const error = new Error("PostgreSQL session store requires asynchronous startup");
+    error.code = "POSTGRES_SESSION_ASYNC_START_REQUIRED";
+    throw error;
+  }
   ensureDatabase();
   cleanupRuntimeSessions({ trigger: "startup", actor: "system" });
   scheduleSessionCleanup();
@@ -23948,17 +24096,49 @@ function startServer(port = PORT) {
   });
 }
 
-function stopServer() {
-  return new Promise((resolve) => {
-    clearSessionCleanupSchedule();
-    if (!server.listening) return resolve();
-    server.close(resolve);
+async function startServerAsync(port = PORT) {
+  assertProductionRuntimeSecurity();
+  ensureDatabase();
+  const store = runtimeSessionStore();
+  try {
+    if (typeof store.initialize === "function") await store.initialize();
+    await cleanupRuntimeSessions({ trigger: "startup", actor: "system" });
+  } catch (error) {
+    if (typeof store.close === "function") {
+      try {
+        await store.close();
+      } catch (closeError) {
+        console.error(`session store close after startup failure failed: ${closeError.message}`);
+      }
+    }
+    runtimeSessionStoreInstance = null;
+    runtimeSessionStoreKey = "";
+    throw error;
+  }
+  scheduleSessionCleanup();
+  return server.listen(port, () => {
+    const address = server.address();
+    const actualPort = typeof address === "object" && address ? address.port : port;
+    console.log(`慢病医防融合管理平台已启动：http://localhost:${actualPort}`);
   });
+}
+
+async function stopServer() {
+  clearSessionCleanupSchedule();
+  if (server.listening) await new Promise((resolve) => server.close(resolve));
+  if (runtimeSessionStoreInstance && typeof runtimeSessionStoreInstance.close === "function") {
+    await runtimeSessionStoreInstance.close();
+  }
+  runtimeSessionStoreInstance = null;
+  runtimeSessionStoreKey = "";
 }
 
 /* c8 ignore next 8 */
 if (require.main === module) {
-  startServer();
+  startServerAsync().catch((error) => {
+    console.error(`server startup failed: ${error.message}`);
+    process.exitCode = 1;
+  });
   const shutdown = async () => {
     await stopServer();
     process.exit(0);
@@ -23978,9 +24158,11 @@ module.exports = {
   readDatabase,
   server,
   sessionStoreMode,
+  sessionTopology,
   sessionRetentionPolicy,
   sessionStoreStatus,
   startServer,
+  startServerAsync,
   stopServer,
   storageMeta,
   writeDatabase

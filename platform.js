@@ -1024,7 +1024,7 @@ function renderIdentityLifecycleCenter() {
   const sessionRetention = sessionStore.retention || {};
   const sessionCleanup = sessionStore.cleanup || {};
   const metrics = [
-    ["会话存储", sessionStore.durable ? `${sessionStore.mode || "sqlite"} 持久化` : "进程内存", sessionStore.crossProcess ? "同一主机共享数据目录可跨进程撤销" : "仅限本地开发和测试"],
+    ["会话存储", sessionStore.durable ? `${sessionStore.mode || "sqlite"} 持久化` : "进程内存", sessionStore.crossHost ? "多主机中央会话可跨节点撤销" : sessionStore.crossProcess ? "同一主机共享数据目录可跨进程撤销" : "仅限本地开发和测试"],
     ["会话保留", `${sessionRetention.expiredDays || 7}/${sessionRetention.revokedDays || 30} 天`, sessionCleanup.status === "ok" ? `最近清理 ${sessionCleanup.deletedTotal || 0} 条` : "等待首次清理"],
     ["OIDC 登录", identity.configured ? "已配置" : "未配置", "UserInfo + 受控账号绑定"],
     ["令牌刷新", identity.refreshConfigured ? "可用" : "未配置", "刷新后重新校验身份"],
