@@ -687,6 +687,7 @@
     }
   ],
   "observabilityAlertDeliveries": [],
+  "smsDeliveryReceipts": [],
   "disasterRecoveryDrills": [
     {
       "id": "ops-drill-backup-restore",

@@ -2,14 +2,19 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const {
+  applySmsDeliveryCallback,
+  buildSmsDeliveryCenter,
   digestPhoneVerificationCode,
   fetchIdentityDirectory,
   fetchOidcUserInfo,
   generatePhoneVerificationCode,
   productionAdapterCenter,
+  recordSmsDeliveryAcceptance,
   refreshOidcAccessToken,
   revokeOidcToken,
-  sendSmsVerificationCode
+  sendSmsVerificationCode,
+  signSmsDeliveryCallback,
+  verifySmsDeliveryCallback
 } = require("../production-adapters");
 
 function jsonResponse(body, status = 200) {
@@ -165,6 +170,137 @@ test("SMS adapter rejects negative provider receipts", async () => {
   }), /rejected the request/);
 });
 
+test("SMS delivery callbacks require a current valid HMAC signature", () => {
+  const secret = "sms-callback-secret-with-at-least-32-characters";
+  const nowMs = Date.parse("2026-07-15T06:30:00.000Z");
+  const timestamp = String(Math.floor(nowMs / 1000));
+  const nonce = "callback-nonce-0001";
+  const payload = {
+    eventId: "sms-event-001",
+    providerMessageId: "provider-sms-001",
+    status: "delivered",
+    occurredAt: "2026-07-15T06:29:58.000Z",
+    providerCode: "DELIVRD",
+    recipient: "13800000000"
+  };
+  const signature = signSmsDeliveryCallback(payload, { secret, timestamp, nonce });
+  const verified = verifySmsDeliveryCallback(payload, {
+    env: { NODE_ENV: "production", SMS_DELIVERY_CALLBACK_SECRET: secret },
+    timestamp,
+    nonce,
+    signature: `sha256=${signature}`,
+    nowMs
+  });
+  assert.equal(verified.status, "delivered");
+  assert.equal(verified.signatureVerified, true);
+  assert.equal("recipient" in verified, false);
+  assert.match(verified.nonceDigest, /^[a-f0-9]{64}$/);
+  assert.doesNotMatch(JSON.stringify(verified), /13800000000|sms-callback-secret/);
+
+  assert.throws(() => verifySmsDeliveryCallback({ ...payload, status: "failed" }, {
+    env: { NODE_ENV: "production", SMS_DELIVERY_CALLBACK_SECRET: secret },
+    timestamp,
+    nonce,
+    signature,
+    nowMs
+  }), (error) => error.code === "SMS_CALLBACK_SIGNATURE_MISMATCH");
+  assert.throws(() => verifySmsDeliveryCallback(payload, {
+    env: { NODE_ENV: "production", SMS_DELIVERY_CALLBACK_SECRET: secret },
+    timestamp: String(Math.floor((nowMs - 301_000) / 1000)),
+    nonce,
+    signature,
+    nowMs
+  }), (error) => error.code === "SMS_CALLBACK_TIMESTAMP_EXPIRED");
+  const futurePayload = { ...payload, occurredAt: "2026-07-15T06:36:00.000Z" };
+  assert.throws(() => verifySmsDeliveryCallback(futurePayload, {
+    env: { NODE_ENV: "production", SMS_DELIVERY_CALLBACK_SECRET: secret },
+    timestamp,
+    nonce,
+    signature: signSmsDeliveryCallback(futurePayload, { secret, timestamp, nonce }),
+    nowMs
+  }), (error) => error.code === "SMS_CALLBACK_TIME_IN_FUTURE");
+});
+
+test("SMS delivery ledger is idempotent and does not regress terminal state", () => {
+  const data = { smsDeliveryReceipts: [] };
+  const accepted = recordSmsDeliveryAcceptance(data, {
+    providerMessageId: "provider-sms-001",
+    clientRequestId: "phone-code-001",
+    maskedPhone: "138****0000",
+    status: "accepted",
+    acceptedAt: "2026-07-15T06:00:00.000Z"
+  });
+  assert.equal(accepted.status, "accepted");
+  accepted.code = "654321";
+  accepted.signature = "provider-signature-must-not-leak";
+  assert.equal(recordSmsDeliveryAcceptance(data, {
+    providerMessageId: "provider-sms-001",
+    clientRequestId: "phone-code-001"
+  }), accepted);
+  assert.throws(() => recordSmsDeliveryAcceptance(data, {
+    providerMessageId: "provider-sms-001",
+    clientRequestId: "phone-code-conflict"
+  }), (error) => error.code === "SMS_ACCEPTANCE_IDENTITY_CONFLICT");
+
+  const deliveredCallback = {
+    eventId: "sms-event-delivered",
+    providerMessageId: "provider-sms-001",
+    status: "delivered",
+    occurredAt: "2026-07-15T06:00:30.000Z",
+    receivedAt: "2026-07-15T06:00:31.000Z",
+    providerCode: "DELIVRD",
+    failureReason: "",
+    nonceDigest: "a".repeat(64),
+    signatureVerified: true
+  };
+  const delivered = applySmsDeliveryCallback(data, deliveredCallback);
+  assert.equal(delivered.receipt.status, "delivered");
+  assert.equal(delivered.event.stateApplied, true);
+  const duplicate = applySmsDeliveryCallback(data, deliveredCallback);
+  assert.equal(duplicate.idempotentReplay, true);
+  assert.throws(() => applySmsDeliveryCallback(data, {
+    ...deliveredCallback,
+    providerCode: "CONFLICT",
+    nonceDigest: "d".repeat(64)
+  }), (error) => error.code === "SMS_CALLBACK_EVENT_CONFLICT");
+
+  const stale = applySmsDeliveryCallback(data, {
+    ...deliveredCallback,
+    eventId: "sms-event-stale",
+    status: "sent",
+    occurredAt: "2026-07-15T06:00:10.000Z",
+    receivedAt: "2026-07-15T06:00:32.000Z",
+    nonceDigest: "b".repeat(64)
+  });
+  assert.equal(stale.receipt.status, "delivered");
+  assert.equal(stale.event.stateApplied, false);
+  assert.equal(stale.event.ignoredReason, "out-of-order");
+
+  const conflict = applySmsDeliveryCallback(data, {
+    ...deliveredCallback,
+    eventId: "sms-event-failed",
+    status: "failed",
+    occurredAt: "2026-07-15T06:00:40.000Z",
+    receivedAt: "2026-07-15T06:00:41.000Z",
+    nonceDigest: "c".repeat(64)
+  });
+  assert.equal(conflict.receipt.status, "delivered");
+  assert.equal(conflict.event.ignoredReason, "terminal-conflict");
+  assert.throws(() => applySmsDeliveryCallback(data, {
+    ...deliveredCallback,
+    eventId: "sms-event-replay",
+    nonceDigest: "c".repeat(64)
+  }), (error) => error.code === "SMS_CALLBACK_REPLAY_DETECTED");
+
+  const center = buildSmsDeliveryCenter(data, { SMS_DELIVERY_CALLBACK_SECRET: "configured" });
+  assert.equal(center.summary.receipts, 1);
+  assert.equal(center.summary.delivered, 1);
+  assert.equal(center.summary.ignoredEvents, 2);
+  assert.equal(center.callbackConfigured, true);
+  assert.doesNotMatch(JSON.stringify(center), /nonceDigest/);
+  assert.doesNotMatch(JSON.stringify(center), /654321|provider-signature-must-not-leak/);
+});
+
 test("phone verification codes are random and stored as keyed digests", () => {
   const code = generatePhoneVerificationCode();
   assert.match(code, /^\d{6}$/);
@@ -183,11 +319,13 @@ test("adapter center separates configured code from site joint-test readiness", 
     IDENTITY_DIRECTORY_URL: "https://identity.example.gov.cn/scim/v2/Users",
     IDENTITY_DIRECTORY_TOKEN: "directory-secret",
     SMS_GATEWAY_URL: "https://sms.example.gov.cn/send",
-    SMS_TEMPLATE_ID: "resident-login-code"
+    SMS_TEMPLATE_ID: "resident-login-code",
+    SMS_DELIVERY_CALLBACK_SECRET: "sms-callback-secret-with-at-least-32-characters"
   });
   assert.equal(center.ready, true);
   assert.equal(center.adapterReady, true);
   assert.equal(center.identityLifecycleReady, true);
+  assert.equal(center.smsDeliveryCallbackReady, true);
   assert.equal(center.productionReady, false);
   assert.equal(center.blockers.includes("real provider joint-test receipts and site signoff"), true);
 });

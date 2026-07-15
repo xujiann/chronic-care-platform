@@ -31,6 +31,7 @@ test("citizen launch foundation readiness captures phase-one gates", () => {
   assert.match(report.externalDependencies.find((item) => item.id === "guardian-relation").onsiteAcceptance, /guardian-binding sample/);
   assert.equal(report.checks.some((item) => item.id === "citizen-foundation:phone-login" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "citizen-foundation:phone-code-delivery" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "citizen-foundation:sms-delivery-callback" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "citizen-foundation:account-provisioning-boundary" && item.passed), true);
   assert.equal(report.checks.find((item) => item.id === "citizen-foundation:account-provisioning-boundary").detail.includes("self-registration"), true);
   assert.equal(report.checks.find((item) => item.id === "citizen-foundation:phone-code-delivery").detail.includes("cooldown"), true);
@@ -54,6 +55,7 @@ test("citizen launch foundation readiness captures phase-one gates", () => {
   assert.match(renderMarkdown(report), /citizen\.html\?client=app&page=health-record&launch=1#citizen-pipeline-panel/);
   assert.match(renderMarkdown(report), /copy-citizen-pipeline-audit/);
   assert.match(renderMarkdown(report), /phone-code delivery/);
+  assert.match(renderMarkdown(report), /sms-delivery-callback/);
   assert.match(renderMarkdown(report), /mobile-preview-service-switch/);
   assert.match(renderMarkdown(report), /pipeline-acceptance-checklist/);
   assert.match(renderMarkdown(report), /account-provisioning-boundary/);

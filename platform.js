@@ -113,6 +113,18 @@ let identityLifecycleCenter = {
     directoryConfigured: false,
     productionHttps: true
   },
+  sms: {
+    configured: false,
+    callbackConfigured: false,
+    productionHttps: true
+  },
+  smsDelivery: {
+    callbackConfigured: false,
+    productionReady: false,
+    summary: { receipts: 0, pending: 0, delivered: 0, failed: 0, callbackEvents: 0, ignoredEvents: 0 },
+    receipts: [],
+    boundary: ""
+  },
   capabilities: {},
   blockers: [],
   plan: null,
@@ -1016,9 +1028,15 @@ function renderIdentityLifecycleCenter() {
   const planTarget = document.querySelector("#identity-directory-plan");
   const statusTarget = document.querySelector("#identity-lifecycle-status");
   const boundaryTarget = document.querySelector("#identity-lifecycle-boundary");
-  if (!metricsTarget || !planTarget) return;
+  const smsMetricsTarget = document.querySelector("#sms-delivery-metrics");
+  const smsReceiptsTarget = document.querySelector("#sms-delivery-receipts");
+  const smsStatusTarget = document.querySelector("#sms-delivery-status");
+  if (!metricsTarget || !planTarget || !smsMetricsTarget || !smsReceiptsTarget) return;
   const center = identityLifecycleCenter;
   const identity = center.identity || {};
+  const sms = center.sms || {};
+  const smsDelivery = center.smsDelivery || {};
+  const smsSummary = smsDelivery.summary || {};
   const summary = center.plan?.summary || {};
   const sessionStore = center.capabilities?.sessionStore || {};
   const sessionRetention = sessionStore.retention || {};
@@ -1056,7 +1074,40 @@ function renderIdentityLifecycleCenter() {
       ${item.action === "controlled-binding-required" && item.localUserId && item.externalSubject && item.remoteActive ? `<button class="inline-action" type="button" data-identity-binding-action data-local-user-id="${platformEscapeHtml(item.localUserId)}" data-external-subject="${platformEscapeHtml(item.externalSubject)}">受控绑定</button>` : ""}
     </div>
   </article>`).join("") : `<p class="muted">尚未运行目录同步预检。</p>`;
-  if (boundaryTarget) boundaryTarget.textContent = center.boundary || "目录同步只允许停用已绑定账号；开户、提权、机构变更和恢复启用必须人工复核。";
+  const smsMetrics = [
+    ["受理回执", smsSummary.receipts || 0, sms.configured ? "短信网关已配置" : "短信网关待配置"],
+    ["待送达", smsSummary.pending || 0, "已受理、排队或已发送"],
+    ["已送达", smsSummary.delivered || 0, "供应商最终送达回执"],
+    ["失败", smsSummary.failed || 0, "失败、过期、不可达或拒绝"],
+    ["回调事件", smsSummary.callbackEvents || 0, `${smsSummary.ignoredEvents || 0} 条乱序或冲突事件未覆盖状态`]
+  ];
+  smsMetricsTarget.innerHTML = smsMetrics.map(([label, value, hint]) => `<article class="metric-card">
+    <span>${platformEscapeHtml(label)}</span>
+    <strong>${platformEscapeHtml(value)}</strong>
+    <small>${platformEscapeHtml(hint)}</small>
+  </article>`).join("");
+  const smsReceipts = smsDelivery.receipts || [];
+  smsReceiptsTarget.innerHTML = smsReceipts.length ? smsReceipts.slice(0, 20).map((item, index) => {
+    const failed = ["failed", "expired", "undeliverable", "rejected"].includes(item.status);
+    const badge = item.status === "delivered" ? "info" : failed ? "danger" : "warn";
+    return `<article class="priority-row" data-sms-delivery-receipt="${platformEscapeHtml(item.id)}">
+      <div class="priority-rank ${badge}">${index + 1}</div>
+      <div>
+        <h3>${platformEscapeHtml(item.purpose || "短信送达")}</h3>
+        <p>${platformEscapeHtml(item.maskedPhone || "-")} · ${platformEscapeHtml(item.providerMessageId || "-")}</p>
+        <small>${platformEscapeHtml(item.latestEventAt || item.acceptedAt || "-")}${item.providerCode ? ` · ${platformEscapeHtml(item.providerCode)}` : ""}</small>
+      </div>
+      <div class="capability-side">
+        <span class="badge ${badge}">${platformEscapeHtml(item.status || "accepted")}</span>
+        <small>${(item.events || []).length} 条回调</small>
+      </div>
+    </article>`;
+  }).join("") : `<p class="muted">尚无短信受理回执。</p>`;
+  if (smsStatusTarget) {
+    smsStatusTarget.textContent = sms.callbackConfigured ? "签名回调就绪" : "回调待配置";
+    smsStatusTarget.className = `badge ${sms.callbackConfigured ? "info" : "warn"}`;
+  }
+  if (boundaryTarget) boundaryTarget.textContent = [center.boundary, smsDelivery.boundary].filter(Boolean).join(" ") || "身份和短信供应商仍需现场联合验收。";
 }
 
 function platformEscapeHtml(value) {

@@ -31,6 +31,10 @@ function buildCitizenLaunchFoundationReadiness(options = {}) {
   const auditDoc = options.auditDoc ?? readText("docs/C端全流程审计与优化清单.md");
   const phaseDoc = options.phaseDoc ?? "";
   const productionRequirements = options.productionRequirements ?? readText("docs/citizen-production-launch-requirements.md");
+  const productionAdapters = options.productionAdapters ?? readText("production-adapters.js");
+  const server = options.server ?? readText("server.js");
+  const platformHtml = options.platformHtml ?? readText("platform.html");
+  const platformJs = options.platformJs ?? readText("platform.js");
   const manifestUrls = new Set((manifest.shortcuts || []).map((item) => item.url));
   const checks = [
     {
@@ -43,6 +47,13 @@ function buildCitizenLaunchFoundationReadiness(options = {}) {
       id: "citizen-foundation:phone-code-delivery",
       passed: hasAll(auth + login, [/sendPhoneCode/, /\/auth\/phone-code/, /data-send-phone-code/, /phone-code-hint/, /retryAfterSeconds/, /expiresAt/]),
       detail: "resident phone-code delivery exposes send action, cooldown, expiry, and demo gateway evidence"
+    },
+    {
+      id: "citizen-foundation:sms-delivery-callback",
+      passed: hasAll(productionAdapters, [/verifySmsDeliveryCallback/, /signSmsDeliveryCallback/, /applySmsDeliveryCallback/, /SMS_CALLBACK_REPLAY_DETECTED/, /terminal-conflict/, /buildSmsDeliveryCenter/]) &&
+        hasAll(server, [/\/api\/auth\/sms-delivery-callback/, /\/api\/auth\/sms-deliveries/, /recordSmsDeliveryAcceptance/, /sms delivery callback/]) &&
+        hasAll(platformHtml + platformJs, [/sms-delivery-status/, /sms-delivery-metrics/, /sms-delivery-receipts/, /renderIdentityLifecycleCenter/]),
+      detail: "signed final-delivery callbacks enforce skew, replay, idempotency and ordered status persistence with commission operations visibility"
     },
     {
       id: "citizen-foundation:account-provisioning-boundary",
@@ -120,7 +131,7 @@ function buildCitizenLaunchFoundationReadiness(options = {}) {
     },
     {
       id: "citizen-foundation:production-requirements",
-      passed: hasAll(productionRequirements, [/SMS_GATEWAY_URL/, /OIDC_\*/, /HIS\/EMR\/LIS\/PACS/, /POST \/api\/auth\/phone-login/, /GET \/api\/messages/, /npm\.cmd run citizen:launch-foundation/, /launch:smoke/, /T0/, /T3/]),
+      passed: hasAll(productionRequirements, [/SMS_GATEWAY_URL/, /SMS_DELIVERY_CALLBACK_SECRET/, /OIDC_\*/, /HIS\/EMR\/LIS\/PACS/, /POST \/api\/auth\/phone-login/, /POST \/api\/auth\/sms-delivery-callback/, /GET \/api\/messages/, /npm\.cmd run citizen:launch-foundation/, /launch:smoke/, /T0/, /T3/]),
       detail: "production launch requirements cover identity, SMS, medical interfaces, messages, smoke tests, and pilot rollout"
     }
   ];

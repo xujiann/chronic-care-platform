@@ -128,6 +128,8 @@ SMS_GATEWAY_TOKEN=replace-with-provider-token
 SMS_TEMPLATE_ID=resident-login-code
 SMS_SENDER=health-platform
 SMS_GATEWAY_TIMEOUT_MS=8000
+SMS_DELIVERY_CALLBACK_SECRET=replace-with-provider-callback-signing-secret
+SMS_DELIVERY_CALLBACK_MAX_SKEW_SECONDS=300
 HOSPITAL_ADAPTER_SECRET=replace-with-hospital-connector-signing-secret
 HIS_ADAPTER_URL=https://his.example.gov.cn/platform/events
 EMR_ADAPTER_URL=https://emr.example.gov.cn/platform/events
@@ -162,6 +164,8 @@ DEPLOYMENT_SECRET_ENV_FILE=/run/secrets/chronic-care-platform.env
 ```
 
 生产化如迁移 PostgreSQL 或正式数据库，需要先完成 `productionDeploymentPlan` 中的数据库适配器工作，再填入 `DATABASE_URL`；在适配器启用前，运行时和发布门禁会拒绝 `STORAGE_ENGINE=postgres/postgresql`，避免静默回落到 SQLite。单主机认证会话可设置 `SESSION_STORE=sqlite`，支持重启恢复、同机跨进程读取和持久化撤销；多主机必须设置 `SESSION_TOPOLOGY=multi-host` 与 `SESSION_STORE=postgres`，并通过 `DATABASE_URL`、`POSTGRES_SSL_MODE=verify-full` 使用迁移包创建的中央会话表。签发和撤销在响应前写入中央表，每个带令牌请求先从中央表装载会话，数据库不可用时鉴权失败关闭且 `/api/health` 返回 503。还必须显式配置过期/撤销会话保留天数及自动清理周期，清理结果可在身份生命周期中心审计。接入政务统一认证时需要填入 `OIDC_ISSUER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET`，可通过 `OIDC_USERINFO_URL` 跳过发现请求；居民端验证码生产上线必须填入 `SMS_GATEWAY_URL/SMS_TEMPLATE_ID`，凭据仅通过环境变量或密钥托管注入。医院连接器至少配置五类 `*_ADAPTER_URL` 和共享 `HOSPITAL_ADAPTER_SECRET`，也可使用每域独立密钥。安全附件需要配置 `OBJECT_STORAGE_GATEWAY_URL/OBJECT_STORAGE_BUCKET/OBJECT_STORAGE_SIGNING_SECRET`，并完成恶意文件扫描和不可变保留锁验收。支付、医保和电子证照必须配置三类 `*_GATEWAY_URL` 与共享或分域 `*_GATEWAY_SECRET`，并完成回调验签、日终对账和联合测试。完整运行时边界见 `docs/production-identity-message-adapters.md`、`docs/production-hospital-connectors.md`、`docs/production-object-storage.md` 和 `docs/production-financial-certificate-gateways.md`。审计保全至少配置 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT`，并补充现场 CA、网关地址等变量。
+
+短信最终送达还必须配置不少于 32 位的 `SMS_DELIVERY_CALLBACK_SECRET`。供应商回调地址为 `POST /api/auth/sms-delivery-callback`，联调必须验证时间窗、nonce 重放、幂等和乱序终态保护；卫健委从 `GET /api/auth/sms-deliveries` 核对脱敏回执。
 
 生产环境上线前应执行严格环境校验：
 

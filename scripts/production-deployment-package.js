@@ -26,6 +26,7 @@ const SECRET_CONTRACT = [
   ["INTEGRATION_GATEWAY_SECRET", "integration callback signing"],
   ["OIDC_CLIENT_SECRET", "identity provider client authentication"],
   ["SMS_GATEWAY_TOKEN", "resident SMS provider authentication"],
+  ["SMS_DELIVERY_CALLBACK_SECRET", "resident SMS delivery callback verification"],
   ["HOSPITAL_ADAPTER_SECRET", "hospital connector signing"],
   ["OBJECT_STORAGE_SIGNING_SECRET", "object storage request signing"],
   ["FINANCIAL_GATEWAY_SECRET", "payment insurance and certificate signing"],

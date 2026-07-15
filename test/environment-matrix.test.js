@@ -15,6 +15,7 @@ test("environment matrix validates demo staging and production gates", () => {
   assert.equal(report.profiles.every((item) => item.missingTemplateVars.length === 0), true);
   assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => item.requiredVars.includes("SMS_GATEWAY_URL")), true);
   assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => item.requiredVars.includes("SMS_TEMPLATE_ID")), true);
+  assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => item.requiredVars.includes("SMS_DELIVERY_CALLBACK_SECRET")), true);
   assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => ["IDENTITY_DIRECTORY_URL", "IDENTITY_DIRECTORY_TOKEN"].every((variable) => item.requiredVars.includes(variable))), true);
   assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => item.requiredVars.includes("HOSPITAL_ADAPTER_SECRET")), true);
   assert.equal(report.profiles.filter((item) => item.id !== "demo").every((item) => ["HIS", "EMR", "LIS", "PACS", "APPOINTMENT"].every((domain) => item.requiredVars.includes(`${domain}_ADAPTER_URL`))), true);

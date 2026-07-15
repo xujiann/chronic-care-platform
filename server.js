@@ -36,14 +36,20 @@ const DiseasePaymentService = require("./disease-payment-service");
 const DiseasePaymentIntake = require("./disease-payment-intake");
 const { buildOhifStudyUrl, listOrthancStudySummaries, publishDiagnosticReportToFhir, publishImagingStudyToFhir, solutionAHealth } = require("./solution-a-connectors");
 const {
+  SmsDeliveryCallbackError,
+  applySmsDeliveryCallback,
+  buildSmsDeliveryCenter,
   digestPhoneVerificationCode,
   fetchIdentityDirectory,
   fetchOidcUserInfo,
   generatePhoneVerificationCode,
   productionAdapterCenter,
+  normalizePersistedSmsDeliveryReceipt,
+  recordSmsDeliveryAcceptance,
   refreshOidcAccessToken,
   revokeOidcToken,
-  sendSmsVerificationCode
+  sendSmsVerificationCode,
+  verifySmsDeliveryCallback
 } = require("./production-adapters");
 const {
   dispatchHospitalRequest,
@@ -942,6 +948,7 @@ function seedState() {
     seniorServices: seedSeniorServices(),
     dataAccessLogs: seedDataAccessLogs(),
     securityEvents: seedSecurityEvents(),
+    smsDeliveryReceipts: [],
     digitalCredentials: seedDigitalCredentials(),
     healthArchiveStandard: seedHealthArchiveStandard(),
     authOrganizations: seedAuthOrganizations(),
@@ -6712,6 +6719,7 @@ function recordRequestMetrics(req, res, startedAt) {
 
 function buildRuntimeMetrics(data) {
   const tasks = buildUnifiedTasks(data, { role: "commission", username: "system", name: "系统监控" });
+  const smsDelivery = buildSmsDeliveryCenter(data, process.env);
   return {
     ok: true,
     service: {
@@ -6727,6 +6735,14 @@ function buildRuntimeMetrics(data) {
       slowRequests: [...runtimeMetrics.slowRequests]
     },
     storage: storageMeta(),
+    messaging: {
+      smsDelivery: {
+        configured: smsDelivery.configured,
+        callbackConfigured: smsDelivery.callbackConfigured,
+        ...smsDelivery.summary,
+        productionReady: false
+      }
+    },
     workload: {
       unifiedTasks: tasks.length,
       overdueTasks: tasks.filter((task) => task.overdue).length,
@@ -6743,6 +6759,7 @@ function renderPrometheusRuntimeMetrics(data) {
   const metrics = buildRuntimeMetrics(data);
   const postgres = metrics.storage?.postgresSync || {};
   const slo = postgres.slo || buildPostgresSyncSlo(postgres);
+  const sms = metrics.messaging?.smsDelivery || {};
   const value = (input, fallback = -1) => input !== null && input !== "" && Number.isFinite(Number(input)) ? Number(input) : fallback;
   return [
     "# HELP health_platform_postgres_sync_enabled Whether PostgreSQL shadow synchronization is enabled.",
@@ -6775,6 +6792,15 @@ function renderPrometheusRuntimeMetrics(data) {
     "# HELP health_platform_postgres_production_primary Whether PostgreSQL is the production primary storage engine.",
     "# TYPE health_platform_postgres_production_primary gauge",
     `health_platform_postgres_production_primary ${postgres.productionPrimary ? 1 : 0}`,
+    "# HELP health_platform_sms_delivery_pending SMS messages awaiting a terminal provider callback.",
+    "# TYPE health_platform_sms_delivery_pending gauge",
+    `health_platform_sms_delivery_pending ${value(sms.pending, 0)}`,
+    "# HELP health_platform_sms_delivery_failed SMS messages in failed, expired, undeliverable or rejected state.",
+    "# TYPE health_platform_sms_delivery_failed gauge",
+    `health_platform_sms_delivery_failed ${value(sms.failed, 0)}`,
+    "# HELP health_platform_sms_delivery_ignored_events Signed callback events retained without changing delivery state.",
+    "# TYPE health_platform_sms_delivery_ignored_events gauge",
+    `health_platform_sms_delivery_ignored_events ${value(sms.ignoredEvents, 0)}`,
     ""
   ].join("\n");
 }
@@ -6786,6 +6812,7 @@ function buildObservabilitySignals(data) {
   const postgresReconciliationMismatches = Number(metrics.storage?.postgresSync?.reconciliation?.mismatched || 0);
   const postgresReconciliationOpenCases = Number(metrics.storage?.postgresSync?.reconciliation?.cases?.unresolved || 0);
   const postgresReconciliationRisk = Math.max(postgresReconciliationMismatches, postgresReconciliationOpenCases);
+  const smsDeliveryFailures = Number(metrics.messaging?.smsDelivery?.failed || 0);
   const definitions = [
     {
       fingerprint: `postgres-sync-slo:${postgresSloBreaches}`,
@@ -6830,6 +6857,17 @@ function buildObservabilitySignals(data) {
       value: metrics.http.slowRequests.length,
       owner: "platform-operations",
       evidenceRefs: ["/api/metrics", "monitoring-readiness-report.md"]
+    },
+    {
+      fingerprint: `sms-delivery-failures:${smsDeliveryFailures}`,
+      source: "sms-delivery",
+      severity: "warning",
+      title: "SMS delivery failures require review",
+      summary: `${smsDeliveryFailures} SMS messages have a terminal failure receipt.`,
+      metric: "smsDeliveryFailures",
+      value: smsDeliveryFailures,
+      owner: "mobile-release",
+      evidenceRefs: ["/api/auth/sms-deliveries", "/api/metrics/prometheus"]
     },
     {
       fingerprint: `data-quality-issues:${metrics.workload.dataQualityIssues}`,
@@ -7306,6 +7344,9 @@ function normalizeState(data) {
     operationsDutyShifts: mergeByKey(seedOperationsDutyShifts(), data.operationsDutyShifts, "id").map((item) => ({ ...item, handoffChecklist: Array.isArray(item.handoffChecklist) ? item.handoffChecklist : [], actionHistory: Array.isArray(item.actionHistory) ? item.actionHistory.slice(0, 20) : [], productionReady: false })),
     operationsIncidents: mergeByKey(seedOperationsIncidents(), data.operationsIncidents, "id").map((item) => ({ ...item, evidenceRefs: Array.isArray(item.evidenceRefs) ? item.evidenceRefs : [], actionHistory: Array.isArray(item.actionHistory) ? item.actionHistory.slice(0, 20) : [], productionReady: false })),
     observabilityAlertDeliveries: Array.isArray(data.observabilityAlertDeliveries) ? data.observabilityAlertDeliveries.slice(0, 200) : [],
+    smsDeliveryReceipts: Array.isArray(data.smsDeliveryReceipts)
+      ? data.smsDeliveryReceipts.slice(0, 500).map(normalizePersistedSmsDeliveryReceipt).filter(Boolean).map((item) => ({ ...item, maskedPhone: maskPhone(item.maskedPhone || "") }))
+      : [],
     disasterRecoveryDrills: mergeByKey(seedDisasterRecoveryDrills(), data.disasterRecoveryDrills, "id").map((item) => ({ ...item, requiredEvidence: Array.isArray(item.requiredEvidence) ? item.requiredEvidence : [], checks: Array.isArray(item.checks) ? item.checks : [], actionHistory: Array.isArray(item.actionHistory) ? item.actionHistory.slice(0, 20) : [], productionReady: false })),
     operationsEvidencePackets: mergeByKey(seedOperationsEvidencePackets(), data.operationsEvidencePackets, "id").map((item) => ({ ...item, productionEvidence: false })),
     healthStatistics: data.healthStatistics && typeof data.healthStatistics === "object" ? data.healthStatistics : seedHealthStatistics(),
@@ -9659,6 +9700,22 @@ function productionSessionRetentionErrors(env = process.env) {
   return errors;
 }
 
+function productionSmsDeliveryErrors(env = process.env) {
+  if (!isProductionRuntime(env)) return [];
+  const enabled = [env.SMS_GATEWAY_URL, env.SMS_TEMPLATE_ID, env.SMS_DELIVERY_CALLBACK_SECRET].some((value) => String(value || "").trim());
+  if (!enabled) return [];
+  const errors = [];
+  if (!/^https:\/\//i.test(String(env.SMS_GATEWAY_URL || "").trim())) errors.push("SMS_GATEWAY_URL must use HTTPS in production");
+  if (!String(env.SMS_TEMPLATE_ID || "").trim()) errors.push("SMS_TEMPLATE_ID is required when the SMS gateway is enabled");
+  const callbackSecret = String(env.SMS_DELIVERY_CALLBACK_SECRET || "").trim();
+  if (callbackSecret.length < 32) errors.push("SMS_DELIVERY_CALLBACK_SECRET must contain at least 32 characters");
+  if (/(replace[-_ ]?with|change[-_ ]?me|demo|example|test[-_ ]?secret)/i.test(callbackSecret)) errors.push("SMS_DELIVERY_CALLBACK_SECRET still contains a placeholder value");
+  const rawSkew = String(env.SMS_DELIVERY_CALLBACK_MAX_SKEW_SECONDS || "").trim();
+  const skewSeconds = Number(rawSkew || 300);
+  if (!Number.isInteger(skewSeconds) || skewSeconds < 60 || skewSeconds > 900) errors.push("SMS_DELIVERY_CALLBACK_MAX_SKEW_SECONDS must be an integer from 60 to 900");
+  return errors;
+}
+
 function assertProductionRuntimeSecurity(env = process.env) {
   const secretErrors = productionSessionSecretErrors(env);
   if (secretErrors.length) {
@@ -9676,6 +9733,12 @@ function assertProductionRuntimeSecurity(env = process.env) {
   if (retentionErrors.length) {
     const error = new Error(`production session retention is invalid: ${retentionErrors.join("; ")}`);
     error.code = "PRODUCTION_SESSION_RETENTION_INVALID";
+    throw error;
+  }
+  const smsErrors = productionSmsDeliveryErrors(env);
+  if (smsErrors.length) {
+    const error = new Error(`production SMS delivery callback is invalid: ${smsErrors.join("; ")}`);
+    error.code = "PRODUCTION_SMS_CALLBACK_INVALID";
     throw error;
   }
   return true;
@@ -9978,6 +10041,19 @@ async function issuePhoneVerificationCode(phone, user) {
       ? { codeDigest: digestPhoneVerificationCode(normalizedPhone, code, authSecrets()[0]) }
       : { code })
   };
+  if (production) {
+    const data = readDatabase();
+    recordSmsDeliveryAcceptance(data, {
+      providerMessageId: receipt.providerMessageId,
+      clientRequestId,
+      purpose: "resident-phone-code",
+      maskedPhone: maskPhone(normalizedPhone),
+      status: receipt.status,
+      acceptedAt: receipt.acceptedAt,
+      providerCode: receipt.providerCode
+    });
+    writeDatabase(normalizeState(data));
+  }
   phoneVerificationCodes.set(normalizedPhone, record);
   return {
     ok: true,
@@ -12140,6 +12216,7 @@ function scopeStateForUser(data, user) {
   delete scoped.authUsers;
   delete scoped.authOrganizations;
   delete scoped.securityEvents;
+  delete scoped.smsDeliveryReceipts;
   delete scoped.interfaceRequirements;
   delete scoped.hospitalInteroperabilityFunctions;
   delete scoped.dataGovernanceAssets;
@@ -18180,6 +18257,58 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "POST" && url.pathname === "/api/auth/sms-delivery-callback") {
+    try {
+      const payload = await collectJson(req);
+      const verified = verifySmsDeliveryCallback(payload, {
+        timestamp: req.headers["x-sms-timestamp"],
+        nonce: req.headers["x-sms-nonce"],
+        signature: req.headers["x-sms-signature"]
+      });
+      const data = readDatabase();
+      const result = applySmsDeliveryCallback(data, verified);
+      writeDatabase(normalizeState(data));
+      appendSecurityEvent({
+        actor: "sms-provider",
+        role: "external-adapter",
+        action: "sms delivery callback",
+        target: verified.providerMessageId,
+        result: result.idempotentReplay ? "idempotent" : result.event.stateApplied ? "allowed" : "recorded-not-applied",
+        detail: `${verified.eventId}:${verified.status}${result.event.ignoredReason ? `:${result.event.ignoredReason}` : ""}`
+      });
+      sendJson(res, 200, {
+        ok: true,
+        idempotentReplay: result.idempotentReplay,
+        delivery: {
+          providerMessageId: result.receipt.providerMessageId,
+          status: result.receipt.status,
+          latestEventAt: result.receipt.latestEventAt,
+          productionEvidence: false
+        },
+        event: {
+          eventId: result.event.eventId,
+          status: result.event.status,
+          stateApplied: result.event.stateApplied,
+          ignoredReason: result.event.ignoredReason
+        }
+      });
+    } catch (error) {
+      const known = error instanceof SmsDeliveryCallbackError;
+      const status = known ? error.statusCode : error instanceof SyntaxError ? 400 : 500;
+      const code = known ? error.code : error instanceof SyntaxError ? "SMS_CALLBACK_BODY_INVALID" : "SMS_CALLBACK_FAILED";
+      appendSecurityEvent({
+        actor: "sms-provider",
+        role: "external-adapter",
+        action: "sms delivery callback",
+        target: "/api/auth/sms-delivery-callback",
+        result: "denied",
+        detail: code
+      });
+      sendJson(res, status, { ok: false, code, message: known ? error.message : "SMS delivery callback failed" });
+    }
+    return;
+  }
+
   const securityControlActionMatch = url.pathname.match(/^\/api\/security\/controls\/([^/]+)\/actions$/);
   if (req.method === "POST" && securityControlActionMatch) {
     const user = requireApiRole(req, res, ["commission"], "/api/security/controls/:id/actions");
@@ -18245,6 +18374,22 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "GET" && url.pathname === "/api/auth/sms-deliveries") {
+    const user = requireApiRole(req, res, ["commission"], "/api/auth/sms-deliveries");
+    if (!user) return;
+    const center = buildSmsDeliveryCenter(readDatabase(), process.env);
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "sms delivery ledger read",
+      target: "/api/auth/sms-deliveries",
+      result: "allowed",
+      detail: `${center.summary.receipts} receipts / ${center.summary.delivered} delivered / production ready false`
+    });
+    sendJson(res, 200, center);
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/auth/identity-lifecycle") {
     const user = requireApiRole(req, res, ["commission"], "/api/auth/identity-lifecycle");
     if (!user) return;
@@ -18252,11 +18397,14 @@ async function handleApi(req, res) {
     sendJson(res, 200, {
       ok: true,
       identity: center.identity,
+      sms: center.sms,
+      smsDelivery: buildSmsDeliveryCenter(readDatabase(), process.env),
       capabilities: {
         login: "oidc-userinfo-controlled-binding",
         refresh: "upstream-refresh-to-local-session",
         logout: "upstream-revocation-and-local-session-delete",
         directory: "controlled-binding-preview-and-deactivation",
+        smsDelivery: "signed-callback-idempotency-and-ordered-ledger",
         sessionStore: await refreshSessionStoreStatus()
       },
       blockers: center.blockers.filter((item) => /OIDC|identity|provider|site/i.test(item)),

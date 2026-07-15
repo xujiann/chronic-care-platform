@@ -94,6 +94,20 @@ test("production startup rejects missing, weak and placeholder session secrets",
     }),
     (error) => error.code === "PRODUCTION_SESSION_STORE_INVALID" && /POSTGRES_SSL_MODE/.test(error.message)
   );
+  assert.throws(
+    () => assertProductionRuntimeSecurity({
+      NODE_ENV: "production",
+      SESSION_SECRET: "production-session-signing-key-with-adequate-entropy",
+      SESSION_STORE: "sqlite",
+      SESSION_TOPOLOGY: "single-host",
+      SESSION_EXPIRED_RETENTION_DAYS: "7",
+      SESSION_REVOKED_RETENTION_DAYS: "30",
+      SESSION_CLEANUP_INTERVAL_MS: "900000",
+      SMS_GATEWAY_URL: "https://sms.example.internal/send",
+      SMS_TEMPLATE_ID: "resident-login-code"
+    }),
+    (error) => error.code === "PRODUCTION_SMS_CALLBACK_INVALID" && /SMS_DELIVERY_CALLBACK_SECRET/.test(error.message)
+  );
   assert.equal(assertProductionRuntimeSecurity({
     NODE_ENV: "production",
     SESSION_SECRET: "production-session-signing-key-with-adequate-entropy",
@@ -103,7 +117,11 @@ test("production startup rejects missing, weak and placeholder session secrets",
     SESSION_REVOKED_RETENTION_DAYS: "30",
     SESSION_CLEANUP_INTERVAL_MS: "900000",
     DATABASE_URL: "postgres://health:secret@postgres.internal:5432/health",
-    POSTGRES_SSL_MODE: "verify-full"
+    POSTGRES_SSL_MODE: "verify-full",
+    SMS_GATEWAY_URL: "https://sms.example.internal/send",
+    SMS_TEMPLATE_ID: "resident-login-code",
+    SMS_DELIVERY_CALLBACK_SECRET: "production-sms-callback-secret-with-adequate-entropy",
+    SMS_DELIVERY_CALLBACK_MAX_SKEW_SECONDS: "300"
   }), true);
 });
 

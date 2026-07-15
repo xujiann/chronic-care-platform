@@ -2769,10 +2769,17 @@ test("production identity and message adapters keep runtime and site boundaries 
   assert.match(adapters, /identityLifecycleReady/);
   assert.match(adapters, /sendSmsVerificationCode/);
   assert.match(adapters, /digestPhoneVerificationCode/);
+  assert.match(adapters, /verifySmsDeliveryCallback/);
+  assert.match(adapters, /applySmsDeliveryCallback/);
+  assert.match(adapters, /SMS_CALLBACK_REPLAY_DETECTED/);
+  assert.match(server, /health_platform_sms_delivery_pending/);
+  assert.match(server, /sms-delivery-failures/);
   assert.match(server, /\/api\/auth\/oidc\/exchange/);
   assert.match(server, /\/api\/auth\/oidc\/refresh/);
   assert.match(server, /\/api\/auth\/oidc\/revoke/);
   assert.match(server, /\/api\/auth\/identity-lifecycle/);
+  assert.match(server, /\/api\/auth\/sms-delivery-callback/);
+  assert.match(server, /\/api\/auth\/sms-deliveries/);
   assert.match(server, /\/api\/auth\/identity-directory\/preview/);
   assert.match(server, /\/api\/auth\/identity-directory\/bind/);
   assert.match(server, /\/api\/auth\/identity-directory\/apply/);
@@ -2790,6 +2797,7 @@ test("production identity and message adapters keep runtime and site boundaries 
   assert.match(documentation, /不自动提权/);
   assert.match(documentation, /不自动复活/);
   assert.match(environment, /SMS_TEMPLATE_ID/);
+  assert.match(environment, /SMS_DELIVERY_CALLBACK_SECRET/);
   assert.match(environment, /OIDC_USERINFO_URL/);
   assert.match(environment, /OIDC_TOKEN_URL/);
   assert.match(environment, /OIDC_REVOCATION_URL/);
@@ -2803,6 +2811,8 @@ test("production identity and message adapters keep runtime and site boundaries 
   assert.match(read("session-store.js"), /request-hydrated-memory/);
   assert.match(read("docs\/production-identity-message-adapters.md"), /SESSION_TOPOLOGY=multi-host/);
   assert.match(read("platform.html"), /identity-lifecycle-center/);
+  assert.match(read("platform.html"), /sms-delivery-receipts/);
+  assert.match(read("platform.js"), /smsDelivery/);
   assert.match(read("platform.js"), /renderIdentityLifecycleCenter/);
   assert.match(read("platform.js"), /runIdentityBindingAction/);
   assert.match(read("platform.js"), /runIdentityDirectoryAction/);

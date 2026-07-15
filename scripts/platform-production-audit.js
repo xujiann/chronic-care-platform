@@ -103,10 +103,10 @@ const MVP_REQUIRED_MODULES = [
   {
     id: "mvp-identity-message",
     name: "统一身份与消息网关",
-    status: "identity-lifecycle-ready-site-joint-test-pending",
+    status: "identity-sms-callback-ready-site-joint-test-pending",
     priority: "P0",
-    implemented: "OIDC UserInfo、稳定 subject 受控绑定、同名回退阻断、token 刷新、token 撤销与本地注销、SCIM 目录预览、受控停用与会话撤销、短信 HTTP 适配、随机验证码、摘要存储和供应商受理回执",
-    remainingCode: "按实际身份与短信供应商补充专有签名、最终送达回调、协议差异和现场映射配置",
+    implemented: "OIDC UserInfo、稳定 subject 受控绑定、同名回退阻断、token 刷新、token 撤销与本地注销、SCIM 目录预览、受控停用与会话撤销、短信 HTTP 适配、随机验证码、摘要存储、供应商受理回执、HMAC 最终送达回调、时间窗与重放防护、幂等乱序状态机和运维台账",
+    remainingCode: "按实际身份与短信供应商补充专有字段映射、密钥托管、网络白名单、退订频控策略、协议差异和现场映射配置",
     siteDependency: "真实凭据、短信模板、目录映射、联合测试回执和责任方签字"
   },
   {
@@ -188,7 +188,9 @@ const PRODUCTION_BLOCKERS = [
     ? "primary-read-production-adapter-ready-site-acceptance-pending"
     : id === "P0-03"
     ? "identity-lifecycle-ready-site-joint-test-pending"
-    : (["P0-04", "P0-05", "P0-06", "P0-08", "P0-09"].includes(id) ? "adapter-foundation-ready-site-joint-test-pending" : "blocked-until-site-evidence"),
+    : id === "P0-04"
+    ? "signed-delivery-callback-ready-site-joint-test-pending"
+    : (["P0-05", "P0-06", "P0-08", "P0-09"].includes(id) ? "adapter-foundation-ready-site-joint-test-pending" : "blocked-until-site-evidence"),
   progress: id === "P0-01"
     ? "已实现不可变部署包、运行文件摘要复核、密钥仅引用不落盘、最小权限进程模板、CI 验证和回滚契约；真实 Vault/KMS、TLS、制品仓库、服务账号和生产 smoke 签字未完成。"
     : id === "P0-02"
@@ -196,7 +198,7 @@ const PRODUCTION_BLOCKERS = [
     : (id === "P0-03"
       ? "已实现 OIDC 稳定 subject 受控绑定、同名回退阻断、UserInfo、刷新、撤销、本地注销、SCIM 目录预览、受控账号停用、会话撤销和运维状态界面，并阻止自动开户、提权、复活、静默改绑、当前操作员停用及最后卫健委账号停用；真实凭据、目录归属与映射验收、供应商差异、联合测试和签字未完成。"
       : (id === "P0-04"
-        ? "已实现短信 HTTP 适配、随机验证码、摘要存储和供应商受理回执；供应商签名、最终送达回调、移动发布和签字未完成。"
+        ? "已实现短信 HTTP 适配、随机验证码、摘要存储、供应商受理回执、通用 HMAC 最终送达回调、时间窗与 nonce 重放防护、幂等和乱序终态保护、持久化回执台账及卫健委可视化；供应商专有字段映射、真实回调密钥、网络白名单、移动发布和现场签字未完成。"
         : (id === "P0-05"
           ? "已实现 HIS/EMR/LIS/PACS/号源通用出站适配、签名、幂等、有限重试、受理回执和死信对账；厂商专有协议、字典、网络、性能和联合签字未完成。"
           : (id === "P0-06"
@@ -303,6 +305,7 @@ function buildPlatformProductionAudit(options = {}) {
     check("platformAudit:capabilityOperationsCenter", runtimeSources.domain.includes("applyPlatformCapabilityReviewAction") && runtimeSources.domain.includes("applyPlatformProductionBlockerAction") && runtimeSources.server.includes("/api/platform/capability-operations/blockers/") && runtimeSources.html.includes("platform-capability-operations-center") && runtimeSources.client.includes("renderPlatformCapabilityOperationsCenter") && runtimeSources.client.includes("runPlatformProductionBlockerAction") && runtimeSources.documentation.includes("reviewed-preproduction") && runtimeSources.documentation.includes("evidence-reviewed-site-pending"), "capability review and production-blocker evidence workflows are runnable, audited and documented"),
     check("platformAudit:productionDatabaseAdapter", ["runPostgresPrimaryReadRehearsal", "buildPostgresPrimaryReadSnapshot"].every((marker) => runtimeSources.postgresRuntime.includes(marker)) && ["readPostgresProductionState", "writePostgresProductionState", "runtime_primary_write_audit", "POSTGRES_PRIMARY_WRITE_BLOCKED"].every((marker) => runtimeSources.postgresAdapter.includes(marker)) && ["/api/production-database/adapter", "/api/production-database/primary-read-rehearsal"].every((marker) => runtimeSources.server.includes(marker)) && ["生产数据库适配器", "SERIALIZABLE", "productionPrimary"].every((marker) => runtimeSources.postgresDocumentation.includes(marker)), "P0-02 primary-read rehearsal and evidence-gated production adapter are runnable, audited and documented"),
     check("platformAudit:identityLifecycleAdapter", ["refreshOidcAccessToken", "revokeOidcToken", "fetchIdentityDirectory", "identityLifecycleReady"].every((marker) => runtimeSources.identityAdapter.includes(marker)) && ["/api/auth/identity-lifecycle", "/api/auth/oidc/refresh", "/api/auth/oidc/revoke", "/api/auth/identity-directory/preview", "/api/auth/identity-directory/bind", "/api/auth/identity-directory/apply", "BIND EXTERNAL IDENTITY", "IDENTITY_BINDING_REASSIGNMENT_BLOCKED", "IDENTITY_DIRECTORY_SELF_DEACTIVATION_BLOCKED", "IDENTITY_DIRECTORY_LAST_COMMISSION_BLOCKED"].every((marker) => runtimeSources.server.includes(marker)) && runtimeSources.html.includes("identity-lifecycle-center") && ["renderIdentityLifecycleCenter", "runIdentityBindingAction", "runIdentityDirectoryAction"].every((marker) => runtimeSources.client.includes(marker)) && ["不按同名用户名自动回退", "不自动开户", "不自动提权", "不自动复活", "现场联合测试回执"].every((marker) => runtimeSources.identityDocumentation.includes(marker)), "P0-03 OIDC subject binding, lifecycle, safe directory deactivation, operations UI and production boundary are runnable, audited and documented"),
+    check("platformAudit:smsDeliveryCallback", ["verifySmsDeliveryCallback", "applySmsDeliveryCallback", "buildSmsDeliveryCenter", "SMS_CALLBACK_REPLAY_DETECTED", "terminal-conflict"].every((marker) => runtimeSources.identityAdapter.includes(marker)) && ["/api/auth/sms-delivery-callback", "/api/auth/sms-deliveries", "smsDeliveryReceipts", "recordSmsDeliveryAcceptance"].every((marker) => runtimeSources.server.includes(marker)) && ["sms-delivery-status", "sms-delivery-metrics", "sms-delivery-receipts"].every((marker) => runtimeSources.html.includes(marker)) && runtimeSources.client.includes("smsDelivery") && ["SMS_DELIVERY_CALLBACK_SECRET", "回调验签", "重放", "乱序"].every((marker) => runtimeSources.identityDocumentation.includes(marker)), "P0-04 signed SMS final-delivery callbacks, replay protection, ordered persistence, operations visibility and site boundary are runnable, audited and documented"),
     check("platformAudit:releaseWiring", Boolean(pkg.scripts?.["platform:production-audit"]) && scriptSources.manifest.includes("platform-production-audit") && scriptSources.deploy.includes("platformProductionAudit") && scriptSources.release.includes("buildPlatformProductionAudit"), "package, manifest, deploy check and release report are wired"),
     check("platformAudit:formalDocument", ["审计结论", "正式生产前已实现的主要功能", "生产割接差距", "下一步开发规划", "正式上线退出条件"].every((marker) => document.includes(marker)), "formal audit document contains conclusion, capability inventory, gaps, roadmap and exit criteria")
   ];
@@ -328,7 +331,8 @@ function buildPlatformProductionAudit(options = {}) {
       releaseChecksPassed: Number(releaseReport.summary?.passed || 0),
       capabilityOperationsCenter: checks.some((item) => item.id === "platformAudit:capabilityOperationsCenter" && item.passed),
       productionDatabaseAdapter: checks.some((item) => item.id === "platformAudit:productionDatabaseAdapter" && item.passed),
-      identityLifecycleAdapter: checks.some((item) => item.id === "platformAudit:identityLifecycleAdapter" && item.passed)
+      identityLifecycleAdapter: checks.some((item) => item.id === "platformAudit:identityLifecycleAdapter" && item.passed),
+      smsDeliveryCallbackAdapter: checks.some((item) => item.id === "platformAudit:smsDeliveryCallback" && item.passed)
     },
     auditBasis: [
       "运行页面与角色入口",
@@ -363,6 +367,7 @@ function renderMarkdown(report) {
     `平台能力运营中心已${report.summary.capabilityOperationsCenter ? "纳入" : "未纳入"}发布门禁，用于统一管理能力域责任人、生产阻断整改、证据提交、生产前复核和审计留痕。`,
     `P0-02 PostgreSQL 主读取演练与生产适配器已${report.summary.productionDatabaseAdapter ? "纳入" : "未纳入"}发布门禁；正式主库切换仍由现场数据库、灾备和四方审批证据阻断。`,
     `P0-03 统一身份生命周期与目录安全停用已${report.summary.identityLifecycleAdapter ? "纳入" : "未纳入"}发布门禁；真实身份源、目录映射、供应商联合测试和责任方签字仍为上线阻断项。`,
+    `P0-04 短信最终送达回调已${report.summary.smsDeliveryCallbackAdapter ? "纳入" : "未纳入"}发布门禁；真实供应商字段映射、密钥托管、网络白名单、移动发布和现场回执仍为上线阻断项。`,
     "",
     "## 二、审计范围与方法",
     "",

@@ -116,10 +116,27 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     accountId: "a2",
     status: "\u542f\u7528"
   });
+  fixture.smsDeliveryReceipts = [{
+    id: "sms-delivery-api-fixture",
+    providerMessageId: "provider-sms-api-001",
+    clientRequestId: "phone-code-api-001",
+    purpose: "resident-phone-code",
+    maskedPhone: "138****0000",
+    status: "accepted",
+    acceptedAt: "2026-07-15T06:00:00.000Z",
+    latestEventAt: "2026-07-15T06:00:00.000Z",
+    providerCode: "ACCEPTED",
+    failureReason: "",
+    events: [],
+    createdAt: "2026-07-15T06:00:00.000Z",
+    updatedAt: "2026-07-15T06:00:00.000Z",
+    productionEvidence: false
+  }];
   fs.writeFileSync(path.join(dataDir, "db.json"), JSON.stringify(fixture, null, 2), "utf8");
 
   process.env.DATA_DIR = dataDir;
   process.env.STORAGE_ENGINE = "json";
+  process.env.SMS_DELIVERY_CALLBACK_SECRET = "sms-callback-secret-with-at-least-32-characters";
   const { server, startServer, stopServer } = require(path.join(ROOT, "server.js"));
   startServer(0);
   await once(server, "listening");
@@ -180,6 +197,66 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(adapterCenter.body.ready, false);
     assert.equal(adapterCenter.body.identity.configured, false);
     assert.equal(adapterCenter.body.sms.configured, false);
+    assert.equal(adapterCenter.body.sms.callbackConfigured, true);
+
+    const smsDeliveries = await api(baseUrl, "/api/auth/sms-deliveries", authorized(accountLogin.body.token));
+    assert.equal(smsDeliveries.response.status, 200);
+    assert.equal(smsDeliveries.body.summary.receipts, 1);
+    assert.equal(smsDeliveries.body.receipts[0].providerMessageId, "provider-sms-api-001");
+    assert.equal(JSON.stringify(smsDeliveries.body).includes("nonceDigest"), false);
+
+    const callbackPayload = {
+      eventId: "sms-event-api-delivered",
+      providerMessageId: "provider-sms-api-001",
+      status: "delivered",
+      occurredAt: new Date().toISOString(),
+      providerCode: "DELIVRD"
+    };
+    const callbackTimestamp = String(Math.floor(Date.now() / 1000));
+    const callbackNonce = "sms-api-nonce-001";
+    const callbackSignature = createHmac("sha256", process.env.SMS_DELIVERY_CALLBACK_SECRET)
+      .update(`${callbackTimestamp}.${callbackNonce}.${stableStringify(callbackPayload)}`)
+      .digest("hex");
+    const callback = await api(baseUrl, "/api/auth/sms-delivery-callback", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-SMS-Timestamp": callbackTimestamp,
+        "X-SMS-Nonce": callbackNonce,
+        "X-SMS-Signature": `sha256=${callbackSignature}`
+      },
+      body: JSON.stringify(callbackPayload)
+    });
+    assert.equal(callback.response.status, 200);
+    assert.equal(callback.body.delivery.status, "delivered");
+    assert.equal(callback.body.event.stateApplied, true);
+    assert.equal(callback.body.delivery.productionEvidence, false);
+
+    const callbackReplay = await api(baseUrl, "/api/auth/sms-delivery-callback", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-SMS-Timestamp": callbackTimestamp,
+        "X-SMS-Nonce": callbackNonce,
+        "X-SMS-Signature": callbackSignature
+      },
+      body: JSON.stringify(callbackPayload)
+    });
+    assert.equal(callbackReplay.response.status, 200);
+    assert.equal(callbackReplay.body.idempotentReplay, true);
+
+    const tamperedCallback = await api(baseUrl, "/api/auth/sms-delivery-callback", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-SMS-Timestamp": callbackTimestamp,
+        "X-SMS-Nonce": "sms-api-nonce-002",
+        "X-SMS-Signature": callbackSignature
+      },
+      body: JSON.stringify({ ...callbackPayload, eventId: "sms-event-api-tampered", status: "failed" })
+    });
+    assert.equal(tamperedCallback.response.status, 401);
+    assert.equal(tamperedCallback.body.code, "SMS_CALLBACK_SIGNATURE_MISMATCH");
 
     const unavailableOidc = await api(baseUrl, "/api/auth/oidc/exchange", {
       method: "POST",
@@ -198,6 +275,8 @@ test("API authentication, scoping and governance regression suite", async (t) =>
 
     const deniedAdapterCenter = await api(baseUrl, "/api/auth/adapters", authorized(residentPhoneLogin.body.token));
     assert.equal(deniedAdapterCenter.response.status, 403);
+    const deniedSmsDeliveries = await api(baseUrl, "/api/auth/sms-deliveries", authorized(residentPhoneLogin.body.token));
+    assert.equal(deniedSmsDeliveries.response.status, 403);
 
     const sentPhoneCode = await phoneCode(baseUrl, "DEMO-MOBILE-R1");
     assert.equal(sentPhoneCode.response.status, 200);
@@ -236,6 +315,16 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(metrics.body.http.apiRequests >= 1, true);
     assert.equal(typeof metrics.body.workload.unifiedTasks, "number");
     assert.equal(typeof metrics.body.workload.dataQualityIssues, "number");
+    assert.equal(metrics.body.messaging.smsDelivery.receipts, 1);
+    assert.equal(metrics.body.messaging.smsDelivery.delivered, 1);
+    assert.equal(metrics.body.messaging.smsDelivery.productionReady, false);
+
+    const prometheusResponse = await fetch(`${baseUrl}/api/metrics/prometheus`, authorized(accountLogin.body.token));
+    assert.equal(prometheusResponse.status, 200);
+    const prometheusBody = await prometheusResponse.text();
+    assert.match(prometheusBody, /health_platform_sms_delivery_pending 0/);
+    assert.match(prometheusBody, /health_platform_sms_delivery_failed 0/);
+    assert.match(prometheusBody, /health_platform_sms_delivery_ignored_events 0/);
 
     const readiness = await api(baseUrl, "/api/system/readiness", authorized(accountLogin.body.token));
     assert.equal(readiness.response.status, 200);
@@ -2195,6 +2284,7 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       "authUsers",
       "authOrganizations",
       "securityEvents",
+      "smsDeliveryReceipts",
       "platformAudit",
       "platformProcessAudit",
       "productionDeploymentPlan",

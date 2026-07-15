@@ -82,6 +82,7 @@ test("release report validates demo and production environment profiles", () => 
       IDENTITY_DIRECTORY_TOKEN: "0123456789abcdef0123456789abcdef",
       SMS_GATEWAY_URL: "https://sms.example.internal/send",
       SMS_TEMPLATE_ID: "resident-login-code",
+      SMS_DELIVERY_CALLBACK_SECRET: "0123456789abcdef0123456789abcdef",
       HOSPITAL_ADAPTER_SECRET: "0123456789abcdef0123456789abcdef",
       HIS_ADAPTER_URL: "https://his.example.internal/events",
       EMR_ADAPTER_URL: "https://emr.example.internal/events",
@@ -128,6 +129,7 @@ test("release report validates demo and production environment profiles", () => 
       IDENTITY_DIRECTORY_TOKEN: "0123456789abcdef0123456789abcdef",
       SMS_GATEWAY_URL: "https://sms.example.internal/send",
       SMS_TEMPLATE_ID: "resident-login-code",
+      SMS_DELIVERY_CALLBACK_SECRET: "0123456789abcdef0123456789abcdef",
       HOSPITAL_ADAPTER_SECRET: "0123456789abcdef0123456789abcdef",
       HIS_ADAPTER_URL: "https://his.example.internal/events",
       EMR_ADAPTER_URL: "https://emr.example.internal/events",
@@ -163,6 +165,8 @@ test("release report validates demo and production environment profiles", () => 
   assert.equal(production.checks.some((item) => item.name === "env:SESSION_RETENTION.policy" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:SESSION_RETENTION.interval" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:OIDC.lifecycle" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:SMS.deliveryCallback" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:SMS.callbackSecretQuality" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:HOSPITAL.connectors" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:HOSPITAL.secretQuality" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:OBJECT_STORAGE.adapter" && item.passed), true);

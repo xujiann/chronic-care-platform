@@ -122,8 +122,10 @@ function buildIdentityContract(options = {}) {
     sms: {
       runtime: adapterSource.includes("sendSmsVerificationCode") && serverSource.includes("/api/auth/phone-code"),
       protectedCode: adapterSource.includes("digestPhoneVerificationCode") && serverSource.includes("codeDigest"),
-      configuration: ["SMS_GATEWAY_URL", "SMS_TEMPLATE_ID", "SMS_GATEWAY_TOKEN"].every((marker) => envTemplate.includes(marker)),
-      boundary: adapterDocument.includes("最终送达回调") && adapterDocument.includes("供应商专有签名")
+      signedDeliveryCallback: ["verifySmsDeliveryCallback", "applySmsDeliveryCallback", "SMS_CALLBACK_REPLAY_DETECTED", "terminal-conflict"].every((marker) => adapterSource.includes(marker)) && ["/api/auth/sms-delivery-callback", "/api/auth/sms-deliveries", "smsDeliveryReceipts"].every((marker) => serverSource.includes(marker)),
+      operationsUi: ["sms-delivery-status", "sms-delivery-metrics", "sms-delivery-receipts"].every((marker) => platformHtml.includes(marker)) && platformSource.includes("smsDelivery"),
+      configuration: ["SMS_GATEWAY_URL", "SMS_TEMPLATE_ID", "SMS_GATEWAY_TOKEN", "SMS_DELIVERY_CALLBACK_SECRET"].every((marker) => envTemplate.includes(marker)),
+      boundary: ["最终送达回调", "供应商专有字段与签名差异", "回调验签", "重放", "乱序"].every((marker) => adapterDocument.includes(marker))
     },
     productionSecurity: {
       localPasswordDisabled: ["LOCAL_PASSWORD_LOGIN_DISABLED", "local password login is disabled in production"].every((marker) => serverSource.includes(marker)),
@@ -147,7 +149,7 @@ function buildIdentityContract(options = {}) {
     { id: "identity:sampleMappings", passed: sampleMappings.every((item) => item.passed), detail: sampleMappings.map((item) => `${item.id}:${item.mappedRole}/${item.mappedHome}`).join(";") },
     { id: "identity:oidcRuntimeAdapter", passed: Object.values(adapterContracts.oidc).every(Boolean), detail: "OIDC UserInfo runtime, configuration and controlled-binding boundary documented" },
     { id: "identity:oidcLifecycle", passed: Object.values(adapterContracts.oidcLifecycle).every(Boolean), detail: "OIDC subject binding, refresh, revocation, safe directory deactivation, operations UI and production boundary documented" },
-    { id: "identity:smsRuntimeAdapter", passed: Object.values(adapterContracts.sms).every(Boolean), detail: "SMS runtime, keyed code digest, provider configuration and delivery boundary documented" },
+    { id: "identity:smsRuntimeAdapter", passed: Object.values(adapterContracts.sms).every(Boolean), detail: "SMS runtime, keyed code digest, signed final-delivery callback, replay-safe ordered ledger, operations UI and provider boundary documented" },
     { id: "identity:productionSecurityBoundary", passed: Object.values(adapterContracts.productionSecurity).every(Boolean), detail: "production local-password, signing-secret, durable session retention, browser fail-closed, resident scope and content-security controls are wired" }
   ];
 
