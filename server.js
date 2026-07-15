@@ -57,9 +57,15 @@ const {
   normalizeDomain: normalizeHospitalConnectorDomain
 } = require("./hospital-connectors");
 const {
+  FinancialCallbackError,
+  applyFinancialCallback,
+  createFinancialReconciliationRun,
   dispatchFinancialRequest,
   financialGatewayCenter,
-  validateFinancialRequest
+  financialGatewayOperationsCenter,
+  normalizeFinancialReconciliationRun,
+  validateFinancialRequest,
+  verifyFinancialCallback
 } = require("./financial-gateways");
 const {
   alertRoutingCenter,
@@ -993,6 +999,8 @@ function seedState() {
     phase2FamilyDoctorFulfillments: seedPhase2FamilyDoctorFulfillments(),
     phase2MutualRecognitionCatalog: seedPhase2MutualRecognitionCatalog(),
     phase2MutualRecognitionCitations: seedPhase2MutualRecognitionCitations(),
+    integrationGatewayEvents: [],
+    financialReconciliationRuns: [],
     chronicProjectBlueprint: seedChronicProjectBlueprint(),
     countyProjectBlueprint: seedCountyProjectBlueprint(),
     countyConsortium: seedCountyConsortium(),
@@ -6720,6 +6728,7 @@ function recordRequestMetrics(req, res, startedAt) {
 function buildRuntimeMetrics(data) {
   const tasks = buildUnifiedTasks(data, { role: "commission", username: "system", name: "系统监控" });
   const smsDelivery = buildSmsDeliveryCenter(data, process.env);
+  const financialOperations = financialGatewayOperationsCenter(data, process.env);
   return {
     ok: true,
     service: {
@@ -6743,6 +6752,13 @@ function buildRuntimeMetrics(data) {
         productionReady: false
       }
     },
+    integrations: {
+      financialCallbacks: {
+        callbackReady: financialOperations.callbackReady,
+        ...financialOperations.summary,
+        productionReady: false
+      }
+    },
     workload: {
       unifiedTasks: tasks.length,
       overdueTasks: tasks.filter((task) => task.overdue).length,
@@ -6760,6 +6776,7 @@ function renderPrometheusRuntimeMetrics(data) {
   const postgres = metrics.storage?.postgresSync || {};
   const slo = postgres.slo || buildPostgresSyncSlo(postgres);
   const sms = metrics.messaging?.smsDelivery || {};
+  const financial = metrics.integrations?.financialCallbacks || {};
   const value = (input, fallback = -1) => input !== null && input !== "" && Number.isFinite(Number(input)) ? Number(input) : fallback;
   return [
     "# HELP health_platform_postgres_sync_enabled Whether PostgreSQL shadow synchronization is enabled.",
@@ -6801,6 +6818,18 @@ function renderPrometheusRuntimeMetrics(data) {
     "# HELP health_platform_sms_delivery_ignored_events Signed callback events retained without changing delivery state.",
     "# TYPE health_platform_sms_delivery_ignored_events gauge",
     `health_platform_sms_delivery_ignored_events ${value(sms.ignoredEvents, 0)}`,
+    "# HELP health_platform_financial_callback_pending Financial gateway requests awaiting a terminal signed callback.",
+    "# TYPE health_platform_financial_callback_pending gauge",
+    `health_platform_financial_callback_pending ${value(financial.pending, 0)}`,
+    "# HELP health_platform_financial_callback_exceptions Financial gateway requests requiring callback reconciliation.",
+    "# TYPE health_platform_financial_callback_exceptions gauge",
+    `health_platform_financial_callback_exceptions ${value(financial.exceptions, 0)}`,
+    "# HELP health_platform_financial_callback_ignored_events Signed financial callbacks retained without changing state.",
+    "# TYPE health_platform_financial_callback_ignored_events gauge",
+    `health_platform_financial_callback_ignored_events ${value(financial.ignoredEvents, 0)}`,
+    "# HELP health_platform_financial_reconciliation_differences Daily financial reconciliation runs with differences.",
+    "# TYPE health_platform_financial_reconciliation_differences gauge",
+    `health_platform_financial_reconciliation_differences ${value(financial.reconciliationDifferences, 0)}`,
     ""
   ].join("\n");
 }
@@ -6813,6 +6842,8 @@ function buildObservabilitySignals(data) {
   const postgresReconciliationOpenCases = Number(metrics.storage?.postgresSync?.reconciliation?.cases?.unresolved || 0);
   const postgresReconciliationRisk = Math.max(postgresReconciliationMismatches, postgresReconciliationOpenCases);
   const smsDeliveryFailures = Number(metrics.messaging?.smsDelivery?.failed || 0);
+  const financialCallbackExceptions = Number(metrics.integrations?.financialCallbacks?.exceptions || 0);
+  const financialReconciliationDifferences = Number(metrics.integrations?.financialCallbacks?.reconciliationDifferences || 0);
   const definitions = [
     {
       fingerprint: `postgres-sync-slo:${postgresSloBreaches}`,
@@ -6868,6 +6899,17 @@ function buildObservabilitySignals(data) {
       value: smsDeliveryFailures,
       owner: "mobile-release",
       evidenceRefs: ["/api/auth/sms-deliveries", "/api/metrics/prometheus"]
+    },
+    {
+      fingerprint: `financial-callback-exceptions:${financialCallbackExceptions}:${financialReconciliationDifferences}`,
+      source: "financial-gateway",
+      severity: "critical",
+      title: "Financial gateway callback reconciliation requires review",
+      summary: `${financialCallbackExceptions} callback exceptions and ${financialReconciliationDifferences} daily reconciliation differences require review.`,
+      metric: "financialGatewayExceptions",
+      value: financialCallbackExceptions + financialReconciliationDifferences,
+      owner: "cross-agency-integration",
+      evidenceRefs: ["/api/financial-gateways/operations", "/api/metrics/prometheus"]
     },
     {
       fingerprint: `data-quality-issues:${metrics.workload.dataQualityIssues}`,
@@ -7512,6 +7554,9 @@ function normalizeState(data) {
     phase2MutualRecognitionCatalog: mergeByKey(seedPhase2MutualRecognitionCatalog(), data.phase2MutualRecognitionCatalog, "id"),
     phase2MutualRecognitionCitations: mergeByKey(seedPhase2MutualRecognitionCitations(), data.phase2MutualRecognitionCitations, "id"),
     integrationGatewayEvents: Array.isArray(data.integrationGatewayEvents) ? data.integrationGatewayEvents : [],
+    financialReconciliationRuns: Array.isArray(data.financialReconciliationRuns)
+      ? data.financialReconciliationRuns.slice(0, 100).map(normalizeFinancialReconciliationRun).filter(Boolean)
+      : [],
     chronicProjectBlueprint: data.chronicProjectBlueprint && typeof data.chronicProjectBlueprint === "object" ? data.chronicProjectBlueprint : seedChronicProjectBlueprint(),
     countyProjectBlueprint: data.countyProjectBlueprint && typeof data.countyProjectBlueprint === "object" ? data.countyProjectBlueprint : seedCountyProjectBlueprint(),
     countyConsortium: data.countyConsortium && typeof data.countyConsortium === "object" ? data.countyConsortium : seedCountyConsortium(),
@@ -9716,6 +9761,30 @@ function productionSmsDeliveryErrors(env = process.env) {
   return errors;
 }
 
+function productionFinancialCallbackErrors(env = process.env) {
+  if (!isProductionRuntime(env)) return [];
+  const gatewayTypes = ["PAYMENT", "INSURANCE", "CERTIFICATE"];
+  const sharedCallbackSecret = String(env.FINANCIAL_CALLBACK_SECRET || "").trim();
+  const enabled = gatewayTypes.some((type) => String(env[`${type}_GATEWAY_URL`] || "").trim())
+    || sharedCallbackSecret
+    || gatewayTypes.some((type) => String(env[`${type}_CALLBACK_SECRET`] || "").trim());
+  if (!enabled) return [];
+  const errors = [];
+  gatewayTypes.forEach((type) => {
+    const gatewayUrl = String(env[`${type}_GATEWAY_URL`] || "").trim();
+    const domainCallbackSecret = String(env[`${type}_CALLBACK_SECRET`] || "").trim();
+    if (!gatewayUrl && !domainCallbackSecret && !sharedCallbackSecret) return;
+    if (gatewayUrl && !/^https:\/\//i.test(gatewayUrl)) errors.push(`${type}_GATEWAY_URL must use HTTPS in production`);
+    const callbackSecret = domainCallbackSecret || sharedCallbackSecret;
+    if (callbackSecret.length < 32) errors.push(`${type} callback secret must contain at least 32 characters`);
+    if (/(replace[-_ ]?with|change[-_ ]?me|demo|example|test[-_ ]?secret)/i.test(callbackSecret)) errors.push(`${type} callback secret still contains a placeholder value`);
+  });
+  const rawSkew = String(env.FINANCIAL_CALLBACK_MAX_SKEW_SECONDS || "").trim();
+  const skewSeconds = Number(rawSkew || 300);
+  if (!Number.isInteger(skewSeconds) || skewSeconds < 60 || skewSeconds > 900) errors.push("FINANCIAL_CALLBACK_MAX_SKEW_SECONDS must be an integer from 60 to 900");
+  return errors;
+}
+
 function assertProductionRuntimeSecurity(env = process.env) {
   const secretErrors = productionSessionSecretErrors(env);
   if (secretErrors.length) {
@@ -9739,6 +9808,12 @@ function assertProductionRuntimeSecurity(env = process.env) {
   if (smsErrors.length) {
     const error = new Error(`production SMS delivery callback is invalid: ${smsErrors.join("; ")}`);
     error.code = "PRODUCTION_SMS_CALLBACK_INVALID";
+    throw error;
+  }
+  const financialCallbackErrors = productionFinancialCallbackErrors(env);
+  if (financialCallbackErrors.length) {
+    const error = new Error(`production financial callback configuration is invalid: ${financialCallbackErrors.join("; ")}`);
+    error.code = "PRODUCTION_FINANCIAL_CALLBACK_INVALID";
     throw error;
   }
   return true;
@@ -12256,6 +12331,7 @@ function scopeStateForUser(data, user) {
     delete scoped.phase2MutualRecognitionCitations;
   }
   delete scoped.integrationGatewayEvents;
+  delete scoped.financialReconciliationRuns;
   delete scoped.secureAttachments;
   delete scoped.platformCapabilities;
   delete scoped.platformIntegrations;
@@ -22047,6 +22123,113 @@ async function handleApi(req, res) {
     return;
   }
 
+  const financialCallbackMatch = url.pathname.match(/^\/api\/financial-gateways\/callbacks\/([^/]+)$/);
+  if (req.method === "POST" && financialCallbackMatch) {
+    const callbackType = decodeURIComponent(financialCallbackMatch[1]);
+    try {
+      const payload = await collectJson(req);
+      const verified = verifyFinancialCallback(payload, {
+        type: callbackType,
+        timestamp: req.headers["x-financial-timestamp"],
+        nonce: req.headers["x-financial-nonce"],
+        signature: req.headers["x-financial-signature"]
+      });
+      const data = readDatabase();
+      const result = applyFinancialCallback(data, verified);
+      writeDatabase(normalizeState(data));
+      appendSecurityEvent({
+        actor: `${verified.gatewayType.toLowerCase()}-provider`,
+        role: "external-adapter",
+        action: "financial gateway callback",
+        target: verified.receiptId,
+        result: result.idempotentReplay ? "idempotent" : result.callbackEvent.stateApplied ? "allowed" : "recorded-not-applied",
+        detail: `${verified.eventId}:${verified.status}${result.callbackEvent.ignoredReason ? `:${result.callbackEvent.ignoredReason}` : ""}`
+      });
+      sendJson(res, 200, {
+        ok: true,
+        idempotentReplay: result.idempotentReplay,
+        gateway: {
+          eventId: result.gatewayEvent.id,
+          gatewayType: result.gatewayEvent.gatewayType,
+          receiptId: verified.receiptId,
+          status: result.gatewayEvent.providerStatus,
+          reconciliationStatus: result.gatewayEvent.reconciliationStatus,
+          productionEvidence: false
+        },
+        callback: {
+          eventId: result.callbackEvent.eventId,
+          status: result.callbackEvent.status,
+          stateApplied: result.callbackEvent.stateApplied,
+          ignoredReason: result.callbackEvent.ignoredReason
+        }
+      });
+    } catch (error) {
+      const unsupportedType = /unsupported financial gateway type/i.test(String(error.message || ""));
+      const known = error instanceof FinancialCallbackError;
+      const status = known ? error.statusCode : unsupportedType || error instanceof SyntaxError ? 400 : 500;
+      const code = known ? error.code : unsupportedType ? "FINANCIAL_CALLBACK_GATEWAY_INVALID" : error instanceof SyntaxError ? "FINANCIAL_CALLBACK_BODY_INVALID" : "FINANCIAL_CALLBACK_FAILED";
+      appendSecurityEvent({
+        actor: "financial-provider",
+        role: "external-adapter",
+        action: "financial gateway callback",
+        target: `/api/financial-gateways/callbacks/${String(callbackType || "").replace(/[\r\n]/g, " ").slice(0, 32)}`,
+        result: "denied",
+        detail: code
+      });
+      sendJson(res, status, { ok: false, code, message: known ? error.message : unsupportedType ? "financial callback gateway is invalid" : "financial callback failed" });
+    }
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/financial-gateways/operations") {
+    const user = requireApiRole(req, res, ["commission", "insurance"], "/api/financial-gateways/operations");
+    if (!user) return;
+    const scopeType = user.role === "insurance" ? "INSURANCE" : "";
+    const center = financialGatewayOperationsCenter(readDatabase(), process.env, scopeType);
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "financial gateway operations read",
+      target: scopeType || "ALL",
+      result: "allowed",
+      detail: `${center.summary.callbackEvents} callbacks / ${center.summary.reconciliationDifferences} reconciliation differences`
+    });
+    sendJson(res, 200, center);
+    return;
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/financial-gateways/reconciliation-runs") {
+    const user = requireApiRole(req, res, ["commission", "insurance"], "/api/financial-gateways/reconciliation-runs");
+    if (!user) return;
+    try {
+      const payload = await collectJson(req);
+      if (user.role === "insurance" && String(payload.gatewayType || payload.type || "").toUpperCase() !== "INSURANCE") {
+        sendJson(res, 403, { error: "Forbidden", message: "insurance role is limited to insurance reconciliation" });
+        return;
+      }
+      const data = readDatabase();
+      const result = createFinancialReconciliationRun(data, payload, user);
+      writeDatabase(normalizeState(data));
+      appendSecurityEvent({
+        actor: user.name,
+        role: user.role,
+        action: "financial daily reconciliation",
+        target: `${result.run.gatewayType}/${result.run.businessDate}`,
+        result: result.run.status === "matched" ? "allowed" : "review-required",
+        detail: `${result.run.id}:${result.run.status}:${result.run.providerSummary.statementDigest}`
+      });
+      sendJson(res, result.idempotentReplay ? 200 : 201, { ok: true, idempotentReplay: result.idempotentReplay, run: result.run, productionEvidence: false });
+    } catch (error) {
+      const known = error instanceof FinancialCallbackError;
+      sendJson(res, known ? error.statusCode : error instanceof SyntaxError ? 400 : 500, {
+        ok: false,
+        code: known ? error.code : error instanceof SyntaxError ? "FINANCIAL_RECONCILIATION_BODY_INVALID" : "FINANCIAL_RECONCILIATION_FAILED",
+        message: known ? error.message : "financial reconciliation failed"
+      });
+    }
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/financial-gateways") {
     const user = requireApiRole(req, res, ["commission", "institution", "insurance"], "/api/financial-gateways");
     if (!user) return;
@@ -22127,6 +22310,10 @@ async function handleApi(req, res) {
         ...baseEvent,
         status: receipt.status,
         adapterReceipt: receipt,
+        adapterReceiptHistory: [],
+        providerStatus: receipt.status,
+        callbackEvents: [],
+        businessDate: String(receipt.acceptedAt || "").slice(0, 10),
         dispatchedAt: receipt.acceptedAt,
         reconciliationStatus: "provider-accepted"
       };
@@ -22455,10 +22642,18 @@ async function handleApi(req, res) {
     }
     if (event.adapterType === "financial" && event.requestPayload) {
       try {
+        const previousReceipt = event.adapterReceipt;
         const receipt = await dispatchFinancialRequest(event.requestPayload);
+        const adapterReceiptHistory = [previousReceipt, ...(Array.isArray(event.adapterReceiptHistory) ? event.adapterReceiptHistory : [])]
+          .filter((item, index, list) => item?.receiptId && list.findIndex((candidate) => candidate?.receiptId === item.receiptId) === index)
+          .slice(0, 10);
         Object.assign(event, {
           status: receipt.status,
           adapterReceipt: receipt,
+          adapterReceiptHistory,
+          providerStatus: receipt.status,
+          latestCallbackAt: "",
+          businessDate: String(receipt.acceptedAt || "").slice(0, 10),
           dispatchedAt: receipt.acceptedAt,
           deadLetter: false,
           deadLetterReason: "",

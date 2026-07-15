@@ -2,11 +2,17 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const {
+  applyFinancialCallback,
+  createFinancialReconciliationRun,
   dispatchFinancialRequest,
   financialGatewayCenter,
+  financialGatewayOperationsCenter,
+  normalizeFinancialReconciliationRun,
+  signFinancialCallback,
   signFinancialRequest,
   stableStringify,
-  validateFinancialRequest
+  validateFinancialRequest,
+  verifyFinancialCallback
 } = require("../financial-gateways");
 
 function jsonResponse(body, status = 200) {
@@ -100,16 +106,204 @@ test("financial gateway center exposes no endpoints or credentials", () => {
     NODE_ENV: "production",
     PAYMENT_GATEWAY_URL: "https://payment.example.gov.cn",
     PAYMENT_GATEWAY_SECRET: "payment-secret",
+    PAYMENT_CALLBACK_SECRET: "payment-callback-secret",
     INSURANCE_GATEWAY_URL: "https://insurance.example.gov.cn",
     INSURANCE_GATEWAY_SECRET: "insurance-secret",
+    INSURANCE_CALLBACK_SECRET: "insurance-callback-secret",
     CERTIFICATE_GATEWAY_URL: "https://certificate.example.gov.cn",
-    CERTIFICATE_GATEWAY_SECRET: "certificate-secret"
+    CERTIFICATE_GATEWAY_SECRET: "certificate-secret",
+    CERTIFICATE_CALLBACK_SECRET: "certificate-callback-secret"
   });
   assert.equal(center.adapterReady, true);
+  assert.equal(center.callbackReady, true);
   assert.equal(center.productionReady, false);
   assert.equal(center.summary.total, 3);
   assert.equal(center.summary.operations, 14);
   const serialized = JSON.stringify(center);
   assert.equal(serialized.includes("payment.example.gov.cn"), false);
   assert.equal(serialized.includes("payment-secret"), false);
+  assert.equal(serialized.includes("payment-callback-secret"), false);
+});
+
+test("financial callbacks require a current valid domain-specific HMAC signature", () => {
+  const secret = "payment-callback-secret-with-at-least-32-characters";
+  const nowMs = Date.parse("2026-07-15T07:30:00.000Z");
+  const timestamp = String(Math.floor(nowMs / 1000));
+  const nonce = "financial-callback-nonce-001";
+  const payload = {
+    gatewayType: "PAYMENT",
+    eventId: "payment-event-001",
+    receiptId: "PAY-001",
+    status: "paid",
+    occurredAt: "2026-07-15T07:29:58.000Z",
+    businessDate: "2026-07-15",
+    amountFen: 12600,
+    settlementReference: "provider-reference-must-be-digested"
+  };
+  const signature = signFinancialCallback(payload, { secret, timestamp, nonce });
+  const verified = verifyFinancialCallback(payload, {
+    type: "PAYMENT",
+    env: { NODE_ENV: "production", PAYMENT_CALLBACK_SECRET: secret },
+    timestamp,
+    nonce,
+    signature: `sha256=${signature}`,
+    nowMs
+  });
+  assert.equal(verified.status, "succeeded");
+  assert.match(verified.nonceDigest, /^[a-f0-9]{64}$/);
+  assert.match(verified.settlementReferenceDigest, /^[a-f0-9]{64}$/);
+  assert.doesNotMatch(JSON.stringify(verified), /provider-reference-must-be-digested|callback-secret/);
+
+  assert.throws(() => verifyFinancialCallback({ ...payload, amountFen: 12000 }, {
+    type: "PAYMENT",
+    env: { NODE_ENV: "production", PAYMENT_CALLBACK_SECRET: secret },
+    timestamp,
+    nonce,
+    signature,
+    nowMs
+  }), (error) => error.code === "FINANCIAL_CALLBACK_SIGNATURE_MISMATCH");
+  assert.throws(() => verifyFinancialCallback(payload, {
+    type: "INSURANCE",
+    env: { NODE_ENV: "production", INSURANCE_CALLBACK_SECRET: secret },
+    timestamp,
+    nonce,
+    signature,
+    nowMs
+  }), (error) => error.code === "FINANCIAL_CALLBACK_GATEWAY_CONFLICT");
+});
+
+test("financial callback ledger is idempotent, amount-safe and reversal-aware", () => {
+  const data = {
+    integrationGatewayEvents: [{
+      id: "igw-payment-001",
+      adapterType: "financial",
+      gatewayType: "PAYMENT",
+      operation: "create-payment",
+      contractId: "payment-transaction-v1",
+      adapterReceipt: { receiptId: "PAY-001", status: "accepted" },
+      adapterReceiptHistory: [{ receiptId: "PAY-OLD", status: "accepted" }],
+      requestPayload: { payload: { orderNo: "REG-001", amountFen: 12600, currency: "CNY" } },
+      providerStatus: "accepted",
+      reconciliationStatus: "provider-accepted",
+      dispatchedAt: "2026-07-15T07:00:00.000Z",
+      callbackEvents: []
+    }]
+  };
+  const callback = {
+    gatewayType: "PAYMENT",
+    eventId: "payment-event-succeeded",
+    receiptId: "PAY-001",
+    status: "succeeded",
+    occurredAt: "2026-07-15T07:00:30.000Z",
+    receivedAt: "2026-07-15T07:00:31.000Z",
+    businessDate: "2026-07-15",
+    amountFen: 12600,
+    providerCode: "SUCCESS",
+    failureReason: "",
+    settlementReferenceDigest: "a".repeat(64),
+    nonceDigest: "b".repeat(64),
+    signatureVerified: true
+  };
+  const succeeded = applyFinancialCallback(data, callback);
+  assert.equal(succeeded.gatewayEvent.providerStatus, "succeeded");
+  assert.equal(succeeded.gatewayEvent.reconciliationStatus, "provider-final");
+  assert.equal(applyFinancialCallback(data, callback).idempotentReplay, true);
+  assert.throws(() => applyFinancialCallback(data, {
+    ...callback,
+    businessDate: "2026-07-14"
+  }), (error) => error.code === "FINANCIAL_CALLBACK_EVENT_CONFLICT");
+
+  const oldReceipt = applyFinancialCallback(data, {
+    ...callback,
+    eventId: "payment-event-old-receipt",
+    receiptId: "PAY-OLD",
+    receivedAt: "2026-07-15T07:00:32.000Z",
+    nonceDigest: "c".repeat(64)
+  });
+  assert.equal(oldReceipt.callbackEvent.stateApplied, false);
+  assert.equal(oldReceipt.callbackEvent.ignoredReason, "superseded-receipt");
+
+  const amountMismatch = applyFinancialCallback(data, {
+    ...callback,
+    eventId: "payment-event-amount-mismatch",
+    amountFen: 12599,
+    receivedAt: "2026-07-15T07:00:33.000Z",
+    nonceDigest: "d".repeat(64)
+  });
+  assert.equal(amountMismatch.callbackEvent.ignoredReason, "amount-mismatch");
+
+  const reversed = applyFinancialCallback(data, {
+    ...callback,
+    eventId: "payment-event-reversed",
+    status: "reversed",
+    occurredAt: "2026-07-15T07:10:00.000Z",
+    receivedAt: "2026-07-15T07:10:01.000Z",
+    nonceDigest: "e".repeat(64)
+  });
+  assert.equal(reversed.callbackEvent.stateApplied, true);
+  assert.equal(reversed.gatewayEvent.providerStatus, "reversed");
+  assert.equal(reversed.gatewayEvent.reconciliationStatus, "provider-exception");
+  assert.throws(() => applyFinancialCallback(data, {
+    ...callback,
+    eventId: "payment-event-replay-nonce",
+    nonceDigest: "e".repeat(64)
+  }), (error) => error.code === "FINANCIAL_CALLBACK_REPLAY_DETECTED");
+});
+
+test("financial reconciliation compares digest-only provider summaries", () => {
+  const data = {
+    integrationGatewayEvents: [{
+      id: "igw-insurance-001",
+      adapterType: "financial",
+      gatewayType: "INSURANCE",
+      operation: "settlement",
+      adapterReceipt: { receiptId: "SETTLE-001", status: "succeeded" },
+      requestPayload: { payload: { claimNo: "CLAIM-001", amountFen: 5600 } },
+      reconciliationStatus: "provider-final",
+      businessDate: "2026-07-15",
+      callbackEvents: []
+    }, {
+      id: "igw-insurance-query-001",
+      adapterType: "financial",
+      gatewayType: "INSURANCE",
+      operation: "eligibility-precheck",
+      adapterReceipt: { receiptId: "ELIGIBILITY-001", status: "accepted" },
+      providerStatus: "succeeded",
+      reconciliationStatus: "provider-final",
+      businessDate: "2026-07-15",
+      callbackEvents: []
+    }],
+    financialReconciliationRuns: []
+  };
+  const input = {
+    gatewayType: "INSURANCE",
+    businessDate: "2026-07-15",
+    providerSummary: {
+      total: 1,
+      succeeded: 1,
+      exceptions: 0,
+      grossAmountFen: 5600,
+      statementDigest: "f".repeat(64)
+    }
+  };
+  const matched = createFinancialReconciliationRun(data, input, { username: "insurance" });
+  assert.equal(matched.run.status, "matched");
+  assert.equal(createFinancialReconciliationRun(data, input).idempotentReplay, true);
+  assert.throws(() => createFinancialReconciliationRun(data, {
+    ...input,
+    providerSummary: { ...input.providerSummary, total: 2 }
+  }), (error) => error.code === "FINANCIAL_RECONCILIATION_DIGEST_CONFLICT");
+  const different = createFinancialReconciliationRun(data, {
+    ...input,
+    providerSummary: { ...input.providerSummary, grossAmountFen: 5500, statementDigest: "1".repeat(64) }
+  });
+  assert.equal(different.run.status, "difference");
+  assert.equal(different.run.differences.grossAmountFen, -100);
+  assert.equal(normalizeFinancialReconciliationRun({ ...different.run, status: "matched" }).status, "difference");
+
+  const center = financialGatewayOperationsCenter(data, { INSURANCE_CALLBACK_SECRET: "configured" }, "INSURANCE");
+  assert.equal(center.summary.dispatched, 2);
+  assert.equal(center.summary.reconciliationRuns, 2);
+  assert.equal(center.summary.reconciliationDifferences, 1);
+  assert.doesNotMatch(JSON.stringify(center), /nonceDigest|CLAIM-001/);
 });

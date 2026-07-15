@@ -11,10 +11,11 @@ test("financial gateway readiness separates adapter foundation from production a
   const report = buildFinancialGatewayReadiness();
   assert.equal(report.ok, true);
   assert.equal(report.productionReady, false);
-  assert.equal(report.status, "adapter-foundation-ready-site-joint-test-pending");
+  assert.equal(report.status, "signed-callback-reconciliation-ready-site-joint-test-pending");
   assert.equal(report.summary.gateways, 3);
   assert.equal(report.summary.operations, 14);
   assert.equal(report.summary.capabilityGroupsReady, report.summary.capabilityGroups);
+  assert.equal(report.checks.find((item) => item.id === "financialGateway:operationsUi").passed, true);
   assert.equal(report.blockers.length, 6);
 });
 

@@ -132,6 +132,15 @@ let identityLifecycleCenter = {
   productionReady: false,
   boundary: ""
 };
+let financialGatewayOperationsCenter = {
+  callbackReady: false,
+  productionReady: false,
+  summary: { dispatched: 0, pending: 0, succeeded: 0, exceptions: 0, callbackEvents: 0, ignoredEvents: 0, reconciliationRuns: 0, reconciliationDifferences: 0 },
+  gateways: [],
+  events: [],
+  reconciliationRuns: [],
+  boundary: ""
+};
 
 const defaultPlatformCapabilities = [
   {
@@ -416,6 +425,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadPostgresReconciliationCenter();
   await loadPostgresProductionAdapterCenter();
   await loadIdentityLifecycleCenter();
+  await loadFinancialGatewayOperationsCenter();
   ensureEditablePlatformData(platformState);
   bindPlatformEditor();
   renderPlatform();
@@ -442,6 +452,7 @@ function renderPlatform() {
   renderPlatformCapabilityOperationsCenter();
   renderProductionDeploymentPlan(platformData.productionDeploymentPlan);
   renderIdentityLifecycleCenter();
+  renderFinancialGatewayOperationsCenter();
   renderProductionDatabaseCutoverCenter(platformData);
   renderCitizenOperationsCenter(platformData);
   renderCommercialCryptoCenter(platformData);
@@ -1110,6 +1121,69 @@ function renderIdentityLifecycleCenter() {
   if (boundaryTarget) boundaryTarget.textContent = [center.boundary, smsDelivery.boundary].filter(Boolean).join(" ") || "身份和短信供应商仍需现场联合验收。";
 }
 
+function renderFinancialGatewayOperationsCenter() {
+  const metricsTarget = document.querySelector("#financial-gateway-operations-metrics");
+  const eventsTarget = document.querySelector("#financial-gateway-callback-events");
+  const runsTarget = document.querySelector("#financial-reconciliation-runs");
+  const statusTarget = document.querySelector("#financial-gateway-operations-status");
+  const boundaryTarget = document.querySelector("#financial-gateway-operations-boundary");
+  if (!metricsTarget || !eventsTarget || !runsTarget) return;
+  const center = financialGatewayOperationsCenter;
+  const summary = center.summary || {};
+  const callbackDomains = (center.gateways || []).filter((item) => item.callbackConfigured).length;
+  const metrics = [
+    ["回调域", `${callbackDomains}/${(center.gateways || []).length || 3}`, center.callbackReady ? "三类签名回调已配置" : "回调密钥待配置"],
+    ["待回调", summary.pending || 0, `${summary.dispatched || 0} 笔出站请求`],
+    ["成功", summary.succeeded || 0, `${summary.callbackEvents || 0} 条签名事件`],
+    ["异常", summary.exceptions || 0, `${summary.ignoredEvents || 0} 条未覆盖状态`],
+    ["对账差异", summary.reconciliationDifferences || 0, `${summary.reconciliationRuns || 0} 次日终对账`]
+  ];
+  metricsTarget.innerHTML = metrics.map(([label, value, hint]) => `<article class="metric-card">
+    <span>${platformEscapeHtml(label)}</span>
+    <strong>${platformEscapeHtml(value)}</strong>
+    <small>${platformEscapeHtml(hint)}</small>
+  </article>`).join("");
+  const events = center.events || [];
+  eventsTarget.innerHTML = events.length ? events.slice(0, 20).map((item, index) => {
+    const exception = item.reconciliationStatus === "provider-exception";
+    const succeeded = item.status === "succeeded";
+    const badge = exception ? "danger" : succeeded ? "info" : "warn";
+    return `<article class="priority-row" data-financial-callback-event="${platformEscapeHtml(item.id)}">
+      <div class="priority-rank ${badge}">${index + 1}</div>
+      <div>
+        <h3>${platformEscapeHtml(item.gatewayType)} · ${platformEscapeHtml(item.operation)}</h3>
+        <p>${platformEscapeHtml(item.receiptId || "回执待生成")}</p>
+        <small>${platformEscapeHtml(item.latestCallbackAt || item.businessDate || "等待最终回调")}</small>
+      </div>
+      <div class="capability-side">
+        <span class="badge ${badge}">${platformEscapeHtml(item.status || "accepted")}</span>
+        <small>${(item.callbackEvents || []).length} 条回调</small>
+      </div>
+    </article>`;
+  }).join("") : `<p class="muted">尚无金融网关出站记录。</p>`;
+  const runs = center.reconciliationRuns || [];
+  runsTarget.innerHTML = runs.length ? runs.slice(0, 20).map((item, index) => {
+    const matched = item.status === "matched";
+    return `<article class="priority-row" data-financial-reconciliation-run="${platformEscapeHtml(item.id)}">
+      <div class="priority-rank ${matched ? "ok" : "danger"}">${index + 1}</div>
+      <div>
+        <h3>${platformEscapeHtml(item.gatewayType)} · ${platformEscapeHtml(item.businessDate)}</h3>
+        <p>本地 ${platformEscapeHtml(item.localSummary?.total || 0)} 笔 · 账单 ${platformEscapeHtml(item.providerSummary?.total || 0)} 笔</p>
+        <small>金额差 ${platformEscapeHtml(item.differences?.grossAmountFen || 0)} 分 · ${platformEscapeHtml(item.createdBy || "operations")}</small>
+      </div>
+      <div class="capability-side">
+        <span class="badge ${matched ? "info" : "danger"}">${matched ? "一致" : "有差异"}</span>
+      </div>
+    </article>`;
+  }).join("") : `<p class="muted">尚无日终对账摘要。</p>`;
+  if (statusTarget) {
+    const hasDifference = Number(summary.exceptions || 0) + Number(summary.reconciliationDifferences || 0) > 0;
+    statusTarget.textContent = hasDifference ? "存在待处置差异" : center.callbackReady ? "签名回调就绪" : "回调待配置";
+    statusTarget.className = `badge ${hasDifference ? "danger" : center.callbackReady ? "info" : "warn"}`;
+  }
+  if (boundaryTarget) boundaryTarget.textContent = center.boundary || "真实机构字段、回调白名单、账单传输和联合签字仍需现场验收。";
+}
+
 function platformEscapeHtml(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -1767,6 +1841,14 @@ function listText(value) {
 
 function bindPlatformEditor() {
   document.addEventListener("click", (event) => {
+    const financialReconciliationOpen = event.target.closest("[data-financial-reconciliation-open]");
+    if (financialReconciliationOpen) {
+      const dialog = document.querySelector("#financial-reconciliation-dialog");
+      const dateInput = dialog?.querySelector('[name="businessDate"]');
+      if (dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
+      dialog?.showModal();
+      return;
+    }
     const platformBlockerButton = event.target.closest("[data-platform-blocker-action]");
     if (platformBlockerButton) {
       runPlatformProductionBlockerAction(platformBlockerButton.dataset.platformBlockerAction, platformBlockerButton.dataset.id, platformBlockerButton);
@@ -1891,6 +1973,50 @@ function bindPlatformEditor() {
     await savePlatformState();
     form.closest("dialog").close();
     renderPlatform();
+  });
+
+  document.querySelector("#financial-reconciliation-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const values = Object.fromEntries(new FormData(form));
+    const statusTarget = document.querySelector("#financial-gateway-operations-status");
+    const submitButton = form.querySelector('[value="save"]');
+    if (submitButton) submitButton.disabled = true;
+    if (statusTarget) {
+      statusTarget.textContent = "正在核对";
+      statusTarget.className = "badge warn";
+    }
+    try {
+      const request = window.HealthCityAuth?.authFetch || fetch;
+      const response = await request(`${PLATFORM_API_BASE}/financial-gateways/reconciliation-runs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gatewayType: values.gatewayType,
+          businessDate: values.businessDate,
+          providerSummary: {
+            total: Number(values.total),
+            succeeded: Number(values.succeeded),
+            exceptions: Number(values.exceptions),
+            grossAmountFen: Number(values.grossAmountFen),
+            statementDigest: values.statementDigest.trim()
+          }
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.message || `HTTP ${response.status}`);
+      await loadFinancialGatewayOperationsCenter();
+      renderFinancialGatewayOperationsCenter();
+      form.closest("dialog")?.close();
+      form.reset();
+    } catch (error) {
+      if (statusTarget) {
+        statusTarget.textContent = error.message || "对账登记失败";
+        statusTarget.className = "badge danger";
+      }
+    } finally {
+      if (submitButton) submitButton.disabled = false;
+    }
   });
 
   document.querySelector("#export-platform-report")?.addEventListener("click", exportPlatformReport);
@@ -2102,6 +2228,18 @@ async function loadIdentityLifecycleCenter() {
     if (!response.ok) return;
     const payload = await response.json();
     identityLifecycleCenter = { ...identityLifecycleCenter, ...payload, plan: identityLifecycleCenter.plan, result: identityLifecycleCenter.result };
+  } catch (error) {
+    // Static and offline fallback remains usable without the commission API.
+  }
+}
+
+async function loadFinancialGatewayOperationsCenter() {
+  if (!PLATFORM_API_BASE) return;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  try {
+    const response = await request(`${PLATFORM_API_BASE}/financial-gateways/operations`);
+    if (!response.ok) return;
+    financialGatewayOperationsCenter = { ...financialGatewayOperationsCenter, ...(await response.json()) };
   } catch (error) {
     // Static and offline fallback remains usable without the commission API.
   }

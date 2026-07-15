@@ -227,6 +227,28 @@
         <p id="identity-lifecycle-boundary" class="implementation-boundary"></p>
       </section>
 
+      <section class="panel" id="financial-gateway-operations-center">
+        <div class="panel-title">
+          <h2>支付医保证照回调与对账中心</h2>
+          <span id="financial-gateway-operations-status" class="badge warn">回调待配置</span>
+        </div>
+        <div class="action-row">
+          <button class="primary-button" type="button" data-financial-reconciliation-open>登记日终对账</button>
+        </div>
+        <div id="financial-gateway-operations-metrics" class="metric-grid"></div>
+        <div class="portal-grid">
+          <div>
+            <h3>最近回调</h3>
+            <div id="financial-gateway-callback-events" class="priority-list"></div>
+          </div>
+          <div>
+            <h3>日终对账</h3>
+            <div id="financial-reconciliation-runs" class="priority-list"></div>
+          </div>
+        </div>
+        <p id="financial-gateway-operations-boundary" class="implementation-boundary"></p>
+      </section>
+
       <section class="panel" id="production-database-cutover-center">
         <div class="panel-title">
           <h2>生产数据库割接演练中心</h2>
@@ -423,6 +445,34 @@
         <footer>
           <button type="button" class="ghost-button" data-close>取消</button>
           <button class="primary-button" value="save">保存证据</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="financial-reconciliation-dialog">
+      <form method="dialog" class="dialog-form" id="financial-reconciliation-form">
+        <header>
+          <h2>登记日终对账摘要</h2>
+          <button type="button" class="icon-button" data-close>×</button>
+        </header>
+        <div class="form-grid">
+          <label>网关
+            <select name="gatewayType" required>
+              <option value="PAYMENT">支付</option>
+              <option value="INSURANCE">医保</option>
+              <option value="CERTIFICATE">电子证照</option>
+            </select>
+          </label>
+          <label>业务日期<input type="date" name="businessDate" required /></label>
+          <label>账单总数<input type="number" name="total" min="0" step="1" required /></label>
+          <label>成功数<input type="number" name="succeeded" min="0" step="1" required /></label>
+          <label>异常数<input type="number" name="exceptions" min="0" step="1" required /></label>
+          <label>总金额（分）<input type="number" name="grossAmountFen" min="0" step="1" required /></label>
+          <label class="full">账单 SHA-256 摘要<input name="statementDigest" pattern="(?:sha256:)?[A-Fa-f0-9]{64}" required /></label>
+        </div>
+        <footer>
+          <button type="button" class="ghost-button" data-close>取消</button>
+          <button class="primary-button" value="save">登记摘要</button>
         </footer>
       </form>
     </dialog>

@@ -108,6 +108,32 @@ test("production startup rejects missing, weak and placeholder session secrets",
     }),
     (error) => error.code === "PRODUCTION_SMS_CALLBACK_INVALID" && /SMS_DELIVERY_CALLBACK_SECRET/.test(error.message)
   );
+  assert.throws(
+    () => assertProductionRuntimeSecurity({
+      NODE_ENV: "production",
+      SESSION_SECRET: "production-session-signing-key-with-adequate-entropy",
+      SESSION_STORE: "sqlite",
+      SESSION_TOPOLOGY: "single-host",
+      SESSION_EXPIRED_RETENTION_DAYS: "7",
+      SESSION_REVOKED_RETENTION_DAYS: "30",
+      SESSION_CLEANUP_INTERVAL_MS: "900000",
+      PAYMENT_GATEWAY_URL: "https://payment.example.internal/transactions"
+    }),
+    (error) => error.code === "PRODUCTION_FINANCIAL_CALLBACK_INVALID" && /PAYMENT callback secret/.test(error.message)
+  );
+  assert.throws(
+    () => assertProductionRuntimeSecurity({
+      NODE_ENV: "production",
+      SESSION_SECRET: "production-session-signing-key-with-adequate-entropy",
+      SESSION_STORE: "sqlite",
+      SESSION_TOPOLOGY: "single-host",
+      SESSION_EXPIRED_RETENTION_DAYS: "7",
+      SESSION_REVOKED_RETENTION_DAYS: "30",
+      SESSION_CLEANUP_INTERVAL_MS: "900000",
+      FINANCIAL_CALLBACK_SECRET: "weak"
+    }),
+    (error) => error.code === "PRODUCTION_FINANCIAL_CALLBACK_INVALID" && /callback secret must contain at least 32 characters/.test(error.message)
+  );
   assert.equal(assertProductionRuntimeSecurity({
     NODE_ENV: "production",
     SESSION_SECRET: "production-session-signing-key-with-adequate-entropy",
@@ -121,7 +147,10 @@ test("production startup rejects missing, weak and placeholder session secrets",
     SMS_GATEWAY_URL: "https://sms.example.internal/send",
     SMS_TEMPLATE_ID: "resident-login-code",
     SMS_DELIVERY_CALLBACK_SECRET: "production-sms-callback-secret-with-adequate-entropy",
-    SMS_DELIVERY_CALLBACK_MAX_SKEW_SECONDS: "300"
+    SMS_DELIVERY_CALLBACK_MAX_SKEW_SECONDS: "300",
+    PAYMENT_GATEWAY_URL: "https://payment.example.internal/transactions",
+    FINANCIAL_CALLBACK_SECRET: "production-financial-callback-secret-with-adequate-entropy",
+    FINANCIAL_CALLBACK_MAX_SKEW_SECONDS: "300"
   }), true);
 });
 

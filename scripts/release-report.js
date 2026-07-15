@@ -276,6 +276,7 @@ function validateProductionConfig(options = {}) {
     const hospitalSecrets = ["HIS", "EMR", "LIS", "PACS", "APPOINTMENT"].map((domain) => String(env[`${domain}_ADAPTER_SECRET`] || env.HOSPITAL_ADAPTER_SECRET || ""));
     const financialGateways = financialGatewayCenter(env);
     const financialSecrets = ["PAYMENT", "INSURANCE", "CERTIFICATE"].map((type) => String(env[`${type}_GATEWAY_SECRET`] || env.FINANCIAL_GATEWAY_SECRET || ""));
+    const financialCallbackSecrets = ["PAYMENT", "INSURANCE", "CERTIFICATE"].map((type) => String(env[`${type}_CALLBACK_SECRET`] || env.FINANCIAL_CALLBACK_SECRET || ""));
     const secureObjectStorage = objectStorageCenter(env);
     const productionAdapters = productionAdapterCenter(env);
     checks.push(
@@ -297,6 +298,8 @@ function validateProductionConfig(options = {}) {
       check("env:OBJECT_STORAGE.secretQuality", secretQuality(env.OBJECT_STORAGE_SIGNING_SECRET).strongEnough, "object storage signing secret must be non-placeholder and at least 32 chars", "error", "environment"),
       check("env:FINANCIAL.gateways", financialGateways.adapterReady, `${financialGateways.summary.configured}/${financialGateways.summary.total} payment, insurance and certificate gateways configured with production HTTPS`, "error", "environment"),
       check("env:FINANCIAL.secretQuality", financialSecrets.every((secret) => secretQuality(secret).strongEnough), "financial gateway signing secrets must be non-placeholder and at least 32 chars", "error", "environment"),
+      check("env:FINANCIAL.callbacks", financialGateways.callbackReady, `${financialGateways.summary.callbacksConfigured}/${financialGateways.summary.total} signed callback domains configured`, "error", "environment"),
+      check("env:FINANCIAL.callbackSecretQuality", financialCallbackSecrets.every((secret) => secretQuality(secret).strongEnough), "financial callback secrets must be separate, non-placeholder and at least 32 chars", "error", "environment"),
       check("env:AUDIT.retentionTarget", Boolean(env.AUDIT_EXPORT_PATH || env.SIEM_ENDPOINT), env.AUDIT_EXPORT_PATH || env.SIEM_ENDPOINT ? "configured" : "missing AUDIT_EXPORT_PATH or SIEM_ENDPOINT", "error", "environment")
     );
   }
@@ -484,6 +487,7 @@ function financialGatewayReadinessChecks(financialGatewayReadiness) {
   return [
     check("financialGateway:readiness", financialGatewayReadiness.ok, financialGatewayReadiness.ok ? "financial gateway adapter checks passed" : "financial gateway adapter checks failed", "error", "financial-gateway"),
     check("financialGateway:capabilities", financialGatewayReadiness.summary?.capabilityGroupsReady === financialGatewayReadiness.summary?.capabilityGroups && (financialGatewayReadiness.summary?.operations || 0) === 14, `${financialGatewayReadiness.summary?.capabilityGroupsReady || 0}/${financialGatewayReadiness.summary?.capabilityGroups || 0} capability groups and ${financialGatewayReadiness.summary?.operations || 0} operations`, "error", "financial-gateway"),
+    check("financialGateway:callbackReconciliation", financialGatewayReadiness.status === "signed-callback-reconciliation-ready-site-joint-test-pending" && financialGatewayReadiness.checks?.some((item) => item.id === "financialGateway:operationsUi" && item.passed), "signed callbacks, amount-safe state handling, digest reconciliation and operations UI are repository-ready", "error", "financial-gateway"),
     check("financialGateway:productionBoundary", financialGatewayReadiness.productionReady === false && (financialGatewayReadiness.summary?.productionBlockers || 0) >= 6, `${financialGatewayReadiness.summary?.productionBlockers || 0} production blockers remain explicit`, "error", "financial-gateway")
   ];
 }

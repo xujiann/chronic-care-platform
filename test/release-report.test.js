@@ -93,6 +93,7 @@ test("release report validates demo and production environment profiles", () => 
       OBJECT_STORAGE_BUCKET: "health-attachments",
       OBJECT_STORAGE_SIGNING_SECRET: "0123456789abcdef0123456789abcdef",
       FINANCIAL_GATEWAY_SECRET: "0123456789abcdef0123456789abcdef",
+      FINANCIAL_CALLBACK_SECRET: "abcdef0123456789abcdef0123456789",
       PAYMENT_GATEWAY_URL: "https://payment.example.internal/transactions",
       INSURANCE_GATEWAY_URL: "https://insurance.example.internal/settlements",
       CERTIFICATE_GATEWAY_URL: "https://certificate.example.internal/certificates",
@@ -140,6 +141,7 @@ test("release report validates demo and production environment profiles", () => 
       OBJECT_STORAGE_BUCKET: "health-attachments",
       OBJECT_STORAGE_SIGNING_SECRET: "0123456789abcdef0123456789abcdef",
       FINANCIAL_GATEWAY_SECRET: "0123456789abcdef0123456789abcdef",
+      FINANCIAL_CALLBACK_SECRET: "abcdef0123456789abcdef0123456789",
       PAYMENT_GATEWAY_URL: "https://payment.example.internal/transactions",
       INSURANCE_GATEWAY_URL: "https://insurance.example.internal/settlements",
       CERTIFICATE_GATEWAY_URL: "https://certificate.example.internal/certificates",
@@ -173,6 +175,8 @@ test("release report validates demo and production environment profiles", () => 
   assert.equal(production.checks.some((item) => item.name === "env:OBJECT_STORAGE.secretQuality" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:FINANCIAL.gateways" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:FINANCIAL.secretQuality" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:FINANCIAL.callbacks" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:FINANCIAL.callbackSecretQuality" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:ALERTING.routes" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:ALERTING.secretQuality" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:DEPLOYMENT.secretProvider" && item.passed), true);
@@ -294,6 +298,7 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.platformProductionAudit.productionReady, false);
   assert.equal(report.checks.some((item) => item.name === "platformProductionAudit:capabilities" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "platformProductionAudit:mvpRequiredModules" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "financialGateway:callbackReconciliation" && item.passed), true);
   assert.equal(report.digitalHospitalStandards.summary.standardDomains >= 6, true);
   assert.equal(report.digitalHospitalStandards.summary.apiMarkers >= 5, true);
   assert.equal(report.digitalHospitalStandards.summary.launchMarkers >= 16, true);

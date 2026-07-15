@@ -9,7 +9,7 @@ const test = require("node:test");
 
 const ROOT = path.resolve(__dirname, "..");
 const { signHospitalRequest, stableStringify: stableHospitalStringify } = require("../hospital-connectors");
-const { signFinancialRequest, stableStringify: stableFinancialStringify } = require("../financial-gateways");
+const { signFinancialCallback, signFinancialRequest, stableStringify: stableFinancialStringify } = require("../financial-gateways");
 const { signAlertRequest, stableStringify: stableAlertStringify } = require("../observability-alerting");
 
 async function waitForHealth(baseUrl) {
@@ -325,6 +325,9 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.match(prometheusBody, /health_platform_sms_delivery_pending 0/);
     assert.match(prometheusBody, /health_platform_sms_delivery_failed 0/);
     assert.match(prometheusBody, /health_platform_sms_delivery_ignored_events 0/);
+    assert.match(prometheusBody, /health_platform_financial_callback_pending 0/);
+    assert.match(prometheusBody, /health_platform_financial_callback_exceptions 0/);
+    assert.match(prometheusBody, /health_platform_financial_reconciliation_differences 0/);
 
     const readiness = await api(baseUrl, "/api/system/readiness", authorized(accountLogin.body.token));
     assert.equal(readiness.response.status, 200);
@@ -3861,12 +3864,14 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     process.env.INSURANCE_GATEWAY_URL = `http://127.0.0.1:${financialPort}/insurance`;
     process.env.CERTIFICATE_GATEWAY_URL = `http://127.0.0.1:${financialPort}/certificate`;
     process.env.FINANCIAL_GATEWAY_SECRET = "api-test-financial-gateway-secret";
+    process.env.FINANCIAL_CALLBACK_SECRET = "api-test-financial-callback-secret";
     process.env.FINANCIAL_GATEWAY_MAX_ATTEMPTS = "1";
     t.after(async () => {
       delete process.env.PAYMENT_GATEWAY_URL;
       delete process.env.INSURANCE_GATEWAY_URL;
       delete process.env.CERTIFICATE_GATEWAY_URL;
       delete process.env.FINANCIAL_GATEWAY_SECRET;
+      delete process.env.FINANCIAL_CALLBACK_SECRET;
       delete process.env.FINANCIAL_GATEWAY_MAX_ATTEMPTS;
       financialMock.closeAllConnections?.();
       await new Promise((resolve) => financialMock.close(resolve));
@@ -3902,6 +3907,10 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(dispatched.body.gatewayType, "PAYMENT");
     assert.equal(dispatched.body.contractId, "payment-transaction-v1");
     assert.equal(dispatched.body.adapterReceipt.receiptId, "payment-provider-1");
+    assert.equal(dispatched.body.providerStatus, "accepted");
+    assert.deepEqual(dispatched.body.adapterReceiptHistory, []);
+    assert.deepEqual(dispatched.body.callbackEvents, []);
+    assert.match(dispatched.body.businessDate, /^\d{4}-\d{2}-\d{2}$/);
     assert.equal(financialRequests.length, 1);
     assert.equal(financialRequests[0].headers["x-idempotency-key"], "financial-payment-001");
     assert.equal(financialRequests[0].headers["x-signature"], signFinancialRequest(
@@ -3910,6 +3919,103 @@ test("API authentication, scoping and governance regression suite", async (t) =>
       financialRequests[0].headers["x-timestamp"],
       financialRequests[0].headers["x-request-id"]
     ));
+
+    const callbackPayload = {
+      gatewayType: "PAYMENT",
+      eventId: "payment-callback-api-001",
+      receiptId: "payment-provider-1",
+      status: "paid",
+      occurredAt: new Date().toISOString(),
+      businessDate: new Date().toISOString().slice(0, 10),
+      amountFen: 12600,
+      providerCode: "SUCCESS"
+    };
+    const callbackTimestamp = String(Math.floor(Date.now() / 1000));
+    const callbackNonce = "financial-api-nonce-001";
+    const callbackSignature = signFinancialCallback(callbackPayload, {
+      secret: process.env.FINANCIAL_CALLBACK_SECRET,
+      timestamp: callbackTimestamp,
+      nonce: callbackNonce
+    });
+    const callback = await api(baseUrl, "/api/financial-gateways/callbacks/PAYMENT", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Financial-Timestamp": callbackTimestamp,
+        "X-Financial-Nonce": callbackNonce,
+        "X-Financial-Signature": `sha256=${callbackSignature}`
+      },
+      body: JSON.stringify(callbackPayload)
+    });
+    assert.equal(callback.response.status, 200);
+    assert.equal(callback.body.gateway.status, "succeeded");
+    assert.equal(callback.body.callback.stateApplied, true);
+    assert.equal(callback.body.gateway.productionEvidence, false);
+
+    const callbackReplay = await api(baseUrl, "/api/financial-gateways/callbacks/PAYMENT", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Financial-Timestamp": callbackTimestamp,
+        "X-Financial-Nonce": callbackNonce,
+        "X-Financial-Signature": callbackSignature
+      },
+      body: JSON.stringify(callbackPayload)
+    });
+    assert.equal(callbackReplay.response.status, 200);
+    assert.equal(callbackReplay.body.idempotentReplay, true);
+
+    const tamperedCallback = await api(baseUrl, "/api/financial-gateways/callbacks/PAYMENT", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Financial-Timestamp": callbackTimestamp,
+        "X-Financial-Nonce": "financial-api-nonce-tampered",
+        "X-Financial-Signature": callbackSignature
+      },
+      body: JSON.stringify({ ...callbackPayload, eventId: "payment-callback-api-tampered", amountFen: 12599 })
+    });
+    assert.equal(tamperedCallback.response.status, 401);
+    assert.equal(tamperedCallback.body.code, "FINANCIAL_CALLBACK_SIGNATURE_MISMATCH");
+
+    const operations = await api(baseUrl, "/api/financial-gateways/operations", authorized(commission.body.token));
+    assert.equal(operations.response.status, 200);
+    assert.equal(operations.body.summary.dispatched >= 1, true);
+    assert.equal(operations.body.summary.succeeded >= 1, true);
+    assert.equal(operations.body.events.some((item) => item.receiptId === "payment-provider-1" && item.status === "succeeded"), true);
+    assert.doesNotMatch(JSON.stringify(operations.body), /financial-api-nonce|api-test-financial-callback-secret/);
+    const insuranceOperations = await api(baseUrl, "/api/financial-gateways/operations", authorized(insurance.body.token));
+    assert.equal(insuranceOperations.response.status, 200);
+    assert.equal(insuranceOperations.body.gateways.every((item) => item.type === "INSURANCE"), true);
+    assert.equal(insuranceOperations.body.events.every((item) => item.gatewayType === "INSURANCE"), true);
+    assert.equal((await api(baseUrl, "/api/financial-gateways/operations", authorized(citizen.body.token))).response.status, 403);
+
+    const reconciliation = await api(baseUrl, "/api/financial-gateways/reconciliation-runs", authorized(commission.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        gatewayType: "PAYMENT",
+        businessDate: callbackPayload.businessDate,
+        providerSummary: {
+          total: 1,
+          succeeded: 1,
+          exceptions: 0,
+          grossAmountFen: 12600,
+          statementDigest: "a".repeat(64)
+        }
+      })
+    }));
+    assert.equal(reconciliation.response.status, 201);
+    assert.equal(reconciliation.body.run.status, "matched");
+    assert.equal(reconciliation.body.productionEvidence, false);
+    const insurancePaymentReconciliation = await api(baseUrl, "/api/financial-gateways/reconciliation-runs", authorized(insurance.body.token, {
+      method: "POST",
+      body: JSON.stringify({
+        gatewayType: "PAYMENT",
+        businessDate: callbackPayload.businessDate,
+        providerSummary: { total: 0, succeeded: 0, exceptions: 0, grossAmountFen: 0, statementDigest: "b".repeat(64) }
+      })
+    }));
+    assert.equal(insurancePaymentReconciliation.response.status, 403);
 
     const replay = await api(baseUrl, "/api/financial-gateways/dispatch", authorized(institution.body.token, {
       method: "POST",

@@ -2867,9 +2867,11 @@ test("secure object storage enforces integrity scan authorization and retention 
   assert.match(read("scripts/release-artifact-manifest.js"), /object-storage-readiness-report\.json/);
 });
 
-test("financial gateways enforce signed minimized requests and production boundaries", () => {
+test("financial gateways enforce signed callbacks digest reconciliation and production boundaries", () => {
   const adapter = read("financial-gateways.js");
   const server = read("server.js");
+  const platformHtml = read("platform.html");
+  const platformSource = read("platform.js");
   const readiness = read("scripts/financial-gateway-readiness.js");
   const documentation = read("docs/production-financial-certificate-gateways.md");
   const environment = read(".env.example");
@@ -2878,14 +2880,33 @@ test("financial gateways enforce signed minimized requests and production bounda
   assert.match(adapter, /FORBIDDEN_PAYLOAD_KEYS/);
   assert.match(adapter, /positive integer in cents/);
   assert.match(adapter, /FINANCIAL_GATEWAY_MAX_ATTEMPTS/);
+  assert.match(adapter, /verifyFinancialCallback/);
+  assert.match(adapter, /FINANCIAL_CALLBACK_REPLAY_DETECTED/);
+  assert.match(adapter, /amount-mismatch/);
+  assert.match(adapter, /superseded-receipt/);
+  assert.match(adapter, /createFinancialReconciliationRun/);
   assert.match(server, /\/api\/financial-gateways\/dispatch/);
+  assert.match(server, /\/api\/financial-gateways\/callbacks\//);
+  assert.match(server, /\/api\/financial-gateways\/operations/);
+  assert.match(server, /\/api\/financial-gateways\/reconciliation-runs/);
+  assert.match(server, /PRODUCTION_FINANCIAL_CALLBACK_INVALID/);
   assert.match(server, /adapterType: "financial"/);
   assert.match(server, /event\.adapterType === "financial"/);
+  assert.match(platformHtml, /financial-gateway-operations-center/);
+  assert.match(platformHtml, /financial-reconciliation-dialog/);
+  assert.match(platformSource, /renderFinancialGatewayOperationsCenter/);
+  assert.match(platformSource, /loadFinancialGatewayOperationsCenter/);
   assert.match(readiness, /financialGateway:releaseWiring/);
+  assert.match(readiness, /financialGateway:operationsUi/);
   assert.match(documentation, /适配器基础通过不等于支付、医保或电子证照已经正式验收/);
+  assert.match(documentation, /签名回调代码就绪/);
+  assert.match(documentation, /摘要级日终对账/);
+  assert.match(environment, /FINANCIAL_CALLBACK_SECRET/);
+  assert.match(environment, /FINANCIAL_CALLBACK_MAX_SKEW_SECONDS/);
   ["PAYMENT", "INSURANCE", "CERTIFICATE"].forEach((type) => assert.match(environment, new RegExp(`${type}_GATEWAY_URL`)));
   assert.match(read("package.json"), /financial-gateway:readiness/);
   assert.match(read("scripts/release-report.js"), /financialGateway:productionBoundary/);
+  assert.match(read("scripts/release-report.js"), /env:FINANCIAL\.callbacks/);
   assert.match(read("scripts/release-artifact-manifest.js"), /financial-gateway-readiness-report\.json/);
 });
 

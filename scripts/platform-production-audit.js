@@ -121,10 +121,10 @@ const MVP_REQUIRED_MODULES = [
   {
     id: "mvp-payment-insurance",
     name: "支付、医保与电子证照网关",
-    status: "adapter-foundation-ready",
+    status: "signed-callback-reconciliation-ready-site-joint-test-pending",
     priority: "P0",
-    implemented: "支付、医保和电子证照通用出站网关，14 个受控操作，HMAC 签名、幂等、整数分金额、敏感字段拦截、有限重试、回执、死信和人工对账",
-    remainingCode: "按支付机构、医保核心和证照平台协议补充专有报文、回调验签、防重放、乱序处理、日终对账和差错补偿",
+    implemented: "支付、医保和电子证照通用出站网关，14 个受控操作，HMAC 签名、幂等、整数分金额、敏感字段拦截、有限重试、回执、死信、独立密钥回调验签、时间窗与 nonce 防重放、金额一致性、旧回执隔离、乱序终态保护、合法冲正、摘要级日终对账和运维中心",
+    remainingCode: "按支付机构、医保核心和证照平台协议补充专有报文与签名映射、来源白名单、账单传输、长短款和差错补偿策略",
     siteDependency: "商户与机构资质、真实密钥、网络白名单、沙箱/生产回执、字段字典和联合验收单"
   },
   {
@@ -190,7 +190,9 @@ const PRODUCTION_BLOCKERS = [
     ? "identity-lifecycle-ready-site-joint-test-pending"
     : id === "P0-04"
     ? "signed-delivery-callback-ready-site-joint-test-pending"
-    : (["P0-05", "P0-06", "P0-08", "P0-09"].includes(id) ? "adapter-foundation-ready-site-joint-test-pending" : "blocked-until-site-evidence"),
+    : id === "P0-06"
+    ? "signed-callback-reconciliation-ready-site-joint-test-pending"
+    : (["P0-05", "P0-08", "P0-09"].includes(id) ? "adapter-foundation-ready-site-joint-test-pending" : "blocked-until-site-evidence"),
   progress: id === "P0-01"
     ? "已实现不可变部署包、运行文件摘要复核、密钥仅引用不落盘、最小权限进程模板、CI 验证和回滚契约；真实 Vault/KMS、TLS、制品仓库、服务账号和生产 smoke 签字未完成。"
     : id === "P0-02"
@@ -202,7 +204,7 @@ const PRODUCTION_BLOCKERS = [
         : (id === "P0-05"
           ? "已实现 HIS/EMR/LIS/PACS/号源通用出站适配、签名、幂等、有限重试、受理回执和死信对账；厂商专有协议、字典、网络、性能和联合签字未完成。"
           : (id === "P0-06"
-            ? "已实现支付、医保与电子证照通用生产网关、14 个受控操作、签名、幂等、敏感字段拦截、有限重试和死信对账；机构专有协议、回调验签、日终对账和联合签字未完成。"
+            ? "已实现支付、医保与电子证照通用生产网关、14 个受控操作、独立密钥 HMAC 回调、时间窗与 nonce 防重放、事件幂等、金额一致性、旧回执隔离、乱序终态保护、成功后冲正、摘要级日终对账、分域运维界面和异常指标；机构专有协议、来源白名单、账单传输、差错补偿和联合签字未完成。"
             : (id === "P0-08"
               ? "已实现去标识化 SIEM/Webhook 投递、HMAC 签名、投递回执和审计链；目标 SIEM/WORM 留存策略、查询验证和防篡改签字未完成。"
               : (id === "P0-09" ? "已实现告警信号、路由状态、幂等投递、有限重试、失败运维事件和恢复关闭；真实值班升级、生产演练和首日观察签字未完成。" : ""))))))
@@ -212,7 +214,7 @@ const ROADMAP = [
   {
     phase: "P0 / 0-30 天",
     objective: "建立可部署、可联调、可审计的生产基线",
-    deliverables: ["已完成不可变部署包、密钥引用和进程模板；继续 Vault/KMS、TLS、制品仓库和环境级编排", "已完成 PostgreSQL 主读取演练与证据门禁生产适配器；继续领域转换、容量故障切换、原生备份恢复和正式回切", "已完成统一身份和短信通用适配基础；继续真实供应商联调和密钥托管", "已完成医院出站连接器与 SIEM/Webhook 告警适配基础；继续厂商协议、目标接收端、网络环境和生产演练"],
+    deliverables: ["已完成不可变部署包、密钥引用和进程模板；继续 Vault/KMS、TLS、制品仓库和环境级编排", "已完成 PostgreSQL 主读取演练与证据门禁生产适配器；继续领域转换、容量故障切换、原生备份恢复和正式回切", "已完成统一身份和短信通用适配基础；继续真实供应商联调和密钥托管", "已完成金融签名回调与摘要对账、医院出站连接器及 SIEM/Webhook 告警适配基础；继续厂商协议、目标接收端、网络环境和生产演练"],
     exit: "P0-01 至 P0-09 均形成可验证证据，生产配置检查不再使用占位值。"
   },
   {
@@ -280,7 +282,9 @@ function buildPlatformProductionAudit(options = {}) {
     postgresAdapter: read("postgres-production-adapter.js"),
     postgresDocumentation: read("docs/postgresql-runtime-sync.md"),
     identityAdapter: read("production-adapters.js"),
-    identityDocumentation: read("docs/production-identity-message-adapters.md")
+    identityDocumentation: read("docs/production-identity-message-adapters.md"),
+    financialAdapter: read("financial-gateways.js"),
+    financialDocumentation: read("docs/production-financial-certificate-gateways.md")
   };
   const document = options.document ?? (exists("docs/数智医院标准平台全程审计与生产前开发规划.md")
     ? read("docs/数智医院标准平台全程审计与生产前开发规划.md")
@@ -306,6 +310,7 @@ function buildPlatformProductionAudit(options = {}) {
     check("platformAudit:productionDatabaseAdapter", ["runPostgresPrimaryReadRehearsal", "buildPostgresPrimaryReadSnapshot"].every((marker) => runtimeSources.postgresRuntime.includes(marker)) && ["readPostgresProductionState", "writePostgresProductionState", "runtime_primary_write_audit", "POSTGRES_PRIMARY_WRITE_BLOCKED"].every((marker) => runtimeSources.postgresAdapter.includes(marker)) && ["/api/production-database/adapter", "/api/production-database/primary-read-rehearsal"].every((marker) => runtimeSources.server.includes(marker)) && ["生产数据库适配器", "SERIALIZABLE", "productionPrimary"].every((marker) => runtimeSources.postgresDocumentation.includes(marker)), "P0-02 primary-read rehearsal and evidence-gated production adapter are runnable, audited and documented"),
     check("platformAudit:identityLifecycleAdapter", ["refreshOidcAccessToken", "revokeOidcToken", "fetchIdentityDirectory", "identityLifecycleReady"].every((marker) => runtimeSources.identityAdapter.includes(marker)) && ["/api/auth/identity-lifecycle", "/api/auth/oidc/refresh", "/api/auth/oidc/revoke", "/api/auth/identity-directory/preview", "/api/auth/identity-directory/bind", "/api/auth/identity-directory/apply", "BIND EXTERNAL IDENTITY", "IDENTITY_BINDING_REASSIGNMENT_BLOCKED", "IDENTITY_DIRECTORY_SELF_DEACTIVATION_BLOCKED", "IDENTITY_DIRECTORY_LAST_COMMISSION_BLOCKED"].every((marker) => runtimeSources.server.includes(marker)) && runtimeSources.html.includes("identity-lifecycle-center") && ["renderIdentityLifecycleCenter", "runIdentityBindingAction", "runIdentityDirectoryAction"].every((marker) => runtimeSources.client.includes(marker)) && ["不按同名用户名自动回退", "不自动开户", "不自动提权", "不自动复活", "现场联合测试回执"].every((marker) => runtimeSources.identityDocumentation.includes(marker)), "P0-03 OIDC subject binding, lifecycle, safe directory deactivation, operations UI and production boundary are runnable, audited and documented"),
     check("platformAudit:smsDeliveryCallback", ["verifySmsDeliveryCallback", "applySmsDeliveryCallback", "buildSmsDeliveryCenter", "SMS_CALLBACK_REPLAY_DETECTED", "terminal-conflict"].every((marker) => runtimeSources.identityAdapter.includes(marker)) && ["/api/auth/sms-delivery-callback", "/api/auth/sms-deliveries", "smsDeliveryReceipts", "recordSmsDeliveryAcceptance"].every((marker) => runtimeSources.server.includes(marker)) && ["sms-delivery-status", "sms-delivery-metrics", "sms-delivery-receipts"].every((marker) => runtimeSources.html.includes(marker)) && runtimeSources.client.includes("smsDelivery") && ["SMS_DELIVERY_CALLBACK_SECRET", "回调验签", "重放", "乱序"].every((marker) => runtimeSources.identityDocumentation.includes(marker)), "P0-04 signed SMS final-delivery callbacks, replay protection, ordered persistence, operations visibility and site boundary are runnable, audited and documented"),
+    check("platformAudit:financialCallbackReconciliation", ["verifyFinancialCallback", "applyFinancialCallback", "createFinancialReconciliationRun", "FINANCIAL_CALLBACK_REPLAY_DETECTED", "amount-mismatch", "superseded-receipt"].every((marker) => runtimeSources.financialAdapter.includes(marker)) && ["/api/financial-gateways/callbacks/", "/api/financial-gateways/operations", "/api/financial-gateways/reconciliation-runs", "financialReconciliationRuns"].every((marker) => runtimeSources.server.includes(marker)) && ["financial-gateway-operations-center", "financial-gateway-callback-events", "financial-reconciliation-runs"].every((marker) => runtimeSources.html.includes(marker)) && ["renderFinancialGatewayOperationsCenter", "loadFinancialGatewayOperationsCenter"].every((marker) => runtimeSources.client.includes(marker)) && ["FINANCIAL_CALLBACK_SECRET", "签名回调代码就绪", "摘要级日终对账", "现场联合测试回执"].every((marker) => runtimeSources.financialDocumentation.includes(marker)), "P0-06 signed financial callbacks, amount-safe ordered persistence, digest-only daily reconciliation, operations visibility and site boundary are runnable, audited and documented"),
     check("platformAudit:releaseWiring", Boolean(pkg.scripts?.["platform:production-audit"]) && scriptSources.manifest.includes("platform-production-audit") && scriptSources.deploy.includes("platformProductionAudit") && scriptSources.release.includes("buildPlatformProductionAudit"), "package, manifest, deploy check and release report are wired"),
     check("platformAudit:formalDocument", ["审计结论", "正式生产前已实现的主要功能", "生产割接差距", "下一步开发规划", "正式上线退出条件"].every((marker) => document.includes(marker)), "formal audit document contains conclusion, capability inventory, gaps, roadmap and exit criteria")
   ];
@@ -332,7 +337,8 @@ function buildPlatformProductionAudit(options = {}) {
       capabilityOperationsCenter: checks.some((item) => item.id === "platformAudit:capabilityOperationsCenter" && item.passed),
       productionDatabaseAdapter: checks.some((item) => item.id === "platformAudit:productionDatabaseAdapter" && item.passed),
       identityLifecycleAdapter: checks.some((item) => item.id === "platformAudit:identityLifecycleAdapter" && item.passed),
-      smsDeliveryCallbackAdapter: checks.some((item) => item.id === "platformAudit:smsDeliveryCallback" && item.passed)
+      smsDeliveryCallbackAdapter: checks.some((item) => item.id === "platformAudit:smsDeliveryCallback" && item.passed),
+      financialCallbackReconciliationAdapter: checks.some((item) => item.id === "platformAudit:financialCallbackReconciliation" && item.passed)
     },
     auditBasis: [
       "运行页面与角色入口",
@@ -368,6 +374,7 @@ function renderMarkdown(report) {
     `P0-02 PostgreSQL 主读取演练与生产适配器已${report.summary.productionDatabaseAdapter ? "纳入" : "未纳入"}发布门禁；正式主库切换仍由现场数据库、灾备和四方审批证据阻断。`,
     `P0-03 统一身份生命周期与目录安全停用已${report.summary.identityLifecycleAdapter ? "纳入" : "未纳入"}发布门禁；真实身份源、目录映射、供应商联合测试和责任方签字仍为上线阻断项。`,
     `P0-04 短信最终送达回调已${report.summary.smsDeliveryCallbackAdapter ? "纳入" : "未纳入"}发布门禁；真实供应商字段映射、密钥托管、网络白名单、移动发布和现场回执仍为上线阻断项。`,
+    `P0-06 金融签名回调与摘要级日终对账已${report.summary.financialCallbackReconciliationAdapter ? "纳入" : "未纳入"}发布门禁；真实机构协议、来源白名单、账单传输、差错补偿和联合签字仍为上线阻断项。`,
     "",
     "## 二、审计范围与方法",
     "",

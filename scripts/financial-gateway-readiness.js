@@ -18,6 +18,8 @@ function buildFinancialGatewayReadiness(options = {}) {
   const pkg = options.pkg || readJson("package.json");
   const adapterSource = options.adapterSource ?? read("financial-gateways.js");
   const serverSource = options.serverSource ?? read("server.js");
+  const platformHtml = options.platformHtml ?? read("platform.html");
+  const platformSource = options.platformSource ?? read("platform.js");
   const documentation = options.documentation ?? read("docs/production-financial-certificate-gateways.md");
   const environment = options.environment ?? read(".env.example");
   const releaseSource = options.releaseSource ?? read("scripts/release-report.js");
@@ -29,11 +31,17 @@ function buildFinancialGatewayReadiness(options = {}) {
     { id: "data-minimization", markers: ["FORBIDDEN_PAYLOAD_KEYS", "credentialToken", "documentBase64", "documentDigest must be a SHA-256 digest"] },
     { id: "money-integrity", markers: ["amountFen", "refundAmountFen", "positive integer in cents"] },
     { id: "resilience", markers: ["FINANCIAL_GATEWAY_MAX_ATTEMPTS", "retryable", "financial gateway request timed out"] },
-    { id: "receipt", markers: ["receiptId", "providerCode", "financial-http-json-hmac"] }
+    { id: "receipt", markers: ["receiptId", "providerCode", "financial-http-json-hmac"] },
+    { id: "callback-security", markers: ["verifyFinancialCallback", "timingSafeEqual", "FINANCIAL_CALLBACK_REPLAY_DETECTED", "FINANCIAL_CALLBACK_MAX_SKEW_SECONDS"] },
+    { id: "callback-state", markers: ["applyFinancialCallback", "superseded-receipt", "amount-mismatch", "terminal-conflict", "reversed"] },
+    { id: "daily-reconciliation", markers: ["createFinancialReconciliationRun", "statementDigest", "grossAmountFen", "provider-summary-digest"] }
   ].map((item) => ({ ...item, passed: item.markers.every((marker) => adapterSource.includes(marker)) }));
   const apiMarkers = [
     "/api/financial-gateways",
     "/api/financial-gateways/dispatch",
+    "/api/financial-gateways/callbacks/",
+    "/api/financial-gateways/operations",
+    "/api/financial-gateways/reconciliation-runs",
     "adapterType: \"financial\"",
     "event.adapterType === \"financial\"",
     "payment-transaction-v1"
@@ -44,19 +52,22 @@ function buildFinancialGatewayReadiness(options = {}) {
     "INSURANCE_GATEWAY_URL",
     "CERTIFICATE_GATEWAY_URL",
     "FINANCIAL_GATEWAY_TIMEOUT_MS",
-    "FINANCIAL_GATEWAY_MAX_ATTEMPTS"
+    "FINANCIAL_GATEWAY_MAX_ATTEMPTS",
+    "FINANCIAL_CALLBACK_SECRET",
+    "FINANCIAL_CALLBACK_MAX_SKEW_SECONDS"
   ];
   const checks = [
     { id: "financialGateway:capabilities", passed: capabilities.every((item) => item.passed), detail: `${capabilities.filter((item) => item.passed).length}/${capabilities.length} capability groups` },
     { id: "financialGateway:api", passed: apiMarkers.every((marker) => serverSource.includes(marker)), detail: `${apiMarkers.filter((marker) => serverSource.includes(marker)).length}/${apiMarkers.length} runtime markers` },
+    { id: "financialGateway:operationsUi", passed: ["financial-gateway-operations-center", "financial-gateway-callback-events", "financial-reconciliation-runs", "financial-reconciliation-dialog"].every((marker) => platformHtml.includes(marker)) && ["renderFinancialGatewayOperationsCenter", "loadFinancialGatewayOperationsCenter", "financial-gateways/reconciliation-runs"].every((marker) => platformSource.includes(marker)), detail: "commission callback, exception and daily reconciliation operations UI" },
     { id: "financialGateway:environment", passed: envVariables.every((marker) => environment.includes(marker)), detail: `${envVariables.filter((marker) => environment.includes(marker)).length}/${envVariables.length} environment variables documented` },
-    { id: "financialGateway:boundary", passed: ["适配器基础通过不等于支付、医保或电子证照已经正式验收", "回调的来源校验、验签、防重放与乱序处理", "日终对账", "现场联合测试回执"].every((marker) => documentation.includes(marker)), detail: "credentials, callbacks, reconciliation and signed acceptance boundaries documented" },
+    { id: "financialGateway:boundary", passed: ["适配器基础通过不等于支付、医保或电子证照已经正式验收", "签名回调代码就绪", "摘要级日终对账", "现场联合测试回执"].every((marker) => documentation.includes(marker)), detail: "credentials, callbacks, reconciliation and signed acceptance boundaries documented" },
     { id: "financialGateway:releaseWiring", passed: Boolean(pkg.scripts?.["financial-gateway:readiness"]) && releaseSource.includes("buildFinancialGatewayReadiness") && deploySource.includes("financialGatewayReadiness") && manifestSource.includes("financial-gateway-readiness-report"), detail: "package, release report, deploy check and manifest wiring" }
   ];
   return {
     ok: checks.every((item) => item.passed),
     generatedAt: new Date().toISOString(),
-    status: "adapter-foundation-ready-site-joint-test-pending",
+    status: "signed-callback-reconciliation-ready-site-joint-test-pending",
     productionReady: false,
     summary: {
       gateways: 3,
@@ -69,8 +80,8 @@ function buildFinancialGatewayReadiness(options = {}) {
     envVariables,
     blockers: [
       "merchant, insurance-agency and certificate-authority credentials",
-      "signed callback verification and replay protection joint test",
-      "payment and insurance daily reconciliation acceptance",
+      "provider-specific callback mapping, source allowlist and replay-protection joint test",
+      "payment and insurance statement transport plus daily reconciliation acceptance",
       "provider field dictionaries and error-code mapping signoff",
       "security, privacy and cryptography assessments",
       "signed site and agency acceptance receipts"

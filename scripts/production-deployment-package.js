@@ -30,6 +30,7 @@ const SECRET_CONTRACT = [
   ["HOSPITAL_ADAPTER_SECRET", "hospital connector signing"],
   ["OBJECT_STORAGE_SIGNING_SECRET", "object storage request signing"],
   ["FINANCIAL_GATEWAY_SECRET", "payment insurance and certificate signing"],
+  ["FINANCIAL_CALLBACK_SECRET", "payment insurance and certificate callback verification"],
   ["SIEM_SIGNING_SECRET", "SIEM alert signing"],
   ["ALERT_WEBHOOK_SECRET", "operations webhook signing"],
   ["DEPLOYMENT_ARTIFACT_DIGEST", "immutable artifact registry digest"]
