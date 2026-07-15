@@ -26,6 +26,8 @@ test("identity contract validates required claims, roles and sample mappings", (
   assert.equal(contract.checks.some((item) => item.id === "identity:oidcLifecycle" && item.passed), true);
   assert.equal(contract.checks.some((item) => item.id === "identity:smsRuntimeAdapter" && item.passed), true);
   assert.equal(Object.values(contract.adapterContracts.oidcLifecycle).every(Boolean), true);
+  assert.equal(Object.values(contract.adapterContracts.productionSecurity).every(Boolean), true);
+  assert.equal(contract.checks.some((item) => item.id === "identity:productionSecurityBoundary" && item.passed), true);
 });
 
 test("identity contract renders and writes release artifacts", (t) => {

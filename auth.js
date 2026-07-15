@@ -94,8 +94,9 @@
         if (response.status === 401 || response.status === 403) {
           return { ok: false, message: payload.message || "账号或密码不正确" };
         }
+        return { ok: false, message: payload.message || "认证服务暂不可用，请稍后重试" };
       } catch (error) {
-        // Static preview and offline demos fall back to local demo users.
+        return { ok: false, message: "认证服务暂不可用，请稍后重试" };
       }
     }
     const user = demoUsers.find((item) => item.username === username && item.password === password);
@@ -132,8 +133,9 @@
         if (response.status === 401 || response.status === 403 || response.status === 404 || response.status === 423) {
           return { ok: false, message: payload.message || "手机号或验证码不正确" };
         }
+        return { ok: false, message: payload.message || "认证服务暂不可用，请稍后重试" };
       } catch (error) {
-        // Static preview and offline demos fall back to local demo users.
+        return { ok: false, message: "认证服务暂不可用，请稍后重试" };
       }
     }
     const user = demoUsers.find((item) => item.role === "citizen" && normalizePhone(item.phone) === normalizedPhone && normalizedCode === (item.smsCode || DEMO_SMS_CODE));
@@ -158,7 +160,7 @@
         if (response.ok && payload.ok) return { ok: true, ...payload };
         return { ok: false, message: payload.message || "验证码发送失败", retryAfterSeconds: payload.retryAfterSeconds || 0 };
       } catch (error) {
-        // Static preview and offline demos fall back to the built-in code.
+        return { ok: false, message: "认证服务暂不可用，请稍后重试", retryAfterSeconds: 0 };
       }
     }
     const user = demoUsers.find((item) => item.role === "citizen" && normalizePhone(item.phone) === normalizedPhone);

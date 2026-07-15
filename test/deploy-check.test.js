@@ -107,6 +107,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "docs:platformResearchReport",
     "docs:platformProductionAudit",
     "api:productionIdentityMessageAdapters",
+    "security:productionRuntimeBoundary",
     "api:productionHospitalConnectors",
     "api:secureObjectStorage",
     "deployment:immutablePackage",

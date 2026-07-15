@@ -6632,8 +6632,22 @@ function relativeProjectPath(filePath) {
   return path.relative(ROOT, filePath).replace(/\\/g, "/");
 }
 
+function securityResponseHeaders() {
+  const headers = {
+    "Content-Security-Policy": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; script-src 'self' 'unsafe-inline'; script-src-attr 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; connect-src 'self' https: wss:; frame-src 'self' https:; worker-src 'self' blob:",
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    "Referrer-Policy": "no-referrer",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "SAMEORIGIN"
+  };
+  if (isProductionRuntime()) headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains";
+  return headers;
+}
+
 function sendJson(res, status, payload) {
   res.writeHead(status, {
+    ...securityResponseHeaders(),
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store"
   });
@@ -6642,6 +6656,7 @@ function sendJson(res, status, payload) {
 
 function sendText(res, status, payload, contentType = "text/plain; charset=utf-8") {
   res.writeHead(status, {
+    ...securityResponseHeaders(),
     "Content-Type": contentType,
     "Cache-Control": "no-store"
   });
@@ -9308,21 +9323,22 @@ function serveStatic(req, res) {
   const rawPath = decodeURIComponent(new URL(req.url, `http://${req.headers.host}`).pathname);
   const requested = rawPath === "/" ? "/index.html" : rawPath;
   const filePath = path.normalize(path.join(ROOT, requested));
+  const relativePath = path.relative(ROOT, filePath);
 
-  if (!filePath.startsWith(ROOT)) {
-    res.writeHead(403);
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+    res.writeHead(403, { ...securityResponseHeaders(), "Content-Type": "text/plain; charset=utf-8" });
     res.end("Forbidden");
     return;
   }
 
   fs.readFile(filePath, (error, content) => {
     if (error) {
-      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      res.writeHead(404, { ...securityResponseHeaders(), "Content-Type": "text/plain; charset=utf-8" });
       res.end("Not found");
       return;
     }
     const ext = path.extname(filePath);
-    res.writeHead(200, { "Content-Type": mimeTypes[ext] || "application/octet-stream" });
+    res.writeHead(200, { ...securityResponseHeaders(), "Content-Type": mimeTypes[ext] || "application/octet-stream" });
     res.end(content);
   });
 }
@@ -9540,7 +9556,36 @@ function applyIdentityDirectoryDeactivations(data, plan, operator, note) {
   };
 }
 
+function isProductionRuntime(env = process.env) {
+  return String(env.NODE_ENV || "").trim().toLowerCase() === "production";
+}
+
+function productionSessionSecretErrors(env = process.env) {
+  if (!isProductionRuntime(env)) return [];
+  const configured = [
+    ...(env.SESSION_SECRETS || "").split(","),
+    env.SESSION_SECRET
+  ].map((item) => String(item || "").trim()).filter(Boolean);
+  const placeholderPattern = /(replace[-_ ]?with|change[-_ ]?me|demo[-_ ]?session|example|test[-_ ]?session)/i;
+  if (!configured.length) return ["SESSION_SECRETS or SESSION_SECRET is required in production"];
+  const errors = [];
+  configured.forEach((secret, index) => {
+    if (secret.length < 32) errors.push(`session secret ${index + 1} must contain at least 32 characters`);
+    if (placeholderPattern.test(secret)) errors.push(`session secret ${index + 1} still contains a placeholder value`);
+  });
+  return errors;
+}
+
+function assertProductionRuntimeSecurity(env = process.env) {
+  const errors = productionSessionSecretErrors(env);
+  if (!errors.length) return true;
+  const error = new Error(`production session signing secrets are invalid: ${errors.join("; ")}`);
+  error.code = "PRODUCTION_SESSION_SECRET_INVALID";
+  throw error;
+}
+
 function authSecrets() {
+  assertProductionRuntimeSecurity();
   const configured = [
     ...(process.env.SESSION_SECRETS || "").split(","),
     process.env.SESSION_SECRET
@@ -9573,6 +9618,7 @@ function verifySignedSessionToken(token) {
 
 function verifyPassword(user, password) {
   if (!user) return false;
+  if (isProductionRuntime()) return false;
   const rawPassword = String(password || "");
   if (user.passwordHash) return verifyPasswordHash(rawPassword, user.passwordHash);
   if (user.password) return timingSafeTextEqual(rawPassword, String(user.password));
@@ -9779,12 +9825,89 @@ function requireApiRole(req, res, roles, target) {
   return session.user;
 }
 
+const RESIDENT_REFERENCE_FIELDS = ["residentId", "maternalResidentId", "patientResidentId", "subjectResidentId"];
+const ORGANIZATION_CODE_FIELDS = ["orgCode", "institutionCode", "institutionId", "hospitalCode", "sourceInstitutionCode", "targetInstitutionCode", "createdByOrgCode"];
+const ORGANIZATION_NAME_FIELDS = ["organization", "organizationName", "institution", "institutionName", "hospital", "sourceInstitution", "targetInstitution", "fromInstitution", "toInstitution"];
+const INSURANCE_RESIDENT_COLLECTIONS = new Set(["insuranceClaims", "medicationPickups", "digitalCredentials", "chronicPharmacyInsuranceLinks", "drugConsumableSupervisions"]);
+const COUNTY_RESIDENT_COLLECTIONS = new Set(["countyCollaborationOrders", "countyAiDiagnosisCases", "countyMutualRecognitionRecords", "diagnosticReports", "personalRecords", "referralTeleconsultations", "phase2DiseaseReportQueue", "phase2DiseaseReportReceipts"]);
+const organizationAliasCache = new WeakMap();
+
+function normalizedScopeValue(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function residentReferences(item) {
+  if (!item || typeof item !== "object") return [];
+  return [...new Set(RESIDENT_REFERENCE_FIELDS.map((field) => String(item[field] || "").trim()).filter(Boolean))];
+}
+
+function organizationAliasesForUser(data, user) {
+  const cacheKey = String(user?.orgCode || "");
+  const dataCache = data && typeof data === "object" ? organizationAliasCache.get(data) : null;
+  if (dataCache?.has(cacheKey)) return dataCache.get(cacheKey);
+  const aliases = new Set([normalizedScopeValue(user?.orgName)].filter(Boolean));
+  if (!user?.orgCode) return aliases;
+  const candidates = Object.values(data || {}).flatMap((value) => Array.isArray(value) ? value : []);
+  candidates.forEach((item) => {
+    if (!item || typeof item !== "object") return;
+    const codeMatches = ORGANIZATION_CODE_FIELDS.some((field) => String(item[field] || "").trim() === user.orgCode);
+    if (!codeMatches) return;
+    ORGANIZATION_NAME_FIELDS.forEach((field) => {
+      const alias = normalizedScopeValue(item[field]);
+      if (alias) aliases.add(alias);
+    });
+    const name = normalizedScopeValue(item.name);
+    if (name) aliases.add(name);
+  });
+  const nextCache = dataCache || new Map();
+  nextCache.set(cacheKey, aliases);
+  organizationAliasCache.set(data, nextCache);
+  return aliases;
+}
+
+function rowHasOrganizationScope(item) {
+  return [...ORGANIZATION_CODE_FIELDS, ...ORGANIZATION_NAME_FIELDS].some((field) => String(item?.[field] || "").trim());
+}
+
+function rowMatchesOrganizationScope(data, user, item) {
+  if (!item || user?.role !== "institution") return false;
+  if (ORGANIZATION_CODE_FIELDS.some((field) => String(item[field] || "").trim() === user.orgCode)) return true;
+  const aliases = organizationAliasesForUser(data, user);
+  const matchesAlias = (value) => {
+    const normalized = normalizedScopeValue(value);
+    if (!normalized) return false;
+    return [...aliases].some((alias) => alias === normalized || (alias.length >= 4 && normalized.includes(alias)) || (normalized.length >= 4 && alias.includes(normalized)));
+  };
+  if (ORGANIZATION_NAME_FIELDS.some((field) => matchesAlias(item[field]))) return true;
+  if (user.doctorId && [item.doctorId, item.applicantDoctor, item.receivingDoctor, item.leaderDoctorId].includes(user.doctorId)) return true;
+  if (user.nurseId && [item.nurseId, item.assignedNurseId].includes(user.nurseId)) return true;
+  return false;
+}
+
+function residentPrimaryMatchesOrganization(data, user, residentId) {
+  const resident = (data.residents || []).find((item) => item.id === residentId);
+  if (!resident) return false;
+  return rowMatchesOrganizationScope(data, user, resident);
+}
+
+function canManageResidentProfile(user, residentId, data) {
+  if (user?.role === "commission") return true;
+  return user?.role === "institution" && residentPrimaryMatchesOrganization(data, user, residentId);
+}
+
+function canAccessBusinessRow(user, item, data) {
+  if (user?.role === "commission") return true;
+  const references = residentReferences(item);
+  if (!references.length || !references.every((residentId) => canAccessResident(user, residentId, data))) return false;
+  if (user.role !== "institution") return true;
+  if (rowHasOrganizationScope(item)) return rowMatchesOrganizationScope(data, user, item);
+  return references.every((residentId) => residentPrimaryMatchesOrganization(data, user, residentId));
+}
+
 function canAccessResident(user, residentId, data) {
+  if (!user) return false;
   if (!residentId) return user.role !== "citizen";
-  if (user.role !== "citizen") return true;
-  if (user.residentId === residentId) return true;
-  const account = data.accounts.find((item) => item.id === user.accountId);
-  return Boolean(account?.members?.some((member) => member.residentId === residentId));
+  return allowedResidentIdsForUser(data, user).has(residentId);
 }
 
 function canAccessDoctor(user, doctorId) {
@@ -11884,6 +12007,7 @@ function scopeStateForUser(data, user) {
     }
     scoped.taskMessages = (data.taskMessages || []).filter((message) => canAccessTaskMessage(user, message, data));
     if (scoped.mobileExperienceSettings) scoped.mobileExperienceSettings = { ...scoped.mobileExperienceSettings, userPreferences: undefined };
+    applyResidentScope(scoped, data, user);
     return scoped;
   }
 
@@ -11916,12 +12040,81 @@ function scopeStateForUser(data, user) {
 }
 
 function allowedResidentIdsForUser(data, user) {
-  if (!user || user.role !== "citizen") return null;
-  const account = (data.accounts || []).find((item) => item.id === user.accountId);
-  return new Set([
-    user.residentId,
-    ...(account?.members || []).map((member) => member.residentId)
-  ].filter(Boolean));
+  if (!user) return new Set();
+  if (user.role === "commission") return new Set((data.residents || []).map((item) => item.id));
+  if (user.role === "citizen") {
+    const account = (data.accounts || []).find((item) => item.id === user.accountId);
+    return new Set([user.residentId, ...(account?.members || []).map((member) => member.residentId)].filter(Boolean));
+  }
+  const allowed = new Set();
+  const addReferences = (rows, predicate = () => true) => (rows || []).forEach((item) => {
+    if (predicate(item)) residentReferences(item).forEach((residentId) => allowed.add(residentId));
+  });
+  if (user.role === "insurance") {
+    INSURANCE_RESIDENT_COLLECTIONS.forEach((collection) => addReferences(data[collection]));
+    return allowed;
+  }
+  if (user.role === "county") {
+    COUNTY_RESIDENT_COLLECTIONS.forEach((collection) => addReferences(data[collection]));
+    addReferences(data.referralSystem?.referrals);
+    addReferences(data.referralSystem?.familyDoctorServices);
+    return allowed;
+  }
+  if (user.role === "institution") {
+    addReferences(data.residents, (item) => rowMatchesOrganizationScope(data, user, item));
+    Object.values(data).forEach((value) => {
+      if (Array.isArray(value)) addReferences(value, (item) => rowMatchesOrganizationScope(data, user, item));
+    });
+    Object.values(data.referralSystem || {}).forEach((value) => {
+      if (Array.isArray(value)) addReferences(value, (item) => rowMatchesOrganizationScope(data, user, item));
+    });
+  }
+  return allowed;
+}
+
+function applyResidentScope(scoped, data, user) {
+  const allowed = allowedResidentIdsForUser(data, user);
+  delete scoped.accounts;
+  scoped.residents = (data.residents || []).filter((item) => allowed.has(item.id));
+  Object.entries(scoped).forEach(([collection, value]) => {
+    if (!Array.isArray(value) || collection === "residents") return;
+    if (!value.some((item) => residentReferences(item).length)) return;
+    if (user.role === "insurance" && !INSURANCE_RESIDENT_COLLECTIONS.has(collection)) {
+      scoped[collection] = [];
+      return;
+    }
+    if (user.role === "county" && !COUNTY_RESIDENT_COLLECTIONS.has(collection)) {
+      scoped[collection] = [];
+      return;
+    }
+    scoped[collection] = value.filter((item) => {
+      const references = residentReferences(item);
+      if (!references.length) return true;
+      if (!references.every((residentId) => allowed.has(residentId))) return false;
+      if (user.role === "county" && collection === "personalRecords") {
+        return Boolean(item.reportId || item.recognitionRecordId || /mutual recognition|互认/i.test(`${item.category || ""} ${item.type || ""}`));
+      }
+      if (user.role !== "institution") return true;
+      if (rowHasOrganizationScope(item)) return rowMatchesOrganizationScope(data, user, item);
+      return references.every((residentId) => residentPrimaryMatchesOrganization(data, user, residentId));
+    });
+  });
+  if (scoped.referralSystem) {
+    Object.entries(scoped.referralSystem).forEach(([collection, value]) => {
+      if (!Array.isArray(value) || !value.some((item) => residentReferences(item).length)) return;
+      if (user.role === "insurance") {
+        scoped.referralSystem[collection] = [];
+        return;
+      }
+      scoped.referralSystem[collection] = value.filter((item) => {
+        const references = residentReferences(item);
+        if (!references.every((residentId) => allowed.has(residentId))) return false;
+        if (user.role !== "institution") return true;
+        if (rowHasOrganizationScope(item)) return rowMatchesOrganizationScope(data, user, item);
+        return references.every((residentId) => residentPrimaryMatchesOrganization(data, user, residentId));
+      });
+    });
+  }
 }
 
 function buildMobileExperience(data, user) {
@@ -14445,7 +14638,7 @@ function patchBusinessCollectionItem({ data, collection, id, patch, user, action
   const rows = Array.isArray(data[collection]) ? data[collection] : [];
   const index = rows.findIndex((item) => item.id === id);
   if (index < 0) return { status: 404, body: { error: "Not Found", message: "未找到业务记录" } };
-  if (!canAccessResident(user, rows[index].residentId, data)) {
+  if (!canAccessBusinessRow(user, rows[index], data)) {
     appendSecurityEvent({ actor: user.name, role: user.role, action, target: `${collection}/${id}`, result: "拒绝", detail: "超出居民授权范围" });
     return { status: 403, body: { error: "Forbidden", message: "无权更新该居民业务记录" } };
   }
@@ -17736,6 +17929,11 @@ async function handleApi(req, res) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/auth/login") {
+    if (isProductionRuntime()) {
+      appendSecurityEvent({ actor: "anonymous", role: "anonymous", action: "local-password-login", target: "production", result: "denied", detail: "local password login is disabled in production" });
+      sendJson(res, 403, { ok: false, code: "LOCAL_PASSWORD_LOGIN_DISABLED", message: "local password login is disabled in production" });
+      return;
+    }
     const credentials = await collectJson(req);
     const user = findAuthUser(String(credentials.username || "").trim());
     if (!user || !verifyPassword(user, credentials.password)) {
@@ -22812,7 +23010,7 @@ async function handleApi(req, res) {
       sendJson(res, 404, { error: "Not Found", message: "未找到居民" });
       return;
     }
-    if (!canAccessResident(user, residentId, data)) {
+    if (!canManageResidentProfile(user, residentId, data)) {
       appendSecurityEvent({ actor: user.name, role: user.role, action: "更新居民档案", target: residentId, result: "拒绝", detail: "超出居民授权范围" });
       sendJson(res, 403, { error: "Forbidden", message: "无权更新该居民档案" });
       return;
@@ -23538,6 +23736,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 function startServer(port = PORT) {
+  assertProductionRuntimeSecurity();
   return server.listen(port, () => {
     ensureDatabase();
     const address = server.address();
@@ -23564,4 +23763,4 @@ if (require.main === module) {
   process.once("SIGTERM", shutdown);
 }
 
-module.exports = { ensureDatabase, openSqliteDatabase, readDatabase, server, startServer, stopServer, storageMeta, writeDatabase };
+module.exports = { assertProductionRuntimeSecurity, ensureDatabase, openSqliteDatabase, productionSessionSecretErrors, readDatabase, server, startServer, stopServer, storageMeta, writeDatabase };

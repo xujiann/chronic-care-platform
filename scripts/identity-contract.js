@@ -67,6 +67,9 @@ function buildIdentityContract(options = {}) {
   const data = options.data || readJson("data/db.json");
   const adapterSource = options.adapterSource ?? readText("production-adapters.js");
   const serverSource = options.serverSource ?? readText("server.js");
+  const authSource = options.authSource ?? readText("auth.js");
+  const bloodBusinessSource = options.bloodBusinessSource ?? readText("blood-business.js");
+  const bloodRecallSource = options.bloodRecallSource ?? readText("blood-recall.js");
   const platformHtml = options.platformHtml ?? readText("platform.html");
   const platformSource = options.platformSource ?? readText("platform.js");
   const adapterDocument = options.adapterDocument ?? readText("docs/production-identity-message-adapters.md");
@@ -120,6 +123,14 @@ function buildIdentityContract(options = {}) {
       protectedCode: adapterSource.includes("digestPhoneVerificationCode") && serverSource.includes("codeDigest"),
       configuration: ["SMS_GATEWAY_URL", "SMS_TEMPLATE_ID", "SMS_GATEWAY_TOKEN"].every((marker) => envTemplate.includes(marker)),
       boundary: adapterDocument.includes("最终送达回调") && adapterDocument.includes("供应商专有签名")
+    },
+    productionSecurity: {
+      localPasswordDisabled: ["LOCAL_PASSWORD_LOGIN_DISABLED", "local password login is disabled in production"].every((marker) => serverSource.includes(marker)),
+      weakSecretStartupBlocked: ["assertProductionRuntimeSecurity", "PRODUCTION_SESSION_SECRET_INVALID"].every((marker) => serverSource.includes(marker)),
+      browserFailClosed: authSource.includes("认证服务暂不可用，请稍后重试"),
+      residentScope: ["applyResidentScope", "canManageResidentProfile", "INSURANCE_RESIDENT_COLLECTIONS", "COUNTY_RESIDENT_COLLECTIONS"].every((marker) => serverSource.includes(marker)),
+      contentSecurity: serverSource.includes("script-src-attr 'none'") && [bloodBusinessSource, bloodRecallSource].every((source) => source.includes("escapeHtml")),
+      boundary: ["生产安全边界", "集中式会话", "不再回退到本地演示账号"].every((marker) => adapterDocument.includes(marker))
     }
   };
 
@@ -132,7 +143,8 @@ function buildIdentityContract(options = {}) {
     { id: "identity:sampleMappings", passed: sampleMappings.every((item) => item.passed), detail: sampleMappings.map((item) => `${item.id}:${item.mappedRole}/${item.mappedHome}`).join(";") },
     { id: "identity:oidcRuntimeAdapter", passed: Object.values(adapterContracts.oidc).every(Boolean), detail: "OIDC UserInfo runtime, configuration and controlled-binding boundary documented" },
     { id: "identity:oidcLifecycle", passed: Object.values(adapterContracts.oidcLifecycle).every(Boolean), detail: "OIDC subject binding, refresh, revocation, safe directory deactivation, operations UI and production boundary documented" },
-    { id: "identity:smsRuntimeAdapter", passed: Object.values(adapterContracts.sms).every(Boolean), detail: "SMS runtime, keyed code digest, provider configuration and delivery boundary documented" }
+    { id: "identity:smsRuntimeAdapter", passed: Object.values(adapterContracts.sms).every(Boolean), detail: "SMS runtime, keyed code digest, provider configuration and delivery boundary documented" },
+    { id: "identity:productionSecurityBoundary", passed: Object.values(adapterContracts.productionSecurity).every(Boolean), detail: "production local-password, signing-secret, browser fail-closed, resident scope and content-security controls are wired" }
   ];
 
   return {

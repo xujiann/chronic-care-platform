@@ -1897,6 +1897,35 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     }
   });
 
+  await t.test("enforces institution and business resident data boundaries", async () => {
+    const hospitalLogin = await login(baseUrl, "hospital");
+    const hospitalState = await api(baseUrl, "/api/state", authorized(hospitalLogin.body.token));
+    assert.equal(hospitalState.body.accounts, undefined);
+    assert.equal(hospitalState.body.followups.length, 0, "hospital must not receive unowned follow-up rows without institution scope");
+    assert.equal(hospitalState.body.internetNursingOrders.every((item) => item.institutionCode === "MR1"), true);
+
+    const crossInstitutionPatch = await api(baseUrl, "/api/residents/r2", authorized(hospitalLogin.body.token, {
+      method: "PATCH",
+      body: JSON.stringify({ address: "cross-institution-write-must-fail" })
+    }));
+    assert.equal(crossInstitutionPatch.response.status, 403);
+
+    const communityLogin = await login(baseUrl, "community");
+    const communityState = await api(baseUrl, "/api/state", authorized(communityLogin.body.token));
+    assert.deepEqual(new Set(communityState.body.followups.map((item) => item.residentId)), new Set(["r1", "r4"]));
+    assert.equal(communityState.body.residents.some((item) => item.id === "r3"), false);
+
+    const insuranceLogin = await login(baseUrl, "mi");
+    const insuranceState = await api(baseUrl, "/api/state", authorized(insuranceLogin.body.token));
+    assert.equal(insuranceState.body.followups.length, 0);
+    assert.equal(insuranceState.body.insuranceClaims.every((item) => ["r1", "r2", "r4"].includes(item.residentId)), true);
+
+    const countyLogin = await login(baseUrl, "county");
+    const countyState = await api(baseUrl, "/api/state", authorized(countyLogin.body.token));
+    assert.equal(countyState.body.followups.length, 0);
+    assert.equal(countyState.body.countyCollaborationOrders.every((item) => ["r1", "r2", "r4"].includes(item.residentId)), true);
+  });
+
   const commissionLogin = await login(baseUrl, "health");
   assert.equal(commissionLogin.response.status, 200);
   const commissionToken = commissionLogin.body.token;

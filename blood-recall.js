@@ -1,4 +1,8 @@
 (function () {
+  function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+  }
+
   function getState() {
     return typeof bloodState === "undefined" ? null : bloodState;
   }
@@ -22,7 +26,7 @@
     if (!state || !element) return;
     const list = element.querySelector("[data-recall-list]");
     const recalls = state.api?.role === "institution" ? (state.api.recalls || []).filter((item) => item.status !== "closed") : [];
-    list.innerHTML = recalls.length ? recalls.map((item) => `<div class="standard-item"><b>待确认</b><span>${item.id}<br><small>${item.reason} · ${(item.bloodUnitIds || []).length} 袋 · 待确认 ${(item.acknowledgementSummary?.pending ?? (item.affectedInstitutions || []).length)} 家</small></span><button class="blood-action" data-recall-action="${item.id}">确认处置</button></div>`).join("") : '<div class="standard-item"><b>已完成</b><span>当前机构没有待确认的召回通知。</span><span class="signal ok">无待办</span></div>';
+    list.innerHTML = recalls.length ? recalls.map((item) => `<div class="standard-item"><b>待确认</b><span>${escapeHtml(item.id)}<br><small>${escapeHtml(item.reason)} · ${(item.bloodUnitIds || []).length} 袋 · 待确认 ${(item.acknowledgementSummary?.pending ?? (item.affectedInstitutions || []).length)} 家</small></span><button class="blood-action" data-recall-action="${escapeHtml(item.id)}">确认处置</button></div>`).join("") : '<div class="standard-item"><b>已完成</b><span>当前机构没有待确认的召回通知。</span><span class="signal ok">无待办</span></div>';
   }
 
   async function acknowledgeRecall(recallId) {
