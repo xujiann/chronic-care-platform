@@ -6,6 +6,7 @@ const test = require("node:test");
 const {
   DOSES,
   HEALTH_PROFILES,
+  LAUNCH_REQUIREMENTS,
   POLICY,
   buildPlan,
   childFromCertificate
@@ -66,8 +67,17 @@ test("immunization readiness report validates page, docs, citizen and commission
   assert.equal(report.checks.some((item) => item.id === "ui:citizen"), true);
   assert.equal(report.checks.some((item) => item.id === "ui:commission"), true);
   assert.equal(report.checks.some((item) => item.id === "rules:special-health-matrix" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "ui:launch-board" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "launch:requirements" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "launch:production-boundary" && item.passed), true);
   assert.equal(report.summary.healthProfiles >= 8, true);
+  assert.equal(report.summary.launchRequirements, LAUNCH_REQUIREMENTS.length);
+  assert.equal(report.summary.launchSitePending >= 4, true);
+  assert.equal(report.formalGoLiveState, "blocked-until-site-evidence-signed");
+  assert.equal(report.launchRequirements.every((item) => item.owner && item.nextAction), true);
   assert.match(markdown, /Immunization program readiness report/);
+  assert.match(markdown, /Launch requirements/);
+  assert.match(markdown, /Registry interface/);
   assert.match(markdown, /Dose rules/);
   assert.match(markdown, /immunization\.html/);
 });

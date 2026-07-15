@@ -1014,6 +1014,63 @@ th {
   line-height: 1.6;
 }
 
+.immunization-launch-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.immunization-launch-item {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 210px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fff;
+}
+
+.immunization-launch-item div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.immunization-launch-item strong {
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.35;
+}
+
+.immunization-launch-item small,
+.immunization-launch-item p,
+.immunization-launch-item span {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.immunization-launch-item > span {
+  word-break: break-word;
+}
+
+@media (max-width: 1180px) {
+  .immunization-launch-board,
+  .immunization-timeline {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .immunization-launch-board,
+  .immunization-timeline {
+    grid-template-columns: 1fr;
+  }
+}
+
 dialog {
   width: min(760px, calc(100vw - 28px));
   max-height: calc(100dvh - 28px);

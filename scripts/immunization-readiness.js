@@ -5,6 +5,7 @@ const {
   DOSES,
   GENERAL_PRINCIPLES,
   HEALTH_PROFILES,
+  LAUNCH_REQUIREMENTS,
   POLICY,
   SPECIAL_HEALTH_RULES,
   buildPlan,
@@ -58,6 +59,21 @@ function buildImmunizationReadinessReport(options = {}) {
   const allRows = plans.flatMap((plan) => plan.rows);
   const hivPlan = buildPlan({ name: "HIV 暴露儿童", gender: "女", birthDate: "2026-06-01" }, { referenceDate: POLICY.referenceDate, healthProfile: "hiv-infected-severe" });
   const hbsagLowWeightPlan = buildPlan({ name: "低体重乙肝暴露儿童", gender: "男", birthDate: "2026-06-01" }, { referenceDate: POLICY.referenceDate, healthProfile: "hbsag-positive-low-weight" });
+  const launchRequirements = LAUNCH_REQUIREMENTS.map((item) => ({
+    ...item,
+    ready: item.status === "ready",
+    blocker: item.status !== "ready"
+  }));
+  const launchSummary = launchRequirements.reduce((acc, item) => {
+    acc.total += 1;
+    if (item.ready) acc.ready += 1;
+    if (item.blocker) acc.sitePending += 1;
+    if (item.severity === "P0") acc.p0 += 1;
+    return acc;
+  }, { total: 0, ready: 0, sitePending: 0, p0: 0 });
+  const launchEvidence = launchRequirements.flatMap((item) =>
+    (item.evidence || []).map((evidence) => ({ requirementId: item.id, evidence }))
+  );
   const checks = [
     check("policy:version", POLICY.version === "2026" && sources.schedule.includes("国家免疫规划疫苗儿童免疫程序及说明（2026年版）"), "2026 policy version and source title are embedded", "policy"),
     check("rules:doses", DOSES.length >= 30 && ["HepB", "BCG", "IPV", "bOPV", "DTaP", "MMR", "JE-L", "JE-I", "MPSV-A", "MPSV-AC", "HepA-L", "HepA-I", "2vHPV"].every((code) => DOSES.some((item) => item.code === code)), `${DOSES.length} dose rules`, "rules"),
@@ -69,6 +85,10 @@ function buildImmunizationReadinessReport(options = {}) {
     check("ui:citizen", sources.citizen.includes("renderImmunizationPlanCards") && sources.citizen.includes("免疫规划（2026版）"), "citizen portal surfaces immunization schedule", "ui"),
     check("ui:commission", sources.commission.includes("computeImmunizationSummary") && sources.commission.includes("免疫逾期"), "commission portal surfaces immunization risk metrics", "ui"),
     check("docs:coverage", sources.docs.includes("2026 版程序覆盖") && sources.docs.includes("2vHPV") && sources.about.includes("immunization.html"), "docs and About link immunization program", "docs"),
+    check("ui:launch-board", sources.html.includes("immunization-launch-board") && sources.pageJs.includes("renderLaunchBoard") && sources.pageJs.includes("launchRequirementBadgeClass"), "standalone page renders launch blockers and evidence ledger", "ui"),
+    check("launch:requirements", launchSummary.total >= 8 && launchSummary.p0 >= 5 && launchSummary.sitePending >= 4, `${launchSummary.total} launch requirements / ${launchSummary.sitePending} site-pending blockers`, "launch"),
+    check("launch:evidence-ledger", launchEvidence.length >= launchSummary.total * 2 && launchRequirements.every((item) => item.owner && item.nextAction), `${launchEvidence.length} launch evidence references with owners and next actions`, "launch"),
+    check("launch:production-boundary", launchSummary.sitePending > 0 && launchRequirements.every((item) => ["ready", "site-pending"].includes(item.status)), "formal production go-live remains blocked until site evidence is signed", "launch"),
     check("release:script", sources.packageSource.includes("immunization:readiness") && sources.packageSource.includes("scripts/immunization-readiness.js"), "package script is available", "release")
   ];
   return {
@@ -85,8 +105,15 @@ function buildImmunizationReadinessReport(options = {}) {
       dueSoon: allRows.filter((row) => row.status === "30天内到期").length,
       healthProfiles: HEALTH_PROFILES.length,
       hivProhibited: hivPlan.summary.prohibited,
-      hbsagSpecialProgram: hbsagLowWeightPlan.summary.specialProgram
+      hbsagSpecialProgram: hbsagLowWeightPlan.summary.specialProgram,
+      launchRequirements: launchSummary.total,
+      launchReady: launchSummary.ready,
+      launchSitePending: launchSummary.sitePending,
+      launchEvidence: launchEvidence.length
     },
+    formalGoLiveState: launchSummary.sitePending === 0 ? "ready-for-production" : "blocked-until-site-evidence-signed",
+    launchRequirements,
+    launchEvidence,
     artifacts: {
       ruleEngine: "immunization-schedule.js",
       page: "immunization.html",
@@ -100,6 +127,10 @@ function buildImmunizationReadinessReport(options = {}) {
 
 function renderMarkdown(report) {
   const rows = report.checks.map((item) => `| ${item.passed ? "PASS" : "FAIL"} | ${item.category} | ${item.id} | ${String(item.detail || "").replace(/\|/g, "/")} |`);
+  const launchRows = (report.launchRequirements || []).map((item) =>
+    `| ${item.ready ? "READY" : "SITE-PENDING"} | ${item.severity} | ${item.category} | ${item.title} | ${item.owner} | ${String(item.nextAction || "").replace(/\|/g, "/")} |`
+  );
+  const evidenceRows = (report.launchEvidence || []).map((item) => `| ${item.requirementId} | ${String(item.evidence || "").replace(/\|/g, "/")} |`);
   return [
     "# Immunization program readiness report",
     "",
@@ -110,6 +141,8 @@ function renderMarkdown(report) {
     `- Generated plans: ${report.summary.plans}`,
     `- Overdue doses: ${report.summary.overdue}`,
     `- Due soon doses: ${report.summary.dueSoon}`,
+    `- Formal go-live state: ${report.formalGoLiveState}`,
+    `- Launch requirements: ${report.summary.launchReady}/${report.summary.launchRequirements} ready; ${report.summary.launchSitePending} site-pending`,
     "",
     "## Artifacts",
     "",
@@ -123,6 +156,18 @@ function renderMarkdown(report) {
     "| Result | Category | Check | Detail |",
     "|---|---|---|---|",
     ...rows,
+    "",
+    "## Launch requirements",
+    "",
+    "| State | Severity | Category | Requirement | Owner | Next action |",
+    "|---|---|---|---|---|---|",
+    ...launchRows,
+    "",
+    "## Evidence ledger",
+    "",
+    "| Requirement | Evidence |",
+    "|---|---|",
+    ...evidenceRows,
     ""
   ].join("\n");
 }

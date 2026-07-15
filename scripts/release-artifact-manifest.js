@@ -10,6 +10,7 @@ const ARTIFACTS = [
   ["release-report", "release", "Release readiness aggregate", "release/release-report.json", "release/release-report.md", "release:report", "/api/release-report"],
   ["launch-smoke", "release", "Launch runtime smoke report", "release/launch-smoke-report.json", "release/launch-smoke-report.md", "launch:smoke", "/api/health"],
   ["release-artifact-manifest", "release", "Release artifact manifest", "release/release-artifact-manifest.json", "release/release-artifact-manifest.md", "release:manifest", "release/release-artifact-manifest.md"],
+  ["health-platform-system-atlas", "governance", "Health information platform top-level system atlas and development rules", "docs/全系统图谱集.md", "docs/全系统图谱集.md", "release:manifest", "docs/全系统图谱集.md"],
   ["platform-production-audit", "governance", "Platform full-process pre-production audit and roadmap", "release/platform-production-audit.json", "docs/数智医院标准平台全程审计与生产前开发规划.md", "platform:production-audit", "release/production-cutover-checklist.md"],
   ["platform-development-report-20260713", "governance", "Digital hospital standards platform development report and next plan", "docs/数智医院标准平台开发报告与下一步计划-2026-07-13.md", "docs/数智医院标准平台开发报告与下一步计划-2026-07-13.md", "release:report", "release/release-report.md"],
   ["platform-rd-report", "governance", "Health information platform R&D report", "docs/卫生健康信息平台研发报告.md", "docs/卫生健康信息平台研发报告.md", "release:report", "docs/卫生健康信息平台研发报告.md"],

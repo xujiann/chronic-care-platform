@@ -399,6 +399,11 @@ test("release report summarizes repository readiness and renders markdown", () =
   assert.equal(report.checks.some((item) => item.name === "priorityApps:acceptanceGates" && item.passed), true);
   assert.equal(report.checks.some((item) => item.name === "maternalChild:riskMetrics" && item.passed), true);
   assert.deepEqual(Object.keys(report.maternalChildReadiness.summary.riskMetrics), ["pendingPublicSecuritySync", "pendingMaternalChildSync", "qualityPending"]);
+  assert.equal(report.checks.some((item) => item.name === "immunization:readiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "immunization:launchBoard" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.name === "immunization:productionBoundary" && item.passed), true);
+  assert.equal(report.immunizationReadiness.formalGoLiveState, "blocked-until-site-evidence-signed");
+  assert.equal(report.immunizationReadiness.summary.launchSitePending >= 4, true);
   const publicHealthReadiness = report.checks.find((item) => item.name === "publicHealth:readiness");
   assert.equal(Boolean(publicHealthReadiness), true);
   assert.equal(publicHealthReadiness.passed || (publicHealthReadiness.severity === "warn" && /site cutover blockers/.test(publicHealthReadiness.detail)), true);

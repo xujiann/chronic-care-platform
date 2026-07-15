@@ -27,6 +27,89 @@
     { id: "blood-products", name: "血液制品使用", guidance: "非减毒活疫苗、卡介苗和口服减毒活疫苗无时间间隔限制；除卡介苗外的注射类减毒活疫苗需间隔至少 3 个月。" }
   ];
 
+  const LAUNCH_REQUIREMENTS = [
+    {
+      id: "registry-interface",
+      category: "integration",
+      title: "Registry interface receipt",
+      owner: "CDC immunization program / platform integration",
+      status: "site-pending",
+      severity: "P0",
+      evidence: ["immunization:readiness", "publicHealth:readiness", "sample child vaccination registry receipt"],
+      nextAction: "Replay one formal child registry payload and archive accepted / rejected receipts."
+    },
+    {
+      id: "birth-certificate-linkage",
+      category: "data",
+      title: "Birth certificate linkage",
+      owner: "Maternal-child health / certificate service",
+      status: "ready",
+      severity: "P0",
+      evidence: ["birthCertificates", "maternal-child:readiness", "immunization.html"],
+      nextAction: "Confirm production certificate identifier and resident authorization mapping."
+    },
+    {
+      id: "appointment-channel",
+      category: "service",
+      title: "Vaccination appointment channel",
+      owner: "Vaccination clinic / citizen service team",
+      status: "site-pending",
+      severity: "P1",
+      evidence: ["citizen.html", "phone-code login", "appointment adapter sample"],
+      nextAction: "Connect the clinic appointment slot and cancellation callback sample."
+    },
+    {
+      id: "inventory-cold-chain",
+      category: "safety",
+      title: "Inventory and cold-chain exception receipt",
+      owner: "CDC cold-chain / vaccine stock team",
+      status: "site-pending",
+      severity: "P0",
+      evidence: ["public health exchange task", "cold-chain exception receipt", "stock risk ledger"],
+      nextAction: "Archive a cold-chain exception and stock lockout receipt for launch rehearsal."
+    },
+    {
+      id: "adverse-event-monitoring",
+      category: "safety",
+      title: "Adverse event monitoring handoff",
+      owner: "Vaccination clinic / AEFI monitoring",
+      status: "site-pending",
+      severity: "P0",
+      evidence: ["AEFI receipt sample", "public-health incident desk", "onsite signoff"],
+      nextAction: "Confirm AEFI escalation path and receipt fields with the vaccination unit."
+    },
+    {
+      id: "resident-notification-consent",
+      category: "citizen",
+      title: "Resident notification and consent",
+      owner: "Citizen service / privacy officer",
+      status: "ready",
+      severity: "P1",
+      evidence: ["citizen.html", "citizen:launch-foundation", "privacy notice"],
+      nextAction: "Confirm SMS template, guardian consent wording and opt-out path."
+    },
+    {
+      id: "role-permission-audit",
+      category: "security",
+      title: "Role permission and audit boundary",
+      owner: "Security administrator / platform operations",
+      status: "ready",
+      severity: "P0",
+      evidence: ["auth.js", "audit:retention", "dataAccessLogs"],
+      nextAction: "Review production roles for commission, institution and citizen access."
+    },
+    {
+      id: "onsite-signoff-drill",
+      category: "cutover",
+      title: "On-site launch drill and signoff",
+      owner: "Release manager / site project office",
+      status: "site-pending",
+      severity: "P0",
+      evidence: ["release:report", "deploy:check", "launch:smoke"],
+      nextAction: "Run launch smoke against the production base URL and archive the signed checklist."
+    }
+  ];
+
   const HEALTH_PROFILES = [
     { id: "routine", name: "常规儿童", description: "按出生日期、性别和既往接种记录生成国家免疫规划提醒。" },
     { id: "preterm-low-weight", name: "早产儿/低出生体重儿", description: "医学评估稳定后按实际月龄接种，乙肝和卡介苗按具体说明处理。" },
@@ -212,7 +295,8 @@
       nextDose: rows.find((row) => row.status !== "已接种" && row.safetyAction !== "prohibit") || null,
       principles: GENERAL_PRINCIPLES,
       healthProfiles: HEALTH_PROFILES,
-      specialHealthRules: SPECIAL_HEALTH_RULES
+      specialHealthRules: SPECIAL_HEALTH_RULES,
+      launchRequirements: LAUNCH_REQUIREMENTS
     };
   }
 
@@ -292,6 +376,7 @@
     DOSES,
     GENERAL_PRINCIPLES,
     HEALTH_PROFILES,
+    LAUNCH_REQUIREMENTS,
     SPECIAL_HEALTH_RULES,
     assessDoseForHealthProfile,
     addDays,

@@ -123,6 +123,11 @@ function buildDeployCheckReport(options = {}) {
   const platformHtml = fs.readFileSync(path.join(ROOT, "platform.html"), "utf8");
   const citizenSource = fs.readFileSync(path.join(ROOT, "citizen.js"), "utf8");
   const citizenHtml = fs.readFileSync(path.join(ROOT, "citizen.html"), "utf8");
+  const immunizationHtml = fs.readFileSync(path.join(ROOT, "immunization.html"), "utf8");
+  const immunizationSource = fs.readFileSync(path.join(ROOT, "immunization.js"), "utf8");
+  const immunizationScheduleSource = fs.readFileSync(path.join(ROOT, "immunization-schedule.js"), "utf8");
+  const immunizationReadinessSource = fs.readFileSync(path.join(ROOT, "scripts", "immunization-readiness.js"), "utf8");
+  const immunizationDoc = fs.readFileSync(path.join(ROOT, "docs", "immunization-program-2026.md"), "utf8");
   const productionDatabaseCutoverDoc = fs.readFileSync(path.join(ROOT, "docs", "production-database-cutover-center.md"), "utf8");
   const postgresMigrationPackageSource = fs.readFileSync(path.join(ROOT, "scripts", "postgres-migration-package.js"), "utf8");
   const postgresMigrationPackageDoc = fs.readFileSync(path.join(ROOT, "docs", "postgresql-migration-package.md"), "utf8");
@@ -244,6 +249,11 @@ function buildDeployCheckReport(options = {}) {
     assertFile("scripts/registration-journey-readiness.js"),
     assertFile("scripts/registration-integration-readiness.js"),
     assertFile("scripts/platform-production-audit.js"),
+    assertFile("immunization.html"),
+    assertFile("immunization.js"),
+    assertFile("immunization-schedule.js"),
+    assertFile("scripts/immunization-readiness.js"),
+    assertFile("docs/immunization-program-2026.md"),
     assertFile("scripts/public-health-readiness.js"),
     assertFile("docs/二期可研对标差距与下一步开发计划.md"),
     assertFile("docs/数智医院标准平台研发报告.md"),
@@ -277,6 +287,7 @@ function buildDeployCheckReport(options = {}) {
     { name: "package:priorityApplicationTemplates", ok: Boolean(pkg.scripts?.["priority-apps:templates"]), detail: pkg.scripts?.["priority-apps:templates"] || "missing" },
     { name: "package:policyCoverage", ok: Boolean(pkg.scripts?.["policy:coverage"]), detail: pkg.scripts?.["policy:coverage"] || "missing" },
     { name: "package:maternalChildReadiness", ok: Boolean(pkg.scripts?.["maternal-child:readiness"]), detail: pkg.scripts?.["maternal-child:readiness"] || "missing" },
+    { name: "package:immunizationReadiness", ok: Boolean(pkg.scripts?.["immunization:readiness"]), detail: pkg.scripts?.["immunization:readiness"] || "missing" },
     { name: "package:publicHealthReadiness", ok: Boolean(pkg.scripts?.["public-health:readiness"]), detail: pkg.scripts?.["public-health:readiness"] || "missing" },
     { name: "package:digitalHospitalStandards", ok: Boolean(pkg.scripts?.["digital-hospital:standards-readiness"]), detail: pkg.scripts?.["digital-hospital:standards-readiness"] || "missing" },
     { name: "package:phase2ProposalReadiness", ok: Boolean(pkg.scripts?.["phase2:proposal-readiness"]), detail: pkg.scripts?.["phase2:proposal-readiness"] || "missing" },
@@ -329,6 +340,9 @@ function buildDeployCheckReport(options = {}) {
     { name: "docs:citizenExternalDependencyOwners", ok: ["platform-ops", "identity-integration", "resident-master-index", "security-compliance", "mobile-release", "required-before-production", "上线阻断口径", "上线前必须归档的证据", "现场验收动作"].every((marker) => citizenProductionRequirementsDoc.includes(marker)), detail: "citizen launch requirements document production dependency owners, blockers, evidence, and onsite acceptance" },
     { name: "docs:productionGoLiveRequirements", ok: productionGoLiveRequirementsDoc.includes("GL-01") && productionGoLiveRequirementsDoc.includes("launch:smoke -- --base-url") && productionGoLiveRequirementsDoc.includes("发布阻断条件"), detail: "real production go-live requirements are documented" },
     { name: "docs:onsiteLaunchMaterials", ok: ["GLM-01", "GLM-04", "GLM-05", "GLM-08", "GLM-10", "CIT-01", "CIT-06", "launch:smoke -- --base-url"].every((marker) => onsiteLaunchMaterialsDoc.includes(marker)), detail: "on-site launch material checklist covers platform and citizen evidence" },
+    { name: "ui:immunizationLaunchBoard", ok: ["immunization-launch-readiness", "immunization-launch-board", "renderLaunchBoard", "launchRequirementBadgeClass"].every((marker) => `${immunizationHtml}\n${immunizationSource}`.includes(marker)), detail: "immunization launch blockers and evidence ledger are visible in the standalone page" },
+    { name: "rules:immunizationLaunchRequirements", ok: ["LAUNCH_REQUIREMENTS", "registry-interface", "inventory-cold-chain", "adverse-event-monitoring", "onsite-signoff-drill"].every((marker) => immunizationScheduleSource.includes(marker)) && ["launch:requirements", "launch:evidence-ledger", "launch:production-boundary"].every((marker) => immunizationReadinessSource.includes(marker)), detail: "immunization launch requirements, evidence ledger and production boundary are machine-checked" },
+    { name: "docs:immunizationProductionGate", ok: ["Production launch gate", "formal production go-live", "Registry interface", "Inventory and cold-chain", "blocked-until-site-evidence-signed"].every((marker) => immunizationDoc.includes(marker)), detail: "immunization production launch gate documents registry, cold-chain, AEFI, consent, audit and signoff evidence" },
     { name: "api:siteLaunchEvidence", ok: serverSource.includes("/api/site-launch-evidence") && serverSource.includes("siteLaunchEvidence") && manifestSource.includes("site-launch-evidence"), detail: "runtime site launch evidence ledger API is wired" },
     { name: "snapshot:interfaceReadiness", ok: p0Interfaces.length >= 4 && p0Interfaces.every((item) => item.id && item.owner && item.status && item.next), detail: `${p0Interfaces.length} P0 interface tracks` },
     { name: "snapshot:securityAcceptance", ok: securityAcceptanceLedger.length >= 4 && securityAcceptanceLedger.every((item) => item.id && item.category && item.owner && item.status && item.next), detail: `${securityAcceptanceLedger.length} security acceptance items` },
@@ -423,6 +437,7 @@ function buildDeployCheckReport(options = {}) {
     { name: "manifest:citizenLaunchFoundation", ok: manifestSource.includes("citizen-launch-foundation-readiness.md") && manifestSource.includes("citizen:launch-foundation") && manifestSource.includes("citizen-pipeline-panel"), detail: "citizen launch foundation artifact links to the resident pipeline acceptance panel" },
     { name: "manifest:policyCoverage", ok: manifestSource.includes("policy-coverage-report.md") && manifestSource.includes("policy:coverage"), detail: "policy coverage artifact is indexed" },
     { name: "manifest:maternalChildReadiness", ok: manifestSource.includes("maternal-child-readiness-report.md") && manifestSource.includes("maternal-child:readiness"), detail: "maternal-child readiness artifact is indexed" },
+    { name: "manifest:immunizationReadiness", ok: manifestSource.includes("immunization-readiness-report.md") && manifestSource.includes("immunization:readiness") && manifestSource.includes("immunization.html"), detail: "immunization readiness artifact is indexed" },
     { name: "manifest:publicHealthReadiness", ok: manifestSource.includes("public-health-readiness-report.md") && manifestSource.includes("public-health:readiness"), detail: "public health readiness artifact is indexed" },
     { name: "manifest:escortServiceReadiness", ok: manifestSource.includes("escort-service-readiness-report.md") && manifestSource.includes("escort:readiness"), detail: "escort service readiness artifact is indexed" },
     { name: "manifest:internetNursingReadiness", ok: manifestSource.includes("internet-nursing-readiness-report.md") && manifestSource.includes("internet-nursing:readiness"), detail: "internet nursing readiness artifact is indexed" },

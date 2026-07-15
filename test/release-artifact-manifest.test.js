@@ -20,6 +20,7 @@ test("release artifact manifest indexes reports templates commands and evidence"
   assert.equal(report.templateReadmes.length, 4);
   assert.equal(report.artifacts.some((item) => item.id === "release-report" && item.command === "release:report"), true);
   assert.equal(report.artifacts.some((item) => item.id === "release-artifact-manifest" && item.command === "release:manifest"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "health-platform-system-atlas" && item.command === "release:manifest" && item.markdown === "docs/全系统图谱集.md" && item.evidence === "docs/全系统图谱集.md"), true);
   assert.equal(report.artifacts.some((item) => item.id === "platform-production-audit" && item.command === "platform:production-audit" && item.markdown === "docs/数智医院标准平台全程审计与生产前开发规划.md" && item.evidence === "release/production-cutover-checklist.md"), true);
   assert.equal(report.artifacts.some((item) => item.id === "platform-development-report-20260713" && item.command === "release:report" && item.markdown === "docs/数智医院标准平台开发报告与下一步计划-2026-07-13.md"), true);
   assert.equal(report.artifacts.some((item) => item.id === "object-storage-readiness" && item.command === "object-storage:readiness" && item.markdown === "release/object-storage-readiness-report.md" && item.evidence === "/api/attachments/storage"), true);
@@ -87,6 +88,8 @@ test("release artifact manifest renders and writes artifacts", (t) => {
   assert.match(markdown, /Doctor multi-practice readiness report/);
   assert.match(markdown, /Template READMEs/);
   assert.match(markdown, /release-artifact-manifest\.md/);
+  assert.match(markdown, /全系统图谱集\.md/);
+  assert.match(markdown, /Health information platform top-level system atlas and development rules/);
   assert.match(markdown, /数智医院标准平台全程审计与生产前开发规划\.md/);
   assert.match(markdown, /卫生健康信息平台研发报告\.md/);
   assert.match(markdown, /data-governance-readiness-report\.md/);

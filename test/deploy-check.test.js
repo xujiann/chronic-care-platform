@@ -41,6 +41,11 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "file:scripts/registration-journey-readiness.js",
     "file:scripts/registration-integration-readiness.js",
     "file:scripts/platform-production-audit.js",
+    "file:immunization.html",
+    "file:immunization.js",
+    "file:immunization-schedule.js",
+    "file:scripts/immunization-readiness.js",
+    "file:docs/immunization-program-2026.md",
     "file:docs/数智医院标准平台全程审计与生产前开发规划.md",
     "file:docs/citizen-production-launch-requirements.md",
     "file:docs/数智医院标准平台研发报告.md",
@@ -48,6 +53,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "package:scripts",
     "package:priorityApplicationTemplates",
     "package:publicHealthReadiness",
+    "package:immunizationReadiness",
     "package:digitalHospitalStandards",
     "package:phase2ProposalReadiness",
     "package:phase2CatalogReadiness",
@@ -110,6 +116,9 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "docs:citizenExternalDependencyOwners",
     "docs:productionGoLiveRequirements",
     "docs:onsiteLaunchMaterials",
+    "ui:immunizationLaunchBoard",
+    "rules:immunizationLaunchRequirements",
+    "docs:immunizationProductionGate",
     "docs:publicHealth",
     "docs:publicHealthNextPlan",
     "docs:phase2ProposalPlan",
@@ -156,6 +165,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "manifest:priorityApplicationTemplates",
     "manifest:citizenLaunchFoundation",
     "manifest:publicHealthReadiness",
+    "manifest:immunizationReadiness",
     "manifest:digitalHospitalStandards",
     "manifest:phase2ProposalReadiness",
     "manifest:phase2CatalogReadiness",
@@ -197,6 +207,8 @@ test("deploy check report covers release-critical snapshot gates", () => {
   assert.match(report.checks.find((item) => item.name === "api:digitalHospitalStandards").detail, /standards API, launch readiness gate, production evidence packets, command briefs, formal cutover approvals, seed data and frontend fetch fallback/);
   assert.match(report.checks.find((item) => item.name === "docs:chronicLaunchCore").detail, /closure, site signoff/);
   assert.match(report.checks.find((item) => item.name === "docs:platformResearchReport").detail, /policy basis/);
+  assert.match(report.checks.find((item) => item.name === "ui:immunizationLaunchBoard").detail, /evidence ledger/);
+  assert.match(report.checks.find((item) => item.name === "docs:immunizationProductionGate").detail, /production launch gate/);
   assert.match(report.checks.find((item) => item.name === "api:productionIdentityMessageAdapters").detail, /OIDC subject binding, refresh, revocation/);
   assert.match(report.checks.find((item) => item.name === "api:productionHospitalConnectors").detail, /outbound connectors/);
   assert.match(report.checks.find((item) => item.name === "manifest:citizenLaunchFoundation").detail, /resident pipeline acceptance panel/);

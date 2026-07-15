@@ -1420,6 +1420,18 @@ test("system structure documentation reflects completed local governance loops",
   assert.match(systemDoc, /生产切换证据深化/);
 });
 
+test("top-level system atlas stays readable and release actionable", () => {
+  const atlas = read("docs/全系统图谱集.md");
+  assert.match(atlas, /卫生健康信息平台全系统图谱集/);
+  assert.match(atlas, /flowchart LR/);
+  assert.match(atlas, /flowchart TB/);
+  assert.match(atlas, /数据治理与平台总线/);
+  assert.match(atlas, /整体开发规则/);
+  assert.match(atlas, /data-governance:readiness/);
+  assert.match(atlas, /onsite blocked|external blocked/);
+  assert.doesNotMatch(atlas, /锟|�|\?\?\?|绯荤粺|骞冲彴/);
+});
+
 test("citizen portal exposes P1 record details trends and source labels", () => {
   const citizenHtml = read("citizen.html");
   const citizenJs = read("citizen.js");

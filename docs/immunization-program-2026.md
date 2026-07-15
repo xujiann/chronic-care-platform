@@ -45,6 +45,23 @@
 
 ## 流程
 
+## Production launch gate
+
+The immunization module is functionally ready in the demo platform, while formal production go-live remains blocked until site evidence is signed. `LAUNCH_REQUIREMENTS` in `immunization-schedule.js` is the shared source for the page board, `immunization:readiness`, `release:report`, `deploy:check`, and `release:manifest`.
+
+| Area | Required evidence before production | Owner |
+| --- | --- | --- |
+| Registry interface | Formal child vaccination registry payload, accepted / rejected receipt, reconciliation sample | CDC immunization program / platform integration |
+| Birth certificate linkage | Production certificate identifier, resident authorization mapping, maternal-child handoff | Maternal-child health / certificate service |
+| Appointment channel | Vaccination clinic slot, cancellation callback, resident notification template | Vaccination clinic / citizen service team |
+| Inventory and cold-chain | Cold-chain exception receipt, stock lockout receipt, public-health exchange task | CDC cold-chain / vaccine stock team |
+| Adverse event monitoring | AEFI receipt sample, escalation owner, incident desk handoff | Vaccination clinic / AEFI monitoring |
+| Resident notification and consent | SMS template, guardian consent, privacy notice and opt-out path | Citizen service / privacy officer |
+| Role permission and audit | Commission, institution and citizen role review plus audit retention evidence | Security administrator / platform operations |
+| On-site drill and signoff | `release:report`, `deploy:check`, production `launch:smoke -- --base-url`, signed checklist | Release manager / site project office |
+
+Release stance: demo release can pass with `formalGoLiveState = blocked-until-site-evidence-signed`; production release cannot be declared complete until every `site-pending` item is signed or explicitly waived.
+
 ```mermaid
 flowchart TD
   A["出生医学证明归集"] --> B["提取出生日期、性别、家庭授权"]

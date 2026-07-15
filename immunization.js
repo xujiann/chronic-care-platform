@@ -62,6 +62,7 @@ function render() {
   renderTimeline(plan);
   renderTable(plan);
   renderRules(plan);
+  renderLaunchBoard(plan);
 }
 
 function renderSummary(certificate, plan) {
@@ -126,6 +127,41 @@ function renderRules(plan) {
     <strong>${escapeHtml(item.name)}</strong>
     <span>${escapeHtml(item.guidance)}</span>
   </article>`)).join("");
+}
+
+function renderLaunchBoard(plan) {
+  const summaryTarget = document.querySelector("#immunization-launch-summary");
+  const boardTarget = document.querySelector("#immunization-launch-board");
+  if (!summaryTarget || !boardTarget) return;
+  const requirements = plan.launchRequirements || window.ImmunizationSchedule2026.LAUNCH_REQUIREMENTS || [];
+  const ready = requirements.filter((item) => item.status === "ready").length;
+  const sitePending = requirements.filter((item) => item.status !== "ready").length;
+  const p0 = requirements.filter((item) => item.severity === "P0").length;
+  const evidence = requirements.reduce((total, item) => total + (item.evidence || []).length, 0);
+  summaryTarget.innerHTML = [
+    ["Launch state", sitePending ? "Site pending" : "Ready", sitePending ? "Formal production go-live waits for signed site evidence" : "All launch requirements are ready"],
+    ["Ready requirements", `${ready}/${requirements.length}`, "Modeled requirements with current evidence"],
+    ["P0 controls", p0, "Registry, safety, audit and signoff controls"],
+    ["Evidence refs", evidence, "Readiness, release and onsite evidence links"]
+  ].map(([label, value, hint]) => `<article class="metric-card">
+    <span>${escapeHtml(label)}</span>
+    <strong>${escapeHtml(value)}</strong>
+    <small>${escapeHtml(hint)}</small>
+  </article>`).join("");
+  boardTarget.innerHTML = requirements.map((item) => `<article class="immunization-launch-item">
+    <div>
+      <span class="badge ${launchRequirementBadgeClass(item.status)}">${escapeHtml(item.status === "ready" ? "Ready" : "Site pending")}</span>
+      <span class="badge ${item.severity === "P0" ? "warn" : "info"}">${escapeHtml(item.severity)}</span>
+    </div>
+    <strong>${escapeHtml(item.title)}</strong>
+    <small>${escapeHtml(item.category)} · ${escapeHtml(item.owner)}</small>
+    <p>${escapeHtml(item.nextAction)}</p>
+    <span>${escapeHtml((item.evidence || []).join(" / "))}</span>
+  </article>`).join("");
+}
+
+function launchRequirementBadgeClass(status) {
+  return status === "ready" ? "info" : "warn";
 }
 
 function safetyBadgeClass(action) {
