@@ -165,6 +165,7 @@
           <span>生产密钥、审计保全、监控告警、灾备演练和现场签字状态</span>
         </div>
         <div id="operation-launch-readiness" class="operation-launch-readiness-grid"></div>
+        <div id="operation-go-live-gates" class="operation-go-live-gate-grid"></div>
         <div id="operation-production-hardening" class="performance-readiness-grid"></div>
         <div id="operation-cutover-command" class="operation-cutover-grid"></div>
         <div id="operation-post-cutover-observation" class="operation-observation-grid"></div>
@@ -215,6 +216,25 @@
           <h2>上线报告与发布证据</h2>
           <span>汇总现场验收、发布归档和下一步联调所需资料</span>
         </div>
+        <div class="operation-delivery-pack-guide" aria-label="交付包验收路线">
+          <article>
+            <strong>1. 先核流程</strong>
+            <span>用完整流程图确认数据接入、调度、对账、审计和上线观察责任链。</span>
+          </article>
+          <article>
+            <strong>2. 再核功能</strong>
+            <span>用开发报告和模块功能报告核对已实现能力、API、数据集合和验证结果。</span>
+          </article>
+          <article>
+            <strong>3. 最后归档</strong>
+            <span>将 PDF 简报、联通需求和 release 证据纳入现场签收材料。</span>
+          </article>
+        </div>
+        <div class="operation-delivery-pack-alert" aria-label="上线前补证提醒">
+          <strong>上线前补证提醒</strong>
+          <span>正式割接前需完成真实报文、验签日志、回放记录、接收端截图、监控值守和审计保全目标配置。</span>
+          <small>生产环境需配置 <code>AUDIT_EXPORT_PATH</code> 或 <code>SIEM_ENDPOINT</code> 后再签收上线。</small>
+        </div>
         <div class="operation-delivery-pack-grid">
           <a class="operation-delivery-pack-card primary" href="./output/pdf/hospital-operations-module-brief-report.pdf" target="_blank" rel="noreferrer">
             <strong>2页开发简要报告</strong>
@@ -225,6 +245,16 @@
             <strong>模块功能报告</strong>
             <span>能力清单、审计检查、发布证据和后续开发计划。</span>
             <small>release/hospital-operations-module-report.md</small>
+          </a>
+          <a class="operation-delivery-pack-card" href="./docs/hospital-operations-flow.md" target="_blank" rel="noreferrer">
+            <strong>完整流程图</strong>
+            <span>数据接入、预警研判、资源调度、复核对账、审计归档和上线观察。</span>
+            <small>docs/hospital-operations-flow.md</small>
+          </a>
+          <a class="operation-delivery-pack-card" href="./docs/hospital-operations-development-report.md" target="_blank" rel="noreferrer">
+            <strong>开发报告</strong>
+            <span>模块定位、已实现功能、数据接口、验收证据和下一步开发计划。</span>
+            <small>docs/hospital-operations-development-report.md</small>
           </a>
           <a class="operation-delivery-pack-card" href="./docs/hospital-operations-integration-requirements.md" target="_blank" rel="noreferrer">
             <strong>系统联通需求</strong>

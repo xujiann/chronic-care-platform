@@ -4494,6 +4494,87 @@ function buildOperationsLaunchReadiness({ productionHardening, cutoverCommand, p
   };
 }
 
+function operationGateStatus(ready, blockedStatus = "现场待签收") {
+  return ready ? "已签收" : blockedStatus;
+}
+
+function buildOperationsGoLiveGates({ productionHardening, siteJointPatrol, cutoverCommand, postCutoverObservation }) {
+  const checks = Array.isArray(productionHardening?.checks) ? productionHardening.checks : [];
+  const check = (id) => checks.find((item) => item.id === id) || {};
+  const patrolPending = Number(siteJointPatrol?.summary?.pending || 0);
+  const cutoverBlocking = Number(cutoverCommand?.summary?.blocking || 0);
+  const observationEvidencePending = Number(postCutoverObservation?.summary?.evidencePending || 0);
+  const rows = [
+    {
+      id: "real-payload-signoff",
+      name: "真实报文联调签收",
+      owner: "医院信息中心/接口联调组",
+      ready: patrolPending === 0 && Boolean(check("site-interface-signoff").passed),
+      status: operationGateStatus(patrolPending === 0 && Boolean(check("site-interface-signoff").passed)),
+      severity: patrolPending === 0 ? "中" : "高",
+      requiredEvidence: ["运行快照真实报文", "调度回执真实报文", "统计对账真实报文", "验签日志", "回放记录", "接收端截图"],
+      blockers: [
+        patrolPending ? `${patrolPending}项现场巡检待归档` : "",
+        !check("site-interface-signoff").passed ? "现场接口联调签字未完成" : ""
+      ].filter(Boolean),
+      nextAction: patrolPending ? "补齐样例报文、验签日志、回放记录、失败重试和接收端截图。" : "归档真实报文联调签收材料。",
+      evidence: ["/api/operations/site-joint-patrol", "/api/operations/integration/snapshots", "/api/operations/integration/dispatch-feedback", "/api/operations/integration/reconciliation"]
+    },
+    {
+      id: "audit-retention-target",
+      name: "审计保全目标配置",
+      owner: "平台运维/安全管理岗",
+      ready: Boolean(check("audit-retention").passed),
+      status: operationGateStatus(Boolean(check("audit-retention").passed), "生产割接前必填"),
+      severity: check("audit-retention").passed ? "常规" : "高",
+      requiredEvidence: ["AUDIT_EXPORT_PATH 或 SIEM_ENDPOINT", "日志保全策略", "留存年限", "访问审计", "导出权限确认"],
+      blockers: check("audit-retention").passed ? [] : ["生产审计保全目标未配置"],
+      nextAction: check("audit-retention").passed ? "保持保全路径和导出权限归档。" : "配置 AUDIT_EXPORT_PATH 或 SIEM_ENDPOINT，并完成安全管理员签收。",
+      evidence: ["/api/audit/verify", "/api/operations/production-hardening", "release:report"]
+    },
+    {
+      id: "monitoring-on-call",
+      name: "监控值守联通",
+      owner: "平台运维/值班长",
+      ready: Boolean(check("monitoring-signoff").passed),
+      status: operationGateStatus(Boolean(check("monitoring-signoff").passed)),
+      severity: check("monitoring-signoff").passed ? "常规" : "高",
+      requiredEvidence: ["/api/health", "/api/metrics", "慢请求告警", "错误率告警", "死信告警", "on-call escalation"],
+      blockers: check("monitoring-signoff").passed ? [] : ["监控值守签字未完成"],
+      nextAction: check("monitoring-signoff").passed ? "保持监控面板和告警规则归档。" : "将运行指标绑定现场监控平台，并完成值班长签收。",
+      evidence: ["/api/health", "/api/metrics", "/api/operations/post-cutover-observation"]
+    },
+    {
+      id: "dr-rehearsal-signoff",
+      name: "灾备演练签收",
+      owner: "数据平台/基础设施组",
+      ready: Boolean(check("dr-rehearsal-signoff").passed) && cutoverBlocking === 0 && observationEvidencePending === 0,
+      status: operationGateStatus(Boolean(check("dr-rehearsal-signoff").passed) && cutoverBlocking === 0 && observationEvidencePending === 0),
+      severity: check("dr-rehearsal-signoff").passed ? "中" : "高",
+      requiredEvidence: ["备份文件", "恢复演练记录", "RTO/RPO 说明", "回退快照", "割接回退策略确认"],
+      blockers: [
+        !check("dr-rehearsal-signoff").passed ? "灾备演练签字未完成" : "",
+        cutoverBlocking ? `${cutoverBlocking}项割接阻断待关闭` : "",
+        observationEvidencePending ? `${observationEvidencePending}项上线观察证据待补` : ""
+      ].filter(Boolean),
+      nextAction: check("dr-rehearsal-signoff").passed ? "复核回退策略和 T+1 观察证据。" : "完成备份恢复演练、RTO/RPO 记录和回退策略签收。",
+      evidence: ["/api/operations/cutover-command", "/api/operations/post-cutover-observation", "release/production-cutover-checklist.md"]
+    }
+  ];
+  return {
+    ok: rows.every((item) => item.ready),
+    generatedAt: new Date().toISOString(),
+    summary: {
+      total: rows.length,
+      ready: rows.filter((item) => item.ready).length,
+      blocked: rows.filter((item) => !item.ready).length,
+      highPriority: rows.filter((item) => !item.ready && item.severity === "高").length
+    },
+    rows,
+    evidence: ["/api/operations/go-live-gates", "/api/operations/production-hardening", "/api/operations/site-joint-patrol", "/api/operations/post-cutover-observation"]
+  };
+}
+
 function buildOperationsIntelligence({ snapshots, dispatchRequests, reconciliationReviews }) {
   const lowerPressureTargets = [...snapshots].sort((a, b) => Number(a.bedOccupancyRate || 0) - Number(b.bedOccupancyRate || 0));
   const recommendations = snapshots.map((snapshot) => {
@@ -5203,6 +5284,12 @@ function buildHospitalOperationsDashboard(data) {
   });
   dashboard.launchReadiness = buildOperationsLaunchReadiness({
     productionHardening,
+    cutoverCommand: dashboard.cutoverCommand,
+    postCutoverObservation: dashboard.postCutoverObservation
+  });
+  dashboard.goLiveGates = buildOperationsGoLiveGates({
+    productionHardening,
+    siteJointPatrol,
     cutoverCommand: dashboard.cutoverCommand,
     postCutoverObservation: dashboard.postCutoverObservation
   });
@@ -9077,6 +9164,14 @@ async function handleApi(req, res) {
     if (!user) return;
     const dashboard = buildHospitalOperationsDashboard(readDatabase());
     sendJson(res, 200, dashboard.postCutoverObservation);
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/operations/go-live-gates") {
+    const user = requireApiRole(req, res, ["commission"], "/api/operations/go-live-gates");
+    if (!user) return;
+    const dashboard = buildHospitalOperationsDashboard(readDatabase());
+    sendJson(res, 200, dashboard.goLiveGates);
     return;
   }
 

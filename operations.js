@@ -163,6 +163,7 @@ const OPERATIONS_EVIDENCE_LABELS = {
   "/api/operations/production-hardening": "生产加固清单接口",
   "/api/operations/cutover-command": "生产割接签收接口",
   "/api/operations/post-cutover-observation": "上线后观察接口",
+  "/api/operations/go-live-gates": "上线前门禁接口",
   "/api/operations/intelligence": "智能调度建议接口",
   "/api/operations/resource-pool": "跨院资源池接口",
   "/api/operations/emergency-dispatch-loop": "急诊拥堵调度闭环接口",
@@ -623,6 +624,75 @@ function buildStaticLaunchReadiness(productionHardening, cutoverCommand, postCut
       ? blockers.map((item) => item.nextAction)
       : ["保留 T+1 观察记录并归档签收材料。", "将上线结论同步治理导出包和发布报告。"],
     evidence: ["/api/operations/production-hardening", "/api/operations/cutover-command", "/api/operations/post-cutover-observation", "release:report:full"]
+  };
+}
+
+function buildStaticGoLiveGates(productionHardening, siteJointPatrol, cutoverCommand, postCutoverObservation) {
+  const checks = Array.isArray(productionHardening?.checks) ? productionHardening.checks : [];
+  const check = (id) => checks.find((item) => item.id === id) || {};
+  const patrolPending = Number(siteJointPatrol?.summary?.pending || 0);
+  const cutoverBlocking = Number(cutoverCommand?.summary?.blocking || 0);
+  const observationEvidencePending = Number(postCutoverObservation?.summary?.evidencePending || 0);
+  const rows = [
+    {
+      id: "real-payload-signoff",
+      name: "真实报文联调签收",
+      owner: "医院信息中心/接口联调组",
+      ready: patrolPending === 0 && Boolean(check("site-interface-signoff").passed),
+      status: patrolPending === 0 && Boolean(check("site-interface-signoff").passed) ? "已签收" : "现场待签收",
+      severity: patrolPending === 0 ? "中" : "高",
+      requiredEvidence: ["运行快照真实报文", "调度回执真实报文", "统计对账真实报文", "验签日志", "回放记录", "接收端截图"],
+      blockers: [patrolPending ? `${patrolPending}项现场巡检待归档` : "", !check("site-interface-signoff").passed ? "现场接口联调签字未完成" : ""].filter(Boolean),
+      nextAction: patrolPending ? "补齐样例报文、验签日志、回放记录、失败重试和接收端截图。" : "归档真实报文联调签收材料。",
+      evidence: ["/api/operations/go-live-gates", "/api/operations/site-joint-patrol"]
+    },
+    {
+      id: "audit-retention-target",
+      name: "审计保全目标配置",
+      owner: "平台运维/安全管理岗",
+      ready: Boolean(check("audit-retention").passed),
+      status: check("audit-retention").passed ? "已签收" : "生产割接前必填",
+      severity: check("audit-retention").passed ? "常规" : "高",
+      requiredEvidence: ["AUDIT_EXPORT_PATH 或 SIEM_ENDPOINT", "日志保全策略", "留存年限", "访问审计", "导出权限确认"],
+      blockers: check("audit-retention").passed ? [] : ["生产审计保全目标未配置"],
+      nextAction: check("audit-retention").passed ? "保持保全路径和导出权限归档。" : "配置 AUDIT_EXPORT_PATH 或 SIEM_ENDPOINT，并完成安全管理员签收。",
+      evidence: ["/api/operations/go-live-gates", "/api/audit/verify"]
+    },
+    {
+      id: "monitoring-on-call",
+      name: "监控值守联通",
+      owner: "平台运维/值班长",
+      ready: Boolean(check("monitoring-signoff").passed),
+      status: check("monitoring-signoff").passed ? "已签收" : "现场待签收",
+      severity: check("monitoring-signoff").passed ? "常规" : "高",
+      requiredEvidence: ["/api/health", "/api/metrics", "慢请求告警", "错误率告警", "死信告警", "on-call escalation"],
+      blockers: check("monitoring-signoff").passed ? [] : ["监控值守签字未完成"],
+      nextAction: check("monitoring-signoff").passed ? "保持监控面板和告警规则归档。" : "将运行指标绑定现场监控平台，并完成值班长签收。",
+      evidence: ["/api/operations/go-live-gates", "/api/metrics"]
+    },
+    {
+      id: "dr-rehearsal-signoff",
+      name: "灾备演练签收",
+      owner: "数据平台/基础设施组",
+      ready: Boolean(check("dr-rehearsal-signoff").passed) && cutoverBlocking === 0 && observationEvidencePending === 0,
+      status: Boolean(check("dr-rehearsal-signoff").passed) && cutoverBlocking === 0 && observationEvidencePending === 0 ? "已签收" : "现场待签收",
+      severity: check("dr-rehearsal-signoff").passed ? "中" : "高",
+      requiredEvidence: ["备份文件", "恢复演练记录", "RTO/RPO 说明", "回退快照", "割接回退策略确认"],
+      blockers: [!check("dr-rehearsal-signoff").passed ? "灾备演练签字未完成" : "", cutoverBlocking ? `${cutoverBlocking}项割接阻断待关闭` : "", observationEvidencePending ? `${observationEvidencePending}项上线观察证据待补` : ""].filter(Boolean),
+      nextAction: check("dr-rehearsal-signoff").passed ? "复核回退策略和 T+1 观察证据。" : "完成备份恢复演练、RTO/RPO 记录和回退策略签收。",
+      evidence: ["/api/operations/go-live-gates", "/api/operations/cutover-command"]
+    }
+  ];
+  return {
+    ok: rows.every((item) => item.ready),
+    summary: {
+      total: rows.length,
+      ready: rows.filter((item) => item.ready).length,
+      blocked: rows.filter((item) => !item.ready).length,
+      highPriority: rows.filter((item) => !item.ready && item.severity === "高").length
+    },
+    rows,
+    evidence: ["/api/operations/go-live-gates", "/api/operations/production-hardening", "/api/operations/site-joint-patrol", "/api/operations/post-cutover-observation"]
   };
 }
 
@@ -1367,6 +1437,7 @@ function renderOperationsDashboard() {
   const cutoverCommand = dashboard.cutoverCommand || buildStaticCutoverCommand(productionHardening, dashboard.siteJointPatrol || {}, dashboard.mobileDuty || {}, [], []);
   const postCutoverObservation = dashboard.postCutoverObservation || buildStaticPostCutoverObservation(filteredSnapshots, dashboard.dispatchRequests || [], dashboard.reconciliationReviews || [], dashboard.siteJointPatrol || {}, cutoverCommand, dashboard.mobileDuty || {}, [], []);
   renderLaunchReadiness(dashboard.launchReadiness || buildStaticLaunchReadiness(productionHardening, cutoverCommand, postCutoverObservation));
+  renderGoLiveGates(dashboard.goLiveGates || buildStaticGoLiveGates(productionHardening, dashboard.siteJointPatrol || {}, cutoverCommand, postCutoverObservation));
   renderProductionHardening(productionHardening);
   renderCutoverCommand(cutoverCommand);
   renderPostCutoverObservation(postCutoverObservation);
@@ -2006,6 +2077,33 @@ function renderLaunchReadiness(launchReadiness) {
         </article>
       `).join("")}
     </div>` : ""}
+  `;
+}
+
+function renderGoLiveGates(goLiveGates) {
+  const target = document.querySelector("#operation-go-live-gates");
+  if (!target) return;
+  const rows = Array.isArray(goLiveGates.rows) ? goLiveGates.rows : [];
+  target.innerHTML = `
+    <article class="operation-go-live-gate-summary ${goLiveGates.ok ? "ready" : "blocked"}">
+      <strong>上线前门禁清单</strong>
+      <span>${goLiveGates.summary?.ready || 0}/${goLiveGates.summary?.total || 0} 项已签收，${goLiveGates.summary?.highPriority || 0} 项高优先级待处理</span>
+      <small>${evidenceList(goLiveGates.evidence || [])}</small>
+    </article>
+    ${rows.map((item) => `
+      <article class="operation-go-live-gate-card ${item.ready ? "ready" : item.severity === "高" ? "critical" : "warning"}">
+        <header>
+          <strong>${zhInline(item.name)}</strong>
+          ${statusBadge(item.ready ? "normal" : "critical")}
+        </header>
+        <span>${zhInline(item.status)} / ${zhInline(item.owner)}</span>
+        <p>${zhInline(item.nextAction)}</p>
+        <div class="operation-go-live-gate-tags">
+          ${(item.requiredEvidence || []).slice(0, 6).map((evidence) => `<small>${zhInline(evidence)}</small>`).join("")}
+        </div>
+        ${Array.isArray(item.blockers) && item.blockers.length ? `<footer>${item.blockers.map((blocker) => `<span>${zhInline(blocker)}</span>`).join("")}</footer>` : ""}
+      </article>
+    `).join("")}
   `;
 }
 

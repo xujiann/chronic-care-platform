@@ -26,6 +26,7 @@ test("hospital operations readiness validates monitor dispatch and reconciliatio
   assert.equal(report.checks.some((item) => item.id === "hospitalOps:postCutoverObservation" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "hospitalOps:postCutoverSignoffGate" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "hospitalOps:launchReadiness" && item.passed), true);
+  assert.equal(report.checks.some((item) => item.id === "hospitalOps:goLiveGates" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "hospitalOps:intelligence" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "hospitalOps:resourcePool" && item.passed), true);
   assert.equal(report.checks.some((item) => item.id === "hospitalOps:emergencyDispatchLoop" && item.passed), true);
@@ -59,6 +60,7 @@ test("hospital operations readiness renders and writes release artifacts", (t) =
   const writtenJson = JSON.parse(fs.readFileSync(path.join(outputDir, "hospital-operations-readiness-report.json"), "utf8"));
   const writtenMarkdown = fs.readFileSync(path.join(outputDir, "hospital-operations-readiness-report.md"), "utf8");
   assert.equal(writtenJson.ok, true);
+  assert.match(writtenMarkdown, /hospitalOps:goLiveGates/);
   assert.match(writtenMarkdown, /hospitalOps:frontend/);
 });
 

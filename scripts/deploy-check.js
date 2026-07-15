@@ -74,6 +74,8 @@ function buildDeployCheckReport(options = {}) {
   const checks = [
     assertFile("README.md"),
     assertFile("DEPLOYMENT.md"),
+    assertFile("docs/hospital-operations-flow.md"),
+    assertFile("docs/hospital-operations-development-report.md"),
     assertFile("data/db.json"),
     assertFile("server.js"),
     assertFile("scripts/storage-admin.js"),
@@ -91,6 +93,7 @@ function buildDeployCheckReport(options = {}) {
     { name: "snapshot:accessibility", ok: Array.isArray(data.accessibilityChecklist) && data.accessibilityChecklist.length >= 5, detail: `${data.accessibilityChecklist?.length || 0} checklist items` },
     { name: "snapshot:healthDashboard", ok: Array.isArray(data.healthDashboardSnapshots) && data.healthDashboardSnapshots.some((item) => Array.isArray(item.sourceApplications) && item.sourceApplications.length === 7), detail: `${data.healthDashboardSnapshots?.length || 0} dashboard snapshots` },
     { name: "manifest:healthDashboardSummary", ok: manifestSource.includes("health-dashboard-summary.md") && manifestSource.includes("health-dashboard:summary"), detail: "health dashboard summary artifact is indexed" },
+    { name: "manifest:hospitalOperationsDocuments", ok: manifestSource.includes("hospital-operations-flow.md") && manifestSource.includes("hospital-operations-development-report.md"), detail: "hospital operations flow and development report are indexed" },
     { name: "snapshot:storageMeta", ok: Boolean(data.storageMeta?.engine && data.storageMeta?.mode), detail: data.storageMeta ? `${data.storageMeta.engine}/${data.storageMeta.mode}` : "missing" }
   ];
 

@@ -261,6 +261,9 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("README.md"), /hospital-operations-release-report\.md/);
   assert.match(read("README.md"), /hospital-operations-module-report\.md/);
   assert.match(read("README.md"), /hospital-operations-module-brief-report\.pdf/);
+  assert.match(read("README.md"), /\/api\/operations\/go-live-gates/);
+  assert.match(read("README.md"), /hospital-operations-flow\.md/);
+  assert.match(read("README.md"), /hospital-operations-development-report\.md/);
   assert.match(read("README.md"), /operations-about\.html/);
   assert.match(read("README.md"), /process-audit-report\.md/);
   assert.match(read("README.md"), /service-acceptance-summary\.md/);
@@ -287,6 +290,9 @@ test("deployment baseline documents scripts and environment template", () => {
   assert.match(read("DEPLOYMENT.md"), /hospital-operations-release-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /hospital-operations-module-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /hospital-operations-module-brief-report\.pdf/);
+  assert.match(read("DEPLOYMENT.md"), /\/api\/operations\/go-live-gates/);
+  assert.match(read("DEPLOYMENT.md"), /hospital-operations-flow\.md/);
+  assert.match(read("DEPLOYMENT.md"), /hospital-operations-development-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /operations-about\.html/);
   assert.match(read("DEPLOYMENT.md"), /process-audit-report\.md/);
   assert.match(read("DEPLOYMENT.md"), /site-readiness-pack\.md/);
@@ -467,6 +473,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsHtml, /operations-site-joint-tests/);
   assert.match(operationsHtml, /operations-site-joint-patrol/);
   assert.match(operationsHtml, /operation-launch-readiness/);
+  assert.match(operationsHtml, /operation-go-live-gates/);
   assert.match(operationsHtml, /operation-production-hardening/);
   assert.match(operationsHtml, /operation-cutover-command/);
   assert.match(operationsHtml, /operation-post-cutover-observation/);
@@ -476,7 +483,17 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsHtml, /operation-mobile-duty/);
   assert.match(operationsHtml, /operation-governance-report/);
   assert.match(operationsHtml, /operations-delivery-pack-panel/);
+  assert.match(operationsHtml, /operation-delivery-pack-guide/);
+  assert.match(operationsHtml, /operation-delivery-pack-alert/);
+  assert.match(operationsHtml, /先核流程/);
+  assert.match(operationsHtml, /再核功能/);
+  assert.match(operationsHtml, /最后归档/);
+  assert.match(operationsHtml, /上线前补证提醒/);
+  assert.match(operationsHtml, /AUDIT_EXPORT_PATH/);
+  assert.match(operationsHtml, /SIEM_ENDPOINT/);
   assert.match(operationsHtml, /hospital-operations-module-brief-report\.pdf/);
+  assert.match(operationsHtml, /hospital-operations-flow\.md/);
+  assert.match(operationsHtml, /hospital-operations-development-report\.md/);
   assert.match(operationsHtml, /operation-next-development/);
   assert.match(operationsHtml, /operation-command-chains/);
   assert.match(operationsHtml, /operation-playbooks/);
@@ -518,6 +535,9 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(operationsJs, /rankedDuties/);
   assert.match(operationsJs, /operations-duty-detail/);
   assert.match(operationsJs, /operation-launch-readiness/);
+  assert.match(operationsJs, /renderGoLiveGates/);
+  assert.match(operationsJs, /buildStaticGoLiveGates/);
+  assert.match(operationsJs, /\/api\/operations\/go-live-gates/);
   assert.match(operationsJs, /applySituationFilter/);
   assert.match(operationsJs, /selectSnapshotById/);
   assert.match(operationsJs, /renderInterfaceMapping/);
@@ -620,6 +640,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("portal.css"), /interface-mapping-card/);
   assert.match(read("portal.css"), /site-joint-patrol-card/);
   assert.match(read("portal.css"), /operation-launch-readiness-summary/);
+  assert.match(read("portal.css"), /operation-go-live-gate-card/);
   assert.match(read("portal.css"), /operation-cutover-card/);
   assert.match(read("portal.css"), /operation-observation-card/);
   assert.match(read("portal.css"), /operation-observation-windows/);
@@ -631,6 +652,8 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("portal.css"), /dispatch-batch-note/);
   assert.match(read("portal.css"), /operation-mobile-duty-card/);
   assert.match(read("portal.css"), /operation-delivery-pack-card/);
+  assert.match(read("portal.css"), /operation-delivery-pack-guide/);
+  assert.match(read("portal.css"), /operation-delivery-pack-alert/);
   assert.match(read("portal.css"), /operation-next-development-card/);
   assert.match(read("portal.css"), /operation-handover-card/);
   assert.match(read("portal.css"), /operation-handover-owner-card/);
@@ -667,6 +690,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("server.js"), /\/api\/operations\/production-hardening/);
   assert.match(read("server.js"), /\/api\/operations\/cutover-command/);
   assert.match(read("server.js"), /\/api\/operations\/post-cutover-observation/);
+  assert.match(read("server.js"), /\/api\/operations\/go-live-gates/);
   assert.match(read("server.js"), /\/api\/operations\/intelligence/);
   assert.match(read("server.js"), /\/api\/operations\/resource-pool/);
   assert.match(read("server.js"), /\/api\/operations\/mobile-duty/);
@@ -680,6 +704,7 @@ test("platform and workbench expose P2 governance and runtime panels", () => {
   assert.match(read("server.js"), /buildOperationsSiteJointPatrol/);
   assert.match(read("server.js"), /buildOperationsCutoverCommand/);
   assert.match(read("server.js"), /buildOperationsPostCutoverObservation/);
+  assert.match(read("server.js"), /buildOperationsGoLiveGates/);
   assert.match(read("server.js"), /buildCommandSla/);
   assert.match(read("server.js"), /buildOperationsPlaybooks/);
   assert.match(read("server.js"), /buildOperationsHandover/);

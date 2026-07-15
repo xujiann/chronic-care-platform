@@ -11,6 +11,8 @@ test("deploy check report covers release-critical snapshot gates", () => {
   [
     "file:README.md",
     "file:DEPLOYMENT.md",
+    "file:docs/hospital-operations-flow.md",
+    "file:docs/hospital-operations-development-report.md",
     "package:scripts",
     "snapshot:collections",
     "snapshot:regionalDataSharing",
@@ -22,6 +24,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
     "snapshot:accessibility",
     "snapshot:healthDashboard",
     "manifest:healthDashboardSummary",
+    "manifest:hospitalOperationsDocuments",
     "snapshot:storageMeta"
   ].forEach((name) => assert.equal(checkNames.has(name), true, `${name} should be checked`));
 });

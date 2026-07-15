@@ -24,6 +24,8 @@ test("release artifact manifest indexes reports templates commands and evidence"
   assert.equal(report.artifacts.some((item) => item.id === "hospital-operations-module-report" && item.command === "hospital-operations:module-report"), true);
   assert.equal(report.artifacts.some((item) => item.id === "hospital-operations-brief-pdf" && item.command === "hospital-operations:brief-pdf"), true);
   assert.equal(report.artifacts.some((item) => item.id === "hospital-operations-brief-pdf" && item.evidence === "output/pdf/hospital-operations-module-brief-report.pdf"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "hospital-operations-flow" && item.markdown === "docs/hospital-operations-flow.md"), true);
+  assert.equal(report.artifacts.some((item) => item.id === "hospital-operations-development-report" && item.markdown === "docs/hospital-operations-development-report.md"), true);
   assert.equal(report.artifacts.some((item) => item.id === "hospital-operations-integration-requirements" && item.markdown === "docs/hospital-operations-integration-requirements.md"), true);
   assert.equal(report.artifacts.some((item) => item.id === "site-readiness" && item.evidence === "/api/site-readiness-pack"), true);
   assert.equal(report.artifacts.some((item) => item.id === "service-acceptance" && item.markdown === "release/service-acceptance-summary.md" && item.evidence === "/api/service-acceptance-summary"), true);
@@ -44,6 +46,8 @@ test("release artifact manifest renders and writes artifacts", (t) => {
   assert.match(markdown, /Template READMEs/);
   assert.match(markdown, /release-artifact-manifest\.md/);
   assert.match(markdown, /hospital-operations-integration-requirements\.md/);
+  assert.match(markdown, /hospital-operations-flow\.md/);
+  assert.match(markdown, /hospital-operations-development-report\.md/);
   assert.match(markdown, /hospital-operations-brief-pdf-report\.md/);
 
   writeOutput(report, {

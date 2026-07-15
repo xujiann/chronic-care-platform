@@ -255,6 +255,9 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(Array.isArray(operationsDashboard.body.launchReadiness.blockers), true);
     assert.equal(Number.isInteger(operationsDashboard.body.launchReadiness.summary.blockers), true);
     assert.equal(operationsDashboard.body.launchReadiness.evidence.includes("release:report:full"), true);
+    assert.equal(operationsDashboard.body.goLiveGates.summary.total, 4);
+    assert.equal(operationsDashboard.body.goLiveGates.rows.some((item) => item.id === "audit-retention-target" && item.requiredEvidence.includes("AUDIT_EXPORT_PATH 或 SIEM_ENDPOINT")), true);
+    assert.equal(operationsDashboard.body.goLiveGates.evidence.includes("/api/operations/go-live-gates"), true);
     assert.equal(operationsDashboard.body.intelligence.recommendations.some((item) => item.recommendation && item.prediction), true);
     assert.equal(operationsDashboard.body.resourcePool.rows.some((item) => item.resourceSlots.length >= 5), true);
     assert.equal(operationsDashboard.body.resourcePool.recommendations.length >= 1, true);
@@ -278,6 +281,12 @@ test("API authentication, scoping and governance regression suite", async (t) =>
     assert.equal(performanceMonitoring.body.manuals.secondary.indicatorDetails.some((item) => item.exceptionTemplate && item.sourceFields.length > 0), true);
     assert.equal(performanceMonitoring.body.manuals.tertiary.indicatorDetails.some((item) => item.numerator && item.denominator), true);
     assert.equal(performanceMonitoring.body.actions.some((item) => item.id === "performance-runtime-pressure"), true);
+
+    const goLiveGates = await api(baseUrl, "/api/operations/go-live-gates", authorized(accountLogin.body.token));
+    assert.equal(goLiveGates.response.status, 200);
+    assert.equal(goLiveGates.body.summary.total, 4);
+    assert.equal(goLiveGates.body.rows.some((item) => item.id === "real-payload-signoff" && item.evidence.includes("/api/operations/integration/snapshots")), true);
+    assert.equal(goLiveGates.body.rows.some((item) => item.id === "monitoring-on-call" && item.requiredEvidence.includes("/api/metrics")), true);
 
     const commandChains = await api(baseUrl, "/api/operations/command-chains", authorized(accountLogin.body.token));
     assert.equal(commandChains.response.status, 200);

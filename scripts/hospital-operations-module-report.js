@@ -28,6 +28,76 @@ function check(id, passed, detail) {
   return { id, passed: Boolean(passed), detail };
 }
 
+function fileExists(relativePath) {
+  return fs.existsSync(path.join(ROOT, relativePath));
+}
+
+function buildDeliveryArtifacts() {
+  return [
+    {
+      id: "operations-flow",
+      name: "完整流程图",
+      stage: "流程核对",
+      file: "docs/hospital-operations-flow.md",
+      detail: "覆盖数据接入、运行监测、预警研判、资源调度、复核对账、审计归档和上线观察全链路。"
+    },
+    {
+      id: "operations-development-report",
+      name: "开发报告",
+      stage: "功能核对",
+      file: "docs/hospital-operations-development-report.md",
+      detail: "汇总模块定位、已实现功能、数据接口、验收证据、上线边界和下一步开发计划。"
+    },
+    {
+      id: "operations-integration-requirements",
+      name: "系统联通需求",
+      stage: "现场联通",
+      file: "docs/hospital-operations-integration-requirements.md",
+      detail: "列出 HIS、排班、设备、门急诊、统计直报、移动值守等现场接口边界。"
+    },
+    {
+      id: "operations-brief-pdf",
+      name: "2页开发简要报告",
+      stage: "汇报归档",
+      file: "output/pdf/hospital-operations-module-brief-report.pdf",
+      detail: "面向现场汇报的两页 PDF 简报，概括功能、证据、联调边界和下一步方向。"
+    }
+  ];
+}
+
+function buildGoLiveGates() {
+  return [
+    {
+      id: "real-payload-signoff",
+      name: "真实报文联调签收",
+      owner: "医院信息中心/接口联调组",
+      requiredEvidence: "运行快照、调度回执、统计对账真实报文，验签日志、回放记录、失败重试记录和接收端截图。",
+      status: "现场待签收"
+    },
+    {
+      id: "audit-retention-target",
+      name: "审计保全目标配置",
+      owner: "平台运维/安全管理岗",
+      requiredEvidence: "生产环境配置 AUDIT_EXPORT_PATH 或 SIEM_ENDPOINT，确认日志保全、留存年限、访问审计和导出权限。",
+      status: "生产割接前必填"
+    },
+    {
+      id: "monitoring-on-call",
+      name: "监控值守联通",
+      owner: "平台运维/值班长",
+      requiredEvidence: "/api/health、/api/metrics、慢请求、错误率、死信、数据质量和 on-call escalation 接入现场监控平台。",
+      status: "现场待签收"
+    },
+    {
+      id: "dr-rehearsal-signoff",
+      name: "灾备演练签收",
+      owner: "数据平台/基础设施组",
+      requiredEvidence: "备份文件、恢复演练记录、RTO/RPO 说明、回退快照和割接回退策略确认。",
+      status: "现场待签收"
+    }
+  ];
+}
+
 function buildCapabilities(data, serverSource, readiness, release) {
   return [
     {
@@ -122,6 +192,13 @@ function buildCapabilities(data, serverSource, readiness, release) {
       status: release.checks.some((item) => item.id === "release:launchReadiness" && item.passed) ? "ready" : "needs-attention",
       evidence: ["/api/operations/dashboard", "/api/operations/production-hardening", "/api/operations/cutover-command", "/api/operations/post-cutover-observation"],
       detail: "将生产加固阻断项、割接签收阻断项、上线后观察异常、待补证据和观察窗口签收状态汇总为可上线运行或暂缓上线运行结论。"
+    },
+    {
+      id: "go-live-gates",
+      name: "上线前门禁清单",
+      status: release.checks.some((item) => item.id === "release:goLiveGates" && item.passed) ? "ready" : "needs-attention",
+      evidence: ["/api/operations/go-live-gates", "/api/operations/site-joint-patrol", "/api/operations/production-hardening", "/api/operations/post-cutover-observation"],
+      detail: "按真实报文联调、审计保全目标、监控值守联通和灾备演练签收生成上线前门禁清单，并在运行页直接提示补证动作。"
     },
     {
       id: "ops-intelligence",
@@ -246,6 +323,8 @@ function buildHospitalOperationsModuleReport(options = {}) {
   const readiness = options.readiness ?? buildHospitalOperationsReadinessReport({ data, pkg, serverSource });
   const release = options.release ?? buildHospitalOperationsReleaseReport({ data, pkg, serverSource, readiness });
   const capabilities = buildCapabilities(data, serverSource, readiness, release);
+  const deliveryArtifacts = buildDeliveryArtifacts();
+  const goLiveGates = buildGoLiveGates();
   const nextPlan = buildNextPlan();
   const checks = [
     check("module:readiness", readiness.ok, "hospital operations readiness passes"),
@@ -253,7 +332,9 @@ function buildHospitalOperationsModuleReport(options = {}) {
     check("module:signedIngestApis", capabilities.find((item) => item.id === "signed-hospital-ingest")?.status === "ready", "signed hospital ingest APIs are ready"),
     check("module:dashboardAggregator", /buildHospitalOperationsDashboard/.test(serverSource), "dashboard aggregator remains source of truth"),
     check("module:capabilityCoverage", capabilities.every((item) => item.status === "ready"), `${capabilities.filter((item) => item.status === "ready").length}/${capabilities.length} capabilities ready`),
-    check("module:nextPlan", nextPlan.length >= 4 && nextPlan.every((item) => item.phase && item.owner && item.exitCriteria), `${nextPlan.length} next-plan rows`)
+    check("module:nextPlan", nextPlan.length >= 4 && nextPlan.every((item) => item.phase && item.owner && item.exitCriteria), `${nextPlan.length} next-plan rows`),
+    check("module:deliveryArtifacts", deliveryArtifacts.every((item) => fileExists(item.file)), `${deliveryArtifacts.filter((item) => fileExists(item.file)).length}/${deliveryArtifacts.length} delivery artifacts present`),
+    check("module:goLiveGates", goLiveGates.every((item) => item.owner && item.requiredEvidence && item.status), `${goLiveGates.length} go-live gates documented`)
   ];
   return {
     ok: checks.every((item) => item.passed),
@@ -274,6 +355,8 @@ function buildHospitalOperationsModuleReport(options = {}) {
       releasePassed: release.summary?.passed || release.checks.filter((item) => item.passed).length
     },
     capabilities,
+    deliveryArtifacts,
+    goLiveGates,
     nextPlan,
     checks
   };
@@ -300,6 +383,18 @@ function renderMarkdown(report) {
     "| 阶段 | 责任方 | 范围 | 交付物 | 退出标准 |",
     "|---|---|---|---|---|",
     ...report.nextPlan.map((item) => `| ${item.phase} | ${item.owner} | ${item.scope} | ${item.deliverable} | ${item.exitCriteria} |`),
+    "",
+    "## 交付文档",
+    "",
+    "| 阶段 | 文档 | 路径 | 说明 |",
+    "|---|---|---|---|",
+    ...report.deliveryArtifacts.map((item) => `| ${item.stage} | ${item.name} | ${item.file} | ${String(item.detail || "").replace(/\|/g, "/")} |`),
+    "",
+    "## 上线前门禁",
+    "",
+    "| 门禁 | 责任方 | 必备证据 | 状态 |",
+    "|---|---|---|---|",
+    ...report.goLiveGates.map((item) => `| ${item.name} | ${item.owner} | ${String(item.requiredEvidence || "").replace(/\|/g, "/")} | ${item.status} |`),
     "",
     "## 审计检查",
     "",
