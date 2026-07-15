@@ -2916,7 +2916,7 @@ test("PostgreSQL migration package keeps CI payload-free and full exports contro
   assert.match(read("postgres-runtime-sync.js"), /ON CONFLICT \(batch_id\) DO NOTHING/);
   assert.match(read("postgres-runtime-sync.js"), /source_version <= EXCLUDED\.source_version/);
   assert.match(read("server.js"), /postgres_sync_outbox/);
-  assert.match(read("server.js"), /STORAGE_SCHEMA_VERSION = 10/);
+  assert.match(read("server.js"), /STORAGE_SCHEMA_VERSION = 11/);
   assert.match(read("server.js"), /postgres_sync_reconciliations/);
   assert.match(read("server.js"), /postgres_sync_reconciliation_cases/);
   assert.match(read("server.js"), /postgres_sync_reconciliation_case_actions/);

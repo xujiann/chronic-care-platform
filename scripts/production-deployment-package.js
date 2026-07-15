@@ -10,6 +10,7 @@ const DEFAULT_MARKDOWN = path.join(ROOT, "release", "production-deployment-packa
 const ALLOWED_RUNTIME_EXTENSIONS = new Set([".js", ".html", ".css", ".svg", ".webmanifest"]);
 const REQUIRED_RUNTIME_FILES = [
   "server.js",
+  "session-store.js",
   "package.json",
   "package-lock.json",
   "service-worker.js",

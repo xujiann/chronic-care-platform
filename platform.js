@@ -1020,7 +1020,9 @@ function renderIdentityLifecycleCenter() {
   const center = identityLifecycleCenter;
   const identity = center.identity || {};
   const summary = center.plan?.summary || {};
+  const sessionStore = center.capabilities?.sessionStore || {};
   const metrics = [
+    ["会话存储", sessionStore.durable ? `${sessionStore.mode || "sqlite"} 持久化` : "进程内存", sessionStore.crossProcess ? "同一主机共享数据目录可跨进程撤销" : "仅限本地开发和测试"],
     ["OIDC 登录", identity.configured ? "已配置" : "未配置", "UserInfo + 受控账号绑定"],
     ["令牌刷新", identity.refreshConfigured ? "可用" : "未配置", "刷新后重新校验身份"],
     ["撤销登出", identity.revocationConfigured ? "可用" : "未配置", "上游撤销 + 本地会话删除"],

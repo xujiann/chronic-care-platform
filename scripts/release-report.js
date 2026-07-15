@@ -128,8 +128,8 @@ function buildProductionCutoverChecklist(env, checks = []) {
       id: "cutover-env-file",
       phase: "environment",
       owner: "platform-ops",
-      passed: ready("env:file", "env:NODE_ENV.production", "env:STORAGE_ENGINE", "env:STORAGE_ENGINE.production", "env:DEPLOYMENT.releaseId", "env:DEPLOYMENT.artifactDigest"),
-      evidence: detail("env:file", "env:NODE_ENV.production", "env:STORAGE_ENGINE", "env:STORAGE_ENGINE.production", "env:DEPLOYMENT.releaseId", "env:DEPLOYMENT.artifactDigest"),
+      passed: ready("env:file", "env:NODE_ENV.production", "env:STORAGE_ENGINE", "env:STORAGE_ENGINE.production", "env:SESSION_STORE.present", "env:SESSION_STORE", "env:SESSION_STORE.productionDurable", "env:DEPLOYMENT.releaseId", "env:DEPLOYMENT.artifactDigest"),
+      evidence: detail("env:file", "env:NODE_ENV.production", "env:STORAGE_ENGINE", "env:STORAGE_ENGINE.production", "env:SESSION_STORE.present", "env:SESSION_STORE", "env:SESSION_STORE.productionDurable", "env:DEPLOYMENT.releaseId", "env:DEPLOYMENT.artifactDigest"),
       nextAction: "在目标服务器创建真实 .env，设置 NODE_ENV=production，绑定已批准发布编号和不可变制品摘要，并确认不使用 JSON 作为生产主存储。"
     },
     {
@@ -217,6 +217,8 @@ function validateProductionConfig(options = {}) {
   const sessionSecretItems = sessionSecrets.split(",").map((item) => item.trim()).filter(Boolean);
   const gatewaySecret = String(env.INTEGRATION_GATEWAY_SECRET || "");
   const storageEngine = String(env.STORAGE_ENGINE || "auto").toLowerCase();
+  const configuredSessionStore = String(env.SESSION_STORE || "").trim().toLowerCase();
+  const sessionStore = configuredSessionStore || (strict ? "sqlite" : "memory");
   const sqliteJournalMode = String(env.SQLITE_JOURNAL_MODE || "").toUpperCase();
   const sqliteSynchronous = String(env.SQLITE_SYNCHRONOUS || "").toUpperCase();
   const sqliteBusyTimeout = Number(env.SQLITE_BUSY_TIMEOUT_MS || 0);
@@ -237,6 +239,9 @@ function validateProductionConfig(options = {}) {
     check("env:file", envFileExists, envFileExists ? envFile : `${envFile} missing`, strict ? "error" : "warn", "environment"),
     check("env:NODE_ENV", Boolean(nodeEnv), nodeEnv || "missing", strict ? "error" : "warn", "environment"),
     check("env:STORAGE_ENGINE", ["auto", "json", "sqlite", "postgres", "postgresql"].includes(storageEngine), storageEngine, "error", "environment"),
+    check("env:SESSION_STORE.present", !strict || Boolean(configuredSessionStore), strict ? configuredSessionStore || "missing SESSION_STORE" : "not enforced outside production", strict ? "error" : "warn", "environment"),
+    check("env:SESSION_STORE", ["memory", "sqlite"].includes(sessionStore), sessionStore || "missing", "error", "environment"),
+    check("env:SESSION_STORE.productionDurable", !strict || sessionStore === "sqlite", strict ? `${sessionStore}; production requires durable SQLite sessions` : "not enforced outside production", strict ? "error" : "warn", "environment"),
     check("env:SESSION_SECRETS.present", sessionSecretItems.length > 0, `${sessionSecretItems.length} configured`, "error", "environment"),
     check("env:SESSION_SECRETS.productionQuality", !strict || sessionSecretItems.every((item) => secretQuality(item).strongEnough), strict ? "production secrets must be non-placeholder and at least 32 chars" : "not enforced outside production", strict ? "error" : "warn", "environment"),
     check("env:INTEGRATION_GATEWAY_SECRET.present", Boolean(gatewaySecret), gatewaySecret ? "configured" : "missing", "error", "environment"),
@@ -794,7 +799,7 @@ function productionDbReadinessChecks(productionDbReadiness) {
     check("productionDb:cutoverCenter", productionDbReadiness.cutoverCenter?.ok && productionDbReadiness.cutoverCenter?.summary?.migrationBatches >= 4 && productionDbReadiness.cutoverCenter?.summary?.productionReadyRuns === 0, `${productionDbReadiness.cutoverCenter?.summary?.migrationBatches || 0} migration batches / ${productionDbReadiness.cutoverCenter?.summary?.cutoverRuns || 0} rehearsal runs / production gate preserved`, "error", "production-db"),
     check("productionDb:migrationPackage", productionDbReadiness.postgresMigrationPackage?.ok && productionDbReadiness.postgresMigrationPackage?.manifest?.mode === "manifest" && !productionDbReadiness.postgresMigrationPackage?.files?.["records.copy.tsv"], `${productionDbReadiness.postgresMigrationPackage?.manifest?.summary?.records || 0} source records summarized without payload export`, "error", "production-db"),
     check("productionDb:migrationBoundary", productionDbReadiness.postgresMigrationPackage?.manifest?.productionReady === false && productionDbReadiness.migrationEvidence?.runtimePostgresBlocked, "migration package cannot enable PostgreSQL runtime or production readiness", "error", "production-db"),
-    check("productionDb:transactionalOutbox", productionDbReadiness.postgresRuntimeSync?.transactionalOutbox && productionDbReadiness.postgresRuntimeSync?.batchIntegrity && productionDbReadiness.postgresRuntimeSync?.healthStatus, "SQLite schema v10 provides atomic signed PostgreSQL change batches and health status", "error", "production-db"),
+    check("productionDb:transactionalOutbox", productionDbReadiness.postgresRuntimeSync?.transactionalOutbox && productionDbReadiness.postgresRuntimeSync?.batchIntegrity && productionDbReadiness.postgresRuntimeSync?.healthStatus, "SQLite schema v11 retains atomic signed PostgreSQL change batches and health status", "error", "production-db"),
     check("productionDb:idempotentWorker", productionDbReadiness.postgresRuntimeSync?.idempotentApply && productionDbReadiness.postgresRuntimeSync?.retryState && productionDbReadiness.postgresRuntimeSync?.workerCommand, "PostgreSQL worker is idempotent, version-aware and retryable", "error", "production-db"),
     check("productionDb:baselineBootstrap", productionDbReadiness.postgresRuntimeSync?.baselineBootstrap, "SQLite collection baseline can be queued once before incremental sync", "error", "production-db"),
     check("productionDb:shadowReconciliation", productionDbReadiness.postgresRuntimeSync?.readOnlyReconciliation && productionDbReadiness.postgresRuntimeSync?.reconciliationLedger && productionDbReadiness.postgresRuntimeSync?.reconciliationCommand, "read-only collection version and digest reconciliation is payload-free and health-visible", "error", "production-db"),
@@ -1016,7 +1021,7 @@ function commandChecks(runCommands) {
     run(npm, ["run", "test:coverage"]),
     run(npm, ["run", "test:e2e"]),
     run(npm, ["run", "deploy:check"]),
-    run(npm, ["audit", "--omit=dev"])
+    run(npm, ["audit", "--omit=dev", "--registry=https://registry.npmjs.org"])
   ].map((item) => check(`command:${item.command}`, item.passed, item.passed ? "passed" : item.stderr || item.stdout, "error", "commands"));
 }
 
@@ -1088,6 +1093,7 @@ function buildReleaseReport(options = {}) {
     assertFile(".env.example"),
     assertFile("data/db.json"),
     assertFile("server.js"),
+    assertFile("session-store.js"),
     assertFile("scripts/storage-admin.js"),
     ...packageChecks(pkg),
     ...snapshotChecks(data),

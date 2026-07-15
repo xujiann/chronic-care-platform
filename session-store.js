@@ -1,0 +1,236 @@
+function clone(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function normalizedText(value, maximumLength = 200) {
+  return String(value || "").trim().slice(0, maximumLength);
+}
+
+const SENSITIVE_SESSION_USER_FIELDS = new Set([
+  "password",
+  "passwordHash",
+  "phone",
+  "idCard",
+  "documentNo",
+  "motherDocumentNo",
+  "fatherDocumentNo",
+  "certificateNo",
+  "credentialNo",
+  "personIndex",
+  "identityIndex",
+  "address"
+]);
+
+function sanitizeSessionUser(user) {
+  const safeUser = clone(user || {});
+  SENSITIVE_SESSION_USER_FIELDS.forEach((field) => delete safeUser[field]);
+  return safeUser;
+}
+
+function normalizeSession(session) {
+  const normalized = {
+    sessionId: normalizedText(session?.sessionId, 128),
+    user: sanitizeSessionUser(session?.user),
+    issuedAt: normalizedText(session?.issuedAt, 64),
+    expiresAt: normalizedText(session?.expiresAt, 64)
+  };
+  if (!normalized.sessionId || !normalized.user.id || !normalized.issuedAt || !normalized.expiresAt) {
+    throw new Error("sessionId, user.id, issuedAt and expiresAt are required");
+  }
+  if (!Number.isFinite(Date.parse(normalized.issuedAt)) || !Number.isFinite(Date.parse(normalized.expiresAt))) {
+    throw new Error("issuedAt and expiresAt must be valid dates");
+  }
+  return normalized;
+}
+
+function createSqliteSessionSchema(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS auth_sessions (
+      session_id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      username TEXT NOT NULL DEFAULT '',
+      role TEXT NOT NULL DEFAULT '',
+      user_payload TEXT NOT NULL,
+      issued_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      revoked_at TEXT NOT NULL DEFAULT '',
+      revoke_reason TEXT NOT NULL DEFAULT '',
+      revoked_by TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_auth_sessions_user_active
+      ON auth_sessions(user_id, revoked_at, expires_at);
+    CREATE INDEX IF NOT EXISTS idx_auth_sessions_expiry
+      ON auth_sessions(revoked_at, expires_at);
+  `);
+}
+
+class MemorySessionStore {
+  constructor(options = {}) {
+    this.now = options.now || (() => new Date());
+    this.sessions = new Map();
+  }
+
+  create(session) {
+    const normalized = normalizeSession(session);
+    this.sessions.set(normalized.sessionId, normalized);
+    return clone(normalized);
+  }
+
+  get(sessionId) {
+    const session = this.sessions.get(normalizedText(sessionId, 128));
+    if (!session || Date.parse(session.expiresAt) <= this.now().getTime()) return null;
+    return clone(session);
+  }
+
+  revoke(sessionId) {
+    return this.sessions.delete(normalizedText(sessionId, 128)) ? 1 : 0;
+  }
+
+  revokeByUserIds(userIds = []) {
+    const targets = new Set(userIds.map((item) => normalizedText(item, 128)).filter(Boolean));
+    let revoked = 0;
+    this.sessions.forEach((session, sessionId) => {
+      if (targets.has(session.user?.id)) {
+        this.sessions.delete(sessionId);
+        revoked += 1;
+      }
+    });
+    return revoked;
+  }
+
+  status() {
+    const now = this.now().getTime();
+    let active = 0;
+    let expired = 0;
+    this.sessions.forEach((session) => {
+      if (Date.parse(session.expiresAt) > now) active += 1;
+      else expired += 1;
+    });
+    return {
+      mode: "memory",
+      durable: false,
+      crossProcess: false,
+      active,
+      revoked: 0,
+      expired
+    };
+  }
+}
+
+class SqliteSessionStore {
+  constructor(options = {}) {
+    if (typeof options.openDatabase !== "function") throw new Error("openDatabase is required");
+    this.openDatabase = options.openDatabase;
+    this.now = options.now || (() => new Date());
+  }
+
+  withDatabase(callback) {
+    const db = this.openDatabase();
+    try {
+      createSqliteSessionSchema(db);
+      return callback(db);
+    } finally {
+      db.close();
+    }
+  }
+
+  create(session) {
+    const normalized = normalizeSession(session);
+    this.withDatabase((db) => {
+      db.prepare(`
+        INSERT INTO auth_sessions (
+          session_id, user_id, username, role, user_payload, issued_at, expires_at, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        normalized.sessionId,
+        normalizedText(normalized.user.id, 128),
+        normalizedText(normalized.user.username || normalized.user.name, 200),
+        normalizedText(normalized.user.role, 100),
+        JSON.stringify(normalized.user),
+        normalized.issuedAt,
+        normalized.expiresAt,
+        this.now().toISOString()
+      );
+    });
+    return clone(normalized);
+  }
+
+  get(sessionId) {
+    const id = normalizedText(sessionId, 128);
+    if (!id) return null;
+    return this.withDatabase((db) => {
+      const row = db.prepare(`
+        SELECT session_id, user_payload, issued_at, expires_at
+        FROM auth_sessions
+        WHERE session_id = ? AND revoked_at = '' AND expires_at > ?
+      `).get(id, this.now().toISOString());
+      if (!row) return null;
+      return {
+        sessionId: row.session_id,
+        user: JSON.parse(row.user_payload),
+        issuedAt: row.issued_at,
+        expiresAt: row.expires_at
+      };
+    });
+  }
+
+  revoke(sessionId, options = {}) {
+    const id = normalizedText(sessionId, 128);
+    if (!id) return 0;
+    const revokedAt = this.now().toISOString();
+    return this.withDatabase((db) => Number(db.prepare(`
+      UPDATE auth_sessions
+      SET revoked_at = ?, revoke_reason = ?, revoked_by = ?
+      WHERE session_id = ? AND revoked_at = ''
+    `).run(
+      revokedAt,
+      normalizedText(options.reason || "logout", 200),
+      normalizedText(options.actor || "system", 200),
+      id
+    ).changes || 0));
+  }
+
+  revokeByUserIds(userIds = [], options = {}) {
+    const ids = [...new Set(userIds.map((item) => normalizedText(item, 128)).filter(Boolean))];
+    if (!ids.length) return 0;
+    const revokedAt = this.now().toISOString();
+    const placeholders = ids.map(() => "?").join(", ");
+    return this.withDatabase((db) => Number(db.prepare(`
+      UPDATE auth_sessions
+      SET revoked_at = ?, revoke_reason = ?, revoked_by = ?
+      WHERE user_id IN (${placeholders}) AND revoked_at = '' AND expires_at > ?
+    `).run(
+      revokedAt,
+      normalizedText(options.reason || "account-disabled", 200),
+      normalizedText(options.actor || "system", 200),
+      ...ids,
+      revokedAt
+    ).changes || 0));
+  }
+
+  status() {
+    const now = this.now().toISOString();
+    const counts = this.withDatabase((db) => db.prepare(`
+      SELECT
+        SUM(CASE WHEN revoked_at = '' AND expires_at > ? THEN 1 ELSE 0 END) AS active,
+        SUM(CASE WHEN revoked_at != '' THEN 1 ELSE 0 END) AS revoked,
+        SUM(CASE WHEN revoked_at = '' AND expires_at <= ? THEN 1 ELSE 0 END) AS expired
+      FROM auth_sessions
+    `).get(now, now));
+    return {
+      mode: "sqlite",
+      durable: true,
+      crossProcess: true,
+      active: Number(counts.active || 0),
+      revoked: Number(counts.revoked || 0),
+      expired: Number(counts.expired || 0)
+    };
+  }
+}
+
+module.exports = {
+  MemorySessionStore,
+  SqliteSessionStore,
+  createSqliteSessionSchema
+};

@@ -1,7 +1,15 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const { buildDeployCheckReport } = require("../scripts/deploy-check");
+const { buildDeployCheckReport, run } = require("../scripts/deploy-check");
+
+test("deploy command runner preserves output beyond the spawn default buffer", () => {
+  const outputSize = 2 * 1024 * 1024;
+  const result = run("node", ["-e", `process.stdout.write('x'.repeat(${outputSize}))`]);
+
+  assert.equal(result.ok, true, result.stderr);
+  assert.equal(result.stdout.length, outputSize);
+});
 
 test("deploy check report covers release-critical snapshot gates", () => {
   const report = buildDeployCheckReport();
@@ -11,6 +19,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
   [
     "file:README.md",
     "file:DEPLOYMENT.md",
+    "file:session-store.js",
     "file:production-adapters.js",
     "file:docs/production-identity-message-adapters.md",
     "file:hospital-connectors.js",

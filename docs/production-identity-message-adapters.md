@@ -8,18 +8,19 @@
 
 - `NODE_ENV=production` 时禁用 `POST /api/auth/login` 本地口令入口，演示账号和固定口令仅保留给开发、测试与静态预览；生产登录必须走已配置的 OIDC 等外部身份链路。
 - 生产启动要求 `SESSION_SECRETS` 或 `SESSION_SECRET` 至少包含 32 个字符，缺失、弱值或占位值会以 `PRODUCTION_SESSION_SECRET_INVALID` 拒绝启动。
+- 生产会话使用 `SESSION_STORE=sqlite`；显式配置 `memory` 会以 `PRODUCTION_SESSION_STORE_INVALID` 拒绝启动。会话只持久化随机会话标识、脱敏用户快照、有效期和撤销审计，不保存签名令牌。
 - 浏览器在 API 认证失败或网络异常时失败关闭，不再回退到本地演示账号；只有 `file:` 等静态预览场景允许本地演示身份。
 - 非市级监管角色按居民家庭、机构归属或医保/区县业务关系收敛居民数据；机构修改居民主索引时还必须匹配居民归属机构。
 - 动态血液业务字段在进入 `innerHTML` 前统一编码，服务端下发 CSP、`nosniff`、同源嵌入、引用策略和生产 HSTS 响应头。
-- 当前平台会话仍存放在单进程内存中，多实例生产部署前必须接入集中式会话或等价的跨节点撤销机制；本轮加固不把该外部依赖误报为已完成。
+- SQLite 会话可跨进程读取，并在共享同一 `DATA_DIR` 的实例间同步注销、账号停用和撤销审计；进程重启不会使有效会话丢失。多主机部署仍须采用可靠共享存储或独立集中式会话服务，并完成并发、故障切换和跨节点撤销演练，本实现不把该现场基础设施误报为已完成。
 
 ## 运行接口
 
 - `POST /api/auth/oidc/exchange`：使用上游 access token 调用 OIDC UserInfo。仅已绑定且启用的本地账号可获得平台会话；新外部身份返回待绑定状态，不自动提权或开户。
 - `POST /api/auth/oidc/refresh`：通过发现文档或显式 token endpoint 刷新上游 token，并重新执行 UserInfo 与本地启用状态校验后签发新平台会话。
-- `POST /api/auth/oidc/revoke`：撤销上游 token 并删除当前本地会话；即使上游撤销失败，本地会话仍立即失效并返回部分失败结果。
+- `POST /api/auth/oidc/revoke`：撤销上游 token 并持久化当前本地会话的撤销时间、原因和操作人；即使上游撤销失败，本地会话仍立即失效并返回部分失败结果。
 - `GET /api/auth/adapters`：卫健委角色查看身份与短信适配器配置状态、HTTPS 要求和现场阻断项，不返回密钥。
-- `GET /api/auth/identity-lifecycle`：卫健委角色查看刷新、撤销、目录和安全边界状态，不返回端点、token 或客户端密钥。
+- `GET /api/auth/identity-lifecycle`：卫健委角色查看刷新、撤销、目录和会话存储状态，不返回端点、token、客户端密钥或会话标识。
 - `POST /api/auth/identity-directory/preview`：只读拉取 SCIM 用户目录，生成匹配、停用、待受控绑定和人工复核计划。
 - `POST /api/auth/identity-directory/bind`：卫健委角色使用审计说明和精确确认短语，把已核对的活跃目录 subject 绑定到同名、同机构、启用的本地账号；禁止 subject 冲突和静默改绑。
 - `POST /api/auth/identity-directory/apply`：使用操作说明和精确确认短语，仅执行已绑定本地账号的停用及会话撤销。

@@ -2,6 +2,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const { createHash, createHmac, pbkdf2Sync, randomUUID, timingSafeEqual } = require("crypto");
+const { MemorySessionStore, SqliteSessionStore, createSqliteSessionSchema } = require("./session-store");
 const {
   applyPostgresReconciliationCaseAction,
   assertSyncMode,
@@ -173,9 +174,10 @@ const SQLITE_BUSY_TIMEOUT_MS = Math.min(60000, Math.max(1000, Number(process.env
 const SQLITE_WAL_AUTOCHECKPOINT_PAGES = Math.min(10000, Math.max(100, Number(process.env.SQLITE_WAL_AUTOCHECKPOINT_PAGES || 1000) || 1000));
 const SQLITE_HEALTH_CHECK_TTL_MS = Math.min(300000, Math.max(5000, Number(process.env.SQLITE_HEALTH_CHECK_TTL_MS || 30000) || 30000));
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+const RUNTIME_SESSION_STORES = new Set(["memory", "sqlite"]);
 const DEMO_PASSWORD = "123456";
 const PASSWORD_HASH_ITERATIONS = 120_000;
-const STORAGE_SCHEMA_VERSION = 10;
+const STORAGE_SCHEMA_VERSION = 11;
 const PROJECT_VERSION = (() => {
   try {
     return JSON.parse(fs.readFileSync(path.join(ROOT, "package.json"), "utf8")).version || "0.0.0";
@@ -192,7 +194,8 @@ const runtimeMetrics = {
   slowRequests: [],
   lastRequestAt: ""
 };
-const sessions = new Map();
+let runtimeSessionStoreInstance = null;
+let runtimeSessionStoreKey = "";
 const DEMO_SMS_CODE = process.env.DEMO_SMS_CODE || "888888";
 const PHONE_CODE_TTL_MS = 5 * 60 * 1000;
 const PHONE_CODE_COOLDOWN_MS = 60 * 1000;
@@ -675,6 +678,13 @@ const SQLITE_MIGRATIONS = [
         CREATE INDEX IF NOT EXISTS idx_postgres_sync_reconciliation_case_actions_case
           ON postgres_sync_reconciliation_case_actions(case_id, created_at DESC);
       `);
+    }
+  },
+  {
+    version: 11,
+    name: "add durable authentication sessions",
+    apply(db) {
+      createSqliteSessionSchema(db);
     }
   }
 ];
@@ -9345,7 +9355,7 @@ function serveStatic(req, res) {
 
 function sanitizeUser(user) {
   if (!user) return null;
-  const { password, passwordHash, ...safeUser } = user;
+  const { password, passwordHash, phone, ...safeUser } = user;
   return safeUser;
 }
 
@@ -9506,16 +9516,8 @@ function applyIdentityDirectoryBinding(data, directoryRecords, payload, operator
   };
 }
 
-function revokeSessionsForUserIds(userIds = []) {
-  const targets = new Set(userIds.filter(Boolean));
-  let revoked = 0;
-  sessions.forEach((session, sessionId) => {
-    if (targets.has(session.user?.id)) {
-      sessions.delete(sessionId);
-      revoked += 1;
-    }
-  });
-  return revoked;
+function revokeSessionsForUserIds(userIds = [], options = {}) {
+  return runtimeSessionStore().revokeByUserIds(userIds, options);
 }
 
 function applyIdentityDirectoryDeactivations(data, plan, operator, note) {
@@ -9552,7 +9554,10 @@ function applyIdentityDirectoryDeactivations(data, plan, operator, note) {
   return {
     appliedAt,
     applied,
-    revokedSessions: revokeSessionsForUserIds(applied.map((item) => item.userId))
+    revokedSessions: revokeSessionsForUserIds(applied.map((item) => item.userId), {
+      reason: "identity-directory-deactivation",
+      actor: operator.username || operator.id
+    })
   };
 }
 
@@ -9576,12 +9581,49 @@ function productionSessionSecretErrors(env = process.env) {
   return errors;
 }
 
-function assertProductionRuntimeSecurity(env = process.env) {
-  const errors = productionSessionSecretErrors(env);
-  if (!errors.length) return true;
-  const error = new Error(`production session signing secrets are invalid: ${errors.join("; ")}`);
-  error.code = "PRODUCTION_SESSION_SECRET_INVALID";
+function sessionStoreMode(env = process.env) {
+  const configured = String(env.SESSION_STORE || "").trim().toLowerCase();
+  const mode = configured || (isProductionRuntime(env) ? "sqlite" : "memory");
+  if (RUNTIME_SESSION_STORES.has(mode)) return mode;
+  const error = new Error(`unsupported SESSION_STORE=${mode}; expected memory or sqlite`);
+  error.code = "SESSION_STORE_INVALID";
   throw error;
+}
+
+function productionSessionStoreErrors(env = process.env) {
+  if (!isProductionRuntime(env)) return [];
+  return sessionStoreMode(env) === "sqlite" ? [] : ["SESSION_STORE=sqlite is required in production"];
+}
+
+function assertProductionRuntimeSecurity(env = process.env) {
+  const secretErrors = productionSessionSecretErrors(env);
+  if (secretErrors.length) {
+    const error = new Error(`production session signing secrets are invalid: ${secretErrors.join("; ")}`);
+    error.code = "PRODUCTION_SESSION_SECRET_INVALID";
+    throw error;
+  }
+  const storeErrors = productionSessionStoreErrors(env);
+  if (storeErrors.length) {
+    const error = new Error(`production session store is invalid: ${storeErrors.join("; ")}`);
+    error.code = "PRODUCTION_SESSION_STORE_INVALID";
+    throw error;
+  }
+  return true;
+}
+
+function runtimeSessionStore() {
+  const mode = sessionStoreMode();
+  const key = `${mode}:${mode === "sqlite" ? SQLITE_FILE : "process"}`;
+  if (runtimeSessionStoreInstance && runtimeSessionStoreKey === key) return runtimeSessionStoreInstance;
+  runtimeSessionStoreInstance = mode === "sqlite"
+    ? new SqliteSessionStore({ openDatabase: openSqliteDatabase })
+    : new MemorySessionStore();
+  runtimeSessionStoreKey = key;
+  return runtimeSessionStoreInstance;
+}
+
+function sessionStoreStatus() {
+  return runtimeSessionStore().status();
 }
 
 function authSecrets() {
@@ -9789,7 +9831,7 @@ function createSession(user) {
     issuedAt,
     expiresAt
   };
-  sessions.set(sessionId, session);
+  runtimeSessionStore().create(session);
   return session;
 }
 
@@ -9800,13 +9842,14 @@ function currentSession(req) {
   if (!token) return null;
   const verified = verifySignedSessionToken(token);
   if (!verified) return null;
-  const session = sessions.get(verified.sessionId);
+  const session = runtimeSessionStore().get(verified.sessionId);
   if (!session) return null;
-  if (new Date(session.expiresAt).getTime() < Date.now()) {
-    sessions.delete(verified.sessionId);
-    return null;
-  }
   return session;
+}
+
+function revokeSession(session, options = {}) {
+  if (!session?.sessionId) return 0;
+  return runtimeSessionStore().revoke(session.sessionId, options);
 }
 
 function requireApiRole(req, res, roles, target) {
@@ -17965,7 +18008,8 @@ async function handleApi(req, res) {
         login: "oidc-userinfo-controlled-binding",
         refresh: "upstream-refresh-to-local-session",
         logout: "upstream-revocation-and-local-session-delete",
-        directory: "controlled-binding-preview-and-deactivation"
+        directory: "controlled-binding-preview-and-deactivation",
+        sessionStore: sessionStoreStatus()
       },
       blockers: center.blockers.filter((item) => /OIDC|identity|provider|site/i.test(item)),
       productionReady: false,
@@ -18050,12 +18094,12 @@ async function handleApi(req, res) {
     const payload = await collectJson(req);
     try {
       const receipt = await revokeOidcToken(payload.upstreamToken, { tokenTypeHint: payload.tokenTypeHint });
-      sessions.delete(session.sessionId);
-      appendSecurityEvent({ actor: session.user.name, role: session.user.role, action: "OIDC revoke logout", target: "unified-auth", result: "allowed", detail: "upstream token revoked and local session deleted" });
+      revokeSession(session, { reason: "oidc-revoke", actor: session.user.username || session.user.id });
+      appendSecurityEvent({ actor: session.user.name, role: session.user.role, action: "OIDC revoke logout", target: "unified-auth", result: "allowed", detail: "upstream token revoked and local session retained as revoked audit evidence" });
       sendJson(res, 200, { ok: true, receipt, localSessionRevoked: true, productionReady: false });
     } catch (error) {
-      sessions.delete(session.sessionId);
-      appendSecurityEvent({ actor: session.user.name, role: session.user.role, action: "OIDC revoke logout", target: "unified-auth", result: "partial", detail: "local session deleted; upstream revocation requires reconciliation" });
+      revokeSession(session, { reason: "oidc-revoke-upstream-failed", actor: session.user.username || session.user.id });
+      appendSecurityEvent({ actor: session.user.name, role: session.user.role, action: "OIDC revoke logout", target: "unified-auth", result: "partial", detail: "local session revoked; upstream revocation requires reconciliation" });
       sendJson(res, 502, { ok: false, message: "upstream token revocation failed", localSessionRevoked: true, upstreamRevoked: false });
     }
     return;
@@ -18196,7 +18240,7 @@ async function handleApi(req, res) {
   if (req.method === "POST" && url.pathname === "/api/auth/logout") {
     const session = currentSession(req);
     if (session) {
-      sessions.delete(session.sessionId);
+      revokeSession(session, { reason: "logout", actor: session.user.username || session.user.id });
       appendSecurityEvent({ actor: session.user.name, role: session.user.role, action: "退出登录", target: "统一认证", result: "允许", detail: "后端会话已注销" });
     }
     sendJson(res, 200, { ok: true });
@@ -23737,8 +23781,9 @@ const server = http.createServer(async (req, res) => {
 
 function startServer(port = PORT) {
   assertProductionRuntimeSecurity();
+  ensureDatabase();
+  sessionStoreStatus();
   return server.listen(port, () => {
-    ensureDatabase();
     const address = server.address();
     const actualPort = typeof address === "object" && address ? address.port : port;
     console.log(`慢病医防融合管理平台已启动：http://localhost:${actualPort}`);
@@ -23763,4 +23808,18 @@ if (require.main === module) {
   process.once("SIGTERM", shutdown);
 }
 
-module.exports = { assertProductionRuntimeSecurity, ensureDatabase, openSqliteDatabase, productionSessionSecretErrors, readDatabase, server, startServer, stopServer, storageMeta, writeDatabase };
+module.exports = {
+  assertProductionRuntimeSecurity,
+  ensureDatabase,
+  openSqliteDatabase,
+  productionSessionSecretErrors,
+  productionSessionStoreErrors,
+  readDatabase,
+  server,
+  sessionStoreMode,
+  sessionStoreStatus,
+  startServer,
+  stopServer,
+  storageMeta,
+  writeDatabase
+};

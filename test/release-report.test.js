@@ -26,12 +26,14 @@ test("release report validates demo and production environment profiles", () => 
       NODE_ENV: "production",
       STORAGE_ENGINE: "json",
       SESSION_SECRETS: "replace-with-long-random-secret",
+      SESSION_STORE: "memory",
       INTEGRATION_GATEWAY_SECRET: "demo-secret"
     }
   });
   assert.equal(failedProduction.passed, false);
   assert.equal(failedProduction.checks.some((item) => item.name === "env:STORAGE_ENGINE.production" && !item.passed), true);
   assert.equal(failedProduction.checks.some((item) => item.name === "env:SESSION_SECRETS.productionQuality" && !item.passed), true);
+  assert.equal(failedProduction.checks.some((item) => item.name === "env:SESSION_STORE.productionDurable" && !item.passed), true);
   assert.equal(failedProduction.checks.some((item) => item.name === "env:SMS.gateway" && !item.passed), true);
   assert.equal(failedProduction.checks.some((item) => item.name === "env:AUDIT.retentionTarget" && !item.passed), true);
   assert.equal(failedProduction.checks.some((item) => item.name === "env:ALERTING.routes" && !item.passed), true);
@@ -102,6 +104,7 @@ test("release report validates demo and production environment profiles", () => 
       SQLITE_SYNCHRONOUS: "FULL",
       SQLITE_BUSY_TIMEOUT_MS: "5000",
       SESSION_SECRETS: "0123456789abcdef0123456789abcdef,abcdef0123456789abcdef0123456789",
+      SESSION_STORE: "sqlite",
       INTEGRATION_GATEWAY_SECRET: "fedcba9876543210fedcba9876543210",
       OIDC_ISSUER_URL: "https://identity.example.internal",
       OIDC_CLIENT_ID: "health-platform",
@@ -138,6 +141,7 @@ test("release report validates demo and production environment profiles", () => 
   assert.equal(production.checks.some((item) => item.name === "env:SQLITE.journalMode" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:SQLITE.synchronous" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:SQLITE.busyTimeout" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:SESSION_STORE.productionDurable" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:OIDC.lifecycle" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:HOSPITAL.connectors" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:HOSPITAL.secretQuality" && item.passed), true);

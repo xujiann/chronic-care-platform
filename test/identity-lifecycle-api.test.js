@@ -74,7 +74,7 @@ test("identity lifecycle API binds, refreshes, revokes and safely applies direct
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "identity-lifecycle-api-"));
   fs.copyFileSync(path.join(ROOT, "data", "db.json"), path.join(dataDir, "db.json"));
   const previousEnv = Object.fromEntries([
-    "NODE_ENV", "DATA_DIR", "STORAGE_ENGINE", "SESSION_SECRETS", "OIDC_ISSUER_URL", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET",
+    "NODE_ENV", "DATA_DIR", "STORAGE_ENGINE", "SESSION_SECRETS", "SESSION_STORE", "OIDC_ISSUER_URL", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET",
     "IDENTITY_DIRECTORY_URL", "IDENTITY_DIRECTORY_TOKEN"
   ].map((key) => [key, process.env[key]]));
   const providerBase = `http://127.0.0.1:${identityProvider.address().port}`;
@@ -83,6 +83,7 @@ test("identity lifecycle API binds, refreshes, revokes and safely applies direct
     DATA_DIR: dataDir,
     STORAGE_ENGINE: "json",
     SESSION_SECRETS: "identity-lifecycle-api-test-session-secret-2026",
+    SESSION_STORE: "memory",
     OIDC_ISSUER_URL: `${providerBase}/issuer`,
     OIDC_CLIENT_ID: "health-platform",
     OIDC_CLIENT_SECRET: "provider-client-secret",
@@ -111,6 +112,10 @@ test("identity lifecycle API binds, refreshes, revokes and safely applies direct
   assert.equal(lifecycle.body.identity.refreshConfigured, true);
   assert.equal(lifecycle.body.identity.revocationConfigured, true);
   assert.equal(lifecycle.body.identity.directoryConfigured, true);
+  assert.equal(lifecycle.body.capabilities.sessionStore.mode, "memory");
+  assert.equal(lifecycle.body.capabilities.sessionStore.durable, false);
+  assert.equal(lifecycle.body.capabilities.sessionStore.crossProcess, false);
+  assert.equal(lifecycle.body.capabilities.sessionStore.active, 1);
   assert.equal(lifecycle.body.productionReady, false);
   assert.doesNotMatch(JSON.stringify(lifecycle.body), /provider-client-secret|provider-directory-secret|127\.0\.0\.1/);
 

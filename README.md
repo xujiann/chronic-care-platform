@@ -9,8 +9,8 @@
 | 范围 | 已完成能力 |
 |---|---|
 | P0 测试与 CI | Node API、隔离测试数据、角色权限、居民数据裁剪、静态页面守卫、敏感信息扫描、API 契约、覆盖率门禁、Chromium 端到端角色旅程 |
-| P0 数据与恢复 | SQLite/JSON 双路径、schema v1-v9 幂等迁移、集合版本、乐观锁、409 冲突契约、PostgreSQL 事务 outbox、基线入队与只读影子核对、备份、恢复演练、脱敏快照、恢复指标验收 |
-| P0 认证与隐私 | PBKDF2 密码哈希兼容、签名会话、密钥轮换、token 篡改拒绝、字段脱敏、授权撤销、访问历史复核、审计哈希链 |
+| P0 数据与恢复 | SQLite/JSON 双路径、schema v1-v11 幂等迁移、集合版本、乐观锁、409 冲突契约、PostgreSQL 事务 outbox、基线入队与只读影子核对、备份、恢复演练、脱敏快照、恢复指标验收 |
+| P0 认证与隐私 | PBKDF2 密码哈希兼容、签名会话、SQLite 持久化会话与跨进程撤销、密钥轮换、token 篡改拒绝、字段脱敏、授权撤销、访问历史复核、审计哈希链 |
 | P0 接口网关 | HIS/EMR/LIS/PACS/医保/电子证照/卫生统计接口契约、HMAC 签名、幂等键、事件落库、失败重试、死信补偿、对账监控、模拟接入 |
 | P1 区域闭环 | 检查检验互认、诊断报告回传、危急值预警、统一任务中心、站内消息、送达回执、超时升级、数据质量问题与评分卡、安全合规证据 |
 | P1 慢病医防融合 | 对照 2025 年基层慢性病健康管理服务要求，已补齐基层慢病健康管理中心、村站、牵头医院、公卫机构职责，能力建设条件、防筛诊治管康路径、多病共管、中医药服务、居民自我管理、用药保障和质控指标 |
@@ -150,6 +150,7 @@ NODE_ENV=production
 STORAGE_ENGINE=auto
 DATA_DIR=/var/lib/chronic-care-platform
 SESSION_SECRETS=replace-with-long-random-secret
+SESSION_STORE=sqlite
 INTEGRATION_GATEWAY_SECRET=replace-with-integration-secret
 DATABASE_URL=postgres://health:replace-with-password@postgres.internal:5432/chronic_care
 OIDC_ISSUER_URL=https://identity.example.gov.cn/real-issuer
@@ -165,6 +166,7 @@ RETENTION_POLICY=10y-worm
 
 - `STORAGE_ENGINE=auto` 会在 Node 支持 `node:sqlite` 时使用 SQLite，并继续维护 `data/db.json` 静态快照。
 - `SESSION_SECRETS` 支持逗号分隔多密钥，便于会话密钥轮换。
+- `SESSION_STORE=sqlite` 在生产环境为必选项；会话可跨进程读取和撤销并保留撤销审计。开发、测试可显式使用 `memory`。
 - `INTEGRATION_GATEWAY_SECRET` 用于接口网关 HMAC 签名模拟。
 - `DATABASE_URL`、`OIDC_*`、`SMS_GATEWAY_URL`、`AUDIT_EXPORT_PATH`/`SIEM_ENDPOINT` 和 `RETENTION_POLICY` 是生产部署路径的正式数据库、政务身份、居民验证码短信网关和审计保全配置项。
 
@@ -177,7 +179,7 @@ npm.cmd run check
 npm.cmd test
 npm.cmd run test:coverage
 npm.cmd run test:e2e
-npm.cmd audit --omit=dev
+npm.cmd audit --omit=dev --registry=https://registry.npmjs.org
 ```
 
 补充部署前检查：
@@ -279,7 +281,7 @@ GitHub Pages 只适合发布静态页面和脱敏 `data/db.json` 快照。以下
 
 1. 生产部署基线：已完成环境模板、demo/staging/production 环境矩阵、健康检查、后端部署说明、发布/部署门禁、CI artifact 取证和静态快照回滚；后续按真实部署平台补密钥注入、现场签字和环境差异参数。
 2. 可观测性：已完成 `/api/metrics`、请求状态、慢请求、任务堆积、死信、数据质量和 `/api/system/readiness`；后续接入 Prometheus/OpenTelemetry 或平台日志服务。
-3. 数据模型深化：已完成 SQLite schema v10、集合版本、乐观锁、恢复演练、P2 结构化镜像表、PostgreSQL 迁移包、事务 outbox、基线入队、只读影子核对及差异处置闭环；后续继续补生产主存储读路径、领域表转换、容量切换和原生备份证据。
+3. 数据模型深化：已完成 SQLite schema v11、集合版本、乐观锁、持久化认证会话、恢复演练、P2 结构化镜像表、PostgreSQL 迁移包、事务 outbox、基线入队、只读影子核对及差异处置闭环；后续继续补生产主存储读路径、领域表转换、容量切换和原生备份证据。
 4. 发布取证：已完成 release report、deploy check、外部依赖风险台账、安全验收台账、慢病/医共体验收台账、全流程审计报告、数据质量/主索引证据、运维就绪证据和 CI 报告归档；后续在真实环境挂接测评报告、联调记录和上线签字。
 5. 测试深化：已覆盖 API 回归、覆盖率、E2E、并发冲突、静态快照、备份恢复、接口网关和发布门禁；后续围绕真实接口字段差异、移动弱网和现场权限边界继续扩展。
 

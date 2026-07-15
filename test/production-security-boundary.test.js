@@ -10,10 +10,12 @@ process.env.DATA_DIR = dataDir;
 process.env.STORAGE_ENGINE = "sqlite";
 process.env.NODE_ENV = "production";
 process.env.SESSION_SECRETS = "prod-session-signing-key-2026-07-15-rotation-a";
+process.env.SESSION_STORE = "sqlite";
 
 const {
   assertProductionRuntimeSecurity,
   server,
+  sessionStoreStatus,
   startServer,
   stopServer
 } = require("../server");
@@ -34,6 +36,14 @@ test("production startup rejects missing, weak and placeholder session secrets",
       (error) => error.code === "PRODUCTION_SESSION_SECRET_INVALID"
     );
   }
+  assert.throws(
+    () => assertProductionRuntimeSecurity({
+      NODE_ENV: "production",
+      SESSION_SECRET: "production-session-signing-key-with-adequate-entropy",
+      SESSION_STORE: "memory"
+    }),
+    (error) => error.code === "PRODUCTION_SESSION_STORE_INVALID"
+  );
 });
 
 test("production runtime disables local passwords and emits browser security headers", async () => {
@@ -41,6 +51,14 @@ test("production runtime disables local passwords and emits browser security hea
   if (!server.listening) await once(server, "listening");
   const { port } = server.address();
   const baseUrl = `http://127.0.0.1:${port}`;
+  assert.deepEqual(sessionStoreStatus(), {
+    mode: "sqlite",
+    durable: true,
+    crossProcess: true,
+    active: 0,
+    revoked: 0,
+    expired: 0
+  });
 
   const page = await fetch(`${baseUrl}/login.html`);
   assert.equal(page.status, 200);

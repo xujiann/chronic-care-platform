@@ -23,6 +23,7 @@ test("production deployment package hashes runtime files without persisting secr
     assert.equal(manifest.productionReady, false);
     assert.match(manifest.artifact.digest, /^sha256:[a-f0-9]{64}$/);
     assert.equal(manifest.artifact.files.some((item) => item.path === "server.js"), true);
+    assert.equal(manifest.artifact.files.some((item) => item.path === "session-store.js"), true);
     assert.equal(manifest.artifact.files.some((item) => item.path === "scripts/postgres-sync-worker.js"), true);
     assert.equal(manifest.artifact.files.some((item) => item.path === "scripts/postgres-shadow-reconcile.js"), true);
     assert.equal(manifest.artifact.files.some((item) => item.path === ".env"), false);

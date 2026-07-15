@@ -45,6 +45,9 @@ test("commission user reaches the governance dashboard and opens maintenance", a
   await expect(page.locator("#mobile-accessibility-governance > div")).toHaveCount(10);
   await expect(page.locator("#security-acceptance-ledger > div")).toHaveCount(4);
   await expect(page.locator("#production-deployment-plan .priority-row")).toHaveCount(4);
+  await expect(page.locator("#identity-lifecycle-metrics")).toContainText("会话存储");
+  await expect(page.locator("#identity-lifecycle-metrics")).toContainText("进程内存");
+  await expect(page.locator("#identity-lifecycle-metrics")).toContainText("仅限本地开发和测试");
 
   await page.goto("/workbench.html");
   await expect(page.locator("#system-readiness")).toBeVisible();
