@@ -59,6 +59,31 @@ test("session stores minimize user snapshots independently of callers", () => {
   assert.equal(session.user.passwordHash, undefined);
 });
 
+test("memory session cleanup removes retained expiry rows and validates cutoffs", () => {
+  const store = new MemorySessionStore({ now: () => new Date("2026-07-15T01:00:00.000Z") });
+  store.create(activeSession);
+  store.create({
+    ...activeSession,
+    sessionId: "session-expired-memory",
+    expiresAt: "2026-07-15T00:30:00.000Z"
+  });
+
+  assert.deepEqual(store.cleanup({
+    expiredBefore: "2026-07-15T00:45:00.000Z",
+    revokedBefore: "2026-06-15T01:00:00.000Z"
+  }), {
+    completedAt: "2026-07-15T01:00:00.000Z",
+    expiredBefore: "2026-07-15T00:45:00.000Z",
+    revokedBefore: "2026-06-15T01:00:00.000Z",
+    deletedExpired: 1,
+    deletedRevoked: 0,
+    deletedTotal: 1
+  });
+  assert.equal(store.get(activeSession.sessionId)?.sessionId, activeSession.sessionId);
+  assert.equal(store.status().expired, 0);
+  assert.throws(() => store.cleanup({ expiredBefore: "invalid", revokedBefore: new Date() }), /expiredBefore/);
+});
+
 test("SQLite session stores share sessions and retain revocation audit evidence", { skip: !DatabaseSync }, () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "health-session-store-"));
   const databaseFile = path.join(dataDir, "sessions.sqlite");
@@ -131,6 +156,25 @@ test("SQLite session stores share sessions and retain revocation audit evidence"
       active: 0,
       revoked: 1,
       expired: 1
+    });
+    assert.deepEqual(reader.cleanup({
+      expiredBefore: "2026-07-15T00:45:00.000Z",
+      revokedBefore: "2026-07-15T01:00:00.000Z"
+    }), {
+      completedAt: "2026-07-15T01:00:00.000Z",
+      expiredBefore: "2026-07-15T00:45:00.000Z",
+      revokedBefore: "2026-07-15T01:00:00.000Z",
+      deletedExpired: 1,
+      deletedRevoked: 1,
+      deletedTotal: 2
+    });
+    assert.deepEqual(reader.status(), {
+      mode: "sqlite",
+      durable: true,
+      crossProcess: true,
+      active: 0,
+      revoked: 0,
+      expired: 0
     });
   } finally {
     fs.rmSync(dataDir, { recursive: true, force: true });

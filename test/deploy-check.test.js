@@ -220,6 +220,7 @@ test("deploy check report covers release-critical snapshot gates", () => {
   assert.match(report.checks.find((item) => item.name === "ui:immunizationLaunchBoard").detail, /evidence ledger/);
   assert.match(report.checks.find((item) => item.name === "docs:immunizationProductionGate").detail, /production launch gate/);
   assert.match(report.checks.find((item) => item.name === "api:productionIdentityMessageAdapters").detail, /OIDC subject binding, refresh, revocation/);
+  assert.match(report.checks.find((item) => item.name === "security:productionRuntimeBoundary").detail, /retention cleanup/);
   assert.match(report.checks.find((item) => item.name === "api:productionHospitalConnectors").detail, /outbound connectors/);
   assert.match(report.checks.find((item) => item.name === "manifest:citizenLaunchFoundation").detail, /resident pipeline acceptance panel/);
   assert.match(report.checks.find((item) => item.name === "api:secureObjectStorage").detail, /malware scan/);

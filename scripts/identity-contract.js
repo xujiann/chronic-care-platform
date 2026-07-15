@@ -129,6 +129,7 @@ function buildIdentityContract(options = {}) {
       localPasswordDisabled: ["LOCAL_PASSWORD_LOGIN_DISABLED", "local password login is disabled in production"].every((marker) => serverSource.includes(marker)),
       weakSecretStartupBlocked: ["assertProductionRuntimeSecurity", "PRODUCTION_SESSION_SECRET_INVALID"].every((marker) => serverSource.includes(marker)),
       persistentSessionStore: ["SqliteSessionStore", "PRODUCTION_SESSION_STORE_INVALID", "sessionStoreStatus"].every((marker) => serverSource.includes(marker)) && ["auth_sessions", "revokeByUserIds", "crossProcess: true"].every((marker) => sessionStoreSource.includes(marker)) && platformSource.includes("同一主机共享数据目录可跨进程撤销") && envTemplate.includes("SESSION_STORE=sqlite"),
+      sessionRetention: ["cleanupRuntimeSessions", "scheduleSessionCleanup", "/api/auth/sessions/cleanup", "SESSION_CLEANUP_CONFIRMATION_REQUIRED", "PRODUCTION_SESSION_RETENTION_INVALID"].every((marker) => serverSource.includes(marker)) && ["cleanup(options", "deletedExpired", "deletedRevoked"].every((marker) => sessionStoreSource.includes(marker)) && ["SESSION_EXPIRED_RETENTION_DAYS", "SESSION_REVOKED_RETENTION_DAYS", "SESSION_CLEANUP_INTERVAL_MS"].every((marker) => envTemplate.includes(marker)) && platformSource.includes("会话保留"),
       browserFailClosed: authSource.includes("认证服务暂不可用，请稍后重试"),
       residentScope: ["applyResidentScope", "canManageResidentProfile", "INSURANCE_RESIDENT_COLLECTIONS", "COUNTY_RESIDENT_COLLECTIONS"].every((marker) => serverSource.includes(marker)),
       contentSecurity: serverSource.includes("script-src-attr 'none'") && [bloodBusinessSource, bloodRecallSource].every((source) => source.includes("escapeHtml")),
@@ -146,7 +147,7 @@ function buildIdentityContract(options = {}) {
     { id: "identity:oidcRuntimeAdapter", passed: Object.values(adapterContracts.oidc).every(Boolean), detail: "OIDC UserInfo runtime, configuration and controlled-binding boundary documented" },
     { id: "identity:oidcLifecycle", passed: Object.values(adapterContracts.oidcLifecycle).every(Boolean), detail: "OIDC subject binding, refresh, revocation, safe directory deactivation, operations UI and production boundary documented" },
     { id: "identity:smsRuntimeAdapter", passed: Object.values(adapterContracts.sms).every(Boolean), detail: "SMS runtime, keyed code digest, provider configuration and delivery boundary documented" },
-    { id: "identity:productionSecurityBoundary", passed: Object.values(adapterContracts.productionSecurity).every(Boolean), detail: "production local-password, signing-secret, durable session, browser fail-closed, resident scope and content-security controls are wired" }
+    { id: "identity:productionSecurityBoundary", passed: Object.values(adapterContracts.productionSecurity).every(Boolean), detail: "production local-password, signing-secret, durable session retention, browser fail-closed, resident scope and content-security controls are wired" }
   ];
 
   return {

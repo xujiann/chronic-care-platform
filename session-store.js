@@ -40,7 +40,15 @@ function normalizeSession(session) {
   if (!Number.isFinite(Date.parse(normalized.issuedAt)) || !Number.isFinite(Date.parse(normalized.expiresAt))) {
     throw new Error("issuedAt and expiresAt must be valid dates");
   }
+  normalized.issuedAt = new Date(normalized.issuedAt).toISOString();
+  normalized.expiresAt = new Date(normalized.expiresAt).toISOString();
   return normalized;
+}
+
+function normalizedDate(value, name) {
+  const timestamp = value instanceof Date ? value.getTime() : Date.parse(String(value || ""));
+  if (!Number.isFinite(timestamp)) throw new Error(`${name} must be a valid date`);
+  return new Date(timestamp).toISOString();
 }
 
 function createSqliteSessionSchema(db) {
@@ -97,6 +105,26 @@ class MemorySessionStore {
       }
     });
     return revoked;
+  }
+
+  cleanup(options = {}) {
+    const expiredBefore = normalizedDate(options.expiredBefore, "expiredBefore");
+    const revokedBefore = normalizedDate(options.revokedBefore, "revokedBefore");
+    let deletedExpired = 0;
+    this.sessions.forEach((session, sessionId) => {
+      if (session.expiresAt <= expiredBefore) {
+        this.sessions.delete(sessionId);
+        deletedExpired += 1;
+      }
+    });
+    return {
+      completedAt: this.now().toISOString(),
+      expiredBefore,
+      revokedBefore,
+      deletedExpired,
+      deletedRevoked: 0,
+      deletedTotal: deletedExpired
+    };
   }
 
   status() {
@@ -207,6 +235,36 @@ class SqliteSessionStore {
       ...ids,
       revokedAt
     ).changes || 0));
+  }
+
+  cleanup(options = {}) {
+    const expiredBefore = normalizedDate(options.expiredBefore, "expiredBefore");
+    const revokedBefore = normalizedDate(options.revokedBefore, "revokedBefore");
+    return this.withDatabase((db) => {
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const deletedRevoked = Number(db.prepare(`
+          DELETE FROM auth_sessions
+          WHERE revoked_at != '' AND revoked_at <= ?
+        `).run(revokedBefore).changes || 0);
+        const deletedExpired = Number(db.prepare(`
+          DELETE FROM auth_sessions
+          WHERE revoked_at = '' AND expires_at <= ?
+        `).run(expiredBefore).changes || 0);
+        db.exec("COMMIT");
+        return {
+          completedAt: this.now().toISOString(),
+          expiredBefore,
+          revokedBefore,
+          deletedExpired,
+          deletedRevoked,
+          deletedTotal: deletedExpired + deletedRevoked
+        };
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+    });
   }
 
   status() {

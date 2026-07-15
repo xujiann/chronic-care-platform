@@ -74,7 +74,7 @@ test("identity lifecycle API binds, refreshes, revokes and safely applies direct
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "identity-lifecycle-api-"));
   fs.copyFileSync(path.join(ROOT, "data", "db.json"), path.join(dataDir, "db.json"));
   const previousEnv = Object.fromEntries([
-    "NODE_ENV", "DATA_DIR", "STORAGE_ENGINE", "SESSION_SECRETS", "SESSION_STORE", "OIDC_ISSUER_URL", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET",
+    "NODE_ENV", "DATA_DIR", "STORAGE_ENGINE", "SESSION_SECRETS", "SESSION_STORE", "SESSION_EXPIRED_RETENTION_DAYS", "SESSION_REVOKED_RETENTION_DAYS", "SESSION_CLEANUP_INTERVAL_MS", "OIDC_ISSUER_URL", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET",
     "IDENTITY_DIRECTORY_URL", "IDENTITY_DIRECTORY_TOKEN"
   ].map((key) => [key, process.env[key]]));
   const providerBase = `http://127.0.0.1:${identityProvider.address().port}`;
@@ -84,6 +84,9 @@ test("identity lifecycle API binds, refreshes, revokes and safely applies direct
     STORAGE_ENGINE: "json",
     SESSION_SECRETS: "identity-lifecycle-api-test-session-secret-2026",
     SESSION_STORE: "memory",
+    SESSION_EXPIRED_RETENTION_DAYS: "2",
+    SESSION_REVOKED_RETENTION_DAYS: "45",
+    SESSION_CLEANUP_INTERVAL_MS: "60000",
     OIDC_ISSUER_URL: `${providerBase}/issuer`,
     OIDC_CLIENT_ID: "health-platform",
     OIDC_CLIENT_SECRET: "provider-client-secret",
@@ -116,8 +119,31 @@ test("identity lifecycle API binds, refreshes, revokes and safely applies direct
   assert.equal(lifecycle.body.capabilities.sessionStore.durable, false);
   assert.equal(lifecycle.body.capabilities.sessionStore.crossProcess, false);
   assert.equal(lifecycle.body.capabilities.sessionStore.active, 1);
+  assert.deepEqual(lifecycle.body.capabilities.sessionStore.retention, {
+    expiredDays: 2,
+    revokedDays: 45,
+    cleanupIntervalMs: 60000
+  });
+  assert.equal(lifecycle.body.capabilities.sessionStore.cleanup.status, "ok");
+  assert.equal(lifecycle.body.capabilities.sessionStore.cleanup.trigger, "startup");
   assert.equal(lifecycle.body.productionReady, false);
   assert.doesNotMatch(JSON.stringify(lifecycle.body), /provider-client-secret|provider-directory-secret|127\.0\.0\.1/);
+
+  const rejectedCleanup = await request(baseUrl, "/api/auth/sessions/cleanup", cityToken, {
+    method: "POST",
+    body: JSON.stringify({ confirmation: "cleanup" })
+  });
+  assert.equal(rejectedCleanup.response.status, 400);
+  assert.equal(rejectedCleanup.body.code, "SESSION_CLEANUP_CONFIRMATION_REQUIRED");
+
+  const cleanedSessions = await request(baseUrl, "/api/auth/sessions/cleanup", cityToken, {
+    method: "POST",
+    body: JSON.stringify({ confirmation: "PURGE RETAINED SESSIONS" })
+  });
+  assert.equal(cleanedSessions.response.status, 200);
+  assert.equal(cleanedSessions.body.result.trigger, "manual");
+  assert.equal(cleanedSessions.body.result.deletedTotal, 0);
+  assert.equal(cleanedSessions.body.sessionStore.cleanup.trigger, "manual");
 
   const unboundRefresh = await request(baseUrl, "/api/auth/oidc/refresh", "", { method: "POST", body: JSON.stringify({ refreshToken: "provider-refresh-unbound" }) });
   assert.equal(unboundRefresh.response.status, 403);

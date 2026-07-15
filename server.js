@@ -174,6 +174,10 @@ const SQLITE_BUSY_TIMEOUT_MS = Math.min(60000, Math.max(1000, Number(process.env
 const SQLITE_WAL_AUTOCHECKPOINT_PAGES = Math.min(10000, Math.max(100, Number(process.env.SQLITE_WAL_AUTOCHECKPOINT_PAGES || 1000) || 1000));
 const SQLITE_HEALTH_CHECK_TTL_MS = Math.min(300000, Math.max(5000, Number(process.env.SQLITE_HEALTH_CHECK_TTL_MS || 30000) || 30000));
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000;
+const SESSION_RETENTION_DAY_MS = 24 * 60 * 60 * 1000;
+const SESSION_EXPIRED_RETENTION_DAYS = boundedEnvironmentNumber("SESSION_EXPIRED_RETENTION_DAYS", 7, 1, 3650);
+const SESSION_REVOKED_RETENTION_DAYS = boundedEnvironmentNumber("SESSION_REVOKED_RETENTION_DAYS", 30, 1, 3650);
+const SESSION_CLEANUP_INTERVAL_MS = boundedEnvironmentNumber("SESSION_CLEANUP_INTERVAL_MS", 15 * 60 * 1000, 60 * 1000, 24 * 60 * 60 * 1000);
 const RUNTIME_SESSION_STORES = new Set(["memory", "sqlite"]);
 const DEMO_PASSWORD = "123456";
 const PASSWORD_HASH_ITERATIONS = 120_000;
@@ -196,6 +200,18 @@ const runtimeMetrics = {
 };
 let runtimeSessionStoreInstance = null;
 let runtimeSessionStoreKey = "";
+let sessionCleanupTimer = null;
+let sessionCleanupState = {
+  status: "not-run",
+  trigger: "",
+  actor: "",
+  completedAt: "",
+  deletedExpired: 0,
+  deletedRevoked: 0,
+  deletedTotal: 0,
+  errorCode: "",
+  error: ""
+};
 const DEMO_SMS_CODE = process.env.DEMO_SMS_CODE || "888888";
 const PHONE_CODE_TTL_MS = 5 * 60 * 1000;
 const PHONE_CODE_COOLDOWN_MS = 60 * 1000;
@@ -9595,6 +9611,30 @@ function productionSessionStoreErrors(env = process.env) {
   return sessionStoreMode(env) === "sqlite" ? [] : ["SESSION_STORE=sqlite is required in production"];
 }
 
+function productionSessionRetentionErrors(env = process.env) {
+  if (!isProductionRuntime(env)) return [];
+  const required = ["SESSION_EXPIRED_RETENTION_DAYS", "SESSION_REVOKED_RETENTION_DAYS", "SESSION_CLEANUP_INTERVAL_MS"];
+  const errors = required
+    .filter((name) => !String(env[name] || "").trim())
+    .map((name) => `${name} is required in production`);
+  const expiredDays = Number(env.SESSION_EXPIRED_RETENTION_DAYS);
+  const revokedDays = Number(env.SESSION_REVOKED_RETENTION_DAYS);
+  const intervalMs = Number(env.SESSION_CLEANUP_INTERVAL_MS);
+  if (String(env.SESSION_EXPIRED_RETENTION_DAYS || "").trim() && (!Number.isInteger(expiredDays) || expiredDays < 1 || expiredDays > 3650)) {
+    errors.push("SESSION_EXPIRED_RETENTION_DAYS must be an integer from 1 to 3650");
+  }
+  if (String(env.SESSION_REVOKED_RETENTION_DAYS || "").trim() && (!Number.isInteger(revokedDays) || revokedDays < 1 || revokedDays > 3650)) {
+    errors.push("SESSION_REVOKED_RETENTION_DAYS must be an integer from 1 to 3650");
+  }
+  if (Number.isInteger(expiredDays) && Number.isInteger(revokedDays) && revokedDays < expiredDays) {
+    errors.push("SESSION_REVOKED_RETENTION_DAYS must be greater than or equal to SESSION_EXPIRED_RETENTION_DAYS");
+  }
+  if (String(env.SESSION_CLEANUP_INTERVAL_MS || "").trim() && (!Number.isInteger(intervalMs) || intervalMs < 60000 || intervalMs > 86400000)) {
+    errors.push("SESSION_CLEANUP_INTERVAL_MS must be an integer from 60000 to 86400000");
+  }
+  return errors;
+}
+
 function assertProductionRuntimeSecurity(env = process.env) {
   const secretErrors = productionSessionSecretErrors(env);
   if (secretErrors.length) {
@@ -9606,6 +9646,12 @@ function assertProductionRuntimeSecurity(env = process.env) {
   if (storeErrors.length) {
     const error = new Error(`production session store is invalid: ${storeErrors.join("; ")}`);
     error.code = "PRODUCTION_SESSION_STORE_INVALID";
+    throw error;
+  }
+  const retentionErrors = productionSessionRetentionErrors(env);
+  if (retentionErrors.length) {
+    const error = new Error(`production session retention is invalid: ${retentionErrors.join("; ")}`);
+    error.code = "PRODUCTION_SESSION_RETENTION_INVALID";
     throw error;
   }
   return true;
@@ -9622,8 +9668,80 @@ function runtimeSessionStore() {
   return runtimeSessionStoreInstance;
 }
 
+function sessionRetentionPolicy(now = new Date()) {
+  const timestamp = now instanceof Date ? now.getTime() : Date.parse(String(now || ""));
+  if (!Number.isFinite(timestamp)) throw new Error("session cleanup time must be a valid date");
+  return {
+    expiredDays: SESSION_EXPIRED_RETENTION_DAYS,
+    revokedDays: SESSION_REVOKED_RETENTION_DAYS,
+    cleanupIntervalMs: SESSION_CLEANUP_INTERVAL_MS,
+    expiredBefore: new Date(timestamp - SESSION_EXPIRED_RETENTION_DAYS * SESSION_RETENTION_DAY_MS).toISOString(),
+    revokedBefore: new Date(timestamp - SESSION_REVOKED_RETENTION_DAYS * SESSION_RETENTION_DAY_MS).toISOString()
+  };
+}
+
+function cleanupRuntimeSessions(options = {}) {
+  const now = options.now ? new Date(options.now) : new Date();
+  const policy = sessionRetentionPolicy(now);
+  const trigger = String(options.trigger || "scheduled").trim().slice(0, 40);
+  const actor = String(options.actor || "system").trim().slice(0, 200);
+  try {
+    const result = runtimeSessionStore().cleanup({
+      expiredBefore: policy.expiredBefore,
+      revokedBefore: policy.revokedBefore
+    });
+    sessionCleanupState = {
+      status: "ok",
+      trigger,
+      actor,
+      ...result,
+      errorCode: "",
+      error: ""
+    };
+    return { ...sessionCleanupState };
+  } catch (error) {
+    sessionCleanupState = {
+      status: "failed",
+      trigger,
+      actor,
+      completedAt: now.toISOString(),
+      deletedExpired: 0,
+      deletedRevoked: 0,
+      deletedTotal: 0,
+      errorCode: String(error?.code || "SESSION_CLEANUP_FAILED").trim().slice(0, 100),
+      error: "session cleanup failed"
+    };
+    throw error;
+  }
+}
+
+function clearSessionCleanupSchedule() {
+  if (sessionCleanupTimer) clearInterval(sessionCleanupTimer);
+  sessionCleanupTimer = null;
+}
+
+function scheduleSessionCleanup() {
+  clearSessionCleanupSchedule();
+  sessionCleanupTimer = setInterval(() => {
+    try {
+      cleanupRuntimeSessions({ trigger: "scheduled", actor: "system" });
+    } catch (error) {
+      console.error(`session cleanup failed: ${error.message}`);
+    }
+  }, SESSION_CLEANUP_INTERVAL_MS);
+  sessionCleanupTimer.unref?.();
+}
+
 function sessionStoreStatus() {
-  return runtimeSessionStore().status();
+  return {
+    ...runtimeSessionStore().status(),
+    retention: {
+      expiredDays: SESSION_EXPIRED_RETENTION_DAYS,
+      revokedDays: SESSION_REVOKED_RETENTION_DAYS,
+      cleanupIntervalMs: SESSION_CLEANUP_INTERVAL_MS
+    },
+    cleanup: { ...sessionCleanupState }
+  };
 }
 
 function authSecrets() {
@@ -18018,6 +18136,45 @@ async function handleApi(req, res) {
     return;
   }
 
+  if (req.method === "POST" && url.pathname === "/api/auth/sessions/cleanup") {
+    const user = requireApiRole(req, res, ["commission"], "/api/auth/sessions/cleanup");
+    if (!user) return;
+    const payload = await collectJson(req);
+    if (String(payload.confirmation || "").trim() !== "PURGE RETAINED SESSIONS") {
+      sendJson(res, 400, {
+        ok: false,
+        code: "SESSION_CLEANUP_CONFIRMATION_REQUIRED",
+        message: "session cleanup confirmation is required"
+      });
+      return;
+    }
+    let result;
+    try {
+      result = cleanupRuntimeSessions({
+        trigger: "manual",
+        actor: user.username || user.id
+      });
+    } catch (error) {
+      console.error(`manual session cleanup failed: ${error.message}`);
+      sendJson(res, 503, {
+        ok: false,
+        code: "SESSION_CLEANUP_FAILED",
+        message: "session cleanup failed; inspect server operations logs"
+      });
+      return;
+    }
+    appendSecurityEvent({
+      actor: user.name,
+      role: user.role,
+      action: "session retention cleanup",
+      target: "unified-auth",
+      result: "allowed",
+      detail: `${result.deletedTotal} retained sessions removed (${result.deletedExpired} expired, ${result.deletedRevoked} revoked)`
+    });
+    sendJson(res, 200, { ok: true, result, sessionStore: sessionStoreStatus() });
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/auth/oidc/exchange") {
     const payload = await collectJson(req);
     try {
@@ -23782,7 +23939,8 @@ const server = http.createServer(async (req, res) => {
 function startServer(port = PORT) {
   assertProductionRuntimeSecurity();
   ensureDatabase();
-  sessionStoreStatus();
+  cleanupRuntimeSessions({ trigger: "startup", actor: "system" });
+  scheduleSessionCleanup();
   return server.listen(port, () => {
     const address = server.address();
     const actualPort = typeof address === "object" && address ? address.port : port;
@@ -23792,6 +23950,7 @@ function startServer(port = PORT) {
 
 function stopServer() {
   return new Promise((resolve) => {
+    clearSessionCleanupSchedule();
     if (!server.listening) return resolve();
     server.close(resolve);
   });
@@ -23810,13 +23969,16 @@ if (require.main === module) {
 
 module.exports = {
   assertProductionRuntimeSecurity,
+  cleanupRuntimeSessions,
   ensureDatabase,
   openSqliteDatabase,
   productionSessionSecretErrors,
+  productionSessionRetentionErrors,
   productionSessionStoreErrors,
   readDatabase,
   server,
   sessionStoreMode,
+  sessionRetentionPolicy,
   sessionStoreStatus,
   startServer,
   stopServer,

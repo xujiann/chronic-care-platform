@@ -151,6 +151,9 @@ STORAGE_ENGINE=auto
 DATA_DIR=/var/lib/chronic-care-platform
 SESSION_SECRETS=replace-with-long-random-secret
 SESSION_STORE=sqlite
+SESSION_EXPIRED_RETENTION_DAYS=7
+SESSION_REVOKED_RETENTION_DAYS=30
+SESSION_CLEANUP_INTERVAL_MS=900000
 INTEGRATION_GATEWAY_SECRET=replace-with-integration-secret
 DATABASE_URL=postgres://health:replace-with-password@postgres.internal:5432/chronic_care
 OIDC_ISSUER_URL=https://identity.example.gov.cn/real-issuer
@@ -167,6 +170,7 @@ RETENTION_POLICY=10y-worm
 - `STORAGE_ENGINE=auto` 会在 Node 支持 `node:sqlite` 时使用 SQLite，并继续维护 `data/db.json` 静态快照。
 - `SESSION_SECRETS` 支持逗号分隔多密钥，便于会话密钥轮换。
 - `SESSION_STORE=sqlite` 在生产环境为必选项；会话可跨进程读取和撤销并保留撤销审计。开发、测试可显式使用 `memory`。
+- `SESSION_EXPIRED_RETENTION_DAYS`、`SESSION_REVOKED_RETENTION_DAYS` 和 `SESSION_CLEANUP_INTERVAL_MS` 控制过期/撤销会话保留期及自动清理周期；启动清理、周期清理和管理员手动清理均通过身份生命周期中心暴露结果。
 - `INTEGRATION_GATEWAY_SECRET` 用于接口网关 HMAC 签名模拟。
 - `DATABASE_URL`、`OIDC_*`、`SMS_GATEWAY_URL`、`AUDIT_EXPORT_PATH`/`SIEM_ENDPOINT` 和 `RETENTION_POLICY` 是生产部署路径的正式数据库、政务身份、居民验证码短信网关和审计保全配置项。
 

@@ -105,6 +105,9 @@ test("release report validates demo and production environment profiles", () => 
       SQLITE_BUSY_TIMEOUT_MS: "5000",
       SESSION_SECRETS: "0123456789abcdef0123456789abcdef,abcdef0123456789abcdef0123456789",
       SESSION_STORE: "sqlite",
+      SESSION_EXPIRED_RETENTION_DAYS: "7",
+      SESSION_REVOKED_RETENTION_DAYS: "30",
+      SESSION_CLEANUP_INTERVAL_MS: "900000",
       INTEGRATION_GATEWAY_SECRET: "fedcba9876543210fedcba9876543210",
       OIDC_ISSUER_URL: "https://identity.example.internal",
       OIDC_CLIENT_ID: "health-platform",
@@ -142,6 +145,9 @@ test("release report validates demo and production environment profiles", () => 
   assert.equal(production.checks.some((item) => item.name === "env:SQLITE.synchronous" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:SQLITE.busyTimeout" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:SESSION_STORE.productionDurable" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:SESSION_RETENTION.present" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:SESSION_RETENTION.policy" && item.passed), true);
+  assert.equal(production.checks.some((item) => item.name === "env:SESSION_RETENTION.interval" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:OIDC.lifecycle" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:HOSPITAL.connectors" && item.passed), true);
   assert.equal(production.checks.some((item) => item.name === "env:HOSPITAL.secretQuality" && item.passed), true);

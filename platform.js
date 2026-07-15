@@ -1021,8 +1021,11 @@ function renderIdentityLifecycleCenter() {
   const identity = center.identity || {};
   const summary = center.plan?.summary || {};
   const sessionStore = center.capabilities?.sessionStore || {};
+  const sessionRetention = sessionStore.retention || {};
+  const sessionCleanup = sessionStore.cleanup || {};
   const metrics = [
     ["会话存储", sessionStore.durable ? `${sessionStore.mode || "sqlite"} 持久化` : "进程内存", sessionStore.crossProcess ? "同一主机共享数据目录可跨进程撤销" : "仅限本地开发和测试"],
+    ["会话保留", `${sessionRetention.expiredDays || 7}/${sessionRetention.revokedDays || 30} 天`, sessionCleanup.status === "ok" ? `最近清理 ${sessionCleanup.deletedTotal || 0} 条` : "等待首次清理"],
     ["OIDC 登录", identity.configured ? "已配置" : "未配置", "UserInfo + 受控账号绑定"],
     ["令牌刷新", identity.refreshConfigured ? "可用" : "未配置", "刷新后重新校验身份"],
     ["撤销登出", identity.revocationConfigured ? "可用" : "未配置", "上游撤销 + 本地会话删除"],
@@ -1733,6 +1736,11 @@ function bindPlatformEditor() {
       runIdentityDirectoryAction(identityDirectoryButton.dataset.identityDirectoryAction, identityDirectoryButton);
       return;
     }
+    const sessionCleanupButton = event.target.closest("[data-session-cleanup-action]");
+    if (sessionCleanupButton) {
+      runSessionCleanupAction(sessionCleanupButton);
+      return;
+    }
     const identityBindingButton = event.target.closest("[data-identity-binding-action]");
     if (identityBindingButton) {
       runIdentityBindingAction(identityBindingButton);
@@ -2083,6 +2091,41 @@ async function runIdentityDirectoryAction(action, button) {
     }
   } finally {
     if (button) button.disabled = false;
+  }
+}
+
+async function runSessionCleanupAction(button) {
+  if (!PLATFORM_API_BASE || !button) return;
+  const confirmation = window.prompt("输入会话清理确认短语", "") || "";
+  if (confirmation !== "PURGE RETAINED SESSIONS") return;
+  const request = window.HealthCityAuth?.authFetch || fetch;
+  const statusTarget = document.querySelector("#identity-lifecycle-status");
+  button.disabled = true;
+  if (statusTarget) {
+    statusTarget.textContent = "清理中";
+    statusTarget.className = "badge info";
+  }
+  try {
+    const response = await request(`${PLATFORM_API_BASE}/auth/sessions/cleanup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirmation })
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.message || `HTTP ${response.status}`);
+    identityLifecycleCenter.capabilities = {
+      ...(identityLifecycleCenter.capabilities || {}),
+      sessionStore: body.sessionStore || identityLifecycleCenter.capabilities?.sessionStore
+    };
+    renderIdentityLifecycleCenter();
+  } catch (error) {
+    if (statusTarget) {
+      statusTarget.textContent = "清理受阻";
+      statusTarget.title = error.message || "会话保留清理失败";
+      statusTarget.className = "badge danger";
+    }
+  } finally {
+    button.disabled = false;
   }
 }
 

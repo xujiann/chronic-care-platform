@@ -11,6 +11,9 @@ process.env.STORAGE_ENGINE = "sqlite";
 process.env.NODE_ENV = "production";
 process.env.SESSION_SECRETS = "prod-session-signing-key-2026-07-15-rotation-a";
 process.env.SESSION_STORE = "sqlite";
+process.env.SESSION_EXPIRED_RETENTION_DAYS = "7";
+process.env.SESSION_REVOKED_RETENTION_DAYS = "30";
+process.env.SESSION_CLEANUP_INTERVAL_MS = "900000";
 
 const {
   assertProductionRuntimeSecurity,
@@ -44,6 +47,25 @@ test("production startup rejects missing, weak and placeholder session secrets",
     }),
     (error) => error.code === "PRODUCTION_SESSION_STORE_INVALID"
   );
+  assert.throws(
+    () => assertProductionRuntimeSecurity({
+      NODE_ENV: "production",
+      SESSION_SECRET: "production-session-signing-key-with-adequate-entropy",
+      SESSION_STORE: "sqlite"
+    }),
+    (error) => error.code === "PRODUCTION_SESSION_RETENTION_INVALID" && /SESSION_EXPIRED_RETENTION_DAYS/.test(error.message)
+  );
+  assert.throws(
+    () => assertProductionRuntimeSecurity({
+      NODE_ENV: "production",
+      SESSION_SECRET: "production-session-signing-key-with-adequate-entropy",
+      SESSION_STORE: "sqlite",
+      SESSION_EXPIRED_RETENTION_DAYS: "60",
+      SESSION_REVOKED_RETENTION_DAYS: "30",
+      SESSION_CLEANUP_INTERVAL_MS: "1000"
+    }),
+    (error) => error.code === "PRODUCTION_SESSION_RETENTION_INVALID" && /greater than or equal|60000/.test(error.message)
+  );
 });
 
 test("production runtime disables local passwords and emits browser security headers", async () => {
@@ -51,14 +73,16 @@ test("production runtime disables local passwords and emits browser security hea
   if (!server.listening) await once(server, "listening");
   const { port } = server.address();
   const baseUrl = `http://127.0.0.1:${port}`;
-  assert.deepEqual(sessionStoreStatus(), {
-    mode: "sqlite",
-    durable: true,
-    crossProcess: true,
-    active: 0,
-    revoked: 0,
-    expired: 0
-  });
+  const sessionStatus = sessionStoreStatus();
+  assert.equal(sessionStatus.mode, "sqlite");
+  assert.equal(sessionStatus.durable, true);
+  assert.equal(sessionStatus.crossProcess, true);
+  assert.equal(sessionStatus.active, 0);
+  assert.equal(sessionStatus.revoked, 0);
+  assert.equal(sessionStatus.expired, 0);
+  assert.deepEqual(sessionStatus.retention, { expiredDays: 7, revokedDays: 30, cleanupIntervalMs: 900000 });
+  assert.equal(sessionStatus.cleanup.status, "ok");
+  assert.equal(sessionStatus.cleanup.trigger, "startup");
 
   const page = await fetch(`${baseUrl}/login.html`);
   assert.equal(page.status, 200);

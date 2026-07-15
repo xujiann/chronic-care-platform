@@ -128,8 +128,8 @@ function buildProductionCutoverChecklist(env, checks = []) {
       id: "cutover-env-file",
       phase: "environment",
       owner: "platform-ops",
-      passed: ready("env:file", "env:NODE_ENV.production", "env:STORAGE_ENGINE", "env:STORAGE_ENGINE.production", "env:SESSION_STORE.present", "env:SESSION_STORE", "env:SESSION_STORE.productionDurable", "env:DEPLOYMENT.releaseId", "env:DEPLOYMENT.artifactDigest"),
-      evidence: detail("env:file", "env:NODE_ENV.production", "env:STORAGE_ENGINE", "env:STORAGE_ENGINE.production", "env:SESSION_STORE.present", "env:SESSION_STORE", "env:SESSION_STORE.productionDurable", "env:DEPLOYMENT.releaseId", "env:DEPLOYMENT.artifactDigest"),
+      passed: ready("env:file", "env:NODE_ENV.production", "env:STORAGE_ENGINE", "env:STORAGE_ENGINE.production", "env:SESSION_STORE.present", "env:SESSION_STORE", "env:SESSION_STORE.productionDurable", "env:SESSION_RETENTION.present", "env:SESSION_RETENTION.policy", "env:SESSION_RETENTION.interval", "env:DEPLOYMENT.releaseId", "env:DEPLOYMENT.artifactDigest"),
+      evidence: detail("env:file", "env:NODE_ENV.production", "env:STORAGE_ENGINE", "env:STORAGE_ENGINE.production", "env:SESSION_STORE.present", "env:SESSION_STORE", "env:SESSION_STORE.productionDurable", "env:SESSION_RETENTION.present", "env:SESSION_RETENTION.policy", "env:SESSION_RETENTION.interval", "env:DEPLOYMENT.releaseId", "env:DEPLOYMENT.artifactDigest"),
       nextAction: "在目标服务器创建真实 .env，设置 NODE_ENV=production，绑定已批准发布编号和不可变制品摘要，并确认不使用 JSON 作为生产主存储。"
     },
     {
@@ -219,6 +219,11 @@ function validateProductionConfig(options = {}) {
   const storageEngine = String(env.STORAGE_ENGINE || "auto").toLowerCase();
   const configuredSessionStore = String(env.SESSION_STORE || "").trim().toLowerCase();
   const sessionStore = configuredSessionStore || (strict ? "sqlite" : "memory");
+  const sessionRetentionConfigured = ["SESSION_EXPIRED_RETENTION_DAYS", "SESSION_REVOKED_RETENTION_DAYS", "SESSION_CLEANUP_INTERVAL_MS"]
+    .every((name) => String(env[name] || "").trim());
+  const sessionExpiredRetentionDays = Number(env.SESSION_EXPIRED_RETENTION_DAYS || 7);
+  const sessionRevokedRetentionDays = Number(env.SESSION_REVOKED_RETENTION_DAYS || 30);
+  const sessionCleanupIntervalMs = Number(env.SESSION_CLEANUP_INTERVAL_MS || 900000);
   const sqliteJournalMode = String(env.SQLITE_JOURNAL_MODE || "").toUpperCase();
   const sqliteSynchronous = String(env.SQLITE_SYNCHRONOUS || "").toUpperCase();
   const sqliteBusyTimeout = Number(env.SQLITE_BUSY_TIMEOUT_MS || 0);
@@ -242,6 +247,9 @@ function validateProductionConfig(options = {}) {
     check("env:SESSION_STORE.present", !strict || Boolean(configuredSessionStore), strict ? configuredSessionStore || "missing SESSION_STORE" : "not enforced outside production", strict ? "error" : "warn", "environment"),
     check("env:SESSION_STORE", ["memory", "sqlite"].includes(sessionStore), sessionStore || "missing", "error", "environment"),
     check("env:SESSION_STORE.productionDurable", !strict || sessionStore === "sqlite", strict ? `${sessionStore}; production requires durable SQLite sessions` : "not enforced outside production", strict ? "error" : "warn", "environment"),
+    check("env:SESSION_RETENTION.present", !strict || sessionRetentionConfigured, strict ? sessionRetentionConfigured ? "configured" : "missing session retention settings" : "defaults allowed outside production", strict ? "error" : "warn", "environment"),
+    check("env:SESSION_RETENTION.policy", Number.isInteger(sessionExpiredRetentionDays) && sessionExpiredRetentionDays >= 1 && sessionExpiredRetentionDays <= 3650 && Number.isInteger(sessionRevokedRetentionDays) && sessionRevokedRetentionDays >= sessionExpiredRetentionDays && sessionRevokedRetentionDays <= 3650, `${sessionExpiredRetentionDays}d expired / ${sessionRevokedRetentionDays}d revoked`, "error", "environment"),
+    check("env:SESSION_RETENTION.interval", Number.isInteger(sessionCleanupIntervalMs) && sessionCleanupIntervalMs >= 60000 && sessionCleanupIntervalMs <= 86400000, `${sessionCleanupIntervalMs}ms`, "error", "environment"),
     check("env:SESSION_SECRETS.present", sessionSecretItems.length > 0, `${sessionSecretItems.length} configured`, "error", "environment"),
     check("env:SESSION_SECRETS.productionQuality", !strict || sessionSecretItems.every((item) => secretQuality(item).strongEnough), strict ? "production secrets must be non-placeholder and at least 32 chars" : "not enforced outside production", strict ? "error" : "warn", "environment"),
     check("env:INTEGRATION_GATEWAY_SECRET.present", Boolean(gatewaySecret), gatewaySecret ? "configured" : "missing", "error", "environment"),

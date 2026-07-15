@@ -112,6 +112,9 @@ SQLITE_HEALTH_CHECK_TTL_MS=30000
 DATA_DIR=/var/lib/chronic-care-platform
 SESSION_SECRETS=replace-with-long-random-secret
 SESSION_STORE=sqlite
+SESSION_EXPIRED_RETENTION_DAYS=7
+SESSION_REVOKED_RETENTION_DAYS=30
+SESSION_CLEANUP_INTERVAL_MS=900000
 INTEGRATION_GATEWAY_SECRET=replace-with-integration-secret
 DATABASE_URL=postgres://health:replace-with-password@postgres.internal:5432/chronic_care
 OIDC_ISSUER_URL=https://identity.example.gov.cn/real-issuer
@@ -157,7 +160,7 @@ DEPLOYMENT_APP_DIR=/opt/chronic-care-platform/releases/approved-release-id
 DEPLOYMENT_SECRET_ENV_FILE=/run/secrets/chronic-care-platform.env
 ```
 
-生产化如迁移 PostgreSQL 或正式数据库，需要先完成 `productionDeploymentPlan` 中的数据库适配器工作，再填入 `DATABASE_URL`；在适配器启用前，运行时和发布门禁会拒绝 `STORAGE_ENGINE=postgres/postgresql`，避免静默回落到 SQLite。生产认证会话必须设置 `SESSION_STORE=sqlite`，以支持重启恢复、同一主机跨进程读取和持久化撤销；多主机仍需可靠共享存储或独立集中式会话服务。接入政务统一认证时需要填入 `OIDC_ISSUER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET`，可通过 `OIDC_USERINFO_URL` 跳过发现请求；居民端验证码生产上线必须填入 `SMS_GATEWAY_URL/SMS_TEMPLATE_ID`，凭据仅通过环境变量或密钥托管注入。医院连接器至少配置五类 `*_ADAPTER_URL` 和共享 `HOSPITAL_ADAPTER_SECRET`，也可使用每域独立密钥。安全附件需要配置 `OBJECT_STORAGE_GATEWAY_URL/OBJECT_STORAGE_BUCKET/OBJECT_STORAGE_SIGNING_SECRET`，并完成恶意文件扫描和不可变保留锁验收。支付、医保和电子证照必须配置三类 `*_GATEWAY_URL` 与共享或分域 `*_GATEWAY_SECRET`，并完成回调验签、日终对账和联合测试。完整运行时边界见 `docs/production-identity-message-adapters.md`、`docs/production-hospital-connectors.md`、`docs/production-object-storage.md` 和 `docs/production-financial-certificate-gateways.md`。审计保全至少配置 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT`，并补充现场 CA、网关地址等变量。
+生产化如迁移 PostgreSQL 或正式数据库，需要先完成 `productionDeploymentPlan` 中的数据库适配器工作，再填入 `DATABASE_URL`；在适配器启用前，运行时和发布门禁会拒绝 `STORAGE_ENGINE=postgres/postgresql`，避免静默回落到 SQLite。生产认证会话必须设置 `SESSION_STORE=sqlite`，以支持重启恢复、同一主机跨进程读取和持久化撤销；还必须显式配置过期/撤销会话保留天数及自动清理周期，清理结果可在身份生命周期中心审计。多主机仍需可靠共享存储或独立集中式会话服务。接入政务统一认证时需要填入 `OIDC_ISSUER_URL/OIDC_CLIENT_ID/OIDC_CLIENT_SECRET`，可通过 `OIDC_USERINFO_URL` 跳过发现请求；居民端验证码生产上线必须填入 `SMS_GATEWAY_URL/SMS_TEMPLATE_ID`，凭据仅通过环境变量或密钥托管注入。医院连接器至少配置五类 `*_ADAPTER_URL` 和共享 `HOSPITAL_ADAPTER_SECRET`，也可使用每域独立密钥。安全附件需要配置 `OBJECT_STORAGE_GATEWAY_URL/OBJECT_STORAGE_BUCKET/OBJECT_STORAGE_SIGNING_SECRET`，并完成恶意文件扫描和不可变保留锁验收。支付、医保和电子证照必须配置三类 `*_GATEWAY_URL` 与共享或分域 `*_GATEWAY_SECRET`，并完成回调验签、日终对账和联合测试。完整运行时边界见 `docs/production-identity-message-adapters.md`、`docs/production-hospital-connectors.md`、`docs/production-object-storage.md` 和 `docs/production-financial-certificate-gateways.md`。审计保全至少配置 `AUDIT_EXPORT_PATH` 或 `SIEM_ENDPOINT`，并补充现场 CA、网关地址等变量。
 
 生产环境上线前应执行严格环境校验：
 

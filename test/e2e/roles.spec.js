@@ -48,6 +48,8 @@ test("commission user reaches the governance dashboard and opens maintenance", a
   await expect(page.locator("#identity-lifecycle-metrics")).toContainText("会话存储");
   await expect(page.locator("#identity-lifecycle-metrics")).toContainText("进程内存");
   await expect(page.locator("#identity-lifecycle-metrics")).toContainText("仅限本地开发和测试");
+  await expect(page.locator("#identity-lifecycle-metrics")).toContainText("会话保留");
+  await expect(page.locator("#identity-lifecycle-metrics")).toContainText("最近清理 0 条");
 
   await page.goto("/workbench.html");
   await expect(page.locator("#system-readiness")).toBeVisible();

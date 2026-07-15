@@ -2776,6 +2776,8 @@ test("production identity and message adapters keep runtime and site boundaries 
   assert.match(server, /\/api\/auth\/identity-directory\/preview/);
   assert.match(server, /\/api\/auth\/identity-directory\/bind/);
   assert.match(server, /\/api\/auth\/identity-directory\/apply/);
+  assert.match(server, /\/api\/auth\/sessions\/cleanup/);
+  assert.match(server, /SESSION_CLEANUP_CONFIRMATION_REQUIRED/);
   assert.match(server, /BIND EXTERNAL IDENTITY/);
   assert.match(server, /IDENTITY_BINDING_REASSIGNMENT_BLOCKED/);
   assert.match(server, /IDENTITY_DIRECTORY_SELF_DEACTIVATION_BLOCKED/);
@@ -2793,10 +2795,14 @@ test("production identity and message adapters keep runtime and site boundaries 
   assert.match(environment, /OIDC_REVOCATION_URL/);
   assert.match(environment, /IDENTITY_DIRECTORY_URL/);
   assert.match(environment, /IDENTITY_DIRECTORY_TOKEN/);
+  assert.match(environment, /SESSION_EXPIRED_RETENTION_DAYS/);
+  assert.match(environment, /SESSION_REVOKED_RETENTION_DAYS/);
+  assert.match(environment, /SESSION_CLEANUP_INTERVAL_MS/);
   assert.match(read("platform.html"), /identity-lifecycle-center/);
   assert.match(read("platform.js"), /renderIdentityLifecycleCenter/);
   assert.match(read("platform.js"), /runIdentityBindingAction/);
   assert.match(read("platform.js"), /runIdentityDirectoryAction/);
+  assert.match(read("platform.js"), /runSessionCleanupAction/);
   assert.match(read("portal.css"), /\.evidence-grid article[\s\S]*?min-width:\s*0/);
   assert.match(read("portal.css"), /\.evidence-grid li[\s\S]*?overflow-wrap:\s*anywhere/);
 });
